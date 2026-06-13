@@ -1,0 +1,127 @@
+{% extends 'teacher/base.html' %}
+
+{% block title %}{{ group.name }} — ЭкЗадачи{% endblock %}
+
+{% block extra_style %}
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.page-title { font-size: 22px; font-weight: 600; }
+.back-link {
+  font-size: 13px;
+  color: var(--text2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.back-link:hover { color: var(--text); }
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.section-title { font-size: 15px; font-weight: 600; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  border-bottom: 0.5px solid var(--border);
+}
+td {
+  padding: 10px 12px;
+  border-bottom: 0.5px solid var(--border);
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+.student-name { font-weight: 500; }
+.stat-val { font-variant-numeric: tabular-nums; }
+.btn-sm {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  border: 0.5px solid var(--accent);
+  border-radius: var(--r);
+  padding: 4px 10px;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+.btn-sm:hover { background: var(--accent); color: #fff; }
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text2);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.card {
+  background: #fff;
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <a href="{% url 'teacher:groups' %}" class="back-link">← Группы</a>
+  <h1 class="page-title">{{ group.name }}</h1>
+</div>
+
+<div class="section-header">
+  <span class="section-title">Ученики ({{ students_data|length }})</span>
+  <a href="{% url 'teacher:group_create' %}" class="btn-sm" style="border-color: var(--border); color: var(--text);">+ Добавить</a>
+</div>
+
+{% if students_data %}
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Ученик</th>
+        <th>Открытых задач</th>
+        <th>Средний балл</th>
+        <th>Тестов</th>
+        <th>Верных</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in students_data %}
+      <tr>
+        <td>
+          <span class="student-name">
+            {% if row.student.get_full_name %}
+              {{ row.student.get_full_name }}
+            {% else %}
+              {{ row.student.username }}
+            {% endif %}
+          </span>
+        </td>
+        <td class="stat-val">{{ row.open_count }}</td>
+        <td class="stat-val">{% if row.open_avg %}{{ row.open_avg }}{% else %}—{% endif %}</td>
+        <td class="stat-val">{{ row.test_count }}</td>
+        <td class="stat-val">{% if row.test_pct %}{{ row.test_pct }}%{% else %}—{% endif %}</td>
+        <td>
+          <a href="{% url 'teacher:student_progress' row.student.pk %}" class="btn-sm">Прогресс</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>В этой группе пока нет учеников.</p>
+</div>
+{% endif %}
+{% endblock %}

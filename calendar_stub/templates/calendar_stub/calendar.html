@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Календарь — ЭкЗадачи</title>
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: #f7f7f5; color: #1a1f2e; }
+
+  /* ---- Тулбар ---- */
+  #cal-toolbar {
+    height: 48px;
+    background: #fff;
+    border-bottom: 1px solid #e8e8e4;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 8px;
+  }
+  #cal-toolbar .btn {
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid #e0e0db;
+    border-radius: 7px;
+    background: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    color: #1a1f2e;
+    display: flex; align-items: center;
+  }
+  #cal-toolbar .btn:hover { background: #f0f0ee; }
+  #cal-toolbar .btn-primary {
+    background: #4f7cff; color: #fff; border-color: #4f7cff;
+  }
+  #cal-toolbar .btn-primary:hover { background: #3a6be0; }
+  #cal-title {
+    font-size: 15px;
+    font-weight: 600;
+    min-width: 160px;
+    text-align: center;
+  }
+  .legend {
+    display: flex; align-items: center; gap: 14px;
+    margin-left: auto; font-size: 12px; color: #555;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%; flex-shrink: 0;
+  }
+
+  /* ---- Контейнер калькулятора ---- */
+  #calendar-wrap {
+    padding: 8px 12px 0;
+  }
+  #calendar {
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+
+  /* ---- FullCalendar переопределения ---- */
+  .fc .fc-button { display: none !important; }
+  .fc-daygrid-day.weekend-col { background: #fafafa; }
+  .fc-day-today { background: #f0f5ff !important; }
+  .fc-event { cursor: pointer; }
+  .fc-event-inner {
+    padding: 1px 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Проблема 1 — фиксированная высота ячеек */
+  .fc-daygrid-day {
+    min-height: 80px !important;
+    max-height: 120px !important;
+  }
+  .fc-event-title {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 11px !important;
+  }
+  .fc-daygrid-event {
+    font-size: 11px !important;
+  }
+
+  /* ---- Модальное окно ---- */
+  .modal-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 1000;
+    align-items: center; justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-box {
+    background: #fff;
+    border-radius: 14px;
+    border: 0.5px solid #e8e8e4;
+    width: 480px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  }
+  .modal-header {
+    padding: 18px 22px 0;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .modal-header h2 { flex: 1; font-size: 16px; font-weight: 600; }
+  .modal-close {
+    border: none; background: none; font-size: 20px; cursor: pointer;
+    color: #999; line-height: 1;
+    flex-shrink: 0;
+    margin-top: -2px;
+  }
+  .modal-body { padding: 14px 22px 22px; }
+
+  /* Бейдж типа */
+  .type-badge {
+    display: inline-block;
+    padding: 2px 10px; border-radius: 99px;
+    font-size: 11px; font-weight: 600; color: #fff;
+  }
+
+  /* Строки деталей */
+  .detail-row {
+    display: flex; gap: 8px;
+    font-size: 13px; color: #444;
+    margin-top: 10px;
+  }
+  .detail-row .label { color: #999; min-width: 80px; }
+  .detail-row a { color: #4f7cff; text-decoration: none; }
+  .detail-row a:hover { text-decoration: underline; }
+
+  /* Кнопки модала */
+  .modal-actions {
+    margin-top: 18px;
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .modal-actions .btn { height: 36px; font-size: 13px; }
+
+  /* ---- Форма создания/редактирования ---- */
+  .form-group { margin-bottom: 14px; }
+  .form-group label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: #666; margin-bottom: 5px;
+  }
+  .form-group input, .form-group textarea, .form-group select {
+    width: 100%; padding: 8px 10px;
+    border: 1px solid #e0e0db; border-radius: 8px;
+    font-size: 13px; color: #1a1f2e;
+    background: #fff;
+  }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+    outline: none; border-color: #4f7cff;
+  }
+  .form-group textarea { resize: vertical; min-height: 64px; }
+
+  /* Пилюли типов */
+  .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill-btn {
+    padding: 5px 14px;
+    border-radius: 99px;
+    border: 1.5px solid #e0e0db;
+    background: #fff; font-size: 12px; cursor: pointer; color: #555;
+    transition: all .15s;
+  }
+  .pill-btn.active {
+    color: #fff; border-color: transparent;
+  }
+  .pill-lesson.active   { background: #3b82f6; }
+  .pill-homework.active { background: #f97316; }
+  .pill-olympiad.active { background: #10b981; }
+  .pill-other.active    { background: #6b7280; }
+
+  /* Чекбокс-группы */
+  .group-list {
+    max-height: 120px; overflow-y: auto;
+    border: 1px solid #e0e0db; border-radius: 8px; padding: 6px;
+  }
+  .group-list label {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 13px; font-weight: 400; color: #1a1f2e;
+    padding: 3px 4px; cursor: pointer;
+  }
+  .group-list label:hover { background: #f5f5f3; border-radius: 5px; }
+
+  /* Inline два поля */
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+</style>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<!-- ===== ТУЛБАР ===== -->
+<div id="cal-toolbar">
+  <button class="btn" id="btn-prev" title="Предыдущий месяц">‹</button>
+  <button class="btn" id="btn-today">Сегодня</button>
+  <button class="btn" id="btn-next" title="Следующий месяц">›</button>
+  <span id="cal-title"></span>
+
+  <div class="legend">
+    <div class="legend-item">
+      <span class="legend-dot" style="background:#3b82f6"></span>Занятие
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot" style="background:#f97316"></span>Домашка
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot" style="background:#10b981"></span>Олимпиада
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot" style="background:#6b7280"></span>Другое
+    </div>
+  </div>
+
+  {% if user_role == 'teacher' or user_role == 'admin' %}
+  <button class="btn btn-primary" id="btn-add-event" style="margin-left:10px;">+ Добавить</button>
+  {% endif %}
+</div>
+
+<!-- ===== КАЛЕНДАРЬ ===== -->
+<div id="calendar-wrap">
+  <div id="calendar"></div>
+</div>
+
+<!-- ===== МОДАЛ ПРОСМОТРА ===== -->
+<div class="modal-backdrop" id="view-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="type-badge" id="view-type-badge"></span>
+      <h2 id="view-title" style="margin-left:8px;"></h2>
+      <button class="modal-close" id="view-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-row" id="view-time">
+        <span class="label">Время</span>
+        <span id="view-time-val"></span>
+      </div>
+      <div class="detail-row" id="view-groups-row">
+        <span class="label">Группы</span>
+        <span id="view-groups-val"></span>
+      </div>
+      <div class="detail-row" id="view-desc-row">
+        <span class="label">Заметки</span>
+        <span id="view-desc-val"></span>
+      </div>
+      <div class="detail-row" id="view-assign-row">
+        <span class="label">Домашка</span>
+        <a id="view-assign-link" href="#" target="_blank"></a>
+      </div>
+      <div class="detail-row" id="view-submissions-row">
+        <span class="label">Сдали</span>
+        <span id="view-submissions-val"></span>
+      </div>
+      <div class="detail-row" id="view-recur-row">
+        <span class="label">Повтор</span>
+        <span style="color:#4f7cff;">↻ Повторяющееся событие</span>
+      </div>
+      <div class="modal-actions" id="view-actions">
+        <button class="btn btn-primary" id="view-edit-btn">Изменить</button>
+        <button class="btn" id="view-delete-btn"
+                style="border-color:#ef4444;color:#ef4444;">Удалить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== МОДАЛ СОЗДАНИЯ/РЕДАКТИРОВАНИЯ ===== -->
+<div class="modal-backdrop" id="edit-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="edit-modal-title">Новое событие</h2>
+      <button class="modal-close" id="edit-close">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-event-id" value="">
+
+      <!-- Тип -->
+      <div class="form-group">
+        <label>Тип</label>
+        <div class="pills" id="type-pills">
+          <button class="pill-btn pill-lesson active" data-type="lesson">Занятие</button>
+          <button class="pill-btn pill-homework" data-type="homework">Домашка</button>
+          {% if user_role == 'admin' %}
+          <button class="pill-btn pill-olympiad" data-type="olympiad">Олимпиада</button>
+          {% endif %}
+          <button class="pill-btn pill-other" data-type="other">Другое</button>
+        </div>
+      </div>
+
+      <!-- Цвет события -->
+      <div class="form-group">
+        <label>Цвет события</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="color" id="event-color" value="#3b82f6"
+                 style="width:36px;height:36px;border:0.5px solid #e8e8e4;border-radius:8px;cursor:pointer;padding:2px;flex-shrink:0">
+          <div style="display:flex;gap:6px" id="color-presets">
+            <div onclick="pickColor('#3b82f6')" style="width:20px;height:20px;border-radius:50%;background:#3b82f6;cursor:pointer;border:2px solid transparent" title="Синий"></div>
+            <div onclick="pickColor('#f97316')" style="width:20px;height:20px;border-radius:50%;background:#f97316;cursor:pointer;border:2px solid transparent" title="Оранжевый"></div>
+            <div onclick="pickColor('#10b981')" style="width:20px;height:20px;border-radius:50%;background:#10b981;cursor:pointer;border:2px solid transparent" title="Зелёный"></div>
+            <div onclick="pickColor('#8b5cf6')" style="width:20px;height:20px;border-radius:50%;background:#8b5cf6;cursor:pointer;border:2px solid transparent" title="Фиолетовый"></div>
+            <div onclick="pickColor('#ec4899')" style="width:20px;height:20px;border-radius:50%;background:#ec4899;cursor:pointer;border:2px solid transparent" title="Розовый"></div>
+            <div onclick="pickColor('#6b7280')" style="width:20px;height:20px;border-radius:50%;background:#6b7280;cursor:pointer;border:2px solid transparent" title="Серый"></div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#aaa;margin-top:4px">По умолчанию: синий — занятие, оранжевый — домашка, зелёный — олимпиада</div>
+      </div>
+
+      <!-- Название -->
+      <div class="form-group">
+        <label for="edit-title">Название</label>
+        <input type="text" id="edit-title" placeholder="Название события">
+      </div>
+
+      <!-- Дата + время -->
+      <div class="row-2">
+        <div class="form-group">
+          <label for="edit-date">Дата</label>
+          <input type="date" id="edit-date">
+        </div>
+        <div></div>
+      </div>
+      <div class="row-2">
+        <div class="form-group">
+          <label for="edit-time-start">Начало</label>
+          <input type="time" id="edit-time-start" placeholder="18:00">
+        </div>
+        <div class="form-group">
+          <label for="edit-time-end">Конец</label>
+          <input type="time" id="edit-time-end" placeholder="19:30">
+        </div>
+      </div>
+
+      <!-- Глобальное (только admin) -->
+      {% if user_role == 'admin' %}
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;color:#1a1f2e;">
+          <input type="checkbox" id="edit-is-global"> Видно всем (глобальное)
+        </label>
+      </div>
+      {% endif %}
+
+      <!-- Группы -->
+      <div class="form-group" id="groups-section">
+        <label>Группы</label>
+        <div class="group-list" id="group-checkboxes">
+          <!-- Заполняется JS -->
+          <span style="font-size:12px;color:#999;padding:4px;">Нет групп</span>
+        </div>
+      </div>
+
+      <!-- Описание / ссылка -->
+      <div class="form-group">
+        <label for="edit-description">Комментарий / ссылка (Zoom и т.п.)</label>
+        <textarea id="edit-description" rows="2" placeholder="https://…"></textarea>
+      </div>
+
+      <!-- Привязка к домашке (тип=homework) -->
+      <div class="form-group" id="assignment-section" style="display:none;">
+        <label for="edit-assignment">Связать с домашкой</label>
+        <select id="edit-assignment">
+          <option value="">— не привязывать —</option>
+          <!-- Заполняется JS -->
+        </select>
+      </div>
+
+      <!-- Повторение -->
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;color:#1a1f2e;">
+          <input type="checkbox" id="edit-recurring"> Повторять каждую неделю
+        </label>
+      </div>
+      <div class="form-group" id="recur-count-section" style="display:none;">
+        <label for="edit-recur-weeks">Количество повторений</label>
+        <select id="edit-recur-weeks">
+          <option value="4">4 раза (1 месяц)</option>
+          <option value="8">8 раз (2 месяца)</option>
+          <option value="12">12 раз (3 месяца)</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="edit-save-btn">Сохранить</button>
+        <button class="btn" id="edit-cancel-btn">Отмена</button>
+        <span id="edit-error" style="font-size:12px;color:#ef4444;align-self:center;"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales/ru.global.min.js"></script>
+<script>
+// ---------- Данные из Django ----------
+const USER_ROLE    = '{{ user_role }}';
+const GROUPS       = {{ groups_json|safe }};
+const ASSIGNMENTS  = {{ assignments_json|safe }};
+const CAN_EDIT     = (USER_ROLE === 'teacher' || USER_ROLE === 'admin');
+
+// ---------- CSRF ----------
+function getCsrf() {
+  const m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
+}
+
+// ---------- FullCalendar ----------
+const calEl = document.getElementById('calendar');
+const calHeight = 'calc(100vh - 48px - 48px - 32px)';
+
+const cal = new FullCalendar.Calendar(calEl, {
+  locale: 'ru',
+  initialView: 'dayGridMonth',
+  headerToolbar: false,
+  fixedWeekCount: false,
+  height: calHeight,
+  contentHeight: 'auto',
+  dayMaxEvents: 3,
+  dayMaxEventRows: 3,
+  moreLinkText: '+%d ещё',
+  displayEventTime: false,
+  firstDay: 1,
+  events: '/calendar/api/events/',
+
+  dayCellClassNames: function(arg) {
+    const d = arg.date.getDay();
+    return (d === 0 || d === 6) ? ['weekend-col'] : [];
+  },
+
+  datesSet: function() {
+    document.getElementById('cal-title').textContent = cal.view.title;
+  },
+
+  eventClick: function(info) {
+    openViewModal(info.event);
+  },
+
+  dateClick: function(info) {
+    if (CAN_EDIT) openCreateModal(info.dateStr);
+  },
+});
+
+cal.render();
+document.getElementById('cal-title').textContent = cal.view.title;
+
+// Кнопки тулбара
+document.getElementById('btn-prev').addEventListener('click', () => { cal.prev(); });
+document.getElementById('btn-next').addEventListener('click', () => { cal.next(); });
+document.getElementById('btn-today').addEventListener('click', () => { cal.today(); });
+const addBtn = document.getElementById('btn-add-event');
+if (addBtn) addBtn.addEventListener('click', () => openCreateModal(null));
+
+// ---------- Состояние текущего события ----------
+let _currentEvent = null;
+
+// ---------- МОДАЛ ПРОСМОТРА ----------
+const VIEW_TYPE_LABELS = {
+  lesson: 'Занятие', homework: 'Домашка', olympiad: 'Олимпиада', other: 'Другое'
+};
+const VIEW_TYPE_COLORS = {
+  lesson: '#3b82f6', homework: '#f97316', olympiad: '#10b981', other: '#6b7280'
+};
+
+function openViewModal(fcEvent) {
+  _currentEvent = fcEvent;
+  const ep = fcEvent.extendedProps;
+
+  document.getElementById('view-type-badge').textContent = VIEW_TYPE_LABELS[ep.event_type] || ep.event_type;
+  document.getElementById('view-type-badge').style.background = VIEW_TYPE_COLORS[ep.event_type] || '#6b7280';
+  document.getElementById('view-title').textContent = ep.full_title;
+
+  // Время
+  const startDt = fcEvent.start ? formatDt(fcEvent.start) : '—';
+  const endDt   = fcEvent.end   ? formatDt(fcEvent.end)   : '';
+  document.getElementById('view-time-val').textContent = endDt ? `${startDt} — ${endDt}` : startDt;
+
+  // Группы — берём из fcEvent (нет готового поля, скроем строку)
+  const groupsRow = document.getElementById('view-groups-row');
+  groupsRow.style.display = 'none';
+
+  // Описание
+  const descRow = document.getElementById('view-desc-row');
+  const descVal = document.getElementById('view-desc-val');
+  if (ep.description) {
+    descRow.style.display = 'flex';
+    if (ep.description.startsWith('http')) {
+      descVal.innerHTML = `<a href="${ep.description}" target="_blank" rel="noopener">${ep.description}</a>`;
+    } else {
+      descVal.textContent = ep.description;
+    }
+  } else {
+    descRow.style.display = 'none';
+  }
+
+  // Ссылка на домашку
+  const assignRow  = document.getElementById('view-assign-row');
+  const assignLink = document.getElementById('view-assign-link');
+  if (ep.assignment_url) {
+    assignRow.style.display = 'flex';
+    assignLink.href = ep.assignment_url;
+    assignLink.textContent = '↗ Открыть домашку';
+  } else {
+    assignRow.style.display = 'none';
+  }
+
+  // Счётчик сдавших
+  const subsRow = document.getElementById('view-submissions-row');
+  const subsVal = document.getElementById('view-submissions-val');
+  if (ep.submissions_info) {
+    subsRow.style.display = 'flex';
+    subsVal.textContent = `${ep.submissions_info.submitted} из ${ep.submissions_info.total}`;
+  } else {
+    subsRow.style.display = 'none';
+  }
+
+  // Повтор
+  document.getElementById('view-recur-row').style.display = ep.is_recurring ? 'flex' : 'none';
+
+  // Кнопки
+  const actionsDiv = document.getElementById('view-actions');
+  actionsDiv.style.display = ep.can_edit ? 'flex' : 'none';
+
+  document.getElementById('view-modal').classList.add('open');
+}
+
+document.getElementById('view-close').addEventListener('click', closeViewModal);
+document.getElementById('view-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeViewModal();
+});
+function closeViewModal() {
+  document.getElementById('view-modal').classList.remove('open');
+  _currentEvent = null;
+}
+
+document.getElementById('view-edit-btn').addEventListener('click', () => {
+  if (!_currentEvent) return;
+  closeViewModal();
+  openEditModal(_currentEvent);
+});
+
+document.getElementById('view-delete-btn').addEventListener('click', () => {
+  if (!_currentEvent) return;
+  const ep = _currentEvent.extendedProps;
+  if (ep.is_recurring || ep.parent_event_id) {
+    const choice = confirm(
+      'Удалить все повторения этого события?\n\nОК — удалить всю серию\nОтмена — только это событие'
+    );
+    deleteEvent(_currentEvent.id, choice);
+  } else {
+    if (confirm('Удалить событие?')) deleteEvent(_currentEvent.id, false);
+  }
+});
+
+function deleteEvent(id, deleteAll) {
+  fetch(`/calendar/api/events/${id}/delete/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCsrf(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ delete_all: deleteAll }),
+  }).then(r => r.json()).then(d => {
+    if (d.status === 'ok') {
+      closeViewModal();
+      cal.refetchEvents();
+    } else {
+      alert(d.error || 'Ошибка');
+    }
+  });
+}
+
+// ---------- МОДАЛ СОЗДАНИЯ/РЕДАКТИРОВАНИЯ ----------
+let _selectedType = 'lesson';
+let _colorManuallyChanged = false;
+
+const TYPE_COLORS = {
+  lesson: '#3b82f6', homework: '#f97316',
+  olympiad: '#10b981', other: '#6b7280',
+};
+
+function pickColor(hex) {
+  document.getElementById('event-color').value = hex;
+  _colorManuallyChanged = true;
+}
+
+// Когда пользователь вручную тянет color picker — ставим флаг
+document.getElementById('event-color').addEventListener('input', () => {
+  _colorManuallyChanged = true;
+});
+
+// Заполняем группы
+const gcBox = document.getElementById('group-checkboxes');
+if (GROUPS.length) {
+  gcBox.innerHTML = '';
+  GROUPS.forEach(g => {
+    const lbl = document.createElement('label');
+    lbl.innerHTML = `<input type="checkbox" value="${g.id}" class="group-cb"> ${g.name}`;
+    gcBox.appendChild(lbl);
+  });
+}
+
+// Заполняем домашки в select
+const assignSel = document.getElementById('edit-assignment');
+ASSIGNMENTS.forEach(a => {
+  const opt = document.createElement('option');
+  opt.value = a.id;
+  opt.textContent = a.name;
+  assignSel.appendChild(opt);
+});
+
+// Пилюли типов
+document.querySelectorAll('.pill-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _selectedType = btn.dataset.type;
+    document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    toggleAssignmentField();
+    // Авто-цвет только если пользователь не выбирал вручную
+    if (!_colorManuallyChanged) {
+      document.getElementById('event-color').value = TYPE_COLORS[_selectedType] || '#6b7280';
+    }
+  });
+});
+
+function setActivePill(type) {
+  _selectedType = type;
+  document.querySelectorAll('.pill-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === type);
+  });
+  toggleAssignmentField();
+}
+
+function toggleAssignmentField() {
+  document.getElementById('assignment-section').style.display =
+    (_selectedType === 'homework') ? '' : 'none';
+}
+
+// Повторение
+document.getElementById('edit-recurring').addEventListener('change', function() {
+  document.getElementById('recur-count-section').style.display = this.checked ? '' : 'none';
+});
+
+// is_global скрывает группы
+const isGlobalCb = document.getElementById('edit-is-global');
+if (isGlobalCb) {
+  isGlobalCb.addEventListener('change', function() {
+    document.getElementById('groups-section').style.display = this.checked ? 'none' : '';
+  });
+}
+
+function openCreateModal(dateStr) {
+  document.getElementById('edit-modal-title').textContent = 'Новое событие';
+  document.getElementById('edit-event-id').value = '';
+  document.getElementById('edit-title').value = '';
+  document.getElementById('edit-date').value = dateStr || todayStr();
+  document.getElementById('edit-time-start').value = '';
+  document.getElementById('edit-time-end').value = '';
+  document.getElementById('edit-description').value = '';
+  document.getElementById('edit-assignment').value = '';
+  document.getElementById('edit-recurring').checked = false;
+  document.getElementById('recur-count-section').style.display = 'none';
+  document.getElementById('edit-error').textContent = '';
+  if (isGlobalCb) { isGlobalCb.checked = false; document.getElementById('groups-section').style.display = ''; }
+  document.querySelectorAll('.group-cb').forEach(cb => cb.checked = false);
+  // Сбрасываем цвет и флаг ручного выбора
+  _colorManuallyChanged = false;
+  document.getElementById('event-color').value = TYPE_COLORS['lesson'];
+  setActivePill('lesson');
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function openEditModal(fcEvent) {
+  const ep = fcEvent.extendedProps;
+  document.getElementById('edit-modal-title').textContent = 'Редактировать событие';
+  document.getElementById('edit-event-id').value = fcEvent.id;
+  document.getElementById('edit-title').value = ep.full_title;
+  document.getElementById('edit-description').value = ep.description || '';
+  document.getElementById('edit-error').textContent = '';
+
+  const start = fcEvent.start;
+  if (start) {
+    document.getElementById('edit-date').value = dateStr(start);
+    document.getElementById('edit-time-start').value = timeStr(start);
+  }
+  if (fcEvent.end) {
+    document.getElementById('edit-time-end').value = timeStr(fcEvent.end);
+  } else {
+    document.getElementById('edit-time-end').value = '';
+  }
+
+  if (isGlobalCb) {
+    // Глобальность можно проверить только по наличию групп — нет групп у глобальных
+    isGlobalCb.checked = false;
+    document.getElementById('groups-section').style.display = '';
+  }
+  document.querySelectorAll('.group-cb').forEach(cb => cb.checked = false);
+  setActivePill(ep.event_type || 'lesson');
+
+  if (ep.assignment_id) {
+    document.getElementById('edit-assignment').value = ep.assignment_id;
+  }
+
+  document.getElementById('edit-recurring').checked = false;
+  document.getElementById('recur-count-section').style.display = 'none';
+
+  // Предзаполняем цвет: сохранённый (если есть) или дефолт по типу
+  const savedColor = ep.event_color || TYPE_COLORS[ep.event_type] || '#3b82f6';
+  document.getElementById('event-color').value = savedColor;
+  _colorManuallyChanged = !!ep.event_color;
+
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+document.getElementById('edit-close').addEventListener('click', closeEditModal);
+document.getElementById('edit-cancel-btn').addEventListener('click', closeEditModal);
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+}
+
+document.getElementById('edit-save-btn').addEventListener('click', saveEvent);
+
+function saveEvent() {
+  const errEl = document.getElementById('edit-error');
+  errEl.textContent = '';
+
+  const id          = document.getElementById('edit-event-id').value;
+  const title       = document.getElementById('edit-title').value.trim();
+  const date        = document.getElementById('edit-date').value;
+  const timeStart   = document.getElementById('edit-time-start').value;
+  const timeEnd     = document.getElementById('edit-time-end').value;
+  const description = document.getElementById('edit-description').value;
+  const isRecurring = document.getElementById('edit-recurring').checked;
+  const recurWeeks  = parseInt(document.getElementById('edit-recur-weeks').value, 10) || 4;
+  const isGlobal    = isGlobalCb ? isGlobalCb.checked : false;
+  const assignId    = document.getElementById('edit-assignment').value;
+  const groupIds    = [...document.querySelectorAll('.group-cb:checked')].map(c => parseInt(c.value));
+
+  if (!title) { errEl.textContent = 'Укажите название'; return; }
+  if (!date)  { errEl.textContent = 'Укажите дату';     return; }
+
+  const color = document.getElementById('event-color').value;
+
+  const body = {
+    title, event_type: _selectedType,
+    date, time_start: timeStart, time_end: timeEnd,
+    description, group_ids: groupIds,
+    is_global: isGlobal,
+    assignment_id: assignId ? parseInt(assignId) : null,
+    is_recurring: isRecurring, recur_weeks: recurWeeks,
+    color,
+  };
+
+  const url = id
+    ? `/calendar/api/events/${id}/update/`
+    : `/calendar/api/events/create/`;
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCsrf(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(r => r.json()).then(d => {
+    if (d.status === 'ok') {
+      closeEditModal();
+      cal.refetchEvents();
+    } else {
+      errEl.textContent = d.error || 'Ошибка сохранения';
+    }
+  }).catch(() => { errEl.textContent = 'Ошибка сети'; });
+}
+
+// ---------- Утилиты ----------
+function todayStr() {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
+function dateStr(dt) {
+  const d = new Date(dt);
+  return d.toLocaleDateString('sv'); // yyyy-mm-dd
+}
+function timeStr(dt) {
+  const d = new Date(dt);
+  return d.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+}
+function formatDt(dt) {
+  const d = new Date(dt);
+  return d.toLocaleString('ru', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+</script>
+</body>
+</html>

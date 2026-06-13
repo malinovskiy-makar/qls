@@ -1,0 +1,210 @@
+{% extends "student/base.html" %}
+
+{% block title %}Мои домашки{% endblock %}
+
+{% block extra_style %}
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 28px;
+}
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text2);
+  margin: 28px 0 12px;
+}
+.section-label:first-child { margin-top: 0; }
+.hw-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: border-color .12s, box-shadow .12s;
+}
+.hw-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(79,124,255,.08); }
+.hw-card-main { flex: 1; min-width: 0; }
+.hw-name {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hw-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text2);
+}
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.progress-bar {
+  width: 100px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width .3s;
+}
+.deadline-badge {
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.deadline-green  { background: #e8f8e8; color: #2e7d32; }
+.deadline-yellow { background: #fffbe6; color: #b45309; }
+.deadline-red    { background: #fff0f0; color: #c0392b; }
+.deadline-grey   { background: var(--panel); color: var(--text2); }
+.score-badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.assignment-metrics { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.metric-open    { color: #1a1f2e; font-weight: 600; font-size: 13px; }
+.metric-test    { color: #2d7a3a; font-weight: 600; font-size: 13px; }
+.metric-pending { color: #888;    font-size: 12px; }
+.metric-progress{ color: #555;    font-size: 12px; }
+.btn-open {
+  background: var(--sb);
+  color: #fff;
+  border: none;
+  border-radius: var(--r);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .12s;
+}
+.btn-open:hover { background: #252c40; }
+.empty-state {
+  text-align: center;
+  padding: 60px 24px;
+  color: var(--text2);
+}
+.empty-state .emoji { font-size: 40px; margin-bottom: 12px; }
+.empty-state p { font-size: 15px; }
+{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Мои домашки</h1>
+
+{% if not active and not submitted and not completed %}
+<div class="empty-state">
+  <div class="emoji">📚</div>
+  <p>Пока домашних заданий нет. Загляни позже!</p>
+</div>
+{% else %}
+
+{% if active %}
+<div class="section-label">Активные</div>
+{% for item in active %}
+<div class="hw-card">
+  <div class="hw-card-main">
+    <div class="hw-name">{{ item.assignment.name }}</div>
+    <div class="hw-meta">
+      <div class="progress-wrap">
+        <div class="progress-bar">
+          <div class="progress-fill"
+               data-done="{{ item.stats.total_reviewed }}" data-total="{{ item.stats.total }}"></div>
+        </div>
+        <span class="metric-progress">{{ item.stats.total_reviewed }} из {{ item.stats.total }}</span>
+      </div>
+      {% if item.deadline %}
+        {% if item.deadline_passed %}
+          <span class="deadline-badge deadline-red">просрочено</span>
+        {% elif item.deadline_soon %}
+          <span class="deadline-badge deadline-yellow">до {{ item.deadline|date:"d.m, H:i" }}</span>
+        {% else %}
+          <span class="deadline-badge deadline-green">до {{ item.deadline|date:"d.m" }}</span>
+        {% endif %}
+      {% else %}
+        <span class="deadline-badge deadline-grey">без срока</span>
+      {% endif %}
+    </div>
+  </div>
+  <a href="{% url 'student:assignment_detail' item.assignment.pk %}" class="btn-open">Открыть</a>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if submitted %}
+<div class="section-label">На проверке</div>
+{% for item in submitted %}
+<div class="hw-card">
+  <div class="hw-card-main">
+    <div class="hw-name">{{ item.assignment.name }}</div>
+    <div class="hw-meta">
+      <span class="metric-progress">Проверено: {{ item.stats.total_reviewed }} из {{ item.stats.total }}</span>
+      {% if item.deadline %}
+        <span class="deadline-badge deadline-grey">дедлайн: {{ item.deadline|date:"d.m" }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <a href="{% url 'student:assignment_detail' item.assignment.pk %}" class="btn-open">Открыть</a>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if completed %}
+<div class="section-label">Завершённые</div>
+{% for item in completed %}
+<div class="hw-card">
+  <div class="hw-card-main">
+    <div class="hw-name">{{ item.assignment.name }}</div>
+    <div class="hw-meta">
+      <span class="metric-progress">{{ item.stats.total }} задач проверено</span>
+      {% if item.deadline %}
+        <span class="deadline-badge deadline-grey">{{ item.deadline|date:"d.m.Y" }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="assignment-metrics">
+    {% if item.stats.open_count > 0 and item.stats.open_avg is not None %}
+      <span class="metric-open">📝 {{ item.stats.open_avg }} б.</span>
+    {% endif %}
+    {% if item.stats.test_count > 0 and item.stats.test_pct is not None %}
+      <span class="metric-test">✅ {{ item.stats.test_pct }}% тестов</span>
+    {% endif %}
+    {% if item.stats.open_count > 0 and item.stats.open_avg is None and item.stats.test_count > 0 and item.stats.test_pct is None %}
+      <span class="metric-pending">Ожидает проверки</span>
+    {% endif %}
+  </div>
+  <a href="{% url 'student:assignment_detail' item.assignment.pk %}" class="btn-open">Результаты</a>
+</div>
+{% endfor %}
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Пересчитываем ширину прогресс-баров по реальному значению done/total
+document.querySelectorAll('.progress-fill').forEach(function(el) {
+  var done = parseInt(el.dataset.done, 10) || 0;
+  var total = parseInt(el.dataset.total, 10) || 0;
+  el.style.width = total > 0 ? Math.round(done / total * 100) + '%' : '0%';
+});
+</script>
+{% endblock %}

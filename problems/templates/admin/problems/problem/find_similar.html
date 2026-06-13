@@ -1,0 +1,68 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Похожие задачи — {{ problem }}{% endblock %}
+
+{% block content %}
+<h1>🔍 Похожие задачи</h1>
+
+<p>
+  <strong>Задача #{{ problem.pk }}:</strong>
+  <a href="/admin/problems/problem/{{ problem.pk }}/change/">{{ problem }}</a>
+</p>
+
+{% if error == 'no_embedding' %}
+  <div class="errornote">
+    <p>У этой задачи ещё нет эмбеддинга. Сначала запустите команду:</p>
+    <pre>./venv/bin/python manage.py build_embeddings --limit 5000</pre>
+  </div>
+
+{% elif rows %}
+  <p>Показаны топ-{{ rows|length }} наиболее похожих задач из базы.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Сходство</th>
+        <th>ID</th>
+        <th>Задача</th>
+        <th>Тема</th>
+        <th>Сложность</th>
+        <th>Источник</th>
+        <th>Статус</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ row.similarity }}</td>
+        <td>{{ row.id }}</td>
+        <td>
+          <a href="/admin/problems/problem/{{ row.id }}/change/" target="_blank">
+            {{ row.title|truncatechars:80 }}
+          </a>
+        </td>
+        <td>{{ row.topics }}</td>
+        <td>{{ row.difficulty }}</td>
+        <td>{{ row.source|truncatechars:40 }}</td>
+        <td>{{ row.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+{% else %}
+  <div class="help">
+    <p>Нет задач с эмбеддингами для сравнения.</p>
+    <p>Запустите: <code>./venv/bin/python manage.py build_embeddings --limit 5000</code></p>
+  </div>
+{% endif %}
+
+<p style="margin-top: 20px;">
+  <a href="/admin/problems/problem/{{ problem.pk }}/change/" class="button">
+    ← Вернуться к задаче
+  </a>
+</p>
+{% endblock %}

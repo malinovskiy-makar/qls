@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Вход — ЭкЗадачи</title>
+  <style>
+:root {
+  --sb:     #1a1f2e;
+  --accent: #4f7cff;
+  --border: #e8e8e4;
+  --text:   #1a1a1a;
+  --text2:  #666;
+  --r:      6px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f5f5f3;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-card {
+  background: #fff;
+  border: .5px solid var(--border);
+  border-radius: 12px;
+  padding: 40px;
+  width: 360px;
+}
+.login-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+.login-logo-icon {
+  width: 36px; height: 36px; border-radius: 9px;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+}
+.login-logo-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+.login-logo-name span { color: var(--accent); }
+h1 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.login-sub {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 28px;
+}
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+input[type=text],
+input[type=password] {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  transition: border-color .12s;
+}
+input:focus { border-color: var(--accent); }
+.form-group { margin-bottom: 16px; }
+.error-list {
+  background: #fff0f0;
+  border: 1px solid #ffd5d5;
+  border-radius: var(--r);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #c0392b;
+}
+.btn-login {
+  display: block;
+  width: 100%;
+  background: var(--sb);
+  color: #fff;
+  border: none;
+  border-radius: var(--r);
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s;
+  margin-top: 8px;
+}
+.btn-login:hover { background: #252c40; }
+.back-link {
+  display: block;
+  text-align: center;
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--text2);
+  text-decoration: none;
+}
+.back-link:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="login-card">
+  <div class="login-logo">
+    <div class="login-logo-icon">Эк</div>
+    <div class="login-logo-name">Эк<span>Задачи</span></div>
+  </div>
+  <h1>Войти</h1>
+  <p class="login-sub">Введите логин и пароль</p>
+
+  {% if form.errors %}
+  <div class="error-list">
+    Неверный логин или пароль. Попробуйте ещё раз.
+  </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    {% if next %}
+    <input type="hidden" name="next" value="{{ next }}">
+    {% endif %}
+    <div class="form-group">
+      <label for="id_username">Логин</label>
+      <input type="text" id="id_username" name="username"
+             value="{{ form.username.value|default:'' }}"
+             autocomplete="username" autofocus>
+    </div>
+    <div class="form-group">
+      <label for="id_password">Пароль</label>
+      <input type="password" id="id_password" name="password"
+             autocomplete="current-password">
+    </div>
+    <button type="submit" class="btn-login">Войти</button>
+  </form>
+  <a class="back-link" href="/">← На главную</a>
+</div>
+</body>
+</html>

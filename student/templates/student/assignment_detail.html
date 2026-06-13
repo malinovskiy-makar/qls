@@ -1,0 +1,556 @@
+{% extends "student/base.html" %}
+{% load student_filters %}
+{% load catalog_filters %}
+
+{% block title %}{{ assignment.name }}{% endblock %}
+
+{% block extra_style %}
+.back-link {
+  font-size: 13px;
+  color: var(--text2);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+.back-link:hover { color: var(--accent); }
+
+.hw-header {
+  margin-bottom: 32px;
+}
+.hw-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.hw-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text2);
+}
+.deadline-badge {
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.deadline-red    { background: #fff0f0; color: #c0392b; }
+.deadline-yellow { background: #fffbe6; color: #b45309; }
+.deadline-green  { background: #e8f8e8; color: #2e7d32; }
+.deadline-grey   { background: var(--panel); color: var(--text2); }
+
+.progress-bar {
+  width: 160px; height: 5px;
+  background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.progress-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+
+/* ── Карточка задачи ─────────────────────────────── */
+.problem-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.problem-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.problem-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text2);
+}
+.problem-title-text {
+  font-size: 14px;
+  font-weight: 600;
+  flex: 1;
+  margin: 0 12px;
+}
+.status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+.status-not_started { background: var(--panel); color: var(--text2); border: 1px solid var(--border); }
+.status-in_progress { background: #fff8e6; color: #b45309; border: 1px solid #ffe4b5; }
+.status-submitted   { background: #eef5ff; color: #2563eb; border: 1px solid #bcd4ff; }
+.status-reviewed    { background: #e8f8e8; color: #2e7d32; border: 1px solid #b7dfb7; }
+
+.problem-card-body {
+  padding: 20px;
+}
+.problem-statement {
+  font-size: 15px;
+  line-height: 1.65;
+  margin-bottom: 16px;
+}
+.problem-parts {
+  margin-bottom: 16px;
+}
+.part-item {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.part-label {
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+  width: 22px;
+}
+
+/* ── Поля ответа ─────────────────────────────────── */
+.answer-area {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.answer-area label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+textarea.answer-text {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 90px;
+  outline: none;
+  transition: border-color .12s;
+}
+textarea.answer-text:focus { border-color: var(--accent); }
+input.answer-file {
+  font-size: 13px;
+  color: var(--text2);
+}
+
+/* Тестовые варианты */
+.choices-list { list-style: none; }
+.choices-list li {
+  margin-bottom: 8px;
+}
+.choices-list label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.choices-list input[type=radio],
+.choices-list input[type=checkbox] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+
+/* ── Подсказки ───────────────────────────────────── */
+.hint-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  transition: border-color .12s, color .12s;
+  margin-top: 12px;
+}
+.hint-btn:hover { border-color: var(--accent); color: var(--accent); }
+.hint-box {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: #fffbf0;
+  border: 1px solid #ffe4b5;
+  border-radius: var(--r);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.hint-box + .hint-box { margin-top: 6px; }
+.hint-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  margin-bottom: 4px;
+}
+
+/* ── Проверенная работа: feedback ────────────────── */
+.feedback-block {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f0faf0;
+  border: 1px solid #b7dfb7;
+  border-radius: var(--r);
+}
+.feedback-score {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2e7d32;
+  margin-bottom: 8px;
+}
+.feedback-comment {
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+.mistake-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.mistake-tag {
+  background: #fff0f0;
+  border: 1px solid #ffd5d5;
+  color: #c0392b;
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-size: 12px;
+}
+
+/* ── Ответ ученика (в проверенной) ──────────────── */
+.submitted-answer {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.submitted-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text2);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+/* ── Кнопка отправки ─────────────────────────────── */
+.submit-row {
+  margin-top: 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.btn-submit {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r);
+  padding: 12px 28px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .12s;
+}
+.btn-submit:hover { background: #3b6ae8; }
+.results-link {
+  font-size: 14px;
+  color: var(--text2);
+  text-decoration: none;
+}
+.results-link:hover { color: var(--accent); }
+{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{% url 'student:dashboard' %}">← Все домашки</a>
+
+<div class="hw-header">
+  <h1 class="hw-title">{{ assignment.name }}</h1>
+  <div class="hw-meta-row">
+    {% with total=problems|length %}
+    {% with done_count=submissions.values|dictsortreversed:"status"|length %}
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="progress-bar">
+        <div class="progress-fill" id="main-progress" style="width:0%"></div>
+      </div>
+      <span id="progress-label">0 из {{ total }}</span>
+    </div>
+    {% endwith %}
+    {% endwith %}
+    {% if assignment.deadline %}
+      {% now "U" as now_ts %}
+      <span class="deadline-badge deadline-grey">до {{ assignment.deadline|date:"d.m.Y, H:i" }}</span>
+    {% else %}
+      <span class="deadline-badge deadline-grey">без срока</span>
+    {% endif %}
+  </div>
+</div>
+
+<form method="post" action="{% url 'student:submit_assignment' assignment.pk %}" enctype="multipart/form-data">
+  {% csrf_token %}
+
+  {% for problem in problems %}
+  {% with sub=submissions|dict_key:problem.pk %}
+  <div class="problem-card" id="problem-{{ problem.pk }}">
+    <div class="problem-card-head">
+      <span class="problem-num">Задача {{ forloop.counter }}</span>
+      {% if problem.title %}
+      <span class="problem-title-text">{{ problem.title }}</span>
+      {% endif %}
+      <span class="status-badge status-{{ sub.status }}">
+        {% if sub.status == 'not_started' %}Не начата
+        {% elif sub.status == 'in_progress' %}В процессе
+        {% elif sub.status == 'submitted' %}Отправлено
+        {% elif sub.status == 'reviewed' %}Проверено
+        {% endif %}
+      </span>
+    </div>
+
+    <div class="problem-card-body">
+      {% if problem.statement %}
+      <div class="problem-statement">{{ problem.statement|safe }}</div>
+      {% endif %}
+
+      {% if problem.parts.all %}
+      <div class="problem-parts">
+        {% for part in problem.parts.all %}
+        <div class="part-item">
+          <span class="part-label">{{ part.label|partlabel }}</span>
+          <span>{{ part.statement|safe }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Поле ответа: только для незавершённых -->
+      {% if sub.status != 'submitted' and sub.status != 'reviewed' %}
+      <div class="answer-area">
+        {% if problem.problem_type == 'тест: один ответ' and problem.parts.all %}
+          <label>Выберите ответ:</label>
+          <ul class="choices-list">
+            {% for part in problem.parts.all %}
+            <li>
+              <label>
+                <input type="radio" name="answer_{{ problem.pk }}" value="{{ part.label }}">
+                <span><b>{{ part.label|partlabel }}</b> {{ part.statement|safe }}</span>
+              </label>
+            </li>
+            {% endfor %}
+          </ul>
+        {% elif problem.problem_type == 'тест: все верные' and problem.parts.all %}
+          <label>Отметьте все верные ответы:</label>
+          <ul class="choices-list">
+            {% for part in problem.parts.all %}
+            <li>
+              <label>
+                <input type="checkbox" name="answer_{{ problem.pk }}_{{ part.label }}" value="{{ part.label }}">
+                <span><b>{{ part.label|partlabel }}</b> {{ part.statement|safe }}</span>
+              </label>
+            </li>
+            {% endfor %}
+          </ul>
+        {% elif problem.problem_type == 'тест: верно/неверно' and problem.parts.all %}
+          <label>Верно или неверно для каждого утверждения:</label>
+          <ul class="choices-list">
+            {% for part in problem.parts.all %}
+            <li>
+              <label>
+                <input type="checkbox" name="answer_{{ problem.pk }}_{{ part.label }}" value="{{ part.label }}">
+                <span><b>{{ part.label|partlabel }}</b> {{ part.statement|safe }}</span>
+              </label>
+            </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <label for="text_{{ problem.pk }}">Моё решение:</label>
+          <textarea class="answer-text" id="text_{{ problem.pk }}"
+                    name="text_{{ problem.pk }}"
+                    placeholder="Запишите ход решения..."
+                    oninput="markInProgress({{ problem.pk }})">{{ sub.solution_text }}</textarea>
+          <div style="margin-top:10px;">
+            <label for="file_{{ problem.pk }}" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--text2);">
+              Прикрепить файл (фото, PDF):
+            </label>
+            <input class="answer-file" type="file" id="file_{{ problem.pk }}"
+                   name="file_{{ problem.pk }}"
+                   accept=".jpg,.jpeg,.png,.pdf">
+          </div>
+          <div style="margin-top:10px;">
+            <label for="answer_{{ problem.pk }}" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--text2);">
+              Краткий ответ (необязательно):
+            </label>
+            <input type="text" id="answer_{{ problem.pk }}"
+                   name="answer_{{ problem.pk }}"
+                   style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;font-size:14px;outline:none;"
+                   placeholder="Например: 4 штуки, 120 руб./ед."
+                   value="{{ sub.submitted_answer }}">
+          </div>
+        {% endif %}
+      </div>
+      {% else %}
+        <!-- Уже отправлено или проверено: показываем ответ ученика -->
+        {% if sub.submitted_answer or sub.solution_text %}
+        <div class="answer-area">
+          <div class="submitted-label">Мой ответ</div>
+          {% if sub.submitted_answer %}
+          <div class="submitted-answer">{{ sub.submitted_answer }}</div>
+          {% endif %}
+          {% if sub.solution_text %}
+          <div class="submitted-answer" style="margin-top:6px;white-space:pre-wrap;">{{ sub.solution_text }}</div>
+          {% endif %}
+          {% if sub.solution_file %}
+          <div style="margin-top:8px;font-size:13px;">
+            <a href="{{ sub.solution_file.url }}" target="_blank" style="color:var(--accent);">
+              📎 Прикреплённый файл
+            </a>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+      {% endif %}
+
+      <!-- Feedback для проверенных -->
+      {% if sub.status == 'reviewed' %}
+        {% with fb=feedbacks|dict_key:problem.pk %}
+        {% if fb %}
+        <div class="feedback-block">
+          {% if fb.score is not None %}
+          <div class="feedback-score">{{ fb.score }} б.</div>
+          {% endif %}
+          {% if fb.comment %}
+          <div class="feedback-comment">{{ fb.comment }}</div>
+          {% endif %}
+          {% if fb.mistakes.all %}
+          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Замечания:</div>
+          <div class="mistake-tags">
+            {% for m in fb.mistakes.all %}
+            <span class="mistake-tag">{{ m.name }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% endwith %}
+      {% endif %}
+
+      <!-- Подсказки -->
+      {% if problem.hints.all and sub.status != 'submitted' and sub.status != 'reviewed' %}
+      <div id="hints-{{ problem.pk }}">
+        {% for hint in problem.hints.all %}
+        <template class="hint-tpl" data-problem="{{ problem.pk }}" data-order="{{ forloop.counter }}">{{ hint.text }}</template>
+        {% endfor %}
+        <button type="button" class="hint-btn"
+                onclick="showHint({{ problem.pk }})">
+          💡 Подсказка
+        </button>
+        <div id="hint-shown-{{ problem.pk }}"></div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+
+  <!-- Кнопка отправки -->
+  {% if not all_reviewed %}
+  {% if not all_submitted_or_reviewed %}
+  <div class="submit-row">
+    <button type="submit" class="btn-submit">Отправить домашку</button>
+    <span style="font-size:13px;color:var(--text2);">
+      Все ответы будут отправлены на проверку преподавателю
+    </span>
+  </div>
+  {% else %}
+  <div class="submit-row">
+    <a href="{% url 'student:dashboard' %}" class="results-link">
+      ✓ Домашка отправлена — ожидай проверку
+    </a>
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="submit-row">
+    <a href="{% url 'student:dashboard' %}" class="results-link">
+      ← Вернуться к списку домашек
+    </a>
+  </div>
+  {% endif %}
+
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Подсказки: показываем по одной при каждом клике
+function showHint(problemPk) {
+  var key = 'hint_idx_' + problemPk;
+  var idx = parseInt(sessionStorage.getItem(key) || '0', 10);
+
+  // Берём подсказки из <template> элементов
+  var tpls = document.querySelectorAll(
+    '#hints-' + problemPk + ' template.hint-tpl'
+  );
+  if (idx >= tpls.length) return;
+
+  var container = document.getElementById('hint-shown-' + problemPk);
+  var box = document.createElement('div');
+  box.className = 'hint-box';
+  box.innerHTML = '<div class="hint-label">Подсказка ' + (idx+1) + '</div>'
+    + tpls[idx].innerHTML;
+  container.appendChild(box);
+  maskEscapedDollars(box);
+  if (typeof initKaTeX === 'function') renderMathInElement(box, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '\\(', right: '\\)', display: false }
+    ], throwOnError: false
+  });
+  // Чистка эскейпов — всегда, даже если CDN KaTeX не загрузился
+  fixCurrencyDollars(box);
+
+  sessionStorage.setItem(key, idx + 1);
+  if (idx + 1 >= tpls.length) {
+    var btn = document.querySelector('#hints-' + problemPk + ' .hint-btn');
+    btn.disabled = true;
+    btn.textContent = 'Все подсказки открыты';
+  }
+}
+
+// Обновление прогресс-бара
+function updateProgress() {
+  var cards = document.querySelectorAll('.problem-card');
+  var total = cards.length;
+  var done = 0;
+  cards.forEach(function(card) {
+    var badge = card.querySelector('.status-badge');
+    if (badge && (badge.classList.contains('status-submitted') || badge.classList.contains('status-reviewed'))) {
+      done++;
+    }
+    // Если есть заполненный textarea — считаем «в процессе»
+  });
+  var pct = total > 0 ? Math.round(done / total * 100) : 0;
+  var fill = document.getElementById('main-progress');
+  var label = document.getElementById('progress-label');
+  if (fill) fill.style.width = pct + '%';
+  if (label) label.textContent = done + ' из ' + total;
+}
+updateProgress();
+
+function markInProgress(pk) {
+  // Визуальный сигнал что пользователь начал вводить текст
+}
+</script>
+{% endblock %}

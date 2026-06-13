@@ -1,0 +1,120 @@
+{% extends "teacher/base.html" %}
+
+{% block title %}Проверка решений{% endblock %}
+
+{% block extra_style %}
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 24px;
+}
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #fff;
+  transition: box-shadow .15s;
+}
+.card:hover {
+  box-shadow: 0 2px 10px rgba(0,0,0,.07);
+}
+.card-info {
+  flex: 1;
+  min-width: 0;
+}
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-meta {
+  font-size: 13px;
+  color: var(--text2);
+}
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-pending {
+  background: #fff3e0;
+  color: #e65100;
+}
+.badge-done {
+  background: #f5f5f5;
+  color: #888;
+}
+.btn-open {
+  display: inline-block;
+  padding: 7px 16px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--r);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity .12s;
+}
+.btn-open:hover { opacity: .87; }
+.empty {
+  text-align: center;
+  color: var(--text2);
+  padding: 60px 0;
+  font-size: 14px;
+}
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+  <h1 class="page-title" style="margin-bottom:0;">Проверка решений</h1>
+  <a href="{% url 'teacher:assignment_create' %}"
+     style="padding:8px 18px;background:var(--accent);color:#fff;border-radius:var(--r);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;">
+    + Создать домашку
+  </a>
+</div>
+
+{% if assignment_data %}
+<div class="cards">
+  {% for item in assignment_data %}
+  <div class="card">
+    <div class="card-info">
+      <div class="card-title">{{ item.assignment.title }}</div>
+      <div class="card-meta">
+        Всего решений: {{ item.total }}
+        {% if item.assignment.deadline %}
+          &nbsp;·&nbsp; Дедлайн: {{ item.assignment.deadline|date:"d.m.Y" }}
+        {% endif %}
+      </div>
+    </div>
+    {% if item.pending > 0 %}
+      <span class="badge badge-pending">{{ item.pending }} ждут проверки</span>
+    {% else %}
+      <span class="badge badge-done">Все проверено</span>
+    {% endif %}
+    <a href="{% url 'teacher:assignment_detail' item.assignment.pk %}" class="btn-open">Открыть</a>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  Пока нет домашних заданий.<br>Создайте их в <a href="/admin/">админке</a>.
+</div>
+{% endif %}
+{% endblock %}

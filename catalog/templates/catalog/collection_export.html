@@ -1,0 +1,323 @@
+{% extends "catalog/base.html" %}
+
+{% block title %}Экспорт — {{ collection.name }}{% endblock %}
+
+{% block extra_style %}
+.export-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding-top: 8px;
+}
+.export-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.export-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--accent);
+  background: #eef2ff;
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+.export-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  line-height: 1.3;
+}
+.export-back {
+  font-size: 13px;
+  color: var(--text2);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 20px;
+}
+.export-back:hover { color: var(--accent); }
+
+/* Список задач */
+.prob-list {
+  background: var(--panel);
+  border: .5px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+.prob-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 11px 18px;
+  border-bottom: .5px solid var(--border);
+  font-size: 13px;
+}
+.prob-item:last-child { border-bottom: none; }
+.prob-num {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 20px;
+}
+.prob-name { color: var(--text); line-height: 1.4; }
+
+/* Настройки экспорта */
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text2);
+  margin-bottom: 12px;
+}
+.settings-card {
+  background: var(--panel);
+  border: .5px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.check-row input[type=checkbox] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Кнопки скачивания */
+.dl-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.dl-card {
+  border: .5px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  background: #fff;
+}
+.dl-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 5px;
+  color: var(--text);
+}
+.dl-card-desc {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+.dl-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: var(--r);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: background .12s, opacity .12s;
+}
+.dl-btn-primary { background: var(--accent); color: #fff; }
+.dl-btn-primary:hover { background: #3d6ef0; }
+.dl-btn-secondary {
+  background: var(--panel);
+  color: var(--text);
+  border: .5px solid var(--border);
+}
+.dl-btn-secondary:hover { background: #ededeb; }
+.dl-btn-disabled {
+  background: var(--panel);
+  color: var(--text2);
+  border: .5px solid var(--border);
+  cursor: not-allowed;
+  opacity: .6;
+}
+.dl-btn-disabled:hover { background: var(--panel); }
+.no-xelatex-note {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 8px;
+  line-height: 1.4;
+}
+.overleaf-hint {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 12px;
+  padding: 11px 13px;
+  background: var(--panel);
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+.overleaf-hint ol {
+  margin: 4px 0 0 0;
+  padding-left: 16px;
+}
+.overleaf-hint a { color: var(--accent); }
+.hint-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--text2);
+}
+{% endblock %}
+
+{% block content %}
+<div class="export-wrap">
+
+  <a class="export-back" href="/catalog/collection/{{ collection.token }}/">
+    ← Вернуться к подборке
+  </a>
+
+  <div class="export-meta">
+    <span class="export-badge">
+      {% if collection.template_type == 'homework' %}Домашнее задание
+      {% elif collection.template_type == 'test' %}Контрольная работа
+      {% else %}Листок задач{% endif %}
+    </span>
+    <span style="font-size:13px; color:var(--text2);">{{ problems|length }} задач</span>
+  </div>
+  <h1 class="export-title">{{ collection.name }}</h1>
+
+  <!-- Список задач -->
+  <div class="section-label">Задачи в подборке</div>
+  <div class="prob-list">
+    {% if problems %}
+      {% for p in problems %}
+      <div class="prob-item">
+        <span class="prob-num">{{ forloop.counter }}.</span>
+        <span class="prob-name">
+          {% if p.title %}{{ p.title|truncatechars:80 }}
+          {% else %}Задача #{{ p.pk }}: {{ p.statement|truncatechars:70 }}
+          {% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="prob-item" style="color:var(--text2);">Подборка пустая</div>
+    {% endif %}
+  </div>
+
+  <!-- Настройки -->
+  <div class="section-label">Настройки экспорта</div>
+  <div class="settings-card">
+    <label class="check-row">
+      <input type="checkbox" id="chk-answers" value="1">
+      Включить ответы
+    </label>
+    <label class="check-row">
+      <input type="checkbox" id="chk-solutions" value="1">
+      Включить решения
+    </label>
+  </div>
+
+  <!-- Кнопки скачивания -->
+  <div class="section-label">Скачать</div>
+  <div class="dl-grid">
+
+    <!-- PDF -->
+    <div class="dl-card">
+      <div class="dl-card-title">📄 PDF</div>
+      <div class="dl-card-desc">
+        Готовый файл для печати.<br>
+        Компилируется через XeLaTeX на сервере.
+      </div>
+      {% if has_xelatex %}
+        <form id="pdf-form" method="post"
+              action="{% url 'catalog:collection_download_pdf' collection.token %}">
+          {% csrf_token %}
+          <input type="hidden" name="show_answers"   id="pdf-answers"   value="0">
+          <input type="hidden" name="show_solutions" id="pdf-solutions" value="0">
+          <button type="submit" class="dl-btn dl-btn-primary">Скачать PDF</button>
+        </form>
+      {% else %}
+        <button class="dl-btn dl-btn-disabled" disabled>Скачать PDF</button>
+        <p class="no-xelatex-note">
+          PDF-компиляция недоступна на сервере.<br>
+          Скачайте <strong>.tex</strong> ниже и откройте в <a href="https://overleaf.com" target="_blank">Overleaf</a> — там бесплатная компиляция.
+        </p>
+      {% endif %}
+    </div>
+
+    <!-- LaTeX -->
+    <div class="dl-card">
+      <div class="dl-card-title">📝 LaTeX (.tex)</div>
+      <div class="dl-card-desc">
+        Исходный файл для редактирования.<br>
+        Откройте в Overleaf или компилируйте локально.
+      </div>
+      <a id="tex-link"
+         href="{% url 'catalog:collection_download_tex' collection.token %}"
+         class="dl-btn dl-btn-secondary">
+        Скачать .tex
+      </a>
+      <div class="overleaf-hint">
+        <svg class="hint-icon" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4M12 8h.01"/>
+        </svg>
+        <div>
+          <strong>Как скомпилировать в Overleaf:</strong>
+          <ol>
+            <li>Скачайте .tex файл</li>
+            <li>Загрузите в <a href="https://overleaf.com" target="_blank" rel="noopener">Overleaf</a></li>
+            <li>Menu → Compiler → <strong>XeLaTeX</strong></li>
+            <li>Нажмите <strong>Recompile</strong></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function syncSettings() {
+  const ans = document.getElementById('chk-answers').checked ? '1' : '0';
+  const sol = document.getElementById('chk-solutions').checked ? '1' : '0';
+
+  // PDF form (hidden inputs)
+  const pdfAns = document.getElementById('pdf-answers');
+  const pdfSol = document.getElementById('pdf-solutions');
+  if (pdfAns) pdfAns.value = ans;
+  if (pdfSol) pdfSol.value = sol;
+
+  // .tex link (query params)
+  const base  = "{% url 'catalog:collection_download_tex' collection.token %}";
+  const link  = document.getElementById('tex-link');
+  link.href   = base + '?show_answers=' + ans + '&show_solutions=' + sol;
+}
+
+document.getElementById('chk-answers').addEventListener('change', syncSettings);
+document.getElementById('chk-solutions').addEventListener('change', syncSettings);
+</script>
+{% endblock %}

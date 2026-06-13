@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: qls-platform
+    env: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2
+    preDeployCommand: python manage.py migrate --noinput && python manage.py collectstatic --noinput
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings_production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: ALLOWED_HOSTS
+        value: .onrender.com
+
+databases:
+  - name: qls-db
+    plan: free
+    databaseName: qls_platform
+    region: frankfurt

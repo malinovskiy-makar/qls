@@ -1,0 +1,155 @@
+{% extends "student/base.html" %}
+{% load student_filters %}
+{% load catalog_filters %}
+
+{% block title %}Результат: {{ problem.title|default:"Задача" }}{% endblock %}
+
+{% block extra_style %}
+.back-link {
+  font-size: 13px; color: var(--text2); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px; margin-bottom: 20px;
+}
+.back-link:hover { color: var(--accent); }
+
+.sub-title { font-size: 22px; font-weight: 700; margin-bottom: 24px; }
+
+.block-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.block-label {
+  font-size: 11px; font-weight: 700; color: var(--text2);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px;
+}
+.problem-statement { font-size: 15px; line-height: 1.65; }
+.part-item { display: flex; gap: 10px; margin-bottom: 6px; font-size: 14px; line-height: 1.6; }
+.part-label { font-weight: 700; color: var(--accent); flex-shrink: 0; width: 22px; }
+
+.answer-text-box {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 12px 14px;
+  font-size: 14px; line-height: 1.6; white-space: pre-wrap;
+}
+
+/* Feedback */
+.feedback-card {
+  border: 1px solid #b7dfb7;
+  background: #f0faf0;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.feedback-score-big {
+  font-size: 32px; font-weight: 800; color: #2e7d32; margin-bottom: 12px;
+}
+.feedback-score-big span { font-size: 16px; font-weight: 400; color: var(--text2); margin-left: 4px; }
+.feedback-comment { font-size: 15px; line-height: 1.65; margin-bottom: 12px; }
+.mistake-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.mistake-tag {
+  background: #fff0f0; border: 1px solid #ffd5d5;
+  color: #c0392b; border-radius: 20px; padding: 3px 10px; font-size: 12px;
+}
+.no-feedback {
+  color: var(--text2); font-size: 14px; font-style: italic;
+}
+.action-row { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+.btn-action {
+  background: var(--sb); color: #fff; border: none;
+  border-radius: var(--r); padding: 9px 18px;
+  font-size: 13px; font-weight: 600; text-decoration: none;
+  transition: background .12s;
+}
+.btn-action:hover { background: #252c40; }
+.btn-action.secondary {
+  background: none; color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.btn-action.secondary:hover { background: rgba(79,124,255,.07); }
+{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{% url 'student:dashboard' %}">← Все домашки</a>
+
+<h1 class="sub-title">
+  {% if problem.title %}{{ problem.title }}{% else %}Задача #{{ problem.pk }}{% endif %}
+</h1>
+
+<!-- Условие задачи -->
+<div class="block-card">
+  <div class="block-label">Условие</div>
+  {% if problem.statement %}
+  <div class="problem-statement">{{ problem.statement|safe }}</div>
+  {% endif %}
+  {% if problem.parts.all %}
+  <div style="margin-top:12px;">
+    {% for part in problem.parts.all %}
+    <div class="part-item">
+      <span class="part-label">{{ part.label|partlabel }}</span>
+      <span>{{ part.statement|safe }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Мой ответ -->
+<div class="block-card">
+  <div class="block-label">Мой ответ</div>
+  {% if submission.submitted_answer %}
+  <div class="answer-text-box">{{ submission.submitted_answer }}</div>
+  {% endif %}
+  {% if submission.solution_text %}
+  <div class="answer-text-box" style="margin-top:8px;">{{ submission.solution_text }}</div>
+  {% endif %}
+  {% if submission.solution_file %}
+  <div style="margin-top:10px; font-size:13px;">
+    <a href="{{ submission.solution_file.url }}" target="_blank"
+       style="color:var(--accent);">📎 Прикреплённый файл</a>
+  </div>
+  {% endif %}
+  {% if not submission.submitted_answer and not submission.solution_text and not submission.solution_file %}
+  <p class="no-feedback">Ответ не был записан.</p>
+  {% endif %}
+</div>
+
+<!-- Результат проверки -->
+{% if feedback %}
+<div class="feedback-card">
+  <div class="block-label" style="color:#2e7d32;">Результат проверки</div>
+  {% if feedback.score is not None %}
+  <div class="feedback-score-big">
+    {{ feedback.score }}<span>баллов</span>
+  </div>
+  {% endif %}
+  {% if feedback.comment %}
+  <div class="feedback-comment">{{ feedback.comment }}</div>
+  {% endif %}
+  {% if feedback.mistakes.all %}
+  <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Замечания:</div>
+  <div class="mistake-tags">
+    {% for m in feedback.mistakes.all %}
+    <span class="mistake-tag">{{ m.name }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if feedback.reviewed_at %}
+  <div style="margin-top:12px;font-size:12px;color:var(--text2);">
+    Проверено: {{ feedback.reviewed_at|date:"d.m.Y" }}
+    {% if feedback.reviewed_by %}— {{ feedback.reviewed_by.get_full_name|default:feedback.reviewed_by.username }}{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="block-card">
+  <div class="block-label">Результат проверки</div>
+  <p class="no-feedback">Преподаватель ещё не проверил эту работу.</p>
+</div>
+{% endif %}
+
+<div class="action-row">
+  <a href="{% url 'student:dashboard' %}" class="btn-action">← К домашкам</a>
+  <a href="/catalog/{{ problem.pk }}/" class="btn-action secondary">Похожие задачи</a>
+</div>
+{% endblock %}

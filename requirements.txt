@@ -1,0 +1,12 @@
+Django==4.2.30
+PyMuPDF==1.26.5
+asgiref==3.11.1
+dj-database-url==2.3.0
+gunicorn==23.0.0
+numpy==2.0.2
+pdfminer.six==20251107
+pillow==11.3.0
+psycopg2-binary==2.9.10
+pypandoc==1.17
+sqlparse==0.5.5
+whitenoise==6.9.0

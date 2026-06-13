@@ -1,0 +1,346 @@
+{% extends "teacher/base.html" %}
+{% load catalog_filters %}
+
+{% block title %}Проверка — {{ submission.student.username }}{% endblock %}
+
+{% block extra_style %}
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.btn-back {
+  color: var(--text2);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  transition: color .12s, border-color .12s;
+  white-space: nowrap;
+}
+.btn-back:hover { color: var(--text); border-color: #bbb; }
+.page-title {
+  font-size: 18px;
+  font-weight: 700;
+  flex: 1;
+}
+.sub-meta {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge-submitted { background: #fff3e0; color: #e65100; }
+.badge-reviewed  { background: #e8f8e8; color: #1e7e1e; }
+
+/* Двухколоночный макет */
+.review-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .review-layout { grid-template-columns: 1fr; }
+}
+
+/* Левая часть — условие и ответ ученика */
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+.problem-block {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.problem-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.parts-list {
+  margin-top: 12px;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.parts-list li {
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-size: 13px;
+}
+.part-label {
+  font-weight: 700;
+  color: var(--accent);
+  margin-right: 6px;
+}
+.answer-block {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.answer-field {
+  margin-bottom: 10px;
+}
+.answer-field:last-child { margin-bottom: 0; }
+.answer-field strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  margin-bottom: 4px;
+}
+.file-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 13px;
+}
+.file-link:hover { text-decoration: underline; }
+.no-answer {
+  color: var(--text2);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Правая часть — форма оценки */
+.form-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  position: sticky;
+  top: 68px;
+}
+.form-card h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+.form-group {
+  margin-bottom: 14px;
+}
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  margin-bottom: 5px;
+}
+.form-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+  color: var(--text);
+  transition: border-color .12s;
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+textarea.form-input {
+  resize: vertical;
+  min-height: 80px;
+}
+input[type="number"].form-input {
+  width: 100px;
+}
+/* Ошибки — чекбоксы */
+.mistakes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+.mistake-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mistake-item input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.btn-save {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background: var(--sb);
+  color: #fff;
+  border: none;
+  border-radius: var(--r);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 18px;
+  transition: opacity .12s;
+}
+.btn-save:hover { opacity: .85; }
+.existing-note {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 4px;
+}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <a href="{% url 'teacher:assignment_detail' submission.assignment.pk %}" class="btn-back">← Назад к списку</a>
+  <h1 class="page-title">
+    {{ submission.student.get_full_name|default:submission.student.username }}
+    —
+    {% if problem.title %}{{ problem.title|truncatechars:50 }}{% else %}Задача #{{ problem.pk }}{% endif %}
+  </h1>
+</div>
+
+<div class="sub-meta">
+  <span class="badge badge-{{ submission.status }}">
+    {% if submission.status == 'submitted' %}Ждёт проверки
+    {% elif submission.status == 'reviewed' %}Проверено
+    {% else %}{{ submission.status }}{% endif %}
+  </span>
+  {% if submission.submitted_at %}
+    Отправлено {{ submission.submitted_at|date:"d.m.Y в H:i" }}
+  {% endif %}
+  · Домашка: {{ submission.assignment.title }}
+</div>
+
+<div class="review-layout">
+
+  <!-- Левая часть -->
+  <div>
+    <div class="section-label">Условие задачи</div>
+    <div class="problem-block">
+      {% if problem.title %}
+        <div class="problem-title">{{ problem.title }}</div>
+      {% endif %}
+      {% if problem.statement %}
+        <div>{{ problem.statement }}</div>
+      {% endif %}
+      {% if problem.parts.exists %}
+        <ul class="parts-list">
+          {% for part in problem.parts.all %}
+          <li>
+            <span class="part-label">{{ part.label|partlabel }}</span>
+            {{ part.statement }}
+            {% if part.points %}<span style="color:var(--text2);font-size:12px;">({{ part.points }} б.)</span>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <div class="section-label">Ответ ученика</div>
+    <div class="answer-block">
+      {% if submission.submitted_answer %}
+        <div class="answer-field">
+          <strong>Выбранный ответ</strong>
+          {{ submission.submitted_answer }}
+        </div>
+      {% endif %}
+      {% if submission.solution_text %}
+        <div class="answer-field">
+          <strong>Текст решения</strong>
+          <div style="white-space:pre-wrap;">{{ submission.solution_text }}</div>
+        </div>
+      {% endif %}
+      {% if submission.solution_file %}
+        <div class="answer-field">
+          <strong>Прикреплённый файл</strong>
+          <a href="{{ submission.solution_file.url }}" class="file-link" target="_blank">
+            Скачать файл
+          </a>
+        </div>
+      {% endif %}
+      {% if not submission.submitted_answer and not submission.solution_text and not submission.solution_file %}
+        <span class="no-answer">Ученик ничего не отправил</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Правая часть — форма оценки -->
+  <div>
+    <form method="post" action="{% url 'teacher:review_submission' submission.pk %}">
+      {% csrf_token %}
+      <div class="form-card">
+        <h3>Оценка</h3>
+
+        <div class="form-group">
+          <label class="form-label" for="score">Балл</label>
+          <input type="number" id="score" name="score" class="form-input"
+                 min="0" max="10" step="0.5"
+                 value="{% if existing_feedback and existing_feedback.score is not None %}{{ existing_feedback.score }}{% endif %}"
+                 placeholder="0–10">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="comment">Комментарий</label>
+          <textarea id="comment" name="comment" class="form-input"
+                    placeholder="Что хорошо, что улучшить...">{% if existing_feedback %}{{ existing_feedback.comment }}{% endif %}</textarea>
+        </div>
+
+        {% if mistake_tags %}
+        <div class="form-group">
+          <label class="form-label">Отметить ошибки</label>
+          <div class="mistakes-list">
+            {% for tag in mistake_tags %}
+            <label class="mistake-item">
+              <input type="checkbox" name="mistakes" value="{{ tag.pk }}"
+                     {% if existing_feedback and tag in existing_feedback.mistakes.all %}checked{% endif %}>
+              {{ tag.name }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if existing_feedback %}
+          <div class="existing-note">
+            Уже проверено {{ existing_feedback.reviewed_at|date:"d.m.Y" }}
+            {% if existing_feedback.reviewed_by %} — {{ existing_feedback.reviewed_by.username }}{% endif %}
+          </div>
+        {% endif %}
+
+        <button type="submit" class="btn-save">Сохранить оценку</button>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

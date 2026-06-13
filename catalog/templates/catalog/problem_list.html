@@ -1,0 +1,812 @@
+{% extends "catalog/base.html" %}
+{% load catalog_filters %}
+
+{% block title %}Каталог задач{% endblock %}
+
+{% block extra_style %}
+/* ── Широкий layout для каталога ──────────────────── */
+.page-wrap {
+  max-width: 1140px;
+  padding: 28px 24px 60px;
+}
+
+/* ── Двухколоночный layout ────────────────────────── */
+.catalog-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/* ── Сайдбар с фильтрами ──────────────────────────── */
+.filter-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 72px;
+  max-height: calc(100vh - 90px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.filter-card {
+  background: var(--panel);
+  border: .5px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 16px;
+}
+.filter-section { margin-bottom: 20px; }
+.filter-section:last-child { margin-bottom: 0; }
+.filter-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+
+/* Поиск */
+.search-row { display: flex; gap: 6px; }
+.search-input {
+  flex: 1; min-width: 0;
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  padding: 7px 10px;
+  font-size: 13px;
+  background: #fff;
+  color: var(--text);
+  transition: border-color .12s;
+}
+.search-input:focus { outline: none; border-color: var(--accent); }
+.search-btn {
+  padding: 7px 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r);
+  font-size: 14px;
+  cursor: pointer;
+}
+.search-btn:hover { background: #3d6ef0; }
+
+/* Тема и Источник — одинаковые select */
+.topic-select {
+  width: 100%;
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  padding: 7px 8px;
+  font-size: 13px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+.topic-select:focus { outline: none; border-color: var(--accent); }
+
+/* Сложность — кнопки-звёздочки */
+.diff-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+.diff-btn {
+  padding: 5px 8px;
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  background: #fff;
+  font-size: 12px;
+  color: #f5a623;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .1s, border-color .1s;
+  white-space: nowrap;
+  line-height: 1;
+}
+.diff-btn:hover { background: #fff8ed; border-color: #f5a623; }
+.diff-btn.active { background: #fff3d9; border-color: #f5a623; font-weight: 600; }
+
+/* Типы задач */
+.type-btns { display: flex; flex-direction: column; gap: 4px; }
+.type-btn {
+  padding: 6px 10px;
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  background: #fff;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  text-decoration: none;
+  text-align: left;
+  transition: background .1s, border-color .1s, color .1s;
+}
+.type-btn:hover { background: #eef2ff; color: var(--accent); border-color: #c5d0ff; }
+.type-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Чекбокс */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.checkbox-label input[type=checkbox] {
+  width: 15px; height: 15px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+/* Сброс */
+.reset-link {
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text2);
+  text-decoration: none;
+  padding: 7px;
+  border-radius: var(--r);
+  margin-top: 4px;
+  transition: color .1s, background .1s;
+}
+.reset-link:hover { color: var(--text); background: rgba(0,0,0,.05); }
+
+/* ── Основная область ─────────────────────────────── */
+.problems-main { flex: 1; min-width: 0; }
+
+.results-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.results-count { font-size: 13px; color: var(--text2); }
+.results-count strong { color: var(--text); font-weight: 600; }
+
+/* ── Карточка задачи ──────────────────────────────── */
+.problem-card {
+  background: #fff;
+  border: .5px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 10px;
+  text-decoration: none;
+  display: block;
+  color: inherit;
+  transition: box-shadow .15s, border-color .15s;
+}
+.problem-card:hover {
+  box-shadow: 0 2px 14px rgba(0,0,0,.07);
+  border-color: #d0d0ca;
+}
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+  flex: 1;
+}
+.problem-card:hover .card-title { color: var(--accent); }
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.card-stars { font-size: 12px; color: #f5a623; letter-spacing: .5px; white-space: nowrap; }
+.card-sol-badge {
+  background: #e9faf0;
+  color: #2a9d5c;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.card-preview {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.55;
+  margin-bottom: 10px;
+}
+.card-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.card-tag {
+  background: #eef2ff;
+  color: var(--accent);
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ── Кнопки действий на карточке ─────────────────── */
+.card-action-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.ca-btn {
+  padding: 4px 11px;
+  border-radius: var(--r);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s, color .12s, border-color .12s;
+  line-height: 1.5;
+}
+.ca-preview {
+  border: .5px solid var(--border);
+  background: #fff;
+  color: var(--text2);
+}
+.ca-preview:hover { border-color: var(--accent); color: var(--accent); }
+.ca-add {
+  border: .5px solid var(--accent);
+  background: #fff;
+  color: var(--accent);
+  font-weight: 500;
+}
+.ca-add:hover { background: var(--accent); color: #fff; }
+.ca-add.added { background: #e9faf0; border-color: #2a9d5c; color: #2a9d5c; }
+
+/* Dropdown домашек */
+.ca-hw-wrap { position: relative; }
+.ca-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: #fff;
+  border: .5px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.12);
+  min-width: 220px;
+  z-index: 200;
+  overflow: hidden;
+}
+.ca-dropdown.open { display: block; }
+.ca-dd-head {
+  padding: 8px 12px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  border-bottom: .5px solid var(--border);
+}
+.ca-dd-item {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background .1s;
+  border-bottom: .5px solid #f5f5f0;
+}
+.ca-dd-item:last-child { border-bottom: none; }
+.ca-dd-item:hover { background: #f7f7f5; }
+.ca-dd-item.new-hw { color: var(--accent); font-weight: 500; }
+.ca-dd-item.done   { color: #2a9d5c; pointer-events: none; }
+
+/* ── Пустой результат ─────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text2);
+  border: .5px solid var(--border);
+  border-radius: 10px;
+}
+.empty-state p { font-size: 15px; margin-bottom: 6px; color: var(--text); }
+.empty-state small { font-size: 13px; }
+
+/* ── Пагинация ────────────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.page-btn {
+  min-width: 36px; height: 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  font-size: 13px;
+  color: var(--text2);
+  text-decoration: none;
+  background: #fff;
+  padding: 0 10px;
+  transition: background .1s, color .1s, border-color .1s;
+}
+.page-btn:hover { background: #eef2ff; color: var(--accent); border-color: #c5d0ff; }
+.page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+.page-btn.disabled { opacity: .35; pointer-events: none; }
+.page-ellipsis {
+  font-size: 13px; color: var(--text2);
+  display: inline-flex; align-items: center;
+  height: 36px; padding: 0 4px;
+}
+/* ── Модальное окно ───────────────────────────────── */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-backdrop.open { display: flex; }
+.c-modal {
+  background: #fff;
+  border-radius: 12px;
+  border: .5px solid var(--border);
+  width: 640px;
+  max-width: 96vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,.18);
+}
+.c-modal-head {
+  padding: 18px 22px 14px;
+  border-bottom: .5px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.c-modal-title {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.c-modal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.c-modal-tag {
+  background: #eef2ff;
+  color: var(--accent);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.c-modal-tag.sol { background: #f0faf0; color: #2a9d5c; }
+.c-modal-close {
+  border: none;
+  background: none;
+  font-size: 20px;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.c-modal-close:hover { color: var(--text); }
+.c-modal-body {
+  padding: 20px 22px;
+  overflow-y: auto;
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.c-modal-part { margin-top: 14px; }
+.c-modal-part-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-bottom: 4px;
+}
+.c-modal-foot {
+  padding: 12px 22px;
+  border-top: .5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.c-modal-source { font-size: 12px; color: var(--text2); flex: 1; }
+.c-modal-loading {
+  display: flex; align-items: center; justify-content: center;
+  height: 100px; color: var(--text2); font-size: 14px;
+}
+{% endblock %}
+
+{% block content %}
+<div class="catalog-layout">
+
+  <!-- ── Сайдбар ── -->
+  <aside class="filter-sidebar">
+    <div class="filter-card">
+      <form method="get" action="" id="filter-form">
+
+        <div class="filter-section">
+          <label class="filter-label">Поиск</label>
+          <div class="search-row">
+            <input class="search-input" type="text" name="q"
+                   value="{{ f_q }}" placeholder="Слово из условия…">
+            <button class="search-btn" type="submit">→</button>
+          </div>
+        </div>
+
+        <div class="filter-section">
+          <label class="filter-label" for="id_topic">Тема</label>
+          <select class="topic-select" name="topic" id="id_topic"
+                  onchange="this.form.submit()">
+            <option value="">Все темы</option>
+            {% for topic in topics %}
+            <option value="{{ topic.id }}"
+              {% if f_topic == topic.id|stringformat:"s" %}selected{% endif %}>
+              {{ topic.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {% if sources %}
+        <div class="filter-section">
+          <label class="filter-label" for="id_source">Источник</label>
+          <select class="topic-select" name="source" id="id_source"
+                  onchange="this.form.submit()">
+            <option value="">Все источники</option>
+            {% for src in sources %}
+            <option value="{{ src.id }}"
+              {% if f_source == src.id|stringformat:"s" %}selected{% endif %}>
+              {{ src.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <div class="filter-section">
+          <span class="filter-label">Сложность</span>
+          <div class="diff-btns">
+            {% for n in "12345" %}
+            <a class="diff-btn{% if f_diff == n %} active{% endif %}"
+               href="?{% filter_param request 'difficulty' n %}">
+              {% for i in n|make_stars %}★{% endfor %}
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if problem_types %}
+        <div class="filter-section">
+          <span class="filter-label">Тип задачи</span>
+          <div class="type-btns">
+            {% for pt in problem_types %}
+            <a class="type-btn{% if f_type == pt %} active{% endif %}"
+               href="?{% filter_param request 'type' pt %}">
+              {{ pt }}
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="filter-section">
+          <label class="checkbox-label">
+            <input type="checkbox" name="has_solution" value="1"
+                   {% if f_sol == '1' %}checked{% endif %}
+                   onchange="this.form.submit()">
+            Только с решением
+          </label>
+        </div>
+
+        <a href="/catalog/" class="reset-link">✕ Сбросить фильтры</a>
+
+      </form>
+    </div>
+  </aside>
+
+  <!-- ── Список задач ── -->
+  <div class="problems-main">
+
+    <div class="results-bar">
+      <span class="results-count">
+        Найдено: <strong>{{ total }}</strong>
+        {% if f_q %} по запросу «{{ f_q }}»{% endif %}
+      </span>
+    </div>
+
+    {% if cards %}
+      {% for card in cards %}
+      <a class="problem-card" href="/catalog/problem/{{ card.problem.pk }}/">
+        <div class="card-top">
+          <span class="card-title">
+            {% if card.problem.title %}{{ card.problem.title }}{% else %}Задача #{{ card.problem.pk }}{% endif %}
+          </span>
+          <div class="card-meta">
+            {% if card.problem.difficulty %}
+            <span class="card-stars">
+              {% for i in card.difficulty_stars %}★{% endfor %}{% for i in card.difficulty_empty %}☆{% endfor %}
+            </span>
+            {% endif %}
+            {% if card.has_solution %}
+            <span class="card-sol-badge">решение ✓</span>
+            {% endif %}
+          </div>
+        </div>
+        {% if card.preview %}
+        <p class="card-preview">{{ card.preview }}</p>
+        {% endif %}
+        {% if card.topics %}
+        <div class="card-tags">
+          {% for topic in card.topics %}
+          <span class="card-tag">{{ topic.name }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <!-- Кнопки действий — stopPropagation чтобы не переходить по ссылке -->
+        <div class="card-action-row" onclick="event.stopPropagation();">
+          <button class="ca-btn ca-preview"
+                  onclick="openCatalogModal({{ card.problem.pk }}, event)">
+            👁 Условие
+          </button>
+          {% if user.is_authenticated and user.role == 'teacher' %}
+          <div class="ca-hw-wrap" id="hw-wrap-{{ card.problem.pk }}">
+            <button class="ca-btn ca-add" id="hw-btn-{{ card.problem.pk }}"
+                    onclick="toggleHwDropdown({{ card.problem.pk }}, event)">
+              + В домашку ▾
+            </button>
+            <div class="ca-dropdown" id="hw-dd-{{ card.problem.pk }}"></div>
+          </div>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
+
+    {% else %}
+      <div class="empty-state">
+        <p>Задач не найдено</p>
+        <small>Попробуйте изменить фильтры или <a href="/catalog/">сбросить их</a></small>
+      </div>
+    {% endif %}
+
+    <!-- Пагинация -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="pagination">
+      {% if page_obj.has_previous %}
+      <a class="page-btn" href="?{{ base_query }}&page={{ page_obj.previous_page_number }}">←</a>
+      {% else %}
+      <span class="page-btn disabled">←</span>
+      {% endif %}
+
+      {% for num in page_range %}
+        {% if num == 0 %}
+          <span class="page-ellipsis">…</span>
+        {% elif num == page_obj.number %}
+          <span class="page-btn active">{{ num }}</span>
+        {% else %}
+          <a class="page-btn" href="?{{ base_query }}&page={{ num }}">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+      <a class="page-btn" href="?{{ base_query }}&page={{ page_obj.next_page_number }}">→</a>
+      {% else %}
+      <span class="page-btn disabled">→</span>
+      {% endif %}
+    </nav>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- ── Модальное окно условия задачи ── -->
+<div class="modal-backdrop" id="c-modal-backdrop" onclick="closeCatalogModal(event)">
+  <div class="c-modal" id="c-modal-box">
+    <div class="c-modal-head">
+      <div style="flex:1;">
+        <div class="c-modal-title" id="c-modal-title">…</div>
+        <div class="c-modal-meta" id="c-modal-meta"></div>
+      </div>
+      <button class="c-modal-close" onclick="closeCatalogModalDirect()">×</button>
+    </div>
+    <div class="c-modal-body" id="c-modal-body">
+      <div class="c-modal-loading">Загрузка…</div>
+    </div>
+    <div class="c-modal-foot">
+      <span class="c-modal-source" id="c-modal-source"></span>
+      <a id="c-modal-link" href="#" class="ca-btn ca-add"
+         style="font-size:13px;padding:6px 16px;text-decoration:none;">
+        Открыть задачу →
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Домашки учителя (JSON из view) ───────────────
+const TEACHER_ASSIGNMENTS = {{ teacher_assignments_json|safe }};
+
+// ── Модальное окно ────────────────────────────────
+function openCatalogModal(pid, e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  document.getElementById('c-modal-backdrop').classList.add('open');
+  document.getElementById('c-modal-title').textContent = '…';
+  document.getElementById('c-modal-meta').innerHTML = '';
+  document.getElementById('c-modal-source').textContent = '';
+  document.getElementById('c-modal-body').innerHTML = '<div class="c-modal-loading">Загрузка…</div>';
+  document.getElementById('c-modal-link').href = '/catalog/problem/' + pid + '/';
+
+  fetch('/catalog/api/problem/' + pid + '/')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('c-modal-body').textContent = 'Ошибка загрузки.';
+        return;
+      }
+      renderCatalogModal(data);
+    })
+    .catch(() => {
+      document.getElementById('c-modal-body').textContent = 'Ошибка сети.';
+    });
+}
+
+function renderCatalogModal(data) {
+  document.getElementById('c-modal-title').textContent = data.title;
+  document.getElementById('c-modal-link').href = '/catalog/problem/' + data.id + '/';
+
+  let metaHtml = '';
+  if (data.difficulty_str) {
+    metaHtml += `<span style="font-size:13px;color:#f5a623;">${data.difficulty_str}</span>`;
+  }
+  data.topics.forEach(t => {
+    metaHtml += `<span class="c-modal-tag">${t}</span>`;
+  });
+  if (data.problem_type) {
+    metaHtml += `<span class="c-modal-tag">${data.problem_type}</span>`;
+  }
+  if (data.has_solution) {
+    metaHtml += `<span class="c-modal-tag sol">решение ✓</span>`;
+  }
+  document.getElementById('c-modal-meta').innerHTML = metaHtml;
+
+  if (data.sources && data.sources.length) {
+    document.getElementById('c-modal-source').textContent = data.sources.join(', ');
+  }
+
+  let bodyHtml = `<div>${data.statement}</div>`;
+  if (data.parts && data.parts.length) {
+    data.parts.forEach(part => {
+      const pts = part.points
+        ? ` <span style="color:var(--text2);font-size:12px;">(${part.points} б.)</span>`
+        : '';
+      bodyHtml += `<div class="c-modal-part">
+        <div class="c-modal-part-label">${part.label ? part.label.replace(/[).．。\s]+$/,'')+')' : ''}${pts}</div>
+        <div>${part.text || ''}</div>
+      </div>`;
+    });
+  }
+  document.getElementById('c-modal-body').innerHTML = bodyHtml;
+
+  maskEscapedDollars(document.getElementById('c-modal-body'));
+  if (typeof renderMathInElement !== 'undefined') {
+    renderMathInElement(document.getElementById('c-modal-body'), {
+      delimiters: [
+        { left: '$$', right: '$$', display: true  },
+        { left: '$',  right: '$',  display: false },
+        { left: '\\[', right: '\\]', display: true  },
+        { left: '\\(', right: '\\)', display: false }
+      ],
+      throwOnError: false
+    });
+  }
+  // Чистка эскейпов — всегда, даже если CDN KaTeX не загрузился
+  fixCurrencyDollars(document.getElementById('c-modal-body'));
+}
+
+function closeCatalogModal(e) {
+  if (e.target === document.getElementById('c-modal-backdrop')) {
+    closeCatalogModalDirect();
+  }
+}
+function closeCatalogModalDirect() {
+  document.getElementById('c-modal-backdrop').classList.remove('open');
+  closeAllDropdowns();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeCatalogModalDirect();
+});
+
+// ── Dropdown "+ В домашку" для учителей ──────────
+let openDropdownPid = null;
+
+function closeAllDropdowns() {
+  if (openDropdownPid !== null) {
+    const dd = document.getElementById('hw-dd-' + openDropdownPid);
+    if (dd) dd.classList.remove('open');
+    openDropdownPid = null;
+  }
+}
+
+function toggleHwDropdown(pid, e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+
+  if (openDropdownPid === pid) {
+    closeAllDropdowns();
+    return;
+  }
+  closeAllDropdowns();
+
+  const dd = document.getElementById('hw-dd-' + pid);
+  if (!dd) return;
+
+  // Наполняем dropdown
+  if (TEACHER_ASSIGNMENTS.length === 0) {
+    dd.innerHTML = `
+      <div class="ca-dd-head">Добавить в:</div>
+      <a class="ca-dd-item new-hw" href="/teacher/assignment/create/?preselect=${pid}"
+         onclick="event.stopPropagation()">+ Новая домашка</a>`;
+  } else {
+    const items = TEACHER_ASSIGNMENTS.map(a =>
+      `<button class="ca-dd-item" onclick="addToAssignment(${a.id}, ${pid}, this); event.stopPropagation();">
+        ${a.name}
+      </button>`
+    ).join('');
+    dd.innerHTML = `
+      <div class="ca-dd-head">Добавить в:</div>
+      ${items}
+      <a class="ca-dd-item new-hw" href="/teacher/assignment/create/?preselect=${pid}"
+         onclick="event.stopPropagation()">+ Новая домашка</a>`;
+  }
+
+  dd.classList.add('open');
+  openDropdownPid = pid;
+}
+
+function addToAssignment(assignmentId, problemId, btn) {
+  const csrfToken = '{{ csrf_token }}';
+  fetch(`/teacher/api/assignment/${assignmentId}/add_problem/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken,
+    },
+    body: JSON.stringify({ problem_id: problemId }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      btn.textContent = '✓ Добавлено';
+      btn.classList.add('done');
+      const hwBtn = document.getElementById('hw-btn-' + problemId);
+      if (hwBtn) {
+        hwBtn.textContent = '✓ Добавлено';
+        hwBtn.classList.add('added');
+      }
+      setTimeout(closeAllDropdowns, 600);
+    }
+  })
+  .catch(() => {});
+}
+
+// Закрываем dropdown при клике вне
+document.addEventListener('click', e => {
+  if (openDropdownPid !== null) {
+    const wrap = document.getElementById('hw-wrap-' + openDropdownPid);
+    if (wrap && !wrap.contains(e.target)) {
+      closeAllDropdowns();
+    }
+  }
+});
+</script>
+{% endblock %}

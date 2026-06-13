@@ -1,0 +1,176 @@
+{% extends 'catalog/base.html' %}
+
+{% block title %}ЭкЗадачи{% endblock %}
+
+{% block extra_style %}
+/* ── Главная страница ───────────────────────────────── */
+.home-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-top: 48px;
+}
+
+.home-title {
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--text);
+}
+.home-title .accent { color: var(--accent); }
+
+.home-slogan {
+  margin-top: 10px;
+  font-size: 16px;
+  color: var(--text2);
+}
+
+/* ── Поиск ──────────────────────────────────────────── */
+.home-search {
+  margin-top: 36px;
+  width: 100%;
+  max-width: 560px;
+  position: relative;
+}
+.home-search input {
+  width: 100%;
+  height: 52px;
+  padding: 0 116px 0 20px;
+  font-size: 15px;
+  font-family: inherit;
+  border: 1.5px solid var(--border);
+  border-radius: 26px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.home-search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79,124,255,.15);
+}
+.home-search button {
+  position: absolute;
+  right: 6px; top: 6px;
+  height: 40px;
+  padding: 0 22px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.home-search button:hover { background: #3d66e0; }
+
+/* ── Статистика ─────────────────────────────────────── */
+.home-stats {
+  margin-top: 44px;
+  display: flex;
+  gap: 56px;
+}
+.stat-num {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--text);
+}
+.stat-label {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text2);
+}
+
+/* ── Карточки ───────────────────────────────────────── */
+.home-cards {
+  margin-top: 48px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 720px;
+}
+.home-card {
+  display: block;
+  padding: 24px 18px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--text);
+  background: #fff;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.home-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 16px rgba(79,124,255,.12);
+  transform: translateY(-2px);
+}
+.card-icon {
+  font-size: 28px;
+}
+.card-title {
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.card-desc {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--text2);
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .home-cards { grid-template-columns: 1fr; }
+  .home-stats { gap: 32px; }
+  .home-title { font-size: 34px; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="home-wrap">
+
+  <h1 class="home-title">Эк<span class="accent">Задачи</span></h1>
+  <p class="home-slogan">Платформа задач по олимпиадной экономике</p>
+
+  <form class="home-search" action="/catalog/" method="get">
+    <input type="text" name="q" placeholder="Поиск по условиям задач…" autofocus>
+    <button type="submit">Найти</button>
+  </form>
+
+  <div class="home-stats">
+    <div class="stat">
+      <div class="stat-num">{{ problems_count }}</div>
+      <div class="stat-label">задач в базе</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">{{ sources_count }}</div>
+      <div class="stat-label">источников</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">{{ topics_count }}</div>
+      <div class="stat-label">тем</div>
+    </div>
+  </div>
+
+  <div class="home-cards">
+    <a class="home-card" href="/catalog/">
+      <div class="card-icon">📚</div>
+      <div class="card-title">Каталог задач</div>
+      <div class="card-desc">Фильтры по теме, сложности и источнику, поиск по тексту</div>
+    </a>
+    <a class="home-card" href="/desmos/">
+      <div class="card-icon">📈</div>
+      <div class="card-title">Графический калькулятор</div>
+      <div class="card-desc">Кривые спроса и предложения, благосостояние, экспорт</div>
+    </a>
+    <a class="home-card" href="{% url 'catalog:random_problem' %}">
+      <div class="card-icon">🎲</div>
+      <div class="card-title">Случайная задача</div>
+      <div class="card-desc">Открыть случайную опубликованную задачу из базы</div>
+    </a>
+  </div>
+
+</div>
+{% endblock %}

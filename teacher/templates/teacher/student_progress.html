@@ -1,0 +1,184 @@
+{% extends 'teacher/base.html' %}
+
+{% block title %}Прогресс — {{ student.get_full_name|default:student.username }} — ЭкЗадачи{% endblock %}
+
+{% block extra_style %}
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.back-link { font-size: 13px; color: var(--text2); text-decoration: none; white-space: nowrap; }
+.back-link:hover { color: var(--text); }
+.avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+}
+.student-name { font-size: 20px; font-weight: 600; }
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.stat-card {
+  background: #fff;
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.stat-label { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+.stat-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat-value.muted { color: var(--text2); font-size: 20px; }
+.section {
+  background: #fff;
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
+}
+.section-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.progress-label { min-width: 200px; color: var(--text); }
+.progress-bar-wrap {
+  flex: 1;
+  height: 8px;
+  background: var(--panel);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width .3s;
+}
+.progress-pct { min-width: 34px; text-align: right; color: var(--text2); font-size: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; padding: 6px 10px; font-size: 12px; font-weight: 500; color: var(--text2); border-bottom: 0.5px solid var(--border); }
+td { padding: 10px 10px; border-bottom: 0.5px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+.mistake-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--border);
+  font-size: 14px;
+}
+.mistake-item:last-child { border-bottom: none; }
+.mistake-count {
+  font-size: 12px;
+  color: var(--text2);
+  background: var(--panel);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.empty { font-size: 13px; color: var(--text2); font-style: italic; }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <a href="javascript:history.back()" class="back-link">← Назад</a>
+  <div class="avatar">
+    {{ student.first_name|first|default:student.username|first|upper }}
+  </div>
+  <h1 class="student-name">
+    {{ student.get_full_name|default:student.username }}
+  </h1>
+</div>
+
+<!-- Сводные счётчики -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">Открытых проверено</div>
+    <div class="stat-value">{{ open_count }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Средний балл</div>
+    <div class="stat-value {% if not open_avg %}muted{% endif %}">
+      {% if open_avg %}{{ open_avg }}{% else %}—{% endif %}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Тестов пройдено</div>
+    <div class="stat-value">{{ test_count }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Верных ответов</div>
+    <div class="stat-value {% if not test_pct %}muted{% endif %}">
+      {% if test_pct %}{{ test_pct }}%{% else %}—{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Прогресс по темам -->
+<div class="section">
+  <div class="section-title">Прогресс по темам</div>
+  {% if topic_progress %}
+    {% for tp in topic_progress %}
+    <div class="progress-row">
+      <span class="progress-label">{{ tp.topic.name }}</span>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" style="width: {{ tp.level }}%;"></div>
+      </div>
+      <span class="progress-pct">{{ tp.level }}%</span>
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty">Пока нет данных.</p>
+  {% endif %}
+</div>
+
+<!-- История домашек -->
+<div class="section">
+  <div class="section-title">История домашек</div>
+  {% if homework_history %}
+  <table>
+    <thead>
+      <tr>
+        <th>Домашка</th>
+        <th>Ср. балл (откр.)</th>
+        <th>Верных тестов</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in homework_history %}
+      <tr>
+        <td>{{ row.assignment.name }}</td>
+        <td>{% if row.open_avg %}{{ row.open_avg }}{% else %}—{% endif %}</td>
+        <td>{% if row.test_pct %}{{ row.test_pct }}%{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="empty">Домашки ещё не проверялись.</p>
+  {% endif %}
+</div>
+
+<!-- Частые ошибки -->
+<div class="section">
+  <div class="section-title">Частые ошибки</div>
+  {% if mistake_counts %}
+    {% for m in mistake_counts %}
+    <div class="mistake-item">
+      <span>{{ m.mistakes__name }}</span>
+      <span class="mistake-count">{{ m.count }} раз</span>
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty">Ошибок не зафиксировано.</p>
+  {% endif %}
+</div>
+{% endblock %}

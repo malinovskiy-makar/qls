@@ -1,0 +1,143 @@
+{% extends "catalog/base.html" %}
+
+{% block title %}Новая подборка{% endblock %}
+
+{% block extra_style %}
+.new-col-wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding-top: 8px;
+}
+.new-col-wrap h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.new-col-wrap .subtitle {
+  font-size: 14px;
+  color: var(--text2);
+  margin-bottom: 32px;
+}
+.tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.tpl-card {
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 22px 18px 20px;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+  background: #fff;
+  text-align: center;
+  user-select: none;
+}
+.tpl-card:hover {
+  border-color: #a0b4ff;
+  box-shadow: 0 2px 10px rgba(79,124,255,.1);
+}
+.tpl-card.selected {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 3px rgba(79,124,255,.12);
+}
+.tpl-icon {
+  font-size: 30px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+.tpl-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+.tpl-desc {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.4;
+}
+.field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+.name-input {
+  width: 100%;
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  font-size: 15px;
+  color: var(--text);
+  background: #fff;
+  transition: border-color .12s;
+  margin-bottom: 20px;
+}
+.name-input:focus { outline: none; border-color: var(--accent); }
+.submit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 28px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s;
+}
+.submit-btn:hover { background: #3d6ef0; }
+{% endblock %}
+
+{% block content %}
+<div class="new-col-wrap">
+  <h1>Новая подборка</h1>
+  <p class="subtitle">Выберите тип и дайте название — потом добавите задачи из каталога</p>
+
+  <form method="post" action="{% url 'catalog:collection_new' %}">
+    {% csrf_token %}
+    <input type="hidden" name="template_type" id="id_template_type" value="homework">
+
+    <div class="tpl-grid">
+      <div class="tpl-card selected" data-type="homework" onclick="selectTpl(this)">
+        <div class="tpl-icon">📋</div>
+        <div class="tpl-name">Домашнее задание</div>
+        <div class="tpl-desc">Задачи на дом, с дедлайном</div>
+      </div>
+      <div class="tpl-card" data-type="test" onclick="selectTpl(this)">
+        <div class="tpl-icon">📝</div>
+        <div class="tpl-name">Контрольная работа</div>
+        <div class="tpl-desc">Варианты для проверки знаний</div>
+      </div>
+      <div class="tpl-card" data-type="sheet" onclick="selectTpl(this)">
+        <div class="tpl-icon">📄</div>
+        <div class="tpl-name">Листок задач</div>
+        <div class="tpl-desc">Тематическая подборка</div>
+      </div>
+    </div>
+
+    <label class="field-label" for="id_name">Название подборки</label>
+    <input class="name-input" type="text" name="name" id="id_name"
+           placeholder="Например: КПВ — занятие 3" autofocus required>
+
+    <button class="submit-btn" type="submit">Далее →</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function selectTpl(card) {
+  document.querySelectorAll('.tpl-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  document.getElementById('id_template_type').value = card.dataset.type;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,70 @@
+# База данных
+db.sqlite3
+*.sqlite3
+backups/
+
+# Исходные материалы для импорта (большие файлы, не нужны на сервере)
+materials/
+
+# Загружаемые пользователями файлы
+media/
+
+# Собранная статика (генерируется при деплое)
+staticfiles/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Django
+*.log
+local_settings.py
+.env
+.env.*
+
+# Отчёты (большие, не нужны на сервере)
+reports/
+
+# Node.js (Playwright)
+node_modules/
+package-lock.json
+package.json
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Дамп данных для деплоя (создаётся командой dump_for_deploy)
+data_dump.json
+
+# Временные файлы
+*.tmp
+/tmp/
+
+# Скриншоты Playwright
+shots/
+tools/*.mjs
+tools/*.py
+
+# OCR кэши
+materials/attachments/kylchik_ocr_cache.txt
+materials/attachments/ksigma_ocr_cache/
+
+# Swift скрипт OCR
+ocr_pdf.swift

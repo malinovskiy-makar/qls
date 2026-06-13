@@ -1,0 +1,204 @@
+{% extends "student/base.html" %}
+
+{% block title %}Мой прогресс{% endblock %}
+
+{% block extra_style %}
+.page-title { font-size: 24px; font-weight: 700; margin-bottom: 28px; }
+
+/* ── Статистика ──────────────────────────────────── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 36px;
+}
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  text-align: center;
+}
+.stat-num { font-size: 28px; font-weight: 800; color: var(--accent); }
+.stat-label { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+/* ── Секция ──────────────────────────────────────── */
+.section-title {
+  font-size: 16px; font-weight: 700; margin: 32px 0 14px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--border);
+}
+.section-title:first-of-type { margin-top: 0; }
+
+/* ── Прогресс-строки ─────────────────────────────── */
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.progress-topic {
+  width: 220px; flex-shrink: 0;
+  font-size: 14px; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.progress-bar {
+  flex: 1; height: 8px;
+  background: var(--border); border-radius: 4px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent), #7da4ff);
+  transition: width .4s ease;
+}
+.progress-val {
+  font-size: 13px; font-weight: 700; color: var(--accent);
+  width: 36px; text-align: right; flex-shrink: 0;
+}
+
+/* ── Ошибки ──────────────────────────────────────── */
+.mistake-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.mistake-count {
+  font-size: 12px; font-weight: 700;
+  background: #fff0f0; color: #c0392b;
+  border-radius: 20px; padding: 2px 9px;
+}
+
+/* ── Результаты тестов ───────────────────────────── */
+.overall-pct {
+  font-size: 14px; color: var(--text);
+  margin-bottom: 16px;
+}
+.topic-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.topic-name {
+  width: 220px; flex-shrink: 0;
+  font-size: 14px; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.topic-bar-wrap {
+  flex: 1; height: 8px;
+  background: var(--border); border-radius: 4px; overflow: hidden;
+}
+.topic-bar {
+  height: 100%; border-radius: 4px;
+  background: var(--accent);
+  transition: width .4s ease;
+}
+.topic-level {
+  font-size: 13px; font-weight: 700;
+  width: 44px; text-align: right; flex-shrink: 0;
+}
+
+/* ── Пустые состояния ────────────────────────────── */
+.empty-hint {
+  color: var(--text2); font-size: 14px; font-style: italic;
+  padding: 16px 0;
+}
+.no-data {
+  color: var(--text2); font-size: 14px; font-style: italic;
+  padding: 16px 0;
+}
+{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Мой прогресс</h1>
+
+<!-- Блок 1: Общая статистика -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-num">{{ open_reviewed }}</div>
+    <div class="stat-label">Открытых проверено</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{ total_test_subs }}</div>
+    <div class="stat-label">Тестов пройдено</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{ total_submitted }}</div>
+    <div class="stat-label">На проверке</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{ topic_progress|length }}</div>
+    <div class="stat-label">Тем изучено</div>
+  </div>
+</div>
+
+<!-- Блок 2: Прогресс по темам -->
+<div class="section-title">Прогресс по темам</div>
+{% if topic_progress %}
+  {% for tp in topic_progress %}
+  <div class="progress-row">
+    <div class="progress-topic" title="{{ tp.topic.name }}">{{ tp.topic.name }}</div>
+    <div class="progress-bar">
+      <div class="progress-fill" style="width:{{ tp.level }}%"></div>
+    </div>
+    <div class="progress-val">{{ tp.level }}</div>
+  </div>
+  {% endfor %}
+{% else %}
+  <p class="empty-hint">Пока нет данных. Реши первую домашку!</p>
+{% endif %}
+
+<!-- Блок 3: Результаты тестов -->
+<div class="section-title">Результаты тестов</div>
+{% if test_overall_pct is not None %}
+  <p class="overall-pct">Общий результат: <strong>{{ test_overall_pct }}%</strong> верных ответов ({{ total_test_correct }} из {{ total_test_subs }})</p>
+  {% if test_topic_stats %}
+    {% for t in test_topic_stats %}
+    <div class="topic-item">
+      <div class="topic-name" title="{{ t.topic }}">{{ t.topic }}</div>
+      <div class="topic-bar-wrap">
+        <div class="topic-bar" style="width:{{ t.pct }}%;"></div>
+      </div>
+      <div class="topic-level" style="color:#4f7cff;">{{ t.correct }}/{{ t.total }}</div>
+    </div>
+    {% endfor %}
+  {% endif %}
+{% else %}
+  <p class="no-data">Пока тестов не пройдено.</p>
+{% endif %}
+
+<!-- Блок 4: Прогресс по навыкам -->
+<div class="section-title">Прогресс по навыкам</div>
+{% if skill_progress %}
+  {% for sp in skill_progress %}
+  <div class="progress-row">
+    <div class="progress-topic" title="{{ sp.skill.name }}">{{ sp.skill.name }}</div>
+    <div class="progress-bar">
+      <div class="progress-fill" style="width:{{ sp.level }}%"></div>
+    </div>
+    <div class="progress-val">{{ sp.level }}</div>
+  </div>
+  {% endfor %}
+{% else %}
+  <p class="empty-hint">Навыки появятся после нескольких проверенных домашек.</p>
+{% endif %}
+
+<!-- Блок 4: Типичные ошибки -->
+<div class="section-title">Частые ошибки</div>
+{% if mistake_counts %}
+  {% for row in mistake_counts %}
+  {% if row.mistakes__name %}
+  <div class="mistake-row">
+    <span>{{ row.mistakes__name }}</span>
+    <span class="mistake-count">{{ row.count }}×</span>
+  </div>
+  {% endif %}
+  {% endfor %}
+{% else %}
+  <p class="empty-hint">Отлично! Пока ошибок не зафиксировано.</p>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "qls-platform",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
+      "runtimeArgs": ["/Users/makarmalinovskiy/Downloads/qls_platform/manage.py", "runserver", "8000"],
+      "port": 8000
+    },
+    {
+      "name": "qls-preview",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
+      "runtimeArgs": ["/Users/makarmalinovskiy/Downloads/qls_platform/manage.py", "runserver", "8001"],
+      "port": 8001,
+      "autoPort": false
+    }
+  ]
+}
