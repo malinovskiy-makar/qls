@@ -52,9 +52,10 @@ STANDARD_APPS = [
     'problems.CalendarEvent',
     'problems.StudentGroup',
     'problems.AutoTopicAssignment',
-    'auth.Group',
-    'auth.Permission',
-    'sessions.Session',
+    # auth.Group / auth.Permission / contenttypes / sessions / admin.LogEntry
+    # НЕ дампим: permissions и contenttypes автосоздаются при migrate,
+    # групп нет, у юзеров нет прямых permissions, сессии эфемерны.
+    # Это устраняет конфликты PK и FK-к-contenttype при loaddata.
 ]
 
 
