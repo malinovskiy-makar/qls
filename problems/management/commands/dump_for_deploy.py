@@ -1,130 +1,172 @@
 """
-Команда dump_for_deploy — создаёт JSON-дамп данных для деплоя на PostgreSQL.
+Команда dump_for_deploy — порционный JSON-дамп данных для деплоя на PostgreSQL.
 
-Исключает поле Problem.embedding (46 МБ binary → слишком большой дамп).
-Эмбеддинги не нужны на продакшене: похожие задачи работают по кэшу M2M.
+Зачем порции:
+  1) Render free-tier PostgreSQL обрывает долгие внешние транзакции — большой
+     дамп в одной транзакции не доезжает. Короткие транзакции (по файлу) переживают.
+  2) Меньше памяти при разборе каждого файла.
+
+Что исключается из Problem:
+  - поле embedding (46 МБ binary, на проде не нужно — модель там не грузится);
+  - M2M similar_problems (self-ref, 105 540 строк) — выгружается ОТДЕЛЬНО последним
+    шагом, когда все Problem уже загружены (иначе forward-ссылки через границы
+    транзакций ломают FK).
+
+Порядок файлов (по зависимостям, грузить в алфавитном порядке имён):
+  10_reference   — независимые справочники (User, Topic, Tag, Source, ...)
+  20_problem_*   — Problem порциями (без embedding, без similar_problems)
+  30_sourceref_* — SourceReference порциями (FK Problem)
+  31_part_*      — ProblemPart порциями (FK Problem)
+  40_misc        — мелкие связанные модели (Lesson, Assignment, Submission, ...)
+  50_dupcand_*   — DuplicateCandidate порциями (FK Problem)
+  51_autotopic_* — AutoTopicAssignment порциями (FK Problem, Topic)
+  90_similar_*   — through-таблица similar_problems порциями (грузить ПОСЛЕДНЕЙ)
 
 Запуск:
-    ./venv/bin/python manage.py dump_for_deploy -o data_dump.json
-    ./venv/bin/python manage.py dump_for_deploy  # вывод в stdout
+    ./venv/bin/python manage.py dump_for_deploy --outdir deploy_fixtures --chunk 5000
 """
 
 import json
+import os
 
+from django.apps import apps
 from django.core import serializers
 from django.core.management.base import BaseCommand
 
 from problems.models import Problem
 
-# Модели, которые дампаем ОТДЕЛЬНО (без поля embedding)
-EXCLUDE_FIELDS = {
-    'problems.problem': {'embedding'},
-}
+# Справочники без FK на Problem (грузятся первыми)
+TIER1 = [
+    'problems.User', 'problems.Topic', 'problems.Subtopic', 'problems.Tag',
+    'problems.Source', 'problems.FileAsset', 'problems.Skill',
+    'problems.MistakeTag', 'problems.Template', 'problems.DesmosGraph',
+    'problems.StudentGroup', 'problems.Job', 'problems.TheoryPage',
+]
 
-# Приложения/модели для стандартного дампа (всё кроме системного мусора и Problem)
-STANDARD_APPS = [
-    'problems.User',
-    'problems.Topic',
-    'problems.Subtopic',
-    'problems.Tag',
-    'problems.Source',
-    'problems.FileAsset',
-    'problems.Skill',
-    'problems.MistakeTag',
-    'problems.TheoryPage',
-    'problems.Rubric',
-    'problems.RubricCriterion',
-    'problems.Hint',
-    'problems.StudentSkillProgress',
-    'problems.ProblemVersion',
-    'problems.Collection',
-    'problems.Job',
-    'problems.Template',
-    'problems.ExportRecord',
-    'problems.ImportSession',
-    'problems.Lesson',
-    'problems.Assignment',
-    'problems.Submission',
-    'problems.TeacherFeedback',
-    'problems.StudentTopicProgress',
-    'problems.DuplicateCandidate',
-    'problems.DesmosGraph',
+# Мелкие модели, зависящие от Problem/User (грузятся после Problem одним файлом)
+TIER4_MISC = [
+    'problems.ProblemVersion', 'problems.Hint', 'problems.Rubric',
+    'problems.RubricCriterion', 'problems.StudentSkillProgress',
+    'problems.Collection', 'problems.ExportRecord', 'problems.ImportSession',
+    'problems.Lesson', 'problems.Assignment', 'problems.Submission',
+    'problems.TeacherFeedback', 'problems.StudentTopicProgress',
     'problems.CalendarEvent',
-    'problems.StudentGroup',
-    'problems.AutoTopicAssignment',
-    # auth.Group / auth.Permission / contenttypes / sessions / admin.LogEntry
-    # НЕ дампим: permissions и contenttypes автосоздаются при migrate,
-    # групп нет, у юзеров нет прямых permissions, сессии эфемерны.
-    # Это устраняет конфликты PK и FK-к-contenttype при loaddata.
 ]
 
 
+def _clean_nul(value):
+    """Рекурсивно убирает байт NUL (0x00) из строк — PostgreSQL его запрещает,
+    а SQLite хранит. Невидимый мусорный символ, удаление безопасно."""
+    if isinstance(value, str):
+        return value.replace('\x00', '')
+    if isinstance(value, list):
+        return [_clean_nul(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _clean_nul(v) for k, v in value.items()}
+    return value
+
+
+def serialize_qs(qs, strip_fields=None):
+    """Сериализует queryset в список dict, удаляя ненужные поля и NUL-байты."""
+    data = json.loads(serializers.serialize('json', qs))
+    for obj in data:
+        if strip_fields:
+            for f in strip_fields:
+                obj['fields'].pop(f, None)
+        obj['fields'] = _clean_nul(obj['fields'])
+    return data
+
+
 class Command(BaseCommand):
-    help = 'Дамп данных для деплоя (без поля embedding)'
+    help = 'Порционный дамп данных для деплоя (без embedding, similar отдельно)'
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            '-o', '--output', type=str, default=None,
-            help='Файл для сохранения (по умолчанию — stdout)'
-        )
+        parser.add_argument('--outdir', type=str, default='deploy_fixtures')
+        parser.add_argument('--chunk', type=int, default=5000)
+
+    def write_file(self, outdir, name, objects):
+        path = os.path.join(outdir, name)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(objects, f, ensure_ascii=False)
+        self.stdout.write(f'  {name}: {len(objects)} объектов')
+
+    def dump_model_chunked(self, outdir, prefix, model_label, chunk, strip=None):
+        """Дамп одной модели порциями по chunk объектов."""
+        model = apps.get_model(*model_label.split('.'))
+        qs = model.objects.all().order_by('pk')
+        if model_label == 'problems.Problem':
+            qs = qs.defer('embedding')
+        total = qs.count()
+        if total == 0:
+            return
+        n = 0
+        idx = 0
+        while n < total:
+            batch = list(qs[n:n + chunk])
+            data = serialize_qs(batch, strip_fields=strip)
+            idx += 1
+            self.write_file(outdir, f'{prefix}_{idx:04d}.json', data)
+            n += len(batch)
 
     def handle(self, *args, **options):
-        self.stdout.write('Собираем дамп без поля embedding...')
+        outdir = options['outdir']
+        chunk = options['chunk']
+        os.makedirs(outdir, exist_ok=True)
 
-        all_objects = []
+        # Чистим старые файлы
+        for fn in os.listdir(outdir):
+            if fn.endswith('.json'):
+                os.remove(os.path.join(outdir, fn))
 
-        # 1. Стандартные модели
-        for model_label in STANDARD_APPS:
+        self.stdout.write('TIER 1 — справочники:')
+        ref_objects = []
+        for label in TIER1:
             try:
-                from django.apps import apps
-                app_label, model_name = model_label.rsplit('.', 1)
-                model = apps.get_model(app_label, model_name)
-                qs = model.objects.all()
-                count = qs.count()
-                if count:
-                    data = json.loads(serializers.serialize('json', qs))
-                    all_objects.extend(data)
-                    self.stdout.write(f'  {model_label}: {count} объектов')
+                model = apps.get_model(*label.split('.'))
             except LookupError:
-                self.stdout.write(self.style.WARNING(f'  {model_label}: модель не найдена, пропускаем'))
+                continue
+            ref_objects.extend(serialize_qs(model.objects.all()))
+        self.write_file(outdir, '10_reference.json', ref_objects)
 
-        # 2. Problem — без поля embedding
-        self.stdout.write('  problems.Problem: без поля embedding...')
-        problems_qs = Problem.objects.all().defer('embedding')
-        problem_data = []
-        BATCH = 500
-        total = problems_qs.count()
-        processed = 0
+        self.stdout.write('TIER 2 — Problem (без embedding, без similar_problems):')
+        self.dump_model_chunked(
+            outdir, '20_problem', 'problems.Problem', chunk,
+            strip=['embedding', 'similar_problems'],
+        )
 
-        for i in range(0, total, BATCH):
-            batch = problems_qs[i:i + BATCH]
-            batch_json = json.loads(serializers.serialize('json', batch))
-            # Удаляем поле embedding из каждого объекта
-            for obj in batch_json:
-                obj['fields'].pop('embedding', None)
-            problem_data.extend(batch_json)
-            processed += len(batch_json)
-            if processed % 5000 == 0 or processed == total:
-                self.stdout.write(f'    {processed}/{total}')
+        self.stdout.write('TIER 3 — SourceReference / ProblemPart:')
+        self.dump_model_chunked(outdir, '30_sourceref', 'problems.SourceReference', chunk)
+        self.dump_model_chunked(outdir, '31_part', 'problems.ProblemPart', chunk)
 
-        all_objects.extend(problem_data)
-        self.stdout.write(f'  problems.Problem: {total} объектов (embedding исключён)')
+        self.stdout.write('TIER 4 — мелкие связанные модели:')
+        misc_objects = []
+        for label in TIER4_MISC:
+            try:
+                model = apps.get_model(*label.split('.'))
+            except LookupError:
+                continue
+            misc_objects.extend(serialize_qs(model.objects.all()))
+        self.write_file(outdir, '40_misc.json', misc_objects)
 
-        # 3. M2M-связи Problem (topics, tags, skills, mistakes, similar_problems)
-        # Они хранятся в промежуточных таблицах и сериализуются вместе с Problem,
-        # но django serializer их включает автоматически через Many2Many.
-        # Проверим что similar_problems (SymmetricalFalse) тоже в дампе.
+        self.stdout.write('TIER 4b — DuplicateCandidate / AutoTopicAssignment:')
+        self.dump_model_chunked(outdir, '50_dupcand', 'problems.DuplicateCandidate', chunk)
+        self.dump_model_chunked(outdir, '51_autotopic', 'problems.AutoTopicAssignment', chunk)
 
-        result_json = json.dumps(all_objects, ensure_ascii=False, indent=2)
+        self.stdout.write('TIER 5 — similar_problems through (грузить ПОСЛЕДНЕЙ):')
+        through = Problem.similar_problems.through
+        through_label = through._meta.label
+        qs = through.objects.all().order_by('pk')
+        total = qs.count()
+        n = idx = 0
+        while n < total:
+            batch = list(qs[n:n + chunk])
+            data = json.loads(serializers.serialize('json', batch))
+            idx += 1
+            self.write_file(outdir, f'90_similar_{idx:04d}.json', data)
+            n += len(batch)
 
-        output_path = options.get('output')
-        if output_path:
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(result_json)
-            size_mb = len(result_json.encode('utf-8')) / 1024 / 1024
-            self.stdout.write(self.style.SUCCESS(
-                f'\nДамп сохранён: {output_path} ({size_mb:.1f} МБ)'
-            ))
-            self.stdout.write(f'Всего объектов: {len(all_objects)}')
-        else:
-            self.stdout.write(result_json)
+        files = sorted(f for f in os.listdir(outdir) if f.endswith('.json'))
+        self.stdout.write(self.style.SUCCESS(
+            f'\nГотово: {len(files)} файлов в {outdir}/'
+        ))
+        self.stdout.write(f'through-модель: {through_label}')
