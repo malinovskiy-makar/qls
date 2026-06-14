@@ -33,10 +33,14 @@ class Command(BaseCommand):
                             help='Папка с фикстурами (по умолчанию deploy_fixtures)')
         parser.add_argument('--retry', type=int, default=3,
                             help='Сколько раз повторить файл при ошибке')
+        parser.add_argument('--done-file', type=str, default=None,
+                            help='Файл-журнал успешно загруженных (для возобновления). '
+                                 'Уже записанные в нём файлы пропускаются.')
 
     def handle(self, *args, **options):
         directory = options['dir']
         max_retry = options['retry']
+        done_file = options['done_file']
 
         # Ловим и .json, и .json.gz (loaddata читает gzip напрямую по расширению)
         files = sorted(glob.glob(os.path.join(directory, '*.json'))
@@ -45,17 +49,28 @@ class Command(BaseCommand):
             self.stderr.write(f'Нет файлов в {directory}/*.json[.gz]')
             return
 
-        self.stdout.write(f'Найдено файлов: {len(files)}')
+        # Возобновление: пропускаем уже загруженные файлы из done-файла
+        done = set()
+        if done_file and os.path.exists(done_file):
+            with open(done_file) as fh:
+                done = {ln.strip() for ln in fh if ln.strip()}
+
+        self.stdout.write(f'Найдено файлов: {len(files)} (уже загружено: {len(done)})')
         ok = 0
         failed = []
 
         for i, path in enumerate(files, 1):
             name = os.path.basename(path)
+            if name in done:
+                continue
             for attempt in range(1, max_retry + 1):
                 self.stdout.write(f'[{i}/{len(files)}] {name} (попытка {attempt})...')
                 try:
                     call_command('loaddata', path, verbosity=0)
                     ok += 1
+                    if done_file:
+                        with open(done_file, 'a') as fh:
+                            fh.write(name + '\n')
                     break
                 except Exception as exc:  # noqa: BLE001
                     self.stderr.write(f'    ошибка: {exc}')
@@ -65,8 +80,8 @@ class Command(BaseCommand):
                         failed.append(name)
 
         self.stdout.write('=' * 40)
-        self.stdout.write(self.style.SUCCESS(f'Загружено файлов OK: {ok}'))
+        self.stdout.write(self.style.SUCCESS(f'Загружено файлов в этот заход: {ok}'))
         if failed:
             self.stderr.write(f'Провалено: {len(failed)} — {", ".join(failed)}')
-        else:
-            self.stdout.write(self.style.SUCCESS('Все файлы загружены без ошибок.'))
+        elif not failed:
+            self.stdout.write(self.style.SUCCESS('Сбойных файлов нет.'))

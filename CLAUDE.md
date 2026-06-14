@@ -3144,3 +3144,81 @@ python manage.py quality_gate --apply  # применить шлюз качес�
 - Приложение засыпает на бесплатном тире — при переходе на платный исчезнет.
 - sentence-transformers только локально — при необходимости импорта новых задач
   с эмбеддингами делать локально, потом заливать дамп.
+
+## Г1 ЗАВЕРШЁН — сайт в проде (2026-06-15)
+
+**🌐 Продакшен-URL: https://qls-platform.onrender.com**
+
+- Хостинг: Render.com (free), регион Frankfurt. БД: PostgreSQL `qls-db` (free, 90 дней).
+- Репозиторий: приватный `https://github.com/malinovskiy-makar/qls` (ветка `main`).
+- В проде: **31 472 задачи** (видимых 18 622), 61 260 подпунктов, 31 469 source-ref,
+  105 540 связей «похожие», 849 тем. Эмбеддинги в прод НЕ грузились (не нужны).
+- На главной — 31 472; `/catalog/` — 200; `/admin/` — 302; KaTeX и фикс `\$`
+  (maskEscapedDollars) на страницах работают.
+
+### Как деплоить изменения
+
+```
+git add .
+git commit -m "описание"
+git push origin main
+```
+Render автоматически передеплоивает при пуше в `main` (2–4 мин).
+
+### ⚠️ Free tier Render: важные ограничения (выяснено в Г1)
+
+- **Нет Shell** на бесплатном тарифе → management-команды на проде запускать
+  НЕЛЬЗЯ напрямую. Только: (а) локально против внешней базы, либо (б) временно
+  через `startCommand` в render.yaml.
+- **Port-scan timeout:** в `startCommand` сервис ОБЯЗАН открыть порт за ~3 мин,
+  иначе деплой = `Timed Out`. Поэтому долгие операции в `startCommand` ДО `gunicorn`
+  убивают деплой; `gunicorn` должен стартовать первым.
+- **1 общий CPU / 512 МБ:** фоновая тяжёлая операция душит `gunicorn` → health-чек
+  падает → петля перезапусков. `nice` спасает gunicorn, но душит саму операцию.
+- **Сон после 15 мин без HTTP**, просыпается ~30 сек. Для беты ок.
+
+### Загрузка/обновление данных в прод (РАБОЧИЙ способ)
+
+Внешнее `loaddata` (по 1 INSERT на объект) через канал в Франкфурт — НЕПРИГОДНО
+(часы, обрывы). Рабочий способ — **bulk_create локально против внешней базы**:
+
+```
+# 1. собрать порционные gzip-фикстуры (исключают embedding, чистят NUL-байты)
+./venv/bin/python manage.py dump_for_deploy --outdir deploy_fixtures --chunk 2000
+gzip -f deploy_fixtures/*.json
+
+# 2. залить пачками (ignore_conflicts → идемпотентно, ~минуты)
+SECRET_KEY=любой \
+DATABASE_URL="<External Database URL Render>?sslmode=require" \
+DJANGO_SETTINGS_MODULE=config.settings_production \
+./venv/bin/python manage.py bulk_load_fixtures --dir deploy_fixtures
+```
+
+External Database URL — в Render Dashboard → qls-db → Connections.
+Команды: `dump_for_deploy`, `bulk_load_fixtures` (быстрая, через bulk_create),
+`load_fixtures_dir` (через loaddata, для отладки). deploy_fixtures/ и
+load_to_render.sh — в `.gitignore` (фикстуры большие, скрипт содержит пароль).
+
+### ⚠️ Сменить пароль admin (СРОЧНО — безопасность)
+
+В проде `admin` пришёл из дампа с дев-паролем `admin12345` (публично известен).
+Сменить: войти на https://qls-platform.onrender.com/admin/ (admin / admin12345)
+→ изменить пароль через интерфейс. Либо локально:
+`DATABASE_URL="<external>?sslmode=require" DJANGO_SETTINGS_MODULE=config.settings_production
+SECRET_KEY=любой ./venv/bin/python manage.py changepassword admin`.
+Тестовые teacher1/student1 (…12345) тоже в проде — сменить или удалить перед боем.
+
+### Создать суперпользователя на проде
+
+Shell нет → локально против внешней базы:
+`DATABASE_URL="<external>?sslmode=require" DJANGO_SETTINGS_MODULE=config.settings_production
+SECRET_KEY=любой ./venv/bin/python manage.py createsuperuser`.
+
+### Технические долги деплоя (Г1)
+
+- **Сменить пароль admin/teacher1/student1** на проде (см. выше) — до показа кому-либо.
+- PDF-экспорт подборок отключён (xelatex нет без Docker) — только `.tex` + Overleaf.
+  Вернуть на платном тарифе через Dockerfile с TeX Live.
+- Сон free-tier (15 мин) и лимит PostgreSQL (90 дней) — уйдут на платном тарифе.
+- Эмбеддинги в проде нет: новые «похожие» считать локально и доливать `bulk_load_fixtures`.
+- В истории git остались временные коммиты с фикстурами (приватный репо — приемлемо).
