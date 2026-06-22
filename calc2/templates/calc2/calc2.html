@@ -4725,16 +4725,17 @@ function drawRobinHood() {
     .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Робин Гуд ' + fmt(st.hoover));
 }
 
-// Узлы кривой Лоренца. В способе 'groups' — перетаскиваемые (ЧК2), иначе просто точки.
+// Узлы кривой Лоренца. В способах 'groups' и 'incomes' — перетаскиваемые
+// (ЧК2 / Задача 2); в 'formula' — узлов нет.
 function drawLorenzNodes() {
   if (STATE.ineqInput === 'formula') return;
   const pts = STATE.ineqLorenz;
   const g = svg.append('g');
   for (let i = 1; i < pts.length - 1; i++) {           // концы (0,0) и (1,1) зафиксированы
     const px = sx(pts[i][0] * 100), py = sy(pts[i][1] * 100);
-    if (STATE.ineqInput === 'groups') {
+    if (STATE.ineqInput === 'groups' || STATE.ineqInput === 'incomes') {
       const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 12).attr('fill', 'transparent').style('cursor', 'ns-resize');
-      attachLorenzNodeDrag(hit, i);                     // ЧК2
+      attachLorenzNodeDrag(hit, i);                     // ЧК2 (groups) / Задача 2 (incomes)
     }
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
       .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5).style('pointer-events', 'none');
@@ -4756,14 +4757,39 @@ function ineqDragNode(i, vFraction) {
   STATE.ineqGroups = nf.map(f => Math.round(f * 1000) / 10);   // обратно в % (сумма = 100)
 }
 
-// Перетаскивание узла i кривой Лоренца по вертикали (способ 'groups', ЧК2).
-// Меняется накопленная доля дохода в точке i → доли соседних групп i−1 и i.
+// Перетаскивание узла i в способе 'incomes' = изменение дохода человека i.
+// Узел i (1..N−1) соответствует i-му человеку отсортированного списка (богатейший N
+// закреплён в (1,1)). Целевая накопленная доля v → новый доход человека i =
+// (v·T − кумул. доход до i−1). Зажим между доходами соседей сохраняет порядок (→ вогнутость).
+function ineqDragIncome(i, vFraction) {
+  const xs = parseNumberList(STATE.ineqIncomes).filter(v => v >= 0).sort((a, b) => a - b);
+  const N = xs.length;
+  if (i < 1 || i > N - 1) return;                      // последний человек закреплён
+  const T = xs.reduce((a, b) => a + b, 0) || 1;
+  let cumPrev = 0; for (let k = 0; k < i - 1; k++) cumPrev += xs[k];
+  const lo = (i >= 2) ? xs[i - 2] : 0;                 // доход предыдущего человека (или 0)
+  const hi = xs[i];                                    // доход следующего человека
+  let xnew = vFraction * T - cumPrev;
+  xnew = Math.max(lo, Math.min(hi, xnew));
+  xs[i - 1] = Math.round(xnew * 100) / 100;
+  STATE.ineqIncomes = xs.join(', ');
+}
+
+// Перетаскивание узла i кривой Лоренца по вертикали. Способ 'groups' (ЧК2) —
+// меняется накопленная доля дохода → доли соседних групп; способ 'incomes' (Задача 2)
+// — меняется доход соответствующего человека. Общий механизм, разная логика.
 function attachLorenzNodeDrag(sel, i) {
   sel.call(d3.drag().container(() => svg.node())
     .on('start', () => { document.body.style.cursor = 'grabbing'; })
     .on('drag', (event) => {
-      ineqDragNode(i, sy.invert(event.y) / 100);       // тянем по Y (доля дохода, 0..1)
-      renderIneqGroupsTable();
+      const v = sy.invert(event.y) / 100;              // тянем по Y (доля дохода, 0..1)
+      if (STATE.ineqInput === 'incomes') {
+        ineqDragIncome(i, v);
+        const inc = document.getElementById('ineq-incomes'); if (inc) inc.value = STATE.ineqIncomes;
+      } else {
+        ineqDragNode(i, v);
+        renderIneqGroupsTable();
+      }
       redrawAll();
     })
     .on('end', () => { document.body.style.cursor = ''; }));
