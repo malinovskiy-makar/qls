@@ -216,6 +216,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         и продавца можно тянуть мышью.</div>
       <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
         дефицит (продаётся меньше), пол выше равновесия — избыток. Линию цены можно тянуть мышью.</div>
+      <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-ghost" checked>
+        <span class="swatch" style="background:#ddd;border:1px solid #aaa;"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
       <div id="info-tax" style="margin-top:8px;"></div>
     </div>
 
@@ -283,6 +285,7 @@ const STATE = {
   intervType: 'tax', // 'tax' — налог (S вверх), 'subsidy' — субсидия (S вниз),
                      // 'ceiling' — потолок цены, 'floor' — пол цены
   pReg: 0,           // регулируемая цена (для потолка / пола); 0 = не задана
+  showGhost: true,   // показывать бледное исходное состояние «было → стало»
 };
 
 /* ---------------------------------------------------------------------
@@ -838,11 +841,8 @@ function drawTaxPoints() {
   const xQ1 = sx(Q), yPb = sy(Pb), yPs = sy(Ps);
   const g = svg.append('g');
 
-  // Исходное равновесие E₀ — бледная полая точка для сравнения.
-  const [x0, y0] = toPx(STATE.eq.Q, STATE.eq.P);
-  g.append('circle').attr('cx', x0).attr('cy', y0).attr('r', 4)
-    .attr('fill', '#fff').attr('stroke', '#aaa').attr('stroke-width', 1.5);
-  haloText(g, x0 + 7, y0 - 6, 'E₀', 'start', 'auto');
+  // Исходное равновесие E₀ рисует общий слой-призрак drawGhost()
+  // (галочка «было → стало»), поэтому здесь его не дублируем.
 
   // Проекции к осям для цен покупателя/продавца и количества.
   const dash = (x1, y1, x2, y2) => g.append('line')
@@ -1117,6 +1117,34 @@ function updatePcPanel() {
 }
 
 /* ---------------------------------------------------------------------
+   БЛОК 8в. «БЫЛО → СТАЛО» — бледный слой исходного состояния (Задача 2).
+   При любом активном вмешательстве (налог / субсидия / потолок / пол)
+   показывает, где было равновесие ДО него. Рисуется ПОД кривыми и
+   точками; общий код для всех сценариев; включается галочкой.
+   Сами кривые D и S не дублируем — базовые кривые и так на графике
+   (для налога исходная S сплошная, сдвинутая — пунктир).
+   --------------------------------------------------------------------- */
+function drawGhost() {
+  if (!STATE.showGhost) return;
+  if (!(STATE.taxActive || STATE.pcActive) || !STATE.eq) return;
+  const { Q, P } = STATE.eq;               // исходное равновесие E₀ (до вмешательства)
+  const [px, py] = toPx(Q, P);
+  const ox = sx(0), oy = sy(0);
+  const g = svg.append('g').attr('class', 'ghost');
+  // Бледные проекции исходного равновесия к осям.
+  g.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy)
+    .attr('stroke', '#c4c4c4').attr('stroke-width', 1).attr('stroke-dasharray', '3 3');
+  g.append('line').attr('x1', px).attr('y1', py).attr('x2', ox).attr('y2', py)
+    .attr('stroke', '#c4c4c4').attr('stroke-width', 1).attr('stroke-dasharray', '3 3');
+  // Бледная полая точка E₀ и подпись.
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
+    .attr('fill', '#fff').attr('stroke', '#aaa').attr('stroke-width', 1.5);
+  g.append('text').attr('x', px + 7).attr('y', py - 6)
+    .attr('font-size', 11).attr('font-weight', 600).attr('fill', '#999')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('E₀');
+}
+
+/* ---------------------------------------------------------------------
    БЛОК 9. redrawAll() — единая точка перерисовки.
    Любое изменение (кривая, перетаскивание, налог) дёргает её.
    --------------------------------------------------------------------- */
@@ -1132,6 +1160,7 @@ function redrawAll() {
   if (STATE.taxActive) drawTaxAreas();
   else if (STATE.pcActive) drawPcAreas();
   else drawAreas();
+  drawGhost();                   // бледный слой «было» под кривыми/точками
   drawCurves();
   drawShiftedSupply();           // пунктирная S + t (если налог активен)
   // Точки/линии: налог E₀/E₁, регулирование цены или обычное равновесие E*.
@@ -1273,6 +1302,10 @@ function wireControls() {
   const ps = document.getElementById('chk-ps');
   cs.addEventListener('change', () => { STATE.showCS = cs.checked; redrawAll(); });
   ps.addEventListener('change', () => { STATE.showPS = ps.checked; redrawAll(); });
+
+  // Галочка «было → стало» (бледное исходное состояние при вмешательстве).
+  const ghost = document.getElementById('chk-ghost');
+  if (ghost) ghost.addEventListener('change', () => { STATE.showGhost = ghost.checked; redrawAll(); });
 
   // Ползунок ставки (синхронизирован с перетаскиванием клина через setTax).
   const taxSlider = document.getElementById('tax-slider');
