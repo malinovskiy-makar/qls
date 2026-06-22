@@ -220,12 +220,44 @@ function compileFormula(expr) {
 
 // Значение кривой в точке Q. Возвращает число или NaN (на ошибке/разрыве).
 function evalCurve(curve, q) {
+  // Быстрый путь для прямых (нужен и для плавного перетаскивания).
+  if (curve.linear) return curve.linear.a * q + curve.linear.b;
   try {
     const v = curve.compiled.evaluate({ x: q, Q: q });
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) {
     return NaN;
   }
+}
+
+// Определяем, линейна ли кривая: считаем наклон по трём точкам.
+// Постоянный наклон -> это прямая P = a*Q + b (возвращаем {a, b}),
+// иначе null. Работает для ЛЮБОЙ записи формулы (не разбираем строку).
+function detectLinear(compiled) {
+  const at = (q) => {
+    try { const v = compiled.evaluate({ x: q, Q: q }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+    catch (e) { return NaN; }
+  };
+  const q1 = CONFIG.Qmax * 0.2, q2 = CONFIG.Qmax * 0.5, q3 = CONFIG.Qmax * 0.8;
+  const f1 = at(q1), f2 = at(q2), f3 = at(q3);
+  if (isNaN(f1) || isNaN(f2) || isNaN(f3)) return null;
+  const a12 = (f2 - f1) / (q2 - q1), a23 = (f3 - f2) / (q3 - q2);
+  if (Math.abs(a12 - a23) > 1e-6 * (1 + Math.abs(a12))) return null;  // наклон «гуляет» -> нелинейная
+  const a = a12, b = f1 - a * q1;
+  return { a, b };
+}
+
+// Красивая запись прямой по a и b (для подписи в списке при перетаскивании).
+function fmtLinear(a, b) {
+  const r = (v) => Math.round(v * 100) / 100; a = r(a); b = r(b);
+  if (a === 0) return `${b}`;
+  if (a < 0) {
+    const aa = Math.abs(a), aPart = aa === 1 ? 'Q' : `${aa}*Q`;
+    return b === 0 ? `-${aPart}` : `${b} - ${aPart}`;
+  }
+  const aPart = a === 1 ? 'Q' : `${a}*Q`;
+  if (b === 0) return aPart;
+  return b > 0 ? `${aPart} + ${b}` : `${aPart} - ${Math.abs(b)}`;
 }
 
 // (findEquilibrium — шаг 5; integrate — шаг 6)
@@ -378,11 +410,39 @@ function drawCurves() {
     .x(d => sx(d[0])).y(d => sy(d[1]));
   STATE.curves.forEach(curve => {
     if (!curve.visible) return;
-    g.append('path').datum(curvePoints(curve))
+    const pts = curvePoints(curve);
+    g.append('path').datum(pts)
       .attr('fill', 'none').attr('stroke', curve.color).attr('stroke-width', 2.5)
       .attr('d', line);
+    // Прямые можно перетаскивать: кладём поверх широкую невидимую «дорожку»
+    // для удобного захвата мышью и вешаем на неё перетаскивание.
+    if (curve.linear) {
+      const hit = g.append('path').datum(pts)
+        .attr('fill', 'none').attr('stroke', 'transparent').attr('stroke-width', 16)
+        .attr('d', line).style('cursor', 'ns-resize');
+      attachDrag(hit, curve);
+    }
   });
 }
+
+/* ---------------------------------------------------------------------
+   БЛОК 7. ИНТЕРАКТИВ — перетаскивание кривых мышью.
+   Линейную кривую тянем по вертикали: меняется свободный член b
+   (наклон a сохраняется). Нелинейные пока не перетаскиваются (TODO).
+   --------------------------------------------------------------------- */
+function attachDrag(sel, curve) {
+  sel.call(d3.drag()
+    .container(() => svg.node())   // координаты события — в пикселях SVG
+    .on('drag', (event) => {
+      const [q, p] = toData(event.x, event.y);
+      // Прямая проходит через курсор с прежним наклоном -> пересчитываем b.
+      curve.linear.b = p - curve.linear.a * q;
+      curve.expr = curve.name = fmtLinear(curve.linear.a, curve.linear.b);
+      redrawAll();        // перерисуем кривую и всё зависимое (равновесие/области — позже)
+      renderCurveList();  // обновим формулу в списке кривых
+    }));
+}
+// TODO (будущие шаги): перетаскивание нелинейных кривых (парабол и т.п.).
 
 /* ---------------------------------------------------------------------
    БЛОК 9. redrawAll() — единая точка перерисовки.
@@ -425,6 +485,7 @@ function addCurve(expr) {
   STATE.curves.push({
     id: curveCounter, expr, compiled,
     color: nextColor(), name: expr, role: null, visible: true,
+    linear: detectLinear(compiled),   // {a, b} для прямых, иначе null
   });
   renderCurveList();
   redrawAll();
