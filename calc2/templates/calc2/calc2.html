@@ -521,6 +521,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           </select>
         </div>
         <div id="ineq-groups-table"></div>
+        <div id="ineq-note-groups" class="hint" style="display:none;color:#b45309;">
+          Группы переставлены по возрастанию дохода — кривая Лоренца всегда идёт от бедных к богатым.</div>
         <div class="hint">Доля дохода каждой группы, в %. Сумма нормируется до 100%.
           Узлы кривой можно тянуть мышью.</div>
       </div>
@@ -531,8 +533,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <input type="text" id="ineq-incomes" value="10, 20, 30, 40, 100" autocomplete="off">
         </div>
         <button class="btn" id="ineq-incomes-apply">Построить</button>
+        <div id="ineq-note-incomes" class="hint" style="display:none;color:#b45309;">
+          Доходы переставлены по возрастанию — кривая Лоренца всегда идёт от бедных к богатым.</div>
         <div class="hint">Каждое число — доход одного человека. Сортируются по возрастанию,
-          строятся накопленные доли.</div>
+          строятся накопленные доли. Узлы кривой можно тянуть мышью.</div>
       </div>
       <!-- Способ «формула»: функция Лоренца L(p), p — доля населения 0..1 -->
       <div id="ineq-pane-formula" style="display:none;margin-top:8px;">
@@ -829,6 +833,7 @@ const STATE = {
   ineqShareN: 0,         // число групп, к которому привязаны ineqShares
   ineqStats: null,       // { gini, hoover, hooverP, decile, quintile }
   ineqWarn: null,        // мягкое предупреждение (сумма ≠ 100, L не выпукла и т.п.)
+  ineqSortNote: false,   // показать подсказку «группы/доходы переставлены по возрастанию»
   // ЧК2: сравнение двух кривых «было → стало».
   ineqGhost: null,       // снимок «было»: { lorenz, gini } (по галочке)
   showIneqGhost: false,  // галочка «Исходное состояние»
@@ -4506,22 +4511,27 @@ function parseNumberList(str) {
 // 'groups'/'incomes'. Возвращает { shares, N, warn } или null. (Формула — отдельно.)
 function inequalitySharesFromInput() {
   if (STATE.ineqInput === 'groups') {
-    const g = STATE.ineqGroups.map(Number).filter(v => !isNaN(v));
-    const N = g.length;
+    const g0 = STATE.ineqGroups.map(Number).filter(v => !isNaN(v));
+    const N = g0.length;
     if (N < 2) return null;
+    // Кривая Лоренца строится от беднейших к богатейшим → доли групп ОБЯЗАНЫ идти
+    // по неубыванию (иначе кривая теряет вогнутость). Сортируем по возрастанию.
+    const g = g0.slice().sort((a, b) => a - b);
+    const reordered = g.some((v, i) => v !== g0[i]);   // порядок реально изменился?
     const sum = g.reduce((a, b) => a + b, 0);
     if (!(sum > 0)) return null;
     let warn = null;
     if (Math.abs(sum - 100) > 0.5) warn = 'Сумма долей = ' + fmt(sum) + '% (нормировано до 100%).';
-    return { shares: g.map(v => Math.max(0, v) / sum), N, warn };
+    return { shares: g.map(v => Math.max(0, v) / sum), N, warn, reordered, sortedGroups: g };
   }
   if (STATE.ineqInput === 'incomes') {
-    const xs = parseNumberList(STATE.ineqIncomes).filter(v => v >= 0);
-    if (xs.length < 2) return null;
-    xs.sort((a, b) => a - b);
+    const xs0 = parseNumberList(STATE.ineqIncomes).filter(v => v >= 0);
+    if (xs0.length < 2) return null;
+    const xs = xs0.slice().sort((a, b) => a - b);
+    const reordered = xs.some((v, i) => v !== xs0[i]);   // ввод был не по возрастанию?
     const total = xs.reduce((a, b) => a + b, 0);
     if (!(total > 0)) return null;
-    return { shares: xs.map(v => v / total), N: xs.length, warn: null };
+    return { shares: xs.map(v => v / total), N: xs.length, warn: null, reordered };
   }
   return null;
 }
@@ -4630,6 +4640,7 @@ function applyRedistribution(shares) {
 function recomputeInequality() {
   STATE.ineqLorenz = null; STATE.ineqStats = null; STATE.ineqWarn = null;
   STATE.ineqShares = null; STATE.ineqShareN = 0; STATE.ineqRedist = null;
+  STATE.ineqSortNote = false;
   if (STATE.ineqInput === 'formula') {
     const r = lorenzFromFormula(STATE.ineqFormula);
     if (!r.pts) { STATE.ineqWarn = 'Не понял формулу: ' + (r.error || ''); return; }
@@ -4638,6 +4649,13 @@ function recomputeInequality() {
   } else {
     const s = inequalitySharesFromInput();
     if (!s) { STATE.ineqWarn = 'Введите хотя бы две группы / два дохода.'; return; }
+    // Если сортировка реально переставила группы — фиксируем порядок в таблице и
+    // показываем мягкую подсказку (только при настоящей пересортировке).
+    if (STATE.ineqInput === 'groups' && s.reordered && s.sortedGroups) {
+      STATE.ineqGroups = s.sortedGroups.slice();
+      renderIneqGroupsTable();
+    }
+    STATE.ineqSortNote = !!s.reordered;
     STATE.ineqShares = s.shares; STATE.ineqShareN = s.N; STATE.ineqWarn = s.warn;
     STATE.ineqLorenz = lorenzFromShares(s.shares);
     STATE.ineqStats = inequalityStats(STATE.ineqLorenz);
@@ -4771,6 +4789,15 @@ function ineqSnapshot() {
   STATE.ineqGhost = { lorenz: STATE.ineqLorenz.map(p => [p[0], p[1]]), gini: STATE.ineqStats.gini };
 }
 
+// Подсказка о пересортировке — показываем только в активном способе ввода и только
+// когда сортировка реально изменила порядок (STATE.ineqSortNote).
+function updateIneqSortNote() {
+  const ng = document.getElementById('ineq-note-groups');
+  const ni = document.getElementById('ineq-note-incomes');
+  if (ng) ng.style.display = (STATE.ineqSortNote && STATE.ineqInput === 'groups') ? '' : 'none';
+  if (ni) ni.style.display = (STATE.ineqSortNote && STATE.ineqInput === 'incomes') ? '' : 'none';
+}
+
 // Табло неравенства.
 function updateInequalityPanel() {
   const box = document.getElementById('info-inequality'); if (!box) return;
@@ -4835,6 +4862,7 @@ function redrawInequality() {
     }
   }
   updateInequalityPanel();
+  updateIneqSortNote();
 }
 
 // Доли дохода по группам по умолчанию (умеренное неравенство, сумма = 100%).
