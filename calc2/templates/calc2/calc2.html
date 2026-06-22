@@ -151,7 +151,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <h1>Графический калькулятор&nbsp;2.0</h1>
     <div class="subtitle">бета · собственный движок (D3&nbsp;+&nbsp;Math.js)</div>
 
-    <!-- Сюда следующие шаги добавят: равновесие, области CS/PS, налог. -->
+    <!-- Переключатель режима калькулятора (Задачи 2–3) -->
+    <div class="section" id="sec-mode">
+      <div class="section-title">Режим</div>
+      <div class="seg">
+        <button class="seg-btn active" id="mode-market">Рынок</button>
+        <button class="seg-btn" id="mode-costs">Издержки</button>
+      </div>
+    </div>
 
     <!-- Кривые (шаг 3) -->
     <div class="section" id="sec-curves">
@@ -243,6 +250,37 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div id="info-mono" style="margin-top:8px;"></div>
     </div>
 
+    <!-- Издержки фирмы (Задача 2) — отдельный режим -->
+    <div class="section" id="sec-costs" style="display:none;">
+      <div class="section-title">Издержки фирмы</div>
+      <div class="field">
+        <label>Суммарные затраты TC(Q)</label>
+        <input type="text" id="inp-tc" value="Q^3 - 6*Q^2 + 15*Q + 18" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Постоянные издержки FC</label>
+        <input type="number" id="inp-fc" step="0.1" value="18">
+      </div>
+      <button class="btn" id="btn-costs-apply">Построить</button>
+      <button class="btn-sm" id="btn-costs-preset" style="margin-top:6px;width:100%;">Стандартные издержки</button>
+      <div class="hint">VC&nbsp;=&nbsp;TC&nbsp;−&nbsp;FC, ATC&nbsp;=&nbsp;TC/Q, AVC&nbsp;=&nbsp;VC/Q,
+        AFC&nbsp;=&nbsp;FC/Q, MC&nbsp;=&nbsp;dTC/dQ. MC проходит через минимумы ATC и AVC.</div>
+      <div class="error" id="costs-error"></div>
+      <div style="margin-top:10px;">
+        <label class="chk"><input type="checkbox" id="chk-mc" checked>
+          <span class="swatch" style="background:#e05052"></span> MC — предельные</label>
+        <label class="chk"><input type="checkbox" id="chk-atc" checked>
+          <span class="swatch" style="background:#4f7cff"></span> ATC — средние общие</label>
+        <label class="chk"><input type="checkbox" id="chk-avc" checked>
+          <span class="swatch" style="background:#21a366"></span> AVC — средние перем.</label>
+        <label class="chk"><input type="checkbox" id="chk-afc" checked>
+          <span class="swatch" style="background:#f59e0b"></span> AFC — средние пост.</label>
+        <label class="chk"><input type="checkbox" id="chk-vc">
+          <span class="swatch" style="background:#8b5cf6"></span> VC — перем. (полные)</label>
+      </div>
+      <div id="info-costs" style="margin-top:8px;"></div>
+    </div>
+
     <!-- Оси и сетка (шаг 2) -->
     <div class="section" id="sec-axes">
       <div class="section-title">Оси и сетка</div>
@@ -313,6 +351,15 @@ const STATE = {
   showMonoCS: true,
   showMonoVC: true,
   showMonoPS: true,
+  // Режим калькулятора (Задачи 2–3): 'market' — рынок, 'costs' — издержки фирмы, 'ppf' — КПВ.
+  mode: 'market',
+  // Издержки фирмы (Задача 2): база — суммарные затраты TC(Q) и постоянные FC.
+  costsTC: 'Q^3 - 6*Q^2 + 15*Q + 18',
+  costsFC: 18,
+  costsCompiled: null,
+  costsReady: false,
+  costsVisited: false,   // первый вход в режим — дружелюбный масштаб
+  showMC: true, showATC: true, showAVC: true, showAFC: true, showVC: false,
 };
 
 /* ---------------------------------------------------------------------
@@ -1372,12 +1419,179 @@ function setMarket(mode) {
 }
 
 /* ---------------------------------------------------------------------
+   БЛОК 10. ИЗДЕРЖКИ ФИРМЫ — кривые MC/ATC/AVC/AFC из TC и FC (Задача 2).
+   База — суммарные затраты TC(Q) и постоянные FC. Остальное выводится:
+     VC = TC − FC,  ATC = TC/Q,  AVC = VC/Q,  AFC = FC/Q,  MC = d(TC)/dQ.
+   MC — численная производная (центральная разность), работает для любой TC.
+   --------------------------------------------------------------------- */
+
+// Значение TC(Q) по компилированной формуле (Q и x — обе переменные).
+function evalTC(q) {
+  if (!STATE.costsCompiled) return NaN;
+  try { const v = STATE.costsCompiled.evaluate({ x: q, Q: q }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  catch (e) { return NaN; }
+}
+function costVC(q)  { const tc = evalTC(q); return isNaN(tc) ? NaN : tc - STATE.costsFC; }   // переменные = TC − FC
+function costATC(q) { const tc = evalTC(q); return isNaN(tc) ? NaN : tc / q; }                // средние общие
+function costAVC(q) { const vc = costVC(q); return isNaN(vc) ? NaN : vc / q; }                // средние переменные
+function costAFC(q) { return STATE.costsFC / q; }                                            // средние постоянные
+// MC = d(TC)/dQ численно (центральная разность) — как mcAt для TC.
+function costMC(q) {
+  const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
+  const a = evalTC(q + h), b = evalTC(q - h);
+  return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / (2 * h);
+}
+
+// Минимум функции f на [qLo, qHi]: грубый скан + локальное уточнение.
+// Через него находим точки закрытия (min AVC) и безубыточности (min ATC).
+function minOf(f, qLo, qHi) {
+  let bestQ = null, bestV = Infinity;
+  const scan = (lo, hi, n) => {
+    for (let i = 0; i <= n; i++) {
+      const q = lo + (hi - lo) * i / n, v = f(q);
+      if (!isNaN(v) && v < bestV) { bestV = v; bestQ = q; }
+    }
+  };
+  scan(qLo, qHi, 2000);
+  if (bestQ != null) { const step = (qHi - qLo) / 2000; scan(Math.max(qLo, bestQ - step), Math.min(qHi, bestQ + step), 400); }
+  return bestQ == null ? null : { Q: bestQ, val: bestV };
+}
+
+// Пересчёт издержек: компиляция TC, ключевые точки (минимумы AVC и ATC).
+function recomputeCosts() {
+  STATE.costsReady = false;
+  STATE.minAVC = STATE.minATC = null;
+  const { compiled } = compileFormula(STATE.costsTC);
+  if (!compiled) { STATE.costsCompiled = null; return; }
+  STATE.costsCompiled = compiled;
+  STATE.costsReady = true;
+  // Сканируем от малого Q>0 (у средних кривых при Q→0 значения уходят в бесконечность).
+  STATE.minAVC = minOf(costAVC, 0.5, CONFIG.Qmax);   // точка закрытия
+  STATE.minATC = minOf(costATC, 0.5, CONFIG.Qmax);   // точка безубыточности
+}
+
+// Точки кривой издержек от малого Q (>0) до Qmax. Выбросы за пределы экрана обрываем.
+function costPoints(f) {
+  const N = 400, q0 = 0.5, out = [];
+  for (let i = 0; i <= N; i++) {
+    const q = q0 + (CONFIG.Qmax - q0) * i / N;
+    const v = f(q);
+    out.push((isNaN(v) || v < 0 || v > CONFIG.Pmax * 4) ? null : [q, v]);
+  }
+  return out;
+}
+
+// Отрисовка кривых издержек + точки закрытия (min AVC) и безубыточности (min ATC).
+function drawCostCurves() {
+  if (!STATE.costsReady) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  const curve = (f, color, on, dash) => {
+    if (!on) return;
+    const p = g.append('path').datum(costPoints(f)).attr('fill', 'none')
+      .attr('stroke', color).attr('stroke-width', 2.2).attr('d', line);
+    if (dash) p.attr('stroke-dasharray', dash);
+  };
+  curve(costVC,  '#8b5cf6', STATE.showVC, '5 4');   // VC — полные переменные (по желанию)
+  curve(costAFC, '#f59e0b', STATE.showAFC);
+  curve(costAVC, '#21a366', STATE.showAVC);
+  curve(costATC, '#4f7cff', STATE.showATC);
+  curve(costMC,  '#e05052', STATE.showMC);
+
+  // Подписи кривых у правого края (на значении при Q≈Qmax, если в пределах Pmax).
+  const labelAt = (f, txt, color) => {
+    const q = CONFIG.Qmax * 0.96, v = f(q);
+    if (isNaN(v) || v < 0 || v > CONFIG.Pmax) return;
+    g.append('text').attr('x', sx(q)).attr('y', sy(v) - 4)
+      .attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(txt);
+  };
+  if (STATE.showMC)  labelAt(costMC,  'MC',  '#e05052');
+  if (STATE.showATC) labelAt(costATC, 'ATC', '#4f7cff');
+  if (STATE.showAVC) labelAt(costAVC, 'AVC', '#21a366');
+  if (STATE.showAFC) labelAt(costAFC, 'AFC', '#f59e0b');
+
+  // Ключевые точки: безубыточность (min ATC) и закрытие (min AVC) — MC проходит через них.
+  const mark = (pt, color, label) => {
+    if (!pt || pt.val > CONFIG.Pmax || pt.Q > CONFIG.Qmax) return;
+    const [px, py] = toPx(pt.Q, pt.val);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
+      .attr('fill', color).attr('stroke', '#fff').attr('stroke-width', 1.5);
+    g.append('text').attr('x', px).attr('y', py - 9)
+      .attr('text-anchor', 'middle').attr('font-size', 9.5).attr('font-weight', 600).attr('fill', color)
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(label);
+  };
+  if (STATE.showATC) mark(STATE.minATC, '#4f7cff', 'безубыт.');
+  if (STATE.showAVC) mark(STATE.minAVC, '#21a366', 'закрытие');
+}
+
+// Табло издержек: ключевые точки закрытия и безубыточности.
+function updateCostsPanel() {
+  const box = document.getElementById('info-costs');
+  if (!box) return;
+  if (!STATE.costsReady) { box.innerHTML = '<div class="warn">Не понял формулу TC.</div>'; return; }
+  let html = '';
+  if (STATE.minATC) html += `<div class="stat"><span>Безубыточность (min ATC)</span><b>Q=${fmt(STATE.minATC.Q)}, ATC=${fmt(STATE.minATC.val)}</b></div>`;
+  if (STATE.minAVC) html += `<div class="stat"><span>Закрытие (min AVC)</span><b>Q=${fmt(STATE.minAVC.Q)}, AVC=${fmt(STATE.minAVC.val)}</b></div>`;
+  html += '<div class="hint">В точках закрытия и безубыточности MC пересекает соответственно AVC и ATC (в их минимумах).</div>';
+  box.innerHTML = html;
+}
+
+// Полная перерисовка режима издержек.
+function redrawCosts() {
+  recomputeCosts();
+  svg.selectAll('*').remove();
+  addDefs();
+  drawGrid();
+  drawAxes();
+  drawCostCurves();
+  updateCostsPanel();
+}
+
+/* ---------------------------------------------------------------------
+   БЛОК 11. ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМОВ (рынок / издержки / КПВ).
+   Показывает нужные секции панели и дёргает перерисовку. Сами режимы
+   издержек (Задача 2) и КПВ (Задача 3) рисуются своими redraw-функциями.
+   --------------------------------------------------------------------- */
+
+// Установить границы осей Qmax/Pmax (и поля ввода / пределы ползунков) разом.
+function setRanges(qmax, pmax) {
+  CONFIG.Qmax = qmax; CONFIG.Pmax = pmax;
+  const qi = document.getElementById('inp-qmax'); if (qi) qi.value = qmax;
+  const pi = document.getElementById('inp-pmax'); if (pi) pi.value = pmax;
+  ['tax-slider', 'tax-input', 'pc-slider', 'pc-input'].forEach(id => {
+    const e = document.getElementById(id); if (e) e.max = pmax;
+  });
+}
+
+// Переключение режима: рынок / издержки / КПВ.
+function setMode(mode) {
+  STATE.mode = mode;
+  const map = { market: 'mode-market', costs: 'mode-costs', ppf: 'mode-ppf' };
+  Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
+  const ab = document.getElementById(map[mode]); if (ab) ab.classList.add('active');
+  // Какие секции панели показывать в каждом режиме (отсутствующие id просто игнорируются).
+  const groups = {
+    market: ['sec-curves', 'sec-eq', 'sec-areas', 'sec-tax', 'sec-mono'],
+    costs:  ['sec-costs'],
+    ppf:    ['sec-ppf'],
+  };
+  const all = new Set([].concat(...Object.values(groups)));
+  all.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+  (groups[mode] || []).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = ''; });
+  // Первый вход в режим издержек — дружелюбный масштаб (U-образные кривые видны).
+  if (mode === 'costs' && !STATE.costsVisited) { STATE.costsVisited = true; setRanges(10, 50); }
+  redrawAll();
+}
+
+/* ---------------------------------------------------------------------
    БЛОК 9. redrawAll() — единая точка перерисовки.
    Любое изменение (кривая, перетаскивание, налог) дёргает её.
    --------------------------------------------------------------------- */
 function redrawAll() {
   computeSize();
   makeScales();
+  if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
   recompute();                   // сначала считаем (равновесие, площади, налог)
   svg.selectAll('*').remove();   // полная перерисовка с чистого листа
   addDefs();
@@ -1585,6 +1799,38 @@ function wireControls() {
   const segMono = document.getElementById('seg-mono');
   if (segComp) segComp.addEventListener('click', () => setMarket('comp'));
   if (segMono) segMono.addEventListener('click', () => setMarket('monopoly'));
+
+  // Переключатель режима «Рынок / Издержки / КПВ» (Задачи 2–3).
+  [['mode-market', 'market'], ['mode-costs', 'costs'], ['mode-ppf', 'ppf']].forEach(([id, mode]) => {
+    const b = document.getElementById(id); if (b) b.addEventListener('click', () => setMode(mode));
+  });
+
+  // Режим издержек (Задача 2): ввод TC/FC, кнопки «Построить» / «Стандартные», галочки кривых.
+  const tcInp = document.getElementById('inp-tc');
+  const fcInp = document.getElementById('inp-fc');
+  function applyCosts() {
+    const tc = ((tcInp && tcInp.value) || '').trim();
+    const fc = parseFloat(fcInp && fcInp.value);
+    const { error } = compileFormula(tc);
+    const errBox = document.getElementById('costs-error');
+    if (error) { if (errBox) { errBox.textContent = 'Не понял формулу TC: ' + error; errBox.style.display = 'block'; } return; }
+    if (errBox) errBox.style.display = 'none';
+    STATE.costsTC = tc;
+    STATE.costsFC = isNaN(fc) ? 0 : fc;
+    redrawAll();
+  }
+  const cApply = document.getElementById('btn-costs-apply');
+  if (cApply) cApply.addEventListener('click', applyCosts);
+  const cPreset = document.getElementById('btn-costs-preset');
+  if (cPreset) cPreset.addEventListener('click', () => {
+    if (tcInp) tcInp.value = 'Q^3 - 6*Q^2 + 15*Q + 18';
+    if (fcInp) fcInp.value = 18;
+    applyCosts();
+  });
+  if (tcInp) tcInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyCosts(); });
+  if (fcInp) fcInp.addEventListener('change', applyCosts);
+  [['chk-mc', 'showMC'], ['chk-atc', 'showATC'], ['chk-avc', 'showAVC'], ['chk-afc', 'showAFC'], ['chk-vc', 'showVC']]
+    .forEach(([id, key]) => { const el = document.getElementById(id); if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); }); });
 
   // Регулируемая цена (потолок / пол): ползунок (целые) + числовое поле (дробные).
   const pcSlider = document.getElementById('pc-slider');
