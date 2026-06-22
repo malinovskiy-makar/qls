@@ -161,6 +161,19 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
     </div>
 
+    <!-- Готовые сцены: заполнение типовой задачи одним кликом (Задача 4) -->
+    <div class="section" id="sec-scenes">
+      <div class="section-title">Готовые сцены</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <button class="btn-sm" id="scene-sd">Спрос и предложение</button>
+        <button class="btn-sm" id="scene-tax">Налог на рынке</button>
+        <button class="btn-sm" id="scene-ceil">Потолок цены</button>
+        <button class="btn-sm" id="scene-mono">Монополия (пост. MC)</button>
+        <button class="btn-sm" id="scene-costs">Издержки фирмы</button>
+        <button class="btn-sm" id="scene-ppf">КПВ вогнутая</button>
+      </div>
+    </div>
+
     <!-- Кривые (шаг 3) -->
     <div class="section" id="sec-curves">
       <div class="section-title">Кривые</div>
@@ -1885,6 +1898,52 @@ function renderCurveList() {
   });
 }
 
+/* ---------------------------------------------------------------------
+   ГОТОВЫЕ СЦЕНЫ (Задача 4) — заполнение типовой задачи одним кликом.
+   Кнопка = программный вызов тех же действий, что делает пользователь
+   руками: очистка кривых, ввод формул, назначение ролей, переключение
+   режима и установка параметра. Никакой новой логики — только композиция.
+   --------------------------------------------------------------------- */
+function loadScene(name) {
+  // Чистый старт: кривые и параметры вмешательства — с нуля.
+  STATE.curves = []; curveCounter = 0;
+  STATE.tax = 0; STATE.pReg = 0;
+  ['tax-slider', 'tax-input', 'pc-slider', 'pc-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = 0; });
+  const tv = document.getElementById('tax-val'); if (tv) tv.textContent = '0';
+  const pv = document.getElementById('pc-val'); if (pv) pv.textContent = '0';
+
+  if (name === 'sd' || name === 'tax' || name === 'ceil' || name === 'mono') {
+    setMode('market');
+    setRanges(100, 100);
+    addCurve('100 - Q'); setRole(STATE.curves[0], 'demand');   // спрос — всегда первая кривая
+    if (name === 'mono') {
+      addCurve('20'); setRole(STATE.curves[1], 'mc');          // постоянные предельные издержки
+      setMarket('monopoly');
+    } else {
+      addCurve('Q'); setRole(STATE.curves[1], 'supply');
+      setMarket('comp');
+      if (name === 'tax')  { setType('tax');     setTax(20); }
+      else if (name === 'ceil') { setType('ceiling'); setPReg(30); }
+      else { setType('tax'); }                                  // 'sd' — чистое равновесие
+    }
+  } else if (name === 'costs') {
+    const tcInp = document.getElementById('inp-tc'), fcInp = document.getElementById('inp-fc');
+    STATE.costsTC = 'Q^3 - 6*Q^2 + 15*Q + 18'; STATE.costsFC = 18;
+    if (tcInp) tcInp.value = STATE.costsTC;
+    if (fcInp) fcInp.value = STATE.costsFC;
+    STATE.costsVisited = true;        // наш масштаб не перебивается первым входом
+    setRanges(10, 50);
+    setMode('costs');
+  } else if (name === 'ppf') {
+    const ppfInp = document.getElementById('inp-ppf');
+    STATE.ppfFormula = '100 - 0.01*X^2'; STATE.ppfX = null;
+    if (ppfInp) ppfInp.value = STATE.ppfFormula;
+    STATE.ppfVisited = true;
+    setRanges(100, 100);
+    setMode('ppf');
+  }
+}
+
 function wireControls() {
   const qmax = document.getElementById('inp-qmax');
   const pmax = document.getElementById('inp-pmax');
@@ -2006,6 +2065,11 @@ function wireControls() {
   if (pLin) pLin.addEventListener('click', () => { if (ppfInp) ppfInp.value = '100 - X'; applyPpf(); });
   const pConc = document.getElementById('btn-ppf-conc');
   if (pConc) pConc.addEventListener('click', () => { if (ppfInp) ppfInp.value = '100 - 0.01*X^2'; applyPpf(); });
+
+  // Готовые сцены (Задача 4): заполнение типовой задачи одним кликом.
+  [['scene-sd', 'sd'], ['scene-tax', 'tax'], ['scene-ceil', 'ceil'],
+   ['scene-mono', 'mono'], ['scene-costs', 'costs'], ['scene-ppf', 'ppf']]
+    .forEach(([id, name]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => loadScene(name)); });
 
   // Регулируемая цена (потолок / пол): ползунок (целые) + числовое поле (дробные).
   const pcSlider = document.getElementById('pc-slider');
