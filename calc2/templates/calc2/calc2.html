@@ -4742,6 +4742,10 @@ function recomputeInequality() {
     const sh = ineqRedistShares();
     if (sh) {
       const ns = applyRedistribution(sh);
+      // Вогнутость: кривая Лоренца строится от беднейших к богатейшим. Трансферт может
+      // сделать бывшую богатейшую группу не самой богатой — сортируем доли по возрастанию,
+      // как при ручном вводе. Налог порядок не переворачивает, для него это идемпотентно.
+      ns.sort((a, b) => a - b);
       const rl = lorenzFromShares(ns);
       STATE.ineqRedist = { lorenz: rl, stats: inequalityStats(rl) };
     }
