@@ -212,6 +212,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="seg-btn" id="seg-ceil">Потолок</button>
         <button class="seg-btn" id="seg-floor">Пол</button>
       </div>
+      <!-- Кто формально платит налог (Задача 1). Виден только для типа «Налог». -->
+      <div id="taxside-row" style="margin-top:8px;">
+        <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Налог платит:</label>
+        <div class="seg">
+          <button class="seg-btn active" id="tsb-seller">Продавец</button>
+          <button class="seg-btn" id="tsb-buyer">Покупатель</button>
+        </div>
+      </div>
       <!-- Поле ставки (налог / субсидия) -->
       <div class="field" id="tax-field" style="margin-top:8px;">
         <label>Ставка <span id="rate-letter">t</span> = <b id="tax-val">0</b></label>
@@ -445,6 +453,8 @@ const STATE = {
   showCS: true,      // показывать заливку излишка потребителя
   showPS: true,      // показывать заливку излишка производителя
   tax: 0,            // ставка вмешательства (0 = нет); тип задаёт intervType
+  taxSide: 'seller', // кто формально платит налог: 'seller' — продавец (сдвиг S вверх),
+                     // 'buyer' — покупатель (сдвиг D вниз). На числа НЕ влияет (Задача 1).
   intervType: 'tax', // 'tax' — налог (S вверх), 'subsidy' — субсидия (S вниз),
                      // 'ceiling' — потолок цены, 'floor' — пол цены
   pReg: 0,           // регулируемая цена (для потолка / пола); 0 = не задана
@@ -1016,19 +1026,24 @@ function updateAreasPanel() {
    БЛОК 8. СЦЕНАРИЙ «НАЛОГ» — сдвиг предложения, новые области, клин.
    --------------------------------------------------------------------- */
 
-// Сдвинутая пунктиром кривая предложения S ± ставка (вверх при налоге, вниз при субсидии).
+// Сдвинутая пунктиром кривая. При налоге на ПРОДАВЦА (по умолчанию) и при субсидии
+// двигается предложение (S ± ставка). При налоге на ПОКУПАТЕЛЯ (Задача 1) двигается
+// спрос вниз (D − t): эффективный спрос. Итоговые числа в обоих случаях идентичны —
+// меняется только то, какую кривую рисуем; считаем в recompute одинаково.
 function drawShiftedSupply() {
   if (!STATE.taxActive) return;
-  const S = STATE.S;
+  const buyerTax = (STATE.intervType === 'tax' && STATE.taxSide === 'buyer');
+  const base = buyerTax ? STATE.D : STATE.S;     // покупатель → двигаем спрос, иначе предложение
+  const sh = buyerTax ? -STATE.tax : STATE.shift; // спрос вниз на t / предложение на ±ставку
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const pts = [];
   for (let i = 0; i <= 400; i++) {
     const q = CONFIG.Qmax * i / 400;
-    const v = evalCurve(S, q);
-    pts.push(isNaN(v) ? null : [q, v + STATE.shift]);
+    const v = evalCurve(base, q);
+    pts.push(isNaN(v) ? null : [q, v + sh]);
   }
-  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', S.color)
+  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', base.color)
     .attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
 }
 
@@ -1163,6 +1178,7 @@ function setType(type) {
   const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
   show('tax-field', isTax);   show('tax-hint', isTax);
   show('pc-field', !isTax);   show('pc-hint', !isTax);
+  show('taxside-row', type === 'tax');   // выбор плательщика — только для налога (Задача 1)
 
   if (isTax) {
     const rl = document.getElementById('rate-letter');
@@ -1207,7 +1223,20 @@ function updateTaxPanel() {
   const lbl = isSub ? 'Выигрыш' : 'Бремя';
   html += `<div class="stat" style="margin-top:6px;"><span>${lbl} покупателя</span><b>${fmt(STATE.incBuyer)}</b></div>`;
   html += `<div class="stat"><span>${lbl} продавца</span><b>${fmt(STATE.incSeller)}</b></div>`;
+  // Вывод об эквивалентности (только для налога): кто платит — не влияет на итог.
+  if (!isSub) html += `<div class="hint" style="margin-top:6px;">Результат не зависит от того, кто формально платит налог: ` +
+    `объём Q, цены покупателя/продавца и распределение бремени одинаковы при налоге на продавца и на покупателя.</div>`;
   box.innerHTML = html;
+}
+
+// Переключение стороны налога (продавец / покупатель). На числа не влияет —
+// меняется только визуально сдвигаемая кривая (Задача 1).
+function setTaxSide(side) {
+  STATE.taxSide = side;
+  const sel = document.getElementById('tsb-seller'), buy = document.getElementById('tsb-buyer');
+  if (sel) sel.classList.toggle('active', side === 'seller');
+  if (buy) buy.classList.toggle('active', side === 'buyer');
+  redrawAll();
 }
 
 /* ---------------------------------------------------------------------
@@ -2899,6 +2928,11 @@ function wireControls() {
   document.getElementById('seg-sub').addEventListener('click', () => setType('subsidy'));
   document.getElementById('seg-ceil').addEventListener('click', () => setType('ceiling'));
   document.getElementById('seg-floor').addEventListener('click', () => setType('floor'));
+
+  // Сторона налога (Задача 1): продавец / покупатель.
+  const tsbSel = document.getElementById('tsb-seller'), tsbBuy = document.getElementById('tsb-buyer');
+  if (tsbSel) tsbSel.addEventListener('click', () => setTaxSide('seller'));
+  if (tsbBuy) tsbBuy.addEventListener('click', () => setTaxSide('buyer'));
 
   // Переключатель рынка «Конкуренция / Монополия».
   const segComp = document.getElementById('seg-comp');
