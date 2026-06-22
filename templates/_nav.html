@@ -8,6 +8,7 @@
       <a href="/catalog/" style="font-size:13px;color:{% if request.resolver_match.namespace == 'catalog' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'catalog' %}#4f7cff{% else %}transparent{% endif %};">Каталог</a>
       <a href="/calendar/" style="font-size:13px;color:{% if request.resolver_match.namespace == 'calendar_stub' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'calendar_stub' %}#4f7cff{% else %}transparent{% endif %};">Календарь</a>
       <a href="/desmos/" style="font-size:13px;color:{% if 'desmos' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'desmos' in request.path %}#4f7cff{% else %}transparent{% endif %};">Калькулятор</a>
+      <a href="/calc2/" style="font-size:13px;color:{% if 'calc2' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'calc2' in request.path %}#4f7cff{% else %}transparent{% endif %};">Калькулятор&nbsp;2.0</a>
       {% if user.is_staff %}
       <a href="/admin/" style="font-size:13px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Админка</a>
       {% endif %}
@@ -18,10 +19,12 @@
       <a href="/catalog/" style="font-size:13px;color:{% if request.resolver_match.namespace == 'catalog' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'catalog' %}#4f7cff{% else %}transparent{% endif %};">Каталог</a>
       <a href="/calendar/" style="font-size:13px;color:{% if request.resolver_match.namespace == 'calendar_stub' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'calendar_stub' %}#4f7cff{% else %}transparent{% endif %};">Календарь</a>
       <a href="/desmos/" style="font-size:13px;color:{% if 'desmos' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'desmos' in request.path %}#4f7cff{% else %}transparent{% endif %};">Калькулятор</a>
+      <a href="/calc2/" style="font-size:13px;color:{% if 'calc2' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'calc2' in request.path %}#4f7cff{% else %}transparent{% endif %};">Калькулятор&nbsp;2.0</a>
 
     {% else %}
       <a href="/catalog/" style="font-size:13px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Каталог</a>
       <a href="/desmos/" style="font-size:13px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Калькулятор</a>
+    <a href="/calc2/" style="font-size:13px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Калькулятор&nbsp;2.0</a>
       {% if user.is_staff %}
       <a href="/admin/" style="font-size:13px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Админка</a>
       {% endif %}
@@ -30,6 +33,7 @@
   {% else %}
     <a href="/catalog/" style="font-size:13px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Каталог</a>
     <a href="/desmos/" style="font-size:13px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Калькулятор</a>
+    <a href="/calc2/" style="font-size:13px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Калькулятор&nbsp;2.0</a>
   {% endif %}
 
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
