@@ -2156,6 +2156,90 @@ function combinedPpfPoints(f1, f2, x1max, x2max, N) {
   return pts;
 }
 
+// Точное оптимальное распределение выпуска X между странами (Задача 1: поиск изломов).
+// Возвращает { x1, x2, y } — сколько X производит каждая страна и суммарный Y.
+// Отдельная, более точная функция (грубый скан + золотое сечение); НЕ трогает maxAllocY.
+function allocAt(f1, f2, X, xmax1, xmax2) {
+  const lo = Math.max(0, X - xmax2), hi = Math.min(xmax1, X);
+  const obj = (x1) => {
+    const a = Math.min(Math.max(x1, 0), xmax1), b = Math.min(Math.max(X - x1, 0), xmax2);
+    const y1 = f1(a), y2 = f2(b);
+    return (isNaN(y1) || isNaN(y2)) ? -Infinity : y1 + y2;
+  };
+  if (hi <= lo + 1e-12) {                         // единственная допустимая точка
+    const x1 = Math.min(Math.max(lo, 0), xmax1), v = obj(x1);
+    return { x1, x2: X - x1, y: v === -Infinity ? NaN : v };
+  }
+  // Грубый скан (на случай невыпуклой КПВ) — находим окрестность максимума.
+  const M = 200; let best = -Infinity, bx = lo;
+  for (let j = 0; j <= M; j++) { const x1 = lo + (hi - lo) * j / M; const v = obj(x1); if (v > best) { best = v; bx = x1; } }
+  // Уточнение золотым сечением вокруг лучшего узла (локально унимодально).
+  const step = (hi - lo) / M;
+  let a = Math.max(lo, bx - step), b = Math.min(hi, bx + step);
+  const gr = (Math.sqrt(5) - 1) / 2;
+  let c = b - gr * (b - a), d = a + gr * (b - a), fc = obj(c), fd = obj(d);
+  for (let k = 0; k < 60; k++) {
+    if (fc > fd) { b = d; d = c; fd = fc; c = b - gr * (b - a); fc = obj(c); }
+    else { a = c; c = d; fc = fd; d = a + gr * (b - a); fd = obj(d); }
+  }
+  const x1 = Math.min(Math.max((a + b) / 2, 0), xmax1), v = obj(x1);
+  return { x1, x2: X - x1, y: v === -Infinity ? NaN : v };
+}
+
+// Надёжный поиск изломов суммарной КПВ (Задача 1). Излом — точка, где меняется
+// ОПТИМАЛЬНЫЙ режим распределения (страна «вступает» в производство X или
+// «исчерпывает» свой запас X). Даёт ровно нужное число изломов независимо от формы.
+// Возвращает [{ x, y }, …] (внутренние изломы по возрастанию x).
+function detectCombinedKinks(f1, f2, xmax1, xmax2) {
+  const Xmax = xmax1 + xmax2;
+  const N = 600;
+  const e1p = 1e-6 * xmax1, e1e = 1e-5 * xmax1, e2p = 1e-6 * xmax2, e2e = 1e-5 * xmax2;
+  // «Режим» в точке X — четыре булевых флага по оптимальному распределению.
+  const regimeAt = (X) => {
+    const al = allocAt(f1, f2, X, xmax1, xmax2);
+    return { p1: al.x1 > e1p, e1: al.x1 > xmax1 - e1e, p2: al.x2 > e2p, e2: al.x2 > xmax2 - e2e };
+  };
+  const flag = { p1: (al) => al.x1 > e1p, e1: (al) => al.x1 > xmax1 - e1e, p2: (al) => al.x2 > e2p, e2: (al) => al.x2 > xmax2 - e2e };
+  // Пробы (концы не трогаем).
+  const probes = [];
+  for (let i = 0; i < N; i++) { const X = Xmax * (i + 0.5) / N; probes.push({ X, r: regimeAt(X) }); }
+  const same = (r, s) => r.p1 === s.p1 && r.e1 === s.e1 && r.p2 === s.p2 && r.e2 === s.e2;
+  // Кандидаты-«скобки» там, где режим сменился.
+  const cands = [];
+  for (let i = 1; i < N; i++) if (!same(probes[i - 1].r, probes[i].r)) cands.push({ lo: probes[i - 1].X, hi: probes[i].X, prev: probes[i - 1].r, cur: probes[i].r });
+  // Слияние близких кандидатов (ближе 3·Xmax/N).
+  const minGap = 3 * Xmax / N, merged = [];
+  for (const c of cands) {
+    const last = merged[merged.length - 1];
+    if (last && c.lo - last.hi < minGap) { last.hi = c.hi; last.cur = c.cur; }
+    else merged.push({ lo: c.lo, hi: c.hi, prev: c.prev, cur: c.cur });
+  }
+  // Уточнение бисекцией по сменившемуся флагу (предикат монотонен по X).
+  const xs = [];
+  for (const c of merged) {
+    let fl = null;
+    for (const name of ['p1', 'e1', 'p2', 'e2']) if (c.prev[name] !== c.cur[name]) { fl = name; break; }
+    if (!fl) { xs.push((c.lo + c.hi) / 2); continue; }
+    const pred = (X) => flag[fl](allocAt(f1, f2, X, xmax1, xmax2));
+    let lo = Math.max(0, c.lo - Xmax / N), hi = Math.min(Xmax, c.hi + Xmax / N);
+    const base = pred(lo);
+    if (base === pred(hi)) { xs.push((c.lo + c.hi) / 2); continue; }   // флаг не флипнулся в скобке
+    for (let k = 0; k < 50; k++) { const mid = (lo + hi) / 2; if (pred(mid) === base) lo = mid; else hi = mid; }
+    xs.push((lo + hi) / 2);
+  }
+  // Только внутренние, без дублей, по возрастанию.
+  xs.sort((a, b) => a - b);
+  const out = [];
+  for (const Xk of xs) {
+    if (Xk <= Xmax * 1e-3 || Xk >= Xmax * (1 - 1e-3)) continue;
+    if (out.length && Math.abs(Xk - out[out.length - 1]) <= Xmax * 1e-3) continue;
+    out.push(Xk);
+  }
+  const result = out.map(Xk => ({ x: Xk, y: allocAt(f1, f2, Xk, xmax1, xmax2).y }));
+  if (result.length > 4) console.warn('detectCombinedKinks: аномально много изломов (' + result.length + ') — проверьте входные КПВ');
+  return result;
+}
+
 // Распознавание аналитической формулы суммарной КПВ (best-effort).
 // Возвращает { type, text, evalY|null, kinks }. evalY(x) — аналитическое значение
 // (NaN вне распознанной области); проверяется численно перед показом.
@@ -2232,10 +2316,14 @@ function recomputePpfSum() {
   const x1max = c1.Xmax, x2max = c2.Xmax, Xtot = x1max + x2max, Ytot = f1(0) + f2(0);
   const points = combinedPpfPoints(f1, f2, x1max, x2max, 240);
   const fr = combinedPpfFormula(c1, c2);
-  let formulaText = fr.text, kinks = fr.kinks || [];
+  let formulaText = fr.text;
   if (fr.evalY) {                                   // распознали форму — проверяем численно
-    if (!verifyFormula(fr.evalY, points)) { formulaText = 'Аналитическая форма не подтвердилась — кривая построена численно.'; kinks = detectKinks(points); }
-  } else { formulaText = 'Построена численно (аналитическая форма для этой пары не распознана).'; kinks = detectKinks(points); }
+    if (!verifyFormula(fr.evalY, points)) formulaText = 'Аналитическая форма не подтвердилась — кривая построена численно.';
+  } else { formulaText = 'Построена численно (аналитическая форма для этой пары не распознана).'; }
+  // Изломы — надёжным режимным детектором (Задача 1); кэшируем для панели и «Схемы».
+  const kinksXY = detectCombinedKinks(f1, f2, x1max, x2max);
+  STATE.ppfSumKinks = kinksXY;
+  const kinks = kinksXY.map(k => [k.x, k.y]);       // [x,y]-пары для существующей отрисовки/панели
   STATE.ppfSumData = {
     ok: true, points, c1pts: singlePpfPoints(f1, x1max), c2pts: singlePpfPoints(f2, x2max),
     Xtot, Ytot, x1max, x2max, formulaText, kinks, type: fr.type,
