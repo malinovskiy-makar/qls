@@ -353,6 +353,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <button class="btn-sm" id="btn-ppfsum-lin" style="flex:1;">Две линейные</button>
           <button class="btn-sm" id="btn-ppfsum-circ" style="flex:1;">Две дуги</button>
         </div>
+        <!-- Вид суммарной КПВ: в масштабе / аккуратная схема (Задача 2) -->
+        <div class="seg" style="margin-top:8px;">
+          <button class="seg-btn active" id="ppfsumview-scale">В масштабе</button>
+          <button class="seg-btn" id="ppfsumview-schema">Схема</button>
+        </div>
         <div class="hint">Совместная КПВ двух стран: при каждом выпуске X производство
           делится так, чтобы суммарный Y был максимален (X наращивает страна с меньшими
           альтернативными издержками X). Это НЕ вертикальная сумма кривых.</div>
@@ -472,6 +477,8 @@ const STATE = {
   ppf1: '100 - X',       // КПВ страны 1 (режим суммы)
   ppf2: '60 - 3*X',      // КПВ страны 2 (режим суммы)
   ppfSumData: null,      // результат расчёта суммарной КПВ (кэшируется, тяжёлый расчёт)
+  ppfSumKinks: null,     // изломы суммарной КПВ [{x,y}] (надёжный детектор, Задача 1)
+  ppfSumView: 'scale',   // вид суммы: 'scale' — в масштабе, 'schema' — аккуратная схема (Задача 2)
   ppftFormula: '100 - X',// КПВ страны (режим КТВ)
   ppftPrice: 2,          // мировое соотношение цен Px/Py (режим КТВ)
   ppfTradeData: null,    // результат расчёта КТВ
@@ -2378,14 +2385,127 @@ function updatePpfSumPanel() {
   box.innerHTML = html;
 }
 
+/* --- Задача 2: режим «Схема» суммарной КПВ -------------------------- */
+
+// Русская запись числа (десятичная запятая) — для подписей схемы.
+function fmtRu(v) { return fmt(v).replace('.', ','); }
+
+// Данные для схемы: ключевые точки (НАСТОЯЩИЕ значения) и типы участков.
+// Возвращает { ok, n, pts:[{x,y,kind}], segs:[{type, convex?}] } или { ok:false }.
+function ppfSumSchemaData() {
+  const d = STATE.ppfSumData;
+  if (!d || !d.ok) return { ok: false };
+  const kinks = (STATE.ppfSumKinks || []).slice().sort((a, b) => a.x - b.x);
+  const n = kinks.length + 1;
+  if (n > 3) return { ok: false };                  // больше 3 участков — схему не рисуем
+  const keyX = [0, ...kinks.map(k => k.x), d.Xtot];
+  const keyY = [d.Ytot, ...kinks.map(k => k.y), 0];
+  for (let i = 1; i < keyY.length; i++)             // итоговая кривая должна монотонно убывать
+    if (keyY[i] > keyY[i - 1] + 1e-6 * (1 + Math.abs(keyY[i - 1]))) return { ok: false };
+  // Точная выборка реальной кривой (через allocAt) для определения типа участка.
+  const r1 = compilePpf(STATE.ppf1), r2 = compilePpf(STATE.ppf2);
+  if (!r1.compiled || !r2.compiled) return { ok: false };
+  const f1 = (x) => ppfEvalWith(r1.compiled, x), f2 = (x) => ppfEvalWith(r2.compiled, x);
+  const yAt = (X) => allocAt(f1, f2, X, d.x1max, d.x2max).y;
+  const segs = [];
+  for (let i = 0; i < n; i++) {
+    const Xa = keyX[i], Xb = keyX[i + 1], Ya = keyY[i], Yb = keyY[i + 1];
+    const scale = Math.max(Math.abs(Xb - Xa), Math.abs(Yb - Ya), 1e-9);   // локальный масштаб участка
+    let maxDev = 0, midDev = 0;
+    for (let j = 1; j <= 5; j++) {                  // 5 внутренних точек, сравнение с хордой
+      const t = j / 6, X = Xa + (Xb - Xa) * t;
+      const dev = yAt(X) - (Ya + (Yb - Ya) * t);    // >0: кривая выше хорды (выпуклость наружу)
+      if (Math.abs(dev) > Math.abs(maxDev)) maxDev = dev;
+      if (j === 3) midDev = dev;
+    }
+    if (Math.abs(maxDev) < 0.01 * scale) segs.push({ type: 'прямая' });
+    else segs.push({ type: 'дуга', convex: midDev >= 0 ? 'out' : 'in' });
+  }
+  const pts = keyX.map((x, i) => ({ x, y: keyY[i], kind: i === 0 ? 'start' : (i === keyX.length - 1 ? 'end' : 'kink') }));
+  return { ok: true, n, pts, segs, Xtot: d.Xtot, Ytot: d.Ytot };
+}
+
+// Плашка-пометка в правом верхнем углу области.
+function schemaNote(text) {
+  const m = CONFIG.margin;
+  svg.append('text').attr('x', W - m.right - 4).attr('y', m.top + 2).attr('text-anchor', 'end').attr('dominant-baseline', 'hanging')
+    .attr('font-size', 11).attr('fill', '#999').attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(text);
+}
+
+// Отрисовка схемы (НЕ в масштабе): причёсанные высоты, без числовых осей, настоящие подписи.
+function drawPpfSumSchema() {
+  const sd = ppfSumSchemaData();
+  if (!sd.ok) {                                     // схема недоступна — обычный масштабный вид + пометка
+    drawGrid(); drawAxes('X', 'Y');
+    const d = STATE.ppfSumData; if (d && d.ok) { drawPpfSumCurves(d); drawPpfSumMarks(d); }
+    schemaNote('схема недоступна для этого случая');
+    return;
+  }
+  // Фиксированные «красивые» доли (отсчёт fy от верха, y вниз).
+  const FR = { 1: [[0, 0], [1, 1]], 2: [[0, 0], [0.52, 0.42], [1, 1]], 3: [[0, 0], [0.30, 0.18], [0.62, 0.55], [1, 1]] }[sd.n];
+  const m = CONFIG.margin;
+  const plotLeft = m.left, plotTop = m.top, plotW = (W - m.right) - m.left, plotH = (H - m.bottom) - m.top;
+  const baseY = H - m.bottom, originX = m.left;
+  const PX = FR.map(([fx, fy]) => [plotLeft + fx * plotW, plotTop + fy * plotH]);
+
+  // Оси со стрелками, без чисел.
+  const ga = svg.append('g');
+  ga.append('line').attr('x1', originX).attr('y1', baseY).attr('x2', W - m.right).attr('y2', baseY)
+    .attr('stroke', '#555').attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+  ga.append('line').attr('x1', originX).attr('y1', baseY).attr('x2', originX).attr('y2', m.top)
+    .attr('stroke', '#555').attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+  ga.append('text').attr('x', W - m.right + 6).attr('y', baseY + 4).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#333').text('X');
+  ga.append('text').attr('x', originX - 4).attr('y', m.top - 8).attr('text-anchor', 'end').attr('font-size', 13).attr('font-weight', 600).attr('fill', '#333').text('Y');
+
+  // Путь кривой по участкам: «прямая» — отрезок, «дуга» — квадратичная Безье (выгиб наружу).
+  let dPath = `M ${PX[0][0]} ${PX[0][1]}`;
+  for (let i = 0; i < sd.segs.length; i++) {
+    const [x0, y0] = PX[i], [x1, y1] = PX[i + 1];
+    if (sd.segs[i].type === 'прямая') { dPath += ` L ${x1} ${y1}`; continue; }
+    const dx = x1 - x0, dy = y1 - y0, sgn = (sd.segs[i].convex === 'in') ? -1 : 1;
+    const cx = (x0 + x1) / 2 + sgn * 0.16 * dy, cy = (y0 + y1) / 2 - sgn * 0.16 * dx;
+    dPath += ` Q ${cx} ${cy} ${x1} ${y1}`;
+  }
+  const last = PX[PX.length - 1];
+  const fillPath = dPath + ` L ${last[0]} ${baseY} L ${originX} ${baseY} Z`;
+  const g = svg.append('g');
+  g.append('path').attr('d', fillPath).attr('fill', '#4f7cff').attr('opacity', 0.07);
+  g.append('path').attr('d', dPath).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.8);
+
+  // Ключевые точки + подписи настоящих значений.
+  PX.forEach(([px, py], i) => {
+    const pt = sd.pts[i];
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    if (pt.kind === 'start') haloText(g, px - 8, py, fmtRu(pt.y), 'end', 'middle');          // Y-перехват у оси Y
+    else if (pt.kind === 'end') haloText(g, px, baseY + 8, fmtRu(pt.x), 'middle', 'hanging'); // Xmax у оси X
+    else g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#1a1f2e')
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(`(${fmtRu(pt.x)}; ${fmtRu(pt.y)})`);
+  });
+  schemaNote('Схема · не в масштабе');
+}
+
 // Полная перерисовка под-режима «Сумма двух КПВ» (тяжёлый расчёт — только если кэш пуст).
 function redrawPpfSum() {
   if (!STATE.ppfSumData) recomputePpfSum();
   makeScales();                                     // setRanges мог изменить границы
-  svg.selectAll('*').remove(); addDefs(); drawGrid(); drawAxes('X', 'Y');
+  svg.selectAll('*').remove(); addDefs();
   const d = STATE.ppfSumData;
-  if (d && d.ok) { drawPpfSumCurves(d); drawPpfSumMarks(d); }
+  if (STATE.ppfSumView === 'schema' && d && d.ok) {
+    drawPpfSumSchema();                             // своя отрисовка осей (без чисел) + схема
+  } else {
+    drawGrid(); drawAxes('X', 'Y');
+    if (d && d.ok) { drawPpfSumCurves(d); drawPpfSumMarks(d); }
+  }
   updatePpfSumPanel();
+}
+
+// Переключение вида суммарной КПВ (в масштабе / схема) — только перерисовка, без пересчёта.
+function setPpfSumView(view) {
+  STATE.ppfSumView = view;
+  const scl = document.getElementById('ppfsumview-scale'), sch = document.getElementById('ppfsumview-schema');
+  if (scl) scl.classList.toggle('active', view === 'scale');
+  if (sch) sch.classList.toggle('active', view === 'schema');
+  redrawAll();
 }
 
 /* --- Задача 2: КТВ — кривая торговых возможностей ------------------- */
@@ -2873,6 +2993,11 @@ function wireControls() {
   if (sumLin) sumLin.addEventListener('click', () => { if (ppf1Inp) ppf1Inp.value = '100 - X'; if (ppf2Inp) ppf2Inp.value = '60 - 3*X'; applyPpfSum(); });
   const sumCirc = document.getElementById('btn-ppfsum-circ');
   if (sumCirc) sumCirc.addEventListener('click', () => { if (ppf1Inp) ppf1Inp.value = 'sqrt(100 - X^2)'; if (ppf2Inp) ppf2Inp.value = 'sqrt(64 - X^2)'; applyPpfSum(); });
+
+  // Вид суммарной КПВ: в масштабе / схема (Задача 2). Переключатель внутри панели «Сумма двух».
+  [['ppfsumview-scale', 'scale'], ['ppfsumview-schema', 'schema']].forEach(([id, v]) => {
+    const b = document.getElementById(id); if (b) b.addEventListener('click', () => setPpfSumView(v));
+  });
 
   // КТВ — торговые возможности (Задача 2): КПВ + мировая цена Px/Py.
   const ppftInp = document.getElementById('inp-ppft'), ppftPriceInp = document.getElementById('inp-ppft-price');
