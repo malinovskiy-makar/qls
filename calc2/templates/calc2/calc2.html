@@ -158,6 +158,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="seg-btn active" id="mode-market">Рынок</button>
         <button class="seg-btn" id="mode-costs">Издержки</button>
         <button class="seg-btn" id="mode-ppf">КПВ</button>
+        <button class="seg-btn" id="mode-labor">Труд</button>
       </div>
     </div>
 
@@ -375,6 +376,37 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div id="info-costs" style="margin-top:8px;"></div>
     </div>
 
+    <!-- Рынок труда (Чекпоинт 1) — отдельный режим. Оси: труд L и зарплата W.
+         Структура: совершенная конкуренция / монопсония + минимальная зарплата (МРОТ). -->
+    <div class="section" id="sec-labor" style="display:none;">
+      <div class="section-title">Рынок труда</div>
+      <div class="seg">
+        <button class="seg-btn active" id="lab-comp">Конкуренция</button>
+        <button class="seg-btn" id="lab-mono">Монопсония</button>
+      </div>
+      <div class="hint">Спрос на труд (роль <b>D</b>) — это MRPL; предложение труда (роль <b>S</b>).
+        Оси: L (труд) и W (зарплата). Формулы можно писать через L: <code>100 - L</code>, <code>L</code>.</div>
+      <!-- Минимальная зарплата (МРОТ) — горизонтальная линия, тянется мышью (Задача 3). -->
+      <div style="margin-top:10px;">
+        <label class="chk"><input type="checkbox" id="chk-labmin">
+          <span class="swatch" style="background:#b45309"></span> Минимальная зарплата (МРОТ)</label>
+        <div class="field" id="labmin-field" style="display:none;">
+          <label>W_min = <b id="labmin-val">0</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="labmin-slider" min="0" max="100" step="1" value="0" style="flex:1;margin-top:0;">
+            <input type="number" id="labmin-input" min="0" max="100" step="0.1" value="0"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+          <div class="hint">В монопсонии правильный МРОТ может УВЕЛИЧИТЬ занятость (парадокс): он делает
+            предельные издержки труда горизонтальными (= W_min) до встречи с предложением. В конкуренции
+            МРОТ выше равновесия даёт безработицу. Линию можно тянуть мышью.</div>
+        </div>
+      </div>
+      <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-lab-ghost" checked>
+        <span class="swatch" style="background:#ddd;border:1px solid #aaa;"></span> Конкурентный ориентир</label>
+      <div id="info-labor" style="margin-top:8px;"></div>
+    </div>
+
     <!-- КПВ — граница производственных возможностей — отдельный режим.
          Три под-режима: одна КПВ / сумма двух КПВ / КТВ (торговля). -->
     <div class="section" id="sec-ppf" style="display:none;">
@@ -538,8 +570,17 @@ const STATE = {
   monoCeilOn: false,     // включён ли потолок (перетаскиваемая линия Pc)
   monoCeilP: 0,          // уровень потолка Pc (0 = не задан)
   monoCeil: null,        // результат расчёта (выпуск/цена/дефицит/DWL при потолке)
-  // Режим калькулятора (Задачи 2–3): 'market' — рынок, 'costs' — издержки фирмы, 'ppf' — КПВ.
+  // Режим калькулятора: 'market' — рынок, 'costs' — издержки фирмы, 'ppf' — КПВ, 'labor' — рынок труда.
   mode: 'market',
+  // Рынок труда (Чекпоинт 1): структура и минимальная зарплата. Оси L (труд) / W (зарплата).
+  laborStruct: 'competition',  // 'competition' — конкуренция, 'monopsony' — монопсония (один наниматель)
+  laborMinOn: false,           // включён ли МРОТ (перетаскиваемая линия W_min)
+  laborMinW: 0,                // уровень МРОТ (0 = не задан)
+  laborVisited: false,         // первый вход в режим — выставить пресет (D 100-L, S L)
+  laborD: null, laborS: null,  // кривые спроса/предложения труда (роли demand/supply)
+  laborEq: null,               // конкурентное равновесие (Lk, Wk)
+  laborMono: null,             // результат монопсонии (Lm, Wm, ориентир, DWL)
+  laborMin: null,              // результат МРОТ (занятость/безработица/новый оптимум)
   // Издержки фирмы (Задача 2): база — суммарные затраты TC(Q) и постоянные FC.
   costsTC: 'Q^3 - 6*Q^2 + 15*Q + 18',
   costsFC: 18,
@@ -576,7 +617,7 @@ const STATE = {
 function compileFormula(expr) {
   try {
     const compiled = math.parse(expr).compile();
-    compiled.evaluate({ x: 1, Q: 1 });   // пробный расчёт ловит опечатки сразу
+    compiled.evaluate({ x: 1, Q: 1, L: 1 });   // пробный расчёт ловит опечатки сразу (L — синоним для рынка труда)
     return { compiled, error: null };
   } catch (e) {
     return { compiled: null, error: e.message };
@@ -590,7 +631,7 @@ function evalCurve(curve, q) {
   // Быстрый путь для прямых (нужен и для плавного перетаскивания).
   if (curve.linear) return curve.linear.a * q + curve.linear.b;
   try {
-    const v = curve.compiled.evaluate({ x: q, Q: q });
+    const v = curve.compiled.evaluate({ x: q, Q: q, L: q });   // L — синоним переменной (рынок труда)
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) {
     return NaN;
@@ -602,7 +643,7 @@ function evalCurve(curve, q) {
 // иначе null. Работает для ЛЮБОЙ записи формулы (не разбираем строку).
 function detectLinear(compiled) {
   const at = (q) => {
-    try { const v = compiled.evaluate({ x: q, Q: q }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+    try { const v = compiled.evaluate({ x: q, Q: q, L: q }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
     catch (e) { return NaN; }
   };
   const q1 = CONFIG.Qmax * 0.2, q2 = CONFIG.Qmax * 0.5, q3 = CONFIG.Qmax * 0.8;
@@ -2290,6 +2331,379 @@ function redrawCosts() {
   updateCostsPanel();
 }
 
+/* =====================================================================
+   БЛОК 10б. РЫНОК ТРУДА (Чекпоинт 1) — отдельный режим mode='labor'.
+   Оси: труд L (горизонталь), зарплата W (вертикаль) — drawAxes('L','W').
+   Кривые: спрос на труд D = MRPL (роль demand), предложение труда S (роль supply).
+   Две структуры: совершенная конкуренция и монопсония (один наниматель).
+   Вся математика — численная, через те же методы (findEquilibrium / findRoot /
+   findRootIn / invCurve / integrate / центральные разности).
+   ===================================================================== */
+
+// Предельные издержки на труд MCL(L) = d(W_s(L)·L)/dL, где W_s = кривая предложения.
+// Численная центральная разность — как marginalRevenue, работает для любой формы S.
+// Для линейного S = a + bL даёт MCL = a + 2bL (вдвое круче предложения).
+function laborMCL(S, l) {
+  const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
+  const f = (x) => { const w = evalCurve(S, x); return isNaN(w) ? NaN : w * x; };
+  const a = f(l + h), b = f(l - h);
+  return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / (2 * h);
+}
+
+// Оптимум монопсонии при МРОТ W_min: ломаные предельные издержки труда.
+// Пока наниматель платит фиксированный W_min (не повышая зарплату), MCL_eff = W_min —
+// горизонтальна на [0, L̂], где W_s(L̂) = W_min. Правее L̂ MCL_eff = обычный MCL.
+// Оптимум — где ломаный MCL_eff встречает спрос; занятость может ВЫРАСТИ (парадокс).
+// Та же механика, что у потолка цены в монополии (monopolyCeiling).
+function laborMinMonopsony(Wmin) {
+  const D = STATE.laborD, S = STATE.laborS, mono = STATE.laborMono;
+  if (!D || !S || !mono) return null;
+  const Wm = mono.Wm, Lm = mono.Lm, Lk = mono.Lk;
+  const Lhat = invCurve(S, Wmin);                 // объём предложения при зарплате W_min: W_s(L̂)=W_min
+  // МРОТ не выше монопсонической зарплаты (или вне области) — не связывает.
+  if (Wmin <= Wm + 1e-9 || Lhat == null) {
+    return { binding: false, Lstar: Lm, wage: Wm, Lhat, unemployment: 0, Wmin, dwl: mono.dwl };
+  }
+  // Относительная прибыль R(L) = ∫ (D − MCL_eff) dL; MCL_eff = W_min до L̂, далее обычный MCL.
+  const Rel = (L) => {
+    const a = Math.min(L, Lhat);
+    let r = integrate(l => evalCurve(D, l) - Wmin, 0, a);
+    if (L > Lhat) r += integrate(l => evalCurve(D, l) - laborMCL(S, l), Lhat, L);
+    return r;
+  };
+  // Кандидаты: 0, точка D=W_min на плоской части, сам L̂, обычный MCL=D за изломом.
+  const cands = [{ L: 0 }];
+  const lflat = findRootIn(l => evalCurve(D, l) - Wmin, 0, Lhat);
+  if (lflat != null) cands.push({ L: lflat });
+  cands.push({ L: Lhat });
+  const lbeyond = findRootIn(l => evalCurve(D, l) - laborMCL(S, l), Lhat, CONFIG.Qmax);
+  if (lbeyond != null) cands.push({ L: lbeyond });
+  cands.forEach(c => c.R = Rel(c.L));
+  let best = cands[0];
+  cands.forEach(c => { if (c.R > best.R + 1e-6 || (Math.abs(c.R - best.R) <= 1e-6 && c.L > best.L)) best = c; });
+  const Lstar = best.L;
+  // Зарплата: на плоской части = W_min, иначе с кривой предложения.
+  const wage = (Lstar <= Lhat + 1e-9) ? Wmin : evalCurve(S, Lstar);
+  // Безработица = желающие работать при W_min (L̂) минус нанятые (Lstar).
+  const unemployment = Math.max(0, Lhat - Lstar);
+  let dwl = null;
+  if (Lk != null) { const lo = Math.min(Lstar, Lk), hi = Math.max(Lstar, Lk); dwl = Math.abs(integrate(l => evalCurve(D, l) - evalCurve(S, l), lo, hi)); }
+  return { binding: true, Lstar, wage, Lhat, unemployment, dwl, Wmin };
+}
+
+// МРОТ в конкуренции: при W_min выше равновесия — классическая безработица.
+// Занятость = объём спроса при W_min (короткая сторона); безработица = Qs − Qd.
+function laborMinCompetition(Wmin) {
+  const D = STATE.laborD, S = STATE.laborS, eq = STATE.laborEq;
+  if (!D || !S || !eq) return null;
+  const binding = (Wmin > eq.P + 1e-9);
+  const Qd = invCurve(D, Wmin);                   // спрос на труд при W_min
+  const Qs = invCurve(S, Wmin);                   // предложение труда при W_min
+  const employment = (Qd != null) ? Qd : null;
+  const unemployment = (Qd != null && Qs != null) ? Math.max(0, Qs - Qd) : null;
+  return { binding, Wmin, Qd, Qs, employment, unemployment };
+}
+
+// Пересчёт рынка труда БЕЗ рисования — складываем результаты в STATE.
+function recomputeLabor() {
+  STATE.laborD = curveByRole('demand');
+  STATE.laborS = curveByRole('supply');
+  STATE.laborEq = STATE.laborMono = STATE.laborMin = null;
+  STATE.laborWorkerCS = STATE.laborFirmCS = null;
+  const D = STATE.laborD, S = STATE.laborS;
+  if (!D || !S) return;
+  // Конкурентное равновесие D = S — считаем всегда (нужно и как ориентир монопсонии).
+  const eq = findEquilibrium(D, S);
+  STATE.laborEq = eq;
+  if (eq) {
+    STATE.laborWorkerCS = integrate(l => eq.P - evalCurve(S, l), 0, eq.Q);   // излишек рабочих (над S, под W)
+    STATE.laborFirmCS = integrate(l => evalCurve(D, l) - eq.P, 0, eq.Q);     // излишек фирм (под D, над W)
+  }
+  // Монопсония: оптимум MCL = D, зарплата опускается на кривую предложения.
+  if (STATE.laborStruct === 'monopsony') {
+    const Lm = findRoot(l => laborMCL(S, l) - evalCurve(D, l));
+    if (Lm != null && Lm > 0) {
+      const Wm = evalCurve(S, Lm);               // зарплата = W_s(Lm) (НЕ с точки MCL=D и НЕ с D)
+      let dwl = null;
+      if (eq) { const lo = Math.min(Lm, eq.Q), hi = Math.max(Lm, eq.Q); dwl = Math.abs(integrate(l => evalCurve(D, l) - evalCurve(S, l), lo, hi)); }
+      STATE.laborMono = { Lm, Wm, Lk: eq ? eq.Q : null, Wk: eq ? eq.P : null, dwl };
+    }
+  }
+  // Минимальная зарплата (МРОТ).
+  if (STATE.laborMinOn && STATE.laborMinW > 0 && eq) {
+    STATE.laborMin = (STATE.laborStruct === 'monopsony')
+      ? laborMinMonopsony(STATE.laborMinW)
+      : laborMinCompetition(STATE.laborMinW);
+  }
+}
+
+// Точка рынка труда с проекциями к осям и подписями L/W.
+function laborPoint(g, L, W, color, label, opts) {
+  opts = opts || {};
+  const ox = sx(0), oy = sy(0), [px, py] = toPx(L, W);
+  const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  dash(px, py, px, oy); dash(px, py, ox, py);
+  if (opts.lText !== null) haloText(g, px, oy + 8, opts.lText || ('L=' + fmt(L)), 'middle', 'hanging');
+  if (opts.wText !== null) haloText(g, ox - 8, py, opts.wText || ('W=' + fmt(W)), 'end', 'middle');
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', '#fff').attr('stroke-width', 1.5);
+  if (label) g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', color).text(label);
+}
+
+// Бледный конкурентный ориентир (Lk, Wk) — точка «К» (по галочке «было → стало»).
+function drawLaborGhost(L, W, label) {
+  if (!STATE.showGhost || L == null || W == null) return;
+  const oy = sy(0), g = svg.append('g'), [px, py] = toPx(L, W);
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', '#fff').attr('stroke', '#aaa').attr('stroke-width', 1.5);
+  g.append('text').attr('x', px + 7).attr('y', py + 13).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#999')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(label || 'К');
+  haloText(g, px, oy + 8, 'Lk=' + fmt(L), 'middle', 'hanging');
+}
+
+// Заливки излишков в конкуренции: излишек рабочих (над S, под W) и фирм (под D, над W).
+function drawLaborSurpluses() {
+  const eq = STATE.laborEq; if (!eq || eq.Q <= 0) return;
+  const D = STATE.laborD, S = STATE.laborS, W = eq.P;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const samp = []; for (let i = 0; i <= 100; i++) samp.push(eq.Q * i / 100);
+  // Излишек рабочих — между предложением (низ) и зарплатой W (верх).
+  const wA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(W));
+  g.append('path').datum(samp).attr('d', wA).attr('fill', '#e05052').attr('opacity', 0.16);
+  // Излишек фирм — между зарплатой W (низ) и спросом D=MRPL (верх).
+  const fA = d3.area().x(d => sx(d)).y0(sy(W)).y1(d => sy(evalCurve(D, d)));
+  g.append('path').datum(samp).attr('d', fA).attr('fill', '#4f7cff').attr('opacity', 0.16);
+}
+
+// Кривая MCL монопсонии (оранжевый пунктир). При связывающем МРОТ — ломаная MCL_eff.
+function drawLaborMCL() {
+  const S = STATE.laborD ? STATE.laborS : null; if (!S) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  const min = STATE.laborMin;
+  if (min && min.binding && min.Lhat != null) {
+    // Ломаная MCL_eff: горизонталь на уровне W_min до L̂, затем обычный MCL.
+    const yW = sy(min.Wmin);
+    g.append('line').attr('x1', sx(0)).attr('y1', yW).attr('x2', sx(min.Lhat)).attr('y2', yW)
+      .attr('stroke', '#f59e0b').attr('stroke-width', 3).attr('stroke-dasharray', '2 2');
+    // Обрыв вверх в L̂ к обычному MCL.
+    const mclHat = laborMCL(S, min.Lhat);
+    if (!isNaN(mclHat)) g.append('line').attr('x1', sx(min.Lhat)).attr('y1', yW).attr('x2', sx(min.Lhat)).attr('y2', sy(mclHat))
+      .attr('stroke', '#f59e0b').attr('stroke-width', 1.5).attr('stroke-dasharray', '2 2').attr('opacity', 0.6);
+    const pts = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; if (l < min.Lhat) { pts.push(null); continue; } const v = laborMCL(S, l); pts.push(isNaN(v) ? null : [l, v]); }
+    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+    g.append('text').attr('x', sx(min.Lhat * 0.4)).attr('y', yW - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#f59e0b')
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MCLэфф = W_min');
+  } else {
+    // Обычная MCL.
+    const pts = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; const v = laborMCL(S, l); pts.push(isNaN(v) ? null : [l, v]); }
+    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+    const ql = CONFIG.Qmax * 0.85, vl = laborMCL(S, ql);
+    if (!isNaN(vl) && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#f59e0b')
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MCL');
+  }
+}
+
+// DWL монопсонии (между D и S от Lm до Lk) — недозанятость.
+function drawLaborDWL(Lfrom) {
+  const mono = STATE.laborMono; if (!mono || mono.Lk == null) return;
+  const Lm = (Lfrom != null) ? Lfrom : mono.Lm;
+  const D = STATE.laborD, S = STATE.laborS;
+  const lo = Math.min(Lm, mono.Lk), hi = Math.max(Lm, mono.Lk);
+  if (hi <= lo) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
+  const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
+  g.append('path').datum(samp).attr('d', a).attr('fill', '#888').attr('opacity', 0.28);
+}
+
+// Точки монопсонии: оптимум на MCL=D, зарплата вниз на S, ориентир «К».
+function drawLaborMonopsonyPoints() {
+  const mono = STATE.laborMono; if (!mono) return;
+  const min = STATE.laborMin, bind = (min && min.binding);
+  // Бледный конкурентный ориентир.
+  drawLaborGhost(mono.Lk, mono.Wk, 'К');
+  const g = svg.append('g');
+  const ox = sx(0), oy = sy(0);
+  const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  if (bind) {
+    // Призрак исходной монопсонии M₀(Lm, Wm).
+    if (STATE.showGhost) {
+      const [px0, py0] = toPx(mono.Lm, mono.Wm);
+      g.append('circle').attr('cx', px0).attr('cy', py0).attr('r', 4).attr('fill', '#fff').attr('stroke', '#aaa').attr('stroke-width', 1.5);
+      g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#999')
+        .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('M₀');
+    }
+    // Новый оптимум при МРОТ.
+    if (min.Lstar > 1e-6) laborPoint(g, min.Lstar, min.wage, '#1a1f2e', 'M', { lText: 'L=' + fmt(min.Lstar), wText: 'W=' + fmt(min.wage) });
+    // Безработица на оси L между Lstar и L̂ (желающие при W_min).
+    if (min.unemployment > 1e-6) {
+      const xLo = sx(Math.min(min.Lstar, min.Lhat)), xHi = sx(Math.max(min.Lstar, min.Lhat));
+      g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', '#dc2626').attr('stroke-width', 5).attr('opacity', 0.5);
+      haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(min.unemployment), 'middle', 'hanging');
+    }
+  } else {
+    // Точка пересечения MCL = D (на уровне MCL).
+    const mclY = laborMCL(STATE.laborS, mono.Lm);
+    const [pxm, pyMcl] = toPx(mono.Lm, mclY);
+    const [, pyW] = toPx(mono.Lm, mono.Wm);
+    // Вертикаль Lm: от MCL=D вниз до зарплаты на предложении.
+    g.append('line').attr('x1', pxm).attr('y1', pyMcl).attr('x2', pxm).attr('y2', oy)
+      .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    // Точка MCL=D (оранжевая) на вертикали.
+    g.append('circle').attr('cx', pxm).attr('cy', pyMcl).attr('r', 3.5).attr('fill', '#f59e0b').attr('stroke', '#fff').attr('stroke-width', 1.2);
+    // Зарплата опускается вертикально на кривую предложения: точка M(Lm, Wm).
+    dash(ox, pyW, pxm, pyW);
+    g.append('circle').attr('cx', pxm).attr('cy', pyW).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    g.append('text').attr('x', pxm + 8).attr('y', pyW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('M');
+    haloText(g, pxm, oy + 8, 'Lм=' + fmt(mono.Lm), 'middle', 'hanging');
+    haloText(g, ox - 8, pyW, 'Wм=' + fmt(mono.Wm), 'end', 'middle');
+  }
+}
+
+// Точки конкуренции: равновесие (Lk, Wk) или результат связывающего МРОТ.
+function drawLaborCompPoints() {
+  const eq = STATE.laborEq; if (!eq) return;
+  const min = STATE.laborMin, bind = (min && min.binding);
+  const g = svg.append('g'), ox = sx(0), oy = sy(0);
+  if (bind) {
+    // Конкурентное равновесие как бледный ориентир.
+    drawLaborGhost(eq.Q, eq.P, 'E₀');
+    // Линия W_min рисуется отдельно (drawLaborMinLine). Здесь — занятость и безработица.
+    const xQd = sx(min.Qd), xQs = sx(min.Qs), yW = sy(min.Wmin);
+    const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+      .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    dash(xQd, yW, xQd, oy); dash(xQs, yW, xQs, oy);
+    haloText(g, xQd, oy + 8, 'Lспрос=' + fmt(min.Qd), 'middle', 'hanging');
+    haloText(g, xQs, oy + 8, 'Lпредл=' + fmt(min.Qs), 'middle', 'hanging');
+    // Безработица — полоса между Qd и Qs на оси L.
+    const xLo = Math.min(xQd, xQs), xHi = Math.max(xQd, xQs);
+    g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', '#dc2626').attr('stroke-width', 5).attr('opacity', 0.5);
+    haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(min.unemployment), 'middle', 'hanging');
+    // Точка занятости (короткая сторона) на линии W_min.
+    g.append('circle').attr('cx', xQd).attr('cy', yW).attr('r', 4).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+  } else {
+    laborPoint(g, eq.Q, eq.P, '#1a1f2e', 'E*', { lText: 'Lk=' + fmt(eq.Q), wText: 'Wk=' + fmt(eq.P) });
+  }
+}
+
+// Перетаскиваемая линия МРОТ (как линия потолка цены).
+function drawLaborMinLine() {
+  if (!STATE.laborMinOn || !(STATE.laborMinW > 0)) return;
+  const ox = sx(0), xMax = sx(CONFIG.Qmax), yW = sy(STATE.laborMinW);
+  const g = svg.append('g');
+  g.append('line').attr('x1', ox).attr('y1', yW).attr('x2', xMax).attr('y2', yW)
+    .attr('stroke', '#b45309').attr('stroke-width', 2.5).style('pointer-events', 'none');
+  haloText(g, ox - 8, yW, 'Wmin=' + fmt(STATE.laborMinW), 'end', 'middle');
+  const hit = g.append('rect').attr('x', ox).attr('y', yW - 12).attr('width', xMax - ox).attr('height', 24)
+    .attr('fill', 'transparent').style('cursor', 'grab');
+  attachLaborMinDrag(hit);
+  g.append('circle').attr('cx', ox + (xMax - ox) * 0.6).attr('cy', yW).attr('r', 7)
+    .attr('fill', '#b45309').attr('stroke', '#fff').attr('stroke-width', 2).style('pointer-events', 'none');
+}
+
+function attachLaborMinDrag(sel) {
+  sel.call(d3.drag().container(() => svg.node())
+    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('drag', (event) => { setLaborMin(sy.invert(event.y)); })
+    .on('end', () => { document.body.style.cursor = ''; }));
+}
+
+// Записать уровень МРОТ в поля панели (без перерисовки).
+function setLaborMinFields(p) {
+  STATE.laborMinW = p;
+  const s = document.getElementById('labmin-slider'); if (s) s.value = p;
+  const l = document.getElementById('labmin-val'); if (l) l.textContent = fmt(p);
+  const i = document.getElementById('labmin-input'); if (i) i.value = fmt(p);
+}
+// Единый путь смены МРОТ (ползунок, поле, перетаскивание).
+function setLaborMin(p) {
+  const s = document.getElementById('labmin-slider');
+  const maxP = s ? (parseFloat(s.max) || CONFIG.Pmax) : CONFIG.Pmax;
+  p = Math.max(0, Math.min(p, maxP));
+  setLaborMinFields(p);
+  redrawAll();
+}
+
+// Переключатель структуры рынка труда.
+function setLaborStruct(mode) {
+  STATE.laborStruct = mode;
+  const c = document.getElementById('lab-comp'), mo = document.getElementById('lab-mono');
+  if (c) c.classList.toggle('active', mode === 'competition');
+  if (mo) mo.classList.toggle('active', mode === 'monopsony');
+  redrawAll();
+}
+
+// Табло рынка труда.
+function updateLaborPanel() {
+  const box = document.getElementById('info-labor'); if (!box) return;
+  if (!STATE.laborD || !STATE.laborS) {
+    box.innerHTML = '<div class="muted">Отметьте одну кривую как D&nbsp;(спрос на труд, MRPL), другую как S&nbsp;(предложение труда).</div>';
+    return;
+  }
+  if (!STATE.laborEq) { box.innerHTML = '<div class="warn">Равновесие рынка труда не найдено в первой четверти.</div>'; return; }
+  const min = STATE.laborMin, bind = (min && min.binding);
+  let html = '';
+  if (STATE.laborStruct === 'monopsony') {
+    const m = STATE.laborMono;
+    if (!m) { box.innerHTML = '<div class="warn">Оптимум монопсонии (MCL = D) не найден.</div>'; return; }
+    html += `<div class="stat"><span>Lм (занятость)</span><b>${fmt(m.Lm)}</b></div>`;
+    html += `<div class="stat"><span>Wм (зарплата)</span><b>${fmt(m.Wm)}</b></div>`;
+    if (m.Lk != null) html += `<div class="stat"><span>Lk (конкуренция)</span><b>${fmt(m.Lk)}</b></div>`;
+    if (m.Wk != null) html += `<div class="stat"><span>Wk (конкуренция)</span><b>${fmt(m.Wk)}</b></div>`;
+    if (m.dwl != null) html += `<div class="stat"><span>DWL (недозанятость)</span><b>${fmt(m.dwl)}</b></div>`;
+    html += `<div class="hint">Монопсония занижает и занятость, и зарплату против конкуренции: рабочим платят Wм&nbsp;=&nbsp;W_s(Lм) — ниже их предельного продукта. Серым — потери общества.</div>`;
+    if (bind) {
+      html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
+      html += `<div class="stat"><span>МРОТ W_min</span><b>${fmt(min.Wmin)}</b></div>`;
+      html += `<div class="stat"><span>Занятость с МРОТ</span><b>${fmt(min.Lstar)} (было ${fmt(m.Lm)})</b></div>`;
+      html += `<div class="stat"><span>Зарплата</span><b>${fmt(min.wage)}</b></div>`;
+      if (min.unemployment > 1e-6) html += `<div class="stat"><span>Безработица</span><b>${fmt(min.unemployment)}</b></div>`;
+      const dl = min.Lstar - m.Lm;
+      html += `<div class="hint">${dl > 1e-6 ? 'МРОТ увеличил занятость (парадокс монопсонии).' : (dl < -1e-6 ? 'МРОТ снизил занятость.' : 'Занятость не изменилась.')}</div>`;
+    } else if (STATE.laborMinOn && STATE.laborMinW > 0) {
+      html += '<div class="hint" style="margin-top:6px;">МРОТ не выше монопсонической зарплаты — не связывает.</div>';
+    }
+  } else {
+    const eq = STATE.laborEq;
+    html += `<div class="stat"><span>Lk (занятость)</span><b>${fmt(eq.Q)}</b></div>`;
+    html += `<div class="stat"><span>Wk (зарплата)</span><b>${fmt(eq.P)}</b></div>`;
+    if (STATE.laborWorkerCS != null) html += `<div class="stat"><span>Излишек рабочих</span><b>${fmt(STATE.laborWorkerCS)}</b></div>`;
+    if (STATE.laborFirmCS != null) html += `<div class="stat"><span>Излишек фирм</span><b>${fmt(STATE.laborFirmCS)}</b></div>`;
+    if (bind) {
+      html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
+      html += `<div class="stat"><span>МРОТ W_min</span><b>${fmt(min.Wmin)}</b></div>`;
+      html += `<div class="stat"><span>Занятость</span><b>${fmt(min.employment)} (было ${fmt(eq.Q)})</b></div>`;
+      if (min.unemployment > 1e-6) html += `<div class="stat"><span>Безработица</span><b>${fmt(min.unemployment)}</b></div>`;
+      html += `<div class="hint">МРОТ выше равновесия: занятость падает до спроса при W_min, возникает безработица (избыток предложения труда).</div>`;
+    } else if (STATE.laborMinOn && STATE.laborMinW > 0) {
+      html += '<div class="hint" style="margin-top:6px;">МРОТ ниже равновесия — не связывает. Рынок в равновесии.</div>';
+    }
+  }
+  box.innerHTML = html;
+}
+
+// Полная перерисовка режима рынка труда.
+function redrawLabor() {
+  recomputeLabor();
+  svg.selectAll('*').remove();
+  addDefs();
+  drawGrid();
+  drawAxes('L', 'W');
+  if (STATE.laborStruct === 'monopsony') {
+    drawLaborDWL();              // потери (между D и S от Lm до Lk)
+    drawCurves();               // спрос на труд D и предложение S (с перетаскиванием прямых)
+    drawLaborMCL();             // MCL пунктиром (или ломаная MCL_eff при МРОТ)
+    drawLaborMonopsonyPoints(); // оптимум, зарплата, ориентир, безработица
+  } else {
+    if (!(STATE.laborMin && STATE.laborMin.binding)) drawLaborSurpluses();  // излишки только без связывающего МРОТ
+    drawCurves();
+    drawLaborCompPoints();      // равновесие или занятость/безработица при МРОТ
+  }
+  if (STATE.laborMinOn) drawLaborMinLine();
+  updateLaborPanel();
+}
+
 /* ---------------------------------------------------------------------
    БЛОК 11. ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМОВ (рынок / издержки / КПВ).
    Показывает нужные секции панели и дёргает перерисовку. Сами режимы
@@ -2301,7 +2715,8 @@ function setRanges(qmax, pmax) {
   CONFIG.Qmax = qmax; CONFIG.Pmax = pmax;
   const qi = document.getElementById('inp-qmax'); if (qi) qi.value = qmax;
   const pi = document.getElementById('inp-pmax'); if (pi) pi.value = pmax;
-  ['tax-slider', 'tax-input', 'pc-slider', 'pc-input', 'mono-ceil-slider', 'mono-ceil-input'].forEach(id => {
+  ['tax-slider', 'tax-input', 'pc-slider', 'pc-input', 'mono-ceil-slider', 'mono-ceil-input',
+   'labmin-slider', 'labmin-input'].forEach(id => {
     const e = document.getElementById(id); if (e) e.max = pmax;
   });
 }
@@ -2309,7 +2724,7 @@ function setRanges(qmax, pmax) {
 // Переключение режима: рынок / издержки / КПВ.
 function setMode(mode) {
   STATE.mode = mode;
-  const map = { market: 'mode-market', costs: 'mode-costs', ppf: 'mode-ppf' };
+  const map = { market: 'mode-market', costs: 'mode-costs', ppf: 'mode-ppf', labor: 'mode-labor' };
   Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
   const ab = document.getElementById(map[mode]); if (ab) ab.classList.add('active');
   // Какие секции панели показывать в каждом режиме (отсутствующие id просто игнорируются).
@@ -2317,20 +2732,28 @@ function setMode(mode) {
     market: ['sec-curves', 'sec-eq', 'sec-areas', 'sec-analysis', 'sec-tax', 'sec-mono'],
     costs:  ['sec-costs'],
     ppf:    ['sec-ppf'],
+    labor:  ['sec-curves', 'sec-labor'],
   };
   const all = new Set([].concat(...Object.values(groups)));
   all.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   (groups[mode] || []).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = ''; });
   applyScenarioVisibility();   // уточнить видимость интервенций/панелей по текущему сценарию
+  // Первый вход в рынок труда — пресет: спрос на труд D = 100 − L, предложение S = L.
+  if (mode === 'labor' && !STATE.laborVisited) {
+    STATE.laborVisited = true;
+    STATE.curves = []; curveCounter = 0;
+    addCurve('100 - L'); if (STATE.curves[0]) setRole(STATE.curves[0], 'demand');
+    addCurve('L');       if (STATE.curves[1]) setRole(STATE.curves[1], 'supply');
+  }
   // При каждом переключении режима — выставлять характерный масштаб осей.
   // Ручные правки в полях «Оси» при смене режима намеренно сбрасываются.
   if (mode === 'costs') setRanges(10, 50);
   else if (mode === 'ppf') setRanges(100, 100);
-  else setRanges(100, 100);   // market и любой другой — стандартный масштаб
-  // Подписи полей масштаба в секции «Оси»: для КПВ — товары X/Y, иначе Q/P.
+  else setRanges(100, 100);   // market / labor / любой другой — стандартный масштаб
+  // Подписи полей масштаба в секции «Оси»: КПВ — X/Y, рынок труда — L/W, иначе Q/P.
   const lq = document.getElementById('lbl-qmax'), lp = document.getElementById('lbl-pmax');
-  if (lq) lq.textContent = (mode === 'ppf') ? 'X макс' : 'Q макс';
-  if (lp) lp.textContent = (mode === 'ppf') ? 'Y макс' : 'P макс';
+  if (lq) lq.textContent = (mode === 'ppf') ? 'X макс' : (mode === 'labor' ? 'L макс' : 'Q макс');
+  if (lp) lp.textContent = (mode === 'ppf') ? 'Y макс' : (mode === 'labor' ? 'W макс' : 'P макс');
   redrawAll();
 }
 
@@ -3105,6 +3528,7 @@ function redrawAll() {
   makeScales();
   if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
   if (STATE.mode === 'ppf')   { redrawPpf();   return; }   // режим КПВ (Задача 3)
+  if (STATE.mode === 'labor') { redrawLabor(); return; }   // режим рынка труда (Чекпоинт 1)
   recompute();                   // сначала считаем (равновесие, площади, налог)
   svg.selectAll('*').remove();   // полная перерисовка с чистого листа
   addDefs();
@@ -3411,10 +3835,33 @@ function wireControls() {
   const mCeilInput = document.getElementById('mono-ceil-input');
   if (mCeilInput) mCeilInput.addEventListener('change', () => { const v = parseFloat(mCeilInput.value); if (!isNaN(v)) setMonoCeil(v); });
 
-  // Переключатель режима «Рынок / Издержки / КПВ» (Задачи 2–3).
-  [['mode-market', 'market'], ['mode-costs', 'costs'], ['mode-ppf', 'ppf']].forEach(([id, mode]) => {
+  // Переключатель режима «Рынок / Издержки / КПВ / Труд».
+  [['mode-market', 'market'], ['mode-costs', 'costs'], ['mode-ppf', 'ppf'], ['mode-labor', 'labor']].forEach(([id, mode]) => {
     const b = document.getElementById(id); if (b) b.addEventListener('click', () => setMode(mode));
   });
+
+  // Рынок труда (Чекпоинт 1): структура, МРОТ, конкурентный ориентир.
+  const labComp = document.getElementById('lab-comp'), labMono = document.getElementById('lab-mono');
+  if (labComp) labComp.addEventListener('click', () => setLaborStruct('competition'));
+  if (labMono) labMono.addEventListener('click', () => setLaborStruct('monopsony'));
+  const labMinChk = document.getElementById('chk-labmin');
+  if (labMinChk) labMinChk.addEventListener('change', () => {
+    STATE.laborMinOn = labMinChk.checked;
+    const f = document.getElementById('labmin-field'); if (f) f.style.display = labMinChk.checked ? '' : 'none';
+    // При включении ставим линию на уровень текущей зарплаты (пока не связывает) — точка отсчёта.
+    if (labMinChk.checked && !(STATE.laborMinW > 0)) {
+      const base = (STATE.laborStruct === 'monopsony' && STATE.laborMono) ? STATE.laborMono.Wm
+                 : (STATE.laborEq ? STATE.laborEq.P : 0);
+      if (base > 0) setLaborMinFields(Math.round(base));
+    }
+    redrawAll();
+  });
+  const labMinSlider = document.getElementById('labmin-slider');
+  if (labMinSlider) labMinSlider.addEventListener('input', () => setLaborMin(parseFloat(labMinSlider.value)));
+  const labMinInput = document.getElementById('labmin-input');
+  if (labMinInput) labMinInput.addEventListener('change', () => { const v = parseFloat(labMinInput.value); if (!isNaN(v)) setLaborMin(v); });
+  const labGhost = document.getElementById('chk-lab-ghost');
+  if (labGhost) labGhost.addEventListener('change', () => { STATE.showGhost = labGhost.checked; redrawAll(); });
 
   // Сценарии анализа рынка (Задачи 2–4): обычный / эластичность / сдвиги / внешний эффект.
   [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'], ['scn-ext', 'externality']]
