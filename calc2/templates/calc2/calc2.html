@@ -203,6 +203,24 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div id="info-areas" style="margin-top:8px;"></div>
     </div>
 
+    <!-- Анализ рынка (Задачи 2–4): взаимоисключающие сценарии поверх «Рынка».
+         «Обычный» — равновесие + интервенции + монополия (как раньше). Остальные
+         сценарии прячут панели интервенций и структуры рынка. -->
+    <div class="section" id="sec-analysis">
+      <div class="section-title">Анализ рынка</div>
+      <div class="seg">
+        <button class="seg-btn active" id="scn-none">Обычный</button>
+        <button class="seg-btn" id="scn-elast">Эластичность</button>
+      </div>
+      <!-- Эластичность спроса вдоль кривой (Задача 2) -->
+      <div id="scn-pane-elast" style="display:none;margin-top:8px;">
+        <div class="hint">Перетаскивайте точку вдоль спроса (роль D). Ed&nbsp;=&nbsp;P/(Q·dP/dQ).
+          Единичная точка (|Ed|=1) — там, где MR&nbsp;=&nbsp;0 и выручка TR&nbsp;=&nbsp;P·Q максимальна:
+          левее спрос эластичный, правее — неэластичный.</div>
+        <div id="info-elast" style="margin-top:6px;"></div>
+      </div>
+    </div>
+
     <!-- Вмешательство государства: налог / субсидия (шаги 7–8) -->
     <div class="section" id="sec-tax">
       <div class="section-title">Вмешательство государства</div>
@@ -460,6 +478,12 @@ const STATE = {
   pReg: 0,           // регулируемая цена (для потолка / пола); 0 = не задана
   showGhost: true,   // показывать бледное исходное состояние «было → стало»
   market: 'comp',    // структура рынка: 'comp' — конкуренция, 'monopoly' — монополия (MR=MC)
+  // Сценарий анализа рынка (Задачи 2–4) — взаимоисключающие, поверх режима «Рынок»:
+  // 'none' — обычный (равновесие + интервенции + монополия), 'elasticity' — эластичность
+  // спроса, 'shift' — разложение сдвигов, 'externality' — внешний эффект и налог Пигу.
+  scenario: 'none',
+  elastQ: null,      // позиция точки эластичности вдоль спроса (null = единичная/центр)
+  elast: null,       // результат расчёта эластичности (Задача 2)
   // Галочки областей монополии (Задача 1): CS над ценой, VC под MC, PS между MC и ценой.
   showMonoCS: true,
   showMonoVC: true,
@@ -624,6 +648,13 @@ function findRoot(g) {
 // Обратная функция кривой: Q, при котором P(Q) = targetP (то есть D⁻¹ или S⁻¹).
 function invCurve(curve, targetP) {
   return findRoot(q => { const v = evalCurve(curve, q); return isNaN(v) ? NaN : v - targetP; });
+}
+
+// Производная кривой dP/dQ численно (центральная разность). Нужна для эластичности (Задача 2).
+function curveDeriv(curve, q) {
+  const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
+  const a = evalCurve(curve, q + h), b = evalCurve(curve, q - h);
+  return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / (2 * h);
 }
 
 /* ---------------------------------------------------------------------
@@ -842,8 +873,10 @@ function recompute() {
   STATE.taxActive = false;
   STATE.taxEq = null;
   // В режиме монополии конкурентные сценарии вмешательства отключены.
+  // Интервенции активны только в обычном сценарии (не при эластичности/сдвигах/внешнем эффекте).
   const compMarket = (STATE.market !== 'monopoly');
-  const isTaxType = compMarket && (STATE.intervType === 'tax' || STATE.intervType === 'subsidy');
+  const scenarioNone = (STATE.scenario === 'none');
+  const isTaxType = compMarket && scenarioNone && (STATE.intervType === 'tax' || STATE.intervType === 'subsidy');
   if (isTaxType && STATE.tax > 0 && STATE.D && STATE.S && STATE.eq) {
     const shift = (STATE.intervType === 'subsidy') ? -STATE.tax : STATE.tax;
     const sShift = { fn: q => evalCurve(STATE.S, q) + shift };   // синтетическая S ± ставка
@@ -874,7 +907,7 @@ function recompute() {
 
   // Ценовое регулирование: потолок / пол цены (Задача 1).
   // Государство фиксирует P_reg. Объём торговли — короткая сторона рынка.
-  STATE.pcMode = compMarket && (STATE.intervType === 'ceiling' || STATE.intervType === 'floor');
+  STATE.pcMode = compMarket && scenarioNone && (STATE.intervType === 'ceiling' || STATE.intervType === 'floor');
   STATE.pcActive = false;
   STATE.pc = null;
   if (STATE.pcMode && STATE.D && STATE.S && STATE.eq && STATE.pReg > 0) {
@@ -929,6 +962,24 @@ function recompute() {
   STATE.monoCeil = null;
   if (STATE.market === 'monopoly' && STATE.monoCeilOn && STATE.monoCeilP > 0 && STATE.mono) {
     STATE.monoCeil = monopolyCeiling(STATE.monoCeilP);
+  }
+
+  // Эластичность спроса вдоль кривой (Задача 2). Точка вдоль D + единичная точка (MR=0).
+  STATE.elast = null;
+  if (compMarket && STATE.scenario === 'elasticity' && STATE.D) {
+    const D = STATE.D;
+    // Единичная эластичность |Ed|=1 ровно там, где MR=0 (MR = d(P·Q)/dQ).
+    const unitQ = findRoot(q => marginalRevenue(D, q));
+    let unit = null;
+    if (unitQ != null && unitQ > 0) { const up = evalCurve(D, unitQ); if (!isNaN(up)) unit = { Q: unitQ, P: up, TR: up * unitQ }; }
+    // Конец спроса по Q (где D пересекает ось Q): для зон и зажима точки.
+    let qDmax = invCurve(D, 0);
+    if (qDmax == null || !(qDmax > 0)) qDmax = CONFIG.Qmax;
+    if (STATE.elastQ == null) STATE.elastQ = unit ? unit.Q : qDmax * 0.5;
+    STATE.elastQ = Math.max(qDmax * 1e-3, Math.min(STATE.elastQ, qDmax * 0.999));
+    const q = STATE.elastQ, p = evalCurve(D, q), slope = curveDeriv(D, q);
+    const Ed = (q > 0 && slope !== 0 && !isNaN(slope) && !isNaN(p)) ? p / (q * slope) : NaN;
+    STATE.elast = { unit, qDmax, q, p, slope, Ed, absEd: Math.abs(Ed) };
   }
 }
 
@@ -1237,6 +1288,84 @@ function setTaxSide(side) {
   if (sel) sel.classList.toggle('active', side === 'seller');
   if (buy) buy.classList.toggle('active', side === 'buyer');
   redrawAll();
+}
+
+/* ---------------------------------------------------------------------
+   БЛОК 8а-2. ЭЛАСТИЧНОСТЬ СПРОСА вдоль кривой (Задача 2).
+   Перетаскиваемая точка на D + живой |Ed|, зоны эластичного/неэластичного
+   спроса (раздел в единичной точке, где MR=0 и выручка TR максимальна).
+   --------------------------------------------------------------------- */
+
+// Бледные заливки зон: эластичный (левее единичной точки) и неэластичный (правее).
+function drawElasticityZones() {
+  const e = STATE.elast; if (!e || !e.unit) return;
+  const D = STATE.D;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
+  const area = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(evalCurve(D, d)));
+  g.append('path').datum(samp(0, e.unit.Q)).attr('d', area).attr('fill', '#21a366').attr('opacity', 0.10);          // эластичный
+  g.append('path').datum(samp(e.unit.Q, e.qDmax)).attr('d', area).attr('fill', '#f59e0b').attr('opacity', 0.10);    // неэластичный
+  // Подписи зон у оси Q.
+  const oy = sy(0);
+  const elText = (q, txt, color) => g.append('text').attr('x', sx(q)).attr('y', oy - 8).attr('text-anchor', 'middle')
+    .attr('font-size', 10).attr('font-weight', 600).attr('fill', color).attr('opacity', 0.8)
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(txt);
+  elText(e.unit.Q * 0.5, 'эластичный', '#21a366');
+  elText((e.unit.Q + e.qDmax) / 2, 'неэластичный', '#d97706');
+}
+
+// Единичная точка (MR=0) + перетаскиваемая точка с проекциями и подписью |Ed|.
+function drawElasticityPoint() {
+  const e = STATE.elast; if (!e || isNaN(e.p)) return;
+  const ox = sx(0), oy = sy(0), g = svg.append('g');
+  // Единичная точка эластичности.
+  if (e.unit) {
+    const [ux, uy] = toPx(e.unit.Q, e.unit.P);
+    g.append('line').attr('x1', ux).attr('y1', uy).attr('x2', ux).attr('y2', oy)
+      .attr('stroke', '#8b5cf6').attr('stroke-width', 1).attr('stroke-dasharray', '3 3');
+    g.append('circle').attr('cx', ux).attr('cy', uy).attr('r', 4).attr('fill', '#8b5cf6').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    g.append('text').attr('x', ux + 7).attr('y', uy - 7).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', '#8b5cf6')
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('|Ed|=1 · MR=0 · TR макс');
+  }
+  // Перетаскиваемая точка вдоль спроса.
+  const [px, py] = toPx(e.q, e.p);
+  const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  dash(px, py, px, oy); dash(px, py, ox, py);
+  haloText(g, px, oy + 8, 'Q=' + fmt(e.q), 'middle', 'hanging');
+  haloText(g, ox - 8, py, 'P=' + fmt(e.p), 'end', 'middle');
+  g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#1a1f2e')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('|Ed|=' + fmt(e.absEd));
+  const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
+  attachElastDrag(hit);
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5.5)
+    .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 2).style('pointer-events', 'none');
+}
+
+// Перетаскивание точки эластичности вдоль спроса (по Q; P берётся с кривой; зажим в recompute).
+function attachElastDrag(sel) {
+  sel.call(d3.drag().container(() => svg.node())
+    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('drag', (event) => { STATE.elastQ = toData(event.x, event.y)[0]; redrawAll(); })
+    .on('end', () => { document.body.style.cursor = ''; }));
+}
+
+// Табло эластичности: точка, |Ed|, зона, единичная точка и максимальная выручка.
+function updateElasticityPanel() {
+  const box = document.getElementById('info-elast'); if (!box) return;
+  if (!STATE.D) { box.innerHTML = '<div class="muted">Отметьте кривую спроса (роль D).</div>'; return; }
+  const e = STATE.elast;
+  if (!e || isNaN(e.Ed)) { box.innerHTML = '<div class="warn">Эластичность не определена в этой точке.</div>'; return; }
+  const zone = e.absEd > 1.0001 ? 'эластичный (|Ed|&gt;1)' : (e.absEd < 0.9999 ? 'неэластичный (|Ed|&lt;1)' : 'единичная (|Ed|=1)');
+  let html = '';
+  html += `<div class="stat"><span>Точка (Q, P)</span><b>${fmt(e.q)}, ${fmt(e.p)}</b></div>`;
+  html += `<div class="stat"><span>|Ed|</span><b>${fmt(e.absEd)}</b></div>`;
+  html += `<div class="stat"><span>Зона спроса</span><b>${zone}</b></div>`;
+  if (e.unit) {
+    html += `<div class="stat" style="margin-top:4px;"><span>Единичная точка</span><b>Q=${fmt(e.unit.Q)}, P=${fmt(e.unit.P)}</b></div>`;
+    html += `<div class="stat"><span>Макс выручка TR</span><b>${fmt(e.unit.TR)}</b></div>`;
+  }
+  box.innerHTML = html;
 }
 
 /* ---------------------------------------------------------------------
@@ -1910,13 +2039,14 @@ function setMode(mode) {
   const ab = document.getElementById(map[mode]); if (ab) ab.classList.add('active');
   // Какие секции панели показывать в каждом режиме (отсутствующие id просто игнорируются).
   const groups = {
-    market: ['sec-curves', 'sec-eq', 'sec-areas', 'sec-tax', 'sec-mono'],
+    market: ['sec-curves', 'sec-eq', 'sec-areas', 'sec-analysis', 'sec-tax', 'sec-mono'],
     costs:  ['sec-costs'],
     ppf:    ['sec-ppf'],
   };
   const all = new Set([].concat(...Object.values(groups)));
   all.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   (groups[mode] || []).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = ''; });
+  applyScenarioVisibility();   // уточнить видимость интервенций/панелей по текущему сценарию
   // При каждом переключении режима — выставлять характерный масштаб осей.
   // Ручные правки в полях «Оси» при смене режима намеренно сбрасываются.
   if (mode === 'costs') setRanges(10, 50);
@@ -1926,6 +2056,35 @@ function setMode(mode) {
   const lq = document.getElementById('lbl-qmax'), lp = document.getElementById('lbl-pmax');
   if (lq) lq.textContent = (mode === 'ppf') ? 'X макс' : 'Q макс';
   if (lp) lp.textContent = (mode === 'ppf') ? 'Y макс' : 'P макс';
+  redrawAll();
+}
+
+// Видимость панелей по сценарию анализа рынка (Задачи 2–4). Без перерисовки.
+// Интервенции и переключатель структуры рынка видны только в обычном сценарии;
+// остальные сценарии показывают свою под-панель (взаимоисключение).
+function applyScenarioVisibility() {
+  const s = STATE.scenario, inMarket = (STATE.mode === 'market');
+  const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
+  show('scn-pane-elast', inMarket && s === 'elasticity');
+  show('scn-pane-shift', inMarket && s === 'shift');
+  show('scn-pane-ext',   inMarket && s === 'externality');
+  show('sec-tax',  inMarket && s === 'none');
+  show('sec-mono', inMarket && s === 'none');
+  [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'], ['scn-ext', 'externality']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', s === v); });
+}
+
+// Переключение сценария анализа рынка. Сценарии — конкурентный контекст: если был
+// монополист, возвращаем конкуренцию (как монополия выключает интервенции).
+function setScenario(s) {
+  STATE.scenario = s;
+  if (s !== 'none' && STATE.market === 'monopoly') {
+    STATE.market = 'comp';
+    const c = document.getElementById('seg-comp'), mo = document.getElementById('seg-mono');
+    if (c) c.classList.add('active'); if (mo) mo.classList.remove('active');
+    ['mono-hint', 'mono-areas-chk', 'mono-ceiling'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+  }
+  applyScenarioVisibility();
   redrawAll();
 }
 
@@ -2692,8 +2851,14 @@ function redrawAll() {
       drawMonopolyPoints();      // точки M и MR=MC, проекции, конкурентный ориентир
       if (STATE.monoCeilOn) drawMonoCeilingLine();   // линия видна, но не связывает
     }
+  } else if (STATE.scenario === 'elasticity') {
+    // Эластичность спроса (Задача 2): зоны + кривые + равновесие + точка |Ed|.
+    drawElasticityZones();
+    drawCurves();
+    drawEquilibrium();
+    drawElasticityPoint();
   } else {
-    // Конкуренция: заливки + кривые + равновесие/вмешательство.
+    // Конкуренция, обычный сценарий: заливки + кривые + равновесие/вмешательство.
     if (STATE.taxActive) drawTaxAreas();
     else if (STATE.pcActive) drawPcAreas();
     else drawAreas();
@@ -2713,6 +2878,9 @@ function redrawAll() {
     // чтобы не висела старая таблица из конкурентного режима.
     const itax = document.getElementById('info-tax');
     if (itax) itax.innerHTML = '<div class="muted">В режиме монополии вмешательство государства выключено.</div>';
+  } else if (STATE.scenario === 'elasticity') {
+    updateElasticityPanel();
+    const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
   } else {
     if (STATE.pcMode) updatePcPanel(); else updateTaxPanel();
     // Панель монополии очищаем, чтобы не висело старое из прошлого режима.
@@ -2826,8 +2994,9 @@ function renderCurveList() {
    режима и установка параметра. Никакой новой логики — только композиция.
    --------------------------------------------------------------------- */
 function loadScene(name) {
-  // Чистый старт: кривые и параметры вмешательства — с нуля.
+  // Чистый старт: кривые, сценарий анализа и параметры вмешательства — с нуля.
   STATE.curves = []; curveCounter = 0;
+  STATE.scenario = 'none';
   STATE.tax = 0; STATE.pReg = 0;
   ['tax-slider', 'tax-input', 'pc-slider', 'pc-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = 0; });
   const tv = document.getElementById('tax-val'); if (tv) tv.textContent = '0';
@@ -2958,6 +3127,10 @@ function wireControls() {
   [['mode-market', 'market'], ['mode-costs', 'costs'], ['mode-ppf', 'ppf']].forEach(([id, mode]) => {
     const b = document.getElementById(id); if (b) b.addEventListener('click', () => setMode(mode));
   });
+
+  // Сценарии анализа рынка (Задачи 2–4): обычный / эластичность / сдвиги / внешний эффект.
+  [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'], ['scn-ext', 'externality']]
+    .forEach(([id, s]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setScenario(s)); });
 
   // Режим издержек (Задача 2): ввод TC/FC, кнопки «Построить» / «Стандартные», галочки кривых.
   const tcInp = document.getElementById('inp-tc');
