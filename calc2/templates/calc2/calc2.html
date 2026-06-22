@@ -121,6 +121,12 @@ input, select { font: inherit; }
 /* Ползунок */
 input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px; }
 
+/* Переключатель «Налог / Субсидия» */
+.seg { display: flex; border: .5px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg-btn { flex: 1; padding: 6px 0; border: none; background: #fff; color: var(--text2); font-size: 12px; }
+.seg-btn.active { background: var(--accent); color: #fff; }
+.seg-btn + .seg-btn { border-left: .5px solid var(--border); }
+
 /* Область графика справа */
 .graph-wrap {
   flex: 1; position: relative; background: #fff; overflow: hidden;
@@ -176,15 +182,20 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div id="info-areas" style="margin-top:8px;"></div>
     </div>
 
-    <!-- Налог за единицу (шаг 7) -->
+    <!-- Вмешательство государства: налог / субсидия (шаги 7–8) -->
     <div class="section" id="sec-tax">
-      <div class="section-title">Налог за единицу</div>
-      <div class="field">
-        <label>Ставка t = <b id="tax-val">0</b></label>
+      <div class="section-title">Вмешательство государства</div>
+      <div class="seg">
+        <button class="seg-btn active" id="seg-tax">Налог</button>
+        <button class="seg-btn" id="seg-sub">Субсидия</button>
+      </div>
+      <div class="field" style="margin-top:8px;">
+        <label>Ставка <span id="rate-letter">t</span> = <b id="tax-val">0</b></label>
         <input type="range" id="tax-slider" min="0" max="100" step="any" value="0">
       </div>
-      <div class="hint">Потоварный налог на производителя: кривая S сдвигается вверх на&nbsp;t.
-        Клин между ценами покупателя и продавца на графике можно тянуть мышью.</div>
+      <div class="hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
+        (налог — вверх, субсидия — вниз) на величину ставки. Клин между ценами покупателя
+        и продавца можно тянуть мышью.</div>
       <div id="info-tax" style="margin-top:8px;"></div>
     </div>
 
@@ -248,7 +259,8 @@ const STATE = {
   showGrid: true,
   showCS: true,      // показывать заливку излишка потребителя
   showPS: true,      // показывать заливку излишка производителя
-  tax: 0,            // ставка потоварного налога (0 = налога нет)
+  tax: 0,            // ставка вмешательства (0 = нет); тип задаёт intervType
+  intervType: 'tax', // 'tax' — налог (S вверх), 'subsidy' — субсидия (S вниз)
 };
 
 /* ---------------------------------------------------------------------
@@ -566,24 +578,34 @@ function recompute() {
     STATE.sw = STATE.cs + STATE.ps;
   }
 
-  // Налог (шаг 7). Потоварный налог t на производителя: S сдвигается вверх на t.
-  // Всё считаем численно, как и для базового равновесия.
+  // Вмешательство государства (шаг 7 — налог, шаг 8 — субсидия).
+  // Налог сдвигает S вверх на t, субсидия — вниз на s. Дальше математика общая.
   STATE.taxActive = false;
   STATE.taxEq = null;
   if (STATE.tax > 0 && STATE.D && STATE.S && STATE.eq) {
-    const sShift = { fn: q => evalCurve(STATE.S, q) + STATE.tax };   // синтетическая S + t
+    const shift = (STATE.intervType === 'subsidy') ? -STATE.tax : STATE.tax;
+    const sShift = { fn: q => evalCurve(STATE.S, q) + shift };   // синтетическая S ± ставка
     const te = findEquilibrium(STATE.D, sShift);
     if (te) {
-      const Q1 = te.Q;
+      const Q1 = te.Q, Q0 = STATE.eq.Q;
       const Pb = evalCurve(STATE.D, Q1);          // цена покупателя
-      const Ps = Pb - STATE.tax;                  // цена продавца (= S(Q1))
+      const Ps = Pb - shift;                      // цена продавца (налог: ниже Pb; субсидия: выше)
+      const lo = Math.min(Q1, Q0), hi = Math.max(Q1, Q0);
+      STATE.shift = shift;
       STATE.taxEq = { Q: Q1, Pb, Ps };
-      STATE.tx = STATE.tax * Q1;                  // сбор налога (прямоугольник)
+      STATE.tx = STATE.tax * Q1;                  // объём денег = площадь прямоугольника
+      STATE.budget = (STATE.intervType === 'subsidy' ? -1 : 1) * STATE.tx;  // +сбор / -расход
       STATE.csTax = integrate(q => evalCurve(STATE.D, q) - Pb, 0, Q1);
       STATE.psTax = integrate(q => Ps - evalCurve(STATE.S, q), 0, Q1);
-      STATE.dwl = integrate(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), Q1, STATE.eq.Q);
-      STATE.incBuyer = Pb - STATE.eq.P;           // бремя покупателя
-      STATE.incSeller = STATE.eq.P - Ps;          // бремя продавца
+      // DWL — площадь между D и S на интервале между старым и новым Q (всегда > 0).
+      STATE.dwl = Math.abs(integrate(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi));
+      if (STATE.intervType === 'subsidy') {
+        STATE.incBuyer = STATE.eq.P - Pb;         // выигрыш покупателя (цена упала)
+        STATE.incSeller = Ps - STATE.eq.P;        // выигрыш продавца (цена выросла)
+      } else {
+        STATE.incBuyer = Pb - STATE.eq.P;         // бремя покупателя
+        STATE.incSeller = STATE.eq.P - Ps;        // бремя продавца
+      }
       STATE.taxActive = true;
     }
   }
@@ -683,27 +705,28 @@ function updateAreasPanel() {
    БЛОК 8. СЦЕНАРИЙ «НАЛОГ» — сдвиг предложения, новые области, клин.
    --------------------------------------------------------------------- */
 
-// Сдвинутая пунктиром кривая предложения S + t.
+// Сдвинутая пунктиром кривая предложения S ± ставка (вверх при налоге, вниз при субсидии).
 function drawShiftedSupply() {
   if (!STATE.taxActive) return;
-  const t = STATE.tax, S = STATE.S;
+  const S = STATE.S;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const pts = [];
   for (let i = 0; i <= 400; i++) {
     const q = CONFIG.Qmax * i / 400;
     const v = evalCurve(S, q);
-    pts.push(isNaN(v) ? null : [q, v + t]);
+    pts.push(isNaN(v) ? null : [q, v + STATE.shift]);
   }
   g.append('path').datum(pts).attr('fill', 'none').attr('stroke', S.color)
     .attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
 }
 
-// Заливки налогового сценария: CS, PS, сбор Tx (прямоугольник), DWL (потери).
+// Заливки сценария вмешательства: CS, PS, деньги бюджета (прямоугольник), DWL (потери).
 function drawTaxAreas() {
   if (!STATE.taxActive) return;
   const { Q, Pb, Ps } = STATE.taxEq;
   const Q0 = STATE.eq.Q;
+  const isSub = (STATE.intervType === 'subsidy');
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
   const s1 = samp(0, Q);
@@ -716,12 +739,16 @@ function drawTaxAreas() {
     const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(Ps));
     g.append('path').datum(s1).attr('d', a).attr('fill', '#e05052').attr('opacity', 0.16);
   }
-  // Tx — прямоугольник сбора налога между Ps и Pb на [0, Q1].
-  const aTx = d3.area().x(d => sx(d)).y0(sy(Ps)).y1(sy(Pb));
-  g.append('path').datum(s1).attr('d', aTx).attr('fill', '#f59e0b').attr('opacity', 0.22);
-  // DWL — потери между предложением и спросом на [Q1, Q0].
-  if (Q0 > Q) {
-    const s2 = samp(Q, Q0);
+  // Деньги бюджета — прямоугольник между Pb и Ps на [0, Q1].
+  // Налог (сбор) — оранжевый; субсидия (расход) — зелёный.
+  const lowP = Math.min(Pb, Ps), highP = Math.max(Pb, Ps);
+  const aTx = d3.area().x(d => sx(d)).y0(sy(lowP)).y1(sy(highP));
+  g.append('path').datum(s1).attr('d', aTx)
+    .attr('fill', isSub ? '#21a366' : '#f59e0b').attr('opacity', 0.22);
+  // DWL — между D и S на интервале между старым и новым Q (налог: [Q1,Q0]; субсидия: [Q0,Q1]).
+  const lo = Math.min(Q, Q0), hi = Math.max(Q, Q0);
+  if (hi > lo) {
+    const s2 = samp(lo, hi);
     const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(d => sy(evalCurve(STATE.D, d)));
     g.append('path').datum(s2).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28);
   }
@@ -762,7 +789,8 @@ function drawTaxPoints() {
   // Клин налога: вертикальный отрезок между Ps и Pb. Его можно тянуть мышью.
   g.append('line').attr('x1', xQ1).attr('y1', yPs).attr('x2', xQ1).attr('y2', yPb)
     .attr('stroke', '#1a1f2e').attr('stroke-width', 2.5);
-  haloText(g, xQ1 + 9, (yPb + yPs) / 2, 't=' + fmt(STATE.tax), 'start', 'middle');
+  const letter = (STATE.intervType === 'subsidy') ? 's=' : 't=';
+  haloText(g, xQ1 + 9, (yPb + yPs) / 2, letter + fmt(STATE.tax), 'start', 'middle');
   const hit = g.append('line').attr('x1', xQ1).attr('y1', yPs).attr('x2', xQ1).attr('y2', yPb)
     .attr('stroke', 'transparent').attr('stroke-width', 18).style('cursor', 'ns-resize');
   attachTaxDrag(hit);
@@ -791,6 +819,16 @@ function setTax(t) {
   redrawAll();
 }
 
+// Переключение типа вмешательства: налог <-> субсидия.
+function setType(type) {
+  STATE.intervType = type;
+  document.getElementById('seg-tax').classList.toggle('active', type === 'tax');
+  document.getElementById('seg-sub').classList.toggle('active', type === 'subsidy');
+  const rl = document.getElementById('rate-letter');
+  if (rl) rl.textContent = (type === 'subsidy') ? 's' : 't';
+  redrawAll();
+}
+
 // Табло налога: таблица «До / После / Δ» и распределение бремени.
 function updateTaxPanel() {
   const box = document.getElementById('info-tax');
@@ -798,8 +836,10 @@ function updateTaxPanel() {
   if (!STATE.D || !STATE.S) {
     box.innerHTML = '<div class="muted">Сначала отметьте кривые D и S.</div>'; return;
   }
+  const isSub = (STATE.intervType === 'subsidy');
   if (!STATE.taxActive) {
-    box.innerHTML = '<div class="muted">Двигайте ползунок или тяните клин на графике, чтобы ввести налог.</div>'; return;
+    box.innerHTML = `<div class="muted">Двигайте ползунок или тяните клин на графике, чтобы ввести ${isSub ? 'субсидию' : 'налог'}.</div>`;
+    return;
   }
   const e0 = STATE.eq, te = STATE.taxEq;
   const rows = [
@@ -808,7 +848,7 @@ function updateTaxPanel() {
     ['P продавца', e0.P, te.Ps],
     ['CS', STATE.cs, STATE.csTax],
     ['PS', STATE.ps, STATE.psTax],
-    ['Бюджет (Tx)', 0, STATE.tx],
+    [isSub ? 'Бюджет (расход)' : 'Бюджет (сбор)', 0, STATE.budget],
     ['DWL', 0, STATE.dwl],
   ];
   let html = '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
@@ -817,8 +857,9 @@ function updateTaxPanel() {
     html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
   });
   html += '</table>';
-  html += `<div class="stat" style="margin-top:6px;"><span>Бремя покупателя</span><b>${fmt(STATE.incBuyer)}</b></div>`;
-  html += `<div class="stat"><span>Бремя продавца</span><b>${fmt(STATE.incSeller)}</b></div>`;
+  const lbl = isSub ? 'Выигрыш' : 'Бремя';
+  html += `<div class="stat" style="margin-top:6px;"><span>${lbl} покупателя</span><b>${fmt(STATE.incBuyer)}</b></div>`;
+  html += `<div class="stat"><span>${lbl} продавца</span><b>${fmt(STATE.incSeller)}</b></div>`;
   box.innerHTML = html;
 }
 
@@ -970,9 +1011,13 @@ function wireControls() {
   cs.addEventListener('change', () => { STATE.showCS = cs.checked; redrawAll(); });
   ps.addEventListener('change', () => { STATE.showPS = ps.checked; redrawAll(); });
 
-  // Ползунок налога (синхронизирован с перетаскиванием клина через setTax).
+  // Ползунок ставки (синхронизирован с перетаскиванием клина через setTax).
   const taxSlider = document.getElementById('tax-slider');
   taxSlider.addEventListener('input', () => setTax(parseFloat(taxSlider.value)));
+
+  // Переключатель «Налог / Субсидия».
+  document.getElementById('seg-tax').addEventListener('click', () => setType('tax'));
+  document.getElementById('seg-sub').addEventListener('click', () => setType('subsidy'));
 
   // Добавление кривой: по кнопке и по Enter в поле формулы.
   const submit = () => { addCurve(formula.value); formula.value = ''; formula.focus(); };
