@@ -157,6 +157,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="seg">
         <button class="seg-btn active" id="mode-market">Рынок</button>
         <button class="seg-btn" id="mode-costs">Издержки</button>
+        <button class="seg-btn" id="mode-ppf">КПВ</button>
       </div>
     </div>
 
@@ -281,16 +282,34 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div id="info-costs" style="margin-top:8px;"></div>
     </div>
 
+    <!-- КПВ — граница производственных возможностей (Задача 3) — отдельный режим -->
+    <div class="section" id="sec-ppf" style="display:none;">
+      <div class="section-title">КПВ — производственные возможности</div>
+      <div class="field">
+        <label>Граница Y&nbsp;=&nbsp;f(X)</label>
+        <input type="text" id="inp-ppf" value="100 - X" autocomplete="off">
+      </div>
+      <button class="btn" id="btn-ppf-apply">Построить</button>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button class="btn-sm" id="btn-ppf-lin" style="flex:1;">Линейная</button>
+        <button class="btn-sm" id="btn-ppf-conc" style="flex:1;">Вогнутая</button>
+      </div>
+      <div class="hint">По осям — два товара: X (горизонталь), Y (вертикаль). Точку на кривой
+        можно тянуть мышью. Наклон |dY/dX| — альтернативные издержки X (в единицах Y).</div>
+      <div class="error" id="ppf-error"></div>
+      <div id="info-ppf" style="margin-top:8px;"></div>
+    </div>
+
     <!-- Оси и сетка (шаг 2) -->
     <div class="section" id="sec-axes">
       <div class="section-title">Оси и сетка</div>
       <div class="row">
         <div class="field">
-          <label>Q макс</label>
+          <label id="lbl-qmax">Q макс</label>
           <input type="number" id="inp-qmax" min="1" step="1" value="100">
         </div>
         <div class="field">
-          <label>P макс</label>
+          <label id="lbl-pmax">P макс</label>
           <input type="number" id="inp-pmax" min="1" step="1" value="100">
         </div>
       </div>
@@ -360,6 +379,12 @@ const STATE = {
   costsReady: false,
   costsVisited: false,   // первый вход в режим — дружелюбный масштаб
   showMC: true, showATC: true, showAVC: true, showAFC: true, showVC: false,
+  // КПВ — граница производственных возможностей (Задача 3). Оси: товар X и товар Y.
+  ppfFormula: '100 - X',
+  ppfCompiled: null,
+  ppfReady: false,
+  ppfVisited: false,
+  ppfX: null,            // позиция перетаскиваемой точки по X (null = центр при первом расчёте)
 };
 
 /* ---------------------------------------------------------------------
@@ -567,8 +592,10 @@ function drawGrid() {
   });
 }
 
-// Положительные полуоси со стрелками, делениями, числами и подписями Q/P.
-function drawAxes() {
+// Положительные полуоси со стрелками, делениями, числами и подписями осей.
+// Подписи параметризованы: по умолчанию Q/P (рынок, издержки), для КПВ — X/Y (Задача 3).
+function drawAxes(xLabel, yLabel) {
+  xLabel = xLabel || 'Q'; yLabel = yLabel || 'P';
   const g = svg.append('g').attr('class', 'axes');
   const ox = sx(0), oy = sy(0);            // пиксели начала координат (0,0)
   const xEnd = sx(CONFIG.Qmax), yEnd = sy(CONFIG.Pmax);
@@ -606,14 +633,14 @@ function drawAxes() {
     .attr('text-anchor', 'end').attr('dominant-baseline', 'hanging')
     .attr('font-size', 10).attr('fill', LBL).text('0');
 
-  // Подписи осей: Q (справа от стрелки), P (над стрелкой).
+  // Подписи осей: X-метка (справа от стрелки), Y-метка (над стрелкой).
   g.append('text').attr('x', xEnd + 6).attr('y', oy + 4)
     .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
     .attr('font-size', 13).attr('font-weight', 600)
-    .attr('fill', '#333').text('Q');
+    .attr('fill', '#333').text(xLabel);
   g.append('text').attr('x', ox - 4).attr('y', yEnd - 12)
     .attr('text-anchor', 'end').attr('font-size', 13).attr('font-weight', 600)
-    .attr('fill', '#333').text('P');
+    .attr('fill', '#333').text(yLabel);
 }
 
 /* ---------------------------------------------------------------------
@@ -1581,7 +1608,134 @@ function setMode(mode) {
   (groups[mode] || []).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = ''; });
   // Первый вход в режим издержек — дружелюбный масштаб (U-образные кривые видны).
   if (mode === 'costs' && !STATE.costsVisited) { STATE.costsVisited = true; setRanges(10, 50); }
+  // Первый вход в КПВ — масштаб товаров 100×100 (на случай прихода из режима издержек).
+  if (mode === 'ppf' && !STATE.ppfVisited) { STATE.ppfVisited = true; setRanges(100, 100); }
+  // Подписи полей масштаба в секции «Оси»: для КПВ — товары X/Y, иначе Q/P.
+  const lq = document.getElementById('lbl-qmax'), lp = document.getElementById('lbl-pmax');
+  if (lq) lq.textContent = (mode === 'ppf') ? 'X макс' : 'Q макс';
+  if (lp) lp.textContent = (mode === 'ppf') ? 'Y макс' : 'P макс';
   redrawAll();
+}
+
+/* ---------------------------------------------------------------------
+   БЛОК 12. КПВ — граница производственных возможностей (Задача 3).
+   Другой тип осей: по горизонтали товар X, по вертикали товар Y.
+   Граница Y = f(X). Наклон |dY/dX| — альтернативные издержки X в единицах Y.
+   Своя компиляция (переменная X), но координаты/оси — общие (drawAxes('X','Y')).
+   --------------------------------------------------------------------- */
+
+// Компиляция Y = f(X). В отличие от рыночной — переменная X (и x как синоним).
+function compilePpf(expr) {
+  try {
+    const compiled = math.parse(expr).compile();
+    compiled.evaluate({ x: 1, X: 1 });   // пробный расчёт ловит опечатки
+    return { compiled, error: null };
+  } catch (e) { return { compiled: null, error: e.message }; }
+}
+
+// Значение границы Y в точке X.
+function evalPpf(x) {
+  if (!STATE.ppfCompiled) return NaN;
+  try { const v = STATE.ppfCompiled.evaluate({ x: x, X: x }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  catch (e) { return NaN; }
+}
+
+// Наклон границы dY/dX численно (центральная разность). |наклон| = альтернативные издержки X.
+function ppfSlope(x) {
+  const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
+  const a = evalPpf(x + h), b = evalPpf(x - h);
+  return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / (2 * h);
+}
+
+// Зажать X в допустимый диапазон: [0, Qmax] и не дальше точки, где Y уходит ниже 0.
+function clampPpfX(x) {
+  x = Math.max(0, Math.min(CONFIG.Qmax, x));
+  if (evalPpf(x) < 0) { const r = findRoot(evalPpf); if (r != null) x = Math.min(x, r); }
+  return x;
+}
+
+// Тип КПВ по постоянству наклона: линейная (пост. альт. изд.) или вогнутая (растущие).
+function ppfTypeLabel() {
+  const s1 = ppfSlope(CONFIG.Qmax * 0.25), s2 = ppfSlope(CONFIG.Qmax * 0.5), s3 = ppfSlope(CONFIG.Qmax * 0.75);
+  if (isNaN(s1) || isNaN(s2) || isNaN(s3)) return 'нелинейная';
+  if (Math.abs(s1 - s2) < 1e-4 && Math.abs(s2 - s3) < 1e-4) return 'линейная (пост. альт. изд.)';
+  return 'вогнутая (растущие альт. изд.)';
+}
+
+// Пересчёт КПВ: компиляция формулы, удержание точки в допустимой зоне.
+function recomputePpf() {
+  STATE.ppfReady = false;
+  const { compiled } = compilePpf(STATE.ppfFormula);
+  if (!compiled) { STATE.ppfCompiled = null; return; }
+  STATE.ppfCompiled = compiled;
+  STATE.ppfReady = true;
+  if (STATE.ppfX == null) STATE.ppfX = CONFIG.Qmax * 0.5;
+  STATE.ppfX = clampPpfX(STATE.ppfX);
+}
+
+// Кривая КПВ + бледная заливка достижимой области под ней.
+function drawPpfCurve() {
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const pts = [];
+  for (let i = 0; i <= 400; i++) { const x = CONFIG.Qmax * i / 400; const y = evalPpf(x); pts.push((isNaN(y) || y < 0) ? null : [x, y]); }
+  const area = d3.area().defined(d => d !== null).x(d => sx(d[0])).y0(sy(0)).y1(d => sy(d[1]));
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  g.append('path').datum(pts).attr('d', area).attr('fill', '#4f7cff').attr('opacity', 0.08);   // достижимо
+  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.5).attr('d', line);
+  g.append('text').attr('x', sx(CONFIG.Qmax * 0.16)).attr('y', sy(CONFIG.Pmax * 0.16))
+    .attr('font-size', 11).attr('fill', '#4f7cff').attr('opacity', 0.75).text('достижимо');
+}
+
+// Перетаскиваемая точка на границе: проекции, подписи X/Y, ручка.
+function drawPpfPoint() {
+  const x = STATE.ppfX, y = evalPpf(x);
+  if (isNaN(y)) return;
+  const [px, py] = toPx(x, y);
+  const ox = sx(0), oy = sy(0);
+  const g = svg.append('g');
+  const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  dash(px, py, px, oy); dash(px, py, ox, py);
+  haloText(g, px, oy + 8, 'X=' + fmt(x), 'middle', 'hanging');
+  haloText(g, ox - 8, py, 'Y=' + fmt(y), 'end', 'middle');
+  // Невидимая зона захвата + видимая ручка.
+  const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
+  attachPpfDrag(hit);
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5.5)
+    .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 2).style('pointer-events', 'none');
+}
+
+// Перетаскивание точки КПВ вдоль кривой (по X), Y берётся с границы.
+function attachPpfDrag(sel) {
+  sel.call(d3.drag().container(() => svg.node())
+    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('drag', (event) => { STATE.ppfX = clampPpfX(toData(event.x, event.y)[0]); redrawAll(); })
+    .on('end', () => { document.body.style.cursor = ''; }));
+}
+
+// Табло КПВ: тип, координаты точки, альтернативные издержки X в ней.
+function updatePpfPanel() {
+  const box = document.getElementById('info-ppf');
+  if (!box) return;
+  if (!STATE.ppfReady) { box.innerHTML = '<div class="warn">Не понял формулу Y = f(X).</div>'; return; }
+  const x = STATE.ppfX, y = evalPpf(x), opp = Math.abs(ppfSlope(x));
+  let html = `<div class="stat"><span>Тип КПВ</span><b>${ppfTypeLabel()}</b></div>`;
+  html += `<div class="stat"><span>Точка (X, Y)</span><b>${fmt(x)}, ${fmt(y)}</b></div>`;
+  html += `<div class="stat"><span>Альт. издержки X</span><b>${fmt(opp)} Y/ед.</b></div>`;
+  html += '<div class="hint">Альтернативные издержки X — сколько Y теряется за +1 ед. X (|наклон|). ' +
+    'Для линейной КПВ постоянны, для вогнутой растут по мере движения вправо.</div>';
+  box.innerHTML = html;
+}
+
+// Полная перерисовка режима КПВ (свои подписи осей X/Y).
+function redrawPpf() {
+  recomputePpf();
+  svg.selectAll('*').remove();
+  addDefs();
+  drawGrid();
+  drawAxes('X', 'Y');
+  if (STATE.ppfReady) { drawPpfCurve(); drawPpfPoint(); }
+  updatePpfPanel();
 }
 
 /* ---------------------------------------------------------------------
@@ -1592,6 +1746,7 @@ function redrawAll() {
   computeSize();
   makeScales();
   if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
+  if (STATE.mode === 'ppf')   { redrawPpf();   return; }   // режим КПВ (Задача 3)
   recompute();                   // сначала считаем (равновесие, площади, налог)
   svg.selectAll('*').remove();   // полная перерисовка с чистого листа
   addDefs();
@@ -1831,6 +1986,26 @@ function wireControls() {
   if (fcInp) fcInp.addEventListener('change', applyCosts);
   [['chk-mc', 'showMC'], ['chk-atc', 'showATC'], ['chk-avc', 'showAVC'], ['chk-afc', 'showAFC'], ['chk-vc', 'showVC']]
     .forEach(([id, key]) => { const el = document.getElementById(id); if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); }); });
+
+  // Режим КПВ (Задача 3): ввод границы Y=f(X), кнопка «Построить», пресеты.
+  const ppfInp = document.getElementById('inp-ppf');
+  function applyPpf() {
+    const f = ((ppfInp && ppfInp.value) || '').trim();
+    const { error } = compilePpf(f);
+    const errBox = document.getElementById('ppf-error');
+    if (error) { if (errBox) { errBox.textContent = 'Не понял формулу: ' + error; errBox.style.display = 'block'; } return; }
+    if (errBox) errBox.style.display = 'none';
+    STATE.ppfFormula = f;
+    STATE.ppfX = null;   // сбросить точку в центр новой кривой
+    redrawAll();
+  }
+  const pApply = document.getElementById('btn-ppf-apply');
+  if (pApply) pApply.addEventListener('click', applyPpf);
+  if (ppfInp) ppfInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpf(); });
+  const pLin = document.getElementById('btn-ppf-lin');
+  if (pLin) pLin.addEventListener('click', () => { if (ppfInp) ppfInp.value = '100 - X'; applyPpf(); });
+  const pConc = document.getElementById('btn-ppf-conc');
+  if (pConc) pConc.addEventListener('click', () => { if (ppfInp) ppfInp.value = '100 - 0.01*X^2'; applyPpf(); });
 
   // Регулируемая цена (потолок / пол): ползунок (целые) + числовое поле (дробные).
   const pcSlider = document.getElementById('pc-slider');
