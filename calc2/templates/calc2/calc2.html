@@ -1355,9 +1355,18 @@ function redrawAll() {
   }
   updateInfoPanel();
   updateAreasPanel();
-  if (STATE.market === 'monopoly') updateMonoPanel();
-  else if (STATE.pcMode) updatePcPanel();
-  else updateTaxPanel();
+  if (STATE.market === 'monopoly') {
+    updateMonoPanel();
+    // Панель вмешательства в монополии неактуальна — заменяем пояснением,
+    // чтобы не висела старая таблица из конкурентного режима.
+    const itax = document.getElementById('info-tax');
+    if (itax) itax.innerHTML = '<div class="muted">В режиме монополии вмешательство государства выключено.</div>';
+  } else {
+    if (STATE.pcMode) updatePcPanel(); else updateTaxPanel();
+    // Панель монополии очищаем, чтобы не висело старое из прошлого режима.
+    const imono = document.getElementById('info-mono');
+    if (imono) imono.innerHTML = '';
+  }
 }
 
 /* ---------------------------------------------------------------------
