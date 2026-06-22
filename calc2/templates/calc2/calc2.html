@@ -545,8 +545,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <input type="text" id="ineq-formula" value="p^2" autocomplete="off">
         </div>
         <button class="btn" id="ineq-formula-apply">Построить</button>
+        <!-- Задача 3: ползунок параметра α для семейства L(p)=p^α. -->
+        <div class="field" id="ineq-alpha-field" style="margin-top:8px;">
+          <label>Параметр α = <b id="ineq-alpha-val">2</b> &nbsp;<span style="color:var(--text2);">(L(p)=p^α)</span></label>
+          <input type="range" id="ineq-alpha" min="1" max="6" step="0.1" value="2">
+        </div>
+        <div class="field">
+          <label>α (точное значение)</label>
+          <input type="number" id="ineq-alpha-num" min="1" step="0.1" value="2">
+        </div>
         <div class="hint">Должно быть L(0)=0, L(1)=1, неубывающая и выпуклая.
-          Примеры: <code>p^2</code>, <code>p^3</code>, <code>p^1.5</code>.</div>
+          Примеры: <code>p^2</code>, <code>p^3</code>, <code>p^1.5</code>. Ползунок α задаёт
+          именно семейство <code>p^α</code>; любую другую формулу можно вписать вручную в поле выше.</div>
       </div>
       <!-- ЧК2: сравнение «было → стало». Галочка запоминает текущую кривую как «было». -->
       <label class="chk" style="margin-top:10px;"><input type="checkbox" id="ineq-ghost">
@@ -827,6 +837,7 @@ const STATE = {
   ineqGroups: [8, 12, 16, 24, 40],   // доля дохода каждой группы, в % (умеренное неравенство)
   ineqIncomes: '10, 20, 30, 40, 100',// список доходов людей (способ 'incomes')
   ineqFormula: 'p^2',    // функция Лоренца L(p) (способ 'formula')
+  ineqAlpha: 2,          // параметр α семейства L(p)=p^α (Задача 3, ползунок)
   ineqVisited: false,    // первый вход в режим — выставить пресет и таблицу групп
   ineqLorenz: null,      // кривая Лоренца [[p, L], ...] в долях 0..1 (общее представление)
   ineqShares: null,      // доли дохода по группам равного населения (для перераспределения)
@@ -4910,6 +4921,23 @@ function setIneqInput(which) {
   redrawAll();
 }
 
+// Задача 3: установить α → формула становится p^α, кривая и коэффициенты пересчитываются.
+// Синхронизирует ползунок, число и поле формулы. Джини считается общим интегральным
+// методом (для p^α совпадает с (α−1)/(α+1)), отдельной формулы не нужно.
+function setIneqAlpha(a) {
+  a = parseFloat(a);
+  if (isNaN(a) || a < 1) a = 1;
+  STATE.ineqAlpha = Math.round(a * 100) / 100;
+  STATE.ineqFormula = 'p^' + STATE.ineqAlpha;
+  const sl = document.getElementById('ineq-alpha'), num = document.getElementById('ineq-alpha-num'),
+        val = document.getElementById('ineq-alpha-val'), fm = document.getElementById('ineq-formula');
+  if (sl) sl.value = STATE.ineqAlpha;
+  if (num) num.value = STATE.ineqAlpha;
+  if (val) val.textContent = fmt(STATE.ineqAlpha);
+  if (fm) fm.value = STATE.ineqFormula;
+  redrawAll();
+}
+
 // Сменить число групп (5 квинтилей / 10 децилей): сбрасывает доли на пресет.
 function setIneqGroupN(n) {
   n = parseInt(n) || 5;
@@ -5492,6 +5520,11 @@ function wireControls() {
   const ineqFmBtn = document.getElementById('ineq-formula-apply');
   if (ineqFmBtn) ineqFmBtn.addEventListener('click', applyIneqFm);
   if (ineqFm) ineqFm.addEventListener('keydown', e => { if (e.key === 'Enter') applyIneqFm(); });
+  // Задача 3: ползунок и поле α для семейства L(p)=p^α.
+  const ineqAlpha = document.getElementById('ineq-alpha');
+  if (ineqAlpha) ineqAlpha.addEventListener('input', () => setIneqAlpha(ineqAlpha.value));
+  const ineqAlphaNum = document.getElementById('ineq-alpha-num');
+  if (ineqAlphaNum) ineqAlphaNum.addEventListener('change', () => setIneqAlpha(ineqAlphaNum.value));
   // ЧК2: галочка «Исходное состояние» — снимок текущей кривой как «было».
   const ineqGhostChk = document.getElementById('ineq-ghost');
   if (ineqGhostChk) ineqGhostChk.addEventListener('change', () => {
