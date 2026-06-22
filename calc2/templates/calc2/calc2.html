@@ -523,6 +523,29 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <!-- ЧК2: сравнение «было → стало». Галочка запоминает текущую кривую как «было». -->
       <label class="chk" style="margin-top:10px;"><input type="checkbox" id="ineq-ghost">
         <span class="swatch" style="background:#ddd;border:1px solid #aaa;"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
+      <!-- ЧК3: перераспределение. Берём текущее распределение как «до налогов»,
+           применяем инструмент, рисуем «после» — Джини падает, кривая ближе к диагонали. -->
+      <div style="margin-top:10px;">
+        <label class="chk"><input type="checkbox" id="ineq-redist">
+          <span class="swatch" style="background:#16a34a"></span> Перераспределение</label>
+        <div id="ineq-redist-pane" style="display:none;">
+          <div class="seg">
+            <button class="seg-btn active" id="ineq-rd-tax">Прогр. налог</button>
+            <button class="seg-btn" id="ineq-rd-transfer">Трансферт</button>
+          </div>
+          <div class="field" id="ineq-tau-field" style="margin-top:8px;">
+            <label>Прогрессивность τ = <b id="ineq-tau-val">0</b></label>
+            <input type="range" id="ineq-tau" min="0" max="1" step="0.05" value="0">
+          </div>
+          <div class="field" id="ineq-transfer-field" style="margin-top:8px;display:none;">
+            <label>Трансферт T = <b id="ineq-transfer-val">0</b>% дохода</label>
+            <input type="range" id="ineq-transfer" min="0" max="50" step="1" value="0">
+          </div>
+          <div class="hint">Налог: доля каждой группы подтягивается к равной (1/N):
+            новая&nbsp;=&nbsp;(1−τ)·старая&nbsp;+&nbsp;τ·(1/N), при τ=1 — полное равенство.
+            Трансферт: T% общего дохода забирается у богатейшей группы и делится поровну между всеми.</div>
+        </div>
+      </div>
       <div id="info-inequality" style="margin-top:8px;"></div>
     </div>
 
@@ -4225,10 +4248,40 @@ function inequalityStats(pts) {
   return { gini, hoover, hooverP, decile, quintile };
 }
 
+// Доли дохода по группам равного населения для перераспределения (ЧК3).
+// groups/incomes — берём готовые доли; formula — выделяем 10 децилей из кривой Лоренца.
+function ineqRedistShares() {
+  if (STATE.ineqInput === 'formula') {
+    if (!STATE.ineqLorenz) return null;
+    const N = 10, sh = [];
+    for (let k = 1; k <= N; k++) sh.push(lorenzAt(STATE.ineqLorenz, k / N) - lorenzAt(STATE.ineqLorenz, (k - 1) / N));
+    return sh;
+  }
+  return STATE.ineqShares ? STATE.ineqShares.slice() : null;
+}
+
+// Применить перераспределение к долям (сумма сохраняется = 1).
+//  Налог: новая доля = (1−τ)·старая + τ·(1/N) — линейное подтягивание к равенству.
+//  Трансферт: T% общего дохода забираем у богатейшей группы, делим поровну между всеми.
+function applyRedistribution(shares) {
+  const N = shares.length;
+  if (STATE.ineqRedistTool === 'tax') {
+    const tau = Math.max(0, Math.min(1, STATE.ineqTau));
+    return shares.map(s => (1 - tau) * s + tau * (1 / N));
+  }
+  const T = Math.max(0, STATE.ineqTransfer) / 100;       // доля общего дохода
+  const out = shares.slice();
+  let ri = 0; for (let i = 1; i < N; i++) if (out[i] > out[ri]) ri = i;   // богатейшая группа
+  const take = Math.min(T, out[ri]);                     // нельзя забрать больше, чем у неё есть
+  out[ri] -= take;
+  for (let i = 0; i < N; i++) out[i] += take / N;
+  return out;
+}
+
 // Пересчёт неравенства БЕЗ рисования — складываем кривую и коэффициенты в STATE.
 function recomputeInequality() {
   STATE.ineqLorenz = null; STATE.ineqStats = null; STATE.ineqWarn = null;
-  STATE.ineqShares = null; STATE.ineqShareN = 0;
+  STATE.ineqShares = null; STATE.ineqShareN = 0; STATE.ineqRedist = null;
   if (STATE.ineqInput === 'formula') {
     const r = lorenzFromFormula(STATE.ineqFormula);
     if (!r.pts) { STATE.ineqWarn = 'Не понял формулу: ' + (r.error || ''); return; }
@@ -4240,6 +4293,15 @@ function recomputeInequality() {
     STATE.ineqShares = s.shares; STATE.ineqShareN = s.N; STATE.ineqWarn = s.warn;
     STATE.ineqLorenz = lorenzFromShares(s.shares);
     STATE.ineqStats = inequalityStats(STATE.ineqLorenz);
+  }
+  // Перераспределение (ЧК3): строим «после» из текущих долей.
+  if (STATE.ineqRedistOn && STATE.ineqLorenz) {
+    const sh = ineqRedistShares();
+    if (sh) {
+      const ns = applyRedistribution(sh);
+      const rl = lorenzFromShares(ns);
+      STATE.ineqRedist = { lorenz: rl, stats: inequalityStats(rl) };
+    }
   }
 }
 
@@ -4341,6 +4403,20 @@ function attachLorenzNodeDrag(sel, i) {
     .on('end', () => { document.body.style.cursor = ''; }));
 }
 
+// Стрелка «налог подтянул кривую к равенству» (ЧК3) — от «до» к «после» в p=0.5.
+function drawRedistArrow(base, redist) {
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const p = 0.5, Lb = lorenzAt(base, p), Lr = lorenzAt(redist, p);
+  if (isNaN(Lb) || isNaN(Lr) || Lr <= Lb + 1e-6) return;
+  const x = sx(p * 100), y0 = sy(Lb * 100), y1 = sy(Lr * 100);
+  g.append('line').attr('x1', x).attr('y1', y0).attr('x2', x).attr('y2', y1)
+    .attr('stroke', '#16a34a').attr('stroke-width', 1.6);
+  g.append('path').attr('d', `M${x - 4},${y1 + 6} L${x},${y1} L${x + 4},${y1 + 6}`)
+    .attr('fill', 'none').attr('stroke', '#16a34a').attr('stroke-width', 1.6);
+  g.append('text').attr('x', x + 8).attr('y', (y0 + y1) / 2).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', '#16a34a')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('к равенству');
+}
+
 // Снимок текущей кривой как «было» (для сравнения двух кривых, ЧК2).
 function ineqSnapshot() {
   if (!STATE.ineqLorenz || !STATE.ineqStats) { STATE.ineqGhost = null; return; }
@@ -4358,8 +4434,16 @@ function updateInequalityPanel() {
   html += `<div class="stat"><span>Робин Гуда (Гувера)</span><b>${fmt(s.hoover)}</b></div>`;
   html += `<div class="stat"><span>Децильный коэф.</span><b>${s.decile == null ? '∞' : fmt(s.decile)}</b></div>`;
   html += `<div class="stat"><span>Квинтильный коэф.</span><b>${s.quintile == null ? '∞' : fmt(s.quintile)}</b></div>`;
-  // Сравнение двух кривых «было → стало» (ЧК2).
-  if (STATE.showIneqGhost && STATE.ineqGhost) {
+  // Перераспределение «до → после» (ЧК3) — имеет приоритет над снимком ЧК2.
+  if (STATE.ineqRedist) {
+    const r = STATE.ineqRedist.stats, d = r.gini - s.gini;
+    html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
+    html += `<div class="stat"><span>Джини до</span><b>${fmt(s.gini)}</b></div>`;
+    html += `<div class="stat"><span>Джини после</span><b>${fmt(r.gini)}</b></div>`;
+    html += `<div class="stat"><span>Δ Джини</span><b style="color:${d < -1e-6 ? '#21a366' : (d > 1e-6 ? '#e05052' : '#666')}">${d >= 0 ? '+' : ''}${fmt(d)}</b></div>`;
+    html += `<div class="stat"><span>Робин Гуда до/после</span><b>${fmt(s.hoover)} / ${fmt(r.hoover)}</b></div>`;
+  } else if (STATE.showIneqGhost && STATE.ineqGhost) {
+    // Сравнение двух кривых «было → стало» (ЧК2).
     const g0 = STATE.ineqGhost.gini, g1 = s.gini, d = g1 - g0;
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
     html += `<div class="stat"><span>Джини было</span><b>${fmt(g0)}</b></div>`;
@@ -4386,13 +4470,21 @@ function redrawInequality() {
   drawAxes('', '');
   drawInequalityCaptions();
   if (STATE.ineqStats && STATE.ineqLorenz) {
-    drawInequalityAreas(STATE.ineqLorenz);
-    drawInequalityDiagonal();
-    // «Было» — бледная пунктирная кривая (снимок ЧК2), под текущей «стало».
-    if (STATE.showIneqGhost && STATE.ineqGhost) drawLorenzCurve(STATE.ineqGhost.lorenz, '#94a3b8', true);
-    drawLorenzCurve(STATE.ineqLorenz, '#4f7cff', false);
-    drawRobinHood();
-    drawLorenzNodes();
+    if (STATE.ineqRedist) {
+      // ЧК3: перераспределение — «до» (пунктир) и «после» (сплошная) + стрелка к равенству.
+      drawInequalityDiagonal();
+      drawLorenzCurve(STATE.ineqLorenz, '#94a3b8', true);          // до перераспределения
+      drawLorenzCurve(STATE.ineqRedist.lorenz, '#16a34a', false);  // после
+      drawRedistArrow(STATE.ineqLorenz, STATE.ineqRedist.lorenz);
+    } else {
+      drawInequalityAreas(STATE.ineqLorenz);
+      drawInequalityDiagonal();
+      // «Было» — бледная пунктирная кривая (снимок ЧК2), под текущей «стало».
+      if (STATE.showIneqGhost && STATE.ineqGhost) drawLorenzCurve(STATE.ineqGhost.lorenz, '#94a3b8', true);
+      drawLorenzCurve(STATE.ineqLorenz, '#4f7cff', false);
+      drawRobinHood();
+      drawLorenzNodes();
+    }
   }
   updateInequalityPanel();
 }
@@ -4422,6 +4514,17 @@ function setIneqGroupN(n) {
   STATE.ineqGroupN = n;
   STATE.ineqGroups = defaultGroupShares(n);
   renderIneqGroupsTable();
+  redrawAll();
+}
+
+// Переключатель инструмента перераспределения: прогрессивный налог / трансферт (ЧК3).
+function setIneqRedistTool(tool) {
+  STATE.ineqRedistTool = tool;
+  [['ineq-rd-tax', 'tax'], ['ineq-rd-transfer', 'transfer']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === tool); });
+  const tf = document.getElementById('ineq-tau-field'), trf = document.getElementById('ineq-transfer-field');
+  if (tf) tf.style.display = (tool === 'tax') ? '' : 'none';
+  if (trf) trf.style.display = (tool === 'transfer') ? '' : 'none';
   redrawAll();
 }
 
@@ -4968,6 +5071,27 @@ function wireControls() {
   if (ineqGhostChk) ineqGhostChk.addEventListener('change', () => {
     STATE.showIneqGhost = ineqGhostChk.checked;
     if (ineqGhostChk.checked) ineqSnapshot(); else STATE.ineqGhost = null;
+    redrawAll();
+  });
+  // ЧК3: перераспределение — галочка, инструмент, ползунки τ и T.
+  const ineqRedistChk = document.getElementById('ineq-redist');
+  if (ineqRedistChk) ineqRedistChk.addEventListener('change', () => {
+    STATE.ineqRedistOn = ineqRedistChk.checked;
+    const p = document.getElementById('ineq-redist-pane'); if (p) p.style.display = ineqRedistChk.checked ? '' : 'none';
+    redrawAll();
+  });
+  [['ineq-rd-tax', 'tax'], ['ineq-rd-transfer', 'transfer']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setIneqRedistTool(v)); });
+  const ineqTau = document.getElementById('ineq-tau');
+  if (ineqTau) ineqTau.addEventListener('input', () => {
+    STATE.ineqTau = parseFloat(ineqTau.value);
+    const l = document.getElementById('ineq-tau-val'); if (l) l.textContent = fmt(STATE.ineqTau);
+    redrawAll();
+  });
+  const ineqTr = document.getElementById('ineq-transfer');
+  if (ineqTr) ineqTr.addEventListener('input', () => {
+    STATE.ineqTransfer = parseFloat(ineqTr.value);
+    const l = document.getElementById('ineq-transfer-val'); if (l) l.textContent = fmt(STATE.ineqTransfer);
     redrawAll();
   });
 
