@@ -151,14 +151,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <h1>Графический калькулятор&nbsp;2.0</h1>
     <div class="subtitle">бета · собственный движок (D3&nbsp;+&nbsp;Math.js)</div>
 
-    <!-- Переключатель режима калькулятора (Задачи 2–3) -->
+    <!-- Переключатель режима калькулятора (Задачи 2–3). Две строки: рынок/издержки/КПВ
+         и труд/неравенство — чтобы длинная метка «Неравенство» помещалась. -->
     <div class="section" id="sec-mode">
       <div class="section-title">Режим</div>
       <div class="seg">
         <button class="seg-btn active" id="mode-market">Рынок</button>
         <button class="seg-btn" id="mode-costs">Издержки</button>
         <button class="seg-btn" id="mode-ppf">КПВ</button>
+      </div>
+      <div class="seg" style="margin-top:6px;">
         <button class="seg-btn" id="mode-labor">Труд</button>
+        <button class="seg-btn" id="mode-ineq">Неравенство</button>
       </div>
     </div>
 
@@ -473,6 +477,52 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div id="info-labor" style="margin-top:8px;"></div>
     </div>
 
+    <!-- Неравенство доходов (ЧК1–3) — отдельный режим. Оси: доля населения / доля
+         дохода (обе 0..100 %). Кривая Лоренца, коэффициенты Джини / Робин Гуда. -->
+    <div class="section" id="sec-inequality" style="display:none;">
+      <div class="section-title">Неравенство доходов</div>
+      <!-- Способ ввода данных -->
+      <div class="seg">
+        <button class="seg-btn active" id="ineq-in-groups">Доли по группам</button>
+        <button class="seg-btn" id="ineq-in-incomes">Доходы</button>
+        <button class="seg-btn" id="ineq-in-formula">Формула</button>
+      </div>
+      <!-- Способ «доли по группам»: N групп равного населения, доля дохода каждой (%) -->
+      <div id="ineq-pane-groups" style="margin-top:8px;">
+        <div class="field">
+          <label>Число групп</label>
+          <select id="ineq-ngroups">
+            <option value="5" selected>5 (квинтили)</option>
+            <option value="10">10 (децили)</option>
+          </select>
+        </div>
+        <div id="ineq-groups-table"></div>
+        <div class="hint">Доля дохода каждой группы, в %. Сумма нормируется до 100%.
+          Узлы кривой можно тянуть мышью.</div>
+      </div>
+      <!-- Способ «доходы»: список чисел (доходы людей) -->
+      <div id="ineq-pane-incomes" style="display:none;margin-top:8px;">
+        <div class="field">
+          <label>Доходы (через запятую)</label>
+          <input type="text" id="ineq-incomes" value="10, 20, 30, 40, 100" autocomplete="off">
+        </div>
+        <button class="btn" id="ineq-incomes-apply">Построить</button>
+        <div class="hint">Каждое число — доход одного человека. Сортируются по возрастанию,
+          строятся накопленные доли.</div>
+      </div>
+      <!-- Способ «формула»: функция Лоренца L(p), p — доля населения 0..1 -->
+      <div id="ineq-pane-formula" style="display:none;margin-top:8px;">
+        <div class="field">
+          <label>Функция Лоренца L(p), p∈[0,1]</label>
+          <input type="text" id="ineq-formula" value="p^2" autocomplete="off">
+        </div>
+        <button class="btn" id="ineq-formula-apply">Построить</button>
+        <div class="hint">Должно быть L(0)=0, L(1)=1, неубывающая и выпуклая.
+          Примеры: <code>p^2</code>, <code>p^3</code>, <code>p^1.5</code>.</div>
+      </div>
+      <div id="info-inequality" style="margin-top:8px;"></div>
+    </div>
+
     <!-- КПВ — граница производственных возможностей — отдельный режим.
          Три под-режима: одна КПВ / сумма двух КПВ / КТВ (торговля). -->
     <div class="section" id="sec-ppf" style="display:none;">
@@ -681,6 +731,27 @@ const STATE = {
   ppftFormula: '100 - X',// КПВ страны (режим КТВ)
   ppftPrice: 2,          // мировое соотношение цен Px/Py (режим КТВ)
   ppfTradeData: null,    // результат расчёта КТВ
+  // Неравенство доходов (ЧК1–3). Оси — доля населения / доля дохода (обе 0..100 %).
+  ineqInput: 'groups',   // способ ввода: 'groups' / 'incomes' / 'formula'
+  ineqGroupN: 5,         // число групп равного населения (5 квинтилей / 10 децилей)
+  ineqGroups: [8, 12, 16, 24, 40],   // доля дохода каждой группы, в % (умеренное неравенство)
+  ineqIncomes: '10, 20, 30, 40, 100',// список доходов людей (способ 'incomes')
+  ineqFormula: 'p^2',    // функция Лоренца L(p) (способ 'formula')
+  ineqVisited: false,    // первый вход в режим — выставить пресет и таблицу групп
+  ineqLorenz: null,      // кривая Лоренца [[p, L], ...] в долях 0..1 (общее представление)
+  ineqShares: null,      // доли дохода по группам равного населения (для перераспределения)
+  ineqShareN: 0,         // число групп, к которому привязаны ineqShares
+  ineqStats: null,       // { gini, hoover, hooverP, decile, quintile }
+  ineqWarn: null,        // мягкое предупреждение (сумма ≠ 100, L не выпукла и т.п.)
+  // ЧК2: сравнение двух кривых «было → стало».
+  ineqGhost: null,       // снимок «было»: { lorenz, gini } (по галочке)
+  showIneqGhost: false,  // галочка «Исходное состояние»
+  // ЧК3: перераспределение (прогрессивный налог / трансферт).
+  ineqRedistOn: false,
+  ineqRedistTool: 'tax', // 'tax' — прогрессивный налог, 'transfer' — трансферт беднейшим
+  ineqTau: 0,            // прогрессивность налога 0..1
+  ineqTransfer: 0,       // размер трансферта, % общего дохода
+  ineqRedist: null,      // результат перераспределения: { lorenz, stats }
 };
 
 /* ---------------------------------------------------------------------
@@ -3243,7 +3314,7 @@ function setRanges(qmax, pmax) {
 // Переключение режима: рынок / издержки / КПВ.
 function setMode(mode) {
   STATE.mode = mode;
-  const map = { market: 'mode-market', costs: 'mode-costs', ppf: 'mode-ppf', labor: 'mode-labor' };
+  const map = { market: 'mode-market', costs: 'mode-costs', ppf: 'mode-ppf', labor: 'mode-labor', inequality: 'mode-ineq' };
   Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
   const ab = document.getElementById(map[mode]); if (ab) ab.classList.add('active');
   // Какие секции панели показывать в каждом режиме (отсутствующие id просто игнорируются).
@@ -3252,11 +3323,14 @@ function setMode(mode) {
     costs:  ['sec-costs'],
     ppf:    ['sec-ppf'],
     labor:  ['sec-curves', 'sec-labor'],
+    inequality: ['sec-inequality'],
   };
   const all = new Set([].concat(...Object.values(groups)));
   all.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   (groups[mode] || []).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = ''; });
   applyScenarioVisibility();   // уточнить видимость интервенций/панелей по текущему сценарию
+  // Секция «Оси» бессмысленна в режиме неравенства (поле всегда 0..100 %) — прячем.
+  const axes = document.getElementById('sec-axes'); if (axes) axes.style.display = (mode === 'inequality') ? 'none' : '';
   // Первый вход в рынок труда — пресет: спрос на труд D = 100 − L, предложение S = L.
   if (mode === 'labor' && !STATE.laborVisited) {
     STATE.laborVisited = true;
@@ -3264,11 +3338,12 @@ function setMode(mode) {
     addCurve('100 - L'); if (STATE.curves[0]) setRole(STATE.curves[0], 'demand');
     addCurve('L');       if (STATE.curves[1]) setRole(STATE.curves[1], 'supply');
   }
+  // Режим неравенства: пометить первый вход и заполнить таблицу групп.
+  if (mode === 'inequality') { STATE.ineqVisited = true; renderIneqGroupsTable(); }
   // При каждом переключении режима — выставлять характерный масштаб осей.
   // Ручные правки в полях «Оси» при смене режима намеренно сбрасываются.
   if (mode === 'costs') setRanges(10, 50);
-  else if (mode === 'ppf') setRanges(100, 100);
-  else setRanges(100, 100);   // market / labor / любой другой — стандартный масштаб
+  else setRanges(100, 100);   // market / labor / ppf / inequality — стандартный масштаб 0..100
   // Подписи полей масштаба в секции «Оси»: КПВ — X/Y, рынок труда — L/W, иначе Q/P.
   const lq = document.getElementById('lbl-qmax'), lp = document.getElementById('lbl-pmax');
   if (lq) lq.textContent = (mode === 'ppf') ? 'X макс' : (mode === 'labor' ? 'L макс' : 'Q макс');
@@ -4040,6 +4115,291 @@ function setPpfSub(sub) {
 }
 
 /* ---------------------------------------------------------------------
+   БЛОК 13. НЕРАВЕНСТВО ДОХОДОВ (ЧК1–3).
+   Оси: доля населения (X) и доля дохода (Y), обе 0..100 %. Кривая Лоренца,
+   коэффициенты Джини / Робин Гуда (Гувера) / децильный / квинтильный.
+   Все три способа ввода сводятся к массиву точек Лоренца {p, L} в долях 0..1.
+   Поле графика — квадратное (свои шкалы 0..100, переопределяют общие).
+   --------------------------------------------------------------------- */
+
+// Разбор списка чисел из строки (через запятую/пробел/точку с запятой).
+function parseNumberList(str) {
+  return (str || '').split(/[\s,;]+/).map(s => s.trim()).filter(s => s.length)
+    .map(Number).filter(v => !isNaN(v));
+}
+
+// Доли дохода по группам равного населения (фракции, сумма = 1) из текущего ввода
+// 'groups'/'incomes'. Возвращает { shares, N, warn } или null. (Формула — отдельно.)
+function inequalitySharesFromInput() {
+  if (STATE.ineqInput === 'groups') {
+    const g = STATE.ineqGroups.map(Number).filter(v => !isNaN(v));
+    const N = g.length;
+    if (N < 2) return null;
+    const sum = g.reduce((a, b) => a + b, 0);
+    if (!(sum > 0)) return null;
+    let warn = null;
+    if (Math.abs(sum - 100) > 0.5) warn = 'Сумма долей = ' + fmt(sum) + '% (нормировано до 100%).';
+    return { shares: g.map(v => Math.max(0, v) / sum), N, warn };
+  }
+  if (STATE.ineqInput === 'incomes') {
+    const xs = parseNumberList(STATE.ineqIncomes).filter(v => v >= 0);
+    if (xs.length < 2) return null;
+    xs.sort((a, b) => a - b);
+    const total = xs.reduce((a, b) => a + b, 0);
+    if (!(total > 0)) return null;
+    return { shares: xs.map(v => v / total), N: xs.length, warn: null };
+  }
+  return null;
+}
+
+// Кривая Лоренца [[p, L], ...] из долей дохода по группам равного населения.
+// Накопленные доли населения (k/N) против накопленных долей дохода. Начинается (0,0).
+function lorenzFromShares(shares) {
+  const N = shares.length, pts = [[0, 0]];
+  let cum = 0;
+  for (let k = 0; k < N; k++) { cum += shares[k]; pts.push([(k + 1) / N, Math.min(1, cum)]); }
+  pts[pts.length - 1][1] = 1;   // закрываем ровно в (1,1)
+  return pts;
+}
+
+// Кривая Лоренца из функции L(p) (переменная p, x — синоним). Возвращает { pts, warn, error }.
+function lorenzFromFormula(expr) {
+  let compiled;
+  try { compiled = math.parse(expr).compile(); compiled.evaluate({ p: 0.5, x: 0.5 }); }
+  catch (e) { return { pts: null, error: e.message }; }
+  const N = 100, pts = [];
+  for (let i = 0; i <= N; i++) {
+    const p = i / N;
+    let L;
+    try { const v = compiled.evaluate({ p: p, x: p }); L = (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+    catch (e) { L = NaN; }
+    pts.push([p, L]);
+  }
+  // Мягкая проверка корректности функции Лоренца (рисуем в любом случае).
+  let warn = null;
+  const L0 = pts[0][1], L1 = pts[pts.length - 1][1];
+  if (isNaN(L0) || isNaN(L1)) warn = 'Функция не вычисляется на всём [0,1].';
+  else if (Math.abs(L0) > 0.02 || Math.abs(L1 - 1) > 0.02) warn = 'Ожидается L(0)=0 и L(1)=1.';
+  else { for (let i = 1; i < pts.length; i++) { if (!isNaN(pts[i][1]) && !isNaN(pts[i - 1][1]) && pts[i][1] < pts[i - 1][1] - 1e-6) { warn = 'L(p) должна быть неубывающей.'; break; } } }
+  return { pts, warn };
+}
+
+// Площадь под кривой Лоренца (метод трапеций по вершинам). points = [[p, L], ...].
+function lorenzAreaUnder(pts) {
+  let area = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    if (isNaN(a[1]) || isNaN(b[1])) continue;
+    area += (a[1] + b[1]) / 2 * (b[0] - a[0]);
+  }
+  return area;
+}
+
+// Интерполяция L на доле населения p (по ломаной Лоренца).
+function lorenzAt(pts, p) {
+  if (p <= 0) return 0;
+  if (p >= 1) return pts[pts.length - 1][1];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    if (p >= a[0] && p <= b[0] && b[0] > a[0]) { const t = (p - a[0]) / (b[0] - a[0]); return a[1] + t * (b[1] - a[1]); }
+  }
+  return NaN;
+}
+
+// Коэффициенты неравенства из кривой Лоренца.
+//  Джини = 1 − 2∫L dp (площадь A между диагональю и кривой / 0.5).
+//  Робин Гуда (Гувера) = max(p − L(p)) — макс. вертикальный разрыв (в вершине ломаной).
+//  Децильный = (1 − L(0.9)) / L(0.1);  квинтильный = (1 − L(0.8)) / L(0.2).
+function inequalityStats(pts) {
+  const B = lorenzAreaUnder(pts);
+  const gini = 1 - 2 * B;
+  let hoover = 0, hooverP = 0;
+  pts.forEach(pt => { if (!isNaN(pt[1])) { const d = pt[0] - pt[1]; if (d > hoover) { hoover = d; hooverP = pt[0]; } } });
+  const L10 = lorenzAt(pts, 0.1), L90 = lorenzAt(pts, 0.9);
+  const L20 = lorenzAt(pts, 0.2), L80 = lorenzAt(pts, 0.8);
+  const decile = (L10 > 1e-9) ? (1 - L90) / L10 : null;
+  const quintile = (L20 > 1e-9) ? (1 - L80) / L20 : null;
+  return { gini, hoover, hooverP, decile, quintile };
+}
+
+// Пересчёт неравенства БЕЗ рисования — складываем кривую и коэффициенты в STATE.
+function recomputeInequality() {
+  STATE.ineqLorenz = null; STATE.ineqStats = null; STATE.ineqWarn = null;
+  STATE.ineqShares = null; STATE.ineqShareN = 0;
+  if (STATE.ineqInput === 'formula') {
+    const r = lorenzFromFormula(STATE.ineqFormula);
+    if (!r.pts) { STATE.ineqWarn = 'Не понял формулу: ' + (r.error || ''); return; }
+    STATE.ineqLorenz = r.pts; STATE.ineqWarn = r.warn;
+    STATE.ineqStats = inequalityStats(r.pts);
+  } else {
+    const s = inequalitySharesFromInput();
+    if (!s) { STATE.ineqWarn = 'Введите хотя бы две группы / два дохода.'; return; }
+    STATE.ineqShares = s.shares; STATE.ineqShareN = s.N; STATE.ineqWarn = s.warn;
+    STATE.ineqLorenz = lorenzFromShares(s.shares);
+    STATE.ineqStats = inequalityStats(STATE.ineqLorenz);
+  }
+}
+
+// --- Отрисовка неравенства (квадратное поле, доли 0..100 %) ---
+
+// Линия равенства (диагональ) — зелёный пунктир.
+function drawInequalityDiagonal() {
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  g.append('line').attr('x1', sx(0)).attr('y1', sy(0)).attr('x2', sx(100)).attr('y2', sy(100))
+    .attr('stroke', '#21a366').attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
+  g.append('text').attr('x', sx(80)).attr('y', sy(86)).attr('font-size', 11).attr('fill', '#21a366')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('равенство');
+}
+
+// Подписи осей (длинные, рисуем сами; drawAxes вызываем без меток).
+function drawInequalityCaptions() {
+  const g = svg.append('g'), ox = sx(0), oy = sy(0), xMid = (sx(0) + sx(100)) / 2, yTop = sy(100);
+  g.append('text').attr('x', xMid).attr('y', oy + 30).attr('text-anchor', 'middle')
+    .attr('font-size', 11).attr('fill', '#666').text('доля населения, %');
+  g.append('text').attr('x', ox + 6).attr('y', yTop - 5).attr('text-anchor', 'start')
+    .attr('font-size', 11).attr('fill', '#666').text('доля дохода, %');
+}
+
+// Заливки A (между диагональю и кривой) и B (под кривой) — смысл Джини.
+function drawInequalityAreas(pts) {
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const bArea = d3.area().defined(d => !isNaN(d[1])).x(d => sx(d[0] * 100)).y0(sy(0)).y1(d => sy(d[1] * 100));
+  g.append('path').datum(pts).attr('d', bArea).attr('fill', '#94a3b8').attr('opacity', 0.15);
+  const aArea = d3.area().defined(d => !isNaN(d[1])).x(d => sx(d[0] * 100)).y0(d => sy(d[0] * 100)).y1(d => sy(d[1] * 100));
+  g.append('path').datum(pts).attr('d', aArea).attr('fill', '#4f7cff').attr('opacity', 0.12);
+  g.append('text').attr('x', sx(33)).attr('y', sy(52)).attr('font-size', 14).attr('font-weight', 600).attr('fill', '#4f7cff').attr('opacity', 0.85).text('A');
+  g.append('text').attr('x', sx(66)).attr('y', sy(18)).attr('font-size', 14).attr('font-weight', 600).attr('fill', '#64748b').attr('opacity', 0.85).text('B');
+}
+
+// Кривая Лоренца (доли 0..1 → проценты). dashed — для «было»/исходной.
+function drawLorenzCurve(pts, color, dashed) {
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => !isNaN(d[1])).x(d => sx(d[0] * 100)).y(d => sy(d[1] * 100));
+  const path = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2.6).attr('d', line);
+  if (dashed) path.attr('stroke-dasharray', '6 4').attr('opacity', 0.75);
+}
+
+// Вертикальный отрезок Робин Гуда в p* (макс. разрыв диагональ−кривая) + подпись.
+function drawRobinHood() {
+  const st = STATE.ineqStats, pts = STATE.ineqLorenz;
+  if (!st || st.hoover <= 1e-9) return;
+  const p = st.hooverP, L = lorenzAt(pts, p), x = sx(p * 100);
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  g.append('line').attr('x1', x).attr('y1', sy(L * 100)).attr('x2', x).attr('y2', sy(p * 100))
+    .attr('stroke', '#e05052').attr('stroke-width', 2.6);
+  g.append('circle').attr('cx', x).attr('cy', sy(L * 100)).attr('r', 3).attr('fill', '#e05052');
+  g.append('circle').attr('cx', x).attr('cy', sy(p * 100)).attr('r', 3).attr('fill', '#e05052');
+  const ymid = sy((L + p) / 2 * 100);
+  g.append('text').attr('x', x + 7).attr('y', ymid).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#e05052')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Робин Гуд ' + fmt(st.hoover));
+}
+
+// Узлы кривой Лоренца. В способе 'groups' — перетаскиваемые (ЧК2), иначе просто точки.
+function drawLorenzNodes() {
+  if (STATE.ineqInput === 'formula') return;
+  const pts = STATE.ineqLorenz;
+  const g = svg.append('g');
+  for (let i = 1; i < pts.length - 1; i++) {           // концы (0,0) и (1,1) зафиксированы
+    const px = sx(pts[i][0] * 100), py = sy(pts[i][1] * 100);
+    if (STATE.ineqInput === 'groups') {
+      const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 12).attr('fill', 'transparent').style('cursor', 'ns-resize');
+      attachLorenzNodeDrag(hit, i);                     // ЧК2
+    }
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
+      .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5).style('pointer-events', 'none');
+  }
+}
+
+// Заглушка перетаскивания узлов (наполняется в ЧК2).
+function attachLorenzNodeDrag(sel, i) { /* ЧК2 */ }
+
+// Табло неравенства.
+function updateInequalityPanel() {
+  const box = document.getElementById('info-inequality'); if (!box) return;
+  if (!STATE.ineqStats) { box.innerHTML = '<div class="warn">' + (STATE.ineqWarn || 'Введите данные.') + '</div>'; return; }
+  const s = STATE.ineqStats;
+  let html = '';
+  if (STATE.ineqWarn) html += '<div class="warn" style="margin-bottom:6px;">' + STATE.ineqWarn + '</div>';
+  html += `<div class="stat"><span>Коэффициент Джини</span><b>${fmt(s.gini)}</b></div>`;
+  html += `<div class="stat"><span>Робин Гуда (Гувера)</span><b>${fmt(s.hoover)}</b></div>`;
+  html += `<div class="stat"><span>Децильный коэф.</span><b>${s.decile == null ? '∞' : fmt(s.decile)}</b></div>`;
+  html += `<div class="stat"><span>Квинтильный коэф.</span><b>${s.quintile == null ? '∞' : fmt(s.quintile)}</b></div>`;
+  html += '<div class="hint" style="margin-top:6px;">Джини: 0 — полное равенство, 1 — весь доход у одного. ' +
+    'Робин Гуда — какую долю дохода нужно перераспределить для равенства (макс. разрыв с диагональю). ' +
+    'Дец./квинт. — во сколько раз доход верхних 10%/20% больше дохода нижних.</div>';
+  box.innerHTML = html;
+}
+
+// Полная перерисовка режима «Неравенство». Поле — квадратное (свои шкалы 0..100).
+function redrawInequality() {
+  recomputeInequality();
+  const m = CONFIG.margin;
+  const availW = W - m.left - m.right, availH = H - m.top - m.bottom;
+  const side = Math.max(60, Math.min(availW, availH));
+  sx = d3.scaleLinear().domain([0, 100]).range([m.left, m.left + side]);
+  sy = d3.scaleLinear().domain([0, 100]).range([m.top + side, m.top]);
+  svg.selectAll('*').remove();
+  addDefs();
+  drawGrid();
+  drawAxes('', '');
+  drawInequalityCaptions();
+  if (STATE.ineqStats && STATE.ineqLorenz) {
+    drawInequalityAreas(STATE.ineqLorenz);
+    drawInequalityDiagonal();
+    drawLorenzCurve(STATE.ineqLorenz, '#4f7cff', false);
+    drawRobinHood();
+    drawLorenzNodes();
+  }
+  updateInequalityPanel();
+}
+
+// Доли дохода по группам по умолчанию (умеренное неравенство, сумма = 100%).
+function defaultGroupShares(n) {
+  if (n === 5) return [8, 12, 16, 24, 40];
+  if (n === 10) return [3, 4, 5, 6, 8, 9, 11, 13, 16, 25];
+  const arr = []; for (let i = 0; i < n; i++) arr.push(100 / n); return arr;   // запасной вариант
+}
+
+// Переключатель способа ввода неравенства: доли по группам / доходы / формула.
+function setIneqInput(which) {
+  STATE.ineqInput = which;
+  [['ineq-in-groups', 'groups'], ['ineq-in-incomes', 'incomes'], ['ineq-in-formula', 'formula']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === which); });
+  const panes = { groups: 'ineq-pane-groups', incomes: 'ineq-pane-incomes', formula: 'ineq-pane-formula' };
+  Object.values(panes).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+  const ap = document.getElementById(panes[which]); if (ap) ap.style.display = '';
+  if (which === 'groups') renderIneqGroupsTable();
+  redrawAll();
+}
+
+// Сменить число групп (5 квинтилей / 10 децилей): сбрасывает доли на пресет.
+function setIneqGroupN(n) {
+  n = parseInt(n) || 5;
+  STATE.ineqGroupN = n;
+  STATE.ineqGroups = defaultGroupShares(n);
+  renderIneqGroupsTable();
+  redrawAll();
+}
+
+// Таблица долей по группам (поля ввода %). Перерисовывается при смене N и при входе в режим.
+function renderIneqGroupsTable() {
+  const box = document.getElementById('ineq-groups-table'); if (!box) return;
+  box.innerHTML = '';
+  STATE.ineqGroups.forEach((v, i) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:4px;';
+    const lab = document.createElement('span');
+    lab.style.cssText = 'font-size:12px;color:var(--text2);width:78px;';
+    lab.textContent = 'Группа ' + (i + 1);
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.step = '0.1'; inp.value = v;
+    inp.style.cssText = 'flex:1;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);';
+    inp.addEventListener('change', () => { const nv = parseFloat(inp.value); if (!isNaN(nv)) { STATE.ineqGroups[i] = nv; redrawAll(); } });
+    row.appendChild(lab); row.appendChild(inp); box.appendChild(row);
+  });
+}
+
+/* ---------------------------------------------------------------------
    БЛОК 9. redrawAll() — единая точка перерисовки.
    Любое изменение (кривая, перетаскивание, налог) дёргает её.
    --------------------------------------------------------------------- */
@@ -4049,6 +4409,7 @@ function redrawAll() {
   if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
   if (STATE.mode === 'ppf')   { redrawPpf();   return; }   // режим КПВ (Задача 3)
   if (STATE.mode === 'labor') { redrawLabor(); return; }   // режим рынка труда (Чекпоинт 1)
+  if (STATE.mode === 'inequality') { redrawInequality(); return; }   // режим неравенства (ЧК1–3)
   // Под-режимы монополии с собственной отрисовкой (Чекпоинт 2): дискриминация 3-й степени
   // (два мини-графика) и ломаный спрос — самодостаточны, рисуют свои оси и панель.
   if (STATE.mode === 'market' && STATE.market === 'monopoly') {
@@ -4393,8 +4754,8 @@ function wireControls() {
   const mCeilInput = document.getElementById('mono-ceil-input');
   if (mCeilInput) mCeilInput.addEventListener('change', () => { const v = parseFloat(mCeilInput.value); if (!isNaN(v)) setMonoCeil(v); });
 
-  // Переключатель режима «Рынок / Издержки / КПВ / Труд».
-  [['mode-market', 'market'], ['mode-costs', 'costs'], ['mode-ppf', 'ppf'], ['mode-labor', 'labor']].forEach(([id, mode]) => {
+  // Переключатель режима «Рынок / Издержки / КПВ / Труд / Неравенство».
+  [['mode-market', 'market'], ['mode-costs', 'costs'], ['mode-ppf', 'ppf'], ['mode-labor', 'labor'], ['mode-ineq', 'inequality']].forEach(([id, mode]) => {
     const b = document.getElementById(id); if (b) b.addEventListener('click', () => setMode(mode));
   });
 
@@ -4541,6 +4902,23 @@ function wireControls() {
   if (pcInput) pcInput.addEventListener('change', () => {
     const v = parseFloat(pcInput.value); if (!isNaN(v)) setPReg(v);
   });
+
+  // Неравенство (ЧК1): способ ввода, число групп, поля доходов и формулы Лоренца.
+  [['ineq-in-groups', 'groups'], ['ineq-in-incomes', 'incomes'], ['ineq-in-formula', 'formula']].forEach(([id, v]) => {
+    const b = document.getElementById(id); if (b) b.addEventListener('click', () => setIneqInput(v));
+  });
+  const ineqN = document.getElementById('ineq-ngroups');
+  if (ineqN) ineqN.addEventListener('change', () => setIneqGroupN(ineqN.value));
+  const ineqInc = document.getElementById('ineq-incomes');
+  const applyIneqInc = () => { if (ineqInc) STATE.ineqIncomes = ineqInc.value; redrawAll(); };
+  const ineqIncBtn = document.getElementById('ineq-incomes-apply');
+  if (ineqIncBtn) ineqIncBtn.addEventListener('click', applyIneqInc);
+  if (ineqInc) ineqInc.addEventListener('keydown', e => { if (e.key === 'Enter') applyIneqInc(); });
+  const ineqFm = document.getElementById('ineq-formula');
+  const applyIneqFm = () => { if (ineqFm) STATE.ineqFormula = ineqFm.value; redrawAll(); };
+  const ineqFmBtn = document.getElementById('ineq-formula-apply');
+  if (ineqFmBtn) ineqFmBtn.addEventListener('click', applyIneqFm);
+  if (ineqFm) ineqFm.addEventListener('keydown', e => { if (e.key === 'Enter') applyIneqFm(); });
 
   // Добавление кривой: по кнопке и по Enter в поле формулы.
   const submit = () => { addCurve(formula.value); formula.value = ''; formula.focus(); };
