@@ -295,22 +295,72 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div id="info-costs" style="margin-top:8px;"></div>
     </div>
 
-    <!-- КПВ — граница производственных возможностей (Задача 3) — отдельный режим -->
+    <!-- КПВ — граница производственных возможностей — отдельный режим.
+         Три под-режима: одна КПВ / сумма двух КПВ / КТВ (торговля). -->
     <div class="section" id="sec-ppf" style="display:none;">
       <div class="section-title">КПВ — производственные возможности</div>
-      <div class="field">
-        <label>Граница Y&nbsp;=&nbsp;f(X)</label>
-        <input type="text" id="inp-ppf" value="100 - X" autocomplete="off">
+      <div class="seg" style="margin-bottom:8px;">
+        <button class="seg-btn active" id="ppfsub-single">Одна КПВ</button>
+        <button class="seg-btn" id="ppfsub-sum">Сумма двух</button>
+        <button class="seg-btn" id="ppfsub-trade">КТВ</button>
       </div>
-      <button class="btn" id="btn-ppf-apply">Построить</button>
-      <div style="display:flex;gap:6px;margin-top:6px;">
-        <button class="btn-sm" id="btn-ppf-lin" style="flex:1;">Линейная</button>
-        <button class="btn-sm" id="btn-ppf-conc" style="flex:1;">Вогнутая</button>
+
+      <!-- Под-режим «Одна КПВ» (исходное поведение) -->
+      <div id="ppf-pane-single">
+        <div class="field">
+          <label>Граница Y&nbsp;=&nbsp;f(X)</label>
+          <input type="text" id="inp-ppf" value="100 - X" autocomplete="off">
+        </div>
+        <button class="btn" id="btn-ppf-apply">Построить</button>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button class="btn-sm" id="btn-ppf-lin" style="flex:1;">Линейная</button>
+          <button class="btn-sm" id="btn-ppf-conc" style="flex:1;">Вогнутая</button>
+        </div>
+        <div class="hint">По осям — два товара: X (горизонталь), Y (вертикаль). Точку на кривой
+          можно тянуть мышью. Наклон |dY/dX| — альтернативные издержки X (в единицах Y).</div>
+        <div class="error" id="ppf-error"></div>
+        <div id="info-ppf" style="margin-top:8px;"></div>
       </div>
-      <div class="hint">По осям — два товара: X (горизонталь), Y (вертикаль). Точку на кривой
-        можно тянуть мышью. Наклон |dY/dX| — альтернативные издержки X (в единицах Y).</div>
-      <div class="error" id="ppf-error"></div>
-      <div id="info-ppf" style="margin-top:8px;"></div>
+
+      <!-- Под-режим «Сумма двух КПВ» (Задача 1) -->
+      <div id="ppf-pane-sum" style="display:none;">
+        <div class="field">
+          <label>КПВ страны&nbsp;1: Y&nbsp;=&nbsp;f₁(X)</label>
+          <input type="text" id="inp-ppf1" value="100 - X" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>КПВ страны&nbsp;2: Y&nbsp;=&nbsp;f₂(X)</label>
+          <input type="text" id="inp-ppf2" value="60 - 3*X" autocomplete="off">
+        </div>
+        <button class="btn" id="btn-ppfsum-apply">Построить сумму</button>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button class="btn-sm" id="btn-ppfsum-lin" style="flex:1;">Две линейные</button>
+          <button class="btn-sm" id="btn-ppfsum-circ" style="flex:1;">Две дуги</button>
+        </div>
+        <div class="hint">Совместная КПВ двух стран: при каждом выпуске X производство
+          делится так, чтобы суммарный Y был максимален (X наращивает страна с меньшими
+          альтернативными издержками X). Это НЕ вертикальная сумма кривых.</div>
+        <div class="error" id="ppfsum-error"></div>
+        <div id="info-ppfsum" style="margin-top:8px;"></div>
+      </div>
+
+      <!-- Под-режим «КТВ — торговые возможности» (Задача 2) -->
+      <div id="ppf-pane-trade" style="display:none;">
+        <div class="field">
+          <label>КПВ страны: Y&nbsp;=&nbsp;f(X)</label>
+          <input type="text" id="inp-ppft" value="100 - X" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Мировая цена Px/Py</label>
+          <input type="number" id="inp-ppft-price" min="0" step="0.1" value="2">
+        </div>
+        <button class="btn" id="btn-ppft-apply">Построить КТВ</button>
+        <div class="hint">КТВ — граница потребления при торговле по мировой цене.
+          Линейная КПВ → полная специализация (угол). Нелинейная → точка касания, где
+          |наклон КПВ|&nbsp;=&nbsp;Px/Py. Линия КТВ лежит выше КПВ — это выигрыш от торговли.</div>
+        <div class="error" id="ppft-error"></div>
+        <div id="info-ppft" style="margin-top:8px;"></div>
+      </div>
     </div>
 
     <!-- Оси и сетка (шаг 2) -->
@@ -396,6 +446,15 @@ const STATE = {
   ppfCompiled: null,
   ppfReady: false,
   ppfX: null,            // позиция перетаскиваемой точки по X (null = центр при первом расчёте)
+  // Под-режим КПВ: 'single' — одна КПВ, 'sum' — сумма двух КПВ (Задача 1 этапа),
+  // 'trade' — кривая торговых возможностей КТВ (Задача 2 этапа).
+  ppfSub: 'single',
+  ppf1: '100 - X',       // КПВ страны 1 (режим суммы)
+  ppf2: '60 - 3*X',      // КПВ страны 2 (режим суммы)
+  ppfSumData: null,      // результат расчёта суммарной КПВ (кэшируется, тяжёлый расчёт)
+  ppftFormula: '100 - X',// КПВ страны (режим КТВ)
+  ppftPrice: 2,          // мировое соотношение цен Px/Py (режим КТВ)
+  ppfTradeData: null,    // результат расчёта КТВ
 };
 
 /* ---------------------------------------------------------------------
@@ -1741,6 +1800,8 @@ function updatePpfPanel() {
 
 // Полная перерисовка режима КПВ (свои подписи осей X/Y).
 function redrawPpf() {
+  if (STATE.ppfSub === 'sum')   { redrawPpfSum();   return; }   // Задача 1: сумма двух КПВ
+  if (STATE.ppfSub === 'trade') { redrawPpfTrade(); return; }   // Задача 2: КТВ
   recomputePpf();
   svg.selectAll('*').remove();
   addDefs();
@@ -1748,6 +1809,414 @@ function redrawPpf() {
   drawAxes('X', 'Y');
   if (STATE.ppfReady) { drawPpfCurve(); drawPpfPoint(); }
   updatePpfPanel();
+}
+
+/* ---------------------------------------------------------------------
+   БЛОК 12б. СУММА ДВУХ КПВ (Задача 1) и КТВ — торговые возможности (Задача 2).
+   Оба под-режима режима «КПВ»: оси «товар X / товар Y», координаты и
+   рисование осей — общие (drawAxes('X','Y')). Класс функций ограничен набором:
+   линейная (a-b*x), вогнутая-эллипс sqrt(a-b*x^2), вогнутая-парабола (a-b*x^2),
+   выпуклая (a-b*sqrt(x)) — все убывающие, в первой четверти.
+   --------------------------------------------------------------------- */
+
+// Значение скомпилированной КПВ Y=f(X) (переменные X и x — синонимы).
+function ppfEvalWith(compiled, x) {
+  try { const v = compiled.evaluate({ x: x, X: x }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  catch (e) { return NaN; }
+}
+
+// Наклон произвольной функции f в точке x (центральная разность).
+function ppfSlopeOf(f, x) {
+  const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
+  const a = f(x + h), b = f(x - h);
+  return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / (2 * h);
+}
+
+// Точка пересечения убывающей КПВ с осью X (где Y=0). NaN-зона трактуется как «ниже нуля».
+// Возвращает Xmax > 0 или null. Расширяем верхнюю границу, затем уточняем бисекцией.
+function ppfXmaxOf(f) {
+  const fpos = (x) => { const v = f(x); return isNaN(v) ? -1 : v; };
+  if (!(fpos(0) > 0)) return null;                 // f(0) должно быть положительным (Ymax)
+  let hi = 1;
+  for (let k = 0; k < 40 && fpos(hi) > 0; k++) hi *= 2;   // расширяем до ~1e12
+  if (fpos(hi) > 0) return null;                   // граница не найдена (не убывает к нулю)
+  let r = bisect(fpos, 0, hi);                     // fpos(0)>0, fpos(hi)≤0 → корень = Xmax
+  // Бисекция может остановиться на эпсилон ЗА границей домена (для sqrt там уже NaN).
+  // Сдвигаем чуть внутрь, чтобы f(Xmax) была определена (кривая доходит ровно до оси).
+  for (let k = 0; k < 60 && (isNaN(f(r)) || f(r) < 0); k++) r -= Math.max(1e-12, Math.abs(r) * 1e-9);
+  return r;
+}
+
+// Метод наименьших квадратов: прямая ys ≈ slope*xs + intercept + коэффициент r².
+function fitLinear(xs, ys) {
+  const n = xs.length; let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++) { sx += xs[i]; sy += ys[i]; sxx += xs[i] * xs[i]; sxy += xs[i] * ys[i]; }
+  const den = n * sxx - sx * sx; if (Math.abs(den) < 1e-12) return null;
+  const slope = (n * sxy - sx * sy) / den, intercept = (sy - slope * sx) / n;
+  const meanY = sy / n; let ssTot = 0, ssRes = 0;
+  for (let i = 0; i < n; i++) { const pred = slope * xs[i] + intercept; ssRes += (ys[i] - pred) ** 2; ssTot += (ys[i] - meanY) ** 2; }
+  const r2 = ssTot < 1e-12 ? 1 : 1 - ssRes / ssTot;
+  return { slope, intercept, r2 };
+}
+
+// Распознать тип КПВ из набора по пробным точкам внутри домена.
+// Возвращает { type, a, b, Xmax, Ymax }: linear (a-b·x), ellipse (sqrt(a-b·x²)),
+// parabola (a-b·x²), convex (a-b·√x) или { type:'unknown' }.
+function classifyPpf(f) {
+  const Xmax = ppfXmaxOf(f);
+  if (Xmax == null || !(Xmax > 0)) return { type: 'unknown', Xmax: null };
+  const Ymax = f(0);
+  const xs = [0.2, 0.4, 0.6, 0.8].map(t => Xmax * t);
+  const ys = xs.map(f);
+  if (ys.some(isNaN)) return { type: 'unknown', Xmax, Ymax };
+  const TOL = 1e-6;
+  const lin = fitLinear(xs, ys);                                   // y vs x
+  if (lin && lin.r2 > 1 - TOL) return { type: 'linear', a: Ymax, b: -lin.slope, Xmax, Ymax };
+  const ell = fitLinear(xs.map(x => x * x), ys.map(y => y * y));   // y² vs x²  →  эллипс/дуга
+  if (ell && ell.r2 > 1 - TOL && ell.slope < 0) return { type: 'ellipse', a: ell.intercept, b: -ell.slope, Xmax, Ymax };
+  const par = fitLinear(xs.map(x => x * x), ys);                   // y vs x²   →  парабола
+  if (par && par.r2 > 1 - TOL) return { type: 'parabola', a: Ymax, b: -par.slope, Xmax, Ymax };
+  const cvx = fitLinear(xs.map(x => Math.sqrt(x)), ys);            // y vs √x   →  выпуклая
+  if (cvx && cvx.r2 > 1 - TOL) return { type: 'convex', a: Ymax, b: -cvx.slope, Xmax, Ymax };
+  return { type: 'unknown', Xmax, Ymax };
+}
+
+// Ближайшее «красивое» число ≥ v (для подгонки масштаба осей).
+function niceMax(v) {
+  if (!(v > 0)) return 10;
+  const k = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * k >= v - 1e-9) return m * k;
+  return 10 * k;
+}
+
+// Точки одной КПВ от 0 до Xmax (для бледной отрисовки исходных кривых).
+function singlePpfPoints(f, xmax) {
+  const N = 200, out = [];
+  for (let i = 0; i <= N; i++) { const x = xmax * i / N; const y = f(x); out.push((isNaN(y) || y < 0) ? null : [x, y]); }
+  return out;
+}
+
+// Универсальный поиск корня g(x)=0 на отрезке [lo, hi] (скан + бисекция). null — нет.
+function findRootIn(g, lo, hi) {
+  const N = 1000; let prevX = lo, prevG = g(lo);
+  for (let i = 1; i <= N; i++) {
+    const x = lo + (hi - lo) * i / N, cur = g(x);
+    if (!isNaN(prevG) && !isNaN(cur) && prevG * cur <= 0 && prevG !== cur)
+      return (prevG === 0) ? prevX : (cur === 0 ? x : bisect(g, prevX, x));
+    prevX = x; prevG = cur;
+  }
+  return null;
+}
+
+// Линейная интерполяция Y по X в массиве отсортированных точек.
+function interpY(points, X) {
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], b = points[i + 1];
+    if (!a || !b) continue;
+    if (X >= a[0] && X <= b[0] && b[0] > a[0]) { const t = (X - a[0]) / (b[0] - a[0]); return a[1] + t * (b[1] - a[1]); }
+  }
+  return NaN;
+}
+
+/* --- Задача 1: суммарная КПВ двух стран ----------------------------- */
+
+// Максимальный суммарный Y при заданном суммарном выпуске X: делим X = x1 + x2
+// между странами так, чтобы f1(x1)+f2(x2) был максимален. Двухуровневая сетка —
+// надёжно для ЛЮБОЙ пары (вогнутые → оптимум внутри, выпуклые → на краю).
+function maxAllocY(f1, f2, X, x1max, x2max) {
+  const lo = Math.max(0, X - x2max), hi = Math.min(x1max, X);
+  if (hi < lo - 1e-9) return NaN;
+  // Аргументы зажимаем в домены стран — страхует от float-эпсилона у самого края (X≈Xmax),
+  // где иначе sqrt(отрицательного) даёт NaN и кривая не доходит до оси.
+  const obj = (x1) => {
+    const a = Math.min(Math.max(x1, 0), x1max), b = Math.min(Math.max(X - x1, 0), x2max);
+    const y1 = f1(a), y2 = f2(b);
+    return (isNaN(y1) || isNaN(y2)) ? -Infinity : y1 + y2;
+  };
+  if (hi <= lo + 1e-9) { const v = obj(lo); return v === -Infinity ? NaN : v; }
+  let best = -Infinity, bx = lo;
+  const M = 200;
+  for (let j = 0; j <= M; j++) { const x1 = lo + (hi - lo) * j / M; const v = obj(x1); if (v > best) { best = v; bx = x1; } }
+  const step = (hi - lo) / M;                       // уточнение вокруг лучшего узла
+  const lo2 = Math.max(lo, bx - step), hi2 = Math.min(hi, bx + step), M2 = 200;
+  for (let j = 0; j <= M2; j++) { const x1 = lo2 + (hi2 - lo2) * j / M2; const v = obj(x1); if (v > best) best = v; }
+  return best === -Infinity ? NaN : best;
+}
+
+// Численная суммарная (совместная) КПВ: для каждого суммарного X — оптимальное деление.
+function combinedPpfPoints(f1, f2, x1max, x2max, N) {
+  N = N || 240;
+  const Xtot = x1max + x2max, pts = [];
+  for (let i = 0; i <= N; i++) { const X = Xtot * i / N; pts.push([X, maxAllocY(f1, f2, X, x1max, x2max)]); }
+  return pts;
+}
+
+// Распознавание аналитической формулы суммарной КПВ (best-effort).
+// Возвращает { type, text, evalY|null, kinks }. evalY(x) — аналитическое значение
+// (NaN вне распознанной области); проверяется численно перед показом.
+function combinedPpfFormula(c1, c2) {
+  // Обе линейные → классический «изломанный» вид (1–2 куска).
+  if (c1.type === 'linear' && c2.type === 'linear') {
+    const lo = (c1.b <= c2.b) ? c1 : c2, hi = (c1.b <= c2.b) ? c2 : c1;  // меньшая альт. цена X специализируется первой
+    const Atot = lo.a + hi.a, xk = lo.Xmax, Xtot = lo.Xmax + hi.Xmax, Ykink = hi.a;
+    if (Math.abs(lo.b - hi.b) < 1e-6) {
+      const text = `Y = ${fmt(Atot)} − ${fmt(lo.b)}·X,  X ∈ [0; ${fmt(Xtot)}]  (равные альт. издержки — одна прямая).`;
+      return { type: 'линейная (1 кусок)', text, evalY: (x) => (x >= 0 && x <= Xtot) ? Atot - lo.b * x : NaN, kinks: [] };
+    }
+    const C = hi.a + hi.b * xk;                       // второй кусок: Y = C − hi.b·X
+    const text = `Y = ${fmt(Atot)} − ${fmt(lo.b)}·X при X ∈ [0; ${fmt(xk)}];  ` +
+                 `Y = ${fmt(C)} − ${fmt(hi.b)}·X при X ∈ [${fmt(xk)}; ${fmt(Xtot)}].`;
+    const evalY = (x) => { if (x < 0 || x > Xtot) return NaN; return x <= xk ? Atot - lo.b * x : C - hi.b * x; };
+    return { type: 'линейная (2 куска)', text, evalY, kinks: [[xk, Ykink]] };
+  }
+  // Обе эллипс/дуга с одинаковым b → одна дуга (эллипс) суммы.
+  if (c1.type === 'ellipse' && c2.type === 'ellipse' && Math.abs(c1.b - c2.b) < 1e-4) {
+    const b = (c1.b + c2.b) / 2;
+    const S = Math.pow(Math.sqrt(c1.a) + Math.sqrt(c2.a), 2);   // (r1+r2)² при b=1
+    const psum = Math.sqrt(S / b);
+    const text = Math.abs(b - 1) < 1e-4
+      ? `Y = √(${fmt(S)} − X²),  X ∈ [0; ${fmt(psum)}]  (дуга радиуса ${fmt(Math.sqrt(S))}).`
+      : `Y = √(${fmt(S)} − ${fmt(b)}·X²),  X ∈ [0; ${fmt(psum)}].`;
+    return { type: 'дуга/эллипс (1 кусок)', text, evalY: (x) => { const v = S - b * x * x; return v >= 0 ? Math.sqrt(v) : NaN; }, kinks: [] };
+  }
+  // Обе параболы → внутренняя часть имеет аккуратный вид; хвост строим численно.
+  if (c1.type === 'parabola' && c2.type === 'parabola') {
+    const a1 = c1.a, a2 = c2.a, b1 = c1.b, b2 = c2.b, bEff = b1 * b2 / (b1 + b2);
+    const Xint = Math.min(c1.Xmax * (b1 + b2) / b2, c2.Xmax * (b1 + b2) / b1);
+    const text = `внутр. часть: Y = ${fmt(a1 + a2)} − ${fmt(bEff)}·X² при X ∈ [0; ${fmt(Xint)}]; далее — хвост (построен численно).`;
+    return { type: 'парабола (внутр. часть)', text, evalY: (x) => (x < 0 || x > Xint) ? NaN : (a1 + a2) - bEff * x * x, kinks: [] };
+  }
+  return { type: 'численная', text: null, evalY: null, kinks: [] };
+}
+
+// Сверка аналитической формулы с численной кривой (доля совпавших точек).
+function verifyFormula(evalY, points) {
+  let tested = 0, ok = 0;
+  for (const p of points) {
+    if (!p || isNaN(p[1])) continue;
+    const y = evalY(p[0]); if (isNaN(y)) continue;
+    tested++; if (Math.abs(y - p[1]) <= 0.01 * (1 + Math.abs(p[1]))) ok++;
+  }
+  return tested >= 5 && ok / tested >= 0.98;
+}
+
+// Численное определение изломов (резкая смена наклона) — для не распознанных пар.
+function detectKinks(points) {
+  const valid = points.filter(p => p && !isNaN(p[1])); const ks = [];
+  if (valid.length < 5) return ks;
+  const slope = (i) => (valid[i + 1][1] - valid[i][1]) / (valid[i + 1][0] - valid[i][0]);
+  for (let i = 1; i < valid.length - 2; i++) {
+    const s0 = slope(i - 1), s1 = slope(i);
+    if (isFinite(s0) && isFinite(s1) && Math.abs(s1 - s0) > 0.15 * (1 + Math.abs(s0)))
+      if (!ks.length || Math.abs(valid[i][0] - ks[ks.length - 1][0]) > 1e-3) ks.push(valid[i]);
+  }
+  return ks;
+}
+
+// Тяжёлый расчёт суммарной КПВ (кэшируется в STATE.ppfSumData; запускается по «Построить»).
+function recomputePpfSum() {
+  STATE.ppfSumData = null;
+  const r1 = compilePpf(STATE.ppf1), r2 = compilePpf(STATE.ppf2);
+  if (!r1.compiled || !r2.compiled) { STATE.ppfSumData = { ok: false, error: r1.error || r2.error }; return; }
+  const f1 = (x) => ppfEvalWith(r1.compiled, x), f2 = (x) => ppfEvalWith(r2.compiled, x);
+  const c1 = classifyPpf(f1), c2 = classifyPpf(f2);
+  if (c1.Xmax == null || c2.Xmax == null || !(c1.Xmax > 0) || !(c2.Xmax > 0)) {
+    STATE.ppfSumData = { ok: false, error: 'Не удалось определить границы КПВ (нужны убывающие кривые, пересекающие оси).' };
+    return;
+  }
+  const x1max = c1.Xmax, x2max = c2.Xmax, Xtot = x1max + x2max, Ytot = f1(0) + f2(0);
+  const points = combinedPpfPoints(f1, f2, x1max, x2max, 240);
+  const fr = combinedPpfFormula(c1, c2);
+  let formulaText = fr.text, kinks = fr.kinks || [];
+  if (fr.evalY) {                                   // распознали форму — проверяем численно
+    if (!verifyFormula(fr.evalY, points)) { formulaText = 'Аналитическая форма не подтвердилась — кривая построена численно.'; kinks = detectKinks(points); }
+  } else { formulaText = 'Построена численно (аналитическая форма для этой пары не распознана).'; kinks = detectKinks(points); }
+  STATE.ppfSumData = {
+    ok: true, points, c1pts: singlePpfPoints(f1, x1max), c2pts: singlePpfPoints(f2, x2max),
+    Xtot, Ytot, x1max, x2max, formulaText, kinks, type: fr.type,
+  };
+  setRanges(niceMax(Xtot * 1.05), niceMax(Ytot * 1.05));
+}
+
+// Отрисовка суммарной КПВ: бледные исходные кривые + жирная синяя суммарная + заливка.
+function drawPpfSumCurves(d) {
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y(p => sy(p[1]));
+  g.append('path').datum(d.c1pts).attr('fill', 'none').attr('stroke', '#21a366').attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '5 4').attr('opacity', 0.5).attr('d', line);
+  g.append('path').datum(d.c2pts).attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '5 4').attr('opacity', 0.5).attr('d', line);
+  const area = d3.area().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y0(sy(0)).y1(p => sy(p[1]));
+  g.append('path').datum(d.points).attr('d', area).attr('fill', '#4f7cff').attr('opacity', 0.07);
+  g.append('path').datum(d.points).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.8).attr('d', line);
+}
+
+// Подписи суммарной КПВ: концы (X макс / Y макс), изломы, ярлык «Σ КПВ».
+function drawPpfSumMarks(d) {
+  const ox = sx(0), oy = sy(0), g = svg.append('g');
+  (d.kinks || []).forEach(k => {
+    const px = sx(k[0]), py = sy(k[1]);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    haloText(g, px, oy + 8, 'X=' + fmt(k[0]), 'middle', 'hanging');
+    haloText(g, ox - 8, py, 'Y=' + fmt(k[1]), 'end', 'middle');
+    g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#1a1f2e')
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('излом');
+  });
+  // концы суммарной кривой
+  haloText(g, ox - 8, sy(d.Ytot), 'Y=' + fmt(d.Ytot), 'end', 'middle');
+  haloText(g, sx(d.Xtot), oy + 8, 'X=' + fmt(d.Xtot), 'middle', 'hanging');
+  const midX = d.Xtot * 0.5, midY = interpY(d.points, midX);
+  if (!isNaN(midY)) g.append('text').attr('x', sx(midX)).attr('y', sy(midY) - 8).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#4f7cff')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Σ КПВ');
+}
+
+// Табло суммарной КПВ: тип, X/Y макс, изломы, текст формулы.
+function updatePpfSumPanel() {
+  const box = document.getElementById('info-ppfsum'); if (!box) return;
+  const d = STATE.ppfSumData;
+  if (!d) { box.innerHTML = '<div class="muted">Введите две КПВ и нажмите «Построить сумму».</div>'; return; }
+  if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось построить.') + '</div>'; return; }
+  let html = '';
+  html += `<div class="stat"><span>Тип</span><b>${d.type}</b></div>`;
+  html += `<div class="stat"><span>X макс (сумма)</span><b>${fmt(d.Xtot)}</b></div>`;
+  html += `<div class="stat"><span>Y макс (сумма)</span><b>${fmt(d.Ytot)}</b></div>`;
+  (d.kinks || []).forEach((k, i) => { html += `<div class="stat"><span>Излом ${i + 1}</span><b>X=${fmt(k[0])}, Y=${fmt(k[1])}</b></div>`; });
+  html += `<div class="hint" style="margin-top:6px;"><b>Суммарная КПВ:</b><br>${d.formulaText || '—'}</div>`;
+  box.innerHTML = html;
+}
+
+// Полная перерисовка под-режима «Сумма двух КПВ» (тяжёлый расчёт — только если кэш пуст).
+function redrawPpfSum() {
+  if (!STATE.ppfSumData) recomputePpfSum();
+  makeScales();                                     // setRanges мог изменить границы
+  svg.selectAll('*').remove(); addDefs(); drawGrid(); drawAxes('X', 'Y');
+  const d = STATE.ppfSumData;
+  if (d && d.ok) { drawPpfSumCurves(d); drawPpfSumMarks(d); }
+  updatePpfSumPanel();
+}
+
+/* --- Задача 2: КТВ — кривая торговых возможностей ------------------- */
+
+// Угловое (полная специализация) решение по ценности: специализация туда, где
+// суммарная выручка больше. Используется для линейной и выпуклой КПВ.
+function cornerByValue(Xmax, Ymax, ratio) {
+  if (ratio * Xmax > Ymax) return { xp: Xmax, yp: 0, regime: 'специализация на X' };
+  return { xp: 0, yp: Ymax, regime: 'специализация на Y' };
+}
+
+// Расчёт КТВ: точка производства и линия торговых возможностей.
+function recomputePpfTrade() {
+  STATE.ppfTradeData = null;
+  const r = compilePpf(STATE.ppftFormula), ratio = STATE.ppftPrice;
+  if (!r.compiled) { STATE.ppfTradeData = { ok: false, error: r.error }; return; }
+  if (!(ratio > 0)) { STATE.ppfTradeData = { ok: false, error: 'Мировая цена Px/Py должна быть больше 0.' }; return; }
+  const f = (x) => ppfEvalWith(r.compiled, x);
+  const c = classifyPpf(f);
+  if (c.Xmax == null || !(c.Xmax > 0)) { STATE.ppfTradeData = { ok: false, error: 'Не удалось определить границы КПВ.' }; return; }
+  const Xmax = c.Xmax, Ymax = f(0);
+  let xp, yp, regime;
+  if (c.type === 'ellipse' || c.type === 'parabola') {
+    // Вогнутая: точка касания, где |наклон КПВ| = мировой цене.
+    const xt = findRootIn(x => (-ppfSlopeOf(f, x)) - ratio, 1e-4, Xmax - 1e-4);
+    if (xt != null) { xp = xt; yp = f(xt); regime = 'касание (внутр. точка)'; }
+    else ({ xp, yp, regime } = cornerByValue(Xmax, Ymax, ratio));
+  } else if (c.type === 'linear') {
+    const b = c.b;                                  // внутренняя альт. цена X
+    if (Math.abs(b - ratio) < 1e-9) { xp = null; yp = null; regime = 'нет торговли'; }
+    else if (ratio > b) { xp = Xmax; yp = 0; regime = 'специализация на X'; }
+    else { xp = 0; yp = Ymax; regime = 'специализация на Y'; }
+  } else {
+    // Выпуклая / неизвестная: угол по ценности (для выпуклой оптимум всегда в углу).
+    ({ xp, yp, regime } = cornerByValue(Xmax, Ymax, ratio));
+  }
+  let line = null, xint = null, yint = null;
+  if (regime !== 'нет торговли' && xp != null) {
+    const c0 = yp + ratio * xp;                     // Y-перехват КТВ: Y = c0 − ratio·X
+    line = { intercept: c0, slope: ratio }; yint = c0; xint = c0 / ratio;
+  }
+  STATE.ppfTradeData = { ok: true, c, Xmax, Ymax, ratio, xp, yp, regime, line, xint, yint, ppfPts: singlePpfPoints(f, Xmax) };
+  const xm = Math.max(Xmax, xint || 0), ym = Math.max(Ymax, yint || 0);
+  setRanges(niceMax(xm * 1.05), niceMax(ym * 1.05));
+}
+
+// Отрисовка КТВ: КПВ страны (синяя) + линия торговых возможностей (красная).
+function drawPpfTrade(d) {
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y(p => sy(p[1]));
+  const area = d3.area().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y0(sy(0)).y1(p => sy(p[1]));
+  g.append('path').datum(d.ppfPts).attr('d', area).attr('fill', '#4f7cff').attr('opacity', 0.06);
+  g.append('path').datum(d.ppfPts).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.5).attr('d', line);
+  if (d.line) {
+    const pts = [[0, d.line.intercept], [d.xint, 0]];          // прямая КТВ от (0,c0) до (xint,0)
+    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#e05052').attr('stroke-width', 2.5).attr('d', line);
+  }
+}
+
+// Подписи КТВ: точка производства, ярлыки кривых, перехваты (макс потребление).
+function drawPpfTradeMarks(d) {
+  const ox = sx(0), oy = sy(0), g = svg.append('g');
+  if (d.line) {
+    g.append('text').attr('x', sx(d.xint * 0.5)).attr('y', sy(d.line.intercept * 0.5) - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#e05052')
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('КТВ');
+  }
+  if (d.xp != null) {
+    const px = sx(d.xp), py = sy(d.yp);
+    const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+      .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    dash(px, py, px, oy); dash(px, py, ox, py);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 2);
+    g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#1a1f2e')
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Произв.');
+    haloText(g, px, oy + 8, 'X=' + fmt(d.xp), 'middle', 'hanging');
+    haloText(g, ox - 8, py, 'Y=' + fmt(d.yp), 'end', 'middle');
+  }
+  if (d.line) {
+    haloText(g, ox - 8, sy(d.yint), 'Cy=' + fmt(d.yint), 'end', 'middle');
+    haloText(g, sx(d.xint), oy + 8, 'Cx=' + fmt(d.xint), 'middle', 'hanging');
+  }
+}
+
+// Табло КТВ: режим, мировая цена, точка производства, максимальное потребление, формула линии.
+function updatePpfTradePanel() {
+  const box = document.getElementById('info-ppft'); if (!box) return;
+  const d = STATE.ppfTradeData;
+  if (!d) { box.innerHTML = '<div class="muted">Введите КПВ и мировую цену, нажмите «Построить КТВ».</div>'; return; }
+  if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось.') + '</div>'; return; }
+  let html = '';
+  html += `<div class="stat"><span>Режим</span><b>${d.regime}</b></div>`;
+  html += `<div class="stat"><span>Мировая цена Px/Py</span><b>${fmt(d.ratio)}</b></div>`;
+  if (d.xp != null) html += `<div class="stat"><span>Производство (X, Y)</span><b>${fmt(d.xp)}, ${fmt(d.yp)}</b></div>`;
+  if (d.line) {
+    html += `<div class="stat"><span>Макс потребление X</span><b>${fmt(d.xint)}</b></div>`;
+    html += `<div class="stat"><span>Макс потребление Y</span><b>${fmt(d.yint)}</b></div>`;
+    html += `<div class="hint" style="margin-top:6px;"><b>КТВ:</b> Y = ${fmt(d.line.intercept)} − ${fmt(d.ratio)}·X</div>`;
+  } else {
+    html += '<div class="hint" style="margin-top:6px;">Мировая цена равна внутренней — торговать невыгодно, КТВ совпадает с КПВ.</div>';
+  }
+  box.innerHTML = html;
+}
+
+// Полная перерисовка под-режима «КТВ» (расчёт лёгкий — можно каждый раз).
+function redrawPpfTrade() {
+  recomputePpfTrade();
+  makeScales();
+  svg.selectAll('*').remove(); addDefs(); drawGrid(); drawAxes('X', 'Y');
+  const d = STATE.ppfTradeData;
+  if (d && d.ok) { drawPpfTrade(d); drawPpfTradeMarks(d); }
+  updatePpfTradePanel();
+}
+
+// Переключение под-режима КПВ (одна / сумма / КТВ): показ нужной панели + перерисовка.
+function setPpfSub(sub) {
+  STATE.ppfSub = sub;
+  const map = { single: 'ppfsub-single', sum: 'ppfsub-sum', trade: 'ppfsub-trade' };
+  Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
+  const ab = document.getElementById(map[sub]); if (ab) ab.classList.add('active');
+  const panes = { single: 'ppf-pane-single', sum: 'ppf-pane-sum', trade: 'ppf-pane-trade' };
+  Object.values(panes).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+  const ap = document.getElementById(panes[sub]); if (ap) ap.style.display = '';
+  if (sub === 'sum') STATE.ppfSumData = null;        // пересчитать при показе
+  redrawAll();
 }
 
 /* ---------------------------------------------------------------------
@@ -1935,6 +2404,7 @@ function loadScene(name) {
     STATE.ppfFormula = '100 - 0.01*X^2'; STATE.ppfX = null;
     if (ppfInp) ppfInp.value = STATE.ppfFormula;
     setMode('ppf');                    // setMode сам ставит setRanges(100, 100)
+    setPpfSub('single');               // сцена показывает одиночную КПВ
   }
 }
 
@@ -2059,6 +2529,41 @@ function wireControls() {
   if (pLin) pLin.addEventListener('click', () => { if (ppfInp) ppfInp.value = '100 - X'; applyPpf(); });
   const pConc = document.getElementById('btn-ppf-conc');
   if (pConc) pConc.addEventListener('click', () => { if (ppfInp) ppfInp.value = '100 - 0.01*X^2'; applyPpf(); });
+
+  // Под-режимы КПВ (Задачи 1–2): одна / сумма двух / КТВ.
+  [['ppfsub-single', 'single'], ['ppfsub-sum', 'sum'], ['ppfsub-trade', 'trade']].forEach(([id, sub]) => {
+    const b = document.getElementById(id); if (b) b.addEventListener('click', () => setPpfSub(sub));
+  });
+
+  // Сумма двух КПВ (Задача 1): два поля, «Построить сумму», пресеты.
+  const ppf1Inp = document.getElementById('inp-ppf1'), ppf2Inp = document.getElementById('inp-ppf2');
+  function applyPpfSum() {
+    STATE.ppf1 = ((ppf1Inp && ppf1Inp.value) || '').trim();
+    STATE.ppf2 = ((ppf2Inp && ppf2Inp.value) || '').trim();
+    STATE.ppfSumData = null;   // принудительный пересчёт
+    redrawAll();
+  }
+  const sumApply = document.getElementById('btn-ppfsum-apply');
+  if (sumApply) sumApply.addEventListener('click', applyPpfSum);
+  if (ppf1Inp) ppf1Inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpfSum(); });
+  if (ppf2Inp) ppf2Inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpfSum(); });
+  const sumLin = document.getElementById('btn-ppfsum-lin');
+  if (sumLin) sumLin.addEventListener('click', () => { if (ppf1Inp) ppf1Inp.value = '100 - X'; if (ppf2Inp) ppf2Inp.value = '60 - 3*X'; applyPpfSum(); });
+  const sumCirc = document.getElementById('btn-ppfsum-circ');
+  if (sumCirc) sumCirc.addEventListener('click', () => { if (ppf1Inp) ppf1Inp.value = 'sqrt(100 - X^2)'; if (ppf2Inp) ppf2Inp.value = 'sqrt(64 - X^2)'; applyPpfSum(); });
+
+  // КТВ — торговые возможности (Задача 2): КПВ + мировая цена Px/Py.
+  const ppftInp = document.getElementById('inp-ppft'), ppftPriceInp = document.getElementById('inp-ppft-price');
+  function applyPpfTrade() {
+    STATE.ppftFormula = ((ppftInp && ppftInp.value) || '').trim();
+    const v = parseFloat(ppftPriceInp && ppftPriceInp.value);
+    STATE.ppftPrice = isNaN(v) ? 0 : v;
+    redrawAll();
+  }
+  const tApply = document.getElementById('btn-ppft-apply');
+  if (tApply) tApply.addEventListener('click', applyPpfTrade);
+  if (ppftInp) ppftInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpfTrade(); });
+  if (ppftPriceInp) ppftPriceInp.addEventListener('change', applyPpfTrade);
 
   // Готовые сцены (Задача 4): заполнение типовой задачи одним кликом.
   [['scene-sd', 'sd'], ['scene-tax', 'tax'], ['scene-ceil', 'ceil'],
