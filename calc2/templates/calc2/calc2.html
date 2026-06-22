@@ -390,13 +390,11 @@ const STATE = {
   costsFC: 18,
   costsCompiled: null,
   costsReady: false,
-  costsVisited: false,   // первый вход в режим — дружелюбный масштаб
   showMC: true, showATC: true, showAVC: true, showAFC: true, showVC: false,
   // КПВ — граница производственных возможностей (Задача 3). Оси: товар X и товар Y.
   ppfFormula: '100 - X',
   ppfCompiled: null,
   ppfReady: false,
-  ppfVisited: false,
   ppfX: null,            // позиция перетаскиваемой точки по X (null = центр при первом расчёте)
 };
 
@@ -1619,10 +1617,11 @@ function setMode(mode) {
   const all = new Set([].concat(...Object.values(groups)));
   all.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   (groups[mode] || []).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = ''; });
-  // Первый вход в режим издержек — дружелюбный масштаб (U-образные кривые видны).
-  if (mode === 'costs' && !STATE.costsVisited) { STATE.costsVisited = true; setRanges(10, 50); }
-  // Первый вход в КПВ — масштаб товаров 100×100 (на случай прихода из режима издержек).
-  if (mode === 'ppf' && !STATE.ppfVisited) { STATE.ppfVisited = true; setRanges(100, 100); }
+  // При каждом переключении режима — выставлять характерный масштаб осей.
+  // Ручные правки в полях «Оси» при смене режима намеренно сбрасываются.
+  if (mode === 'costs') setRanges(10, 50);
+  else if (mode === 'ppf') setRanges(100, 100);
+  else setRanges(100, 100);   // market и любой другой — стандартный масштаб
   // Подписи полей масштаба в секции «Оси»: для КПВ — товары X/Y, иначе Q/P.
   const lq = document.getElementById('lbl-qmax'), lp = document.getElementById('lbl-pmax');
   if (lq) lq.textContent = (mode === 'ppf') ? 'X макс' : 'Q макс';
@@ -1913,8 +1912,7 @@ function loadScene(name) {
   const pv = document.getElementById('pc-val'); if (pv) pv.textContent = '0';
 
   if (name === 'sd' || name === 'tax' || name === 'ceil' || name === 'mono') {
-    setMode('market');
-    setRanges(100, 100);
+    setMode('market');                 // setMode сам ставит setRanges(100, 100)
     addCurve('100 - Q'); setRole(STATE.curves[0], 'demand');   // спрос — всегда первая кривая
     if (name === 'mono') {
       addCurve('20'); setRole(STATE.curves[1], 'mc');          // постоянные предельные издержки
@@ -1931,16 +1929,12 @@ function loadScene(name) {
     STATE.costsTC = 'Q^3 - 6*Q^2 + 15*Q + 18'; STATE.costsFC = 18;
     if (tcInp) tcInp.value = STATE.costsTC;
     if (fcInp) fcInp.value = STATE.costsFC;
-    STATE.costsVisited = true;        // наш масштаб не перебивается первым входом
-    setRanges(10, 50);
-    setMode('costs');
+    setMode('costs');                  // setMode сам ставит setRanges(10, 50)
   } else if (name === 'ppf') {
     const ppfInp = document.getElementById('inp-ppf');
     STATE.ppfFormula = '100 - 0.01*X^2'; STATE.ppfX = null;
     if (ppfInp) ppfInp.value = STATE.ppfFormula;
-    STATE.ppfVisited = true;
-    setRanges(100, 100);
-    setMode('ppf');
+    setMode('ppf');                    // setMode сам ставит setRanges(100, 100)
   }
 }
 
