@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Графический калькулятор 2.0 (бета)</title>
+
+  <!-- ── Внешние библиотеки (CDN, без сборки) ──────────────────────────
+       D3.js v7   — рисование SVG, оси, кривые, перетаскивание мышью.
+       Math.js    — «мозг»: разбор и вычисление любых формул, численные методы.
+       Подключаются точно так же, как Desmos в старом калькуляторе. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.3/math.min.js"></script>
+
+  <style>
+/* ── Палитра и базовые стили (как на остальном сайте) ──────────────── */
+:root {
+  --sb:      #1a1f2e;   /* тёмный (шапка)        */
+  --accent:  #4f7cff;   /* синий акцент          */
+  --panel:   #f7f7f5;   /* фон левой панели      */
+  --border:  #e8e8e4;   /* линии-разделители     */
+  --text:    #1a1a1a;
+  --text2:   #888;
+  --r:       6px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px; color: var(--text); background: #fff;
+}
+button { cursor: pointer; font: inherit; }
+input, select { font: inherit; }
+
+/* ── Основной макет: левая панель + область графика ────────────────── */
+.app { display: flex; height: calc(100vh - 48px); }
+
+/* Левая панель управления (~300px) */
+.panel {
+  width: 300px; flex-shrink: 0; background: var(--panel);
+  border-right: .5px solid var(--border);
+  overflow-y: auto; padding: 16px;
+}
+.panel h1 {
+  font-size: 15px; font-weight: 600; margin-bottom: 2px;
+}
+.panel .subtitle {
+  font-size: 12px; color: var(--text2); margin-bottom: 16px;
+}
+
+/* Секции внутри панели */
+.section { margin-bottom: 18px; }
+.section-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text2); margin-bottom: 8px;
+}
+
+/* Область графика справа */
+.graph-wrap {
+  flex: 1; position: relative; background: #fff; overflow: hidden;
+}
+#chart { display: block; width: 100%; height: 100%; }
+
+/* Заглушка-подсказка по центру пустого графика (шаг 1) */
+.empty-hint {
+  position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center;
+  color: var(--text2); font-size: 13px; pointer-events: none;
+}
+  </style>
+</head>
+<body>
+{% include '_nav.html' %}
+
+<div class="app">
+
+  <!-- ── ЛЕВАЯ ПАНЕЛЬ УПРАВЛЕНИЯ ───────────────────────────────────── -->
+  <aside class="panel">
+    <h1>Графический калькулятор&nbsp;2.0</h1>
+    <div class="subtitle">бета · собственный движок (D3&nbsp;+&nbsp;Math.js)</div>
+
+    <!-- Сюда следующие шаги добавят: ввод формулы, список кривых,
+         равновесие, области CS/PS, налог. Пока панель почти пустая. -->
+    <div class="section" id="panel-content">
+      <div class="section-title">Управление</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.5;">
+        Элементы управления появятся на следующих шагах разработки.
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── ОБЛАСТЬ ГРАФИКА ───────────────────────────────────────────── -->
+  <div class="graph-wrap" id="graph-wrap">
+    <svg id="chart"></svg>
+    <div class="empty-hint" id="empty-hint">График появится на шаге&nbsp;2 (оси и сетка)</div>
+  </div>
+
+</div>
+
+<script>
+/* =====================================================================
+   ГРАФИЧЕСКИЙ КАЛЬКУЛЯТОР 2.0 — собственный движок (D3 + Math.js)
+
+   Код разбит на смысловые блоки. Каждый шаг разработки наполняет
+   свой блок, не ломая остальные:
+
+     1) CONFIG / STATE   — настройки и состояние
+     2) МАТЕМАТИКА        — формулы, поиск равновесия, интегрирование
+     3) КООРДИНАТЫ И ОСИ  — шкалы, перевод данные↔пиксели, оси, сетка
+     4) КРИВЫЕ            — отрисовка кривых по формулам
+     5) РАВНОВЕСИЕ        — численный поиск точки D = S
+     6) ОБЛАСТИ           — CS / PS через численное интегрирование
+     7) ИНТЕРАКТИВ        — перетаскивание мышью
+     8) СЦЕНАРИИ          — налог, субсидия
+     9) redrawAll()       — единая перерисовка всего
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   БЛОК 1. CONFIG / STATE — настройки и состояние калькулятора
+   --------------------------------------------------------------------- */
+const CONFIG = {
+  // Границы видимой области в «экономических» координатах.
+  // Только первая четверть: Q от 0 до Qmax, P от 0 до Pmax.
+  Qmax: 100,
+  Pmax: 100,
+  // Поля (margins) под подписи осей, в пикселях.
+  margin: { top: 24, right: 28, bottom: 44, left: 52 },
+};
+
+// Состояние: список кривых и настройки. Наполняется на следующих шагах.
+const STATE = {
+  curves: [],        // [{ id, expr, compiled, color, name, role, visible }]
+  showGrid: true,
+};
+
+/* ---------------------------------------------------------------------
+   БЛОК 2. МАТЕМАТИКА — заполняется на шагах 3, 5, 6
+   --------------------------------------------------------------------- */
+// (функции compileFormula / evalCurve / findEquilibrium / integrate
+//  появятся на соответствующих шагах)
+
+/* ---------------------------------------------------------------------
+   БЛОК 3. КООРДИНАТЫ И ОСИ — заполняется на шаге 2
+   --------------------------------------------------------------------- */
+// (scaleX / scaleY / toPx / toData / drawAxes появятся на шаге 2)
+
+/* ---------------------------------------------------------------------
+   БЛОК 9. redrawAll() — единая точка перерисовки.
+   Любое изменение (кривая, перетаскивание, налог) дёргает её.
+   --------------------------------------------------------------------- */
+function redrawAll() {
+  // Пока перерисовывать нечего — наполнится на следующих шагах.
+}
+
+/* ---------------------------------------------------------------------
+   ИНИЦИАЛИЗАЦИЯ
+   --------------------------------------------------------------------- */
+function init() {
+  // Проверяем, что библиотеки загрузились (в консоли браузера видно версии).
+  if (typeof d3 === 'undefined' || typeof math === 'undefined') {
+    console.error('Не загрузились библиотеки D3 или Math.js (проверьте интернет).');
+    return;
+  }
+  console.log('calc2: D3', d3.version, '| Math.js загружен');
+  redrawAll();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
