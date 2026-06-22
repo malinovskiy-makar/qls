@@ -211,6 +211,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="seg">
         <button class="seg-btn active" id="scn-none">Обычный</button>
         <button class="seg-btn" id="scn-elast">Эластичность</button>
+        <button class="seg-btn" id="scn-shift">Сдвиги</button>
       </div>
       <!-- Эластичность спроса вдоль кривой (Задача 2) -->
       <div id="scn-pane-elast" style="display:none;margin-top:8px;">
@@ -218,6 +219,28 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           Единичная точка (|Ed|=1) — там, где MR&nbsp;=&nbsp;0 и выручка TR&nbsp;=&nbsp;P·Q максимальна:
           левее спрос эластичный, правее — неэластичный.</div>
         <div id="info-elast" style="margin-top:6px;"></div>
+      </div>
+      <!-- Разложение двойных сдвигов спроса и предложения (Задача 3) -->
+      <div id="scn-pane-shift" style="display:none;margin-top:8px;">
+        <div class="field">
+          <label>Сдвиг спроса ΔD = <b id="shiftD-val">0</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="shiftD-slider" min="-50" max="50" step="1" value="0" style="flex:1;margin-top:0;">
+            <input type="number" id="shiftD-input" step="1" value="0"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+        </div>
+        <div class="field">
+          <label>Сдвиг предложения ΔS = <b id="shiftS-val">0</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="shiftS-slider" min="-50" max="50" step="1" value="0" style="flex:1;margin-top:0;">
+            <input type="number" id="shiftS-input" step="1" value="0"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+        </div>
+        <div class="hint">Сдвиг по вертикали (свободный член кривой): + вверх, − вниз.
+          Разложение показывает вклад спроса (E₀→E_d), предложения (E₀→E_s) и итог (E₀→E₁).</div>
+        <div id="info-shift" style="margin-top:6px;"></div>
       </div>
     </div>
 
@@ -484,6 +507,10 @@ const STATE = {
   scenario: 'none',
   elastQ: null,      // позиция точки эластичности вдоль спроса (null = единичная/центр)
   elast: null,       // результат расчёта эластичности (Задача 2)
+  shiftD: 0,         // вертикальный сдвиг спроса ΔD (Задача 3)
+  shiftS: 0,         // вертикальный сдвиг предложения ΔS (Задача 3)
+  shiftActive: false,
+  shiftRes: null,    // четыре равновесия E0/E_d/E_s/E1 и разложение (Задача 3)
   // Галочки областей монополии (Задача 1): CS над ценой, VC под MC, PS между MC и ценой.
   showMonoCS: true,
   showMonoVC: true,
@@ -981,6 +1008,27 @@ function recompute() {
     const Ed = (q > 0 && slope !== 0 && !isNaN(slope) && !isNaN(p)) ? p / (q * slope) : NaN;
     STATE.elast = { unit, qDmax, q, p, slope, Ed, absEd: Math.abs(Ed) };
   }
+
+  // Разложение двойных сдвигов спроса и предложения (Задача 3): четыре равновесия.
+  STATE.shiftActive = false;
+  STATE.shiftRes = null;
+  if (compMarket && STATE.scenario === 'shift' && STATE.D && STATE.S && STATE.eq) {
+    const dD = STATE.shiftD || 0, dS = STATE.shiftS || 0;
+    const Dsh = { fn: q => evalCurve(STATE.D, q) + dD };   // спрос со сдвигом по вертикали
+    const Ssh = { fn: q => evalCurve(STATE.S, q) + dS };   // предложение со сдвигом по вертикали
+    const E0 = STATE.eq;
+    const Ed = findEquilibrium(Dsh, STATE.S);   // сдвинут только спрос
+    const Es = findEquilibrium(STATE.D, Ssh);   // сдвинуто только предложение
+    const E1 = findEquilibrium(Dsh, Ssh);       // оба сдвига вместе
+    if (Ed && Es && E1) {
+      STATE.shiftRes = {
+        dD, dS, E0, Ed, Es, E1,
+        dQ: { demand: Ed.Q - E0.Q, supply: Es.Q - E0.Q, total: E1.Q - E0.Q },
+        dP: { demand: Ed.P - E0.P, supply: Es.P - E0.P, total: E1.P - E0.P },
+      };
+      STATE.shiftActive = true;
+    }
+  }
 }
 
 // Точка равновесия E*: пунктирные проекции на оси + подпись.
@@ -1369,6 +1417,79 @@ function updateElasticityPanel() {
 }
 
 /* ---------------------------------------------------------------------
+   БЛОК 8а-3. РАЗЛОЖЕНИЕ ДВОЙНЫХ СДВИГОВ (Задача 3).
+   Сдвигаем спрос на ΔD и предложение на ΔS, считаем четыре равновесия
+   (E0, только спрос, только предложение, оба) и раскладываем ΔQ и ΔP на
+   вклад спроса, предложения и итог.
+   --------------------------------------------------------------------- */
+
+// Одна помеченная точка равновесия с проекциями к осям.
+function shiftMark(g, pt, label, color) {
+  const ox = sx(0), oy = sy(0), [px, py] = toPx(pt.Q, pt.P);
+  g.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy)
+    .attr('stroke', color).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', 0.55);
+  g.append('line').attr('x1', px).attr('y1', py).attr('x2', ox).attr('y2', py)
+    .attr('stroke', color).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', 0.55);
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', '#fff').attr('stroke-width', 1.5);
+  g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', color)
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(label);
+}
+
+// Отрисовка сценария сдвигов: исходные кривые + пунктирные сдвинутые + точки E_d/E_s/E1.
+function drawShiftScenario() {
+  drawGhost();        // E₀ как бледный призрак (активируется shiftActive)
+  drawCurves();       // исходные D и S
+  const r = STATE.shiftRes;
+  if (!r) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  const shifted = (base, sh, color) => {
+    if (sh === 0) return;
+    const pts = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = evalCurve(base, q); pts.push(isNaN(v) ? null : [q, v + sh]); }
+    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  };
+  shifted(STATE.D, r.dD, STATE.D.color);
+  shifted(STATE.S, r.dS, STATE.S.color);
+  // Промежуточные равновесия и итог. E_d/E_s — разными цветами, E₁ — тёмный (итог).
+  const gp = svg.append('g');
+  if (r.dD !== 0) shiftMark(gp, r.Ed, 'E_d', '#4f7cff');
+  if (r.dS !== 0) shiftMark(gp, r.Es, 'E_s', '#21a366');
+  shiftMark(gp, r.E1, 'E₁', '#1a1f2e');
+}
+
+// Табло сдвигов: четыре равновесия и таблица разложения ΔQ*/ΔP*.
+function updateShiftPanel() {
+  const box = document.getElementById('info-shift'); if (!box) return;
+  if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Отметьте кривые D и S.</div>'; return; }
+  if (!STATE.eq) { box.innerHTML = '<div class="warn">Исходное равновесие не найдено.</div>'; return; }
+  const r = STATE.shiftRes;
+  if (!r) { box.innerHTML = '<div class="warn">Равновесие после сдвигов не найдено в первой четверти.</div>'; return; }
+  const sg = (v) => (v > 0 ? '+' : '') + fmt(v);
+  let html = '';
+  html += `<div class="stat"><span>E₀ (исходное)</span><b>${fmt(r.E0.Q)}, ${fmt(r.E0.P)}</b></div>`;
+  html += `<div class="stat"><span>E_d (только спрос)</span><b>${fmt(r.Ed.Q)}, ${fmt(r.Ed.P)}</b></div>`;
+  html += `<div class="stat"><span>E_s (только предлож.)</span><b>${fmt(r.Es.Q)}, ${fmt(r.Es.P)}</b></div>`;
+  html += `<div class="stat"><span>E₁ (оба сдвига)</span><b>${fmt(r.E1.Q)}, ${fmt(r.E1.P)}</b></div>`;
+  html += '<table class="tx-table" style="margin-top:6px;"><tr><th></th><th>спрос</th><th>предл.</th><th>итог</th></tr>';
+  html += `<tr><td>ΔQ*</td><td>${sg(r.dQ.demand)}</td><td>${sg(r.dQ.supply)}</td><td>${sg(r.dQ.total)}</td></tr>`;
+  html += `<tr><td>ΔP*</td><td>${sg(r.dP.demand)}</td><td>${sg(r.dP.supply)}</td><td>${sg(r.dP.total)}</td></tr>`;
+  html += '</table>';
+  box.innerHTML = html;
+}
+
+// Единый путь смены сдвига (ползунок / число): which = 'D' | 'S'.
+function setShift(which, v) {
+  v = isNaN(v) ? 0 : v;
+  const ids = which === 'D'
+    ? ['shiftD-slider', 'shiftD-input', 'shiftD-val'] : ['shiftS-slider', 'shiftS-input', 'shiftS-val'];
+  if (which === 'D') STATE.shiftD = v; else STATE.shiftS = v;
+  const sl = document.getElementById(ids[0]); if (sl) sl.value = v;
+  const inp = document.getElementById(ids[1]); if (inp) inp.value = v;
+  const lbl = document.getElementById(ids[2]); if (lbl) lbl.textContent = fmt(v);
+  redrawAll();
+}
+
+/* ---------------------------------------------------------------------
    БЛОК 8б. ЦЕНОВОЕ РЕГУЛИРОВАНИЕ — потолок и пол цены (Задача 1).
    Линия фиксированной цены тянется мышью; рынок не расчищается —
    возникает дефицит (потолок) или избыток (пол).
@@ -1516,7 +1637,7 @@ function updatePcPanel() {
    --------------------------------------------------------------------- */
 function drawGhost() {
   if (!STATE.showGhost) return;
-  if (!(STATE.taxActive || STATE.pcActive) || !STATE.eq) return;
+  if (!(STATE.taxActive || STATE.pcActive || STATE.shiftActive) || !STATE.eq) return;
   const { Q, P } = STATE.eq;               // исходное равновесие E₀ (до вмешательства)
   const [px, py] = toPx(Q, P);
   const ox = sx(0), oy = sy(0);
@@ -2851,6 +2972,9 @@ function redrawAll() {
       drawMonopolyPoints();      // точки M и MR=MC, проекции, конкурентный ориентир
       if (STATE.monoCeilOn) drawMonoCeilingLine();   // линия видна, но не связывает
     }
+  } else if (STATE.scenario === 'shift') {
+    // Разложение сдвигов (Задача 3): исходные + сдвинутые кривые + E_d/E_s/E₁.
+    drawShiftScenario();
   } else if (STATE.scenario === 'elasticity') {
     // Эластичность спроса (Задача 2): зоны + кривые + равновесие + точка |Ed|.
     drawElasticityZones();
@@ -2878,6 +3002,9 @@ function redrawAll() {
     // чтобы не висела старая таблица из конкурентного режима.
     const itax = document.getElementById('info-tax');
     if (itax) itax.innerHTML = '<div class="muted">В режиме монополии вмешательство государства выключено.</div>';
+  } else if (STATE.scenario === 'shift') {
+    updateShiftPanel();
+    const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
   } else if (STATE.scenario === 'elasticity') {
     updateElasticityPanel();
     const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
@@ -3131,6 +3258,13 @@ function wireControls() {
   // Сценарии анализа рынка (Задачи 2–4): обычный / эластичность / сдвиги / внешний эффект.
   [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'], ['scn-ext', 'externality']]
     .forEach(([id, s]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setScenario(s)); });
+
+  // Сдвиги спроса и предложения (Задача 3): ползунки + числовые поля.
+  [['shiftD-slider', 'shiftD-input', 'D'], ['shiftS-slider', 'shiftS-input', 'S']].forEach(([sid, iid, which]) => {
+    const sl = document.getElementById(sid), inp = document.getElementById(iid);
+    if (sl) sl.addEventListener('input', () => setShift(which, parseFloat(sl.value)));
+    if (inp) inp.addEventListener('change', () => setShift(which, parseFloat(inp.value)));
+  });
 
   // Режим издержек (Задача 2): ввод TC/FC, кнопки «Построить» / «Стандартные», галочки кривых.
   const tcInp = document.getElementById('inp-tc');
