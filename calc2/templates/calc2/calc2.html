@@ -654,9 +654,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <label>КПВ страны: Y&nbsp;=&nbsp;f(X)</label>
             <input type="text" id="inp-ppft" value="100 - X" autocomplete="off">
           </div>
+          <!-- Задача 2: мировая цена — ползунок (основное управление) + синхронное поле. -->
+          <div class="field" id="ppft-price-field" style="margin-top:8px;">
+            <label>Мировая цена Px/Py = <b id="ppft-price-val">2</b></label>
+            <input type="range" id="ppft-price-slider" min="0.1" max="4" step="0.01" value="2">
+          </div>
           <div class="field">
-            <label>Мировая цена Px/Py</label>
-            <input type="number" id="inp-ppft-price" min="0" step="0.1" value="2">
+            <label>Px/Py (точное значение)</label>
+            <input type="number" id="inp-ppft-price" min="0.1" step="0.05" value="2">
           </div>
           <button class="btn" id="btn-ppft-apply">Построить КТВ</button>
           <div class="hint">КТВ — граница потребления при торговле по мировой цене.
@@ -676,10 +681,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <input type="text" id="inp-tb2" value="100 - 2*X" autocomplete="off">
           </div>
           <button class="btn" id="btn-tb-apply">Построить торговлю</button>
-          <!-- Задача 4: своя мировая цена (ручной ввод) + сброс к равновесной. -->
-          <div class="field" style="margin-top:8px;">
-            <label>Мировая цена Pw</label>
-            <input type="number" id="inp-tb-price" min="0" step="0.05" placeholder="равновесная (авто)">
+          <!-- Задача 2: своя мировая цена — ползунок + синхронное поле + сброс к равновесной. -->
+          <div class="field" id="tb-price-field" style="margin-top:8px;">
+            <label>Мировая цена Pw = <b id="tb-price-val">—</b></label>
+            <input type="range" id="tb-price-slider" min="0.1" max="4" step="0.01" value="1.41">
+          </div>
+          <div class="field">
+            <label>Pw (точное значение)</label>
+            <input type="number" id="inp-tb-price" min="0.1" step="0.05" placeholder="равновесная (авто)">
           </div>
           <button class="btn-sm" id="btn-tb-reset" style="margin-top:2px;">Сбросить к равновесной</button>
           <div class="hint">Линейные КПВ. Автарктическая цена X каждой страны — наклон её КПВ.
@@ -4291,13 +4300,20 @@ function cornerByValue(Xmax, Ymax, ratio) {
 // Расчёт КТВ: точка производства и линия торговых возможностей.
 function recomputePpfTrade() {
   STATE.ppfTradeData = null;
-  const r = compilePpf(STATE.ppftFormula), ratio = STATE.ppftPrice;
+  const r = compilePpf(STATE.ppftFormula);
   if (!r.compiled) { STATE.ppfTradeData = { ok: false, error: r.error }; return; }
-  if (!(ratio > 0)) { STATE.ppfTradeData = { ok: false, error: 'Мировая цена Px/Py должна быть больше 0.' }; return; }
   const f = (x) => ppfEvalWith(r.compiled, x);
   const c = classifyPpf(f);
   if (c.Xmax == null || !(c.Xmax > 0)) { STATE.ppfTradeData = { ok: false, error: 'Не удалось определить границы КПВ.' }; return; }
   const Xmax = c.Xmax, Ymax = f(0);
+  // Задача 2: зажать мировую цену в диапазон вокруг наклона КПВ — страховка от «улёта».
+  const sl = (c.type === 'linear' && c.b > 0) ? c.b : ((Ymax > 0 && Xmax > 0) ? Ymax / Xmax : 1);
+  const priceMin = 0.1, priceMax = Math.max(4 * sl, 0.2);
+  let ratio = STATE.ppftPrice;
+  if (!(ratio > 0)) ratio = sl;                         // запас на пустое/битое значение
+  ratio = Math.max(priceMin, Math.min(priceMax, ratio));
+  STATE.ppftPrice = Math.round(ratio * 100) / 100;
+  ratio = STATE.ppftPrice;
   let xp, yp, regime;
   if (c.type === 'ellipse' || c.type === 'parabola') {
     // Вогнутая: точка касания, где |наклон КПВ| = мировой цене.
@@ -4318,7 +4334,7 @@ function recomputePpfTrade() {
     const c0 = yp + ratio * xp;                     // Y-перехват КТВ: Y = c0 − ratio·X
     line = { intercept: c0, slope: ratio }; yint = c0; xint = c0 / ratio;
   }
-  STATE.ppfTradeData = { ok: true, c, Xmax, Ymax, ratio, xp, yp, regime, line, xint, yint, ppfPts: singlePpfPoints(f, Xmax) };
+  STATE.ppfTradeData = { ok: true, c, Xmax, Ymax, ratio, xp, yp, regime, line, xint, yint, priceMin, priceMax, ppfPts: singlePpfPoints(f, Xmax) };
   const xm = Math.max(Xmax, xint || 0), ym = Math.max(Ymax, yint || 0);
   setRanges(niceMax(xm * 1.05), niceMax(ym * 1.05));
 }
@@ -4333,30 +4349,8 @@ function drawPpfTrade(d) {
   if (d.line) {
     const pts = [[0, d.line.intercept], [d.xint, 0]];          // прямая КТВ от (0,c0) до (xint,0)
     g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#e05052').attr('stroke-width', 2.5).attr('d', line);
-    // Задача 4: линия мировой цены перетаскивается мышью — меняется Px/Py.
-    const hit = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', 'transparent').attr('stroke-width', 20).attr('d', line).style('cursor', 'grab');
-    attachPpftLineDrag(hit);
+    // Задача 2: линия цены больше не перетаскивается мышью — управление ползунком Px/Py.
   }
-}
-
-// Задача 4: перетаскивание линии КТВ (мировая цена Px/Py). Линия проходит через точку
-// производства (xp,yp) с наклоном −ratio. По положению курсора восстанавливаем
-// ratio = (yp − Yc) / (Xc − xp) — наклон прямой от точки производства к курсору.
-function attachPpftLineDrag(sel) {
-  sel.call(d3.drag().container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
-    .on('drag', (event) => {
-      const d = STATE.ppfTradeData; if (!d || !d.ok || d.xp == null) return;
-      const Xc = sx.invert(event.x), Yc = sy.invert(event.y);
-      const denom = Xc - d.xp;
-      if (Math.abs(denom) < 1e-6) return;
-      const ratio = (d.yp - Yc) / denom;
-      if (!(ratio > 0.01) || ratio > 1000) return;             // держим положительную разумную цену
-      STATE.ppftPrice = Math.round(ratio * 100) / 100;
-      const inp = document.getElementById('inp-ppft-price'); if (inp) inp.value = STATE.ppftPrice;
-      redrawAll();
-    })
-    .on('end', () => { document.body.style.cursor = ''; }));
 }
 
 // Подписи КТВ: точка производства, ярлыки кривых, перехваты (макс потребление).
@@ -4403,6 +4397,18 @@ function updatePpfTradePanel() {
   box.innerHTML = html;
 }
 
+// Задача 2: синхронизировать ползунок и поле мировой цены (сценарий А) с расчётом.
+// Ставит диапазон ползунка по бортам, его значение и число — без событий (не зациклить).
+function syncPpftPriceUI(d) {
+  const sl = document.getElementById('ppft-price-slider'),
+        num = document.getElementById('inp-ppft-price'),
+        val = document.getElementById('ppft-price-val');
+  if (!d || !d.ok) return;
+  if (sl) { sl.min = d.priceMin; sl.max = d.priceMax; sl.value = d.ratio; }
+  if (num) { num.min = d.priceMin; num.max = d.priceMax; num.value = d.ratio; }
+  if (val) val.textContent = fmt(d.ratio);
+}
+
 // Полная перерисовка под-режима «КТВ» (расчёт лёгкий — можно каждый раз).
 function redrawPpfTrade() {
   if (STATE.tradeScenario === 'B') { redrawTradeB(); return; }   // ЧК5: эндогенная мировая цена
@@ -4412,6 +4418,7 @@ function redrawPpfTrade() {
   const d = STATE.ppfTradeData;
   if (d && d.ok) { drawPpfTrade(d); drawPpfTradeMarks(d); }
   updatePpfTradePanel();
+  syncPpftPriceUI(d);
 }
 
 /* --- ЧК5: сценарий Б — эндогенная мировая цена двух стран -----------
@@ -4443,8 +4450,14 @@ function recomputeTradeB() {
   const lowCo = lowIs1 ? co1 : co2, highCo = lowIs1 ? co2 : co1;
   const bL = lowCo.b, bH = highCo.b;
   const Pweq = Math.sqrt(bL * bH);                     // равновесная (эндогенная) мировая цена в (bL, bH)
-  // Задача 4: своя цена (ручной ввод / перетаскивание) или равновесная.
-  const manual = (STATE.tbManualPrice != null && STATE.tbManualPrice > 0);
+  // Задача 2: зажать мировую цену в [0.1, 2×макс. автарктической] — страховка от «улёта».
+  const priceMin = 0.1, priceMax = 2 * Math.max(b1, b2);
+  // Своя цена (ручной ввод / ползунок) или равновесная.
+  let manual = (STATE.tbManualPrice != null && STATE.tbManualPrice > 0);
+  if (manual) {
+    const clamped = Math.max(priceMin, Math.min(priceMax, STATE.tbManualPrice));
+    STATE.tbManualPrice = Math.round(clamped * 1000) / 1000;
+  }
   const Pw = manual ? STATE.tbManualPrice : Pweq;
   const inInterval = (Pw > bL + 1e-9 && Pw < bH - 1e-9);
   // Подсветка нерыночной цены: вне интервала автаркических — одной стране торговать невыгодно.
@@ -4457,7 +4470,7 @@ function recomputeTradeB() {
   // Линия торговых возможностей через точку производства, наклон −Pw: Y = c0 − Pw·X.
   const cpf = (co) => { const c0 = co.prod[1] + Pw * co.prod[0]; return { intercept: c0, yint: c0, xint: c0 / Pw }; };
   lowCo.cpf = cpf(lowCo); highCo.cpf = cpf(highCo);
-  STATE.tradeBData = { ok: true, Pw, Pweq, manual, inInterval, noTradeMsg, bL, bH, b1, b2, co1, co2, lowIdx: lowCo.idx, highIdx: highCo.idx };
+  STATE.tradeBData = { ok: true, Pw, Pweq, manual, inInterval, noTradeMsg, priceMin, priceMax, bL, bH, b1, b2, co1, co2, lowIdx: lowCo.idx, highIdx: highCo.idx };
   const xm = Math.max(c1.Xmax, c2.Xmax, lowCo.cpf.xint, highCo.cpf.xint);
   const ym = Math.max(c1.Ymax, c2.Ymax, lowCo.cpf.yint, highCo.cpf.yint);
   setRanges(niceMax(xm * 1.08), niceMax(ym * 1.08));
@@ -4472,28 +4485,8 @@ function drawTradeB(d) {
     const cpfpts = [[0, co.cpf.yint], [co.cpf.xint, 0]];
     g.append('path').datum(cpfpts).attr('fill', 'none').attr('stroke', co.color).attr('stroke-width', 1.8)
       .attr('stroke-dasharray', '6 4').attr('opacity', 0.85).attr('d', line);
-    // Задача 4: линию торговых возможностей можно тянуть мышью — меняется мировая цена Pw.
-    const hit = g.append('path').datum(cpfpts).attr('fill', 'none').attr('stroke', 'transparent').attr('stroke-width', 18).attr('d', line).style('cursor', 'grab');
-    attachTbLineDrag(hit, co.prod);
+    // Задача 2: линии цены больше не перетаскиваются мышью — управление ползунком Pw.
   });
-}
-
-// Задача 4: перетаскивание линии торговых возможностей в сценарии Б — задаёт свою
-// мировую цену Pw. Линия проходит через точку производства prod с наклоном −Pw.
-function attachTbLineDrag(sel, prod) {
-  sel.call(d3.drag().container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
-    .on('drag', (event) => {
-      const Xc = sx.invert(event.x), Yc = sy.invert(event.y);
-      const denom = Xc - prod[0];
-      if (Math.abs(denom) < 1e-6) return;
-      const ratio = (prod[1] - Yc) / denom;
-      if (!(ratio > 0.01) || ratio > 1000) return;
-      STATE.tbManualPrice = Math.round(ratio * 1000) / 1000;
-      const inp = document.getElementById('inp-tb-price'); if (inp) inp.value = STATE.tbManualPrice;
-      redrawAll();
-    })
-    .on('end', () => { document.body.style.cursor = ''; }));
 }
 
 // Подписи сценария Б: точки производства (специализация), ярлыки стран и КТВ.
@@ -4530,9 +4523,20 @@ function updateTradeBPanel() {
   } else {
     html += `<div class="hint" style="margin-top:6px;">Мировая цена Pw&nbsp;=&nbsp;${fmt(d.Pw)} лежит между автарктическими
       (${fmt(d.bL)} и ${fmt(d.bH)}) — её определяет сам рынок. Каждая страна специализируется по сравнительному
-      преимуществу; пунктир — линии торговых возможностей, они выше КПВ (обе страны выигрывают). Линию можно тянуть мышью.</div>`;
+      преимуществу; пунктир — линии торговых возможностей, они выше КПВ (обе страны выигрывают). Цену задаёт ползунок.</div>`;
   }
   box.innerHTML = html;
+}
+
+// Задача 2: синхронизировать ползунок и поле мировой цены (сценарий Б) с расчётом.
+function syncTbPriceUI(d) {
+  const sl = document.getElementById('tb-price-slider'),
+        num = document.getElementById('inp-tb-price'),
+        val = document.getElementById('tb-price-val');
+  if (!d || !d.ok) return;
+  if (sl) { sl.min = d.priceMin; sl.max = d.priceMax; sl.value = d.Pw; }
+  if (num) { num.min = d.priceMin; num.max = d.priceMax; if (d.manual) num.value = d.Pw; else num.value = ''; }
+  if (val) val.textContent = fmt(d.Pw);
 }
 
 // Полная перерисовка сценария Б.
@@ -4543,6 +4547,7 @@ function redrawTradeB() {
   const d = STATE.tradeBData;
   if (d && d.ok) { drawTradeB(d); drawTradeBMarks(d); }
   updateTradeBPanel();
+  syncTbPriceUI(d);
 }
 
 // Переключатель сценария торговли А / Б (ЧК5).
@@ -5546,6 +5551,13 @@ function wireControls() {
   if (tApply) tApply.addEventListener('click', applyPpfTrade);
   if (ppftInp) ppftInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpfTrade(); });
   if (ppftPriceInp) ppftPriceInp.addEventListener('change', applyPpfTrade);
+  // Задача 2: ползунок мировой цены Px/Py — основное управление, синхронен с полем.
+  const ppftSlider = document.getElementById('ppft-price-slider');
+  if (ppftSlider) ppftSlider.addEventListener('input', () => {
+    const v = parseFloat(ppftSlider.value); if (isNaN(v)) return;
+    STATE.ppftPrice = v;       // фактическое значение зажмётся в recomputePpfTrade
+    redrawAll();
+  });
 
   // ЧК5: сценарий торговли А / Б + две страны (эндогенная мировая цена).
   const tradeA = document.getElementById('trade-a'), tradeB = document.getElementById('trade-b');
@@ -5560,17 +5572,22 @@ function wireControls() {
   const tbApply = document.getElementById('btn-tb-apply');
   if (tbApply) tbApply.addEventListener('click', applyTradeB);
   [tb1, tb2].forEach(el => { if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') applyTradeB(); }); });
-  // Задача 4: своя мировая цена + сброс к равновесной.
+  // Задача 2: своя мировая цена — ползунок + поле + сброс к равновесной (всё синхронно).
   const tbPrice = document.getElementById('inp-tb-price');
   if (tbPrice) tbPrice.addEventListener('change', () => {
     const v = parseFloat(tbPrice.value);
     STATE.tbManualPrice = (!isNaN(v) && v > 0) ? v : null;
     redrawAll();
   });
+  const tbSlider = document.getElementById('tb-price-slider');
+  if (tbSlider) tbSlider.addEventListener('input', () => {
+    const v = parseFloat(tbSlider.value); if (isNaN(v)) return;
+    STATE.tbManualPrice = v;   // фактическое значение зажмётся в recomputeTradeB
+    redrawAll();
+  });
   const tbReset = document.getElementById('btn-tb-reset');
   if (tbReset) tbReset.addEventListener('click', () => {
-    STATE.tbManualPrice = null;
-    const tp = document.getElementById('inp-tb-price'); if (tp) tp.value = '';
+    STATE.tbManualPrice = null;   // вернуться к равновесной; ползунок/поле обновит syncTbPriceUI
     redrawAll();
   });
 
