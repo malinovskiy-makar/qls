@@ -231,6 +231,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="hint" id="mono-hint" style="display:none;">Монополист выпускает там, где <b>MR&nbsp;=&nbsp;MC</b>,
         и берёт цену с кривой спроса (выше предельных издержек). Нужны: спрос (роль D) и предельные издержки
         (роль MC, либо TC, либо S как MC). Серым — потери общества (DWL) против конкуренции.</div>
+      <!-- Галочки областей монополии (Задача 1). Видны только в режиме монополии. -->
+      <div id="mono-areas-chk" style="display:none;margin-top:8px;">
+        <label class="chk"><input type="checkbox" id="chk-mono-cs" checked>
+          <span class="swatch" style="background:#4f7cff"></span> Показывать CS</label>
+        <label class="chk"><input type="checkbox" id="chk-mono-vc" checked>
+          <span class="swatch" style="background:#94a3b8"></span> Показывать VC</label>
+        <label class="chk"><input type="checkbox" id="chk-mono-ps" checked>
+          <span class="swatch" style="background:#e05052"></span> Показывать PS (TR&nbsp;−&nbsp;VC)</label>
+      </div>
       <div id="info-mono" style="margin-top:8px;"></div>
     </div>
 
@@ -300,6 +309,10 @@ const STATE = {
   pReg: 0,           // регулируемая цена (для потолка / пола); 0 = не задана
   showGhost: true,   // показывать бледное исходное состояние «было → стало»
   market: 'comp',    // структура рынка: 'comp' — конкуренция, 'monopoly' — монополия (MR=MC)
+  // Галочки областей монополии (Задача 1): CS над ценой, VC под MC, PS между MC и ценой.
+  showMonoCS: true,
+  showMonoVC: true,
+  showMonoPS: true,
 };
 
 /* ---------------------------------------------------------------------
@@ -719,10 +732,15 @@ function recompute() {
         const lo = Math.min(Qm, Qc), hi = Math.max(Qm, Qc);
         dwl = Math.abs(integrate(q => evalCurve(STATE.D, q) - mcAt(q), lo, hi));
       }
-      let profit = null;                           // прибыль — только если задана ATC
+      let profit = null;                           // прибыль (TR − TC) — только если задана ATC
       const ATC = curveByRole('atc');
       if (ATC) { const a = evalCurve(ATC, Qm); if (!isNaN(a)) profit = (Pm - a) * Qm; }
-      STATE.mono = { Qm, Pm, mcAtQm, Qc, Pc, dwl, profit };
+      // Области монополии (Задача 1) — все численным интегрированием от 0 до Qm.
+      // Под спросом до Qm три слоя без перекрытия: VC (под MC), PS (MC..Pm), CS (Pm..D).
+      const csM = integrate(q => evalCurve(STATE.D, q) - Pm, 0, Qm);  // ∫ (D − Pm) dQ — излишек потребителя
+      const vcM = integrate(q => mcAt(q), 0, Qm);                     // ∫ MC dQ — переменные издержки (VC(0)=0)
+      const psM = integrate(q => Pm - mcAt(q), 0, Qm);               // ∫ (Pm − MC) dQ = TR − VC — излишек производителя
+      STATE.mono = { Qm, Pm, mcAtQm, Qc, Pc, dwl, profit, csM, vcM, psM };
     }
   }
 }
@@ -1218,16 +1236,39 @@ function marginalRevenue(D, q) {
   return (a - b) / (2 * h);
 }
 
-// Заливка DWL монополии (между D и MC от Qm до Qc).
+// Заливки монополии: области CS / VC / PS до Qm (Задача 1) и DWL (между D и MC от Qm до Qc).
 function drawMonopolyAreas() {
-  if (!STATE.mono || STATE.mono.Qc == null) return;
+  if (!STATE.mono) return;
   const m = STATE.mono;
-  const lo = Math.min(m.Qm, m.Qc), hi = Math.max(m.Qm, m.Qc);
-  if (hi <= lo) return;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
-  const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
-  const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(STATE.D, d)));
-  g.append('path').datum(samp).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28);
+  const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
+
+  // Три области под спросом от 0 до Qm: тремя слоями (накладываются только границами).
+  if (m.Qm > 0) {
+    const s1 = samp(0, m.Qm);
+    if (STATE.showMonoVC) {   // VC — под кривой MC (от оси P=0 до MC). Нейтральный серо-голубой.
+      const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d)));
+      g.append('path').datum(s1).attr('d', a).attr('fill', '#94a3b8').attr('opacity', 0.22);
+    }
+    if (STATE.showMonoPS) {   // PS (TR − VC) — между MC (низ) и ценой Pm (верх). Красный, как PS конкуренции.
+      const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(m.Pm));
+      g.append('path').datum(s1).attr('d', a).attr('fill', '#e05052').attr('opacity', 0.16);
+    }
+    if (STATE.showMonoCS) {   // CS — между ценой Pm (низ) и спросом D (верх). Синий, как CS конкуренции.
+      const a = d3.area().x(d => sx(d)).y0(sy(m.Pm)).y1(d => sy(evalCurve(STATE.D, d)));
+      g.append('path').datum(s1).attr('d', a).attr('fill', '#4f7cff').attr('opacity', 0.16);
+    }
+  }
+
+  // DWL — между D и MC от Qm до Qc (потери против конкуренции), как раньше.
+  if (m.Qc != null) {
+    const lo = Math.min(m.Qm, m.Qc), hi = Math.max(m.Qm, m.Qc);
+    if (hi > lo) {
+      const s2 = samp(lo, hi);
+      const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(STATE.D, d)));
+      g.append('path').datum(s2).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28);
+    }
+  }
 }
 
 // Кривая MR (пунктир) и — если MC выведена из TC — сама кривая MC.
@@ -1307,7 +1348,12 @@ function updateMonoPanel() {
     html += `<div class="stat"><span>Pc (конкуренция)</span><b>${fmt(m.Pc)}</b></div>`;
   }
   if (m.dwl != null) html += `<div class="stat"><span>DWL (потери)</span><b>${fmt(m.dwl)}</b></div>`;
-  if (m.profit != null) html += `<div class="stat"><span>Прибыль</span><b>${fmt(m.profit)}</b></div>`;
+  // Области (Задача 1). PS — это излишек производителя (TR − VC), НЕ прибыль:
+  // прибыль = TR − TC, и от PS она отличается на постоянные издержки FC.
+  html += `<div class="stat"><span>CS (потребитель)</span><b>${fmt(m.csM)}</b></div>`;
+  html += `<div class="stat"><span>VC (перем. издержки)</span><b>${fmt(m.vcM)}</b></div>`;
+  html += `<div class="stat"><span>Излишек произв. (TR&nbsp;−&nbsp;VC)</span><b>${fmt(m.psM)}</b></div>`;
+  if (m.profit != null) html += `<div class="stat"><span>Прибыль (TR&nbsp;−&nbsp;TC)</span><b>${fmt(m.profit)}</b></div>`;
   box.innerHTML = html;
 }
 
@@ -1319,6 +1365,9 @@ function setMarket(mode) {
   if (mo) mo.classList.toggle('active', mode === 'monopoly');
   const mh = document.getElementById('mono-hint');
   if (mh) mh.style.display = (mode === 'monopoly') ? '' : 'none';
+  // Галочки областей монополии (Задача 1) видны только в режиме монополии.
+  const ma = document.getElementById('mono-areas-chk');
+  if (ma) ma.style.display = (mode === 'monopoly') ? '' : 'none';
   redrawAll();
 }
 
@@ -1500,6 +1549,13 @@ function wireControls() {
   const ps = document.getElementById('chk-ps');
   cs.addEventListener('change', () => { STATE.showCS = cs.checked; redrawAll(); });
   ps.addEventListener('change', () => { STATE.showPS = ps.checked; redrawAll(); });
+
+  // Галочки областей монополии (Задача 1): CS / VC / PS.
+  [['chk-mono-cs', 'showMonoCS'], ['chk-mono-vc', 'showMonoVC'], ['chk-mono-ps', 'showMonoPS']]
+    .forEach(([id, key]) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); });
+    });
 
   // Галочка «было → стало» (бледное исходное состояние при вмешательстве).
   const ghost = document.getElementById('chk-ghost');
