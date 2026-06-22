@@ -2121,6 +2121,8 @@ function setMarket(mode) {
   if (mo) mo.classList.toggle('active', mode === 'monopoly');
   const mh = document.getElementById('mono-hint');
   if (mh) mh.style.display = (mode === 'monopoly') ? '' : 'none';
+  // Вход в монополию — подставить стандартные кривые/поля, если их нет (Задача 1).
+  if (mode === 'monopoly') ensureMonopolyPreset();
   // Видимость под-режима монополии и его панелей (галочки областей / потолок / дискриминация / ломаный).
   applyMonoVisibility();
   redrawAll();
@@ -2601,10 +2603,44 @@ function applyMonoVisibility() {
   show('mono-kink-pane', inMono && mm === 'kinked');
 }
 
+// Стандартный пресет при входе в монополию (Задача 1): ставится ТОЛЬКО если нужного нет.
+// «Обычная»/«Дискр.1» работают на кривых D и MC из списка; «Дискр.3»/«Ломаный» — на полях формул.
+// Не перетирает уже заданное пользователем.
+function ensureMonopolyCurves() {
+  if (!curveByRole('demand')) {                       // нет спроса → добавить D = 100 − Q
+    addCurve('100 - Q'); const c = STATE.curves[STATE.curves.length - 1]; if (c) setRole(c, 'demand');
+  }
+  if (!mcSourceCurve() && !curveByRole('tc')) {        // нет источника MC (mc/S/TC) → добавить MC = 20
+    addCurve('20'); const c = STATE.curves[STATE.curves.length - 1]; if (c) setRole(c, 'mc');
+  }
+}
+// Заполнить поле формулы стандартным значением, только если оно пустое (+ обновить input).
+function fillIfEmpty(key, def, id) {
+  if (!((STATE[key] || '').trim())) { STATE[key] = def; const e = document.getElementById(id); if (e) e.value = def; }
+}
+function ensureD3Fields() {
+  fillIfEmpty('d3D1', '100 - Q', 'inp-d3-1');
+  fillIfEmpty('d3D2', '80 - 2*Q', 'inp-d3-2');
+  fillIfEmpty('d3MC', '20', 'inp-d3-mc');
+}
+function ensureKinkFields() {
+  if (STATE.kinkInput === 'piecewise') { fillIfEmpty('kpD1', '100 - Q', 'inp-kp-1'); fillIfEmpty('kpD2', '120 - 1.5*Q', 'inp-kp-2'); }
+  else { fillIfEmpty('kiD1', '100 - Q', 'inp-ki-1'); fillIfEmpty('kiD2', '60 - Q', 'inp-ki-2'); }
+  fillIfEmpty('kinkMC', '20', 'inp-kink-mc');
+}
+// Подставить стандартное по текущему под-режиму монополии (диспетчер).
+function ensureMonopolyPreset() {
+  const mm = STATE.monoMode;
+  if (mm === 'discr3') ensureD3Fields();
+  else if (mm === 'kinked') ensureKinkFields();
+  else ensureMonopolyCurves();                         // simple / discr1 — кривые D и MC
+}
+
 function setMonoMode(mm) {
   STATE.monoMode = mm;
   [['mm-simple', 'simple'], ['mm-d1', 'discr1'], ['mm-d3', 'discr3'], ['mm-kink', 'kinked']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === mm); });
+  if (STATE.market === 'monopoly') ensureMonopolyPreset();   // стандартный пресет, если пусто (Задача 1)
   applyMonoVisibility();
   redrawAll();
 }
@@ -2617,6 +2653,7 @@ function setKinkInput(which) {
   const ind = document.getElementById('kink-indiv'), pie = document.getElementById('kink-piece');
   if (ind) ind.style.display = (which === 'individual') ? '' : 'none';
   if (pie) pie.style.display = (which === 'piecewise') ? '' : 'none';
+  if (STATE.market === 'monopoly' && STATE.monoMode === 'kinked') ensureKinkFields();   // стандартный пример, если пусто (Задача 1)
   redrawAll();
 }
 
