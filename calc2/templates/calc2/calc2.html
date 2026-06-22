@@ -627,22 +627,48 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div id="info-ppfsum" style="margin-top:8px;"></div>
       </div>
 
-      <!-- Под-режим «КТВ — торговые возможности» (Задача 2) -->
+      <!-- Под-режим «КТВ / торговля». Сценарий А — мировая цена задана извне (исходный);
+           сценарий Б (ЧК5) — две страны сами определяют равновесную мировую цену. -->
       <div id="ppf-pane-trade" style="display:none;">
-        <div class="field">
-          <label>КПВ страны: Y&nbsp;=&nbsp;f(X)</label>
-          <input type="text" id="inp-ppft" value="100 - X" autocomplete="off">
+        <div class="seg" style="margin-bottom:8px;">
+          <button class="seg-btn active" id="trade-a">Сценарий А (цена задана)</button>
+          <button class="seg-btn" id="trade-b">Сценарий Б (цена эндогенна)</button>
         </div>
-        <div class="field">
-          <label>Мировая цена Px/Py</label>
-          <input type="number" id="inp-ppft-price" min="0" step="0.1" value="2">
+        <!-- Сценарий А — одна страна, мировая цена Px/Py вводится. -->
+        <div id="trade-pane-a">
+          <div class="field">
+            <label>КПВ страны: Y&nbsp;=&nbsp;f(X)</label>
+            <input type="text" id="inp-ppft" value="100 - X" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>Мировая цена Px/Py</label>
+            <input type="number" id="inp-ppft-price" min="0" step="0.1" value="2">
+          </div>
+          <button class="btn" id="btn-ppft-apply">Построить КТВ</button>
+          <div class="hint">КТВ — граница потребления при торговле по мировой цене.
+            Линейная КПВ → полная специализация (угол). Нелинейная → точка касания, где
+            |наклон КПВ|&nbsp;=&nbsp;Px/Py. Линия КТВ лежит выше КПВ — это выигрыш от торговли.</div>
+          <div class="error" id="ppft-error"></div>
+          <div id="info-ppft" style="margin-top:8px;"></div>
         </div>
-        <button class="btn" id="btn-ppft-apply">Построить КТВ</button>
-        <div class="hint">КТВ — граница потребления при торговле по мировой цене.
-          Линейная КПВ → полная специализация (угол). Нелинейная → точка касания, где
-          |наклон КПВ|&nbsp;=&nbsp;Px/Py. Линия КТВ лежит выше КПВ — это выигрыш от торговли.</div>
-        <div class="error" id="ppft-error"></div>
-        <div id="info-ppft" style="margin-top:8px;"></div>
+        <!-- Сценарий Б — две страны, мировая цена находится самим рынком (ЧК5). -->
+        <div id="trade-pane-b" style="display:none;">
+          <div class="field">
+            <label>КПВ страны&nbsp;1: Y&nbsp;=&nbsp;f₁(X)</label>
+            <input type="text" id="inp-tb1" value="100 - X" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>КПВ страны&nbsp;2: Y&nbsp;=&nbsp;f₂(X)</label>
+            <input type="text" id="inp-tb2" value="100 - 2*X" autocomplete="off">
+          </div>
+          <button class="btn" id="btn-tb-apply">Построить торговлю</button>
+          <div class="hint">Линейные КПВ. Автарктическая цена X каждой страны — наклон её КПВ.
+            Мировая цена Pw устанавливается МЕЖДУ автарктическими (эндогенно). Страна с меньшими
+            альт. издержками X специализируется на X и экспортирует его; другая — на Y. Линии
+            торговых возможностей обеих стран лежат вне их КПВ (выигрыш от торговли).</div>
+          <div class="error" id="tb-error" style="display:none;"></div>
+          <div id="info-tb" style="margin-top:8px;"></div>
+        </div>
       </div>
     </div>
 
@@ -785,6 +811,12 @@ const STATE = {
   ppftFormula: '100 - X',// КПВ страны (режим КТВ)
   ppftPrice: 2,          // мировое соотношение цен Px/Py (режим КТВ)
   ppfTradeData: null,    // результат расчёта КТВ
+  // ЧК5: сценарий торговли. 'A' — мировая цена задана (исходный КТВ),
+  // 'B' — две страны сами определяют равновесную мировую цену (эндогенно).
+  tradeScenario: 'A',
+  tbF1: '100 - X',       // КПВ страны 1 (сценарий Б)
+  tbF2: '100 - 2*X',     // КПВ страны 2 (сценарий Б)
+  tradeBData: null,      // результат расчёта сценария Б
   // Неравенство доходов (ЧК1–3). Оси — доля населения / доля дохода (обе 0..100 %).
   ineqInput: 'groups',   // способ ввода: 'groups' / 'incomes' / 'formula'
   ineqGroupN: 5,         // число групп равного населения (5 квинтилей / 10 децилей)
@@ -4327,12 +4359,120 @@ function updatePpfTradePanel() {
 
 // Полная перерисовка под-режима «КТВ» (расчёт лёгкий — можно каждый раз).
 function redrawPpfTrade() {
+  if (STATE.tradeScenario === 'B') { redrawTradeB(); return; }   // ЧК5: эндогенная мировая цена
   recomputePpfTrade();
   makeScales();
   svg.selectAll('*').remove(); addDefs(); drawGrid(); drawAxes('X', 'Y');
   const d = STATE.ppfTradeData;
   if (d && d.ok) { drawPpfTrade(d); drawPpfTradeMarks(d); }
   updatePpfTradePanel();
+}
+
+/* --- ЧК5: сценарий Б — эндогенная мировая цена двух стран -----------
+   Две страны с КПВ. Автарктическая цена X каждой = наклон её КПВ. Равновесная
+   мировая цена Pw устанавливается МЕЖДУ автарктическими ценами (среднее
+   геометрическое — строго внутри интервала). Специализация по сравнительному
+   преимуществу: страна с меньшими альт. издержками X специализируется на X и
+   экспортирует его, другая — на Y. Линии торговых возможностей при Pw лежат вне
+   КПВ обеих стран (выигрыш от торговли). Полноценный баланс спроса-предложения
+   требует функций спроса (их нет) — берём разумную минимально достаточную
+   версию: Pw эндогенна и в правильном интервале, а не задана извне. */
+function recomputeTradeB() {
+  STATE.tradeBData = null;
+  const r1 = compilePpf(STATE.tbF1), r2 = compilePpf(STATE.tbF2);
+  if (!r1.compiled || !r2.compiled) { STATE.tradeBData = { ok: false, error: r1.error || r2.error }; return; }
+  const f1 = (x) => ppfEvalWith(r1.compiled, x), f2 = (x) => ppfEvalWith(r2.compiled, x);
+  const c1 = classifyPpf(f1), c2 = classifyPpf(f2);
+  if (c1.Xmax == null || c2.Xmax == null || !(c1.Xmax > 0) || !(c2.Xmax > 0)) {
+    STATE.tradeBData = { ok: false, error: 'Не удалось определить границы КПВ (нужны убывающие кривые, пересекающие оси).' };
+    return;
+  }
+  // Автарктическая цена X = альт. издержки X. Для линейной — наклон c.b; иначе среднее Ymax/Xmax.
+  const b1 = (c1.type === 'linear') ? c1.b : (c1.Ymax / c1.Xmax);
+  const b2 = (c2.type === 'linear') ? c2.b : (c2.Ymax / c2.Xmax);
+  if (Math.abs(b1 - b2) < 1e-9) { STATE.tradeBData = { ok: false, error: 'Альтернативные издержки стран совпали — торговать незачем.' }; return; }
+  const co1 = { idx: 1, c: c1, b: b1, color: '#4f7cff', ppts: singlePpfPoints(f1, c1.Xmax) };
+  const co2 = { idx: 2, c: c2, b: b2, color: '#e05052', ppts: singlePpfPoints(f2, c2.Xmax) };
+  const lowIs1 = b1 < b2;                              // у кого меньше альт. цена X — тот экспортирует X
+  const lowCo = lowIs1 ? co1 : co2, highCo = lowIs1 ? co2 : co1;
+  const bL = lowCo.b, bH = highCo.b;
+  const Pw = Math.sqrt(bL * bH);                       // эндогенная мировая цена, строго в (bL, bH)
+  // Специализация (углы линейной КПВ): низкая страна → весь X, высокая → весь Y.
+  lowCo.prod = [lowCo.c.Xmax, 0]; lowCo.exports = 'X';
+  highCo.prod = [0, highCo.c.Ymax]; highCo.exports = 'Y';
+  // Линия торговых возможностей через точку производства, наклон −Pw: Y = c0 − Pw·X.
+  const cpf = (co) => { const c0 = co.prod[1] + Pw * co.prod[0]; return { intercept: c0, yint: c0, xint: c0 / Pw }; };
+  lowCo.cpf = cpf(lowCo); highCo.cpf = cpf(highCo);
+  STATE.tradeBData = { ok: true, Pw, bL, bH, b1, b2, co1, co2, lowIdx: lowCo.idx, highIdx: highCo.idx };
+  const xm = Math.max(c1.Xmax, c2.Xmax, lowCo.cpf.xint, highCo.cpf.xint);
+  const ym = Math.max(c1.Ymax, c2.Ymax, lowCo.cpf.yint, highCo.cpf.yint);
+  setRanges(niceMax(xm * 1.08), niceMax(ym * 1.08));
+}
+
+// Отрисовка сценария Б: КПВ обеих стран (сплошные) + линии торговых возможностей (пунктир).
+function drawTradeB(d) {
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y(p => sy(p[1]));
+  [d.co1, d.co2].forEach(co => {
+    g.append('path').datum(co.ppts).attr('fill', 'none').attr('stroke', co.color).attr('stroke-width', 2.2).attr('d', line);
+    const cpfpts = [[0, co.cpf.yint], [co.cpf.xint, 0]];
+    g.append('path').datum(cpfpts).attr('fill', 'none').attr('stroke', co.color).attr('stroke-width', 1.8)
+      .attr('stroke-dasharray', '6 4').attr('opacity', 0.85).attr('d', line);
+  });
+}
+
+// Подписи сценария Б: точки производства (специализация), ярлыки стран и КТВ.
+function drawTradeBMarks(d) {
+  const ox = sx(0), oy = sy(0), g = svg.append('g');
+  [d.co1, d.co2].forEach(co => {
+    const px = sx(co.prod[0]), py = sy(co.prod[1]);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', co.color).attr('stroke', '#fff').attr('stroke-width', 2);
+    g.append('text').attr('x', px + 8).attr('y', py + (co.prod[1] > 0 ? -8 : 16)).attr('font-size', 11).attr('font-weight', 600).attr('fill', co.color)
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Стр.' + co.idx + ' (эксп. ' + co.exports + ')');
+    // ярлык КТВ у середины линии торговых возможностей
+    const mx = co.cpf.xint * 0.5, my = co.cpf.yint * 0.5;
+    g.append('text').attr('x', sx(mx)).attr('y', sy(my) - 4).attr('font-size', 10).attr('fill', co.color).attr('opacity', 0.9)
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2).text('КТВ' + co.idx);
+  });
+}
+
+// Табло сценария Б.
+function updateTradeBPanel() {
+  const box = document.getElementById('info-tb'); if (!box) return;
+  const d = STATE.tradeBData;
+  if (!d) { box.innerHTML = '<div class="muted">Введите две КПВ и нажмите «Построить торговлю».</div>'; return; }
+  if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось.') + '</div>'; return; }
+  let html = '';
+  html += `<div class="stat"><span>Автарк. цена X стр.1</span><b>${fmt(d.b1)}</b></div>`;
+  html += `<div class="stat"><span>Автарк. цена X стр.2</span><b>${fmt(d.b2)}</b></div>`;
+  html += `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(d.Pw)}</b></div>`;
+  html += `<div class="stat"><span>Экспортируют</span><b>Стр.${d.lowIdx} → X, Стр.${d.highIdx} → Y</b></div>`;
+  html += `<div class="hint" style="margin-top:6px;">Мировая цена Pw&nbsp;=&nbsp;${fmt(d.Pw)} лежит между автарктическими
+    (${fmt(d.bL)} и ${fmt(d.bH)}) — её определяет сам рынок. Каждая страна специализируется по сравнительному
+    преимуществу; пунктир — линии торговых возможностей, они выше КПВ (обе страны выигрывают).</div>`;
+  box.innerHTML = html;
+}
+
+// Полная перерисовка сценария Б.
+function redrawTradeB() {
+  recomputeTradeB();
+  makeScales();
+  svg.selectAll('*').remove(); addDefs(); drawGrid(); drawAxes('X', 'Y');
+  const d = STATE.tradeBData;
+  if (d && d.ok) { drawTradeB(d); drawTradeBMarks(d); }
+  updateTradeBPanel();
+}
+
+// Переключатель сценария торговли А / Б (ЧК5).
+function setTradeScenario(s) {
+  STATE.tradeScenario = s;
+  const a = document.getElementById('trade-a'), b = document.getElementById('trade-b');
+  if (a) a.classList.toggle('active', s === 'A');
+  if (b) b.classList.toggle('active', s === 'B');
+  const pa = document.getElementById('trade-pane-a'), pb = document.getElementById('trade-pane-b');
+  if (pa) pa.style.display = (s === 'A') ? '' : 'none';
+  if (pb) pb.style.display = (s === 'B') ? '' : 'none';
+  redrawAll();
 }
 
 // Переключение под-режима КПВ (одна / сумма / КТВ): показ нужной панели + перерисовка.
@@ -5254,6 +5394,20 @@ function wireControls() {
   if (tApply) tApply.addEventListener('click', applyPpfTrade);
   if (ppftInp) ppftInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpfTrade(); });
   if (ppftPriceInp) ppftPriceInp.addEventListener('change', applyPpfTrade);
+
+  // ЧК5: сценарий торговли А / Б + две страны (эндогенная мировая цена).
+  const tradeA = document.getElementById('trade-a'), tradeB = document.getElementById('trade-b');
+  if (tradeA) tradeA.addEventListener('click', () => setTradeScenario('A'));
+  if (tradeB) tradeB.addEventListener('click', () => setTradeScenario('B'));
+  const tb1 = document.getElementById('inp-tb1'), tb2 = document.getElementById('inp-tb2');
+  function applyTradeB() {
+    if (tb1) STATE.tbF1 = (tb1.value || '').trim();
+    if (tb2) STATE.tbF2 = (tb2.value || '').trim();
+    redrawAll();
+  }
+  const tbApply = document.getElementById('btn-tb-apply');
+  if (tbApply) tbApply.addEventListener('click', applyTradeB);
+  [tb1, tb2].forEach(el => { if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') applyTradeB(); }); });
 
   // Готовые сцены (Задача 4): заполнение типовой задачи одним кликом.
   [['scene-sd', 'sd'], ['scene-tax', 'tax'], ['scene-ceil', 'ceil'],
