@@ -317,6 +317,72 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="hint" id="mono-hint" style="display:none;">Монополист выпускает там, где <b>MR&nbsp;=&nbsp;MC</b>,
         и берёт цену с кривой спроса (выше предельных издержек). Нужны: спрос (роль D) и предельные издержки
         (роль MC, либо TC, либо S как MC). Серым — потери общества (DWL) против конкуренции.</div>
+      <!-- Под-режимы монополии (Чекпоинт 2): обычная / дискриминация 1 / дискриминация 3 / ломаный спрос.
+           Виден только в режиме монополии. -->
+      <div id="mono-submode" style="display:none;margin-top:8px;">
+        <div class="seg">
+          <button class="seg-btn active" id="mm-simple">Обычная</button>
+          <button class="seg-btn" id="mm-d1">Дискр.1</button>
+          <button class="seg-btn" id="mm-d3">Дискр.3</button>
+          <button class="seg-btn" id="mm-kink">Ломаный</button>
+        </div>
+      </div>
+      <!-- Панель дискриминации 1-й степени (Задача 4): использует D и MC из списка кривых. -->
+      <div id="mono-d1-pane" style="display:none;margin-top:8px;">
+        <div class="hint">Совершенная (1-й степени) дискриминация: монополист продаёт каждую единицу
+          по её цене спроса до точки, где спрос&nbsp;=&nbsp;MC. Весь излишек достаётся фирме:
+          <b>CS&nbsp;=&nbsp;0</b>, <b>DWL&nbsp;=&nbsp;0</b>, выпуск&nbsp;=&nbsp;конкурентному.
+          Нужны: спрос (роль D) и предельные издержки (роль MC / S / TC) в списке кривых.</div>
+      </div>
+      <!-- Панель дискриминации 3-й степени (Задача 5): два рынка + общий MC. -->
+      <div id="mono-d3-pane" style="display:none;margin-top:8px;">
+        <div class="field"><label>Спрос рынка&nbsp;1: P&nbsp;=&nbsp;f₁(Q)</label>
+          <input type="text" id="inp-d3-1" value="100 - Q" autocomplete="off"></div>
+        <div class="field"><label>Спрос рынка&nbsp;2: P&nbsp;=&nbsp;f₂(Q)</label>
+          <input type="text" id="inp-d3-2" value="80 - 2*Q" autocomplete="off"></div>
+        <div class="field"><label>Общие предельные издержки MC (число или f(Q))</label>
+          <input type="text" id="inp-d3-mc" value="20" autocomplete="off"></div>
+        <button class="btn" id="btn-d3-apply">Построить</button>
+        <div class="hint">Фирма распределяет выпуск так, что MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.
+          На менее эластичном рынке цена выше. Два мини-графика рынков — бок о бок.</div>
+        <div class="error" id="d3-error" style="display:none;"></div>
+        <div id="info-d3" style="margin-top:8px;"></div>
+      </div>
+      <!-- Панель ломаного спроса (Задача 6): два способа ввода. -->
+      <div id="mono-kink-pane" style="display:none;margin-top:8px;">
+        <div class="seg">
+          <button class="seg-btn active" id="ki-indiv">Инд. спросы</button>
+          <button class="seg-btn" id="ki-piece">Кусочный</button>
+        </div>
+        <!-- Способ 1: индивидуальные спросы → горизонтальное сложение. -->
+        <div id="kink-indiv" style="margin-top:8px;">
+          <div class="field"><label>Спрос&nbsp;1: P&nbsp;=&nbsp;f₁(Q)</label>
+            <input type="text" id="inp-ki-1" value="100 - Q" autocomplete="off"></div>
+          <div class="field"><label>Спрос&nbsp;2: P&nbsp;=&nbsp;f₂(Q)</label>
+            <input type="text" id="inp-ki-2" value="60 - Q" autocomplete="off"></div>
+          <div class="field"><label>Спрос&nbsp;3 (необязательно)</label>
+            <input type="text" id="inp-ki-3" value="" autocomplete="off"></div>
+          <div class="hint">Рыночный спрос&nbsp;=&nbsp;горизонтальная сумма (при каждой цене складываем
+            объёмы). Изломы — там, где очередной потребитель выходит на рынок.</div>
+        </div>
+        <!-- Способ 2: рыночный спрос двумя кусками (стыкуются в точке пересечения). -->
+        <div id="kink-piece" style="display:none;margin-top:8px;">
+          <div class="field"><label>Верхний кусок (малые Q): P&nbsp;=&nbsp;f₁(Q)</label>
+            <input type="text" id="inp-kp-1" value="100 - Q" autocomplete="off"></div>
+          <div class="field"><label>Нижний кусок (большие Q): P&nbsp;=&nbsp;f₂(Q)</label>
+            <input type="text" id="inp-kp-2" value="120 - 1.5*Q" autocomplete="off"></div>
+          <div class="hint">Излом&nbsp;Q — точка стыка кусков (их пересечение). До излома&nbsp;— f₁,
+            после&nbsp;— f₂.</div>
+        </div>
+        <div class="field" style="margin-top:8px;"><label>Предельные издержки MC (число или f(Q))</label>
+          <input type="text" id="inp-kink-mc" value="20" autocomplete="off"></div>
+        <button class="btn" id="btn-kink-apply">Построить</button>
+        <div class="hint">MR на каждом куске — своя прямая (вдвое круче спроса), в изломах MR
+          разрывается вниз. Оптимум выбирается по <b>максимуму прибыли</b> среди кандидатов
+          (пересечения MR&nbsp;=&nbsp;MC и сами изломы), а не по первому пересечению.</div>
+        <div class="error" id="kink-error" style="display:none;"></div>
+        <div id="info-kink" style="margin-top:8px;"></div>
+      </div>
       <!-- Галочки областей монополии (Задача 1). Видны только в режиме монополии. -->
       <div id="mono-areas-chk" style="display:none;margin-top:8px;">
         <label class="chk"><input type="checkbox" id="chk-mono-cs" checked>
@@ -570,6 +636,18 @@ const STATE = {
   monoCeilOn: false,     // включён ли потолок (перетаскиваемая линия Pc)
   monoCeilP: 0,          // уровень потолка Pc (0 = не задан)
   monoCeil: null,        // результат расчёта (выпуск/цена/дефицит/DWL при потолке)
+  // Под-режимы монополии (Чекпоинт 2): 'simple' — обычная (как раньше),
+  // 'discr1' — ценовая дискриминация 1-й степени, 'discr3' — 3-й степени (два рынка),
+  // 'kinked' — монополист при ломаном (кусочном) рыночном спросе.
+  monoMode: 'simple',
+  discr1: null,          // результат дискриминации 1-й степени (Qcomp, прибыль)
+  d3D1: '100 - Q', d3D2: '80 - 2*Q', d3MC: '20',   // дискриминация 3-й степени: два спроса + общий MC
+  discr3: null,          // результат дискриминации 3-й степени (q1,P1,q2,P2,Qtot)
+  kinkInput: 'individual',                         // ввод ломаного спроса: 'individual' / 'piecewise'
+  kiD1: '100 - Q', kiD2: '60 - Q', kiD3: '',       // индивидуальные спросы (горизонтальная сумма)
+  kpD1: '100 - Q', kpD2: '120 - 1.5*Q',            // кусочный рыночный спрос (два куска)
+  kinkMC: '20',
+  kinked: null,          // результат: сегменты спроса, кандидаты, оптимум
   // Режим калькулятора: 'market' — рынок, 'costs' — издержки фирмы, 'ppf' — КПВ, 'labor' — рынок труда.
   mode: 'market',
   // Рынок труда (Чекпоинт 1): структура и минимальная зарплата. Оси L (труд) / W (зарплата).
@@ -1058,8 +1136,19 @@ function recompute() {
 
   // Потолок цены в монополии (Задача 3): ломаный MR_eff даёт новый выпуск/цену/дефицит.
   STATE.monoCeil = null;
-  if (STATE.market === 'monopoly' && STATE.monoCeilOn && STATE.monoCeilP > 0 && STATE.mono) {
+  if (STATE.market === 'monopoly' && STATE.monoMode === 'simple' && STATE.monoCeilOn && STATE.monoCeilP > 0 && STATE.mono) {
     STATE.monoCeil = monopolyCeiling(STATE.monoCeilP);
+  }
+
+  // Ценовая дискриминация 1-й степени (Задача 4): монополист забирает весь излишек,
+  // продавая каждую единицу по её цене спроса до точки, где спрос = MC (= конкурентный выпуск).
+  STATE.discr1 = null;
+  if (STATE.market === 'monopoly' && STATE.monoMode === 'discr1' && STATE.D && (mcSourceCurve() || curveByRole('tc'))) {
+    const Qcomp = findRoot(q => evalCurve(STATE.D, q) - mcAt(q));   // выпуск: D = MC
+    if (Qcomp != null && Qcomp > 0) {
+      const profit = integrate(q => evalCurve(STATE.D, q) - mcAt(q), 0, Qcomp);   // вся область между D и MC
+      STATE.discr1 = { Qcomp, profit };   // CS=0, DWL=0
+    }
   }
 
   // Эластичность спроса вдоль кривой (Задача 2). Точка вдоль D + единичная точка (MR=0).
@@ -2032,12 +2121,8 @@ function setMarket(mode) {
   if (mo) mo.classList.toggle('active', mode === 'monopoly');
   const mh = document.getElementById('mono-hint');
   if (mh) mh.style.display = (mode === 'monopoly') ? '' : 'none';
-  // Галочки областей монополии (Задача 1) видны только в режиме монополии.
-  const ma = document.getElementById('mono-areas-chk');
-  if (ma) ma.style.display = (mode === 'monopoly') ? '' : 'none';
-  // Потолок цены (Задача 3) — тоже только в режиме монополии.
-  const mcl = document.getElementById('mono-ceiling');
-  if (mcl) mcl.style.display = (mode === 'monopoly') ? '' : 'none';
+  // Видимость под-режима монополии и его панелей (галочки областей / потолок / дискриминация / ломаный).
+  applyMonoVisibility();
   redrawAll();
 }
 
@@ -2198,6 +2283,340 @@ function setMonoCeil(p) {
   const maxP = s ? (parseFloat(s.max) || CONFIG.Pmax) : CONFIG.Pmax;
   p = Math.max(0, Math.min(p, maxP));
   setMonoCeilFields(p);
+  redrawAll();
+}
+
+/* =====================================================================
+   БЛОК 8е. ПОД-РЕЖИМЫ МОНОПОЛИИ (Чекпоинт 2) — внутри структуры «Монополия».
+   monoMode: 'simple' (как раньше, не трогаем) | 'discr1' (ценовая дискриминация
+   1-й степени) | 'discr3' (3-й степени, два рынка) | 'kinked' (ломаный спрос).
+   Переиспользуем существующие численные методы (findRoot / findRootIn / integrate /
+   marginalRevenue / mcAt / invCurve). Каждый под-режим самодостаточен.
+   ===================================================================== */
+
+// Построить «кривую» из произвольной формулы (число или f(Q)) — пригодна для evalCurve.
+function makeCurve(expr) {
+  const { compiled, error } = compileFormula((expr || '').trim());
+  if (error) return { error };
+  return { compiled, linear: detectLinear(compiled), error: null };
+}
+
+/* --- Задача 4: ценовая дискриминация 1-й степени --- */
+
+// Отрисовка: D и MC, вся область между ними до Qcomp = прибыль (CS=0, DWL=0).
+function drawDiscr1() {
+  const D = STATE.D, d1 = STATE.discr1;
+  drawCurves();                         // спрос D и (если задана как кривая) MC
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  // Если MC выведена из TC (нет кривой mc/S) — нарисуем её красным.
+  if (!mcSourceCurve() && curveByRole('tc')) {
+    const pts = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = mcAt(q); pts.push(isNaN(v) ? null : [q, v]); }
+    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#e05052').attr('stroke-width', 2.5).attr('d', line);
+  }
+  if (!d1) return;
+  // Заливка прибыли — между MC (низ) и D (верх) от 0 до Qcomp.
+  const samp = []; for (let i = 0; i <= 120; i++) samp.push(d1.Qcomp * i / 120);
+  const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d)));
+  g.append('path').datum(samp).attr('d', a).attr('fill', '#21a366').attr('opacity', 0.20);
+  // Точка Qcomp на спросе + проекции.
+  const ox = sx(0), oy = sy(0), Pq = evalCurve(D, d1.Qcomp);
+  const og = svg.append('g'), [px, py] = toPx(d1.Qcomp, Pq);
+  og.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy).attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', '#21a366').attr('stroke', '#fff').attr('stroke-width', 1.5);
+  haloText(og, px, oy + 8, 'Qcomp=' + fmt(d1.Qcomp), 'middle', 'hanging');
+  haloText(og, sx(d1.Qcomp * 0.45), sy(Math.max(0, (Pq + mcAt(d1.Qcomp * 0.45)) / 2)), 'Прибыль', 'middle', 'middle');
+}
+
+function updateDiscr1Panel() {
+  const box = document.getElementById('info-mono'); if (!box) return;
+  if (!STATE.D) { box.innerHTML = '<div class="muted">Отметьте кривую спроса (роль D).</div>'; return; }
+  if (!mcSourceCurve() && !curveByRole('tc')) { box.innerHTML = '<div class="muted">Нужны предельные издержки: роль MC (либо TC, либо S как MC).</div>'; return; }
+  const d1 = STATE.discr1;
+  if (!d1) { box.innerHTML = '<div class="warn">Точка D = MC не найдена в первой четверти.</div>'; return; }
+  let html = '';
+  html += `<div class="stat"><span>Выпуск (= конкурентному)</span><b>${fmt(d1.Qcomp)}</b></div>`;
+  html += `<div class="stat"><span>Прибыль (весь излишек)</span><b>${fmt(d1.profit)}</b></div>`;
+  html += `<div class="stat"><span>CS (потребитель)</span><b>0</b></div>`;
+  html += `<div class="stat"><span>DWL (потери)</span><b>0</b></div>`;
+  // Сравнение с простой монополией (STATE.mono считается в recompute параллельно).
+  if (STATE.mono) {
+    html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
+    html += `<div class="stat"><span>Простая монополия: Qm</span><b>${fmt(STATE.mono.Qm)}</b></div>`;
+    html += `<div class="stat"><span>Простая монополия: излишек (TR−VC)</span><b>${fmt(STATE.mono.psM)}</b></div>`;
+    if (STATE.mono.dwl != null) html += `<div class="stat"><span>Простая монополия: DWL</span><b>${fmt(STATE.mono.dwl)}</b></div>`;
+  }
+  html += '<div class="hint">Совершенная дискриминация: выпуск растёт до конкурентного, потерь нет, но весь излишек у фирмы.</div>';
+  box.innerHTML = html;
+}
+
+/* --- Задача 5: ценовая дискриминация 3-й степени (два рынка) --- */
+
+// Распределение выпуска Qtot между рынками так, что MR₁ = MR₂ (бисекция: h убывает по q1).
+function allocateMR(c1, c2, Qtot) {
+  const h = (q1) => { const a = marginalRevenue(c1, q1), b = marginalRevenue(c2, Qtot - q1); return (isNaN(a) || isNaN(b)) ? NaN : a - b; };
+  const flo = h(1e-9); if (isNaN(flo)) return 0;
+  const fhi = h(Qtot - 1e-9);
+  if (!(flo > 0)) return 0;            // MR₁ уже ≤ MR₂ → весь выпуск на рынок 2
+  if (!(fhi < 0)) return Qtot;         // MR₁ всё ещё ≥ MR₂ → весь выпуск на рынок 1
+  let lo = 0, hi = Qtot;
+  for (let k = 0; k < 80; k++) { const mid = (lo + hi) / 2, fm = h(mid); if (Math.abs(fm) < 1e-7) return mid; if (fm > 0) lo = mid; else hi = mid; }
+  return (lo + hi) / 2;
+}
+
+// Пересчёт дискриминации 3-й степени: сканируем суммарный Q, на каждом делим по MR₁=MR₂,
+// общий MR (max активной отрасли) приравниваем к MC(Qtot). Работает для const и f(Q) MC.
+function recomputeDiscr3() {
+  STATE.discr3 = null;
+  const errBox = document.getElementById('d3-error');
+  const c1 = makeCurve(STATE.d3D1), c2 = makeCurve(STATE.d3D2), cm = makeCurve(STATE.d3MC);
+  if (c1.error || c2.error || cm.error) { if (errBox) { errBox.style.display = 'block'; errBox.textContent = 'Не понял формулу: ' + (c1.error || c2.error || cm.error); } return; }
+  if (errBox) errBox.style.display = 'none';
+  const mc = (q) => evalCurve(cm, q);
+  const commonMR = (Qtot) => {
+    const q1 = allocateMR(c1, c2, Qtot);
+    const m1 = marginalRevenue(c1, q1), m2 = marginalRevenue(c2, Qtot - q1);
+    return Math.max(isNaN(m1) ? -Infinity : m1, isNaN(m2) ? -Infinity : m2);   // MR следующей единицы (в лучшем рынке)
+  };
+  const Qtot = findRootIn((Q) => commonMR(Q) - mc(Q), 1e-6, 2 * CONFIG.Qmax);
+  if (Qtot == null || !(Qtot > 0)) { STATE.discr3 = { c1, c2, cm, found: false }; return; }
+  const q1 = allocateMR(c1, c2, Qtot), q2 = Qtot - q1;
+  const P1 = evalCurve(c1, q1), P2 = evalCurve(c2, q2), mcLevel = mc(Qtot);
+  STATE.discr3 = { c1, c2, cm, found: true, Qtot, q1, q2, P1, P2, mcLevel };
+}
+
+// Мини-график одного рынка в пиксельной полосе [gx0, gx1]: D, MR, MC и точка (qi, Pi).
+function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
+  const ml = 46, mr = 18, mt = 30, mb = 42;
+  const left = gx0 + ml, right = gx1 - mr, top = mt, bottom = H - mb;
+  if (right <= left || bottom <= top) return;
+  let Xmax = invCurve(D, 0); if (Xmax == null || !(Xmax > 0)) Xmax = CONFIG.Qmax; Xmax = niceMax(Xmax * 1.1);
+  let Ymax = evalCurve(D, 0); if (isNaN(Ymax) || !(Ymax > 0)) Ymax = CONFIG.Pmax; Ymax = niceMax(Ymax * 1.1);
+  const lx = d3.scaleLinear().domain([0, Xmax]).range([left, right]);
+  const ly = d3.scaleLinear().domain([0, Ymax]).range([bottom, top]);
+  const g = svg.append('g');
+  const cid = 'mini-clip-' + idx;
+  svg.select('defs').append('clipPath').attr('id', cid).append('rect').attr('x', left).attr('y', top).attr('width', right - left).attr('height', bottom - top);
+  // Оси.
+  g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', right).attr('y2', bottom).attr('stroke', '#555').attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+  g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', left).attr('y2', top).attr('stroke', '#555').attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+  g.append('text').attr('x', (left + right) / 2).attr('y', top - 12).attr('text-anchor', 'middle').attr('font-size', 12.5).attr('font-weight', 600).attr('fill', '#333').text(title);
+  g.append('text').attr('x', right + 4).attr('y', bottom + 4).attr('font-size', 11).attr('fill', '#666').text('Q');
+  g.append('text').attr('x', left - 4).attr('y', top - 2).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', '#666').text('P');
+  [0.25, 0.5, 0.75, 1].forEach(t => { const xq = Xmax * t; g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('font-size', 9).attr('fill', '#888').text(fmt(xq)); });
+  [0.25, 0.5, 0.75, 1].forEach(t => { const yp = Ymax * t; g.append('text').attr('x', left - 5).attr('y', ly(yp)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').attr('font-size', 9).attr('fill', '#888').text(fmt(yp)); });
+  const gc = svg.append('g').attr('clip-path', 'url(#' + cid + ')');
+  const line = d3.line().defined(d => d !== null).x(d => lx(d[0])).y(d => ly(d[1]));
+  const sample = (f) => { const o = []; for (let i = 0; i <= 300; i++) { const q = Xmax * i / 300; const v = f(q); o.push((isNaN(v) || v < 0) ? null : [q, v]); } return o; };
+  gc.append('path').datum(sample(q => evalCurve(D, q))).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.5).attr('d', line);           // D
+  gc.append('path').datum(sample(q => marginalRevenue(D, q))).attr('fill', 'none').attr('stroke', '#8b5cf6').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);  // MR
+  gc.append('path').datum(sample(q => evalCurve(mcCurve, q))).attr('fill', 'none').attr('stroke', '#e05052').attr('stroke-width', 2).attr('d', line);       // MC
+  if (qi != null && qi > 0 && !isNaN(Pi)) {
+    const px = lx(qi), py = ly(Pi);
+    g.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', bottom).attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    g.append('line').attr('x1', px).attr('y1', py).attr('x2', left).attr('y2', py).attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    haloText(g, px, bottom + 12, 'q=' + fmt(qi), 'middle', 'hanging');
+    haloText(g, left - 5, py, 'P=' + fmt(Pi), 'end', 'middle');
+  }
+}
+
+// Полная перерисовка дискриминации 3-й степени: два мини-графика бок о бок.
+function redrawDiscr3() {
+  recomputeDiscr3();
+  svg.selectAll('*').remove();
+  addDefs();
+  const d = STATE.discr3;
+  if (!d || !d.found) {
+    drawGrid(); drawAxes();
+    updateDiscr3Panel();
+    return;
+  }
+  const midX = W / 2;
+  drawMiniMarket(0, midX, 'Рынок 1', d.c1, d.q1, d.P1, d.cm, 1);
+  drawMiniMarket(midX, W, 'Рынок 2', d.c2, d.q2, d.P2, d.cm, 2);
+  // Разделитель между панелями.
+  svg.append('line').attr('x1', midX).attr('y1', 18).attr('x2', midX).attr('y2', H - 30).attr('stroke', '#eee').attr('stroke-width', 1);
+  updateDiscr3Panel();
+}
+
+function updateDiscr3Panel() {
+  const box = document.getElementById('info-d3'); if (!box) return;
+  const d = STATE.discr3;
+  if (!d) { box.innerHTML = '<div class="muted">Введите два спроса и MC, нажмите «Построить».</div>'; return; }
+  if (!d.found) { box.innerHTML = '<div class="warn">Оптимум MR = MC не найден.</div>'; return; }
+  // Эластичность в точке оптимума: |E| = |P / (Q·dP/dQ)|. Меньше эластичный → выше цена.
+  const less = (d.P1 >= d.P2) ? '1' : '2';
+  let html = '';
+  html += `<div class="stat"><span>Рынок 1: q₁ / P₁</span><b>${fmt(d.q1)} / ${fmt(d.P1)}</b></div>`;
+  html += `<div class="stat"><span>Рынок 2: q₂ / P₂</span><b>${fmt(d.q2)} / ${fmt(d.P2)}</b></div>`;
+  html += `<div class="stat"><span>Σ выпуск</span><b>${fmt(d.Qtot)}</b></div>`;
+  html += `<div class="stat"><span>MR₁ = MR₂ = MC</span><b>${fmt(d.mcLevel)}</b></div>`;
+  html += `<div class="hint">Цена выше на менее эластичном рынке (здесь — рынок&nbsp;${less}). Фирма выравнивает предельный доход: MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.</div>`;
+  box.innerHTML = html;
+}
+
+/* --- Задача 6: монополист при ломаном (кусочном) рыночном спросе --- */
+
+// Единое представление рыночного спроса: { segs:[{q0,q1,D}], kinks:[Q], Dfn } или { error }.
+function buildKinkedDemand() {
+  if (STATE.kinkInput === 'piecewise') {
+    const f1 = makeCurve(STATE.kpD1), f2 = makeCurve(STATE.kpD2);
+    if (f1.error) return { error: f1.error };
+    if (f2.error) return { error: f2.error };
+    let qk = findRoot(q => { const a = evalCurve(f1, q), b = evalCurve(f2, q); return (isNaN(a) || isNaN(b)) ? NaN : a - b; });
+    if (qk == null || !(qk > 0) || qk >= CONFIG.Qmax) {            // куски не пересекаются → один кусок
+      return { segs: [{ q0: 0, q1: CONFIG.Qmax, D: f1 }], kinks: [], Dfn: q => evalCurve(f1, q) };
+    }
+    const segs = [{ q0: 0, q1: qk, D: f1 }, { q0: qk, q1: CONFIG.Qmax, D: f2 }];
+    return { segs, kinks: [qk], Dfn: q => (q < qk) ? evalCurve(f1, q) : evalCurve(f2, q) };
+  }
+  // Индивидуальные спросы → горизонтальная сумма.
+  const exprs = [STATE.kiD1, STATE.kiD2, STATE.kiD3].map(s => (s || '').trim()).filter(s => s.length);
+  if (!exprs.length) return { error: 'Введите хотя бы один спрос' };
+  const cs = []; for (const e of exprs) { const c = makeCurve(e); if (c.error) return { error: c.error }; cs.push(c); }
+  if (cs.every(c => c.linear)) {
+    // Все линейные: изломы — на ценах-перехватах b_i, между ними сумма линейна (точно).
+    const lins = cs.map(c => c.linear);
+    const prices = [...new Set(lins.map(l => l.b).filter(b => b > 0))].sort((x, y) => y - x);
+    prices.push(0);
+    const Qat = (P) => lins.reduce((s, l) => { const q = (P - l.b) / l.a; return s + (q > 0 ? q : 0); }, 0);
+    const bps = prices.map(P => [Qat(P), P]).filter(p => !isNaN(p[0]));
+    const segs = [], kinks = [];
+    for (let i = 0; i < bps.length - 1; i++) {
+      const [q0, p0] = bps[i], [q1, p1] = bps[i + 1];
+      if (q1 <= q0 + 1e-9) continue;
+      const a = (p1 - p0) / (q1 - q0), b = p0 - a * q0;
+      segs.push({ q0, q1, D: { linear: { a, b } } });
+      if (segs.length > 1 && q0 > 1e-9) kinks.push(q0);
+    }
+    if (!segs.length) return { error: 'Спрос не строится' };
+    const Dfn = (Q) => { for (const s of segs) { if (Q >= s.q0 - 1e-9 && Q <= s.q1 + 1e-9) return evalCurve(s.D, Q); } const last = segs[segs.length - 1]; return last ? evalCurve(last.D, Q) : NaN; };
+    return { segs, kinks, Dfn };
+  }
+  // Нелинейный спрос — численная горизонтальная сумма как одна гладкая кривая (без явных изломов).
+  const Dfn = (Q) => {
+    const Qsum = (P) => cs.reduce((s, c) => { const q = invCurve(c, P); return s + ((q != null && q > 0) ? q : 0); }, 0);
+    let lo = 0, hi = CONFIG.Pmax * 4;
+    if (Qsum(lo) < Q) return 0;
+    for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (Qsum(mid) > Q) lo = mid; else hi = mid; }
+    return (lo + hi) / 2;
+  };
+  return { segs: [{ q0: 0, q1: CONFIG.Qmax, D: { fn: Dfn } }], kinks: [], Dfn };
+}
+
+// Пересчёт ломаного спроса: кандидаты (MR=MC на каждом куске + сами изломы) → максимум прибыли.
+function recomputeKinked() {
+  STATE.kinked = null;
+  const errBox = document.getElementById('kink-error');
+  const km = makeCurve(STATE.kinkMC);
+  const built = buildKinkedDemand();
+  if ((built && built.error) || km.error) { if (errBox) { errBox.style.display = 'block'; errBox.textContent = 'Не понял формулу: ' + ((built && built.error) || km.error); } return; }
+  if (errBox) errBox.style.display = 'none';
+  const mc = (q) => evalCurve(km, q);
+  const { segs, kinks, Dfn } = built;
+  const cands = [];
+  segs.forEach(s => { const r = findRootIn(q => marginalRevenue(s.D, q) - mc(q), s.q0, s.q1); if (r != null) cands.push({ Q: r, kind: 'MR=MC' }); });
+  kinks.forEach(qk => cands.push({ Q: qk, kind: 'излом' }));
+  const prof = (Q) => { const p = Dfn(Q); return isNaN(p) ? -Infinity : p * Q - integrate(mc, 0, Q); };
+  cands.forEach(c => c.profit = prof(c.Q));
+  if (!cands.length) { STATE.kinked = { segs, kinks, Dfn, mcCurve: km, found: false }; return; }
+  let best = cands[0]; cands.forEach(c => { if (c.profit > best.profit + 1e-6) best = c; });
+  best.win = true;
+  STATE.kinked = { segs, kinks, Dfn, mcCurve: km, found: true, Qstar: best.Q, Pstar: Dfn(best.Q), profit: best.profit, winKind: best.kind, cands };
+}
+
+function drawKinkedFull() {
+  recomputeKinked();
+  svg.selectAll('*').remove();
+  addDefs(); drawGrid(); drawAxes();
+  const k = STATE.kinked;
+  if (!k) { updateKinkPanel(); return; }
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  // Ломаный спрос (по Dfn).
+  const dPts = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = k.Dfn(q); dPts.push((isNaN(v) || v < 0) ? null : [q, v]); }
+  g.append('path').datum(dPts).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.5).attr('d', line);
+  // MR по каждому куску (отдельные отрезки) + вертикальные разрывы в изломах.
+  k.segs.forEach(s => {
+    const pts = []; for (let i = 0; i <= 200; i++) { const q = s.q0 + (s.q1 - s.q0) * i / 200; const v = marginalRevenue(s.D, q); pts.push(isNaN(v) ? null : [q, v]); }
+    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#8b5cf6').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  });
+  k.kinks.forEach(qk => {
+    const segL = k.segs.find(s => Math.abs(s.q1 - qk) < 1e-6), segR = k.segs.find(s => Math.abs(s.q0 - qk) < 1e-6);
+    if (segL && segR) {
+      const mrL = marginalRevenue(segL.D, qk), mrR = marginalRevenue(segR.D, qk);
+      if (!isNaN(mrL) && !isNaN(mrR)) g.append('line').attr('x1', sx(qk)).attr('y1', sy(Math.max(0, mrL))).attr('x2', sx(qk)).attr('y2', sy(Math.max(0, mrR)))
+        .attr('stroke', '#8b5cf6').attr('stroke-width', 1.3).attr('stroke-dasharray', '2 2').attr('opacity', 0.6);
+    }
+  });
+  // MC.
+  const mcPts = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = evalCurve(k.mcCurve, q); mcPts.push(isNaN(v) ? null : [q, v]); }
+  g.append('path').datum(mcPts).attr('fill', 'none').attr('stroke', '#e05052').attr('stroke-width', 2.5).attr('d', line);
+  // Оптимум.
+  if (k.found && k.Qstar > 0 && !isNaN(k.Pstar)) {
+    const og = svg.append('g'), ox = sx(0), oy = sy(0), [px, py] = toPx(k.Qstar, k.Pstar);
+    const dash = (x1, y1, x2, y2) => og.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2).attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    dash(px, py, px, oy); dash(px, py, ox, py);
+    og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    og.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('M');
+    haloText(og, px, oy + 8, 'Q*=' + fmt(k.Qstar), 'middle', 'hanging');
+    haloText(og, ox - 8, py, 'P*=' + fmt(k.Pstar), 'end', 'middle');
+  }
+  updateKinkPanel();
+}
+
+function updateKinkPanel() {
+  const box = document.getElementById('info-kink'); if (!box) return;
+  const k = STATE.kinked;
+  if (!k) { box.innerHTML = '<div class="muted">Введите спрос и MC, нажмите «Построить».</div>'; return; }
+  if (!k.found) { box.innerHTML = '<div class="warn">Оптимум не найден (нет кандидатов).</div>'; return; }
+  let html = '';
+  html += `<div class="stat"><span>Q* (выпуск)</span><b>${fmt(k.Qstar)}</b></div>`;
+  html += `<div class="stat"><span>P* (цена)</span><b>${fmt(k.Pstar)}</b></div>`;
+  html += `<div class="stat"><span>Прибыль π</span><b>${fmt(k.profit)}</b></div>`;
+  html += `<div class="stat"><span>Победил кандидат</span><b>${k.winKind} @ Q=${fmt(k.Qstar)}</b></div>`;
+  // Таблица всех кандидатов с прибылью (видно сравнение).
+  html += '<table class="tx-table" style="margin-top:6px;"><tr><th>Кандидат</th><th>Q</th><th>π</th></tr>';
+  k.cands.forEach(c => {
+    const win = (Math.abs(c.Q - k.Qstar) < 1e-6);
+    html += `<tr${win ? ' style="font-weight:700;color:#1a1f2e;"' : ''}><td>${c.kind}</td><td>${fmt(c.Q)}</td><td>${fmt(c.profit)}</td></tr>`;
+  });
+  html += '</table>';
+  html += '<div class="hint">Оптимум — по МАКСИМУМУ прибыли среди кандидатов (а не по первому пересечению MR&nbsp;=&nbsp;MC).</div>';
+  box.innerHTML = html;
+}
+
+/* --- Переключатели под-режимов монополии --- */
+
+// Видимость панелей монополии: под-режим и его поля (вызывается из setMarket и setMonoMode).
+function applyMonoVisibility() {
+  const inMono = (STATE.market === 'monopoly'), mm = STATE.monoMode;
+  const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
+  show('mono-submode', inMono);
+  show('mono-areas-chk', inMono && mm === 'simple');
+  show('mono-ceiling', inMono && mm === 'simple');
+  show('mono-d1-pane', inMono && mm === 'discr1');
+  show('mono-d3-pane', inMono && mm === 'discr3');
+  show('mono-kink-pane', inMono && mm === 'kinked');
+}
+
+function setMonoMode(mm) {
+  STATE.monoMode = mm;
+  [['mm-simple', 'simple'], ['mm-d1', 'discr1'], ['mm-d3', 'discr3'], ['mm-kink', 'kinked']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === mm); });
+  applyMonoVisibility();
+  redrawAll();
+}
+
+function setKinkInput(which) {
+  STATE.kinkInput = which;
+  const i = document.getElementById('ki-indiv'), p = document.getElementById('ki-piece');
+  if (i) i.classList.toggle('active', which === 'individual');
+  if (p) p.classList.toggle('active', which === 'piecewise');
+  const ind = document.getElementById('kink-indiv'), pie = document.getElementById('kink-piece');
+  if (ind) ind.style.display = (which === 'individual') ? '' : 'none';
+  if (pie) pie.style.display = (which === 'piecewise') ? '' : 'none';
   redrawAll();
 }
 
@@ -2781,7 +3200,8 @@ function setScenario(s) {
     STATE.market = 'comp';
     const c = document.getElementById('seg-comp'), mo = document.getElementById('seg-mono');
     if (c) c.classList.add('active'); if (mo) mo.classList.remove('active');
-    ['mono-hint', 'mono-areas-chk', 'mono-ceiling'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+    const mh = document.getElementById('mono-hint'); if (mh) mh.style.display = 'none';
+    applyMonoVisibility();   // спрятать под-режим монополии и его панели (market теперь comp)
   }
   applyScenarioVisibility();
   redrawAll();
@@ -3529,12 +3949,21 @@ function redrawAll() {
   if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
   if (STATE.mode === 'ppf')   { redrawPpf();   return; }   // режим КПВ (Задача 3)
   if (STATE.mode === 'labor') { redrawLabor(); return; }   // режим рынка труда (Чекпоинт 1)
+  // Под-режимы монополии с собственной отрисовкой (Чекпоинт 2): дискриминация 3-й степени
+  // (два мини-графика) и ломаный спрос — самодостаточны, рисуют свои оси и панель.
+  if (STATE.mode === 'market' && STATE.market === 'monopoly') {
+    if (STATE.monoMode === 'discr3') { redrawDiscr3(); return; }
+    if (STATE.monoMode === 'kinked') { drawKinkedFull(); return; }
+  }
   recompute();                   // сначала считаем (равновесие, площади, налог)
   svg.selectAll('*').remove();   // полная перерисовка с чистого листа
   addDefs();
   drawGrid();
   drawAxes();
-  if (STATE.market === 'monopoly') {
+  if (STATE.market === 'monopoly' && STATE.monoMode === 'discr1') {
+    // Ценовая дискриминация 1-й степени (Задача 4): D, MC и область прибыли.
+    drawDiscr1();
+  } else if (STATE.market === 'monopoly') {
     if (STATE.monoCeil && STATE.monoCeil.binding) {
       // Связывающий потолок (Задача 3): ломаный MR_eff, новый выпуск, дефицит.
       drawMonoCeilingAreas();    // CS/VC/PS до нового Q + DWL (Qstar..Qc)
@@ -3579,7 +4008,7 @@ function redrawAll() {
   updateInfoPanel();
   updateAreasPanel();
   if (STATE.market === 'monopoly') {
-    updateMonoPanel();
+    if (STATE.monoMode === 'discr1') updateDiscr1Panel(); else updateMonoPanel();
     // Панель вмешательства в монополии неактуальна — заменяем пояснением,
     // чтобы не висела старая таблица из конкурентного режима.
     const itax = document.getElementById('info-tax');
@@ -3820,6 +4249,35 @@ function wireControls() {
   const segMono = document.getElementById('seg-mono');
   if (segComp) segComp.addEventListener('click', () => setMarket('comp'));
   if (segMono) segMono.addEventListener('click', () => setMarket('monopoly'));
+
+  // Под-режимы монополии (Чекпоинт 2): обычная / дискр.1 / дискр.3 / ломаный.
+  [['mm-simple', 'simple'], ['mm-d1', 'discr1'], ['mm-d3', 'discr3'], ['mm-kink', 'kinked']]
+    .forEach(([id, mm]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setMonoMode(mm)); });
+
+  // Дискриминация 3-й степени (Задача 5): два спроса + общий MC, кнопка «Построить».
+  const d3a = document.getElementById('inp-d3-1'), d3b = document.getElementById('inp-d3-2'), d3m = document.getElementById('inp-d3-mc');
+  function applyD3() {
+    if (d3a) STATE.d3D1 = d3a.value; if (d3b) STATE.d3D2 = d3b.value; if (d3m) STATE.d3MC = d3m.value;
+    redrawAll();
+  }
+  const d3btn = document.getElementById('btn-d3-apply');
+  if (d3btn) d3btn.addEventListener('click', applyD3);
+  [d3a, d3b, d3m].forEach(el => { if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') applyD3(); }); });
+
+  // Ломаный спрос (Задача 6): переключатель ввода + поля + кнопка «Построить».
+  const kiI = document.getElementById('ki-indiv'), kiP = document.getElementById('ki-piece');
+  if (kiI) kiI.addEventListener('click', () => setKinkInput('individual'));
+  if (kiP) kiP.addEventListener('click', () => setKinkInput('piecewise'));
+  const ki1 = document.getElementById('inp-ki-1'), ki2 = document.getElementById('inp-ki-2'), ki3 = document.getElementById('inp-ki-3');
+  const kp1 = document.getElementById('inp-kp-1'), kp2 = document.getElementById('inp-kp-2'), kmc = document.getElementById('inp-kink-mc');
+  function applyKink() {
+    if (ki1) STATE.kiD1 = ki1.value; if (ki2) STATE.kiD2 = ki2.value; if (ki3) STATE.kiD3 = ki3.value;
+    if (kp1) STATE.kpD1 = kp1.value; if (kp2) STATE.kpD2 = kp2.value; if (kmc) STATE.kinkMC = kmc.value;
+    redrawAll();
+  }
+  const kbtn = document.getElementById('btn-kink-apply');
+  if (kbtn) kbtn.addEventListener('click', applyKink);
+  [ki1, ki2, ki3, kp1, kp2, kmc].forEach(el => { if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') applyKink(); }); });
 
   // Потолок цены в монополии (Задача 3): галочка + ползунок + числовое поле.
   const mCeilChk = document.getElementById('chk-mono-ceil');
