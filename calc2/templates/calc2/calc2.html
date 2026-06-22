@@ -212,6 +212,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="seg-btn active" id="scn-none">Обычный</button>
         <button class="seg-btn" id="scn-elast">Эластичность</button>
         <button class="seg-btn" id="scn-shift">Сдвиги</button>
+        <button class="seg-btn" id="scn-ext">Внеш. эффект</button>
       </div>
       <!-- Эластичность спроса вдоль кривой (Задача 2) -->
       <div id="scn-pane-elast" style="display:none;margin-top:8px;">
@@ -241,6 +242,20 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div class="hint">Сдвиг по вертикали (свободный член кривой): + вверх, − вниз.
           Разложение показывает вклад спроса (E₀→E_d), предложения (E₀→E_s) и итог (E₀→E₁).</div>
         <div id="info-shift" style="margin-top:6px;"></div>
+      </div>
+      <!-- Внешний эффект и налог Пигу (Задача 4) -->
+      <div id="scn-pane-ext" style="display:none;margin-top:8px;">
+        <div class="field">
+          <label>Внешние предельные издержки (число или f(Q))</label>
+          <input type="text" id="ext-input" value="20" autocomplete="off">
+        </div>
+        <label class="chk"><input type="checkbox" id="ext-pigou">
+          <span class="swatch" style="background:#16a34a"></span> Применить налог Пигу</label>
+        <div class="hint">Спрос&nbsp;=&nbsp;общественная выгода MSB, предложение (роль S)&nbsp;=&nbsp;частные
+          издержки MPC. MSC&nbsp;=&nbsp;MPC&nbsp;+&nbsp;внешние. Рынок выпускает Qрын (D&nbsp;=&nbsp;MPC),
+          оптимум Qопт (D&nbsp;=&nbsp;MSC). Налог Пигу поднимает MPC до MSC — рынок приходит в Qопт.</div>
+        <div class="error" id="ext-error" style="display:none;"></div>
+        <div id="info-ext" style="margin-top:6px;"></div>
       </div>
     </div>
 
@@ -511,6 +526,10 @@ const STATE = {
   shiftS: 0,         // вертикальный сдвиг предложения ΔS (Задача 3)
   shiftActive: false,
   shiftRes: null,    // четыре равновесия E0/E_d/E_s/E1 и разложение (Задача 3)
+  extExpr: '20',     // внешние предельные издержки: константа или f(Q) (Задача 4)
+  extCompiled: null,
+  applyPigou: false, // применить корректирующий налог Пигу
+  ext: null,         // результат расчёта внешнего эффекта (Задача 4)
   // Галочки областей монополии (Задача 1): CS над ценой, VC под MC, PS между MC и ценой.
   showMonoCS: true,
   showMonoVC: true,
@@ -682,6 +701,17 @@ function curveDeriv(curve, q) {
   const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
   const a = evalCurve(curve, q + h), b = evalCurve(curve, q - h);
   return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / (2 * h);
+}
+
+// Внешние предельные издержки (Задача 4): константа или функция от Q (как спрос — переменная Q).
+function compileExt(expr) {
+  try { const c = math.parse(expr).compile(); c.evaluate({ x: 1, Q: 1 }); return { compiled: c, error: null }; }
+  catch (e) { return { compiled: null, error: e.message }; }
+}
+function evalExt(q) {
+  if (!STATE.extCompiled) return NaN;
+  try { const v = STATE.extCompiled.evaluate({ x: q, Q: q }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  catch (e) { return NaN; }
 }
 
 /* ---------------------------------------------------------------------
@@ -1028,6 +1058,24 @@ function recompute() {
       };
       STATE.shiftActive = true;
     }
+  }
+
+  // Внешний эффект и налог Пигу (Задача 4). MPC = S (роль предложения), MSC = MPC + внешние.
+  STATE.ext = null;
+  if (compMarket && STATE.scenario === 'externality' && STATE.D && STATE.S && STATE.eq) {
+    const msc = q => { const s = evalCurve(STATE.S, q), x = evalExt(q); return (isNaN(s) || isNaN(x)) ? NaN : s + x; };
+    const Qmkt = STATE.eq.Q, Pmkt = STATE.eq.P;            // рыночный выпуск: D = MPC
+    const Qopt = findRoot(q => evalCurve(STATE.D, q) - msc(q));   // оптимум: D = MSC
+    let Popt = null, dwl = null, pigou = null, pigouEq = null;
+    if (Qopt != null) {
+      Popt = evalCurve(STATE.D, Qopt);
+      const lo = Math.min(Qopt, Qmkt), hi = Math.max(Qopt, Qmkt);
+      dwl = Math.abs(integrate(q => msc(q) - evalCurve(STATE.D, q), lo, hi));   // потери между MSC и D
+      pigou = evalExt(Qopt);                              // налог Пигу = внешние пред. издержки в оптимуме
+      const Sp = { fn: q => evalCurve(STATE.S, q) + pigou };   // MPC + налог = рынок приходит в Qопт
+      pigouEq = findEquilibrium(STATE.D, Sp);
+    }
+    STATE.ext = { msc, Qmkt, Pmkt, Qopt, Popt, dwl, pigou, pigouEq, applyPigou: STATE.applyPigou };
   }
 }
 
@@ -1487,6 +1535,112 @@ function setShift(which, v) {
   const inp = document.getElementById(ids[1]); if (inp) inp.value = v;
   const lbl = document.getElementById(ids[2]); if (lbl) lbl.textContent = fmt(v);
   redrawAll();
+}
+
+/* ---------------------------------------------------------------------
+   БЛОК 8а-4. ВНЕШНИЙ ЭФФЕКТ и НАЛОГ ПИГУ (Задача 4).
+   Отрицательный внешний эффект производства: MSC = MPC + внешние пред. издержки.
+   Рынок выпускает Qрын (D = MPC), оптимум — Qопт (D = MSC). Налог Пигу поднимает
+   MPC до MSC и приводит рынок в Qопт. Всё численно (любые кривые).
+   --------------------------------------------------------------------- */
+
+// Заливка DWL (между MSC и D от Qопт до Qрын) — потери от внешнего эффекта.
+function drawExtAreas(e) {
+  if (!e || e.Qopt == null) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const lo = Math.min(e.Qopt, e.Qmkt), hi = Math.max(e.Qopt, e.Qmkt);
+  if (hi <= lo) return;
+  const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
+  const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.D, d))).y1(d => sy(e.msc(d)));
+  g.append('path').datum(samp).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28);
+}
+
+// Кривая MSC (оранжево-красная сплошная) + (если применён) MPC + налог Пигу (пунктир).
+function drawExtCurves(e) {
+  if (!e) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  const pts = (f) => { const o = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = f(q); o.push(isNaN(v) ? null : [q, v]); } return o; };
+  g.append('path').datum(pts(e.msc)).attr('fill', 'none').attr('stroke', '#d97706').attr('stroke-width', 2.5).attr('d', line);
+  // Ярлык MSC у правого края.
+  const qL = CONFIG.Qmax * 0.9, vL = e.msc(qL);
+  if (!isNaN(vL) && vL <= CONFIG.Pmax) g.append('text').attr('x', sx(qL)).attr('y', sy(vL) - 4)
+    .attr('font-size', 11).attr('font-weight', 600).attr('fill', '#d97706')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MSC');
+  // Налог Пигу: MPC + налог (≈ MSC) — зелёный пунктир.
+  if (e.applyPigou && e.pigou != null) {
+    g.append('path').datum(pts(q => evalCurve(STATE.S, q) + e.pigou))
+      .attr('fill', 'none').attr('stroke', '#16a34a').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  }
+}
+
+// Точки Qрын и Qопт (+ налог Пигу — новое равновесие в Qопт), проекции и подписи.
+function drawExtPoints(e) {
+  if (!e) return;
+  const ox = sx(0), oy = sy(0), g = svg.append('g');
+  const dash = (x1, y1, x2, y2, c) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', c || '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  // Рыночный выпуск (Qрын, Pрын) — на пересечении D и MPC.
+  const [pxm, pym] = toPx(e.Qmkt, e.Pmkt);
+  dash(pxm, pym, pxm, oy); dash(pxm, pym, ox, pym);
+  g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+  g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#1a1f2e')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Qрын');
+  haloText(g, pxm, oy + 8, fmt(e.Qmkt), 'middle', 'hanging');
+  // Общественный оптимум (Qопт, Pопт) — на пересечении D и MSC.
+  if (e.Qopt != null) {
+    const [pxo, pyo] = toPx(e.Qopt, e.Popt);
+    dash(pxo, pyo, pxo, oy, '#16a34a'); dash(pxo, pyo, ox, pyo, '#16a34a');
+    g.append('circle').attr('cx', pxo).attr('cy', pyo).attr('r', 4.5).attr('fill', '#16a34a').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    g.append('text').attr('x', pxo + 8).attr('y', pyo - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#15803d')
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Qопт');
+    haloText(g, pxo, oy + 8, fmt(e.Qopt), 'middle', 'hanging');
+    // С налогом Пигу новое равновесие совпадает с Qопт — отмечаем кольцом.
+    if (e.applyPigou && e.pigouEq) {
+      const [pxp, pyp] = toPx(e.pigouEq.Q, e.pigouEq.P);
+      g.append('circle').attr('cx', pxp).attr('cy', pyp).attr('r', 7).attr('fill', 'none').attr('stroke', '#16a34a').attr('stroke-width', 2);
+    }
+  }
+}
+
+// Полная отрисовка сценария внешнего эффекта.
+function drawExtScenario() {
+  const e = STATE.ext;
+  drawExtAreas(e);
+  drawCurves();      // D (MSB) и S (MPC)
+  drawExtCurves(e);  // MSC (+ MPC+налог при Пигу)
+  drawExtPoints(e);
+}
+
+// Табло внешнего эффекта: Qрын/Qопт, DWL, налог Пигу, новое равновесие.
+function updateExtPanel() {
+  const box = document.getElementById('info-ext'); if (!box) return;
+  if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Отметьте D (выгода MSB) и S (частные издержки MPC).</div>'; return; }
+  if (!STATE.eq) { box.innerHTML = '<div class="warn">Рыночное равновесие не найдено.</div>'; return; }
+  const e = STATE.ext;
+  if (!e) { box.innerHTML = '<div class="warn">Введите внешние предельные издержки.</div>'; return; }
+  let html = '';
+  html += `<div class="stat"><span>Qрын (D = MPC)</span><b>Q=${fmt(e.Qmkt)}, P=${fmt(e.Pmkt)}</b></div>`;
+  if (e.Qopt != null) {
+    html += `<div class="stat"><span>Qопт (D = MSC)</span><b>Q=${fmt(e.Qopt)}, P=${fmt(e.Popt)}</b></div>`;
+    html += `<div class="stat"><span>DWL (потери)</span><b>${fmt(e.dwl)}</b></div>`;
+    html += `<div class="stat"><span>Налог Пигу</span><b>${fmt(e.pigou)}</b></div>`;
+    if (e.applyPigou && e.pigouEq) {
+      html += `<div class="stat" style="margin-top:4px;"><span>Новое равновесие</span><b>Q=${fmt(e.pigouEq.Q)}, P=${fmt(e.pigouEq.P)}</b></div>`;
+      html += '<div class="hint">Налог Пигу сместил рынок в общественный оптимум Qопт — DWL устранён.</div>';
+    }
+  } else {
+    html += '<div class="warn">Оптимум D = MSC не найден в первой четверти.</div>';
+  }
+  box.innerHTML = html;
+}
+
+// Перекомпиляция внешних предельных издержек (вызывается при смене формулы / сценария).
+function recompileExt() {
+  const r = compileExt(STATE.extExpr);
+  STATE.extCompiled = r.compiled;
+  const errBox = document.getElementById('ext-error');
+  if (errBox) { errBox.style.display = r.error ? 'block' : 'none'; errBox.textContent = r.error ? 'Не понял формулу: ' + r.error : ''; }
 }
 
 /* ---------------------------------------------------------------------
@@ -2199,6 +2353,7 @@ function applyScenarioVisibility() {
 // монополист, возвращаем конкуренцию (как монополия выключает интервенции).
 function setScenario(s) {
   STATE.scenario = s;
+  if (s === 'externality') recompileExt();   // подготовить внешние пред. издержки
   if (s !== 'none' && STATE.market === 'monopoly') {
     STATE.market = 'comp';
     const c = document.getElementById('seg-comp'), mo = document.getElementById('seg-mono');
@@ -2972,6 +3127,9 @@ function redrawAll() {
       drawMonopolyPoints();      // точки M и MR=MC, проекции, конкурентный ориентир
       if (STATE.monoCeilOn) drawMonoCeilingLine();   // линия видна, но не связывает
     }
+  } else if (STATE.scenario === 'externality') {
+    // Внешний эффект (Задача 4): DWL + D/MPC + MSC + точки Qрын/Qопт (+ Пигу).
+    drawExtScenario();
   } else if (STATE.scenario === 'shift') {
     // Разложение сдвигов (Задача 3): исходные + сдвинутые кривые + E_d/E_s/E₁.
     drawShiftScenario();
@@ -3002,6 +3160,9 @@ function redrawAll() {
     // чтобы не висела старая таблица из конкурентного режима.
     const itax = document.getElementById('info-tax');
     if (itax) itax.innerHTML = '<div class="muted">В режиме монополии вмешательство государства выключено.</div>';
+  } else if (STATE.scenario === 'externality') {
+    updateExtPanel();
+    const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
   } else if (STATE.scenario === 'shift') {
     updateShiftPanel();
     const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
@@ -3265,6 +3426,16 @@ function wireControls() {
     if (sl) sl.addEventListener('input', () => setShift(which, parseFloat(sl.value)));
     if (inp) inp.addEventListener('change', () => setShift(which, parseFloat(inp.value)));
   });
+
+  // Внешний эффект (Задача 4): формула внешних издержек + галочка налога Пигу.
+  const extInp = document.getElementById('ext-input');
+  if (extInp) {
+    const applyExt = () => { STATE.extExpr = (extInp.value || '').trim(); recompileExt(); redrawAll(); };
+    extInp.addEventListener('change', applyExt);
+    extInp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') applyExt(); });
+  }
+  const extPigou = document.getElementById('ext-pigou');
+  if (extPigou) extPigou.addEventListener('change', () => { STATE.applyPigou = extPigou.checked; redrawAll(); });
 
   // Режим издержек (Задача 2): ввод TC/FC, кнопки «Построить» / «Стандартные», галочки кривых.
   const tcInp = document.getElementById('inp-tc');
