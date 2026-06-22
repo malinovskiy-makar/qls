@@ -520,6 +520,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div class="hint">Должно быть L(0)=0, L(1)=1, неубывающая и выпуклая.
           Примеры: <code>p^2</code>, <code>p^3</code>, <code>p^1.5</code>.</div>
       </div>
+      <!-- ЧК2: сравнение «было → стало». Галочка запоминает текущую кривую как «было». -->
+      <label class="chk" style="margin-top:10px;"><input type="checkbox" id="ineq-ghost">
+        <span class="swatch" style="background:#ddd;border:1px solid #aaa;"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
       <div id="info-inequality" style="margin-top:8px;"></div>
     </div>
 
@@ -4310,8 +4313,39 @@ function drawLorenzNodes() {
   }
 }
 
-// Заглушка перетаскивания узлов (наполняется в ЧК2).
-function attachLorenzNodeDrag(sel, i) { /* ЧК2 */ }
+// Установить накопленную долю дохода в узле i = vFraction (доля 0..1), сохранив
+// монотонность: зажимаем в [cumL[i−1], cumL[i+1]] (доли соседних групп ≥ 0).
+// Меняются доли групп i−1 и i; остальные не трогаются; сумма остаётся 100%.
+function ineqDragNode(i, vFraction) {
+  const g = STATE.ineqGroups.map(Number);
+  const sum = g.reduce((a, b) => a + b, 0) || 1;
+  const frac = g.map(x => Math.max(0, x) / sum);       // доли (сумма = 1)
+  const cum = [0]; for (let k = 0; k < frac.length; k++) cum.push(cum[k] + frac[k]);
+  if (i < 1 || i > frac.length - 1) return;            // только внутренние узлы
+  let v = Math.max(cum[i - 1], Math.min(cum[i + 1], vFraction));
+  cum[i] = v;
+  const nf = []; for (let k = 0; k < frac.length; k++) nf.push(cum[k + 1] - cum[k]);
+  STATE.ineqGroups = nf.map(f => Math.round(f * 1000) / 10);   // обратно в % (сумма = 100)
+}
+
+// Перетаскивание узла i кривой Лоренца по вертикали (способ 'groups', ЧК2).
+// Меняется накопленная доля дохода в точке i → доли соседних групп i−1 и i.
+function attachLorenzNodeDrag(sel, i) {
+  sel.call(d3.drag().container(() => svg.node())
+    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('drag', (event) => {
+      ineqDragNode(i, sy.invert(event.y) / 100);       // тянем по Y (доля дохода, 0..1)
+      renderIneqGroupsTable();
+      redrawAll();
+    })
+    .on('end', () => { document.body.style.cursor = ''; }));
+}
+
+// Снимок текущей кривой как «было» (для сравнения двух кривых, ЧК2).
+function ineqSnapshot() {
+  if (!STATE.ineqLorenz || !STATE.ineqStats) { STATE.ineqGhost = null; return; }
+  STATE.ineqGhost = { lorenz: STATE.ineqLorenz.map(p => [p[0], p[1]]), gini: STATE.ineqStats.gini };
+}
 
 // Табло неравенства.
 function updateInequalityPanel() {
@@ -4324,6 +4358,14 @@ function updateInequalityPanel() {
   html += `<div class="stat"><span>Робин Гуда (Гувера)</span><b>${fmt(s.hoover)}</b></div>`;
   html += `<div class="stat"><span>Децильный коэф.</span><b>${s.decile == null ? '∞' : fmt(s.decile)}</b></div>`;
   html += `<div class="stat"><span>Квинтильный коэф.</span><b>${s.quintile == null ? '∞' : fmt(s.quintile)}</b></div>`;
+  // Сравнение двух кривых «было → стало» (ЧК2).
+  if (STATE.showIneqGhost && STATE.ineqGhost) {
+    const g0 = STATE.ineqGhost.gini, g1 = s.gini, d = g1 - g0;
+    html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
+    html += `<div class="stat"><span>Джини было</span><b>${fmt(g0)}</b></div>`;
+    html += `<div class="stat"><span>Джини стало</span><b>${fmt(g1)}</b></div>`;
+    html += `<div class="stat"><span>Δ Джини</span><b style="color:${d < -1e-6 ? '#21a366' : (d > 1e-6 ? '#e05052' : '#666')}">${d >= 0 ? '+' : ''}${fmt(d)}</b></div>`;
+  }
   html += '<div class="hint" style="margin-top:6px;">Джини: 0 — полное равенство, 1 — весь доход у одного. ' +
     'Робин Гуда — какую долю дохода нужно перераспределить для равенства (макс. разрыв с диагональю). ' +
     'Дец./квинт. — во сколько раз доход верхних 10%/20% больше дохода нижних.</div>';
@@ -4346,6 +4388,8 @@ function redrawInequality() {
   if (STATE.ineqStats && STATE.ineqLorenz) {
     drawInequalityAreas(STATE.ineqLorenz);
     drawInequalityDiagonal();
+    // «Было» — бледная пунктирная кривая (снимок ЧК2), под текущей «стало».
+    if (STATE.showIneqGhost && STATE.ineqGhost) drawLorenzCurve(STATE.ineqGhost.lorenz, '#94a3b8', true);
     drawLorenzCurve(STATE.ineqLorenz, '#4f7cff', false);
     drawRobinHood();
     drawLorenzNodes();
@@ -4919,6 +4963,13 @@ function wireControls() {
   const ineqFmBtn = document.getElementById('ineq-formula-apply');
   if (ineqFmBtn) ineqFmBtn.addEventListener('click', applyIneqFm);
   if (ineqFm) ineqFm.addEventListener('keydown', e => { if (e.key === 'Enter') applyIneqFm(); });
+  // ЧК2: галочка «Исходное состояние» — снимок текущей кривой как «было».
+  const ineqGhostChk = document.getElementById('ineq-ghost');
+  if (ineqGhostChk) ineqGhostChk.addEventListener('change', () => {
+    STATE.showIneqGhost = ineqGhostChk.checked;
+    if (ineqGhostChk.checked) ineqSnapshot(); else STATE.ineqGhost = null;
+    redrawAll();
+  });
 
   // Добавление кривой: по кнопке и по Enter в поле формулы.
   const submit = () => { addCurve(formula.value); formula.value = ''; formula.focus(); };
