@@ -188,8 +188,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="seg">
         <button class="seg-btn active" id="seg-tax">Налог</button>
         <button class="seg-btn" id="seg-sub">Субсидия</button>
+        <button class="seg-btn" id="seg-ceil">Потолок</button>
+        <button class="seg-btn" id="seg-floor">Пол</button>
       </div>
-      <div class="field" style="margin-top:8px;">
+      <!-- Поле ставки (налог / субсидия) -->
+      <div class="field" id="tax-field" style="margin-top:8px;">
         <label>Ставка <span id="rate-letter">t</span> = <b id="tax-val">0</b></label>
         <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
           <input type="range" id="tax-slider" min="0" max="100" step="1" value="0"
@@ -198,9 +201,21 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
                  style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
         </div>
       </div>
-      <div class="hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
+      <!-- Поле регулируемой цены (потолок / пол) -->
+      <div class="field" id="pc-field" style="margin-top:8px;display:none;">
+        <label>Цена <span id="pc-letter">Pc</span> = <b id="pc-val">0</b></label>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+          <input type="range" id="pc-slider" min="0" max="100" step="1" value="0"
+                 style="flex:1;margin-top:0;">
+          <input type="number" id="pc-input" min="0" max="100" step="0.1" value="0"
+                 style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+        </div>
+      </div>
+      <div class="hint" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
         (налог — вверх, субсидия — вниз) на величину ставки. Клин между ценами покупателя
         и продавца можно тянуть мышью.</div>
+      <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
+        дефицит (продаётся меньше), пол выше равновесия — избыток. Линию цены можно тянуть мышью.</div>
       <div id="info-tax" style="margin-top:8px;"></div>
     </div>
 
@@ -265,7 +280,9 @@ const STATE = {
   showCS: true,      // показывать заливку излишка потребителя
   showPS: true,      // показывать заливку излишка производителя
   tax: 0,            // ставка вмешательства (0 = нет); тип задаёт intervType
-  intervType: 'tax', // 'tax' — налог (S вверх), 'subsidy' — субсидия (S вниз)
+  intervType: 'tax', // 'tax' — налог (S вверх), 'subsidy' — субсидия (S вниз),
+                     // 'ceiling' — потолок цены, 'floor' — пол цены
+  pReg: 0,           // регулируемая цена (для потолка / пола); 0 = не задана
 };
 
 /* ---------------------------------------------------------------------
@@ -376,6 +393,28 @@ function integrate(f, a, b, n = 1000) {
   let sum = 0.5 * (f(a) + f(b));
   for (let i = 1; i < n; i++) sum += f(a + i * h);
   return sum * h;
+}
+
+// Универсальный поиск корня g(Q)=0 в первой четверти [0, Qmax].
+// Сканируем мелкую сетку, на смене знака уточняем бисекцией; null — если корня нет.
+// Та же идея, что в findEquilibrium, но для любой функции (обратные кривые, MR=MC).
+function findRoot(g) {
+  const N = 1000;
+  let prevQ = 0, prevG = g(0);
+  for (let i = 1; i <= N; i++) {
+    const q = CONFIG.Qmax * i / N;
+    const cur = g(q);
+    if (!isNaN(prevG) && !isNaN(cur) && prevG * cur <= 0 && prevG !== cur) {
+      return (prevG === 0) ? prevQ : (cur === 0 ? q : bisect(g, prevQ, q));
+    }
+    prevQ = q; prevG = cur;
+  }
+  return null;
+}
+
+// Обратная функция кривой: Q, при котором P(Q) = targetP (то есть D⁻¹ или S⁻¹).
+function invCurve(curve, targetP) {
+  return findRoot(q => { const v = evalCurve(curve, q); return isNaN(v) ? NaN : v - targetP; });
 }
 
 /* ---------------------------------------------------------------------
@@ -591,7 +630,8 @@ function recompute() {
   // Налог сдвигает S вверх на t, субсидия — вниз на s. Дальше математика общая.
   STATE.taxActive = false;
   STATE.taxEq = null;
-  if (STATE.tax > 0 && STATE.D && STATE.S && STATE.eq) {
+  const isTaxType = (STATE.intervType === 'tax' || STATE.intervType === 'subsidy');
+  if (isTaxType && STATE.tax > 0 && STATE.D && STATE.S && STATE.eq) {
     const shift = (STATE.intervType === 'subsidy') ? -STATE.tax : STATE.tax;
     const sShift = { fn: q => evalCurve(STATE.S, q) + shift };   // синтетическая S ± ставка
     const te = findEquilibrium(STATE.D, sShift);
@@ -616,6 +656,33 @@ function recompute() {
         STATE.incSeller = STATE.eq.P - Ps;        // бремя продавца
       }
       STATE.taxActive = true;
+    }
+  }
+
+  // Ценовое регулирование: потолок / пол цены (Задача 1).
+  // Государство фиксирует P_reg. Объём торговли — короткая сторона рынка.
+  STATE.pcMode = (STATE.intervType === 'ceiling' || STATE.intervType === 'floor');
+  STATE.pcActive = false;
+  STATE.pc = null;
+  if (STATE.pcMode && STATE.D && STATE.S && STATE.eq && STATE.pReg > 0) {
+    const Preg = STATE.pReg;
+    const isCeiling = (STATE.intervType === 'ceiling');
+    // Связывает ли регулирование: потолок ниже равновесия / пол выше равновесия.
+    const binding = isCeiling ? (Preg < STATE.eq.P) : (Preg > STATE.eq.P);
+    const Qd = invCurve(STATE.D, Preg);   // объём спроса при цене Preg (D⁻¹)
+    const Qs = invCurve(STATE.S, Preg);   // объём предложения при цене Preg (S⁻¹)
+    const Qtrade = (Qd != null && Qs != null) ? Math.min(Qd, Qs) : null;  // короткая сторона
+    const gap = (Qd != null && Qs != null) ? Math.abs(Qd - Qs) : null;    // дефицит/избыток
+    STATE.pc = { Preg, isCeiling, binding, Qd, Qs, Qtrade, gap };
+    if (binding && Qtrade != null) {
+      // CS / PS считаем интегрированием по фактическому объёму торговли.
+      STATE.pc.cs = integrate(q => evalCurve(STATE.D, q) - Preg, 0, Qtrade);
+      STATE.pc.ps = integrate(q => Preg - evalCurve(STATE.S, q), 0, Qtrade);
+      STATE.pc.sw = STATE.pc.cs + STATE.pc.ps;
+      // DWL — площадь между D и S от Q_trade до Q* (недо-/перепроизводство).
+      const lo = Math.min(Qtrade, STATE.eq.Q), hi = Math.max(Qtrade, STATE.eq.Q);
+      STATE.pc.dwl = Math.abs(integrate(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi));
+      STATE.pcActive = true;
     }
   }
 }
@@ -853,10 +920,27 @@ function setTax(t) {
 // Переключение типа вмешательства: налог <-> субсидия.
 function setType(type) {
   STATE.intervType = type;
-  document.getElementById('seg-tax').classList.toggle('active', type === 'tax');
-  document.getElementById('seg-sub').classList.toggle('active', type === 'subsidy');
-  const rl = document.getElementById('rate-letter');
-  if (rl) rl.textContent = (type === 'subsidy') ? 's' : 't';
+  const map = { tax: 'seg-tax', subsidy: 'seg-sub', ceiling: 'seg-ceil', floor: 'seg-floor' };
+  Object.values(map).forEach(id => {
+    const b = document.getElementById(id); if (b) b.classList.remove('active');
+  });
+  const ab = document.getElementById(map[type]); if (ab) ab.classList.add('active');
+
+  const isTax = (type === 'tax' || type === 'subsidy');
+  // Показ нужного поля ввода и подсказки.
+  const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
+  show('tax-field', isTax);   show('tax-hint', isTax);
+  show('pc-field', !isTax);   show('pc-hint', !isTax);
+
+  if (isTax) {
+    const rl = document.getElementById('rate-letter');
+    if (rl) rl.textContent = (type === 'subsidy') ? 's' : 't';
+  } else {
+    const pl = document.getElementById('pc-letter');
+    if (pl) pl.textContent = (type === 'ceiling') ? 'Pc' : 'Pf';
+    // Стартовая цена = равновесная: линия появляется сразу (пока не связывает).
+    if (STATE.pReg <= 0 && STATE.eq) setPRegFields(Math.round(STATE.eq.P));
+  }
   redrawAll();
 }
 
@@ -895,6 +979,144 @@ function updateTaxPanel() {
 }
 
 /* ---------------------------------------------------------------------
+   БЛОК 8б. ЦЕНОВОЕ РЕГУЛИРОВАНИЕ — потолок и пол цены (Задача 1).
+   Линия фиксированной цены тянется мышью; рынок не расчищается —
+   возникает дефицит (потолок) или избыток (пол).
+   --------------------------------------------------------------------- */
+
+// Записать регулируемую цену в поля панели (без перерисовки).
+function setPRegFields(p) {
+  STATE.pReg = p;
+  const slider = document.getElementById('pc-slider'); if (slider) slider.value = p;
+  const lbl = document.getElementById('pc-val');       if (lbl) lbl.textContent = fmt(p);
+  const inp = document.getElementById('pc-input');     if (inp) inp.value = fmt(p);
+}
+
+// Единый путь смены цены (ползунок, числовое поле, перетаскивание линии).
+function setPReg(p) {
+  const slider = document.getElementById('pc-slider');
+  const maxP = slider ? (parseFloat(slider.max) || CONFIG.Pmax) : CONFIG.Pmax;
+  p = Math.max(0, Math.min(p, maxP));
+  setPRegFields(p);
+  redrawAll();
+}
+
+// Заливки CS / PS / DWL при связывающем регулировании (до Q_trade).
+function drawPcAreas() {
+  if (!STATE.pcActive) return;
+  const { Preg, Qtrade } = STATE.pc;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
+  const s1 = samp(0, Qtrade);
+  if (STATE.showCS) {   // CS — между ценой Preg (низ) и спросом (верх)
+    const a = d3.area().x(d => sx(d)).y0(sy(Preg)).y1(d => sy(evalCurve(STATE.D, d)));
+    g.append('path').datum(s1).attr('d', a).attr('fill', '#4f7cff').attr('opacity', 0.16);
+  }
+  if (STATE.showPS) {   // PS — между предложением (низ) и ценой Preg (верх)
+    const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(Preg));
+    g.append('path').datum(s1).attr('d', a).attr('fill', '#e05052').attr('opacity', 0.16);
+  }
+  // DWL — площадь между D и S от Q_trade до Q* (потери от нерасчищенного рынка).
+  const lo = Math.min(Qtrade, STATE.eq.Q), hi = Math.max(Qtrade, STATE.eq.Q);
+  if (hi > lo) {
+    const s2 = samp(lo, hi);
+    const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(d => sy(evalCurve(STATE.D, d)));
+    g.append('path').datum(s2).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28);
+  }
+}
+
+// Перетаскиваемая линия цены + проекции Qs/Qd и зона дефицита/избытка.
+function drawPriceControl() {
+  if (!STATE.pcMode) return;
+  const pc = STATE.pc;
+  if (!pc) { drawEquilibrium(); return; }   // цена не задана — обычное равновесие
+  const Preg = pc.Preg;
+  const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax);
+  const yReg = sy(Preg);
+  const g = svg.append('g');
+  const lineColor = pc.isCeiling ? '#b45309' : '#7c3aed';
+
+  // Горизонтальная линия фиксированной цены через весь график.
+  g.append('line').attr('x1', ox).attr('y1', yReg).attr('x2', xMax).attr('y2', yReg)
+    .attr('stroke', lineColor).attr('stroke-width', 2.5).style('pointer-events', 'none');
+  haloText(g, ox - 8, yReg, (pc.isCeiling ? 'Pc=' : 'Pf=') + fmt(Preg), 'end', 'middle');
+
+  if (STATE.pcActive) {
+    const { Qs, Qd, Qtrade, gap, isCeiling } = pc;
+    const xQs = sx(Qs), xQd = sx(Qd), xQt = sx(Qtrade);
+    const dash = (x1, y1, x2, y2) => g.append('line')
+      .attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+      .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    dash(xQs, yReg, xQs, oy);   // проекция объёма предложения на ось Q
+    dash(xQd, yReg, xQd, oy);   // проекция объёма спроса на ось Q
+    haloText(g, xQs, oy + 8, 'Qs=' + fmt(Qs), 'middle', 'hanging');
+    haloText(g, xQd, oy + 8, 'Qd=' + fmt(Qd), 'middle', 'hanging');
+    // Зона дефицита/избытка — цветная полоса на оси Q между Qs и Qd.
+    const xLo = Math.min(xQs, xQd), xHi = Math.max(xQs, xQd);
+    g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy)
+      .attr('stroke', isCeiling ? '#dc2626' : '#7c3aed').attr('stroke-width', 5).attr('opacity', 0.5);
+    haloText(g, (xLo + xHi) / 2, oy + 24, (isCeiling ? 'Дефицит' : 'Избыток') + ' = ' + fmt(gap), 'middle', 'hanging');
+    // Точка фактической торговли (короткая сторона рынка) на линии цены.
+    g.append('circle').attr('cx', xQt).attr('cy', yReg).attr('r', 4)
+      .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+  } else {
+    drawEquilibrium();   // не связывает — рынок остаётся в равновесии
+  }
+
+  // Зона захвата (24px вокруг линии) + видимая ручка для перетаскивания.
+  const hit = g.append('rect')
+    .attr('x', ox).attr('y', yReg - 12).attr('width', xMax - ox).attr('height', 24)
+    .attr('fill', 'transparent').style('cursor', 'grab');
+  attachPcDrag(hit);
+  g.append('circle').attr('cx', ox + (xMax - ox) * 0.5).attr('cy', yReg).attr('r', 7)
+    .attr('fill', lineColor).attr('stroke', '#fff').attr('stroke-width', 2)
+    .style('pointer-events', 'none');
+}
+
+// Перетаскивание линии цены: вертикальное положение курсора = новая цена.
+function attachPcDrag(sel) {
+  sel.call(d3.drag()
+    .container(() => svg.node())
+    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('drag', (event) => { setPReg(sy.invert(event.y)); })
+    .on('end', () => { document.body.style.cursor = ''; }));
+}
+
+// Табло регулирования: таблица «До / После / Δ» и дефицит/избыток.
+function updatePcPanel() {
+  const box = document.getElementById('info-tax');
+  if (!box) return;
+  const isCeiling = (STATE.intervType === 'ceiling');
+  if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Сначала отметьте кривые D и S.</div>'; return; }
+  if (!STATE.eq) { box.innerHTML = '<div class="warn">Равновесие не найдено.</div>'; return; }
+  const pc = STATE.pc;
+  if (!pc || STATE.pReg <= 0) {
+    box.innerHTML = `<div class="muted">Двигайте ползунок или тяните линию цены, чтобы задать ${isCeiling ? 'потолок' : 'пол'} цены.</div>`;
+    return;
+  }
+  if (!pc.binding) {
+    box.innerHTML = `<div class="warn">${isCeiling ? 'Потолок' : 'Пол'} ${isCeiling ? 'выше' : 'ниже'} равновесия (P*=${fmt(STATE.eq.P)}) — не действует. Рынок в равновесии.</div>`;
+    return;
+  }
+  const rows = [
+    ['Q (торговля)', STATE.eq.Q, pc.Qtrade],
+    ['CS', STATE.cs, pc.cs],
+    ['PS', STATE.ps, pc.ps],
+    ['SW', STATE.sw, pc.sw],
+    ['DWL', 0, pc.dwl],
+  ];
+  let html = `<div class="stat"><span>${isCeiling ? 'Потолок Pc' : 'Пол Pf'}</span><b>${fmt(pc.Preg)}</b></div>`;
+  html += '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
+  rows.forEach(([k, a, b]) => {
+    const d = b - a, ds = (d > 0 ? '+' : '') + fmt(d);
+    html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
+  });
+  html += '</table>';
+  html += `<div class="stat" style="margin-top:6px;"><span>${isCeiling ? 'Дефицит' : 'Избыток'}</span><b>${fmt(pc.gap)}</b></div>`;
+  box.innerHTML = html;
+}
+
+/* ---------------------------------------------------------------------
    БЛОК 9. redrawAll() — единая точка перерисовки.
    Любое изменение (кривая, перетаскивание, налог) дёргает её.
    --------------------------------------------------------------------- */
@@ -906,15 +1128,19 @@ function redrawAll() {
   addDefs();
   drawGrid();
   drawAxes();
-  // Заливки (под кривыми): налоговые или обычные CS/PS.
-  if (STATE.taxActive) drawTaxAreas(); else drawAreas();
+  // Заливки (под кривыми): налог, ценовое регулирование или обычные CS/PS.
+  if (STATE.taxActive) drawTaxAreas();
+  else if (STATE.pcActive) drawPcAreas();
+  else drawAreas();
   drawCurves();
   drawShiftedSupply();           // пунктирная S + t (если налог активен)
-  // Точки равновесия: налоговые E₀/E₁ или обычная E*.
-  if (STATE.taxActive) drawTaxPoints(); else drawEquilibrium();
+  // Точки/линии: налог E₀/E₁, регулирование цены или обычное равновесие E*.
+  if (STATE.taxActive) drawTaxPoints();
+  else if (STATE.pcMode) drawPriceControl();
+  else drawEquilibrium();
   updateInfoPanel();
   updateAreasPanel();
-  updateTaxPanel();
+  if (STATE.pcMode) updatePcPanel(); else updateTaxPanel();
 }
 
 /* ---------------------------------------------------------------------
@@ -1033,6 +1259,10 @@ function wireControls() {
       if (slider) slider.max = v;     // верхний предел налога ≈ масштаб цены
       const inp = document.getElementById('tax-input');
       if (inp) inp.max = v;
+      const ps = document.getElementById('pc-slider');
+      if (ps) ps.max = v;             // верхний предел регулируемой цены — тоже Pmax
+      const pi = document.getElementById('pc-input');
+      if (pi) pi.max = v;
       redrawAll();
     }
   });
@@ -1057,9 +1287,19 @@ function wireControls() {
     });
   }
 
-  // Переключатель «Налог / Субсидия».
+  // Переключатель «Налог / Субсидия / Потолок / Пол».
   document.getElementById('seg-tax').addEventListener('click', () => setType('tax'));
   document.getElementById('seg-sub').addEventListener('click', () => setType('subsidy'));
+  document.getElementById('seg-ceil').addEventListener('click', () => setType('ceiling'));
+  document.getElementById('seg-floor').addEventListener('click', () => setType('floor'));
+
+  // Регулируемая цена (потолок / пол): ползунок (целые) + числовое поле (дробные).
+  const pcSlider = document.getElementById('pc-slider');
+  if (pcSlider) pcSlider.addEventListener('input', () => setPReg(parseFloat(pcSlider.value)));
+  const pcInput = document.getElementById('pc-input');
+  if (pcInput) pcInput.addEventListener('change', () => {
+    const v = parseFloat(pcInput.value); if (!isNaN(v)) setPReg(v);
+  });
 
   // Добавление кривой: по кнопке и по Enter в поле формулы.
   const submit = () => { addCurve(formula.value); formula.value = ''; formula.focus(); };
