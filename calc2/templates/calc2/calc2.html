@@ -83,12 +83,17 @@ input, select { font: inherit; }
 .muted { font-size: 12px; color: var(--text2); }
 .error { font-size: 12px; color: #e05052; margin-top: 8px; display: none; line-height: 1.4; }
 
-/* Список кривых */
+/* Список кривых (две строки: формула + роль) */
 .curve-row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 0; border-bottom: .5px solid var(--border);
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 0; border-bottom: .5px solid var(--border);
 }
 .curve-row:last-child { border-bottom: none; }
+.crow-top { display: flex; align-items: center; gap: 8px; }
+.role-sel {
+  width: 100%; padding: 4px 6px; border: .5px solid var(--border);
+  border-radius: 5px; background: #fff; font-size: 12px; color: var(--text2);
+}
 .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
 .curve-name {
   flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis;
@@ -99,6 +104,12 @@ input, select { font: inherit; }
   font-size: 14px; padding: 2px 4px; line-height: 1; flex-shrink: 0;
 }
 .btn-icon:hover { color: #e05052; }
+
+/* Табло результатов (равновесие, площади, налог) */
+.stat { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; font-size: 13px; }
+.stat span { color: var(--text2); }
+.stat b { font-variant-numeric: tabular-nums; }
+.warn { font-size: 12px; color: #c2710c; line-height: 1.4; }
 
 /* Область графика справа */
 .graph-wrap {
@@ -137,6 +148,12 @@ input, select { font: inherit; }
         Примеры: <code>100 - Q</code>, <code>100 - 0.5*Q</code>, <code>Q^2/10</code>, <code>50 - sqrt(Q)*3</code></div>
       <div class="error" id="curve-error"></div>
       <div id="curve-list" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Равновесие (шаг 5) -->
+    <div class="section" id="sec-eq">
+      <div class="section-title">Равновесие D = S</div>
+      <div id="info-eq"></div>
     </div>
 
     <!-- Оси и сетка (шаг 2) -->
@@ -260,7 +277,44 @@ function fmtLinear(a, b) {
   return b > 0 ? `${aPart} + ${b}` : `${aPart} - ${Math.abs(b)}`;
 }
 
-// (findEquilibrium — шаг 5; integrate — шаг 6)
+// Численный поиск равновесия D(Q) = S(Q).
+// Идём по мелкой сетке, ищем интервал смены знака g = D - S, уточняем
+// бисекцией. Работает для ЛЮБЫХ кривых (прямых и нелинейных).
+// Если пересечения в первой четверти нет — возвращаем null (не падаем).
+function findEquilibrium(D, S) {
+  const g = (q) => {
+    const d = evalCurve(D, q), s = evalCurve(S, q);
+    return (isNaN(d) || isNaN(s)) ? NaN : d - s;
+  };
+  const priceAt = (q) => (evalCurve(D, q) + evalCurve(S, q)) / 2;
+  const N = 1000;                       // число узлов сетки
+  let prevQ = 0, prevG = g(0);
+  for (let i = 1; i <= N; i++) {
+    const q = CONFIG.Qmax * i / N;
+    const cur = g(q);
+    // Смена знака (или попадание точно в ноль на границе интервала).
+    if (!isNaN(prevG) && !isNaN(cur) && prevG * cur <= 0 && prevG !== cur) {
+      const qstar = (prevG === 0) ? prevQ : (cur === 0 ? q : bisect(g, prevQ, q));
+      const p = priceAt(qstar);
+      if (qstar >= 0 && p >= 0) return { Q: qstar, P: p };   // только первая четверть
+    }
+    prevQ = q; prevG = cur;
+  }
+  return null;
+}
+
+// Бисекция: уточняет корень f на отрезке [lo, hi], где знак f меняется.
+function bisect(f, lo, hi) {
+  let flo = f(lo);
+  for (let k = 0; k < 100; k++) {
+    const mid = (lo + hi) / 2, fm = f(mid);
+    if (fm === 0 || (hi - lo) < 1e-9) return mid;
+    if (flo * fm < 0) hi = mid; else { lo = mid; flo = fm; }
+  }
+  return (lo + hi) / 2;
+}
+
+// (integrate — шаг 6)
 
 /* ---------------------------------------------------------------------
    БЛОК 3. КООРДИНАТЫ И ОСИ
@@ -445,18 +499,87 @@ function attachDrag(sel, curve) {
 // TODO (будущие шаги): перетаскивание нелинейных кривых (парабол и т.п.).
 
 /* ---------------------------------------------------------------------
+   БЛОК 5. РАВНОВЕСИЕ — численный поиск и отрисовка точки D = S.
+   --------------------------------------------------------------------- */
+
+// Найти кривую с заданной ролью ('demand' / 'supply'), либо null.
+function curveByRole(role) { return STATE.curves.find(c => c.role === role) || null; }
+
+// Пересчёт сценария БЕЗ рисования: складываем результаты в STATE,
+// чтобы функции отрисовки и табло читали готовые числа.
+function recompute() {
+  STATE.D = curveByRole('demand');
+  STATE.S = curveByRole('supply');
+  STATE.eq = (STATE.D && STATE.S) ? findEquilibrium(STATE.D, STATE.S) : null;
+}
+
+// Точка равновесия E*: пунктирные проекции на оси + подпись.
+function drawEquilibrium() {
+  if (!STATE.eq) return;
+  const { Q, P } = STATE.eq;
+  const [px, py] = toPx(Q, P);
+  const ox = sx(0), oy = sy(0);
+  const g = svg.append('g').attr('class', 'equilibrium');
+
+  // Пунктирные проекции к осям.
+  g.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy)
+    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  g.append('line').attr('x1', px).attr('y1', py).attr('x2', ox).attr('y2', py)
+    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+
+  // Числа Q* и P* у осей (с белой обводкой, чтобы читались поверх делений).
+  haloText(g, px, oy + 8, 'Q*=' + fmt(Q), 'middle', 'hanging');
+  haloText(g, ox - 8, py, 'P*=' + fmt(P), 'end', 'middle');
+
+  // Сама точка и подпись E*.
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
+    .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+  g.append('text').attr('x', px + 8).attr('y', py - 8)
+    .attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('E*');
+}
+
+// Текст с белой обводкой (halo) — чтобы подписи равновесия читались над сеткой.
+function haloText(g, x, y, txt, anchor, baseline) {
+  g.append('text').attr('x', x).attr('y', y)
+    .attr('text-anchor', anchor).attr('dominant-baseline', baseline)
+    .attr('font-size', 10).attr('font-weight', 600).attr('fill', '#1a1f2e')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 3)
+    .text(txt);
+}
+
+// Табло слева: показываем Q* и P* (или подсказку / «не найдено»).
+function updateInfoPanel() {
+  const box = document.getElementById('info-eq');
+  if (!box) return;
+  if (!STATE.D || !STATE.S) {
+    box.innerHTML = '<div class="muted">Отметьте одну кривую как D&nbsp;(спрос), другую как S&nbsp;(предложение) в списке кривых.</div>';
+    return;
+  }
+  if (!STATE.eq) {
+    box.innerHTML = '<div class="warn">Равновесие не найдено в первой четверти.</div>';
+    return;
+  }
+  box.innerHTML =
+    `<div class="stat"><span>Q* (количество)</span><b>${fmt(STATE.eq.Q)}</b></div>` +
+    `<div class="stat"><span>P* (цена)</span><b>${fmt(STATE.eq.P)}</b></div>`;
+}
+
+/* ---------------------------------------------------------------------
    БЛОК 9. redrawAll() — единая точка перерисовки.
    Любое изменение (кривая, перетаскивание, налог) дёргает её.
    --------------------------------------------------------------------- */
 function redrawAll() {
   computeSize();
   makeScales();
+  recompute();                   // сначала считаем (равновесие и т.д.)
   svg.selectAll('*').remove();   // полная перерисовка с чистого листа
   addDefs();
   drawGrid();
   drawAxes();
   drawCurves();
-  // Следующие шаги добавят сюда: drawEquilibrium(); drawAreas(); ...
+  drawEquilibrium();
+  updateInfoPanel();
+  // Следующие шаги добавят сюда: drawAreas(); сценарии налога/субсидии ...
 }
 
 /* ---------------------------------------------------------------------
@@ -491,6 +614,19 @@ function addCurve(expr) {
   redrawAll();
 }
 
+// Назначить роль кривой. D и S — единственны: при назначении снимаем
+// ту же роль с других кривых.
+function setRole(curve, role) {
+  if (!role) {
+    curve.role = null;
+  } else {
+    STATE.curves.forEach(c => { if (c !== curve && c.role === role) c.role = null; });
+    curve.role = role;
+  }
+  renderCurveList();
+  redrawAll();
+}
+
 // Перерисовать список кривых в панели.
 function renderCurveList() {
   const list = document.getElementById('curve-list');
@@ -503,21 +639,21 @@ function renderCurveList() {
     const row = document.createElement('div');
     row.className = 'curve-row';
 
-    // Галочка видимости
+    // Верхняя строка: галочка видимости, цвет, формула, удаление.
+    const top = document.createElement('div');
+    top.className = 'crow-top';
+
     const cb = document.createElement('input');
     cb.type = 'checkbox'; cb.checked = curve.visible; cb.title = 'Показать/скрыть';
     cb.addEventListener('change', () => { curve.visible = cb.checked; renderCurveList(); redrawAll(); });
 
-    // Цветной квадратик
     const sw = document.createElement('span');
     sw.className = 'swatch'; sw.style.background = curve.color;
 
-    // Название (формула)
     const nm = document.createElement('span');
     nm.className = 'curve-name'; nm.textContent = curve.name;
     if (!curve.visible) nm.style.opacity = '.4';
 
-    // Кнопка удаления
     const del = document.createElement('button');
     del.className = 'btn-icon'; del.textContent = '✕'; del.title = 'Удалить кривую';
     del.addEventListener('click', () => {
@@ -525,8 +661,20 @@ function renderCurveList() {
       renderCurveList();
       redrawAll();
     });
+    top.append(cb, sw, nm, del);
 
-    row.append(cb, sw, nm, del);
+    // Нижняя строка: роль кривой (обычная / спрос / предложение).
+    const sel = document.createElement('select');
+    sel.className = 'role-sel';
+    [['', '— обычная кривая'], ['demand', 'D — спрос'], ['supply', 'S — предложение']]
+      .forEach(([v, t]) => {
+        const o = document.createElement('option'); o.value = v; o.textContent = t;
+        sel.appendChild(o);
+      });
+    sel.value = curve.role || '';
+    sel.addEventListener('change', () => setRole(curve, sel.value));
+
+    row.append(top, sel);
     list.appendChild(row);
   });
 }
