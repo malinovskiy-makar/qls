@@ -2931,31 +2931,38 @@ function drawLaborSurpluses() {
 }
 
 // Кривая MCL монопсонии (оранжевый пунктир). При связывающем МРОТ — ломаная MCL_eff.
+// Предельные издержки труда. Разводим два объекта (Задача 2):
+//  1) НАСТОЯЩАЯ MCL = d(W_s·L)/dL — объективная кривая рынка, от МРОТ НЕ зависит.
+//     Рисуем её ЦЕЛИКОМ всегда (амбер-пунктир #f59e0b) — и без МРОТ, и с МРОТ.
+//  2) ЭФФЕКТИВНАЯ ломаная MCL_eff (полка W_min до L̂, дальше = настоящая MCL) — ПОВЕРХ
+//     настоящей, отдельным видом (тёмно-оранжевый #c2410c, сплошной, потолще). Это
+//     вспомогательная линия выбора равновесия; математику выбора НЕ меняем.
 function drawLaborMCL() {
   const S = STATE.laborD ? STATE.laborS : null; if (!S) return;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  // (1) Настоящая MCL — всегда во всю длину.
+  const ptsFull = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; const v = laborMCL(S, l); ptsFull.push(isNaN(v) ? null : [l, v]); }
+  g.append('path').datum(ptsFull).attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  const ql = CONFIG.Qmax * 0.85, vl = laborMCL(S, ql);
+  if (!isNaN(vl) && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#f59e0b')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MCL');
+  // (2) Эффективная ломаная MCL_eff — поверх настоящей, при связывающем МРОТ.
   const min = STATE.laborMin;
   if (min && min.binding && min.Lhat != null) {
-    // Ломаная MCL_eff: горизонталь на уровне W_min до L̂, затем обычный MCL.
     const yW = sy(min.Wmin);
+    // Полка W_min до L̂ (сплошная, тёмно-оранжевая, потолще).
     g.append('line').attr('x1', sx(0)).attr('y1', yW).attr('x2', sx(min.Lhat)).attr('y2', yW)
-      .attr('stroke', '#f59e0b').attr('stroke-width', 3).attr('stroke-dasharray', '2 2');
-    // Обрыв вверх в L̂ к обычному MCL.
+      .attr('stroke', '#c2410c').attr('stroke-width', 3.5);
+    // Дальше L̂ MCL_eff совпадает с настоящей MCL — подчёркиваем сплошной поверх пунктира.
+    const ptsBeyond = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; if (l < min.Lhat) { ptsBeyond.push(null); continue; } const v = laborMCL(S, l); ptsBeyond.push(isNaN(v) ? null : [l, v]); }
+    g.append('path').datum(ptsBeyond).attr('fill', 'none').attr('stroke', '#c2410c').attr('stroke-width', 3).attr('d', line);
+    // Вертикальный скачок в L̂ от W_min к настоящей MCL.
     const mclHat = laborMCL(S, min.Lhat);
     if (!isNaN(mclHat)) g.append('line').attr('x1', sx(min.Lhat)).attr('y1', yW).attr('x2', sx(min.Lhat)).attr('y2', sy(mclHat))
-      .attr('stroke', '#f59e0b').attr('stroke-width', 1.5).attr('stroke-dasharray', '2 2').attr('opacity', 0.6);
-    const pts = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; if (l < min.Lhat) { pts.push(null); continue; } const v = laborMCL(S, l); pts.push(isNaN(v) ? null : [l, v]); }
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
-    g.append('text').attr('x', sx(min.Lhat * 0.4)).attr('y', yW - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#f59e0b')
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MCLэфф = W_min');
-  } else {
-    // Обычная MCL.
-    const pts = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; const v = laborMCL(S, l); pts.push(isNaN(v) ? null : [l, v]); }
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
-    const ql = CONFIG.Qmax * 0.85, vl = laborMCL(S, ql);
-    if (!isNaN(vl) && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#f59e0b')
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MCL');
+      .attr('stroke', '#c2410c').attr('stroke-width', 2).attr('stroke-dasharray', '3 2').attr('opacity', 0.7);
+    g.append('text').attr('x', sx(min.Lhat * 0.4)).attr('y', yW - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#c2410c')
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MCLэфф');
   }
 }
 
