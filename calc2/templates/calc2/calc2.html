@@ -261,6 +261,22 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <label class="chk"><input type="checkbox" id="chk-mono-ps" checked>
           <span class="swatch" style="background:#e05052"></span> Показывать PS (TR&nbsp;−&nbsp;VC)</label>
       </div>
+      <!-- Потолок цены в монополии (Задача 3) — виден только в режиме монополии. -->
+      <div id="mono-ceiling" style="display:none;margin-top:10px;">
+        <label class="chk"><input type="checkbox" id="chk-mono-ceil">
+          <span class="swatch" style="background:#b45309"></span> Потолок цены</label>
+        <div class="field" id="mono-ceil-field" style="display:none;">
+          <label>Цена Pc = <b id="mono-ceil-val">0</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="mono-ceil-slider" min="0" max="100" step="1" value="0" style="flex:1;margin-top:0;">
+            <input type="number" id="mono-ceil-input" min="0" max="100" step="0.1" value="0"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+          <div class="hint">Потолок ниже монопольной цены делает MR горизонтальным (=&nbsp;Pc) до пересечения
+            со спросом — это «ломаный MR». Правильный потолок увеличивает выпуск (вплоть до конкурентного);
+            слишком низкий (ниже MC) — даёт дефицит. Линию можно тянуть мышью.</div>
+        </div>
+      </div>
       <div id="info-mono" style="margin-top:8px;"></div>
     </div>
 
@@ -433,6 +449,10 @@ const STATE = {
   showMonoCS: true,
   showMonoVC: true,
   showMonoPS: true,
+  // Потолок цены в монополии (Задача 3): ломаный MR_eff, парадокс роста выпуска.
+  monoCeilOn: false,     // включён ли потолок (перетаскиваемая линия Pc)
+  monoCeilP: 0,          // уровень потолка Pc (0 = не задан)
+  monoCeil: null,        // результат расчёта (выпуск/цена/дефицит/DWL при потолке)
   // Режим калькулятора (Задачи 2–3): 'market' — рынок, 'costs' — издержки фирмы, 'ppf' — КПВ.
   mode: 'market',
   // Издержки фирмы (Задача 2): база — суммарные затраты TC(Q) и постоянные FC.
@@ -886,6 +906,12 @@ function recompute() {
       const psM = integrate(q => Pm - mcAt(q), 0, Qm);               // ∫ (Pm − MC) dQ = TR − VC — излишек производителя
       STATE.mono = { Qm, Pm, mcAtQm, Qc, Pc, dwl, profit, csM, vcM, psM };
     }
+  }
+
+  // Потолок цены в монополии (Задача 3): ломаный MR_eff даёт новый выпуск/цену/дефицит.
+  STATE.monoCeil = null;
+  if (STATE.market === 'monopoly' && STATE.monoCeilOn && STATE.monoCeilP > 0 && STATE.mono) {
+    STATE.monoCeil = monopolyCeiling(STATE.monoCeilP);
   }
 }
 
@@ -1498,6 +1524,22 @@ function updateMonoPanel() {
   html += `<div class="stat"><span>VC (перем. издержки)</span><b>${fmt(m.vcM)}</b></div>`;
   html += `<div class="stat"><span>Излишек произв. (TR&nbsp;−&nbsp;VC)</span><b>${fmt(m.psM)}</b></div>`;
   if (m.profit != null) html += `<div class="stat"><span>Прибыль (TR&nbsp;−&nbsp;TC)</span><b>${fmt(m.profit)}</b></div>`;
+  // Потолок цены (Задача 3): сравнение «было → стало».
+  if (STATE.monoCeilOn && STATE.monoCeil) {
+    const mc = STATE.monoCeil;
+    html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
+    html += `<div class="stat"><span>Потолок Pc</span><b>${fmt(mc.Pc)}</b></div>`;
+    if (!mc.binding) {
+      html += '<div class="hint">Потолок не ниже монопольной цены — не связывает (выпуск прежний).</div>';
+    } else {
+      html += `<div class="stat"><span>Выпуск с потолком</span><b>${fmt(mc.Qstar)} (было ${fmt(m.Qm)})</b></div>`;
+      html += `<div class="stat"><span>Цена</span><b>${fmt(mc.price)}</b></div>`;
+      if (mc.shortage > 1e-6) html += `<div class="stat"><span>Дефицит</span><b>${fmt(mc.shortage)}</b></div>`;
+      if (mc.dwl != null) html += `<div class="stat"><span>DWL с потолком</span><b>${fmt(mc.dwl)} (было ${fmt(m.dwl)})</b></div>`;
+      const dq = mc.Qstar - m.Qm;
+      html += `<div class="hint">${dq > 1e-6 ? 'Потолок увеличил выпуск (парадокс).' : (dq < -1e-6 ? 'Потолок снизил выпуск, возник дефицит.' : 'Выпуск не изменился.')}</div>`;
+    }
+  }
   box.innerHTML = html;
 }
 
@@ -1512,6 +1554,169 @@ function setMarket(mode) {
   // Галочки областей монополии (Задача 1) видны только в режиме монополии.
   const ma = document.getElementById('mono-areas-chk');
   if (ma) ma.style.display = (mode === 'monopoly') ? '' : 'none';
+  // Потолок цены (Задача 3) — тоже только в режиме монополии.
+  const mcl = document.getElementById('mono-ceiling');
+  if (mcl) mcl.style.display = (mode === 'monopoly') ? '' : 'none';
+  redrawAll();
+}
+
+/* ---------------------------------------------------------------------
+   БЛОК 8д. ПОТОЛОК ЦЕНЫ В МОНОПОЛИИ (Задача 3).
+   Потолок Pc делает предельный доход «ломаным»: пока монополист продаёт по
+   фиксированной цене Pc (не сбивая её), MR_eff = Pc — горизонтальна на [0, Q̂],
+   где Q̂ — точка, в которой потолок встречает спрос (D(Q̂)=Pc). Правее Q̂
+   MR_eff = обычный падающий MR. Монополист выпускает там, где ломаный MR_eff
+   пересекает MC. Правильный потолок УВЕЛИЧИВАЕТ выпуск (парадокс); слишком
+   низкий (ниже MC) — даёт дефицит. Всё численно (работает для любых кривых).
+   --------------------------------------------------------------------- */
+
+// Оптимум монополиста при потолке Pc через ломаный MR_eff.
+// Возвращает { binding, Qstar, price, Qhat, shortage, dwl, csM, vcM, psM, Pc }.
+function monopolyCeiling(Pc) {
+  const D = STATE.D, m = STATE.mono;
+  if (!D || !m) return null;
+  const Pm = m.Pm, Qm = m.Qm, Qc = m.Qc;
+  const Qhat = invCurve(D, Pc);                 // объём спроса при цене Pc: D(Q̂)=Pc
+  // Потолок не ниже монопольной цены (или выше спроса) — не связывает.
+  if (Pc >= Pm - 1e-9 || Qhat == null) {
+    return { binding: false, Qstar: Qm, price: Pm, Qhat, shortage: 0, Pc, dwl: m.dwl, csM: m.csM, vcM: m.vcM, psM: m.psM };
+  }
+  // Относительная прибыль R(Q) = ∫ (MR_eff − MC) dQ; MR_eff горизонтальна (=Pc) до Q̂, далее обычный MR.
+  // Разрыв в Q̂ учитываем, разбивая интеграл.
+  const Rel = (Q) => {
+    const a = Math.min(Q, Qhat);
+    let r = integrate(q => Pc - mcAt(q), 0, a);
+    if (Q > Qhat) r += integrate(q => marginalRevenue(D, q) - mcAt(q), Qhat, Q);
+    return r;
+  };
+  // Кандидаты на оптимум: 0, точка MC=Pc на плоской части, сам Q̂, обычный MR=MC за изломом.
+  const cands = [{ Q: 0 }];
+  const qmc = findRootIn(q => Pc - mcAt(q), 0, Qhat);
+  if (qmc != null) cands.push({ Q: qmc });
+  cands.push({ Q: Qhat });
+  const qfall = findRootIn(q => marginalRevenue(D, q) - mcAt(q), Qhat, CONFIG.Qmax);
+  if (qfall != null) cands.push({ Q: qfall });
+  cands.forEach(c => c.R = Rel(c.Q));
+  let best = cands[0];
+  cands.forEach(c => { if (c.R > best.R + 1e-6 || (Math.abs(c.R - best.R) <= 1e-6 && c.Q > best.Q)) best = c; });
+  const Qstar = best.Q;
+  const price = (Qstar <= Qhat + 1e-9) ? Pc : evalCurve(D, Qstar);   // на плоской части цена = потолок
+  const shortage = Math.max(0, Qhat - Qstar);                        // Qd(Pc)=Q̂, Qs=Qstar
+  let dwl = null;
+  if (Qc != null) {                              // потери — площадь между D и MC от Qstar до Qc
+    const lo = Math.min(Qstar, Qc), hi = Math.max(Qstar, Qc);
+    dwl = Math.abs(integrate(q => evalCurve(D, q) - mcAt(q), lo, hi));
+  }
+  // Области CS/VC/PS до нового выпуска при новой цене (для табло и заливок).
+  const csM = integrate(q => evalCurve(D, q) - price, 0, Qstar);
+  const vcM = integrate(q => mcAt(q), 0, Qstar);
+  const psM = integrate(q => price - mcAt(q), 0, Qstar);
+  return { binding: true, Qstar, price, Qhat, shortage, Pc, dwl, csM, vcM, psM };
+}
+
+// Заливки при связывающем потолке: CS/VC/PS до Qstar (при новой цене) + DWL от Qstar до Qc.
+function drawMonoCeilingAreas() {
+  const mc = STATE.monoCeil, m = STATE.mono;
+  if (!mc || !mc.binding || !m) return;
+  const D = STATE.D, g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
+  const Qs = mc.Qstar, P = mc.price;
+  if (Qs > 1e-6) {
+    const s1 = samp(0, Qs);
+    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d))); g.append('path').datum(s1).attr('d', a).attr('fill', '#94a3b8').attr('opacity', 0.22); }
+    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(P)); g.append('path').datum(s1).attr('d', a).attr('fill', '#e05052').attr('opacity', 0.16); }
+    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s1).attr('d', a).attr('fill', '#4f7cff').attr('opacity', 0.16); }
+  }
+  if (m.Qc != null) {                            // DWL — между D и MC от Qstar до Qc
+    const lo = Math.min(Qs, m.Qc), hi = Math.max(Qs, m.Qc);
+    if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28); }
+  }
+}
+
+// Ломаный предельный доход MR_eff: горизонталь на уровне Pc до Q̂ + «обрыв» вниз в Q̂.
+function drawMonoKinkedMR() {
+  const mc = STATE.monoCeil;
+  if (!mc || !mc.binding || mc.Qhat == null) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const yPc = sy(mc.Pc);
+  g.append('line').attr('x1', sx(0)).attr('y1', yPc).attr('x2', sx(mc.Qhat)).attr('y2', yPc)
+    .attr('stroke', '#8b5cf6').attr('stroke-width', 3).attr('stroke-dasharray', '2 2');
+  const mrHat = marginalRevenue(STATE.D, mc.Qhat);   // обрыв MR в Q̂ вниз к обычному MR
+  if (!isNaN(mrHat)) {
+    g.append('line').attr('x1', sx(mc.Qhat)).attr('y1', yPc).attr('x2', sx(mc.Qhat)).attr('y2', sy(Math.max(0, mrHat)))
+      .attr('stroke', '#8b5cf6').attr('stroke-width', 1.5).attr('stroke-dasharray', '2 2').attr('opacity', 0.6);
+  }
+  g.append('text').attr('x', sx(mc.Qhat * 0.4)).attr('y', yPc - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#8b5cf6')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MRэфф = Pc');
+}
+
+// Точки при связывающем потолке: новый выпуск M(Qstar, price), призрак M₀(Qm,Pm), полоса дефицита.
+function drawMonoCeilingPoints() {
+  const mc = STATE.monoCeil, m = STATE.mono;
+  if (!mc || !mc.binding || !m) return;
+  const ox = sx(0), oy = sy(0), g = svg.append('g');
+  const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  // Призрак исходной монополии M₀(Qm, Pm).
+  if (STATE.showGhost) {
+    const [px0, py0] = toPx(m.Qm, m.Pm);
+    g.append('circle').attr('cx', px0).attr('cy', py0).attr('r', 4).attr('fill', '#fff').attr('stroke', '#aaa').attr('stroke-width', 1.5);
+    g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#999')
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('M₀');
+  }
+  // Новый выпуск/цена (Qstar, price).
+  if (mc.Qstar > 1e-6) {
+    const [pxm, pym] = toPx(mc.Qstar, mc.price);
+    dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
+    g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('M');
+    haloText(g, pxm, oy + 8, 'Q=' + fmt(mc.Qstar), 'middle', 'hanging');
+  }
+  // Дефицит на оси Q между Qstar и Q̂ (объём спроса при цене Pc).
+  if (mc.shortage > 1e-6) {
+    const xLo = sx(Math.min(mc.Qstar, mc.Qhat)), xHi = sx(Math.max(mc.Qstar, mc.Qhat));
+    g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', '#dc2626').attr('stroke-width', 5).attr('opacity', 0.5);
+    haloText(g, sx(mc.Qhat), oy + 8, 'Qd=' + fmt(mc.Qhat), 'middle', 'hanging');
+    haloText(g, (xLo + xHi) / 2, oy + 24, 'Дефицит = ' + fmt(mc.shortage), 'middle', 'hanging');
+  }
+}
+
+// Перетаскиваемая линия потолка (рисуется всегда, пока потолок включён).
+function drawMonoCeilingLine() {
+  if (!STATE.monoCeilOn || !(STATE.monoCeilP > 0)) return;
+  const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax), yPc = sy(STATE.monoCeilP);
+  const g = svg.append('g');
+  g.append('line').attr('x1', ox).attr('y1', yPc).attr('x2', xMax).attr('y2', yPc)
+    .attr('stroke', '#b45309').attr('stroke-width', 2.5).style('pointer-events', 'none');
+  haloText(g, ox - 8, yPc, 'Pc=' + fmt(STATE.monoCeilP), 'end', 'middle');
+  const hit = g.append('rect').attr('x', ox).attr('y', yPc - 12).attr('width', xMax - ox).attr('height', 24)
+    .attr('fill', 'transparent').style('cursor', 'grab');
+  attachMonoCeilDrag(hit);
+  g.append('circle').attr('cx', ox + (xMax - ox) * 0.72).attr('cy', yPc).attr('r', 7)
+    .attr('fill', '#b45309').attr('stroke', '#fff').attr('stroke-width', 2).style('pointer-events', 'none');
+}
+
+function attachMonoCeilDrag(sel) {
+  sel.call(d3.drag().container(() => svg.node())
+    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('drag', (event) => { setMonoCeil(sy.invert(event.y)); })
+    .on('end', () => { document.body.style.cursor = ''; }));
+}
+
+// Записать уровень потолка в поля панели (без перерисовки) — для синхронизации перетаскивания.
+function setMonoCeilFields(p) {
+  STATE.monoCeilP = p;
+  const s = document.getElementById('mono-ceil-slider'); if (s) s.value = p;
+  const l = document.getElementById('mono-ceil-val'); if (l) l.textContent = fmt(p);
+  const i = document.getElementById('mono-ceil-input'); if (i) i.value = fmt(p);
+}
+
+// Единый путь смены потолка (ползунок, числовое поле, перетаскивание линии).
+function setMonoCeil(p) {
+  const s = document.getElementById('mono-ceil-slider');
+  const maxP = s ? (parseFloat(s.max) || CONFIG.Pmax) : CONFIG.Pmax;
+  p = Math.max(0, Math.min(p, maxP));
+  setMonoCeilFields(p);
   redrawAll();
 }
 
@@ -1656,7 +1861,7 @@ function setRanges(qmax, pmax) {
   CONFIG.Qmax = qmax; CONFIG.Pmax = pmax;
   const qi = document.getElementById('inp-qmax'); if (qi) qi.value = qmax;
   const pi = document.getElementById('inp-pmax'); if (pi) pi.value = pmax;
-  ['tax-slider', 'tax-input', 'pc-slider', 'pc-input'].forEach(id => {
+  ['tax-slider', 'tax-input', 'pc-slider', 'pc-input', 'mono-ceil-slider', 'mono-ceil-input'].forEach(id => {
     const e = document.getElementById(id); if (e) e.max = pmax;
   });
 }
@@ -2234,11 +2439,22 @@ function redrawAll() {
   drawGrid();
   drawAxes();
   if (STATE.market === 'monopoly') {
-    // Монополия: потери DWL (под кривыми), затем D/MC, MR и точки оптимума.
-    drawMonopolyAreas();
-    drawCurves();                // спрос D и (если задана явно) кривая MC
-    drawMonopoly();              // MR + (если MC выведена из TC) сама MC
-    drawMonopolyPoints();        // точки M и MR=MC, проекции, конкурентный ориентир
+    if (STATE.monoCeil && STATE.monoCeil.binding) {
+      // Связывающий потолок (Задача 3): ломаный MR_eff, новый выпуск, дефицит.
+      drawMonoCeilingAreas();    // CS/VC/PS до нового Q + DWL (Qstar..Qc)
+      drawCurves();              // спрос D и (если задана явно) кривая MC
+      drawMonopoly();            // обычный падающий MR
+      drawMonoKinkedMR();        // ломаный MR_eff (горизонталь на Pc до Q̂)
+      drawMonoCeilingPoints();   // новый M(Qstar,price), призрак M₀(Qm,Pm), дефицит
+      drawMonoCeilingLine();     // перетаскиваемая линия потолка
+    } else {
+      // Монополия без связывающего потолка: потери DWL, D/MC, MR и точки оптимума.
+      drawMonopolyAreas();
+      drawCurves();              // спрос D и (если задана явно) кривая MC
+      drawMonopoly();            // MR + (если MC выведена из TC) сама MC
+      drawMonopolyPoints();      // точки M и MR=MC, проекции, конкурентный ориентир
+      if (STATE.monoCeilOn) drawMonoCeilingLine();   // линия видна, но не связывает
+    }
   } else {
     // Конкуренция: заливки + кривые + равновесие/вмешательство.
     if (STATE.taxActive) drawTaxAreas();
@@ -2431,6 +2647,10 @@ function wireControls() {
       if (ps) ps.max = v;             // верхний предел регулируемой цены — тоже Pmax
       const pi = document.getElementById('pc-input');
       if (pi) pi.max = v;
+      const mcs = document.getElementById('mono-ceil-slider');
+      if (mcs) mcs.max = v;           // верхний предел потолка монополии — тоже Pmax
+      const mci = document.getElementById('mono-ceil-input');
+      if (mci) mci.max = v;
       redrawAll();
     }
   });
@@ -2477,6 +2697,20 @@ function wireControls() {
   const segMono = document.getElementById('seg-mono');
   if (segComp) segComp.addEventListener('click', () => setMarket('comp'));
   if (segMono) segMono.addEventListener('click', () => setMarket('monopoly'));
+
+  // Потолок цены в монополии (Задача 3): галочка + ползунок + числовое поле.
+  const mCeilChk = document.getElementById('chk-mono-ceil');
+  if (mCeilChk) mCeilChk.addEventListener('change', () => {
+    STATE.monoCeilOn = mCeilChk.checked;
+    const f = document.getElementById('mono-ceil-field'); if (f) f.style.display = mCeilChk.checked ? '' : 'none';
+    // При включении ставим линию на уровень монопольной цены (пока не связывает) — точка отсчёта.
+    if (mCeilChk.checked && !(STATE.monoCeilP > 0) && STATE.mono) setMonoCeilFields(Math.round(STATE.mono.Pm));
+    redrawAll();
+  });
+  const mCeilSlider = document.getElementById('mono-ceil-slider');
+  if (mCeilSlider) mCeilSlider.addEventListener('input', () => setMonoCeil(parseFloat(mCeilSlider.value)));
+  const mCeilInput = document.getElementById('mono-ceil-input');
+  if (mCeilInput) mCeilInput.addEventListener('change', () => { const v = parseFloat(mCeilInput.value); if (!isNaN(v)) setMonoCeil(v); });
 
   // Переключатель режима «Рынок / Издержки / КПВ» (Задачи 2–3).
   [['mode-market', 'market'], ['mode-costs', 'costs'], ['mode-ppf', 'ppf']].forEach(([id, mode]) => {
