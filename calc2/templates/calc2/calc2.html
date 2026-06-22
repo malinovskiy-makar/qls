@@ -221,6 +221,19 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div id="info-tax" style="margin-top:8px;"></div>
     </div>
 
+    <!-- Структура рынка: конкуренция / монополия (Задача 3) -->
+    <div class="section" id="sec-mono">
+      <div class="section-title">Рынок</div>
+      <div class="seg">
+        <button class="seg-btn active" id="seg-comp">Конкуренция</button>
+        <button class="seg-btn" id="seg-mono">Монополия</button>
+      </div>
+      <div class="hint" id="mono-hint" style="display:none;">Монополист выпускает там, где <b>MR&nbsp;=&nbsp;MC</b>,
+        и берёт цену с кривой спроса (выше предельных издержек). Нужны: спрос (роль D) и предельные издержки
+        (роль MC, либо TC, либо S как MC). Серым — потери общества (DWL) против конкуренции.</div>
+      <div id="info-mono" style="margin-top:8px;"></div>
+    </div>
+
     <!-- Оси и сетка (шаг 2) -->
     <div class="section" id="sec-axes">
       <div class="section-title">Оси и сетка</div>
@@ -286,6 +299,7 @@ const STATE = {
                      // 'ceiling' — потолок цены, 'floor' — пол цены
   pReg: 0,           // регулируемая цена (для потолка / пола); 0 = не задана
   showGhost: true,   // показывать бледное исходное состояние «было → стало»
+  market: 'comp',    // структура рынка: 'comp' — конкуренция, 'monopoly' — монополия (MR=MC)
 };
 
 /* ---------------------------------------------------------------------
@@ -633,7 +647,9 @@ function recompute() {
   // Налог сдвигает S вверх на t, субсидия — вниз на s. Дальше математика общая.
   STATE.taxActive = false;
   STATE.taxEq = null;
-  const isTaxType = (STATE.intervType === 'tax' || STATE.intervType === 'subsidy');
+  // В режиме монополии конкурентные сценарии вмешательства отключены.
+  const compMarket = (STATE.market !== 'monopoly');
+  const isTaxType = compMarket && (STATE.intervType === 'tax' || STATE.intervType === 'subsidy');
   if (isTaxType && STATE.tax > 0 && STATE.D && STATE.S && STATE.eq) {
     const shift = (STATE.intervType === 'subsidy') ? -STATE.tax : STATE.tax;
     const sShift = { fn: q => evalCurve(STATE.S, q) + shift };   // синтетическая S ± ставка
@@ -664,7 +680,7 @@ function recompute() {
 
   // Ценовое регулирование: потолок / пол цены (Задача 1).
   // Государство фиксирует P_reg. Объём торговли — короткая сторона рынка.
-  STATE.pcMode = (STATE.intervType === 'ceiling' || STATE.intervType === 'floor');
+  STATE.pcMode = compMarket && (STATE.intervType === 'ceiling' || STATE.intervType === 'floor');
   STATE.pcActive = false;
   STATE.pc = null;
   if (STATE.pcMode && STATE.D && STATE.S && STATE.eq && STATE.pReg > 0) {
@@ -686,6 +702,27 @@ function recompute() {
       const lo = Math.min(Qtrade, STATE.eq.Q), hi = Math.max(Qtrade, STATE.eq.Q);
       STATE.pc.dwl = Math.abs(integrate(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi));
       STATE.pcActive = true;
+    }
+  }
+
+  // Монополия: оптимум MR = MC, цена берётся с кривой спроса (Задача 3).
+  STATE.mono = null;
+  if (STATE.market === 'monopoly' && STATE.D && (mcSourceCurve() || curveByRole('tc'))) {
+    const Qm = findRoot(q => marginalRevenue(STATE.D, q) - mcAt(q));   // MR(Q) = MC(Q)
+    if (Qm != null && Qm > 0) {
+      const Pm = evalCurve(STATE.D, Qm);          // цена монополии — на кривой спроса
+      const mcAtQm = mcAt(Qm);
+      const Qc = findRoot(q => evalCurve(STATE.D, q) - mcAt(q));       // конкуренция: D = MC
+      const Pc = (Qc != null) ? mcAt(Qc) : null;
+      let dwl = null;
+      if (Qc != null) {                            // потери — площадь между D и MC от Qm до Qc
+        const lo = Math.min(Qm, Qc), hi = Math.max(Qm, Qc);
+        dwl = Math.abs(integrate(q => evalCurve(STATE.D, q) - mcAt(q), lo, hi));
+      }
+      let profit = null;                           // прибыль — только если задана ATC
+      const ATC = curveByRole('atc');
+      if (ATC) { const a = evalCurve(ATC, Qm); if (!isNaN(a)) profit = (Pm - a) * Qm; }
+      STATE.mono = { Qm, Pm, mcAtQm, Qc, Pc, dwl, profit };
     }
   }
 }
@@ -1145,6 +1182,147 @@ function drawGhost() {
 }
 
 /* ---------------------------------------------------------------------
+   БЛОК 8г. МОНОПОЛИЯ — предельный доход MR и предельные издержки MC (Задача 3).
+   Монополист выпускает Q, где MR = MC, и берёт цену с кривой спроса.
+   MR и MC — производные: численно (центральная разность), поэтому работают
+   для ЛЮБОЙ формы кривой спроса и затрат.
+   --------------------------------------------------------------------- */
+
+// Источник предельных издержек: явная кривая MC, иначе предложение S
+// (в совершенной конкуренции S = MC — стандартное допущение, удобно как fallback).
+function mcSourceCurve() {
+  return curveByRole('mc') || curveByRole('supply') || null;
+}
+
+// Предельные издержки в точке Q: прямая кривая MC/S, иначе d(TC)/dQ.
+function mcAt(q) {
+  const direct = mcSourceCurve();
+  if (direct) return evalCurve(direct, q);
+  const TC = curveByRole('tc');
+  if (TC) {
+    const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
+    const a = evalCurve(TC, q + h), b = evalCurve(TC, q - h);
+    if (isNaN(a) || isNaN(b)) return NaN;
+    return (a - b) / (2 * h);            // центральная разность производной
+  }
+  return NaN;
+}
+
+// Предельный доход MR(Q) = d(TR)/dQ, где TR = P(Q)·Q = D(Q)·Q.
+// Центральная разность точна для линейного спроса (даёт MR = a − 2bQ).
+function marginalRevenue(D, q) {
+  const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
+  const tr = (x) => { const p = evalCurve(D, x); return isNaN(p) ? NaN : p * x; };
+  const a = tr(q + h), b = tr(q - h);
+  if (isNaN(a) || isNaN(b)) return NaN;
+  return (a - b) / (2 * h);
+}
+
+// Заливка DWL монополии (между D и MC от Qm до Qc).
+function drawMonopolyAreas() {
+  if (!STATE.mono || STATE.mono.Qc == null) return;
+  const m = STATE.mono;
+  const lo = Math.min(m.Qm, m.Qc), hi = Math.max(m.Qm, m.Qc);
+  if (hi <= lo) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
+  const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(STATE.D, d)));
+  g.append('path').datum(samp).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28);
+}
+
+// Кривая MR (пунктир) и — если MC выведена из TC — сама кривая MC.
+function drawMonopoly() {
+  if (!STATE.mono) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  const sample = (f) => {
+    const pts = [];
+    for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = f(q); pts.push(isNaN(v) ? null : [q, v]); }
+    return pts;
+  };
+  // MR — фиолетовый пунктир.
+  g.append('path').datum(sample(q => marginalRevenue(STATE.D, q)))
+    .attr('fill', 'none').attr('stroke', '#8b5cf6').attr('stroke-width', 2)
+    .attr('stroke-dasharray', '6 4').attr('d', line);
+  // Если MC выведена из TC (нет явной кривой mc/S) — нарисуем её красным.
+  if (!mcSourceCurve() && curveByRole('tc')) {
+    g.append('path').datum(sample(mcAt))
+      .attr('fill', 'none').attr('stroke', '#e05052').attr('stroke-width', 2.5).attr('d', line);
+  }
+}
+
+// Точки оптимума, проекции и конкурентный ориентир (бледный, по галочке «было → стало»).
+function drawMonopolyPoints() {
+  if (!STATE.mono) return;
+  const m = STATE.mono;
+  const ox = sx(0), oy = sy(0);
+  const g = svg.append('g');
+  const [pxm, pym] = toPx(m.Qm, m.Pm);
+  const [, pymc] = toPx(m.Qm, m.mcAtQm);
+  const dash = (x1, y1, x2, y2) => g.append('line')
+    .attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+
+  // Конкурентный ориентир (Qc, Pc) — бледный, как призрак (Задача 2).
+  if (STATE.showGhost && m.Qc != null) {
+    const [pxc, pyc] = toPx(m.Qc, m.Pc);
+    g.append('circle').attr('cx', pxc).attr('cy', pyc).attr('r', 4)
+      .attr('fill', '#fff').attr('stroke', '#aaa').attr('stroke-width', 1.5);
+    g.append('text').attr('x', pxc + 7).attr('y', pyc + 13)
+      .attr('font-size', 11).attr('font-weight', 600).attr('fill', '#999')
+      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('К');
+    haloText(g, pxc, oy + 8, 'Qc=' + fmt(m.Qc), 'middle', 'hanging');
+  }
+
+  // Вертикаль Qm (через точку MR=MC до спроса) + горизонталь к оси P.
+  dash(pxm, oy, pxm, pym);
+  dash(ox, pym, pxm, pym);
+  // Точка MR=MC (фиолетовая) на вертикали.
+  g.append('circle').attr('cx', pxm).attr('cy', pymc).attr('r', 3.5)
+    .attr('fill', '#8b5cf6').attr('stroke', '#fff').attr('stroke-width', 1.2);
+  // Точка монополии (Qm, Pm) на кривой спроса.
+  g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5)
+    .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+  g.append('text').attr('x', pxm + 8).attr('y', pym - 8)
+    .attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('M');
+  haloText(g, pxm, oy + 8, 'Qm=' + fmt(m.Qm), 'middle', 'hanging');
+  haloText(g, ox - 8, pym, 'Pm=' + fmt(m.Pm), 'end', 'middle');
+}
+
+// Табло монополии: Qm, Pm, конкурентные Qc/Pc, DWL, прибыль (если задана ATC).
+function updateMonoPanel() {
+  const box = document.getElementById('info-mono');
+  if (!box) return;
+  if (!STATE.D) { box.innerHTML = '<div class="muted">Отметьте кривую спроса (роль D).</div>'; return; }
+  if (!mcSourceCurve() && !curveByRole('tc')) {
+    box.innerHTML = '<div class="muted">Нужны предельные издержки: роль MC (либо TC, либо S как MC).</div>'; return;
+  }
+  if (!STATE.mono) { box.innerHTML = '<div class="warn">Оптимум MR = MC не найден в первой четверти.</div>'; return; }
+  const m = STATE.mono;
+  let html = '';
+  html += `<div class="stat"><span>Qm (монополия)</span><b>${fmt(m.Qm)}</b></div>`;
+  html += `<div class="stat"><span>Pm (цена)</span><b>${fmt(m.Pm)}</b></div>`;
+  if (m.Qc != null) {
+    html += `<div class="stat"><span>Qc (конкуренция)</span><b>${fmt(m.Qc)}</b></div>`;
+    html += `<div class="stat"><span>Pc (конкуренция)</span><b>${fmt(m.Pc)}</b></div>`;
+  }
+  if (m.dwl != null) html += `<div class="stat"><span>DWL (потери)</span><b>${fmt(m.dwl)}</b></div>`;
+  if (m.profit != null) html += `<div class="stat"><span>Прибыль</span><b>${fmt(m.profit)}</b></div>`;
+  box.innerHTML = html;
+}
+
+// Переключатель структуры рынка: конкуренция ↔ монополия.
+function setMarket(mode) {
+  STATE.market = mode;
+  const c = document.getElementById('seg-comp'), mo = document.getElementById('seg-mono');
+  if (c) c.classList.toggle('active', mode === 'comp');
+  if (mo) mo.classList.toggle('active', mode === 'monopoly');
+  const mh = document.getElementById('mono-hint');
+  if (mh) mh.style.display = (mode === 'monopoly') ? '' : 'none';
+  redrawAll();
+}
+
+/* ---------------------------------------------------------------------
    БЛОК 9. redrawAll() — единая точка перерисовки.
    Любое изменение (кривая, перетаскивание, налог) дёргает её.
    --------------------------------------------------------------------- */
@@ -1156,20 +1334,30 @@ function redrawAll() {
   addDefs();
   drawGrid();
   drawAxes();
-  // Заливки (под кривыми): налог, ценовое регулирование или обычные CS/PS.
-  if (STATE.taxActive) drawTaxAreas();
-  else if (STATE.pcActive) drawPcAreas();
-  else drawAreas();
-  drawGhost();                   // бледный слой «было» под кривыми/точками
-  drawCurves();
-  drawShiftedSupply();           // пунктирная S + t (если налог активен)
-  // Точки/линии: налог E₀/E₁, регулирование цены или обычное равновесие E*.
-  if (STATE.taxActive) drawTaxPoints();
-  else if (STATE.pcMode) drawPriceControl();
-  else drawEquilibrium();
+  if (STATE.market === 'monopoly') {
+    // Монополия: потери DWL (под кривыми), затем D/MC, MR и точки оптимума.
+    drawMonopolyAreas();
+    drawCurves();                // спрос D и (если задана явно) кривая MC
+    drawMonopoly();              // MR + (если MC выведена из TC) сама MC
+    drawMonopolyPoints();        // точки M и MR=MC, проекции, конкурентный ориентир
+  } else {
+    // Конкуренция: заливки + кривые + равновесие/вмешательство.
+    if (STATE.taxActive) drawTaxAreas();
+    else if (STATE.pcActive) drawPcAreas();
+    else drawAreas();
+    drawGhost();                 // бледный слой «было» под кривыми/точками
+    drawCurves();
+    drawShiftedSupply();         // пунктирная S + t (если налог активен)
+    // Точки/линии: налог E₀/E₁, регулирование цены или обычное равновесие E*.
+    if (STATE.taxActive) drawTaxPoints();
+    else if (STATE.pcMode) drawPriceControl();
+    else drawEquilibrium();
+  }
   updateInfoPanel();
   updateAreasPanel();
-  if (STATE.pcMode) updatePcPanel(); else updateTaxPanel();
+  if (STATE.market === 'monopoly') updateMonoPanel();
+  else if (STATE.pcMode) updatePcPanel();
+  else updateTaxPanel();
 }
 
 /* ---------------------------------------------------------------------
@@ -1256,7 +1444,8 @@ function renderCurveList() {
     // Нижняя строка: роль кривой (обычная / спрос / предложение).
     const sel = document.createElement('select');
     sel.className = 'role-sel';
-    [['', '— обычная кривая'], ['demand', 'D — спрос'], ['supply', 'S — предложение']]
+    [['', '— обычная кривая'], ['demand', 'D — спрос'], ['supply', 'S — предложение'],
+     ['mc', 'MC — пред. издержки'], ['tc', 'TC — суммарные затраты'], ['atc', 'ATC — средние затраты']]
       .forEach(([v, t]) => {
         const o = document.createElement('option'); o.value = v; o.textContent = t;
         sel.appendChild(o);
@@ -1325,6 +1514,12 @@ function wireControls() {
   document.getElementById('seg-sub').addEventListener('click', () => setType('subsidy'));
   document.getElementById('seg-ceil').addEventListener('click', () => setType('ceiling'));
   document.getElementById('seg-floor').addEventListener('click', () => setType('floor'));
+
+  // Переключатель рынка «Конкуренция / Монополия».
+  const segComp = document.getElementById('seg-comp');
+  const segMono = document.getElementById('seg-mono');
+  if (segComp) segComp.addEventListener('click', () => setMarket('comp'));
+  if (segMono) segMono.addEventListener('click', () => setMarket('monopoly'));
 
   // Регулируемая цена (потолок / пол): ползунок (целые) + числовое поле (дробные).
   const pcSlider = document.getElementById('pc-slider');
