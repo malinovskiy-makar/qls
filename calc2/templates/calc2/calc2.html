@@ -191,7 +191,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
       <div class="field" style="margin-top:8px;">
         <label>Ставка <span id="rate-letter">t</span> = <b id="tax-val">0</b></label>
-        <input type="range" id="tax-slider" min="0" max="100" step="any" value="0">
+        <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+          <input type="range" id="tax-slider" min="0" max="100" step="1" value="0"
+                 style="flex:1;margin-top:0;">
+          <input type="number" id="tax-input" min="0" max="100" step="0.1" value="0"
+                 style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+        </div>
       </div>
       <div class="hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
         (налог — вверх, субсидия — вниз) на величину ставки. Клин между ценами покупателя
@@ -460,8 +465,10 @@ function drawAxes() {
     .attr('stroke', AX).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
 
   // Деления и числа на оси X (0 пропускаем — он отдельно в начале координат).
+  // Деления ближе 14 px к концу оси не печатаем — иначе налезают на стрелку и букву Q.
   sx.ticks(10).forEach(t => {
     if (t <= 0 || t > CONFIG.Qmax) return;
+    if (sx(t) > xEnd - 14) return;
     g.append('line').attr('x1', sx(t)).attr('y1', oy).attr('x2', sx(t)).attr('y2', oy + 5)
       .attr('stroke', AX).attr('stroke-width', 1);
     g.append('text').attr('x', sx(t)).attr('y', oy + 8)
@@ -471,6 +478,7 @@ function drawAxes() {
   // Деления и числа на оси Y.
   sy.ticks(8).forEach(t => {
     if (t <= 0 || t > CONFIG.Pmax) return;
+    if (sy(t) < yEnd + 14) return;
     g.append('line').attr('x1', ox).attr('y1', sy(t)).attr('x2', ox - 5).attr('y2', sy(t))
       .attr('stroke', AX).attr('stroke-width', 1);
     g.append('text').attr('x', ox - 8).attr('y', sy(t))
@@ -482,13 +490,14 @@ function drawAxes() {
     .attr('text-anchor', 'end').attr('dominant-baseline', 'hanging')
     .attr('font-size', 10).attr('fill', LBL).text('0');
 
-  // Подписи осей: Q (под осью справа), P (слева сверху от оси Y).
-  g.append('text').attr('x', xEnd).attr('y', oy + 30)
-    .attr('text-anchor', 'middle').attr('font-size', 13).attr('font-weight', 600)
+  // Подписи осей: Q (справа от стрелки), P (над стрелкой).
+  g.append('text').attr('x', xEnd + 6).attr('y', oy + 4)
+    .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
+    .attr('font-size', 13).attr('font-weight', 600)
     .attr('fill', '#333').text('Q');
-  g.append('text').attr('x', ox - 14).attr('y', yEnd)
-    .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
-    .attr('font-size', 13).attr('font-weight', 600).attr('fill', '#333').text('P');
+  g.append('text').attr('x', ox - 4).attr('y', yEnd - 12)
+    .attr('text-anchor', 'end').attr('font-size', 13).attr('font-weight', 600)
+    .attr('fill', '#333').text('P');
 }
 
 /* ---------------------------------------------------------------------
@@ -786,36 +795,58 @@ function drawTaxPoints() {
   g.append('circle').attr('cx', xQ1).attr('cy', yPs).attr('r', 4)
     .attr('fill', '#e05052').attr('stroke', '#fff').attr('stroke-width', 1.5);
 
-  // Клин налога: вертикальный отрезок между Ps и Pb. Его можно тянуть мышью.
+  // Клин налога: вертикальный отрезок между Ps и Pb.
   g.append('line').attr('x1', xQ1).attr('y1', yPs).attr('x2', xQ1).attr('y2', yPb)
-    .attr('stroke', '#1a1f2e').attr('stroke-width', 2.5);
+    .attr('stroke', '#1a1f2e').attr('stroke-width', 2.5).style('pointer-events', 'none');
   const letter = (STATE.intervType === 'subsidy') ? 's=' : 't=';
-  haloText(g, xQ1 + 9, (yPb + yPs) / 2, letter + fmt(STATE.tax), 'start', 'middle');
-  const hit = g.append('line').attr('x1', xQ1).attr('y1', yPs).attr('x2', xQ1).attr('y2', yPb)
-    .attr('stroke', 'transparent').attr('stroke-width', 18).style('cursor', 'ns-resize');
-  attachTaxDrag(hit);
+  const yMid = (yPb + yPs) / 2;
+  haloText(g, xQ1 + 16, yMid, letter + fmt(STATE.tax), 'start', 'middle');
+  // Широкая прозрачная зона захвата поверх клина — удобно хватать мышью.
+  const hitRect = g.append('rect')
+    .attr('x', xQ1 - 13).attr('y', Math.min(yPb, yPs))
+    .attr('width', 26).attr('height', Math.abs(yPb - yPs))
+    .attr('fill', 'transparent')
+    .style('cursor', 'grab');
+  attachTaxDrag(hitRect);
+  // Видимая ручка в середине клина (сигнал «меня можно тянуть»).
+  g.append('circle').attr('cx', xQ1).attr('cy', yMid).attr('r', 7)
+    .attr('fill', '#f59e0b').attr('stroke', '#fff').attr('stroke-width', 2)
+    .style('pointer-events', 'none');
 }
 
-// Перетаскивание клина: вертикальное движение меняет ставку налога t.
+// Перетаскивание клина: вертикальное движение меняет ставку налога/субсидии.
+// Используем абсолютное смещение от начала перетаскивания — устойчивее дельт.
 function attachTaxDrag(sel) {
+  let startY, startTax;
   sel.call(d3.drag()
     .container(() => svg.node())
+    .on('start', (event) => {
+      startY = event.y;
+      startTax = STATE.tax;
+      document.body.style.cursor = 'grabbing';
+    })
     .on('drag', (event) => {
-      // переводим пиксельный сдвиг в изменение цены (=изменение t)
-      const dPrice = sy.invert(event.y) - sy.invert(event.y - event.dy);
-      setTax(STATE.tax + dPrice);
+      // sy.invert: меньший пиксель = выше на экране = бо́льшая цена.
+      // Тянем вверх (y уменьшается) → dP > 0 → ставка растёт.
+      const dP = sy.invert(event.y) - sy.invert(startY);
+      setTax(startTax + dP);
+    })
+    .on('end', () => {
+      document.body.style.cursor = '';
     }));
 }
 
-// Установить ставку налога (общий путь для ползунка и клина) + синхронизация.
+// Установить ставку налога (единый путь для ползунка, числового поля и клина).
 function setTax(t) {
   const slider = document.getElementById('tax-slider');
   const maxT = slider ? (parseFloat(slider.max) || CONFIG.Pmax) : CONFIG.Pmax;
   t = Math.max(0, Math.min(t, maxT));
   STATE.tax = t;
-  if (slider) slider.value = t;
+  if (slider) slider.value = t;                        // ползунок (step=1, целые)
   const lbl = document.getElementById('tax-val');
   if (lbl) lbl.textContent = fmt(t);
+  const inp = document.getElementById('tax-input');
+  if (inp) inp.value = fmt(t);                         // числовое поле (точное)
   redrawAll();
 }
 
@@ -1000,6 +1031,8 @@ function wireControls() {
       CONFIG.Pmax = v;
       const slider = document.getElementById('tax-slider');
       if (slider) slider.max = v;     // верхний предел налога ≈ масштаб цены
+      const inp = document.getElementById('tax-input');
+      if (inp) inp.max = v;
       redrawAll();
     }
   });
@@ -1014,6 +1047,15 @@ function wireControls() {
   // Ползунок ставки (синхронизирован с перетаскиванием клина через setTax).
   const taxSlider = document.getElementById('tax-slider');
   taxSlider.addEventListener('input', () => setTax(parseFloat(taxSlider.value)));
+
+  // Числовое поле ставки: принимает дробные значения (0.1), точнее ползунка.
+  const taxInput = document.getElementById('tax-input');
+  if (taxInput) {
+    taxInput.addEventListener('change', () => {
+      const v = parseFloat(taxInput.value);
+      if (!isNaN(v)) setTax(v);
+    });
+  }
 
   // Переключатель «Налог / Субсидия».
   document.getElementById('seg-tax').addEventListener('click', () => setType('tax'));
