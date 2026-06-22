@@ -55,6 +55,28 @@ input, select { font: inherit; }
   letter-spacing: .04em; color: var(--text2); margin-bottom: 8px;
 }
 
+/* Элементы управления в панели */
+.field { margin-bottom: 8px; }
+.field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 3px; }
+.field input[type="text"], .field input[type="number"], .field select {
+  width: 100%; padding: 6px 8px; border: .5px solid var(--border);
+  border-radius: var(--r); background: #fff; color: var(--text);
+}
+.row { display: flex; gap: 8px; }
+.row .field { flex: 1; }
+.chk { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; margin-bottom: 6px; }
+.chk input { cursor: pointer; }
+.btn {
+  width: 100%; padding: 8px 10px; border: none; border-radius: var(--r);
+  background: var(--accent); color: #fff; font-weight: 500; font-size: 13px;
+}
+.btn:hover { background: #3f6ae8; }
+.btn-sm {
+  padding: 3px 8px; border: .5px solid var(--border); border-radius: 5px;
+  background: #fff; color: var(--text2); font-size: 12px;
+}
+.btn-sm:hover { color: var(--text); border-color: #ccc; }
+
 /* Область графика справа */
 .graph-wrap {
   flex: 1; position: relative; background: #fff; overflow: hidden;
@@ -80,19 +102,28 @@ input, select { font: inherit; }
     <div class="subtitle">бета · собственный движок (D3&nbsp;+&nbsp;Math.js)</div>
 
     <!-- Сюда следующие шаги добавят: ввод формулы, список кривых,
-         равновесие, области CS/PS, налог. Пока панель почти пустая. -->
-    <div class="section" id="panel-content">
-      <div class="section-title">Управление</div>
-      <div style="font-size:12px;color:var(--text2);line-height:1.5;">
-        Элементы управления появятся на следующих шагах разработки.
+         равновесие, области CS/PS, налог. -->
+
+    <!-- Оси и сетка (шаг 2) -->
+    <div class="section" id="sec-axes">
+      <div class="section-title">Оси и сетка</div>
+      <div class="row">
+        <div class="field">
+          <label>Q макс</label>
+          <input type="number" id="inp-qmax" min="1" step="1" value="100">
+        </div>
+        <div class="field">
+          <label>P макс</label>
+          <input type="number" id="inp-pmax" min="1" step="1" value="100">
+        </div>
       </div>
+      <label class="chk"><input type="checkbox" id="chk-grid" checked> Показывать сетку</label>
     </div>
   </aside>
 
   <!-- ── ОБЛАСТЬ ГРАФИКА ───────────────────────────────────────────── -->
   <div class="graph-wrap" id="graph-wrap">
     <svg id="chart"></svg>
-    <div class="empty-hint" id="empty-hint">График появится на шаге&nbsp;2 (оси и сетка)</div>
   </div>
 
 </div>
@@ -140,16 +171,146 @@ const STATE = {
 //  появятся на соответствующих шагах)
 
 /* ---------------------------------------------------------------------
-   БЛОК 3. КООРДИНАТЫ И ОСИ — заполняется на шаге 2
+   БЛОК 3. КООРДИНАТЫ И ОСИ
+   Рисуем только первую четверть: Q вправо, P вверх. Начало (0,0) —
+   в левом нижнем углу. Оси, сетку и подписи рисуем сами через D3.
    --------------------------------------------------------------------- */
-// (scaleX / scaleY / toPx / toData / drawAxes появятся на шаге 2)
+const svg = d3.select('#chart');   // корневой SVG-элемент
+let W = 0, H = 0;                  // размеры области графика в пикселях
+let sx, sy;                       // D3-шкалы: данные -> пиксели
+
+// Размер SVG берём из контейнера (обновляется при изменении окна).
+function computeSize() {
+  const wrap = document.getElementById('graph-wrap');
+  W = wrap.clientWidth;
+  H = wrap.clientHeight;
+  svg.attr('width', W).attr('height', H);
+}
+
+// Линейные шкалы по двум осям.
+// X: Q из [0..Qmax] -> пиксели [левое поле .. правый край].
+// Y: P из [0..Pmax] -> пиксели [низ .. верх] (диапазон перевёрнут: больше P = выше).
+function makeScales() {
+  const m = CONFIG.margin;
+  sx = d3.scaleLinear().domain([0, CONFIG.Qmax]).range([m.left, W - m.right]);
+  sy = d3.scaleLinear().domain([0, CONFIG.Pmax]).range([H - m.bottom, m.top]);
+}
+
+// Перевод координат туда-обратно (пригодится для перетаскивания мышью).
+function toPx(q, p) { return [sx(q), sy(p)]; }
+function toData(px, py) { return [sx.invert(px), sy.invert(py)]; }
+
+// Формат числа для подписей делений (без длинных хвостов после точки).
+function fmt(v) {
+  if (Math.abs(v) >= 1000) return d3.format('.2~s')(v);
+  return (Math.round(v * 100) / 100).toString();
+}
+
+// Стрелки на концах осей — один раз как <marker> в <defs>.
+function addDefs() {
+  const defs = svg.append('defs');
+  defs.append('marker')
+    .attr('id', 'arrow').attr('viewBox', '0 0 10 10')
+    .attr('refX', 8).attr('refY', 5)
+    .attr('markerWidth', 7).attr('markerHeight', 7)
+    .attr('orient', 'auto-start-reverse')
+    .append('path').attr('d', 'M0,0 L10,5 L0,10 z').attr('fill', '#555');
+}
+
+// Лёгкая сетка по делениям шкал. Рисуется под осями, поэтому первой.
+function drawGrid() {
+  if (!STATE.showGrid) return;
+  const g = svg.append('g').attr('class', 'grid');
+  const x0 = sx(0), xMax = sx(CONFIG.Qmax);
+  const y0 = sy(0), yMax = sy(CONFIG.Pmax);
+  sx.ticks(10).forEach(t => {              // вертикальные линии (по оси Q)
+    if (t <= 0) return;
+    g.append('line').attr('x1', sx(t)).attr('y1', y0).attr('x2', sx(t)).attr('y2', yMax)
+      .attr('stroke', '#eee').attr('stroke-width', 1);
+  });
+  sy.ticks(8).forEach(t => {               // горизонтальные линии (по оси P)
+    if (t <= 0) return;
+    g.append('line').attr('x1', x0).attr('y1', sy(t)).attr('x2', xMax).attr('y2', sy(t))
+      .attr('stroke', '#eee').attr('stroke-width', 1);
+  });
+}
+
+// Положительные полуоси со стрелками, делениями, числами и подписями Q/P.
+function drawAxes() {
+  const g = svg.append('g').attr('class', 'axes');
+  const ox = sx(0), oy = sy(0);            // пиксели начала координат (0,0)
+  const xEnd = sx(CONFIG.Qmax), yEnd = sy(CONFIG.Pmax);
+  const AX = '#555', LBL = '#666';
+
+  // Ось X (вправо) и ось Y (вверх) со стрелками на концах.
+  g.append('line').attr('x1', ox).attr('y1', oy).attr('x2', xEnd).attr('y2', oy)
+    .attr('stroke', AX).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+  g.append('line').attr('x1', ox).attr('y1', oy).attr('x2', ox).attr('y2', yEnd)
+    .attr('stroke', AX).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+
+  // Деления и числа на оси X (0 пропускаем — он отдельно в начале координат).
+  sx.ticks(10).forEach(t => {
+    if (t <= 0 || t > CONFIG.Qmax) return;
+    g.append('line').attr('x1', sx(t)).attr('y1', oy).attr('x2', sx(t)).attr('y2', oy + 5)
+      .attr('stroke', AX).attr('stroke-width', 1);
+    g.append('text').attr('x', sx(t)).attr('y', oy + 8)
+      .attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
+      .attr('font-size', 10).attr('fill', LBL).text(fmt(t));
+  });
+  // Деления и числа на оси Y.
+  sy.ticks(8).forEach(t => {
+    if (t <= 0 || t > CONFIG.Pmax) return;
+    g.append('line').attr('x1', ox).attr('y1', sy(t)).attr('x2', ox - 5).attr('y2', sy(t))
+      .attr('stroke', AX).attr('stroke-width', 1);
+    g.append('text').attr('x', ox - 8).attr('y', sy(t))
+      .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
+      .attr('font-size', 10).attr('fill', LBL).text(fmt(t));
+  });
+  // Единственный «0» в начале координат.
+  g.append('text').attr('x', ox - 8).attr('y', oy + 8)
+    .attr('text-anchor', 'end').attr('dominant-baseline', 'hanging')
+    .attr('font-size', 10).attr('fill', LBL).text('0');
+
+  // Подписи осей: Q (под осью справа), P (слева сверху от оси Y).
+  g.append('text').attr('x', xEnd).attr('y', oy + 30)
+    .attr('text-anchor', 'middle').attr('font-size', 13).attr('font-weight', 600)
+    .attr('fill', '#333').text('Q');
+  g.append('text').attr('x', ox - 14).attr('y', yEnd)
+    .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
+    .attr('font-size', 13).attr('font-weight', 600).attr('fill', '#333').text('P');
+}
 
 /* ---------------------------------------------------------------------
    БЛОК 9. redrawAll() — единая точка перерисовки.
    Любое изменение (кривая, перетаскивание, налог) дёргает её.
    --------------------------------------------------------------------- */
 function redrawAll() {
-  // Пока перерисовывать нечего — наполнится на следующих шагах.
+  computeSize();
+  makeScales();
+  svg.selectAll('*').remove();   // полная перерисовка с чистого листа
+  addDefs();
+  drawGrid();
+  drawAxes();
+  // Следующие шаги добавят сюда: drawCurves(); drawEquilibrium(); drawAreas(); ...
+}
+
+/* ---------------------------------------------------------------------
+   БЛОК UI. Привязка элементов управления панели к логике.
+   --------------------------------------------------------------------- */
+function wireControls() {
+  const qmax = document.getElementById('inp-qmax');
+  const pmax = document.getElementById('inp-pmax');
+  const grid = document.getElementById('chk-grid');
+
+  qmax.addEventListener('change', () => {
+    const v = parseFloat(qmax.value);
+    if (v > 0) { CONFIG.Qmax = v; redrawAll(); }
+  });
+  pmax.addEventListener('change', () => {
+    const v = parseFloat(pmax.value);
+    if (v > 0) { CONFIG.Pmax = v; redrawAll(); }
+  });
+  grid.addEventListener('change', () => { STATE.showGrid = grid.checked; redrawAll(); });
 }
 
 /* ---------------------------------------------------------------------
@@ -162,7 +323,10 @@ function init() {
     return;
   }
   console.log('calc2: D3', d3.version, '| Math.js загружен');
+  wireControls();
   redrawAll();
+  // Перерисовываем при изменении размера окна, чтобы оси не «съезжали».
+  window.addEventListener('resize', redrawAll);
 }
 
 document.addEventListener('DOMContentLoaded', init);
