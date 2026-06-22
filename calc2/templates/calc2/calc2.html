@@ -77,6 +77,29 @@ input, select { font: inherit; }
 }
 .btn-sm:hover { color: var(--text); border-color: #ccc; }
 
+/* Подсказки, ошибки, код в подсказках */
+.hint { font-size: 11px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
+.hint code { background: #ececec; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+.muted { font-size: 12px; color: var(--text2); }
+.error { font-size: 12px; color: #e05052; margin-top: 8px; display: none; line-height: 1.4; }
+
+/* Список кривых */
+.curve-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: .5px solid var(--border);
+}
+.curve-row:last-child { border-bottom: none; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.curve-name {
+  flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+.btn-icon {
+  border: none; background: none; color: var(--text2);
+  font-size: 14px; padding: 2px 4px; line-height: 1; flex-shrink: 0;
+}
+.btn-icon:hover { color: #e05052; }
+
 /* Область графика справа */
 .graph-wrap {
   flex: 1; position: relative; background: #fff; overflow: hidden;
@@ -101,8 +124,20 @@ input, select { font: inherit; }
     <h1>Графический калькулятор&nbsp;2.0</h1>
     <div class="subtitle">бета · собственный движок (D3&nbsp;+&nbsp;Math.js)</div>
 
-    <!-- Сюда следующие шаги добавят: ввод формулы, список кривых,
-         равновесие, области CS/PS, налог. -->
+    <!-- Сюда следующие шаги добавят: равновесие, области CS/PS, налог. -->
+
+    <!-- Кривые (шаг 3) -->
+    <div class="section" id="sec-curves">
+      <div class="section-title">Кривые</div>
+      <div class="field">
+        <input type="text" id="inp-formula" placeholder="например: 100 - Q" autocomplete="off">
+      </div>
+      <button class="btn" id="btn-add-curve">Добавить кривую</button>
+      <div class="hint">Цена как функция количества: P&nbsp;=&nbsp;f(Q).<br>
+        Примеры: <code>100 - Q</code>, <code>100 - 0.5*Q</code>, <code>Q^2/10</code>, <code>50 - sqrt(Q)*3</code></div>
+      <div class="error" id="curve-error"></div>
+      <div id="curve-list" style="margin-top:10px;"></div>
+    </div>
 
     <!-- Оси и сетка (шаг 2) -->
     <div class="section" id="sec-axes">
@@ -165,10 +200,35 @@ const STATE = {
 };
 
 /* ---------------------------------------------------------------------
-   БЛОК 2. МАТЕМАТИКА — заполняется на шагах 3, 5, 6
+   БЛОК 2. МАТЕМАТИКА
+   «Всеядность»: любую формулу разбирает и считает Math.js. Поэтому код
+   ниже одинаково работает и для прямых, и для кривых (парабол, корней…).
    --------------------------------------------------------------------- */
-// (функции compileFormula / evalCurve / findEquilibrium / integrate
-//  появятся на соответствующих шагах)
+
+// Компиляция формулы P = f(Q). Возвращает { compiled, error }.
+// Пользователь пишет от Q; внутри даём Math.js обе переменные (Q и x),
+// чтобы принимались оба варианта записи.
+function compileFormula(expr) {
+  try {
+    const compiled = math.parse(expr).compile();
+    compiled.evaluate({ x: 1, Q: 1 });   // пробный расчёт ловит опечатки сразу
+    return { compiled, error: null };
+  } catch (e) {
+    return { compiled: null, error: e.message };
+  }
+}
+
+// Значение кривой в точке Q. Возвращает число или NaN (на ошибке/разрыве).
+function evalCurve(curve, q) {
+  try {
+    const v = curve.compiled.evaluate({ x: q, Q: q });
+    return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+  } catch (e) {
+    return NaN;
+  }
+}
+
+// (findEquilibrium — шаг 5; integrate — шаг 6)
 
 /* ---------------------------------------------------------------------
    БЛОК 3. КООРДИНАТЫ И ОСИ
@@ -215,6 +275,14 @@ function addDefs() {
     .attr('markerWidth', 7).attr('markerHeight', 7)
     .attr('orient', 'auto-start-reverse')
     .append('path').attr('d', 'M0,0 L10,5 L0,10 z').attr('fill', '#555');
+
+  // Прямоугольник-«окно» первой четверти. Всё, что нарисовано с этим
+  // clip-path, обрезается ровно по осям (P от 0 до Pmax, Q от 0 до Qmax) —
+  // кривые и заливки не вылезают в отрицательную зону и за границы.
+  defs.append('clipPath').attr('id', 'plot-clip').append('rect')
+    .attr('x', sx(0)).attr('y', sy(CONFIG.Pmax))
+    .attr('width', sx(CONFIG.Qmax) - sx(0))
+    .attr('height', sy(0) - sy(CONFIG.Pmax));
 }
 
 // Лёгкая сетка по делениям шкал. Рисуется под осями, поэтому первой.
@@ -281,6 +349,42 @@ function drawAxes() {
 }
 
 /* ---------------------------------------------------------------------
+   БЛОК 4. КРИВЫЕ — отрисовка кривых по формулам.
+   --------------------------------------------------------------------- */
+
+// Палитра: цвета кривым выдаются по очереди при добавлении.
+const PALETTE = ['#4f7cff', '#e05052', '#21a366', '#f59e0b', '#8b5cf6', '#0891b2'];
+function nextColor() { return PALETTE[STATE.curves.length % PALETTE.length]; }
+
+// Набор точек кривой: 400 отрезков по Q. NaN -> разрыв (null).
+// Точки с P<0 или P>Pmax не выбрасываем — их аккуратно срежет clip-path
+// по первой четверти (см. addDefs), линия обрывается ровно на оси.
+function curvePoints(curve) {
+  const N = 400;
+  const out = [];
+  for (let i = 0; i <= N; i++) {
+    const q = CONFIG.Qmax * i / N;
+    const p = evalCurve(curve, q);
+    out.push(isNaN(p) ? null : [q, p]);
+  }
+  return out;
+}
+
+// Рисуем все видимые кривые внутри «окна» первой четверти.
+function drawCurves() {
+  const g = svg.append('g').attr('class', 'curves').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line()
+    .defined(d => d !== null)               // разрыв там, где формула не считается
+    .x(d => sx(d[0])).y(d => sy(d[1]));
+  STATE.curves.forEach(curve => {
+    if (!curve.visible) return;
+    g.append('path').datum(curvePoints(curve))
+      .attr('fill', 'none').attr('stroke', curve.color).attr('stroke-width', 2.5)
+      .attr('d', line);
+  });
+}
+
+/* ---------------------------------------------------------------------
    БЛОК 9. redrawAll() — единая точка перерисовки.
    Любое изменение (кривая, перетаскивание, налог) дёргает её.
    --------------------------------------------------------------------- */
@@ -291,16 +395,87 @@ function redrawAll() {
   addDefs();
   drawGrid();
   drawAxes();
-  // Следующие шаги добавят сюда: drawCurves(); drawEquilibrium(); drawAreas(); ...
+  drawCurves();
+  // Следующие шаги добавят сюда: drawEquilibrium(); drawAreas(); ...
 }
 
 /* ---------------------------------------------------------------------
-   БЛОК UI. Привязка элементов управления панели к логике.
+   БЛОК UI. Элементы управления панели и их привязка к логике.
    --------------------------------------------------------------------- */
+
+// Сообщение об ошибке формулы (понятно пользователю, без падения страницы).
+function showError(msg) {
+  const box = document.getElementById('curve-error');
+  box.textContent = msg; box.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('curve-error').style.display = 'none';
+}
+
+let curveCounter = 0;   // сквозной счётчик id кривых
+
+// Добавить кривую по формуле из поля ввода.
+function addCurve(expr) {
+  expr = (expr || '').trim();
+  if (!expr) { showError('Введите формулу, например 100 - Q'); return; }
+  const { compiled, error } = compileFormula(expr);
+  if (error) { showError('Не понял формулу: ' + error); return; }
+  hideError();
+  curveCounter++;
+  STATE.curves.push({
+    id: curveCounter, expr, compiled,
+    color: nextColor(), name: expr, role: null, visible: true,
+  });
+  renderCurveList();
+  redrawAll();
+}
+
+// Перерисовать список кривых в панели.
+function renderCurveList() {
+  const list = document.getElementById('curve-list');
+  list.innerHTML = '';
+  if (STATE.curves.length === 0) {
+    list.innerHTML = '<div class="muted">Пока нет кривых.</div>';
+    return;
+  }
+  STATE.curves.forEach(curve => {
+    const row = document.createElement('div');
+    row.className = 'curve-row';
+
+    // Галочка видимости
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = curve.visible; cb.title = 'Показать/скрыть';
+    cb.addEventListener('change', () => { curve.visible = cb.checked; renderCurveList(); redrawAll(); });
+
+    // Цветной квадратик
+    const sw = document.createElement('span');
+    sw.className = 'swatch'; sw.style.background = curve.color;
+
+    // Название (формула)
+    const nm = document.createElement('span');
+    nm.className = 'curve-name'; nm.textContent = curve.name;
+    if (!curve.visible) nm.style.opacity = '.4';
+
+    // Кнопка удаления
+    const del = document.createElement('button');
+    del.className = 'btn-icon'; del.textContent = '✕'; del.title = 'Удалить кривую';
+    del.addEventListener('click', () => {
+      STATE.curves = STATE.curves.filter(c => c.id !== curve.id);
+      renderCurveList();
+      redrawAll();
+    });
+
+    row.append(cb, sw, nm, del);
+    list.appendChild(row);
+  });
+}
+
 function wireControls() {
   const qmax = document.getElementById('inp-qmax');
   const pmax = document.getElementById('inp-pmax');
   const grid = document.getElementById('chk-grid');
+  const formula = document.getElementById('inp-formula');
+  const addBtn = document.getElementById('btn-add-curve');
 
   qmax.addEventListener('change', () => {
     const v = parseFloat(qmax.value);
@@ -311,6 +486,11 @@ function wireControls() {
     if (v > 0) { CONFIG.Pmax = v; redrawAll(); }
   });
   grid.addEventListener('change', () => { STATE.showGrid = grid.checked; redrawAll(); });
+
+  // Добавление кривой: по кнопке и по Enter в поле формулы.
+  const submit = () => { addCurve(formula.value); formula.value = ''; formula.focus(); };
+  addBtn.addEventListener('click', submit);
+  formula.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
 }
 
 /* ---------------------------------------------------------------------
@@ -324,6 +504,7 @@ function init() {
   }
   console.log('calc2: D3', d3.version, '| Math.js загружен');
   wireControls();
+  renderCurveList();
   redrawAll();
   // Перерисовываем при изменении размера окна, чтобы оси не «съезжали».
   window.addEventListener('resize', redrawAll);
