@@ -2866,6 +2866,7 @@ function recomputeLabor() {
   STATE.laborS = curveByRole('supply');
   STATE.laborEq = STATE.laborMono = STATE.laborMin = null;
   STATE.laborWorkerCS = STATE.laborFirmCS = null;
+  STATE.laborMinWelfare = null;
   const D = STATE.laborD, S = STATE.laborS;
   if (!D || !S) return;
   // Конкурентное равновесие D = S — считаем всегда (нужно и как ориентир монопсонии).
@@ -2890,6 +2891,21 @@ function recomputeLabor() {
     STATE.laborMin = (STATE.laborStruct === 'monopsony')
       ? laborMinMonopsony(STATE.laborMinW)
       : laborMinCompetition(STATE.laborMinW);
+  }
+  // Благосостояние при связывающем МРОТ (Задача 3): перестраиваем под фактическое
+  // состояние (занятость L*, фактическая зарплата W_факт) — единый источник чисел для
+  // заливок и табло. L* и W_факт берём из уже найденного STATE.laborMin (не пересчитываем).
+  if (STATE.laborMin && STATE.laborMin.binding && eq) {
+    const min = STATE.laborMin;
+    const Lstar = (STATE.laborStruct === 'monopsony') ? min.Lstar : min.employment;
+    const Wfact = (STATE.laborStruct === 'monopsony') ? min.wage : min.Wmin;
+    if (Lstar != null && Lstar > 0 && Wfact != null) {
+      const workerCS = integrate(l => Wfact - evalCurve(S, l), 0, Lstar);   // над S, под W_факт, до L*
+      const firmCS = integrate(l => evalCurve(D, l) - Wfact, 0, Lstar);     // под D, над W_факт, до L*
+      const Lk = eq.Q, lo = Math.min(Lstar, Lk), hi = Math.max(Lstar, Lk);
+      const dwl = Math.abs(integrate(l => evalCurve(D, l) - evalCurve(S, l), lo, hi));  // между D и S от L* до Lk
+      STATE.laborMinWelfare = { Lstar, Wfact, workerCS, firmCS, dwl };
+    }
   }
 }
 
@@ -2928,6 +2944,31 @@ function drawLaborSurpluses() {
   // Излишек фирм — между зарплатой W (низ) и спросом D=MRPL (верх).
   const fA = d3.area().x(d => sx(d)).y0(sy(W)).y1(d => sy(evalCurve(D, d)));
   g.append('path').datum(samp).attr('d', fA).attr('fill', '#4f7cff').attr('opacity', 0.16);
+}
+
+// Благосостояние при связывающем МРОТ (Задача 3): перестроенные излишки + DWL.
+// Те же цвета/стиль, что без МРОТ; границы по L* и W_факт из STATE.laborMinWelfare
+// (стыкуются без зазоров). Работает в обеих структурах (конкуренция и монопсония).
+function drawLaborMinWelfare() {
+  const wf = STATE.laborMinWelfare, eq = STATE.laborEq;
+  if (!wf || !eq) return;
+  const D = STATE.laborD, S = STATE.laborS, Lstar = wf.Lstar, Wfact = wf.Wfact;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
+  const s1 = samp(0, Lstar);
+  // Излишек рабочих — между предложением S (низ) и фактической зарплатой (верх), до L*.
+  const wA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(Wfact));
+  g.append('path').datum(s1).attr('d', wA).attr('fill', '#e05052').attr('opacity', 0.16);
+  // Излишек фирм — между фактической зарплатой (низ) и спросом D (верх), до L*.
+  const fA = d3.area().x(d => sx(d)).y0(sy(Wfact)).y1(d => sy(evalCurve(D, d)));
+  g.append('path').datum(s1).attr('d', fA).attr('fill', '#4f7cff').attr('opacity', 0.16);
+  // DWL — между D и S от L* до конкурентной занятости Lk (недозанятость/безработица).
+  const Lk = eq.Q, lo = Math.min(Lstar, Lk), hi = Math.max(Lstar, Lk);
+  if (hi > lo) {
+    const s2 = samp(lo, hi);
+    const dA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
+    g.append('path').datum(s2).attr('d', dA).attr('fill', '#888').attr('opacity', 0.28);
+  }
 }
 
 // Кривая MCL монопсонии (оранжевый пунктир). При связывающем МРОТ — ломаная MCL_eff.
@@ -3122,6 +3163,12 @@ function updateLaborPanel() {
       html += `<div class="stat"><span>Занятость с МРОТ</span><b>${fmt(min.Lstar)} (было ${fmt(m.Lm)})</b></div>`;
       html += `<div class="stat"><span>Зарплата</span><b>${fmt(min.wage)}</b></div>`;
       if (min.unemployment > 1e-6) html += `<div class="stat"><span>Безработица</span><b>${fmt(min.unemployment)}</b></div>`;
+      const w = STATE.laborMinWelfare;
+      if (w) {
+        html += `<div class="stat"><span>Излишек рабочих</span><b>${fmt(w.workerCS)}</b></div>`;
+        html += `<div class="stat"><span>Излишек фирм</span><b>${fmt(w.firmCS)}</b></div>`;
+        html += `<div class="stat"><span>DWL (потери)</span><b>${fmt(w.dwl)}</b></div>`;
+      }
       const dl = min.Lstar - m.Lm;
       html += `<div class="hint">${dl > 1e-6 ? 'МРОТ увеличил занятость (парадокс монопсонии).' : (dl < -1e-6 ? 'МРОТ снизил занятость.' : 'Занятость не изменилась.')}</div>`;
     } else if (STATE.laborMinOn && STATE.laborMinW > 0) {
@@ -3138,6 +3185,12 @@ function updateLaborPanel() {
       html += `<div class="stat"><span>МРОТ W_min</span><b>${fmt(min.Wmin)}</b></div>`;
       html += `<div class="stat"><span>Занятость</span><b>${fmt(min.employment)} (было ${fmt(eq.Q)})</b></div>`;
       if (min.unemployment > 1e-6) html += `<div class="stat"><span>Безработица</span><b>${fmt(min.unemployment)}</b></div>`;
+      const w = STATE.laborMinWelfare;
+      if (w) {
+        html += `<div class="stat"><span>Излишек рабочих</span><b>${fmt(w.workerCS)}</b></div>`;
+        html += `<div class="stat"><span>Излишек фирм</span><b>${fmt(w.firmCS)}</b></div>`;
+        html += `<div class="stat"><span>DWL (потери)</span><b>${fmt(w.dwl)}</b></div>`;
+      }
       html += `<div class="hint">МРОТ выше равновесия: занятость падает до спроса при W_min, возникает безработица (избыток предложения труда).</div>`;
     } else if (STATE.laborMinOn && STATE.laborMinW > 0) {
       html += '<div class="hint" style="margin-top:6px;">МРОТ ниже равновесия — не связывает. Рынок в равновесии.</div>';
@@ -3153,13 +3206,16 @@ function redrawLabor() {
   addDefs();
   drawGrid();
   drawAxes('L', 'W');
+  const minBind = (STATE.laborMin && STATE.laborMin.binding);
   if (STATE.laborStruct === 'monopsony') {
-    drawLaborDWL();              // потери (между D и S от Lm до Lk)
+    if (minBind) drawLaborMinWelfare();   // перестроенные излишки + DWL под МРОТ (Задача 3)
+    else drawLaborDWL();                  // потери монопсонии (между D и S от Lm до Lk)
     drawCurves();               // спрос на труд D и предложение S (с перетаскиванием прямых)
-    drawLaborMCL();             // MCL пунктиром (или ломаная MCL_eff при МРОТ)
+    drawLaborMCL();             // настоящая MCL целиком + эффективная ломаная при МРОТ
     drawLaborMonopsonyPoints(); // оптимум, зарплата, ориентир, безработица
   } else {
-    if (!(STATE.laborMin && STATE.laborMin.binding)) drawLaborSurpluses();  // излишки только без связывающего МРОТ
+    if (minBind) drawLaborMinWelfare();   // перестроенные излишки + DWL под МРОТ (Задача 3)
+    else drawLaborSurpluses();            // излишки рабочих/фирм в равновесии
     drawCurves();
     drawLaborCompPoints();      // равновесие или занятость/безработица при МРОТ
   }
