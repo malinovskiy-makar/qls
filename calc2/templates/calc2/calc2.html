@@ -453,11 +453,35 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="seg">
         <button class="seg-btn active" id="lab-comp">Конкуренция</button>
         <button class="seg-btn" id="lab-mono">Монопсония</button>
+        <button class="seg-btn" id="lab-union">Профсоюз</button>
       </div>
       <div class="hint">Спрос на труд (роль <b>D</b>) — это MRPL; предложение труда (роль <b>S</b>).
         Оси: L (труд) и W (зарплата). Формулы можно писать через L: <code>100 - L</code>, <code>L</code>.</div>
+      <!-- Профсоюз (ЧК4): монополист труда. Под-модели — монополист / диктат зарплаты.
+           Виден только при структуре «Профсоюз». -->
+      <div id="union-pane" style="display:none;margin-top:10px;">
+        <div class="seg">
+          <button class="seg-btn active" id="un-monopoly">Монополист</button>
+          <button class="seg-btn" id="un-wagefloor">Диктат зарплаты</button>
+        </div>
+        <div class="hint" id="un-hint-mono">Профсоюз продаёт труд монопольно: его предельный
+          доход MRL лежит ниже спроса D, предельные издержки — кривая предложения S.
+          Занятость Lп там, где MRL&nbsp;=&nbsp;S; зарплата Wп берётся с кривой спроса (выше
+          конкурентной). Зеркало монопсонии.</div>
+        <div class="field" id="union-wage-field" style="display:none;margin-top:8px;">
+          <label>Зарплата профсоюза W = <b id="union-wage-val">0</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="union-wage-slider" min="0" max="100" step="1" value="0" style="flex:1;margin-top:0;">
+            <input type="number" id="union-wage-input" min="0" max="100" step="0.1" value="0"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+          <div class="hint">Профсоюз диктует зарплату выше конкурентной: занятость падает по кривой
+            СПРОСА (Lп, где D&nbsp;=&nbsp;W), возникает безработица (желающие по предложению минус занятые).
+            Это ценовой пол на рынке труда. Линию можно тянуть мышью.</div>
+        </div>
+      </div>
       <!-- Минимальная зарплата (МРОТ) — горизонтальная линия, тянется мышью (Задача 3). -->
-      <div style="margin-top:10px;">
+      <div id="labmin-block" style="margin-top:10px;">
         <label class="chk"><input type="checkbox" id="chk-labmin">
           <span class="swatch" style="background:#b45309"></span> Минимальная зарплата (МРОТ)</label>
         <div class="field" id="labmin-field" style="display:none;">
@@ -727,7 +751,11 @@ const STATE = {
   // Режим калькулятора: 'market' — рынок, 'costs' — издержки фирмы, 'ppf' — КПВ, 'labor' — рынок труда.
   mode: 'market',
   // Рынок труда (Чекпоинт 1): структура и минимальная зарплата. Оси L (труд) / W (зарплата).
-  laborStruct: 'competition',  // 'competition' — конкуренция, 'monopsony' — монопсония (один наниматель)
+  laborStruct: 'competition',  // 'competition' — конкуренция, 'monopsony' — монопсония, 'union' — профсоюз (ЧК4)
+  unionModel: 'monopoly',      // профсоюз: 'monopoly' — монополист труда (MRL=S), 'wagefloor' — диктат зарплаты
+  unionWage: 0,                // уровень зарплаты профсоюза при диктате (0 = не задан)
+  unionWageVisited: false,     // первый вход в диктат — выставить зарплату-ориентир
+  laborUnion: null,            // результат профсоюза (Lп, Wп, безработица, DWL)
   laborMinOn: false,           // включён ли МРОТ (перетаскиваемая линия W_min)
   laborMinW: 0,                // уровень МРОТ (0 = не задан)
   laborVisited: false,         // первый вход в режим — выставить пресет (D 100-L, S L)
@@ -2957,6 +2985,34 @@ function laborMinCompetition(Wmin) {
   return { binding, Wmin, Qd, Qs, employment, unemployment };
 }
 
+// Профсоюз как монополист труда (ЧК4) — зеркало монопсонии. Профсоюз продаёт труд
+// монопольно: спрос на труд D (=MRPL) — его «спрос», предельный доход MRL ниже D;
+// «предельные издержки» — кривая предложения S (резервная зарплата). Оптимум Lп:
+// MRL = S. Зарплата Wп берётся с кривой спроса D в точке Lп (выше конкурентной).
+function laborUnionMonopoly() {
+  const D = STATE.laborD, S = STATE.laborS, eq = STATE.laborEq;
+  if (!D || !S) return null;
+  const Lu = findRoot(l => { const mr = marginalRevenue(D, l), s = evalCurve(S, l); return (isNaN(mr) || isNaN(s)) ? NaN : mr - s; });
+  if (Lu == null || Lu <= 1e-6) return null;
+  const Wu = evalCurve(D, Lu);                       // зарплата = D(Lп), НЕ MRL и НЕ S
+  let dwl = null;
+  if (eq) { const lo = Math.min(Lu, eq.Q), hi = Math.max(Lu, eq.Q); dwl = Math.abs(integrate(l => evalCurve(D, l) - evalCurve(S, l), lo, hi)); }
+  return { Lu, Wu, Lk: eq ? eq.Q : null, Wk: eq ? eq.P : null, dwl };
+}
+
+// Профсоюз диктует зарплату W выше конкурентной (ЧК4): занятость падает по кривой
+// СПРОСА (Lп где D(Lп)=W), желающих работать — по предложению (Qs где S=W).
+// Безработица = Qs − Lп. Это ровно ценовой пол на рынке труда.
+function laborUnionWageFloor(W) {
+  const D = STATE.laborD, S = STATE.laborS, eq = STATE.laborEq;
+  if (!D || !S || !eq) return null;
+  const binding = (W > eq.P + 1e-9);
+  const Lu = invCurve(D, W);                         // занятость = D⁻¹(W) (короткая сторона)
+  const Qs = invCurve(S, W);                         // желающие работать = S⁻¹(W)
+  const unemployment = (Lu != null && Qs != null) ? Math.max(0, Qs - Lu) : null;
+  return { binding, W, Lu, Qs, employment: Lu, unemployment, Lk: eq.Q, Wk: eq.P };
+}
+
 // Пересчёт рынка труда БЕЗ рисования — складываем результаты в STATE.
 function recomputeLabor() {
   STATE.laborD = curveByRole('demand');
@@ -2964,6 +3020,7 @@ function recomputeLabor() {
   STATE.laborEq = STATE.laborMono = STATE.laborMin = null;
   STATE.laborWorkerCS = STATE.laborFirmCS = null;
   STATE.laborMinWelfare = null;
+  STATE.laborUnion = null;
   const D = STATE.laborD, S = STATE.laborS;
   if (!D || !S) return;
   // Конкурентное равновесие D = S — считаем всегда (нужно и как ориентир монопсонии).
@@ -2982,6 +3039,12 @@ function recomputeLabor() {
       if (eq) { const lo = Math.min(Lm, eq.Q), hi = Math.max(Lm, eq.Q); dwl = Math.abs(integrate(l => evalCurve(D, l) - evalCurve(S, l), lo, hi)); }
       STATE.laborMono = { Lm, Wm, Lk: eq ? eq.Q : null, Wk: eq ? eq.P : null, dwl };
     }
+  }
+  // Профсоюз (ЧК4): монополист труда (MRL=S) или диктат зарплаты (ценовой пол).
+  if (STATE.laborStruct === 'union') {
+    STATE.laborUnion = (STATE.unionModel === 'wagefloor')
+      ? laborUnionWageFloor(STATE.unionWage)
+      : laborUnionMonopoly();
   }
   // Минимальная зарплата (МРОТ).
   if (STATE.laborMinOn && STATE.laborMinW > 0 && eq) {
@@ -3226,12 +3289,124 @@ function setLaborMin(p) {
   redrawAll();
 }
 
-// Переключатель структуры рынка труда.
+/* --- Профсоюз (ЧК4): отрисовка MRL, точек, безработицы, DWL --- */
+
+// Кривая предельного дохода профсоюза MRL (фиолетовый пунктир, ниже спроса D).
+function drawLaborUnionMRL() {
+  const D = STATE.laborD; if (!D) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  const pts = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; const v = marginalRevenue(D, l); pts.push(isNaN(v) ? null : [l, v]); }
+  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#8b5cf6').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  const ql = CONFIG.Qmax * 0.28, vl = marginalRevenue(D, ql);
+  if (!isNaN(vl) && vl >= 0 && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#8b5cf6')
+    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MRL');
+}
+
+// Серая область DWL между D и S на отрезке [La, Lb] (потери от профсоюза).
+function drawLaborGapDWL(La, Lb) {
+  const D = STATE.laborD, S = STATE.laborS; if (!D || !S || La == null || Lb == null) return;
+  const lo = Math.min(La, Lb), hi = Math.max(La, Lb); if (hi <= lo) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
+  const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
+  g.append('path').datum(samp).attr('d', a).attr('fill', '#888').attr('opacity', 0.28);
+}
+
+// Точки профсоюза: оптимум монополиста (MRL=S, зарплата вверх на D) или диктат зарплаты.
+function drawLaborUnionPoints() {
+  const u = STATE.laborUnion; if (!u) return;
+  drawLaborGhost(u.Lk, u.Wk, 'К');                 // конкурентный ориентир
+  const g = svg.append('g'), ox = sx(0), oy = sy(0);
+  const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  if (STATE.unionModel === 'monopoly') {
+    const S = STATE.laborS, sAt = evalCurve(S, u.Lu);
+    const [px, pyW] = toPx(u.Lu, u.Wu), [, pyS] = toPx(u.Lu, sAt);
+    // Вертикаль Lп: от оси вверх до зарплаты Wп на спросе.
+    g.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', pyW).attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    // Точка MRL=S (фиолетовая) на уровне предложения.
+    g.append('circle').attr('cx', px).attr('cy', pyS).attr('r', 3.5).attr('fill', '#8b5cf6').attr('stroke', '#fff').attr('stroke-width', 1.2);
+    // Зарплата профсоюза Wп на кривой спроса (выше конкурентной).
+    dash(ox, pyW, px, pyW);
+    g.append('circle').attr('cx', px).attr('cy', pyW).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    g.append('text').attr('x', px + 8).attr('y', pyW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('П');
+    haloText(g, px, oy + 8, 'Lп=' + fmt(u.Lu), 'middle', 'hanging');
+    haloText(g, ox - 8, pyW, 'Wп=' + fmt(u.Wu), 'end', 'middle');
+  } else if (u.binding) {
+    // Диктат зарплаты (ценовой пол): занятость по спросу, безработица до предложения.
+    const yW = sy(u.W), xL = sx(u.Lu), xQs = sx(u.Qs);
+    dash(xL, yW, xL, oy); dash(xQs, yW, xQs, oy);
+    haloText(g, xL, oy + 8, 'Lп=' + fmt(u.Lu), 'middle', 'hanging');
+    haloText(g, xQs, oy + 8, 'Lпредл=' + fmt(u.Qs), 'middle', 'hanging');
+    const xLo = Math.min(xL, xQs), xHi = Math.max(xL, xQs);
+    g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', '#dc2626').attr('stroke-width', 5).attr('opacity', 0.5);
+    if (u.unemployment > 1e-6) haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(u.unemployment), 'middle', 'hanging');
+    g.append('circle').attr('cx', xL).attr('cy', yW).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    g.append('text').attr('x', xL + 8).attr('y', yW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('П');
+  }
+}
+
+// Перетаскиваемая линия зарплаты профсоюза (диктат) — как линия МРОТ.
+function drawLaborUnionWageLine() {
+  if (!(STATE.unionWage > 0)) return;
+  const ox = sx(0), xMax = sx(CONFIG.Qmax), yW = sy(STATE.unionWage);
+  const g = svg.append('g');
+  g.append('line').attr('x1', ox).attr('y1', yW).attr('x2', xMax).attr('y2', yW)
+    .attr('stroke', '#0891b2').attr('stroke-width', 2.5).style('pointer-events', 'none');
+  haloText(g, ox - 8, yW, 'Wп=' + fmt(STATE.unionWage), 'end', 'middle');
+  const hit = g.append('rect').attr('x', ox).attr('y', yW - 12).attr('width', xMax - ox).attr('height', 24)
+    .attr('fill', 'transparent').style('cursor', 'grab');
+  attachUnionWageDrag(hit);
+  g.append('circle').attr('cx', ox + (xMax - ox) * 0.6).attr('cy', yW).attr('r', 7)
+    .attr('fill', '#0891b2').attr('stroke', '#fff').attr('stroke-width', 2).style('pointer-events', 'none');
+}
+
+function attachUnionWageDrag(sel) {
+  sel.call(d3.drag().container(() => svg.node())
+    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('drag', (event) => { setUnionWage(sy.invert(event.y)); })
+    .on('end', () => { document.body.style.cursor = ''; }));
+}
+
+// Записать уровень зарплаты профсоюза в поля панели (без перерисовки).
+function setUnionWageFields(p) {
+  STATE.unionWage = p;
+  const s = document.getElementById('union-wage-slider'); if (s) s.value = p;
+  const l = document.getElementById('union-wage-val'); if (l) l.textContent = fmt(p);
+  const i = document.getElementById('union-wage-input'); if (i) i.value = fmt(p);
+}
+// Единый путь смены зарплаты профсоюза (ползунок, поле, перетаскивание).
+function setUnionWage(p) {
+  const s = document.getElementById('union-wage-slider');
+  const maxP = s ? (parseFloat(s.max) || CONFIG.Pmax) : CONFIG.Pmax;
+  p = Math.max(0, Math.min(p, maxP));
+  setUnionWageFields(p);
+  redrawAll();
+}
+
+// Переключатель модели профсоюза: монополист / диктат зарплаты (ЧК4).
+function setUnionModel(model) {
+  STATE.unionModel = model;
+  const a = document.getElementById('un-monopoly'), b = document.getElementById('un-wagefloor');
+  if (a) a.classList.toggle('active', model === 'monopoly');
+  if (b) b.classList.toggle('active', model === 'wagefloor');
+  const wf = document.getElementById('union-wage-field'); if (wf) wf.style.display = (model === 'wagefloor') ? '' : 'none';
+  const hm = document.getElementById('un-hint-mono'); if (hm) hm.style.display = (model === 'monopoly') ? '' : 'none';
+  // Первый вход в диктат — поставить зарплату-ориентир чуть выше конкурентной.
+  if (model === 'wagefloor' && !(STATE.unionWage > 0) && STATE.laborEq) setUnionWageFields(Math.round(STATE.laborEq.P * 1.3));
+  redrawAll();
+}
+
+// Переключатель структуры рынка труда (конкуренция / монопсония / профсоюз).
 function setLaborStruct(mode) {
   STATE.laborStruct = mode;
-  const c = document.getElementById('lab-comp'), mo = document.getElementById('lab-mono');
-  if (c) c.classList.toggle('active', mode === 'competition');
-  if (mo) mo.classList.toggle('active', mode === 'monopsony');
+  [['lab-comp', 'competition'], ['lab-mono', 'monopsony'], ['lab-union', 'union']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === mode); });
+  // Панель профсоюза видна только при структуре «Профсоюз»; МРОТ — только при остальных.
+  const up = document.getElementById('union-pane'); if (up) up.style.display = (mode === 'union') ? '' : 'none';
+  const lb = document.getElementById('labmin-block'); if (lb) lb.style.display = (mode === 'union') ? 'none' : '';
+  if (mode === 'union') setUnionModel(STATE.unionModel);   // синхронизировать под-модель/поля
   redrawAll();
 }
 
@@ -3245,6 +3420,31 @@ function updateLaborPanel() {
   if (!STATE.laborEq) { box.innerHTML = '<div class="warn">Равновесие рынка труда не найдено в первой четверти.</div>'; return; }
   const min = STATE.laborMin, bind = (min && min.binding);
   let html = '';
+  if (STATE.laborStruct === 'union') {
+    const u = STATE.laborUnion;
+    if (!u) { box.innerHTML = '<div class="warn">Оптимум профсоюза не найден.</div>'; return; }
+    if (STATE.unionModel === 'monopoly') {
+      html += `<div class="stat"><span>Lп (занятость)</span><b>${fmt(u.Lu)}</b></div>`;
+      html += `<div class="stat"><span>Wп (зарплата)</span><b>${fmt(u.Wu)}</b></div>`;
+      if (u.Lk != null) html += `<div class="stat"><span>Lk (конкуренция)</span><b>${fmt(u.Lk)}</b></div>`;
+      if (u.Wk != null) html += `<div class="stat"><span>Wk (конкуренция)</span><b>${fmt(u.Wk)}</b></div>`;
+      if (u.dwl != null) html += `<div class="stat"><span>DWL (недозанятость)</span><b>${fmt(u.dwl)}</b></div>`;
+      html += '<div class="hint">Профсоюз-монополист продаёт труд там, где MRL&nbsp;=&nbsp;S, и берёт зарплату Wп с кривой спроса — ВЫШЕ конкурентной, но занятость НИЖЕ. Зеркало монопсонии. Серым — потери общества.</div>';
+    } else {
+      html += `<div class="stat"><span>Зарплата профсоюза Wп</span><b>${fmt(u.W)}</b></div>`;
+      if (u.binding) {
+        html += `<div class="stat"><span>Занятость Lп</span><b>${fmt(u.Lu)} (было ${fmt(u.Lk)})</b></div>`;
+        html += `<div class="stat"><span>Желающих работать</span><b>${fmt(u.Qs)}</b></div>`;
+        if (u.unemployment > 1e-6) html += `<div class="stat"><span>Безработица</span><b>${fmt(u.unemployment)}</b></div>`;
+        html += '<div class="hint">Профсоюз диктует зарплату выше равновесия: занятость падает по спросу, возникает безработица (ценовой пол на рынке труда).</div>';
+      } else {
+        html += `<div class="stat"><span>Lk (конкуренция)</span><b>${fmt(u.Lk)}</b></div>`;
+        html += '<div class="hint" style="margin-top:6px;">Зарплата профсоюза не выше конкурентной — не связывает. Рынок в равновесии.</div>';
+      }
+    }
+    box.innerHTML = html;
+    return;
+  }
   if (STATE.laborStruct === 'monopsony') {
     const m = STATE.laborMono;
     if (!m) { box.innerHTML = '<div class="warn">Оптимум монопсонии (MCL = D) не найден.</div>'; return; }
@@ -3304,7 +3504,15 @@ function redrawLabor() {
   drawGrid();
   drawAxes('L', 'W');
   const minBind = (STATE.laborMin && STATE.laborMin.binding);
-  if (STATE.laborStruct === 'monopsony') {
+  if (STATE.laborStruct === 'union') {
+    // Профсоюз (ЧК4): потери от ограничения труда + кривые + (для монополиста) MRL + точки.
+    const u = STATE.laborUnion;
+    if (u && (STATE.unionModel === 'monopoly' || u.binding)) drawLaborGapDWL(u.Lu, u.Lk);
+    drawCurves();
+    if (STATE.unionModel === 'monopoly') drawLaborUnionMRL();
+    drawLaborUnionPoints();
+    if (STATE.unionModel === 'wagefloor') drawLaborUnionWageLine();
+  } else if (STATE.laborStruct === 'monopsony') {
     if (minBind) drawLaborMinWelfare();   // перестроенные излишки + DWL под МРОТ (Задача 3)
     else drawLaborDWL();                  // потери монопсонии (между D и S от Lm до Lk)
     drawCurves();               // спрос на труд D и предложение S (с перетаскиванием прямых)
@@ -3316,7 +3524,7 @@ function redrawLabor() {
     drawCurves();
     drawLaborCompPoints();      // равновесие или занятость/безработица при МРОТ
   }
-  if (STATE.laborMinOn) drawLaborMinLine();
+  if (STATE.laborMinOn && STATE.laborStruct !== 'union') drawLaborMinLine();
   updateLaborPanel();
 }
 
@@ -3332,7 +3540,7 @@ function setRanges(qmax, pmax) {
   const qi = document.getElementById('inp-qmax'); if (qi) qi.value = qmax;
   const pi = document.getElementById('inp-pmax'); if (pi) pi.value = pmax;
   ['tax-slider', 'tax-input', 'pc-slider', 'pc-input', 'mono-ceil-slider', 'mono-ceil-input',
-   'labmin-slider', 'labmin-input'].forEach(id => {
+   'labmin-slider', 'labmin-input', 'union-wage-slider', 'union-wage-input'].forEach(id => {
     const e = document.getElementById(id); if (e) e.max = pmax;
   });
 }
@@ -4910,6 +5118,16 @@ function wireControls() {
   const labComp = document.getElementById('lab-comp'), labMono = document.getElementById('lab-mono');
   if (labComp) labComp.addEventListener('click', () => setLaborStruct('competition'));
   if (labMono) labMono.addEventListener('click', () => setLaborStruct('monopsony'));
+  // Профсоюз (ЧК4): структура + под-модель + ползунок/поле зарплаты при диктате.
+  const labUnion = document.getElementById('lab-union');
+  if (labUnion) labUnion.addEventListener('click', () => setLaborStruct('union'));
+  const unMono = document.getElementById('un-monopoly'), unWf = document.getElementById('un-wagefloor');
+  if (unMono) unMono.addEventListener('click', () => setUnionModel('monopoly'));
+  if (unWf) unWf.addEventListener('click', () => setUnionModel('wagefloor'));
+  const unWageSlider = document.getElementById('union-wage-slider');
+  if (unWageSlider) unWageSlider.addEventListener('input', () => setUnionWage(parseFloat(unWageSlider.value)));
+  const unWageInput = document.getElementById('union-wage-input');
+  if (unWageInput) unWageInput.addEventListener('change', () => { const v = parseFloat(unWageInput.value); if (!isNaN(v)) setUnionWage(v); });
   const labMinChk = document.getElementById('chk-labmin');
   if (labMinChk) labMinChk.addEventListener('change', () => {
     STATE.laborMinOn = labMinChk.checked;
