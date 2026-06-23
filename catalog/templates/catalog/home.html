@@ -106,13 +106,32 @@
   box-shadow: 0 4px 16px rgba(79,124,255,.12);
   transform: translateY(-2px);
 }
+/* Иконка карточки: единый line-SVG в акценте на тинте (язык чипов),
+   вместо разнородных эмодзи — «инструмент, а не игрушка» (PRODUCT.md). */
 .card-icon {
-  font-size: 28px;
+  width: 46px;
+  height: 46px;
+  margin: 0 auto;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s;
 }
+.card-icon svg { display: block; }
+.home-card:hover .card-icon { background: var(--accent); color: #fff; }
 .card-title {
-  margin-top: 10px;
+  /* min-height + центрирование выравнивает старт описаний при 1- и 2-строчных заголовках */
+  margin-top: 14px;
   font-size: 15px;
   font-weight: 600;
+  line-height: 1.25;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .card-desc {
   margin-top: 4px;
@@ -156,17 +175,23 @@
 
   <div class="home-cards">
     <a class="home-card" href="/catalog/">
-      <div class="card-icon">📚</div>
+      <div class="card-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.6C10.4 5.5 7.9 5 4 5v12.5c3.9 0 6.4.5 8 1.5 1.6-1 4.1-1.5 8-1.5V5c-3.9 0-6.4.5-8 1.6Z"/><path d="M12 6.6v12.4"/></svg>
+      </div>
       <div class="card-title">Каталог задач</div>
       <div class="card-desc">Фильтры по теме, сложности и источнику, поиск по тексту</div>
     </a>
     <a class="home-card" href="/desmos/">
-      <div class="card-icon">📈</div>
+      <div class="card-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="M7.5 13.5 11 9l3 2 3.5-5"/></svg>
+      </div>
       <div class="card-title">Графический калькулятор</div>
       <div class="card-desc">Кривые спроса и предложения, благосостояние, экспорт</div>
     </a>
     <a class="home-card" href="{% url 'catalog:random_problem' %}">
-      <div class="card-icon">🎲</div>
+      <div class="card-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="8.8" cy="8.8" r="1.15" fill="currentColor" stroke="none"/><circle cx="15.2" cy="15.2" r="1.15" fill="currentColor" stroke="none"/><circle cx="15.2" cy="8.8" r="1.15" fill="currentColor" stroke="none"/><circle cx="8.8" cy="15.2" r="1.15" fill="currentColor" stroke="none"/></svg>
+      </div>
       <div class="card-title">Случайная задача</div>
       <div class="card-desc">Открыть случайную опубликованную задачу из базы</div>
     </a>
