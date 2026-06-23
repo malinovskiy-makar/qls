@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Каталог задач{% endblock %} — Экономика</title>
 
+  {% include '_tokens.html' %}
+
   <!-- KaTeX -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
@@ -12,22 +14,15 @@
           onload="initKaTeX()"></script>
 
   <style>
-:root {
-  --sb:     #1a1f2e;
-  --accent: #4f7cff;
-  --panel:  #f7f7f5;
-  --border: #e8e8e4;
-  --text:   #1a1a1a;
-  --text2:  #666;
-  --r:      6px;
-}
+/* Цветовые токены — в общем партиале _tokens.html (свет + тьма). */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 15px; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: var(--text);
-  background: #fff;
+  background: var(--bg);
   min-height: 100vh;
+  transition: background-color .2s ease, color .2s ease;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;

@@ -14,8 +14,8 @@
   font-weight: 600;
 }
 .btn-primary {
-  background: var(--accent);
-  color: #fff;
+  background: var(--btn-bg);
+  color: var(--on-btn);
   border: none;
   border-radius: var(--r);
   padding: 8px 16px;
@@ -23,16 +23,16 @@
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;
-  transition: opacity .12s;
+  transition: background .12s;
 }
-.btn-primary:hover { opacity: .88; }
+.btn-primary:hover { background: var(--btn-bg-hover); }
 .groups-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
 }
 .group-card {
-  background: #fff;
+  background: var(--surface);
   border: 0.5px solid var(--border);
   border-radius: 10px;
   padding: 20px;

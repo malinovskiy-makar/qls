@@ -18,7 +18,7 @@
 }
 .section-label:first-child { margin-top: 0; }
 .hw-card {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 18px 20px;
@@ -28,7 +28,7 @@
   gap: 16px;
   transition: border-color .12s, box-shadow .12s;
 }
-.hw-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(79,124,255,.08); }
+.hw-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
 .hw-card-main { flex: 1; min-width: 0; }
 .hw-name {
   font-size: 15px;
@@ -69,9 +69,9 @@
   font-size: 11px;
   font-weight: 600;
 }
-.deadline-green  { background: #e8f8e8; color: #2e7d32; }
-.deadline-yellow { background: #fffbe6; color: #b45309; }
-.deadline-red    { background: #fff0f0; color: #c0392b; }
+.deadline-green  { background: var(--green-tint); color: var(--green); }
+.deadline-yellow { background: var(--amber-tint); color: var(--text); }
+.deadline-red    { background: var(--error-tint); color: var(--error); }
 .deadline-grey   { background: var(--panel); color: var(--text2); }
 .score-badge {
   font-size: 13px;
@@ -80,13 +80,13 @@
   white-space: nowrap;
 }
 .assignment-metrics { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
-.metric-open    { color: #1a1f2e; font-weight: 600; font-size: 13px; }
-.metric-test    { color: #2d7a3a; font-weight: 600; font-size: 13px; }
-.metric-pending { color: #888;    font-size: 12px; }
-.metric-progress{ color: #555;    font-size: 12px; }
+.metric-open    { color: var(--text); font-weight: 600; font-size: 13px; }
+.metric-test    { color: var(--green); font-weight: 600; font-size: 13px; }
+.metric-pending { color: var(--text2); font-size: 12px; }
+.metric-progress{ color: var(--text2); font-size: 12px; }
 .btn-open {
-  background: var(--sb);
-  color: #fff;
+  background: var(--btn-bg);
+  color: var(--on-btn);
   border: none;
   border-radius: var(--r);
   padding: 8px 16px;
@@ -96,7 +96,7 @@
   white-space: nowrap;
   transition: background .12s;
 }
-.btn-open:hover { background: #252c40; }
+.btn-open:hover { background: var(--btn-bg-hover); }
 .empty-state {
   text-align: center;
   padding: 60px 24px;

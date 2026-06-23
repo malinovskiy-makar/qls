@@ -35,38 +35,38 @@
 
 /* Feedback */
 .feedback-card {
-  border: 1px solid #b7dfb7;
-  background: #f0faf0;
+  border: 1px solid var(--green-border);
+  background: var(--green-tint);
   border-radius: 10px;
   padding: 20px;
   margin-bottom: 16px;
 }
 .feedback-score-big {
-  font-size: 32px; font-weight: 800; color: #2e7d32; margin-bottom: 12px;
+  font-size: 32px; font-weight: 800; color: var(--green); margin-bottom: 12px;
 }
 .feedback-score-big span { font-size: 16px; font-weight: 400; color: var(--text2); margin-left: 4px; }
 .feedback-comment { font-size: 15px; line-height: 1.65; margin-bottom: 12px; }
 .mistake-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .mistake-tag {
-  background: #fff0f0; border: 1px solid #ffd5d5;
-  color: #c0392b; border-radius: 20px; padding: 3px 10px; font-size: 12px;
+  background: var(--error-tint); border: 1px solid var(--error-border);
+  color: var(--error); border-radius: 20px; padding: 3px 10px; font-size: 12px;
 }
 .no-feedback {
   color: var(--text2); font-size: 14px; font-style: italic;
 }
 .action-row { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
 .btn-action {
-  background: var(--sb); color: #fff; border: none;
+  background: var(--btn-bg); color: var(--on-btn); border: none;
   border-radius: var(--r); padding: 9px 18px;
   font-size: 13px; font-weight: 600; text-decoration: none;
   transition: background .12s;
 }
-.btn-action:hover { background: #252c40; }
+.btn-action:hover { background: var(--btn-bg-hover); }
 .btn-action.secondary {
   background: none; color: var(--accent);
   border: 1px solid var(--accent);
 }
-.btn-action.secondary:hover { background: rgba(79,124,255,.07); }
+.btn-action.secondary:hover { background: var(--accent-tint); }
 {% endblock %}
 
 {% block content %}
@@ -117,7 +117,7 @@
 <!-- Результат проверки -->
 {% if feedback %}
 <div class="feedback-card">
-  <div class="block-label" style="color:#2e7d32;">Результат проверки</div>
+  <div class="block-label" style="color:var(--green);">Результат проверки</div>
   {% if feedback.score is not None %}
   <div class="feedback-score-big">
     {{ feedback.score }}<span>баллов</span>

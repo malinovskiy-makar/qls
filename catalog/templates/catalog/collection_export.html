@@ -19,8 +19,8 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .5px;
-  color: var(--accent);
-  background: #eef2ff;
+  color: var(--chip-text);
+  background: var(--chip-bg);
   border-radius: 20px;
   padding: 3px 10px;
 }
@@ -43,7 +43,7 @@
 
 /* Список задач */
 .prob-list {
-  background: var(--panel);
+  background: var(--surface);
   border: .5px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
@@ -76,7 +76,7 @@
   margin-bottom: 12px;
 }
 .settings-card {
-  background: var(--panel);
+  background: var(--surface);
   border: .5px solid var(--border);
   border-radius: 10px;
   padding: 16px 20px;
@@ -112,7 +112,7 @@
   border: .5px solid var(--border);
   border-radius: 12px;
   padding: 20px;
-  background: #fff;
+  background: var(--surface);
 }
 .dl-card-title {
   font-size: 15px;
@@ -139,22 +139,22 @@
   text-decoration: none;
   transition: background .12s, opacity .12s;
 }
-.dl-btn-primary { background: var(--accent); color: #fff; }
-.dl-btn-primary:hover { background: #3d6ef0; }
+.dl-btn-primary { background: var(--btn-bg); color: var(--on-btn); }
+.dl-btn-primary:hover { background: var(--btn-bg-hover); }
 .dl-btn-secondary {
-  background: var(--panel);
+  background: var(--surface-2);
   color: var(--text);
   border: .5px solid var(--border);
 }
-.dl-btn-secondary:hover { background: #ededeb; }
+.dl-btn-secondary:hover { background: var(--border); }
 .dl-btn-disabled {
-  background: var(--panel);
+  background: var(--surface-2);
   color: var(--text2);
   border: .5px solid var(--border);
   cursor: not-allowed;
   opacity: .6;
 }
-.dl-btn-disabled:hover { background: var(--panel); }
+.dl-btn-disabled:hover { background: var(--surface-2); }
 .no-xelatex-note {
   font-size: 11px;
   color: var(--text2);

@@ -1,0 +1,88 @@
+{% comment %}
+  _tokens.html — единая система дизайн-токенов публичного сайта (свет + тьма).
+  Подключается ПЕРВЫМ в <head> каждого публичного базового шаблона
+  (catalog/student/teacher base + login). НЕ подключается в /calc2/ и /admin/ —
+  у них свои изолированные миры токенов.
+
+  Анти-мигание: скрипт ДО <style> ставит data-theme по сохранённому выбору,
+  поэтому тёмная тема применяется без вспышки белого фона при загрузке.
+
+  Палитра малинового акцента взята из /calc2/ (Scene). Акцент — ТОЛЬКО на
+  мелочах (логотип, активный пункт nav, ссылки, фокус, чекбоксы, чипы).
+  Крупные сплошные кнопки — графитовые (--btn-bg), НЕ малиновые.
+  Сигналы священны: --amber = звёзды сложности, --green = «решение ✓».
+{% endcomment %}
+<script>(function(){try{if(localStorage.getItem('theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<style>
+:root {
+  /* акцент — малиновый (как в /calc2/) */
+  --accent: #BE185D;
+  --accent-deep: #9D1450;
+  --accent-tint: rgba(190,24,93,.10);
+  --accent-ring: rgba(190,24,93,.34);
+  /* поверхности и фон */
+  --bg: #f5f5f3;          /* фон страницы */
+  --surface: #ffffff;     /* карточки/панели с контентом */
+  --surface-2: #f5f5f3;   /* рецессивные: рельс фильтров, инпуты */
+  --border: rgba(22,26,38,.12);
+  --border-soft: rgba(22,26,38,.07);
+  /* текст */
+  --text: #1a1a1a;
+  --text2: #5b6472;
+  --text3: #687180;
+  /* крупные кнопки — графитовые, НЕ малиновые */
+  --btn-bg: #1e293b;
+  --btn-bg-hover: #293548;
+  --on-btn: #ffffff;
+  /* шапка/nav — графит (в обеих темах) */
+  --nav-bg: #1a1f2e;
+  /* нейтральный чип (тема задачи и т.п.) */
+  --chip-bg: #f1f0ec;
+  --chip-text: #5b6472;
+  /* сигналы — сохраняем */
+  --amber: #f5a623;
+  --amber-tint: #fff7e8;
+  --amber-border: #ffe0a3;
+  --green: #2a9d5c;
+  --green-tint: #e9faf0;
+  --green-border: #b7dfb7;
+  /* ошибки */
+  --error: #c0392b;
+  --error-tint: #fff0f0;
+  --error-border: #ffd5d5;
+  /* радиус (был в каждом base) */
+  --r: 6px;
+  /* легаси-алиасы старых имён — чтобы не переписывать каждую ссылку */
+  --sb: var(--nav-bg);
+  --panel: var(--surface-2);
+}
+[data-theme="dark"] {
+  --accent: #FF4D94;
+  --accent-deep: #FF6BA6;
+  --accent-tint: rgba(255,77,148,.16);
+  --accent-ring: rgba(255,77,148,.42);
+  --bg: #10141c;
+  --surface: #161b25;
+  --surface-2: #1d2330;
+  --border: rgba(255,255,255,.13);
+  --border-soft: rgba(255,255,255,.07);
+  --text: #e7e9ef;
+  --text2: #a7aebc;
+  --text3: #8e96a4;
+  --btn-bg: #334155;
+  --btn-bg-hover: #3e4f69;
+  --on-btn: #ffffff;
+  --nav-bg: #1a1f2e;
+  --chip-bg: rgba(255,255,255,.07);
+  --chip-text: #a7aebc;
+  --amber: #f5a623;
+  --amber-tint: rgba(245,166,35,.15);
+  --amber-border: rgba(245,166,35,.35);
+  --green: #3fc77f;
+  --green-tint: rgba(63,199,127,.15);
+  --green-border: rgba(63,199,127,.32);
+  --error: #ff6b6b;
+  --error-tint: rgba(192,57,43,.16);
+  --error-border: rgba(255,107,107,.30);
+}
+</style>

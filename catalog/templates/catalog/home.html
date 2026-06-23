@@ -46,7 +46,7 @@
 }
 .home-search input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(79,124,255,.15);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .home-search button {
   position: absolute;
@@ -56,14 +56,14 @@
   font-size: 14px;
   font-weight: 600;
   font-family: inherit;
-  color: #fff;
-  background: var(--accent);
+  color: var(--on-btn);
+  background: var(--btn-bg);
   border: none;
   border-radius: 20px;
   cursor: pointer;
   transition: background .15s;
 }
-.home-search button:hover { background: #3d66e0; }
+.home-search button:hover { background: var(--btn-bg-hover); }
 
 /* ── Статистика ─────────────────────────────────────── */
 .home-stats {
@@ -98,12 +98,12 @@
   border-radius: 12px;
   text-decoration: none;
   color: var(--text);
-  background: #fff;
+  background: var(--surface);
   transition: border-color .15s, box-shadow .15s, transform .15s;
 }
 .home-card:hover {
   border-color: var(--accent);
-  box-shadow: 0 4px 16px rgba(79,124,255,.12);
+  box-shadow: 0 4px 16px rgba(0,0,0,.10);
   transform: translateY(-2px);
 }
 /* Иконка карточки: единый line-SVG в акценте на тинте (язык чипов),
@@ -113,7 +113,7 @@
   height: 46px;
   margin: 0 auto;
   border-radius: 12px;
-  background: #eef2ff;
+  background: var(--accent-tint);
   color: var(--accent);
   display: flex;
   align-items: center;
@@ -121,7 +121,7 @@
   transition: background .15s, color .15s;
 }
 .card-icon svg { display: block; }
-.home-card:hover .card-icon { background: var(--accent); color: #fff; }
+.home-card:hover .card-icon { background: var(--accent); color: var(--on-btn); }
 .card-title {
   /* min-height + центрирование выравнивает старт описаний при 1- и 2-строчных заголовках */
   margin-top: 14px;

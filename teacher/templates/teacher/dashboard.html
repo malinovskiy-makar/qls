@@ -21,7 +21,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  background: #fff;
+  background: var(--surface);
   transition: box-shadow .15s;
 }
 .card:hover {
@@ -53,26 +53,26 @@
   white-space: nowrap;
 }
 .badge-pending {
-  background: #fff3e0;
-  color: #e65100;
+  background: var(--amber-tint);
+  color: var(--text);
 }
 .badge-done {
-  background: #f5f5f5;
-  color: #888;
+  background: var(--surface-2);
+  color: var(--text2);
 }
 .btn-open {
   display: inline-block;
   padding: 7px 16px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--btn-bg);
+  color: var(--on-btn);
   border-radius: var(--r);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
-  transition: opacity .12s;
+  transition: background .12s;
 }
-.btn-open:hover { opacity: .87; }
+.btn-open:hover { background: var(--btn-bg-hover); }
 .empty {
   text-align: center;
   color: var(--text2);
@@ -85,7 +85,7 @@
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
   <h1 class="page-title" style="margin-bottom:0;">Проверка решений</h1>
   <a href="{% url 'teacher:assignment_create' %}"
-     style="padding:8px 18px;background:var(--accent);color:#fff;border-radius:var(--r);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;">
+     style="padding:8px 18px;background:var(--btn-bg);color:var(--on-btn);border-radius:var(--r);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;">
     + Создать домашку
   </a>
 </div>

@@ -14,17 +14,18 @@
   font-size: 13px;
   color: var(--text2);
 }
-.problem-stars { color: #f5a623; letter-spacing: 1px; font-size: 14px; }
+.problem-stars { color: var(--amber); letter-spacing: 1px; font-size: 14px; }
 .problem-source {
-  background: var(--panel);
+  background: var(--chip-bg);
+  color: var(--chip-text);
   border: .5px solid var(--border);
   border-radius: 20px;
   padding: 3px 10px;
 }
 .problem-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag-pill {
-  background: #eef2ff;
-  color: var(--accent);
+  background: var(--chip-bg);
+  color: var(--chip-text);
   border-radius: 20px;
   padding: 3px 10px;
   font-size: 12px;
@@ -48,7 +49,7 @@
 .math-content .katex-display { margin: 1em 0; }
 
 .problem-statement {
-  background: var(--panel);
+  background: var(--surface);
   border: .5px solid var(--border);
   border-radius: 10px;
   padding: 20px 24px;
@@ -71,10 +72,10 @@
   margin-bottom: 24px;
 }
 .part-item {
-  border: .5px solid #d8e0f5;
+  border: .5px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  background: #f2f5ff;            /* лёгкий голубой фон — отличие от серого условия */
+  background: var(--accent-tint);  /* лёгкий малиновый фон — отличие от условия */
 }
 .part-header {
   display: flex;
@@ -100,7 +101,7 @@
   gap: 7px;
   padding: 9px 16px;
   border: .5px solid var(--border);
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--r);
   font-size: 13px;
   font-weight: 500;
@@ -108,13 +109,13 @@
   cursor: pointer;
   transition: background .12s, color .12s, border-color .12s;
 }
-.reveal-btn:hover { background: var(--panel); color: var(--text); border-color: #d0d0cb; }
+.reveal-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
 .reveal-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
 .reveal-content {
   display: none;
   margin-top: 12px;
   padding: 16px 20px;
-  background: var(--panel);
+  background: var(--surface);
   border: .5px solid var(--border);
   border-radius: 10px;
 }
@@ -147,7 +148,7 @@
 .similar-card {
   display: block;
   padding: 12px 16px;
-  background: var(--panel);
+  background: var(--surface);
   border: .5px solid var(--border);
   border-radius: var(--r);
   text-decoration: none;
@@ -156,7 +157,7 @@
 }
 .similar-card:hover {
   border-color: var(--accent);
-  background: #f5f7ff;
+  background: var(--accent-tint);
 }
 .similar-card-title {
   font-size: 14px;
@@ -171,11 +172,11 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-.similar-stars { color: #f5a623; font-size: 12px; letter-spacing: 1px; }
+.similar-stars { color: var(--amber); font-size: 12px; letter-spacing: 1px; }
 .similar-topic {
   font-size: 11px;
-  color: var(--accent);
-  background: #eef2ff;
+  color: var(--chip-text);
+  background: var(--chip-bg);
   border-radius: 20px;
   padding: 2px 8px;
   font-weight: 500;
@@ -208,7 +209,7 @@
   <span class="tag-pill">{{ topic.name }}</span>
   {% endfor %}
   {% for tag in tags %}
-  <span class="tag-pill" style="background:#f0faf4; color:#2a9d5c;">{{ tag.name }}</span>
+  <span class="tag-pill" style="background:var(--chip-bg); color:var(--chip-text);">{{ tag.name }}</span>
   {% endfor %}
 </div>
 {% endif %}
