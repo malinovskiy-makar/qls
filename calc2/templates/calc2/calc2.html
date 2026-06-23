@@ -12,28 +12,117 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.3/math.min.js"></script>
 
+  <!-- Тема: применяем сохранённый выбор (или системную) ДО отрисовки — без мигания. -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('calc2-theme');
+        var dark = saved ? saved === 'dark'
+                         : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
+
   <style>
-/* ── Палитра и базовые стили (как на остальном сайте) ──────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   ТОКЕНЫ ДИЗАЙНА — «Чертёжный инструмент»
+   Кривые — единственный источник цвета на холсте; интерфейс намеренно
+   нейтрально-графитовый, с одним смелым малиновым акцентом, который не
+   совпадает ни с одним цветом кривой (его нельзя спутать с D/S/MR/MC…).
+   Светлая тема — по умолчанию (класс/проектор), тёмная — вечерняя работа.
+   ═══════════════════════════════════════════════════════════════════ */
 :root {
-  --sb:      #1a1f2e;   /* тёмный (шапка)        */
-  --accent:  #4f7cff;   /* синий акцент          */
-  --panel:   #f7f7f5;   /* фон левой панели      */
-  --border:  #e8e8e4;   /* линии-разделители     */
-  --text:    #1a1a1a;
-  --text2:   #888;
-  --r:       6px;
+  color-scheme: light;
+
+  /* ── Палитра кривых (ЗАФИКСИРОВАНА — одинакова в обеих темах) ── */
+  --curve-d:     #2F6FED;   /* спрос D                       */
+  --curve-s:     #E0563B;   /* предложение S                 */
+  --curve-mr:    #8B3FE0;   /* предельный доход MR           */
+  --curve-mc:    #119C8A;   /* предельные издержки MC        */
+  --curve-tax:   #2E9E44;   /* налог / субсидия / бюджет     */
+  --curve-dwl:   #8C8C84;   /* потери общества DWL           */
+  --curve-reg:   #B5791F;   /* регулируемая цена (потолок/пол/МРОТ) */
+  --curve-ghost: #9AA0A6;   /* «было» (исходное состояние)   */
+  --c-warn:      #C2680F;   /* предупреждение                */
+  --c-bad:       #D23B3B;   /* дефицит / ошибка              */
+  /* Кривые издержек — пять различимых вторичных цветов. */
+  --cost-mc:  #119C8A;  --cost-atc: #2F6FED;  --cost-avc: #B5791F;
+  --cost-afc: #8B3FE0;  --cost-vc:  #5B6472;
+
+  /* ── Структурные цвета холста (зависят от темы) ── */
+  --ink:      #2a2f3a;   /* оси, подписи осей, текст у точек  */
+  --ink-soft: #5e6675;   /* цифры делений, вторичные подписи  */
+  --grid:     #ebebef;   /* линии сетки                       */
+  --halo:     #ffffff;   /* обводка-фон под подписями         */
+  --canvas:   #ffffff;   /* фон графика                       */
+
+  /* ── Интерфейс ── */
+  --text:        #1a1a1a;
+  --text2:       #5b6472;
+  --text3:       #8a909c;
+  --bg:          #eceef2;   /* оболочка за холстом            */
+  --surface:     #ffffff;   /* плавающие панели               */
+  --surface-2:   #f5f5f3;   /* док, вложенные блоки           */
+  --input-bg:    #ffffff;
+  --border:      rgba(22,26,38,.12);
+  --border-soft: rgba(22,26,38,.07);
+  --accent:      #D61F69;   /* малиновый — действия интерфейса */
+  --accent-deep: #B81A59;
+  --accent-tint: rgba(214,31,105,.10);
+  --accent-ring: rgba(214,31,105,.32);
+  --on-accent:   #ffffff;
+
+  /* ── Радиусы / тени / слои ── */
+  --r:    8px;
+  --r-sm: 6px;
+  --r-lg: 14px;
+  --shadow-panel: 0 1px 2px rgba(15,18,28,.06), 0 8px 28px -8px rgba(15,18,28,.18);
+  --shadow-pop:   0 2px 6px rgba(15,18,28,.10), 0 14px 40px -10px rgba(15,18,28,.28);
+  --z-canvas: 1; --z-dock: 20; --z-float: 30; --z-drawer: 40; --z-pop: 50; --z-picker: 60;
+  /* совместимость со старыми именами */
+  --sb: #1a1f2e;  --panel: var(--surface-2);
+
+  --ease: cubic-bezier(.23,1,.32,1);
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --ink:      #d7dbe3;
+  --ink-soft: #98a1b0;
+  --grid:     rgba(255,255,255,.075);
+  --halo:     #10141c;
+  --canvas:   #10141c;
+
+  --text:        #e7e9ef;
+  --text2:       #a7aebc;
+  --text3:       #727a88;
+  --bg:          #07090e;
+  --surface:     #161b25;
+  --surface-2:   #1d2330;
+  --input-bg:    #11151d;
+  --border:      rgba(255,255,255,.13);
+  --border-soft: rgba(255,255,255,.07);
+  --accent:      #FF4D94;
+  --accent-deep: #FF6BA6;
+  --accent-tint: rgba(255,77,148,.16);
+  --accent-ring: rgba(255,77,148,.42);
+  --on-accent:   #190810;
+  --shadow-panel: 0 0 0 1px rgba(255,255,255,.05), 0 10px 34px -10px rgba(0,0,0,.6);
+  --shadow-pop:   0 0 0 1px rgba(255,255,255,.07), 0 16px 46px -12px rgba(0,0,0,.7);
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
   height: 100%; overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 14px; color: var(--text); background: #fff;
+  font-size: 14px; color: var(--text); background: var(--bg);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
 }
-button { cursor: pointer; font: inherit; }
+button { cursor: pointer; font: inherit; color: inherit; }
 input, select { font: inherit; }
+:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); border-radius: var(--r-sm); }
 
 /* ── Основной макет: левая панель + область графика ────────────────── */
-.app { display: flex; height: calc(100vh - 48px); }
+.app { display: flex; height: calc(100vh - 48px); background: var(--bg); }
 
 /* Левая панель управления (~300px) */
 .panel {
@@ -59,29 +148,39 @@ input, select { font: inherit; }
 .field { margin-bottom: 8px; }
 .field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 3px; }
 .field input[type="text"], .field input[type="number"], .field select {
-  width: 100%; padding: 6px 8px; border: .5px solid var(--border);
-  border-radius: var(--r); background: #fff; color: var(--text);
+  width: 100%; padding: 6px 8px; border: 1px solid var(--border);
+  border-radius: var(--r-sm); background: var(--input-bg); color: var(--text);
+  transition: border-color .12s var(--ease), box-shadow .12s var(--ease);
+}
+.field input:focus-visible, .field select:focus-visible,
+input:focus-visible, select:focus-visible {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .row { display: flex; gap: 8px; }
 .row .field { flex: 1; }
 .chk { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; margin-bottom: 6px; }
-.chk input { cursor: pointer; }
+.chk input { cursor: pointer; accent-color: var(--accent); }
 .btn {
-  width: 100%; padding: 8px 10px; border: none; border-radius: var(--r);
-  background: var(--accent); color: #fff; font-weight: 500; font-size: 13px;
+  width: 100%; padding: 8px 10px; border: none; border-radius: var(--r-sm);
+  background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 13px;
+  transition: background .12s var(--ease), transform .08s var(--ease);
 }
-.btn:hover { background: #3f6ae8; }
+.btn:hover { background: var(--accent-deep); }
+.btn:active { transform: scale(.98); }
 .btn-sm {
-  padding: 3px 8px; border: .5px solid var(--border); border-radius: 5px;
-  background: #fff; color: var(--text2); font-size: 12px;
+  padding: 4px 9px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text2); font-size: 12px;
+  transition: color .12s var(--ease), border-color .12s var(--ease), background .12s var(--ease);
 }
-.btn-sm:hover { color: var(--text); border-color: #ccc; }
+.btn-sm:hover { color: var(--accent); border-color: var(--accent); }
+.btn-sm:active { transform: scale(.98); }
 
 /* Подсказки, ошибки, код в подсказках */
 .hint { font-size: 11px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
-.hint code { background: #ececec; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+.hint code { background: var(--surface-2); border: 1px solid var(--border-soft);
+  padding: 1px 4px; border-radius: 3px; font-size: 11px; }
 .muted { font-size: 12px; color: var(--text2); }
-.error { font-size: 12px; color: #e05052; margin-top: 8px; display: none; line-height: 1.4; }
+.error { font-size: 12px; color: var(--c-bad); margin-top: 8px; display: none; line-height: 1.4; }
 
 /* Список кривых (две строки: формула + роль) */
 .curve-row {
@@ -91,25 +190,26 @@ input, select { font: inherit; }
 .curve-row:last-child { border-bottom: none; }
 .crow-top { display: flex; align-items: center; gap: 8px; }
 .role-sel {
-  width: 100%; padding: 4px 6px; border: .5px solid var(--border);
-  border-radius: 5px; background: #fff; font-size: 12px; color: var(--text2);
+  width: 100%; padding: 4px 6px; border: 1px solid var(--border);
+  border-radius: var(--r-sm); background: var(--input-bg); font-size: 12px; color: var(--text2);
 }
 .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
 .curve-name {
   flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  white-space: nowrap; font-family: ui-monospace, 'SF Mono', Menlo, monospace; color: var(--text);
 }
 .btn-icon {
   border: none; background: none; color: var(--text2);
   font-size: 14px; padding: 2px 4px; line-height: 1; flex-shrink: 0;
+  transition: color .12s var(--ease);
 }
-.btn-icon:hover { color: #e05052; }
+.btn-icon:hover { color: var(--c-bad); }
 
 /* Табло результатов (равновесие, площади, налог) */
 .stat { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; font-size: 13px; }
 .stat span { color: var(--text2); }
-.stat b { font-variant-numeric: tabular-nums; }
-.warn { font-size: 12px; color: #c2710c; line-height: 1.4; }
+.stat b { font-variant-numeric: tabular-nums; color: var(--text); }
+.warn { font-size: 12px; color: var(--c-warn); line-height: 1.4; }
 
 /* Таблица «До / После / Δ» для налога */
 .tx-table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 4px; }
@@ -122,14 +222,17 @@ input, select { font: inherit; }
 input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px; }
 
 /* Переключатель «Налог / Субсидия» */
-.seg { display: flex; border: .5px solid var(--border); border-radius: 6px; overflow: hidden; }
-.seg-btn { flex: 1; padding: 6px 0; border: none; background: #fff; color: var(--text2); font-size: 12px; }
-.seg-btn.active { background: var(--accent); color: #fff; }
-.seg-btn + .seg-btn { border-left: .5px solid var(--border); }
+.seg { display: flex; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+.seg-btn { flex: 1; padding: 6px 0; border: none; background: var(--surface); color: var(--text2); font-size: 12px;
+  transition: background .12s var(--ease), color .12s var(--ease); }
+.seg-btn:hover { color: var(--text); }
+.seg-btn.active { background: var(--accent); color: var(--on-accent); }
+.seg-btn.active:hover { color: var(--on-accent); }
+.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
 
 /* Область графика справа */
 .graph-wrap {
-  flex: 1; position: relative; background: #fff; overflow: hidden;
+  flex: 1; position: relative; background: var(--canvas); overflow: hidden;
 }
 #chart { display: block; width: 100%; height: 100%; }
 
@@ -138,6 +241,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   position: absolute; inset: 0; display: flex;
   align-items: center; justify-content: center;
   color: var(--text2); font-size: 13px; pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
   </style>
 </head>
@@ -202,9 +309,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <div class="section" id="sec-areas">
       <div class="section-title">Излишки</div>
       <label class="chk"><input type="checkbox" id="chk-cs" checked>
-        <span class="swatch" style="background:#4f7cff"></span> Показывать CS</label>
+        <span class="swatch" style="background:var(--curve-d)"></span> Показывать CS</label>
       <label class="chk"><input type="checkbox" id="chk-ps" checked>
-        <span class="swatch" style="background:#e05052"></span> Показывать PS</label>
+        <span class="swatch" style="background:var(--curve-s)"></span> Показывать PS</label>
       <div id="info-areas" style="margin-top:8px;"></div>
     </div>
 
@@ -255,7 +362,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <input type="text" id="ext-input" value="20" autocomplete="off">
         </div>
         <label class="chk"><input type="checkbox" id="ext-pigou">
-          <span class="swatch" style="background:#16a34a"></span> Применить налог Пигу</label>
+          <span class="swatch" style="background:var(--curve-tax)"></span> Применить налог Пигу</label>
         <div class="hint">Спрос&nbsp;=&nbsp;общественная выгода MSB, предложение (роль S)&nbsp;=&nbsp;частные
           издержки MPC. MSC&nbsp;=&nbsp;MPC&nbsp;+&nbsp;внешние. Рынок выпускает Qрын (D&nbsp;=&nbsp;MPC),
           оптимум Qопт (D&nbsp;=&nbsp;MSC). Налог Пигу поднимает MPC до MSC — рынок приходит в Qопт.</div>
@@ -307,7 +414,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
         дефицит (продаётся меньше), пол выше равновесия — избыток. Линию цены можно тянуть мышью.</div>
       <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-ghost" checked>
-        <span class="swatch" style="background:#ddd;border:1px solid #aaa;"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
+        <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
       <div id="info-tax" style="margin-top:8px;"></div>
     </div>
 
@@ -390,16 +497,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <!-- Галочки областей монополии (Задача 1). Видны только в режиме монополии. -->
       <div id="mono-areas-chk" style="display:none;margin-top:8px;">
         <label class="chk"><input type="checkbox" id="chk-mono-cs" checked>
-          <span class="swatch" style="background:#4f7cff"></span> Показывать CS</label>
+          <span class="swatch" style="background:var(--curve-d)"></span> Показывать CS</label>
         <label class="chk"><input type="checkbox" id="chk-mono-vc" checked>
-          <span class="swatch" style="background:#94a3b8"></span> Показывать VC</label>
+          <span class="swatch" style="background:var(--curve-dwl)"></span> Показывать VC</label>
         <label class="chk"><input type="checkbox" id="chk-mono-ps" checked>
-          <span class="swatch" style="background:#e05052"></span> Показывать PS (TR&nbsp;−&nbsp;VC)</label>
+          <span class="swatch" style="background:var(--curve-s)"></span> Показывать PS (TR&nbsp;−&nbsp;VC)</label>
       </div>
       <!-- Потолок цены в монополии (Задача 3) — виден только в режиме монополии. -->
       <div id="mono-ceiling" style="display:none;margin-top:10px;">
         <label class="chk"><input type="checkbox" id="chk-mono-ceil">
-          <span class="swatch" style="background:#b45309"></span> Потолок цены</label>
+          <span class="swatch" style="background:var(--curve-reg)"></span> Потолок цены</label>
         <div class="field" id="mono-ceil-field" style="display:none;">
           <label>Цена Pc = <b id="mono-ceil-val">0</b></label>
           <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
@@ -433,15 +540,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="error" id="costs-error"></div>
       <div style="margin-top:10px;">
         <label class="chk"><input type="checkbox" id="chk-mc" checked>
-          <span class="swatch" style="background:#e05052"></span> MC — предельные</label>
+          <span class="swatch" style="background:var(--cost-mc)"></span> MC — предельные</label>
         <label class="chk"><input type="checkbox" id="chk-atc" checked>
-          <span class="swatch" style="background:#4f7cff"></span> ATC — средние общие</label>
+          <span class="swatch" style="background:var(--cost-atc)"></span> ATC — средние общие</label>
         <label class="chk"><input type="checkbox" id="chk-avc" checked>
-          <span class="swatch" style="background:#21a366"></span> AVC — средние перем.</label>
+          <span class="swatch" style="background:var(--cost-avc)"></span> AVC — средние перем.</label>
         <label class="chk"><input type="checkbox" id="chk-afc" checked>
-          <span class="swatch" style="background:#f59e0b"></span> AFC — средние пост.</label>
+          <span class="swatch" style="background:var(--cost-afc)"></span> AFC — средние пост.</label>
         <label class="chk"><input type="checkbox" id="chk-vc">
-          <span class="swatch" style="background:#8b5cf6"></span> VC — перем. (полные)</label>
+          <span class="swatch" style="background:var(--cost-vc)"></span> VC — перем. (полные)</label>
       </div>
       <div id="info-costs" style="margin-top:8px;"></div>
     </div>
@@ -483,7 +590,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <!-- Минимальная зарплата (МРОТ) — горизонтальная линия, тянется мышью (Задача 3). -->
       <div id="labmin-block" style="margin-top:10px;">
         <label class="chk"><input type="checkbox" id="chk-labmin">
-          <span class="swatch" style="background:#b45309"></span> Минимальная зарплата (МРОТ)</label>
+          <span class="swatch" style="background:var(--curve-reg)"></span> Минимальная зарплата (МРОТ)</label>
         <div class="field" id="labmin-field" style="display:none;">
           <label>W_min = <b id="labmin-val">0</b></label>
           <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
@@ -497,7 +604,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         </div>
       </div>
       <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-lab-ghost" checked>
-        <span class="swatch" style="background:#ddd;border:1px solid #aaa;"></span> Конкурентный ориентир</label>
+        <span class="swatch" style="background:var(--curve-ghost);"></span> Конкурентный ориентир</label>
       <div id="info-labor" style="margin-top:8px;"></div>
     </div>
 
@@ -560,12 +667,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
       <!-- ЧК2: сравнение «было → стало». Галочка запоминает текущую кривую как «было». -->
       <label class="chk" style="margin-top:10px;"><input type="checkbox" id="ineq-ghost">
-        <span class="swatch" style="background:#ddd;border:1px solid #aaa;"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
+        <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
       <!-- ЧК3: перераспределение. Берём текущее распределение как «до налогов»,
            применяем инструмент, рисуем «после» — Джини падает, кривая ближе к диагонали. -->
       <div style="margin-top:10px;">
         <label class="chk"><input type="checkbox" id="ineq-redist">
-          <span class="swatch" style="background:#16a34a"></span> Перераспределение</label>
+          <span class="swatch" style="background:var(--curve-tax)"></span> Перераспределение</label>
         <div id="ineq-redist-pane" style="display:none;">
           <div class="seg">
             <button class="seg-btn active" id="ineq-rd-tax">Прогр. налог</button>
@@ -873,6 +980,65 @@ const STATE = {
 };
 
 /* ---------------------------------------------------------------------
+   ЦВЕТА — единый источник правды.
+   Все цвета отрисовки описаны CSS-переменными (см. <style>): палитра кривых
+   (зафиксирована, одинакова в светлой и тёмной теме) и «структурные» цвета
+   осей/сетки/подписей (зависят от темы). JS читает их в карту COL при каждой
+   перерисовке, поэтому смена темы мгновенно меняет и SVG. В .attr()/.style()
+   нужны конкретные hex — поэтому используем COL.*, а не var(--…) (var в
+   презентационных атрибутах SVG ненадёжен).
+   --------------------------------------------------------------------- */
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+let COL = {};
+function refreshColors() {
+  COL = {
+    // Палитра кривых (фиксированная, различима для дальтоников).
+    D:    cssVar('--curve-d'),    // спрос
+    S:    cssVar('--curve-s'),    // предложение
+    MR:   cssVar('--curve-mr'),   // предельный доход
+    MC:   cssVar('--curve-mc'),   // предельные издержки
+    tax:  cssVar('--curve-tax'),  // налог / субсидия / бюджет
+    dwl:  cssVar('--curve-dwl'),  // потери общества
+    reg:  cssVar('--curve-reg'),  // регулируемая цена (потолок/пол/МРОТ)
+    ghost:cssVar('--curve-ghost'),// бледное «было»
+    warn: cssVar('--c-warn'),     // предупреждение (оранжевый)
+    bad:  cssVar('--c-bad'),      // дефицит / ошибка (красный)
+    // Кривые издержек (отдельный режим — свои различимые цвета).
+    costMC:  cssVar('--cost-mc'),
+    costATC: cssVar('--cost-atc'),
+    costAVC: cssVar('--cost-avc'),
+    costAFC: cssVar('--cost-afc'),
+    costVC:  cssVar('--cost-vc'),
+    // Структурные цвета (зависят от темы).
+    ink:     cssVar('--ink'),       // оси, подписи осей, текст у точек
+    inkSoft: cssVar('--ink-soft'),  // цифры делений, вторичные подписи
+    grid:    cssVar('--grid'),      // линии сетки
+    halo:    cssVar('--halo'),      // фон-обводка под подписями, центр маркеров
+  };
+}
+
+// Цвет кривой по роли — чтобы спрос всегда был синим, предложение красным,
+// MC бирюзовым (а не по порядку добавления). Для «обычных» кривых — палитра.
+function roleColor(role) {
+  return { demand: COL.D, supply: COL.S, mc: COL.MC, tc: COL.reg, atc: COL.D }[role] || null;
+}
+
+// Переключение темы (кнопка в доке). Тёмная — вечерняя работа/проектор,
+// светлая — класс/печать. Выбор запоминается в localStorage.
+function setCalcTheme(theme) {
+  const t = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem('calc2-theme', t); } catch (e) {}
+  if (typeof redrawAll === 'function') redrawAll();   // перечитает COL и перерисует SVG
+}
+function toggleCalcTheme() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  setCalcTheme(dark ? 'light' : 'dark');
+}
+
+/* ---------------------------------------------------------------------
    БЛОК 2. МАТЕМАТИКА
    «Всеядность»: любую формулу разбирает и считает Math.js. Поэтому код
    ниже одинаково работает и для прямых, и для кривых (парабол, корней…).
@@ -1066,7 +1232,7 @@ function addDefs() {
     .attr('refX', 8).attr('refY', 5)
     .attr('markerWidth', 7).attr('markerHeight', 7)
     .attr('orient', 'auto-start-reverse')
-    .append('path').attr('d', 'M0,0 L10,5 L0,10 z').attr('fill', '#555');
+    .append('path').attr('d', 'M0,0 L10,5 L0,10 z').attr('fill', COL.ink);
 
   // Прямоугольник-«окно» первой четверти. Всё, что нарисовано с этим
   // clip-path, обрезается ровно по осям (P от 0 до Pmax, Q от 0 до Qmax) —
@@ -1086,12 +1252,12 @@ function drawGrid() {
   sx.ticks(10).forEach(t => {              // вертикальные линии (по оси Q)
     if (t <= 0) return;
     g.append('line').attr('x1', sx(t)).attr('y1', y0).attr('x2', sx(t)).attr('y2', yMax)
-      .attr('stroke', '#eee').attr('stroke-width', 1);
+      .attr('stroke', COL.grid).attr('stroke-width', 1);
   });
   sy.ticks(8).forEach(t => {               // горизонтальные линии (по оси P)
     if (t <= 0) return;
     g.append('line').attr('x1', x0).attr('y1', sy(t)).attr('x2', xMax).attr('y2', sy(t))
-      .attr('stroke', '#eee').attr('stroke-width', 1);
+      .attr('stroke', COL.grid).attr('stroke-width', 1);
   });
 }
 
@@ -1102,7 +1268,7 @@ function drawAxes(xLabel, yLabel) {
   const g = svg.append('g').attr('class', 'axes');
   const ox = sx(0), oy = sy(0);            // пиксели начала координат (0,0)
   const xEnd = sx(CONFIG.Qmax), yEnd = sy(CONFIG.Pmax);
-  const AX = '#555', LBL = '#666';
+  const AX = COL.ink, LBL = COL.inkSoft;
 
   // Ось X (вправо) и ось Y (вверх) со стрелками на концах.
   g.append('line').attr('x1', ox).attr('y1', oy).attr('x2', xEnd).attr('y2', oy)
@@ -1140,19 +1306,22 @@ function drawAxes(xLabel, yLabel) {
   g.append('text').attr('x', xEnd + 6).attr('y', oy + 4)
     .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
     .attr('font-size', 13).attr('font-weight', 600)
-    .attr('fill', '#333').text(xLabel);
+    .attr('fill', COL.ink).text(xLabel);
   g.append('text').attr('x', ox - 4).attr('y', yEnd - 12)
     .attr('text-anchor', 'end').attr('font-size', 13).attr('font-weight', 600)
-    .attr('fill', '#333').text(yLabel);
+    .attr('fill', COL.ink).text(yLabel);
 }
 
 /* ---------------------------------------------------------------------
    БЛОК 4. КРИВЫЕ — отрисовка кривых по формулам.
    --------------------------------------------------------------------- */
 
-// Палитра: цвета кривым выдаются по очереди при добавлении.
-const PALETTE = ['#4f7cff', '#e05052', '#21a366', '#f59e0b', '#8b5cf6', '#0891b2'];
-function nextColor() { return PALETTE[STATE.curves.length % PALETTE.length]; }
+// Палитра: цвета «обычным» кривым выдаются по очереди при добавлении.
+// Читаем COL лениво (на момент вызова), т.к. COL наполняется в refreshColors().
+function nextColor() {
+  const pal = [COL.D, COL.S, COL.tax, COL.reg, COL.MR, COL.MC];
+  return pal[STATE.curves.length % pal.length];
+}
 
 // Набор точек кривой: 400 отрезков по Q. NaN -> разрыв (null).
 // Точки с P<0 или P>Pmax не выбрасываем — их аккуратно срежет clip-path
@@ -1408,9 +1577,9 @@ function drawEquilibrium() {
 
   // Пунктирные проекции к осям.
   g.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy)
-    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   g.append('line').attr('x1', px).attr('y1', py).attr('x2', ox).attr('y2', py)
-    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
 
   // Числа Q* и P* у осей (с белой обводкой, чтобы читались поверх делений).
   haloText(g, px, oy + 8, 'Q*=' + fmt(Q), 'middle', 'hanging');
@@ -1418,17 +1587,17 @@ function drawEquilibrium() {
 
   // Сама точка и подпись E*.
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
-    .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   g.append('text').attr('x', px + 8).attr('y', py - 8)
-    .attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('E*');
+    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('E*');
 }
 
 // Текст с белой обводкой (halo) — чтобы подписи равновесия читались над сеткой.
 function haloText(g, x, y, txt, anchor, baseline) {
   g.append('text').attr('x', x).attr('y', y)
     .attr('text-anchor', anchor).attr('dominant-baseline', baseline)
-    .attr('font-size', 10).attr('font-weight', 600).attr('fill', '#1a1f2e')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 3)
+    .attr('font-size', 10).attr('font-weight', 600).attr('fill', COL.ink)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
     .text(txt);
 }
 
@@ -1473,12 +1642,12 @@ function drawAreas() {
   // CS — между ценой P* (низ) и кривой спроса (верх).
   if (STATE.showCS && STATE.D) {
     const csArea = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(STATE.D, d)));
-    g.append('path').datum(samples).attr('d', csArea).attr('fill', '#4f7cff').attr('opacity', 0.16);
+    g.append('path').datum(samples).attr('d', csArea).attr('fill', COL.D).attr('opacity', 0.16);
   }
   // PS — между кривой предложения (низ) и ценой P* (верх).
   if (STATE.showPS && STATE.S) {
     const psArea = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(P));
-    g.append('path').datum(samples).attr('d', psArea).attr('fill', '#e05052').attr('opacity', 0.16);
+    g.append('path').datum(samples).attr('d', psArea).attr('fill', COL.S).attr('opacity', 0.16);
   }
 }
 
@@ -1526,31 +1695,30 @@ function drawTaxAreas() {
   if (!STATE.taxActive) return;
   const { Q, Pb, Ps } = STATE.taxEq;
   const Q0 = STATE.eq.Q;
-  const isSub = (STATE.intervType === 'subsidy');
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
   const s1 = samp(0, Q);
 
   if (STATE.showCS) {   // CS: между ценой покупателя Pb и спросом
     const a = d3.area().x(d => sx(d)).y0(sy(Pb)).y1(d => sy(evalCurve(STATE.D, d)));
-    g.append('path').datum(s1).attr('d', a).attr('fill', '#4f7cff').attr('opacity', 0.16);
+    g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16);
   }
   if (STATE.showPS) {   // PS: между предложением и ценой продавца Ps
     const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(Ps));
-    g.append('path').datum(s1).attr('d', a).attr('fill', '#e05052').attr('opacity', 0.16);
+    g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16);
   }
-  // Деньги бюджета — прямоугольник между Pb и Ps на [0, Q1].
-  // Налог (сбор) — оранжевый; субсидия (расход) — зелёный.
+  // Деньги бюджета (сбор налога / расход на субсидию) — прямоугольник между Pb и Ps
+  // на [0, Q1]. По фиксированной палитре налог/субсидия/бюджет — один зелёный цвет.
   const lowP = Math.min(Pb, Ps), highP = Math.max(Pb, Ps);
   const aTx = d3.area().x(d => sx(d)).y0(sy(lowP)).y1(sy(highP));
   g.append('path').datum(s1).attr('d', aTx)
-    .attr('fill', isSub ? '#21a366' : '#f59e0b').attr('opacity', 0.22);
+    .attr('fill', COL.tax).attr('opacity', 0.22);
   // DWL — между D и S на интервале между старым и новым Q (налог: [Q1,Q0]; субсидия: [Q0,Q1]).
   const lo = Math.min(Q, Q0), hi = Math.max(Q, Q0);
   if (hi > lo) {
     const s2 = samp(lo, hi);
     const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(d => sy(evalCurve(STATE.D, d)));
-    g.append('path').datum(s2).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28);
+    g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28);
   }
 }
 
@@ -1568,7 +1736,7 @@ function drawTaxPoints() {
   // Проекции к осям для цен покупателя/продавца и количества.
   const dash = (x1, y1, x2, y2) => g.append('line')
     .attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(xQ1, yPb, xQ1, oy);
   dash(xQ1, yPb, ox, yPb);
   dash(xQ1, yPs, ox, yPs);
@@ -1579,13 +1747,13 @@ function drawTaxPoints() {
 
   // Точки покупателя (синяя) и продавца (красная).
   g.append('circle').attr('cx', xQ1).attr('cy', yPb).attr('r', 4)
-    .attr('fill', '#4f7cff').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    .attr('fill', COL.D).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   g.append('circle').attr('cx', xQ1).attr('cy', yPs).attr('r', 4)
-    .attr('fill', '#e05052').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    .attr('fill', COL.S).attr('stroke', COL.halo).attr('stroke-width', 1.5);
 
   // Клин налога: вертикальный отрезок между Ps и Pb.
   g.append('line').attr('x1', xQ1).attr('y1', yPs).attr('x2', xQ1).attr('y2', yPb)
-    .attr('stroke', '#1a1f2e').attr('stroke-width', 2.5).style('pointer-events', 'none');
+    .attr('stroke', COL.ink).attr('stroke-width', 2.5).style('pointer-events', 'none');
   const letter = (STATE.intervType === 'subsidy') ? 's=' : 't=';
   const yMid = (yPb + yPs) / 2;
   haloText(g, xQ1 + 16, yMid, letter + fmt(STATE.tax), 'start', 'middle');
@@ -1598,7 +1766,7 @@ function drawTaxPoints() {
   attachTaxDrag(hitRect);
   // Видимая ручка в середине клина (сигнал «меня можно тянуть»).
   g.append('circle').attr('cx', xQ1).attr('cy', yMid).attr('r', 7)
-    .attr('fill', '#f59e0b').attr('stroke', '#fff').attr('stroke-width', 2)
+    .attr('fill', COL.reg).attr('stroke', COL.halo).attr('stroke-width', 2)
     .style('pointer-events', 'none');
 }
 
@@ -1726,15 +1894,15 @@ function drawElasticityZones() {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
   const area = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp(0, e.unit.Q)).attr('d', area).attr('fill', '#21a366').attr('opacity', 0.10);          // эластичный
-  g.append('path').datum(samp(e.unit.Q, e.qDmax)).attr('d', area).attr('fill', '#f59e0b').attr('opacity', 0.10);    // неэластичный
+  g.append('path').datum(samp(0, e.unit.Q)).attr('d', area).attr('fill', COL.tax).attr('opacity', 0.10);          // эластичный
+  g.append('path').datum(samp(e.unit.Q, e.qDmax)).attr('d', area).attr('fill', COL.reg).attr('opacity', 0.10);    // неэластичный
   // Подписи зон у оси Q.
   const oy = sy(0);
   const elText = (q, txt, color) => g.append('text').attr('x', sx(q)).attr('y', oy - 8).attr('text-anchor', 'middle')
     .attr('font-size', 10).attr('font-weight', 600).attr('fill', color).attr('opacity', 0.8)
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(txt);
-  elText(e.unit.Q * 0.5, 'эластичный', '#21a366');
-  elText((e.unit.Q + e.qDmax) / 2, 'неэластичный', '#d97706');
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(txt);
+  elText(e.unit.Q * 0.5, 'эластичный', COL.tax);
+  elText((e.unit.Q + e.qDmax) / 2, 'неэластичный', COL.reg);
 }
 
 // Единичная точка (MR=0) + перетаскиваемая точка с проекциями и подписью |Ed|.
@@ -1745,24 +1913,24 @@ function drawElasticityPoint() {
   if (e.unit) {
     const [ux, uy] = toPx(e.unit.Q, e.unit.P);
     g.append('line').attr('x1', ux).attr('y1', uy).attr('x2', ux).attr('y2', oy)
-      .attr('stroke', '#8b5cf6').attr('stroke-width', 1).attr('stroke-dasharray', '3 3');
-    g.append('circle').attr('cx', ux).attr('cy', uy).attr('r', 4).attr('fill', '#8b5cf6').attr('stroke', '#fff').attr('stroke-width', 1.5);
-    g.append('text').attr('x', ux + 7).attr('y', uy - 7).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', '#8b5cf6')
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('|Ed|=1 · MR=0 · TR макс');
+      .attr('stroke', COL.MR).attr('stroke-width', 1).attr('stroke-dasharray', '3 3');
+    g.append('circle').attr('cx', ux).attr('cy', uy).attr('r', 4).attr('fill', COL.MR).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    g.append('text').attr('x', ux + 7).attr('y', uy - 7).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', COL.MR)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Ed|=1 · MR=0 · TR макс');
   }
   // Перетаскиваемая точка вдоль спроса.
   const [px, py] = toPx(e.q, e.p);
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
   haloText(g, px, oy + 8, 'Q=' + fmt(e.q), 'middle', 'hanging');
   haloText(g, ox - 8, py, 'P=' + fmt(e.p), 'end', 'middle');
-  g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#1a1f2e')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('|Ed|=' + fmt(e.absEd));
+  g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Ed|=' + fmt(e.absEd));
   const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
   attachElastDrag(hit);
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5.5)
-    .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 2).style('pointer-events', 'none');
+    .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
 }
 
 // Перетаскивание точки эластичности вдоль спроса (по Q; P берётся с кривой; зажим в recompute).
@@ -1805,9 +1973,9 @@ function shiftMark(g, pt, label, color) {
     .attr('stroke', color).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', 0.55);
   g.append('line').attr('x1', px).attr('y1', py).attr('x2', ox).attr('y2', py)
     .attr('stroke', color).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', 0.55);
-  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', '#fff').attr('stroke-width', 1.5);
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', color)
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(label);
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
 }
 
 // Отрисовка сценария сдвигов: исходные кривые + пунктирные сдвинутые + точки E_d/E_s/E1.
@@ -1827,9 +1995,9 @@ function drawShiftScenario() {
   shifted(STATE.S, r.dS, STATE.S.color);
   // Промежуточные равновесия и итог. E_d/E_s — разными цветами, E₁ — тёмный (итог).
   const gp = svg.append('g');
-  if (r.dD !== 0) shiftMark(gp, r.Ed, 'E_d', '#4f7cff');
-  if (r.dS !== 0) shiftMark(gp, r.Es, 'E_s', '#21a366');
-  shiftMark(gp, r.E1, 'E₁', '#1a1f2e');
+  if (r.dD !== 0) shiftMark(gp, r.Ed, 'E_d', COL.D);
+  if (r.dS !== 0) shiftMark(gp, r.Es, 'E_s', COL.tax);
+  shiftMark(gp, r.E1, 'E₁', COL.ink);
 }
 
 // Табло сдвигов: четыре равновесия и таблица разложения ΔQ*/ΔP*.
@@ -1879,7 +2047,7 @@ function drawExtAreas(e) {
   if (hi <= lo) return;
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
   const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.D, d))).y1(d => sy(e.msc(d)));
-  g.append('path').datum(samp).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28);
+  g.append('path').datum(samp).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28);
 }
 
 // Кривая MSC (оранжево-красная сплошная) + (если применён) MPC + налог Пигу (пунктир).
@@ -1888,16 +2056,16 @@ function drawExtCurves(e) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const pts = (f) => { const o = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = f(q); o.push(isNaN(v) ? null : [q, v]); } return o; };
-  g.append('path').datum(pts(e.msc)).attr('fill', 'none').attr('stroke', '#d97706').attr('stroke-width', 2.5).attr('d', line);
+  g.append('path').datum(pts(e.msc)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr('d', line);
   // Ярлык MSC у правого края.
   const qL = CONFIG.Qmax * 0.9, vL = e.msc(qL);
   if (!isNaN(vL) && vL <= CONFIG.Pmax) g.append('text').attr('x', sx(qL)).attr('y', sy(vL) - 4)
-    .attr('font-size', 11).attr('font-weight', 600).attr('fill', '#d97706')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MSC');
+    .attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.reg)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MSC');
   // Налог Пигу: MPC + налог (≈ MSC) — зелёный пунктир.
   if (e.applyPigou && e.pigou != null) {
     g.append('path').datum(pts(q => evalCurve(STATE.S, q) + e.pigou))
-      .attr('fill', 'none').attr('stroke', '#16a34a').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+      .attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
   }
 }
 
@@ -1906,26 +2074,26 @@ function drawExtPoints(e) {
   if (!e) return;
   const ox = sx(0), oy = sy(0), g = svg.append('g');
   const dash = (x1, y1, x2, y2, c) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-    .attr('stroke', c || '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', c || COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   // Рыночный выпуск (Qрын, Pрын) — на пересечении D и MPC.
   const [pxm, pym] = toPx(e.Qmkt, e.Pmkt);
   dash(pxm, pym, pxm, oy); dash(pxm, pym, ox, pym);
-  g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
-  g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#1a1f2e')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Qрын');
+  g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+  g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Qрын');
   haloText(g, pxm, oy + 8, fmt(e.Qmkt), 'middle', 'hanging');
   // Общественный оптимум (Qопт, Pопт) — на пересечении D и MSC.
   if (e.Qopt != null) {
     const [pxo, pyo] = toPx(e.Qopt, e.Popt);
-    dash(pxo, pyo, pxo, oy, '#16a34a'); dash(pxo, pyo, ox, pyo, '#16a34a');
-    g.append('circle').attr('cx', pxo).attr('cy', pyo).attr('r', 4.5).attr('fill', '#16a34a').attr('stroke', '#fff').attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxo + 8).attr('y', pyo - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#15803d')
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Qопт');
+    dash(pxo, pyo, pxo, oy, COL.tax); dash(pxo, pyo, ox, pyo, COL.tax);
+    g.append('circle').attr('cx', pxo).attr('cy', pyo).attr('r', 4.5).attr('fill', COL.tax).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    g.append('text').attr('x', pxo + 8).attr('y', pyo - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.tax)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Qопт');
     haloText(g, pxo, oy + 8, fmt(e.Qopt), 'middle', 'hanging');
     // С налогом Пигу новое равновесие совпадает с Qопт — отмечаем кольцом.
     if (e.applyPigou && e.pigouEq) {
       const [pxp, pyp] = toPx(e.pigouEq.Q, e.pigouEq.P);
-      g.append('circle').attr('cx', pxp).attr('cy', pyp).attr('r', 7).attr('fill', 'none').attr('stroke', '#16a34a').attr('stroke-width', 2);
+      g.append('circle').attr('cx', pxp).attr('cy', pyp).attr('r', 7).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2);
     }
   }
 }
@@ -2002,18 +2170,18 @@ function drawPcAreas() {
   const s1 = samp(0, Qtrade);
   if (STATE.showCS) {   // CS — между ценой Preg (низ) и спросом (верх)
     const a = d3.area().x(d => sx(d)).y0(sy(Preg)).y1(d => sy(evalCurve(STATE.D, d)));
-    g.append('path').datum(s1).attr('d', a).attr('fill', '#4f7cff').attr('opacity', 0.16);
+    g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16);
   }
   if (STATE.showPS) {   // PS — между предложением (низ) и ценой Preg (верх)
     const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(Preg));
-    g.append('path').datum(s1).attr('d', a).attr('fill', '#e05052').attr('opacity', 0.16);
+    g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16);
   }
   // DWL — площадь между D и S от Q_trade до Q* (потери от нерасчищенного рынка).
   const lo = Math.min(Qtrade, STATE.eq.Q), hi = Math.max(Qtrade, STATE.eq.Q);
   if (hi > lo) {
     const s2 = samp(lo, hi);
     const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(d => sy(evalCurve(STATE.D, d)));
-    g.append('path').datum(s2).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28);
+    g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28);
   }
 }
 
@@ -2026,7 +2194,7 @@ function drawPriceControl() {
   const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax);
   const yReg = sy(Preg);
   const g = svg.append('g');
-  const lineColor = pc.isCeiling ? '#b45309' : '#7c3aed';
+  const lineColor = pc.isCeiling ? COL.reg : COL.MR;
 
   // Горизонтальная линия фиксированной цены через весь график.
   g.append('line').attr('x1', ox).attr('y1', yReg).attr('x2', xMax).attr('y2', yReg)
@@ -2038,7 +2206,7 @@ function drawPriceControl() {
     const xQs = sx(Qs), xQd = sx(Qd), xQt = sx(Qtrade);
     const dash = (x1, y1, x2, y2) => g.append('line')
       .attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-      .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     dash(xQs, yReg, xQs, oy);   // проекция объёма предложения на ось Q
     dash(xQd, yReg, xQd, oy);   // проекция объёма спроса на ось Q
     haloText(g, xQs, oy + 8, 'Qs=' + fmt(Qs), 'middle', 'hanging');
@@ -2046,11 +2214,11 @@ function drawPriceControl() {
     // Зона дефицита/избытка — цветная полоса на оси Q между Qs и Qd.
     const xLo = Math.min(xQs, xQd), xHi = Math.max(xQs, xQd);
     g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy)
-      .attr('stroke', isCeiling ? '#dc2626' : '#7c3aed').attr('stroke-width', 5).attr('opacity', 0.5);
+      .attr('stroke', isCeiling ? COL.bad : COL.MR).attr('stroke-width', 5).attr('opacity', 0.5);
     haloText(g, (xLo + xHi) / 2, oy + 24, (isCeiling ? 'Дефицит' : 'Избыток') + ' = ' + fmt(gap), 'middle', 'hanging');
     // Точка фактической торговли (короткая сторона рынка) на линии цены.
     g.append('circle').attr('cx', xQt).attr('cy', yReg).attr('r', 4)
-      .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+      .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   } else {
     drawEquilibrium();   // не связывает — рынок остаётся в равновесии
   }
@@ -2061,7 +2229,7 @@ function drawPriceControl() {
     .attr('fill', 'transparent').style('cursor', 'grab');
   attachPcDrag(hit);
   g.append('circle').attr('cx', ox + (xMax - ox) * 0.5).attr('cy', yReg).attr('r', 7)
-    .attr('fill', lineColor).attr('stroke', '#fff').attr('stroke-width', 2)
+    .attr('fill', lineColor).attr('stroke', COL.halo).attr('stroke-width', 2)
     .style('pointer-events', 'none');
 }
 
@@ -2125,15 +2293,15 @@ function drawGhost() {
   const g = svg.append('g').attr('class', 'ghost');
   // Бледные проекции исходного равновесия к осям.
   g.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy)
-    .attr('stroke', '#c4c4c4').attr('stroke-width', 1).attr('stroke-dasharray', '3 3');
+    .attr('stroke', COL.ghost).attr('stroke-width', 1).attr('stroke-dasharray', '3 3');
   g.append('line').attr('x1', px).attr('y1', py).attr('x2', ox).attr('y2', py)
-    .attr('stroke', '#c4c4c4').attr('stroke-width', 1).attr('stroke-dasharray', '3 3');
+    .attr('stroke', COL.ghost).attr('stroke-width', 1).attr('stroke-dasharray', '3 3');
   // Бледная полая точка E₀ и подпись.
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
-    .attr('fill', '#fff').attr('stroke', '#aaa').attr('stroke-width', 1.5);
+    .attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
   g.append('text').attr('x', px + 7).attr('y', py - 6)
-    .attr('font-size', 11).attr('font-weight', 600).attr('fill', '#999')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('E₀');
+    .attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('E₀');
 }
 
 /* ---------------------------------------------------------------------
@@ -2185,15 +2353,15 @@ function drawMonopolyAreas() {
     const s1 = samp(0, m.Qm);
     if (STATE.showMonoVC) {   // VC — под кривой MC (от оси P=0 до MC). Нейтральный серо-голубой.
       const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d)));
-      g.append('path').datum(s1).attr('d', a).attr('fill', '#94a3b8').attr('opacity', 0.22);
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22);
     }
     if (STATE.showMonoPS) {   // PS (TR − VC) — между MC (низ) и ценой Pm (верх). Красный, как PS конкуренции.
       const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(m.Pm));
-      g.append('path').datum(s1).attr('d', a).attr('fill', '#e05052').attr('opacity', 0.16);
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16);
     }
     if (STATE.showMonoCS) {   // CS — между ценой Pm (низ) и спросом D (верх). Синий, как CS конкуренции.
       const a = d3.area().x(d => sx(d)).y0(sy(m.Pm)).y1(d => sy(evalCurve(STATE.D, d)));
-      g.append('path').datum(s1).attr('d', a).attr('fill', '#4f7cff').attr('opacity', 0.16);
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16);
     }
   }
 
@@ -2203,7 +2371,7 @@ function drawMonopolyAreas() {
     if (hi > lo) {
       const s2 = samp(lo, hi);
       const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(STATE.D, d)));
-      g.append('path').datum(s2).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28);
+      g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28);
     }
   }
 }
@@ -2220,12 +2388,12 @@ function drawMonopoly() {
   };
   // MR — фиолетовый пунктир.
   g.append('path').datum(sample(q => marginalRevenue(STATE.D, q)))
-    .attr('fill', 'none').attr('stroke', '#8b5cf6').attr('stroke-width', 2)
+    .attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2)
     .attr('stroke-dasharray', '6 4').attr('d', line);
   // Если MC выведена из TC (нет явной кривой mc/S) — нарисуем её красным.
   if (!mcSourceCurve() && curveByRole('tc')) {
     g.append('path').datum(sample(mcAt))
-      .attr('fill', 'none').attr('stroke', '#e05052').attr('stroke-width', 2.5).attr('d', line);
+      .attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line);
   }
 }
 
@@ -2239,16 +2407,16 @@ function drawMonopolyPoints() {
   const [, pymc] = toPx(m.Qm, m.mcAtQm);
   const dash = (x1, y1, x2, y2) => g.append('line')
     .attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
 
   // Конкурентный ориентир (Qc, Pc) — бледный, как призрак (Задача 2).
   if (STATE.showGhost && m.Qc != null) {
     const [pxc, pyc] = toPx(m.Qc, m.Pc);
     g.append('circle').attr('cx', pxc).attr('cy', pyc).attr('r', 4)
-      .attr('fill', '#fff').attr('stroke', '#aaa').attr('stroke-width', 1.5);
+      .attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
     g.append('text').attr('x', pxc + 7).attr('y', pyc + 13)
-      .attr('font-size', 11).attr('font-weight', 600).attr('fill', '#999')
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('К');
+      .attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('К');
     haloText(g, pxc, oy + 8, 'Qc=' + fmt(m.Qc), 'middle', 'hanging');
   }
 
@@ -2257,12 +2425,12 @@ function drawMonopolyPoints() {
   dash(ox, pym, pxm, pym);
   // Точка MR=MC (фиолетовая) на вертикали.
   g.append('circle').attr('cx', pxm).attr('cy', pymc).attr('r', 3.5)
-    .attr('fill', '#8b5cf6').attr('stroke', '#fff').attr('stroke-width', 1.2);
+    .attr('fill', COL.MR).attr('stroke', COL.halo).attr('stroke-width', 1.2);
   // Точка монополии (Qm, Pm) на кривой спроса.
   g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5)
-    .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   g.append('text').attr('x', pxm + 8).attr('y', pym - 8)
-    .attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('M');
+    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('M');
   haloText(g, pxm, oy + 8, 'Qm=' + fmt(m.Qm), 'middle', 'hanging');
   haloText(g, ox - 8, pym, 'Pm=' + fmt(m.Pm), 'end', 'middle');
 }
@@ -2388,13 +2556,13 @@ function drawMonoCeilingAreas() {
   const Qs = mc.Qstar, P = mc.price;
   if (Qs > 1e-6) {
     const s1 = samp(0, Qs);
-    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d))); g.append('path').datum(s1).attr('d', a).attr('fill', '#94a3b8').attr('opacity', 0.22); }
-    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(P)); g.append('path').datum(s1).attr('d', a).attr('fill', '#e05052').attr('opacity', 0.16); }
-    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s1).attr('d', a).attr('fill', '#4f7cff').attr('opacity', 0.16); }
+    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22); }
+    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(P)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16); }
+    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16); }
   }
   if (m.Qc != null) {                            // DWL — между D и MC от Qstar до Qc
     const lo = Math.min(Qs, m.Qc), hi = Math.max(Qs, m.Qc);
-    if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', '#888').attr('opacity', 0.28); }
+    if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28); }
   }
 }
 
@@ -2405,14 +2573,14 @@ function drawMonoKinkedMR() {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const yPc = sy(mc.Pc);
   g.append('line').attr('x1', sx(0)).attr('y1', yPc).attr('x2', sx(mc.Qhat)).attr('y2', yPc)
-    .attr('stroke', '#8b5cf6').attr('stroke-width', 3).attr('stroke-dasharray', '2 2');
+    .attr('stroke', COL.MR).attr('stroke-width', 3).attr('stroke-dasharray', '2 2');
   const mrHat = marginalRevenue(STATE.D, mc.Qhat);   // обрыв MR в Q̂ вниз к обычному MR
   if (!isNaN(mrHat)) {
     g.append('line').attr('x1', sx(mc.Qhat)).attr('y1', yPc).attr('x2', sx(mc.Qhat)).attr('y2', sy(Math.max(0, mrHat)))
-      .attr('stroke', '#8b5cf6').attr('stroke-width', 1.5).attr('stroke-dasharray', '2 2').attr('opacity', 0.6);
+      .attr('stroke', COL.MR).attr('stroke-width', 1.5).attr('stroke-dasharray', '2 2').attr('opacity', 0.6);
   }
-  g.append('text').attr('x', sx(mc.Qhat * 0.4)).attr('y', yPc - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#8b5cf6')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MRэфф = Pc');
+  g.append('text').attr('x', sx(mc.Qhat * 0.4)).attr('y', yPc - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.MR)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MRэфф = Pc');
 }
 
 // Точки при связывающем потолке: новый выпуск M(Qstar, price), призрак M₀(Qm,Pm), полоса дефицита.
@@ -2421,26 +2589,26 @@ function drawMonoCeilingPoints() {
   if (!mc || !mc.binding || !m) return;
   const ox = sx(0), oy = sy(0), g = svg.append('g');
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   // Призрак исходной монополии M₀(Qm, Pm).
   if (STATE.showGhost) {
     const [px0, py0] = toPx(m.Qm, m.Pm);
-    g.append('circle').attr('cx', px0).attr('cy', py0).attr('r', 4).attr('fill', '#fff').attr('stroke', '#aaa').attr('stroke-width', 1.5);
-    g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#999')
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('M₀');
+    g.append('circle').attr('cx', px0).attr('cy', py0).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
+    g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('M₀');
   }
   // Новый выпуск/цена (Qstar, price).
   if (mc.Qstar > 1e-6) {
     const [pxm, pym] = toPx(mc.Qstar, mc.price);
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
-    g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('M');
+    g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('M');
     haloText(g, pxm, oy + 8, 'Q=' + fmt(mc.Qstar), 'middle', 'hanging');
   }
   // Дефицит на оси Q между Qstar и Q̂ (объём спроса при цене Pc).
   if (mc.shortage > 1e-6) {
     const xLo = sx(Math.min(mc.Qstar, mc.Qhat)), xHi = sx(Math.max(mc.Qstar, mc.Qhat));
-    g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', '#dc2626').attr('stroke-width', 5).attr('opacity', 0.5);
+    g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
     haloText(g, sx(mc.Qhat), oy + 8, 'Qd=' + fmt(mc.Qhat), 'middle', 'hanging');
     haloText(g, (xLo + xHi) / 2, oy + 24, 'Дефицит = ' + fmt(mc.shortage), 'middle', 'hanging');
   }
@@ -2452,13 +2620,13 @@ function drawMonoCeilingLine() {
   const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax), yPc = sy(STATE.monoCeilP);
   const g = svg.append('g');
   g.append('line').attr('x1', ox).attr('y1', yPc).attr('x2', xMax).attr('y2', yPc)
-    .attr('stroke', '#b45309').attr('stroke-width', 2.5).style('pointer-events', 'none');
+    .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
   haloText(g, ox - 8, yPc, 'Pc=' + fmt(STATE.monoCeilP), 'end', 'middle');
   const hit = g.append('rect').attr('x', ox).attr('y', yPc - 12).attr('width', xMax - ox).attr('height', 24)
     .attr('fill', 'transparent').style('cursor', 'grab');
   attachMonoCeilDrag(hit);
   g.append('circle').attr('cx', ox + (xMax - ox) * 0.72).attr('cy', yPc).attr('r', 7)
-    .attr('fill', '#b45309').attr('stroke', '#fff').attr('stroke-width', 2).style('pointer-events', 'none');
+    .attr('fill', COL.reg).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
 }
 
 function attachMonoCeilDrag(sel) {
@@ -2511,18 +2679,18 @@ function drawDiscr1() {
   // Если MC выведена из TC (нет кривой mc/S) — нарисуем её красным.
   if (!mcSourceCurve() && curveByRole('tc')) {
     const pts = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = mcAt(q); pts.push(isNaN(v) ? null : [q, v]); }
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#e05052').attr('stroke-width', 2.5).attr('d', line);
+    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line);
   }
   if (!d1) return;
   // Заливка прибыли — между MC (низ) и D (верх) от 0 до Qcomp.
   const samp = []; for (let i = 0; i <= 120; i++) samp.push(d1.Qcomp * i / 120);
   const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp).attr('d', a).attr('fill', '#21a366').attr('opacity', 0.20);
+  g.append('path').datum(samp).attr('d', a).attr('fill', COL.tax).attr('opacity', 0.20);
   // Точка Qcomp на спросе + проекции.
   const ox = sx(0), oy = sy(0), Pq = evalCurve(D, d1.Qcomp);
   const og = svg.append('g'), [px, py] = toPx(d1.Qcomp, Pq);
-  og.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy).attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
-  og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', '#21a366').attr('stroke', '#fff').attr('stroke-width', 1.5);
+  og.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.tax).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   haloText(og, px, oy + 8, 'Qcomp=' + fmt(d1.Qcomp), 'middle', 'hanging');
   haloText(og, sx(d1.Qcomp * 0.45), sy(Math.max(0, (Pq + mcAt(d1.Qcomp * 0.45)) / 2)), 'Прибыль', 'middle', 'middle');
 }
@@ -2597,24 +2765,24 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
   const cid = 'mini-clip-' + idx;
   svg.select('defs').append('clipPath').attr('id', cid).append('rect').attr('x', left).attr('y', top).attr('width', right - left).attr('height', bottom - top);
   // Оси.
-  g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', right).attr('y2', bottom).attr('stroke', '#555').attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
-  g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', left).attr('y2', top).attr('stroke', '#555').attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
-  g.append('text').attr('x', (left + right) / 2).attr('y', top - 12).attr('text-anchor', 'middle').attr('font-size', 12.5).attr('font-weight', 600).attr('fill', '#333').text(title);
-  g.append('text').attr('x', right + 4).attr('y', bottom + 4).attr('font-size', 11).attr('fill', '#666').text('Q');
-  g.append('text').attr('x', left - 4).attr('y', top - 2).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', '#666').text('P');
-  [0.25, 0.5, 0.75, 1].forEach(t => { const xq = Xmax * t; g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('font-size', 9).attr('fill', '#888').text(fmt(xq)); });
-  [0.25, 0.5, 0.75, 1].forEach(t => { const yp = Ymax * t; g.append('text').attr('x', left - 5).attr('y', ly(yp)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').attr('font-size', 9).attr('fill', '#888').text(fmt(yp)); });
+  g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', right).attr('y2', bottom).attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+  g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', left).attr('y2', top).attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+  g.append('text').attr('x', (left + right) / 2).attr('y', top - 12).attr('text-anchor', 'middle').attr('font-size', 12.5).attr('font-weight', 600).attr('fill', COL.ink).text(title);
+  g.append('text').attr('x', right + 4).attr('y', bottom + 4).attr('font-size', 11).attr('fill', COL.inkSoft).text('Q');
+  g.append('text').attr('x', left - 4).attr('y', top - 2).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', COL.inkSoft).text('P');
+  [0.25, 0.5, 0.75, 1].forEach(t => { const xq = Xmax * t; g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('font-size', 9).attr('fill', COL.inkSoft).text(fmt(xq)); });
+  [0.25, 0.5, 0.75, 1].forEach(t => { const yp = Ymax * t; g.append('text').attr('x', left - 5).attr('y', ly(yp)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').attr('font-size', 9).attr('fill', COL.inkSoft).text(fmt(yp)); });
   const gc = svg.append('g').attr('clip-path', 'url(#' + cid + ')');
   const line = d3.line().defined(d => d !== null).x(d => lx(d[0])).y(d => ly(d[1]));
   const sample = (f) => { const o = []; for (let i = 0; i <= 300; i++) { const q = Xmax * i / 300; const v = f(q); o.push((isNaN(v) || v < 0) ? null : [q, v]); } return o; };
-  gc.append('path').datum(sample(q => evalCurve(D, q))).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.5).attr('d', line);           // D
-  gc.append('path').datum(sample(q => marginalRevenue(D, q))).attr('fill', 'none').attr('stroke', '#8b5cf6').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);  // MR
-  gc.append('path').datum(sample(q => evalCurve(mcCurve, q))).attr('fill', 'none').attr('stroke', '#e05052').attr('stroke-width', 2).attr('d', line);       // MC
+  gc.append('path').datum(sample(q => evalCurve(D, q))).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line);           // D
+  gc.append('path').datum(sample(q => marginalRevenue(D, q))).attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);  // MR
+  gc.append('path').datum(sample(q => evalCurve(mcCurve, q))).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2).attr('d', line);       // MC
   if (qi != null && qi > 0 && !isNaN(Pi)) {
     const px = lx(qi), py = ly(Pi);
-    g.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', bottom).attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
-    g.append('line').attr('x1', px).attr('y1', py).attr('x2', left).attr('y2', py).attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
-    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    g.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', bottom).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    g.append('line').attr('x1', px).attr('y1', py).attr('x2', left).attr('y2', py).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     haloText(g, px, bottom + 12, 'q=' + fmt(qi), 'middle', 'hanging');
     haloText(g, left - 5, py, 'P=' + fmt(Pi), 'end', 'middle');
   }
@@ -2635,7 +2803,7 @@ function redrawDiscr3() {
   drawMiniMarket(0, midX, 'Рынок 1', d.c1, d.q1, d.P1, d.cm, 1);
   drawMiniMarket(midX, W, 'Рынок 2', d.c2, d.q2, d.P2, d.cm, 2);
   // Разделитель между панелями.
-  svg.append('line').attr('x1', midX).attr('y1', 18).attr('x2', midX).attr('y2', H - 30).attr('stroke', '#eee').attr('stroke-width', 1);
+  svg.append('line').attr('x1', midX).attr('y1', 18).attr('x2', midX).attr('y2', H - 30).attr('stroke', COL.grid).attr('stroke-width', 1);
   updateDiscr3Panel();
 }
 
@@ -2735,30 +2903,30 @@ function drawKinkedFull() {
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   // Ломаный спрос (по Dfn).
   const dPts = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = k.Dfn(q); dPts.push((isNaN(v) || v < 0) ? null : [q, v]); }
-  g.append('path').datum(dPts).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.5).attr('d', line);
+  g.append('path').datum(dPts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line);
   // MR по каждому куску (отдельные отрезки) + вертикальные разрывы в изломах.
   k.segs.forEach(s => {
     const pts = []; for (let i = 0; i <= 200; i++) { const q = s.q0 + (s.q1 - s.q0) * i / 200; const v = marginalRevenue(s.D, q); pts.push(isNaN(v) ? null : [q, v]); }
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#8b5cf6').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
   });
   k.kinks.forEach(qk => {
     const segL = k.segs.find(s => Math.abs(s.q1 - qk) < 1e-6), segR = k.segs.find(s => Math.abs(s.q0 - qk) < 1e-6);
     if (segL && segR) {
       const mrL = marginalRevenue(segL.D, qk), mrR = marginalRevenue(segR.D, qk);
       if (!isNaN(mrL) && !isNaN(mrR)) g.append('line').attr('x1', sx(qk)).attr('y1', sy(Math.max(0, mrL))).attr('x2', sx(qk)).attr('y2', sy(Math.max(0, mrR)))
-        .attr('stroke', '#8b5cf6').attr('stroke-width', 1.3).attr('stroke-dasharray', '2 2').attr('opacity', 0.6);
+        .attr('stroke', COL.MR).attr('stroke-width', 1.3).attr('stroke-dasharray', '2 2').attr('opacity', 0.6);
     }
   });
   // MC.
   const mcPts = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = evalCurve(k.mcCurve, q); mcPts.push(isNaN(v) ? null : [q, v]); }
-  g.append('path').datum(mcPts).attr('fill', 'none').attr('stroke', '#e05052').attr('stroke-width', 2.5).attr('d', line);
+  g.append('path').datum(mcPts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line);
   // Оптимум.
   if (k.found && k.Qstar > 0 && !isNaN(k.Pstar)) {
     const og = svg.append('g'), ox = sx(0), oy = sy(0), [px, py] = toPx(k.Qstar, k.Pstar);
-    const dash = (x1, y1, x2, y2) => og.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2).attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    const dash = (x1, y1, x2, y2) => og.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     dash(px, py, px, oy); dash(px, py, ox, py);
-    og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
-    og.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('M');
+    og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    og.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('M');
     haloText(og, px, oy + 8, 'Q*=' + fmt(k.Qstar), 'middle', 'hanging');
     haloText(og, ox - 8, py, 'P*=' + fmt(k.Pstar), 'end', 'middle');
   }
@@ -2779,7 +2947,7 @@ function updateKinkPanel() {
   html += '<table class="tx-table" style="margin-top:6px;"><tr><th>Кандидат</th><th>Q</th><th>π</th></tr>';
   k.cands.forEach(c => {
     const win = (Math.abs(c.Q - k.Qstar) < 1e-6);
-    html += `<tr${win ? ' style="font-weight:700;color:#1a1f2e;"' : ''}><td>${c.kind}</td><td>${fmt(c.Q)}</td><td>${fmt(c.profit)}</td></tr>`;
+    html += `<tr${win ? ' style="font-weight:700;color:var(--text);"' : ''}><td>${c.kind}</td><td>${fmt(c.Q)}</td><td>${fmt(c.profit)}</td></tr>`;
   });
   html += '</table>';
   html += '<div class="hint">Оптимум — по МАКСИМУМУ прибыли среди кандидатов (а не по первому пересечению MR&nbsp;=&nbsp;MC).</div>';
@@ -2928,11 +3096,11 @@ function drawCostCurves() {
       .attr('stroke', color).attr('stroke-width', 2.2).attr('d', line);
     if (dash) p.attr('stroke-dasharray', dash);
   };
-  curve(costVC,  '#8b5cf6', STATE.showVC, '5 4');   // VC — полные переменные (по желанию)
-  curve(costAFC, '#f59e0b', STATE.showAFC);
-  curve(costAVC, '#21a366', STATE.showAVC);
-  curve(costATC, '#4f7cff', STATE.showATC);
-  curve(costMC,  '#e05052', STATE.showMC);
+  curve(costVC,  COL.costVC, STATE.showVC, '5 4');   // VC — полные переменные (по желанию)
+  curve(costAFC, COL.costAFC, STATE.showAFC);
+  curve(costAVC, COL.costAVC, STATE.showAVC);
+  curve(costATC, COL.costATC, STATE.showATC);
+  curve(costMC,  COL.costMC, STATE.showMC);
 
   // Подписи кривых у правого края (на значении при Q≈Qmax, если в пределах Pmax).
   const labelAt = (f, txt, color) => {
@@ -2940,25 +3108,25 @@ function drawCostCurves() {
     if (isNaN(v) || v < 0 || v > CONFIG.Pmax) return;
     g.append('text').attr('x', sx(q)).attr('y', sy(v) - 4)
       .attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(txt);
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(txt);
   };
-  if (STATE.showMC)  labelAt(costMC,  'MC',  '#e05052');
-  if (STATE.showATC) labelAt(costATC, 'ATC', '#4f7cff');
-  if (STATE.showAVC) labelAt(costAVC, 'AVC', '#21a366');
-  if (STATE.showAFC) labelAt(costAFC, 'AFC', '#f59e0b');
+  if (STATE.showMC)  labelAt(costMC,  'MC',  COL.costMC);
+  if (STATE.showATC) labelAt(costATC, 'ATC', COL.costATC);
+  if (STATE.showAVC) labelAt(costAVC, 'AVC', COL.costAVC);
+  if (STATE.showAFC) labelAt(costAFC, 'AFC', COL.costAFC);
 
   // Ключевые точки: безубыточность (min ATC) и закрытие (min AVC) — MC проходит через них.
   const mark = (pt, color, label) => {
     if (!pt || pt.val > CONFIG.Pmax || pt.Q > CONFIG.Qmax) return;
     const [px, py] = toPx(pt.Q, pt.val);
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
-      .attr('fill', color).attr('stroke', '#fff').attr('stroke-width', 1.5);
+      .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     g.append('text').attr('x', px).attr('y', py - 9)
       .attr('text-anchor', 'middle').attr('font-size', 9.5).attr('font-weight', 600).attr('fill', color)
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(label);
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
   };
-  if (STATE.showATC) mark(STATE.minATC, '#4f7cff', 'безубыт.');
-  if (STATE.showAVC) mark(STATE.minAVC, '#21a366', 'закрытие');
+  if (STATE.showATC) mark(STATE.minATC, COL.costATC, 'безубыт.');
+  if (STATE.showAVC) mark(STATE.minAVC, COL.costAVC, 'закрытие');
 }
 
 // Табло издержек: ключевые точки закрытия и безубыточности.
@@ -3146,11 +3314,11 @@ function laborPoint(g, L, W, color, label, opts) {
   opts = opts || {};
   const ox = sx(0), oy = sy(0), [px, py] = toPx(L, W);
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
   if (opts.lText !== null) haloText(g, px, oy + 8, opts.lText || ('L=' + fmt(L)), 'middle', 'hanging');
   if (opts.wText !== null) yWageLabel(g, ox, py, opts.wText || ('W=' + fmt(W)));
-  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', '#fff').attr('stroke-width', 1.5);
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   if (label) g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', color).text(label);
 }
 
@@ -3158,9 +3326,9 @@ function laborPoint(g, L, W, color, label, opts) {
 function drawLaborGhost(L, W, label) {
   if (!STATE.showGhost || L == null || W == null) return;
   const oy = sy(0), g = svg.append('g'), [px, py] = toPx(L, W);
-  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', '#fff').attr('stroke', '#aaa').attr('stroke-width', 1.5);
-  g.append('text').attr('x', px + 7).attr('y', py + 13).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#999')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(label || 'К');
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
+  g.append('text').attr('x', px + 7).attr('y', py + 13).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label || 'К');
   haloText(g, px, oy + 8, 'Lk=' + fmt(L), 'middle', 'hanging');
 }
 
@@ -3172,10 +3340,10 @@ function drawLaborSurpluses() {
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(eq.Q * i / 100);
   // Излишек рабочих — между предложением (низ) и зарплатой W (верх).
   const wA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(W));
-  g.append('path').datum(samp).attr('d', wA).attr('fill', '#e05052').attr('opacity', 0.16);
+  g.append('path').datum(samp).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16);
   // Излишек фирм — между зарплатой W (низ) и спросом D=MRPL (верх).
   const fA = d3.area().x(d => sx(d)).y0(sy(W)).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp).attr('d', fA).attr('fill', '#4f7cff').attr('opacity', 0.16);
+  g.append('path').datum(samp).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16);
 }
 
 // Благосостояние при связывающем МРОТ (Задача 3): перестроенные излишки + DWL.
@@ -3190,16 +3358,16 @@ function drawLaborMinWelfare() {
   const s1 = samp(0, Lstar);
   // Излишек рабочих — между предложением S (низ) и фактической зарплатой (верх), до L*.
   const wA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(Wfact));
-  g.append('path').datum(s1).attr('d', wA).attr('fill', '#e05052').attr('opacity', 0.16);
+  g.append('path').datum(s1).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16);
   // Излишек фирм — между фактической зарплатой (низ) и спросом D (верх), до L*.
   const fA = d3.area().x(d => sx(d)).y0(sy(Wfact)).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(s1).attr('d', fA).attr('fill', '#4f7cff').attr('opacity', 0.16);
+  g.append('path').datum(s1).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16);
   // DWL — между D и S от L* до конкурентной занятости Lk (недозанятость/безработица).
   const Lk = eq.Q, lo = Math.min(Lstar, Lk), hi = Math.max(Lstar, Lk);
   if (hi > lo) {
     const s2 = samp(lo, hi);
     const dA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
-    g.append('path').datum(s2).attr('d', dA).attr('fill', '#888').attr('opacity', 0.28);
+    g.append('path').datum(s2).attr('d', dA).attr('fill', COL.inkSoft).attr('opacity', 0.28);
   }
 }
 
@@ -3216,26 +3384,26 @@ function drawLaborMCL() {
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   // (1) Настоящая MCL — всегда во всю длину.
   const ptsFull = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; const v = laborMCL(S, l); ptsFull.push(isNaN(v) ? null : [l, v]); }
-  g.append('path').datum(ptsFull).attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  g.append('path').datum(ptsFull).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
   const ql = CONFIG.Qmax * 0.85, vl = laborMCL(S, ql);
-  if (!isNaN(vl) && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#f59e0b')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MCL');
+  if (!isNaN(vl) && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.reg)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MCL');
   // (2) Эффективная ломаная MCL_eff — поверх настоящей, при связывающем МРОТ.
   const min = STATE.laborMin;
   if (min && min.binding && min.Lhat != null) {
     const yW = sy(min.Wmin);
     // Полка W_min до L̂ (сплошная, тёмно-оранжевая, потолще).
     g.append('line').attr('x1', sx(0)).attr('y1', yW).attr('x2', sx(min.Lhat)).attr('y2', yW)
-      .attr('stroke', '#c2410c').attr('stroke-width', 3.5);
+      .attr('stroke', COL.warn).attr('stroke-width', 3.5);
     // Дальше L̂ MCL_eff совпадает с настоящей MCL — подчёркиваем сплошной поверх пунктира.
     const ptsBeyond = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; if (l < min.Lhat) { ptsBeyond.push(null); continue; } const v = laborMCL(S, l); ptsBeyond.push(isNaN(v) ? null : [l, v]); }
-    g.append('path').datum(ptsBeyond).attr('fill', 'none').attr('stroke', '#c2410c').attr('stroke-width', 3).attr('d', line);
+    g.append('path').datum(ptsBeyond).attr('fill', 'none').attr('stroke', COL.warn).attr('stroke-width', 3).attr('d', line);
     // Вертикальный скачок в L̂ от W_min к настоящей MCL.
     const mclHat = laborMCL(S, min.Lhat);
     if (!isNaN(mclHat)) g.append('line').attr('x1', sx(min.Lhat)).attr('y1', yW).attr('x2', sx(min.Lhat)).attr('y2', sy(mclHat))
-      .attr('stroke', '#c2410c').attr('stroke-width', 2).attr('stroke-dasharray', '3 2').attr('opacity', 0.7);
-    g.append('text').attr('x', sx(min.Lhat * 0.4)).attr('y', yW - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#c2410c')
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MCLэфф');
+      .attr('stroke', COL.warn).attr('stroke-width', 2).attr('stroke-dasharray', '3 2').attr('opacity', 0.7);
+    g.append('text').attr('x', sx(min.Lhat * 0.4)).attr('y', yW - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.warn)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MCLэфф');
   }
 }
 
@@ -3249,7 +3417,7 @@ function drawLaborDWL(Lfrom) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
   const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp).attr('d', a).attr('fill', '#888').attr('opacity', 0.28);
+  g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28);
 }
 
 // Точки монопсонии: оптимум на MCL=D, зарплата вниз на S, ориентир «К».
@@ -3261,21 +3429,21 @@ function drawLaborMonopsonyPoints() {
   const g = svg.append('g');
   const ox = sx(0), oy = sy(0);
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   if (bind) {
     // Призрак исходной монопсонии M₀(Lm, Wm).
     if (STATE.showGhost) {
       const [px0, py0] = toPx(mono.Lm, mono.Wm);
-      g.append('circle').attr('cx', px0).attr('cy', py0).attr('r', 4).attr('fill', '#fff').attr('stroke', '#aaa').attr('stroke-width', 1.5);
-      g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#999')
-        .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('M₀');
+      g.append('circle').attr('cx', px0).attr('cy', py0).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
+      g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+        .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('M₀');
     }
     // Новый оптимум при МРОТ.
-    if (min.Lstar > 1e-6) laborPoint(g, min.Lstar, min.wage, '#1a1f2e', 'M', { lText: 'L=' + fmt(min.Lstar), wText: 'W=' + fmt(min.wage) });
+    if (min.Lstar > 1e-6) laborPoint(g, min.Lstar, min.wage, COL.ink, 'M', { lText: 'L=' + fmt(min.Lstar), wText: 'W=' + fmt(min.wage) });
     // Безработица на оси L между Lstar и L̂ (желающие при W_min).
     if (min.unemployment > 1e-6) {
       const xLo = sx(Math.min(min.Lstar, min.Lhat)), xHi = sx(Math.max(min.Lstar, min.Lhat));
-      g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', '#dc2626').attr('stroke-width', 5).attr('opacity', 0.5);
+      g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
       haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(min.unemployment), 'middle', 'hanging');
     }
   } else {
@@ -3285,13 +3453,13 @@ function drawLaborMonopsonyPoints() {
     const [, pyW] = toPx(mono.Lm, mono.Wm);
     // Вертикаль Lm: от MCL=D вниз до зарплаты на предложении.
     g.append('line').attr('x1', pxm).attr('y1', pyMcl).attr('x2', pxm).attr('y2', oy)
-      .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     // Точка MCL=D (оранжевая) на вертикали.
-    g.append('circle').attr('cx', pxm).attr('cy', pyMcl).attr('r', 3.5).attr('fill', '#f59e0b').attr('stroke', '#fff').attr('stroke-width', 1.2);
+    g.append('circle').attr('cx', pxm).attr('cy', pyMcl).attr('r', 3.5).attr('fill', COL.reg).attr('stroke', COL.halo).attr('stroke-width', 1.2);
     // Зарплата опускается вертикально на кривую предложения: точка M(Lm, Wm).
     dash(ox, pyW, pxm, pyW);
-    g.append('circle').attr('cx', pxm).attr('cy', pyW).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pyW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('M');
+    g.append('circle').attr('cx', pxm).attr('cy', pyW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    g.append('text').attr('x', pxm + 8).attr('y', pyW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('M');
     haloText(g, pxm, oy + 8, 'Lм=' + fmt(mono.Lm), 'middle', 'hanging');
     yWageLabel(g, ox, pyW, 'Wм=' + fmt(mono.Wm));
   }
@@ -3308,18 +3476,18 @@ function drawLaborCompPoints() {
     // Линия W_min рисуется отдельно (drawLaborMinLine). Здесь — занятость и безработица.
     const xQd = sx(min.Qd), xQs = sx(min.Qs), yW = sy(min.Wmin);
     const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-      .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     dash(xQd, yW, xQd, oy); dash(xQs, yW, xQs, oy);
     haloText(g, xQd, oy + 8, 'Lспрос=' + fmt(min.Qd), 'middle', 'hanging');
     haloText(g, xQs, oy + 8, 'Lпредл=' + fmt(min.Qs), 'middle', 'hanging');
     // Безработица — полоса между Qd и Qs на оси L.
     const xLo = Math.min(xQd, xQs), xHi = Math.max(xQd, xQs);
-    g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', '#dc2626').attr('stroke-width', 5).attr('opacity', 0.5);
+    g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
     haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(min.unemployment), 'middle', 'hanging');
     // Точка занятости (короткая сторона) на линии W_min.
-    g.append('circle').attr('cx', xQd).attr('cy', yW).attr('r', 4).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    g.append('circle').attr('cx', xQd).attr('cy', yW).attr('r', 4).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   } else {
-    laborPoint(g, eq.Q, eq.P, '#1a1f2e', 'E*', { lText: 'Lk=' + fmt(eq.Q), wText: 'Wk=' + fmt(eq.P) });
+    laborPoint(g, eq.Q, eq.P, COL.ink, 'E*', { lText: 'Lk=' + fmt(eq.Q), wText: 'Wk=' + fmt(eq.P) });
   }
 }
 
@@ -3329,13 +3497,13 @@ function drawLaborMinLine() {
   const ox = sx(0), xMax = sx(CONFIG.Qmax), yW = sy(STATE.laborMinW);
   const g = svg.append('g');
   g.append('line').attr('x1', ox).attr('y1', yW).attr('x2', xMax).attr('y2', yW)
-    .attr('stroke', '#b45309').attr('stroke-width', 2.5).style('pointer-events', 'none');
+    .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
   haloText(g, ox - 8, yW, 'Wmin=' + fmt(STATE.laborMinW), 'end', 'middle');
   const hit = g.append('rect').attr('x', ox).attr('y', yW - 12).attr('width', xMax - ox).attr('height', 24)
     .attr('fill', 'transparent').style('cursor', 'grab');
   attachLaborMinDrag(hit);
   g.append('circle').attr('cx', ox + (xMax - ox) * 0.6).attr('cy', yW).attr('r', 7)
-    .attr('fill', '#b45309').attr('stroke', '#fff').attr('stroke-width', 2).style('pointer-events', 'none');
+    .attr('fill', COL.reg).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
 }
 
 function attachLaborMinDrag(sel) {
@@ -3369,10 +3537,10 @@ function drawLaborUnionMRL() {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const pts = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; const v = marginalRevenue(D, l); pts.push(isNaN(v) ? null : [l, v]); }
-  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#8b5cf6').attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
   const ql = CONFIG.Qmax * 0.28, vl = marginalRevenue(D, ql);
-  if (!isNaN(vl) && vl >= 0 && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#8b5cf6')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('MRL');
+  if (!isNaN(vl) && vl >= 0 && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.MR)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MRL');
 }
 
 // Серая область DWL между D и S на отрезке [La, Lb] (потери от профсоюза).
@@ -3382,7 +3550,7 @@ function drawLaborGapDWL(La, Lb) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
   const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp).attr('d', a).attr('fill', '#888').attr('opacity', 0.28);
+  g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28);
 }
 
 // Точки профсоюза: оптимум монополиста (MRL=S, зарплата вверх на D) или диктат зарплаты.
@@ -3391,18 +3559,18 @@ function drawLaborUnionPoints() {
   drawLaborGhost(u.Lk, u.Wk, 'К');                 // конкурентный ориентир
   const g = svg.append('g'), ox = sx(0), oy = sy(0);
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   if (STATE.unionModel === 'monopoly') {
     const S = STATE.laborS, sAt = evalCurve(S, u.Lu);
     const [px, pyW] = toPx(u.Lu, u.Wu), [, pyS] = toPx(u.Lu, sAt);
     // Вертикаль Lп: от оси вверх до зарплаты Wп на спросе.
-    g.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', pyW).attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    g.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', pyW).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     // Точка MRL=S (фиолетовая) на уровне предложения.
-    g.append('circle').attr('cx', px).attr('cy', pyS).attr('r', 3.5).attr('fill', '#8b5cf6').attr('stroke', '#fff').attr('stroke-width', 1.2);
+    g.append('circle').attr('cx', px).attr('cy', pyS).attr('r', 3.5).attr('fill', COL.MR).attr('stroke', COL.halo).attr('stroke-width', 1.2);
     // Зарплата профсоюза Wп на кривой спроса (выше конкурентной).
     dash(ox, pyW, px, pyW);
-    g.append('circle').attr('cx', px).attr('cy', pyW).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
-    g.append('text').attr('x', px + 8).attr('y', pyW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('П');
+    g.append('circle').attr('cx', px).attr('cy', pyW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    g.append('text').attr('x', px + 8).attr('y', pyW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('П');
     haloText(g, px, oy + 8, 'Lп=' + fmt(u.Lu), 'middle', 'hanging');
     yWageLabel(g, ox, pyW, 'Wп=' + fmt(u.Wu));
   } else if (u.binding) {
@@ -3412,10 +3580,10 @@ function drawLaborUnionPoints() {
     haloText(g, xL, oy + 8, 'Lп=' + fmt(u.Lu), 'middle', 'hanging');
     haloText(g, xQs, oy + 8, 'Lпредл=' + fmt(u.Qs), 'middle', 'hanging');
     const xLo = Math.min(xL, xQs), xHi = Math.max(xL, xQs);
-    g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', '#dc2626').attr('stroke-width', 5).attr('opacity', 0.5);
+    g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
     if (u.unemployment > 1e-6) haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(u.unemployment), 'middle', 'hanging');
-    g.append('circle').attr('cx', xL).attr('cy', yW).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
-    g.append('text').attr('x', xL + 8).attr('y', yW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('П');
+    g.append('circle').attr('cx', xL).attr('cy', yW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    g.append('text').attr('x', xL + 8).attr('y', yW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('П');
   }
 }
 
@@ -3425,13 +3593,13 @@ function drawLaborUnionWageLine() {
   const ox = sx(0), xMax = sx(CONFIG.Qmax), yW = sy(STATE.unionWage);
   const g = svg.append('g');
   g.append('line').attr('x1', ox).attr('y1', yW).attr('x2', xMax).attr('y2', yW)
-    .attr('stroke', '#0891b2').attr('stroke-width', 2.5).style('pointer-events', 'none');
+    .attr('stroke', COL.MC).attr('stroke-width', 2.5).style('pointer-events', 'none');
   haloText(g, ox - 8, yW, 'Wп=' + fmt(STATE.unionWage), 'end', 'middle');
   const hit = g.append('rect').attr('x', ox).attr('y', yW - 12).attr('width', xMax - ox).attr('height', 24)
     .attr('fill', 'transparent').style('cursor', 'grab');
   attachUnionWageDrag(hit);
   g.append('circle').attr('cx', ox + (xMax - ox) * 0.6).attr('cy', yW).attr('r', 7)
-    .attr('fill', '#0891b2').attr('stroke', '#fff').attr('stroke-width', 2).style('pointer-events', 'none');
+    .attr('fill', COL.MC).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
 }
 
 function attachUnionWageDrag(sel) {
@@ -3751,10 +3919,10 @@ function drawPpfCurve() {
   for (let i = 0; i <= 400; i++) { const x = CONFIG.Qmax * i / 400; const y = evalPpf(x); pts.push((isNaN(y) || y < 0) ? null : [x, y]); }
   const area = d3.area().defined(d => d !== null).x(d => sx(d[0])).y0(sy(0)).y1(d => sy(d[1]));
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
-  g.append('path').datum(pts).attr('d', area).attr('fill', '#4f7cff').attr('opacity', 0.08);   // достижимо
-  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.5).attr('d', line);
+  g.append('path').datum(pts).attr('d', area).attr('fill', COL.D).attr('opacity', 0.08);   // достижимо
+  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line);
   g.append('text').attr('x', sx(CONFIG.Qmax * 0.16)).attr('y', sy(CONFIG.Pmax * 0.16))
-    .attr('font-size', 11).attr('fill', '#4f7cff').attr('opacity', 0.75).text('достижимо');
+    .attr('font-size', 11).attr('fill', COL.D).attr('opacity', 0.75).text('достижимо');
 }
 
 // Перетаскиваемая точка на границе: проекции, подписи X/Y, ручка.
@@ -3765,7 +3933,7 @@ function drawPpfPoint() {
   const ox = sx(0), oy = sy(0);
   const g = svg.append('g');
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-    .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
   haloText(g, px, oy + 8, 'X=' + fmt(x), 'middle', 'hanging');
   haloText(g, ox - 8, py, 'Y=' + fmt(y), 'end', 'middle');
@@ -3773,7 +3941,7 @@ function drawPpfPoint() {
   const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
   attachPpfDrag(hit);
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5.5)
-    .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 2).style('pointer-events', 'none');
+    .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
 }
 
 // Перетаскивание точки КПВ вдоль кривой (по X), Y берётся с границы.
@@ -4130,13 +4298,13 @@ function recomputePpfSum() {
 function drawPpfSumCurves(d) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y(p => sy(p[1]));
-  g.append('path').datum(d.c1pts).attr('fill', 'none').attr('stroke', '#21a366').attr('stroke-width', 1.5)
+  g.append('path').datum(d.c1pts).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 1.5)
     .attr('stroke-dasharray', '5 4').attr('opacity', 0.5).attr('d', line);
-  g.append('path').datum(d.c2pts).attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 1.5)
+  g.append('path').datum(d.c2pts).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 1.5)
     .attr('stroke-dasharray', '5 4').attr('opacity', 0.5).attr('d', line);
   const area = d3.area().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y0(sy(0)).y1(p => sy(p[1]));
-  g.append('path').datum(d.points).attr('d', area).attr('fill', '#4f7cff').attr('opacity', 0.07);
-  g.append('path').datum(d.points).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.8).attr('d', line);
+  g.append('path').datum(d.points).attr('d', area).attr('fill', COL.D).attr('opacity', 0.07);
+  g.append('path').datum(d.points).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.8).attr('d', line);
 }
 
 // Подписи суммарной КПВ: концы (X макс / Y макс), изломы, ярлык «Σ КПВ».
@@ -4144,18 +4312,18 @@ function drawPpfSumMarks(d) {
   const ox = sx(0), oy = sy(0), g = svg.append('g');
   (d.kinks || []).forEach(k => {
     const px = sx(k[0]), py = sy(k[1]);
-    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     haloText(g, px, oy + 8, 'X=' + fmt(k[0]), 'middle', 'hanging');
     haloText(g, ox - 8, py, 'Y=' + fmt(k[1]), 'end', 'middle');
-    g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#1a1f2e')
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('излом');
+    g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('излом');
   });
   // концы суммарной кривой
   haloText(g, ox - 8, sy(d.Ytot), 'Y=' + fmt(d.Ytot), 'end', 'middle');
   haloText(g, sx(d.Xtot), oy + 8, 'X=' + fmt(d.Xtot), 'middle', 'hanging');
   const midX = d.Xtot * 0.5, midY = interpY(d.points, midX);
-  if (!isNaN(midY)) g.append('text').attr('x', sx(midX)).attr('y', sy(midY) - 8).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#4f7cff')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Σ КПВ');
+  if (!isNaN(midY)) g.append('text').attr('x', sx(midX)).attr('y', sy(midY) - 8).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.D)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Σ КПВ');
 }
 
 // Табло суммарной КПВ: тип, X/Y макс, изломы, текст формулы.
@@ -4217,7 +4385,7 @@ function ppfSumSchemaData() {
 function schemaNote(text) {
   const m = CONFIG.margin;
   svg.append('text').attr('x', W - m.right - 4).attr('y', m.top + 2).attr('text-anchor', 'end').attr('dominant-baseline', 'hanging')
-    .attr('font-size', 11).attr('fill', '#999').attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(text);
+    .attr('font-size', 11).attr('fill', COL.inkSoft).attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(text);
 }
 
 // Отрисовка схемы (НЕ в масштабе): причёсанные высоты, без числовых осей, настоящие подписи.
@@ -4239,11 +4407,11 @@ function drawPpfSumSchema() {
   // Оси со стрелками, без чисел.
   const ga = svg.append('g');
   ga.append('line').attr('x1', originX).attr('y1', baseY).attr('x2', W - m.right).attr('y2', baseY)
-    .attr('stroke', '#555').attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+    .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
   ga.append('line').attr('x1', originX).attr('y1', baseY).attr('x2', originX).attr('y2', m.top)
-    .attr('stroke', '#555').attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
-  ga.append('text').attr('x', W - m.right + 6).attr('y', baseY + 4).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#333').text('X');
-  ga.append('text').attr('x', originX - 4).attr('y', m.top - 8).attr('text-anchor', 'end').attr('font-size', 13).attr('font-weight', 600).attr('fill', '#333').text('Y');
+    .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+  ga.append('text').attr('x', W - m.right + 6).attr('y', baseY + 4).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('X');
+  ga.append('text').attr('x', originX - 4).attr('y', m.top - 8).attr('text-anchor', 'end').attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('Y');
 
   // Путь кривой по участкам: «прямая» — отрезок, «дуга» — квадратичная Безье (выгиб наружу).
   let dPath = `M ${PX[0][0]} ${PX[0][1]}`;
@@ -4257,17 +4425,17 @@ function drawPpfSumSchema() {
   const last = PX[PX.length - 1];
   const fillPath = dPath + ` L ${last[0]} ${baseY} L ${originX} ${baseY} Z`;
   const g = svg.append('g');
-  g.append('path').attr('d', fillPath).attr('fill', '#4f7cff').attr('opacity', 0.07);
-  g.append('path').attr('d', dPath).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.8);
+  g.append('path').attr('d', fillPath).attr('fill', COL.D).attr('opacity', 0.07);
+  g.append('path').attr('d', dPath).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.8);
 
   // Ключевые точки + подписи настоящих значений.
   PX.forEach(([px, py], i) => {
     const pt = sd.pts[i];
-    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     if (pt.kind === 'start') haloText(g, px - 8, py, fmtRu(pt.y), 'end', 'middle');          // Y-перехват у оси Y
     else if (pt.kind === 'end') haloText(g, px, baseY + 8, fmtRu(pt.x), 'middle', 'hanging'); // Xmax у оси X
-    else g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#1a1f2e')
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text(`(${fmtRu(pt.x)}; ${fmtRu(pt.y)})`);
+    else g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(`(${fmtRu(pt.x)}; ${fmtRu(pt.y)})`);
   });
   schemaNote('Схема · не в масштабе');
 }
@@ -4352,11 +4520,11 @@ function drawPpfTrade(d) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y(p => sy(p[1]));
   const area = d3.area().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y0(sy(0)).y1(p => sy(p[1]));
-  g.append('path').datum(d.ppfPts).attr('d', area).attr('fill', '#4f7cff').attr('opacity', 0.06);
-  g.append('path').datum(d.ppfPts).attr('fill', 'none').attr('stroke', '#4f7cff').attr('stroke-width', 2.5).attr('d', line);
+  g.append('path').datum(d.ppfPts).attr('d', area).attr('fill', COL.D).attr('opacity', 0.06);
+  g.append('path').datum(d.ppfPts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line);
   if (d.line) {
     const pts = [[0, d.line.intercept], [d.xint, 0]];          // прямая КТВ от (0,c0) до (xint,0)
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', '#e05052').attr('stroke-width', 2.5).attr('d', line);
+    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line);
     // Задача 2: линия цены больше не перетаскивается мышью — управление ползунком Px/Py.
   }
 }
@@ -4365,17 +4533,17 @@ function drawPpfTrade(d) {
 function drawPpfTradeMarks(d) {
   const ox = sx(0), oy = sy(0), g = svg.append('g');
   if (d.line) {
-    g.append('text').attr('x', sx(d.xint * 0.5)).attr('y', sy(d.line.intercept * 0.5) - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#e05052')
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('КТВ');
+    g.append('text').attr('x', sx(d.xint * 0.5)).attr('y', sy(d.line.intercept * 0.5) - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.S)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('КТВ');
   }
   if (d.xp != null) {
     const px = sx(d.xp), py = sy(d.yp);
     const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-      .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     dash(px, py, px, oy); dash(px, py, ox, py);
-    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 2);
-    g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', '#1a1f2e')
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Произв.');
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 2);
+    g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Произв.');
     haloText(g, px, oy + 8, 'X=' + fmt(d.xp), 'middle', 'hanging');
     haloText(g, ox - 8, py, 'Y=' + fmt(d.yp), 'end', 'middle');
   }
@@ -4452,8 +4620,8 @@ function recomputeTradeB() {
   const b1 = (c1.type === 'linear') ? c1.b : (c1.Ymax / c1.Xmax);
   const b2 = (c2.type === 'linear') ? c2.b : (c2.Ymax / c2.Xmax);
   if (Math.abs(b1 - b2) < 1e-9) { STATE.tradeBData = { ok: false, error: 'Альтернативные издержки стран совпали — торговать незачем.' }; return; }
-  const co1 = { idx: 1, c: c1, b: b1, color: '#4f7cff', ppts: singlePpfPoints(f1, c1.Xmax) };
-  const co2 = { idx: 2, c: c2, b: b2, color: '#e05052', ppts: singlePpfPoints(f2, c2.Xmax) };
+  const co1 = { idx: 1, c: c1, b: b1, color: COL.D, ppts: singlePpfPoints(f1, c1.Xmax) };
+  const co2 = { idx: 2, c: c2, b: b2, color: COL.S, ppts: singlePpfPoints(f2, c2.Xmax) };
   const lowIs1 = b1 < b2;                              // у кого меньше альт. цена X — тот экспортирует X
   const lowCo = lowIs1 ? co1 : co2, highCo = lowIs1 ? co2 : co1;
   const bL = lowCo.b, bH = highCo.b;
@@ -4502,13 +4670,13 @@ function drawTradeBMarks(d) {
   const ox = sx(0), oy = sy(0), g = svg.append('g');
   [d.co1, d.co2].forEach(co => {
     const px = sx(co.prod[0]), py = sy(co.prod[1]);
-    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', co.color).attr('stroke', '#fff').attr('stroke-width', 2);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', co.color).attr('stroke', COL.halo).attr('stroke-width', 2);
     g.append('text').attr('x', px + 8).attr('y', py + (co.prod[1] > 0 ? -8 : 16)).attr('font-size', 11).attr('font-weight', 600).attr('fill', co.color)
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Стр.' + co.idx + ' (эксп. ' + co.exports + ')');
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Стр.' + co.idx + ' (эксп. ' + co.exports + ')');
     // ярлык КТВ у середины линии торговых возможностей
     const mx = co.cpf.xint * 0.5, my = co.cpf.yint * 0.5;
     g.append('text').attr('x', sx(mx)).attr('y', sy(my) - 4).attr('font-size', 10).attr('fill', co.color).attr('opacity', 0.9)
-      .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2).text('КТВ' + co.idx);
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2).text('КТВ' + co.idx);
   });
 }
 
@@ -4522,7 +4690,7 @@ function updateTradeBPanel() {
   if (d.noTradeMsg) html += `<div class="warn" style="margin-bottom:6px;">${d.noTradeMsg}</div>`;
   html += `<div class="stat"><span>Автарк. цена X стр.1</span><b>${fmt(d.b1)}</b></div>`;
   html += `<div class="stat"><span>Автарк. цена X стр.2</span><b>${fmt(d.b2)}</b></div>`;
-  html += `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(d.Pw)}</b>${d.manual ? ' <span style="color:#b45309;">(своя)</span>' : ' <span style="color:var(--text2);">(равновесная)</span>'}</div>`;
+  html += `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(d.Pw)}</b>${d.manual ? ' <span style="color:var(--curve-reg);">(своя)</span>' : ' <span style="color:var(--text2);">(равновесная)</span>'}</div>`;
   if (d.manual) html += `<div class="stat"><span>Равновесная Pw</span><b>${fmt(d.Pweq)}</b></div>`;
   html += `<div class="stat"><span>Экспортируют</span><b>Стр.${d.lowIdx} → X, Стр.${d.highIdx} → Y</b></div>`;
   if (d.manual) {
@@ -4771,29 +4939,29 @@ function recomputeInequality() {
 function drawInequalityDiagonal() {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   g.append('line').attr('x1', sx(0)).attr('y1', sy(0)).attr('x2', sx(100)).attr('y2', sy(100))
-    .attr('stroke', '#21a366').attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
-  g.append('text').attr('x', sx(80)).attr('y', sy(86)).attr('font-size', 11).attr('fill', '#21a366')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('равенство');
+    .attr('stroke', COL.tax).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
+  g.append('text').attr('x', sx(80)).attr('y', sy(86)).attr('font-size', 11).attr('fill', COL.tax)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('равенство');
 }
 
 // Подписи осей (длинные, рисуем сами; drawAxes вызываем без меток).
 function drawInequalityCaptions() {
   const g = svg.append('g'), ox = sx(0), oy = sy(0), xMid = (sx(0) + sx(100)) / 2, yTop = sy(100);
   g.append('text').attr('x', xMid).attr('y', oy + 30).attr('text-anchor', 'middle')
-    .attr('font-size', 11).attr('fill', '#666').text('доля населения, %');
+    .attr('font-size', 11).attr('fill', COL.inkSoft).text('доля населения, %');
   g.append('text').attr('x', ox + 6).attr('y', yTop - 5).attr('text-anchor', 'start')
-    .attr('font-size', 11).attr('fill', '#666').text('доля дохода, %');
+    .attr('font-size', 11).attr('fill', COL.inkSoft).text('доля дохода, %');
 }
 
 // Заливки A (между диагональю и кривой) и B (под кривой) — смысл Джини.
 function drawInequalityAreas(pts) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const bArea = d3.area().defined(d => !isNaN(d[1])).x(d => sx(d[0] * 100)).y0(sy(0)).y1(d => sy(d[1] * 100));
-  g.append('path').datum(pts).attr('d', bArea).attr('fill', '#94a3b8').attr('opacity', 0.15);
+  g.append('path').datum(pts).attr('d', bArea).attr('fill', COL.dwl).attr('opacity', 0.15);
   const aArea = d3.area().defined(d => !isNaN(d[1])).x(d => sx(d[0] * 100)).y0(d => sy(d[0] * 100)).y1(d => sy(d[1] * 100));
-  g.append('path').datum(pts).attr('d', aArea).attr('fill', '#4f7cff').attr('opacity', 0.12);
-  g.append('text').attr('x', sx(33)).attr('y', sy(52)).attr('font-size', 14).attr('font-weight', 600).attr('fill', '#4f7cff').attr('opacity', 0.85).text('A');
-  g.append('text').attr('x', sx(66)).attr('y', sy(18)).attr('font-size', 14).attr('font-weight', 600).attr('fill', '#64748b').attr('opacity', 0.85).text('B');
+  g.append('path').datum(pts).attr('d', aArea).attr('fill', COL.D).attr('opacity', 0.12);
+  g.append('text').attr('x', sx(33)).attr('y', sy(52)).attr('font-size', 14).attr('font-weight', 600).attr('fill', COL.D).attr('opacity', 0.85).text('A');
+  g.append('text').attr('x', sx(66)).attr('y', sy(18)).attr('font-size', 14).attr('font-weight', 600).attr('fill', COL.dwl).attr('opacity', 0.85).text('B');
 }
 
 // Кривая Лоренца (доли 0..1 → проценты). dashed — для «было»/исходной.
@@ -4811,12 +4979,12 @@ function drawRobinHood() {
   const p = st.hooverP, L = lorenzAt(pts, p), x = sx(p * 100);
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   g.append('line').attr('x1', x).attr('y1', sy(L * 100)).attr('x2', x).attr('y2', sy(p * 100))
-    .attr('stroke', '#e05052').attr('stroke-width', 2.6);
-  g.append('circle').attr('cx', x).attr('cy', sy(L * 100)).attr('r', 3).attr('fill', '#e05052');
-  g.append('circle').attr('cx', x).attr('cy', sy(p * 100)).attr('r', 3).attr('fill', '#e05052');
+    .attr('stroke', COL.S).attr('stroke-width', 2.6);
+  g.append('circle').attr('cx', x).attr('cy', sy(L * 100)).attr('r', 3).attr('fill', COL.S);
+  g.append('circle').attr('cx', x).attr('cy', sy(p * 100)).attr('r', 3).attr('fill', COL.S);
   const ymid = sy((L + p) / 2 * 100);
-  g.append('text').attr('x', x + 7).attr('y', ymid).attr('font-size', 11).attr('font-weight', 600).attr('fill', '#e05052')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('Робин Гуд ' + fmt(st.hoover));
+  g.append('text').attr('x', x + 7).attr('y', ymid).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.S)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Робин Гуд ' + fmt(st.hoover));
 }
 
 // Узлы кривой Лоренца. В способах 'groups' и 'incomes' — перетаскиваемые
@@ -4832,7 +5000,7 @@ function drawLorenzNodes() {
       attachLorenzNodeDrag(hit, i);                     // ЧК2 (groups) / Задача 2 (incomes)
     }
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
-      .attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5).style('pointer-events', 'none');
+      .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5).style('pointer-events', 'none');
   }
 }
 
@@ -4896,11 +5064,11 @@ function drawRedistArrow(base, redist) {
   if (isNaN(Lb) || isNaN(Lr) || Lr <= Lb + 1e-6) return;
   const x = sx(p * 100), y0 = sy(Lb * 100), y1 = sy(Lr * 100);
   g.append('line').attr('x1', x).attr('y1', y0).attr('x2', x).attr('y2', y1)
-    .attr('stroke', '#16a34a').attr('stroke-width', 1.6);
+    .attr('stroke', COL.tax).attr('stroke-width', 1.6);
   g.append('path').attr('d', `M${x - 4},${y1 + 6} L${x},${y1} L${x + 4},${y1 + 6}`)
-    .attr('fill', 'none').attr('stroke', '#16a34a').attr('stroke-width', 1.6);
-  g.append('text').attr('x', x + 8).attr('y', (y0 + y1) / 2).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', '#16a34a')
-    .attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 2.5).text('к равенству');
+    .attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 1.6);
+  g.append('text').attr('x', x + 8).attr('y', (y0 + y1) / 2).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', COL.tax)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('к равенству');
 }
 
 // Снимок текущей кривой как «было» (для сравнения двух кривых, ЧК2).
@@ -4935,7 +5103,7 @@ function updateInequalityPanel() {
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
     html += `<div class="stat"><span>Джини до</span><b>${fmt(s.gini)}</b></div>`;
     html += `<div class="stat"><span>Джини после</span><b>${fmt(r.gini)}</b></div>`;
-    html += `<div class="stat"><span>Δ Джини</span><b style="color:${d < -1e-6 ? '#21a366' : (d > 1e-6 ? '#e05052' : '#666')}">${d >= 0 ? '+' : ''}${fmt(d)}</b></div>`;
+    html += `<div class="stat"><span>Δ Джини</span><b style="color:${d < -1e-6 ? COL.tax : (d > 1e-6 ? COL.S : COL.inkSoft)}">${d >= 0 ? '+' : ''}${fmt(d)}</b></div>`;
     html += `<div class="stat"><span>Робин Гуда до/после</span><b>${fmt(s.hoover)} / ${fmt(r.hoover)}</b></div>`;
   } else if (STATE.showIneqGhost && STATE.ineqGhost) {
     // Сравнение двух кривых «было → стало» (ЧК2).
@@ -4943,7 +5111,7 @@ function updateInequalityPanel() {
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
     html += `<div class="stat"><span>Джини было</span><b>${fmt(g0)}</b></div>`;
     html += `<div class="stat"><span>Джини стало</span><b>${fmt(g1)}</b></div>`;
-    html += `<div class="stat"><span>Δ Джини</span><b style="color:${d < -1e-6 ? '#21a366' : (d > 1e-6 ? '#e05052' : '#666')}">${d >= 0 ? '+' : ''}${fmt(d)}</b></div>`;
+    html += `<div class="stat"><span>Δ Джини</span><b style="color:${d < -1e-6 ? COL.tax : (d > 1e-6 ? COL.S : COL.inkSoft)}">${d >= 0 ? '+' : ''}${fmt(d)}</b></div>`;
   }
   html += '<div class="hint" style="margin-top:6px;">Джини: 0 — полное равенство, 1 — весь доход у одного. ' +
     'Робин Гуда — какую долю дохода нужно перераспределить для равенства (макс. разрыв с диагональю). ' +
@@ -4968,15 +5136,15 @@ function redrawInequality() {
     if (STATE.ineqRedist) {
       // ЧК3: перераспределение — «до» (пунктир) и «после» (сплошная) + стрелка к равенству.
       drawInequalityDiagonal();
-      drawLorenzCurve(STATE.ineqLorenz, '#94a3b8', true);          // до перераспределения
-      drawLorenzCurve(STATE.ineqRedist.lorenz, '#16a34a', false);  // после
+      drawLorenzCurve(STATE.ineqLorenz, COL.dwl, true);          // до перераспределения
+      drawLorenzCurve(STATE.ineqRedist.lorenz, COL.tax, false);  // после
       drawRedistArrow(STATE.ineqLorenz, STATE.ineqRedist.lorenz);
     } else {
       drawInequalityAreas(STATE.ineqLorenz);
       drawInequalityDiagonal();
       // «Было» — бледная пунктирная кривая (снимок ЧК2), под текущей «стало».
-      if (STATE.showIneqGhost && STATE.ineqGhost) drawLorenzCurve(STATE.ineqGhost.lorenz, '#94a3b8', true);
-      drawLorenzCurve(STATE.ineqLorenz, '#4f7cff', false);
+      if (STATE.showIneqGhost && STATE.ineqGhost) drawLorenzCurve(STATE.ineqGhost.lorenz, COL.dwl, true);
+      drawLorenzCurve(STATE.ineqLorenz, COL.D, false);
       drawRobinHood();
       drawLorenzNodes();
     }
@@ -5064,6 +5232,7 @@ function renderIneqGroupsTable() {
    Любое изменение (кривая, перетаскивание, налог) дёргает её.
    --------------------------------------------------------------------- */
 function redrawAll() {
+  refreshColors();   // перечитать цвета из CSS-переменных (учитывает смену темы)
   computeSize();
   makeScales();
   if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
@@ -5191,6 +5360,9 @@ function setRole(curve, role) {
   } else {
     STATE.curves.forEach(c => { if (c !== curve && c.role === role) c.role = null; });
     curve.role = role;
+    // Перекрашиваем по роли: спрос — синий, предложение — красный, MC — бирюзовый.
+    const rc = roleColor(role);
+    if (rc) curve.color = rc;
   }
   renderCurveList();
   redrawAll();
@@ -5678,6 +5850,7 @@ function init() {
     return;
   }
   console.log('calc2: D3', d3.version, '| Math.js загружен');
+  refreshColors();   // наполнить карту цветов до первого рисования/добавления кривой
   wireControls();
   renderCurveList();
   redrawAll();
