@@ -42,11 +42,23 @@
   border: 2px solid var(--accent);
   box-shadow: 0 0 0 3px rgba(79,124,255,.12);
 }
+/* Иконка шаблона: единый line-SVG на тинте (как на главной),
+   при выборе заливается акцентом — «инструмент, а не игрушка». */
 .tpl-icon {
-  font-size: 30px;
-  line-height: 1;
-  margin-bottom: 12px;
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 14px;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s;
 }
+.tpl-icon svg { display: block; }
+.tpl-card:hover .tpl-icon { background: #e0e8ff; }
+.tpl-card.selected .tpl-icon { background: var(--accent); color: #fff; }
 .tpl-name {
   font-size: 14px;
   font-weight: 600;
@@ -107,17 +119,23 @@
 
     <div class="tpl-grid">
       <div class="tpl-card selected" data-type="homework" onclick="selectTpl(this)">
-        <div class="tpl-icon">📋</div>
+        <div class="tpl-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H8a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1"/><rect x="9" y="2.5" width="6" height="3.4" rx="1"/><path d="M9.5 11h5M9.5 15h3.5"/></svg>
+        </div>
         <div class="tpl-name">Домашнее задание</div>
         <div class="tpl-desc">Задачи на дом, с дедлайном</div>
       </div>
       <div class="tpl-card" data-type="test" onclick="selectTpl(this)">
-        <div class="tpl-icon">📝</div>
+        <div class="tpl-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9.3 14 1.7 1.7L15 11.7"/></svg>
+        </div>
         <div class="tpl-name">Контрольная работа</div>
         <div class="tpl-desc">Варианты для проверки знаний</div>
       </div>
       <div class="tpl-card" data-type="sheet" onclick="selectTpl(this)">
-        <div class="tpl-icon">📄</div>
+        <div class="tpl-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h7M8.5 9.5h2.5"/></svg>
+        </div>
         <div class="tpl-name">Листок задач</div>
         <div class="tpl-desc">Тематическая подборка</div>
       </div>
