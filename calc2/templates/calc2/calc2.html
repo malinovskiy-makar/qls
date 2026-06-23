@@ -1432,6 +1432,14 @@ function haloText(g, x, y, txt, anchor, baseline) {
     .text(txt);
 }
 
+// Подпись значения у оси Y (зарплата/цена): короткая — слева от оси («end»),
+// длинная с десятичной частью («Wм=33.33») уводится ВНУТРЬ справа («start»),
+// чтобы не клиппиться за левым полем (52px). Только позиция подписи, не математика.
+function yWageLabel(g, ox, py, txt) {
+  if (String(txt).length > 7) haloText(g, ox + 6, py, txt, 'start', 'middle');
+  else                        haloText(g, ox - 8, py, txt, 'end',   'middle');
+}
+
 // Табло слева: показываем Q* и P* (или подсказку / «не найдено»).
 function updateInfoPanel() {
   const box = document.getElementById('info-eq');
@@ -3141,7 +3149,7 @@ function laborPoint(g, L, W, color, label, opts) {
     .attr('stroke', '#888').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
   if (opts.lText !== null) haloText(g, px, oy + 8, opts.lText || ('L=' + fmt(L)), 'middle', 'hanging');
-  if (opts.wText !== null) haloText(g, ox - 8, py, opts.wText || ('W=' + fmt(W)), 'end', 'middle');
+  if (opts.wText !== null) yWageLabel(g, ox, py, opts.wText || ('W=' + fmt(W)));
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', '#fff').attr('stroke-width', 1.5);
   if (label) g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', color).text(label);
 }
@@ -3285,7 +3293,7 @@ function drawLaborMonopsonyPoints() {
     g.append('circle').attr('cx', pxm).attr('cy', pyW).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
     g.append('text').attr('x', pxm + 8).attr('y', pyW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('M');
     haloText(g, pxm, oy + 8, 'Lм=' + fmt(mono.Lm), 'middle', 'hanging');
-    haloText(g, ox - 8, pyW, 'Wм=' + fmt(mono.Wm), 'end', 'middle');
+    yWageLabel(g, ox, pyW, 'Wм=' + fmt(mono.Wm));
   }
 }
 
@@ -3396,7 +3404,7 @@ function drawLaborUnionPoints() {
     g.append('circle').attr('cx', px).attr('cy', pyW).attr('r', 4.5).attr('fill', '#1a1f2e').attr('stroke', '#fff').attr('stroke-width', 1.5);
     g.append('text').attr('x', px + 8).attr('y', pyW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#1a1f2e').text('П');
     haloText(g, px, oy + 8, 'Lп=' + fmt(u.Lu), 'middle', 'hanging');
-    haloText(g, ox - 8, pyW, 'Wп=' + fmt(u.Wu), 'end', 'middle');
+    yWageLabel(g, ox, pyW, 'Wп=' + fmt(u.Wu));
   } else if (u.binding) {
     // Диктат зарплаты (ценовой пол): занятость по спросу, безработица до предложения.
     const yW = sy(u.W), xL = sx(u.Lu), xQs = sx(u.Qs);
