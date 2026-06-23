@@ -18,10 +18,13 @@ preference is the first-run default; applied pre-paint in a `<head>` bootstrap.
   · `--curve-dwl #8C8C84` (DWL) · `--curve-reg #B5791F` (потолок/пол/МРОТ) · `--curve-ghost #9AA0A6`.
   Area fills = same colors at 0.16–0.22 opacity. Cost curves: `--cost-mc/atc/avc/afc/vc`
   (teal/blue/amber/violet/slate — 5 distinct).
-- **UI accent = raspberry** `#BE185D` light / `#FF4D94` dark. Chosen because it does NOT
-  collide with any curve hue (blue/orange-red/violet/teal/green/amber/gray) and is clearly
-  different from the site's ink-blue. White text on light accent = 6:1 (AA); accent-as-text
-  on light surfaces ≈ 5:1. Dark accent uses dark `--on-accent #190810`.
+- **UI accent = raspberry** `#BE185D` light / `#FF4D94` dark. Reserved for **small**
+  affordances: checkbox `accent-color`, focus rings (`--accent-ring`), "← Сценарии" border,
+  active-state dot on dock. Does NOT collide with any curve hue. White on accent = 6:1 (AA);
+  dark accent uses `--on-accent #190810`.
+- **Large action buttons (`.btn`)** — graphite, NOT raspberry: `--btn-bg #1e293b` (light) /
+  `#334155` (dark); hover `--btn-bg-hover #293548` / `#3e4f69`; text `--on-btn #ffffff` both
+  themes. Keeps crimson as a rare signal — not a background fill on every CTA.
 - **Structural canvas colors are theme-aware** (`--ink`, `--ink-soft`, `--grid`, `--halo`,
   `--canvas`) and read into a JS `COL` map (`refreshColors()`) on every redraw, so theme
   switching repaints the SVG. SVG gets concrete hex via `COL.*` (never `var()` in SVG attrs).

@@ -74,6 +74,11 @@
   --accent-tint: rgba(190,24,93,.10);
   --accent-ring: rgba(190,24,93,.34);
   --on-accent:   #ffffff;
+  /* Кнопки действий (крупные .btn) — графитовые, НЕ малиновые.
+     Малиновый — только мелкие элементы: чекбоксы, фокус-кольцо, кнопка «←». */
+  --btn-bg:       #1e293b;
+  --btn-bg-hover: #293548;
+  --on-btn:       #ffffff;
 
   /* ── Радиусы / тени / слои ── */
   --r:    8px;
@@ -109,6 +114,9 @@
   --accent-tint: rgba(255,77,148,.16);
   --accent-ring: rgba(255,77,148,.42);
   --on-accent:   #190810;
+  --btn-bg:       #334155;
+  --btn-bg-hover: #3e4f69;
+  --on-btn:       #ffffff;
   --shadow-panel: 0 0 0 1px rgba(255,255,255,.05), 0 10px 34px -10px rgba(0,0,0,.6);
   --shadow-pop:   0 0 0 1px rgba(255,255,255,.07), 0 16px 46px -12px rgba(0,0,0,.7);
 }
@@ -164,10 +172,10 @@ input:focus-visible, select:focus-visible {
 .chk input { cursor: pointer; accent-color: var(--accent); }
 .btn {
   width: 100%; padding: 8px 10px; border: none; border-radius: var(--r-sm);
-  background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 13px;
+  background: var(--btn-bg); color: var(--on-btn); font-weight: 600; font-size: 13px;
   transition: background .12s var(--ease), transform .08s var(--ease);
 }
-.btn:hover { background: var(--accent-deep); }
+.btn:hover { background: var(--btn-bg-hover); }
 .btn:active { transform: scale(.98); }
 .btn-sm {
   padding: 4px 9px; border: 1px solid var(--border); border-radius: var(--r-sm);

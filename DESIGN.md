@@ -242,8 +242,11 @@ float over it like instrument readouts, so it has its own scoped tokens (full de
   `--curve-reg #B5791F` (потолок/пол/МРОТ), `--curve-ghost #9AA0A6` (исходное состояние).
   Area fills reuse these at 12–22 % opacity. Cost curves: `--cost-mc/atc/avc/afc/vc`.
 - **UI accent — raspberry**, deliberately NOT ink-blue: `#BE185D` (light) / `#FF4D94` (dark).
-  Reserved for actions / active state / focus. Chosen because it collides with no curve hue
-  and is unmistakable against the site's blue. White-on-accent = 6:1 (AA).
+  Reserved for **small** affordances only: checkbox `accent-color`, focus rings, "← Сценарии"
+  border. Chosen because it collides with no curve hue. White-on-accent = 6:1 (AA).
+- **Large action buttons (`.btn`)** — graphite, NOT raspberry: `--btn-bg #1e293b` (light) /
+  `#334155` (dark), hover `--btn-bg-hover #293548` / `#3e4f69`, text `--on-btn #ffffff`.
+  Linear/Stripe-style calm fill so crimson remains a rare accent, not a background wash.
 - **Dual theme** (light default, dark for evening/projector), `data-theme` on `<html>`,
   persisted; structural canvas colors (`--ink/--ink-soft/--grid/--halo/--canvas`) flip with theme.
 - **Surfaces:** floating panels on `--surface` with 1px `--border` + soft `--shadow-panel`;
