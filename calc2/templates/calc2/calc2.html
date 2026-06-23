@@ -4227,6 +4227,62 @@ function setRanges(qmax, pmax) {
   });
 }
 
+/* ---------------------------------------------------------------------
+   Плавная анимация осей (КТВ). При смене мировой цены Pw в режиме
+   КПВ → КТВ масштаб не должен скакать: оси и кривые плавно «доезжают»
+   до нового масштаба за ~0.45 с (ease-out). Идея — не менять отрисовку,
+   а интерполировать CONFIG.Qmax/Pmax по кадрам requestAnimationFrame и
+   каждый кадр звать redrawAll() (он сам перечитывает CONFIG и рисует всё).
+   Анимируем ТОЛЬКО смену Pw; переключение сцен/режимов — мгновенно.
+   --------------------------------------------------------------------- */
+let _rangeAnimReq = null;     // id текущего кадра анимации (для отмены)
+let _rangeAnimating = false;  // идёт ли анимация прямо сейчас (мы внутри кадра)
+let _wantRangeAnim = false;   // одноразовый запрос анимации от ползунка/поля Pw
+
+function prefersReducedMotion() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+// Плавно перевести масштаб осей к (targetQmax, targetPmax) за ~450 мс (ease-out).
+function animateRanges(targetQmax, targetPmax) {
+  // Отменить незавершённую анимацию (быстрые подёргивания ползунка Pw).
+  if (_rangeAnimReq != null) { cancelAnimationFrame(_rangeAnimReq); _rangeAnimReq = null; }
+  const startQ = CONFIG.Qmax, startP = CONFIG.Pmax;
+  // Уже на месте — просто выставить точные значения, без анимации.
+  if (Math.abs(startQ - targetQmax) < 1e-6 && Math.abs(startP - targetPmax) < 1e-6) {
+    setRanges(targetQmax, targetPmax); return;
+  }
+  const DUR = 450;            // длительность, мс
+  let t0 = null;
+  const step = (ts) => {
+    if (t0 == null) t0 = ts;
+    let t = (ts - t0) / DUR; if (t > 1) t = 1;
+    const e = 1 - (1 - t) * (1 - t);    // ease-out (квадратичный)
+    _rangeAnimating = true;             // в кадре recompute не трогает CONFIG (цикл ведёт сам)
+    CONFIG.Qmax = startQ + (targetQmax - startQ) * e;
+    CONFIG.Pmax = startP + (targetPmax - startP) * e;
+    redrawAll();
+    _rangeAnimating = false;
+    if (t < 1) {
+      _rangeAnimReq = requestAnimationFrame(step);
+    } else {
+      _rangeAnimReq = null;
+      setRanges(targetQmax, targetPmax);  // точные финальные значения + синк полей «Оси»/ползунков
+    }
+  };
+  _rangeAnimReq = requestAnimationFrame(step);
+}
+
+// Применить масштаб осей в КТВ: анимировать (если запрошено сменой Pw и не reduce-motion)
+// либо выставить мгновенно. Вызывается ВМЕСТО прямого setRanges в recompute КТВ.
+function applyTradeRanges(targetQmax, targetPmax) {
+  if (_rangeAnimating) return;                 // внутри кадра анимации границами управляет цикл
+  const wantAnim = _wantRangeAnim;
+  _wantRangeAnim = false;                       // запрос одноразовый — гасим сразу
+  if (wantAnim && !prefersReducedMotion()) animateRanges(targetQmax, targetPmax);
+  else setRanges(targetQmax, targetPmax);
+}
+
 // Переключение режима: рынок / издержки / КПВ.
 function setMode(mode) {
   STATE.mode = mode;
@@ -4954,7 +5010,7 @@ function recomputePpfTrade() {
   }
   STATE.ppfTradeData = { ok: true, c, Xmax, Ymax, ratio, xp, yp, regime, line, xint, yint, priceMin, priceMax, ppfPts: singlePpfPoints(f, Xmax) };
   const xm = Math.max(Xmax, xint || 0), ym = Math.max(Ymax, yint || 0);
-  setRanges(niceMax(xm * 1.05), niceMax(ym * 1.05));
+  applyTradeRanges(niceMax(xm * 1.05), niceMax(ym * 1.05));  // плавно при смене Pw, иначе мгновенно
 }
 
 // Отрисовка КТВ: КПВ страны (синяя) + линия торговых возможностей (красная).
@@ -5037,6 +5093,7 @@ function redrawPpfTrade() {
   if (d && d.ok) { drawPpfTrade(d); drawPpfTradeMarks(d); }
   updatePpfTradePanel();
   syncPpftPriceUI(d);
+  _wantRangeAnim = false;   // страховка: гасим запрос, даже если recompute вышел по ошибке
 }
 
 /* --- ЧК5: сценарий Б — эндогенная мировая цена двух стран -----------
@@ -5091,7 +5148,7 @@ function recomputeTradeB() {
   STATE.tradeBData = { ok: true, Pw, Pweq, manual, inInterval, noTradeMsg, priceMin, priceMax, bL, bH, b1, b2, co1, co2, lowIdx: lowCo.idx, highIdx: highCo.idx };
   const xm = Math.max(c1.Xmax, c2.Xmax, lowCo.cpf.xint, highCo.cpf.xint);
   const ym = Math.max(c1.Ymax, c2.Ymax, lowCo.cpf.yint, highCo.cpf.yint);
-  setRanges(niceMax(xm * 1.08), niceMax(ym * 1.08));
+  applyTradeRanges(niceMax(xm * 1.08), niceMax(ym * 1.08));  // плавно при смене Pw, иначе мгновенно
 }
 
 // Отрисовка сценария Б: КПВ обеих стран (сплошные) + линии торговых возможностей (пунктир).
@@ -5166,6 +5223,7 @@ function redrawTradeB() {
   if (d && d.ok) { drawTradeB(d); drawTradeBMarks(d); }
   updateTradeBPanel();
   syncTbPriceUI(d);
+  _wantRangeAnim = false;   // страховка: гасим запрос, даже если recompute вышел по ошибке
 }
 
 // Переключатель сценария торговли А / Б (ЧК5).
@@ -6343,12 +6401,14 @@ function wireControls() {
   const tApply = document.getElementById('btn-ppft-apply');
   if (tApply) tApply.addEventListener('click', applyPpfTrade);
   if (ppftInp) ppftInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpfTrade(); });
-  if (ppftPriceInp) ppftPriceInp.addEventListener('change', applyPpfTrade);
+  // Смена мировой цены полем — анимируем переезд осей (как и ползунком).
+  if (ppftPriceInp) ppftPriceInp.addEventListener('change', () => { _wantRangeAnim = true; applyPpfTrade(); });
   // Задача 2: ползунок мировой цены Px/Py — основное управление, синхронен с полем.
   const ppftSlider = document.getElementById('ppft-price-slider');
   if (ppftSlider) ppftSlider.addEventListener('input', () => {
     const v = parseFloat(ppftSlider.value); if (isNaN(v)) return;
     STATE.ppftPrice = v;       // фактическое значение зажмётся в recomputePpfTrade
+    _wantRangeAnim = true;     // смена Pw → плавный переезд осей (см. applyTradeRanges)
     redrawAll();
   });
 
@@ -6370,17 +6430,20 @@ function wireControls() {
   if (tbPrice) tbPrice.addEventListener('change', () => {
     const v = parseFloat(tbPrice.value);
     STATE.tbManualPrice = (!isNaN(v) && v > 0) ? v : null;
+    _wantRangeAnim = true;     // смена Pw → плавный переезд осей
     redrawAll();
   });
   const tbSlider = document.getElementById('tb-price-slider');
   if (tbSlider) tbSlider.addEventListener('input', () => {
     const v = parseFloat(tbSlider.value); if (isNaN(v)) return;
     STATE.tbManualPrice = v;   // фактическое значение зажмётся в recomputeTradeB
+    _wantRangeAnim = true;     // смена Pw → плавный переезд осей
     redrawAll();
   });
   const tbReset = document.getElementById('btn-tb-reset');
   if (tbReset) tbReset.addEventListener('click', () => {
     STATE.tbManualPrice = null;   // вернуться к равновесной; ползунок/поле обновит syncTbPriceUI
+    _wantRangeAnim = true;        // равновесная Pw тоже меняет масштаб — плавно
     redrawAll();
   });
 
