@@ -1695,7 +1695,7 @@ function drawGrid() {
 // Положительные полуоси со стрелками, делениями, числами и подписями осей.
 // Подписи параметризованы: по умолчанию Q/P (рынок, издержки), для КПВ — X/Y (Задача 3).
 function drawAxes(xLabel, yLabel) {
-  xLabel = xLabel || 'Q'; yLabel = yLabel || 'P';
+  if (xLabel == null) xLabel = 'Q'; if (yLabel == null) yLabel = 'P';
   const g = svg.append('g').attr('class', 'axes');
   const ox = sx(0), oy = sy(0);            // пиксели начала координат (0,0)
   const xEnd = sx(CONFIG.Qmax), yEnd = sy(CONFIG.Pmax);
@@ -1733,12 +1733,13 @@ function drawAxes(xLabel, yLabel) {
     .attr('text-anchor', 'end').attr('dominant-baseline', 'hanging')
     .attr('font-size', 10).attr('fill', LBL).text('0');
 
-  // Подписи осей: X-метка (справа от стрелки), Y-метка (над стрелкой).
-  g.append('text').attr('x', xEnd + 6).attr('y', oy + 4)
+  // Подписи осей: X-метка (справа от стрелки), Y-метка (над стрелкой слева).
+  // Пустая строка '' — сигнал «без метки» (напр. неравенство и издержки добавляют свою).
+  if (xLabel) g.append('text').attr('x', xEnd + 6).attr('y', oy + 4)
     .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
     .attr('font-size', 13).attr('font-weight', 600)
     .attr('fill', COL.ink).text(xLabel);
-  g.append('text').attr('x', ox - 4).attr('y', yEnd - 12)
+  if (yLabel) g.append('text').attr('x', ox - 4).attr('y', yEnd - 12)
     .attr('text-anchor', 'end').attr('font-size', 13).attr('font-weight', 600)
     .attr('fill', COL.ink).text(yLabel);
 }
@@ -3578,7 +3579,9 @@ function redrawCosts() {
   svg.selectAll('*').remove();
   addDefs();
   drawGrid();
-  drawAxes();
+  drawAxes('Q', '');
+  svg.append('text').attr('x', sx(0) + 6).attr('y', sy(CONFIG.Pmax) - 5)
+    .attr('text-anchor', 'start').attr('font-size', 11).attr('fill', COL.inkSoft).text('издержки');
   drawCostCurves();
   updateCostsPanel();
 }
