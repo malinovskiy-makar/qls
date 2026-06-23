@@ -23,11 +23,18 @@ BATCH_SIZE = 100
 
 
 def problem_to_text(problem: Problem) -> str:
-    """Строит текст для эмбеддинга: заголовок + первые 500 символов условия."""
+    """Строит текст для эмбеддинга: заголовок + первые 500 символов условия.
+    Если у задачи есть подпункты — добавляет их тексты (до 500 символов суммарно).
+    Для задач без подпунктов поведение не изменилось."""
     parts = []
     if problem.title:
         parts.append(problem.title + '.')
     parts.append(problem.statement[:500])
+    subparts = list(problem.parts.all())  # Meta.ordering = ['order', 'label']
+    if subparts:
+        subtext = ' '.join(sp.statement for sp in subparts if sp.statement)
+        if subtext:
+            parts.append(subtext[:500])
     return ' '.join(parts)
 
 

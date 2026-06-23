@@ -37,9 +37,9 @@
   font-size: 11px;
   font-weight: 600;
 }
-.deadline-red    { background: #fff0f0; color: #c0392b; }
-.deadline-yellow { background: #fffbe6; color: #b45309; }
-.deadline-green  { background: #e8f8e8; color: #2e7d32; }
+.deadline-red    { background: var(--error-tint); color: var(--error); }
+.deadline-yellow { background: var(--amber-tint); color: var(--text); }
+.deadline-green  { background: var(--green-tint); color: var(--green); }
 .deadline-grey   { background: var(--panel); color: var(--text2); }
 
 .progress-bar {
@@ -50,6 +50,7 @@
 
 /* ── Карточка задачи ─────────────────────────────── */
 .problem-card {
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   margin-bottom: 20px;
@@ -81,9 +82,9 @@
   border-radius: 20px;
 }
 .status-not_started { background: var(--panel); color: var(--text2); border: 1px solid var(--border); }
-.status-in_progress { background: #fff8e6; color: #b45309; border: 1px solid #ffe4b5; }
-.status-submitted   { background: #eef5ff; color: #2563eb; border: 1px solid #bcd4ff; }
-.status-reviewed    { background: #e8f8e8; color: #2e7d32; border: 1px solid #b7dfb7; }
+.status-in_progress { background: var(--amber-tint); color: var(--text); border: 1px solid var(--amber-border); }
+.status-submitted   { background: var(--accent-tint); color: var(--accent); border: 1px solid var(--accent); }
+.status-reviewed    { background: var(--green-tint); color: var(--green); border: 1px solid var(--green-border); }
 
 .problem-card-body {
   padding: 20px;
@@ -126,6 +127,8 @@
   letter-spacing: .05em;
 }
 textarea.answer-text {
+  background: var(--surface);
+  color: var(--text);
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--r);
@@ -183,8 +186,8 @@ input.answer-file {
 .hint-box {
   margin-top: 10px;
   padding: 12px 14px;
-  background: #fffbf0;
-  border: 1px solid #ffe4b5;
+  background: var(--amber-tint);
+  border: 1px solid var(--amber-border);
   border-radius: var(--r);
   font-size: 13px;
   line-height: 1.6;
@@ -193,7 +196,7 @@ input.answer-file {
 .hint-label {
   font-size: 11px;
   font-weight: 700;
-  color: #b45309;
+  color: var(--amber);
   margin-bottom: 4px;
 }
 
@@ -201,14 +204,14 @@ input.answer-file {
 .feedback-block {
   margin-top: 16px;
   padding: 16px;
-  background: #f0faf0;
-  border: 1px solid #b7dfb7;
+  background: var(--green-tint);
+  border: 1px solid var(--green-border);
   border-radius: var(--r);
 }
 .feedback-score {
   font-size: 20px;
   font-weight: 700;
-  color: #2e7d32;
+  color: var(--green);
   margin-bottom: 8px;
 }
 .feedback-comment {
@@ -218,9 +221,9 @@ input.answer-file {
 }
 .mistake-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .mistake-tag {
-  background: #fff0f0;
-  border: 1px solid #ffd5d5;
-  color: #c0392b;
+  background: var(--error-tint);
+  border: 1px solid var(--error-border);
+  color: var(--error);
   border-radius: 20px;
   padding: 2px 9px;
   font-size: 12px;
@@ -253,8 +256,8 @@ input.answer-file {
   gap: 16px;
 }
 .btn-submit {
-  background: var(--accent);
-  color: #fff;
+  background: var(--btn-bg);
+  color: var(--on-btn);
   border: none;
   border-radius: var(--r);
   padding: 12px 28px;
@@ -263,7 +266,7 @@ input.answer-file {
   cursor: pointer;
   transition: background .12s;
 }
-.btn-submit:hover { background: #3b6ae8; }
+.btn-submit:hover { background: var(--btn-bg-hover); }
 .results-link {
   font-size: 14px;
   color: var(--text2);

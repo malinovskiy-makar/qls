@@ -17,7 +17,7 @@
 }
 .back-link:hover { color: var(--text); }
 .form-card {
-  background: #fff;
+  background: var(--surface);
   border: 0.5px solid var(--border);
   border-radius: 10px;
   padding: 28px;
@@ -31,6 +31,8 @@ label {
   margin-bottom: 6px;
 }
 .form-input {
+  background: var(--surface);
+  color: var(--text);
   width: 100%;
   border: 0.5px solid var(--border);
   border-radius: var(--r);
@@ -41,6 +43,7 @@ label {
 }
 .form-input:focus { border-color: var(--accent); }
 .students-list {
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -67,17 +70,17 @@ label {
   margin-top: 24px;
 }
 .btn-primary {
-  background: var(--accent);
-  color: #fff;
+  background: var(--btn-bg);
+  color: var(--on-btn);
   border: none;
   border-radius: var(--r);
   padding: 9px 20px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: opacity .12s;
+  transition: background .12s;
 }
-.btn-primary:hover { opacity: .88; }
+.btn-primary:hover { background: var(--btn-bg-hover); }
 .btn-cancel {
   font-size: 13px;
   color: var(--text2);

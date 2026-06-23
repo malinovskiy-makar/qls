@@ -4,17 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Календарь — ЭкЗадачи</title>
+{% include '_tokens.html' %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-         background: #f7f7f5; color: #1a1f2e; }
+         background: var(--bg); color: var(--text);
+         transition: background-color .2s ease, color .2s ease; }
 
   /* ---- Тулбар ---- */
   #cal-toolbar {
     height: 48px;
-    background: #fff;
-    border-bottom: 1px solid #e8e8e4;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     padding: 0 20px;
@@ -23,19 +25,19 @@
   #cal-toolbar .btn {
     height: 32px;
     padding: 0 12px;
-    border: 1px solid #e0e0db;
+    border: 1px solid var(--border);
     border-radius: 7px;
-    background: #fff;
+    background: var(--surface);
     font-size: 13px;
     cursor: pointer;
-    color: #1a1f2e;
+    color: var(--text);
     display: flex; align-items: center;
   }
-  #cal-toolbar .btn:hover { background: #f0f0ee; }
+  #cal-toolbar .btn:hover { background: var(--surface-2); }
   #cal-toolbar .btn-primary {
-    background: #4f7cff; color: #fff; border-color: #4f7cff;
+    background: var(--btn-bg); color: var(--on-btn); border-color: var(--btn-bg);
   }
-  #cal-toolbar .btn-primary:hover { background: #3a6be0; }
+  #cal-toolbar .btn-primary:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
   #cal-title {
     font-size: 15px;
     font-weight: 600;
@@ -44,7 +46,7 @@
   }
   .legend {
     display: flex; align-items: center; gap: 14px;
-    margin-left: auto; font-size: 12px; color: #555;
+    margin-left: auto; font-size: 12px; color: var(--text2);
   }
   .legend-item { display: flex; align-items: center; gap: 5px; }
   .legend-dot {
@@ -57,16 +59,27 @@
     padding: 8px 12px 0;
   }
   #calendar {
-    background: #fff;
+    background: var(--surface);
     border-radius: 10px;
     overflow: hidden;
     box-shadow: 0 1px 4px rgba(0,0,0,.06);
   }
 
   /* ---- FullCalendar переопределения ---- */
+  /* Привязываем внутренние переменные FullCalendar к токенам — иначе
+     сетка/границы/текст остаются «светлыми» в тёмной теме. */
+  .fc {
+    --fc-border-color: var(--border);
+    --fc-page-bg-color: var(--surface);
+    --fc-neutral-bg-color: var(--surface-2);
+    --fc-today-bg-color: var(--accent-tint);
+    --fc-more-link-bg-color: var(--surface-2);
+    --fc-more-link-text-color: var(--text2);
+    color: var(--text);
+  }
   .fc .fc-button { display: none !important; }
-  .fc-daygrid-day.weekend-col { background: #fafafa; }
-  .fc-day-today { background: #f0f5ff !important; }
+  .fc-daygrid-day.weekend-col { background: var(--surface-2); }
+  .fc-day-today { background: var(--accent-tint) !important; }
   .fc-event { cursor: pointer; }
   .fc-event-inner {
     padding: 1px 4px;
@@ -101,9 +114,9 @@
   }
   .modal-backdrop.open { display: flex; }
   .modal-box {
-    background: #fff;
+    background: var(--surface);
     border-radius: 14px;
-    border: 0.5px solid #e8e8e4;
+    border: 0.5px solid var(--border);
     width: 480px;
     max-width: 95vw;
     max-height: 90vh;
@@ -117,7 +130,7 @@
   .modal-header h2 { flex: 1; font-size: 16px; font-weight: 600; }
   .modal-close {
     border: none; background: none; font-size: 20px; cursor: pointer;
-    color: #999; line-height: 1;
+    color: var(--text2); line-height: 1;
     flex-shrink: 0;
     margin-top: -2px;
   }
@@ -127,17 +140,17 @@
   .type-badge {
     display: inline-block;
     padding: 2px 10px; border-radius: 99px;
-    font-size: 11px; font-weight: 600; color: #fff;
+    font-size: 11px; font-weight: 600; color: var(--on-btn);
   }
 
   /* Строки деталей */
   .detail-row {
     display: flex; gap: 8px;
-    font-size: 13px; color: #444;
+    font-size: 13px; color: var(--text);
     margin-top: 10px;
   }
-  .detail-row .label { color: #999; min-width: 80px; }
-  .detail-row a { color: #4f7cff; text-decoration: none; }
+  .detail-row .label { color: var(--text2); min-width: 80px; }
+  .detail-row a { color: var(--accent); text-decoration: none; }
   .detail-row a:hover { text-decoration: underline; }
 
   /* Кнопки модала */
@@ -151,16 +164,16 @@
   .form-group { margin-bottom: 14px; }
   .form-group label {
     display: block; font-size: 12px; font-weight: 600;
-    color: #666; margin-bottom: 5px;
+    color: var(--text2); margin-bottom: 5px;
   }
   .form-group input, .form-group textarea, .form-group select {
     width: 100%; padding: 8px 10px;
-    border: 1px solid #e0e0db; border-radius: 8px;
-    font-size: 13px; color: #1a1f2e;
-    background: #fff;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; color: var(--text);
+    background: var(--surface);
   }
   .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
-    outline: none; border-color: #4f7cff;
+    outline: none; border-color: var(--accent);
   }
   .form-group textarea { resize: vertical; min-height: 64px; }
 
@@ -169,12 +182,12 @@
   .pill-btn {
     padding: 5px 14px;
     border-radius: 99px;
-    border: 1.5px solid #e0e0db;
-    background: #fff; font-size: 12px; cursor: pointer; color: #555;
+    border: 1.5px solid var(--border);
+    background: var(--surface); font-size: 12px; cursor: pointer; color: var(--text2);
     transition: all .15s;
   }
   .pill-btn.active {
-    color: #fff; border-color: transparent;
+    color: var(--on-btn); border-color: transparent;
   }
   .pill-lesson.active   { background: #3b82f6; }
   .pill-homework.active { background: #f97316; }
@@ -184,14 +197,14 @@
   /* Чекбокс-группы */
   .group-list {
     max-height: 120px; overflow-y: auto;
-    border: 1px solid #e0e0db; border-radius: 8px; padding: 6px;
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px;
   }
   .group-list label {
     display: flex; align-items: center; gap: 7px;
-    font-size: 13px; font-weight: 400; color: #1a1f2e;
+    font-size: 13px; font-weight: 400; color: var(--text);
     padding: 3px 4px; cursor: pointer;
   }
-  .group-list label:hover { background: #f5f5f3; border-radius: 5px; }
+  .group-list label:hover { background: var(--surface-2); border-radius: 5px; }
 
   /* Inline два поля */
   .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -264,12 +277,12 @@
       </div>
       <div class="detail-row" id="view-recur-row">
         <span class="label">Повтор</span>
-        <span style="color:#4f7cff;">↻ Повторяющееся событие</span>
+        <span style="color:var(--accent);">↻ Повторяющееся событие</span>
       </div>
       <div class="modal-actions" id="view-actions">
         <button class="btn btn-primary" id="view-edit-btn">Изменить</button>
         <button class="btn" id="view-delete-btn"
-                style="border-color:#ef4444;color:#ef4444;">Удалить</button>
+                style="border-color:var(--error);color:var(--error);">Удалить</button>
       </div>
     </div>
   </div>
@@ -303,7 +316,7 @@
         <label>Цвет события</label>
         <div style="display:flex;align-items:center;gap:10px">
           <input type="color" id="event-color" value="#3b82f6"
-                 style="width:36px;height:36px;border:0.5px solid #e8e8e4;border-radius:8px;cursor:pointer;padding:2px;flex-shrink:0">
+                 style="width:36px;height:36px;border:0.5px solid var(--border);border-radius:8px;cursor:pointer;padding:2px;flex-shrink:0">
           <div style="display:flex;gap:6px" id="color-presets">
             <div onclick="pickColor('#3b82f6')" style="width:20px;height:20px;border-radius:50%;background:#3b82f6;cursor:pointer;border:2px solid transparent" title="Синий"></div>
             <div onclick="pickColor('#f97316')" style="width:20px;height:20px;border-radius:50%;background:#f97316;cursor:pointer;border:2px solid transparent" title="Оранжевый"></div>
@@ -313,7 +326,7 @@
             <div onclick="pickColor('#6b7280')" style="width:20px;height:20px;border-radius:50%;background:#6b7280;cursor:pointer;border:2px solid transparent" title="Серый"></div>
           </div>
         </div>
-        <div style="font-size:11px;color:#aaa;margin-top:4px">По умолчанию: синий — занятие, оранжевый — домашка, зелёный — олимпиада</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">По умолчанию: синий — занятие, оранжевый — домашка, зелёный — олимпиада</div>
       </div>
 
       <!-- Название -->
@@ -344,7 +357,7 @@
       <!-- Глобальное (только admin) -->
       {% if user_role == 'admin' %}
       <div class="form-group">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;color:#1a1f2e;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;color:var(--text);">
           <input type="checkbox" id="edit-is-global"> Видно всем (глобальное)
         </label>
       </div>
@@ -355,7 +368,7 @@
         <label>Группы</label>
         <div class="group-list" id="group-checkboxes">
           <!-- Заполняется JS -->
-          <span style="font-size:12px;color:#999;padding:4px;">Нет групп</span>
+          <span style="font-size:12px;color:var(--text3);padding:4px;">Нет групп</span>
         </div>
       </div>
 
@@ -376,7 +389,7 @@
 
       <!-- Повторение -->
       <div class="form-group">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;color:#1a1f2e;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;color:var(--text);">
           <input type="checkbox" id="edit-recurring"> Повторять каждую неделю
         </label>
       </div>
@@ -392,7 +405,7 @@
       <div class="modal-actions">
         <button class="btn btn-primary" id="edit-save-btn">Сохранить</button>
         <button class="btn" id="edit-cancel-btn">Отмена</button>
-        <span id="edit-error" style="font-size:12px;color:#ef4444;align-self:center;"></span>
+        <span id="edit-error" style="font-size:12px;color:var(--error);align-self:center;"></span>
       </div>
     </div>
   </div>

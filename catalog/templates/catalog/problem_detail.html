@@ -14,17 +14,18 @@
   font-size: 13px;
   color: var(--text2);
 }
-.problem-stars { color: #f5a623; letter-spacing: 1px; font-size: 14px; }
+.problem-stars { color: var(--amber); letter-spacing: 1px; font-size: 14px; }
 .problem-source {
-  background: var(--panel);
+  background: var(--chip-bg);
+  color: var(--chip-text);
   border: .5px solid var(--border);
   border-radius: 20px;
   padding: 3px 10px;
 }
 .problem-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag-pill {
-  background: #eef2ff;
-  color: var(--accent);
+  background: var(--chip-bg);
+  color: var(--chip-text);
   border-radius: 20px;
   padding: 3px 10px;
   font-size: 12px;
@@ -48,7 +49,7 @@
 .math-content .katex-display { margin: 1em 0; }
 
 .problem-statement {
-  background: var(--panel);
+  background: var(--surface);
   border: .5px solid var(--border);
   border-radius: 10px;
   padding: 20px 24px;
@@ -71,10 +72,10 @@
   margin-bottom: 24px;
 }
 .part-item {
-  border: .5px solid #d8e0f5;
+  border: .5px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  background: #f2f5ff;            /* лёгкий голубой фон — отличие от серого условия */
+  background: var(--accent-tint);  /* лёгкий малиновый фон — отличие от условия */
 }
 .part-header {
   display: flex;
@@ -93,13 +94,14 @@
 
 /* ── Кнопки «Показать» ───────────────────────────── */
 .reveal-section { margin-bottom: 16px; }
+.part-reveal-section { padding: 0 18px 14px; }
 .reveal-btn {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   padding: 9px 16px;
   border: .5px solid var(--border);
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--r);
   font-size: 13px;
   font-weight: 500;
@@ -107,13 +109,13 @@
   cursor: pointer;
   transition: background .12s, color .12s, border-color .12s;
 }
-.reveal-btn:hover { background: var(--panel); color: var(--text); border-color: #d0d0cb; }
+.reveal-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
 .reveal-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
 .reveal-content {
   display: none;
   margin-top: 12px;
   padding: 16px 20px;
-  background: var(--panel);
+  background: var(--surface);
   border: .5px solid var(--border);
   border-radius: 10px;
 }
@@ -146,7 +148,7 @@
 .similar-card {
   display: block;
   padding: 12px 16px;
-  background: var(--panel);
+  background: var(--surface);
   border: .5px solid var(--border);
   border-radius: var(--r);
   text-decoration: none;
@@ -155,7 +157,7 @@
 }
 .similar-card:hover {
   border-color: var(--accent);
-  background: #f5f7ff;
+  background: var(--accent-tint);
 }
 .similar-card-title {
   font-size: 14px;
@@ -170,11 +172,11 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-.similar-stars { color: #f5a623; font-size: 12px; letter-spacing: 1px; }
+.similar-stars { color: var(--amber); font-size: 12px; letter-spacing: 1px; }
 .similar-topic {
   font-size: 11px;
-  color: var(--accent);
-  background: #eef2ff;
+  color: var(--chip-text);
+  background: var(--chip-bg);
   border-radius: 20px;
   padding: 2px 8px;
   font-weight: 500;
@@ -207,7 +209,7 @@
   <span class="tag-pill">{{ topic.name }}</span>
   {% endfor %}
   {% for tag in tags %}
-  <span class="tag-pill" style="background:#f0faf4; color:#2a9d5c;">{{ tag.name }}</span>
+  <span class="tag-pill" style="background:var(--chip-bg); color:var(--chip-text);">{{ tag.name }}</span>
   {% endfor %}
 </div>
 {% endif %}
@@ -233,13 +235,28 @@
       <div class="part-statement math-content">{{ part.statement }}</div>
       {% endif %}
     </div>
+    {% if part.answer %}
+    <div class="part-reveal-section">
+      <button class="reveal-btn" onclick="toggleReveal('part-answer-{{ part.pk }}', this)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="8" cy="8" r="6.5"/>
+          <path d="M8 7v4M8 5.5v.5"/>
+        </svg>
+        Показать ответ
+      </button>
+      <div id="part-answer-{{ part.pk }}" class="reveal-content">
+        <div class="reveal-label">Ответ</div>
+        <div class="math-content">{{ part.answer }}</div>
+      </div>
+    </div>
+    {% endif %}
   </div>
   {% endfor %}
 </div>
 {% endif %}
 
-<!-- Кнопка «Показать ответ» -->
-{% if problem.answer or parts %}
+<!-- Кнопка «Показать ответ» — только если нет per-part ответов -->
+{% if problem.answer and not has_part_answers %}
 <div class="reveal-section">
   <button class="reveal-btn" onclick="toggleReveal('answer-block', this)">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -250,19 +267,7 @@
   </button>
   <div id="answer-block" class="reveal-content">
     <div class="reveal-label">Ответ</div>
-    {% if problem.answer %}
     <div class="math-content">{{ problem.answer }}</div>
-    {% endif %}
-    {% if parts %}
-    {% for part in parts %}
-    {% if part.answer %}
-    <div style="margin-top: 8px;">
-      <strong style="color: var(--accent);">{{ part.label|partlabel }}</strong>
-      <span class="math-content" style="display:inline;">{{ part.answer }}</span>
-    </div>
-    {% endif %}
-    {% endfor %}
-    {% endif %}
   </div>
 </div>
 {% endif %}

@@ -2,7 +2,7 @@ import json
 import re
 
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Count, F, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -92,6 +92,12 @@ def problem_list(request):
     f_type   = request.GET.get('type',         '').strip()
     f_sol    = request.GET.get('has_solution', '').strip()
     f_source = request.GET.get('source',       '').strip()
+    f_sort   = request.GET.get('sort',         '').strip()
+
+    # Режим отображения: строки (по умолчанию) / таблица / галерея
+    view_mode = request.GET.get('view', 'rows').strip()
+    if view_mode not in ('rows', 'table', 'gallery'):
+        view_mode = 'rows'
 
     if f_q:
         qs = qs.filter(Q(statement__icontains=f_q) | Q(title__icontains=f_q))
@@ -106,7 +112,17 @@ def problem_list(request):
     if f_source:
         qs = qs.filter(source_references__source_id=f_source)
 
-    qs = qs.prefetch_related('topics').order_by('-id').distinct()
+    # Сортировка (поверх существующих фильтров; не меняет их логику)
+    order_map = {
+        'diff_asc':  [F('difficulty').asc(nulls_last=True), '-id'],
+        'diff_desc': [F('difficulty').desc(nulls_last=True), '-id'],
+        'new':       ['-id'],
+        'relevance': ['-id'],
+    }
+    order_by = order_map.get(f_sort, ['-id'])
+
+    qs = (qs.prefetch_related('topics', 'source_references__source')
+            .order_by(*order_by).distinct())
 
     paginator = Paginator(qs, 20)
     page_obj  = paginator.get_page(request.GET.get('page', 1))
@@ -116,8 +132,9 @@ def problem_list(request):
     cards = []
     for p in page_obj:
         raw     = _strip_latex(p.statement)
-        preview = raw[:150] + ('…' if len(raw) > 150 else '')
+        preview = raw[:180] + ('…' if len(raw) > 180 else '')
         d       = p.difficulty or 0
+        refs    = list(p.source_references.all())
         cards.append({
             'problem':          p,
             'preview':          preview,
@@ -125,6 +142,8 @@ def problem_list(request):
             'difficulty_stars': range(d),
             'difficulty_empty': range(5 - d),
             'has_solution':     bool(p.solution) and not p.solution_needs_review,
+            'source':           refs[0].source.name if refs else '',
+            'grade':            refs[0].grade if refs else '',
         })
 
     # Типы задач среди опубликованных (для кнопок фильтра)
@@ -165,27 +184,60 @@ def problem_list(request):
             for a in active_qs
         ])
 
+    # 21 каноническая тема в каноническом порядке (фильтр + чипы + атлас).
+    # Этап А3: микро → макро → прочее.
+    canonical_topics = sorted(
+        Topic.objects.filter(name__in=CANONICAL),
+        key=lambda t: CANONICAL.index(t.name),
+    )
+
+    # Нулевое состояние: нет поиска и ни одного фильтра → показываем атлас тем
+    # (21 каноническая тема с числом опубликованных задач) вместо списка.
+    is_zero_state = not any([f_q, f_topic, f_diff, f_type, f_sol, f_source])
+    atlas = []
+    if is_zero_state:
+        counted = (
+            Topic.objects.filter(name__in=CANONICAL)
+            .annotate(n=Count('problems', filter=Q(
+                problems__status=Problem.Status.PUBLISHED,
+                problems__needs_quality_review=False,
+            )))
+        )
+        by_name = {t.name: t for t in counted}
+        atlas = [by_name[name] for name in CANONICAL if name in by_name]
+
+    # Подписи активных фильтров для чипов
+    f_topic_name = next((t.name for t in canonical_topics
+                         if str(t.id) == f_topic), '')
+    f_source_name = ''
+    if f_source:
+        f_source_name = (Source.objects.filter(id=f_source)
+                         .values_list('name', flat=True).first() or '')
+
     context = {
         'page_obj':      page_obj,
         'cards':         cards,
         'total':         total,
-        # В фильтре показываем только 21 каноническую тему (Этап А3),
-        # в каноническом порядке: микро → макро → прочее.
-        'topics':        sorted(
-            Topic.objects.filter(name__in=CANONICAL),
-            key=lambda t: CANONICAL.index(t.name),
-        ),
+        'topics':        canonical_topics,
         'sources':       sources,
         'problem_types': problem_types,
         'page_range':    _page_range(page_obj),
         'base_query':    base_query,
+        # режим отображения и сортировка
+        'view_mode':     view_mode,
+        'f_sort':        f_sort or 'relevance',
+        # нулевое состояние и атлас тем
+        'is_zero_state': is_zero_state,
+        'atlas':         atlas,
         # текущие значения фильтров
         'f_q':           f_q,
         'f_topic':       f_topic,
+        'f_topic_name':  f_topic_name,
         'f_diff':        f_diff,
         'f_type':        f_type,
         'f_sol':         f_sol,
         'f_source':      f_source,
+        'f_source_name': f_source_name,
         # Домашки учителя для dropdown
         'teacher_assignments_json': teacher_assignments_json,
     }
@@ -218,6 +270,7 @@ def problem_detail(request, pk):
     context = {
         'problem':          problem,
         'parts':            problem.parts.all(),
+        'has_part_answers': problem.parts.filter(answer__gt='').exists(),
         'topics':           problem.topics.all(),
         'tags':             problem.tags.all(),
         'sources':          problem.source_references.select_related('source').all(),
