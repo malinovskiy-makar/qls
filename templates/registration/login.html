@@ -21,6 +21,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 .login-card {
   background: #fff;
@@ -75,7 +78,19 @@ input[type=password] {
   outline: none;
   transition: border-color .12s;
 }
-input:focus { border-color: var(--accent); }
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79,124,255,.15);
+}
+/* Клавиатурный фокус-ринг + reduced-motion (страница standalone, base не наследуется) */
+a:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .001ms !important; }
+}
 .form-group { margin-bottom: 16px; }
 .error-list {
   background: #fff0f0;
