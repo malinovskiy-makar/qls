@@ -83,10 +83,11 @@
 }
 .topic-select:focus { outline: none; border-color: var(--accent); }
 
-/* Сложность — кнопки-звёздочки */
-.diff-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+/* Сложность — кнопки-звёздочки: сетка 3×2 (ровные колонки), а не рваный wrap */
+.diff-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .diff-btn {
-  padding: 5px 8px;
+  padding: 5px 6px;
+  text-align: center;
   border: .5px solid var(--border);
   border-radius: var(--r);
   background: #fff;
@@ -519,7 +520,7 @@
 
     <div class="results-bar">
       <span class="results-count">
-        Найдено: <strong>{{ total }}</strong>
+        Найдено: <strong>{{ total|spaceint }}</strong>
         {% if f_q %} по запросу «{{ f_q }}»{% endif %}
       </span>
     </div>

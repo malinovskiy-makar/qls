@@ -29,6 +29,20 @@ def make_stars(value):
 
 
 @register.filter
+def spaceint(value):
+    """Целое с пробелом-разделителем тысяч (рус. формат): 18643 → «18 643».
+
+    Совпадает с _fmt_number в catalog/views.py (главная), чтобы счётчики
+    каталога и главной выглядели одинаково. Только отображение; нечисловое
+    значение возвращается как есть."""
+    try:
+        n = int(value)
+    except (ValueError, TypeError):
+        return value
+    return f'{n:,}'.replace(',', ' ')
+
+
+@register.filter
 def partlabel(value):
     """Метка подпункта с РОВНО одной закрывающей скобкой.
 
