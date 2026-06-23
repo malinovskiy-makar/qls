@@ -93,6 +93,7 @@
 
 /* ── Кнопки «Показать» ───────────────────────────── */
 .reveal-section { margin-bottom: 16px; }
+.part-reveal-section { padding: 0 18px 14px; }
 .reveal-btn {
   display: inline-flex;
   align-items: center;
@@ -233,13 +234,28 @@
       <div class="part-statement math-content">{{ part.statement }}</div>
       {% endif %}
     </div>
+    {% if part.answer %}
+    <div class="part-reveal-section">
+      <button class="reveal-btn" onclick="toggleReveal('part-answer-{{ part.pk }}', this)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="8" cy="8" r="6.5"/>
+          <path d="M8 7v4M8 5.5v.5"/>
+        </svg>
+        Показать ответ
+      </button>
+      <div id="part-answer-{{ part.pk }}" class="reveal-content">
+        <div class="reveal-label">Ответ</div>
+        <div class="math-content">{{ part.answer }}</div>
+      </div>
+    </div>
+    {% endif %}
   </div>
   {% endfor %}
 </div>
 {% endif %}
 
-<!-- Кнопка «Показать ответ» -->
-{% if problem.answer or parts %}
+<!-- Кнопка «Показать ответ» — только если нет per-part ответов -->
+{% if problem.answer and not has_part_answers %}
 <div class="reveal-section">
   <button class="reveal-btn" onclick="toggleReveal('answer-block', this)">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -250,19 +266,7 @@
   </button>
   <div id="answer-block" class="reveal-content">
     <div class="reveal-label">Ответ</div>
-    {% if problem.answer %}
     <div class="math-content">{{ problem.answer }}</div>
-    {% endif %}
-    {% if parts %}
-    {% for part in parts %}
-    {% if part.answer %}
-    <div style="margin-top: 8px;">
-      <strong style="color: var(--accent);">{{ part.label|partlabel }}</strong>
-      <span class="math-content" style="display:inline;">{{ part.answer }}</span>
-    </div>
-    {% endif %}
-    {% endfor %}
-    {% endif %}
   </div>
 </div>
 {% endif %}

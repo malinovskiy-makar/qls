@@ -218,6 +218,7 @@ def problem_detail(request, pk):
     context = {
         'problem':          problem,
         'parts':            problem.parts.all(),
+        'has_part_answers': problem.parts.filter(answer__gt='').exists(),
         'topics':           problem.topics.all(),
         'tags':             problem.tags.all(),
         'sources':          problem.source_references.select_related('source').all(),
