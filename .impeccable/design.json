@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-23T03:05:00Z",
+  "title": "Design System: ЭкЗадачи",
+  "extensions": {
+    "colorMeta": {
+      "ink-blue":      { "role": "primary",  "displayName": "Ink Blue",         "canonical": "#4f7cff", "tonalRamp": ["#0a1a4d", "#15276b", "#243f9e", "#3a5ed6", "#4f7cff", "#7a9bff", "#a8bfff", "#d6e2ff"] },
+      "ink-blue-deep": { "role": "primary",  "displayName": "Ink Blue Deep",    "canonical": "#3d66e0", "tonalRamp": ["#091542", "#122463", "#1f3a96", "#3050c9", "#3d66e0", "#6f8eee", "#a3b8f6", "#d3defb"] },
+      "graphite":      { "role": "secondary","displayName": "Graphite",         "canonical": "#1a1f2e", "tonalRamp": ["#0a0c14", "#12151f", "#1a1f2e", "#2a3147", "#3d4661", "#5c6884", "#8a93ac", "#c3c9d8"] },
+      "amber":         { "role": "tertiary", "displayName": "Difficulty Amber", "canonical": "#f5a623", "tonalRamp": ["#4a3107", "#74500e", "#a4731a", "#cf9322", "#f5a623", "#f8bd5a", "#fbd596", "#fdeccf"] },
+      "solution-green":{ "role": "tertiary", "displayName": "Solution Green",   "canonical": "#2a9d5c", "tonalRamp": ["#0c3a21", "#135631", "#1d7644", "#249153", "#2a9d5c", "#5cbb86", "#94d6b1", "#cdeede"] },
+      "warm-paper":    { "role": "neutral",  "displayName": "Warm Paper",       "canonical": "#f7f7f5", "tonalRamp": ["#2a2a26", "#48483f", "#6c6c5f", "#929287", "#bcbcb1", "#d9d9d2", "#ececea", "#f7f7f5"] },
+      "pencil-line":   { "role": "neutral",  "displayName": "Pencil Line",      "canonical": "#e8e8e4", "tonalRamp": ["#2e2e2a", "#4c4c46", "#6f6f67", "#95958c", "#bdbdb4", "#d8d8d2", "#e8e8e4", "#f4f4f1"] },
+      "graphite-text": { "role": "neutral",  "displayName": "Graphite Text",    "canonical": "#1a1a1a", "tonalRamp": ["#000000", "#0d0d0d", "#1a1a1a", "#333333", "#4d4d4d", "#808080", "#b3b3b3", "#e6e6e6"] },
+      "muted-text":    { "role": "neutral",  "displayName": "Muted Text",       "canonical": "#666666", "tonalRamp": ["#1a1a1a", "#333333", "#4d4d4d", "#595959", "#666666", "#8c8c8c", "#b3b3b3", "#d9d9d9"] }
+    },
+    "typographyMeta": {
+      "display":  { "displayName": "Display",  "purpose": "Wordmark and home hero only — the one place type is allowed to be loud." },
+      "headline": { "displayName": "Headline", "purpose": "Page-level and card-group headings." },
+      "title":    { "displayName": "Title",    "purpose": "Problem-card and modal titles, list item headings." },
+      "body":     { "displayName": "Body",     "purpose": "Problem statements and prose; line-height never below 1.55." },
+      "label":    { "displayName": "Label",    "purpose": "Uppercase filter-rail labels and badge captions." }
+    },
+    "shadows": [
+      { "name": "card-hover",  "value": "0 2px 14px rgba(0,0,0,0.07)",      "purpose": "Gentle lift on a hovered problem card." },
+      { "name": "accent-hover","value": "0 4px 16px rgba(79,124,255,0.12)", "purpose": "Tinted lift on home navigation cards (with translateY(-2px))." },
+      { "name": "focus-ring",  "value": "0 0 0 3px rgba(79,124,255,0.15)",  "purpose": "Soft ink-blue halo on a focused search field; replaces hard outline." },
+      { "name": "dropdown",    "value": "0 4px 20px rgba(0,0,0,0.12)",      "purpose": "Floating '+ В домашку' menu." },
+      { "name": "modal",       "value": "0 8px 40px rgba(0,0,0,0.18)",      "purpose": "Problem-preview overlay — deepest shadow, used once at a time." }
+    ],
+    "motion": [
+      { "name": "ease-quick",  "value": "120ms ease",  "purpose": "Color and border-color state changes on buttons, links, inputs." },
+      { "name": "ease-lift",   "value": "150ms ease",  "purpose": "Card hover (box-shadow + transform); never longer." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single ink-blue call to action — search submit, primary confirm.",
+      "html": "<button class=\"ds-btn-primary\">Найти</button>",
+      "css": ".ds-btn-primary { background: #4f7cff; color: #fff; border: none; border-radius: 6px; padding: 7px 14px; font: 600 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; cursor: pointer; transition: background 0.12s ease; } .ds-btn-primary:hover { background: #3d66e0; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(79,124,255,0.25); }"
+    },
+    {
+      "name": "Dark Button",
+      "kind": "button",
+      "refersTo": "button-dark",
+      "description": "Graphite submit, used for the login form's full-width 'Войти'.",
+      "html": "<button class=\"ds-btn-dark\">Войти</button>",
+      "css": ".ds-btn-dark { display: block; width: 100%; background: #1a1f2e; color: #fff; border: none; border-radius: 6px; padding: 11px; font: 600 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; cursor: pointer; transition: background 0.12s ease; } .ds-btn-dark:hover { background: #252c40; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Outline action on a card — '👁 Условие', '+ В домашку'.",
+      "html": "<button class=\"ds-btn-ghost\">👁 Условие</button>",
+      "css": ".ds-btn-ghost { background: #fff; color: #666; border: 0.5px solid #e8e8e4; border-radius: 6px; padding: 4px 11px; font: 400 12px -apple-system, sans-serif; cursor: pointer; transition: color 0.12s ease, border-color 0.12s ease; } .ds-btn-ghost:hover { color: #4f7cff; border-color: #4f7cff; }"
+    },
+    {
+      "name": "Chip / Tag",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Pill-shaped topic tag — ink-blue text on a pale tint; static label, not interactive.",
+      "html": "<span class=\"ds-chip\">Монополия</span>",
+      "css": ".ds-chip { display: inline-block; background: #eef2ff; color: #4f7cff; border-radius: 20px; padding: 2px 9px; font: 500 11px -apple-system, sans-serif; }"
+    },
+    {
+      "name": "Problem Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat white content card with a hairline border that lifts on hover.",
+      "html": "<a class=\"ds-card\"><span class=\"ds-card-title\">Задача о монополии</span><p class=\"ds-card-prev\">Фирма-монополист сталкивается со спросом…</p></a>",
+      "css": ".ds-card { display: block; background: #fff; border: 0.5px solid #e8e8e4; border-radius: 10px; padding: 16px 20px; text-decoration: none; transition: box-shadow 0.15s ease, border-color 0.15s ease; } .ds-card:hover { box-shadow: 0 2px 14px rgba(0,0,0,0.07); border-color: #d0d0ca; } .ds-card-title { font: 600 14px -apple-system, sans-serif; color: #1a1a1a; } .ds-card:hover .ds-card-title { color: #4f7cff; } .ds-card-prev { margin-top: 6px; font: 400 13px -apple-system, sans-serif; color: #666; line-height: 1.55; }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "White field with hairline border; focus shifts the border to ink-blue plus a soft halo.",
+      "html": "<input class=\"ds-input\" placeholder=\"Слово из условия…\">",
+      "css": ".ds-input { width: 100%; background: #fff; color: #1a1a1a; border: 0.5px solid #e8e8e4; border-radius: 6px; padding: 7px 10px; font: 400 13px -apple-system, sans-serif; transition: border-color 0.12s ease, box-shadow 0.12s ease; } .ds-input:focus { outline: none; border-color: #4f7cff; box-shadow: 0 0 0 3px rgba(79,124,255,0.15); }"
+    },
+    {
+      "name": "Navigation Bar",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "Sticky graphite bar with the ink-blue logo tile and weight-500 links; active link gets a 2px ink-blue underline.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-logo\">Эк</a><a class=\"ds-nav-link active\">Каталог</a><a class=\"ds-nav-link\">Калькулятор</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 4px; background: #1a1f2e; height: 48px; padding: 0 20px; } .ds-nav-logo { width: 28px; height: 28px; border-radius: 7px; background: #4f7cff; color: #fff; display: flex; align-items: center; justify-content: center; font: 500 13px -apple-system, sans-serif; text-decoration: none; margin-right: 16px; } .ds-nav-link { color: rgba(255,255,255,0.6); text-decoration: none; font: 500 13px -apple-system, sans-serif; height: 48px; display: flex; align-items: center; padding: 0 12px; border-bottom: 2px solid transparent; transition: color 0.12s ease; } .ds-nav-link:hover { color: #fff; } .ds-nav-link.active { color: #fff; border-bottom-color: #4f7cff; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Graphite Notebook",
+    "overview": "ЭкЗадачи looks like a well-kept graphite notebook owned by a serious economics coach: warm off-white pages, a graphite-dark spine, one disciplined ink-blue pen reserved for the things that matter, and a soft amber pencil that marks difficulty. The interface is calm and dense with information but never loud. It is built for two roles on one platform — teachers see a denser surface, students a lighter one, both sharing the same graphite header and ink-blue accent language. It is infrastructure, not a course: every screen should feel like a precise instrument, not a marketing page.",
+    "keyCharacteristics": [
+      "Warm-paper surfaces, graphite structure, a single ink-blue accent used sparingly.",
+      "Flat by default; depth appears only on interaction (hover lift, focus ring, modal).",
+      "Math is first-class: KaTeX-rendered formulas, never images, never broken $.",
+      "Information-dense but quiet — the accent earns attention because it is rare.",
+      "One platform, two densities: teacher-dense, student-light, shared language."
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "Ink Blue (#4f7cff) appears on ≤10% of any screen. Its rarity is what makes 'active', 'primary', and 'interactive' instantly legible.", "section": "colors" },
+      { "name": "The No-Stark-White Rule", "body": "Pure #ffffff is for content cards only. Page chrome and recessive panels use warm paper (#f7f7f5) or cool paper (#f5f5f3).", "section": "colors" },
+      { "name": "The Signal-Color Lockbox", "body": "Amber means difficulty, green means solution-present. Neither is ever borrowed for decoration.", "section": "colors" },
+      { "name": "The Readable-Math Rule", "body": "Problem body line-height never drops below 1.55. Inline KaTeX needs vertical air.", "section": "typography" },
+      { "name": "The Weight-Not-Color Hierarchy", "body": "Heading vs. body is expressed by weight and size, not by tinting text with the accent.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Resting surfaces have a border, never a shadow. Depth is feedback (hover, focus, overlay), not decoration.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep Ink Blue (#4f7cff) under ~10% of any screen — logo, one primary action, active state, links.",
+      "Do sit recessive chrome on Warm Paper (#f7f7f5) and content on white.",
+      "Do define resting surfaces with a 0.5px Pencil-Line border and reserve shadow for hover/focus/overlay.",
+      "Do keep problem-body line-height >= 1.55 so inline KaTeX stays legible.",
+      "Do pair every signal color with a shape or word — amber with star, green with check.",
+      "Do express hierarchy with weight and size; keep transitions <= 0.15s and degrade under prefers-reduced-motion."
+    ],
+    "donts": [
+      "Don't build Corporate SaaS surfaces: no gradient hero metrics, no '01 / 02 / 03' scaffolding, no upsell banners.",
+      "Don't fall back to a Soviet-textbook / Word look: no Times New Roman, no black-on-stark-white walls of text.",
+      "Don't let the public product look like a reskinned Django admin grid.",
+      "Don't tint heading text with the accent to 'make it pop' — ink-blue text means link or active state.",
+      "Don't borrow amber or green for decoration — they mean difficulty and solution-present.",
+      "Don't put a drop-shadow on a resting card, and don't use a border-left color stripe thicker than the hairline."
+    ]
+  }
+}
