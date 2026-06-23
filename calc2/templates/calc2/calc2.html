@@ -119,7 +119,7 @@ html, body {
 }
 button { cursor: pointer; font: inherit; color: inherit; }
 input, select { font: inherit; }
-:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); border-radius: var(--r-sm); }
+:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
 
 /* ── Основной макет: левая панель + область графика ────────────────── */
 .app { display: flex; height: calc(100vh - 48px); background: var(--bg); }
@@ -452,6 +452,27 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   transition: opacity .2s var(--ease), transform .2s var(--ease);
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ДВИЖЕНИЕ — целенаправленное, ease-out, <300мс; уважает reduced-motion.
+   ═══════════════════════════════════════════════════════════════════ */
+/* Окно выбора: мягкое появление содержимого (один раз при загрузке).
+   Без fill-mode — если анимация не сыграет, карточки уже видимы (не пусто). */
+@keyframes pickerIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+.picker-inner { animation: pickerIn .42s var(--ease); }
+/* Закрытие окна — лёгкий «отъезд назад», открывая готовую сцену. */
+.picker.hidden { transform: scale(.99); }
+
+/* Тактильная отдача нажатия на кнопки дока. */
+.dock-btn:not(:disabled):active { transform: scale(.92); }
+
+/* Шапка сцены мягко въезжает один раз (у неё нет состояния сворачивания,
+   поэтому floatIn не конфликтует со слайдом панелей по горизонтали). */
+@keyframes floatIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.scene-header { animation: floatIn .34s var(--ease) .04s; }
   </style>
 </head>
 <body>
