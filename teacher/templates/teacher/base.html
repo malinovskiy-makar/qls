@@ -107,6 +107,21 @@ body {
 .messages li.error   { background: var(--error-tint); border: 1px solid var(--error-border); color: var(--error); }
 .messages li.warning { background: var(--amber-tint); border: 1px solid var(--amber-border); color: var(--text); }
 
+/* ── Доступность: фокус-ринг для клавиатуры + reduced-motion ── */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 {% block extra_style %}{% endblock %}
   </style>
 </head>
