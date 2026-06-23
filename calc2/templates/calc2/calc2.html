@@ -312,6 +312,146 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   .scard.free { flex-direction: column; align-items: stretch; }
   .scard.free .scard-spec { width: 100%; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ЭКРАН 2 — РАБОЧЕЕ МЕСТО «СЦЕНА»
+   График во весь экран; управление и результаты — плавающими панелями
+   поверх холста. Все контролы — те же, лишь переставлены.
+   ═══════════════════════════════════════════════════════════════════ */
+.app { position: relative; display: block; height: calc(100vh - 48px); overflow: hidden; }
+.graph-wrap { position: absolute; inset: 0; }
+
+/* ── Левый док (тонкая полоса инструментов) ── */
+.dock {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 56px; z-index: var(--z-dock);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 12px 0; background: var(--surface-2);
+  border-right: 1px solid var(--border);
+}
+.dock-sep { width: 24px; height: 1px; background: var(--border); margin: 6px 0; }
+.dock-spacer { flex: 1; }
+.dock-btn {
+  width: 40px; height: 40px; border: 1px solid transparent; border-radius: var(--r-sm);
+  background: transparent; color: var(--text2); display: grid; place-items: center;
+  position: relative; transition: background .12s var(--ease), color .12s var(--ease);
+}
+.dock-btn svg { width: 20px; height: 20px; }
+.dock-btn:hover { background: var(--surface); color: var(--text); }
+.dock-btn.active { background: var(--accent-tint); color: var(--accent); }
+.dock-btn:disabled { opacity: .4; cursor: not-allowed; }
+/* Подпись-тултип справа от кнопки */
+.dock-btn[data-tip]::after {
+  content: attr(data-tip); position: absolute; left: calc(100% + 8px); top: 50%;
+  transform: translateY(-50%) scale(.96); transform-origin: left center;
+  background: var(--text); color: var(--surface); font-size: 11px; font-weight: 600;
+  padding: 4px 8px; border-radius: 5px; white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity .12s var(--ease), transform .12s var(--ease); z-index: var(--z-pop);
+}
+.dock-btn:hover[data-tip]::after { opacity: 1; transform: translateY(-50%) scale(1); }
+
+/* ── Шапка сцены: «← Сценарии» + название ── */
+.scene-header {
+  position: absolute; top: 12px; left: 68px; z-index: var(--z-float);
+  display: flex; align-items: center; gap: 10px;
+}
+.scene-back {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 9px;
+  border: 1px solid var(--border); border-radius: 18px; background: var(--surface);
+  color: var(--text); font-size: 13px; font-weight: 600; box-shadow: var(--shadow-panel);
+  transition: border-color .12s var(--ease), color .12s var(--ease), transform .08s var(--ease);
+}
+.scene-back svg { width: 15px; height: 15px; }
+.scene-back:hover { border-color: var(--accent); color: var(--accent); }
+.scene-back:active { transform: scale(.97); }
+.scene-name { font-size: 13px; font-weight: 600; color: var(--text2); padding-left: 2px; }
+
+/* ── Плавающая панель управления (низ-слева) ── */
+.tools {
+  position: absolute; left: 68px; bottom: 14px; z-index: var(--z-float);
+  width: 300px; max-height: min(74vh, 720px);
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel); overflow: hidden;
+  transition: transform .26s var(--ease), opacity .2s var(--ease);
+}
+.tools.collapsed { transform: translateX(-126%); opacity: 0; pointer-events: none; }
+.tools-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0;
+}
+.tools-head h2 { font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+.tools-body { overflow-y: auto; padding: 14px; }
+/* Панель внутри сцены: сбрасываем «старый» вид левой колонки */
+.tools.panel { width: 300px; border-right: none; }
+.tools .panel-only { display: none; }   /* h1/subtitle старой панели прячем */
+
+/* Кнопка-иконка закрытия панели */
+.tools-x {
+  width: 26px; height: 26px; border: none; border-radius: var(--r-sm); background: transparent;
+  color: var(--text2); display: grid; place-items: center;
+}
+.tools-x:hover { background: var(--surface-2); color: var(--text); }
+.tools-x svg { width: 16px; height: 16px; }
+
+/* «Все настройки» — раскрытие вторичных секций (режим/сцены/оси) */
+#tools-advanced { display: none; }
+.tools.show-all #tools-advanced { display: block; }
+.tools-allbtn {
+  width: 100%; margin-top: 6px; padding: 8px; border: 1px dashed var(--border);
+  border-radius: var(--r-sm); background: transparent; color: var(--text2);
+  font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: border-color .12s var(--ease), color .12s var(--ease);
+}
+.tools-allbtn:hover { border-color: var(--accent); color: var(--accent); }
+.tools-allbtn svg { width: 13px; height: 13px; transition: transform .2s var(--ease); }
+.tools.show-all .tools-allbtn svg { transform: rotate(180deg); }
+
+/* ── Плавающее табло результатов (право) ── */
+.scoreboard {
+  position: absolute; right: 14px; top: 12px; z-index: var(--z-float);
+  width: 252px; max-height: calc(100% - 24px);
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel); overflow: hidden;
+  transition: transform .26s var(--ease), opacity .2s var(--ease);
+}
+.scoreboard.collapsed { transform: translateX(126%); opacity: 0; pointer-events: none; }
+.sb-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0;
+}
+.sb-head h2 {
+  font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text3);
+}
+.sb-body { overflow-y: auto; padding: 6px 14px 14px; }
+.sb-body .section { margin-bottom: 12px; }
+.sb-body .section:last-child { margin-bottom: 0; }
+.sb-body .section-title { margin-top: 8px; }
+/* Крупные «приборные» цифры в табло */
+.scoreboard .stat { padding: 5px 0; align-items: baseline; gap: 10px; }
+.scoreboard .stat span { font-size: 12px; }
+.scoreboard .stat b { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.sb-empty { font-size: 12.5px; color: var(--text2); line-height: 1.5; padding: 6px 0; }
+
+@media (max-width: 760px) {
+  .tools { width: min(300px, calc(100vw - 80px)); max-height: 56vh; }
+  .scoreboard { width: 220px; max-height: 56vh; top: auto; bottom: 14px; }
+  .scene-name { display: none; }
+}
+
+/* Интервал между блоками результатов; пустые блоки (чужой режим) не занимают места. */
+.sb-body > div:not(:empty) { margin-bottom: 12px; }
+.sb-body > div:empty { margin: 0; }
+
+/* Тост-уведомление (заглушки «сохранить/экспорт») */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 12px); z-index: var(--z-pop);
+  background: var(--text); color: var(--surface); font-size: 13px; font-weight: 600;
+  padding: 9px 16px; border-radius: 20px; box-shadow: var(--shadow-pop);
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s var(--ease), transform .2s var(--ease);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
   </style>
 </head>
 <body>
@@ -459,10 +599,55 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
 <div class="app">
 
-  <!-- ── ЛЕВАЯ ПАНЕЛЬ УПРАВЛЕНИЯ ───────────────────────────────────── -->
-  <aside class="panel">
-    <h1>Графический калькулятор&nbsp;2.0</h1>
-    <div class="subtitle">бета · собственный движок (D3&nbsp;+&nbsp;Math.js)</div>
+  <!-- ── ГРАФИК ВО ВЕСЬ ЭКРАН ──────────────────────────────────────── -->
+  <div class="graph-wrap" id="graph-wrap">
+    <svg id="chart"></svg>
+  </div>
+
+  <!-- ── ЛЕВЫЙ ДОК ─────────────────────────────────────────────────── -->
+  <nav class="dock" aria-label="Инструменты сцены">
+    <button class="dock-btn active" id="dock-tools" type="button" data-tip="Инструменты" aria-label="Показать или скрыть панель инструментов" aria-pressed="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2.4" fill="var(--surface-2)"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2.4" fill="var(--surface-2)"/></svg>
+    </button>
+    <button class="dock-btn active" id="dock-score" type="button" data-tip="Табло результатов" aria-label="Показать или скрыть табло результатов" aria-pressed="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 19V11"/><path d="M12 19V5"/><path d="M19 19v-6"/><path d="M4 19h16"/></svg>
+    </button>
+    <div class="dock-sep"></div>
+    <button class="dock-btn" id="dock-grid" type="button" data-tip="Сетка" aria-label="Показать или скрыть сетку" aria-pressed="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+    </button>
+    <button class="dock-btn" id="dock-save" type="button" data-tip="Сохранить (скоро)" aria-label="Сохранить график — скоро">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><rect x="8" y="13" width="8" height="6"/></svg>
+    </button>
+    <button class="dock-btn" id="dock-export" type="button" data-tip="Экспорт (скоро)" aria-label="Экспортировать — скоро">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
+    </button>
+    <div class="dock-spacer"></div>
+    <button class="dock-btn" id="dock-theme" type="button" data-tip="Светлая / тёмная тема" aria-label="Переключить светлую или тёмную тему">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14a8 8 0 1 1-9.5-9.8A6.5 6.5 0 0 0 20 14z"/></svg>
+    </button>
+  </nav>
+
+  <!-- ── ШАПКА СЦЕНЫ ───────────────────────────────────────────────── -->
+  <div class="scene-header">
+    <button class="scene-back" id="scene-back" type="button" aria-label="Вернуться к выбору сценария">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l-6 7 6 7"/><path d="M7 12h11"/></svg>
+      Сценарии
+    </button>
+    <span class="scene-name" id="scene-name">Свободный холст</span>
+  </div>
+
+  <!-- ── ПЛАВАЮЩАЯ ПАНЕЛЬ УПРАВЛЕНИЯ (бывшая левая колонка) ─────────── -->
+  <aside class="panel tools" id="tools-panel" aria-label="Инструменты">
+    <div class="tools-head">
+      <h2>Инструменты</h2>
+      <button class="tools-x" id="tools-close" type="button" aria-label="Свернуть панель инструментов">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="tools-body">
+    <h1 class="panel-only">Графический калькулятор&nbsp;2.0</h1>
+    <div class="subtitle panel-only">бета · собственный движок (D3&nbsp;+&nbsp;Math.js)</div>
 
     <!-- Переключатель режима калькулятора (Задачи 2–3). Две строки: рынок/издержки/КПВ
          и труд/неравенство — чтобы длинная метка «Неравенство» помещалась. -->
@@ -1029,12 +1214,27 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
       <label class="chk"><input type="checkbox" id="chk-grid" checked> Показывать сетку</label>
     </div>
+
+      <!-- «Все настройки»: раскрывает вторичные секции (режим/сцены/оси),
+           которые JS переносит в #tools-advanced при инициализации сцены. -->
+      <button class="tools-allbtn" id="tools-allbtn" type="button" aria-expanded="false">
+        Все настройки
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div id="tools-advanced"></div>
+    </div><!-- /tools-body -->
   </aside>
 
-  <!-- ── ОБЛАСТЬ ГРАФИКА ───────────────────────────────────────────── -->
-  <div class="graph-wrap" id="graph-wrap">
-    <svg id="chart"></svg>
-  </div>
+  <!-- ── ПЛАВАЮЩЕЕ ТАБЛО РЕЗУЛЬТАТОВ ───────────────────────────────── -->
+  <aside class="scoreboard" id="scoreboard" aria-label="Результаты">
+    <div class="sb-head">
+      <h2>Результаты</h2>
+      <button class="tools-x" id="sb-close" type="button" aria-label="Свернуть табло результатов">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="sb-body" id="sb-body"><!-- JS переносит сюда #info-* и блок равновесия --></div>
+  </aside>
 
 </div>
 
@@ -5438,7 +5638,8 @@ function renderIneqGroupsTable() {
    Любое изменение (кривая, перетаскивание, налог) дёргает её.
    --------------------------------------------------------------------- */
 function redrawAll() {
-  refreshColors();   // перечитать цвета из CSS-переменных (учитывает смену темы)
+  refreshColors();      // перечитать цвета из CSS-переменных (учитывает смену темы)
+  clearResultPanels();  // очистить табло — активный режим заполнит свои блоки
   computeSize();
   makeScales();
   if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
@@ -5707,7 +5908,114 @@ function pickScene(key) {
                    setMode('market'); renderCurveList(); },
   };
   (actions[key] || actions.free)();
+  const nm = document.getElementById('scene-name');
+  if (nm) nm.textContent = SCENE_NAMES[key] || 'Сцена';
   closePicker();
+}
+
+/* ---------------------------------------------------------------------
+   ЭКРАН 2 — рабочее место «Сцена».
+   Перекомпоновка: те же контролы и те же #info-* блоки, лишь переставленные.
+   Вторичные секции (режим/сцены/оси) → в раскрывашку «Все настройки»;
+   блоки результатов → в плавающее табло справа.
+   --------------------------------------------------------------------- */
+const SCENE_NAMES = {
+  sd: 'Спрос и предложение', tax: 'Налог и субсидия', ceil: 'Потолок и пол цены',
+  mono: 'Монополия', costs: 'Издержки фирмы', ppf: 'КПВ — возможности',
+  labor: 'Рынок труда', ineq: 'Неравенство доходов',
+  ppfsum: 'Сумма КПВ двух стран', trade: 'Торговля (КТВ)', free: 'Свободный холст',
+};
+// Блоки результатов в табло (порядок = порядок показа). info-eq переносим вместе
+// с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
+const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-costs', 'info-labor',
+  'info-inequality', 'info-elast', 'info-shift', 'info-ext', 'info-d3', 'info-kink',
+  'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
+
+function relocateForScene() {
+  const adv = document.getElementById('tools-advanced');
+  if (adv) ['sec-mode', 'sec-scenes', 'sec-axes'].forEach(id => {
+    const el = document.getElementById(id); if (el) adv.appendChild(el);
+  });
+  const sb = document.getElementById('sb-body');
+  if (sb) {
+    const eq = document.getElementById('sec-eq'); if (eq) sb.appendChild(eq);
+    RESULT_IDS.forEach(id => { const el = document.getElementById(id); if (el) sb.appendChild(el); });
+  }
+}
+
+// Очистка всех блоков табло перед перерисовкой: активный режим заполнит свои,
+// чужие останутся пустыми (CSS прячет пустые) — без устаревших чисел из прошлого режима.
+function clearResultPanels() {
+  ['info-eq'].concat(RESULT_IDS).forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+}
+
+// Маленький тост для заглушек («сохранить/экспорт — скоро»).
+function toast(msg) {
+  let t = document.getElementById('calc2-toast');
+  if (!t) { t = document.createElement('div'); t.id = 'calc2-toast'; t.className = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function dockActive(id, on) {
+  const b = document.getElementById(id);
+  if (b) { b.classList.toggle('active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+}
+function setToolsOpen(open) {
+  const t = document.getElementById('tools-panel'); if (t) t.classList.toggle('collapsed', !open);
+  dockActive('dock-tools', open);
+}
+function setScoreOpen(open) {
+  const s = document.getElementById('scoreboard'); if (s) s.classList.toggle('collapsed', !open);
+  dockActive('dock-score', open);
+}
+
+function wireScene() {
+  const tools = document.getElementById('tools-panel');
+  const score = document.getElementById('scoreboard');
+
+  const dTools = document.getElementById('dock-tools');
+  if (dTools) dTools.addEventListener('click', () => setToolsOpen(tools.classList.contains('collapsed')));
+  const tClose = document.getElementById('tools-close');
+  if (tClose) tClose.addEventListener('click', () => setToolsOpen(false));
+
+  const dScore = document.getElementById('dock-score');
+  if (dScore) dScore.addEventListener('click', () => setScoreOpen(score.classList.contains('collapsed')));
+  const sClose = document.getElementById('sb-close');
+  if (sClose) sClose.addEventListener('click', () => setScoreOpen(false));
+
+  // Сетка — быстрый тумблер в доке (синхронен с галочкой «Показывать сетку»).
+  const dGrid = document.getElementById('dock-grid');
+  if (dGrid) dGrid.addEventListener('click', () => {
+    STATE.showGrid = !STATE.showGrid;
+    const cb = document.getElementById('chk-grid'); if (cb) cb.checked = STATE.showGrid;
+    dockActive('dock-grid', STATE.showGrid);
+    redrawAll();
+  });
+
+  // Тема.
+  const dTheme = document.getElementById('dock-theme');
+  if (dTheme) dTheme.addEventListener('click', () => toggleCalcTheme());
+
+  // Заглушки.
+  const dSave = document.getElementById('dock-save');
+  if (dSave) dSave.addEventListener('click', () => toast('Сохранение графиков появится в следующей версии'));
+  const dExport = document.getElementById('dock-export');
+  if (dExport) dExport.addEventListener('click', () => toast('Экспорт (PNG / PDF / LaTeX) появится в следующей версии'));
+
+  // «← Сценарии» — вернуться к окну выбора.
+  const back = document.getElementById('scene-back');
+  if (back) back.addEventListener('click', () => openPicker());
+
+  // «Все настройки» — раскрыть вторичные секции (режим/сцены/оси).
+  const allBtn = document.getElementById('tools-allbtn');
+  if (allBtn) allBtn.addEventListener('click', () => {
+    const on = tools.classList.toggle('show-all');
+    allBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+  });
+
+  // Начальные состояния док-кнопок.
+  dockActive('dock-grid', STATE.showGrid);
 }
 
 function wireControls() {
@@ -5747,7 +6055,7 @@ function wireControls() {
       redrawAll();
     }
   });
-  grid.addEventListener('change', () => { STATE.showGrid = grid.checked; redrawAll(); });
+  grid.addEventListener('change', () => { STATE.showGrid = grid.checked; dockActive('dock-grid', STATE.showGrid); redrawAll(); });
 
   // Галочки показа областей CS и PS.
   const cs = document.getElementById('chk-cs');
@@ -6104,7 +6412,9 @@ function init() {
   }
   console.log('calc2: D3', d3.version, '| Math.js загружен');
   refreshColors();   // наполнить карту цветов до первого рисования/добавления кривой
+  relocateForScene();   // перенести вторичные секции и блоки результатов в новые контейнеры
   wireControls();
+  wireScene();          // док, плавающие панели, шапка, тема
   renderCurveList();
   redrawAll();
   openPicker();   // при входе показываем окно выбора сценария (рабочее место — под ним)
