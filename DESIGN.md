@@ -228,3 +228,26 @@ The left rail in the catalog is the platform's signature dense surface: a Warm-P
 - **Don't** tint heading text with the accent to "make it pop" — ink-blue text means link or active state, nothing else (The Weight-Not-Color Hierarchy).
 - **Don't** borrow amber or green for decoration — they mean difficulty and solution-present, respectively (The Signal-Color Lockbox).
 - **Don't** put a drop-shadow on a resting card, and don't use a `border-left` color stripe thicker than the hairline as a substitute for real hierarchy.
+
+## 7. Scoped surface — Graphing instrument (/calc2/)
+
+The new graphing calculator (`/calc2/`) is the one place that **departs from the ink-blue
+system on purpose**. It is a tool where the full-bleed plot is the hero and controls/results
+float over it like instrument readouts, so it has its own scoped tokens (full detail in
+`.interface-design/system.md`). The rest of the site is unchanged.
+
+- **Curve palette (fixed, colorblind-distinct, both themes):** `--curve-d #2F6FED` (спрос),
+  `--curve-s #E0563B` (предложение), `--curve-mr #8B3FE0` (MR), `--curve-mc #119C8A` (MC),
+  `--curve-tax #2E9E44` (налог/субсидия/бюджет — единый зелёный), `--curve-dwl #8C8C84` (DWL),
+  `--curve-reg #B5791F` (потолок/пол/МРОТ), `--curve-ghost #9AA0A6` (исходное состояние).
+  Area fills reuse these at 12–22 % opacity. Cost curves: `--cost-mc/atc/avc/afc/vc`.
+- **UI accent — raspberry**, deliberately NOT ink-blue: `#BE185D` (light) / `#FF4D94` (dark).
+  Reserved for actions / active state / focus. Chosen because it collides with no curve hue
+  and is unmistakable against the site's blue. White-on-accent = 6:1 (AA).
+- **Dual theme** (light default, dark for evening/projector), `data-theme` on `<html>`,
+  persisted; structural canvas colors (`--ink/--ink-soft/--grid/--halo/--canvas`) flip with theme.
+- **Surfaces:** floating panels on `--surface` with 1px `--border` + soft `--shadow-panel`;
+  dock/inputs on `--surface-2`. Radii `--r-sm 6 / --r 8 / --r-lg 14`. Motion `--ease`
+  `cubic-bezier(.23,1,.32,1)`, all < 300 ms, full `prefers-reduced-motion` off-switch.
+- **Signature:** the scenario-picker cards carry a mini-graph drawn in the engine's own
+  curve colors; the scoreboard shows big tabular "instrument" numbers (Q*, P*, …).

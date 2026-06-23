@@ -60,17 +60,19 @@
   /* ── Интерфейс ── */
   --text:        #1a1a1a;
   --text2:       #5b6472;
-  --text3:       #8a909c;
+  --text3:       #687180;   /* затемнён до контраста AA для мелких подписей */
   --bg:          #eceef2;   /* оболочка за холстом            */
   --surface:     #ffffff;   /* плавающие панели               */
   --surface-2:   #f5f5f3;   /* док, вложенные блоки           */
   --input-bg:    #ffffff;
   --border:      rgba(22,26,38,.12);
   --border-soft: rgba(22,26,38,.07);
-  --accent:      #D61F69;   /* малиновый — действия интерфейса */
-  --accent-deep: #B81A59;
-  --accent-tint: rgba(214,31,105,.10);
-  --accent-ring: rgba(214,31,105,.32);
+  /* Малиновый — действия интерфейса. Глубокий тон: белый текст на нём даёт 6:1
+     (AA), а сам он как текст — 5:1 на светлых поверхностях. Отличим от всех кривых. */
+  --accent:      #BE185D;
+  --accent-deep: #9D1450;
+  --accent-tint: rgba(190,24,93,.10);
+  --accent-ring: rgba(190,24,93,.34);
   --on-accent:   #ffffff;
 
   /* ── Радиусы / тени / слои ── */
@@ -95,7 +97,7 @@
 
   --text:        #e7e9ef;
   --text2:       #a7aebc;
-  --text3:       #727a88;
+  --text3:       #8e96a4;   /* осветлён до контраста AA на тёмных поверхностях */
   --bg:          #07090e;
   --surface:     #161b25;
   --surface-2:   #1d2330;
@@ -255,9 +257,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .picker {
   position: fixed; inset: 48px 0 0 0; z-index: var(--z-picker);
   background: var(--bg); overflow-y: auto;
-  opacity: 1; transition: opacity .26s var(--ease);
+  opacity: 1; transition: opacity .26s var(--ease), visibility .26s var(--ease);
 }
-.picker.hidden { opacity: 0; pointer-events: none; }
+/* visibility:hidden убирает скрытое окно из дерева доступности и из таб-порядка
+   (одного opacity:0 для этого недостаточно). */
+.picker.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 .picker-inner { max-width: 1100px; margin: 0 auto; padding: 44px 28px 64px; }
 .picker-head { margin-bottom: 28px; }
 .picker-eyebrow {
@@ -628,31 +632,31 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   <!-- ── ЛЕВЫЙ ДОК ─────────────────────────────────────────────────── -->
   <nav class="dock" aria-label="Инструменты сцены">
     <button class="dock-btn active" id="dock-tools" type="button" data-tip="Инструменты" aria-label="Показать или скрыть панель инструментов" aria-pressed="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2.4" fill="var(--surface-2)"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2.4" fill="var(--surface-2)"/></svg>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2.4" fill="var(--surface-2)"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2.4" fill="var(--surface-2)"/></svg>
     </button>
     <button class="dock-btn active" id="dock-score" type="button" data-tip="Табло результатов" aria-label="Показать или скрыть табло результатов" aria-pressed="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 19V11"/><path d="M12 19V5"/><path d="M19 19v-6"/><path d="M4 19h16"/></svg>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 19V11"/><path d="M12 19V5"/><path d="M19 19v-6"/><path d="M4 19h16"/></svg>
     </button>
     <div class="dock-sep"></div>
     <button class="dock-btn" id="dock-grid" type="button" data-tip="Сетка" aria-label="Показать или скрыть сетку" aria-pressed="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
     </button>
     <button class="dock-btn" id="dock-save" type="button" data-tip="Сохранить (скоро)" aria-label="Сохранить график — скоро">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><rect x="8" y="13" width="8" height="6"/></svg>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><rect x="8" y="13" width="8" height="6"/></svg>
     </button>
     <button class="dock-btn" id="dock-export" type="button" data-tip="Экспорт (скоро)" aria-label="Экспортировать — скоро">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
     </button>
     <div class="dock-spacer"></div>
     <button class="dock-btn" id="dock-theme" type="button" data-tip="Светлая / тёмная тема" aria-label="Переключить светлую или тёмную тему">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14a8 8 0 1 1-9.5-9.8A6.5 6.5 0 0 0 20 14z"/></svg>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14a8 8 0 1 1-9.5-9.8A6.5 6.5 0 0 0 20 14z"/></svg>
     </button>
   </nav>
 
   <!-- ── ШАПКА СЦЕНЫ ───────────────────────────────────────────────── -->
   <div class="scene-header">
     <button class="scene-back" id="scene-back" type="button" aria-label="Вернуться к выбору сценария">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l-6 7 6 7"/><path d="M7 12h11"/></svg>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l-6 7 6 7"/><path d="M7 12h11"/></svg>
       Сценарии
     </button>
     <span class="scene-name" id="scene-name">Свободный холст</span>
@@ -663,7 +667,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <div class="tools-head">
       <h2>Инструменты</h2>
       <button class="tools-x" id="tools-close" type="button" aria-label="Свернуть панель инструментов">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
       </button>
     </div>
     <div class="tools-body">
@@ -1240,7 +1244,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
            которые JS переносит в #tools-advanced при инициализации сцены. -->
       <button class="tools-allbtn" id="tools-allbtn" type="button" aria-expanded="false">
         Все настройки
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div id="tools-advanced"></div>
     </div><!-- /tools-body -->
@@ -1251,7 +1255,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <div class="sb-head">
       <h2>Результаты</h2>
       <button class="tools-x" id="sb-close" type="button" aria-label="Свернуть табло результатов">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
       </button>
     </div>
     <div class="sb-body" id="sb-body"><!-- JS переносит сюда #info-* и блок равновесия --></div>
@@ -5899,15 +5903,18 @@ function loadScene(name) {
    --------------------------------------------------------------------- */
 function closePicker() {
   const p = document.getElementById('scene-picker');
-  if (p) p.classList.add('hidden');
+  if (p) { p.classList.add('hidden'); p.setAttribute('inert', ''); }
   const app = document.querySelector('.app');
   if (app) app.removeAttribute('inert');
+  const back = document.getElementById('scene-back');
+  if (back) back.focus();   // вернуть фокус в сцену (а не «потерять» его на скрытой карточке)
   redrawAll();   // график стал видимым — пересчитать размеры под холст
 }
 function openPicker() {
   const p = document.getElementById('scene-picker');
   if (!p) return;
   p.classList.remove('hidden');
+  p.removeAttribute('inert');
   const app = document.querySelector('.app');
   if (app) app.setAttribute('inert', '');   // рабочее место под окном — не фокусируется
   const first = p.querySelector('.scard');
@@ -6045,6 +6052,19 @@ function wireControls() {
   if (picker) picker.addEventListener('click', (e) => {
     const card = e.target.closest('.scard');
     if (card && card.dataset.scene) pickScene(card.dataset.scene);
+  });
+  // Клавиатура в окне выбора: Escape закрывает, Tab «закольцован» по карточкам.
+  document.addEventListener('keydown', (e) => {
+    const p = document.getElementById('scene-picker');
+    if (!p || p.classList.contains('hidden')) return;
+    if (e.key === 'Escape') { e.preventDefault(); closePicker(); return; }
+    if (e.key === 'Tab') {
+      const cards = p.querySelectorAll('.scard');
+      if (!cards.length) return;
+      const first = cards[0], last = cards[cards.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
   });
 
   const qmax = document.getElementById('inp-qmax');
