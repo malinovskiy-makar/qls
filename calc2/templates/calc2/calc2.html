@@ -6526,7 +6526,8 @@ function positionPultDefault() {
   pult.style.top = top + 'px';
   pult.style.right = 'auto';
   pult.style.bottom = 'auto';
-  pult._dock = { edge: 'right', frac: 0 };   // чтобы resize держал его у правого края
+  // _dock НЕ ставим: пока пульт не двигали, его держит выделенный resize-слушатель
+  // (positionPultDefault). После ручного переноса позицией ведает makeDockable.
 }
 
 function showPult(on, title) {
