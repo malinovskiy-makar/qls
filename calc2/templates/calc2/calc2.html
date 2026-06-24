@@ -445,29 +445,52 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .scoreboard .stat b { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
 .sb-empty { font-size: 12.5px; color: var(--text2); line-height: 1.5; padding: 6px 0; }
 
-/* ── Плавающий пульт: живые регуляторы активного сценария ── */
+/* ── Плавающий пульт: горизонтальная лента (как пульт плеера) ──
+   Ручка слева, регуляторы в один ряд. Вся раскладка скоупится под #pult —
+   при возврате узлов в #sec-tax их обычный вертикальный вид НЕ меняется.
+   На боковых краях лента остаётся горизонтальной (рефлоу в вертикаль —
+   возможное будущее улучшение). */
 .pult {
-  position: absolute; right: 14px; top: 12px; z-index: var(--z-float);
-  width: 248px;
+  position: absolute; left: 14px; bottom: 14px; z-index: var(--z-float);
+  display: flex; align-items: stretch;
+  min-width: 420px; max-width: min(560px, 92vw);
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
   box-shadow: var(--shadow-panel); overflow: hidden;
   opacity: 0; transform: translateY(8px); pointer-events: none;
   transition: opacity .2s var(--ease), transform .22s var(--ease);
 }
 .pult.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+/* Ручка-шапка слева: за неё таскают; компактная вертикальная колонка. */
 .pult-head {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 12px; border-bottom: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  padding: 0 11px; border-right: 1px solid var(--border-soft); flex-shrink: 0;
   cursor: grab; touch-action: none; user-select: none;
 }
 .pult-head:active { cursor: grabbing; }
-.pult-grip { display: inline-flex; gap: 3px; }
+.pult-grip { display: inline-flex; flex-direction: column; gap: 3px; }
 .pult-grip i { width: 3px; height: 3px; border-radius: 50%; background: var(--text3); }
-.pult-head h2 { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text3); }
-.pult-body { padding: 12px; }
+.pult-head h2 {
+  font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text3); writing-mode: vertical-rl; transform: rotate(180deg); margin: 0;
+}
+/* Тело — регуляторы в один ряд, переносятся на узком экране. */
+.pult-body {
+  flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
+  padding: 10px 14px;
+}
 .pult-body .field { margin: 0; }
-.pult-body #taxside-row { margin-top: 0 !important; margin-bottom: 10px; }
-.pult-body #tax-field { margin-top: 0 !important; }
+/* Тумблер «Налог платит»: метка и сегменты в строку. */
+#pult #taxside-row {
+  margin: 0 !important; display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+#pult #taxside-row > label { display: inline; margin: 0; white-space: nowrap; }
+#pult #taxside-row .seg-btn { padding: 6px 10px; }
+/* Блок «Ставка t»: метка + ползунок + число в строку, ползунок тянется. */
+#pult #tax-field {
+  margin: 0 !important; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px;
+}
+#pult #tax-field > label { margin: 0; white-space: nowrap; }
+#pult #tax-field > div { margin-top: 0 !important; flex: 1; min-width: 140px; }
 
 /* Перетаскивание/прилипание плавающих панелей (пульт + табло) — ручка = шапка. */
 .sb-head { cursor: grab; touch-action: none; user-select: none; }
@@ -6257,6 +6280,10 @@ function pickScene(key) {
   const nm = document.getElementById('scene-name');
   if (nm) nm.textContent = SCENE_NAMES[key] || 'Сцена';
   if (typeof updatePult === 'function') updatePult();   // показать/спрятать пульт под выбранную сцену
+  // Меньше загромождения: пресетные сцены открываются со свёрнутыми «Инструментами»
+  // (разворачиваются иконкой-ползунками в доке). «Свободный холст» — развёрнуты сразу:
+  // там пользователь сам добавляет кривые, настройка нужна под рукой.
+  setToolsOpen(key === 'free');
   closePicker();
 }
 
@@ -6485,11 +6512,8 @@ function wireScene() {
   if (pult && pultHead) {
     pultDock = makeDockable(pult, pultHead, { topInset: 56 });
   }
-  // При resize, пока пульт не двигали вручную, держим его под «Результатами».
-  window.addEventListener('resize', () => {
-    const p = document.getElementById('pult');
-    if (p && p.classList.contains('show') && !p._userMoved) positionPultDefault();
-  });
+  // Resize пульта держит сам makeDockable (его _dock задаёт positionPultDefault),
+  // поэтому отдельный слушатель не нужен.
 
   // Начальные состояния док-кнопок.
   dockActive('dock-grid', STATE.showGrid);
@@ -6512,22 +6536,13 @@ function pultShouldShow() {
 
 // Поставить пульт под «Результатами» у правого края (стартовая позиция).
 function positionPultDefault() {
-  const app = document.querySelector('.app');
   const pult = document.getElementById('pult');
-  const sb = document.getElementById('scoreboard');
-  if (!app || !pult) return;
-  const cw = app.clientWidth, ch = app.clientHeight;
-  const pw = pult.offsetWidth, ph = pult.offsetHeight;
-  const left = Math.max(14, cw - pw - 14);
-  let top = 12;
-  if (sb && !sb.classList.contains('collapsed')) top = sb.offsetTop + sb.offsetHeight + 12;
-  top = Math.max(56, Math.min(ch - ph - 14, top));
-  pult.style.left = left + 'px';
-  pult.style.top = top + 'px';
-  pult.style.right = 'auto';
-  pult.style.bottom = 'auto';
-  // _dock НЕ ставим: пока пульт не двигали, его держит выделенный resize-слушатель
-  // (positionPultDefault). После ручного переноса позицией ведает makeDockable.
+  if (!pult) return;
+  // Лента ложится по центру нижнего края. frac=0.5 при равных отступах краёв
+  // даёт точный центр: left = (ширина − ширина_ленты) / 2. После ручного
+  // переноса _userMoved=true и эта функция не вызывается — позиция запоминается.
+  pult._dock = { edge: 'bottom', frac: 0.5 };
+  if (pultDock) pultDock.applyEdge();
 }
 
 function showPult(on, title) {
