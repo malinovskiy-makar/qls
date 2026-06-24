@@ -498,9 +498,21 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 #pult #tax-field > label, #pult #pc-field > label { margin: 0; white-space: nowrap; }
 #pult #tax-field > div, #pult #pc-field > div { margin-top: 0 !important; flex: 1; min-width: 140px; }
 
-/* Контейнер слайдеров сдвига кривых внутри ленты — те же правила ряда, что и у тела. */
-#pult #pult-curves {
-  display: contents;   /* чипы становятся прямыми flex-детьми ленты (единый ряд/перенос) */
+/* Контейнеры слайдеров кривых и сцен-слайдеров — прозрачны для flex (чипы текут рядом). */
+#pult #pult-curves, #pult #pult-extra {
+  display: contents;   /* дети становятся прямыми flex-детьми ленты (единый ряд/перенос) */
+}
+/* Сцен-слайдер (КПВ «Макс X/Y», мастер неравенства): метка + range(акцент) + число. */
+#pult .pult-xchip {
+  margin: 0; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 190px;
+}
+#pult .pult-xchip .xc-label {
+  font-size: 12px; font-weight: 600; color: var(--text2); white-space: nowrap;
+}
+#pult .pult-xchip input[type="range"] { margin-top: 0; flex: 1; min-width: 96px; }
+#pult .pult-xchip .xc-val {
+  font-size: 12px; font-weight: 700; color: var(--text); min-width: 30px; text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 /* Чип кривой: цветной маркер + метка (роль/формула) + ползунок «b» + число. */
 #pult .pult-cchip {
@@ -1214,8 +1226,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <button class="btn-sm" id="btn-ppf-lin" style="flex:1;">Линейная</button>
           <button class="btn-sm" id="btn-ppf-conc" style="flex:1;">Вогнутая</button>
         </div>
-        <div class="hint">По осям — два товара: X (горизонталь), Y (вертикаль). Точку на кривой
-          можно тянуть мышью. Наклон |dY/dX| — альтернативные издержки X (в единицах Y).</div>
+        <div class="hint">По осям — два товара: X (горизонталь), Y (вертикаль). Форму границы
+          задают ползунки «Макс X / Макс Y» в пульте-ленте. Наклон |dY/dX| (= Макс&nbsp;Y / Макс&nbsp;X) —
+          альтернативные издержки X в единицах Y.</div>
         <div class="error" id="ppf-error"></div>
         <div id="info-ppf" style="margin-top:8px;"></div>
       </div>
@@ -1353,7 +1366,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <span class="pult-grip" aria-hidden="true"><i></i><i></i><i></i></span>
       <h2 id="pult-title">Регуляторы</h2>
     </div>
-    <div class="pult-body" id="pult-body"></div>
+    <!-- Тело ленты: [слайдеры кривых] + [сцен-слайдеры] + [перенесённые регуляторы].
+         Два контейнера всегда первые и в фиксированном порядке (display:contents —
+         их дети текут прямым flex-рядом ленты); перенесённые узлы добавляются после. -->
+    <div class="pult-body" id="pult-body">
+      <div id="pult-curves"></div>
+      <div id="pult-extra"></div>
+    </div>
   </aside>
 
 </div>
@@ -1508,6 +1527,11 @@ const STATE = {
   ineqTau: 0,            // прогрессивность налога 0..1
   ineqTransfer: 0,       // размер трансферта, % общего дохода
   ineqRedist: null,      // результат перераспределения: { lorenz, stats }
+  // Мастер «Сила неравенства» (пульт, способы «Доли»/«Доходы»): базовый профиль,
+  // флаг отвязки (ручная правка) и текущий масштаб s. Меняет только входные доли/доходы.
+  ineqMasterBase: null,
+  ineqMasterDetached: false,
+  ineqMasterS: 1,
 };
 
 /* ---------------------------------------------------------------------
@@ -4371,6 +4395,7 @@ function setUnionModel(model) {
   const hm = document.getElementById('un-hint-mono'); if (hm) hm.style.display = (model === 'monopoly') ? '' : 'none';
   // Первый вход в диктат — поставить зарплату-ориентир чуть выше конкурентной.
   if (model === 'wagefloor' && !(STATE.unionWage > 0) && STATE.laborEq) setUnionWageFields(Math.round(STATE.laborEq.P * 1.3));
+  if (typeof updatePult === 'function') updatePult();   // поле зарплаты при «диктате» в пульт
   redrawAll();
 }
 
@@ -4383,6 +4408,7 @@ function setLaborStruct(mode) {
   const up = document.getElementById('union-pane'); if (up) up.style.display = (mode === 'union') ? '' : 'none';
   const lb = document.getElementById('labmin-block'); if (lb) lb.style.display = (mode === 'union') ? 'none' : '';
   if (mode === 'union') setUnionModel(STATE.unionModel);   // синхронизировать под-модель/поля
+  if (typeof updatePult === 'function') updatePult();   // зарплата профсоюза / МРОТ в пульт
   redrawAll();
 }
 
@@ -4718,44 +4744,20 @@ function drawPpfCurve() {
     .attr('font-size', 11).attr('fill', COL.D).attr('opacity', 0.75).text('достижимо');
 }
 
-// Перетаскиваемая точка на границе: проекции, подписи X/Y, ручка.
-function drawPpfPoint() {
-  const x = STATE.ppfX, y = evalPpf(x);
-  if (isNaN(y)) return;
-  const [px, py] = toPx(x, y);
-  const ox = sx(0), oy = sy(0);
-  const g = svg.append('g');
-  const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
-    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
-  dash(px, py, px, oy); dash(px, py, ox, py);
-  haloText(g, px, oy + 8, 'X=' + fmt(x), 'middle', 'hanging');
-  haloText(g, ox - 8, py, 'Y=' + fmt(y), 'end', 'middle');
-  // Невидимая зона захвата + видимая ручка.
-  const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
-  attachPpfDrag(hit);
-  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5.5)
-    .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
-}
-
-// Перетаскивание точки КПВ вдоль кривой (по X), Y берётся с границы.
-function attachPpfDrag(sel) {
-  sel.call(d3.drag().container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
-    .on('drag', (event) => { STATE.ppfX = clampPpfX(toData(event.x, event.y)[0]); redrawAll(); })
-    .on('end', () => { document.body.style.cursor = ''; }));
-}
-
-// Табло КПВ: тип, координаты точки, альтернативные издержки X в ней.
+// Табло КПВ: тип, перехваты Макс X / Макс Y, альтернативные издержки X.
+// Форму границы задают ползунки пульта «Макс X / Макс Y» (точку производства убрали).
 function updatePpfPanel() {
   const box = document.getElementById('info-ppf');
   if (!box) return;
   if (!STATE.ppfReady) { box.innerHTML = '<div class="warn">Не понял формулу Y = f(X).</div>'; return; }
-  const x = STATE.ppfX, y = evalPpf(x), opp = Math.abs(ppfSlope(x));
+  const maxY = evalPpf(0), maxX = ppfXmaxOf((x) => evalPpf(x));
+  const opp = Math.abs(ppfSlope(CONFIG.Qmax * 0.5));   // |наклон| в середине (для линейной — постоянен)
   let html = `<div class="stat"><span>Тип КПВ</span><b>${ppfTypeLabel()}</b></div>`;
-  html += `<div class="stat"><span>Точка (X, Y)</span><b>${fmt(x)}, ${fmt(y)}</b></div>`;
+  html += `<div class="stat"><span>Макс X</span><b>${fmt((maxX != null) ? maxX : NaN)}</b></div>`;
+  html += `<div class="stat"><span>Макс Y</span><b>${fmt(maxY)}</b></div>`;
   html += `<div class="stat"><span>Альт. издержки X</span><b>${fmt(opp)} Y/ед.</b></div>`;
-  html += '<div class="hint">Альтернативные издержки X — сколько Y теряется за +1 ед. X (|наклон|). ' +
-    'Для линейной КПВ постоянны, для вогнутой растут по мере движения вправо.</div>';
+  html += '<div class="hint">Альтернативные издержки X — сколько Y теряется за +1 ед. X (|наклон| = Макс Y / Макс X). ' +
+    'Двигайте ползунки «Макс X / Макс Y» в пульте — наклон (и альт. издержки) меняются вживую.</div>';
   box.innerHTML = html;
 }
 
@@ -4768,7 +4770,8 @@ function redrawPpf() {
   addDefs();
   drawGrid();
   drawAxes('X', 'Y');
-  if (STATE.ppfReady) { drawPpfCurve(); drawPpfPoint(); }
+  // Точку производства убрали: форму КПВ задают ползунки «Макс X / Макс Y» в пульте.
+  if (STATE.ppfReady) drawPpfCurve();
   updatePpfPanel();
 }
 
@@ -5530,6 +5533,7 @@ function setTradeScenario(s) {
   const pa = document.getElementById('trade-pane-a'), pb = document.getElementById('trade-pane-b');
   if (pa) pa.style.display = (s === 'A') ? '' : 'none';
   if (pb) pb.style.display = (s === 'B') ? '' : 'none';
+  if (typeof updatePult === 'function') updatePult();   // мировая цена A/Б в пульт
   redrawAll();
 }
 
@@ -5543,6 +5547,7 @@ function setPpfSub(sub) {
   Object.values(panes).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   const ap = document.getElementById(panes[sub]); if (ap) ap.style.display = '';
   if (sub === 'sum') STATE.ppfSumData = null;        // пересчитать при показе
+  if (typeof updatePult === 'function') updatePult();   // сцен-слайдеры КПВ / мировая цена
   redrawAll();
 }
 
@@ -5847,6 +5852,7 @@ function attachLorenzNodeDrag(sel, i) {
         ineqDragNode(i, v);
         renderIneqGroupsTable();
       }
+      if (typeof ineqMasterDetach === 'function') ineqMasterDetach();   // ручная правка узла → отвязка мастера
       redrawAll();
     })
     .on('end', () => { document.body.style.cursor = ''; }));
@@ -5964,6 +5970,9 @@ function setIneqInput(which) {
   Object.values(panes).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   const ap = document.getElementById(panes[which]); if (ap) ap.style.display = '';
   if (which === 'groups') renderIneqGroupsTable();
+  // Свежий способ ввода — сбрасываем мастер «Сила неравенства» (база = текущий профиль на 100 %).
+  STATE.ineqMasterBase = null; STATE.ineqMasterDetached = false; STATE.ineqMasterS = 1;
+  if (typeof updatePult === 'function') updatePult();   // α (формула) ↔ мастер (доли/доходы)
   redrawAll();
 }
 
@@ -5990,6 +5999,8 @@ function setIneqGroupN(n) {
   STATE.ineqGroupN = n;
   STATE.ineqGroups = defaultGroupShares(n);
   renderIneqGroupsTable();
+  if (typeof ineqMasterDetach === 'function') ineqMasterDetach();   // новый профиль → мастер перебазируется
+  if (typeof updatePult === 'function') updatePult();
   redrawAll();
 }
 
@@ -6017,7 +6028,7 @@ function renderIneqGroupsTable() {
     const inp = document.createElement('input');
     inp.type = 'number'; inp.step = '0.1'; inp.value = v;
     inp.style.cssText = 'flex:1;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);';
-    inp.addEventListener('change', () => { const nv = parseFloat(inp.value); if (!isNaN(nv)) { STATE.ineqGroups[i] = nv; redrawAll(); } });
+    inp.addEventListener('change', () => { const nv = parseFloat(inp.value); if (!isNaN(nv)) { STATE.ineqGroups[i] = nv; if (typeof ineqMasterDetach === 'function') ineqMasterDetach(); redrawAll(); } });
     row.appendChild(lab); row.appendChild(inp); box.appendChild(row);
   });
 }
@@ -6270,7 +6281,7 @@ function loadScene(name) {
     setMode('costs');                  // setMode сам ставит setRanges(10, 50)
   } else if (name === 'ppf') {
     const ppfInp = document.getElementById('inp-ppf');
-    STATE.ppfFormula = '100 - 0.01*X^2'; STATE.ppfX = null;
+    STATE.ppfFormula = '100 - X'; STATE.ppfX = null;   // линейная: форму задают ползунки Макс X/Y
     if (ppfInp) ppfInp.value = STATE.ppfFormula;
     setMode('ppf');                    // setMode сам ставит setRanges(100, 100)
     setPpfSub('single');               // сцена показывает одиночную КПВ
@@ -6561,54 +6572,86 @@ function wireScene() {
 }
 
 /* ---------------------------------------------------------------------
-   ПУЛЬТ — единое «рабочее место руками».
-   Лента собирается для АКТИВНОЙ сцены из двух источников:
-   (1) экранные регуляторы вмешательства (#taxside-row / #tax-field / #pc-field)
-       ФИЗИЧЕСКИ переносятся из «Инструментов» в пульт через appendChild —
-       ID и обработчики сохраняются (НЕ клонируем); домой возвращаются так же;
-   (2) слайдеры сдвига каждой ДВИГАЕМОЙ (линейной) кривой сцены — генерируются
-       в контейнере #pult-curves; ползунок задаёт свободный член b ТЕМ ЖЕ путём,
-       что и перетаскивание мышью (setCurveFreeTerm) → двусторонняя синхронизация.
-   Реестр регуляторов и список кривых вычисляются по текущему STATE — поэтому
-   механизм один на все рыночные сцены (sd / tax / ceil / mono / free), а не
-   хардкод под налог.
+   ПУЛЬТ — единое «рабочее место руками» для ВСЕХ сцен.
+   Лента собирается для АКТИВНОЙ сцены из трёх источников:
+   (1) слайдеры сдвига видимых линейных кривин (#pult-curves) — ползунок задаёт
+       свободный член b ТЕМ ЖЕ путём, что перетаскивание (setCurveFreeTerm);
+   (2) сцен-слайдеры (#pult-extra), генерируемые для сцены: КПВ «Макс X/Y»
+       (одна — 2, сумма — 4 по странам) и мастер «Сила неравенства». Каждый
+       задаёт реальное состояние ТЕМ ЖЕ путём, что ручной ввод (формула КПВ /
+       поля долей), и зовёт штатный redraw — новой экономики нет;
+   (3) ЭКРАННЫЕ регуляторы сцены (ставка/цена/зарплата/МРОТ/мировая цена/α),
+       которые ФИЗИЧЕСКИ переносятся из «Инструментов» в пульт через appendChild
+       (ID и обработчики сохраняются — НЕ клонируем) и возвращаются домой.
+   Всё вычисляется по текущему STATE — механизм единый для всех режимов.
    --------------------------------------------------------------------- */
 let pultDock = null;
 
-// Все перетаскиваемые регуляторы вмешательства; их «дом» — секция #sec-tax.
-const PULT_REG_ALL = ['taxside-row', 'tax-field', 'pc-field'];
+// Все переносимые экранные регуляторы (по всем сценам). «Дом» каждого запоминается
+// при первом обращении (исходный родитель + стабильный якорь) — поддержка любой секции.
+const PULT_MOVABLE = ['taxside-row', 'tax-field', 'pc-field',          // рынок: вмешательство
+  'union-wage-field', 'labmin-field',                                  // труд: зарплата / МРОТ
+  'ppft-price-field', 'tb-price-field',                                // КТВ: мировая цена (A / Б)
+  'ineq-alpha-field'];                                                 // неравенство: α (формула)
+const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
 
 // Какие экранные регуляторы должны жить в пульте ПРЯМО СЕЙЧАС (по состоянию).
-// Только рыночный режим. Сцены sd / free экранных регуляторов не дают (пульт у них —
-// чисто из слайдеров кривых). Интервенционные сцены дают активное поле по intervType.
 function pultRegulatorIds() {
-  if (STATE.mode !== 'market') return [];
-  const interventionScene = (STATE.sceneKey === 'tax' || STATE.sceneKey === 'ceil' || STATE.sceneKey === 'mono');
-  if (!interventionScene) return [];
-  const t = STATE.intervType;
-  if (t === 'tax' || t === 'subsidy') {
+  if (STATE.mode === 'market') {
+    const interventionScene = (STATE.sceneKey === 'tax' || STATE.sceneKey === 'ceil' || STATE.sceneKey === 'mono');
+    if (!interventionScene) return [];
+    const t = STATE.intervType;
+    if (t === 'tax' || t === 'subsidy') {
+      const ids = [];
+      if (t === 'tax' && STATE.market !== 'monopoly') ids.push('taxside-row');  // как в setType
+      ids.push('tax-field');
+      return ids;
+    }
+    return ['pc-field'];   // потолок / пол
+  }
+  if (STATE.mode === 'labor') {
     const ids = [];
-    // «Налог платит» виден только для типа налог в конкуренции (как в setType).
-    if (t === 'tax' && STATE.market !== 'monopoly') ids.push('taxside-row');
-    ids.push('tax-field');
+    if (STATE.laborStruct === 'union' && STATE.unionModel === 'wagefloor') ids.push('union-wage-field');
+    if (STATE.laborStruct !== 'union' && STATE.laborMinOn) ids.push('labmin-field');
     return ids;
   }
-  return ['pc-field'];   // потолок / пол — поле регулируемой цены
+  if (STATE.mode === 'ppf' && STATE.ppfSub === 'trade') {
+    return [STATE.tradeScenario === 'B' ? 'tb-price-field' : 'ppft-price-field'];
+  }
+  if (STATE.mode === 'inequality' && STATE.ineqInput === 'formula') {
+    return ['ineq-alpha-field'];
+  }
+  return [];
 }
 
 // Линейные (=> перетаскиваемые) видимые кривые активной сцены — под слайдеры.
+// Рынок и труд держат D/S в STATE.curves; остальные режимы — свои кривые без сдвига.
 function pultCurveList() {
-  if (STATE.mode !== 'market') return [];
-  return STATE.curves.filter(c => c.linear && c.visible);
+  if (STATE.mode === 'market' || STATE.mode === 'labor') return STATE.curves.filter(c => c.linear && c.visible);
+  return [];
 }
 
-// Пульт нужен, если есть хоть один экранный регулятор ИЛИ хоть одна двигаемая кривая.
+// Сцен-слайдеры (#pult-extra): что определяет их НАБОР (для пере-сборки при смене).
+function pultExtraSig() {
+  if (STATE.mode === 'ppf') {
+    if (STATE.ppfSub === 'single') return 'ppf1';   // одна КПВ → Макс X / Макс Y
+    if (STATE.ppfSub === 'sum')    return 'ppf2';   // сумма → 4 ползунка по странам
+    return '';                                       // КТВ — мировая цена идёт регулятором
+  }
+  if (STATE.mode === 'inequality' && (STATE.ineqInput === 'groups' || STATE.ineqInput === 'incomes')) return 'ineqM';
+  return '';
+}
+
+// Пульт нужен, если есть хоть один регулятор / слайдер кривой / сцен-слайдер.
 function pultShouldShow() {
-  return pultRegulatorIds().length > 0 || pultCurveList().length > 0;
+  return pultRegulatorIds().length > 0 || pultCurveList().length > 0 || pultExtraSig() !== '';
 }
 
-// Заголовок ленты (вертикально на ручке): по типу вмешательства, иначе «Кривые».
+// Заголовок ленты (вертикально на ручке).
 function pultTitle() {
+  if (STATE.mode === 'ppf')        return (STATE.ppfSub === 'trade') ? 'Торговля' : 'КПВ';
+  if (STATE.mode === 'labor')      return 'Труд';
+  if (STATE.mode === 'inequality') return 'Неравенство';
   if (pultRegulatorIds().length) {
     return ({ tax: 'Налог', subsidy: 'Субсидия', ceiling: 'Потолок', floor: 'Пол' })[STATE.intervType] || 'Регуляторы';
   }
@@ -6696,28 +6739,161 @@ function syncPultCurveValues(list) {
   });
 }
 
-// Перенести активные регуляторы в пульт (после чипов), лишние — домой (в #sec-tax,
-// в канонический порядок перед #tax-hint). Узлы те же — appendChild/insertBefore, не клон.
+/* --- «Дом» переносимых регуляторов: исходный родитель + стабильный якорь ----
+   Запоминаем ОДИН раз (до первого переноса), чтобы вернуть узел точно на место в
+   любой секции, а не только в #sec-tax. Якорь — ближайший следующий НЕ-переносимый
+   элемент (он не двигается), иначе append в конец. */
+function capturePultHome(id) {
+  const n = document.getElementById(id);
+  if (!n || n._pultHome) return;
+  let a = n.nextSibling;
+  while (a && (a.nodeType !== 1 || (a.id && PULT_MOVABLE_SET.has(a.id)))) a = a.nextSibling;
+  n._pultHome = { parent: n.parentElement, anchor: a };
+}
+function capturePultHomes() {
+  if (capturePultHomes._done) return;
+  PULT_MOVABLE.forEach(capturePultHome);
+  capturePultHomes._done = true;
+}
+function returnPultHome(id) {
+  const n = document.getElementById(id);
+  if (!n || !n._pultHome) return;
+  const { parent, anchor } = n._pultHome;
+  if (!parent || n.parentElement === parent) return;
+  if (anchor && anchor.parentElement === parent) parent.insertBefore(n, anchor);
+  else parent.appendChild(n);
+}
+
+// Перенести активные регуляторы в пульт (после контейнеров чипов/сцен-слайдеров),
+// лишние — домой. Узлы те же — appendChild/insertBefore, не клон. В ленте регулятор
+// всегда видим (он здесь, потому что активен) — снимаем возможный inline display:none.
 function syncPultRegulators(activeIds) {
-  const secTax = document.getElementById('sec-tax');
+  capturePultHomes();
   const body = document.getElementById('pult-body');
-  const anchor = document.getElementById('tax-hint');
   activeIds.forEach(id => {
     const n = document.getElementById(id);
-    if (n && body && n.parentElement !== body) body.appendChild(n);
+    if (!n || !body) return;
+    if (n.parentElement !== body) body.appendChild(n);
+    n.style.display = '';
   });
-  if (secTax && anchor) {
-    PULT_REG_ALL.forEach(id => {
-      if (activeIds.includes(id)) return;
-      const n = document.getElementById(id);
-      if (n && n.parentElement !== secTax) secTax.insertBefore(n, anchor);
-    });
-    // Нормализуем канонический порядок того, что сейчас дома.
-    PULT_REG_ALL.forEach(id => {
-      const n = document.getElementById(id);
-      if (n && n.parentElement === secTax) secTax.insertBefore(n, anchor);
-    });
+  PULT_MOVABLE.forEach(id => { if (!activeIds.includes(id)) returnPultHome(id); });
+}
+
+/* --- Сцен-слайдеры (#pult-extra): КПВ «Макс X/Y» и мастер «Сила неравенства».
+   Генерируются как чипы; задают реальное состояние ТЕМ ЖЕ путём, что ручной ввод. */
+
+// Линейная КПВ из перехватов: Y = maxY − (maxY/maxX)·X (переменная X, как требует compilePpf).
+function ppfLinearFormula(maxX, maxY) {
+  maxX = Math.max(1, maxX); maxY = Math.max(0, maxY);
+  const slope = Math.round((maxY / maxX) * 1000) / 1000;
+  return fmt(Math.round(maxY * 100) / 100) + ' - ' + slope + '*X';
+}
+// Перехваты {maxX,maxY} произвольной формулы КПВ (через существующие хелперы движка).
+function ppfInterceptsOf(formulaStr) {
+  const r = compilePpf(formulaStr);
+  if (!r.compiled) return { maxX: CONFIG.Qmax, maxY: CONFIG.Pmax };
+  const f = (x) => ppfEvalWith(r.compiled, x);
+  const my = f(0), mx = ppfXmaxOf(f);
+  return { maxX: (mx != null && mx > 0) ? mx : CONFIG.Qmax, maxY: (my > 0) ? my : CONFIG.Pmax };
+}
+// Задать одиночную КПВ по перехватам — ТОТ ЖЕ путь, что ручной ввод формулы (applyPpf).
+function ppfSetSingle(maxX, maxY) {
+  const formula = ppfLinearFormula(maxX, maxY);
+  const inp = document.getElementById('inp-ppf'); if (inp) inp.value = formula;
+  STATE.ppfFormula = formula;
+  redrawAll();
+}
+// Задать КПВ страны (1/2) в режиме суммы — ТОТ ЖЕ путь, что applyPpfSum.
+function ppfSetSum(which, maxX, maxY) {
+  const formula = ppfLinearFormula(maxX, maxY);
+  const inp = document.getElementById(which === 1 ? 'inp-ppf1' : 'inp-ppf2'); if (inp) inp.value = formula;
+  if (which === 1) STATE.ppf1 = formula; else STATE.ppf2 = formula;
+  STATE.ppfSumData = null;   // форс пересчёт суммы (как applyPpfSum)
+  redrawAll();
+}
+
+// Один сцен-слайдер (метка + range + число). onInput(value) применяет состояние.
+function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr) {
+  const chip = document.createElement('div'); chip.className = 'pult-xchip';
+  const lab = document.createElement('span'); lab.className = 'xc-label'; lab.textContent = label;
+  const sl = document.createElement('input');
+  sl.type = 'range'; sl.min = min; sl.max = max; sl.step = step;
+  sl.value = Math.round(value); sl.style.accentColor = color;
+  if (idAttr) sl.id = idAttr;
+  const val = document.createElement('span'); val.className = 'xc-val';
+  val.textContent = fmt(value); if (idAttr) val.id = idAttr + '-val';
+  sl.addEventListener('input', () => { const v = parseFloat(sl.value); val.textContent = fmt(v); onInput(v); });
+  chip.append(lab, sl, val); box.appendChild(chip);
+}
+
+// Пересобрать сцен-слайдеры под текущую сцену.
+function buildPultExtra(sig) {
+  const box = document.getElementById('pult-extra'); if (!box) return;
+  box.innerHTML = '';
+  if (sig === 'ppf1') {                                   // одна КПВ: Макс X / Макс Y
+    const ic = ppfInterceptsOf(STATE.ppfFormula);
+    addPultXChip(box, 'Макс X', ic.maxX, COL.D, 5, 200, 5, v => ppfSetSingle(v, ppfInterceptsOf(STATE.ppfFormula).maxY));
+    addPultXChip(box, 'Макс Y', ic.maxY, COL.D, 5, 200, 5, v => ppfSetSingle(ppfInterceptsOf(STATE.ppfFormula).maxX, v));
+  } else if (sig === 'ppf2') {                            // сумма: 2 страны × (Макс X / Макс Y)
+    const a = ppfInterceptsOf(STATE.ppf1), b = ppfInterceptsOf(STATE.ppf2);
+    addPultXChip(box, 'Стр.1 X', a.maxX, COL.tax, 5, 200, 5, v => ppfSetSum(1, v, ppfInterceptsOf(STATE.ppf1).maxY));
+    addPultXChip(box, 'Стр.1 Y', a.maxY, COL.tax, 5, 200, 5, v => ppfSetSum(1, ppfInterceptsOf(STATE.ppf1).maxX, v));
+    addPultXChip(box, 'Стр.2 X', b.maxX, COL.reg, 5, 200, 5, v => ppfSetSum(2, v, ppfInterceptsOf(STATE.ppf2).maxY));
+    addPultXChip(box, 'Стр.2 Y', b.maxY, COL.reg, 5, 200, 5, v => ppfSetSum(2, ppfInterceptsOf(STATE.ppf2).maxX, v));
+  } else if (sig === 'ineqM') {                           // неравенство: мастер «Сила неравенства»
+    buildIneqMasterChip(box);
   }
+}
+
+/* --- Мастер «Сила неравенства» (способы «Доли» / «Доходы») -----------------
+   s = ползунок/100. Эффективное значение группы i = mean + s·(base_i − mean):
+   s=0 — полное равенство (Джини→0), 100% — базовый профиль, >100% — усиление.
+   Меняем ТОЛЬКО входные доли/доходы — Джини/Лоренца считает существующий движок
+   (тот же путь, что ручной ввод полей). Ручная правка поля/узла Лоренца → «отвязка». */
+function ineqParseIncomes(str) {
+  return String(str || '').split(/[\s,;]+/).map(Number).filter(v => isFinite(v));
+}
+function ineqMasterRebase() {        // запомнить текущий профиль как базу (отсчёт 100%)
+  STATE.ineqMasterBase = (STATE.ineqInput === 'incomes')
+    ? ineqParseIncomes(STATE.ineqIncomes)
+    : STATE.ineqGroups.map(Number);
+}
+function ineqMasterScale(s) {         // применить масштаб s → задать доли/доходы как ручной ввод
+  const base = STATE.ineqMasterBase; if (!base || !base.length) return;
+  const n = base.length;
+  if (STATE.ineqInput === 'incomes') {
+    const mean = base.reduce((a, b) => a + b, 0) / n;
+    const eff = base.map(v => Math.max(0, mean + s * (v - mean)));
+    STATE.ineqIncomes = eff.map(v => fmt(v)).join(', ');
+    const inc = document.getElementById('ineq-incomes'); if (inc) inc.value = STATE.ineqIncomes;
+  } else {
+    const mean = 100 / n;                            // равное распределение долей
+    let eff = base.map(v => Math.max(0, mean + s * (v - mean)));
+    const sum = eff.reduce((a, b) => a + b, 0) || 1;
+    eff = eff.map(v => v / sum * 100);               // ренормировка к 100 %
+    STATE.ineqGroups = eff;
+    renderIneqGroupsTable();
+  }
+  redrawAll();
+}
+function ineqMasterApply(sliderVal) { // движение мастера (отвязан → сперва перебазируемся)
+  const s = sliderVal / 100;
+  if (STATE.ineqMasterDetached || !STATE.ineqMasterBase) { ineqMasterRebase(); STATE.ineqMasterDetached = false; }
+  STATE.ineqMasterS = s;
+  ineqMasterScale(s);
+  const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = Math.round(sliderVal) + '%';
+}
+function ineqMasterDetach() {         // ручная правка профиля → одним числом не выразить
+  STATE.ineqMasterDetached = true;
+  const sl = document.getElementById('ineq-master-slider'); if (sl) sl.value = 100;
+  const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = '—';
+}
+function buildIneqMasterChip(box) {
+  const detached = !!STATE.ineqMasterDetached;
+  const pct = detached ? 100 : Math.round((STATE.ineqMasterS != null ? STATE.ineqMasterS : 1) * 100);
+  addPultXChip(box, 'Сила неравенства', pct, COL.D, 0, 200, 1, v => ineqMasterApply(v), 'ineq-master-slider');
+  const val = document.getElementById('ineq-master-slider-val');
+  if (val) val.textContent = detached ? '—' : (pct + '%');
 }
 
 function showPult(on, title) {
@@ -6733,29 +6909,37 @@ function showPult(on, title) {
   } else {
     syncPultRegulators([]);   // все узлы — домой
     const cc = document.getElementById('pult-curves'); if (cc) cc.innerHTML = '';
-    pult._curveSig = '';
+    const ce = document.getElementById('pult-extra'); if (ce) ce.innerHTML = '';
+    pult._curveSig = ''; pult._extraSig = '';
     pult.classList.remove('show');
     pult.setAttribute('aria-hidden', 'true');
   }
 }
 
 // Единая точка пересмотра состояния пульта — дёргается из renderCurveList (кривые)
-// и из setType/setMarket/setMode/pickScene (регуляторы/режим/сцена).
+// и из set-функций режима/сцены/типа (регуляторы/сцен-слайдеры/видимость).
 function updatePult() {
   const pult = document.getElementById('pult');
   if (!pult) return;
   if (!pultShouldShow()) { showPult(false); return; }
 
+  // (1) слайдеры кривых: пересборка только при изменении набора, иначе синхронизация значений.
   const curves = pultCurveList();
-  const sig = pultCurveSig(curves);
-  const rebuilt = (pult._curveSig !== sig);
-  if (rebuilt) { buildPultCurveChips(curves); pult._curveSig = sig; }
-  else { syncPultCurveValues(curves); }       // перетаскивание: только значения, без пересборки
+  const csig = pultCurveSig(curves);
+  const curvesRebuilt = (pult._curveSig !== csig);
+  if (curvesRebuilt) { buildPultCurveChips(curves); pult._curveSig = csig; }
+  else { syncPultCurveValues(curves); }
 
-  syncPultRegulators(pultRegulatorIds());     // регуляторы сцены → после чипов
+  // (2) сцен-слайдеры: пересборка только при смене сцены/под-режима.
+  const esig = pultExtraSig();
+  const extraRebuilt = (pult._extraSig !== esig);
+  if (extraRebuilt) { buildPultExtra(esig); pult._extraSig = esig; }
+
+  // (3) экранные регуляторы сцены → в пульт (после контейнеров).
+  syncPultRegulators(pultRegulatorIds());
   showPult(true, pultTitle());
   // Набор/ширина изменились — пере-центрировать ленту (пока пользователь её не таскал).
-  if (rebuilt && !pult._userMoved) positionPultDefault();
+  if ((curvesRebuilt || extraRebuilt) && !pult._userMoved) positionPultDefault();
 }
 
 function wireControls() {
@@ -6916,6 +7100,7 @@ function wireControls() {
                  : (STATE.laborEq ? STATE.laborEq.P : 0);
       if (base > 0) setLaborMinFields(Math.round(base));
     }
+    if (typeof updatePult === 'function') updatePult();   // ползунок МРОТ в пульт / домой
     redrawAll();
   });
   const labMinSlider = document.getElementById('labmin-slider');
@@ -6982,8 +7167,10 @@ function wireControls() {
     if (error) { if (errBox) { errBox.textContent = 'Не понял формулу: ' + error; errBox.style.display = 'block'; } return; }
     if (errBox) errBox.style.display = 'none';
     STATE.ppfFormula = f;
-    STATE.ppfX = null;   // сбросить точку в центр новой кривой
+    STATE.ppfX = null;
     redrawAll();
+    const pl = document.getElementById('pult'); if (pl) pl._extraSig = '';   // пере-инициализировать
+    if (typeof updatePult === 'function') updatePult();                      // ползунки Макс X/Y
   }
   const pApply = document.getElementById('btn-ppf-apply');
   if (pApply) pApply.addEventListener('click', applyPpf);
@@ -7005,6 +7192,8 @@ function wireControls() {
     STATE.ppf2 = ((ppf2Inp && ppf2Inp.value) || '').trim();
     STATE.ppfSumData = null;   // принудительный пересчёт
     redrawAll();
+    const pl = document.getElementById('pult'); if (pl) pl._extraSig = '';   // пере-инициализировать
+    if (typeof updatePult === 'function') updatePult();                      // 4 ползунка по странам
   }
   const sumApply = document.getElementById('btn-ppfsum-apply');
   if (sumApply) sumApply.addEventListener('click', applyPpfSum);
@@ -7097,7 +7286,7 @@ function wireControls() {
   const ineqN = document.getElementById('ineq-ngroups');
   if (ineqN) ineqN.addEventListener('change', () => setIneqGroupN(ineqN.value));
   const ineqInc = document.getElementById('ineq-incomes');
-  const applyIneqInc = () => { if (ineqInc) STATE.ineqIncomes = ineqInc.value; redrawAll(); };
+  const applyIneqInc = () => { if (ineqInc) STATE.ineqIncomes = ineqInc.value; if (typeof ineqMasterDetach === 'function') ineqMasterDetach(); redrawAll(); };
   const ineqIncBtn = document.getElementById('ineq-incomes-apply');
   if (ineqIncBtn) ineqIncBtn.addEventListener('click', applyIneqInc);
   if (ineqInc) ineqInc.addEventListener('keydown', e => { if (e.key === 'Enter') applyIneqInc(); });
