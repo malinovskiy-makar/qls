@@ -59,6 +59,7 @@
     if (isDark()) { h.removeAttribute('data-theme'); try { localStorage.setItem('theme', 'light'); } catch (e) {} }
     else { h.setAttribute('data-theme', 'dark'); try { localStorage.setItem('theme', 'dark'); } catch (e) {} }
     paint();
+    if (typeof redrawAll === 'function') redrawAll();
   });
 })();
 </script>
