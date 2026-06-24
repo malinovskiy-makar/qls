@@ -423,7 +423,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   position: absolute; right: 14px; top: 12px; z-index: var(--z-float);
   width: 252px; max-height: calc(100% - 24px);
   display: flex; flex-direction: column;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface);   /* фолбэк для браузеров без color-mix — непрозрачно */
+  background: color-mix(in srgb, var(--surface) 84%, transparent);  /* frosted glass: график мягко просвечивает */
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border: 1px solid var(--border); border-radius: var(--r-lg);
   box-shadow: var(--shadow-panel); overflow: hidden;
   transition: transform .26s var(--ease), opacity .2s var(--ease);
 }
@@ -454,7 +457,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   position: absolute; left: 14px; bottom: 14px; z-index: var(--z-float);
   display: flex; align-items: stretch;
   min-width: 420px; max-width: min(560px, 92vw);
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface);   /* фолбэк без color-mix */
+  background: color-mix(in srgb, var(--surface) 84%, transparent);  /* frosted glass */
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border: 1px solid var(--border); border-radius: var(--r-lg);
   box-shadow: var(--shadow-panel); overflow: hidden;
   opacity: 0; transform: translateY(8px); pointer-events: none;
   transition: opacity .2s var(--ease), transform .22s var(--ease);
@@ -1357,8 +1363,11 @@ const CONFIG = {
   // Только первая четверть: Q от 0 до Qmax, P от 0 до Pmax.
   Qmax: 100,
   Pmax: 100,
-  // Поля (margins) под подписи осей, в пикселях.
-  margin: { top: 72, right: 40, bottom: 52, left: 84 },
+  // Поля (margins) области графика, в пикселях. Помимо места под подписи осей
+  // дают «воздух» у краёв: снизу — широкая полоса под горизонтальную ленту-пульт
+  // (ось Q с числами остаётся над лентой), слева — отступ от дока/«Инструментов».
+  // Меняют ТОЛЬКО геометрию холста (d3-range и clip) — масштабы/математику не трогают.
+  margin: { top: 72, right: 48, bottom: 100, left: 104 },
 };
 
 // Состояние: список кривых и настройки. Наполняется на следующих шагах.
