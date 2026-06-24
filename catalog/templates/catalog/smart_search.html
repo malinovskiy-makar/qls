@@ -1,0 +1,398 @@
+{% extends 'catalog/base.html' %}
+
+{% block title %}Умный поиск задач{% endblock %}
+
+{% block extra_style %}
+/* ── Страница семантического поиска ─────────────────── */
+.ss-hero {
+  text-align: center;
+  padding: 48px 0 32px;
+}
+.ss-hero h1 {
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: -.5px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.ss-hero p {
+  color: var(--text2);
+  font-size: .95rem;
+  max-width: 480px;
+  margin: 0 auto 32px;
+  line-height: 1.6;
+}
+
+/* ── Форма ──────────────────────────────────────────── */
+.ss-form {
+  background: var(--surface);
+  border: 1px solid var(--border, #e8e8e4);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+.ss-textarea {
+  width: 100%;
+  min-height: 100px;
+  font-size: .95rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface-2, #f7f7f5);
+  border: 1px solid var(--border, #e8e8e4);
+  border-radius: 8px;
+  padding: 12px 14px;
+  resize: vertical;
+  transition: border-color .15s;
+  box-sizing: border-box;
+}
+.ss-textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+.ss-textarea::placeholder { color: var(--text3, #aaa); }
+
+.ss-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+  align-items: center;
+}
+.ss-filters select {
+  font-size: .875rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface-2, #f7f7f5);
+  border: 1px solid var(--border, #e8e8e4);
+  border-radius: 7px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.ss-filters select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.ss-checkbox-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .875rem;
+  color: var(--text2);
+  cursor: pointer;
+}
+.ss-checkbox-wrap input[type=checkbox] {
+  width: 15px; height: 15px;
+  accent-color: var(--accent);
+}
+.ss-submit {
+  margin-left: auto;
+  background: var(--btn-bg, #1a1f2e);
+  color: var(--on-btn, #fff);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 22px;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s, opacity .12s;
+}
+.ss-submit:hover { background: var(--btn-bg-hover, #252c3f); }
+.ss-submit:active { opacity: .85; }
+
+/* ── Состояние «ищу» ────────────────────────────────── */
+.ss-loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--text2);
+  font-size: .95rem;
+}
+
+/* ── Шапка результатов ──────────────────────────────── */
+.ss-results-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.ss-results-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.ss-count {
+  font-size: .8rem;
+  color: var(--text2);
+}
+
+/* ── Карточка результата ────────────────────────────── */
+.ss-result-item {
+  background: var(--surface);
+  border: 1px solid var(--border, #e8e8e4);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 16px;
+  transition: border-color .12s, box-shadow .12s;
+}
+.ss-result-item:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 10px rgba(0,0,0,.06);
+}
+
+/* Бейдж схожести */
+.ss-score-badge {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  min-width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.ss-score-badge span {
+  font-size: .65rem;
+  font-weight: 500;
+  opacity: .75;
+  margin-top: 2px;
+}
+
+/* Цвета бейджа по проценту схожести */
+.score-high  { background: var(--green-tint, #e6f5eb); color: var(--green, #1d7e45); }
+.score-mid   { background: #fff8e6; color: #b26b00; }
+.score-low   { background: var(--surface-2, #f5f5f5); color: var(--text2); }
+
+.ss-result-body { flex: 1; min-width: 0; }
+.ss-result-title {
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ss-result-title:hover { color: var(--accent); }
+
+.ss-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.ss-chip {
+  font-size: .75rem;
+  background: var(--chip-bg, #f0f0ee);
+  color: var(--chip-text, #555);
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.ss-chip.topic { background: var(--accent-tint, #fce7f3); color: var(--accent-deep, #9d174d); }
+.ss-stars { color: var(--amber, #b26b00); font-size: .8rem; }
+
+.ss-result-preview {
+  font-size: .85rem;
+  color: var(--text2);
+  line-height: 1.55;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ── Нет результатов ────────────────────────────────── */
+.ss-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text2);
+}
+.ss-empty-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: .35; }
+.ss-empty h3 { font-size: 1rem; color: var(--text); margin-bottom: 6px; }
+.ss-empty p { font-size: .875rem; }
+
+/* ── Ошибка ─────────────────────────────────────────── */
+.ss-error {
+  background: #fff5f5;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-size: .875rem;
+  color: #b91c1c;
+  margin-bottom: 20px;
+}
+{% endblock %}
+
+{% block content %}
+<div class="ss-hero">
+  <h1>Умный поиск задач</h1>
+  <p>Опишите задачу своими словами — система найдёт похожие из банка по смыслу, а не только по ключевым словам.</p>
+</div>
+
+<!-- ── Форма поиска ────────────────────────────────────── -->
+<div class="ss-form">
+  <form method="get" action="">
+    <textarea
+      class="ss-textarea"
+      name="q"
+      rows="3"
+      placeholder="Например: задача на равновесие рынка с налогом на производителей и поиском DWL…"
+      autofocus
+    >{{ query|default:'' }}</textarea>
+
+    <div class="ss-filters">
+      <!-- Тема -->
+      <select name="topic_id" title="Тема">
+        <option value="">Все темы</option>
+        {% for t in canonical_topics %}
+          <option value="{{ t.id }}" {% if topic_id == t.id|stringformat:'s' %}selected{% endif %}>
+            {{ t.name }}
+          </option>
+        {% endfor %}
+      </select>
+
+      <!-- Сложность -->
+      <select name="difficulty" title="Сложность">
+        <option value="">Любая сложность</option>
+        {% for d in difficulty_choices %}
+          <option value="{{ d }}" {% if difficulty == d|stringformat:'s' %}selected{% endif %}>
+            {{ '★'|ljust:d }}{{ '☆'|ljust:5|slice:d|default:'' }}
+            &nbsp;({{ d }})
+          </option>
+        {% endfor %}
+      </select>
+
+      <!-- Только с решением -->
+      <label class="ss-checkbox-wrap">
+        <input type="checkbox" name="has_solution" value="1" {% if has_solution %}checked{% endif %}>
+        Только с решением
+      </label>
+
+      <button type="submit" class="ss-submit">Найти</button>
+    </div>
+  </form>
+</div>
+
+<!-- ── Ошибка ──────────────────────────────────────────── -->
+{% if error %}
+  <div class="ss-error">⚠ {{ error }}</div>
+{% endif %}
+
+<!-- ── Результаты ─────────────────────────────────────── -->
+{% if searched %}
+  {% if results %}
+    <div class="ss-results-header">
+      <h2>Результаты</h2>
+      <span class="ss-count">{{ results|length }} задач{{ results|length|pluralize:'а,и,' }}</span>
+    </div>
+
+    {% for item in results %}
+      {% with p=item.problem pct=item.score %}
+        {% comment %}
+          Вычисляем цвет бейджа: score — число от 0 до 1 (косинусное сходство).
+          ≥ 0.70 → зелёный, ≥ 0.50 → жёлтый, ниже → серый.
+        {% endcomment %}
+        <div class="ss-result-item">
+
+          <!-- Бейдж схожести -->
+          {% if pct >= 0.70 %}
+            <div class="ss-score-badge score-high">
+              {% widthratio pct 1 100 %}<span>%</span>
+            </div>
+          {% elif pct >= 0.50 %}
+            <div class="ss-score-badge score-mid">
+              {% widthratio pct 1 100 %}<span>%</span>
+            </div>
+          {% else %}
+            <div class="ss-score-badge score-low">
+              {% widthratio pct 1 100 %}<span>%</span>
+            </div>
+          {% endif %}
+
+          <!-- Тело карточки -->
+          <div class="ss-result-body">
+            <a class="ss-result-title" href="{% url 'catalog:problem_detail' p.pk %}" title="{{ p.title|default:'Без названия' }}">
+              {% if p.title %}
+                {{ p.title }}
+              {% else %}
+                Задача #{{ p.pk }}
+              {% endif %}
+            </a>
+
+            <div class="ss-result-meta">
+              {% if p.difficulty %}
+                <span class="ss-stars">{% for i in "12345" %}{% if forloop.counter <= p.difficulty %}★{% else %}☆{% endif %}{% endfor %}</span>
+              {% endif %}
+
+              {% for tname in item.topics_display %}
+                <span class="ss-chip topic">{{ tname }}</span>
+              {% endfor %}
+
+              {% if p.solution and not p.solution_needs_review %}
+                <span class="ss-chip" style="color:var(--green);background:var(--green-tint)">✓ есть решение</span>
+              {% endif %}
+            </div>
+
+            {% if item.preview %}
+              <div class="ss-result-preview">{{ item.preview }}</div>
+            {% endif %}
+          </div>
+
+        </div>
+      {% endwith %}
+    {% endfor %}
+
+  {% else %}
+    <!-- Нет результатов -->
+    <div class="ss-empty">
+      <div class="ss-empty-icon">🔍</div>
+      <h3>Ничего не найдено</h3>
+      <p>Попробуйте переформулировать запрос или убрать фильтры.</p>
+    </div>
+  {% endif %}
+
+{% elif not error %}
+  <!-- Нулевое состояние — ещё не искали -->
+  <div class="ss-empty">
+    <div class="ss-empty-icon">💡</div>
+    <h3>Попробуйте описать задачу</h3>
+    <p>«Монополист максимизирует прибыль при линейном спросе и постоянных издержках»</p>
+  </div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Рендер KaTeX в превью результатов — для задач с формулами.
+document.addEventListener('DOMContentLoaded', function () {
+  var previews = document.querySelectorAll('.ss-result-preview');
+  previews.forEach(function (el) {
+    maskEscapedDollars(el);
+  });
+  if (typeof renderMathInElement !== 'undefined') {
+    previews.forEach(function (el) {
+      renderMathInElement(el, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$',  right: '$',  display: false },
+          { left: '\\[', right: '\\]', display: true },
+          { left: '\\(', right: '\\)', display: false }
+        ],
+        throwOnError: false
+      });
+    });
+  }
+  previews.forEach(function (el) { fixCurrencyDollars(el); });
+});
+</script>
+{% endblock %}

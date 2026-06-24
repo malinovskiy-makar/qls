@@ -1,6 +1,7 @@
 import json
 import re
 
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, F, Q
 from django.http import HttpResponse, JsonResponse
@@ -521,5 +522,78 @@ def catalog_api_problem(request, pk):
         'problem_type':   problem.problem_type,
         'has_solution':   bool(problem.solution) and not problem.solution_needs_review,
         'sources':        sources,
+    })
+
+
+# ── Семантический поиск (Стадия 1, прототип) ─────────────────────────────────
+
+@login_required
+def smart_search(request):
+    """Поиск задач по текстовому описанию через эмбеддинги.
+
+    Стадия 1: нет HyDE, нет новых моделей — только уже посчитанные векторы.
+    Загрузка модели и индекса происходит лениво при первом запросе (~7 с),
+    последующие запросы мгновенны (всё в памяти).
+    """
+    from .semantic import search as semantic_search
+
+    # 21 каноническая тема для фильтра (тот же порядок, что в каталоге).
+    canonical_topics = sorted(
+        Topic.objects.filter(name__in=CANONICAL),
+        key=lambda t: CANONICAL.index(t.name),
+    )
+
+    query = request.GET.get('q', '').strip()
+    topic_id = request.GET.get('topic_id', '')
+    difficulty = request.GET.get('difficulty', '')
+    has_solution = request.GET.get('has_solution', '') == '1'
+
+    results = []
+    error = None
+    searched = False
+
+    if query:
+        searched = True
+        try:
+            raw = semantic_search(
+                query_text=query,
+                topic_id=int(topic_id) if topic_id.isdigit() else None,
+                difficulty=int(difficulty) if difficulty.isdigit() else None,
+                has_solution=has_solution,
+                limit=20,
+            )
+            # Обогащаем каждый результат превью-текстом без LaTeX.
+            for item in raw:
+                p = item['problem']
+                preview = _strip_latex(p.statement)[:200].strip()
+                if not preview:
+                    # Берём первый подпункт если условие пустое.
+                    first_part = p.parts.first()
+                    if first_part:
+                        preview = _strip_latex(first_part.statement)[:200].strip()
+                item['preview'] = preview
+                # Канонические темы задачи для отображения.
+                item['topics_display'] = [
+                    t.name for t in p.topics.all() if t.name in CANONICAL
+                ][:2]
+            results = raw
+        except ImportError:
+            error = (
+                'Модель эмбеддингов не установлена. '
+                'Запустите: pip install sentence-transformers'
+            )
+        except Exception as exc:
+            error = f'Ошибка поиска: {exc}'
+
+    return render(request, 'catalog/smart_search.html', {
+        'query': query,
+        'topic_id': topic_id,
+        'difficulty': difficulty,
+        'has_solution': has_solution,
+        'results': results,
+        'error': error,
+        'searched': searched,
+        'canonical_topics': canonical_topics,
+        'difficulty_choices': range(1, 6),
     })
 

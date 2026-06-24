@@ -11,6 +11,9 @@ urlpatterns = [
     # Публичный API для модального окна
     path('api/problem/<int:pk>/',               views.catalog_api_problem, name='api_problem'),
 
+    # Семантический поиск (Стадия 1, локальный прототип)
+    path('smart-search/',                         views.smart_search,       name='smart_search'),
+
     # Конструктор подборок (Этап Б1)
     path('collection/new/',                     views.collection_new,     name='collection_new'),
     path('collection/<str:token>/',             views.collection_detail,  name='collection_detail'),
