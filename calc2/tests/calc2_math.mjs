@@ -69,6 +69,47 @@ const CASES = [
     checks: [['Q*', 'Qstar', 40, 0.5], ['P*', 'Pstar', 60, 0.5]],
   },
   {
+    name: 'Монополия · налог t=10 (D=100−Q, MC=20): MR=MC+t, Q↓ P↑',
+    // База 40/60; при налоге MR=100−2Q=MC+t=30 ⇒ Q=35, P=65, сбор=10·35=350.
+    run: `loadScene('mono'); setMonoMode('simple'); setType('tax'); setTax(10); redrawAll();
+          var t = STATE.monoTax || {};
+          var gap = marginalRevenue(STATE.D, t.Qt) - (mcAt(t.Qt) + 10);
+          return { Qt: t.Qt, Pt: t.Pt, budget: t.budget, gap: gap };`,
+    checks: [['Qt', 'Qt', 35, 0.4], ['Pt', 'Pt', 65, 0.4], ['сбор', 'budget', 350, 5], ['MR−(MC+t)', 'gap', 0, 0.5]],
+  },
+  {
+    name: 'Монополия · субсидия s=10: MR=MC−s, Q↑ P↓',
+    // MR=100−2Q=MC−s=10 ⇒ Q=45, P=55, расход=−10·45=−450.
+    run: `loadScene('mono'); setMonoMode('simple'); setType('subsidy'); setTax(10); redrawAll();
+          var t = STATE.monoTax || {};
+          var gap = marginalRevenue(STATE.D, t.Qt) - (mcAt(t.Qt) - 10);
+          return { Qt: t.Qt, Pt: t.Pt, budget: t.budget, gap: gap };`,
+    checks: [['Qt', 'Qt', 45, 0.4], ['Pt', 'Pt', 55, 0.4], ['расход', 'budget', -450, 5], ['MR−(MC−s)', 'gap', 0, 0.5]],
+  },
+  {
+    name: 'Монополия · потолок Pc=40: перенос логики идентичен прежней галочке',
+    // Связывающий потолок (Pc<Pm=60). Сверяем «проводной» STATE.monoCeil с прямым вызовом.
+    run: `loadScene('mono'); setMonoMode('simple'); setType('ceiling'); setPReg(40); redrawAll();
+          var wired = (STATE.monoCeil || {}).Qstar;
+          var direct = (monopolyCeiling(40) || {}).Qstar;
+          return { wired: wired, want: direct, binding: (STATE.monoCeil||{}).binding ? 1 : 0 };`,
+    checks: [['Qstar=прямой', 'wired', 'WANT', 0.3], ['Qstar', 'wired', 60, 0.6], ['связывает', 'binding', 1, 0.1]],
+  },
+  {
+    name: 'Монополия · пол Pf=80 > Pm=60: цена = пол, выпуск = D(Pf)',
+    run: `loadScene('mono'); setMonoMode('simple'); setType('floor'); setPReg(80); redrawAll();
+          var fl = STATE.monoFloor || {};
+          return { price: fl.price, Q: fl.Q, binding: fl.binding ? 1 : 0 };`,
+    checks: [['цена', 'price', 80, 0.4], ['Q', 'Q', 20, 0.5], ['связывает', 'binding', 1, 0.1]],
+  },
+  {
+    name: 'Монополия · пол Pf=40 < Pm=60: не связывает (без изменений)',
+    run: `loadScene('mono'); setMonoMode('simple'); setType('floor'); setPReg(40); redrawAll();
+          var fl = STATE.monoFloor || {}; var m = STATE.mono || {};
+          return { binding: fl.binding ? 1 : 0, Qm: m.Qm, Pm: m.Pm };`,
+    checks: [['не связывает', 'binding', 0, 0.1], ['Qm', 'Qm', 40, 0.4], ['Pm', 'Pm', 60, 0.4]],
+  },
+  {
     name: 'Эластичность · D=100−Q при Q=50 ⇒ |Ed|=1',
     run: `loadScene('sd'); setScenario('elasticity');
           // двигаем точку на Q=50 (единичная эластичность — середина)
