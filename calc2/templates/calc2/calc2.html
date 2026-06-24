@@ -491,12 +491,33 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 }
 #pult #taxside-row > label { display: inline; margin: 0; white-space: nowrap; }
 #pult #taxside-row .seg-btn { padding: 6px 10px; }
-/* Блок «Ставка t»: метка + ползунок + число в строку, ползунок тянется. */
-#pult #tax-field {
+/* Блоки «Ставка t» и «Цена Pc»: метка + ползунок + число в строку, ползунок тянется. */
+#pult #tax-field, #pult #pc-field {
   margin: 0 !important; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px;
 }
-#pult #tax-field > label { margin: 0; white-space: nowrap; }
-#pult #tax-field > div { margin-top: 0 !important; flex: 1; min-width: 140px; }
+#pult #tax-field > label, #pult #pc-field > label { margin: 0; white-space: nowrap; }
+#pult #tax-field > div, #pult #pc-field > div { margin-top: 0 !important; flex: 1; min-width: 140px; }
+
+/* Контейнер слайдеров сдвига кривых внутри ленты — те же правила ряда, что и у тела. */
+#pult #pult-curves {
+  display: contents;   /* чипы становятся прямыми flex-детьми ленты (единый ряд/перенос) */
+}
+/* Чип кривой: цветной маркер + метка (роль/формула) + ползунок «b» + число. */
+#pult .pult-cchip {
+  margin: 0; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px;
+}
+#pult .pult-cchip .cc-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+}
+#pult .pult-cchip .cc-label {
+  font-size: 12px; font-weight: 600; color: var(--text2); white-space: nowrap;
+  max-width: 78px; overflow: hidden; text-overflow: ellipsis;
+}
+#pult .pult-cchip input[type="range"] { margin-top: 0; flex: 1; min-width: 110px; }
+#pult .pult-cchip .cc-val {
+  font-size: 12px; font-weight: 700; color: var(--text); min-width: 30px; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Перетаскивание/прилипание плавающих панелей (пульт + табло) — ручка = шапка. */
 .sb-head { cursor: grab; touch-action: none; user-select: none; }
@@ -1876,16 +1897,24 @@ function drawCurves() {
    Линейную кривую тянем по вертикали: меняется свободный член b
    (наклон a сохраняется). Нелинейные пока не перетаскиваются (TODO).
    --------------------------------------------------------------------- */
+// Сдвиг линейной кривой по вертикали: меняем свободный член b (наклон a сохраняется),
+// обновляем подпись и перерисовываем. ЕДИНАЯ точка для перетаскивания мышью И для
+// ползунка-слайдера в пульте — никакой параллельной математики.
+function setCurveFreeTerm(curve, b) {
+  if (!curve || !curve.linear) return;
+  curve.linear.b = b;
+  curve.expr = curve.name = fmtLinear(curve.linear.a, curve.linear.b);
+  redrawAll();        // перерисуем кривую и всё зависимое (равновесие/области)
+  renderCurveList();  // обновим формулу в списке кривых (и слайдеры пульта — в конце renderCurveList)
+}
+
 function attachDrag(sel, curve) {
   sel.call(d3.drag()
     .container(() => svg.node())   // координаты события — в пикселях SVG
     .on('drag', (event) => {
       const [q, p] = toData(event.x, event.y);
-      // Прямая проходит через курсор с прежним наклоном -> пересчитываем b.
-      curve.linear.b = p - curve.linear.a * q;
-      curve.expr = curve.name = fmtLinear(curve.linear.a, curve.linear.b);
-      redrawAll();        // перерисуем кривую и всё зависимое (равновесие/области — позже)
-      renderCurveList();  // обновим формулу в списке кривых
+      // Прямая проходит через курсор с прежним наклоном -> пересчитываем b тем же путём.
+      setCurveFreeTerm(curve, p - curve.linear.a * q);
     }));
 }
 // TODO (будущие шаги): перетаскивание нелинейных кривых (парабол и т.п.).
@@ -2358,7 +2387,7 @@ function setType(type) {
       if (base > 0) setPRegFields(Math.round(base));
     }
   }
-  if (typeof updatePult === 'function') updatePult();   // пульт виден только при типе налог/субсидия
+  if (typeof updatePult === 'function') updatePult();   // сменился тип/набор регуляторов пульта
   redrawAll();
 }
 
@@ -3007,7 +3036,7 @@ function setMarket(mode) {
   if (tsr) tsr.style.display = (mode !== 'monopoly' && STATE.intervType === 'tax') ? '' : 'none';
   // Видимость под-режима монополии и его панелей (галочки областей / дискриминация / ломаный).
   applyMonoVisibility();
-  if (typeof updatePult === 'function') updatePult();   // в монополии живого пульта нет
+  if (typeof updatePult === 'function') updatePult();   // монополия: пульт = слайдеры D/MC + поле вмешательства
   redrawAll();
 }
 
@@ -6199,6 +6228,7 @@ function renderCurveList() {
     row.append(top, sel);
     list.appendChild(row);
   });
+  if (typeof updatePult === 'function') updatePult();   // пересобрать слайдеры кривых в пульте
 }
 
 /* ---------------------------------------------------------------------
@@ -6223,6 +6253,8 @@ function loadScene(name) {
     if (name === 'mono') {
       addCurve('20'); setRole(STATE.curves[1], 'mc');          // постоянные предельные издержки
       setMarket('monopoly');
+      setType('tax');   // детерминированный старт вмешательства (как в конкуренции) — иначе
+                        // тип «протекает» из прошлой сцены и пульт показывал бы не то поле
     } else {
       addCurve('Q'); setRole(STATE.curves[1], 'supply');
       setMarket('comp');
@@ -6529,21 +6561,61 @@ function wireScene() {
 }
 
 /* ---------------------------------------------------------------------
-   ПУЛЬТ — показ/скрытие и перенос живых регуляторов сценария.
-   Узлы #taxside-row и #tax-field ФИЗИЧЕСКИ переносятся между «Инструментами»
-   и пультом (appendChild сохраняет ID и обработчики — НЕ клонируем).
+   ПУЛЬТ — единое «рабочее место руками».
+   Лента собирается для АКТИВНОЙ сцены из двух источников:
+   (1) экранные регуляторы вмешательства (#taxside-row / #tax-field / #pc-field)
+       ФИЗИЧЕСКИ переносятся из «Инструментов» в пульт через appendChild —
+       ID и обработчики сохраняются (НЕ клонируем); домой возвращаются так же;
+   (2) слайдеры сдвига каждой ДВИГАЕМОЙ (линейной) кривой сцены — генерируются
+       в контейнере #pult-curves; ползунок задаёт свободный член b ТЕМ ЖЕ путём,
+       что и перетаскивание мышью (setCurveFreeTerm) → двусторонняя синхронизация.
+   Реестр регуляторов и список кривых вычисляются по текущему STATE — поэтому
+   механизм один на все рыночные сцены (sd / tax / ceil / mono / free), а не
+   хардкод под налог.
    --------------------------------------------------------------------- */
 let pultDock = null;
 
-// Сценарий «Налог/Субсидия» с живыми регуляторами активен?
-function pultShouldShow() {
-  return STATE.sceneKey === 'tax'
-      && STATE.mode === 'market'
-      && STATE.market !== 'monopoly'
-      && (STATE.intervType === 'tax' || STATE.intervType === 'subsidy');
+// Все перетаскиваемые регуляторы вмешательства; их «дом» — секция #sec-tax.
+const PULT_REG_ALL = ['taxside-row', 'tax-field', 'pc-field'];
+
+// Какие экранные регуляторы должны жить в пульте ПРЯМО СЕЙЧАС (по состоянию).
+// Только рыночный режим. Сцены sd / free экранных регуляторов не дают (пульт у них —
+// чисто из слайдеров кривых). Интервенционные сцены дают активное поле по intervType.
+function pultRegulatorIds() {
+  if (STATE.mode !== 'market') return [];
+  const interventionScene = (STATE.sceneKey === 'tax' || STATE.sceneKey === 'ceil' || STATE.sceneKey === 'mono');
+  if (!interventionScene) return [];
+  const t = STATE.intervType;
+  if (t === 'tax' || t === 'subsidy') {
+    const ids = [];
+    // «Налог платит» виден только для типа налог в конкуренции (как в setType).
+    if (t === 'tax' && STATE.market !== 'monopoly') ids.push('taxside-row');
+    ids.push('tax-field');
+    return ids;
+  }
+  return ['pc-field'];   // потолок / пол — поле регулируемой цены
 }
 
-// Поставить пульт под «Результатами» у правого края (стартовая позиция).
+// Линейные (=> перетаскиваемые) видимые кривые активной сцены — под слайдеры.
+function pultCurveList() {
+  if (STATE.mode !== 'market') return [];
+  return STATE.curves.filter(c => c.linear && c.visible);
+}
+
+// Пульт нужен, если есть хоть один экранный регулятор ИЛИ хоть одна двигаемая кривая.
+function pultShouldShow() {
+  return pultRegulatorIds().length > 0 || pultCurveList().length > 0;
+}
+
+// Заголовок ленты (вертикально на ручке): по типу вмешательства, иначе «Кривые».
+function pultTitle() {
+  if (pultRegulatorIds().length) {
+    return ({ tax: 'Налог', subsidy: 'Субсидия', ceiling: 'Потолок', floor: 'Пол' })[STATE.intervType] || 'Регуляторы';
+  }
+  return 'Кривые';
+}
+
+// Поставить пульт по центру нижнего края (стартовая позиция).
 function positionPultDefault() {
   const pult = document.getElementById('pult');
   if (!pult) return;
@@ -6554,16 +6626,104 @@ function positionPultDefault() {
   if (pultDock) pultDock.applyEdge();
 }
 
+// Короткая метка кривой для чипа: по роли, иначе усечённая формула.
+function curveChipLabel(c) {
+  const byRole = { demand: 'D', supply: 'S', mc: 'MC', tc: 'TC', atc: 'ATC' };
+  if (c.role && byRole[c.role]) return byRole[c.role];
+  const f = (c.name || c.expr || '').trim();
+  return f.length > 10 ? f.slice(0, 9) + '…' : (f || '?');
+}
+
+// Сигнатура набора кривых — чтобы НЕ пересобирать чипы на каждом кадре перетаскивания
+// (там меняется только b → достаточно обновить значения, см. syncPultCurveValues).
+function pultCurveSig(list) {
+  return list.map(c => c.id + ':' + (c.role || '') + ':' + c.color).join('|');
+}
+
+// Построить (пересобрать) чипы слайдеров кривых в контейнере #pult-curves.
+function buildPultCurveChips(list) {
+  const body = document.getElementById('pult-body');
+  let box = document.getElementById('pult-curves');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'pult-curves';
+    if (body) body.appendChild(box);   // создаём первым; регуляторы добавятся после
+  }
+  box.innerHTML = '';
+  list.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'pult-cchip'; chip.dataset.cid = c.id;
+
+    const dot = document.createElement('span');
+    dot.className = 'cc-dot'; dot.style.background = c.color;
+
+    const lab = document.createElement('span');
+    lab.className = 'cc-label'; lab.textContent = curveChipLabel(c);
+    lab.title = 'Сдвиг кривой: ' + (c.name || c.expr || '');
+
+    const sl = document.createElement('input');
+    sl.type = 'range'; sl.min = 0; sl.max = CONFIG.Pmax; sl.step = 1;
+    sl.value = Math.round(c.linear.b);
+    sl.style.accentColor = c.color;   // акцент ползунка в цвет кривой
+    sl.title = 'Сдвиг кривой по вертикали (свободный член b)';
+
+    const val = document.createElement('span');
+    val.className = 'cc-val'; val.textContent = fmt(c.linear.b);
+
+    // Слайдер → задаём b ТЕМ ЖЕ путём, что перетаскивание (по id, кривая могла пересоздаться).
+    sl.addEventListener('input', () => {
+      const cur = STATE.curves.find(x => x.id === c.id);
+      if (cur && cur.linear) setCurveFreeTerm(cur, parseFloat(sl.value));
+    });
+
+    chip.append(dot, lab, sl, val);
+    box.appendChild(chip);
+  });
+}
+
+// Обновить ТОЛЬКО значения существующих чипов (после перетаскивания/redraw) — без пересборки.
+// Слайдер, который пользователь держит прямо сейчас, не трогаем (чтобы не спорить с рукой).
+function syncPultCurveValues(list) {
+  const box = document.getElementById('pult-curves');
+  if (!box) return;
+  list.forEach(c => {
+    const chip = box.querySelector('.pult-cchip[data-cid="' + c.id + '"]');
+    if (!chip) return;
+    const sl = chip.querySelector('input[type="range"]');
+    const val = chip.querySelector('.cc-val');
+    if (sl && document.activeElement !== sl) sl.value = Math.round(c.linear.b);
+    if (val) val.textContent = fmt(c.linear.b);
+  });
+}
+
+// Перенести активные регуляторы в пульт (после чипов), лишние — домой (в #sec-tax,
+// в канонический порядок перед #tax-hint). Узлы те же — appendChild/insertBefore, не клон.
+function syncPultRegulators(activeIds) {
+  const secTax = document.getElementById('sec-tax');
+  const body = document.getElementById('pult-body');
+  const anchor = document.getElementById('tax-hint');
+  activeIds.forEach(id => {
+    const n = document.getElementById(id);
+    if (n && body && n.parentElement !== body) body.appendChild(n);
+  });
+  if (secTax && anchor) {
+    PULT_REG_ALL.forEach(id => {
+      if (activeIds.includes(id)) return;
+      const n = document.getElementById(id);
+      if (n && n.parentElement !== secTax) secTax.insertBefore(n, anchor);
+    });
+    // Нормализуем канонический порядок того, что сейчас дома.
+    PULT_REG_ALL.forEach(id => {
+      const n = document.getElementById(id);
+      if (n && n.parentElement === secTax) secTax.insertBefore(n, anchor);
+    });
+  }
+}
+
 function showPult(on, title) {
   const pult = document.getElementById('pult');
-  const body = document.getElementById('pult-body');
-  if (!pult || !body) return;
+  if (!pult) return;
   if (on) {
-    // Перенести живые узлы из «Инструментов» в пульт (если ещё не там).
-    const taxside = document.getElementById('taxside-row');
-    const taxfield = document.getElementById('tax-field');
-    if (taxside && taxside.parentElement !== body) body.appendChild(taxside);
-    if (taxfield && taxfield.parentElement !== body) body.appendChild(taxfield);
     const t = document.getElementById('pult-title'); if (t && title) t.textContent = title;
     pult.setAttribute('aria-hidden', 'false');
     if (!pult.classList.contains('show')) {
@@ -6571,32 +6731,31 @@ function showPult(on, title) {
       if (!pult._userMoved) positionPultDefault();
     }
   } else {
-    returnTaxControls();
+    syncPultRegulators([]);   // все узлы — домой
+    const cc = document.getElementById('pult-curves'); if (cc) cc.innerHTML = '';
+    pult._curveSig = '';
     pult.classList.remove('show');
     pult.setAttribute('aria-hidden', 'true');
   }
 }
 
-// Вернуть #taxside-row и #tax-field обратно в #sec-tax перед #pc-field (исходный порядок).
-function returnTaxControls() {
-  const secTax = document.getElementById('sec-tax');
-  const pcField = document.getElementById('pc-field');
-  const taxside = document.getElementById('taxside-row');
-  const taxfield = document.getElementById('tax-field');
-  if (!secTax) return;
-  if (taxside && taxside.parentElement !== secTax) {
-    pcField ? secTax.insertBefore(taxside, pcField) : secTax.appendChild(taxside);
-  }
-  if (taxfield && taxfield.parentElement !== secTax) {
-    pcField ? secTax.insertBefore(taxfield, pcField) : secTax.appendChild(taxfield);
-  }
-}
-
-// Единая точка пересмотра состояния пульта — дёргается из setType/setMode/setMarket/сцен.
+// Единая точка пересмотра состояния пульта — дёргается из renderCurveList (кривые)
+// и из setType/setMarket/setMode/pickScene (регуляторы/режим/сцена).
 function updatePult() {
-  const show = pultShouldShow();
-  const title = (STATE.intervType === 'subsidy') ? 'Субсидия' : 'Налог';
-  showPult(show, title);
+  const pult = document.getElementById('pult');
+  if (!pult) return;
+  if (!pultShouldShow()) { showPult(false); return; }
+
+  const curves = pultCurveList();
+  const sig = pultCurveSig(curves);
+  const rebuilt = (pult._curveSig !== sig);
+  if (rebuilt) { buildPultCurveChips(curves); pult._curveSig = sig; }
+  else { syncPultCurveValues(curves); }       // перетаскивание: только значения, без пересборки
+
+  syncPultRegulators(pultRegulatorIds());     // регуляторы сцены → после чипов
+  showPult(true, pultTitle());
+  // Набор/ширина изменились — пере-центрировать ленту (пока пользователь её не таскал).
+  if (rebuilt && !pult._userMoved) positionPultDefault();
 }
 
 function wireControls() {
@@ -6643,6 +6802,8 @@ function wireControls() {
       const pi = document.getElementById('pc-input');
       if (pi) pi.max = v;             // потолок/пол в монополии используют тот же pc-slider
       redrawAll();
+      const pl = document.getElementById('pult'); if (pl) pl._curveSig = '';   // форсируем пересборку
+      if (typeof updatePult === 'function') updatePult();   // слайдеры кривых: новый предел = Pmax
     }
   });
   grid.addEventListener('change', () => { STATE.showGrid = grid.checked; dockActive('dock-grid', STATE.showGrid); redrawAll(); });
