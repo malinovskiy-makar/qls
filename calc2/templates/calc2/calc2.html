@@ -1928,6 +1928,7 @@ function setCurveFreeTerm(curve, b) {
   if (!curve || !curve.linear) return;
   curve.linear.b = b;
   curve.expr = curve.name = fmtLinear(curve.linear.a, curve.linear.b);
+  if (STATE.mode === 'labor') _wantRangeAnim = true;   // труд авто-масштабируется → плавно (Фаза 4)
   redrawAll();        // перерисуем кривую и всё зависимое (равновесие/области)
   renderCurveList();  // обновим формулу в списке кривых (и слайдеры пульта — в конце renderCurveList)
 }
@@ -4067,6 +4068,15 @@ function recomputeLabor() {
       STATE.laborMinWelfare = { Lstar, Wfact, workerCS, firmCS, dwl };
     }
   }
+  // Авто-масштаб осей под кривые труда (Фаза 4): рамка из перехватов D/S и значимых
+  // уровней зарплаты (МРОТ / профсоюз), +10% воздуха. Плавно при кручении ползунков
+  // (applyAutoRanges), мгновенно на входе. Только геометрия — числа выше не меняются.
+  let Lmax = invCurve(D, 0); if (!(Lmax > 0) || !isFinite(Lmax)) Lmax = CONFIG.Qmax;
+  let Wmax = evalCurve(D, 0); if (!(Wmax > 0) || isNaN(Wmax)) Wmax = CONFIG.Pmax;
+  const sEnd = evalCurve(S, Lmax); if (sEnd > Wmax) Wmax = sEnd;        // предложение на правом краю
+  if (STATE.laborMinOn && STATE.laborMinW > Wmax) Wmax = STATE.laborMinW;
+  if (STATE.laborStruct === 'union' && STATE.unionModel === 'wagefloor' && STATE.unionWage > Wmax) Wmax = STATE.unionWage;
+  applyAutoRanges(niceMax(Lmax * 1.1), niceMax(Wmax * 1.1));
 }
 
 // Точка рынка труда с проекциями к осям и подписями L/W.
@@ -4286,6 +4296,7 @@ function setLaborMin(p) {
   const maxP = s ? (parseFloat(s.max) || CONFIG.Pmax) : CONFIG.Pmax;
   p = Math.max(0, Math.min(p, maxP));
   setLaborMinFields(p);
+  if (STATE.mode === 'labor') _wantRangeAnim = true;   // плавный масштаб, если МРОТ двинул рамку
   redrawAll();
 }
 
@@ -4382,6 +4393,7 @@ function setUnionWage(p) {
   const maxP = s ? (parseFloat(s.max) || CONFIG.Pmax) : CONFIG.Pmax;
   p = Math.max(0, Math.min(p, maxP));
   setUnionWageFields(p);
+  if (STATE.mode === 'labor') _wantRangeAnim = true;   // плавный масштаб, если зарплата двинула рамку
   redrawAll();
 }
 
@@ -4501,6 +4513,7 @@ function updateLaborPanel() {
 // Полная перерисовка режима рынка труда.
 function redrawLabor() {
   recomputeLabor();
+  makeScales();   // recomputeLabor мог изменить масштаб (авто-рамка) — пересчитать шкалы
   svg.selectAll('*').remove();
   addDefs();
   drawGrid();
@@ -4603,8 +4616,69 @@ function applyTradeRanges(targetQmax, targetPmax) {
   else setRanges(targetQmax, targetPmax);
 }
 
+/* --- Плавный авто-масштаб с дебаунсом (КПВ одна/сумма, труд) ---------------
+   Тот же твин animateRanges, что у КТВ, но с маленькой задержкой (~90 мс): при
+   живом кручении ползунка экран НЕ дёргается на каждый пиксель — оси «доезжают»
+   до нового размера, когда пользователь чуть притормозит. Цель считается из
+   данных (не из CONFIG) — во время кадра анимации recompute её не трогает
+   (guard _rangeAnimating). reduce-motion → мгновенный setRanges. */
+const RANGE_DEBOUNCE = 90;     // мс задержки перед стартом плавного переезда осей
+let _rangeSchedT = null;       // таймер дебаунса
+let _rangeSchedTarget = null;  // последняя запрошенная цель [qmax, pmax]
+
+function scheduleRangeAnim(qmax, pmax) {
+  _rangeSchedTarget = [qmax, pmax];
+  clearTimeout(_rangeSchedT);
+  _rangeSchedT = setTimeout(() => {
+    _rangeSchedT = null;
+    if (_rangeAnimating) return;
+    const [q, p] = _rangeSchedTarget;
+    animateRanges(q, p);
+  }, RANGE_DEBOUNCE);
+}
+
+// Аналог applyTradeRanges для сцен с авто-масштабом: вход на сцену / reduce-motion —
+// мгновенно; живое кручение ползунка (_wantRangeAnim) — плавно с дебаунсом.
+function applyAutoRanges(qmax, pmax) {
+  if (_rangeAnimating) return;
+  const wantAnim = _wantRangeAnim;
+  _wantRangeAnim = false;
+  if (wantAnim && !prefersReducedMotion()) scheduleRangeAnim(qmax, pmax);
+  else setRanges(qmax, pmax);
+}
+
+// Отменить и дебаунс, и текущий твин (при смене сцены/режима — чтобы отложенный
+// переезд не сработал уже на ДРУГОЙ сцене).
+function cancelRangeAnim() {
+  if (_rangeSchedT != null) { clearTimeout(_rangeSchedT); _rangeSchedT = null; }
+  if (_rangeAnimReq != null) { cancelAnimationFrame(_rangeAnimReq); _rangeAnimReq = null; }
+  _rangeAnimating = false;
+  _wantRangeAnim = false;
+}
+
+/* --- Троттл живого пересчёта (неравенство) ---------------------------------
+   Тяжёлый recomputeInequality + полная пересборка SVG/панели на каждый микрошаг
+   ползунка мигают. Троттл (ведущий + хвостовой, ~90 мс) обновляет картинку
+   и числа СОГЛАСОВАННО, не чаще ~11 раз/с — плавно, без мигания. Это не «motion»,
+   а ограничение частоты пересчёта, поэтому действует и при reduce-motion. */
+function makeThrottle(interval) {
+  let last = 0, tid = null, pending = null;
+  return (fn) => {
+    pending = fn;
+    const now = Date.now();
+    const wait = interval - (now - last);
+    if (wait <= 0) { last = now; if (tid) { clearTimeout(tid); tid = null; } const f = pending; pending = null; f(); }
+    else if (tid == null) {
+      tid = setTimeout(() => { last = Date.now(); tid = null; const f = pending; pending = null; if (f) f(); }, wait);
+    }
+  };
+}
+const _ineqThrottle = makeThrottle(90);
+function ineqRedraw() { _ineqThrottle(() => redrawAll()); }   // живой пересчёт неравенства — троттлом
+
 // Переключение режима: рынок / издержки / КПВ.
 function setMode(mode) {
+  cancelRangeAnim();   // отложенный/идущий переезд осей прошлой сцены — отменить
   STATE.mode = mode;
   const map = { market: 'mode-market', costs: 'mode-costs', ppf: 'mode-ppf', labor: 'mode-labor', inequality: 'mode-ineq' };
   Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
@@ -4629,6 +4703,12 @@ function setMode(mode) {
     STATE.curves = []; curveCounter = 0;
     addCurve('100 - L'); if (STATE.curves[0]) setRole(STATE.curves[0], 'demand');
     addCurve('L');       if (STATE.curves[1]) setRole(STATE.curves[1], 'supply');
+    // По умолчанию для сцены включаем МРОТ — чтобы пульт сразу показал его ползунок
+    // (Фаза 6). Дальше пользователь может снять галочку — ползунок уйдёт как обычно.
+    STATE.laborMinOn = true;
+    const chk = document.getElementById('chk-labmin'); if (chk) chk.checked = true;
+    const lf = document.getElementById('labmin-field'); if (lf) lf.style.display = '';
+    if (!(STATE.laborMinW > 0) && typeof setLaborMinFields === 'function') setLaborMinFields(65);  // выше равновесия (≈50) → связывающий
   }
   // Режим неравенства: пометить первый вход и заполнить таблицу групп.
   if (mode === 'inequality') { STATE.ineqVisited = true; renderIneqGroupsTable(); }
@@ -4727,8 +4807,12 @@ function recomputePpf() {
   if (!compiled) { STATE.ppfCompiled = null; return; }
   STATE.ppfCompiled = compiled;
   STATE.ppfReady = true;
-  if (STATE.ppfX == null) STATE.ppfX = CONFIG.Qmax * 0.5;
-  STATE.ppfX = clampPpfX(STATE.ppfX);
+  // Авто-масштаб под границу: рамка из перехватов Макс X / Макс Y (+10% воздуха).
+  // Плавно при кручении ползунка (applyAutoRanges), мгновенно на входе — теперь вся
+  // граница всегда в кадре (баг «линия за кадром» уходит вместе с авто-масштабом).
+  let mx = ppfXmaxOf((x) => evalPpf(x)); if (!(mx > 0) || !isFinite(mx)) mx = CONFIG.Qmax;
+  let my = evalPpf(0); if (!(my > 0) || isNaN(my)) my = CONFIG.Pmax;
+  applyAutoRanges(niceMax(mx * 1.1), niceMax(my * 1.1));
 }
 
 // Кривая КПВ + бледная заливка достижимой области под ней.
@@ -4766,6 +4850,7 @@ function redrawPpf() {
   if (STATE.ppfSub === 'sum')   { redrawPpfSum();   return; }   // Задача 1: сумма двух КПВ
   if (STATE.ppfSub === 'trade') { redrawPpfTrade(); return; }   // Задача 2: КТВ
   recomputePpf();
+  makeScales();   // recomputePpf мог изменить масштаб (авто-рамка) — пересчитать шкалы
   svg.selectAll('*').remove();
   addDefs();
   drawGrid();
@@ -5087,7 +5172,7 @@ function recomputePpfSum() {
     ok: true, points, c1pts: singlePpfPoints(f1, x1max), c2pts: singlePpfPoints(f2, x2max),
     Xtot, Ytot, x1max, x2max, formulaText, kinks, type: fr.type,
   };
-  setRanges(niceMax(Xtot * 1.05), niceMax(Ytot * 1.05));
+  applyAutoRanges(niceMax(Xtot * 1.05), niceMax(Ytot * 1.05));   // плавно при смене Макс X/Y, иначе мгновенно
 }
 
 // Отрисовка суммарной КПВ: бледные исходные кривые + жирная синяя суммарная + заливка.
@@ -5539,6 +5624,7 @@ function setTradeScenario(s) {
 
 // Переключение под-режима КПВ (одна / сумма / КТВ): показ нужной панели + перерисовка.
 function setPpfSub(sub) {
+  cancelRangeAnim();   // отложенный переезд осей прошлого под-режима — отменить
   STATE.ppfSub = sub;
   const map = { single: 'ppfsub-single', sum: 'ppfsub-sum', trade: 'ppfsub-trade' };
   Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
@@ -5990,7 +6076,7 @@ function setIneqAlpha(a) {
   if (num) num.value = STATE.ineqAlpha;
   if (val) val.textContent = fmt(STATE.ineqAlpha);
   if (fm) fm.value = STATE.ineqFormula;
-  redrawAll();
+  ineqRedraw();   // живой ползунок α — пересчёт троттлом (без мигания)
 }
 
 // Сменить число групп (5 квинтилей / 10 децилей): сбрасывает доли на пресет.
@@ -6801,6 +6887,7 @@ function ppfSetSingle(maxX, maxY) {
   const formula = ppfLinearFormula(maxX, maxY);
   const inp = document.getElementById('inp-ppf'); if (inp) inp.value = formula;
   STATE.ppfFormula = formula;
+  _wantRangeAnim = true;   // смена формы → плавный переезд осей (с дебаунсом)
   redrawAll();
 }
 // Задать КПВ страны (1/2) в режиме суммы — ТОТ ЖЕ путь, что applyPpfSum.
@@ -6809,6 +6896,7 @@ function ppfSetSum(which, maxX, maxY) {
   const inp = document.getElementById(which === 1 ? 'inp-ppf1' : 'inp-ppf2'); if (inp) inp.value = formula;
   if (which === 1) STATE.ppf1 = formula; else STATE.ppf2 = formula;
   STATE.ppfSumData = null;   // форс пересчёт суммы (как applyPpfSum)
+  _wantRangeAnim = true;     // смена формы страны → плавный переезд осей (с дебаунсом)
   redrawAll();
 }
 
@@ -6877,11 +6965,16 @@ function ineqMasterScale(s) {         // применить масштаб s →
   redrawAll();
 }
 function ineqMasterApply(sliderVal) { // движение мастера (отвязан → сперва перебазируемся)
-  const s = sliderVal / 100;
-  if (STATE.ineqMasterDetached || !STATE.ineqMasterBase) { ineqMasterRebase(); STATE.ineqMasterDetached = false; }
-  STATE.ineqMasterS = s;
-  ineqMasterScale(s);
+  // Живой readout % — сразу (это сам регулятор). Тяжёлый пересчёт (доли + таблица +
+  // перерисовка + Джини/Робин Гуд) — троттлом, чтобы числа и кривая обновлялись
+  // СОГЛАСОВАННО и без мигания при живом кручении (Фаза 5).
   const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = Math.round(sliderVal) + '%';
+  _ineqThrottle(() => {
+    const s = sliderVal / 100;
+    if (STATE.ineqMasterDetached || !STATE.ineqMasterBase) { ineqMasterRebase(); STATE.ineqMasterDetached = false; }
+    STATE.ineqMasterS = s;
+    ineqMasterScale(s);   // доли/доходы + таблица + redrawAll (внутри троттла)
+  });
 }
 function ineqMasterDetach() {         // ручная правка профиля → одним числом не выразить
   STATE.ineqMasterDetached = true;
@@ -7320,13 +7413,13 @@ function wireControls() {
   if (ineqTau) ineqTau.addEventListener('input', () => {
     STATE.ineqTau = parseFloat(ineqTau.value);
     const l = document.getElementById('ineq-tau-val'); if (l) l.textContent = fmt(STATE.ineqTau);
-    redrawAll();
+    ineqRedraw();   // живой ползунок τ — пересчёт троттлом
   });
   const ineqTr = document.getElementById('ineq-transfer');
   if (ineqTr) ineqTr.addEventListener('input', () => {
     STATE.ineqTransfer = parseFloat(ineqTr.value);
     const l = document.getElementById('ineq-transfer-val'); if (l) l.textContent = fmt(STATE.ineqTransfer);
-    redrawAll();
+    ineqRedraw();   // живой ползунок трансферта — пересчёт троттлом
   });
 
   // Добавление кривой: по кнопке и по Enter в поле формулы.
