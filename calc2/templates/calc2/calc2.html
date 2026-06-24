@@ -2326,6 +2326,7 @@ function setType(type) {
       if (base > 0) setPRegFields(Math.round(base));
     }
   }
+  if (typeof updatePult === 'function') updatePult();   // пульт виден только при типе налог/субсидия
   redrawAll();
 }
 
@@ -2974,6 +2975,7 @@ function setMarket(mode) {
   if (tsr) tsr.style.display = (mode !== 'monopoly' && STATE.intervType === 'tax') ? '' : 'none';
   // Видимость под-режима монополии и его панелей (галочки областей / дискриминация / ломаный).
   applyMonoVisibility();
+  if (typeof updatePult === 'function') updatePult();   // в монополии живого пульта нет
   redrawAll();
 }
 
@@ -4551,6 +4553,7 @@ function setMode(mode) {
   const lq = document.getElementById('lbl-qmax'), lp = document.getElementById('lbl-pmax');
   if (lq) lq.textContent = (mode === 'ppf') ? 'X макс' : (mode === 'labor' ? 'L макс' : 'Q макс');
   if (lp) lp.textContent = (mode === 'ppf') ? 'Y макс' : (mode === 'labor' ? 'W макс' : 'P макс');
+  if (typeof updatePult === 'function') updatePult();   // вне рыночного режима пульт скрыт
   redrawAll();
 }
 
@@ -6173,6 +6176,7 @@ function renderCurveList() {
    режима и установка параметра. Никакой новой логики — только композиция.
    --------------------------------------------------------------------- */
 function loadScene(name) {
+  STATE.sceneKey = name;   // и при выборе из «Готовых сцен», и из окна сценариев
   // Чистый старт: кривые, сценарий анализа и параметры вмешательства — с нуля.
   STATE.curves = []; curveCounter = 0;
   STATE.scenario = 'none';
@@ -6234,6 +6238,7 @@ function openPicker() {
   if (first) first.focus();
 }
 function pickScene(key) {
+  STATE.sceneKey = key;   // запоминаем сцену: пульт живёт только в сцене «Налог/Субсидия»
   const actions = {
     sd:    () => loadScene('sd'),
     tax:   () => loadScene('tax'),
@@ -6251,6 +6256,7 @@ function pickScene(key) {
   (actions[key] || actions.free)();
   const nm = document.getElementById('scene-name');
   if (nm) nm.textContent = SCENE_NAMES[key] || 'Сцена';
+  if (typeof updatePult === 'function') updatePult();   // показать/спрятать пульт под выбранную сцену
   closePicker();
 }
 
@@ -6311,6 +6317,119 @@ function setScoreOpen(open) {
   dockActive('dock-score', open);
 }
 
+/* ---------------------------------------------------------------------
+   ДВИЖОК ПЕРЕТАСКИВАНИЯ ПАНЕЛЕЙ — makeDockable(panel, handle, opts).
+   • Тащим panel за handle (pointer events: мышь и тач, setPointerCapture).
+   • Координаты — пиксельные left/top внутри контейнера-границ (.app).
+   • На отпускании — прилипание к ближайшему из 4 краёв; запоминаем
+     {edge, frac} (положение вдоль края) и пере-применяем при resize.
+   • Внутренние контролы (ползунки/кнопки) НЕ перехватываются: drag стартует
+     только на самой ручке и игнорируется, если нажата кнопка внутри ручки.
+   --------------------------------------------------------------------- */
+function makeDockable(panel, handle, opts) {
+  opts = opts || {};
+  const pad       = opts.pad ?? 14;        // отступ от краёв контейнера
+  const topInset  = opts.topInset ?? 14;   // верхний отступ (под шапку «← Сценарии»)
+  const leftInset = opts.leftInset ?? 14;  // левый отступ (вне дока 56px)
+
+  const container = () => panel.parentElement;            // .app
+  const cbox = () => container().getBoundingClientRect();
+
+  function setPos(left, top) {
+    panel.style.left = left + 'px';
+    panel.style.top = top + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }
+  function clamp(left, top, w, h) {
+    const c = cbox();
+    const maxL = c.width - w - pad, maxT = c.height - h - pad;
+    return {
+      left: Math.max(leftInset, Math.min(maxL, left)),
+      top:  Math.max(topInset,  Math.min(maxT, top)),
+    };
+  }
+  // Поставить панель по сохранённому краю и доле вдоль него.
+  function applyEdge() {
+    if (!panel._dock) return;
+    const c = cbox(), r = panel.getBoundingClientRect();
+    const w = r.width, h = r.height, { edge, frac } = panel._dock;
+    let left, top;
+    if (edge === 'left' || edge === 'right') {
+      left = (edge === 'left') ? leftInset : (c.width - w - pad);
+      const span = c.height - h - topInset - pad;
+      top = topInset + frac * Math.max(0, span);
+    } else {
+      top = (edge === 'top') ? topInset : (c.height - h - pad);
+      const span = c.width - w - leftInset - pad;
+      left = leftInset + frac * Math.max(0, span);
+    }
+    const cl = clamp(left, top, w, h);
+    setPos(cl.left, cl.top);
+  }
+  // Определить ближайший край и долю, прилипнуть.
+  function snap() {
+    const c = cbox(), r = panel.getBoundingClientRect();
+    const w = r.width, h = r.height;
+    const left = r.left - c.left, top = r.top - c.top;
+    const dl = left - leftInset;
+    const dr = (c.width - pad) - (left + w);
+    const dt = top - topInset;
+    const db = (c.height - pad) - (top + h);
+    const min = Math.min(dl, dr, dt, db);
+    let edge = 'right';
+    if (min === dl) edge = 'left';
+    else if (min === dt) edge = 'top';
+    else if (min === db) edge = 'bottom';
+    else edge = 'right';
+    let frac;
+    if (edge === 'left' || edge === 'right') {
+      const span = c.height - h - topInset - pad;
+      frac = span > 0 ? (top - topInset) / span : 0;
+    } else {
+      const span = c.width - w - leftInset - pad;
+      frac = span > 0 ? (left - leftInset) / span : 0;
+    }
+    panel._dock = { edge, frac: Math.max(0, Math.min(1, frac)) };
+    panel.classList.add('snapping');
+    applyEdge();
+    clearTimeout(panel._snapT);
+    panel._snapT = setTimeout(() => panel.classList.remove('snapping'), 320);
+  }
+
+  let dragging = false, sx, sy, sl, st, w0, h0;
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.target.closest('button')) return;        // клик по кнопке-«×» в шапке — не drag
+    const c = cbox(), r = panel.getBoundingClientRect();
+    sl = r.left - c.left; st = r.top - c.top; w0 = r.width; h0 = r.height;
+    sx = e.clientX; sy = e.clientY;
+    dragging = true; panel._userMoved = true;
+    setPos(sl, st);
+    panel.classList.add('dragging');
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const cl = clamp(sl + (e.clientX - sx), st + (e.clientY - sy), w0, h0);
+    setPos(cl.left, cl.top);
+  });
+  function end(e) {
+    if (!dragging) return;
+    dragging = false;
+    panel.classList.remove('dragging');
+    try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+    snap();
+  }
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+
+  window.addEventListener('resize', () => { if (panel._dock) applyEdge(); });
+
+  return { applyEdge, snap, setDock(edge, frac) { panel._dock = { edge, frac }; applyEdge(); } };
+}
+
 function wireScene() {
   const tools = document.getElementById('tools-panel');
   const score = document.getElementById('scoreboard');
@@ -6355,8 +6474,104 @@ function wireScene() {
     allBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
   });
 
+  // Перетаскивание «Результатов» за свою шапку (.sb-head). Фон/позиция по умолчанию
+  // не меняются — пока пользователь не потащит, держится правый-верхний угол из CSS.
+  const sbHead = document.getElementById('sb-head') || score.querySelector('.sb-head');
+  if (score && sbHead) makeDockable(score, sbHead, { topInset: 56 });
+
+  // Пульт — отдельная панель того же семейства, ручка = .pult-head.
+  const pult = document.getElementById('pult');
+  const pultHead = document.getElementById('pult-head');
+  if (pult && pultHead) {
+    pultDock = makeDockable(pult, pultHead, { topInset: 56 });
+  }
+  // При resize, пока пульт не двигали вручную, держим его под «Результатами».
+  window.addEventListener('resize', () => {
+    const p = document.getElementById('pult');
+    if (p && p.classList.contains('show') && !p._userMoved) positionPultDefault();
+  });
+
   // Начальные состояния док-кнопок.
   dockActive('dock-grid', STATE.showGrid);
+}
+
+/* ---------------------------------------------------------------------
+   ПУЛЬТ — показ/скрытие и перенос живых регуляторов сценария.
+   Узлы #taxside-row и #tax-field ФИЗИЧЕСКИ переносятся между «Инструментами»
+   и пультом (appendChild сохраняет ID и обработчики — НЕ клонируем).
+   --------------------------------------------------------------------- */
+let pultDock = null;
+
+// Сценарий «Налог/Субсидия» с живыми регуляторами активен?
+function pultShouldShow() {
+  return STATE.sceneKey === 'tax'
+      && STATE.mode === 'market'
+      && STATE.market !== 'monopoly'
+      && (STATE.intervType === 'tax' || STATE.intervType === 'subsidy');
+}
+
+// Поставить пульт под «Результатами» у правого края (стартовая позиция).
+function positionPultDefault() {
+  const app = document.querySelector('.app');
+  const pult = document.getElementById('pult');
+  const sb = document.getElementById('scoreboard');
+  if (!app || !pult) return;
+  const cw = app.clientWidth, ch = app.clientHeight;
+  const pw = pult.offsetWidth, ph = pult.offsetHeight;
+  const left = Math.max(14, cw - pw - 14);
+  let top = 12;
+  if (sb && !sb.classList.contains('collapsed')) top = sb.offsetTop + sb.offsetHeight + 12;
+  top = Math.max(56, Math.min(ch - ph - 14, top));
+  pult.style.left = left + 'px';
+  pult.style.top = top + 'px';
+  pult.style.right = 'auto';
+  pult.style.bottom = 'auto';
+  pult._dock = { edge: 'right', frac: 0 };   // чтобы resize держал его у правого края
+}
+
+function showPult(on, title) {
+  const pult = document.getElementById('pult');
+  const body = document.getElementById('pult-body');
+  if (!pult || !body) return;
+  if (on) {
+    // Перенести живые узлы из «Инструментов» в пульт (если ещё не там).
+    const taxside = document.getElementById('taxside-row');
+    const taxfield = document.getElementById('tax-field');
+    if (taxside && taxside.parentElement !== body) body.appendChild(taxside);
+    if (taxfield && taxfield.parentElement !== body) body.appendChild(taxfield);
+    const t = document.getElementById('pult-title'); if (t && title) t.textContent = title;
+    pult.setAttribute('aria-hidden', 'false');
+    if (!pult.classList.contains('show')) {
+      pult.classList.add('show');
+      if (!pult._userMoved) positionPultDefault();
+    }
+  } else {
+    returnTaxControls();
+    pult.classList.remove('show');
+    pult.setAttribute('aria-hidden', 'true');
+  }
+}
+
+// Вернуть #taxside-row и #tax-field обратно в #sec-tax перед #pc-field (исходный порядок).
+function returnTaxControls() {
+  const secTax = document.getElementById('sec-tax');
+  const pcField = document.getElementById('pc-field');
+  const taxside = document.getElementById('taxside-row');
+  const taxfield = document.getElementById('tax-field');
+  if (!secTax) return;
+  if (taxside && taxside.parentElement !== secTax) {
+    pcField ? secTax.insertBefore(taxside, pcField) : secTax.appendChild(taxside);
+  }
+  if (taxfield && taxfield.parentElement !== secTax) {
+    pcField ? secTax.insertBefore(taxfield, pcField) : secTax.appendChild(taxfield);
+  }
+}
+
+// Единая точка пересмотра состояния пульта — дёргается из setType/setMode/setMarket/сцен.
+function updatePult() {
+  const show = pultShouldShow();
+  const title = (STATE.intervType === 'subsidy') ? 'Субсидия' : 'Налог';
+  showPult(show, title);
 }
 
 function wireControls() {
