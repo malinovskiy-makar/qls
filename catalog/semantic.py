@@ -22,7 +22,7 @@ _EMBEDDING_DIM = 384
 
 # Ленивые синглтоны — инициализируются при первом вызове get_model()/get_index().
 _model = None
-_index = None   # словарь: {'matrix': ndarray (N, dim), 'ids': list[int], 'problem_types': list[str]}
+_index = None   # словарь: {'matrix': ndarray (N, dim), 'ids': list[int], 'is_test_flags': list[bool]}
 
 
 def get_model():
@@ -66,6 +66,16 @@ def _build_index():
 
     logger.info('Строим индекс эмбеддингов...')
 
+    # Два источника признака «это тест»:
+    # 1) problem_type начинается с «тест:» — проставлено при импорте;
+    # 2) тема «Тест» — часть задач импортирована с пустым problem_type,
+    #    но правильно размечена темой. Нормализация через problem_type отложена.
+    topic_test_ids = set(
+        Problem.objects
+        .filter(topics__name='Тест')
+        .values_list('id', flat=True)
+    )
+
     qs = (
         Problem.objects
         .filter(
@@ -79,7 +89,7 @@ def _build_index():
 
     ids = []
     vecs = []
-    problem_types = []  # Параллельный список типов задач для фильтра по виду контента.
+    is_test_flags = []  # True если задача — тест (по problem_type ИЛИ теме «Тест»).
 
     for pid, raw_emb, ptype in qs.iterator(chunk_size=1000):
         raw = bytes(raw_emb)
@@ -89,14 +99,15 @@ def _build_index():
         vec = np.frombuffer(raw, dtype=np.float32)
         ids.append(pid)
         vecs.append(vec)
-        problem_types.append(ptype or '')
+        is_test = (ptype or '').lower().startswith('тест:') or (pid in topic_test_ids)
+        is_test_flags.append(is_test)
 
     if not vecs:
         logger.warning('Индекс пуст — нет задач с эмбеддингами.')
         return {
             'matrix': np.empty((0, _EMBEDDING_DIM), dtype=np.float32),
             'ids': [],
-            'problem_types': [],
+            'is_test_flags': [],
         }
 
     matrix = np.stack(vecs)  # (N, dim)
@@ -107,7 +118,7 @@ def _build_index():
     matrix = matrix / norms
 
     logger.info('Индекс готов: %d задач.', len(ids))
-    return {'matrix': matrix, 'ids': ids, 'problem_types': problem_types}
+    return {'matrix': matrix, 'ids': ids, 'is_test_flags': is_test_flags}
 
 
 def get_index():
@@ -178,12 +189,13 @@ def search(query_text: str,
     top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
 
     # Фильтр по типу контента ('problems' — без тестов, 'tests' — только тесты, 'all' — всё).
-    ptypes = idx['problem_types']
+    # is_test_flags учитывает оба источника: problem_type и тему «Тест».
+    is_test_flags = idx['is_test_flags']
     if content_kind != 'all':
         is_test = (content_kind == 'tests')
         top_indices = [
             i for i in top_indices.tolist()
-            if (ptypes[i].lower().startswith('тест:')) == is_test
+            if is_test_flags[i] == is_test
         ]
 
     top_ids_ordered = [ids[i] for i in top_indices]
