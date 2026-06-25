@@ -1,7 +1,7 @@
 """
 Команда build_embeddings — строит векторные эмбеддинги для задач.
 
-Использует модель paraphrase-multilingual-MiniLM-L12-v2 (поддерживает русский).
+Использует модель из problems.embedding_config.EMBEDDING_MODEL_NAME (сейчас BAAI/bge-m3).
 Результат сохраняется в Problem.embedding как bytes (numpy float32).
 
 Запуск:
@@ -17,24 +17,50 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from problems.models import Problem
+from problems.embedding_config import EMBEDDING_MODEL_NAME
 
-MODEL_NAME = 'paraphrase-multilingual-MiniLM-L12-v2'
+# Псевдоним для обратной совместимости: night_embeddings.py импортирует MODEL_NAME отсюда.
+MODEL_NAME = EMBEDDING_MODEL_NAME
 BATCH_SIZE = 100
 
 
 def problem_to_text(problem: Problem) -> str:
-    """Строит текст для эмбеддинга: заголовок + первые 500 символов условия.
-    Если у задачи есть подпункты — добавляет их тексты (до 500 символов суммарно).
-    Для задач без подпунктов поведение не изменилось."""
+    """Строит текст для эмбеддинга: заголовок + условие + подпункты + темы + навыки.
+
+    Порядок блоков:
+      1. title (если есть)
+      2. statement[:500]
+      3. подпункты ProblemPart.statement (до 500 символов суммарно)
+      4. «Темы: …» — канонические темы, исключая техническую тему «Тест»
+      5. «Навыки: …» — навыки задачи
+
+    Блоки 4 и 5 добавляются только если у задачи есть соответствующие объекты.
+    Для задач без тем/навыков текст не изменится по структуре.
+
+    ⚠️ Требует prefetch_related('parts', 'topics', 'skills') при батч-запросе.
+    """
     parts = []
     if problem.title:
         parts.append(problem.title + '.')
     parts.append(problem.statement[:500])
+
+    # Подпункты
     subparts = list(problem.parts.all())  # Meta.ordering = ['order', 'label']
     if subparts:
         subtext = ' '.join(sp.statement for sp in subparts if sp.statement)
         if subtext:
             parts.append(subtext[:500])
+
+    # Темы (исключаем «Тест» — техническая метка импорта, не смысловая)
+    topic_names = [t.name for t in problem.topics.all() if t.name != 'Тест']
+    if topic_names:
+        parts.append('Темы: ' + ', '.join(topic_names) + '.')
+
+    # Навыки
+    skill_names = [s.name for s in problem.skills.all()]
+    if skill_names:
+        parts.append('Навыки: ' + ', '.join(skill_names) + '.')
+
     return ' '.join(parts)
 
 
@@ -63,7 +89,7 @@ class Command(BaseCommand):
 
         self.stdout.write('Загружаем модель...')
         t0 = time.time()
-        model = SentenceTransformer(MODEL_NAME)
+        model = SentenceTransformer(EMBEDDING_MODEL_NAME)
         self.stdout.write(f'Модель загружена за {time.time() - t0:.1f}с')
 
         qs = Problem.objects.all()
@@ -89,7 +115,12 @@ class Command(BaseCommand):
 
         for batch_start in range(0, len(ids), BATCH_SIZE):
             batch_ids = ids[batch_start:batch_start + BATCH_SIZE]
-            problems = list(Problem.objects.filter(id__in=batch_ids).only('id', 'title', 'statement'))
+            problems = list(
+                Problem.objects
+                .filter(id__in=batch_ids)
+                .only('id', 'title', 'statement')
+                .prefetch_related('parts', 'topics', 'skills')
+            )
 
             texts = [problem_to_text(p) for p in problems]
             # encode() возвращает numpy array shape (N, dim)

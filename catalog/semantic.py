@@ -12,13 +12,13 @@ from typing import Optional
 
 import numpy as np
 
+from problems.embedding_config import EMBEDDING_MODEL_NAME, EMBEDDING_DIM
+
 logger = logging.getLogger(__name__)
 
-# Имя модели — совпадает с build_embeddings.py (важно для совместимости).
-_MODEL_NAME = 'paraphrase-multilingual-MiniLM-L12-v2'
-
-# Размер вектора для данной модели.
-_EMBEDDING_DIM = 384
+# Имя модели и размерность берём из единого источника истины (problems/embedding_config.py).
+_MODEL_NAME = EMBEDDING_MODEL_NAME
+_EMBEDDING_DIM = EMBEDDING_DIM
 
 # Ленивые синглтоны — инициализируются при первом вызове get_model()/get_index().
 _model = None
