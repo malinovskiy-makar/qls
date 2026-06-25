@@ -277,6 +277,13 @@
         Только с решением
       </label>
 
+      <!-- Тип контента: задачи / тесты / всё -->
+      <select name="kind" title="Тип">
+        <option value="problems" {% if kind == 'problems' or not kind %}selected{% endif %}>Задачи</option>
+        <option value="tests"    {% if kind == 'tests'    %}selected{% endif %}>Тесты</option>
+        <option value="all"      {% if kind == 'all'      %}selected{% endif %}>Всё</option>
+      </select>
+
       <button type="submit" class="ss-submit">Найти</button>
     </div>
   </form>

@@ -22,7 +22,7 @@ _EMBEDDING_DIM = 384
 
 # Ленивые синглтоны — инициализируются при первом вызове get_model()/get_index().
 _model = None
-_index = None   # словарь: {'matrix': ndarray (N, dim), 'ids': list[int]}
+_index = None   # словарь: {'matrix': ndarray (N, dim), 'ids': list[int], 'problem_types': list[str]}
 
 
 def get_model():
@@ -73,14 +73,15 @@ def _build_index():
             needs_quality_review=False,
             embedding__isnull=False,
         )
-        .only('id', 'embedding')
-        .values_list('id', 'embedding')
+        .only('id', 'embedding', 'problem_type')
+        .values_list('id', 'embedding', 'problem_type')
     )
 
     ids = []
     vecs = []
+    problem_types = []  # Параллельный список типов задач для фильтра по виду контента.
 
-    for pid, raw_emb in qs.iterator(chunk_size=1000):
+    for pid, raw_emb, ptype in qs.iterator(chunk_size=1000):
         raw = bytes(raw_emb)
         # Пропускаем задачи с повреждёнными эмбеддингами (неверный размер).
         if len(raw) != _EMBEDDING_DIM * 4:
@@ -88,10 +89,15 @@ def _build_index():
         vec = np.frombuffer(raw, dtype=np.float32)
         ids.append(pid)
         vecs.append(vec)
+        problem_types.append(ptype or '')
 
     if not vecs:
         logger.warning('Индекс пуст — нет задач с эмбеддингами.')
-        return {'matrix': np.empty((0, _EMBEDDING_DIM), dtype=np.float32), 'ids': []}
+        return {
+            'matrix': np.empty((0, _EMBEDDING_DIM), dtype=np.float32),
+            'ids': [],
+            'problem_types': [],
+        }
 
     matrix = np.stack(vecs)  # (N, dim)
 
@@ -101,7 +107,7 @@ def _build_index():
     matrix = matrix / norms
 
     logger.info('Индекс готов: %d задач.', len(ids))
-    return {'matrix': matrix, 'ids': ids}
+    return {'matrix': matrix, 'ids': ids, 'problem_types': problem_types}
 
 
 def get_index():
@@ -132,6 +138,7 @@ def search(query_text: str,
            topic_id: Optional[int] = None,
            difficulty: Optional[int] = None,
            has_solution: bool = False,
+           content_kind: str = 'problems',
            limit: int = 20) -> list[dict]:
     """Семантический поиск по текстовому описанию.
 
@@ -140,6 +147,8 @@ def search(query_text: str,
         topic_id     — id Topic для жёсткого фильтра (None = без фильтра).
         difficulty   — уровень сложности 1–5 (None = любой).
         has_solution — показывать только задачи с непустым решением.
+        content_kind — 'problems' (по умолчанию, исключить тесты),
+                       'tests' (только тесты), 'all' (без фильтра по типу).
         limit        — максимальное число результатов.
 
     Возвращает список словарей:
@@ -167,6 +176,15 @@ def search(query_text: str,
     top_k = min(limit * 10, len(ids))
     top_indices = np.argpartition(scores, -top_k)[-top_k:]
     top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
+
+    # Фильтр по типу контента ('problems' — без тестов, 'tests' — только тесты, 'all' — всё).
+    ptypes = idx['problem_types']
+    if content_kind != 'all':
+        is_test = (content_kind == 'tests')
+        top_indices = [
+            i for i in top_indices.tolist()
+            if (ptypes[i].lower().startswith('тест:')) == is_test
+        ]
 
     top_ids_ordered = [ids[i] for i in top_indices]
     top_scores = {ids[i]: float(scores[i]) for i in top_indices}

@@ -547,6 +547,7 @@ def smart_search(request):
     topic_id = request.GET.get('topic_id', '')
     difficulty = request.GET.get('difficulty', '')
     has_solution = request.GET.get('has_solution', '') == '1'
+    kind = request.GET.get('kind', 'problems')
 
     results = []
     error = None
@@ -560,6 +561,7 @@ def smart_search(request):
                 topic_id=int(topic_id) if topic_id.isdigit() else None,
                 difficulty=int(difficulty) if difficulty.isdigit() else None,
                 has_solution=has_solution,
+                content_kind=kind,
                 limit=20,
             )
             # Обогащаем каждый результат превью-текстом без LaTeX.
@@ -590,6 +592,7 @@ def smart_search(request):
         'topic_id': topic_id,
         'difficulty': difficulty,
         'has_solution': has_solution,
+        'kind': kind,
         'results': results,
         'error': error,
         'searched': searched,
