@@ -30,13 +30,21 @@ def get_model():
 
     Первый вызов занимает ~6–7 секунд (загрузка с диска).
     Последующие — мгновенны (объект жив в памяти процесса).
+
+    MPS исключён намеренно: BGE-M3 на Apple Silicon 8 ГБ вызывал зависание.
+    CPU достаточно для кодирования одиночных поисковых запросов.
     """
     global _model
     if _model is None:
         try:
             from sentence_transformers import SentenceTransformer
-            logger.info('Загружаем модель %s...', _MODEL_NAME)
-            _model = SentenceTransformer(_MODEL_NAME)
+            try:
+                import torch
+                device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            except ImportError:
+                device = 'cpu'
+            logger.info('Загружаем модель %s (device=%s)...', _MODEL_NAME, device)
+            _model = SentenceTransformer(_MODEL_NAME, device=device)
             logger.info('Модель загружена.')
         except ImportError:
             logger.error(
