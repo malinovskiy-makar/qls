@@ -306,6 +306,17 @@ class Problem(models.Model):
         related_name='similar_to',
     )
 
+    # Батч 1 — ИИ-обогащение (Сессия 3)
+    ai_blurb = models.TextField(
+        blank=True, default='',
+        help_text='ИИ: Дано/Найти или суть (внутреннее, для поискового отпечатка; на сайте не показывается)',
+    )
+    # Батч 1: задача — склейка нескольких условий в одном документе, нужен переимпорт.
+    multiple_problems = models.BooleanField(
+        'Склейка нескольких задач', default=False,
+        help_text='ИИ-флаг: задача содержит несколько условий, требует ручного разбиения.',
+    )
+
     created_at = models.DateTimeField('Создана', auto_now_add=True)
     updated_at = models.DateTimeField('Изменена', auto_now=True)
 

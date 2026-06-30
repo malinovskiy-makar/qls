@@ -55,6 +55,18 @@ data_dump.json
 deploy_fixtures/
 # Скрипт загрузки содержит пароль продакшен-базы — НИКОГДА не коммитить
 load_to_render.sh
+# Ключ Anthropic API — НИКОГДА не коммитить
+anthropic_key.txt
+
+# Артефакты Батч 1 (submit_batch1) — не коммитить
+batch1_ids.txt
+batch1_sample.txt
+batch1_requests.jsonl
+# Артефакты Батч 1 (apply_batch1) — отчёты, не коммитить
+batch1_topic_review.csv
+batch1_reimport_queue.txt
+batch1_not_a_problem.txt
+batch1_missing_figure.txt
 
 # Pandoc установщик (скачивается автоматически, не нужен в репо)
 *.pkg
@@ -66,6 +78,10 @@ duplicates_backup/
 # Временные файлы
 *.tmp
 /tmp/
+
+# Batch API результаты
+batch1_parsed.jsonl
+batch1_errors.txt
 
 # Скриншоты Playwright
 shots/
