@@ -13,7 +13,7 @@
       reports/batch2/apply_report.md
       reports/batch2/skipped_flagged.txt
       reports/batch2/skipped_conflict_solution.txt
-      reports/batch2/skipped_conflict_parts.txt
+      reports/batch2/skipped_unknown_part_label.txt
       reports/batch2/skipped_bad_trim.txt
       reports/batch2/skipped_not_found.txt
       reports/batch2/changed_problem_ids.txt   (для пересчёта эмбеддингов)
@@ -82,9 +82,8 @@ def _classify_record(rec: Dict, db_problem: Optional[Problem]) -> Dict[str, Any]
       skip_reason: str (если skip)
       changes: dict  — какие правки будут применены
         - stmt: новое условие (str) или None
-        - parts_update: {label: text} для обновления
+        - parts_update: {label: text} для обновления существующих пунктов
         - parts_create: {label: text} для создания новых ProblemPart
-        - parts_delete: [label] для удаления
         - solution: extracted text (str) или None
     """
     data = rec.get("data", {})
@@ -110,6 +109,8 @@ def _classify_record(rec: Dict, db_problem: Optional[Problem]) -> Dict[str, Any]
         changes["stmt"] = cleaned_stmt
 
     # --- Подпункты ---
+    # cleaned_parts — ЗАПЛАТКА: модель возвращает только изменённые пункты.
+    # Существующие пункты НИКОГДА не удаляются.
     cleaned_parts: Dict[str, str] = data.get("cleaned_parts") or {}
     if cleaned_parts and isinstance(cleaned_parts, dict):
         existing_parts = list(db_problem.parts.all())
@@ -117,45 +118,21 @@ def _classify_record(rec: Dict, db_problem: Optional[Problem]) -> Dict[str, Any]
         existing_labels = set(existing_by_label.keys())
         model_labels = set(cleaned_parts.keys())
 
-        if existing_labels == model_labels:
-            # Наборы меток совпадают — просто обновляем тексты.
+        if not existing_parts:
+            # Нет пунктов в базе, модель нашла разбивку → создать все.
+            changes["parts_create"] = dict(cleaned_parts)
+        else:
+            unknown_labels = model_labels - existing_labels
+            if unknown_labels:
+                # Модель вернула метку, которой нет среди существующих → пропуск.
+                return {"skip": True, "skip_reason": "unknown_part_label", "changes": {}}
+            # Все метки модели есть в базе → обновляем только их, остальные не трогаем.
             parts_update = {}
             for lbl, new_text in cleaned_parts.items():
                 if new_text.strip() != (existing_by_label[lbl].statement or "").strip():
                     parts_update[lbl] = new_text
             if parts_update:
                 changes["parts_update"] = parts_update
-        elif existing_parts:
-            # Наборы различаются — проверяем, безопасно ли принять разметку модели.
-            has_answers = any(
-                (p.answer or "").strip() or p.points is not None
-                for p in existing_parts
-            )
-            if has_answers:
-                return {"skip": True, "skip_reason": "conflict_parts", "changes": {}}
-            # Безопасно: принимаем разметку модели целиком.
-            parts_update = {}
-            parts_create = {}
-            parts_delete = []
-            for lbl, new_text in cleaned_parts.items():
-                if lbl in existing_by_label:
-                    old_text = (existing_by_label[lbl].statement or "").strip()
-                    if new_text.strip() != old_text:
-                        parts_update[lbl] = new_text
-                else:
-                    parts_create[lbl] = new_text
-            for lbl in existing_labels:
-                if lbl not in model_labels:
-                    parts_delete.append(lbl)
-            if parts_update:
-                changes["parts_update"] = parts_update
-            if parts_create:
-                changes["parts_create"] = parts_create
-            if parts_delete:
-                changes["parts_delete"] = parts_delete
-        else:
-            # Подпунктов в базе нет, модель нашла — создаём.
-            changes["parts_create"] = dict(cleaned_parts)
 
     # --- Решение ---
     if data.get("has_solution"):
@@ -186,10 +163,9 @@ def _apply_changes_to_problem(problem: Problem, changes: Dict) -> List[str]:
         problem.solution_ai_extracted = True
         applied.append("solution")
 
-    # Для подпунктов: update + create + delete.
+    # Для подпунктов: update + create. Удаление — никогда.
     parts_update = changes.get("parts_update", {})
     parts_create = changes.get("parts_create", {})
-    parts_delete = changes.get("parts_delete", [])
 
     if parts_update:
         by_label = {p.label: p for p in problem.parts.all()}
@@ -201,10 +177,6 @@ def _apply_changes_to_problem(problem: Problem, changes: Dict) -> List[str]:
         if bulk:
             ProblemPart.objects.bulk_update(bulk, ["statement"])
         applied.append("parts_update")
-
-    if parts_delete:
-        problem.parts.filter(label__in=parts_delete).delete()
-        applied.append("parts_delete")
 
     if parts_create:
         existing_labels = set(problem.parts.values_list("label", flat=True))
@@ -247,8 +219,7 @@ _CSS = """\
   .diff-table td { padding: 4px 8px; border-top: 1px solid #eee; vertical-align: top; }
   .diff-table tr.changed td { background: #fffbeb; }
   .field-name { font-weight: bold; color: #555; font-size: 11px; white-space: nowrap; }
-  .math-content { font-size: 13px; line-height: 1.6; overflow-wrap: break-word; }
-  .math-content p { margin: 2px 0 6px; }
+  .math-content { font-size: 13px; line-height: 1.6; overflow-wrap: break-word; white-space: pre-wrap; }
   .summary { background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 16px; margin-bottom: 24px; }
   .summary pre { margin: 0; font-size: 13px; }
   .raw-toggle { margin-top: 4px; }
@@ -313,16 +284,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 def _render_text(text: str) -> str:
-    """Простой текст → HTML с абзацами и <br>, готовый для KaTeX auto-render."""
+    """Текст → единый HTML-узел без разбивки на <p>/<br>.
+    white-space:pre-wrap в CSS сохраняет переносы строк для KaTeX auto-render:
+    многострочные блоки $$...\begin{cases}...$$ не разрезаются тегами."""
     if not text:
-        return "<p></p>"
-    escaped = html.escape(text)
-    # Двойной перенос строки → граница абзаца; одиночный → <br>.
-    paragraphs = re.split(r'\n{2,}', escaped)
-    parts = []
-    for para in paragraphs:
-        parts.append("<p>" + para.replace("\n", "<br>") + "</p>")
-    return "\n".join(parts)
+        return ""
+    return html.escape(text)
 
 
 def _diff_row(label: str, old: str, new: str) -> str:
@@ -347,6 +314,26 @@ def _diff_row(label: str, old: str, new: str) -> str:
     )
 
 
+def _diff_row_unchanged(label: str, text: str) -> str:
+    """Строка для существующего пункта без изменений — серая, в свёрнутом виде."""
+    def cell(t: str) -> str:
+        return (
+            f'<div class="math-content" style="color:#aaa">{_render_text(t)}</div>'
+            f'<details class="raw-toggle">'
+            f'<summary>Показать сырой текст</summary>'
+            f'<pre class="no-katex pre-raw">{html.escape(t)}</pre>'
+            f'</details>'
+        )
+    no_change_cell = '<span style="color:#aaa;font-style:italic">без изменений</span>'
+    return (
+        f'<tr>'
+        f'<td class="field-name" style="color:#aaa">{html.escape(label)}</td>'
+        f'<td>{cell(text)}</td>'
+        f'<td>{no_change_cell}</td>'
+        f'</tr>'
+    )
+
+
 def _problem_row(pid: int, problem: Problem, changes: Dict, section: str) -> str:
     """Генерирует HTML-блок для одной задачи в предпросмотре."""
     title = html.escape(problem.title or f"Задача #{pid}")
@@ -362,10 +349,9 @@ def _problem_row(pid: int, problem: Problem, changes: Dict, section: str) -> str
     # Подпункты
     parts_update = changes.get("parts_update", {})
     parts_create = changes.get("parts_create", {})
-    parts_delete = changes.get("parts_delete", [])
     by_label = {p.label: p for p in problem.parts.all()}
 
-    if parts_update or parts_create or parts_delete or section == "parts":
+    if parts_update or parts_create or section == "parts":
         for lbl in sorted(by_label.keys()):
             if lbl in parts_update:
                 rows.append(_diff_row(
@@ -374,16 +360,12 @@ def _problem_row(pid: int, problem: Problem, changes: Dict, section: str) -> str
                     parts_update[lbl],
                 ))
             elif section == "parts":
-                rows.append(_diff_row(
+                rows.append(_diff_row_unchanged(
                     f"Подп. [{lbl}]",
-                    by_label[lbl].statement or "",
                     by_label[lbl].statement or "",
                 ))
         for lbl in sorted(parts_create.keys()):
             rows.append(_diff_row(f"Подп. [{lbl}] (новый)", "", parts_create[lbl]))
-        for lbl in sorted(parts_delete):
-            old_text = by_label[lbl].statement if lbl in by_label else ""
-            rows.append(_diff_row(f"Подп. [{lbl}] (удаление)", old_text, "❌ УДАЛЁН"))
 
     # Решение
     if "solution" in changes:
@@ -518,7 +500,7 @@ class Command(BaseCommand):
         n_skip_multiple = sum(1 for _, _, r in classified if r["skip_reason"] == "multiple_problems")
         n_skip_bad_trim = sum(1 for _, _, r in classified if r["skip_reason"] == "bad_trim")
         n_skip_sol = sum(1 for _, _, r in classified if r["skip_reason"] == "conflict_solution")
-        n_skip_parts = sum(1 for _, _, r in classified if r["skip_reason"] == "conflict_parts")
+        n_skip_unknown_label = sum(1 for _, _, r in classified if r["skip_reason"] == "unknown_part_label")
         n_no_changes = sum(
             1 for _, _, r in classified
             if not r["skip"] and not r["changes"]
@@ -531,8 +513,7 @@ class Command(BaseCommand):
             (pid, p, r) for pid, p, r in classified
             if not r["skip"] and (
                 r["changes"].get("parts_update") or
-                r["changes"].get("parts_create") or
-                r["changes"].get("parts_delete")
+                r["changes"].get("parts_create")
             )
         ]
         will_change = set(
@@ -561,7 +542,7 @@ class Command(BaseCommand):
             f"  multiple_problems=True:            {n_skip_multiple:>7,}",
             f"  подозрительное сокращение (20%):   {n_skip_bad_trim:>7,}",
             f"  конфликт решения (уже есть):       {n_skip_sol:>7,}",
-            f"  конфликт подпунктов (есть ответы): {n_skip_parts:>7,}",
+            f"  неизвестная метка подпункта:       {n_skip_unknown_label:>7,}",
         ]
         summary = "\n".join(summary_lines)
 
@@ -611,7 +592,7 @@ class Command(BaseCommand):
         skipped_flagged = []
         skipped_bad_trim = []
         skipped_sol = []
-        skipped_parts = []
+        skipped_unknown_label = []
         skipped_not_found = []
 
         # Собираем списки пропущенных.
@@ -626,8 +607,8 @@ class Command(BaseCommand):
                 skipped_bad_trim.append(entry)
             elif reason == "conflict_solution":
                 skipped_sol.append(entry)
-            elif reason == "conflict_parts":
-                skipped_parts.append(entry)
+            elif reason == "unknown_part_label":
+                skipped_unknown_label.append(entry)
             elif reason == "not_found":
                 skipped_not_found.append(entry)
 
@@ -653,7 +634,7 @@ class Command(BaseCommand):
         _write_lines(os.path.join(REPORT_DIR, "skipped_flagged.txt"), skipped_flagged)
         _write_lines(os.path.join(REPORT_DIR, "skipped_bad_trim.txt"), skipped_bad_trim)
         _write_lines(os.path.join(REPORT_DIR, "skipped_conflict_solution.txt"), skipped_sol)
-        _write_lines(os.path.join(REPORT_DIR, "skipped_conflict_parts.txt"), skipped_parts)
+        _write_lines(os.path.join(REPORT_DIR, "skipped_unknown_part_label.txt"), skipped_unknown_label)
         _write_lines(os.path.join(REPORT_DIR, "skipped_not_found.txt"), skipped_not_found)
         _write_lines(
             os.path.join(REPORT_DIR, "changed_problem_ids.txt"),
