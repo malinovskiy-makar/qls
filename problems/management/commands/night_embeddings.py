@@ -108,8 +108,11 @@ class Command(BaseCommand):
         t_start = time.time()
         for batch_start in range(0, len(remaining), BATCH_SIZE):
             batch_ids = remaining[batch_start:batch_start + BATCH_SIZE]
-            problems = list(Problem.objects.filter(id__in=batch_ids)
-                            .only('id', 'title', 'statement'))
+            problems = list(
+                Problem.objects.filter(id__in=batch_ids)
+                .only('id', 'title', 'statement', 'ai_blurb')
+                .prefetch_related('parts', 'topics', 'skills', 'tags')
+            )
             texts = [problem_to_text(p) for p in problems]
             embeddings = model.encode(texts, show_progress_bar=False,
                                       batch_size=BATCH_SIZE)

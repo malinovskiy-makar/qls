@@ -20,7 +20,7 @@ from django.core.management.base import BaseCommand
 from django.db.models.expressions import RawSQL
 
 from problems.models import Problem
-from problems.embedding_config import EMBEDDING_MODEL_NAME, EMBEDDING_DIM
+from problems.embedding_config import EMBEDDING_MODEL_NAME, EMBEDDING_DIM, CANONICAL_TAG_NAMES
 
 # Псевдоним для обратной совместимости: night_embeddings.py импортирует MODEL_NAME отсюда.
 MODEL_NAME = EMBEDDING_MODEL_NAME
@@ -49,7 +49,7 @@ def _select_device(preferred: str) -> str:
 
 
 def problem_to_text(problem: Problem) -> str:
-    """Строит текст для эмбеддинга: заголовок + условие + подпункты + темы + навыки.
+    """Строит текст для эмбеддинга.
 
     Порядок блоков:
       1. title (если есть)
@@ -57,11 +57,11 @@ def problem_to_text(problem: Problem) -> str:
       3. подпункты ProblemPart.statement (до 500 символов суммарно)
       4. «Темы: …» — канонические темы, исключая техническую тему «Тест»
       5. «Навыки: …» — навыки задачи
+      6. ai_blurb[:400] — краткая суть (Дано/Найти или резюме)
+      7. «Теги: …» — только канонические теги из CANONICAL_TAG_NAMES
 
-    Блоки 4 и 5 добавляются только если у задачи есть соответствующие объекты.
-    Для задач без тем/навыков текст не изменится по структуре.
-
-    ⚠️ Требует prefetch_related('parts', 'topics', 'skills') при батч-запросе.
+    Решение и ответ в отпечаток НЕ входят.
+    ⚠️ Требует prefetch_related('parts', 'topics', 'skills', 'tags') при батч-запросе.
     """
     parts = []
     if problem.title:
@@ -84,6 +84,20 @@ def problem_to_text(problem: Problem) -> str:
     skill_names = [s.name for s in problem.skills.all()]
     if skill_names:
         parts.append('Навыки: ' + ', '.join(skill_names) + '.')
+
+    # Краткая суть из Батча 1 (ai_blurb — внутреннее поле, в интерфейсе не показывается)
+    blurb = (problem.ai_blurb or '').strip()
+    if blurb:
+        parts.append(blurb[:400])
+
+    # Канонические теги (только из CANONICAL_TAG_NAMES — без мусорных «Homework», «тут» и пр.)
+    # Сравнение по точному имени: регистр в базе совпадает с каноном (проверено на данных).
+    canonical_tags = sorted(
+        t.name for t in problem.tags.all()
+        if t.name in CANONICAL_TAG_NAMES
+    )
+    if canonical_tags:
+        parts.append('Теги: ' + ', '.join(canonical_tags) + '.')
 
     return ' '.join(parts)
 
@@ -158,8 +172,8 @@ class Command(BaseCommand):
             problems = list(
                 Problem.objects
                 .filter(id__in=batch_ids)
-                .only('id', 'title', 'statement')
-                .prefetch_related('parts', 'topics', 'skills')
+                .only('id', 'title', 'statement', 'ai_blurb')
+                .prefetch_related('parts', 'topics', 'skills', 'tags')
             )
 
             texts = [problem_to_text(p) for p in problems]
