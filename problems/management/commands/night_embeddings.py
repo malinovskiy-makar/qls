@@ -15,6 +15,13 @@
         --ids-file reports/quality_audit/changed_ids_B.txt \
         --ids-file reports/quality_audit/changed_ids_C.txt \
         --ids-file reports/quality_audit/changed_ids_D.txt
+
+Полный пересчёт (все задачи, CPU, resume-safe):
+    ./venv/bin/python manage.py night_embeddings \
+        --ids-file reports/recompute_2026-07/all_problem_ids.txt \
+        --done-file reports/recompute_2026-07/embeddings_done_ids.txt \
+        --log-file  reports/recompute_2026-07/recompute.log \
+        --device cpu --encode-batch 8
 """
 
 import os
@@ -25,7 +32,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from problems.models import Problem
-from problems.management.commands.build_embeddings import MODEL_NAME, problem_to_text
+from problems.management.commands.build_embeddings import MODEL_NAME, problem_to_text, _select_device
 
 BATCH_SIZE = 100
 LOG_EVERY = 500
@@ -45,6 +52,14 @@ class Command(BaseCommand):
         parser.add_argument('--log-file', default=DEFAULT_LOG,
                             help='Файл прогресс-лога.')
         parser.add_argument('--limit', type=int, default=None)
+        parser.add_argument(
+            '--device', choices=['auto', 'mps', 'cpu'], default='auto',
+            help='Устройство вычислений. На Mac с BGE-M3 обязательно --device cpu.',
+        )
+        parser.add_argument(
+            '--encode-batch', type=int, default=BATCH_SIZE,
+            help='Батч кодирования модели (default 100; снижай до 8 на 8 ГБ RAM).',
+        )
 
     def log(self, log_file, msg):
         line = f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] {msg}'
@@ -99,9 +114,13 @@ class Command(BaseCommand):
             self.log(log_file, 'Всё уже пересчитано. Готово.')
             return
 
+        device = _select_device(options['device'])
+        encode_batch = options['encode_batch']
+        self.log(log_file, f'Устройство: {device}, батч кодирования: {encode_batch}')
+
         self.log(log_file, 'Загружаем модель...')
         t0 = time.time()
-        model = SentenceTransformer(MODEL_NAME)
+        model = SentenceTransformer(MODEL_NAME, device=device)
         self.log(log_file, f'Модель загружена за {time.time() - t0:.1f}с')
 
         built = 0
@@ -115,7 +134,7 @@ class Command(BaseCommand):
             )
             texts = [problem_to_text(p) for p in problems]
             embeddings = model.encode(texts, show_progress_bar=False,
-                                      batch_size=BATCH_SIZE)
+                                      batch_size=encode_batch)
             for p, emb in zip(problems, embeddings):
                 p.embedding = emb.astype(np.float32).tobytes()
             Problem.objects.bulk_update(problems, ['embedding'])

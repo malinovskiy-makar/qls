@@ -83,6 +83,12 @@ duplicates_backup/
 batch1_parsed.jsonl
 batch1_errors.txt
 
+# Артефакты Батч 2 — не коммитить
+batch2_ids.txt
+batch2_sample.txt
+batch2_parsed.jsonl
+batch2_errors.txt
+
 # Скриншоты Playwright
 shots/
 tools/*.mjs
@@ -94,3 +100,6 @@ materials/attachments/ksigma_ocr_cache/
 
 # Swift скрипт OCR
 ocr_pdf.swift
+
+# Аудит чистых задач
+clean_audit.txt
