@@ -180,7 +180,8 @@ class ProblemAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'get_source', 'status', 'difficulty',
                     'difficulty_native', 'owner', 'updated_at')
     list_filter = ('status', 'difficulty', 'topics', 'tags', 'skills',
-                   'mistakes')
+                   'mistakes', 'multiple_problems', 'solution_ai_extracted',
+                   'solution_needs_review', 'needs_quality_review')
     search_fields = ('title', 'statement', 'answer', 'solution')
     filter_horizontal = ('topics', 'subtopics', 'tags', 'files', 'skills',
                          'mistakes')

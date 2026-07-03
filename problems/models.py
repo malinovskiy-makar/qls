@@ -316,6 +316,11 @@ class Problem(models.Model):
         'Склейка нескольких задач', default=False,
         help_text='ИИ-флаг: задача содержит несколько условий, требует ручного разбиения.',
     )
+    # Батч 2: решение извлечено ИИ из текста условия, требует ручной проверки.
+    solution_ai_extracted = models.BooleanField(
+        'Решение извлечено ИИ', default=False,
+        help_text='Батч 2: решение вынесено из текста задачи автоматически, требует проверки.',
+    )
 
     created_at = models.DateTimeField('Создана', auto_now_add=True)
     updated_at = models.DateTimeField('Изменена', auto_now=True)
