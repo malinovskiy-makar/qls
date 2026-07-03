@@ -23,6 +23,7 @@ import html
 import json
 import os
 import random
+import re
 import shutil
 
 from django.core.management.base import BaseCommand
@@ -228,8 +229,122 @@ def _apply_changes_to_problem(problem: Problem, changes: Dict) -> List[str]:
 # HTML-предпросмотр
 # ---------------------------------------------------------------------------
 
-def _html_escape(text: str) -> str:
-    return html.escape(text or "")
+# KaTeX — та же версия, что на сайте (catalog/templates/catalog/base.html).
+_KATEX_VERSION = "0.16.9"
+
+_CSS = """\
+  body { font-family: sans-serif; font-size: 13px; background: #f5f5f5; margin: 0; padding: 16px; }
+  h1 { font-size: 18px; }
+  h2 { font-size: 15px; margin-top: 32px; border-bottom: 2px solid #ccc; padding-bottom: 4px; }
+  .card { background: #fff; border: 1px solid #ddd; border-radius: 6px; margin: 12px 0; padding: 12px; }
+  .card-header { margin-bottom: 8px; }
+  .pid { font-weight: bold; color: #555; margin-right: 8px; }
+  .title { font-weight: bold; }
+  .section-tag { float: right; background: #e0e7ff; color: #3730a3; border-radius: 4px; padding: 1px 7px; font-size: 11px; }
+  .diff-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .diff-table th { background: #f0f0f0; padding: 4px 8px; text-align: left; width: 12%; }
+  .diff-table th:nth-child(2), .diff-table th:nth-child(3) { width: 44%; }
+  .diff-table td { padding: 4px 8px; border-top: 1px solid #eee; vertical-align: top; }
+  .diff-table tr.changed td { background: #fffbeb; }
+  .field-name { font-weight: bold; color: #555; font-size: 11px; white-space: nowrap; }
+  .math-content { font-size: 13px; line-height: 1.6; overflow-wrap: break-word; }
+  .math-content p { margin: 2px 0 6px; }
+  .summary { background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 16px; margin-bottom: 24px; }
+  .summary pre { margin: 0; font-size: 13px; }
+  .raw-toggle { margin-top: 4px; }
+  .raw-toggle summary { cursor: pointer; font-size: 11px; color: #888; user-select: none; }
+  .pre-raw { white-space: pre-wrap; word-break: break-word; margin: 4px 0 0;
+             font-family: monospace; font-size: 11px; background: #f8f8f8;
+             border: 1px solid #e0e0e0; border-radius: 3px; padding: 6px; }"""
+
+# Те же функции, что в catalog/base.html: маскируем \$ до KaTeX, чистим после.
+# ignoredClasses: ['no-katex'] — исключает <pre class="no-katex"> из обработки.
+_KATEX_JS = r"""
+var DOLLAR_SENTINEL = '';
+
+function maskEscapedDollars(root) {
+  var walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT, null);
+  var node;
+  while ((node = walker.nextNode())) {
+    var p = node.parentNode && node.parentNode.nodeName;
+    if (p === 'SCRIPT' || p === 'STYLE' || p === 'TEXTAREA') continue;
+    if (node.nodeValue.indexOf('\\$') !== -1) {
+      node.nodeValue = node.nodeValue.split('\\$').join(DOLLAR_SENTINEL);
+    }
+  }
+}
+
+function fixCurrencyDollars(root) {
+  var walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT, null);
+  var node;
+  while ((node = walker.nextNode())) {
+    var p = node.parentNode && node.parentNode.nodeName;
+    if (p === 'SCRIPT' || p === 'STYLE' || p === 'TEXTAREA') continue;
+    var v = node.nodeValue;
+    if (v.indexOf(DOLLAR_SENTINEL) !== -1 || v.indexOf('\\$') !== -1 ||
+        v.indexOf('\\_') !== -1 || v.indexOf('\\&') !== -1 ||
+        v.indexOf('\\#') !== -1) {
+      node.nodeValue = v.split(DOLLAR_SENTINEL).join('$').split('\\$').join('$')
+                        .split('\\_').join('_').split('\\&').join('&')
+                        .split('\\#').join('#');
+    }
+  }
+}
+
+function initKaTeX() {
+  maskEscapedDollars(document.body);
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$',   right: '$$',   display: true  },
+      { left: '$',    right: '$',    display: false },
+      { left: '\\[',  right: '\\]',  display: true  },
+      { left: '\\(',  right: '\\)',  display: false }
+    ],
+    throwOnError: false,
+    ignoredClasses: ['no-katex']
+  });
+  fixCurrencyDollars(document.body);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  fixCurrencyDollars(document.body);
+});
+"""
+
+
+def _render_text(text: str) -> str:
+    """Простой текст → HTML с абзацами и <br>, готовый для KaTeX auto-render."""
+    if not text:
+        return "<p></p>"
+    escaped = html.escape(text)
+    # Двойной перенос строки → граница абзаца; одиночный → <br>.
+    paragraphs = re.split(r'\n{2,}', escaped)
+    parts = []
+    for para in paragraphs:
+        parts.append("<p>" + para.replace("\n", "<br>") + "</p>")
+    return "\n".join(parts)
+
+
+def _diff_row(label: str, old: str, new: str) -> str:
+    changed = old.strip() != new.strip()
+    cls = "changed" if changed else ""
+
+    def cell(text: str) -> str:
+        return (
+            f'<div class="math-content">{_render_text(text)}</div>'
+            f'<details class="raw-toggle">'
+            f'<summary>Показать сырой текст</summary>'
+            f'<pre class="no-katex pre-raw">{html.escape(text)}</pre>'
+            f'</details>'
+        )
+
+    return (
+        f'<tr class="{cls}">'
+        f'<td class="field-name">{html.escape(label)}</td>'
+        f'<td>{cell(old)}</td>'
+        f'<td>{cell(new)}</td>'
+        f'</tr>'
+    )
 
 
 def _problem_row(pid: int, problem: Problem, changes: Dict, section: str) -> str:
@@ -240,11 +355,7 @@ def _problem_row(pid: int, problem: Problem, changes: Dict, section: str) -> str
 
     # Условие
     if "stmt" in changes:
-        rows.append(_diff_row(
-            "Условие",
-            problem.statement or "",
-            changes["stmt"],
-        ))
+        rows.append(_diff_row("Условие", problem.statement or "", changes["stmt"]))
     elif section == "stmt":
         rows.append(_diff_row("Условие", problem.statement or "", problem.statement or ""))
 
@@ -271,7 +382,8 @@ def _problem_row(pid: int, problem: Problem, changes: Dict, section: str) -> str
         for lbl in sorted(parts_create.keys()):
             rows.append(_diff_row(f"Подп. [{lbl}] (новый)", "", parts_create[lbl]))
         for lbl in sorted(parts_delete):
-            rows.append(_diff_row(f"Подп. [{lbl}] (удаление)", by_label.get(lbl, None) and by_label[lbl].statement or "", "❌ УДАЛЁН"))
+            old_text = by_label[lbl].statement if lbl in by_label else ""
+            rows.append(_diff_row(f"Подп. [{lbl}] (удаление)", old_text, "❌ УДАЛЁН"))
 
     # Решение
     if "solution" in changes:
@@ -288,69 +400,62 @@ def _problem_row(pid: int, problem: Problem, changes: Dict, section: str) -> str
         ))
 
     rows_html = "\n".join(rows)
-    return f"""
-<div class="card">
-  <div class="card-header">
-    <span class="pid">#{pid}</span>
-    <span class="title">{title}</span>
-    <span class="section-tag">{section}</span>
-  </div>
-  <table class="diff-table">
-    <thead><tr><th>Поле</th><th>БЫЛО</th><th>СТАНЕТ</th></tr></thead>
-    <tbody>{rows_html}</tbody>
-  </table>
-</div>"""
+    return (
+        f'\n<div class="card">'
+        f'\n  <div class="card-header">'
+        f'<span class="pid">#{pid}</span>'
+        f'<span class="title">{title}</span>'
+        f'<span class="section-tag">{section}</span>'
+        f'</div>'
+        f'\n  <table class="diff-table">'
+        f'\n    <thead><tr><th>Поле</th><th>БЫЛО</th><th>СТАНЕТ</th></tr></thead>'
+        f'\n    <tbody>{rows_html}</tbody>'
+        f'\n  </table>'
+        f'\n</div>'
+    )
 
 
-def _diff_row(label: str, old: str, new: str) -> str:
-    changed = old.strip() != new.strip()
-    cls = "changed" if changed else ""
-    return f"""<tr class="{cls}">
-      <td class="field-name">{html.escape(label)}</td>
-      <td><pre class="pre-wrap">{html.escape(old)}</pre></td>
-      <td><pre class="pre-wrap">{html.escape(new)}</pre></td>
-    </tr>"""
-
-
-HTML_TEMPLATE = """<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<title>Батч 2 — предпросмотр применения</title>
-<style>
-  body {{ font-family: sans-serif; font-size: 13px; background: #f5f5f5; margin: 0; padding: 16px; }}
-  h1 {{ font-size: 18px; }}
-  h2 {{ font-size: 15px; margin-top: 32px; border-bottom: 2px solid #ccc; padding-bottom: 4px; }}
-  .card {{ background: #fff; border: 1px solid #ddd; border-radius: 6px; margin: 12px 0; padding: 12px; }}
-  .card-header {{ margin-bottom: 8px; }}
-  .pid {{ font-weight: bold; color: #555; margin-right: 8px; }}
-  .title {{ font-weight: bold; }}
-  .section-tag {{ float: right; background: #e0e7ff; color: #3730a3; border-radius: 4px; padding: 1px 7px; font-size: 11px; }}
-  .diff-table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
-  .diff-table th {{ background: #f0f0f0; padding: 4px 8px; text-align: left; width: 12%; }}
-  .diff-table th:nth-child(2), .diff-table th:nth-child(3) {{ width: 44%; }}
-  .diff-table td {{ padding: 4px 8px; border-top: 1px solid #eee; vertical-align: top; }}
-  .diff-table tr.changed td {{ background: #fffbeb; }}
-  .field-name {{ font-weight: bold; color: #555; font-size: 11px; white-space: nowrap; }}
-  .pre-wrap {{ white-space: pre-wrap; word-break: break-word; margin: 0; font-family: monospace; font-size: 12px; }}
-  .summary {{ background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 16px; margin-bottom: 24px; }}
-  .summary pre {{ margin: 0; font-size: 13px; }}
-</style>
-</head>
-<body>
-<h1>Батч 2 — предпросмотр применения</h1>
-<div class="summary"><pre>{summary}</pre></div>
-
-<h2>Раздел 1: задачи с чисткой условия (~{n_stmt} из выборки)</h2>
-{section_stmt}
-
-<h2>Раздел 2: задачи с вынесенным решением (~{n_sol} из выборки)</h2>
-{section_sol}
-
-<h2>Раздел 3: задачи с переписанными подпунктами (~{n_parts} из выборки)</h2>
-{section_parts}
-</body>
-</html>"""
+def _build_preview_html(
+    summary: str,
+    n_stmt: int, n_sol: int, n_parts: int,
+    section_stmt: str, section_sol: str, section_parts: str,
+) -> str:
+    """Собирает итоговый HTML без .format() — чтобы фигурные скобки JS не мешали."""
+    v = _KATEX_VERSION
+    cdn = f"https://cdn.jsdelivr.net/npm/katex@{v}/dist"
+    return "\n".join([
+        "<!DOCTYPE html>",
+        '<html lang="ru">',
+        "<head>",
+        '<meta charset="utf-8">',
+        "<title>Батч 2 — предпросмотр применения</title>",
+        f'<link rel="stylesheet" href="{cdn}/katex.min.css">',
+        f'<script defer src="{cdn}/katex.min.js"></script>',
+        f'<script defer src="{cdn}/contrib/auto-render.min.js"',
+        '        onload="initKaTeX()"></script>',
+        "<style>",
+        _CSS,
+        "</style>",
+        "</head>",
+        "<body>",
+        "<h1>Батч 2 — предпросмотр применения</h1>",
+        f'<div class="summary"><pre class="no-katex">{html.escape(summary)}</pre></div>',
+        "",
+        f"<h2>Раздел 1: задачи с чисткой условия (~{n_stmt} из выборки)</h2>",
+        section_stmt,
+        "",
+        f"<h2>Раздел 2: задачи с вынесенным решением (~{n_sol} из выборки)</h2>",
+        section_sol,
+        "",
+        f"<h2>Раздел 3: задачи с переписанными подпунктами (~{n_parts} из выборки)</h2>",
+        section_parts,
+        "",
+        "<script>",
+        _KATEX_JS,
+        "</script>",
+        "</body>",
+        "</html>",
+    ])
 
 
 class Command(BaseCommand):
@@ -591,8 +696,8 @@ class Command(BaseCommand):
                 blocks.append(_problem_row(pid, problem, result["changes"], section_tag))
             return "\n".join(blocks) if blocks else "<p><em>Нет данных</em></p>"
 
-        html_content = HTML_TEMPLATE.format(
-            summary=html.escape(summary),
+        html_content = _build_preview_html(
+            summary=summary,
             n_stmt=len(sample_stmt),
             n_sol=len(sample_sol),
             n_parts=len(sample_parts),
