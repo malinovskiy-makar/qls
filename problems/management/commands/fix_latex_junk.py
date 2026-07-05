@@ -1,13 +1,17 @@
 """
 Механическая чистка детерминированного LaTeX-мусора в условиях задач.
 
-Чинит три паттерна в Problem.statement и ProblemPart.statement (published):
+Чинит четыре паттерна в Problem.statement и ProblemPart.statement (published):
 
   1. \\footnote{...}  — удалить целиком (подсчёт вложенных скобок).
   2. <<метка>> в начале условия — удалить вместе с содержимым;
      << / >> в середине текста — заменить на «ёлочки» « и ».
   3. %слово — токен вида %<буква><слово> (слипшийся LaTeX-комментарий) —
      удалить. Не трогаем: 5%, \%, % перед цифрой, %  (пробел после %).
+  4. inline_bullet — маркер « • », слипшийся с предыдущим предложением (не в
+     начале строки), — перед ним вставляется \n (пробелы/табы перед маркером
+     схлопываются). Сам маркер и текст после не трогаем. Уже стоящие в начале
+     строки « • » (после \n) не трогаем — идемпотентно.
 
 Защита: если после чистки текст < 50% исходного — пропустить задачу.
 
@@ -113,6 +117,20 @@ def _remove_junk_comments(text):
     return _JUNK_COMMENT_RE.sub('', text)
 
 
+# ── Паттерн 4: инлайновый маркер « • », слипшийся с текстом ────────────────────
+
+# Символ перед пробелами/табами и маркером должен быть НЕ переводом строки и НЕ
+# самим маркером — иначе (а) маркер уже стоит в начале строки, трогать не надо;
+# (б) слипшиеся «••» (OCR-мусор) будут раскачиваться между проходами вместо
+# стабильного результата — идемпотентность.
+_INLINE_BULLET_RE = re.compile(r'([^\n•])[ \t]*•')
+
+
+def _fix_inline_bullets(text):
+    # type: (str) -> str
+    return _INLINE_BULLET_RE.sub(r'\1\n•', text)
+
+
 # ── Постобработка ─────────────────────────────────────────────────────────────
 
 def _normalize(text):
@@ -144,6 +162,11 @@ def clean_text(text):
     if t3 != text:
         applied.append('junk_comment')
     text = t3
+
+    t4 = _fix_inline_bullets(text)
+    if t4 != text:
+        applied.append('inline_bullet')
+    text = t4
 
     text = _normalize(text)
     if text != original.strip():
@@ -182,7 +205,8 @@ class Command(BaseCommand):
         # (pid, field, old_text, new_text, patterns_applied, part_id_or_none)
         hits = []   # type: List[Tuple[int, str, str, str, List[str], Optional[int]]]
         skipped_too_short = []  # type: List[Tuple[int, str]]  # (pid, field)
-        pattern_counts = {'footnote': 0, 'pseudo_quotes': 0, 'junk_comment': 0}
+        pattern_counts = {'footnote': 0, 'pseudo_quotes': 0, 'junk_comment': 0,
+                         'inline_bullet': 0}
         non_idempotent = []  # type: List[Tuple[int, str]]
 
         for p in qs:
