@@ -94,16 +94,6 @@ a:focus-visible, button:focus-visible {
   color: var(--text2);
   font-size: 16px;
 }
-.rush-rules {
-  display: flex;
-  justify-content: center;
-  gap: 22px;
-  margin: 26px 0 6px;
-  font-size: 15px;
-  color: var(--text2);
-  flex-wrap: wrap;
-}
-.rush-rules b { color: var(--text); font-weight: 600; }
 .topic-chips {
   display: flex;
   flex-wrap: wrap;
@@ -129,22 +119,78 @@ a:focus-visible, button:focus-visible {
   color: #fff;
   font-weight: 600;
 }
-.btn-play {
-  font: inherit;
-  font-size: 17px;
-  font-weight: 600;
-  height: 56px;
-  padding: 0 48px;
-  margin-top: 26px;
-  border: none;
-  border-radius: 12px;
-  background: var(--btn-bg);
-  color: var(--on-btn);
-  cursor: pointer;
-  transition: background .12s, transform .1s;
+/* Карточки режимов: клик по карточке = старт забега в этом режиме */
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 24px;
+  text-align: left;
 }
-.btn-play:hover { background: var(--btn-bg-hover); }
-.btn-play:active { transform: scale(.97); }
+.mode-card {
+  font: inherit;
+  position: relative;
+  padding: 14px 16px;
+  border: 1px solid var(--rush-border);
+  border-radius: 14px;
+  background: var(--rush-surface);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .12s, transform .1s, box-shadow .12s;
+}
+.mode-card:hover {
+  border-color: var(--rush-accent);
+  box-shadow: 0 2px 12px rgba(0,0,0,.08);
+}
+.mode-card:active { transform: scale(.98); }
+.mode-name {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -.3px;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.mode-name .mode-emoji { font-size: 15px; }
+.mode-kind {
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--text2);
+}
+.mode-terms {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+.mode-terms b { color: var(--text2); font-weight: 600; }
+.mode-best {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--rush-accent);
+  font-weight: 600;
+  min-height: 14px;
+}
+.mode-card.disabled {
+  opacity: .55;
+  cursor: default;
+  pointer-events: none;
+}
+.mode-card .soon-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--rush-border);
+  color: var(--text3);
+}
 .best-line {
   margin-top: 16px;
   font-size: 13px;
@@ -500,6 +546,7 @@ a:focus-visible, button:focus-visible {
 /* ── Мобильная версия (≤720px) ─────────────────────────────────── */
 @media (max-width: 720px) {
   .rush-wrap { padding: 16px 12px 32px; }
+  .mode-grid { grid-template-columns: 1fr; }
   .opts { grid-template-columns: 1fr; }
   .opt .key { display: none; }
   .keys-hint { display: none; }
@@ -535,20 +582,15 @@ a:focus-visible, button:focus-visible {
   <section id="screen-start" class="screen active">
     <div class="col">
       <h1 class="rush-logo">ECON<span class="bolt">⚡</span><span class="rush">RUSH</span></h1>
-      <p class="rush-sub">60 секунд. Вопросы по экономике. Сколько наберёшь?</p>
-      <div class="rush-rules">
-        <span>⏱ <b>60 сек</b> на старте</span>
-        <span>✓ верный <b>+6 с</b></span>
-        <span>✗ неверный <b>−4 с</b></span>
-      </div>
+      <p class="rush-sub">Вопросы по экономике на время. Четыре режима — как в шахматах.</p>
       <div class="topic-chips" id="topic-chips">
         <button class="topic-chip active" data-topic="">Все темы</button>
         {% for t in topics %}
         <button class="topic-chip" data-topic="{{ t }}">{{ t }}</button>
         {% endfor %}
       </div>
-      <button class="btn-play" id="btn-play">Играть</button>
-      <p class="best-line" id="best-line"></p>
+      <div class="mode-grid" id="mode-grid"></div>
+      <p class="best-line" id="best-line">Клик по режиму — старт забега<span class="kbd-hint"> · Enter — последний режим</span></p>
     </div>
   </section>
 
@@ -610,12 +652,31 @@ a:focus-visible, button:focus-visible {
   'use strict';
 
   var CFG = {{ config_json|safe }};
-  var BEST_KEY = 'econrush_best';
   var REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* Подписи карточек режимов (сама механика — только из CFG.modes) */
+  var MODE_META = {
+    bullet:  { emoji: '⚡', kind: 'Данетки: Верно или Неверно' },
+    blitz:   { emoji: '🔥', kind: 'Один верный из вариантов' },
+    rapid:   { emoji: '🎯', kind: 'Несколько верных из вариантов' },
+    classic: { emoji: '🧮', kind: 'Числовой ответ — впиши сам' }
+  };
+  var MODE_ORDER = ['bullet', 'blitz', 'rapid', 'classic'];
+
+  /* Рекорды — отдельно на режим; старый общий ключ считаем рекордом блица */
+  function bestKey(m) { return 'econ_rush_best_' + m; }
+  (function migrateOldBest() {
+    var old = localStorage.getItem('econrush_best');
+    if (old && !localStorage.getItem(bestKey('blitz'))) {
+      localStorage.setItem(bestKey('blitz'), old);
+    }
+  })();
 
   /* -- состояние -- */
   var state = 'start';          // start | playing | finished
   var topic = '';               // выбранная тема ('' = все)
+  var mode = CFG.default_mode;  // выбранный режим (последний сыгранный)
+  var MODE = CFG.modes[mode];   // конфиг текущего режима (duration, дельты)
   var timeLeft = 0;             // секунд
   var lastTick = 0;             // timestamp прошлого кадра
   var rafId = null;
@@ -676,13 +737,65 @@ a:focus-visible, button:focus-visible {
     } catch (e) { /* формула не критична для игры */ }
   }
 
-  /* ---------- СТАРТ ---------- */
-  function paintBest() {
-    var best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10);
-    $('best-line').innerHTML = (best > 0 ? 'Твой рекорд: <b>' + best.toLocaleString('ru-RU') + '</b>' : 'Первый забег!')
-      + ' <span class="kbd-hint">· отвечай клавишами 1–4</span>';
+  /* ---------- СТАРТ: карточки режимов ---------- */
+  function formatSec(n) { return (n > 0 ? '+' : '−') + Math.abs(n) + ' с'; }
+
+  function renderModeCards() {
+    var grid = $('mode-grid');
+    grid.innerHTML = '';
+    MODE_ORDER.forEach(function (key) {
+      var m = CFG.modes[key];
+      var meta = MODE_META[key];
+      var empty = !CFG.pool_counts[key];
+      var card = document.createElement('button');
+      card.className = 'mode-card' + (empty ? ' disabled' : '');
+      card.dataset.mode = key;
+      if (empty) card.disabled = true;
+
+      var name = document.createElement('div');
+      name.className = 'mode-name';
+      name.innerHTML = '<span class="mode-emoji"></span><span class="mode-title"></span>';
+      name.querySelector('.mode-emoji').textContent = meta.emoji;
+      name.querySelector('.mode-title').textContent = m.title;
+      card.appendChild(name);
+
+      var kind = document.createElement('div');
+      kind.className = 'mode-kind';
+      kind.textContent = meta.kind;
+      card.appendChild(kind);
+
+      var terms = document.createElement('div');
+      terms.className = 'mode-terms';
+      terms.innerHTML = '<b></b> · верный <b></b> · ошибка <b></b>';
+      var bs = terms.querySelectorAll('b');
+      bs[0].textContent = (m.duration >= 60 ? (m.duration / 60) + ' мин' : m.duration + ' с');
+      bs[1].textContent = formatSec(m.time_correct);
+      bs[2].textContent = formatSec(m.time_wrong);
+      card.appendChild(terms);
+
+      var bestEl = document.createElement('div');
+      bestEl.className = 'mode-best';
+      if (empty) {
+        var soon = document.createElement('span');
+        soon.className = 'soon-badge';
+        soon.textContent = 'Скоро';
+        card.appendChild(soon);
+      } else {
+        var best = parseInt(localStorage.getItem(bestKey(key)) || '0', 10);
+        bestEl.textContent = best > 0 ? '🏆 рекорд ' + best.toLocaleString('ru-RU') : '';
+      }
+      card.appendChild(bestEl);
+      grid.appendChild(card);
+    });
   }
-  paintBest();
+  renderModeCards();
+
+  $('mode-grid').addEventListener('click', function (e) {
+    var card = e.target.closest('.mode-card');
+    if (!card || card.disabled) return;
+    mode = card.dataset.mode;
+    startRun();
+  });
 
   $('topic-chips').addEventListener('click', function (e) {
     var chip = e.target.closest('.topic-chip');
@@ -694,13 +807,15 @@ a:focus-visible, button:focus-visible {
   });
 
   function startRun() {
-    api('/game/api/session/start/?topic=' + encodeURIComponent(topic))
+    api('/game/api/session/start/?mode=' + encodeURIComponent(mode)
+        + '&topic=' + encodeURIComponent(topic))
       .then(function (d) {
         if (!d.ok) { alert(d.error || 'Не удалось начать игру'); return; }
+        MODE = d.mode; // тайминги режима — с сервера (единый источник)
         score = 0; streak = 0; bestStreak = 0;
         answered = 0; correctCount = 0;
         misses = []; nextBuf = null; poolExhausted = false;
-        timeLeft = CFG.start_seconds;
+        timeLeft = MODE.duration;
         runStartedAt = performance.now();
         show('playing');
         paintHud();
@@ -710,7 +825,6 @@ a:focus-visible, button:focus-visible {
         rafId = requestAnimationFrame(tick);
       });
   }
-  $('btn-play').addEventListener('click', startRun);
 
   /* ---------- ТАЙМЕР (rAF от timestamp) ---------- */
   function tick(ts) {
@@ -732,7 +846,7 @@ a:focus-visible, button:focus-visible {
     combo.classList.toggle('hot', mult > 1);
     combo.classList.toggle('show', mult > 1);
     var fill = $('time-fill');
-    var frac = Math.max(0, Math.min(1, timeLeft / CFG.start_seconds));
+    var frac = Math.max(0, Math.min(1, timeLeft / MODE.duration));
     fill.style.transform = 'scaleX(' + frac + ')';
     fill.classList.toggle('low', timeLeft < 7);
     fill.classList.toggle('mid', timeLeft >= 7 && timeLeft < 15);
@@ -779,7 +893,7 @@ a:focus-visible, button:focus-visible {
     var hint = $('keys-hint');
     if (hint) {
       hint.textContent = 'Клавиши 1–' + q.options.length +
-        ' — ответ · пробел — пропустить (' + CFG.time_skip + ' с)';
+        ' — ответ · пробел — пропустить (' + MODE.time_skip + ' с)';
     }
   }
 
@@ -825,7 +939,7 @@ a:focus-visible, button:focus-visible {
         bestStreak = Math.max(bestStreak, streak);
         score += CFG.base_points * comboMult(streak);
         buttons[choice].classList.add('is-correct');
-        showDelta('+' + CFG.time_correct + ' с', 'plus');
+        showDelta('+' + d.time_delta + ' с', 'plus');
         flashTrack(false);
         comboToastMaybe();
         setTimeout(advance, REDUCED ? 0 : 500);
@@ -834,7 +948,7 @@ a:focus-visible, button:focus-visible {
         streak = 0;
         buttons[choice].classList.add('is-wrong');
         if (buttons[d.correct_index]) buttons[d.correct_index].classList.add('show-right');
-        showDelta(CFG.time_wrong + ' с', 'minus');
+        showDelta(d.time_delta + ' с', 'minus');
         flashTrack(true);
         vignette();
         misses.push({ q: q, chosen: choice, right: d.correct_index });
@@ -856,7 +970,7 @@ a:focus-visible, button:focus-visible {
       timeLeft = Math.max(0, timeLeft + d.time_delta);
       streak = 0;
       if (timeLeft <= 0) { paintHud(); endRun(); return; }
-      showDelta(CFG.time_skip + ' с', 'skip');
+      showDelta(d.time_delta + ' с', 'skip');
       paintHud();
       advance();
     });
@@ -925,7 +1039,7 @@ a:focus-visible, button:focus-visible {
     if (confirm('Прервать забег? Результат не сохранится.')) {
       cancelAnimationFrame(rafId);
       show('start');
-      paintBest();
+      renderModeCards();
     }
   });
 
@@ -941,16 +1055,17 @@ a:focus-visible, button:focus-visible {
     $('st-streak').textContent = bestStreak; // длина лучшей серии верных подряд
     $('st-speed').textContent = Math.round(total / mins);
 
-    /* рекорд */
-    var best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10);
+    /* рекорд — отдельный на режим */
+    var best = parseInt(localStorage.getItem(bestKey(mode)) || '0', 10);
     var isRecord = score > best && score > 0;
     if (isRecord) {
-      localStorage.setItem(BEST_KEY, String(score));
+      localStorage.setItem(bestKey(mode), String(score));
       $('record-badge').classList.add('on');
       if (!REDUCED) confetti();
     } else {
       $('record-badge').classList.remove('on');
     }
+    renderModeCards(); // освежить рекорды на карточках к возврату на старт
 
     /* счёт: count-up ~800 мс */
     var scoreEl = $('final-score');
@@ -1057,7 +1172,8 @@ a:focus-visible, button:focus-visible {
   document.addEventListener('keydown', function (e) {
     if (e.repeat) return;
     if (state === 'start') {
-      if (e.key === 'Enter') { e.preventDefault(); startRun(); }
+      // Enter — забег в последнем сыгранном режиме (или режиме по умолчанию)
+      if (e.key === 'Enter' && CFG.pool_counts[mode]) { e.preventDefault(); startRun(); }
       return;
     }
     if (state === 'finished') {

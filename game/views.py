@@ -99,12 +99,6 @@ def game_page(request):
             'pool_counts': pool_counts,
             'base_points': config.BASE_POINTS,
             'combo_steps': config.COMBO_STEPS,
-            # Легаси-ключи для старого JS (значения = режим по умолчанию);
-            # убрать вместе с переделкой фронтенда (Фазы 5–6).
-            'start_seconds': config.MODES[config.DEFAULT_MODE]['duration'],
-            'time_correct': config.MODES[config.DEFAULT_MODE]['time_correct'],
-            'time_wrong': config.MODES[config.DEFAULT_MODE]['time_wrong'],
-            'time_skip': config.MODES[config.DEFAULT_MODE]['time_skip'],
         }),
     })
 
