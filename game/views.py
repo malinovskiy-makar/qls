@@ -44,14 +44,15 @@ def game_page(request):
               if counts.get(name, 0) >= MIN_TOPIC_POOL]
     return render(request, 'game/game.html', {
         'topics': topics,
-        'config': {
+        # JSON для JS-клиента: механика читается только из config.py
+        'config_json': json.dumps({
             'start_seconds': config.START_SECONDS,
             'time_correct': config.TIME_CORRECT,
             'time_wrong': config.TIME_WRONG,
             'time_skip': config.TIME_SKIP,
             'base_points': config.BASE_POINTS,
             'combo_steps': config.COMBO_STEPS,
-        },
+        }),
     })
 
 
