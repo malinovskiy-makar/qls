@@ -268,6 +268,8 @@ a:focus-visible, button:focus-visible {
   cursor: pointer;
   transition: border-color .12s, background .12s, transform .1s;
 }
+/* нечётный «хвост» (3-й из трёх, 5-й из пяти) занимает всю ширину */
+.opt:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .opt:hover { border-color: var(--rush-accent); background: var(--rush-accent-tint); }
 .opt:active { transform: scale(.98); }
 .opt .key {
@@ -511,7 +513,7 @@ a:focus-visible, button:focus-visible {
       <div class="combo-toast" id="combo-toast"></div>
       <div class="q-card" id="q-card"></div>
       <div class="opts" id="opts"></div>
-      <p class="keys-hint">Клавиши 1–4 — ответ · пробел — пропустить (−2 с)</p>
+      <p class="keys-hint" id="keys-hint">Клавиши 1–4 — ответ · пробел — пропустить (−2 с)</p>
     </div>
   </section>
 
@@ -719,6 +721,12 @@ a:focus-visible, button:focus-visible {
     });
     renderMath(card);
     renderMath(opts);
+    // подсказка под сеткой — по фактическому числу вариантов (бывает 2 и 5)
+    var hint = $('keys-hint');
+    if (hint) {
+      hint.textContent = 'Клавиши 1–' + q.options.length +
+        ' — ответ · пробел — пропустить (' + CFG.time_skip + ' с)';
+    }
   }
 
   function prefetchNext() {
@@ -754,6 +762,9 @@ a:focus-visible, button:focus-visible {
     }).then(function (d) {
       if (d.error) { inputLocked = false; return; }
       timeLeft = Math.max(0, timeLeft + d.time_delta);
+      // время кончилось прямо на этой дельте — не ждём следующего кадра rAF
+      // (в фоновой вкладке rAF заморожен и финал бы не наступил)
+      if (timeLeft <= 0) { paintHud(); endRun(); return; }
       var buttons = $('opts').querySelectorAll('.opt');
       if (d.correct) {
         answered++; correctCount++; streak++;
@@ -788,6 +799,7 @@ a:focus-visible, button:focus-visible {
       if (d.error) { inputLocked = false; return; }
       timeLeft = Math.max(0, timeLeft + d.time_delta);
       streak = 0;
+      if (timeLeft <= 0) { paintHud(); endRun(); return; }
       dropChip(CFG.time_skip + ' с');
       paintHud();
       advance();
@@ -881,7 +893,7 @@ a:focus-visible, button:focus-visible {
     var mins = Math.max(0.25, (performance.now() - runStartedAt) / 60000);
     $('st-correct').textContent = correctCount + '/' + total;
     $('st-acc').textContent = acc + '%';
-    $('st-streak').textContent = '×' + comboMult(bestStreak);
+    $('st-streak').textContent = bestStreak; // длина лучшей серии верных подряд
     $('st-speed').textContent = Math.round(total / mins);
 
     /* рекорд */
@@ -1008,7 +1020,8 @@ a:focus-visible, button:focus-visible {
       return;
     }
     if (state === 'playing') {
-      if (e.key >= '1' && e.key <= '4') {
+      if (e.key >= '1' && e.key <= '5') {
+        // до 5 вариантов (в пуле есть тесты с пятью)
         var i = parseInt(e.key, 10) - 1;
         if (current && i < current.options.length) { e.preventDefault(); answer(i); }
       } else if (e.key === ' ') {
