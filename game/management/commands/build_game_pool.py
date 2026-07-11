@@ -48,7 +48,7 @@ MAX_QUESTION_LEN = 300   # символов после чистки перено
 MIN_QUESTION_LEN = 15
 MAX_OPTION_LEN = 160
 MIN_OPTIONS = 2
-MAX_OPTIONS = 5
+MAX_OPTIONS = 6   # олимпиадные тесты бывают а–е (6 вариантов)
 
 # Признаки контента, который в игре не отрисуется честно:
 # картинки, ссылки, остатки PDF-вёрстки, псевдотаблицы. \begin{...}/\end{...}
@@ -213,6 +213,23 @@ def clean_question(problem):
     return question, None
 
 
+# Метка следующего варианта, приклеенная внутри текста ЭТОГО варианта — признак
+# того, что импорт склеил два (или больше) подпункта в один
+# («…меньше конкурентного е) Фирмы могут свободно входить…»). Склейка не всегда
+# ссылается на реально существующий следующий ProblemPart (буквы «е»/«ж» часто
+# вообще не заведены отдельными подпунктами) — поэтому ищем ЛЮБУЮ одиночную
+# кириллическую букву-метку не в начале строки, а не только метку следующего
+# по списку подпункта. Цифровые метки («1)», «2)») сюда намеренно не входят —
+# слишком много ложных срабатываний на формулах вида «$(...-1) \cdot 100\%$».
+GLUED_LABEL_RE = re.compile(r'\S\s+[а-яё]\)\s')
+
+
+def _has_glued_label(text):
+    """True, если внутри текста варианта (не в самом начале) встречается
+    метка вида «е) …» — см. GLUED_LABEL_RE."""
+    return bool(GLUED_LABEL_RE.search(text))
+
+
 def clean_options(parts):
     """Чистит варианты ответа из подпунктов. Возвращает (options, причина).
     Огрызки меток срезаем только у вопроса: у вариантов ответа ведущая цифра
@@ -220,6 +237,8 @@ def clean_options(parts):
     options = [normalize_formulas(clean_text(p.statement)) for p in parts]
     if any(not o for o in options):
         return None, 'пустой вариант'
+    if any(_has_glued_label(o) for o in options):
+        return None, 'glued_options'
     if any(len(o) > MAX_OPTION_LEN for o in options):
         return None, 'вариант слишком длинный'
     if len(set(o.lower() for o in options)) != len(options):
@@ -232,7 +251,7 @@ def extract_question(problem):
     # Любое сомнение → (None, None, None, 'причина').
     parts = list(problem.parts.all())  # ordering = ['order', 'label']
     if not (MIN_OPTIONS <= len(parts) <= MAX_OPTIONS):
-        return None, None, None, 'вариантов не 2–5'
+        return None, None, None, 'вариантов не 2–6'
 
     question, reason = clean_question(problem)
     if reason:
@@ -305,7 +324,7 @@ def extract_multi(problem):
     любая буква без пары среди меток или ноль правильных = брак, не гадаем."""
     parts = list(problem.parts.all())
     if not (MIN_OPTIONS <= len(parts) <= MAX_OPTIONS):
-        return None, None, None, 'вариантов не 2–5'
+        return None, None, None, 'вариантов не 2–6'
 
     question, reason = clean_question(problem)
     if reason:
