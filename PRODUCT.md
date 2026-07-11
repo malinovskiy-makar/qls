@@ -38,6 +38,14 @@ The platform feels like a smart colleague who happens to be well-organized: it d
 4. **Speed over flourish.** Interactions should be immediate. Animations exist only where they help orientation (e.g., a panel opening, a result appearing). Never decorate for its own sake.
 5. **Grow without breaking.** The platform will add features (calendar, parent cabinet, graph-as-homework). The design system must accommodate new surfaces without each one requiring a visual restart.
 
+## Game Surface — Econ Rush (/game/)
+
+**The brand rule stands: warmth comes from clarity and reliability, not from gamification — and the learning surfaces (student cabinet, teacher panel, catalog) remain free of points, streaks, and badges.** Econ Rush does not soften that rule; it is deliberately fenced off from it.
+
+Econ Rush is a separate, public *acquisition* surface: a serious speed game about economics («серьёзная игра на скорость про экономику»). Its job is to attract prospective students before they have an account — 60 seconds against the clock, real test questions from the bank, a shareable score. It is a demonstration of the platform's content, not a layer on top of the learning workflow. Points, combos, and the timer live only at `/game/` and never leak into assignments, progress pages, or the catalog.
+
+The tone is the same **Ясный · Дружелюбный · Точный**: real olympiad-grade questions, honest feedback (the correct answer is always shown after a miss), a «Разобрать ошибки» list that links every missed question to its full catalog page — the funnel from play to study. No mascots, no confetti-for-everything (only a brief burst on a personal record), keyboard-first, reduced-motion respected.
+
 ## Accessibility & Inclusion
 
 - Target: WCAG 2.1 AA (contrast ≥ 4.5:1 for body text, ≥ 3:1 for large/UI text).

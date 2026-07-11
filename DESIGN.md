@@ -254,3 +254,36 @@ float over it like instrument readouts, so it has its own scoped tokens (full de
   `cubic-bezier(.23,1,.32,1)`, all < 300 ms, full `prefers-reduced-motion` off-switch.
 - **Signature:** the scenario-picker cards carry a mini-graph drawn in the engine's own
   curve colors; the scoreboard shows big tabular "instrument" numbers (Q*, P*, …).
+
+## 8. Scoped surface — Game (/game/)
+
+Econ Rush is a public acquisition surface (no login) that stays inside the site's
+raspberry «Scene» system but adds a scoped `--rush-*` token layer, every value of
+which **maps onto the global tokens** from `templates/_tokens.html` — no raw hex:
+`--rush-accent → var(--accent)`, `--rush-surface → var(--surface)`,
+`--rush-ok/-tint → var(--green)/(--green-tint)`, `--rush-bad/-tint → var(--error)/
+(--error-tint)`, motion ease `cubic-bezier(.23,1,.32,1)`. Both themes come for free
+via the shared `localStorage['theme']` key and the shared anti-flash bootstrap.
+
+- **Documented exception to the Signal-Color Lockbox — the time bar.** The 8px
+  time track re-colors by remaining time: raspberry (normal) → amber `var(--amber)`
+  (<15 s) → red `var(--error)` with a slow pulse (<7 s). This borrows the amber
+  signal hue for something other than difficulty stars — allowed HERE ONLY because
+  the bar encodes timer semantics (urgency), is unique on screen, never appears on
+  learning surfaces, and is always paired with the numeric timer (no color-only
+  encoding). Do not copy this pattern elsewhere.
+- **Key badges (kbd style):** each answer button carries a 26px square badge
+  `1`–`5` — `--surface-2` fill, `--border` outline with a 2px bottom edge
+  (keycap look), `--text3` label. Hidden on touch (`hover: none`) and under 720px.
+  Hover of the whole option = raspberry border + `--accent-tint` wash; correct =
+  green tint + green border; wrong = red tint + shake, correct option outlined
+  green. Green/red here are true semantic verdicts — not decoration.
+- **Layout:** game scene max 760px, question card on `--surface`, radius 16,
+  card-hover shadow from the vocabulary; options grid 2×2 (odd last option spans
+  full width), one column on mobile. Final screen: two columns ~880px
+  (score + 2×2 stats | «Разобрать ошибки» list), stacked on mobile.
+- **Motion:** all under ~500 ms with the calc2 ease; «+6 с» chip flies to the
+  time bar (~450 ms), wrong answer shakes 300 ms + brief red vignette, next
+  question slides up ~500 ms, combo badge pulses on ×2/×3/×4 thresholds; canvas
+  confetti ~1.5 s only on a new personal record. Everything collapses to instant
+  swaps under `prefers-reduced-motion`.
