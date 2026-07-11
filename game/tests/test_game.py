@@ -1,14 +1,18 @@
 """
-Тесты Econ Rush: отборщик пула (парсинг) + API забега (анти-чит, повторы).
+Тесты Econ Rush: отборщики пула (парсинг), API забега (анти-чит, повторы),
+четыре режима (типы вопросов, проверка multi/numeric, «сначала невиданные»).
 """
 import json
+from fractions import Fraction
 
 from django.test import TestCase, Client
 
 from problems.models import Problem, ProblemPart
 from game.models import GameQuestion
-from game.management.commands.build_game_pool import extract_question
-from game.config import combo_multiplier
+from game.management.commands.build_game_pool import (
+    extract_question, extract_boolean, extract_multi)
+from game.config import combo_multiplier, MODES
+from game.views import parse_exact_number
 
 
 def make_test_problem(statement='Что изучает микроэкономика?',
@@ -26,6 +30,22 @@ def make_test_problem(statement='Что изучает микроэкономи�
         ProblemPart.objects.create(problem=p, label=label, statement=text,
                                    answer=mark, order=i)
     return p
+
+
+def make_gq(qtype='single', question='Что изучает микроэкономика?',
+            options=None, correct_index=None, correct_indices=None,
+            correct_value='', lang='ru'):
+    """Готовый GameQuestion нужного типа (пул — кэш, парсинг не обязателен)."""
+    p = Problem.objects.create(
+        title='', statement=question, answer='',
+        problem_type='тест: один ответ', status='published')
+    if options is None:
+        options = {'boolean': ['Верно', 'Неверно'],
+                   'numeric': []}.get(qtype, ['Фирмы', 'Страны', 'Планеты', 'Климат'])
+    return GameQuestion.objects.create(
+        problem=p, question_type=qtype, question=question, options=options,
+        correct_index=correct_index, correct_indices=correct_indices,
+        correct_value=correct_value, difficulty=2, topics=[], lang=lang)
 
 
 class ExtractQuestionTests(TestCase):
@@ -261,3 +281,255 @@ class GameApiTests(TestCase):
     def test_bad_topic_400(self):
         r = self.client.get('/game/api/session/start/', {'topic': 'Нет такой'})
         self.assertEqual(r.status_code, 400)
+
+
+class ExtractBooleanTests(TestCase):
+    """Извлекатель данеток: утверждение в statement, варианты Верно/Неверно."""
+
+    def test_converted_one_to_one(self):
+        p = make_test_problem(
+            statement='Большинство макроэкономических переменных ацикличны.',
+            answer='б', labels=('а', 'б'), options=('Верно', 'Неверно'),
+            problem_type='тест: верно/неверно')
+        q, correct, reason = extract_boolean(p)
+        self.assertIsNone(reason)
+        self.assertTrue(q.startswith('Большинство'))
+        self.assertEqual(correct, 1)  # «б» → Неверно
+
+    def test_correct_index_canonical_despite_part_order(self):
+        # подпункты в задаче идут «Неверно, Верно» — correct_index всё равно
+        # в каноническом порядке options=['Верно','Неверно']
+        p = make_test_problem(
+            statement='Спрос падает при росте цены практически всегда.',
+            answer='а', labels=('а', 'б'), options=('Неверно', 'Верно'),
+            problem_type='тест: верно/неверно')
+        q, correct, reason = extract_boolean(p)
+        self.assertIsNone(reason)
+        self.assertEqual(correct, 1)  # «а» указывает на текст «Неверно»
+
+    def test_nonstandard_options_fallback(self):
+        from game.management.commands.build_game_pool import BOOLEAN_FALLBACK
+        p = make_test_problem(
+            statement='Забастовка авиадиспетчеров сместила кривую спроса.',
+            answer='а', labels=('а', 'б'),
+            options=('Верно (можно утверждать)', 'Неверно (нельзя утверждать)'),
+            problem_type='тест: верно/неверно')
+        q, correct, reason = extract_boolean(p)
+        self.assertEqual(reason, BOOLEAN_FALLBACK)
+
+    def test_no_answer_letter_rejected(self):
+        p = make_test_problem(
+            statement='Инфляция всегда снижает реальные доходы населения.',
+            answer='', labels=('а', 'б'), options=('Верно', 'Неверно'),
+            problem_type='тест: верно/неверно')
+        q, correct, reason = extract_boolean(p)
+        self.assertEqual(reason, 'правильный ответ не определён')
+
+
+class ExtractMultiTests(TestCase):
+    """Извлекатель «все верные»: correct_indices из букв Problem.answer."""
+
+    def test_letters_mapped_to_indices(self):
+        p = make_test_problem(answer='аг', labels=('а', 'б', 'в', 'г'),
+                              problem_type='тест: все верные')
+        q, opts, indices, reason = extract_multi(p)
+        self.assertIsNone(reason)
+        self.assertEqual(indices, [0, 3])
+
+    def test_letters_with_separators(self):
+        p = make_test_problem(answer='а, в', labels=('а', 'б', 'в', 'г'),
+                              problem_type='тест: все верные')
+        q, opts, indices, reason = extract_multi(p)
+        self.assertIsNone(reason)
+        self.assertEqual(indices, [0, 2])
+
+    def test_unmatched_letter_rejected(self):
+        p = make_test_problem(answer='ад', labels=('а', 'б', 'в', 'г'),
+                              problem_type='тест: все верные')
+        q, opts, indices, reason = extract_multi(p)
+        self.assertEqual(reason, 'буква ответа не сопоставилась с меткой')
+
+    def test_empty_answer_rejected(self):
+        p = make_test_problem(answer='', labels=('а', 'б', 'в', 'г'),
+                              problem_type='тест: все верные')
+        q, opts, indices, reason = extract_multi(p)
+        self.assertEqual(reason, 'правильный ответ не определён')
+
+
+class ParseExactNumberTests(TestCase):
+    """Точный разбор числового ответа (fractions.Fraction)."""
+
+    def test_equivalent_forms(self):
+        self.assertEqual(parse_exact_number('0,1'), Fraction(1, 10))
+        self.assertEqual(parse_exact_number('0.1'), Fraction(1, 10))
+        self.assertEqual(parse_exact_number('1/10'), Fraction(1, 10))
+        self.assertEqual(parse_exact_number('-2'), Fraction(-2))
+        self.assertEqual(parse_exact_number(' 1 / 3 '), Fraction(1, 3))
+        self.assertEqual(parse_exact_number('2/6'), Fraction(1, 3))
+
+    def test_inexact_is_not_equal(self):
+        self.assertNotEqual(parse_exact_number('0,33'), parse_exact_number('1/3'))
+
+    def test_garbage_is_none(self):
+        for bad in ('abc', '', None, '1/0', '1/3/4', '--2', '1.2.3', '/'):
+            self.assertIsNone(parse_exact_number(bad), bad)
+
+
+class ModeStartTests(TestCase):
+    """Старт режимов: типы вопросов, тайминги, 400 на неизвестный режим."""
+
+    def setUp(self):
+        self.client = Client()
+        for i in range(4):
+            make_gq('boolean', f'Утверждение {i} про экономику.', correct_index=0)
+            make_gq('single', f'Одиночный вопрос {i}?', correct_index=1)
+            make_gq('multi', f'Мульти-вопрос {i}?', correct_indices=[0, 2])
+            make_gq('numeric', f'Числовой вопрос {i}?', correct_value='0.1')
+
+    def test_start_each_mode(self):
+        for mode in ('bullet', 'blitz', 'rapid', 'classic'):
+            d = self.client.get('/game/api/session/start/', {'mode': mode}).json()
+            self.assertTrue(d.get('ok'), d)
+            self.assertEqual(d['mode']['key'], mode)
+            self.assertEqual(d['mode']['duration'], MODES[mode]['duration'])
+            self.assertEqual(d['mode']['time_skip'], MODES[mode]['time_skip'])
+            self.assertEqual(d['question']['type'], MODES[mode]['question_type'])
+
+    def test_default_mode_is_blitz(self):
+        d = self.client.get('/game/api/session/start/').json()
+        self.assertEqual(d['mode']['key'], 'blitz')
+
+    def test_unknown_mode_400(self):
+        r = self.client.get('/game/api/session/start/', {'mode': 'hyperbullet'})
+        self.assertEqual(r.status_code, 400)
+
+    def test_only_needed_type_issued(self):
+        d = self.client.get('/game/api/session/start/', {'mode': 'bullet'}).json()
+        types = {d['question']['type']}
+        for _ in range(5):
+            r = self.client.get('/game/api/question/').json()
+            if r.get('exhausted'):
+                break
+            types.add(r['question']['type'])
+        self.assertEqual(types, {'boolean'})
+
+    def test_payload_leaks_nothing_in_any_mode(self):
+        # строковая проверка: ни correct_index, ни correct_indices,
+        # ни correct_value (все содержат подстроку 'correct')
+        for mode in ('bullet', 'blitz', 'rapid', 'classic'):
+            d = self.client.get('/game/api/session/start/', {'mode': mode}).json()
+            self.assertNotIn('correct', json.dumps(d['question']), mode)
+
+
+class MultiAnswerTests(TestCase):
+    """Рапид: засчитывается только полное совпадение множеств."""
+
+    def setUp(self):
+        self.client = Client()
+        for i in range(3):
+            make_gq('multi', f'Мульти-вопрос {i}?', correct_indices=[0, 2])
+
+    def start_and_answer(self, payload):
+        d = self.client.get('/game/api/session/start/', {'mode': 'rapid'}).json()
+        payload['question_id'] = d['question']['id']
+        return self.client.post('/game/api/answer/', json.dumps(payload),
+                                content_type='application/json')
+
+    def test_full_match_correct_any_order(self):
+        d = self.start_and_answer({'choices': [2, 0]}).json()
+        self.assertTrue(d['correct'])
+        self.assertEqual(d['time_delta'], MODES['rapid']['time_correct'])
+        self.assertEqual(d['correct_indices'], [0, 2])
+
+    def test_partial_subset_wrong(self):
+        d = self.start_and_answer({'choices': [0]}).json()
+        self.assertFalse(d['correct'])
+        self.assertEqual(d['time_delta'], MODES['rapid']['time_wrong'])
+
+    def test_superset_wrong(self):
+        d = self.start_and_answer({'choices': [0, 1, 2]}).json()
+        self.assertFalse(d['correct'])
+
+    def test_null_choices_is_skip(self):
+        d = self.start_and_answer({'choices': None}).json()
+        self.assertEqual(d['result'], 'skip')
+        self.assertEqual(d['time_delta'], MODES['rapid']['time_skip'])
+
+    def test_out_of_range_400(self):
+        r = self.start_and_answer({'choices': [0, 7]})
+        self.assertEqual(r.status_code, 400)
+
+
+class NumericAnswerTests(TestCase):
+    """Классика: точное равенство значений через Fraction."""
+
+    def setUp(self):
+        self.client = Client()
+
+    def start_and_answer(self, correct_value, given):
+        make_gq('numeric', f'Найдите x ({correct_value})?',
+                correct_value=correct_value)
+        d = self.client.get('/game/api/session/start/', {'mode': 'classic'}).json()
+        return self.client.post(
+            '/game/api/answer/',
+            json.dumps({'question_id': d['question']['id'], 'value': given}),
+            content_type='application/json')
+
+    def test_equivalent_forms_correct(self):
+        for given in ('0,1', '0.1', '1/10'):
+            d = self.start_and_answer('0.1', given).json()
+            self.assertTrue(d['correct'], given)
+            self.assertEqual(d['time_delta'], MODES['classic']['time_correct'])
+            self.assertEqual(d['correct_value'], '0.1')
+
+    def test_inexact_decimal_wrong(self):
+        d = self.start_and_answer('1/3', '0,33').json()
+        self.assertFalse(d['correct'])
+        self.assertEqual(d['time_delta'], MODES['classic']['time_wrong'])
+
+    def test_garbage_input_wrong_without_500(self):
+        r = self.start_and_answer('0.1', 'сорок два')
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.json()['correct'])
+
+    def test_empty_value_is_skip(self):
+        d = self.start_and_answer('0.1', '').json()
+        self.assertEqual(d['result'], 'skip')
+        self.assertEqual(d['time_delta'], MODES['classic']['time_skip'])
+
+
+class UnseenBetweenRunsTests(TestCase):
+    """«Сначала невиданные»: вопросы не повторяются между забегами,
+    пока пул режима не исчерпан; после исчерпания — цикл по кругу."""
+
+    def setUp(self):
+        self.client = Client()
+        for i in range(6):
+            make_gq('boolean', f'Утверждение номер {i} об экономике.',
+                    correct_index=0)
+
+    def collect_run(self, n):
+        """Стартует забег и собирает id первых n выданных вопросов."""
+        ids = [self.client.get('/game/api/session/start/',
+                               {'mode': 'bullet'}).json()['question']['id']]
+        for _ in range(n - 1):
+            d = self.client.get('/game/api/question/').json()
+            if d.get('exhausted'):
+                break
+            ids.append(d['question']['id'])
+        return ids
+
+    def test_two_runs_do_not_repeat_until_exhausted(self):
+        run1 = self.collect_run(3)
+        run2 = self.collect_run(3)
+        self.assertEqual(len(run1), 3)
+        self.assertEqual(len(run2), 3)
+        self.assertFalse(set(run1) & set(run2))          # без пересечений
+        self.assertEqual(len(set(run1) | set(run2)), 6)  # весь пул за 2 забега
+
+    def test_cycle_restarts_after_pool_seen(self):
+        self.collect_run(3)
+        self.collect_run(3)  # весь пул видан
+        run3 = self.collect_run(6)
+        self.assertEqual(len(run3), 6)                   # круг начался заново
+        self.assertEqual(len(set(run3)), 6)              # в забеге без повторов
