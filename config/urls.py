@@ -29,6 +29,8 @@ urlpatterns = [
     path('catalog/', include('catalog.urls')),
     # Этап Е — Заглушка календаря.
     path('calendar/', include('calendar_stub.urls')),
+    # Игра Econ Rush (публичная, без логина).
+    path('game/', include('game.urls')),
 ]
 
 # В режиме разработки показываем загруженные файлы (картинки, PDF).
