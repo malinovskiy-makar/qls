@@ -3,9 +3,22 @@ build_game_pool — сборка игрового пула Econ Rush из тес
 
 Идея: GameQuestion — это КЭШ. Команда проходит по published-тестам без флага
 качества и КОНСЕРВАТИВНО отбирает пригодные для игры: короткое условие,
-2–5 внятных вариантов, однозначно известный правильный ответ, без
+внятные варианты, однозначно известный правильный ответ, без
 картинок/таблиц/битого LaTeX. Не уверены → не берём: качество пула важнее
 размера. Контент-таблицы (Problem/ProblemPart) не изменяются.
+
+Три извлекателя по подвиду теста (Фаза 2 сессии game-modes):
+- «тест: один ответ»    → single (Блиц): варианты из подпунктов, один правильный.
+- «тест: верно/неверно» → boolean (Пуля): разведка 2026-07-11 показала, что
+  это НЕ пачки утверждений, а одиночные данетки — утверждение лежит в
+  Problem.statement, подпункты — служебные варианты «Верно»/«Неверно».
+  Конвертация 1:1: question = утверждение, options = ['Верно', 'Неверно'].
+  Если варианты не строго «Верно»/«Неверно» — фолбэк в single (не гадаем).
+- «тест: все верные»    → multi (Рапид): варианты как в single, правильные —
+  буквы из Problem.answer (строка вида «аб»); любая несопоставленная буква
+  или ноль правильных = брак.
+Числовые вопросы (numeric, Классика) пока не извлекаются — источник появится
+с импортом региональных тестов.
 
 Правильный ответ определяется так же, как в автопроверке ученика
 (student/views.py::auto_check_submission): буква из Problem.answer против
@@ -24,9 +37,12 @@ from problems.models import Problem
 from problems.management.commands.apply_topic_mapping import CANONICAL
 from game.models import GameQuestion
 
-# Подвиды тестов, пригодные для игры. «тест: все верные» исключён:
-# там несколько правильных вариантов, в механику одного клика не ложится.
-GAME_TYPES = ['тест: один ответ', 'тест: верно/неверно']
+# Подвид теста → тип игрового вопроса.
+GAME_TYPES = {
+    'тест: один ответ': 'single',
+    'тест: верно/неверно': 'boolean',
+    'тест: все верные': 'multi',
+}
 
 MAX_QUESTION_LEN = 300   # символов после чистки переносов
 MIN_QUESTION_LEN = 15
@@ -175,37 +191,60 @@ def heuristic_difficulty(problem, question):
     return 4
 
 
+def content_reason(all_text):
+    """Общие проверки качества текста. Возвращает причину брака или None."""
+    if BAD_CONTENT_RE.search(all_text) or has_bad_environment(all_text):
+        return 'битый LaTeX / вёрстка'
+    if NEEDS_FIGURE_RE.search(all_text):
+        return 'нужен рисунок/таблица'
+    if not dollars_balanced(all_text):
+        return 'непарные $'
+    return None
+
+
+def clean_question(problem):
+    """Чистит текст условия. Возвращает (question, причина_брака)."""
+    question = strip_label_debris(clean_text(problem.statement))
+    question = normalize_formulas(question)
+    if len(question) < MIN_QUESTION_LEN:
+        return None, 'условие слишком короткое'
+    if len(question) > MAX_QUESTION_LEN:
+        return None, 'условие длиннее 300'
+    return question, None
+
+
+def clean_options(parts):
+    """Чистит варианты ответа из подпунктов. Возвращает (options, причина).
+    Огрызки меток срезаем только у вопроса: у вариантов ответа ведущая цифра
+    часто настоящее число («-$1400», «0.75%») — срезать метку там нельзя."""
+    options = [normalize_formulas(clean_text(p.statement)) for p in parts]
+    if any(not o for o in options):
+        return None, 'пустой вариант'
+    if any(len(o) > MAX_OPTION_LEN for o in options):
+        return None, 'вариант слишком длинный'
+    if len(set(o.lower() for o in options)) != len(options):
+        return None, 'варианты дублируются'
+    return options, None
+
+
 def extract_question(problem):
-    # Возвращает (question, options, correct_index, reason_отказа).
+    # single: возвращает (question, options, correct_index, reason_отказа).
     # Любое сомнение → (None, None, None, 'причина').
     parts = list(problem.parts.all())  # ordering = ['order', 'label']
     if not (MIN_OPTIONS <= len(parts) <= MAX_OPTIONS):
         return None, None, None, 'вариантов не 2–5'
 
-    question = strip_label_debris(clean_text(problem.statement))
-    question = normalize_formulas(question)
-    if len(question) < MIN_QUESTION_LEN:
-        return None, None, None, 'условие слишком короткое'
-    if len(question) > MAX_QUESTION_LEN:
-        return None, None, None, 'условие длиннее 300'
+    question, reason = clean_question(problem)
+    if reason:
+        return None, None, None, reason
 
-    # Огрызки меток срезаем только у вопроса: у вариантов ответа ведущая цифра
-    # часто настоящее число («-$1400», «0.75%») — срезать метку там нельзя.
-    options = [normalize_formulas(clean_text(p.statement)) for p in parts]
-    if any(not o for o in options):
-        return None, None, None, 'пустой вариант'
-    if any(len(o) > MAX_OPTION_LEN for o in options):
-        return None, None, None, 'вариант слишком длинный'
-    if len(set(o.lower() for o in options)) != len(options):
-        return None, None, None, 'варианты дублируются'
+    options, reason = clean_options(parts)
+    if reason:
+        return None, None, None, reason
 
-    all_text = question + ' ' + ' '.join(options)
-    if BAD_CONTENT_RE.search(all_text) or has_bad_environment(all_text):
-        return None, None, None, 'битый LaTeX / вёрстка'
-    if NEEDS_FIGURE_RE.search(all_text):
-        return None, None, None, 'нужен рисунок/таблица'
-    if not dollars_balanced(all_text):
-        return None, None, None, 'непарные $'
+    reason = content_reason(question + ' ' + ' '.join(options))
+    if reason:
+        return None, None, None, reason
 
     # Правильный ответ: два независимых сигнала, при конфликте — брак.
     ans = normalize_label(problem.answer)
@@ -225,6 +264,75 @@ def extract_question(problem):
     return question, options, correct, None
 
 
+# Причина-маркер: данетка с нестандартными вариантами уходит в single.
+BOOLEAN_FALLBACK = 'варианты не «Верно»/«Неверно»'
+
+
+def extract_boolean(problem):
+    """boolean: возвращает (question, correct_index, reason_отказа).
+    Утверждение — в Problem.statement, подпункты должны быть строго
+    «Верно»/«Неверно» (иначе BOOLEAN_FALLBACK → задача уйдёт в single).
+    correct_index: 0 = «Верно», 1 = «Неверно» — канонический порядок options,
+    независимо от порядка подпунктов в задаче."""
+    parts = list(problem.parts.all())
+    stmts = [normalize_label(p.statement) for p in parts]
+    if sorted(stmts) != ['верно', 'неверно']:
+        return None, None, BOOLEAN_FALLBACK
+
+    question, reason = clean_question(problem)
+    if reason:
+        return None, None, reason
+    reason = content_reason(question)
+    if reason:
+        return None, None, reason
+
+    # Правильный подпункт — по букве ответа (метка «верно» в part.answer у
+    # этого подвида не встречается, но сигнал конфликтует — бракуем как в single).
+    ans = normalize_label(problem.answer)
+    labels = [normalize_label(p.label) for p in parts]
+    if not ans or ans not in labels:
+        return None, None, 'правильный ответ не определён'
+    correct_stmt = stmts[labels.index(ans)]
+    return question, (0 if correct_stmt == 'верно' else 1), None
+
+
+ANSWER_SEPARATORS = set(' ,;.()')
+
+
+def extract_multi(problem):
+    """multi: возвращает (question, options, correct_indices, reason_отказа).
+    Правильные — буквы из Problem.answer (строка вида «аб», «а, в»);
+    любая буква без пары среди меток или ноль правильных = брак, не гадаем."""
+    parts = list(problem.parts.all())
+    if not (MIN_OPTIONS <= len(parts) <= MAX_OPTIONS):
+        return None, None, None, 'вариантов не 2–5'
+
+    question, reason = clean_question(problem)
+    if reason:
+        return None, None, None, reason
+    options, reason = clean_options(parts)
+    if reason:
+        return None, None, None, reason
+    reason = content_reason(question + ' ' + ' '.join(options))
+    if reason:
+        return None, None, None, reason
+
+    labels = [normalize_label(p.label) for p in parts]
+    if len(set(labels)) != len(labels):
+        return None, None, None, 'метки дублируются'
+
+    letters = [ch for ch in normalize_label(problem.answer)
+               if ch not in ANSWER_SEPARATORS]
+    if not letters:
+        return None, None, None, 'правильный ответ не определён'
+    indices = set()
+    for ch in letters:
+        if ch not in labels:
+            return None, None, None, 'буква ответа не сопоставилась с меткой'
+        indices.add(labels.index(ch))
+    return question, options, sorted(indices), None
+
+
 class Command(BaseCommand):
     help = 'Пересобирает игровой пул Econ Rush (кэш GameQuestion) из тестов.'
 
@@ -240,14 +348,37 @@ class Command(BaseCommand):
 
         built = []
         rejected = {}
+        boolean_fallback = 0  # данетки с нестандартными вариантами, ушли в single
         debris_fixed = []    # (problem_id, текст до чистки) — аудит Бага 2
         tall_formula = []    # (problem_id, вопрос) — аудит Бага 1
+
+        def reject(reason):
+            rejected[reason] = rejected.get(reason, 0) + 1
+
         for p in qs:
-            raw_question = clean_text(p.statement)
-            question, opts, correct, reason = extract_question(p)
+            qtype = GAME_TYPES[p.problem_type]
+            correct_index = None
+            correct_indices = None
+
+            if qtype == 'boolean':
+                question, correct_index, reason = extract_boolean(p)
+                if reason == BOOLEAN_FALLBACK:
+                    # нестандартная данетка — честный одиночный выбор
+                    boolean_fallback += 1
+                    qtype = 'single'
+                    question, opts, correct_index, reason = extract_question(p)
+                else:
+                    opts = ['Верно', 'Неверно']
+            elif qtype == 'multi':
+                question, opts, correct_indices, reason = extract_multi(p)
+            else:
+                question, opts, correct_index, reason = extract_question(p)
+
             if reason:
-                rejected[reason] = rejected.get(reason, 0) + 1
+                reject(reason)
                 continue
+
+            raw_question = clean_text(p.statement)
             if strip_label_debris(raw_question) != raw_question:
                 debris_fixed.append((p.id, raw_question[:60]))
             if ENV_NAME_RE.search(question + ' ' + ' '.join(opts)):
@@ -256,9 +387,12 @@ class Command(BaseCommand):
                            if t.name in canonical_set and t.name != 'Тест']
             built.append(GameQuestion(
                 problem=p,
+                part=None,
+                question_type=qtype,
                 question=question,
                 options=opts,
-                correct_index=correct,
+                correct_index=correct_index,
+                correct_indices=correct_indices,
                 difficulty=heuristic_difficulty(p, question),
                 topics=topic_names,
                 lang=detect_lang(question),
@@ -270,8 +404,15 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(
             f'Пул пересобран: {len(built)} вопросов (было {deleted}).'))
-        ru = sum(1 for g in built if g.lang == 'ru')
-        self.stdout.write(f'  русских: {ru}, английских: {len(built) - ru}')
+        by_type = {}
+        for g in built:
+            key = (g.question_type, g.lang)
+            by_type[key] = by_type.get(key, 0) + 1
+        for qtype in ('boolean', 'single', 'multi', 'numeric'):
+            ru = by_type.get((qtype, 'ru'), 0)
+            en = by_type.get((qtype, 'en'), 0)
+            self.stdout.write(f'  {qtype}: {ru + en} (ru {ru}, en {en})')
+        self.stdout.write(f'  данеток ушло в single (нестандартные варианты): {boolean_fallback}')
         self.stdout.write('Отсев по причинам:')
         for reason, n in sorted(rejected.items(), key=lambda kv: -kv[1]):
             self.stdout.write(f'  {reason}: {n}')
