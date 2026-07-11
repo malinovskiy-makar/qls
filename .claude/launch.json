@@ -5,7 +5,8 @@
       "name": "qls-platform",
       "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
       "runtimeArgs": ["/Users/makarmalinovskiy/Downloads/qls_platform/manage.py", "runserver", "8000"],
-      "port": 8000
+      "port": 8000,
+      "autoPort": false
     },
     {
       "name": "qls-preview",

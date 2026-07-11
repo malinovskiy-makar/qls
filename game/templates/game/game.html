@@ -178,6 +178,8 @@ a:focus-visible, button:focus-visible {
 @keyframes lowPulse { 50% { opacity: .55; } }
 .time-flash { animation: trackFlash .4s var(--rush-ease); }
 @keyframes trackFlash { 0% { box-shadow: 0 0 0 3px var(--accent-ring); } 100% { box-shadow: none; } }
+.time-flash-bad { animation: trackFlashBad .4s var(--rush-ease); }
+@keyframes trackFlashBad { 0% { box-shadow: 0 0 0 3px var(--rush-bad); } 100% { box-shadow: none; } }
 
 .hud {
   display: flex;
@@ -201,14 +203,58 @@ a:focus-visible, button:focus-visible {
   text-align: center;
   flex: 1;
 }
+/* .timer-box — inline-block ровно по ширине цифр (.timer-num — просто
+   текст): дельта (.time-delta) встаёт вплотную справа от НИХ, а не от
+   края широкого flex:1-блока .hud-timer. */
+.timer-box {
+  position: relative;
+  display: inline-block;
+}
+.timer-num { transition: color .12s ease; }
+.timer-num.flash-plus { color: var(--rush-ok); }
+.timer-num.flash-minus { color: var(--rush-bad); }
+.timer-num.flash-skip { color: var(--text3); }
+
+/* крупная дельта времени у таймера: появляется мгновенно, ~700мс висит,
+   уплывает вверх с fade (направление одно и для минуса — смысл несёт цвет) */
+.time-delta {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  margin-left: 8px;
+  transform: translateY(-50%);
+  font-size: 24px; /* ~70% размера таймера */
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+.time-delta.plus { color: var(--rush-ok); }
+.time-delta.minus { color: var(--rush-bad); }
+.time-delta.skip { color: var(--text3); }
+.time-delta.show { animation: deltaFloat .7s var(--rush-ease) forwards; }
+@keyframes deltaFloat {
+  0% { opacity: 0; transform: translateY(-40%); }
+  12% { opacity: 1; transform: translateY(-50%); }
+  70% { opacity: 1; transform: translateY(-50%); }
+  100% { opacity: 0; transform: translateY(-85%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .time-delta.show { animation: none; opacity: 1; }
+}
 .hud-combo {
   min-width: 90px;
   text-align: right;
   font-size: 15px;
   font-weight: 700;
   color: var(--text3);
-  transition: color .15s;
+  opacity: 0;
+  transform: scale(.85);
+  transition: opacity .15s, transform .15s, color .15s;
 }
+/* бейдж серии — только со ×2 и выше, «×1» не несёт информации */
+.hud-combo.show { opacity: 1; transform: scale(1); }
 .hud-combo.hot { color: var(--rush-accent); }
 .hud-combo.bump { animation: comboBump .35s var(--rush-ease); }
 @keyframes comboBump { 30% { transform: scale(1.25); } 100% { transform: scale(1); } }
@@ -239,10 +285,30 @@ a:focus-visible, button:focus-visible {
   display: flex;
   align-items: center;
 }
+/* .q-card — flex-обёртка ровно с ОДНИМ ребёнком (.q-text), иначе при
+   display-формуле внутри вопроса браузер расколол бы текст на анонимные
+   flex-элементы и расставил их в ряд, а не друг под другом. */
+.q-text { width: 100%; }
 .q-slide-in { animation: qSlide .5s var(--rush-ease); }
 @keyframes qSlide {
   0% { opacity: 0; transform: translateY(26px); }
   100% { opacity: 1; transform: none; }
+}
+
+/* KaTeX внутри строчного контекста не должен переноситься сам по себе
+   (иначе «Q =» и «1/P» расползаются на разные строки посреди фразы) —
+   формула летит в строке целиком или целиком уходит на следующую. */
+.q-text .katex, .opt .katex, .miss-item .katex {
+  white-space: nowrap;
+}
+/* Внутри display-формулы (кусочные функции, матрицы) перенос разрешён —
+   там формула и так занимает свою строку целиком. */
+.q-text .katex-display .katex, .miss-item .katex-display .katex {
+  white-space: normal;
+}
+.q-text .katex-display, .miss-item .katex-display {
+  margin: 12px 0;
+  overflow-x: auto;
 }
 
 .opts {
@@ -308,20 +374,6 @@ a:focus-visible, button:focus-visible {
   font-size: 12.5px;
   color: var(--text3);
 }
-
-/* летящий чип «+6 с» / падающий «−4 с» */
-.time-chip {
-  position: fixed;
-  z-index: 60;
-  font-size: 14px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 12px;
-  pointer-events: none;
-  will-change: transform, opacity;
-}
-.time-chip.plus { background: var(--rush-ok-tint); color: var(--rush-ok); border: 1px solid var(--rush-ok); }
-.time-chip.minus { background: var(--rush-bad-tint); color: var(--rush-bad); border: 1px solid var(--rush-bad); }
 
 /* красная виньетка при ошибке */
 .vignette {
@@ -507,11 +559,11 @@ a:focus-visible, button:focus-visible {
       <div class="time-track"><div class="time-fill" id="time-fill"></div></div>
       <div class="hud">
         <div class="hud-score"><small>СЧЁТ</small><span id="hud-score">0</span></div>
-        <div class="hud-timer" id="hud-timer">60</div>
+        <div class="hud-timer"><span class="timer-box"><span class="timer-num" id="hud-timer">60</span><span class="time-delta" id="time-delta"></span></span></div>
         <div class="hud-combo" id="hud-combo">🔥 ×1</div>
       </div>
       <div class="combo-toast" id="combo-toast"></div>
-      <div class="q-card" id="q-card"></div>
+      <div class="q-card" id="q-card"><div class="q-text" id="q-text"></div></div>
       <div class="opts" id="opts"></div>
       <p class="keys-hint" id="keys-hint">Клавиши 1–4 — ответ · пробел — пропустить (−2 с)</p>
     </div>
@@ -615,6 +667,7 @@ a:focus-visible, button:focus-visible {
       renderMathInElement(node, {
         delimiters: [
           { left: '$$', right: '$$', display: true },
+          { left: '\\[', right: '\\]', display: true },
           { left: '$', right: '$', display: false },
           { left: '\\(', right: '\\)', display: false }
         ],
@@ -677,6 +730,7 @@ a:focus-visible, button:focus-visible {
     var combo = $('hud-combo');
     combo.textContent = '🔥 ×' + mult;
     combo.classList.toggle('hot', mult > 1);
+    combo.classList.toggle('show', mult > 1);
     var fill = $('time-fill');
     var frac = Math.max(0, Math.min(1, timeLeft / CFG.start_seconds));
     fill.style.transform = 'scaleX(' + frac + ')';
@@ -696,7 +750,7 @@ a:focus-visible, button:focus-visible {
   function showQuestion(q) {
     current = q;
     inputLocked = false;
-    var card = $('q-card');
+    var card = $('q-text');
     card.textContent = q.question;
     if (!REDUCED) {
       card.classList.remove('q-slide-in');
@@ -771,7 +825,8 @@ a:focus-visible, button:focus-visible {
         bestStreak = Math.max(bestStreak, streak);
         score += CFG.base_points * comboMult(streak);
         buttons[choice].classList.add('is-correct');
-        flyChip('+' + CFG.time_correct + ' с', 'plus', buttons[choice]);
+        showDelta('+' + CFG.time_correct + ' с', 'plus');
+        flashTrack(false);
         comboToastMaybe();
         setTimeout(advance, REDUCED ? 0 : 500);
       } else {
@@ -779,7 +834,8 @@ a:focus-visible, button:focus-visible {
         streak = 0;
         buttons[choice].classList.add('is-wrong');
         if (buttons[d.correct_index]) buttons[d.correct_index].classList.add('show-right');
-        dropChip(CFG.time_wrong + ' с');
+        showDelta(CFG.time_wrong + ' с', 'minus');
+        flashTrack(true);
         vignette();
         misses.push({ q: q, chosen: choice, right: d.correct_index });
         setTimeout(advance, REDUCED ? 0 : 900);
@@ -800,54 +856,43 @@ a:focus-visible, button:focus-visible {
       timeLeft = Math.max(0, timeLeft + d.time_delta);
       streak = 0;
       if (timeLeft <= 0) { paintHud(); endRun(); return; }
-      dropChip(CFG.time_skip + ' с');
+      showDelta(CFG.time_skip + ' с', 'skip');
       paintHud();
       advance();
     });
   }
 
   /* ---------- ФИДБЕК-АНИМАЦИИ ---------- */
-  function flyChip(text, kind, fromBtn) {
-    if (REDUCED) { flashTrack(); return; }
-    var chip = document.createElement('div');
-    chip.className = 'time-chip ' + kind;
+  var deltaTimer1 = null, deltaTimer2 = null;
+
+  // Единая дельта времени у таймера: kind — 'plus' (верно) / 'minus'
+  // (неверно) / 'skip' (пропуск). Одновременно вспыхивают цифры таймера
+  // тем же цветом. При reduced-motion — без полёта, просто показать/скрыть.
+  function showDelta(text, kind) {
+    var chip = $('time-delta');
+    var num = $('hud-timer');
     chip.textContent = text;
-    var from = fromBtn.getBoundingClientRect();
-    var to = document.querySelector('.time-track').getBoundingClientRect();
-    chip.style.left = (from.left + from.width / 2) + 'px';
-    chip.style.top = (from.top) + 'px';
-    document.body.appendChild(chip);
-    var dx = (to.left + to.width * 0.75) - (from.left + from.width / 2);
-    var dy = to.top - from.top;
-    chip.animate([
-      { transform: 'translate(0,0)', opacity: 1 },
-      { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(.7)', opacity: .2 }
-    ], { duration: 450, easing: 'cubic-bezier(.23,1,.32,1)' }).onfinish = function () {
-      chip.remove();
-      flashTrack();
-    };
+    num.className = 'timer-num flash-' + kind;
+    if (REDUCED) {
+      chip.className = 'time-delta ' + kind;
+      chip.style.opacity = '1';
+      clearTimeout(deltaTimer1);
+      deltaTimer1 = setTimeout(function () { chip.style.opacity = '0'; }, 700);
+    } else {
+      chip.style.opacity = '';
+      chip.className = 'time-delta ' + kind;
+      void chip.offsetWidth; // перезапуск анимации
+      chip.classList.add('show');
+    }
+    clearTimeout(deltaTimer2);
+    deltaTimer2 = setTimeout(function () { num.className = 'timer-num'; }, 300);
   }
 
-  function flashTrack() {
+  function flashTrack(bad) {
     var track = document.querySelector('.time-track');
-    track.classList.remove('time-flash');
+    track.classList.remove('time-flash', 'time-flash-bad');
     void track.offsetWidth;
-    track.classList.add('time-flash');
-  }
-
-  function dropChip(text) {
-    if (REDUCED) return;
-    var chip = document.createElement('div');
-    chip.className = 'time-chip minus';
-    chip.textContent = text;
-    var timer = $('hud-timer').getBoundingClientRect();
-    chip.style.left = (timer.left + timer.width / 2) + 'px';
-    chip.style.top = (timer.bottom + 4) + 'px';
-    document.body.appendChild(chip);
-    chip.animate([
-      { transform: 'translate(0,0)', opacity: 1 },
-      { transform: 'translate(0,46px)', opacity: 0 }
-    ], { duration: 550, easing: 'ease-out' }).onfinish = function () { chip.remove(); };
+    track.classList.add(bad ? 'time-flash-bad' : 'time-flash');
   }
 
   function vignette() {
@@ -954,7 +999,7 @@ a:focus-visible, button:focus-visible {
     var total = answered;
     var text = 'Econ Rush: ' + score.toLocaleString('ru-RU') + ' очков · '
       + correctCount + '/' + total + ' · комбо ×' + comboMult(bestStreak)
-      + ' — обгони меня: ' + location.pathname;
+      + ' — обгони меня: ' + location.origin + '/game/';
     var btn = this;
     function restore() {
       setTimeout(function () { btn.textContent = 'Скопировать результат'; }, 2000);

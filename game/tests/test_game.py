@@ -93,6 +93,80 @@ class ExtractQuestionTests(TestCase):
         self.assertIsNone(reason)
         self.assertEqual(correct, 1)
 
+    # ---- Баг 1: display-формулы на карточке ----
+
+    def test_simple_display_formula_becomes_inline(self):
+        # $$...$$ без высоких конструкций сжимается в строчный режим,
+        # иначе на карточке текст рвётся вокруг формулы
+        p = make_test_problem(statement='Функция спроса $$Q = 100 - P$$ дана нам.')
+        q, opts, correct, reason = extract_question(p)
+        self.assertIsNone(reason)
+        self.assertNotIn('$$', q)
+        self.assertIn('$Q = 100 - P$', q)
+
+    def test_dfrac_converted_to_frac_even_inline(self):
+        # \dfrac форсирует display-style дробь даже внутри строчной формулы
+        p = make_test_problem(statement=r'Цена равна $P = \dfrac{a}{b}$, найдите Q.')
+        q, opts, correct, reason = extract_question(p)
+        self.assertIsNone(reason)
+        self.assertNotIn('dfrac', q)
+        self.assertIn(r'\frac{a}{b}', q)
+
+    def test_tall_formula_with_cases_stays_display(self):
+        # \begin{cases} — высокая конструкция, не сжимаем, но и не бракуем
+        stmt = (r'Издержки заданы \[TC(q) = \begin{cases} 0, & q=0; \\ '
+                r'5q, & q>0; \end{cases}\] Что верно про издержки фирмы?')
+        p = make_test_problem(statement=stmt, answer='A')
+        q, opts, correct, reason = extract_question(p)
+        self.assertIsNone(reason)
+        self.assertIn(r'\begin{cases}', q)
+        self.assertIn(r'\[', q)
+
+    def test_unsupported_environment_rejected(self):
+        # \begin{tabular} — не математическое окружение, по-прежнему брак
+        p = make_test_problem(
+            statement=r'Смотри \begin{tabular}{c} X \end{tabular} тут для ответа.')
+        q, opts, correct, reason = extract_question(p)
+        self.assertEqual(reason, 'битый LaTeX / вёрстка')
+
+    def test_array_with_hline_table_rejected(self):
+        # \begin{array} + \hline — визуальная таблица, а не система уравнений
+        p = make_test_problem(
+            statement=r'Данные: $$\begin{array}{|c|c|}\hline A & B \\\hline\end{array}$$ '
+                      r'Что выбрать?')
+        q, opts, correct, reason = extract_question(p)
+        self.assertEqual(reason, 'битый LaTeX / вёрстка')
+
+    # ---- Баг 2: огрызки меток в начале/конце вопроса ----
+
+    def test_orphaned_closing_paren_stripped(self):
+        p = make_test_problem(
+            statement=') Коэффициент эластичности суммы налоговых сборов положителен.')
+        q, opts, correct, reason = extract_question(p)
+        self.assertIsNone(reason)
+        self.assertTrue(q.startswith('Коэффициент'), q)
+
+    def test_leading_letter_label_stripped(self):
+        p = make_test_problem(statement='б) Коэффициент эластичности равен единице?')
+        q, opts, correct, reason = extract_question(p)
+        self.assertIsNone(reason)
+        self.assertTrue(q.startswith('Коэффициент'), q)
+
+    def test_trailing_open_paren_stripped(self):
+        p = make_test_problem(statement='Определите равновесную цену на рынке (')
+        q, opts, correct, reason = extract_question(p)
+        self.assertIsNone(reason)
+        self.assertFalse(q.endswith('('), q)
+
+    def test_option_leading_digit_not_mistaken_for_label(self):
+        # у вариантов ведущая цифра часто настоящее число («-$1400», «0.75%») —
+        # чистку меток к ним не применяем вовсе (см. extract_question)
+        p = make_test_problem(options=(r'-\$1400', '0.75%', '4.0', '10.0%'))
+        q, opts, correct, reason = extract_question(p)
+        self.assertIsNone(reason)
+        self.assertIn(r'-\$1400', opts)
+        self.assertIn('0.75%', opts)
+
 
 class ComboTests(TestCase):
     def test_combo_multiplier_steps(self):
