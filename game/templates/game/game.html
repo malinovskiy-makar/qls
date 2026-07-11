@@ -69,6 +69,9 @@ a:focus-visible, button:focus-visible {
 .screen { display: none; }
 .screen.active { display: block; }
 
+/* hidden обязан побеждать display:flex на классах (.multi-actions и т.п.) */
+[hidden] { display: none !important; }
+
 /* ── Экран 1: старт ────────────────────────────────────────────── */
 #screen-start .col {
   max-width: 560px;
@@ -414,6 +417,87 @@ a:focus-visible, button:focus-visible {
   90% { transform: translateX(2px); }
 }
 
+/* Данетка (Пуля): две крупные кнопки во всю ширину сетки */
+.opts.opts-bool .opt {
+  min-height: 92px;
+  font-size: 18px;
+  font-weight: 700;
+  justify-content: center;
+}
+
+/* Мультивыбор (Рапид): клик/клавиша переключает выделение */
+.opt.selected {
+  border-color: var(--rush-accent);
+  background: var(--rush-accent-tint);
+}
+.opt.selected .key {
+  background: var(--rush-accent);
+  border-color: var(--rush-accent);
+  color: #fff;
+}
+.multi-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+.btn-submit {
+  font: inherit; font-size: 15px; font-weight: 600;
+  height: 46px; padding: 0 36px;
+  border: none; border-radius: 10px;
+  background: var(--btn-bg); color: var(--on-btn);
+  cursor: pointer;
+  transition: background .12s, transform .1s, opacity .12s;
+}
+.btn-submit:disabled { opacity: .45; cursor: default; }
+.btn-submit:not(:disabled):hover { background: var(--btn-bg-hover); }
+.btn-submit:not(:disabled):active { transform: scale(.97); }
+
+/* Числовой ответ (Классика): поле ввода + отправить/пропустить */
+.numeric-block {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.num-input {
+  font: inherit;
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  width: min(340px, 100%);
+  height: 56px;
+  border: 1px solid var(--rush-border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.num-input:focus {
+  outline: 2px solid var(--rush-accent);
+  outline-offset: 2px;
+  border-color: var(--rush-accent);
+}
+.num-hint { font-size: 12.5px; color: var(--text3); }
+.numeric-actions { display: flex; gap: 10px; }
+.btn-skip {
+  font: inherit; font-size: 15px; font-weight: 500;
+  height: 46px; padding: 0 20px;
+  border: 1px solid var(--rush-border); border-radius: 10px;
+  background: var(--rush-surface); color: var(--text2);
+  cursor: pointer;
+  transition: border-color .12s, color .12s;
+}
+.btn-skip:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+.num-feedback {
+  font-size: 15px;
+  font-weight: 600;
+  min-height: 20px;
+  text-align: center;
+}
+.num-feedback.ok { color: var(--rush-ok); }
+.num-feedback.bad { color: var(--rush-bad); }
+
 .keys-hint {
   margin-top: 14px;
   text-align: center;
@@ -462,6 +546,7 @@ a:focus-visible, button:focus-visible {
   align-items: start;
 }
 .final-left h2 { font-size: 26px; font-weight: 800; letter-spacing: -.5px; }
+.final-mode { margin-top: 2px; font-size: 14px; color: var(--text2); }
 .final-score {
   font-size: 56px;
   font-weight: 800;
@@ -548,6 +633,9 @@ a:focus-visible, button:focus-visible {
   .rush-wrap { padding: 16px 12px 32px; }
   .mode-grid { grid-template-columns: 1fr; }
   .opts { grid-template-columns: 1fr; }
+  /* данетка: две большие тап-зоны рядом даже на узком экране */
+  .opts.opts-bool { grid-template-columns: 1fr 1fr; }
+  .opts.opts-bool .opt { min-height: 76px; }
   .opt .key { display: none; }
   .keys-hint { display: none; }
   .q-card { font-size: 16.5px; padding: 18px 18px; min-height: 84px; }
@@ -607,7 +695,20 @@ a:focus-visible, button:focus-visible {
       <div class="combo-toast" id="combo-toast"></div>
       <div class="q-card" id="q-card"><div class="q-text" id="q-text"></div></div>
       <div class="opts" id="opts"></div>
-      <p class="keys-hint" id="keys-hint">Клавиши 1–4 — ответ · пробел — пропустить (−2 с)</p>
+      <div class="multi-actions" id="multi-actions" hidden>
+        <button class="btn-submit" id="btn-submit" disabled>Ответить</button>
+      </div>
+      <div class="numeric-block" id="numeric-block" hidden>
+        <input id="num-input" class="num-input" inputmode="decimal"
+               autocomplete="off" spellcheck="false" placeholder="Например: 12,5">
+        <div class="num-hint">Дробь можно вводить как 1/3 · запятая или точка — не важно</div>
+        <div class="numeric-actions">
+          <button class="btn-submit" id="btn-num-submit">Ответить</button>
+          <button class="btn-skip" id="btn-num-skip">Пропустить</button>
+        </div>
+        <div class="num-feedback" id="num-feedback"></div>
+      </div>
+      <p class="keys-hint" id="keys-hint">Клавиши 1–4 — ответ · пробел — пропустить</p>
     </div>
   </section>
 
@@ -616,6 +717,7 @@ a:focus-visible, button:focus-visible {
     <div class="final-grid">
       <div class="final-left">
         <h2>Время вышло!</h2>
+        <p class="final-mode" id="final-mode"></p>
         <div class="final-score"><span id="final-score">0</span><small>очков</small></div>
         <div class="record-badge" id="record-badge">🏆 Новый рекорд!</div>
         <div class="stats-grid">
@@ -686,11 +788,12 @@ a:focus-visible, button:focus-visible {
   var answered = 0;             // отвечено (без пропусков)
   var correctCount = 0;
   var runStartedAt = 0;         // для «вопросов в минуту»
-  var current = null;           // текущий вопрос {id, question, options, topics, problem_id}
+  var current = null;           // текущий вопрос {id, type, question, options, topics, problem_id}
   var nextBuf = null;           // предзагруженный следующий вопрос
   var inputLocked = true;       // во время фидбека ввод игнорируется
   var misses = [];              // промахи для «Разобрать ошибки»
   var poolExhausted = false;
+  var selected = [];            // выделенные варианты (мультивыбор, Рапид)
 
   /* -- DOM -- */
   var $ = function (id) { return document.getElementById(id); };
@@ -864,6 +967,11 @@ a:focus-visible, button:focus-visible {
   function showQuestion(q) {
     current = q;
     inputLocked = false;
+    selected = [];
+    var isMulti = q.type === 'multi';
+    var isBool = q.type === 'boolean';
+    var isNumeric = q.type === 'numeric';
+
     var card = $('q-text');
     card.textContent = q.question;
     if (!REDUCED) {
@@ -871,30 +979,69 @@ a:focus-visible, button:focus-visible {
       void card.offsetWidth; // перезапуск анимации
       card.classList.add('q-slide-in');
     }
+
     var opts = $('opts');
     opts.innerHTML = '';
-    q.options.forEach(function (text, i) {
-      var b = document.createElement('button');
-      b.className = 'opt';
-      b.dataset.index = i;
-      var key = document.createElement('span');
-      key.className = 'key';
-      key.textContent = i + 1;
-      b.appendChild(key);
-      var span = document.createElement('span');
-      span.textContent = text;
-      b.appendChild(span);
-      b.addEventListener('click', function () { answer(i); });
-      opts.appendChild(b);
-    });
+    opts.classList.toggle('opts-bool', isBool);
+    opts.style.display = isNumeric ? 'none' : '';
+    $('multi-actions').hidden = !isMulti;
+    $('btn-submit').disabled = true;
+    $('numeric-block').hidden = !isNumeric;
+
+    if (isNumeric) {
+      var inp = $('num-input');
+      inp.value = '';
+      inp.disabled = false;
+      var fb = $('num-feedback');
+      fb.textContent = '';
+      fb.className = 'num-feedback';
+      inp.focus();
+    } else {
+      q.options.forEach(function (text, i) {
+        var b = document.createElement('button');
+        b.className = 'opt';
+        b.dataset.index = i;
+        var key = document.createElement('span');
+        key.className = 'key';
+        key.textContent = i + 1;
+        b.appendChild(key);
+        var span = document.createElement('span');
+        span.textContent = text;
+        b.appendChild(span);
+        b.addEventListener('click', function () {
+          if (isMulti) { toggleOption(i); } else { answer(i); }
+        });
+        opts.appendChild(b);
+      });
+    }
     renderMath(card);
     renderMath(opts);
-    // подсказка под сеткой — по фактическому числу вариантов (бывает 2 и 5)
+
+    // подсказка под сеткой — своя на каждый тип вопроса
     var hint = $('keys-hint');
     if (hint) {
-      hint.textContent = 'Клавиши 1–' + q.options.length +
-        ' — ответ · пробел — пропустить (' + MODE.time_skip + ' с)';
+      if (isBool) {
+        hint.textContent = '1 — Верно · 2 — Неверно · пробел — пропустить (' + MODE.time_skip + ' с)';
+      } else if (isMulti) {
+        hint.textContent = 'Клавиши 1–' + q.options.length +
+          ' — выбрать · Enter — ответить · пробел — пропустить (' + MODE.time_skip + ' с)';
+      } else if (isNumeric) {
+        hint.textContent = 'Enter — отправить ответ';
+      } else {
+        hint.textContent = 'Клавиши 1–' + q.options.length +
+          ' — ответ · пробел — пропустить (' + MODE.time_skip + ' с)';
+      }
     }
+  }
+
+  /* мультивыбор: клавиша/тап переключает выделение, Enter/кнопка — отправка */
+  function toggleOption(i) {
+    if (state !== 'playing' || inputLocked || !current) return;
+    var pos = selected.indexOf(i);
+    if (pos === -1) { selected.push(i); } else { selected.splice(pos, 1); }
+    var btn = $('opts').querySelectorAll('.opt')[i];
+    if (btn) btn.classList.toggle('selected', pos === -1);
+    $('btn-submit').disabled = selected.length === 0;
   }
 
   function prefetchNext() {
@@ -920,61 +1067,147 @@ a:focus-visible, button:focus-visible {
   }
 
   /* ---------- ОТВЕТ / ПРОПУСК ---------- */
+  // Общий каркас: POST ответа, дельта времени, финал по нулю времени.
+  // (Время кончилось прямо на дельте — не ждём следующего кадра rAF:
+  // в фоновой вкладке rAF заморожен и финал бы не наступил.)
+  function postAnswer(payload, onResult) {
+    api('/game/api/answer/', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }).then(function (d) {
+      if (d.error) { inputLocked = false; return; }
+      timeLeft = Math.max(0, timeLeft + d.time_delta);
+      if (timeLeft <= 0) { paintHud(); endRun(); return; }
+      onResult(d);
+      paintHud();
+    });
+  }
+
+  function registerCorrect() {
+    answered++; correctCount++; streak++;
+    bestStreak = Math.max(bestStreak, streak);
+    score += CFG.base_points * comboMult(streak);
+  }
+
+  function registerWrong(q) {
+    answered++;
+    streak = 0;  // комбо рвёт ТОЛЬКО неверный ответ (пропуск — нет)
+    misses.push({ q: q });
+  }
+
+  // boolean / single: один клик — один ответ
   function answer(choice) {
     if (state !== 'playing' || inputLocked || !current) return;
     inputLocked = true;
     var q = current;
-    api('/game/api/answer/', {
-      method: 'POST',
-      body: JSON.stringify({ question_id: q.id, choice: choice })
-    }).then(function (d) {
-      if (d.error) { inputLocked = false; return; }
-      timeLeft = Math.max(0, timeLeft + d.time_delta);
-      // время кончилось прямо на этой дельте — не ждём следующего кадра rAF
-      // (в фоновой вкладке rAF заморожен и финал бы не наступил)
-      if (timeLeft <= 0) { paintHud(); endRun(); return; }
+    postAnswer({ question_id: q.id, choice: choice }, function (d) {
       var buttons = $('opts').querySelectorAll('.opt');
       if (d.correct) {
-        answered++; correctCount++; streak++;
-        bestStreak = Math.max(bestStreak, streak);
-        score += CFG.base_points * comboMult(streak);
+        registerCorrect();
         buttons[choice].classList.add('is-correct');
         showDelta('+' + d.time_delta + ' с', 'plus');
         flashTrack(false);
         comboToastMaybe();
         setTimeout(advance, REDUCED ? 0 : 500);
       } else {
-        answered++;
-        streak = 0;
+        registerWrong(q);
         buttons[choice].classList.add('is-wrong');
         if (buttons[d.correct_index]) buttons[d.correct_index].classList.add('show-right');
         showDelta(d.time_delta + ' с', 'minus');
         flashTrack(true);
         vignette();
-        misses.push({ q: q, chosen: choice, right: d.correct_index });
         setTimeout(advance, REDUCED ? 0 : 900);
       }
-      paintHud();
     });
   }
 
+  // multi (Рапид): отправка выделенного множества, подсветка правильного
+  function submitMulti() {
+    if (state !== 'playing' || inputLocked || !current) return;
+    if (current.type !== 'multi' || selected.length === 0) return;
+    inputLocked = true;
+    var q = current;
+    var chosen = selected.slice();
+    postAnswer({ question_id: q.id, choices: chosen }, function (d) {
+      var buttons = $('opts').querySelectorAll('.opt');
+      var right = d.correct_indices || [];
+      // выбранные верные — зелёные; выбранные лишние — красные;
+      // упущенные верные — зелёная рамка
+      right.forEach(function (i) {
+        if (!buttons[i]) return;
+        buttons[i].classList.add(chosen.indexOf(i) !== -1 ? 'is-correct' : 'show-right');
+      });
+      chosen.forEach(function (i) {
+        if (right.indexOf(i) === -1 && buttons[i]) buttons[i].classList.add('is-wrong');
+      });
+      if (d.correct) {
+        registerCorrect();
+        showDelta('+' + d.time_delta + ' с', 'plus');
+        flashTrack(false);
+        comboToastMaybe();
+        setTimeout(advance, REDUCED ? 0 : 700);
+      } else {
+        registerWrong(q);
+        showDelta(d.time_delta + ' с', 'minus');
+        flashTrack(true);
+        vignette();
+        setTimeout(advance, REDUCED ? 0 : 1200);
+      }
+    });
+  }
+
+  // numeric (Классика): отправка значения из поля ввода
+  function submitNumeric() {
+    if (state !== 'playing' || inputLocked || !current) return;
+    if (current.type !== 'numeric') return;
+    var value = $('num-input').value.trim();
+    if (!value) return;
+    inputLocked = true;
+    var q = current;
+    $('num-input').disabled = true;
+    postAnswer({ question_id: q.id, value: value }, function (d) {
+      var fb = $('num-feedback');
+      if (d.correct) {
+        registerCorrect();
+        fb.textContent = '✓ Верно';
+        fb.className = 'num-feedback ok';
+        showDelta('+' + d.time_delta + ' с', 'plus');
+        flashTrack(false);
+        comboToastMaybe();
+        setTimeout(advance, REDUCED ? 0 : 600);
+      } else {
+        registerWrong(q);
+        fb.textContent = 'Правильный ответ: ' + d.correct_value;
+        fb.className = 'num-feedback bad';
+        showDelta(d.time_delta + ' с', 'minus');
+        flashTrack(true);
+        vignette();
+        setTimeout(advance, REDUCED ? 0 : 1300);
+      }
+    });
+  }
+
+  // Пропуск: работает для любого типа ({choice:null} сервер трактует как
+  // скип и для multi/numeric — нужного поля просто нет в теле).
+  // Комбо НЕ сбрасывается.
   function skip() {
     if (state !== 'playing' || inputLocked || !current) return;
     inputLocked = true;
     var q = current;
-    api('/game/api/answer/', {
-      method: 'POST',
-      body: JSON.stringify({ question_id: q.id, choice: null })
-    }).then(function (d) {
-      if (d.error) { inputLocked = false; return; }
-      timeLeft = Math.max(0, timeLeft + d.time_delta);
-      streak = 0;
-      if (timeLeft <= 0) { paintHud(); endRun(); return; }
+    postAnswer({ question_id: q.id, choice: null }, function (d) {
       showDelta(d.time_delta + ' с', 'skip');
-      paintHud();
       advance();
     });
   }
+
+  $('btn-submit').addEventListener('click', submitMulti);
+  $('btn-num-submit').addEventListener('click', submitNumeric);
+  $('btn-num-skip').addEventListener('click', skip);
+  // разрешённые символы числового ответа: цифры , . / -
+  $('num-input').addEventListener('input', function () {
+    var cleaned = this.value.replace(/[^0-9,.\/\-]/g, '');
+    if (cleaned !== this.value) this.value = cleaned;
+  });
 
   /* ---------- ФИДБЕК-АНИМАЦИИ ---------- */
   var deltaTimer1 = null, deltaTimer2 = null;
@@ -1065,6 +1298,9 @@ a:focus-visible, button:focus-visible {
     } else {
       $('record-badge').classList.remove('on');
     }
+    var bestNow = Math.max(best, score);
+    $('final-mode').textContent = 'Режим «' + MODE.title + '»'
+      + (bestNow > 0 ? ' · рекорд ' + bestNow.toLocaleString('ru-RU') : '');
     renderModeCards(); // освежить рекорды на карточках к возврату на старт
 
     /* счёт: count-up ~800 мс */
@@ -1112,8 +1348,8 @@ a:focus-visible, button:focus-visible {
 
   $('btn-copy').addEventListener('click', function () {
     var total = answered;
-    var text = 'Econ Rush: ' + score.toLocaleString('ru-RU') + ' очков · '
-      + correctCount + '/' + total + ' · комбо ×' + comboMult(bestStreak)
+    var text = 'Econ Rush · ' + MODE.title + ' · ' + score.toLocaleString('ru-RU')
+      + ' очков · ' + correctCount + '/' + total + ' · комбо ×' + comboMult(bestStreak)
       + ' — обгони меня: ' + location.origin + '/game/';
     var btn = this;
     function restore() {
@@ -1181,13 +1417,25 @@ a:focus-visible, button:focus-visible {
       return;
     }
     if (state === 'playing') {
+      if (!current) return;
+      if (current.type === 'numeric') {
+        // цифры и знаки идут в поле ввода; глобально ловим только Enter
+        if (e.key === 'Enter') { e.preventDefault(); submitNumeric(); }
+        return;
+      }
       if (e.key >= '1' && e.key <= '5') {
         // до 5 вариантов (в пуле есть тесты с пятью)
         var i = parseInt(e.key, 10) - 1;
-        if (current && i < current.options.length) { e.preventDefault(); answer(i); }
+        if (i < current.options.length) {
+          e.preventDefault();
+          if (current.type === 'multi') { toggleOption(i); } else { answer(i); }
+        }
       } else if (e.key === ' ') {
         e.preventDefault();
         skip();
+      } else if (e.key === 'Enter' && current.type === 'multi') {
+        e.preventDefault();
+        submitMulti();
       }
     }
   });
