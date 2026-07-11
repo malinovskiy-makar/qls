@@ -206,14 +206,14 @@ class GameApiTests(TestCase):
         d = r.json()
         self.assertTrue(d['correct'])
         self.assertEqual(d['correct_index'], 0)
-        self.assertEqual(d['time_delta'], 6)
+        self.assertEqual(d['time_delta'], 5)   # блиц (режим по умолчанию)
         # следующий вопрос — неверный ответ
         q2 = self.client.get('/game/api/question/').json()['question']
         d2 = self.client.post('/game/api/answer/',
                               json.dumps({'question_id': q2['id'], 'choice': 2}),
                               content_type='application/json').json()
         self.assertFalse(d2['correct'])
-        self.assertEqual(d2['time_delta'], -4)
+        self.assertEqual(d2['time_delta'], -5)
 
     def test_skip(self):
         q = self.start()
@@ -221,7 +221,7 @@ class GameApiTests(TestCase):
                              json.dumps({'question_id': q['id'], 'choice': None}),
                              content_type='application/json').json()
         self.assertEqual(d['result'], 'skip')
-        self.assertEqual(d['time_delta'], -2)
+        self.assertEqual(d['time_delta'], -3)  # блиц (режим по умолчанию)
 
     def test_repeat_answer_409(self):
         q = self.start()
