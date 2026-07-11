@@ -1,19 +1,44 @@
 """
 Механическая чистка детерминированного LaTeX-мусора в условиях задач.
 
-Чинит четыре паттерна в Problem.statement и ProblemPart.statement (published):
+Чинит в Problem.statement и ProblemPart.statement (published):
 
   1. \\footnote{...}  — удалить целиком (подсчёт вложенных скобок).
+     ВЫКЛЮЧЕН ПО УМОЛЧАНИЮ (см. сессию «корректировка по итогам ревью») — по
+     dry-run выяснилось, что почти все сноски в этой базе содержат не мусор,
+     а содержательные учебные подсказки («Hint: возьмите производную…»,
+     определения терминов). Удалять их целиком нельзя — сначала нужен
+     отдельный перенос текста сноски в скобки рядом с местом сноски. Включить
+     можно флагом --include-footnote (для будущей доработки).
   2. <<метка>> в начале условия — удалить вместе с содержимым;
      << / >> в середине текста — заменить на «ёлочки» « и ».
-  3. %слово — токен вида %<буква><слово> (слипшийся LaTeX-комментарий) —
-     удалить. Не трогаем: 5%, \%, % перед цифрой, %  (пробел после %).
+  3. %слово — токен вида %<буква><слово> (слипшийся LaTeX-комментарий).
+     Правило (переписано по итогам ревью): если после % до конца текста есть
+     перевод строки — вырезается всё от % до этого \n (граница
+     LaTeX-комментария однозначна). Если \n после % нет — граница
+     неопределима, весь текст этим паттерном НЕ трогается, задача уходит на
+     ручной разбор (список собирает preview_fix_latex_junk).
   4. inline_bullet — маркер « • », слипшийся с предыдущим предложением (не в
      начале строки), — перед ним вставляется \n (пробелы/табы перед маркером
      схлопываются). Сам маркер и текст после не трогаем. Уже стоящие в начале
      строки « • » (после \n) не трогаем — идемпотентно.
 
-Защита: если после чистки текст < 50% исходного — пропустить задачу.
+Защита от математики: паттерны 2 и 3 (<<>> и %слово) не трогают совпадения
+внутри $...$ / $$...$$ / \(...\) / \[...\] — там << и % почти всегда часть
+содержательной формулы (условие неравенства, знак процента в вычислении), а
+не мусор. Общая маска — _math_mask().
+
+Нормализация пробелов ТОЧЕЧНАЯ (по итогам ревью): раньше был безусловный
+общий проход _normalize() по всему тексту, который менял текст ДАЖЕ когда ни
+один паттерн не сработал (схлопывал пробелы, где угодно, включая
+псевдотаблицы с пробелами-отступами — см. #50125 в отчёте ревью). Теперь
+общего прохода нет вообще: если ни один паттерн не сработал — текст
+возвращается байт-в-байт таким же, каким пришёл. Пробел, оставшийся ровно на
+месте вырезания (двойной пробел на стыке), схлопывает сам вырезающий паттерн
+локально, только у себя на границе.
+
+Защита: если после чистки текст < 50% исходного — пропустить задачу
+(SKIP_SHRINK_RATIO).
 
 Без --confirm: HTML-предпросмотр
   reports/dirty_text_audit/junk_preview.html
@@ -33,17 +58,38 @@ from problems.models import Problem, ProblemPart
 
 REPORT_DIR = "reports/dirty_text_audit"
 
+# Защита от перечистки: если после чистки текст короче этой доли исходного —
+# поле пропускается целиком (не считается изменённым). Вынесено в константу,
+# чтобы другие команды (preview_fix_latex_junk) могли воспроизвести ту же
+# логику для точного совпадения счётчиков с dry-run этой команды.
+SKIP_SHRINK_RATIO = 0.5
+
 
 # ── Паттерн 1: \\footnote{...} ────────────────────────────────────────────────
 
+_FOOTNOTE_START_RE = re.compile(r'\\footnote\{')
+
+
+def has_footnote(text):
+    # type: (str) -> bool
+    """Есть ли в тексте \\footnote{...} — независимо от того, включён ли
+    паттерн (include_footnote). Используется для очереди «отложено на
+    перенос в скобки» (footnote_deferred_ids.txt), которую собирают по всей
+    базе, даже когда сам паттерн выключен."""
+    return bool(_FOOTNOTE_START_RE.search(text))
+
+
 def _remove_footnotes(text):
     # type: (str) -> str
-    """Удаляет \\footnote{...} подсчётом вложенных {}."""
+    """Удаляет \\footnote{...} подсчётом вложенных {}. Точечно схлопывает
+    двойной пробел, если он образовался ровно на месте вырезания (пробел
+    был и до \\footnote, и сразу после закрывающей скобки) — только на этом
+    стыке, остальной текст не трогается."""
     result = []
     i = 0
     n = len(text)
     while i < n:
-        m = re.search(r'\\footnote\{', text[i:])
+        m = _FOOTNOTE_START_RE.search(text[i:])
         if not m:
             result.append(text[i:])
             break
@@ -57,6 +103,9 @@ def _remove_footnotes(text):
                 depth += 1
             elif text[j] == '}':
                 depth -= 1
+            j += 1
+        # точечная чистка стыка: пробел до и после вырезанного — оставляем один
+        if result and result[-1].endswith(' ') and j < n and text[j] == ' ':
             j += 1
         # j указывает за закрывающую скобку
         i = j
@@ -78,16 +127,25 @@ _MATH_RE = re.compile(
 )
 
 
+def _math_mask(text):
+    # type: (str) -> List[bool]
+    """Булева маска по индексам символов: True — позиция внутри формулы
+    ($...$, $$...$$, \\(...\\), \\[...\\]). Используется всеми паттернами,
+    которым нельзя трогать содержимое формул (<<>> и %-комментарии — знаки
+    внутри математики почти всегда содержательные, а не мусор)."""
+    mask = [False] * len(text)
+    for m in _MATH_RE.finditer(text):
+        for k in range(m.start(), m.end()):
+            mask[k] = True
+    return mask
+
+
 def _fix_pseudo_quotes(text):
     # type: (str) -> str
     # Сначала удаляем метку-лейбл в начале
     text = _LABEL_AT_START_RE.sub('', text)
     # Заменяем << >> вне математики на «ёлочки»
-    # Строим маску «математических» позиций
-    mask = [False] * len(text)
-    for m in _MATH_RE.finditer(text):
-        for k in range(m.start(), m.end()):
-            mask[k] = True
+    mask = _math_mask(text)
 
     result = []
     i = 0
@@ -107,14 +165,52 @@ def _fix_pseudo_quotes(text):
 
 # ── Паттерн 3: %слово (слипшийся LaTeX-комментарий) ─────────────────────────
 
-# %<кирилл. или лат. буква><возможно ещё буквы>
-# НЕ трогаем: \% (экранированный), %<пробел>, %<цифра>, просто % в конце
+# Признак слипшегося комментария: % (не экранированный), сразу за ним буква
+# без пробела — обычный процент («20%», «20% годовых») так не выглядит,
+# пробел или конец строки после % не матчатся. Это только ТРИГГЕР — где
+# кончается сам комментарий, решает _remove_junk_comments по границе \n.
 _JUNK_COMMENT_RE = re.compile(r'(?<!\\)%([А-ЯЁа-яёA-Za-z][А-ЯЁа-яёA-Za-z]*)')
 
 
 def _remove_junk_comments(text):
-    # type: (str) -> str
-    return _JUNK_COMMENT_RE.sub('', text)
+    # type: (str) -> Tuple[str, bool]
+    """Удаляет %-комментарии вне формул.
+
+    Правило границы (переписано по итогам ревью — старая версия вырезала
+    только первое слово после %, оставляя огрызки вроде «при вмешательстве»,
+    см. reports/fix_latex_junk/approval_summary.md, #4853): LaTeX-комментарий
+    тянется от % до конца строки, поэтому вырезаем всё от % до ближайшего
+    \n включительно слева (сам \n остаётся — это разделитель, не мусор).
+    Пробел перед % (стык вырезания) схлопывается вместе с ним.
+
+    Если у ХОТЯ БЫ ОДНОГО кандидата в этом тексте нет \n после себя — граница
+    комментария неопределима (последняя строка текста, конца не видно). В
+    этом случае НЕ гадаем: весь текст этим паттерном не трогаем, возвращаем
+    (исходный_текст, True) — True здесь значит «нужен ручной разбор».
+
+    Знак % внутри $...$/\\(...\\)/\\[...\\] — почти всегда содержательная
+    часть формулы (проценты, доли), не комментарий, поэтому не трогаем.
+    """
+    mask = _math_mask(text)
+    candidates = [m for m in _JUNK_COMMENT_RE.finditer(text) if not mask[m.start()]]
+    if not candidates:
+        return text, False
+
+    for m in candidates:
+        if text.find('\n', m.start()) == -1:
+            return text, True  # граница неопределима — весь текст на ручной разбор
+
+    result = []
+    last = 0
+    for m in candidates:
+        strip_start = m.start()
+        while strip_start > last and text[strip_start - 1] in ' \t':
+            strip_start -= 1  # пробел перед % — тоже часть вырезаемого стыка
+        nl = text.find('\n', m.start())
+        result.append(text[last:strip_start])
+        last = nl
+    result.append(text[last:])
+    return ''.join(result), False
 
 
 # ── Паттерн 4: инлайновый маркер « • », слипшийся с текстом ────────────────────
@@ -131,34 +227,34 @@ def _fix_inline_bullets(text):
     return _INLINE_BULLET_RE.sub(r'\1\n•', text)
 
 
-# ── Постобработка ─────────────────────────────────────────────────────────────
-
-def _normalize(text):
-    # type: (str) -> str
-    # Схлопнуть двойные пробелы, обрезать по краям
-    text = re.sub(r'[ \t]{2,}', ' ', text)
-    return text.strip()
-
-
 # ── Основная функция чистки ───────────────────────────────────────────────────
 
-def clean_text(text):
-    # type: (str) -> Tuple[str, List[str]]
-    """Возвращает (очищенный текст, список применённых паттернов)."""
-    original = text
+def clean_text(text, include_footnote=False):
+    # type: (str, bool) -> Tuple[str, List[str], bool]
+    """Возвращает (очищенный текст, список применённых паттернов,
+    нужен_ли_ручной_разбор_junk_comment).
+
+    footnote выключен по умолчанию — включается include_footnote=True
+    (флаг --include-footnote), см. докстринг модуля.
+
+    Общего прохода по пробелам больше нет: каждый паттерн отвечает за
+    точечную чистку стыка на месте собственного вырезания. Если ни один
+    паттерн не сработал, text возвращается байт-в-байт таким же, каким пришёл.
+    """
     applied = []  # type: List[str]
 
-    t1 = _remove_footnotes(text)
-    if t1 != text:
-        applied.append('footnote')
-    text = t1
+    if include_footnote:
+        t1 = _remove_footnotes(text)
+        if t1 != text:
+            applied.append('footnote')
+        text = t1
 
     t2 = _fix_pseudo_quotes(text)
     if t2 != text:
         applied.append('pseudo_quotes')
     text = t2
 
-    t3 = _remove_junk_comments(text)
+    t3, needs_manual = _remove_junk_comments(text)
     if t3 != text:
         applied.append('junk_comment')
     text = t3
@@ -168,16 +264,13 @@ def clean_text(text):
         applied.append('inline_bullet')
     text = t4
 
-    text = _normalize(text)
-    if text != original.strip():
-        pass  # нормализация не считается отдельным паттерном
-    return text, applied
+    return text, applied, needs_manual
 
 
-def _check_idempotent(text):
-    # type: (str) -> bool
+def _check_idempotent(text, include_footnote=False):
+    # type: (str, bool) -> bool
     """True если повторный прогон не меняет текст."""
-    cleaned, _ = clean_text(text)
+    cleaned, _, _ = clean_text(text, include_footnote=include_footnote)
     return cleaned == text
 
 
@@ -188,9 +281,14 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--confirm', action='store_true',
                             help='Записать изменения в базу.')
+        parser.add_argument('--include-footnote', action='store_true',
+                            help='Включить паттерн footnote (выключен по умолчанию — '
+                                 'см. докстринг модуля, почти все сноски в базе '
+                                 'содержательные, не мусор).')
 
     def handle(self, *args, **opts):
         confirm = opts['confirm']
+        include_footnote = opts['include_footnote']
         os.makedirs(REPORT_DIR, exist_ok=True)
         os.makedirs('backups', exist_ok=True)
 
@@ -201,6 +299,10 @@ class Command(BaseCommand):
               .order_by('id'))
         total_pub = qs.count()
         self.stdout.write('  published: {:,}'.format(total_pub))
+        if include_footnote:
+            self.stdout.write('  --include-footnote передан: паттерн footnote ВКЛЮЧЁН.')
+        else:
+            self.stdout.write('  Паттерн footnote выключен по умолчанию.')
 
         # (pid, field, old_text, new_text, patterns_applied, part_id_or_none)
         hits = []   # type: List[Tuple[int, str, str, str, List[str], Optional[int]]]
@@ -208,6 +310,7 @@ class Command(BaseCommand):
         pattern_counts = {'footnote': 0, 'pseudo_quotes': 0, 'junk_comment': 0,
                          'inline_bullet': 0}
         non_idempotent = []  # type: List[Tuple[int, str]]
+        junk_comment_manual_count = 0
 
         for p in qs:
             pid = p.id
@@ -215,15 +318,17 @@ class Command(BaseCommand):
             # Проверяем statement
             stmt = p.statement or ''
             if stmt:
-                cleaned, applied = clean_text(stmt)
+                cleaned, applied, needs_manual = clean_text(stmt, include_footnote=include_footnote)
+                if needs_manual:
+                    junk_comment_manual_count += 1
                 if cleaned != stmt:
-                    if len(cleaned) < 0.5 * len(stmt):
+                    if len(cleaned) < SKIP_SHRINK_RATIO * len(stmt):
                         skipped_too_short.append((pid, 'statement'))
                     else:
                         for pat in applied:
                             pattern_counts[pat] = pattern_counts.get(pat, 0) + 1
                         hits.append((pid, 'statement', stmt, cleaned, applied, None))
-                        if not _check_idempotent(cleaned):
+                        if not _check_idempotent(cleaned, include_footnote=include_footnote):
                             non_idempotent.append((pid, 'statement'))
 
             # Проверяем подпункты
@@ -231,16 +336,18 @@ class Command(BaseCommand):
                 ps = part.statement or ''
                 if not ps:
                     continue
-                cleaned, applied = clean_text(ps)
+                cleaned, applied, needs_manual = clean_text(ps, include_footnote=include_footnote)
+                if needs_manual:
+                    junk_comment_manual_count += 1
                 if cleaned != ps:
-                    if len(cleaned) < 0.5 * len(ps):
+                    if len(cleaned) < SKIP_SHRINK_RATIO * len(ps):
                         skipped_too_short.append((pid, 'part:{}'.format(part.label)))
                     else:
                         for pat in applied:
                             pattern_counts[pat] = pattern_counts.get(pat, 0) + 1
                         hits.append(
                             (pid, 'part:{}'.format(part.label), ps, cleaned, applied, part.id))
-                        if not _check_idempotent(cleaned):
+                        if not _check_idempotent(cleaned, include_footnote=include_footnote):
                             non_idempotent.append((pid, 'part:{}'.format(part.label)))
 
         problems_touched = len({h[0] for h in hits})
@@ -252,6 +359,8 @@ class Command(BaseCommand):
         for pat, cnt in sorted(pattern_counts.items()):
             self.stdout.write('  {}: {:,}'.format(pat, cnt))
         self.stdout.write('Пропущено (< 50% исходного): {:,}'.format(len(skipped_too_short)))
+        self.stdout.write('junk_comment: полей на ручной разбор (нет \\n после %): {:,}'.format(
+            junk_comment_manual_count))
         self.stdout.write('Идемпотентность: {} НЕ прошли'.format(len(non_idempotent)))
         if non_idempotent:
             for pid, field in non_idempotent[:5]:
