@@ -80,6 +80,7 @@ PROFILES = {
     },
 }
 YEAR_PROFILES = {
+    2018: 'chast_flat',
     2019: 'chast_flat',
     2020: 'zadanie',
     2021: 'zadanie',
@@ -90,6 +91,17 @@ YEAR_PROFILES = {
 }
 
 PDF_URLS = {
+    # 2018–2019: 10 и 11 классы писали один общий тест (файл 1011)
+    2018: {
+        9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2018/region_2018_test_answers_9_16633.pdf',
+        10: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2018/region_2018_test_answers_1011_16632.pdf',
+        11: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2018/region_2018_test_answers_1011_16632.pdf',
+    },
+    2019: {
+        9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2019/region_2019_test_answers_9_18471.pdf',
+        10: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2019/region_2019_test_answers_1011_18470.pdf',
+        11: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2019/region_2019_test_answers_1011_18470.pdf',
+    },
     # 2020: 10 и 11 классы писали один общий тест (файл 10-11)
     2020: {
         9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2020/region_2020_test_answers_9_19904.pdf',
@@ -147,7 +159,7 @@ QSTART_RE = re.compile(r'^(\d)\.(\d)\.\s*')
 OPT_RE = re.compile(r'^([1-4])\)\s*')
 COMMENT_RE = re.compile(r'^Комментарий\.\s*')
 ANSWER_RE = re.compile(r'^Ответ:\s*')
-POINTS_RE = re.compile(r'приносит (\d+) балл')
+POINTS_RE = re.compile(r'(?:приносит|оценивается в) (\d+) балл')
 
 WS_RE = re.compile(r'\s+')
 
