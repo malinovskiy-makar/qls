@@ -25,7 +25,7 @@ from django.core.management.base import BaseCommand, CommandError
 from game.views import parse_exact_number
 
 DOLLAR_RE = re.compile(r'(?<!\\)\$')
-MATH_SEG_RE = re.compile(r'\$([^$]*)\$')
+MATH_SEG_RE = re.compile(r'(?<!\\)\$((?:\\.|[^$\\])*)\$')
 CTRL_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
 RANGE_MIN, RANGE_MAX = 12, 60

@@ -72,7 +72,76 @@ MANUAL_GLYPHS = {
             983: 'ы',            # курсивное «убывающей» (2.5)
         },
     },
+    # 2021: битый только 11 класс (ToUnicode есть, но врёт). Старая версия
+    # шрифтов — часть глифов сдвинута относительно референсов 2023/2025.
+    # Каждый проверен визуально по рендеру страницы.
+    2021: {
+        'LibertinusSerif-Regular': {
+            5: '$',              # «дефицитом 2 млн $»
+            47: 'N',             # «В городе N располагается…»
+            1750: '–',           # '––' в тексте (постпроцесс склеит в «—»)
+            1751: '—',           # «Ключевая ставка — другой инструмент»
+            1861: '№',           # «Лекарство №1»
+        },
+        # курсив: алфавитный блок со сдвигом (А=923, К=933, Ш=947, а=955)
+        'LibertinusSerif-Italic': {
+            923: 'А', 933: 'К', 947: 'Ш', 955: 'а',
+        },
+        'LibertinusMath-Regular': {
+            32: '?',             # ASCII-блок глифов: gid = код − 0x1F
+            1770: '…',           # «MC(1) + MC(2) + … + MC(q)»
+            1952: '→',           # «49 → min»
+            1995: '∈',           # «ставке t ∈ (0; 90)»
+            2004: '−',           # минус: «(y(2/3) − y(1/3))»
+            2165: '⋅',           # «w₁ ⋅ L₁»
+            2166: '⋆',           # «q₂⋆ = Q − 3»
+            # Блок математического курсива: заглавные 𝐴=2599…(𝐴+i);
+            # строчные 𝑎=2625…, слот «h» пропущен (ℎ живёт в Letterlike).
+            # Якоря проверены по рендерам: AVC, P_A/P_B, MC=2q, «за N»,
+            # «за Q», TR₀, T_d, q_d=90−p, q_s=p/2, «равна r», «ставке t»,
+            # L_s=w, y=x³.
+            2599: '\U0001D434',  # 𝐴
+            2600: '\U0001D435',  # 𝐵
+            2601: '\U0001D436',  # 𝐶
+            2610: '\U0001D43F',  # 𝐿
+            2611: '\U0001D440',  # 𝑀
+            2612: '\U0001D441',  # 𝑁
+            2614: '\U0001D443',  # 𝑃
+            2615: '\U0001D444',  # 𝑄
+            2616: '\U0001D445',  # 𝑅
+            2618: '\U0001D447',  # 𝑇
+            2620: '\U0001D449',  # 𝑉
+            2628: '\U0001D451',  # 𝑑
+            2629: '\U0001D452',  # 𝑒
+            2639: '\U0001D45D',  # 𝑝
+            2640: '\U0001D45E',  # 𝑞
+            2641: '\U0001D45F',  # 𝑟
+            2642: '\U0001D460',  # 𝑠
+            2643: '\U0001D461',  # 𝑡
+            2646: '\U0001D464',  # 𝑤
+            2647: '\U0001D465',  # 𝑥
+            2648: '\U0001D466',  # 𝑦
+            # Скрипт-кегли (оптические варианты для степеней/индексов) —
+            # раскладка сверена по глифовой структуре дробей 1/(1+r) и т.п.
+            3551: '2', 3552: '3', 3553: '1', 3554: '0',
+            3562: '+', 3565: '(', 3566: ')',
+            3610: '{',           # фрагмент фигурной скобки кусочной функции
+        },
+        'Asana-Math': {
+            1527: '⩽',           # «TC(Q) ⩽ Q²»
+            1528: '⩾',           # «для любого Q ⩾ 0»
+        },
+    },
 }
+
+# MyriadPro-SemiboldIt (2021, 11 класс): этим шрифтом набраны маркеры
+# «Комментарий.» и «Ответ:». Кириллица — сплошным блоком А=630…я=693
+# (якоря К,о,м,м,е,н,т,а,р,и,й проверены по рендеру и взаимной
+# согласованности позиций). ASCII — Adobe-порядок глифов: gid = код − 31
+# (пробел=1, «:»=27 — сверено по маркеру «Ответ:»).
+_MYRIAD_2021 = {630 + i: chr(0x410 + i) for i in range(64)}
+_MYRIAD_2021.update({code - 31: chr(code) for code in range(32, 127)})
+MANUAL_GLYPHS[2021]['MyriadPro-SemiboldIt'] = _MYRIAD_2021
 
 WORD_RE = re.compile(r'\S+')
 CYR_LOWER = set('абвгдеёжзиклмнопрстуфхцчшщъыьэюя')
@@ -84,6 +153,9 @@ def norm_family(name):
     name = name.split('+')[-1]
     if name.endswith('-Identity-H'):
         name = name[:-len('-Identity-H')]
+    # старые сборки называют шрифт без «-Regular» (LibertinusMath, 2021)
+    if name == 'LibertinusMath':
+        name = 'LibertinusMath-Regular'
     return name
 
 
@@ -95,7 +167,8 @@ def span_family(span):
     курсива иначе загрязняют карту обычного Semibold (и у них конфликтующая
     нумерация!). Курсив восстанавливаем по italic-биту flags (бит 1)."""
     fam = norm_family(span['font'])
-    if span['flags'] & 2 and not fam.endswith('Italic'):
+    # «It» покрывает и полный суффикс Italic, и усечённый (MyriadPro-SemiboldIt)
+    if span['flags'] & 2 and 'It' not in fam:
         fam += 'Italic'
     return fam
 
@@ -238,6 +311,30 @@ class Command(BaseCommand):
     def _fix_one(self, fitz, pdf, versions, manual):
         doc = fitz.open(pdf)
 
+        # Сам факт наличия ToUnicode ничего не гарантирует: у 11 класса 2021
+        # CMap есть, но маппит в мусор. Критерий здоровья — документный:
+        # текст первой страницы читается по-русски → шрифты с ToUnicode не
+        # трогаем; не читается → перезаписываем карты всем.
+        page1 = doc[0].get_text()
+        letters = [c for c in page1 if c.isalpha()]
+        cyr = sum(1 for c in letters if 'Ѐ' <= c <= 'ӿ')
+        doc_readable = bool(letters) and cyr / len(letters) > 0.5
+        healthy = set()
+        if doc_readable:
+            for pno in range(len(doc)):
+                for f in doc.get_page_fonts(pno):
+                    t, _ = doc.xref_get_key(f[0], 'ToUnicode')
+                    if t == 'xref':
+                        healthy.add(f[3])
+        all_tags = {f[3] for pno in range(len(doc))
+                    for f in doc.get_page_fonts(pno)}
+        if healthy == all_tags:
+            doc.close()
+            self.stdout.write(self.style.SUCCESS(
+                f'  {pdf.name}: текст читается, у всех шрифтов есть '
+                'ToUnicode — пропуск'))
+            return
+
         # Использованные глифы каждого сабсета: с texttrace постранично,
         # тег сабсета берём из шрифтов страницы (однозначен на странице).
         used = {}      # полное имя сабсета -> set(глифов)
@@ -269,23 +366,27 @@ class Command(BaseCommand):
         # Подбор версии карты на сабсет
         chosen = {}
         for tag, gids in used.items():
+            if tag in healthy:
+                continue
             fam = norm_family(tag)
             candidates = []
             for m in versions.get(fam, []):
                 covered = gids & set(m)
                 text = ''.join(m.get(g, '�') for g in sorted(gids))
                 candidates.append((len(gids - set(m)), garbage_score(text), m))
-            if not candidates:
-                self.stdout.write(self.style.WARNING(
-                    f'  {pdf.name}: {tag} — нет референсной карты, '
-                    f'{len(gids)} глифов останутся U+FFFD'))
-                continue
-            candidates.sort(key=lambda c: (c[0], c[1]))
-            miss, garbage, best = candidates[0]
-            if len(candidates) > 1 and candidates[1][:2] == (miss, garbage):
-                raise CommandError(
-                    f'{pdf.name}: {tag} — неоднозначный выбор версии карты')
-            mapping = dict(best)
+            garbage = 0
+            if candidates:
+                candidates.sort(key=lambda c: (c[0], c[1]))
+                miss, garbage, best = candidates[0]
+                if (len(candidates) > 1
+                        and candidates[1][:2] == (miss, garbage)):
+                    raise CommandError(
+                        f'{pdf.name}: {tag} — неоднозначный выбор версии карты')
+                mapping = dict(best)
+            else:
+                # референса нет — карта только из ручных глифов + U+FFFD,
+                # чтобы сырые гиды не маскировались под честные символы
+                mapping = {}
             # Ручные глифы (проверены визуально) — только поверх пробелов
             for gid, ch in manual.get(fam, {}).items():
                 if gid in mapping and mapping[gid] != ch:
@@ -293,10 +394,15 @@ class Command(BaseCommand):
                         f'{pdf.name}: {tag} глиф {gid} — ручное значение '
                         f'{ch!r} противоречит референсу {mapping[gid]!r}')
                 mapping[gid] = ch
-            chosen[tag] = mapping
             unmapped = gids - set(mapping)
+            # Непокрытые глифы — явный U+FFFD: иначе MuPDF отдаёт chr(gid)
+            # и мусор маскируется под безобидные ASCII/греческие символы.
+            # С FFFD парсер честно отправляет вопрос в unparsed.
+            for gid in unmapped:
+                mapping[gid] = '�'
+            chosen[tag] = mapping
             note = ('полное покрытие' if not unmapped
-                    else f'{len(unmapped)} глифов без расшифровки')
+                    else f'{len(unmapped)} глифов без расшифровки (U+FFFD)')
             self.stdout.write(f'  {pdf.name}: {tag} → карта '
                               f'({len(mapping)} глифов, {note}, мусор {garbage})')
             for gid in sorted(unmapped):

@@ -114,6 +114,13 @@ class FinishMathTests(SimpleTestCase):
         self.assertEqual(out, '$1{,}1N _{1{,}2} {}_{2}$')
         self.assertTrue(issues)
 
+    def test_literal_dollar_survives_postprocess(self):
+        # валютный доллар хранится как $\$$ — постпроцесс не рвёт сегменты
+        text = postprocess_text(
+            'дефицит 2 млн $\\$$, а сбережения на 5 млн $\\$$. Итого $Y=2M/P$.')
+        self.assertIn('$\\$$', text)
+        self.assertIn('$Y=\\frac{2M}{P}$', text)
+
     def test_mixed_scripts_untouched(self):
         # q^{7}_{1} — степень+индекс легальны, \pi _{2} — просто индекс
         from problems.management.commands.parse_vsosh_region import _finish_math

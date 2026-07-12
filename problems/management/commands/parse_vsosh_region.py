@@ -53,14 +53,21 @@ PROFILES = {
         'section_re': re.compile(r'^Задание (\d)$'),
         'qtypes': {1: 'boolean', 2: 'single', 3: 'multi', 4: 'numeric'},
         'stop_section': None,
+        # 2021: в конце файла сводная сетка «Правильные ответы» с повтором
+        # «Задание N»/«1.1.» и чекбоксами — не контент, разбор прекращаем.
+        # У 11 класса заголовок сетки: «Первый тур. Тест. Правильные ответы.»
+        'stop_line_re': re.compile(
+            r'^(Первый тур\. Тест\. )?Правильные ответы\.?$'),
     },
     'chast': {
         'section_re': re.compile(r'^Часть (\d)$'),
         'qtypes': {1: 'single', 2: 'multi', 3: 'numeric'},
         'stop_section': 4,
+        'stop_line_re': None,
     },
 }
 YEAR_PROFILES = {
+    2021: 'zadanie',
     2022: 'zadanie',
     2023: 'zadanie',
     2024: 'chast',
@@ -68,6 +75,11 @@ YEAR_PROFILES = {
 }
 
 PDF_URLS = {
+    2021: {
+        9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2021/region_2021_test_solutions_9_21401.pdf',
+        10: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2021/region_2021_test_solutions_10_21400.pdf',
+        11: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2021/region_2021_test_solutions_11_21399.pdf',
+    },
     2022: {
         9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2022/region_2022_test_answers_9_22810.pdf',
         10: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2022/region_2022_test_answers_10_22808.pdf',
@@ -548,7 +560,10 @@ def render_paragraph(line_list, body, indent_breaks=False, left_margin=None,
                         and not pieces[-1].endswith((' ', '\n')) \
                         and not txt.startswith((' ', ',', '.', ';', ':', ')', '?', '!')):
                     pieces.append(' ')
-                pieces.append(txt)
+                # литеральный доллар (валюта «2 млн $») → $\$$: KaTeX
+                # рендерит его как знак валюты, а голые $ спарились бы
+                # в псевдоформулу (проверено в браузере)
+                pieces.append(txt.replace('$', '$\\$$'))
                 glue_next = False
         # перенос слова на стыке строк?
         last_txt = ''
@@ -610,7 +625,9 @@ PAREN_FRAC_POW_RE = re.compile(
 # Два и более дефиса/коротких тире подряд (--, ––) -> одно длинное тире.
 # Настоящий em dash (—) не входит в класс — не трогаем уже верное тире.
 DASH_RUN_RE = re.compile(r'[-‐‑‒–]{2,}')
-MATH_SEGMENT_RE = re.compile(r'(\$[^$]*\$)')
+# Сегмент математики: от неэкранированного $ до парного ему; \$ внутри
+# (валютный доллар «$\$$») съедается как экранированная пара.
+MATH_SEGMENT_RE = re.compile(r'((?<!\\)\$(?:\\.|[^$\\])*\$)')
 # Радикал из юникод-математики (√KL -> \sqrt KL): без скобок KaTeX возьмёт
 # под корень один символ, а в PDF винкулум накрывает весь буквенный ран.
 SQRT_RUN_RE = re.compile(r'\\sqrt\s+([A-Za-z]+|\d+)')
@@ -686,6 +703,8 @@ def canonicalize_answer(raw):
     «50.» → ('50', ''); «19 % или 0,19.» → ('0,19', '') — безразмерная форма
     предпочтительнее; «𝑄= 2.» → ('2', ''); «120 руб.» → ('120', 'руб.')."""
     text = raw.strip().rstrip('.').strip()
+    # KaTeX-декорация десятичной запятой из math-рана («-0{,}25»)
+    text = text.replace('{,}', ',')
     if not text:
         return None, 'пустой ответ'
     candidates = [c.strip() for c in re.split(r'\s+или\s+', text) if c.strip()]
@@ -694,6 +713,9 @@ def canonicalize_answer(raw):
         m = VAR_EQ_RE.match(cand)
         if m:
             cand = m.group(1).strip()
+        # «на 64 %» (вопрос «на сколько процентов…») — предлог не значим,
+        # жюри засчитывает ответы «с соответствующими предлогами и без них»
+        cand = re.sub(r'^на\s+', '', cand)
         cand = cand.rstrip('.').strip()
         if NUMBER_RE.match(cand.replace(' ', '')):
             parsed.append((cand.replace(' ', ''), ''))
@@ -789,8 +811,12 @@ def parse_document(doc, grade, errors, profile):
         line = Line(new_spans, line.bbox, line.page_no)
         return line, bold
 
+    stop_line_re = profile.get('stop_line_re')
     for line in lines:
         plain = line.plain
+
+        if stop_line_re is not None and stop_line_re.match(plain):
+            break
 
         m = section_re.match(plain)
         if m:
@@ -902,6 +928,11 @@ def build_question(cur, buffers, body, left_margin, grade):
             for o in buffers['options']]
     bold_idx = [i for i, o in enumerate(buffers['options']) if o['bold']]
 
+    # U+FFFD — глиф, который фиксер ToUnicode не смог расшифровать:
+    # текст вопроса неполон, выдумывать нечего — в unparsed.
+    if '�' in statement + solution + ''.join(opts):
+        return None, 'нерасшифрованные глифы (U+FFFD) — сверить с PDF'
+
     q = {'grades': [grade], 'number': cur['number'], 'qtype': qtype,
          'statement': statement, 'options': [], 'correct': None,
          'unit': '', 'solution': solution, 'points': None}
@@ -946,6 +977,8 @@ def build_question(cur, buffers, body, left_margin, grade):
     answer_raw = render_plain_latex(buffers['answer'], body)
     if not answer_raw:
         return None, 'строка «Ответ:» не найдена'
+    if '�' in answer_raw:
+        return None, 'нерасшифрованные глифы (U+FFFD) в ответе'
     parsed, err = canonicalize_answer(answer_raw)
     if err:
         return None, err
