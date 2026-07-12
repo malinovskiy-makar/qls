@@ -79,6 +79,21 @@ class PostprocessTextTests(SimpleTestCase):
         text = postprocess_text('$TC_{1}(Q/2)+TC_{2}(Q/2)$')
         self.assertEqual(text, '$TC_{1}(\\frac{Q}{2})+TC_{2}(\\frac{Q}{2})$')
 
+    def test_sqrt_letter_run_gets_braces(self):
+        # √KL из юникод-математики: винкулум в PDF накрывает весь ран
+        self.assertEqual(postprocess_text('$Q=\\sqrt KL$'),
+                         '$Q=\\sqrt{KL}$')
+        self.assertEqual(postprocess_text('$10 \\sqrt Q  \\cdot Q$'),
+                         '$10 \\sqrt{Q}  \\cdot Q$')
+
+    def test_root_index_before_sqrt(self):
+        # маленькая «4» перед радикалом — корень 4-й степени, не множитель
+        self.assertEqual(postprocess_text('$Q= ^{4}\\sqrt KL$'),
+                         '$Q= \\sqrt[4]{KL}$')
+
+    def test_braced_sqrt_not_double_wrapped(self):
+        self.assertEqual(postprocess_text('$\\sqrt{KL}+1$'), '$\\sqrt{KL}+1$')
+
 
 class CanonicalizeAnswerUntouchedTests(SimpleTestCase):
 

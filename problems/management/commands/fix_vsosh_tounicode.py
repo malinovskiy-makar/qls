@@ -1,0 +1,330 @@
+# -*- coding: utf-8 -*-
+"""
+fix_vsosh_tounicode — лечит PDF ВсОШ-региона с битой текстовой кодировкой
+(2024: CID-шрифты Identity-H БЕЗ ToUnicode — извлекаемый «текст» состоит из
+сырых glyph ID вместо букв).
+
+Принцип. Все PDF линейки (2023–2025) сверстаны одними шрифтами (Libertinus),
+а Identity-H означает «код символа = CID = глиф исходного шрифта». В файлах
+2023/2025 ToUnicode есть → через get_texttrace() снимаем пары (глиф → юникод)
+и получаем референсные карты. В целевом файле теми же глифами набран текст —
+вписываем в каждый шрифт корректный /ToUnicode CMap и сохраняем PDF рядом.
+После этого обычное извлечение текста (и parse_vsosh_region) работает как ни
+в чём не бывало.
+
+Осторожности:
+- В одном документе бывает ДВА одноимённых сабсета с разной нумерацией
+  глифов (документ склеен из «теста» и «задач» разных сборок). Карты
+  строятся по-сабсетно; референсные страницы, где семейство представлено
+  двумя сабсетами сразу, пропускаются.
+- Целевой сабсет получает карту-кандидата только если она покрывает все его
+  глифы; из кандидатов выбирается тот, чей декод даёт связный русский текст
+  (минимум «рваных» слов со сменой регистра внутри). Неоднозначность —
+  честная ошибка, файл не пишется.
+- Глифы без расшифровки отображаются в U+FFFD — дальше их ловят шлюзы
+  качества (check_vsosh_gates) на уровне вопросов.
+
+Запуск: ./venv/bin/python manage.py fix_vsosh_tounicode --year 2024
+Выход:  test_answers_<класс>.pdf перезаписывается исправленной копией
+        (оригиналы скачанных файлов не трогаются).
+"""
+import re
+from pathlib import Path
+
+from django.core.management.base import BaseCommand, CommandError
+
+REFERENCE_PDFS = [
+    'materials/vsosh_region/2025/test_answers_9.pdf',
+    'materials/vsosh_region/2025/test_answers_10.pdf',
+    'materials/vsosh_region/2025/test_answers_11.pdf',
+    'materials/vsosh_region/2023/test_answers_9.pdf',
+    'materials/vsosh_region/2023/test_answers_10.pdf',
+    'materials/vsosh_region/2023/test_answers_11.pdf',
+]
+
+# Глифы, которых нет в референсах 2023/2025. Каждый ПРОВЕРЕН ВИЗУАЛЬНО по
+# рендеру страницы 2024 (глиф 93 в ASCII-фолбэке маскировался под «]», на
+# рендере это «|» — модуль в 1/|ε|). Ключ — год, чтобы карты не протекали
+# на другие годы с иной нумерацией глифов.
+MANUAL_GLYPHS = {
+    2024: {
+        'LibertinusMath-Regular': {
+            3406: '\U0001D700',  # 𝜀 — эластичность («по цене 𝜀 = −2»)
+            2726: '\U0001D43E',  # 𝐾 — «Q = √(KL)»
+            2729: '\U0001D441',  # 𝑁 — «NPV = …»
+            2717: '\U0001D435',  # 𝐵 — «MSB = 100 − Q»
+            93: '|',             # модуль: 1/|ε|
+        },
+        'Asana-Math': {
+            761: '√',            # радикал («10/√Q», «√KL»)
+        },
+        'LibertinusSerif-Regular': {
+            42: 'I',             # «XXIX» в титуле
+            47: '/',             # слэш в «2023/2024»
+            54: '6',             # цифра 6 (вариант начертания, «3,6»)
+            60: '[',             # интервалы в вариантах 1.4: «[0 %; 5 %)»
+            62: ']',             # «[15 %; 20 %]»
+            72: 'g', 83: 'r', 84: 's', 85: 't', 86: 'u', 87: 'v',
+            #                    «rosstat.gov.ru» в условии 1.4
+            967: 'Я',            # «Яков и Иван» (2.1)
+        },
+        'LibertinusSerif-Italic': {
+            983: 'ы',            # курсивное «убывающей» (2.5)
+        },
+    },
+}
+
+WORD_RE = re.compile(r'\S+')
+CYR_LOWER = set('абвгдеёжзиклмнопрстуфхцчшщъыьэюя')
+CYR_UPPER = set(c.upper() for c in CYR_LOWER)
+
+
+def norm_family(name):
+    """Имя шрифта без тега сабсета и суффикса кодировки."""
+    name = name.split('+')[-1]
+    if name.endswith('-Identity-H'):
+        name = name[:-len('-Identity-H')]
+    return name
+
+
+def span_family(span):
+    """Каноническое семейство для спана texttrace.
+
+    ⚠ texttrace обрезает имя шрифта (~31 символ): «VCMFWA+LibertinusSerif-
+    SemiboldItalic» приходит как «LibertinusSerif-Semibold» — глифы жирного
+    курсива иначе загрязняют карту обычного Semibold (и у них конфликтующая
+    нумерация!). Курсив восстанавливаем по italic-биту flags (бит 1)."""
+    fam = norm_family(span['font'])
+    if span['flags'] & 2 and not fam.endswith('Italic'):
+        fam += 'Italic'
+    return fam
+
+
+def page_family_tags(doc, pno):
+    """Семейство → [полные имена сабсетов] на странице."""
+    fams = {}
+    for f in doc.get_page_fonts(pno):
+        full = f[3]
+        fams.setdefault(norm_family(full), set()).add(full)
+    return fams
+
+
+def collect_reference_maps(paths):
+    """Референсные карты: {полное имя сабсета: {глиф: юникод}}.
+    Страницы, где семейство представлено ≥2 сабсетами, пропускаются —
+    texttrace не говорит, какой из них рисовал спан."""
+    import fitz
+    subset_maps = {}
+    for path in paths:
+        doc = fitz.open(path)
+        for pno in range(len(doc)):
+            fams = page_family_tags(doc, pno)
+            ambiguous = {fam for fam, tags in fams.items() if len(tags) > 1}
+            tag_of = {fam: next(iter(tags)) for fam, tags in fams.items()
+                      if len(tags) == 1}
+            for span in doc[pno].get_texttrace():
+                fam = span_family(span)
+                if fam in ambiguous or fam not in tag_of:
+                    continue
+                m = subset_maps.setdefault((path, tag_of[fam]), {})
+                for uni, gid in ((c[0], c[1]) for c in span['chars']):
+                    m[gid] = chr(uni)
+        doc.close()
+    return subset_maps
+
+
+def merge_versions(subset_maps):
+    """Сабсеты одного семейства, согласные на общих глифах, сливаются в
+    «версию». Результат: {семейство: [карта_версии, ...]}."""
+    by_family = {}
+    for (path, tag), m in subset_maps.items():
+        by_family.setdefault(norm_family(tag), []).append(m)
+    versions = {}
+    for fam, maps_list in by_family.items():
+        groups = []
+        for m in maps_list:
+            for g in groups:
+                if all(g[k] == v for k, v in m.items() if k in g):
+                    g.update(m)
+                    break
+            else:
+                groups.append(dict(m))
+        versions[fam] = groups
+    return versions
+
+
+def garbage_score(text):
+    """Число «рваных» слов: смена регистра внутри слова, нерусский мусор."""
+    bad = 0
+    for w in WORD_RE.findall(text):
+        letters = [c for c in w if c.isalpha()]
+        if not letters:
+            continue
+        switches = sum(1 for a, b in zip(letters, letters[1:])
+                       if a in CYR_LOWER and b in CYR_UPPER)
+        non_cyr = sum(1 for c in letters
+                      if c not in CYR_LOWER and c not in CYR_UPPER
+                      and not c.isascii())
+        if switches or non_cyr:
+            bad += 1
+    return bad
+
+
+def build_cmap_stream(mapping):
+    """Глиф→юникод → содержимое /ToUnicode CMap (bfchar-блоками по 100)."""
+    def uhex(s):
+        return ''.join(f'{b:04X}' for ch in s
+                       for b in _utf16_units(ch))
+    entries = [f'<{gid:04X}> <{uhex(uni)}>' for gid, uni in sorted(mapping.items())]
+    blocks = []
+    for i in range(0, len(entries), 100):
+        chunk = entries[i:i + 100]
+        blocks.append(f'{len(chunk)} beginbfchar\n'
+                      + '\n'.join(chunk) + '\nendbfchar')
+    body = '\n'.join(blocks)
+    return f'''/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo <</Registry (Adobe) /Ordering (UCS) /Supplement 0>> def
+/CMapName /Adobe-Identity-UCS def
+/CMapType 2 def
+1 begincodespacerange
+<0000> <FFFF>
+endcodespacerange
+{body}
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end'''.encode('utf-8')
+
+
+def _utf16_units(ch):
+    code = ord(ch)
+    if code < 0x10000:
+        return [code]
+    code -= 0x10000
+    return [0xD800 + (code >> 10), 0xDC00 + (code & 0x3FF)]
+
+
+class Command(BaseCommand):
+    help = ('Вписывает корректные ToUnicode в PDF ВсОШ-региона с битой '
+            'кодировкой (карты глифов снимаются с соседних годов)')
+
+    def add_arguments(self, parser):
+        parser.add_argument('--year', type=int, required=True)
+
+    def handle(self, *args, **options):
+        import fitz
+
+        year = options['year']
+        folder = Path('materials/vsosh_region') / str(year)
+        if not folder.is_dir():
+            raise CommandError(f'Нет папки {folder}')
+
+        self.stdout.write('Снимаю референсные карты глифов (2023, 2025)…')
+        subset_maps = collect_reference_maps(REFERENCE_PDFS)
+        versions = merge_versions(subset_maps)
+        for fam, groups in sorted(versions.items()):
+            self.stdout.write(f'  {fam}: версий {len(groups)}, глифов '
+                              + '/'.join(str(len(g)) for g in groups))
+        manual = MANUAL_GLYPHS.get(year, {})
+
+        for grade in (9, 10, 11):
+            pdf = folder / f'test_answers_{grade}.pdf'
+            if not pdf.exists():
+                raise CommandError(f'Нет файла {pdf}')
+            self._fix_one(fitz, pdf, versions, manual)
+
+    def _fix_one(self, fitz, pdf, versions, manual):
+        doc = fitz.open(pdf)
+
+        # Использованные глифы каждого сабсета: с texttrace постранично,
+        # тег сабсета берём из шрифтов страницы (однозначен на странице).
+        used = {}      # полное имя сабсета -> set(глифов)
+        pages_of = {}  # (полное имя, глиф) -> set(страниц) — для отчёта
+        xref_of = {}   # полное имя сабсета -> xref
+        skipped_pages = []
+        for pno in range(len(doc)):
+            fams = page_family_tags(doc, pno)
+            for f in doc.get_page_fonts(pno):
+                xref_of.setdefault(f[3], f[0])
+            ambiguous = {fam for fam, tags in fams.items() if len(tags) > 1}
+            if ambiguous:
+                skipped_pages.append((pno + 1, sorted(ambiguous)))
+            tag_of = {fam: next(iter(tags)) for fam, tags in fams.items()
+                      if len(tags) == 1}
+            for span in doc[pno].get_texttrace():
+                fam = span_family(span)
+                if fam in ambiguous or fam not in tag_of:
+                    continue
+                tag = tag_of[fam]
+                for c in span['chars']:
+                    used.setdefault(tag, set()).add(c[1])
+                    pages_of.setdefault((tag, c[1]), set()).add(pno + 1)
+        for pno, fams in skipped_pages:
+            self.stdout.write(self.style.WARNING(
+                f'  {pdf.name} стр. {pno}: два сабсета {fams} — глифы '
+                'страницы не декодируются (останутся U+FFFD)'))
+
+        # Подбор версии карты на сабсет
+        chosen = {}
+        for tag, gids in used.items():
+            fam = norm_family(tag)
+            candidates = []
+            for m in versions.get(fam, []):
+                covered = gids & set(m)
+                text = ''.join(m.get(g, '�') for g in sorted(gids))
+                candidates.append((len(gids - set(m)), garbage_score(text), m))
+            if not candidates:
+                self.stdout.write(self.style.WARNING(
+                    f'  {pdf.name}: {tag} — нет референсной карты, '
+                    f'{len(gids)} глифов останутся U+FFFD'))
+                continue
+            candidates.sort(key=lambda c: (c[0], c[1]))
+            miss, garbage, best = candidates[0]
+            if len(candidates) > 1 and candidates[1][:2] == (miss, garbage):
+                raise CommandError(
+                    f'{pdf.name}: {tag} — неоднозначный выбор версии карты')
+            mapping = dict(best)
+            # Ручные глифы (проверены визуально) — только поверх пробелов
+            for gid, ch in manual.get(fam, {}).items():
+                if gid in mapping and mapping[gid] != ch:
+                    raise CommandError(
+                        f'{pdf.name}: {tag} глиф {gid} — ручное значение '
+                        f'{ch!r} противоречит референсу {mapping[gid]!r}')
+                mapping[gid] = ch
+            chosen[tag] = mapping
+            unmapped = gids - set(mapping)
+            note = ('полное покрытие' if not unmapped
+                    else f'{len(unmapped)} глифов без расшифровки')
+            self.stdout.write(f'  {pdf.name}: {tag} → карта '
+                              f'({len(mapping)} глифов, {note}, мусор {garbage})')
+            for gid in sorted(unmapped):
+                pages = sorted(pages_of.get((tag, gid), ()))
+                self.stdout.write(self.style.WARNING(
+                    f'      без расшифровки: глиф {gid} (стр. '
+                    f'{", ".join(map(str, pages))})'))
+
+        # Вписываем ToUnicode
+        for tag, mapping in chosen.items():
+            stream = build_cmap_stream(mapping)
+            new_xref = doc.get_new_xref()
+            doc.update_object(new_xref, '<<>>')
+            doc.update_stream(new_xref, stream, new=True)
+            doc.xref_set_key(xref_of[tag], 'ToUnicode', f'{new_xref} 0 R')
+
+        tmp = pdf.with_suffix('.fixed.pdf')
+        doc.save(str(tmp), deflate=True)
+        doc.close()
+        tmp.replace(pdf)
+
+        # Контроль: текст читается
+        doc = fitz.open(pdf)
+        page1 = doc[0].get_text()
+        ok = ('лимпиада' in page1 or 'кономик' in page1)
+        n_bad = page1.count('�')
+        doc.close()
+        style = self.style.SUCCESS if ok else self.style.ERROR
+        self.stdout.write(style(
+            f'  {pdf.name}: сохранён; страница 1 читается: {ok}, '
+            f'U+FFFD на стр.1: {n_bad}'))

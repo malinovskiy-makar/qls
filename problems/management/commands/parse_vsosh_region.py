@@ -591,6 +591,12 @@ PAREN_FRAC_POW_RE = re.compile(
 # Настоящий em dash (—) не входит в класс — не трогаем уже верное тире.
 DASH_RUN_RE = re.compile(r'[-‐‑‒–]{2,}')
 MATH_SEGMENT_RE = re.compile(r'(\$[^$]*\$)')
+# Радикал из юникод-математики (√KL -> \sqrt KL): без скобок KaTeX возьмёт
+# под корень один символ, а в PDF винкулум накрывает весь буквенный ран.
+SQRT_RUN_RE = re.compile(r'\\sqrt\s+([A-Za-z]+|\d+)')
+# Индекс корня: маленькая цифра перед радикалом распознаётся кегельной
+# логикой как степень (^{4}\sqrt{KL}), а в вёрстке это корень 4-й степени.
+ROOT_INDEX_RE = re.compile(r'\^\{(\d+)\}\s*\\sqrt\{')
 
 NUMBER_RE = re.compile(r'^-?\d+(?:[.,]\d+)?(?:/\d+)?$')
 VAR_EQ_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_{}\\]*\s*=\s*(.+)$')
@@ -624,6 +630,8 @@ def postprocess_text(text):
             inner = PAREN_FRAC_POW_RE.sub(
                 r'\\left(\\frac{\1}{\2}\\right)^{\3}', inner)
             inner = FRAC_RE.sub(r'\\frac{\1}{\2}', inner)
+            inner = SQRT_RUN_RE.sub(r'\\sqrt{\1}', inner)
+            inner = ROOT_INDEX_RE.sub(r'\\sqrt[\1]{', inner)
             out.append('$' + inner + '$')
         else:
             out.append(DASH_RUN_RE.sub('—', part))
