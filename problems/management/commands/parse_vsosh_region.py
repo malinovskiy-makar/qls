@@ -43,8 +43,28 @@ BOLD_FLAG = 16  # бит полужирного в span['flags'] PyMuPDF
 
 GRADES = (9, 10, 11)
 
-# Типы вопросов по номеру задания (структура теста региона).
-SECTION_QTYPES = {1: 'boolean', 2: 'single', 3: 'multi', 4: 'numeric'}
+# --- Годоспецифика вёрстки -------------------------------------------------
+# Два поколения макета:
+# «zadanie» (≈2020–2023): секции «Задание N», данетки в №1, numeric в №4.
+# «chast»   (2024–2025):  секции «Часть N», без данеток, numeric в №3,
+#                         «Часть 4» — задачи второго тура (НЕ тест, стоп).
+PROFILES = {
+    'zadanie': {
+        'section_re': re.compile(r'^Задание (\d)$'),
+        'qtypes': {1: 'boolean', 2: 'single', 3: 'multi', 4: 'numeric'},
+        'stop_section': None,
+    },
+    'chast': {
+        'section_re': re.compile(r'^Часть (\d)$'),
+        'qtypes': {1: 'single', 2: 'multi', 3: 'numeric'},
+        'stop_section': 4,
+    },
+}
+YEAR_PROFILES = {
+    2023: 'zadanie',
+    2024: 'chast',
+    2025: 'chast',
+}
 
 PDF_URLS = {
     2023: {
@@ -52,22 +72,38 @@ PDF_URLS = {
         10: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2023/region_2023_test_answers_10_23513.pdf',
         11: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2023/region_2023_test_answers_11_23511.pdf',
     },
+    # URL восстановлены из имён скачанных файлов по схеме сайта (сеть с этой
+    # машины к iloveeconomics.ru заблокирована — не сверялись с сервером).
+    2024: {
+        9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2024/region_2024_resheniya_9_klass_25173.pdf',
+        10: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2024/region_2024_resheniya_10_klass_25172.pdf',
+        11: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2024/region_2024_resheniya_11_klass_25171.pdf',
+    },
+    2025: {
+        9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2025/region_2025_resheniya_9_klass_28274.pdf',
+        10: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2025/region_2025_resheniya_10_klass_28275.pdf',
+        11: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2025/region_2025_resheniya_11_klass_28276.pdf',
+    },
 }
 
-# Колонтитулы: убираем по тексту; голые числа (номера страниц) — только если
-# это ТЕКСТОВЫЙ шрифт полного кегля (числители дробей набраны Math-шрифтом).
+# Колонтитулы всех поколений вёрстки: убираем по тексту; голые числа (номера
+# страниц) — только если это ТЕКСТОВЫЙ шрифт полного кегля (числители дробей
+# набраны Math-шрифтом). Паттерны точечные — целую строку контента не съедят.
 HEADER_RES = [
-    re.compile(r'^Всероссийская олимпиада школьников$'),
+    re.compile(r'^(Тридцатая |XX[IVX]+ )?Всероссийская олимпиада школьников'
+               r'( по экономике)?$'),
+    re.compile(r'^Всероссийской олимпиады школьников$'),
+    re.compile(r'^по экономике$'),
     re.compile(r'^Экономика$'),
-    re.compile(r'^2023$'),
-    re.compile(r'^2022/2023 год$'),
+    re.compile(r'^\d{4}(/\d{4})?( год)?$'),
+    re.compile(r'^\d{1,2} (января|февраля|марта) \d{4} года$'),
     re.compile(r'^Региональный этап(, \d+ класс)?$'),
+    re.compile(r'^\d{1,2}(–\d{1,2})? класс$'),
     re.compile(r'^Первый тур\. Тест\.( \d+ класс\.)?$'),
     re.compile(r'^Правильные ответы и комментарии$'),
+    re.compile(r'^Ответы, решения и схемы проверки$'),
 ]
 PAGENUM_RE = re.compile(r'^\d{1,2}$')
-
-SECTION_RE = re.compile(r'^Задание (\d)$')
 QSTART_RE = re.compile(r'^(\d)\.(\d)\.\s*')
 OPT_RE = re.compile(r'^([1-4])\)\s*')
 COMMENT_RE = re.compile(r'^Комментарий\.\s*')
@@ -109,6 +145,7 @@ def extract_lines(doc):
     body_size = _body_size(doc)
     lines = []
     for page_no, page in enumerate(doc, start=1):
+        page_h = page.rect.height
         for block in page.get_text('dict')['blocks']:
             for raw in block.get('lines', []):
                 spans = [dict(sp) for sp in raw['spans']
@@ -119,8 +156,12 @@ def extract_lines(doc):
                 if any(rx.match(text) for rx in HEADER_RES):
                     continue
                 # Колонцифра: одинокое число ТЕКСТОВЫМ шрифтом (числители
-                # этажных дробей набраны Math-шрифтом — их не трогаем).
-                if (PAGENUM_RE.match(text)
+                # этажных дробей набраны Math-шрифтом — их не трогаем) И
+                # у края страницы. Числа в середине — контент (ячейки
+                # таблиц, вёрстка 2025 потеряла бы ставки НДФЛ).
+                near_edge = (raw['bbox'][1] > 0.85 * page_h
+                             or raw['bbox'][3] < 0.10 * page_h)
+                if (PAGENUM_RE.match(text) and near_edge
                         and all(not is_math_span(sp) for sp in spans)):
                     continue
                 lines.append(Line(spans, raw['bbox'], page_no))
@@ -623,8 +664,11 @@ def canonicalize_answer(raw):
 # Сегментация документа на вопросы
 # ---------------------------------------------------------------------------
 
-def parse_document(doc, grade, errors):
+def parse_document(doc, grade, errors, profile):
     """PDF одного класса → (questions, unparsed, preambles)."""
+    section_re = profile['section_re']
+    section_qtypes = profile['qtypes']
+    stop_section = profile['stop_section']
     lines, body = extract_lines(doc)
     lines = reassemble_display_math(lines, body)   # выключные формулы
     lines = reassemble_fractions(lines, body)      # строчные этажные дроби
@@ -698,13 +742,20 @@ def parse_document(doc, grade, errors):
     for line in lines:
         plain = line.plain
 
-        m = SECTION_RE.match(plain)
+        m = section_re.match(plain)
         if m:
             flush_question()
             if state == 'preamble' and buffers['preamble']:
                 preambles.append({'section': section,
                                   'text': render_paragraph(buffers['preamble'], body)})
             section = int(m.group(1))
+            if stop_section is not None and section >= stop_section:
+                # дальше не тест (развёрнутые задачи) — прекращаем разбор
+                section = None
+                state = 'idle'
+                cur = None
+                buffers = new_buffers()
+                break
             state = 'preamble'
             buffers = new_buffers()
             continue
@@ -718,13 +769,14 @@ def parse_document(doc, grade, errors):
             buffers = new_buffers()
             stripped, _ = strip_marker(line, QSTART_RE)
             cur = {'number': f'{m.group(1)}.{m.group(2)}', 'section': section,
-                   'qtype': SECTION_QTYPES.get(section)}
+                   'qtype': section_qtypes.get(section)}
             buffers['statement'].append(stripped)
             state = 'statement'
             continue
 
         m = OPT_RE.match(plain)
-        if (m and cur is not None and section in (1, 2, 3)
+        if (m and cur is not None
+                and cur['qtype'] in ('boolean', 'single', 'multi')
                 and state in ('statement', 'options')
                 and int(m.group(1)) == len(buffers['options']) + 1):
             stripped, bold = strip_marker(line, OPT_RE)
@@ -740,7 +792,8 @@ def parse_document(doc, grade, errors):
             continue
 
         m = ANSWER_RE.match(plain)
-        if m and cur is not None and section == 4 and state == 'statement':
+        if (m and cur is not None and cur['qtype'] == 'numeric'
+                and state == 'statement'):
             stripped, _ = strip_marker(line, ANSWER_RE)
             buffers['answer'].append(stripped)
             state = 'answer'
@@ -887,6 +940,12 @@ class Command(BaseCommand):
         folder = Path('materials/vsosh_region') / str(year)
         if not folder.is_dir():
             raise CommandError(f'Нет папки {folder}')
+        profile_name = YEAR_PROFILES.get(year)
+        if profile_name is None:
+            raise CommandError(
+                f'Для года {year} не задан профиль вёрстки (YEAR_PROFILES) — '
+                'сначала изучить структуру PDF дампером')
+        profile = PROFILES[profile_name]
 
         all_q, all_unparsed, all_preambles = [], [], []
         per_grade_counts = {}
@@ -895,7 +954,7 @@ class Command(BaseCommand):
             if not pdf.exists():
                 raise CommandError(f'Нет файла {pdf}')
             doc = fitz.open(pdf)
-            qs, unp, pre = parse_document(doc, grade, self.stderr)
+            qs, unp, pre = parse_document(doc, grade, self.stderr, profile)
             per_grade_counts[grade] = len(qs)
             all_q.extend(qs)
             all_unparsed.extend(unp)

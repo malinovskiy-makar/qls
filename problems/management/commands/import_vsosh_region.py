@@ -54,6 +54,30 @@ def norm_hash(text):
     return hashlib.md5(WS_RE.sub(' ', text).strip().lower().encode()).hexdigest()
 
 
+def norm_option(text):
+    """Нормализация варианта для сравнения: регистр, ё→е, хвостовая
+    пунктуация (в разных копиях банка «выпуска;» vs «выпуска.»)."""
+    t = WS_RE.sub(' ', text).strip().lower().replace('ё', 'е')
+    return t.rstrip(';.').strip()
+
+
+def is_duplicate_of_existing(q, cand_ids, parts_of):
+    """Совпадение нормализованного условия — ещё не дубликат: у вопросов
+    с генерическим стемом («Выберите все верные утверждения:») содержание
+    живёт в вариантах. Дубликат — только если у кандидата совпал и набор
+    вариантов. Вопрос без вариантов (numeric) — по условию, как раньше.
+    Кандидат-«пустышка» (тот же стем, но ни одного подпункта) дубликатом
+    не считается — иначе молча выкидываем новый полноценный вопрос."""
+    if not q.get('options'):
+        return True
+    want = sorted(norm_option(o) for o in q['options'])
+    for pid in cand_ids:
+        have = sorted(norm_option(s) for s in parts_of(pid))
+        if have and have == want:
+            return True
+    return False
+
+
 def raw_hash(text):
     """content_hash в поле Problem — md5 сырого условия (как в import_ieo)."""
     return hashlib.md5(text.encode()).hexdigest()
@@ -98,21 +122,33 @@ class Command(BaseCommand):
 
         # --- Дубликаты: нормализованное условие против ВСЕЙ базы -----------
         self.stdout.write('Считаю хэши условий существующих задач…')
-        existing = set()
-        qs = Problem.objects.values_list('statement', flat=True).iterator()
-        for stmt in qs:
-            existing.add(norm_hash(stmt))
+        existing = {}   # хэш условия -> [id, ...] (для сверки вариантов)
+        qs = Problem.objects.values_list('id', 'statement').iterator()
+        for pid, stmt in qs:
+            existing.setdefault(norm_hash(stmt), []).append(pid)
         self.stdout.write(f'  в базе задач: {len(existing)} уникальных условий')
+
+        def parts_of(pid):
+            return list(ProblemPart.objects.filter(problem_id=pid)
+                        .values_list('statement', flat=True))
 
         new_items, dupes = [], []
         seen_batch = set()
         for q in questions:
             h = norm_hash(q['statement'])
-            if h in existing or h in seen_batch:
+            # внутри партии: условие+варианты (генерические стемы не слипаются)
+            batch_key = norm_hash(
+                q['statement'] + '\x1f'
+                + '\x1f'.join(norm_option(o) for o in q.get('options') or []))
+            if batch_key in seen_batch:
                 dupes.append(q)
-            else:
-                seen_batch.add(h)
-                new_items.append(q)
+                continue
+            if h in existing and is_duplicate_of_existing(q, existing[h],
+                                                          parts_of):
+                dupes.append(q)
+                continue
+            seen_batch.add(batch_key)
+            new_items.append(q)
 
         n_parts = 0
         by_type = {}
