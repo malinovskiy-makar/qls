@@ -573,6 +573,11 @@ def reassemble_intraline_fracs(lines, body, bars):
                 for sp in l.spans:
                     if sp.get('converted') or not sp['text'].strip():
                         continue
+                    # ярус дроби — math-шрифт или скрипт-кегль; полноразмерный
+                    # ТЕКСТ (маркер варианта «1)» со следующей строки) — нет
+                    if not (is_math_span(sp)
+                            or sp['size'] < body * SMALL_RATIO):
+                        continue
                     sx0, sx1 = sp['bbox'][0], sp['bbox'][2]
                     if sx0 < bx0 - 2.5 or sx1 > bx1 + 2.5:
                         continue
@@ -585,6 +590,8 @@ def reassemble_intraline_fracs(lines, body, bars):
                 continue
             if not any(is_math_span(sp) for _, sp in num + den):
                 continue   # числа в ячейках таблицы — не дробь
+            if any('√' in sp['text'] for _, sp in num + den):
+                continue   # черта — винкулум корня, не дробь
             num_txt = _render_math_run(
                 [sp for _, sp in sorted(num, key=lambda t: t[1]['bbox'][0])], body)
             den_txt = _render_math_run(
