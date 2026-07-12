@@ -99,6 +99,23 @@ class PostprocessTextTests(SimpleTestCase):
         text = postprocess_text('$TC(Q) = {Q^{2}, Q \\le 1; 2Q-1, Q> 1.$')
         self.assertEqual(text, '$TC(Q) = \\{Q^{2}, Q \\le 1; 2Q-1, Q> 1.$')
 
+    def test_frac_trailing_sub_is_den_power(self):
+        # (1+r)²: степень знаменателя, промеченная как _{2} после дроби
+        text = postprocess_text('$\\frac{0{,}1N+ N}{(1 + r)} _{2}.$')
+        self.assertEqual(text, '$\\frac{0{,}1N+ N}{(1 + r)^{2}}.$')
+        # настоящие индексы не после \frac — не трогаем
+        self.assertEqual(postprocess_text('$w^{\\star} _{1} = 10$'),
+                         '$w^{\\star} _{1} = 10$')
+
+    def test_literal_paired_braces_escaped(self):
+        # min{A, B}: парные литеральные скобки KaTeX прячет как группу —
+        # экранируем, структурные (^{}, \frac{}{}) не трогаем
+        text = postprocess_text('$min {TC_{1}(Q), TC_{2}(Q)}$')
+        self.assertEqual(text, '$min \\{TC_{1}(Q), TC_{2}(Q)\\}$')
+        self.assertEqual(postprocess_text('$\\frac{a}{b}+x^{2}$'),
+                         '$\\frac{a}{b}+x^{2}$')
+        self.assertEqual(postprocess_text('$\\sqrt[4]{KL}$'), '$\\sqrt[4]{KL}$')
+
     def test_balanced_braces_untouched(self):
         self.assertEqual(postprocess_text('$x^{2}+\\frac{a}{b}$'),
                          '$x^{2}+\\frac{a}{b}$')

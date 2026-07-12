@@ -202,16 +202,91 @@ class Line:
         return ''.join(sp['text'] for sp in self.spans).strip()
 
 
+def _split_span_by_baseline(sp):
+    """Спан → подспаны с единой посимвольной базовой линией.
+
+    MuPDF при склейке спанов «затягивает» origin.y соседних кусков к одному
+    значению (полноразмерный « + 5,324 + 133,1» получает y индекса «2», хотя
+    посимвольные origin'ы верные: ось «+» на 154.6, числитель на 145.7).
+    Без разрезки ярусная кластеризация дробей и скрипт-детекция ломаются."""
+    chars = sp.get('chars')
+    if not chars:
+        return [sp]
+    groups = []
+    pending_ws = []   # пробелы нейтральны: синтетический пробел MuPDF несёт
+    for ch in chars:  # чужой y и не должен рождать собственный «ярус»
+        if ch['c'].isspace():
+            if groups:
+                groups[-1]['chars'].append(ch)
+            else:
+                pending_ws.append(ch)
+            continue
+        y = round(ch['origin'][1], 1)
+        if groups and abs(groups[-1]['y'] - y) <= 0.5:
+            groups[-1]['chars'].append(ch)
+        else:
+            groups.append({'y': y, 'chars': pending_ws + [ch]})
+            pending_ws = []
+    if pending_ws:
+        if groups:
+            groups[-1]['chars'].extend(pending_ws)
+        else:
+            groups.append({'y': round(pending_ws[0]['origin'][1], 1),
+                           'chars': pending_ws})
+    out = []
+    for g in groups:
+        cs = g['chars']
+        text = ''.join(c['c'] for c in cs)
+        # bbox — по видимым символам: пробел по краям (синтетический,
+        # MuPDF) растягивает рамку и ломает геометрию (дробь «не влезает»
+        # в свою черту)
+        vis = [c for c in cs if not c['c'].isspace()] or cs
+        x0 = min(c['bbox'][0] for c in vis)
+        x1 = max(c['bbox'][2] for c in vis)
+        y0 = min(c['bbox'][1] for c in vis)
+        y1 = max(c['bbox'][3] for c in vis)
+        sub = {k: v for k, v in sp.items() if k != 'chars'}
+        sub['text'] = text
+        sub['origin'] = (cs[0]['origin'][0], g['y'])
+        sub['bbox'] = (x0, y0, x1, y1)
+        out.append(sub)
+    return out
+
+
+def extract_bars(doc):
+    """Горизонтальные черты (векторная графика) по страницам — кандидаты
+    в черты дробей: {page_no: [(x0, x1, y), …]}."""
+    bars = {}
+    for page_no, page in enumerate(doc, start=1):
+        out = []
+        for d in page.get_drawings():
+            for item in d['items']:
+                if item[0] == 'l':
+                    p1, p2 = item[1], item[2]
+                    if abs(p1.y - p2.y) < 0.6 and abs(p2.x - p1.x) > 3:
+                        out.append((min(p1.x, p2.x), max(p1.x, p2.x),
+                                    (p1.y + p2.y) / 2))
+                elif item[0] == 're':
+                    r = item[1]
+                    if r.height < 2 and r.width > 3:
+                        out.append((r.x0, r.x1, (r.y0 + r.y1) / 2))
+        bars[page_no] = out
+    return bars
+
+
 def extract_lines(doc):
     """Все содержательные строки документа в порядке чтения."""
     body_size = _body_size(doc)
     lines = []
     for page_no, page in enumerate(doc, start=1):
         page_h = page.rect.height
-        for block in page.get_text('dict')['blocks']:
+        for block in page.get_text('rawdict')['blocks']:
             for raw in block.get('lines', []):
-                spans = [dict(sp) for sp in raw['spans']
-                         if strip_soft_junk(sp['text']).strip() or ' ' in sp['text']]
+                spans = []
+                for rsp in raw['spans']:
+                    for sp in _split_span_by_baseline(rsp):
+                        if strip_soft_junk(sp['text']).strip() or ' ' in sp['text']:
+                            spans.append(sp)
                 if not spans:
                     continue
                 text = ''.join(sp['text'] for sp in spans).strip()
@@ -275,19 +350,36 @@ def _script_mark(sp, base_y):
     return ''
 
 
+def _mode_baseline(spans, min_size):
+    """Доминирующая базовая линия: мода origin.y спанов полного кегля.
+    Отдельный спан может нести «затянутый» к соседнему индексу y (артефакт
+    сборки строк MuPDF: полноразмерный «−20𝑞» получает y индекса «2») —
+    мода по всем полноразмерным спанам от этого устойчива."""
+    ys = [round(sp['origin'][1], 1) for sp in spans
+          if span_text(sp).strip() and not sp.get('converted')
+          and sp['size'] >= min_size]
+    if not ys:
+        return None
+    counts = {}
+    for y in ys:
+        counts[y] = counts.get(y, 0) + 1
+    return max(counts, key=lambda y: (counts[y], -ys.index(y)))
+
+
 def _render_math_run(spans, body):
     """Спаны одной формулы → LaTeX-строка (без $), со степенями/индексами."""
     out = ''
-    base_size = base_y = None
+    sized = [sp for sp in spans if span_text(sp).strip()]
+    base_size = max((sp['size'] for sp in sized), default=None)
+    base_y = (_mode_baseline(spans, base_size * SMALL_RATIO)
+              if base_size else None)
     for sp in spans:
         txt = replace_unicode_math(span_text(sp))
         small = base_size is not None and sp['size'] < base_size * SMALL_RATIO
-        mark = _script_mark(sp, base_y) if small else ''
+        mark = _script_mark(sp, base_y) if small and base_y is not None else ''
         if small and mark:
             out += mark + '{' + txt.strip() + '}'
         else:
-            if not small:
-                base_size, base_y = sp['size'], sp['origin'][1]
             out += txt
     return out.strip()
 
@@ -303,6 +395,21 @@ def _frac_span(num_latex, den_latex, body, y):
 
 def _pure_math(line):
     return all(is_math_span(sp) for sp in line.spans)
+
+
+def _mathish(line, body):
+    """Строка формулы, допускающая малые текстовые вкрапления-подписи
+    («max», «min», «ж» — индексы, набранные текстовым шрифтом): полноразмерный
+    текст дисквалифицирует («где 𝑃max — …» — обычный текст со вставкой)."""
+    for sp in line.spans:
+        if is_math_span(sp) or sp.get('converted'):
+            continue
+        txt = sp['text'].strip()
+        if not txt:
+            continue
+        if sp['size'] >= body * SMALL_RATIO or len(txt) > 4:
+            return False
+    return any(is_math_span(sp) for sp in line.spans)
 
 
 def _y_clusters(spans, tol=3.0):
@@ -324,7 +431,21 @@ def _reconstruct_display(group, body):
     колонки числитель-над-знаменателем → \\frac, осевые спаны — как есть.
     Не собралось однозначно → None (вызывающий код линеаризует с пометкой)."""
     spans = [sp for line in group for sp in line.spans]
-    clusters = _y_clusters(spans)
+    # Ярусы считаем по полноразмерным спанам: скрипт-цифры (степень «²» у
+    # знаменателя) висят между ярусами и разваливали кластеризацию — их
+    # прикрепляем к ближайшему ярусу.
+    full = [sp for sp in spans if sp['size'] >= body * SMALL_RATIO]
+    clusters = _y_clusters(full if full else spans)
+    if len(clusters) >= 2:
+        all_ys = sorted(y for c in clusters for y in c)
+        def nearest_cluster_ys(sp):
+            y = round(sp['origin'][1], 1)
+            best = min(clusters, key=lambda c: min(abs(y - cy) for cy in c))
+            return best
+        for sp in spans:
+            y = round(sp['origin'][1], 1)
+            if not any(y in c for c in clusters):
+                nearest_cluster_ys(sp).append(y)
     if len(clusters) == 2:
         top = [sp for sp in spans if round(sp['origin'][1], 1) in clusters[0]]
         bot = [sp for sp in spans if round(sp['origin'][1], 1) in clusters[1]]
@@ -407,7 +528,7 @@ def reassemble_display_math(lines, body):
     i = 0
     while i < len(lines):
         j = i
-        while (j < len(lines) and _pure_math(lines[j])
+        while (j < len(lines) and _mathish(lines[j], body)
                and lines[j].bbox[2] - lines[j].bbox[0] < 0.6 * column_w):
             j += 1
         if j - i >= 2:
@@ -427,6 +548,63 @@ def reassemble_display_math(lines, body):
             result.append(lines[i])
             i += 1
     return result
+
+
+def reassemble_intraline_fracs(lines, body, bars):
+    """Rule D: сборка дробей ОТ ЧЕРТЫ. Куски инлайн-дроби (скрипт-кегль в
+    строке текста) после посимвольной разрезки живут в одной или соседних
+    псевдостроках; без черты их не отличить от пар «степень+индекс» одного
+    токена (Q^{D}_{1}). Поэтому идём от каждой векторной черты страницы:
+    спаны целиком внутри её x-диапазона и на ≤14pt выше/ниже — числитель и
+    знаменатель. Подчёркивания ссылок (нет числителя), винкулум корня (нет
+    знаменателя) и линейки таблиц (нет math-спанов) отсеиваются сами."""
+    by_page = {}
+    for l in lines:
+        by_page.setdefault(l.page_no, []).append(l)
+
+    for page_no, page_lines in by_page.items():
+        for bx0, bx1, by in bars.get(page_no, []):
+            if bx1 - bx0 > 200 or bx1 - bx0 < 4:
+                continue   # линейки страниц/таблиц и точечный мусор
+            num, den = [], []   # (line, span)
+            for l in page_lines:
+                if l.bbox[3] < by - 20 or l.bbox[1] > by + 20:
+                    continue
+                for sp in l.spans:
+                    if sp.get('converted') or not sp['text'].strip():
+                        continue
+                    sx0, sx1 = sp['bbox'][0], sp['bbox'][2]
+                    if sx0 < bx0 - 2.5 or sx1 > bx1 + 2.5:
+                        continue
+                    y = sp['origin'][1]
+                    if by - 14 < y < by:
+                        num.append((l, sp))
+                    elif by < y < by + 14:
+                        den.append((l, sp))
+            if not num or not den:
+                continue
+            if not any(is_math_span(sp) for _, sp in num + den):
+                continue   # числа в ячейках таблицы — не дробь
+            num_txt = _render_math_run(
+                [sp for _, sp in sorted(num, key=lambda t: t[1]['bbox'][0])], body)
+            den_txt = _render_math_run(
+                [sp for _, sp in sorted(den, key=lambda t: t[1]['bbox'][0])], body)
+            if not num_txt or not den_txt:
+                continue
+            host_line, first_sp = min(num + den,
+                                      key=lambda t: (t[1]['origin'][1],
+                                                     t[1]['bbox'][0]))
+            frac = _frac_span(num_txt, den_txt, body, by)
+            frac['origin'] = (bx0, by)
+            frac['bbox'] = (bx0, min(sp['bbox'][1] for _, sp in num),
+                            bx1, max(sp['bbox'][3] for _, sp in den))
+            consumed = {id(sp) for _, sp in num + den}
+            for l in set(l for l, _ in num + den):
+                l.spans = [sp for sp in l.spans if id(sp) not in consumed]
+            host_line.spans = sorted(host_line.spans + [frac],
+                                     key=lambda s: s['bbox'][0])
+    # строки, из которых дробь забрала все спаны, выбрасываем
+    return [l for l in lines if l.spans]
 
 
 def reassemble_fractions(lines, body):
@@ -527,7 +705,9 @@ def _finish_math(run, issues=None):
     if not txt:
         return ''
     txt = re.sub(r'(?<!\\)%', r'\\%', txt)
-    txt = re.sub(r'(\d),(\d)', r'\1{,}\2', txt)   # десятичная запятая в KaTeX
+    # Перенос уравнения в PDF повторяет знак на новой строке
+    # («Q = ␊ = 60») — склейка строк давала «= =».
+    txt = re.sub(r'=\s*=', '=', txt)
     txt = WS_RE.sub(' ', txt)
     fixed = DOUBLE_SCRIPT_RE.sub(r'\1\2 {}', txt)
     if fixed != txt:
@@ -536,6 +716,9 @@ def _finish_math(run, issues=None):
             issues.append('этажная дробь из PDF не собралась — индексы могли '
                           'слипнуться, сверить с оригиналом')
     if NEEDS_DOLLARS_RE.search(txt):
+        # Декорация десятичной запятой — ТОЛЬКО внутри $...$: в голом
+        # тексте «(0{,}5; 2)» она видна пользователю буквально.
+        txt = re.sub(r'(\d),(\d)', r'\1{,}\2', txt)
         return '$' + txt + '$'
     return txt
 
@@ -578,20 +761,30 @@ def render_paragraph(line_list, body, indent_breaks=False, left_margin=None,
                     math_run += ' '
                 elif pieces and not pieces[-1].endswith((' ', '\n')):
                     pieces.append(' ')
+        # Базовая линия ЭТОЙ строки — мода y полноразмерных спанов: origin
+        # отдельного спана бывает «затянут» к соседнему индексу («−20𝑞»
+        # получает y индекса «2»), и бегущая base_y теряла индексы.
+        line_max = max((sp['size'] for sp in line.spans
+                        if span_text(sp).strip() and not sp.get('converted')),
+                       default=None)
+        line_base = (_mode_baseline(line.spans, line_max * SMALL_RATIO)
+                     if line_max else None)
         for sp in line.spans:
             txt = span_text(sp)
             if not txt:
                 continue
             if sp.get('converted'):
                 if base_size is None:
-                    base_size, base_y = sp['size'], sp['origin'][1]
+                    base_size = sp['size']
                 math_run += (' ' if math_run and not math_run.endswith(' ')
                              else '') + txt
                 continue
             small = base_size is not None and sp['size'] < base_size * SMALL_RATIO
-            mark = _script_mark(sp, base_y) if small else ''
+            ref_y = line_base if line_base is not None else base_y
+            mark = _script_mark(sp, ref_y) if small and ref_y is not None else ''
             if not small:
-                base_size, base_y = sp['size'], sp['origin'][1]
+                base_size = sp['size']
+                base_y = ref_y if ref_y is not None else sp['origin'][1]
             if is_math_span(sp):
                 conv = replace_unicode_math(txt)
                 if small and mark:
@@ -599,6 +792,12 @@ def render_paragraph(line_list, body, indent_breaks=False, left_margin=None,
                 else:
                     math_run += conv
             else:
+                if small and mark == '_' and math_run:
+                    # текстовый индекс при формуле: «𝑤 min» → w_{\text{min}},
+                    # «𝐿 ж» → L_{\text{ж}} (малый ТЕКСТОВЫЙ спан ниже базовой
+                    # линии раньше уходил в голый текст)
+                    math_run += '_{\\text{' + txt.strip() + '}}'
+                    continue
                 flush_math()
                 if pieces and pieces[-1] and not glue_next \
                         and not pieces[-1].endswith((' ', '\n')) \
@@ -678,6 +877,11 @@ SQRT_RUN_RE = re.compile(r'\\sqrt\s+([A-Za-z]+|\d+)')
 # Индекс корня: маленькая цифра перед радикалом распознаётся кегельной
 # логикой как степень (^{4}\sqrt{KL}), а в вёрстке это корень 4-й степени.
 ROOT_INDEX_RE = re.compile(r'\^\{(\d+)\}\s*\\sqrt\{')
+# Цифра-«индекс» сразу после \frac{}{} — на деле потерянная степень
+# знаменателя: (1+r)² в PDF, «2» стоит между ярусами и метится как '_'
+# относительно оси. Настоящих нижних индексов у \frac конвейер не порождает.
+FRAC_TRAIL_SUB_RE = re.compile(
+    r'(\\frac\{(?:[^{}]|\{[^{}]*\})*\}\{(?:[^{}]|\{[^{}]*\})*)\}\s*_\{(\d{1,2})\}')
 
 NUMBER_RE = re.compile(r'^-?\d+(?:[.,]\d+)?(?:/\d+)?$')
 VAR_EQ_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_{}\\]*\s*=\s*(.+)$')
@@ -697,25 +901,41 @@ def _parses_as_number(s):
         return False
 
 
+_CMD_TAIL_RE = re.compile(r'\\[A-Za-z]+\s*$')
+
+
 def _escape_unmatched_braces(inner):
-    """Литеральная фигурная скобка из PDF (кусочная функция, cases) остаётся
-    в тексте непарной и ломает KaTeX. Скобки LaTeX-групп (^{...}, \\frac{}{})
-    парсер порождает парами; непарные — вёрстка — экранируем в \\{ / \\}."""
-    stack, orphans = [], []
+    """Литеральные фигурные скобки из PDF → \\{ / \\}.
+
+    Наш конвейер порождает «{» только структурно: после ^, _, } (второй
+    аргумент \\frac), ] (индекс корня) или имени команды (\\frac, \\text…).
+    Остальные «{» — контент вёрстки (кусочные функции, min{A, B}): без
+    экранирования KaTeX прячет их как границы группы (или падает, если
+    скобка непарная)."""
+    stack, literal = [], set()
     for i, ch in enumerate(inner):
-        if inner[i - 1] == '\\' and i > 0:
+        if i > 0 and inner[i - 1] == '\\':
             continue
         if ch == '{':
-            stack.append(i)
+            if inner[i:i + 3] == '{,}':   # десятичная запятая — структурная
+                stack.append((i, False))
+                continue
+            prev = inner[:i].rstrip()
+            structural = (prev.endswith(('^', '_', '}', ']'))
+                          or _CMD_TAIL_RE.search(prev))
+            stack.append((i, not structural))
         elif ch == '}':
             if stack:
-                stack.pop()
+                j, is_literal = stack.pop()
+                if is_literal:
+                    literal.update((i, j))
             else:
-                orphans.append(i)
-    bad = set(stack) | set(orphans)
-    if not bad:
+                literal.add(i)
+    literal.update(i for i, _ in stack)   # незакрытые — тоже экранируем
+    if not literal:
         return inner
-    return ''.join('\\' + ch if i in bad else ch for i, ch in enumerate(inner))
+    return ''.join('\\' + ch if i in literal else ch
+                   for i, ch in enumerate(inner))
 
 
 def postprocess_text(text):
@@ -734,6 +954,7 @@ def postprocess_text(text):
             inner = FRAC_RE.sub(r'\\frac{\1}{\2}', inner)
             inner = SQRT_RUN_RE.sub(r'\\sqrt{\1}', inner)
             inner = ROOT_INDEX_RE.sub(r'\\sqrt[\1]{', inner)
+            inner = FRAC_TRAIL_SUB_RE.sub(r'\1^{\2}}', inner)
             inner = _escape_unmatched_braces(inner)
             out.append('$' + inner + '$')
         else:
@@ -789,8 +1010,10 @@ def parse_document(doc, grade, errors, profile):
     flat = profile.get('flat_numbering', False)
     next_flat_number = 1
     lines, body = extract_lines(doc)
+    bars = extract_bars(doc)
     lines = reassemble_display_math(lines, body)   # выключные формулы
     lines = reassemble_fractions(lines, body)      # строчные этажные дроби
+    lines = reassemble_intraline_fracs(lines, body, bars)  # дроби в строке
     left_margin = min((l.bbox[0] for l in lines
                        if l.spans and not is_math_span(l.spans[0])), default=0)
 
