@@ -7,10 +7,10 @@ from fractions import Fraction
 
 from django.test import TestCase, Client
 
-from problems.models import Problem, ProblemPart
+from problems.models import Problem, ProblemPart, Source, SourceReference
 from game.models import GameQuestion
 from game.management.commands.build_game_pool import (
-    extract_question, extract_boolean, extract_multi)
+    extract_question, extract_boolean, extract_multi, extract_numeric)
 from game.config import combo_multiplier, MODES
 from game.views import parse_exact_number
 
@@ -394,6 +394,108 @@ class ExtractMultiTests(TestCase):
                               problem_type='тест: все верные')
         q, opts, indices, reason = extract_multi(p)
         self.assertEqual(reason, 'правильный ответ не определён')
+
+
+def make_numeric_problem(statement='Спрос Q=100-P, предложение Q=P. '
+                                   'Найдите равновесную цену.',
+                         answer='50'):
+    """Problem типа «тест: числовой ответ» — без подпунктов, ответ в answer.
+    Формат приедет с импортом региональных тестов ВсОШ."""
+    return Problem.objects.create(
+        title='', statement=statement, answer=answer,
+        problem_type='тест: числовой ответ', status='published')
+
+
+class ExtractNumericTests(TestCase):
+    """Извлекатель numeric (Классика): ответ обязан парситься parse_exact_number."""
+
+    def test_integer_answer(self):
+        q, value, reason = extract_numeric(make_numeric_problem(answer='50'))
+        self.assertIsNone(reason)
+        self.assertIn('равновесную цену', q)
+        self.assertEqual(value, '50')
+
+    def test_fraction_and_decimal_kept_verbatim(self):
+        # Каноническая запись сохраняется как есть — сверять будет
+        # parse_exact_number на стороне игры (1/3 останется дробью).
+        for ans in ('1/3', '0,4', '-1.25'):
+            q, value, reason = extract_numeric(make_numeric_problem(answer=ans))
+            self.assertIsNone(reason, ans)
+            self.assertEqual(value, ans)
+
+    def test_unparsable_answer_rejected(self):
+        for bad in ('см. решение', '50 руб.', '10%', '1/3/4', ''):
+            q, value, reason = extract_numeric(make_numeric_problem(answer=bad))
+            self.assertIsNotNone(reason, bad)
+        self.assertEqual(
+            extract_numeric(make_numeric_problem(answer='нет'))[2],
+            'ответ не парсится в число')
+
+    def test_answer_whitespace_stripped(self):
+        q, value, reason = extract_numeric(make_numeric_problem(answer='  50 '))
+        self.assertIsNone(reason)
+        self.assertEqual(value, '50')
+
+    def test_question_quality_rules_apply(self):
+        # Общие фильтры качества (длина, рисунок) работают и для numeric.
+        p = make_numeric_problem(statement='На основе графика найдите цену.')
+        self.assertEqual(extract_numeric(p)[2], 'нужен рисунок/таблица')
+        p = make_numeric_problem(statement='Найдите X. ' * 40)
+        self.assertEqual(extract_numeric(p)[2], 'условие длиннее 300')
+
+    def test_overlong_answer_rejected(self):
+        p = make_numeric_problem(answer='1' * 51)
+        self.assertEqual(extract_numeric(p)[2], 'числовой ответ длиннее 50')
+
+
+class BuildPoolMetadataTests(TestCase):
+    """Полный прогон build_game_pool: numeric попадает в пул, stage/year/grade
+    денормализуются во все типы вопросов из SourceReference."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.source = Source.objects.create(
+            name='ВсОШ — региональный этап', kind='олимпиада')
+
+    def _run(self):
+        from django.core.management import call_command
+        from io import StringIO
+        call_command('build_game_pool', stdout=StringIO())
+
+    def test_numeric_built_with_metadata(self):
+        p = make_numeric_problem(answer='1/3')
+        SourceReference.objects.create(
+            problem=p, source=self.source, stage='региональный',
+            year=2023, grade='11', problem_number='7')
+        self._run()
+        gq = GameQuestion.objects.get(problem=p)
+        self.assertEqual(gq.question_type, 'numeric')
+        self.assertEqual(gq.options, [])
+        self.assertEqual(gq.correct_value, '1/3')
+        self.assertEqual((gq.stage, gq.year, gq.grade),
+                         ('региональный', 2023, '11'))
+
+    def test_metadata_denormalized_for_choice_types_too(self):
+        p = make_test_problem(answer='A')
+        SourceReference.objects.create(
+            problem=p, source=self.source, stage='региональный',
+            year=2023, grade='9')
+        self._run()
+        gq = GameQuestion.objects.get(problem=p)
+        self.assertEqual(gq.question_type, 'single')
+        self.assertEqual((gq.stage, gq.year, gq.grade),
+                         ('региональный', 2023, '9'))
+
+    def test_no_reference_means_empty_metadata(self):
+        p = make_test_problem(answer='A')
+        self._run()
+        gq = GameQuestion.objects.get(problem=p)
+        self.assertEqual((gq.stage, gq.year, gq.grade), ('', None, ''))
+
+    def test_unparsable_numeric_not_in_pool(self):
+        p = make_numeric_problem(answer='зависит от вкусов')
+        self._run()
+        self.assertFalse(GameQuestion.objects.filter(problem=p).exists())
 
 
 class ParseExactNumberTests(TestCase):

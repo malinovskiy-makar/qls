@@ -17,8 +17,14 @@ build_game_pool — сборка игрового пула Econ Rush из тес
 - «тест: все верные»    → multi (Рапид): варианты как в single, правильные —
   буквы из Problem.answer (строка вида «аб»); любая несопоставленная буква
   или ноль правильных = брак.
-Числовые вопросы (numeric, Классика) пока не извлекаются — источник появится
-с импортом региональных тестов.
+- «тест: числовой ответ» → numeric (Классика): вопрос из statement, вариантов
+  нет, correct_value = Problem.answer. Ответ обязан парситься тем же
+  parse_exact_number, что проверяет ввод игрока (game/views.py) — иначе брак:
+  вопрос, на который движок не сможет честно сверить ответ, в пул не попадает.
+
+Метаданные олимпиады (stage/year/grade) денормализуются во ВСЕ типы вопросов
+из первой SourceReference задачи, где они заполнены, — под фильтр
+«только регион» в игре.
 
 Правильный ответ определяется так же, как в автопроверке ученика
 (student/views.py::auto_check_submission): буква из Problem.answer против
@@ -36,13 +42,18 @@ from django.db import transaction
 from problems.models import Problem
 from problems.management.commands.apply_topic_mapping import CANONICAL
 from game.models import GameQuestion
+from game.views import parse_exact_number
 
 # Подвид теста → тип игрового вопроса.
 GAME_TYPES = {
     'тест: один ответ': 'single',
     'тест: верно/неверно': 'boolean',
     'тест: все верные': 'multi',
+    'тест: числовой ответ': 'numeric',
 }
+
+# Лимит поля GameQuestion.correct_value (CharField max_length=50).
+MAX_NUMERIC_ANSWER_LEN = 50
 
 MAX_QUESTION_LEN = 300   # символов после чистки переносов
 MIN_QUESTION_LEN = 15
@@ -352,6 +363,28 @@ def extract_multi(problem):
     return question, options, sorted(indices), None
 
 
+def extract_numeric(problem):
+    """numeric: возвращает (question, correct_value, reason_отказа).
+    Вариантов нет; correct_value — точная каноническая запись из Problem.answer
+    (целое, десятичное, дробь a/b). Обязана парситься parse_exact_number —
+    той же функцией, что сверяет ввод игрока, — иначе брак."""
+    question, reason = clean_question(problem)
+    if reason:
+        return None, None, reason
+    reason = content_reason(question)
+    if reason:
+        return None, None, reason
+
+    value = (problem.answer or '').strip()
+    if not value:
+        return None, None, 'правильный ответ не определён'
+    if len(value) > MAX_NUMERIC_ANSWER_LEN:
+        return None, None, 'числовой ответ длиннее 50'
+    if parse_exact_number(value) is None:
+        return None, None, 'ответ не парсится в число'
+    return question, value, None
+
+
 class Command(BaseCommand):
     help = 'Пересобирает игровой пул Econ Rush (кэш GameQuestion) из тестов.'
 
@@ -360,7 +393,7 @@ class Command(BaseCommand):
         qs = (Problem.objects
               .filter(status='published', needs_quality_review=False,
                       problem_type__in=GAME_TYPES)
-              .prefetch_related('parts', 'topics'))
+              .prefetch_related('parts', 'topics', 'source_references'))
 
         total = qs.count()
         self.stdout.write(f'Тестов-кандидатов: {total}')
@@ -378,6 +411,7 @@ class Command(BaseCommand):
             qtype = GAME_TYPES[p.problem_type]
             correct_index = None
             correct_indices = None
+            correct_value = ''
 
             if qtype == 'boolean':
                 question, correct_index, reason = extract_boolean(p)
@@ -390,6 +424,9 @@ class Command(BaseCommand):
                     opts = ['Верно', 'Неверно']
             elif qtype == 'multi':
                 question, opts, correct_indices, reason = extract_multi(p)
+            elif qtype == 'numeric':
+                question, correct_value, reason = extract_numeric(p)
+                opts = []
             else:
                 question, opts, correct_index, reason = extract_question(p)
 
@@ -404,6 +441,13 @@ class Command(BaseCommand):
                 tall_formula.append((p.id, question[:60]))
             topic_names = [t.name for t in p.topics.all()
                            if t.name in canonical_set and t.name != 'Тест']
+            # Метаданные олимпиады: первая привязка к источнику, где хоть
+            # что-то из stage/year/grade заполнено (у большинства задач — ни одной).
+            stage, year, grade = '', None, ''
+            for ref in p.source_references.all():
+                if ref.stage or ref.year or ref.grade:
+                    stage, year, grade = ref.stage, ref.year, ref.grade
+                    break
             built.append(GameQuestion(
                 problem=p,
                 part=None,
@@ -412,9 +456,13 @@ class Command(BaseCommand):
                 options=opts,
                 correct_index=correct_index,
                 correct_indices=correct_indices,
+                correct_value=correct_value,
                 difficulty=heuristic_difficulty(p, question),
                 topics=topic_names,
                 lang=detect_lang(question),
+                stage=stage,
+                year=year,
+                grade=grade,
             ))
 
         with transaction.atomic():

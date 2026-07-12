@@ -140,6 +140,9 @@ class SourceReference(models.Model):
     source = models.ForeignKey(Source, on_delete=models.PROTECT,
                                related_name='references', verbose_name='Источник')
     stage = models.CharField('Этап олимпиады', max_length=120, blank=True)
+    # Год конкретного тура/варианта. Source.year — год источника-книги,
+    # а у сквозных источников («ВсОШ — региональный этап») год живёт здесь.
+    year = models.PositiveIntegerField('Год', null=True, blank=True)
     grade = models.CharField('Класс', max_length=50, blank=True)
     problem_number = models.CharField('Номер задачи в источнике',
                                       max_length=50, blank=True)
