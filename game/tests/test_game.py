@@ -187,6 +187,35 @@ class ExtractQuestionTests(TestCase):
         self.assertIn(r'-\$1400', opts)
         self.assertIn('0.75%', opts)
 
+    # ---- Баг 1 (game-modes-9): 6 вариантов и склеенные опции ----
+
+    def test_six_options_accepted(self):
+        # олимпиадные тесты бывают а-е — 6 вариантов не должны бракова́ться
+        p = make_test_problem(
+            answer='F', labels=('A', 'B', 'C', 'D', 'E', 'F'),
+            options=('Один', 'Два', 'Три', 'Четыре', 'Пять', 'Шесть'))
+        q, opts, correct, reason = extract_question(p)
+        self.assertIsNone(reason)
+        self.assertEqual(len(opts), 6)
+        self.assertEqual(correct, 5)
+
+    def test_seven_options_rejected(self):
+        p = make_test_problem(
+            answer='G', labels=('A', 'B', 'C', 'D', 'E', 'F', 'G'),
+            options=('1', '2', '3', '4', '5', '6', '7'))
+        q, opts, correct, reason = extract_question(p)
+        self.assertEqual(reason, 'вариантов не 2–6')
+
+    def test_glued_option_rejected(self):
+        # вариант, внутри которого не в начале приклеена метка следующего
+        # варианта — импорт склеил два подпункта в один (Баг 1б)
+        p = make_test_problem(
+            answer='A',
+            options=('Цена ниже конкурентного уровня д) Фирмы могут '
+                     'свободно входить на рынок', 'Страны', 'Планеты', 'Климат'))
+        q, opts, correct, reason = extract_question(p)
+        self.assertEqual(reason, 'glued_options')
+
 
 class ComboTests(TestCase):
     def test_combo_multiplier_steps(self):
@@ -342,6 +371,17 @@ class ExtractMultiTests(TestCase):
         q, opts, indices, reason = extract_multi(p)
         self.assertIsNone(reason)
         self.assertEqual(indices, [0, 2])
+
+    def test_six_options_correct_indices(self):
+        # 6 вариантов (а-е) должны проходить в пул с верными correct_indices
+        p = make_test_problem(
+            answer='аге', labels=('а', 'б', 'в', 'г', 'д', 'е'),
+            options=('Один', 'Два', 'Три', 'Четыре', 'Пять', 'Шесть'),
+            problem_type='тест: все верные')
+        q, opts, indices, reason = extract_multi(p)
+        self.assertIsNone(reason)
+        self.assertEqual(len(opts), 6)
+        self.assertEqual(indices, [0, 3, 5])
 
     def test_unmatched_letter_rejected(self):
         p = make_test_problem(answer='ад', labels=('а', 'б', 'в', 'г'),

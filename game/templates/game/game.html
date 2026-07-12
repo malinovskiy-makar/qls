@@ -373,6 +373,7 @@ a:focus-visible, button:focus-visible {
   min-height: 56px;
   padding: 12px 14px 12px 12px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   text-align: left;
@@ -410,6 +411,32 @@ a:focus-visible, button:focus-visible {
   animation: optShake .3s linear;
 }
 .opt.show-right { border-color: var(--rush-ok); border-width: 2px; padding: 11px 13px 11px 11px; }
+
+/* Разбор по каждому варианту в Рапиде (мультивыбор) после ответа:
+   правильный+выбранный — заливка (is-correct выше); правильный, но
+   пропущенный — пунктирная рамка + подпись; выбранный, но неверный —
+   is-wrong (заливка выше); ни то ни другое — приглушаем. */
+.opt.opt-missed {
+  background: var(--rush-surface);
+  border-color: var(--rush-ok);
+  border-width: 2px;
+  border-style: dashed;
+  padding: 11px 13px 11px 11px;
+}
+.opt.opt-muted { opacity: .5; }
+.opt-mark {
+  margin-left: auto;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.opt.is-correct .opt-mark { color: var(--rush-ok); }
+.opt.is-wrong .opt-mark { color: var(--rush-bad); }
+.opt-caption {
+  flex: 1 0 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rush-ok);
+}
 @keyframes optShake {
   20% { transform: translateX(-6px); }
   45% { transform: translateX(5px); }
@@ -1121,7 +1148,23 @@ a:focus-visible, button:focus-visible {
     });
   }
 
-  // multi (Рапид): отправка выделенного множества, подсветка правильного
+  // multi (Рапид): отправка выделенного множества, разбор по каждому варианту:
+  // выбран и верен → зелёная заливка + ✓; верен, но пропущен → зелёная
+  // пунктирная рамка + подпись «надо было выбрать»; выбран, но неверен →
+  // красная заливка + ✗; ни то ни другое → приглушаем.
+  function addMark(btn, text) {
+    var m = document.createElement('span');
+    m.className = 'opt-mark';
+    m.textContent = text;
+    btn.appendChild(m);
+  }
+  function addCaption(btn, text) {
+    var c = document.createElement('span');
+    c.className = 'opt-caption';
+    c.textContent = text;
+    btn.appendChild(c);
+  }
+
   function submitMulti() {
     if (state !== 'playing' || inputLocked || !current) return;
     if (current.type !== 'multi' || selected.length === 0) return;
@@ -1131,27 +1174,34 @@ a:focus-visible, button:focus-visible {
     postAnswer({ question_id: q.id, choices: chosen }, function (d) {
       var buttons = $('opts').querySelectorAll('.opt');
       var right = d.correct_indices || [];
-      // выбранные верные — зелёные; выбранные лишние — красные;
-      // упущенные верные — зелёная рамка
-      right.forEach(function (i) {
-        if (!buttons[i]) return;
-        buttons[i].classList.add(chosen.indexOf(i) !== -1 ? 'is-correct' : 'show-right');
-      });
-      chosen.forEach(function (i) {
-        if (right.indexOf(i) === -1 && buttons[i]) buttons[i].classList.add('is-wrong');
+      buttons.forEach(function (btn, i) {
+        var isRight = right.indexOf(i) !== -1;
+        var isChosen = chosen.indexOf(i) !== -1;
+        if (isRight && isChosen) {
+          btn.classList.add('is-correct');
+          addMark(btn, '✓');
+        } else if (isRight && !isChosen) {
+          btn.classList.add('opt-missed');
+          addCaption(btn, 'надо было выбрать');
+        } else if (!isRight && isChosen) {
+          btn.classList.add('is-wrong');
+          addMark(btn, '✗');
+        } else {
+          btn.classList.add('opt-muted');
+        }
       });
       if (d.correct) {
         registerCorrect();
         showDelta('+' + d.time_delta + ' с', 'plus');
         flashTrack(false);
         comboToastMaybe();
-        setTimeout(advance, REDUCED ? 0 : 700);
+        setTimeout(advance, REDUCED ? 0 : 1500);
       } else {
         registerWrong(q);
         showDelta(d.time_delta + ' с', 'minus');
         flashTrack(true);
         vignette();
-        setTimeout(advance, REDUCED ? 0 : 1200);
+        setTimeout(advance, REDUCED ? 0 : 1500);
       }
     });
   }
@@ -1423,8 +1473,8 @@ a:focus-visible, button:focus-visible {
         if (e.key === 'Enter') { e.preventDefault(); submitNumeric(); }
         return;
       }
-      if (e.key >= '1' && e.key <= '5') {
-        // до 5 вариантов (в пуле есть тесты с пятью)
+      if (e.key >= '1' && e.key <= '6') {
+        // до 6 вариантов (олимпиадные тесты бывают а-е)
         var i = parseInt(e.key, 10) - 1;
         if (i < current.options.length) {
           e.preventDefault();
