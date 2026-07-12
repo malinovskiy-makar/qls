@@ -138,6 +138,15 @@ class FinishMathTests(SimpleTestCase):
         self.assertIn('$\\$$', text)
         self.assertIn('$Y=\\frac{2M}{P}$', text)
 
+    def test_doubled_signs_collapse(self):
+        # перенос уравнения повторяет знак: «12P − ␊ −140» → «12P −140»
+        from problems.management.commands.parse_vsosh_region import _finish_math
+        self.assertEqual(_finish_math('12P- -140'), '$12P-140$')
+        self.assertEqual(_finish_math('(10 - -Q)Q-2Q'), '$(10 -Q)Q-2Q$')
+        self.assertEqual(_finish_math('Q = = 60'), '$Q = 60$')
+        # унарный минус в скобках не трогаем
+        self.assertEqual(_finish_math('a -(-b)'), '$a -(-b)$')
+
     def test_mixed_scripts_untouched(self):
         # q^{7}_{1} — степень+индекс легальны, \pi _{2} — просто индекс
         from problems.management.commands.parse_vsosh_region import _finish_math
