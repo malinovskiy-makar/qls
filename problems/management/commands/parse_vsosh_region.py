@@ -67,6 +67,7 @@ PROFILES = {
     },
 }
 YEAR_PROFILES = {
+    2020: 'zadanie',
     2021: 'zadanie',
     2022: 'zadanie',
     2023: 'zadanie',
@@ -75,6 +76,12 @@ YEAR_PROFILES = {
 }
 
 PDF_URLS = {
+    # 2020: 10 и 11 классы писали один общий тест (файл 10-11)
+    2020: {
+        9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2020/region_2020_test_answers_9_19904.pdf',
+        10: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2020/region_2020_test_answers_10-11_19906.pdf',
+        11: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2020/region_2020_test_answers_10-11_19906.pdf',
+    },
     2021: {
         9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2021/region_2021_test_solutions_9_21401.pdf',
         10: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2021/region_2021_test_solutions_10_21400.pdf',
@@ -117,7 +124,7 @@ HEADER_RES = [
     re.compile(r'^\d{1,2} (января|февраля|марта) \d{4} года$'),
     re.compile(r'^Региональный этап(, \d+ класс)?$'),
     re.compile(r'^\d{1,2}(–\d{1,2})? класс$'),
-    re.compile(r'^Первый тур\. Тест\.( \d+ класс\.)?$'),
+    re.compile(r'^Первый тур\. Тест\.( \d+(-\d+)? класс\.)?$'),
     re.compile(r'^Правильные ответы и комментарии$'),
     re.compile(r'^Ответы, решения и схемы проверки$'),
 ]
