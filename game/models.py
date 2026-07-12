@@ -65,6 +65,11 @@ class GameQuestion(models.Model):
     stage = models.CharField('Этап олимпиады', max_length=40, blank=True, default='')
     year = models.PositiveIntegerField('Год', null=True, blank=True)
     grade = models.CharField('Класс', max_length=20, blank=True, default='')
+    # Единица измерения числового ответа («%», «руб.») — подсказка игроку
+    # рядом с полем ввода Классики. Источник — SourceReference.note
+    # («единица ответа: …»), денормализуется при пересборке пула.
+    unit = models.CharField('Единица ответа', max_length=40, blank=True,
+                            default='')
 
     created_at = models.DateTimeField('Собран', auto_now_add=True)
 

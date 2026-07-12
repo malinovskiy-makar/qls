@@ -247,6 +247,18 @@ class GameApiTests(TestCase):
         r = self.client.get('/game/api/question/')
         self.assertNotIn('correct_index', json.dumps(r.json()['question']))
 
+    def test_numeric_payload_carries_unit_without_answer(self):
+        p = make_numeric_problem(answer='64')
+        GameQuestion.objects.create(
+            problem=p, question=p.statement, question_type='numeric',
+            options=[], correct_value='64', unit='%', difficulty=2,
+            topics=[], lang='ru')
+        r = self.client.get('/game/api/session/start/?mode=classic')
+        q = r.json()['question']
+        self.assertEqual(q['type'], 'numeric')
+        self.assertEqual(q['unit'], '%')
+        self.assertNotIn('correct', json.dumps(q))
+
     def test_answer_correct_and_wrong(self):
         q = self.start()
         r = self.client.post('/game/api/answer/',
@@ -500,6 +512,23 @@ class BuildPoolMetadataTests(TestCase):
         p = make_numeric_problem(answer='зависит от вкусов')
         self._run()
         self.assertFalse(GameQuestion.objects.filter(problem=p).exists())
+
+    def test_numeric_unit_from_reference_note(self):
+        p = make_numeric_problem(answer='64')
+        SourceReference.objects.create(
+            problem=p, source=self.source, stage='региональный',
+            year=2021, grade='10',
+            note='7 б. за верный ответ; единица ответа: %; общий вопрос')
+        self._run()
+        gq = GameQuestion.objects.get(problem=p)
+        self.assertEqual(gq.unit, '%')
+
+    def test_no_unit_note_means_empty_unit(self):
+        p = make_numeric_problem(answer='5')
+        SourceReference.objects.create(
+            problem=p, source=self.source, stage='региональный', year=2020)
+        self._run()
+        self.assertEqual(GameQuestion.objects.get(problem=p).unit, '')
 
 
 class ParseExactNumberTests(TestCase):

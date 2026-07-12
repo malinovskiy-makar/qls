@@ -58,6 +58,10 @@ GAME_TYPES = {
 # Лимит поля GameQuestion.correct_value (CharField max_length=50).
 MAX_NUMERIC_ANSWER_LEN = 50
 
+# Единица ответа в SourceReference.note («…; единица ответа: %; …») —
+# записывает import_vsosh_region, пул денормализует в GameQuestion.unit.
+UNIT_NOTE_RE = re.compile(r'единица ответа:\s*([^;]+)')
+
 MAX_QUESTION_LEN = 300   # символов после чистки переносов
 # numeric (Классика, 600 с на вопрос) — полноценные расчётные задачи с
 # развёрнутым условием, не куцые тестовые вопросы; лимит мягче, чем у
@@ -451,9 +455,13 @@ class Command(BaseCommand):
             # Метаданные олимпиады: первая привязка к источнику, где хоть
             # что-то из stage/year/grade заполнено (у большинства задач — ни одной).
             stage, year, grade = '', None, ''
+            unit = ''
             for ref in p.source_references.all():
                 if ref.stage or ref.year or ref.grade:
                     stage, year, grade = ref.stage, ref.year, ref.grade
+                    m = UNIT_NOTE_RE.search(ref.note or '')
+                    if m:
+                        unit = m.group(1).strip()
                     break
             built.append(GameQuestion(
                 problem=p,
@@ -470,6 +478,7 @@ class Command(BaseCommand):
                 stage=stage,
                 year=year,
                 grade=grade,
+                unit=unit if qtype == 'numeric' else '',
             ))
 
         with transaction.atomic():

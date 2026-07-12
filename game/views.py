@@ -105,7 +105,7 @@ def game_page(request):
 
 def _question_payload(gq, number):
     """Вопрос для клиента — БЕЗ правильного ответа (анти-чит)."""
-    return {
+    payload = {
         'id': gq.id,
         'number': number,
         'type': gq.question_type,
@@ -114,6 +114,10 @@ def _question_payload(gq, number):
         'topics': gq.topics,
         'problem_id': gq.problem_id,
     }
+    if gq.question_type == 'numeric' and gq.unit:
+        # единица измерения («%», «руб.») — подсказка у поля ввода, не ответ
+        payload['unit'] = gq.unit
+    return payload
 
 
 def _pick_next(request, state):

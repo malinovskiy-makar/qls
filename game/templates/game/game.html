@@ -506,6 +506,8 @@ a:focus-visible, button:focus-visible {
   border-color: var(--rush-accent);
 }
 .num-hint { font-size: 12.5px; color: var(--text3); }
+/* единица измерения ответа («ответ в %») — приходит с вопросом Классики */
+.num-unit { font-size: 14.5px; font-weight: 600; color: var(--text2); }
 .numeric-actions { display: flex; gap: 10px; }
 .btn-skip {
   font: inherit; font-size: 15px; font-weight: 500;
@@ -726,6 +728,7 @@ a:focus-visible, button:focus-visible {
         <button class="btn-submit" id="btn-submit" disabled>Ответить</button>
       </div>
       <div class="numeric-block" id="numeric-block" hidden>
+        <div class="num-unit" id="num-unit" hidden></div>
         <input id="num-input" class="num-input" inputmode="decimal"
                autocomplete="off" spellcheck="false" placeholder="Например: 12,5">
         <div class="num-hint">Дробь можно вводить как 1/3 · запятая или точка — не важно</div>
@@ -1022,6 +1025,13 @@ a:focus-visible, button:focus-visible {
       var fb = $('num-feedback');
       fb.textContent = '';
       fb.className = 'num-feedback';
+      var unitEl = $('num-unit');
+      if (q.unit) {
+        unitEl.textContent = 'ответ в ' + q.unit;
+        unitEl.hidden = false;
+      } else {
+        unitEl.hidden = true;
+      }
       inp.focus();
     } else {
       q.options.forEach(function (text, i) {
