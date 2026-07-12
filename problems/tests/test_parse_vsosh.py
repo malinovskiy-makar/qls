@@ -36,14 +36,48 @@ class PostprocessTextTests(SimpleTestCase):
         self.assertEqual(postprocess_text('расстояние 60 км/ч по трассе'),
                          'расстояние 60 км/ч по трассе')
 
-    def test_complex_subscript_fraction_not_touched(self):
-        # P_{e}/40 — не «простая» дробь (числитель с индексом), не трогаем
-        text = postprocess_text('$100/80 \\le P_{e}/40$')
-        self.assertEqual(text, '$\\frac{100}{80} \\le P_{e}/40$')
-
     def test_existing_frac_not_double_converted(self):
         text = postprocess_text('$80 = \\frac{100}{1+r_{12}}$')
         self.assertEqual(text, '$80 = \\frac{100}{1+r_{12}}$')
+
+    def test_complex_expression_fraction_not_touched(self):
+        # 10/(5 \cdot 2) и (8w-w^2+20)/(10-w) — составные, не «атомы», не трогаем
+        self.assertEqual(postprocess_text('$10/(5 \\cdot 2)$'),
+                         '$10/(5 \\cdot 2)$')
+        text = postprocess_text('$(8w-w^{2} + 20)/(10 -w) = w+ 2$')
+        self.assertEqual(text, '$(8w-w^{2} + 20)/(10 -w) = w+ 2$')
+
+    def test_subscript_numerator_becomes_frac(self):
+        # P_e/40 — атом с индексом (без скобок в исходнике) -> \frac
+        self.assertEqual(postprocess_text('$P_e/40$'), '$\\frac{P_e}{40}$')
+
+    def test_braced_subscript_numerator_becomes_frac(self):
+        # P_{e}/40 — та же переменная, но как реально рендерит парсер (с {})
+        text = postprocess_text('$100/80 \\le P_{e}/40$')
+        self.assertEqual(text, '$\\frac{100}{80} \\le \\frac{P_{e}}{40}$')
+
+    def test_superscript_numerator_becomes_frac(self):
+        # Q^2/2 -> \frac{Q^2}{2}
+        self.assertEqual(postprocess_text('$Q^2/2$'), '$\\frac{Q^2}{2}$')
+
+    def test_plain_slash_fraction_in_expression(self):
+        self.assertEqual(postprocess_text('$11 - Q/2$'), '$11 - \\frac{Q}{2}$')
+
+    def test_paren_fraction_with_power_gets_left_right(self):
+        # (Q/2)^7 -> \left(\frac{Q}{2}\right)^{7} — скобки растут вместе с дробью
+        self.assertEqual(postprocess_text('$(Q/2)^7$'),
+                         '$\\left(\\frac{Q}{2}\\right)^{7}$')
+
+    def test_paren_fraction_with_braced_power_gets_left_right(self):
+        text = postprocess_text('$3(Q/2)^{7} + 7(Q/2)^{3}$')
+        self.assertEqual(
+            text,
+            '$3\\left(\\frac{Q}{2}\\right)^{7} + 7\\left(\\frac{Q}{2}\\right)^{3}$')
+
+    def test_paren_fraction_without_power_stays_plain_parens(self):
+        # без внешней степени скобки не поднимаем — обычных достаточно
+        text = postprocess_text('$TC_{1}(Q/2)+TC_{2}(Q/2)$')
+        self.assertEqual(text, '$TC_{1}(\\frac{Q}{2})+TC_{2}(\\frac{Q}{2})$')
 
 
 class CanonicalizeAnswerUntouchedTests(SimpleTestCase):
