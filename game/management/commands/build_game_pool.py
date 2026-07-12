@@ -21,6 +21,9 @@ build_game_pool — сборка игрового пула Econ Rush из тес
   нет, correct_value = Problem.answer. Ответ обязан парситься тем же
   parse_exact_number, что проверяет ввод игрока (game/views.py) — иначе брак:
   вопрос, на который движок не сможет честно сверить ответ, в пул не попадает.
+  Лимит длины условия мягче, чем у остальных типов (MAX_QUESTION_LEN_NUMERIC=700
+  вместо 300) — Классика даёт 600 с на вопрос, полноценные расчётные задачи
+  региона длиннее куцых тестовых вопросов из других источников.
 
 Метаданные олимпиады (stage/year/grade) денормализуются во ВСЕ типы вопросов
 из первой SourceReference задачи, где они заполнены, — под фильтр
@@ -56,6 +59,10 @@ GAME_TYPES = {
 MAX_NUMERIC_ANSWER_LEN = 50
 
 MAX_QUESTION_LEN = 300   # символов после чистки переносов
+# numeric (Классика, 600 с на вопрос) — полноценные расчётные задачи с
+# развёрнутым условием, не куцые тестовые вопросы; лимит мягче, чем у
+# быстрых режимов (Пуля/Блиц/Рапид), где длинный текст не читается за секунды.
+MAX_QUESTION_LEN_NUMERIC = 700
 MIN_QUESTION_LEN = 15
 MAX_OPTION_LEN = 160
 MIN_OPTIONS = 2
@@ -213,14 +220,14 @@ def content_reason(all_text):
     return None
 
 
-def clean_question(problem):
+def clean_question(problem, max_len=MAX_QUESTION_LEN):
     """Чистит текст условия. Возвращает (question, причина_брака)."""
     question = strip_label_debris(clean_text(problem.statement))
     question = normalize_formulas(question)
     if len(question) < MIN_QUESTION_LEN:
         return None, 'условие слишком короткое'
-    if len(question) > MAX_QUESTION_LEN:
-        return None, 'условие длиннее 300'
+    if len(question) > max_len:
+        return None, f'условие длиннее {max_len}'
     return question, None
 
 
@@ -368,7 +375,7 @@ def extract_numeric(problem):
     Вариантов нет; correct_value — точная каноническая запись из Problem.answer
     (целое, десятичное, дробь a/b). Обязана парситься parse_exact_number —
     той же функцией, что сверяет ввод игрока, — иначе брак."""
-    question, reason = clean_question(problem)
+    question, reason = clean_question(problem, max_len=MAX_QUESTION_LEN_NUMERIC)
     if reason:
         return None, None, reason
     reason = content_reason(question)

@@ -437,11 +437,15 @@ class ExtractNumericTests(TestCase):
         self.assertEqual(value, '50')
 
     def test_question_quality_rules_apply(self):
-        # Общие фильтры качества (длина, рисунок) работают и для numeric.
+        # Общие фильтры качества (длина, рисунок) работают и для numeric —
+        # но лимит длины мягче (700, не 300): Классика даёт 600 с на вопрос,
+        # расчётные региональные задачи длиннее куцых тестовых вопросов.
         p = make_numeric_problem(statement='На основе графика найдите цену.')
         self.assertEqual(extract_numeric(p)[2], 'нужен рисунок/таблица')
         p = make_numeric_problem(statement='Найдите X. ' * 40)
-        self.assertEqual(extract_numeric(p)[2], 'условие длиннее 300')
+        self.assertIsNone(extract_numeric(p)[2])
+        p = make_numeric_problem(statement='Найдите X. ' * 70)
+        self.assertEqual(extract_numeric(p)[2], 'условие длиннее 700')
 
     def test_overlong_answer_rejected(self):
         p = make_numeric_problem(answer='1' * 51)
