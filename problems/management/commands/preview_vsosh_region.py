@@ -142,10 +142,15 @@ class Command(BaseCommand):
         for p in data.get('section_preambles', []):
             preambles.setdefault(p['section'], p)
 
+        def q_section(q):
+            return q.get('section') or int(q['number'].split('.')[0])
+
         last_section = None
         for q in sorted(questions,
-                        key=lambda q: (q['number'], min(q['grades']))):
-            section = int(q['number'].split('.')[0])
+                        key=lambda q: (q_section(q),
+                                       [int(x) for x in q['number'].split('.')],
+                                       min(q['grades']))):
+            section = q_section(q)
             if section != last_section:
                 out.append(f'<h2 class="section">{SECTION_TITLES.get(section, "")}</h2>')
                 if section in preambles:

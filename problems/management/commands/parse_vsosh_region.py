@@ -65,8 +65,22 @@ PROFILES = {
         'stop_section': 4,
         'stop_line_re': None,
     },
+    # 2019: секции «Часть N» со старыми типами и СКВОЗНОЙ одинарной
+    # нумерацией вопросов («1.» … «20.»). Защита от ложных срабатываний
+    # (строка текста, начинающаяся числом) — номер обязан быть равен
+    # предыдущему + 1.
+    'chast_flat': {
+        'section_re': re.compile(r'^Часть (\d)$'),
+        'qtypes': {1: 'boolean', 2: 'single', 3: 'multi', 4: 'numeric'},
+        'stop_section': None,
+        'stop_line_re': re.compile(
+            r'^(Первый тур\. Тест\. )?Правильные ответы\.?$'),
+        'qstart_re': re.compile(r'^(\d{1,2})\.\s+'),
+        'flat_numbering': True,
+    },
 }
 YEAR_PROFILES = {
+    2019: 'chast_flat',
     2020: 'zadanie',
     2021: 'zadanie',
     2022: 'zadanie',
@@ -748,6 +762,9 @@ def parse_document(doc, grade, errors, profile):
     section_re = profile['section_re']
     section_qtypes = profile['qtypes']
     stop_section = profile['stop_section']
+    qstart_re = profile.get('qstart_re', QSTART_RE)
+    flat = profile.get('flat_numbering', False)
+    next_flat_number = 1
     lines, body = extract_lines(doc)
     lines = reassemble_display_math(lines, body)   # выключные формулы
     lines = reassemble_fractions(lines, body)      # строчные этажные дроби
@@ -843,19 +860,28 @@ def parse_document(doc, grade, errors, profile):
             buffers = new_buffers()
             continue
 
-        m = QSTART_RE.match(plain)
-        if m and section is not None and int(m.group(1)) == section:
-            flush_question()
-            if state == 'preamble' and buffers['preamble']:
-                preambles.append({'section': section,
-                                  'text': render_paragraph(buffers['preamble'], body)})
-            buffers = new_buffers()
-            stripped, _ = strip_marker(line, QSTART_RE)
-            cur = {'number': f'{m.group(1)}.{m.group(2)}', 'section': section,
-                   'qtype': section_qtypes.get(section)}
-            buffers['statement'].append(stripped)
-            state = 'statement'
-            continue
+        m = qstart_re.match(plain)
+        if m and section is not None:
+            if flat:
+                is_qstart = int(m.group(1)) == next_flat_number
+                number = m.group(1)
+            else:
+                is_qstart = int(m.group(1)) == section
+                number = f'{m.group(1)}.{m.group(2)}'
+            if is_qstart:
+                flush_question()
+                if state == 'preamble' and buffers['preamble']:
+                    preambles.append({'section': section,
+                                      'text': render_paragraph(buffers['preamble'], body)})
+                buffers = new_buffers()
+                stripped, _ = strip_marker(line, qstart_re)
+                cur = {'number': number, 'section': section,
+                       'qtype': section_qtypes.get(section)}
+                if flat:
+                    next_flat_number = int(number) + 1
+                buffers['statement'].append(stripped)
+                state = 'statement'
+                continue
 
         m = OPT_RE.match(plain)
         if (m and cur is not None
@@ -901,7 +927,7 @@ def parse_document(doc, grade, errors, profile):
     flush_question()
 
     for q in questions:
-        q['points'] = points_by_section.get(int(q['number'].split('.')[0]))
+        q['points'] = points_by_section.get(q['section'])
     return questions, unparsed, preambles
 
 
@@ -940,7 +966,8 @@ def build_question(cur, buffers, body, left_margin, grade):
     if '�' in statement + solution + ''.join(opts):
         return None, 'нерасшифрованные глифы (U+FFFD) — сверить с PDF'
 
-    q = {'grades': [grade], 'number': cur['number'], 'qtype': qtype,
+    q = {'grades': [grade], 'number': cur['number'],
+         'section': cur['section'], 'qtype': qtype,
          'statement': statement, 'options': [], 'correct': None,
          'unit': '', 'solution': solution, 'points': None}
     notes = []
