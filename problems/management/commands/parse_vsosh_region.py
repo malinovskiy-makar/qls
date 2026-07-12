@@ -80,6 +80,7 @@ PROFILES = {
     },
 }
 YEAR_PROFILES = {
+    2017: 'chast_flat',
     2018: 'chast_flat',
     2019: 'chast_flat',
     2020: 'zadanie',
@@ -91,6 +92,11 @@ YEAR_PROFILES = {
 }
 
 PDF_URLS = {
+    # 2016–2017: все классы писали один общий тест (единый файл)
+    2017: {
+        g: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2017/region_2017_test_9-11_klass_s_otvetami_11618.pdf'
+        for g in (9, 10, 11)
+    },
     # 2018–2019: 10 и 11 классы писали один общий тест (файл 1011)
     2018: {
         9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2018/region_2018_test_answers_9_16633.pdf',
