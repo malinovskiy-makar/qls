@@ -528,6 +528,17 @@ def render_plain_latex(line_list, body):
 # Канонизация числового ответа
 # ---------------------------------------------------------------------------
 
+# Простая слэш-дробь ВНУТРИ математики: «буквы/цифры / буквы/цифры»
+# (Y=2M/P -> Y=\frac{2M}{P}). Границы через lookaround, а не \b — числитель/
+# знаменатель не должны затрагивать соседние индексы/скобки/\frac{...}
+# (P_{e}/40, Q^{2}/2, \frac{100}{...} осознанно НЕ трогаем — не «простые»).
+FRAC_RE = re.compile(r'(?<![A-Za-z0-9\\}])([A-Za-z0-9]+)\s*/\s*([A-Za-z0-9]+)'
+                     r'(?![A-Za-z0-9{])')
+# Два и более дефиса/коротких тире подряд (--, ––) -> одно длинное тире.
+# Настоящий em dash (—) не входит в класс — не трогаем уже верное тире.
+DASH_RUN_RE = re.compile(r'[-‐‑‒–]{2,}')
+MATH_SEGMENT_RE = re.compile(r'(\$[^$]*\$)')
+
 NUMBER_RE = re.compile(r'^-?\d+(?:[.,]\d+)?(?:/\d+)?$')
 VAR_EQ_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_{}\\]*\s*=\s*(.+)$')
 UNIT_RE = re.compile(r'^(-?\d+(?:[.,]\d+)?(?:/\d+)?)\s*(\\?%|[а-яё.\s]+)$')
@@ -544,6 +555,22 @@ def _parses_as_number(s):
         return True
     except (ValueError, ZeroDivisionError):
         return False
+
+
+def postprocess_text(text):
+    """Косметика по уже отрендеренному тексту (statement/solution/options):
+    слэш-дроби -> \\frac только внутри $...$, двойные дефисы/тире -> «—»
+    только вне $...$ (внутри математики дефис может быть минусом)."""
+    if not text:
+        return text
+    parts = MATH_SEGMENT_RE.split(text)
+    out = []
+    for part in parts:
+        if part.startswith('$') and part.endswith('$') and len(part) >= 2:
+            out.append('$' + FRAC_RE.sub(r'\\frac{\1}{\2}', part[1:-1]) + '$')
+        else:
+            out.append(DASH_RUN_RE.sub('—', part))
+    return ''.join(out)
 
 
 def canonicalize_answer(raw):
@@ -741,14 +768,17 @@ def build_question(cur, buffers, body, left_margin, grade):
     statement = render_paragraph(buffers['statement'], body)
     if not statement:
         return None, 'пустое условие'
+    statement = postprocess_text(statement)
 
     degraded = any(l.degraded for key in ('statement', 'options_flat', 'solution')
                    for l in _flat(buffers, key))
 
     solution = render_paragraph(buffers['solution'], body,
                                 indent_breaks=True, left_margin=left_margin)
+    solution = postprocess_text(solution)
 
-    opts = [render_paragraph(o['lines'], body) for o in buffers['options']]
+    opts = [postprocess_text(render_paragraph(o['lines'], body))
+            for o in buffers['options']]
     bold_idx = [i for i, o in enumerate(buffers['options']) if o['bold']]
 
     q = {'grades': [grade], 'number': cur['number'], 'qtype': qtype,
