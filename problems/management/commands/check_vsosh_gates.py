@@ -46,7 +46,8 @@ def text_problems(text, where):
         problems.append(f'{where}: непарный $ (всего {n_dollar})')
     else:
         for seg in MATH_SEG_RE.findall(text):
-            if seg.count('{') != seg.count('}'):
+            bare = seg.replace('\\{', '').replace('\\}', '')
+            if bare.count('{') != bare.count('}'):
                 problems.append(f'{where}: дисбаланс {{}} в ${seg[:40]}…$')
     if text.count('\\left') != text.count('\\right'):
         problems.append(f'{where}: \\left≠\\right')

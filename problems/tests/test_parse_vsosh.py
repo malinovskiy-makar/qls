@@ -94,6 +94,35 @@ class PostprocessTextTests(SimpleTestCase):
     def test_braced_sqrt_not_double_wrapped(self):
         self.assertEqual(postprocess_text('$\\sqrt{KL}+1$'), '$\\sqrt{KL}+1$')
 
+    def test_unmatched_brace_escaped(self):
+        # кусочная функция: литеральная скобка PDF -> \{, KaTeX не падает
+        text = postprocess_text('$TC(Q) = {Q^{2}, Q \\le 1; 2Q-1, Q> 1.$')
+        self.assertEqual(text, '$TC(Q) = \\{Q^{2}, Q \\le 1; 2Q-1, Q> 1.$')
+
+    def test_balanced_braces_untouched(self):
+        self.assertEqual(postprocess_text('$x^{2}+\\frac{a}{b}$'),
+                         '$x^{2}+\\frac{a}{b}$')
+
+
+class FinishMathTests(SimpleTestCase):
+
+    def test_double_subscript_gets_empty_base(self):
+        # _{1,2}_{2} — расползшаяся дробь; KaTeX падает без пустой базы
+        from problems.management.commands.parse_vsosh_region import _finish_math
+        issues = []
+        out = _finish_math('1{,}1N _{1{,}2}_{2}', issues)
+        self.assertEqual(out, '$1{,}1N _{1{,}2} {}_{2}$')
+        self.assertTrue(issues)
+
+    def test_mixed_scripts_untouched(self):
+        # q^{7}_{1} — степень+индекс легальны, \pi _{2} — просто индекс
+        from problems.management.commands.parse_vsosh_region import _finish_math
+        issues = []
+        self.assertEqual(_finish_math('3q^{7} _{1}', issues), '$3q^{7} _{1}$')
+        self.assertEqual(_finish_math('\\pi _{2}(q_{2})', issues),
+                         '$\\pi _{2}(q_{2})$')
+        self.assertEqual(issues, [])
+
 
 class CanonicalizeAnswerUntouchedTests(SimpleTestCase):
 

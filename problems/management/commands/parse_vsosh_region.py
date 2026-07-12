@@ -61,12 +61,18 @@ PROFILES = {
     },
 }
 YEAR_PROFILES = {
+    2022: 'zadanie',
     2023: 'zadanie',
     2024: 'chast',
     2025: 'chast',
 }
 
 PDF_URLS = {
+    2022: {
+        9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2022/region_2022_test_answers_9_22810.pdf',
+        10: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2022/region_2022_test_answers_10_22808.pdf',
+        11: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2022/region_2022_test_answers_11_22809.pdf',
+    },
     2023: {
         9: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2023/region_2023_test_answers_9_23512.pdf',
         10: 'https://www.iloveeconomics.ru/sites/default/files/olimp/region/2023/region_2023_test_answers_10_23513.pdf',
@@ -452,7 +458,14 @@ HYPHEN_END_RE = re.compile(r'[а-яёА-ЯЁ]-$')
 NEEDS_DOLLARS_RE = re.compile(r'[A-Za-z\\^_]')
 
 
-def _finish_math(run):
+# Два подряд скрипта ОДНОГО типа (_{1,2}_{2}) — так расползаются инлайн
+# этажные дроби; KaTeX падает («Double subscript»). Разные типы (q^{7}_{1})
+# легальны — не трогаем. Вставка пустой базы {} делает формулу валидной,
+# сохранив честную линеаризацию. Группа с одним уровнем вложения ({,}).
+DOUBLE_SCRIPT_RE = re.compile(r'([_^])(\{(?:[^{}]|\{[^{}]*\})*\})\s*(?=\1\{)')
+
+
+def _finish_math(run, issues=None):
     """Готовый math-ран → фрагмент текста (с $...$ или без)."""
     txt = run.strip()
     if not txt:
@@ -460,12 +473,19 @@ def _finish_math(run):
     txt = re.sub(r'(?<!\\)%', r'\\%', txt)
     txt = re.sub(r'(\d),(\d)', r'\1{,}\2', txt)   # десятичная запятая в KaTeX
     txt = WS_RE.sub(' ', txt)
+    fixed = DOUBLE_SCRIPT_RE.sub(r'\1\2 {}', txt)
+    if fixed != txt:
+        txt = fixed
+        if issues is not None:
+            issues.append('этажная дробь из PDF не собралась — индексы могли '
+                          'слипнуться, сверить с оригиналом')
     if NEEDS_DOLLARS_RE.search(txt):
         return '$' + txt + '$'
     return txt
 
 
-def render_paragraph(line_list, body, indent_breaks=False, left_margin=None):
+def render_paragraph(line_list, body, indent_breaks=False, left_margin=None,
+                     issues=None):
     """Строки → единый текст: математика в $...$, переносы склеены,
     абзацные отступы (для решений) → пустая строка."""
     pieces = []       # готовые текстовые фрагменты
@@ -476,7 +496,7 @@ def render_paragraph(line_list, body, indent_breaks=False, left_margin=None):
 
     def flush_math():
         nonlocal math_run, glue_next
-        frag = _finish_math(math_run)
+        frag = _finish_math(math_run, issues)
         if frag:
             if (pieces and not glue_next
                     and not pieces[-1].endswith((' ', '\n', '(', '«'))):
@@ -616,6 +636,27 @@ def _parses_as_number(s):
         return False
 
 
+def _escape_unmatched_braces(inner):
+    """Литеральная фигурная скобка из PDF (кусочная функция, cases) остаётся
+    в тексте непарной и ломает KaTeX. Скобки LaTeX-групп (^{...}, \\frac{}{})
+    парсер порождает парами; непарные — вёрстка — экранируем в \\{ / \\}."""
+    stack, orphans = [], []
+    for i, ch in enumerate(inner):
+        if inner[i - 1] == '\\' and i > 0:
+            continue
+        if ch == '{':
+            stack.append(i)
+        elif ch == '}':
+            if stack:
+                stack.pop()
+            else:
+                orphans.append(i)
+    bad = set(stack) | set(orphans)
+    if not bad:
+        return inner
+    return ''.join('\\' + ch if i in bad else ch for i, ch in enumerate(inner))
+
+
 def postprocess_text(text):
     """Косметика по уже отрендеренному тексту (statement/solution/options):
     слэш-дроби -> \\frac только внутри $...$, двойные дефисы/тире -> «—»
@@ -632,6 +673,7 @@ def postprocess_text(text):
             inner = FRAC_RE.sub(r'\\frac{\1}{\2}', inner)
             inner = SQRT_RUN_RE.sub(r'\\sqrt{\1}', inner)
             inner = ROOT_INDEX_RE.sub(r'\\sqrt[\1]{', inner)
+            inner = _escape_unmatched_braces(inner)
             out.append('$' + inner + '$')
         else:
             out.append(DASH_RUN_RE.sub('—', part))
@@ -842,7 +884,8 @@ def build_question(cur, buffers, body, left_margin, grade):
     if qtype is None:
         return None, f'неизвестное задание {cur["section"]}'
 
-    statement = render_paragraph(buffers['statement'], body)
+    issues = []
+    statement = render_paragraph(buffers['statement'], body, issues=issues)
     if not statement:
         return None, 'пустое условие'
     statement = postprocess_text(statement)
@@ -851,19 +894,24 @@ def build_question(cur, buffers, body, left_margin, grade):
                    for l in _flat(buffers, key))
 
     solution = render_paragraph(buffers['solution'], body,
-                                indent_breaks=True, left_margin=left_margin)
+                                indent_breaks=True, left_margin=left_margin,
+                                issues=issues)
     solution = postprocess_text(solution)
 
-    opts = [postprocess_text(render_paragraph(o['lines'], body))
+    opts = [postprocess_text(render_paragraph(o['lines'], body, issues=issues))
             for o in buffers['options']]
     bold_idx = [i for i, o in enumerate(buffers['options']) if o['bold']]
 
     q = {'grades': [grade], 'number': cur['number'], 'qtype': qtype,
          'statement': statement, 'options': [], 'correct': None,
          'unit': '', 'solution': solution, 'points': None}
+    notes = []
     if degraded:
-        q['notes'] = ('математика линеаризована: этажную дробь из PDF '
-                      'не удалось собрать автоматически — сверить с оригиналом')
+        notes.append('математика линеаризована: этажную дробь из PDF '
+                     'не удалось собрать автоматически — сверить с оригиналом')
+    notes.extend(dict.fromkeys(issues))   # уникальные, порядок сохранён
+    if notes:
+        q['notes'] = '; '.join(notes)
 
     if qtype == 'boolean':
         norm = [o.rstrip('.').strip().lower() for o in opts]
