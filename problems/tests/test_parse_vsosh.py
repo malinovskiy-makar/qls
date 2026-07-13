@@ -138,6 +138,35 @@ class FinishMathTests(SimpleTestCase):
         self.assertIn('$\\$$', text)
         self.assertIn('$Y=\\frac{2M}{P}$', text)
 
+    def test_homoglyphs_fixed_outside_math(self):
+        from problems.management.commands.parse_vsosh_region import fix_homoglyphs
+        # латиница внутри русских слов -> кириллица
+        self.assertEqual(fix_homoglyphs('нужно произвести нe менее'),
+                         'нужно произвести не менее')
+        # одиночный «предлог» латиницей
+        self.assertEqual(fix_homoglyphs('годовых c капитализацией'),
+                         'годовых с капитализацией')
+        # чистая латиница не трогается
+        self.assertEqual(fix_homoglyphs('U-образный вид, город N-ске, GDP'),
+                         'U-образный вид, город N-ске, GDP')
+
+    def test_mixed_den_atom_not_fraction(self):
+        # 5/4X = (5/4)·X, а не 5/(4X) — смешанный атом в знаменателе
+        self.assertEqual(postprocess_text('$Y= 4500 -5/4X$'),
+                         '$Y= 4500 -5/4X$')
+        # чистые атомы по-прежнему конвертируются
+        self.assertEqual(postprocess_text('$Y= 2M/P$'),
+                         '$Y= \\frac{2M}{P}$')
+
+    def test_url_space_join(self):
+        self.assertEqual(postprocess_text('данные worldbank. org/indicator'),
+                         'данные worldbank.org/indicator')
+
+    def test_cdot_doubling_collapse(self):
+        from problems.management.commands.parse_vsosh_region import _finish_math
+        self.assertEqual(_finish_math('0{,}1^{4} \\cdot \\cdot 2^{12}'),
+                         '$0{,}1^{4} \\cdot 2^{12}$')
+
     def test_doubled_signs_collapse(self):
         # перенос уравнения повторяет знак: «12P − ␊ −140» → «12P −140»
         from problems.management.commands.parse_vsosh_region import _finish_math

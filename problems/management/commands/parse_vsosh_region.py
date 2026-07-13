@@ -173,8 +173,41 @@ HEADER_RES = [
 PAGENUM_RE = re.compile(r'^\d{1,2}$')
 QSTART_RE = re.compile(r'^(\d)\.(\d)\.\s*')
 OPT_RE = re.compile(r'^([1-4])\)\s*')
-COMMENT_RE = re.compile(r'^Комментарий\.\s*')
+# 2016 пишет заголовок «Комментарий» отдельной строкой БЕЗ точки — без
+# второй альтернативы блок пояснений жюри влипал в последний вариант (№12).
+COMMENT_RE = re.compile(r'^Комментарий\.\s*|^Комментарий\s*$')
 ANSWER_RE = re.compile(r'^Ответ:\s*')
+
+# Композиты, разорванные переносом В СОБСТВЕННОМ дефисе: от словопереноса
+# текстом не отличимы, поэтому перечислены явно — список полон для корпуса
+# 2016–2025 (полный скан всех 806 склеек переносов).
+COMPOUND_JOINS = {
+    ('из', 'за'),
+    ('врачей', 'рентгенологов'),
+    ('причинно', 'следственной'),
+    ('стране', 'экспортере'),
+    ('товар', 'комплемент'),
+    ('фирмы', 'монополиста'),
+}
+
+# Гомоглифы: латиница, визуально неотличимая от кириллицы, внутри русских
+# слов («нe», «c капитализацией») — и из PDF-вёрстки, и из текстового слоя.
+HOMOGLYPH_TRANS = str.maketrans('aceopxyABCEHKMOPTX',
+                                'асеорхуАВСЕНКМОРТХ')
+CYR_WORD_RE = re.compile(r'[\w-]*[а-яёА-ЯЁ][\w-]*')
+LONE_LAT_RE = re.compile(r'(?<=[а-яёА-ЯЁ,)»] )([caoy])(?= [а-яёА-ЯЁ«(\d])')
+
+
+def fix_homoglyphs(text):
+    """Латинские двойники кириллицы → кириллица: внутри слов, содержащих
+    кириллицу, и в одиночных «предлогах» (c/a/o/y) между русскими словами.
+    Слова без кириллицы (N-ске — «N» отдельно, U-образный, GDP) не трогаем."""
+    def fix_word(m):
+        w = m.group(0)
+        return w.translate(HOMOGLYPH_TRANS)
+    text = CYR_WORD_RE.sub(fix_word, text)
+    return LONE_LAT_RE.sub(lambda m: m.group(1).translate(HOMOGLYPH_TRANS),
+                           text)
 POINTS_RE = re.compile(r'(?:приносит|оценивается в) (\d+) балл')
 
 WS_RE = re.compile(r'\s+')
@@ -201,6 +234,7 @@ class Line:
         self.bbox = bbox
         self.page_no = page_no
         self.degraded = False  # остаток этажной дроби, не собранный правилами
+        self.degraded_gid = None  # id группы выключной формулы (для дочистки)
 
     @property
     def plain(self):
@@ -254,8 +288,33 @@ def _split_span_by_baseline(sp):
         sub['text'] = text
         sub['origin'] = (cs[0]['origin'][0], g['y'])
         sub['bbox'] = (x0, y0, x1, y1)
+        sub['chars'] = cs   # для поздней x-разрезки (границы радиканда)
         out.append(sub)
     return out
+
+
+def _split_span_at_x(sp, x):
+    """Спан → (левая часть до x, правая от x) по посимвольным рамкам.
+    Нужен, когда граница радиканда/дроби проходит внутри спана."""
+    chars = sp.get('chars')
+    if not chars:
+        return (sp, None) if sp['bbox'][2] <= x else (None, sp)
+    left = [c for c in chars if (c['bbox'][0] + c['bbox'][2]) / 2 <= x]
+    right = [c for c in chars if (c['bbox'][0] + c['bbox'][2]) / 2 > x]
+    def build(cs):
+        if not cs or not ''.join(c['c'] for c in cs).strip():
+            return None
+        sub = {k: v for k, v in sp.items() if k != 'chars'}
+        vis = [c for c in cs if not c['c'].isspace()] or cs
+        sub['text'] = ''.join(c['c'] for c in cs)
+        sub['origin'] = (cs[0]['origin'][0], sp['origin'][1])
+        sub['bbox'] = (min(c['bbox'][0] for c in vis),
+                       min(c['bbox'][1] for c in vis),
+                       max(c['bbox'][2] for c in vis),
+                       max(c['bbox'][3] for c in vis))
+        sub['chars'] = cs
+        return sub
+    return build(left), build(right)
 
 
 def extract_bars(doc):
@@ -277,6 +336,82 @@ def extract_bars(doc):
                         out.append((r.x0, r.x1, (r.y0 + r.y1) / 2))
         bars[page_no] = out
     return bars
+
+
+def extract_figures(doc):
+    """Зоны рисунков (графики) по страницам: {page_no: [Rect, …]}.
+
+    График выдаёт себя диагональными отрезками (кривые D/S/MR, КПВ) и
+    кривыми Безье; линейки таблиц и черты дробей строго горизонтальны/
+    вертикальны и сюда не попадают. Зона — объединение рамок таких
+    элементов (+поля), если их ≥3 на странице рядом."""
+    import fitz
+    figures = {}
+    for page_no, page in enumerate(doc, start=1):
+        marks = []
+        for d in page.get_drawings():
+            for item in d['items']:
+                r = d['rect']
+                if item[0] == 'c':
+                    # мелкие безье — углы рамок-маркеров, галочки, логотипы
+                    if max(r.width, r.height) > 30:
+                        marks.append(r)
+                elif item[0] == 'l':
+                    p1, p2 = item[1], item[2]
+                    if abs(p1.x - p2.x) > 8 and abs(p1.y - p2.y) > 8:
+                        marks.append(r)
+        if len(marks) < 3:
+            continue
+        # кластеризация: жадное слияние пересекающихся (с полем 12pt) рамок
+        zones = []
+        for r in marks:
+            r = fitz.Rect(r.x0 - 12, r.y0 - 12, r.x1 + 12, r.y1 + 12)
+            for z in zones:
+                if z.intersects(r):
+                    z.include_rect(r)
+                    break
+            else:
+                zones.append(r)
+        # оси графика — прямые линии, примыкающие к зоне кривых: зона
+        # прирастает ими (и их подписями рядом), иначе подписи осей
+        # остаются снаружи
+        straight = []
+        for d in page.get_drawings():
+            for item in d['items']:
+                if item[0] == 'l':
+                    p1, p2 = item[1], item[2]
+                    if abs(p1.x - p2.x) > 15 or abs(p1.y - p2.y) > 15:
+                        straight.append(d['rect'])
+        for _ in range(2):
+            for r in straight:
+                rr = fitz.Rect(r.x0 - 12, r.y0 - 12, r.x1 + 12, r.y1 + 12)
+                for z in zones:
+                    if z.intersects(rr):
+                        z.include_rect(rr)
+                        break
+        figures[page_no] = zones
+    return figures
+
+
+def drop_figure_labels(lines, figures):
+    """Строки целиком внутри зоны рисунка — подписи осей/кривых (P, Q, D,
+    MR, 8, 16 …), в тексте задачи им не место. Возвращает (строки,
+    страницы с вычищенными подписями) — вопросам этих страниц парсер
+    допишет пометку про рисунок."""
+    kept, fig_pages = [], set()
+    label_re = re.compile(r'[а-яёА-ЯЁ]{4,}')
+    for l in lines:
+        zones = figures.get(l.page_no, [])
+        inside = any(l.bbox[0] >= z.x0 and l.bbox[2] <= z.x1
+                     and l.bbox[1] >= z.y0 and l.bbox[3] <= z.y1
+                     for z in zones)
+        # подпись — короткие латинские/цифровые метки; строка с русским
+        # словом (заголовок, текст, «Ответ: …») контентная даже в зоне
+        if inside and not label_re.search(l.plain):
+            fig_pages.add(l.page_no)
+        else:
+            kept.append(l)
+    return kept, fig_pages
 
 
 def extract_lines(doc):
@@ -385,6 +520,11 @@ def _render_math_run(spans, body):
     base_y = (_mode_baseline(spans, base_size * SMALL_RATIO)
               if base_size else None)
     for sp in spans:
+        if sp.get('converted'):
+            # уже готовый LaTeX (\sqrt{…}, \frac{…}{…}) — вставляем как есть
+            out += (' ' if out and not out.endswith(' ') else '') \
+                + sp['text'] + ' '
+            continue
         txt = replace_unicode_math(span_text(sp))
         small = base_size is not None and sp['size'] < base_size * SMALL_RATIO
         mark = _script_mark(sp, base_y) if small and base_y is not None else ''
@@ -395,13 +535,15 @@ def _render_math_run(spans, body):
     return out.strip()
 
 
-def _frac_span(num_latex, den_latex, body, y):
+def _frac_span(num_latex, den_latex, body, y, bbox=None):
     """Псевдоспан с готовым LaTeX (converted=True — конвертер не трогает)."""
     # Хвостовая пунктуация знаменателя («...(1+r_{23}),») выносится из дроби.
     m = re.match(r'^(.*?)([,.;:]*)$', den_latex)
     latex = '\\frac{' + num_latex + '}{' + m.group(1) + '}' + m.group(2)
     return {'text': latex, 'font': 'Math-Converted', 'size': body,
-            'origin': (0, y), 'flags': 0, 'converted': True}
+            'origin': (bbox[0] if bbox else 0, y), 'flags': 0,
+            'converted': True,
+            'bbox': tuple(bbox) if bbox else (0, y, 0, y)}
 
 
 def _pure_math(line):
@@ -435,11 +577,23 @@ def _y_clusters(spans, tol=3.0):
     return clusters
 
 
-def _reconstruct_display(group, body):
+def _bar_between(page_bars, x0, x1, y_top, y_bot):
+    """Есть ли черта между ярусами y_top..y_bot, накрывающая [x0, x1]."""
+    for bx0, bx1, by in page_bars:
+        if (y_top < by < y_bot
+                and min(bx1, x1) - max(bx0, x0) >= 0.8 * (x1 - x0)):
+            return True
+    return False
+
+
+def _reconstruct_display(group, body, page_bars):
     """Выключная формула с этажными дробями (все части ПОЛНОГО кегля —
     в display-режиме LaTeX дробь не уменьшается). Ярусы: числитель / ось
-    (знаки =, <, множители) / знаменатель. Собираем проходом слева направо:
-    колонки числитель-над-знаменателем → \\frac, осевые спаны — как есть.
+    (знаки =, <, множители) / знаменатель. Дробью пара ярусов считается
+    ТОЛЬКО при наличии черты между ними в векторной графике (кусочные
+    функции и системы уравнений — те же два яруса, но без черты).
+    Колонки трёхъярусной формулы тоже режутся ПО ЧЕРТАМ: широкая дробь
+    с пробелом в числителе не разваливается на псевдоколонки.
     Не собралось однозначно → None (вызывающий код линеаризует с пометкой)."""
     spans = [sp for line in group for sp in line.spans]
     # Ярусы считаем по полноразмерным спанам: скрипт-цифры (степень «²» у
@@ -448,11 +602,9 @@ def _reconstruct_display(group, body):
     full = [sp for sp in spans if sp['size'] >= body * SMALL_RATIO]
     clusters = _y_clusters(full if full else spans)
     if len(clusters) >= 2:
-        all_ys = sorted(y for c in clusters for y in c)
         def nearest_cluster_ys(sp):
             y = round(sp['origin'][1], 1)
-            best = min(clusters, key=lambda c: min(abs(y - cy) for cy in c))
-            return best
+            return min(clusters, key=lambda c: min(abs(y - cy) for cy in c))
         for sp in spans:
             y = round(sp['origin'][1], 1)
             if not any(y in c for c in clusters):
@@ -467,12 +619,20 @@ def _reconstruct_display(group, body):
         overlap = min(t1, b1) - max(t0, b0)
         if overlap <= 0.5 * min(t1 - t0, b1 - b0):
             return None
+        if not _bar_between(page_bars, max(t0, b0), min(t1, b1),
+                            max(clusters[0]), min(clusters[1])):
+            return None   # два яруса без черты — не дробь
         num = _render_math_run(sorted(top, key=lambda s: s['bbox'][0]), body)
         den = _render_math_run(sorted(bot, key=lambda s: s['bbox'][0]), body)
         return '\\frac{' + num + '}{' + den + '}'
     if len(clusters) != 3:
         return None
     num_ys, axis_ys, den_ys = clusters
+    frac_bars = sorted(
+        (b for b in page_bars
+         if max(num_ys) < b[2] < min(den_ys)), key=lambda b: b[0])
+    if not frac_bars:
+        return None
 
     def level(sp):
         y = round(sp['origin'][1], 1)
@@ -482,11 +642,31 @@ def _reconstruct_display(group, body):
             return 'axis'
         return 'den'
 
+    def owner_bar(sp):
+        cx = (sp['bbox'][0] + sp['bbox'][2]) / 2
+        for bi, (bx0, bx1, _) in enumerate(frac_bars):
+            if bx0 - 2.5 <= cx <= bx1 + 2.5:
+                return bi
+        return None
+
+    # раскладка: осевые спаны и дроби (по чертам) в порядке x
+    items = []   # (x, 'axis', span) | (x, 'frac', bi)
+    frac_parts = {bi: {'num': [], 'den': []} for bi in range(len(frac_bars))}
+    seen_frac = set()
+    for sp in sorted(spans, key=lambda s: s['bbox'][0]):
+        lvl = level(sp)
+        if lvl == 'axis':
+            items.append((sp['bbox'][0], 'axis', sp))
+            continue
+        bi = owner_bar(sp)
+        if bi is None:
+            return None   # ярусный спан вне всех черт — структура неясна
+        frac_parts[bi][lvl].append(sp)
+        if bi not in seen_frac:
+            seen_frac.add(bi)
+            items.append((frac_bars[bi][0], 'frac', bi))
     out = ''
-    col_top, col_bot = [], []
-    col_x1 = None
-    axis_buf = []   # подряд идущие осевые спаны рендерятся одним раном,
-                    # чтобы индексы («C» в «P_C=») распознались по кеглю
+    axis_buf = []
 
     def flush_axis():
         nonlocal out, axis_buf
@@ -495,40 +675,25 @@ def _reconstruct_display(group, body):
                 sorted(axis_buf, key=lambda s: s['bbox'][0]), body)
             axis_buf = []
 
-    def flush_col():
-        nonlocal out, col_top, col_bot, col_x1
-        if not col_top and not col_bot:
-            return True
-        if not col_top or not col_bot:
-            return False  # ярус без пары — структура не дробь
+    for _, kind, payload in sorted(items, key=lambda t: t[0]):
+        if kind == 'axis':
+            axis_buf.append(payload)
+            continue
+        parts = frac_parts[payload]
+        if not parts['num'] or not parts['den']:
+            return None   # черта без числителя или знаменателя
         flush_axis()
-        num = _render_math_run(sorted(col_top, key=lambda s: s['bbox'][0]), body)
-        den = _render_math_run(sorted(col_bot, key=lambda s: s['bbox'][0]), body)
+        num = _render_math_run(
+            sorted(parts['num'], key=lambda s: s['bbox'][0]), body)
+        den = _render_math_run(
+            sorted(parts['den'], key=lambda s: s['bbox'][0]), body)
         m = re.match(r'^(.*?)([,.;:]*)$', den)
         out += ' \\frac{' + num + '}{' + m.group(1) + '}' + m.group(2)
-        col_top, col_bot, col_x1 = [], [], None
-        return True
-
-    for sp in sorted(spans, key=lambda s: s['bbox'][0]):
-        lvl = level(sp)
-        if lvl == 'axis':
-            if not flush_col():
-                return None
-            axis_buf.append(sp)
-        else:
-            flush_axis()
-            if col_x1 is not None and sp['bbox'][0] > col_x1 + 2:
-                if not flush_col():
-                    return None
-            (col_top if lvl == 'num' else col_bot).append(sp)
-            col_x1 = max(col_x1 or sp['bbox'][2], sp['bbox'][2])
-    if not flush_col():
-        return None
     flush_axis()
     return re.sub(r'\s+', ' ', out).strip()
 
 
-def reassemble_display_math(lines, body):
+def reassemble_display_math(lines, body, bars):
     """Группы подряд идущих коротких чисто-математических строк — выключные
     формулы. Успешная сборка → одна строка с готовым LaTeX; неуспешная —
     строки остаются и помечаются degraded (линеаризация будет честно видна)."""
@@ -536,6 +701,7 @@ def reassemble_display_math(lines, body):
         return lines
     column_w = max(l.bbox[2] for l in lines) - min(l.bbox[0] for l in lines)
     result = []
+    gid = 0
     i = 0
     while i < len(lines):
         j = i
@@ -544,16 +710,25 @@ def reassemble_display_math(lines, body):
             j += 1
         if j - i >= 2:
             group = lines[i:j]
-            latex = _reconstruct_display(group, body)
+            latex = _reconstruct_display(group, body,
+                                         bars.get(group[0].page_no, []))
             if latex is not None:
+                gb = (min(l.bbox[0] for l in group),
+                      min(l.bbox[1] for l in group),
+                      max(l.bbox[2] for l in group),
+                      max(l.bbox[3] for l in group))
                 frac = {'text': latex, 'font': 'Math-Converted',
-                        'size': body, 'origin': (0, group[0].bbox[1]),
-                        'flags': 0, 'converted': True}
-                result.append(Line([frac], group[0].bbox, group[0].page_no))
+                        'size': body, 'origin': (gb[0], gb[1]),
+                        'flags': 0, 'converted': True, 'bbox': gb}
+                result.append(Line([frac], gb, group[0].page_no))
             else:
+                # группа помечается общим id: если Rule D позже соберёт её
+                # дроби/корни от черты, флаг снимется (clear_resolved_degraded)
                 for l in group:
                     l.degraded = True
+                    l.degraded_gid = gid
                     result.append(l)
+                gid += 1
             i = j
         else:
             result.append(lines[i])
@@ -561,48 +736,166 @@ def reassemble_display_math(lines, body):
     return result
 
 
+def clear_resolved_degraded(lines, body):
+    """Снимает флаг degraded с групп выключных формул, чьи этажные структуры
+    Rule D собрал начисто. Остаток «числитель над знаменателем» (два
+    неконвертированных math-спана с перекрытием по X и разными базовыми
+    линиями) внутри группы означает, что дробь так и не собралась — флаг
+    остаётся честным."""
+    groups = {}
+    for l in lines:
+        if l.degraded and l.degraded_gid is not None:
+            groups.setdefault(l.degraded_gid, []).append(l)
+    for gid, gls in groups.items():
+        spans = [sp for l in gls for sp in l.spans
+                 if not sp.get('converted') and sp['text'].strip()
+                 and (is_math_span(sp) or sp['size'] < body * SMALL_RATIO)]
+        remnant = False
+        for a in range(len(spans)):
+            for b in range(a + 1, len(spans)):
+                sa, sb = spans[a], spans[b]
+                if abs(sa['origin'][1] - sb['origin'][1]) < 2:
+                    continue   # одна базовая линия — не этаж
+                ox = (min(sa['bbox'][2], sb['bbox'][2])
+                      - max(sa['bbox'][0], sb['bbox'][0]))
+                narrow = min(sa['bbox'][2] - sa['bbox'][0],
+                             sb['bbox'][2] - sb['bbox'][0])
+                if ox > 0.4 * max(narrow, 1e-6):
+                    remnant = True
+                    break
+            if remnant:
+                break
+        if not remnant:
+            for l in gls:
+                l.degraded = False
+    return lines
+
+
+def _find_vinculum_radical(page_lines, bx0, bx1, by):
+    """Радикал, чья черта — данный отрезок: спан с «√», примыкающий справа
+    к началу черты (x1 ≈ bx0) и телом ниже уровня черты. Возвращает
+    (line, span) или None. У ДРОБНОЙ черты со √ в знаменателе радикал
+    находится ГЛУБЖЕ под чертой и к её началу не примыкает."""
+    for l in page_lines:
+        if l.bbox[3] < by - 16 or l.bbox[1] > by + 16:
+            continue
+        for sp in l.spans:
+            if sp.get('converted') or '√' not in sp['text']:
+                continue
+            if (bx0 - 4 <= sp['bbox'][2] <= bx0 + 3
+                    and sp['bbox'][3] > by + 1):
+                return l, sp
+    return None
+
+
 def reassemble_intraline_fracs(lines, body, bars):
-    """Rule D: сборка дробей ОТ ЧЕРТЫ. Куски инлайн-дроби (скрипт-кегль в
-    строке текста) после посимвольной разрезки живут в одной или соседних
-    псевдостроках; без черты их не отличить от пар «степень+индекс» одного
-    токена (Q^{D}_{1}). Поэтому идём от каждой векторной черты страницы:
-    спаны целиком внутри её x-диапазона и на ≤14pt выше/ниже — числитель и
-    знаменатель. Подчёркивания ссылок (нет числителя), винкулум корня (нет
-    знаменателя) и линейки таблиц (нет math-спанов) отсеиваются сами."""
+    """Rule D: сборка дробей и радикандов ОТ ЧЕРТЫ. Куски инлайн-дроби
+    (скрипт-кегль в строке текста) после посимвольной разрезки живут в
+    одной или соседних псевдостроках; без черты их не отличить от пар
+    «степень+индекс» одного токена (Q^{D}_{1}). Идём от каждой векторной
+    черты страницы (уже — раньше: вложенные структуры собираются первыми):
+    черта с примыкающим радикалом — винкулум → \\sqrt{радиканд};
+    иначе спаны внутри x-диапазона выше/ниже — числитель и знаменатель.
+    Подчёркивания ссылок (нет числителя) и линейки таблиц (нет math-спанов)
+    отсеиваются сами."""
     by_page = {}
     for l in lines:
         by_page.setdefault(l.page_no, []).append(l)
 
     for page_no, page_lines in by_page.items():
-        for bx0, bx1, by in bars.get(page_no, []):
+        page_bars = sorted(bars.get(page_no, []),
+                           key=lambda b: b[1] - b[0])   # вложенные — первыми
+        for bx0, bx1, by in page_bars:
             if bx1 - bx0 > 200 or bx1 - bx0 < 4:
                 continue   # линейки страниц/таблиц и точечный мусор
+
+            # --- Винкулум корня: √ примыкает к началу черты ---------------
+            rad = _find_vinculum_radical(page_lines, bx0, bx1, by)
+            if rad is not None:
+                rl, rsp = rad
+                rad_y = rsp['origin'][1]
+                radicand = []   # (line, span) между чертой и базовой линией
+                for l in page_lines:
+                    if l.bbox[3] < by - 16 or l.bbox[1] > by + 20:
+                        continue
+                    for sp in list(l.spans):
+                        if sp is rsp or sp.get('converted') \
+                                or not sp['text'].strip():
+                            continue
+                        # от черты вниз до базовой линии радикала: сама
+                        # база + степени внутри радиканда (K²+L²)
+                        if not (by < sp['origin'][1] < rad_y + 3.5):
+                            continue
+                        sx0, sx1 = sp['bbox'][0], sp['bbox'][2]
+                        if sx0 >= bx0 - 2 and sx1 <= bx1 + 2.5:
+                            radicand.append((l, sp))
+                        elif sx0 < bx1 - 1 < sx1 and sp.get('chars'):
+                            # радиканд кончается внутри спана — режем по x
+                            left, right = _split_span_at_x(sp, bx1 + 1)
+                            if left is not None and right is not None:
+                                idx = l.spans.index(sp)
+                                l.spans[idx:idx + 1] = [left, right]
+                                radicand.append((l, left))
+                if not radicand:
+                    continue
+                inner = _render_math_run(
+                    [sp for _, sp in
+                     sorted(radicand, key=lambda t: t[1]['bbox'][0])], body)
+                if not inner.strip():
+                    continue
+                conv = {'text': '\\sqrt{' + inner.strip() + '}',
+                        'font': 'Math-Converted', 'size': body,
+                        'origin': (rsp['bbox'][0], rad_y),
+                        'flags': 0, 'converted': True,
+                        'bbox': (rsp['bbox'][0],
+                                 min(sp['bbox'][1] for _, sp in radicand),
+                                 bx1,
+                                 max(sp['bbox'][3] for _, sp in radicand))}
+                consumed = {id(rsp)} | {id(sp) for _, sp in radicand}
+                for l in set([rl] + [l for l, _ in radicand]):
+                    l.spans = [sp for sp in l.spans
+                               if id(sp) not in consumed]
+                rl.spans = sorted(rl.spans + [conv],
+                                  key=lambda s: s['bbox'][0])
+                continue
+
+            # --- Дробная черта ---------------------------------------------
             num, den = [], []   # (line, span)
             for l in page_lines:
                 if l.bbox[3] < by - 20 or l.bbox[1] > by + 20:
                     continue
                 for sp in l.spans:
-                    if sp.get('converted') or not sp['text'].strip():
+                    if not sp['text'].strip():
                         continue
-                    # ярус дроби — math-шрифт или скрипт-кегль; полноразмерный
-                    # ТЕКСТ (маркер варианта «1)» со следующей строки) — нет
-                    if not (is_math_span(sp)
+                    # ярус дроби — math-шрифт, скрипт-кегль или уже собранное
+                    # подвыражение (\sqrt{…}); полноразмерный ТЕКСТ (маркер
+                    # варианта «1)» со следующей строки) — нет
+                    if not (is_math_span(sp) or sp.get('converted')
                             or sp['size'] < body * SMALL_RATIO):
                         continue
                     sx0, sx1 = sp['bbox'][0], sp['bbox'][2]
-                    if sx0 < bx0 - 2.5 or sx1 > bx1 + 2.5:
+                    if sx0 < bx0 - 3 or sx1 > bx1 + 2.5:
                         continue
                     y = sp['origin'][1]
+                    if sp.get('converted'):
+                        # собранное подвыражение (\sqrt{…}, \frac) высокое,
+                        # его рамка перекрывает черту — ярус определяем по
+                        # БАЗОВОЙ линии (широкое окно; строгий x-охват черты
+                        # уже не пустил чужие спаны)
+                        if by - 2.2 * body < y < by:
+                            num.append((l, sp))
+                        elif by < y < by + 2.2 * body:
+                            den.append((l, sp))
+                        continue
                     if by - 14 < y < by:
                         num.append((l, sp))
                     elif by < y < by + 14:
                         den.append((l, sp))
             if not num or not den:
                 continue
-            if not any(is_math_span(sp) for _, sp in num + den):
+            if not any(is_math_span(sp) or sp.get('converted')
+                       for _, sp in num + den):
                 continue   # числа в ячейках таблицы — не дробь
-            if any('√' in sp['text'] for _, sp in num + den):
-                continue   # черта — винкулум корня, не дробь
             num_txt = _render_math_run(
                 [sp for _, sp in sorted(num, key=lambda t: t[1]['bbox'][0])], body)
             den_txt = _render_math_run(
@@ -621,21 +914,34 @@ def reassemble_intraline_fracs(lines, body, bars):
                 l.spans = [sp for sp in l.spans if id(sp) not in consumed]
             host_line.spans = sorted(host_line.spans + [frac],
                                      key=lambda s: s['bbox'][0])
-    # строки, из которых дробь забрала все спаны, выбрасываем
+    # строки, из которых дробь/корень забрали все спаны, выбрасываем
     return [l for l in lines if l.spans]
 
 
-def reassemble_fractions(lines, body):
+def reassemble_fractions(lines, body, bars):
     """Три строгих паттерна этажной дроби; остальное — линеаризуется с флагом.
 
     Rule C: строка перед числителем кончается на «=», после — начинается
             маленьким math-префиксом (знаменатель): «80 = \\frac{100}{1+r}».
-    Rule A: два подряд чисто-математических маленьких ряда, стоящих друг под
+    Rule A: две подряд чисто-математические маленькие строки друг под
             другом (перекрытие по X) — числитель над знаменателем.
     Rule B: маленький math-хвост строки + следующая чисто-математическая
             маленькая строка под ним.
-    Защита от ложных склеек: обе части не короче 3 символов (одинокая «1» —
-    это уехавший индекс, не числитель)."""
+    Каждый паттерн подтверждается ЧЕРТОЙ между ярусами в векторной графике
+    (кусочные функции — те же два ряда, но без черты). Защита от ложных
+    склеек: обе части не короче 3 символов (одинокая «1» — уехавший индекс)."""
+
+    def has_bar(top_line, bot_spans, page_no):
+        b0 = min(sp['bbox'][0] for sp in bot_spans)
+        b1 = max(sp['bbox'][2] for sp in bot_spans)
+        x0 = max(top_line.bbox[0], b0)
+        x1 = min(top_line.bbox[2], b1)
+        if x1 <= x0:
+            return False
+        y_top = max(sp['origin'][1] for sp in top_line.spans)
+        y_bot = min(sp['origin'][1] for sp in bot_spans)
+        return _bar_between(bars.get(page_no, []), x0, x1, y_top, y_bot)
+
     result = []
     i = 0
     while i < len(lines):
@@ -648,14 +954,18 @@ def reassemble_fractions(lines, body):
             if (result and nxt is not None
                     and _render_math_run(result[-1].spans, body).rstrip().endswith('=')
                     and nxt.spans and is_math_span(nxt.spans[0])
-                    and _is_small(nxt.spans[0], body)):
+                    and _is_small(nxt.spans[0], body)
+                    and has_bar(line, [sp for sp in nxt.spans
+                                       if is_math_span(sp)
+                                       and _is_small(sp, body)],
+                                line.page_no)):
                 den_spans = []
                 rest = list(nxt.spans)
                 while rest and is_math_span(rest[0]) and _is_small(rest[0], body):
                     den_spans.append(rest.pop(0))
                 frac = _frac_span(_render_math_run(line.spans, body),
                                   _render_math_run(den_spans, body),
-                                  body, line.bbox[1])
+                                  body, line.bbox[1], bbox=line.bbox)
                 result[-1].spans.append(frac)
                 if rest:
                     nxt.spans = rest
@@ -665,10 +975,11 @@ def reassemble_fractions(lines, body):
             # Rule A: две маленькие math-строки друг под другом
             if (nxt is not None and _pure_small_math(nxt, body)
                     and len(num_txt) >= 3 and len(nxt.plain) >= 3
-                    and _x_overlap(line, nxt) > 0.5):
+                    and _x_overlap(line, nxt) > 0.5
+                    and has_bar(line, nxt.spans, line.page_no)):
                 frac = _frac_span(_render_math_run(line.spans, body),
                                   _render_math_run(nxt.spans, body),
-                                  body, line.bbox[1])
+                                  body, line.bbox[1], bbox=line.bbox)
                 merged = Line([frac], line.bbox, line.page_no)
                 result.append(merged)
                 i += 2
@@ -686,10 +997,11 @@ def reassemble_fractions(lines, body):
             while head and is_math_span(head[-1]) and _is_small(head[-1], body):
                 tail.insert(0, head.pop(0 - 1))
             tail_txt = ''.join(sp['text'] for sp in tail).strip()
-            if head and len(tail_txt) >= 3:
+            if (head and len(tail_txt) >= 3
+                    and has_bar(line, nxt.spans, line.page_no)):
                 frac = _frac_span(_render_math_run(tail, body),
                                   _render_math_run(nxt.spans, body),
-                                  body, line.bbox[1])
+                                  body, line.bbox[1], bbox=line.bbox)
                 line.spans = head + [frac]
                 result.append(line)
                 i += 2
@@ -730,6 +1042,7 @@ def _finish_math(run, issues=None):
     txt = re.sub(r'=\s*=', '=', txt)
     txt = re.sub(r'([-−])\s+[-−]', r'\1', txt)
     txt = re.sub(r'\+\s+\+', '+', txt)
+    txt = re.sub(r'\\cdot\s+\\cdot\s+', r'\\cdot ', txt)
     txt = WS_RE.sub(' ', txt)
     fixed = DOUBLE_SCRIPT_RE.sub(r'\1\2 {}', txt)
     if fixed != txt:
@@ -753,6 +1066,7 @@ def render_paragraph(line_list, body, indent_breaks=False, left_margin=None,
     math_run = ''     # копящаяся формула
     base_size = base_y = None
     prev_line_hyphen = False
+    prev_line_compound = False  # разрыв в дефисе композита: клеим, дефис жив
     glue_next = False  # после склейки переноса пробел не вставлять
 
     def flush_math():
@@ -775,8 +1089,9 @@ def render_paragraph(line_list, body, indent_breaks=False, left_margin=None,
                 flush_math()
                 pieces.append('\n\n')
                 prev_line_hyphen = False
-            elif prev_line_hyphen:
-                glue_next = True  # перенос слова: склейка без пробела
+            elif prev_line_hyphen or prev_line_compound:
+                glue_next = True  # перенос слова/композита: без пробела
+                prev_line_compound = False
             else:
                 # межстрочный стык: пробел (в формуле — внутри рана)
                 if math_run:
@@ -845,11 +1160,24 @@ def render_paragraph(line_list, body, indent_breaks=False, left_margin=None,
         prev_line_hyphen = bool(HYPHEN_END_RE.search(last_txt.rstrip())
                                 and CYR_LOWER_RE.match(nxt_first.lstrip()))
         if prev_line_hyphen:
-            # срезаем дефис у последнего фрагмента
-            if math_run:
-                math_run = math_run.rstrip()[:-1]
-            elif pieces:
-                pieces[-1] = pieces[-1].rstrip()[:-1]
+            # Составное слово, разорванное В ДЕФИСЕ («причинно- ␊
+            # следственной»), от словопереноса текстом не отличить —
+            # корпус закрыт, известные композиты перечислены явно
+            # (полный скан 806 склеек 2016–2025).
+            left = last_txt.rstrip().split()[-1].rstrip('-').lower() \
+                if last_txt.rstrip().split() else ''
+            right = nxt_first.lstrip().split()[0].lower() \
+                .strip('.,;:!?»)') if nxt_first.lstrip().split() else ''
+            if (left, right) in COMPOUND_JOINS:
+                # дефис настоящий: клеим без пробела, дефис остаётся
+                prev_line_hyphen = False
+                prev_line_compound = True
+            else:
+                # словоперенос: срезаем дефис у последнего фрагмента
+                if math_run:
+                    math_run = math_run.rstrip()[:-1]
+                elif pieces:
+                    pieces[-1] = pieces[-1].rstrip()[:-1]
 
     flush_math()
     text = ''.join(pieces)
@@ -874,22 +1202,28 @@ def render_plain_latex(line_list, body):
 # (P_e, P_{e}, Q^2, Q^{2}), либо коэффициент+буквы (2M). Составные выражения
 # (5 \cdot 2, 1+r_{12}, w^{2}+20) атомом не являются — туда \frac не лезем.
 ATOM = r'[A-Za-z0-9]+(?:[_^]\{?[A-Za-z0-9]+\}?)?'
+# Знаменатель строже: ЧИСТО цифры или ЧИСТО буквы (с опц. скриптом) —
+# смешанный «4X» в «5/4X» это (5/4)·X, а не 5/(4X) (вычитка 2018 №18).
+DEN_ATOM = r'(?:\d+|[A-Za-z]+)(?:[_^]\{?[A-Za-z0-9]+\}?)?'
 
 # Простая слэш-дробь ВНУТРИ математики: «атом / атом» (Y=2M/P -> \frac{2M}{P},
 # P_e/40 -> \frac{P_e}{40}, Q^2/2 -> \frac{Q^{2}}{2}). Границы через lookaround,
 # а не \b — не должны затрагивать соседние скобки/\frac{...} (\frac{100}{...},
 # 10/(5 \cdot 2), (8w-w^{2}+20)/(10-w) осознанно НЕ трогаем — не «простые»).
-FRAC_RE = re.compile(r'(?<![A-Za-z0-9\\{}_^])(' + ATOM + r')\s*/\s*(' + ATOM
-                     + r')(?![A-Za-z0-9{}_^])')
+FRAC_RE = re.compile(r'(?<![A-Za-z0-9\\{}_^])(' + ATOM + r')\s*/\s*('
+                     + DEN_ATOM + r')(?![A-Za-z0-9{}_^])')
 # Дробь в скобках со степенью снаружи: (A/B)^N -> \left(\frac{A}{B}\right)^{N}
 # — обычные скобки малы для \frac внутри, поэтому вместе с дробью растут в
 # \left(...\right). Применяется ДО общего FRAC_RE (иначе останется голое ^N
 # при обычных скобках).
 PAREN_FRAC_POW_RE = re.compile(
-    r'\(\s*(' + ATOM + r')\s*/\s*(' + ATOM + r')\s*\)\s*\^\s*\{?([A-Za-z0-9]+)\}?')
+    r'\(\s*(' + ATOM + r')\s*/\s*(' + DEN_ATOM
+    + r')\s*\)\s*\^\s*\{?([A-Za-z0-9]+)\}?')
 # Два и более дефиса/коротких тире подряд (--, ––) -> одно длинное тире.
 # Настоящий em dash (—) не входит в класс — не трогаем уже верное тире.
 DASH_RUN_RE = re.compile(r'[-‐‑‒–]{2,}')
+# Пробел внутри URL от переноса строки: «worldbank. org/…» (2018 №7).
+URL_SPACE_RE = re.compile(r'([a-z0-9])\.\s+(ru|org|com|net|edu|gov|info)\b')
 # Сегмент математики: от неэкранированного $ до парного ему; \$ внутри
 # (валютный доллар «$\$$») съедается как экранированная пара.
 MATH_SEGMENT_RE = re.compile(r'((?<!\\)\$(?:\\.|[^$\\])*\$)')
@@ -899,11 +1233,12 @@ SQRT_RUN_RE = re.compile(r'\\sqrt\s+([A-Za-z]+|\d+)')
 # Индекс корня: маленькая цифра перед радикалом распознаётся кегельной
 # логикой как степень (^{4}\sqrt{KL}), а в вёрстке это корень 4-й степени.
 ROOT_INDEX_RE = re.compile(r'\^\{(\d+)\}\s*\\sqrt\{')
-# Цифра-«индекс» сразу после \frac{}{} — на деле потерянная степень
-# знаменателя: (1+r)² в PDF, «2» стоит между ярусами и метится как '_'
-# относительно оси. Настоящих нижних индексов у \frac конвейер не порождает.
+# «Индекс» сразу после \frac{}{} — на деле потерянный ВЕРХНИЙ индекс
+# знаменателя: (1+r)² или P₁ˢ в PDF, скрипт стоит между ярусами и метится
+# как '_' относительно оси. Настоящих индексов у \frac конвейер не порождает.
 FRAC_TRAIL_SUB_RE = re.compile(
-    r'(\\frac\{(?:[^{}]|\{[^{}]*\})*\}\{(?:[^{}]|\{[^{}]*\})*)\}\s*_\{(\d{1,2})\}')
+    r'(\\frac\{(?:[^{}]|\{[^{}]*\})*\}\{(?:[^{}]|\{[^{}]*\})*)\}\s*'
+    r'_\{([A-Za-z0-9]{1,2})\}')
 
 NUMBER_RE = re.compile(r'^-?\d+(?:[.,]\d+)?(?:/\d+)?$')
 VAR_EQ_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_{}\\]*\s*=\s*(.+)$')
@@ -980,7 +1315,11 @@ def postprocess_text(text):
             inner = _escape_unmatched_braces(inner)
             out.append('$' + inner + '$')
         else:
-            out.append(DASH_RUN_RE.sub('—', part))
+            part = DASH_RUN_RE.sub('—', part)
+            part = fix_homoglyphs(part)
+            # пробел внутри URL от переноса строки: «worldbank. org»
+            part = URL_SPACE_RE.sub(r'\1.\2', part)
+            out.append(part)
     return ''.join(out)
 
 
@@ -1033,9 +1372,12 @@ def parse_document(doc, grade, errors, profile):
     next_flat_number = 1
     lines, body = extract_lines(doc)
     bars = extract_bars(doc)
-    lines = reassemble_display_math(lines, body)   # выключные формулы
-    lines = reassemble_fractions(lines, body)      # строчные этажные дроби
-    lines = reassemble_intraline_fracs(lines, body, bars)  # дроби в строке
+    figures = extract_figures(doc)
+    lines, fig_pages = drop_figure_labels(lines, figures)  # подписи графиков
+    lines = reassemble_display_math(lines, body, bars)  # выключные формулы
+    lines = reassemble_fractions(lines, body, bars)  # строчные этажные дроби
+    lines = reassemble_intraline_fracs(lines, body, bars)  # дроби и корни
+    lines = clear_resolved_degraded(lines, body)  # снять плашку с собранных
     left_margin = min((l.bbox[0] for l in lines
                        if l.spans and not is_math_span(l.spans[0])), default=0)
 
@@ -1065,6 +1407,14 @@ def parse_document(doc, grade, errors, profile):
                              'qtype': cur['qtype'], 'reason': reason,
                              'raw': raw})
         else:
+            q_pages = {l.page_no for key in
+                       ('statement', 'options_flat', 'solution')
+                       for l in _flat(buffers, key)}
+            if q_pages & fig_pages:
+                note = ('в оригинале рисунок — подписи осей/кривых из '
+                        'текста исключены, сверить с PDF')
+                q['notes'] = (q['notes'] + '; ' + note
+                              if q.get('notes') else note)
             questions.append(q)
         cur = None
 

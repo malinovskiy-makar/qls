@@ -242,6 +242,13 @@ class Command(BaseCommand):
         note_bits = []
         if q.get('points'):
             note_bits.append(f'{q["points"]} б. за верный ответ')
+        # У общего вопроса номер может расходиться по классам (2022: 3.4 у
+        # 10-го = 3.5 у 11-го) — problem_number хранит номер младшего класса,
+        # расхождение фиксируем в note.
+        numbers = q.get('numbers') or {}
+        if len(set(numbers.values())) > 1:
+            note_bits.append('номера по классам: ' + ', '.join(
+                f'{g} кл. — {n}' for g, n in sorted(numbers.items())))
         if q.get('unit'):
             note_bits.append(f'единица ответа: {q["unit"]}')
         if len(q['grades']) > 1:
