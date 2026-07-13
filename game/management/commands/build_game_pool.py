@@ -185,6 +185,38 @@ HAS_TABLE_RE = re.compile(r'\\begin\{array\}')
 WS_RE = re.compile(r'\s+')
 
 
+def dedup_norm(s):
+    """Нормализация текста для ключа схлопывания повторов в пуле: регистр,
+    ё→е, пробелы схлопнуты. Не трогает контентные таблицы — только сборку
+    пула (см. Command.handle)."""
+    return WS_RE.sub(' ', (s or '').strip().lower().replace('ё', 'е'))
+
+
+def pool_dedup_key(qtype, question, options, correct_value):
+    """Ключ повтора: нормализованный текст + нормализованные варианты В
+    ИСХОДНОМ ПОРЯДКЕ (не сортируем — переставленные варианты это другой
+    вопрос для игрока). Тип вопроса — тоже часть ключа (не смешиваем
+    boolean/single с случайно совпавшими вариантами «Верно»/«Неверно»).
+    numeric: вариантов нет, поэтому в ключ обязательно входит correct_value —
+    иначе одинаковый текст с разными числовыми ответами (варианты одной и
+    той же задачи по годам) схлопнулся бы в один вопрос с одним ответом."""
+    key = (qtype, dedup_norm(question), tuple(dedup_norm(o) for o in options))
+    if qtype == 'numeric':
+        key = key + (dedup_norm(correct_value),)
+    return key
+
+
+def pool_dedup_wins(candidate, incumbent):
+    """True, если candidate должен вытеснить incumbent при совпадении ключа:
+    более свежий year побеждает; при равенстве (в т.ч. оба без year) —
+    меньший problem_id."""
+    cy = candidate.year or -1
+    iy = incumbent.year or -1
+    if cy != iy:
+        return cy > iy
+    return candidate.problem_id < incumbent.problem_id
+
+
 def normalize_label(s):
     """Нормализация метки/ответа — 1-в-1 как в student.views.auto_check_submission."""
     if not s:
@@ -433,9 +465,10 @@ class Command(BaseCommand):
         total = qs.count()
         self.stdout.write(f'Тестов-кандидатов: {total}')
 
-        built = []
+        pool_by_key = {}      # ключ схлопывания -> (GameQuestion, raw_question)
         rejected = {}
         boolean_fallback = 0  # данетки с нестандартными вариантами, ушли в single
+        duplicate_in_pool = 0  # схлопнуто повторов на сборке (в базе не трогаем)
         debris_fixed = []    # (problem_id, текст до чистки) — аудит Бага 2
         tall_formula = []    # (problem_id, вопрос) — аудит Бага 1
 
@@ -470,10 +503,6 @@ class Command(BaseCommand):
                 continue
 
             raw_question = clean_text(p.statement)
-            if strip_label_debris(raw_question) != raw_question:
-                debris_fixed.append((p.id, raw_question[:60]))
-            if ENV_NAME_RE.search(question + ' ' + ' '.join(opts)):
-                tall_formula.append((p.id, question[:60]))
             topic_names = [t.name for t in p.topics.all()
                            if t.name in canonical_set and t.name != 'Тест']
             # Метаданные олимпиады: первая привязка к источнику, где хоть
@@ -487,7 +516,7 @@ class Command(BaseCommand):
                     if m:
                         unit = m.group(1).strip()
                     break
-            built.append(GameQuestion(
+            gq = GameQuestion(
                 problem=p,
                 part=None,
                 question_type=qtype,
@@ -503,14 +532,37 @@ class Command(BaseCommand):
                 year=year,
                 grade=grade,
                 unit=unit if qtype == 'numeric' else '',
-            ))
+            )
+
+            # Схлопывание повторов на сборке пула (контент-таблицы Problem/
+            # ProblemPart не трогаем — только какие GameQuestion попадут в
+            # итоговый кэш). Совпадение ключа → оставляем более свежий year,
+            # при равенстве — меньший problem_id; проигравший считается в
+            # duplicate_in_pool и не попадает в built.
+            key = pool_dedup_key(qtype, question, opts, correct_value)
+            incumbent = pool_by_key.get(key)
+            if incumbent is not None:
+                duplicate_in_pool += 1
+                if pool_dedup_wins(gq, incumbent[0]):
+                    pool_by_key[key] = (gq, raw_question)
+                continue
+            pool_by_key[key] = (gq, raw_question)
+
+        built = []
+        for gq, raw_question in pool_by_key.values():
+            if strip_label_debris(raw_question) != raw_question:
+                debris_fixed.append((gq.problem_id, raw_question[:60]))
+            if ENV_NAME_RE.search(gq.question + ' ' + ' '.join(gq.options)):
+                tall_formula.append((gq.problem_id, gq.question[:60]))
+            built.append(gq)
 
         with transaction.atomic():
             deleted, _ = GameQuestion.objects.all().delete()
             GameQuestion.objects.bulk_create(built, batch_size=500)
 
         self.stdout.write(self.style.SUCCESS(
-            f'Пул пересобран: {len(built)} вопросов (было {deleted}).'))
+            f'Пул пересобран: {len(built)} вопросов (было {deleted}), '
+            f'схлопнуто повторов: {duplicate_in_pool}.'))
         by_type = {}
         for g in built:
             key = (g.question_type, g.lang)

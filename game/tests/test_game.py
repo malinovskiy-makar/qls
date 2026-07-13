@@ -571,6 +571,73 @@ class BuildPoolMetadataTests(TestCase):
         self.assertEqual(GameQuestion.objects.get(problem=p).unit, '')
 
 
+class PoolDedupTests(TestCase):
+    """Схлопывание повторов на сборке пула: одинаковый текст+варианты — один
+    вопрос в пуле (побеждает более свежий year), в базе ничего не меняется."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.source = Source.objects.create(
+            name='ВсОШ — региональный этап', kind='олимпиада')
+
+    def _run(self):
+        from django.core.management import call_command
+        from io import StringIO
+        call_command('build_game_pool', stdout=StringIO())
+
+    def test_same_text_and_options_collapse_newer_year_wins(self):
+        old = make_test_problem(answer='A')
+        new = make_test_problem(answer='A')
+        SourceReference.objects.create(
+            problem=old, source=self.source, year=2018, grade='9')
+        SourceReference.objects.create(
+            problem=new, source=self.source, year=2022, grade='9')
+        self._run()
+        self.assertEqual(
+            GameQuestion.objects.filter(
+                problem__in=[old, new]).count(), 1)
+        survivor = GameQuestion.objects.get(problem__in=[old, new])
+        self.assertEqual(survivor.problem_id, new.id)
+        self.assertEqual(survivor.year, 2022)
+        # в базе обе задачи остались нетронутыми — дедуп только в пуле
+        self.assertTrue(Problem.objects.filter(id=old.id).exists())
+        self.assertTrue(Problem.objects.filter(id=new.id).exists())
+
+    def test_tie_on_year_smaller_id_wins(self):
+        a = make_test_problem(answer='A')
+        b = make_test_problem(answer='A')
+        SourceReference.objects.create(
+            problem=a, source=self.source, year=2020, grade='9')
+        SourceReference.objects.create(
+            problem=b, source=self.source, year=2020, grade='10')
+        self._run()
+        survivor = GameQuestion.objects.get(problem__in=[a, b])
+        self.assertEqual(survivor.problem_id, min(a.id, b.id))
+
+    def test_numeric_same_text_different_answer_both_kept(self):
+        # одинаковое условие, но разный числовой ответ (варианты одной задачи
+        # по годам) — это РАЗНЫЕ вопросы, оба должны остаться в пуле
+        p1 = make_numeric_problem(statement='Найдите равновесную цену.',
+                                  answer='50')
+        p2 = make_numeric_problem(statement='Найдите равновесную цену.',
+                                  answer='64')
+        self._run()
+        self.assertEqual(
+            GameQuestion.objects.filter(problem__in=[p1, p2]).count(), 2)
+        values = set(GameQuestion.objects.filter(problem__in=[p1, p2])
+                     .values_list('correct_value', flat=True))
+        self.assertEqual(values, {'50', '64'})
+
+    def test_different_options_not_collapsed(self):
+        p1 = make_test_problem(answer='A',
+                               options=('Фирмы', 'Страны', 'Планеты', 'Климат'))
+        p2 = make_test_problem(answer='A',
+                               options=('Рынки', 'Банки', 'Заводы', 'Домохозяйства'))
+        self._run()
+        self.assertEqual(
+            GameQuestion.objects.filter(problem__in=[p1, p2]).count(), 2)
+
+
 class ParseExactNumberTests(TestCase):
     """Точный разбор числового ответа (fractions.Fraction)."""
 
