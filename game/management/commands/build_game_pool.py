@@ -83,6 +83,10 @@ BAD_CONTENT_RE = re.compile(
     r'|Scoring Guide|Page \d+ of'
     r'|\|\s*\|'          # двойная вертикальная черта — псевдотаблица
 )
+# Корректный блок реконструированной таблицы. Его \hline и рамки {|l|c|}
+# легитимны — перед общими фильтрами такие блоки вырезаем, чтобы они не
+# путались с псевдотаблицами/битой вёрсткой из других источников.
+GOOD_ARRAY_RE = re.compile(r'\$\$\\begin\{array\}.*?\\end\{array\}\$\$', re.S)
 
 # Математические окружения, которые KaTeX рендерит честно (кусочные функции,
 # матрицы, выровненные системы) — их не бракуем, а оставляем display-формулой.
@@ -163,13 +167,20 @@ def strip_label_debris(text):
 SUSPICIOUS_START_RE = re.compile(r'^[)\.\-–—:,;]')
 SUSPICIOUS_END_RE = re.compile(r'[(\-–—]\s*$')
 
-# Вопрос ссылается на рисунок/таблицу/график, которых в игре не будет.
+# Вопрос ссылается на РИСУНОК/график — его в игре не показать, брак.
 NEEDS_FIGURE_RE = re.compile(
-    r'рисунк|диаграмм|на графике|графике ниже|в таблице|таблиц[ае]'
-    r'|figure|in the table|table below|graph below|graph above|shown below'
+    r'рисунк|диаграмм|на графике|графике ниже|схеме ниже'
+    r'|figure|graph below|graph above|shown below'
     r'|на основе графика|по графику',
     re.IGNORECASE,
 )
+# Ссылка на ТАБЛИЦУ. Если таблица реконструирована (\begin{array} в тексте) —
+# ссылка удовлетворена, вопрос берём; иначе (таблица потеряна) — брак.
+NEEDS_TABLE_RE = re.compile(
+    r'в таблице|в таблице ниже|таблиц[ае]|in the table|table below',
+    re.IGNORECASE,
+)
+HAS_TABLE_RE = re.compile(r'\\begin\{array\}')
 
 WS_RE = re.compile(r'\s+')
 
@@ -215,13 +226,26 @@ def heuristic_difficulty(problem, question):
 
 def content_reason(all_text):
     """Общие проверки качества текста. Возвращает причину брака или None."""
-    if BAD_CONTENT_RE.search(all_text) or has_bad_environment(all_text):
+    # корректные array-блоки вырезаем: их \hline/рамки легитимны и не должны
+    # бить по фильтрам псевдотаблиц (чужой мусор вне такого блока — ловится)
+    core = GOOD_ARRAY_RE.sub(' [array] ', all_text)
+    if BAD_CONTENT_RE.search(core) or has_bad_environment(core):
         return 'битый LaTeX / вёрстка'
     if NEEDS_FIGURE_RE.search(all_text):
-        return 'нужен рисунок/таблица'
+        return 'нужен рисунок'
+    # ссылка на таблицу: пускаем, только если таблица реконструирована
+    if NEEDS_TABLE_RE.search(all_text) and not HAS_TABLE_RE.search(all_text):
+        return 'нужна таблица'
     if not dollars_balanced(all_text):
         return 'непарные $'
     return None
+
+
+def reading_length(text):
+    """Длина условия для лимита: markup таблицы-массива (GOOD_ARRAY_RE)
+    раздувал бы счёт, хотя таблица рендерится компактно — считаем как
+    плейсхолдер фиксированного веса."""
+    return len(GOOD_ARRAY_RE.sub('[таблица]', text))
 
 
 def clean_question(problem, max_len=MAX_QUESTION_LEN):
@@ -230,7 +254,7 @@ def clean_question(problem, max_len=MAX_QUESTION_LEN):
     question = normalize_formulas(question)
     if len(question) < MIN_QUESTION_LEN:
         return None, 'условие слишком короткое'
-    if len(question) > max_len:
+    if reading_length(question) > max_len:
         return None, f'условие длиннее {max_len}'
     return question, None
 

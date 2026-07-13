@@ -85,7 +85,7 @@ class ExtractQuestionTests(TestCase):
     def test_figure_reference_rejected(self):
         p = make_test_problem(statement='Определите по графику ниже равновесную цену.')
         q, opts, correct, reason = extract_question(p)
-        self.assertEqual(reason, 'нужен рисунок/таблица')
+        self.assertEqual(reason, 'нужен рисунок')
 
     def test_broken_latex_rejected(self):
         p = make_test_problem(statement=r'Что тут: \begin{itemize} мусор?')
@@ -149,13 +149,32 @@ class ExtractQuestionTests(TestCase):
         q, opts, correct, reason = extract_question(p)
         self.assertEqual(reason, 'битый LaTeX / вёрстка')
 
-    def test_array_with_hline_table_rejected(self):
-        # \begin{array} + \hline — визуальная таблица, а не система уравнений
+    def test_array_table_allowed(self):
+        # \begin{array} + \hline — реконструированная таблица (KaTeX её
+        # рендерит): игра ТЕПЕРЬ такой вопрос берёт (структура сохранена)
         p = make_test_problem(
             statement=r'Данные: $$\begin{array}{|c|c|}\hline A & B \\\hline\end{array}$$ '
                       r'Что выбрать?')
         q, opts, correct, reason = extract_question(p)
+        self.assertIsNone(reason)
+
+    def test_stray_hline_without_array_rejected(self):
+        # \hline вне корректного array-блока — битая вёрстка, по-прежнему брак
+        p = make_test_problem(statement=r'Мусор \hline посреди текста. Что?')
+        q, opts, correct, reason = extract_question(p)
         self.assertEqual(reason, 'битый LaTeX / вёрстка')
+
+    def test_pseudo_table_double_bar_rejected(self):
+        # «| |» вне array — псевдотаблица из битого парсинга, брак
+        p = make_test_problem(statement='Ряд | | 5 | | 7 значений. Что верно?')
+        q, opts, correct, reason = extract_question(p)
+        self.assertEqual(reason, 'битый LaTeX / вёрстка')
+
+    def test_table_reference_without_table_rejected(self):
+        # ссылка «в таблице», но таблицы нет — брак
+        p = make_test_problem(statement='В таблице выше найдите максимум.')
+        q, opts, correct, reason = extract_question(p)
+        self.assertEqual(reason, 'нужна таблица')
 
     # ---- Баг 2: огрызки меток в начале/конце вопроса ----
 
@@ -448,12 +467,25 @@ class ExtractNumericTests(TestCase):
         self.assertIsNone(reason)
         self.assertEqual(value, '50')
 
+    def test_numeric_with_table_accepted(self):
+        # numeric-вопрос со ссылкой на таблицу И реконструированной таблицей:
+        # берём; разметка массива не раздувает лимит длины (reading_length)
+        arr = (r'$$\begin{array}{|l|c|}\hline \text{Годовой доход} & '
+               r'\text{Ставка} \\ \hline \text{до } 5 & 13 \\ \hline'
+               r'\text{свыше } 5 & 15 \\ \hline\end{array}$$')
+        p = make_numeric_problem(
+            statement='В таблице дана шкала налога. ' + arr
+                      + ' Сколько заплатит Тихон? ' + ('слово ' * 60))
+        q, value, reason = extract_numeric(p)
+        self.assertIsNone(reason)
+        self.assertIn(r'\begin{array}', q)
+
     def test_question_quality_rules_apply(self):
         # Общие фильтры качества (длина, рисунок) работают и для numeric —
         # но лимит длины мягче (700, не 300): Классика даёт 600 с на вопрос,
         # расчётные региональные задачи длиннее куцых тестовых вопросов.
         p = make_numeric_problem(statement='На основе графика найдите цену.')
-        self.assertEqual(extract_numeric(p)[2], 'нужен рисунок/таблица')
+        self.assertEqual(extract_numeric(p)[2], 'нужен рисунок')
         p = make_numeric_problem(statement='Найдите X. ' * 40)
         self.assertIsNone(extract_numeric(p)[2])
         p = make_numeric_problem(statement='Найдите X. ' * 70)

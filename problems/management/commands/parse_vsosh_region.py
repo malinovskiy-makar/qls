@@ -421,6 +421,266 @@ def drop_figure_labels(lines, figures):
     return kept, used_zones
 
 
+# ---------------------------------------------------------------------------
+# Реконструкция таблиц из геометрии PDF → $$\begin{array}...$$
+# ---------------------------------------------------------------------------
+# Класс дефекта: таблица (шкала НДФЛ, спрос/предложение, ряд цен по периодам)
+# размазана в строку текста. Детекция — по горизонтальным линейкам одинаковой
+# ширины/x-охвата (booktabs) + консистентности колонок; реконструкция — строки
+# по бандам между линейками, колонки по вертикальным линейкам или по якорям
+# (центры ячеек строки с максимумом ячеек). Формат — LaTeX-массив (см.
+# reports/vsosh_region/structure_audit.md, Фаза 1). Детектор синхронизирован
+# с manage.py audit_vsosh_structure.
+
+TBL_CYR = re.compile(r'[а-яёА-ЯЁ]{3,}')
+TBL_SECTION_RE = re.compile(r'^(Часть|Задание)\s+\d|Правильные ответы'
+                            r'|Региональн|Первый тур|олимпиад|Ответы, решения')
+TBL_ANSGRID_RE = re.compile(r'Образец|Бланк|Конкурс|заполнени'
+                            r'|(?:\d\.\d\.\s*){2,}\d\.\d\.')
+TBL_NUM_CELL = re.compile(r'^[-−]?\d')
+NUM_ONLY_RE = re.compile(r'^[-−]?\d+(?:[.,]\d+)?$')
+
+
+def _table_rules(page, y0, y1):
+    """Горизонтальные (90–490pt) и вертикальные линейки в зоне + x-охват."""
+    hr, vr, hx = [], [], []
+    for d in page.get_drawings():
+        for it in d['items']:
+            if it[0] == 'l':
+                p1, p2 = it[1], it[2]
+                if (abs(p1.y - p2.y) < 0.8 and 90 <= abs(p2.x - p1.x) <= 490
+                        and y0 - 5 < p1.y < y1 + 5):
+                    hr.append(p1.y)
+                    hx.append((min(p1.x, p2.x), max(p1.x, p2.x)))
+                elif (abs(p1.x - p2.x) < 0.8 and abs(p2.y - p1.y) > 10
+                      and y0 - 5 < min(p1.y, p2.y) < y1 + 5):
+                    vr.append(p1.x)
+            elif it[0] == 're':
+                r = it[1]
+                yc = (r.y0 + r.y1) / 2
+                if r.height < 2 and 90 <= r.width <= 490 and y0 - 5 < yc < y1 + 5:
+                    hr.append(yc)
+                    hx.append((r.x0, r.x1))
+                elif r.width < 2 and r.height > 10 and y0 - 5 < r.y0 < y1 + 5:
+                    vr.append(r.x0)
+    xr = (min(x[0] for x in hx), max(x[1] for x in hx)) if hx else None
+    return sorted(hr), sorted(set(round(x, 1) for x in vr)), xr
+
+
+def _table_span_rows(page, y0, y1, xr):
+    """Спаны зоны (посимвольно разрезанные), сгруппированные в визуальные
+    строки по базовой линии; клип по x-охвату рамки (боковая проза вопроса
+    рядом с таблицей отсекается)."""
+    spans = []
+    for block in page.get_text('rawdict')['blocks']:
+        for line in block.get('lines', []):
+            for rsp in line['spans']:
+                for sp in _split_span_by_baseline(rsp):
+                    if not sp['text'].strip():
+                        continue
+                    if not (y0 - 2 < sp['origin'][1] < y1 + 2):
+                        continue
+                    cx = (sp['bbox'][0] + sp['bbox'][2]) / 2
+                    if xr and not (xr[0] - 3 <= cx <= xr[1] + 3):
+                        continue
+                    spans.append(sp)
+    return spans
+
+
+def _band_rows(spans, hr):
+    """Логические строки: банды между горизонт. линейками; внутри банды —
+    кластеры по базовой линии (booktabs держит несколько строк в одном банде)."""
+    rows = []
+    for i in range(len(hr) - 1):
+        band = [s for s in spans if hr[i] - 0.5 < s['origin'][1] < hr[i + 1] + 0.5]
+        if not band:
+            continue
+        ys = sorted(set(round(s['origin'][1], 1) for s in band))
+        clusters = []
+        for y in ys:
+            if clusters and y - clusters[-1][-1] <= 10:
+                clusters[-1].append(y)
+            else:
+                clusters.append([y])
+        for cl in clusters:
+            rows.append([s for s in band if round(s['origin'][1], 1) in cl])
+    return rows
+
+
+def _merge_row_cells(row):
+    """Спаны строки → ячейки (слияние соседних при зазоре < 14pt)."""
+    sp = sorted(row, key=lambda s: s['bbox'][0])
+    cells = []
+    for s in sp:
+        if cells and s['bbox'][0] - cells[-1][-1]['bbox'][2] < 14:
+            cells[-1].append(s)
+        else:
+            cells.append([s])
+    return cells
+
+
+def _column_anchors(rows, vr):
+    """Опорные x колонок: середины между вертикальными линейками (полная
+    рамка) либо центры ячеек строки с максимумом ячеек (booktabs)."""
+    if len(vr) >= 3:
+        v = sorted(vr)
+        return [(v[i] + v[i + 1]) / 2 for i in range(len(v) - 1)]
+    best = max(rows, key=lambda r: len(_merge_row_cells(r)))
+    return [(c[0]['bbox'][0] + c[-1]['bbox'][2]) / 2
+            for c in _merge_row_cells(best)]
+
+
+def _render_table_cell(spans, body):
+    """Спаны ячейки → фрагмент LaTeX для массива: чистое число — голым,
+    математика — без $, текст — в \\text{…}."""
+    if not spans:
+        return ''
+    ln = Line(sorted(spans, key=lambda s: s['bbox'][0]), None, 0)
+    txt = render_paragraph([ln], body).strip()
+    if NUM_ONLY_RE.match(txt.replace('−', '-')):
+        return txt.replace('−', '-')
+    parts = re.split(r'(?<!\\)(\$(?:\\.|[^$\\])*\$)', txt)
+    out = []
+    for p in parts:
+        if p.startswith('$') and p.endswith('$') and len(p) >= 2:
+            out.append(p[1:-1])
+        elif p:
+            out.append('\\text{' + p.replace('%', '\\%') + '}')
+    return ''.join(out).strip()
+
+
+def reconstruct_table(page, y0, y1, body):
+    """Зона таблицы → строка `$$\\begin{array}…$$` или None, если геометрия
+    не складывается в таблицу (тогда вызывающий код оставляет текст как есть)."""
+    hr, vr, xr = _table_rules(page, y0, y1)
+    if len(hr) < 2 or xr is None:
+        return None
+    spans = _table_span_rows(page, hr[0], hr[-1], xr)
+    rows = _band_rows(spans, hr)
+    if len(rows) < 2:
+        return None
+    anchors = _column_anchors(rows, vr)
+    ncols = len(anchors)
+    if ncols < 2:
+        return None
+
+    def col_of(x):
+        return min(range(ncols), key=lambda i: abs(anchors[i] - x))
+
+    grid = [[[] for _ in range(ncols)] for _ in rows]
+    for ri, row in enumerate(rows):
+        for s in row:
+            grid[ri][col_of((s['bbox'][0] + s['bbox'][2]) / 2)].append(s)
+    latex_rows = [' & '.join(_render_table_cell(c, body) for c in row)
+                  for row in grid]
+    colspec = '|' + '|'.join(['l'] + ['c'] * (ncols - 1)) + '|'
+    return ('$$\\begin{array}{' + colspec + '}\\hline '
+            + ' \\\\ \\hline '.join(latex_rows) + ' \\\\ \\hline\\end{array}$$')
+
+
+def _detect_table_regions(page, page_h):
+    """Зоны реальных таблиц на странице (те же фильтры, что в
+    audit_vsosh_structure: линейки одной ширины/x-охвата, консистентные
+    колонки, строка-заголовок или числовая матрица; формулы/сетки/заголовки
+    секций отсеиваются). Возвращает [(y0, y1)]."""
+    rules = sorted(_table_rules(page, 0, page_h * 2)[0])
+    rules = [r for r in rules if 0.06 * page_h < r < 0.94 * page_h]
+    # группы линеек с совпадающим x-охватом
+    raw = _table_rules(page, 0, page_h * 2)
+    hr_all = [(y, ) for y in rules]
+    # пересобираем с x-охватом каждой линейки
+    rule_list = []
+    for d in page.get_drawings():
+        for it in d['items']:
+            if it[0] == 'l':
+                p1, p2 = it[1], it[2]
+                if abs(p1.y - p2.y) < 0.8 and 90 <= abs(p2.x - p1.x) <= 490:
+                    rule_list.append((min(p1.x, p2.x), max(p1.x, p2.x), p1.y))
+            elif it[0] == 're':
+                r = it[1]
+                if r.height < 2 and 90 <= r.width <= 490:
+                    rule_list.append((r.x0, r.x1, (r.y0 + r.y1) / 2))
+    rule_list = [r for r in rule_list if 0.06 * page_h < r[2] < 0.94 * page_h]
+    rule_list.sort(key=lambda t: t[2])
+    groups = []
+    for r in rule_list:
+        for g in groups:
+            if (abs(g[0][0] - r[0]) < 16 and abs(g[0][1] - r[1]) < 16
+                    and r[2] - g[-1][2] < 230):
+                g.append(r)
+                break
+        else:
+            groups.append([r])
+    out = []
+    for g in groups:
+        if len(g) < 2:
+            continue
+        y0 = min(x[2] for x in g)
+        y1 = max(x[2] for x in g)
+        xr = (min(x[0] for x in g), max(x[1] for x in g))
+        rows = _band_rows(_table_span_rows(page, y0, y1, xr), sorted(x[2] for x in g))
+        if len(rows) < 2:
+            continue
+        alltext = ' '.join(sp['text'] for row in rows for sp in row)
+        if TBL_SECTION_RE.search(alltext.strip()[:45]) \
+                or TBL_ANSGRID_RE.search(alltext):
+            continue
+        hdr = any(sum(1 for s in row
+                      if TBL_CYR.search(s['text']) and s['bbox'][0] > 55) >= 2
+                  for row in rows)
+        nummat = sum(1 for row in rows
+                     if sum(1 for s in row
+                            if TBL_NUM_CELL.match(s['text'].strip())) >= 3) >= 2
+        if not (hdr or nummat):
+            continue
+        out.append((y0, y1, xr))
+    return out
+
+
+def extract_tables(doc, body):
+    """{page_no: [(y0, y1, xr, latex)]} — реконструированные таблицы по страницам."""
+    tables = {}
+    for page_no, page in enumerate(doc, start=1):
+        for y0, y1, xr in _detect_table_regions(page, page.rect.height):
+            latex = reconstruct_table(page, y0, y1, body)
+            if latex:
+                tables.setdefault(page_no, []).append((y0, y1, xr, latex))
+    return tables
+
+
+def apply_tables(lines, tables, body):
+    """Строки внутри зоны таблицы (по y И x-охвату) заменяются одной
+    converted-строкой с готовым `$$\\begin{array}…$$`; боковая проза
+    (вне x-охвата) сохраняется."""
+    if not tables:
+        return lines
+    inserted = set()
+    result = []
+    for l in lines:
+        regs = tables.get(l.page_no, [])
+        hit = None
+        for (y0, y1, xr, latex) in regs:
+            lcx = (l.bbox[0] + l.bbox[2]) / 2
+            if y0 - 3 <= (l.bbox[1] + l.bbox[3]) / 2 <= y1 + 3 \
+                    and xr[0] - 3 <= lcx <= xr[1] + 3:
+                hit = (y0, y1, xr, latex)
+                break
+        if hit is None:
+            result.append(l)
+            continue
+        key = (l.page_no, round(hit[0], 1))
+        if key not in inserted:
+            inserted.add(key)
+            frac = {'text': hit[3], 'font': 'Math-Converted', 'size': body,
+                    'origin': (hit[2][0], hit[0]), 'flags': 0,
+                    'converted': True, 'is_table': True,
+                    'bbox': (hit[2][0], hit[0], hit[2][1], hit[1])}
+            result.append(Line([frac], (hit[2][0], hit[0], hit[2][1], hit[1]),
+                               l.page_no))
+        # строка поглощена таблицей — не добавляем
+    return result
+
+
 def extract_lines(doc):
     """Все содержательные строки документа в порядке чтения."""
     body_size = _body_size(doc)
@@ -1117,6 +1377,16 @@ def render_paragraph(line_list, body, indent_breaks=False, left_margin=None,
             txt = span_text(sp)
             if not txt:
                 continue
+            if sp.get('is_table'):
+                # готовый блок `$$\begin{array}…$$` — своим абзацем, не
+                # оборачивать в $…$ и не сливать с math_run
+                flush_math()
+                if pieces and not pieces[-1].endswith('\n'):
+                    pieces.append('\n\n')
+                pieces.append(txt)
+                pieces.append('\n\n')
+                glue_next = False
+                continue
             if sp.get('converted'):
                 if base_size is None:
                     base_size = sp['size']
@@ -1381,6 +1651,8 @@ def parse_document(doc, grade, errors, profile):
     bars = extract_bars(doc)
     figures = extract_figures(doc)
     lines, fig_zones = drop_figure_labels(lines, figures)  # подписи графиков
+    tables = extract_tables(doc, body)                 # таблицы → $$array$$
+    lines = apply_tables(lines, tables, body)          # до дробей: спаны ушли
     lines = reassemble_display_math(lines, body, bars)  # выключные формулы
     lines = reassemble_fractions(lines, body, bars)  # строчные этажные дроби
     lines = reassemble_intraline_fracs(lines, body, bars)  # дроби и корни
