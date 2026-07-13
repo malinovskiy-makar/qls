@@ -1451,10 +1451,17 @@ def build_question_docx(cur, buf, grades, group, fname):
 # Слияние одинаковых вопросов разных классов (внутри года)
 # ---------------------------------------------------------------------------
 
+def _norm_merge(text):
+    """Нормализация для слияния классов: пробелы, регистр, ё→е, хвостовая
+    пунктуация (в разных файлах года «вперёд» vs «вперед»)."""
+    t = WS_RE.sub(' ', text).strip().lower().replace('ё', 'е')
+    return t.rstrip(';.').strip()
+
+
 def dedup_key_m(q):
-    norm = WS_RE.sub(' ', q['statement']).strip().lower()
-    return (norm, q['qtype'],
-            json.dumps(q['options'], ensure_ascii=False),
+    return (_norm_merge(q['statement']), q['qtype'],
+            json.dumps([_norm_merge(o) for o in q['options']],
+                       ensure_ascii=False),
             json.dumps(q['correct']), q['unit'])
 
 
