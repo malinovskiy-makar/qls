@@ -396,22 +396,29 @@ def extract_figures(doc):
 def drop_figure_labels(lines, figures):
     """Строки целиком внутри зоны рисунка — подписи осей/кривых (P, Q, D,
     MR, 8, 16 …), в тексте задачи им не место. Возвращает (строки,
-    страницы с вычищенными подписями) — вопросам этих страниц парсер
-    допишет пометку про рисунок."""
-    kept, fig_pages = [], set()
+    зоны-с-удалёнными-подписями по страницам) — вопрос-владелец рисунка
+    парсер пометит по вертикальному соседству с зоной (не по всей странице)."""
+    kept = []
+    used_zones = {}   # page_no -> [(y0, y1), …] зон, из которых что-то удалено
     label_re = re.compile(r'[а-яёА-ЯЁ]{4,}')
     for l in lines:
         zones = figures.get(l.page_no, [])
-        inside = any(l.bbox[0] >= z.x0 and l.bbox[2] <= z.x1
-                     and l.bbox[1] >= z.y0 and l.bbox[3] <= z.y1
-                     for z in zones)
+        hit = None
+        for z in zones:
+            if (l.bbox[0] >= z.x0 and l.bbox[2] <= z.x1
+                    and l.bbox[1] >= z.y0 and l.bbox[3] <= z.y1):
+                hit = z
+                break
         # подпись — короткие латинские/цифровые метки; строка с русским
         # словом (заголовок, текст, «Ответ: …») контентная даже в зоне
-        if inside and not label_re.search(l.plain):
-            fig_pages.add(l.page_no)
+        if hit is not None and not label_re.search(l.plain):
+            used_zones.setdefault(l.page_no, [])
+            key = (round(hit.y0, 1), round(hit.y1, 1))
+            if key not in used_zones[l.page_no]:
+                used_zones[l.page_no].append(key)
         else:
             kept.append(l)
-    return kept, fig_pages
+    return kept, used_zones
 
 
 def extract_lines(doc):
@@ -1373,7 +1380,7 @@ def parse_document(doc, grade, errors, profile):
     lines, body = extract_lines(doc)
     bars = extract_bars(doc)
     figures = extract_figures(doc)
-    lines, fig_pages = drop_figure_labels(lines, figures)  # подписи графиков
+    lines, fig_zones = drop_figure_labels(lines, figures)  # подписи графиков
     lines = reassemble_display_math(lines, body, bars)  # выключные формулы
     lines = reassemble_fractions(lines, body, bars)  # строчные этажные дроби
     lines = reassemble_intraline_fracs(lines, body, bars)  # дроби и корни
@@ -1407,10 +1414,25 @@ def parse_document(doc, grade, errors, profile):
                              'qtype': cur['qtype'], 'reason': reason,
                              'raw': raw})
         else:
-            q_pages = {l.page_no for key in
-                       ('statement', 'options_flat', 'solution')
-                       for l in _flat(buffers, key)}
-            if q_pages & fig_pages:
+            # рисунок приписываем вопросу, чьи строки вертикально соседствуют
+            # с зоной (текст обрамляет её или примыкает ≤40pt) — а не всем
+            # вопросам страницы: соседний вопрос той же страницы не пометится
+            owns_figure = False
+            by_page = {}
+            for key in ('statement', 'options_flat', 'solution'):
+                for l in _flat(buffers, key):
+                    by_page.setdefault(l.page_no, []).append(l)
+            for pno, qlines in by_page.items():
+                qy0 = min(l.bbox[1] for l in qlines)
+                qy1 = max(l.bbox[3] for l in qlines)
+                for zy0, zy1 in fig_zones.get(pno, []):
+                    zc = (zy0 + zy1) / 2
+                    if qy0 - 40 <= zc <= qy1 + 40:
+                        owns_figure = True
+                        break
+                if owns_figure:
+                    break
+            if owns_figure:
                 note = ('в оригинале рисунок — подписи осей/кривых из '
                         'текста исключены, сверить с PDF')
                 q['notes'] = (q['notes'] + '; ' + note
