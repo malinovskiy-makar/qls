@@ -1016,6 +1016,15 @@ def _reconstruct_display(group, body, page_bars):
     return re.sub(r'\s+', ' ', out).strip()
 
 
+def _is_cases_group(group):
+    """Группа выключной формулы — кусочная функция: литеральная «{» (скобка
+    системы) + «;» (разделитель ветвей) среди спанов. Такую _reconstruct_display
+    не собирает (нет черты — это НЕ дробь), но постпроцесс соберёт её в
+    \\begin{cases}; линеаризацией она не является, плашку не ставим."""
+    txt = ''.join(sp['text'] for l in group for sp in l.spans)
+    return '{' in txt and ';' in txt
+
+
 def reassemble_display_math(lines, body, bars):
     """Группы подряд идущих коротких чисто-математических строк — выключные
     формулы. Успешная сборка → одна строка с готовым LaTeX; неуспешная —
@@ -1044,6 +1053,12 @@ def reassemble_display_math(lines, body, bars):
                         'size': body, 'origin': (gb[0], gb[1]),
                         'flags': 0, 'converted': True, 'bbox': gb}
                 result.append(Line([frac], gb, group[0].page_no))
+            elif _is_cases_group(group):
+                # кусочная функция (два яруса + «{» слева, БЕЗ черты) — НЕ
+                # линеаризация: постпроцесс соберёт её в \begin{cases}, поэтому
+                # плашку «математика линеаризована» не ставим
+                for l in group:
+                    result.append(l)
             else:
                 # группа помечается общим id: если Rule D позже соберёт её
                 # дроби/корни от черты, флаг снимется (clear_resolved_degraded)

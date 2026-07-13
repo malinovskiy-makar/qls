@@ -158,6 +158,14 @@ class ExtractQuestionTests(TestCase):
         q, opts, correct, reason = extract_question(p)
         self.assertIsNone(reason)
 
+    def test_cases_allowed(self):
+        # \begin{cases} — кусочная функция (cases в TALL_MATH_ENVS): не брак
+        p = make_test_problem(
+            statement=r'Издержки $TC(Q) = \begin{cases} Q^{2} & Q \le 1 \\ '
+                      r'2Q-1 & Q> 1 \end{cases}$. Что верно?')
+        q, opts, correct, reason = extract_question(p)
+        self.assertIsNone(reason)
+
     def test_stray_hline_without_array_rejected(self):
         # \hline вне корректного array-блока — битая вёрстка, по-прежнему брак
         p = make_test_problem(statement=r'Мусор \hline посреди текста. Что?')
