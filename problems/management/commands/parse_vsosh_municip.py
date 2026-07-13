@@ -139,6 +139,13 @@ def has_doubled_math(text):
     return False
 
 
+UNESC_DOLLAR_RE = re.compile(r'(?<!\\)\$')
+
+
+def _unpaired_dollar(text):
+    return bool(text) and len(UNESC_DOLLAR_RE.findall(text)) % 2 == 1
+
+
 # --- Колонтитулы муниципальных PDF (все годы) -------------------------------
 M_HEADER_RES = [
     re.compile(r'^©?\s*ГАОУ ДПО ЦПМ'),
@@ -754,6 +761,15 @@ def build_question_a(cur, buffers, body, left_margin, grades, group,
     letters_got = [o['letter'] for o in opt_items]
     if letters_got != list(LETTERS[:len(letters_got)]):
         return None, f'буквы вариантов с пропуском: {letters_got}'
+    if opts and any(not o.strip() for o in opts):
+        return None, 'пустой вариант — формула Word не собралась'
+    if _unpaired_dollar(statement) or any(_unpaired_dollar(o) for o in opts):
+        return None, 'непарный $ в условии/вариантах — формулы не собрались'
+    if _unpaired_dollar(solution):
+        q_note = ('решение жюри не собралось (непарная математика) — '
+                  'не импортируется, сверить с PDF')
+        solution = ''
+        issues.append(q_note)
 
     q = {'grades': list(grades), 'grade_group': group,
          'number': str(cur['number']), 'section': cur['section'],
