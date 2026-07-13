@@ -1572,6 +1572,52 @@ def _escape_unmatched_braces(inner):
                    for i, ch in enumerate(inner))
 
 
+# Условие ветви кусочной, набранное текстом между сегментами: «$X,$ если $Y$»
+# — «если»/«при» уходят в математику ветви как \text{…}, чтобы ветвь стала
+# цельным сегментом (Form B → потом Form A).
+CASES_IF_SPLIT_RE = re.compile(r',\s*\$\s*(если|при)\s*\$')
+
+
+def _assemble_cases(text):
+    """Кусочная функция из литеральной «\\{ ветвь1; ветвь2 .» → \\begin{cases}.
+
+    Признак кусочной (в отличие от множества \\{A, B\\}): открытая «\\{» без
+    закрывающей «\\}», ветви через «;», внутри ветви значение и условие через
+    запятую. Двухъярусная запись PDF уже уплощена в эту форму (;=ярусы,
+    ,=значение/условие) — собираем по разделителям."""
+    if '\\{' not in text:
+        return text
+    # Form B: втянуть «если/при» из текста в математику ветви (только когда
+    # рядом кусочная — «\\{» в тексте; в обычной прозе не срабатывает)
+    text = CASES_IF_SPLIT_RE.sub(lambda m: r', \text{' + m.group(1) + ' }', text)
+
+    def conv(m):
+        seg = m.group(0)[1:-1]            # внутренность $…$
+        j = seg.find('\\{')
+        if j < 0 or '\\}' in seg[j:]:
+            return m.group(0)             # множество или нет скобки
+        head, body = seg[:j], seg[j + 2:].strip().rstrip('.')
+        if ';' not in body:
+            return m.group(0)             # одна ветвь — не кусочная
+        branches = []
+        for br in body.split(';'):
+            br = br.strip()
+            if not br:
+                continue
+            mm = re.match(r'^(.*),\s*(.+)$', br)   # жадно: последняя запятая
+            if not mm:
+                return m.group(0)         # ветвь без «значение, условие» —
+                #                            это множество/список, не кусочная
+            branches.append((mm.group(1).strip(), mm.group(2).strip()))
+        if len(branches) < 2:
+            return m.group(0)
+        rows = [v + ' & ' + c for v, c in branches]
+        return ('$' + head + '\\begin{cases} '
+                + ' \\\\ '.join(rows) + ' \\end{cases}$')
+
+    return MATH_SEGMENT_RE.sub(conv, text)
+
+
 def postprocess_text(text):
     """Косметика по уже отрендеренному тексту (statement/solution/options):
     слэш-дроби -> \\frac только внутри $...$, двойные дефисы/тире -> «—»
@@ -1597,7 +1643,7 @@ def postprocess_text(text):
             # пробел внутри URL от переноса строки: «worldbank. org»
             part = URL_SPACE_RE.sub(r'\1.\2', part)
             out.append(part)
-    return ''.join(out)
+    return _assemble_cases(''.join(out))
 
 
 def canonicalize_answer(raw):

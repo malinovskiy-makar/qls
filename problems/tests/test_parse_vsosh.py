@@ -95,9 +95,11 @@ class PostprocessTextTests(SimpleTestCase):
         self.assertEqual(postprocess_text('$\\sqrt{KL}+1$'), '$\\sqrt{KL}+1$')
 
     def test_unmatched_brace_escaped(self):
-        # кусочная функция: литеральная скобка PDF -> \{, KaTeX не падает
-        text = postprocess_text('$TC(Q) = {Q^{2}, Q \\le 1; 2Q-1, Q> 1.$')
-        self.assertEqual(text, '$TC(Q) = \\{Q^{2}, Q \\le 1; 2Q-1, Q> 1.$')
+        # литеральная скобка без структуры «значение, условие» (не кусочная) —
+        # экранируется в \{, KaTeX не падает; в cases НЕ превращается
+        text = postprocess_text('$Q \\in {5; 10; 15$ вариантов.')
+        self.assertNotIn('\\begin{cases}', text)
+        self.assertIn('\\{', text)
 
     def test_frac_trailing_sub_is_den_power(self):
         # (1+r)²: степень знаменателя, промеченная как _{2} после дроби
@@ -137,6 +139,28 @@ class FinishMathTests(SimpleTestCase):
             'дефицит 2 млн $\\$$, а сбережения на 5 млн $\\$$. Итого $Y=2M/P$.')
         self.assertIn('$\\$$', text)
         self.assertIn('$Y=\\frac{2M}{P}$', text)
+
+    def test_inline_cases_to_begin_cases(self):
+        # кусочная в одну строку: \{v1, c1; v2, c2. → \begin{cases}
+        text = postprocess_text('$TC(Q) = \\{Q^{2}, Q \\le 1; 2Q-1, Q> 1.$')
+        self.assertIn('\\begin{cases}', text)
+        self.assertIn('Q^{2} & Q \\le 1', text)
+        self.assertIn('2Q-1 & Q> 1', text)
+        self.assertNotIn('\\{', text)
+
+    def test_cases_if_split_conditions(self):
+        # условия ветвей через «если» между $-сегментами → \text{если }
+        text = postprocess_text(
+            '$T = \\{ 0,$ если $q = 0; 6q + 49,$ если $q > 0.$')
+        self.assertIn('\\begin{cases}', text)
+        self.assertIn('\\text{если }', text)
+        self.assertIn('0 & \\text{если }q = 0', text)
+
+    def test_set_notation_not_cases(self):
+        # множество \{A, B\} (со \}) — НЕ кусочная, остаётся как есть
+        text = postprocess_text('$\\min \\{TC_{1}(Q), TC_{2}(Q)\\}$')
+        self.assertNotIn('\\begin{cases}', text)
+        self.assertIn('\\{TC_{1}(Q), TC_{2}(Q)\\}', text)
 
     def test_homoglyphs_fixed_outside_math(self):
         from problems.management.commands.parse_vsosh_region import fix_homoglyphs
