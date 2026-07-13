@@ -338,13 +338,53 @@ def extract_bars(doc):
     return bars
 
 
+def _polyline_figure_marks(page):
+    """Рамки компактных плотных кластеров коротких сегментов — график,
+    нарисованный полилинией (не кривыми Безье). Возвращает список Rect.
+
+    Отсекается: сетка ответов/бланк (сотни сегментов, но РАСТЯНУТЫ на всю
+    страницу — не компактны) и редкие сегменты текста (кластер < 15)."""
+    import fitz
+    centers = []
+    for d in page.get_drawings():
+        for item in d['items']:
+            if item[0] != 'l':
+                continue
+            p1, p2 = item[1], item[2]
+            if ((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2) ** 0.5 < 50:
+                centers.append(((p1.x + p2.x) / 2, (p1.y + p2.y) / 2))
+    if len(centers) < 15:
+        return []
+    # жадная пространственная кластеризация центров (порог 34pt)
+    clusters = []
+    for c in centers:
+        for cl in clusters:
+            if any((c[0] - q[0]) ** 2 + (c[1] - q[1]) ** 2 < 34 ** 2 for q in cl):
+                cl.append(c)
+                break
+        else:
+            clusters.append([c])
+    out = []
+    for cl in clusters:
+        if len(cl) < 15:
+            continue
+        x0 = min(p[0] for p in cl); x1 = max(p[0] for p in cl)
+        y0 = min(p[1] for p in cl); y1 = max(p[1] for p in cl)
+        # компактный (график ~150×150; сетка ответов растянута >320)
+        if x1 - x0 < 300 and y1 - y0 < 300:
+            out.append(fitz.Rect(x0, y0, x1, y1))
+    return out
+
+
 def extract_figures(doc):
     """Зоны рисунков (графики) по страницам: {page_no: [Rect, …]}.
 
     График выдаёт себя диагональными отрезками (кривые D/S/MR, КПВ) и
     кривыми Безье; линейки таблиц и черты дробей строго горизонтальны/
     вертикальны и сюда не попадают. Зона — объединение рамок таких
-    элементов (+поля), если их ≥3 на странице рядом."""
+    элементов (+поля), если их ≥3 на странице рядом. ВТОРОЙ путь: график,
+    нарисованный полилинией (много коротких прямых сегментов вместо кривых
+    Безье), — компактный плотный кластер коротких отрезков."""
     import fitz
     figures = {}
     for page_no, page in enumerate(doc, start=1):
@@ -360,10 +400,14 @@ def extract_figures(doc):
                     p1, p2 = item[1], item[2]
                     if abs(p1.x - p2.x) > 8 and abs(p1.y - p2.y) > 8:
                         marks.append(r)
-        if len(marks) < 3:
+        # полилинийный график — самостоятельная уверенная зона (плотный
+        # компактный кластер коротких сегментов), минует порог ≥3 марок
+        poly = _polyline_figure_marks(page)
+        if len(marks) < 3 and not poly:
             continue
         # кластеризация: жадное слияние пересекающихся (с полем 12pt) рамок
-        zones = []
+        zones = [fitz.Rect(r.x0 - 12, r.y0 - 12, r.x1 + 12, r.y1 + 12)
+                 for r in poly]
         for r in marks:
             r = fitz.Rect(r.x0 - 12, r.y0 - 12, r.x1 + 12, r.y1 + 12)
             for z in zones:
@@ -401,12 +445,24 @@ def drop_figure_labels(lines, figures):
     kept = []
     used_zones = {}   # page_no -> [(y0, y1), …] зон, из которых что-то удалено
     label_re = re.compile(r'[а-яёА-ЯЁ]{4,}')
+    # короткая подпись оси/деления: 1–4 значимых символа (P, Q, TC, 10, 100),
+    # без длинного русского слова — такие метки сидят вплотную СНАРУЖИ рамки
+    # кривой (у концов осей), поэтому ловим их в поле ±22pt вокруг зоны
+    MARGIN = 22
+
+    def short_axis_label(l):
+        plain = l.plain.replace('$', '').strip()
+        return plain and len(plain) <= 4 and not label_re.search(plain)
+
     for l in lines:
         zones = figures.get(l.page_no, [])
         hit = None
         for z in zones:
-            if (l.bbox[0] >= z.x0 and l.bbox[2] <= z.x1
-                    and l.bbox[1] >= z.y0 and l.bbox[3] <= z.y1):
+            inside = (l.bbox[0] >= z.x0 and l.bbox[2] <= z.x1
+                      and l.bbox[1] >= z.y0 and l.bbox[3] <= z.y1)
+            near = (z.x0 - MARGIN <= (l.bbox[0] + l.bbox[2]) / 2 <= z.x1 + MARGIN
+                    and z.y0 - MARGIN <= (l.bbox[1] + l.bbox[3]) / 2 <= z.y1 + MARGIN)
+            if inside or (near and short_axis_label(l)):
                 hit = z
                 break
         # подпись — короткие латинские/цифровые метки; строка с русским
@@ -1732,24 +1788,24 @@ def parse_document(doc, grade, errors, profile):
                              'qtype': cur['qtype'], 'reason': reason,
                              'raw': raw})
         else:
-            # рисунок приписываем вопросу, чьи строки вертикально соседствуют
-            # с зоной (текст обрамляет её или примыкает ≤40pt) — а не всем
-            # вопросам страницы: соседний вопрос той же страницы не пометится
+            # рисунок приписываем вопросу, в чей ПОТОК ЧТЕНИЯ (page, y) попадает
+            # верх зоны: от первой до последней строки вопроса (+40pt на конце,
+            # график в конце решения). Так владелец графика на стыке страниц
+            # (текст выше на предыдущей странице) ловится, а сосед снизу — нет.
             owns_figure = False
-            by_page = {}
-            for key in ('statement', 'options_flat', 'solution'):
-                for l in _flat(buffers, key):
-                    by_page.setdefault(l.page_no, []).append(l)
-            for pno, qlines in by_page.items():
-                qy0 = min(l.bbox[1] for l in qlines)
-                qy1 = max(l.bbox[3] for l in qlines)
-                for zy0, zy1 in fig_zones.get(pno, []):
-                    zc = (zy0 + zy1) / 2
-                    if qy0 - 40 <= zc <= qy1 + 40:
-                        owns_figure = True
+            qlines = [l for key in ('statement', 'options_flat', 'solution')
+                      for l in _flat(buffers, key)]
+            if qlines:
+                first = min((l.page_no, l.bbox[1]) for l in qlines)
+                last = max((l.page_no, l.bbox[3]) for l in qlines)
+                for pno, zones in fig_zones.items():
+                    for zy0, zy1 in zones:
+                        ztop = (pno, zy0)
+                        if first <= ztop and (pno, zy0 - 40) <= last:
+                            owns_figure = True
+                            break
+                    if owns_figure:
                         break
-                if owns_figure:
-                    break
             if owns_figure:
                 note = ('в оригинале рисунок — подписи осей/кривых из '
                         'текста исключены, сверить с PDF')
