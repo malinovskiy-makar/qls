@@ -134,6 +134,27 @@ class ControlNumbersBlockA(SimpleTestCase):
         self.assertEqual(s['dp_abs'], 15)
         self.assertEqual(s['dq_abs'], 15)
 
+    def test_tax(self):
+        s = ARCHETYPES['tax_subsidy'].solve(
+            {'a': 100, 'b': 1, 'c': 0, 'd': 1, 'good': 0,
+             'kind': 'tax', 'rate': 20})
+        self.assertEqual(s['pb'], 60)
+        self.assertEqual(s['ps'], 40)
+        self.assertEqual(s['q1'], 40)
+        self.assertEqual(s['budget'], 800)
+        self.assertEqual(s['dwl'], 100)
+        self.assertEqual(s['share_buyers'], 50)
+
+    def test_subsidy(self):
+        s = ARCHETYPES['tax_subsidy'].solve(
+            {'a': 100, 'b': 1, 'c': 0, 'd': 1, 'good': 0,
+             'kind': 'subsidy', 'rate': 20})
+        self.assertEqual(s['q1'], 60)
+        self.assertEqual(s['budget'], 1200)
+        self.assertEqual(s['dwl'], 100)
+        self.assertEqual(s['pb'], 40)
+        self.assertEqual(s['ps'], 60)
+
 
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
@@ -148,3 +169,12 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             test.assertGreater(solved['p0'], 0)
             test.assertGreater(solved['q0'], 0)
         self.run_archetype('shift_equilibrium', v)
+
+    def test_tax_subsidy(self):
+        def v(test, params, solved):
+            # вмешательство не убивает рынок, цены в первой четверти
+            test.assertGreater(solved['q1'], 0)
+            test.assertGreater(solved['pb'], 0)
+            test.assertGreater(solved['ps'], 0)
+            test.assertEqual(Fraction(solved['dwl']).denominator, 1)
+        self.run_archetype('tax_subsidy', v)

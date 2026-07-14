@@ -118,7 +118,7 @@ class Asked(object):
 
     def __init__(self, key, nom='', acc='', gender='f', unit='',
                  kind='value', question='', claim_tpl='', class_options=None,
-                 trivial=False):
+                 trivial=False, max_value=None):
         self.key = key
         self.nom = nom
         self.acc = acc
@@ -129,6 +129,7 @@ class Asked(object):
         self.claim_tpl = claim_tpl
         self.class_options = class_options or []
         self.trivial = trivial
+        self.max_value = max_value  # потолок правдоподобия дистракторов (доля ≤ 100 %)
 
 
 class Wrapper(object):
@@ -213,16 +214,19 @@ def _claim_sentence(asked, value_str):
 # Дистракторы
 # ---------------------------------------------------------------------------
 
-def _clean_distractors(errors, answer, non_negative=True):
+def _clean_distractors(errors, answer, max_value=None):
     """Фильтр вычисленных ошибок: уникальны, ≠ ответу, красивы,
-    правдоподобны (неотрицательны). Порядок сохраняется."""
+    правдоподобны (неотрицательны; не выше max_value, если задан).
+    Порядок сохраняется."""
     out = []
     seen = {Fraction(answer)}
     for e in errors:
         e = Fraction(e)
         if e in seen:
             continue
-        if non_negative and e < 0:
+        if e < 0:
+            continue
+        if max_value is not None and e > max_value:
             continue
         if not is_nice(e):
             continue
@@ -301,7 +305,8 @@ def generate_question(arch, rng, question_type):
         else:
             answer = Fraction(solved[asked.key])
             distractors = _clean_distractors(
-                arch.error_variants(params, solved, asked), answer)
+                arch.error_variants(params, solved, asked), answer,
+                max_value=asked.max_value)
             if question_type != 'numeric' and len(distractors) < MIN_DISTRACTORS:
                 continue  # мало красивых дистракторов — пересэмплировать
 
