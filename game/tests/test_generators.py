@@ -215,6 +215,18 @@ class ControlNumbersBlockB(SimpleTestCase):
         self.assertEqual(s['dwl'], 800)
 
 
+class ControlNumbersBlockV(SimpleTestCase):
+    """Контрольные числа Задачи 5 (КПВ и торговля)."""
+
+    def test_ppf_single(self):
+        # 60X/30Y: альт. стоимость 1X = 0,5Y; точка (40; 10) — на границе
+        s = ARCHETYPES['ppf_single'].solve(
+            {'mx': 60, 'my': 30, 'x0': 40, 'y0': 10, 'gx': 0, 'gy': 1})
+        self.assertEqual(s['oc_x'], Fraction(1, 2))
+        self.assertEqual(s['y_at_x'], 10)
+        self.assertIn(u'на границе', s['point_class'])
+
+
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
 
@@ -310,3 +322,13 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             test.assertEqual(solved['dwl'] * 2, solved['profit'])
             test.assertEqual(Fraction(solved['dwl']).denominator, 1)
         self.run_archetype('monopoly', v)
+
+    def test_ppf_single(self):
+        def v(test, params, solved):
+            test.assertGreater(params['mx'], 0)
+            test.assertGreater(params['my'], 0)
+            test.assertGreater(params['x0'], 0)
+            test.assertGreater(solved['y_at_x'], 0)
+            # взаимно обратные альтернативные стоимости
+            test.assertEqual(solved['oc_x'] * solved['oc_y'], 1)
+        self.run_archetype('ppf_single', v)
