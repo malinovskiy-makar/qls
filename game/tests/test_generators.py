@@ -170,6 +170,14 @@ class ControlNumbersBlockA(SimpleTestCase):
         self.assertEqual(s['e_abs'], 1)
         self.assertIn(u'единичная', s['e_class'])
 
+    def test_elasticity_arc(self):
+        # (P=40, Q=60) → (P=60, Q=40): |E| = 1, выручка не меняется
+        s = ARCHETYPES['elasticity_arc'].solve(
+            {'p1': 40, 'p2': 60, 'q1': 60, 'q2': 40, 'good': 0})
+        self.assertEqual(s['e_arc'], 1)
+        self.assertEqual(s['rev_class'], u'не изменится')
+        self.assertEqual(s['dr_abs'], 0)
+
 
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
@@ -211,3 +219,18 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             test.assertGreater(solved['q_star'], 0)
             test.assertGreater(solved['e_abs'], 0)
         self.run_archetype('elasticity_point', v)
+
+    def test_elasticity_arc(self):
+        def v(test, params, solved):
+            test.assertGreater(params['p2'], params['p1'])
+            test.assertGreater(params['q1'], params['q2'])
+            test.assertGreater(params['q2'], 0)
+            test.assertGreater(solved['e_arc'], 0)
+            # тождество: |E| > 1 ⟺ выручка при росте цены падает
+            if solved['e_arc'] > 1:
+                test.assertEqual(solved['rev_class'], u'снизится')
+            elif solved['e_arc'] < 1:
+                test.assertEqual(solved['rev_class'], u'вырастет')
+            else:
+                test.assertEqual(solved['rev_class'], u'не изменится')
+        self.run_archetype('elasticity_arc', v)
