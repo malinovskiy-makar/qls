@@ -24,12 +24,17 @@ class ComparativeAdvantageArchetype(Archetype):
     topics = [u'Международная торговля']
 
     def sample(self, rng):
+        # Правило красивого ответа: границы цены — отношения My/Mx, сами по
+        # себе часто дробные; в ~70 % случаев требуем обе границы целыми.
+        want_int = rng.random() < 0.7
         for _ in range(300):
             mxa, mya = rng.choice(_ppf.M_GRID), rng.choice(_ppf.M_GRID)
             mxb, myb = rng.choice(_ppf.M_GRID), rng.choice(_ppf.M_GRID)
             oca, ocb = _ppf.oc_x(mxa, mya), _ppf.oc_x(mxb, myb)
             if oca == ocb:
                 continue  # преимущества нет — обмен не взаимовыгоден
+            if want_int and (oca.denominator != 1 or ocb.denominator != 1):
+                continue
             ix, iy = _ppf.pick_goods_pair(rng)
             return {'mxa': mxa, 'mya': mya, 'mxb': mxb, 'myb': myb,
                     'gx': ix, 'gy': iy}

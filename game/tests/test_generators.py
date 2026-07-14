@@ -237,6 +237,15 @@ class ControlNumbersBlockV(SimpleTestCase):
         self.assertEqual(s['total_max_x'], 80)
         self.assertEqual(s['total_max_y'], 70)
 
+    def test_comparative_advantage(self):
+        # преимущество по X у Альфы; цена 1X между 0,5Y и 2Y
+        s = ARCHETYPES['comparative_advantage'].solve(
+            {'mxa': 60, 'mya': 30, 'mxb': 20, 'myb': 40, 'gx': 0, 'gy': 1})
+        self.assertEqual(s['adv_x'], u'страна Альфа')
+        self.assertEqual(s['adv_y'], u'страна Бета')
+        self.assertEqual(s['price_low'], Fraction(1, 2))
+        self.assertEqual(s['price_high'], 2)
+
 
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
@@ -351,3 +360,10 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             test.assertGreater(solved['kink_y'], 0)
             test.assertLess(solved['kink_y'], solved['total_max_y'])
         self.run_archetype('ppf_joint', v)
+
+    def test_comparative_advantage(self):
+        def v(test, params, solved):
+            # преимущества противоположны, диапазон невырожден
+            test.assertNotEqual(solved['adv_x'], solved['adv_y'])
+            test.assertLess(solved['price_low'], solved['price_high'])
+        self.run_archetype('comparative_advantage', v)
