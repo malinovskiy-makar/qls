@@ -10,11 +10,14 @@ from collections import OrderedDict
 
 
 def _build():
-    archetypes = []
-    # Блок А — рынок (спрос и предложение)
-    # Блок Б — фирма и издержки
-    # Блок В — КПВ и торговля
-    # Блок Г — макро-лайт
+    from . import equilibrium
+    archetypes = [
+        # Блок А — рынок (спрос и предложение)
+        equilibrium.ARCHETYPE,
+        # Блок Б — фирма и издержки
+        # Блок В — КПВ и торговля
+        # Блок Г — макро-лайт
+    ]
     return OrderedDict((a.key, a) for a in archetypes)
 
 

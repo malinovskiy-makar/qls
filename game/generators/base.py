@@ -85,11 +85,8 @@ def fmt_coef(x):
     return '' if ax == 1 else fmt_num(ax, latex=True)
 
 
-def linear_eq(head, intercept, coef, var='P'):
-    """'$Q_d = 100 - 2P$': правая часть a + b·var с чисткой нулей и единиц.
-
-    intercept/coef — Fraction/int; coef может быть отрицательным (спрос).
-    Возвращает готовую инлайн-формулу с долларами."""
+def linear_rhs(intercept, coef, var='P'):
+    """Правая часть 'a + b·var' с чисткой нулей и единиц: '100 - 2P', 'P'."""
     a, b = Fraction(intercept), Fraction(coef)
     parts = ''
     if a != 0 or b == 0:
@@ -100,7 +97,13 @@ def linear_eq(head, intercept, coef, var='P'):
             parts += (' + ' if b > 0 else ' - ') + term
         else:
             parts = ('-' if b < 0 else '') + term
-    return '${} = {}$'.format(head, parts)
+    return parts
+
+
+def linear_eq(head, intercept, coef, var='P'):
+    """'$Q_d = 100 - 2P$' — готовая инлайн-формула с долларами.
+    coef может быть отрицательным (спрос)."""
+    return '${} = {}$'.format(head, linear_rhs(intercept, coef, var))
 
 
 class Asked(object):
