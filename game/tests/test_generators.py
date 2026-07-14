@@ -124,9 +124,27 @@ class ControlNumbersBlockA(SimpleTestCase):
         self.assertEqual(s['p_star'], 50)
         self.assertEqual(s['q_star'], 50)
 
+    def test_shift_equilibrium(self):
+        # Qd: 100−P → 130−P (сдвиг спроса +30), Qs = P → P* = 65
+        s = ARCHETYPES['shift_equilibrium'].solve(
+            {'a': 100, 'b': 1, 'c': 0, 'd': 1, 'good': 0,
+             'side': 'demand', 'delta': 30, 'reason': 0})
+        self.assertEqual(s['p_new'], 65)
+        self.assertEqual(s['q_new'], 65)
+        self.assertEqual(s['dp_abs'], 15)
+        self.assertEqual(s['dq_abs'], 15)
+
 
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
 
     def test_equilibrium(self):
         self.run_archetype('equilibrium', market_validator)
+
+    def test_shift_equilibrium(self):
+        def v(test, params, solved):
+            test.assertGreater(solved['p_new'], 0)
+            test.assertGreater(solved['q_new'], 0)
+            test.assertGreater(solved['p0'], 0)
+            test.assertGreater(solved['q0'], 0)
+        self.run_archetype('shift_equilibrium', v)

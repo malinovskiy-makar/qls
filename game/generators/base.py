@@ -189,14 +189,21 @@ def _unit_paren(unit):
 
 
 def _question_sentence(rng, asked):
-    """Вопросительное предложение для value-вопроса (numeric и single)."""
+    """Вопросительное предложение для value-вопроса (numeric и single).
+    Если у Asked задан собственный question — он главнее шаблонов
+    (нужно для вопросов об изменениях: «На сколько … вырастет цена?»)."""
+    if asked.question:
+        return asked.question
     tpl = rng.choice(_NUMERIC_TPLS)
     return tpl.format(acc=asked.acc, nom=asked.nom,
                       ravn=_RAVN[asked.gender], unit_p=_unit_paren(asked.unit))
 
 
 def _claim_sentence(asked, value_str):
-    """Утверждение для boolean-вопроса типа value: «верно ли, что X равен V»."""
+    """Утверждение для boolean-вопроса типа value: «верно ли, что X равен V».
+    Если задан claim_tpl — берём его (с подстановкой {V})."""
+    if asked.claim_tpl:
+        return u'Верно ли, что {}?'.format(asked.claim_tpl.format(V=value_str))
     unit_sfx = u' {}'.format(asked.unit) if asked.unit else ''
     return u'Верно ли, что {} {} {}{}?'.format(
         asked.nom, _RAVN[asked.gender], value_str, unit_sfx)
