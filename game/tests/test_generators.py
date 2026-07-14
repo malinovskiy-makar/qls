@@ -164,6 +164,12 @@ class ControlNumbersBlockA(SimpleTestCase):
         self.assertEqual(s['q_sold'], 30)
         self.assertEqual(s['q_d'], 70)
 
+    def test_elasticity_point(self):
+        s = ARCHETYPES['elasticity_point'].solve(
+            {'a': 100, 'b': 1, 'c': 0, 'd': 1, 'good': 0, 'curve': 'demand'})
+        self.assertEqual(s['e_abs'], 1)
+        self.assertIn(u'единичная', s['e_class'])
+
 
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
@@ -198,3 +204,10 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             test.assertGreater(solved['q_d'], 0)
             test.assertGreater(solved['q_s'], 0)
         self.run_archetype('price_control', v)
+
+    def test_elasticity_point(self):
+        def v(test, params, solved):
+            test.assertGreater(solved['p_star'], 0)
+            test.assertGreater(solved['q_star'], 0)
+            test.assertGreater(solved['e_abs'], 0)
+        self.run_archetype('elasticity_point', v)
