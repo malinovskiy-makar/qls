@@ -216,15 +216,15 @@ def _claim_sentence(asked, value_str):
 
 def _clean_distractors(errors, answer, max_value=None):
     """Фильтр вычисленных ошибок: уникальны, ≠ ответу, красивы,
-    правдоподобны (неотрицательны; не выше max_value, если задан).
-    Порядок сохраняется."""
+    правдоподобны (строго положительны — ноль как вариант ответа выглядит
+    подсказкой «не тот»; не выше max_value, если задан). Порядок сохраняется."""
     out = []
     seen = {Fraction(answer)}
     for e in errors:
         e = Fraction(e)
         if e in seen:
             continue
-        if e < 0:
+        if e <= 0:
             continue
         if max_value is not None and e > max_value:
             continue

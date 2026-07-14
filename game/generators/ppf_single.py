@@ -77,13 +77,17 @@ class PpfSingleArchetype(Archetype):
     def asked_values(self, params):
         gx = _ppf.PPF_GOODS[params['gx']]
         gy = _ppf.PPF_GOODS[params['gy']]
-        oc_phrase_x = (u'альтернативная стоимость производства одной '
-                       u'единицы {} (в единицах {})'.format(gx[1], gy[1]))
-        oc_phrase_y = (u'альтернативная стоимость производства одной '
-                       u'единицы {} (в единицах {})'.format(gy[1], gx[1]))
+        oc_nom_x = (u'альтернативная стоимость производства одной '
+                    u'единицы {} (в единицах {})'.format(gx[1], gy[1]))
+        oc_acc_x = (u'альтернативную стоимость производства одной '
+                    u'единицы {} (в единицах {})'.format(gx[1], gy[1]))
+        oc_nom_y = (u'альтернативная стоимость производства одной '
+                    u'единицы {} (в единицах {})'.format(gy[1], gx[1]))
+        oc_acc_y = (u'альтернативную стоимость производства одной '
+                    u'единицы {} (в единицах {})'.format(gy[1], gx[1]))
         return [
-            Asked('oc_x', nom=oc_phrase_x, acc=oc_phrase_x, gender='f', unit=''),
-            Asked('oc_y', nom=oc_phrase_y, acc=oc_phrase_y, gender='f', unit=''),
+            Asked('oc_x', nom=oc_nom_x, acc=oc_acc_x, gender='f', unit=''),
+            Asked('oc_y', nom=oc_nom_y, acc=oc_acc_y, gender='f', unit=''),
             Asked('y_at_x', unit=u'ед.',
                   question=(u'Какое наибольшее количество единиц {} можно '
                             u'произвести, если выпускается {} единиц {}?'
