@@ -1,0 +1,7 @@
+{
+  "files": ["**/templates/**/*.html"],
+  "exclude": ["**/admin/**/*.html"],
+  "insertBefore": "</body>",
+  "commentSyntax": "html",
+  "cspChecked": true
+}
