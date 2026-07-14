@@ -198,6 +198,13 @@ class ControlNumbersBlockB(SimpleTestCase):
         self.assertEqual(s['mc0'], 60)
         self.assertEqual(s['avc0'], 40)
 
+    def test_comp_firm(self):
+        s = ARCHETYPES['comp_firm'].solve(
+            {'F': 100, 'g': 20, 'h': 4, 'p': 100, 'good': 0})
+        self.assertEqual(s['q_star'], 10)
+        self.assertEqual(s['profit'], 300)
+        self.assertEqual(s['revenue'], 1000)
+
 
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
@@ -274,3 +281,14 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             test.assertEqual(solved['atc_min'],
                              params['g'] + 2 * params['h'] * solved['q_min'])
         self.run_archetype('costs_tc', v)
+
+    def test_comp_firm(self):
+        def v(test, params, solved):
+            test.assertGreater(solved['q_star'], 0)
+            test.assertGreater(solved['profit'], 0)
+            test.assertGreater(params['F'], 0)
+            # P = MC в оптимуме
+            test.assertEqual(
+                params['p'],
+                params['g'] + 2 * params['h'] * solved['q_star'])
+        self.run_archetype('comp_firm', v)

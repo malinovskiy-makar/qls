@@ -11,7 +11,8 @@ from collections import OrderedDict
 
 def _build():
     from . import (equilibrium, shift_equilibrium, tax_subsidy, price_control,
-                   elasticity_point, elasticity_arc, surplus, costs_tc)
+                   elasticity_point, elasticity_arc, surplus, costs_tc,
+                   comp_firm)
     archetypes = [
         # Блок А — рынок (спрос и предложение)
         equilibrium.ARCHETYPE,
@@ -23,6 +24,7 @@ def _build():
         surplus.ARCHETYPE,
         # Блок Б — фирма и издержки
         costs_tc.ARCHETYPE,
+        comp_firm.ARCHETYPE,
         # Блок В — КПВ и торговля
         # Блок Г — макро-лайт
     ]
