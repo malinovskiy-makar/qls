@@ -205,6 +205,15 @@ class ControlNumbersBlockB(SimpleTestCase):
         self.assertEqual(s['profit'], 300)
         self.assertEqual(s['revenue'], 1000)
 
+    def test_monopoly(self):
+        s = ARCHETYPES['monopoly'].solve(
+            {'a': 100, 'b': 1, 'mc': 20, 'good': 0})
+        self.assertEqual(s['q_m'], 40)
+        self.assertEqual(s['p_m'], 60)
+        self.assertEqual(s['profit'], 1600)
+        self.assertEqual(s['q_c'], 80)
+        self.assertEqual(s['dwl'], 800)
+
 
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
@@ -292,3 +301,12 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
                 params['p'],
                 params['g'] + 2 * params['h'] * solved['q_star'])
         self.run_archetype('comp_firm', v)
+
+    def test_monopoly(self):
+        def v(test, params, solved):
+            test.assertGreater(solved['q_m'], 0)
+            test.assertGreater(solved['p_m'], params['mc'])  # наценка положительна
+            test.assertEqual(solved['q_c'], 2 * solved['q_m'])
+            test.assertEqual(solved['dwl'] * 2, solved['profit'])
+            test.assertEqual(Fraction(solved['dwl']).denominator, 1)
+        self.run_archetype('monopoly', v)
