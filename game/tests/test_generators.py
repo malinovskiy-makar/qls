@@ -186,6 +186,19 @@ class ControlNumbersBlockA(SimpleTestCase):
         self.assertEqual(s['total'], 2500)
 
 
+class ControlNumbersBlockB(SimpleTestCase):
+    """Контрольные числа Задачи 4 (TC = 100 + 20Q + 4Q²)."""
+
+    def test_costs_tc(self):
+        s = ARCHETYPES['costs_tc'].solve(
+            {'F': 100, 'g': 20, 'h': 4, 'q0': 5, 'good': 0})
+        self.assertEqual(s['fc'], 100)
+        self.assertEqual(s['q_min'], 5)
+        self.assertEqual(s['atc_min'], 60)
+        self.assertEqual(s['mc0'], 60)
+        self.assertEqual(s['avc0'], 40)
+
+
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
 
@@ -250,3 +263,14 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             test.assertGreater(solved['cs'], 0)
             test.assertGreater(solved['ps'], 0)
         self.run_archetype('surplus', v)
+
+    def test_costs_tc(self):
+        def v(test, params, solved):
+            test.assertGreater(params['F'], 0)
+            test.assertGreater(params['h'], 0)
+            test.assertGreater(params['q0'], 0)
+            test.assertGreater(solved['q_min'], 0)
+            # тождество: в минимуме ATC = MC
+            test.assertEqual(solved['atc_min'],
+                             params['g'] + 2 * params['h'] * solved['q_min'])
+        self.run_archetype('costs_tc', v)
