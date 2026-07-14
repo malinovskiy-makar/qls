@@ -170,3 +170,8 @@ LOAD_EMBEDDINGS_MODEL = True
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/student/'  # переопределяется в RoleBasedLoginView
 LOGOUT_REDIRECT_URL = '/login/'
+
+# Econ Rush: сгенерированные вопросы (game/generators/) участвуют в выдаче.
+# На проде выключено в settings_production.py, пока преподаватель не проверил
+# превью и не принял решение о выкатке.
+GAME_GENERATED_ENABLED = True

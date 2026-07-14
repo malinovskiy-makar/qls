@@ -648,6 +648,37 @@ a:focus-visible, button:focus-visible {
 .miss-item .mi-topic { font-size: 11px; color: var(--text3); display: block; margin-bottom: 2px; }
 .miss-item a { color: var(--accent); text-decoration: none; font-size: 12.5px; }
 .miss-item a:hover { text-decoration: underline; }
+
+/* Чип «Тренировочный» на карточке сгенерированного вопроса — в стиле
+   topic-chip, только меньше и некликабельный (токены --rush-*). */
+.gen-chip {
+  display: inline-block;
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--rush-border);
+  border-radius: 999px;
+  background: var(--rush-surface);
+  color: var(--text3);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* Разбор сгенерированного вопроса: кнопка-ссылка + разворачиваемое решение */
+.mi-sol-btn {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--rush-accent); font-size: 12.5px; font-family: inherit;
+}
+.mi-sol-btn:hover { text-decoration: underline; }
+.mi-solution {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--rush-accent);
+  background: var(--rush-surface);
+  font-size: 13px;
+  white-space: pre-line;   /* шаги решения разделены \n */
+}
 .miss-empty { color: var(--text3); font-size: 14px; }
 
 #confetti-canvas {
@@ -722,7 +753,7 @@ a:focus-visible, button:focus-visible {
         <div class="hud-combo" id="hud-combo">🔥 ×1</div>
       </div>
       <div class="combo-toast" id="combo-toast"></div>
-      <div class="q-card" id="q-card"><div class="q-text" id="q-text"></div></div>
+      <div class="q-card" id="q-card"><span class="gen-chip" id="gen-chip" hidden>Тренировочный</span><div class="q-text" id="q-text"></div></div>
       <div class="opts" id="opts"></div>
       <div class="multi-actions" id="multi-actions" hidden>
         <button class="btn-submit" id="btn-submit" disabled>Ответить</button>
@@ -1004,6 +1035,7 @@ a:focus-visible, button:focus-visible {
 
     var card = $('q-text');
     card.textContent = q.question;
+    $('gen-chip').hidden = !q.generated;
     if (!REDUCED) {
       card.classList.remove('q-slide-in');
       void card.offsetWidth; // перезапуск анимации
@@ -1126,10 +1158,12 @@ a:focus-visible, button:focus-visible {
     score += CFG.base_points * comboMult(streak);
   }
 
-  function registerWrong(q) {
+  function registerWrong(q, d) {
     answered++;
     streak = 0;  // комбо рвёт ТОЛЬКО неверный ответ (пропуск — нет)
-    misses.push({ q: q });
+    // solution приходит только у сгенерированных вопросов (после ответа) —
+    // «Разобрать ошибки» показывает его вместо ссылки в каталог.
+    misses.push({ q: q, solution: (d && d.solution) || null });
   }
 
   // boolean / single: один клик — один ответ
@@ -1147,7 +1181,7 @@ a:focus-visible, button:focus-visible {
         comboToastMaybe();
         setTimeout(advance, REDUCED ? 0 : 500);
       } else {
-        registerWrong(q);
+        registerWrong(q, d);
         buttons[choice].classList.add('is-wrong');
         if (buttons[d.correct_index]) buttons[d.correct_index].classList.add('show-right');
         showDelta(d.time_delta + ' с', 'minus');
@@ -1207,7 +1241,7 @@ a:focus-visible, button:focus-visible {
         comboToastMaybe();
         setTimeout(advance, REDUCED ? 0 : 1500);
       } else {
-        registerWrong(q);
+        registerWrong(q, d);
         showDelta(d.time_delta + ' с', 'minus');
         flashTrack(true);
         vignette();
@@ -1236,7 +1270,7 @@ a:focus-visible, button:focus-visible {
         comboToastMaybe();
         setTimeout(advance, REDUCED ? 0 : 600);
       } else {
-        registerWrong(q);
+        registerWrong(q, d);
         fb.textContent = 'Правильный ответ: ' + d.correct_value;
         fb.className = 'num-feedback bad';
         showDelta(d.time_delta + ' с', 'minus');
@@ -1393,11 +1427,32 @@ a:focus-visible, button:focus-visible {
         li.innerHTML = '<span class="mi-topic"></span><span class="mi-q"></span><br>';
         li.querySelector('.mi-topic').textContent = topicName;
         li.querySelector('.mi-q').textContent = m.q.question.slice(0, 120) + (m.q.question.length > 120 ? '…' : '');
-        var a = document.createElement('a');
-        a.href = '/catalog/' + m.q.problem_id + '/';
-        a.textContent = 'Открыть задачу →';
-        a.target = '_blank';
-        li.appendChild(a);
+        if (m.q.generated) {
+          // у сгенерированного вопроса нет задачи в каталоге —
+          // вместо ссылки разворачиваем пошаговое решение
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'mi-sol-btn';
+          btn.textContent = 'Показать решение';
+          var sol = document.createElement('div');
+          sol.className = 'mi-solution';
+          sol.textContent = m.solution || 'Решение недоступно.';
+          sol.hidden = true;
+          btn.addEventListener('click', function (b, s) {
+            return function () {
+              s.hidden = !s.hidden;
+              b.textContent = s.hidden ? 'Показать решение' : 'Скрыть решение';
+            };
+          }(btn, sol));
+          li.appendChild(btn);
+          li.appendChild(sol);
+        } else {
+          var a = document.createElement('a');
+          a.href = '/catalog/' + m.q.problem_id + '/';
+          a.textContent = 'Открыть задачу →';
+          a.target = '_blank';
+          li.appendChild(a);
+        }
         list.appendChild(li);
       });
       renderMath(list);

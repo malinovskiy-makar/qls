@@ -19,6 +19,7 @@ import json
 import random
 from fractions import Fraction
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -57,6 +58,16 @@ def parse_exact_number(s):
         return None
 
 
+def _pool_qs():
+    """Базовый queryset игрового пула с учётом флага GAME_GENERATED_ENABLED:
+    при False сгенерированные вопросы полностью исключаются из выдачи
+    (единая точка — счётчики страницы и выбор вопроса ходят только сюда)."""
+    qs = GameQuestion.objects.filter(lang=GAME_LANG)
+    if not getattr(settings, 'GAME_GENERATED_ENABLED', False):
+        qs = qs.filter(is_generated=False)
+    return qs
+
+
 def _mode_payload(mode_key):
     """Параметры режима для клиента (тайминги — только из config.py)."""
     m = config.MODES[mode_key]
@@ -76,7 +87,7 @@ def game_page(request):
     """Страница игры: три экрана в одном шаблоне, управляются JS."""
     # Чипы тем: только канонические темы, по которым в пуле достаточно вопросов.
     counts = {}
-    for g in GameQuestion.objects.filter(lang=GAME_LANG).values_list('topics', flat=True):
+    for g in _pool_qs().values_list('topics', flat=True):
         for name in g:
             counts[name] = counts.get(name, 0) + 1
     topics = [name for name in CANONICAL
@@ -84,8 +95,7 @@ def game_page(request):
 
     # Сколько ru-вопросов доступно на каждый режим (для карточек на старте).
     type_counts = {}
-    for qtype in GameQuestion.objects.filter(lang=GAME_LANG).values_list(
-            'question_type', flat=True):
+    for qtype in _pool_qs().values_list('question_type', flat=True):
         type_counts[qtype] = type_counts.get(qtype, 0) + 1
     pool_counts = {key: type_counts.get(m['question_type'], 0)
                    for key, m in config.MODES.items()}
@@ -104,7 +114,10 @@ def game_page(request):
 
 
 def _question_payload(gq, number):
-    """Вопрос для клиента — БЕЗ правильного ответа (анти-чит)."""
+    """Вопрос для клиента — БЕЗ правильного ответа (анти-чит).
+
+    У сгенерированных вопросов gen_solution сюда тоже НЕ входит: решение
+    содержит ответ, клиент получает его только в ответе api_answer."""
     payload = {
         'id': gq.id,
         'number': number,
@@ -112,7 +125,8 @@ def _question_payload(gq, number):
         'question': gq.question,
         'options': gq.options,
         'topics': gq.topics,
-        'problem_id': gq.problem_id,
+        'problem_id': gq.problem_id,     # None у сгенерированных
+        'generated': gq.is_generated,    # чип «Тренировочный» на карточке
     }
     if gq.question_type == 'numeric' and gq.unit:
         # единица измерения («%», «руб.») — подсказка у поля ввода, не ответ
@@ -136,8 +150,7 @@ def _pick_next(request, state):
     seen_run = set(state['seen'])
     topic = state.get('topic')
 
-    rows = GameQuestion.objects.filter(
-        lang=GAME_LANG, question_type=qtype).values_list('id', 'topics')
+    rows = _pool_qs().filter(question_type=qtype).values_list('id', 'topics')
     candidates = [pk for pk, topics in rows
                   if pk not in seen_run and (not topic or topic in topics)]
     if not candidates:
@@ -281,4 +294,8 @@ def api_answer(request):
         payload['correct_value'] = gq.correct_value
     else:
         payload['correct_index'] = gq.correct_index
+    # Сгенерированный вопрос: пошаговое решение для «Разобрать ошибки»
+    # (в каталог его не откроешь — задачи-источника нет).
+    if gq.is_generated and gq.gen_solution:
+        payload['solution'] = gq.gen_solution
     return JsonResponse(payload)

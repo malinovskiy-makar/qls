@@ -476,3 +476,58 @@ class StorageTests(TestCase):
         call_command('purge_generated', verbosity=0)
         self.assertEqual(
             GameQuestion.objects.filter(is_generated=True).count(), 0)
+
+
+class ServingTests(TestCase):
+    """Выдача: флаг GAME_GENERATED_ENABLED, анти-чит, решение в разборе."""
+
+    def _start_session(self, mode='classic'):
+        return self.client.get('/game/api/session/start/?mode=' + mode)
+
+    def test_flag_off_excludes_generated(self):
+        make_generated_question()
+        with self.settings(GAME_GENERATED_ENABLED=False):
+            resp = self._start_session()
+            # других numeric в пуле нет → пул пуст
+            self.assertEqual(resp.status_code, 503)
+
+    def test_flag_on_serves_generated_with_anticheat(self):
+        gq = make_generated_question()
+        with self.settings(GAME_GENERATED_ENABLED=True):
+            resp = self._start_session()
+            self.assertEqual(resp.status_code, 200)
+            q = resp.json()['question']
+            self.assertEqual(q['id'], gq.pk)
+            self.assertTrue(q['generated'])
+            self.assertIsNone(q['problem_id'])
+            self.assertEqual(q.get('unit'), u'ден. ед.')
+            # анти-чит: ни ответа, ни решения в payload вопроса
+            payload_text = str(q)
+            self.assertNotIn('correct', payload_text)
+            self.assertNotIn(u'Шаг решения', payload_text)
+
+            # неверный ответ → решение приходит в разборе
+            resp = self.client.post(
+                '/game/api/answer/',
+                data='{"question_id": %d, "value": "5"}' % gq.pk,
+                content_type='application/json')
+            data = resp.json()
+            self.assertEqual(data['result'], 'wrong')
+            self.assertEqual(data['correct_value'], '4')
+            self.assertEqual(data['solution'], u'1. Шаг решения.')
+
+    def test_game_page_counts_respect_flag(self):
+        import json as _json
+        import re as _re
+        make_generated_question()
+
+        def classic_count():
+            resp = self.client.get('/game/')
+            m = _re.search(r'"pool_counts": ({[^}]+})',
+                           resp.content.decode('utf-8'))
+            return _json.loads(m.group(1))['classic']
+
+        with self.settings(GAME_GENERATED_ENABLED=False):
+            self.assertEqual(classic_count(), 0)
+        with self.settings(GAME_GENERATED_ENABLED=True):
+            self.assertEqual(classic_count(), 1)

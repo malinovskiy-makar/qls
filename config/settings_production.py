@@ -72,3 +72,7 @@ XELATEX_PATH = None
 # ─── sentence-transformers: не грузим на сервере ─────────────────────────────
 
 LOAD_EMBEDDINGS_MODEL = False
+
+# ─── Econ Rush: сгенерированные вопросы выключены до решения о выкатке ──────
+
+GAME_GENERATED_ENABLED = False
