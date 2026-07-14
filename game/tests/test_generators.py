@@ -247,6 +247,29 @@ class ControlNumbersBlockV(SimpleTestCase):
         self.assertEqual(s['price_high'], 2)
 
 
+class ControlNumbersBlockG(SimpleTestCase):
+    """Контрольные числа Задачи 6 (макро-лайт)."""
+
+    def test_mpc_multiplier(self):
+        # MPC = 0,8 → мультипликатор 5; ΔG = 20 → ΔВВП = 100
+        s = ARCHETYPES['mpc_multiplier'].solve(
+            {'mpc': '0,8', 'dg': 20, 'variant': 'given_dg'})
+        self.assertEqual(s['mult'], 5)
+        self.assertEqual(s['dgdp'], 100)
+        s2 = ARCHETYPES['mpc_multiplier'].solve(
+            {'mpc': '0,8', 'dy': 100, 'variant': 'need_dy'})
+        self.assertEqual(s2['dg_needed'], 20)
+
+    def test_labor_minwage(self):
+        # Ld = 100 − 2W, Ls = −20 + 4W → W* = 20, L* = 60; МРОТ 25 → 30
+        s = ARCHETYPES['labor_minwage'].solve(
+            {'a': 100, 'b': 2, 'c': -20, 'd': 4, 'wm': 25})
+        self.assertEqual(s['w_star'], 20)
+        self.assertEqual(s['l_star'], 60)
+        self.assertEqual(s['unemployment'], 30)
+        self.assertEqual(s['employment'], 50)
+
+
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
 
@@ -367,3 +390,20 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             test.assertNotEqual(solved['adv_x'], solved['adv_y'])
             test.assertLess(solved['price_low'], solved['price_high'])
         self.run_archetype('comparative_advantage', v)
+
+    def test_mpc_multiplier(self):
+        def v(test, params, solved):
+            test.assertGreater(solved['mult'], 1)
+            mpc = Fraction(str(params['mpc']).replace(',', '.'))
+            test.assertEqual(solved['mult'] * (1 - mpc), 1)
+        self.run_archetype('mpc_multiplier', v)
+
+    def test_labor_minwage(self):
+        def v(test, params, solved):
+            test.assertGreater(solved['w_star'], 0)
+            test.assertGreater(solved['l_star'], 0)
+            # МРОТ связывает: выше равновесной ставки, занятость жива
+            test.assertGreater(params['wm'], solved['w_star'])
+            test.assertGreater(solved['employment'], 0)
+            test.assertGreater(solved['unemployment'], 0)
+        self.run_archetype('labor_minwage', v)
