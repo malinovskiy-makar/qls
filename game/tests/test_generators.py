@@ -155,6 +155,15 @@ class ControlNumbersBlockA(SimpleTestCase):
         self.assertEqual(s['pb'], 40)
         self.assertEqual(s['ps'], 60)
 
+    def test_price_control(self):
+        # потолок P = 30 при равновесии 50 → дефицит 40
+        s = ARCHETYPES['price_control'].solve(
+            {'a': 100, 'b': 1, 'c': 0, 'd': 1, 'good': 0,
+             'kind': 'ceiling', 'limit': 30})
+        self.assertEqual(s['gap'], 40)
+        self.assertEqual(s['q_sold'], 30)
+        self.assertEqual(s['q_d'], 70)
+
 
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
@@ -178,3 +187,14 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             test.assertGreater(solved['ps'], 0)
             test.assertEqual(Fraction(solved['dwl']).denominator, 1)
         self.run_archetype('tax_subsidy', v)
+
+    def test_price_control(self):
+        def v(test, params, solved):
+            # ограничение связывает: потолок ниже P*, пол выше
+            if params['kind'] == 'ceiling':
+                test.assertLess(params['limit'], solved['p0'])
+            else:
+                test.assertGreater(params['limit'], solved['p0'])
+            test.assertGreater(solved['q_d'], 0)
+            test.assertGreater(solved['q_s'], 0)
+        self.run_archetype('price_control', v)
