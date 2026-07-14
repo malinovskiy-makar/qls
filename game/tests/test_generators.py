@@ -226,6 +226,17 @@ class ControlNumbersBlockV(SimpleTestCase):
         self.assertEqual(s['y_at_x'], 10)
         self.assertIn(u'на границе', s['point_class'])
 
+    def test_ppf_joint(self):
+        # A(60X/30Y) + B(20X/40Y) → излом (60; 40); при X = 70 → Y = 20
+        base = {'mxa': 60, 'mya': 30, 'mxb': 20, 'myb': 40,
+                'gx': 0, 'gy': 1}
+        s = ARCHETYPES['ppf_joint'].solve(dict(base, x0=70))
+        self.assertEqual(s['kink_x'], 60)
+        self.assertEqual(s['kink_y'], 40)
+        self.assertEqual(s['y_at_x'], 20)
+        self.assertEqual(s['total_max_x'], 80)
+        self.assertEqual(s['total_max_y'], 70)
+
 
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
@@ -332,3 +343,11 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             # взаимно обратные альтернативные стоимости
             test.assertEqual(solved['oc_x'] * solved['oc_y'], 1)
         self.run_archetype('ppf_single', v)
+
+    def test_ppf_joint(self):
+        def v(test, params, solved):
+            test.assertGreater(solved['y_at_x'], 0)
+            test.assertGreater(solved['kink_x'], 0)
+            test.assertGreater(solved['kink_y'], 0)
+            test.assertLess(solved['kink_y'], solved['total_max_y'])
+        self.run_archetype('ppf_joint', v)
