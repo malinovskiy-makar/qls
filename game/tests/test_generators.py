@@ -178,6 +178,13 @@ class ControlNumbersBlockA(SimpleTestCase):
         self.assertEqual(s['rev_class'], u'не изменится')
         self.assertEqual(s['dr_abs'], 0)
 
+    def test_surplus(self):
+        s = ARCHETYPES['surplus'].solve(
+            {'a': 100, 'b': 1, 'c': 0, 'd': 1, 'good': 0})
+        self.assertEqual(s['cs'], 1250)
+        self.assertEqual(s['ps'], 1250)
+        self.assertEqual(s['total'], 2500)
+
 
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
@@ -234,3 +241,12 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             else:
                 test.assertEqual(solved['rev_class'], u'не изменится')
         self.run_archetype('elasticity_arc', v)
+
+    def test_surplus(self):
+        def v(test, params, solved):
+            market_validator(test, params, solved)
+            # валидный треугольник PS: цена предложения при Q=0 неотрицательна
+            test.assertLessEqual(params['c'], 0)
+            test.assertGreater(solved['cs'], 0)
+            test.assertGreater(solved['ps'], 0)
+        self.run_archetype('surplus', v)
