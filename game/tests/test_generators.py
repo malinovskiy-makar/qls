@@ -12,11 +12,13 @@
 import random
 from fractions import Fraction
 
-from django.test import SimpleTestCase
+from django.core.management import call_command
+from django.test import SimpleTestCase, TestCase
 
 from game.generators import base as gbase
 from game.generators.base import fmt_num, is_nice, LIMIT_FULL, LIMIT_SHORT
 from game.generators.registry import ARCHETYPES
+from game.models import GameQuestion
 from game.views import parse_exact_number
 
 N_SAMPLES = 500          # сэмплов на архетип (распределяются по трём типам)
@@ -407,3 +409,70 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             test.assertGreater(solved['employment'], 0)
             test.assertGreater(solved['unemployment'], 0)
         self.run_archetype('labor_minwage', v)
+
+
+def make_generated_question(**kw):
+    """Минимальный сгенерированный вопрос для тестов хранения/выдачи."""
+    defaults = dict(
+        problem=None, part=None,
+        question_type='numeric',
+        question=u'Тестовый сгенерированный вопрос: чему равно 2 + 2?',
+        options=[],
+        correct_value='4',
+        difficulty=2,
+        topics=[u'Спрос и предложение'],
+        lang='ru',
+        unit=u'ден. ед.',
+        is_generated=True,
+        generator_key='equilibrium',
+        gen_params={'a': 100, 'b': 1, 'c': 0, 'd': 1, 'good': 0,
+                    '_asked': 'p_star', '_wrapper': 'city'},
+        gen_solution=u'1. Шаг решения.',
+    )
+    defaults.update(kw)
+    return GameQuestion.objects.create(**defaults)
+
+
+class StorageTests(TestCase):
+    """Хранение: build_game_pool не трогает сгенерированные,
+    generate_game_questions пишет и переписывает, purge_generated
+    возвращает пул ровно к исходному состоянию."""
+
+    def test_build_game_pool_preserves_generated(self):
+        from problems.models import Problem
+        p = Problem.objects.create(
+            statement=u'Тестовая задача-источник', status='draft',
+            problem_type=u'тест: один ответ')
+        GameQuestion.objects.create(
+            problem=p, question_type='single',
+            question=u'Старый вопрос из теста', options=['1', '2'],
+            correct_index=0, lang='ru')
+        gen = make_generated_question()
+
+        call_command('build_game_pool', verbosity=0)
+
+        # сгенерированный жив, вопрос из теста пересобран (кандидатов нет → 0)
+        self.assertTrue(
+            GameQuestion.objects.filter(pk=gen.pk, is_generated=True).exists())
+        self.assertEqual(
+            GameQuestion.objects.filter(is_generated=False).count(), 0)
+
+    def test_generate_and_purge_roundtrip(self):
+        baseline = make_generated_question(
+            generator_key='__manual__').pk  # чужой ключ не должен удаляться
+        call_command('generate_game_questions', '--per-archetype', '2',
+                     '--confirm', '--only', 'equilibrium', verbosity=0)
+        n_eq = GameQuestion.objects.filter(
+            is_generated=True, generator_key='equilibrium').count()
+        self.assertEqual(n_eq, 6)  # 2 вопроса × 3 типа
+        self.assertTrue(GameQuestion.objects.filter(pk=baseline).exists())
+
+        # повторный запуск того же ключа не плодит дубли
+        call_command('generate_game_questions', '--per-archetype', '2',
+                     '--confirm', '--only', 'equilibrium', verbosity=0)
+        self.assertEqual(GameQuestion.objects.filter(
+            is_generated=True, generator_key='equilibrium').count(), 6)
+
+        call_command('purge_generated', verbosity=0)
+        self.assertEqual(
+            GameQuestion.objects.filter(is_generated=True).count(), 0)
