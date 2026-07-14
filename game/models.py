@@ -27,8 +27,10 @@ class GameQuestion(models.Model):
     # FK (не OneToOne): одна задача может дать несколько игровых вопросов —
     # задел под данетки-пачки из будущего импорта (разведка 2026-07-11
     # показала, что в текущей базе пачек нет, но формат приедет с регионами).
+    # NULL — только у сгенерированных вопросов (is_generated=True): у них
+    # нет задачи-источника, их math задаётся generator_key + gen_params.
     problem = models.ForeignKey(
-        'problems.Problem', on_delete=models.CASCADE,
+        'problems.Problem', on_delete=models.CASCADE, null=True, blank=True,
         related_name='game_questions', verbose_name='Задача-источник')
     # Подпункт-источник — только для вопросов, извлечённых из конкретного
     # ProblemPart (разбивка пачек). Для вопросов «вся задача целиком» — NULL.
@@ -70,6 +72,19 @@ class GameQuestion(models.Model):
     # («единица ответа: …»), денормализуется при пересборке пула.
     unit = models.CharField('Единица ответа', max_length=40, blank=True,
                             default='')
+
+    # --- Параметрические генераторы (game/generators/) ---
+    # Сгенерированные вопросы живут в том же кэше, но: build_game_pool их
+    # НЕ трогает (пересобирает только is_generated=False), а полный откат —
+    # команда purge_generated.
+    is_generated = models.BooleanField(
+        'Сгенерирован', default=False, db_index=True)
+    generator_key = models.CharField(
+        'Ключ генератора (архетип)', max_length=64, blank=True, default='')
+    gen_params = models.JSONField(
+        'Параметры генерации', null=True, blank=True)
+    gen_solution = models.TextField(
+        'Пошаговое решение (KaTeX)', blank=True, default='')
 
     created_at = models.DateTimeField('Собран', auto_now_add=True)
 

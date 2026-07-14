@@ -557,7 +557,11 @@ class Command(BaseCommand):
             built.append(gq)
 
         with transaction.atomic():
-            deleted, _ = GameQuestion.objects.all().delete()
+            # Сгенерированные вопросы (is_generated=True) — отдельный слой
+            # кэша, ими управляют generate_game_questions/purge_generated;
+            # пересборка пула из тестов их НЕ трогает.
+            deleted, _ = GameQuestion.objects.filter(
+                is_generated=False).delete()
             GameQuestion.objects.bulk_create(built, batch_size=500)
 
         self.stdout.write(self.style.SUCCESS(
