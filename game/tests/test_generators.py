@@ -272,6 +272,30 @@ class ControlNumbersBlockG(SimpleTestCase):
         self.assertEqual(s['employment'], 50)
 
 
+class ControlNumbersBonus(SimpleTestCase):
+    """Контрольные числа бонус-архетипов 16–17."""
+
+    def test_price_index(self):
+        # (10 шт: 4→6) + (5 шт: 8→8) → индекс 125 %, инфляция 25 %
+        s = ARCHETYPES['price_index'].solve(
+            {'n1': 10, 'n2': 5, 'p1_0': 4, 'p1_1': 6,
+             'p2_0': 8, 'p2_1': 8, 'g1': 0, 'g2': 1})
+        self.assertEqual(s['cost0'], 80)
+        self.assertEqual(s['cost1'], 100)
+        self.assertEqual(s['index'], 125)
+        self.assertEqual(s['inflation'], 25)
+
+    def test_perfect_price_discrimination(self):
+        # P = 100 − Q, MC = 20 → выпуск 80, прибыль 3200 (без FC)
+        s = ARCHETYPES['perfect_price_discrimination'].solve(
+            {'a': 100, 'b': 1, 'mc': 20, 'good': 0})
+        self.assertEqual(s['q_pd'], 80)
+        self.assertEqual(s['profit_pd'], 3200)
+        self.assertEqual(s['q_m'], 40)
+        self.assertEqual(s['profit_m'], 1600)
+        self.assertEqual(s['extra'], 1600)
+
+
 class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
     """500 сэмплов на каждый архетип."""
 
@@ -399,6 +423,24 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             mpc = Fraction(str(params['mpc']).replace(',', '.'))
             test.assertEqual(solved['mult'] * (1 - mpc), 1)
         self.run_archetype('mpc_multiplier', v)
+
+    def test_price_index(self):
+        def v(test, params, solved):
+            test.assertGreater(params['p1_1'], 0)
+            test.assertGreater(params['p2_1'], 0)
+            test.assertGreater(solved['cost0'], 0)
+            # по построению инфляция положительна
+            test.assertGreater(solved['index'], 100)
+        self.run_archetype('price_index', v)
+
+    def test_perfect_price_discrimination(self):
+        def v(test, params, solved):
+            test.assertGreater(params['a'], params['mc'])
+            test.assertGreater(solved['q_pd'], 0)
+            test.assertGreater(solved['profit_pd'], 0)
+            # дискриминация ровно удваивает прибыль линейной монополии
+            test.assertEqual(solved['profit_pd'], 2 * solved['profit_m'])
+        self.run_archetype('perfect_price_discrimination', v)
 
     def test_labor_minwage(self):
         def v(test, params, solved):

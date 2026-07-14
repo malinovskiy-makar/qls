@@ -13,7 +13,8 @@ def _build():
     from . import (equilibrium, shift_equilibrium, tax_subsidy, price_control,
                    elasticity_point, elasticity_arc, surplus, costs_tc,
                    comp_firm, monopoly, ppf_single, ppf_joint,
-                   comparative_advantage, mpc_multiplier, labor_minwage)
+                   comparative_advantage, mpc_multiplier, labor_minwage,
+                   price_index, perfect_price_discrimination)
     archetypes = [
         # Блок А — рынок (спрос и предложение)
         equilibrium.ARCHETYPE,
@@ -27,6 +28,7 @@ def _build():
         costs_tc.ARCHETYPE,
         comp_firm.ARCHETYPE,
         monopoly.ARCHETYPE,
+        perfect_price_discrimination.ARCHETYPE,  # бонус 17
         # Блок В — КПВ и торговля
         ppf_single.ARCHETYPE,
         ppf_joint.ARCHETYPE,
@@ -34,6 +36,7 @@ def _build():
         # Блок Г — макро-лайт
         mpc_multiplier.ARCHETYPE,
         labor_minwage.ARCHETYPE,
+        price_index.ARCHETYPE,  # бонус 16
     ]
     return OrderedDict((a.key, a) for a in archetypes)
 
