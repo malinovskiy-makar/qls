@@ -638,55 +638,169 @@ a:focus-visible, button:focus-visible {
 }
 
 /* ── Экран 3: финал ────────────────────────────────────────────── */
-#screen-final .final-grid {
-  max-width: 880px;
+/* ── Экран результатов ─────────────────────────────────────────────
+   Один столбец сверху вниз по важности. Акцент сайта (малиновый) —
+   ровно на одном блоке: «Работа над ошибками». Всё остальное —
+   поверхности и текст. */
+#screen-final .final {
+  max-width: 760px;
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
-.final-left h2 { font-size: 26px; font-weight: 800; letter-spacing: -.5px; }
-.final-mode { margin-top: 2px; font-size: 14px; color: var(--text2); }
-.final-score {
-  font-size: 56px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -2px;
-  margin: 6px 0 2px;
+.fin-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
 }
-.final-score small { font-size: 15px; font-weight: 600; color: var(--text3); letter-spacing: 0; margin-left: 6px; }
-.record-badge {
-  display: none;
-  margin: 10px 0 2px;
-  padding: 8px 14px;
-  border-radius: 10px;
-  background: var(--rush-accent);
-  color: #fff;
+.fin-head h2 { font-size: 26px; font-weight: 800; letter-spacing: -.5px; }
+.fin-sub { margin-top: 6px; display: flex; align-items: center; gap: 8px; }
+.fin-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--rush-accent-tint);
+  color: var(--rush-accent);
+  font-size: 12.5px;
   font-weight: 700;
-  font-size: 14px;
 }
-.record-badge.on { display: inline-block; }
-.stats-grid {
+.fin-date { font-size: 12.5px; color: var(--text3); }
+.fin-head-r { text-align: right; flex-shrink: 0; }
+.fin-hearts { font-size: 17px; letter-spacing: 3px; line-height: 1; }
+.fin-hearts .heart.lost { opacity: .35; }
+.fin-reason { margin-top: 7px; font-size: 12.5px; color: var(--text3); }
+
+.fin-metrics {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
   gap: 10px;
-  margin-top: 18px;
 }
-.stat-cell {
+.metric {
   background: var(--rush-surface);
   border: 1px solid var(--rush-border);
   border-radius: 12px;
   padding: 12px 14px;
 }
-.stat-cell b {
+.metric small { font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: .3px; }
+.metric b {
   display: block;
+  margin-top: 2px;
   font-size: 22px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.stat-cell span { font-size: 12px; color: var(--text3); }
-.final-actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+.metric > span { font-size: 12px; color: var(--text3); }
+.metric-main b.final-score {
+  font-size: 38px;
+  letter-spacing: -1.5px;
+  line-height: 1.1;
+}
+.record-badge {
+  display: none;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--rush-accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 11.5px;
+}
+.record-badge.on { display: inline-block; }
+
+/* Работа над ошибками — единственный акцентный блок экрана */
+.fin-mistakes {
+  border: 1.5px solid var(--rush-accent);
+  border-radius: 14px;
+  background: var(--rush-accent-tint);
+  padding: 18px 20px;
+}
+.fin-mistakes[hidden], .fin-clean[hidden], .fin-topics[hidden] { display: none; }
+.fin-mistakes h3 { font-size: 17px; font-weight: 800; color: var(--rush-accent); }
+.fm-lead { margin-top: 3px; font-size: 13.5px; color: var(--text2); }
+/* полоса пропорции: доли тем в будущем забеге, ширина = доля */
+.fm-bar {
+  display: flex;
+  height: 10px;
+  margin: 14px 0 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--rush-surface);
+}
+.fm-bar i { display: block; height: 100%; }
+.fm-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.fm-legend li { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text2); }
+.fm-legend i { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+.fm-go {
+  font: inherit; font-size: 15px; font-weight: 700;
+  margin-top: 14px;
+  height: 46px; padding: 0 22px;
+  border: none; border-radius: 10px;
+  background: var(--rush-accent); color: #fff;
+  cursor: pointer;
+  transition: filter .12s, transform .1s;
+}
+.fm-go:hover { filter: brightness(1.08); }
+.fm-go:active { transform: scale(.97); }
+
+.fin-clean {
+  border: 1px solid var(--rush-ok);
+  background: var(--rush-ok-tint);
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+.fin-clean b { font-size: 16px; color: var(--rush-ok); }
+.fin-clean p { margin-top: 3px; font-size: 13.5px; color: var(--text2); }
+/* текстовая кнопка-ссылка (внутри предложения) */
+.link-btn {
+  font: inherit; font-weight: 700;
+  padding: 0; border: none; background: none;
+  color: var(--rush-accent); cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Точность по темам */
+.fin-topics h3, .fin-details h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.tp-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.tp-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
+.tp-name { font-size: 13.5px; font-weight: 600; }
+.tp-num { font-size: 12.5px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.tp-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.tp-bar i { display: block; height: 100%; }
+.tp-ok { background: var(--rush-ok); }
+.tp-bad { background: var(--rush-bad); }
+.tp-skip { background: var(--text3); opacity: .45; }
+.tp-key { margin-top: 12px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text3); }
+.tp-key .k { width: 9px; height: 9px; border-radius: 3px; margin-left: 10px; }
+.tp-key .k:first-child { margin-left: 0; }
+.k-ok { background: var(--rush-ok); }
+.k-bad { background: var(--rush-bad); }
+.k-skip { background: var(--text3); opacity: .45; }
+
+/* Подробная статистика — свёрнута, графики строятся при раскрытии */
+.det-toggle {
+  font: inherit; font-size: 14px; font-weight: 600;
+  width: 100%;
+  height: 44px; padding: 0 16px;
+  text-align: left;
+  border: 1px solid var(--rush-border); border-radius: 10px;
+  background: var(--rush-surface); color: var(--text2);
+  cursor: pointer;
+}
+.det-toggle::after { content: ' ▾'; float: right; color: var(--text3); }
+.det-toggle[aria-expanded="true"]::after { content: ' ▴'; }
+.det-toggle:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+.det-body { margin-top: 12px; }
+.det-body[hidden] { display: none; }
+
+.final-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .btn-again {
   font: inherit; font-size: 15px; font-weight: 600;
   height: 46px; padding: 0 28px;
@@ -706,8 +820,9 @@ a:focus-visible, button:focus-visible {
   transition: border-color .12s, color .12s;
 }
 .btn-copy:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+/* ссылка «в каталог» носит вид кнопки .btn-copy — выравниваем текст по центру */
+a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
-.final-right h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
 .miss-list { list-style: none; max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .miss-item {
   background: var(--rush-surface);
@@ -773,7 +888,13 @@ a:focus-visible, button:focus-visible {
   .q-card { font-size: 16.5px; padding: 18px 18px; min-height: 84px; }
   .hud-timer { font-size: 28px; }
   .quit-x { position: static; float: right; }
-  #screen-final .final-grid { grid-template-columns: 1fr; }
+  /* результаты: всё в один столбец, метрики по две в ряд */
+  .fin-metrics { grid-template-columns: 1fr 1fr; }
+  .fin-head { flex-direction: column; }
+  .fin-head-r { text-align: left; }
+  .final-actions { flex-direction: column; align-items: stretch; }
+  .final-actions .btn-again, .final-actions .btn-copy { width: 100%; }
+  .btn-catalog { display: flex; align-items: center; justify-content: center; }
 }
 /* на тач-устройствах подсказки клавиш не нужны при любой ширине */
 @media (hover: none) {
@@ -848,29 +969,96 @@ a:focus-visible, button:focus-visible {
     </div>
   </section>
 
-  <!-- ЭКРАН 3: ФИНАЛ -->
+  <!-- ЭКРАН 3: ФИНАЛ.
+       Порядок блоков = порядок важности: чем кончилось → сколько набрал →
+       ЧТО С ЭТИМ ДЕЛАТЬ (работа над ошибками, акцент сайта) → где именно
+       ошибся (точность по темам) → необязательные подробности и шеринг. -->
   <section id="screen-final" class="screen">
-    <div class="final-grid">
-      <div class="final-left">
-        <h2 id="final-title">Время вышло!</h2>
-        <p class="final-mode" id="final-mode"></p>
-        <div class="final-score"><span id="final-score">0</span><small>очков</small></div>
-        <div class="record-badge" id="record-badge">🏆 Новый рекорд!</div>
-        <div class="stats-grid">
-          <div class="stat-cell"><b id="st-correct">0/0</b><span>верных ответов</span></div>
-          <div class="stat-cell"><b id="st-acc">0%</b><span>точность</span></div>
-          <div class="stat-cell"><b id="st-streak">×1</b><span>лучшая серия</span></div>
-          <div class="stat-cell"><b id="st-speed">0</b><span>вопросов в минуту</span></div>
+    <div class="final">
+
+      <!-- 1. Шапка: чем кончился забег -->
+      <header class="fin-head">
+        <div>
+          <h2 id="final-title">Время вышло!</h2>
+          <p class="fin-sub">
+            <span class="fin-chip" id="fin-mode-chip">Блиц</span>
+            <span class="fin-date" id="fin-date"></span>
+          </p>
         </div>
-        <div class="final-actions">
-          <button class="btn-again" id="btn-again">Ещё раз</button>
-          <button class="btn-copy" id="btn-copy">Скопировать результат</button>
+        <div class="fin-head-r">
+          <div class="fin-hearts" id="fin-hearts" aria-label="Жизни"></div>
+          <div class="fin-reason" id="fin-reason"></div>
+        </div>
+      </header>
+
+      <!-- 2. Метрики забега -->
+      <div class="fin-metrics">
+        <div class="metric metric-main">
+          <small>Итоговый счёт</small>
+          <b class="final-score" id="final-score">0</b>
+          <span class="record-badge" id="record-badge">🏆 личный рекорд</span>
+        </div>
+        <div class="metric">
+          <small>Верных</small>
+          <b id="st-correct">0/0</b>
+          <span id="st-acc">0%</span>
+        </div>
+        <div class="metric">
+          <small>Макс. комбо</small>
+          <b id="st-streak">×1</b>
+          <span id="st-streak-sub">серия 0</span>
+        </div>
+        <div class="metric">
+          <small>Жизни</small>
+          <b id="st-lives">3/3</b>
+          <span id="st-lives-sub">целы</span>
         </div>
       </div>
-      <div class="final-right">
-        <h3>Разобрать ошибки</h3>
-        <ul class="miss-list" id="miss-list"></ul>
+
+      <!-- 3. Работа над ошибками — главное действие экрана -->
+      <section class="fin-mistakes" id="fin-mistakes" hidden>
+        <h3>Работа над ошибками</h3>
+        <p class="fm-lead" id="fm-lead">Соберём забег по темам, где вы ошиблись</p>
+        <div class="fm-bar" id="fm-bar"></div>
+        <ul class="fm-legend" id="fm-legend"></ul>
+        <button class="fm-go" id="btn-mistakes">Начать работу над ошибками</button>
+      </section>
+
+      <!-- 3б. Идеальный забег: ошибок нет -->
+      <section class="fin-clean" id="fin-clean" hidden>
+        <b>Чисто! Ошибок нет</b>
+        <p id="clean-sub"></p>
+      </section>
+
+      <!-- 4. Точность по темам — обучающее ядро -->
+      <section class="fin-topics" id="fin-topics" hidden>
+        <h3>Точность по темам</h3>
+        <ul class="tp-list" id="tp-list"></ul>
+        <p class="tp-key">
+          <i class="k k-ok"></i> верно
+          <i class="k k-bad"></i> неверно
+          <i class="k k-skip"></i> пропуск
+        </p>
+      </section>
+
+      <!-- 5. Подробная статистика (графики — Фаза 5) -->
+      <section class="fin-details">
+        <button class="det-toggle" id="det-toggle" aria-expanded="false"
+                aria-controls="det-body">Подробная статистика</button>
+        <div class="det-body" id="det-body" hidden></div>
+      </section>
+
+      <!-- 6. Шеринг (Фаза 6) -->
+      <section class="fin-share" id="fin-share" hidden></section>
+
+      <!-- 7. Действия -->
+      <div class="final-actions">
+        <button class="btn-again" id="btn-again">Сыграть ещё раз</button>
+        <button class="btn-copy" id="btn-review" hidden>Разобрать все ошибки</button>
+        <a class="btn-copy" id="btn-catalog" href="/catalog/">Перейти к темам в каталоге</a>
       </div>
+      <ul class="miss-list" id="miss-list" hidden></ul>
+
     </div>
   </section>
 
@@ -898,6 +1086,7 @@ a:focus-visible, button:focus-visible {
 
   var CFG = {{ config_json|safe }};
   var REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var MISTAKES_RUN_SIZE = CFG.mistakes_run_size;  // размер целевого забега (config.py)
 
   /* Подписи карточек режимов (сама механика — только из CFG.modes) */
   var MODE_META = {
@@ -934,7 +1123,6 @@ a:focus-visible, button:focus-visible {
   var livesMax = 3;             // запас режима — сколько сердец рисовать
   var answered = 0;             // отвечено (без пропусков)
   var correctCount = 0;
-  var runStartedAt = 0;         // для «вопросов в минуту»
   var current = null;           // текущий вопрос {id, type, question, options, topics, problem_id}
   var nextBuf = null;           // предзагруженный следующий вопрос
   var inputLocked = true;       // во время фидбека ввод игнорируется
@@ -1092,7 +1280,6 @@ a:focus-visible, button:focus-visible {
         endReason = 'time'; runOver = false; goInfo = null; summary = null;
         $('gameover-overlay').hidden = true;
         timeLeft = MODE.duration;
-        runStartedAt = performance.now();
         show('playing');
         paintHud();
         paintLives(false);
@@ -1590,107 +1777,235 @@ a:focus-visible, button:focus-visible {
     };
   }
 
+  /* Сегменты полосы «работы над ошибками» — один акцентный цвет с разной
+     плотностью, а не своя палитра: зелёный и янтарь заняты смыслом
+     (верно / сложность), и новый цветной набор конкурировал бы с ними. */
+  var SEG_ALPHA = [1, .68, .45, .3, .2];
+  function segAlpha(i) { return SEG_ALPHA[Math.min(i, SEG_ALPHA.length - 1)]; }
+
+  function plural(n, forms) {  // [ошибка, ошибки, ошибок]
+    var n10 = n % 10, n100 = n % 100;
+    if (n10 === 1 && n100 !== 11) return forms[0];
+    if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return forms[1];
+    return forms[2];
+  }
+
+  function formatDate(iso) {
+    var d = iso ? new Date(iso) : new Date();
+    if (isNaN(d.getTime())) return '';
+    try {
+      return d.toLocaleString('ru-RU', { day: 'numeric', month: 'long',
+                                         hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return ''; }
+  }
+
+  function reasonText(s) {
+    if (s.ended_reason === 'lives') return 'выбыл на вопросе ' + s.last_number;
+    if (s.ended_reason === 'done') return 'вопросы кончились';
+    return 'время вышло';
+  }
+
+  function paintHearts(box, left, max) {
+    box.innerHTML = '';
+    for (var i = 0; i < max; i++) {
+      var h = document.createElement('span');
+      var lost = i >= left;
+      h.className = 'heart' + (lost ? ' lost' : '');
+      h.textContent = lost ? '♡' : '♥';
+      box.appendChild(h);
+    }
+    box.setAttribute('aria-label', 'Жизни: ' + left + ' из ' + max);
+  }
+
   function paintFinal() {
+    var s = summary;
     $('final-title').textContent =
       endReason === 'lives' ? 'Забег окончен' :
       endReason === 'done' ? 'Вопросы кончились' : 'Время вышло!';
-    var total = answered;
-    var acc = total ? Math.round(100 * correctCount / total) : 0;
-    var mins = Math.max(0.25, (performance.now() - runStartedAt) / 60000);
-    $('st-correct').textContent = correctCount + '/' + total;
-    $('st-acc').textContent = acc + '%';
-    $('st-streak').textContent = bestStreak; // длина лучшей серии верных подряд
-    $('st-speed').textContent = Math.round(total / mins);
+    $('fin-mode-chip').textContent = s.mode_title;
+    $('fin-date').textContent = formatDate(s.played_at);
+    paintHearts($('fin-hearts'), s.lives_left, s.lives_max);
+    $('fin-reason').textContent = reasonText(s);
+
+    /* метрики */
+    $('st-correct').textContent = s.correct + '/' + s.total;
+    $('st-acc').textContent = s.accuracy + '%';
+    $('st-streak').textContent = '×' + s.max_multiplier;
+    $('st-streak-sub').textContent = 'серия ' + s.best_streak;
+    $('st-lives').textContent = s.lives_left + '/' + s.lives_max;
+    var lost = s.lives_max - s.lives_left;
+    $('st-lives-sub').textContent = lost
+      ? lost + ' ' + plural(lost, ['потеряна', 'потеряно', 'потеряно'])
+      : 'целы';
 
     /* рекорд — посчитан в endRun (см. там про «событие, а не состояние») */
     $('record-badge').classList.toggle('on', isRecord);
     if (isRecord && !REDUCED) confetti();
-    $('final-mode').textContent = 'Режим «' + MODE.title + '»'
-      + (bestNow > 0 ? ' · рекорд ' + bestNow.toLocaleString('ru-RU') : '');
 
     /* счёт: count-up ~800 мс */
     var scoreEl = $('final-score');
     if (REDUCED) {
-      scoreEl.textContent = score.toLocaleString('ru-RU');
+      scoreEl.textContent = s.score.toLocaleString('ru-RU');
     } else {
       var t0 = performance.now();
       (function up(ts) {
         var k = Math.min(1, (ts - t0) / 800);
         var eased = 1 - Math.pow(1 - k, 3);
-        scoreEl.textContent = Math.round(score * eased).toLocaleString('ru-RU');
+        scoreEl.textContent = Math.round(s.score * eased).toLocaleString('ru-RU');
         if (k < 1) requestAnimationFrame(up);
       })(t0);
     }
 
-    /* разбор ошибок */
-    var list = $('miss-list');
-    list.innerHTML = '';
-    if (!misses.length) {
+    /* работа над ошибками / чистый забег */
+    var wrongTopics = (s.topic_rows || []).filter(function (t) { return t.wrong > 0; });
+    $('fin-mistakes').hidden = !wrongTopics.length;
+    // «Чисто!» — только когда ошибок ТОЧНО не было. Без сети тем нет,
+    // но число ошибок известно: молчим, а не поздравляем зря.
+    $('fin-clean').hidden = s.wrong > 0;
+    if (wrongTopics.length) paintMistakes(wrongTopics);
+    else if (!s.wrong) paintClean();
+
+    paintTopics(s);
+    paintMisses();
+  }
+
+  /* Блок работы над ошибками: полоса пропорции + легенда. Пропорция та же,
+     по которой сервер соберёт целевой забег — по сырому числу ошибок. */
+  function paintMistakes(rows) {
+    var totalWrong = rows.reduce(function (a, t) { return a + t.wrong; }, 0);
+    $('fm-lead').textContent = 'Соберём забег из ' + MISTAKES_RUN_SIZE
+      + ' вопросов по темам, где вы ошиблись: ' + totalWrong + ' '
+      + plural(totalWrong, ['ошибка', 'ошибки', 'ошибок']) + ' в '
+      + rows.length + ' ' + plural(rows.length, ['теме', 'темах', 'темах']);
+    var bar = $('fm-bar'); bar.innerHTML = '';
+    var leg = $('fm-legend'); leg.innerHTML = '';
+    rows.forEach(function (t, i) {
+      var seg = document.createElement('i');
+      seg.style.width = (100 * t.wrong / totalWrong) + '%';
+      seg.style.background = 'var(--rush-accent)';
+      seg.style.opacity = segAlpha(i);
+      bar.appendChild(seg);
+
       var li = document.createElement('li');
-      li.className = 'miss-empty';
-      li.textContent = 'Ни одной ошибки — чистый забег!';
-      list.appendChild(li);
+      var sw = document.createElement('i');
+      sw.style.background = 'var(--rush-accent)';
+      sw.style.opacity = segAlpha(i);
+      var txt = document.createElement('span');
+      txt.textContent = t.topic + ' — ' + t.wrong;
+      li.appendChild(sw);
+      li.appendChild(txt);
+      leg.appendChild(li);
+    });
+  }
+
+  /* Идеальный забег: вместо блока ошибок — предложение режима сложнее
+     (следующего по порядку контроля времени). */
+  function paintClean() {
+    var sub = $('clean-sub');
+    sub.textContent = '';
+    var next = MODE_ORDER[MODE_ORDER.indexOf(mode) + 1];
+    if (next && CFG.pool_counts[next]) {
+      sub.appendChild(document.createTextNode('Попробуйте режим сложнее — '));
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'link-btn';
+      b.textContent = CFG.modes[next].title;
+      b.addEventListener('click', function () { mode = next; startRun(); });
+      sub.appendChild(b);
     } else {
-      misses.forEach(function (m) {
-        var li = document.createElement('li');
-        li.className = 'miss-item';
-        var topicName = (m.q.topics && m.q.topics[0]) || 'Экономика';
-        li.innerHTML = '<span class="mi-topic"></span><span class="mi-q"></span><br>';
-        li.querySelector('.mi-topic').textContent = topicName;
-        li.querySelector('.mi-q').textContent = m.q.question.slice(0, 120) + (m.q.question.length > 120 ? '…' : '');
-        if (m.q.generated) {
-          // у сгенерированного вопроса нет задачи в каталоге —
-          // вместо ссылки разворачиваем пошаговое решение
-          var btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'mi-sol-btn';
-          btn.textContent = 'Показать решение';
-          var sol = document.createElement('div');
-          sol.className = 'mi-solution';
-          sol.textContent = m.solution || 'Решение недоступно.';
-          sol.hidden = true;
-          btn.addEventListener('click', function (b, s) {
-            return function () {
-              s.hidden = !s.hidden;
-              b.textContent = s.hidden ? 'Показать решение' : 'Скрыть решение';
-            };
-          }(btn, sol));
-          li.appendChild(btn);
-          li.appendChild(sol);
-        } else {
-          var a = document.createElement('a');
-          a.href = '/catalog/' + m.q.problem_id + '/';
-          a.textContent = 'Открыть задачу →';
-          a.target = '_blank';
-          li.appendChild(a);
-        }
-        list.appendChild(li);
-      });
-      renderMath(list);
+      sub.textContent = 'Чище уже некуда — попробуйте побить свой рекорд.';
     }
   }
 
-  $('btn-again').addEventListener('click', startRun);
+  /* Точность по темам: зелёный верно / красный неверно / серый пропуск */
+  function paintTopics(s) {
+    var rows = s.topic_rows || [];
+    $('fin-topics').hidden = !rows.length;
+    var list = $('tp-list');
+    list.innerHTML = '';
+    rows.forEach(function (t) {
+      var li = document.createElement('li');
+      li.className = 'tp-row';
+      var name = document.createElement('span');
+      name.className = 'tp-name';
+      name.textContent = t.topic;
+      var num = document.createElement('span');
+      num.className = 'tp-num';
+      var tries = t.correct + t.wrong;
+      num.textContent = tries
+        ? t.correct + '/' + tries + ' · ' + t.accuracy + '%'
+        : 'пропущено';
+      var bar = document.createElement('div');
+      bar.className = 'tp-bar';
+      [['tp-ok', t.correct], ['tp-bad', t.wrong], ['tp-skip', t.skip]]
+        .forEach(function (pair) {
+          if (!pair[1]) return;
+          var seg = document.createElement('i');
+          seg.className = pair[0];
+          seg.style.width = (100 * pair[1] / t.total) + '%';
+          bar.appendChild(seg);
+        });
+      li.appendChild(name);
+      li.appendChild(num);
+      li.appendChild(bar);
+      list.appendChild(li);
+    });
+  }
 
-  $('btn-copy').addEventListener('click', function () {
-    var total = answered;
-    var text = 'Econ Rush · ' + MODE.title + ' · ' + score.toLocaleString('ru-RU')
-      + ' очков · ' + correctCount + '/' + total + ' · комбо ×' + comboMult(bestStreak)
-      + ' — обгони меня: ' + location.origin + '/game/';
-    var btn = this;
-    function restore() {
-      setTimeout(function () { btn.textContent = 'Скопировать результат'; }, 2000);
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () {
-        btn.textContent = 'Скопировано ✓'; restore();
-      }, function () {
-        prompt('Скопируйте результат:', text); restore();
-      });
-    } else {
-      prompt('Скопируйте результат:', text); restore();
-    }
+  /* Список промахов — под кнопкой «Разобрать все ошибки».
+     Тексты вопросов есть только у клиента (в журнале сервера их нет). */
+  function paintMisses() {
+    var btn = $('btn-review');
+    btn.hidden = !misses.length;
+    btn.textContent = 'Разобрать все ошибки (' + misses.length + ')';
+    var list = $('miss-list');
+    list.hidden = true;
+    list.innerHTML = '';
+    misses.forEach(function (m) {
+      var li = document.createElement('li');
+      li.className = 'miss-item';
+      var topicName = (m.q.topics && m.q.topics[0]) || 'Экономика';
+      li.innerHTML = '<span class="mi-topic"></span><span class="mi-q"></span><br>';
+      li.querySelector('.mi-topic').textContent = topicName;
+      li.querySelector('.mi-q').textContent = m.q.question.slice(0, 120) + (m.q.question.length > 120 ? '…' : '');
+      if (m.q.generated) {
+        // у сгенерированного вопроса нет задачи в каталоге —
+        // вместо ссылки разворачиваем пошаговое решение
+        var sbtn = document.createElement('button');
+        sbtn.type = 'button';
+        sbtn.className = 'mi-sol-btn';
+        sbtn.textContent = 'Показать решение';
+        var sol = document.createElement('div');
+        sol.className = 'mi-solution';
+        sol.textContent = m.solution || 'Решение недоступно.';
+        sol.hidden = true;
+        sbtn.addEventListener('click', function (b, x) {
+          return function () {
+            x.hidden = !x.hidden;
+            b.textContent = x.hidden ? 'Показать решение' : 'Скрыть решение';
+          };
+        }(sbtn, sol));
+        li.appendChild(sbtn);
+        li.appendChild(sol);
+      } else {
+        var a = document.createElement('a');
+        a.href = '/catalog/' + m.q.problem_id + '/';
+        a.textContent = 'Открыть задачу →';
+        a.target = '_blank';
+        li.appendChild(a);
+      }
+      list.appendChild(li);
+    });
+    renderMath(list);
+  }
+
+  $('btn-review').addEventListener('click', function () {
+    var list = $('miss-list');
+    list.hidden = !list.hidden;
+    if (!list.hidden) list.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'nearest' });
   });
+
+  $('btn-again').addEventListener('click', startRun);
 
   /* ---------- КОНФЕТТИ (canvas, ~1.5 с) ---------- */
   function confetti() {

@@ -115,6 +115,7 @@ def game_page(request):
             'pool_counts': pool_counts,
             'base_points': config.BASE_POINTS,
             'combo_steps': config.COMBO_STEPS,
+            'mistakes_run_size': config.MISTAKES_RUN_SIZE,
         }),
     })
 
