@@ -37,6 +37,10 @@ from . import config
 SESSION_KEY = 'econ_rush'        # состояние текущего забега
 SEEN_KEY = 'econ_rush_seen'      # {mode: [id, ...]} — виданные МЕЖДУ забегами
 SEEN_LIMIT = 1500                # сколько последних id помнить на режим
+LAST_KEY = 'econ_rush_last'      # {mode, log} завершённого забега — для
+                                 # «работы над ошибками» (переживает старт
+                                 # нового забега, в отличие от SESSION_KEY)
+NO_TOPIC = 'Без темы'            # вопрос без канонических тем
 # В игре пока только русские вопросы (английская часть пула лежит в базе
 # на будущее — отдельный режим). Минимум вопросов на тему для чипа на старте.
 GAME_LANG = 'ru'
@@ -150,12 +154,18 @@ def _pick_next(request, state):
     ничего не осталось — список режима очищается (цикл по кругу) и выбор
     идёт из всех оставшихся. Пул забега исчерпан полностью → None.
 
+    У целевого забега («работа над ошибками») вопросы заданы списком
+    заранее — тогда просто выдаём их по очереди.
+
     Фильтр по теме — в Python: JSONField.__contains не работает на SQLite,
     а пул маленький (тысячи строк), перебор дешёвый."""
     mode = state['mode']
     qtype = config.MODES[mode]['question_type']
     seen_run = set(state['seen'])
     topic = state.get('topic')
+
+    if state.get('queue') is not None:
+        return _pick_from_queue(request, state)
 
     rows = _pool_qs().filter(question_type=qtype).values_list('id', 'topics')
     candidates = [pk for pk, topics in rows
@@ -177,6 +187,27 @@ def _pick_next(request, state):
     seen_map[mode] = mode_seen[-SEEN_LIMIT:]
     request.session[SEEN_KEY] = seen_map
     return gq
+
+
+def _pick_from_queue(request, state):
+    """Следующий вопрос курированного забега: список собран заранее
+    (build_mistakes_run), берём по очереди. Список кончился — забег
+    кончился. Вопрос мог исчезнуть из базы между сборкой очереди и выдачей
+    (пул пересобирают командой) — молча идём к следующему."""
+    while state['queue']:
+        pk = state['queue'].pop(0)
+        try:
+            gq = GameQuestion.objects.get(id=pk)
+        except GameQuestion.DoesNotExist:
+            continue
+        state['seen'].append(gq.id)
+        seen_map = request.session.get(SEEN_KEY) or {}
+        mode_seen = seen_map.get(state['mode'], [])
+        mode_seen.append(gq.id)
+        seen_map[state['mode']] = mode_seen[-SEEN_LIMIT:]
+        request.session[SEEN_KEY] = seen_map
+        return gq
+    return None
 
 
 def _new_state(mode, topic):
@@ -324,7 +355,7 @@ def build_summary(state):
     # ошибки просто исчезли бы из работы над ошибками.
     topics = {}
     for r in log:
-        for name in (r['topics'] or ['Без темы']):
+        for name in (r['topics'] or [NO_TOPIC]):
             cell = topics.setdefault(name, {'correct': 0, 'wrong': 0, 'skip': 0})
             cell[r['outcome']] += 1
     topic_rows = []
@@ -491,6 +522,142 @@ def api_answer(request):
     return JsonResponse(payload)
 
 
+def mistakes_by_topic(log):
+    """Сколько ошибок в каждой теме — по журналу забега.
+
+    Вопрос с двумя темами даёт ошибку обеим: какая из них подвела, мы не
+    знаем, и делить ошибку пополам было бы выдумкой. Вопросы без тем
+    в подсчёт не идут: целиться в «Без темы» нечем (см. build_mistakes_run).
+    """
+    counts = {}
+    for r in log:
+        if r['outcome'] != 'wrong':
+            continue
+        for name in (r['topics'] or []):
+            counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def allocate_quotas(counts, size):
+    """Раздать ровно `size` мест по темам пропорционально числу ошибок —
+    методом наибольшего остатка.
+
+    Пропорция по сырому числу ошибок: при трёх жизнях ошибок мало, зато
+    они точные. Пример: 2 ошибки в A и 1 в B на 10 мест → A получает
+    6 целых мест (10·2/3 = 6,67) и B — 3 (10·1/3 = 3,33); девять роздано,
+    десятое уходит теме с бо́льшим остатком, то есть A → 7/3.
+
+    Ничья остатков решается числом ошибок, затем именем темы: результат
+    обязан быть один и тот же при одинаковом входе.
+    """
+    pairs = [(t, c) for t, c in counts.items() if c > 0]
+    total = sum(c for _, c in pairs)
+    if not pairs or total <= 0 or size <= 0:
+        return {}
+    quotas, remainders = {}, []
+    for topic, cnt in pairs:
+        exact = size * cnt / total
+        base = int(exact)
+        quotas[topic] = base
+        remainders.append((exact - base, cnt, topic))
+    left = size - sum(quotas.values())
+    remainders.sort(key=lambda r: (-r[0], -r[1], r[2]))
+    for i in range(left):
+        quotas[remainders[i % len(remainders)][2]] += 1
+    return quotas
+
+
+def build_mistakes_run(rows, quotas, size, seen_before=()):
+    """Список id вопросов для целевого забега.
+
+    rows — кандидаты нужного типа и языка: [(id, [темы]), ...].
+    Сначала каждой теме выдаём её квоту. Не хватило вопросов в теме —
+    недобор добираем сначала из других тем ошибок, потом из любых вопросов
+    того же типа. Если и тогда меньше size — забег будет короче: это не
+    ошибка, а честный конец пула (клиент завершит его причиной 'done').
+
+    Один вопрос дважды не берём (он мог попасть в две темы ошибок сразу),
+    и внутри каждой выборки действует то же правило «сначала невиданные»,
+    что в обычном забеге.
+    """
+    seen_before = set(seen_before)
+    taken, used = [], set()
+
+    def pick(pool, n):
+        if n <= 0:
+            return
+        pool = [pk for pk in dict.fromkeys(pool) if pk not in used]
+        fresh = [pk for pk in pool if pk not in seen_before]
+        old = [pk for pk in pool if pk in seen_before]
+        random.shuffle(fresh)
+        random.shuffle(old)
+        for pk in (fresh + old)[:n]:
+            used.add(pk)
+            taken.append(pk)
+
+    by_topic = {}
+    for pk, topics in rows:
+        for name in (topics or []):
+            by_topic.setdefault(name, []).append(pk)
+
+    # Крупные квоты первыми: если вопросов в обрез, их получит тема,
+    # где игрок ошибался больше.
+    for topic, quota in sorted(quotas.items(), key=lambda kv: (-kv[1], kv[0])):
+        pick(by_topic.get(topic, []), quota)
+    if len(taken) < size:  # недобор — из любых тем ошибок
+        pick([pk for t in quotas for pk in by_topic.get(t, [])], size - len(taken))
+    if len(taken) < size:  # и уже из любых вопросов этого типа
+        pick([pk for pk, _ in rows], size - len(taken))
+
+    random.shuffle(taken)  # темы вперемешку, а не блоками
+    return taken[:size]
+
+
+@require_GET
+def api_session_start_mistakes(request):
+    """Начать целевой забег «работа над ошибками».
+
+    Темы и пропорция — из журнала ПРЕДЫДУЩЕГО забега (LAST_KEY), режим —
+    его же: разбирать ошибки «Пули» вопросами «Классики» бессмысленно,
+    это другой тип вопроса.
+    """
+    last = request.session.get(LAST_KEY)
+    if not last or not last.get('log'):
+        return JsonResponse({'error': 'Нет завершённого забега'}, status=400)
+    mode = last.get('mode')
+    if mode not in config.MODES:
+        return JsonResponse({'error': 'Неизвестный режим'}, status=400)
+
+    counts = mistakes_by_topic(last['log'])
+    if not counts:
+        return JsonResponse({'error': 'В этом забеге не было ошибок'}, status=400)
+
+    qtype = config.MODES[mode]['question_type']
+    rows = list(_pool_qs().filter(question_type=qtype)
+                .values_list('id', 'topics'))
+    quotas = allocate_quotas(counts, config.MISTAKES_RUN_SIZE)
+    seen_map = request.session.get(SEEN_KEY) or {}
+    queue = build_mistakes_run(rows, quotas, config.MISTAKES_RUN_SIZE,
+                               seen_map.get(mode, []))
+    if not queue:
+        return JsonResponse({'error': 'Вопросов по этим темам не нашлось'},
+                            status=503)
+
+    state = _new_state(mode, None)
+    state['queue'] = queue
+    state['mistakes_run'] = True
+    gq = _pick_next(request, state)
+    request.session[SESSION_KEY] = state
+    return JsonResponse({
+        'ok': True,
+        'mode': _mode_payload(mode),
+        'lives': state['lives'],
+        'mistakes_run': True,
+        'topics': sorted(quotas, key=lambda t: (-quotas[t], t)),
+        'question': _question_payload(gq, 1),
+    })
+
+
 @require_POST
 def api_session_finish(request):
     """Завершить забег и получить сводку.
@@ -513,4 +680,8 @@ def api_session_finish(request):
         reason = body.get('reason')
         state['ended'] = reason if reason in ('time', 'done') else 'time'
     request.session[SESSION_KEY] = state
+    # Журнал завершённого забега — отдельным ключом: с него живёт «работа
+    # над ошибками», а SESSION_KEY затрётся, как только начнётся новый
+    # забег. Храним только нужное ей: режим и журнал.
+    request.session[LAST_KEY] = {'mode': state['mode'], 'log': state['log']}
     return JsonResponse({'summary': build_summary(state)})

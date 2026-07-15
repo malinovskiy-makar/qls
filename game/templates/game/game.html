@@ -665,6 +665,10 @@ a:focus-visible, button:focus-visible {
   font-size: 12.5px;
   font-weight: 700;
 }
+/* чип целевого забега — не акцент: акцент на экране занят блоком
+   «Работа над ошибками», а это просто пометка, чем был забег */
+.fin-chip-alt { background: var(--surface-2); color: var(--text2); font-weight: 600; }
+.fin-chip-alt[hidden] { display: none; }
 .fin-date { font-size: 12.5px; color: var(--text3); }
 .fin-head-r { text-align: right; flex-shrink: 0; }
 .fin-hearts { font-size: 17px; letter-spacing: 3px; line-height: 1; }
@@ -982,6 +986,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <h2 id="final-title">Время вышло!</h2>
           <p class="fin-sub">
             <span class="fin-chip" id="fin-mode-chip">Блиц</span>
+            <span class="fin-chip fin-chip-alt" id="fin-mistakes-chip" hidden>работа над ошибками</span>
             <span class="fin-date" id="fin-date"></span>
           </p>
         </div>
@@ -1135,6 +1140,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var summary = null;           // сводка забега с сервера (экран результатов)
   var skippedCount = 0;         // пропущено (для запасной сводки без сети)
   var isRecord = false;         // побит ли личный рекорд этим забегом
+  var mistakesRun = false;      // это забег «работа над ошибками»?
   var bestNow = 0;              // рекорд режима с учётом этого забега
   var selected = [];            // выделенные варианты (мультивыбор, Рапид)
 
@@ -1266,11 +1272,20 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     });
   });
 
-  function startRun() {
-    api('/game/api/session/start/?mode=' + encodeURIComponent(mode)
-        + '&topic=' + encodeURIComponent(topic))
+  /* Забег — обычный или целевой («работа над ошибками»): отличается
+     только эндпоинтом старта, дальше всё то же самое. Темы и пропорцию
+     целевого считает сервер по журналу прошлого забега. */
+  function startRun(opts) {
+    var mistakes = !!(opts && opts.mistakes);
+    var url = mistakes
+      ? '/game/api/session/start_mistakes/'
+      : '/game/api/session/start/?mode=' + encodeURIComponent(mode)
+        + '&topic=' + encodeURIComponent(topic);
+    api(url)
       .then(function (d) {
         if (!d.ok) { alert(d.error || 'Не удалось начать игру'); return; }
+        mode = d.mode.key;        // у целевого забега режим приходит с сервера
+        mistakesRun = mistakes;
         MODE = d.mode; // тайминги и жизни режима — с сервера (единый источник)
         score = 0; streak = 0; bestStreak = 0;
         livesMax = MODE.lives; lives = d.lives;
@@ -1823,6 +1838,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       endReason === 'lives' ? 'Забег окончен' :
       endReason === 'done' ? 'Вопросы кончились' : 'Время вышло!';
     $('fin-mode-chip').textContent = s.mode_title;
+    $('fin-mistakes-chip').hidden = !mistakesRun;
     $('fin-date').textContent = formatDate(s.played_at);
     paintHearts($('fin-hearts'), s.lives_left, s.lives_max);
     $('fin-reason').textContent = reasonText(s);
@@ -2005,7 +2021,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     if (!list.hidden) list.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'nearest' });
   });
 
-  $('btn-again').addEventListener('click', startRun);
+  $('btn-again').addEventListener('click', function () { startRun(); });
+  $('btn-mistakes').addEventListener('click', function () {
+    startRun({ mistakes: true });
+  });
 
   /* ---------- КОНФЕТТИ (canvas, ~1.5 с) ---------- */
   function confetti() {

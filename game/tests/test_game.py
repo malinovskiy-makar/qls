@@ -12,7 +12,8 @@ from game.models import GameQuestion
 from game.management.commands.build_game_pool import (
     extract_question, extract_boolean, extract_multi, extract_numeric)
 from game.config import combo_multiplier, MODES
-from game.views import parse_exact_number, build_summary
+from game.views import (parse_exact_number, build_summary, allocate_quotas,
+                        mistakes_by_topic, build_mistakes_run)
 
 
 def make_test_problem(statement='Что изучает микроэкономика?',
@@ -700,6 +701,231 @@ class FinishTests(TestCase):
         s = self.finish('time')
         self.assertEqual(s['topic_rows'][0]['topic'], 'Эластичность')
         self.assertEqual(s['topic_rows'][0]['wrong'], 1)
+
+
+class QuotaTests(TestCase):
+    """Раздача мест целевого забега по темам — метод наибольшего остатка."""
+
+    def test_two_topics_seven_three(self):
+        """Контрольная арифметика: 2 ошибки в A, 1 в B на 10 мест.
+        10·2/3 = 6,67 → 6 целых; 10·1/3 = 3,33 → 3 целых; девять роздано,
+        десятое — теме с бо́льшим остатком (A) → 7/3."""
+        q = allocate_quotas({'A': 2, 'B': 1}, 10)
+        self.assertEqual(q, {'A': 7, 'B': 3})
+        self.assertEqual(sum(q.values()), 10)
+
+    def test_single_topic_takes_everything(self):
+        self.assertEqual(allocate_quotas({'A': 1}, 10), {'A': 10})
+
+    def test_three_equal_topics_sum_to_ten(self):
+        """Поровну не делится — но в сумме обязано выйти ровно 10."""
+        q = allocate_quotas({'A': 1, 'B': 1, 'C': 1}, 10)
+        self.assertEqual(sum(q.values()), 10)
+        self.assertEqual(sorted(q.values()), [3, 3, 4])
+
+    def test_tie_is_deterministic(self):
+        """Одинаковый вход — одинаковый выход (ничья решается именем)."""
+        a = allocate_quotas({'Спрос': 1, 'Издержки': 1, 'Налоги': 1}, 10)
+        b = allocate_quotas({'Налоги': 1, 'Издержки': 1, 'Спрос': 1}, 10)
+        self.assertEqual(a, b)
+
+    def test_no_mistakes_no_quotas(self):
+        self.assertEqual(allocate_quotas({}, 10), {})
+        self.assertEqual(allocate_quotas({'A': 0}, 10), {})
+
+    def test_mistakes_by_topic_counts_only_wrong(self):
+        log = [
+            log_row(topics=('A',), outcome='wrong'),
+            log_row(topics=('A',), outcome='correct'),
+            log_row(topics=('A',), outcome='skip'),
+            log_row(topics=('B',), outcome='wrong'),
+        ]
+        self.assertEqual(mistakes_by_topic(log), {'A': 1, 'B': 1})
+
+    def test_mistake_with_two_topics_counts_in_both(self):
+        """Какая из двух тем подвела — неизвестно; делить ошибку пополам
+        было бы выдумкой, поэтому засчитываем обеим."""
+        log = [log_row(topics=('A', 'B'), outcome='wrong')]
+        self.assertEqual(mistakes_by_topic(log), {'A': 1, 'B': 1})
+
+    def test_mistake_without_topics_is_not_targetable(self):
+        log = [log_row(topics=(), outcome='wrong')]
+        self.assertEqual(mistakes_by_topic(log), {})
+
+
+class MistakesRunBuildTests(TestCase):
+    """Сборка списка вопросов целевого забега (чистая функция)."""
+
+    def rows(self, spec):
+        """spec: {id: [темы]} → [(id, [темы])]"""
+        return [(pk, topics) for pk, topics in spec.items()]
+
+    def test_quotas_respected(self):
+        rows = self.rows({i: ['A'] for i in range(1, 21)})
+        rows += self.rows({i: ['B'] for i in range(21, 41)})
+        got = build_mistakes_run(rows, {'A': 7, 'B': 3}, 10)
+        self.assertEqual(len(got), 10)
+        self.assertEqual(len([p for p in got if p <= 20]), 7)
+        self.assertEqual(len([p for p in got if p > 20]), 3)
+
+    def test_no_duplicates_when_question_in_two_topics(self):
+        """Вопрос в двух темах ошибок не должен попасть в забег дважды."""
+        rows = self.rows({1: ['A', 'B'], 2: ['A'], 3: ['B'], 4: ['A', 'B']})
+        got = build_mistakes_run(rows, {'A': 3, 'B': 3}, 6)
+        self.assertEqual(len(got), len(set(got)))
+        self.assertEqual(sorted(got), [1, 2, 3, 4])   # больше в пуле нет
+
+    def test_shortfall_filled_from_other_mistake_topics(self):
+        """В теме не хватило под квоту — добираем из других тем ошибок."""
+        rows = self.rows({1: ['A'], 2: ['A']})
+        rows += self.rows({i: ['B'] for i in range(3, 20)})
+        got = build_mistakes_run(rows, {'A': 7, 'B': 3}, 10)
+        self.assertEqual(len(got), 10)
+        self.assertEqual(sorted([p for p in got if p <= 2]), [1, 2])  # все, что есть
+
+    def test_shortfall_filled_from_any_question_of_type(self):
+        """Тем ошибок не хватило совсем — добираем любыми того же типа."""
+        rows = self.rows({1: ['A']})
+        rows += self.rows({i: ['Другое'] for i in range(2, 30)})
+        got = build_mistakes_run(rows, {'A': 10}, 10)
+        self.assertEqual(len(got), 10)
+        self.assertIn(1, got)
+
+    def test_short_pool_gives_short_run_without_crash(self):
+        """Вопросов меньше десяти — забег просто короче, это не ошибка."""
+        rows = self.rows({1: ['A'], 2: ['A']})
+        got = build_mistakes_run(rows, {'A': 10}, 10)
+        self.assertEqual(sorted(got), [1, 2])
+
+    def test_empty_pool_gives_empty_run(self):
+        self.assertEqual(build_mistakes_run([], {'A': 10}, 10), [])
+
+    def test_unseen_questions_preferred(self):
+        """Тот же принцип, что в обычном забеге: сначала невиданные."""
+        rows = self.rows({i: ['A'] for i in range(1, 11)})
+        got = build_mistakes_run(rows, {'A': 3}, 3, seen_before=list(range(1, 8)))
+        self.assertEqual(sorted(got), [8, 9, 10])   # только невиданные
+
+
+class MistakesRunApiTests(TestCase):
+    """Целевой забег через API: фильтры типа/языка/тем, крайние случаи."""
+
+    def setUp(self):
+        self.client = Client()
+        # по 12 single-вопросов на две темы + шум других типов и языков
+        for topic in ('Эластичность', 'Издержки'):
+            for i in range(12):
+                p = make_test_problem(statement=f'{topic} вопрос {i}?', answer='A')
+                GameQuestion.objects.create(
+                    problem=p, question=p.statement,
+                    options=['Фирмы', 'Страны', 'Планеты', 'Климат'],
+                    correct_index=0, difficulty=2, topics=[topic], lang='ru')
+        # ловушки: тот же текст, но другой тип и другой язык
+        for i in range(12):
+            p = make_test_problem(statement=f'Данетка {i}?', answer='A')
+            GameQuestion.objects.create(
+                problem=p, question=p.statement, question_type='boolean',
+                options=['Верно', 'Неверно'], correct_index=0, difficulty=2,
+                topics=['Эластичность'], lang='ru')
+            p2 = make_test_problem(statement=f'English {i}?', answer='A')
+            GameQuestion.objects.create(
+                problem=p2, question=p2.statement,
+                options=['Firms', 'States', 'Planets', 'Climate'],
+                correct_index=0, difficulty=2, topics=['Эластичность'],
+                lang='en')
+
+    def play_with_mistakes(self):
+        """Забег с двумя ошибками в «Эластичности» и одной в «Издержках»."""
+        r = self.client.get('/game/api/session/start/').json()
+        qid = r['question']['id']
+        made = {'Эластичность': 0, 'Издержки': 0}
+        while sum(made.values()) < 3:
+            gq = GameQuestion.objects.get(id=qid)
+            topic = gq.topics[0]
+            need = {'Эластичность': 2, 'Издержки': 1}[topic]
+            choice = 2 if made[topic] < need else 0     # 2 = неверный
+            if made[topic] < need:
+                made[topic] += 1
+            self.client.post('/game/api/answer/',
+                             json.dumps({'question_id': qid, 'choice': choice}),
+                             content_type='application/json')
+            nxt = self.client.get('/game/api/question/').json()
+            if 'question' not in nxt:
+                break
+            qid = nxt['question']['id']
+        return made
+
+    def test_start_mistakes_without_previous_run_400(self):
+        r = self.client.get('/game/api/session/start_mistakes/')
+        self.assertEqual(r.status_code, 400)
+
+    def test_clean_run_has_no_mistakes_run(self):
+        """Ошибок нет — целевой забег не собирается (на экране и кнопки нет)."""
+        qid = self.client.get('/game/api/session/start/').json()['question']['id']
+        self.client.post('/game/api/answer/',
+                         json.dumps({'question_id': qid, 'choice': 0}),
+                         content_type='application/json')
+        self.client.post('/game/api/session/finish/', json.dumps({'reason': 'time'}),
+                         content_type='application/json')
+        r = self.client.get('/game/api/session/start_mistakes/')
+        self.assertEqual(r.status_code, 400)
+
+    def test_mistakes_run_uses_only_error_topics_type_and_lang(self):
+        self.play_with_mistakes()
+        self.client.post('/game/api/session/finish/', json.dumps({'reason': 'time'}),
+                         content_type='application/json')
+        r = self.client.get('/game/api/session/start_mistakes/')
+        self.assertEqual(r.status_code, 200)
+        d = r.json()
+        self.assertTrue(d['ok'])
+        self.assertTrue(d['mistakes_run'])
+        self.assertEqual(d['mode']['key'], 'blitz')     # режим тот же
+        self.assertEqual(d['lives'], 3)                 # жизни свежие
+
+        # проходим забег до конца и смотрим, из чего он собран
+        ids = [d['question']['id']]
+        while True:
+            nxt = self.client.get('/game/api/question/').json()
+            if 'question' not in nxt:
+                break
+            ids.append(nxt['question']['id'])
+        self.assertEqual(len(ids), 10)                  # ровно N вопросов
+        got = GameQuestion.objects.filter(id__in=ids)
+        self.assertEqual({g.question_type for g in got}, {'single'})  # тип режима
+        self.assertEqual({g.lang for g in got}, {'ru'})               # только ru
+        topics = [g.topics[0] for g in got]
+        self.assertEqual(set(topics), {'Эластичность', 'Издержки'})
+        # пропорция ошибок 2:1 → метод наибольшего остатка даёт 7/3
+        self.assertEqual(topics.count('Эластичность'), 7)
+        self.assertEqual(topics.count('Издержки'), 3)
+
+    def test_mistakes_run_is_a_normal_run_with_summary(self):
+        """Целевой забег — обычный забег: те же жизни, тот же финал."""
+        self.play_with_mistakes()
+        self.client.post('/game/api/session/finish/', json.dumps({'reason': 'time'}),
+                         content_type='application/json')
+        qid = self.client.get('/game/api/session/start_mistakes/').json()['question']['id']
+        for i in range(3):
+            self.client.post('/game/api/answer/',
+                             json.dumps({'question_id': qid, 'choice': 2}),
+                             content_type='application/json')
+            if i < 2:
+                qid = self.client.get('/game/api/question/').json()['question']['id']
+        s = self.client.post('/game/api/session/finish/', json.dumps({'reason': 'time'}),
+                             content_type='application/json').json()['summary']
+        self.assertEqual(s['ended_reason'], 'lives')
+        self.assertEqual(s['wrong'], 3)
+
+    def test_mistakes_run_survives_deleted_question(self):
+        """Пул пересобрали между сборкой очереди и выдачей — не падаем."""
+        self.play_with_mistakes()
+        self.client.post('/game/api/session/finish/', json.dumps({'reason': 'time'}),
+                         content_type='application/json')
+        d = self.client.get('/game/api/session/start_mistakes/').json()
+        # сносим все вопросы, кроме уже выданного первого
+        GameQuestion.objects.exclude(id=d['question']['id']).delete()
+        nxt = self.client.get('/game/api/question/').json()
+        self.assertTrue(nxt.get('exhausted'))
 
 
 class ExtractBooleanTests(TestCase):
