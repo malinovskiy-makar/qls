@@ -168,6 +168,8 @@ a:focus-visible, button:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 .mode-terms b { color: var(--text2); font-weight: 600; }
+/* сердца в условиях режима — тем же красным, что и в HUD */
+.mt-hearts { color: var(--rush-bad); letter-spacing: 1px; }
 .mode-best {
   margin-top: 6px;
   font-size: 11.5px;
@@ -259,6 +261,36 @@ a:focus-visible, button:focus-visible {
   position: relative;
   display: inline-block;
 }
+/* Жизни: три сердца под таймером. Погасшее — серый контур, а не отсутствие
+   символа: запас всегда виден целиком, «сколько было и сколько осталось». */
+.hud-lives {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 15px;
+  line-height: 1;
+}
+.heart {
+  color: var(--rush-bad);
+  transition: color .2s ease, transform .2s var(--rush-ease);
+}
+.heart.lost {
+  color: var(--text3);
+  opacity: .45;
+  transform: scale(.85);
+}
+/* сердце гаснет с толчком — единственный момент, когда оно двигается */
+.heart.pop { animation: heartPop .45s var(--rush-ease); }
+@keyframes heartPop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.5); }
+  100% { transform: scale(.85); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .heart.pop { animation: none; }
+}
+
 .timer-num { transition: color .12s ease; }
 .timer-num.flash-plus { color: var(--rush-ok); }
 .timer-num.flash-minus { color: var(--rush-bad); }
@@ -338,6 +370,46 @@ a:focus-visible, button:focus-visible {
    display-формуле внутри вопроса браузер расколол бы текст на анонимные
    flex-элементы и расставил их в ряд, а не друг под другом. */
 .q-text { width: 100%; }
+
+/* Ошибка: короткая красная вспышка карточки. Цвет гаснет сам — это
+   уведомление о потере жизни, а не состояние. */
+.q-card.flash-bad { animation: cardBad .45s var(--rush-ease); }
+@keyframes cardBad {
+  0%   { border-color: var(--rush-bad); background: var(--rush-bad-tint); }
+  60%  { border-color: var(--rush-bad); background: var(--rush-bad-tint); }
+  100% { border-color: var(--rush-border); background: var(--rush-surface); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .q-card.flash-bad { animation: none; }
+}
+
+/* Оверлей конца забега по жизням: живёт поверх сцены ~1.1 с, потом
+   уходим на экран результатов. Появляется ТОЛЬКО когда жизни кончились —
+   по времени забег завершается без оверлея (таймер и так на виду). */
+.gameover-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(3px);
+  animation: goFade .2s ease;
+}
+.gameover-overlay[hidden] { display: none; }
+@keyframes goFade { from { opacity: 0; } to { opacity: 1; } }
+.go-card {
+  text-align: center;
+  color: #fff;
+  padding: 28px 40px;
+}
+.go-hearts { font-size: 38px; letter-spacing: 6px; margin-bottom: 10px; }
+.go-card h2 { font-size: 30px; font-weight: 800; margin: 0 0 6px; }
+.go-card p { font-size: 15px; opacity: .8; margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .gameover-overlay { animation: none; }
+}
 .q-slide-in { animation: qSlide .5s var(--rush-ease); }
 @keyframes qSlide {
   0% { opacity: 0; transform: translateY(26px); }
@@ -749,7 +821,10 @@ a:focus-visible, button:focus-visible {
       <div class="time-track"><div class="time-fill" id="time-fill"></div></div>
       <div class="hud">
         <div class="hud-score"><small>СЧЁТ</small><span id="hud-score">0</span></div>
-        <div class="hud-timer"><span class="timer-box"><span class="timer-num" id="hud-timer">60</span><span class="time-delta" id="time-delta"></span></span></div>
+        <div class="hud-timer">
+          <span class="timer-box"><span class="timer-num" id="hud-timer">60</span><span class="time-delta" id="time-delta"></span></span>
+          <div class="hud-lives" id="hud-lives" aria-label="Жизни"></div>
+        </div>
         <div class="hud-combo" id="hud-combo">🔥 ×1</div>
       </div>
       <div class="combo-toast" id="combo-toast"></div>
@@ -777,7 +852,7 @@ a:focus-visible, button:focus-visible {
   <section id="screen-final" class="screen">
     <div class="final-grid">
       <div class="final-left">
-        <h2>Время вышло!</h2>
+        <h2 id="final-title">Время вышло!</h2>
         <p class="final-mode" id="final-mode"></p>
         <div class="final-score"><span id="final-score">0</span><small>очков</small></div>
         <div class="record-badge" id="record-badge">🏆 Новый рекорд!</div>
@@ -802,6 +877,13 @@ a:focus-visible, button:focus-visible {
 </div>
 
 <div class="vignette" id="vignette"></div>
+<div class="gameover-overlay" id="gameover-overlay" hidden>
+  <div class="go-card">
+    <div class="go-hearts">💔</div>
+    <h2>Забег окончен</h2>
+    <p id="go-sub">Жизни кончились</p>
+  </div>
+</div>
 <canvas id="confetti-canvas" width="0" height="0"></canvas>
 
 <script>
@@ -843,9 +925,13 @@ a:focus-visible, button:focus-visible {
   var timeLeft = 0;             // секунд
   var lastTick = 0;             // timestamp прошлого кадра
   var rafId = null;
+  // Очки/серию/жизни считает СЕРВЕР — здесь только последние присланные
+  // им числа для отрисовки. Клиент их не вычисляет (один источник правды).
   var score = 0;
   var streak = 0;               // текущая серия верных
   var bestStreak = 0;
+  var lives = 3;                // осталось жизней (приходит с сервера)
+  var livesMax = 3;             // запас режима — сколько сердец рисовать
   var answered = 0;             // отвечено (без пропусков)
   var correctCount = 0;
   var runStartedAt = 0;         // для «вопросов в минуту»
@@ -854,6 +940,9 @@ a:focus-visible, button:focus-visible {
   var inputLocked = true;       // во время фидбека ввод игнорируется
   var misses = [];              // промахи для «Разобрать ошибки»
   var poolExhausted = false;
+  var endReason = 'time';       // 'lives' | 'time' | 'done' — чем кончился забег
+  var runOver = false;          // жизни кончились: новый вопрос не выдаём
+  var goInfo = null;            // {reason, question_number} с сервера
   var selected = [];            // выделенные варианты (мультивыбор, Рапид)
 
   /* -- DOM -- */
@@ -904,6 +993,18 @@ a:focus-visible, button:focus-visible {
   /* ---------- СТАРТ: карточки режимов ---------- */
   function formatSec(n) { return (n > 0 ? '+' : '−') + Math.abs(n) + ' с'; }
 
+  /* Что показать у таймера на ошибке: сейчас время за ошибку не снимается,
+     поэтому показываем потерянную жизнь. Вернут штраф временем в конфиг —
+     покажем секунды. */
+  function wrongDeltaText(d) { return d.time_delta ? d.time_delta + ' с' : '−1 ♥'; }
+
+  /* Цена пропуска берётся из конфига: сейчас 0 (пропуск бесплатный),
+     но если режим снова начнут тюнить временем — подсказка не соврёт. */
+  function skipLabel() {
+    return MODE.time_skip ? 'пропустить (' + MODE.time_skip + ' с)'
+                          : 'пропустить (бесплатно)';
+  }
+
   function renderModeCards() {
     var grid = $('mode-grid');
     grid.innerHTML = '';
@@ -930,11 +1031,13 @@ a:focus-visible, button:focus-visible {
 
       var terms = document.createElement('div');
       terms.className = 'mode-terms';
-      terms.innerHTML = '<b></b> · верный <b></b> · ошибка <b></b>';
+      // условия режима: запас времени · бонус за верный · запас жизней
+      // (штрафа временем больше нет — ошибка стоит жизни)
+      terms.innerHTML = '<b></b> · верный <b></b> · <b class="mt-hearts"></b>';
       var bs = terms.querySelectorAll('b');
       bs[0].textContent = (m.duration >= 60 ? (m.duration / 60) + ' мин' : m.duration + ' с');
       bs[1].textContent = formatSec(m.time_correct);
-      bs[2].textContent = formatSec(m.time_wrong);
+      bs[2].textContent = new Array(m.lives + 1).join('♥');
       card.appendChild(terms);
 
       var bestEl = document.createElement('div');
@@ -975,14 +1078,18 @@ a:focus-visible, button:focus-visible {
         + '&topic=' + encodeURIComponent(topic))
       .then(function (d) {
         if (!d.ok) { alert(d.error || 'Не удалось начать игру'); return; }
-        MODE = d.mode; // тайминги режима — с сервера (единый источник)
+        MODE = d.mode; // тайминги и жизни режима — с сервера (единый источник)
         score = 0; streak = 0; bestStreak = 0;
+        livesMax = MODE.lives; lives = d.lives;
         answered = 0; correctCount = 0;
         misses = []; nextBuf = null; poolExhausted = false;
+        endReason = 'time';
+        $('gameover-overlay').hidden = true;
         timeLeft = MODE.duration;
         runStartedAt = performance.now();
         show('playing');
         paintHud();
+        paintLives(false);
         showQuestion(d.question);
         prefetchNext();
         lastTick = performance.now();
@@ -995,7 +1102,7 @@ a:focus-visible, button:focus-visible {
     if (state !== 'playing') return;
     timeLeft -= (ts - lastTick) / 1000;
     lastTick = ts;
-    if (timeLeft <= 0) { timeLeft = 0; paintHud(); endRun(); return; }
+    if (timeLeft <= 0) { timeLeft = 0; paintHud(); endRun('time'); return; }
     paintHud();
     rafId = requestAnimationFrame(tick);
   }
@@ -1014,6 +1121,23 @@ a:focus-visible, button:focus-visible {
     fill.style.transform = 'scaleX(' + frac + ')';
     fill.classList.toggle('low', timeLeft < 7);
     fill.classList.toggle('mid', timeLeft >= 7 && timeLeft < 15);
+  }
+
+  /* Сердца: рисуем весь запас режима, потраченные — гаснут.
+     pop=true — только что потеряли жизнь, последнее живое гаснет с толчком. */
+  function paintLives(pop) {
+    var box = $('hud-lives');
+    box.innerHTML = '';
+    for (var i = 0; i < livesMax; i++) {
+      var h = document.createElement('span');
+      var lost = i >= lives;
+      h.className = 'heart' + (lost ? ' lost' : '');
+      // погасшее сердце — контур, живое — сплошное
+      h.textContent = lost ? '♡' : '♥';
+      if (pop && !REDUCED && i === lives) h.classList.add('pop');
+      box.appendChild(h);
+    }
+    box.setAttribute('aria-label', 'Жизни: ' + lives + ' из ' + livesMax);
   }
 
   function comboMult(s) {
@@ -1090,15 +1214,15 @@ a:focus-visible, button:focus-visible {
     var hint = $('keys-hint');
     if (hint) {
       if (isBool) {
-        hint.textContent = '1 — Верно · 2 — Неверно · пробел — пропустить (' + MODE.time_skip + ' с)';
+        hint.textContent = '1 — Верно · 2 — Неверно · пробел — ' + skipLabel();
       } else if (isMulti) {
         hint.textContent = 'Клавиши 1–' + q.options.length +
-          ' — выбрать · Enter — ответить · пробел — пропустить (' + MODE.time_skip + ' с)';
+          ' — выбрать · Enter — ответить · пробел — ' + skipLabel();
       } else if (isNumeric) {
         hint.textContent = 'Enter — отправить ответ';
       } else {
         hint.textContent = 'Клавиши 1–' + q.options.length +
-          ' — ответ · пробел — пропустить (' + MODE.time_skip + ' с)';
+          ' — ответ · пробел — ' + skipLabel();
       }
     }
   }
@@ -1123,12 +1247,13 @@ a:focus-visible, button:focus-visible {
 
   function advance() {
     if (state !== 'playing') return;
+    if (runOver) { showGameOver(); return; }  // жизни кончились
     if (nextBuf) {
       var q = nextBuf;
       prefetchNext();
       showQuestion(q);
     } else if (poolExhausted) {
-      endRun(); // вопросы кончились — забег завершается досрочно
+      endRun('done'); // вопросы кончились — забег завершается досрочно
     } else {
       // буфер ещё в пути — короткая повторная попытка
       setTimeout(advance, 120);
@@ -1145,25 +1270,53 @@ a:focus-visible, button:focus-visible {
       body: JSON.stringify(payload)
     }).then(function (d) {
       if (d.error) { inputLocked = false; return; }
+      // Очки, серия и жизни посчитаны сервером — здесь только присваиваем.
+      if (typeof d.score === 'number') {
+        score = d.score;
+        streak = d.streak;
+        bestStreak = d.best_streak;
+        lives = d.lives;
+      }
+      // Жизни кончились: новых вопросов не будет, но разбор ответа
+      // доигрываем — оверлей поднимет advance() по своему таймауту.
+      if (d.game_over) { runOver = true; goInfo = d.game_over; }
       timeLeft = Math.max(0, timeLeft + d.time_delta);
-      if (timeLeft <= 0) { paintHud(); endRun(); return; }
+      if (timeLeft <= 0 && !runOver) { paintHud(); endRun('time'); return; }
       onResult(d);
       paintHud();
     });
   }
 
   function registerCorrect() {
-    answered++; correctCount++; streak++;
-    bestStreak = Math.max(bestStreak, streak);
-    score += CFG.base_points * comboMult(streak);
+    answered++; correctCount++;
   }
 
   function registerWrong(q, d) {
     answered++;
-    streak = 0;  // комбо рвёт ТОЛЬКО неверный ответ (пропуск — нет)
+    // Ошибка стоит жизни: гасим сердце и коротко подсвечиваем карточку.
+    paintLives(true);
+    var card = $('q-card');
+    card.classList.remove('flash-bad');
+    void card.offsetWidth; // перезапуск анимации
+    card.classList.add('flash-bad');
     // solution приходит только у сгенерированных вопросов (после ответа) —
     // «Разобрать ошибки» показывает его вместо ссылки в каталог.
     misses.push({ q: q, solution: (d && d.solution) || null });
+  }
+
+  /* Оверлей «Забег окончен» — только для конца по жизням: по времени
+     таймер и так на виду. Показывается ПОСЛЕ разбора последнего ответа
+     (его зовёт advance() с задержкой, своей у каждого типа вопроса). */
+  function showGameOver() {
+    var ov = $('gameover-overlay');
+    $('go-sub').textContent = (goInfo && goInfo.question_number)
+      ? 'Выбыл на вопросе ' + goInfo.question_number
+      : 'Жизни кончились';
+    ov.hidden = false;
+    setTimeout(function () {
+      ov.hidden = true;
+      endRun('lives');
+    }, REDUCED ? 250 : 1100);
   }
 
   // boolean / single: один клик — один ответ
@@ -1184,7 +1337,7 @@ a:focus-visible, button:focus-visible {
         registerWrong(q, d);
         buttons[choice].classList.add('is-wrong');
         if (buttons[d.correct_index]) buttons[d.correct_index].classList.add('show-right');
-        showDelta(d.time_delta + ' с', 'minus');
+        showDelta(wrongDeltaText(d), 'minus');
         flashTrack(true);
         vignette();
         setTimeout(advance, REDUCED ? 0 : 900);
@@ -1242,7 +1395,7 @@ a:focus-visible, button:focus-visible {
         setTimeout(advance, REDUCED ? 0 : 1500);
       } else {
         registerWrong(q, d);
-        showDelta(d.time_delta + ' с', 'minus');
+        showDelta(wrongDeltaText(d), 'minus');
         flashTrack(true);
         vignette();
         setTimeout(advance, REDUCED ? 0 : 1500);
@@ -1273,7 +1426,7 @@ a:focus-visible, button:focus-visible {
         registerWrong(q, d);
         fb.textContent = 'Правильный ответ: ' + d.correct_value;
         fb.className = 'num-feedback bad';
-        showDelta(d.time_delta + ' с', 'minus');
+        showDelta(wrongDeltaText(d), 'minus');
         flashTrack(true);
         vignette();
         setTimeout(advance, REDUCED ? 0 : 1300);
@@ -1289,7 +1442,8 @@ a:focus-visible, button:focus-visible {
     inputLocked = true;
     var q = current;
     postAnswer({ question_id: q.id, choice: null }, function (d) {
-      showDelta(d.time_delta + ' с', 'skip');
+      // пропуск бесплатный — дельту показываем, только если она есть
+      if (d.time_delta) showDelta(d.time_delta + ' с', 'skip');
       advance();
     });
   }
@@ -1371,9 +1525,14 @@ a:focus-visible, button:focus-visible {
   });
 
   /* ---------- ФИНАЛ ---------- */
-  function endRun() {
+  function endRun(reason) {
+    endReason = reason || 'time';
+    runOver = false;
     cancelAnimationFrame(rafId);
     show('finished');
+    $('final-title').textContent =
+      endReason === 'lives' ? 'Забег окончен' :
+      endReason === 'done' ? 'Вопросы кончились' : 'Время вышло!';
     var total = answered;
     var acc = total ? Math.round(100 * correctCount / total) : 0;
     var mins = Math.max(0.25, (performance.now() - runStartedAt) / 60000);

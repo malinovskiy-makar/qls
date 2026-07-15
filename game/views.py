@@ -7,13 +7,17 @@
 - Вся правда о правильных ответах живёт ТОЛЬКО на сервере: эндпоинт вопроса
   никогда не отдаёт correct_index/correct_indices/correct_value; клиент
   узнаёт правильный ответ лишь после своего ответа.
-- Состояние забега — в Django session (подписанные куки/бэкенд сессий):
-  режим, список выданных вопросов (без повторов внутри забега). Отдельный
-  ключ SEEN_KEY живёт МЕЖДУ забегами: «сначала невиданные» — вопрос не
-  повторится в новых забегах, пока пул режима не исчерпан (тогда цикл
-  по кругу). Время и очки считает клиент по константам config.py — сервер
-  отдаёт только дельты; серверного лидерборда пока нет, поэтому
-  анти-чит сводится к сокрытию правильных ответов.
+- Состояние забега — в Django session (бэкенд сессий, не куки: в состоянии
+  лежат списки id и журнал забега): режим, список выданных вопросов (без
+  повторов внутри забега), жизни, очки, серия. Отдельный ключ SEEN_KEY живёт
+  МЕЖДУ забегами: «сначала невиданные» — вопрос не повторится в новых
+  забегах, пока пул режима не исчерпан (тогда цикл по кругу).
+- Очки, комбо и жизни считает СЕРВЕР и отдаёт клиенту готовыми числами —
+  один источник правды. Клиент их только рисует. У клиента остаётся ТОЛЬКО
+  таймер (сервер не тикает): он владеет обратным отсчётом, применяет дельту
+  времени из ответа сервера и сам сообщает конец забега по времени.
+  Серверного лидерборда пока нет, поэтому анти-чит сводится к сокрытию
+  правильных ответов.
 """
 import json
 import random
@@ -69,7 +73,7 @@ def _pool_qs():
 
 
 def _mode_payload(mode_key):
-    """Параметры режима для клиента (тайминги — только из config.py)."""
+    """Параметры режима для клиента (тайминги и жизни — только из config.py)."""
     m = config.MODES[mode_key]
     return {
         'key': mode_key,
@@ -79,6 +83,7 @@ def _mode_payload(mode_key):
         'time_correct': m['time_correct'],
         'time_wrong': m['time_wrong'],
         'time_skip': m['time_skip'],
+        'lives': m['lives'],
     }
 
 
@@ -172,6 +177,22 @@ def _pick_next(request, state):
     return gq
 
 
+def _new_state(mode, topic):
+    """Чистое состояние забега. Очки/серия/жизни — серверные, клиент их
+    только рисует; ended заполняется в конце забега (см. _finish_reason)."""
+    return {
+        'mode': mode,
+        'topic': topic,
+        'seen': [],
+        'answered': {},
+        'lives': config.MODES[mode]['lives'],
+        'score': 0,
+        'streak': 0,            # текущая серия верных подряд
+        'best_streak': 0,       # лучшая серия за забег
+        'ended': None,          # None | 'lives' | 'time' | 'done'
+    }
+
+
 @require_GET
 def api_session_start(request):
     """Начать забег: режим + тема (или «все») → первый вопрос и тайминги."""
@@ -182,7 +203,7 @@ def api_session_start(request):
     if topic and topic not in CANONICAL:
         return JsonResponse({'error': 'Неизвестная тема'}, status=400)
 
-    state = {'mode': mode, 'topic': topic or None, 'seen': [], 'answered': {}}
+    state = _new_state(mode, topic or None)
     gq = _pick_next(request, state)
     if gq is None:
         return JsonResponse({'error': 'Пул вопросов пуст'}, status=503)
@@ -190,6 +211,7 @@ def api_session_start(request):
     return JsonResponse({
         'ok': True,
         'mode': _mode_payload(mode),
+        'lives': state['lives'],
         'question': _question_payload(gq, 1),
     })
 
@@ -250,10 +272,13 @@ def _check_answer(gq, body):
 def api_answer(request):
     """Проверка ответа. Тело: {question_id, choice|choices|value}
     (null/отсутствие = пропуск). Ответ: верно/нет, правильный ответ
-    (по типу вопроса), дельта времени из конфига режима."""
+    (по типу вопроса), дельта времени, а также посчитанные СЕРВЕРОМ очки,
+    серия и жизни. Когда жизни кончились — game_over с причиной 'lives'."""
     state = request.session.get(SESSION_KEY)
     if not state:
         return JsonResponse({'error': 'Забег не начат'}, status=400)
+    if state.get('ended'):
+        return JsonResponse({'error': 'Забег уже завершён'}, status=409)
     try:
         body = json.loads(request.body.decode('utf-8'))
         qid = int(body['question_id'])
@@ -276,17 +301,44 @@ def api_answer(request):
     is_skip, correct = checked
 
     mode_cfg = config.MODES[state['mode']]
+    points = 0
     if is_skip:
+        # Пропуск безопасен: жизнь цела, комбо цело, время не трогаем.
         result = 'skip'
         delta = mode_cfg['time_skip']
+    elif correct:
+        result = 'correct'
+        delta = mode_cfg['time_correct']
+        state['streak'] += 1
+        state['best_streak'] = max(state['best_streak'], state['streak'])
+        points = config.BASE_POINTS * config.combo_multiplier(state['streak'])
+        state['score'] += points
     else:
-        result = 'correct' if correct else 'wrong'
-        delta = mode_cfg['time_correct'] if correct else mode_cfg['time_wrong']
+        # Ошибка: минус жизнь и комбо в ноль. Время НЕ трогаем —
+        # наказание одно, а не два.
+        result = 'wrong'
+        delta = mode_cfg['time_wrong']
+        state['streak'] = 0
+        state['lives'] = max(0, state['lives'] - 1)
 
     state['answered'][str(qid)] = result
+    number = state['seen'].index(qid) + 1   # номер вопроса в забеге
+    if state['lives'] <= 0:
+        state['ended'] = 'lives'
     request.session[SESSION_KEY] = state
 
-    payload = {'result': result, 'correct': correct, 'time_delta': delta}
+    payload = {
+        'result': result,
+        'correct': correct,
+        'time_delta': delta,
+        'points': points,           # очки именно за этот ответ
+        'score': state['score'],
+        'streak': state['streak'],
+        'best_streak': state['best_streak'],
+        'lives': state['lives'],
+    }
+    if state['ended'] == 'lives':
+        payload['game_over'] = {'reason': 'lives', 'question_number': number}
     # Правда о правильном ответе — только теперь, когда вопрос сыгран.
     if gq.question_type == 'multi':
         payload['correct_indices'] = gq.correct_indices

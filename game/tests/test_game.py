@@ -301,7 +301,9 @@ class GameApiTests(TestCase):
                               json.dumps({'question_id': q2['id'], 'choice': 2}),
                               content_type='application/json').json()
         self.assertFalse(d2['correct'])
-        self.assertEqual(d2['time_delta'], -5)
+        # за ошибку время больше не снимается — снимается жизнь
+        self.assertEqual(d2['time_delta'], 0)
+        self.assertEqual(d2['lives'], 2)
 
     def test_skip(self):
         q = self.start()
@@ -309,7 +311,8 @@ class GameApiTests(TestCase):
                              json.dumps({'question_id': q['id'], 'choice': None}),
                              content_type='application/json').json()
         self.assertEqual(d['result'], 'skip')
-        self.assertEqual(d['time_delta'], -3)  # блиц (режим по умолчанию)
+        self.assertEqual(d['time_delta'], 0)   # пропуск бесплатный
+        self.assertEqual(d['lives'], 3)        # и жизнь за него не берут
 
     def test_repeat_answer_409(self):
         q = self.start()
@@ -349,6 +352,123 @@ class GameApiTests(TestCase):
     def test_bad_topic_400(self):
         r = self.client.get('/game/api/session/start/', {'topic': 'Нет такой'})
         self.assertEqual(r.status_code, 400)
+
+
+class LivesTests(TestCase):
+    """Жизни вместо штрафа временем: ошибка стоит жизнь, третья завершает
+    забег, пропуск не стоит ничего. Очки и серию считает сервер.
+
+    Конец по времени сервером не проверяется: таймер живёт на клиенте
+    (см. views.py), сервер узнаёт причину 'time' только при завершении
+    забега — это проверяет FinishTests."""
+
+    def setUp(self):
+        self.client = Client()
+        for i in range(12):
+            p = make_test_problem(statement=f'Вопрос номер {i}?', answer='A')
+            GameQuestion.objects.create(
+                problem=p, question=p.statement,
+                options=['Фирмы', 'Страны', 'Планеты', 'Климат'],
+                correct_index=0, difficulty=2, topics=[], lang='ru')
+
+    def start(self):
+        return self.client.get('/game/api/session/start/').json()
+
+    def answer(self, qid, choice):
+        return self.client.post(
+            '/game/api/answer/', json.dumps({'question_id': qid, 'choice': choice}),
+            content_type='application/json')
+
+    def next_id(self):
+        return self.client.get('/game/api/question/').json()['question']['id']
+
+    def test_start_reports_full_lives(self):
+        d = self.start()
+        self.assertEqual(d['lives'], 3)
+        self.assertEqual(d['mode']['lives'], 3)
+
+    def test_wrong_costs_one_life_and_no_time(self):
+        qid = self.start()['question']['id']
+        d = self.answer(qid, 2).json()
+        self.assertEqual(d['result'], 'wrong')
+        self.assertEqual(d['lives'], 2)
+        self.assertEqual(d['time_delta'], 0)
+        self.assertNotIn('game_over', d)
+
+    def test_game_over_exactly_on_third_mistake(self):
+        qid = self.start()['question']['id']
+        lives = []
+        for i in range(3):
+            d = self.answer(qid, 2).json()
+            lives.append(d['lives'])
+            if i < 2:
+                self.assertNotIn('game_over', d)  # забег продолжается
+            else:
+                self.assertEqual(d['game_over']['reason'], 'lives')
+                # выбыл на третьем вопросе — номер в забеге, не индекс
+                self.assertEqual(d['game_over']['question_number'], 3)
+            qid = self.next_id() if i < 2 else qid
+        self.assertEqual(lives, [2, 1, 0])
+
+    def test_answer_after_game_over_409(self):
+        qid = self.start()['question']['id']
+        for i in range(3):
+            self.answer(qid, 2)
+            if i < 2:
+                qid = self.next_id()
+        r = self.answer(qid, 2)
+        self.assertEqual(r.status_code, 409)   # забег уже кончился
+
+    def test_skip_touches_nothing(self):
+        """Пропуск: жизни целы, время цело, комбо цело."""
+        qid = self.start()['question']['id']
+        for _ in range(3):          # набираем серию 3 → множитель ×2
+            self.answer(qid, 0)
+            qid = self.next_id()
+        d = self.client.post(
+            '/game/api/answer/', json.dumps({'question_id': qid, 'choice': None}),
+            content_type='application/json').json()
+        self.assertEqual(d['result'], 'skip')
+        self.assertEqual(d['lives'], 3)
+        self.assertEqual(d['time_delta'], 0)
+        self.assertEqual(d['streak'], 3)       # серия не порвалась
+        # и следующий верный идёт уже по множителю ×2 (серия продолжилась)
+        d2 = self.answer(self.next_id(), 0).json()
+        self.assertEqual(d2['streak'], 4)
+        self.assertEqual(d2['points'], 200)
+
+    def test_wrong_breaks_combo(self):
+        qid = self.start()['question']['id']
+        for _ in range(3):
+            self.answer(qid, 0)
+            qid = self.next_id()
+        d = self.answer(qid, 2).json()
+        self.assertEqual(d['streak'], 0)
+        self.assertEqual(d['best_streak'], 3)  # лучшая серия помнится
+
+    def test_score_counted_by_server_with_multiplier(self):
+        """Очки считает сервер: 100 × множитель серии."""
+        qid = self.start()['question']['id']
+        points, score = [], 0
+        for _ in range(4):
+            d = self.answer(qid, 0).json()
+            points.append(d['points'])
+            score = d['score']
+            qid = self.next_id()
+        # серии 1,2 → ×1; серии 3,4 → ×2
+        self.assertEqual(points, [100, 100, 200, 200])
+        self.assertEqual(score, 600)
+
+    def test_lives_remain_while_run_continues(self):
+        """Две ошибки — забег жив: конец только по жизням в ноль."""
+        qid = self.start()['question']['id']
+        self.answer(qid, 2)
+        d = self.answer(self.next_id(), 2).json()
+        self.assertEqual(d['lives'], 1)
+        self.assertNotIn('game_over', d)
+        # и следующий вопрос по-прежнему выдаётся
+        r = self.client.get('/game/api/question/')
+        self.assertIn('question', r.json())
 
 
 class ExtractBooleanTests(TestCase):
