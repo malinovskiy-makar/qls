@@ -10,4 +10,5 @@ urlpatterns = [
     path('api/session/start/', views.api_session_start, name='session_start'),
     path('api/question/', views.api_question, name='question'),
     path('api/answer/', views.api_answer, name='answer'),
+    path('api/session/finish/', views.api_session_finish, name='session_finish'),
 ]

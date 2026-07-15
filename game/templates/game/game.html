@@ -943,6 +943,11 @@ a:focus-visible, button:focus-visible {
   var endReason = 'time';       // 'lives' | 'time' | 'done' — чем кончился забег
   var runOver = false;          // жизни кончились: новый вопрос не выдаём
   var goInfo = null;            // {reason, question_number} с сервера
+  var questionShownAt = 0;      // когда показали карточку (для elapsed_ms)
+  var summary = null;           // сводка забега с сервера (экран результатов)
+  var skippedCount = 0;         // пропущено (для запасной сводки без сети)
+  var isRecord = false;         // побит ли личный рекорд этим забегом
+  var bestNow = 0;              // рекорд режима с учётом этого забега
   var selected = [];            // выделенные варианты (мультивыбор, Рапид)
 
   /* -- DOM -- */
@@ -1083,7 +1088,8 @@ a:focus-visible, button:focus-visible {
         livesMax = MODE.lives; lives = d.lives;
         answered = 0; correctCount = 0;
         misses = []; nextBuf = null; poolExhausted = false;
-        endReason = 'time';
+        skippedCount = 0; isRecord = false; bestNow = 0;
+        endReason = 'time'; runOver = false; goInfo = null; summary = null;
         $('gameover-overlay').hidden = true;
         timeLeft = MODE.duration;
         runStartedAt = performance.now();
@@ -1153,6 +1159,7 @@ a:focus-visible, button:focus-visible {
     current = q;
     inputLocked = false;
     selected = [];
+    questionShownAt = performance.now();  // для elapsed_ms в журнале забега
     var isMulti = q.type === 'multi';
     var isBool = q.type === 'boolean';
     var isNumeric = q.type === 'numeric';
@@ -1265,6 +1272,9 @@ a:focus-visible, button:focus-visible {
   // (Время кончилось прямо на дельте — не ждём следующего кадра rAF:
   // в фоновой вкладке rAF заморожен и финал бы не наступил.)
   function postAnswer(payload, onResult) {
+    // сколько игрок думал над этим вопросом — считает клиент (он знает
+    // момент показа карточки), сервер кладёт число в журнал забега
+    payload.elapsed_ms = Math.round(performance.now() - questionShownAt);
     api('/game/api/answer/', {
       method: 'POST',
       body: JSON.stringify(payload)
@@ -1442,6 +1452,7 @@ a:focus-visible, button:focus-visible {
     inputLocked = true;
     var q = current;
     postAnswer({ question_id: q.id, choice: null }, function (d) {
+      skippedCount++;
       // пропуск бесплатный — дельту показываем, только если она есть
       if (d.time_delta) showDelta(d.time_delta + ' с', 'skip');
       advance();
@@ -1525,11 +1536,61 @@ a:focus-visible, button:focus-visible {
   });
 
   /* ---------- ФИНАЛ ---------- */
+  /* Конец забега: сообщаем серверу причину и забираем сводку.
+     Причину 'time'/'done' знает только клиент (таймер и буфер вопросов
+     у него), но перебить сервер она не может: если тот закрыл забег
+     по жизням, в сводке останется 'lives'. */
   function endRun(reason) {
     endReason = reason || 'time';
     runOver = false;
     cancelAnimationFrame(rafId);
     show('finished');
+
+    // Рекорд считаем ЗДЕСЬ и ровно один раз: «новый рекорд» — событие,
+    // а не состояние. Пересчитай его при повторной отрисовке — и рекорд,
+    // уже записанный в localStorage, перестал бы быть рекордом сам себе.
+    var best = parseInt(localStorage.getItem(bestKey(mode)) || '0', 10);
+    isRecord = score > best && score > 0;
+    bestNow = Math.max(best, score);
+    if (isRecord) localStorage.setItem(bestKey(mode), String(score));
+    renderModeCards();  // освежить рекорды на карточках к возврату на старт
+
+    // Сводку считает сервер по журналу забега. Пока она в пути (и если
+    // сеть подведёт совсем) — держим запасную из своих счётчиков: экран
+    // результатов не имеет права пропасть.
+    summary = localSummary();
+    api('/game/api/session/finish/', {
+      method: 'POST',
+      body: JSON.stringify({ reason: endReason })
+    }).then(function (d) {
+      if (d && d.summary) {
+        summary = d.summary;
+        endReason = summary.ended_reason;
+      }
+      paintFinal();
+    }, function () { paintFinal(); });
+  }
+
+  /* Запасная сводка формой как серверная — на случай, если сеть отвалилась
+     в самом конце. Не второй расчёт очков: score/lives/streak тут те же
+     числа, что прислал сервер по ходу забега, а correct/answered — тальми
+     его же вердиктов. Разбивок по темам и графиков в ней нет: их честно
+     считает только сервер по журналу. */
+  function localSummary() {
+    return {
+      mode: mode, mode_title: MODE.title, score: score,
+      correct: correctCount, wrong: answered - correctCount,
+      skipped: skippedCount, total: answered,
+      accuracy: answered ? Math.round(100 * correctCount / answered) : 0,
+      best_streak: bestStreak, max_multiplier: comboMult(bestStreak),
+      lives_left: lives, lives_max: livesMax,
+      ended_reason: endReason, last_number: 0,
+      topic_rows: [], difficulty: [], time_buckets: [],
+      score_curve: [], combo_curve: [], offline: true
+    };
+  }
+
+  function paintFinal() {
     $('final-title').textContent =
       endReason === 'lives' ? 'Забег окончен' :
       endReason === 'done' ? 'Вопросы кончились' : 'Время вышло!';
@@ -1541,20 +1602,11 @@ a:focus-visible, button:focus-visible {
     $('st-streak').textContent = bestStreak; // длина лучшей серии верных подряд
     $('st-speed').textContent = Math.round(total / mins);
 
-    /* рекорд — отдельный на режим */
-    var best = parseInt(localStorage.getItem(bestKey(mode)) || '0', 10);
-    var isRecord = score > best && score > 0;
-    if (isRecord) {
-      localStorage.setItem(bestKey(mode), String(score));
-      $('record-badge').classList.add('on');
-      if (!REDUCED) confetti();
-    } else {
-      $('record-badge').classList.remove('on');
-    }
-    var bestNow = Math.max(best, score);
+    /* рекорд — посчитан в endRun (см. там про «событие, а не состояние») */
+    $('record-badge').classList.toggle('on', isRecord);
+    if (isRecord && !REDUCED) confetti();
     $('final-mode').textContent = 'Режим «' + MODE.title + '»'
       + (bestNow > 0 ? ' · рекорд ' + bestNow.toLocaleString('ru-RU') : '');
-    renderModeCards(); // освежить рекорды на карточках к возврату на старт
 
     /* счёт: count-up ~800 мс */
     var scoreEl = $('final-score');

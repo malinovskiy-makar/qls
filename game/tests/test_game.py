@@ -12,7 +12,7 @@ from game.models import GameQuestion
 from game.management.commands.build_game_pool import (
     extract_question, extract_boolean, extract_multi, extract_numeric)
 from game.config import combo_multiplier, MODES
-from game.views import parse_exact_number
+from game.views import parse_exact_number, build_summary
 
 
 def make_test_problem(statement='Что изучает микроэкономика?',
@@ -469,6 +469,237 @@ class LivesTests(TestCase):
         # и следующий вопрос по-прежнему выдаётся
         r = self.client.get('/game/api/question/')
         self.assertIn('question', r.json())
+
+
+def log_row(outcome='correct', topics=('Спрос и предложение',), difficulty=3,
+            number=1, elapsed_ms=3000, running_score=100, running_combo=1,
+            lives_after=3, question_id=1, question_type='single'):
+    """Одна запись журнала забега — как её пишет api_answer."""
+    return {
+        'question_id': question_id, 'number': number, 'topics': list(topics),
+        'difficulty': difficulty, 'question_type': question_type,
+        'outcome': outcome, 'elapsed_ms': elapsed_ms,
+        'running_score': running_score, 'running_combo': running_combo,
+        'lives_after': lives_after,
+    }
+
+
+def fake_state(log, mode='blitz', score=0, best_streak=0, lives=3, ended=None):
+    """Состояние забега с подставленным журналом (для агрегатора)."""
+    return {'mode': mode, 'topic': None, 'seen': [], 'answered': {},
+            'lives': lives, 'score': score, 'streak': 0,
+            'best_streak': best_streak, 'ended': ended, 'log': log}
+
+
+class SummaryTests(TestCase):
+    """Агрегатор сводки: чистая функция журнала, базу не трогает."""
+
+    def test_accuracy_counts_attempts_not_skips(self):
+        """Точность = верные / (верные + неверные). Пропуск не ответ и
+        точность не портит — иначе честный пропуск был бы хуже угадывания."""
+        s = build_summary(fake_state([
+            log_row(outcome='correct'), log_row(outcome='correct'),
+            log_row(outcome='wrong'), log_row(outcome='skip'),
+            log_row(outcome='skip'),
+        ]))
+        self.assertEqual((s['correct'], s['wrong'], s['skipped']), (2, 1, 2))
+        self.assertEqual(s['total'], 3)         # попыток, а не показов
+        self.assertEqual(s['accuracy'], 67)     # 2/3
+
+    def test_empty_log_does_not_divide_by_zero(self):
+        s = build_summary(fake_state([]))
+        self.assertEqual(s['accuracy'], 0)
+        self.assertEqual(s['total'], 0)
+        self.assertEqual(s['topic_rows'], [])
+        self.assertEqual(s['score_curve'], [])
+
+    def test_topic_breakdown_and_order(self):
+        """По каждой теме — верно/неверно/пропуск; вперёд идут темы
+        с ошибками (на них экран и работа над ошибками)."""
+        s = build_summary(fake_state([
+            log_row(topics=('Спрос и предложение',), outcome='correct'),
+            log_row(topics=('Спрос и предложение',), outcome='wrong'),
+            log_row(topics=('Эластичность',), outcome='wrong'),
+            log_row(topics=('Эластичность',), outcome='wrong'),
+            log_row(topics=('Издержки',), outcome='correct'),
+            log_row(topics=('Издержки',), outcome='skip'),
+        ]))
+        rows = {r['topic']: r for r in s['topic_rows']}
+        self.assertEqual(rows['Эластичность']['wrong'], 2)
+        self.assertEqual(rows['Эластичность']['accuracy'], 0)
+        self.assertEqual(rows['Спрос и предложение']['accuracy'], 50)
+        self.assertEqual(rows['Издержки']['skip'], 1)
+        self.assertEqual(rows['Издержки']['total'], 2)
+        # порядок: больше ошибок — выше
+        self.assertEqual([r['topic'] for r in s['topic_rows']][0], 'Эластичность')
+
+    def test_question_with_two_topics_counts_in_both(self):
+        s = build_summary(fake_state([
+            log_row(topics=('Спрос и предложение', 'Эластичность'), outcome='wrong'),
+        ]))
+        self.assertEqual({r['topic']: r['wrong'] for r in s['topic_rows']},
+                         {'Спрос и предложение': 1, 'Эластичность': 1})
+
+    def test_question_without_topics_not_lost(self):
+        """Вопрос без тем не исчезает — иначе его ошибка пропала бы из сводки."""
+        s = build_summary(fake_state([log_row(topics=(), outcome='wrong')]))
+        self.assertEqual([r['topic'] for r in s['topic_rows']], ['Без темы'])
+
+    def test_difficulty_groups(self):
+        s = build_summary(fake_state([
+            log_row(difficulty=1, outcome='correct'),
+            log_row(difficulty=2, outcome='wrong'),
+            log_row(difficulty=3, outcome='correct'),
+            log_row(difficulty=5, outcome='correct'),
+            log_row(difficulty=4, outcome='skip'),
+        ]))
+        d = {g['key']: g for g in s['difficulty']}
+        self.assertEqual((d['easy']['total'], d['easy']['correct']), (2, 1))
+        self.assertEqual((d['medium']['total'], d['medium']['correct']), (1, 1))
+        self.assertEqual((d['hard']['total'], d['hard']['correct']), (2, 1))
+
+    def test_time_buckets(self):
+        """Границы корзин: значение попадает в ту, где lo <= t < hi."""
+        s = build_summary(fake_state([
+            log_row(elapsed_ms=500),      # 0–2
+            log_row(elapsed_ms=2000),     # ровно граница → 2–4
+            log_row(elapsed_ms=3999),     # 2–4
+            log_row(elapsed_ms=9000),     # 8–10
+            log_row(elapsed_ms=14000),    # 10–15
+            log_row(elapsed_ms=30000),    # ровно граница → >30
+            log_row(elapsed_ms=99000),    # >30
+        ]))
+        counts = {b['title']: b['count'] for b in s['time_buckets']}
+        self.assertEqual(counts['0–2 с'], 1)
+        self.assertEqual(counts['2–4 с'], 2)
+        self.assertEqual(counts['4–6 с'], 0)
+        self.assertEqual(counts['8–10 с'], 1)
+        self.assertEqual(counts['10–15 с'], 1)
+        self.assertEqual(counts['>30 с'], 2)
+        self.assertEqual(sum(b['count'] for b in s['time_buckets']), 7)
+
+    def test_max_combo_is_multiplier_of_best_streak(self):
+        s = build_summary(fake_state([log_row()], best_streak=7))
+        self.assertEqual(s['best_streak'], 7)
+        self.assertEqual(s['max_multiplier'], 3)   # серия 6..8 → ×3
+
+    def test_curves_follow_question_order(self):
+        s = build_summary(fake_state([
+            log_row(number=1, running_score=100, running_combo=1),
+            log_row(number=2, running_score=200, running_combo=2),
+            log_row(number=3, running_score=200, running_combo=0, outcome='wrong'),
+        ]))
+        self.assertEqual(s['score_curve'], [100, 200, 200])
+        self.assertEqual(s['combo_curve'], [1, 2, 0])
+        self.assertEqual(s['last_number'], 3)
+
+
+class FinishTests(TestCase):
+    """Завершение забега: причина, сводка, две концовки."""
+
+    def setUp(self):
+        self.client = Client()
+        for i in range(8):
+            p = make_test_problem(statement=f'Вопрос номер {i}?', answer='A')
+            GameQuestion.objects.create(
+                problem=p, question=p.statement,
+                options=['Фирмы', 'Страны', 'Планеты', 'Климат'],
+                correct_index=0, difficulty=2, topics=['Эластичность'],
+                lang='ru')
+
+    def start(self):
+        return self.client.get('/game/api/session/start/').json()['question']['id']
+
+    def answer(self, qid, choice, elapsed_ms=None):
+        body = {'question_id': qid, 'choice': choice}
+        if elapsed_ms is not None:
+            body['elapsed_ms'] = elapsed_ms
+        return self.client.post('/game/api/answer/', json.dumps(body),
+                                content_type='application/json').json()
+
+    def next_id(self):
+        return self.client.get('/game/api/question/').json()['question']['id']
+
+    def finish(self, reason='time'):
+        r = self.client.post('/game/api/session/finish/',
+                             json.dumps({'reason': reason}),
+                             content_type='application/json')
+        self.assertEqual(r.status_code, 200)
+        return r.json()['summary']
+
+    def test_finish_by_time_with_lives_left(self):
+        """Конец по времени при жизнях > 0: причину знает только клиент."""
+        qid = self.start()
+        self.answer(qid, 0)
+        self.answer(self.next_id(), 2)      # одна ошибка
+        s = self.finish('time')
+        self.assertEqual(s['ended_reason'], 'time')
+        self.assertEqual(s['lives_left'], 2)
+        self.assertEqual((s['correct'], s['wrong']), (1, 1))
+
+    def test_finish_by_lives_ignores_client_reason(self):
+        """Конец по жизням при времени > 0: слово клиента сервер не перебивает."""
+        qid = self.start()
+        for i in range(3):
+            self.answer(qid, 2)
+            if i < 2:
+                qid = self.next_id()
+        s = self.finish('time')             # клиент врёт, что вышло время
+        self.assertEqual(s['ended_reason'], 'lives')
+        self.assertEqual(s['lives_left'], 0)
+        self.assertEqual(s['last_number'], 3)
+
+    def test_finish_by_done(self):
+        qid = self.start()
+        self.answer(qid, 0)
+        s = self.finish('done')
+        self.assertEqual(s['ended_reason'], 'done')
+
+    def test_unknown_reason_falls_back_to_time(self):
+        self.answer(self.start(), 0)
+        s = self.finish('чепуха')
+        self.assertEqual(s['ended_reason'], 'time')
+
+    def test_finish_is_idempotent(self):
+        self.answer(self.start(), 0)
+        first = self.finish('time')
+        second = self.finish('time')
+        self.assertEqual(first['score'], second['score'])
+        self.assertEqual(first['ended_reason'], second['ended_reason'])
+
+    def test_finish_without_session_400(self):
+        r = self.client.post('/game/api/session/finish/', json.dumps({}),
+                             content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_summary_carries_elapsed_from_client(self):
+        qid = self.start()
+        self.answer(qid, 0, elapsed_ms=1500)
+        self.answer(self.next_id(), 0, elapsed_ms=12000)
+        s = self.finish('time')
+        counts = {b['title']: b['count'] for b in s['time_buckets']}
+        self.assertEqual(counts['0–2 с'], 1)
+        self.assertEqual(counts['10–15 с'], 1)
+
+    def test_elapsed_garbage_does_not_break_summary(self):
+        """Мусор в elapsed_ms не роняет забег — поле игрока не должно быть
+        способом положить сводку."""
+        qid = self.start()
+        for bad in ('ерунда', -5, 10 ** 12, None):
+            self.client.post(
+                '/game/api/answer/',
+                json.dumps({'question_id': qid, 'choice': None, 'elapsed_ms': bad}),
+                content_type='application/json')
+            qid = self.next_id()
+        s = self.finish('time')
+        self.assertEqual(s['time_buckets'][0]['count'], 4)   # все в корзину 0–2
+
+    def test_summary_topics_come_from_journal(self):
+        qid = self.start()
+        self.answer(qid, 2)
+        s = self.finish('time')
+        self.assertEqual(s['topic_rows'][0]['topic'], 'Эластичность')
+        self.assertEqual(s['topic_rows'][0]['wrong'], 1)
 
 
 class ExtractBooleanTests(TestCase):

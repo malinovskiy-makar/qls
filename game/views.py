@@ -26,6 +26,7 @@ from fractions import Fraction
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
@@ -179,7 +180,8 @@ def _pick_next(request, state):
 
 def _new_state(mode, topic):
     """Чистое состояние забега. Очки/серия/жизни — серверные, клиент их
-    только рисует; ended заполняется в конце забега (см. _finish_reason)."""
+    только рисует; ended заполняется на третьей ошибке (api_answer) либо
+    при завершении забега (api_session_finish)."""
     return {
         'mode': mode,
         'topic': topic,
@@ -190,6 +192,11 @@ def _new_state(mode, topic):
         'streak': 0,            # текущая серия верных подряд
         'best_streak': 0,       # лучшая серия за забег
         'ended': None,          # None | 'lives' | 'time' | 'done'
+        # Журнал забега: по записи на КАЖДЫЙ сыгранный вопрос, в порядке
+        # игры. Из него целиком считается сводка (см. build_summary) —
+        # отдельных счётчиков «сколько ошибок в теме» не заводим, иначе
+        # они разойдутся с журналом.
+        'log': [],
     }
 
 
@@ -268,6 +275,118 @@ def _check_answer(gq, body):
     return False, choice == gq.correct_index
 
 
+def _parse_elapsed(body):
+    """Сколько миллисекунд игрок думал над вопросом (клиент знает момент
+    показа карточки). Поле необязательное — старый клиент его не шлёт,
+    тогда 0. Мусор, отрицательные и неправдоподобно большие значения — тоже
+    0: сводка не должна падать из-за подсунутого поля."""
+    try:
+        v = int(body.get('elapsed_ms') or 0)
+    except (TypeError, ValueError):
+        return 0
+    return v if 0 <= v <= 3600000 else 0
+
+
+# Корзины гистограммы времени: (левая граница сек, правая или None = ∞, подпись).
+TIME_BUCKETS = [
+    (0, 2, '0–2 с'),
+    (2, 4, '2–4 с'),
+    (4, 6, '4–6 с'),
+    (6, 8, '6–8 с'),
+    (8, 10, '8–10 с'),
+    (10, 15, '10–15 с'),
+    (15, 30, '15–30 с'),
+    (30, None, '>30 с'),
+]
+
+# Сложность GameQuestion 1–5 → три группы для кольцевой диаграммы.
+DIFFICULTY_GROUPS = [('easy', 'Лёгкие', (1, 2)),
+                     ('medium', 'Средние', (3,)),
+                     ('hard', 'Сложные', (4, 5))]
+
+
+def build_summary(state):
+    """Сводка забега — чистая функция журнала (state['log']).
+
+    Ничего не берёт из базы и не считает заново того, что уже записано:
+    журнал — единственный источник. Точность считается от ПОПЫТОК
+    (верные + неверные): пропуск не ответ, и портить им точность нечестно —
+    иначе честный пропуск наказывался бы сильнее угадывания.
+    """
+    log = state.get('log') or []
+    correct = sum(1 for r in log if r['outcome'] == 'correct')
+    wrong = sum(1 for r in log if r['outcome'] == 'wrong')
+    skipped = sum(1 for r in log if r['outcome'] == 'skip')
+    attempts = correct + wrong
+
+    # Разбивка по темам. Вопрос без тем идёт в «Без темы» — иначе его
+    # ошибки просто исчезли бы из работы над ошибками.
+    topics = {}
+    for r in log:
+        for name in (r['topics'] or ['Без темы']):
+            cell = topics.setdefault(name, {'correct': 0, 'wrong': 0, 'skip': 0})
+            cell[r['outcome']] += 1
+    topic_rows = []
+    for name, cell in topics.items():
+        tries = cell['correct'] + cell['wrong']
+        topic_rows.append({
+            'topic': name,
+            'correct': cell['correct'],
+            'wrong': cell['wrong'],
+            'skip': cell['skip'],
+            'total': cell['correct'] + cell['wrong'] + cell['skip'],
+            'accuracy': round(100 * cell['correct'] / tries) if tries else 0,
+        })
+    # Сначала темы с ошибками (главное на экране), потом по объёму.
+    topic_rows.sort(key=lambda t: (-t['wrong'], -t['total'], t['topic']))
+
+    difficulty = []
+    for key, title, levels in DIFFICULTY_GROUPS:
+        rows = [r for r in log if r['difficulty'] in levels]
+        difficulty.append({
+            'key': key,
+            'title': title,
+            'total': len(rows),
+            'correct': sum(1 for r in rows if r['outcome'] == 'correct'),
+        })
+
+    buckets = []
+    for lo, hi, title in TIME_BUCKETS:
+        n = 0
+        for r in log:
+            sec = (r['elapsed_ms'] or 0) / 1000.0
+            if sec >= lo and (hi is None or sec < hi):
+                n += 1
+        buckets.append({'title': title, 'count': n})
+
+    best_streak = state.get('best_streak', 0)
+    return {
+        'mode': state['mode'],
+        'mode_title': config.MODES[state['mode']]['title'],
+        'topic': state.get('topic'),
+        'score': state.get('score', 0),
+        'correct': correct,
+        'wrong': wrong,
+        'skipped': skipped,
+        'total': attempts,
+        'accuracy': round(100 * correct / attempts) if attempts else 0,
+        'best_streak': best_streak,
+        'max_multiplier': config.combo_multiplier(best_streak),
+        'lives_left': state.get('lives', 0),
+        'lives_max': config.MODES[state['mode']]['lives'],
+        'ended_reason': state.get('ended') or 'time',
+        # номер вопроса, на котором выбыли (нужен плашке экрана результатов)
+        'last_number': log[-1]['number'] if log else 0,
+        'topic_rows': topic_rows,
+        'difficulty': difficulty,
+        'time_buckets': buckets,
+        # кривые для графиков: значение по номеру вопроса
+        'score_curve': [r['running_score'] for r in log],
+        'combo_curve': [r['running_combo'] for r in log],
+        'played_at': timezone.now().isoformat(timespec='seconds'),
+    }
+
+
 @require_POST
 def api_answer(request):
     """Проверка ответа. Тело: {question_id, choice|choices|value}
@@ -284,6 +403,7 @@ def api_answer(request):
         qid = int(body['question_id'])
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         return JsonResponse({'error': 'Некорректный запрос'}, status=400)
+    elapsed_ms = _parse_elapsed(body)
 
     if qid not in state['seen']:
         return JsonResponse({'error': 'Этот вопрос не выдавался'}, status=404)
@@ -325,6 +445,23 @@ def api_answer(request):
     number = state['seen'].index(qid) + 1   # номер вопроса в забеге
     if state['lives'] <= 0:
         state['ended'] = 'lives'
+
+    # Журнал: всё, из чего потом считается сводка забега. Темы и сложность
+    # берём из GameQuestion (они там денормализованы) — сводке не придётся
+    # ходить в базу за вопросами, которых к тому времени может уже не быть
+    # (пул пересобирается командой build_game_pool).
+    state['log'].append({
+        'question_id': qid,
+        'number': number,
+        'topics': gq.topics or [],
+        'difficulty': gq.difficulty,
+        'question_type': gq.question_type,
+        'outcome': result,
+        'elapsed_ms': elapsed_ms,
+        'running_score': state['score'],
+        'running_combo': state['streak'],
+        'lives_after': state['lives'],
+    })
     request.session[SESSION_KEY] = state
 
     payload = {
@@ -351,3 +488,28 @@ def api_answer(request):
     if gq.is_generated and gq.gen_solution:
         payload['solution'] = gq.gen_solution
     return JsonResponse(payload)
+
+
+@require_POST
+def api_session_finish(request):
+    """Завершить забег и получить сводку.
+
+    Причину конца сообщает клиент ('time' — вышло время, 'done' — кончились
+    вопросы), но слово клиента НЕ перебивает сервер: если сервер уже сам
+    закрыл забег по жизням, причина остаётся 'lives'. Про время сервер
+    знать не может — таймер живёт на клиенте.
+
+    Идемпотентен: повторный вызов просто пересчитает ту же сводку.
+    """
+    state = request.session.get(SESSION_KEY)
+    if not state:
+        return JsonResponse({'error': 'Забег не начат'}, status=400)
+    try:
+        body = json.loads(request.body.decode('utf-8')) if request.body else {}
+    except json.JSONDecodeError:
+        body = {}
+    if not state.get('ended'):
+        reason = body.get('reason')
+        state['ended'] = reason if reason in ('time', 'done') else 'time'
+    request.session[SESSION_KEY] = state
+    return JsonResponse({'summary': build_summary(state)})
