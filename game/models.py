@@ -11,7 +11,22 @@ single — один из вариантов (Блиц), multi — несколь
 numeric — числовой ответ вводом (Классика; извлечение появится с импортом
 региональных тестов).
 """
+import secrets
+
 from django.db import models
+
+# Алфавит кода публичной ссылки — Crockford base32: без I, L, O, U,
+# чтобы код нельзя было спутать при чтении вслух или переписывании.
+CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+CODE_LENGTH = 8
+
+
+def make_result_code():
+    """Случайный код публичной страницы результата.
+
+    32^8 ≈ 1,1 трлн вариантов — угадать чужой результат перебором не выйдет,
+    а порядковый id выдавал бы, сколько всего забегов сыграно."""
+    return ''.join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
 
 
 class GameQuestion(models.Model):
@@ -102,3 +117,45 @@ class GameQuestion(models.Model):
 
     def __str__(self):
         return f'GameQuestion #{self.pk} (задача #{self.problem_id})'
+
+
+class GameResult(models.Model):
+    """Сохранённый результат забега — для публичной страницы `/game/r/<код>/`.
+
+    Отдельная таблица, ничего в игре от неё не зависит: строка создаётся при
+    завершении забега и живёт сама по себе. Это НЕ лидерборд — записи ничьи,
+    сравнивать их между собой нельзя (авторизации у игры нет, счёт приходит
+    из сессии игрока). Смысл один: у ссылки, которой делятся, должно быть
+    что показать.
+
+    Разбивки лежат JSON-полями (Django 4.2 умеет их и на SQLite, и на
+    Postgres): страница read-only, запросов «по темам» к ним не будет.
+    """
+    code = models.CharField('Код ссылки', max_length=16, unique=True,
+                            default=make_result_code, db_index=True)
+    mode = models.CharField('Режим', max_length=16)
+    score = models.PositiveIntegerField('Счёт', default=0)
+    correct_count = models.PositiveSmallIntegerField('Верных', default=0)
+    total_count = models.PositiveSmallIntegerField('Попыток', default=0)
+    max_combo = models.PositiveSmallIntegerField('Макс. множитель', default=1)
+    ended_reason = models.CharField('Чем кончился', max_length=8, default='time')
+    # [{topic, correct, wrong, skip, total, accuracy}, ...]
+    topic_breakdown = models.JSONField('Разбивка по темам', default=list, blank=True)
+    # [{key, title, total, correct}, ...]
+    difficulty_breakdown = models.JSONField('Разбивка по сложности',
+                                            default=list, blank=True)
+    # счёт по номеру вопроса — мини-график на публичной странице
+    score_curve = models.JSONField('Кривая счёта', default=list, blank=True)
+    created_at = models.DateTimeField('Сыгран', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Результат забега'
+        verbose_name_plural = 'Результаты забегов'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.code}: {self.score} очков ({self.mode})'
+
+    @property
+    def accuracy(self):
+        return round(100 * self.correct_count / self.total_count) if self.total_count else 0

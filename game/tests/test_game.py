@@ -3,12 +3,13 @@
 четыре режима (типы вопросов, проверка multi/numeric, «сначала невиданные»).
 """
 import json
+import re
 from fractions import Fraction
 
 from django.test import TestCase, Client
 
 from problems.models import Problem, ProblemPart, Source, SourceReference
-from game.models import GameQuestion
+from game.models import GameQuestion, GameResult, make_result_code
 from game.management.commands.build_game_pool import (
     extract_question, extract_boolean, extract_multi, extract_numeric)
 from game.config import combo_multiplier, MODES
@@ -950,6 +951,100 @@ class MistakesRunApiTests(TestCase):
         GameQuestion.objects.exclude(id=d['question']['id']).delete()
         nxt = self.client.get('/game/api/question/').json()
         self.assertTrue(nxt.get('exhausted'))
+
+
+class ResultPageTests(TestCase):
+    """Публичная страница результата: сохранение, доступ без логина,
+    абсолютная ссылка, Open Graph."""
+
+    def setUp(self):
+        self.client = Client()
+        for i in range(6):
+            p = make_test_problem(statement=f'Вопрос номер {i}?', answer='A')
+            GameQuestion.objects.create(
+                problem=p, question=p.statement,
+                options=['Фирмы', 'Страны', 'Планеты', 'Климат'],
+                correct_index=0, difficulty=2, topics=['Эластичность'],
+                lang='ru')
+
+    def play_and_finish(self):
+        qid = self.client.get('/game/api/session/start/').json()['question']['id']
+        self.client.post('/game/api/answer/',
+                         json.dumps({'question_id': qid, 'choice': 0}),
+                         content_type='application/json')
+        return self.client.post('/game/api/session/finish/',
+                                json.dumps({'reason': 'time'}),
+                                content_type='application/json').json()
+
+    def test_finish_creates_result_with_absolute_url(self):
+        d = self.play_and_finish()
+        self.assertEqual(GameResult.objects.count(), 1)
+        r = GameResult.objects.get()
+        self.assertEqual(d['share']['code'], r.code)
+        # ссылка АБСОЛЮТНАЯ — иначе в мессенджере не откроется
+        self.assertTrue(d['share']['url'].startswith('http://'))
+        self.assertIn('/game/r/' + r.code + '/', d['share']['url'])
+        self.assertEqual(r.score, 100)
+        self.assertEqual((r.correct_count, r.total_count), (1, 1))
+        self.assertEqual(r.topic_breakdown[0]['topic'], 'Эластичность')
+
+    def test_finish_twice_does_not_duplicate_result(self):
+        first = self.play_and_finish()
+        second = self.client.post('/game/api/session/finish/',
+                                  json.dumps({'reason': 'time'}),
+                                  content_type='application/json').json()
+        self.assertEqual(GameResult.objects.count(), 1)
+        self.assertEqual(first['share']['code'], second['share']['code'])
+
+    def test_public_page_opens_without_login(self):
+        d = self.play_and_finish()
+        r = self.client.get('/game/r/%s/' % d['share']['code'])
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode()
+        self.assertIn('Сыграть тоже', html)
+        self.assertIn('Эластичность', html)
+
+    def test_public_page_has_open_graph_tags(self):
+        d = self.play_and_finish()
+        html = self.client.get('/game/r/%s/' % d['share']['code']).content.decode()
+        for tag in ['og:title', 'og:description', 'og:url', 'og:image',
+                    'twitter:card']:
+            self.assertIn(tag, html)
+        self.assertIn('summary_large_image', html)
+        self.assertIn('100 очков в Econ Rush', html)   # счёт в тексте превью
+        # og:url и og:image — абсолютные
+        m = re.search(r'property="og:url" content="([^"]+)"', html)
+        self.assertTrue(m.group(1).startswith('http://'))
+        m = re.search(r'property="og:image" content="([^"]+)"', html)
+        self.assertTrue(m.group(1).startswith('http://'))
+        self.assertIn('og_default.png', m.group(1))
+
+    def test_unknown_code_404(self):
+        self.assertEqual(self.client.get('/game/r/NOPENOPE/').status_code, 404)
+
+    def test_head_answers_like_get(self):
+        """Мессенджер дёргает HEAD перед разворачиванием превью."""
+        d = self.play_and_finish()
+        self.assertEqual(
+            self.client.head('/game/r/%s/' % d['share']['code']).status_code, 200)
+
+    def test_code_alphabet_has_no_confusable_letters(self):
+        """Код читают и переписывают руками: I, L, O, U в нём быть не должно."""
+        codes = ''.join(make_result_code() for _ in range(200))
+        self.assertFalse(set('ILOU') & set(codes))
+        self.assertEqual(len(make_result_code()), 8)
+
+    def test_curve_points_for_polyline(self):
+        from game.views import _curve_points
+        self.assertEqual(_curve_points([]), '')
+        self.assertEqual(_curve_points([100]), '')       # одна точка — не линия
+        pts = _curve_points([0, 50, 100]).split()
+        self.assertEqual(len(pts), 3)
+        # растёт слева направо, верх графика — максимум счёта
+        xs = [float(p.split(',')[0]) for p in pts]
+        ys = [float(p.split(',')[1]) for p in pts]
+        self.assertEqual(xs, sorted(xs))
+        self.assertGreater(ys[0], ys[-1])
 
 
 class ExtractBooleanTests(TestCase):

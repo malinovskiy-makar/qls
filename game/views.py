@@ -24,14 +24,17 @@ import random
 from fractions import Fraction
 
 from django.conf import settings
+from django.db import IntegrityError
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
+from django.templatetags.static import static
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_safe
 
 from problems.management.commands.apply_topic_mapping import CANONICAL
-from .models import GameQuestion
+from .models import GameQuestion, GameResult, make_result_code
 from . import config
 
 SESSION_KEY = 'econ_rush'        # состояние текущего забега
@@ -692,4 +695,90 @@ def api_session_finish(request):
     # над ошибками», а SESSION_KEY затрётся, как только начнётся новый
     # забег. Храним только нужное ей: режим и журнал.
     request.session[LAST_KEY] = {'mode': state['mode'], 'log': state['log']}
-    return JsonResponse({'summary': build_summary(state)})
+
+    summary = build_summary(state)
+    share = _save_result(request, state, summary)
+    return JsonResponse({'summary': summary, 'share': share})
+
+
+def _save_result(request, state, summary):
+    """Сохранить результат забега и отдать ссылку на публичную страницу.
+
+    Ссылка АБСОЛЮТНАЯ (build_absolute_uri): её вставляют в Telegram и VK,
+    а относительный путь там просто не откроется.
+
+    Идемпотентность: код забега запоминается в состоянии, повторный вызов
+    finish отдаёт ту же строку, а не плодит новые.
+    """
+    code = state.get('result_code')
+    result = GameResult.objects.filter(code=code).first() if code else None
+    if result is None:
+        for _ in range(5):   # коллизия кода почти невероятна, но не 500
+            try:
+                result = GameResult.objects.create(
+                    code=make_result_code(),
+                    mode=state['mode'],
+                    score=summary['score'],
+                    correct_count=summary['correct'],
+                    total_count=summary['total'],
+                    max_combo=summary['max_multiplier'],
+                    ended_reason=summary['ended_reason'],
+                    topic_breakdown=summary['topic_rows'],
+                    difficulty_breakdown=summary['difficulty'],
+                    score_curve=summary['score_curve'],
+                )
+                break
+            except IntegrityError:
+                continue
+        if result is None:
+            return None      # не смогли сохранить — забег важнее ссылки
+        state['result_code'] = result.code
+        request.session[SESSION_KEY] = state
+    return {
+        'code': result.code,
+        'url': request.build_absolute_uri(
+            reverse('game:result', args=[result.code])),
+    }
+
+
+@require_safe
+def result_page(request, code):
+    """Публичная страница результата — то, что видит человек по ссылке.
+
+    Без логина и read-only: чужой забег нельзя ни продолжить, ни изменить.
+    require_safe, а не require_GET: HEAD должен отвечать как везде на сайте
+    (мессенджеры дёргают HEAD перед разворачиванием превью).
+    """
+    result = get_object_or_404(GameResult, code=code)
+    mode_title = (config.MODES.get(result.mode) or {}).get('title', result.mode)
+    # Ссылки в мета-тегах — абсолютные: относительный путь мессенджер
+    # не развернёт.
+    page_url = request.build_absolute_uri(
+        reverse('game:result', args=[result.code]))
+    return render(request, 'game/result.html', {
+        'r': result,
+        'mode_title': mode_title,
+        'accuracy': result.accuracy,
+        'topics': [t for t in (result.topic_breakdown or []) if t.get('total')],
+        'page_url': page_url,
+        'game_url': request.build_absolute_uri(reverse('game:page')),
+        'og_image': request.build_absolute_uri(static('game/og_default.png')),
+        'og_title': f'{result.score} очков в Econ Rush — обгонишь?',
+        'og_description': (f'Режим «{mode_title}» · точность {result.accuracy}% '
+                           f'· комбо ×{result.max_combo}'),
+        'curve_points': _curve_points(result.score_curve),
+    })
+
+
+def _curve_points(curve):
+    """Точки мини-графика счёта для публичной страницы: «x,y x,y …» под
+    <polyline>. Считаем в питоне — на публичной странице JS не нужен вовсе.
+    Меньше двух точек — графика нет (рисовать нечего)."""
+    if not curve or len(curve) < 2:
+        return ''
+    w, h, pad = 300.0, 60.0, 3.0
+    top = max(curve) or 1
+    step = (w - 2 * pad) / (len(curve) - 1)
+    return ' '.join(
+        '%.1f,%.1f' % (pad + i * step, h - pad - (v / top) * (h - 2 * pad))
+        for i, v in enumerate(curve))

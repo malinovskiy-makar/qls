@@ -836,6 +836,22 @@ a:focus-visible, button:focus-visible {
 .d-medium { background: var(--amber); }
 .d-hard { background: var(--rush-bad); }
 
+.fin-share[hidden] { display: none; }
+.fin-share h3 { font-size: 16px; font-weight: 700; }
+.share-lead { margin-top: 3px; font-size: 12.5px; color: var(--text3); }
+.share-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.share-row button {
+  font: inherit; font-size: 13.5px; font-weight: 600;
+  height: 42px; padding: 0 16px;
+  border: 1px solid var(--rush-border); border-radius: 10px;
+  background: var(--rush-surface); color: var(--text2);
+  cursor: pointer;
+  transition: border-color .12s, color .12s;
+}
+.share-row button:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+.share-row button[hidden] { display: none; }
+#share-canvas { display: none; }
+
 .final-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .btn-again {
   font: inherit; font-size: 15px; font-weight: 600;
@@ -1108,8 +1124,19 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         </div>
       </section>
 
-      <!-- 6. Шеринг (Фаза 6) -->
-      <section class="fin-share" id="fin-share" hidden></section>
+      <!-- 6. Шеринг: ссылка на публичную страницу + карточка-картинка -->
+      <section class="fin-share" id="fin-share" hidden>
+        <h3>Поделиться результатом</h3>
+        <p class="share-lead" id="share-lead"></p>
+        <div class="share-row">
+          <button type="button" id="btn-share-img">Поделиться картинкой</button>
+          <button type="button" id="btn-share-link">Скопировать ссылку</button>
+          <button type="button" id="btn-share-native" hidden>Поделиться</button>
+        </div>
+        <!-- холст карточки: рисуем в браузере (кириллицу отрисует он сам),
+             на экране не показываем — он нужен только чтобы отдать PNG -->
+        <canvas id="share-canvas" width="1000" height="524" hidden></canvas>
+      </section>
 
       <!-- 7. Действия -->
       <div class="final-actions">
@@ -1222,6 +1249,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var isRecord = false;         // побит ли личный рекорд этим забегом
   var mistakesRun = false;      // это забег «работа над ошибками»?
   var chartsBuilt = false;      // графики подробной статистики уже построены?
+  var shareInfo = null;         // {code, url} публичной страницы результата
   var bestNow = 0;              // рекорд режима с учётом этого забега
   var selected = [];            // выделенные варианты (мультивыбор, Рапид)
 
@@ -1374,6 +1402,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         misses = []; nextBuf = null; poolExhausted = false;
         skippedCount = 0; isRecord = false; bestNow = 0;
         endReason = 'time'; runOver = false; goInfo = null; summary = null;
+        shareInfo = null;
         $('gameover-overlay').hidden = true;
         timeLeft = MODE.duration;
         show('playing');
@@ -1853,6 +1882,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       if (d && d.summary) {
         summary = d.summary;
         endReason = summary.ended_reason;
+        shareInfo = d.share || null;   // абсолютный URL страницы результата
       }
       done();
     }, done);
@@ -1971,6 +2001,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
     paintTopics(s);
     paintMisses();
+
+    paintShare(s);
 
     /* подробная статистика — заново свёрнута, графики построятся при
        раскрытии уже по НОВОЙ сводке */
@@ -2108,6 +2140,119 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     });
     renderMath(list);
   }
+
+  /* ---------- ШЕРИНГ ----------
+     Делимся ссылкой на публичную страницу результата (её абсолютный URL
+     считает сервер: относительный в мессенджере не откроется) и картинкой,
+     которую рисует сам браузер — кириллицу он отрисует без наших забот
+     о шрифтах, а серверу не придётся держать рендер картинок. */
+  function shareText() {
+    var s = summary;
+    return 'Econ Rush · ' + s.mode_title + ' · ' + s.score.toLocaleString('ru-RU')
+      + ' очков · ' + s.correct + '/' + s.total + ' · комбо ×' + s.max_multiplier
+      + ' — обгонишь?';
+  }
+
+  function paintShare(s) {
+    var box = $('fin-share');
+    // Нет ссылки (сеть подвела) — блока нет: делиться нечем.
+    box.hidden = !(shareInfo && shareInfo.url);
+    if (box.hidden) return;
+    $('share-lead').textContent = 'Ссылка открывается у всех, без регистрации';
+    $('btn-share-native').hidden = !navigator.share;
+  }
+
+  /* Карточка-картинка. Размер 1000×524 — те же пропорции, что у превью
+     ссылки (1200×630), чтобы в ленте они выглядели одинаково. */
+  function drawShareCard() {
+    var cv = $('share-canvas');
+    var ctx = cv.getContext('2d');
+    var W = cv.width, H = cv.height, s = summary;
+    ctx.fillStyle = '#0d0d12';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#FF4D94';
+    ctx.fillRect(0, 0, 10, H);
+
+    ctx.fillStyle = '#96969f';
+    ctx.font = '600 26px -apple-system, "Segoe UI", sans-serif';
+    ctx.fillText('ЭкЗадачи · Econ Rush', 64, 74);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '800 140px -apple-system, "Segoe UI", sans-serif';
+    var scoreText = s.score.toLocaleString('ru-RU');
+    ctx.fillText(scoreText, 64, 210);
+    var scoreW = ctx.measureText(scoreText).width;   // «очков» ставим за счётом
+    ctx.fillStyle = '#96969f';
+    ctx.font = '600 30px -apple-system, "Segoe UI", sans-serif';
+    ctx.fillText('очков', 64 + scoreW + 14, 210);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '600 34px -apple-system, "Segoe UI", sans-serif';
+    ctx.fillText('Режим «' + s.mode_title + '»', 64, 290);
+    ctx.fillStyle = '#96969f';
+    ctx.font = '400 30px -apple-system, "Segoe UI", sans-serif';
+    ctx.fillText('верных ' + s.correct + '/' + s.total + ' · точность '
+                 + s.accuracy + '% · комбо ×' + s.max_multiplier, 64, 340);
+
+    ctx.fillStyle = '#FF4D94';
+    ctx.font = '800 44px -apple-system, "Segoe UI", sans-serif';
+    ctx.fillText('Обгонишь?', 64, 430);
+
+    ctx.fillStyle = '#6b6b78';
+    ctx.font = '400 24px -apple-system, "Segoe UI", sans-serif';
+    ctx.fillText((shareInfo && shareInfo.url) || '', 64, H - 44);
+  }
+
+  function toast(btn, text, back) {
+    btn.textContent = text;
+    setTimeout(function () { btn.textContent = back; }, 2000);
+  }
+
+  $('btn-share-img').addEventListener('click', function () {
+    var btn = this;
+    drawShareCard();
+    $('share-canvas').toBlob(function (blob) {
+      if (!blob) { toast(btn, 'Не вышло', 'Поделиться картинкой'); return; }
+      var file = null;
+      try { file = new File([blob], 'econ-rush.png', { type: 'image/png' }); }
+      catch (e) { /* старый браузер без конструктора File — уйдём в скачивание */ }
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], text: shareText(),
+                          url: shareInfo && shareInfo.url })
+          .catch(function () { /* игрок передумал — не ошибка */ });
+        return;
+      }
+      // Десктоп: системного «Поделиться» с файлом нет — отдаём файл.
+      var a = document.createElement('a');
+      var href = URL.createObjectURL(blob);
+      a.href = href;
+      a.download = 'econ-rush.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(href);
+      toast(btn, 'Картинка скачана ✓', 'Поделиться картинкой');
+    }, 'image/png');
+  });
+
+  $('btn-share-link').addEventListener('click', function () {
+    var btn = this;
+    var url = shareInfo && shareInfo.url;
+    if (!url) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(
+        function () { toast(btn, 'Ссылка скопирована ✓', 'Скопировать ссылку'); },
+        function () { prompt('Скопируйте ссылку:', url); });
+    } else {
+      prompt('Скопируйте ссылку:', url);
+    }
+  });
+
+  $('btn-share-native').addEventListener('click', function () {
+    if (!navigator.share || !shareInfo) return;
+    navigator.share({ title: 'Econ Rush', text: shareText(), url: shareInfo.url })
+      .catch(function () { /* игрок передумал — не ошибка */ });
+  });
 
   /* ---------- ПОДРОБНАЯ СТАТИСТИКА: графики ----------
      Рисуем SVG руками, без библиотеки. Причина не в размере: цвета идут
