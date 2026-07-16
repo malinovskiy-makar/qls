@@ -133,3 +133,57 @@ class PageJsTests(TestCase):
         self.assertIn('MODE.lives', self.js)
         # запас жизней не захардкожен в отрисовке сердец
         self.assertNotRegex(self.js, r'for \(var i = 0; i < 3;')
+
+
+class FigureModuleTests(TestCase):
+    """Модуль чертежей — общий у страницы игры и HTML-предпросмотра.
+
+    Он вынесен в static именно ради этого: второй рисователь «только для
+    превью» разошёлся бы с боевым, и преподаватель смотрел бы не то, что
+    увидит игрок. Тесты держат эту связку.
+    """
+    JS = os.path.join(settings.BASE_DIR, 'game', 'static', 'game', 'figure.js')
+    CSS = os.path.join(settings.BASE_DIR, 'game', 'static', 'game', 'figure.css')
+
+    @unittest.skipIf(shutil.which('node') is None, 'node не установлен')
+    def test_figure_js_parses(self):
+        p = subprocess.run(['node', '--check', self.JS],
+                           capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stderr)
+
+    def test_figure_js_exposes_only_draw_figure(self):
+        """Наружу торчит одна функция: остальное — в замыкании."""
+        with open(self.JS, encoding='utf-8') as f:
+            src = f.read()
+        self.assertIn('window.drawFigure = drawFigure;', src)
+        self.assertEqual(len(re.findall(r'\bwindow\.\w+\s*=', src)), 1)
+
+    def test_game_page_includes_the_module(self):
+        with open(TEMPLATE, encoding='utf-8') as f:
+            src = f.read()
+        self.assertIn("{% static 'game/figure.js' %}", src)
+        self.assertIn("{% static 'game/figure.css' %}", src)
+        self.assertIn('{% load static %}', src)
+
+    def test_preview_command_inlines_the_same_module(self):
+        """Предпросмотр инлайнит те же файлы, а не свою копию."""
+        from game.management.commands import preview_generated as cmd
+        with open(cmd.__file__, encoding='utf-8') as f:
+            src = f.read()
+        # вызов может быть перенесён по строкам — ищем с учётом переносов
+        self.assertRegex(src, r"_read_static\(\s*'figure\.js'\s*\)")
+        self.assertRegex(src, r"_read_static\(\s*'figure\.css'\s*\)")
+        # своей копии рисователя у превью быть не должно
+        self.assertNotIn('function drawFigure', src)
+
+    def test_roles_of_python_schema_are_known_to_the_renderer(self):
+        """Каждая роль из _figure.ROLES имеет цвет у рисователя.
+
+        Разъехались — питон отдаст роль, которой рисователь не знает, и
+        кривая молча уедет в цвет «ghost»."""
+        from game.generators import _figure
+        with open(self.JS, encoding='utf-8') as f:
+            src = f.read()
+        block = re.search(r'var FIG_ROLES = \{(.*?)\};', src, re.S).group(1)
+        known = set(re.findall(r'(\w+)\s*:', block))
+        self.assertEqual(sorted(set(_figure.ROLES) - known), [])

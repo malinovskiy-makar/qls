@@ -3,12 +3,23 @@ preview_generated — HTML-превью сгенерированных вопр�
 
 По каждому архетипу генерирует --per примеров КАЖДОГО типа (numeric, single,
 boolean) и складывает в reports/generators/preview.html: условие (KaTeX),
-варианты с пометкой правильного, ответ, пошаговое решение, сложность,
-обёртка, generator_key. Оглавление по блокам. В базу ничего не пишется.
+чертёж (у графических архетипов), варианты с пометкой правильного, ответ,
+пошаговое решение, сложность, сюжет, generator_key. Оглавление по блокам.
+В базу ничего не пишется.
+
+Чертежи рисует ТОТ ЖЕ модуль, что и страница игры (game/static/game/
+figure.js + figure.css) — он инлайнится в отчёт. Второй рисователь «только
+для превью» неизбежно разошёлся бы с боевым, и предпросмотр показывал бы
+преподавателю не то, что увидит игрок.
+
+Архетипы, переработанные под эталон (сюжет-библиотека, полное решение,
+график), помечены в отчёте — чтобы было видно, что уже на планке, а что
+ещё ждёт очереди.
 
 Запуск: ./venv/bin/python manage.py preview_generated --per 10 [--seed S]
 """
 import html
+import json
 import os
 import random
 
@@ -16,6 +27,11 @@ from django.core.management.base import BaseCommand
 
 from game.generators.base import generate_batch
 from game.generators.registry import ARCHETYPES
+
+# Архетипы на эталоне (Notion, решение 2026-07-16). Тот же список — в
+# game/tests/test_generators.py::ETALON_ARCHETYPES.
+ETALON_KEYS = ('monopoly', 'equilibrium', 'tax_subsidy', 'ppf_single')
+STATIC_DIR = os.path.join('game', 'static', 'game')
 
 OUT_PATH = 'reports/generators/preview.html'
 QUESTION_TYPES = ('numeric', 'single', 'boolean')
@@ -37,6 +53,13 @@ PAGE_HEAD = u"""<!DOCTYPE html>
 <style>
  body { font-family: -apple-system, 'Segoe UI', sans-serif; margin: 24px;
         max-width: 980px; color: #1a1a1a; }
+ .etalon { border-left: 3px solid #1d7e45; }
+ .badge { display: inline-block; font-size: 10px; font-weight: 700;
+          padding: 2px 7px; border-radius: 999px; vertical-align: middle;
+          margin-left: 8px; }
+ .badge-ok { background: #e6f4ec; color: #1d7e45; }
+ .badge-old { background: #f2f2f4; color: #777; }
+ .legend { font-size: 12.5px; color: #555; margin: 8px 0 0; }
  h1 { font-size: 22px; }
  h2 { font-size: 18px; margin-top: 40px; border-bottom: 2px solid #BE185D;
       padding-bottom: 4px; }
@@ -86,12 +109,23 @@ class Command(BaseCommand):
             blocks[-1][1].append(arch)
 
         parts = [PAGE_HEAD]
+        # Общий с игрой модуль чертежей — инлайном, чтобы отчёт остался
+        # одним самодостаточным файлом (его открывают двойным кликом).
+        parts.append(u'<style>\n{}\n</style>'.format(self._read_static(
+            'figure.css')))
+        parts.append(u'<script>\n{}\n</script>'.format(self._read_static(
+            'figure.js')))
         parts.append(u'<h1>Превью генераторов Econ Rush</h1>')
         parts.append(u'<p>По {} примеров каждого типа на архетип; правильный '
                      u'вариант отмечен ✓. В базу ничего не записано — превью '
                      u'генерирует свежие вопросы (seed {}).</p>'.format(
                          per, options['seed']))
 
+        parts.append(u'<p class="legend">Зелёной чертой и бейджем '
+                     u'«эталон» помечены архетипы, переработанные под планку '
+                     u'(сюжет-библиотека, полное решение с рассуждением, '
+                     u'график у графических). Остальные ждут очереди и '
+                     u'держатся выключенным флагом.</p>')
         parts.append(u'<div class="toc"><b>Оглавление</b><ul>')
         for block, archs in blocks:
             parts.append(u'<li>{}<ul>'.format(html.escape(block)))
@@ -105,8 +139,12 @@ class Command(BaseCommand):
         for block, archs in blocks:
             parts.append(u'<h2>{}</h2>'.format(html.escape(block)))
             for arch in archs:
-                parts.append(u'<h2 id="{}">{} — {}</h2>'.format(
-                    arch.key, arch.key, html.escape(arch.title)))
+                badge = (u'<span class="badge badge-ok">эталон</span>'
+                         if arch.key in ETALON_KEYS else
+                         u'<span class="badge badge-old">ждёт переработки'
+                         u'</span>')
+                parts.append(u'<h2 id="{}">{} — {}{}</h2>'.format(
+                    arch.key, arch.key, html.escape(arch.title), badge))
                 parts.append(u'<p class="meta">Темы: {}</p>'.format(
                     html.escape(', '.join(arch.topics))))
                 for qtype in QUESTION_TYPES:
@@ -116,6 +154,14 @@ class Command(BaseCommand):
                         parts.append(self._card(q))
 
         parts.append(u'<p class="meta">Всего примеров: {}</p>'.format(total))
+        # Чертежи рисуем после загрузки: у каждой карточки геометрия лежит
+        # в data-figure, рисователь — общий с игрой.
+        parts.append(u'''<script>
+document.querySelectorAll('[data-figure]').forEach(function (holder) {
+  var node = window.drawFigure(JSON.parse(holder.dataset.figure));
+  if (node) holder.appendChild(node);
+});
+</script>''')
         parts.append(u'</body></html>')
 
         os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
@@ -124,8 +170,13 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             'Превью: {} ({} примеров)'.format(OUT_PATH, total)))
 
+    def _read_static(self, name):
+        with open(os.path.join(STATIC_DIR, name), encoding='utf-8') as f:
+            return f.read()
+
     def _card(self, q):
-        rows = [u'<div class="card">']
+        etalon = q['generator_key'] in ETALON_KEYS
+        rows = [u'<div class="card{}">'.format(u' etalon' if etalon else u'')]
         rows.append(
             u'<div class="meta"><code>{}</code> · сложность '
             u'<span class="diff">{}</span> · обёртка <code>{}</code> · '
@@ -135,6 +186,9 @@ class Command(BaseCommand):
                 q['params'].get('_asked', '')))
         rows.append(u'<div class="stmt">{}</div>'.format(
             html.escape(q['statement'])))
+        if q.get('figure'):
+            rows.append(u'<div data-figure="{}"></div>'.format(
+                html.escape(json.dumps(q['figure']), quote=True)))
         if q['options']:
             rows.append(u'<ol class="opts">')
             for i, o in enumerate(q['options']):
