@@ -730,9 +730,9 @@ class FlagHoldsEverywhereTests(TestCase):
 # сюжет-библиотека, полное решение, целочисленные параметры, график у
 # графических). Список растёт по мере переработки — планка проверяется
 # только для них; остальные ждут очереди и держатся выключенным флагом.
-ETALON_ARCHETYPES = ['monopoly', 'equilibrium', 'tax_subsidy']
+ETALON_ARCHETYPES = ['monopoly', 'equilibrium', 'tax_subsidy', 'ppf_single']
 # Графические из них — обязаны отдавать чертёж к развёрнутому вопросу.
-ETALON_WITH_FIGURE = ['monopoly', 'equilibrium', 'tax_subsidy']
+ETALON_WITH_FIGURE = ['monopoly', 'equilibrium', 'tax_subsidy', 'ppf_single']
 
 MIN_STATEMENT_LEN = 250     # солидный абзац с мотивацией, а не две строки
 MIN_SOLUTION_STEPS = 3      # решение с рассуждением, а не «MR=MC ⇒ Q=25»
@@ -861,9 +861,10 @@ class EtalonQualityTests(TestCase):
         «Равновесный объём 190 шт.» под рассказом про кофе в зёрнах (его
         меряют в килограммах) — ровно та небрежность, из-за которой задаче
         не место на сайте."""
-        from game.generators import equilibrium, monopoly, tax_subsidy
+        from game.generators import (equilibrium, monopoly, ppf_single,
+                                      tax_subsidy)
         mods = {'monopoly': monopoly, 'equilibrium': equilibrium,
-                'tax_subsidy': tax_subsidy}
+                'tax_subsidy': tax_subsidy, 'ppf_single': ppf_single}
         for key in ETALON_ARCHETYPES:
             mod = mods[key]
             for _, q in self.each(key):

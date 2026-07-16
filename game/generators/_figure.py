@@ -27,7 +27,8 @@ SVG (game.html::drawFigure). Схема одна на все архетипы �
 from fractions import Fraction
 
 # Смысловые слои, которые понимает рисователь (game.html::FIG_ROLES).
-ROLES = ('d', 's', 'mr', 'mc', 'tax', 'dwl', 'reg', 'ghost', 'cs', 'ps')
+ROLES = ('d', 's', 'mr', 'mc', 'tax', 'dwl', 'reg', 'ghost', 'cs', 'ps',
+         'ppf', 'feasible')
 
 
 def num(v):
