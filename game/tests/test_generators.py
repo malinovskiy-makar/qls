@@ -730,9 +730,9 @@ class FlagHoldsEverywhereTests(TestCase):
 # сюжет-библиотека, полное решение, целочисленные параметры, график у
 # графических). Список растёт по мере переработки — планка проверяется
 # только для них; остальные ждут очереди и держатся выключенным флагом.
-ETALON_ARCHETYPES = ['monopoly', 'equilibrium']
+ETALON_ARCHETYPES = ['monopoly', 'equilibrium', 'tax_subsidy']
 # Графические из них — обязаны отдавать чертёж к развёрнутому вопросу.
-ETALON_WITH_FIGURE = ['monopoly', 'equilibrium']
+ETALON_WITH_FIGURE = ['monopoly', 'equilibrium', 'tax_subsidy']
 
 MIN_STATEMENT_LEN = 250     # солидный абзац с мотивацией, а не две строки
 MIN_SOLUTION_STEPS = 3      # решение с рассуждением, а не «MR=MC ⇒ Q=25»
@@ -853,7 +853,7 @@ class EtalonQualityTests(TestCase):
             self.assertIsNone(q['figure'])
 
     # величины-количества: их единица обязана прийти из сюжета
-    QUANTITY_KEYS = ('q_star', 'q_m', 'q_c')
+    QUANTITY_KEYS = ('q_star', 'q_m', 'q_c', 'q1')
 
     def test_units_match_the_story(self):
         """Единица количества — из сюжета, а не общая на архетип.
@@ -861,8 +861,9 @@ class EtalonQualityTests(TestCase):
         «Равновесный объём 190 шт.» под рассказом про кофе в зёрнах (его
         меряют в килограммах) — ровно та небрежность, из-за которой задаче
         не место на сайте."""
-        from game.generators import equilibrium, monopoly
-        mods = {'monopoly': monopoly, 'equilibrium': equilibrium}
+        from game.generators import equilibrium, monopoly, tax_subsidy
+        mods = {'monopoly': monopoly, 'equilibrium': equilibrium,
+                'tax_subsidy': tax_subsidy}
         for key in ETALON_ARCHETYPES:
             mod = mods[key]
             for _, q in self.each(key):
