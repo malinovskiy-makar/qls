@@ -530,6 +530,11 @@ def api_answer(request):
     # (в каталог его не откроешь — задачи-источника нет).
     if gq.is_generated and gq.gen_solution:
         payload['solution'] = gq.gen_solution
+    # Чертёж к задаче — туда же, в разбор. Как и решение, он содержит ответ
+    # (на графике отмечены оптимум и цены), поэтому в payload вопроса его
+    # нет: игрок получает его только после того, как вопрос сыгран.
+    if gq.is_generated and gq.figure:
+        payload['figure'] = gq.figure
     return JsonResponse(payload)
 
 

@@ -876,3 +876,44 @@ class EtalonQualityTests(TestCase):
                     u'{}/{}: единица «{}» не из сюжета'.format(
                         key, story.key, q['unit']))
                 self.assertIn(story.unit_q, q['solution_text'])
+
+
+class FigureServingTests(TestCase):
+    """Чертёж доезжает до разбора и не утекает раньше времени."""
+
+    FIG = {'kind': 'monopoly', 'xmax': 60, 'ymax': 130,
+           'xlabel': 'Q', 'ylabel': 'P',
+           'lines': [{'role': 'd', 'label': 'D', 'from': [0, 120],
+                      'to': [60, 0], 'dash': False}],
+           'points': [{'x': 25, 'y': 70, 'label': 'M', 'role': 'd'}]}
+
+    def test_figure_comes_only_after_the_question_is_played(self):
+        """Анти-чит: на чертеже отмечены оптимум и цены — это ответ.
+
+        Поэтому в payload вопроса чертежа нет; он приходит вместе с
+        решением, когда вопрос уже сыгран."""
+        gq = make_generated_question(figure=self.FIG)
+        with self.settings(GAME_GENERATED_ENABLED=True):
+            resp = self.client.get('/game/api/session/start/?mode=classic')
+            q = resp.json()['question']
+            self.assertNotIn('figure', q)
+            self.assertNotIn('monopoly', str(q))
+
+            resp = self.client.post(
+                '/game/api/answer/',
+                data='{"question_id": %d, "value": "5"}' % gq.pk,
+                content_type='application/json')
+            data = resp.json()
+            self.assertEqual(data['result'], 'wrong')
+            self.assertEqual(data['figure'], self.FIG)
+
+    def test_question_without_figure_sends_no_figure_key(self):
+        """Неграфический архетип — ключа figure нет вовсе (не null)."""
+        gq = make_generated_question(figure=None)
+        with self.settings(GAME_GENERATED_ENABLED=True):
+            self.client.get('/game/api/session/start/?mode=classic')
+            resp = self.client.post(
+                '/game/api/answer/',
+                data='{"question_id": %d, "value": "5"}' % gq.pk,
+                content_type='application/json')
+            self.assertNotIn('figure', resp.json())

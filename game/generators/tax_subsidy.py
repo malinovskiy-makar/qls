@@ -386,8 +386,12 @@ class TaxSubsidyArchetype(Archetype):
             ],
             points=[
                 _figure.point(q0, p0, 'E_0', 'ghost'),
-                _figure.point(q1, pb, 'B', 'd'),
-                _figure.point(q1, ps, 'S', 's'),
+                # Точки покупателя и продавца — БЕЗ подписей: это углы
+                # прямоугольника бюджета, а их цены уже названы засечками
+                # P_b и P_s. Подпись «S» рядом с кривой S читалась бы как
+                # вторая кривая предложения (проверено в браузере).
+                _figure.point(q1, pb, '', 'd'),
+                _figure.point(q1, ps, '', 's'),
             ],
             marks=[_figure.mark('y', pb, 'P_b'),
                    _figure.mark('y', ps, 'P_s'),

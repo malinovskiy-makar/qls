@@ -349,7 +349,9 @@ class MonopolyArchetype(Archetype):
                 _figure.mark('x', q_m, 'Q_m'),
                 _figure.mark('x', q_c, 'Q_c'),
                 _figure.mark('y', p_m, 'P_m'),
-                _figure.mark('y', mc, 'MC'),
+                # у засечки MC подписи нет: сама линия уже подписана MC,
+                # вторая надпись рядом читалась бы как другая величина
+                _figure.mark('y', mc, ''),
             ])
 
 
