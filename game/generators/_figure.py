@@ -90,6 +90,33 @@ def figure(kind, xmax, ymax, xlabel, ylabel,
     return fig
 
 
+def clip_linear(slope, intercept, xmax, ymax):
+    u"""Отрезок прямой P = slope·Q + intercept внутри рамки [0,xmax]×[0,ymax].
+
+    Кривые задаются экономикой, а рамка — удобством чтения, и сами по себе
+    они не совпадают: спрос $Q_d = 280 - P$ уходит к P = 280, хотя всё
+    интересное происходит около равновесной цены 100. Обрезаем прямую по
+    рамке здесь, в питоне, — иначе клиент рисовал бы линию за краем осей
+    или пришлось бы растягивать рамку под пустое место.
+
+    Возвращает ((x1, y1), (x2, y2)) или None, если прямая в рамку не попала.
+    """
+    m, k = Fraction(slope), Fraction(intercept)
+    xmax, ymax = Fraction(xmax), Fraction(ymax)
+    if m == 0:
+        if not (0 <= k <= ymax):
+            return None
+        return (0, k), (xmax, k)
+    # Q, при которых P = 0 и P = ymax
+    q_at_0 = -k / m
+    q_at_top = (ymax - k) / m
+    lo, hi = sorted([q_at_0, q_at_top])
+    lo, hi = max(lo, Fraction(0)), min(hi, xmax)
+    if hi <= lo:
+        return None
+    return (lo, m * lo + k), (hi, m * hi + k)
+
+
 def axis_max(value, pad=Fraction(115, 100)):
     """Верх оси: величина с запасом ~15 %, округлённая вверх до круглого.
 

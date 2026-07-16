@@ -49,11 +49,15 @@ class Story(object):
 
     У каждого сюжета СВОЙ текст абзаца (метод full), а не общий шаблон с
     подставленными словами: подстановка слов в один шаблон читается как
-    подстановка слов в один шаблон. Общими остаются только числа."""
+    подстановка слов в один шаблон. Общими остаются только числа.
+
+    unit_q — единица количества ИМЕННО этого сюжета, в форме под оборот
+    «(в …)». Паром продаёт поездки, а не «тыс. шт.»: единица из чужого
+    сюжета — та самая небрежность, из-за которой задаче не место на сайте."""
 
     def __init__(self, key, unit_q, full):
         self.key = key
-        self.unit_q = unit_q      # «тыс. картриджей» — для текста условия
+        self.unit_q = unit_q
         self.full = full
 
 
@@ -110,9 +114,9 @@ def _ferry(p):
 
 
 STORIES = [
-    Story('aqualine', u'тыс. картриджей', _aqualine),
+    Story('aqualine', u'тыс. шт.', _aqualine),
     Story('pharma', u'тыс. упаковок', _pharma),
-    Story('monotown', u'тыс. штук', _monotown),
+    Story('monotown', u'тыс. шт.', _monotown),
     Story('airport', u'тыс. стаканов', _airport),
     Story('ferry', u'тыс. поездок', _ferry),
 ]
@@ -169,10 +173,11 @@ class MonopolyArchetype(Archetype):
         Сложность проставлена явно, по экономической глубине: найти выпуск —
         один шаг MR = MC; прибыль — ещё и издержки с FC; потери общества —
         сравнение с конкурентным исходом."""
+        unit_q = STORIES[params['story']].unit_q
         return [
             Asked('q_m', nom=u'оптимальный месячный выпуск монополиста',
                   acc=u'оптимальный выпуск монополиста', gender='m',
-                  unit=u'тыс. шт.', difficulty=3),
+                  unit=unit_q, difficulty=3),
             Asked('p_m', nom=u'цена, которую назначит монополист',
                   acc=u'цену, которую назначит монополист', gender='f',
                   unit=u'руб.', difficulty=3),
@@ -183,7 +188,7 @@ class MonopolyArchetype(Archetype):
                               u'ценообразовании ($P = MC$)'),
                   acc=(u'объём, который сложился бы при конкурентном '
                        u'ценообразовании ($P = MC$)'), gender='m',
-                  unit=u'тыс. шт.', difficulty=4),
+                  unit=unit_q, difficulty=4),
             Asked('dwl', nom=u'величина чистых потерь общества от монополии',
                   acc=u'величину чистых потерь общества от монополии',
                   gender='f', unit=u'тыс. руб.', difficulty=5),
@@ -247,6 +252,7 @@ class MonopolyArchetype(Archetype):
         a, b = params['a'], params['b']
         mc, fc = params['mc'], params['fc']
         q_m, p_m = solved['q_m'], solved['p_m']
+        unit_q = STORIES[params['story']].unit_q
         # Коэффициент 1 не пишем: «$80Q - 1Q^2$» и «$80 - 1 \cdot 20$» —
         # мелочь, которая сразу выдаёт машинную подстановку.
         bq = u'' if F(b) == 1 else fmt_num(b, latex=True)
@@ -267,9 +273,9 @@ class MonopolyArchetype(Archetype):
                 fmt_num(2 * F(b), latex=True)),
             u'Монополист наращивает выпуск, пока лишняя единица приносит '
             u'выручки больше, чем стоит, и останавливается при $MR = MC$: '
-            u'${} - {}Q = {} \\Rightarrow Q_m = {}$ тыс. шт.'.format(
+            u'${} - {}Q = {} \\Rightarrow Q_m = {}$ {}'.format(
                 fmt_num(a, latex=True), fmt_num(2 * F(b), latex=True), mc,
-                fmt_num(q_m, latex=True)),
+                fmt_num(q_m, latex=True), unit_q),
         ]
         if asked.key in ('p_m', 'profit', 'dwl'):
             steps.append(
@@ -295,10 +301,10 @@ class MonopolyArchetype(Archetype):
         if asked.key in ('q_c', 'dwl'):
             steps.append(
                 u'При конкуренции цена опустилась бы до предельных издержек '
-                u'($P = MC$): ${} - {}Q = {} \\Rightarrow Q_c = {}$ тыс. шт. '
+                u'($P = MC$): ${} - {}Q = {} \\Rightarrow Q_c = {}$ {} '
                 u'— вдвое больше монопольного выпуска.'.format(
                     fmt_num(a, latex=True), bq, mc,
-                    fmt_num(solved['q_c'], latex=True)))
+                    fmt_num(solved['q_c'], latex=True), unit_q))
         if asked.key == 'dwl':
             steps.append(
                 u'Чистые потери — треугольник между спросом и $MC$ на '
@@ -319,7 +325,8 @@ class MonopolyArchetype(Archetype):
         xmax = _figure.axis_max(a / b)        # спрос упирается в ось Q
         ymax = _figure.axis_max(a)
         return _figure.figure(
-            'monopoly', xmax, ymax, u'Q, тыс. шт.', u'P, руб.',
+            'monopoly', xmax, ymax,
+            u'Q, {}'.format(STORIES[params['story']].unit_q), u'P, руб.',
             lines=[
                 _figure.line('d', 'D', (0, a), (a / b, 0)),
                 _figure.line('mr', 'MR', (0, a), (a / (2 * b), 0)),
