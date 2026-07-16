@@ -11,6 +11,7 @@
 """
 import json
 import random
+import re
 from fractions import Fraction
 
 from django.core.management import call_command
@@ -208,14 +209,36 @@ class ControlNumbersBlockB(SimpleTestCase):
         self.assertEqual(s['profit'], 300)
         self.assertEqual(s['revenue'], 1000)
 
-    def test_monopoly(self):
+    def test_monopoly_etalon_aqualine(self):
+        """Эталон «Аквалайн», утверждённый преподавателем 2026-07-16.
+
+        Спрос Q = (120 − P)/2 ⇒ a = 120, b = 2; MC = 20, FC = 100.
+        MR = 120 − 4Q = 20 ⇒ Q_m = 25; P_m = 70;
+        π = 70·25 − (20·25 + 100) = 1750 − 600 = 1150 тыс. руб.
+        Эти числа — договорённость с владельцем, а не деталь реализации:
+        поедут они — поедет и планка качества."""
         s = ARCHETYPES['monopoly'].solve(
-            {'a': 100, 'b': 1, 'mc': 20, 'good': 0})
-        self.assertEqual(s['q_m'], 40)
-        self.assertEqual(s['p_m'], 60)
-        self.assertEqual(s['profit'], 1600)
-        self.assertEqual(s['q_c'], 80)
-        self.assertEqual(s['dwl'], 800)
+            {'a': 120, 'b': 2, 'mc': 20, 'fc': 100, 'story': 0})
+        self.assertEqual(s['q_m'], 25)
+        self.assertEqual(s['p_m'], 70)
+        self.assertEqual(s['revenue'], 1750)
+        self.assertEqual(s['total_cost'], 600)
+        self.assertEqual(s['profit'], 1150)
+        self.assertEqual(s['q_c'], 50)
+        self.assertEqual(s['dwl'], 625)
+
+    def test_monopoly_fixed_costs_do_not_move_the_optimum(self):
+        """Постоянные издержки не влияют на выпуск и цену — только на прибыль.
+
+        Это главная мысль решения архетипа; если она сломается, разбор будет
+        объяснять то, чего в числах нет."""
+        arch = ARCHETYPES['monopoly']
+        a = arch.solve({'a': 120, 'b': 2, 'mc': 20, 'fc': 100, 'story': 0})
+        b = arch.solve({'a': 120, 'b': 2, 'mc': 20, 'fc': 500, 'story': 0})
+        self.assertEqual(a['q_m'], b['q_m'])
+        self.assertEqual(a['p_m'], b['p_m'])
+        self.assertEqual(a['dwl'], b['dwl'])
+        self.assertEqual(a['profit'] - b['profit'], 400)   # ровно разница FC
 
 
 class ControlNumbersBlockV(SimpleTestCase):
@@ -389,8 +412,16 @@ class ArchetypeProperties(SimpleTestCase, ArchetypePropertyMixin):
             test.assertGreater(solved['q_m'], 0)
             test.assertGreater(solved['p_m'], params['mc'])  # наценка положительна
             test.assertEqual(solved['q_c'], 2 * solved['q_m'])
-            test.assertEqual(solved['dwl'] * 2, solved['profit'])
+            # Прибыль ДО постоянных издержек = b·Q_m² = 2·DWL. С появлением FC
+            # (переработка под эталон) прибыль на них меньше — инвариант
+            # теперь связывает DWL с прибылью ПЛЮС постоянные издержки.
+            test.assertEqual(solved['dwl'] * 2,
+                             solved['profit'] + Fraction(params['fc']))
             test.assertEqual(Fraction(solved['dwl']).denominator, 1)
+            # Прибыль положительна — иначе сюжет «директор максимизирует
+            # прибыль» описывает фирму, которой выгодно закрыться.
+            test.assertGreater(solved['profit'], 0)
+            test.assertEqual(solved['revenue'], solved['p_m'] * solved['q_m'])
         self.run_archetype('monopoly', v)
 
     def test_ppf_single(self):
@@ -693,3 +724,130 @@ class FlagHoldsEverywhereTests(TestCase):
                 content_type='application/json')
         self.assertEqual(r.status_code, 404)
         self.assertNotIn('solution', r.json())
+
+
+# Архетипы, переработанные под ЭТАЛОН качества (решение в Notion, 2026-07-16:
+# сюжет-библиотека, полное решение, целочисленные параметры, график у
+# графических). Список растёт по мере переработки — планка проверяется
+# только для них; остальные ждут очереди и держатся выключенным флагом.
+ETALON_ARCHETYPES = ['monopoly']
+# Графические из них — обязаны отдавать чертёж к развёрнутому вопросу.
+ETALON_WITH_FIGURE = ['monopoly']
+
+MIN_STATEMENT_LEN = 250     # солидный абзац с мотивацией, а не две строки
+MIN_SOLUTION_STEPS = 3      # решение с рассуждением, а не «MR=MC ⇒ Q=25»
+MIN_STORIES = 3             # библиотека сюжетов, а не один шаблон
+
+
+class EtalonQualityTests(TestCase):
+    """Планка качества сгенерированных задач (эталон «Аквалайн»).
+
+    Проверяем не «работает ли генератор», а «достойна ли задача сайта»:
+    длину сюжета, ровно один числовой вопрос с единицами, глубину решения,
+    точность ответа и наличие чертежа. Эти проверки — машинная часть
+    договорённости с преподавателем; вкус («интересно ли читать») по-прежнему
+    смотрит он сам по HTML-предпросмотру.
+    """
+    SAMPLES = 60
+
+    def each(self, key):
+        rng = random.Random(20260716)
+        arch = ARCHETYPES[key]
+        for _ in range(self.SAMPLES):
+            yield arch, gbase.generate_question(arch, rng, 'numeric')
+
+    def test_statement_is_a_real_story(self):
+        """Условие — абзац с сюжетом, а не две строки с формулой."""
+        for key in ETALON_ARCHETYPES:
+            for _, q in self.each(key):
+                self.assertGreaterEqual(
+                    len(q['statement']), MIN_STATEMENT_LEN,
+                    u'{}: сюжет короче эталона: {}'.format(key, q['statement']))
+                self.assertLessEqual(len(q['statement']), gbase.LIMIT_FULL)
+
+    def test_exactly_one_numeric_question_with_units(self):
+        """В Классике — РОВНО ОДИН числовой вопрос, и у него есть единицы.
+
+        Два вопроса в карточке забега = игрок не знает, что вводить."""
+        for key in ETALON_ARCHETYPES:
+            for _, q in self.each(key):
+                asks = q['statement'].count('?') + len(re.findall(
+                    u'(Найдите|Определите)', q['statement']))
+                self.assertEqual(asks, 1,
+                                 u'{}: вопросов не один: {}'.format(
+                                     key, q['statement']))
+                self.assertTrue(q['unit'], u'{}: у ответа нет единиц'.format(key))
+
+    def test_solution_has_steps_and_reasoning(self):
+        """Решение — пронумерованные шаги с рассуждением, не одна строка."""
+        for key in ETALON_ARCHETYPES:
+            for _, q in self.each(key):
+                steps = [l for l in q['solution_text'].split('\n') if l.strip()]
+                self.assertGreaterEqual(
+                    len(steps), MIN_SOLUTION_STEPS,
+                    u'{}: решение из {} шагов'.format(key, len(steps)))
+                self.assertRegex(q['solution_text'], r'^1\. ')
+
+    def test_answer_is_exact_and_recomputable(self):
+        """correct_value — точное число, сходится с независимым solve()."""
+        for key in ETALON_ARCHETYPES:
+            for arch, q in self.each(key):
+                parsed = parse_exact_number(q['correct_value'])
+                self.assertIsNotNone(parsed, q['correct_value'])
+                solved = arch.solve(q['params'])
+                self.assertEqual(parsed, Fraction(solved[q['params']['_asked']]))
+                self.assertTrue(is_nice(parsed))
+
+    def test_story_library_is_not_one_template(self):
+        """Сюжетов несколько и они реально разные (по тексту, не по числам)."""
+        for key in ETALON_ARCHETYPES:
+            keys, openings = set(), set()
+            for _, q in self.each(key):
+                keys.add(q['params'].get('story'))
+                openings.add(q['statement'][:40])   # завязка, до чисел
+            self.assertGreaterEqual(
+                len(keys), MIN_STORIES,
+                u'{}: сюжетов всего {}'.format(key, len(keys)))
+            self.assertGreaterEqual(len(openings), MIN_STORIES)
+
+    def test_difficulty_is_not_glued_to_prose_length(self):
+        """Сложность — про экономику, а не про длину решения.
+
+        Развёрнутые решения длинные у всех вопросов архетипа; если бы
+        сложность считалась по числу строк, она была бы у всех одна."""
+        for key in ETALON_ARCHETYPES:
+            diffs = {q['difficulty'] for _, q in self.each(key)}
+            self.assertGreater(
+                len(diffs), 1, u'{}: сложность у всех одна: {}'.format(key, diffs))
+            for d in diffs:
+                self.assertIn(d, (1, 2, 3, 4, 5))
+
+    def test_graphical_archetypes_return_a_valid_figure(self):
+        """Чертёж есть, и он по схеме _figure (роли известны рисователю)."""
+        from game.generators import _figure
+        for key in ETALON_WITH_FIGURE:
+            for _, q in self.each(key):
+                fig = q['figure']
+                self.assertIsNotNone(fig, u'{}: нет чертежа'.format(key))
+                self.assertGreater(fig['xmax'], 0)
+                self.assertGreater(fig['ymax'], 0)
+                self.assertTrue(fig['xlabel'] and fig['ylabel'])
+                for ln in fig.get('lines', []):
+                    self.assertIn(ln['role'], _figure.ROLES)
+                for ar in fig.get('areas', []):
+                    self.assertIn(ar['role'], _figure.ROLES)
+                    self.assertGreaterEqual(len(ar['points']), 3)
+                for pnt in fig.get('points', []):
+                    # ключевые точки — внутри осей, иначе уедут за рамку
+                    self.assertLessEqual(pnt['x'], fig['xmax'])
+                    self.assertLessEqual(pnt['y'], fig['ymax'])
+                json.dumps(fig)   # чертёж обязан лечь в JSONField
+
+    def test_figure_only_on_the_detailed_question(self):
+        """График — к numeric (его смотрят в разборе). В Блице/Пуле карточка
+        короткая, чертёж там был бы лишним."""
+        rng = random.Random(1)
+        arch = ARCHETYPES['monopoly']
+        for qtype in ('single', 'boolean'):
+            q = gbase.generate_question(arch, rng, qtype)
+            self.assertIsNone(q['figure'])

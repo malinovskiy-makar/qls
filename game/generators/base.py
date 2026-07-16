@@ -114,11 +114,15 @@ class Asked(object):
     kind='class' — качественная (классификация): question — готовый вопрос
     для single, claim_tpl — шаблон утверждения для boolean с {V},
     class_options — метки вариантов; solved[key] обязан быть одной из меток.
-    trivial=True — одношаговое «считывание» (сложность 1, а не 2)."""
+    trivial=True — одношаговое «считывание» (сложность 1, а не 2).
+    difficulty=N — сложность 1–5 ЯВНО, по экономической глубине вопроса.
+    Без неё сложность выводится из числа шагов решения (старое поведение),
+    а это неверно для развёрнутых решений: подробный разбор «почему так»
+    длиннее не потому, что задача труднее. Многословность ≠ сложность."""
 
     def __init__(self, key, nom='', acc='', gender='f', unit='',
                  kind='value', question='', claim_tpl='', class_options=None,
-                 trivial=False, max_value=None):
+                 trivial=False, max_value=None, difficulty=None):
         self.key = key
         self.nom = nom
         self.acc = acc
@@ -130,6 +134,7 @@ class Asked(object):
         self.class_options = class_options or []
         self.trivial = trivial
         self.max_value = max_value  # потолок правдоподобия дистракторов (доля ≤ 100 %)
+        self.difficulty = difficulty
 
 
 class Wrapper(object):
@@ -169,6 +174,14 @@ class Archetype(object):
 
     def solution(self, params, solved, asked):
         raise NotImplementedError
+
+    def figure(self, params, solved, asked):
+        """Чертёж к задаче — dict по схеме _figure.py или None.
+
+        Необязателен: график есть только у графических архетипов (монополия,
+        равновесие, налог/субсидия, КПВ). Показывается в РАЗБОРЕ ошибок, не
+        в карточке во время забега — на скорость забега он не влияет."""
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -355,6 +368,16 @@ def generate_question(arch, rng, question_type):
             gen_params['_claim'] = str(claim_value)
         json.dumps(gen_params)  # гарантия JSON-сериализуемости (упадёт тут, не в БД)
 
+        # Сложность: явная у Asked (экономическая глубина), иначе — старая
+        # оценка по числу шагов. Развёрнутое решение НЕ делает вопрос труднее.
+        difficulty = asked.difficulty if asked.difficulty is not None \
+            else _difficulty(len(steps), asked.trivial)
+
+        # График — только к развёрнутому numeric: его смотрят в разборе,
+        # где есть место. У Блица/Пули карточка короткая, чертёж там лишний.
+        figure = arch.figure(params, solved, asked) \
+            if question_type == 'numeric' else None
+
         return {
             'question_type': question_type,
             'statement': statement,
@@ -363,10 +386,11 @@ def generate_question(arch, rng, question_type):
             'correct_value': correct_value,
             'unit': unit,
             'solution_text': _numbered(steps),
-            'difficulty': _difficulty(len(steps), asked.trivial),
+            'difficulty': difficulty,
             'topics': list(arch.topics),
             'generator_key': arch.key,
             'params': gen_params,
+            'figure': figure,
         }
 
     raise GenerationError(

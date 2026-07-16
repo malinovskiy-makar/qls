@@ -82,6 +82,7 @@ class Command(BaseCommand):
                         generator_key=q['generator_key'],
                         gen_params=q['params'],
                         gen_solution=q['solution_text'],
+                        figure=q.get('figure'),
                     ))
             summary.append((key, counts))
             short = [c for c in counts.values() if c < per]

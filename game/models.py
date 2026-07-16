@@ -100,6 +100,11 @@ class GameQuestion(models.Model):
         'Параметры генерации', null=True, blank=True)
     gen_solution = models.TextField(
         'Пошаговое решение (KaTeX)', blank=True, default='')
+    # Чертёж к задаче: параметры статичного SVG (тип диаграммы + числа),
+    # рисует клиент в разборе ошибок. Схема — game/generators/_figure.py.
+    # NULL — у вопроса графика нет (не все архетипы графические).
+    figure = models.JSONField(
+        'Параметры графика', null=True, blank=True)
 
     created_at = models.DateTimeField('Собран', auto_now_add=True)
 
