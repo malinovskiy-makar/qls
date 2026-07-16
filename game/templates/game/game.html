@@ -2214,6 +2214,21 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     setTimeout(function () { btn.textContent = back; }, 2000);
   }
 
+  /* Скачивание карточки — единственный запасной путь кнопки «Поделиться
+     картинкой». В текст не уходим НИКОГДА: нажали «картинкой» — получите
+     картинку. Текст и ссылка живут на соседних кнопках. */
+  function downloadCard(blob, btn) {
+    var a = document.createElement('a');
+    var href = URL.createObjectURL(blob);
+    a.href = href;
+    a.download = 'econ-rush.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(href);
+    toast(btn, 'Картинка скачана ✓', 'Поделиться картинкой');
+  }
+
   $('btn-share-img').addEventListener('click', function () {
     var btn = this;
     drawShareCard();
@@ -2222,22 +2237,21 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       var file = null;
       try { file = new File([blob], 'econ-rush.png', { type: 'image/png' }); }
       catch (e) { /* старый браузер без конструктора File — уйдём в скачивание */ }
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], text: shareText(),
-                          url: shareInfo && shareInfo.url })
-          .catch(function () { /* игрок передумал — не ошибка */ });
+      if (!(file && navigator.canShare && navigator.canShare({ files: [file] }))) {
+        downloadCard(blob, btn);   // системного «Поделиться» с файлом нет
         return;
       }
-      // Десктоп: системного «Поделиться» с файлом нет — отдаём файл.
-      var a = document.createElement('a');
-      var href = URL.createObjectURL(blob);
-      a.href = href;
-      a.download = 'econ-rush.png';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(href);
-      toast(btn, 'Картинка скачана ✓', 'Поделиться картинкой');
+      /* ⚠️ Отдаём ТОЛЬКО файл — ни text, ни url. Положишь их рядом с files —
+         системное окно «Поделиться» на десктопе берёт текст и ВЫБРАСЫВАЕТ
+         картинку: именно так кнопка «поделиться картинкой» уходила текстовой
+         подписью. Проверено в браузере: было {files, text, url} → уезжал текст. */
+      navigator.share({ files: [file], title: 'Econ Rush' })
+        .catch(function (e) {
+          // Игрок передумал (AbortError) — не ошибка, ничего не делаем.
+          // Любой другой отказ значит, что систему файл не взяла — скачиваем.
+          if (e && e.name === 'AbortError') return;
+          downloadCard(blob, btn);
+        });
     }, 'image/png');
   });
 

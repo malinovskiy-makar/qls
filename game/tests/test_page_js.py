@@ -99,6 +99,33 @@ class PageJsTests(TestCase):
                 dead.append(name)
         self.assertEqual(sorted(dead), [])
 
+    def test_image_share_sends_only_the_file(self):
+        """Кнопка «Поделиться картинкой» отдаёт в share ТОЛЬКО файл.
+
+        Если рядом с files положить text/url, системное окно «Поделиться»
+        на десктопе берёт текст и ВЫБРАСЫВАЕТ картинку — кнопка начинает
+        делиться подписью вместо карточки. Ровно этот баг ловили в браузере
+        2026-07-16: уходило {files, text, url}. Ссылка не теряется — она
+        нарисована на самой карточке и живёт на соседних кнопках."""
+        calls = re.findall(r'navigator\.share\(\{(.*?)\}\)', self.js, re.S)
+        with_files = [c for c in calls if 'files' in c]
+        self.assertEqual(len(with_files), 1,
+                         'ожидался ровно один share с файлом')
+        self.assertNotIn('text:', with_files[0])
+        self.assertNotIn('url:', with_files[0])
+
+    def test_image_button_falls_back_to_download_not_text(self):
+        """Запасной путь кнопки-картинки — скачивание PNG, никогда не текст.
+
+        Нажали «картинкой» — получите картинку: текст и ссылка живут на
+        своих кнопках."""
+        m = re.search(r"\$\('btn-share-img'\)\.addEventListener\("
+                      r"'click', function \(\) \{(.*?)\n  \}\);", self.js, re.S)
+        self.assertIsNotNone(m, 'обработчик кнопки-картинки не найден')
+        handler = m.group(1)
+        self.assertIn('downloadCard', handler)
+        self.assertNotIn('shareText', handler)
+
     def test_mechanics_numbers_come_from_config(self):
         """Числа механики клиент не выдумывает: 3 жизни и размер целевого
         забега приходят из config.py, а не написаны в шаблоне руками."""
