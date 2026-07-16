@@ -9,6 +9,7 @@
    дистракторы уникальны и ≠ ответу, длины в лимитах, parse_exact_number
    принимает каждый correct_value (класс ArchetypeProperties).
 """
+import json
 import random
 from fractions import Fraction
 
@@ -573,3 +574,122 @@ class ServingTests(TestCase):
             self.assertEqual(classic_count(), 0)
         with self.settings(GAME_GENERATED_ENABLED=True):
             self.assertEqual(classic_count(), 1)
+
+
+class FlagHoldsEverywhereTests(TestCase):
+    """Флаг GAME_GENERATED_ENABLED=False — герметичен на ВСЕХ поверхностях.
+
+    Тесты выше проверяют флаг на пустом пуле (нет базовых вопросов → 503).
+    Здесь ситуация как на проде: пул СМЕШАННЫЙ — базовые вопросы из тестов
+    и сгенерированные лежат рядом. Вопрос теста один: может ли игрок при
+    выключенном флаге хоть как-нибудь получить сгенерированный вопрос.
+
+    Поверхностей четыре (все ходят через views._pool_qs): счётчики и чипы
+    тем стартовой страницы, выбор вопроса в забеге, очередь работы над
+    ошибками, ответ на вопрос по id.
+    """
+    TOPIC = u'Спрос и предложение'
+
+    def setUp(self):
+        from problems.models import Problem
+        self.source = Problem.objects.create(
+            statement=u'Задача-источник для игровых тестов', status='draft',
+            problem_type=u'тест: один ответ')
+
+    def make_base(self, n, topic=None):
+        """n базовых (не сгенерированных) вопросов режима Блиц."""
+        out = []
+        for i in range(n):
+            out.append(GameQuestion.objects.create(
+                problem=self.source if i == 0 else None,
+                question_type='single',
+                question=u'Базовый вопрос №{}'.format(i),
+                options=['а', 'б', 'в'], correct_index=0,
+                topics=[topic or self.TOPIC], lang='ru', is_generated=False))
+        return out
+
+    def make_gen(self, n, topic=None):
+        return [make_generated_question(
+            question_type='single', question=u'Сгенерированный №{}'.format(i),
+            options=['а', 'б', 'в'], correct_index=0, correct_value='',
+            topics=[topic or self.TOPIC])
+            for i in range(n)]
+
+    def test_flag_off_never_serves_generated_in_a_whole_run(self):
+        """Забег до исчерпания пула: ни одного сгенерированного вопроса.
+
+        Базовых мало, сгенерированных много — если бы флаг протекал,
+        случайная выдача почти наверняка выдала бы сгенерированный."""
+        base_ids = {g.pk for g in self.make_base(3)}
+        self.make_gen(40)
+        with self.settings(GAME_GENERATED_ENABLED=False):
+            r = self.client.get('/game/api/session/start/?mode=blitz').json()
+            served = [r['question']['id']]
+            while True:
+                nxt = self.client.get('/game/api/question/').json()
+                if 'question' not in nxt:
+                    break
+                served.append(nxt['question']['id'])
+        self.assertEqual(len(served), 3)          # пул кончился на базовых
+        self.assertEqual(set(served), base_ids)   # сгенерированных не было
+        self.assertEqual(
+            GameQuestion.objects.filter(id__in=served, is_generated=True).count(), 0)
+
+    def test_flag_off_hides_topic_chip_of_generated_only_topic(self):
+        """Тема, которая держится только на сгенерированных, чипом не встаёт.
+
+        Иначе игрок ткнул бы в чип и получил пустой забег (503)."""
+        # MIN_TOPIC_POOL=30 — берём с запасом, тема канонична
+        self.make_gen(35, topic=self.TOPIC)
+
+        def has_chip():
+            html = self.client.get('/game/').content.decode('utf-8')
+            return 'data-topic="{}"'.format(self.TOPIC) in html
+
+        with self.settings(GAME_GENERATED_ENABLED=False):
+            self.assertFalse(has_chip())
+        with self.settings(GAME_GENERATED_ENABLED=True):
+            self.assertTrue(has_chip())
+
+    def test_flag_off_mistakes_run_pulls_no_generated(self):
+        """Работа над ошибками — курированная очередь, отдельная поверхность.
+
+        Ошибаемся в теме, где сгенерированных вопросов больше, чем базовых:
+        при выключенном флаге в целевой забег не должен попасть ни один."""
+        self.make_base(4)
+        self.make_gen(40)
+        with self.settings(GAME_GENERATED_ENABLED=False):
+            r = self.client.get('/game/api/session/start/?mode=blitz').json()
+            qid = r['question']['id']
+            self.client.post(              # неверный ответ → ошибка в теме
+                '/game/api/answer/',
+                json.dumps({'question_id': qid, 'choice': 1}),
+                content_type='application/json')
+            self.client.post('/game/api/session/finish/',
+                             json.dumps({'reason': 'time'}),
+                             content_type='application/json')
+            d = self.client.get('/game/api/session/start_mistakes/').json()
+            served = [d['question']['id']]
+            while True:
+                nxt = self.client.get('/game/api/question/').json()
+                if 'question' not in nxt:
+                    break
+                served.append(nxt['question']['id'])
+        self.assertEqual(
+            GameQuestion.objects.filter(id__in=served, is_generated=True).count(), 0)
+
+    def test_flag_off_rejects_answer_to_generated_question_by_id(self):
+        """Прямой POST по id сгенерированного вопроса — не лазейка.
+
+        Вопрос не выдавался (его нет в state['seen']) → 404, ответ и
+        решение наружу не уходят."""
+        self.make_base(2)
+        gen = self.make_gen(1)[0]
+        with self.settings(GAME_GENERATED_ENABLED=False):
+            self.client.get('/game/api/session/start/?mode=blitz')
+            r = self.client.post(
+                '/game/api/answer/',
+                json.dumps({'question_id': gen.pk, 'choice': 0}),
+                content_type='application/json')
+        self.assertEqual(r.status_code, 404)
+        self.assertNotIn('solution', r.json())
