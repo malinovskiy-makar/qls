@@ -801,8 +801,40 @@ a:focus-visible, button:focus-visible {
 .det-toggle::after { content: ' ▾'; float: right; color: var(--text3); }
 .det-toggle[aria-expanded="true"]::after { content: ' ▴'; }
 .det-toggle:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
-.det-body { margin-top: 12px; }
+.det-body { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .det-body[hidden] { display: none; }
+.chart-card {
+  background: var(--rush-surface);
+  border: 1px solid var(--rush-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.chart-card h4 { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.chart-box { width: 100%; }
+/* SVG рисуем сами: цвета идут через var(--…), поэтому переключение темы
+   сайта перекрашивает графики без единой строки JS. Обводки не тончают
+   при масштабировании — vector-effect в самих линиях. */
+.chart-box svg { display: block; width: 100%; height: auto; }
+.chart-empty { font-size: 12.5px; color: var(--text3); padding: 18px 0; text-align: center; }
+.chart-key { margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text3); }
+.chart-key .k { width: 9px; height: 9px; border-radius: 3px; margin-left: 8px; }
+.chart-key .k:first-child { margin-left: 0; }
+.k-score { background: var(--rush-accent); }
+.k-combo { background: var(--text3); opacity: .5; }
+.chart-x { margin-left: auto; }
+.chart-lbl { font-size: 9px; fill: var(--text3); }
+.chart-val { font-size: 9px; fill: var(--text2); font-weight: 700; }
+/* Кольцевая сложностей: легенда рядом с кольцом */
+.chart-donut { display: flex; align-items: center; gap: 14px; }
+.chart-donut svg { width: 104px; flex-shrink: 0; }
+.donut-legend { list-style: none; display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.donut-legend li { display: flex; align-items: center; gap: 6px; color: var(--text2); }
+.donut-legend i { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+/* сложность: лёгкие → средние → сложные. Янтарь тут в своём законном
+   смысле (это шкала сложности), зелёный и красный — концы шкалы. */
+.d-easy { background: var(--rush-ok); }
+.d-medium { background: var(--amber); }
+.d-hard { background: var(--rush-bad); }
 
 .final-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .btn-again {
@@ -894,6 +926,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   .quit-x { position: static; float: right; }
   /* результаты: всё в один столбец, метрики по две в ряд */
   .fin-metrics { grid-template-columns: 1fr 1fr; }
+  .det-body { grid-template-columns: 1fr; }
   .fin-head { flex-direction: column; }
   .fin-head-r { text-align: left; }
   .final-actions { flex-direction: column; align-items: stretch; }
@@ -1050,7 +1083,29 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <section class="fin-details">
         <button class="det-toggle" id="det-toggle" aria-expanded="false"
                 aria-controls="det-body">Подробная статистика</button>
-        <div class="det-body" id="det-body" hidden></div>
+        <div class="det-body" id="det-body" hidden>
+          <div class="chart-card">
+            <h4>Динамика забега</h4>
+            <div class="chart-box" id="chart-curve"></div>
+            <p class="chart-key">
+              <i class="k k-score"></i> счёт
+              <i class="k k-combo"></i> комбо
+              <span class="chart-x">номер вопроса →</span>
+            </p>
+          </div>
+          <div class="chart-card">
+            <h4>Время на ответ</h4>
+            <div class="chart-box" id="chart-time"></div>
+          </div>
+          <div class="chart-card">
+            <h4>Распределение сложностей</h4>
+            <div class="chart-box chart-donut" id="chart-diff"></div>
+          </div>
+          <div class="chart-card">
+            <h4>Сравнение с прошлыми играми</h4>
+            <div class="chart-box" id="chart-history"></div>
+          </div>
+        </div>
       </section>
 
       <!-- 6. Шеринг (Фаза 6) -->
@@ -1104,6 +1159,31 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   /* Рекорды — отдельно на режим; старый общий ключ считаем рекордом блица */
   function bestKey(m) { return 'econ_rush_best_' + m; }
+
+  /* История забегов — для графика «сравнение с прошлыми играми». Раньше
+     в localStorage жил только рекорд, истории не было совсем. Храним
+     локально и только своё: серверного лидерборда у игры нет. */
+  var HISTORY_KEY = 'econ_rush_history';
+  var HISTORY_LIMIT = 30;   // сколько забегов помним
+  var HISTORY_SHOWN = 12;   // сколько показываем на графике
+
+  function loadHistory() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+      return Array.isArray(raw) ? raw : [];
+    } catch (e) { return []; }   // мусор в ключе не должен ронять экран
+  }
+
+  function saveRunToHistory(s) {
+    // Целевой забег в историю не идёт: десять вопросов по темам ошибок —
+    // не тот же забег, сравнивать его с полным нечестно.
+    if (mistakesRun || !s) return;
+    var h = loadHistory();
+    h.push({ mode: mode, score: s.score, accuracy: s.accuracy, at: Date.now() });
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(-HISTORY_LIMIT)));
+    } catch (e) { /* приватный режим браузера — история не критична */ }
+  }
   (function migrateOldBest() {
     var old = localStorage.getItem('econrush_best');
     if (old && !localStorage.getItem(bestKey('blitz'))) {
@@ -1141,6 +1221,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var skippedCount = 0;         // пропущено (для запасной сводки без сети)
   var isRecord = false;         // побит ли личный рекорд этим забегом
   var mistakesRun = false;      // это забег «работа над ошибками»?
+  var chartsBuilt = false;      // графики подробной статистики уже построены?
   var bestNow = 0;              // рекорд режима с учётом этого забега
   var selected = [];            // выделенные варианты (мультивыбор, Рапид)
 
@@ -1761,6 +1842,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // сеть подведёт совсем) — держим запасную из своих счётчиков: экран
     // результатов не имеет права пропасть.
     summary = localSummary();
+    function done() {
+      saveRunToHistory(summary);
+      paintFinal();
+    }
     api('/game/api/session/finish/', {
       method: 'POST',
       body: JSON.stringify({ reason: endReason })
@@ -1769,8 +1854,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         summary = d.summary;
         endReason = summary.ended_reason;
       }
-      paintFinal();
-    }, function () { paintFinal(); });
+      done();
+    }, done);
   }
 
   /* Запасная сводка формой как серверная — на случай, если сеть отвалилась
@@ -1787,7 +1872,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       best_streak: bestStreak, max_multiplier: comboMult(bestStreak),
       lives_left: lives, lives_max: livesMax,
       ended_reason: endReason, last_number: 0,
-      topic_rows: [], difficulty: [], time_buckets: [],
+      topic_rows: [], mistake_topics: [], difficulty: [], time_buckets: [],
       score_curve: [], combo_curve: [], offline: true
     };
   }
@@ -1872,17 +1957,26 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       })(t0);
     }
 
-    /* работа над ошибками / чистый забег */
-    var wrongTopics = (s.topic_rows || []).filter(function (t) { return t.wrong > 0; });
-    $('fin-mistakes').hidden = !wrongTopics.length;
+    /* работа над ошибками / чистый забег.
+       Темы берём из s.mistake_topics — это ровно то, что соберёт сервер.
+       Своим фильтром по s.topic_rows экран обещал бы разбор «Без темы»,
+       в которую целиться нечем. */
+    var mt = s.mistake_topics || [];
+    $('fin-mistakes').hidden = !mt.length;
     // «Чисто!» — только когда ошибок ТОЧНО не было. Без сети тем нет,
     // но число ошибок известно: молчим, а не поздравляем зря.
     $('fin-clean').hidden = s.wrong > 0;
-    if (wrongTopics.length) paintMistakes(wrongTopics);
+    if (mt.length) paintMistakes(mt);
     else if (!s.wrong) paintClean();
 
     paintTopics(s);
     paintMisses();
+
+    /* подробная статистика — заново свёрнута, графики построятся при
+       раскрытии уже по НОВОЙ сводке */
+    chartsBuilt = false;
+    $('det-body').hidden = true;
+    $('det-toggle').setAttribute('aria-expanded', 'false');
   }
 
   /* Блок работы над ошибками: полоса пропорции + легенда. Пропорция та же,
@@ -2014,6 +2108,221 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     });
     renderMath(list);
   }
+
+  /* ---------- ПОДРОБНАЯ СТАТИСТИКА: графики ----------
+     Рисуем SVG руками, без библиотеки. Причина не в размере: цвета идут
+     через var(--rush-*), поэтому переключатель темы сайта перекрашивает
+     графики сам — canvas-библиотеке пришлось бы перерисовывать всё на
+     каждую смену темы. Четыре графика тут простые, экономия не стоила бы
+     этой возни. Данные — только из серверной сводки. */
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS(SVG_NS, tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      el.setAttribute(k, attrs[k]);
+    });
+    return el;
+  }
+
+  function chartFrame(box, w, h) {
+    box.innerHTML = '';
+    var svg = svgEl('svg', { viewBox: '0 0 ' + w + ' ' + h, role: 'img' });
+    box.appendChild(svg);
+    return svg;
+  }
+
+  function chartEmpty(box, text) {
+    box.innerHTML = '';
+    var p = document.createElement('p');
+    p.className = 'chart-empty';
+    p.textContent = text;
+    box.appendChild(p);
+  }
+
+  /* 1. Динамика: счёт линией (акцент) + комбо ступенькой (приглушённо,
+     своя шкала — величины разного порядка, общая ось врала бы). */
+  function chartCurve(s) {
+    var box = $('chart-curve');
+    var scores = s.score_curve || [];
+    if (scores.length < 2) {
+      chartEmpty(box, 'Забег слишком короткий для графика');
+      return;
+    }
+    var W = 400, H = 130, P = 8;
+    var svg = chartFrame(box, W, H);
+    var maxScore = Math.max.apply(null, scores) || 1;
+    var combo = s.combo_curve || [];
+    var maxCombo = Math.max.apply(null, combo.concat([1])) || 1;
+    var x = function (i) { return P + i * (W - 2 * P) / (scores.length - 1); };
+    var yScore = function (v) { return H - P - (v / maxScore) * (H - 2 * P); };
+    // комбо живёт в нижней трети — это фон к линии счёта, а не соперник
+    var yCombo = function (v) { return H - P - (v / maxCombo) * (H - 2 * P) * 0.33; };
+
+    svg.appendChild(svgEl('line', {
+      x1: P, y1: H - P, x2: W - P, y2: H - P,
+      stroke: 'var(--rush-border)', 'stroke-width': 1
+    }));
+    if (combo.length === scores.length) {
+      var cpts = [];
+      combo.forEach(function (c, i) {
+        if (i) cpts.push(x(i) + ',' + yCombo(combo[i - 1]));  // ступенька
+        cpts.push(x(i) + ',' + yCombo(c));
+      });
+      svg.appendChild(svgEl('polyline', {
+        points: cpts.join(' '), fill: 'none', stroke: 'var(--text3)',
+        'stroke-width': 1.5, opacity: .5, 'vector-effect': 'non-scaling-stroke'
+      }));
+    }
+    svg.appendChild(svgEl('polyline', {
+      points: scores.map(function (v, i) { return x(i) + ',' + yScore(v); }).join(' '),
+      fill: 'none', stroke: 'var(--rush-accent)', 'stroke-width': 2,
+      'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke'
+    }));
+    var last = svgEl('text', {
+      x: W - P, y: yScore(scores[scores.length - 1]) - 5,
+      'text-anchor': 'end', class: 'chart-val'
+    });
+    last.textContent = scores[scores.length - 1].toLocaleString('ru-RU');
+    svg.appendChild(last);
+  }
+
+  /* 2. Гистограмма времени по корзинам сводки */
+  function chartTime(s) {
+    var box = $('chart-time');
+    var buckets = s.time_buckets || [];
+    var total = buckets.reduce(function (a, b) { return a + b.count; }, 0);
+    if (!total) { chartEmpty(box, 'Нет данных о времени ответов'); return; }
+    var W = 400, H = 130, P = 8, BOT = 22;
+    var svg = chartFrame(box, W, H);
+    var max = Math.max.apply(null, buckets.map(function (b) { return b.count; })) || 1;
+    var slot = (W - 2 * P) / buckets.length;
+    buckets.forEach(function (b, i) {
+      var bh = (b.count / max) * (H - P - BOT - 10);
+      var bx = P + i * slot + slot * 0.15;
+      var bw = slot * 0.7;
+      svg.appendChild(svgEl('rect', {
+        x: bx, y: H - BOT - bh, width: bw, height: Math.max(bh, b.count ? 2 : 0),
+        rx: 2, fill: 'var(--rush-accent)', opacity: b.count ? .85 : .15
+      }));
+      if (b.count) {
+        var v = svgEl('text', { x: bx + bw / 2, y: H - BOT - bh - 4,
+                                'text-anchor': 'middle', class: 'chart-val' });
+        v.textContent = b.count;
+        svg.appendChild(v);
+      }
+      var l = svgEl('text', { x: bx + bw / 2, y: H - 8,
+                              'text-anchor': 'middle', class: 'chart-lbl' });
+      l.textContent = b.title.replace(' с', '');
+      svg.appendChild(l);
+    });
+    svg.appendChild(svgEl('line', {
+      x1: P, y1: H - BOT, x2: W - P, y2: H - BOT,
+      stroke: 'var(--rush-border)', 'stroke-width': 1
+    }));
+  }
+
+  /* 3. Кольцевая сложностей. Янтарь тут в своём законном смысле —
+     это шкала сложности, а не акцент. */
+  var DIFF_COLOR = { easy: 'var(--rush-ok)', medium: 'var(--amber)',
+                     hard: 'var(--rush-bad)' };
+
+  function chartDifficulty(s) {
+    var box = $('chart-diff');
+    var rows = (s.difficulty || []).filter(function (g) { return g.total > 0; });
+    var total = rows.reduce(function (a, g) { return a + g.total; }, 0);
+    if (!total) { chartEmpty(box, 'Нет данных о сложности'); return; }
+    box.innerHTML = '';
+    var W = 104, R = 40, SW = 14, C = W / 2;
+    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + W, role: 'img' });
+    var len = 2 * Math.PI * R;
+    var offset = 0;
+    rows.forEach(function (g) {
+      var frac = g.total / total;
+      var arc = svgEl('circle', {
+        cx: C, cy: C, r: R, fill: 'none',
+        stroke: DIFF_COLOR[g.key] || 'var(--text3)',
+        'stroke-width': SW,
+        'stroke-dasharray': (len * frac) + ' ' + (len * (1 - frac)),
+        'stroke-dashoffset': -offset,
+        transform: 'rotate(-90 ' + C + ' ' + C + ')'
+      });
+      svg.appendChild(arc);
+      offset += len * frac;
+    });
+    var mid = svgEl('text', { x: C, y: C + 4, 'text-anchor': 'middle',
+                              class: 'chart-val' });
+    mid.textContent = total;
+    svg.appendChild(mid);
+    box.appendChild(svg);
+
+    var leg = document.createElement('ul');
+    leg.className = 'donut-legend';
+    rows.forEach(function (g) {
+      var li = document.createElement('li');
+      var sw = document.createElement('i');
+      sw.className = 'd-' + g.key;
+      var txt = document.createElement('span');
+      txt.textContent = g.title + ' — ' + g.total + ' (верно ' + g.correct + ')';
+      li.appendChild(sw);
+      li.appendChild(txt);
+      leg.appendChild(li);
+    });
+    box.appendChild(leg);
+  }
+
+  /* 4. Сравнение с прошлыми забегами ЭТОГО режима (счёт «Пули» и
+     «Классики» несравним — разные запасы времени). Текущий — акцентом. */
+  function chartHistory(s) {
+    var box = $('chart-history');
+    var rows = loadHistory().filter(function (r) { return r.mode === mode; });
+    rows = rows.slice(-HISTORY_SHOWN);
+    if (rows.length < 2) {
+      chartEmpty(box, 'Это ваш первый забег в этом режиме — будет с чем сравнить');
+      return;
+    }
+    var W = 400, H = 130, P = 8, BOT = 18;
+    var svg = chartFrame(box, W, H);
+    var max = Math.max.apply(null, rows.map(function (r) { return r.score; })) || 1;
+    var slot = (W - 2 * P) / rows.length;
+    rows.forEach(function (r, i) {
+      var bh = (r.score / max) * (H - P - BOT - 12);
+      var bx = P + i * slot + slot * 0.15;
+      var bw = slot * 0.7;
+      var isNow = i === rows.length - 1;
+      svg.appendChild(svgEl('rect', {
+        x: bx, y: H - BOT - bh, width: bw, height: Math.max(bh, 2), rx: 2,
+        fill: isNow ? 'var(--rush-accent)' : 'var(--text3)',
+        opacity: isNow ? 1 : .35
+      }));
+      if (isNow || rows.length <= 6) {
+        var v = svgEl('text', { x: bx + bw / 2, y: H - BOT - bh - 4,
+                                'text-anchor': 'middle', class: 'chart-val' });
+        v.textContent = r.score;
+        svg.appendChild(v);
+      }
+    });
+    var l = svgEl('text', { x: P, y: H - 5, class: 'chart-lbl' });
+    l.textContent = 'последние ' + rows.length + ' — правый столбец этот забег';
+    svg.appendChild(l);
+  }
+
+  function buildCharts() {
+    if (!summary) return;
+    chartCurve(summary);
+    chartTime(summary);
+    chartDifficulty(summary);
+    chartHistory(summary);
+  }
+
+  $('det-toggle').addEventListener('click', function () {
+    var body = $('det-body');
+    var open = body.hidden;
+    body.hidden = !open;
+    this.setAttribute('aria-expanded', open ? 'true' : 'false');
+    // графики строим лениво — при первом раскрытии в этом забеге
+    if (open && !chartsBuilt) { buildCharts(); chartsBuilt = true; }
+  });
 
   $('btn-review').addEventListener('click', function () {
     var list = $('miss-list');

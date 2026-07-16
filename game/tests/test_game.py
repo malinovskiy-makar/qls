@@ -579,6 +579,30 @@ class SummaryTests(TestCase):
         self.assertEqual(counts['>30 с'], 2)
         self.assertEqual(sum(b['count'] for b in s['time_buckets']), 7)
 
+    def test_mistake_topics_match_what_generator_targets(self):
+        """Полоса на экране обязана обещать ровно то, что соберёт сервер.
+
+        В topic_rows «Без темы» есть (это честная строка точности), а в
+        mistake_topics её быть не должно: целиться в неё нечем — экран
+        обещал бы разбор, которого не будет."""
+        log = [
+            log_row(topics=('Эластичность',), outcome='wrong'),
+            log_row(topics=('Эластичность',), outcome='wrong'),
+            log_row(topics=('Издержки',), outcome='wrong'),
+            log_row(topics=(), outcome='wrong'),          # без темы
+            log_row(topics=('Налоги',), outcome='correct'),
+        ]
+        s = build_summary(fake_state(log))
+        self.assertIn('Без темы', [r['topic'] for r in s['topic_rows']])
+        self.assertEqual(s['mistake_topics'], [
+            {'topic': 'Эластичность', 'wrong': 2},
+            {'topic': 'Издержки', 'wrong': 1},
+        ])
+        # и это ровно тот вход, из которого считаются квоты забега
+        self.assertEqual(
+            {r['topic']: r['wrong'] for r in s['mistake_topics']},
+            mistakes_by_topic(log))
+
     def test_max_combo_is_multiplier_of_best_streak(self):
         s = build_summary(fake_state([log_row()], best_streak=7))
         self.assertEqual(s['best_streak'], 7)

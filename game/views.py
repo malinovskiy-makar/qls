@@ -410,6 +410,14 @@ def build_summary(state):
         # номер вопроса, на котором выбыли (нужен плашке экрана результатов)
         'last_number': log[-1]['number'] if log else 0,
         'topic_rows': topic_rows,
+        # Темы, по которым РЕАЛЬНО соберётся работа над ошибками — тем же
+        # подсчётом, каким её собирает api_session_start_mistakes. Экран
+        # рисует полосу пропорции отсюда, а не считает сам: иначе он обещал
+        # бы игроку одно, а сервер собирал другое. Отличается от topic_rows:
+        # «Без темы» сюда не попадает — целиться в неё нечем.
+        'mistake_topics': [{'topic': t, 'wrong': c} for t, c in
+                           sorted(mistakes_by_topic(log).items(),
+                                  key=lambda kv: (-kv[1], kv[0]))],
         'difficulty': difficulty,
         'time_buckets': buckets,
         # кривые для графиков: значение по номеру вопроса
