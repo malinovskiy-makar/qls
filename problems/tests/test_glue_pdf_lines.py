@@ -87,14 +87,34 @@ class SimpleGlueTests(SimpleTestCase):
 
 
 class HyphenTests(SimpleTestCase):
-    """Дефисные разрывы: клеим только уверенно-кириллические, сомнения — в лог."""
+    """Дефисные разрывы: в v1 не клеятся вовсе (AUTO_HYPHEN_JOIN=False),
+    все случаи — в лог; уверенные кандидаты помечаются «[склеил бы]»."""
 
-    def test_valid_hyphen_break_joined_without_hyphen(self):
+    def test_confident_hyphen_break_logged_not_joined(self):
+        # Политика v1 (итог адверсариального ревью): даже уверенный кандидат
+        # не клеится — без словаря «предло-жение» неотличимо от
+        # «денежно-кредитную», разорванного по собственному дефису
         text = 'Функция предло-\nжения растёт с ценой.'
         res = glue_field(text)
-        self.assertEqual(res.new_text, 'Функция предложения растёт с ценой.')
-        self.assertEqual(res.hyphen_count, 1)
-        self.assertEqual(res.doubtful, [])
+        self.assertIsNone(res.new_text)
+        self.assertEqual(len(res.doubtful), 1)
+        self.assertIn('[склеил бы: предложения]', res.doubtful[0])
+
+    def test_auto_join_mechanics_work_when_enabled(self):
+        # Механика склейки сохранена за константой — проверяем её отдельно
+        with mock.patch(
+                'problems.management.commands.glue_pdf_lines.AUTO_HYPHEN_JOIN',
+                True):
+            res = glue_field('Функция предло-\nжения растёт с ценой.')
+            self.assertEqual(res.new_text, 'Функция предложения растёт с ценой.')
+            self.assertEqual(res.hyphen_count, 1)
+
+    def test_compound_word_never_corrupted(self):
+        # Находка ревью: «денежно-\nкредитную» склеивалась бы в порчу
+        # «денежнокредитную» — политика v1 исключает это классом
+        text = 'Центральный банк проводит денежно-\nкредитную политику.'
+        res = glue_field(text)
+        self.assertIsNone(res.new_text)
 
     def test_doubtful_prefix_left_untouched_and_logged(self):
         # «во-первых» — осмысленное дефисное слово, склейка испортила бы его
@@ -197,6 +217,30 @@ class StructuralKeepTests(SimpleTestCase):
         text = 'расходы фирм на оборудование: 350\nстроительство за счёт бюджета: 200'
         self.assertEqual(glued(text), text)
 
+    def test_roman_numeral_markers_kept(self):
+        # Находка ревью: (ii)/(iii) склеивались через paren_continuation
+        text = ('Which of the following are true?\n'
+                '(i) demand increases when price falls\n'
+                '(ii) supply increases when price rises\n'
+                '(iii) the equilibrium is unique')
+        self.assertEqual(glued(text), text)
+
+    def test_list_marker_without_space_kept(self):
+        # Находка ревью: PDF-извлечение теряет пробел после скобки — «а)12»
+        text = 'Выберите верный ответ\nа)12\nб)24\nв)36'
+        self.assertEqual(glued(text), text)
+
+    def test_data_rows_without_colon_kept(self):
+        # Находка ревью: столбик показателей без двоеточия
+        text = 'Дано:\nинфляция 5%\nбезработица 6%\nнорма резервирования 20%'
+        self.assertEqual(glued(text), text)
+
+    def test_year_rows_kept(self):
+        # Находка ревью: годовой ряд «2019 г. — 500 млрд»
+        text = ('Динамика ВВП страны\n2019 г. — 500 млрд\n'
+                '2020 г. — 550 млрд\n2021 г. — 600 млрд')
+        self.assertEqual(glued(text), text)
+
     def test_uppercase_after_weak_ending_kept(self):
         # Реальный случай #50174: недоклеить безопаснее, чем склеить лишнее
         text = 'Определите фактический\nВВП прошлого года.'
@@ -228,7 +272,7 @@ class IdempotencyAndGuardTests(SimpleTestCase):
     def test_idempotent_on_all_glue_kinds(self):
         battery = [
             'Налог на продажи товаров\nявляется регрессивным.',
-            'Функция предло-\nжения растёт с ценой.',
+            'Кривая предложения фирмы в краткосрочном периоде\nимеет положительный наклон.',
             'Цена выросла в\nМоскве на 10%.',
             'вид: $U = ln(C)$\n, где $C$ — потребление.',
             'ВВП составляет\n4800 млрд р., как известно.',
@@ -329,6 +373,25 @@ class GluePdfLinesCommandTests(TestCase):
         out = self._call('--source-id', str(self.source.id))
         self.assertIn('PDF-источник (тест)', out)
         self.assertNotIn('Чужой источник (тест)', out)
+
+    def test_confirm_with_duplicate_part_labels_keeps_texts_apart(self):
+        # Регресс адверсариального ревью: метки подпунктов НЕ уникальны
+        # (в базе есть задачи с двумя «а») — запись по label затирала оба
+        # подпункта одним текстом. Применение обязано адресовать по pk.
+        from problems.models import ProblemPart
+        p1 = ProblemPart.objects.create(
+            problem=self.sliced, label='а', order=1,
+            statement='Первый подпункт оборван посреди\nфразы про спрос.')
+        p2 = ProblemPart.objects.create(
+            problem=self.sliced, label='а', order=2,
+            statement='Второй подпункт оборван посреди\nфразы про предложение.')
+        self._call('--source-id', str(self.source.id), '--confirm')
+        p1.refresh_from_db()
+        p2.refresh_from_db()
+        self.assertEqual(p1.statement,
+                         'Первый подпункт оборван посреди фразы про спрос.')
+        self.assertEqual(p2.statement,
+                         'Второй подпункт оборван посреди фразы про предложение.')
 
     def test_confirm_applies_and_writes_changed_ids(self):
         # --confirm в этой сессии не запускается на боевой базе — но сама

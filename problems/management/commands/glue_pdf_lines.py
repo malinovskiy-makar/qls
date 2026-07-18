@@ -55,11 +55,12 @@ ProblemPart.statement).
     - B начинается с заглавной, НО конец A «сильный»: запятая, открывающая
       скобка/кавычка, оператор (= + − × · /), тире или висячее служебное
       слово (предлог/союз/частица из HANGING_WORDS: «...цена и» → «Спрос»).
-  Дефисный разрыв слова («предло-\\nжение»): дефис удаляется, половинки
-  клеятся встык ТОЛЬКО если обе кириллические, длиной ≥2 и не похожи на
-  осмысленное дефисное слово (во-первых, кое-кто, что-либо, юго-запад —
-  списки LEFT_DOUBT/RIGHT_DOUBT). Сомнительные случаи не трогаются вовсе и
-  логируются в reports/glue_lines/hyphen_doubtful.txt.
+  Дефисный разрыв слова («предло-\\nжение»): в v1 НЕ клеится вовсе — все
+  случаи логируются в reports/glue_lines/hyphen_doubtful.txt, уверенные
+  кандидаты (обе половинки кириллические, длиной ≥2, не похожи на
+  осмысленное дефисное слово из списков LEFT_DOUBT/RIGHT_DOUBT) помечаются
+  «[склеил бы: ...]». Автосклейку можно включить константой AUTO_HYPHEN_JOIN
+  — почему она выключена, см. комментарий у константы.
 
 Предохранитель (поле аномально — вся задача пропускается и пишется в
 reports/glue_lines/borderline.txt; изменения к ней НЕ применяются):
@@ -113,6 +114,15 @@ MAX_GLUES_PER_FIELD = 80
 MAX_GLUED_PARA_LEN = 2500
 MIN_LINES_FOR_PARA_GUARD = 3
 
+# Автосклейка дефисных разрывов в v1 ВЫКЛЮЧЕНА (решение по итогам
+# адверсариального ревью): без словаря нельзя отличить мягкий перенос
+# («предло-жение») от настоящего дефисного слова, разорванного по своему
+# дефису («денежно-\nкредитную» → порча «денежнокредитную»), а выигрыш
+# ничтожен — на все 13 603 задачи набралось лишь 12 склеек. Все дефисные
+# разрывы идут в hyphen_doubtful.txt; уверенные кандидаты помечаются
+# «[склеил бы: ...]» — решают глаза.
+AUTO_HYPHEN_JOIN = False
+
 MATH_CH = ''  # символ-заглушка: им в «тени» текста заменена математика
 TERMINAL_PUNCT = '.?!;…'
 LINE_CLOSERS = ')]"\'»”'
@@ -161,16 +171,20 @@ def build_shadow(text):
 
 # ── Регулярки структурных строк ──────────────────────────────────────────────
 
-# Маркеры подпунктов/списков в начале строки. Требуем пробел после «а)»/«1.» —
-# так «г. Москва» в середине фразы не примет город за пункт списка (а если
-# примет — мы просто НЕ склеим, ошибка в безопасную сторону).
+# Маркеры подпунктов/списков в начале строки. После «а.»/«1.» требуем пробел —
+# так «г. Москва» и «3.14» не примутся за пункт списка; после «а)»/«1)» пробел
+# НЕ требуем — сокращений вида «г)» не бывает, а PDF-извлечение нередко теряет
+# пробел («а)12», находка ревью). Римские нумералы (ii)/(iii) — тоже маркеры.
 LIST_MARKER_RE = re.compile(
     r'^\s*(?:'
     r'[•‣▪◦*]\s*'
     r'|[-–—]\s+'
-    r'|\(?[а-яёa-zА-ЯЁA-Z][.)]\s'
-    r'|\(?\d{1,3}[.)]\s'
-    r'|\(\d{1,3}\)\s*'
+    r'|\(?[ivxlcIVXLC]{2,5}[.)]'
+    r'|\(?[а-яёa-zА-ЯЁA-Z]\)'
+    r'|[а-яёa-zА-ЯЁA-Z]\.\s'
+    r'|\(?\d{1,3}\)'
+    r'|\d{1,3}\.\s'
+    r'|\(\d{1,3}\)'
     r'|\\item\b'
     r')'
 )
@@ -192,6 +206,15 @@ _NUMERIC_LINE_RE = re.compile(r'^[\d\s.,;:%()+*/^=<>≈±−–—-]+$')
 
 # Строка-показатель «Метка: число» (national accounts из #50095 и подобные).
 _LABEL_NUM_RE = re.compile(r'^[^:]{1,80}:\s*[+−-]?[\d\s.,%]+$')
+
+# Строка-показатель БЕЗ двоеточия («инфляция 5%», находка ревью): короткая
+# строка, кончающаяся числом/процентом без завершающей пунктуации. Столбик
+# распознаём только ПАРОЙ таких строк — одиночная может быть обычной
+# оборванной фразой.
+_DATA_ROW_RE = re.compile(r'^[^:.!?;]{1,60}\s[+−-]?\d[\d\s.,]*\s*%?$')
+
+# Строка годового ряда «2019 г. — 500 млрд» (находка ревью): год + тире.
+_YEAR_ROW_RE = re.compile(r'^(?:19|20)\d{2}\s*(?:гг?\.|год[ау]?)?\s*[—–-]')
 
 # Висячие служебные слова: строка, оборванная на предлоге/союзе/частице, —
 # верный признак технического переноса, клеим даже перед заглавной буквой.
@@ -297,6 +320,8 @@ def classify_boundary(ra, rb, sa, sb):
         return ('keep', 'numeric_line')
     if _LABEL_NUM_RE.match(sa_r.strip()) and _LABEL_NUM_RE.match(sb_l.strip()):
         return ('keep', 'label_number_pair')
+    if _DATA_ROW_RE.match(sa_r.strip()) and _DATA_ROW_RE.match(sb_l.strip()):
+        return ('keep', 'data_row_pair')
 
     # 2. Как заканчивается A (закрывашки не мешают увидеть пунктуацию).
     tail = sa_r
@@ -344,6 +369,8 @@ def classify_boundary(ra, rb, sa, sb):
     if first == '=':
         return ('glue', 'operator')
     if first.isdigit():
+        if _YEAR_ROW_RE.match(sb_l):
+            return ('keep', 'year_row')
         if (last.isalpha() and last.islower()) or last == ',' or _strong_ending(tail):
             return ('glue', 'digit_continuation')
         return ('keep', 'digit_unclear')
@@ -405,6 +432,12 @@ def glue_field(text):
             action = classify_boundary(cur_r, nxt_r, cur_s, nxt_s)
 
         kind = action[0]
+        if kind == 'hyphen_join' and not AUTO_HYPHEN_JOIN:
+            # v1: уверенный кандидат не клеится, а помечается в логе —
+            # см. комментарий у AUTO_HYPHEN_JOIN
+            kind = 'hyphen_doubt'
+            action = ('hyphen_doubt', action[1] + ' [склеил бы: '
+                      + action[1].replace('-', '') + ']')
         if kind == 'glue':
             res.glue_count += 1
             res.glue_kinds[action[1]] += 1
@@ -515,8 +548,8 @@ class Command(BaseCommand):
             agg = per_source[sid]
             agg['problems'] += 1
 
-            fields = []  # (метка, старый, новый, FieldResult)
-            for label, value in self._iter_fields(p):
+            fields = []  # (метка, старый, новый, FieldResult, pk подпункта|None)
+            for label, value, part_pk in self._iter_fields(p):
                 r = glue_field(value)
                 total_keep.update(r.keep_reasons)
                 total_glue.update(r.glue_kinds)
@@ -524,17 +557,17 @@ class Command(BaseCommand):
                     doubtful_rows.append('#{}\t{}\t{}'.format(p.id, label, d))
                     agg['hyphen_doubtful'] += 1
                 if r.new_text is not None:
-                    fields.append((label, value, r.new_text, r))
+                    fields.append((label, value, r.new_text, r, part_pk))
 
             if not fields:
                 continue
 
-            border = next((r.borderline for _, _, _, r in fields if r.borderline), None)
+            border = next((r.borderline for _, _, _, r, _ in fields if r.borderline), None)
             record = {
                 'id': p.id, 'sid': sid,
                 'title': p.title or '',
                 'fields': fields,
-                'glues': sum(r.changes for _, _, _, r in fields),
+                'glues': sum(r.changes for _, _, _, r, _ in fields),
                 'borderline': border,
             }
             records.append(record)
@@ -542,7 +575,7 @@ class Command(BaseCommand):
             if border:
                 # предохранитель: задача пропускается целиком
                 agg['borderline'] += 1
-                for label, _, _, r in fields:
+                for label, _, _, r, _ in fields:
                     if r.borderline:
                         borderline_rows.append('#{}\t{}\t{}'.format(
                             p.id, label, r.borderline))
@@ -550,10 +583,10 @@ class Command(BaseCommand):
 
             agg['changed'] += 1
             agg['glued_lines'] += record['glues']
-            agg['hyphens'] += sum(r.hyphen_count for _, _, _, r in fields)
+            agg['hyphens'] += sum(r.hyphen_count for _, _, _, r, _ in fields)
 
             # идемпотентность: повторная склейка уже склеенного = 0 изменений
-            for label, _, new_text, _ in fields:
+            for label, _, new_text, _, _ in fields:
                 second = glue_field(new_text)
                 if second.new_text is not None:
                     non_idempotent.append((p.id, label))
@@ -572,7 +605,8 @@ class Command(BaseCommand):
 
         self._write_logs(doubtful_rows, borderline_rows)
         self._write_stats_md(per_source, source_names, source_ids, records,
-                             opts['examples'], total_keep, total_glue)
+                             opts['examples'], total_keep, total_glue,
+                             confirm=confirm)
         if opts['preview']:
             self._write_preview(records, source_names)
 
@@ -587,13 +621,17 @@ class Command(BaseCommand):
 
     @staticmethod
     def _iter_fields(problem):
-        # type: (Problem) -> List[Tuple[str, str]]
+        # type: (Problem) -> List[Tuple[str, str, Optional[int]]]
+        """(метка, текст, pk подпункта или None). pk обязателен: метки
+        подпунктов НЕ уникальны в схеме, и запись «по label» затёрла бы
+        оба подпункта «а» одним текстом."""
         fields = []
         if problem.statement:
-            fields.append(('statement', problem.statement))
+            fields.append(('statement', problem.statement, None))
         for part in problem.parts.all():
             if part.statement:
-                fields.append(('part:{}'.format(part.label), part.statement))
+                fields.append(('part:{}'.format(part.label), part.statement,
+                               part.id))
         return fields
 
     # ── Отчёты ───────────────────────────────────────────────────────────────
@@ -639,13 +677,16 @@ class Command(BaseCommand):
             border_path, len(borderline_rows)))
 
     def _write_stats_md(self, per_source, source_names, source_ids, records,
-                        examples_per_source, total_keep=None, total_glue=None):
+                        examples_per_source, total_keep=None, total_glue=None,
+                        confirm=False):
         path = os.path.join(REPORT_DIR, 'dry_run_stats.md')
         lines = []
-        lines.append('# Склейка построчной нарезки — dry-run')
+        lines.append('# Склейка построчной нарезки — {}'.format(
+            'ПРИМЕНЕНО (--confirm)' if confirm else 'dry-run'))
         lines.append('')
-        lines.append('Дата: {}. База НЕ менялась.'.format(
-            datetime.now().strftime('%Y-%m-%d %H:%M')))
+        lines.append('Дата: {}. {}'.format(
+            datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'Изменения ЗАПИСАНЫ в базу.' if confirm else 'База НЕ менялась.'))
         lines.append('')
         lines.append('Пороги предохранителя: > {} склеек на поле или абзац > {} симв. '
                      'из ≥ {} строк → задача пропускается.'.format(
@@ -702,7 +743,7 @@ class Command(BaseCommand):
                 lines.append('')
                 lines.append('### #{} {}'.format(sid, source_names.get(sid, '?')))
                 for rec in rng.sample(pool, min(examples_per_source, len(pool))):
-                    label, old, new, _ = rec['fields'][0]
+                    label, old, new, _, _ = rec['fields'][0]
                     lines.append('')
                     lines.append('**#{}** ({}):'.format(rec['id'], label))
                     lines.append('```')
@@ -738,16 +779,19 @@ class Command(BaseCommand):
             self.stdout.write('Бэкап → {}'.format(bk))
 
         stmt_map = {}   # pid -> новый statement
-        part_map = {}   # (pid, label) -> новый текст подпункта
+        part_map = {}   # pk подпункта -> новый текст
         changed_pids = set()
         for rec in records:
             if rec['borderline']:
                 continue  # предохранитель: не применяем
-            for label, _, new_text, _ in rec['fields']:
-                if label == 'statement':
+            for label, _, new_text, _, part_pk in rec['fields']:
+                if part_pk is None:
                     stmt_map[rec['id']] = new_text
                 else:
-                    part_map[(rec['id'], label.split(':', 1)[1])] = new_text
+                    # адресуем подпункт строго по pk: метки НЕ уникальны
+                    # (в базе есть задачи с двумя подпунктами «а»), запись
+                    # «по label» затёрла бы оба одним текстом
+                    part_map[part_pk] = new_text
                 changed_pids.add(rec['id'])
 
         if stmt_map:
@@ -759,13 +803,10 @@ class Command(BaseCommand):
             self.stdout.write('Обновлено statement: {:,}'.format(len(updates)))
 
         if part_map:
-            pids = list({pid for pid, _ in part_map})
             updates = []
-            for part in ProblemPart.objects.filter(problem_id__in=pids):
-                key = (part.problem_id, part.label)
-                if key in part_map:
-                    part.statement = part_map[key]
-                    updates.append(part)
+            for part in ProblemPart.objects.filter(id__in=list(part_map.keys())):
+                part.statement = part_map[part.id]
+                updates.append(part)
             ProblemPart.objects.bulk_update(updates, ['statement'], batch_size=500)
             self.stdout.write('Обновлено подпунктов: {:,}'.format(len(updates)))
 
@@ -898,7 +939,7 @@ def _preview_card(rec, source_names):
         '<div class="meta"><b>#{pid}</b> — {src}{chips} — '
         '<a href="http://127.0.0.1:8000/catalog/{pid}/" target="_blank">открыть в каталоге</a></div>'.format(
             pid=rec['id'], src=esc(source_names.get(rec['sid'], '?')), chips=chips))
-    for label, old, new, _ in rec['fields']:
+    for label, old, new, _, _ in rec['fields']:
         parts.append('<div class="fieldlabel">{}</div>'.format(esc(label)))
         parts.append('<div class="cols">')
         parts.append('<div class="col before"><div class="col-label">ДО</div>'
