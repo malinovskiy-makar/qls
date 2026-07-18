@@ -152,6 +152,34 @@ class ClassifyUnknownLabelTests(TestCase):
         self.assertTrue(res['apply'])
         self.assertEqual(set(res['changes']['parts_raw'].keys()), set(pks))
 
+    def test_unchanged_matched_part_not_written(self):
+        # Находка пост-контроля применения (2026-07-19): Sonnet иногда
+        # включает в cleaned_parts пункт, текст которого byte-в-byte
+        # совпадает с текущим — сопоставление находится, но писать в базу
+        # одно и то же поле не нужно (реальный случай #50010, part «Ь»).
+        p = make_problem(statement='Условие.')
+        ProblemPart.objects.create(problem=p, label='а', order=1,
+                                   statement='Первый пункт.', answer='')
+        ProblemPart.objects.create(problem=p, label='Ь', order=2,
+                                   statement='Второй пункт без изменений.', answer='')
+        rec = _rec(cleaned_parts={
+            'а': 'Первый пункт переформулирован.',
+            'б': 'Второй пункт без изменений.',  # идентично текущему
+        })
+        res = classify_unknown_label(p, rec)
+        self.assertTrue(res['apply'])
+        pks = {pp.label: pp.pk for pp in p.parts.all()}
+        self.assertEqual(set(res['changes']['parts_raw'].keys()), {pks['а']})
+
+    def test_all_matched_parts_unchanged_goes_to_remainder(self):
+        p = make_problem(statement='Условие.')
+        ProblemPart.objects.create(problem=p, label='Ь', order=1,
+                                   statement='Пункт без изменений.', answer='')
+        rec = _rec(cleaned_parts={'б': 'Пункт без изменений.'})
+        res = classify_unknown_label(p, rec)
+        self.assertFalse(res['apply'])
+        self.assertEqual(res['reasons'], ['no_net_change'])
+
     def test_ambiguous_mapping_to_remainder(self):
         p = make_problem(statement='Условие.')
         ProblemPart.objects.create(problem=p, label='а', order=1,

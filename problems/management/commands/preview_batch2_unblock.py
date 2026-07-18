@@ -284,13 +284,21 @@ class Command(BaseCommand):
 
     @staticmethod
     def _diff_block(label, old, new):
-        esc = html.escape
-        return (
-            '<div class="fieldlabel">{label}</div>'
-            '<div class="cols">'
-            '<div class="col before"><div class="col-label">ДО</div>'
-            '<div class="text">{old}</div></div>'
-            '<div class="col after"><div class="col-label">ПОСЛЕ</div>'
-            '<div class="text">{new}</div></div>'
-            '</div>'
-        ).format(label=esc(label), old=esc(old), new=esc(new))
+        return diff_block(label, old, new)
+
+
+def diff_block(label, old, new):
+    # type: (str, str, str) -> str
+    """ДО/ПОСЛЕ-блок одного поля — вынесен на уровень модуля, чтобы
+    переиспользовать в пост-контроле применения (та же карточная вёрстка,
+    что в preview.html, урок склейки нарезки про два расходящихся генератора)."""
+    esc = html.escape
+    return (
+        '<div class="fieldlabel">{label}</div>'
+        '<div class="cols">'
+        '<div class="col before"><div class="col-label">ДО</div>'
+        '<div class="text">{old}</div></div>'
+        '<div class="col after"><div class="col-label">ПОСЛЕ</div>'
+        '<div class="text">{new}</div></div>'
+        '</div>'
+    ).format(label=esc(label), old=esc(old), new=esc(new))

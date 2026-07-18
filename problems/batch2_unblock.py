@@ -223,7 +223,11 @@ def classify_unknown_label(problem, rec):
     if cleaned_parts and match is None:
         reasons.append('parts_ambiguous')
     elif match:
-        changes['parts_raw'] = match
+        by_pk_text = {pk: text for pk, _, text in existing}
+        upd = {pk: txt for pk, txt in match.items()
+              if txt.strip() != (by_pk_text.get(pk) or '').strip()}
+        if upd:
+            changes['parts_raw'] = upd
 
     cur_stmt = problem.statement or ''
     cleaned_stmt = (data.get('cleaned_statement') or '').strip()
