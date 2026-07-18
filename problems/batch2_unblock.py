@@ -42,11 +42,49 @@
 """
 from typing import Dict, List, Optional, Tuple
 import difflib
+import re
 
 from problems.management.commands.apply_batch2 import _is_suspicious_trim
-from problems.management.commands.glue_pdf_lines import glue_field
+from problems.management.commands.glue_pdf_lines import build_shadow, glue_field
 
 MIN_LABEL_SCORE = 0.55
+
+# ── Задача 1 сессии применения: автоправки поверх текста Sonnet ────────────
+
+# Парные «уголки» << ... >> → «ёлочки». Не жадный — не пересекает несколько
+# пар в одной строке; требует ХОТЯ БЫ один символ внутри (не «<<>>»).
+# Одиночные < / > (могут быть неравенствами вида x < 5) не матчатся вовсе —
+# паттерну нужны ДВА подряд символа с обеих сторон.
+_ANGLE_QUOTE_RE = re.compile(r'<<([^<>]+?)>>')
+
+
+def normalize_quotes(text):
+    # type: (str) -> str
+    """Парные <<...>> → «...». Одиночные < > (неравенства) не трогает —
+    паттерн требует парных двойных уголков с обеих сторон."""
+    if not text:
+        return text
+    return _ANGLE_QUOTE_RE.sub('«\\1»', text)
+
+
+def _pipes_outside_math(text):
+    # type: (str) -> int
+    """Число '|' вне формул ($...$/$$...$$/\\(..\\)/\\[..\\]/\\begin..\\end —
+    маска та же, что у glue_pdf_lines, «|x|» внутри формулы не считается)."""
+    if not text:
+        return 0
+    shadow, _ = build_shadow(text)
+    return shadow.count('|')
+
+
+def introduces_pipe_table(old_text, new_text):
+    # type: (str, str) -> bool
+    """True, если правка ВНОСИТ '|' как разделитель вне формул, которого не
+    было в старом тексте — суррогат markdown-таблицы палочками. Настоящую
+    реконструкцию таблиц делаем отдельным этапом (по образцу
+    parse_vsosh_region.reconstruct_table); пока — не чиним автоматикой,
+    исключаем всю карточку из применения."""
+    return _pipes_outside_math(new_text) > 0 and _pipes_outside_math(old_text) == 0
 
 
 def apply_glue(text):
@@ -254,3 +292,52 @@ def pipeline_changes(changes):
     if 'solution_raw' in changes:
         out['solution'] = changes['solution_raw']
     return out
+
+
+def build_apply_pipeline(problem, rec, category):
+    # type: (object, Dict, str) -> Tuple[Optional[Dict], Optional[str], str]
+    """Полный конвейер сессии применения (2026-07-19): classify → БЕЗ
+    solution (эта сессия ни одно solution не пишет — только конфликт-лог) →
+    нормализация кавычек → фильтр палочек (карточка целиком в остаток, если
+    правка вносит '|' как разделитель, которого не было) → glue_field.
+
+    Возвращает (final_changes, exclude_reason, extracted_solution).
+    final_changes is None при exclude_reason (фильтр палочек) или когда
+    классификатор изначально не даёт применить/нечего применять без solution.
+    """
+    if category == 'conflict_solution':
+        result = classify_conflict_solution(problem, rec)
+    elif category == 'unknown_label':
+        result = classify_unknown_label(problem, rec)
+    else:
+        raise ValueError('unknown category: {}'.format(category))
+
+    extracted_solution = result.get('extracted_solution') or ''
+    if not result['apply']:
+        return None, None, extracted_solution
+
+    raw = dict(result['changes'])
+    raw.pop('solution_raw', None)  # эта сессия ни одно solution не пишет
+
+    normalized = {}
+    if 'stmt_raw' in raw:
+        normalized['stmt_raw'] = normalize_quotes(raw['stmt_raw'])
+    if 'parts_raw' in raw:
+        normalized['parts_raw'] = {
+            pk: normalize_quotes(t) for pk, t in raw['parts_raw'].items()}
+
+    if not normalized:
+        return None, None, extracted_solution  # был только solution — нечего применять
+
+    if 'stmt_raw' in normalized:
+        if introduces_pipe_table(problem.statement or '', normalized['stmt_raw']):
+            return None, 'introduces_pipe_table:statement', extracted_solution
+    if 'parts_raw' in normalized:
+        by_pk = {p.pk: p for p in problem.parts.all()}
+        for pk, new_text in normalized['parts_raw'].items():
+            old_text = by_pk[pk].statement if pk in by_pk else ''
+            if introduces_pipe_table(old_text or '', new_text):
+                return None, 'introduces_pipe_table:part_{}'.format(pk), extracted_solution
+
+    final = pipeline_changes(normalized)
+    return final, None, extracted_solution
