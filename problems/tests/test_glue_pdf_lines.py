@@ -111,6 +111,14 @@ class HyphenTests(SimpleTestCase):
         self.assertIsNone(res.new_text)
         self.assertEqual(len(res.doubtful), 1)
 
+    def test_abbreviation_kol_vo_is_doubtful(self):
+        # Реальный случай #42377: «кол-\nву» — сокращение «кол-во» с настоящим
+        # дефисом; склейка дала бы порчу «колву»
+        text = 'Определите изменение кол-\nву проданных товаров.'
+        res = glue_field(text)
+        self.assertIsNone(res.new_text)
+        self.assertEqual(len(res.doubtful), 1)
+
     def test_latin_hyphen_break_is_doubtful(self):
         # По ТЗ дефис убираем только у кириллических половинок
         text = 'The firm maximizes its consump-\ntion every period.'
