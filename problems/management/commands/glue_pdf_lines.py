@@ -66,8 +66,8 @@ ProblemPart.statement).
 reports/glue_lines/borderline.txt; изменения к ней НЕ применяются):
   - в одном поле больше MAX_GLUES_PER_FIELD склеек — типичное условие даёт
     5–30, сотня склеек значит свалку/псевдотаблицу, пусть смотрят глаза;
-  - склейка собрала абзац длиннее MAX_GLUED_PARA_LEN символов из
-    MIN_LINES_FOR_PARA_GUARD и более строк — вероятно, склеено структурное.
+  - склейка собрала НОВЫЙ абзац длиннее MAX_GLUED_PARA_LEN символов
+    (в исходнике такой строки не было) — вероятно, склеено структурное.
 
 Идемпотентность: повторный прогон по уже склеенному тексту даёт 0 изменений
 (проверяется на каждом изменённом поле, нарушения попадают в отчёт).
@@ -112,7 +112,6 @@ HARD_WRAP_SOURCE_IDS = [3, 4, 5, 6, 7, 8, 9, 10, 14, 18, 19, 20, 21, 22, 23, 24]
 # это ~35 склеенных строк подряд без единой точки, так предложения не выглядят.
 MAX_GLUES_PER_FIELD = 80
 MAX_GLUED_PARA_LEN = 2500
-MIN_LINES_FOR_PARA_GUARD = 3
 
 # Автосклейка дефисных разрывов в v1 ВЫКЛЮЧЕНА (решение по итогам
 # адверсариального ревью): без словаря нельзя отличить мягкий перенос
@@ -401,14 +400,9 @@ class FieldResult(object):
         return self.glue_count + self.hyphen_count
 
 
-def glue_field(text):
+def _glue_once(text):
     # type: (str) -> FieldResult
-    """Склеивает нарезку в одном поле. Чистая функция: базы не касается.
-
-    При сработавшем предохранителе new_text всё равно заполняется (чтобы
-    предпросмотр мог показать, ЧТО получилось бы), но res.borderline
-    непуст — применять такое поле нельзя.
-    """
+    """Один проход склейки (без предохранителей — они в glue_field)."""
     res = FieldResult()
     if not text or '\n' not in text:
         return res
@@ -418,9 +412,7 @@ def glue_field(text):
     slines = shadow.split('\n')
 
     out = []           # готовые строки результата
-    paras = []         # (длина, из скольких строк собрана) — для предохранителя
     cur_r, cur_s = rlines[0], slines[0]
-    merged = 1
 
     for k in range(len(rlines) - 1):
         nxt_r, nxt_s = rlines[k + 1], slines[k + 1]
@@ -443,25 +435,20 @@ def glue_field(text):
             res.glue_kinds[action[1]] += 1
             cur_r = cur_r.rstrip() + ' ' + nxt_r.lstrip()
             cur_s = cur_s.rstrip() + ' ' + nxt_s.lstrip()
-            merged += 1
         elif kind == 'hyphen_join':
             res.hyphen_count += 1
             res.glue_kinds['hyphen'] += 1
             cur_r = cur_r.rstrip()[:-1] + nxt_r.lstrip()
             cur_s = cur_s.rstrip()[:-1] + nxt_s.lstrip()
-            merged += 1
         else:
             if kind == 'hyphen_doubt':
                 res.doubtful.append(action[1])
                 res.keep_reasons['hyphen_doubt'] += 1
             else:
                 res.keep_reasons[action[1]] += 1
-            paras.append((len(cur_r), merged))
             out.append(cur_r)
             cur_r, cur_s = nxt_r, nxt_s
-            merged = 1
 
-    paras.append((len(cur_r), merged))
     out.append(cur_r)
 
     if res.changes == 0:
@@ -471,16 +458,58 @@ def glue_field(text):
     if new_text == text:
         return res
     res.new_text = new_text
-
-    if res.changes > MAX_GLUES_PER_FIELD:
-        res.borderline = 'too_many_glues: {} склеек'.format(res.changes)
-        return res
-    for plen, pmerged in paras:
-        if plen > MAX_GLUED_PARA_LEN and pmerged >= MIN_LINES_FOR_PARA_GUARD:
-            res.borderline = 'giant_paragraph: {} симв. из {} строк'.format(
-                plen, pmerged)
-            return res
     return res
+
+
+MAX_GLUE_PASSES = 10  # каждый проход убирает хотя бы один \n — сходится раньше
+
+
+def glue_field(text):
+    # type: (str) -> FieldResult
+    """Склеивает нарезку в одном поле до неподвижной точки. Чистая функция.
+
+    Почему не один проход: склейка может ВОССОЕДИНИТЬ разорванную
+    inline-формулу («...$P» + «Q$...» → «...$P Q$...»), после чего маска
+    математики меняется и соседняя граница классифицируется иначе —
+    у второго прохода появляется законная склейка (реальные случаи #49876
+    и #41529). Гоняем _glue_once, пока текст не стабилизируется, —
+    идемпотентность получается по построению.
+
+    При сработавшем предохранителе new_text всё равно заполняется (чтобы
+    предпросмотр мог показать, ЧТО получилось бы), но res.borderline
+    непуст — применять такое поле нельзя.
+    """
+    total = FieldResult()
+    current = text
+    for i in range(MAX_GLUE_PASSES):
+        res = _glue_once(current)
+        if i == 0:
+            # диагностика границ — с первого прохода (дальше границы те же,
+            # повторный учёт только задвоил бы счётчики и лог дефисов)
+            total.keep_reasons = res.keep_reasons
+            total.doubtful = res.doubtful
+        if res.new_text is None:
+            break
+        total.glue_count += res.glue_count
+        total.hyphen_count += res.hyphen_count
+        total.glue_kinds.update(res.glue_kinds)
+        current = res.new_text
+
+    if current == text:
+        return total
+    total.new_text = current
+
+    if total.changes > MAX_GLUES_PER_FIELD:
+        total.borderline = 'too_many_glues: {} склеек'.format(total.changes)
+        return total
+    # Гигантский НОВЫЙ абзац (в исходнике такой строки не было) — вероятно,
+    # склеено что-то структурное; пусть смотрят глаза.
+    orig_lines = set(text.split('\n'))
+    for line in current.split('\n'):
+        if len(line) > MAX_GLUED_PARA_LEN and line not in orig_lines:
+            total.borderline = 'giant_paragraph: {} симв.'.format(len(line))
+            return total
+    return total
 
 
 # ── Команда ──────────────────────────────────────────────────────────────────
@@ -688,10 +717,9 @@ class Command(BaseCommand):
             datetime.now().strftime('%Y-%m-%d %H:%M'),
             'Изменения ЗАПИСАНЫ в базу.' if confirm else 'База НЕ менялась.'))
         lines.append('')
-        lines.append('Пороги предохранителя: > {} склеек на поле или абзац > {} симв. '
-                     'из ≥ {} строк → задача пропускается.'.format(
-                         MAX_GLUES_PER_FIELD, MAX_GLUED_PARA_LEN,
-                         MIN_LINES_FOR_PARA_GUARD))
+        lines.append('Пороги предохранителя: > {} склеек на поле или новый '
+                     'абзац > {} симв. → задача пропускается.'.format(
+                         MAX_GLUES_PER_FIELD, MAX_GLUED_PARA_LEN))
         lines.append('')
         lines.append('| id | Источник | Задач | Изменится | Строк склеено | Дефисных | Предохранитель | Дефис-сомнения |')
         lines.append('|---:|---|---:|---:|---:|---:|---:|---:|')
