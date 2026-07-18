@@ -868,11 +868,11 @@ PREVIEW_PER_SOURCE = 4
 PREVIEW_TOP_N = 10
 PREVIEW_BORDERLINE_N = 20
 
-_PREVIEW_HEAD = """<!DOCTYPE html>
+_PREVIEW_HEAD_TEMPLATE = """<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>Склейка нарезки — предпросмотр ДО/ПОСЛЕ</title>
+<title>{title}</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" onload="initKaTeX()"></script>
@@ -907,12 +907,32 @@ h3.source { margin: 22px 0 8px; font-size: 15px; color: #444; }
 </head>
 <body>
 <header>
-<h1>Склейка построчной нарезки — предпросмотр ДО/ПОСЛЕ</h1>
-<p>Обе колонки показаны с white-space: pre-line — так видно фактические переносы строк.
-Слева — как текст хранится сейчас, справа — как он будет храниться после склейки. База НЕ менялась.</p>
+<h1>{h1}</h1>
+<p>{intro}</p>
 </header>
 <main>
 """
+
+
+def preview_head(title, h1, intro):
+    # type: (str, str, str) -> str
+    """Общая HTML-шапка предпросмотра ДО/ПОСЛЕ — используется и dry-run
+    предпросмотром (build_preview_html), и пост-контролем применённой
+    склейки (команда glue_post_apply_sample), чтобы оба генератора не
+    разошлись версткой/CSS. str.replace, не .format: шаблон содержит CSS
+    с фигурными скобками."""
+    return (_PREVIEW_HEAD_TEMPLATE
+            .replace('{title}', title)
+            .replace('{h1}', h1)
+            .replace('{intro}', intro))
+
+
+_PREVIEW_HEAD = preview_head(
+    'Склейка нарезки — предпросмотр ДО/ПОСЛЕ',
+    'Склейка построчной нарезки — предпросмотр ДО/ПОСЛЕ',
+    'Обе колонки показаны с white-space: pre-line — так видно фактические переносы строк.'
+    ' Слева — как текст хранится сейчас, справа — как он будет храниться после склейки.'
+    ' База НЕ менялась.')
 
 # JS-обработка валютных долларов — как в problems/diagnostics.py, чтобы \\$
 # не спаривались в псевдоформулы при рендере KaTeX.
@@ -979,7 +999,7 @@ def _preview_card(rec, source_names):
     parts = ['<div class="card{}">'.format(' borderline' if rec['borderline'] else '')]
     parts.append(
         '<div class="meta"><b>#{pid}</b> — {src}{chips} — '
-        '<a href="http://127.0.0.1:8000/catalog/{pid}/" target="_blank">открыть в каталоге</a></div>'.format(
+        '<a href="http://127.0.0.1:8000/catalog/problem/{pid}/" target="_blank">открыть в каталоге</a></div>'.format(
             pid=rec['id'], src=esc(source_names.get(rec['sid'], '?')), chips=chips))
     for label, old, new, _, _ in rec['fields']:
         parts.append('<div class="fieldlabel">{}</div>'.format(esc(label)))
