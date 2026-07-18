@@ -724,8 +724,12 @@ class Command(BaseCommand):
     # ── Запись в базу ────────────────────────────────────────────────────────
 
     def _apply(self, records):
-        db_path = 'db.sqlite3'
-        if os.path.exists(db_path):
+        # Бэкапим именно ту базу, в которую пишем (в тестах это тестовая БД,
+        # и копировать боевой db.sqlite3 не нужно).
+        from django.db import connection
+        db_path = str(connection.settings_dict.get('NAME') or '')
+        if (os.path.basename(db_path) == 'db.sqlite3'
+                and os.path.exists(db_path)):
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
             os.makedirs('backups', exist_ok=True)
             bk = os.path.join('backups', 'before_glue_lines_{}.sqlite3'.format(ts))
