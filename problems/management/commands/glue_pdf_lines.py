@@ -212,6 +212,18 @@ _LABEL_NUM_RE = re.compile(r'^[^:]{1,80}:\s*[+−-]?[\d\s.,%]+$')
 # оборванной фразой.
 _DATA_ROW_RE = re.compile(r'^[^:.!?;]{1,60}\s[+−-]?\d[\d\s.,]*\s*%?$')
 
+# Строка-элемент перечня величин «идентификатор(число) = значение»/«=?»
+# (напр. «мс (6) =?», «VC(21)=40») — типичные пункты перечня «найти
+# неизвестную величину» (Акимова #49998), где обрамление $...$ у отдельного
+# пункта потеряно при извлечении: тень не отличает такую строку от обычного
+# текста, а она сама выглядит как продолжение фразы («...= 25$» → «мс (6)»).
+# Правило только запрещает: не клеим НИ К такой строке, НИ ОТ неё — иначе
+# соседние пункты перечня сливаются в одну фразу.
+_LIST_QUANTITY_RE = re.compile(
+    r'^[A-Za-zА-Яа-яЁё]{1,6}\s*\(\s*\d{1,4}\s*\)\s*=\s*\??\s*'
+    r'[-+−]?\d*[.,]?\d*\s*[;,]?\s*$'
+)
+
 # Строка годового ряда «2019 г. — 500 млрд» (находка ревью): год + тире.
 _YEAR_ROW_RE = re.compile(r'^(?:19|20)\d{2}\s*(?:гг?\.|год[ау]?)?\s*[—–-]')
 
@@ -311,6 +323,8 @@ def classify_boundary(ra, rb, sa, sb):
         return ('keep', 'list_marker')
     if SERVICE_LABEL_RE.match(rb_l):
         return ('keep', 'service_label')
+    if _LIST_QUANTITY_RE.match(rb.strip()) or _LIST_QUANTITY_RE.match(ra.strip()):
+        return ('keep', 'list_quantity_item')
     if _is_display_math_line(ra) or _is_display_math_line(rb):
         return ('keep', 'display_math')
     if _is_tableish(sa_r) or _is_tableish(sb_l):

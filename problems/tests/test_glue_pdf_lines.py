@@ -251,6 +251,40 @@ class StructuralKeepTests(SimpleTestCase):
         text = '$u_1(T, L) = x$,\n$u_1(B, L) = 1$.'
         self.assertEqual(glued(text), text)
 
+    def test_list_quantity_items_kept_akimova_49998(self):
+        # Реальный случай #49998 (Акимова): у первой строки-формулы потеряно
+        # закрывающее обрамление $...$, дальше — перечень пунктов «мс (6) =?»
+        # без $. До фикса первая строка (тень — сплошной MATH_CH) клеилась к
+        # «мс (6) =?», потому что B начинается со строчной буквы.
+        text = ('$АС (5) = 41; VC (4) = 40; МС (5) = 25$\n'
+                'мс (6) =?\n'
+                'мс (6) =?\n'
+                'АС (6) =?\n'
+                'АС (6) =?\n'
+                'vc (21) =?\n'
+                'АС (9) =?\n'
+                'МС(7)=?\n'
+                'АС (6) =?\n'
+                'АС(4) =?')
+        self.assertEqual(glued(text), text)
+
+    def test_list_quantity_item_as_next_line_kept(self):
+        # Синтетика: обычная строчная строка перед пунктом перечня —
+        # раньше склеилась бы по правилу «lowercase», теперь под защитой.
+        text = 'найдите неизвестную величину\nMC (6) =?'
+        self.assertEqual(glued(text), text)
+
+    def test_list_quantity_item_as_prev_line_kept(self):
+        # Синтетика: пункт перечня без «?» (кончается цифрой, не пунктуацией)
+        # перед обычной строчной строкой — тоже не клеим.
+        text = 'AC (6) = 10\nи это ещё не конец перечня'
+        self.assertEqual(glued(text), text)
+
+    def test_consecutive_list_quantity_items_kept(self):
+        # Синтетика: два пункта перечня подряд, оба без завершающей пунктуации
+        text = 'AC(6)=10\nMC(7)=15'
+        self.assertEqual(glued(text), text)
+
     def test_ile_like_structural_text_unchanged(self):
         # Профиль ILE: длинные строки-абзацы с завершающей пунктуацией,
         # список с маркерами. Не должен измениться ни на символ.
