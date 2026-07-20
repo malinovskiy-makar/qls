@@ -5,12 +5,19 @@
 #50130 (в базе не хватает пункта — model длиннее existing), #30402
 (статья уже перестроена другим процессом — «оболочка» короче нормы).
 """
+import json
+import os
+import tempfile
+from io import StringIO
+from unittest import mock
+
+from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 
 from problems.batch2_unblock import (
     apply_glue, build_apply_pipeline, classify_bad_trim,
     classify_conflict_solution, classify_unknown_label, introduces_pipe_table,
-    match_parts_by_content, normalize_quotes, pipeline_changes,
+    match_parts_by_content, normalize_quotes, pipeline_changes, sweep_field,
 )
 from problems.models import ProblemPart
 from problems.tests.factories import make_problem
@@ -351,3 +358,152 @@ class BuildApplyPipelineTests(TestCase):
             p, rec, 'conflict_solution')
         self.assertIsNone(final)
         self.assertIsNone(exclude_reason)
+
+
+class SweepFieldTests(SimpleTestCase):
+    """Регресс на реальных случаях ревью соавтора (2026-07-20, 3 находки
+    на 95 применённых задач): подмена знака #48915, подмена чисел #6118,
+    два подпункта с одним и тем же текстом вопроса вместо ответа #27756."""
+
+    def test_sign_word_substitution_detected(self):
+        # Реальный случай #48915, pk 66527
+        r = sweep_field('negative one hundred forty', 'positive one hundred forty')
+        self.assertEqual(r['verdict'], 'digit_sign_change')
+
+    def test_number_substitution_detected(self):
+        # Реальный случай #6118, pk 5264
+        r = sweep_field(
+            'Фирма «Сеж» поставляет 40 персиков, фирма «Ра» поставляет 40 персиков',
+            'Фирма «Сеж» поставляет $\\frac{80}{3}$ персиков, '
+            'фирма «Ра» поставляет 0 персиков')
+        self.assertEqual(r['verdict'], 'digit_sign_change')
+
+    def test_answer_replaced_by_question_detected(self):
+        # Реальный случай #27756, pk 35653/35654 — числовой ответ подменён
+        # переформулированным вопросом
+        r = sweep_field('$q_{1} = 40, q_2 = 30, p = 30$',
+                        'Найдите новое равновесие. А также сравните прибыли 2 фирм.')
+        self.assertEqual(r['verdict'], 'digit_sign_change')
+
+    def test_number_deleted_without_insert_detected(self):
+        r = sweep_field('Цена равна 40 рублям.', 'Цена равна рублям.')
+        self.assertEqual(r['verdict'], 'digit_sign_change')
+
+    def test_number_changed_mid_sentence_detected(self):
+        r = sweep_field('При Q=40 найдите P.', 'При Q=45 найдите P.')
+        self.assertEqual(r['verdict'], 'digit_sign_change')
+
+    def test_safe_rephrase_without_numbers_not_flagged(self):
+        r = sweep_field('Определите равновесную цену на рынке товара.',
+                        'Найдите равновесную цену на данном рынке товара.')
+        self.assertEqual(r['verdict'], 'other')
+
+    def test_pure_insertion_without_numbers_is_new_sentence(self):
+        r = sweep_field('Определите цену.',
+                        'Определите цену. Дополнительно объясните, почему '
+                        'кривая спроса имеет отрицательный наклон.')
+        self.assertEqual(r['verdict'], 'new_sentence')
+
+    def test_pure_insertion_with_new_number_is_new_sentence_not_digit_change(self):
+        # Число появляется ТОЛЬКО внутри нового предложения — оно не
+        # подменяет ничего старого, это не digit_sign_change
+        r = sweep_field('Определите цену.',
+                        'Определите цену. При объёме 50 единиц найдите выручку.')
+        self.assertEqual(r['verdict'], 'new_sentence')
+
+    def test_quote_normalization_alone_is_same(self):
+        r = sweep_field('Он сказал <<привет>>.', 'Он сказал «привет».')
+        self.assertEqual(r['verdict'], 'same')
+
+    def test_glue_alone_is_same(self):
+        r = sweep_field('Строка первая\nстрока вторая.',
+                        'Строка первая строка вторая.')
+        self.assertEqual(r['verdict'], 'same')
+
+    def test_identical_text_is_same(self):
+        r = sweep_field('Тот же текст.', 'Тот же текст.')
+        self.assertEqual(r['verdict'], 'same')
+
+    def test_braced_decimal_comma_is_same_value(self):
+        # Находка ревью #27868: Sonnet расставил LaTeX-защиту от кернинга
+        # у десятичной запятой — «0,5» и «0{,}5» одно и то же число, диф не
+        # должен принять фигурные скобки за пропавшую цифру.
+        r = sweep_field('$TC = 0,5Q^2 + 300Q$', '$TC = 0{,}5Q^2 + 300Q$')
+        self.assertEqual(r['verdict'], 'same')
+
+    def test_braced_decimal_point_is_same_value(self):
+        r = sweep_field('$x = 2.4$', '$x = 2{.}4$')
+        self.assertEqual(r['verdict'], 'same')
+
+    def test_braced_decimal_does_not_mask_real_change(self):
+        # Скобки — не индульгенция: реальная подмена значения внутри всё
+        # равно ловится.
+        r = sweep_field('$x = 2{,}4$', '$x = 2{,}9$')
+        self.assertEqual(r['verdict'], 'digit_sign_change')
+
+
+class Batch2UnblockSweepCommandTests(TestCase):
+    """Команда: dry-run не пишет в базу, --confirm откатывает подмены,
+    --exclude-part-pk выводит подпункт из-под автооткота."""
+
+    def setUp(self):
+        self.p1 = make_problem(statement='Условие первой задачи.')
+        self.part_digit = ProblemPart.objects.create(
+            problem=self.p1, label='а', order=1,
+            statement='positive one hundred forty', answer='')
+        self.part_new_sentence = ProblemPart.objects.create(
+            problem=self.p1, label='б', order=2,
+            statement='Определите цену. Дополнительно объясните знак наклона.',
+            answer='')
+        self.p2 = make_problem(statement='Условие второй задачи, не тронуто.')
+
+        self.backup = {
+            'problems': {},
+            'parts': {
+                str(self.part_digit.pk): 'negative one hundred forty',
+                str(self.part_new_sentence.pk): 'Определите цену.',
+            },
+            'solution': {},
+        }
+
+    def _call(self, backup, *args):
+        out = StringIO()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            backup_path = os.path.join(tmpdir, 'backup.json')
+            with open(backup_path, 'w', encoding='utf-8') as f:
+                json.dump(backup, f)
+            with mock.patch(
+                    'problems.management.commands.batch2_unblock_sweep.OUT_DIR',
+                    os.path.join(tmpdir, 'out')):
+                call_command('batch2_unblock_sweep', '--backup', backup_path,
+                             *args, stdout=out)
+        return out.getvalue()
+
+    def test_dry_run_does_not_touch_db(self):
+        before = self.part_digit.statement
+        out = self._call(self.backup)
+        self.part_digit.refresh_from_db()
+        self.assertEqual(self.part_digit.statement, before)
+        self.assertIn('база НЕ изменена', out)
+        self.assertIn('digit_sign_change=1', out)
+        self.assertIn('new_sentence=1', out)
+
+    def test_confirm_reverts_digit_change_leaves_new_sentence(self):
+        self._call(self.backup, '--confirm')
+        self.part_digit.refresh_from_db()
+        self.part_new_sentence.refresh_from_db()
+        self.assertEqual(self.part_digit.statement, 'negative one hundred forty')
+        self.assertEqual(self.part_new_sentence.statement,
+                         'Определите цену. Дополнительно объясните знак наклона.')
+
+    def test_excluded_part_pk_not_reverted(self):
+        self._call(self.backup, '--confirm',
+                  '--exclude-part-pk', str(self.part_digit.pk))
+        self.part_digit.refresh_from_db()
+        self.assertEqual(self.part_digit.statement, 'positive one hundred forty')
+
+    def test_untouched_problem_unaffected(self):
+        before = self.p2.statement
+        self._call(self.backup, '--confirm')
+        self.p2.refresh_from_db()
+        self.assertEqual(self.p2.statement, before)

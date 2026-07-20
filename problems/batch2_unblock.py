@@ -345,3 +345,111 @@ def build_apply_pipeline(problem, rec, category):
 
     final = pipeline_changes(normalized)
     return final, None, extracted_solution
+
+
+# ── Ревизия: свип подмен содержания (найдено ревью соавтора, 2026-07-20) ────
+#
+# Три реальных случая на 95 применённых задач: подменённый знак («positive»
+# вместо «negative», #48915), подменённые числа (40/40 → 80/3 и 0, #6118),
+# два разных подпункта, получивших ОДИН И ТОТ ЖЕ текст переформулированного
+# вопроса вместо содержательного ответа (#27756). Механическая чистка не
+# имеет права менять числа/знаки/суть — такое откатывается ВСЕГДА, даже
+# если правка выглядит «умной». Отдельно — обратный, безопасный случай:
+# Sonnet иногда восстанавливает утраченный при импорте текст (реальный
+# вопрос там, где раньше было пусто/оборвано) — это НЕ подмена, а находка,
+# и решает только Макар.
+
+_NUM_TOKEN_RE = re.compile(
+    r'-?\d[\d.,]*'
+    r'|\\pm|\\geq|\\leq|\\ge|\\le'
+    r'|[±≤≥<>]'
+    r'|\bnegative\b|\bpositive\b|\bminus\b|\bplus\b'
+    r'|отрицательн\w*|положительн\w*',
+    re.IGNORECASE)
+
+
+_BRACED_DECIMAL_RE = re.compile(r'(\d)\{([,.])\}(?=\d)')
+
+
+def canon_for_sweep(text):
+    # type: (str) -> str
+    """ДО и ПОСЛЕ приводятся к одному виду перед сравнением — свип не
+    должен путать НАШИ ЖЕ намеренные правки (кавычки, склейка) с подменой.
+
+    Отдельно нормализуется LaTeX-скобка десятичного разделителя: «0{,}5» —
+    то же число, что «0,5» (защита от кернинга, не подмена значения,
+    находка ревью на #27868: Sonnet расставил `{,}` по всей задаче, и
+    посимвольный/потокенный дифф без этой нормализации принял бы каждую
+    такую запятую за пропавшее число)."""
+    t = normalize_quotes(text or '')
+    prev = None
+    while prev != t:
+        prev = t
+        t = _BRACED_DECIMAL_RE.sub(r'\1\2', t)
+    t = re.sub(r'\s+', ' ', t).strip()
+    return t
+
+
+def _num_tokens(chunk):
+    # type: (str) -> List[str]
+    return [m.group(0).lower() for m in _NUM_TOKEN_RE.finditer(chunk)]
+
+
+def _looks_like_sentence(chunk):
+    # type: (str) -> bool
+    chunk = chunk.strip()
+    if len(chunk) < 8:
+        return False
+    return sum(1 for c in chunk if c.isalpha()) >= 5
+
+
+def sweep_field(old_text, new_text):
+    # type: (str, str) -> Dict
+    """Свип одного поля (ДО из бэкапа / ПОСЛЕ из базы), игнорируя
+    нормализацию кавычек и склейку (через canon_for_sweep).
+
+    Возвращает {'verdict': 'same'|'digit_sign_change'|'new_sentence'|'other',
+    'detail': [...]}.
+
+    digit_sign_change сравнивается ГЛОБАЛЬНО по ПОСЛЕДОВАТЕЛЬНОСТИ
+    числовых/знаковых токенов всего поля, а не по посимвольным чанкам диффа:
+    посимвольный SequenceMatcher режет близкие по написанию слова («negative»
+    /«positive» делят общий хвост «itive») на куски, не попадающие целиком в
+    границы слова — регулярка на таком обрубке слово не находит, и подмена
+    знака проходит мимо. Последовательность токенов такого не пропускает.
+
+    new_sentence — только когда числовая подпись СОВПАЛА (иначе это уже
+    digit_sign_change) — чистая вставка фрагмента, который читается как
+    предложение и не встречался в старом тексте вообще.
+    """
+    old_c = canon_for_sweep(old_text)
+    new_c = canon_for_sweep(new_text)
+    if old_c == new_c:
+        return {'verdict': 'same', 'detail': []}
+
+    old_tokens = _num_tokens(old_c)
+    new_tokens = _num_tokens(new_c)
+    if old_tokens != new_tokens:
+        # Диф по САМИМ токенам (не по символам поля): отличаем «пропал/сменился
+        # СУЩЕСТВОВАВШИЙ токен» (подмена, откат) от «появились ТОЛЬКО новые
+        # токены» (это в чистом виде новое предложение — числа внутри него не
+        # подменяют ничего старого, см. new_sentence ниже).
+        tsm = difflib.SequenceMatcher(None, old_tokens, new_tokens, autojunk=False)
+        pure_insert = all(tag in ('equal', 'insert')
+                          for tag, _, _, _, _ in tsm.get_opcodes())
+        if not pure_insert:
+            return {'verdict': 'digit_sign_change',
+                    'detail': [(old_tokens, new_tokens)]}
+
+    sm = difflib.SequenceMatcher(None, old_c, new_c, autojunk=False)
+    insertions = []
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag not in ('insert', 'replace'):
+            continue
+        new_chunk = new_c[j1:j2]
+        if _looks_like_sentence(new_chunk):
+            insertions.append(new_chunk)
+
+    if insertions:
+        return {'verdict': 'new_sentence', 'detail': insertions}
+    return {'verdict': 'other', 'detail': [(old_c, new_c)]}
