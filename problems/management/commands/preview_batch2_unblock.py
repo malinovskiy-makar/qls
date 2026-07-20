@@ -291,14 +291,21 @@ def diff_block(label, old, new):
     # type: (str, str, str) -> str
     """ДО/ПОСЛЕ-блок одного поля — вынесен на уровень модуля, чтобы
     переиспользовать в пост-контроле применения (та же карточная вёрстка,
-    что в preview.html, урок склейки нарезки про два расходящихся генератора)."""
+    что в preview.html, урок склейки нарезки про два расходящихся генератора).
+
+    Класс контейнера — field-text, НЕ text: KaTeX сам генерирует
+    <span class="mord text"> для \\text{...}, и класс .text ловил бы его
+    тоже (CSS матчит по токену класса), протаскивая внутрь формулы рамку,
+    фон, паддинг и white-space: pre-line — находка визуального ревью
+    2026-07-20 (#7865 «Rich-to-Poor» разваливался на боксы в превью, хотя в
+    базе рендерился чисто)."""
     esc = html.escape
     return (
         '<div class="fieldlabel">{label}</div>'
         '<div class="cols">'
         '<div class="col before"><div class="col-label">ДО</div>'
-        '<div class="text">{old}</div></div>'
+        '<div class="field-text">{old}</div></div>'
         '<div class="col after"><div class="col-label">ПОСЛЕ</div>'
-        '<div class="text">{new}</div></div>'
+        '<div class="field-text">{new}</div></div>'
         '</div>'
     ).format(label=esc(label), old=esc(old), new=esc(new))

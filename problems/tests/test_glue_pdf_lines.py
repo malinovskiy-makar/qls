@@ -19,7 +19,7 @@ from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 
 from problems.management.commands.glue_pdf_lines import (
-    MAX_GLUES_PER_FIELD, classify_boundary, glue_field,
+    MAX_GLUES_PER_FIELD, classify_boundary, glue_field, _preview_card,
 )
 from problems.tests.factories import link_source, make_problem, make_source
 
@@ -436,3 +436,18 @@ class GluePdfLinesCommandTests(TestCase):
                          'Налог на продажи товаров является регрессивным.')
         self.other.refresh_from_db()
         self.assertIn('\n', self.other.statement)  # чужой источник не тронут
+
+
+class PreviewCardCssCollisionTests(SimpleTestCase):
+    """Регресс визуальной доводки группы Б (2026-07-20, тот же генератор
+    вёрстки): класс контейнера ДО/ПОСЛЕ не должен называться "text" — KaTeX
+    сам генерирует <span class="mord text"> для \\text{...}, и class="text"
+    матчился бы CSS-селектором .text тоже, протаскивая рамку/паддинг/
+    white-space:pre-line прямо в формулу."""
+
+    def test_card_container_class_is_not_bare_text(self):
+        rec = {'id': 1, 'sid': 1, 'title': 'т', 'glues': 0, 'borderline': None,
+              'fields': [('statement', 'до', 'после', None, None)]}
+        html = _preview_card(rec, {1: 'источник'})
+        self.assertNotIn('class="text"', html)
+        self.assertIn('class="field-text"', html)

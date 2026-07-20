@@ -898,10 +898,16 @@ h3.source { margin: 22px 0 8px; font-size: 15px; color: #444; }
 .cols { display: flex; gap: 14px; }
 .col { flex: 1; min-width: 0; }
 .col-label { font-size: 11px; font-weight: 700; color: #666; margin-bottom: 4px; }
-.text { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px;
+/* НЕ .text: KaTeX сам генерирует <span class="mord text"> для \\text{...} —
+   класс .text ловил бы и его тоже (CSS матчит по токену класса, не по полной
+   строке), рисуя рамку/фон/паддинг ПРЯМО ВНУТРИ формулы и включая
+   white-space: pre-line там, где KaTeX ожидает узкий инлайн-спан — находка
+   визуального ревью 2026-07-20 (#7865 «Rich-to-Poor» разваливался на боксы
+   и переносы ИМЕННО из-за этой коллизии, хотя в базе рендерился чисто). */
+.field-text { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px;
         padding: 10px 12px; font-size: 14px; line-height: 1.6;
         white-space: pre-line; word-wrap: break-word; }
-.col.after .text { background: #f2fbf5; border-color: #cde8d6; }
+.col.after .field-text { background: #f2fbf5; border-color: #cde8d6; }
 @media (max-width: 900px) { .cols { flex-direction: column; } }
 </style>
 </head>
@@ -1005,9 +1011,9 @@ def _preview_card(rec, source_names):
         parts.append('<div class="fieldlabel">{}</div>'.format(esc(label)))
         parts.append('<div class="cols">')
         parts.append('<div class="col before"><div class="col-label">ДО</div>'
-                     '<div class="text">{}</div></div>'.format(esc(old)))
+                     '<div class="field-text">{}</div></div>'.format(esc(old)))
         parts.append('<div class="col after"><div class="col-label">ПОСЛЕ</div>'
-                     '<div class="text">{}</div></div>'.format(esc(new)))
+                     '<div class="field-text">{}</div></div>'.format(esc(new)))
         parts.append('</div>')
     parts.append('</div>')
     return '\n'.join(parts)

@@ -19,6 +19,7 @@ from problems.batch2_unblock import (
     classify_conflict_solution, classify_unknown_label, introduces_pipe_table,
     match_parts_by_content, normalize_quotes, pipeline_changes, sweep_field,
 )
+from problems.management.commands.preview_batch2_unblock import diff_block
 from problems.models import ProblemPart
 from problems.tests.factories import make_problem
 
@@ -507,3 +508,20 @@ class Batch2UnblockSweepCommandTests(TestCase):
         self._call(self.backup, '--confirm')
         self.p2.refresh_from_db()
         self.assertEqual(self.p2.statement, before)
+
+
+class DiffBlockCssCollisionTests(SimpleTestCase):
+    """Регресс визуальной доводки 2026-07-20: класс контейнера ДО/ПОСЛЕ не
+    должен называться "text" — KaTeX сам генерирует <span class="mord text">
+    для \\text{...}, и class="text" матчился бы CSS-селектором .text тоже,
+    протаскивая рамку/паддинг/white-space:pre-line прямо в формулу
+    (#7865 «Rich-to-Poor» разваливался на боксы и переносы в превью, хотя
+    рендерился чисто на боевой странице)."""
+
+    def test_container_class_is_not_bare_text(self):
+        html = diff_block('Условие', 'до', 'после')
+        self.assertNotIn('class="text"', html)
+
+    def test_container_class_is_field_text(self):
+        html = diff_block('Условие', 'до', 'после')
+        self.assertIn('class="field-text"', html)
