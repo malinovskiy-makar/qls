@@ -54,9 +54,8 @@ import sqlite3
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from problems.batch2_unblock import apply_glue, sweep_field
+from problems.batch2_unblock import revert_with_recleaning, sweep_field
 from problems.management.commands.apply_batch2 import _is_suspicious_trim, _problem_id
-from problems.management.commands.fix_latex_junk import SKIP_SHRINK_RATIO, clean_text
 from problems.management.commands.glue_pdf_lines import _PREVIEW_TAIL, preview_head
 from problems.management.commands.preview_batch2_unblock import diff_block
 from problems.models import Problem, ProblemPart
@@ -502,46 +501,24 @@ class Command(BaseCommand):
             else:
                 backup["part"][str(c["pk"])] = current_text
 
-            # Попытка 1: полный конвейер (fix_latex_junk.clean_text → glue_field).
-            # ВАЖНО: обе функции разрабатывались и проверялись на тексте,
-            # который уже прошёл июньскую чистку Sonnet (более короткие,
-            # разбитые на предложения абзацы). Здесь они впервые применяются
-            # к СЫРОМУ до-Sonnet тексту — находка этого прогона (#4357):
-            # junk_comment режет до ПЕРВОГО '\n' после '%', а в сыром тексте
-            # (не прошедшем склейку) этот перенос может оказаться на сотни
-            # символов дальше настоящей границы комментария, и паттерн
-            # съедает реальный кусок условия. Три попытки по убыванию
-            # чистки, каждая проверяется пересвипом против ДО — гарантия
-            # «этот прогон никогда не вносит НОВУЮ подмену числа/знака»
-            # важнее полноты июльской чистки на единичных проблемных полях.
-            cleaned, applied_patterns, needs_manual = clean_text(old_backup_text)
-            if old_backup_text and len(cleaned) < SKIP_SHRINK_RATIO * len(old_backup_text):
-                cleaned = old_backup_text
-                shrink_guard_hits.append((c["kind"], c.get("pk") or c["pid"]))
-            candidate_1 = apply_glue(cleaned)
-            recheck_1 = sweep_field(old_backup_text, candidate_1)
-
-            if recheck_1["verdict"] != "digit_sign_change":
-                final_text = candidate_1
+            # Трёхуровневый fallback (полный конвейер → glue-only → сырой ДО)
+            # с пересвипом каждой попытки — общая логика с откатом
+            # new_sentence, вынесена в batch2_unblock.revert_with_recleaning
+            # (там же — история находки #4357 про junk_comment на сыром
+            # до-Sonnet тексте).
+            res = revert_with_recleaning(old_backup_text)
+            final_text = res["final"]
+            ident = (c["kind"], c.get("pk") or c["pid"])
+            if res["shrink_guard"]:
+                shrink_guard_hits.append(ident)
+            if res["level"] == "full":
                 recheck_ok += 1
+            elif res["level"] == "glue_only":
+                fallback_glue_only.append(ident)
             else:
-                # Попытка 2: без clean_text, только glue (склейка нарезки
-                # числа/знаки не трогает по построению — но проверяем и её).
-                candidate_2 = apply_glue(old_backup_text)
-                recheck_2 = sweep_field(old_backup_text, candidate_2)
-                if recheck_2["verdict"] != "digit_sign_change":
-                    final_text = candidate_2
-                    fallback_glue_only.append((c["kind"], c.get("pk") or c["pid"]))
-                else:
-                    # Попытка 3: гарантированно безопасный откат — сырой ДО
-                    # без какой-либо переприменённой механики.
-                    final_text = old_backup_text
-                    fallback_raw.append((c["kind"], c.get("pk") or c["pid"]))
-
-            # Контроль идемпотентности склейки на финальном тексте.
-            glue_again = apply_glue(final_text)
-            if glue_again != final_text:
-                glue_not_idempotent.append((c["kind"], c.get("pk") or c["pid"]))
+                fallback_raw.append(ident)
+            if not res["glue_idempotent"]:
+                glue_not_idempotent.append(ident)
 
             if c["kind"] == "statement":
                 stmt_updates[c["pid"]] = final_text

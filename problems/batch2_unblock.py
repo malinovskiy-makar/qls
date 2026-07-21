@@ -453,3 +453,45 @@ def sweep_field(old_text, new_text):
     if insertions:
         return {'verdict': 'new_sentence', 'detail': insertions}
     return {'verdict': 'other', 'detail': [(old_c, new_c)]}
+
+
+def revert_with_recleaning(old_text):
+    # type: (str) -> Dict
+    """Откат поля к ДО (бэкап) с переприменением механической чистки —
+    трёхуровневый fallback, вынесенный из batch2_full_sweep._apply_reverts,
+    чтобы откат digit_sign_change и откат new_sentence не разошлись логикой.
+
+    ВАЖНО: clean_text/glue_field разрабатывались на тексте, уже прошедшем
+    июньскую чистку Sonnet, а здесь применяются к СЫРОМУ до-Sonnet тексту —
+    на нём clean_text сам вносил подмены (junk_comment режет до первого
+    '\\n' после '%', в сыром неразбитом тексте перенос может оказаться на
+    сотни символов дальше настоящей границы комментария, #4357). Поэтому
+    КАЖДАЯ попытка проверяется пересвипом против ДО; принимается первая,
+    чей пересвип не находит digit_sign_change:
+      1. полный конвейер (clean_text → glue),
+      2. только glue,
+      3. чистый ДО без переприменения.
+
+    Возвращает {'final': str, 'level': 'full'|'glue_only'|'raw',
+    'shrink_guard': bool, 'glue_idempotent': bool}.
+    """
+    from problems.management.commands.fix_latex_junk import (
+        SKIP_SHRINK_RATIO, clean_text)
+
+    cleaned, _, _ = clean_text(old_text)
+    shrink_guard = bool(old_text) and len(cleaned) < SKIP_SHRINK_RATIO * len(old_text)
+    if shrink_guard:
+        cleaned = old_text
+
+    candidate_1 = apply_glue(cleaned)
+    if sweep_field(old_text, candidate_1)['verdict'] != 'digit_sign_change':
+        final, level = candidate_1, 'full'
+    else:
+        candidate_2 = apply_glue(old_text)
+        if sweep_field(old_text, candidate_2)['verdict'] != 'digit_sign_change':
+            final, level = candidate_2, 'glue_only'
+        else:
+            final, level = old_text, 'raw'
+
+    return {'final': final, 'level': level, 'shrink_guard': shrink_guard,
+            'glue_idempotent': apply_glue(final) == final}
