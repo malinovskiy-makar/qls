@@ -684,6 +684,34 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+/* ── Модальное окно (экспорт, Фаза 5) ────────────────────────────────── */
+.modal {
+  position: fixed; inset: 0; z-index: var(--z-picker);
+  display: none; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(15, 18, 26, .42); backdrop-filter: blur(2px);
+}
+.modal.open { display: flex; }
+.modal-card {
+  width: min(380px, 100%); max-height: 90vh; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-pop); padding: 20px;
+}
+.modal-title { font-size: 17px; font-weight: 650; color: var(--text); margin: 0 0 4px; }
+.modal-sub { font-size: 12px; color: var(--text2); margin: 0 0 16px; line-height: 1.5; }
+.modal-opts { display: grid; gap: 8px; margin-top: 16px; }
+.modal-opts .hint { margin-top: 2px; }
+.modal-foot { margin-top: 16px; display: flex; justify-content: flex-end; }
+.btn-ghost {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); font-weight: 600;
+}
+.btn-ghost:hover:not(:disabled) { background: var(--surface-2); border-color: var(--accent); color: var(--accent); }
+.btn:disabled, .btn-ghost:disabled { opacity: .45; cursor: not-allowed; }
+@media (prefers-reduced-motion: no-preference) {
+  .modal.open .modal-card { animation: modalIn .18s var(--ease); }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ДВИЖЕНИЕ — целенаправленное, ease-out, <300мс; уважает reduced-motion.
    ═══════════════════════════════════════════════════════════════════ */
@@ -1007,7 +1035,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <button class="dock-btn" id="dock-save" type="button" data-tip="Сохранить (скоро)" aria-label="Сохранить график — скоро">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><rect x="8" y="13" width="8" height="6"/></svg>
     </button>
-    <button class="dock-btn" id="dock-export" type="button" data-tip="Экспорт (скоро)" aria-label="Экспортировать — скоро">
+    <button class="dock-btn" id="dock-export" type="button" data-tip="Сохранить график" aria-label="Сохранить график: PNG, TeX или PDF">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
     </button>
     <div class="dock-spacer"></div>
@@ -2007,8 +2035,51 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     </div>
   </aside>
 
+  <!-- ── ОКНО ЭКСПОРТА (Фаза 5) ─────────────────────────────────────── -->
+  <div class="modal" id="export-modal" role="dialog" aria-modal="true"
+       aria-labelledby="export-title" inert>
+    <div class="modal-card">
+      <h2 class="modal-title" id="export-title">Сохранить график</h2>
+      <p class="modal-sub">Заголовок и подпись попадут в файл .tex и в PDF.</p>
+
+      <div class="field">
+        <label for="exp-title">Заголовок</label>
+        <input type="text" id="exp-title" placeholder="например: Рынок хлеба" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="exp-label">Подпись для ссылки (label)</label>
+        <input type="text" id="exp-label" placeholder="например: fig:bread" autocomplete="off">
+      </div>
+
+      <div class="modal-opts">
+        <button class="btn" id="exp-png" type="button">Скачать PNG</button>
+        <button class="btn btn-ghost" id="exp-tex" type="button">Скачать .tex</button>
+        {% if has_xelatex %}
+          <button class="btn btn-ghost" id="exp-pdf" type="button">Скачать PDF</button>
+        {% else %}
+          <button class="btn btn-ghost" type="button" disabled>Скачать PDF</button>
+          <div class="hint">PDF на этом сервере не собирается: не установлен xelatex.
+            Скачайте .tex и откройте в
+            <a href="https://overleaf.com" target="_blank" rel="noopener">Overleaf</a>,
+            там компилятор бесплатный. В Overleaf: Menu → Compiler → XeLaTeX.</div>
+        {% endif %}
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn-sm" id="exp-close" type="button">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
+{% csrf_token %}
+<script>
+// Адрес серверной сборки PDF и наличие xelatex — из Django, чтобы интерфейс
+// не обещал того, чего на этом сервере нет.
+const CALC2_PDF_URL = "{% url 'calc2:export_pdf' %}";
+const CALC2_HAS_XELATEX = {% if has_xelatex %}true{% else %}false{% endif %};
+</script>
 <script>
 /* =====================================================================
    ГРАФИЧЕСКИЙ КАЛЬКУЛЯТОР 2.0 — собственный движок (D3 + Math.js)
@@ -9448,6 +9519,263 @@ function renderMarkList() {
 }
 
 /* ---------------------------------------------------------------------
+   ЭКСПОРТ (Фаза 5). Три формата:
+     PNG — целиком на клиенте: SVG → картинка → canvas → файл. Работает
+           всегда, сервер не нужен.
+     TeX — формат pgfplots, как в старом калькуляторе (graphs/exportLaTeX):
+           axis + \addplot + \fill + \node. Отличие в источнике данных:
+           calc2 считает численно, поэтому кривые уходят точками, а не
+           формулой — так одинаково честно рисуются и прямые, и кусочные.
+     PDF — тот же .tex компилируется на сервере через xelatex
+           (catalog/latex_export.compile_pdf). На бесплатном тарифе Render
+           xelatex не установлен, поэтому кнопка там отключена и об этом
+           написано прямо в окне.
+   --------------------------------------------------------------------- */
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Имя файла: заголовок из окна экспорта → заголовок графика → название сцены.
+function exportBaseName() {
+  const t = (document.getElementById('exp-title') || {}).value || STATE.graphTitle
+            || SCENE_NAMES[STATE.sceneKey] || 'график';
+  return String(t).trim().replace(/[\\/:*?"<>|]+/g, '-').slice(0, 60) || 'график';
+}
+
+function exportPNG(scale) {
+  const node = document.getElementById('chart');
+  if (!node) return;
+  const w = node.clientWidth || W, h = node.clientHeight || H;
+  const clone = node.cloneNode(true);
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('width', w); clone.setAttribute('height', h);
+  const src = new XMLSerializer().serializeToString(clone);
+  const img = new Image();
+  img.onload = () => {
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = cssVar('--canvas') || '#ffffff';   // фон под тему, иначе прозрачный
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    cv.toBlob(b => {
+      if (!b) { toast('Не получилось собрать картинку'); return; }
+      downloadBlob(b, exportBaseName() + '.png');
+      toast('PNG сохранён');
+    });
+  };
+  img.onerror = () => toast('Не получилось собрать картинку');
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src);
+}
+
+// ── .tex ────────────────────────────────────────────────────────────────
+function texEscape(s) {
+  return String(s == null ? '' : s)
+    .replace(/\\/g, '\\textbackslash{}')
+    .replace(/([&%$#_{}])/g, '\\$1')
+    .replace(/~/g, '\\textasciitilde{}')
+    .replace(/\^/g, '\\textasciicircum{}');
+}
+const r2 = (v) => (Math.round(v * 100) / 100);
+
+// Что выгружать в текущем режиме. Кривые берём готовыми функциями — генератор
+// не знает и не должен знать, откуда они взялись.
+function exportCurves() {
+  const out = [];
+  if (STATE.mode === 'costs' && STATE.costsSub === 'costs' && STATE.costsReady) {
+    if (STATE.showMC)  out.push({ f: costMC,  name: 'MC',  color: COL.costMC });
+    if (STATE.showATC) out.push({ f: costATC, name: 'ATC', color: COL.costATC });
+    if (STATE.showAVC) out.push({ f: costAVC, name: 'AVC', color: COL.costAVC });
+    if (STATE.showAFC) out.push({ f: costAFC, name: 'AFC', color: COL.costAFC });
+    if (STATE.showVC)  out.push({ f: costVC,  name: 'VC',  color: COL.costVC, dashed: true });
+    return out;
+  }
+  if (STATE.mode === 'ppf' && STATE.ppfSub === 'single' && STATE.ppfReady) {
+    out.push({ f: evalPpf, name: 'КПВ', color: COL.D });
+    return out;
+  }
+  STATE.curves.filter(c => c.visible).forEach(c => {
+    out.push({ f: (q) => evalCurve(c, q), name: curveShortName(c), color: c.color });
+  });
+  return out;
+}
+
+function buildTex(title, label) {
+  const xmax = CONFIG.Qmax, ymax = CONFIG.Pmax;
+  const xl = texEscape(STATE.axisXName || STATE.axisXDefault || 'Q');
+  const yl = texEscape(STATE.axisYName || STATE.axisYDefault || 'P');
+  const defs = [], fills = [], plots = [], nodes = [];
+
+  // Цвет объявляем один раз на оттенок и зовём по имени.
+  const cname = (hex) => {
+    const h = normHex(hex).slice(1).toUpperCase();
+    const key = 'col' + h;
+    const line = '\\definecolor{' + key + '}{HTML}{' + h + '}';
+    if (defs.indexOf(line) < 0) defs.push(line);
+    return key;
+  };
+  // Кривая точками. Разрывы (вне окна / не считается) режут её на куски —
+  // каждый кусок отдельным \addplot, иначе pgfplots соединит их прямой.
+  const plotCurve = (f, hex, dashed) => {
+    const key = cname(hex), N = 160;
+    let run = [];
+    const flush = () => {
+      if (run.length > 1) {
+        plots.push('  \\addplot[color=' + key + ', thick' + (dashed ? ', dashed' : '') +
+                   '] coordinates {' + run.join(' ') + '};');
+      }
+      run = [];
+    };
+    for (let i = 0; i <= N; i++) {
+      const q = xmax * i / N, v = f(q);
+      if (isNaN(v) || v < 0 || v > ymax) { flush(); continue; }
+      run.push('(' + r2(q) + ',' + r2(v) + ')');
+    }
+    flush();
+  };
+  const point = (x, y, txt, hex) => {
+    const key = cname(hex);
+    plots.push('  \\addplot[only marks, mark=*, mark size=2pt, color=' + key +
+               '] coordinates {(' + r2(x) + ',' + r2(y) + ')};');
+    if (txt) nodes.push('  \\node[above right, color=' + key + ', font=\\small] at (axis cs:' +
+                        r2(x) + ',' + r2(y) + ') {' + texEscape(txt) + '};');
+  };
+  // Заливка между кривой и горизонталью на отрезке [0; qEnd].
+  const fillUnder = (f, yBase, qEnd, hex, opacity) => {
+    const key = cname(hex), N = 80, pts = [];
+    pts.push('(axis cs:0,' + r2(yBase) + ')');
+    for (let i = 0; i <= N; i++) {
+      const q = qEnd * i / N, v = f(q);
+      if (isNaN(v)) continue;
+      pts.push('(axis cs:' + r2(q) + ',' + r2(Math.max(0, Math.min(ymax, v))) + ')');
+    }
+    pts.push('(axis cs:' + r2(qEnd) + ',' + r2(yBase) + ')');
+    if (pts.length > 3) {
+      fills.push('  \\fill[' + key + ', opacity=' + opacity + '] ' + pts.join(' -- ') + ' -- cycle;');
+    }
+  };
+
+  exportCurves().forEach(c => {
+    plotCurve(c.f, c.color, c.dashed);
+    // Подпись у правого края — там же, где её ставит сам график.
+    const a = curveAnchor(c.f);
+    if (a) nodes.push('  \\node[above left, color=' + cname(c.color) + ', font=\\small] at (axis cs:' +
+                      r2(a.q) + ',' + r2(a.v) + ') {' + texEscape(c.name) + '};');
+  });
+
+  // Сдвинутая вмешательством кривая (пунктир) и точки «было → стало».
+  if (STATE.taxActive) {
+    const buyer = (STATE.intervType === 'tax' && STATE.taxSide === 'buyer');
+    const after = buyer ? STATE.taxAfterD : STATE.taxAfterS;
+    const base = buyer ? STATE.D : STATE.S;
+    if (after && base) plotCurve(q => evalCurve(after, q), base.color, true);
+  }
+
+  // Излишки и равновесие.
+  if (STATE.eq && STATE.D && STATE.S) {
+    const { Q, P } = STATE.eq;
+    if (STATE.showCS) fillUnder(q => evalCurve(STATE.D, q), P, Q, COL.D, 0.16);
+    if (STATE.showPS) fillUnder(q => evalCurve(STATE.S, q), P, Q, COL.S, 0.16);
+    plots.push('  \\draw[dashed, gray] (axis cs:0,' + r2(P) + ') -- (axis cs:' + r2(Q) + ',' + r2(P) + ');');
+    plots.push('  \\draw[dashed, gray] (axis cs:' + r2(Q) + ',0) -- (axis cs:' + r2(Q) + ',' + r2(P) + ');');
+    point(Q, P, 'E*', COL.ink);
+  }
+
+  // Свои точки пользователя — с той же подписью, что на экране.
+  (STATE.marks || []).forEach(mk => {
+    point(mk.x, mk.y, markCaption(mk).join('; '), COL.ink);
+  });
+
+  const cap = texEscape(title || STATE.graphTitle || '');
+  const lab = String(label || '').trim().replace(/[^A-Za-z0-9:_-]/g, '');
+
+  return [
+    '% !TeX program = xelatex',
+    '\\documentclass[12pt,a4paper]{article}',
+    '\\usepackage{fontspec}',
+    '\\setmainfont{DejaVu Serif}',
+    '\\usepackage[russian]{babel}',
+    '\\usepackage{pgfplots}',
+    '\\pgfplotsset{compat=1.18}',
+    '\\usepackage{geometry}',
+    '\\geometry{margin=2cm}',
+    ...defs,
+    '',
+    '\\begin{document}',
+    '',
+    '\\begin{figure}[h]',
+    '\\centering',
+    '\\begin{tikzpicture}',
+    '\\begin{axis}[',
+    '    axis lines=left,',
+    '    xmin=0, xmax=' + r2(xmax) + ',',
+    '    ymin=0, ymax=' + r2(ymax) + ',',
+    '    xlabel={' + xl + '}, ylabel={' + yl + '},',
+    '    xlabel style={at={(axis description cs:1,0)}, anchor=north},',
+    '    ylabel style={at={(axis description cs:0,1)}, rotate=-90, anchor=south},',
+    '    width=13cm, height=10cm,',
+    '    tick style={color=black},',
+    ']',
+    ...fills,      // заливки первыми: линии и точки должны лечь поверх них
+    ...plots,
+    ...nodes,
+    '\\end{axis}',
+    '\\end{tikzpicture}',
+    cap ? '\\caption{' + cap + '}' : '',
+    lab ? '\\label{' + lab + '}' : '',
+    '\\end{figure}',
+    '',
+    '\\end{document}',
+  ].filter(s => s !== '').join('\n');
+}
+
+function exportTex() {
+  const title = (document.getElementById('exp-title') || {}).value || '';
+  const label = (document.getElementById('exp-label') || {}).value || '';
+  const tex = buildTex(title, label);
+  downloadBlob(new Blob([tex], { type: 'text/plain;charset=utf-8' }), exportBaseName() + '.tex');
+  toast('Файл .tex сохранён');
+}
+
+function exportPDF() {
+  const title = (document.getElementById('exp-title') || {}).value || '';
+  const label = (document.getElementById('exp-label') || {}).value || '';
+  const btn = document.getElementById('exp-pdf');
+  if (btn) { btn.disabled = true; btn.textContent = 'Собираю…'; }
+  const body = new FormData();
+  body.append('tex', buildTex(title, label));
+  body.append('name', exportBaseName());
+  body.append('csrfmiddlewaretoken', (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '');
+  fetch(CALC2_PDF_URL, { method: 'POST', body })
+    .then(r => r.ok ? r.blob() : r.text().then(t => { throw new Error(t.slice(0, 200)); }))
+    .then(b => { downloadBlob(b, exportBaseName() + '.pdf'); toast('PDF готов'); })
+    .catch(e => toast('PDF не собрался: ' + e.message))
+    .finally(() => { if (btn) { btn.disabled = false; btn.textContent = 'Скачать PDF'; } });
+}
+
+function openExport() {
+  const m = document.getElementById('export-modal');
+  if (!m) return;
+  const t = document.getElementById('exp-title');
+  if (t && !t.value) t.value = STATE.graphTitle || SCENE_NAMES[STATE.sceneKey] || '';
+  m.classList.add('open');
+  m.removeAttribute('inert');
+  if (t) t.focus();
+}
+function closeExport() {
+  const m = document.getElementById('export-modal');
+  if (!m) return;
+  m.classList.remove('open');
+  m.setAttribute('inert', '');
+  const b = document.getElementById('dock-export'); if (b) b.focus();
+}
+
+/* ---------------------------------------------------------------------
    БЛОК UI. Элементы управления панели и их привязка к логике.
    --------------------------------------------------------------------- */
 
@@ -10135,11 +10463,26 @@ function wireScene() {
   const dTheme = document.getElementById('dock-theme');
   if (dTheme) dTheme.addEventListener('click', () => toggleCalcTheme());
 
-  // Заглушки.
+  // Сохранение графиков в базу — задача следующей сессии, кнопка пока заглушка.
   const dSave = document.getElementById('dock-save');
   if (dSave) dSave.addEventListener('click', () => toast('Сохранение графиков появится в следующей версии'));
+
+  // Экспорт (Фаза 5): окно с заголовком и подписью, затем PNG / .tex / PDF.
   const dExport = document.getElementById('dock-export');
-  if (dExport) dExport.addEventListener('click', () => toast('Экспорт (PNG / PDF / LaTeX) появится в следующей версии'));
+  if (dExport) dExport.addEventListener('click', () => openExport());
+  const expClose = document.getElementById('exp-close');
+  if (expClose) expClose.addEventListener('click', () => closeExport());
+  const expModal = document.getElementById('export-modal');
+  if (expModal) expModal.addEventListener('click', (e) => { if (e.target === expModal) closeExport(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && expModal && expModal.classList.contains('open')) closeExport();
+  });
+  const expPng = document.getElementById('exp-png');
+  if (expPng) expPng.addEventListener('click', () => exportPNG(2));   // 2× — читаемо в печати
+  const expTex = document.getElementById('exp-tex');
+  if (expTex) expTex.addEventListener('click', () => exportTex());
+  const expPdf = document.getElementById('exp-pdf');
+  if (expPdf) expPdf.addEventListener('click', () => exportPDF());
 
   // «← Сценарии» — вернуться к окну выбора.
   const back = document.getElementById('scene-back');
