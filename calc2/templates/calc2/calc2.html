@@ -12,6 +12,15 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.3/math.min.js"></script>
 
+  <!-- KaTeX — ровно тот же способ подключения, что в каталоге задач
+       (catalog/base.html): та же версия 0.16.9 с того же CDN. Вторая
+       библиотека формул не нужна. Здесь достаточно katex.render, поэтому
+       auto-render не тянем: он ищет $…$ по всей странице, а нам нужно
+       отрендерить одно поле. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+          onload="if (typeof onKatexReady === 'function') onKatexReady();"></script>
+
   <!-- Тема: применяем сохранённый выбор (или системную) ДО отрисовки — без мигания. -->
   <script>
     (function () {
@@ -204,27 +213,46 @@ input:focus-visible, select:focus-visible {
 }
 .f-help:hover, .f-help[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .f-pop {
-  display: none; margin-top: 6px; padding: 9px 10px;
-  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+  display: none; margin-top: 8px; padding: 11px 11px 10px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: var(--shadow-pop);
 }
 .f-pop.open { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .f-pop.open { animation: fpop .16s var(--ease); }
+  @keyframes fpop { from { opacity: 0; transform: translateY(-4px); } }
+}
 .f-pop-title {
   font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--text3); margin-bottom: 6px;
+  color: var(--text3); margin-bottom: 9px;
 }
+/* Примеры — ровная колонка карточек: набранная формула сверху, за что её берут снизу.
+   Раньше формула и пояснение стояли в строку и на длинных примерах ломали ряд. */
+.f-grid { display: grid; gap: 5px; }
 .f-ex {
-  display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left;
-  padding: 4px 5px; margin: 0 -5px; border: none; border-radius: 4px; background: none;
-  transition: background .12s var(--ease);
+  display: grid; gap: 3px; width: 100%; text-align: left; cursor: pointer;
+  padding: 8px 10px; border: 1px solid transparent; border-radius: var(--r-sm);
+  background: var(--surface-2);
+  transition: background .12s var(--ease), border-color .12s var(--ease), transform .1s var(--ease);
 }
-.f-ex:hover { background: var(--accent-tint); }
-.f-ex code {
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; color: var(--text);
-  background: var(--surface); border: 1px solid var(--border-soft); padding: 1px 4px; border-radius: 3px;
-  white-space: nowrap;
+.f-ex:hover { background: var(--accent-tint); border-color: var(--accent-ring); }
+.f-ex:active { transform: scale(.99); }
+.f-ex:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.f-ex-math { font-size: 13px; color: var(--text); line-height: 1.35; overflow-x: auto; }
+.f-ex-note { font-size: 10.5px; color: var(--text2); line-height: 1.35; }
+.f-pop-foot {
+  font-size: 10.5px; color: var(--text3); line-height: 1.5;
+  margin-top: 9px; padding-top: 8px; border-top: .5px solid var(--border);
 }
-.f-ex span { font-size: 10.5px; color: var(--text2); }
-.f-pop-foot { font-size: 10.5px; color: var(--text3); margin-top: 6px; line-height: 1.45; }
+/* Живой предпросмотр формулы под полем (Фаза 4б): в поле остаётся синтаксис
+   Math.js, а тут видно, как формула выглядит набранной. */
+.f-preview { margin-top: 6px; font-size: 14px; color: var(--text); overflow-x: auto; }
+.f-preview:not(.has) { display: none; }
+.f-preview.has {
+  padding: 7px 9px; background: var(--surface-2);
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+}
+.f-preview .katex { font-size: 1.04em; }
 
 /* Бейдж формы ввода кривой (Q(P) — введена как объём от цены). */
 .form-badge {
@@ -9627,30 +9655,94 @@ const FORMULA_EXAMPLES = {
     ['100 - 10*sqrt(X)', 'выпуклая — убывающие альт. издержки'],
   ] },
 };
-const FORMULA_FOOT = 'Умножение — звёздочкой (2*Q), степень — ^. Доступны sqrt, abs, exp, log, min, max.';
+const FORMULA_FOOT = 'Умножение — звёздочкой (2*Q), степень — ^. Есть sqrt, abs, exp, log, min, max.';
 
-// Повесить подсказку на поле. kind — ключ FORMULA_EXAMPLES либо функция, его возвращающая.
+/* ── Красивая математика в подсказках и предпросмотре (Фаза 4б) ──────────
+   Поле ввода остаётся обычным текстом с синтаксисом Math.js: считается ровно
+   то, что написано. Меняется только то, что человек видит рядом.
+
+   Перевод в LaTeX делает сам Math.js — у разобранного дерева есть toTex().
+   Это надёжнее самодельных замен: степени, дроби, корни и функции он знает
+   лучше любой регулярки, и второй библиотеки не нужно. Пока формула
+   недописана («100 - »), разбор падает — тогда работает запасной грубый
+   перевод, чтобы предпросмотр не мигал пустотой на каждой букве. */
+function texFallback(expr) {
+  return String(expr)
+    .replace(/\bsqrt\(([^()]*)\)/g, '\\sqrt{$1}')
+    .replace(/\^(\w+)/g, '^{$1}')
+    .replace(/\*/g, '\\cdot ')
+    .replace(/<=/g, '\\le ').replace(/>=/g, '\\ge ');
+}
+function mathToTex(expr) {
+  const s = String(expr || '').trim();
+  if (!s) return '';
+  try { return math.parse(s).toTex({ parenthesis: 'auto' }); }
+  catch (e) { return texFallback(s); }
+}
+// Отрисовать формулу в элемент. Без KaTeX (CDN недоступен) показываем исходный
+// текст — предпросмотр деградирует, но ничего не ломается.
+function renderTex(el, expr) {
+  if (!el) return;
+  const tex = mathToTex(expr);
+  if (!tex) { el.textContent = ''; el.classList.remove('has'); return; }
+  el.classList.add('has');
+  if (typeof katex === 'undefined') { el.textContent = expr; return; }
+  try { katex.render(tex, el, { throwOnError: false, displayMode: false }); }
+  catch (e) { el.textContent = expr; }
+}
+// KaTeX подгружается отложенно — когда доедет, перерисовываем то, что уже на экране.
+const _texPending = [];
+function onKatexReady() { _texPending.forEach(fn => { try { fn(); } catch (e) {} }); }
+
+/* Подсказка формата формулы (Фаза 4а). Карточка под полем: заголовок, сетка
+   примеров (каждый — набранная формула + за что её берут) и строка о синтаксисе.
+   Пример кликабелен: подставляется в поле, считать заново руками не нужно. */
 function attachFormulaHelp(btnId, popId, inputId, kind) {
   const btn = document.getElementById(btnId), pop = document.getElementById(popId);
   if (!btn || !pop) return;
+  const inp = document.getElementById(inputId);
+
+  // Живой предпросмотр под полем: показывает то же, что написано, но набранным.
+  let prev = null;
+  if (inp) {
+    prev = document.createElement('div');
+    prev.className = 'f-preview';
+    pop.parentNode.insertBefore(prev, pop);
+    const sync = () => renderTex(prev, inp.value);
+    inp.addEventListener('input', sync);
+    _texPending.push(sync);
+    sync();
+  }
+
   const render = () => {
     const k = (typeof kind === 'function') ? kind() : kind;
     const set = FORMULA_EXAMPLES[k] || FORMULA_EXAMPLES.PQ;
     pop.innerHTML = '';
-    const t = document.createElement('div'); t.className = 'f-pop-title'; t.textContent = set.title;
+    const t = document.createElement('div');
+    t.className = 'f-pop-title'; t.textContent = set.title;
     pop.appendChild(t);
+
+    const grid = document.createElement('div');
+    grid.className = 'f-grid';
     set.items.forEach(([ex, note]) => {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'f-ex'; b.title = 'Подставить в поле';
-      const c = document.createElement('code'); c.textContent = ex;
-      const s = document.createElement('span'); s.textContent = note;
-      b.append(c, s);
+      b.type = 'button'; b.className = 'f-ex'; b.title = 'Поставить эту формулу в поле';
+      const m = document.createElement('span'); m.className = 'f-ex-math';
+      renderTex(m, ex);
+      const s = document.createElement('span'); s.className = 'f-ex-note'; s.textContent = note;
+      b.append(m, s);
       b.addEventListener('click', () => {
-        const inp = document.getElementById(inputId);
-        if (inp) { inp.value = ex; inp.focus(); }
+        if (!inp) return;
+        inp.value = ex;
+        inp.dispatchEvent(new Event('input', { bubbles: true }));   // предпросмотр и слушатели поля
+        inp.focus();
+        pop.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
       });
-      pop.appendChild(b);
+      grid.appendChild(b);
     });
+    pop.appendChild(grid);
+
     const f = document.createElement('div'); f.className = 'f-pop-foot'; f.textContent = FORMULA_FOOT;
     pop.appendChild(f);
   };
