@@ -157,7 +157,7 @@ input, select { font: inherit; }
 }
 
 /* Секции внутри панели */
-.section { margin-bottom: 18px; }
+.section { margin-bottom: 20px; }
 .section-title {
   font-size: 11px; font-weight: 600; text-transform: uppercase;
   letter-spacing: .04em; color: var(--text2); margin-bottom: 8px;
@@ -329,9 +329,15 @@ input:focus-visible, select:focus-visible {
 .mark-row .chk { font-size: 11.5px; margin: 6px 0 0; }
 
 /* Табло результатов (равновесие, площади, налог) */
-.stat { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; font-size: 13px; }
+.stat { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0; font-size: 13px; }
 .stat span { color: var(--text2); }
 .stat b { font-variant-numeric: tabular-nums; color: var(--text); }
+/* В табло результатов число — главное, что человек ищет глазами, поэтому оно
+   крупнее и тяжелее подписи. В «Инструментах» те же .stat остаются мелкими:
+   там они справочные, а не отсчёт прибора. */
+.sb-body .stat { padding: 5px 0; }
+.sb-body .stat span { font-size: 12px; font-weight: 500; }
+.sb-body .stat b { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
 .warn { font-size: 12px; color: var(--c-warn); line-height: 1.4; }
 
 /* Таблица «До / После / Δ» для налога */
@@ -584,7 +590,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 /* Ручка-шапка слева: за неё таскают; компактная вертикальная колонка. */
 .pult-head {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  padding: 0 11px; border-right: 1px solid var(--border-soft); flex-shrink: 0;
+  width: 40px; flex-shrink: 0;                 /* фиксированная: иначе длинный заголовок
+                                                  двигал бы все регуляторы вбок */
+  border-right: 1px solid var(--border-soft);
   cursor: grab; touch-action: none; user-select: none;
 }
 .pult-head:active { cursor: grabbing; }
@@ -598,11 +606,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   color: var(--text3); writing-mode: vertical-rl; transform: rotate(180deg); margin: 0;
   max-height: 74px; white-space: normal; line-height: 1.3; text-align: center;
 }
-/* Тело — регуляторы в один ряд, переносятся на узком экране. */
+/* Тело — регуляторы в один ряд, переносятся на узком экране.
+   Раскладка держится на ОДНОМ числе: базовая ширина регулятора 220px.
+   Раньше у трёх видов чипов стояли разные min-width (190 / 200 / 230) вместе
+   с flex:1 — при переносе последний ряд растягивался на всю ленту, а колонки
+   выходили разной ширины. Одна база + одинаковый рост даёт ровную сетку. */
 .pult-body {
-  flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
-  padding: 10px 14px;
+  flex: 1; display: flex; align-items: center; flex-wrap: wrap;
+  gap: 10px 18px; padding: 10px 16px;
 }
+/* Все регуляторы ленты, какой бы природы ни были, растут одинаково. */
+#pult .pult-cchip, #pult .pult-xchip, #pult .field { flex: 1 1 220px; max-width: 320px; }
 .pult-body .field { margin: 0; }
 /* Тумблеры «Налог платит» и «Вид ставки»: метка и сегменты в строку. */
 #pult #taxside-row, #pult #taxkind-row {
@@ -618,11 +632,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    зарплата профсоюза, α) в ленте выкладывается в одну строку: метка + ползунок +
    число. Без этого блок остаётся двухэтажным и лента вырастает вдвое. */
 #pult .field {
-  margin: 0 !important; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 230px;
+  margin: 0 !important; display: flex; align-items: center; gap: 9px;
 }
-#pult .field > label { margin: 0; white-space: nowrap; }
-#pult .field > div { margin-top: 0 !important; flex: 1; min-width: 130px; }
-#pult .field > input[type="range"] { margin-top: 0; flex: 1; min-width: 110px; }
+#pult .field > label {
+  margin: 0; white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--text2);
+}
+#pult .field > label b { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+#pult .field > div { margin-top: 0 !important; flex: 1; min-width: 112px; }
+#pult .field > input[type="range"] { margin-top: 0; flex: 1; min-width: 112px; }
+#pult .field input[type="number"] { font-variant-numeric: tabular-nums; }
 /* Пояснения живут в «Инструментах»: внутри ленты длинный текст сжимался в узкую
    колонку и растягивал её (сцена «Труд» доходила до 220px при полосе в 100px). */
 #pult .hint { display: none; }
@@ -632,31 +650,27 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   display: contents;   /* дети становятся прямыми flex-детьми ленты (единый ряд/перенос) */
 }
 /* Сцен-слайдер (КПВ «Макс X/Y», мастер неравенства): метка + range(акцент) + число. */
-#pult .pult-xchip {
-  margin: 0; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 190px;
-}
+#pult .pult-xchip { margin: 0; display: flex; align-items: center; gap: 9px; }
 #pult .pult-xchip .xc-label {
   font-size: 12px; font-weight: 600; color: var(--text2); white-space: nowrap;
 }
-#pult .pult-xchip input[type="range"] { margin-top: 0; flex: 1; min-width: 96px; }
+#pult .pult-xchip input[type="range"] { margin-top: 0; flex: 1; min-width: 112px; }
 #pult .pult-xchip .xc-val {
-  font-size: 12px; font-weight: 700; color: var(--text); min-width: 30px; text-align: right;
+  font-size: 13px; font-weight: 700; color: var(--text); min-width: 38px; text-align: right;
   font-variant-numeric: tabular-nums;
 }
 /* Чип кривой: цветной маркер + метка (роль/формула) + ползунок «b» + число. */
-#pult .pult-cchip {
-  margin: 0; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px;
-}
+#pult .pult-cchip { margin: 0; display: flex; align-items: center; gap: 9px; }
 #pult .pult-cchip .cc-dot {
   width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
 }
 #pult .pult-cchip .cc-label {
   font-size: 12px; font-weight: 600; color: var(--text2); white-space: nowrap;
-  max-width: 78px; overflow: hidden; text-overflow: ellipsis;
+  max-width: 84px; overflow: hidden; text-overflow: ellipsis;
 }
-#pult .pult-cchip input[type="range"] { margin-top: 0; flex: 1; min-width: 110px; }
+#pult .pult-cchip input[type="range"] { margin-top: 0; flex: 1; min-width: 112px; }
 #pult .pult-cchip .cc-val {
-  font-size: 12px; font-weight: 700; color: var(--text); min-width: 30px; text-align: right;
+  font-size: 13px; font-weight: 700; color: var(--text); min-width: 38px; text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
@@ -763,17 +777,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="81" cy="45" r="3.4" fill="var(--curve-d)" stroke="none"/></g></svg></span>
+            <circle cx="81" cy="45" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Спрос и предложение</span>
           <span class="scard-desc">Равновесие, излишки CS и PS, общественное благосостояние.</span>
         </button>
         <button class="scard" data-scene="tax">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="22" y="36" width="52" height="22" fill="var(--curve-tax)" opacity=".22"/>
+            <rect x="22" y="36" width="52" height="22" fill="var(--curve-tax)" opacity=".16"/>
             <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 58 L120 12" stroke="var(--curve-s)" stroke-width="2" stroke-dasharray="4 4"/></g></svg></span>
+            <path d="M22 58 L120 12" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-name">Налог и субсидия</span>
           <span class="scard-desc">Клин, цены покупателя и продавца, сбор бюджета, потери DWL.</span>
         </button>
@@ -790,7 +804,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M22 18 L140 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 18 L88 74" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="4 4"/>
+            <path d="M22 18 L88 74" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
             <path d="M18 52 H150" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Монополия</span>
           <span class="scard-desc">MR = MC, монопольная цена, потери против конкуренции.</span>
@@ -798,22 +812,22 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="scard" data-scene="elast">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="18" y="12" width="52" height="66" fill="var(--curve-tax)" opacity=".12"/>
-            <rect x="70" y="12" width="66" height="66" fill="var(--curve-reg)" opacity=".12"/>
+            <rect x="18" y="12" width="52" height="66" fill="var(--curve-tax)" opacity=".16"/>
+            <rect x="70" y="12" width="66" height="66" fill="var(--curve-reg)" opacity=".16"/>
             <path d="M22 16 L136 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M18 45 H70" stroke="var(--ink-soft)" stroke-width="1" stroke-dasharray="3 3"/>
-            <path d="M70 45 V78" stroke="var(--ink-soft)" stroke-width="1" stroke-dasharray="3 3"/>
-            <circle cx="70" cy="45" r="4" fill="var(--curve-d)" stroke="none"/></g></svg></span>
+            <path d="M18 45 H70" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <path d="M70 45 V78" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <circle cx="70" cy="45" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Эластичность</span>
           <span class="scard-desc">Точечная |Ed| и |Es|, единичная точка, связь с выручкой.</span>
         </button>
         <button class="scard" data-scene="ext">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M63 41 L88 55 L88 27 Z" fill="var(--curve-dwl)" opacity=".38" stroke="none"/>
+            <path d="M63 41 L88 55 L88 27 Z" fill="var(--curve-dwl)" opacity=".16" stroke="none"/>
             <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 74 L140 24" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 56 L140 6" stroke="var(--curve-reg)" stroke-width="2.4"/></g></svg></span>
+            <path d="M22 56 L140 6" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Внешние эффекты</span>
           <span class="scard-desc">MSC или MSB против частных, потери DWL, налог или субсидия Пигу.</span>
         </button>
@@ -835,7 +849,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M26 16 Q132 22 140 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="92" cy="36" r="3.4" fill="var(--curve-d)" stroke="none"/></g></svg></span>
+            <circle cx="92" cy="36" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">КПВ — возможности</span>
           <span class="scard-desc">Граница производства, альтернативные издержки, выпуклость.</span>
         </button>
@@ -849,7 +863,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M26 24 L92 40 L140 74" stroke="var(--curve-d)" stroke-width="2.6" stroke-linejoin="round"/>
-            <path d="M26 24 L92 40" stroke="var(--curve-s)" stroke-width="2" stroke-dasharray="3 3"/></g></svg></span>
+            <path d="M26 24 L92 40" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-name">Сумма КПВ двух стран</span>
           <span class="scard-desc">Совместная граница с изломом — кто что производит дешевле.</span>
         </button>
@@ -858,17 +872,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M26 22 Q120 30 132 74" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 34 L140 70" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="78" cy="46" r="3.4" fill="var(--curve-s)" stroke="none"/></g></svg></span>
+            <circle cx="78" cy="46" r="3.6" fill="var(--curve-s)" stroke="none"/></g></svg></span>
           <span class="scard-name">КТВ через КПВ</span>
           <span class="scard-desc">Альтернативные издержки: точка производства на КПВ и выигрыш при заданной мировой цене.</span>
         </button>
         <button class="scard" data-scene="tradeprice">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L96 74" stroke="var(--curve-d)" stroke-width="2.4"/>
-            <path d="M22 46 L128 74" stroke="var(--curve-s)" stroke-width="2.4"/>
-            <path d="M22 16 L140 74" stroke="var(--curve-d)" stroke-width="1.6" stroke-dasharray="5 4" opacity=".8"/>
-            <path d="M22 34 L140 74" stroke="var(--curve-s)" stroke-width="1.6" stroke-dasharray="5 4" opacity=".8"/></g></svg></span>
+            <path d="M22 20 L96 74" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M22 46 L128 74" stroke="var(--curve-s)" stroke-width="2.6"/>
+            <path d="M22 16 L140 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
+            <path d="M22 34 L140 74" stroke="var(--curve-s)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/></g></svg></span>
           <span class="scard-name">Как определяется мировая цена</span>
           <span class="scard-desc">Две страны: цена устанавливается между автарктическими — не задаётся, а находится.</span>
         </button>
@@ -878,7 +892,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
             <path d="M18 60 H150" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M52 60 H108" stroke="var(--c-bad)" stroke-width="4" opacity=".55"/></g></svg></span>
+            <rect x="52" y="57" width="56" height="6" fill="var(--c-bad)" opacity=".4"/></g></svg></span>
           <span class="scard-name">Малая открытая экономика</span>
           <span class="scard-desc">Мировая цена, импорт или экспорт, тариф и квота, два треугольника потерь.</span>
         </button>
@@ -886,9 +900,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M22 18 L100 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 18 L61 74" stroke="var(--curve-mr)" stroke-width="2" stroke-dasharray="4 4"/>
-            <path d="M18 48 H150" stroke="var(--curve-reg)" stroke-width="2.4"/>
-            <path d="M22 74 L140 20" stroke="var(--curve-mc)" stroke-width="2.4"/></g></svg></span>
+            <path d="M22 18 L61 74" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
+            <path d="M18 48 H150" stroke="var(--curve-reg)" stroke-width="2.6"/>
+            <path d="M22 74 L140 20" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Монополист и мировой рынок</span>
           <span class="scard-desc">Дома — своя цена, за рубежом — мировая: MR внутри = Pw = MC.</span>
         </button>
@@ -902,9 +916,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M22 20 L128 74" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M28 70 Q46 38 96 30" stroke="var(--curve-d)" stroke-width="2.4"/>
-            <path d="M24 78 Q44 26 110 20" stroke="var(--curve-d)" stroke-width="1.6" opacity=".35"/>
-            <circle cx="63" cy="41" r="4" fill="var(--ink)" stroke="none"/></g></svg></span>
+            <path d="M28 70 Q46 38 96 30" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M24 78 Q44 26 110 20" stroke="var(--curve-d)" stroke-width="1.5" opacity=".4"/>
+            <circle cx="63" cy="41" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Выбор потребителя</span>
           <span class="scard-desc">Бюджетная линия, кривые безразличия, оптимум и разложение Слуцкого.</span>
         </button>
@@ -919,14 +933,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 74 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 74 L96 22" stroke="var(--curve-s)" stroke-width="2" stroke-dasharray="4 4"/></g></svg></span>
+            <path d="M22 74 L96 22" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-name">Рынок труда</span>
           <span class="scard-desc">Конкуренция, монопсония, профсоюз, МРОТ; оси L и W.</span>
         </button>
         <button class="scard" data-scene="ineq">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 74 L140 14" stroke="var(--ink-soft)" stroke-width="1.6" stroke-dasharray="4 4"/>
+            <path d="M22 74 L140 14" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/>
             <path d="M22 74 Q108 70 140 14" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Неравенство доходов</span>
           <span class="scard-desc">Кривая Лоренца, коэффициент Джини, перераспределение.</span>
@@ -968,7 +982,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M22 22 L120 72" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M46 22 L144 72" stroke="var(--curve-reg)" stroke-width="2" stroke-dasharray="5 4"/>
+            <path d="M46 22 L144 72" stroke="var(--curve-reg)" stroke-width="2.2" stroke-dasharray="5 4"/>
             <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Заёмные средства</span>
           <span class="scard-desc">Дефицит бюджета поднимает ставку и вытесняет частные инвестиции.</span>
@@ -978,15 +992,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M22 20 L140 68" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 72 L140 24" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M18 58 H150" stroke="var(--curve-reg)" stroke-width="2.4"/></g></svg></span>
+            <path d="M18 58 H150" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Валютный рынок</span>
           <span class="scard-desc">Плавающий и фиксированный курс; интервенции при разрыве.</span>
         </button>
         <button class="scard" data-scene="laffer">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 76 Q84 6 146 76" stroke="var(--curve-tax)" stroke-width="2.8"/>
-            <circle cx="84" cy="24" r="3.8" fill="var(--ink)" stroke="none"/></g></svg></span>
+            <path d="M22 76 Q84 6 146 76" stroke="var(--curve-tax)" stroke-width="2.6"/>
+            <circle cx="84" cy="24" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Кривая Лаффера</span>
           <span class="scard-desc">Поступления как функция ставки: строится прогоном самой модели налога.</span>
         </button>
@@ -1012,7 +1026,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M18 66 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M26 16 Q84 96 142 16" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M84 62 L146 34" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M110 48 H130 V39" stroke="var(--curve-reg)" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <path d="M110 48 H130 V39" stroke="var(--curve-reg)" stroke-width="1.5" stroke-dasharray="5 4"/>
             <circle cx="110" cy="48" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Производная и касательная</span>
           <span class="scard-desc">Точка едет по кривой, треугольник показывает Δx и Δy, снизу график f′(x).</span>
@@ -1023,7 +1037,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M26 74 C 52 6, 68 82, 84 50 C 100 18, 116 84, 142 22" stroke="var(--curve-d)" stroke-width="2.6"/>
             <circle cx="46" cy="24" r="3.6" fill="var(--curve-s)" stroke="none"/>
             <circle cx="66" cy="70" r="3.6" fill="var(--curve-mc)" stroke="none"/>
-            <circle cx="84" cy="50" r="3.2" fill="var(--curve-mr)" stroke="none"/></g></svg></span>
+            <circle cx="84" cy="50" r="3.6" fill="var(--curve-mr)" stroke="none"/></g></svg></span>
           <span class="scard-name">Максимумы и минимумы</span>
           <span class="scard-desc">Экстремумы, точки перегиба, выпуклые и вогнутые участки разным цветом.</span>
         </button>
@@ -1038,7 +1052,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="scard" data-scene="m-inverse">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M26 80 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M26 80 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 20 H96 M26 32 H110 M26 44 H116 M26 56 H112 M26 68 H98" stroke="var(--curve-d)" stroke-width="4" stroke-opacity=".22"/>
+            <rect x="26" y="16" width="70" height="8" fill="var(--curve-d)" opacity=".16"/><rect x="26" y="28" width="84" height="8" fill="var(--curve-d)" opacity=".16"/><rect x="26" y="40" width="90" height="8" fill="var(--curve-d)" opacity=".16"/><rect x="26" y="52" width="86" height="8" fill="var(--curve-d)" opacity=".16"/><rect x="26" y="64" width="72" height="8" fill="var(--curve-d)" opacity=".16"/>
             <path d="M96 14 Q124 46 96 74" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Оси наоборот</span>
           <span class="scard-desc">Кривая задана как x = g(y): площадь берётся интегралом по y, а не по x.</span>
@@ -1046,9 +1060,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="scard" data-scene="m-minmax">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 70 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 70 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M24 20 L142 66" stroke="var(--curve-d)" stroke-width="1.8" stroke-dasharray="5 4"/>
-            <path d="M24 64 L142 18" stroke="var(--curve-s)" stroke-width="1.8" stroke-dasharray="5 4"/>
-            <path d="M24 64 L83 42 L142 66" stroke="var(--curve-mc)" stroke-width="3" stroke-linejoin="round"/>
+            <path d="M24 20 L142 66" stroke="var(--curve-d)" stroke-width="2.2" stroke-dasharray="5 4"/>
+            <path d="M24 64 L142 18" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
+            <path d="M24 64 L83 42 L142 66" stroke="var(--curve-mc)" stroke-width="2.6" stroke-linejoin="round"/>
             <circle cx="83" cy="42" r="3.6" fill="var(--curve-mc)" stroke="none"/></g></svg></span>
           <span class="scard-name">Функции min и max</span>
           <span class="scard-desc">Две функции и итоговая Z: где они меняются местами, там излом.</span>
@@ -1057,9 +1071,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M24 20 L136 74" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M34 66 Q56 34 96 26" stroke="var(--curve-d)" stroke-width="1.6" stroke-opacity=".4"/>
-            <path d="M44 74 Q72 44 116 36" stroke="var(--curve-d)" stroke-width="2.4"/>
-            <circle cx="74" cy="45" r="3.8" fill="var(--ink)" stroke="none"/></g></svg></span>
+            <path d="M34 66 Q56 34 96 26" stroke="var(--curve-d)" stroke-width="1.5" stroke-opacity=".4"/>
+            <path d="M44 74 Q72 44 116 36" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <circle cx="74" cy="45" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Оптимум при ограничении</span>
           <span class="scard-desc">Максимум F(a, b) при pa·a + pb·b = M: касание линии уровня и ограничения.</span>
         </button>
@@ -1070,8 +1084,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="picker-grid">
         <button class="scard free" data-scene="free">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M22 76 H146" stroke="var(--ink-soft)" stroke-width="1.6" stroke-dasharray="5 5"/>
-            <path d="M22 76 V14" stroke="var(--ink-soft)" stroke-width="1.6" stroke-dasharray="5 5"/></g></svg></span>
+            <path d="M22 76 H146" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <path d="M22 76 V14" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-body">
             <span class="scard-name">Свободный холст</span>
             <span class="scard-desc">Чистые оси и полный набор инструментов — стройте свои кривые с нуля.</span>

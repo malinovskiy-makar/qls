@@ -10,6 +10,8 @@ the focal point; UI is quiet graphite chrome so the curve colors are the only sa
 thing on the canvas. Dual theme: **light is default** (classroom / projector / print
 parity), **dark** for evening work. Persisted in `localStorage['calc2-theme']`; system
 preference is the first-run default; applied pre-paint in a `<head>` bootstrap.
+(The key is now plain `localStorage['theme']`, shared with the rest of the site — it was
+unified so the theme carries across /calc2/ and the catalog.)
 
 ## Color
 - **Curve palette is FIXED** (colorblind-distinct, identical in both themes), in CSS vars:
@@ -43,8 +45,28 @@ One hue, lightness-only shifts across surfaces. Dark mode leans on borders, not 
 ## Hierarchy
 - **Picker (Screen 1):** one hero — `picker-title` 30px/800. Category labels 11px/600 muted.
   Cards carry a mini-graph specimen drawn in the engine's own curve colors (the signature).
-- **Scoreboard:** "decided metric" readout — `--stat b` 19px/700 tabular-nums (Q*, P*…),
-  label 12px muted. Big numbers are the instrument readout.
+- **Scoreboard:** "decided metric" readout — `.sb-body .stat b` **16px/700** tabular-nums,
+  label 12px/500 muted. (Recorded as 19px originally; lowered to 16 once real scenes turned
+  out to show up to ~11 rows at once — 19px made the panel a wall and broke the "one focal
+  point" it was meant to create. 16 vs 12 still reads as an instrument readout.)
+  The same `.stat` inside **Tools** stays 13px: there it is reference text, not a readout.
+
+## Card specimens — icon geometry (fixed tiers)
+Every mini-graph in the picker uses exactly three stroke weights, one marker size, one dash:
+**axes/helper 1.5 · secondary or dashed curve 2.2 · primary curve 2.6 · marker r 3.6 ·
+dash `5 4`**. Fills that hint at an area use `opacity .16` (matching the canvas area-fill
+rule); a deliberately faded line uses `.4`. Bands (deficit strip, integral strips) are
+`<rect>` fills, never thick strokes. Before this was fixed there were 11 stroke widths,
+5 marker radii and 4 dash patterns across 30 cards.
+
+## Pult (live control strip)
+One base width for every regulator, whatever its kind: `flex: 1 1 220px; max-width: 320px`
+on `.pult-cchip`, `.pult-xchip` and any relocated `.field`. Mixed bases (190/200/230 with
+`flex:1`) made wrapped rows ragged and stretched a lone last-row item across the strip.
+Row gap 10px, column gap 18px. Handle `.pult-head` is a **fixed 40px** column — a variable
+handle shifted every control sideways when the scene title changed length.
+**Hard invariant: the strip must fit inside `CONFIG.margin.bottom` (100px)** or it covers
+the graph. Regulator label 12px/600 muted, value 13px/700 tabular-nums, min-width 38px.
 
 ## Layout (Scene)
 Full-bleed `.graph-wrap` (absolute inset:0). Left **dock** 56px (tool/score toggles, grid,
