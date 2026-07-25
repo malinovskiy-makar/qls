@@ -528,12 +528,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   padding: 10px 14px;
 }
 .pult-body .field { margin: 0; }
-/* Тумблер «Налог платит»: метка и сегменты в строку. */
-#pult #taxside-row {
+/* Тумблеры «Налог платит» и «Вид ставки»: метка и сегменты в строку. */
+#pult #taxside-row, #pult #taxkind-row {
   margin: 0 !important; display: flex; align-items: center; gap: 8px; flex-shrink: 0;
 }
-#pult #taxside-row > label { display: inline; margin: 0; white-space: nowrap; }
-#pult #taxside-row .seg-btn { padding: 6px 10px; }
+#pult #taxside-row > label, #pult #taxkind-row > label { display: inline; margin: 0; white-space: nowrap; }
+#pult #taxside-row .seg-btn, #pult #taxkind-row .seg-btn { padding: 6px 10px; white-space: nowrap; }
 /* Блоки «Ставка t» и «Цена Pc»: метка + ползунок + число в строку, ползунок тянется. */
 #pult #tax-field, #pult #pc-field {
   margin: 0 !important; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px;
@@ -680,6 +680,28 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M18 52 H150" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Монополия</span>
           <span class="scard-desc">MR = MC, монопольная цена, потери против конкуренции.</span>
+        </button>
+        <button class="scard" data-scene="elast">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <rect x="18" y="12" width="52" height="66" fill="var(--curve-tax)" opacity=".12"/>
+            <rect x="70" y="12" width="66" height="66" fill="var(--curve-reg)" opacity=".12"/>
+            <path d="M22 16 L136 74" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M18 45 H70" stroke="var(--ink-soft)" stroke-width="1" stroke-dasharray="3 3"/>
+            <path d="M70 45 V78" stroke="var(--ink-soft)" stroke-width="1" stroke-dasharray="3 3"/>
+            <circle cx="70" cy="45" r="4" fill="var(--curve-d)" stroke="none"/></g></svg></span>
+          <span class="scard-name">Эластичность</span>
+          <span class="scard-desc">Точечная |Ed| и |Es|, единичная точка, связь с выручкой.</span>
+        </button>
+        <button class="scard" data-scene="ext">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M63 41 L88 55 L88 27 Z" fill="var(--curve-dwl)" opacity=".38" stroke="none"/>
+            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M22 74 L140 24" stroke="var(--curve-s)" stroke-width="2.6"/>
+            <path d="M22 56 L140 6" stroke="var(--curve-reg)" stroke-width="2.4"/></g></svg></span>
+          <span class="scard-name">Внешние эффекты</span>
+          <span class="scard-desc">MSC или MSB против частных, потери DWL, налог или субсидия Пигу.</span>
         </button>
       </div>
     </section>
@@ -899,11 +921,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="seg-btn" id="scn-shift">Сдвиги</button>
         <button class="seg-btn" id="scn-ext">Внеш. эффект</button>
       </div>
-      <!-- Эластичность спроса вдоль кривой (Задача 2) -->
+      <!-- Эластичность спроса и предложения вдоль кривых (Задача 2 + Фаза 2а) -->
       <div id="scn-pane-elast" style="display:none;margin-top:8px;">
-        <div class="hint">Перетаскивайте точку вдоль спроса (роль D). Ed&nbsp;=&nbsp;P/(Q·dP/dQ).
-          Единичная точка (|Ed|=1) — там, где MR&nbsp;=&nbsp;0 и выручка TR&nbsp;=&nbsp;P·Q максимальна:
-          левее спрос эластичный, правее — неэластичный.</div>
+        <label class="chk"><input type="checkbox" id="chk-elast-s" checked>
+          <span class="swatch" style="background:var(--curve-s)"></span> Точка на предложении (Es)</label>
+        <div class="hint">Перетаскивайте точки вдоль кривых. Точечная эластичность
+          E&nbsp;=&nbsp;(dQ/dP)·(P/Q)&nbsp;=&nbsp;P/(Q·dP/dQ). Единичная точка спроса (|Ed|=1) — там,
+          где MR&nbsp;=&nbsp;0 и выручка TR&nbsp;=&nbsp;P·Q максимальна: левее спрос эластичный,
+          правее — неэластичный.</div>
         <div id="info-elast" style="margin-top:6px;"></div>
       </div>
       <!-- Разложение двойных сдвигов спроса и предложения (Задача 3) -->
@@ -928,17 +953,29 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           Разложение показывает вклад спроса (E₀→E_d), предложения (E₀→E_s) и итог (E₀→E₁).</div>
         <div id="info-shift" style="margin-top:6px;"></div>
       </div>
-      <!-- Внешний эффект и налог Пигу (Задача 4) -->
+      <!-- Внешний эффект и корректирующий налог/субсидия Пигу (Задача 4 + Фаза 2б).
+           Два зеркальных случая: отрицательный (перепроизводство → налог) и
+           положительный (недопроизводство → субсидия). -->
       <div id="scn-pane-ext" style="display:none;margin-top:8px;">
-        <div class="field">
-          <label>Внешние предельные издержки (число или f(Q))</label>
+        <div class="seg">
+          <button class="seg-btn active" id="ext-neg">Отрицательный</button>
+          <button class="seg-btn" id="ext-pos">Положительный</button>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label id="ext-label">Внешние предельные издержки (число или f(Q))</label>
           <input type="text" id="ext-input" value="20" autocomplete="off">
         </div>
         <label class="chk"><input type="checkbox" id="ext-pigou">
-          <span class="swatch" style="background:var(--curve-tax)"></span> Применить налог Пигу</label>
-        <div class="hint">Спрос&nbsp;=&nbsp;общественная выгода MSB, предложение (роль S)&nbsp;=&nbsp;частные
+          <span class="swatch" style="background:var(--curve-tax)"></span>
+          <span id="ext-pigou-label">Применить налог Пигу</span></label>
+        <div class="hint" id="ext-hint-neg">Спрос&nbsp;=&nbsp;предельная выгода, предложение (роль S)&nbsp;=&nbsp;частные
           издержки MPC. MSC&nbsp;=&nbsp;MPC&nbsp;+&nbsp;внешние. Рынок выпускает Qрын (D&nbsp;=&nbsp;MPC),
-          оптимум Qопт (D&nbsp;=&nbsp;MSC). Налог Пигу поднимает MPC до MSC — рынок приходит в Qопт.</div>
+          оптимум Qопт (D&nbsp;=&nbsp;MSC) — <b>меньше</b> рыночного: перепроизводство.
+          Налог Пигу поднимает MPC до MSC — рынок приходит в Qопт.</div>
+        <div class="hint" id="ext-hint-pos" style="display:none;">Спрос (роль D)&nbsp;=&nbsp;частная выгода MPB,
+          предложение&nbsp;=&nbsp;издержки. MSB&nbsp;=&nbsp;MPB&nbsp;+&nbsp;внешние. Рынок выпускает Qрын
+          (MPB&nbsp;=&nbsp;S), оптимум Qопт (MSB&nbsp;=&nbsp;S) — <b>больше</b> рыночного: недопроизводство.
+          Корректирующая субсидия опускает издержки — рынок приходит в Qопт.</div>
         <div class="error" id="ext-error" style="display:none;"></div>
         <div id="info-ext" style="margin-top:6px;"></div>
       </div>
@@ -959,6 +996,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div class="seg">
           <button class="seg-btn active" id="tsb-seller">Продавец</button>
           <button class="seg-btn" id="tsb-buyer">Покупатель</button>
+        </div>
+      </div>
+      <!-- Вид ставки (Фаза 2в): потоварная (руб./ед.) — параллельный сдвиг S;
+           адвалорная (%) — ПОВОРОТ: S_после(Q) = (1+τ)·S(Q). Только в конкуренции. -->
+      <div id="taxkind-row" style="margin-top:8px;">
+        <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Вид ставки:</label>
+        <div class="seg">
+          <button class="seg-btn active" id="tk-unit">Специфический</button>
+          <button class="seg-btn" id="tk-adv">Адвалорный</button>
         </div>
       </div>
       <!-- Поле ставки (налог / субсидия) -->
@@ -1489,6 +1535,11 @@ const STATE = {
   showCS: true,      // показывать заливку излишка потребителя
   showPS: true,      // показывать заливку излишка производителя
   tax: 0,            // ставка вмешательства (0 = нет); тип задаёт intervType
+                     // при taxKind='unit' — рубли за единицу, при 'advalorem' — ПРОЦЕНТЫ
+  // Вид потоварной ставки (Фаза 2в): 'unit' — специфический налог/субсидия (параллельный
+  // сдвиг S на ставку), 'advalorem' — адвалорный (ПОВОРОТ: S_после(Q) = (1+τ)·S(Q) для
+  // налога, S(Q)/(1+τ) для субсидии). Доступен только в конкуренции.
+  taxKind: 'unit',
   taxSide: 'seller', // кто формально платит налог: 'seller' — продавец (сдвиг S вверх),
                      // 'buyer' — покупатель (сдвиг D вниз). На числа НЕ влияет (Задача 1).
   intervType: 'tax', // 'tax' — налог (S вверх), 'subsidy' — субсидия (S вниз),
@@ -1502,14 +1553,21 @@ const STATE = {
   scenario: 'none',
   elastQ: null,      // позиция точки эластичности вдоль спроса (null = единичная/центр)
   elast: null,       // результат расчёта эластичности (Задача 2)
+  elastQS: null,     // позиция точки эластичности вдоль ПРЕДЛОЖЕНИЯ (Фаза 2а)
+  elastS: null,      // результат расчёта эластичности предложения
+  showElastS: true,  // показывать точку эластичности предложения
   shiftD: 0,         // вертикальный сдвиг спроса ΔD (Задача 3)
   shiftS: 0,         // вертикальный сдвиг предложения ΔS (Задача 3)
   shiftActive: false,
   shiftRes: null,    // четыре равновесия E0/E_d/E_s/E1 и разложение (Задача 3)
-  extExpr: '20',     // внешние предельные издержки: константа или f(Q) (Задача 4)
+  extExpr: '20',     // внешний эффект: константа или f(Q) (Задача 4)
   extCompiled: null,
-  applyPigou: false, // применить корректирующий налог Пигу
+  applyPigou: false, // применить корректирующий налог / субсидию Пигу
   ext: null,         // результат расчёта внешнего эффекта (Задача 4)
+  // Знак внешнего эффекта (Фаза 2б). 'neg' — отрицательный (издержки: MSC = MPC + ext,
+  // перепроизводство, лечится НАЛОГОМ); 'pos' — положительный (выгода: MSB = MPB + ext,
+  // недопроизводство, лечится СУБСИДИЕЙ). Случаи строго зеркальны.
+  extSign: 'neg',
   // Галочки областей монополии (Задача 1): CS над ценой, VC под MC, PS между MC и ценой.
   showMonoCS: true,
   showMonoVC: true,
@@ -2160,17 +2218,39 @@ function recompute() {
   const scenarioNone = (STATE.scenario === 'none');
   const isTaxType = compMarket && scenarioNone && (STATE.intervType === 'tax' || STATE.intervType === 'subsidy');
   if (isTaxType && STATE.tax > 0 && STATE.D && STATE.S && STATE.eq) {
-    const shift = (STATE.intervType === 'subsidy') ? -STATE.tax : STATE.tax;
-    const sShift = { fn: q => evalCurve(STATE.S, q) + shift };   // синтетическая S ± ставка
-    const te = findEquilibrium(STATE.D, sShift);
+    const isSub = (STATE.intervType === 'subsidy');
+    const adv = (STATE.taxKind === 'advalorem');
+    const tau = adv ? STATE.tax / 100 : 0;        // адвалорная ставка в долях (STATE.tax — проценты)
+    const shift = isSub ? -STATE.tax : STATE.tax; // потоварная ставка со знаком
+    // Кривая предложения ПОСЛЕ вмешательства — единый источник и для чисел, и для отрисовки.
+    //  • специфическое: параллельный СДВИГ  S ± ставка (разрыв постоянен);
+    //  • адвалорное: ПОВОРОТ. Налог: покупатель платит в (1+τ) раз больше, чем получает
+    //    продавец при том же объёме ⇒ S_после = (1+τ)·S. Субсидия — зеркально: продавец
+    //    получает в (1+τ) раз больше, чем платит покупатель ⇒ S_после = S/(1+τ).
+    //    Вертикальный разрыв между S и S_после = τ·S(Q) — растёт вместе с Q.
+    const factor = isSub ? 1 / (1 + tau) : (1 + tau);
+    const sAfter = adv
+      ? { fn: q => { const s = evalCurve(STATE.S, q); return isNaN(s) ? NaN : s * factor; } }
+      : { fn: q => evalCurve(STATE.S, q) + shift };
+    const te = findEquilibrium(STATE.D, sAfter);
     if (te) {
       const Q1 = te.Q, Q0 = STATE.eq.Q;
       const Pb = evalCurve(STATE.D, Q1);          // цена покупателя
-      const Ps = Pb - shift;                      // цена продавца (налог: ниже Pb; субсидия: выше)
+      // Цена продавца: в обоих случаях это S(Q1) (для потоварного — ровно Pb − ставка).
+      const Ps = adv ? evalCurve(STATE.S, Q1) : (Pb - shift);
       const lo = Math.min(Q1, Q0), hi = Math.max(Q1, Q0);
       STATE.shift = shift;
+      STATE.advTau = adv ? tau : 0;
+      STATE.taxAfterS = sAfter;                   // ту же функцию рисует drawShiftedSupply
+      // Эквивалентная запись «налог платит покупатель» (для рисования): при потоварном —
+      // D − t, при адвалорном — D/(1+τ). Объём и цены получаются те же самые.
+      STATE.taxAfterD = adv
+        ? { fn: q => { const d = evalCurve(STATE.D, q); return isNaN(d) ? NaN : d / factor; } }
+        : { fn: q => evalCurve(STATE.D, q) - STATE.tax };
       STATE.taxEq = { Q: Q1, Pb, Ps };
-      STATE.tx = STATE.tax * Q1;                  // объём денег = площадь прямоугольника
+      // Объём денег = площадь прямоугольника между ценами покупателя и продавца.
+      // Для потоварного это в точности ставка·Q1, для адвалорного — τ·Ps·Q1 (налог).
+      STATE.tx = Math.abs(Pb - Ps) * Q1;
       STATE.budget = (STATE.intervType === 'subsidy' ? -1 : 1) * STATE.tx;  // +сбор / -расход
       STATE.csTax = integrate(q => evalCurve(STATE.D, q) - Pb, 0, Q1);
       STATE.psTax = integrate(q => Ps - evalCurve(STATE.S, q), 0, Q1);
@@ -2282,7 +2362,20 @@ function recompute() {
     STATE.elastQ = Math.max(qDmax * 1e-3, Math.min(STATE.elastQ, qDmax * 0.999));
     const q = STATE.elastQ, p = evalCurve(D, q), slope = curveDeriv(D, q);
     const Ed = (q > 0 && slope !== 0 && !isNaN(slope) && !isNaN(p)) ? p / (q * slope) : NaN;
-    STATE.elast = { unit, qDmax, q, p, slope, Ed, absEd: Math.abs(Ed) };
+    STATE.elast = { unit, qDmax, q, p, slope, Ed, absEd: Math.abs(Ed), TR: p * q };
+  }
+
+  // Эластичность ПРЕДЛОЖЕНИЯ (Фаза 2а) — та же механика на кривой S.
+  // Es = (dQ/dP)·(P/Q) = P/(Q·dP/dQ); у растущего предложения dP/dQ > 0, поэтому Es > 0.
+  // Прямая через начало координат даёт Es = 1 при любом Q (наглядный частный случай).
+  STATE.elastS = null;
+  if (compMarket && STATE.scenario === 'elasticity' && STATE.S && STATE.showElastS) {
+    const S = STATE.S;
+    if (STATE.elastQS == null) STATE.elastQS = STATE.eq ? STATE.eq.Q : CONFIG.Qmax * 0.5;
+    STATE.elastQS = Math.max(CONFIG.Qmax * 1e-3, Math.min(STATE.elastQS, CONFIG.Qmax * 0.999));
+    const q = STATE.elastQS, p = evalCurve(S, q), slope = curveDeriv(S, q);
+    const Es = (q > 0 && slope !== 0 && !isNaN(slope) && !isNaN(p)) ? p / (q * slope) : NaN;
+    STATE.elastS = { q, p, slope, Es, absEs: Math.abs(Es) };
   }
 
   // Разложение двойных сдвигов спроса и предложения (Задача 3): четыре равновесия.
@@ -2306,22 +2399,38 @@ function recompute() {
     }
   }
 
-  // Внешний эффект и налог Пигу (Задача 4). MPC = S (роль предложения), MSC = MPC + внешние.
+  // Внешний эффект и корректирующий инструмент Пигу (Задача 4 + Фаза 2б).
+  // Два ЗЕРКАЛЬНЫХ случая, общий код:
+  //   'neg' — эффект на ИЗДЕРЖКАХ: MSC = MPC + ext (MPC = кривая S). Рынок (D = MPC)
+  //           выпускает БОЛЬШЕ оптимума (D = MSC) → перепроизводство, лечится НАЛОГОМ.
+  //   'pos' — эффект на ВЫГОДЕ: MSB = MPB + ext (MPB = кривая D). Рынок (MPB = S)
+  //           выпускает МЕНЬШЕ оптимума (MSB = S) → недопроизводство, лечится СУБСИДИЕЙ.
+  // Рыночное равновесие в обоих случаях одно и то же (пересечение частных кривых).
   STATE.ext = null;
   if (compMarket && STATE.scenario === 'externality' && STATE.D && STATE.S && STATE.eq) {
-    const msc = q => { const s = evalCurve(STATE.S, q), x = evalExt(q); return (isNaN(s) || isNaN(x)) ? NaN : s + x; };
-    const Qmkt = STATE.eq.Q, Pmkt = STATE.eq.P;            // рыночный выпуск: D = MPC
-    const Qopt = findRoot(q => evalCurve(STATE.D, q) - msc(q));   // оптимум: D = MSC
-    let Popt = null, dwl = null, pigou = null, pigouEq = null;
+    const pos = (STATE.extSign === 'pos');
+    // Общественная кривая = частная той стороны, где сидит эффект, плюс внешний эффект.
+    const social = pos
+      ? (q => { const d = evalCurve(STATE.D, q), x = evalExt(q); return (isNaN(d) || isNaN(x)) ? NaN : d + x; })
+      : (q => { const s = evalCurve(STATE.S, q), x = evalExt(q); return (isNaN(s) || isNaN(x)) ? NaN : s + x; });
+    // «Противоположная» частная кривая — с ней общественная и пересекается в оптимуме.
+    const other = pos ? (q => evalCurve(STATE.S, q)) : (q => evalCurve(STATE.D, q));
+    const Qmkt = STATE.eq.Q, Pmkt = STATE.eq.P;
+    const Qopt = findRoot(q => social(q) - other(q));
+    let Popt = null, dwl = null, corrective = null, pigouEq = null;
     if (Qopt != null) {
-      Popt = evalCurve(STATE.D, Qopt);
+      Popt = other(Qopt);                                  // высота точки пересечения
       const lo = Math.min(Qopt, Qmkt), hi = Math.max(Qopt, Qmkt);
-      dwl = Math.abs(integrate(q => msc(q) - evalCurve(STATE.D, q), lo, hi));   // потери между MSC и D
-      pigou = evalExt(Qopt);                              // налог Пигу = внешние пред. издержки в оптимуме
-      const Sp = { fn: q => evalCurve(STATE.S, q) + pigou };   // MPC + налог = рынок приходит в Qопт
+      // Клин потерь — площадь между общественной и противоположной частной кривой.
+      dwl = Math.abs(integrate(q => social(q) - other(q), lo, hi));
+      corrective = evalExt(Qopt);                          // величина эффекта в оптимуме
+      // Корректирующий инструмент приводит рынок ровно в Qопт, двигая предложение:
+      // отрицательный эффект → налог (S + t); положительный → субсидия (S − s).
+      const Sp = { fn: q => evalCurve(STATE.S, q) + (pos ? -corrective : corrective) };
       pigouEq = findEquilibrium(STATE.D, Sp);
     }
-    STATE.ext = { msc, Qmkt, Pmkt, Qopt, Popt, dwl, pigou, pigouEq, applyPigou: STATE.applyPigou };
+    STATE.ext = { pos, social, other, msc: social, Qmkt, Pmkt, Qopt, Popt, dwl,
+                  corrective, pigou: corrective, pigouEq, applyPigou: STATE.applyPigou };
   }
 }
 
@@ -2434,18 +2543,32 @@ function updateAreasPanel() {
 function drawShiftedSupply() {
   if (!STATE.taxActive) return;
   const buyerTax = (STATE.intervType === 'tax' && STATE.taxSide === 'buyer');
-  const base = buyerTax ? STATE.D : STATE.S;     // покупатель → двигаем спрос, иначе предложение
-  const sh = buyerTax ? -STATE.tax : STATE.shift; // спрос вниз на t / предложение на ±ставку
+  const base = buyerTax ? STATE.D : STATE.S;              // чью кривую рисуем сдвинутой
+  // Берём ГОТОВУЮ функцию «после вмешательства» из recompute — она уже знает,
+  // сдвиг это (потоварное) или поворот (адвалорное). Никакой параллельной математики.
+  const after = buyerTax ? STATE.taxAfterD : STATE.taxAfterS;
+  if (!after) return;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const pts = [];
   for (let i = 0; i <= 400; i++) {
     const q = CONFIG.Qmax * i / 400;
-    const v = evalCurve(base, q);
-    pts.push(isNaN(v) ? null : [q, v + sh]);
+    const v = evalCurve(after, q);
+    pts.push(isNaN(v) ? null : [q, v]);
   }
   g.append('path').datum(pts).attr('fill', 'none').attr('stroke', base.color)
     .attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  // Ярлык у правого края: видно, что при адвалорном разрыв растёт с Q.
+  const qL = CONFIG.Qmax * 0.82, vL = evalCurve(after, qL);
+  if (!isNaN(vL) && vL > 0 && vL <= CONFIG.Pmax) {
+    const adv = (STATE.taxKind === 'advalorem');
+    const isSub = (STATE.intervType === 'subsidy');
+    const nm = buyerTax ? (adv ? 'D/(1+τ)' : 'D − t')
+                        : (adv ? (isSub ? 'S/(1+τ)' : 'S·(1+τ)') : (isSub ? 'S − s' : 'S + t'));
+    g.append('text').attr('x', sx(qL)).attr('y', sy(vL) - 6)
+      .attr('font-size', 11).attr('font-weight', 600).attr('fill', base.color)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(nm);
+  }
 }
 
 // Заливки сценария вмешательства: CS, PS, деньги бюджета (прямоугольник), DWL (потери).
@@ -2581,10 +2704,12 @@ function setType(type) {
   // Выбор плательщика — только для налога и только в конкуренции (в монополии налог
   // на производство; эквивалентность «кто платит» там не задаётся стороной).
   show('taxside-row', type === 'tax' && STATE.market !== 'monopoly');
+  // Вид ставки (Фаза 2в) — только для потоварного вмешательства и только в конкуренции:
+  // в монополии налог входит в MC (monopolyTax), адвалорная форма туда не переносится.
+  show('taxkind-row', isTax && STATE.market !== 'monopoly');
 
   if (isTax) {
-    const rl = document.getElementById('rate-letter');
-    if (rl) rl.textContent = (type === 'subsidy') ? 's' : 't';
+    applyTaxRateBounds();   // подпись ставки (t / s / τ,%) и пределы ползунка
   } else {
     const pl = document.getElementById('pc-letter');
     if (pl) pl.textContent = (type === 'ceiling') ? 'Pc' : 'Pf';
@@ -2597,6 +2722,36 @@ function setType(type) {
   }
   if (typeof updatePult === 'function') updatePult();   // сменился тип/набор регуляторов пульта
   redrawAll();
+}
+
+/* --- Фаза 2в. Вид потоварной ставки: специфический ↔ адвалорный --------- */
+
+// Пределы ползунка ставки и подпись её буквы. Специфический — рубли за единицу
+// (потолок = масштаб цены Pmax); адвалорный — проценты (потолок 200 %).
+function applyTaxRateBounds() {
+  const adv = (STATE.taxKind === 'advalorem');
+  const max = adv ? 200 : CONFIG.Pmax;
+  ['tax-slider', 'tax-input'].forEach(id => { const e = document.getElementById(id); if (e) e.max = max; });
+  const rl = document.getElementById('rate-letter');
+  if (rl) rl.textContent = adv ? 'τ, %' : ((STATE.intervType === 'subsidy') ? 's' : 't');
+  const h = document.getElementById('tax-hint');
+  if (h) h.innerHTML = adv
+    ? 'Адвалорная ставка — доля от цены, поэтому предложение не сдвигается, а <b>поворачивается</b>: ' +
+      'S<sub>после</sub>(Q)&nbsp;=&nbsp;(1+τ)·S(Q) при налоге. Вертикальный разрыв между S и S<sub>после</sub> ' +
+      'растёт вместе с Q (в отличие от постоянного клина при специфической ставке).'
+    : 'Потоварное вмешательство на стороне производителя: кривая S <b>сдвигается</b> ' +
+      '(налог — вверх, субсидия — вниз) на величину ставки. Клин между ценами покупателя ' +
+      'и продавца можно тянуть мышью.';
+}
+
+// Переключатель вида ставки. Значение переносится и зажимается новыми пределами.
+function setTaxKind(kind) {
+  STATE.taxKind = (kind === 'advalorem') ? 'advalorem' : 'unit';
+  const u = document.getElementById('tk-unit'), a = document.getElementById('tk-adv');
+  if (u) u.classList.toggle('active', STATE.taxKind === 'unit');
+  if (a) a.classList.toggle('active', STATE.taxKind === 'advalorem');
+  applyTaxRateBounds();
+  setTax(STATE.tax);   // пере-зажать значение под новые пределы + перерисовать
 }
 
 // Табло налога: таблица «До / После / Δ» и распределение бремени.
@@ -2621,7 +2776,10 @@ function updateTaxPanel() {
     [isSub ? 'Бюджет (расход)' : 'Бюджет (сбор)', 0, STATE.budget],
     ['DWL', 0, STATE.dwl],
   ];
-  let html = '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
+  const adv = (STATE.taxKind === 'advalorem');
+  let html = `<div class="stat"><span>${adv ? 'Ставка τ (адвалорная)' : (isSub ? 'Субсидия s' : 'Налог t')}</span>` +
+             `<b>${fmt(STATE.tax)}${adv ? ' %' : ''}</b></div>`;
+  html += '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
   rows.forEach(([k, a, b]) => {
     const d = b - a, ds = (d > 0 ? '+' : '') + fmt(d);
     html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
@@ -2631,6 +2789,13 @@ function updateTaxPanel() {
   html += `<div class="stat" style="margin-top:6px;"><span>${lbl} покупателя</span><b>${fmt(STATE.incBuyer)}</b></div>`;
   html += `<div class="stat"><span>${lbl} продавца</span><b>${fmt(STATE.incSeller)}</b></div>`;
   // Вывод об эквивалентности (только для налога): кто платит — не влияет на итог.
+  if (adv) {
+    const k = 1 + STATE.tax / 100;
+    html += `<div class="hint" style="margin-top:6px;">Адвалорная ставка: ` +
+      (isSub ? `продавец получает в (1+τ)=${fmt(k)} раза больше покупателя — Ps = Pb·(1+τ) = ${fmt(te.Ps)}.`
+             : `покупатель платит в (1+τ)=${fmt(k)} раза больше продавца — Ps = Pb/(1+τ) = ${fmt(te.Ps)}.`) +
+      ` Деньги = (Pb − Ps)·Q = ${fmt(STATE.tx)}.</div>`;
+  }
   if (!isSub) html += `<div class="hint" style="margin-top:6px;">Результат не зависит от того, кто формально платит налог: ` +
     `объём Q, цены покупателя/продавца и распределение бремени одинаковы при налоге на продавца и на покупателя.</div>`;
   box.innerHTML = html;
@@ -2706,6 +2871,29 @@ function attachElastDrag(sel) {
     .on('end', () => { document.body.style.cursor = ''; }));
 }
 
+// Точка эластичности на кривой ПРЕДЛОЖЕНИЯ (Фаза 2а) — зеркало точки на спросе.
+function drawElasticityPointS() {
+  const e = STATE.elastS; if (!e || isNaN(e.p)) return;
+  const ox = sx(0), oy = sy(0), g = svg.append('g');
+  const [px, py] = toPx(e.q, e.p);
+  const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  dash(px, py, px, oy); dash(px, py, ox, py);
+  g.append('text').attr('x', px + 9).attr('y', py + 15).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.S)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Es|=' + fmt(e.absEs));
+  const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
+  attachElastDragS(hit);
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5.5)
+    .attr('fill', COL.S).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
+}
+
+function attachElastDragS(sel) {
+  sel.call(d3.drag().container(() => svg.node())
+    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('drag', (event) => { STATE.elastQS = toData(event.x, event.y)[0]; redrawAll(); })
+    .on('end', () => { document.body.style.cursor = ''; }));
+}
+
 // Табло эластичности: точка, |Ed|, зона, единичная точка и максимальная выручка.
 function updateElasticityPanel() {
   const box = document.getElementById('info-elast'); if (!box) return;
@@ -2714,12 +2902,33 @@ function updateElasticityPanel() {
   if (!e || isNaN(e.Ed)) { box.innerHTML = '<div class="warn">Эластичность не определена в этой точке.</div>'; return; }
   const zone = e.absEd > 1.0001 ? 'эластичный (|Ed|&gt;1)' : (e.absEd < 0.9999 ? 'неэластичный (|Ed|&lt;1)' : 'единичная (|Ed|=1)');
   let html = '';
-  html += `<div class="stat"><span>Точка (Q, P)</span><b>${fmt(e.q)}, ${fmt(e.p)}</b></div>`;
+  html += `<div class="stat"><span>Точка спроса (Q, P)</span><b>${fmt(e.q)}, ${fmt(e.p)}</b></div>`;
   html += `<div class="stat"><span>|Ed|</span><b>${fmt(e.absEd)}</b></div>`;
   html += `<div class="stat"><span>Зона спроса</span><b>${zone}</b></div>`;
+  html += `<div class="stat"><span>Выручка TR = P·Q</span><b>${fmt(e.TR)}</b></div>`;
+  // Связь эластичности с выручкой — главный вывод темы, поэтому словами (Фаза 2а).
+  const trNote = e.absEd > 1.0001
+    ? 'Спрос <b>эластичный</b>: снижение цены (рост Q) <b>увеличивает</b> выручку — объём растёт быстрее, чем падает цена.'
+    : (e.absEd < 0.9999
+      ? 'Спрос <b>неэластичный</b>: снижение цены (рост Q) <b>уменьшает</b> выручку — объём растёт медленнее, чем падает цена.'
+      : 'Единичная эластичность: выручка в максимуме, малое изменение цены её почти не меняет.');
+  html += `<div class="hint" style="margin-top:4px;">${trNote}</div>`;
   if (e.unit) {
     html += `<div class="stat" style="margin-top:4px;"><span>Единичная точка</span><b>Q=${fmt(e.unit.Q)}, P=${fmt(e.unit.P)}</b></div>`;
     html += `<div class="stat"><span>Макс выручка TR</span><b>${fmt(e.unit.TR)}</b></div>`;
+  }
+  // Эластичность предложения (Фаза 2а) — вторая точка, своя строка в табло.
+  const s = STATE.elastS;
+  if (s && !isNaN(s.Es)) {
+    const zs = s.absEs > 1.0001 ? 'эластичное (|Es|&gt;1)' : (s.absEs < 0.9999 ? 'неэластичное (|Es|&lt;1)' : 'единичная (|Es|=1)');
+    html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
+    html += `<div class="stat"><span>Точка предложения (Q, P)</span><b>${fmt(s.q)}, ${fmt(s.p)}</b></div>`;
+    html += `<div class="stat"><span>|Es|</span><b>${fmt(s.absEs)}</b></div>`;
+    html += `<div class="stat"><span>Зона предложения</span><b>${zs}</b></div>`;
+    html += '<div class="hint">Прямое предложение через начало координат даёт |Es|&nbsp;=&nbsp;1 в любой точке; ' +
+      'с положительным перехватом цены — неэластично, с отрицательным — эластично.</div>';
+  } else if (STATE.showElastS && !STATE.S) {
+    html += '<div class="hint" style="margin-top:6px;">Для |Es| отметьте кривую предложения (роль S).</div>';
   }
   box.innerHTML = html;
 }
@@ -2804,32 +3013,34 @@ function setShift(which, v) {
    MPC до MSC и приводит рынок в Qопт. Всё численно (любые кривые).
    --------------------------------------------------------------------- */
 
-// Заливка DWL (между MSC и D от Qопт до Qрын) — потери от внешнего эффекта.
+// Заливка DWL — клин между общественной и противоположной частной кривой
+// на отрезке между рыночным и оптимальным выпуском (Фаза 2б: оба знака).
 function drawExtAreas(e) {
   if (!e || e.Qopt == null) return;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const lo = Math.min(e.Qopt, e.Qmkt), hi = Math.max(e.Qopt, e.Qmkt);
   if (hi <= lo) return;
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
-  const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.D, d))).y1(d => sy(e.msc(d)));
+  const aD = d3.area().x(d => sx(d)).y0(d => sy(e.other(d))).y1(d => sy(e.social(d)));
   g.append('path').datum(samp).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28);
 }
 
-// Кривая MSC (оранжево-красная сплошная) + (если применён) MPC + налог Пигу (пунктир).
+// Общественная кривая MSC (эффект на издержках) либо MSB (эффект на выгоде)
+// + (если применён) частная кривая после корректирующего налога / субсидии.
 function drawExtCurves(e) {
   if (!e) return;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const pts = (f) => { const o = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = f(q); o.push(isNaN(v) ? null : [q, v]); } return o; };
-  g.append('path').datum(pts(e.msc)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr('d', line);
-  // Ярлык MSC у правого края.
-  const qL = CONFIG.Qmax * 0.9, vL = e.msc(qL);
-  if (!isNaN(vL) && vL <= CONFIG.Pmax) g.append('text').attr('x', sx(qL)).attr('y', sy(vL) - 4)
+  g.append('path').datum(pts(e.social)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr('d', line);
+  // Ярлык общественной кривой у правого края.
+  const qL = CONFIG.Qmax * 0.9, vL = e.social(qL);
+  if (!isNaN(vL) && vL <= CONFIG.Pmax && vL >= 0) g.append('text').attr('x', sx(qL)).attr('y', sy(vL) - 4)
     .attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.reg)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MSC');
-  // Налог Пигу: MPC + налог (≈ MSC) — зелёный пунктир.
-  if (e.applyPigou && e.pigou != null) {
-    g.append('path').datum(pts(q => evalCurve(STATE.S, q) + e.pigou))
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(e.pos ? 'MSB' : 'MSC');
+  // Корректирующий инструмент: налог поднимает предложение, субсидия — опускает (зелёный пунктир).
+  if (e.applyPigou && e.corrective != null) {
+    g.append('path').datum(pts(q => evalCurve(STATE.S, q) + (e.pos ? -e.corrective : e.corrective)))
       .attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
   }
 }
@@ -2878,21 +3089,47 @@ function updateExtPanel() {
   if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Отметьте D (выгода MSB) и S (частные издержки MPC).</div>'; return; }
   if (!STATE.eq) { box.innerHTML = '<div class="warn">Рыночное равновесие не найдено.</div>'; return; }
   const e = STATE.ext;
-  if (!e) { box.innerHTML = '<div class="warn">Введите внешние предельные издержки.</div>'; return; }
+  if (!e) { box.innerHTML = '<div class="warn">Введите величину внешнего эффекта.</div>'; return; }
+  const mktEq = e.pos ? 'MPB = S' : 'D = MPC', optEq = e.pos ? 'MSB = S' : 'D = MSC';
+  const tool = e.pos ? 'Корректирующая субсидия' : 'Корректирующий налог (Пигу)';
   let html = '';
-  html += `<div class="stat"><span>Qрын (D = MPC)</span><b>Q=${fmt(e.Qmkt)}, P=${fmt(e.Pmkt)}</b></div>`;
+  html += `<div class="stat"><span>Qрын (${mktEq})</span><b>Q=${fmt(e.Qmkt)}, P=${fmt(e.Pmkt)}</b></div>`;
   if (e.Qopt != null) {
-    html += `<div class="stat"><span>Qопт (D = MSC)</span><b>Q=${fmt(e.Qopt)}, P=${fmt(e.Popt)}</b></div>`;
+    html += `<div class="stat"><span>Qопт (${optEq})</span><b>Q=${fmt(e.Qopt)}, P=${fmt(e.Popt)}</b></div>`;
     html += `<div class="stat"><span>DWL (потери)</span><b>${fmt(e.dwl)}</b></div>`;
-    html += `<div class="stat"><span>Налог Пигу</span><b>${fmt(e.pigou)}</b></div>`;
+    html += `<div class="stat"><span>${tool}</span><b>${fmt(e.corrective)}</b></div>`;
+    const gap = e.Qopt - e.Qmkt;
+    html += `<div class="hint" style="margin-top:4px;">${gap < -1e-6
+      ? 'Рынок выпускает <b>больше</b> общественного оптимума на ' + fmt(-gap) + ' — <b>перепроизводство</b>: частные издержки ниже общественных.'
+      : (gap > 1e-6
+        ? 'Рынок выпускает <b>меньше</b> общественного оптимума на ' + fmt(gap) + ' — <b>недопроизводство</b>: частная выгода ниже общественной.'
+        : 'Рынок уже в общественном оптимуме — внешний эффект нулевой.')}</div>`;
     if (e.applyPigou && e.pigouEq) {
       html += `<div class="stat" style="margin-top:4px;"><span>Новое равновесие</span><b>Q=${fmt(e.pigouEq.Q)}, P=${fmt(e.pigouEq.P)}</b></div>`;
-      html += '<div class="hint">Налог Пигу сместил рынок в общественный оптимум Qопт — DWL устранён.</div>';
+      html += `<div class="hint">${e.pos ? 'Субсидия опустила издержки' : 'Налог Пигу поднял издержки'} — рынок пришёл в Qопт, DWL устранён.</div>`;
     }
   } else {
-    html += '<div class="warn">Оптимум D = MSC не найден в первой четверти.</div>';
+    html += `<div class="warn">Оптимум ${optEq} не найден в первой четверти.</div>`;
   }
   box.innerHTML = html;
+}
+
+// Переключатель знака внешнего эффекта (Фаза 2б): меняет подписи полей и модель.
+function setExtSign(sign) {
+  STATE.extSign = (sign === 'pos') ? 'pos' : 'neg';
+  const pos = (STATE.extSign === 'pos');
+  const n = document.getElementById('ext-neg'), p = document.getElementById('ext-pos');
+  if (n) n.classList.toggle('active', !pos);
+  if (p) p.classList.toggle('active', pos);
+  const lbl = document.getElementById('ext-label');
+  if (lbl) lbl.textContent = pos ? 'Внешняя предельная выгода (число или f(Q))'
+                                 : 'Внешние предельные издержки (число или f(Q))';
+  const pl = document.getElementById('ext-pigou-label');
+  if (pl) pl.textContent = pos ? 'Применить корректирующую субсидию' : 'Применить налог Пигу';
+  const hn = document.getElementById('ext-hint-neg'), hp = document.getElementById('ext-hint-pos');
+  if (hn) hn.style.display = pos ? 'none' : '';
+  if (hp) hp.style.display = pos ? '' : 'none';
+  redrawAll();
 }
 
 // Перекомпиляция внешних предельных издержек (вызывается при смене формулы / сценария).
@@ -3242,6 +3479,18 @@ function setMarket(mode) {
   // Сторона налога («кто платит») видна только в конкуренции при типе «Налог».
   const tsr = document.getElementById('taxside-row');
   if (tsr) tsr.style.display = (mode !== 'monopoly' && STATE.intervType === 'tax') ? '' : 'none';
+  // Вид ставки — только в конкуренции: в монополии налог входит в предельные издержки
+  // (monopolyTax сдвигает MC), адвалорная форма туда не переносится. При входе в
+  // монополию честно возвращаем специфический вид, чтобы не считать по «не той» модели.
+  const tkr = document.getElementById('taxkind-row');
+  if (tkr) tkr.style.display = (mode !== 'monopoly' && (STATE.intervType === 'tax' || STATE.intervType === 'subsidy')) ? '' : 'none';
+  if (mode === 'monopoly' && STATE.taxKind === 'advalorem') {
+    STATE.taxKind = 'unit';
+    const u = document.getElementById('tk-unit'), a = document.getElementById('tk-adv');
+    if (u) u.classList.add('active'); if (a) a.classList.remove('active');
+    applyTaxRateBounds();
+    STATE.tax = Math.min(STATE.tax, CONFIG.Pmax);
+  }
   // Видимость под-режима монополии и его панелей (галочки областей / дискриминация / ломаный).
   applyMonoVisibility();
   if (typeof updatePult === 'function') updatePult();   // монополия: пульт = слайдеры D/MC + поле вмешательства
@@ -4737,8 +4986,12 @@ function setRanges(qmax, pmax) {
   CONFIG.Qmax = qmax; CONFIG.Pmax = pmax;
   const qi = document.getElementById('inp-qmax'); if (qi) qi.value = qmax;
   const pi = document.getElementById('inp-pmax'); if (pi) pi.value = pmax;
+  // Адвалорная ставка меряется в ПРОЦЕНТАХ — её пределы к масштабу цены не привязаны
+  // (ими управляет applyTaxRateBounds), поэтому поля ставки в этом случае пропускаем.
+  const advRate = (STATE.taxKind === 'advalorem');
   ['tax-slider', 'tax-input', 'pc-slider', 'pc-input',
    'labmin-slider', 'labmin-input', 'union-wage-slider', 'union-wage-input'].forEach(id => {
+    if (advRate && (id === 'tax-slider' || id === 'tax-input')) return;
     const e = document.getElementById(id); if (e) e.max = pmax;
   });
 }
@@ -6373,6 +6626,7 @@ function redrawAll() {
     drawCurves();
     drawEquilibrium();
     drawElasticityPoint();
+    drawElasticityPointS();   // вторая точка — на предложении (Фаза 2а)
   } else {
     // Конкуренция, обычный сценарий: заливки + кривые + равновесие/вмешательство.
     if (STATE.taxActive) drawTaxAreas();
@@ -6663,6 +6917,22 @@ function loadScene(name) {
       else if (name === 'ceil') { setType('ceiling'); setPReg(30); }
       else { setType('tax'); }                                  // 'sd' — чистое равновесие
     }
+  } else if (name === 'elast' || name === 'ext') {
+    // Фаза 2: эластичность и внешние эффекты — конкурентный рынок D = 100 − Q, S = Q.
+    setMode('market');
+    addCurve('100 - Q'); setRole(STATE.curves[0], 'demand');
+    addCurve('Q');       setRole(STATE.curves[1], 'supply');
+    setMarket('comp');
+    if (name === 'elast') {
+      STATE.elastQ = null; STATE.elastQS = null;   // точки встанут в «умные» стартовые позиции
+      setScenario('elasticity');
+    } else {
+      STATE.extSign = 'neg'; STATE.extExpr = '20'; STATE.applyPigou = false;
+      const ei = document.getElementById('ext-input'); if (ei) ei.value = '20';
+      const ep = document.getElementById('ext-pigou'); if (ep) ep.checked = false;
+      setExtSign('neg');
+      setScenario('externality');
+    }
   } else if (name === 'costs') {
     const tcInp = document.getElementById('inp-tc'), fcInp = document.getElementById('inp-fc');
     STATE.costsTC = 'Q^3 - 6*Q^2 + 15*Q + 18'; STATE.costsFC = 18;
@@ -6709,6 +6979,8 @@ function pickScene(key) {
     tax:   () => loadScene('tax'),
     ceil:  () => loadScene('ceil'),
     mono:  () => loadScene('mono'),
+    elast: () => loadScene('elast'),
+    ext:   () => loadScene('ext'),
     costs: () => loadScene('costs'),
     ppf:   () => loadScene('ppf'),
     labor: () => setMode('labor'),
@@ -6737,7 +7009,8 @@ function pickScene(key) {
    --------------------------------------------------------------------- */
 const SCENE_NAMES = {
   sd: 'Спрос и предложение', tax: 'Налог и субсидия', ceil: 'Потолок и пол цены',
-  mono: 'Монополия', costs: 'Издержки фирмы', ppf: 'КПВ — возможности',
+  mono: 'Монополия', elast: 'Эластичность', ext: 'Внешние эффекты',
+  costs: 'Издержки фирмы', ppf: 'КПВ — возможности',
   labor: 'Рынок труда', ineq: 'Неравенство доходов',
   ppfsum: 'Сумма КПВ двух стран', trade: 'Торговля (КТВ)', free: 'Свободный холст',
 };
@@ -6979,7 +7252,7 @@ let pultDock = null;
 
 // Все переносимые экранные регуляторы (по всем сценам). «Дом» каждого запоминается
 // при первом обращении (исходный родитель + стабильный якорь) — поддержка любой секции.
-const PULT_MOVABLE = ['taxside-row', 'tax-field', 'pc-field',          // рынок: вмешательство
+const PULT_MOVABLE = ['taxkind-row', 'taxside-row', 'tax-field', 'pc-field',   // рынок: вмешательство
   'union-wage-field', 'labmin-field',                                  // труд: зарплата / МРОТ
   'ppft-price-field', 'tb-price-field',                                // КТВ: мировая цена (A / Б)
   'ineq-alpha-field'];                                                 // неравенство: α (формула)
@@ -6993,6 +7266,7 @@ function pultRegulatorIds() {
     const t = STATE.intervType;
     if (t === 'tax' || t === 'subsidy') {
       const ids = [];
+      if (STATE.market !== 'monopoly') ids.push('taxkind-row');                 // вид ставки (Фаза 2в)
       if (t === 'tax' && STATE.market !== 'monopoly') ids.push('taxside-row');  // как в setType
       ids.push('tax-field');
       return ids;
@@ -7540,6 +7814,19 @@ function wireControls() {
   }
   const extPigou = document.getElementById('ext-pigou');
   if (extPigou) extPigou.addEventListener('change', () => { STATE.applyPigou = extPigou.checked; redrawAll(); });
+  // Фаза 2б: знак внешнего эффекта (отрицательный ↔ положительный).
+  const extNeg = document.getElementById('ext-neg'), extPos = document.getElementById('ext-pos');
+  if (extNeg) extNeg.addEventListener('click', () => setExtSign('neg'));
+  if (extPos) extPos.addEventListener('click', () => setExtSign('pos'));
+
+  // Фаза 2а: галочка «точка на предложении» (вторая точка эластичности).
+  const elS = document.getElementById('chk-elast-s');
+  if (elS) elS.addEventListener('change', () => { STATE.showElastS = elS.checked; redrawAll(); });
+
+  // Фаза 2в: вид потоварной ставки (специфический ↔ адвалорный).
+  const tkU = document.getElementById('tk-unit'), tkA = document.getElementById('tk-adv');
+  if (tkU) tkU.addEventListener('click', () => setTaxKind('unit'));
+  if (tkA) tkA.addEventListener('click', () => setTaxKind('advalorem'));
 
   // Режим издержек (Задача 2): ввод TC/FC, кнопки «Построить» / «Стандартные», галочки кривых.
   const tcInp = document.getElementById('inp-tc');

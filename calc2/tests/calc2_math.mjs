@@ -247,6 +247,57 @@ const CASES = [
           return { p100: evalCurve(c, 100), p50: evalCurve(c, 50), isFn: c.fn ? 1 : 0 };`,
     checks: [['P(Q=100)', 'p100', 3, 0.01], ['P(Q=50)', 'p50', 7, 0.01], ['численный канон', 'isFn', 1, 0.1]],
   },
+
+  /* ── Фаза 2: эластичность, экстерналии, адвалорный налог ─────────────── */
+  {
+    name: 'Эластичность спроса · D=100−Q: |Ed| = 3 при Q=25 и 0.333 при Q=75',
+    run: `loadScene('elast');
+          STATE.elastQ = 25; redrawAll(); var a = (STATE.elast||{}).absEd;
+          STATE.elastQ = 75; redrawAll(); var b = (STATE.elast||{}).absEd;
+          STATE.elastQ = 50; redrawAll(); var c = (STATE.elast||{}).absEd;
+          return { a: a, b: b, c: c, TR: (STATE.elast||{}).TR };`,
+    checks: [['|Ed| при Q=25', 'a', 3, 0.02], ['|Ed| при Q=75', 'b', 0.3333, 0.01],
+             ['|Ed| при Q=50', 'c', 1, 0.01], ['TR при Q=50', 'TR', 2500, 20]],
+  },
+  {
+    name: 'Эластичность предложения · S=Q (прямая через 0) ⇒ |Es| = 1 в любой точке',
+    run: `loadScene('elast'); STATE.showElastS = true;
+          STATE.elastQS = 20; redrawAll(); var a = (STATE.elastS||{}).absEs;
+          STATE.elastQS = 70; redrawAll(); var b = (STATE.elastS||{}).absEs;
+          return { a: a, b: b };`,
+    checks: [['|Es| при Q=20', 'a', 1, 0.02], ['|Es| при Q=70', 'b', 1, 0.02]],
+  },
+  {
+    name: 'Внешний эффект ПОЛОЖИТЕЛЬНЫЙ · MPB=100−Q, ext=20, S=Q ⇒ Qрын=50, Qопт=60, DWL=100',
+    // Зеркало отрицательного случая: недопроизводство, лечится СУБСИДИЕЙ.
+    // В конце возвращаем знак на 'neg', чтобы не влиять на порядок прогона.
+    run: `loadScene('ext'); setExtSign('pos');
+          STATE.extExpr = '20'; recompileExt(); redrawAll();
+          var e = STATE.ext || {};
+          var res = { Qmkt: e.Qmkt, Qopt: e.Qopt, dwl: e.dwl, sub: e.corrective,
+                      Popt: e.Popt, pos: e.pos ? 1 : 0 };
+          setExtSign('neg');
+          return res;`,
+    checks: [['Qрын', 'Qmkt', 50, 0.3], ['Qопт', 'Qopt', 60, 0.4], ['DWL', 'dwl', 100, 2],
+             ['субсидия', 'sub', 20, 0.2], ['Pопт = S(Qопт)', 'Popt', 60, 0.4], ['знак +', 'pos', 1, 0.1]],
+  },
+  {
+    name: 'Адвалорный налог · D=100−Q, S=2Q, τ=50% ⇒ Q1=25, Pb=75, Ps=50, сбор=625',
+    // Поворот, а не сдвиг: S_после = (1+τ)·S = 3Q. Вертикальный разрыв между S и
+    // S_после РАСТЁТ с Q (20 при Q=20, 40 при Q=40) — в отличие от постоянного клина.
+    run: `setMode('market'); STATE.scenario = 'none'; STATE.curves = [];
+          addCurve('100 - Q'); setRole(STATE.curves[0], 'demand');
+          addCurve('2*Q');     setRole(STATE.curves[1], 'supply');
+          setMarket('comp'); setType('tax'); setTaxKind('advalorem'); setTax(50); redrawAll();
+          var te = STATE.taxEq || {};
+          var g20 = evalCurve(STATE.taxAfterS, 20) - evalCurve(STATE.S, 20);
+          var g40 = evalCurve(STATE.taxAfterS, 40) - evalCurve(STATE.S, 40);
+          var res = { Q1: te.Q, Pb: te.Pb, Ps: te.Ps, tx: STATE.tx, g20: g20, g40: g40 };
+          setTaxKind('unit'); setTax(0);
+          return res;`,
+    checks: [['Q1', 'Q1', 25, 0.2], ['Pb', 'Pb', 75, 0.3], ['Ps', 'Ps', 50, 0.3],
+             ['сбор', 'tx', 625, 5], ['разрыв при Q=20', 'g20', 20, 0.3], ['разрыв при Q=40', 'g40', 40, 0.5]],
+  },
 ];
 
 function approx(got, want, tol) {
