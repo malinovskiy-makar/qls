@@ -1421,6 +1421,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="seg-btn" id="lab-mono">Монопсония</button>
         <button class="seg-btn" id="lab-union">Профсоюз</button>
       </div>
+      <div class="seg" style="margin-top:6px;">
+        <button class="seg-btn" id="lab-bilat">Двусторонняя монополия</button>
+      </div>
       <div class="hint">Спрос на труд (роль <b>D</b>) — это MRPL; предложение труда (роль <b>S</b>).
         Оси: L (труд) и W (зарплата). Формулы можно писать через L: <code>100 - L</code>, <code>L</code>.</div>
       <!-- Профсоюз (ЧК4): монополист труда. Под-модели — монополист / диктат зарплаты.
@@ -1922,7 +1925,9 @@ const STATE = {
   cons: null,                    // результат расчёта
   consErr: null,
   // Рынок труда (Чекпоинт 1): структура и минимальная зарплата. Оси L (труд) / W (зарплата).
-  laborStruct: 'competition',  // 'competition' — конкуренция, 'monopsony' — монопсония, 'union' — профсоюз (ЧК4)
+  // 'competition' | 'monopsony' | 'union' | 'bilateral' (двусторонняя монополия, Фаза 12)
+  laborStruct: 'competition',
+  laborBilateral: null,        // диапазон зарплат [Wм; Wп] — модель НЕ даёт одной точки
   unionModel: 'monopoly',      // профсоюз: 'monopoly' — монополист труда (MRL=S), 'wagefloor' — диктат зарплаты
   unionWage: 0,                // уровень зарплаты профсоюза при диктате (0 = не задан)
   unionWageVisited: false,     // первый вход в диктат — выставить зарплату-ориентир
@@ -5881,7 +5886,8 @@ function recomputeLabor() {
     STATE.laborFirmCS = integrate(l => evalCurve(D, l) - eq.P, 0, eq.Q);     // излишек фирм (под D, над W)
   }
   // Монопсония: оптимум MCL = D, зарплата опускается на кривую предложения.
-  if (STATE.laborStruct === 'monopsony') {
+  // При двусторонней монополии (Фаза 12) она нужна как НИЖНЯЯ граница диапазона.
+  if (STATE.laborStruct === 'monopsony' || STATE.laborStruct === 'bilateral') {
     const Lm = findRoot(l => laborMCL(S, l) - evalCurve(D, l));
     if (Lm != null && Lm > 0) {
       const Wm = evalCurve(S, Lm);               // зарплата = W_s(Lm) (НЕ с точки MCL=D и НЕ с D)
@@ -5895,6 +5901,22 @@ function recomputeLabor() {
     STATE.laborUnion = (STATE.unionModel === 'wagefloor')
       ? laborUnionWageFloor(STATE.unionWage)
       : laborUnionMonopoly();
+  }
+  /* Двусторонняя монополия (Фаза 12): один наниматель против одного профсоюза.
+     ВАЖНО ПРО МОДЕЛЬ: единственного равновесия здесь НЕТ — исход зависит от
+     переговорной силы сторон, и стандартная трактовка в учебниках именно такая.
+     Поэтому считаем не «точку», а ДИАПАЗОН [Wм; Wп]: снизу — что назначил бы
+     монопсонист в одиночку, сверху — чего добился бы профсоюз-монополист.
+     Обе границы берём из уже проверенных функций, ничего не пересчитывая. */
+  STATE.laborBilateral = null;
+  if (STATE.laborStruct === 'bilateral') {
+    STATE.laborUnion = laborUnionMonopoly();
+    const m = STATE.laborMono, u = STATE.laborUnion;
+    if (m && u) {
+      const lo = Math.min(m.Wm, u.Wu), hi = Math.max(m.Wm, u.Wu);
+      STATE.laborBilateral = { Wlo: lo, Whi: hi, Wm: m.Wm, Lm: m.Lm, Wu: u.Wu, Lu: u.Lu,
+                               Wk: eq ? eq.P : null, Lk: eq ? eq.Q : null };
+    }
   }
   // Минимальная зарплата (МРОТ).
   if (STATE.laborMinOn && STATE.laborMinW > 0 && eq) {
@@ -6260,14 +6282,65 @@ function setUnionModel(model) {
   redrawAll();
 }
 
+/* --- Фаза 12. Двусторонняя монополия: полоса возможных исходов ----------- */
+
+// Закрашенная горизонтальная полоса между Wм и Wп + обе граничные точки.
+// Одной «правильной» точки внутри полосы модель не даёт — так и подписываем.
+function drawLaborBilateral() {
+  const b = STATE.laborBilateral; if (!b) return;
+  const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax);
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const yLo = sy(b.Wlo), yHi = sy(b.Whi);
+  g.append('rect').attr('x', ox).attr('y', yHi).attr('width', xMax - ox).attr('height', Math.abs(yLo - yHi))
+    .attr('fill', COL.reg).attr('opacity', 0.16);
+  g.append('line').attr('x1', ox).attr('y1', yLo).attr('x2', xMax).attr('y2', yLo)
+    .attr('stroke', COL.reg).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
+  g.append('line').attr('x1', ox).attr('y1', yHi).attr('x2', xMax).attr('y2', yHi)
+    .attr('stroke', COL.reg).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
+  const gg = svg.append('g');
+  haloText(gg, ox - 8, yLo, 'Wм=' + fmt(b.Wm), 'end', 'middle');
+  haloText(gg, ox - 8, yHi, 'Wп=' + fmt(b.Wu), 'end', 'middle');
+  gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2)
+    .attr('text-anchor', 'middle').attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.warn)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
+    .text('диапазон возможных исходов');
+  gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2 + 15)
+    .attr('text-anchor', 'middle').attr('font-size', 10.5).attr('fill', COL.inkSoft)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
+    .text('конкретная точка зависит от переговорной силы — модель её не определяет');
+  // Две граничные точки: решение монопсониста и решение профсоюза.
+  laborPoint(gg, b.Lm, b.Wm, COL.S, 'М', { lText: 'Lм=' + fmt(b.Lm), wText: null });
+  laborPoint(gg, b.Lu, b.Wu, COL.MR, 'П', { lText: 'Lп=' + fmt(b.Lu), wText: null });
+}
+
+// Табло двусторонней монополии.
+function updateLaborBilateralPanel() {
+  const b = STATE.laborBilateral;
+  if (!b) return '<div class="warn">Не удалось найти обе границы: нужны спрос на труд (D) и предложение (S).</div>';
+  let html = '';
+  html += `<div class="stat"><span>Нижняя граница Wм (монопсония)</span><b>${fmt(b.Wm)}</b></div>`;
+  html += `<div class="stat"><span>Верхняя граница Wп (профсоюз)</span><b>${fmt(b.Wu)}</b></div>`;
+  html += `<div class="stat"><span>Диапазон зарплаты</span><b>${fmt(b.Wlo)} … ${fmt(b.Whi)}</b></div>`;
+  if (b.Wk != null) html += `<div class="stat"><span>Конкурентный ориентир Wk</span><b>${fmt(b.Wk)}</b></div>`;
+  html += `<div class="stat"><span>Занятость на границах</span><b>${fmt(b.Lm)} и ${fmt(b.Lu)}</b></div>`;
+  html += '<div class="hint" style="margin-top:6px;">Один наниматель против одного профсоюза. У этой модели ' +
+    '<b>нет единственного равновесия</b>: если бы монопсонист диктовал условия один, зарплата упала бы до Wм; ' +
+    'если бы диктовал профсоюз — поднялась бы до Wп. Реальный исход лежит между и зависит от переговорной силы ' +
+    'сторон, которую модель не описывает. Показывать здесь одно «точное» число было бы ложной точностью — ' +
+    'поэтому показан диапазон.</div>';
+  return html;
+}
+
 // Переключатель структуры рынка труда (конкуренция / монопсония / профсоюз).
 function setLaborStruct(mode) {
   STATE.laborStruct = mode;
-  [['lab-comp', 'competition'], ['lab-mono', 'monopsony'], ['lab-union', 'union']]
+  [['lab-comp', 'competition'], ['lab-mono', 'monopsony'], ['lab-union', 'union'], ['lab-bilat', 'bilateral']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === mode); });
-  // Панель профсоюза видна только при структуре «Профсоюз»; МРОТ — только при остальных.
+  // Панель профсоюза видна только при структуре «Профсоюз»; МРОТ — только там, где он осмыслен
+  // (в двусторонней монополии показывается диапазон, поверх него МРОТ только запутал бы).
   const up = document.getElementById('union-pane'); if (up) up.style.display = (mode === 'union') ? '' : 'none';
-  const lb = document.getElementById('labmin-block'); if (lb) lb.style.display = (mode === 'union') ? 'none' : '';
+  const lb = document.getElementById('labmin-block');
+  if (lb) lb.style.display = (mode === 'union' || mode === 'bilateral') ? 'none' : '';
   if (mode === 'union') setUnionModel(STATE.unionModel);   // синхронизировать под-модель/поля
   if (typeof updatePult === 'function') updatePult();   // зарплата профсоюза / МРОТ в пульт
   redrawAll();
@@ -6283,6 +6356,10 @@ function updateLaborPanel() {
   if (!STATE.laborEq) { box.innerHTML = '<div class="warn">Равновесие рынка труда не найдено в первой четверти.</div>'; return; }
   const min = STATE.laborMin, bind = (min && min.binding);
   let html = '';
+  if (STATE.laborStruct === 'bilateral') {   // Фаза 12 — диапазон, а не точка
+    box.innerHTML = updateLaborBilateralPanel();
+    return;
+  }
   if (STATE.laborStruct === 'union') {
     const u = STATE.laborUnion;
     if (!u) { box.innerHTML = '<div class="warn">Оптимум профсоюза не найден.</div>'; return; }
@@ -6368,7 +6445,15 @@ function redrawLabor() {
   drawGrid();
   drawAxes('L', 'W');
   const minBind = (STATE.laborMin && STATE.laborMin.binding);
-  if (STATE.laborStruct === 'union') {
+  if (STATE.laborStruct === 'bilateral') {
+    // Фаза 12: обе «крайние» кривые сразу — MCL нанимателя и MRL профсоюза + полоса исходов.
+    drawLaborBilateral();
+    drawCurves();
+    drawLaborMCL();
+    drawLaborUnionMRL();
+    drawLaborGhost(STATE.laborBilateral ? STATE.laborBilateral.Lk : null,
+                   STATE.laborBilateral ? STATE.laborBilateral.Wk : null, 'К');
+  } else if (STATE.laborStruct === 'union') {
     // Профсоюз (ЧК4): потери от ограничения труда + кривые + (для монополиста) MRL + точки.
     const u = STATE.laborUnion;
     if (u && (STATE.unionModel === 'monopoly' || u.binding)) drawLaborGapDWL(u.Lu, u.Lk);
@@ -7869,9 +7954,31 @@ function inequalityStats(pts) {
   pts.forEach(pt => { if (!isNaN(pt[1])) { const d = pt[0] - pt[1]; if (d > hoover) { hoover = d; hooverP = pt[0]; } } });
   const L10 = lorenzAt(pts, 0.1), L90 = lorenzAt(pts, 0.9);
   const L20 = lorenzAt(pts, 0.2), L80 = lorenzAt(pts, 0.8);
+  // Фаза 13. «Децильный коэффициент» в российской (росстатовской) традиции —
+  // это КОЭФФИЦИЕНТ ФОНДОВ: отношение СУММАРНОГО дохода верхних 10 % населения
+  // к СУММАРНОМУ доходу нижних 10 %. По кривой Лоренца это ровно
+  // (1 − L(0.9)) / L(0.1): числитель — доля дохода верхней децили, знаменатель —
+  // нижней. Деление на неравные группы даёт интерполяция внутри lorenzAt.
   const decile = (L10 > 1e-9) ? (1 - L90) / L10 : null;
   const quintile = (L20 > 1e-9) ? (1 - L80) / L20 : null;
-  return { gini, hoover, hooverP, decile, quintile };
+  return { gini, hoover, hooverP, decile, funds: decile, quintile };
+}
+
+// Фаза 13. АЛЬТЕРНАТИВНАЯ метрика — отношение ПОРОГОВ P90/P10 (девятый дециль
+// к первому). Это НЕ коэффициент фондов: там отношение сумм доходов групп, здесь —
+// отношение граничных доходов. Считается только там, где известны сами доходы;
+// для долей по группам и формулы Лоренца порогов нет — возвращаем null.
+function inequalityP90P10() {
+  if (STATE.ineqInput !== 'incomes') return null;
+  const xs = parseNumberList(STATE.ineqIncomes).filter(v => v >= 0).sort((a, b) => a - b);
+  const n = xs.length;
+  if (n < 2) return null;
+  const q = (p) => {                       // порядковая статистика с линейной интерполяцией
+    const idx = (n - 1) * p, lo = Math.floor(idx), hi = Math.min(n - 1, lo + 1);
+    return xs[lo] + (idx - lo) * (xs[hi] - xs[lo]);
+  };
+  const p10 = q(0.1), p90 = q(0.9);
+  return (p10 > 1e-9) ? { p10, p90, ratio: p90 / p10 } : null;
 }
 
 // Доли дохода по группам равного населения для перераспределения (ЧК3).
@@ -8106,8 +8213,22 @@ function updateInequalityPanel() {
   if (STATE.ineqWarn) html += '<div class="warn" style="margin-bottom:6px;">' + STATE.ineqWarn + '</div>';
   html += `<div class="stat"><span>Коэффициент Джини</span><b>${fmt(s.gini)}</b></div>`;
   html += `<div class="stat"><span>Робин Гуда (Гувера)</span><b>${fmt(s.hoover)}</b></div>`;
-  html += `<div class="stat"><span>Децильный коэф.</span><b>${s.decile == null ? '∞' : fmt(s.decile)}</b></div>`;
-  html += `<div class="stat"><span>Квинтильный коэф.</span><b>${s.quintile == null ? '∞' : fmt(s.quintile)}</b></div>`;
+  // Фаза 13: явные подписи — что именно показано.
+  html += `<div class="stat"><span>Коэф. фондов (децильный)</span><b>${s.decile == null ? '∞' : fmt(s.decile)}</b></div>`;
+  html += `<div class="stat"><span>Квинтильный коэф. фондов</span><b>${s.quintile == null ? '∞' : fmt(s.quintile)}</b></div>`;
+  const pp = inequalityP90P10();
+  if (pp) {
+    html += `<div class="stat"><span>P90/P10 (пороги)</span><b>${fmt(pp.ratio)}</b></div>`;
+    html += `<div class="hint">Это ДВЕ разные величины. <b>Коэффициент фондов</b> — отношение
+      суммарного дохода верхних 10&nbsp;% населения к суммарному доходу нижних 10&nbsp;%
+      (российская, росстатовская традиция; здесь ${fmt(s.decile)}). <b>P90/P10</b> — отношение
+      граничных доходов: девятого дециля (${fmt(pp.p90)}) к первому (${fmt(pp.p10)}) —
+      здесь ${fmt(pp.ratio)}. Фонды учитывают «хвост» самых богатых, пороги — нет.</div>`;
+  } else {
+    html += '<div class="hint">Показан <b>коэффициент фондов</b>: отношение суммарного дохода ' +
+      'верхних 10&nbsp;% к суммарному доходу нижних 10&nbsp;% (не отношение порогов P90/P10 — ' +
+      'это другая величина). Пороги можно посчитать только по способу ввода «Доходы».</div>';
+  }
   // Перераспределение «до → после» (ЧК3) — имеет приоритет над снимком ЧК2.
   if (STATE.ineqRedist) {
     const r = STATE.ineqRedist.stats, d = r.gini - s.gini;
@@ -9628,6 +9749,8 @@ function wireControls() {
   // Профсоюз (ЧК4): структура + под-модель + ползунок/поле зарплаты при диктате.
   const labUnion = document.getElementById('lab-union');
   if (labUnion) labUnion.addEventListener('click', () => setLaborStruct('union'));
+  const labBilat = document.getElementById('lab-bilat');
+  if (labBilat) labBilat.addEventListener('click', () => setLaborStruct('bilateral'));
   const unMono = document.getElementById('un-monopoly'), unWf = document.getElementById('un-wagefloor');
   if (unMono) unMono.addEventListener('click', () => setUnionModel('monopoly'));
   if (unWf) unWf.addEventListener('click', () => setUnionModel('wagefloor'));
