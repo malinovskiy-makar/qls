@@ -499,7 +499,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .pult {
   position: absolute; left: 14px; bottom: 14px; z-index: var(--z-float);
   display: flex; align-items: stretch;
-  min-width: 420px; max-width: min(560px, 92vw);
+  /* Шире, чем раньше: у сцен с большим числом регуляторов (монополия, налог)
+     лента иначе переносится на 3 ряда и залезает на график (Фаза 3). */
+  min-width: 420px; max-width: min(880px, 94vw);
   background: var(--surface);   /* фолбэк без color-mix */
   background: color-mix(in srgb, var(--surface) 84%, transparent);  /* frosted glass */
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
@@ -518,9 +520,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .pult-head:active { cursor: grabbing; }
 .pult-grip { display: inline-flex; flex-direction: column; gap: 3px; }
 .pult-grip i { width: 3px; height: 3px; border-radius: 50%; background: var(--text3); }
+/* Вертикальный заголовок ручки. max-height обязателен: без него длинный заголовок
+   («Монополия: потолок») растягивал ВСЮ ленту до ~150px и она залезала на график.
+   С ограничением текст переносится во второй вертикальный столбец. */
 .pult-head h2 {
   font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
   color: var(--text3); writing-mode: vertical-rl; transform: rotate(180deg); margin: 0;
+  max-height: 74px; white-space: normal; line-height: 1.3; text-align: center;
 }
 /* Тело — регуляторы в один ряд, переносятся на узком экране. */
 .pult-body {
@@ -534,6 +540,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 }
 #pult #taxside-row > label, #pult #taxkind-row > label { display: inline; margin: 0; white-space: nowrap; }
 #pult #taxside-row .seg-btn, #pult #taxkind-row .seg-btn { padding: 6px 10px; white-space: nowrap; }
+/* Под-режим монополии: в ленте — одна строка (в «Инструментах» остаются две). */
+#pult #mono-submode { margin: 0 !important; display: flex; flex-direction: row; gap: 6px; flex-shrink: 0; }
+#pult #mono-submode .seg { margin: 0 !important; }
+#pult #mono-submode .seg-btn { padding: 5px 9px; font-size: 11.5px; white-space: nowrap; }
 /* Блоки «Ставка t» и «Цена Pc»: метка + ползунок + число в строку, ползунок тянется. */
 #pult #tax-field, #pult #pc-field {
   margin: 0 !important; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px;
@@ -1047,14 +1057,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="hint" id="mono-hint" style="display:none;">Монополист выпускает там, где <b>MR&nbsp;=&nbsp;MC</b>,
         и берёт цену с кривой спроса (выше предельных издержек). Нужны: спрос (роль D) и предельные издержки
         (роль MC, либо TC, либо S как MC). Серым — потери общества (DWL) против конкуренции.</div>
-      <!-- Под-режимы монополии (Чекпоинт 2): обычная / дискриминация 1 / дискриминация 3 / ломаный спрос.
-           Виден только в режиме монополии. -->
+      <!-- Под-режимы монополии: обычная / дискриминация 1° / дискриминация 3° /
+           составной спрос / естественная монополия. Виден только в режиме монополии;
+           при выборе сцены «Монополия» переносится в пульт-ленту (Фаза 3а). -->
       <div id="mono-submode" style="display:none;margin-top:8px;">
         <div class="seg">
-          <button class="seg-btn active" id="mm-simple">Обычная</button>
-          <button class="seg-btn" id="mm-d1">Дискр.1</button>
-          <button class="seg-btn" id="mm-d3">Дискр.3</button>
-          <button class="seg-btn" id="mm-kink">Ломаный</button>
+          <button class="seg-btn active" id="mm-simple" title="Обычная монополия: MR = MC, одна цена">Обычная</button>
+          <button class="seg-btn" id="mm-d1" title="Ценовая дискриминация 1-й степени (совершенная)">Дискр.&nbsp;1°</button>
+          <button class="seg-btn" id="mm-d3" title="Ценовая дискриминация 3-й степени: два сегмента рынка">Дискр.&nbsp;3°</button>
+        </div>
+        <div class="seg" style="margin-top:6px;">
+          <button class="seg-btn" id="mm-kink" title="Составной спрос: рыночный спрос склеен из сегментов покупателей">Составной&nbsp;спрос</button>
+          <button class="seg-btn" id="mm-nat" title="Естественная монополия: большие постоянные издержки, убывающая ATC">Естественная</button>
         </div>
       </div>
       <!-- Панель дискриминации 1-й степени (Задача 4): использует D и MC из списка кривых. -->
@@ -1078,8 +1092,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div class="error" id="d3-error" style="display:none;"></div>
         <div id="info-d3" style="margin-top:8px;"></div>
       </div>
-      <!-- Панель ломаного спроса (Задача 6): два способа ввода. -->
+      <!-- Панель составного спроса (Задача 6): два способа ввода. -->
       <div id="mono-kink-pane" style="display:none;margin-top:8px;">
+        <div class="hint" style="margin-top:0;margin-bottom:6px;">Это <b>составной</b> (кусочный) спрос:
+          рыночная кривая склеена из спросов разных групп покупателей, поэтому у неё есть излом,
+          а MR разрывается. Это <b>не</b> модель ломаного спроса Суизи (жёсткость цены в олигополии
+          из-за асимметричной реакции конкурентов) — та модель другая.</div>
         <div class="seg">
           <button class="seg-btn active" id="ki-indiv">Инд. спросы</button>
           <button class="seg-btn" id="ki-piece">Кусочный</button>
@@ -1112,6 +1130,25 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           (пересечения MR&nbsp;=&nbsp;MC и сами изломы), а не по первому пересечению.</div>
         <div class="error" id="kink-error" style="display:none;"></div>
         <div id="info-kink" style="margin-top:8px;"></div>
+      </div>
+      <!-- Естественная монополия и регулирование (Фаза 3в). Та же база, что у обычной
+           монополии (спрос D + предельные издержки MC), плюс постоянные издержки FC.
+           ATC(Q) = (FC + ∫₀^Q MC dq)/Q — считается численно, годится для любой MC. -->
+      <div id="mono-nat-pane" style="display:none;margin-top:8px;">
+        <div class="field">
+          <label>Постоянные издержки FC</label>
+          <input type="number" id="inp-nat-fc" step="1" value="800">
+        </div>
+        <label class="chk"><input type="checkbox" id="chk-nat-profit" checked>
+          <span class="swatch" style="background:var(--curve-tax)"></span> Прибыль монополии</label>
+        <label class="chk"><input type="checkbox" id="chk-nat-loss" checked>
+          <span class="swatch" style="background:var(--c-bad)"></span> Убыток при P&nbsp;=&nbsp;MC</label>
+        <div class="hint">Три ориентира на одном графике: <b>M</b> — нерегулируемая монополия (MR&nbsp;=&nbsp;MC);
+          <b>MC</b> — регулирование по предельным издержкам (P&nbsp;=&nbsp;MC, эффективно, но цена ниже средних
+          затрат → убыток, нужна субсидия); <b>AC</b> — регулирование по средним издержкам
+          (P&nbsp;=&nbsp;ATC, нулевая прибыль, «второе лучшее»). Уравнение D&nbsp;=&nbsp;ATC может иметь два корня —
+          берём больший, между Qm и Qc.</div>
+        <div id="info-nat" style="margin-top:8px;"></div>
       </div>
       <!-- Галочки областей монополии (Задача 1). Видны только в режиме монополии. -->
       <div id="mono-areas-chk" style="display:none;margin-top:8px;">
@@ -1581,7 +1618,13 @@ const STATE = {
   // Под-режимы монополии (Чекпоинт 2): 'simple' — обычная (как раньше),
   // 'discr1' — ценовая дискриминация 1-й степени, 'discr3' — 3-й степени (два рынка),
   // 'kinked' — монополист при ломаном (кусочном) рыночном спросе.
+  // 'natural' — естественная монополия: большие FC, убывающая ATC, три ориентира
+  // регулирования (без вмешательства / P=MC / P=ATC). Фаза 3в.
   monoMode: 'simple',
+  natFC: 800,            // постоянные издержки естественной монополии
+  natural: null,         // результат: три точки-ориентира, субсидия, прибыль
+  showNatProfit: true,   // заливка прибыли монополии (Pm − ATC)·Qm
+  showNatLoss: true,     // заливка убытка при P = MC (ATC − P)·Qc = требуемая субсидия
   discr1: null,          // результат дискриминации 1-й степени (Qcomp, прибыль)
   d3D1: '100 - Q', d3D2: '80 - 2*Q', d3MC: '20',   // дискриминация 3-й степени: два спроса + общий MC
   discr3: null,          // результат дискриминации 3-й степени (q1,P1,q2,P2,Qtot)
@@ -1706,8 +1749,10 @@ function refreshColors() {
 
 // Цвет кривой по роли — чтобы спрос всегда был синим, предложение красным,
 // MC бирюзовым (а не по порядку добавления). Для «обычных» кривых — палитра.
+// Фаза 3в: ATC получила свой цвет (янтарный — «ориентир регулятора»), TC — сланцевый.
+// Раньше atc красилась в синий спроса и сливалась с кривой D на одном графике.
 function roleColor(role) {
-  return { demand: COL.D, supply: COL.S, mc: COL.MC, tc: COL.reg, atc: COL.D }[role] || null;
+  return { demand: COL.D, supply: COL.S, mc: COL.MC, tc: COL.costVC, atc: COL.reg }[role] || null;
 }
 
 // Переключение темы (кнопка в доке). Тёмная — вечерняя работа/проектор,
@@ -2336,6 +2381,11 @@ function recompute() {
     }
   }
 
+  // Естественная монополия (Фаза 3в): считается ПОВЕРХ обычной монополии —
+  // Qm/Pm/Qc берутся из STATE.mono, добавляются FC, ATC и два режима регулирования.
+  STATE.natural = null;
+  if (STATE.market === 'monopoly' && STATE.monoMode === 'natural' && STATE.mono) recomputeNatural();
+
   // Ценовая дискриминация 1-й степени (Задача 4): монополист забирает весь излишек,
   // продавая каждую единицу по её цене спроса до точки, где спрос = MC (= конкурентный выпуск).
   STATE.discr1 = null;
@@ -2371,7 +2421,9 @@ function recompute() {
   STATE.elastS = null;
   if (compMarket && STATE.scenario === 'elasticity' && STATE.S && STATE.showElastS) {
     const S = STATE.S;
-    if (STATE.elastQS == null) STATE.elastQS = STATE.eq ? STATE.eq.Q : CONFIG.Qmax * 0.5;
+    // Стартовая позиция — правее равновесия, чтобы точка на предложении не легла
+    // ровно поверх точки на спросе (в равновесии обе кривые проходят через одну точку).
+    if (STATE.elastQS == null) STATE.elastQS = STATE.eq ? STATE.eq.Q * 1.3 : CONFIG.Qmax * 0.6;
     STATE.elastQS = Math.max(CONFIG.Qmax * 1e-3, Math.min(STATE.elastQS, CONFIG.Qmax * 0.999));
     const q = STATE.elastQS, p = evalCurve(S, q), slope = curveDeriv(S, q);
     const Es = (q > 0 && slope !== 0 && !isNaN(slope) && !isNaN(p)) ? p / (q * slope) : NaN;
@@ -3677,6 +3729,174 @@ function monopolyFloor(Pf) {
   return { binding: true, Pf, Q, price, csM, vcM, psM, dwl };
 }
 
+/* =====================================================================
+   БЛОК 8ж. ЕСТЕСТВЕННАЯ МОНОПОЛИЯ И РЕГУЛИРОВАНИЕ (Фаза 3в).
+   Та же база, что у обычной монополии (спрос D + предельные издержки MC),
+   плюс постоянные издержки FC. Большие FC делают ATC убывающей — одной фирме
+   производить дешевле, чем нескольким (отсюда «естественная»).
+   Три ориентира показываются ОДНОВРЕМЕННО:
+     1) нерегулируемая монополия  — MR = MC (Qm, Pm), максимум прибыли;
+     2) регулирование по предельным издержкам P = MC — эффективный выпуск Qc,
+        но цена ниже средних затрат ⇒ убыток, нужна субсидия (ATC−P)·Q;
+     3) регулирование по средним издержкам P = ATC — нулевая прибыль
+        («второе лучшее»). Уравнение D = ATC может иметь ДВА корня (обе кривые
+        убывают) — берём БОЛЬШИЙ, лежащий между Qm и Qc.
+   Всё численно: ATC через интеграл MC, корни — сканирование + бисекция.
+   ===================================================================== */
+
+// Средние общие издержки: ATC(Q) = (FC + ∫₀^Q MC dq) / Q.
+// Интеграл — теми же трапециями, что везде в движке, поэтому работает для любой
+// формы MC (при постоянной MC = c даёт привычное ATC = FC/Q + c).
+function naturalATC(q) {
+  if (!(q > 0)) return NaN;
+  const eps = Math.max(1e-9, q * 1e-6);          // страховка: MC в самом нуле может быть NaN
+  const m0 = mcAt(eps);
+  if (isNaN(m0)) return NaN;
+  const vc = integrate(mcAt, eps, q, 400) + m0 * eps;
+  return isNaN(vc) ? NaN : (STATE.natFC + vc) / q;
+}
+
+// НАИБОЛЬШИЙ корень g(Q)=0 на [lo,hi]: идём с правого края и берём первую смену
+// знака. Нужен там, где корней может быть два, а осмыслен только правый (D = ATC).
+function findRootLast(g, lo, hi) {
+  const N = 1000;
+  let prevX = hi, prevG = g(hi);
+  for (let i = N - 1; i >= 0; i--) {
+    const x = lo + (hi - lo) * i / N, cur = g(x);
+    if (!isNaN(prevG) && !isNaN(cur) && prevG * cur <= 0 && prevG !== cur) {
+      if (prevG === 0) return prevX;
+      if (cur === 0) return x;
+      return bisect(g, x, prevX);
+    }
+    prevX = x; prevG = cur;
+  }
+  return null;
+}
+
+function recomputeNatural() {
+  STATE.natural = null;
+  const D = STATE.D, m = STATE.mono;
+  if (!D || !m) return;
+  const Qm = m.Qm, Pm = m.Pm, Qc = m.Qc;
+  const atcAtQm = naturalATC(Qm);
+  const profit = isNaN(atcAtQm) ? null : (Pm - atcAtQm) * Qm;   // прибыль нерегулируемой монополии
+  // (2) P = MC — эффективный выпуск = конкурентному Qc; убыток = (ATC − P)·Q = субсидия.
+  let mcReg = null;
+  if (Qc != null && Qc > 0) {
+    const Pmc = mcAt(Qc), atcC = naturalATC(Qc);
+    const subsidy = (isNaN(atcC) || isNaN(Pmc)) ? null : (atcC - Pmc) * Qc;
+    mcReg = { Q: Qc, P: Pmc, atc: atcC, subsidy };
+  }
+  // (3) P = ATC — ищем корень D − ATC СПРАВА, в окне [Qm, Qc]: там разность
+  // меняет знак с «+» (монополия прибыльна) на «−» (при Qc она в убытке).
+  let acReg = null, acNote = null;
+  if (Qc != null && Qc > Qm) {
+    const g = (q) => { const d = evalCurve(D, q), a = naturalATC(q); return (isNaN(d) || isNaN(a)) ? NaN : d - a; };
+    const Qac = findRootLast(g, Qm, Qc);
+    if (Qac != null) acReg = { Q: Qac, P: evalCurve(D, Qac), atc: naturalATC(Qac) };
+    else acNote = (g(Qm) < 0)
+      ? 'При таких FC монополия убыточна даже в своей лучшей точке — цены по средним издержкам не существует.'
+      : 'Пересечение D = ATC между Qm и Qc не найдено.';
+  }
+  STATE.natural = { Qm, Pm, atcAtQm, profit, mcReg, acReg, acNote, FC: STATE.natFC };
+}
+
+// Заливки: прибыль монополии (Pm − ATC(Qm))·Qm и убыток при P = MC (ATC − P)·Qc.
+function drawNaturalAreas() {
+  const n = STATE.natural; if (!n) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const rect = (q, yLo, yHi, color, op) => {
+    if (!(q > 0) || isNaN(yLo) || isNaN(yHi)) return;
+    g.append('rect').attr('x', sx(0)).attr('y', sy(Math.max(yLo, yHi)))
+      .attr('width', sx(q) - sx(0)).attr('height', Math.abs(sy(Math.min(yLo, yHi)) - sy(Math.max(yLo, yHi))))
+      .attr('fill', color).attr('opacity', op);
+  };
+  if (STATE.showNatProfit && n.profit != null && n.profit > 0) rect(n.Qm, n.atcAtQm, n.Pm, COL.tax, 0.20);
+  if (STATE.showNatLoss && n.mcReg && n.mcReg.subsidy != null && n.mcReg.subsidy > 0)
+    rect(n.mcReg.Q, n.mcReg.P, n.mcReg.atc, COL.bad, 0.18);
+}
+
+// Кривые: ATC (янтарная — «ориентир регулятора») и обычный падающий MR.
+function drawNaturalCurves() {
+  const D = STATE.D; if (!D) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  const sample = (f, q0) => {
+    const pts = [], a = q0 || 0;
+    for (let i = 0; i <= 400; i++) { const q = a + (CONFIG.Qmax - a) * i / 400; const v = f(q); pts.push((isNaN(v) || v > CONFIG.Pmax * 4) ? null : [q, v]); }
+    return pts;
+  };
+  g.append('path').datum(sample(q => marginalRevenue(D, q)))
+    .attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  g.append('path').datum(sample(naturalATC, CONFIG.Qmax * 0.005))
+    .attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr('d', line);
+  const qL = CONFIG.Qmax * 0.93, vL = naturalATC(qL);
+  if (!isNaN(vL) && vL <= CONFIG.Pmax) g.append('text').attr('x', sx(qL)).attr('y', sy(vL) - 5)
+    .attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.reg)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('ATC');
+}
+
+// Три вертикальных ориентира с подписями: M (монополия), MC (P=MC), AC (P=ATC).
+function drawNaturalPoints() {
+  const n = STATE.natural; if (!n) return;
+  const oy = sy(0), ox = sx(0), g = svg.append('g');
+  const mark = (Q, P, label, color, side) => {
+    if (Q == null || !(Q > 0) || isNaN(P)) return;
+    const px = sx(Q), py = sy(P);
+    g.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', py)
+      .attr('stroke', color).attr('stroke-width', 1.2).attr('stroke-dasharray', '4 3').attr('opacity', 0.85);
+    g.append('line').attr('x1', ox).attr('y1', py).attr('x2', px).attr('y2', py)
+      .attr('stroke', color).attr('stroke-width', 1).attr('stroke-dasharray', '4 3').attr('opacity', 0.55);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
+      .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    g.append('text').attr('x', px + (side < 0 ? -9 : 9)).attr('y', py - 9)
+      .attr('text-anchor', side < 0 ? 'end' : 'start')
+      .attr('font-size', 12).attr('font-weight', 700).attr('fill', color)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
+    haloText(g, px, oy + 8, fmt(Q), 'middle', 'hanging');
+  };
+  mark(n.Qm, n.Pm, 'M · монополия', COL.ink, -1);
+  if (n.acReg) mark(n.acReg.Q, n.acReg.P, 'AC · P=ATC', COL.reg, 1);
+  if (n.mcReg) mark(n.mcReg.Q, n.mcReg.P, 'MC · P=MC', COL.MC, -1);
+}
+
+// Полная отрисовка под-режима «Естественная монополия».
+function drawNaturalFull() {
+  drawNaturalAreas();
+  drawCurves();          // спрос D и предельные издержки MC из списка кривых
+  drawNaturalCurves();   // MR и ATC
+  drawNaturalPoints();
+}
+
+// Табло естественной монополии: три ориентира и вывод о компромиссе регулятора.
+function updateNaturalPanel() {
+  const box = document.getElementById('info-nat'); if (!box) return;
+  if (!STATE.D) { box.innerHTML = '<div class="muted">Отметьте кривую спроса (роль D).</div>'; return; }
+  if (!mcSourceCurve() && !curveByRole('tc')) {
+    box.innerHTML = '<div class="muted">Нужны предельные издержки: роль MC (либо TC, либо S как MC).</div>'; return;
+  }
+  const n = STATE.natural;
+  if (!n) { box.innerHTML = '<div class="warn">Оптимум монополии не найден — проверьте кривые.</div>'; return; }
+  let html = `<div class="stat"><span>Постоянные издержки FC</span><b>${fmt(n.FC)}</b></div>`;
+  html += `<div class="stat"><span>1 · Монополия: Q / P</span><b>${fmt(n.Qm)} / ${fmt(n.Pm)}</b></div>`;
+  if (!isNaN(n.atcAtQm)) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;ATC(Qm) / прибыль</span><b>${fmt(n.atcAtQm)} / ${fmt(n.profit)}</b></div>`;
+  if (n.mcReg) {
+    html += `<div class="stat" style="margin-top:4px;"><span>2 · P = MC: Q / P</span><b>${fmt(n.mcReg.Q)} / ${fmt(n.mcReg.P)}</b></div>`;
+    html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;ATC на этом Q</span><b>${fmt(n.mcReg.atc)}</b></div>`;
+    if (n.mcReg.subsidy != null) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;Нужна субсидия</span><b>${fmt(n.mcReg.subsidy)}</b></div>`;
+  }
+  if (n.acReg) {
+    html += `<div class="stat" style="margin-top:4px;"><span>3 · P = ATC: Q / P</span><b>${fmt(n.acReg.Q)} / ${fmt(n.acReg.P)}</b></div>`;
+    html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;Прибыль</span><b>0</b></div>`;
+  } else if (n.acNote) {
+    html += `<div class="warn" style="margin-top:4px;">${n.acNote}</div>`;
+  }
+  html += '<div class="hint" style="margin-top:6px;">Компромисс регулятора: цена по предельным издержкам эффективна, ' +
+    'но при убывающей ATC даёт фирме убыток (нужна субсидия из бюджета). Цена по средним издержкам ' +
+    'обходится без субсидии, но выпуск меньше эффективного — часть выигрыша теряется.</div>';
+  box.innerHTML = html;
+}
+
 // Заливки при налоге/субсидии: CS, прямоугольник денег бюджета (между MC и MC±ставка), DWL.
 function drawMonoTaxAreas() {
   const t = STATE.monoTax, m = STATE.mono;
@@ -4157,6 +4377,7 @@ function applyMonoVisibility() {
   show('mono-d1-pane', inMono && mm === 'discr1');
   show('mono-d3-pane', inMono && mm === 'discr3');
   show('mono-kink-pane', inMono && mm === 'kinked');
+  show('mono-nat-pane', inMono && mm === 'natural');
 }
 
 // Стандартный пресет при входе в монополию (Задача 1): ставится ТОЛЬКО если нужного нет.
@@ -4194,10 +4415,12 @@ function ensureMonopolyPreset() {
 
 function setMonoMode(mm) {
   STATE.monoMode = mm;
-  [['mm-simple', 'simple'], ['mm-d1', 'discr1'], ['mm-d3', 'discr3'], ['mm-kink', 'kinked']]
+  [['mm-simple', 'simple'], ['mm-d1', 'discr1'], ['mm-d3', 'discr3'],
+   ['mm-kink', 'kinked'], ['mm-nat', 'natural']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === mm); });
   if (STATE.market === 'monopoly') ensureMonopolyPreset();   // стандартный пресет, если пусто (Задача 1)
   applyMonoVisibility();
+  if (typeof updatePult === 'function') updatePult();   // набор регуляторов ленты зависит от под-режима
   redrawAll();
 }
 
@@ -6582,6 +6805,9 @@ function redrawAll() {
   if (STATE.market === 'monopoly' && STATE.monoMode === 'discr1') {
     // Ценовая дискриминация 1-й степени (Задача 4): D, MC и область прибыли.
     drawDiscr1();
+  } else if (STATE.market === 'monopoly' && STATE.monoMode === 'natural') {
+    // Естественная монополия (Фаза 3в): ATC + три ориентира регулирования.
+    drawNaturalFull();
   } else if (STATE.market === 'monopoly') {
     if (STATE.monoCeil && STATE.monoCeil.binding) {
       // Связывающий потолок (Задача 3): ломаный MR_eff, новый выпуск, дефицит.
@@ -6644,6 +6870,7 @@ function redrawAll() {
   updateAreasPanel();
   if (STATE.market === 'monopoly') {
     if (STATE.monoMode === 'discr1') updateDiscr1Panel(); else updateMonoPanel();
+    if (STATE.monoMode === 'natural') updateNaturalPanel();   // три ориентира регулирования (Фаза 3в)
     // Вмешательство государства в монополии (Фаза 2): налог/субсидия/потолок/пол.
     updateMonoInterventionPanel();
   } else if (STATE.scenario === 'externality') {
@@ -7016,7 +7243,7 @@ const SCENE_NAMES = {
 };
 // Блоки результатов в табло (порядок = порядок показа). info-eq переносим вместе
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
-const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-costs', 'info-labor',
+const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs', 'info-labor',
   'info-inequality', 'info-elast', 'info-shift', 'info-ext', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
 
@@ -7252,7 +7479,11 @@ let pultDock = null;
 
 // Все переносимые экранные регуляторы (по всем сценам). «Дом» каждого запоминается
 // при первом обращении (исходный родитель + стабильный якорь) — поддержка любой секции.
-const PULT_MOVABLE = ['taxkind-row', 'taxside-row', 'tax-field', 'pc-field',   // рынок: вмешательство
+// «Вид ставки» (taxkind-row) намеренно НЕ переносится в ленту: это разовая настройка
+// постановки задачи, а не живой регулятор — иначе лента вырастает в три ряда и
+// закрывает график. Живой регулятор здесь один — сама ставка.
+const PULT_MOVABLE = ['mono-submode',                                          // монополия: под-режим
+  'taxside-row', 'tax-field', 'pc-field',                                      // рынок: вмешательство
   'union-wage-field', 'labmin-field',                                  // труд: зарплата / МРОТ
   'ppft-price-field', 'tb-price-field',                                // КТВ: мировая цена (A / Б)
   'ineq-alpha-field'];                                                 // неравенство: α (формула)
@@ -7263,10 +7494,20 @@ function pultRegulatorIds() {
   if (STATE.mode === 'market') {
     const interventionScene = (STATE.sceneKey === 'tax' || STATE.sceneKey === 'ceil' || STATE.sceneKey === 'mono');
     if (!interventionScene) return [];
+    // Монополия: переключатель под-режима — главный регулятор сцены, поэтому он в ленте
+    // (Фаза 3а: раньше жил только в свёрнутых «Инструментах» и был не виден).
+    // Вмешательство государства считается лишь в под-режиме «Обычная» (см. recompute),
+    // поэтому в остальных под-режимах поля ставки/цены в ленту не выносим.
+    if (STATE.market === 'monopoly') {
+      if (STATE.monoMode !== 'simple') return ['mono-submode'];
+      const t0 = STATE.intervType;
+      const ids = ['mono-submode'];
+      if (t0 === 'tax' || t0 === 'subsidy') ids.push('tax-field'); else ids.push('pc-field');
+      return ids;
+    }
     const t = STATE.intervType;
     if (t === 'tax' || t === 'subsidy') {
       const ids = [];
-      if (STATE.market !== 'monopoly') ids.push('taxkind-row');                 // вид ставки (Фаза 2в)
       if (t === 'tax' && STATE.market !== 'monopoly') ids.push('taxside-row');  // как в setType
       ids.push('tax-field');
       return ids;
@@ -7291,6 +7532,10 @@ function pultRegulatorIds() {
 // Линейные (=> перетаскиваемые) видимые кривые активной сцены — под слайдеры.
 // Рынок и труд держат D/S в STATE.curves; остальные режимы — свои кривые без сдвига.
 function pultCurveList() {
+  // Под-режимы монополии «Дискр. 3°» и «Составной спрос» рисуются по СВОИМ полям формул,
+  // а не по списку кривых — слайдеры сдвига там ничего бы не двигали на графике.
+  if (STATE.mode === 'market' && STATE.market === 'monopoly' &&
+      (STATE.monoMode === 'discr3' || STATE.monoMode === 'kinked')) return [];
   if (STATE.mode === 'market' || STATE.mode === 'labor') return STATE.curves.filter(c => c.linear && c.visible);
   return [];
 }
@@ -7316,6 +7561,13 @@ function pultTitle() {
   if (STATE.mode === 'ppf')        return (STATE.ppfSub === 'trade') ? 'Торговля' : 'КПВ';
   if (STATE.mode === 'labor')      return 'Труд';
   if (STATE.mode === 'inequality') return 'Неравенство';
+  const rate = ({ tax: 'налог', subsidy: 'субсидия', ceiling: 'потолок', floor: 'пол' })[STATE.intervType] || '';
+  // Монополия: заголовок ленты берёт контекст под-режима (Фаза 3б). Держим коротким —
+  // он печатается вертикально на ручке и определяет высоту ленты.
+  if (STATE.mode === 'market' && STATE.market === 'monopoly') {
+    if (STATE.monoMode === 'simple') return 'Монополия: ' + rate;
+    return ({ discr1: 'Дискр. 1°', discr3: 'Дискр. 3°', kinked: 'Составной', natural: 'Естественная' })[STATE.monoMode] || 'Монополия';
+  }
   if (pultRegulatorIds().length) {
     return ({ tax: 'Налог', subsidy: 'Субсидия', ceiling: 'Потолок', floor: 'Пол' })[STATE.intervType] || 'Регуляторы';
   }
@@ -7723,9 +7975,22 @@ function wireControls() {
   if (segComp) segComp.addEventListener('click', () => setMarket('comp'));
   if (segMono) segMono.addEventListener('click', () => setMarket('monopoly'));
 
-  // Под-режимы монополии (Чекпоинт 2): обычная / дискр.1 / дискр.3 / ломаный.
-  [['mm-simple', 'simple'], ['mm-d1', 'discr1'], ['mm-d3', 'discr3'], ['mm-kink', 'kinked']]
+  // Под-режимы монополии: обычная / дискр. 1° / дискр. 3° / составной спрос / естественная.
+  [['mm-simple', 'simple'], ['mm-d1', 'discr1'], ['mm-d3', 'discr3'],
+   ['mm-kink', 'kinked'], ['mm-nat', 'natural']]
     .forEach(([id, mm]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setMonoMode(mm)); });
+
+  // Естественная монополия (Фаза 3в): постоянные издержки FC + галочки заливок.
+  const natFC = document.getElementById('inp-nat-fc');
+  if (natFC) {
+    const applyFC = () => { const v = parseFloat(natFC.value); if (!isNaN(v) && v >= 0) { STATE.natFC = v; redrawAll(); } };
+    natFC.addEventListener('change', applyFC);
+    natFC.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFC(); });
+  }
+  [['chk-nat-profit', 'showNatProfit'], ['chk-nat-loss', 'showNatLoss']].forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); });
+  });
 
   // Дискриминация 3-й степени (Задача 5): два спроса + общий MC, кнопка «Построить».
   const d3a = document.getElementById('inp-d3-1'), d3b = document.getElementById('inp-d3-2'), d3m = document.getElementById('inp-d3-mc');

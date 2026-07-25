@@ -298,6 +298,31 @@ const CASES = [
     checks: [['Q1', 'Q1', 25, 0.2], ['Pb', 'Pb', 75, 0.3], ['Ps', 'Ps', 50, 0.3],
              ['сбор', 'tx', 625, 5], ['разрыв при Q=20', 'g20', 20, 0.3], ['разрыв при Q=40', 'g40', 40, 0.5]],
   },
+
+  /* ── Фаза 3: естественная монополия и регулирование ──────────────────── */
+  {
+    name: 'Естественная монополия · D=100−Q, MC=20, FC=800: три ориентира регулирования',
+    // ATC(Q) = (800 + 20Q)/Q. Монополия 40/60 (прибыль 800 = FC). P=MC: Q=80, P=20,
+    // ATC=30 ⇒ убыток (30−20)·80 = 800 — ровно столько нужно субсидии.
+    // P=ATC: 100−Q = 800/Q + 20 ⇒ Q² − 80Q + 800 = 0 ⇒ корни 11.72 и 68.28,
+    // берём БОЛЬШИЙ (он и лежит между Qm=40 и Qc=80).
+    run: `loadScene('mono'); setMonoMode('natural');
+          STATE.natFC = 800; var f = document.getElementById('inp-nat-fc'); if (f) f.value = 800;
+          redrawAll();
+          var n = STATE.natural || {}, mc = n.mcReg || {}, ac = n.acReg || {};
+          var inWindow = (ac.Q != null && ac.Q > n.Qm && ac.Q < mc.Q) ? 1 : 0;
+          var res = { Qm: n.Qm, Pm: n.Pm, atcQm: n.atcAtQm, profit: n.profit,
+                      Qmc: mc.Q, Pmc: mc.P, atcMc: mc.atc, sub: mc.subsidy,
+                      Qac: ac.Q, Pac: ac.P, inWindow: inWindow };
+          setMonoMode('simple');
+          return res;`,
+    checks: [['Qm', 'Qm', 40, 0.3], ['Pm', 'Pm', 60, 0.3], ['ATC(Qm)', 'atcQm', 40, 0.3],
+             ['π монополии', 'profit', 800, 8],
+             ['Q при P=MC', 'Qmc', 80, 0.4], ['P=MC', 'Pmc', 20, 0.2], ['ATC(80)', 'atcMc', 30, 0.3],
+             ['субсидия', 'sub', 800, 8],
+             ['Q при P=ATC', 'Qac', 68.284, 0.5], ['P при P=ATC', 'Pac', 31.716, 0.5],
+             ['корень между Qm и Qc', 'inWindow', 1, 0.1]],
+  },
 ];
 
 function approx(got, want, tol) {
