@@ -2094,6 +2094,113 @@ function evalExt(q) {
   catch (e) { return NaN; }
 }
 
+/* =====================================================================
+   БЛОК 2б. ДВИЖОК КАСАНИЯ УРОВНЯ (Фаза 7) — общий для потребителя и фирмы.
+
+   Работает с функцией ДВУХ переменных f(a, b). Геометрический смысл
+   переменных движку не важен: для потребителя это полезность U(x, y),
+   для фирмы — выпуск Q(L, K). Отсюда и переиспользование: кривая
+   безразличия и изокванта — одна и та же математика.
+
+   Всё численно, закрытых формул нет — поэтому произвольная пользовательская
+   функция «просто работает», а для стандартных форм численный ответ обязан
+   совпасть с известной аналитикой (это и есть проверка правильности).
+   ===================================================================== */
+
+// Компиляция функции двух переменных. Пользователь пишет через x,y (потребитель)
+// или L,K (фирма) — внутрь подаём обе пары синонимов, поэтому годятся обе записи.
+function compileTwoVar(expr) {
+  try {
+    const compiled = math.parse(expr).compile();
+    compiled.evaluate({ x: 1, y: 1, L: 1, K: 1 });   // пробный расчёт ловит опечатки
+    return { compiled, error: null };
+  } catch (e) { return { compiled: null, error: e.message }; }
+}
+function evalTwoVar(compiled, a, b) {
+  try { const v = compiled.evaluate({ x: a, y: b, L: a, K: b }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  catch (e) { return NaN; }
+}
+
+// Найти b ∈ [0, bMax], при котором f(a, b) = level — бисекцией по b.
+// Предполагается, что f монотонно РАСТЁТ по b: это стандартное свойство функций
+// полезности и выпуска (положительная предельная полезность / производительность).
+// Если корня в разумном диапазоне нет — возвращаем null (точку просто пропустим,
+// а не уроним всю кривую).
+function solveLevelB(f, level, a, bMax) {
+  const g = (b) => { const v = f(a, b); return (typeof v === 'number' && isFinite(v)) ? v - level : NaN; };
+  let lo = 0, hi = bMax;
+  let glo = g(lo);
+  if (isNaN(glo)) { lo = bMax * 1e-9; glo = g(lo); }   // f может быть не определена ровно в нуле
+  const ghi = g(hi);
+  if (isNaN(glo) || isNaN(ghi)) return null;
+  if (glo > 0) return null;    // уровень достигнут уже при b=0 — кривая ниже сетки
+  if (ghi < 0) return null;    // даже при b=bMax уровня не достичь
+  for (let k = 0; k < 80; k++) {
+    const mid = (lo + hi) / 2, gm = g(mid);
+    if (isNaN(gm)) { lo = mid; continue; }
+    if (gm === 0) return mid;
+    if (gm < 0) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+// Трассировка НЕЯВНОЙ кривой уровня f(a, b) = level по сетке значений a.
+// Возвращает массив [a, b] или null в точках, где уровень недостижим.
+function traceLevelCurve(f, level, aMax, bMax, steps) {
+  const N = steps || 200, out = [];
+  for (let i = 0; i <= N; i++) {
+    const a = aMax * i / N;
+    const b = solveLevelB(f, level, a, bMax);
+    out.push((b == null) ? null : [a, b]);
+  }
+  return out;
+}
+
+// Частные производные численно (центральная разность, у границы — односторонняя).
+function partialA(f, a, b) {
+  const h = Math.max(1e-6, Math.abs(a) * 1e-5), lo = Math.max(0, a - h);
+  const v1 = f(a + h, b), v0 = f(lo, b);
+  return (isFinite(v1) && isFinite(v0)) ? (v1 - v0) / ((a + h) - lo) : NaN;
+}
+function partialB(f, a, b) {
+  const h = Math.max(1e-6, Math.abs(b) * 1e-5), lo = Math.max(0, b - h);
+  const v1 = f(a, b + h), v0 = f(a, lo);
+  return (isFinite(v1) && isFinite(v0)) ? (v1 - v0) / ((b + h) - lo) : NaN;
+}
+// Предельная норма замещения (для фирмы — технического замещения MRTS):
+// MRS = (∂f/∂a)/(∂f/∂b) — сколько b компенсирует единицу a на том же уровне.
+function mrsAt(f, a, b) {
+  const pa = partialA(f, a, b), pb = partialB(f, a, b);
+  return (isFinite(pa) && isFinite(pb) && Math.abs(pb) > 1e-12) ? pa / pb : NaN;
+}
+
+// Максимум f(a, b) при линейном ограничении priceA·a + priceB·b = income.
+// Параметризуем по a: b = (income − priceA·a)/priceB, ищем argmax ТРОЙНЫМ поиском
+// (унимодальность вдоль бюджетной линии — стандартное свойство поддерживаемых
+// видов предпочтений). Закрытых формул для Кобба-Дугласа и т.п. НЕТ намеренно:
+// один численный путь для любой функции, а совпадение с аналитикой — проверка.
+// Концы отрезка проверяем отдельно: при линейных предпочтениях (совершенные
+// субституты) оптимум лежит ровно в углу, куда тройной поиск сам может не дойти.
+function optimizeAlongConstraint(f, priceA, priceB, income) {
+  if (!(priceA > 0) || !(priceB > 0) || !(income > 0)) return null;
+  const aMax = income / priceA, bMax = income / priceB;
+  const val = (a) => {
+    if (a < 0 || a > aMax) return -Infinity;
+    const b = Math.max(0, (income - priceA * a) / priceB);
+    const v = f(a, b);
+    return (typeof v === 'number' && isFinite(v)) ? v : -Infinity;
+  };
+  let lo = 0, hi = aMax;
+  for (let k = 0; k < 100; k++) {
+    const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+    if (val(m1) < val(m2)) lo = m1; else hi = m2;
+  }
+  let bestA = (lo + hi) / 2, bestV = val(bestA);
+  [0, aMax].forEach(c => { const v = val(c); if (v > bestV + 1e-12) { bestV = v; bestA = c; } });
+  const b = Math.max(0, (income - priceA * bestA) / priceB);
+  return { a: bestA, b, value: bestV, aMax, bMax, mrs: mrsAt(f, bestA, b) };
+}
+
 /* ---------------------------------------------------------------------
    БЛОК 3. КООРДИНАТЫ И ОСИ
    Рисуем только первую четверть: Q вправо, P вверх. Начало (0,0) —

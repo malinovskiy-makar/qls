@@ -375,6 +375,24 @@ const CASES = [
              ['q₁ внутри', 'q1', 25, 0.4], ['P₁ внутри', 'P1', 75, 0.4],
              ['q₂ экспорт', 'q2', 25, 0.4], ['P₂ = Pw', 'P2', 50, 0.3]],
   },
+
+  /* ── Фаза 7: общий движок касания уровня ─────────────────────────────── */
+  {
+    name: 'Движок касания · Кобб-Дуглас f=√x·√y, Pa=1, Pb=2, I=100 ⇒ a*=50, b*=25, MRS=0.5',
+    // Численный оптимум обязан совпасть с известной аналитикой: доля дохода на
+    // каждое благо = его показатель степени ⇒ 50 на a (цена 1) и 50 на b (цена 2).
+    // Проверяем и обратный ход: кривая уровня через оптимум в точке a=50 даёт b=25.
+    run: `var f = function (a, b) { return Math.sqrt(a) * Math.sqrt(b); };
+          var r = optimizeAlongConstraint(f, 1, 2, 100);
+          var yAt = solveLevelB(f, r.value, r.a, 400);
+          var curve = traceLevelCurve(f, r.value, 200, 400, 100);
+          var pts = curve.filter(function (p) { return p; });
+          return { a: r.a, b: r.b, spend: 1 * r.a + 2 * r.b, mrs: r.mrs,
+                   value: r.value, yAt: yAt, nPts: pts.length };`,
+    checks: [['a*', 'a', 50, 0.05], ['b*', 'b', 25, 0.05], ['потрачен весь доход', 'spend', 100, 0.1],
+             ['MRS = Pa/Pb', 'mrs', 0.5, 0.01], ['уровень f', 'value', 35.355, 0.02],
+             ['кривая уровня через оптимум', 'yAt', 25, 0.05], ['точек на кривой', 'nPts', 100, 1]],
+  },
 ];
 
 function approx(got, want, tol) {
