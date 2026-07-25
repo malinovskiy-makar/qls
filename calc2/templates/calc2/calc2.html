@@ -247,6 +247,22 @@ input:focus-visible, select:focus-visible {
   border-radius: var(--r-sm); background: var(--input-bg); font-size: 12px; color: var(--text2);
 }
 .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+/* Кликабельный образец = нативный input[type=color] (Фаза 2). */
+.swatch-pick {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; padding: 0; cursor: pointer;
+  border: 1px solid var(--border-soft); border-radius: 3px; background: none;
+  transition: border-color .12s var(--ease), transform .12s var(--ease);
+}
+.swatch-pick::-webkit-color-swatch-wrapper { padding: 0; }
+.swatch-pick::-webkit-color-swatch { border: none; border-radius: 2px; }
+.swatch-pick::-moz-color-swatch { border: none; border-radius: 2px; }
+.swatch-pick:hover { border-color: var(--accent); transform: scale(1.12); }
+/* Поле «имя кривой на графике» в списке кривых (Фаза 1). */
+.curve-label-inp {
+  width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-size: 12px;
+}
 .curve-name {
   flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; font-family: ui-monospace, 'SF Mono', Menlo, monospace; color: var(--text);
@@ -257,6 +273,27 @@ input:focus-visible, select:focus-visible {
   transition: color .12s var(--ease);
 }
 .btn-icon:hover { color: var(--c-bad); }
+
+/* Подзаголовок внутри секции («Свои точки» в «Оформлении»). */
+.vsub {
+  font-size: 11px; font-weight: 600; letter-spacing: .03em; color: var(--text3);
+  margin: 14px 0 7px; padding-top: 11px; border-top: .5px solid var(--border);
+}
+/* Кнопка «Поставить точку» во взведённом состоянии — ждёт щелчка по графику. */
+.btn-sm.armed { color: var(--accent); border-color: var(--accent); background: var(--accent-tint); }
+/* Строка своей точки: координаты, подпись, что показывать, удаление. */
+.mark-row { padding: 8px 0; border-bottom: .5px solid var(--border); }
+.mark-row:last-child { border-bottom: none; }
+.mark-top { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.mark-co {
+  flex: 1; font-size: 11.5px; color: var(--text2); white-space: nowrap;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+.mark-row input[type="text"] {
+  width: 100%; padding: 5px 7px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-size: 12px;
+}
+.mark-row .chk { font-size: 11.5px; margin: 6px 0 0; }
 
 /* Табло результатов (равновесие, площади, налог) */
 .stat { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; font-size: 13px; }
@@ -972,37 +1009,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <h1 class="panel-only">Графический калькулятор&nbsp;2.0</h1>
     <div class="subtitle panel-only">бета · собственный движок (D3&nbsp;+&nbsp;Math.js)</div>
 
-    <!-- Переключатель режима калькулятора (Задачи 2–3). Две строки: рынок/издержки/КПВ
-         и труд/неравенство — чтобы длинная метка «Неравенство» помещалась. -->
-    <div class="section" id="sec-mode">
-      <div class="section-title">Режим</div>
-      <div class="seg">
-        <button class="seg-btn active" id="mode-market">Рынок</button>
-        <button class="seg-btn" id="mode-costs">Издержки</button>
-        <button class="seg-btn" id="mode-ppf">КПВ</button>
-      </div>
-      <div class="seg" style="margin-top:6px;">
-        <button class="seg-btn" id="mode-labor">Труд</button>
-        <button class="seg-btn" id="mode-ineq">Неравенство</button>
-      </div>
-      <div class="seg" style="margin-top:6px;">
-        <button class="seg-btn" id="mode-consumer">Потребитель</button>
-        <button class="seg-btn" id="mode-macro">Макро</button>
-      </div>
-    </div>
-
-    <!-- Готовые сцены: заполнение типовой задачи одним кликом (Задача 4) -->
-    <div class="section" id="sec-scenes">
-      <div class="section-title">Готовые сцены</div>
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        <button class="btn-sm" id="scene-sd">Спрос и предложение</button>
-        <button class="btn-sm" id="scene-tax">Налог на рынке</button>
-        <button class="btn-sm" id="scene-ceil">Потолок цены</button>
-        <button class="btn-sm" id="scene-mono">Монополия (пост. MC)</button>
-        <button class="btn-sm" id="scene-costs">Издержки фирмы</button>
-        <button class="btn-sm" id="scene-ppf">КПВ вогнутая</button>
-      </div>
-    </div>
+    <!-- Выбор режима и готовой сцены живёт ТОЛЬКО в окне сценариев (#scene-picker).
+         Раньше здесь стояли те же кнопки вторым экземпляром: два входа в одно
+         действие сбивали с толку. Кнопка «Сценарии» в шапке возвращает к выбору. -->
 
     <!-- Кривые (шаг 3) -->
     <div class="section" id="sec-curves">
@@ -1374,15 +1383,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="error" id="costs-error"></div>
       <div style="margin-top:10px;">
         <label class="chk"><input type="checkbox" id="chk-mc" checked>
-          <span class="swatch" style="background:var(--cost-mc)"></span> MC — предельные</label>
+          <input type="color" class="swatch swatch-pick" data-col="costMC" title="Цвет MC"> MC — предельные</label>
         <label class="chk"><input type="checkbox" id="chk-atc" checked>
-          <span class="swatch" style="background:var(--cost-atc)"></span> ATC — средние общие</label>
+          <input type="color" class="swatch swatch-pick" data-col="costATC" title="Цвет ATC"> ATC — средние общие</label>
         <label class="chk"><input type="checkbox" id="chk-avc" checked>
-          <span class="swatch" style="background:var(--cost-avc)"></span> AVC — средние перем.</label>
+          <input type="color" class="swatch swatch-pick" data-col="costAVC" title="Цвет AVC"> AVC — средние перем.</label>
         <label class="chk"><input type="checkbox" id="chk-afc" checked>
-          <span class="swatch" style="background:var(--cost-afc)"></span> AFC — средние пост.</label>
+          <input type="color" class="swatch swatch-pick" data-col="costAFC" title="Цвет AFC"> AFC — средние пост.</label>
         <label class="chk"><input type="checkbox" id="chk-vc">
-          <span class="swatch" style="background:var(--cost-vc)"></span> VC — перем. (полные)</label>
+          <input type="color" class="swatch swatch-pick" data-col="costVC" title="Цвет VC"> VC — перем. (полные)</label>
       </div>
       <!-- 9в: долгосрочное равновесие конкурентной фирмы. -->
       <div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border);">
@@ -1418,11 +1427,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="btn" id="btn-prod-apply">Построить</button>
         <div style="margin-top:10px;">
           <label class="chk"><input type="checkbox" id="chk-tp" checked>
-            <span class="swatch" style="background:var(--curve-d)"></span> TP — общий продукт</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodTP" title="Цвет TP"> TP — общий продукт</label>
           <label class="chk"><input type="checkbox" id="chk-mp" checked>
-            <span class="swatch" style="background:var(--cost-mc)"></span> MP — предельный продукт</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodMP" title="Цвет MP"> MP — предельный продукт</label>
           <label class="chk"><input type="checkbox" id="chk-ap" checked>
-            <span class="swatch" style="background:var(--cost-avc)"></span> AP — средний продукт</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodAP" title="Цвет AP"> AP — средний продукт</label>
         </div>
         <div class="hint">Верхняя панель — общий продукт TP, нижняя — предельный MP&nbsp;=&nbsp;dQ/dL и
           средний AP&nbsp;=&nbsp;Q/L (у них свой масштаб, иначе на фоне TP их не видно).
@@ -1448,7 +1457,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         </div>
         <div class="field"><label>Бюджет C</label><input type="number" id="iso-c" min="1" step="1" value="100"></div>
         <label class="chk"><input type="checkbox" id="chk-iso-fan" checked>
-          <span class="swatch" style="background:var(--curve-d)"></span> Веер изоквант</label>
+          <input type="color" class="swatch swatch-pick" data-col="isoq" title="Цвет изоквант"> Веер изоквант</label>
         <div class="hint">Изокоста w·L&nbsp;+&nbsp;r·K&nbsp;=&nbsp;C; оптимум — касание изокванты и изокосты,
           там MRTS&nbsp;=&nbsp;w/r. Считает ТОТ ЖЕ движок, что кривые безразличия потребителя:
           при Q&nbsp;=&nbsp;L^0.5·K^0.5, w=1, r=2, C=100 получаются те же 50 и 25.</div>
@@ -1659,7 +1668,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div class="f-pop" id="fp-cons" role="region" aria-label="Примеры функций полезности"></div>
       </div>
       <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-cons-fan" checked>
-        <span class="swatch" style="background:var(--curve-d)"></span> Веер кривых безразличия</label>
+        <input type="color" class="swatch swatch-pick" data-col="indiff" title="Цвет кривых безразличия"> Веер кривых безразличия</label>
       <!-- 8в: разложение Слуцкого (эффект замещения и эффект дохода). -->
       <label class="chk"><input type="checkbox" id="chk-cons-slutsky">
         <span class="swatch" style="background:var(--curve-mr)"></span> Разложить изменение цены (Слуцкий)</label>
@@ -1886,6 +1895,32 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div id="info-macro" style="margin-top:8px;"></div>
     </div>
 
+    <!-- Оформление (Фаза 1): подписи графика и свои точки. Секции нет в groups[]
+         у setMode, поэтому она видна во всех режимах — эти настройки универсальны. -->
+    <div class="section" id="sec-view">
+      <div class="section-title">Оформление</div>
+      <div class="field">
+        <label for="inp-gtitle">Заголовок графика</label>
+        <input type="text" id="inp-gtitle" placeholder="не показывать" autocomplete="off">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="inp-xname">Ось X</label>
+          <input type="text" id="inp-xname" placeholder="Q" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="inp-yname">Ось Y</label>
+          <input type="text" id="inp-yname" placeholder="P" autocomplete="off">
+        </div>
+      </div>
+      <div class="hint">Оставьте пустым, чтобы взять названия из сцены.</div>
+
+      <div class="vsub">Свои точки</div>
+      <button class="btn-sm" id="btn-mark-add" type="button">Поставить точку</button>
+      <div class="hint" id="mark-hint">Нажмите кнопку, потом щёлкните по графику.</div>
+      <div id="mark-list" style="margin-top:8px;"></div>
+    </div>
+
     <!-- Оси и сетка (шаг 2) -->
     <div class="section" id="sec-axes">
       <div class="section-title">Оси и сетка</div>
@@ -1988,6 +2023,17 @@ const STATE = {
   // 'QP' — Q = f(P) (привычная запись спроса). Q(P) приводится к P=f(Q) при добавлении:
   // линейная — аналитически, любая другая — численным обращением (бисекция по P).
   curveForm: 'PQ',
+  // Оформление (Фаза 1). Пустая строка = «берём то, что даёт сцена».
+  graphTitle: '',    // заголовок над графиком
+  axisXName: '',     // своё название оси X (перекрывает сценовое)
+  axisYName: '',     // своё название оси Y
+  axisXDefault: 'Q', // что сцена нарисовала бы сама — идёт в placeholder полей
+  axisYDefault: 'P',
+  marks: [],         // свои точки: {id, x, y, text, showCoords, showCurves}
+  markArm: false,    // взведён режим «следующий щелчок по графику ставит точку»
+  // Свои цвета кривых сцены (Фаза 2): ключ = поле COL, значение = hex из пикера.
+  // Накладывается в refreshColors поверх токенов; токены остаются как есть.
+  colorOverride: {},
   showCS: true,      // показывать заливку излишка потребителя
   showPS: true,      // показывать заливку излишка производителя
   tax: 0,            // ставка вмешательства (0 = нет); тип задаёт intervType
@@ -2212,12 +2258,23 @@ function refreshColors() {
     costAVC: cssVar('--cost-avc'),
     costAFC: cssVar('--cost-afc'),
     costVC:  cssVar('--cost-vc'),
+    // Отдельные ключи для кривых, у которых свой пикер (Фаза 2). Значения по
+    // умолчанию те же токены — картинка не меняется, но смена цвета MP больше
+    // не перекрашивает MC, а веер изоквант — все кривые спроса на сайте.
+    prodTP: cssVar('--curve-d'),
+    prodMP: cssVar('--cost-mc'),
+    prodAP: cssVar('--cost-avc'),
+    isoq:   cssVar('--curve-d'),
+    indiff: cssVar('--curve-d'),
     // Структурные цвета (зависят от темы).
     ink:     cssVar('--ink'),       // оси, подписи осей, текст у точек
     inkSoft: cssVar('--ink-soft'),  // цифры делений, вторичные подписи
     grid:    cssVar('--grid'),      // линии сетки
     halo:    cssVar('--halo'),      // фон-обводка под подписями, центр маркеров
   };
+  // Свои цвета из пикеров (Фаза 2) кладутся ПОВЕРХ токенов и только на этот сеанс.
+  // Сам файл токенов не меняется: палитра по умолчанию остаётся исходной точкой.
+  Object.keys(STATE.colorOverride || {}).forEach(k => { COL[k] = STATE.colorOverride[k]; });
 }
 
 // Цвет кривой по роли — чтобы спрос всегда был синим, предложение красным,
@@ -2707,6 +2764,11 @@ function drawGrid() {
 // Подписи параметризованы: по умолчанию Q/P (рынок, издержки), для КПВ — X/Y (Задача 3).
 function drawAxes(xLabel, yLabel) {
   if (xLabel == null) xLabel = 'Q'; if (yLabel == null) yLabel = 'P';
+  // Оформление (Фаза 1): своё название оси перекрывает сценовое. Пустую строку ''
+  // сцена присылает намеренно («метку рисую сама») — её не трогаем, иначе получим
+  // две подписи. Заодно запоминаем сценовые названия для placeholder'ов в панели.
+  if (xLabel) { STATE.axisXDefault = xLabel; if (STATE.axisXName) xLabel = STATE.axisXName; }
+  if (yLabel) { STATE.axisYDefault = yLabel; if (STATE.axisYName) yLabel = STATE.axisYName; }
   const g = svg.append('g').attr('class', 'axes');
   const ox = sx(0), oy = sy(0);            // пиксели начала координат (0,0)
   const xEnd = sx(CONFIG.Qmax), yEnd = sy(CONFIG.Pmax);
@@ -5657,10 +5719,10 @@ function redrawProduction() {
     g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', width || 2.4).attr('d', line);
   };
   const gTop = panel(t1, yTop0, 'TP — общий продукт');
-  curve(gTop, prodEval, t1, COL.D, STATE.showTP, 2.6);
+  curve(gTop, prodEval, t1, COL.prodTP, STATE.showTP, 2.6);
   const gBot = panel(t2, yBot0, 'MP и AP');
-  curve(gBot, prodMP, t2, COL.costMC, STATE.showMP);
-  curve(gBot, prodAP, t2, COL.costAVC, STATE.showAP);
+  curve(gBot, prodMP, t2, COL.prodMP, STATE.showMP);
+  curve(gBot, prodAP, t2, COL.prodAP, STATE.showAP);
   // Ключевые вертикали: перегиб TP (максимум MP) и максимум AP (там AP = MP).
   const vline = (L, color, label) => {
     if (L == null) return;
@@ -5671,17 +5733,17 @@ function redrawProduction() {
     g.append('text').attr('x', x + 5).attr('y', top + 10).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', color)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
   };
-  if (p.maxMP) vline(p.maxMP.L, COL.costMC, 'перегиб TP · max MP · L=' + fmt(p.maxMP.L));
-  if (p.maxAP) vline(p.maxAP.L, COL.costAVC, 'max AP = MP · L=' + fmt(p.maxAP.L));
+  if (p.maxMP) vline(p.maxMP.L, COL.prodMP, 'перегиб TP · max MP · L=' + fmt(p.maxMP.L));
+  if (p.maxAP) vline(p.maxAP.L, COL.prodAP, 'max AP = MP · L=' + fmt(p.maxAP.L));
   if (p.maxTP) vline(p.maxTP.L, COL.ghost, 'max TP · MP=0');
   // Точки на нижней панели.
   if (p.maxAP && STATE.showAP) {
     svg.append('circle').attr('cx', lx(p.maxAP.L)).attr('cy', t2(p.maxAP.val)).attr('r', 4.5)
-      .attr('fill', COL.costAVC).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+      .attr('fill', COL.prodAP).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   }
   if (p.maxMP && STATE.showMP) {
     svg.append('circle').attr('cx', lx(p.maxMP.L)).attr('cy', t2(p.maxMP.val)).attr('r', 4.5)
-      .attr('fill', COL.costMC).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+      .attr('fill', COL.prodMP).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   }
   updateProdPanel();
 }
@@ -5721,9 +5783,9 @@ function redrawIsoquant() {
   addDefs(); drawGrid(); drawAxes('L', 'K');
   const iso = STATE.iso;
   if (!iso) { updateIsoPanel(); return; }
-  if (STATE.isoFan && iso.Q > 0) [0.62, 0.8, 1.22].forEach(m => drawLevelCurve(iso.f, iso.Q * m, COL.D, 1.6, 0.35));
+  if (STATE.isoFan && iso.Q > 0) [0.62, 0.8, 1.22].forEach(m => drawLevelCurve(iso.f, iso.Q * m, COL.isoq, 1.6, 0.35));
   drawBudgetLine({ xInt: iso.Lint, yInt: iso.Kint }, COL.reg, false, 'изокоста');
-  drawLevelCurve(iso.f, iso.Q, COL.D, 2.6, 1);
+  drawLevelCurve(iso.f, iso.Q, COL.isoq, 2.6, 1);
   drawChoicePoint(iso.L, iso.K, COL.ink, 'E');
   updateIsoPanel();
 }
@@ -6828,21 +6890,21 @@ function redrawConsumer() {
   const f = c.f, b = c.base, s = c.slutsky;
   // Веер соседних кривых безразличия — «карта» предпочтений (ниже и выше оптимума).
   if (STATE.consFan && b.U > 0) {
-    [0.62, 0.8, 1.22].forEach(m => drawLevelCurve(f, b.U * m, COL.D, 1.6, 0.35));
+    [0.62, 0.8, 1.22].forEach(m => drawLevelCurve(f, b.U * m, COL.indiff, 1.6, 0.35));
   }
   if (s) {
     // Три бюджетные линии: старая, компенсированная (Слуцкий), новая.
     drawBudgetLine(b, COL.ghost, true, 'старая');
     drawBudgetLine(s.comp, COL.MR, true, 'компенсир.');
     drawBudgetLine(s.fin, COL.reg, false, 'новая');
-    drawLevelCurve(f, b.U, COL.D, 2.2, 1);          // кривая исходного уровня
+    drawLevelCurve(f, b.U, COL.indiff, 2.2, 1);          // кривая исходного уровня
     if (s.fin.U > 0) drawLevelCurve(f, s.fin.U, COL.reg, 2, 0.9, '5 4');
     drawChoicePoint(b.x, b.y, COL.ghost, 'A');
     drawChoicePoint(s.comp.x, s.comp.y, COL.MR, 'B');
     drawChoicePoint(s.fin.x, s.fin.y, COL.ink, 'C');
   } else {
     drawBudgetLine(b, COL.reg, false, null);
-    drawLevelCurve(f, b.U, COL.D, 2.6, 1);
+    drawLevelCurve(f, b.U, COL.indiff, 2.6, 1);
     drawChoicePoint(b.x, b.y, COL.ink, 'E');
     attachBudgetHandles(b);
   }
@@ -7469,10 +7531,6 @@ function ineqRedraw() { _ineqThrottle(() => redrawAll()); }   // живой пе
 function setMode(mode) {
   cancelRangeAnim();   // отложенный/идущий переезд осей прошлой сцены — отменить
   STATE.mode = mode;
-  const map = { market: 'mode-market', costs: 'mode-costs', ppf: 'mode-ppf', labor: 'mode-labor',
-                inequality: 'mode-ineq', consumer: 'mode-consumer', macro: 'mode-macro' };
-  Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
-  const ab = document.getElementById(map[mode]); if (ab) ab.classList.add('active');
   // Какие секции панели показывать в каждом режиме (отсутствующие id просто игнорируются).
   const groups = {
     market: ['sec-curves', 'sec-eq', 'sec-areas', 'sec-analysis', 'sec-tax', 'sec-mono'],
@@ -8970,7 +9028,16 @@ function renderIneqGroupsTable() {
    БЛОК 9. redrawAll() — единая точка перерисовки.
    Любое изменение (кривая, перетаскивание, налог) дёргает её.
    --------------------------------------------------------------------- */
+/* Единая перерисовка = сцена + общий слой оформления поверх неё.
+   Сцен много, и почти каждая выходит из redrawScene своим `return`, поэтому
+   заголовок графика и свои точки рисуются НЕ внутри сцены, а обёрткой после неё:
+   так они работают в любом режиме и ни одну сцену не пришлось трогать. */
 function redrawAll() {
+  redrawScene();
+  drawOverlays();
+}
+
+function redrawScene() {
   refreshColors();      // перечитать цвета из CSS-переменных (учитывает смену темы)
   clearResultPanels();  // очистить табло — активный режим заполнит свои блоки
   computeSize();
@@ -9089,6 +9156,228 @@ function redrawAll() {
 }
 
 /* ---------------------------------------------------------------------
+   ОФОРМЛЕНИЕ (Фаза 1) — слой поверх любой сцены: заголовок и свои точки.
+   --------------------------------------------------------------------- */
+
+// Канонические шкалы главного графика. Считаем свои копии, а не берём глобальные
+// sx/sy: сцены с двумя мини-графиками (дискриминация 3°, производство, два завода)
+// оставляют в sx/sy шкалу ПОСЛЕДНЕЙ панели, и точки уехали бы вместе с ней.
+function mainScales() {
+  const m = CONFIG.margin;
+  return {
+    mx: d3.scaleLinear().domain([0, CONFIG.Qmax]).range([m.left, W - m.right]),
+    my: d3.scaleLinear().domain([0, CONFIG.Pmax]).range([H - m.bottom, m.top]),
+  };
+}
+
+function drawOverlays() {
+  if (!svg || !svg.node()) return;
+  drawGraphTitle();
+  drawMarks();
+  syncAxisPlaceholders();
+  syncSceneColorPickers();   // образцы в панели идут за темой и за своими цветами
+}
+
+/* Пикеры цвета у именованных кривых сцены (издержки, производство, вееры).
+   data-col = ключ в COL. Значение живёт в STATE.colorOverride и накладывается
+   поверх токена в refreshColors — правится ровно одна кривая, палитра цела. */
+function initSceneColorPickers() {
+  document.querySelectorAll('input.swatch-pick[data-col]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      STATE.colorOverride[inp.dataset.col] = inp.value;
+      redrawAll();
+    });
+  });
+  syncSceneColorPickers();
+}
+function syncSceneColorPickers() {
+  document.querySelectorAll('input.swatch-pick[data-col]').forEach(inp => {
+    const v = COL[inp.dataset.col];
+    if (v) inp.value = normHex(v);
+  });
+}
+
+// Плейсхолдеры полей «Ось X/Y» показывают, что нарисует сцена, если оставить пусто.
+function syncAxisPlaceholders() {
+  const x = document.getElementById('inp-xname'), y = document.getElementById('inp-yname');
+  if (x) x.placeholder = STATE.axisXDefault || 'Q';
+  if (y) y.placeholder = STATE.axisYDefault || 'P';
+}
+
+// Заголовок графика по центру верхнего поля.
+function drawGraphTitle() {
+  const t = (STATE.graphTitle || '').trim();
+  if (!t) return;
+  const m = CONFIG.margin;
+  svg.append('text')
+    .attr('x', (m.left + (W - m.right)) / 2).attr('y', Math.max(17, m.top - 11))
+    .attr('text-anchor', 'middle').attr('font-size', 15).attr('font-weight', 650)
+    .attr('fill', COL.ink)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
+    .text(t);
+}
+
+/* Пикер цвета (Фаза 2) — переиспользуемый для ЛЮБОГО списка кривых.
+   Нативный <input type="color"> под видом того же квадратика-образца: сторонняя
+   библиотека не нужна. Меняет цвет только у своего экземпляра кривой; файл
+   дизайн-токенов (--curve-*, --cost-*) остаётся нетронутым и служит палитрой
+   по умолчанию — колорблайнд-безопасной точкой отсчёта. */
+function normHex(c) {
+  const s = String(c || '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(s)) return s;
+  if (/^#[0-9a-f]{3}$/i.test(s)) return '#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3];
+  const m = s.match(/rgba?\(\s*(\d+)\D+(\d+)\D+(\d+)/i);
+  if (m) return '#' + [1, 2, 3].map(i => (+m[i]).toString(16).padStart(2, '0')).join('');
+  return '#888888';
+}
+function makeColorPicker(value, onChange, title) {
+  const inp = document.createElement('input');
+  inp.type = 'color';
+  inp.className = 'swatch swatch-pick';
+  inp.value = normHex(value);
+  inp.title = title || 'Цвет кривой';
+  inp.addEventListener('input', () => onChange(inp.value));
+  return inp;
+}
+
+// Короткое имя кривой для подписей: своё имя → роль → формула.
+function curveShortName(c) {
+  const custom = (c.label || '').trim();
+  if (custom) return custom;
+  const byRole = { demand: 'D', supply: 'S', mc: 'MC', tc: 'TC', atc: 'ATC' };
+  if (c.role && byRole[c.role]) return byRole[c.role];
+  return (c.name || c.expr || '').trim() || '?';
+}
+
+// Строки подписи своей точки: текст пользователя + по галочкам координаты
+// и значения видимых кривых в этой точке.
+function markCaption(mk) {
+  const parts = [];
+  if (mk.text) parts.push(mk.text);
+  if (mk.showCoords) parts.push('(' + fmt(mk.x) + '; ' + fmt(mk.y) + ')');
+  if (mk.showCurves) {
+    STATE.curves.filter(c => c.visible).slice(0, 3).forEach(c => {
+      const v = evalCurve(c, mk.x);
+      if (!isNaN(v)) parts.push(curveShortName(c) + ' = ' + fmt(v));
+    });
+  }
+  return parts;
+}
+
+function drawMarks() {
+  if (!STATE.marks || !STATE.marks.length) return;
+  const { mx, my } = mainScales();
+  const g = svg.append('g').attr('class', 'marks');
+  STATE.marks.forEach(mk => {
+    if (mk.x < 0 || mk.x > CONFIG.Qmax || mk.y < 0 || mk.y > CONFIG.Pmax) return;
+    const px = mx(mk.x), py = my(mk.y);
+    // Пунктирные проекции на оси — как у равновесия: так точка читается по осям.
+    g.append('line').attr('x1', mx(0)).attr('y1', py).attr('x2', px).attr('y2', py)
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
+      .attr('stroke-dasharray', '3 3').attr('opacity', .5);
+    g.append('line').attr('x1', px).attr('y1', my(0)).attr('x2', px).attr('y2', py)
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
+      .attr('stroke-dasharray', '3 3').attr('opacity', .5);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
+      .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.6)
+      .style('cursor', 'move')
+      .call(d3.drag().container(() => svg.node()).on('drag', ev => {
+        mk.x = Math.max(0, Math.min(CONFIG.Qmax, mx.invert(ev.x)));
+        mk.y = Math.max(0, Math.min(CONFIG.Pmax, my.invert(ev.y)));
+        renderMarkList(); redrawAll();
+      }));
+    // Подпись растёт ВВЕРХ от точки, чтобы не накрывать её саму.
+    const lines = markCaption(mk);
+    lines.forEach((s, i) => {
+      g.append('text').attr('x', px + 9).attr('y', py - 9 - (lines.length - 1 - i) * 13)
+        .attr('font-size', 11.5).attr('font-weight', i === 0 ? 650 : 500).attr('fill', COL.ink)
+        .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6)
+        .text(s);
+    });
+  });
+}
+
+let markCounter = 0;
+
+// Взвести/снять режим «следующий щелчок по графику ставит точку».
+function armMark(on) {
+  STATE.markArm = on;
+  const b = document.getElementById('btn-mark-add');
+  if (b) { b.classList.toggle('armed', on); b.textContent = on ? 'Щёлкните по графику' : 'Поставить точку'; }
+  const wrap = document.getElementById('graph-wrap');
+  if (wrap) wrap.style.cursor = on ? 'crosshair' : '';
+}
+
+// Сброс оформления при выборе новой сцены: чужие подписи осей и точки
+// в другой модели читались бы как ошибка.
+function resetDecor() {
+  STATE.graphTitle = ''; STATE.axisXName = ''; STATE.axisYName = '';
+  STATE.marks = []; markCounter = 0;
+  armMark(false);
+  [['inp-gtitle', ''], ['inp-xname', ''], ['inp-yname', '']].forEach(([id, v]) => {
+    const e = document.getElementById(id); if (e) e.value = v;
+  });
+  renderMarkList();
+}
+
+function addMarkAt(x, y) {
+  markCounter++;
+  STATE.marks.push({
+    id: markCounter, x, y, text: 'Точка ' + markCounter,
+    showCoords: true, showCurves: false,
+  });
+  renderMarkList();
+  redrawAll();
+}
+
+// Список своих точек в панели: подпись, что показывать, удаление.
+function renderMarkList() {
+  const box = document.getElementById('mark-list');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!STATE.marks.length) {
+    box.innerHTML = '<div class="muted">Пока нет своих точек.</div>';
+    return;
+  }
+  STATE.marks.forEach(mk => {
+    const row = document.createElement('div');
+    row.className = 'mark-row';
+
+    const top = document.createElement('div');
+    top.className = 'mark-top';
+    const co = document.createElement('span');
+    co.className = 'mark-co';
+    co.textContent = '(' + fmt(mk.x) + '; ' + fmt(mk.y) + ')';
+    const del = document.createElement('button');
+    del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.title = 'Убрать точку';
+    del.addEventListener('click', () => {
+      STATE.marks = STATE.marks.filter(m => m.id !== mk.id);
+      renderMarkList(); redrawAll();
+    });
+    top.append(co, del);
+
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.value = mk.text; inp.placeholder = 'подпись точки';
+    inp.addEventListener('input', () => { mk.text = inp.value; redrawAll(); });
+
+    const mk1 = document.createElement('label');
+    mk1.className = 'chk';
+    const c1 = document.createElement('input'); c1.type = 'checkbox'; c1.checked = mk.showCoords;
+    c1.addEventListener('change', () => { mk.showCoords = c1.checked; redrawAll(); });
+    mk1.append(c1, document.createTextNode('координаты'));
+
+    const mk2 = document.createElement('label');
+    mk2.className = 'chk';
+    const c2 = document.createElement('input'); c2.type = 'checkbox'; c2.checked = mk.showCurves;
+    c2.addEventListener('change', () => { mk.showCurves = c2.checked; redrawAll(); });
+    mk2.append(c2, document.createTextNode('значения кривых'));
+
+    row.append(top, inp, mk1, mk2);
+    box.appendChild(row);
+  });
+}
+
+/* ---------------------------------------------------------------------
    БЛОК UI. Элементы управления панели и их привязка к логике.
    --------------------------------------------------------------------- */
 
@@ -9148,8 +9437,9 @@ function setRole(curve, role) {
     STATE.curves.forEach(c => { if (c !== curve && c.role === role) c.role = null; });
     curve.role = role;
     // Перекрашиваем по роли: спрос — синий, предложение — красный, MC — бирюзовый.
+    // Свой цвет из пикера (Фаза 2) сильнее роли: выбор пользователя не затираем.
     const rc = roleColor(role);
-    if (rc) curve.color = rc;
+    if (rc && !curve.colorCustom) curve.color = rc;
   }
   renderCurveList();
   redrawAll();
@@ -9175,11 +9465,17 @@ function renderCurveList() {
     cb.type = 'checkbox'; cb.checked = curve.visible; cb.title = 'Показать/скрыть';
     cb.addEventListener('change', () => { curve.visible = cb.checked; renderCurveList(); redrawAll(); });
 
-    const sw = document.createElement('span');
-    sw.className = 'swatch'; sw.style.background = curve.color;
+    // Цвет кривой (Фаза 2): пикер меняет цвет ТОЛЬКО у этого экземпляра.
+    // Палитра по умолчанию (--curve-*) не трогается: она остаётся точкой отсчёта,
+    // пользователь лишь перекрывает её локально на время сеанса.
+    const sw = makeColorPicker(curve.color, (hex) => {
+      curve.color = hex; curve.colorCustom = true;
+      renderCurveList(); redrawAll();
+    });
 
     const nm = document.createElement('span');
-    nm.className = 'curve-name'; nm.textContent = curve.name;
+    nm.className = 'curve-name'; nm.textContent = curveShortName(curve);
+    nm.title = curve.name || curve.expr || '';
     if (!curve.visible) nm.style.opacity = '.4';
 
     // Бейдж формы записи (Фаза 1б): видно, что кривая введена как «объём от цены».
@@ -9213,7 +9509,20 @@ function renderCurveList() {
     sel.value = curve.role || '';
     sel.addEventListener('change', () => setRole(curve, sel.value));
 
-    row.append(top, sel);
+    // Своё имя кривой (Фаза 1). Если задано — идёт и в подпись на графике,
+    // и в список, и в чип пульта вместо родового «D»/«S».
+    const nameInp = document.createElement('input');
+    nameInp.type = 'text'; nameInp.className = 'curve-label-inp';
+    nameInp.value = curve.label || '';
+    nameInp.placeholder = 'имя на графике, напр. D₁';
+    nameInp.addEventListener('input', () => {
+      curve.label = nameInp.value;
+      nm.textContent = curveShortName(curve);
+      redrawAll();
+      if (typeof updatePult === 'function') updatePult();
+    });
+
+    row.append(top, nameInp, sel);
     list.appendChild(row);
   });
   if (typeof updatePult === 'function') updatePult();   // пересобрать слайдеры кривых в пульте
@@ -9442,6 +9751,7 @@ function openPicker() {
   if (first) first.focus();
 }
 function pickScene(key) {
+  resetDecor();           // новая сцена — чистое оформление (Фаза 1)
   STATE.sceneKey = key;   // запоминаем сцену: пульт живёт только в сцене «Налог/Субсидия»
   const actions = {
     sd:    () => loadScene('sd'),
@@ -9514,7 +9824,7 @@ const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-cos
 
 function relocateForScene() {
   const adv = document.getElementById('tools-advanced');
-  if (adv) ['sec-mode', 'sec-scenes', 'sec-axes'].forEach(id => {
+  if (adv) ['sec-axes'].forEach(id => {
     const el = document.getElementById(id); if (el) adv.appendChild(el);
   });
   const sb = document.getElementById('sb-body');
@@ -9885,16 +10195,14 @@ function positionPultDefault() {
 
 // Короткая метка кривой для чипа: по роли, иначе усечённая формула.
 function curveChipLabel(c) {
-  const byRole = { demand: 'D', supply: 'S', mc: 'MC', tc: 'TC', atc: 'ATC' };
-  if (c.role && byRole[c.role]) return byRole[c.role];
-  const f = (c.name || c.expr || '').trim();
-  return f.length > 10 ? f.slice(0, 9) + '…' : (f || '?');
+  const f = curveShortName(c);   // своё имя → роль → формула (Фаза 1)
+  return f.length > 10 ? f.slice(0, 9) + '…' : f;
 }
 
 // Сигнатура набора кривых — чтобы НЕ пересобирать чипы на каждом кадре перетаскивания
 // (там меняется только b → достаточно обновить значения, см. syncPultCurveValues).
 function pultCurveSig(list) {
-  return list.map(c => c.id + ':' + (c.role || '') + ':' + c.color).join('|');
+  return list.map(c => c.id + ':' + (c.role || '') + ':' + c.color + ':' + (c.label || '')).join('|');
 }
 
 // Построить (пересобрать) чипы слайдеров кривых в контейнере #pult-curves.
@@ -10318,11 +10626,7 @@ function wireControls() {
   // Потолок/пол цены в монополии (Фаза 2) задаются ОБЩИМ блоком «Вмешательство»
   // (сегменты «Потолок»/«Пол» + ползунок pc-slider → setPReg), отдельной галочки больше нет.
 
-  // Переключатель режима «Рынок / Издержки / КПВ / Труд / Неравенство / Потребитель».
-  [['mode-market', 'market'], ['mode-costs', 'costs'], ['mode-ppf', 'ppf'], ['mode-labor', 'labor'],
-   ['mode-ineq', 'inequality'], ['mode-consumer', 'consumer'], ['mode-macro', 'macro']].forEach(([id, mode]) => {
-    const b = document.getElementById(id); if (b) b.addEventListener('click', () => setMode(mode));
-  });
+  // Режим выбирается карточкой в окне сценариев; кнопок режима в панели больше нет.
 
   // Теория потребителя (Фаза 8): цены, доход, тип предпочтений, параметры, Слуцкий.
   [['cons-px', 'consPx'], ['cons-py', 'consPy'], ['cons-i', 'consI'],
@@ -10640,10 +10944,33 @@ function wireControls() {
     redrawAll();
   });
 
-  // Готовые сцены (Задача 4): заполнение типовой задачи одним кликом.
-  [['scene-sd', 'sd'], ['scene-tax', 'tax'], ['scene-ceil', 'ceil'],
-   ['scene-mono', 'mono'], ['scene-costs', 'costs'], ['scene-ppf', 'ppf']]
-    .forEach(([id, name]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => loadScene(name)); });
+  // Готовые сцены раздаёт окно сценариев (#scene-picker) — второго списка кнопок нет.
+
+  // Оформление (Фаза 1): заголовок графика и свои названия осей.
+  const gTitle = document.getElementById('inp-gtitle');
+  if (gTitle) gTitle.addEventListener('input', () => { STATE.graphTitle = gTitle.value; redrawAll(); });
+  const xName = document.getElementById('inp-xname');
+  if (xName) xName.addEventListener('input', () => { STATE.axisXName = xName.value; redrawAll(); });
+  const yName = document.getElementById('inp-yname');
+  if (yName) yName.addEventListener('input', () => { STATE.axisYName = yName.value; redrawAll(); });
+
+  // Своя точка: кнопка взводит режим, следующий щелчок по графику ставит точку.
+  const markBtn = document.getElementById('btn-mark-add');
+  if (markBtn) markBtn.addEventListener('click', () => armMark(!STATE.markArm));
+  const chartEl = document.getElementById('chart');
+  if (chartEl) chartEl.addEventListener('click', (ev) => {
+    if (!STATE.markArm) return;
+    const { mx, my } = mainScales();
+    const [px, py] = d3.pointer(ev, chartEl);
+    const x = mx.invert(px), y = my.invert(py);
+    armMark(false);
+    if (x < 0 || x > CONFIG.Qmax || y < 0 || y > CONFIG.Pmax) return;   // щелчок мимо поля
+    addMarkAt(x, y);
+  });
+  // Esc снимает взведённый режим — иначе курсор-перекрестие остаётся «залипшим».
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && STATE.markArm) armMark(false); });
+  renderMarkList();
+  initSceneColorPickers();   // Фаза 2: пикеры у кривых издержек, производства, вееров
 
   // Регулируемая цена (потолок / пол): ползунок (целые) + числовое поле (дробные).
   const pcSlider = document.getElementById('pc-slider');
