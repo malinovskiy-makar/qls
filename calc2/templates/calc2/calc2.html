@@ -5008,7 +5008,9 @@ function recomputeDiscr3() {
 
 // Мини-график одного рынка в пиксельной полосе [gx0, gx1]: D, MR, MC и точка (qi, Pi).
 function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
-  const ml = 46, mr = 18, mt = 30, mb = 42;
+  // mt=64: заголовок панели печатается на 12px выше её верха, а сверху слева
+  // висит шапка сцены («← Сценарии», до 44px) — с прежними 30 они накладывались.
+  const ml = 46, mr = 18, mt = 64, mb = 42;
   const left = gx0 + ml, right = gx1 - mr, top = mt, bottom = H - mb;
   if (right <= left || bottom <= top) return;
   let Xmax = invCurve(D, 0); if (Xmax == null || !(Xmax > 0)) Xmax = CONFIG.Qmax; Xmax = niceMax(Xmax * 1.1);
@@ -5053,15 +5055,16 @@ function redrawDiscr3() {
     updateDiscr3Panel();
     return;
   }
-  const midX = W / 2;
+  // Левая панель начинается ПОСЛЕ дока (56px), иначе её ось и цифры уходят под него.
+  const gxLeft = 64, midX = gxLeft + (W - gxLeft) / 2;
   // Фаза 4г: в сюжете «монополист и мировой рынок» те же два мини-графика подписаны
   // как внутренний рынок и экспорт по мировой цене (математика та же, discr3).
   const t1 = STATE.d3World ? 'Внутренний рынок' : 'Рынок 1';
   const t2 = STATE.d3World ? 'Экспорт по мировой цене' : 'Рынок 2';
-  drawMiniMarket(0, midX, t1, d.c1, d.q1, d.P1, d.cm, 1);
+  drawMiniMarket(gxLeft, midX, t1, d.c1, d.q1, d.P1, d.cm, 1);
   drawMiniMarket(midX, W, t2, d.c2, d.q2, d.P2, d.cm, 2);
   // Разделитель между панелями.
-  svg.append('line').attr('x1', midX).attr('y1', 18).attr('x2', midX).attr('y2', H - 30).attr('stroke', COL.grid).attr('stroke-width', 1);
+  svg.append('line').attr('x1', midX).attr('y1', 52).attr('x2', midX).attr('y2', H - 30).attr('stroke', COL.grid).attr('stroke-width', 1);
   updateDiscr3Panel();
 }
 
