@@ -1274,7 +1274,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
     <!-- Издержки фирмы (Задача 2) — отдельный режим -->
     <div class="section" id="sec-costs" style="display:none;">
-      <div class="section-title">Издержки фирмы</div>
+      <div class="section-title">Фирма</div>
+      <!-- Фаза 9: три сюжета на одной базе. «Издержки» — прежний режим (кривые из TC)
+           плюс долгосрочное равновесие; «Производство» — TP/MP/AP от труда;
+           «Изокванты» — тот же движок касания уровня, что у потребителя. -->
+      <div class="seg" style="margin-bottom:8px;">
+        <button class="seg-btn active" id="cs-costs">Издержки</button>
+        <button class="seg-btn" id="cs-prod">Производство</button>
+        <button class="seg-btn" id="cs-iso">Изокванты</button>
+      </div>
+      <div id="costs-pane-costs">
       <div class="field f-wrap">
         <label>Суммарные затраты TC(Q)</label>
         <div class="f-row">
@@ -1305,7 +1314,77 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <label class="chk"><input type="checkbox" id="chk-vc">
           <span class="swatch" style="background:var(--cost-vc)"></span> VC — перем. (полные)</label>
       </div>
+      <!-- 9в: долгосрочное равновесие конкурентной фирмы. -->
+      <div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border);">
+        <label class="chk"><input type="checkbox" id="chk-lr" checked>
+          <span class="swatch" style="background:var(--curve-reg)"></span> Рыночная цена P и прибыль</label>
+        <div class="field" id="lr-price-field">
+          <label>Цена P = <b id="lr-price-val">15</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="lr-price-slider" min="0" max="50" step="0.5" value="15" style="flex:1;margin-top:0;">
+            <input type="number" id="lr-price-input" min="0" step="0.1" value="15"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+        </div>
+        <label class="chk"><input type="checkbox" id="chk-lr-area" checked>
+          <span class="swatch" style="background:var(--curve-tax)"></span> Прямоугольник прибыли / убытка</label>
+        <div class="hint">Фирма выбирает Q, где P&nbsp;=&nbsp;MC (на возрастающей ветке). Прибыль
+          (P&nbsp;−&nbsp;ATC)·Q закрашивается зелёным, убыток — красным. Долгосрочная точка входа
+          и выхода — там, где P&nbsp;=&nbsp;min&nbsp;ATC: экономическая прибыль ноль.</div>
+      </div>
       <div id="info-costs" style="margin-top:8px;"></div>
+      </div><!-- /costs-pane-costs -->
+
+      <!-- 9а. Производственная функция Q = f(L) при фиксированном капитале. -->
+      <div id="costs-pane-prod" style="display:none;">
+        <div class="field f-wrap">
+          <label>Выпуск Q&nbsp;=&nbsp;f(L)</label>
+          <div class="f-row">
+            <input type="text" id="inp-prod" value="30*L^2 - L^3" autocomplete="off">
+            <button class="f-help" id="fh-prod" type="button" aria-expanded="false" aria-controls="fp-prod" title="Как писать формулы">?</button>
+          </div>
+          <div class="f-pop" id="fp-prod" role="region" aria-label="Примеры производственных функций"></div>
+        </div>
+        <button class="btn" id="btn-prod-apply">Построить</button>
+        <div style="margin-top:10px;">
+          <label class="chk"><input type="checkbox" id="chk-tp" checked>
+            <span class="swatch" style="background:var(--curve-d)"></span> TP — общий продукт</label>
+          <label class="chk"><input type="checkbox" id="chk-mp" checked>
+            <span class="swatch" style="background:var(--cost-mc)"></span> MP — предельный продукт</label>
+          <label class="chk"><input type="checkbox" id="chk-ap" checked>
+            <span class="swatch" style="background:var(--cost-avc)"></span> AP — средний продукт</label>
+        </div>
+        <div class="hint">Верхняя панель — общий продукт TP, нижняя — предельный MP&nbsp;=&nbsp;dQ/dL и
+          средний AP&nbsp;=&nbsp;Q/L (у них свой масштаб, иначе на фоне TP их не видно).
+          Точка перегиба TP — там, где MP максимален: с неё начинается убывающая предельная отдача.
+          Максимум AP — там, где AP&nbsp;=&nbsp;MP.</div>
+        <div class="error" id="prod-error" style="display:none;"></div>
+        <div id="info-prod" style="margin-top:8px;"></div>
+      </div>
+
+      <!-- 9б. Изокванты и изокосты — тот же движок касания уровня, что у потребителя. -->
+      <div id="costs-pane-iso" style="display:none;">
+        <div class="field f-wrap">
+          <label>Производственная функция Q(L,&nbsp;K)</label>
+          <div class="f-row">
+            <input type="text" id="inp-iso" value="L^0.5 * K^0.5" autocomplete="off">
+            <button class="f-help" id="fh-iso" type="button" aria-expanded="false" aria-controls="fp-iso" title="Как писать формулы">?</button>
+          </div>
+          <div class="f-pop" id="fp-iso" role="region" aria-label="Примеры производственных функций"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Цена труда w</label><input type="number" id="iso-w" min="0.01" step="0.1" value="1"></div>
+          <div class="field"><label>Цена капитала r</label><input type="number" id="iso-r" min="0.01" step="0.1" value="2"></div>
+        </div>
+        <div class="field"><label>Бюджет C</label><input type="number" id="iso-c" min="1" step="1" value="100"></div>
+        <label class="chk"><input type="checkbox" id="chk-iso-fan" checked>
+          <span class="swatch" style="background:var(--curve-d)"></span> Веер изоквант</label>
+        <div class="hint">Изокоста w·L&nbsp;+&nbsp;r·K&nbsp;=&nbsp;C; оптимум — касание изокванты и изокосты,
+          там MRTS&nbsp;=&nbsp;w/r. Считает ТОТ ЖЕ движок, что кривые безразличия потребителя:
+          при Q&nbsp;=&nbsp;L^0.5·K^0.5, w=1, r=2, C=100 получаются те же 50 и 25.</div>
+        <div class="error" id="iso-error" style="display:none;"></div>
+        <div id="info-iso" style="margin-top:8px;"></div>
+      </div>
     </div>
 
     <!-- Рынок труда (Чекпоинт 1) — отдельный режим. Оси: труд L и зарплата W.
@@ -1836,6 +1915,15 @@ const STATE = {
   costsCompiled: null,
   costsReady: false,
   showMC: true, showATC: true, showAVC: true, showAFC: true, showVC: false,
+  // Фаза 9: три сюжета режима «Фирма».
+  costsSub: 'costs',           // 'costs' | 'production' | 'isoquant'
+  // 9в — долгосрочное равновесие: рыночная цена, оптимум P = MC, прибыль/убыток.
+  lrOn: true, lrPrice: 15, lrArea: true, lr: null,
+  // 9а — производственная функция Q = f(L): TP / MP / AP.
+  prodExpr: '30*L^2 - L^3', prodCompiled: null, prod: null,
+  showTP: true, showMP: true, showAP: true,
+  // 9б — изокванты и изокосты: та же математика, что кривые безразличия.
+  isoExpr: 'L^0.5 * K^0.5', isoW: 1, isoR: 2, isoC: 100, isoFan: true, iso: null, isoErr: null,
   // КПВ — граница производственных возможностей (Задача 3). Оси: товар X и товар Y.
   ppfFormula: '100 - X',
   ppfCompiled: null,
@@ -5130,20 +5218,315 @@ function updateCostsPanel() {
   if (STATE.minATC) html += `<div class="stat"><span>Безубыточность (min ATC)</span><b>Q=${fmt(STATE.minATC.Q)}, ATC=${fmt(STATE.minATC.val)}</b></div>`;
   if (STATE.minAVC) html += `<div class="stat"><span>Закрытие (min AVC)</span><b>Q=${fmt(STATE.minAVC.Q)}, AVC=${fmt(STATE.minAVC.val)}</b></div>`;
   html += '<div class="hint">В точках закрытия и безубыточности MC пересекает соответственно AVC и ATC (в их минимумах).</div>';
+  html = updateLongRunPanel(html);   // 9в — цена, оптимум P = MC, прибыль/убыток
   box.innerHTML = html;
 }
 
-// Полная перерисовка режима издержек.
+// Полная перерисовка режима «Фирма»: три сюжета (Фаза 9).
 function redrawCosts() {
+  if (STATE.costsSub === 'production') { redrawProduction(); return; }   // 9а
+  if (STATE.costsSub === 'isoquant')   { redrawIsoquant();   return; }   // 9б
   recomputeCosts();
+  recomputeLongRun();     // 9в — после recomputeCosts: нужны minATC / minAVC
   svg.selectAll('*').remove();
   addDefs();
   drawGrid();
   drawAxes('Q', '');
   svg.append('text').attr('x', sx(0) + 6).attr('y', sy(CONFIG.Pmax) - 5)
-    .attr('text-anchor', 'start').attr('font-size', 11).attr('fill', COL.inkSoft).text('издержки');
+    .attr('text-anchor', 'start').attr('font-size', 11).attr('fill', COL.inkSoft).text('издержки, цена');
+  drawLongRunArea();      // прямоугольник прибыли/убытка — под кривыми
   drawCostCurves();
+  if (STATE.lrOn) drawLongRunMarks();
   updateCostsPanel();
+}
+
+/* =====================================================================
+   БЛОК 10а-2. ФИРМА: ПРОИЗВОДСТВО, ИЗОКВАНТЫ, ДОЛГИЙ ПЕРИОД (Фаза 9).
+   Три сюжета внутри режима «Фирма» (costsSub):
+     'costs'      — прежние кривые из TC + долгосрочное равновесие (9в);
+     'production' — Q = f(L): TP, MP = dQ/dL, AP = Q/L (9а);
+     'isoquant'   — Q(L,K), изокоста w·L + r·K = C, оптимум MRTS = w/r (9б).
+   9б переиспользует ДВИЖОК КАСАНИЯ УРОВНЯ из Фазы 7 без изменений — тот же,
+   что рисует кривые безразличия потребителя.
+   ===================================================================== */
+
+/* --- 9в. Долгосрочное равновесие конкурентной фирмы --------------------- */
+// Оптимум фирмы-ценополучателя: P = MC на ВОЗРАСТАЮЩЕЙ ветке (у U-образных
+// издержек MC = P пересекается дважды; левый корень — минимум прибыли).
+// Поэтому ищем корень справа налево, как findRootLast.
+function recomputeLongRun() {
+  STATE.lr = null;
+  if (!STATE.costsReady || !STATE.lrOn) return;
+  const P = STATE.lrPrice;
+  if (!(P > 0)) return;
+  const g = (q) => { const m = costMC(q); return isNaN(m) ? NaN : P - m; };   // P − MC: слева +, справа −
+  const Q = findRootLast(g, 0.5, CONFIG.Qmax);
+  if (Q == null || !(Q > 0)) return;
+  const atc = costATC(Q), avc = costAVC(Q);
+  const profit = isNaN(atc) ? null : (P - atc) * Q;
+  // Краткосрочное правило остановки: цена ниже минимума AVC — выгоднее закрыться.
+  const shutdown = (STATE.minAVC && P < STATE.minAVC.val - 1e-9);
+  // Долгосрочная точка входа/выхода: P = min ATC (нулевая экономическая прибыль).
+  const breakeven = STATE.minATC ? STATE.minATC.val : null;
+  STATE.lr = { P, Q, atc, avc, profit, shutdown, breakeven };
+}
+
+// Прямоугольник прибыли (зелёный) или убытка (красный) между P и ATC на [0, Q].
+function drawLongRunArea() {
+  const lr = STATE.lr; if (!lr || !STATE.lrArea || lr.profit == null) return;
+  if (Math.abs(lr.profit) < 1e-9 || !(lr.Q > 0)) return;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const yHi = Math.max(lr.P, lr.atc), yLo = Math.min(lr.P, lr.atc);
+  g.append('rect').attr('x', sx(0)).attr('y', sy(yHi))
+    .attr('width', sx(lr.Q) - sx(0)).attr('height', Math.abs(sy(yLo) - sy(yHi)))
+    .attr('fill', lr.profit > 0 ? COL.tax : COL.bad).attr('opacity', lr.profit > 0 ? 0.20 : 0.18);
+}
+
+// Линия цены, точка P = MC и подписи.
+function drawLongRunMarks() {
+  const lr = STATE.lr; if (!lr) return;
+  const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax), g = svg.append('g');
+  const yP = sy(lr.P);
+  g.append('line').attr('x1', ox).attr('y1', yP).attr('x2', xMax).attr('y2', yP)
+    .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
+  haloText(g, ox - 8, yP, 'P=' + fmt(lr.P), 'end', 'middle');
+  const px = sx(lr.Q);
+  g.append('line').attr('x1', px).attr('y1', yP).attr('x2', px).attr('y2', oy)
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  g.append('circle').attr('cx', px).attr('cy', yP).attr('r', 4.5)
+    .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+  haloText(g, px, oy + 8, 'Q=' + fmt(lr.Q), 'middle', 'hanging');
+  // Зона захвата линии цены — тянется мышью.
+  const hit = g.append('rect').attr('x', ox).attr('y', yP - 12).attr('width', xMax - ox).attr('height', 24)
+    .attr('fill', 'transparent').style('cursor', 'grab');
+  hit.call(d3.drag().container(() => svg.node())
+    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('drag', (e) => setLrPrice(sy.invert(e.y)))
+    .on('end', () => { document.body.style.cursor = ''; }));
+  g.append('circle').attr('cx', ox + (xMax - ox) * 0.9).attr('cy', yP).attr('r', 7)
+    .attr('fill', COL.reg).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
+}
+
+function setLrPrice(p) {
+  p = Math.max(0, Math.min(p, CONFIG.Pmax));
+  STATE.lrPrice = Math.round(p * 100) / 100;
+  const s = document.getElementById('lr-price-slider'); if (s) s.value = STATE.lrPrice;
+  const l = document.getElementById('lr-price-val');    if (l) l.textContent = fmt(STATE.lrPrice);
+  const i = document.getElementById('lr-price-input');  if (i) i.value = STATE.lrPrice;
+  redrawAll();
+}
+
+function updateLongRunPanel(html) {
+  const lr = STATE.lr;
+  if (!lr) return html;
+  html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
+  html += `<div class="stat"><span>Цена P</span><b>${fmt(lr.P)}</b></div>`;
+  html += `<div class="stat"><span>Выпуск Q (P = MC)</span><b>${fmt(lr.Q)}</b></div>`;
+  html += `<div class="stat"><span>ATC(Q)</span><b>${fmt(lr.atc)}</b></div>`;
+  html += `<div class="stat"><span>${lr.profit >= 0 ? 'Прибыль' : 'Убыток'} (P − ATC)·Q</span><b>${fmt(lr.profit)}</b></div>`;
+  if (lr.breakeven != null) html += `<div class="stat"><span>Вход/выход: P = min ATC</span><b>${fmt(lr.breakeven)}</b></div>`;
+  html += `<div class="hint" style="margin-top:4px;">${lr.shutdown
+    ? 'Цена ниже минимума AVC — в коротком периоде выгоднее <b>закрыться</b>: выручка не покрывает даже переменные издержки.'
+    : (lr.profit > 1e-9
+      ? 'Прибыль положительна — в долгом периоде в отрасль входят новые фирмы, цена падает к min ATC.'
+      : (lr.profit < -1e-9
+        ? 'Убыток при P выше min AVC: в коротком периоде производить стоит, в долгом — фирмы уходят, цена растёт к min ATC.'
+        : 'Нулевая экономическая прибыль — это и есть долгосрочное равновесие.'))}</div>`;
+  return html;
+}
+
+/* --- 9а. Производственная функция Q = f(L) ------------------------------ */
+function prodEval(L) {
+  if (!STATE.prodCompiled) return NaN;
+  try { const v = STATE.prodCompiled.evaluate({ L: L, x: L, Q: L }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  catch (e) { return NaN; }
+}
+// Предельный продукт MP = dQ/dL — центральная разность (как везде в движке).
+function prodMP(L) {
+  const h = Math.max(1e-5, L * 1e-5 || 1e-5), lo = Math.max(0, L - h);
+  const a = prodEval(L + h), b = prodEval(lo);
+  return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / ((L + h) - lo);
+}
+function prodAP(L) { const q = prodEval(L); return (isNaN(q) || L <= 0) ? NaN : q / L; }
+
+// Максимум произвольной функции на отрезке (зеркало minOf).
+function maxOf(f, lo, hi) {
+  let bestQ = null, bestV = -Infinity;
+  const scan = (a, b, n) => { for (let i = 0; i <= n; i++) { const q = a + (b - a) * i / n, v = f(q); if (!isNaN(v) && v > bestV) { bestV = v; bestQ = q; } } };
+  scan(lo, hi, 2000);
+  if (bestQ != null) { const st = (hi - lo) / 2000; scan(Math.max(lo, bestQ - st), Math.min(hi, bestQ + st), 400); }
+  return bestQ == null ? null : { L: bestQ, val: bestV };
+}
+
+function recomputeProduction() {
+  STATE.prod = null;
+  const { compiled, error } = compileFormula(STATE.prodExpr);
+  const errBox = document.getElementById('prod-error');
+  if (errBox) { errBox.style.display = error ? 'block' : 'none'; errBox.textContent = error ? ('Не понял формулу: ' + error) : ''; }
+  if (!compiled) { STATE.prodCompiled = null; return; }
+  STATE.prodCompiled = compiled;
+  // Домен по L: до точки, где выпуск возвращается к нулю (или до края сетки).
+  let Lmax = CONFIG.Qmax;
+  const zero = findRootIn((l) => prodEval(l), CONFIG.Qmax * 0.02, CONFIG.Qmax * 20);
+  if (zero != null && zero > 0) Lmax = zero;
+  const maxTP = maxOf(prodEval, 0, Lmax);           // максимум выпуска
+  const maxMP = maxOf(prodMP, 1e-3, Lmax);          // точка перегиба TP — начало убывающей отдачи
+  const maxAP = maxOf(prodAP, 1e-3, Lmax);          // максимум AP: там AP = MP
+  const mpAtMaxAP = maxAP ? prodMP(maxAP.L) : NaN;
+  STATE.prod = { Lmax, maxTP, maxMP, maxAP, mpAtMaxAP };
+}
+
+// Две панели, общая ось L: сверху TP, снизу MP и AP (у них свой масштаб).
+function redrawProduction() {
+  recomputeProduction();
+  svg.selectAll('*').remove();
+  addDefs();
+  const p = STATE.prod;
+  if (!p) { updateProdPanel(); return; }
+  const m = CONFIG.margin;
+  const left = m.left, right = W - m.right;
+  const top = m.top, bottom = H - m.bottom;
+  const gap = 34, hTop = (bottom - top - gap) * 0.55, hBot = (bottom - top - gap) - hTop;
+  const yTop0 = top + hTop, yBot0 = bottom;
+  const Lmax = p.Lmax || CONFIG.Qmax;
+  const tpMax = niceMax((p.maxTP ? p.maxTP.val : 1) * 1.12);
+  const mpMax = niceMax(Math.max(p.maxMP ? p.maxMP.val : 1, p.maxAP ? p.maxAP.val : 1) * 1.15);
+  const lx = d3.scaleLinear().domain([0, Lmax]).range([left, right]);
+  const t1 = d3.scaleLinear().domain([0, tpMax]).range([yTop0, top]);
+  const t2 = d3.scaleLinear().domain([0, mpMax]).range([yBot0, yTop0 + gap]);
+  const panel = (scale, y0, title) => {
+    const g = svg.append('g');
+    g.append('line').attr('x1', left).attr('y1', y0).attr('x2', right).attr('y2', y0)
+      .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+    g.append('line').attr('x1', left).attr('y1', y0).attr('x2', left).attr('y2', scale.range()[1])
+      .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
+    g.append('text').attr('x', left + 4).attr('y', scale.range()[1] - 6).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink).text(title);
+    g.append('text').attr('x', right + 6).attr('y', y0 + 4).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('L');
+    scale.ticks(5).forEach(t => { if (t <= 0) return;
+      g.append('text').attr('x', left - 6).attr('y', scale(t)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
+        .attr('font-size', 10).attr('fill', COL.inkSoft).text(fmt(t)); });
+    lx.ticks(8).forEach(t => { if (t <= 0) return;
+      g.append('text').attr('x', lx(t)).attr('y', y0 + 8).attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
+        .attr('font-size', 10).attr('fill', COL.inkSoft).text(fmt(t)); });
+    return g;
+  };
+  const curve = (g, f, scale, color, on, width) => {
+    if (!on) return;
+    const line = d3.line().defined(d => d !== null).x(d => lx(d[0])).y(d => scale(d[1]));
+    const pts = [];
+    for (let i = 0; i <= 300; i++) {
+      const l = Lmax * i / 300, v = f(l);
+      pts.push((isNaN(v) || v < 0 || v > scale.domain()[1] * 1.5) ? null : [l, v]);
+    }
+    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', width || 2.4).attr('d', line);
+  };
+  const gTop = panel(t1, yTop0, 'TP — общий продукт');
+  curve(gTop, prodEval, t1, COL.D, STATE.showTP, 2.6);
+  const gBot = panel(t2, yBot0, 'MP и AP');
+  curve(gBot, prodMP, t2, COL.costMC, STATE.showMP);
+  curve(gBot, prodAP, t2, COL.costAVC, STATE.showAP);
+  // Ключевые вертикали: перегиб TP (максимум MP) и максимум AP (там AP = MP).
+  const vline = (L, color, label) => {
+    if (L == null) return;
+    const x = lx(L);
+    svg.append('line').attr('x1', x).attr('y1', top).attr('x2', x).attr('y2', bottom)
+      .attr('stroke', color).attr('stroke-width', 1.2).attr('stroke-dasharray', '5 4').attr('opacity', 0.8);
+    const g = svg.append('g');
+    g.append('text').attr('x', x + 5).attr('y', top + 10).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', color)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
+  };
+  if (p.maxMP) vline(p.maxMP.L, COL.costMC, 'перегиб TP · max MP · L=' + fmt(p.maxMP.L));
+  if (p.maxAP) vline(p.maxAP.L, COL.costAVC, 'max AP = MP · L=' + fmt(p.maxAP.L));
+  if (p.maxTP) vline(p.maxTP.L, COL.ghost, 'max TP · MP=0');
+  // Точки на нижней панели.
+  if (p.maxAP && STATE.showAP) {
+    svg.append('circle').attr('cx', lx(p.maxAP.L)).attr('cy', t2(p.maxAP.val)).attr('r', 4.5)
+      .attr('fill', COL.costAVC).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+  }
+  if (p.maxMP && STATE.showMP) {
+    svg.append('circle').attr('cx', lx(p.maxMP.L)).attr('cy', t2(p.maxMP.val)).attr('r', 4.5)
+      .attr('fill', COL.costMC).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+  }
+  updateProdPanel();
+}
+
+function updateProdPanel() {
+  const box = document.getElementById('info-prod'); if (!box) return;
+  const p = STATE.prod;
+  if (!p) { box.innerHTML = '<div class="warn">Не понял формулу Q = f(L).</div>'; return; }
+  let html = '';
+  if (p.maxMP) html += `<div class="stat"><span>Перегиб TP (max MP)</span><b>L=${fmt(p.maxMP.L)}, MP=${fmt(p.maxMP.val)}</b></div>`;
+  if (p.maxAP) html += `<div class="stat"><span>Максимум AP</span><b>L=${fmt(p.maxAP.L)}, AP=${fmt(p.maxAP.val)}</b></div>`;
+  if (p.maxAP && !isNaN(p.mpAtMaxAP)) html += `<div class="stat"><span>MP в этой точке</span><b>${fmt(p.mpAtMaxAP)}</b></div>`;
+  if (p.maxTP) html += `<div class="stat"><span>Максимум TP</span><b>L=${fmt(p.maxTP.L)}, Q=${fmt(p.maxTP.val)}</b></div>`;
+  html += '<div class="hint" style="margin-top:4px;">С точки перегиба TP начинается <b>убывающая предельная отдача</b>: ' +
+    'каждый следующий работник добавляет меньше предыдущего. В максимуме AP выполняется <b>AP = MP</b> — ' +
+    'пока MP выше среднего, средний растёт; как только MP опускается ниже, средний начинает падать. ' +
+    'В максимуме TP предельный продукт равен нулю.</div>';
+  box.innerHTML = html;
+}
+
+/* --- 9б. Изокванты и изокосты (движок Фазы 7 без изменений) -------------- */
+function recomputeIsoquant() {
+  STATE.iso = null; STATE.isoErr = null;
+  const { compiled, error } = compileTwoVar(STATE.isoExpr);
+  if (error) { STATE.isoErr = error; return; }
+  const f = (L, K) => evalTwoVar(compiled, L, K);
+  const r = optimizeAlongConstraint(f, STATE.isoW, STATE.isoR, STATE.isoC);
+  if (!r) { STATE.isoErr = 'Проверьте цены факторов и бюджет: должны быть положительными.'; return; }
+  STATE.iso = { f, L: r.a, K: r.b, Q: r.value, mrts: r.mrs, Lint: r.aMax, Kint: r.bMax };
+  applyAutoRanges(niceMax(r.aMax * 1.12), niceMax(r.bMax * 1.12));
+}
+
+function redrawIsoquant() {
+  recomputeIsoquant();
+  makeScales();
+  svg.selectAll('*').remove();
+  addDefs(); drawGrid(); drawAxes('L', 'K');
+  const iso = STATE.iso;
+  if (!iso) { updateIsoPanel(); return; }
+  if (STATE.isoFan && iso.Q > 0) [0.62, 0.8, 1.22].forEach(m => drawLevelCurve(iso.f, iso.Q * m, COL.D, 1.6, 0.35));
+  drawBudgetLine({ xInt: iso.Lint, yInt: iso.Kint }, COL.reg, false, 'изокоста');
+  drawLevelCurve(iso.f, iso.Q, COL.D, 2.6, 1);
+  drawChoicePoint(iso.L, iso.K, COL.ink, 'E');
+  updateIsoPanel();
+}
+
+function updateIsoPanel() {
+  const box = document.getElementById('info-iso'); if (!box) return;
+  const err = document.getElementById('iso-error');
+  if (err) { err.style.display = STATE.isoErr ? 'block' : 'none'; err.textContent = STATE.isoErr ? ('Не понял формулу: ' + STATE.isoErr) : ''; }
+  const iso = STATE.iso;
+  if (!iso) { box.innerHTML = '<div class="warn">' + (STATE.isoErr || 'Задайте цены факторов и бюджет.') + '</div>'; return; }
+  let html = '';
+  html += `<div class="stat"><span>Оптимум L* / K*</span><b>${fmt(iso.L)} / ${fmt(iso.K)}</b></div>`;
+  html += `<div class="stat"><span>Выпуск Q</span><b>${fmt(iso.Q)}</b></div>`;
+  html += `<div class="stat"><span>MRTS в оптимуме</span><b>${fmt(iso.mrts)}</b></div>`;
+  html += `<div class="stat"><span>w/r</span><b>${fmt(STATE.isoW / STATE.isoR)}</b></div>`;
+  html += `<div class="stat"><span>Потрачено</span><b>${fmt(STATE.isoW * iso.L + STATE.isoR * iso.K)}</b></div>`;
+  html += '<div class="hint" style="margin-top:4px;">Условие оптимума то же, что у потребителя, только вместо ' +
+    'полезности — выпуск, а вместо цен благ — цены факторов: <b>MRTS = w/r</b>. Это буквально один и тот же ' +
+    'численный движок касания уровня.</div>';
+  box.innerHTML = html;
+}
+
+// Переключатель сюжета режима «Фирма».
+function setCostsSub(sub) {
+  STATE.costsSub = sub;
+  [['cs-costs', 'costs'], ['cs-prod', 'production'], ['cs-iso', 'isoquant']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === sub); });
+  const panes = { costs: 'costs-pane-costs', production: 'costs-pane-prod', isoquant: 'costs-pane-iso' };
+  Object.values(panes).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+  const ap = document.getElementById(panes[sub]); if (ap) ap.style.display = '';
+  cancelRangeAnim();
+  // Шапка сцены показывает конкретный сюжет, а не общее «Издержки фирмы».
+  const nm = document.getElementById('scene-name');
+  if (nm && STATE.mode === 'costs') nm.textContent =
+    ({ costs: 'Издержки фирмы', production: 'Производство: TP, MP, AP', isoquant: 'Изокванты и изокосты' })[sub] || 'Фирма';
+  // Характерный масштаб под сюжет: издержки — мелкий, изокванты — по бюджету.
+  if (sub === 'costs') setRanges(10, 50);
+  if (typeof updatePult === 'function') updatePult();
+  redrawAll();
 }
 
 /* =====================================================================
@@ -7908,6 +8291,20 @@ const FORMULA_EXAMPLES = {
     ['20 + 4*Q*sqrt(Q)',        'с корнем'],
   ] },
   // Граница производственных возможностей Y = f(X).
+  // Производственная функция от труда Q = f(L) — режим «Фирма → Производство».
+  PROD: { title: 'Выпуск от труда Q = f(L)', items: [
+    ['30*L^2 - L^3',  'классическая S-образная'],
+    ['20*L - 0.5*L^2', 'квадратичная'],
+    ['12*sqrt(L)',    'убывающая отдача сразу'],
+    ['10*L',          'постоянная отдача'],
+  ] },
+  // Производственная функция двух факторов Q(L, K) — изокванты.
+  ISO: { title: 'Выпуск от факторов Q(L, K)', items: [
+    ['L^0.5 * K^0.5',   'Кобб-Дуглас (пост. отдача)'],
+    ['L^0.3 * K^0.7',   'капиталоёмкая'],
+    ['2*L + K',         'совершенные субституты'],
+    ['min(L/1, K/2)',   'жёсткая пропорция (Леонтьев)'],
+  ] },
   // Функция полезности U(x, y) — своя формула в режиме «Потребитель».
   UTIL: { title: 'Полезность U(x, y)', items: [
     ['x^0.5 * y^0.5',   'Кобб-Дуглас'],
@@ -8143,7 +8540,8 @@ const SCENE_NAMES = {
 };
 // Блоки результатов в табло (порядок = порядок показа). info-eq переносим вместе
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
-const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs', 'info-labor',
+const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
+  'info-prod', 'info-iso', 'info-labor',
   'info-inequality', 'info-consumer', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
 
@@ -8388,7 +8786,8 @@ const PULT_MOVABLE = ['mono-submode',                                          /
   'union-wage-field', 'labmin-field',                                  // труд: зарплата / МРОТ
   'ppft-price-field', 'tb-price-field',                                // КТВ: мировая цена (A / Б)
   'ineq-alpha-field',                                                  // неравенство: α (формула)
-  'cons-px1-row'];                                                     // потребитель: новая цена Px₁
+  'cons-px1-row',                                                      // потребитель: новая цена Px₁
+  'lr-price-field'];                                                   // фирма: рыночная цена P
 const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
 
 // Какие экранные регуляторы должны жить в пульте ПРЯМО СЕЙЧАС (по состоянию).
@@ -8440,6 +8839,10 @@ function pultRegulatorIds() {
   if (STATE.mode === 'consumer') {
     return STATE.consSlutskyOn ? ['cons-px1-row'] : [];
   }
+  // Фирма (Фаза 9): рыночная цена в сюжете «Издержки» — от неё зависит прибыль.
+  if (STATE.mode === 'costs') {
+    return (STATE.costsSub === 'costs' && STATE.lrOn) ? ['lr-price-field'] : [];
+  }
   return [];
 }
 
@@ -8476,6 +8879,7 @@ function pultTitle() {
   if (STATE.mode === 'labor')      return 'Труд';
   if (STATE.mode === 'inequality') return 'Неравенство';
   if (STATE.mode === 'consumer')   return 'Слуцкий';
+  if (STATE.mode === 'costs')      return 'Цена и прибыль';
   if (STATE.mode === 'market' && STATE.scenario === 'openecon') {
     return ({ tariff: 'Тариф', quota: 'Квота' })[STATE.openTool] || 'Мировая цена';
   }
@@ -9100,8 +9504,43 @@ function wireControls() {
   });
   if (tcInp) tcInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyCosts(); });
   if (fcInp) fcInp.addEventListener('change', applyCosts);
-  [['chk-mc', 'showMC'], ['chk-atc', 'showATC'], ['chk-avc', 'showAVC'], ['chk-afc', 'showAFC'], ['chk-vc', 'showVC']]
+  [['chk-mc', 'showMC'], ['chk-atc', 'showATC'], ['chk-avc', 'showAVC'], ['chk-afc', 'showAFC'], ['chk-vc', 'showVC'],
+   ['chk-tp', 'showTP'], ['chk-mp', 'showMP'], ['chk-ap', 'showAP'], ['chk-iso-fan', 'isoFan'], ['chk-lr-area', 'lrArea']]
     .forEach(([id, key]) => { const el = document.getElementById(id); if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); }); });
+
+  // Фаза 9: сюжеты режима «Фирма» (издержки / производство / изокванты).
+  [['cs-costs', 'costs'], ['cs-prod', 'production'], ['cs-iso', 'isoquant']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setCostsSub(v)); });
+  // 9в: рыночная цена и прибыль.
+  const lrChk = document.getElementById('chk-lr');
+  if (lrChk) lrChk.addEventListener('change', () => {
+    STATE.lrOn = lrChk.checked;
+    const f = document.getElementById('lr-price-field'); if (f) f.style.display = lrChk.checked ? '' : 'none';
+    if (typeof updatePult === 'function') updatePult();
+    redrawAll();
+  });
+  const lrS = document.getElementById('lr-price-slider'), lrI = document.getElementById('lr-price-input');
+  if (lrS) lrS.addEventListener('input', () => setLrPrice(parseFloat(lrS.value)));
+  if (lrI) lrI.addEventListener('change', () => { const v = parseFloat(lrI.value); if (!isNaN(v)) setLrPrice(v); });
+  // 9а: производственная функция.
+  const prodInp = document.getElementById('inp-prod');
+  const applyProd = () => { if (prodInp) STATE.prodExpr = (prodInp.value || '').trim(); redrawAll(); };
+  const prodBtn = document.getElementById('btn-prod-apply');
+  if (prodBtn) prodBtn.addEventListener('click', applyProd);
+  if (prodInp) prodInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyProd(); });
+  attachFormulaHelp('fh-prod', 'fp-prod', 'inp-prod', 'PROD');
+  // 9б: изокванты и изокосты.
+  const isoInp = document.getElementById('inp-iso');
+  if (isoInp) {
+    const applyIso = () => { STATE.isoExpr = (isoInp.value || '').trim(); redrawAll(); };
+    isoInp.addEventListener('change', applyIso);
+    isoInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyIso(); });
+  }
+  attachFormulaHelp('fh-iso', 'fp-iso', 'inp-iso', 'ISO');
+  [['iso-w', 'isoW'], ['iso-r', 'isoR'], ['iso-c', 'isoC']].forEach(([id, key]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('change', () => { const v = parseFloat(e.value); if (!isNaN(v) && v > 0) { STATE[key] = v; _wantRangeAnim = true; redrawAll(); } });
+  });
 
   // Режим КПВ (Задача 3): ввод границы Y=f(X), кнопка «Построить», пресеты.
   const ppfInp = document.getElementById('inp-ppf');

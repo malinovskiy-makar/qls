@@ -440,6 +440,47 @@ const CASES = [
              ['эффект замещения', 'sub', -18.75, 0.06], ['эффект дохода', 'inc', -18.75, 0.06],
              ['итого', 'tot', -37.5, 0.08]],
   },
+
+  /* ── Фаза 9: производство, изокванты, долгий период ──────────────────── */
+  {
+    name: 'Производство · Q=30L²−L³: перегиб TP при L=10, максимум AP при L=15 (AP=MP=225)',
+    run: `setMode('costs'); setCostsSub('production');
+          STATE.prodExpr = '30*L^2 - L^3'; redrawAll();
+          var p = STATE.prod || {};
+          return { Lmp: (p.maxMP||{}).L, MP: (p.maxMP||{}).val,
+                   Lap: (p.maxAP||{}).L, AP: (p.maxAP||{}).val, mpAtAp: p.mpAtMaxAP,
+                   Ltp: (p.maxTP||{}).L };`,
+    checks: [['L перегиба TP', 'Lmp', 10, 0.1], ['MP в максимуме', 'MP', 300, 1],
+             ['L максимума AP', 'Lap', 15, 0.1], ['AP в максимуме', 'AP', 225, 1],
+             ['MP там же = AP', 'mpAtAp', 225, 1], ['L максимума TP', 'Ltp', 20, 0.1]],
+  },
+  {
+    name: 'Изокванты · Q=L^0.5·K^0.5, w=1, r=2, C=100 ⇒ L*=50, K*=25 (тот же движок, что у потребителя)',
+    // Те же числа, что в кейсе потребителя, — это и есть доказательство переиспользования Фазы 7.
+    run: `setMode('costs'); setCostsSub('isoquant');
+          STATE.isoExpr = 'L^0.5 * K^0.5'; STATE.isoW = 1; STATE.isoR = 2; STATE.isoC = 100;
+          redrawAll();
+          var i = STATE.iso || {};
+          return { L: i.L, K: i.K, Q: i.Q, mrts: i.mrts, spend: 1 * i.L + 2 * i.K };`,
+    checks: [['L*', 'L', 50, 0.05], ['K*', 'K', 25, 0.05], ['выпуск Q', 'Q', 35.355, 0.03],
+             ['MRTS = w/r', 'mrts', 0.5, 0.01], ['потрачен весь бюджет', 'spend', 100, 0.1]],
+  },
+  {
+    name: 'Долгий период · TC=Q³−6Q²+15Q+18: при P=15 Q=4, ATC=11.5, прибыль +14; при P=8 — убыток',
+    run: `setMode('costs'); setCostsSub('costs');
+          STATE.costsTC = 'Q^3 - 6*Q^2 + 15*Q + 18'; STATE.costsFC = 18;
+          STATE.lrOn = true; setLrPrice(15);
+          var a = STATE.lr || {};
+          var r1 = { Q: a.Q, atc: a.atc, profit: a.profit, be: a.breakeven };
+          setLrPrice(8);
+          var b = STATE.lr || {};
+          return { Q: r1.Q, atc: r1.atc, profit: r1.profit, be: r1.be,
+                   Q2: b.Q, loss: b.profit, shut: b.shutdown ? 1 : 0 };`,
+    checks: [['Q при P=15', 'Q', 4, 0.05], ['ATC(4)', 'atc', 11.5, 0.05],
+             ['прибыль', 'profit', 14, 0.2], ['P безубыточности = min ATC', 'be', 11.35, 0.1],
+             ['Q при P=8', 'Q2', 3.291, 0.05], ['убыток < 0', 'loss', -11.7, 0.4],
+             ['не закрывается (P > min AVC)', 'shut', 0, 0.1]],
+  },
 ];
 
 function approx(got, want, tol) {
