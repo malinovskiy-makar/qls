@@ -481,6 +481,28 @@ const CASES = [
              ['Q при P=8', 'Q2', 3.291, 0.05], ['убыток < 0', 'loss', -11.7, 0.4],
              ['не закрывается (P > min AVC)', 'shut', 0, 0.1]],
   },
+
+  /* ── Фаза 10: два завода (min-cost allocation + горизонтальная MC) ────── */
+  {
+    name: 'Два завода · TC₁=Q₁², TC₂=2Q₂² ⇒ при Q=30 делится 20/10, MC=40, TC=600',
+    // MC₁=2Q₁, MC₂=4Q₂. В оптимуме MC₁=MC₂ ⇒ 2Q₁=4Q₂ и Q₁+Q₂=30 ⇒ 20 и 10.
+    // Совокупная MC(Q) = (4/3)·Q: при Q=30 → 40, при Q=15 → 20 (делится 10/5),
+    // TC(15) = 100 + 50 = 150 и то же самое даёт интеграл ∫MC.
+    run: `setMode('costs'); setCostsSub('plants');
+          STATE.pl1 = 'Q^2'; STATE.pl2 = '2*Q^2'; setPlantsQ(30);
+          var a = plantsAt(30), b = plantsAt(15);
+          var naive30 = plantTC(STATE.plants.c1, 30) + plantTC(STATE.plants.c2, 30);
+          return { q1: a.q1, q2: a.q2, mc30: a.m, tc30: a.tcDirect, vc30: a.vc,
+                   q1b: b.q1, q2b: b.q2, mc15: b.m, tc15: b.tcDirect, vc15: b.vc,
+                   naive: naive30 };`,
+    checks: [['Q₁ при Q=30', 'q1', 20, 0.15], ['Q₂ при Q=30', 'q2', 10, 0.15],
+             ['MC₁=MC₂ при Q=30', 'mc30', 40, 0.3], ['TC(30) прямая сумма', 'tc30', 600, 4],
+             ['TC(30) через ∫MC', 'vc30', 600, 4],
+             ['Q₁ при Q=15', 'q1b', 10, 0.15], ['Q₂ при Q=15', 'q2b', 5, 0.15],
+             ['MC при Q=15', 'mc15', 20, 0.3], ['TC(15) прямая сумма', 'tc15', 150, 2],
+             ['TC(15) через ∫MC', 'vc15', 150, 2],
+             ['«сумма в лоб» дороже', 'naive', 2700, 5]],
+  },
 ];
 
 function approx(got, want, tol) {

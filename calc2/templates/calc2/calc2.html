@@ -1282,6 +1282,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="seg-btn active" id="cs-costs">Издержки</button>
         <button class="seg-btn" id="cs-prod">Производство</button>
         <button class="seg-btn" id="cs-iso">Изокванты</button>
+        <button class="seg-btn" id="cs-plants">Два завода</button>
       </div>
       <div id="costs-pane-costs">
       <div class="field f-wrap">
@@ -1384,6 +1385,30 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           при Q&nbsp;=&nbsp;L^0.5·K^0.5, w=1, r=2, C=100 получаются те же 50 и 25.</div>
         <div class="error" id="iso-error" style="display:none;"></div>
         <div id="info-iso" style="margin-top:8px;"></div>
+      </div>
+
+      <!-- Фаза 10. Два завода: совокупные издержки — это НЕ сумма TC1(Q)+TC2(Q),
+           а минимум суммы при делении выпуска. Отсюда горизонтальное сложение MC. -->
+      <div id="costs-pane-plants" style="display:none;">
+        <div class="field"><label>Затраты завода 1: TC₁(Q₁)</label>
+          <input type="text" id="inp-pl1" value="Q^2" autocomplete="off"></div>
+        <div class="field"><label>Затраты завода 2: TC₂(Q₂)</label>
+          <input type="text" id="inp-pl2" value="2*Q^2" autocomplete="off"></div>
+        <button class="btn" id="btn-pl-apply">Построить</button>
+        <div class="seg" style="margin-top:8px;">
+          <button class="seg-btn active" id="plv-tc">Издержки TC</button>
+          <button class="seg-btn" id="plv-mc">Предельные MC</button>
+        </div>
+        <div class="field" id="pl-q-field" style="margin-top:8px;">
+          <label>Совокупный выпуск Q = <b id="pl-q-val">30</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="pl-q-slider" min="0" max="60" step="1" value="30" style="flex:1;margin-top:0;">
+            <input type="number" id="pl-q-input" min="0" step="0.5" value="30"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+        </div>
+        <div class="error" id="pl-error" style="display:none;"></div>
+        <div id="info-plants" style="margin-top:8px;"></div>
       </div>
     </div>
 
@@ -1924,6 +1949,9 @@ const STATE = {
   showTP: true, showMP: true, showAP: true,
   // 9б — изокванты и изокосты: та же математика, что кривые безразличия.
   isoExpr: 'L^0.5 * K^0.5', isoW: 1, isoR: 2, isoC: 100, isoFan: true, iso: null, isoErr: null,
+  // Фаза 10 — два завода: TC(Q) = min[Q₁+Q₂=Q]{TC₁(Q₁)+TC₂(Q₂)}, совокупная MC —
+  // ГОРИЗОНТАЛЬНАЯ сумма MC₁ и MC₂ (не поточечная!).
+  pl1: 'Q^2', pl2: '2*Q^2', plView: 'tc', plQ: 30, plants: null, plErr: null,
   // КПВ — граница производственных возможностей (Задача 3). Оси: товар X и товар Y.
   ppfFormula: '100 - X',
   ppfCompiled: null,
@@ -5226,6 +5254,7 @@ function updateCostsPanel() {
 function redrawCosts() {
   if (STATE.costsSub === 'production') { redrawProduction(); return; }   // 9а
   if (STATE.costsSub === 'isoquant')   { redrawIsoquant();   return; }   // 9б
+  if (STATE.costsSub === 'plants')     { redrawPlants();     return; }   // Фаза 10
   recomputeCosts();
   recomputeLongRun();     // 9в — после recomputeCosts: нужны minATC / minAVC
   svg.selectAll('*').remove();
@@ -5510,21 +5539,225 @@ function updateIsoPanel() {
   box.innerHTML = html;
 }
 
+/* =====================================================================
+   БЛОК 10а-3. ДВА ЗАВОДА (Фаза 10) — агрегирование издержек.
+
+   Совокупные издержки — это НЕ поточечная сумма TC₁(Q)+TC₂(Q), а минимум
+   суммы по всем способам разделить выпуск:
+        TC(Q) = min[Q₁+Q₂=Q] { TC₁(Q₁) + TC₂(Q₂) }.
+   Условие оптимума: MC₁(Q₁) = MC₂(Q₂) = MC(Q). Если предельные издержки
+   заводов различаются, выпуск выгодно перебросить туда, где дешевле
+   следующая единица, — и так до выравнивания.
+   Отсюда совокупная MC строится ГОРИЗОНТАЛЬНЫМ сложением: фиксируем уровень
+   предельных издержек m, у каждого завода берём его Qᵢ(m) = MCᵢ⁻¹(m) и
+   складываем ОБЪЁМЫ (та же логика, что сложение предложений фирм в рыночное).
+
+   Реализация численная и параметрическая ПО УРОВНЮ m: для сетки m считаем
+   Q₁(m), Q₂(m) (бисекция по объёму) и получаем пары (Q₁+Q₂, m) — это и есть
+   готовая кривая совокупной MC. Дальше TC(Q) — интеграл трапециями по этой
+   же таблице; параллельно считается прямая сумма TC₁(Q₁)+TC₂(Q₂) как сверка.
+   ===================================================================== */
+
+// Предельные издержки завода по его TC (центральная разность).
+function plantMC(compiled, q) {
+  const h = Math.max(1e-5, q * 1e-5 || 1e-5), lo = Math.max(0, q - h);
+  const at = (x) => { try { const v = compiled.evaluate({ Q: x, x: x, L: x }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; } catch (e) { return NaN; } };
+  const a = at(q + h), b = at(lo);
+  return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / ((q + h) - lo);
+}
+function plantTC(compiled, q) {
+  try { const v = compiled.evaluate({ Q: q, x: q, L: q }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  catch (e) { return NaN; }
+}
+// Объём завода при уровне предельных издержек m: MC(q) = m. MC растёт по q,
+// поэтому чистая бисекция без сканирования — быстро (важно: вызывается сотни раз).
+function plantQatMC(compiled, m, qMax) {
+  if (!(plantMC(compiled, 1e-6) < m)) return 0;      // даже первая единица дороже m — завод стоит
+  if (plantMC(compiled, qMax) <= m) return qMax;     // упёрлись в правый край сетки
+  let lo = 0, hi = qMax;
+  for (let k = 0; k < 60; k++) {
+    const mid = (lo + hi) / 2, v = plantMC(compiled, mid);
+    if (isNaN(v)) { hi = mid; continue; }
+    if (v < m) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+function recomputePlants() {
+  STATE.plants = null; STATE.plErr = null;
+  const r1 = compileFormula(STATE.pl1), r2 = compileFormula(STATE.pl2);
+  if (r1.error || r2.error) { STATE.plErr = r1.error || r2.error; return; }
+  const c1 = r1.compiled, c2 = r2.compiled;
+  const qMax = CONFIG.Qmax;                          // предел выпуска ОДНОГО завода
+  const mMax = Math.max(plantMC(c1, qMax), plantMC(c2, qMax));
+  if (!(mMax > 0)) { STATE.plErr = 'Предельные издержки не растут — проверьте формулы TC.'; return; }
+  // Таблица горизонтального сложения: по уровню предельных издержек m.
+  const N = 400, table = [];
+  let cum = 0;                                       // ∫ m dQ трапециями по таблице
+  for (let i = 0; i <= N; i++) {
+    const m = mMax * i / N;
+    const q1 = plantQatMC(c1, m, qMax), q2 = plantQatMC(c2, m, qMax);
+    const Q = q1 + q2;
+    if (i > 0) { const p = table[table.length - 1]; cum += (m + p.m) / 2 * (Q - p.Q); }
+    table.push({ m, q1, q2, Q, vc: cum, tcDirect: plantTC(c1, q1) + plantTC(c2, q2) });
+  }
+  STATE.plants = { c1, c2, table, qMax, mMax, Qtot: table[table.length - 1].Q };
+  // Масштаб ползунка совокупного выпуска — под суммарный предел.
+  const sl = document.getElementById('pl-q-slider'), inp = document.getElementById('pl-q-input');
+  const top = Math.max(1, Math.round(STATE.plants.Qtot));
+  if (sl) sl.max = top; if (inp) inp.max = top;
+}
+
+// Линейная интерполяция строки таблицы по совокупному выпуску Q.
+function plantsAt(Q) {
+  const p = STATE.plants; if (!p) return null;
+  const t = p.table;
+  if (Q <= 0) return { Q: 0, q1: 0, q2: 0, m: t[0].m, vc: 0, tcDirect: t[0].tcDirect };
+  for (let i = 0; i < t.length - 1; i++) {
+    const a = t[i], b = t[i + 1];
+    if (Q >= a.Q && Q <= b.Q && b.Q > a.Q) {
+      const k = (Q - a.Q) / (b.Q - a.Q);
+      return { Q, q1: a.q1 + k * (b.q1 - a.q1), q2: a.q2 + k * (b.q2 - a.q2),
+               m: a.m + k * (b.m - a.m), vc: a.vc + k * (b.vc - a.vc),
+               tcDirect: a.tcDirect + k * (b.tcDirect - a.tcDirect) };
+    }
+  }
+  const last = t[t.length - 1];
+  return { Q: last.Q, q1: last.q1, q2: last.q2, m: last.m, vc: last.vc, tcDirect: last.tcDirect };
+}
+
+function redrawPlants() {
+  recomputePlants();
+  const p = STATE.plants;
+  // Масштаб: по совокупной кривой (она самая длинная по Q).
+  if (p) {
+    const yTop = (STATE.plView === 'mc') ? p.mMax : Math.max(p.table[p.table.length - 1].tcDirect, 1);
+    applyAutoRanges(niceMax(p.Qtot * 1.05), niceMax(yTop * 1.1));
+  }
+  makeScales();
+  svg.selectAll('*').remove();
+  addDefs(); drawGrid(); drawAxes('Q', '');
+  const errBox = document.getElementById('pl-error');
+  if (errBox) { errBox.style.display = STATE.plErr ? 'block' : 'none'; errBox.textContent = STATE.plErr ? ('Не понял формулу: ' + STATE.plErr) : ''; }
+  if (!p) { updatePlantsPanel(); return; }
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  const label = (x, y, txt, color) => {
+    if (isNaN(y) || y > CONFIG.Pmax || y < 0) return;
+    g.append('text').attr('x', sx(x)).attr('y', sy(y) - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(txt);
+  };
+  if (STATE.plView === 'mc') {
+    // MC каждого завода по СВОЕМУ объёму + совокупная MC (горизонтальная сумма).
+    const mkMC = (c) => { const o = []; for (let i = 0; i <= 300; i++) { const q = p.qMax * i / 300; const v = plantMC(c, q); o.push(isNaN(v) ? null : [q, v]); } return o; };
+    g.append('path').datum(mkMC(p.c1)).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+    g.append('path').datum(mkMC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+    g.append('path').datum(p.table.map(r => [r.Q, r.m])).attr('fill', 'none').attr('stroke', COL.MC).attr('stroke-width', 2.8).attr('d', line);
+    label(p.qMax * 0.5, plantMC(p.c1, p.qMax * 0.5), 'MC₁', COL.tax);
+    label(p.qMax * 0.34, plantMC(p.c2, p.qMax * 0.34), 'MC₂', COL.reg);
+    const mid = plantsAt(p.Qtot * 0.6); if (mid) label(mid.Q, mid.m, 'MC совокупная', COL.MC);
+  } else {
+    // TC каждого завода по своему объёму + совокупная TC(Q) (минимум суммы).
+    const mkTC = (c) => { const o = []; for (let i = 0; i <= 300; i++) { const q = p.qMax * i / 300; const v = plantTC(c, q); o.push(isNaN(v) ? null : [q, v]); } return o; };
+    g.append('path').datum(mkTC(p.c1)).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+    g.append('path').datum(mkTC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+    g.append('path').datum(p.table.map(r => [r.Q, r.tcDirect])).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.8).attr('d', line);
+    label(p.qMax * 0.7, plantTC(p.c1, p.qMax * 0.7), 'TC₁', COL.tax);
+    label(p.qMax * 0.45, plantTC(p.c2, p.qMax * 0.45), 'TC₂', COL.reg);
+    const mid = plantsAt(p.Qtot * 0.7); if (mid) label(mid.Q, mid.tcDirect, 'TC совокупная', COL.D);
+  }
+  // Метка выбранного совокупного выпуска и его разложение на заводы.
+  const cur = plantsAt(STATE.plQ);
+  if (cur && cur.Q > 0) {
+    const og = svg.append('g'), ox = sx(0), oy = sy(0);
+    const yv = (STATE.plView === 'mc') ? cur.m : cur.tcDirect;
+    const [px, py] = toPx(cur.Q, yv);
+    og.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', py)
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    og.append('line').attr('x1', ox).attr('y1', py).attr('x2', px).attr('y2', py)
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    haloText(og, px, oy + 8, 'Q=' + fmt(cur.Q), 'middle', 'hanging');
+    haloText(og, ox - 8, py, fmt(yv), 'end', 'middle');
+    if (STATE.plView === 'mc') {
+      // Показываем ГОРИЗОНТАЛЬНОЕ сложение: на уровне m объёмы заводов складываются.
+      og.append('line').attr('x1', ox).attr('y1', py).attr('x2', sx(cur.Q)).attr('y2', py)
+        .attr('stroke', COL.MC).attr('stroke-width', 1.6).attr('opacity', 0.5);
+      [[cur.q1, COL.tax, 'Q₁'], [cur.q2, COL.reg, 'Q₂']].forEach(([q, c, t]) => {
+        if (!(q > 0)) return;
+        og.append('circle').attr('cx', sx(q)).attr('cy', py).attr('r', 3.5).attr('fill', c).attr('stroke', COL.halo).attr('stroke-width', 1.2);
+        haloText(og, sx(q), py - 10, t + '=' + fmt(q), 'middle', 'auto');
+      });
+    }
+  }
+  updatePlantsPanel();
+}
+
+function updatePlantsPanel() {
+  const box = document.getElementById('info-plants'); if (!box) return;
+  const p = STATE.plants;
+  if (!p) { box.innerHTML = '<div class="warn">' + (STATE.plErr || 'Введите функции затрат обоих заводов.') + '</div>'; return; }
+  const cur = plantsAt(STATE.plQ);
+  let html = '';
+  if (cur) {
+    html += `<div class="stat"><span>Совокупный выпуск Q</span><b>${fmt(cur.Q)}</b></div>`;
+    html += `<div class="stat"><span>Завод 1: Q₁</span><b>${fmt(cur.q1)}</b></div>`;
+    html += `<div class="stat"><span>Завод 2: Q₂</span><b>${fmt(cur.q2)}</b></div>`;
+    html += `<div class="stat"><span>MC₁ = MC₂ = MC(Q)</span><b>${fmt(cur.m)}</b></div>`;
+    html += `<div class="stat"><span>TC(Q) = TC₁ + TC₂</span><b>${fmt(cur.tcDirect)}</b></div>`;
+    html += `<div class="stat"><span>∫ MC(q)dq (сверка)</span><b>${fmt(cur.vc)}</b></div>`;
+    // Наглядная проверка: неверная «сумма в лоб» TC₁(Q)+TC₂(Q) заметно дороже.
+    const naive = plantTC(p.c1, cur.Q) + plantTC(p.c2, cur.Q);
+    if (!isNaN(naive)) html += `<div class="stat"><span>«Сумма в лоб» TC₁(Q)+TC₂(Q)</span><b>${fmt(naive)}</b></div>`;
+  }
+  html += '<div class="hint" style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);">' +
+    '<b>Почему сложение ГОРИЗОНТАЛЬНОЕ</b><br>' +
+    'Совокупные издержки — это не TC₁(Q)&nbsp;+&nbsp;TC₂(Q) (это стоило бы выпустить <i>по Q</i> на каждом заводе, ' +
+    'то есть 2Q всего), а минимум суммы при делении выпуска:<br>' +
+    '<code>TC(Q) = min[Q₁+Q₂=Q] { TC₁(Q₁) + TC₂(Q₂) }</code>.<br><br>' +
+    'Пока MC₁&nbsp;≠&nbsp;MC₂, единицу выгодно перебросить с дорогого завода на дешёвый — значит в оптимуме ' +
+    '<b>MC₁&nbsp;=&nbsp;MC₂&nbsp;=&nbsp;MC(Q)</b>. Поэтому совокупную кривую строят так: фиксируют уровень ' +
+    'предельных издержек m, у каждого завода берут его объём Qᵢ(m)&nbsp;=&nbsp;MCᵢ⁻¹(m) и складывают ' +
+    '<b>объёмы</b>, а не высоты — ровно как рыночное предложение из предложений фирм.<br><br>' +
+    'Проверить можно так: на вкладке «Предельные MC» на выбранном уровне видно, что Q₁&nbsp;+&nbsp;Q₂ даёт ' +
+    'точку совокупной кривой, а TC(Q) совпадает с интегралом ∫MC — с точностью до постоянных издержек.</div>';
+  box.innerHTML = html;
+}
+
+function setPlantsView(v) {
+  STATE.plView = v;
+  const a = document.getElementById('plv-tc'), b = document.getElementById('plv-mc');
+  if (a) a.classList.toggle('active', v === 'tc');
+  if (b) b.classList.toggle('active', v === 'mc');
+  redrawAll();
+}
+function setPlantsQ(q) {
+  if (isNaN(q) || q < 0) return;
+  STATE.plQ = q;
+  const s = document.getElementById('pl-q-slider'); if (s) s.value = q;
+  const l = document.getElementById('pl-q-val');    if (l) l.textContent = fmt(q);
+  const i = document.getElementById('pl-q-input');  if (i) i.value = q;
+  redrawAll();
+}
+
 // Переключатель сюжета режима «Фирма».
 function setCostsSub(sub) {
   STATE.costsSub = sub;
-  [['cs-costs', 'costs'], ['cs-prod', 'production'], ['cs-iso', 'isoquant']]
+  [['cs-costs', 'costs'], ['cs-prod', 'production'], ['cs-iso', 'isoquant'], ['cs-plants', 'plants']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === sub); });
-  const panes = { costs: 'costs-pane-costs', production: 'costs-pane-prod', isoquant: 'costs-pane-iso' };
+  const panes = { costs: 'costs-pane-costs', production: 'costs-pane-prod',
+                  isoquant: 'costs-pane-iso', plants: 'costs-pane-plants' };
   Object.values(panes).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   const ap = document.getElementById(panes[sub]); if (ap) ap.style.display = '';
   cancelRangeAnim();
   // Шапка сцены показывает конкретный сюжет, а не общее «Издержки фирмы».
   const nm = document.getElementById('scene-name');
   if (nm && STATE.mode === 'costs') nm.textContent =
-    ({ costs: 'Издержки фирмы', production: 'Производство: TP, MP, AP', isoquant: 'Изокванты и изокосты' })[sub] || 'Фирма';
-  // Характерный масштаб под сюжет: издержки — мелкий, изокванты — по бюджету.
+    ({ costs: 'Издержки фирмы', production: 'Производство: TP, MP, AP',
+       isoquant: 'Изокванты и изокосты', plants: 'Два завода' })[sub] || 'Фирма';
+  // Характерный масштаб под сюжет: издержки — мелкий, два завода — по объёму заводов.
   if (sub === 'costs') setRanges(10, 50);
+  if (sub === 'plants') setRanges(30, 100);
   if (typeof updatePult === 'function') updatePult();
   redrawAll();
 }
@@ -8541,7 +8774,7 @@ const SCENE_NAMES = {
 // Блоки результатов в табло (порядок = порядок показа). info-eq переносим вместе
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
 const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
-  'info-prod', 'info-iso', 'info-labor',
+  'info-prod', 'info-iso', 'info-plants', 'info-labor',
   'info-inequality', 'info-consumer', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
 
@@ -8787,7 +9020,7 @@ const PULT_MOVABLE = ['mono-submode',                                          /
   'ppft-price-field', 'tb-price-field',                                // КТВ: мировая цена (A / Б)
   'ineq-alpha-field',                                                  // неравенство: α (формула)
   'cons-px1-row',                                                      // потребитель: новая цена Px₁
-  'lr-price-field'];                                                   // фирма: рыночная цена P
+  'lr-price-field', 'pl-q-field'];                                     // фирма: цена P / выпуск двух заводов
 const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
 
 // Какие экранные регуляторы должны жить в пульте ПРЯМО СЕЙЧАС (по состоянию).
@@ -8841,6 +9074,7 @@ function pultRegulatorIds() {
   }
   // Фирма (Фаза 9): рыночная цена в сюжете «Издержки» — от неё зависит прибыль.
   if (STATE.mode === 'costs') {
+    if (STATE.costsSub === 'plants') return ['pl-q-field'];
     return (STATE.costsSub === 'costs' && STATE.lrOn) ? ['lr-price-field'] : [];
   }
   return [];
@@ -8879,7 +9113,7 @@ function pultTitle() {
   if (STATE.mode === 'labor')      return 'Труд';
   if (STATE.mode === 'inequality') return 'Неравенство';
   if (STATE.mode === 'consumer')   return 'Слуцкий';
-  if (STATE.mode === 'costs')      return 'Цена и прибыль';
+  if (STATE.mode === 'costs')      return (STATE.costsSub === 'plants') ? 'Два завода' : 'Цена и прибыль';
   if (STATE.mode === 'market' && STATE.scenario === 'openecon') {
     return ({ tariff: 'Тариф', quota: 'Квота' })[STATE.openTool] || 'Мировая цена';
   }
@@ -9509,8 +9743,20 @@ function wireControls() {
     .forEach(([id, key]) => { const el = document.getElementById(id); if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); }); });
 
   // Фаза 9: сюжеты режима «Фирма» (издержки / производство / изокванты).
-  [['cs-costs', 'costs'], ['cs-prod', 'production'], ['cs-iso', 'isoquant']]
+  [['cs-costs', 'costs'], ['cs-prod', 'production'], ['cs-iso', 'isoquant'], ['cs-plants', 'plants']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setCostsSub(v)); });
+  // Фаза 10: два завода — формулы TC, вид графика, совокупный выпуск.
+  const pl1 = document.getElementById('inp-pl1'), pl2 = document.getElementById('inp-pl2');
+  const applyPl = () => { if (pl1) STATE.pl1 = (pl1.value || '').trim(); if (pl2) STATE.pl2 = (pl2.value || '').trim(); redrawAll(); };
+  const plBtn = document.getElementById('btn-pl-apply');
+  if (plBtn) plBtn.addEventListener('click', applyPl);
+  [pl1, pl2].forEach(e => { if (e) e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') applyPl(); }); });
+  [['plv-tc', 'tc'], ['plv-mc', 'mc']].forEach(([id, v]) => {
+    const b = document.getElementById(id); if (b) b.addEventListener('click', () => setPlantsView(v));
+  });
+  const plS = document.getElementById('pl-q-slider'), plI = document.getElementById('pl-q-input');
+  if (plS) plS.addEventListener('input', () => setPlantsQ(parseFloat(plS.value)));
+  if (plI) plI.addEventListener('change', () => setPlantsQ(parseFloat(plI.value)));
   // 9в: рыночная цена и прибыль.
   const lrChk = document.getElementById('chk-lr');
   if (lrChk) lrChk.addEventListener('change', () => {
