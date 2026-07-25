@@ -765,8 +765,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <header class="picker-head">
       <div class="picker-eyebrow">Графический калькулятор 2.0</div>
       <h1 class="picker-title" id="picker-title">С чего начнём?</h1>
-      <p class="picker-sub">Выберите тип задачи — график соберётся сам, а все настройки
-        останутся под рукой. Любую сцену можно поменять или дополнить позже.</p>
+      <p class="picker-sub">Выберите тип задачи, и график соберётся сам. Все настройки останутся
+        под рукой, а любую сцену можно поменять или дополнить позже.</p>
     </header>
 
     <section class="picker-group" aria-label="Рынок">
@@ -850,7 +850,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M26 16 Q132 22 140 74" stroke="var(--curve-d)" stroke-width="2.6"/>
             <circle cx="92" cy="36" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
-          <span class="scard-name">КПВ — возможности</span>
+          <span class="scard-name">КПВ: граница возможностей</span>
           <span class="scard-desc">Граница производства, альтернативные издержки, выпуклость.</span>
         </button>
       </div>
@@ -865,7 +865,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M26 24 L92 40 L140 74" stroke="var(--curve-d)" stroke-width="2.6" stroke-linejoin="round"/>
             <path d="M26 24 L92 40" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-name">Сумма КПВ двух стран</span>
-          <span class="scard-desc">Совместная граница с изломом — кто что производит дешевле.</span>
+          <span class="scard-desc">Совместная граница с изломом: видно, кто что производит дешевле.</span>
         </button>
         <button class="scard" data-scene="trade">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
@@ -884,7 +884,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M22 16 L140 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
             <path d="M22 34 L140 74" stroke="var(--curve-s)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/></g></svg></span>
           <span class="scard-name">Как определяется мировая цена</span>
-          <span class="scard-desc">Две страны: цена устанавливается между автарктическими — не задаётся, а находится.</span>
+          <span class="scard-desc">Две страны: цена встаёт между автарктическими. Её не задают, её находят.</span>
         </button>
         <button class="scard" data-scene="smallopen">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
@@ -904,7 +904,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M18 48 H150" stroke="var(--curve-reg)" stroke-width="2.6"/>
             <path d="M22 74 L140 20" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Монополист и мировой рынок</span>
-          <span class="scard-desc">Дома — своя цена, за рубежом — мировая: MR внутри = Pw = MC.</span>
+          <span class="scard-desc">Дома своя цена, за рубежом мировая: MR внутри = Pw = MC.</span>
         </button>
       </div>
     </section>
@@ -1047,7 +1047,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M40 14 Q84 92 128 14" stroke="var(--curve-ghost)" stroke-width="2.2" stroke-dasharray="5 4"/>
             <path d="M22 14 Q66 92 110 14" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Деформации графика</span>
-          <span class="scard-desc">Сдвиги, растяжения, отражения и модули — одним ползунком, обе кривые сразу.</span>
+          <span class="scard-desc">Сдвиги, растяжения, отражения и модули. Один ползунок, обе кривые сразу.</span>
         </button>
         <button class="scard" data-scene="m-inverse">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
@@ -1088,7 +1088,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M22 76 V14" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-body">
             <span class="scard-name">Свободный холст</span>
-            <span class="scard-desc">Чистые оси и полный набор инструментов — стройте свои кривые с нуля.</span>
+            <span class="scard-desc">Чистые оси и полный набор инструментов. Стройте свои кривые с нуля.</span>
           </span>
         </button>
       </div>
@@ -1115,7 +1115,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <button class="dock-btn" id="dock-grid" type="button" data-tip="Сетка" aria-label="Показать или скрыть сетку" aria-pressed="true">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
     </button>
-    <button class="dock-btn" id="dock-save" type="button" data-tip="Сохранить (скоро)" aria-label="Сохранить график — скоро">
+    <button class="dock-btn" id="dock-save" type="button" data-tip="Сохранить (скоро)" aria-label="Сохранить график">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><rect x="8" y="13" width="8" height="6"/></svg>
     </button>
     <button class="dock-btn" id="dock-export" type="button" data-tip="Сохранить график" aria-label="Сохранить график: PNG, TeX или PDF">
@@ -1211,9 +1211,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <label class="chk"><input type="checkbox" id="chk-elast-s" checked>
           <span class="swatch" style="background:var(--curve-s)"></span> Точка на предложении (Es)</label>
         <div class="hint">Перетаскивайте точки вдоль кривых. Точечная эластичность
-          E&nbsp;=&nbsp;(dQ/dP)·(P/Q)&nbsp;=&nbsp;P/(Q·dP/dQ). Единичная точка спроса (|Ed|=1) — там,
-          где MR&nbsp;=&nbsp;0 и выручка TR&nbsp;=&nbsp;P·Q максимальна: левее спрос эластичный,
-          правее — неэластичный.</div>
+          E&nbsp;=&nbsp;(dQ/dP)·(P/Q)&nbsp;=&nbsp;P/(Q·dP/dQ). Единичная точка спроса (|Ed|=1) стоит там,
+          где MR&nbsp;=&nbsp;0 и выручка TR&nbsp;=&nbsp;P·Q максимальна. Левее спрос эластичный,
+          правее неэластичный.</div>
         <div id="info-elast" style="margin-top:6px;"></div>
       </div>
       <!-- Разложение двойных сдвигов спроса и предложения (Задача 3) -->
@@ -1255,12 +1255,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span id="ext-pigou-label">Применить налог Пигу</span></label>
         <div class="hint" id="ext-hint-neg">Спрос&nbsp;=&nbsp;предельная выгода, предложение (роль S)&nbsp;=&nbsp;частные
           издержки MPC. MSC&nbsp;=&nbsp;MPC&nbsp;+&nbsp;внешние. Рынок выпускает Qрын (D&nbsp;=&nbsp;MPC),
-          оптимум Qопт (D&nbsp;=&nbsp;MSC) — <b>меньше</b> рыночного: перепроизводство.
-          Налог Пигу поднимает MPC до MSC — рынок приходит в Qопт.</div>
+          оптимум Qопт (D&nbsp;=&nbsp;MSC) <b>меньше</b> рыночного: перепроизводство.
+          Налог Пигу поднимает MPC до MSC, и рынок приходит в Qопт.</div>
         <div class="hint" id="ext-hint-pos" style="display:none;">Спрос (роль D)&nbsp;=&nbsp;частная выгода MPB,
           предложение&nbsp;=&nbsp;издержки. MSB&nbsp;=&nbsp;MPB&nbsp;+&nbsp;внешние. Рынок выпускает Qрын
-          (MPB&nbsp;=&nbsp;S), оптимум Qопт (MSB&nbsp;=&nbsp;S) — <b>больше</b> рыночного: недопроизводство.
-          Корректирующая субсидия опускает издержки — рынок приходит в Qопт.</div>
+          (MPB&nbsp;=&nbsp;S), оптимум Qопт (MSB&nbsp;=&nbsp;S) <b>больше</b> рыночного: недопроизводство.
+          Корректирующая субсидия опускает издержки, и рынок приходит в Qопт.</div>
         <div class="error" id="ext-error" style="display:none;"></div>
         <div id="info-ext" style="margin-top:6px;"></div>
       </div>
@@ -1301,9 +1301,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span class="swatch" style="background:var(--curve-tax)"></span> Доход бюджета / рента квоты</label>
         <label class="chk"><input type="checkbox" id="chk-open-dwl" checked>
           <span class="swatch" style="background:var(--curve-dwl)"></span> Два треугольника потерь</label>
-        <div class="hint">Страна мала: мировая цена от неё не зависит, поэтому Pw — горизонтальная линия
-          (её можно тянуть мышью). Если при Pw объём спроса больше объёма предложения — страна
-          <b>импортирует</b>, если меньше — <b>экспортирует</b>. Тариф поднимает внутреннюю цену до
+        <div class="hint">Страна мала: мировая цена от неё не зависит, поэтому Pw идёт горизонтальной линией
+          (её можно тянуть мышью). Если при Pw объём спроса больше объёма предложения, страна
+          <b>импортирует</b>, если меньше, <b>экспортирует</b>. Тариф поднимает внутреннюю цену до
           Pw&nbsp;+&nbsp;t; квота ограничивает объём напрямую, а цена находится численно из условия
           Qd(P)&nbsp;−&nbsp;Qs(P)&nbsp;=&nbsp;квота.</div>
         <div id="info-open" style="margin-top:6px;"></div>
@@ -1323,7 +1323,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         </div>
         <div class="hint" id="mono-hint" style="display:none;">Монополист выпускает там, где <b>MR&nbsp;=&nbsp;MC</b>,
           и берёт цену с кривой спроса (выше предельных издержек). Нужны: спрос (роль D) и предельные издержки
-          (роль MC, либо TC, либо S как MC). Серым — потери общества (DWL) против конкуренции.</div>
+          (роль MC, либо TC, либо S как MC). Серым закрашены потери общества (DWL) против конкуренции.</div>
         <!-- Под-режимы монополии: обычная / дискриминация 1° / дискриминация 3° /
              составной спрос / естественная монополия. Виден только в режиме монополии;
              при выборе сцены «Монополия» переносится в пульт-ленту (Фаза 3а). -->
@@ -1355,7 +1355,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <input type="text" id="inp-d3-mc" value="20" autocomplete="off"></div>
           <button class="btn" id="btn-d3-apply">Построить</button>
           <div class="hint">Фирма распределяет выпуск так, что MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.
-            На менее эластичном рынке цена выше. Два мини-графика рынков — бок о бок.</div>
+            На менее эластичном рынке цена выше. Два мини-графика рынков стоят бок о бок.</div>
           <div class="error" id="d3-error" style="display:none;"></div>
           <div id="info-d3" style="margin-top:8px;"></div>
         </div>
@@ -1364,7 +1364,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <div class="hint" style="margin-top:0;margin-bottom:6px;">Это <b>составной</b> (кусочный) спрос:
             рыночная кривая склеена из спросов разных групп покупателей, поэтому у неё есть излом,
             а MR разрывается. Это <b>не</b> модель ломаного спроса Суизи (жёсткость цены в олигополии
-            из-за асимметричной реакции конкурентов) — та модель другая.</div>
+            из-за асимметричной реакции конкурентов). Та модель устроена иначе.</div>
           <div class="seg">
             <button class="seg-btn active" id="ki-indiv">Инд. спросы</button>
             <button class="seg-btn" id="ki-piece">Кусочный</button>
@@ -1378,7 +1378,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <div class="field"><label>Спрос&nbsp;3 (необязательно)</label>
               <input type="text" id="inp-ki-3" value="" autocomplete="off"></div>
             <div class="hint">Рыночный спрос&nbsp;=&nbsp;горизонтальная сумма (при каждой цене складываем
-              объёмы). Изломы — там, где очередной потребитель выходит на рынок.</div>
+              объёмы). Изломы стоят там, где очередной потребитель выходит на рынок.</div>
           </div>
           <!-- Способ 2: рыночный спрос двумя кусками (стыкуются в точке пересечения). -->
           <div id="kink-piece" style="display:none;margin-top:8px;">
@@ -1386,13 +1386,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
               <input type="text" id="inp-kp-1" value="100 - Q" autocomplete="off"></div>
             <div class="field"><label>Нижний кусок (большие Q): P&nbsp;=&nbsp;f₂(Q)</label>
               <input type="text" id="inp-kp-2" value="120 - 1.5*Q" autocomplete="off"></div>
-            <div class="hint">Излом&nbsp;Q — точка стыка кусков (их пересечение). До излома&nbsp;— f₁,
-              после&nbsp;— f₂.</div>
+            <div class="hint">Излом&nbsp;Q это точка стыка кусков (их пересечение). До излома работает f₁,
+              после f₂.</div>
           </div>
           <div class="field" style="margin-top:8px;"><label>Предельные издержки MC (число или f(Q))</label>
             <input type="text" id="inp-kink-mc" value="20" autocomplete="off"></div>
           <button class="btn" id="btn-kink-apply">Построить</button>
-          <div class="hint">MR на каждом куске — своя прямая (вдвое круче спроса), в изломах MR
+          <div class="hint">MR на каждом куске своя прямая (вдвое круче спроса), в изломах MR
             разрывается вниз. Оптимум выбирается по <b>максимуму прибыли</b> среди кандидатов
             (пересечения MR&nbsp;=&nbsp;MC и сами изломы), а не по первому пересечению.</div>
           <div class="error" id="kink-error" style="display:none;"></div>
@@ -1410,10 +1410,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <span class="swatch" style="background:var(--curve-tax)"></span> Прибыль монополии</label>
           <label class="chk"><input type="checkbox" id="chk-nat-loss" checked>
             <span class="swatch" style="background:var(--c-bad)"></span> Убыток при P&nbsp;=&nbsp;MC</label>
-          <div class="hint">Три ориентира на одном графике: <b>M</b> — нерегулируемая монополия (MR&nbsp;=&nbsp;MC);
-            <b>MC</b> — регулирование по предельным издержкам (P&nbsp;=&nbsp;MC, эффективно, но цена ниже средних
-            затрат → убыток, нужна субсидия); <b>AC</b> — регулирование по средним издержкам
-            (P&nbsp;=&nbsp;ATC, нулевая прибыль, «второе лучшее»). Уравнение D&nbsp;=&nbsp;ATC может иметь два корня —
+          <div class="hint">Три ориентира на одном графике: <b>M</b>: нерегулируемая монополия (MR&nbsp;=&nbsp;MC);
+            <b>MC</b>: регулирование по предельным издержкам (P&nbsp;=&nbsp;MC, эффективно, но цена ниже средних
+            затрат → убыток, нужна субсидия); <b>AC</b>: регулирование по средним издержкам
+            (P&nbsp;=&nbsp;ATC, нулевая прибыль, «второе лучшее»). Уравнение D&nbsp;=&nbsp;ATC может иметь два корня,
             берём больший, между Qm и Qc.</div>
           <div id="info-nat" style="margin-top:8px;"></div>
         </div>
@@ -1484,10 +1484,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           </div>
         </div>
         <div class="hint" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
-          (налог — вверх, субсидия — вниз) на величину ставки. Клин между ценами покупателя
+          на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя
           и продавца можно тянуть мышью.</div>
         <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
-          дефицит (продаётся меньше), пол выше равновесия — избыток. Линию цены можно тянуть мышью.</div>
+          дефицит (продаётся меньше), пол выше равновесия даёт избыток. Линию цены можно тянуть мышью.</div>
         <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-ghost" checked>
           <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
         <div id="info-tax" style="margin-top:8px;"></div>
@@ -1528,15 +1528,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="error" id="costs-error"></div>
       <div style="margin-top:10px;">
         <label class="chk"><input type="checkbox" id="chk-mc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costMC" title="Цвет MC"> MC — предельные</label>
+          <input type="color" class="swatch swatch-pick" data-col="costMC" title="Цвет MC"> MC (предельные)</label>
         <label class="chk"><input type="checkbox" id="chk-atc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costATC" title="Цвет ATC"> ATC — средние общие</label>
+          <input type="color" class="swatch swatch-pick" data-col="costATC" title="Цвет ATC"> ATC (средние общие)</label>
         <label class="chk"><input type="checkbox" id="chk-avc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costAVC" title="Цвет AVC"> AVC — средние перем.</label>
+          <input type="color" class="swatch swatch-pick" data-col="costAVC" title="Цвет AVC"> AVC (средние переменные)</label>
         <label class="chk"><input type="checkbox" id="chk-afc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costAFC" title="Цвет AFC"> AFC — средние пост.</label>
+          <input type="color" class="swatch swatch-pick" data-col="costAFC" title="Цвет AFC"> AFC (средние постоянные)</label>
         <label class="chk"><input type="checkbox" id="chk-vc">
-          <input type="color" class="swatch swatch-pick" data-col="costVC" title="Цвет VC"> VC — перем. (полные)</label>
+          <input type="color" class="swatch swatch-pick" data-col="costVC" title="Цвет VC"> VC (переменные, полные)</label>
       </div>
       <!-- 9в: долгосрочное равновесие конкурентной фирмы. -->
       <div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border);">
@@ -1553,8 +1553,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <label class="chk"><input type="checkbox" id="chk-lr-area" checked>
           <span class="swatch" style="background:var(--curve-tax)"></span> Прямоугольник прибыли / убытка</label>
         <div class="hint">Фирма выбирает Q, где P&nbsp;=&nbsp;MC (на возрастающей ветке). Прибыль
-          (P&nbsp;−&nbsp;ATC)·Q закрашивается зелёным, убыток — красным. Долгосрочная точка входа
-          и выхода — там, где P&nbsp;=&nbsp;min&nbsp;ATC: экономическая прибыль ноль.</div>
+          (P&nbsp;−&nbsp;ATC)·Q закрашивается зелёным, убыток красным. Долгосрочная точка входа
+          и выхода стоит там, где P&nbsp;=&nbsp;min&nbsp;ATC: экономическая прибыль ноль.</div>
       </div>
       <div id="info-costs" style="margin-top:8px;"></div>
       </div><!-- /costs-pane-costs -->
@@ -1572,16 +1572,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="btn" id="btn-prod-apply">Построить</button>
         <div style="margin-top:10px;">
           <label class="chk"><input type="checkbox" id="chk-tp" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodTP" title="Цвет TP"> TP — общий продукт</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodTP" title="Цвет TP"> TP (общий продукт)</label>
           <label class="chk"><input type="checkbox" id="chk-mp" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodMP" title="Цвет MP"> MP — предельный продукт</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodMP" title="Цвет MP"> MP (предельный продукт)</label>
           <label class="chk"><input type="checkbox" id="chk-ap" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodAP" title="Цвет AP"> AP — средний продукт</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodAP" title="Цвет AP"> AP (средний продукт)</label>
         </div>
-        <div class="hint">Верхняя панель — общий продукт TP, нижняя — предельный MP&nbsp;=&nbsp;dQ/dL и
+        <div class="hint">На верхней панели общий продукт TP, на нижней предельный MP&nbsp;=&nbsp;dQ/dL и
           средний AP&nbsp;=&nbsp;Q/L (у них свой масштаб, иначе на фоне TP их не видно).
-          Точка перегиба TP — там, где MP максимален: с неё начинается убывающая предельная отдача.
-          Максимум AP — там, где AP&nbsp;=&nbsp;MP.</div>
+          Точка перегиба TP стоит там, где MP максимален: с неё начинается убывающая предельная отдача.
+          Максимум AP там, где AP&nbsp;=&nbsp;MP.</div>
         <div class="error" id="prod-error" style="display:none;"></div>
         <div id="info-prod" style="margin-top:8px;"></div>
       </div>
@@ -1603,7 +1603,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div class="field"><label>Бюджет C</label><input type="number" id="iso-c" min="1" step="1" value="100"></div>
         <label class="chk"><input type="checkbox" id="chk-iso-fan" checked>
           <input type="color" class="swatch swatch-pick" data-col="isoq" title="Цвет изоквант"> Веер изоквант</label>
-        <div class="hint">Изокоста w·L&nbsp;+&nbsp;r·K&nbsp;=&nbsp;C; оптимум — касание изокванты и изокосты,
+        <div class="hint">Изокоста w·L&nbsp;+&nbsp;r·K&nbsp;=&nbsp;C; оптимум это касание изокванты и изокосты,
           там MRTS&nbsp;=&nbsp;w/r. Считает ТОТ ЖЕ движок, что кривые безразличия потребителя:
           при Q&nbsp;=&nbsp;L^0.5·K^0.5, w=1, r=2, C=100 получаются те же 50 и 25.</div>
         <div class="error" id="iso-error" style="display:none;"></div>
@@ -1647,7 +1647,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="seg" style="margin-top:6px;">
         <button class="seg-btn" id="lab-bilat">Двусторонняя монополия</button>
       </div>
-      <div class="hint">Спрос на труд (роль <b>D</b>) — это MRPL; предложение труда (роль <b>S</b>).
+      <div class="hint">Спрос на труд (роль <b>D</b>) и есть MRPL; предложение труда (роль <b>S</b>).
         Оси: L (труд) и W (зарплата). Формулы можно писать через L: <code>100 - L</code>, <code>L</code>.</div>
       <!-- Профсоюз (ЧК4): монополист труда. Под-модели — монополист / диктат зарплаты.
            Виден только при структуре «Профсоюз». -->
@@ -1657,7 +1657,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <button class="seg-btn" id="un-wagefloor">Диктат зарплаты</button>
         </div>
         <div class="hint" id="un-hint-mono">Профсоюз продаёт труд монопольно: его предельный
-          доход MRL лежит ниже спроса D, предельные издержки — кривая предложения S.
+          доход MRL лежит ниже спроса D, предельные издержки задаёт кривая предложения S.
           Занятость Lп там, где MRL&nbsp;=&nbsp;S; зарплата Wп берётся с кривой спроса (выше
           конкурентной). Зеркало монопсонии.</div>
         <div class="field" id="union-wage-field" style="display:none;margin-top:8px;">
@@ -1714,7 +1714,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         </div>
         <div id="ineq-groups-table"></div>
         <div id="ineq-note-groups" class="hint" style="display:none;color:#b45309;">
-          Группы переставлены по возрастанию дохода — кривая Лоренца всегда идёт от бедных к богатым.</div>
+          Группы переставлены по возрастанию дохода: кривая Лоренца всегда идёт от бедных к богатым.</div>
         <div class="hint">Доля дохода каждой группы, в %. Сумма нормируется до 100%.
           Узлы кривой можно тянуть мышью.</div>
       </div>
@@ -1726,8 +1726,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         </div>
         <button class="btn" id="ineq-incomes-apply">Построить</button>
         <div id="ineq-note-incomes" class="hint" style="display:none;color:#b45309;">
-          Доходы переставлены по возрастанию — кривая Лоренца всегда идёт от бедных к богатым.</div>
-        <div class="hint">Каждое число — доход одного человека. Сортируются по возрастанию,
+          Доходы переставлены по возрастанию: кривая Лоренца всегда идёт от бедных к богатым.</div>
+        <div class="hint">Каждое число это доход одного человека. Сортируются по возрастанию,
           строятся накопленные доли. Узлы кривой можно тянуть мышью.</div>
       </div>
       <!-- Способ «формула»: функция Лоренца L(p), p — доля населения 0..1 -->
@@ -1772,7 +1772,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <input type="range" id="ineq-transfer" min="0" max="50" step="1" value="0">
           </div>
           <div class="hint">Налог: доля каждой группы подтягивается к равной (1/N):
-            новая&nbsp;=&nbsp;(1−τ)·старая&nbsp;+&nbsp;τ·(1/N), при τ=1 — полное равенство.
+            новая&nbsp;=&nbsp;(1−τ)·старая&nbsp;+&nbsp;τ·(1/N), при τ=1 получается полное равенство.
             Трансферт: T% общего дохода забирается у богатейшей группы и делится поровну между всеми.</div>
         </div>
       </div>
@@ -1825,8 +1825,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
                  style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
         </div>
       </div>
-      <div class="hint">Оптимум — точка касания бюджетной линии и кривой безразличия: там
-        MRS&nbsp;=&nbsp;Px/Py. Ищется численно (тройной поиск вдоль бюджетной линии) — одинаково
+      <div class="hint">Оптимум это точка касания бюджетной линии и кривой безразличия: там
+        MRS&nbsp;=&nbsp;Px/Py. Ищется численно (тройной поиск вдоль бюджетной линии), одинаково
         для всех типов предпочтений, включая свою формулу. Концы бюджетной линии можно тянуть
         мышью: это меняет соответствующую цену.</div>
       <div class="error" id="cons-error" style="display:none;"></div>
@@ -1836,7 +1836,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <!-- КПВ — граница производственных возможностей — отдельный режим.
          Три под-режима: одна КПВ / сумма двух КПВ / КТВ (торговля). -->
     <div class="section" id="sec-ppf" style="display:none;">
-      <div class="section-title">КПВ — производственные возможности</div>
+      <div class="section-title">КПВ: производственные возможности</div>
       <div class="seg" style="margin-bottom:8px;">
         <button class="seg-btn active" id="ppfsub-single">Одна КПВ</button>
         <button class="seg-btn" id="ppfsub-sum">Сумма двух</button>
@@ -1859,8 +1859,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <button class="btn-sm" id="btn-ppf-lin" style="flex:1;">Линейная</button>
           <button class="btn-sm" id="btn-ppf-conc" style="flex:1;">Вогнутая</button>
         </div>
-        <div class="hint">По осям — два товара: X (горизонталь), Y (вертикаль). Форму границы
-          задают ползунки «Макс X / Макс Y» в пульте-ленте. Наклон |dY/dX| (= Макс&nbsp;Y / Макс&nbsp;X) —
+        <div class="hint">По осям стоят два товара: X (горизонталь), Y (вертикаль). Форму границы
+          задают ползунки «Макс X / Макс Y» в пульте-ленте. Наклон |dY/dX| (= Макс&nbsp;Y / Макс&nbsp;X) и есть
           альтернативные издержки X в единицах Y.</div>
         <div class="error" id="ppf-error"></div>
         <div id="info-ppf" style="margin-top:8px;"></div>
@@ -1916,9 +1916,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <input type="number" id="inp-ppft-price" min="0.1" step="0.05" value="2">
           </div>
           <button class="btn" id="btn-ppft-apply">Построить КТВ</button>
-          <div class="hint">КТВ — граница потребления при торговле по мировой цене.
+          <div class="hint">КТВ это граница потребления при торговле по мировой цене.
             Линейная КПВ → полная специализация (угол). Нелинейная → точка касания, где
-            |наклон КПВ|&nbsp;=&nbsp;Px/Py. Линия КТВ лежит выше КПВ — это выигрыш от торговли.</div>
+            |наклон КПВ|&nbsp;=&nbsp;Px/Py. Линия КТВ лежит выше КПВ: это и есть выигрыш от торговли.</div>
           <div class="error" id="ppft-error"></div>
           <div id="info-ppft" style="margin-top:8px;"></div>
         </div>
@@ -1935,7 +1935,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <button class="btn" id="btn-tb-apply">Построить торговлю</button>
           <!-- Задача 2: своя мировая цена — ползунок + синхронное поле + сброс к равновесной. -->
           <div class="field" id="tb-price-field" style="margin-top:8px;">
-            <label>Мировая цена Pw = <b id="tb-price-val">—</b></label>
+            <label>Мировая цена Pw = <b id="tb-price-val">не найдена</b></label>
             <input type="range" id="tb-price-slider" min="0.1" max="4" step="0.01" value="1.41">
           </div>
           <div class="field">
@@ -1943,9 +1943,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <input type="number" id="inp-tb-price" min="0.1" step="0.05" placeholder="равновесная (авто)">
           </div>
           <button class="btn-sm" id="btn-tb-reset" style="margin-top:2px;">Сбросить к равновесной</button>
-          <div class="hint">Линейные КПВ. Автарктическая цена X каждой страны — наклон её КПВ.
+          <div class="hint">Линейные КПВ. Автарктическая цена X каждой страны равна наклону её КПВ.
             Мировая цена Pw устанавливается МЕЖДУ автарктическими (эндогенно). Страна с меньшими
-            альт. издержками X специализируется на X и экспортирует его; другая — на Y. Линии
+            альт. издержками X специализируется на X и экспортирует его, другая на Y. Линии
             торговых возможностей обеих стран лежат вне их КПВ (выигрыш от торговли).</div>
           <div class="error" id="tb-error" style="display:none;"></div>
           <div id="info-tb" style="margin-top:8px;"></div>
@@ -1972,13 +1972,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
 
       <div id="macro-pane-adas" style="margin-top:10px;">
-        <div class="field"><label>Потенциальный выпуск Y* (LRAS — вертикаль)</label>
+        <div class="field"><label>Потенциальный выпуск Y* (LRAS, вертикаль)</label>
           <input type="number" id="ma-lras" step="1" value="100"></div>
         <div class="field"><label>SRAS: P = f(Y)</label><input type="text" id="ma-sras" value="10 + 0.5*Y"></div>
         <div class="field"><label>AD: P = f(Y)</label><input type="text" id="ma-ad" value="120 - 0.6*Y"></div>
-        <div class="hint">Оси подписаны Y (реальный ВВП) и P (уровень цен) — не Q/P, чтобы не путать
+        <div class="hint">Оси подписаны Y (реальный ВВП) и P (уровень цен), а не Q/P, чтобы не путать
           с обычным рынком. Разрыв выпуска отмечается на оси Y: рецессионный, если фактический
-          выпуск ниже потенциального, инфляционный — если выше.</div>
+          выпуск ниже потенциального, инфляционный, если выше.</div>
       </div>
       <div id="macro-pane-phillips" style="display:none;margin-top:10px;">
         <div class="row">
@@ -1986,13 +1986,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <div class="field"><label>Естественный u*</label><input type="number" id="ma-ustar" step="0.1" value="5"></div>
         </div>
         <div class="field"><label>Наклон β</label><input type="number" id="ma-beta" step="0.05" value="0.5"></div>
-        <div class="hint">Краткосрочная: π&nbsp;=&nbsp;πe&nbsp;−&nbsp;β(u&nbsp;−&nbsp;u*). Долгосрочная —
-          вертикаль при u&nbsp;=&nbsp;u*.</div>
+        <div class="hint">Краткосрочная: π&nbsp;=&nbsp;πe&nbsp;−&nbsp;β(u&nbsp;−&nbsp;u*). Долгосрочная идёт
+          вертикалью при u&nbsp;=&nbsp;u*.</div>
       </div>
       <div id="macro-pane-money" style="display:none;margin-top:10px;">
         <div class="field"><label>Спрос на деньги: M = f(i)</label><input type="text" id="ma-md" value="200 - 4*i"></div>
-        <div class="field"><label>Предложение Ms (ЦБ — вертикаль)</label><input type="number" id="ma-ms" step="1" value="120"></div>
-        <div class="hint">Спрос записывается как объём от ставки — так его и задают в задачах;
+        <div class="field"><label>Предложение Ms (ЦБ, вертикаль)</label><input type="number" id="ma-ms" step="1" value="120"></div>
+        <div class="hint">Спрос записывается как объём от ставки: так его и задают в задачах,
           калькулятор сам приводит к виду «ставка от объёма».</div>
       </div>
       <div id="macro-pane-loanable" style="display:none;margin-top:10px;">
@@ -2006,7 +2006,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           </div>
         </div>
         <div class="hint">Дефицит сдвигает ОБЩИЙ спрос вправо на ΔG. Вытеснение считается по
-          <b>исходной</b> кривой частного спроса при новой ставке — это разные кривые, не путайте.</div>
+          <b>исходной</b> кривой частного спроса при новой ставке. Это разные кривые, не путайте их.</div>
       </div>
       <div id="macro-pane-fx" style="display:none;margin-top:10px;">
         <div class="field"><label>Спрос на валюту: Q = f(e)</label><input type="text" id="ma-fxd" value="100 - 2*e"></div>
@@ -2021,7 +2021,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
                    style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
           </div>
         </div>
-        <div class="hint">Фиксированный курс — это ровно потолок или пол цены, только оси переименованы:
+        <div class="hint">Фиксированный курс это ровно потолок или пол цены, только оси переименованы:
           торгуется короткая сторона, разрыв покрывают интервенции ЦБ.</div>
       </div>
       <div id="macro-pane-laffer" style="display:none;margin-top:10px;">
@@ -2029,7 +2029,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div class="field"><label>Предложение: P = f(Q)</label><input type="text" id="ma-lafs" value="Q"></div>
         <div class="field"><label>Максимальная ставка на оси</label><input type="number" id="ma-lafmax" step="5" value="100"></div>
         <div class="hint">Кривая строится прогоном штатного расчёта «равновесие с потоварным налогом»
-          по сетке ставок — отдельной формулы нет, поэтому она согласована с остальным движком.</div>
+          по сетке ставок. Отдельной формулы нет, поэтому она согласована с остальным движком.</div>
       </div>
       <div id="macro-pane-islm" style="display:none;margin-top:10px;">
         <div class="field"><label>IS: r = f(Y)</label><input type="text" id="ma-is" value="20 - 0.1*Y"></div>
@@ -2087,7 +2087,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         </div>
         <div class="hint">Точку можно тянуть прямо по кривой. Треугольник у неё показывает Δx и Δy:
           их отношение и есть тангенс угла наклона, он же значение производной.
-          Уменьшайте Δx — секущая ложится на касательную.</div>
+          Уменьшайте Δx, и секущая ложится на касательную.</div>
       </div>
 
       <!-- 7б. Оптимизация -->
@@ -2096,7 +2096,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span class="swatch" style="background:var(--curve-d)"></span> Выпуклость и вогнутость</label>
         <label class="chk"><input type="checkbox" id="chk-inflect" checked>
           <span class="swatch" style="background:var(--curve-mr)"></span> Точки перегиба</label>
-        <div class="hint">Максимумы и минимумы ищутся по нулям производной, перегибы — по смене
+        <div class="hint">Максимумы и минимумы ищутся по нулям производной, перегибы по смене
           знака второй производной. Всё численно, поэтому годится любая функция.</div>
       </div>
 
@@ -2105,12 +2105,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div class="field">
           <label for="math-trans">Что делаем с графиком</label>
           <select id="math-trans">
-            <option value="up">f(x) + a — сдвиг по вертикали</option>
-            <option value="left">f(x + a) — сдвиг по горизонтали</option>
-            <option value="scaleY">a·f(x) — растяжение по вертикали</option>
-            <option value="scaleX">f(a·x) — сжатие по горизонтали</option>
-            <option value="negY">−f(x) — отражение относительно оси x</option>
-            <option value="negX">f(−x) — отражение относительно оси y</option>
+            <option value="up">f(x) + a: сдвиг по вертикали</option>
+            <option value="left">f(x + a): сдвиг по горизонтали</option>
+            <option value="scaleY">a·f(x): растяжение по вертикали</option>
+            <option value="scaleX">f(a·x): сжатие по горизонтали</option>
+            <option value="negY">−f(x): отражение относительно оси x</option>
+            <option value="negX">f(−x): отражение относительно оси y</option>
             <option value="absY">|f(x)|</option>
             <option value="absX">f(|x|)</option>
           </select>
@@ -2156,7 +2156,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <button class="seg-btn active" id="mm-min">Z = min(f, g)</button>
           <button class="seg-btn" id="mm-max">Z = max(f, g)</button>
         </div>
-        <div class="hint">Жирным — итоговая Z. Кружками отмечены точки, где функции меняются местами.</div>
+        <div class="hint">Жирным нарисована итоговая Z. Кружками отмечены точки, где функции меняются местами.</div>
       </div>
 
       <!-- 7е. Оптимизация с ограничением -->
@@ -2401,11 +2401,11 @@ const STATE = {
   taxKind: 'unit',
   taxSide: 'seller', // кто формально платит налог: 'seller' — продавец (сдвиг S вверх),
                      // 'buyer' — покупатель (сдвиг D вниз). На числа НЕ влияет (Задача 1).
-  intervType: 'tax', // 'tax' — налог (S вверх), 'subsidy' — субсидия (S вниз),
+  intervType: 'tax', // 'tax': налог (S вверх), 'subsidy' — субсидия (S вниз),
                      // 'ceiling' — потолок цены, 'floor' — пол цены
   pReg: 0,           // регулируемая цена (для потолка / пола); 0 = не задана
   showGhost: true,   // показывать бледное исходное состояние «было → стало»
-  market: 'comp',    // структура рынка: 'comp' — конкуренция, 'monopoly' — монополия (MR=MC)
+  market: 'comp',    // структура рынка: 'comp': конкуренция, 'monopoly' — монополия (MR=MC)
   // Сценарий анализа рынка (Задачи 2–4) — взаимоисключающие, поверх режима «Рынок»:
   // 'none' — обычный (равновесие + интервенции + монополия), 'elasticity' — эластичность
   // спроса, 'shift' — разложение сдвигов, 'externality' — внешний эффект и налог Пигу,
@@ -2501,7 +2501,7 @@ const STATE = {
   // 'competition' | 'monopsony' | 'union' | 'bilateral' (двусторонняя монополия, Фаза 12)
   laborStruct: 'competition',
   laborBilateral: null,        // диапазон зарплат [Wм; Wп] — модель НЕ даёт одной точки
-  unionModel: 'monopoly',      // профсоюз: 'monopoly' — монополист труда (MRL=S), 'wagefloor' — диктат зарплаты
+  unionModel: 'monopoly',      // профсоюз: 'monopoly': монополист труда (MRL=S), 'wagefloor' — диктат зарплаты
   unionWage: 0,                // уровень зарплаты профсоюза при диктате (0 = не задан)
   unionWageVisited: false,     // первый вход в диктат — выставить зарплату-ориентир
   laborUnion: null,            // результат профсоюза (Lп, Wп, безработица, DWL)
@@ -2542,7 +2542,7 @@ const STATE = {
   ppf2: '60 - 3*X',      // КПВ страны 2 (режим суммы)
   ppfSumData: null,      // результат расчёта суммарной КПВ (кэшируется, тяжёлый расчёт)
   ppfSumKinks: null,     // изломы суммарной КПВ [{x,y}] (надёжный детектор, Задача 1)
-  ppfSumView: 'scale',   // вид суммы: 'scale' — в масштабе, 'schema' — аккуратная схема (Задача 2)
+  ppfSumView: 'scale',   // вид суммы: 'scale': в масштабе, 'schema' — аккуратная схема (Задача 2)
   ppftFormula: '100 - X',// КПВ страны (режим КТВ)
   ppftPrice: 2,          // мировое соотношение цен Px/Py (режим КТВ)
   ppfTradeData: null,    // результат расчёта КТВ
@@ -2572,7 +2572,7 @@ const STATE = {
   showIneqGhost: false,  // галочка «Исходное состояние»
   // ЧК3: перераспределение (прогрессивный налог / трансферт).
   ineqRedistOn: false,
-  ineqRedistTool: 'tax', // 'tax' — прогрессивный налог, 'transfer' — трансферт беднейшим
+  ineqRedistTool: 'tax', // 'tax': прогрессивный налог, 'transfer' — трансферт беднейшим
   ineqTau: 0,            // прогрессивность налога 0..1
   ineqTransfer: 0,       // размер трансферта, % общего дохода
   ineqRedist: null,      // результат перераспределения: { lorenz, stats }
@@ -2791,7 +2791,7 @@ function buildCurveFromQP(expr) {
     if (Math.abs(lp.d) < 1e-9) {
       // Q не зависит от цены: кривая вертикальна (совершенно неэластична),
       // как P = f(Q) она не записывается — честно говорим об этом.
-      return { error: 'объём не зависит от цены — такая кривая вертикальна и не задаётся как P = f(Q)' };
+      return { error: 'объём не зависит от цены, такая кривая вертикальна и не задаётся как P = f(Q)' };
     }
     // Q = c + d·P  ⇒  P = (1/d)·Q − c/d
     return { srcCompiled: compiled, srcLinear: lp, linear: { a: 1 / lp.d, b: -lp.c / lp.d }, fn: null };
@@ -3788,15 +3788,15 @@ function updateOpenPanel() {
     html += `<div class="stat"><span>Qd′ / Qs′</span><b>${fmt(o.Qd1)} / ${fmt(o.Qs1)}</b></div>`;
     html += `<div class="stat"><span>Импорт после</span><b>${fmt(o.vol1)} (было ${fmt(o.volume)})</b></div>`;
     html += `<div class="stat"><span>${isTar ? 'Доход бюджета' : 'Рента от квоты'}</span><b>${fmt(o.money)}</b></div>`;
-    if (!isTar) html += '<div class="hint">Рента от квоты — это не доход государства: кому она достанется, ' +
+    if (!isTar) html += '<div class="hint">Рента от квоты это не доход государства: кому она достанется, ' +
       'зависит от того, как распределены лицензии на импорт (могут получить импортёры, иностранные ' +
       'поставщики или бюджет, если лицензии продаются).</div>';
     // Разбивка потерь — по отдельности, без «одного числа».
     html += `<div class="stat" style="margin-top:4px;"><span>Потери: искажение производства</span><b>${fmt(o.dwlProd)}</b></div>`;
     html += `<div class="stat"><span>Потери: искажение потребления</span><b>${fmt(o.dwlCons)}</b></div>`;
     html += `<div class="stat"><span>Итого потери</span><b>${fmt(o.dwlTotal)}</b></div>`;
-    html += '<div class="hint">Левый треугольник — производственное искажение: часть импорта заместили ' +
-      'более дорогим отечественным выпуском. Правый — потребительское: часть покупателей ушла с рынка ' +
+    html += '<div class="hint">Левый треугольник это производственное искажение: часть импорта заместили ' +
+      'более дорогим отечественным выпуском. Правый это потребительское искажение: часть покупателей ушла с рынка ' +
       'из-за выросшей цены.</div>';
   }
   box.innerHTML = html;
@@ -4100,11 +4100,11 @@ function applyTaxRateBounds() {
   if (rl) rl.textContent = adv ? 'τ, %' : ((STATE.intervType === 'subsidy') ? 's' : 't');
   const h = document.getElementById('tax-hint');
   if (h) h.innerHTML = adv
-    ? 'Адвалорная ставка — доля от цены, поэтому предложение не сдвигается, а <b>поворачивается</b>: ' +
+    ? 'Адвалорная ставка берётся долей от цены, поэтому предложение не сдвигается, а <b>поворачивается</b>: ' +
       'S<sub>после</sub>(Q)&nbsp;=&nbsp;(1+τ)·S(Q) при налоге. Вертикальный разрыв между S и S<sub>после</sub> ' +
       'растёт вместе с Q (в отличие от постоянного клина при специфической ставке).'
     : 'Потоварное вмешательство на стороне производителя: кривая S <b>сдвигается</b> ' +
-      '(налог — вверх, субсидия — вниз) на величину ставки. Клин между ценами покупателя ' +
+      'на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя ' +
       'и продавца можно тянуть мышью.';
 }
 
@@ -4156,8 +4156,8 @@ function updateTaxPanel() {
   if (adv) {
     const k = 1 + STATE.tax / 100;
     html += `<div class="hint" style="margin-top:6px;">Адвалорная ставка: ` +
-      (isSub ? `продавец получает в (1+τ)=${fmt(k)} раза больше покупателя — Ps = Pb·(1+τ) = ${fmt(te.Ps)}.`
-             : `покупатель платит в (1+τ)=${fmt(k)} раза больше продавца — Ps = Pb/(1+τ) = ${fmt(te.Ps)}.`) +
+      (isSub ? `продавец получает в (1+τ)=${fmt(k)} раза больше покупателя: Ps = Pb·(1+τ) = ${fmt(te.Ps)}.`
+             : `покупатель платит в (1+τ)=${fmt(k)} раза больше продавца: Ps = Pb/(1+τ) = ${fmt(te.Ps)}.`) +
       ` Деньги = (Pb − Ps)·Q = ${fmt(STATE.tx)}.</div>`;
   }
   if (!isSub) html += `<div class="hint" style="margin-top:6px;">Результат не зависит от того, кто формально платит налог: ` +
@@ -4272,9 +4272,9 @@ function updateElasticityPanel() {
   html += `<div class="stat"><span>Выручка TR = P·Q</span><b>${fmt(e.TR)}</b></div>`;
   // Связь эластичности с выручкой — главный вывод темы, поэтому словами (Фаза 2а).
   const trNote = e.absEd > 1.0001
-    ? 'Спрос <b>эластичный</b>: снижение цены (рост Q) <b>увеличивает</b> выручку — объём растёт быстрее, чем падает цена.'
+    ? 'Спрос <b>эластичный</b>: снижение цены (рост Q) <b>увеличивает</b> выручку: объём растёт быстрее, чем падает цена.'
     : (e.absEd < 0.9999
-      ? 'Спрос <b>неэластичный</b>: снижение цены (рост Q) <b>уменьшает</b> выручку — объём растёт медленнее, чем падает цена.'
+      ? 'Спрос <b>неэластичный</b>: снижение цены (рост Q) <b>уменьшает</b> выручку: объём растёт медленнее, чем падает цена.'
       : 'Единичная эластичность: выручка в максимуме, малое изменение цены её почти не меняет.');
   html += `<div class="hint" style="margin-top:4px;">${trNote}</div>`;
   if (e.unit) {
@@ -4290,7 +4290,7 @@ function updateElasticityPanel() {
     html += `<div class="stat"><span>|Es|</span><b>${fmt(s.absEs)}</b></div>`;
     html += `<div class="stat"><span>Зона предложения</span><b>${zs}</b></div>`;
     html += '<div class="hint">Прямое предложение через начало координат даёт |Es|&nbsp;=&nbsp;1 в любой точке; ' +
-      'с положительным перехватом цены — неэластично, с отрицательным — эластично.</div>';
+      'с положительным перехватом цены неэластично, с отрицательным эластично.</div>';
   } else if (STATE.showElastS && !STATE.S) {
     html += '<div class="hint" style="margin-top:6px;">Для |Es| отметьте кривую предложения (роль S).</div>';
   }
@@ -4462,13 +4462,13 @@ function updateExtPanel() {
     html += `<div class="stat"><span>${tool}</span><b>${fmt(e.corrective)}</b></div>`;
     const gap = e.Qopt - e.Qmkt;
     html += `<div class="hint" style="margin-top:4px;">${gap < -1e-6
-      ? 'Рынок выпускает <b>больше</b> общественного оптимума на ' + fmt(-gap) + ' — <b>перепроизводство</b>: частные издержки ниже общественных.'
+      ? 'Рынок выпускает <b>больше</b> общественного оптимума на ' + fmt(-gap) + ': <b>перепроизводство</b>, частные издержки ниже общественных.'
       : (gap > 1e-6
-        ? 'Рынок выпускает <b>меньше</b> общественного оптимума на ' + fmt(gap) + ' — <b>недопроизводство</b>: частная выгода ниже общественной.'
-        : 'Рынок уже в общественном оптимуме — внешний эффект нулевой.')}</div>`;
+        ? 'Рынок выпускает <b>меньше</b> общественного оптимума на ' + fmt(gap) + ': <b>недопроизводство</b>, частная выгода ниже общественной.'
+        : 'Рынок уже в общественном оптимуме: внешний эффект нулевой.')}</div>`;
     if (e.applyPigou && e.pigouEq) {
       html += `<div class="stat" style="margin-top:4px;"><span>Новое равновесие</span><b>Q=${fmt(e.pigouEq.Q)}, P=${fmt(e.pigouEq.P)}</b></div>`;
-      html += `<div class="hint">${e.pos ? 'Субсидия опустила издержки' : 'Налог Пигу поднял издержки'} — рынок пришёл в Qопт, DWL устранён.</div>`;
+      html += `<div class="hint">${e.pos ? 'Субсидия опустила издержки' : 'Налог Пигу поднял издержки'}, рынок пришёл в Qопт, DWL устранён.</div>`;
     }
   } else {
     html += `<div class="warn">Оптимум ${optEq} не найден в первой четверти.</div>`;
@@ -4619,7 +4619,7 @@ function updatePcPanel() {
     return;
   }
   if (!pc.binding) {
-    box.innerHTML = `<div class="warn">${isCeiling ? 'Потолок' : 'Пол'} ${isCeiling ? 'выше' : 'ниже'} равновесия (P*=${fmt(STATE.eq.P)}) — не действует. Рынок в равновесии.</div>`;
+    box.innerHTML = `<div class="warn">${isCeiling ? 'Потолок' : 'Пол'} ${isCeiling ? 'выше' : 'ниже'} равновесия (P*=${fmt(STATE.eq.P)}), поэтому не действует. Рынок в равновесии.</div>`;
     return;
   }
   const rows = [
@@ -5105,7 +5105,7 @@ function recomputeNatural() {
     const Qac = findRootLast(g, Qm, Qc);
     if (Qac != null) acReg = { Q: Qac, P: evalCurve(D, Qac), atc: naturalATC(Qac) };
     else acNote = (g(Qm) < 0)
-      ? 'При таких FC монополия убыточна даже в своей лучшей точке — цены по средним издержкам не существует.'
+      ? 'При таких FC монополия убыточна даже в своей лучшей точке, поэтому цены по средним издержкам не существует.'
       : 'Пересечение D = ATC между Qm и Qc не найдено.';
   }
   STATE.natural = { Qm, Pm, atcAtQm, profit, mcReg, acReg, acNote, FC: STATE.natFC };
@@ -5185,7 +5185,7 @@ function updateNaturalPanel() {
     box.innerHTML = '<div class="muted">Нужны предельные издержки: роль MC (либо TC, либо S как MC).</div>'; return;
   }
   const n = STATE.natural;
-  if (!n) { box.innerHTML = '<div class="warn">Оптимум монополии не найден — проверьте кривые.</div>'; return; }
+  if (!n) { box.innerHTML = '<div class="warn">Оптимум монополии не найден. Проверьте кривые.</div>'; return; }
   let html = `<div class="stat"><span>Постоянные издержки FC</span><b>${fmt(n.FC)}</b></div>`;
   html += `<div class="stat"><span>1 · Монополия: Q / P</span><b>${fmt(n.Qm)} / ${fmt(n.Pm)}</b></div>`;
   if (!isNaN(n.atcAtQm)) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;ATC(Qm) / прибыль</span><b>${fmt(n.atcAtQm)} / ${fmt(n.profit)}</b></div>`;
@@ -5202,7 +5202,7 @@ function updateNaturalPanel() {
   }
   html += '<div class="hint" style="margin-top:6px;">Компромисс регулятора: цена по предельным издержкам эффективна, ' +
     'но при убывающей ATC даёт фирме убыток (нужна субсидия из бюджета). Цена по средним издержкам ' +
-    'обходится без субсидии, но выпуск меньше эффективного — часть выигрыша теряется.</div>';
+    'обходится без субсидии, но выпуск меньше эффективного, поэтому часть выигрыша теряется.</div>';
   box.innerHTML = html;
 }
 
@@ -5325,7 +5325,7 @@ function updateMonoInterventionPanel() {
   if (it === 'tax' || it === 'subsidy') {
     const isSub = (it === 'subsidy');
     if (!STATE.monoTax || !(STATE.tax > 0)) {
-      box.innerHTML = `<div class="muted">Двигайте ставку — ${isSub ? 'субсидия снизит MC' : 'налог поднимет MC'}; новый оптимум: MR = MC ${isSub ? '−' : '+'} ставка.</div>`;
+      box.innerHTML = `<div class="muted">Двигайте ставку: ${isSub ? 'субсидия снизит MC' : 'налог поднимет MC'}; новый оптимум: MR = MC ${isSub ? '−' : '+'} ставка.</div>`;
       return;
     }
     const t = STATE.monoTax;
@@ -5347,7 +5347,7 @@ function updateMonoInterventionPanel() {
   if (it === 'ceiling') {
     const mc = STATE.monoCeil;
     if (!mc || !(STATE.pReg > 0)) { box.innerHTML = '<div class="muted">Двигайте линию/ползунок цены, чтобы задать потолок Pc.</div>'; return; }
-    if (!mc.binding) { box.innerHTML = `<div class="warn">Потолок Pc=${fmt(mc.Pc)} не ниже монопольной цены (Pm=${fmt(m.Pm)}) — не связывает.</div>`; return; }
+    if (!mc.binding) { box.innerHTML = `<div class="warn">Потолок Pc=${fmt(mc.Pc)} не ниже монопольной цены (Pm=${fmt(m.Pm)}), поэтому не связывает.</div>`; return; }
     let html = `<div class="stat"><span>Потолок Pc</span><b>${fmt(mc.Pc)}</b></div>`;
     html += `<div class="stat"><span>Выпуск</span><b>${fmt(mc.Qstar)} (было ${fmt(m.Qm)})</b></div>`;
     html += `<div class="stat"><span>Цена</span><b>${fmt(mc.price)} (было ${fmt(m.Pm)})</b></div>`;
@@ -5361,7 +5361,7 @@ function updateMonoInterventionPanel() {
   if (it === 'floor') {
     const fl = STATE.monoFloor;
     if (!fl || !(STATE.pReg > 0)) { box.innerHTML = '<div class="muted">Двигайте линию/ползунок цены, чтобы задать пол Pf.</div>'; return; }
-    if (!fl.binding) { box.innerHTML = `<div class="warn">Пол Pf=${fmt(fl.Pf)} не выше монопольной цены (Pm=${fmt(m.Pm)}) — не связывает.</div>`; return; }
+    if (!fl.binding) { box.innerHTML = `<div class="warn">Пол Pf=${fmt(fl.Pf)} не выше монопольной цены (Pm=${fmt(m.Pm)}), поэтому не связывает.</div>`; return; }
     let html = `<div class="stat"><span>Пол Pf</span><b>${fmt(fl.Pf)}</b></div>`;
     html += `<div class="stat"><span>Цена</span><b>${fmt(fl.price)} (было ${fmt(m.Pm)})</b></div>`;
     html += `<div class="stat"><span>Выпуск</span><b>${fmt(fl.Q)} (было ${fmt(m.Qm)})</b></div>`;
@@ -5548,7 +5548,7 @@ function updateDiscr3Panel() {
       const mcFar = evalCurve(d.cm, 2 * CONFIG.Qmax);      // куда дорастают предельные издержки
       if (!isNaN(Pw) && !isNaN(mcFar) && mcFar < Pw) {
         box.innerHTML = '<div class="warn">При постоянных предельных издержках ниже мировой цены оптимальный ' +
-          'объём экспорта не ограничен — фирме выгодна любая дополнительная единица. Это нормальное свойство ' +
+          'объём экспорта не ограничен: фирме выгодна любая дополнительная единица. Это нормальное свойство ' +
           'модели, а не ошибка расчёта: используйте возрастающие MC (например <code>Q</code>).</div>';
         return;
       }
@@ -5563,9 +5563,9 @@ function updateDiscr3Panel() {
     html += `<div class="stat"><span>Σ выпуск</span><b>${fmt(d.Qtot)}</b></div>`;
     html += `<div class="stat"><span>MR₁ = Pw = MC</span><b>${fmt(d.mcLevel)}</b></div>`;
     html += '<div class="hint">Мировой рынок для малой фирмы совершенно эластичен: продать за границей можно ' +
-      'сколько угодно по цене Pw, поэтому предельный доход от экспорта постоянен и равен Pw. Условие оптимума — ' +
+      'сколько угодно по цене Pw, поэтому предельный доход от экспорта постоянен и равен Pw. Условие оптимума такое: ' +
       '<b>MR внутри = Pw = MC(Σ выпуска)</b>: издержки считаются от ОБЩЕГО выпуска, поэтому экспорт влияет ' +
-      'на внутреннюю цену. Дома цена выше мировой — классический «обратный демпинг» при растущих издержках.</div>';
+      'на внутреннюю цену. Дома цена выше мировой: классический «обратный демпинг» при растущих издержках.</div>';
     box.innerHTML = html;
     return;
   }
@@ -5576,7 +5576,7 @@ function updateDiscr3Panel() {
   html += `<div class="stat"><span>Рынок 2: q₂ / P₂</span><b>${fmt(d.q2)} / ${fmt(d.P2)}</b></div>`;
   html += `<div class="stat"><span>Σ выпуск</span><b>${fmt(d.Qtot)}</b></div>`;
   html += `<div class="stat"><span>MR₁ = MR₂ = MC</span><b>${fmt(d.mcLevel)}</b></div>`;
-  html += `<div class="hint">Цена выше на менее эластичном рынке (здесь — рынок&nbsp;${less}). Фирма выравнивает предельный доход: MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.</div>`;
+  html += `<div class="hint">Цена выше на менее эластичном рынке (здесь это рынок&nbsp;${less}). Фирма выравнивает предельный доход: MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.</div>`;
   box.innerHTML = html;
 }
 
@@ -5589,16 +5589,16 @@ function applyD3WorldLabels() {
   const labels = pane.querySelectorAll('.field > label');
   if (labels.length >= 3) {
     labels[0].innerHTML = w ? 'Внутренний спрос: P = f(Q)' : 'Спрос рынка&nbsp;1: P&nbsp;=&nbsp;f₁(Q)';
-    labels[1].innerHTML = w ? 'Мировая цена Pw (число — спрос совершенно эластичен)' : 'Спрос рынка&nbsp;2: P&nbsp;=&nbsp;f₂(Q)';
+    labels[1].innerHTML = w ? 'Мировая цена Pw (число: спрос совершенно эластичен)' : 'Спрос рынка&nbsp;2: P&nbsp;=&nbsp;f₂(Q)';
     labels[2].innerHTML = w ? 'Предельные издержки MC от ОБЩЕГО выпуска' : 'Общие предельные издержки MC (число или f(Q))';
   }
   const hint = pane.querySelector('.hint');
   if (hint) hint.innerHTML = w
-    ? 'Мировой рынок — второй «сегмент» с горизонтальным спросом на уровне Pw. Математика та же, что у ' +
+    ? 'Мировой рынок это второй «сегмент» с горизонтальным спросом на уровне Pw. Математика та же, что у ' +
       'дискриминации 3-й степени: фирма выравнивает предельный доход по сегментам, MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC. ' +
       'Так как MR₂&nbsp;=&nbsp;Pw, условие превращается в MR₁&nbsp;=&nbsp;Pw&nbsp;=&nbsp;MC.'
     : 'Фирма распределяет выпуск так, что MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC. На менее эластичном рынке цена выше. ' +
-      'Два мини-графика рынков — бок о бок.';
+      'Два мини-графика рынков стоят бок о бок.';
 }
 
 /* --- Задача 6: монополист при ломаном (кусочном) рыночном спросе --- */
@@ -5728,7 +5728,7 @@ function updateKinkPanel() {
     html += `<tr${win ? ' style="font-weight:700;color:var(--text);"' : ''}><td>${c.kind}</td><td>${fmt(c.Q)}</td><td>${fmt(c.profit)}</td></tr>`;
   });
   html += '</table>';
-  html += '<div class="hint">Оптимум — по МАКСИМУМУ прибыли среди кандидатов (а не по первому пересечению MR&nbsp;=&nbsp;MC).</div>';
+  html += '<div class="hint">Оптимум берётся по МАКСИМУМУ прибыли среди кандидатов, а не по первому пересечению MR&nbsp;=&nbsp;MC.</div>';
   box.innerHTML = html;
 }
 
@@ -6023,12 +6023,12 @@ function updateLongRunPanel(html) {
   html += `<div class="stat"><span>${lr.profit >= 0 ? 'Прибыль' : 'Убыток'} (P − ATC)·Q</span><b>${fmt(lr.profit)}</b></div>`;
   if (lr.breakeven != null) html += `<div class="stat"><span>Вход/выход: P = min ATC</span><b>${fmt(lr.breakeven)}</b></div>`;
   html += `<div class="hint" style="margin-top:4px;">${lr.shutdown
-    ? 'Цена ниже минимума AVC — в коротком периоде выгоднее <b>закрыться</b>: выручка не покрывает даже переменные издержки.'
+    ? 'Цена ниже минимума AVC, поэтому в коротком периоде выгоднее <b>закрыться</b>: выручка не покрывает даже переменные издержки.'
     : (lr.profit > 1e-9
-      ? 'Прибыль положительна — в долгом периоде в отрасль входят новые фирмы, цена падает к min ATC.'
+      ? 'Прибыль положительна, поэтому в долгом периоде в отрасль входят новые фирмы и цена падает к min ATC.'
       : (lr.profit < -1e-9
-        ? 'Убыток при P выше min AVC: в коротком периоде производить стоит, в долгом — фирмы уходят, цена растёт к min ATC.'
-        : 'Нулевая экономическая прибыль — это и есть долгосрочное равновесие.'))}</div>`;
+        ? 'Убыток при P выше min AVC: в коротком периоде производить стоит, в долгом фирмы уходят и цена растёт к min ATC.'
+        : 'Нулевая экономическая прибыль и есть долгосрочное равновесие.'))}</div>`;
   return html;
 }
 
@@ -6117,7 +6117,7 @@ function redrawProduction() {
     }
     g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', width || 2.4).attr('d', line);
   };
-  const gTop = panel(t1, yTop0, 'TP — общий продукт');
+  const gTop = panel(t1, yTop0, 'TP, общий продукт');
   curve(gTop, prodEval, t1, COL.prodTP, STATE.showTP, 2.6);
   const gBot = panel(t2, yBot0, 'MP и AP');
   curve(gBot, prodMP, t2, COL.prodMP, STATE.showMP);
@@ -6157,7 +6157,7 @@ function updateProdPanel() {
   if (p.maxAP && !isNaN(p.mpAtMaxAP)) html += `<div class="stat"><span>MP в этой точке</span><b>${fmt(p.mpAtMaxAP)}</b></div>`;
   if (p.maxTP) html += `<div class="stat"><span>Максимум TP</span><b>L=${fmt(p.maxTP.L)}, Q=${fmt(p.maxTP.val)}</b></div>`;
   html += '<div class="hint" style="margin-top:4px;">С точки перегиба TP начинается <b>убывающая предельная отдача</b>: ' +
-    'каждый следующий работник добавляет меньше предыдущего. В максимуме AP выполняется <b>AP = MP</b> — ' +
+    'каждый следующий работник добавляет меньше предыдущего. В максимуме AP выполняется <b>AP = MP</b>, ' +
     'пока MP выше среднего, средний растёт; как только MP опускается ниже, средний начинает падать. ' +
     'В максимуме TP предельный продукт равен нулю.</div>';
   box.innerHTML = html;
@@ -6202,7 +6202,7 @@ function updateIsoPanel() {
   html += `<div class="stat"><span>w/r</span><b>${fmt(STATE.isoW / STATE.isoR)}</b></div>`;
   html += `<div class="stat"><span>Потрачено</span><b>${fmt(STATE.isoW * iso.L + STATE.isoR * iso.K)}</b></div>`;
   html += '<div class="hint" style="margin-top:4px;">Условие оптимума то же, что у потребителя, только вместо ' +
-    'полезности — выпуск, а вместо цен благ — цены факторов: <b>MRTS = w/r</b>. Это буквально один и тот же ' +
+    'полезности стоит выпуск, а вместо цен благ цены факторов: <b>MRTS = w/r</b>. Это буквально один и тот же ' +
     'численный движок касания уровня.</div>';
   box.innerHTML = html;
 }
@@ -6258,7 +6258,7 @@ function recomputePlants() {
   const c1 = r1.compiled, c2 = r2.compiled;
   const qMax = CONFIG.Qmax;                          // предел выпуска ОДНОГО завода
   const mMax = Math.max(plantMC(c1, qMax), plantMC(c2, qMax));
-  if (!(mMax > 0)) { STATE.plErr = 'Предельные издержки не растут — проверьте формулы TC.'; return; }
+  if (!(mMax > 0)) { STATE.plErr = 'Предельные издержки не растут. Проверьте формулы TC.'; return; }
   // Таблица горизонтального сложения: по уровню предельных издержек m.
   const N = 400, table = [];
   let cum = 0;                                       // ∫ m dQ трапециями по таблице
@@ -6380,15 +6380,15 @@ function updatePlantsPanel() {
   }
   html += '<div class="hint" style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);">' +
     '<b>Почему сложение ГОРИЗОНТАЛЬНОЕ</b><br>' +
-    'Совокупные издержки — это не TC₁(Q)&nbsp;+&nbsp;TC₂(Q) (это стоило бы выпустить <i>по Q</i> на каждом заводе, ' +
+    'Совокупные издержки это не TC₁(Q)&nbsp;+&nbsp;TC₂(Q) (столько стоило бы выпустить <i>по Q</i> на каждом заводе, ' +
     'то есть 2Q всего), а минимум суммы при делении выпуска:<br>' +
     '<code>TC(Q) = min[Q₁+Q₂=Q] { TC₁(Q₁) + TC₂(Q₂) }</code>.<br><br>' +
-    'Пока MC₁&nbsp;≠&nbsp;MC₂, единицу выгодно перебросить с дорогого завода на дешёвый — значит в оптимуме ' +
+    'Пока MC₁&nbsp;≠&nbsp;MC₂, единицу выгодно перебросить с дорогого завода на дешёвый, значит в оптимуме ' +
     '<b>MC₁&nbsp;=&nbsp;MC₂&nbsp;=&nbsp;MC(Q)</b>. Поэтому совокупную кривую строят так: фиксируют уровень ' +
     'предельных издержек m, у каждого завода берут его объём Qᵢ(m)&nbsp;=&nbsp;MCᵢ⁻¹(m) и складывают ' +
-    '<b>объёмы</b>, а не высоты — ровно как рыночное предложение из предложений фирм.<br><br>' +
+    '<b>объёмы</b>, а не высоты, ровно как рыночное предложение из предложений фирм.<br><br>' +
     'Проверить можно так: на вкладке «Предельные MC» на выбранном уровне видно, что Q₁&nbsp;+&nbsp;Q₂ даёт ' +
-    'точку совокупной кривой, а TC(Q) совпадает с интегралом ∫MC — с точностью до постоянных издержек.</div>';
+    'точку совокупной кривой, а TC(Q) совпадает с интегралом ∫MC с точностью до постоянных издержек.</div>';
   box.innerHTML = html;
 }
 
@@ -6970,7 +6970,7 @@ function drawLaborBilateral() {
   gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2 + 15)
     .attr('text-anchor', 'middle').attr('font-size', 10.5).attr('fill', COL.inkSoft)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
-    .text('конкретная точка зависит от переговорной силы — модель её не определяет');
+    .text('конкретная точка зависит от переговорной силы, а её модель не определяет');
   // Две граничные точки: решение монопсониста и решение профсоюза.
   laborPoint(gg, b.Lm, b.Wm, COL.S, 'М', { lText: 'Lм=' + fmt(b.Lm), wText: null });
   laborPoint(gg, b.Lu, b.Wu, COL.MR, 'П', { lText: 'Lп=' + fmt(b.Lu), wText: null });
@@ -6988,8 +6988,8 @@ function updateLaborBilateralPanel() {
   html += `<div class="stat"><span>Занятость на границах</span><b>${fmt(b.Lm)} и ${fmt(b.Lu)}</b></div>`;
   html += '<div class="hint" style="margin-top:6px;">Один наниматель против одного профсоюза. У этой модели ' +
     '<b>нет единственного равновесия</b>: если бы монопсонист диктовал условия один, зарплата упала бы до Wм; ' +
-    'если бы диктовал профсоюз — поднялась бы до Wп. Реальный исход лежит между и зависит от переговорной силы ' +
-    'сторон, которую модель не описывает. Показывать здесь одно «точное» число было бы ложной точностью — ' +
+    'если бы диктовал профсоюз, поднялась бы до Wп. Реальный исход лежит между и зависит от переговорной силы ' +
+    'сторон, которую модель не описывает. Показывать здесь одно «точное» число было бы ложной точностью, ' +
     'поэтому показан диапазон.</div>';
   return html;
 }
@@ -7032,7 +7032,7 @@ function updateLaborPanel() {
       if (u.Lk != null) html += `<div class="stat"><span>Lk (конкуренция)</span><b>${fmt(u.Lk)}</b></div>`;
       if (u.Wk != null) html += `<div class="stat"><span>Wk (конкуренция)</span><b>${fmt(u.Wk)}</b></div>`;
       if (u.dwl != null) html += `<div class="stat"><span>DWL (недозанятость)</span><b>${fmt(u.dwl)}</b></div>`;
-      html += '<div class="hint">Профсоюз-монополист продаёт труд там, где MRL&nbsp;=&nbsp;S, и берёт зарплату Wп с кривой спроса — ВЫШЕ конкурентной, но занятость НИЖЕ. Зеркало монопсонии. Серым — потери общества.</div>';
+      html += '<div class="hint">Профсоюз-монополист продаёт труд там, где MRL&nbsp;=&nbsp;S, и берёт зарплату Wп с кривой спроса, ВЫШЕ конкурентной, но занятость НИЖЕ. Зеркало монопсонии. Серым закрашены потери общества.</div>';
     } else {
       html += `<div class="stat"><span>Зарплата профсоюза Wп</span><b>${fmt(u.W)}</b></div>`;
       if (u.binding) {
@@ -7042,7 +7042,7 @@ function updateLaborPanel() {
         html += '<div class="hint">Профсоюз диктует зарплату выше равновесия: занятость падает по спросу, возникает безработица (ценовой пол на рынке труда).</div>';
       } else {
         html += `<div class="stat"><span>Lk (конкуренция)</span><b>${fmt(u.Lk)}</b></div>`;
-        html += '<div class="hint" style="margin-top:6px;">Зарплата профсоюза не выше конкурентной — не связывает. Рынок в равновесии.</div>';
+        html += '<div class="hint" style="margin-top:6px;">Зарплата профсоюза не выше конкурентной, поэтому не связывает. Рынок в равновесии.</div>';
       }
     }
     box.innerHTML = html;
@@ -7056,7 +7056,7 @@ function updateLaborPanel() {
     if (m.Lk != null) html += `<div class="stat"><span>Lk (конкуренция)</span><b>${fmt(m.Lk)}</b></div>`;
     if (m.Wk != null) html += `<div class="stat"><span>Wk (конкуренция)</span><b>${fmt(m.Wk)}</b></div>`;
     if (m.dwl != null) html += `<div class="stat"><span>DWL (недозанятость)</span><b>${fmt(m.dwl)}</b></div>`;
-    html += `<div class="hint">Монопсония занижает и занятость, и зарплату против конкуренции: рабочим платят Wм&nbsp;=&nbsp;W_s(Lм) — ниже их предельного продукта. Серым — потери общества.</div>`;
+    html += `<div class="hint">Монопсония занижает и занятость, и зарплату против конкуренции: рабочим платят Wм&nbsp;=&nbsp;W_s(Lм), ниже их предельного продукта. Серым закрашены потери общества.</div>`;
     if (bind) {
       html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
       html += `<div class="stat"><span>МРОТ W_min</span><b>${fmt(min.Wmin)}</b></div>`;
@@ -7072,7 +7072,7 @@ function updateLaborPanel() {
       const dl = min.Lstar - m.Lm;
       html += `<div class="hint">${dl > 1e-6 ? 'МРОТ увеличил занятость (парадокс монопсонии).' : (dl < -1e-6 ? 'МРОТ снизил занятость.' : 'Занятость не изменилась.')}</div>`;
     } else if (STATE.laborMinOn && STATE.laborMinW > 0) {
-      html += '<div class="hint" style="margin-top:6px;">МРОТ не выше монопсонической зарплаты — не связывает.</div>';
+      html += '<div class="hint" style="margin-top:6px;">МРОТ не выше монопсонической зарплаты, поэтому не связывает.</div>';
     }
   } else {
     const eq = STATE.laborEq;
@@ -7093,7 +7093,7 @@ function updateLaborPanel() {
       }
       html += `<div class="hint">МРОТ выше равновесия: занятость падает до спроса при W_min, возникает безработица (избыток предложения труда).</div>`;
     } else if (STATE.laborMinOn && STATE.laborMinW > 0) {
-      html += '<div class="hint" style="margin-top:6px;">МРОТ ниже равновесия — не связывает. Рынок в равновесии.</div>';
+      html += '<div class="hint" style="margin-top:6px;">МРОТ ниже равновесия, поэтому не связывает. Рынок в равновесии.</div>';
     }
   }
   box.innerHTML = html;
@@ -7330,8 +7330,8 @@ function updateConsumerPanel() {
     const rx = STATE.consA / b.px, ry = STATE.consB / b.py;
     html += `<div class="hint" style="margin-top:4px;">Совершенные субституты: сравниваем «выгоду на рубль» —
       a/Px&nbsp;=&nbsp;${fmt(rx)} против b/Py&nbsp;=&nbsp;${fmt(ry)}. ` +
-      (Math.abs(rx - ry) < 1e-9 ? 'Они равны — годится любой набор на бюджетной линии.'
-        : (rx > ry ? 'Весь доход уходит на <b>x</b> — угловое решение.' : 'Весь доход уходит на <b>y</b> — угловое решение.')) + '</div>';
+      (Math.abs(rx - ry) < 1e-9 ? 'Они равны, поэтому годится любой набор на бюджетной линии.'
+        : (rx > ry ? 'Весь доход уходит на <b>x</b>: угловое решение.' : 'Весь доход уходит на <b>y</b>: угловое решение.')) + '</div>';
   } else if (t === 'compl') {
     html += `<div class="hint" style="margin-top:4px;">Совершенные комплементы: оптимум всегда на изломе
       x/a&nbsp;=&nbsp;y/b, то есть блага потребляются в жёсткой пропорции
@@ -7711,8 +7711,8 @@ function updateMacroPanel() {
     html += `<div class="hint" style="margin-top:4px;">${Math.abs(g) < 1e-6
       ? 'Экономика ровно на потенциале: краткосрочное равновесие совпало с долгосрочным, разрыва нет.'
       : (g < 0
-        ? '<b>Рецессионный разрыв</b>: фактический выпуск ниже потенциального на ' + fmt(-g) + ' — ресурсы недозагружены, безработица выше естественной.'
-        : '<b>Инфляционный разрыв</b>: фактический выпуск выше потенциального на ' + fmt(g) + ' — экономика перегрета, давление на цены вверх.')}</div>`;
+        ? '<b>Рецессионный разрыв</b>: фактический выпуск ниже потенциального на ' + fmt(-g) + ': ресурсы недозагружены, безработица выше естественной.'
+        : '<b>Инфляционный разрыв</b>: фактический выпуск выше потенциального на ' + fmt(g) + ': экономика перегрета, давление на цены вверх.')}</div>`;
   } else if (r.kind === 'phillips') {
     const f = r.f;
     html += `<div class="stat"><span>Ожидаемая инфляция πe</span><b>${fmt(P.pe)}</b></div>`;
@@ -7722,12 +7722,12 @@ function updateMacroPanel() {
     [P.ustar - 2, P.ustar, P.ustar + 2].forEach(u => { html += `<tr><td>${fmt(u)}</td><td>${fmt(f(u))}</td></tr>`; });
     html += '</table>';
     html += '<div class="hint">Краткосрочная кривая проходит через точку (u*, πe) с наклоном −β: снизить ' +
-      'безработицу ниже естественной можно только ценой более высокой инфляции. Долгосрочная — вертикаль ' +
+      'безработицу ниже естественной можно только ценой более высокой инфляции. Долгосрочная идёт вертикалью ' +
       'при u = u*: в долгом периоде ожидания подстраиваются, и размена нет.</div>';
   } else if (r.kind === 'money') {
     html += `<div class="stat"><span>Предложение денег Ms</span><b>${fmt(P.ms)}</b></div>`;
     html += `<div class="stat"><span>Равновесная ставка i</span><b>${fmt(r.eq.P)}</b></div>`;
-    html += '<div class="hint">Предложение денег задаёт ЦБ — оно не зависит от ставки, поэтому вертикально. ' +
+    html += '<div class="hint">Предложение денег задаёт ЦБ, оно не зависит от ставки и поэтому вертикально. ' +
       'Ставка уравновешивает спрос на деньги с этим фиксированным предложением.</div>';
   } else if (r.kind === 'loanable') {
     html += `<div class="stat"><span>База: r / объём</span><b>${fmt(r.base.P)} / ${fmt(r.base.Q)}</b></div>`;
@@ -7736,7 +7736,7 @@ function updateMacroPanel() {
       html += `<div class="stat"><span>Новая ставка r</span><b>${fmt(r.eq.P)}</b></div>`;
       html += `<div class="stat"><span>Частные инвестиции при новой r</span><b>${fmt(r.privAfter)}</b></div>`;
       html += `<div class="stat"><span>Вытеснение</span><b>${fmt(r.crowding)}</b></div>`;
-      html += '<div class="hint">Государство занимает — ОБЩИЙ спрос на заёмные средства сдвигается вправо, ставка ' +
+      html += '<div class="hint">Государство занимает, ОБЩИЙ спрос на заёмные средства сдвигается вправо, ставка ' +
         'растёт. Вытеснение считается по <b>исходной</b> кривой ЧАСТНОГО спроса при новой ставке: сколько частных ' +
         'инвестиций ушло. Не путайте её со сдвинутой общей кривой.</div>';
     } else {
@@ -7762,11 +7762,11 @@ function updateMacroPanel() {
     html += '<div class="hint">Кривая построена НЕ отдельной формулой: для каждой ставки прогоняется тот же ' +
       'расчёт рыночного равновесия с потоварным налогом, что и в сцене «Налог», и берётся ставка × объём. ' +
       'Поэтому она согласована с остальным движком по построению. При нулевой ставке поступлений нет; при ' +
-      'запретительной рынок схлопывается — максимум лежит между.</div>';
+      'запретительной рынок схлопывается, поэтому максимум лежит между.</div>';
   } else if (r.kind === 'islm') {
     html += `<div class="stat"><span>Равновесный выпуск Y</span><b>${fmt(r.eq.Q)}</b></div>`;
     html += `<div class="stat"><span>Равновесная ставка r</span><b>${fmt(r.eq.P)}</b></div>`;
-    html += '<div class="hint">IS — сочетания Y и r, при которых равновесен товарный рынок; LM — при которых ' +
+    html += '<div class="hint">IS это сочетания Y и r, при которых равновесен товарный рынок; LM те, при которых ' +
       'равновесен денежный. Пересечение даёт единственную пару, где равновесны оба.</div>';
   }
   box.innerHTML = html;
@@ -8098,8 +8098,8 @@ function updatePpfPanel() {
   html += `<div class="stat"><span>Макс X</span><b>${fmt((maxX != null) ? maxX : NaN)}</b></div>`;
   html += `<div class="stat"><span>Макс Y</span><b>${fmt(maxY)}</b></div>`;
   html += `<div class="stat"><span>Альт. издержки X</span><b>${fmt(opp)} Y/ед.</b></div>`;
-  html += '<div class="hint">Альтернативные издержки X — сколько Y теряется за +1 ед. X (|наклон| = Макс Y / Макс X). ' +
-    'Двигайте ползунки «Макс X / Макс Y» в пульте — наклон (и альт. издержки) меняются вживую.</div>';
+  html += '<div class="hint">Альтернативные издержки X показывают, сколько Y теряется за +1 ед. X (|наклон| = Макс Y / Макс X). ' +
+    'Двигайте ползунки «Макс X / Макс Y» в пульте: наклон и альт. издержки меняются вживую.</div>';
   box.innerHTML = html;
 }
 
@@ -8338,7 +8338,7 @@ function detectCombinedKinks(f1, f2, xmax1, xmax2) {
     out.push(Xk);
   }
   const result = out.map(Xk => ({ x: Xk, y: allocAt(f1, f2, Xk, xmax1, xmax2).y }));
-  if (result.length > 4) console.warn('detectCombinedKinks: аномально много изломов (' + result.length + ') — проверьте входные КПВ');
+  if (result.length > 4) console.warn('detectCombinedKinks: аномально много изломов (' + result.length + '). Проверьте входные КПВ');
   return result;
 }
 
@@ -8351,7 +8351,7 @@ function combinedPpfFormula(c1, c2) {
     const lo = (c1.b <= c2.b) ? c1 : c2, hi = (c1.b <= c2.b) ? c2 : c1;  // меньшая альт. цена X специализируется первой
     const Atot = lo.a + hi.a, xk = lo.Xmax, Xtot = lo.Xmax + hi.Xmax, Ykink = hi.a;
     if (Math.abs(lo.b - hi.b) < 1e-6) {
-      const text = `Y = ${fmt(Atot)} − ${fmt(lo.b)}·X,  X ∈ [0; ${fmt(Xtot)}]  (равные альт. издержки — одна прямая).`;
+      const text = `Y = ${fmt(Atot)} − ${fmt(lo.b)}·X,  X ∈ [0; ${fmt(Xtot)}]  (равные альт. издержки дают одну прямую).`;
       return { type: 'линейная (1 кусок)', text, evalY: (x) => (x >= 0 && x <= Xtot) ? Atot - lo.b * x : NaN, kinks: [] };
     }
     const C = hi.a + hi.b * xk;                       // второй кусок: Y = C − hi.b·X
@@ -8374,7 +8374,7 @@ function combinedPpfFormula(c1, c2) {
   if (c1.type === 'parabola' && c2.type === 'parabola') {
     const a1 = c1.a, a2 = c2.a, b1 = c1.b, b2 = c2.b, bEff = b1 * b2 / (b1 + b2);
     const Xint = Math.min(c1.Xmax * (b1 + b2) / b2, c2.Xmax * (b1 + b2) / b1);
-    const text = `внутр. часть: Y = ${fmt(a1 + a2)} − ${fmt(bEff)}·X² при X ∈ [0; ${fmt(Xint)}]; далее — хвост (построен численно).`;
+    const text = `внутр. часть: Y = ${fmt(a1 + a2)} − ${fmt(bEff)}·X² при X ∈ [0; ${fmt(Xint)}]; далее идёт хвост (построен численно).`;
     return { type: 'парабола (внутр. часть)', text, evalY: (x) => (x < 0 || x > Xint) ? NaN : (a1 + a2) - bEff * x * x, kinks: [] };
   }
   return { type: 'численная', text: null, evalY: null, kinks: [] };
@@ -8420,7 +8420,7 @@ function recomputePpfSum() {
   const fr = combinedPpfFormula(c1, c2);
   let formulaText = fr.text;
   if (fr.evalY) {                                   // распознали форму — проверяем численно
-    if (!verifyFormula(fr.evalY, points)) formulaText = 'Аналитическая форма не подтвердилась — кривая построена численно.';
+    if (!verifyFormula(fr.evalY, points)) formulaText = 'Аналитическая форма не подтвердилась, кривая построена численно.';
   } else { formulaText = 'Построена численно (аналитическая форма для этой пары не распознана).'; }
   // Изломы — надёжным режимным детектором (Задача 1); кэшируем для панели и «Схемы».
   const kinksXY = detectCombinedKinks(f1, f2, x1max, x2max);
@@ -8476,7 +8476,7 @@ function updatePpfSumPanel() {
   html += `<div class="stat"><span>X макс (сумма)</span><b>${fmt(d.Xtot)}</b></div>`;
   html += `<div class="stat"><span>Y макс (сумма)</span><b>${fmt(d.Ytot)}</b></div>`;
   (d.kinks || []).forEach((k, i) => { html += `<div class="stat"><span>Излом ${i + 1}</span><b>X=${fmt(k[0])}, Y=${fmt(k[1])}</b></div>`; });
-  html += `<div class="hint" style="margin-top:6px;"><b>Суммарная КПВ:</b><br>${d.formulaText || '—'}</div>`;
+  html += `<div class="hint" style="margin-top:6px;"><b>Суммарная КПВ:</b><br>${d.formulaText || 'не подобралась'}</div>`;
   box.innerHTML = html;
 }
 
@@ -8707,7 +8707,7 @@ function updatePpfTradePanel() {
     html += `<div class="stat"><span>Макс потребление Y</span><b>${fmt(d.yint)}</b></div>`;
     html += `<div class="hint" style="margin-top:6px;"><b>КТВ:</b> Y = ${fmt(d.line.intercept)} − ${fmt(d.ratio)}·X</div>`;
   } else {
-    html += '<div class="hint" style="margin-top:6px;">Мировая цена равна внутренней — торговать невыгодно, КТВ совпадает с КПВ.</div>';
+    html += '<div class="hint" style="margin-top:6px;">Мировая цена равна внутренней, торговать невыгодно: КТВ совпадает с КПВ.</div>';
   }
   box.innerHTML = html;
 }
@@ -8759,7 +8759,7 @@ function recomputeTradeB() {
   // Автарктическая цена X = альт. издержки X. Для линейной — наклон c.b; иначе среднее Ymax/Xmax.
   const b1 = (c1.type === 'linear') ? c1.b : (c1.Ymax / c1.Xmax);
   const b2 = (c2.type === 'linear') ? c2.b : (c2.Ymax / c2.Xmax);
-  if (Math.abs(b1 - b2) < 1e-9) { STATE.tradeBData = { ok: false, error: 'Альтернативные издержки стран совпали — торговать незачем.' }; return; }
+  if (Math.abs(b1 - b2) < 1e-9) { STATE.tradeBData = { ok: false, error: 'Альтернативные издержки стран совпали, торговать незачем.' }; return; }
   const co1 = { idx: 1, c: c1, b: b1, color: COL.D, ppts: singlePpfPoints(f1, c1.Xmax) };
   const co2 = { idx: 2, c: c2, b: b2, color: COL.S, ppts: singlePpfPoints(f2, c2.Xmax) };
   const lowIs1 = b1 < b2;                              // у кого меньше альт. цена X — тот экспортирует X
@@ -8837,19 +8837,19 @@ function updateTradeBPanel() {
   // и предложения, границы интервала и честная оговорка о том, чего модель не знает.
   html += '<div class="hint" style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);">' +
     '<b>Откуда берётся Pw</b><br>' +
-    `Автарктическая цена X — это альтернативные издержки X внутри страны: ` +
-    `у страны&nbsp;${d.lowIdx} она ${fmt(d.bL)}, у страны&nbsp;${d.highIdx} — ${fmt(d.bH)}.<br><br>` +
+    `Автарктическая цена X это альтернативные издержки X внутри страны: ` +
+    `у страны&nbsp;${d.lowIdx} она ${fmt(d.bL)}, у страны&nbsp;${d.highIdx} она ${fmt(d.bH)}.<br><br>` +
     'Мировая цена уравновешивает мировой рынок: <b>сколько X страна-экспортёр хочет продать при цене Pw, ' +
-    'столько же X страна-импортёр хочет купить</b> — избыточное предложение = избыточному спросу.<br><br>' +
+    'столько же X страна-импортёр хочет купить</b>: избыточное предложение = избыточному спросу.<br><br>' +
     `Отсюда сразу следуют границы. При Pw&nbsp;≤&nbsp;${fmt(d.bL)} стране&nbsp;${d.lowIdx} невыгодно продавать X ` +
-    '(дома за него дают не меньше) — избыточное предложение обнуляется. ' +
-    `При Pw&nbsp;≥&nbsp;${fmt(d.bH)} стране&nbsp;${d.highIdx} невыгодно покупать X (дешевле произвести самой) — ` +
+    '(дома за него дают не меньше), и избыточное предложение обнуляется. ' +
+    `При Pw&nbsp;≥&nbsp;${fmt(d.bH)} стране&nbsp;${d.highIdx} невыгодно покупать X (дешевле произвести самой), и ` +
     'обнуляется избыточный спрос. Значит равновесие обязано лежать <b>строго внутри</b> ' +
-    `интервала (${fmt(d.bL)};&nbsp;${fmt(d.bH)}) — и это следует из ОДНИХ КПВ, без всяких допущений.<br><br>` +
+    `интервала (${fmt(d.bL)};&nbsp;${fmt(d.bH)}), и это следует из ОДНИХ КПВ, без всяких допущений.<br><br>` +
     '<b>Чего модель не знает.</b> Конкретная точка внутри интервала зависит от того, сколько каждая страна ' +
     'хочет ПОТРЕБИТЬ при данной цене, то есть от предпочтений (функций спроса). В модели из одних КПВ их нет, ' +
-    'поэтому одним числом точка не определяется — определяется интервал. ' +
-    `Калькулятор ставит нейтральную точку строго внутри — среднее геометрическое ` +
+    'поэтому одним числом точка не определяется, определяется интервал. ' +
+    `Калькулятор ставит нейтральную точку строго внутри: среднее геометрическое ` +
     `√(${fmt(d.bL)}·${fmt(d.bH)})&nbsp;=&nbsp;${fmt(d.Pweq)}. Ползунком Pw пройдите весь интервал: ` +
     'чем ближе цена к автарктической цене страны, тем меньше её выигрыш от торговли.</div>';
   if (d.manual) {
@@ -9289,7 +9289,7 @@ function updateInequalityPanel() {
       здесь ${fmt(pp.ratio)}. Фонды учитывают «хвост» самых богатых, пороги — нет.</div>`;
   } else {
     html += '<div class="hint">Показан <b>коэффициент фондов</b>: отношение суммарного дохода ' +
-      'верхних 10&nbsp;% к суммарному доходу нижних 10&nbsp;% (не отношение порогов P90/P10 — ' +
+      'верхних 10&nbsp;% к суммарному доходу нижних 10&nbsp;% (не отношение порогов P90/P10, ' +
       'это другая величина). Пороги можно посчитать только по способу ввода «Доходы».</div>';
   }
   // Перераспределение «до → после» (ЧК3) — имеет приоритет над снимком ЧК2.
@@ -9308,9 +9308,9 @@ function updateInequalityPanel() {
     html += `<div class="stat"><span>Джини стало</span><b>${fmt(g1)}</b></div>`;
     html += `<div class="stat"><span>Δ Джини</span><b style="color:${d < -1e-6 ? COL.tax : (d > 1e-6 ? COL.S : COL.inkSoft)}">${d >= 0 ? '+' : ''}${fmt(d)}</b></div>`;
   }
-  html += '<div class="hint" style="margin-top:6px;">Джини: 0 — полное равенство, 1 — весь доход у одного. ' +
-    'Робин Гуда — какую долю дохода нужно перераспределить для равенства (макс. разрыв с диагональю). ' +
-    'Дец./квинт. — во сколько раз доход верхних 10%/20% больше дохода нижних.</div>';
+  html += '<div class="hint" style="margin-top:6px;">Джини: 0 значит полное равенство, 1 значит весь доход у одного. ' +
+    'Робин Гуда показывает, какую долю дохода нужно перераспределить для равенства (макс. разрыв с диагональю). ' +
+    'Дец./квинт. показывают, во сколько раз доход верхних 10%/20% больше дохода нижних.</div>';
   box.innerHTML = html;
 }
 
@@ -9881,8 +9881,8 @@ function mathAnalyse(f, lo, hi) {
 // Преобразование графика (7в). Возвращает новую функцию и человеческую подпись.
 const MATH_TRANS = {
   up:     { tex: 'f(x) + a',  note: 'Плюс a поднимает график, минус опускает.' },
-  left:   { tex: 'f(x + a)',  note: 'Внимание: при a > 0 график уезжает ВЛЕВО, а не вправо. Внутри скобок всё наоборот — это самое частое место, где путаются.' },
-  scaleY: { tex: 'a · f(x)',  note: 'Больше единицы — растягиваем вверх, меньше — прижимаем к оси x, отрицательное — ещё и переворачиваем.' },
+  left:   { tex: 'f(x + a)',  note: 'Внимание: при a > 0 график уезжает ВЛЕВО, а не вправо. Внутри скобок всё наоборот, и это самое частое место, где путаются.' },
+  scaleY: { tex: 'a · f(x)',  note: 'Больше единицы растягивает вверх, меньше прижимает к оси x, отрицательное ещё и переворачивает.' },
   scaleX: { tex: 'f(a · x)',  note: 'И здесь наоборот: a > 1 СЖИМАЕТ график к оси y, а 0 < a < 1 растягивает.' },
   negY:   { tex: '−f(x)',     note: 'Отражение относительно оси x: что было сверху, окажется снизу.' },
   negX:   { tex: 'f(−x)',     note: 'Отражение относительно оси y: правая половина становится левой.' },
@@ -9998,7 +9998,7 @@ function drawMathTangent(f) {
   g.append('text').attr('x', m.left + 4).attr('y', top + 12)
     .attr('font-size', 11.5).attr('font-weight', 600).attr('fill', COL.inkSoft).text('f(x)');
   g.append('text').attr('x', m.left + 4).attr('y', yMid + gap + 12)
-    .attr('font-size', 11.5).attr('font-weight', 600).attr('fill', COL.inkSoft).text('f′(x) — производная');
+    .attr('font-size', 11.5).attr('font-weight', 600).attr('fill', COL.inkSoft).text('f′(x), производная');
 
   mathLine(g, f, s1.mx, s1.my, COL.D, 2.6);
   mathLine(g, dfun, s2.mx, s2.my, COL.MC, 2.4);
@@ -10727,7 +10727,7 @@ function renderCurveList() {
       badge.className = 'form-badge'; badge.textContent = 'Q(P)';
       const can = curve.linear ? ('P = ' + fmtLinear(curve.linear.a, curve.linear.b))
                               : 'P = f(Q) считается численно';
-      badge.title = 'Введено как Q(P); в расчётах — ' + can;
+      badge.title = 'Введено как Q(P), в расчётах ' + can;
     }
 
     const del = document.createElement('button');
@@ -10742,8 +10742,8 @@ function renderCurveList() {
     // Нижняя строка: роль кривой (обычная / спрос / предложение).
     const sel = document.createElement('select');
     sel.className = 'role-sel';
-    [['', '— обычная кривая'], ['demand', 'D — спрос'], ['supply', 'S — предложение'],
-     ['mc', 'MC — пред. издержки'], ['tc', 'TC — суммарные затраты'], ['atc', 'ATC — средние затраты']]
+    [['', 'обычная кривая'], ['demand', 'D, спрос'], ['supply', 'S, предложение'],
+     ['mc', 'MC, предельные издержки'], ['tc', 'TC, суммарные затраты'], ['atc', 'ATC, средние затраты']]
       .forEach(([v, t]) => {
         const o = document.createElement('option'); o.value = v; o.textContent = t;
         sel.appendChild(o);
@@ -10780,22 +10780,22 @@ const FORMULA_EXAMPLES = {
   // Рыночная кривая P = f(Q) — канон движка.
   PQ: { title: 'Цена от количества: P = f(Q)', items: [
     ['100 - 2*Q',                    'линейная'],
-    ['sqrt(100 - Q^2)',              'с корнем — дуга'],
-    ['120 / (Q + 1)',                'дробная — гипербола'],
+    ['sqrt(100 - Q^2)',              'с корнем, даёт дугу'],
+    ['120 / (Q + 1)',                'дробная, даёт гиперболу'],
     ['Q < 40 ? 100 - Q : 80 - 0.5*Q', 'кусочная: условие ? … : …'],
   ] },
   // Ввод «объём от цены» (Фаза 1б) — приводится к канону автоматически.
   QP: { title: 'Количество от цены: Q = f(P)', items: [
     ['100 - 2*P',        'линейная'],
-    ['sqrt(400 - P^2)',  'с корнем — дуга'],
-    ['500 / (P + 1)',    'дробная — гипербола'],
+    ['sqrt(400 - P^2)',  'с корнем, даёт дугу'],
+    ['500 / (P + 1)',    'дробная, даёт гиперболу'],
     ['P < 30 ? 90 - P : 120 - 2*P', 'кусочная: условие ? … : …'],
   ] },
   // Суммарные затраты TC(Q) в режиме издержек.
   TC: { title: 'Суммарные затраты TC(Q)', items: [
-    ['Q^3 - 6*Q^2 + 15*Q + 18', 'кубическая — U-образные средние'],
+    ['Q^3 - 6*Q^2 + 15*Q + 18', 'кубическая, средние выходят U-образными'],
     ['2*Q^2 + 10*Q + 50',       'квадратичная'],
-    ['30 + 8*Q',                'линейная — постоянные MC'],
+    ['30 + 8*Q',                'линейная, предельные издержки постоянны'],
     ['20 + 4*Q*sqrt(Q)',        'с корнем'],
   ] },
   // Граница производственных возможностей Y = f(X).
@@ -10840,13 +10840,13 @@ const FORMULA_EXAMPLES = {
     ['min(a/1, b/2)', 'жёсткая пропорция'],
   ] },
   PPF: { title: 'Граница возможностей Y = f(X)', items: [
-    ['100 - X',          'линейная — пост. альт. издержки'],
-    ['sqrt(10000 - X^2)', 'дуга — растущие альт. издержки'],
-    ['100 - 0.01*X^2',   'парабола — растущие альт. издержки'],
-    ['100 - 10*sqrt(X)', 'выпуклая — убывающие альт. издержки'],
+    ['100 - X',          'линейная, альт. издержки постоянны'],
+    ['sqrt(10000 - X^2)', 'дуга, альт. издержки растут'],
+    ['100 - 0.01*X^2',   'парабола, альт. издержки растут'],
+    ['100 - 10*sqrt(X)', 'выпуклая, альт. издержки убывают'],
   ] },
 };
-const FORMULA_FOOT = 'Умножение — звёздочкой (2*Q), степень — ^. Есть sqrt, abs, exp, log, min, max.';
+const FORMULA_FOOT = 'Умножение ставится звёздочкой (2*Q), степень знаком ^. Есть sqrt, abs, exp, log, min, max.';
 
 /* ── Красивая математика в подсказках и предпросмотре (Фаза 4б) ──────────
    Поле ввода остаётся обычным текстом с синтаксисом Math.js: считается ровно
@@ -10960,7 +10960,7 @@ function setCurveForm(form) {
   if (inp) inp.placeholder = (STATE.curveForm === 'QP') ? 'например: 100 - 2*P' : 'например: 100 - Q';
   const h = document.getElementById('curve-form-hint');
   if (h) h.innerHTML = (STATE.curveForm === 'QP')
-    ? 'Количество как функция цены: Q&nbsp;=&nbsp;f(P). Приведём к P&nbsp;=&nbsp;f(Q) сами: линейную — явно, любую другую — численно.'
+    ? 'Количество как функция цены: Q&nbsp;=&nbsp;f(P). Приведём к P&nbsp;=&nbsp;f(Q) сами: линейную явно, любую другую численно.'
     : 'Цена как функция количества: P&nbsp;=&nbsp;f(Q).';
   const pop = document.getElementById('fp-formula');
   if (pop && pop.classList.contains('open') && typeof pop._render === 'function') pop._render();
@@ -11132,7 +11132,7 @@ function pickScene(key) {
 const SCENE_NAMES = {
   sd: 'Спрос и предложение', tax: 'Налог и субсидия', ceil: 'Потолок и пол цены',
   mono: 'Монополия', elast: 'Эластичность', ext: 'Внешние эффекты',
-  costs: 'Издержки фирмы', ppf: 'КПВ — возможности',
+  costs: 'Издержки фирмы', ppf: 'КПВ: граница возможностей',
   labor: 'Рынок труда', ineq: 'Неравенство доходов', consumer: 'Выбор потребителя',
   adas: 'AD–AS', phillips: 'Кривая Филлипса', money: 'Денежный рынок',
   loanable: 'Рынок заёмных средств', fx: 'Валютный рынок', laffer: 'Кривая Лаффера', islm: 'IS–LM',
@@ -11765,14 +11765,14 @@ function ineqMasterApply(sliderVal) { // движение мастера (отв
 function ineqMasterDetach() {         // ручная правка профиля → одним числом не выразить
   STATE.ineqMasterDetached = true;
   const sl = document.getElementById('ineq-master-slider'); if (sl) sl.value = 100;
-  const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = '—';
+  const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = 'своё';
 }
 function buildIneqMasterChip(box) {
   const detached = !!STATE.ineqMasterDetached;
   const pct = detached ? 100 : Math.round((STATE.ineqMasterS != null ? STATE.ineqMasterS : 1) * 100);
   addPultXChip(box, 'Сила неравенства', pct, COL.D, 0, 200, 1, v => ineqMasterApply(v), 'ineq-master-slider');
   const val = document.getElementById('ineq-master-slider-val');
-  if (val) val.textContent = detached ? '—' : (pct + '%');
+  if (val) val.textContent = detached ? 'своё' : (pct + '%');
 }
 
 function showPult(on, title) {
