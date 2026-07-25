@@ -393,6 +393,53 @@ const CASES = [
              ['MRS = Pa/Pb', 'mrs', 0.5, 0.01], ['уровень f', 'value', 35.355, 0.02],
              ['кривая уровня через оптимум', 'yAt', 25, 0.05], ['точек на кривой', 'nPts', 100, 1]],
   },
+
+  /* ── Фаза 8: теория потребителя ──────────────────────────────────────── */
+  {
+    name: 'Потребитель · четыре вида предпочтений через ОДИН численный оптимизатор',
+    // Кобб-Дуглас (Px=1,Py=2,I=100) → 50/25; комплементы min(x/1,y/2) при 1,1,30 → 10/20;
+    // субституты 2x+y при 1,1,50 → угол 50/0; квазилинейные x+2√y при 1,1,50 → 49/1.
+    run: `setMode('consumer');
+          var out = {};
+          setConsumerType('cobb'); STATE.consA = 0.5; STATE.consB = 0.5;
+          STATE.consPx = 1; STATE.consPy = 2; STATE.consI = 100; redrawAll();
+          out.cdX = STATE.cons.base.x; out.cdY = STATE.cons.base.y; out.cdMrs = STATE.cons.base.mrs;
+          setConsumerType('compl'); STATE.consA = 1; STATE.consB = 2;
+          STATE.consPx = 1; STATE.consPy = 1; STATE.consI = 30; redrawAll();
+          out.coX = STATE.cons.base.x; out.coY = STATE.cons.base.y;
+          setConsumerType('subs'); STATE.consA = 2; STATE.consB = 1;
+          STATE.consPx = 1; STATE.consPy = 1; STATE.consI = 50; redrawAll();
+          out.suX = STATE.cons.base.x; out.suY = STATE.cons.base.y;
+          setConsumerType('quasi'); STATE.consK = 2;
+          STATE.consPx = 1; STATE.consPy = 1; STATE.consI = 50; redrawAll();
+          out.quX = STATE.cons.base.x; out.quY = STATE.cons.base.y;
+          // Свойство квазилинейных: y не зависит от дохода.
+          STATE.consI = 80; redrawAll();
+          out.quY80 = STATE.cons.base.y; out.quX80 = STATE.cons.base.x;
+          return out;`,
+    checks: [['Кобб-Дуглас x*', 'cdX', 50, 0.05], ['Кобб-Дуглас y*', 'cdY', 25, 0.05],
+             ['MRS = Px/Py', 'cdMrs', 0.5, 0.01],
+             ['комплементы x*', 'coX', 10, 0.05], ['комплементы y*', 'coY', 20, 0.05],
+             ['субституты x* (угол)', 'suX', 50, 0.05], ['субституты y*', 'suY', 0, 0.05],
+             ['квазилинейные x*', 'quX', 49, 0.05], ['квазилинейные y*', 'quY', 1, 0.03],
+             ['y не зависит от дохода', 'quY80', 1, 0.03], ['весь прирост в x', 'quX80', 79, 0.06]],
+  },
+  {
+    name: 'Слуцкий · Кобб-Дуглас I=100, Py=1, Px 1→4 ⇒ замещение −18.75, доход −18.75',
+    // x0 = 50 → компенсированный доход I′ = 4·50 + 1·50 = 250 → x = 31.25 → x1 = 12.5.
+    run: `setMode('consumer'); setConsumerType('cobb');
+          STATE.consA = 0.5; STATE.consB = 0.5;
+          STATE.consPx = 1; STATE.consPy = 1; STATE.consI = 100;
+          STATE.consSlutskyOn = true; STATE.consPx1 = 4; redrawAll();
+          var c = STATE.cons, s = c.slutsky || {};
+          return { x0: c.base.x, y0: c.base.y, Icomp: s.Icomp,
+                   xc: (s.comp||{}).x, x1: (s.fin||{}).x,
+                   sub: s.subX, inc: s.incX, tot: s.totX };`,
+    checks: [['x₀', 'x0', 50, 0.05], ['y₀', 'y0', 50, 0.05], ['I′ компенсир.', 'Icomp', 250, 0.3],
+             ['x компенсир.', 'xc', 31.25, 0.05], ['x₁ новый', 'x1', 12.5, 0.05],
+             ['эффект замещения', 'sub', -18.75, 0.06], ['эффект дохода', 'inc', -18.75, 0.06],
+             ['итого', 'tot', -37.5, 0.08]],
+  },
 ];
 
 function approx(got, want, tol) {
