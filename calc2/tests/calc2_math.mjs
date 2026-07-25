@@ -215,6 +215,38 @@ const CASES = [
           return { Pweq: t.Pweq, Pw: t.Pw };`,
     checks: [['Pw равн.', 'Pweq', 1.41421, 0.02]],
   },
+
+  /* ── Фаза 1 (сессия B): универсальный ввод P(Q) / Q(P) ───────────────── */
+  {
+    name: 'Ввод Q(P) · «100 − 2P» ≡ P(Q) «50 − 0.5Q»: одно и то же равновесие с S=Q',
+    // Одна и та же кривая спроса, записанная двумя способами, обязана дать
+    // одинаковые Q*/P*. Канон Q(P)→P(Q): Q=100−2P ⇒ P = 50 − 0.5Q.
+    // setMode('market') обязателен: предыдущий кейс мог оставить режим 'ppf',
+    // и тогда redrawAll() ушёл бы в redrawPpf(), не пересчитав STATE.eq.
+    run: `setMode('market'); STATE.scenario = 'none'; STATE.curves = [];
+          addCurve('50 - 0.5*Q'); setRole(STATE.curves[0], 'demand');
+          addCurve('Q');          setRole(STATE.curves[1], 'supply');
+          redrawAll();
+          var a = { Q: STATE.eq.Q, P: STATE.eq.P };
+          STATE.curves = [];
+          addCurve('100 - 2*P', 'QP'); setRole(STATE.curves[0], 'demand');
+          addCurve('Q');               setRole(STATE.curves[1], 'supply');
+          redrawAll();
+          var lin = STATE.curves[0].linear;
+          return { Qpq: a.Q, Ppq: a.P, Qqp: STATE.eq.Q, Pqp: STATE.eq.P, a: lin.a, b: lin.b };`,
+    checks: [['Q* через P(Q)', 'Qpq', 33.333, 0.05], ['P* через P(Q)', 'Ppq', 33.333, 0.05],
+             ['Q* через Q(P)', 'Qqp', 33.333, 0.05], ['P* через Q(P)', 'Pqp', 33.333, 0.05],
+             ['канон a', 'a', -0.5, 0.005], ['канон b', 'b', 50, 0.05]],
+  },
+  {
+    name: 'Ввод Q(P) · нелинейная 400/(P+1) ⇒ численное обращение бисекцией',
+    // Q = 400/(P+1)  ⇒  P = 400/Q − 1: при Q=100 → 3, при Q=50 → 7.
+    run: `setMode('market'); STATE.curves = [];
+          addCurve('400 / (P + 1)', 'QP');
+          var c = STATE.curves[0];
+          return { p100: evalCurve(c, 100), p50: evalCurve(c, 50), isFn: c.fn ? 1 : 0 };`,
+    checks: [['P(Q=100)', 'p100', 3, 0.01], ['P(Q=50)', 'p50', 7, 0.01], ['численный канон', 'isFn', 1, 0.1]],
+  },
 ];
 
 function approx(got, want, tol) {

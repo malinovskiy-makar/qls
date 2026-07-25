@@ -189,6 +189,49 @@ input:focus-visible, select:focus-visible {
 .hint { font-size: 11px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
 .hint code { background: var(--surface-2); border: 1px solid var(--border-soft);
   padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+
+/* ── Подсказка формата формулы (Фаза 1а) ──────────────────────────────
+   Кнопка «?» рядом с полем ввода; всплывающая карточка с примерами
+   синтаксиса Math.js. Поле НЕ заслоняется — карточка раскрывается под ним.
+   Пример кликабелен: подставляется прямо в поле. */
+.f-wrap { position: relative; }
+.f-row { display: flex; gap: 6px; align-items: stretch; }
+.f-row > input { flex: 1; min-width: 0; }
+.f-help {
+  flex-shrink: 0; width: 30px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text2); font-size: 13px; font-weight: 700; line-height: 1;
+  transition: color .12s var(--ease), border-color .12s var(--ease);
+}
+.f-help:hover, .f-help[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.f-pop {
+  display: none; margin-top: 6px; padding: 9px 10px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+}
+.f-pop.open { display: block; }
+.f-pop-title {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 6px;
+}
+.f-ex {
+  display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left;
+  padding: 4px 5px; margin: 0 -5px; border: none; border-radius: 4px; background: none;
+  transition: background .12s var(--ease);
+}
+.f-ex:hover { background: var(--accent-tint); }
+.f-ex code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border-soft); padding: 1px 4px; border-radius: 3px;
+  white-space: nowrap;
+}
+.f-ex span { font-size: 10.5px; color: var(--text2); }
+.f-pop-foot { font-size: 10.5px; color: var(--text3); margin-top: 6px; line-height: 1.45; }
+
+/* Бейдж формы ввода кривой (Q(P) — введена как объём от цены). */
+.form-badge {
+  flex-shrink: 0; font-size: 9.5px; font-weight: 700; letter-spacing: .02em;
+  color: var(--accent); background: var(--accent-tint);
+  border-radius: 3px; padding: 1px 4px;
+}
 .muted { font-size: 12px; color: var(--text2); }
 .error { font-size: 12px; color: var(--c-bad); margin-top: 8px; display: none; line-height: 1.4; }
 
@@ -808,12 +851,23 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <!-- Кривые (шаг 3) -->
     <div class="section" id="sec-curves">
       <div class="section-title">Кривые</div>
-      <div class="field">
-        <input type="text" id="inp-formula" placeholder="например: 100 - Q" autocomplete="off">
+      <!-- Фаза 1б: форма записи. P(Q) — цена от количества (канон движка);
+           Q(P) — количество от цены (привычная запись спроса). Q(P) приводится
+           к P=f(Q) аналитически (линейная) или численно (обращение бисекцией). -->
+      <div class="seg" style="margin-bottom:8px;">
+        <button class="seg-btn active" id="cf-pq">Вводить P(Q)</button>
+        <button class="seg-btn" id="cf-qp">Вводить Q(P)</button>
+      </div>
+      <div class="field f-wrap">
+        <div class="f-row">
+          <input type="text" id="inp-formula" placeholder="например: 100 - Q" autocomplete="off">
+          <button class="f-help" id="fh-formula" type="button" aria-expanded="false"
+                  aria-controls="fp-formula" title="Как писать формулы">?</button>
+        </div>
+        <div class="f-pop" id="fp-formula" role="region" aria-label="Примеры формул"></div>
       </div>
       <button class="btn" id="btn-add-curve">Добавить кривую</button>
-      <div class="hint">Цена как функция количества: P&nbsp;=&nbsp;f(Q).<br>
-        Примеры: <code>100 - Q</code>, <code>100 - 0.5*Q</code>, <code>Q^2/10</code>, <code>50 - sqrt(Q)*3</code></div>
+      <div class="hint" id="curve-form-hint">Цена как функция количества: P&nbsp;=&nbsp;f(Q).</div>
       <div class="error" id="curve-error"></div>
       <div id="curve-list" style="margin-top:10px;"></div>
     </div>
@@ -1036,9 +1090,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <!-- Издержки фирмы (Задача 2) — отдельный режим -->
     <div class="section" id="sec-costs" style="display:none;">
       <div class="section-title">Издержки фирмы</div>
-      <div class="field">
+      <div class="field f-wrap">
         <label>Суммарные затраты TC(Q)</label>
-        <input type="text" id="inp-tc" value="Q^3 - 6*Q^2 + 15*Q + 18" autocomplete="off">
+        <div class="f-row">
+          <input type="text" id="inp-tc" value="Q^3 - 6*Q^2 + 15*Q + 18" autocomplete="off">
+          <button class="f-help" id="fh-tc" type="button" aria-expanded="false"
+                  aria-controls="fp-tc" title="Как писать формулы">?</button>
+        </div>
+        <div class="f-pop" id="fp-tc" role="region" aria-label="Примеры формул TC"></div>
       </div>
       <div class="field">
         <label>Постоянные издержки FC</label>
@@ -1217,9 +1276,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
       <!-- Под-режим «Одна КПВ» (исходное поведение) -->
       <div id="ppf-pane-single">
-        <div class="field">
+        <div class="field f-wrap">
           <label>Граница Y&nbsp;=&nbsp;f(X)</label>
-          <input type="text" id="inp-ppf" value="100 - X" autocomplete="off">
+          <div class="f-row">
+            <input type="text" id="inp-ppf" value="100 - X" autocomplete="off">
+            <button class="f-help" id="fh-ppf" type="button" aria-expanded="false"
+                    aria-controls="fp-ppf" title="Как писать формулы">?</button>
+          </div>
+          <div class="f-pop" id="fp-ppf" role="region" aria-label="Примеры формул КПВ"></div>
         </div>
         <button class="btn" id="btn-ppf-apply">Построить</button>
         <div style="display:flex;gap:6px;margin-top:6px;">
@@ -1334,6 +1398,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         </div>
       </div>
       <label class="chk"><input type="checkbox" id="chk-grid" checked> Показывать сетку</label>
+      <!-- Фаза 1в: мелкая сетка — 5 дополнительных линий между подписанными
+           делениями (бледнее). Подписи остаются только у крупных линий. -->
+      <label class="chk"><input type="checkbox" id="chk-grid-dense"> Мелкая сетка (подробнее)</label>
     </div>
 
       <!-- «Все настройки»: раскрывает вторичные секции (режим/сцены/оси),
@@ -1414,6 +1481,11 @@ const CONFIG = {
 const STATE = {
   curves: [],        // [{ id, expr, compiled, color, name, role, visible, linear }]
   showGrid: true,
+  gridDense: false,  // мелкая сетка: 5 бледных линий между подписанными делениями (Фаза 1в)
+  // Форма записи следующей добавляемой кривой (Фаза 1б): 'PQ' — P = f(Q) (канон движка),
+  // 'QP' — Q = f(P) (привычная запись спроса). Q(P) приводится к P=f(Q) при добавлении:
+  // линейная — аналитически, любая другая — численным обращением (бисекция по P).
+  curveForm: 'PQ',
   showCS: true,      // показывать заливку излишка потребителя
   showPS: true,      // показывать заливку излишка производителя
   tax: 0,            // ставка вмешательства (0 = нет); тип задаёт intervType
@@ -1644,16 +1716,96 @@ function detectLinear(compiled) {
 }
 
 // Красивая запись прямой по a и b (для подписи в списке при перетаскивании).
-function fmtLinear(a, b) {
+// varName — имя переменной ('Q' по умолчанию; 'P' для записи Q(P), Фаза 1б).
+function fmtLinear(a, b, varName) {
+  const V = varName || 'Q';
   const r = (v) => Math.round(v * 100) / 100; a = r(a); b = r(b);
   if (a === 0) return `${b}`;
   if (a < 0) {
-    const aa = Math.abs(a), aPart = aa === 1 ? 'Q' : `${aa}*Q`;
+    const aa = Math.abs(a), aPart = aa === 1 ? V : `${aa}*${V}`;
     return b === 0 ? `-${aPart}` : `${b} - ${aPart}`;
   }
-  const aPart = a === 1 ? 'Q' : `${a}*Q`;
+  const aPart = a === 1 ? V : `${a}*${V}`;
   if (b === 0) return aPart;
   return b > 0 ? `${aPart} + ${b}` : `${aPart} - ${Math.abs(b)}`;
+}
+
+/* --- Фаза 1б. Ввод Q(P): приведение к каноническому виду P = f(Q) ----------
+   Вся остальная архитектура движка требует P = f(Q). Поэтому кривую, введённую
+   как «объём от цены», приводим к канону ПЕРЕД использованием — двумя путями:
+     • линейная Q = c + d·P (d ≠ 0)  →  явно  P = (Q − c)/d = (1/d)·Q − c/d;
+     • любая другая                  →  численно: для заданного Q ищем P, при
+       котором Q(P) = Q (сканирование сетки + бисекция — тот же метод, что
+       findEquilibrium/findRoot, только по оси цен).
+   Формула хранится КАК ВВЕДЕНА (curve.srcExpr), в математику уходит канон. */
+
+// Компиляция формулы Q = f(P). Переменные: P (основная), p и x — синонимы.
+function compileFormulaP(expr) {
+  try {
+    const compiled = math.parse(expr).compile();
+    compiled.evaluate({ P: 1, p: 1, x: 1 });   // пробный расчёт ловит опечатки сразу
+    return { compiled, error: null };
+  } catch (e) {
+    return { compiled: null, error: e.message };
+  }
+}
+
+// Значение Q(P) в точке P. NaN — на ошибке/разрыве.
+function evalQofP(compiled, p) {
+  try { const v = compiled.evaluate({ P: p, p: p, x: p }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  catch (e) { return NaN; }
+}
+
+// Линейность Q(P) по трём точкам: Q = c + d·P → { c, d } или null.
+// Сетка проб по цене (0.2/0.5/0.8 от Pmax) — зеркало detectLinear по количеству.
+function detectLinearP(compiled) {
+  const at = (p) => evalQofP(compiled, p);
+  const p1 = CONFIG.Pmax * 0.2, p2 = CONFIG.Pmax * 0.5, p3 = CONFIG.Pmax * 0.8;
+  const f1 = at(p1), f2 = at(p2), f3 = at(p3);
+  if (isNaN(f1) || isNaN(f2) || isNaN(f3)) return null;
+  const d12 = (f2 - f1) / (p2 - p1), d23 = (f3 - f2) / (p3 - p2);
+  if (Math.abs(d12 - d23) > 1e-6 * (1 + Math.abs(d12))) return null;   // наклон «гуляет» → нелинейная
+  const d = d12, c = f1 - d * p1;
+  return { c, d };
+}
+
+// Численное обращение Q(P): найти цену P ≥ 0, при которой Q(P) = q.
+// Сканируем сетку цен [0, Pmax·3], на смене знака уточняем бисекцией.
+// Работает и для убывающей (спрос), и для возрастающей (предложение) функции.
+function invertQofP(compiled, q) {
+  const g = (p) => { const v = evalQofP(compiled, p); return isNaN(v) ? NaN : v - q; };
+  const hi = Math.max(1, CONFIG.Pmax * 3);
+  const N = 240;                       // сетка проб: компромисс «точность / скорость перерисовки»
+  let prevP = 0, prevG = g(0);
+  if (prevG === 0) return 0;
+  for (let i = 1; i <= N; i++) {
+    const p = hi * i / N, cur = g(p);
+    if (!isNaN(prevG) && !isNaN(cur) && prevG * cur <= 0 && prevG !== cur) {
+      if (cur === 0) return p;
+      return bisect(g, prevP, p);
+    }
+    prevP = p; prevG = cur;
+  }
+  return NaN;                          // цены, дающей такой объём, в первой четверти нет
+}
+
+// Собрать кривую из формулы Q(P): вернуть поля для STATE.curves или { error }.
+// Возвращает { linear|fn, srcCompiled, srcLinear } — дальше используется как обычная кривая.
+function buildCurveFromQP(expr) {
+  const { compiled, error } = compileFormulaP(expr);
+  if (error) return { error };
+  const lp = detectLinearP(compiled);
+  if (lp) {
+    if (Math.abs(lp.d) < 1e-9) {
+      // Q не зависит от цены: кривая вертикальна (совершенно неэластична),
+      // как P = f(Q) она не записывается — честно говорим об этом.
+      return { error: 'объём не зависит от цены — такая кривая вертикальна и не задаётся как P = f(Q)' };
+    }
+    // Q = c + d·P  ⇒  P = (1/d)·Q − c/d
+    return { srcCompiled: compiled, srcLinear: lp, linear: { a: 1 / lp.d, b: -lp.c / lp.d }, fn: null };
+  }
+  // Нелинейная: канон задаём численным обращением (кэш не нужен — вызовы редкие и дешёвые).
+  return { srcCompiled: compiled, srcLinear: null, linear: null, fn: (q) => invertQofP(compiled, q) };
 }
 
 // Численный поиск равновесия D(Q) = S(Q).
@@ -1799,17 +1951,40 @@ function addDefs() {
 }
 
 // Лёгкая сетка по делениям шкал. Рисуется под осями, поэтому первой.
+// Крупные линии совпадают с подписанными делениями осей (drawAxes берёт те же
+// sx.ticks(10)/sy.ticks(8)) — каждая линия сетки «читается» по числу на оси.
+// Мелкая сетка (Фаза 1в) добавляет 4 бледные линии между крупными, без подписей.
 function drawGrid() {
   if (!STATE.showGrid) return;
   const g = svg.append('g').attr('class', 'grid');
   const x0 = sx(0), xMax = sx(CONFIG.Qmax);
   const y0 = sy(0), yMax = sy(CONFIG.Pmax);
-  sx.ticks(10).forEach(t => {              // вертикальные линии (по оси Q)
+  const tx = sx.ticks(10), ty = sy.ticks(8);
+  // Мелкие линии — сначала (крупные лягут поверх и останутся заметнее).
+  if (STATE.gridDense) {
+    const SUB = 5;                                    // делений между соседними подписями
+    const minor = (ticks, draw) => {
+      if (ticks.length < 2) return;
+      const step = (ticks[1] - ticks[0]) / SUB;
+      if (!(step > 0)) return;
+      for (let v = 0; v <= (ticks === tx ? CONFIG.Qmax : CONFIG.Pmax) + 1e-9; v += step) {
+        // Пропускаем узлы, совпадающие с крупными делениями (там уже будет яркая линия).
+        if (ticks.some(t => Math.abs(t - v) < step * 1e-6)) continue;
+        if (v <= 0) continue;
+        draw(v);
+      }
+    };
+    minor(tx, (v) => g.append('line').attr('x1', sx(v)).attr('y1', y0).attr('x2', sx(v)).attr('y2', yMax)
+      .attr('stroke', COL.grid).attr('stroke-width', 1).attr('opacity', 0.45));
+    minor(ty, (v) => g.append('line').attr('x1', x0).attr('y1', sy(v)).attr('x2', xMax).attr('y2', sy(v))
+      .attr('stroke', COL.grid).attr('stroke-width', 1).attr('opacity', 0.45));
+  }
+  tx.forEach(t => {                        // вертикальные линии (по оси Q)
     if (t <= 0) return;
     g.append('line').attr('x1', sx(t)).attr('y1', y0).attr('x2', sx(t)).attr('y2', yMax)
       .attr('stroke', COL.grid).attr('stroke-width', 1);
   });
-  sy.ticks(8).forEach(t => {               // горизонтальные линии (по оси P)
+  ty.forEach(t => {                        // горизонтальные линии (по оси P)
     if (t <= 0) return;
     g.append('line').attr('x1', x0).attr('y1', sy(t)).attr('x2', xMax).attr('y2', sy(t))
       .attr('stroke', COL.grid).attr('stroke-width', 1);
@@ -1927,7 +2102,15 @@ function drawCurves() {
 function setCurveFreeTerm(curve, b) {
   if (!curve || !curve.linear) return;
   curve.linear.b = b;
-  curve.expr = curve.name = fmtLinear(curve.linear.a, curve.linear.b);
+  if (curve.srcForm === 'QP') {
+    // Кривая введена как Q(P) — показываем её в ТОЙ ЖЕ форме (Фаза 1б).
+    // P = a·Q + b  ⟺  Q = (−b/a) + (1/a)·P; канон curve.linear уже обновлён выше.
+    const a = curve.linear.a;
+    curve.srcLinear = { c: -b / a, d: 1 / a };
+    curve.srcExpr = curve.expr = curve.name = fmtLinear(1 / a, -b / a, 'P');
+  } else {
+    curve.expr = curve.name = fmtLinear(curve.linear.a, curve.linear.b);
+  }
   if (STATE.mode === 'labor') _wantRangeAnim = true;   // труд авто-масштабируется → плавно (Фаза 4)
   redrawAll();        // перерисуем кривую и всё зависимое (равновесие/области)
   renderCurveList();  // обновим формулу в списке кривых (и слайдеры пульта — в конце renderCurveList)
@@ -6241,10 +6424,28 @@ function hideError() {
 
 let curveCounter = 0;   // сквозной счётчик id кривых
 
-// Добавить кривую по формуле из поля ввода.
-function addCurve(expr) {
+// Добавить кривую по формуле. form: 'PQ' — P = f(Q) (по умолчанию, канон движка),
+// 'QP' — Q = f(P) (Фаза 1б; приводится к канону в buildCurveFromQP).
+// ВАЖНО: значение по умолчанию — 'PQ', поэтому все внутренние вызовы (пресеты сцен,
+// ensureMonopolyCurves и т.п.) работают ровно как раньше; форму передаёт только UI.
+function addCurve(expr, form) {
   expr = (expr || '').trim();
   if (!expr) { showError('Введите формулу, например 100 - Q'); return; }
+  if (form === 'QP') {
+    const built = buildCurveFromQP(expr);
+    if (built.error) { showError('Не понял формулу Q(P): ' + built.error); return; }
+    hideError();
+    curveCounter++;
+    STATE.curves.push({
+      id: curveCounter, expr, compiled: null,
+      color: nextColor(), name: expr, role: null, visible: true,
+      linear: built.linear, fn: built.fn,
+      srcForm: 'QP', srcExpr: expr, srcCompiled: built.srcCompiled, srcLinear: built.srcLinear,
+    });
+    renderCurveList();
+    redrawAll();
+    return;
+  }
   const { compiled, error } = compileFormula(expr);
   if (error) { showError('Не понял формулу: ' + error); return; }
   hideError();
@@ -6253,6 +6454,7 @@ function addCurve(expr) {
     id: curveCounter, expr, compiled,
     color: nextColor(), name: expr, role: null, visible: true,
     linear: detectLinear(compiled),   // {a, b} для прямых, иначе null
+    srcForm: 'PQ',
   });
   renderCurveList();
   redrawAll();
@@ -6301,6 +6503,16 @@ function renderCurveList() {
     nm.className = 'curve-name'; nm.textContent = curve.name;
     if (!curve.visible) nm.style.opacity = '.4';
 
+    // Бейдж формы записи (Фаза 1б): видно, что кривая введена как «объём от цены».
+    let badge = null;
+    if (curve.srcForm === 'QP') {
+      badge = document.createElement('span');
+      badge.className = 'form-badge'; badge.textContent = 'Q(P)';
+      const can = curve.linear ? ('P = ' + fmtLinear(curve.linear.a, curve.linear.b))
+                              : 'P = f(Q) считается численно';
+      badge.title = 'Введено как Q(P); в расчётах — ' + can;
+    }
+
     const del = document.createElement('button');
     del.className = 'btn-icon'; del.textContent = '✕'; del.title = 'Удалить кривую';
     del.addEventListener('click', () => {
@@ -6308,7 +6520,7 @@ function renderCurveList() {
       renderCurveList();
       redrawAll();
     });
-    top.append(cb, sw, nm, del);
+    if (badge) top.append(cb, sw, nm, badge, del); else top.append(cb, sw, nm, del);
 
     // Нижняя строка: роль кривой (обычная / спрос / предложение).
     const sel = document.createElement('select');
@@ -6326,6 +6538,98 @@ function renderCurveList() {
     list.appendChild(row);
   });
   if (typeof updatePult === 'function') updatePult();   // пересобрать слайдеры кривых в пульте
+}
+
+/* ---------------------------------------------------------------------
+   ФАЗА 1а. ПОДСКАЗКА ФОРМАТА ФОРМУЛЫ — переиспользуемый компонент.
+   Кнопка «?» рядом с полем раскрывает карточку с 4 примерами синтаксиса
+   Math.js. Пример кликабелен — подставляется прямо в поле. Один и тот же
+   компонент вешается на любое поле формулы (kind задаёт набор примеров).
+   --------------------------------------------------------------------- */
+const FORMULA_EXAMPLES = {
+  // Рыночная кривая P = f(Q) — канон движка.
+  PQ: { title: 'Цена от количества: P = f(Q)', items: [
+    ['100 - 2*Q',                    'линейная'],
+    ['sqrt(100 - Q^2)',              'с корнем — дуга'],
+    ['120 / (Q + 1)',                'дробная — гипербола'],
+    ['Q < 40 ? 100 - Q : 80 - 0.5*Q', 'кусочная: условие ? … : …'],
+  ] },
+  // Ввод «объём от цены» (Фаза 1б) — приводится к канону автоматически.
+  QP: { title: 'Количество от цены: Q = f(P)', items: [
+    ['100 - 2*P',        'линейная'],
+    ['sqrt(400 - P^2)',  'с корнем — дуга'],
+    ['500 / (P + 1)',    'дробная — гипербола'],
+    ['P < 30 ? 90 - P : 120 - 2*P', 'кусочная: условие ? … : …'],
+  ] },
+  // Суммарные затраты TC(Q) в режиме издержек.
+  TC: { title: 'Суммарные затраты TC(Q)', items: [
+    ['Q^3 - 6*Q^2 + 15*Q + 18', 'кубическая — U-образные средние'],
+    ['2*Q^2 + 10*Q + 50',       'квадратичная'],
+    ['30 + 8*Q',                'линейная — постоянные MC'],
+    ['20 + 4*Q*sqrt(Q)',        'с корнем'],
+  ] },
+  // Граница производственных возможностей Y = f(X).
+  PPF: { title: 'Граница возможностей Y = f(X)', items: [
+    ['100 - X',          'линейная — пост. альт. издержки'],
+    ['sqrt(10000 - X^2)', 'дуга — растущие альт. издержки'],
+    ['100 - 0.01*X^2',   'парабола — растущие альт. издержки'],
+    ['100 - 10*sqrt(X)', 'выпуклая — убывающие альт. издержки'],
+  ] },
+};
+const FORMULA_FOOT = 'Умножение — звёздочкой (2*Q), степень — ^. Доступны sqrt, abs, exp, log, min, max.';
+
+// Повесить подсказку на поле. kind — ключ FORMULA_EXAMPLES либо функция, его возвращающая.
+function attachFormulaHelp(btnId, popId, inputId, kind) {
+  const btn = document.getElementById(btnId), pop = document.getElementById(popId);
+  if (!btn || !pop) return;
+  const render = () => {
+    const k = (typeof kind === 'function') ? kind() : kind;
+    const set = FORMULA_EXAMPLES[k] || FORMULA_EXAMPLES.PQ;
+    pop.innerHTML = '';
+    const t = document.createElement('div'); t.className = 'f-pop-title'; t.textContent = set.title;
+    pop.appendChild(t);
+    set.items.forEach(([ex, note]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'f-ex'; b.title = 'Подставить в поле';
+      const c = document.createElement('code'); c.textContent = ex;
+      const s = document.createElement('span'); s.textContent = note;
+      b.append(c, s);
+      b.addEventListener('click', () => {
+        const inp = document.getElementById(inputId);
+        if (inp) { inp.value = ex; inp.focus(); }
+      });
+      pop.appendChild(b);
+    });
+    const f = document.createElement('div'); f.className = 'f-pop-foot'; f.textContent = FORMULA_FOOT;
+    pop.appendChild(f);
+  };
+  pop._render = render;
+  btn.addEventListener('click', () => {
+    const open = pop.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) render();
+  });
+}
+
+/* ---------------------------------------------------------------------
+   ФАЗА 1б. Переключатель формы записи кривой: P(Q) ↔ Q(P).
+   Меняет только то, КАК пользователь пишет формулу; в математику всегда
+   уходит канон P = f(Q) (см. buildCurveFromQP). Форма запоминается у каждой
+   кривой отдельно — можно смешивать в одной сцене.
+   --------------------------------------------------------------------- */
+function setCurveForm(form) {
+  STATE.curveForm = (form === 'QP') ? 'QP' : 'PQ';
+  const a = document.getElementById('cf-pq'), b = document.getElementById('cf-qp');
+  if (a) a.classList.toggle('active', STATE.curveForm === 'PQ');
+  if (b) b.classList.toggle('active', STATE.curveForm === 'QP');
+  const inp = document.getElementById('inp-formula');
+  if (inp) inp.placeholder = (STATE.curveForm === 'QP') ? 'например: 100 - 2*P' : 'например: 100 - Q';
+  const h = document.getElementById('curve-form-hint');
+  if (h) h.innerHTML = (STATE.curveForm === 'QP')
+    ? 'Количество как функция цены: Q&nbsp;=&nbsp;f(P). Приведём к P&nbsp;=&nbsp;f(Q) сами: линейную — явно, любую другую — численно.'
+    : 'Цена как функция количества: P&nbsp;=&nbsp;f(Q).';
+  const pop = document.getElementById('fp-formula');
+  if (pop && pop.classList.contains('open') && typeof pop._render === 'function') pop._render();
 }
 
 /* ---------------------------------------------------------------------
@@ -7084,6 +7388,19 @@ function wireControls() {
     }
   });
   grid.addEventListener('change', () => { STATE.showGrid = grid.checked; dockActive('dock-grid', STATE.showGrid); redrawAll(); });
+  // Фаза 1в: мелкая сетка (бледные линии между подписанными делениями).
+  const gridDense = document.getElementById('chk-grid-dense');
+  if (gridDense) gridDense.addEventListener('change', () => { STATE.gridDense = gridDense.checked; redrawAll(); });
+
+  // Фаза 1б: форма записи кривой P(Q) / Q(P).
+  const cfPQ = document.getElementById('cf-pq'), cfQP = document.getElementById('cf-qp');
+  if (cfPQ) cfPQ.addEventListener('click', () => setCurveForm('PQ'));
+  if (cfQP) cfQP.addEventListener('click', () => setCurveForm('QP'));
+
+  // Фаза 1а: подсказки формата формулы у полей ввода.
+  attachFormulaHelp('fh-formula', 'fp-formula', 'inp-formula', () => STATE.curveForm);
+  attachFormulaHelp('fh-tc', 'fp-tc', 'inp-tc', 'TC');
+  attachFormulaHelp('fh-ppf', 'fp-ppf', 'inp-ppf', 'PPF');
 
   // Галочки показа областей CS и PS.
   const cs = document.getElementById('chk-cs');
@@ -7423,7 +7740,8 @@ function wireControls() {
   });
 
   // Добавление кривой: по кнопке и по Enter в поле формулы.
-  const submit = () => { addCurve(formula.value); formula.value = ''; formula.focus(); };
+  // Форма записи (P(Q) / Q(P)) берётся из переключателя — Фаза 1б.
+  const submit = () => { addCurve(formula.value, STATE.curveForm); formula.value = ''; formula.focus(); };
   addBtn.addEventListener('click', submit);
   formula.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
 }
