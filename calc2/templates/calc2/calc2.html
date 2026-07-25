@@ -162,6 +162,11 @@ input, select { font: inherit; }
   font-size: 11px; font-weight: 600; text-transform: uppercase;
   letter-spacing: .04em; color: var(--text2); margin-bottom: 8px;
 }
+/* Вложенная секция (Фаза 8): «Структура рынка» и «Вмешательство» живут внутри
+   «Что изучаем», поэтому у них нет собственных отступов верхнего уровня —
+   их роль обозначает подзаголовок .vsub. */
+.section .section { margin-bottom: 0; }
+.section .section:last-child { margin-bottom: 0; }
 
 /* Элементы управления в панели */
 .field { margin-bottom: 8px; }
@@ -1113,9 +1118,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
          «Обычный» — равновесие + интервенции + монополия (как раньше). Остальные
          сценарии прячут панели интервенций и структуры рынка. -->
     <div class="section" id="sec-analysis">
-      <div class="section-title">Анализ рынка</div>
+      <div class="section-title">Что изучаем</div>
       <div class="seg">
-        <button class="seg-btn active" id="scn-none">Обычный</button>
+        <button class="seg-btn active" id="scn-none">Равновесие</button>
         <button class="seg-btn" id="scn-elast">Эластичность</button>
         <button class="seg-btn" id="scn-shift">Сдвиги</button>
       </div>
@@ -1225,185 +1230,191 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           Qd(P)&nbsp;−&nbsp;Qs(P)&nbsp;=&nbsp;квота.</div>
         <div id="info-open" style="margin-top:6px;"></div>
       </div>
-    </div>
 
-    <!-- Вмешательство государства: налог / субсидия (шаги 7–8) -->
-    <div class="section" id="sec-tax">
-      <div class="section-title">Вмешательство государства</div>
-      <div class="seg">
-        <button class="seg-btn active" id="seg-tax">Налог</button>
-        <button class="seg-btn" id="seg-sub">Субсидия</button>
-        <button class="seg-btn" id="seg-ceil">Потолок</button>
-        <button class="seg-btn" id="seg-floor">Пол</button>
-      </div>
-      <!-- Кто формально платит налог (Задача 1). Виден только для типа «Налог». -->
-      <div id="taxside-row" style="margin-top:8px;">
-        <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Налог платит:</label>
+      <!-- Ветка «Равновесие» (Фаза 8). Структура рынка и вмешательство раньше
+           стояли отдельными секциями того же уровня, что и «Анализ рынка», хотя
+           это не «что изучаем», а «что делаем с рынком». Видимостью по-прежнему
+           управляет applyScenarioVisibility по тем же id: поменялось только место
+           в разметке, логика не тронута. -->
+      <!-- Структура рынка: конкуренция / монополия (Задача 3) -->
+      <div class="section" id="sec-mono">
+        <div class="vsub">Структура рынка</div>
         <div class="seg">
-          <button class="seg-btn active" id="tsb-seller">Продавец</button>
-          <button class="seg-btn" id="tsb-buyer">Покупатель</button>
+          <button class="seg-btn active" id="seg-comp">Конкуренция</button>
+          <button class="seg-btn" id="seg-mono">Монополия</button>
         </div>
-      </div>
-      <!-- Вид ставки (Фаза 2в): потоварная (руб./ед.) — параллельный сдвиг S;
-           адвалорная (%) — ПОВОРОТ: S_после(Q) = (1+τ)·S(Q). Только в конкуренции. -->
-      <div id="taxkind-row" style="margin-top:8px;">
-        <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Вид ставки:</label>
-        <div class="seg">
-          <button class="seg-btn active" id="tk-unit">Специфический</button>
-          <button class="seg-btn" id="tk-adv">Адвалорный</button>
+        <div class="hint" id="mono-hint" style="display:none;">Монополист выпускает там, где <b>MR&nbsp;=&nbsp;MC</b>,
+          и берёт цену с кривой спроса (выше предельных издержек). Нужны: спрос (роль D) и предельные издержки
+          (роль MC, либо TC, либо S как MC). Серым — потери общества (DWL) против конкуренции.</div>
+        <!-- Под-режимы монополии: обычная / дискриминация 1° / дискриминация 3° /
+             составной спрос / естественная монополия. Виден только в режиме монополии;
+             при выборе сцены «Монополия» переносится в пульт-ленту (Фаза 3а). -->
+        <div id="mono-submode" style="display:none;margin-top:8px;">
+          <div class="seg">
+            <button class="seg-btn active" id="mm-simple" title="Обычная монополия: MR = MC, одна цена">Обычная</button>
+            <button class="seg-btn" id="mm-d1" title="Ценовая дискриминация 1-й степени (совершенная)">Дискр.&nbsp;1°</button>
+            <button class="seg-btn" id="mm-d3" title="Ценовая дискриминация 3-й степени: два сегмента рынка">Дискр.&nbsp;3°</button>
+          </div>
+          <div class="seg" style="margin-top:6px;">
+            <button class="seg-btn" id="mm-kink" title="Составной спрос: рыночный спрос склеен из сегментов покупателей">Составной&nbsp;спрос</button>
+            <button class="seg-btn" id="mm-nat" title="Естественная монополия: большие постоянные издержки, убывающая ATC">Естественная</button>
+          </div>
         </div>
-      </div>
-      <!-- Поле ставки (налог / субсидия) -->
-      <div class="field" id="tax-field" style="margin-top:8px;">
-        <label>Ставка <span id="rate-letter">t</span> = <b id="tax-val">0</b></label>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
-          <input type="range" id="tax-slider" min="0" max="100" step="1" value="0"
-                 style="flex:1;margin-top:0;">
-          <input type="number" id="tax-input" min="0" max="100" step="0.1" value="0"
-                 style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+        <!-- Панель дискриминации 1-й степени (Задача 4): использует D и MC из списка кривых. -->
+        <div id="mono-d1-pane" style="display:none;margin-top:8px;">
+          <div class="hint">Совершенная (1-й степени) дискриминация: монополист продаёт каждую единицу
+            по её цене спроса до точки, где спрос&nbsp;=&nbsp;MC. Весь излишек достаётся фирме:
+            <b>CS&nbsp;=&nbsp;0</b>, <b>DWL&nbsp;=&nbsp;0</b>, выпуск&nbsp;=&nbsp;конкурентному.
+            Нужны: спрос (роль D) и предельные издержки (роль MC / S / TC) в списке кривых.</div>
         </div>
-      </div>
-      <!-- Поле регулируемой цены (потолок / пол) -->
-      <div class="field" id="pc-field" style="margin-top:8px;display:none;">
-        <label>Цена <span id="pc-letter">Pc</span> = <b id="pc-val">0</b></label>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
-          <input type="range" id="pc-slider" min="0" max="100" step="1" value="0"
-                 style="flex:1;margin-top:0;">
-          <input type="number" id="pc-input" min="0" max="100" step="0.1" value="0"
-                 style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+        <!-- Панель дискриминации 3-й степени (Задача 5): два рынка + общий MC. -->
+        <div id="mono-d3-pane" style="display:none;margin-top:8px;">
+          <div class="field"><label>Спрос рынка&nbsp;1: P&nbsp;=&nbsp;f₁(Q)</label>
+            <input type="text" id="inp-d3-1" value="100 - Q" autocomplete="off"></div>
+          <div class="field"><label>Спрос рынка&nbsp;2: P&nbsp;=&nbsp;f₂(Q)</label>
+            <input type="text" id="inp-d3-2" value="80 - 2*Q" autocomplete="off"></div>
+          <div class="field"><label>Общие предельные издержки MC (число или f(Q))</label>
+            <input type="text" id="inp-d3-mc" value="20" autocomplete="off"></div>
+          <button class="btn" id="btn-d3-apply">Построить</button>
+          <div class="hint">Фирма распределяет выпуск так, что MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.
+            На менее эластичном рынке цена выше. Два мини-графика рынков — бок о бок.</div>
+          <div class="error" id="d3-error" style="display:none;"></div>
+          <div id="info-d3" style="margin-top:8px;"></div>
         </div>
+        <!-- Панель составного спроса (Задача 6): два способа ввода. -->
+        <div id="mono-kink-pane" style="display:none;margin-top:8px;">
+          <div class="hint" style="margin-top:0;margin-bottom:6px;">Это <b>составной</b> (кусочный) спрос:
+            рыночная кривая склеена из спросов разных групп покупателей, поэтому у неё есть излом,
+            а MR разрывается. Это <b>не</b> модель ломаного спроса Суизи (жёсткость цены в олигополии
+            из-за асимметричной реакции конкурентов) — та модель другая.</div>
+          <div class="seg">
+            <button class="seg-btn active" id="ki-indiv">Инд. спросы</button>
+            <button class="seg-btn" id="ki-piece">Кусочный</button>
+          </div>
+          <!-- Способ 1: индивидуальные спросы → горизонтальное сложение. -->
+          <div id="kink-indiv" style="margin-top:8px;">
+            <div class="field"><label>Спрос&nbsp;1: P&nbsp;=&nbsp;f₁(Q)</label>
+              <input type="text" id="inp-ki-1" value="100 - Q" autocomplete="off"></div>
+            <div class="field"><label>Спрос&nbsp;2: P&nbsp;=&nbsp;f₂(Q)</label>
+              <input type="text" id="inp-ki-2" value="60 - Q" autocomplete="off"></div>
+            <div class="field"><label>Спрос&nbsp;3 (необязательно)</label>
+              <input type="text" id="inp-ki-3" value="" autocomplete="off"></div>
+            <div class="hint">Рыночный спрос&nbsp;=&nbsp;горизонтальная сумма (при каждой цене складываем
+              объёмы). Изломы — там, где очередной потребитель выходит на рынок.</div>
+          </div>
+          <!-- Способ 2: рыночный спрос двумя кусками (стыкуются в точке пересечения). -->
+          <div id="kink-piece" style="display:none;margin-top:8px;">
+            <div class="field"><label>Верхний кусок (малые Q): P&nbsp;=&nbsp;f₁(Q)</label>
+              <input type="text" id="inp-kp-1" value="100 - Q" autocomplete="off"></div>
+            <div class="field"><label>Нижний кусок (большие Q): P&nbsp;=&nbsp;f₂(Q)</label>
+              <input type="text" id="inp-kp-2" value="120 - 1.5*Q" autocomplete="off"></div>
+            <div class="hint">Излом&nbsp;Q — точка стыка кусков (их пересечение). До излома&nbsp;— f₁,
+              после&nbsp;— f₂.</div>
+          </div>
+          <div class="field" style="margin-top:8px;"><label>Предельные издержки MC (число или f(Q))</label>
+            <input type="text" id="inp-kink-mc" value="20" autocomplete="off"></div>
+          <button class="btn" id="btn-kink-apply">Построить</button>
+          <div class="hint">MR на каждом куске — своя прямая (вдвое круче спроса), в изломах MR
+            разрывается вниз. Оптимум выбирается по <b>максимуму прибыли</b> среди кандидатов
+            (пересечения MR&nbsp;=&nbsp;MC и сами изломы), а не по первому пересечению.</div>
+          <div class="error" id="kink-error" style="display:none;"></div>
+          <div id="info-kink" style="margin-top:8px;"></div>
+        </div>
+        <!-- Естественная монополия и регулирование (Фаза 3в). Та же база, что у обычной
+             монополии (спрос D + предельные издержки MC), плюс постоянные издержки FC.
+             ATC(Q) = (FC + ∫₀^Q MC dq)/Q — считается численно, годится для любой MC. -->
+        <div id="mono-nat-pane" style="display:none;margin-top:8px;">
+          <div class="field">
+            <label>Постоянные издержки FC</label>
+            <input type="number" id="inp-nat-fc" step="1" value="800">
+          </div>
+          <label class="chk"><input type="checkbox" id="chk-nat-profit" checked>
+            <span class="swatch" style="background:var(--curve-tax)"></span> Прибыль монополии</label>
+          <label class="chk"><input type="checkbox" id="chk-nat-loss" checked>
+            <span class="swatch" style="background:var(--c-bad)"></span> Убыток при P&nbsp;=&nbsp;MC</label>
+          <div class="hint">Три ориентира на одном графике: <b>M</b> — нерегулируемая монополия (MR&nbsp;=&nbsp;MC);
+            <b>MC</b> — регулирование по предельным издержкам (P&nbsp;=&nbsp;MC, эффективно, но цена ниже средних
+            затрат → убыток, нужна субсидия); <b>AC</b> — регулирование по средним издержкам
+            (P&nbsp;=&nbsp;ATC, нулевая прибыль, «второе лучшее»). Уравнение D&nbsp;=&nbsp;ATC может иметь два корня —
+            берём больший, между Qm и Qc.</div>
+          <div id="info-nat" style="margin-top:8px;"></div>
+        </div>
+        <!-- Галочки областей монополии (Задача 1). Видны только в режиме монополии. -->
+        <div id="mono-areas-chk" style="display:none;margin-top:8px;">
+          <label class="chk"><input type="checkbox" id="chk-mono-cs" checked>
+            <span class="swatch" style="background:var(--curve-d)"></span> Показывать CS</label>
+          <label class="chk"><input type="checkbox" id="chk-mono-vc" checked>
+            <span class="swatch" style="background:var(--curve-dwl)"></span> Показывать VC</label>
+          <label class="chk"><input type="checkbox" id="chk-mono-ps" checked>
+            <span class="swatch" style="background:var(--curve-s)"></span> Показывать PS (TR&nbsp;−&nbsp;VC)</label>
+        </div>
+        <!-- Вмешательство государства в монополии (Фаза 2) задаётся ОБЩИМ блоком
+             «Вмешательство государства» вверху панели — здесь только подсказка. -->
+        <div id="mono-interv-hint" class="hint" style="display:none;margin-top:10px;">
+          Вмешательство государства (налог, субсидия, потолок, пол) задаётся ниже,
+          в блоке «Вмешательство государства»; оно работает и в монополии. Налог/субсидия
+          сдвигают MC (оптимум MR&nbsp;=&nbsp;MC&nbsp;±&nbsp;ставка); грамотный потолок может увеличить выпуск;
+          пол связывает, только если он выше монопольной цены. Линию цены можно тянуть мышью.
+        </div>
+        <div id="info-mono" style="margin-top:8px;"></div>
       </div>
-      <div class="hint" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
-        (налог — вверх, субсидия — вниз) на величину ставки. Клин между ценами покупателя
-        и продавца можно тянуть мышью.</div>
-      <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
-        дефицит (продаётся меньше), пол выше равновесия — избыток. Линию цены можно тянуть мышью.</div>
-      <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-ghost" checked>
-        <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
-      <div id="info-tax" style="margin-top:8px;"></div>
-    </div>
 
-    <!-- Структура рынка: конкуренция / монополия (Задача 3) -->
-    <div class="section" id="sec-mono">
-      <div class="section-title">Рынок</div>
-      <div class="seg">
-        <button class="seg-btn active" id="seg-comp">Конкуренция</button>
-        <button class="seg-btn" id="seg-mono">Монополия</button>
-      </div>
-      <div class="hint" id="mono-hint" style="display:none;">Монополист выпускает там, где <b>MR&nbsp;=&nbsp;MC</b>,
-        и берёт цену с кривой спроса (выше предельных издержек). Нужны: спрос (роль D) и предельные издержки
-        (роль MC, либо TC, либо S как MC). Серым — потери общества (DWL) против конкуренции.</div>
-      <!-- Под-режимы монополии: обычная / дискриминация 1° / дискриминация 3° /
-           составной спрос / естественная монополия. Виден только в режиме монополии;
-           при выборе сцены «Монополия» переносится в пульт-ленту (Фаза 3а). -->
-      <div id="mono-submode" style="display:none;margin-top:8px;">
+      <!-- Вмешательство государства: налог / субсидия (шаги 7–8) -->
+      <div class="section" id="sec-tax">
+        <div class="vsub">Вмешательство государства</div>
         <div class="seg">
-          <button class="seg-btn active" id="mm-simple" title="Обычная монополия: MR = MC, одна цена">Обычная</button>
-          <button class="seg-btn" id="mm-d1" title="Ценовая дискриминация 1-й степени (совершенная)">Дискр.&nbsp;1°</button>
-          <button class="seg-btn" id="mm-d3" title="Ценовая дискриминация 3-й степени: два сегмента рынка">Дискр.&nbsp;3°</button>
+          <button class="seg-btn active" id="seg-tax">Налог</button>
+          <button class="seg-btn" id="seg-sub">Субсидия</button>
+          <button class="seg-btn" id="seg-ceil">Потолок</button>
+          <button class="seg-btn" id="seg-floor">Пол</button>
         </div>
-        <div class="seg" style="margin-top:6px;">
-          <button class="seg-btn" id="mm-kink" title="Составной спрос: рыночный спрос склеен из сегментов покупателей">Составной&nbsp;спрос</button>
-          <button class="seg-btn" id="mm-nat" title="Естественная монополия: большие постоянные издержки, убывающая ATC">Естественная</button>
+        <!-- Кто формально платит налог (Задача 1). Виден только для типа «Налог». -->
+        <div id="taxside-row" style="margin-top:8px;">
+          <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Налог платит:</label>
+          <div class="seg">
+            <button class="seg-btn active" id="tsb-seller">Продавец</button>
+            <button class="seg-btn" id="tsb-buyer">Покупатель</button>
+          </div>
         </div>
-      </div>
-      <!-- Панель дискриминации 1-й степени (Задача 4): использует D и MC из списка кривых. -->
-      <div id="mono-d1-pane" style="display:none;margin-top:8px;">
-        <div class="hint">Совершенная (1-й степени) дискриминация: монополист продаёт каждую единицу
-          по её цене спроса до точки, где спрос&nbsp;=&nbsp;MC. Весь излишек достаётся фирме:
-          <b>CS&nbsp;=&nbsp;0</b>, <b>DWL&nbsp;=&nbsp;0</b>, выпуск&nbsp;=&nbsp;конкурентному.
-          Нужны: спрос (роль D) и предельные издержки (роль MC / S / TC) в списке кривых.</div>
-      </div>
-      <!-- Панель дискриминации 3-й степени (Задача 5): два рынка + общий MC. -->
-      <div id="mono-d3-pane" style="display:none;margin-top:8px;">
-        <div class="field"><label>Спрос рынка&nbsp;1: P&nbsp;=&nbsp;f₁(Q)</label>
-          <input type="text" id="inp-d3-1" value="100 - Q" autocomplete="off"></div>
-        <div class="field"><label>Спрос рынка&nbsp;2: P&nbsp;=&nbsp;f₂(Q)</label>
-          <input type="text" id="inp-d3-2" value="80 - 2*Q" autocomplete="off"></div>
-        <div class="field"><label>Общие предельные издержки MC (число или f(Q))</label>
-          <input type="text" id="inp-d3-mc" value="20" autocomplete="off"></div>
-        <button class="btn" id="btn-d3-apply">Построить</button>
-        <div class="hint">Фирма распределяет выпуск так, что MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.
-          На менее эластичном рынке цена выше. Два мини-графика рынков — бок о бок.</div>
-        <div class="error" id="d3-error" style="display:none;"></div>
-        <div id="info-d3" style="margin-top:8px;"></div>
-      </div>
-      <!-- Панель составного спроса (Задача 6): два способа ввода. -->
-      <div id="mono-kink-pane" style="display:none;margin-top:8px;">
-        <div class="hint" style="margin-top:0;margin-bottom:6px;">Это <b>составной</b> (кусочный) спрос:
-          рыночная кривая склеена из спросов разных групп покупателей, поэтому у неё есть излом,
-          а MR разрывается. Это <b>не</b> модель ломаного спроса Суизи (жёсткость цены в олигополии
-          из-за асимметричной реакции конкурентов) — та модель другая.</div>
-        <div class="seg">
-          <button class="seg-btn active" id="ki-indiv">Инд. спросы</button>
-          <button class="seg-btn" id="ki-piece">Кусочный</button>
+        <!-- Вид ставки (Фаза 2в): потоварная (руб./ед.) — параллельный сдвиг S;
+             адвалорная (%) — ПОВОРОТ: S_после(Q) = (1+τ)·S(Q). Только в конкуренции. -->
+        <div id="taxkind-row" style="margin-top:8px;">
+          <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Вид ставки:</label>
+          <div class="seg">
+            <button class="seg-btn active" id="tk-unit">Специфический</button>
+            <button class="seg-btn" id="tk-adv">Адвалорный</button>
+          </div>
         </div>
-        <!-- Способ 1: индивидуальные спросы → горизонтальное сложение. -->
-        <div id="kink-indiv" style="margin-top:8px;">
-          <div class="field"><label>Спрос&nbsp;1: P&nbsp;=&nbsp;f₁(Q)</label>
-            <input type="text" id="inp-ki-1" value="100 - Q" autocomplete="off"></div>
-          <div class="field"><label>Спрос&nbsp;2: P&nbsp;=&nbsp;f₂(Q)</label>
-            <input type="text" id="inp-ki-2" value="60 - Q" autocomplete="off"></div>
-          <div class="field"><label>Спрос&nbsp;3 (необязательно)</label>
-            <input type="text" id="inp-ki-3" value="" autocomplete="off"></div>
-          <div class="hint">Рыночный спрос&nbsp;=&nbsp;горизонтальная сумма (при каждой цене складываем
-            объёмы). Изломы — там, где очередной потребитель выходит на рынок.</div>
+        <!-- Поле ставки (налог / субсидия) -->
+        <div class="field" id="tax-field" style="margin-top:8px;">
+          <label>Ставка <span id="rate-letter">t</span> = <b id="tax-val">0</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="tax-slider" min="0" max="100" step="1" value="0"
+                   style="flex:1;margin-top:0;">
+            <input type="number" id="tax-input" min="0" max="100" step="0.1" value="0"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
         </div>
-        <!-- Способ 2: рыночный спрос двумя кусками (стыкуются в точке пересечения). -->
-        <div id="kink-piece" style="display:none;margin-top:8px;">
-          <div class="field"><label>Верхний кусок (малые Q): P&nbsp;=&nbsp;f₁(Q)</label>
-            <input type="text" id="inp-kp-1" value="100 - Q" autocomplete="off"></div>
-          <div class="field"><label>Нижний кусок (большие Q): P&nbsp;=&nbsp;f₂(Q)</label>
-            <input type="text" id="inp-kp-2" value="120 - 1.5*Q" autocomplete="off"></div>
-          <div class="hint">Излом&nbsp;Q — точка стыка кусков (их пересечение). До излома&nbsp;— f₁,
-            после&nbsp;— f₂.</div>
+        <!-- Поле регулируемой цены (потолок / пол) -->
+        <div class="field" id="pc-field" style="margin-top:8px;display:none;">
+          <label>Цена <span id="pc-letter">Pc</span> = <b id="pc-val">0</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="pc-slider" min="0" max="100" step="1" value="0"
+                   style="flex:1;margin-top:0;">
+            <input type="number" id="pc-input" min="0" max="100" step="0.1" value="0"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
         </div>
-        <div class="field" style="margin-top:8px;"><label>Предельные издержки MC (число или f(Q))</label>
-          <input type="text" id="inp-kink-mc" value="20" autocomplete="off"></div>
-        <button class="btn" id="btn-kink-apply">Построить</button>
-        <div class="hint">MR на каждом куске — своя прямая (вдвое круче спроса), в изломах MR
-          разрывается вниз. Оптимум выбирается по <b>максимуму прибыли</b> среди кандидатов
-          (пересечения MR&nbsp;=&nbsp;MC и сами изломы), а не по первому пересечению.</div>
-        <div class="error" id="kink-error" style="display:none;"></div>
-        <div id="info-kink" style="margin-top:8px;"></div>
+        <div class="hint" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
+          (налог — вверх, субсидия — вниз) на величину ставки. Клин между ценами покупателя
+          и продавца можно тянуть мышью.</div>
+        <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
+          дефицит (продаётся меньше), пол выше равновесия — избыток. Линию цены можно тянуть мышью.</div>
+        <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-ghost" checked>
+          <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
+        <div id="info-tax" style="margin-top:8px;"></div>
       </div>
-      <!-- Естественная монополия и регулирование (Фаза 3в). Та же база, что у обычной
-           монополии (спрос D + предельные издержки MC), плюс постоянные издержки FC.
-           ATC(Q) = (FC + ∫₀^Q MC dq)/Q — считается численно, годится для любой MC. -->
-      <div id="mono-nat-pane" style="display:none;margin-top:8px;">
-        <div class="field">
-          <label>Постоянные издержки FC</label>
-          <input type="number" id="inp-nat-fc" step="1" value="800">
-        </div>
-        <label class="chk"><input type="checkbox" id="chk-nat-profit" checked>
-          <span class="swatch" style="background:var(--curve-tax)"></span> Прибыль монополии</label>
-        <label class="chk"><input type="checkbox" id="chk-nat-loss" checked>
-          <span class="swatch" style="background:var(--c-bad)"></span> Убыток при P&nbsp;=&nbsp;MC</label>
-        <div class="hint">Три ориентира на одном графике: <b>M</b> — нерегулируемая монополия (MR&nbsp;=&nbsp;MC);
-          <b>MC</b> — регулирование по предельным издержкам (P&nbsp;=&nbsp;MC, эффективно, но цена ниже средних
-          затрат → убыток, нужна субсидия); <b>AC</b> — регулирование по средним издержкам
-          (P&nbsp;=&nbsp;ATC, нулевая прибыль, «второе лучшее»). Уравнение D&nbsp;=&nbsp;ATC может иметь два корня —
-          берём больший, между Qm и Qc.</div>
-        <div id="info-nat" style="margin-top:8px;"></div>
-      </div>
-      <!-- Галочки областей монополии (Задача 1). Видны только в режиме монополии. -->
-      <div id="mono-areas-chk" style="display:none;margin-top:8px;">
-        <label class="chk"><input type="checkbox" id="chk-mono-cs" checked>
-          <span class="swatch" style="background:var(--curve-d)"></span> Показывать CS</label>
-        <label class="chk"><input type="checkbox" id="chk-mono-vc" checked>
-          <span class="swatch" style="background:var(--curve-dwl)"></span> Показывать VC</label>
-        <label class="chk"><input type="checkbox" id="chk-mono-ps" checked>
-          <span class="swatch" style="background:var(--curve-s)"></span> Показывать PS (TR&nbsp;−&nbsp;VC)</label>
-      </div>
-      <!-- Вмешательство государства в монополии (Фаза 2) задаётся ОБЩИМ блоком
-           «Вмешательство государства» вверху панели — здесь только подсказка. -->
-      <div id="mono-interv-hint" class="hint" style="display:none;margin-top:10px;">
-        Вмешательство государства (налог, субсидия, потолок, пол) — в блоке
-        «Вмешательство государства» вверху панели; оно работает и в монополии. Налог/субсидия
-        сдвигают MC (оптимум MR&nbsp;=&nbsp;MC&nbsp;±&nbsp;ставка); грамотный потолок может увеличить выпуск;
-        пол связывает, только если он выше монопольной цены. Линию цены можно тянуть мышью.
-      </div>
-      <div id="info-mono" style="margin-top:8px;"></div>
+
     </div>
 
     <!-- Издержки фирмы (Задача 2) — отдельный режим -->
