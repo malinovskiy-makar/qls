@@ -836,6 +836,74 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
     </section>
 
+    <section class="picker-group" aria-label="Макроэкономика">
+      <div class="picker-group-label">Макроэкономика</div>
+      <div class="picker-grid">
+        <button class="scard" data-scene="adas">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M22 20 L140 68" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M22 70 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/>
+            <path d="M96 78 V12" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
+          <span class="scard-name">AD–AS</span>
+          <span class="scard-desc">Совокупный спрос и предложение, потенциал LRAS, разрыв выпуска.</span>
+        </button>
+        <button class="scard" data-scene="phillips">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M26 18 L140 66" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M84 78 V12" stroke="var(--curve-mc)" stroke-width="2.6"/>
+            <circle cx="84" cy="42" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
+          <span class="scard-name">Кривая Филлипса</span>
+          <span class="scard-desc">Размен инфляции и безработицы в коротком периоде и его исчезновение в долгом.</span>
+        </button>
+        <button class="scard" data-scene="money">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M22 20 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M88 78 V12" stroke="var(--curve-s)" stroke-width="2.6"/>
+            <circle cx="88" cy="48" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
+          <span class="scard-name">Денежный рынок</span>
+          <span class="scard-desc">Спрос на деньги, фиксированное предложение ЦБ, равновесная ставка.</span>
+        </button>
+        <button class="scard" data-scene="loanable">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M22 22 L120 72" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M46 22 L144 72" stroke="var(--curve-reg)" stroke-width="2" stroke-dasharray="5 4"/>
+            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/></g></svg></span>
+          <span class="scard-name">Заёмные средства</span>
+          <span class="scard-desc">Дефицит бюджета поднимает ставку и вытесняет частные инвестиции.</span>
+        </button>
+        <button class="scard" data-scene="fx">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M22 20 L140 68" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M22 72 L140 24" stroke="var(--curve-s)" stroke-width="2.6"/>
+            <path d="M18 58 H150" stroke="var(--curve-reg)" stroke-width="2.4"/></g></svg></span>
+          <span class="scard-name">Валютный рынок</span>
+          <span class="scard-desc">Плавающий и фиксированный курс; интервенции при разрыве.</span>
+        </button>
+        <button class="scard" data-scene="laffer">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M22 76 Q84 6 146 76" stroke="var(--curve-tax)" stroke-width="2.8"/>
+            <circle cx="84" cy="24" r="3.8" fill="var(--ink)" stroke="none"/></g></svg></span>
+          <span class="scard-name">Кривая Лаффера</span>
+          <span class="scard-desc">Поступления как функция ставки: строится прогоном самой модели налога.</span>
+        </button>
+        <button class="scard" data-scene="islm">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M22 22 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M22 74 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
+            <circle cx="81" cy="46" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
+          <span class="scard-name">IS–LM</span>
+          <span class="scard-desc">Товарный и денежный рынок вместе: пара (Y, r), равновесная для обоих.</span>
+        </button>
+      </div>
+    </section>
+
     <section class="picker-group" aria-label="Пустой холст">
       <div class="picker-grid">
         <button class="scard free" data-scene="free">
@@ -919,6 +987,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
       <div class="seg" style="margin-top:6px;">
         <button class="seg-btn" id="mode-consumer">Потребитель</button>
+        <button class="seg-btn" id="mode-macro">Макро</button>
       </div>
     </div>
 
@@ -1730,6 +1799,93 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
     </div>
 
+    <!-- Макроэкономика (Фазы 16–22) — отдельный режим. Семь моделей, общая механика:
+         две кривые на своих осях + пересечение. Форма ввода подписана у каждой. -->
+    <div class="section" id="sec-macro" style="display:none;">
+      <div class="section-title">Макроэкономика</div>
+      <div class="seg">
+        <button class="seg-btn active" id="mm-adas">AD–AS</button>
+        <button class="seg-btn" id="mm-phillips">Филлипс</button>
+        <button class="seg-btn" id="mm-money">Деньги</button>
+      </div>
+      <div class="seg" style="margin-top:6px;">
+        <button class="seg-btn" id="mm-loanable">Заёмные средства</button>
+        <button class="seg-btn" id="mm-fx">Валюта</button>
+      </div>
+      <div class="seg" style="margin-top:6px;">
+        <button class="seg-btn" id="mm-laffer">Лаффер</button>
+        <button class="seg-btn" id="mm-islm">IS–LM</button>
+      </div>
+
+      <div id="macro-pane-adas" style="margin-top:10px;">
+        <div class="field"><label>Потенциальный выпуск Y* (LRAS — вертикаль)</label>
+          <input type="number" id="ma-lras" step="1" value="100"></div>
+        <div class="field"><label>SRAS: P = f(Y)</label><input type="text" id="ma-sras" value="10 + 0.5*Y"></div>
+        <div class="field"><label>AD: P = f(Y)</label><input type="text" id="ma-ad" value="120 - 0.6*Y"></div>
+        <div class="hint">Оси подписаны Y (реальный ВВП) и P (уровень цен) — не Q/P, чтобы не путать
+          с обычным рынком. Разрыв выпуска отмечается на оси Y: рецессионный, если фактический
+          выпуск ниже потенциального, инфляционный — если выше.</div>
+      </div>
+      <div id="macro-pane-phillips" style="display:none;margin-top:10px;">
+        <div class="row">
+          <div class="field"><label>Ожидания πe</label><input type="number" id="ma-pe" step="0.1" value="5"></div>
+          <div class="field"><label>Естественный u*</label><input type="number" id="ma-ustar" step="0.1" value="5"></div>
+        </div>
+        <div class="field"><label>Наклон β</label><input type="number" id="ma-beta" step="0.05" value="0.5"></div>
+        <div class="hint">Краткосрочная: π&nbsp;=&nbsp;πe&nbsp;−&nbsp;β(u&nbsp;−&nbsp;u*). Долгосрочная —
+          вертикаль при u&nbsp;=&nbsp;u*.</div>
+      </div>
+      <div id="macro-pane-money" style="display:none;margin-top:10px;">
+        <div class="field"><label>Спрос на деньги: M = f(i)</label><input type="text" id="ma-md" value="200 - 4*i"></div>
+        <div class="field"><label>Предложение Ms (ЦБ — вертикаль)</label><input type="number" id="ma-ms" step="1" value="120"></div>
+        <div class="hint">Спрос записывается как объём от ставки — так его и задают в задачах;
+          калькулятор сам приводит к виду «ставка от объёма».</div>
+      </div>
+      <div id="macro-pane-loanable" style="display:none;margin-top:10px;">
+        <div class="field"><label>Сбережения: S = f(r)</label><input type="text" id="ma-ls" value="50 + 2*r"></div>
+        <div class="field"><label>ЧАСТНЫЕ инвестиции: D = f(r)</label><input type="text" id="ma-ld" value="150 - 3*r"></div>
+        <div class="field" id="ma-dg-field"><label>Дефицит бюджета ΔG = <b id="ma-dg-val">0</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="ma-dg-slider" min="0" max="100" step="1" value="0" style="flex:1;margin-top:0;">
+            <input type="number" id="ma-dg-input" min="0" step="1" value="0"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+        </div>
+        <div class="hint">Дефицит сдвигает ОБЩИЙ спрос вправо на ΔG. Вытеснение считается по
+          <b>исходной</b> кривой частного спроса при новой ставке — это разные кривые, не путайте.</div>
+      </div>
+      <div id="macro-pane-fx" style="display:none;margin-top:10px;">
+        <div class="field"><label>Спрос на валюту: Q = f(e)</label><input type="text" id="ma-fxd" value="100 - 2*e"></div>
+        <div class="field"><label>Предложение валюты: Q = f(e)</label><input type="text" id="ma-fxs" value="20 + 3*e"></div>
+        <label class="chk"><input type="checkbox" id="ma-fx-fixed">
+          <span class="swatch" style="background:var(--curve-reg)"></span> Фиксированный курс</label>
+        <div class="field" id="ma-fx-fixed-field" style="display:none;">
+          <label>Курс e = <b id="ma-fxe-val">20</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="ma-fxe-slider" min="0" max="60" step="0.5" value="20" style="flex:1;margin-top:0;">
+            <input type="number" id="ma-fxe-input" min="0" step="0.5" value="20"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+        </div>
+        <div class="hint">Фиксированный курс — это ровно потолок или пол цены, только оси переименованы:
+          торгуется короткая сторона, разрыв покрывают интервенции ЦБ.</div>
+      </div>
+      <div id="macro-pane-laffer" style="display:none;margin-top:10px;">
+        <div class="field"><label>Спрос: P = f(Q)</label><input type="text" id="ma-lafd" value="100 - Q"></div>
+        <div class="field"><label>Предложение: P = f(Q)</label><input type="text" id="ma-lafs" value="Q"></div>
+        <div class="field"><label>Максимальная ставка на оси</label><input type="number" id="ma-lafmax" step="5" value="100"></div>
+        <div class="hint">Кривая строится прогоном штатного расчёта «равновесие с потоварным налогом»
+          по сетке ставок — отдельной формулы нет, поэтому она согласована с остальным движком.</div>
+      </div>
+      <div id="macro-pane-islm" style="display:none;margin-top:10px;">
+        <div class="field"><label>IS: r = f(Y)</label><input type="text" id="ma-is" value="20 - 0.1*Y"></div>
+        <div class="field"><label>LM: r = f(Y)</label><input type="text" id="ma-lm" value="0.05*Y - 5"></div>
+        <div class="hint">Пересечение даёт пару (Y, r), при которой равновесны и товарный, и денежный рынок.</div>
+      </div>
+      <div class="error" id="macro-error" style="display:none;"></div>
+      <div id="info-macro" style="margin-top:8px;"></div>
+    </div>
+
     <!-- Оси и сетка (шаг 2) -->
     <div class="section" id="sec-axes">
       <div class="section-title">Оси и сетка</div>
@@ -1924,6 +2080,20 @@ const STATE = {
   consPx1: 4,                    // новая цена x для разложения
   cons: null,                    // результат расчёта
   consErr: null,
+  // Макроэкономика (Фазы 16–22). Семь моделей в одном режиме: устройство общее
+  // (две кривые на своих осях + пересечение), различаются подписи, форма ввода
+  // и «сверх-логика» (разрыв выпуска, вытеснение, кривая Лаффера).
+  macroModel: 'adas',
+  macro: {
+    adas:     { lras: 100, sras: '10 + 0.5*Y', ad: '120 - 0.6*Y' },
+    phillips: { pe: 5, ustar: 5, beta: 0.5 },
+    money:    { md: '200 - 4*i', ms: 120 },
+    loanable: { s: '50 + 2*r', d: '150 - 3*r', dg: 0 },
+    fx:       { d: '100 - 2*e', s: '20 + 3*e', fixedOn: false, fixed: 20 },
+    laffer:   { d: '100 - Q', s: 'Q', tmax: 100 },
+    islm:     { is: '20 - 0.1*Y', lm: '0.05*Y - 5' },
+  },
+  macroRes: null, macroErr: null,
   // Рынок труда (Чекпоинт 1): структура и минимальная зарплата. Оси L (труд) / W (зарплата).
   // 'competition' | 'monopsony' | 'union' | 'bilateral' (двусторонняя монополия, Фаза 12)
   laborStruct: 'competition',
@@ -2092,6 +2262,8 @@ function compileFormula(expr) {
 
 // Значение кривой в точке Q. Возвращает число или NaN (на ошибке/разрыве).
 function evalCurve(curve, q) {
+  // Вертикальная кривая (Фаза 15) не задаёт цену как функцию количества.
+  if (curve.kind === 'vertical') return NaN;
   // Синтетическая кривая, заданная функцией (например, предложение S + налог t).
   if (curve.fn) return curve.fn(q);
   // Быстрый путь для прямых (нужен и для плавного перетаскивания).
@@ -2214,20 +2386,45 @@ function buildCurveFromQP(expr) {
   return { srcCompiled: compiled, srcLinear: null, linear: null, fn: (q) => invertQofP(compiled, q) };
 }
 
+/* --- Фаза 15. ВЕРТИКАЛЬНАЯ кривая -----------------------------------------
+   Все обычные кривые движка имеют вид P = f(Q). Для макромоделей нужен ещё
+   один тип: вертикальная прямая — фиксированное количество при ЛЮБОЙ цене
+   (LRAS на потенциальном выпуске, долгосрочная кривая Филлипса при u*,
+   предложение денег, заданное центральным банком).
+   Как P = f(Q) она не записывается, поэтому у неё свой kind и своя ветка
+   в поиске равновесия. «Почти вертикальную» кривую с огромным наклоном
+   гнать через бисекцию нельзя — численно неустойчиво. */
+function makeVerticalCurve(atQ, opts) {
+  return Object.assign({ kind: 'vertical', atQ: atQ, linear: null, fn: null, compiled: null,
+                         visible: true, color: null }, opts || {});
+}
+function isVertical(c) { return !!(c && c.kind === 'vertical'); }
+
 // Численный поиск равновесия D(Q) = S(Q).
 // Идём по мелкой сетке, ищем интервал смены знака g = D - S, уточняем
 // бисекцией. Работает для ЛЮБЫХ кривых (прямых и нелинейных).
 // Если пересечения в первой четверти нет — возвращаем null (не падаем).
-function findEquilibrium(D, S) {
+// qMaxOpt — необязательная ВЕРХНЯЯ ГРАНИЦА ПОИСКА. По умолчанию это край видимой
+// области (как было), но макромодели ищут равновесие ДО того, как подобран масштаб,
+// и передают свой запас — иначе пересечение за краем кадра просто не находится.
+function findEquilibrium(D, S, qMaxOpt) {
+  // Фаза 15: одна из кривых вертикальна ⇒ решение тривиально, бисекция не нужна.
+  if (isVertical(D) || isVertical(S)) {
+    if (isVertical(D) && isVertical(S)) return null;   // две вертикали: либо совпали, либо решения нет
+    const v = isVertical(D) ? D : S, other = isVertical(D) ? S : D;
+    const Q = v.atQ, P = evalCurve(other, Q);
+    return (isFinite(P) && Q >= 0 && P >= 0) ? { Q, P } : null;
+  }
   const g = (q) => {
     const d = evalCurve(D, q), s = evalCurve(S, q);
     return (isNaN(d) || isNaN(s)) ? NaN : d - s;
   };
   const priceAt = (q) => (evalCurve(D, q) + evalCurve(S, q)) / 2;
+  const QM = (qMaxOpt != null && qMaxOpt > 0) ? qMaxOpt : CONFIG.Qmax;
   const N = 1000;                       // число узлов сетки
   let prevQ = 0, prevG = g(0);
   for (let i = 1; i <= N; i++) {
-    const q = CONFIG.Qmax * i / N;
+    const q = QM * i / N;
     const cur = g(q);
     // Смена знака (или попадание точно в ноль на границе интервала).
     if (!isNaN(prevG) && !isNaN(cur) && prevG * cur <= 0 && prevG !== cur) {
@@ -2279,7 +2476,9 @@ function findRoot(g) {
 }
 
 // Обратная функция кривой: Q, при котором P(Q) = targetP (то есть D⁻¹ или S⁻¹).
+// У вертикальной кривой объём один и тот же при любой цене (Фаза 15).
 function invCurve(curve, targetP) {
+  if (isVertical(curve)) return curve.atQ;
   return findRoot(q => { const v = evalCurve(curve, q); return isNaN(v) ? NaN : v - targetP; });
 }
 
@@ -6726,6 +6925,403 @@ function setConsumerType(t) {
   redrawAll();
 }
 
+/* =====================================================================
+   БЛОК 10г. МАКРОЭКОНОМИКА (Фазы 16–22) — режим mode='macro'.
+
+   Семь моделей живут в одном режиме, потому что устроены одинаково:
+   две кривые на СВОИХ осях, пересечение, числа в табло. Отличаются только
+   подписи осей, форма ввода и «сверх-логика» (разрыв выпуска, вытеснение,
+   ломаная Лаффера). Общая часть — один код, специфика — в реестре MACRO.
+
+   Форма ввода различается по модели и подписана явно:
+     y = f(x)  — AD/AS/SRAS, кривая Филлипса, IS/LM (цена от количества);
+     x = g(y)  — денежный рынок, заёмные средства, валютный рынок
+                 (количество от ставки/курса — как их и записывают в задачах).
+     Второй случай приводится к первому тем же обращением, что ввод Q(P)
+     в Фазе 1б: линейная — явно, любая другая — численно бисекцией.
+   Вертикальные кривые (LRAS, долгосрочная Филлипса, Ms) — тип из Фазы 15.
+   ===================================================================== */
+
+// Компиляция выражения с ИМЕНЕМ переменной модели (Y, u, i, r, e, Q) + синоним x.
+function compileVar(expr, names) {
+  try {
+    const compiled = math.parse(expr).compile();
+    const ctx = { x: 1 }; names.forEach(n => { ctx[n] = 1; });
+    compiled.evaluate(ctx);
+    return { compiled, error: null };
+  } catch (e) { return { compiled: null, error: e.message }; }
+}
+function evalVar(compiled, v, names) {
+  try {
+    const ctx = { x: v }; names.forEach(n => { ctx[n] = v; });
+    const r = compiled.evaluate(ctx);
+    return (typeof r === 'number' && isFinite(r)) ? r : NaN;
+  } catch (e) { return NaN; }
+}
+
+// Кривая, заданная как y = f(x) — прямо в каноне движка.
+function macroCurveY(expr, names) {
+  const { compiled, error } = compileVar(expr, names);
+  if (error) return { error };
+  return { fn: (v) => evalVar(compiled, v, names) };
+}
+
+// Кривая, заданная как x = g(y) («количество от ставки»). Приводим к y = f(x):
+// линейную — явной формулой, любую другую — численным обращением (та же идея,
+// что invertQofP в Фазе 1б).
+function macroCurveInv(expr, names, yMax) {
+  const { compiled, error } = compileVar(expr, names);
+  if (error) return { error };
+  const g = (y) => evalVar(compiled, y, names);
+  const y1 = yMax * 0.2, y2 = yMax * 0.5, y3 = yMax * 0.8;
+  const f1 = g(y1), f2 = g(y2), f3 = g(y3);
+  const d12 = (f2 - f1) / (y2 - y1), d23 = (f3 - f2) / (y3 - y2);
+  if (isFinite(d12) && isFinite(d23) && Math.abs(d12 - d23) < 1e-6 * (1 + Math.abs(d12)) && Math.abs(d12) > 1e-9) {
+    const d = d12, c = f1 - d * y1;          // x = c + d·y  ⇒  y = (x − c)/d
+    return { fn: (v) => (v - c) / d, inv: { c, d } };
+  }
+  return { fn: (v) => {
+    const h = (y) => { const q = g(y); return isNaN(q) ? NaN : q - v; };
+    const hi = Math.max(1, yMax * 3);
+    let prevY = 0, prevH = h(0);
+    for (let k = 1; k <= 240; k++) {
+      const y = hi * k / 240, cur = h(y);
+      if (!isNaN(prevH) && !isNaN(cur) && prevH * cur <= 0 && prevH !== cur) return (cur === 0) ? y : bisect(h, prevY, y);
+      prevY = y; prevH = cur;
+    }
+    return NaN;
+  } };
+}
+
+// Реестр моделей: подписи осей и пресеты полей. Поля живут в STATE.macro[model].
+const MACRO = {
+  adas:     { title: 'AD–AS', xl: 'Y', yl: 'P', vars: ['Y'] },
+  phillips: { title: 'Кривая Филлипса', xl: 'u, %', yl: 'π, %', vars: ['u'] },
+  money:    { title: 'Денежный рынок', xl: 'M', yl: 'i, %', vars: ['i'] },
+  loanable: { title: 'Рынок заёмных средств', xl: 'Объём', yl: 'r, %', vars: ['r'] },
+  fx:       { title: 'Валютный рынок', xl: 'Валюта', yl: 'e (курс)', vars: ['e'] },
+  laffer:   { title: 'Кривая Лаффера', xl: 't (ставка)', yl: 'Поступления', vars: ['Q'] },
+  islm:     { title: 'IS–LM', xl: 'Y', yl: 'r, %', vars: ['Y'] },
+};
+
+function macroP() { return STATE.macro[STATE.macroModel] || {}; }
+// Запас поиска равновесия для макромоделей: масштаб осей подбирается ПОСЛЕ расчёта,
+// поэтому искать в пределах текущего кадра нельзя — пересечение может быть за краем.
+const MACRO_SEARCH = 5000;
+
+/* --- Расчёты по моделям ------------------------------------------------- */
+function recomputeMacro() {
+  STATE.macroRes = null; STATE.macroErr = null;
+  const m = STATE.macroModel, P = macroP(), V = MACRO[m].vars;
+  const fail = (msg) => { STATE.macroErr = msg; };
+
+  if (m === 'adas') {
+    const sras = macroCurveY(P.sras, V), ad = macroCurveY(P.ad, V);
+    if (sras.error || ad.error) return fail(sras.error || ad.error);
+    const lras = makeVerticalCurve(P.lras);
+    const eq = findEquilibrium(ad, sras, MACRO_SEARCH);     // краткосрочное равновесие
+    const lr = findEquilibrium(ad, lras, MACRO_SEARCH);     // где AD пересекает LRAS
+    if (!eq) return fail('Краткосрочное равновесие AD = SRAS не найдено.');
+    const gap = eq.Q - P.lras;                              // >0 инфляционный, <0 рецессионный
+    STATE.macroRes = { kind: 'adas', curves: [['AD', ad, COL.D], ['SRAS', sras, COL.S]],
+                       vertical: [['LRAS', lras, COL.MC]], eq, lr, gap, Ystar: P.lras };
+    applyAutoRanges(niceMax(Math.max(P.lras, eq.Q) * 1.5), niceMax(Math.max(eq.P, 1) * 2));
+    return;
+  }
+  if (m === 'phillips') {
+    // π = πe − β(u − u*): прямая с наклоном −β через точку (u*, πe).
+    const f = (u) => P.pe - P.beta * (u - P.ustar);
+    const sr = { fn: f };
+    const lrp = makeVerticalCurve(P.ustar);
+    STATE.macroRes = { kind: 'phillips', curves: [['SRPC', sr, COL.D]],
+                       vertical: [['LRPC', lrp, COL.MC]],
+                       eq: { Q: P.ustar, P: f(P.ustar) }, f, params: P };
+    applyAutoRanges(niceMax(Math.max(P.ustar * 2.4, 10)), niceMax(Math.max(f(0), P.pe * 2, 10)));
+    return;
+  }
+  if (m === 'money') {
+    const md = macroCurveInv(P.md, V, 100);                 // M = f(i) → i = f(M)
+    if (md.error) return fail(md.error);
+    const ms = makeVerticalCurve(P.ms);
+    const eq = findEquilibrium(md, ms, MACRO_SEARCH);
+    if (!eq) return fail('Равновесие Md = Ms не найдено при неотрицательной ставке.');
+    STATE.macroRes = { kind: 'money', curves: [['Md', md, COL.D]], vertical: [['Ms', ms, COL.S]], eq };
+    applyAutoRanges(niceMax(Math.max(P.ms, eq.Q) * 1.7), niceMax(Math.max(eq.P, 1) * 2.4));
+    return;
+  }
+  if (m === 'loanable') {
+    // Спрос на заёмные средства ЧАСТНЫЙ; дефицит ΔG сдвигает ОБЩИЙ спрос вправо.
+    const sv = macroCurveInv(P.s, V, 100), dv = macroCurveInv(P.d, V, 100);
+    if (sv.error || dv.error) return fail(sv.error || dv.error);
+    // Общий спрос = частный, сдвинутый вправо на ΔG по объёму. Ниже объёма ΔG
+    // ставки нет вовсе: государству нужны эти ΔG при любой ставке, то есть там
+    // кривая вертикальна и как r = f(Q) не выражается. Возвращаем NaN, чтобы не
+    // рисовать вместо неё ложную горизонтальную полку на уровне запретительной ставки.
+    const dTot = { fn: (x) => (x < P.dg) ? NaN : dv.fn(x - P.dg) };
+    const base = findEquilibrium(dv, sv, MACRO_SEARCH);
+    const after = findEquilibrium(dTot, sv, MACRO_SEARCH);
+    if (!base || !after) return fail('Равновесие на рынке заёмных средств не найдено.');
+    // ВЫТЕСНЕНИЕ считаем по ИСХОДНОЙ кривой частного спроса при НОВОЙ ставке.
+    const privAfter = invCurve(dv, after.P);
+    const crowding = (privAfter == null) ? null : base.Q - privAfter;
+    STATE.macroRes = { kind: 'loanable', curves: [['S', sv, COL.S], ['D частн.', dv, COL.D]],
+                       extra: (P.dg > 0) ? [['D общий', dTot, COL.reg]] : [],
+                       vertical: [], eq: after, base, privAfter, crowding, dg: P.dg };
+    applyAutoRanges(niceMax(Math.max(base.Q, after.Q) * 1.6), niceMax(Math.max(base.P, after.P) * 2));
+    return;
+  }
+  if (m === 'fx') {
+    const dv = macroCurveInv(P.d, V, 100), sv = macroCurveInv(P.s, V, 100);
+    if (dv.error || sv.error) return fail(dv.error || sv.error);
+    const eq = findEquilibrium(dv, sv, MACRO_SEARCH);
+    if (!eq) return fail('Равновесный курс не найден.');
+    // Фиксированный курс — ТА ЖЕ геометрия, что потолок/пол цены: короткая сторона
+    // рынка торгуется, разрыв покрывают интервенции ЦБ.
+    let fixed = null;
+    if (P.fixedOn && P.fixed > 0) {
+      const Qd = invCurve(dv, P.fixed), Qs = invCurve(sv, P.fixed);
+      if (Qd != null && Qs != null) {
+        fixed = { e: P.fixed, Qd, Qs, trade: Math.min(Qd, Qs), gap: Math.abs(Qd - Qs),
+                  deficit: Qd > Qs };   // спрос выше предложения ⇒ ЦБ продаёт резервы
+      }
+    }
+    STATE.macroRes = { kind: 'fx', curves: [['D валюты', dv, COL.D], ['S валюты', sv, COL.S]],
+                       vertical: [], eq, fixed };
+    applyAutoRanges(niceMax(eq.Q * 1.7), niceMax(eq.P * 2.2));
+    return;
+  }
+  if (m === 'laffer') {
+    // Фаза 21: НЕ отдельная формула — прогоняем уже проверенный механизм
+    // «равновесие с потоварным налогом» по сетке ставок и копим пары (t, доход).
+    const dr = compileFormula(P.d), sr = compileFormula(P.s);
+    if (dr.error || sr.error) return fail(dr.error || sr.error);
+    const D = { compiled: dr.compiled, linear: detectLinear(dr.compiled) };
+    const S = { compiled: sr.compiled, linear: detectLinear(sr.compiled) };
+    const pts = [];
+    let best = { t: 0, rev: 0, Q: null };
+    const N = 200, tMax = P.tmax;
+    for (let i = 0; i <= N; i++) {
+      const t = tMax * i / N;
+      const st = { fn: (q) => { const v = evalCurve(S, q); return isNaN(v) ? NaN : v + t; } };
+      const e = findEquilibrium(D, st);
+      const rev = e ? t * e.Q : 0;
+      pts.push([t, rev]);
+      if (rev > best.rev) best = { t, rev, Q: e ? e.Q : null };
+    }
+    STATE.macroRes = { kind: 'laffer', pts, best, tMax };
+    applyAutoRanges(niceMax(tMax), niceMax(Math.max(best.rev, 1) * 1.25));
+    return;
+  }
+  if (m === 'islm') {
+    const is = macroCurveY(P.is, V), lm = macroCurveY(P.lm, V);
+    if (is.error || lm.error) return fail(is.error || lm.error);
+    const eq = findEquilibrium(is, lm, MACRO_SEARCH);
+    if (!eq) return fail('Пересечение IS и LM не найдено в первой четверти.');
+    STATE.macroRes = { kind: 'islm', curves: [['IS', is, COL.D], ['LM', lm, COL.S]], vertical: [], eq };
+    applyAutoRanges(niceMax(eq.Q * 1.6), niceMax(Math.max(eq.P, 1) * 3));
+    return;
+  }
+}
+
+/* --- Общая отрисовка макромоделей --------------------------------------- */
+function drawMacroCurve(c, color, dash, label) {
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  if (isVertical(c)) {
+    g.append('line').attr('x1', sx(c.atQ)).attr('y1', sy(0)).attr('x2', sx(c.atQ)).attr('y2', sy(CONFIG.Pmax))
+      .attr('stroke', color).attr('stroke-width', 2.8);
+    if (label) g.append('text').attr('x', sx(c.atQ) + 6).attr('y', sy(CONFIG.Pmax * 0.94))
+      .attr('font-size', 11.5).attr('font-weight', 600).attr('fill', color)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
+    return;
+  }
+  const pts = [];
+  for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = evalCurve(c, q); pts.push(isNaN(v) ? null : [q, v]); }
+  const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2.6).attr('d', line);
+  if (dash) p.attr('stroke-dasharray', '6 4');
+  if (label) {
+    for (const t of [0.86, 0.7, 0.5, 0.3, 0.14]) {
+      const q = CONFIG.Qmax * t, v = evalCurve(c, q);
+      if (!isNaN(v) && v > CONFIG.Pmax * 0.04 && v < CONFIG.Pmax * 0.95) {
+        g.append('text').attr('x', sx(q)).attr('y', sy(v) - 6).attr('font-size', 11.5).attr('font-weight', 600).attr('fill', color)
+          .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
+        break;
+      }
+    }
+  }
+}
+
+function redrawMacro() {
+  recomputeMacro();
+  makeScales();
+  svg.selectAll('*').remove();
+  addDefs(); drawGrid();
+  const M = MACRO[STATE.macroModel];
+  drawAxes(M.xl, M.yl);
+  const errBox = document.getElementById('macro-error');
+  if (errBox) { errBox.style.display = STATE.macroErr ? 'block' : 'none'; errBox.textContent = STATE.macroErr || ''; }
+  const r = STATE.macroRes;
+  if (!r) { updateMacroPanel(); return; }
+
+  if (r.kind === 'laffer') {
+    const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+    const line = d3.line().x(d => sx(d[0])).y(d => sy(d[1]));
+    const area = d3.area().x(d => sx(d[0])).y0(sy(0)).y1(d => sy(d[1]));
+    g.append('path').datum(r.pts).attr('d', area).attr('fill', COL.tax).attr('opacity', 0.12);
+    g.append('path').datum(r.pts).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2.8).attr('d', line);
+    const og = svg.append('g'), ox = sx(0), oy = sy(0);
+    const [px, py] = toPx(r.best.t, r.best.rev);
+    og.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', py)
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    og.append('line').attr('x1', ox).attr('y1', py).attr('x2', px).attr('y2', py)
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    og.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 2);
+    haloText(og, px, oy + 8, 't=' + fmt(r.best.t), 'middle', 'hanging');
+    haloText(og, ox - 8, py, fmt(r.best.rev), 'end', 'middle');
+    og.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', 12).attr('font-weight', 700).attr('fill', COL.ink)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('максимум');
+    updateMacroPanel();
+    return;
+  }
+
+  // Разрыв выпуска в AD–AS — отрезок на оси Y между фактическим и потенциальным.
+  if (r.kind === 'adas' && Math.abs(r.gap) > 1e-6) {
+    const oy = sy(0), g = svg.append('g');
+    const x1 = sx(Math.min(r.eq.Q, r.Ystar)), x2 = sx(Math.max(r.eq.Q, r.Ystar));
+    g.append('line').attr('x1', x1).attr('y1', oy).attr('x2', x2).attr('y2', oy)
+      .attr('stroke', r.gap < 0 ? COL.bad : COL.warn).attr('stroke-width', 6).attr('opacity', 0.55);
+    haloText(g, (x1 + x2) / 2, oy + 24, (r.gap < 0 ? 'Рецессионный разрыв = ' : 'Инфляционный разрыв = ') + fmt(Math.abs(r.gap)), 'middle', 'hanging');
+  }
+  // Фиксированный курс — переиспользуем геометрию потолка/пола цены.
+  if (r.kind === 'fx' && r.fixed) {
+    const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax), g = svg.append('g');
+    const ye = sy(r.fixed.e);
+    g.append('line').attr('x1', ox).attr('y1', ye).attr('x2', xMax).attr('y2', ye)
+      .attr('stroke', COL.reg).attr('stroke-width', 2.5);
+    haloText(g, ox - 8, ye, 'e фикс=' + fmt(r.fixed.e), 'end', 'middle');
+    const xa = sx(Math.min(r.fixed.Qd, r.fixed.Qs)), xb = sx(Math.max(r.fixed.Qd, r.fixed.Qs));
+    if (xb > xa + 1) {
+      g.append('line').attr('x1', xa).attr('y1', oy).attr('x2', xb).attr('y2', oy)
+        .attr('stroke', r.fixed.deficit ? COL.bad : COL.MR).attr('stroke-width', 5).attr('opacity', 0.5);
+      haloText(g, (xa + xb) / 2, oy + 24,
+        (r.fixed.deficit ? 'Дефицит валюты = ' : 'Избыток валюты = ') + fmt(r.fixed.gap), 'middle', 'hanging');
+    }
+  }
+  (r.extra || []).forEach(([lab, c, col]) => drawMacroCurve(c, col, true, lab));
+  (r.curves || []).forEach(([lab, c, col]) => drawMacroCurve(c, col, false, lab));
+  (r.vertical || []).forEach(([lab, c, col]) => drawMacroCurve(c, col, false, lab));
+  // Точка равновесия + бледный исходный ориентир (заёмные средства «до дефицита»).
+  if (r.base && STATE.showGhost && Math.abs(r.base.Q - r.eq.Q) > 1e-6) {
+    const g = svg.append('g'), [bx, by] = toPx(r.base.Q, r.base.P);
+    g.append('circle').attr('cx', bx).attr('cy', by).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
+    g.append('text').attr('x', bx + 7).attr('y', by + 14).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('было');
+  }
+  if (r.eq) drawEquilibriumAt(r.eq.Q, r.eq.P, (r.kind === 'phillips') ? 'u*' : 'E');
+  updateMacroPanel();
+}
+
+// Точка пересечения с проекциями (обобщение drawEquilibrium под любые оси).
+function drawEquilibriumAt(Q, P, label) {
+  const ox = sx(0), oy = sy(0), g = svg.append('g'), [px, py] = toPx(Q, P);
+  const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  dash(px, py, px, oy); dash(px, py, ox, py);
+  haloText(g, px, oy + 8, fmt(Q), 'middle', 'hanging');
+  haloText(g, ox - 8, py, fmt(P), 'end', 'middle');
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+  if (label) g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text(label);
+}
+
+function updateMacroPanel() {
+  const box = document.getElementById('info-macro'); if (!box) return;
+  const r = STATE.macroRes;
+  if (!r) { box.innerHTML = '<div class="warn">' + (STATE.macroErr || 'Задайте параметры модели.') + '</div>'; return; }
+  const P = macroP();
+  let html = '';
+  if (r.kind === 'adas') {
+    html += `<div class="stat"><span>Краткосрочно: Y / P</span><b>${fmt(r.eq.Q)} / ${fmt(r.eq.P)}</b></div>`;
+    html += `<div class="stat"><span>Потенциальный выпуск Y*</span><b>${fmt(r.Ystar)}</b></div>`;
+    const g = r.gap;
+    html += `<div class="stat"><span>Разрыв выпуска</span><b>${(g >= 0 ? '+' : '') + fmt(g)}</b></div>`;
+    html += `<div class="hint" style="margin-top:4px;">${Math.abs(g) < 1e-6
+      ? 'Экономика ровно на потенциале: краткосрочное равновесие совпало с долгосрочным, разрыва нет.'
+      : (g < 0
+        ? '<b>Рецессионный разрыв</b>: фактический выпуск ниже потенциального на ' + fmt(-g) + ' — ресурсы недозагружены, безработица выше естественной.'
+        : '<b>Инфляционный разрыв</b>: фактический выпуск выше потенциального на ' + fmt(g) + ' — экономика перегрета, давление на цены вверх.')}</div>`;
+  } else if (r.kind === 'phillips') {
+    const f = r.f;
+    html += `<div class="stat"><span>Ожидаемая инфляция πe</span><b>${fmt(P.pe)}</b></div>`;
+    html += `<div class="stat"><span>Естественный уровень u*</span><b>${fmt(P.ustar)}</b></div>`;
+    html += `<div class="stat"><span>Наклон β</span><b>${fmt(P.beta)}</b></div>`;
+    html += '<table class="tx-table" style="margin-top:6px;"><tr><th>u</th><th>π = πe − β(u − u*)</th></tr>';
+    [P.ustar - 2, P.ustar, P.ustar + 2].forEach(u => { html += `<tr><td>${fmt(u)}</td><td>${fmt(f(u))}</td></tr>`; });
+    html += '</table>';
+    html += '<div class="hint">Краткосрочная кривая проходит через точку (u*, πe) с наклоном −β: снизить ' +
+      'безработицу ниже естественной можно только ценой более высокой инфляции. Долгосрочная — вертикаль ' +
+      'при u = u*: в долгом периоде ожидания подстраиваются, и размена нет.</div>';
+  } else if (r.kind === 'money') {
+    html += `<div class="stat"><span>Предложение денег Ms</span><b>${fmt(P.ms)}</b></div>`;
+    html += `<div class="stat"><span>Равновесная ставка i</span><b>${fmt(r.eq.P)}</b></div>`;
+    html += '<div class="hint">Предложение денег задаёт ЦБ — оно не зависит от ставки, поэтому вертикально. ' +
+      'Ставка уравновешивает спрос на деньги с этим фиксированным предложением.</div>';
+  } else if (r.kind === 'loanable') {
+    html += `<div class="stat"><span>База: r / объём</span><b>${fmt(r.base.P)} / ${fmt(r.base.Q)}</b></div>`;
+    if (r.dg > 0) {
+      html += `<div class="stat"><span>Дефицит бюджета ΔG</span><b>${fmt(r.dg)}</b></div>`;
+      html += `<div class="stat"><span>Новая ставка r</span><b>${fmt(r.eq.P)}</b></div>`;
+      html += `<div class="stat"><span>Частные инвестиции при новой r</span><b>${fmt(r.privAfter)}</b></div>`;
+      html += `<div class="stat"><span>Вытеснение</span><b>${fmt(r.crowding)}</b></div>`;
+      html += '<div class="hint">Государство занимает — ОБЩИЙ спрос на заёмные средства сдвигается вправо, ставка ' +
+        'растёт. Вытеснение считается по <b>исходной</b> кривой ЧАСТНОГО спроса при новой ставке: сколько частных ' +
+        'инвестиций ушло. Не путайте её со сдвинутой общей кривой.</div>';
+    } else {
+      html += '<div class="hint">Задайте дефицит бюджета ΔG, чтобы увидеть эффект вытеснения.</div>';
+    }
+  } else if (r.kind === 'fx') {
+    html += `<div class="stat"><span>Плавающий курс e</span><b>${fmt(r.eq.P)}</b></div>`;
+    html += `<div class="stat"><span>Объём при плавающем</span><b>${fmt(r.eq.Q)}</b></div>`;
+    if (r.fixed) {
+      html += `<div class="stat" style="margin-top:4px;"><span>Фиксированный курс</span><b>${fmt(r.fixed.e)}</b></div>`;
+      html += `<div class="stat"><span>Спрос / предложение</span><b>${fmt(r.fixed.Qd)} / ${fmt(r.fixed.Qs)}</b></div>`;
+      html += `<div class="stat"><span>${r.fixed.deficit ? 'Дефицит валюты' : 'Избыток валюты'}</span><b>${fmt(r.fixed.gap)}</b></div>`;
+      html += `<div class="hint">Это ровно та же геометрия, что потолок и пол цены на обычном рынке: торгуется ` +
+        `короткая сторона, а разрыв ${r.fixed.deficit ? 'ЦБ покрывает продажей резервов' : 'ЦБ скупает, наращивая резервы'}.</div>`;
+    } else {
+      html += '<div class="hint">Включите фиксированный курс, чтобы увидеть дефицит или избыток валюты и ' +
+        'необходимые интервенции ЦБ.</div>';
+    }
+  } else if (r.kind === 'laffer') {
+    html += `<div class="stat"><span>Ставка максимума t</span><b>${fmt(r.best.t)}</b></div>`;
+    html += `<div class="stat"><span>Максимальные поступления</span><b>${fmt(r.best.rev)}</b></div>`;
+    if (r.best.Q != null) html += `<div class="stat"><span>Объём рынка при ней</span><b>${fmt(r.best.Q)}</b></div>`;
+    html += '<div class="hint">Кривая построена НЕ отдельной формулой: для каждой ставки прогоняется тот же ' +
+      'расчёт рыночного равновесия с потоварным налогом, что и в сцене «Налог», и берётся ставка × объём. ' +
+      'Поэтому она согласована с остальным движком по построению. При нулевой ставке поступлений нет; при ' +
+      'запретительной рынок схлопывается — максимум лежит между.</div>';
+  } else if (r.kind === 'islm') {
+    html += `<div class="stat"><span>Равновесный выпуск Y</span><b>${fmt(r.eq.Q)}</b></div>`;
+    html += `<div class="stat"><span>Равновесная ставка r</span><b>${fmt(r.eq.P)}</b></div>`;
+    html += '<div class="hint">IS — сочетания Y и r, при которых равновесен товарный рынок; LM — при которых ' +
+      'равновесен денежный. Пересечение даёт единственную пару, где равновесны оба.</div>';
+  }
+  box.innerHTML = html;
+}
+
+// Переключатель макромодели: показ нужной панели полей + перерисовка.
+function setMacroModel(m) {
+  STATE.macroModel = m;
+  cancelRangeAnim();
+  Object.keys(MACRO).forEach(k => {
+    const b = document.getElementById('mm-' + k); if (b) b.classList.toggle('active', k === m);
+    const p = document.getElementById('macro-pane-' + k); if (p) p.style.display = (k === m) ? '' : 'none';
+  });
+  const nm = document.getElementById('scene-name');
+  if (nm && STATE.mode === 'macro') nm.textContent = MACRO[m].title;
+  if (typeof updatePult === 'function') updatePult();
+  redrawAll();
+}
+
 /* ---------------------------------------------------------------------
    БЛОК 11. ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМОВ (рынок / издержки / КПВ).
    Показывает нужные секции панели и дёргает перерисовку. Сами режимы
@@ -6871,7 +7467,7 @@ function setMode(mode) {
   cancelRangeAnim();   // отложенный/идущий переезд осей прошлой сцены — отменить
   STATE.mode = mode;
   const map = { market: 'mode-market', costs: 'mode-costs', ppf: 'mode-ppf', labor: 'mode-labor',
-                inequality: 'mode-ineq', consumer: 'mode-consumer' };
+                inequality: 'mode-ineq', consumer: 'mode-consumer', macro: 'mode-macro' };
   Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
   const ab = document.getElementById(map[mode]); if (ab) ab.classList.add('active');
   // Какие секции панели показывать в каждом режиме (отсутствующие id просто игнорируются).
@@ -6882,13 +7478,15 @@ function setMode(mode) {
     labor:  ['sec-curves', 'sec-labor'],
     inequality: ['sec-inequality'],
     consumer: ['sec-consumer'],
+    macro: ['sec-macro'],
   };
   const all = new Set([].concat(...Object.values(groups)));
   all.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   (groups[mode] || []).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = ''; });
   applyScenarioVisibility();   // уточнить видимость интервенций/панелей по текущему сценарию
   // Секция «Оси» бессмысленна в режиме неравенства (поле всегда 0..100 %) — прячем.
-  const axes = document.getElementById('sec-axes'); if (axes) axes.style.display = (mode === 'inequality') ? 'none' : '';
+  const axes = document.getElementById('sec-axes');
+  if (axes) axes.style.display = (mode === 'inequality' || mode === 'macro') ? 'none' : '';
   // Первый вход в рынок труда — пресет: спрос на труд D = 100 − L, предложение S = L.
   if (mode === 'labor' && !STATE.laborVisited) {
     STATE.laborVisited = true;
@@ -6913,6 +7511,7 @@ function setMode(mode) {
   if (lq) lq.textContent = (mode === 'ppf') ? 'X макс' : (mode === 'labor' ? 'L макс' : (mode === 'consumer' ? 'x макс' : 'Q макс'));
   if (lp) lp.textContent = (mode === 'ppf') ? 'Y макс' : (mode === 'labor' ? 'W макс' : (mode === 'consumer' ? 'y макс' : 'P макс'));
   if (mode === 'consumer') applyConsumerTypeUI();   // показать поля под текущий тип предпочтений
+  if (mode === 'macro') setMacroModel(STATE.macroModel);   // подписи осей и панель полей модели
   if (typeof updatePult === 'function') updatePult();   // вне рыночного режима пульт скрыт
   redrawAll();
 }
@@ -8378,6 +8977,7 @@ function redrawAll() {
   if (STATE.mode === 'labor') { redrawLabor(); return; }   // режим рынка труда (Чекпоинт 1)
   if (STATE.mode === 'inequality') { redrawInequality(); return; }   // режим неравенства (ЧК1–3)
   if (STATE.mode === 'consumer')   { redrawConsumer();   return; }   // теория потребителя (Фаза 8)
+  if (STATE.mode === 'macro')      { redrawMacro();      return; }   // макромодели (Фазы 16–22)
   // Под-режимы монополии с собственной отрисовкой (Чекпоинт 2): дискриминация 3-й степени
   // (два мини-графика) и ломаный спрос — самодостаточны, рисуют свои оси и панель.
   if (STATE.mode === 'market' && STATE.market === 'monopoly') {
@@ -8852,6 +9452,14 @@ function pickScene(key) {
     labor: () => setMode('labor'),
     ineq:  () => setMode('inequality'),
     consumer: () => setMode('consumer'),
+    // Макромодели: карточка = выбор модели внутри общего макрорежима (Фазы 16–22).
+    adas:     () => { setMode('macro'); setMacroModel('adas'); },
+    phillips: () => { setMode('macro'); setMacroModel('phillips'); },
+    money:    () => { setMode('macro'); setMacroModel('money'); },
+    loanable: () => { setMode('macro'); setMacroModel('loanable'); },
+    fx:       () => { setMode('macro'); setMacroModel('fx'); },
+    laffer:   () => { setMode('macro'); setMacroModel('laffer'); },
+    islm:     () => { setMode('macro'); setMacroModel('islm'); },
     ppfsum:() => { setMode('ppf'); setPpfSub('sum'); },
     trade: () => { setMode('ppf'); setPpfSub('trade'); setTradeScenario('A'); },
     tradeprice: () => { setMode('ppf'); setPpfSub('trade'); setTradeScenario('B'); },
@@ -8882,6 +9490,8 @@ const SCENE_NAMES = {
   mono: 'Монополия', elast: 'Эластичность', ext: 'Внешние эффекты',
   costs: 'Издержки фирмы', ppf: 'КПВ — возможности',
   labor: 'Рынок труда', ineq: 'Неравенство доходов', consumer: 'Выбор потребителя',
+  adas: 'AD–AS', phillips: 'Кривая Филлипса', money: 'Денежный рынок',
+  loanable: 'Рынок заёмных средств', fx: 'Валютный рынок', laffer: 'Кривая Лаффера', islm: 'IS–LM',
   // Международная торговля — четыре РАЗНЫЕ модели, названия разводят их явно
   // (Фаза 4): первые две — рикардианские, через КПВ и альтернативные издержки;
   // третья — частичное равновесие по ЦЕНЕ; четвёртая — фирма с рыночной властью.
@@ -8896,7 +9506,7 @@ const SCENE_NAMES = {
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
 const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
   'info-prod', 'info-iso', 'info-plants', 'info-labor',
-  'info-inequality', 'info-consumer', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
+  'info-inequality', 'info-consumer', 'info-macro', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
 
 function relocateForScene() {
@@ -9141,7 +9751,8 @@ const PULT_MOVABLE = ['mono-submode',                                          /
   'ppft-price-field', 'tb-price-field',                                // КТВ: мировая цена (A / Б)
   'ineq-alpha-field',                                                  // неравенство: α (формула)
   'cons-px1-row',                                                      // потребитель: новая цена Px₁
-  'lr-price-field', 'pl-q-field'];                                     // фирма: цена P / выпуск двух заводов
+  'lr-price-field', 'pl-q-field',                                      // фирма: цена P / выпуск двух заводов
+  'ma-dg-field', 'ma-fx-fixed-field'];                                 // макро: дефицит ΔG / фикс. курс
 const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
 
 // Какие экранные регуляторы должны жить в пульте ПРЯМО СЕЙЧАС (по состоянию).
@@ -9194,6 +9805,12 @@ function pultRegulatorIds() {
     return STATE.consSlutskyOn ? ['cons-px1-row'] : [];
   }
   // Фирма (Фаза 9): рыночная цена в сюжете «Издержки» — от неё зависит прибыль.
+  // Макро (Фазы 16–22): живой регулятор — дефицит бюджета / фиксированный курс.
+  if (STATE.mode === 'macro') {
+    if (STATE.macroModel === 'loanable') return ['ma-dg-field'];
+    if (STATE.macroModel === 'fx' && STATE.macro.fx.fixedOn) return ['ma-fx-fixed-field'];
+    return [];
+  }
   if (STATE.mode === 'costs') {
     if (STATE.costsSub === 'plants') return ['pl-q-field'];
     return (STATE.costsSub === 'costs' && STATE.lrOn) ? ['lr-price-field'] : [];
@@ -9235,6 +9852,7 @@ function pultTitle() {
   if (STATE.mode === 'inequality') return 'Неравенство';
   if (STATE.mode === 'consumer')   return 'Слуцкий';
   if (STATE.mode === 'costs')      return (STATE.costsSub === 'plants') ? 'Два завода' : 'Цена и прибыль';
+  if (STATE.mode === 'macro')      return (STATE.macroModel === 'fx') ? 'Курс' : 'Дефицит ΔG';
   if (STATE.mode === 'market' && STATE.scenario === 'openecon') {
     return ({ tariff: 'Тариф', quota: 'Квота' })[STATE.openTool] || 'Мировая цена';
   }
@@ -9699,7 +10317,7 @@ function wireControls() {
 
   // Переключатель режима «Рынок / Издержки / КПВ / Труд / Неравенство / Потребитель».
   [['mode-market', 'market'], ['mode-costs', 'costs'], ['mode-ppf', 'ppf'], ['mode-labor', 'labor'],
-   ['mode-ineq', 'inequality'], ['mode-consumer', 'consumer']].forEach(([id, mode]) => {
+   ['mode-ineq', 'inequality'], ['mode-consumer', 'consumer'], ['mode-macro', 'macro']].forEach(([id, mode]) => {
     const b = document.getElementById(id); if (b) b.addEventListener('click', () => setMode(mode));
   });
 
@@ -10080,6 +10698,63 @@ function wireControls() {
     STATE.ineqTransfer = parseFloat(ineqTr.value);
     const l = document.getElementById('ineq-transfer-val'); if (l) l.textContent = fmt(STATE.ineqTransfer);
     ineqRedraw();   // живой ползунок трансферта — пересчёт троттлом
+  });
+
+  /* Макроэкономика (Фазы 16–22). Поля моделей связываются единообразно:
+     текстовые — с формулами, числовые — с параметрами, ползунки — с живыми
+     регуляторами. Каждое изменение просто дёргает redrawAll(). */
+  Object.keys(MACRO).forEach(k => {
+    const b = document.getElementById('mm-' + k); if (b) b.addEventListener('click', () => setMacroModel(k));
+  });
+  const macroField = (id, model, key, isNum) => {
+    const e = document.getElementById(id); if (!e) return;
+    const apply = () => {
+      const v = isNum ? parseFloat(e.value) : (e.value || '').trim();
+      if (isNum && isNaN(v)) return;
+      STATE.macro[model][key] = v;
+      _wantRangeAnim = true;
+      redrawAll();
+    };
+    e.addEventListener('change', apply);
+    if (!isNum) e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); });
+  };
+  macroField('ma-lras', 'adas', 'lras', true);
+  macroField('ma-sras', 'adas', 'sras', false);
+  macroField('ma-ad', 'adas', 'ad', false);
+  macroField('ma-pe', 'phillips', 'pe', true);
+  macroField('ma-ustar', 'phillips', 'ustar', true);
+  macroField('ma-beta', 'phillips', 'beta', true);
+  macroField('ma-md', 'money', 'md', false);
+  macroField('ma-ms', 'money', 'ms', true);
+  macroField('ma-ls', 'loanable', 's', false);
+  macroField('ma-ld', 'loanable', 'd', false);
+  macroField('ma-fxd', 'fx', 'd', false);
+  macroField('ma-fxs', 'fx', 's', false);
+  macroField('ma-lafd', 'laffer', 'd', false);
+  macroField('ma-lafs', 'laffer', 's', false);
+  macroField('ma-lafmax', 'laffer', 'tmax', true);
+  macroField('ma-is', 'islm', 'is', false);
+  macroField('ma-lm', 'islm', 'lm', false);
+  // Живые ползунки: дефицит бюджета и фиксированный курс.
+  const macroSlider = (sid, iid, vid, model, key) => {
+    const sl = document.getElementById(sid), inp = document.getElementById(iid), lab = document.getElementById(vid);
+    const apply = (v) => {
+      if (isNaN(v) || v < 0) return;
+      STATE.macro[model][key] = v;
+      if (sl) sl.value = v; if (inp) inp.value = v; if (lab) lab.textContent = fmt(v);
+      _wantRangeAnim = true; redrawAll();
+    };
+    if (sl) sl.addEventListener('input', () => apply(parseFloat(sl.value)));
+    if (inp) inp.addEventListener('change', () => apply(parseFloat(inp.value)));
+  };
+  macroSlider('ma-dg-slider', 'ma-dg-input', 'ma-dg-val', 'loanable', 'dg');
+  macroSlider('ma-fxe-slider', 'ma-fxe-input', 'ma-fxe-val', 'fx', 'fixed');
+  const fxFix = document.getElementById('ma-fx-fixed');
+  if (fxFix) fxFix.addEventListener('change', () => {
+    STATE.macro.fx.fixedOn = fxFix.checked;
+    const f = document.getElementById('ma-fx-fixed-field'); if (f) f.style.display = fxFix.checked ? '' : 'none';
+    if (typeof updatePult === 'function') updatePult();
+    redrawAll();
   });
 
   // Добавление кривой: по кнопке и по Enter в поле формулы.

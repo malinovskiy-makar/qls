@@ -535,6 +535,108 @@ const CASES = [
     checks: [['коэф. фондов', 'funds', 15, 0.05], ['алиас funds', 'same', 15, 0.05],
              ['P90', 'p90', 78, 0.2], ['P10', 'p10', 14.5, 0.1], ['P90/P10', 'ratio', 5.379, 0.03]],
   },
+
+  /* ── Фазы 15–22: вертикальная кривая и макромодели ───────────────────── */
+  {
+    name: 'Вертикальная кривая · равновесие с ней берётся без бисекции',
+    run: `var v = makeVerticalCurve(40);
+          var D = { fn: function (q) { return 100 - q; } };
+          var e1 = findEquilibrium(D, v), e2 = findEquilibrium(v, D);
+          return { Q: e1.Q, P: e1.P, Q2: e2.Q, P2: e2.P,
+                   isV: isVertical(v) ? 1 : 0, ev: isNaN(evalCurve(v, 10)) ? 1 : 0,
+                   inv: invCurve(v, 999) };`,
+    checks: [['Q', 'Q', 40, 0.01], ['P = D(40)', 'P', 60, 0.01],
+             ['порядок аргументов не важен', 'Q2', 40, 0.01], ['P (обратный порядок)', 'P2', 60, 0.01],
+             ['тип распознан', 'isV', 1, 0.1], ['P=f(Q) не определена', 'ev', 1, 0.1],
+             ['обратная = atQ при любой цене', 'inv', 40, 0.01]],
+  },
+  {
+    name: 'AD–AS · LRAS Y*=100, SRAS 10+0.5Y: AD 120−0.6Y без разрыва, 100−0.6Y и 140−0.6Y — по 18.2',
+    run: `setMode('macro'); setMacroModel('adas');
+          STATE.macro.adas.lras = 100; STATE.macro.adas.sras = '10 + 0.5*Y';
+          STATE.macro.adas.ad = '120 - 0.6*Y'; redrawAll();
+          var a = STATE.macroRes;
+          var base = { Y: a.eq.Q, P: a.eq.P, gap: a.gap };
+          STATE.macro.adas.ad = '100 - 0.6*Y'; redrawAll();
+          var b = STATE.macroRes;
+          STATE.macro.adas.ad = '140 - 0.6*Y'; redrawAll();
+          var c = STATE.macroRes;
+          STATE.macro.adas.ad = '120 - 0.6*Y'; redrawAll();
+          return { Y0: base.Y, P0: base.P, gap0: base.gap,
+                   Y1: b.eq.Q, P1: b.eq.P, gap1: b.gap,
+                   Y2: c.eq.Q, gap2: c.gap };`,
+    checks: [['Y базовый', 'Y0', 100, 0.3], ['P базовый', 'P0', 60, 0.3], ['разрыв = 0', 'gap0', 0, 0.3],
+             ['Y при AD1', 'Y1', 81.82, 0.4], ['P при AD1', 'P1', 50.91, 0.4],
+             ['рецессионный разрыв', 'gap1', -18.18, 0.4],
+             ['Y при AD2', 'Y2', 118.18, 0.4], ['инфляционный разрыв', 'gap2', 18.18, 0.4]],
+  },
+  {
+    name: 'Кривая Филлипса · πe=5, u*=5, β=0.5 ⇒ u=3→π=6, u=7→π=4, u=5→π=5',
+    run: `setMode('macro'); setMacroModel('phillips');
+          STATE.macro.phillips = { pe: 5, ustar: 5, beta: 0.5 }; redrawAll();
+          var f = STATE.macroRes.f;
+          return { p3: f(3), p7: f(7), p5: f(5), uStar: STATE.macroRes.eq.Q, piStar: STATE.macroRes.eq.P };`,
+    checks: [['π при u=3', 'p3', 6, 0.02], ['π при u=7', 'p7', 4, 0.02], ['π при u=5', 'p5', 5, 0.02],
+             ['пересечение при u*', 'uStar', 5, 0.02], ['и π=πe', 'piStar', 5, 0.02]],
+  },
+  {
+    name: 'Денежный рынок · Md = 200 − 4i, Ms = 120 ⇒ i = 20',
+    run: `setMode('macro'); setMacroModel('money');
+          STATE.macro.money = { md: '200 - 4*i', ms: 120 }; redrawAll();
+          return { i: STATE.macroRes.eq.P, M: STATE.macroRes.eq.Q };`,
+    checks: [['ставка i', 'i', 20, 0.1], ['объём M = Ms', 'M', 120, 0.1]],
+  },
+  {
+    name: 'Заёмные средства · S=50+2r, D=150−3r ⇒ r=20/Q=90; ΔG=30 ⇒ r=26, вытеснение 18',
+    // Ключевое: частные инвестиции при новой ставке берутся по ИСХОДНОЙ кривой D,
+    // а не по сдвинутой общей: 150 − 3·26 = 72, вытеснение 90 − 72 = 18.
+    run: `setMode('macro'); setMacroModel('loanable');
+          STATE.macro.loanable = { s: '50 + 2*r', d: '150 - 3*r', dg: 0 }; redrawAll();
+          var b = STATE.macroRes.base;
+          STATE.macro.loanable.dg = 30; redrawAll();
+          var a = STATE.macroRes;
+          return { r0: b.P, q0: b.Q, r1: a.eq.P, priv: a.privAfter, crowd: a.crowding };`,
+    checks: [['базовая r', 'r0', 20, 0.1], ['базовый объём', 'q0', 90, 0.2],
+             ['новая r', 'r1', 26, 0.15], ['частные инвестиции при r=26', 'priv', 72, 0.3],
+             ['вытеснение', 'crowd', 18, 0.3]],
+  },
+  {
+    name: 'Валютный рынок · D=100−2e, S=20+3e ⇒ плавающий e=16, объём 68',
+    run: `setMode('macro'); setMacroModel('fx');
+          STATE.macro.fx = { d: '100 - 2*e', s: '20 + 3*e', fixedOn: false, fixed: 20 }; redrawAll();
+          var f = STATE.macroRes;
+          STATE.macro.fx.fixedOn = true; STATE.macro.fx.fixed = 10; redrawAll();
+          var g = STATE.macroRes.fixed || {};
+          STATE.macro.fx.fixedOn = false; redrawAll();
+          return { e: f.eq.P, q: f.eq.Q, Qd: g.Qd, Qs: g.Qs, gap: g.gap, def: g.deficit ? 1 : 0 };`,
+    checks: [['плавающий курс e', 'e', 16, 0.1], ['объём', 'q', 68, 0.2],
+             ['фикс. e=10: спрос', 'Qd', 80, 0.3], ['фикс. e=10: предложение', 'Qs', 50, 0.3],
+             ['дефицит валюты', 'gap', 30, 0.4], ['именно дефицит', 'def', 1, 0.1]],
+  },
+  {
+    name: 'Кривая Лаффера · D=100−Q, S=Q ⇒ максимум при t=50, поступления 1250',
+    // Строится прогоном штатного расчёта равновесия с налогом: доход(t) = t·(100−t)/2.
+    run: `setMode('macro'); setMacroModel('laffer');
+          STATE.macro.laffer = { d: '100 - Q', s: 'Q', tmax: 100 }; redrawAll();
+          var r = STATE.macroRes;
+          // Значение кривой при t=20 должно равняться 20·80/2 = 800.
+          var at20 = null, at80 = null;
+          r.pts.forEach(function (p) {
+            if (Math.abs(p[0] - 20) < 0.3 && at20 === null) at20 = p[1];
+            if (Math.abs(p[0] - 80) < 0.3 && at80 === null) at80 = p[1];
+          });
+          return { t: r.best.t, rev: r.best.rev, Q: r.best.Q, at20: at20, at80: at80 };`,
+    checks: [['ставка максимума', 't', 50, 0.6], ['максимум поступлений', 'rev', 1250, 5],
+             ['объём при ней', 'Q', 25, 0.3], ['доход при t=20', 'at20', 800, 6],
+             ['доход при t=80', 'at80', 800, 6]],
+  },
+  {
+    name: 'IS–LM · IS r=20−0.1Y, LM r=0.05Y−5 ⇒ Y≈166.67, r≈3.33',
+    run: `setMode('macro'); setMacroModel('islm');
+          STATE.macro.islm = { is: '20 - 0.1*Y', lm: '0.05*Y - 5' }; redrawAll();
+          return { Y: STATE.macroRes.eq.Q, r: STATE.macroRes.eq.P };`,
+    checks: [['выпуск Y', 'Y', 166.67, 0.6], ['ставка r', 'r', 3.333, 0.1]],
+  },
 ];
 
 function approx(got, want, tol) {
