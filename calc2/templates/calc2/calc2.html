@@ -2842,6 +2842,51 @@ function curvePoints(curve) {
   return out;
 }
 
+/* ── Подписи кривых (Фаза 3) ─────────────────────────────────────────────
+   Раньше подпись жёстко висела на одной пробной точке (Q = 0.96·Qmax) и, если
+   кривая там уходила за верх окна, не рисовалась ВООБЩЕ. Отсюда и «мигание»
+   подписей при смене масштаба: пробная точка переезжала, а вместе с ней
+   пропадала и подпись. Теперь ищем ближайшее к правому краю место, где кривая
+   реально видна, и вешаем подпись туда. Совсем скрываем только если кривой
+   нет в кадре — подписывать тогда нечего.
+
+   Якорь: идём от правого края влево, берём первую точку внутри окна. */
+function curveAnchor(f, fromFrac, toFrac) {
+  const from = (fromFrac == null) ? 0.97 : fromFrac;
+  const to   = (toFrac   == null) ? 0.04 : toFrac;
+  const N = 72;
+  for (let i = 0; i <= N; i++) {
+    const q = CONFIG.Qmax * (from + (to - from) * i / N);
+    const v = f(q);
+    if (!isNaN(v) && v >= 0 && v <= CONFIG.Pmax) return { q, v };
+  }
+  return null;
+}
+
+/* Подпись у якоря, зажатая внутрь поля графика: у правого края текст
+   разворачивается влево, у верхнего — переезжает под кривую. Так подпись
+   переносится, а не исчезает. */
+function labelCurve(g, f, txt, color, opts) {
+  const o = opts || {};
+  const a = curveAnchor(f, o.from, o.to);
+  if (!a) return null;
+  const px = sx(a.q), py = sy(a.v);
+  const m = CONFIG.margin;
+  const right = W - m.right;
+  const wide = txt.length * 6.3 + 8;              // грубая ширина текста, px
+  const toLeft = (px + wide > right);
+  let y = py + (o.below ? 14 : -7);
+  if (y < m.top + 12) y = py + 14;                // упёрлись в верх — под кривую
+  if (y > H - m.bottom - 4) y = py - 7;           // упёрлись в низ — над кривой
+  g.append('text')
+    .attr('x', toLeft ? px - 6 : px + 6).attr('y', y)
+    .attr('text-anchor', toLeft ? 'end' : 'start')
+    .attr('font-size', o.size || 11).attr('font-weight', 600).attr('fill', color)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6)
+    .text(txt);
+  return a;
+}
+
 // Рисуем все видимые кривые внутри «окна» первой четверти.
 function drawCurves() {
   const g = svg.append('g').attr('class', 'curves').attr('clip-path', 'url(#plot-clip)');
@@ -2862,6 +2907,15 @@ function drawCurves() {
         .attr('d', line).style('cursor', 'ns-resize');
       attachDrag(hit, curve);
     }
+  });
+  // Подписи поверх линий (Фаза 1 и 3): имя кривой видно прямо на графике.
+  // Отдельным проходом, чтобы текст не оказался под соседней кривой.
+  STATE.curves.forEach((curve, i) => {
+    if (!curve.visible) return;
+    let nm = curveShortName(curve);
+    if (nm.length > 14) nm = nm.slice(0, 13) + '…';
+    // Соседние кривые в одной точке — разводим по вертикали, иначе подписи слипнутся.
+    labelCurve(g, q => evalCurve(curve, q), nm, curve.color, { below: i % 2 === 1 });
   });
 }
 
@@ -3515,17 +3569,13 @@ function drawShiftedSupply() {
   }
   g.append('path').datum(pts).attr('fill', 'none').attr('stroke', base.color)
     .attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
-  // Ярлык у правого края: видно, что при адвалорном разрыв растёт с Q.
-  const qL = CONFIG.Qmax * 0.82, vL = evalCurve(after, qL);
-  if (!isNaN(vL) && vL > 0 && vL <= CONFIG.Pmax) {
-    const adv = (STATE.taxKind === 'advalorem');
-    const isSub = (STATE.intervType === 'subsidy');
-    const nm = buyerTax ? (adv ? 'D/(1+τ)' : 'D − t')
-                        : (adv ? (isSub ? 'S/(1+τ)' : 'S·(1+τ)') : (isSub ? 'S − s' : 'S + t'));
-    g.append('text').attr('x', sx(qL)).attr('y', sy(vL) - 6)
-      .attr('font-size', 11).attr('font-weight', 600).attr('fill', base.color)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(nm);
-  }
+  // Ярлык сдвинутой кривой. Ищем видимый якорь (Фаза 3): при адвалорной ставке
+  // кривая круто уходит вверх и на фиксированной точке ярлык раньше пропадал.
+  const adv = (STATE.taxKind === 'advalorem');
+  const isSub = (STATE.intervType === 'subsidy');
+  const nm = buyerTax ? (adv ? 'D/(1+τ)' : 'D − t')
+                      : (adv ? (isSub ? 'S/(1+τ)' : 'S·(1+τ)') : (isSub ? 'S − s' : 'S + t'));
+  labelCurve(g, q => evalCurve(after, q), nm, base.color, { from: 0.82 });
 }
 
 // Заливки сценария вмешательства: CS, PS, деньги бюджета (прямоугольник), DWL (потери).
@@ -3990,11 +4040,9 @@ function drawExtCurves(e) {
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const pts = (f) => { const o = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = f(q); o.push(isNaN(v) ? null : [q, v]); } return o; };
   g.append('path').datum(pts(e.social)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr('d', line);
-  // Ярлык общественной кривой у правого края.
-  const qL = CONFIG.Qmax * 0.9, vL = e.social(qL);
-  if (!isNaN(vL) && vL <= CONFIG.Pmax && vL >= 0) g.append('text').attr('x', sx(qL)).attr('y', sy(vL) - 4)
-    .attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.reg)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(e.pos ? 'MSB' : 'MSC');
+  // Ярлык общественной кривой (Фаза 3): у правого края или у ближайшего
+  // видимого места — раньше при большом внешнем эффекте он пропадал.
+  labelCurve(g, e.social, e.pos ? 'MSB' : 'MSC', COL.reg, { from: 0.9 });
   // Корректирующий инструмент: налог поднимает предложение, субсидия — опускает (зелёный пунктир).
   if (e.applyPigou && e.corrective != null) {
     g.append('path').datum(pts(q => evalCurve(STATE.S, q) + (e.pos ? -e.corrective : e.corrective)))
@@ -4735,10 +4783,9 @@ function drawNaturalCurves() {
     .attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
   g.append('path').datum(sample(naturalATC, CONFIG.Qmax * 0.005))
     .attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr('d', line);
-  const qL = CONFIG.Qmax * 0.93, vL = naturalATC(qL);
-  if (!isNaN(vL) && vL <= CONFIG.Pmax) g.append('text').attr('x', sx(qL)).attr('y', sy(vL) - 5)
-    .attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.reg)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('ATC');
+  // ATC естественной монополии круто уходит вверх у нуля — ярлык ищем по
+  // видимому участку (Фаза 3), а не на фиксированной точке.
+  labelCurve(g, naturalATC, 'ATC', COL.reg, { from: 0.93 });
 }
 
 // Три вертикальных ориентира с подписями: M (монополия), MC (P=MC), AC (P=ATC).
@@ -5479,18 +5526,13 @@ function drawCostCurves() {
   curve(costATC, COL.costATC, STATE.showATC);
   curve(costMC,  COL.costMC, STATE.showMC);
 
-  // Подписи кривых у правого края (на значении при Q≈Qmax, если в пределах Pmax).
-  const labelAt = (f, txt, color) => {
-    const q = CONFIG.Qmax * 0.96, v = f(q);
-    if (isNaN(v) || v < 0 || v > CONFIG.Pmax) return;
-    g.append('text').attr('x', sx(q)).attr('y', sy(v) - 4)
-      .attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(txt);
-  };
-  if (STATE.showMC)  labelAt(costMC,  'MC',  COL.costMC);
-  if (STATE.showATC) labelAt(costATC, 'ATC', COL.costATC);
-  if (STATE.showAVC) labelAt(costAVC, 'AVC', COL.costAVC);
-  if (STATE.showAFC) labelAt(costAFC, 'AFC', COL.costAFC);
+  // Подписи кривых (Фаза 3): у правого края, а если кривая там вне окна —
+  // у ближайшего места, где она видна. Раньше подпись просто пропадала.
+  if (STATE.showMC)  labelCurve(g, costMC,  'MC',  COL.costMC);
+  if (STATE.showATC) labelCurve(g, costATC, 'ATC', COL.costATC);
+  if (STATE.showAVC) labelCurve(g, costAVC, 'AVC', COL.costAVC, { below: true });
+  if (STATE.showAFC) labelCurve(g, costAFC, 'AFC', COL.costAFC);
+  if (STATE.showVC)  labelCurve(g, costVC,  'VC',  COL.costVC, { below: true });
 
   // Ключевые точки: безубыточность (min ATC) и закрытие (min AVC) — MC проходит через них.
   const mark = (pt, color, label) => {
