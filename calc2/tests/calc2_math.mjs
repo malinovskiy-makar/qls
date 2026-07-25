@@ -323,6 +323,58 @@ const CASES = [
              ['Q при P=ATC', 'Qac', 68.284, 0.5], ['P при P=ATC', 'Pac', 31.716, 0.5],
              ['корень между Qm и Qc', 'inWindow', 1, 0.1]],
   },
+
+  /* ── Фаза 4: международная торговля ──────────────────────────────────── */
+  {
+    name: 'Малая открытая экономика · D=100−Q, S=Q, Pw=30 ⇒ импорт 40 (Qd=70, Qs=30)',
+    run: `loadScene('smallopen'); setOpenTool('none'); setOpenPw(30); redrawAll();
+          var o = STATE.open || {};
+          return { Qd: o.Qd, Qs: o.Qs, imp: o.volume, isImp: o.importing ? 1 : 0,
+                   autQ: (o.aut||{}).Q, autP: (o.aut||{}).P };`,
+    checks: [['Qd', 'Qd', 70, 0.3], ['Qs', 'Qs', 30, 0.3], ['импорт', 'imp', 40, 0.4],
+             ['импортирует', 'isImp', 1, 0.1], ['автаркия Q*', 'autQ', 50, 0.3], ['автаркия P*', 'autP', 50, 0.3]],
+  },
+  {
+    name: 'Тариф t=10 · Qd′=60, Qs′=40, импорт 20, бюджет 200, DWL 50 + 50',
+    // Два треугольника СЧИТАЮТСЯ ОТДЕЛЬНО: производственное искажение (S дороже Pw
+    // на [30;40]) и потребительское (D ниже Pw на [60;70]) — по 50 каждый.
+    run: `loadScene('smallopen'); setOpenPw(30); setOpenTool('tariff');
+          STATE.openTariff = 10; redrawAll();
+          var o = STATE.open || {};
+          return { P1: o.P1, Qd1: o.Qd1, Qs1: o.Qs1, imp1: o.vol1, money: o.money,
+                   dwlP: o.dwlProd, dwlC: o.dwlCons, dwlT: o.dwlTotal };`,
+    checks: [['P₁', 'P1', 40, 0.3], ['Qd′', 'Qd1', 60, 0.3], ['Qs′', 'Qs1', 40, 0.3],
+             ['импорт′', 'imp1', 20, 0.4], ['доход бюджета', 'money', 200, 3],
+             ['DWL производства', 'dwlP', 50, 1.5], ['DWL потребления', 'dwlC', 50, 1.5],
+             ['DWL всего', 'dwlT', 100, 3]],
+  },
+  {
+    name: 'Квота 20 · та же цена 40 и та же геометрия, но 200 — рента, а не бюджет',
+    // Цена ищется ЧИСЛЕННО из условия Qd(P) − Qs(P) = 20 ⇒ (100−P) − P = 20 ⇒ P = 40.
+    run: `loadScene('smallopen'); setOpenPw(30); setOpenTool('quota');
+          STATE.openQuota = 20; redrawAll();
+          var o = STATE.open || {};
+          return { P1: o.P1, Qd1: o.Qd1, Qs1: o.Qs1, imp1: o.vol1, rent: o.money,
+                   dwlT: o.dwlTotal, tool: (o.tool === 'quota') ? 1 : 0 };`,
+    checks: [['P₁ (численно)', 'P1', 40, 0.3], ['Qd′', 'Qd1', 60, 0.3], ['Qs′', 'Qs1', 40, 0.3],
+             ['импорт′ = квота', 'imp1', 20, 0.4], ['рента квоты', 'rent', 200, 3],
+             ['DWL всего', 'dwlT', 100, 3], ['инструмент = квота', 'tool', 1, 0.1]],
+  },
+  {
+    name: 'Монополист и мировой рынок · D=100−Q, MC=Q, Pw=50 ⇒ MR₁ = Pw = MC(Σ)',
+    // Частный случай дискриминации 3°: второй сегмент — горизонтальный спрос на Pw.
+    // Условие оптимума MR₁ = Pw = MC(Q₁+Q₂): MC(Σ)=Σ=50, MR₁=100−2q₁=50 ⇒ q₁=25,
+    // P₁=75, экспорт q₂=25. См. отчёт: это ОТЛИЧАЕТСЯ от контрольных чисел ТЗ
+    // (33.33/66.67/50), которые соответствуют РАЗДЕЛЬНЫМ издержкам по рынкам.
+    run: `loadScene('monoexport'); redrawAll();
+          var d = STATE.discr3 || {};
+          return { q1: d.q1, P1: d.P1, q2: d.q2, P2: d.P2, Qtot: d.Qtot, mc: d.mcLevel,
+                   found: d.found ? 1 : 0, world: STATE.d3World ? 1 : 0 };`,
+    checks: [['найден оптимум', 'found', 1, 0.1], ['режим мировой торговли', 'world', 1, 0.1],
+             ['Σ выпуск (MC=Pw)', 'Qtot', 50, 0.4], ['MR₁=Pw=MC', 'mc', 50, 0.4],
+             ['q₁ внутри', 'q1', 25, 0.4], ['P₁ внутри', 'P1', 75, 0.4],
+             ['q₂ экспорт', 'q2', 25, 0.4], ['P₂ = Pw', 'P2', 50, 0.3]],
+  },
 ];
 
 function approx(got, want, tol) {

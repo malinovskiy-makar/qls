@@ -544,12 +544,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 #pult #mono-submode { margin: 0 !important; display: flex; flex-direction: row; gap: 6px; flex-shrink: 0; }
 #pult #mono-submode .seg { margin: 0 !important; }
 #pult #mono-submode .seg-btn { padding: 5px 9px; font-size: 11.5px; white-space: nowrap; }
-/* Блоки «Ставка t» и «Цена Pc»: метка + ползунок + число в строку, ползунок тянется. */
-#pult #tax-field, #pult #pc-field {
-  margin: 0 !important; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px;
+/* ЛЮБОЙ перенесённый .field (ставка, цена Pc, мировая цена, тариф, квота, МРОТ,
+   зарплата профсоюза, α) в ленте выкладывается в одну строку: метка + ползунок +
+   число. Без этого блок остаётся двухэтажным и лента вырастает вдвое. */
+#pult .field {
+  margin: 0 !important; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 230px;
 }
-#pult #tax-field > label, #pult #pc-field > label { margin: 0; white-space: nowrap; }
-#pult #tax-field > div, #pult #pc-field > div { margin-top: 0 !important; flex: 1; min-width: 140px; }
+#pult .field > label { margin: 0; white-space: nowrap; }
+#pult .field > div { margin-top: 0 !important; flex: 1; min-width: 130px; }
+#pult .field > input[type="range"] { margin-top: 0; flex: 1; min-width: 110px; }
+/* Пояснения живут в «Инструментах»: внутри ленты длинный текст сжимался в узкую
+   колонку и растягивал её (сцена «Труд» доходила до 220px при полосе в 100px). */
+#pult .hint { display: none; }
 
 /* Контейнеры слайдеров кривых и сцен-слайдеров — прозрачны для flex (чипы текут рядом). */
 #pult #pult-curves, #pult #pult-extra {
@@ -755,8 +761,38 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
             <path d="M26 22 Q120 30 132 74" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 34 L140 70" stroke="var(--curve-s)" stroke-width="2.6"/>
             <circle cx="78" cy="46" r="3.4" fill="var(--curve-s)" stroke="none"/></g></svg></span>
-          <span class="scard-name">Торговля (КТВ)</span>
-          <span class="scard-desc">Линия торговых возможностей и выигрыш от мировой цены.</span>
+          <span class="scard-name">КТВ через КПВ</span>
+          <span class="scard-desc">Альтернативные издержки: точка производства на КПВ и выигрыш при заданной мировой цене.</span>
+        </button>
+        <button class="scard" data-scene="tradeprice">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M22 20 L96 74" stroke="var(--curve-d)" stroke-width="2.4"/>
+            <path d="M22 46 L128 74" stroke="var(--curve-s)" stroke-width="2.4"/>
+            <path d="M22 16 L140 74" stroke="var(--curve-d)" stroke-width="1.6" stroke-dasharray="5 4" opacity=".8"/>
+            <path d="M22 34 L140 74" stroke="var(--curve-s)" stroke-width="1.6" stroke-dasharray="5 4" opacity=".8"/></g></svg></span>
+          <span class="scard-name">Как определяется мировая цена</span>
+          <span class="scard-desc">Две страны: цена устанавливается между автарктическими — не задаётся, а находится.</span>
+        </button>
+        <button class="scard" data-scene="smallopen">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
+            <path d="M18 60 H150" stroke="var(--curve-reg)" stroke-width="2.6"/>
+            <path d="M52 60 H108" stroke="var(--c-bad)" stroke-width="4" opacity=".55"/></g></svg></span>
+          <span class="scard-name">Малая открытая экономика</span>
+          <span class="scard-desc">Мировая цена, импорт или экспорт, тариф и квота, два треугольника потерь.</span>
+        </button>
+        <button class="scard" data-scene="monoexport">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M22 18 L100 74" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M22 18 L61 74" stroke="var(--curve-mr)" stroke-width="2" stroke-dasharray="4 4"/>
+            <path d="M18 48 H150" stroke="var(--curve-reg)" stroke-width="2.4"/>
+            <path d="M22 74 L140 20" stroke="var(--curve-mc)" stroke-width="2.4"/></g></svg></span>
+          <span class="scard-name">Монополист и мировой рынок</span>
+          <span class="scard-desc">Дома — своя цена, за рубежом — мировая: MR внутри = Pw = MC.</span>
         </button>
       </div>
     </section>
@@ -929,7 +965,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="seg-btn active" id="scn-none">Обычный</button>
         <button class="seg-btn" id="scn-elast">Эластичность</button>
         <button class="seg-btn" id="scn-shift">Сдвиги</button>
+      </div>
+      <div class="seg" style="margin-top:6px;">
         <button class="seg-btn" id="scn-ext">Внеш. эффект</button>
+        <button class="seg-btn" id="scn-open">Открытая экономика</button>
       </div>
       <!-- Эластичность спроса и предложения вдоль кривых (Задача 2 + Фаза 2а) -->
       <div id="scn-pane-elast" style="display:none;margin-top:8px;">
@@ -988,6 +1027,50 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           Корректирующая субсидия опускает издержки — рынок приходит в Qопт.</div>
         <div class="error" id="ext-error" style="display:none;"></div>
         <div id="info-ext" style="margin-top:6px;"></div>
+      </div>
+      <!-- Малая открытая экономика (Фаза 4в). Обычные D(Q) и S(Q) ПО ЦЕНЕ (это
+           частичное равновесие, а не рикардианская модель через альт. издержки),
+           горизонтальная мировая цена Pw и два инструмента: тариф и импортная квота. -->
+      <div id="scn-pane-open" style="display:none;margin-top:8px;">
+        <div class="field" id="open-pw-field">
+          <label>Мировая цена Pw = <b id="open-pw-val">30</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="open-pw-slider" min="0" max="100" step="1" value="30" style="flex:1;margin-top:0;">
+            <input type="number" id="open-pw-input" min="0" step="0.1" value="30"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+        </div>
+        <div class="seg" style="margin-top:8px;">
+          <button class="seg-btn active" id="oi-none">Без вмешательства</button>
+          <button class="seg-btn" id="oi-tariff">Тариф</button>
+          <button class="seg-btn" id="oi-quota">Квота</button>
+        </div>
+        <div class="field" id="open-tariff-field" style="display:none;margin-top:8px;">
+          <label>Тариф t = <b id="open-tariff-val">10</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="open-tariff-slider" min="0" max="100" step="1" value="10" style="flex:1;margin-top:0;">
+            <input type="number" id="open-tariff-input" min="0" step="0.1" value="10"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+        </div>
+        <div class="field" id="open-quota-field" style="display:none;margin-top:8px;">
+          <label>Квота (объём импорта) = <b id="open-quota-val">20</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="open-quota-slider" min="0" max="100" step="1" value="20" style="flex:1;margin-top:0;">
+            <input type="number" id="open-quota-input" min="0" step="0.1" value="20"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+        </div>
+        <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-open-money" checked>
+          <span class="swatch" style="background:var(--curve-tax)"></span> Доход бюджета / рента квоты</label>
+        <label class="chk"><input type="checkbox" id="chk-open-dwl" checked>
+          <span class="swatch" style="background:var(--curve-dwl)"></span> Два треугольника потерь</label>
+        <div class="hint">Страна мала: мировая цена от неё не зависит, поэтому Pw — горизонтальная линия
+          (её можно тянуть мышью). Если при Pw объём спроса больше объёма предложения — страна
+          <b>импортирует</b>, если меньше — <b>экспортирует</b>. Тариф поднимает внутреннюю цену до
+          Pw&nbsp;+&nbsp;t; квота ограничивает объём напрямую, а цена находится численно из условия
+          Qd(P)&nbsp;−&nbsp;Qs(P)&nbsp;=&nbsp;квота.</div>
+        <div id="info-open" style="margin-top:6px;"></div>
       </div>
     </div>
 
@@ -1586,8 +1669,17 @@ const STATE = {
   market: 'comp',    // структура рынка: 'comp' — конкуренция, 'monopoly' — монополия (MR=MC)
   // Сценарий анализа рынка (Задачи 2–4) — взаимоисключающие, поверх режима «Рынок»:
   // 'none' — обычный (равновесие + интервенции + монополия), 'elasticity' — эластичность
-  // спроса, 'shift' — разложение сдвигов, 'externality' — внешний эффект и налог Пигу.
+  // спроса, 'shift' — разложение сдвигов, 'externality' — внешний эффект и налог Пигу,
+  // 'openecon' — малая открытая экономика (мировая цена, тариф, квота) — Фаза 4в.
   scenario: 'none',
+  // Малая открытая экономика (Фаза 4в). Страна мала ⇒ Pw задана извне и горизонтальна.
+  openPw: 30,            // мировая цена
+  openTool: 'none',      // 'none' | 'tariff' | 'quota'
+  openTariff: 10,        // ставка тарифа (руб./ед.)
+  openQuota: 20,         // разрешённый объём импорта
+  open: null,            // результат расчёта
+  showOpenMoney: true,   // заливка дохода бюджета / ренты квоты
+  showOpenDwl: true,     // заливки двух треугольников потерь
   elastQ: null,      // позиция точки эластичности вдоль спроса (null = единичная/центр)
   elast: null,       // результат расчёта эластичности (Задача 2)
   elastQS: null,     // позиция точки эластичности вдоль ПРЕДЛОЖЕНИЯ (Фаза 2а)
@@ -1628,6 +1720,10 @@ const STATE = {
   discr1: null,          // результат дискриминации 1-й степени (Qcomp, прибыль)
   d3D1: '100 - Q', d3D2: '80 - 2*Q', d3MC: '20',   // дискриминация 3-й степени: два спроса + общий MC
   discr3: null,          // результат дискриминации 3-й степени (q1,P1,q2,P2,Qtot)
+  // Фаза 4г: «Монополист, торгующий с миром» — ЧАСТНЫЙ СЛУЧАЙ дискриминации 3-й
+  // степени, где второй сегмент — горизонтальный спрос по мировой цене (совершенно
+  // эластичный). Своей математики нет: флаг только меняет подписи и предупреждения.
+  d3World: false,
   kinkInput: 'individual',                         // ввод ломаного спроса: 'individual' / 'piecewise'
   kiD1: '100 - Q', kiD2: '60 - Q', kiD3: '',       // индивидуальные спросы (горизонтальная сумма)
   kpD1: '100 - Q', kpD2: '120 - 1.5*Q',            // кусочный рыночный спрос (два куска)
@@ -2484,6 +2580,240 @@ function recompute() {
     STATE.ext = { pos, social, other, msc: social, Qmkt, Pmkt, Qopt, Popt, dwl,
                   corrective, pigou: corrective, pigouEq, applyPigou: STATE.applyPigou };
   }
+
+  // Малая открытая экономика (Фаза 4в) — считается отдельной функцией.
+  STATE.open = null;
+  if (compMarket && STATE.scenario === 'openecon' && STATE.D && STATE.S) recomputeOpenEconomy();
+}
+
+/* =====================================================================
+   БЛОК 8з. МАЛАЯ ОТКРЫТАЯ ЭКОНОМИКА (Фаза 4в).
+   ВНИМАНИЕ: это модель ЧАСТИЧНОГО РАВНОВЕСИЯ по ЦЕНЕ — обычные D(Q) и S(Q)
+   одного рынка. Её нельзя путать с рикардианскими моделями через КПВ
+   («КТВ через КПВ» и «Как определяется мировая цена»), где по осям стоят
+   два товара, а «цена» — это альтернативные издержки.
+   Страна мала ⇒ мировая цена Pw дана извне и горизонтальна.
+     Qd = D⁻¹(Pw), Qs = S⁻¹(Pw);  Qd > Qs → импорт, Qs > Qd → экспорт.
+   Инструменты (для случая импорта):
+     • тариф t: внутренняя цена P₁ = Pw + t, доход бюджета = t·(Qd′ − Qs′);
+     • квота q: цена находится ЧИСЛЕННО из условия Qd(P) − Qs(P) = q,
+       средний прямоугольник — рента от квоты (кому она достаётся, зависит
+       от распределения лицензий, поэтому в подписи нейтрально).
+   Потери разбиты на ДВА треугольника — искажение производства и искажение
+   потребления; они не суммируются в одно число без разбивки.
+   ===================================================================== */
+function recomputeOpenEconomy() {
+  const D = STATE.D, S = STATE.S, Pw = STATE.openPw;
+  if (!(Pw > 0)) return;
+  const Qd = invCurve(D, Pw), Qs = invCurve(S, Pw);
+  if (Qd == null || Qs == null) { STATE.open = { Pw, error: 'При такой мировой цене объёмы спроса/предложения не определены.' }; return; }
+  const importing = (Qd > Qs);
+  const volume = Math.abs(Qd - Qs);
+  // Свободная торговля: излишки считаются по фактическим объёмам сторон.
+  const csFree = integrate(q => evalCurve(D, q) - Pw, 0, Qd);
+  const psFree = integrate(q => Pw - evalCurve(S, q), 0, Qs);
+  const swFree = csFree + psFree;
+  // Автаркия — для сравнения (выигрыш от торговли).
+  const aut = STATE.eq;
+  const swAut = (aut && STATE.cs != null) ? STATE.sw : null;
+  const gain = (swAut != null) ? swFree - swAut : null;
+
+  const res = { Pw, Qd, Qs, importing, volume, csFree, psFree, swFree, swAut, gain,
+                tool: STATE.openTool, aut };
+
+  // Инструменты применяются только к импорту (экспортные — отложены, см. отчёт).
+  if (STATE.openTool !== 'none' && importing) {
+    let P1 = null, note = null;
+    if (STATE.openTool === 'tariff') {
+      P1 = Pw + STATE.openTariff;
+    } else {
+      // Квота: ищем внутреннюю цену, при которой избыточный спрос равен квоте.
+      // Избыточный спрос Qd(P) − Qs(P) убывает по цене ⇒ корень единственный.
+      const q = Math.max(0, STATE.openQuota);
+      const excess = (p) => {
+        const a = invCurve(D, p), b = invCurve(S, p);
+        return (a == null || b == null) ? NaN : (a - b) - q;
+      };
+      const hiP = Math.max(Pw, CONFIG.Pmax);
+      const root = findRootIn(excess, Pw, hiP);
+      if (root != null) P1 = root;
+      else { P1 = null; note = 'Цена под такую квоту не найдена: возможно, квота не меньше свободного импорта.'; }
+    }
+    if (P1 != null) {
+      const Qd1 = invCurve(D, P1), Qs1 = invCurve(S, P1);
+      if (Qd1 != null && Qs1 != null) {
+        const vol1 = Math.max(0, Qd1 - Qs1);
+        const money = (P1 - Pw) * vol1;                  // тариф → бюджет; квота → рента
+        // ДВА треугольника потерь, по отдельности:
+        //  производство — площадь между S и Pw на [Qs, Qs′] (дороже произвели дома);
+        //  потребление  — площадь между D и Pw на [Qd′, Qd] (недопотребили).
+        const dwlProd = Math.abs(integrate(q => evalCurve(S, q) - Pw, Qs, Qs1));
+        const dwlCons = Math.abs(integrate(q => Pw - evalCurve(D, q), Qd1, Qd));
+        const cs1 = integrate(q => evalCurve(D, q) - P1, 0, Qd1);
+        const ps1 = integrate(q => P1 - evalCurve(S, q), 0, Qs1);
+        res.tool = STATE.openTool;
+        res.P1 = P1; res.Qd1 = Qd1; res.Qs1 = Qs1; res.vol1 = vol1;
+        res.money = money; res.dwlProd = dwlProd; res.dwlCons = dwlCons;
+        res.dwlTotal = dwlProd + dwlCons;
+        res.cs1 = cs1; res.ps1 = ps1;
+        res.sw1 = cs1 + ps1 + (STATE.openTool === 'tariff' ? money : 0);   // рента квоты — не доход государства
+      }
+    }
+    res.note = note;
+  } else if (STATE.openTool !== 'none' && !importing) {
+    res.note = 'Тариф и импортная квота действуют, когда страна импортирует. Сейчас при Pw страна экспортирует.';
+  }
+  STATE.open = res;
+}
+
+// Заливки открытой экономики: излишки, деньги (бюджет/рента) и два треугольника потерь.
+function drawOpenAreas() {
+  const o = STATE.open; if (!o || o.error) return;
+  const D = STATE.D, S = STATE.S;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const samp = (a, b) => { const out = []; for (let i = 0; i <= 100; i++) out.push(a + (b - a) * i / 100); return out; };
+  const Pdom = (o.P1 != null) ? o.P1 : o.Pw;             // фактическая внутренняя цена
+  const qD = (o.Qd1 != null) ? o.Qd1 : o.Qd;
+  const qS = (o.Qs1 != null) ? o.Qs1 : o.Qs;
+  if (STATE.showCS && qD > 0) {
+    const a = d3.area().x(d => sx(d)).y0(sy(Pdom)).y1(d => sy(evalCurve(D, d)));
+    g.append('path').datum(samp(0, qD)).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16);
+  }
+  if (STATE.showPS && qS > 0) {
+    const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(Pdom));
+    g.append('path').datum(samp(0, qS)).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16);
+  }
+  if (o.P1 == null) return;
+  // Прямоугольник денег: между Pw и внутренней ценой, шириной в фактический импорт.
+  if (STATE.showOpenMoney && o.vol1 > 1e-9) {
+    g.append('rect').attr('x', sx(qS)).attr('y', sy(o.P1))
+      .attr('width', sx(qD) - sx(qS)).attr('height', sy(o.Pw) - sy(o.P1))
+      .attr('fill', COL.tax).attr('opacity', 0.22);
+  }
+  // Два треугольника потерь — рисуем отдельными фигурами, чтобы их было ВИДНО как два.
+  if (STATE.showOpenDwl) {
+    if (o.Qs1 > o.Qs + 1e-9) {
+      const a = d3.area().x(d => sx(d)).y0(sy(o.Pw)).y1(d => sy(evalCurve(S, d)));
+      g.append('path').datum(samp(o.Qs, o.Qs1)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38);
+    }
+    if (o.Qd > o.Qd1 + 1e-9) {
+      const a = d3.area().x(d => sx(d)).y0(sy(o.Pw)).y1(d => sy(evalCurve(D, d)));
+      g.append('path').datum(samp(o.Qd1, o.Qd)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38);
+    }
+  }
+}
+
+// Линии цен (мировая — перетаскиваемая, внутренняя — при вмешательстве) и полоса торговли.
+function drawOpenLines() {
+  const o = STATE.open; if (!o) return;
+  const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax), g = svg.append('g');
+  const yPw = sy(o.Pw);
+  g.append('line').attr('x1', ox).attr('y1', yPw).attr('x2', xMax).attr('y2', yPw)
+    .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
+  haloText(g, ox - 8, yPw, 'Pw=' + fmt(o.Pw), 'end', 'middle');
+  if (o.error) { attachOpenPwDrag(g.append('rect').attr('x', ox).attr('y', yPw - 12).attr('width', xMax - ox).attr('height', 24).attr('fill', 'transparent').style('cursor', 'grab')); return; }
+  // Внутренняя цена при тарифе/квоте — вторая линия.
+  if (o.P1 != null) {
+    const y1 = sy(o.P1);
+    g.append('line').attr('x1', ox).attr('y1', y1).attr('x2', xMax).attr('y2', y1)
+      .attr('stroke', COL.MR).attr('stroke-width', 2.5).attr('stroke-dasharray', '7 4').style('pointer-events', 'none');
+    haloText(g, ox - 8, y1, 'P₁=' + fmt(o.P1), 'end', 'middle');
+  }
+  // Проекции и полоса объёма торговли на уровне действующей цены.
+  const Pdom = (o.P1 != null) ? o.P1 : o.Pw;
+  const yD = sy(Pdom);
+  const qD = (o.Qd1 != null) ? o.Qd1 : o.Qd, qS = (o.Qs1 != null) ? o.Qs1 : o.Qs;
+  const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  dash(sx(qS), yD, sx(qS), oy); dash(sx(qD), yD, sx(qD), oy);
+  haloText(g, sx(qS), oy + 8, 'Qs=' + fmt(qS), 'middle', 'hanging');
+  haloText(g, sx(qD), oy + 8, 'Qd=' + fmt(qD), 'middle', 'hanging');
+  const lo = Math.min(sx(qS), sx(qD)), hi = Math.max(sx(qS), sx(qD));
+  if (hi > lo + 1) {
+    g.append('line').attr('x1', lo).attr('y1', yD).attr('x2', hi).attr('y2', yD)
+      .attr('stroke', o.importing ? COL.D : COL.S).attr('stroke-width', 6).attr('opacity', 0.45);
+    haloText(g, (lo + hi) / 2, yD - 12, (o.importing ? 'Импорт = ' : 'Экспорт = ') + fmt(Math.abs(qD - qS)), 'middle', 'auto');
+  }
+  // Точки на кривых + автаркическое равновесие бледным призраком.
+  g.append('circle').attr('cx', sx(qS)).attr('cy', yD).attr('r', 4).attr('fill', COL.S).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+  g.append('circle').attr('cx', sx(qD)).attr('cy', yD).attr('r', 4).attr('fill', COL.D).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+  if (STATE.showGhost && o.aut) {
+    const [px, py] = toPx(o.aut.Q, o.aut.P);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
+    g.append('text').attr('x', px + 7).attr('y', py - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('автаркия');
+  }
+  // Зона захвата мировой цены (перетаскивание линии Pw).
+  const hit = g.append('rect').attr('x', ox).attr('y', yPw - 12).attr('width', xMax - ox).attr('height', 24)
+    .attr('fill', 'transparent').style('cursor', 'grab');
+  attachOpenPwDrag(hit);
+  g.append('circle').attr('cx', ox + (xMax - ox) * 0.86).attr('cy', yPw).attr('r', 7)
+    .attr('fill', COL.reg).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
+}
+
+function attachOpenPwDrag(sel) {
+  sel.call(d3.drag().container(() => svg.node())
+    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('drag', (event) => { setOpenPw(sy.invert(event.y)); })
+    .on('end', () => { document.body.style.cursor = ''; }));
+}
+
+// Единый путь смены мировой цены (ползунок, поле, перетаскивание линии).
+function setOpenPw(p) {
+  p = Math.max(0, Math.min(p, CONFIG.Pmax));
+  STATE.openPw = p;
+  const s = document.getElementById('open-pw-slider'); if (s) s.value = p;
+  const l = document.getElementById('open-pw-val');    if (l) l.textContent = fmt(p);
+  const i = document.getElementById('open-pw-input');  if (i) i.value = fmt(p);
+  redrawAll();
+}
+
+// Переключатель инструмента: без вмешательства / тариф / квота.
+function setOpenTool(tool) {
+  STATE.openTool = (tool === 'tariff' || tool === 'quota') ? tool : 'none';
+  [['oi-none', 'none'], ['oi-tariff', 'tariff'], ['oi-quota', 'quota']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === STATE.openTool); });
+  const tf = document.getElementById('open-tariff-field'), qf = document.getElementById('open-quota-field');
+  if (tf) tf.style.display = (STATE.openTool === 'tariff') ? '' : 'none';
+  if (qf) qf.style.display = (STATE.openTool === 'quota') ? '' : 'none';
+  if (typeof updatePult === 'function') updatePult();
+  redrawAll();
+}
+
+// Табло открытой экономики: направление торговли, выигрыш, разбивка потерь.
+function updateOpenPanel() {
+  const box = document.getElementById('info-open'); if (!box) return;
+  if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Отметьте кривые D и S.</div>'; return; }
+  const o = STATE.open;
+  if (!o) { box.innerHTML = '<div class="muted">Задайте мировую цену Pw.</div>'; return; }
+  if (o.error) { box.innerHTML = '<div class="warn">' + o.error + '</div>'; return; }
+  let html = `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(o.Pw)}</b></div>`;
+  if (o.aut) html += `<div class="stat"><span>Автаркия: Q* / P*</span><b>${fmt(o.aut.Q)} / ${fmt(o.aut.P)}</b></div>`;
+  html += `<div class="stat"><span>При Pw: Qd / Qs</span><b>${fmt(o.Qd)} / ${fmt(o.Qs)}</b></div>`;
+  html += `<div class="stat"><span>${o.importing ? 'Импорт' : 'Экспорт'}</span><b>${fmt(o.volume)}</b></div>`;
+  html += `<div class="stat"><span>CS / PS при своб. торговле</span><b>${fmt(o.csFree)} / ${fmt(o.psFree)}</b></div>`;
+  if (o.gain != null) html += `<div class="stat"><span>Выигрыш от торговли</span><b>${(o.gain >= 0 ? '+' : '') + fmt(o.gain)}</b></div>`;
+  if (o.note) html += `<div class="warn" style="margin-top:6px;">${o.note}</div>`;
+  if (o.P1 != null) {
+    const isTar = (o.tool === 'tariff');
+    html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
+    html += `<div class="stat"><span>${isTar ? 'Тариф t' : 'Квота'}</span><b>${fmt(isTar ? STATE.openTariff : STATE.openQuota)}</b></div>`;
+    html += `<div class="stat"><span>Внутренняя цена P₁</span><b>${fmt(o.P1)}</b></div>`;
+    html += `<div class="stat"><span>Qd′ / Qs′</span><b>${fmt(o.Qd1)} / ${fmt(o.Qs1)}</b></div>`;
+    html += `<div class="stat"><span>Импорт после</span><b>${fmt(o.vol1)} (было ${fmt(o.volume)})</b></div>`;
+    html += `<div class="stat"><span>${isTar ? 'Доход бюджета' : 'Рента от квоты'}</span><b>${fmt(o.money)}</b></div>`;
+    if (!isTar) html += '<div class="hint">Рента от квоты — это не доход государства: кому она достанется, ' +
+      'зависит от того, как распределены лицензии на импорт (могут получить импортёры, иностранные ' +
+      'поставщики или бюджет, если лицензии продаются).</div>';
+    // Разбивка потерь — по отдельности, без «одного числа».
+    html += `<div class="stat" style="margin-top:4px;"><span>Потери: искажение производства</span><b>${fmt(o.dwlProd)}</b></div>`;
+    html += `<div class="stat"><span>Потери: искажение потребления</span><b>${fmt(o.dwlCons)}</b></div>`;
+    html += `<div class="stat"><span>Итого потери</span><b>${fmt(o.dwlTotal)}</b></div>`;
+    html += '<div class="hint">Левый треугольник — производственное искажение: часть импорта заместили ' +
+      'более дорогим отечественным выпуском. Правый — потребительское: часть покупателей ушла с рынка ' +
+      'из-за выросшей цены.</div>';
+  }
+  box.innerHTML = html;
 }
 
 // Точка равновесия E*: пунктирные проекции на оси + подпись.
@@ -4211,8 +4541,12 @@ function redrawDiscr3() {
     return;
   }
   const midX = W / 2;
-  drawMiniMarket(0, midX, 'Рынок 1', d.c1, d.q1, d.P1, d.cm, 1);
-  drawMiniMarket(midX, W, 'Рынок 2', d.c2, d.q2, d.P2, d.cm, 2);
+  // Фаза 4г: в сюжете «монополист и мировой рынок» те же два мини-графика подписаны
+  // как внутренний рынок и экспорт по мировой цене (математика та же, discr3).
+  const t1 = STATE.d3World ? 'Внутренний рынок' : 'Рынок 1';
+  const t2 = STATE.d3World ? 'Экспорт по мировой цене' : 'Рынок 2';
+  drawMiniMarket(0, midX, t1, d.c1, d.q1, d.P1, d.cm, 1);
+  drawMiniMarket(midX, W, t2, d.c2, d.q2, d.P2, d.cm, 2);
   // Разделитель между панелями.
   svg.append('line').attr('x1', midX).attr('y1', 18).attr('x2', midX).attr('y2', H - 30).attr('stroke', COL.grid).attr('stroke-width', 1);
   updateDiscr3Panel();
@@ -4221,8 +4555,38 @@ function redrawDiscr3() {
 function updateDiscr3Panel() {
   const box = document.getElementById('info-d3'); if (!box) return;
   const d = STATE.discr3;
-  if (!d) { box.innerHTML = '<div class="muted">Введите два спроса и MC, нажмите «Построить».</div>'; return; }
-  if (!d.found) { box.innerHTML = '<div class="warn">Оптимум MR = MC не найден.</div>'; return; }
+  const world = !!STATE.d3World;
+  if (!d) { box.innerHTML = '<div class="muted">Введите ' + (world ? 'внутренний спрос, мировую цену и MC' : 'два спроса и MC') + ', нажмите «Построить».</div>'; return; }
+  if (!d.found) {
+    // Фаза 4г: вырожденный случай мировой торговли — если предельные издержки НИГДЕ
+    // не дорастают до мировой цены, оптимальный экспорт математически не ограничен.
+    // Это свойство модели, а не сбой солвера, — так и пишем.
+    if (world) {
+      const Pw = evalCurve(d.c2, 0);                       // мировая цена = уровень горизонтального спроса
+      const mcFar = evalCurve(d.cm, 2 * CONFIG.Qmax);      // куда дорастают предельные издержки
+      if (!isNaN(Pw) && !isNaN(mcFar) && mcFar < Pw) {
+        box.innerHTML = '<div class="warn">При постоянных предельных издержках ниже мировой цены оптимальный ' +
+          'объём экспорта не ограничен — фирме выгодна любая дополнительная единица. Это нормальное свойство ' +
+          'модели, а не ошибка расчёта: используйте возрастающие MC (например <code>Q</code>).</div>';
+        return;
+      }
+    }
+    box.innerHTML = '<div class="warn">Оптимум MR = MC не найден.</div>'; return;
+  }
+  if (world) {
+    // Экспорт по мировой цене: сегмент 2 — горизонтальный спрос, поэтому MR₂ = Pw.
+    let html = '';
+    html += `<div class="stat"><span>Внутри: q₁ / P₁</span><b>${fmt(d.q1)} / ${fmt(d.P1)}</b></div>`;
+    html += `<div class="stat"><span>Экспорт q₂ (по Pw)</span><b>${fmt(d.q2)} / ${fmt(d.P2)}</b></div>`;
+    html += `<div class="stat"><span>Σ выпуск</span><b>${fmt(d.Qtot)}</b></div>`;
+    html += `<div class="stat"><span>MR₁ = Pw = MC</span><b>${fmt(d.mcLevel)}</b></div>`;
+    html += '<div class="hint">Мировой рынок для малой фирмы совершенно эластичен: продать за границей можно ' +
+      'сколько угодно по цене Pw, поэтому предельный доход от экспорта постоянен и равен Pw. Условие оптимума — ' +
+      '<b>MR внутри = Pw = MC(Σ выпуска)</b>: издержки считаются от ОБЩЕГО выпуска, поэтому экспорт влияет ' +
+      'на внутреннюю цену. Дома цена выше мировой — классический «обратный демпинг» при растущих издержках.</div>';
+    box.innerHTML = html;
+    return;
+  }
   // Эластичность в точке оптимума: |E| = |P / (Q·dP/dQ)|. Меньше эластичный → выше цена.
   const less = (d.P1 >= d.P2) ? '1' : '2';
   let html = '';
@@ -4232,6 +4596,27 @@ function updateDiscr3Panel() {
   html += `<div class="stat"><span>MR₁ = MR₂ = MC</span><b>${fmt(d.mcLevel)}</b></div>`;
   html += `<div class="hint">Цена выше на менее эластичном рынке (здесь — рынок&nbsp;${less}). Фирма выравнивает предельный доход: MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.</div>`;
   box.innerHTML = html;
+}
+
+// Фаза 4г: подписи полей дискриминации 3° под сюжет «монополист и мировой рынок».
+function applyD3WorldLabels() {
+  const w = !!STATE.d3World;
+  const set = (sel, txt) => { const e = document.querySelector(sel); if (e) e.textContent = txt; };
+  const pane = document.getElementById('mono-d3-pane');
+  if (!pane) return;
+  const labels = pane.querySelectorAll('.field > label');
+  if (labels.length >= 3) {
+    labels[0].innerHTML = w ? 'Внутренний спрос: P = f(Q)' : 'Спрос рынка&nbsp;1: P&nbsp;=&nbsp;f₁(Q)';
+    labels[1].innerHTML = w ? 'Мировая цена Pw (число — спрос совершенно эластичен)' : 'Спрос рынка&nbsp;2: P&nbsp;=&nbsp;f₂(Q)';
+    labels[2].innerHTML = w ? 'Предельные издержки MC от ОБЩЕГО выпуска' : 'Общие предельные издержки MC (число или f(Q))';
+  }
+  const hint = pane.querySelector('.hint');
+  if (hint) hint.innerHTML = w
+    ? 'Мировой рынок — второй «сегмент» с горизонтальным спросом на уровне Pw. Математика та же, что у ' +
+      'дискриминации 3-й степени: фирма выравнивает предельный доход по сегментам, MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC. ' +
+      'Так как MR₂&nbsp;=&nbsp;Pw, условие превращается в MR₁&nbsp;=&nbsp;Pw&nbsp;=&nbsp;MC.'
+    : 'Фирма распределяет выпуск так, что MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC. На менее эластичном рынке цена выше. ' +
+      'Два мини-графика рынков — бок о бок.';
 }
 
 /* --- Задача 6: монополист при ломаном (кусочном) рыночном спросе --- */
@@ -5213,10 +5598,13 @@ function setRanges(qmax, pmax) {
   // (ими управляет applyTaxRateBounds), поэтому поля ставки в этом случае пропускаем.
   const advRate = (STATE.taxKind === 'advalorem');
   ['tax-slider', 'tax-input', 'pc-slider', 'pc-input',
-   'labmin-slider', 'labmin-input', 'union-wage-slider', 'union-wage-input'].forEach(id => {
+   'labmin-slider', 'labmin-input', 'union-wage-slider', 'union-wage-input',
+   'open-pw-slider', 'open-pw-input', 'open-tariff-slider', 'open-tariff-input'].forEach(id => {
     if (advRate && (id === 'tax-slider' || id === 'tax-input')) return;
     const e = document.getElementById(id); if (e) e.max = pmax;
   });
+  // Квота меряется в ЕДИНИЦАХ товара — её предел задаёт масштаб количества (Фаза 4в).
+  ['open-quota-slider', 'open-quota-input'].forEach(id => { const e = document.getElementById(id); if (e) e.max = qmax; });
 }
 
 /* ---------------------------------------------------------------------
@@ -5392,9 +5780,11 @@ function applyScenarioVisibility() {
   show('scn-pane-elast', inMarket && s === 'elasticity');
   show('scn-pane-shift', inMarket && s === 'shift');
   show('scn-pane-ext',   inMarket && s === 'externality');
+  show('scn-pane-open',  inMarket && s === 'openecon');
   show('sec-tax',  inMarket && s === 'none');
   show('sec-mono', inMarket && s === 'none');
-  [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'], ['scn-ext', 'externality']]
+  [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'],
+   ['scn-ext', 'externality'], ['scn-open', 'openecon']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', s === v); });
 }
 
@@ -6234,13 +6624,27 @@ function updateTradeBPanel() {
   html += `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(d.Pw)}</b>${d.manual ? ' <span style="color:var(--curve-reg);">(своя)</span>' : ' <span style="color:var(--text2);">(равновесная)</span>'}</div>`;
   if (d.manual) html += `<div class="stat"><span>Равновесная Pw</span><b>${fmt(d.Pweq)}</b></div>`;
   html += `<div class="stat"><span>Экспортируют</span><b>Стр.${d.lowIdx} → X, Стр.${d.highIdx} → Y</b></div>`;
+  // Фаза 4б: не просто число, а КАК оно получается — логика избыточного спроса
+  // и предложения, границы интервала и честная оговорка о том, чего модель не знает.
+  html += '<div class="hint" style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);">' +
+    '<b>Откуда берётся Pw</b><br>' +
+    `Автарктическая цена X — это альтернативные издержки X внутри страны: ` +
+    `у страны&nbsp;${d.lowIdx} она ${fmt(d.bL)}, у страны&nbsp;${d.highIdx} — ${fmt(d.bH)}.<br><br>` +
+    'Мировая цена уравновешивает мировой рынок: <b>сколько X страна-экспортёр хочет продать при цене Pw, ' +
+    'столько же X страна-импортёр хочет купить</b> — избыточное предложение = избыточному спросу.<br><br>' +
+    `Отсюда сразу следуют границы. При Pw&nbsp;≤&nbsp;${fmt(d.bL)} стране&nbsp;${d.lowIdx} невыгодно продавать X ` +
+    '(дома за него дают не меньше) — избыточное предложение обнуляется. ' +
+    `При Pw&nbsp;≥&nbsp;${fmt(d.bH)} стране&nbsp;${d.highIdx} невыгодно покупать X (дешевле произвести самой) — ` +
+    'обнуляется избыточный спрос. Значит равновесие обязано лежать <b>строго внутри</b> ' +
+    `интервала (${fmt(d.bL)};&nbsp;${fmt(d.bH)}) — и это следует из ОДНИХ КПВ, без всяких допущений.<br><br>` +
+    '<b>Чего модель не знает.</b> Конкретная точка внутри интервала зависит от того, сколько каждая страна ' +
+    'хочет ПОТРЕБИТЬ при данной цене, то есть от предпочтений (функций спроса). В модели из одних КПВ их нет, ' +
+    'поэтому одним числом точка не определяется — определяется интервал. ' +
+    `Калькулятор ставит нейтральную точку строго внутри — среднее геометрическое ` +
+    `√(${fmt(d.bL)}·${fmt(d.bH)})&nbsp;=&nbsp;${fmt(d.Pweq)}. Ползунком Pw пройдите весь интервал: ` +
+    'чем ближе цена к автарктической цене страны, тем меньше её выигрыш от торговли.</div>';
   if (d.manual) {
-    html += `<div class="hint" style="margin-top:6px;">Цена задана вручную (или перетаскиванием). Равновесная Pw&nbsp;=&nbsp;${fmt(d.Pweq)}
-      лежит между автарктическими (${fmt(d.bL)} и ${fmt(d.bH)}). Кнопка «Сбросить к равновесной» вернёт её.</div>`;
-  } else {
-    html += `<div class="hint" style="margin-top:6px;">Мировая цена Pw&nbsp;=&nbsp;${fmt(d.Pw)} лежит между автарктическими
-      (${fmt(d.bL)} и ${fmt(d.bH)}) — её определяет сам рынок. Каждая страна специализируется по сравнительному
-      преимуществу; пунктир — линии торговых возможностей, они выше КПВ (обе страны выигрывают). Цену задаёт ползунок.</div>`;
+    html += `<div class="hint" style="margin-top:6px;">Сейчас цена задана вручную. Кнопка «Сбросить к равновесной» вернёт ${fmt(d.Pweq)}.</div>`;
   }
   box.innerHTML = html;
 }
@@ -6846,6 +7250,11 @@ function redrawAll() {
   } else if (STATE.scenario === 'shift') {
     // Разложение сдвигов (Задача 3): исходные + сдвинутые кривые + E_d/E_s/E₁.
     drawShiftScenario();
+  } else if (STATE.scenario === 'openecon') {
+    // Малая открытая экономика (Фаза 4в): излишки/деньги/потери, кривые, линии цен.
+    drawOpenAreas();
+    drawCurves();
+    drawOpenLines();
   } else if (STATE.scenario === 'elasticity') {
     // Эластичность спроса (Задача 2): зоны + кривые + равновесие + точка |Ed|.
     drawElasticityZones();
@@ -6881,6 +7290,9 @@ function redrawAll() {
     const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
   } else if (STATE.scenario === 'elasticity') {
     updateElasticityPanel();
+    const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
+  } else if (STATE.scenario === 'openecon') {
+    updateOpenPanel();
     const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
   } else {
     if (STATE.pcMode) updatePcPanel(); else updateTaxPanel();
@@ -7160,6 +7572,29 @@ function loadScene(name) {
       setExtSign('neg');
       setScenario('externality');
     }
+  } else if (name === 'smallopen') {
+    // Фаза 4в: малая открытая экономика. Автаркия D=100−Q, S=Q даёт P*=50, Q*=50;
+    // при Pw=30 страна импортирует 40 (Qd=70, Qs=30).
+    setMode('market');
+    addCurve('100 - Q'); setRole(STATE.curves[0], 'demand');
+    addCurve('Q');       setRole(STATE.curves[1], 'supply');
+    setMarket('comp');
+    STATE.openTool = 'none'; STATE.openTariff = 10; STATE.openQuota = 20;
+    setOpenTool('none');
+    setOpenPw(30);
+    setScenario('openecon');
+  } else if (name === 'monoexport') {
+    // Фаза 4г: обёртка над дискриминацией 3-й степени — второй сегмент горизонтален (Pw).
+    setMode('market');
+    addCurve('100 - Q'); setRole(STATE.curves[0], 'demand');
+    addCurve('Q');       setRole(STATE.curves[1], 'mc');
+    setMarket('monopoly');
+    STATE.d3World = true;
+    STATE.d3D1 = '100 - Q'; STATE.d3D2 = '50'; STATE.d3MC = 'Q';
+    const a = document.getElementById('inp-d3-1'), b = document.getElementById('inp-d3-2'), c = document.getElementById('inp-d3-mc');
+    if (a) a.value = STATE.d3D1; if (b) b.value = STATE.d3D2; if (c) c.value = STATE.d3MC;
+    applyD3WorldLabels();
+    setMonoMode('discr3');
   } else if (name === 'costs') {
     const tcInp = document.getElementById('inp-tc'), fcInp = document.getElementById('inp-fc');
     STATE.costsTC = 'Q^3 - 6*Q^2 + 15*Q + 18'; STATE.costsFC = 18;
@@ -7213,7 +7648,10 @@ function pickScene(key) {
     labor: () => setMode('labor'),
     ineq:  () => setMode('inequality'),
     ppfsum:() => { setMode('ppf'); setPpfSub('sum'); },
-    trade: () => { setMode('ppf'); setPpfSub('trade'); },
+    trade: () => { setMode('ppf'); setPpfSub('trade'); setTradeScenario('A'); },
+    tradeprice: () => { setMode('ppf'); setPpfSub('trade'); setTradeScenario('B'); },
+    smallopen: () => loadScene('smallopen'),
+    monoexport: () => loadScene('monoexport'),
     free:  () => { STATE.curves = []; curveCounter = 0; STATE.scenario = 'none';
                    setMode('market'); renderCurveList(); },
   };
@@ -7239,12 +7677,20 @@ const SCENE_NAMES = {
   mono: 'Монополия', elast: 'Эластичность', ext: 'Внешние эффекты',
   costs: 'Издержки фирмы', ppf: 'КПВ — возможности',
   labor: 'Рынок труда', ineq: 'Неравенство доходов',
-  ppfsum: 'Сумма КПВ двух стран', trade: 'Торговля (КТВ)', free: 'Свободный холст',
+  // Международная торговля — четыре РАЗНЫЕ модели, названия разводят их явно
+  // (Фаза 4): первые две — рикардианские, через КПВ и альтернативные издержки;
+  // третья — частичное равновесие по ЦЕНЕ; четвёртая — фирма с рыночной властью.
+  ppfsum: 'Сумма КПВ двух стран',
+  trade: 'КТВ через КПВ (альт. издержки)',
+  tradeprice: 'Как определяется мировая цена',
+  smallopen: 'Малая открытая экономика',
+  monoexport: 'Монополист, торгующий с миром',
+  free: 'Свободный холст',
 };
 // Блоки результатов в табло (порядок = порядок показа). info-eq переносим вместе
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
 const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs', 'info-labor',
-  'info-inequality', 'info-elast', 'info-shift', 'info-ext', 'info-d3', 'info-kink',
+  'info-inequality', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
 
 function relocateForScene() {
@@ -7484,6 +7930,7 @@ let pultDock = null;
 // закрывает график. Живой регулятор здесь один — сама ставка.
 const PULT_MOVABLE = ['mono-submode',                                          // монополия: под-режим
   'taxside-row', 'tax-field', 'pc-field',                                      // рынок: вмешательство
+  'open-pw-field', 'open-tariff-field', 'open-quota-field',                    // открытая экономика
   'union-wage-field', 'labmin-field',                                  // труд: зарплата / МРОТ
   'ppft-price-field', 'tb-price-field',                                // КТВ: мировая цена (A / Б)
   'ineq-alpha-field'];                                                 // неравенство: α (формула)
@@ -7492,6 +7939,14 @@ const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
 // Какие экранные регуляторы должны жить в пульте ПРЯМО СЕЙЧАС (по состоянию).
 function pultRegulatorIds() {
   if (STATE.mode === 'market') {
+    // Малая открытая экономика (Фаза 4в): мировая цена — главный живой регулятор,
+    // рядом — ставка действующего инструмента.
+    if (STATE.scenario === 'openecon') {
+      const ids = ['open-pw-field'];
+      if (STATE.openTool === 'tariff') ids.push('open-tariff-field');
+      else if (STATE.openTool === 'quota') ids.push('open-quota-field');
+      return ids;
+    }
     const interventionScene = (STATE.sceneKey === 'tax' || STATE.sceneKey === 'ceil' || STATE.sceneKey === 'mono');
     if (!interventionScene) return [];
     // Монополия: переключатель под-режима — главный регулятор сцены, поэтому он в ленте
@@ -7561,6 +8016,9 @@ function pultTitle() {
   if (STATE.mode === 'ppf')        return (STATE.ppfSub === 'trade') ? 'Торговля' : 'КПВ';
   if (STATE.mode === 'labor')      return 'Труд';
   if (STATE.mode === 'inequality') return 'Неравенство';
+  if (STATE.mode === 'market' && STATE.scenario === 'openecon') {
+    return ({ tariff: 'Тариф', quota: 'Квота' })[STATE.openTool] || 'Мировая цена';
+  }
   const rate = ({ tax: 'налог', subsidy: 'субсидия', ceiling: 'потолок', floor: 'пол' })[STATE.intervType] || '';
   // Монополия: заголовок ленты берёт контекст под-режима (Фаза 3б). Держим коротким —
   // он печатается вертикально на ручке и определяет высоту ленты.
@@ -8059,9 +8517,34 @@ function wireControls() {
   const labGhost = document.getElementById('chk-lab-ghost');
   if (labGhost) labGhost.addEventListener('change', () => { STATE.showGhost = labGhost.checked; redrawAll(); });
 
-  // Сценарии анализа рынка (Задачи 2–4): обычный / эластичность / сдвиги / внешний эффект.
-  [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'], ['scn-ext', 'externality']]
+  // Сценарии анализа рынка: обычный / эластичность / сдвиги / внешний эффект / открытая экономика.
+  [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'],
+   ['scn-ext', 'externality'], ['scn-open', 'openecon']]
     .forEach(([id, s]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setScenario(s)); });
+
+  // Малая открытая экономика (Фаза 4в): мировая цена, инструмент, тариф и квота.
+  const opwS = document.getElementById('open-pw-slider'), opwI = document.getElementById('open-pw-input');
+  if (opwS) opwS.addEventListener('input', () => setOpenPw(parseFloat(opwS.value)));
+  if (opwI) opwI.addEventListener('change', () => { const v = parseFloat(opwI.value); if (!isNaN(v)) setOpenPw(v); });
+  [['oi-none', 'none'], ['oi-tariff', 'tariff'], ['oi-quota', 'quota']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setOpenTool(v)); });
+  const setOpenNum = (key, sliderId, inputId, valId) => {
+    const sl = document.getElementById(sliderId), inp = document.getElementById(inputId), lab = document.getElementById(valId);
+    const apply = (v) => {
+      if (isNaN(v) || v < 0) return;
+      STATE[key] = v;
+      if (sl) sl.value = v; if (inp) inp.value = fmt(v); if (lab) lab.textContent = fmt(v);
+      redrawAll();
+    };
+    if (sl) sl.addEventListener('input', () => apply(parseFloat(sl.value)));
+    if (inp) inp.addEventListener('change', () => apply(parseFloat(inp.value)));
+  };
+  setOpenNum('openTariff', 'open-tariff-slider', 'open-tariff-input', 'open-tariff-val');
+  setOpenNum('openQuota', 'open-quota-slider', 'open-quota-input', 'open-quota-val');
+  [['chk-open-money', 'showOpenMoney'], ['chk-open-dwl', 'showOpenDwl']].forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); });
+  });
 
   // Сдвиги спроса и предложения (Задача 3): ползунки + числовые поля.
   [['shiftD-slider', 'shiftD-input', 'D'], ['shiftS-slider', 'shiftS-input', 'S']].forEach(([sid, iid, which]) => {
