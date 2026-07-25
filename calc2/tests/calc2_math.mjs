@@ -637,6 +637,111 @@ const CASES = [
           return { Y: STATE.macroRes.eq.Q, r: STATE.macroRes.eq.P };`,
     checks: [['выпуск Y', 'Y', 166.67, 0.6], ['ставка r', 'r', 3.333, 0.1]],
   },
+
+  // ── Раздел «Математика» (Фаза 7) ─────────────────────────────────────
+  // Численные методы те же, что во всей остальной модели: центральная разность
+  // для производных, сетка + бисекция для корней, трапеции для площади.
+  // Поэтому проверяем их школьными примерами с известным ответом.
+  {
+    name: 'Математика · касательная к x² в точке 3 ⇒ y = 6x − 9',
+    run: `setMode('math'); setMathSub('tangent');
+          STATE.mathFormula='x^2'; setMathWindow(-6,6,-4,20); setMathX0(3);
+          var f = mathF();
+          return { k: dNum(f,3), y0: f(3), atZero: f(3) + dNum(f,3)*(0-3) };`,
+    checks: [['f′(3)', 'k', 6, 0.01], ['f(3)', 'y0', 9, 0.01], ['касательная при x=0', 'atZero', -9, 0.02]],
+  },
+  {
+    name: 'Математика · секущая стягивается к касательной при уменьшении Δx',
+    run: `setMode('math'); setMathSub('tangent'); STATE.mathFormula='x^2';
+          var f = mathF();
+          var s = function(dx){ return (f(3+dx)-f(3))/dx; };
+          return { big: s(2), small: s(0.05), tang: dNum(f,3) };`,
+    checks: [['секущая при Δx=2', 'big', 8, 0.01], ['секущая при Δx=0.05', 'small', 6.05, 0.01],
+             ['касательная', 'tang', 6, 0.01]],
+  },
+  {
+    name: 'Математика · производная x³ в точке 2 ⇒ 12 (и 0 в нуле)',
+    run: `setMode('math'); setMathSub('tangent'); STATE.mathFormula='x^3'; setMathWindow(-4,4,-20,20);
+          var f = mathF(); return { k: dNum(f,2), k0: dNum(f,0) };`,
+    checks: [['f′(2)', 'k', 12, 0.02], ['f′(0)', 'k0', 0, 0.01]],
+  },
+  {
+    name: 'Математика · x³−3x: max при −1, min при 1, перегиб в 0',
+    run: `setMode('math'); setMathSub('optimum'); STATE.mathFormula='x^3 - 3*x';
+          setMathWindow(-3,3,-6,6); redrawAll();
+          var a = STATE.mathRes;
+          var mx = a.ext.filter(function(p){return p.kind==='max';})[0] || {};
+          var mn = a.ext.filter(function(p){return p.kind==='min';})[0] || {};
+          return { xmax: mx.x, ymax: mx.y, xmin: mn.x, ymin: mn.y,
+                   inf: (a.inf[0]||{}).x, nInf: a.inf.length };`,
+    checks: [['x максимума', 'xmax', -1, 0.02], ['значение в нём', 'ymax', 2, 0.03],
+             ['x минимума', 'xmin', 1, 0.02], ['значение в нём', 'ymin', -2, 0.03],
+             ['перегиб', 'inf', 0, 0.02], ['перегибов всего', 'nInf', 1, 0.01]],
+  },
+  {
+    name: 'Математика · x²: ровно один минимум в нуле, перегибов нет',
+    // Нуль производной попадает РОВНО в узел сетки — проверка «произведение
+    // соседних значений меньше нуля» такой корень пропускала бы.
+    run: `setMode('math'); setMathSub('optimum'); STATE.mathFormula='x^2';
+          setMathWindow(-4,4,-2,16); redrawAll();
+          var a = STATE.mathRes;
+          return { n: a.ext.length, x: a.ext[0].x, isMin: a.ext[0].kind==='min'?1:0, nInf: a.inf.length };`,
+    checks: [['экстремумов', 'n', 1, 0.01], ['x', 'x', 0, 0.02],
+             ['это минимум', 'isMin', 1, 0.01], ['перегибов', 'nInf', 0, 0.01]],
+  },
+  {
+    name: 'Математика · деформации: f(x+a) при a>0 уводит график ВЛЕВО',
+    run: `setMode('math'); setMathSub('transform'); STATE.mathFormula='x^2';
+          var f = mathF(); var t = mathTransformed(f,'left',2);
+          return { atMinus2: t(-2), atPlus2: t(2), up: mathTransformed(f,'up',3)(0),
+                   negY: mathTransformed(f,'negY',0)(2), absX: mathTransformed(f,'absX',0)(-3),
+                   scaleY: mathTransformed(f,'scaleY',3)(2) };`,
+    checks: [['f(x+2) при x=−2', 'atMinus2', 0, 0.001], ['f(x+2) при x=2', 'atPlus2', 16, 0.001],
+             ['f(x)+3 при x=0', 'up', 3, 0.001], ['−f(x) при x=2', 'negY', -4, 0.001],
+             ['f(|x|) при x=−3', 'absX', 9, 0.001], ['3·f(x) при x=2', 'scaleY', 12, 0.001]],
+  },
+  {
+    name: 'Математика · площадь под x = 10 − y²/10 интегралом ПО y ⇒ 66.67',
+    run: `setMode('math'); setMathSub('inverse');
+          STATE.mathInvFormula='10 - y^2/10'; STATE.mathY0=0; STATE.mathY1=10;
+          setMathWindow(-2,12,-1,11); redrawAll();
+          return { area: STATE.mathRes.area };`,
+    checks: [['площадь', 'area', 66.667, 0.05]],
+  },
+  {
+    name: 'Математика · x = 4 + 2y на [0;5] ⇒ трапеция 45',
+    run: `setMode('math'); setMathSub('inverse');
+          STATE.mathInvFormula='4 + 2*y'; STATE.mathY0=0; STATE.mathY1=5;
+          setMathWindow(-2,16,-1,7); redrawAll();
+          return { area: STATE.mathRes.area };`,
+    checks: [['площадь', 'area', 45, 0.02]],
+  },
+  {
+    name: 'Математика · Z = min(x², 4−x): смена ветви при x ≈ 1.5616',
+    run: `setMode('math'); setMathSub('minmax'); STATE.mathFormula='x^2'; STATE.mathG2='4 - x';
+          STATE.mathMinMax='min'; setMathWindow(-5,6,-3,12); redrawAll();
+          var sw = STATE.mathRes.switches;
+          return { n: sw.length, x: sw[sw.length-1] };`,
+    checks: [['точек смены', 'n', 2, 0.01], ['правая точка', 'x', 1.5616, 0.01]],
+  },
+  {
+    name: 'Математика · max a^0.5·b^0.5 при a+b=10 ⇒ (5; 5)',
+    run: `setMode('math'); setMathSub('constraint');
+          STATE.mathFC='a^0.5 * b^0.5'; STATE.mathPa=1; STATE.mathPb=1; STATE.mathM=10;
+          redrawAll();
+          var o = STATE.mathRes.opt || {};
+          return { a: o.a, b: o.b, F: o.value };`,
+    checks: [['a*', 'a', 5, 0.15], ['b*', 'b', 5, 0.15], ['F', 'F', 5, 0.15]],
+  },
+  {
+    name: 'Математика · то же при pa=2, pb=1, M=12 ⇒ (3; 6)',
+    run: `setMode('math'); setMathSub('constraint');
+          STATE.mathFC='a^0.5 * b^0.5'; STATE.mathPa=2; STATE.mathPb=1; STATE.mathM=12;
+          redrawAll();
+          var o = STATE.mathRes.opt || {};
+          return { a: o.a, b: o.b };`,
+    checks: [['a*', 'a', 3, 0.2], ['b*', 'b', 6, 0.3]],
+  },
 ];
 
 function approx(got, want, tol) {

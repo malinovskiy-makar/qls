@@ -1002,6 +1002,70 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
     </section>
 
+    <!-- Математика (Фаза 7): общий инструментарий, вне экономических моделей.
+         Иконки в тех же цветах движка и с той же толщиной линий, что у остальных. -->
+    <section class="picker-group" aria-label="Математика">
+      <div class="picker-group-label">Математика</div>
+      <div class="picker-grid">
+        <button class="scard" data-scene="m-tangent">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 66 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M26 16 Q84 96 142 16" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <path d="M84 62 L146 34" stroke="var(--curve-reg)" stroke-width="2.6"/>
+            <path d="M110 48 H130 V39" stroke="var(--curve-reg)" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <circle cx="110" cy="48" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
+          <span class="scard-name">Производная и касательная</span>
+          <span class="scard-desc">Точка едет по кривой, треугольник показывает Δx и Δy, снизу график f′(x).</span>
+        </button>
+        <button class="scard" data-scene="m-optimum">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 50 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M26 74 C 52 6, 68 82, 84 50 C 100 18, 116 84, 142 22" stroke="var(--curve-d)" stroke-width="2.6"/>
+            <circle cx="46" cy="24" r="3.6" fill="var(--curve-s)" stroke="none"/>
+            <circle cx="66" cy="70" r="3.6" fill="var(--curve-mc)" stroke="none"/>
+            <circle cx="84" cy="50" r="3.2" fill="var(--curve-mr)" stroke="none"/></g></svg></span>
+          <span class="scard-name">Максимумы и минимумы</span>
+          <span class="scard-desc">Экстремумы, точки перегиба, выпуклые и вогнутые участки разным цветом.</span>
+        </button>
+        <button class="scard" data-scene="m-transform">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 66 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M40 14 Q84 92 128 14" stroke="var(--curve-ghost)" stroke-width="2.2" stroke-dasharray="5 4"/>
+            <path d="M22 14 Q66 92 110 14" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
+          <span class="scard-name">Деформации графика</span>
+          <span class="scard-desc">Сдвиги, растяжения, отражения и модули — одним ползунком, обе кривые сразу.</span>
+        </button>
+        <button class="scard" data-scene="m-inverse">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M26 80 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M26 80 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M26 20 H96 M26 32 H110 M26 44 H116 M26 56 H112 M26 68 H98" stroke="var(--curve-d)" stroke-width="4" stroke-opacity=".22"/>
+            <path d="M96 14 Q124 46 96 74" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
+          <span class="scard-name">Оси наоборот</span>
+          <span class="scard-desc">Кривая задана как x = g(y): площадь берётся интегралом по y, а не по x.</span>
+        </button>
+        <button class="scard" data-scene="m-minmax">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 70 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 70 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M24 20 L142 66" stroke="var(--curve-d)" stroke-width="1.8" stroke-dasharray="5 4"/>
+            <path d="M24 64 L142 18" stroke="var(--curve-s)" stroke-width="1.8" stroke-dasharray="5 4"/>
+            <path d="M24 64 L83 42 L142 66" stroke="var(--curve-mc)" stroke-width="3" stroke-linejoin="round"/>
+            <circle cx="83" cy="42" r="3.6" fill="var(--curve-mc)" stroke="none"/></g></svg></span>
+          <span class="scard-name">Функции min и max</span>
+          <span class="scard-desc">Две функции и итоговая Z: где они меняются местами, там излом.</span>
+        </button>
+        <button class="scard" data-scene="m-constraint">
+          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
+            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <path d="M24 20 L136 74" stroke="var(--curve-s)" stroke-width="2.6"/>
+            <path d="M34 66 Q56 34 96 26" stroke="var(--curve-d)" stroke-width="1.6" stroke-opacity=".4"/>
+            <path d="M44 74 Q72 44 116 36" stroke="var(--curve-d)" stroke-width="2.4"/>
+            <circle cx="74" cy="45" r="3.8" fill="var(--ink)" stroke="none"/></g></svg></span>
+          <span class="scard-name">Оптимум при ограничении</span>
+          <span class="scard-desc">Максимум F(a, b) при pa·a + pb·b = M: касание линии уровня и ограничения.</span>
+        </button>
+      </div>
+    </section>
+
     <section class="picker-group" aria-label="Пустой холст">
       <div class="picker-grid">
         <button class="scard free" data-scene="free">
@@ -1962,6 +2026,156 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div id="info-macro" style="margin-top:8px;"></div>
     </div>
 
+    <!-- ── МАТЕМАТИКА (Фаза 7) — общий инструментарий, вне экономических моделей.
+         Оси здесь x и y, и в отличие от всех прочих режимов виден полный план,
+         а не только первая четверть: без отрицательных x не показать ни f(−x),
+         ни f(|x|), ни привычную параболу. Поэтому у режима свои шкалы и свои оси. -->
+    <div class="section" id="sec-math" style="display:none;">
+      <div class="section-title">Математика</div>
+      <div class="seg">
+        <button class="seg-btn active" id="ms-tangent">Производная</button>
+        <button class="seg-btn" id="ms-optimum">Оптимум</button>
+      </div>
+      <div class="seg" style="margin-top:6px;">
+        <button class="seg-btn" id="ms-transform">Деформации</button>
+        <button class="seg-btn" id="ms-inverse">Оси наоборот</button>
+      </div>
+      <div class="seg" style="margin-top:6px;">
+        <button class="seg-btn" id="ms-minmax">min и max</button>
+        <button class="seg-btn" id="ms-constraint">С ограничением</button>
+      </div>
+
+      <div class="field f-wrap" id="math-row-f" style="margin-top:12px;">
+        <label id="math-f-label">Функция y = f(x)</label>
+        <div class="f-row">
+          <input type="text" id="inp-mathf" value="x^2" autocomplete="off">
+          <button class="f-help" id="fh-mathf" type="button" aria-expanded="false"
+                  aria-controls="fp-mathf" title="Как писать формулы">?</button>
+        </div>
+        <div class="f-pop" id="fp-mathf" role="region" aria-label="Примеры функций"></div>
+      </div>
+      <div class="error" id="math-error" style="display:none;"></div>
+
+      <!-- 7а. Производная и касательная -->
+      <div id="math-pane-tangent">
+        <div class="field">
+          <label>Точка x₀ = <b id="mathx0-val">1</b></label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+            <input type="range" id="mathx0-slider" min="-10" max="10" step="0.1" value="1" style="flex:1;margin-top:0;">
+            <input type="number" id="mathx0-input" step="0.1" value="1"
+                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          </div>
+        </div>
+        <label class="chk"><input type="checkbox" id="chk-secant"> Секущая через две точки</label>
+        <div class="field" id="mathdx-field" style="display:none;">
+          <label>Шаг Δx = <b id="mathdx-val">2</b></label>
+          <input type="range" id="mathdx-slider" min="0.05" max="5" step="0.05" value="2" style="width:100%;">
+        </div>
+        <div class="hint">Точку можно тянуть прямо по кривой. Треугольник у неё показывает Δx и Δy:
+          их отношение и есть тангенс угла наклона, он же значение производной.
+          Уменьшайте Δx — секущая ложится на касательную.</div>
+      </div>
+
+      <!-- 7б. Оптимизация -->
+      <div id="math-pane-optimum" style="display:none;">
+        <label class="chk"><input type="checkbox" id="chk-convex" checked>
+          <span class="swatch" style="background:var(--curve-d)"></span> Выпуклость и вогнутость</label>
+        <label class="chk"><input type="checkbox" id="chk-inflect" checked>
+          <span class="swatch" style="background:var(--curve-mr)"></span> Точки перегиба</label>
+        <div class="hint">Максимумы и минимумы ищутся по нулям производной, перегибы — по смене
+          знака второй производной. Всё численно, поэтому годится любая функция.</div>
+      </div>
+
+      <!-- 7в. Деформации графика -->
+      <div id="math-pane-transform" style="display:none;">
+        <div class="field">
+          <label for="math-trans">Что делаем с графиком</label>
+          <select id="math-trans">
+            <option value="up">f(x) + a — сдвиг по вертикали</option>
+            <option value="left">f(x + a) — сдвиг по горизонтали</option>
+            <option value="scaleY">a·f(x) — растяжение по вертикали</option>
+            <option value="scaleX">f(a·x) — сжатие по горизонтали</option>
+            <option value="negY">−f(x) — отражение относительно оси x</option>
+            <option value="negX">f(−x) — отражение относительно оси y</option>
+            <option value="absY">|f(x)|</option>
+            <option value="absX">f(|x|)</option>
+          </select>
+        </div>
+        <div class="field" id="math-a-field">
+          <label>Параметр a = <b id="matha-val">1</b></label>
+          <input type="range" id="matha-slider" min="-5" max="5" step="0.1" value="1" style="width:100%;">
+        </div>
+        <div class="hint" id="math-trans-hint"></div>
+      </div>
+
+      <!-- 7г. Перевёрнутые оси -->
+      <div id="math-pane-inverse" style="display:none;">
+        <div class="field f-wrap">
+          <label>Кривая задана как x = g(y)</label>
+          <div class="f-row">
+            <input type="text" id="inp-mathg" value="10 - y^2/10" autocomplete="off">
+            <button class="f-help" id="fh-mathg" type="button" aria-expanded="false"
+                    aria-controls="fp-mathg" title="Как писать формулы">?</button>
+          </div>
+          <div class="f-pop" id="fp-mathg" role="region" aria-label="Примеры функций"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>от y</label><input type="number" id="inp-mathy0" step="0.5" value="0"></div>
+          <div class="field"><label>до y</label><input type="number" id="inp-mathy1" step="0.5" value="10"></div>
+        </div>
+        <div class="hint">Полоски лежат горизонтально, ширина каждой равна g(y), поэтому площадь
+          берётся интегралом по y. По x её здесь не посчитать: одному x отвечают два значения y.</div>
+      </div>
+
+      <!-- 7д. min и max двух функций -->
+      <div id="math-pane-minmax" style="display:none;">
+        <div class="field f-wrap">
+          <label>Вторая функция g(x)</label>
+          <div class="f-row">
+            <input type="text" id="inp-mathg2" value="4 - x" autocomplete="off">
+            <button class="f-help" id="fh-mathg2" type="button" aria-expanded="false"
+                    aria-controls="fp-mathg2" title="Как писать формулы">?</button>
+          </div>
+          <div class="f-pop" id="fp-mathg2" role="region" aria-label="Примеры функций"></div>
+        </div>
+        <div class="seg">
+          <button class="seg-btn active" id="mm-min">Z = min(f, g)</button>
+          <button class="seg-btn" id="mm-max">Z = max(f, g)</button>
+        </div>
+        <div class="hint">Жирным — итоговая Z. Кружками отмечены точки, где функции меняются местами.</div>
+      </div>
+
+      <!-- 7е. Оптимизация с ограничением -->
+      <div id="math-pane-constraint" style="display:none;">
+        <div class="field f-wrap">
+          <label>Целевая функция F(a, b)</label>
+          <div class="f-row">
+            <input type="text" id="inp-mathfc" value="a^0.5 * b^0.5" autocomplete="off">
+            <button class="f-help" id="fh-mathfc" type="button" aria-expanded="false"
+                    aria-controls="fp-mathfc" title="Как писать формулы">?</button>
+          </div>
+          <div class="f-pop" id="fp-mathfc" role="region" aria-label="Примеры функций"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>цена a</label><input type="number" id="inp-mathpa" min="0.1" step="0.5" value="1"></div>
+          <div class="field"><label>цена b</label><input type="number" id="inp-mathpb" min="0.1" step="0.5" value="1"></div>
+          <div class="field"><label>ресурс M</label><input type="number" id="inp-mathm" min="1" step="1" value="10"></div>
+        </div>
+        <div class="hint">Тот же численный движок касания уровня, что рисует изокванты и кривые
+          безразличия, только без экономической привязки: максимум F при pa·a + pb·b = M.
+          Переменные названы a и b, чтобы ничего не подсказывать заранее.</div>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <div class="field"><label>x от</label><input type="number" id="inp-mxmin" step="1" value="-10"></div>
+        <div class="field"><label>x до</label><input type="number" id="inp-mxmax" step="1" value="10"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>y от</label><input type="number" id="inp-mymin" step="1" value="-10"></div>
+        <div class="field"><label>y до</label><input type="number" id="inp-mymax" step="1" value="10"></div>
+      </div>
+    </div>
+
     <!-- Оформление (Фаза 1): подписи графика и свои точки. Секции нет в groups[]
          у setMode, поэтому она видна во всех режимах — эти настройки универсальны. -->
     <div class="section" id="sec-view">
@@ -2144,6 +2358,25 @@ const STATE = {
   // Свои цвета кривых сцены (Фаза 2): ключ = поле COL, значение = hex из пикера.
   // Накладывается в refreshColors поверх токенов; токены остаются как есть.
   colorOverride: {},
+  // ── Раздел «Математика» (Фаза 7). Единственный режим с полным планом:
+  // окно задаётся четырьмя границами, а не Qmax/Pmax первой четверти.
+  mathSub: 'tangent',            // сюжет: tangent|optimum|transform|inverse|minmax|constraint
+  mathFormula: 'x^2',            // общая f(x)
+  mathXmin: -6, mathXmax: 6, mathYmin: -4, mathYmax: 20,
+  mathX0: 1,                     // точка касания (7а)
+  mathDx: 2,                     // шаг Δx для треугольника и секущей
+  mathSecant: false,             // показывать секущую через две точки
+  mathConvex: true,              // заливка по знаку второй производной (7б)
+  mathInflect: true,             // отмечать перегибы
+  mathTrans: 'up',               // вид деформации (7в)
+  mathA: 1,                      // её параметр
+  mathInvFormula: '10 - y^2/10', // x = g(y) (7г)
+  mathY0: 0, mathY1: 10,         // пределы интегрирования по y
+  mathG2: '4 - x',               // вторая функция (7д)
+  mathMinMax: 'min',
+  mathFC: 'a^0.5 * b^0.5',       // целевая функция двух переменных (7е)
+  mathPa: 1, mathPb: 1, mathM: 10,
+  mathRes: null,                 // результат текущего расчёта — для табло
   showCS: true,      // показывать заливку излишка потребителя
   showPS: true,      // показывать заливку излишка производителя
   tax: 0,            // ставка вмешательства (0 = нет); тип задаёт intervType
@@ -7692,6 +7925,7 @@ function setMode(mode) {
     inequality: ['sec-inequality'],
     consumer: ['sec-consumer'],
     macro: ['sec-macro'],
+    math: ['sec-math'],
   };
   const all = new Set([].concat(...Object.values(groups)));
   all.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
@@ -7699,7 +7933,9 @@ function setMode(mode) {
   applyScenarioVisibility();   // уточнить видимость интервенций/панелей по текущему сценарию
   // Секция «Оси» бессмысленна в режиме неравенства (поле всегда 0..100 %) — прячем.
   const axes = document.getElementById('sec-axes');
-  if (axes) axes.style.display = (mode === 'inequality' || mode === 'macro') ? 'none' : '';
+  // «Оси» первой четверти не нужны там, где поле фиксировано (неравенство, макро)
+  // и в «Математике» — у неё свои четыре границы окна.
+  if (axes) axes.style.display = ['inequality', 'macro', 'math'].includes(mode) ? 'none' : '';
   // Первый вход в рынок труда — пресет: спрос на труд D = 100 − L, предложение S = L.
   if (mode === 'labor' && !STATE.laborVisited) {
     STATE.laborVisited = true;
@@ -7717,7 +7953,8 @@ function setMode(mode) {
   if (mode === 'inequality') { STATE.ineqVisited = true; renderIneqGroupsTable(); }
   // При каждом переключении режима — выставлять характерный масштаб осей.
   // Ручные правки в полях «Оси» при смене режима намеренно сбрасываются.
-  if (mode === 'costs') setRanges(10, 50);
+  if (mode === 'math') { /* окно задаёт сам раздел (setMathWindow) */ }
+  else if (mode === 'costs') setRanges(10, 50);
   else setRanges(100, 100);   // market / labor / ppf / inequality — стандартный масштаб 0..100
   // Подписи полей масштаба в секции «Оси»: КПВ — X/Y, рынок труда — L/W, иначе Q/P.
   const lq = document.getElementById('lbl-qmax'), lp = document.getElementById('lbl-pmax');
@@ -9200,6 +9437,7 @@ function redrawScene() {
   if (STATE.mode === 'inequality') { redrawInequality(); return; }   // режим неравенства (ЧК1–3)
   if (STATE.mode === 'consumer')   { redrawConsumer();   return; }   // теория потребителя (Фаза 8)
   if (STATE.mode === 'macro')      { redrawMacro();      return; }   // макромодели (Фазы 16–22)
+  if (STATE.mode === 'math')       { redrawMath();       return; }   // раздел «Математика» (Фаза 7)
   // Под-режимы монополии с собственной отрисовкой (Чекпоинт 2): дискриминация 3-й степени
   // (два мини-графика) и ломаный спрос — самодостаточны, рисуют свои оси и панель.
   if (STATE.mode === 'market' && STATE.market === 'monopoly') {
@@ -9316,6 +9554,8 @@ function redrawScene() {
 // оставляют в sx/sy шкалу ПОСЛЕДНЕЙ панели, и точки уехали бы вместе с ней.
 function mainScales() {
   const m = CONFIG.margin;
+  // В «Математике» окно другое — полный план вместо первой четверти.
+  if (STATE.mode === 'math') return mathScales();
   return {
     mx: d3.scaleLinear().domain([0, CONFIG.Qmax]).range([m.left, W - m.right]),
     my: d3.scaleLinear().domain([0, CONFIG.Pmax]).range([H - m.bottom, m.top]),
@@ -9420,8 +9660,9 @@ function drawMarks() {
   if (!STATE.marks || !STATE.marks.length) return;
   const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'marks');
+  const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
   STATE.marks.forEach(mk => {
-    if (mk.x < 0 || mk.x > CONFIG.Qmax || mk.y < 0 || mk.y > CONFIG.Pmax) return;
+    if (mk.x < xLo || mk.x > xHi || mk.y < yLo || mk.y > yHi) return;
     const px = mx(mk.x), py = my(mk.y);
     // Пунктирные проекции на оси — как у равновесия: так точка читается по осям.
     g.append('line').attr('x1', mx(0)).attr('y1', py).attr('x2', px).attr('y2', py)
@@ -9434,8 +9675,8 @@ function drawMarks() {
       .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.6)
       .style('cursor', 'move')
       .call(d3.drag().container(() => svg.node()).on('drag', ev => {
-        mk.x = Math.max(0, Math.min(CONFIG.Qmax, mx.invert(ev.x)));
-        mk.y = Math.max(0, Math.min(CONFIG.Pmax, my.invert(ev.y)));
+        mk.x = Math.max(xLo, Math.min(xHi, mx.invert(ev.x)));
+        mk.y = Math.max(yLo, Math.min(yHi, my.invert(ev.y)));
         renderMarkList(); redrawAll();
       }));
     // Подпись растёт ВВЕРХ от точки, чтобы не накрывать её саму.
@@ -9527,6 +9768,584 @@ function renderMarkList() {
     row.append(top, inp, mk1, mk2);
     box.appendChild(row);
   });
+}
+
+/* =====================================================================
+   БЛОК 13. МАТЕМАТИКА (Фаза 7) — общий инструментарий, не привязанный ни к
+   одной экономической модели. Шесть сюжетов по учебникам Сафронова и Бахарева:
+     'tangent'    — функция, касательная, производная снизу (7а);
+     'optimum'    — максимумы, минимумы, выпуклость, перегибы (7б);
+     'transform'  — деформации графика одним параметром a (7в);
+     'inverse'    — кривая x = g(y) и площадь интегралом ПО y (7г);
+     'minmax'     — Z = min(f, g) или max(f, g) (7д);
+     'constraint' — максимум F(a, b) при ограничении (7е).
+
+   Отличие от всех прочих режимов: здесь нужен ПОЛНЫЙ план, а не первая
+   четверть (иначе не показать ни f(−x), ни f(|x|), ни обычную параболу).
+   Поэтому у режима свои шкалы и свои оси через начало координат; общий
+   код осей первой четверти не тронут.
+
+   Производные — центральной разностью, как MC и наклон КПВ в остальном
+   движке. Отдельного аналитического дифференциатора нет и не нужно:
+   численный путь работает для любой пользовательской функции, включая
+   кусочные, а на школьных примерах сходится с известным ответом.
+   ===================================================================== */
+
+// Компиляция функции одной переменной. Имя переменной задаётся явно, синоним x
+// добавляет compileVar — поэтому и «x^2», и «y^2/10» разбираются одинаково.
+function compileMath(expr, name) { return compileVar(expr, [name]); }
+function evalMathAt(compiled, name, v) { return compiled ? evalVar(compiled, v, [name]) : NaN; }
+
+// Шаг численного дифференцирования: доля видимого диапазона, а не константа —
+// иначе на окне 0..0.1 шаг «съест» всю картинку, а на 0..1000 потеряет точность.
+function mathH() { return Math.max(1e-6, (STATE.mathXmax - STATE.mathXmin) * 1e-4); }
+function dNum(f, x, h) {
+  h = h || mathH();
+  const a = f(x + h), b = f(x - h);
+  return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / (2 * h);
+}
+function d2Num(f, x, h) {
+  h = h || Math.max(1e-4, mathH() * 20);   // вторая разность шумит сильнее — шаг крупнее
+  const a = f(x + h), c = f(x), b = f(x - h);
+  return (isNaN(a) || isNaN(b) || isNaN(c)) ? NaN : (a - 2 * c + b) / (h * h);
+}
+
+// Готовая f(x) текущего режима или null, если формула не разобралась.
+function mathF() {
+  const { compiled } = compileMath(STATE.mathFormula, 'x');
+  if (!compiled) return null;
+  return (x) => evalMathAt(compiled, 'x', x);
+}
+
+// Нули функции g на отрезке: сетка + бисекция на каждой смене знака.
+// Тем же способом ищутся равновесие и корни во всём остальном движке.
+function rootsOf(g, lo, hi, N) {
+  N = N || 600;
+  const out = [];
+  const push = (r) => {
+    if (r == null || isNaN(r)) return;
+    if (!out.length || Math.abs(r - out[out.length - 1]) > (hi - lo) * 1e-3) out.push(r);
+  };
+  let px = lo, pg = g(lo);
+  for (let i = 1; i <= N; i++) {
+    const x = lo + (hi - lo) * i / N, cur = g(x);
+    if (!isNaN(pg) && !isNaN(cur)) {
+      // Узел РОВНО на нуле — частый случай на школьных примерах: у x² производная
+      // обращается в нуль в x = 0, и это ровно узел сетки. Проверка «произведение
+      // меньше нуля» такой корень пропускает, поэтому нули ловим отдельно.
+      if (pg === 0) push(px);
+      else if (cur === 0) push(x);
+      else if (pg * cur < 0) push(bisect(g, px, x));
+    }
+    px = x; pg = cur;
+  }
+  if (pg === 0) push(hi);
+  return out;
+}
+
+// Экстремумы и перегибы. Экстремум — нуль первой производной, тип определяет
+// знак второй; перегиб — смена знака второй производной.
+function mathAnalyse(f, lo, hi) {
+  const ext = rootsOf((x) => dNum(f, x), lo, hi).map(x => {
+    const s = d2Num(f, x);
+    return { x, y: f(x), kind: (s > 0 ? 'min' : (s < 0 ? 'max' : 'flat')) };
+  }).filter(p => !isNaN(p.y));
+  const inf = rootsOf((x) => d2Num(f, x), lo, hi)
+    .map(x => ({ x, y: f(x) })).filter(p => !isNaN(p.y));
+  // Глобальные — с учётом концов отрезка: у школьных задач ответ часто на краю.
+  let gMax = null, gMin = null;
+  const consider = (x) => {
+    const y = f(x); if (isNaN(y)) return;
+    if (!gMax || y > gMax.y) gMax = { x, y };
+    if (!gMin || y < gMin.y) gMin = { x, y };
+  };
+  ext.forEach(p => consider(p.x));
+  consider(lo); consider(hi);
+  return { ext, inf, gMax, gMin };
+}
+
+// Преобразование графика (7в). Возвращает новую функцию и человеческую подпись.
+const MATH_TRANS = {
+  up:     { tex: 'f(x) + a',  note: 'Плюс a поднимает график, минус опускает.' },
+  left:   { tex: 'f(x + a)',  note: 'Внимание: при a > 0 график уезжает ВЛЕВО, а не вправо. Внутри скобок всё наоборот — это самое частое место, где путаются.' },
+  scaleY: { tex: 'a · f(x)',  note: 'Больше единицы — растягиваем вверх, меньше — прижимаем к оси x, отрицательное — ещё и переворачиваем.' },
+  scaleX: { tex: 'f(a · x)',  note: 'И здесь наоборот: a > 1 СЖИМАЕТ график к оси y, а 0 < a < 1 растягивает.' },
+  negY:   { tex: '−f(x)',     note: 'Отражение относительно оси x: что было сверху, окажется снизу.' },
+  negX:   { tex: 'f(−x)',     note: 'Отражение относительно оси y: правая половина становится левой.' },
+  absY:   { tex: '|f(x)|',    note: 'Всё, что ниже оси x, отражается наверх.' },
+  absX:   { tex: 'f(|x|)',    note: 'Правая половина копируется налево, левая исходная пропадает.' },
+};
+function mathTransformed(f, kind, a) {
+  switch (kind) {
+    case 'up':     return (x) => f(x) + a;
+    case 'left':   return (x) => f(x + a);
+    case 'scaleY': return (x) => a * f(x);
+    case 'scaleX': return (x) => f(a * x);
+    case 'negY':   return (x) => -f(x);
+    case 'negX':   return (x) => f(-x);
+    case 'absY':   return (x) => Math.abs(f(x));
+    case 'absX':   return (x) => f(Math.abs(x));
+    default:       return f;
+  }
+}
+
+/* ── Оси полного плана ──────────────────────────────────────────────────
+   Отдельная функция: общая drawAxes умеет только первую четверть со
+   стрелками из нуля, а здесь ось может пройти по середине холста. */
+function mathScales(yTop, yBot, yLo, yHi) {
+  const m = CONFIG.margin;
+  return {
+    mx: d3.scaleLinear().domain([STATE.mathXmin, STATE.mathXmax]).range([m.left, W - m.right]),
+    my: d3.scaleLinear()
+          .domain([yLo == null ? STATE.mathYmin : yLo, yHi == null ? STATE.mathYmax : yHi])
+          .range([yBot == null ? H - m.bottom : yBot, yTop == null ? m.top : yTop]),
+  };
+}
+function drawPlaneAxes(g, mx, my, xlab, ylab) {
+  const [px0, px1] = mx.range(), [py0, py1] = my.range();
+  const ox = Math.max(px0, Math.min(px1, mx(0)));   // если ноль вне окна — прижимаем к краю
+  const oy = Math.max(py1, Math.min(py0, my(0)));
+  g.append('line').attr('x1', px0).attr('y1', oy).attr('x2', px1).attr('y2', oy)
+    .attr('stroke', COL.ink).attr('stroke-width', 1.4);
+  g.append('line').attr('x1', ox).attr('y1', py0).attr('x2', ox).attr('y2', py1)
+    .attr('stroke', COL.ink).attr('stroke-width', 1.4);
+  mx.ticks(10).forEach(t => {
+    if (Math.abs(t) < 1e-9) return;
+    g.append('line').attr('x1', mx(t)).attr('y1', oy - 3).attr('x2', mx(t)).attr('y2', oy + 3)
+      .attr('stroke', COL.ink).attr('stroke-width', 1);
+    g.append('text').attr('x', mx(t)).attr('y', oy + 7)
+      .attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
+      .attr('font-size', 10).attr('fill', COL.inkSoft)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
+  });
+  my.ticks(8).forEach(t => {
+    if (Math.abs(t) < 1e-9) return;
+    g.append('line').attr('x1', ox - 3).attr('y1', my(t)).attr('x2', ox + 3).attr('y2', my(t))
+      .attr('stroke', COL.ink).attr('stroke-width', 1);
+    g.append('text').attr('x', ox - 6).attr('y', my(t))
+      .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
+      .attr('font-size', 10).attr('fill', COL.inkSoft)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
+  });
+  g.append('text').attr('x', px1 - 2).attr('y', oy - 7).attr('text-anchor', 'end')
+    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text(xlab || 'x');
+  g.append('text').attr('x', ox + 7).attr('y', py1 + 11)
+    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text(ylab || 'y');
+}
+
+// Кривая на полном плане: разрывы (NaN или далеко за окном) режут линию.
+function mathLine(g, f, mx, my, color, width, dash) {
+  const [lo, hi] = mx.domain(), [ylo, yhi] = my.domain();
+  const pad = (yhi - ylo) * 2;
+  const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
+  const pts = [];
+  for (let i = 0; i <= 500; i++) {
+    const x = lo + (hi - lo) * i / 500, v = f(x);
+    pts.push((isNaN(v) || v < ylo - pad || v > yhi + pad) ? null : [x, v]);
+  }
+  const p = g.append('path').datum(pts).attr('fill', 'none')
+    .attr('stroke', color).attr('stroke-width', width || 2.5).attr('d', line);
+  if (dash) p.attr('stroke-dasharray', dash);
+  return pts;
+}
+
+function mathDot(g, mx, my, x, y, color, label, dy) {
+  g.append('circle').attr('cx', mx(x)).attr('cy', my(y)).attr('r', 4.5)
+    .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.6);
+  if (label) g.append('text').attr('x', mx(x) + 8).attr('y', my(y) + (dy == null ? -8 : dy))
+    .attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6).text(label);
+}
+
+/* ── 7а. Производная и касательная ─────────────────────────────────────
+   Две панели с общей осью x: сверху f(x) с точкой и касательной, снизу
+   f′(x) численно. Треугольник у точки показывает Δx и Δy — то самое
+   «тангенс угла, и больше из тригонометрии ничего не нужно». */
+function drawMathTangent(f) {
+  const m = CONFIG.margin;
+  const top = m.top, bottom = H - m.bottom;
+  const gap = 30, hTop = (bottom - top - gap) * 0.6;
+  const yMid = top + hTop;
+  const s1 = mathScales(top, yMid);
+  const dfun = (x) => dNum(f, x);
+  // Масштаб нижней панели — по реальному размаху производной в окне.
+  let dLo = 0, dHi = 0;
+  for (let i = 0; i <= 200; i++) {
+    const x = STATE.mathXmin + (STATE.mathXmax - STATE.mathXmin) * i / 200;
+    const v = dfun(x);
+    if (!isNaN(v) && isFinite(v)) { dLo = Math.min(dLo, v); dHi = Math.max(dHi, v); }
+  }
+  const pad = Math.max(1, (dHi - dLo) * 0.15);
+  const s2 = mathScales(yMid + gap, bottom, dLo - pad, dHi + pad);
+
+  const g = svg.append('g');
+  drawPlaneAxes(g, s1.mx, s1.my, 'x', 'y');
+  drawPlaneAxes(g, s2.mx, s2.my, 'x', 'f′');
+  g.append('text').attr('x', m.left + 4).attr('y', top + 12)
+    .attr('font-size', 11.5).attr('font-weight', 600).attr('fill', COL.inkSoft).text('f(x)');
+  g.append('text').attr('x', m.left + 4).attr('y', yMid + gap + 12)
+    .attr('font-size', 11.5).attr('font-weight', 600).attr('fill', COL.inkSoft).text('f′(x) — производная');
+
+  mathLine(g, f, s1.mx, s1.my, COL.D, 2.6);
+  mathLine(g, dfun, s2.mx, s2.my, COL.MC, 2.4);
+
+  const x0 = STATE.mathX0, y0 = f(x0), k = dfun(x0);
+  STATE.mathRes = { x0, y0, k, secant: null };
+  if (isNaN(y0)) { updateMathPanel(); return; }
+
+  // Касательная: y = y0 + k·(x − x0).
+  if (!isNaN(k)) {
+    mathLine(g, (x) => y0 + k * (x - x0), s1.mx, s1.my, COL.reg, 2, null);
+    // Треугольник Δx / Δy — наглядное «отношение катетов = тангенс = производная».
+    const dx = Math.min(STATE.mathDx, (STATE.mathXmax - STATE.mathXmin) * 0.25);
+    const xa = x0, xb = x0 + dx, ya = y0, yb = y0 + k * dx;
+    const tri = [[s1.mx(xa), s1.my(ya)], [s1.mx(xb), s1.my(ya)], [s1.mx(xb), s1.my(yb)]];
+    g.append('path').attr('d', 'M' + tri.map(p => p.join(',')).join('L') + 'Z')
+      .attr('fill', COL.reg).attr('opacity', 0.14)
+      .attr('stroke', COL.reg).attr('stroke-width', 1.2).attr('stroke-dasharray', '4 3');
+    g.append('text').attr('x', (s1.mx(xa) + s1.mx(xb)) / 2).attr('y', s1.my(ya) + 13)
+      .attr('text-anchor', 'middle').attr('font-size', 10.5).attr('fill', COL.reg)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.4)
+      .text('Δx = ' + fmt(dx));
+    g.append('text').attr('x', s1.mx(xb) + 6).attr('y', (s1.my(ya) + s1.my(yb)) / 2)
+      .attr('dominant-baseline', 'middle').attr('font-size', 10.5).attr('fill', COL.reg)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.4)
+      .text('Δy = ' + fmt(k * dx));
+  }
+
+  // Секущая через две точки — видно, как она ложится на касательную при малом Δx.
+  if (STATE.mathSecant) {
+    const dx = STATE.mathDx, y1 = f(x0 + dx);
+    if (!isNaN(y1)) {
+      const ks = (y1 - y0) / dx;
+      mathLine(g, (x) => y0 + ks * (x - x0), s1.mx, s1.my, COL.tax, 1.8, '6 4');
+      mathDot(g, s1.mx, s1.my, x0 + dx, y1, COL.tax, null);
+      STATE.mathRes.secant = ks;
+    }
+  }
+
+  // Точка касания тянется мышью вдоль кривой.
+  const dot = g.append('circle').attr('cx', s1.mx(x0)).attr('cy', s1.my(y0)).attr('r', 6)
+    .attr('fill', COL.D).attr('stroke', COL.halo).attr('stroke-width', 2).style('cursor', 'ew-resize');
+  dot.call(d3.drag().container(() => svg.node()).on('drag', (ev) => {
+    setMathX0(Math.max(STATE.mathXmin, Math.min(STATE.mathXmax, s1.mx.invert(ev.x))));
+  }));
+  if (!isNaN(k)) mathDot(g, s2.mx, s2.my, x0, k, COL.MC, 'f′ = ' + fmt(k));
+  updateMathPanel();
+}
+
+/* ── 7б. Оптимизация: экстремумы, выпуклость, перегибы ─────────────── */
+function drawMathOptimum(f) {
+  const { mx, my } = mathScales();
+  const g = svg.append('g');
+  drawPlaneAxes(g, mx, my, 'x', 'y');
+  const lo = STATE.mathXmin, hi = STATE.mathXmax;
+
+  // Заливка по знаку второй производной: вверх выпуклая или вниз.
+  if (STATE.mathConvex) {
+    const N = 240, w = (mx.range()[1] - mx.range()[0]) / N;
+    for (let i = 0; i < N; i++) {
+      const x = lo + (hi - lo) * (i + 0.5) / N, s = d2Num(f, x);
+      if (isNaN(s) || Math.abs(s) < 1e-9) continue;
+      g.append('rect').attr('x', mx(lo + (hi - lo) * i / N)).attr('y', my.range()[1])
+        .attr('width', w + 0.6).attr('height', my.range()[0] - my.range()[1])
+        .attr('fill', s > 0 ? COL.D : COL.S).attr('opacity', 0.055);
+    }
+  }
+  mathLine(g, f, mx, my, COL.D, 2.8);
+
+  const a = mathAnalyse(f, lo, hi);
+  STATE.mathRes = a;
+  a.ext.forEach(p => {
+    if (p.y < my.domain()[0] || p.y > my.domain()[1]) return;
+    mathDot(g, mx, my, p.x, p.y, p.kind === 'max' ? COL.S : COL.MC,
+            (p.kind === 'max' ? 'max' : (p.kind === 'min' ? 'min' : 'плато')) + ' ' + fmt(p.y));
+  });
+  if (STATE.mathInflect) a.inf.forEach(p => {
+    if (p.y < my.domain()[0] || p.y > my.domain()[1]) return;
+    mathDot(g, mx, my, p.x, p.y, COL.MR, 'перегиб', 14);
+  });
+  updateMathPanel();
+}
+
+/* ── 7в. Деформации графика ────────────────────────────────────────── */
+function drawMathTransform(f) {
+  const { mx, my } = mathScales();
+  const g = svg.append('g');
+  drawPlaneAxes(g, mx, my, 'x', 'y');
+  const t = mathTransformed(f, STATE.mathTrans, STATE.mathA);
+  mathLine(g, f, mx, my, COL.ghost, 2.2, '6 4');   // исходная — бледным пунктиром
+  mathLine(g, t, mx, my, COL.D, 2.8);
+  labelCurveMath(g, f, mx, my, 'исходная', COL.ghost);
+  labelCurveMath(g, t, mx, my, MATH_TRANS[STATE.mathTrans].tex, COL.D);
+  STATE.mathRes = { trans: STATE.mathTrans, a: STATE.mathA };
+  updateMathPanel();
+}
+// Подпись кривой на полном плане: ищем видимый участок, как в Фазе 3.
+function labelCurveMath(g, f, mx, my, txt, color) {
+  const [lo, hi] = mx.domain(), [ylo, yhi] = my.domain();
+  for (let i = 0; i <= 60; i++) {
+    const x = hi - (hi - lo) * (0.06 + i * 0.014);
+    const v = f(x);
+    if (!isNaN(v) && v >= ylo && v <= yhi) {
+      g.append('text').attr('x', mx(x) - 4).attr('y', my(v) - 7).attr('text-anchor', 'end')
+        .attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
+        .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6).text(txt);
+      return;
+    }
+  }
+}
+
+/* ── 7г. Перевёрнутые оси: x = g(y), площадь интегралом ПО y ──────── */
+function drawMathInverse() {
+  const { compiled } = compileMath(STATE.mathInvFormula, 'y');
+  const g = svg.append('g');
+  const { mx, my } = mathScales();
+  drawPlaneAxes(g, mx, my, 'x', 'y');
+  if (!compiled) { STATE.mathRes = { error: true }; updateMathPanel(); return; }
+  const gy = (y) => evalMathAt(compiled, 'y', y);
+
+  // Кривая рисуется «по y»: для каждого y берём x = g(y).
+  const [ylo, yhi] = my.domain();
+  const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
+  const pts = [];
+  for (let i = 0; i <= 400; i++) {
+    const y = ylo + (yhi - ylo) * i / 400, x = gy(y);
+    pts.push(isNaN(x) ? null : [x, y]);
+  }
+  g.append('path').datum(pts).attr('fill', 'none')
+    .attr('stroke', COL.D).attr('stroke-width', 2.8).attr('d', line);
+
+  // Горизонтальные полоски — из них и складывается интеграл по y.
+  const y0 = Math.min(STATE.mathY0, STATE.mathY1), y1 = Math.max(STATE.mathY0, STATE.mathY1);
+  const N = 26;
+  for (let i = 0; i < N; i++) {
+    const ya = y0 + (y1 - y0) * i / N, yb = y0 + (y1 - y0) * (i + 1) / N;
+    const xw = gy((ya + yb) / 2);
+    if (isNaN(xw)) continue;
+    g.append('rect').attr('x', mx(0)).attr('y', my(yb))
+      .attr('width', Math.max(0, mx(xw) - mx(0))).attr('height', Math.max(0, my(ya) - my(yb)))
+      .attr('fill', COL.D).attr('opacity', 0.14)
+      .attr('stroke', COL.D).attr('stroke-width', 0.5).attr('stroke-opacity', 0.35);
+  }
+  // Та же самая integrate(), просто применённая к переменной y.
+  const area = integrate(gy, y0, y1);
+  STATE.mathRes = { area, y0, y1 };
+  g.append('text').attr('x', (mx(0) + mx(gy((y0 + y1) / 2) || 0)) / 2).attr('y', my((y0 + y1) / 2))
+    .attr('text-anchor', 'middle').attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.D)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
+    .text('S = ' + fmt(area));
+  updateMathPanel();
+}
+
+/* ── 7д. Z = min(f, g) или max(f, g) ──────────────────────────────── */
+function drawMathMinMax(f) {
+  const { compiled } = compileMath(STATE.mathG2, 'x');
+  const { mx, my } = mathScales();
+  const g = svg.append('g');
+  drawPlaneAxes(g, mx, my, 'x', 'y');
+  if (!compiled) { STATE.mathRes = { error: true }; updateMathPanel(); return; }
+  const g2 = (x) => evalMathAt(compiled, 'x', x);
+  const isMin = (STATE.mathMinMax === 'min');
+  const z = (x) => {
+    const a = f(x), b = g2(x);
+    if (isNaN(a)) return b; if (isNaN(b)) return a;
+    return isMin ? Math.min(a, b) : Math.max(a, b);
+  };
+  mathLine(g, f, mx, my, COL.D, 1.8, '5 4');
+  mathLine(g, g2, mx, my, COL.S, 1.8, '5 4');
+  mathLine(g, z, mx, my, COL.MC, 3.2);
+  labelCurveMath(g, f, mx, my, 'f', COL.D);
+  labelCurveMath(g, g2, mx, my, 'g', COL.S);
+  // Точки, где функции меняются местами — корни f − g.
+  const sw = rootsOf((x) => f(x) - g2(x), STATE.mathXmin, STATE.mathXmax);
+  sw.forEach(x => { const y = f(x); if (!isNaN(y)) mathDot(g, mx, my, x, y, COL.MC, null); });
+  STATE.mathRes = { switches: sw, isMin };
+  updateMathPanel();
+}
+
+/* ── 7е. Оптимизация с ограничением ───────────────────────────────────
+   Переиспользует движок касания уровня Фазы 7 прошлой сессии
+   (optimizeAlongConstraint / traceLevelCurve). Своей математики здесь нет —
+   только нейтральные названия осей a и b вместо x, y или L, K. */
+// Своя компиляция F(a, b): общая compileTwoVar пробует формулу на x/y/L/K, и на
+// «a^0.5 * b^0.5» падает на неизвестном символе. Трогать её не стали — у неё свои
+// пользователи (потребитель, изокванты), а тут добавлены только имена a и b.
+function compileAB(expr) {
+  try {
+    const compiled = math.parse(expr).compile();
+    compiled.evaluate({ a: 1, b: 1, x: 1, y: 1, L: 1, K: 1 });
+    return { compiled, error: null };
+  } catch (e) { return { compiled: null, error: 'Не понял формулу F(a, b): ' + e.message }; }
+}
+
+function drawMathConstraint() {
+  const g = svg.append('g');
+  const { compiled, error } = compileAB(STATE.mathFC);
+  const m = CONFIG.margin;
+  const pa = Math.max(0.01, STATE.mathPa), pb = Math.max(0.01, STATE.mathPb), M = Math.max(0.01, STATE.mathM);
+  // Оси по ограничению: край = сколько получится купить на весь ресурс.
+  const aMax = niceMax(M / pa * 1.25), bMax = niceMax(M / pb * 1.25);
+  const mx = d3.scaleLinear().domain([0, aMax]).range([m.left, W - m.right]);
+  const my = d3.scaleLinear().domain([0, bMax]).range([H - m.bottom, m.top]);
+  drawPlaneAxes(g, mx, my, 'a', 'b');
+  if (!compiled) {
+    STATE.mathRes = { error: error || 'не понял формулу' };
+    updateMathPanel(); return;
+  }
+  const f = (a, b) => {
+    try {
+      const v = compiled.evaluate({ a, b, x: a, y: b, L: a, K: b });
+      return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+    } catch (e) { return NaN; }
+  };
+  // Линия ограничения pa·a + pb·b = M.
+  const line = d3.line().x(d => mx(d[0])).y(d => my(d[1]));
+  g.append('path').datum([[0, M / pb], [M / pa, 0]]).attr('fill', 'none')
+    .attr('stroke', COL.S).attr('stroke-width', 2.6).attr('d', line);
+
+  const opt = optimizeAlongConstraint(f, pa, pb, M);
+  STATE.mathRes = { opt, pa, pb, M };
+  if (opt) {
+    // Веер линий уровня + линия, проходящая через оптимум (она и касается ограничения).
+    [0.55, 0.78, 1.25].forEach(k => drawLevelCurveOn(g, mx, my, f, opt.value * k, COL.D, 1.5, 0.32));
+    drawLevelCurveOn(g, mx, my, f, opt.value, COL.D, 2.6, 1);
+    mathDot(g, mx, my, opt.a, opt.b, COL.ink, 'оптимум (' + fmt(opt.a) + '; ' + fmt(opt.b) + ')');
+  }
+  updateMathPanel();
+}
+// Линия уровня F = const на своих шкалах (движок трассировки — общий).
+function drawLevelCurveOn(g, mx, my, f, level, color, width, opacity) {
+  const pts = traceLevelCurve(f, level, mx.domain()[1], my.domain()[1], 220);
+  if (!pts || pts.length < 2) return;
+  const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
+  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
+    .attr('stroke-width', width).attr('opacity', opacity).attr('d', line);
+}
+
+// Табло раздела.
+function updateMathPanel() {
+  const box = document.getElementById('info-math');
+  if (!box) return;
+  const r = STATE.mathRes || {};
+  let html = '';
+  if (STATE.mathSub === 'tangent') {
+    if (isNaN(r.y0)) html = '<div class="warn">В этой точке функция не определена.</div>';
+    else {
+      html += `<div class="stat"><span>Точка x₀</span><b>${fmt(r.x0)}</b></div>`;
+      html += `<div class="stat"><span>f(x₀)</span><b>${fmt(r.y0)}</b></div>`;
+      html += `<div class="stat"><span>Наклон касательной f′(x₀)</span><b>${fmt(r.k)}</b></div>`;
+      html += `<div class="stat"><span>Угол наклона</span><b>${fmt(Math.atan(r.k) * 180 / Math.PI)}°</b></div>`;
+      if (r.secant != null) {
+        html += `<div class="stat"><span>Наклон секущей</span><b>${fmt(r.secant)}</b></div>`;
+        html += `<div class="stat"><span>Разница с касательной</span><b>${fmt(Math.abs(r.secant - r.k))}</b></div>`;
+      }
+      html += `<div class="hint">Уравнение касательной: y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '−'} ${fmt(Math.abs(r.k))}·(x ${r.x0 >= 0 ? '−' : '+'} ${fmt(Math.abs(r.x0))}).</div>`;
+    }
+  } else if (STATE.mathSub === 'optimum') {
+    if (r.gMax) html += `<div class="stat"><span>Наибольшее на отрезке</span><b>${fmt(r.gMax.y)} при x = ${fmt(r.gMax.x)}</b></div>`;
+    if (r.gMin) html += `<div class="stat"><span>Наименьшее на отрезке</span><b>${fmt(r.gMin.y)} при x = ${fmt(r.gMin.x)}</b></div>`;
+    (r.ext || []).forEach(p => {
+      html += `<div class="stat"><span>${p.kind === 'max' ? 'Локальный максимум' : (p.kind === 'min' ? 'Локальный минимум' : 'Плато')}</span><b>x = ${fmt(p.x)}, y = ${fmt(p.y)}</b></div>`;
+    });
+    (r.inf || []).forEach(p => { html += `<div class="stat"><span>Перегиб</span><b>x = ${fmt(p.x)}</b></div>`; });
+    if (!html) html = '<div class="muted">На этом отрезке ни экстремумов, ни перегибов.</div>';
+  } else if (STATE.mathSub === 'transform') {
+    const t = MATH_TRANS[STATE.mathTrans];
+    html += `<div class="stat"><span>Преобразование</span><b>${t.tex}</b></div>`;
+    html += `<div class="stat"><span>Параметр a</span><b>${fmt(STATE.mathA)}</b></div>`;
+    html += `<div class="hint">${t.note}</div>`;
+  } else if (STATE.mathSub === 'inverse') {
+    if (r.error) html = '<div class="warn">Не понял формулу x = g(y).</div>';
+    else {
+      html += `<div class="stat"><span>Площадь</span><b>${fmt(r.area)}</b></div>`;
+      html += `<div class="stat"><span>Пределы по y</span><b>от ${fmt(r.y0)} до ${fmt(r.y1)}</b></div>`;
+      html += '<div class="hint">Считали ∫ g(y) dy по y, а не по x: полоски горизонтальные.</div>';
+    }
+  } else if (STATE.mathSub === 'minmax') {
+    if (r.error) html = '<div class="warn">Не понял формулу g(x).</div>';
+    else {
+      html += `<div class="stat"><span>Строим</span><b>Z = ${r.isMin ? 'min' : 'max'}(f, g)</b></div>`;
+      html += `<div class="stat"><span>Функции меняются местами</span><b>${(r.switches || []).length ? r.switches.map(fmt).join(', ') : 'нигде'}</b></div>`;
+    }
+  } else if (STATE.mathSub === 'constraint') {
+    if (r.error) html = `<div class="warn">${r.error}</div>`;
+    else if (!r.opt) html = '<div class="muted">Оптимум не нашёлся: проверьте формулу и ресурс.</div>';
+    else {
+      html += `<div class="stat"><span>a*</span><b>${fmt(r.opt.a)}</b></div>`;
+      html += `<div class="stat"><span>b*</span><b>${fmt(r.opt.b)}</b></div>`;
+      html += `<div class="stat"><span>F(a*, b*)</span><b>${fmt(r.opt.value)}</b></div>`;
+      html += `<div class="stat"><span>Ограничение</span><b>${fmt(r.pa)}·a + ${fmt(r.pb)}·b = ${fmt(r.M)}</b></div>`;
+    }
+  }
+  box.innerHTML = html;
+}
+
+function redrawMath() {
+  svg.selectAll('*').remove();
+  addDefs();
+  const err = document.getElementById('math-error');
+  // Сюжеты со своей формулой f(x) не нужны «Ограничению» и «Осям наоборот».
+  if (STATE.mathSub === 'constraint') { if (err) err.style.display = 'none'; drawMathConstraint(); return; }
+  if (STATE.mathSub === 'inverse')    { if (err) err.style.display = 'none'; drawMathInverse();    return; }
+  const f = mathF();
+  if (!f) {
+    if (err) { err.style.display = 'block'; err.textContent = 'Не понял формулу f(x).'; }
+    const { mx, my } = mathScales();
+    drawPlaneAxes(svg.append('g'), mx, my, 'x', 'y');
+    STATE.mathRes = {}; updateMathPanel(); return;
+  }
+  if (err) err.style.display = 'none';
+  if (STATE.mathSub === 'tangent')   drawMathTangent(f);
+  else if (STATE.mathSub === 'optimum')   drawMathOptimum(f);
+  else if (STATE.mathSub === 'transform') drawMathTransform(f);
+  else if (STATE.mathSub === 'minmax')    drawMathMinMax(f);
+}
+
+// Переключение сюжета: показываем нужную панель и характерный пример.
+const MATH_PRESETS = {
+  tangent:    { f: 'x^2',            win: [-6, 6, -4, 20] },
+  optimum:    { f: 'x^3 - 3*x',      win: [-3, 3, -6, 6] },
+  transform:  { f: 'x^2',            win: [-8, 8, -6, 14] },
+  inverse:    { f: 'x^2',            win: [-2, 12, -1, 11] },
+  minmax:     { f: 'x^2',            win: [-5, 6, -3, 12] },
+  constraint: { f: 'x^2',            win: [0, 12, 0, 12] },
+};
+function setMathSub(sub, keepFormula) {
+  STATE.mathSub = sub;
+  [['ms-tangent', 'tangent'], ['ms-optimum', 'optimum'], ['ms-transform', 'transform'],
+   ['ms-inverse', 'inverse'], ['ms-minmax', 'minmax'], ['ms-constraint', 'constraint']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === sub); });
+  ['tangent', 'optimum', 'transform', 'inverse', 'minmax', 'constraint'].forEach(v => {
+    const p = document.getElementById('math-pane-' + v);
+    if (p) p.style.display = (v === sub) ? '' : 'none';
+  });
+  // «Ограничение» и «Оси наоборот» пользуются своими полями, общее f(x) им не нужно.
+  const rowF = document.getElementById('math-row-f');
+  if (rowF) rowF.style.display = (sub === 'constraint' || sub === 'inverse') ? 'none' : '';
+  const p = MATH_PRESETS[sub];
+  if (p && !keepFormula) {
+    STATE.mathFormula = p.f;
+    const inp = document.getElementById('inp-mathf');
+    if (inp) { inp.value = p.f; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+    setMathWindow(p.win[0], p.win[1], p.win[2], p.win[3]);
+  }
+  redrawAll();
+}
+function setMathWindow(x0, x1, y0, y1) {
+  STATE.mathXmin = x0; STATE.mathXmax = x1; STATE.mathYmin = y0; STATE.mathYmax = y1;
+  [['inp-mxmin', x0], ['inp-mxmax', x1], ['inp-mymin', y0], ['inp-mymax', y1]]
+    .forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.value = v; });
+  const sl = document.getElementById('mathx0-slider');
+  if (sl) { sl.min = x0; sl.max = x1; sl.step = (x1 - x0) / 200; }
+  setMathX0(Math.max(x0, Math.min(x1, STATE.mathX0)));
+}
+function setMathX0(x) {
+  STATE.mathX0 = x;
+  const v = document.getElementById('mathx0-val'); if (v) v.textContent = fmt(x);
+  const s = document.getElementById('mathx0-slider'); if (s) s.value = x;
+  const n = document.getElementById('mathx0-input'); if (n) n.value = Math.round(x * 100) / 100;
+  redrawAll();
 }
 
 /* ---------------------------------------------------------------------
@@ -9987,6 +10806,25 @@ const FORMULA_EXAMPLES = {
     ['min(x/1, y/2)',   'совершенные комплементы'],
     ['x + 2*sqrt(y)',   'квазилинейные'],
   ] },
+  // Раздел «Математика» (Фаза 7): произвольная функция одной переменной.
+  MATHF: { title: 'Функция y = f(x)', items: [
+    ['x^2',                    'парабола'],
+    ['x^3 - 3*x',              'кубическая: максимум, минимум, перегиб'],
+    ['sqrt(abs(x))',           'корень из модуля'],
+    ['x < 0 ? -x : x^2',       'кусочная: условие ? … : …'],
+  ] },
+  MATHY: { title: 'Кривая как x = g(y)', items: [
+    ['10 - y^2/10', 'парабола, лежащая на боку'],
+    ['sqrt(100 - y^2)', 'четверть окружности'],
+    ['4 + 2*y',     'прямая'],
+    ['20/(y + 1)',  'гипербола'],
+  ] },
+  MATHAB: { title: 'Целевая функция F(a, b)', items: [
+    ['a^0.5 * b^0.5', 'корень из произведения'],
+    ['a^0.3 * b^0.7', 'с перекосом в b'],
+    ['2*a + b',       'линейная'],
+    ['min(a/1, b/2)', 'жёсткая пропорция'],
+  ] },
   PPF: { title: 'Граница возможностей Y = f(X)', items: [
     ['100 - X',          'линейная — пост. альт. издержки'],
     ['sqrt(10000 - X^2)', 'дуга — растущие альт. издержки'],
@@ -10249,6 +11087,12 @@ function pickScene(key) {
     ppfsum:() => { setMode('ppf'); setPpfSub('sum'); },
     trade: () => { setMode('ppf'); setPpfSub('trade'); setTradeScenario('A'); },
     tradeprice: () => { setMode('ppf'); setPpfSub('trade'); setTradeScenario('B'); },
+    'm-tangent':    () => { setMode('math'); setMathSub('tangent'); },
+    'm-optimum':    () => { setMode('math'); setMathSub('optimum'); },
+    'm-transform':  () => { setMode('math'); setMathSub('transform'); },
+    'm-inverse':    () => { setMode('math'); setMathSub('inverse'); },
+    'm-minmax':     () => { setMode('math'); setMathSub('minmax'); },
+    'm-constraint': () => { setMode('math'); setMathSub('constraint'); },
     smallopen: () => loadScene('smallopen'),
     monoexport: () => loadScene('monoexport'),
     free:  () => { STATE.curves = []; curveCounter = 0; STATE.scenario = 'none';
@@ -10287,12 +11131,16 @@ const SCENE_NAMES = {
   smallopen: 'Малая открытая экономика',
   monoexport: 'Монополист, торгующий с миром',
   free: 'Свободный холст',
+  // Математика (Фаза 7) — общий инструментарий, вне экономических моделей.
+  'm-tangent': 'Производная и касательная', 'm-optimum': 'Максимумы и минимумы',
+  'm-transform': 'Деформации графика', 'm-inverse': 'Оси наоборот',
+  'm-minmax': 'Функции min и max', 'm-constraint': 'Оптимум при ограничении',
 };
 // Блоки результатов в табло (порядок = порядок показа). info-eq переносим вместе
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
 const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
   'info-prod', 'info-iso', 'info-plants', 'info-labor',
-  'info-inequality', 'info-consumer', 'info-macro', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
+  'info-inequality', 'info-consumer', 'info-macro', 'info-math', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
 
 function relocateForScene() {
@@ -11021,6 +11869,10 @@ function wireControls() {
   attachFormulaHelp('fh-formula', 'fp-formula', 'inp-formula', () => STATE.curveForm);
   attachFormulaHelp('fh-tc', 'fp-tc', 'inp-tc', 'TC');
   attachFormulaHelp('fh-ppf', 'fp-ppf', 'inp-ppf', 'PPF');
+  attachFormulaHelp('fh-mathf', 'fp-mathf', 'inp-mathf', 'MATHF');
+  attachFormulaHelp('fh-mathg', 'fp-mathg', 'inp-mathg', 'MATHY');
+  attachFormulaHelp('fh-mathg2', 'fp-mathg2', 'inp-mathg2', 'MATHF');
+  attachFormulaHelp('fh-mathfc', 'fp-mathfc', 'inp-mathfc', 'MATHAB');
 
   // Галочки показа областей CS и PS.
   const cs = document.getElementById('chk-cs');
@@ -11434,6 +12286,82 @@ function wireControls() {
 
   // Готовые сцены раздаёт окно сценариев (#scene-picker) — второго списка кнопок нет.
 
+  /* ── Раздел «Математика» (Фаза 7) ─────────────────────────────────── */
+  [['ms-tangent', 'tangent'], ['ms-optimum', 'optimum'], ['ms-transform', 'transform'],
+   ['ms-inverse', 'inverse'], ['ms-minmax', 'minmax'], ['ms-constraint', 'constraint']]
+    .forEach(([id, sub]) => {
+      const b = document.getElementById(id);
+      if (b) b.addEventListener('click', () => setMathSub(sub));
+    });
+
+  // Поля формул раздела: правка сразу перерисовывает график.
+  [['inp-mathf', 'mathFormula'], ['inp-mathg', 'mathInvFormula'],
+   ['inp-mathg2', 'mathG2'], ['inp-mathfc', 'mathFC']].forEach(([id, key]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('input', () => { STATE[key] = e.value; redrawAll(); });
+  });
+
+  // Числовые поля раздела (границы окна, пределы по y, цены и ресурс).
+  [['inp-mxmin', 'mathXmin'], ['inp-mxmax', 'mathXmax'],
+   ['inp-mymin', 'mathYmin'], ['inp-mymax', 'mathYmax'],
+   ['inp-mathy0', 'mathY0'], ['inp-mathy1', 'mathY1'],
+   ['inp-mathpa', 'mathPa'], ['inp-mathpb', 'mathPb'], ['inp-mathm', 'mathM']].forEach(([id, key]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('change', () => {
+      const v = parseFloat(e.value);
+      if (!isNaN(v)) { STATE[key] = v; redrawAll(); }
+    });
+  });
+
+  // Точка касания: ползунок, числовое поле (её же тянут мышью по кривой).
+  const mx0s = document.getElementById('mathx0-slider');
+  if (mx0s) mx0s.addEventListener('input', () => setMathX0(parseFloat(mx0s.value)));
+  const mx0i = document.getElementById('mathx0-input');
+  if (mx0i) mx0i.addEventListener('change', () => {
+    const v = parseFloat(mx0i.value); if (!isNaN(v)) setMathX0(v);
+  });
+  // Секущая через две точки: ползунок Δx появляется вместе с галочкой.
+  const secChk = document.getElementById('chk-secant');
+  if (secChk) secChk.addEventListener('change', () => {
+    STATE.mathSecant = secChk.checked;
+    const f = document.getElementById('mathdx-field');
+    if (f) f.style.display = secChk.checked ? '' : 'none';
+    redrawAll();
+  });
+  const dxs = document.getElementById('mathdx-slider');
+  if (dxs) dxs.addEventListener('input', () => {
+    STATE.mathDx = parseFloat(dxs.value);
+    const v = document.getElementById('mathdx-val'); if (v) v.textContent = fmt(STATE.mathDx);
+    redrawAll();
+  });
+  [['chk-convex', 'mathConvex'], ['chk-inflect', 'mathInflect']].forEach(([id, key]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('change', () => { STATE[key] = e.checked; redrawAll(); });
+  });
+  // Деформации: вид преобразования и его параметр.
+  const trSel = document.getElementById('math-trans');
+  if (trSel) trSel.addEventListener('change', () => {
+    STATE.mathTrans = trSel.value;
+    const h = document.getElementById('math-trans-hint');
+    if (h) h.textContent = MATH_TRANS[STATE.mathTrans].note;
+    redrawAll();
+  });
+  const aSl = document.getElementById('matha-slider');
+  if (aSl) aSl.addEventListener('input', () => {
+    STATE.mathA = parseFloat(aSl.value);
+    const v = document.getElementById('matha-val'); if (v) v.textContent = fmt(STATE.mathA);
+    redrawAll();
+  });
+  const mmMin = document.getElementById('mm-min'), mmMax = document.getElementById('mm-max');
+  if (mmMin) mmMin.addEventListener('click', () => {
+    STATE.mathMinMax = 'min'; mmMin.classList.add('active'); mmMax.classList.remove('active'); redrawAll();
+  });
+  if (mmMax) mmMax.addEventListener('click', () => {
+    STATE.mathMinMax = 'max'; mmMax.classList.add('active'); mmMin.classList.remove('active'); redrawAll();
+  });
+  { const h = document.getElementById('math-trans-hint');
+    if (h) h.textContent = MATH_TRANS[STATE.mathTrans].note; }
+
   // Оформление (Фаза 1): заголовок графика и свои названия осей.
   const gTitle = document.getElementById('inp-gtitle');
   if (gTitle) gTitle.addEventListener('input', () => { STATE.graphTitle = gTitle.value; redrawAll(); });
@@ -11451,8 +12379,9 @@ function wireControls() {
     const { mx, my } = mainScales();
     const [px, py] = d3.pointer(ev, chartEl);
     const x = mx.invert(px), y = my.invert(py);
+    const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
     armMark(false);
-    if (x < 0 || x > CONFIG.Qmax || y < 0 || y > CONFIG.Pmax) return;   // щелчок мимо поля
+    if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
     addMarkAt(x, y);
   });
   // Esc снимает взведённый режим — иначе курсор-перекрестие остаётся «залипшим».
