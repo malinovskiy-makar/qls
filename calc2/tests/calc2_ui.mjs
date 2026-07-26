@@ -544,6 +544,57 @@ await t('нет ИИ-штампов в видимом тексте', () => page.
   return found.length === 0 || found.join(', ');
 }));
 
+/* --- Прилипание своих точек к кривым ----------------------------------- */
+await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
+await page.evaluate(() => openPicker());
+await page.click('.scard[data-scene="sd"]');   // D = 100 − Q, S = Q, равновесие (50; 50)
+await page.waitForTimeout(340);
+
+await t('щелчок рядом с кривой садится на кривую', () => page.evaluate(() => {
+  const { mx, my } = mainScales();
+  const h = snapPointAt(mx(30), my(72));       // мимо спроса на 2 по цене
+  if (!h) return 'не прилипло';
+  // На спросе D = 100 − Q цена и количество обязаны сойтись в сумме к 100.
+  return (h.name === 'D' && Math.abs(h.x + h.y - 100) < 0.5) || JSON.stringify(h);
+}));
+
+await t('рядом с перекрестьем точка садится в пересечение', () => page.evaluate(() => {
+  const { mx, my } = mainScales();
+  const h = snapPointAt(mx(49), my(51));
+  return (h && h.cross && Math.abs(h.x - 50) < 0.2 && Math.abs(h.y - 50) < 0.2)
+         || JSON.stringify(h);
+}));
+
+await t('в пустом месте ничего не притягивается', () => page.evaluate(() => {
+  const { mx, my } = mainScales();
+  // При Q = 20 спрос даёт 80, предложение 20: цена 55 далека от обеих кривых.
+  return snapPointAt(mx(20), my(55)) === null || 'притянуло на пустом месте';
+}));
+
+await t('точка на кривой скользит по ней при перетаскивании', () => page.evaluate(() => {
+  const { mx, my } = mainScales();
+  const h = snapPointAt(mx(70), my(72));       // рядом с предложением S = Q
+  if (!h) return 'не прилипло к S';
+  addMarkAt(h.x, h.y, h.cross ? null : h.name);
+  const m = STATE.marks[STATE.marks.length - 1];
+  if (m.snapTo !== 'S') return 'привязка: ' + m.snapTo;
+  const f = markSnapFn(m);
+  if (!f) return 'функция кривой не нашлась';
+  m.x = 30; m.y = f(30);                        // как при перетаскивании
+  const ok = Math.abs(m.y - 30) < 1e-6;         // на S = Q высота равна Q
+  STATE.marks = []; renderMarkList(); redrawAll();
+  return ok || 'после сдвига y = ' + m.y;
+}));
+
+await t('подсказка показывает, куда сядет точка, и убирается', () => page.evaluate(() => {
+  const { mx, my } = mainScales();
+  armMark(true);
+  showSnapHint(snapPointAt(mx(30), my(71)));
+  const shown = !!document.getElementById('snap-hint');
+  armMark(false);                               // снятие режима убирает кружок
+  return (shown && !document.getElementById('snap-hint')) || `показан ${shown}`;
+}));
+
 /* --- Легенда закрашенных областей -------------------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 

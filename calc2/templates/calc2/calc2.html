@@ -10283,7 +10283,12 @@ function drawMarks() {
       .style('cursor', 'move')
       .call(d3.drag().container(() => svg.node()).on('drag', ev => {
         mk.x = Math.max(xLo, Math.min(xHi, mx.invert(ev.x)));
-        mk.y = Math.max(yLo, Math.min(yHi, my.invert(ev.y)));
+        // Точка, посаженная на кривую, при перетаскивании скользит ПО ней:
+        // тянем только вдоль оси X, высоту берём с самой кривой.
+        const f = markSnapFn(mk);
+        const onCurve = f ? f(mk.x) : NaN;
+        mk.y = isFinite(onCurve) ? onCurve
+             : Math.max(yLo, Math.min(yHi, my.invert(ev.y)));
         renderMarkList(); redrawAll();
       }));
     // Подпись растёт ВВЕРХ от точки, чтобы не накрывать её саму.
@@ -10297,6 +10302,99 @@ function drawMarks() {
   });
 }
 
+/* ---------------------------------------------------------------------
+   ПРИЛИПАНИЕ ТОЧЕК К КРИВЫМ
+   Попасть щелчком ровно в кривую мышью невозможно, а точка нужна именно НА
+   ней: «отметьте выпуск при цене 60» теряет смысл, если отметка висит рядом.
+   Поэтому щелчок в пределах нескольких пикселей от кривой сажает точку на
+   кривую, а щелчок в пустом месте оставляет её там, где щёлкнули.
+   Если рядом сразу две кривые, метят почти наверняка в их пересечение:
+   там и ставим, честно решая f1(x) = f2(x).
+   --------------------------------------------------------------------- */
+const SNAP_PX = 14;   // на каком расстоянии от кривой щелчок считается «в неё»
+
+// К чему можно прилипнуть в текущей сцене. Кривые берём готовыми функциями:
+// откуда они взялись, прилипанию знать не нужно.
+function snapTargets() {
+  const out = [];
+  if (STATE.mode === 'costs' && STATE.costsSub === 'costs' && STATE.costsReady) {
+    if (STATE.showMC)  out.push({ name: 'MC',  f: costMC });
+    if (STATE.showATC) out.push({ name: 'ATC', f: costATC });
+    if (STATE.showAVC) out.push({ name: 'AVC', f: costAVC });
+    if (STATE.showAFC) out.push({ name: 'AFC', f: costAFC });
+    return out;
+  }
+  if (STATE.mode === 'costs' && STATE.costsSub === 'production' && STATE.prodReady) {
+    if (STATE.showTP) out.push({ name: 'TP', f: prodEval });
+    return out;
+  }
+  if (STATE.mode === 'ppf' && STATE.ppfSub === 'single' && STATE.ppfReady) {
+    out.push({ name: 'КПВ', f: evalPpf });
+    return out;
+  }
+  STATE.curves.filter(c => c.visible && !isVertical(c)).forEach(c => {
+    out.push({ name: curveShortName(c), f: (q) => evalCurve(c, q) });
+  });
+  return out;
+}
+
+// Ближайшая точка НА кривых к пикселю (px, py) или null, если все далеко.
+function snapPointAt(px, py) {
+  const { mx, my } = mainScales();
+  const targets = snapTargets();
+  if (!targets.length) return null;
+  const [xLo, xHi] = mx.domain();
+  const near = [];
+  targets.forEach(t => {
+    let bd = Infinity, bx = null, by = null;
+    const N = 300;
+    for (let i = 0; i <= N; i++) {
+      const x = xLo + (xHi - xLo) * i / N;
+      const y = t.f(x);
+      if (!isFinite(y)) continue;
+      const d = Math.hypot(mx(x) - px, my(y) - py);
+      if (d < bd) { bd = d; bx = x; by = y; }
+    }
+    if (bx !== null && bd <= SNAP_PX) near.push({ t, d: bd, x: bx, y: by });
+  });
+  if (!near.length) return null;
+  near.sort((a, b) => a.d - b.d);
+
+  // Две кривые в пределах допуска — метят в пересечение. Ищем его в окне
+  // вокруг щелчка шириной в тот же допуск, переведённый в единицы данных.
+  if (near.length >= 2) {
+    const span = Math.abs(mx.invert(px + SNAP_PX * 2) - mx.invert(px - SNAP_PX * 2));
+    const a = near[0].t, b = near[1].t;
+    const r = findRootIn((x) => a.f(x) - b.f(x),
+                         Math.max(xLo, near[0].x - span), Math.min(xHi, near[0].x + span));
+    if (r != null && isFinite(a.f(r))) {
+      return { x: r, y: a.f(r), name: a.name + ' и ' + b.name, cross: true };
+    }
+  }
+  return { x: near[0].x, y: near[0].y, name: near[0].t.name, cross: false };
+}
+
+// Подсказка при наведении во взведённом режиме: кружок там, куда сядет точка.
+// Двигаем отдельный элемент, а не перерисовываем весь холст: перерисовка на
+// каждое движение мыши заметно тормозила бы.
+function showSnapHint(hit) {
+  let c = document.getElementById('snap-hint');
+  if (!hit) { if (c) c.remove(); return; }
+  const { mx, my } = mainScales();
+  if (!c) {
+    c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('id', 'snap-hint');
+    c.setAttribute('r', '7');
+    c.setAttribute('fill', 'none');
+    c.setAttribute('stroke-width', '2');
+    c.setAttribute('pointer-events', 'none');
+    svg.node().appendChild(c);
+  }
+  c.setAttribute('cx', mx(hit.x));
+  c.setAttribute('cy', my(hit.y));
+  c.setAttribute('stroke', hit.cross ? COL.reg : COL.ink);
+}
+
 let markCounter = 0;
 
 // Взвести/снять режим «следующий щелчок по графику ставит точку».
@@ -10306,6 +10404,7 @@ function armMark(on) {
   if (b) { b.classList.toggle('armed', on); b.textContent = on ? 'Щёлкните по графику' : 'Поставить точку'; }
   const wrap = document.getElementById('graph-wrap');
   if (wrap) wrap.style.cursor = on ? 'crosshair' : '';
+  if (!on) showSnapHint(null);   // снятый режим не оставляет кружок-подсказку
 }
 
 // Сброс оформления при выборе новой сцены: чужие подписи осей и точки
@@ -10320,14 +10419,24 @@ function resetDecor() {
   renderMarkList();
 }
 
-function addMarkAt(x, y) {
+function addMarkAt(x, y, snapTo) {
   markCounter++;
   STATE.marks.push({
     id: markCounter, x, y, text: 'Точка ' + markCounter,
     showCoords: true, showCurves: false,
+    // Имя кривой, на которой сидит точка. Пока оно задано, точка при
+    // перетаскивании скользит ПО кривой, а не отрывается от неё.
+    snapTo: snapTo || null,
   });
   renderMarkList();
   redrawAll();
+}
+
+// Функция кривой, к которой привязана точка (или null, если привязки нет).
+function markSnapFn(mk) {
+  if (!mk.snapTo) return null;
+  const t = snapTargets().filter(t => t.name === mk.snapTo)[0];
+  return t ? t.f : null;
 }
 
 // Список своих точек в панели: подпись, что показывать, удаление.
@@ -10373,6 +10482,17 @@ function renderMarkList() {
     mk2.append(c2, document.createTextNode('значения кривых'));
 
     row.append(top, inp, mk1, mk2);
+
+    // Точка, посаженная на кривую, скользит по ней. Галочка отпускает её,
+    // если нужно поставить отметку рядом, а не на самой кривой.
+    if (mk.snapTo) {
+      const mk3 = document.createElement('label');
+      mk3.className = 'chk';
+      const c3 = document.createElement('input'); c3.type = 'checkbox'; c3.checked = true;
+      c3.addEventListener('change', () => { if (!c3.checked) mk.snapTo = null; renderMarkList(); redrawAll(); });
+      mk3.append(c3, document.createTextNode('держать на кривой ' + mk.snapTo));
+      row.appendChild(mk3);
+    }
     box.appendChild(row);
   });
 }
@@ -13419,12 +13539,25 @@ function wireControls() {
     if (!STATE.markArm) return;
     const { mx, my } = mainScales();
     const [px, py] = d3.pointer(ev, chartEl);
-    const x = mx.invert(px), y = my.invert(py);
     const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
     armMark(false);
+    showSnapHint(null);
+    // Рядом с кривой точка садится НА неё, в пустом месте остаётся где щёлкнули.
+    const hit = snapPointAt(px, py);
+    const x = hit ? hit.x : mx.invert(px);
+    const y = hit ? hit.y : my.invert(py);
     if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
-    addMarkAt(x, y);
+    // К пересечению точку не привязываем: скольжение по одной из кривых увело
+    // бы её из перекрестья, а смысл отметки именно в нём.
+    addMarkAt(x, y, hit && !hit.cross ? hit.name : null);
   });
+  // Подсказка: пока режим взведён, показываем кружком, куда сядет точка.
+  if (chartEl) chartEl.addEventListener('mousemove', (ev) => {
+    if (!STATE.markArm) return;
+    const [px, py] = d3.pointer(ev, chartEl);
+    showSnapHint(snapPointAt(px, py));
+  });
+  if (chartEl) chartEl.addEventListener('mouseleave', () => showSnapHint(null));
   // Esc снимает взведённый режим — иначе курсор-перекрестие остаётся «залипшим».
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && STATE.markArm) armMark(false); });
   renderMarkList();
