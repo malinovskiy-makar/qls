@@ -1,0 +1,91 @@
+{% extends 'catalog/base.html' %}
+{% comment %}
+  Доска вызова дня. Сортировка: по счёту вниз, при равенстве — кто раньше
+  закончил, тот выше (правило должно быть задано, иначе одинаковый вход
+  даст разный порядок).
+
+  На доске только вошедшие в аккаунт: у анонима нет имени, а «аноним №4»
+  ничего не значит. Играть при этом может кто угодно.
+{% endcomment %}
+{% block title %}Доска вызова дня — {{ mode_title }}{% endblock %}
+
+{% block extra_style %}
+<style>
+  .db-wrap { max-width: 780px; margin: 0 auto; padding: 26px 20px 60px; }
+  .db-wrap h1 { font-size: 1.5rem; }
+  .db-sub { color: var(--muted); margin-top: 6px; }
+  .db-acts { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .db-btn {
+    display: inline-block; padding: 8px 16px; border-radius: 10px;
+    text-decoration: none; font-weight: 600; font-size: .9rem;
+    background: var(--btn-bg); color: var(--on-btn); border: 1px solid var(--btn-bg);
+  }
+  .db-btn.ghost { background: var(--surface); color: var(--text);
+                  border-color: var(--border); }
+  .db-box { margin-top: 20px; border: 1px solid var(--border);
+            border-radius: 12px; background: var(--surface); overflow-x: auto; }
+  table.db { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  table.db th, table.db td { padding: 9px 12px; text-align: left;
+                             border-bottom: 1px solid var(--border); }
+  table.db th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+  table.db td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.db tr.me { background: var(--accent-tint); font-weight: 600; }
+  table.db tr.gap td { text-align: center; color: var(--muted); }
+  .db-empty { padding: 28px; text-align: center; color: var(--muted); }
+  .db-note { margin-top: 12px; font-size: .84rem; color: var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="db-wrap">
+  <h1>Вызов дня · {{ mode_title }}</h1>
+  <p class="db-sub">
+    {{ day|date:"d E Y" }} · {{ gset.size }} вопр. · сыграли: {{ total }}
+    {% if not is_today %} · архивная доска{% endif %}
+  </p>
+  <div class="db-acts">
+    {% if is_today %}<a class="db-btn" href="{{ play_url }}">Играть</a>{% endif %}
+    <a class="db-btn ghost" href="{% url 'game:daily' %}">Все вызовы дня</a>
+    <a class="db-btn ghost" href="{{ yesterday_url }}">Вчерашняя доска</a>
+  </div>
+
+  <div class="db-box">
+    <table class="db">
+      <thead>
+        <tr><th>Место</th><th>Ник</th><th class="num">Счёт</th>
+            <th class="num">Точность</th><th class="num">Макс. комбо</th></tr>
+      </thead>
+      <tbody>
+      {% for r in top %}
+        <tr class="{% if r.is_me %}me{% endif %}">
+          <td class="num">{{ r.place }}</td>
+          <td>{{ r.name }}</td>
+          <td class="num">{{ r.score }}</td>
+          <td class="num">{{ r.accuracy }}%</td>
+          <td class="num">×{{ r.max_combo }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="db-empty">
+          Сегодня этот вызов ещё никто не прошёл. Будь первым.
+        </td></tr>
+      {% endfor %}
+      {% if my_row %}
+        <tr class="gap"><td colspan="5">⋯</td></tr>
+        <tr class="me">
+          <td class="num">{{ my_row.place }}</td>
+          <td>{{ my_row.name }}</td>
+          <td class="num">{{ my_row.score }}</td>
+          <td class="num">{{ my_row.accuracy }}%</td>
+          <td class="num">×{{ my_row.max_combo }}</td>
+        </tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="db-note">
+    Сортировка: по счёту, при равенстве выше тот, кто закончил раньше.
+    На доску попадают только вошедшие в аккаунт.
+  </p>
+</div>
+{% endblock %}

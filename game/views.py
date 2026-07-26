@@ -19,6 +19,7 @@
   Серверного лидерборда пока нет, поэтому анти-чит сводится к сокрытию
   правильных ответов.
 """
+import datetime
 import json
 import random
 from fractions import Fraction
@@ -26,7 +27,7 @@ from fractions import Fraction
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import IntegrityError
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.templatetags.static import static
 from django.urls import reverse
@@ -59,7 +60,7 @@ MIN_TOPIC_POOL = 30
 # Готовность поверхностей нижнего ряда стартового экрана. Ставится в TRUE
 # той фазой, которая приносит соответствующую страницу; до этого вход
 # помечен «скоро» и никуда не ведёт.
-HAS_DAILY = False
+HAS_DAILY = True     # Фаза 4 — /game/daily/
 HAS_DUEL = False
 
 
@@ -1062,6 +1063,79 @@ def set_question_stats(gset):
             'percent': round(100 * cell['correct'] / tries) if tries else None,
         })
     return rows
+
+
+# ---------------------------------------------------------------------------
+# Вызов дня
+# ---------------------------------------------------------------------------
+
+@require_safe
+def daily_page(request):
+    """Четыре карточки вызова дня — по одной на режим."""
+    from . import daily as daily_mod
+    day = daily_mod.today()
+    cards = []
+    for key, m in config.MODES.items():
+        gset = daily_mod.get_daily_set(key, day)
+        if gset is None:
+            continue     # в пуле нет вопросов этого типа — вызова нет
+        mine = None
+        if request.user.is_authenticated:
+            mine = gset.results.filter(user=request.user).first()
+        played = bool(mine) or gset.code in played_set_codes(request)
+        cards.append({
+            'mode': key,
+            'title': m['title'],
+            'size': gset.size,
+            'code': gset.code,
+            'played': played,
+            'my_score': mine.score if mine else None,
+            'play_url': reverse('game:set_page', args=[gset.code]),
+            'board_url': reverse('game:daily_board', args=[key]),
+        })
+    return render(request, 'game/daily.html', {
+        'cards': cards,
+        'day': day,
+        'reset_at': daily_mod.next_reset().isoformat(),
+    })
+
+
+@require_safe
+def daily_board(request, mode, day=None):
+    """Доска вызова дня: топ-50 + твоё место, если ты вне топа."""
+    from . import daily as daily_mod
+    if mode not in config.MODES:
+        raise Http404('Неизвестный режим')
+    if day:
+        try:
+            day_obj = datetime.datetime.strptime(day, '%Y-%m-%d').date()
+        except ValueError:
+            raise Http404('Неверная дата')
+    else:
+        day_obj = daily_mod.today()
+    # Вчерашнюю доску показываем, но задним числом наборы не создаём:
+    # архив дальше вчера не требуется, а плодить наборы за прошлое нечестно.
+    create = day_obj == daily_mod.today()
+    gset = daily_mod.get_daily_set(mode, day_obj, create=create)
+    if gset is None:
+        raise Http404('Вызова на этот день нет')
+
+    me = request.user if request.user.is_authenticated else None
+    top, my_row, total = daily_mod.board_rows(gset, me)
+    yesterday = day_obj - datetime.timedelta(days=1)
+    return render(request, 'game/daily_board.html', {
+        'gset': gset,
+        'mode': mode,
+        'mode_title': config.MODES[mode]['title'],
+        'day': day_obj,
+        'is_today': day_obj == daily_mod.today(),
+        'top': top,
+        'my_row': my_row,
+        'total': total,
+        'play_url': reverse('game:set_page', args=[gset.code]),
+        'yesterday_url': reverse('game:daily_board_day',
+                                 args=[mode, yesterday.isoformat()]),
+    })
 
 
 @require_POST
