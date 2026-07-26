@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -181,4 +182,6 @@ GAME_GENERATED_ENABLED = True
 # семейство (game/figures/), они не зависят от семнадцати архетипов, и
 # включаться должны отдельным решением. По умолчанию ВЫКЛЮЧЕН — до
 # визуальной приёмки преподавателем.
-GAME_FIGURE_ENABLED = False
+# Локально включается переменной окружения — чтобы посмотреть режим глазами,
+# не правя настройки:  GAME_FIGURE_ENABLED=1 ./venv/bin/python manage.py runserver
+GAME_FIGURE_ENABLED = os.environ.get('GAME_FIGURE_ENABLED', '') == '1'

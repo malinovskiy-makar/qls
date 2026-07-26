@@ -84,6 +84,11 @@ class PriceCeiling(Scenario):
             cap = p - d * gap                          # потолок
             if c < 0 or cap <= 0 or cap <= c:
                 continue      # ниже точки выхода предложения продавать некому
+            # ⚠️ Требование к КАРТИНКЕ (см. тот же комментарий у налога):
+            # потолок обязан заметно кусать, а предложение — начинаться
+            # низко, иначе треугольник потерь вырождается в волосок.
+            if (p - cap) * 4 < p or c * 3 > p * 2:
+                continue
             q_sold = q - gap                           # короткая сторона
             q_demanded = q + (d * gap) / b             # длинная сторона
             if q_demanded.denominator != 1:
@@ -175,7 +180,20 @@ class PriceCeiling(Scenario):
 
     # ---------------- чертёж ----------------
     def frame(self, params):
-        return axis_max(params['q_demanded']), axis_max(params['a'])
+        u"""Рамка ТОЛЬКО из params — и по ЦЕНАМ, а не по свободному члену.
+
+        Та же беда, что у налога: `axis_max(a)` тянул верх оси к цене
+        спроса при нулевом объёме, и треугольник потерь превращался в
+        волосок. Верх берём по самой высокой ЗНАЧИМОЙ цене — цене спроса
+        при проданном объёме и цене предложения при объёме спроса (вторая
+        нужна инжектору «продано по стороне спроса»). Кривые выше рамки
+        обрежет clip_linear.
+        """
+        p_demand = Fraction(params['p']) + params['b'] * params['gap']
+        p_supply_long = (Fraction(params['c'])
+                         + params['d'] * params['q_demanded'])
+        return (axis_max(params['q_demanded']),
+                axis_max(max(p_demand, p_supply_long)))
 
     def draw(self, params, solution):
         xmax, ymax = self.frame(params)

@@ -257,6 +257,30 @@ a:focus-visible, button:focus-visible {
   display: inline-block; width: 1.5px; height: 13px;
   background: var(--rush-accent); margin-left: 2px;
 }
+/* Макет режима «График»: чертёж слева, четыре шага проверки справа —
+   картинкой понятнее, чем абзацем «найди первый неверный шаг». */
+.mock-audit { display: flex; gap: 7px; align-items: stretch; }
+.mock-chart {
+  flex: 0 0 46%; height: 44px; border-radius: 7px; position: relative;
+  border: 1px solid var(--rush-border); background: var(--surface-2);
+  overflow: hidden;
+}
+.mock-chart i {
+  position: absolute; left: 6px; right: 6px; bottom: 6px; top: 30%;
+  border-left: 1.5px solid var(--rush-border);
+  border-bottom: 1.5px solid var(--rush-border);
+}
+.mock-chart b {
+  position: absolute; left: 26%; top: 40%; width: 34%; height: 34%;
+  background: var(--rush-accent); opacity: .35; border-radius: 2px;
+}
+.mock-steps { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.mock-steps span {
+  flex: 1; border-radius: 5px; border: 1px solid var(--rush-border);
+  background: var(--surface-2);
+}
+/* второй шаг подсвечен рамкой акцента — «вот здесь и сломалось» */
+.mock-steps span:nth-child(2) { border-color: var(--rush-accent); }
 .mock-tiles {
   display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
 }
@@ -532,6 +556,14 @@ a:focus-visible, button:focus-visible {
   flex-wrap: wrap;
 }
 @media (max-width: 720px) {
+  /* На узком экране кнопки над чертежом встают ОБЫЧНОЙ строкой, а не
+     поверх него: наложенные, они закрывают верх графика. */
+  .fig-tools { position: static; justify-content: flex-end; margin-bottom: 6px; }
+  /* Подсказка про клавиши на телефоне бессмысленна — там кнопка рядом. */
+  .fig-hint { display: none; }
+  /* В развороте варианты компактнее: каждый лишний пиксель у них —
+     отнятый у чертежа, ради которого разворот и открыт. */
+  body.figfull .opts .opt { padding: 9px 12px; font-size: 15px; }
   /* Четыре чертежа на 380px нечитаемы: тап увеличивает плитку на весь
      экран, второй тап (или кнопка) засчитывает ответ. */
   .opts.opts-figure.has-zoom .opt-tile { display: none; }
@@ -541,6 +573,126 @@ a:focus-visible, button:focus-visible {
   }
   .opts.opts-figure.has-zoom .opt-tile.zoomed .mi-figure svg { width: 100%; }
 }
+
+/* Формулировка режима «График»: одна на все сюжеты, поэтому и подана
+   отдельно от условия — как правило игры, а не как часть задачи. */
+.q-prompt {
+  margin: 2px 2px 6px; font-size: 14px; font-weight: 700;
+  color: var(--rush-accent); letter-spacing: .01em;
+}
+
+/* Разбор ошибок режима «График»: два чертежа рядом. */
+.mi-figpair { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.mi-figcell { flex: 1 1 320px; min-width: 0; }
+.mi-figcell b {
+  display: block; font-size: 12px; color: var(--rush-dim);
+  margin: 0 0 2px 2px; font-weight: 600;
+}
+.mi-figdiff {
+  flex: 1 1 100%; margin: 2px 0 0; font-size: 13px; font-weight: 600;
+  color: var(--rush-accent);
+}
+
+/* ── Режим «График»: чертёж чужого решения и его разворот ─────────
+   Игроку показывают ОДИН размеченный чертёж, а варианты ответа — обычные
+   текстовые, четыре штуки в фиксированном порядке. */
+.fig-wrap { position: relative; margin: 10px 0 4px; }
+.fig-holder {
+  background: var(--rush-card);
+  border: 1px solid var(--rush-line);
+  border-radius: 14px;
+  padding: 6px;
+  cursor: zoom-in;
+}
+.fig-holder .mi-figure { margin: 0; }
+/* ⚠️ Потолок высоты в СВЁРНУТОМ виде. Без него чертёж съедает весь экран,
+   и варианты 3–4 уходят под сгиб — играть приходится со скроллом. Видно
+   только в браузере: ни один тест высоту экрана не знает. */
+.fig-holder .mi-figure svg {
+  max-height: 34vh; width: auto; max-width: 100%; margin: 0 auto;
+}
+.fig-tools {
+  position: absolute; top: 10px; right: 12px; z-index: 3;
+  display: flex; gap: 8px;
+}
+.fig-btn {
+  font: inherit; font-size: 13px; font-weight: 600;
+  padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  color: var(--rush-fg); background: var(--rush-bg);
+  border: 1px solid var(--rush-line);
+}
+.fig-btn:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+.fig-hint { font-size: 12.5px; color: var(--rush-dim); margin: 4px 2px 0; }
+
+/* Разворот на весь экран — НАЛОЖЕНИЕ средствами CSS, а НЕ системный
+   Fullscreen API: системный на iOS ведёт себя непредсказуемо и умеет
+   съедать клавиатурные события и таймер. Здесь же и таймер, и варианты
+   ответа остаются на экране и продолжают работать. */
+body.figfull { overflow: hidden; }
+/* Навигация сайта в развороте скрывается: она липкая, с z-index 200 в
+   инлайн-стиле, и накрывала собой и полосу времени, и таймер — то есть
+   ровно то, что в развороте обязано быть видно. !important нужен потому,
+   что display объявлен инлайном (переопределить иначе нечем). */
+body.figfull nav { display: none !important; }
+body.figfull .time-track {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 71; margin: 0;
+  border-radius: 0;
+}
+body.figfull .hud {
+  position: fixed; top: 8px; left: 0; right: 0; z-index: 71;
+  padding: 0 16px; margin: 0;
+}
+body.figfull .q-chips, body.figfull .keys-hint,
+body.figfull .q-prompt { display: none; }
+/* условие сворачивается: на чертёж нужно всё место, а текст уже прочитан */
+body.figfull .q-card {
+  position: fixed; z-index: 73; left: 12px; right: 12px; top: 62px;
+  max-height: 0; padding: 0; border-width: 0; overflow: hidden;
+  min-height: 0; transition: none;
+  /* ⚠️ Свёрнутое условие обязано быть НЕКЛИКАБЕЛЬНЫМ. Ноль высоты его от
+     этого не спасает: карточка вспыхивает по ошибке (.flash-bad), а
+     анимация двигает её бокс — и невидимая полоса начинает перехватывать
+     нажатия на кнопки над чертежом. Поймано браузером, тесты этого класса
+     дефектов не видят. */
+  pointer-events: none;
+}
+body.figfull.figtext .q-card {
+  /* ⚠️ Развёрнутое условие начинается НИЖЕ полосы кнопок над чертежом.
+     Иначе оно накрывает собой кнопку «Условие», и свернуть его обратно
+     нечем — тупик, который видно только в браузере. */
+  top: 100px;
+  max-height: 46vh; overflow: auto; padding: 14px 16px; border-width: 1px;
+  pointer-events: auto;
+}
+body.figfull .fig-wrap {
+  position: fixed; z-index: 70; left: 0; right: 0; top: 58px;
+  bottom: var(--fig-bar, 116px); margin: 0; padding: 6px 12px 0;
+  background: var(--rush-bg);
+  display: flex; flex-direction: column;
+}
+body.figfull .fig-holder {
+  flex: 1; min-height: 0; cursor: zoom-out;
+  display: flex; align-items: center; justify-content: center;
+  overflow: auto;                 /* на телефоне работает щипковое увеличение */
+  touch-action: pinch-zoom;
+}
+body.figfull .fig-holder .mi-figure { width: 100%; }
+body.figfull .fig-holder .mi-figure { width: 100%; height: 100%; }
+/* В развороте чертёж ЗАПОЛНЯЕТ отведённое место: width+height по 100 %,
+   пропорции держит preserveAspectRatio самого SVG. Без height:100 % он
+   вставал по натуральной высоте и болтался маленьким посреди пустоты —
+   ровно то, ради чего разворот и делается, не работало. */
+body.figfull .fig-holder .mi-figure svg {
+  max-width: none; max-height: none; width: 100%; height: 100%;
+}
+body.figfull .opts {
+  position: fixed; z-index: 72; left: 0; right: 0; bottom: 0; margin: 0;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--rush-bg); border-top: 1px solid var(--rush-line);
+}
+/* Виньетка последней жизни в развороте вдвое бледнее: она обязана
+   напоминать, но не мешать читать чертёж. */
+body.figfull .last-life-frame.on { opacity: .42; }
 
 /* ── Последняя жизнь ──────────────────────────────────────────────
    Красная виньетка по краю, пульсация сердец и полоса времени
@@ -1516,7 +1668,27 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
            одним ребёнком (см. её стиль), а лишние дети вставали в ряд
            рядом с текстом вопроса. -->
       <div class="q-chips"><span class="gen-chip" id="gen-chip" hidden>Тренировочный</span><span class="stat-chip" id="stat-chip" hidden></span></div>
+      <!-- Формулировка режима «График» — ОТДЕЛЬНОЙ строкой над условием:
+           она одна и та же на все сюжеты, и слипаясь с условием, читается
+           как часть задачи. -->
+      <p class="q-prompt" id="q-prompt" hidden></p>
       <div class="q-card" id="q-card"><div class="q-text" id="q-text"></div></div>
+      <!-- Режим «График»: чертёж чужого решения. Разворачивается на весь
+           экран НАЛОЖЕНИЕМ (CSS), варианты и таймер при этом остаются
+           видимыми и рабочими. -->
+      <div class="fig-wrap" id="fig-wrap" hidden>
+        <div class="fig-tools">
+          <!-- ⚠️ Пропуск здесь кнопкой и клавишей S, а не пробелом: в этом
+               режиме пробел разворачивает чертёж (так задумано), и без
+               отдельной кнопки пропуск стал бы недоступен вовсе. -->
+          <button class="fig-btn" id="fig-skip" type="button">Пропустить (S)</button>
+          <button class="fig-btn" id="fig-text" type="button" hidden>Условие</button>
+          <button class="fig-btn" id="fig-expand" type="button">⤢ Развернуть (F)</button>
+          <button class="fig-btn" id="fig-close" type="button" hidden>✕ Свернуть (Esc)</button>
+        </div>
+        <div class="fig-holder" id="fig-holder"></div>
+        <p class="fig-hint" id="fig-hint">Клик по чертежу, F или пробел — развернуть на весь экран</p>
+      </div>
       <div class="opts" id="opts"></div>
       <div class="multi-actions" id="multi-actions" hidden>
         <button class="btn-submit" id="btn-submit" disabled>Ответить</button>
@@ -1718,10 +1890,21 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
                mock: 'check' },
     classic: { emoji: '🧮', kind: 'как классика — числовой ответ вводом',
                mock: 'input' },
-    figure:  { emoji: '📈', kind: 'как классика с доской — выбери верный график',
-               mock: 'tiles' }
+    figure:  { emoji: '📈',
+               kind: 'как разбор у доски — найди первый неверный шаг в чужом решении',
+               mock: 'audit' }
   };
   var MODE_ORDER = ['bullet', 'blitz', 'rapid', 'classic', 'figure'];
+
+  /* Названия шагов режима «График» — те же четыре варианта ответа, что
+     приходят с сервера, и в том же порядке. Порядок фиксирован: он и есть
+     правильный порядок проверки чужого решения. */
+  var STEP_TITLE = {
+    points: 'координаты точек',
+    region: 'заштрихованная область',
+    value: 'вычисление',
+    clean: 'ошибки не было'
+  };
 
   /* Рекорды — отдельно на режим; старый общий ключ считаем рекордом блица */
   function bestKey(m) { return 'econ_rush_best_' + m; }
@@ -1872,6 +2055,13 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       inp.className = 'mock-input';
       inp.innerHTML = '<span>12,5</span><i class="mock-caret"></i>';
       box.appendChild(inp);
+    } else if (kind === 'audit') {
+      var au = document.createElement('div');
+      au.className = 'mock-audit';
+      au.innerHTML = '<div class="mock-chart"><i></i><b></b></div>'
+        + '<div class="mock-steps"><span></span><span></span>'
+        + '<span></span><span></span></div>';
+      box.appendChild(au);
     } else if (kind === 'tiles') {
       var tiles = document.createElement('div');
       tiles.className = 'mock-tiles';
@@ -2236,9 +2426,13 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var isBool = q.type === 'boolean';
     var isNumeric = q.type === 'numeric';
     var isFigure = q.type === 'figure_choice';
+    var isAudit = q.type === 'figure_audit';
 
     var card = $('q-text');
     card.textContent = q.question;
+    $('q-prompt').hidden = !isAudit;
+    $('q-prompt').textContent = isAudit ? q.prompt : '';
+    paintAuditFigure(isAudit ? q : null);
     $('gen-chip').hidden = !q.generated;
     $('stat-chip').hidden = true;   // статистика приходит только с ответом
     if (!REDUCED) {
@@ -2317,7 +2511,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // подсказка под сеткой — своя на каждый тип вопроса
     var hint = $('keys-hint');
     if (hint) {
-      if (isFigure) {
+      if (isAudit) {
+        hint.textContent = 'Клавиши 1–4 — ответ · F или пробел — развернуть '
+          + 'чертёж · S — ' + skipLabel();
+      } else if (isFigure) {
         hint.textContent = NARROW()
           ? 'Тап — увеличить чертёж, второй тап — ответить · пробел — '
             + skipLabel()
@@ -2335,6 +2532,57 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       }
     }
   }
+
+  /* ---------- РЕЖИМ «ГРАФИК»: чертёж и его разворот ----------
+     Разворот сделан НАЛОЖЕНИЕМ через класс на <body>, а не системным
+     Fullscreen API. Причина не в лени: системный полноэкранный режим на
+     iOS ведёт себя непредсказуемо и умеет съесть и клавиатурные события,
+     и таймер, а таймер здесь обязан идти и быть виден. */
+  var figFull = false;
+
+  function paintAuditFigure(q) {
+    var wrap = $('fig-wrap');
+    var holder = $('fig-holder');
+    holder.innerHTML = '';
+    if (!q) { wrap.hidden = true; setFigFull(false); return; }
+    wrap.hidden = false;
+    var node = typeof window.drawFigure === 'function'
+      ? window.drawFigure(q.figure) : null;
+    if (node) { holder.appendChild(node); }
+  }
+
+  function setFigFull(on) {
+    figFull = !!on && !$('fig-wrap').hidden;
+    document.body.classList.toggle('figfull', figFull);
+    /* Сколько места оставить снизу — РОВНО столько, сколько занимают
+       варианты ответа. Числом в CSS это не задать: на 380px четыре строки
+       вдвое выше, чем на десктопе, и чертёж болтался бы в пустоте. */
+    if (figFull) {
+      var bar = $('opts').getBoundingClientRect().height;
+      document.body.style.setProperty('--fig-bar', Math.round(bar + 8) + 'px');
+    } else {
+      document.body.style.removeProperty('--fig-bar');
+    }
+    document.body.classList.remove('figtext');
+    $('fig-expand').hidden = figFull;
+    $('fig-close').hidden = !figFull;
+    $('fig-text').hidden = !figFull;
+    $('fig-hint').hidden = figFull;
+  }
+
+  function toggleFigFull() { setFigFull(!figFull); }
+
+  $('fig-holder').addEventListener('click', function (e) {
+    // тап ВНЕ чертежа в развороте — закрыть (сам чертёж остаётся кликабельным)
+    if (figFull && e.target === this) { setFigFull(false); return; }
+    toggleFigFull();
+  });
+  $('fig-expand').addEventListener('click', function () { setFigFull(true); });
+  $('fig-close').addEventListener('click', function () { setFigFull(false); });
+  $('fig-text').addEventListener('click', function () {
+    document.body.classList.toggle('figtext');
+  });
+  $('fig-skip').addEventListener('click', function () { skip(); });
 
   /* мультивыбор: клавиша/тап переключает выделение, Enter/кнопка — отправка */
   /* Узкий экран: четыре чертежа на 380px нечитаемы. Первый тап
@@ -2452,7 +2700,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // solution приходит только у сгенерированных вопросов (после ответа) —
     // «Разобрать ошибки» показывает его вместо ссылки в каталог.
     misses.push({ q: q, solution: (d && d.solution) || null,
-                  figure: (d && d.figure) || null });
+                  figure: (d && d.figure) || null,
+                  // эталонный чертёж режима «График»: разбор показывает
+                  // «как было в решении» и «как правильно» рядом
+                  figureRef: (d && d.figure_ref) || null,
+                  step: (d && d.injected_step) || '' });
   }
 
   /* Оверлей «Забег окончен» — только для конца по жизням: по времени
@@ -2470,9 +2722,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     }, REDUCED ? 250 : 1100);
   }
 
-  // boolean / single: один клик — один ответ
+  // boolean / single / figure_audit: один клик — один ответ
   function answer(choice) {
     if (state !== 'playing' || inputLocked || !current) return;
+    // разворот закрываем: обратную связь (верно/неверно, сердца, дельту
+    // времени) видно только на обычном экране
+    if (figFull) setFigFull(false);
     inputLocked = true;
     var q = current;
     postAnswer({ question_id: q.id, choice: choice }, function (d) {
@@ -3005,7 +3260,37 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         sol.hidden = true;
         // Чертёж (если архетип графический) — над шагами решения: сначала
         // «как это выглядит», потом «как это считается».
-        if (m.figure) {
+        // У режима «График» чертежей ДВА: «как было в решении» и «как
+        // правильно», рядом. Рисует их тот же единственный рисователь.
+        if (m.figureRef) {
+          var pair = document.createElement('div');
+          pair.className = 'mi-figpair';
+          /* ⚠️ Когда ошибки НЕ БЫЛО, чертёж один: два одинаковых с
+             подписями «как было» и «как правильно» — это загадка, а не
+             разбор. Видно только в браузере на живом промахе. */
+          var rows = m.step === 'clean'
+            ? [['решение было верным — ошибки нет', m.figureRef]]
+            : [['как было в решении', m.figure],
+               ['как правильно', m.figureRef]];
+          rows.forEach(function (row) {
+            var cell = document.createElement('div');
+            cell.className = 'mi-figcell';
+            var cap = document.createElement('b');
+            cap.textContent = row[0];
+            cell.appendChild(cap);
+            var node = drawFigure(row[1]);
+            if (node) cell.appendChild(node);
+            pair.appendChild(cell);
+          });
+          if (m.step && m.step !== 'clean') {
+            var diff = document.createElement('p');
+            diff.className = 'mi-figdiff';
+            diff.textContent = 'Первый неверный шаг: '
+              + (STEP_TITLE[m.step] || m.step);
+            pair.appendChild(diff);
+          }
+          sol.insertBefore(pair, sol.firstChild);
+        } else if (m.figure) {
           var fig = drawFigure(m.figure);
           if (fig) sol.insertBefore(fig, sol.firstChild);
         }
@@ -3757,6 +4042,26 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     }
     if (state === 'playing') {
       if (!current) return;
+      if (current.type === 'figure_audit') {
+        /* ⚠️ Здесь пробел РАЗВОРАЧИВАЕТ чертёж, а не пропускает вопрос:
+           без разворота режим не играется (чертёж мелкий), и это главное
+           действие экрана. Пропуск при этом не потерян — он на S и на
+           кнопке рядом с чертежом. */
+        if (e.key === 'f' || e.key === 'F' || e.key === 'а' || e.key === 'А'
+            || e.key === ' ') {
+          e.preventDefault(); toggleFigFull(); return;
+        }
+        if (e.key === 'Escape' && figFull) {
+          e.preventDefault(); setFigFull(false); return;
+        }
+        if (e.key === 's' || e.key === 'S' || e.key === 'ы' || e.key === 'Ы') {
+          e.preventDefault(); skip(); return;
+        }
+        if (e.key >= '1' && e.key <= '4') {
+          e.preventDefault(); answer(parseInt(e.key, 10) - 1); return;
+        }
+        return;
+      }
       if (current.type === 'numeric') {
         // цифры и знаки идут в поле ввода; глобально ловим только Enter
         if (e.key === 'Enter') { e.preventDefault(); submitNumeric(); }

@@ -272,3 +272,85 @@ class PoolLifecycleTests(TestCase):
         call_command('purge_figure_questions', stdout=StringIO())
         self.assertFalse(GameQuestion.objects.filter(id=self.gq.id).exists())
         self.assertTrue(GameQuestion.objects.filter(id=other.id).exists())
+
+
+class ClientTests(TestCase):
+    u"""Разметка и логика клиента для режима «График».
+
+    ⚠️ Класс ловит то, чего не видит ни `check`, ни рендер: страница
+    отдаёт 200 с любой опечаткой в JS, а ломается уже у игрока.
+    """
+
+    def setUp(self):
+        import os
+        from django.conf import settings
+        path = os.path.join(settings.BASE_DIR, 'game', 'templates', 'game',
+                            'game.html')
+        with open(path, encoding='utf-8') as f:
+            self.src = f.read()
+
+    def test_the_figure_is_drawn_by_the_one_shared_renderer(self):
+        u"""Второго рисователя не заводим ни под каким видом."""
+        self.assertIn('window.drawFigure(q.figure)', self.src)
+        self.assertNotIn('function drawFigure', self.src)
+
+    def test_prompt_is_a_separate_line_above_the_condition(self):
+        self.assertIn('id="q-prompt"', self.src)
+        self.assertIn("$('q-prompt').textContent = isAudit ? q.prompt : ''",
+                      self.src)
+
+    def test_fullscreen_is_css_overlay_not_the_system_api(self):
+        u"""★ Системный Fullscreen API на iOS съедает клавиши и таймер."""
+        self.assertIn('body.figfull', self.src)
+        self.assertNotIn('requestFullscreen', self.src)
+        self.assertNotIn('webkitRequestFullscreen', self.src)
+
+    def test_options_and_timer_stay_alive_in_fullscreen(self):
+        u"""Иначе ради ответа пришлось бы сворачивать — смысл теряется."""
+        self.assertIn('body.figfull .opts {', self.src)
+        self.assertIn('body.figfull .hud {', self.src)
+        self.assertIn('body.figfull .time-track {', self.src)
+        # таймер не останавливается: в развороте нет ни одной остановки
+        self.assertNotIn('clearInterval(timerId)', self.src.split(
+            'body.figfull')[1][:400])
+
+    def test_fullscreen_opens_by_click_key_and_space_and_closes_by_esc(self):
+        self.assertIn("$('fig-holder').addEventListener('click'", self.src)
+        self.assertIn("e.key === 'f' || e.key === 'F'", self.src)
+        self.assertIn("|| e.key === ' '", self.src)
+        self.assertIn("if (e.key === 'Escape' && figFull)", self.src)
+
+    def test_skip_is_still_reachable_when_space_is_taken(self):
+        u"""Пробел разворачивает чертёж — значит пропуск обязан быть на S."""
+        self.assertIn("e.key === 's' || e.key === 'S'", self.src)
+        self.assertIn('id="fig-skip"', self.src)
+
+    def test_last_life_vignette_is_dimmer_in_fullscreen(self):
+        self.assertIn('body.figfull .last-life-frame.on { opacity: .42; }',
+                      self.src)
+
+    def test_review_shows_two_figures_and_one_for_a_clean_solution(self):
+        self.assertIn('mi-figpair', self.src)
+        self.assertIn(u'как было в решении', self.src)
+        self.assertIn(u'как правильно', self.src)
+        self.assertIn(u"m.step === 'clean'", self.src)
+
+    def test_step_titles_match_the_server_options(self):
+        u"""Разъехавшиеся названия шагов = «undefined» в разборе."""
+        for step, word in ((fbase.STEP_POINTS, u'координаты точек'),
+                           (fbase.STEP_REGION, u'заштрихованная область'),
+                           (fbase.STEP_VALUE, u'вычисление')):
+            self.assertIn(u"%s: '%s'" % (step, word), self.src)
+
+    def test_narrow_screen_gets_one_column_and_no_keyboard_hint(self):
+        block = self.src.split('@media (max-width: 720px)')[-1]
+        self.assertIn('.fig-hint { display: none; }', self.src)
+        self.assertIn('.fig-tools { position: static;', self.src)
+
+    def test_chart_has_a_height_cap_when_collapsed(self):
+        u"""Без потолка чертёж съедает экран и варианты уходят под сгиб."""
+        self.assertIn('max-height: 34vh', self.src)
+
+    def test_mode_card_mock_is_the_audit_one(self):
+        self.assertIn("kind === 'audit'", self.src)
+        self.assertIn('mock-audit', self.src)

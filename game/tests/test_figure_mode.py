@@ -185,8 +185,12 @@ class ClientTests(TestCase):
         self.assertIn('.opts.opts-figure.has-zoom .opt-tile.zoomed', self.src)
 
     def test_mode_meta_has_the_figure_entry(self):
+        u"""Карточка режима на старте объясняет аудит, а не выбор картинки."""
         self.assertIn("figure:  { emoji: '📈'", self.src)
-        self.assertIn("mock: 'tiles'", self.src)
+        self.assertIn("mock: 'audit'", self.src)
+        self.assertIn(u'найди первый неверный шаг', self.src)
+        # макет плиток остался в коде — тип figure_choice спит, а не удалён
+        self.assertIn("kind === 'tiles'", self.src)
 
     def test_keyboard_selects_a_tile(self):
         # клавиши 1–6 уже ведут в answer(i) для не-multi типов
