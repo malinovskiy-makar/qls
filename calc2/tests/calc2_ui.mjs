@@ -544,6 +544,59 @@ await t('нет ИИ-штампов в видимом тексте', () => page.
   return found.length === 0 || found.join(', ');
 }));
 
+/* --- Роль кривой спрашивается до формулы -------------------------------- */
+await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
+await page.evaluate(() => openPicker());
+await page.click('.scard[data-scene="free"]');
+await page.waitForTimeout(320);
+
+await t('справка подстраивается под выбранную роль', async () => {
+  const want = { '': 'PQ', demand: 'DEMAND', supply: 'SUPPLY', mc: 'MC', tc: 'TC', atc: 'ATC' };
+  const bad = [];
+  for (const role of Object.keys(want)) {
+    await page.selectOption('#new-role', role);
+    await page.waitForTimeout(120);
+    const k = await page.evaluate(() => curveHelpKind());
+    if (k !== want[role]) bad.push(`${role || 'обычная'}: ${k}`);
+  }
+  return bad.length === 0 || bad.join(', ');
+});
+
+await t('для издержек форма «объём от цены» скрыта', async () => {
+  await page.selectOption('#new-role', 'mc');
+  await page.waitForTimeout(140);
+  const hidden = await page.evaluate(() =>
+    document.getElementById('curve-form-seg').style.display === 'none' && STATE.curveForm === 'PQ');
+  await page.selectOption('#new-role', 'demand');
+  await page.waitForTimeout(140);
+  const shown = await page.evaluate(() =>
+    document.getElementById('curve-form-seg').style.display !== 'none');
+  return (hidden && shown) || `скрыт ${hidden}, показан ${shown}`;
+});
+
+await t('кривая добавляется сразу со своей ролью', async () => {
+  await page.evaluate(() => { STATE.curves = []; renderCurveList(); redrawAll(); });
+  await page.selectOption('#new-role', 'mc');
+  await page.fill('#inp-formula', '20');
+  await page.click('#btn-add-curve');
+  await page.waitForTimeout(220);
+  return await page.evaluate(() => {
+    const c = STATE.curves[0];
+    // Поле формулы очищается только при успешном добавлении.
+    const cleared = document.getElementById('inp-formula').value === '';
+    return (c && c.role === 'mc' && cleared) || JSON.stringify({ role: c && c.role, cleared });
+  });
+});
+
+await t('заголовок справки называет именно эту роль', async () => {
+  await page.click('#fh-formula');
+  await page.waitForTimeout(220);
+  const title = await page.locator('#fp-formula .f-pop-title').first().textContent();
+  await page.click('#fh-formula');   // закрыть, чтобы не мешал дальше
+  await page.waitForTimeout(120);
+  return title.includes('Предельные издержки') || title;
+});
+
 /* --- Прилипание своих точек к кривым ----------------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.evaluate(() => openPicker());

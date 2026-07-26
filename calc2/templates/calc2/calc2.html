@@ -1545,10 +1545,25 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <!-- Кривые (шаг 3) -->
     <div class="section" id="sec-curves">
       <div class="section-title">Кривые</div>
+      <!-- Сначала спрашиваем, ЧТО за кривая: от этого зависят и примеры под
+           знаком «?», и подсказка формы записи, и цвет. Раньше роль ставили
+           уже после добавления, и справка всем подряд объясняла запись
+           спроса, хотя добавляли, например, предельные издержки. -->
+      <div class="field">
+        <label for="new-role">Что добавляем</label>
+        <select id="new-role">
+          <option value="">обычная кривая</option>
+          <option value="demand">D, спрос</option>
+          <option value="supply">S, предложение</option>
+          <option value="mc">MC, предельные издержки</option>
+          <option value="tc">TC, суммарные затраты</option>
+          <option value="atc">ATC, средние затраты</option>
+        </select>
+      </div>
       <!-- Фаза 1б: форма записи. P(Q) — цена от количества (канон движка);
            Q(P) — количество от цены (привычная запись спроса). Q(P) приводится
            к P=f(Q) аналитически (линейная) или численно (обращение бисекцией). -->
-      <div class="seg" style="margin-bottom:8px;">
+      <div class="seg" id="curve-form-seg" style="margin-bottom:8px;">
         <button class="seg-btn active" id="cf-pq">Вводить P(Q)</button>
         <button class="seg-btn" id="cf-qp">Вводить Q(P)</button>
       </div>
@@ -11638,6 +11653,32 @@ const FORMULA_EXAMPLES = {
     ['500 / (P + 1)',    'дробная, даёт гиперболу'],
     ['P < 30 ? 90 - P : 120 - 2*P', 'кусочная: условие ? … : …'],
   ] },
+  // Примеры под конкретную роль: их показывает справка, когда в поле «Что
+  // добавляем» выбрана эта роль. Общая PQ-подсказка про запись спроса рядом
+  // с предельными издержками только сбивала бы.
+  DEMAND: { title: 'Спрос: цена от количества P = f(Q)', items: [
+    ['100 - Q',                       'линейный'],
+    ['100 - 2*Q',                     'круче: цена падает быстрее'],
+    ['200 / (Q + 1)',                 'с постоянной эластичностью по виду'],
+    ['Q < 40 ? 100 - Q : 80 - 0.5*Q', 'кусочный: сегменты покупателей'],
+  ] },
+  SUPPLY: { title: 'Предложение: цена от количества P = f(Q)', items: [
+    ['Q',            'линейное из начала координат'],
+    ['20 + 0.5*Q',   'с порогом: дешевле 20 никто не продаёт'],
+    ['0.02*Q^2',     'растущие предельные издержки'],
+    ['Q < 30 ? 10 : 10 + 2*(Q - 30)', 'кусочное: мощности кончились'],
+  ] },
+  MC: { title: 'Предельные издержки MC(Q)', items: [
+    ['20',           'постоянные'],
+    ['2*Q',          'линейно растущие'],
+    ['0.03*Q^2 + 5', 'растущие с ускорением'],
+    ['40 - 0.3*Q',   'убывающие (эффект масштаба)'],
+  ] },
+  ATC: { title: 'Средние затраты ATC(Q)', items: [
+    ['Q - 10 + 100/Q', 'U-образные'],
+    ['500/Q + 4',      'падающие: большие постоянные издержки'],
+    ['20',             'постоянные'],
+  ] },
   // Суммарные затраты TC(Q) в режиме издержек.
   TC: { title: 'Суммарные затраты TC(Q)', items: [
     ['Q^3 - 6*Q^2 + 15*Q + 18', 'кубическая, средние выходят U-образными'],
@@ -11985,12 +12026,50 @@ function setCurveForm(form) {
   const a = document.getElementById('cf-pq'), b = document.getElementById('cf-qp');
   if (a) a.classList.toggle('active', STATE.curveForm === 'PQ');
   if (b) b.classList.toggle('active', STATE.curveForm === 'QP');
+  applyNewRoleUI();
+}
+
+/* Какой набор примеров показать в справке поля кривой. Зависит от того, ЧТО
+   пользователь собрался добавить: рядом с предельными издержками объяснять
+   запись спроса бессмысленно. */
+function newCurveRole() {
+  const sel = document.getElementById('new-role');
+  return sel ? sel.value : '';
+}
+function curveHelpKind() {
+  if (STATE.curveForm === 'QP') return 'QP';          // «объём от цены» — свой набор
+  return { demand: 'DEMAND', supply: 'SUPPLY', mc: 'MC', tc: 'TC', atc: 'ATC' }[newCurveRole()] || 'PQ';
+}
+
+/* Подсказка, плейсхолдер и доступность формы записи под выбранную роль.
+   Запись «объём от цены» осмысленна для спроса и предложения; предельные и
+   средние затраты по определению функции количества, поэтому для них
+   переключатель формы прячется. */
+function applyNewRoleUI() {
+  const role = newCurveRole();
+  const qpOk = (role === '' || role === 'demand' || role === 'supply');
+  const seg = document.getElementById('curve-form-seg');
+  if (seg) seg.style.display = qpOk ? '' : 'none';
+  if (!qpOk && STATE.curveForm === 'QP') { STATE.curveForm = 'PQ'; setCurveForm('PQ'); return; }
+
   const inp = document.getElementById('inp-formula');
-  if (inp) inp.placeholder = (STATE.curveForm === 'QP') ? 'например: 100 - 2*P' : 'например: 100 - Q';
+  const ph = { demand: 'например: 100 - Q', supply: 'например: Q',
+               mc: 'например: 20', tc: 'например: Q^2 + 10*Q + 50',
+               atc: 'например: Q - 10 + 100/Q' };
+  if (inp) inp.placeholder = (STATE.curveForm === 'QP') ? 'например: 100 - 2*P' : (ph[role] || 'например: 100 - Q');
+
   const h = document.getElementById('curve-form-hint');
+  const note = {
+    demand: 'Спрос: цена как функция количества, P&nbsp;=&nbsp;f(Q).',
+    supply: 'Предложение: цена как функция количества, P&nbsp;=&nbsp;f(Q).',
+    mc: 'Предельные издержки как функция выпуска, MC(Q). Форма записи тут одна.',
+    tc: 'Суммарные затраты как функция выпуска, TC(Q). Средние и предельные посчитаем сами.',
+    atc: 'Средние затраты как функция выпуска, ATC(Q).',
+  };
   if (h) h.innerHTML = (STATE.curveForm === 'QP')
     ? 'Количество как функция цены: Q&nbsp;=&nbsp;f(P). Приведём к P&nbsp;=&nbsp;f(Q) сами: линейную явно, любую другую численно.'
-    : 'Цена как функция количества: P&nbsp;=&nbsp;f(Q).';
+    : (note[role] || 'Цена как функция количества: P&nbsp;=&nbsp;f(Q).');
+
   const pop = document.getElementById('fp-formula');
   if (pop && pop.classList.contains('open') && typeof pop._render === 'function') pop._render();
 }
@@ -13032,7 +13111,7 @@ function wireControls() {
   if (cfQP) cfQP.addEventListener('click', () => setCurveForm('QP'));
 
   // Фаза 1а: подсказки формата формулы у полей ввода.
-  attachFormulaHelp('fh-formula', 'fp-formula', 'inp-formula', () => STATE.curveForm);
+  attachFormulaHelp('fh-formula', 'fp-formula', 'inp-formula', () => curveHelpKind());
   attachFormulaHelp('fh-tc', 'fp-tc', 'inp-tc', 'TC');
   attachFormulaHelp('fh-ppf', 'fp-ppf', 'inp-ppf', 'PPF');
   attachFormulaHelp('fh-mathf', 'fp-mathf', 'inp-mathf', 'MATHF');
@@ -13681,9 +13760,26 @@ function wireControls() {
 
   // Добавление кривой: по кнопке и по Enter в поле формулы.
   // Форма записи (P(Q) / Q(P)) берётся из переключателя — Фаза 1б.
-  const submit = () => { addCurve(formula.value, STATE.curveForm); formula.value = ''; formula.focus(); };
+  // Роль спрашивается ДО формулы, поэтому назначается сразу после добавления:
+  // кривая появляется уже спросом или предельными издержками, а не «обычной».
+  const submit = () => {
+    const before = STATE.curves.length;
+    addCurve(formula.value, STATE.curveForm);
+    if (STATE.curves.length > before) {
+      const sel = document.getElementById('new-role');
+      const role = sel ? sel.value : '';
+      if (role) setRole(STATE.curves[STATE.curves.length - 1], role);
+      formula.value = '';
+    }
+    formula.focus();
+  };
   addBtn.addEventListener('click', submit);
   formula.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+
+  // Смена роли до ввода перенастраивает справку, подсказку и форму записи.
+  const newRole = document.getElementById('new-role');
+  if (newRole) newRole.addEventListener('change', () => applyNewRoleUI());
+  applyNewRoleUI();
 }
 
 /* ---------------------------------------------------------------------
