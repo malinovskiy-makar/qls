@@ -2657,14 +2657,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="modal-opts">
         <button class="btn" id="exp-png" type="button">Скачать PNG</button>
         <button class="btn btn-ghost" id="exp-tex" type="button">Скачать .tex</button>
-        {% if has_xelatex %}
+        {% if has_pdflatex %}
           <button class="btn btn-ghost" id="exp-pdf" type="button">Скачать PDF</button>
         {% else %}
           <button class="btn btn-ghost" type="button" disabled>Скачать PDF</button>
-          <div class="hint">PDF на этом сервере не собирается: не установлен xelatex.
+          <div class="hint">PDF на этом сервере не собирается: не установлен pdflatex.
             Скачайте .tex и откройте в
             <a href="https://overleaf.com" target="_blank" rel="noopener">Overleaf</a>,
-            там компилятор бесплатный. В Overleaf: Menu → Compiler → XeLaTeX.</div>
+            там компилятор бесплатный и подходит стандартный pdfLaTeX.</div>
         {% endif %}
       </div>
 
@@ -2678,10 +2678,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
 {% csrf_token %}
 <script>
-// Адрес серверной сборки PDF и наличие xelatex — из Django, чтобы интерфейс
+// Адрес серверной сборки PDF и наличие компилятора — из Django, чтобы интерфейс
 // не обещал того, чего на этом сервере нет.
 const CALC2_PDF_URL = "{% url 'calc2:export_pdf' %}";
-const CALC2_HAS_XELATEX = {% if has_xelatex %}true{% else %}false{% endif %};
+const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 </script>
 <script>
 /* =====================================================================
@@ -10828,14 +10828,13 @@ function setMathX0(x) {
    ЭКСПОРТ (Фаза 5). Три формата:
      PNG — целиком на клиенте: SVG → картинка → canvas → файл. Работает
            всегда, сервер не нужен.
-     TeX — формат pgfplots, как в старом калькуляторе (graphs/exportLaTeX):
-           axis + \addplot + \fill + \node. Отличие в источнике данных:
-           calc2 считает численно, поэтому кривые уходят точками, а не
-           формулой — так одинаково честно рисуются и прямые, и кусочные.
-     PDF — тот же .tex компилируется на сервере через xelatex
-           (catalog/latex_export.compile_pdf). На бесплатном тарифе Render
-           xelatex не установлен, поэтому кнопка там отключена и об этом
-           написано прямо в окне.
+     TeX — нарисованный холст переводится в TikZ (buildTex): на бумаге
+           выходит ровно то же, что на экране, в том же масштабе и сразу для
+           любой сцены. Чистый TikZ без pgfplots, поэтому файл собирается
+           обычным pdflatex.
+     PDF — тот же .tex компилируется на сервере (calc2/views.export_pdf).
+           На бесплатном тарифе Render компилятора нет, поэтому кнопка там
+           отключена и об этом написано прямо в окне.
    --------------------------------------------------------------------- */
 
 function downloadBlob(blob, filename) {
@@ -10889,125 +10888,217 @@ function texEscape(s) {
 }
 const r2 = (v) => (Math.round(v * 100) / 100);
 
-// Что выгружать в текущем режиме. Кривые берём готовыми функциями — генератор
-// не знает и не должен знать, откуда они взялись.
-function exportCurves() {
-  const out = [];
-  if (STATE.mode === 'costs' && STATE.costsSub === 'costs' && STATE.costsReady) {
-    if (STATE.showMC)  out.push({ f: costMC,  name: 'MC',  color: COL.costMC });
-    if (STATE.showATC) out.push({ f: costATC, name: 'ATC', color: COL.costATC });
-    if (STATE.showAVC) out.push({ f: costAVC, name: 'AVC', color: COL.costAVC });
-    if (STATE.showAFC) out.push({ f: costAFC, name: 'AFC', color: COL.costAFC });
-    if (STATE.showVC)  out.push({ f: costVC,  name: 'VC',  color: COL.costVC, dashed: true });
-    return out;
-  }
-  if (STATE.mode === 'ppf' && STATE.ppfSub === 'single' && STATE.ppfReady) {
-    out.push({ f: evalPpf, name: 'КПВ', color: COL.D });
-    return out;
-  }
-  STATE.curves.filter(c => c.visible).forEach(c => {
-    out.push({ f: (q) => evalCurve(c, q), name: curveShortName(c), color: c.color });
-  });
+/* ---------------------------------------------------------------------
+   ЭКСПОРТ В LaTeX
+   Раньше .tex собирался заново из формул рыночной сцены, и в остальных
+   тридцати сюжетах выходила не та картинка и не в том масштабе: оси брались
+   из CONFIG.Qmax, а «Математика», КПВ, макро, труд и потребитель живут в
+   своих окнах, да и заливки с MR, DWL и вмешательством генератор просто не
+   знал. Теперь в TikZ переводится уже НАРИСОВАННЫЙ холст, поэтому на бумаге
+   получается ровно то же, что на экране, сразу для любой сцены.
+   Чистый TikZ без pgfplots: файл собирается обычным pdflatex.
+   --------------------------------------------------------------------- */
+const TEX_WIDTH_CM = 16;      // ширина картинки на странице
+const TEX_MAX_SAMPLES = 420;  // точек на одну кривую при оцифровке
+
+// Символы, которых нет в кириллических шрифтах pdflatex: уводим их в математику.
+// Применяется ПОСЛЕ texEscape, потому что подстановки содержат $ и обратный слэш.
+const TEX_UNICODE = [
+  ['₀', '$_0$'], ['₁', '$_1$'], ['₂', '$_2$'], ['₃', '$_3$'], ['₄', '$_4$'],
+  ['₅', '$_5$'], ['₆', '$_6$'], ['₇', '$_7$'], ['₈', '$_8$'], ['₉', '$_9$'],
+  ['⁰', '$^0$'], ['¹', '$^1$'], ['²', '$^2$'], ['³', '$^3$'],
+  ['′', "$'$"], ['″', "$''$"], ['−', '$-$'], ['–', '--'], ['—', '---'],
+  ['×', '$\\times$'], ['·', '$\\cdot$'], ['÷', '$\\div$'], ['±', '$\\pm$'],
+  ['≈', '$\\approx$'], ['≤', '$\\le$'], ['≥', '$\\ge$'], ['≠', '$\\ne$'],
+  ['∞', '$\\infty$'], ['∫', '$\\int$'], ['∑', '$\\sum$'], ['√', '$\\sqrt{\\ }$'],
+  ['°', '$^\\circ$'], ['→', '$\\to$'], ['←', '$\\leftarrow$'], ['↔', '$\\leftrightarrow$'],
+  ['Δ', '$\\Delta$'], ['α', '$\\alpha$'], ['β', '$\\beta$'], ['γ', '$\\gamma$'],
+  ['π', '$\\pi$'], ['τ', '$\\tau$'], ['σ', '$\\sigma$'], ['λ', '$\\lambda$'],
+  ['μ', '$\\mu$'], ['ε', '$\\varepsilon$'], ['θ', '$\\theta$'], ['Σ', '$\\Sigma$'],
+  ['∈', '$\\in$'], ['∂', '$\\partial$'], [' ', '~'],
+];
+function texText(s) {
+  let out = texEscape(s);
+  TEX_UNICODE.forEach(([from, to]) => { out = out.split(from).join(to); });
   return out;
 }
 
-function buildTex(title, label) {
-  const xmax = CONFIG.Qmax, ymax = CONFIG.Pmax;
-  const xl = texEscape(STATE.axisXName || STATE.axisXDefault || 'Q');
-  const yl = texEscape(STATE.axisYName || STATE.axisYDefault || 'P');
-  const defs = [], fills = [], plots = [], nodes = [];
+// Любой CSS-цвет → шесть шестнадцатеричных цифр. Браузер уже отдаёт
+// вычисленное значение, поэтому переменные темы разворачивать не нужно.
+function texHex(css) {
+  const s = String(css || '').trim();
+  const m = s.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
+  const two = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).toUpperCase().padStart(2, '0');
+  if (m) return two(+m[1]) + two(+m[2]) + two(+m[3]);
+  if (/^#[0-9a-f]{6}$/i.test(s)) return s.slice(1).toUpperCase();
+  if (/^#[0-9a-f]{3}$/i.test(s)) return s.slice(1).split('').map(c => (c + c).toUpperCase()).join('');
+  return '000000';
+}
 
-  // Цвет объявляем один раз на оттенок и зовём по имени.
-  const cname = (hex) => {
-    const h = normHex(hex).slice(1).toUpperCase();
-    const key = 'col' + h;
+/* Оцифровка нарисованного элемента. getPointAtLength обходит фигуру по длине
+   и потому одинаково хорошо берёт и ломаные, и кривые Безье. Пути с разрывами
+   (d3 .defined) состоят из нескольких кусков; переход между ними занимает
+   нулевую длину, поэтому в выборке он виден скачком — по нему и режем, иначе
+   TikZ соединил бы куски прямой через весь график. */
+function texSamplePath(el) {
+  let len = 0;
+  try { len = el.getTotalLength(); } catch (e) { return []; }
+  if (!(len > 0)) return [];
+  const n = Math.max(2, Math.min(TEX_MAX_SAMPLES, Math.ceil(len / 2)));
+  const m = el.getCTM();
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const p = el.getPointAtLength(len * i / n);
+    pts.push(m ? [m.a * p.x + m.c * p.y + m.e, m.b * p.x + m.d * p.y + m.f] : [p.x, p.y]);
+  }
+  const step = len / n, jump = Math.max(6, step * 6);
+  const runs = [];
+  let run = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const dx = pts[i][0] - pts[i - 1][0], dy = pts[i][1] - pts[i - 1][1];
+    if (Math.hypot(dx, dy) > jump) { if (run.length > 1) runs.push(run); run = [pts[i]]; }
+    else run.push(pts[i]);
+  }
+  if (run.length > 1) runs.push(run);
+  return runs;
+}
+
+function buildTex(title, label) {
+  const svgEl = document.getElementById('chart');
+  if (!svgEl) return '';
+  const W = svgEl.clientWidth || 1280, H = svgEl.clientHeight || 720;
+  const k = TEX_WIDTH_CM / W;                       // пиксели → сантиметры
+  const X = (x) => (x * k).toFixed(3);
+  const Y = (y) => ((H - y) * k).toFixed(3);        // в TikZ ось Y смотрит вверх
+  const pt = (p) => '(' + X(p[0]) + ',' + Y(p[1]) + ')';
+
+  const defs = [];
+  const colorName = (css) => {
+    const h = texHex(css), key = 'c' + h;
     const line = '\\definecolor{' + key + '}{HTML}{' + h + '}';
     if (defs.indexOf(line) < 0) defs.push(line);
     return key;
   };
-  // Кривая точками. Разрывы (вне окна / не считается) режут её на куски —
-  // каждый кусок отдельным \addplot, иначе pgfplots соединит их прямой.
-  const plotCurve = (f, hex, dashed) => {
-    const key = cname(hex), N = 160;
-    let run = [];
-    const flush = () => {
-      if (run.length > 1) {
-        plots.push('  \\addplot[color=' + key + ', thick' + (dashed ? ', dashed' : '') +
-                   '] coordinates {' + run.join(' ') + '};');
+
+  // Прямоугольники обрезки: элементы внутри clip-path не должны вылезать
+  // за поле графика, поэтому оборачиваем их в scope с \clip.
+  const clipRect = (ref) => {
+    const id = String(ref || '').replace(/^url\(#?|\)$/g, '').replace(/^#/, '');
+    const cp = id && svgEl.querySelector('clipPath#' + CSS.escape(id));
+    const r = cp && cp.querySelector('rect');
+    if (!r) return null;
+    const x = +r.getAttribute('x'), y = +r.getAttribute('y');
+    const w = +r.getAttribute('width'), h = +r.getAttribute('height');
+    return '(' + X(x) + ',' + Y(y + h) + ') rectangle (' + X(x + w) + ',' + Y(y) + ')';
+  };
+
+  const items = [];   // {clip: строка-прямоугольник или null, code: строка TikZ}
+  const push = (clip, code) => { if (code) items.push({ clip, code }); };
+
+  // Общие свойства обводки: толщина, пунктир, прозрачность, стрелка на конце.
+  const strokeOpts = (el, cs) => {
+    const o = [];
+    o.push('color=' + colorName(cs.stroke));
+    const w = parseFloat(cs.strokeWidth) || 1;
+    o.push('line width=' + (w * k).toFixed(4) + 'cm');
+    const dash = (el.getAttribute('stroke-dasharray') || cs.strokeDasharray || '').trim();
+    if (dash && dash !== 'none') {
+      const nums = dash.split(/[\s,]+/).map(parseFloat).filter(v => v > 0);
+      if (nums.length >= 2) {
+        o.push('dash pattern=on ' + (nums[0] * k).toFixed(4) + 'cm off ' + (nums[1] * k).toFixed(4) + 'cm');
+      } else o.push('dashed');
+    }
+    const op = parseFloat(cs.strokeOpacity) * parseFloat(cs.opacity || 1);
+    if (isFinite(op) && op < 0.99) o.push('opacity=' + op.toFixed(2));
+    if (el.getAttribute('marker-end')) o.push('->');
+    if (String(cs.strokeLinecap) === 'round') o.push('line cap=round');
+    return o.join(', ');
+  };
+  const fillOpts = (el, cs) => {
+    const o = ['color=' + colorName(cs.fill)];
+    const op = parseFloat(cs.fillOpacity) * parseFloat(cs.opacity || 1);
+    if (isFinite(op) && op < 0.99) o.push('opacity=' + op.toFixed(2));
+    return o.join(', ');
+  };
+
+  const walk = (node, clip) => {
+    for (const el of node.children) {
+      const tag = el.tagName.toLowerCase();
+      if (tag === 'defs' || tag === 'clippath' || tag === 'marker') continue;
+      const myClip = el.getAttribute('clip-path') ? (clipRect(el.getAttribute('clip-path')) || clip) : clip;
+      if (tag === 'g') { walk(el, myClip); continue; }
+
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || parseFloat(cs.opacity) === 0) continue;
+      const hasFill = cs.fill && cs.fill !== 'none' && parseFloat(cs.fillOpacity) > 0;
+      const hasStroke = cs.stroke && cs.stroke !== 'none' && (parseFloat(cs.strokeWidth) || 0) > 0;
+
+      if (tag === 'path') {
+        const runs = texSamplePath(el);
+        if (hasFill) runs.forEach(r => push(myClip, '\\fill[' + fillOpts(el, cs) + '] ' + r.map(pt).join(' -- ') + ' -- cycle;'));
+        if (hasStroke) runs.forEach(r => push(myClip, '\\draw[' + strokeOpts(el, cs) + '] ' + r.map(pt).join(' -- ') + ';'));
+      } else if (tag === 'line') {
+        if (!hasStroke) continue;
+        const p1 = [+el.getAttribute('x1'), +el.getAttribute('y1')];
+        const p2 = [+el.getAttribute('x2'), +el.getAttribute('y2')];
+        push(myClip, '\\draw[' + strokeOpts(el, cs) + '] ' + pt(p1) + ' -- ' + pt(p2) + ';');
+      } else if (tag === 'rect') {
+        const x = +el.getAttribute('x'), y = +el.getAttribute('y');
+        const w = +el.getAttribute('width'), h = +el.getAttribute('height');
+        if (!(w > 0 && h > 0)) continue;
+        const box = pt([x, y + h]) + ' rectangle ' + pt([x + w, y]);
+        if (hasFill) push(myClip, '\\fill[' + fillOpts(el, cs) + '] ' + box + ';');
+        if (hasStroke) push(myClip, '\\draw[' + strokeOpts(el, cs) + '] ' + box + ';');
+      } else if (tag === 'circle') {
+        const c = [+el.getAttribute('cx'), +el.getAttribute('cy')];
+        const rad = (+el.getAttribute('r') * k).toFixed(4) + 'cm';
+        if (hasFill) push(myClip, '\\fill[' + fillOpts(el, cs) + '] ' + pt(c) + ' circle[radius=' + rad + '];');
+        if (hasStroke) push(myClip, '\\draw[' + strokeOpts(el, cs) + '] ' + pt(c) + ' circle[radius=' + rad + '];');
+      } else if (tag === 'text') {
+        const txt = texText(el.textContent || '');
+        if (!txt.trim()) continue;
+        // Якорь узла собираем из text-anchor (по горизонтали) и dominant-baseline
+        // (по вертикали): в SVG y текста — это базовая линия.
+        const ha = { start: ' west', middle: '', end: ' east' }[cs.textAnchor] ?? '';
+        const bl = el.getAttribute('dominant-baseline') || cs.dominantBaseline || '';
+        const va = (bl === 'hanging' || bl === 'text-before-edge') ? 'north'
+                 : (bl === 'middle' || bl === 'central') ? 'mid' : 'base';
+        const anchor = (va + ha).trim() || 'base';
+        const fs = (parseFloat(cs.fontSize) || 10) * k * 28.4527;   // сантиметры → пункты
+        const bold = (parseInt(cs.fontWeight, 10) || 400) >= 600 ? '\\bfseries ' : '';
+        const op = parseFloat(cs.opacity || 1);
+        const opt = ['anchor=' + anchor, 'text=' + colorName(cs.fill), 'inner sep=0pt'];
+        if (isFinite(op) && op < 0.99) opt.push('opacity=' + op.toFixed(2));
+        push(myClip, '\\node[' + opt.join(', ') + '] at ' + pt([+el.getAttribute('x') || 0, +el.getAttribute('y') || 0]) +
+                     ' {\\fontsize{' + fs.toFixed(1) + '}{' + (fs * 1.2).toFixed(1) + '}\\selectfont ' + bold + txt + '};');
       }
-      run = [];
-    };
-    for (let i = 0; i <= N; i++) {
-      const q = xmax * i / N, v = f(q);
-      if (isNaN(v) || v < 0 || v > ymax) { flush(); continue; }
-      run.push('(' + r2(q) + ',' + r2(v) + ')');
-    }
-    flush();
-  };
-  const point = (x, y, txt, hex) => {
-    const key = cname(hex);
-    plots.push('  \\addplot[only marks, mark=*, mark size=2pt, color=' + key +
-               '] coordinates {(' + r2(x) + ',' + r2(y) + ')};');
-    if (txt) nodes.push('  \\node[above right, color=' + key + ', font=\\small] at (axis cs:' +
-                        r2(x) + ',' + r2(y) + ') {' + texEscape(txt) + '};');
-  };
-  // Заливка между кривой и горизонталью на отрезке [0; qEnd].
-  const fillUnder = (f, yBase, qEnd, hex, opacity) => {
-    const key = cname(hex), N = 80, pts = [];
-    pts.push('(axis cs:0,' + r2(yBase) + ')');
-    for (let i = 0; i <= N; i++) {
-      const q = qEnd * i / N, v = f(q);
-      if (isNaN(v)) continue;
-      pts.push('(axis cs:' + r2(q) + ',' + r2(Math.max(0, Math.min(ymax, v))) + ')');
-    }
-    pts.push('(axis cs:' + r2(qEnd) + ',' + r2(yBase) + ')');
-    if (pts.length > 3) {
-      fills.push('  \\fill[' + key + ', opacity=' + opacity + '] ' + pts.join(' -- ') + ' -- cycle;');
     }
   };
+  walk(svgEl, null);
 
-  exportCurves().forEach(c => {
-    plotCurve(c.f, c.color, c.dashed);
-    // Подпись у правого края — там же, где её ставит сам график.
-    const a = curveAnchor(c.f);
-    if (a) nodes.push('  \\node[above left, color=' + cname(c.color) + ', font=\\small] at (axis cs:' +
-                      r2(a.q) + ',' + r2(a.v) + ') {' + texEscape(c.name) + '};');
+  // Соседние элементы с одинаковой обрезкой заворачиваем в один scope.
+  const body = [];
+  let cur = null;
+  items.forEach(it => {
+    if (it.clip !== cur) {
+      if (cur) body.push('\\end{scope}');
+      if (it.clip) { body.push('\\begin{scope}'); body.push('\\clip ' + it.clip + ';'); }
+      cur = it.clip;
+    }
+    body.push(it.code);
   });
+  if (cur) body.push('\\end{scope}');
 
-  // Сдвинутая вмешательством кривая (пунктир) и точки «было → стало».
-  if (STATE.taxActive) {
-    const buyer = (STATE.intervType === 'tax' && STATE.taxSide === 'buyer');
-    const after = buyer ? STATE.taxAfterD : STATE.taxAfterS;
-    const base = buyer ? STATE.D : STATE.S;
-    if (after && base) plotCurve(q => evalCurve(after, q), base.color, true);
-  }
-
-  // Излишки и равновесие.
-  if (STATE.eq && STATE.D && STATE.S) {
-    const { Q, P } = STATE.eq;
-    if (STATE.showCS) fillUnder(q => evalCurve(STATE.D, q), P, Q, COL.D, 0.16);
-    if (STATE.showPS) fillUnder(q => evalCurve(STATE.S, q), P, Q, COL.S, 0.16);
-    plots.push('  \\draw[dashed, gray] (axis cs:0,' + r2(P) + ') -- (axis cs:' + r2(Q) + ',' + r2(P) + ');');
-    plots.push('  \\draw[dashed, gray] (axis cs:' + r2(Q) + ',0) -- (axis cs:' + r2(Q) + ',' + r2(P) + ');');
-    point(Q, P, 'E*', COL.ink);
-  }
-
-  // Свои точки пользователя — с той же подписью, что на экране.
-  (STATE.marks || []).forEach(mk => {
-    point(mk.x, mk.y, markCaption(mk).join('; '), COL.ink);
-  });
-
-  const cap = texEscape(title || STATE.graphTitle || '');
+  const cap = texText(title || STATE.graphTitle || '');
   const lab = String(label || '').trim().replace(/[^A-Za-z0-9:_-]/g, '');
 
   return [
-    '% !TeX program = xelatex',
+    '% Собран калькулятором «Экономика 2.0». Компилируется обычным pdflatex.',
     '\\documentclass[12pt,a4paper]{article}',
-    '\\usepackage{fontspec}',
-    '\\setmainfont{DejaVu Serif}',
-    '\\usepackage[russian]{babel}',
-    '\\usepackage{pgfplots}',
-    '\\pgfplotsset{compat=1.18}',
+    '\\usepackage[T2A]{fontenc}',
+    '\\usepackage[utf8]{inputenc}',
+    '\\usepackage[english,russian]{babel}',
+    '\\usepackage{tikz}',
     '\\usepackage{geometry}',
     '\\geometry{margin=2cm}',
     ...defs,
@@ -11016,21 +11107,8 @@ function buildTex(title, label) {
     '',
     '\\begin{figure}[h]',
     '\\centering',
-    '\\begin{tikzpicture}',
-    '\\begin{axis}[',
-    '    axis lines=left,',
-    '    xmin=0, xmax=' + r2(xmax) + ',',
-    '    ymin=0, ymax=' + r2(ymax) + ',',
-    '    xlabel={' + xl + '}, ylabel={' + yl + '},',
-    '    xlabel style={at={(axis description cs:1,0)}, anchor=north},',
-    '    ylabel style={at={(axis description cs:0,1)}, rotate=-90, anchor=south},',
-    '    width=13cm, height=10cm,',
-    '    tick style={color=black},',
-    ']',
-    ...fills,      // заливки первыми: линии и точки должны лечь поверх них
-    ...plots,
-    ...nodes,
-    '\\end{axis}',
+    '\\begin{tikzpicture}[x=1cm, y=1cm]',
+    ...body,
     '\\end{tikzpicture}',
     cap ? '\\caption{' + cap + '}' : '',
     lab ? '\\label{' + lab + '}' : '',

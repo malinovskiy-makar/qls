@@ -325,8 +325,8 @@ await t('заголовок подставился из названия сце�
 
 await t('.tex собирается и содержит кривые', () => page.evaluate(() => {
   const tex = buildTex('Рынок хлеба', 'fig:bread');
-  const plots = (tex.match(/\\addplot/g) || []).length;
-  return (plots >= 3 && tex.includes('\\begin{axis}')) || `addplot: ${plots}`;
+  const draws = (tex.match(/\\draw\[/g) || []).length;
+  return (draws >= 10 && tex.includes('\\begin{tikzpicture}')) || `\\draw: ${draws}`;
 }));
 
 await t('.tex несёт заголовок, label и заливки', () => page.evaluate(() => {
@@ -336,17 +336,40 @@ await t('.tex несёт заголовок, label и заливки', () => pag
   return ok || tex.slice(0, 400);
 }));
 
-await t('.tex под xelatex и с кириллицей (fontspec, не inputenc)', () => page.evaluate(() => {
+await t('.tex под обычный pdflatex, кириллица через T2A', () => page.evaluate(() => {
   const tex = buildTex('Рынок хлеба', '');
-  return (tex.startsWith('% !TeX program = xelatex') && tex.includes('\\usepackage{fontspec}')
-          && !tex.includes('inputenc')) || tex.slice(0, 200);
+  return (tex.includes('\\usepackage[T2A]{fontenc}') && tex.includes('\\usepackage[utf8]{inputenc}')
+          && !tex.includes('fontspec') && !tex.includes('pgfplots')) || tex.slice(0, 300);
 }));
 
+// Экранная геометрия и есть источник .tex, поэтому масштаб проверяем прямым
+// пересчётом: точка равновесия на холсте обязана попасть в ту же точку картинки.
+await t('масштаб .tex совпадает с экранным', () => page.evaluate(() => {
+  const svg = document.getElementById('chart');
+  const c = svg.querySelector('circle');
+  if (!c) return 'на сцене нет точек';
+  const W = svg.clientWidth, H = svg.clientHeight, k = 16 / W;
+  const wantX = (+c.getAttribute('cx') * k).toFixed(3);
+  const wantY = ((H - +c.getAttribute('cy')) * k).toFixed(3);
+  const tex = buildTex('', '');
+  return tex.includes('(' + wantX + ',' + wantY + ') circle') || `ждали (${wantX},${wantY})`;
+}));
+
+await t('.tex обрезает кривые тем же прямоугольником, что экран', () => page.evaluate(() => {
+  const tex = buildTex('', '');
+  return (tex.includes('\\begin{scope}') && tex.includes('\\clip ')
+          && (tex.match(/\\begin\{scope\}/g) || []).length === (tex.match(/\\end\{scope\}/g) || []).length)
+         || 'обрезка не сошлась';
+}));
+
+// Экспорт читает НАРИСОВАННЫЙ холст, поэтому подпись сначала должна попасть
+// на график: без redrawAll её в SVG ещё нет и проверять нечего.
 await t('.tex экранирует опасные символы в подписях', () => page.evaluate(() => {
   STATE.axisXName = 'Доля 50% & выше';
+  redrawAll();
   const tex = buildTex('', '');
-  STATE.axisXName = '';
-  return (tex.includes('50\\% \\& выше')) || 'нет экранирования';
+  STATE.axisXName = ''; redrawAll();
+  return tex.includes('50\\% \\& выше') || 'нет экранирования';
 }));
 
 await t('label чистится от посторонних символов', () => page.evaluate(() => {
@@ -355,10 +378,15 @@ await t('label чистится от посторонних символов', (
   return (m && /^[A-Za-z0-9:_-]*$/.test(m[1])) || (m ? m[1] : 'нет label');
 }));
 
-await t('пунктирная кривая S+t попала в .tex при налоге', () => page.evaluate(() => {
-  const tex = buildTex('', '');
-  return tex.includes('dashed') || 'нет пунктира';
-}));
+await t('пунктирная кривая S+t попала в .tex при налоге', async () => {
+  await page.evaluate(() => openPicker());
+  await page.click('.scard[data-scene="tax"]');
+  await page.waitForTimeout(300);
+  return await page.evaluate(() => {
+    const tex = buildTex('', '');
+    return tex.includes('dash pattern=on') || 'нет пунктира';
+  });
+});
 
 await t('свои точки попадают в .tex с подписью', () => page.evaluate(() => {
   addMarkAt(20, 80); STATE.marks[STATE.marks.length - 1].text = 'Ориентир'; redrawAll();
@@ -369,9 +397,28 @@ await t('свои точки попадают в .tex с подписью', () =
 
 await t('в режиме издержек выгружаются кривые издержек', () => page.evaluate(() => {
   openPicker(); pickScene('costs'); closePicker(); redrawAll();
-  const names = exportCurves().map(c => c.name);
-  return (names.includes('MC') && names.includes('ATC')) || names.join(',');
+  const tex = buildTex('', '');
+  // Названия кривых уходят в .tex подписями узлов, как и на экране.
+  return (tex.includes('{MC}') || tex.includes('MC};')) && tex.includes('ATC') || tex.slice(0, 200);
 }));
+
+// Раньше .tex собирался из формул рыночной сцены, поэтому во всех остальных
+// сюжетах выходила пустая или чужая картинка. Проверяем несколько разных.
+await t('.tex не пустой в любом режиме, не только рыночном', async () => {
+  const scenes = ['m-optimum', 'adas', 'consumer', 'labor-mono', 'ppf', 'ineq', 'prod'];
+  const thin = [];
+  for (const s of scenes) {
+    await page.evaluate(() => openPicker());
+    await page.click(`.scard[data-scene="${s}"]`);
+    await page.waitForTimeout(260);
+    const n = await page.evaluate(() => {
+      const tex = buildTex('', '');
+      return (tex.match(/\\draw|\\fill|\\node/g) || []).length;
+    });
+    if (n < 20) thin.push(`${s}:${n}`);
+  }
+  return thin.length === 0 || 'мало элементов — ' + thin.join(', ');
+});
 
 await t('PNG собирается в canvas без ошибок', () => page.evaluate(() => new Promise(res => {
   const node = document.getElementById('chart');

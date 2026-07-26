@@ -9,15 +9,74 @@ Views для собственного графического движка (Э�
 интерактивный инструмент. Сохранение графиков — задача будущих сессий.
 """
 
+import os
 import re
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
-from catalog.latex_export import compile_pdf, xelatex_available
+
+# ── Компиляция через pdflatex ──────────────────────────────────────────────
+# Экспорт подборок задач (catalog/latex_export.py) остаётся на xelatex: там
+# документ с fontspec, и трогать работающую функцию незачем. Калькулятор же
+# выпускает чистый TikZ с inputenc и T2A, который собирается ОБЫЧНЫМ pdflatex,
+# поэтому у него своя маленькая сборка без общих зависимостей.
+
+def _pdflatex_bin():
+    """Путь к pdflatex: из настроек, иначе из PATH, иначе рядом с xelatex."""
+    path = getattr(settings, 'PDFLATEX_PATH', None)
+    if path:
+        return path
+    found = shutil.which('pdflatex')
+    if found:
+        return found
+    # На macOS TeX Live прописывают одной строкой XELATEX_PATH — pdflatex лежит рядом.
+    xe = getattr(settings, 'XELATEX_PATH', None)
+    if xe:
+        guess = os.path.join(os.path.dirname(xe), 'pdflatex')
+        if os.path.isfile(guess):
+            return guess
+    return None
+
+
+def pdflatex_available():
+    """True, если на этом сервере есть чем собрать PDF."""
+    binary = _pdflatex_bin()
+    return bool(binary) and os.path.isfile(binary) and os.access(binary, os.X_OK)
+
+
+def compile_pdf_pdflatex(tex_content):
+    """Собирает .tex в PDF. Возвращает (bytes, None) или (None, лог ошибки)."""
+    binary = _pdflatex_bin()
+    if not binary:
+        return None, 'pdflatex не найден на сервере'
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tex_path = Path(tmpdir) / 'graph.tex'
+        pdf_path = Path(tmpdir) / 'graph.pdf'
+        log_path = Path(tmpdir) / 'graph.log'
+        tex_path.write_text(tex_content, encoding='utf-8')
+        try:
+            subprocess.run(
+                [binary, '-interaction=nonstopmode', '-halt-on-error',
+                 '-output-directory', tmpdir, str(tex_path)],
+                capture_output=True, timeout=40,
+            )
+        except FileNotFoundError:
+            return None, 'pdflatex не найден на сервере'
+        except subprocess.TimeoutExpired:
+            return None, 'pdflatex превысил лимит времени (40 с)'
+        if pdf_path.exists():
+            return pdf_path.read_bytes(), None
+        log = log_path.read_text(encoding='utf-8', errors='replace') if log_path.exists() else ''
+        return None, log
 
 
 @method_decorator(login_required, name='dispatch')
@@ -31,16 +90,16 @@ class Calc2View(TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         # Честно говорим интерфейсу, умеет ли ЭТОТ сервер собирать PDF.
-        # На бесплатном тарифе Render xelatex не установлен (XELATEX_PATH=None),
-        # поэтому кнопка «Скачать PDF» там не показывается вовсе — как это уже
-        # сделано на странице экспорта подборок (catalog/collection_export.html).
-        ctx['has_xelatex'] = xelatex_available()
+        # На бесплатном тарифе Render компилятора нет, поэтому кнопка
+        # «Скачать PDF» там не показывается вовсе — как это уже сделано на
+        # странице экспорта подборок (catalog/collection_export.html).
+        ctx['has_pdflatex'] = pdflatex_available()
         return ctx
 
 
 # Команды LaTeX, которых наш генератор не выпускает и которые дают доступ
 # к файловой системе или к оболочке. Файл .tex приходит с клиента, поэтому
-# проверяем его перед запуском компилятора: xelatex по умолчанию идёт без
+# проверяем его перед запуском компилятора: pdflatex по умолчанию идёт без
 # --shell-escape, но \input умеет вклеить в PDF содержимое чужого файла.
 _TEX_FORBIDDEN = re.compile(
     r'\\(write18|input|include|openin|openout|read|catcode|csname|immediate'
@@ -52,15 +111,15 @@ _TEX_FORBIDDEN = re.compile(
 @login_required
 @require_POST
 def export_pdf(request):
-    """Компилирует присланный .tex в PDF через xelatex и отдаёт файл.
+    """Компилирует присланный .tex в PDF через pdflatex и отдаёт файл.
 
     Используется кнопкой «Скачать PDF» в окне экспорта калькулятора. Сам .tex
-    собирает клиент (buildTex в calc2.html) — там же, где известны кривые,
-    заливки и подписи. Здесь только компиляция.
+    собирает клиент (buildTex в calc2.html): он переводит нарисованный холст
+    в TikZ. Здесь только компиляция.
     """
-    if not xelatex_available():
+    if not pdflatex_available():
         return HttpResponse(
-            'На этом сервере не установлен xelatex. Скачайте .tex и '
+            'На этом сервере не установлен pdflatex. Скачайте .tex и '
             'скомпилируйте его в Overleaf.',
             status=503, content_type='text/plain; charset=utf-8',
         )
@@ -68,16 +127,16 @@ def export_pdf(request):
     tex = request.POST.get('tex', '')
     if not tex.strip():
         return HttpResponseBadRequest('Пустой файл .tex')
-    if len(tex) > 400_000:
+    if len(tex) > 900_000:
         return HttpResponseBadRequest('Файл .tex слишком большой')
     if _TEX_FORBIDDEN.search(tex):
         return HttpResponseBadRequest('В .tex есть команды, которые сервер не компилирует')
 
-    pdf, err = compile_pdf(tex)
+    pdf, err = compile_pdf_pdflatex(tex)
     if pdf is None:
-        # Лог xelatex длинный; для окна экспорта хватает хвоста.
+        # Лог компилятора длинный; для окна экспорта хватает хвоста.
         return HttpResponse(
-            'xelatex не собрал PDF:\n' + (err or '')[-1500:],
+            'pdflatex не собрал PDF:\n' + (err or '')[-1500:],
             status=500, content_type='text/plain; charset=utf-8',
         )
 
