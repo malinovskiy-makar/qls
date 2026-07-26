@@ -104,6 +104,20 @@ a:focus-visible, button:focus-visible {
 }
 .rush-count b { color: var(--rush-accent); font-weight: 700; }
 
+/* Спокойная строка «режим недоступен» / «под этими настройками вопросов
+   нет» — НЕ alert() и НЕ экран результатов: сервер честно отказался
+   начинать забег, игрок остаётся на стартовом экране (см. Задачи 2 и 3
+   отчёта об аудите пустого забега). */
+.start-notice {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--rush-border);
+  background: var(--rush-surface);
+  color: var(--text2);
+  font-size: 13px;
+}
+
 /* Карточки режимов: клик по карточке = старт забега в этом режиме */
 .mode-grid {
   display: grid;
@@ -1549,6 +1563,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
       <div class="mode-grid" id="mode-grid"></div>
 
+      <!-- Сервер честно отказался начинать забег (режим за флагом или
+           пустой пул под фильтром) — здесь, а не alert() и не в экране
+           результатов. Скрыта, пока сказать нечего. -->
+      <p class="start-notice" id="start-notice" hidden></p>
+
       <!-- Строка настройки: сводка выбора + кнопка раскрытия панели -->
       <div class="setup-bar">
         <span class="setup-summary" id="setup-summary">Все темы · Все источники · Любая сложность</span>
@@ -1995,6 +2014,18 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     });
   }
 
+  /* Сервер честно отказался начинать забег (режим за флагом, пустой пул
+     под фильтром) — спокойная строка на стартовом экране, а не alert()
+     и не переход на экран результатов (см. api_session_start). */
+  function showStartNotice(text) {
+    var el = $('start-notice');
+    el.textContent = text;
+    el.hidden = false;
+  }
+  function hideStartNotice() {
+    $('start-notice').hidden = true;
+  }
+
   function getCookie(name) {
     var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
     return m ? m.pop() : '';
@@ -2153,6 +2184,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var card = e.target.closest('.mode-card');
     if (!card || card.disabled) return;
     mode = card.dataset.mode;
+    hideStartNotice();
     startRun();
   });
 
@@ -2298,7 +2330,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           + '&' + filterQuery();
     api(url)
       .then(function (d) {
-        if (!d.ok) { alert(d.error || 'Не удалось начать игру'); return; }
+        /* Сервер отказывается начинать забег из нуля вопросов (флаг
+           выключил режим целиком или фильтр не оставил ни одного вопроса)
+           — спокойная строка на стартовом экране, никакого перехода в игру
+           и никакого экрана результатов (см. api_session_start). */
+        if (!d.ok) { showStartNotice(d.error || 'Не удалось начать игру'); return; }
+        hideStartNotice();
         setRun = d.set || null;   // забег по набору: код и происхождение
         mode = d.mode.key;        // у целевого забега режим приходит с сервера
         mistakesRun = mistakes;
@@ -2317,10 +2354,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         lastTickSecond = -1;
         paintHud();
         paintLives(false);
-        /* Под фильтром игрока может не оказаться ни одного вопроса. Это НЕ
-           ошибка и не диалог «пул пуст»: забег честно кончается причиной
-           pool_empty, а экран результатов подсказывает смягчить фильтр. */
-        if (!d.question) { endRun('done'); return; }
+        // ok:true гарантирует вопрос — забег из нуля вопросов не начинается.
         showQuestion(d.question);
         prefetchNext();
         lastTick = performance.now();
@@ -3130,11 +3164,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
        в которую целиться нечем. */
     var mt = s.mistake_topics || [];
     $('fin-mistakes').hidden = !mt.length;
-    // «Чисто!» — только когда ошибок ТОЧНО не было. Без сети тем нет,
-    // но число ошибок известно: молчим, а не поздравляем зря.
-    $('fin-clean').hidden = s.wrong > 0;
+    // «Чисто!» — только когда ошибок ТОЧНО не было И хотя бы один ответ
+    // был верным: при total=0 (ни одного вопроса сыграно) хвалить не за что,
+    // а s.wrong > 0 сам по себе этого не ловит (0 верных, 0 неверных —
+    // тоже "wrong > 0 === false").
+    var clean = s.correct > 0 && !s.wrong;
+    $('fin-clean').hidden = !clean;
     if (mt.length) paintMistakes(mt);
-    else if (!s.wrong) paintClean();
+    else if (clean) paintClean();
 
     paintTopics(s);
     paintMisses();

@@ -38,6 +38,18 @@ class ServingTests(TestCase):
     def setUp(self):
         self.gq = make_audit_question()
 
+    def test_flag_on_actually_serves_a_question(self):
+        u"""Задача 5: этот тест обязан покраснеть, если при включённом
+        флаге пул «Графика» вдруг окажется пуст — а не молча пройти на
+        d['ok'] is True с d['question'] is None (ровно так выглядел баг,
+        см. FlagOffTests.test_direct_entry_does_not_start_a_run — там
+        флаг ВЫКЛЮЧЕН и это ожидаемо)."""
+        d = self.client.get(reverse('game:session_start'),
+                            {'mode': 'figure'}).json()
+        self.assertTrue(d['ok'])
+        self.assertIsNotNone(d['question'])
+        self.assertEqual(d['question']['type'], AUDIT)
+
     def test_payload_has_the_figure_and_the_prompt(self):
         d = self.client.get(reverse('game:session_start'),
                             {'mode': 'figure'}).json()
@@ -131,12 +143,23 @@ class FlagOffTests(TestCase):
         cfg = json.loads(html.split('var CFG = ', 1)[1].split(';\n', 1)[0])
         self.assertEqual(cfg['pool_counts']['figure'], 0)
 
-    def test_direct_entry_gives_an_empty_run_not_a_crash(self):
+    def test_direct_entry_does_not_start_a_run(self):
+        u"""Прямой заход /game/api/session/start/?mode=figure при выключенном
+        флаге НЕ создаёт забег вообще (Задача 2) — раньше сервер стартовал
+        забег из нуля вопросов и сразу сам его хоронил причиной pool_empty,
+        и с точки зрения игрока это неотличимо от честного конца забега
+        (тот же экран результатов, «Вопросы кончились», 0/0)."""
         r = self.client.get(reverse('game:session_start'), {'mode': 'figure'})
         self.assertEqual(r.status_code, 200)
         d = r.json()
-        self.assertTrue(d['pool_empty'])
-        self.assertIsNone(d['question'])
+        self.assertFalse(d['ok'])
+        self.assertEqual(d['reason'], 'mode_unavailable')
+        self.assertNotIn('question', d)
+        self.assertIsNone(self.client.session.get(views.SESSION_KEY))
+
+        # Повторный старт («сыграть ещё раз») ведёт туда же — тот же эндпоинт.
+        r2 = self.client.get(reverse('game:session_start'), {'mode': 'figure'})
+        self.assertFalse(r2.json()['ok'])
 
     def test_the_page_itself_still_opens(self):
         self.assertEqual(self.client.get(reverse('game:page')).status_code, 200)

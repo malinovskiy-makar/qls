@@ -160,6 +160,29 @@ class PageJsTests(TestCase):
         for reason in ('lives', 'set_done', 'pool_empty'):
             self.assertIn("'%s'" % reason, m2.group(1))
 
+    def test_clean_badge_requires_at_least_one_correct_answer(self):
+        """«Чисто! Ошибок нет» ошибочно показывалась и при 0/0 (пустой
+        забег из нуля вопросов) — s.wrong > 0 у пустого забега тоже false.
+        Ловим регрессию: условие обязано требовать s.correct > 0."""
+        m = re.search(r'var clean = (.*?);', self.js)
+        self.assertIsNotNone(m, 'условие clean не найдено')
+        self.assertIn('s.correct > 0', m.group(1))
+
+    def test_start_refusal_shows_a_calm_banner_not_an_alert(self):
+        """Отказ сервера начать забег (режим за флагом, пустой пул под
+        фильтром — Задачи 2 и 3) — спокойная строка на стартовом экране,
+        а не alert() и не переход на игровой экран."""
+        # ни одного ИСПОЛНЯЕМОГО вызова alert( — только упоминания в
+        # комментариях (тексте самого регресс-теста этой ошибки).
+        code_alerts = [line for line in self.js.splitlines()
+                      if 'alert(' in line and not line.strip().startswith(('*', '//'))
+                      and 'НЕ alert' not in line and 'не alert' not in line]
+        self.assertEqual(code_alerts, [])
+        self.assertIn('showStartNotice', self.js)
+        self.assertIn('hideStartNotice', self.js)
+        m = re.search(r'if \(!d\.ok\) \{ showStartNotice\(', self.js)
+        self.assertIsNotNone(m, 'startRun не показывает баннер на !d.ok')
+
     def test_mechanics_numbers_come_from_config(self):
         """Числа механики клиент не выдумывает: 3 жизни и размер целевого
         забега приходят из config.py, а не написаны в шаблоне руками."""

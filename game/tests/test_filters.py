@@ -6,15 +6,17 @@
 - старый одиночный `topic=` продолжает работать (ссылками уже делились);
 - фильтр НАСЛЕДУЕТСЯ «сыграть ещё раз» и работой над ошибками — раньше
   выбор игрока молча сбрасывался;
-- пустой пул под фильтром даёт честную концовку `pool_empty`, а не 503;
+- пустой пул под фильтром не создаёт забег вовсе (Задача 3, 2026-07-27) —
+  честный отказ `ok: False`, а не 503 и не забег из нуля вопросов;
 - режим с пустым пулом на стартовом экране не рисуется вовсе.
 """
 import json
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from game import config
+from game import config, views
+from game.figures.base import QUESTION_TYPE as FIGURE_AUDIT
 from game.models import GameQuestion
 from game import sources as game_sources
 from problems.models import Problem
@@ -97,20 +99,21 @@ class FilterNarrowsServingTests(TestCase):
         d = self._start(topics=['Эластичность', 'Рынок труда'])
         self.assertIn(d['question']['id'], {self.elastic.id, self.labour.id})
 
-    def test_impossible_combination_gives_pool_empty_not_an_error(self):
+    def test_impossible_combination_does_not_start_a_run(self):
         """Тема из одного вопроса + источник из другого = пусто.
 
-        Это не 503 и не диалог «пул пуст»: забег стартует и честно
-        кончается причиной pool_empty."""
+        Это не 503 и не забег из нуля вопросов, который сам себя тут же
+        хоронит: сервер честно отказывается начинать (Задача 3), сессия не
+        создаётся вовсе — session_finish на неё отвечает «забег не начат»."""
         d = self._start(topics=['Эластичность'], sources=['books'])
-        self.assertTrue(d['ok'])
-        self.assertTrue(d['pool_empty'])
-        self.assertIsNone(d['question'])
+        self.assertFalse(d['ok'])
+        self.assertEqual(d['reason'], 'pool_empty')
+        self.assertNotIn('question', d)
 
         r = self.client.post(reverse('game:session_finish'),
                              json.dumps({'reason': 'done'}),
                              content_type='application/json')
-        self.assertEqual(r.json()['summary']['ended_reason'], 'pool_empty')
+        self.assertEqual(r.status_code, 400)
 
     def test_measured_difficulty_is_used_by_the_filter(self):
         """Фильтр сложности опирается на ту же величину, что и вся игра:
@@ -251,3 +254,47 @@ class TopicGroupsTests(TestCase):
         for key, title in game_sources.GROUPS:
             self.assertIn('value="%s"' % key, html, key)
             self.assertIn(title, html, title)
+
+
+def make_typed_q(qtype, topics):
+    """Один вопрос заданного типа с заданными темами — минимум, нужный
+    _candidate_rows (сам ответ в этих тестах не проверяется)."""
+    kw = dict(question_type=qtype, problem=None, question='Вопрос.',
+             options=['а', 'б'], difficulty=3, topics=topics, lang='ru',
+             is_generated=True)
+    if qtype == 'numeric':
+        kw['options'] = []
+        kw['correct_value'] = '5'
+    elif qtype == 'multi':
+        kw['correct_indices'] = [0]
+    else:
+        kw['correct_index'] = 0
+    return GameQuestion.objects.create(**kw)
+
+
+@override_settings(GAME_FIGURE_ENABLED=True)
+class EmptyFilterNeverStartsARunTests(TestCase):
+    """Задача 3 (2026-07-27), общее правило для ВСЕХ режимов: если под
+    выбранным фильтром не нашлось ни одного вопроса, забег не начинается.
+
+    У каждого режима здесь вопросы ЕСТЬ (просто не под запрошенной темой) —
+    поэтому причина именно `pool_empty`, а не `mode_unavailable`
+    (недостижимость самого режима проверяет FlagOffTests в
+    test_figure_audit.py)."""
+
+    def setUp(self):
+        for qtype in ('boolean', 'single', 'multi', 'numeric', FIGURE_AUDIT):
+            make_typed_q(qtype, topics=['Спрос и предложение'])
+
+    def test_every_mode_refuses_to_start_under_an_impossible_topic(self):
+        for mode in config.MODES:
+            with self.subTest(mode=mode):
+                r = self.client.get(reverse('game:session_start'),
+                                    {'mode': mode,
+                                     'topics': 'Инфляция и безработица'})
+                self.assertEqual(r.status_code, 200)
+                d = r.json()
+                self.assertFalse(d['ok'], mode)
+                self.assertEqual(d['reason'], 'pool_empty', mode)
+                self.assertNotIn('question', d)
+                self.assertIsNone(self.client.session.get(views.SESSION_KEY))

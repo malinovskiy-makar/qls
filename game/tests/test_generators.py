@@ -21,7 +21,7 @@ from game.generators import base as gbase
 from game.generators.base import fmt_num, is_nice, LIMIT_FULL, LIMIT_SHORT
 from game.generators.registry import ARCHETYPES
 from game.models import GameQuestion
-from game.views import parse_exact_number
+from game.views import parse_exact_number, SESSION_KEY
 
 N_SAMPLES = 500          # сэмплов на архетип (распределяются по трём типам)
 MIN_INT_SHARE = 0.6      # доля целых ответов среди numeric (правило ≥80%
@@ -564,12 +564,13 @@ class ServingTests(TestCase):
         make_generated_question()
         with self.settings(GAME_GENERATED_ENABLED=False):
             resp = self._start_session()
-            # других numeric в пуле нет → пул пуст. Это НЕ ошибка и не 503:
-            # забег стартует и сразу кончается причиной pool_empty.
+            # других numeric в пуле нет → пул режима пуст целиком, значит
+            # забег не начинается вовсе (Задача 3), а не стартует и сразу
+            # хоронит себя причиной pool_empty.
             self.assertEqual(resp.status_code, 200)
             body = resp.json()
-            self.assertTrue(body.get('pool_empty'))
-            self.assertIsNone(body['question'])
+            self.assertFalse(body['ok'])
+            self.assertIsNone(self.client.session.get(SESSION_KEY))
 
     def test_flag_on_serves_generated_with_anticheat(self):
         gq = make_generated_question()

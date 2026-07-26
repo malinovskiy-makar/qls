@@ -358,11 +358,18 @@ class GameApiTests(TestCase):
     def test_one_bad_topic_among_good_ones_is_dropped_silently(self):
         """Мульти-выбор: кривое значение не роняет забег, если уцелело
         хоть что-то осмысленное — фильтр это удобство, а не контракт."""
+        p = make_test_problem(statement='Вопрос про эластичность?', answer='A')
+        GameQuestion.objects.create(
+            problem=p, question=p.statement,
+            options=['Фирмы', 'Страны', 'Планеты', 'Климат'],
+            correct_index=0, difficulty=2, topics=['Эластичность'], lang='ru')
         r = self.client.get('/game/api/session/start/',
                             {'mode': 'blitz', 'topics': ['Эластичность',
                                                          'Нет такой']})
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['filter']['topics'], ['Эластичность'])
+        d = r.json()
+        self.assertTrue(d['ok'])
+        self.assertEqual(d['filter']['topics'], ['Эластичность'])
 
     def test_bad_source_400(self):
         r = self.client.get('/game/api/session/start/',

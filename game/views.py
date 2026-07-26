@@ -117,6 +117,19 @@ def _pool_qs():
     return qs
 
 
+def _mode_enabled(mode):
+    """Есть ли у режима вообще вопросы в пуле — БЕЗ учёта фильтра забега.
+
+    Отличает две разные пустоты, которые раньше были слиты в одну
+    (`pool_empty`): режим, выключенный флагом (сегодня — «График» при
+    `GAME_FIGURE_ENABLED=False`), не наберёт вопросов ни под каким
+    фильтром — это НЕДОСТИЖИМОСТЬ режима. Пустой пул ПОД ФИЛЬТРОМ у
+    режима, у которого вопросы вообще есть, — другая вещь (см.
+    `_candidate_rows` в `api_session_start`)."""
+    qtype = config.MODES[mode]['question_type']
+    return _pool_qs().filter(question_type=qtype).exists()
+
+
 def empty_filter():
     """Фильтр «ничего не выбрано» = играем всем пулом режима."""
     return {'topics': [], 'sources': [],
@@ -461,16 +474,30 @@ def api_session_start(request):
     Старый одиночный `topic=` продолжает работать — ссылками с ним могли
     поделиться. Пустой фильтр = весь пул режима.
 
-    ⚠️ Пул под фильтром может оказаться пустым — это НЕ ошибка и не 503:
-    забег стартует и сразу честно кончается причиной `pool_empty`
-    («вопросы под твоими настройками кончились»). Проверять пул ДО старта
-    и гасить сочетания фильтров запрещено — прямое указание Макара:
-    фильтр работает так, будто задач по каждой теме и источнику
-    неограниченно.
+    ⚠️ Панель фильтра НЕ гасит сочетания заранее и не показывает счётчики —
+    прямое указание Макара: фильтр работает так, будто задач по каждой теме
+    и источнику неограниченно. Но забег из НУЛЯ вопросов не существует
+    (решение 2026-07-27): если под режимом или под конкретным фильтром не
+    нашлось ни одного вопроса, сессия не создаётся вовсе, и клиент остаётся
+    на стартовом экране с честной строкой. Раньше сервер стартовал такой
+    забег и сразу сам его завершал причиной `pool_empty` — с точки зрения
+    игрока это неотличимо от настоящего конца забега (тот же экран
+    результатов, «Вопросы кончились», 0/0, и даже плашка «Чисто!»).
+    `pool_empty` остаётся как причина конца ПОСРЕДИ забега, когда вопросы
+    уже были и пул под фильтром исчерпался в процессе (см. `_end_reason`).
     """
     mode = request.GET.get('mode', '').strip() or config.DEFAULT_MODE
     if mode not in config.MODES:
         return JsonResponse({'error': 'Неизвестный режим'}, status=400)
+
+    # Режим существует в конфиге, но у него сейчас нет ни одного вопроса —
+    # либо погашен своим флагом (сегодня «График» при
+    # GAME_FIGURE_ENABLED=False), либо пуст сам по себе. Ни под каким
+    # фильтром вопросов не появится — это НЕДОСТИЖИМОСТЬ режима, а не
+    # пустой результат конкретного фильтра (см. _mode_enabled).
+    if not _mode_enabled(mode):
+        return JsonResponse({'ok': False, 'reason': 'mode_unavailable',
+                             'error': 'Этот режим пока недоступен'})
 
     # Мусор среди выбранных значений отбрасываем молча (одна кривая тема
     # не должна ронять забег), но если не уцелело НИ ОДНОГО из явно
@@ -487,17 +514,22 @@ def api_session_start(request):
     legacy_topic = request.GET.get('topic', '').strip() or None
     state = _new_state(mode, legacy_topic, run_filter)
     gq = _pick_next(request, state)
+    if gq is None:
+        # Под этим конкретным фильтром вопросов нет — забег не начинается
+        # (в отличие от _mode_enabled выше, у режима вопросы ЕСТЬ, просто не
+        # под этими темами/источниками/сложностью). Состояние в сессию не
+        # пишем — начинать и сразу же хоронить забег незачем.
+        return JsonResponse({
+            'ok': False, 'reason': 'pool_empty',
+            'error': 'Под этими настройками вопросов нет — измени фильтры'})
     request.session[SESSION_KEY] = state
-    payload = {
+    return JsonResponse({
         'ok': True,
         'mode': _mode_payload(mode),
         'lives': state['lives'],
         'filter': run_filter,
-        'question': _question_payload(gq, 1) if gq else None,
-    }
-    if gq is None:
-        payload['pool_empty'] = True
-    return JsonResponse(payload)
+        'question': _question_payload(gq, 1),
+    })
 
 
 @require_GET
@@ -1021,19 +1053,23 @@ def api_session_start_set(request, code):
 
     state = start_set_state(request, gset)
     gq = _pick_next(request, state)
+    if gq is None:
+        # Все вопросы набора исчезли из кэша между сборкой очереди и стартом
+        # (пул пересобрали) — забег из нуля вопросов не начинается (Задача 3
+        # действует и на наборы, не только на свободный выбор режима).
+        return JsonResponse({
+            'ok': False, 'reason': 'pool_empty',
+            'error': 'В этом наборе не осталось доступных вопросов'})
     request.session[SESSION_KEY] = state
-    payload = {
+    return JsonResponse({
         'ok': True,
         'mode': _mode_payload(gset.mode),
         'lives': state['lives'],
         'filter': normalize_filter(gset.filter_snapshot),
         'set': {'code': gset.code, 'kind': gset.kind, 'title': gset.title,
                 'size': gset.size},
-        'question': _question_payload(gq, 1) if gq else None,
-    }
-    if gq is None:
-        payload['pool_empty'] = True
-    return JsonResponse(payload)
+        'question': _question_payload(gq, 1),
+    })
 
 
 def make_code_lookup(raw):
