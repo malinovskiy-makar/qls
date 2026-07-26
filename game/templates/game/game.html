@@ -508,6 +508,50 @@ a:focus-visible, button:focus-visible {
   }
 }
 
+/* ── Последняя жизнь ──────────────────────────────────────────────
+   Красная виньетка по краю, пульсация сердец и полоса времени
+   принудительно в своём красном режиме — независимо от остатка времени.
+   Всё это ДУБЛИРУЕТ то, что и так видно (одно сердце вместо трёх):
+   звук и цвет усиливают сигнал, а не заменяют его. */
+.last-life-frame {
+  position: fixed; inset: 0; pointer-events: none; z-index: 40;
+  box-shadow: inset 0 0 90px 10px var(--rush-bad-tint),
+              inset 0 0 0 3px var(--rush-bad);
+  opacity: 0;
+  transition: opacity .35s ease;
+}
+.last-life-frame.on { opacity: .85; }
+@media (prefers-reduced-motion: no-preference) {
+  .last-life-frame.on { animation: lastLifeBreath 1.9s ease-in-out infinite; }
+}
+@keyframes lastLifeBreath {
+  0%, 100% { opacity: .55; }
+  50% { opacity: .95; }
+}
+.hud-lives.last-life .heart:not(.lost) {
+  color: var(--rush-bad);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hud-lives.last-life .heart:not(.lost) {
+    animation: heartBeat 1.05s ease-in-out infinite;
+  }
+}
+@keyframes heartBeat {
+  0%, 100% { transform: scale(1); }
+  28% { transform: scale(1.25); }
+  46% { transform: scale(1); }
+}
+.sound-x {
+  position: absolute; top: 10px; right: 44px;
+  font: inherit; font-size: 15px; line-height: 1;
+  width: 28px; height: 28px; border-radius: 8px;
+  border: 1px solid var(--rush-border);
+  background: var(--rush-surface); color: var(--text3);
+  cursor: pointer; padding: 0;
+}
+.sound-x:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+.sound-x.off { opacity: .5; }
+
 /* ── Экран 2: игра ─────────────────────────────────────────────── */
 #screen-play .scene {
   max-width: 760px;
@@ -1195,12 +1239,17 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
 /* Чип «Тренировочный» на карточке сгенерированного вопроса — в стиле
    topic-chip, только меньше и некликабельный (токены --rush-*). */
+.q-chips {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  min-height: 22px;
+}
 .gen-chip {
   display: inline-block;
   font-size: 10.5px;
   line-height: 1;
   padding: 4px 8px;
-  margin-bottom: 8px;
   border: 1px solid var(--rush-border);
   border-radius: 999px;
   background: var(--rush-surface);
@@ -1218,8 +1267,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   font-size: 11px;
   line-height: 1;
   padding: 4px 9px;
-  margin-bottom: 8px;
-  margin-left: 6px;
   border: 1px solid var(--rush-border);
   border-radius: 999px;
   background: var(--rush-surface);
@@ -1291,6 +1338,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      рисователь), общий с HTML-предпросмотром генераторов. -->
 <link rel="stylesheet" href="{% static 'game/figure.css' %}">
 <script defer src="{% static 'game/figure.js' %}"></script>
+<!-- Звук: синтез через Web Audio, без файлов. Наружу — window.rushSound. -->
+<script defer src="{% static 'game/sound.js' %}"></script>
 </head>
 <body>
 
@@ -1418,6 +1467,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   <section id="screen-play" class="screen">
     <div class="scene">
       <button class="quit-x" id="btn-quit" title="Выйти из забега" aria-label="Выйти из забега">✕</button>
+      <button class="sound-x" id="btn-sound" title="Звук" aria-label="Включить или выключить звук">♪</button>
       <div class="time-track"><div class="time-fill" id="time-fill"></div></div>
       <div class="hud">
         <div class="hud-score"><small>СЧЁТ</small><span id="hud-score">0</span></div>
@@ -1428,7 +1478,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         <div class="hud-combo" id="hud-combo">🔥 ×1</div>
       </div>
       <div class="combo-toast" id="combo-toast"></div>
-      <div class="q-card" id="q-card"><span class="gen-chip" id="gen-chip" hidden>Тренировочный</span><span class="stat-chip" id="stat-chip" hidden></span><div class="q-text" id="q-text"></div></div>
+      <!-- Чипы вынесены НАД карточкой: .q-card — flex-обёртка ровно с
+           одним ребёнком (см. её стиль), а лишние дети вставали в ряд
+           рядом с текстом вопроса. -->
+      <div class="q-chips"><span class="gen-chip" id="gen-chip" hidden>Тренировочный</span><span class="stat-chip" id="stat-chip" hidden></span></div>
+      <div class="q-card" id="q-card"><div class="q-text" id="q-text"></div></div>
       <div class="opts" id="opts"></div>
       <div class="multi-actions" id="multi-actions" hidden>
         <button class="btn-submit" id="btn-submit" disabled>Ответить</button>
@@ -1557,12 +1611,15 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         <p class="share-lead" id="share-lead"></p>
         <div class="share-row">
           <button type="button" id="btn-share-img">Поделиться картинкой</button>
+          <button type="button" id="btn-share-story">Вертикальная (сторис)</button>
           <button type="button" id="btn-share-link">Скопировать ссылку</button>
           <button type="button" id="btn-share-native" hidden>Поделиться</button>
         </div>
         <!-- холст карточки: рисуем в браузере (кириллицу отрисует он сам),
-             на экране не показываем — он нужен только чтобы отдать PNG -->
-        <canvas id="share-canvas" width="1000" height="524" hidden></canvas>
+             на экране не показываем — он нужен только чтобы отдать PNG.
+             Размер ставится перед отрисовкой: 1200×630 широкая, 1080×1350
+             вертикальная под сторис. -->
+        <canvas id="share-canvas" width="1200" height="630" hidden></canvas>
       </section>
 
       <!-- 7. Действия -->
@@ -1580,6 +1637,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 </div>
 
 <div class="vignette" id="vignette"></div>
+<div class="last-life-frame" id="last-life-frame"></div>
 <div class="gameover-overlay" id="gameover-overlay" hidden>
   <div class="go-card">
     <div class="go-hearts">💔</div>
@@ -2022,6 +2080,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         $('gameover-overlay').hidden = true;
         timeLeft = MODE.duration;
         show('playing');
+        rush('start');
+        lastTickSecond = -1;
         paintHud();
         paintLives(false);
         /* Под фильтром игрока может не оказаться ни одного вопроса. Это НЕ
@@ -2057,8 +2117,44 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var fill = $('time-fill');
     var frac = Math.max(0, Math.min(1, timeLeft / MODE.duration));
     fill.style.transform = 'scaleX(' + frac + ')';
-    fill.classList.toggle('low', timeLeft < 7);
-    fill.classList.toggle('mid', timeLeft >= 7 && timeLeft < 15);
+    // На последней жизни полоса времени принудительно в красном режиме,
+    // сколько бы времени ни осталось: она перестаёт быть про время и
+    // становится про опасность.
+    var last = isLastLife();
+    fill.classList.toggle('low', last || timeLeft < 7);
+    fill.classList.toggle('mid', !last && timeLeft >= 7 && timeLeft < 15);
+    tickSoundMaybe();
+  }
+
+  /* Последняя жизнь: один и тот же вопрос задают четыре места (полоса
+     времени, сердца, виньетка, звук) — ответ обязан быть один. */
+  function isLastLife() {
+    return state === 'playing' && lives === 1;
+  }
+
+  function paintLastLife() {
+    var on = isLastLife();
+    $('last-life-frame').classList.toggle('on', on);
+    $('hud-lives').classList.toggle('last-life', on);
+    if (on) { rush('lowLayerOn'); } else { rush('lowLayerOff'); }
+  }
+
+  /* Тик последних секунд — один раз на каждую целую секунду. */
+  var lastTickSecond = -1;
+  function tickSoundMaybe() {
+    if (state !== 'playing') return;
+    var sec = Math.ceil(timeLeft);
+    if (sec === lastTickSecond) return;
+    lastTickSecond = sec;
+    if (sec > 0 && sec <= 5) rush('tick');
+  }
+
+  /* Единая точка входа в звук: модуль мог не загрузиться (CDN, блокировщик),
+     и игра обязана работать без него. */
+  function rush(method, arg) {
+    if (window.rushSound && typeof window.rushSound[method] === 'function') {
+      try { window.rushSound[method](arg); } catch (e) { /* звук не критичен */ }
+    }
   }
 
   /* Сердца: рисуем весь запас режима, потраченные — гаснут.
@@ -2076,6 +2172,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       box.appendChild(h);
     }
     box.setAttribute('aria-label', 'Жизни: ' + lives + ' из ' + livesMax);
+    paintLastLife();
   }
 
   function comboMult(s) {
@@ -2204,7 +2301,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   // Общий каркас: POST ответа, дельта времени, финал по нулю времени.
   // (Время кончилось прямо на дельте — не ждём следующего кадра rAF:
   // в фоновой вкладке rAF заморожен и финал бы не наступил.)
+  var livesBefore = 3;   // сколько жизней было ДО этого ответа (для звука)
   function postAnswer(payload, onResult) {
+    livesBefore = lives;
     // сколько игрок думал над этим вопросом — считает клиент (он знает
     // момент показа карточки), сервер кладёт число в журнал забега
     payload.elapsed_ms = Math.round(performance.now() - questionShownAt);
@@ -2244,11 +2343,16 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   function registerCorrect() {
     answered++; correctCount++;
+    rush('correct', comboMult(streak));
   }
 
   function registerWrong(q, d) {
     answered++;
     // Ошибка стоит жизни: гасим сердце и коротко подсвечиваем карточку.
+    // Потеря жизни — ОТДЕЛЬНОЕ событие со своим звуком: игрок обязан
+    // слышать разницу между «ошибся» и «сгорело сердце».
+    rush(d && typeof d.lives === 'number' && d.lives < livesBefore
+         ? 'lifeLost' : 'wrong');
     paintLives(true);
     var card = $('q-card');
     card.classList.remove('flash-bad');
@@ -2471,6 +2575,23 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     }
   }
 
+  /* ---------- ЗВУК ----------
+     Состояние живёт в localStorage (econ_rush_sound) и переживает
+     перезагрузку. По умолчанию звук ВКЛЮЧЁН. */
+  function paintSoundBtn() {
+    var on = !window.rushSound || window.rushSound.isOn();
+    var btn = $('btn-sound');
+    btn.classList.toggle('off', !on);
+    btn.textContent = on ? '♪' : '♪̸';
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.title = on ? 'Звук включён' : 'Звук выключен';
+  }
+  $('btn-sound').addEventListener('click', function () {
+    if (window.rushSound) window.rushSound.toggle();
+    paintSoundBtn();
+  });
+  paintSoundBtn();
+
   /* ---------- ВЫХОД ИЗ ЗАБЕГА ---------- */
   $('btn-quit').addEventListener('click', function () {
     if (state !== 'playing') return;
@@ -2491,6 +2612,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     runOver = false;
     cancelAnimationFrame(rafId);
     show('finished');
+    // Экран результатов и перерисовка графиков звука не издают: он
+    // сопровождает забег, а не отчёт о нём. Одно исключение — рекорд.
+    rush('lowLayerOff');
+    $('last-life-frame').classList.remove('on');
+    rush('over');
 
     // Рекорд считаем ЗДЕСЬ и ровно один раз: «новый рекорд» — событие,
     // а не состояние. Пересчитай его при повторной отрисовке — и рекорд,
@@ -2498,7 +2624,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var best = parseInt(localStorage.getItem(bestKey(mode)) || '0', 10);
     isRecord = score > best && score > 0;
     bestNow = Math.max(best, score);
-    if (isRecord) localStorage.setItem(bestKey(mode), String(score));
+    if (isRecord) {
+      localStorage.setItem(bestKey(mode), String(score));
+      rush('record');
+    }
     renderModeCards();  // освежить рекорды на карточках к возврату на старт
 
     // Сводку считает сервер по журналу забега. Пока она в пути (и если
@@ -2824,51 +2953,243 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('btn-share-native').hidden = !navigator.share;
   }
 
-  /* Карточка-картинка. Размер 1000×524 — те же пропорции, что у превью
-     ссылки (1200×630), чтобы в ленте они выглядели одинаково.
+  /* ---------- КАРТОЧКА РЕЗУЛЬТАТА ----------
+     Рисует canvas в браузере: кириллицу он отрисует сам, серверу рендер
+     картинок не нужен.
 
-     ⚠️ Цвета тут захардкожены, и это осознанное исключение из правила
-     «каждый цвет через var(--…)»: canvas не читает CSS-переменные, а
-     картинка уезжает ЧУЖИМ людям — она обязана выглядеть одинаково
-     независимо от того, какая тема стояла у отправителя. Тёмная палитра
-     выбрана намеренно: карточку смотрят в ленте мессенджера. */
-  function drawShareCard() {
+     Два размера: 1200×630 (широкая, как превью ссылки) и 1080×1350
+     (вертикальная под сторис).
+
+     ⚠️ Карточка ВСЕГДА ТЁМНАЯ, независимо от темы сайта: её смотрят в
+     ленте мессенджера, и мы обязаны точно знать, как она выглядит у
+     чужого человека. Отсюда же захардкоженные цвета — осознанное
+     исключение из правила «каждый цвет через var(--…)»: canvas не читает
+     CSS-переменные, а картинка уезжает наружу.
+
+     Главный элемент — КРИВАЯ СЧЁТА со ступеньками комбо во всю ширину:
+     у каждого забега своя форма, ради этого её и показывают.
+
+     ⚠️ Внизу ЗАРЕЗЕРВИРОВАННАЯ ПОЛОСА ПОД ССЫЛКУ фиксированной высоты,
+     сейчас ПУСТАЯ: домена ещё нет, а `127.0.0.1` на карточке — позор.
+     Появится домен — впишем строку, и вёрстка не сдвинется ни на пиксель. */
+  var CARD_SIZES = {
+    wide:  { w: 1200, h: 630 },
+    story: { w: 1080, h: 1350 }
+  };
+  var CARD = {
+    bg: '#0d0d12', panel: '#161b25', accent: '#FF4D94',
+    ink: '#ffffff', soft: '#96969f', dim: '#4a4a55',
+    ok: '#3fc77f', combo: '#f5a623'
+  };
+  /* Один вшитый шрифт вместо системного: на системном карточка выйдет
+     разной на разных устройствах, а местами с кривой кириллицей.
+     Файл кладётся в game/static/game/fonts/ — пока его нет, честно
+     работаем на системном стеке (и это видно в отчёте, а не молча). */
+  var CARD_FONT = 'RushCard';
+  var CARD_FALLBACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  var cardFontReady = false;
+
+  function cardFont(weight, size) {
+    var family = cardFontReady ? ('"' + CARD_FONT + '", ' + CARD_FALLBACK)
+                               : CARD_FALLBACK;
+    return weight + ' ' + size + 'px ' + family;
+  }
+
+  /* Ждём готовности шрифтов ДО отрисовки: иначе первый кадр уйдёт
+     системным шрифтом, а игрок увидит другую картинку, чем ожидал. */
+  function withFonts(done) {
+    if (!document.fonts || !document.fonts.ready) { done(); return; }
+    document.fonts.ready.then(function () {
+      try { cardFontReady = document.fonts.check('16px "' + CARD_FONT + '"'); }
+      catch (e) { cardFontReady = false; }
+      done();
+    }, done);
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  /* Кривая счёта со ступеньками комбо — главный элемент карточки. */
+  function drawCurve(ctx, s, x, y, w, h) {
+    var scores = s.score_curve || [];
+    var combo = s.combo_curve || [];
+    ctx.fillStyle = CARD.panel;
+    roundRect(ctx, x, y, w, h, 18);
+    ctx.fill();
+    if (scores.length < 2) {
+      ctx.fillStyle = CARD.dim;
+      ctx.font = cardFont(600, 24);
+      ctx.fillText('слишком короткий забег для кривой', x + 26, y + h / 2);
+      return;
+    }
+    var pad = 22;
+    var maxScore = Math.max.apply(null, scores) || 1;
+    var maxCombo = Math.max.apply(null, combo.concat([1])) || 1;
+    var px = function (i) { return x + pad + i * (w - 2 * pad) / (scores.length - 1); };
+    var py = function (v) { return y + h - pad - (v / maxScore) * (h - 2 * pad); };
+
+    // ступеньки комбо — СТУПЕНЧАТОЙ линией внизу поля. Блоками они
+    // сливались с розовой заливкой в грязно-коричневый; ступенька же
+    // читается как ступенька и не спорит с кривой счёта.
+    if (combo.length) {
+      var cy = function (v) {
+        return y + h - pad - (v / maxCombo) * (h - 2 * pad) * 0.34;
+      };
+      ctx.beginPath();
+      combo.forEach(function (c, i) {
+        if (i === 0) { ctx.moveTo(px(i), cy(c)); }
+        else { ctx.lineTo(px(i), cy(combo[i - 1])); ctx.lineTo(px(i), cy(c)); }
+      });
+      ctx.strokeStyle = 'rgba(245,166,35,.75)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+
+    // заливка под кривой
+    ctx.beginPath();
+    ctx.moveTo(px(0), y + h - pad);
+    scores.forEach(function (v, i) { ctx.lineTo(px(i), py(v)); });
+    ctx.lineTo(px(scores.length - 1), y + h - pad);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,77,148,.16)';
+    ctx.fill();
+
+    // сама кривая
+    ctx.beginPath();
+    scores.forEach(function (v, i) {
+      if (i === 0) { ctx.moveTo(px(i), py(v)); } else { ctx.lineTo(px(i), py(v)); }
+    });
+    ctx.strokeStyle = CARD.accent;
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+
+  /* Ряд сердец: погашенные — контуром. */
+  function drawHearts(ctx, left, max, x, y, size) {
+    ctx.font = cardFont(400, size);
+    for (var i = 0; i < max; i++) {
+      var lost = i >= left;
+      ctx.fillStyle = lost ? CARD.dim : '#ff5470';
+      ctx.fillText(lost ? '♡' : '♥', x + i * (size * 0.95), y);
+    }
+  }
+
+  /* Кольцо сложностей в углу — маленькое, справочное. */
+  function drawDonut(ctx, s, cx, cy, r) {
+    var rows = (s.difficulty || []).filter(function (g) { return g.total > 0; });
+    var total = rows.reduce(function (a, g) { return a + g.total; }, 0);
+    if (!total) return;
+    var colors = { easy: CARD.ok, medium: CARD.soft, hard: CARD.combo };
+    var a0 = -Math.PI / 2;
+    rows.forEach(function (g) {
+      var a1 = a0 + (g.total / total) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, a0, a1);
+      ctx.strokeStyle = colors[g.key] || CARD.soft;
+      ctx.lineWidth = r * 0.42;
+      ctx.stroke();
+      a0 = a1;
+    });
+  }
+
+  /* Лента «НОВЫЙ РЕКОРД» по диагонали. */
+  function drawRecordRibbon(ctx, W) {
+    ctx.save();
+    ctx.translate(W - 130, 96);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = CARD.accent;
+    ctx.fillRect(-170, -22, 340, 44);
+    ctx.fillStyle = '#fff';
+    ctx.font = cardFont(800, 24);
+    ctx.textAlign = 'center';
+    ctx.fillText('НОВЫЙ РЕКОРД', 0, 8);
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
+
+  /* Раскладка задана ЯВНЫМИ координатами на каждый размер, а не цепочкой
+     «предыдущий + отступ»: цепочка молча выезжала за нижнюю полосу, и
+     сердца с кольцом сложностей просто не влезали в кадр. */
+  var CARD_LAYOUT = {
+    wide: { pad: 64, linkBand: 96, mark: 88, mode: 134,
+            curveY: 164, curveH: 196, score: 470, scoreSize: 118,
+            metrics: 508, heartsY: 470, heartSize: 38,
+            donutX: 106, donutY: 440, donutR: 38 },
+    story: { pad: 72, linkBand: 120, mark: 124, mode: 182,
+             curveY: 220, curveH: 470, score: 850, scoreSize: 138,
+             metrics: 908, heartsY: 1040, heartSize: 50,
+             donutX: 124, donutY: 1010, donutR: 50 }
+  };
+
+  function drawShareCard(kind) {
+    var story = kind === 'story';
+    var size = CARD_SIZES[story ? 'story' : 'wide'];
+    var L = CARD_LAYOUT[story ? 'story' : 'wide'];
     var cv = $('share-canvas');
+    cv.width = size.w;
+    cv.height = size.h;
     var ctx = cv.getContext('2d');
     var W = cv.width, H = cv.height, s = summary;
-    ctx.fillStyle = '#0d0d12';
+
+    ctx.fillStyle = CARD.bg;
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#FF4D94';
-    ctx.fillRect(0, 0, 10, H);
+    ctx.fillStyle = CARD.accent;
+    ctx.fillRect(0, 0, 12, H);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
 
-    ctx.fillStyle = '#96969f';
-    ctx.font = '600 26px -apple-system, "Segoe UI", sans-serif';
-    ctx.fillText('ЭкЗадачи · Econ Rush', 64, 74);
+    ctx.fillStyle = CARD.soft;
+    ctx.font = cardFont(600, story ? 30 : 26);
+    ctx.fillText('ЭкЗадачи · Econ Rush', L.pad, L.mark);
+    ctx.fillStyle = CARD.ink;
+    ctx.font = cardFont(700, story ? 38 : 32);
+    ctx.fillText('Режим «' + s.mode_title + '»', L.pad, L.mode);
 
-    ctx.fillStyle = '#fff';
-    ctx.font = '800 140px -apple-system, "Segoe UI", sans-serif';
+    // кривая счёта — главный элемент, во всю ширину
+    drawCurve(ctx, s, L.pad, L.curveY, W - L.pad * 2, L.curveH);
+
+    // крупный счёт
+    ctx.fillStyle = CARD.ink;
+    ctx.font = cardFont(800, L.scoreSize);
     var scoreText = s.score.toLocaleString('ru-RU');
-    ctx.fillText(scoreText, 64, 210);
-    var scoreW = ctx.measureText(scoreText).width;   // «очков» ставим за счётом
-    ctx.fillStyle = '#96969f';
-    ctx.font = '600 30px -apple-system, "Segoe UI", sans-serif';
-    ctx.fillText('очков', 64 + scoreW + 14, 210);
+    ctx.fillText(scoreText, L.pad, L.score);
+    var scoreW = ctx.measureText(scoreText).width;
+    ctx.fillStyle = CARD.soft;
+    ctx.font = cardFont(600, story ? 32 : 28);
+    ctx.fillText('очков', L.pad + scoreW + 16, L.score);
 
-    ctx.fillStyle = '#fff';
-    ctx.font = '600 34px -apple-system, "Segoe UI", sans-serif';
-    ctx.fillText('Режим «' + s.mode_title + '»', 64, 290);
-    ctx.fillStyle = '#96969f';
-    ctx.font = '400 30px -apple-system, "Segoe UI", sans-serif';
-    ctx.fillText('верных ' + s.correct + '/' + s.total + ' · точность '
-                 + s.accuracy + '% · комбо ×' + s.max_multiplier, 64, 340);
+    // метрики строкой
+    ctx.fillStyle = CARD.soft;
+    ctx.font = cardFont(500, story ? 30 : 26);
+    ctx.fillText('точность ' + s.accuracy + '%  ·  комбо ×' + s.max_multiplier
+                 + '  ·  вопросов ' + (s.total + s.skipped),
+                 L.pad, L.metrics);
 
-    ctx.fillStyle = '#FF4D94';
-    ctx.font = '800 44px -apple-system, "Segoe UI", sans-serif';
-    ctx.fillText('Обгонишь?', 64, 430);
+    // сердца — справа (на широкой в одной строке со счётом, на
+    // вертикальной под ним), кольцо сложностей в углу
+    var heartsW = s.lives_max * L.heartSize * 0.95;
+    drawHearts(ctx, s.lives_left, s.lives_max,
+               W - L.pad - L.donutX - heartsW - 24, L.heartsY, L.heartSize);
+    drawDonut(ctx, s, W - L.pad - L.donutR, L.donutY, L.donutR);
 
-    ctx.fillStyle = '#6b6b78';
-    ctx.font = '400 24px -apple-system, "Segoe UI", sans-serif';
-    ctx.fillText((shareInfo && shareInfo.url) || '', 64, H - 44);
+    if (isRecord) drawRecordRibbon(ctx, W);
+
+    // ЗАРЕЗЕРВИРОВАННАЯ ПОЛОСА ПОД ССЫЛКУ — пустая. Домена нет; когда
+    // появится, строка впишется сюда и ничего не сдвинет.
+    ctx.fillStyle = CARD.panel;
+    ctx.fillRect(0, H - L.linkBand, W, L.linkBand);
+    ctx.fillStyle = CARD.accent;
+    ctx.font = cardFont(800, story ? 40 : 34);
+    ctx.fillText('Обгонишь?', L.pad, H - L.linkBand / 2 + (story ? 14 : 12));
   }
 
   function toast(btn, text, back) {
@@ -2879,7 +3200,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   /* Скачивание карточки — единственный запасной путь кнопки «Поделиться
      картинкой». В текст не уходим НИКОГДА: нажали «картинкой» — получите
      картинку. Текст и ссылка живут на соседних кнопках. */
-  function downloadCard(blob, btn) {
+  function downloadCard(blob, btn, label) {
     var a = document.createElement('a');
     var href = URL.createObjectURL(blob);
     a.href = href;
@@ -2888,19 +3209,23 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(href);
-    toast(btn, 'Картинка скачана ✓', 'Поделиться картинкой');
+    toast(btn, 'Картинка скачана ✓', label || 'Поделиться картинкой');
   }
 
-  $('btn-share-img').addEventListener('click', function () {
-    var btn = this;
-    drawShareCard();
-    $('share-canvas').toBlob(function (blob) {
-      if (!blob) { toast(btn, 'Не вышло', 'Поделиться картинкой'); return; }
+  /* Общий обработчик обеих кнопок карточки: отличается только размером.
+     ⚠️ Ловушка Web Share (чинили 2026-07-16): в navigator.share рядом с
+     files НЕЛЬЗЯ класть text/url — системное окно берёт текст и
+     ВЫБРАСЫВАЕТ картинку. Отдаём только {files, title}. */
+  function shareCard(btn, kind, label) {
+    withFonts(function () {
+      drawShareCard(kind);
+      $('share-canvas').toBlob(function (blob) {
+      if (!blob) { toast(btn, 'Не вышло', label); return; }
       var file = null;
       try { file = new File([blob], 'econ-rush.png', { type: 'image/png' }); }
       catch (e) { /* старый браузер без конструктора File — уйдём в скачивание */ }
       if (!(file && navigator.canShare && navigator.canShare({ files: [file] }))) {
-        downloadCard(blob, btn);   // системного «Поделиться» с файлом нет
+        downloadCard(blob, btn, label);   // системного «Поделиться» с файлом нет
         return;
       }
       /* ⚠️ Отдаём ТОЛЬКО файл — ни text, ни url. Положишь их рядом с files —
@@ -2912,9 +3237,17 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           // Игрок передумал (AbortError) — не ошибка, ничего не делаем.
           // Любой другой отказ значит, что систему файл не взяла — скачиваем.
           if (e && e.name === 'AbortError') return;
-          downloadCard(blob, btn);
+          downloadCard(blob, btn, label);
         });
-    }, 'image/png');
+      }, 'image/png');
+    });
+  }
+
+  $('btn-share-img').addEventListener('click', function () {
+    shareCard(this, 'wide', 'Поделиться картинкой');
+  });
+  $('btn-share-story').addEventListener('click', function () {
+    shareCard(this, 'story', 'Вертикальная (сторис)');
   });
 
   $('btn-share-link').addEventListener('click', function () {

@@ -125,12 +125,19 @@ class PageJsTests(TestCase):
 
         Нажали «картинкой» — получите картинку: текст и ссылка живут на
         своих кнопках."""
-        m = re.search(r"\$\('btn-share-img'\)\.addEventListener\("
-                      r"'click', function \(\) \{(.*?)\n  \}\);", self.js, re.S)
-        self.assertIsNotNone(m, 'обработчик кнопки-картинки не найден')
+        # обе кнопки карточки (широкая и вертикальная) ходят через один
+        # shareCard — запасной путь у них общий
+        m = re.search(r'function shareCard\(btn, kind, label\) \{(.*?)\n  \}\n',
+                      self.js, re.S)
+        self.assertIsNotNone(m, 'shareCard не найден')
         handler = m.group(1)
         self.assertIn('downloadCard', handler)
         self.assertNotIn('shareText', handler)
+        for btn in ('btn-share-img', 'btn-share-story'):
+            self.assertRegex(
+                self.js,
+                r"\$\('%s'\)\.addEventListener\('click', function \(\) \{\s*"
+                r"shareCard\(" % btn)
 
     def test_filter_state_is_persisted_and_sent(self):
         """Фильтр живёт в localStorage и уезжает на сервер — иначе выбор

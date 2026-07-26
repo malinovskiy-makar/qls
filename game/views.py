@@ -183,6 +183,30 @@ def _candidate_rows(state):
     return out
 
 
+def escalation_slice(rows, streak):
+    """Кандидаты из целевой полосы сложности — МЯГКО.
+
+    rows — [(id, difficulty), ...] уже под пользовательским фильтром
+    (он жёсткая рамка, эскалация ходит только внутри неё).
+
+    Полоса задаётся комбо (config.ESCALATION_BANDS). Если в ней пусто,
+    полоса РАСШИРЯЕТСЯ на шаг в обе стороны, пока кто-нибудь не найдётся;
+    расширять больше нечего — отдаём всё, что есть. Забег из-за эскалации
+    кончиться не может: она делает игру интереснее, а не короче.
+    """
+    if not rows:
+        return []
+    lo, hi = config.escalation_band(streak)
+    while True:
+        band = [r for r in rows if lo <= r[1] <= hi]
+        if band:
+            return band
+        if lo <= config.DIFFICULTY_MIN and hi >= config.DIFFICULTY_MAX:
+            return rows          # полоса уже во весь диапазон — берём всё
+        lo = max(config.DIFFICULTY_MIN, lo - 1)
+        hi = min(config.DIFFICULTY_MAX, hi + 1)
+
+
 def _mode_payload(mode_key):
     """Параметры режима для клиента (тайминги и жизни — только из config.py)."""
     m = config.MODES[mode_key]
@@ -241,6 +265,7 @@ def _game_page_context(request):
             'base_points': config.BASE_POINTS,
             'combo_steps': config.COMBO_STEPS,
             'mistakes_run_size': config.MISTAKES_RUN_SIZE,
+            'last_life_multiplier': config.LAST_LIFE_MULTIPLIER,
             'difficulty_min': config.DIFFICULTY_MIN,
             'difficulty_max': config.DIFFICULTY_MAX,
             'topic_groups': [{'key': key, 'title': title, 'topics': names}
@@ -296,8 +321,9 @@ def _pick_next(request, state):
     if state.get('queue') is not None:
         return _pick_from_queue(request, state)
 
-    candidates = [pk for pk, _d, _t in _candidate_rows(state)
-                  if pk not in seen_run]
+    rows = [(pk, d) for pk, d, _t in _candidate_rows(state)
+            if pk not in seen_run]
+    candidates = [pk for pk, _d in escalation_slice(rows, state.get('streak', 0))]
     if not candidates:
         return None  # пул исчерпан в этом забеге
 
@@ -661,7 +687,13 @@ def api_answer(request):
         delta = mode_cfg['time_correct']
         state['streak'] += 1
         state['best_streak'] = max(state['best_streak'], state['streak'])
-        points = config.BASE_POINTS * config.combo_multiplier(state['streak'])
+        # Очки: база по сложности вопроса (сегодня везде одинаковая — это
+        # задел, см. config.POINTS_BY_DIFFICULTY) × множитель комбо ×
+        # множитель последней жизни. Считает СЕРВЕР, клиент только рисует.
+        base = config.points_for(stats_mod.effective_difficulty(gq))
+        points = base * config.combo_multiplier(state['streak'])
+        if state['lives'] == 1:
+            points *= config.LAST_LIFE_MULTIPLIER
         state['score'] += points
     else:
         # Ошибка: минус жизнь и комбо в ноль. Время НЕ трогаем —
