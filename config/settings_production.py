@@ -76,3 +76,6 @@ LOAD_EMBEDDINGS_MODEL = False
 # ─── Econ Rush: сгенерированные вопросы выключены до решения о выкатке ──────
 
 GAME_GENERATED_ENABLED = False
+
+# Режим «График» на проде выключен (см. settings.py).
+GAME_FIGURE_ENABLED = False

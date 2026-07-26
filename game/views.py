@@ -28,6 +28,7 @@ from urllib.parse import quote
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import IntegrityError
+from django.db.models import Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
@@ -42,6 +43,8 @@ from .sources import GROUP_KEYS
 from .models import (ArchetypeStat, GameQuestion, GameResult, GameSet,
                      make_result_code)
 from . import config, stats as stats_mod
+from .figures import base as figures_base
+from .figures.base import QUESTION_TYPE as FIGURE_AUDIT
 
 SESSION_KEY = 'econ_rush'        # состояние текущего забега
 SEEN_KEY = 'econ_rush_seen'      # {mode: [id, ...]} — виданные МЕЖДУ забегами
@@ -86,12 +89,31 @@ def parse_exact_number(s):
 
 
 def _pool_qs():
-    """Базовый queryset игрового пула с учётом флага GAME_GENERATED_ENABLED:
-    при False сгенерированные вопросы полностью исключаются из выдачи
-    (единая точка — счётчики страницы и выбор вопроса ходят только сюда)."""
-    qs = GameQuestion.objects.filter(lang=GAME_LANG)
+    """Базовый queryset игрового пула — ЕДИНАЯ точка входа в пул.
+
+    Здесь же живут оба флага выдачи. Все поверхности (счётчики стартовой
+    страницы, чипы тем, выбор вопроса, очередь работы над ошибками, наборы)
+    ходят только сюда — это и делает флаги герметичными.
+
+    ⚠️ Флага два, и они НЕЗАВИСИМЫ:
+    - `GAME_GENERATED_ENABLED` — семнадцать архетипов (`game/generators/`);
+    - `GAME_FIGURE_ENABLED` — сюжеты режима «График» (`game/figures/`).
+
+    Вопросы аудита обязаны иметь `is_generated=True`, иначе `build_game_pool`
+    снесёт их при первой же пересборке пула (она удаляет все строки с
+    is_generated=False). Отсюда и исключение ниже: без него выключенный
+    `GAME_GENERATED_ENABLED` гасил бы и «График», и флаги перестали бы быть
+    независимыми.
+
+    ⚠️ Вопросы прежнего типа `figure_choice` не выдаются НИКОГДА: слот
+    режима «График» занял аудит чужого решения. Строки в базе остаются.
+    """
+    qs = GameQuestion.objects.filter(lang=GAME_LANG).exclude(
+        question_type='figure_choice')
+    if not getattr(settings, 'GAME_FIGURE_ENABLED', False):
+        qs = qs.exclude(question_type=FIGURE_AUDIT)
     if not getattr(settings, 'GAME_GENERATED_ENABLED', False):
-        qs = qs.filter(is_generated=False)
+        qs = qs.filter(Q(is_generated=False) | Q(question_type=FIGURE_AUDIT))
     return qs
 
 
@@ -299,6 +321,13 @@ def _question_payload(gq, number):
     if gq.question_type == 'numeric' and gq.unit:
         # единица измерения («%», «руб.») — подсказка у поля ввода, не ответ
         payload['unit'] = gq.unit
+    if gq.question_type == FIGURE_AUDIT:
+        # ⚠️ Показанный чертёж — это САМ ВОПРОС, без него играть нечем,
+        # поэтому он входит в payload. А вот эталонный чертёж (figure_ref),
+        # верный вариант и вид внедрённой ошибки (gen_params['_inject'])
+        # сюда не попадают НИКОГДА: по ним ответ вычисляется мгновенно.
+        payload['figure'] = gq.figure
+        payload['prompt'] = figures_base.QUESTION_PROMPT
     return payload
 
 
@@ -512,7 +541,7 @@ def _check_answer(gq, body):
         return False, (given is not None and expected is not None
                        and given == expected)
 
-    # boolean / single
+    # boolean / single / figure_audit (везде один выбранный вариант)
     choice = body.get('choice', None)
     if choice is None:
         return True, False
@@ -729,6 +758,10 @@ def api_answer(request):
     # повторный ответ того же человека уже знает правильный вариант.
     if (state.get('first_seen') or {}).get(str(qid)):
         stat = stats_mod.record_answer(gq, result, elapsed_ms)
+        # У «Графика» второй счётчик — по ВИДУ внедрённой ошибки: экземпляры
+        # у сюжета каждый раз новые, а вид ошибки устойчив, и знать, какая из
+        # них чаще обманывает, полезнее средней доли по сюжету.
+        stats_mod.record_variant(gq, result, elapsed_ms)
         _mark_counted(request, qid)
     else:
         stat = stats_mod.get_stat(gq)
@@ -762,6 +795,12 @@ def api_answer(request):
     # нет: игрок получает его только после того, как вопрос сыгран.
     if gq.is_generated and gq.figure:
         payload['figure'] = gq.figure
+    # Режим «График»: разбор показывает ДВА чертежа рядом — «как было в
+    # решении» (он у клиента уже есть, это сам вопрос) и «как правильно».
+    # Эталон уходит только сейчас, после ответа: до ответа он и есть ответ.
+    if gq.question_type == FIGURE_AUDIT and gq.figure_ref:
+        payload['figure_ref'] = gq.figure_ref
+        payload['injected_step'] = (gq.gen_params or {}).get('_step', '')
     # Как этот вопрос решают остальные — чип на карточке обратной связи.
     # Именно в ОТВЕТЕ, а не в payload вопроса: доля верных у данетки почти
     # выдавала бы правильный вариант. Ниже порога попыток поля нет вовсе —

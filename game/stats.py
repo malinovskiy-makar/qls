@@ -88,6 +88,44 @@ def record_answer(gq, outcome, elapsed_ms=0):
     return model.objects.filter(**lookup).first()
 
 
+# Разделитель ключа «сюжет | вид внедрённой ошибки». Вертикальная черта в
+# ключах сюжетов и архетипов не встречается, поэтому разбор ключа обратим.
+VARIANT_SEP = '|'
+
+
+def variant_key(gq):
+    u"""Ключ статистики «сюжет + вид внедрённой ошибки» или None.
+
+    Только для режима «График»: у его вопросов параметры каждый раз новые,
+    зато вид ошибки — устойчивая величина, и знать, какая из них чаще
+    обманывает игроков, полезнее, чем средняя доля по сюжету.
+    """
+    if not gq.generator_key or gq.question_type != 'figure_audit':
+        return None
+    inject = (gq.gen_params or {}).get('_inject')
+    if not inject:
+        return None
+    return '%s%s%s' % (gq.generator_key, VARIANT_SEP, inject)
+
+
+def record_variant(gq, outcome, elapsed_ms=0):
+    u"""Второй счётчик — по виду внедрённой ошибки. Первый (по сюжету)
+    ставит `record_answer`, и его трогать нельзя: на нём стоит измеренная
+    сложность, а она обязана считаться по сюжету целиком."""
+    key = variant_key(gq)
+    if key is None or outcome not in ('correct', 'wrong', 'skip'):
+        return None
+    field = {'correct': 'correct', 'wrong': 'wrong', 'skip': 'skipped'}[outcome]
+    lookup = {'generator_key': key}
+    with transaction.atomic():
+        ArchetypeStat.objects.get_or_create(**lookup)
+        ArchetypeStat.objects.filter(**lookup).update(
+            shown=F('shown') + 1,
+            total_ms=F('total_ms') + max(0, int(elapsed_ms or 0)),
+            **{field: F(field) + 1})
+    return ArchetypeStat.objects.filter(**lookup).first()
+
+
 def public_stat(stat):
     """Что можно показать человеку: {'p_correct': 0.53, 'attempts': 1240}.
 

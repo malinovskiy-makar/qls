@@ -126,67 +126,42 @@ class GenerationTests(TestCase):
             gen_base.generate_figure_choice(ARCHETYPES['price_index'], rng)
 
 
-@override_settings(GAME_GENERATED_ENABLED=True)
-class ServingTests(TestCase):
-    def setUp(self):
-        self.gq = make_figure_question()
+@override_settings(GAME_GENERATED_ENABLED=True, GAME_FIGURE_ENABLED=True)
+class RetiredTypeTests(TestCase):
+    u"""★ Тип `figure_choice` больше НЕ ВЫДАЁТСЯ ни одним режимом.
 
-    def test_correct_index_never_leaks_into_the_question_payload(self):
-        """★ Анти-чит: правильный индекс — только в ответе на ответ."""
-        d = self.client.get(reverse('game:session_start'),
-                            {'mode': 'figure'}).json()
-        q = d['question']
-        self.assertEqual(q['type'], 'figure_choice')
-        self.assertEqual(len(q['options']), 4)
-        for banned in ('correct_index', 'correct_indices', 'correct_value'):
-            self.assertNotIn(banned, q)
-        self.assertNotIn('correct', json.dumps(q))
-
-    def test_answer_is_checked_like_a_single_choice(self):
-        d = self.client.get(reverse('game:session_start'),
-                            {'mode': 'figure'}).json()
-        qid = d['question']['id']
-        body = self.client.post(
-            reverse('game:answer'),
-            json.dumps({'question_id': qid,
-                        'choice': self.gq.correct_index}),
-            content_type='application/json').json()
-        self.assertTrue(body['correct'])
-        self.assertEqual(body['correct_index'], self.gq.correct_index)
-
-    def test_mode_timings_come_from_config(self):
-        d = self.client.get(reverse('game:session_start'),
-                            {'mode': 'figure'}).json()
-        self.assertEqual(d['mode']['duration'],
-                         config.MODES['figure']['duration'])
-        self.assertEqual(d['mode']['time_correct'],
-                         config.MODES['figure']['time_correct'])
-        self.assertEqual(d['mode']['lives'], config.MODES['figure']['lives'])
-
-    def test_mode_is_on_the_start_screen_when_the_flag_is_on(self):
-        html = self.client.get(reverse('game:page')).content.decode('utf-8')
-        cfg = json.loads(html.split('var CFG = ', 1)[1].split(';\n', 1)[0])
-        self.assertEqual(cfg['pool_counts']['figure'], 1)
-
-
-@override_settings(GAME_GENERATED_ENABLED=False)
-class FlagOffTests(TestCase):
-    """Вопросы режима бывают только сгенерированные — при выключенном
-    флаге режима нет ни в выдаче, ни на экране."""
+    Слот режима «График» занял аудит чужого решения (решение Notion
+    2026-07-26): формат «выбери правильный график» решался узнаванием, без
+    счёта. Генератор, вариант типа в модели и уже сгенерированные строки
+    оставлены на месте — откат решения не должен стоить пересборки пула.
+    Этот класс стережёт именно инвариант «не выдаётся», а не «удалено».
+    """
 
     def setUp(self):
         self.gq = make_figure_question()
 
-    def test_pool_count_is_zero(self):
-        html = self.client.get(reverse('game:page')).content.decode('utf-8')
-        cfg = json.loads(html.split('var CFG = ', 1)[1].split(';\n', 1)[0])
-        self.assertEqual(cfg['pool_counts']['figure'], 0)
+    def test_the_figure_mode_serves_audit_questions_now(self):
+        self.assertEqual(config.MODES['figure']['question_type'],
+                         'figure_audit')
 
-    def test_starting_the_mode_gives_an_empty_run_not_a_leak(self):
+    def test_no_mode_asks_for_the_retired_type(self):
+        types = {m['question_type'] for m in config.MODES.values()}
+        self.assertNotIn('figure_choice', types)
+
+    def test_the_pool_never_returns_the_retired_type(self):
+        u"""Даже при обоих включённых флагах строка figure_choice не выдаётся."""
+        from game import views
+        self.assertEqual(
+            views._pool_qs().filter(question_type='figure_choice').count(), 0)
+        self.assertEqual(GameQuestion.objects.filter(
+            question_type='figure_choice').count(), 1)   # в базе — на месте
+
+    def test_starting_the_mode_does_not_hand_out_a_retired_question(self):
         d = self.client.get(reverse('game:session_start'),
                             {'mode': 'figure'}).json()
-        self.assertTrue(d['pool_empty'])
-        self.assertIsNone(d['question'])
+        q = d.get('question')
+        if q is not None:
+            self.assertEqual(q['type'], 'figure_audit')
 
 
 class ClientTests(TestCase):
