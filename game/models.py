@@ -53,6 +53,7 @@ class GameQuestion(models.Model):
         ('single', 'Один из'),
         ('multi', 'Несколько из'),
         ('numeric', 'Числовой'),
+        ('figure_choice', 'Выбор чертежа'),
     ]
 
     # FK (не OneToOne): одна задача может дать несколько игровых вопросов —
@@ -71,11 +72,13 @@ class GameQuestion(models.Model):
         related_name='game_questions', verbose_name='Подпункт-источник')
 
     question_type = models.CharField(
-        'Тип вопроса', max_length=10, choices=QUESTION_TYPES,
+        'Тип вопроса', max_length=16, choices=QUESTION_TYPES,
         default='single', db_index=True)
     question = models.TextField('Текст вопроса')
     # Варианты ответа — список строк (2–5 штук), порядок как в задаче.
     # Для boolean всегда ['Верно', 'Неверно']; для numeric — пустой список.
+    # Для figure_choice — список из четырёх ЧЕРТЕЖЕЙ (dict по схеме
+    # _figure.py): игроку нужно их видеть, это и есть варианты ответа.
     options = models.JSONField('Варианты ответа')
     # Правильный ответ — ровно одно из трёх полей по типу вопроса:
     # boolean/single → correct_index; multi → correct_indices; numeric → correct_value.

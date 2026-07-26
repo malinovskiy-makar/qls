@@ -508,6 +508,40 @@ a:focus-visible, button:focus-visible {
   }
 }
 
+/* ── Режим «График»: четыре чертежа плитками ─────────────────────
+   Рисует их window.drawFigure из общего модуля figure.js — второго
+   рисователя не заводим: он разошёлся бы с боевым. */
+.opts.opts-figure {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.opt-tile {
+  position: relative;
+  padding: 10px 10px 6px;
+  display: block;
+  text-align: left;
+}
+.opt-tile .mi-figure { pointer-events: none; }
+.opt-tile .key { position: absolute; top: 8px; left: 10px; z-index: 2; }
+.tile-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+@media (max-width: 720px) {
+  /* Четыре чертежа на 380px нечитаемы: тап увеличивает плитку на весь
+     экран, второй тап (или кнопка) засчитывает ответ. */
+  .opts.opts-figure.has-zoom .opt-tile { display: none; }
+  .opts.opts-figure.has-zoom .opt-tile.zoomed {
+    display: block;
+    grid-column: 1 / -1;
+  }
+  .opts.opts-figure.has-zoom .opt-tile.zoomed .mi-figure svg { width: 100%; }
+}
+
 /* ── Последняя жизнь ──────────────────────────────────────────────
    Красная виньетка по краю, пульсация сердец и полоса времени
    принудительно в своём красном режиме — независимо от остатка времени.
@@ -1487,6 +1521,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <div class="multi-actions" id="multi-actions" hidden>
         <button class="btn-submit" id="btn-submit" disabled>Ответить</button>
       </div>
+      <!-- Режим «График» на узком экране: увеличенная плитка + явная
+           кнопка. Второй тап по самой плитке делает то же самое. -->
+      <div class="tile-actions" id="tile-answer" hidden>
+        <button class="btn-submit" id="btn-tile-submit">Ответить этим графиком</button>
+        <button class="btn-skip" id="btn-tile-back">Назад ко всем</button>
+      </div>
       <div class="numeric-block" id="numeric-block" hidden>
         <div class="num-unit" id="num-unit" hidden></div>
         <input id="num-input" class="num-input" inputmode="decimal"
@@ -2192,6 +2232,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var isMulti = q.type === 'multi';
     var isBool = q.type === 'boolean';
     var isNumeric = q.type === 'numeric';
+    var isFigure = q.type === 'figure_choice';
 
     var card = $('q-text');
     card.textContent = q.question;
@@ -2206,8 +2247,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var opts = $('opts');
     opts.innerHTML = '';
     opts.classList.toggle('opts-bool', isBool);
+    opts.classList.toggle('opts-figure', isFigure);
     opts.style.display = isNumeric ? 'none' : '';
+    zoomedTile = null;
     $('multi-actions').hidden = !isMulti;
+    $('tile-answer').hidden = true;
+    opts.classList.remove('has-zoom');
     $('btn-submit').disabled = true;
     $('numeric-block').hidden = !isNumeric;
 
@@ -2226,6 +2271,25 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         unitEl.hidden = true;
       }
       inp.focus();
+    } else if (isFigure) {
+      /* Режим «График»: четыре чертежа плитками 2×2. Рисует ТОТ ЖЕ
+         window.drawFigure, что и разбор ошибок, — второго рисователя не
+         заводим ни под каким видом (он разошёлся бы с боевым). */
+      q.options.forEach(function (fig, i) {
+        var b = document.createElement('button');
+        b.className = 'opt opt-tile';
+        b.dataset.index = i;
+        var key = document.createElement('span');
+        key.className = 'key';
+        key.textContent = i + 1;
+        b.appendChild(key);
+        var box = typeof window.drawFigure === 'function'
+          ? window.drawFigure(fig) : null;
+        if (box) { b.appendChild(box); }
+        else { b.appendChild(document.createTextNode('вариант ' + (i + 1))); }
+        b.addEventListener('click', function () { tileClick(i, b); });
+        opts.appendChild(b);
+      });
     } else {
       q.options.forEach(function (text, i) {
         var b = document.createElement('button');
@@ -2250,7 +2314,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // подсказка под сеткой — своя на каждый тип вопроса
     var hint = $('keys-hint');
     if (hint) {
-      if (isBool) {
+      if (isFigure) {
+        hint.textContent = NARROW()
+          ? 'Тап — увеличить чертёж, второй тап — ответить · пробел — '
+            + skipLabel()
+          : 'Клавиши 1–4 — выбрать чертёж · пробел — ' + skipLabel();
+      } else if (isBool) {
         hint.textContent = '1 — Верно · 2 — Неверно · пробел — ' + skipLabel();
       } else if (isMulti) {
         hint.textContent = 'Клавиши 1–' + q.options.length +
@@ -2265,6 +2334,25 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   }
 
   /* мультивыбор: клавиша/тап переключает выделение, Enter/кнопка — отправка */
+  /* Узкий экран: четыре чертежа на 380px нечитаемы. Первый тап
+     увеличивает плитку на весь экран, второй засчитывает ответ. На
+     широком экране увеличение не нужно — там чертежи и так читаются. */
+  var zoomedTile = null;
+  function NARROW() { return window.matchMedia('(max-width: 720px)').matches; }
+
+  function tileClick(i, btn) {
+    if (state !== 'playing' || inputLocked) return;
+    if (!NARROW()) { answer(i); return; }
+    if (zoomedTile === btn) { answer(i); return; }   // второй тап — ответ
+    var opts = $('opts');
+    opts.querySelectorAll('.opt-tile').forEach(function (el) {
+      el.classList.toggle('zoomed', el === btn);
+    });
+    opts.classList.add('has-zoom');
+    zoomedTile = btn;
+    $('tile-answer').hidden = false;
+  }
+
   function toggleOption(i) {
     if (state !== 'playing' || inputLocked || !current) return;
     var pos = selected.indexOf(i);
@@ -2508,6 +2596,18 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       advance();
     });
   }
+
+  $('btn-tile-submit').addEventListener('click', function () {
+    if (zoomedTile) answer(parseInt(zoomedTile.dataset.index, 10));
+  });
+  $('btn-tile-back').addEventListener('click', function () {
+    $('opts').classList.remove('has-zoom');
+    $('opts').querySelectorAll('.opt-tile').forEach(function (el) {
+      el.classList.remove('zoomed');
+    });
+    zoomedTile = null;
+    $('tile-answer').hidden = true;
+  });
 
   $('btn-submit').addEventListener('click', submitMulti);
   $('btn-num-submit').addEventListener('click', submitNumeric);

@@ -538,14 +538,16 @@ class StorageTests(TestCase):
                      '--confirm', '--only', 'equilibrium', verbosity=0)
         n_eq = GameQuestion.objects.filter(
             is_generated=True, generator_key='equilibrium').count()
-        self.assertEqual(n_eq, 6)  # 2 вопроса × 3 типа
+        # 2 вопроса × 4 типа: у equilibrium есть чертёж, значит к трём
+        # обычным типам добавляется figure_choice (режим «График»).
+        self.assertEqual(n_eq, 8)
         self.assertTrue(GameQuestion.objects.filter(pk=baseline).exists())
 
         # повторный запуск того же ключа не плодит дубли
         call_command('generate_game_questions', '--per-archetype', '2',
                      '--confirm', '--only', 'equilibrium', verbosity=0)
         self.assertEqual(GameQuestion.objects.filter(
-            is_generated=True, generator_key='equilibrium').count(), 6)
+            is_generated=True, generator_key='equilibrium').count(), 8)
 
         call_command('purge_generated', verbosity=0)
         self.assertEqual(
