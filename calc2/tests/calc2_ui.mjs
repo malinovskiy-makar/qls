@@ -544,6 +544,68 @@ await t('нет ИИ-штампов в видимом тексте', () => page.
   return found.length === 0 || found.join(', ');
 }));
 
+/* --- Справка «?»: палитра операций и конструктор кусочной -------------- */
+await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
+await page.evaluate(() => openPicker());
+await page.click('.scard[data-scene="free"]');
+await page.waitForTimeout(320);
+await page.click('#fh-formula');
+await page.waitForTimeout(220);
+
+await t('в справке есть палитра операций', async () => {
+  const groups = await page.locator('#fp-formula .f-pal-group').count();
+  const btns = await page.locator('#fp-formula .f-pal').count();
+  return (groups >= 5 && btns >= 25) || `групп ${groups}, кнопок ${btns}`;
+});
+
+await t('кусочки подставляются по курсору, а не затирают строку', async () => {
+  await page.evaluate(() => {
+    const i = document.getElementById('inp-formula');
+    i.value = '100'; i.dispatchEvent(new Event('input', { bubbles: true }));
+    i.setSelectionRange(3, 3);
+  });
+  const btns = await page.locator('#fp-formula .f-pal').all();
+  for (const btn of btns) {
+    if ((await btn.textContent()).trim() === 'sqrt( )') { await btn.click(); break; }
+  }
+  await page.waitForTimeout(150);
+  const v = await page.inputValue('#inp-formula');
+  const caret = await page.evaluate(() => document.getElementById('inp-formula').selectionStart);
+  // Курсор должен встать ВНУТРИ скобок (между «(» и «)»), чтобы можно было
+  // сразу писать дальше: у «100sqrt()» это позиция 8.
+  return (v === '100sqrt()' && caret === 8) || `${v}, курсор ${caret}`;
+});
+
+await t('конструктор кусочной собирает верную запись', async () => {
+  await page.locator('#fp-formula .f-pal.wide').click();
+  await page.waitForTimeout(280);
+  const segs = await page.locator('#pw-count .seg-btn').all();
+  await segs[1].click();                     // три куска
+  await page.waitForTimeout(180);
+  const rows = await page.locator('#pw-rows .pw-row').all();
+  if (rows.length !== 3) return 'строк ' + rows.length;
+  await rows[1].locator('input[type=text]').first().fill('60');
+  await rows[1].locator('input.pw-bound').fill('70');
+  await rows[2].locator('input[type=text]').first().fill('20');
+  await page.waitForTimeout(220);
+  await page.click('#pw-apply');
+  await page.waitForTimeout(220);
+  return await page.evaluate(() => {
+    const expr = document.getElementById('inp-formula').value;
+    const r = compileFormula(expr);
+    if (r.error) return 'не компилируется: ' + r.error;
+    const at = (q) => r.compiled.evaluate({ x: q, Q: q, L: q });
+    return (at(10) === 90 && at(50) === 60 && at(90) === 20) || `${expr} → ${at(10)}/${at(50)}/${at(90)}`;
+  });
+});
+
+await t('кусочная кривая строится движком', () => page.evaluate(() => {
+  addCurve(document.getElementById('inp-formula').value);
+  const c = STATE.curves[STATE.curves.length - 1];
+  return (c.linear === null && evalCurve(c, 10) === 90 && evalCurve(c, 90) === 20)
+         || JSON.stringify({ lin: c.linear, v10: evalCurve(c, 10), v90: evalCurve(c, 90) });
+}));
+
 /* --- Зум колесом и тачпадом ------------------------------------------- */
 // Проверка экспорта выше оставила своё модальное окно открытым, а оно ловит
 // указатель поверх графика. Закрываем, иначе колесо до холста не доедет.

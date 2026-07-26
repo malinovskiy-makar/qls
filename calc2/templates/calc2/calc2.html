@@ -249,6 +249,42 @@ input:focus-visible, select:focus-visible {
   font-size: 10.5px; color: var(--text3); line-height: 1.5;
   margin-top: 9px; padding-top: 8px; border-top: .5px solid var(--border);
 }
+/* Палитра операций: кусочки формулы, которые подставляются по нажатию.
+   Плотный ряд плиток, чтобы весь набор помещался в панель шириной 256px. */
+.f-pal-lead { font-size: 10.5px; color: var(--text2); line-height: 1.45; margin: -4px 0 8px; }
+.f-pal-group {
+  font-size: 10px; font-weight: 600; color: var(--text3);
+  margin: 8px 0 4px; letter-spacing: .03em;
+}
+.f-pal-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.f-pal {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11.5px;
+  padding: 4px 7px; cursor: pointer; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+  transition: background .12s var(--ease), border-color .12s var(--ease), transform .1s var(--ease);
+}
+.f-pal:hover { background: var(--accent-tint); border-color: var(--accent-ring); }
+.f-pal:active { transform: scale(.96); }
+.f-pal:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.f-pal.wide { font-family: inherit; font-size: 11.5px; font-weight: 600; }
+
+/* Конструктор кусочной функции: слева нарисованная фигурная скобка,
+   справа строки «формула — на участке до границы». */
+.pw-brace { display: flex; gap: 10px; margin: 4px 0 12px; }
+.pw-brace-mark {
+  flex: 0 0 10px; border: 2px solid var(--border); border-right: none;
+  border-radius: 8px 0 0 8px; min-height: 60px;
+}
+.pw-rows { flex: 1; display: grid; gap: 7px; }
+.pw-row { display: flex; align-items: center; gap: 7px; }
+.pw-row input[type=text] {
+  flex: 1 1 120px; min-width: 0; padding: 5px 7px; font-size: 12px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text);
+}
+.pw-row input.pw-bound { flex: 0 0 74px; }
+.pw-when { font-size: 11.5px; color: var(--text2); white-space: nowrap; }
 /* Живой предпросмотр формулы под полем (Фаза 4б): в поле остаётся синтаксис
    Math.js, а тут видно, как формула выглядит набранной. */
 .f-preview { margin-top: 6px; font-size: 14px; color: var(--text); overflow-x: auto; }
@@ -2670,6 +2706,39 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
       <div class="modal-foot">
         <button class="btn-sm" id="exp-close" type="button">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── КОНСТРУКТОР КУСОЧНОЙ ФУНКЦИИ ────────────────────────────────
+       Движок понимает кусочные записи через условие «? :», но набирать их
+       руками неудобно и страшно. Здесь спрашиваем число кусков и рисуем
+       фигурную скобку: в каждой строке своя формула и своя граница. -->
+  <div class="modal" id="pw-modal" role="dialog" aria-modal="true" aria-labelledby="pw-title" inert>
+    <div class="modal-card">
+      <h2 class="modal-title" id="pw-title">Кусочная функция</h2>
+      <p class="modal-sub">Функция задана по-разному на разных участках. Укажите, сколько
+        кусков, впишите формулу каждого и границу, где он заканчивается.</p>
+
+      <div class="field">
+        <label>Сколько кусков</label>
+        <div class="seg" id="pw-count"></div>
+      </div>
+
+      <div class="pw-brace">
+        <div class="pw-brace-mark" aria-hidden="true"></div>
+        <div class="pw-rows" id="pw-rows"></div>
+      </div>
+
+      <div class="field">
+        <label>Что получится</label>
+        <div class="f-preview has" id="pw-preview"></div>
+        <div class="hint" id="pw-raw"></div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn" id="pw-apply" type="button">Поставить в поле</button>
+        <button class="btn-sm" id="pw-close" type="button">Отмена</button>
       </div>
     </div>
   </div>
@@ -11440,7 +11509,44 @@ const FORMULA_EXAMPLES = {
     ['100 - 10*sqrt(X)', 'выпуклая, альт. издержки убывают'],
   ] },
 };
-const FORMULA_FOOT = 'Умножение ставится звёздочкой (2*Q), степень знаком ^. Есть sqrt, abs, exp, log, min, max.';
+const FORMULA_FOOT = 'Умножение ставится звёздочкой (2*Q), степень знаком ^. Дробное значение пишется через точку: 0.5.';
+
+/* Палитра операций: всё, что понимает движок, разложено по кучкам и
+   подставляется в строку ПО КУСОЧКАМ, а не заменяет её целиком. Это главный
+   вход для новичка, который не знает, как вообще набирать формулы.
+   ins — что вставить; caret — на сколько символов увести курсор назад от
+   конца вставки, чтобы он оказался внутри скобок. */
+const FORMULA_PALETTE = [
+  ['Арифметика', [
+    ['+', 'сложить'], ['-', 'вычесть'], ['*', 'умножить'], ['/', 'разделить'],
+    ['( )', 'скобки', '()', 1],
+  ]],
+  ['Степени и корни', [
+    ['^2', 'квадрат'], ['^3', 'куб'], ['^0.5', 'корень степенью'],
+    ['sqrt( )', 'квадратный корень', 'sqrt()', 1],
+    ['nthRoot( , 3)', 'корень любой степени', 'nthRoot(, 3)', 4],
+  ]],
+  ['Функции', [
+    ['abs( )', 'модуль', 'abs()', 1],
+    ['min( , )', 'наименьшее из', 'min(, )', 3],
+    ['max( , )', 'наибольшее из', 'max(, )', 3],
+    ['exp( )', 'экспонента', 'exp()', 1],
+    ['log( )', 'натуральный логарифм', 'log()', 1],
+    ['log( , 10)', 'логарифм по основанию', 'log(, 10)', 5],
+    ['round( )', 'округлить', 'round()', 1],
+    ['floor( )', 'округлить вниз', 'floor()', 1],
+  ]],
+  ['Тригонометрия', [
+    ['sin( )', 'синус', 'sin()', 1], ['cos( )', 'косинус', 'cos()', 1],
+    ['tan( )', 'тангенс', 'tan()', 1], ['pi', 'число пи'], ['e', 'число e'],
+  ]],
+  ['Кусочная функция', [
+    ['Q < 40 ? … : …', 'один излом', 'Q < 40 ? 100 - Q : 80 - 0.5*Q', 0],
+    ['? :', 'условие: если ? то : иначе', ' ?  : ', 4],
+    ['<', 'меньше'], ['<=', 'меньше или равно'],
+    ['>', 'больше'], ['>=', 'больше или равно'],
+  ]],
+];
 
 /* ── Красивая математика в подсказках и предпросмотре (Фаза 4б) ──────────
    Поле ввода остаётся обычным текстом с синтаксисом Math.js: считается ровно
@@ -11482,6 +11588,109 @@ function onKatexReady() { _texPending.forEach(fn => { try { fn(); } catch (e) {}
 /* Подсказка формата формулы (Фаза 4а). Карточка под полем: заголовок, сетка
    примеров (каждый — набранная формула + за что её берут) и строка о синтаксисе.
    Пример кликабелен: подставляется в поле, считать заново руками не нужно. */
+/* Как называется переменная в поле каждого вида: конструктор кусочной функции
+   должен писать условие в тех же буквах, что и сама формула. */
+const FORMULA_VAR = { PQ: 'Q', QP: 'P', TC: 'Q', PROD: 'L', PPF: 'X', MATHF: 'x', ISO: 'L', UTIL: 'x' };
+
+/* ── Конструктор кусочной функции ──────────────────────────────────────
+   Движок понимает кусочную запись через условие «услвие ? то : иначе» и
+   вложенные условия, но набирать её руками неудобно. Здесь спрашиваем число
+   кусков и собираем ту же запись из отдельных полей. */
+const PW = { inp: null, v: 'Q', n: 2, rows: [] };
+
+function pwFormula() {
+  const rows = PW.rows.slice(0, PW.n);
+  // Последний кусок идёт без условия: он и есть «иначе».
+  let out = (rows[rows.length - 1].f || '0').trim() || '0';
+  for (let i = rows.length - 2; i >= 0; i--) {
+    const f = (rows[i].f || '0').trim() || '0';
+    const b = (rows[i].b || '').trim();
+    if (!b) continue;                       // граница не задана — кусок пропускаем
+    // Скобки нужны только вокруг вложенного условия: у простого куска они
+    // лишние и мешают читать запись.
+    const tail = out.indexOf('?') >= 0 ? '(' + out + ')' : out;
+    out = PW.v + ' < ' + b + ' ? ' + f + ' : ' + tail;
+  }
+  return out;
+}
+
+function renderPw() {
+  const seg = document.getElementById('pw-count');
+  if (seg) {
+    seg.innerHTML = '';
+    [2, 3, 4, 5].forEach(n => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'seg-btn' + (n === PW.n ? ' active' : ''); b.textContent = n;
+      b.addEventListener('click', () => { PW.n = n; renderPw(); });
+      seg.appendChild(b);
+    });
+  }
+  while (PW.rows.length < PW.n) PW.rows.push({ f: '', b: '' });
+  const box = document.getElementById('pw-rows');
+  if (box) {
+    box.innerHTML = '';
+    for (let i = 0; i < PW.n; i++) {
+      const row = document.createElement('div');
+      row.className = 'pw-row';
+      const f = document.createElement('input');
+      f.type = 'text'; f.value = PW.rows[i].f; f.placeholder = 'формула куска';
+      f.addEventListener('input', () => { PW.rows[i].f = f.value; pwPreview(); });
+      const when = document.createElement('span');
+      when.className = 'pw-when';
+      row.append(f, when);
+      if (i < PW.n - 1) {
+        when.textContent = 'пока ' + PW.v + ' <';
+        const b = document.createElement('input');
+        b.type = 'text'; b.className = 'pw-bound'; b.value = PW.rows[i].b; b.placeholder = 'граница';
+        b.addEventListener('input', () => { PW.rows[i].b = b.value; pwPreview(); });
+        row.appendChild(b);
+      } else {
+        when.textContent = 'дальше';
+      }
+      box.appendChild(row);
+    }
+  }
+  pwPreview();
+}
+
+function pwPreview() {
+  const expr = pwFormula();
+  const raw = document.getElementById('pw-raw');
+  if (raw) raw.textContent = expr;
+  const prev = document.getElementById('pw-preview');
+  if (prev) renderTex(prev, expr);
+}
+
+function openPiecewise(inp, v) {
+  PW.inp = inp; PW.v = v || 'Q';
+  if (!PW.rows.length) PW.rows = [{ f: '100 - ' + PW.v, b: '40' }, { f: '80 - 0.5*' + PW.v, b: '' }];
+  renderPw();
+  const m = document.getElementById('pw-modal');
+  if (!m) return;
+  m.classList.add('open'); m.removeAttribute('inert');
+  const first = m.querySelector('.pw-row input');
+  if (first) first.focus();
+}
+function closePiecewise() {
+  const m = document.getElementById('pw-modal');
+  if (!m) return;
+  m.classList.remove('open'); m.setAttribute('inert', '');
+}
+
+/* Вставка кусочка формулы туда, где стоит курсор. Поле не очищается, поэтому
+   формулу можно набирать кнопками по частям. back — на сколько символов увести
+   курсор назад, чтобы он оказался внутри только что поставленных скобок. */
+function insertIntoFormula(inp, text, back) {
+  if (!inp) return;
+  const s = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
+  const e = inp.selectionEnd == null ? s : inp.selectionEnd;
+  inp.value = inp.value.slice(0, s) + text + inp.value.slice(e);
+  const caret = s + text.length - (back || 0);
+  inp.dispatchEvent(new Event('input', { bubbles: true }));   // предпросмотр и слушатели поля
+  inp.focus();
+  try { inp.setSelectionRange(caret, caret); } catch (err) { /* поле без выделения */ }
+}
+
 function attachFormulaHelp(btnId, popId, inputId, kind) {
   const btn = document.getElementById(btnId), pop = document.getElementById(popId);
   if (!btn || !pop) return;
@@ -11527,6 +11736,48 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
       grid.appendChild(b);
     });
     pop.appendChild(grid);
+
+    // Палитра операций: подставляется в строку по кусочкам, поле не очищается.
+    // Это то место, где новичок видит, из чего вообще можно собрать формулу.
+    const pt = document.createElement('div');
+    pt.className = 'f-pop-title'; pt.style.marginTop = '12px';
+    pt.textContent = 'Из чего собрать формулу';
+    pop.appendChild(pt);
+    const lead = document.createElement('div');
+    lead.className = 'f-pal-lead';
+    lead.textContent = 'Нажимайте по очереди: кусочки подставляются в строку туда, где стоит курсор.';
+    pop.appendChild(lead);
+
+    FORMULA_PALETTE.forEach(([groupName, ops]) => {
+      const gl = document.createElement('div');
+      gl.className = 'f-pal-group'; gl.textContent = groupName;
+      pop.appendChild(gl);
+      const row = document.createElement('div');
+      row.className = 'f-pal-row';
+      ops.forEach(([shown, note, insRaw, back]) => {
+        const ins = insRaw != null ? insRaw : shown;
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'f-pal'; b.textContent = shown; b.title = note;
+        b.addEventListener('click', () => { insertIntoFormula(inp, ins, back || 0); });
+        row.appendChild(b);
+      });
+      pop.appendChild(row);
+    });
+
+    // Отдельный вход в конструктор: он собирает ту же кусочную запись, но по полям.
+    const pwRow = document.createElement('div');
+    pwRow.className = 'f-pal-row'; pwRow.style.marginTop = '6px';
+    const pwBtn = document.createElement('button');
+    pwBtn.type = 'button'; pwBtn.className = 'f-pal wide';
+    pwBtn.textContent = 'Собрать кусочную функцию';
+    pwBtn.title = 'Спросим число кусков и соберём запись из отдельных полей';
+    pwBtn.addEventListener('click', () => {
+      pop.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      openPiecewise(inp, FORMULA_VAR[k] || 'x');
+    });
+    pwRow.appendChild(pwBtn);
+    pop.appendChild(pwRow);
 
     const f = document.createElement('div'); f.className = 'f-pop-foot'; f.textContent = FORMULA_FOOT;
     pop.appendChild(f);
@@ -12038,6 +12289,25 @@ function wireScene() {
   if (expModal) expModal.addEventListener('click', (e) => { if (e.target === expModal) closeExport(); });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && expModal && expModal.classList.contains('open')) closeExport();
+  });
+
+  // Конструктор кусочной функции: собранная запись уходит в то поле формулы,
+  // из справки которого его открыли.
+  const pwModal = document.getElementById('pw-modal');
+  const pwClose = document.getElementById('pw-close');
+  if (pwClose) pwClose.addEventListener('click', () => closePiecewise());
+  if (pwModal) pwModal.addEventListener('click', (e) => { if (e.target === pwModal) closePiecewise(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && pwModal && pwModal.classList.contains('open')) closePiecewise();
+  });
+  const pwApply = document.getElementById('pw-apply');
+  if (pwApply) pwApply.addEventListener('click', () => {
+    if (PW.inp) {
+      PW.inp.value = pwFormula();
+      PW.inp.dispatchEvent(new Event('input', { bubbles: true }));
+      PW.inp.focus();
+    }
+    closePiecewise();
   });
   const expPng = document.getElementById('exp-png');
   if (expPng) expPng.addEventListener('click', () => exportPNG(2));   // 2× — читаемо в печати
