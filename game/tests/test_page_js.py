@@ -30,7 +30,11 @@ FAKE_CONFIG = (
     '{"modes":{"blitz":{"key":"blitz","title":"Блиц","question_type":"single",'
     '"duration":120,"time_correct":5,"time_wrong":0,"time_skip":0,"lives":3}},'
     '"default_mode":"blitz","pool_counts":{"blitz":10},"base_points":100,'
-    '"combo_steps":[[9,4],[6,3],[3,2]],"mistakes_run_size":10}'
+    '"combo_steps":[[9,4],[6,3],[3,2]],"mistakes_run_size":10,'
+    '"difficulty_min":1,"difficulty_max":5,'
+    '"topic_groups":[{"key":"micro","title":"Микро","topics":["Эластичность"]}],'
+    '"source_groups":[{"key":"vsosh","title":"ВсОШ"}],'
+    '"has_daily":false,"has_duel":false}'
 )
 
 
@@ -125,6 +129,27 @@ class PageJsTests(TestCase):
         handler = m.group(1)
         self.assertIn('downloadCard', handler)
         self.assertNotIn('shareText', handler)
+
+    def test_filter_state_is_persisted_and_sent(self):
+        """Фильтр живёт в localStorage и уезжает на сервер — иначе выбор
+        игрока сбрасывался бы на каждом «сыграть ещё раз»."""
+        self.assertIn("var FILTER_KEY = 'econ_rush_filter';", self.js)
+        self.assertIn('filterQuery()', self.js)
+        self.assertIn('localStorage.setItem(FILTER_KEY', self.js)
+
+    def test_all_four_endings_have_their_own_text(self):
+        """Развилка исходов забега четырёхветочная: lives / time /
+        pool_empty / set_done. Пропущенная ветка молча показала бы
+        «время вышло» там, где время не при чём."""
+        m = re.search(r'function reasonText\(s\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIsNotNone(m)
+        body = m.group(1)
+        for reason in ('lives', 'set_done', 'pool_empty'):
+            self.assertIn("'%s'" % reason, body)
+        m2 = re.search(r'function titleText\(s\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIsNotNone(m2)
+        for reason in ('lives', 'set_done', 'pool_empty'):
+            self.assertIn("'%s'" % reason, m2.group(1))
 
     def test_mechanics_numbers_come_from_config(self):
         """Числа механики клиент не выдумывает: 3 жизни и размер целевого

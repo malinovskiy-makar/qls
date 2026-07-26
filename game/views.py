@@ -35,6 +35,8 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST, require_safe
 
 from problems.management.commands.apply_topic_mapping import CANONICAL
+from . import sources as game_sources
+from .sources import GROUP_KEYS
 from .models import ArchetypeStat, GameQuestion, GameResult, make_result_code
 from . import config, stats as stats_mod
 
@@ -52,6 +54,12 @@ NO_TOPIC = 'Без темы'            # вопрос без каноничес
 # на будущее — отдельный режим). Минимум вопросов на тему для чипа на старте.
 GAME_LANG = 'ru'
 MIN_TOPIC_POOL = 30
+
+# Готовность поверхностей нижнего ряда стартового экрана. Ставится в TRUE
+# той фазой, которая приносит соответствующую страницу; до этого вход
+# помечен «скоро» и никуда не ведёт.
+HAS_DAILY = False
+HAS_DUEL = False
 
 
 def parse_exact_number(s):
@@ -84,6 +92,94 @@ def _pool_qs():
     return qs
 
 
+def empty_filter():
+    """Фильтр «ничего не выбрано» = играем всем пулом режима."""
+    return {'topics': [], 'sources': [],
+            'dmin': config.DIFFICULTY_MIN, 'dmax': config.DIFFICULTY_MAX}
+
+
+def parse_filter(request):
+    """Фильтр забега из query-параметров.
+
+    Понимает и новый мульти-выбор (`topics=A&topics=B`, `sources=vsosh`,
+    `dmin`/`dmax`), и старый одиночный `topic=` — ссылками со старым
+    параметром могли уже поделиться, ломать их незачем.
+
+    Неизвестные значения молча отбрасываются: фильтр — это удобство, а не
+    контракт, и падать из-за подсунутой темы забег не должен.
+    """
+    f = empty_filter()
+    topics = [t.strip() for t in request.GET.getlist('topics') if t.strip()]
+    legacy = request.GET.get('topic', '').strip()
+    if legacy:
+        topics.append(legacy)
+    # dict.fromkeys — уникальность с сохранением порядка выбора
+    f['topics'] = [t for t in dict.fromkeys(topics) if t in CANONICAL]
+
+    sources = [s.strip() for s in request.GET.getlist('sources') if s.strip()]
+    f['sources'] = [s for s in dict.fromkeys(sources) if s in GROUP_KEYS]
+
+    def _level(name, default):
+        try:
+            v = int(request.GET.get(name, default))
+        except (TypeError, ValueError):
+            return default
+        return min(max(v, config.DIFFICULTY_MIN), config.DIFFICULTY_MAX)
+
+    f['dmin'] = _level('dmin', config.DIFFICULTY_MIN)
+    f['dmax'] = _level('dmax', config.DIFFICULTY_MAX)
+    if f['dmin'] > f['dmax']:            # ползунок перевернули — не спорим
+        f['dmin'], f['dmax'] = f['dmax'], f['dmin']
+    return f
+
+
+def normalize_filter(f):
+    """Фильтр из состояния забега → в нормальную форму (на случай старого
+    состояния в сессии, где его ещё не было)."""
+    base = empty_filter()
+    if isinstance(f, dict):
+        base.update({k: f[k] for k in base if k in f})
+    return base
+
+
+def _filter_matches(f, topics, source_group, difficulty):
+    """Подходит ли вопрос под фильтр. Пустой список тем/источников значит
+    «любые» — так фильтр не превращается в запрет."""
+    if f['topics'] and not (set(topics or []) & set(f['topics'])):
+        return False
+    if f['sources'] and (source_group or 'other') not in f['sources']:
+        return False
+    return f['dmin'] <= difficulty <= f['dmax']
+
+
+def _candidate_rows(state):
+    """Кандидаты режима под фильтром забега: [(id, difficulty, topics), ...].
+
+    Читается плоским values_list по трём причинам: JSONField.__contains не
+    работает на SQLite, пул маленький (тысячи строк), а join на источники
+    дал бы дубли строк у задач с несколькими привязками.
+
+    Сложность берётся через измеренную, если она есть (см. game/stats.py):
+    пользовательский фильтр сложности обязан опираться на ту же величину,
+    что и всё остальное в игре.
+    """
+    f = normalize_filter(state.get('filter'))
+    qtype = config.MODES[state['mode']]['question_type']
+    bank_map, arch_map = stats_mod.difficulty_overrides()
+    rows = _pool_qs().filter(question_type=qtype).values_list(
+        'id', 'topics', 'source_group', 'difficulty',
+        'problem_id', 'part_id', 'generator_key')
+    out = []
+    for pk, topics, group, difficulty, problem_id, part_id, gen_key in rows:
+        if problem_id is not None:
+            difficulty = bank_map.get((problem_id, part_id), difficulty)
+        elif gen_key:
+            difficulty = arch_map.get(gen_key, difficulty)
+        if _filter_matches(f, topics, group, difficulty):
+            out.append((pk, difficulty, topics or []))
+    return out
+
+
 def _mode_payload(mode_key):
     """Параметры режима для клиента (тайминги и жизни — только из config.py)."""
     m = config.MODES[mode_key]
@@ -101,15 +197,14 @@ def _mode_payload(mode_key):
 
 @ensure_csrf_cookie
 def game_page(request):
-    """Страница игры: три экрана в одном шаблоне, управляются JS."""
-    # Чипы тем: только канонические темы, по которым в пуле достаточно вопросов.
-    counts = {}
-    for g in _pool_qs().values_list('topics', flat=True):
-        for name in g:
-            counts[name] = counts.get(name, 0) + 1
-    topics = [name for name in CANONICAL
-              if counts.get(name, 0) >= MIN_TOPIC_POOL]
+    """Страница игры: три экрана в одном шаблоне, управляются JS.
 
+    ⚠️ Счётчиков у тем и источников на экране НЕТ, и «пустые» сочетания
+    фильтров не гасятся — прямое указание Макара: фильтр работает так,
+    будто задач по каждой теме и источнику неограниченно. Единственный
+    счётчик, который считается по пулу, — пустой ли пул РЕЖИМА: режим без
+    единого вопроса на экране не показывается вовсе (играть в него нечем).
+    """
     # Сколько ru-вопросов доступно на каждый режим (для карточек на старте).
     type_counts = {}
     for qtype in _pool_qs().values_list('question_type', flat=True):
@@ -118,7 +213,15 @@ def game_page(request):
                    for key, m in config.MODES.items()}
 
     return render(request, 'game/game.html', {
-        'topics': topics,
+        # Темы — все 21 каноническая, сгруппированы по колонкам панели.
+        'topic_groups': [{'key': key, 'title': title, 'topics': names}
+                         for key, title, names in config.TOPIC_GROUPS],
+        'source_groups': [{'key': key, 'title': title}
+                          for key, title in game_sources.GROUPS],
+        # «Вопросов из реальных олимпиад» — считаем ТОЛЬКО вопросы банка:
+        # сгенерированные тренировочные из олимпиад не приходили, и врать
+        # в цифре на первом экране нельзя.
+        'pool_total': _pool_qs().filter(is_generated=False).count(),
         # JSON для JS-клиента: механика читается только из config.py
         'config_json': json.dumps({
             'modes': {key: _mode_payload(key) for key in config.MODES},
@@ -127,6 +230,17 @@ def game_page(request):
             'base_points': config.BASE_POINTS,
             'combo_steps': config.COMBO_STEPS,
             'mistakes_run_size': config.MISTAKES_RUN_SIZE,
+            'difficulty_min': config.DIFFICULTY_MIN,
+            'difficulty_max': config.DIFFICULTY_MAX,
+            'topic_groups': [{'key': key, 'title': title, 'topics': names}
+                             for key, title, names in config.TOPIC_GROUPS],
+            'source_groups': [{'key': key, 'title': title}
+                              for key, title in game_sources.GROUPS],
+            # Входы нижнего ряда включаются, когда их страницы появляются
+            # (отдельными фазами). Кнопка в никуда хуже честной пометки
+            # «скоро», поэтому знание о готовности приходит с сервера.
+            'has_daily': HAS_DAILY,
+            'has_duel': HAS_DUEL,
         }),
     })
 
@@ -161,22 +275,18 @@ def _pick_next(request, state):
     ничего не осталось — список режима очищается (цикл по кругу) и выбор
     идёт из всех оставшихся. Пул забега исчерпан полностью → None.
 
-    У целевого забега («работа над ошибками») вопросы заданы списком
-    заранее — тогда просто выдаём их по очереди.
+    У целевого забега («работа над ошибками», набор, дуэль, вызов дня)
+    вопросы заданы списком заранее — тогда просто выдаём их по очереди.
 
-    Фильтр по теме — в Python: JSONField.__contains не работает на SQLite,
-    а пул маленький (тысячи строк), перебор дешёвый."""
+    Фильтр (темы, источники, сложность) применяется в _candidate_rows."""
     mode = state['mode']
-    qtype = config.MODES[mode]['question_type']
     seen_run = set(state['seen'])
-    topic = state.get('topic')
 
     if state.get('queue') is not None:
         return _pick_from_queue(request, state)
 
-    rows = _pool_qs().filter(question_type=qtype).values_list('id', 'topics')
-    candidates = [pk for pk, topics in rows
-                  if pk not in seen_run and (not topic or topic in topics)]
+    candidates = [pk for pk, _d, _t in _candidate_rows(state)
+                  if pk not in seen_run]
     if not candidates:
         return None  # пул исчерпан в этом забеге
 
@@ -248,13 +358,17 @@ def _pick_from_queue(request, state):
     return None
 
 
-def _new_state(mode, topic):
+def _new_state(mode, topic, run_filter=None):
     """Чистое состояние забега. Очки/серия/жизни — серверные, клиент их
     только рисует; ended заполняется на третьей ошибке (api_answer) либо
     при завершении забега (api_session_finish)."""
     return {
         'mode': mode,
         'topic': topic,
+        # Фильтр забега живёт в состоянии, а не только в URL старта: его
+        # НАСЛЕДУЮТ «сыграть ещё раз» и «работа над ошибками». Раньше они
+        # сбрасывали выбор игрока молча.
+        'filter': normalize_filter(run_filter),
         'seen': [],
         'answered': {},
         'lives': config.MODES[mode]['lives'],
@@ -276,25 +390,48 @@ def _new_state(mode, topic):
 
 @require_GET
 def api_session_start(request):
-    """Начать забег: режим + тема (или «все») → первый вопрос и тайминги."""
+    """Начать забег: режим + фильтр (темы, источники, сложность).
+
+    Старый одиночный `topic=` продолжает работать — ссылками с ним могли
+    поделиться. Пустой фильтр = весь пул режима.
+
+    ⚠️ Пул под фильтром может оказаться пустым — это НЕ ошибка и не 503:
+    забег стартует и сразу честно кончается причиной `pool_empty`
+    («вопросы под твоими настройками кончились»). Проверять пул ДО старта
+    и гасить сочетания фильтров запрещено — прямое указание Макара:
+    фильтр работает так, будто задач по каждой теме и источнику
+    неограниченно.
+    """
     mode = request.GET.get('mode', '').strip() or config.DEFAULT_MODE
     if mode not in config.MODES:
         return JsonResponse({'error': 'Неизвестный режим'}, status=400)
-    topic = request.GET.get('topic', '').strip()
-    if topic and topic not in CANONICAL:
-        return JsonResponse({'error': 'Неизвестная тема'}, status=400)
 
-    state = _new_state(mode, topic or None)
+    # Мусор среди выбранных значений отбрасываем молча (одна кривая тема
+    # не должна ронять забег), но если не уцелело НИ ОДНОГО из явно
+    # запрошенных — это опечатка, и молчать нечестно: игрок получил бы
+    # весь пул вместо того, что просил.
+    asked_topics = [t for t in (request.GET.getlist('topics')
+                                + [request.GET.get('topic', '')]) if t.strip()]
+    asked_sources = [s for s in request.GET.getlist('sources') if s.strip()]
+    run_filter = parse_filter(request)
+    if asked_topics and not run_filter['topics']:
+        return JsonResponse({'error': 'Неизвестная тема'}, status=400)
+    if asked_sources and not run_filter['sources']:
+        return JsonResponse({'error': 'Неизвестный источник'}, status=400)
+    legacy_topic = request.GET.get('topic', '').strip() or None
+    state = _new_state(mode, legacy_topic, run_filter)
     gq = _pick_next(request, state)
-    if gq is None:
-        return JsonResponse({'error': 'Пул вопросов пуст'}, status=503)
     request.session[SESSION_KEY] = state
-    return JsonResponse({
+    payload = {
         'ok': True,
         'mode': _mode_payload(mode),
         'lives': state['lives'],
-        'question': _question_payload(gq, 1),
-    })
+        'filter': run_filter,
+        'question': _question_payload(gq, 1) if gq else None,
+    }
+    if gq is None:
+        payload['pool_empty'] = True
+    return JsonResponse(payload)
 
 
 @require_GET
@@ -703,9 +840,11 @@ def api_session_start_mistakes(request):
     if not counts:
         return JsonResponse({'error': 'В этом забеге не было ошибок'}, status=400)
 
-    qtype = config.MODES[mode]['question_type']
-    rows = list(_pool_qs().filter(question_type=qtype)
-                .values_list('id', 'topics'))
+    # Фильтр наследуется от разбираемого забега: игрок выбрал источники и
+    # сложность не для того, чтобы разбор ошибок молча вернул ему весь пул.
+    run_filter = normalize_filter(last.get('filter'))
+    probe = _new_state(mode, None, run_filter)
+    rows = [(pk, topics) for pk, _d, topics in _candidate_rows(probe)]
     quotas = allocate_quotas(counts, config.MISTAKES_RUN_SIZE)
     seen_map = request.session.get(SEEN_KEY) or {}
     queue = build_mistakes_run(rows, quotas, config.MISTAKES_RUN_SIZE,
@@ -714,7 +853,7 @@ def api_session_start_mistakes(request):
         return JsonResponse({'error': 'Вопросов по этим темам не нашлось'},
                             status=503)
 
-    state = _new_state(mode, None)
+    state = _new_state(mode, None, run_filter)
     state['queue'] = queue
     state['mistakes_run'] = True
     gq = _pick_next(request, state)
@@ -748,17 +887,39 @@ def api_session_finish(request):
     except json.JSONDecodeError:
         body = {}
     if not state.get('ended'):
-        reason = body.get('reason')
-        state['ended'] = reason if reason in ('time', 'done') else 'time'
+        state['ended'] = _end_reason(state, body.get('reason'))
     request.session[SESSION_KEY] = state
     # Журнал завершённого забега — отдельным ключом: с него живёт «работа
     # над ошибками», а SESSION_KEY затрётся, как только начнётся новый
-    # забег. Храним только нужное ей: режим и журнал.
-    request.session[LAST_KEY] = {'mode': state['mode'], 'log': state['log']}
+    # забег. Храним нужное ей: режим, журнал и фильтр (его наследует
+    # целевой забег — иначе выбор игрока молча сбрасывался бы).
+    request.session[LAST_KEY] = {'mode': state['mode'], 'log': state['log'],
+                                 'filter': normalize_filter(state.get('filter'))}
 
     summary = build_summary(state)
     share = _save_result(request, state, summary)
     return JsonResponse({'summary': summary, 'share': share})
+
+
+def _end_reason(state, claimed):
+    """Чем кончился забег. Слово клиента НЕ перебивает сервер.
+
+    Четыре исхода:
+      lives      — выбыл, кончились жизни (ставит сам сервер в api_answer);
+      time       — вышло время (знает только клиент, у него таймер);
+      pool_empty — вопросы под фильтром игрока кончились;
+      set_done   — курированный список пройден до конца (набор, дуэль,
+                   вызов дня, работа над ошибками).
+
+    Клиент знает про конец вопросов, но НЕ знает, курированный это забег
+    или свободный, — а сервер знает. Поэтому он присылает нейтральное
+    'done' (и старые клиенты тоже), а разделение делает сервер.
+    """
+    if claimed == 'time':
+        return 'time'
+    if claimed in ('done', 'pool_empty', 'set_done'):
+        return 'set_done' if state.get('queue') is not None else 'pool_empty'
+    return 'time'
 
 
 def _save_result(request, state, summary):

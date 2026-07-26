@@ -562,8 +562,12 @@ class ServingTests(TestCase):
         make_generated_question()
         with self.settings(GAME_GENERATED_ENABLED=False):
             resp = self._start_session()
-            # других numeric в пуле нет → пул пуст
-            self.assertEqual(resp.status_code, 503)
+            # других numeric в пуле нет → пул пуст. Это НЕ ошибка и не 503:
+            # забег стартует и сразу кончается причиной pool_empty.
+            self.assertEqual(resp.status_code, 200)
+            body = resp.json()
+            self.assertTrue(body.get('pool_empty'))
+            self.assertIsNone(body['question'])
 
     def test_flag_on_serves_generated_with_anticheat(self):
         gq = make_generated_question()
@@ -666,21 +670,25 @@ class FlagHoldsEverywhereTests(TestCase):
         self.assertEqual(
             GameQuestion.objects.filter(id__in=served, is_generated=True).count(), 0)
 
-    def test_flag_off_hides_topic_chip_of_generated_only_topic(self):
-        """Тема, которая держится только на сгенерированных, чипом не встаёт.
+    def test_flag_off_keeps_generated_out_of_the_start_screen_counts(self):
+        """Счётчик пула на стартовом экране не считает сгенерированные.
 
-        Иначе игрок ткнул бы в чип и получил пустой забег (503)."""
-        # MIN_TOPIC_POOL=30 — берём с запасом, тема канонична
+        Чипов тем на экране больше нет (панель фильтров показывает все 21
+        тему без счётчиков — указание Макара), но счётчик режимов остался
+        и ходит через тот же _pool_qs. Утечка здесь показала бы игроку
+        вопросы, которых при выключенном флаге не существует."""
         self.make_gen(35, topic=self.TOPIC)
 
-        def has_chip():
+        def blitz_count():
             html = self.client.get('/game/').content.decode('utf-8')
-            return 'data-topic="{}"'.format(self.TOPIC) in html
+            m = re.search(r'"pool_counts": \{[^}]*"blitz": (\d+)', html)
+            return int(m.group(1))
 
         with self.settings(GAME_GENERATED_ENABLED=False):
-            self.assertFalse(has_chip())
+            off = blitz_count()
         with self.settings(GAME_GENERATED_ENABLED=True):
-            self.assertTrue(has_chip())
+            on = blitz_count()
+        self.assertEqual(on - off, 35)
 
     def test_flag_off_mistakes_run_pulls_no_generated(self):
         """Работа над ошибками — курированная очередь, отдельная поверхность.

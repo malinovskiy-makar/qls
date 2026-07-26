@@ -134,6 +134,31 @@ def effective_difficulty(gq, stat=None):
     return measured_difficulty(pub['p_correct'])
 
 
+def difficulty_overrides():
+    """Карты измеренной сложности для быстрой фильтрации пула.
+
+    Возвращает (bank, arch): {(problem_id, part_id): 1..5} и
+    {generator_key: 1..5} — только для вопросов, где попыток набралось
+    достаточно. Два запроса вместо запроса на вопрос: выбор очередного
+    вопроса читает пул плоским списком и не может позволить себе N+1.
+    """
+    thr = config.STATS_MIN_ATTEMPTS
+    bank, arch = {}, {}
+    rows = (BankQuestionStat.objects
+            .annotate(att=F('correct') + F('wrong'))
+            .filter(att__gte=thr)
+            .values_list('problem_id', 'part_id', 'correct', 'att'))
+    for problem_id, part_id, correct, att in rows:
+        bank[(problem_id, part_id)] = measured_difficulty(correct / att)
+    rows = (ArchetypeStat.objects
+            .annotate(att=F('correct') + F('wrong'))
+            .filter(att__gte=thr)
+            .values_list('generator_key', 'correct', 'att'))
+    for key, correct, att in rows:
+        arch[key] = measured_difficulty(correct / att)
+    return bank, arch
+
+
 def bulk_stats(questions):
     """Словарь id вопроса → строка статистики. Один запрос на банк и один
     на архетипы вместо запроса на вопрос: служебная страница показывает

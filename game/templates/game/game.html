@@ -73,70 +73,56 @@ a:focus-visible, button:focus-visible {
 /* hidden обязан побеждать display:flex на классах (.multi-actions и т.п.) */
 [hidden] { display: none !important; }
 
-/* ── Экран 1: старт ────────────────────────────────────────────── */
+/* ── Экран 1: старт ────────────────────────────────────────────────
+   Главное пятно страницы — карточки режимов, а не логотип: игрок пришёл
+   играть, а не любоваться маркой. Поэтому шапка сжата в три строки,
+   а карточки крупные и с макетом виджета ответа: тип вопроса объясняется
+   картинкой, а не словами. */
 #screen-start .col {
-  max-width: 560px;
+  max-width: 860px;
   margin: 0 auto;
   text-align: center;
-  padding-top: 4vh;
+  padding-top: 2vh;
 }
-.rush-logo {
-  font-size: clamp(40px, 6vw, 56px);
+.rush-head { margin-bottom: 22px; }
+.rush-mark {
+  font-size: clamp(20px, 3vw, 26px);
   font-weight: 800;
-  letter-spacing: -1.5px;
-  line-height: 1.05;
-  user-select: none;
+  letter-spacing: -.5px;
+  line-height: 1.15;
 }
-.rush-logo .bolt { margin: 0 .08em; }
-.rush-logo .rush {
-  color: var(--rush-accent);
-  display: inline-block;
-  transform: rotate(-2deg) skewX(-6deg);
-}
+.rush-mark .rush-dot { color: var(--rush-accent); }
 .rush-sub {
-  margin-top: 10px;
+  margin-top: 6px;
   color: var(--text2);
-  font-size: 16px;
+  font-size: 14.5px;
 }
-.topic-chips {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin: 22px 0 4px;
-}
-.topic-chip {
-  font: inherit;
+.rush-count {
+  margin-top: 6px;
   font-size: 13px;
-  padding: 6px 13px;
-  border-radius: 20px;
-  border: 1px solid var(--rush-border);
-  background: var(--rush-surface);
-  color: var(--text2);
-  cursor: pointer;
-  transition: border-color .12s, color .12s, background .12s;
+  color: var(--text3);
 }
-.topic-chip:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
-.topic-chip.active {
-  background: var(--rush-accent);
-  border-color: var(--rush-accent);
-  color: #fff;
-  font-weight: 600;
-}
+.rush-count b { color: var(--rush-accent); font-weight: 700; }
+
 /* Карточки режимов: клик по карточке = старт забега в этом режиме */
 .mode-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 24px;
+  /* число колонок ставит JS по числу ПОКАЗАННЫХ режимов (4 → 2×2, 5 → 3+2):
+     auto-fit давал бы 3+1 — одинокая карточка во втором ряду выглядит
+     как ошибка вёрстки. */
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
   text-align: left;
+}
+@media (max-width: 640px) {
+  .mode-grid { grid-template-columns: 1fr !important; }
 }
 .mode-card {
   font: inherit;
   position: relative;
-  padding: 14px 16px;
+  padding: 16px 18px 14px;
   border: 1px solid var(--rush-border);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--rush-surface);
   color: var(--text);
   cursor: pointer;
@@ -145,25 +131,27 @@ a:focus-visible, button:focus-visible {
 }
 .mode-card:hover {
   border-color: var(--rush-accent);
-  box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  box-shadow: 0 2px 14px rgba(0,0,0,.09);
 }
-.mode-card:active { transform: scale(.98); }
+.mode-card:active { transform: scale(.985); }
 .mode-name {
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 800;
   letter-spacing: -.3px;
   display: flex;
   align-items: baseline;
   gap: 7px;
 }
-.mode-name .mode-emoji { font-size: 15px; }
+.mode-name .mode-emoji { font-size: 16px; }
 .mode-kind {
   margin-top: 3px;
   font-size: 12.5px;
   color: var(--text2);
+  /* две строки: иначе карточки с короткой подписью «подпрыгивают» */
+  min-height: 2.6em;
 }
 .mode-terms {
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 12px;
   color: var(--text3);
   font-variant-numeric: tabular-nums;
@@ -197,12 +185,283 @@ a:focus-visible, button:focus-visible {
   border: 1px solid var(--rush-border);
   color: var(--text3);
 }
+
+/* Макет виджета ответа на карточке режима — СТАТИЧНАЯ картинка, ничего
+   не делает. Объяснить «данетка» или «несколько верных» словами дороже,
+   чем показать: игрок узнаёт виджет, который сейчас увидит в забеге. */
+.mode-mock {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* макеты разной высоты (тумблер vs четыре радиокнопки) — фиксируем
+     общую, чтобы карточки режимов стояли ровно */
+  min-height: 103px;
+  gap: 5px;
+  pointer-events: none;
+  user-select: none;
+}
+.mock-row { display: flex; gap: 6px; }
+.mock-pill {
+  flex: 1;
+  height: 22px;
+  border-radius: 7px;
+  border: 1px solid var(--rush-border);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  font-size: 10.5px;
+  color: var(--text3);
+}
+.mock-dot {
+  width: 9px; height: 9px; flex: 0 0 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--rush-border);
+}
+.mock-dot.on { border-color: var(--rush-accent); background: var(--rush-accent); }
+.mock-box {
+  width: 9px; height: 9px; flex: 0 0 9px;
+  border-radius: 3px;
+  border: 1.5px solid var(--rush-border);
+}
+.mock-box.on { border-color: var(--rush-accent); background: var(--rush-accent); }
+.mock-toggle {
+  display: flex; gap: 6px;
+}
+.mock-toggle span {
+  flex: 1;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--rush-border);
+  background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--text3);
+}
+.mock-toggle span.on {
+  border-color: var(--rush-accent);
+  color: var(--rush-accent);
+  font-weight: 700;
+}
+.mock-input {
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--rush-border);
+  background: var(--surface-2);
+  display: flex; align-items: center;
+  padding: 0 9px;
+  font-size: 11.5px; color: var(--text3);
+}
+.mock-caret {
+  display: inline-block; width: 1.5px; height: 13px;
+  background: var(--rush-accent); margin-left: 2px;
+}
+.mock-tiles {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
+}
+.mock-tile {
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--rush-border);
+  background: var(--surface-2);
+  position: relative;
+  overflow: hidden;
+}
+.mock-tile::after {
+  content: '';
+  position: absolute; left: 5px; right: 5px; bottom: 5px; top: 50%;
+  border-left: 1.5px solid var(--rush-border);
+  border-bottom: 1.5px solid var(--rush-border);
+}
+
+/* ── Строка настройки и панель фильтров ───────────────────────────
+   Фильтры показываются ПОЛНОСТЬЮ, без счётчиков и без гашения пустых
+   сочетаний: задач по каждой теме и источнику мы считаем неограниченно
+   много (указание Макара). Иначе экран рассказывал бы о сегодняшнем
+   состоянии банка вместо того, чтобы предлагать выбор. */
+.setup-bar {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.setup-summary { font-size: 13px; color: var(--text2); }
+.setup-btn {
+  font: inherit; font-size: 13px; font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--rush-border);
+  background: var(--rush-surface);
+  color: var(--text2);
+  cursor: pointer;
+}
+.setup-btn:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+.setup-btn[aria-expanded="true"] {
+  background: var(--rush-accent); border-color: var(--rush-accent); color: #fff;
+}
+.setup-panel {
+  margin-top: 14px;
+  padding: 18px;
+  border: 1px solid var(--rush-border);
+  border-radius: 16px;
+  background: var(--rush-surface);
+  text-align: left;
+}
+.setup-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.setup-panel-head b { font-size: 15px; }
+.setup-close {
+  font: inherit; font-size: 15px; line-height: 1;
+  background: none; border: none; color: var(--text3); cursor: pointer;
+  padding: 4px 6px;
+}
+.setup-block { margin-bottom: 16px; }
+.setup-block-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; margin-bottom: 8px;
+}
+.setup-block h3 {
+  font-size: 12px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text3);
+}
+.preset-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.preset {
+  font: inherit; font-size: 11.5px;
+  padding: 3px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--rush-border);
+  background: transparent; color: var(--text2); cursor: pointer;
+}
+.preset:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+.topic-cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.topic-col h4 {
+  font-size: 12px; font-weight: 700; color: var(--text2);
+  margin-bottom: 5px;
+}
+.check {
+  display: flex; align-items: flex-start; gap: 7px;
+  font-size: 12.5px; color: var(--text2);
+  padding: 3px 0; cursor: pointer;
+}
+.check input { margin-top: 2px; accent-color: var(--rush-accent); cursor: pointer; }
+.source-row { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.diff-row {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--text2);
+}
+.diff-row label { display: flex; align-items: center; gap: 8px; }
+.diff-slider { accent-color: var(--rush-accent); width: 130px; }
+.diff-out {
+  font-weight: 700; color: var(--rush-accent);
+  font-variant-numeric: tabular-nums;
+}
+.setup-foot { display: flex; justify-content: flex-end; }
+.setup-apply {
+  font: inherit; font-size: 13px; font-weight: 600;
+  padding: 8px 20px; border-radius: 10px;
+  border: 1px solid var(--btn-bg);
+  background: var(--btn-bg); color: var(--on-btn); cursor: pointer;
+}
+
 .best-line {
   margin-top: 16px;
   font-size: 13px;
   color: var(--text3);
 }
 .best-line .kbd-hint { white-space: nowrap; }
+
+/* ── Нижний ряд входов ──────────────────────────────────────────── */
+.entry-row {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  text-align: left;
+}
+.entry {
+  font: inherit;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 11px 13px;
+  border: 1px solid var(--rush-border);
+  border-radius: 12px;
+  background: var(--rush-surface);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+}
+.entry:hover { border-color: var(--rush-accent); }
+.entry b { font-size: 13.5px; font-weight: 700; }
+.entry small { font-size: 11.5px; color: var(--text3); }
+.entry[data-soon] { position: relative; }
+.entry.soon { opacity: .55; cursor: default; pointer-events: none; }
+.entry.soon::after {
+  content: 'скоро';
+  position: absolute; top: 9px; right: 11px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: .5px;
+  text-transform: uppercase; color: var(--text3);
+}
+.entry-code { cursor: default; }
+.code-form { display: flex; gap: 6px; margin-top: 4px; }
+.code-form input {
+  font: inherit; font-size: 12.5px;
+  flex: 1; min-width: 0;
+  padding: 5px 9px;
+  border: 1px solid var(--rush-border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.code-form button {
+  font: inherit; font-size: 13px;
+  padding: 5px 11px;
+  border: 1px solid var(--rush-border);
+  border-radius: 8px;
+  background: var(--rush-surface);
+  color: var(--text2); cursor: pointer;
+}
+.code-form button:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+.records-box {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--rush-border);
+  border-radius: 12px;
+  background: var(--rush-surface);
+  text-align: left;
+  font-size: 13px;
+}
+.records-box .rec-row {
+  display: flex; justify-content: space-between;
+  padding: 3px 0; color: var(--text2);
+}
+.records-box .rec-row b { color: var(--rush-accent); font-variant-numeric: tabular-nums; }
+
+/* Узкий экран: панель фильтров становится шторкой снизу */
+@media (max-width: 720px) {
+  .topic-cols { grid-template-columns: 1fr; }
+  .setup-panel {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 60;
+    margin: 0;
+    max-height: 82vh;
+    overflow-y: auto;
+    border-radius: 18px 18px 0 0;
+    border-bottom: none;
+    box-shadow: 0 -8px 30px rgba(0,0,0,.24);
+  }
+}
 
 /* ── Экран 2: игра ─────────────────────────────────────────────── */
 #screen-play .scene {
@@ -994,19 +1253,104 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
 <div class="rush-wrap">
 
-  <!-- ЭКРАН 1: СТАРТ -->
+  <!-- ЭКРАН 1: СТАРТ.
+       Порядок сверху вниз: сжатая шапка → карточки режимов (главное пятно
+       страницы) → строка настройки с раскрывающейся панелью фильтров →
+       нижний ряд входов. Счётчиков у тем и источников НЕТ и пустые
+       сочетания не гасятся: фильтр работает так, будто задач по каждой
+       теме и источнику неограниченно. -->
   <section id="screen-start" class="screen active">
     <div class="col">
-      <h1 class="rush-logo">ECON<span class="bolt">⚡</span><span class="rush">RUSH</span></h1>
-      <p class="rush-sub">Вопросы по экономике на время. Четыре режима — как в шахматах.</p>
-      <div class="topic-chips" id="topic-chips">
-        <button class="topic-chip active" data-topic="">Все темы</button>
-        {% for t in topics %}
-        <button class="topic-chip" data-topic="{{ t }}">{{ t }}</button>
-        {% endfor %}
-      </div>
+      <header class="rush-head">
+        <h1 class="rush-mark">ЭкЗадачи <span class="rush-dot">·</span> Econ&nbsp;Rush</h1>
+        <p class="rush-sub">Вопросы по экономике на время — пять режимов, как контроли в шахматах.</p>
+        <p class="rush-count"><b>{{ pool_total }}</b> вопросов из реальных олимпиад</p>
+      </header>
+
       <div class="mode-grid" id="mode-grid"></div>
-      <p class="best-line" id="best-line">Клик по режиму — старт забега<span class="kbd-hint"> · Enter — последний режим</span></p>
+
+      <!-- Строка настройки: сводка выбора + кнопка раскрытия панели -->
+      <div class="setup-bar">
+        <span class="setup-summary" id="setup-summary">Все темы · Все источники · Любая сложность</span>
+        <button class="setup-btn" id="setup-toggle" aria-expanded="false"
+                aria-controls="setup-panel">Настроить</button>
+      </div>
+
+      <div class="setup-panel" id="setup-panel" hidden>
+        <div class="setup-panel-head">
+          <b>Настройки забега</b>
+          <button class="setup-close" id="setup-close" aria-label="Закрыть">✕</button>
+        </div>
+
+        <section class="setup-block">
+          <div class="setup-block-head">
+            <h3>Темы</h3>
+            <div class="preset-row">
+              <button class="preset" data-preset="all">все</button>
+              <button class="preset" data-preset="micro">микро</button>
+              <button class="preset" data-preset="macro">макро</button>
+              <button class="preset" data-preset="none">снять всё</button>
+            </div>
+          </div>
+          <div class="topic-cols">
+            {% for g in topic_groups %}
+            <div class="topic-col" data-group="{{ g.key }}">
+              <h4>{{ g.title }}</h4>
+              {% for t in g.topics %}
+              <label class="check"><input type="checkbox" class="f-topic" value="{{ t }}"><span>{{ t }}</span></label>
+              {% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="setup-block">
+          <div class="setup-block-head"><h3>Источники</h3></div>
+          <div class="source-row">
+            {% for s in source_groups %}
+            <label class="check"><input type="checkbox" class="f-source" value="{{ s.key }}"><span>{{ s.title }}</span></label>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="setup-block">
+          <div class="setup-block-head"><h3>Сложность</h3></div>
+          <div class="diff-row">
+            <label>от <input type="range" id="f-dmin" class="diff-slider" min="1" max="5" step="1" value="1"></label>
+            <output class="diff-out" id="diff-out">1–5</output>
+            <label>до <input type="range" id="f-dmax" class="diff-slider" min="1" max="5" step="1" value="5"></label>
+          </div>
+        </section>
+
+        <div class="setup-foot">
+          <button class="setup-apply" id="setup-apply">Готово</button>
+        </div>
+      </div>
+
+      <p class="best-line" id="best-line">Клик по режиму — старт забега<span class="kbd-hint"> · 1–5 — выбрать режим · Enter — последний</span></p>
+
+      <!-- Нижний ряд входов -->
+      <div class="entry-row" id="entry-row">
+        <button class="entry" id="entry-daily" data-soon="1">
+          <b>Вызов дня</b><small>один набор на всех, одна попытка</small>
+        </button>
+        <div class="entry entry-code">
+          <b>Играть по коду</b>
+          <form class="code-form" id="code-form">
+            <input id="code-input" maxlength="12" autocomplete="off"
+                   spellcheck="false" placeholder="код набора" aria-label="Код набора">
+            <button type="submit" id="code-go">→</button>
+          </form>
+        </div>
+        <button class="entry" id="entry-duel" data-soon="1">
+          <b>Бросить вызов</b><small>дуэль по ссылке</small>
+        </button>
+        <button class="entry" id="entry-records">
+          <b>Мои рекорды</b><small>по режимам, локально</small>
+        </button>
+      </div>
+
+      <div class="records-box" id="records-box" hidden></div>
     </div>
   </section>
 
@@ -1197,14 +1541,22 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var MISTAKES_RUN_SIZE = CFG.mistakes_run_size;  // размер целевого забега (config.py)
 
-  /* Подписи карточек режимов (сама механика — только из CFG.modes) */
+  /* Подписи карточек режимов (сама механика — только из CFG.modes).
+     mock — какой макет виджета ответа нарисовать на карточке: тип вопроса
+     объясняется картинкой, а не абзацем текста. */
   var MODE_META = {
-    bullet:  { emoji: '⚡', kind: 'Данетки: Верно или Неверно' },
-    blitz:   { emoji: '🔥', kind: 'Один верный из вариантов' },
-    rapid:   { emoji: '🎯', kind: 'Несколько верных из вариантов' },
-    classic: { emoji: '🧮', kind: 'Числовой ответ — впиши сам' }
+    bullet:  { emoji: '⚡', kind: 'как пуля в шахматах — данетка Верно/Неверно',
+               mock: 'toggle' },
+    blitz:   { emoji: '🔥', kind: 'как блиц — один верный из вариантов',
+               mock: 'radio' },
+    rapid:   { emoji: '🎯', kind: 'как рапид — несколько верных сразу',
+               mock: 'check' },
+    classic: { emoji: '🧮', kind: 'как классика — числовой ответ вводом',
+               mock: 'input' },
+    figure:  { emoji: '📈', kind: 'как классика с доской — выбери верный график',
+               mock: 'tiles' }
   };
-  var MODE_ORDER = ['bullet', 'blitz', 'rapid', 'classic'];
+  var MODE_ORDER = ['bullet', 'blitz', 'rapid', 'classic', 'figure'];
 
   /* Рекорды — отдельно на режим; старый общий ключ считаем рекордом блица */
   function bestKey(m) { return 'econ_rush_best_' + m; }
@@ -1242,7 +1594,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   /* -- состояние -- */
   var state = 'start';          // start | playing | finished
-  var topic = '';               // выбранная тема ('' = все)
+  /* Фильтр забега. Живёт в localStorage и НАСЛЕДУЕТСЯ «сыграть ещё раз»:
+     раньше выбор игрока молча сбрасывался на каждом новом забеге. */
+  var FILTER_KEY = 'econ_rush_filter';
+  var filter = loadFilter();
   var mode = CFG.default_mode;  // выбранный режим (последний сыгранный)
   var MODE = CFG.modes[mode];   // конфиг текущего режима (duration, дельты)
   var timeLeft = 0;             // секунд
@@ -1335,17 +1690,60 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
                           : 'пропустить (бесплатно)';
   }
 
+  /* Макет виджета ответа — статичная картинка, ничего не делает.
+     Показать «данетку» дешевле, чем описать её словами. */
+  function buildMock(kind) {
+    var box = document.createElement('div');
+    box.className = 'mode-mock';
+    if (kind === 'toggle') {
+      var t = document.createElement('div');
+      t.className = 'mock-toggle';
+      t.innerHTML = '<span class="on">Верно</span><span>Неверно</span>';
+      box.appendChild(t);
+    } else if (kind === 'input') {
+      var inp = document.createElement('div');
+      inp.className = 'mock-input';
+      inp.innerHTML = '<span>12,5</span><i class="mock-caret"></i>';
+      box.appendChild(inp);
+    } else if (kind === 'tiles') {
+      var tiles = document.createElement('div');
+      tiles.className = 'mock-tiles';
+      tiles.innerHTML = '<div class="mock-tile"></div><div class="mock-tile"></div>'
+        + '<div class="mock-tile"></div><div class="mock-tile"></div>';
+      box.appendChild(tiles);
+    } else {
+      // radio (один верный) и check (несколько верных) — разная фигура
+      // маркера и разное число «выбранных»: в рапиде их два.
+      var isCheck = kind === 'check';
+      var marks = isCheck ? [1, 0, 1, 0] : [1, 0, 0, 0];
+      marks.forEach(function (on) {
+        var row = document.createElement('div');
+        row.className = 'mock-row';
+        var pill = document.createElement('div');
+        pill.className = 'mock-pill';
+        var dot = document.createElement('i');
+        dot.className = (isCheck ? 'mock-box' : 'mock-dot') + (on ? ' on' : '');
+        pill.appendChild(dot);
+        row.appendChild(pill);
+        box.appendChild(row);
+      });
+    }
+    return box;
+  }
+
   function renderModeCards() {
     var grid = $('mode-grid');
     grid.innerHTML = '';
     MODE_ORDER.forEach(function (key) {
       var m = CFG.modes[key];
-      var meta = MODE_META[key];
-      var empty = !CFG.pool_counts[key];
+      // Режим, которого нет в конфиге (или чей пул пуст), на экране не
+      // показывается ВОВСЕ: карточка «скоро» обещала бы игроку то, чего
+      // сейчас нет, — а играть в неё всё равно нельзя.
+      if (!m || !CFG.pool_counts[key]) return;
+      var meta = MODE_META[key] || { emoji: '•', kind: '', mock: 'radio' };
       var card = document.createElement('button');
-      card.className = 'mode-card' + (empty ? ' disabled' : '');
+      card.className = 'mode-card';
       card.dataset.mode = key;
-      if (empty) card.disabled = true;
 
       var name = document.createElement('div');
       name.className = 'mode-name';
@@ -1358,6 +1756,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       kind.className = 'mode-kind';
       kind.textContent = meta.kind;
       card.appendChild(kind);
+
+      card.appendChild(buildMock(meta.mock));
 
       var terms = document.createElement('div');
       terms.className = 'mode-terms';
@@ -1372,19 +1772,24 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
       var bestEl = document.createElement('div');
       bestEl.className = 'mode-best';
-      if (empty) {
-        var soon = document.createElement('span');
-        soon.className = 'soon-badge';
-        soon.textContent = 'Скоро';
-        card.appendChild(soon);
-      } else {
-        var best = parseInt(localStorage.getItem(bestKey(key)) || '0', 10);
-        bestEl.textContent = best > 0 ? '🏆 рекорд ' + best.toLocaleString('ru-RU') : '';
-      }
+      var best = parseInt(localStorage.getItem(bestKey(key)) || '0', 10);
+      bestEl.textContent = best > 0 ? '🏆 рекорд ' + best.toLocaleString('ru-RU') : '';
       card.appendChild(bestEl);
       grid.appendChild(card);
     });
+    // 4 режима → 2×2, 5 → 3+2, меньше трёх → по числу карточек
+    var n = grid.children.length;
+    grid.style.gridTemplateColumns =
+      'repeat(' + (n === 4 ? 2 : Math.min(3, n || 1)) + ', 1fr)';
   }
+
+  /* Режимы, реально показанные на экране, — по ним ходят клавиши 1–5. */
+  function visibleModes() {
+    return MODE_ORDER.filter(function (k) {
+      return CFG.modes[k] && CFG.pool_counts[k];
+    });
+  }
+
   renderModeCards();
 
   $('mode-grid').addEventListener('click', function (e) {
@@ -1394,14 +1799,130 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     startRun();
   });
 
-  $('topic-chips').addEventListener('click', function (e) {
-    var chip = e.target.closest('.topic-chip');
-    if (!chip) return;
-    topic = chip.dataset.topic;
-    this.querySelectorAll('.topic-chip').forEach(function (c) {
-      c.classList.toggle('active', c === chip);
+  /* ---------- ФИЛЬТР ЗАБЕГА ----------
+     Хранится в localStorage, наследуется «сыграть ещё раз» и работой над
+     ошибками (её фильтр сервер берёт из журнала прошлого забега).
+     Счётчиков у тем и источников нет намеренно: фильтр обещает выбор,
+     а не отчёт о сегодняшнем состоянии банка. */
+  function emptyFilter() {
+    return { topics: [], sources: [],
+             dmin: CFG.difficulty_min, dmax: CFG.difficulty_max };
+  }
+
+  function loadFilter() {
+    var f = emptyFilter();
+    try {
+      var raw = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null');
+      if (raw && typeof raw === 'object') {
+        if (Array.isArray(raw.topics)) f.topics = raw.topics;
+        if (Array.isArray(raw.sources)) f.sources = raw.sources;
+        if (raw.dmin >= CFG.difficulty_min) f.dmin = raw.dmin;
+        if (raw.dmax <= CFG.difficulty_max) f.dmax = raw.dmax;
+      }
+    } catch (e) { /* мусор в ключе не должен ронять экран */ }
+    if (f.dmin > f.dmax) { var t = f.dmin; f.dmin = f.dmax; f.dmax = t; }
+    return f;
+  }
+
+  function saveFilter() {
+    try { localStorage.setItem(FILTER_KEY, JSON.stringify(filter)); }
+    catch (e) { /* приватный режим браузера */ }
+  }
+
+  function filterQuery() {
+    var parts = [];
+    filter.topics.forEach(function (t) {
+      parts.push('topics=' + encodeURIComponent(t));
     });
+    filter.sources.forEach(function (s) {
+      parts.push('sources=' + encodeURIComponent(s));
+    });
+    parts.push('dmin=' + filter.dmin, 'dmax=' + filter.dmax);
+    return parts.join('&');
+  }
+
+  function filterSummary() {
+    var t = filter.topics.length
+      ? (filter.topics.length === 1 ? filter.topics[0]
+                                    : filter.topics.length + ' темы')
+      : 'Все темы';
+    var srcTitles = {};
+    (CFG.source_groups || []).forEach(function (g) { srcTitles[g.key] = g.title; });
+    var s = filter.sources.length
+      ? (filter.sources.length === 1 ? srcTitles[filter.sources[0]]
+                                     : filter.sources.length + ' источника')
+      : 'Все источники';
+    var d = (filter.dmin === CFG.difficulty_min && filter.dmax === CFG.difficulty_max)
+      ? 'Любая сложность'
+      : 'Сложность ' + filter.dmin + '–' + filter.dmax;
+    return t + ' · ' + s + ' · ' + d;
+  }
+
+  function paintFilterSummary() {
+    $('setup-summary').textContent = filterSummary();
+  }
+
+  function syncFilterControls() {
+    document.querySelectorAll('.f-topic').forEach(function (cb) {
+      cb.checked = filter.topics.indexOf(cb.value) >= 0;
+    });
+    document.querySelectorAll('.f-source').forEach(function (cb) {
+      cb.checked = filter.sources.indexOf(cb.value) >= 0;
+    });
+    $('f-dmin').value = filter.dmin;
+    $('f-dmax').value = filter.dmax;
+    $('diff-out').textContent = filter.dmin + '–' + filter.dmax;
+    paintFilterSummary();
+  }
+
+  function readFilterControls() {
+    filter.topics = [].slice.call(document.querySelectorAll('.f-topic'))
+      .filter(function (cb) { return cb.checked; })
+      .map(function (cb) { return cb.value; });
+    filter.sources = [].slice.call(document.querySelectorAll('.f-source'))
+      .filter(function (cb) { return cb.checked; })
+      .map(function (cb) { return cb.value; });
+    var lo = parseInt($('f-dmin').value, 10);
+    var hi = parseInt($('f-dmax').value, 10);
+    filter.dmin = Math.min(lo, hi);
+    filter.dmax = Math.max(lo, hi);
+    saveFilter();
+    syncFilterControls();
+  }
+
+  function openSetup(open) {
+    $('setup-panel').hidden = !open;
+    $('setup-toggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) syncFilterControls();
+  }
+
+  $('setup-toggle').addEventListener('click', function () {
+    openSetup($('setup-panel').hidden);
   });
+  $('setup-close').addEventListener('click', function () { openSetup(false); });
+  $('setup-apply').addEventListener('click', function () { openSetup(false); });
+  $('setup-panel').addEventListener('change', readFilterControls);
+  $('setup-panel').addEventListener('input', function (e) {
+    if (e.target.classList.contains('diff-slider')) readFilterControls();
+  });
+  $('setup-panel').addEventListener('click', function (e) {
+    var btn = e.target.closest('.preset');
+    if (!btn) return;
+    var preset = btn.dataset.preset;
+    var groups = CFG.topic_groups || [];
+    var wanted = [];
+    if (preset === 'all') {
+      groups.forEach(function (g) { wanted = wanted.concat(g.topics); });
+    } else if (preset === 'micro' || preset === 'macro') {
+      groups.forEach(function (g) {
+        if (g.key === preset) wanted = wanted.concat(g.topics);
+      });
+    }
+    filter.topics = wanted;   // 'none' оставляет пустой список = все темы
+    saveFilter();
+    syncFilterControls();
+  });
+  syncFilterControls();
 
   /* Забег — обычный или целевой («работа над ошибками»): отличается
      только эндпоинтом старта, дальше всё то же самое. Темы и пропорцию
@@ -1411,7 +1932,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var url = mistakes
       ? '/game/api/session/start_mistakes/'
       : '/game/api/session/start/?mode=' + encodeURIComponent(mode)
-        + '&topic=' + encodeURIComponent(topic);
+        + '&' + filterQuery();
     api(url)
       .then(function (d) {
         if (!d.ok) { alert(d.error || 'Не удалось начать игру'); return; }
@@ -1430,6 +1951,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         show('playing');
         paintHud();
         paintLives(false);
+        /* Под фильтром игрока может не оказаться ни одного вопроса. Это НЕ
+           ошибка и не диалог «пул пуст»: забег честно кончается причиной
+           pool_empty, а экран результатов подсказывает смягчить фильтр. */
+        if (!d.question) { endRun('done'); return; }
         showQuestion(d.question);
         prefetchNext();
         lastTick = performance.now();
@@ -1965,10 +2490,22 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     } catch (e) { return ''; }
   }
 
+  /* Четыре исхода забега — по одному тексту на каждый. Причину «кончились
+     вопросы» сервер уже разделил на pool_empty (свободный забег под
+     фильтром) и set_done (курированный список пройден): клиент знает про
+     конец вопросов, но не знает, какой это был забег. */
   function reasonText(s) {
     if (s.ended_reason === 'lives') return 'выбыл на вопросе ' + s.last_number;
-    if (s.ended_reason === 'done') return 'вопросы кончились';
+    if (s.ended_reason === 'set_done') return 'список пройден до конца';
+    if (s.ended_reason === 'pool_empty') return 'вопросы под настройками кончились';
     return 'время вышло';
+  }
+
+  function titleText(s) {
+    if (s.ended_reason === 'lives') return 'Забег окончен';
+    if (s.ended_reason === 'set_done') return 'Пройдено!';
+    if (s.ended_reason === 'pool_empty') return 'Вопросы кончились';
+    return 'Время вышло!';
   }
 
   function paintHearts(box, left, max) {
@@ -1985,9 +2522,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   function paintFinal() {
     var s = summary;
-    $('final-title').textContent =
-      endReason === 'lives' ? 'Забег окончен' :
-      endReason === 'done' ? 'Вопросы кончились' : 'Время вышло!';
+    $('final-title').textContent = titleText(s);
     $('fin-mode-chip').textContent = s.mode_title;
     $('fin-mistakes-chip').hidden = !mistakesRun;
     $('fin-date').textContent = formatDate(s.played_at);
@@ -2542,6 +3077,66 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     startRun({ mistakes: true });
   });
 
+  /* ---------- НИЖНИЙ РЯД ВХОДОВ ----------
+     «Вызов дня» и «Бросить вызов» помечаются «скоро», пока их страниц нет
+     (они приезжают отдельными фазами). Кнопка, которая ведёт в никуда,
+     хуже честной пометки. */
+  (function markSoon() {
+    [['entry-daily', CFG.has_daily], ['entry-duel', CFG.has_duel]]
+      .forEach(function (pair) {
+        var el = $(pair[0]);
+        if (!pair[1]) el.classList.add('soon');
+      });
+  })();
+
+  if (CFG.has_daily) {
+    $('entry-daily').addEventListener('click', function () {
+      location.href = '/game/daily/';
+    });
+  }
+  if (CFG.has_duel) {
+    $('entry-duel').addEventListener('click', function () {
+      location.href = '/game/duel/new/?mode=' + encodeURIComponent(mode)
+        + '&' + filterQuery();
+    });
+  }
+
+  /* Код набора: нечувствителен к регистру и пробелам — его переписывают
+     руками с доски или из чата. */
+  $('code-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = ($('code-input').value || '').replace(/\s+/g, '').toUpperCase();
+    if (!code) return;
+    location.href = '/game/s/' + encodeURIComponent(code) + '/';
+  });
+
+  $('entry-records').addEventListener('click', function () {
+    var box = $('records-box');
+    if (!box.hidden) { box.hidden = true; return; }
+    box.innerHTML = '';
+    var any = false;
+    visibleModes().forEach(function (key) {
+      var best = parseInt(localStorage.getItem(bestKey(key)) || '0', 10);
+      var row = document.createElement('div');
+      row.className = 'rec-row';
+      var name = document.createElement('span');
+      name.textContent = CFG.modes[key].title;
+      var val = document.createElement('b');
+      val.textContent = best > 0 ? best.toLocaleString('ru-RU') : '—';
+      if (best > 0) any = true;
+      row.appendChild(name);
+      row.appendChild(val);
+      box.appendChild(row);
+    });
+    if (!any) {
+      var hint = document.createElement('div');
+      hint.className = 'rec-row';
+      hint.textContent = 'Рекордов пока нет — сыграй первый забег.';
+      box.appendChild(hint);
+    }
+    box.hidden = false;
+  });
+
   /* ---------- КОНФЕТТИ (canvas, ~1.5 с) ---------- */
   function confetti() {
     var cv = $('confetti-canvas');
@@ -2584,8 +3179,16 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   document.addEventListener('keydown', function (e) {
     if (e.repeat) return;
     if (state === 'start') {
+      // Ввод кода набора — клавиши экрана не перехватываем
+      if (e.target && e.target.tagName === 'INPUT') return;
       // Enter — забег в последнем сыгранном режиме (или режиме по умолчанию)
       if (e.key === 'Enter' && CFG.pool_counts[mode]) { e.preventDefault(); startRun(); }
+      // 1–5 — выбрать режим по порядку карточек на экране
+      if (e.key >= '1' && e.key <= '5') {
+        var shown = visibleModes();
+        var idx = parseInt(e.key, 10) - 1;
+        if (idx < shown.length) { e.preventDefault(); mode = shown[idx]; startRun(); }
+      }
       return;
     }
     if (state === 'finished') {

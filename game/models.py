@@ -87,6 +87,16 @@ class GameQuestion(models.Model):
     # («единица ответа: …»), денормализуется при пересборке пула.
     unit = models.CharField('Единица ответа', max_length=40, blank=True,
                             default='')
+    # Источник вопроса — денормализован при сборке пула (как topics и
+    # stage/year/grade). Нужен фильтру «источники» на стартовом экране:
+    # выбор вопроса читает пул одним плоским values_list, join на
+    # SourceReference там дал бы дубли строк у задач с двумя привязками.
+    # Пусто — у сгенерированных (у них нет задачи-источника) и у редких
+    # задач банка без SourceReference.
+    source_id = models.PositiveIntegerField('ID источника', null=True,
+                                            blank=True, db_index=True)
+    source_group = models.CharField('Группа источников', max_length=16,
+                                    blank=True, default='', db_index=True)
 
     # --- Параметрические генераторы (game/generators/) ---
     # Сгенерированные вопросы живут в том же кэше, но: build_game_pool их
