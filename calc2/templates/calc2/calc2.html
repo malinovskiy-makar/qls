@@ -211,6 +211,21 @@ input:focus-visible, select:focus-visible {
 .f-wrap { position: relative; }
 .f-row { display: flex; gap: 6px; align-items: stretch; }
 .f-row > input { flex: 1; min-width: 0; }
+/* Набранная формула поверх самого поля: пока в поле не пишут, строка
+   показывает формулу так, как её печатают в учебнике. Стоит в потоке рядом с
+   input'ом (не поверх него абсолютом), поэтому ничего не съезжает при смене
+   темы и масштаба шрифта. Сам input продолжает хранить текст Math.js —
+   считается ровно то, что написано. */
+.f-slot { position: relative; flex: 1; min-width: 0; }
+.f-slot > input { width: 100%; }
+.f-typeset {
+  position: absolute; inset: 0; display: none; align-items: center;
+  padding: 0 8px; overflow-x: auto; overflow-y: hidden; cursor: text;
+  background: var(--input-bg); border: 1px solid var(--border);
+  border-radius: var(--r-sm); color: var(--text); font-size: 14px; line-height: 1;
+}
+.f-typeset.show { display: flex; }
+.f-typeset:hover { border-color: var(--accent-ring); }
 .f-help {
   flex-shrink: 0; width: 30px; border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--surface); color: var(--text2); font-size: 13px; font-weight: 700; line-height: 1;
@@ -11976,14 +11991,38 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
   if (!btn || !pop) return;
   const inp = document.getElementById(inputId);
 
-  // Живой предпросмотр под полем: показывает то же, что написано, но набранным.
-  let prev = null;
+  // Набранная формула в САМОЙ строке. Пока в поле не пишут, поверх него лежит
+  // та же формула, но напечатанная как в учебнике; стоит щёлкнуть или перейти
+  // табом — сверху снова обычный текст, который и правится. Так формула и
+  // выглядит по-человечески, и остаётся ровно тем, что считает движок:
+  // разбирать набранную запись обратно в Math.js не нужно, а значит нечему и
+  // ломаться.
+  //
+  // Отдельного предпросмотра под полем больше нет. Он не только дублировал
+  // строку, но и ломал добавление кривой: на потере фокуса блок схлопывался,
+  // кнопка «Добавить» уезжала вверх между нажатием и отпусканием мыши, и щелчок
+  // не доходил. Накладка лежит абсолютом внутри своей ячейки и высоту строки
+  // не меняет, поэтому ничего не прыгает.
   if (inp) {
-    prev = document.createElement('div');
-    prev.className = 'f-preview';
-    pop.parentNode.insertBefore(prev, pop);
-    const sync = () => renderTex(prev, inp.value);
+    const slot = document.createElement('div');
+    slot.className = 'f-slot';
+    inp.parentNode.insertBefore(slot, inp);
+    slot.appendChild(inp);
+    const typeset = document.createElement('div');
+    typeset.className = 'f-typeset';
+    typeset.title = 'Щёлкните, чтобы поправить формулу';
+    slot.appendChild(typeset);
+
+    const focused = () => document.activeElement === inp;
+    const sync = () => {
+      const val = (inp.value || '').trim();
+      renderTex(typeset, val);
+      typeset.classList.toggle('show', !focused() && !!val && typeset.classList.contains('has'));
+    };
     inp.addEventListener('input', sync);
+    inp.addEventListener('focus', sync);
+    inp.addEventListener('blur', sync);
+    typeset.addEventListener('mousedown', (e) => { e.preventDefault(); inp.focus(); });
     _texPending.push(sync);
     sync();
   }

@@ -219,23 +219,84 @@ await t('недописанная формула не роняет предпр�
   return typeof s === 'string' || 'упало';
 }));
 
-await t('предпросмотр под полем формулы рендерит математику', async () => {
+// Формула набирается прямо в строке: пока поле не в работе, поверх него лежит
+// та же запись, но напечатанная. Отдельного блока под полем больше нет.
+// Сцены открываются со свёрнутой панелью, а нам нужны настоящие щелчки по
+// полю и кнопке — разворачиваем и подводим секцию к глазам.
+await page.evaluate(() => {
+  setToolsOpen(true);
+  const s = document.getElementById('sec-curves');
+  if (s) s.scrollIntoView({ block: 'center' });
+});
+await page.waitForTimeout(300);
+await t('строка показывает формулу набранной, когда её не правят', async () => {
   await page.fill('#inp-formula', '100 - 2*Q');
-  await page.waitForTimeout(200);
+  await page.evaluate(() => document.getElementById('inp-formula').blur());
+  await page.waitForTimeout(250);
   return await page.evaluate(() => {
-    const p = document.querySelector('#sec-curves .f-preview');
-    return (p && p.classList.contains('has') && p.querySelector('.katex') !== null)
-      || (p ? 'нет .katex: ' + p.innerHTML.slice(0, 60) : 'нет .f-preview');
+    const ts = document.querySelector('#sec-curves .f-typeset');
+    return (ts && ts.classList.contains('show') && ts.querySelector('.katex') !== null)
+      || (ts ? 'не показана: ' + ts.className : 'нет .f-typeset');
   });
 });
 
-await t('пустое поле прячет предпросмотр', async () => {
-  await page.fill('#inp-formula', '');
-  await page.waitForTimeout(150);
+// Накладка лежит поверх поля, поэтому щёлкают по ней: её обработчик и
+// передаёт фокус в поле, как это делает человек.
+await t('при правке строка снова обычный текст', async () => {
+  await page.locator('#sec-curves .f-typeset').click();
+  await page.waitForTimeout(200);
   return await page.evaluate(() => {
-    const p = document.querySelector('#sec-curves .f-preview');
-    return !p.classList.contains('has') || 'предпросмотр остался';
+    const ts = document.querySelector('#sec-curves .f-typeset');
+    return (!ts.classList.contains('show') && document.activeElement.id === 'inp-formula')
+      || 'накладка не убралась или фокус мимо поля';
   });
+});
+
+await t('пустое поле не показывает накладку', async () => {
+  await page.fill('#inp-formula', '');
+  await page.evaluate(() => document.getElementById('inp-formula').blur());
+  await page.waitForTimeout(200);
+  return await page.evaluate(() => {
+    const ts = document.querySelector('#sec-curves .f-typeset');
+    return !ts.classList.contains('show') || 'накладка на пустом поле';
+  });
+});
+
+// Корень прежней поломки: блок предпросмотра под полем схлопывался на потере
+// фокуса, всё под ним уезжало вверх, и щелчок по «Добавить» не доходил, потому
+// что между нажатием и отпусканием кнопка успевала сдвинуться. Проверяем
+// геометрию напрямую: строка формулы не меняет высоту при уходе фокуса.
+await t('уход фокуса из формулы не двигает кнопку «Добавить»', async () => {
+  await page.click('#inp-formula');
+  await page.fill('#inp-formula', '100 - 2*Q');
+  await page.waitForTimeout(200);
+  const before = await page.evaluate(() =>
+    document.getElementById('btn-add-curve').getBoundingClientRect().top);
+  await page.evaluate(() => document.getElementById('inp-formula').blur());
+  await page.waitForTimeout(250);
+  const after = await page.evaluate(() =>
+    document.getElementById('btn-add-curve').getBoundingClientRect().top);
+  return Math.abs(after - before) < 0.5 || `кнопка уехала на ${(after - before).toFixed(1)} px`;
+});
+
+await t('кривая добавляется настоящим щелчком по кнопке', async () => {
+  await page.evaluate(() => { STATE.curves = []; renderCurveList(); redrawAll(); });
+  await page.selectOption('#new-role', '');
+  await page.fill('#inp-formula', '100 - Q');
+  // Панель прокручиваемая и кнопка может оказаться за её краем, поэтому
+  // воспроизводим последовательность браузера: нажатие, потеря фокуса, щелчок.
+  await page.evaluate(() => {
+    const btn = document.getElementById('btn-add-curve');
+    const opt = { bubbles: true, cancelable: true, view: window };
+    btn.dispatchEvent(new MouseEvent('mousedown', opt));
+    document.getElementById('inp-formula').blur();
+    btn.dispatchEvent(new MouseEvent('mouseup', opt));
+    btn.click();
+  });
+  await page.waitForTimeout(300);
+  return await page.evaluate(() =>
+    (STATE.curves.length === 1 && STATE.curves[0].expr === '100 - Q')
+    || JSON.stringify(STATE.curves.map(c => c.expr)));
 });
 
 await t('в попапе примеры набраны математикой, не текстом', async () => {
@@ -256,10 +317,11 @@ await t('клик по примеру подставляет его в поле'
   return v === '100 - 2*Q' || `в поле «${v}»`;
 });
 
-await t('после подстановки предпросмотр обновился, попап закрылся', () => page.evaluate(() => {
+await t('после подстановки строка набралась, попап закрылся', () => page.evaluate(() => {
   const pop = document.getElementById('fp-formula');
-  const p = document.querySelector('#sec-curves .f-preview');
-  return (!pop.classList.contains('open') && p.classList.contains('has')) || 'попап открыт или предпросмотр пуст';
+  const ts = document.querySelector('#sec-curves .f-typeset');
+  return (!pop.classList.contains('open') && ts.classList.contains('has'))
+    || 'попап открыт или строка пуста';
 }));
 
 await t('своё имя кривой заменяет родовое D на графике', async () => {
