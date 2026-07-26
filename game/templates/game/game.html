@@ -2011,13 +2011,16 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   function filterSummary() {
     var t = filter.topics.length
       ? (filter.topics.length === 1 ? filter.topics[0]
-                                    : filter.topics.length + ' темы')
+         : filter.topics.length + ' '
+           + plural(filter.topics.length, ['тема', 'темы', 'тем']))
       : 'Все темы';
     var srcTitles = {};
     (CFG.source_groups || []).forEach(function (g) { srcTitles[g.key] = g.title; });
     var s = filter.sources.length
       ? (filter.sources.length === 1 ? srcTitles[filter.sources[0]]
-                                     : filter.sources.length + ' источника')
+         : filter.sources.length + ' '
+           + plural(filter.sources.length,
+                    ['источник', 'источника', 'источников']))
       : 'Все источники';
     var d = (filter.dmin === CFG.difficulty_min && filter.dmax === CFG.difficulty_max)
       ? 'Любая сложность'
