@@ -1,0 +1,30 @@
+{% extends 'catalog/base.html' %}
+{% comment %}
+  Дуэль создать не из чего: под выбранными фильтрами в пуле нет ни одного
+  вопроса. Пустую дуэль не создаём — соперник получил бы ссылку в никуда.
+{% endcomment %}
+{% block title %}Дуэль не собралась{% endblock %}
+
+{% block extra_style %}
+<style>
+  .de-wrap { max-width: 520px; margin: 0 auto; padding: 60px 20px;
+             text-align: center; }
+  .de-wrap h1 { font-size: 1.5rem; }
+  .de-wrap p { color: var(--muted); margin-top: 10px; }
+  .de-btn { display: inline-block; margin-top: 20px; padding: 10px 22px;
+            border-radius: 11px; text-decoration: none; font-weight: 600;
+            background: var(--btn-bg); color: var(--on-btn);
+            border: 1px solid var(--btn-bg); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="de-wrap">
+  <h1>Дуэль не собралась</h1>
+  <p>
+    Под текущими настройками в режиме «{{ mode_title }}» не нашлось ни
+    одного вопроса. Смягчите фильтры — и попробуйте снова.
+  </p>
+  <a class="de-btn" href="/game/">К настройкам</a>
+</div>
+{% endblock %}

@@ -16,6 +16,9 @@ urlpatterns = [
     path('daily/<str:mode>/', views.daily_board, name='daily_board'),
     path('daily/<str:mode>/<str:day>/', views.daily_board,
          name='daily_board_day'),
+    # Дуэль: создание (сразу в игру) и страница сравнения.
+    path('duel/new/', views.duel_new, name='duel_new'),
+    path('d/<str:code>/', views.duel_page, name='duel'),
     # Набор: забег по коду и доска результатов набора.
     path('s/<str:code>/', views.set_page, name='set_page'),
     path('s/<str:code>/board/', views.set_board, name='set_board'),

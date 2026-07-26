@@ -3256,6 +3256,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('set-play').addEventListener('click', function () {
       startRun({ setCode: AUTO_SET.code });
     });
+    // Автор дуэли уходит играть сразу: вопросов он не видел и увидеть
+    // не должен, показывать ему заставку не с чем.
+    if (AUTO_SET.autostart) startRun({ setCode: AUTO_SET.code });
   })();
 
   /* ---------- КОНФЕТТИ (canvas, ~1.5 с) ---------- */

@@ -23,12 +23,13 @@ import datetime
 import json
 import random
 from fractions import Fraction
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import IntegrityError
 from django.http import Http404, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
@@ -61,7 +62,7 @@ MIN_TOPIC_POOL = 30
 # той фазой, которая приносит соответствующую страницу; до этого вход
 # помечен «скоро» и никуда не ведёт.
 HAS_DAILY = True     # Фаза 4 — /game/daily/
-HAS_DUEL = False
+HAS_DUEL = True      # Фаза 5 — /game/duel/new/ и /game/d/<код>/
 
 
 def parse_exact_number(s):
@@ -997,14 +998,28 @@ def set_page(request, code):
         'why': why,
         'board_url': reverse('game:set_board', args=[gset.code]),
     }
+    # ?auto=1 — начать сразу, без карточки-заставки: так уходит играть
+    # автор дуэли, который вопросов ещё не видел (и не должен увидеть).
+    ctx['auto_set']['autostart'] = (request.GET.get('auto') == '1'
+                                    and allowed)
     ctx['auto_set_json'] = json.dumps(ctx['auto_set'])
     return render(request, 'game/game.html', ctx)
 
 
 @require_safe
 def set_board(request, code):
-    """Доска набора: кто прошёл и на каких вопросах посыпался класс."""
+    """Доска набора: кто прошёл и на каких вопросах посыпался класс.
+
+    ⚠️ Тексты вопросов показываются НЕ ВСЕМ. Доска публичная, и ученик,
+    который ещё не играл контрольную, мог бы прочитать её вопросы отсюда —
+    это нашёл тест дуэли (первая версия доски выдавала весь список ДО
+    игры). Тексты видят: автор набора, персонал и тот, кто уже сыграл.
+    Остальным — «Вопрос N»: доля верных остаётся видна, содержание нет.
+    """
     gset = get_object_or_404(GameSet, code=make_code_lookup(code))
+    if gset.kind == 'duel':
+        # У дуэли своя страница, и на ней вопросов нет вовсе.
+        return redirect('game:duel', code=gset.code)
     rows = list(gset.results.select_related('user').order_by(
         '-score', 'created_at'))
     board = [{
@@ -1018,16 +1033,21 @@ def set_board(request, code):
         'is_me': bool(request.user.is_authenticated
                       and r.user_id == request.user.id),
     } for i, r in enumerate(rows)]
+    show_text = bool(
+        request.user.is_authenticated
+        and (request.user.is_staff or gset.author_id == request.user.id)
+    ) or my_result_for(request, gset) is not None
     return render(request, 'game/set_board.html', {
         'gset': gset,
         'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
         'board': board,
-        'questions': set_question_stats(gset),
+        'questions': set_question_stats(gset, show_text=show_text),
+        'show_text': show_text,
         'play_url': reverse('game:set_page', args=[gset.code]),
     })
 
 
-def set_question_stats(gset):
+def set_question_stats(gset, show_text=True):
     """Разбивка по вопросам НАБОРА — самое ценное для учителя.
 
     Доля верных считается ВНУТРИ набора (по журналам его забегов), а не по
@@ -1037,6 +1057,9 @@ def set_question_stats(gset):
     Журналы забегов лежат в сессиях игроков и до нас не доходят — поэтому
     считаем по сохранённым результатам: у каждого результата есть разбивка
     по вопросам (question_outcomes), которую кладёт finish.
+
+    show_text=False — вместо текста «Вопрос N»: доска публичная, и тому,
+    кто набор ещё не играл, содержание вопросов знать рано.
     """
     counts = {}
     for r in gset.results.all():
@@ -1056,13 +1079,183 @@ def set_question_stats(gset):
         rows.append({
             'number': i + 1,
             'id': qid,
-            'text': (texts.get(qid) or '(вопрос исчез из пула)')[:160],
+            'text': ((texts.get(qid) or '(вопрос исчез из пула)')[:160]
+                     if show_text else 'Вопрос %d' % (i + 1)),
             'correct': cell['correct'],
             'wrong': cell['wrong'],
             'skip': cell['skip'],
             'percent': round(100 * cell['correct'] / tries) if tries else None,
         })
     return rows
+
+
+# ---------------------------------------------------------------------------
+# Асинхронная дуэль по ссылке
+# ---------------------------------------------------------------------------
+
+MY_RESULTS_KEY = 'econ_rush_set_results'   # {код набора: код результата}
+
+
+def remember_my_result(request, set_code, result_code):
+    """Запомнить свой результат по набору — чтобы страница дуэли узнала
+    анонимного игрока (у авторизованного есть user, у анонима только
+    сессия)."""
+    mine = request.session.get(MY_RESULTS_KEY) or {}
+    mine[set_code] = result_code
+    request.session[MY_RESULTS_KEY] = mine
+
+
+def my_result_for(request, gset):
+    """Мой результат по этому набору — или None."""
+    if request.user.is_authenticated:
+        r = gset.results.filter(user=request.user).first()
+        if r:
+            return r
+    code = (request.session.get(MY_RESULTS_KEY) or {}).get(gset.code)
+    return gset.results.filter(code=code).first() if code else None
+
+
+@require_GET
+def duel_new(request):
+    """Создать дуэль и СРАЗУ уйти играть.
+
+    ⚠️ Набор дуэли собирается СЛУЧАЙНО под выбранные фильтры, и автор
+    вызова НЕ ВИДИТ вопросы до игры: он играет их вслепую первым, наравне
+    с соперником. Поэтому экрана «вот твой набор, поехали» не существует —
+    ни одна вьюха не отдаёт список вопросов до того, как игрок их сыграл.
+    """
+    mode = request.GET.get('mode', '').strip() or config.DEFAULT_MODE
+    if mode not in config.MODES:
+        return JsonResponse({'error': 'Неизвестный режим'}, status=400)
+    run_filter = parse_filter(request)
+    probe = _new_state(mode, None, run_filter)
+    ids = [pk for pk, _d, _t in _candidate_rows(probe)]
+    if not ids:
+        # Под фильтром пусто — не создаём пустую дуэль, а честно говорим.
+        return render(request, 'game/duel_empty.html', {
+            'mode_title': config.MODES[mode]['title']}, status=200)
+    random.shuffle(ids)
+    gset = GameSet.objects.create(
+        code=make_result_code(), mode=mode, kind='duel',
+        title='Дуэль · %s' % config.MODES[mode]['title'],
+        author=request.user if request.user.is_authenticated else None,
+        question_ids=ids[:config.DUEL_SIZE],
+        filter_snapshot=run_filter, attempts_allowed=1)
+    return redirect(reverse('game:set_page', args=[gset.code]) + '?auto=1')
+
+
+@require_safe
+def duel_page(request, code):
+    """Страница дуэли `/game/d/<код>/`.
+
+    Соперник видит: кто вызвал, режим, фильтры, число вопросов, результат
+    вызвавшего — и кнопку «Играть». ВОПРОСЫ НЕ ПОКАЗЫВАЮТСЯ.
+
+    Ссылку могут открыть больше двух человек — тогда страница показывает
+    всех сыгравших доской, автор помечен. Это надмножество сравнения двоих
+    и стоит ровно ничего.
+    """
+    gset = get_object_or_404(GameSet, code=make_code_lookup(code), kind='duel')
+    results = list(gset.results.select_related('user').order_by('created_at'))
+    mine = my_result_for(request, gset)
+
+    author_result = None
+    for r in results:
+        if gset.author_id and r.user_id == gset.author_id:
+            author_result = r
+            break
+    if author_result is None and results:
+        author_result = results[0]   # аноним-автор: первый сыгравший
+
+    rows = []
+    for r in sorted(results, key=lambda x: (-x.score, x.created_at)):
+        rows.append({
+            'name': (r.user.username if r.user else 'аноним'),
+            'score': r.score,
+            'accuracy': r.accuracy,
+            'max_combo': r.max_combo,
+            'reason': r.ended_reason,
+            'is_author': author_result is not None and r.id == author_result.id,
+            'is_me': mine is not None and r.id == mine.id,
+        })
+
+    allowed, why = set_run_allowed(request, gset)
+    compare = _duel_compare(gset, author_result, mine) \
+        if (mine and author_result and mine.id != author_result.id) else None
+
+    f = normalize_filter(gset.filter_snapshot)
+    return render(request, 'game/duel.html', {
+        'gset': gset,
+        'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
+        'author_name': (gset.author.username if gset.author else 'аноним'),
+        'author_result': author_result,
+        'rows': rows,
+        'mine': mine,
+        'compare': compare,
+        'allowed': allowed,
+        'why': why,
+        'play_url': reverse('game:set_page', args=[gset.code]),
+        'again_url': (reverse('game:duel_new') + '?mode=' + gset.mode
+                      + _filter_query(f)),
+        'filter_text': _filter_text(f),
+        'page_url': request.build_absolute_uri(
+            reverse('game:duel', args=[gset.code])),
+    })
+
+
+def _filter_query(f):
+    parts = ['&topics=' + quote(t) for t in f['topics']]
+    parts += ['&sources=' + quote(s) for s in f['sources']]
+    parts.append('&dmin=%d&dmax=%d' % (f['dmin'], f['dmax']))
+    return ''.join(parts)
+
+
+def _filter_text(f):
+    """Фильтр словами — соперник должен понимать, во что его зовут."""
+    topics = ', '.join(f['topics']) if f['topics'] else 'все темы'
+    if f['sources']:
+        sources = ', '.join(game_sources.group_title(s) for s in f['sources'])
+    else:
+        sources = 'все источники'
+    if f['dmin'] == config.DIFFICULTY_MIN and f['dmax'] == config.DIFFICULTY_MAX:
+        diff = 'любая сложность'
+    else:
+        diff = 'сложность %d–%d' % (f['dmin'], f['dmax'])
+    return '%s · %s · %s' % (topics, sources, diff)
+
+
+def _duel_compare(gset, a, b):
+    """Сравнение двух забегов лоб в лоб: метрики и полоса «кто что взял».
+
+    Полоса строится по question_outcomes: у каждого вопроса набора два
+    значка — верно / неверно / пропуск / не дошёл.
+    """
+    def by_qid(result):
+        return {item.get('question_id'): item.get('outcome')
+                for item in (result.question_outcomes or [])}
+
+    ma, mb = by_qid(a), by_qid(b)
+    strip = []
+    for i, qid in enumerate(gset.question_ids or []):
+        strip.append({'number': i + 1,
+                      'a': ma.get(qid, 'none'),
+                      'b': mb.get(qid, 'none')})
+    if a.score > b.score:
+        verdict = 'Побеждает %s' % (a.user.username if a.user else 'вызвавший')
+    elif b.score > a.score:
+        verdict = 'Побеждает %s' % (b.user.username if b.user else 'соперник')
+    else:
+        verdict = 'Ничья'
+    return {
+        'a': {'name': (a.user.username if a.user else 'вызвавший'),
+              'score': a.score, 'accuracy': a.accuracy,
+              'max_combo': a.max_combo, 'reason': a.ended_reason},
+        'b': {'name': (b.user.username if b.user else 'соперник'),
+              'score': b.score, 'accuracy': b.accuracy,
+              'max_combo': b.max_combo, 'reason': b.ended_reason},
+        'strip': strip,
+        'verdict': verdict,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1240,18 +1433,22 @@ def _save_result(request, state, summary):
         request.session[SESSION_KEY] = state
         if gset is not None:
             mark_set_played(request, gset.code)
+            remember_my_result(request, gset.code, result.code)
     out = {
         'code': result.code,
         'url': request.build_absolute_uri(
             reverse('game:result', args=[result.code])),
     }
     if gset is not None:
+        # У дуэли «доска» — это её страница сравнения, а не общая доска
+        # набора: соперника интересует счёт лоб в лоб.
+        board = reverse('game:duel', args=[gset.code]) if gset.kind == 'duel' \
+            else reverse('game:set_board', args=[gset.code])
         out['set'] = {
             'code': gset.code,
             'kind': gset.kind,
             'title': gset.title,
-            'board_url': request.build_absolute_uri(
-                reverse('game:set_board', args=[gset.code])),
+            'board_url': request.build_absolute_uri(board),
         }
     return out
 
