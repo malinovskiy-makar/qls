@@ -123,6 +123,27 @@ for (const [key, want, lock] of CARDS) {
   });
 }
 
+/* --- 2б. Сцена собирается заново, а не наследует чужие кривые ---------- */
+// Рынок труда живёт на общем списке кривых. Пресет ставился только при первом
+// входе, поэтому вторая попытка открыть сцену после монополии доставалась с
+// кривыми монополии: ни предложения труда, ни равновесия.
+await t('труд после монополии остаётся рабочим', async () => {
+  for (let pass = 0; pass < 2; pass++) {
+    await page.evaluate(() => openPicker());
+    await page.click('.scard[data-scene="mono"]');
+    await page.waitForTimeout(300);
+    await page.evaluate(() => openPicker());
+    await page.click('.scard[data-scene="labor"]');
+    await page.waitForTimeout(700);
+    const st = await page.evaluate(() => ({
+      roles: STATE.curves.map(c => c.role),
+      eq: !!STATE.laborEq,
+    }));
+    if (!st.roles.includes('supply') || !st.eq) return `заход ${pass + 1}: ${JSON.stringify(st)}`;
+  }
+  return true;
+});
+
 /* --- 3. Возврат к свободному холсту снимает все запреты --------------- */
 await t('свободный холст ничего не прячет', async () => {
   await page.evaluate(() => openPicker());

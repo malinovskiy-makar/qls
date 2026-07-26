@@ -544,6 +544,66 @@ await t('нет ИИ-штампов в видимом тексте', () => page.
   return found.length === 0 || found.join(', ');
 }));
 
+/* --- Легенда закрашенных областей -------------------------------------- */
+await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
+
+await t('легенда называет области в сцене налога', async () => {
+  await page.evaluate(() => openPicker());
+  await page.click('.scard[data-scene="tax"]');
+  await page.waitForTimeout(350);
+  const names = await page.evaluate(() =>
+    [...document.querySelectorAll('#chart .legend text')].map(t => t.textContent));
+  const want = ['Излишек покупателя (CS)', 'Излишек продавца (PS)', 'Сбор бюджета', 'Потери общества (DWL)'];
+  return want.every(w => names.includes(w)) || names.join(' | ');
+});
+
+await t('субсидия подписана расходом, а не сбором', async () => {
+  await page.evaluate(() => { setType('subsidy'); setTax(20); });
+  await page.waitForTimeout(300);
+  const names = await page.evaluate(() =>
+    [...document.querySelectorAll('#chart .legend text')].map(t => t.textContent));
+  const ok = names.includes('Расход бюджета') && !names.includes('Сбор бюджета');
+  await page.evaluate(() => { setType('tax'); setTax(20); });
+  await page.waitForTimeout(200);
+  return ok || names.join(' | ');
+});
+
+await t('легенда собирается и в других режимах', async () => {
+  const thin = [];
+  for (const s of ['mono', 'labor', 'ppf', 'laffer', 'ext']) {
+    await page.evaluate(() => openPicker());
+    await page.click(`.scard[data-scene="${s}"]`);
+    await page.waitForTimeout(300);
+    const n = await page.evaluate(() => document.querySelectorAll('#chart .legend text').length);
+    if (n < 1) thin.push(s);
+  }
+  return thin.length === 0 || 'без легенды: ' + thin.join(', ');
+});
+
+await t('легенда попадает в экспорт вместе с графиком', async () => {
+  await page.evaluate(() => openPicker());
+  await page.click('.scard[data-scene="tax"]');
+  await page.waitForTimeout(330);
+  return await page.evaluate(() => {
+    const tex = buildTex('', '');
+    return (tex.includes('Сбор бюджета') && tex.includes('Потери общества')) || 'подписей нет в .tex';
+  });
+});
+
+await t('легенда выключается галочкой', async () => {
+  await page.evaluate(() => { STATE.showLegend = false; redrawAll(); });
+  const off = await page.evaluate(() => document.querySelectorAll('#chart .legend').length);
+  await page.evaluate(() => { STATE.showLegend = true; redrawAll(); });
+  const on = await page.evaluate(() => document.querySelectorAll('#chart .legend').length);
+  return (off === 0 && on === 1) || `выкл ${off}, вкл ${on}`;
+});
+
+await t('легенда стоит выше поля графика, не поверх кривых', () => page.evaluate(() => {
+  const t0 = document.querySelector('#chart .legend text');
+  if (!t0) return 'легенды нет';
+  return (+t0.getAttribute('y') < CONFIG.margin.top) || 'заехала в поле графика';
+}));
+
 /* --- Справка «?»: палитра операций и конструктор кусочной -------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.evaluate(() => openPicker());

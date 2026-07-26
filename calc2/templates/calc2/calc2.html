@@ -2610,6 +2610,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
       <div class="hint">Оставьте пустым, чтобы взять названия из сцены.</div>
 
+      <label class="chk"><input type="checkbox" id="chk-legend" checked>
+        Легенда закрашенных областей</label>
+      <div class="hint">Подписывает, какая площадь что означает: излишки, сбор бюджета, потери.</div>
+
       <div class="vsub">Свои точки</div>
       <button class="btn-sm" id="btn-mark-add" type="button">Поставить точку</button>
       <div class="hint" id="mark-hint">Нажмите кнопку, потом щёлкните по графику.</div>
@@ -2808,6 +2812,7 @@ const STATE = {
   // Пользователь покрутил колесо: его масштаб держится, пока он не сменит
   // сцену или не щёлкнет по графику дважды.
   zoomLock: false,
+  showLegend: true,   // подписи к закрашенным областям под заголовком графика
   // ── Раздел «Математика» (Фаза 7). Единственный режим с полным планом:
   // окно задаётся четырьмя границами, а не Qmax/Pmax первой четверти.
   mathSub: 'tangent',            // сюжет: tangent|optimum|transform|inverse|minmax|constraint
@@ -4099,28 +4104,28 @@ function drawOpenAreas() {
   const qS = (o.Qs1 != null) ? o.Qs1 : o.Qs;
   if (STATE.showCS && qD > 0) {
     const a = d3.area().x(d => sx(d)).y0(sy(Pdom)).y1(d => sy(evalCurve(D, d)));
-    g.append('path').datum(samp(0, qD)).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16);
+    g.append('path').datum(samp(0, qD)).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
   }
   if (STATE.showPS && qS > 0) {
     const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(Pdom));
-    g.append('path').datum(samp(0, qS)).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16);
+    g.append('path').datum(samp(0, qS)).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
   }
   if (o.P1 == null) return;
   // Прямоугольник денег: между Pw и внутренней ценой, шириной в фактический импорт.
   if (STATE.showOpenMoney && o.vol1 > 1e-9) {
     g.append('rect').attr('x', sx(qS)).attr('y', sy(o.P1))
       .attr('width', sx(qD) - sx(qS)).attr('height', sy(o.Pw) - sy(o.P1))
-      .attr('fill', COL.tax).attr('opacity', 0.22);
+      .attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.openTool === 'quota' ? 'Рента квоты' : 'Доход бюджета');
   }
   // Два треугольника потерь — рисуем отдельными фигурами, чтобы их было ВИДНО как два.
   if (STATE.showOpenDwl) {
     if (o.Qs1 > o.Qs + 1e-9) {
       const a = d3.area().x(d => sx(d)).y0(sy(o.Pw)).y1(d => sy(evalCurve(S, d)));
-      g.append('path').datum(samp(o.Qs, o.Qs1)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38);
+      g.append('path').datum(samp(o.Qs, o.Qs1)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38).attr('data-legend', 'Потери общества (DWL)');
     }
     if (o.Qd > o.Qd1 + 1e-9) {
       const a = d3.area().x(d => sx(d)).y0(sy(o.Pw)).y1(d => sy(evalCurve(D, d)));
-      g.append('path').datum(samp(o.Qd1, o.Qd)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38);
+      g.append('path').datum(samp(o.Qd1, o.Qd)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38).attr('data-legend', 'Потери общества (DWL)');
     }
   }
 }
@@ -4313,12 +4318,12 @@ function drawAreas() {
   // CS — между ценой P* (низ) и кривой спроса (верх).
   if (STATE.showCS && STATE.D) {
     const csArea = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(STATE.D, d)));
-    g.append('path').datum(samples).attr('d', csArea).attr('fill', COL.D).attr('opacity', 0.16);
+    g.append('path').datum(samples).attr('d', csArea).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
   }
   // PS — между кривой предложения (низ) и ценой P* (верх).
   if (STATE.showPS && STATE.S) {
     const psArea = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(P));
-    g.append('path').datum(samples).attr('d', psArea).attr('fill', COL.S).attr('opacity', 0.16);
+    g.append('path').datum(samples).attr('d', psArea).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
   }
 }
 
@@ -4382,24 +4387,24 @@ function drawTaxAreas() {
 
   if (STATE.showCS) {   // CS: между ценой покупателя Pb и спросом
     const a = d3.area().x(d => sx(d)).y0(sy(Pb)).y1(d => sy(evalCurve(STATE.D, d)));
-    g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16);
+    g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
   }
   if (STATE.showPS) {   // PS: между предложением и ценой продавца Ps
     const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(Ps));
-    g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16);
+    g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
   }
   // Деньги бюджета (сбор налога / расход на субсидию) — прямоугольник между Pb и Ps
   // на [0, Q1]. По фиксированной палитре налог/субсидия/бюджет — один зелёный цвет.
   const lowP = Math.min(Pb, Ps), highP = Math.max(Pb, Ps);
   const aTx = d3.area().x(d => sx(d)).y0(sy(lowP)).y1(sy(highP));
   g.append('path').datum(s1).attr('d', aTx)
-    .attr('fill', COL.tax).attr('opacity', 0.22);
+    .attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.intervType === 'subsidy' ? 'Расход бюджета' : 'Сбор бюджета');
   // DWL — между D и S на интервале между старым и новым Q (налог: [Q1,Q0]; субсидия: [Q0,Q1]).
   const lo = Math.min(Q, Q0), hi = Math.max(Q, Q0);
   if (hi > lo) {
     const s2 = samp(lo, hi);
     const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(d => sy(evalCurve(STATE.D, d)));
-    g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28);
+    g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
   }
 }
 
@@ -4822,7 +4827,7 @@ function drawExtAreas(e) {
   if (hi <= lo) return;
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
   const aD = d3.area().x(d => sx(d)).y0(d => sy(e.other(d))).y1(d => sy(e.social(d)));
-  g.append('path').datum(samp).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28);
+  g.append('path').datum(samp).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери от внешнего эффекта (DWL)');
 }
 
 // Общественная кривая MSC (эффект на издержках) либо MSB (эффект на выгоде)
@@ -4970,18 +4975,18 @@ function drawPcAreas() {
   const s1 = samp(0, Qtrade);
   if (STATE.showCS) {   // CS — между ценой Preg (низ) и спросом (верх)
     const a = d3.area().x(d => sx(d)).y0(sy(Preg)).y1(d => sy(evalCurve(STATE.D, d)));
-    g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16);
+    g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
   }
   if (STATE.showPS) {   // PS — между предложением (низ) и ценой Preg (верх)
     const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(Preg));
-    g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16);
+    g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
   }
   // DWL — площадь между D и S от Q_trade до Q* (потери от нерасчищенного рынка).
   const lo = Math.min(Qtrade, STATE.eq.Q), hi = Math.max(Qtrade, STATE.eq.Q);
   if (hi > lo) {
     const s2 = samp(lo, hi);
     const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(d => sy(evalCurve(STATE.D, d)));
-    g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28);
+    g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
   }
 }
 
@@ -5153,15 +5158,15 @@ function drawMonopolyAreas() {
     const s1 = samp(0, m.Qm);
     if (STATE.showMonoVC) {   // VC — под кривой MC (от оси P=0 до MC). Нейтральный серо-голубой.
       const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d)));
-      g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22);
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)');
     }
     if (STATE.showMonoPS) {   // PS (TR − VC) — между MC (низ) и ценой Pm (верх). Красный, как PS конкуренции.
       const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(m.Pm));
-      g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16);
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)');
     }
     if (STATE.showMonoCS) {   // CS — между ценой Pm (низ) и спросом D (верх). Синий, как CS конкуренции.
       const a = d3.area().x(d => sx(d)).y0(sy(m.Pm)).y1(d => sy(evalCurve(STATE.D, d)));
-      g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16);
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
     }
   }
 
@@ -5171,7 +5176,7 @@ function drawMonopolyAreas() {
     if (hi > lo) {
       const s2 = samp(lo, hi);
       const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(STATE.D, d)));
-      g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28);
+      g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
     }
   }
 }
@@ -5358,13 +5363,13 @@ function drawMonoCeilingAreas() {
   const Qs = mc.Qstar, P = mc.price;
   if (Qs > 1e-6) {
     const s1 = samp(0, Qs);
-    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22); }
-    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(P)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16); }
-    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16); }
+    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'); }
+    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(P)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'); }
+    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'); }
   }
   if (m.Qc != null) {                            // DWL — между D и MC от Qstar до Qc
     const lo = Math.min(Qs, m.Qc), hi = Math.max(Qs, m.Qc);
-    if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28); }
+    if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'); }
   }
 }
 
@@ -5652,16 +5657,16 @@ function drawMonoTaxAreas() {
     const s1 = samp(0, t.Qt);
     if (STATE.showMonoCS) {   // CS — между ценой Pt (низ) и спросом (верх)
       const a = d3.area().x(d => sx(d)).y0(sy(t.Pt)).y1(d => sy(evalCurve(D, d)));
-      g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16);
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
     }
     // Деньги бюджета — полоса между MC и MC±ставка на [0,Qt]; её площадь = ставка·Qt = бюджет.
     const a2 = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(mcAt(d) + t.shift));
-    g.append('path').datum(s1).attr('d', a2).attr('fill', COL.tax).attr('opacity', 0.22);
+    g.append('path').datum(s1).attr('d', a2).attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.intervType === 'subsidy' ? 'Расход бюджета' : 'Сбор бюджета');
   }
   // DWL — между D и социальной MC от Qt до конкурентного Qc.
   if (m.Qc != null) {
     const lo = Math.min(t.Qt, m.Qc), hi = Math.max(t.Qt, m.Qc);
-    if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28); }
+    if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'); }
   }
 }
 
@@ -5709,11 +5714,11 @@ function drawMonoFloorAreas() {
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
   if (fl.Q > 1e-6) {
     const s1 = samp(0, fl.Q);
-    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22); }
-    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(fl.price)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16); }
-    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(fl.price)).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16); }
+    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'); }
+    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(fl.price)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'); }
+    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(fl.price)).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'); }
   }
-  if (m.Qc != null) { const lo = Math.min(fl.Q, m.Qc), hi = Math.max(fl.Q, m.Qc); if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28); } }
+  if (m.Qc != null) { const lo = Math.min(fl.Q, m.Qc), hi = Math.max(fl.Q, m.Qc); if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'); } }
 }
 
 // Точки при связывающем поле: призрак M₀(Qm,Pm) + новый M(Q, Pf).
@@ -5841,7 +5846,7 @@ function drawDiscr1() {
   // Заливка прибыли — между MC (низ) и D (верх) от 0 до Qcomp.
   const samp = []; for (let i = 0; i <= 120; i++) samp.push(d1.Qcomp * i / 120);
   const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp).attr('d', a).attr('fill', COL.tax).attr('opacity', 0.20);
+  g.append('path').datum(samp).attr('d', a).attr('fill', COL.tax).attr('opacity', 0.20).attr('data-legend', 'Излишек фирмы: весь излишек рынка');
   // Точка Qcomp на спросе + проекции.
   const ox = sx(0), oy = sy(0), Pq = evalCurve(D, d1.Qcomp);
   const og = svg.append('g'), [px, py] = toPx(d1.Qcomp, Pq);
@@ -7080,10 +7085,10 @@ function drawLaborSurpluses() {
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(eq.Q * i / 100);
   // Излишек рабочих — между предложением (низ) и зарплатой W (верх).
   const wA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(W));
-  g.append('path').datum(samp).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16);
+  g.append('path').datum(samp).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек работников');
   // Излишек фирм — между зарплатой W (низ) и спросом D=MRPL (верх).
   const fA = d3.area().x(d => sx(d)).y0(sy(W)).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16);
+  g.append('path').datum(samp).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек фирм');
 }
 
 // Благосостояние при связывающем МРОТ (Задача 3): перестроенные излишки + DWL.
@@ -7098,16 +7103,16 @@ function drawLaborMinWelfare() {
   const s1 = samp(0, Lstar);
   // Излишек рабочих — между предложением S (низ) и фактической зарплатой (верх), до L*.
   const wA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(Wfact));
-  g.append('path').datum(s1).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16);
+  g.append('path').datum(s1).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек работников');
   // Излишек фирм — между фактической зарплатой (низ) и спросом D (верх), до L*.
   const fA = d3.area().x(d => sx(d)).y0(sy(Wfact)).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(s1).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16);
+  g.append('path').datum(s1).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек фирм');
   // DWL — между D и S от L* до конкурентной занятости Lk (недозанятость/безработица).
   const Lk = eq.Q, lo = Math.min(Lstar, Lk), hi = Math.max(Lstar, Lk);
   if (hi > lo) {
     const s2 = samp(lo, hi);
     const dA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
-    g.append('path').datum(s2).attr('d', dA).attr('fill', COL.inkSoft).attr('opacity', 0.28);
+    g.append('path').datum(s2).attr('d', dA).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
   }
 }
 
@@ -7157,7 +7162,7 @@ function drawLaborDWL(Lfrom) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
   const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28);
+  g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
 }
 
 // Точки монопсонии: оптимум на MCL=D, зарплата вниз на S, ориентир «К».
@@ -7291,7 +7296,7 @@ function drawLaborGapDWL(La, Lb) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
   const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28);
+  g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
 }
 
 // Точки профсоюза: оптимум монополиста (MRL=S, зарплата вверх на D) или диктат зарплаты.
@@ -7391,7 +7396,7 @@ function drawLaborBilateral() {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const yLo = sy(b.Wlo), yHi = sy(b.Whi);
   g.append('rect').attr('x', ox).attr('y', yHi).attr('width', xMax - ox).attr('height', Math.abs(yLo - yHi))
-    .attr('fill', COL.reg).attr('opacity', 0.16);
+    .attr('fill', COL.reg).attr('opacity', 0.16).attr('data-legend', 'Диапазон возможных зарплат');
   g.append('line').attr('x1', ox).attr('y1', yLo).attr('x2', xMax).attr('y2', yLo)
     .attr('stroke', COL.reg).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
   g.append('line').attr('x1', ox).attr('y1', yHi).attr('x2', xMax).attr('y2', yHi)
@@ -8080,7 +8085,7 @@ function redrawMacro() {
     const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
     const line = d3.line().x(d => sx(d[0])).y(d => sy(d[1]));
     const area = d3.area().x(d => sx(d[0])).y0(sy(0)).y1(d => sy(d[1]));
-    g.append('path').datum(r.pts).attr('d', area).attr('fill', COL.tax).attr('opacity', 0.12);
+    g.append('path').datum(r.pts).attr('d', area).attr('fill', COL.tax).attr('opacity', 0.12).attr('data-legend', 'Поступления бюджета');
     g.append('path').datum(r.pts).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2.8).attr('d', line);
     const og = svg.append('g'), ox = sx(0), oy = sy(0);
     const [px, py] = toPx(r.best.t, r.best.rev);
@@ -8476,18 +8481,27 @@ function setMode(mode) {
   // «Оси» первой четверти не нужны там, где поле фиксировано (неравенство, макро)
   // и в «Математике» — у неё свои четыре границы окна.
   if (axes) axes.style.display = ['inequality', 'macro', 'math'].includes(mode) ? 'none' : '';
-  // Первый вход в рынок труда — пресет: спрос на труд D = 100 − L, предложение S = L.
-  if (mode === 'labor' && !STATE.laborVisited) {
-    STATE.laborVisited = true;
-    STATE.curves = []; curveCounter = 0;
-    addCurve('100 - L'); if (STATE.curves[0]) setRole(STATE.curves[0], 'demand');
-    addCurve('L');       if (STATE.curves[1]) setRole(STATE.curves[1], 'supply');
-    // По умолчанию для сцены включаем МРОТ — чтобы пульт сразу показал его ползунок
-    // (Фаза 6). Дальше пользователь может снять галочку — ползунок уйдёт как обычно.
-    STATE.laborMinOn = true;
-    const chk = document.getElementById('chk-labmin'); if (chk) chk.checked = true;
-    const lf = document.getElementById('labmin-field'); if (lf) lf.style.display = '';
-    if (!(STATE.laborMinW > 0) && typeof setLaborMinFields === 'function') setLaborMinFields(65);  // выше равновесия (≈50) → связывающий
+  // Рынок труда работает на общем списке кривых, поэтому при входе он обязан
+  // получить спрос на труд и предложение труда. Раньше пресет ставился ТОЛЬКО
+  // при первом входе, и сцена, открытая вторым заходом после монополии,
+  // доставалась с чужими кривыми (спрос и MC): равновесия нет, площадей нет.
+  // Теперь пресет восстанавливается всякий раз, когда нужной роли не хватает;
+  // свои кривые пользователя при этом не трогаются.
+  if (mode === 'labor') {
+    if (!curveByRole('demand') || !curveByRole('supply')) {
+      STATE.curves = []; curveCounter = 0;
+      addCurve('100 - L'); if (STATE.curves[0]) setRole(STATE.curves[0], 'demand');
+      addCurve('L');       if (STATE.curves[1]) setRole(STATE.curves[1], 'supply');
+    }
+    if (!STATE.laborVisited) {
+      STATE.laborVisited = true;
+      // По умолчанию для сцены включаем МРОТ — чтобы пульт сразу показал его ползунок
+      // (Фаза 6). Дальше пользователь может снять галочку — ползунок уйдёт как обычно.
+      STATE.laborMinOn = true;
+      const chk = document.getElementById('chk-labmin'); if (chk) chk.checked = true;
+      const lf = document.getElementById('labmin-field'); if (lf) lf.style.display = '';
+      if (!(STATE.laborMinW > 0) && typeof setLaborMinFields === 'function') setLaborMinFields(65);  // выше равновесия (≈50) → связывающий
+    }
   }
   // Режим неравенства: пометить первый вход и заполнить таблицу групп.
   if (mode === 'inequality') { STATE.ineqVisited = true; renderIneqGroupsTable(); }
@@ -8606,7 +8620,7 @@ function drawPpfCurve() {
   for (let i = 0; i <= 400; i++) { const x = CONFIG.Qmax * i / 400; const y = evalPpf(x); pts.push((isNaN(y) || y < 0) ? null : [x, y]); }
   const area = d3.area().defined(d => d !== null).x(d => sx(d[0])).y0(sy(0)).y1(d => sy(d[1]));
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
-  g.append('path').datum(pts).attr('d', area).attr('fill', COL.D).attr('opacity', 0.08);   // достижимо
+  g.append('path').datum(pts).attr('d', area).attr('fill', COL.D).attr('opacity', 0.08).attr('data-legend', 'Достижимые наборы');   // достижимо
   g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line);
   g.append('text').attr('x', sx(CONFIG.Qmax * 0.16)).attr('y', sy(CONFIG.Pmax * 0.16))
     .attr('font-size', 11).attr('fill', COL.D).attr('opacity', 0.75).text('достижимо');
@@ -10108,9 +10122,59 @@ function mainScales() {
 function drawOverlays() {
   if (!svg || !svg.node()) return;
   drawGraphTitle();
+  drawLegend();
   drawMarks();
   syncAxisPlaceholders();
   syncSceneColorPickers();   // образцы в панели идут за темой и за своими цветами
+}
+
+/* ---------------------------------------------------------------------
+   ЛЕГЕНДА ЗАКРАШЕННЫХ ОБЛАСТЕЙ
+   Цвет площади сам по себе ничего не говорит: синее пятно над ценой это
+   излишек покупателя, серое между кривыми это потери общества, и без
+   подписи их не различить.
+   Сцены не ведут никакого реестра: каждая заливка помечена при отрисовке
+   атрибутом data-legend, а легенда просто собирает то, что уже нарисовано.
+   Значит, новая сцена получает легенду бесплатно, достаточно пометить
+   заливку. Рисуется в том же SVG, поэтому попадает и в PNG, и в .tex.
+   Место: верхнее поле под заголовком — там никогда не проходят кривые.
+   --------------------------------------------------------------------- */
+function drawLegend() {
+  if (!STATE.showLegend) return;
+  const seen = [], byName = {};
+  svg.selectAll('[data-legend]').each(function () {
+    const name = this.getAttribute('data-legend');
+    if (!name || byName[name]) return;
+    byName[name] = 1;
+    seen.push({ name, color: this.getAttribute('fill'), opacity: +this.getAttribute('opacity') || 0.2 });
+  });
+  if (!seen.length) return;
+
+  const m = CONFIG.margin;
+  const avail = (W - m.right) - m.left;
+  // Ширина оценивается по числу букв: измерять текст до отрисовки дорого,
+  // а промах в пару пикселей на глаз не виден.
+  const CH = 6.0, SW = 11, GAP_IN = 5, GAP = 15;
+  const widths = seen.map(e => SW + GAP_IN + e.name.length * CH);
+  let total = widths.reduce((a, b) => a + b, 0) + GAP * (seen.length - 1);
+  let scale = Math.min(1, avail / Math.max(1, total));
+  const fs = Math.max(8.5, 11 * scale);
+
+  const y = Math.max(30, m.top - 26);
+  const g = svg.append('g').attr('class', 'legend').style('pointer-events', 'none');
+  let x = m.left + Math.max(0, (avail - total * scale) / 2);
+  seen.forEach((e, i) => {
+    g.append('rect')
+      .attr('x', x).attr('y', y - SW * scale + 2).attr('width', SW * scale).attr('height', SW * scale)
+      .attr('rx', 2).attr('fill', e.color).attr('opacity', Math.max(0.35, e.opacity * 2))
+      .attr('stroke', e.color).attr('stroke-opacity', 0.55).attr('stroke-width', 1);
+    g.append('text')
+      .attr('x', x + (SW + GAP_IN) * scale).attr('y', y)
+      .attr('font-size', fs).attr('font-weight', 500).attr('fill', COL.inkSoft)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
+      .text(e.name);
+    x += widths[i] * scale + GAP * scale;
+  });
 }
 
 /* Пикеры цвета у именованных кривых сцены (издержки, производство, вееры).
@@ -12809,14 +12873,21 @@ function wireControls() {
   const formula = document.getElementById('inp-formula');
   const addBtn = document.getElementById('btn-add-curve');
 
+  const legendChk = document.getElementById('chk-legend');
+  if (legendChk) legendChk.addEventListener('change', () => {
+    STATE.showLegend = legendChk.checked; redrawAll();
+  });
+
   qmax.addEventListener('change', () => {
     const v = parseFloat(qmax.value);
-    if (v > 0) { CONFIG.Qmax = v; redrawAll(); }
+    // Ручная правда масштаба тоже главнее авто-подгонки сцены, как и колесо.
+    if (v > 0) { CONFIG.Qmax = v; STATE.zoomLock = true; redrawAll(); }
   });
   pmax.addEventListener('change', () => {
     const v = parseFloat(pmax.value);
     if (v > 0) {
       CONFIG.Pmax = v;
+      STATE.zoomLock = true;   // как и у Q макс: ручной масштаб держится
       const slider = document.getElementById('tax-slider');
       if (slider) slider.max = v;     // верхний предел налога ≈ масштаб цены
       const inp = document.getElementById('tax-input');
