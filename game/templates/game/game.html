@@ -905,6 +905,23 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   text-transform: uppercase;
 }
 
+/* Чип «верно отвечают N %» — появляется ПОСЛЕ ответа, рядом с разбором.
+   Показывается только когда попыток набралось достаточно (порог в
+   config.py); нейтральный, без сигнальных цветов: это справка, а не
+   оценка ответа игрока. */
+.stat-chip {
+  display: inline-block;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 9px;
+  margin-bottom: 8px;
+  margin-left: 6px;
+  border: 1px solid var(--rush-border);
+  border-radius: 999px;
+  background: var(--rush-surface);
+  color: var(--text3);
+}
+
 /* Разбор сгенерированного вопроса: кнопка-ссылка + разворачиваемое решение */
 .mi-sol-btn {
   background: none; border: none; padding: 0; cursor: pointer;
@@ -1007,7 +1024,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         <div class="hud-combo" id="hud-combo">🔥 ×1</div>
       </div>
       <div class="combo-toast" id="combo-toast"></div>
-      <div class="q-card" id="q-card"><span class="gen-chip" id="gen-chip" hidden>Тренировочный</span><div class="q-text" id="q-text"></div></div>
+      <div class="q-card" id="q-card"><span class="gen-chip" id="gen-chip" hidden>Тренировочный</span><span class="stat-chip" id="stat-chip" hidden></span><div class="q-text" id="q-text"></div></div>
       <div class="opts" id="opts"></div>
       <div class="multi-actions" id="multi-actions" hidden>
         <button class="btn-submit" id="btn-submit" disabled>Ответить</button>
@@ -1484,6 +1501,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var card = $('q-text');
     card.textContent = q.question;
     $('gen-chip').hidden = !q.generated;
+    $('stat-chip').hidden = true;   // статистика приходит только с ответом
     if (!REDUCED) {
       card.classList.remove('q-slide-in');
       void card.offsetWidth; // перезапуск анимации
@@ -1609,9 +1627,21 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       if (d.game_over) { runOver = true; goInfo = d.game_over; }
       timeLeft = Math.max(0, timeLeft + d.time_delta);
       if (timeLeft <= 0 && !runOver) { paintHud(); endRun('time'); return; }
+      showStatChip(d);
       onResult(d);
       paintHud();
     });
+  }
+
+  /* «Верно отвечают N %» — справка о вопросе, а не оценка ответа игрока.
+     Сервер шлёт p_correct только когда попыток набралось достаточно
+     (порог в config.py); нет поля — нет и чипа, выдумывать нечего. */
+  function showStatChip(d) {
+    var chip = $('stat-chip');
+    if (typeof d.p_correct !== 'number') { chip.hidden = true; return; }
+    chip.textContent = 'верно отвечают ' + Math.round(d.p_correct * 100) + '%';
+    chip.title = 'по ' + d.attempts + ' попыткам других игроков';
+    chip.hidden = false;
   }
 
   function registerCorrect() {

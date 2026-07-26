@@ -164,3 +164,86 @@ class GameResult(models.Model):
     @property
     def accuracy(self):
         return round(100 * self.correct_count / self.total_count) if self.total_count else 0
+
+
+class QuestionStatBase(models.Model):
+    """Общие счётчики статистики вопроса.
+
+    ⚠️ Почему статистика НЕ лежит на GameQuestion: пул — это КЭШ, команда
+    `build_game_pool` сносит все несгенерированные строки и создаёт их
+    заново с новыми id. Счётчики, положенные на строку кэша, умерли бы при
+    первой же пересборке. Поэтому они привязаны к устойчивым сущностям:
+    задаче банка (Problem + ProblemPart) либо ключу архетипа.
+
+    Доля верных считается от ПОПЫТОК (correct + wrong) — тот же принцип,
+    что в build_summary: пропуск не ответ и портить им долю нечестно.
+    """
+    shown = models.PositiveIntegerField('Показов', default=0)
+    correct = models.PositiveIntegerField('Верных', default=0)
+    wrong = models.PositiveIntegerField('Неверных', default=0)
+    skipped = models.PositiveIntegerField('Пропусков', default=0)
+    # Сумма времени ответов. Медиану по сумме не восстановить — служебная
+    # страница честно показывает СРЕДНЕЕ и так и подписана.
+    total_ms = models.BigIntegerField('Сумма времени ответов (мс)', default=0)
+    updated = models.DateTimeField('Обновлено', auto_now=True)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def attempts(self):
+        return self.correct + self.wrong
+
+    @property
+    def p_correct(self):
+        """Доля верных 0..1 или None, если попыток ещё нет."""
+        return (self.correct / self.attempts) if self.attempts else None
+
+    @property
+    def avg_ms(self):
+        """Среднее время ответа. Именно среднее, не медиана: по сумме
+        медиану не восстановить, а хранить каждый ответ ради неё дорого."""
+        return round(self.total_ms / self.shown) if self.shown else 0
+
+
+class BankQuestionStat(QuestionStatBase):
+    """Статистика вопроса из банка: ключ — задача (+ подпункт, если вопрос
+    извлечён из него). Переживает любую пересборку пула."""
+
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.CASCADE,
+        related_name='game_stats', verbose_name='Задача')
+    part = models.ForeignKey(
+        'problems.ProblemPart', null=True, blank=True,
+        on_delete=models.CASCADE,
+        related_name='game_stats', verbose_name='Подпункт')
+
+    class Meta:
+        verbose_name = 'Статистика вопроса банка'
+        verbose_name_plural = 'Статистика вопросов банка'
+        constraints = [
+            models.UniqueConstraint(fields=['problem', 'part'],
+                                    name='uniq_bank_stat_problem_part'),
+        ]
+
+    def __str__(self):
+        return f'stat задачи #{self.problem_id}: {self.correct}/{self.attempts}'
+
+
+class ArchetypeStat(QuestionStatBase):
+    """Статистика сгенерированного вопроса — по АРХЕТИПУ, не по вопросу.
+
+    У сгенерированного вопроса параметры каждый раз новые: «монополия
+    с ценой 40» и «монополия с ценой 60» — разные строки кэша, но одна и та
+    же задача по сути. Считать долю верных по конкретной строке значит
+    делить выборку на песчинки; по архетипу — осмысленно.
+    """
+    generator_key = models.CharField('Ключ архетипа', max_length=64,
+                                     unique=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Статистика архетипа'
+        verbose_name_plural = 'Статистика архетипов'
+
+    def __str__(self):
+        return f'stat архетипа {self.generator_key}: {self.correct}/{self.attempts}'

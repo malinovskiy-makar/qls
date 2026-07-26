@@ -24,6 +24,7 @@ import random
 from fractions import Fraction
 
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.db import IntegrityError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -34,12 +35,15 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST, require_safe
 
 from problems.management.commands.apply_topic_mapping import CANONICAL
-from .models import GameQuestion, GameResult, make_result_code
-from . import config
+from .models import ArchetypeStat, GameQuestion, GameResult, make_result_code
+from . import config, stats as stats_mod
 
 SESSION_KEY = 'econ_rush'        # состояние текущего забега
 SEEN_KEY = 'econ_rush_seen'      # {mode: [id, ...]} — виданные МЕЖДУ забегами
 SEEN_LIMIT = 1500                # сколько последних id помнить на режим
+COUNTED_KEY = 'econ_rush_counted'  # id вопросов, уже учтённых в статистике
+COUNTED_LIMIT = 6000               # столько последних помним (id пула
+                                   # меняются при каждой пересборке кэша)
 LAST_KEY = 'econ_rush_last'      # {mode, log} завершённого забега — для
                                  # «работы над ошибками» (переживает старт
                                  # нового забега, в отличие от SESSION_KEY)
@@ -184,12 +188,48 @@ def _pick_next(request, state):
         fresh = candidates
 
     gq = GameQuestion.objects.get(id=random.choice(fresh))
+    _remember_seen(request, state, gq)
+    return gq
+
+
+def _remember_seen(request, state, gq):
+    """Пометить вопрос выданным — и запомнить, ПЕРВАЯ ли это встреча.
+
+    Статистика вопроса (game/stats.py) считает только первые встречи:
+    второй раз тот же человек отвечает уже зная ответ, и складывать это
+    с чужими первыми ответами значит портить выборку.
+
+    ⚠️ Список SEEN_KEY для этого НЕ годится: он умышленно очищается, когда
+    пул режима пройден целиком («цикл по кругу», см. _pick_next), — иначе
+    игра кончилась бы у того, кто прошёл весь пул. Поэтому у статистики
+    свой список COUNTED_KEY, который не чистится никогда. Он плоский (без
+    разбивки по режимам): один и тот же вопрос в двух режимах не окажется,
+    типы разные.
+    """
+    mode = state['mode']
+    counted = request.session.get(COUNTED_KEY) or []
+    state.setdefault('first_seen', {})[str(gq.id)] = gq.id not in counted
+
     state['seen'].append(gq.id)
-    mode_seen = seen_map.get(mode, [])
-    mode_seen.append(gq.id)
+    seen_map = request.session.get(SEEN_KEY) or {}
+    mode_seen = list(seen_map.get(mode, [])) + [gq.id]
     seen_map[mode] = mode_seen[-SEEN_LIMIT:]
     request.session[SEEN_KEY] = seen_map
-    return gq
+
+
+def _mark_counted(request, qid):
+    """Запомнить, что ответ на этот вопрос уже учтён в статистике.
+
+    Помечаем при ОТВЕТЕ, а не при выдаче: игрок мог закрыть вкладку, не
+    ответив, — тогда вопрос обязан остаться «первой встречей» на будущее.
+    Список ограничен: id пула всё равно меняются при каждой пересборке
+    кэша, помнить их вечно бессмысленно.
+    """
+    counted = request.session.get(COUNTED_KEY) or []
+    if qid in counted:
+        return
+    counted.append(qid)
+    request.session[COUNTED_KEY] = counted[-COUNTED_LIMIT:]
 
 
 def _pick_from_queue(request, state):
@@ -203,12 +243,7 @@ def _pick_from_queue(request, state):
             gq = GameQuestion.objects.get(id=pk)
         except GameQuestion.DoesNotExist:
             continue
-        state['seen'].append(gq.id)
-        seen_map = request.session.get(SEEN_KEY) or {}
-        mode_seen = seen_map.get(state['mode'], [])
-        mode_seen.append(gq.id)
-        seen_map[state['mode']] = mode_seen[-SEEN_LIMIT:]
-        request.session[SEEN_KEY] = seen_map
+        _remember_seen(request, state, gq)
         return gq
     return None
 
@@ -227,6 +262,10 @@ def _new_state(mode, topic):
         'streak': 0,            # текущая серия верных подряд
         'best_streak': 0,       # лучшая серия за забег
         'ended': None,          # None | 'lives' | 'time' | 'done'
+        # {id вопроса: True/False} — первая ли это встреча игрока с вопросом.
+        # Ставится при выдаче (см. _remember_seen), читается при ответе:
+        # в статистику вопроса идут ТОЛЬКО первые встречи.
+        'first_seen': {},
         # Журнал забега: по записи на КАЖДЫЙ сыгранный вопрос, в порядке
         # игры. Из него целиком считается сводка (см. build_summary) —
         # отдельных счётчиков «сколько ошибок в теме» не заводим, иначе
@@ -505,6 +544,14 @@ def api_answer(request):
         'running_combo': state['streak'],
         'lives_after': state['lives'],
     })
+    # Счётчики вопроса — в той же точке, что и журнал: разъехаться им
+    # нельзя. Только первая встреча игрока с вопросом (см. _remember_seen):
+    # повторный ответ того же человека уже знает правильный вариант.
+    if (state.get('first_seen') or {}).get(str(qid)):
+        stat = stats_mod.record_answer(gq, result, elapsed_ms)
+        _mark_counted(request, qid)
+    else:
+        stat = stats_mod.get_stat(gq)
     request.session[SESSION_KEY] = state
 
     payload = {
@@ -535,6 +582,14 @@ def api_answer(request):
     # нет: игрок получает его только после того, как вопрос сыгран.
     if gq.is_generated and gq.figure:
         payload['figure'] = gq.figure
+    # Как этот вопрос решают остальные — чип на карточке обратной связи.
+    # Именно в ОТВЕТЕ, а не в payload вопроса: доля верных у данетки почти
+    # выдавала бы правильный вариант. Ниже порога попыток поля нет вовсе —
+    # клиенту нечего рисовать, и он чипа не покажет.
+    pub = stats_mod.public_stat(stat)
+    if pub:
+        payload['p_correct'] = pub['p_correct']
+        payload['attempts'] = pub['attempts']
     return JsonResponse(payload)
 
 
@@ -772,6 +827,84 @@ def result_page(request, code):
         'og_description': (f'Режим «{mode_title}» · точность {result.accuracy}% '
                            f'· комбо ×{result.max_combo}'),
         'curve_points': _curve_points(result.score_curve),
+    })
+
+
+@staff_member_required
+@require_safe
+def stats_page(request):
+    """Служебная страница статистики пула — только для персонала.
+
+    Смотрят её ради двух хвостов распределения: вопросы с долей верных
+    ниже STATS_BROKEN_BELOW почти наверняка сломаны (не тот ключ ответа,
+    потерялась формула при импорте), выше STATS_TRIVIAL_ABOVE — тривиальны
+    и только разбавляют пул. Середина интересна как измеренная сложность.
+
+    Вопросы без набранных попыток внизу списка: у них ещё нечего смотреть.
+    """
+    tab = 'arch' if request.GET.get('tab') == 'arch' else 'pool'
+    min_attempts = config.STATS_MIN_ATTEMPTS
+
+    if tab == 'arch':
+        rows = []
+        for st in ArchetypeStat.objects.all():
+            rows.append({
+                'key': st.generator_key,
+                'shown': st.shown,
+                'attempts': st.attempts,
+                'skipped': st.skipped,
+                'percent': (round(100 * st.p_correct)
+                            if st.attempts >= min_attempts else None),
+                'avg_ms': st.avg_ms,
+            })
+        rows.sort(key=lambda r: (r['percent'] is None,
+                                 r['percent'] if r['percent'] is not None else 0,
+                                 r['key']))
+        return render(request, 'game/stats.html', {
+            'tab': tab, 'arch_rows': rows, 'rows': [],
+            'min_attempts': min_attempts,
+            'broken_pct': round(100 * config.STATS_BROKEN_BELOW),
+            'trivial_pct': round(100 * config.STATS_TRIVIAL_ABOVE),
+        })
+
+    questions = list(_pool_qs().order_by('id'))
+    by_id = stats_mod.bulk_stats(questions)
+    rows = []
+    for gq in questions:
+        st = by_id.get(gq.id)
+        attempts = st.attempts if st else 0
+        percent = (round(100 * st.p_correct)
+                   if st and attempts >= min_attempts else None)
+        rows.append({
+            'id': gq.id,
+            'text': gq.question[:140],
+            'type': gq.get_question_type_display(),
+            'topics': ', '.join(gq.topics or []) or '—',
+            'shown': st.shown if st else 0,
+            'attempts': attempts,
+            'percent': percent,
+            'avg_ms': st.avg_ms if st else 0,
+            'difficulty': stats_mod.effective_difficulty(gq, st),
+            'measured': percent is not None,
+            'problem_id': gq.problem_id,
+            'generated': gq.is_generated,
+            'broken': percent is not None and percent < 100 * config.STATS_BROKEN_BELOW,
+            'trivial': percent is not None and percent > 100 * config.STATS_TRIVIAL_ABOVE,
+        })
+    # Сортировка по доле верных: сломанные — вверху, вопросы без данных —
+    # внизу (у них смотреть пока нечего).
+    rows.sort(key=lambda r: (r['percent'] is None,
+                             r['percent'] if r['percent'] is not None else 0,
+                             r['id']))
+    return render(request, 'game/stats.html', {
+        'tab': tab,
+        'rows': rows,
+        'arch_rows': [],
+        'total': len(rows),
+        'measured': sum(1 for r in rows if r['measured']),
+        'min_attempts': min_attempts,
+        'broken_pct': round(100 * config.STATS_BROKEN_BELOW),
+        'trivial_pct': round(100 * config.STATS_TRIVIAL_ABOVE),
     })
 
 

@@ -1,0 +1,154 @@
+{% extends 'catalog/base.html' %}
+{% comment %}
+  Служебная страница статистики игрового пула (/game/stats/).
+  Только для персонала — staff_member_required во вьюхе.
+
+  Читают её ради хвостов распределения: почти нулевая доля верных = вопрос
+  скорее всего сломан (не тот ключ ответа, потерялась формула при импорте),
+  почти стопроцентная = тривиален и только разбавляет пул.
+
+  Наследуем базу каталога — своя вёрстка тут не нужна, а токены темы и
+  навигация приезжают готовыми.
+{% endcomment %}
+{% block title %}Статистика игрового пула{% endblock %}
+
+{% block extra_style %}
+<style>
+  .st-wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 60px; }
+  .st-wrap h1 { font-size: 1.5rem; margin-bottom: 6px; }
+  .st-lead { color: var(--muted); margin-bottom: 18px; max-width: 70ch; }
+  .st-tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .st-tabs a {
+    padding: 7px 14px; border-radius: 999px; text-decoration: none;
+    border: 1px solid var(--border); color: var(--text);
+    background: var(--surface); font-size: .9rem;
+  }
+  .st-tabs a.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .st-legend { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px;
+               font-size: .85rem; color: var(--muted); }
+  .st-legend b { font-weight: 600; }
+  .st-table-box { overflow-x: auto; border: 1px solid var(--border);
+                  border-radius: 12px; background: var(--surface); }
+  table.st { border-collapse: collapse; width: 100%; font-size: .87rem; }
+  table.st th, table.st td {
+    padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.st th { background: var(--surface-2); font-weight: 600; position: sticky; top: 0; }
+  table.st td.q { white-space: normal; max-width: 420px; min-width: 260px; }
+  table.st td.tp { white-space: normal; max-width: 180px; }
+  table.st td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.broken td.pct { color: var(--error); font-weight: 700; }
+  tr.trivial td.pct { color: var(--muted); }
+  .st-dash { color: var(--muted); }
+  .st-tag { font-size: .75rem; padding: 1px 6px; border-radius: 5px;
+            border: 1px solid var(--border); color: var(--muted); }
+  .st-empty { padding: 30px; text-align: center; color: var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="st-wrap">
+  <h1>Статистика игрового пула</h1>
+  <p class="st-lead">
+    Считается только ПЕРВАЯ встреча игрока с вопросом: повторный ответ того
+    же человека уже знает правильный вариант. Доля верных — от попыток
+    (верные + неверные), пропуск её не портит. Пока попыток меньше
+    {{ min_attempts }}, процент не показываем: на пяти ответах это шум,
+    а не сложность.
+  </p>
+
+  <nav class="st-tabs">
+    <a href="?tab=pool" class="{% if tab == 'pool' %}on{% endif %}">Вопросы пула</a>
+    <a href="?tab=arch" class="{% if tab == 'arch' %}on{% endif %}">Архетипы генератора</a>
+  </nav>
+
+  {% if tab == 'pool' %}
+    <p class="st-legend">
+      <span>Всего в пуле: <b>{{ total }}</b></span>
+      <span>С набранной статистикой: <b>{{ measured }}</b></span>
+      <span style="color:var(--error)">красный — доля &lt; {{ broken_pct }} % (вопрос скорее всего сломан)</span>
+      <span>серый — доля &gt; {{ trivial_pct }} % (тривиален, кандидат на вылет)</span>
+    </p>
+    <div class="st-table-box">
+      <table class="st">
+        <thead>
+          <tr>
+            <th class="num">% верных</th><th class="num">Попыток</th>
+            <th class="num">Показов</th><th class="num">Ср. время</th>
+            <th class="num">Сложн.</th><th>Тип</th>
+            <th>Вопрос</th><th>Темы</th><th>Задача</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+          <tr class="{% if r.broken %}broken{% elif r.trivial %}trivial{% endif %}">
+            <td class="num pct">
+              {% if r.percent is not None %}{{ r.percent }} %{% else %}<span class="st-dash">—</span>{% endif %}
+            </td>
+            <td class="num">{{ r.attempts }}</td>
+            <td class="num">{{ r.shown }}</td>
+            <td class="num">
+              {% if r.avg_ms %}{% widthratio r.avg_ms 1000 1 %} с{% else %}<span class="st-dash">—</span>{% endif %}
+            </td>
+            <td class="num">{{ r.difficulty }}{% if r.measured %}<span title="измерено">*</span>{% endif %}</td>
+            <td>{{ r.type }}</td>
+            <td class="q">{{ r.text }}</td>
+            <td class="tp">{{ r.topics }}</td>
+            <td>
+              {% if r.problem_id %}
+                <a href="/catalog/problem/{{ r.problem_id }}/">#{{ r.problem_id }}</a>
+              {% else %}<span class="st-tag">генератор</span>{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="9" class="st-empty">Пул пуст.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="st-legend" style="margin-top:12px">
+      «Ср. время» — среднее, не медиана: хранится сумма времени ответов,
+      медиану по ней не восстановить. Звёздочка у сложности значит,
+      что она измерена, а не взята из эвристики сборки пула.
+    </p>
+  {% else %}
+    <div class="st-table-box">
+      <table class="st">
+        <thead>
+          <tr>
+            <th>Архетип</th><th class="num">Показов</th><th class="num">Попыток</th>
+            <th class="num">Пропусков</th><th class="num">% верных</th>
+            <th class="num">Ср. время</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in arch_rows %}
+          <tr>
+            <td><code>{{ r.key }}</code></td>
+            <td class="num">{{ r.shown }}</td>
+            <td class="num">{{ r.attempts }}</td>
+            <td class="num">{{ r.skipped }}</td>
+            <td class="num pct">
+              {% if r.percent is not None %}{{ r.percent }} %{% else %}<span class="st-dash">—</span>{% endif %}
+            </td>
+            <td class="num">
+              {% if r.avg_ms %}{% widthratio r.avg_ms 1000 1 %} с{% else %}<span class="st-dash">—</span>{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="st-empty">
+            Сгенерированные вопросы ещё никто не играл.
+          </td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="st-legend" style="margin-top:12px">
+      Статистика сгенерированных вопросов считается ПО АРХЕТИПУ, а не по
+      конкретному вопросу: параметры каждый раз новые, и доля верных по
+      одной строке кэша была бы выборкой из песчинок.
+    </p>
+  {% endif %}
+</div>
+{% endblock %}
