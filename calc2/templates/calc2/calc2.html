@@ -296,6 +296,14 @@ input:focus-visible, select:focus-visible {
   width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--input-bg); color: var(--text); font-size: 12px;
 }
+/* Формула кривой правится на месте. Моноширинный шрифт как у подписи кривой,
+   красная рамка = формулу пока не поняли и старая кривая осталась на графике. */
+.curve-expr-inp {
+  width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-size: 12px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+.curve-expr-inp.bad { border-color: var(--c-bad); }
 .curve-name {
   flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; font-family: ui-monospace, 'SF Mono', Menlo, monospace; color: var(--text);
@@ -2438,8 +2446,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         </div>
         <label class="chk"><input type="checkbox" id="chk-secant"> Секущая через две точки</label>
         <div class="field" id="mathdx-field" style="display:none;">
-          <label>Шаг Δx = <b id="mathdx-val">2</b></label>
-          <input type="range" id="mathdx-slider" min="0.05" max="5" step="0.05" value="2" style="width:100%;">
+          <label>Шаг Δx = <b id="mathdx-val">1</b></label>
+          <input type="range" id="mathdx-slider" min="0.05" max="5" step="0.05" value="1" style="width:100%;">
         </div>
         <div class="hint">Точку можно тянуть прямо по кривой. Треугольник у неё показывает Δx и Δy:
           их отношение и есть тангенс угла наклона, он же значение производной.
@@ -2728,13 +2736,16 @@ const STATE = {
   // Свои цвета кривых сцены (Фаза 2): ключ = поле COL, значение = hex из пикера.
   // Накладывается в refreshColors поверх токенов; токены остаются как есть.
   colorOverride: {},
+  // Пользователь покрутил колесо: его масштаб держится, пока он не сменит
+  // сцену или не щёлкнет по графику дважды.
+  zoomLock: false,
   // ── Раздел «Математика» (Фаза 7). Единственный режим с полным планом:
   // окно задаётся четырьмя границами, а не Qmax/Pmax первой четверти.
   mathSub: 'tangent',            // сюжет: tangent|optimum|transform|inverse|minmax|constraint
   mathFormula: 'x^2',            // общая f(x)
   mathXmin: -6, mathXmax: 6, mathYmin: -4, mathYmax: 20,
   mathX0: 1,                     // точка касания (7а)
-  mathDx: 2,                     // шаг Δx для треугольника и секущей
+  mathDx: 1,                     // шаг Δx: единичный, так треугольник читается сразу
   mathSecant: false,             // показывать секущую через две точки
   mathConvex: true,              // заливка по знаку второй производной (7б)
   mathInflect: true,             // отмечать перегибы
@@ -8260,10 +8271,86 @@ function scheduleRangeAnim(qmax, pmax) {
 // мгновенно; живое кручение ползунка (_wantRangeAnim) — плавно с дебаунсом.
 function applyAutoRanges(qmax, pmax) {
   if (_rangeAnimating) return;
+  // Пользователь покрутил колесо — его масштаб главнее авто-подгонки, иначе
+  // сцена возвращала бы свой вид на первой же перерисовке. Снимается сменой
+  // сцены или двойным щелчком по графику (resetZoom).
+  if (STATE.zoomLock) { _wantRangeAnim = false; return; }
   const wantAnim = _wantRangeAnim;
   _wantRangeAnim = false;
   if (wantAnim && !prefersReducedMotion()) scheduleRangeAnim(qmax, pmax);
   else setRanges(qmax, pmax);
+}
+
+/* ---------------------------------------------------------------------
+   ЗУМ КОЛЕСОМ И ТАЧПАДОМ
+   Приближать и отдалять без ручной правки «Q макс» и «P макс».
+   Экономические сцены живут в первой четверти, поэтому ноль там остаётся на
+   месте, а меняется предел по осям: это и есть привычное «отдалить, чтобы
+   увидеть больше». Раздел «Математика» показывает полный план, и там окно
+   тянется К КУРСОРУ, как в обычном графопостроителе.
+   --------------------------------------------------------------------- */
+const ZOOM_MIN = 1e-3, ZOOM_MAX = 1e7;
+
+// Три значащие цифры: и полям «Оси» есть что показать, и мелкий шаг колеса
+// не залипает на округлении.
+function zoomRound(v) {
+  if (!isFinite(v) || v <= 0) return v;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)) - 2);
+  return Math.round(v / mag) * mag;
+}
+
+function zoomBy(factor, px, py) {
+  if (!isFinite(factor) || factor <= 0) return;
+  if (STATE.mode === 'math') {
+    const m = CONFIG.margin;
+    const w = Math.max(1, W - m.left - m.right), h = Math.max(1, H - m.top - m.bottom);
+    const tx = Math.min(1, Math.max(0, (px - m.left) / w));
+    const ty = Math.min(1, Math.max(0, (py - m.top) / h));
+    const x0 = STATE.mathXmin, x1 = STATE.mathXmax, y0 = STATE.mathYmin, y1 = STATE.mathYmax;
+    const span = (x1 - x0) * factor;
+    if (!(span > 1e-6 && span < 1e9)) return;
+    const xc = x0 + (x1 - x0) * tx;
+    // В подрежиме «производная» панелей две, и курсор может стоять над нижней,
+    // поэтому по вертикали растягиваем от центра окна, а не от курсора.
+    const yc = (STATE.mathSub === 'tangent') ? (y0 + y1) / 2 : y1 - (y1 - y0) * ty;
+    setMathWindow(xc - (xc - x0) * factor, xc + (x1 - xc) * factor,
+                  yc - (yc - y0) * factor, yc + (y1 - yc) * factor);
+    redrawAll();
+    return;
+  }
+  const q = CONFIG.Qmax * factor, p = CONFIG.Pmax * factor;
+  if (q < ZOOM_MIN || p < ZOOM_MIN || q > ZOOM_MAX || p > ZOOM_MAX) return;
+  STATE.zoomLock = true;
+  cancelRangeAnim();          // отложенный переезд осей больше не нужен
+  setRanges(zoomRound(q), zoomRound(p));
+  redrawAll();
+}
+
+// Двойной щелчок по графику возвращает масштаб сцены: снимаем замок и даём
+// сцене снова подогнать оси под свои данные.
+function resetZoom() {
+  STATE.zoomLock = false;
+  if (STATE.mode === 'math') { const p = MATH_PRESETS[STATE.mathSub]; if (p) setMathWindow(p.win[0], p.win[1], p.win[2], p.win[3]); }
+  else if (STATE.mode === 'costs') setRanges(10, 50);
+  else setRanges(100, 100);
+  redrawAll();
+}
+
+function initZoom() {
+  const gw = document.getElementById('graph-wrap');
+  if (!gw) return;
+  gw.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    let dy = e.deltaY;
+    if (e.deltaMode === 1) dy *= 16;        // строки → пиксели
+    else if (e.deltaMode === 2) dy *= 100;  // страницы → пиксели
+    // Щипок на тачпаде приходит сюда же, но с ctrlKey и мелкой дельтой,
+    // поэтому ему нужен более крупный шаг.
+    const k = e.ctrlKey ? 0.011 : 0.0022;
+    const r = gw.getBoundingClientRect();
+    zoomBy(Math.exp(dy * k), e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  gw.addEventListener('dblclick', () => resetZoom());
 }
 
 // Отменить и дебаунс, и текущий твин (при смене сцены/режима — чтобы отложенный
@@ -8298,6 +8385,7 @@ function ineqRedraw() { _ineqThrottle(() => redrawAll()); }   // живой пе
 // Переключение режима: рынок / издержки / КПВ.
 function setMode(mode) {
   cancelRangeAnim();   // отложенный/идущий переезд осей прошлой сцены — отменить
+  STATE.zoomLock = false;   // новая сцена показывает себя в своём масштабе
   STATE.mode = mode;
   // Какие секции панели показывать в каждом режиме (отсутствующие id просто игнорируются).
   const groups = {
@@ -10367,10 +10455,12 @@ function drawMathTangent(f) {
   const g = svg.append('g');
   drawPlaneAxes(g, s1.mx, s1.my, 'x', 'y');
   drawPlaneAxes(g, s2.mx, s2.my, 'x', 'f′');
-  g.append('text').attr('x', m.left + 4).attr('y', top + 12)
-    .attr('font-size', 11.5).attr('font-weight', 600).attr('fill', COL.inkSoft).text('f(x)');
-  g.append('text').attr('x', m.left + 4).attr('y', yMid + gap + 12)
-    .attr('font-size', 11.5).attr('font-weight', 600).attr('fill', COL.inkSoft).text('f′(x), производная');
+  // Подписи панелей крупнее и в цвет своей кривой: сразу видно, где сама
+  // функция, а где производная (мелкий серый текст читался плохо).
+  g.append('text').attr('x', m.left + 4).attr('y', top + 14)
+    .attr('font-size', 13.5).attr('font-weight', 700).attr('fill', COL.D).text('f(x), сама функция');
+  g.append('text').attr('x', m.left + 4).attr('y', yMid + gap + 14)
+    .attr('font-size', 13.5).attr('font-weight', 700).attr('fill', COL.MC).text('f′(x), производная');
 
   mathLine(g, f, s1.mx, s1.my, COL.D, 2.6);
   mathLine(g, dfun, s2.mx, s2.my, COL.MC, 2.4);
@@ -11042,6 +11132,31 @@ function addCurve(expr, form) {
   redrawAll();
 }
 
+/* Правка формулы уже добавленной кривой. Пересобираем её внутренности на
+   месте, сохраняя id, цвет, роль, своё имя и видимость: раньше, чтобы
+   поправить опечатку, кривую приходилось удалять и заводить заново, теряя
+   все настройки. Возвращает текст ошибки или null, если всё хорошо. */
+function updateCurveExpr(curve, expr) {
+  expr = (expr || '').trim();
+  if (!expr) return 'пустая формула';
+  if (curve.kind === 'vertical') return 'у вертикальной линии формулы нет';
+  if (curve.srcForm === 'QP') {
+    const built = buildCurveFromQP(expr);
+    if (built.error) return built.error;
+    curve.expr = expr; curve.compiled = null;
+    curve.linear = built.linear; curve.fn = built.fn;
+    curve.srcExpr = expr; curve.srcCompiled = built.srcCompiled; curve.srcLinear = built.srcLinear;
+  } else {
+    const { compiled, error } = compileFormula(expr);
+    if (error) return error;
+    curve.expr = expr; curve.compiled = compiled;
+    curve.linear = detectLinear(compiled);
+    curve.fn = null;   // синтетическая функция (S + t и т.п.) больше не действует
+  }
+  if (!curve.label) curve.name = expr;   // родовое имя идёт за формулой
+  return null;
+}
+
 // Назначить роль кривой. D и S — единственны: при назначении снимаем
 // ту же роль с других кривых.
 function setRole(curve, role) {
@@ -11082,9 +11197,15 @@ function renderCurveList() {
     // Цвет кривой (Фаза 2): пикер меняет цвет ТОЛЬКО у этого экземпляра.
     // Палитра по умолчанию (--curve-*) не трогается: она остаётся точкой отсчёта,
     // пользователь лишь перекрывает её локально на время сеанса.
+    //
+    // ВАЖНО: здесь НЕЛЬЗЯ вызывать renderCurveList(). Она чистит innerHTML
+    // списка и уничтожает тот самый input, к которому привязана открытая
+    // палитра браузера, поэтому окно выбора цвета захлопывалось на первом же
+    // клике по градиенту. Перерисовываем только график, а строку списка
+    // подкрашиваем на месте.
     const sw = makeColorPicker(curve.color, (hex) => {
       curve.color = hex; curve.colorCustom = true;
-      renderCurveList(); redrawAll();
+      redrawAll();
     });
 
     const nm = document.createElement('span');
@@ -11123,6 +11244,28 @@ function renderCurveList() {
     sel.value = curve.role || '';
     sel.addEventListener('change', () => setRole(curve, sel.value));
 
+    // Формула кривой правится прямо здесь: кривая остаётся в списке со своей
+    // записью, её не нужно удалять и заводить заново ради одной опечатки.
+    // Битую формулу не применяем: подсвечиваем поле и оставляем прежнюю кривую.
+    let fInp = null;
+    if (curve.kind !== 'vertical') {
+      fInp = document.createElement('input');
+      fInp.type = 'text'; fInp.className = 'curve-expr-inp';
+      fInp.value = curve.srcForm === 'QP' ? (curve.srcExpr || curve.expr) : curve.expr;
+      fInp.placeholder = curve.srcForm === 'QP' ? 'Q = f(P)' : 'P = f(Q)';
+      fInp.title = 'Формула кривой: правится на месте';
+      fInp.addEventListener('input', () => {
+        const err = updateCurveExpr(curve, fInp.value);
+        fInp.classList.toggle('bad', !!err);
+        fInp.title = err ? ('Пока не применено: ' + err) : 'Формула кривой: правится на месте';
+        if (!err) {
+          nm.textContent = curveShortName(curve);
+          redrawAll();
+          if (typeof updatePult === 'function') updatePult();
+        }
+      });
+    }
+
     // Своё имя кривой (Фаза 1). Если задано — идёт и в подпись на графике,
     // и в список, и в чип пульта вместо родового «D»/«S».
     const nameInp = document.createElement('input');
@@ -11136,7 +11279,8 @@ function renderCurveList() {
       if (typeof updatePult === 'function') updatePult();
     });
 
-    row.append(top, nameInp, sel);
+    if (fInp) row.append(top, fInp, nameInp, sel);
+    else row.append(top, nameInp, sel);
     list.appendChild(row);
   });
   if (typeof updatePult === 'function') updatePult();   // пересобрать слайдеры кривых в пульте
@@ -11564,6 +11708,7 @@ function applyCardScope() {
 
 function pickScene(key) {
   resetDecor();           // новая сцена — чистое оформление (Фаза 1)
+  STATE.zoomLock = false; // и свой масштаб, а не унаследованный от колеса
   const r = SCENE_ROUTE[key] || SCENE_ROUTE.free;
   r.run();
   // Ключ карточки ставим ПОСЛЕ run: loadScene внутри пишет туда своё имя
@@ -12865,6 +13010,7 @@ function wireControls() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && STATE.markArm) armMark(false); });
   renderMarkList();
   initSceneColorPickers();   // Фаза 2: пикеры у кривых издержек, производства, вееров
+  initZoom();                // колесо и тачпад приближают график, двойной щелчок возвращает масштаб
 
   // Регулируемая цена (потолок / пол): ползунок (целые) + числовое поле (дробные).
   const pcSlider = document.getElementById('pc-slider');

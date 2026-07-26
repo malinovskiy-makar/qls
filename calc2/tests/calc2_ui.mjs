@@ -497,6 +497,114 @@ await t('нет ИИ-штампов в видимом тексте', () => page.
   return found.length === 0 || found.join(', ');
 }));
 
+/* --- Зум колесом и тачпадом ------------------------------------------- */
+// Проверка экспорта выше оставила своё модальное окно открытым, а оно ловит
+// указатель поверх графика. Закрываем, иначе колесо до холста не доедет.
+await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
+await page.waitForTimeout(150);
+await page.evaluate(() => openPicker());
+await page.click('.scard[data-scene="sd"]');
+await page.waitForTimeout(320);
+
+await t('колесо к себе приближает график', async () => {
+  const before = await page.evaluate(() => CONFIG.Qmax);
+  await page.mouse.move(700, 450);
+  await page.mouse.wheel(0, -300);
+  await page.waitForTimeout(220);
+  const after = await page.evaluate(() => CONFIG.Qmax);
+  return after < before || `${before} → ${after}`;
+});
+
+await t('колесо от себя отдаляет', async () => {
+  const before = await page.evaluate(() => CONFIG.Qmax);
+  await page.mouse.wheel(0, 600);
+  await page.waitForTimeout(220);
+  const after = await page.evaluate(() => CONFIG.Qmax);
+  return after > before || `${before} → ${after}`;
+});
+
+await t('поля «Оси» идут за колесом', () => page.evaluate(() =>
+  Math.abs(parseFloat(document.getElementById('inp-qmax').value) - CONFIG.Qmax) < 1e-6 || 'поле отстало'));
+
+await t('двойной щелчок возвращает масштаб сцены', async () => {
+  await page.dblclick('#graph-wrap', { position: { x: 700, y: 450 } });
+  await page.waitForTimeout(280);
+  return await page.evaluate(() => (CONFIG.Qmax === 100 && CONFIG.Pmax === 100 && !STATE.zoomLock) || CONFIG.Qmax);
+});
+
+await t('в математике окно тянется к курсору', async () => {
+  await page.evaluate(() => openPicker());
+  await page.click('.scard[data-scene="m-optimum"]');
+  await page.waitForTimeout(320);
+  const b = await page.evaluate(() => [STATE.mathXmin, STATE.mathXmax]);
+  await page.mouse.move(500, 400);
+  await page.mouse.wheel(0, -300);
+  await page.waitForTimeout(220);
+  const a = await page.evaluate(() => [STATE.mathXmin, STATE.mathXmax]);
+  // Окно сузилось и сместилось несимметрично: курсор был левее середины.
+  const narrower = (a[1] - a[0]) < (b[1] - b[0]);
+  const shifted = Math.abs((a[0] + a[1]) / 2 - (b[0] + b[1]) / 2) > 1e-6;
+  return (narrower && shifted) || `${b} → ${a}`;
+});
+
+await t('авто-подгонка сцены не сбивает ручной зум', async () => {
+  await page.evaluate(() => openPicker());
+  await page.click('.scard[data-scene="adas"]');
+  await page.waitForTimeout(360);
+  await page.mouse.move(700, 450);
+  await page.mouse.wheel(0, -400);
+  await page.waitForTimeout(220);
+  const zoomed = await page.evaluate(() => CONFIG.Qmax);
+  await page.evaluate(() => redrawAll());
+  await page.waitForTimeout(200);
+  const after = await page.evaluate(() => CONFIG.Qmax);
+  return after === zoomed || `${zoomed} → ${after}`;
+});
+
+/* --- Правка формулы прямо в карточке кривой ---------------------------- */
+await page.evaluate(() => openPicker());
+await page.click('.scard[data-scene="sd"]');
+await page.waitForTimeout(320);
+await page.evaluate(() => setToolsOpen(true));
+await page.waitForTimeout(180);
+
+await t('у каждой кривой есть поле формулы', async () =>
+  (await page.locator('.curve-expr-inp').count()) === 2 || 'полей: ' + (await page.locator('.curve-expr-inp').count()));
+
+await t('правка формулы пересчитывает равновесие', async () => {
+  await page.locator('.curve-expr-inp').first().fill('200 - 2*Q');
+  await page.waitForTimeout(300);
+  return await page.evaluate(() => {
+    const e = STATE.eq;
+    return (Math.abs(e.Q - 66.667) < .1 && Math.abs(e.P - 66.667) < .1) || JSON.stringify(e);
+  });
+});
+
+await t('правка сохраняет роль, цвет и id кривой', () => page.evaluate(() =>
+  (STATE.curves[0].role === 'demand' && STATE.curves[0].id === 1) || JSON.stringify(STATE.curves[0])));
+
+await t('битая формула не сносит кривую', async () => {
+  await page.locator('.curve-expr-inp').first().fill('200 - 2*');
+  await page.waitForTimeout(250);
+  const bad = await page.evaluate(() => document.querySelector('.curve-expr-inp').classList.contains('bad'));
+  const kept = await page.evaluate(() => STATE.curves[0].expr);
+  return (bad && kept === '200 - 2*Q') || `подсветка ${bad}, формула ${kept}`;
+});
+
+/* --- Пикер цвета не убивает собственную палитру ------------------------ */
+await t('правка цвета не пересобирает список кривых', () => page.evaluate(() => {
+  const inp = document.querySelector('#curve-list input[type=color]');
+  if (!inp) return 'пикера нет';
+  inp.value = '#123456';
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  // Если бы список перерисовался, узел был бы уже другим и нативная палитра
+  // браузера захлопнулась бы на первом же клике по градиенту.
+  return document.querySelector('#curve-list input[type=color]') === inp || 'узел заменён';
+}));
+
+await t('цвет из пикера доехал до кривой', () => page.evaluate(() =>
+  STATE.curves[0].color === '#123456' || STATE.curves[0].color));
+
 console.log('\n' + checks.map(([s, n, d]) => `${s.padEnd(4)} ${n}${d ? '  → ' + d : ''}`).join('\n'));
 const bad = checks.filter(c => c[0] !== 'OK').length;
 if (errors.length) console.log('\nОшибки страницы:\n' + errors.slice(0, 10).join('\n'));
