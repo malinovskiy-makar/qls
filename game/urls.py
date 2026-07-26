@@ -11,6 +11,11 @@ urlpatterns = [
     path('r/<str:code>/', views.result_page, name='result'),
     # Служебная статистика пула — только для персонала.
     path('stats/', views.stats_page, name='stats'),
+    # Набор: забег по коду и доска результатов набора.
+    path('s/<str:code>/', views.set_page, name='set_page'),
+    path('s/<str:code>/board/', views.set_board, name='set_board'),
+    path('api/session/start_set/<str:code>/', views.api_session_start_set,
+         name='session_start_set'),
     path('api/session/start/', views.api_session_start, name='session_start'),
     path('api/session/start_mistakes/', views.api_session_start_mistakes,
          name='session_start_mistakes'),

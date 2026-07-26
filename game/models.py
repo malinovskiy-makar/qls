@@ -21,12 +21,28 @@ CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 CODE_LENGTH = 8
 
 
-def make_result_code():
-    """Случайный код публичной страницы результата.
+def make_code():
+    """Случайный короткий код: публичная страница результата и набор.
 
-    32^8 ≈ 1,1 трлн вариантов — угадать чужой результат перебором не выйдет,
-    а порядковый id выдавал бы, сколько всего забегов сыграно."""
+    32^8 ≈ 1,1 трлн вариантов — угадать чужой результат или набор перебором
+    не выйдет, а порядковый id выдавал бы, сколько всего забегов сыграно.
+    Функция ОДНА на обе сущности: копия разъехалась бы с алфавитом.
+    """
     return ''.join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
+
+
+def normalize_code(raw):
+    """Код, введённый руками: без пробелов, в верхнем регистре.
+
+    Его переписывают с доски и диктуют вслух, поэтому регистр и пробелы
+    значить не должны. Символы вне алфавита не чиним — это уже не наш код.
+    """
+    return ''.join((raw or '').split()).upper()
+
+
+# Прежнее имя оставлено: на него ссылается default в миграции 0005, а
+# исторические миграции переписывать нельзя.
+make_result_code = make_code
 
 
 class GameQuestion(models.Model):
@@ -134,6 +150,71 @@ class GameQuestion(models.Model):
         return f'GameQuestion #{self.pk} (задача #{self.problem_id})'
 
 
+class GameSet(models.Model):
+    """Набор — забег с ЗАРАНЕЕ ЗАФИКСИРОВАННЫМ списком вопросов.
+
+    Одна сущность на три поверхности (решение Notion от 2026-07-26):
+    вызов дня, набор учителя и дуэль — это один и тот же забег, у которого
+    список вопросов задан заранее и одинаков у всех, кто его играет.
+
+    ⚠️ Именно фиксированный список делает возможной доску результатов.
+    Общий лидерборд по случайным забегам по-прежнему невозможен (записи
+    ничьи и несравнимы), а доска набора возможна: вопросы у всех одни.
+
+    question_ids — УПОРЯДОЧЕННЫЙ список id. Порядок часть контракта: при
+    разном порядке сравнение результатов нечестно (кто-то встретил трудный
+    вопрос на свежую голову, кто-то на последней жизни).
+    """
+
+    KINDS = [
+        ('daily', 'Вызов дня'),
+        ('custom', 'Набор учителя'),
+        ('duel', 'Дуэль'),
+    ]
+
+    code = models.CharField('Код', max_length=16, unique=True,
+                            default=make_code, db_index=True)
+    mode = models.CharField('Режим', max_length=16)
+    kind = models.CharField('Происхождение', max_length=8, choices=KINDS,
+                            default='custom', db_index=True)
+    title = models.CharField('Название', max_length=120, blank=True, default='')
+    # NULL — у анонимного автора (дуэль без логина) и у вызова дня.
+    author = models.ForeignKey('problems.User', null=True, blank=True,
+                               on_delete=models.SET_NULL,
+                               related_name='game_sets', verbose_name='Автор')
+    created = models.DateTimeField('Создан', auto_now_add=True)
+
+    question_ids = models.JSONField('Вопросы (по порядку)', default=list)
+    # Под какой фильтр собран — показываем сопернику и «бросить вызов дальше».
+    filter_snapshot = models.JSONField('Снимок фильтра', default=dict, blank=True)
+
+    opens_at = models.DateTimeField('Открыт с', null=True, blank=True)
+    closes_at = models.DateTimeField('Закрыт с', null=True, blank=True)
+    attempts_allowed = models.PositiveSmallIntegerField('Попыток', default=1)
+
+    # Дата вызова дня — по ней он и ищется. Для остальных видов пусто.
+    # Пара (kind='daily', mode, day) уникальна: один вызов на режим в день.
+    day = models.DateField('Дата вызова дня', null=True, blank=True,
+                           db_index=True)
+
+    class Meta:
+        verbose_name = 'Набор вопросов'
+        verbose_name_plural = 'Наборы вопросов'
+        ordering = ['-created']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['kind', 'mode', 'day'], name='uniq_daily_set_per_mode',
+                condition=models.Q(kind='daily')),
+        ]
+
+    def __str__(self):
+        return f'{self.get_kind_display()} {self.code} ({self.mode})'
+
+    @property
+    def size(self):
+        return len(self.question_ids or [])
+
+
 class GameResult(models.Model):
     """Сохранённый результат забега — для публичной страницы `/game/r/<код>/`.
 
@@ -148,6 +229,19 @@ class GameResult(models.Model):
     """
     code = models.CharField('Код ссылки', max_length=16, unique=True,
                             default=make_result_code, db_index=True)
+    # Связь с набором: результаты одного набора и есть его доска.
+    # NULL — обычный случайный забег (такие между собой несравнимы).
+    game_set = models.ForeignKey(GameSet, null=True, blank=True,
+                                 on_delete=models.CASCADE,
+                                 related_name='results',
+                                 verbose_name='Набор')
+    # Кто сыграл. NULL — аноним: игра публичная, логин не требуется.
+    # На доску попадают только авторизованные (у анонима нет имени, а
+    # «аноним №4» ничего не значит).
+    user = models.ForeignKey('problems.User', null=True, blank=True,
+                             on_delete=models.SET_NULL,
+                             related_name='game_results',
+                             verbose_name='Игрок')
     mode = models.CharField('Режим', max_length=16)
     score = models.PositiveIntegerField('Счёт', default=0)
     correct_count = models.PositiveSmallIntegerField('Верных', default=0)
@@ -161,6 +255,12 @@ class GameResult(models.Model):
                                             default=list, blank=True)
     # счёт по номеру вопроса — мини-график на публичной странице
     score_curve = models.JSONField('Кривая счёта', default=list, blank=True)
+    # [{question_id, number, outcome}, ...] — исход каждого вопроса.
+    # Нужен доске набора («на чём посыпался класс») и полосе сравнения в
+    # дуэли: журналы забегов живут в сессиях игроков и до сервера доски не
+    # доходят, а результат — доходит.
+    question_outcomes = models.JSONField('Исходы по вопросам',
+                                         default=list, blank=True)
     created_at = models.DateTimeField('Сыгран', auto_now_add=True)
 
     class Meta:

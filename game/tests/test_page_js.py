@@ -47,7 +47,9 @@ def inline_js(src):
     """Инлайн-скрипт страницы с подставленным конфигом."""
     m = re.search(r'<script>\n(.*?)\n</script>', src, re.S)
     assert m, 'инлайн-скрипт не найден'
-    return m.group(1).replace('{{ config_json|safe }}', FAKE_CONFIG)
+    js = m.group(1).replace('{{ config_json|safe }}', FAKE_CONFIG)
+    # Забег по набору: на обычной странице сервер кладёт сюда null.
+    return js.replace('{{ auto_set_json|safe }}', 'null')
 
 
 class PageJsTests(TestCase):

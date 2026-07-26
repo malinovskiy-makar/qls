@@ -1,0 +1,129 @@
+{% extends 'catalog/base.html' %}
+{% comment %}
+  Доска набора: кто прошёл и — главное для учителя — на каких вопросах
+  посыпался класс. Доля верных считается ВНУТРИ набора: учителю важно, как
+  справился его класс, а не средний игрок интернета.
+
+  Страница публичная и read-only. Наследуем базу каталога: токены темы и
+  навигация приезжают готовыми, своей вёрстки тут не нужно.
+{% endcomment %}
+{% block title %}Доска набора {{ gset.code }}{% endblock %}
+
+{% block extra_style %}
+<style>
+  .bd-wrap { max-width: 900px; margin: 0 auto; padding: 24px 20px 60px; }
+  .bd-head { margin-bottom: 20px; }
+  .bd-kind { font-size: 11px; font-weight: 700; letter-spacing: .08em;
+             text-transform: uppercase; color: var(--accent); }
+  .bd-wrap h1 { font-size: 1.6rem; margin-top: 4px; }
+  .bd-meta { color: var(--muted); margin-top: 6px; font-size: .92rem; }
+  .bd-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+             letter-spacing: .1em; font-weight: 700; }
+  .bd-actions { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .bd-btn {
+    display: inline-block; padding: 9px 18px; border-radius: 10px;
+    text-decoration: none; font-weight: 600; font-size: .92rem;
+    background: var(--btn-bg); color: var(--on-btn);
+    border: 1px solid var(--btn-bg);
+  }
+  .bd-btn.ghost { background: var(--surface); color: var(--text);
+                  border-color: var(--border); }
+  .bd-wrap h2 { font-size: 1.05rem; margin: 26px 0 10px; }
+  .bd-box { border: 1px solid var(--border); border-radius: 12px;
+            background: var(--surface); overflow-x: auto; }
+  table.bd { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  table.bd th, table.bd td {
+    padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border);
+  }
+  table.bd th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+  table.bd td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.bd tr.me { background: var(--accent-tint); }
+  table.bd td.q { max-width: 460px; }
+  .bd-empty { padding: 28px; text-align: center; color: var(--muted); }
+  .bd-hard { color: var(--error); font-weight: 700; }
+  .bd-note { margin-top: 10px; font-size: .82rem; color: var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bd-wrap">
+  <header class="bd-head">
+    <div class="bd-kind">{{ gset.get_kind_display }}</div>
+    <h1>{% if gset.title %}{{ gset.title }}{% else %}Набор {{ gset.code }}{% endif %}</h1>
+    <p class="bd-meta">
+      Режим «{{ mode_title }}» · {{ gset.size }} вопр. ·
+      код <span class="bd-code">{{ gset.code }}</span>
+      {% if gset.author %} · автор {{ gset.author.username }}{% endif %}
+    </p>
+    <div class="bd-actions">
+      <a class="bd-btn" href="{{ play_url }}">Играть этот набор</a>
+      <a class="bd-btn ghost" href="/game/">В обычную игру</a>
+    </div>
+  </header>
+
+  <h2>Кто прошёл</h2>
+  <div class="bd-box">
+    <table class="bd">
+      <thead>
+        <tr>
+          <th>#</th><th>Игрок</th><th class="num">Счёт</th>
+          <th class="num">Точность</th><th class="num">Макс. комбо</th>
+          <th>Чем кончилось</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in board %}
+        <tr class="{% if r.is_me %}me{% endif %}">
+          <td class="num">{{ r.place }}</td>
+          <td>{{ r.name }}</td>
+          <td class="num">{{ r.score }}</td>
+          <td class="num">{{ r.accuracy }}%</td>
+          <td class="num">×{{ r.max_combo }}</td>
+          <td>
+            {% if r.reason == 'lives' %}выбыл
+            {% elif r.reason == 'set_done' %}прошёл до конца
+            {% elif r.reason == 'pool_empty' %}вопросы кончились
+            {% else %}время вышло{% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="bd-empty">Набор ещё никто не сыграл.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>На чём посыпались</h2>
+  <div class="bd-box">
+    <table class="bd">
+      <thead>
+        <tr>
+          <th>№</th><th>Вопрос</th>
+          <th class="num">Верно</th><th class="num">Неверно</th>
+          <th class="num">Пропуск</th><th class="num">% верных</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for q in questions %}
+        <tr>
+          <td class="num">{{ q.number }}</td>
+          <td class="q">{{ q.text }}</td>
+          <td class="num">{{ q.correct }}</td>
+          <td class="num">{{ q.wrong }}</td>
+          <td class="num">{{ q.skip }}</td>
+          <td class="num {% if q.percent is not None and q.percent < 50 %}bd-hard{% endif %}">
+            {% if q.percent is not None %}{{ q.percent }}%{% else %}—{% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="bd-empty">В наборе нет вопросов.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="bd-note">
+    Доля верных считается ВНУТРИ этого набора — по забегам тех, кто его
+    играл, а не по всему сайту. Пропуск в долю не входит.
+  </p>
+</div>
+{% endblock %}

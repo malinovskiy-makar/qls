@@ -372,6 +372,15 @@ a:focus-visible, button:focus-visible {
   background: var(--btn-bg); color: var(--on-btn); cursor: pointer;
 }
 
+.btn-board {
+  font: inherit; font-size: 14px; font-weight: 600;
+  padding: 10px 20px; border-radius: 11px;
+  border: 1px solid var(--rush-border);
+  background: var(--rush-surface); color: var(--text2);
+  text-decoration: none; display: inline-flex; align-items: center;
+}
+.btn-board:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+
 .best-line {
   margin-top: 16px;
   font-size: 13px;
@@ -446,6 +455,42 @@ a:focus-visible, button:focus-visible {
   padding: 3px 0; color: var(--text2);
 }
 .records-box .rec-row b { color: var(--rush-accent); font-variant-numeric: tabular-nums; }
+
+/* ── Карточка забега по набору ──────────────────────────────────── */
+.set-intro {
+  margin: 4vh auto 0;
+  max-width: 520px;
+  padding: 26px 24px;
+  border: 1px solid var(--rush-border);
+  border-radius: 18px;
+  background: var(--rush-surface);
+  text-align: center;
+}
+.set-kind {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--rush-accent);
+}
+.set-title { margin-top: 6px; font-size: 24px; font-weight: 800; letter-spacing: -.4px; }
+.set-meta { margin-top: 8px; font-size: 13.5px; color: var(--text2); }
+.set-note { margin-top: 10px; font-size: 12.5px; color: var(--text3); }
+.set-actions {
+  margin-top: 18px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.set-play {
+  font: inherit; font-size: 15px; font-weight: 700;
+  padding: 11px 30px; border-radius: 12px;
+  border: 1px solid var(--btn-bg); background: var(--btn-bg);
+  color: var(--on-btn); cursor: pointer;
+}
+.set-play[disabled] { opacity: .5; cursor: default; }
+.set-board-link, .set-back { font-size: 13px; color: var(--rush-accent); }
+.set-back { color: var(--text3); }
+/* Плашка «этот забег по набору» на экране результатов */
+.fin-chip-set {
+  border-color: var(--rush-accent);
+  color: var(--rush-accent);
+}
 
 /* Узкий экран: панель фильтров становится шторкой снизу */
 @media (max-width: 720px) {
@@ -1351,6 +1396,21 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       </div>
 
       <div class="records-box" id="records-box" hidden></div>
+
+      <!-- Карточка забега по набору: подставляется вместо обычного старта,
+           когда страницу открыли по коду (/game/s/<код>/). Вопросов тут
+           НЕТ — иначе автор дуэли увидел бы задания до игры. -->
+      <div class="set-intro" id="set-intro" hidden>
+        <div class="set-kind" id="set-kind"></div>
+        <h2 class="set-title" id="set-title"></h2>
+        <p class="set-meta" id="set-meta"></p>
+        <p class="set-note" id="set-note">Вопросы одинаковы у всех, кто играет этот набор.</p>
+        <div class="set-actions">
+          <button class="set-play" id="set-play">Играть</button>
+          <a class="set-board-link" id="set-board-link" href="#">Доска результатов</a>
+          <a class="set-back" href="/game/">В обычную игру</a>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -1402,6 +1462,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <p class="fin-sub">
             <span class="fin-chip" id="fin-mode-chip">Блиц</span>
             <span class="fin-chip fin-chip-alt" id="fin-mistakes-chip" hidden>работа над ошибками</span>
+            <span class="fin-chip fin-chip-set" id="fin-set-chip" hidden></span>
             <span class="fin-date" id="fin-date"></span>
           </p>
         </div>
@@ -1506,6 +1567,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
       <!-- 7. Действия -->
       <div class="final-actions">
+        <a class="btn-board" id="btn-board" href="#" hidden>Доска набора</a>
         <button class="btn-again" id="btn-again">Сыграть ещё раз</button>
         <button class="btn-copy" id="btn-review" hidden>Разобрать все ошибки</button>
         <a class="btn-copy" id="btn-catalog" href="/catalog/">Перейти к темам в каталоге</a>
@@ -1538,6 +1600,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   'use strict';
 
   var CFG = {{ config_json|safe }};
+  /* Забег по набору (вызов дня / набор учителя / дуэль): страница та же,
+     сервер лишь подставляет курированную очередь. null — обычный вход.
+     ⚠️ Вопросов набора здесь НЕТ и быть не может: иначе автор дуэли
+     увидел бы задания до игры. */
+  var AUTO_SET = {{ auto_set_json|safe }};
   var REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var MISTAKES_RUN_SIZE = CFG.mistakes_run_size;  // размер целевого забега (config.py)
 
@@ -1576,9 +1643,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   }
 
   function saveRunToHistory(s) {
-    // Целевой забег в историю не идёт: десять вопросов по темам ошибок —
-    // не тот же забег, сравнивать его с полным нечестно.
-    if (mistakesRun || !s) return;
+    // Целевой забег и забег по набору в историю не идут: десять вопросов
+    // по темам ошибок (или фиксированный список набора) — не тот же забег,
+    // сравнивать его с полным нечестно.
+    if (mistakesRun || setRun || !s) return;
     var h = loadHistory();
     h.push({ mode: mode, score: s.score, accuracy: s.accuracy, at: Date.now() });
     try {
@@ -1625,6 +1693,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var skippedCount = 0;         // пропущено (для запасной сводки без сети)
   var isRecord = false;         // побит ли личный рекорд этим забегом
   var mistakesRun = false;      // это забег «работа над ошибками»?
+  var setRun = null;            // {code, kind, title, size} забега по набору
   var chartsBuilt = false;      // графики подробной статистики уже построены?
   var shareInfo = null;         // {code, url} публичной страницы результата
   var bestNow = 0;              // рекорд режима с учётом этого забега
@@ -1929,13 +1998,17 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      целевого считает сервер по журналу прошлого забега. */
   function startRun(opts) {
     var mistakes = !!(opts && opts.mistakes);
-    var url = mistakes
-      ? '/game/api/session/start_mistakes/'
-      : '/game/api/session/start/?mode=' + encodeURIComponent(mode)
-        + '&' + filterQuery();
+    var setCode = opts && opts.setCode;
+    var url = setCode
+      ? '/game/api/session/start_set/' + encodeURIComponent(setCode) + '/'
+      : mistakes
+        ? '/game/api/session/start_mistakes/'
+        : '/game/api/session/start/?mode=' + encodeURIComponent(mode)
+          + '&' + filterQuery();
     api(url)
       .then(function (d) {
         if (!d.ok) { alert(d.error || 'Не удалось начать игру'); return; }
+        setRun = d.set || null;   // забег по набору: код и происхождение
         mode = d.mode.key;        // у целевого забега режим приходит с сервера
         mistakesRun = mistakes;
         MODE = d.mode; // тайминги и жизни режима — с сервера (единый источник)
@@ -2525,6 +2598,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('final-title').textContent = titleText(s);
     $('fin-mode-chip').textContent = s.mode_title;
     $('fin-mistakes-chip').hidden = !mistakesRun;
+    var setChip = $('fin-set-chip');
+    setChip.hidden = !setRun;
+    if (setRun) {
+      setChip.textContent = setRun.kind === 'daily' ? 'вызов дня'
+        : setRun.kind === 'duel' ? 'дуэль' : 'набор ' + setRun.code;
+    }
     $('fin-date').textContent = formatDate(s.played_at);
     paintHearts($('fin-hearts'), s.lives_left, s.lives_max);
     $('fin-reason').textContent = reasonText(s);
@@ -2731,6 +2810,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   }
 
   function paintShare(s) {
+    // Ссылка на доску набора — она интереснее личной ссылки: там видно,
+    // кто ещё играл тот же список.
+    var board = $('btn-board');
+    var setInfo = shareInfo && shareInfo.set;
+    board.hidden = !setInfo;
+    if (setInfo) board.href = setInfo.board_url;
     var box = $('fin-share');
     // Нет ссылки (сеть подвела) — блока нет: делиться нечем.
     box.hidden = !(shareInfo && shareInfo.url);
@@ -3072,7 +3157,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     if (!list.hidden) list.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'nearest' });
   });
 
-  $('btn-again').addEventListener('click', function () { startRun(); });
+  $('btn-again').addEventListener('click', function () {
+    // В забеге по набору «ещё раз» не имеет смысла: попытка одна, а список
+    // фиксирован. Отправляем в обычную игру — там выбор режима и фильтров.
+    if (setRun) { location.href = '/game/'; return; }
+    startRun();
+  });
   $('btn-mistakes').addEventListener('click', function () {
     startRun({ mistakes: true });
   });
@@ -3136,6 +3226,37 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     }
     box.hidden = false;
   });
+
+  /* ---------- ЗАБЕГ ПО НАБОРУ ----------
+     Страницу открыли по коду: вместо обычного старта показываем карточку
+     набора. Списка вопросов у клиента НЕТ — сервер отдаёт их по одному,
+     как в любом забеге. */
+  (function initAutoSet() {
+    if (!AUTO_SET) return;
+    ['mode-grid', 'setup-bar', 'setup-panel', 'best-line', 'entry-row',
+     'records-box'].forEach(function (id) {
+      var el = $(id);
+      if (el) el.hidden = true;
+    });
+    $('set-intro').hidden = false;
+    $('set-kind').textContent = AUTO_SET.kind === 'daily' ? 'Вызов дня'
+      : AUTO_SET.kind === 'duel' ? 'Дуэль' : 'Набор';
+    $('set-title').textContent = AUTO_SET.title;
+    $('set-meta').textContent = 'Режим «' + AUTO_SET.mode_title + '» · '
+      + AUTO_SET.size + ' вопр. · код ' + AUTO_SET.code;
+    $('set-board-link').href = AUTO_SET.board_url;
+    if (!AUTO_SET.allowed) {
+      var btn = $('set-play');
+      btn.disabled = true;
+      btn.textContent = AUTO_SET.why || 'Играть нельзя';
+      $('set-note').textContent = AUTO_SET.why === 'Попытка уже использована'
+        ? 'Попытка на этот набор одна — результат уже на доске.'
+        : ($('set-note').textContent);
+    }
+    $('set-play').addEventListener('click', function () {
+      startRun({ setCode: AUTO_SET.code });
+    });
+  })();
 
   /* ---------- КОНФЕТТИ (canvas, ~1.5 с) ---------- */
   function confetti() {

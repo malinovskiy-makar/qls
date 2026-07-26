@@ -37,7 +37,8 @@ from django.views.decorators.http import require_GET, require_POST, require_safe
 from problems.management.commands.apply_topic_mapping import CANONICAL
 from . import sources as game_sources
 from .sources import GROUP_KEYS
-from .models import ArchetypeStat, GameQuestion, GameResult, make_result_code
+from .models import (ArchetypeStat, GameQuestion, GameResult, GameSet,
+                     make_result_code)
 from . import config, stats as stats_mod
 
 SESSION_KEY = 'econ_rush'        # состояние текущего забега
@@ -197,7 +198,13 @@ def _mode_payload(mode_key):
 
 @ensure_csrf_cookie
 def game_page(request):
-    """Страница игры: три экрана в одном шаблоне, управляются JS.
+    """Страница игры: три экрана в одном шаблоне, управляются JS."""
+    return render(request, 'game/game.html', _game_page_context(request))
+
+
+def _game_page_context(request):
+    """Контекст страницы игры. Общий у обычного входа и забега по набору
+    (`/game/s/<код>/`): страница одна, набор лишь подставляет очередь.
 
     ⚠️ Счётчиков у тем и источников на экране НЕТ, и «пустые» сочетания
     фильтров не гасятся — прямое указание Макара: фильтр работает так,
@@ -212,7 +219,9 @@ def game_page(request):
     pool_counts = {key: type_counts.get(m['question_type'], 0)
                    for key, m in config.MODES.items()}
 
-    return render(request, 'game/game.html', {
+    return {
+        'auto_set': None,
+        'auto_set_json': 'null',
         # Темы — все 21 каноническая, сгруппированы по колонкам панели.
         'topic_groups': [{'key': key, 'title': title, 'topics': names}
                          for key, title, names in config.TOPIC_GROUPS],
@@ -242,7 +251,7 @@ def game_page(request):
             'has_daily': HAS_DAILY,
             'has_duel': HAS_DUEL,
         }),
-    })
+    }
 
 
 def _question_payload(gq, number):
@@ -868,6 +877,193 @@ def api_session_start_mistakes(request):
     })
 
 
+# ---------------------------------------------------------------------------
+# Забег по НАБОРУ (вызов дня, набор учителя, дуэль — одна механика)
+# ---------------------------------------------------------------------------
+
+ATTEMPTS_KEY = 'econ_rush_sets_played'   # коды сыгранных наборов (сессия)
+
+
+def played_set_codes(request):
+    return request.session.get(ATTEMPTS_KEY) or []
+
+
+def mark_set_played(request, code):
+    codes = played_set_codes(request)
+    if code not in codes:
+        codes.append(code)
+        request.session[ATTEMPTS_KEY] = codes[-200:]
+
+
+def attempts_used(request, gset):
+    """Сколько попыток по набору уже израсходовано этим игроком.
+
+    Авторизованный — считаем по базе (надёжно). Аноним — по сессии и
+    localStorage клиента; ⚠️ это заведомо слабая защита, обходится чисткой
+    браузера. Так решено сознательно (решение в Notion): требование
+    регистрации убило бы публичность игры, ради которой она и делалась.
+    """
+    if request.user.is_authenticated:
+        return GameResult.objects.filter(game_set=gset,
+                                         user=request.user).count()
+    return 1 if gset.code in played_set_codes(request) else 0
+
+
+def set_run_allowed(request, gset):
+    """(можно ли играть, причина отказа)."""
+    now = timezone.now()
+    if gset.opens_at and now < gset.opens_at:
+        return False, 'Набор ещё не открыт'
+    if gset.closes_at and now >= gset.closes_at:
+        return False, 'Набор уже закрыт'
+    if attempts_used(request, gset) >= gset.attempts_allowed:
+        return False, 'Попытка уже использована'
+    return True, ''
+
+
+def start_set_state(request, gset):
+    """Состояние забега по набору: очередь = список набора целиком.
+
+    Добор из общего пула ЗАПРЕЩЁН (_pick_from_queue не добирает), значит
+    все игроки получат ровно те же вопросы в том же порядке. Вопрос мог
+    исчезнуть из кэша (пул пересобрали) — он молча пропускается, забег
+    станет короче: это не ошибка, а честное поведение кэша.
+    """
+    state = _new_state(gset.mode, None, gset.filter_snapshot)
+    state['queue'] = list(gset.question_ids or [])
+    state['set_code'] = gset.code
+    state['curated'] = True     # эскалации сложности тут нет: список задан
+    return state
+
+
+@require_GET
+def api_session_start_set(request, code):
+    """Начать забег по набору. Код нечувствителен к регистру и пробелам."""
+    gset = get_object_or_404(GameSet, code=make_code_lookup(code))
+    if gset.mode not in config.MODES:
+        return JsonResponse({'error': 'Неизвестный режим набора'}, status=400)
+    allowed, why = set_run_allowed(request, gset)
+    if not allowed:
+        return JsonResponse({'error': why}, status=409)
+
+    state = start_set_state(request, gset)
+    gq = _pick_next(request, state)
+    request.session[SESSION_KEY] = state
+    payload = {
+        'ok': True,
+        'mode': _mode_payload(gset.mode),
+        'lives': state['lives'],
+        'filter': normalize_filter(gset.filter_snapshot),
+        'set': {'code': gset.code, 'kind': gset.kind, 'title': gset.title,
+                'size': gset.size},
+        'question': _question_payload(gq, 1) if gq else None,
+    }
+    if gq is None:
+        payload['pool_empty'] = True
+    return JsonResponse(payload)
+
+
+def make_code_lookup(raw):
+    """Код из адреса — в нормальную форму (регистр и пробелы не значат)."""
+    from .models import normalize_code
+    return normalize_code(raw)
+
+
+@ensure_csrf_cookie
+@require_safe
+def set_page(request, code):
+    """Страница забега по набору `/game/s/<код>/`.
+
+    Это та же страница игры: набор просто подставляет курированную очередь.
+    Отдельного экрана с превью вопросов НЕТ и быть не может — иначе автор
+    дуэли увидел бы задания до игры.
+
+    ⚠️ ensure_csrf_cookie обязателен: со страницы уходят POST-ы ответов, и
+    без куки они получают 403 (ловилось в браузере — забег молча вставал
+    на первом же ответе).
+    """
+    gset = get_object_or_404(GameSet, code=make_code_lookup(code))
+    allowed, why = set_run_allowed(request, gset)
+    ctx = _game_page_context(request)
+    ctx['auto_set'] = {
+        'code': gset.code,
+        'kind': gset.kind,
+        'title': gset.title or dict(GameSet.KINDS).get(gset.kind, 'Набор'),
+        'size': gset.size,
+        'mode': gset.mode,
+        'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
+        'allowed': allowed,
+        'why': why,
+        'board_url': reverse('game:set_board', args=[gset.code]),
+    }
+    ctx['auto_set_json'] = json.dumps(ctx['auto_set'])
+    return render(request, 'game/game.html', ctx)
+
+
+@require_safe
+def set_board(request, code):
+    """Доска набора: кто прошёл и на каких вопросах посыпался класс."""
+    gset = get_object_or_404(GameSet, code=make_code_lookup(code))
+    rows = list(gset.results.select_related('user').order_by(
+        '-score', 'created_at'))
+    board = [{
+        'place': i + 1,
+        'name': (r.user.username if r.user else 'аноним'),
+        'score': r.score,
+        'accuracy': r.accuracy,
+        'max_combo': r.max_combo,
+        'reason': r.ended_reason,
+        'at': r.created_at,
+        'is_me': bool(request.user.is_authenticated
+                      and r.user_id == request.user.id),
+    } for i, r in enumerate(rows)]
+    return render(request, 'game/set_board.html', {
+        'gset': gset,
+        'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
+        'board': board,
+        'questions': set_question_stats(gset),
+        'play_url': reverse('game:set_page', args=[gset.code]),
+    })
+
+
+def set_question_stats(gset):
+    """Разбивка по вопросам НАБОРА — самое ценное для учителя.
+
+    Доля верных считается ВНУТРИ набора (по журналам его забегов), а не по
+    всему сайту: учителю важно, на чём посыпался его класс, а не средний
+    игрок интернета.
+
+    Журналы забегов лежат в сессиях игроков и до нас не доходят — поэтому
+    считаем по сохранённым результатам: у каждого результата есть разбивка
+    по вопросам (question_outcomes), которую кладёт finish.
+    """
+    counts = {}
+    for r in gset.results.all():
+        for item in (r.question_outcomes or []):
+            cell = counts.setdefault(item.get('question_id'),
+                                     {'correct': 0, 'wrong': 0, 'skip': 0})
+            outcome = item.get('outcome')
+            if outcome in cell:
+                cell[outcome] += 1
+    rows = []
+    order = list(gset.question_ids or [])
+    texts = dict(GameQuestion.objects.filter(id__in=order)
+                 .values_list('id', 'question'))
+    for i, qid in enumerate(order):
+        cell = counts.get(qid, {'correct': 0, 'wrong': 0, 'skip': 0})
+        tries = cell['correct'] + cell['wrong']
+        rows.append({
+            'number': i + 1,
+            'id': qid,
+            'text': (texts.get(qid) or '(вопрос исчез из пула)')[:160],
+            'correct': cell['correct'],
+            'wrong': cell['wrong'],
+            'skip': cell['skip'],
+            'percent': round(100 * cell['correct'] / tries) if tries else None,
+        })
+    return rows
+
+
 @require_POST
 def api_session_finish(request):
     """Завершить забег и получить сводку.
@@ -933,6 +1129,12 @@ def _save_result(request, state, summary):
     """
     code = state.get('result_code')
     result = GameResult.objects.filter(code=code).first() if code else None
+    # Забег по набору попадает на его доску. Попытка засчитывается ровно
+    # здесь, при сохранении результата: начатый и брошенный забег попытку
+    # не тратит.
+    gset = None
+    if state.get('set_code'):
+        gset = GameSet.objects.filter(code=state['set_code']).first()
     if result is None:
         for _ in range(5):   # коллизия кода почти невероятна, но не 500
             try:
@@ -947,6 +1149,13 @@ def _save_result(request, state, summary):
                     topic_breakdown=summary['topic_rows'],
                     difficulty_breakdown=summary['difficulty'],
                     score_curve=summary['score_curve'],
+                    question_outcomes=[
+                        {'question_id': r['question_id'],
+                         'number': r['number'],
+                         'outcome': r['outcome']}
+                        for r in (state.get('log') or [])],
+                    game_set=gset,
+                    user=request.user if request.user.is_authenticated else None,
                 )
                 break
             except IntegrityError:
@@ -955,11 +1164,22 @@ def _save_result(request, state, summary):
             return None      # не смогли сохранить — забег важнее ссылки
         state['result_code'] = result.code
         request.session[SESSION_KEY] = state
-    return {
+        if gset is not None:
+            mark_set_played(request, gset.code)
+    out = {
         'code': result.code,
         'url': request.build_absolute_uri(
             reverse('game:result', args=[result.code])),
     }
+    if gset is not None:
+        out['set'] = {
+            'code': gset.code,
+            'kind': gset.kind,
+            'title': gset.title,
+            'board_url': request.build_absolute_uri(
+                reverse('game:set_board', args=[gset.code])),
+        }
+    return out
 
 
 @require_safe
