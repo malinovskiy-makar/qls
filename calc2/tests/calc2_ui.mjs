@@ -544,6 +544,68 @@ await t('нет ИИ-штампов в видимом тексте', () => page.
   return found.length === 0 || found.join(', ');
 }));
 
+/* --- Переименование ключевых точек прямо на графике --------------------- */
+await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
+await page.evaluate(() => openPicker());
+await page.click('.scard[data-scene="m-optimum"]');
+await page.waitForTimeout(420);
+
+// У подписи висит дочерний <title> с всплывающей подсказкой, поэтому всюду
+// ниже берём только собственные текстовые узлы, а не textContent.
+await t('машина сама подписала максимум, минимум и перегиб', () => page.evaluate(() => {
+  const own = (el) => Array.prototype.filter.call(el.childNodes, n => n.nodeType === 3)
+    .map(n => n.nodeValue).join('');
+  const names = [...document.querySelectorAll('#chart text')].map(own);
+  const has = (re) => names.some(s => re.test(s));
+  return (has(/^max /) && has(/^min /) && has(/^перегиб/)) || names.join(' | ');
+}));
+
+await t('щелчок по подписи открывает переименование', async () => {
+  await page.locator('#chart text', { hasText: 'max' }).first().click();
+  await page.waitForTimeout(220);
+  const n = await page.locator('#pt-rename').count();
+  const v = n ? await page.locator('#pt-rename').inputValue() : '';
+  return (n === 1 && /^max /.test(v)) || `полей ${n}, значение «${v}»`;
+});
+
+await t('Enter сохраняет своё имя точки', async () => {
+  await page.fill('#pt-rename', 'Точка выхода');
+  await page.press('#pt-rename', 'Enter');
+  await page.waitForTimeout(300);
+  return await page.evaluate(() => {
+    const own = (el) => Array.prototype.filter.call(el.childNodes, n => n.nodeType === 3)
+      .map(n => n.nodeValue).join('');
+    const onChart = [...document.querySelectorAll('#chart text')].some(t => own(t) === 'Точка выхода');
+    const gone = !document.getElementById('pt-rename');
+    return (onChart && gone && STATE.pointNames.ext0 === 'Точка выхода')
+           || JSON.stringify({ onChart, gone, names: STATE.pointNames });
+  });
+});
+
+await t('своё имя точки уходит в экспорт, подсказка нет', () => page.evaluate(() => {
+  const tex = buildTex('', '');
+  return (tex.includes('Точка выхода') && !tex.includes('переименовать'))
+         || 'имя ' + tex.includes('Точка выхода') + ', подсказка ' + tex.includes('переименовать');
+}));
+
+await t('Esc отменяет переименование', async () => {
+  await page.locator('#chart text', { hasText: 'перегиб' }).first().click();
+  await page.waitForTimeout(200);
+  await page.fill('#pt-rename', 'НЕ СОХРАНЯТЬ');
+  await page.press('#pt-rename', 'Escape');
+  await page.waitForTimeout(260);
+  return await page.evaluate(() =>
+    !Object.values(STATE.pointNames).includes('НЕ СОХРАНЯТЬ') || 'сохранилось вопреки Esc');
+});
+
+await t('смена сцены сбрасывает свои имена точек', async () => {
+  await page.evaluate(() => openPicker());
+  await page.click('.scard[data-scene="m-tangent"]');
+  await page.waitForTimeout(330);
+  return await page.evaluate(() =>
+    Object.keys(STATE.pointNames).length === 0 || JSON.stringify(STATE.pointNames));
+});
+
 /* --- Роль кривой спрашивается до формулы -------------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.evaluate(() => openPicker());

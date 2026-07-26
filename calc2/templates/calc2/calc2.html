@@ -2828,6 +2828,9 @@ const STATE = {
   // сцену или не щёлкнет по графику дважды.
   zoomLock: false,
   showLegend: true,   // подписи к закрашенным областям под заголовком графика
+  // Свои названия ключевых точек: ключ вида 'ext0' / 'inf1' / 'opt' → текст.
+  // Пусто — показывается машинное имя («max 12.5», «перегиб»).
+  pointNames: {},
   // ── Раздел «Математика» (Фаза 7). Единственный режим с полным планом:
   // окно задаётся четырьмя границами, а не Qmax/Pmax первой четверти.
   mathSub: 'tangent',            // сюжет: tangent|optimum|transform|inverse|minmax|constraint
@@ -10427,6 +10430,8 @@ function armMark(on) {
 function resetDecor() {
   STATE.graphTitle = ''; STATE.axisXName = ''; STATE.axisYName = '';
   STATE.marks = []; markCounter = 0;
+  STATE.pointNames = {};   // свои названия ключевых точек — тоже оформление сцены
+  const ren = document.getElementById('pt-rename'); if (ren) ren.remove();
   armMark(false);
   [['inp-gtitle', ''], ['inp-xname', ''], ['inp-yname', '']].forEach(([id, v]) => {
     const e = document.getElementById(id); if (e) e.value = v;
@@ -10691,12 +10696,57 @@ function mathLine(g, f, mx, my, color, width, dash) {
   return pts;
 }
 
-function mathDot(g, mx, my, x, y, color, label, dy) {
+/* Точка с подписью. Если передан key, подпись можно переименовать прямо на
+   графике: щелчок по тексту открывает поле ввода на его месте. «max 12.5» это
+   то, что нашла машина, а назвать точку в своей задаче человек хочет по-своему
+   («точка выхода», «оптимум фирмы»). Имена живут в STATE.pointNames и
+   сбрасываются вместе с остальным оформлением при смене сцены. */
+function mathDot(g, mx, my, x, y, color, label, dy, key) {
   g.append('circle').attr('cx', mx(x)).attr('cy', my(y)).attr('r', 4.5)
     .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.6);
-  if (label) g.append('text').attr('x', mx(x) + 8).attr('y', my(y) + (dy == null ? -8 : dy))
+  if (!label) return;
+  const shown = (key && STATE.pointNames[key] != null) ? STATE.pointNames[key] : label;
+  if (!shown) return;
+  const tx = mx(x) + 8, ty = my(y) + (dy == null ? -8 : dy);
+  const t = g.append('text').attr('x', tx).attr('y', ty)
     .attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6).text(label);
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6).text(shown);
+  if (!key) return;
+  t.style('cursor', 'text').append('title').text('Щёлкните, чтобы переименовать точку');
+  t.on('click', (ev) => { ev.stopPropagation(); editPointName(key, shown, tx, ty); });
+}
+
+/* Поле ввода поверх графика на месте подписи. Enter и уход фокуса сохраняют,
+   Esc отменяет, пустая строка возвращает машинное имя. */
+function editPointName(key, current, px, py) {
+  const wrap = document.getElementById('graph-wrap');
+  if (!wrap) return;
+  const old = document.getElementById('pt-rename');
+  if (old) old.remove();
+  const inp = document.createElement('input');
+  inp.id = 'pt-rename'; inp.type = 'text'; inp.value = current;
+  inp.style.cssText = 'position:absolute;z-index:40;font-size:11px;font-weight:600;padding:2px 5px;'
+    + 'border:1px solid var(--accent);border-radius:var(--r-sm);background:var(--surface);'
+    + 'color:var(--text);min-width:110px;'
+    + 'left:' + Math.round(px) + 'px;top:' + Math.round(py - 16) + 'px;';
+  let done = false;
+  const finish = (save) => {
+    if (done) return;
+    done = true;
+    if (save) {
+      const v = inp.value.trim();
+      if (v) STATE.pointNames[key] = v; else delete STATE.pointNames[key];
+    }
+    inp.remove();
+    redrawAll();
+  };
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  inp.addEventListener('blur', () => finish(true));
+  wrap.appendChild(inp);
+  inp.focus(); inp.select();
 }
 
 /* ── 7а. Производная и касательная ─────────────────────────────────────
@@ -10774,7 +10824,7 @@ function drawMathTangent(f) {
   dot.call(d3.drag().container(() => svg.node()).on('drag', (ev) => {
     setMathX0(Math.max(STATE.mathXmin, Math.min(STATE.mathXmax, s1.mx.invert(ev.x))));
   }));
-  if (!isNaN(k)) mathDot(g, s2.mx, s2.my, x0, k, COL.MC, 'f′ = ' + fmt(k));
+  if (!isNaN(k)) mathDot(g, s2.mx, s2.my, x0, k, COL.MC, 'f′ = ' + fmt(k), null, 'deriv');
   updateMathPanel();
 }
 
@@ -10800,14 +10850,15 @@ function drawMathOptimum(f) {
 
   const a = mathAnalyse(f, lo, hi);
   STATE.mathRes = a;
-  a.ext.forEach(p => {
+  a.ext.forEach((p, i) => {
     if (p.y < my.domain()[0] || p.y > my.domain()[1]) return;
     mathDot(g, mx, my, p.x, p.y, p.kind === 'max' ? COL.S : COL.MC,
-            (p.kind === 'max' ? 'max' : (p.kind === 'min' ? 'min' : 'плато')) + ' ' + fmt(p.y));
+            (p.kind === 'max' ? 'max' : (p.kind === 'min' ? 'min' : 'плато')) + ' ' + fmt(p.y),
+            null, 'ext' + i);
   });
-  if (STATE.mathInflect) a.inf.forEach(p => {
+  if (STATE.mathInflect) a.inf.forEach((p, i) => {
     if (p.y < my.domain()[0] || p.y > my.domain()[1]) return;
-    mathDot(g, mx, my, p.x, p.y, COL.MR, 'перегиб', 14);
+    mathDot(g, mx, my, p.x, p.y, COL.MR, 'перегиб', 14, 'inf' + i);
   });
   updateMathPanel();
 }
@@ -10954,7 +11005,7 @@ function drawMathConstraint() {
     // Веер линий уровня + линия, проходящая через оптимум (она и касается ограничения).
     [0.55, 0.78, 1.25].forEach(k => drawLevelCurveOn(g, mx, my, f, opt.value * k, COL.D, 1.5, 0.32));
     drawLevelCurveOn(g, mx, my, f, opt.value, COL.D, 2.6, 1);
-    mathDot(g, mx, my, opt.a, opt.b, COL.ink, 'оптимум (' + fmt(opt.a) + '; ' + fmt(opt.b) + ')');
+    mathDot(g, mx, my, opt.a, opt.b, COL.ink, 'оптимум (' + fmt(opt.a) + '; ' + fmt(opt.b) + ')', null, 'opt');
   }
   updateMathPanel();
 }
@@ -11323,7 +11374,11 @@ function buildTex(title, label) {
         if (hasFill) push(myClip, '\\fill[' + fillOpts(el, cs) + '] ' + pt(c) + ' circle[radius=' + rad + '];');
         if (hasStroke) push(myClip, '\\draw[' + strokeOpts(el, cs) + '] ' + pt(c) + ' circle[radius=' + rad + '];');
       } else if (tag === 'text') {
-        const txt = texText(el.textContent || '');
+        // Только собственные текстовые узлы: у подписи может висеть дочерний
+        // <title> с всплывающей подсказкой, и textContent втянул бы её в файл.
+        const raw = Array.prototype.filter.call(el.childNodes, n => n.nodeType === 3)
+          .map(n => n.nodeValue).join('');
+        const txt = texText(raw);
         if (!txt.trim()) continue;
         // Якорь узла собираем из text-anchor (по горизонтали) и dominant-baseline
         // (по вертикали): в SVG y текста — это базовая линия.
