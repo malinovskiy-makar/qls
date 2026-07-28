@@ -21,6 +21,9 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
+
+from .review_categories import CATEGORY_CHOICES
 
 
 # ---------------------------------------------------------------------------
@@ -1159,3 +1162,38 @@ class AutoTopicAssignment(models.Model):
 
     def __str__(self):
         return f'#{self.problem_id} → {self.topic} ({self.neighbor_votes}/10)'
+
+
+class ReviewVerdict(models.Model):
+    """Вердикт ручного ревью внешнего вида задачи (офлайн-пакеты снимков).
+
+    Ревьюер смотрит офлайн-снимок боевой страницы задачи (reviewer.html из
+    пакета export_review_bundle) и жмёт клавишу вердикта. Вердикты приезжают
+    JSON-файлом и импортируются командой import_review_verdicts.
+
+    На пару (задача, ревьюер) — ровно один вердикт: повторный импорт или
+    пересмотр решения ОБНОВЛЯЕТ запись, а не плодит дубли (это и делает
+    импорт идемпотентным). Категории — problems/review_categories.py.
+    """
+
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE,
+                                related_name='review_verdicts',
+                                verbose_name='Задача')
+    category = models.CharField('Категория', max_length=32,
+                                choices=CATEGORY_CHOICES)
+    comment = models.TextField('Комментарий', blank=True)
+    reviewer = models.CharField('Ревьюер', max_length=64, blank=True)
+    # Не auto_now_add: при импорте сюда пишется момент вердикта из JSON
+    # (когда ревьюер нажал клавишу), а не момент импорта.
+    created_at = models.DateTimeField('Когда вынесен', default=timezone.now)
+
+    class Meta:
+        verbose_name = 'Вердикт ревью'
+        verbose_name_plural = 'Вердикты ревью'
+        constraints = [
+            models.UniqueConstraint(fields=['problem', 'reviewer'],
+                                    name='uniq_review_verdict_per_reviewer'),
+        ]
+
+    def __str__(self):
+        return f'#{self.problem_id}: {self.get_category_display()} ({self.reviewer or "аноним"})'

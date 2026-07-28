@@ -32,6 +32,7 @@ from .models import (
     Problem,
     ProblemPart,
     ProblemVersion,
+    ReviewVerdict,
     Rubric,
     RubricCriterion,
     Skill,
@@ -776,3 +777,13 @@ class CalendarEventAdmin(admin.ModelAdmin):
     search_fields = ['title', 'description']
     date_hierarchy = 'start_datetime'
     raw_id_fields = ['assignment', 'parent_event']
+
+
+@admin.register(ReviewVerdict)
+class ReviewVerdictAdmin(admin.ModelAdmin):
+    """Вердикты ручного ревью внешнего вида (импорт из офлайн-пакетов)."""
+    list_display = ['problem', 'category', 'reviewer', 'comment', 'created_at']
+    list_filter = ['category', 'reviewer']
+    search_fields = ['problem__id', 'comment']
+    raw_id_fields = ['problem']
+    date_hierarchy = 'created_at'

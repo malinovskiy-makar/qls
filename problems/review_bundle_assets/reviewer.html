@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ревью задач — офлайн-пакет</title>
+<!--
+  Оболочка ручного ревью внешнего вида задач. Открывается двойным кликом
+  (file://) в Chrome, интернет не нужен. Список задач и категории вердиктов
+  приходят из manifest.js (его пишет команда export_review_bundle) — здесь
+  НИЧЕГО не хардкодится. Вердикты живут в localStorage браузера и выгружаются
+  кнопкой в JSON-файл для команды import_review_verdicts.
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px; color: #1a1a1a; background: #f2f2f4;
+    display: flex; overflow: hidden;
+  }
+  /* ── Левая панель ── */
+  #panel {
+    width: 360px; min-width: 360px; height: 100%; overflow-y: auto;
+    background: #fff; border-right: 1px solid #ddd;
+    padding: 16px; display: flex; flex-direction: column; gap: 12px;
+  }
+  h1 { font-size: 15px; font-weight: 700; }
+  .muted { color: #666; font-size: 12px; }
+  /* прогресс */
+  #progress-bar { height: 6px; background: #e8e8ec; border-radius: 3px; overflow: hidden; }
+  #progress-fill { height: 100%; width: 0; background: #BE185D; transition: width .2s; }
+  /* карточка текущей задачи */
+  #meta { background: #f7f7f9; border: 1px solid #e3e3e8; border-radius: 8px; padding: 10px 12px; }
+  #meta .title { font-weight: 600; margin: 2px 0 4px; line-height: 1.35; }
+  /* текущий вердикт */
+  #current-verdict { font-size: 13px; padding: 7px 12px; border-radius: 8px;
+    background: #f2f2f4; border: 1px dashed #ccc; color: #666; }
+  #current-verdict.has { border-style: solid; }
+  #current-verdict.ok       { background: #e8f5ec; border-color: #1d7e45; color: #1d7e45; }
+  #current-verdict.defect   { background: #fdf1e3; border-color: #b26b00; color: #8a5300; }
+  #current-verdict.disputed { background: #eee; border-color: #888; color: #555; }
+  /* кнопки вердиктов */
+  #buttons { display: flex; flex-direction: column; gap: 6px; }
+  .vbtn {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 8px 10px; border-radius: 8px; border: 1px solid #d8d8de;
+    background: #fff; cursor: pointer; font-size: 13px; text-align: left;
+    transition: background .1s, border-color .1s;
+  }
+  .vbtn:hover { background: #f7f7f9; border-color: #bbb; }
+  .vbtn .key {
+    min-width: 22px; height: 22px; border-radius: 5px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px; color: #fff; background: #999; flex-shrink: 0;
+  }
+  .vbtn.ok .key { background: #1d7e45; }
+  .vbtn.defect .key { background: #b26b00; }
+  .vbtn.disputed .key { background: #777; }
+  .vbtn .cnt { margin-left: auto; color: #999; font-size: 12px; }
+  .vbtn.active { border-color: #BE185D; background: #fdf2f7; }
+  /* комментарий */
+  #comment { width: 100%; min-height: 52px; resize: vertical; padding: 8px 10px;
+    border: 1px solid #d8d8de; border-radius: 8px; font: inherit; font-size: 13px; }
+  #comment:focus { outline: 2px solid #BE185D; outline-offset: 1px; }
+  /* навигация */
+  #nav-row { display: flex; gap: 6px; }
+  .nbtn { flex: 1; padding: 7px 4px; border: 1px solid #d8d8de; border-radius: 8px;
+    background: #fff; cursor: pointer; font-size: 12.5px; }
+  .nbtn:hover { background: #f7f7f9; }
+  #goto-row { display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: #666; }
+  #goto { width: 76px; padding: 6px 8px; border: 1px solid #d8d8de; border-radius: 8px; font: inherit; }
+  /* сервис */
+  input[type=text] { width: 100%; padding: 7px 10px; border: 1px solid #d8d8de;
+    border-radius: 8px; font: inherit; font-size: 13px; }
+  .row-label { font-size: 12px; color: #666; margin-bottom: 3px; }
+  .big-btn { width: 100%; padding: 10px; border: none; border-radius: 8px;
+    background: #333; color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .big-btn:hover { background: #222; }
+  .ghost-btn { width: 100%; padding: 8px; border: 1px solid #d8d8de; border-radius: 8px;
+    background: #fff; color: #333; font-size: 12.5px; cursor: pointer; }
+  #banner { display: none; background: #fdecec; border: 1px solid #c0392b; color: #7c261b;
+    border-radius: 8px; padding: 9px 12px; font-size: 12.5px; line-height: 1.45; }
+  #flash { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+    background: #333; color: #fff; padding: 9px 16px; border-radius: 8px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 50; }
+  #flash.show { opacity: 1; }
+  label.chk { display: flex; gap: 7px; align-items: flex-start; font-size: 12px; color: #666;
+    line-height: 1.4; cursor: pointer; }
+  details.help { font-size: 12px; color: #666; }
+  details.help summary { cursor: pointer; font-weight: 600; }
+  details.help td { padding: 2px 8px 2px 0; vertical-align: top; }
+  /* ── Правая часть: снимок ── */
+  #main { flex: 1; height: 100%; }
+  #frame { width: 100%; height: 100%; border: none; background: #fff; }
+  #fatal { padding: 40px; font-size: 15px; line-height: 1.6; max-width: 640px; }
+</style>
+</head>
+<body>
+
+<div id="fatal" hidden>
+  <h1>Не удалось открыть пакет</h1>
+  <p style="margin-top:12px">Рядом с reviewer.html не найден файл <b>manifest.js</b>.
+  Скорее всего, пакет распакован не полностью или файлы переименованы/перемещены.
+  Распакуйте архив заново и откройте reviewer.html из его корня, ничего не переименовывая.</p>
+</div>
+
+<aside id="panel" hidden>
+  <div>
+    <h1 id="bundle-title">Ревью задач</h1>
+    <div class="muted" id="progress-text">—</div>
+    <div id="progress-bar" style="margin-top:6px"><div id="progress-fill"></div></div>
+  </div>
+
+  <div id="banner"></div>
+
+  <div id="meta">
+    <div class="muted" id="meta-pos">—</div>
+    <div class="title" id="meta-title">—</div>
+    <div class="muted" id="meta-source"></div>
+  </div>
+
+  <div id="current-verdict">Вердикта пока нет</div>
+
+  <div id="buttons"></div>
+
+  <div>
+    <div class="row-label">Комментарий (обязателен для «Прочее», можно к любому вердикту; Enter — сохранить и дальше)</div>
+    <textarea id="comment" placeholder="Что именно не так…"></textarea>
+  </div>
+
+  <div id="nav-row">
+    <button class="nbtn" id="btn-prev" title="Стрелка влево">← Назад</button>
+    <button class="nbtn" id="btn-next" title="Стрелка вправо">Вперёд →</button>
+    <button class="nbtn" id="btn-first-unreviewed" title="К первой задаче без вердикта">К непроверенной</button>
+  </div>
+  <div id="goto-row">
+    <span>Перейти к №</span>
+    <input id="goto" type="number" min="1">
+    <span id="goto-max"></span>
+  </div>
+
+  <div>
+    <div class="row-label">Ваше имя (попадёт в файл вердиктов)</div>
+    <input type="text" id="reviewer" placeholder="Например: Ксения">
+  </div>
+
+  <label class="chk">
+    <input type="checkbox" id="keys-lock" checked>
+    <span>Клавиши работают всегда (снимите галочку, если нужно выделить текст задачи мышкой)</span>
+  </label>
+
+  <button class="big-btn" id="btn-download">Скачать вердикты (JSON)</button>
+  <div class="muted" id="download-hint" style="text-align:center">—</div>
+  <button class="ghost-btn" id="btn-import">Импорт вердиктов (продолжить с другого компьютера)</button>
+  <input type="file" id="import-file" accept=".json,application/json" hidden>
+
+  <details class="help">
+    <summary>Клавиши</summary>
+    <table style="margin-top:6px">
+      <tr><td><b>1–9</b></td><td>вердикт (список выше) и переход дальше</td></tr>
+      <tr><td><b>← →</b></td><td>листать без вердикта</td></tr>
+      <tr><td><b>Backspace</b></td><td>убрать вердикт текущей задачи</td></tr>
+      <tr><td><b>C</b></td><td>перейти в поле комментария</td></tr>
+      <tr><td><b>Esc</b></td><td>выйти из поля ввода</td></tr>
+    </table>
+  </details>
+</aside>
+
+<main id="main"><iframe id="frame" title="Снимок задачи"></iframe></main>
+<div id="flash"></div>
+
+<script src="manifest.js"></script>
+<script>
+(function () {
+  'use strict';
+  var M = window.REVIEW_MANIFEST;
+  if (!M || !M.problems || !M.problems.length) {
+    document.getElementById('fatal').hidden = false;
+    return;
+  }
+  document.getElementById('panel').hidden = false;
+
+  var problems = M.problems;
+  var cats = M.categories;
+  var byHotkey = {};
+  var byKey = {};
+  cats.forEach(function (c) { byHotkey[c.hotkey] = c; byKey[c.key] = c; });
+
+  // ── Хранилище: localStorage, а при его недоступности — режим «в памяти» ──
+  var STORE_KEY = 'qls_review::' + M.bundle_id;
+  var memoryMode = false;
+  var memoryStore = null;
+  try {
+    localStorage.setItem(STORE_KEY + '::probe', '1');
+    localStorage.removeItem(STORE_KEY + '::probe');
+  } catch (e) { memoryMode = true; }
+
+  function loadState() {
+    if (memoryMode) return memoryStore;
+    try { return JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { return null; }
+  }
+  function persist() {
+    if (memoryMode) { memoryStore = state; return; }
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+    catch (e) { memoryMode = true; memoryStore = state; showBanner(); }
+  }
+
+  var state = loadState() || { reviewer: '', idx: 0, verdicts: {}, sinceDownload: 0 };
+  if (state.idx >= problems.length) state.idx = 0;
+
+  function showBanner() {
+    var b = document.getElementById('banner');
+    if (memoryMode) {
+      b.style.display = 'block';
+      b.innerHTML = '<b>Внимание: браузер не сохраняет вердикты между запусками.</b> ' +
+        'Всё живёт только в памяти этой вкладки. НЕ закрывайте её, ' +
+        'а «Скачать вердикты (JSON)» нажимайте как можно чаще — это единственная защита от потери.';
+    } else {
+      b.style.display = 'none';
+    }
+  }
+  showBanner();
+
+  // ── Отрисовка ──
+  var $ = function (id) { return document.getElementById(id); };
+  var frame = $('frame'), commentEl = $('comment');
+
+  $('bundle-title').textContent = 'Ревью: ' + M.bundle_id + ' (' + problems.length + ' задач)';
+  $('goto').max = problems.length;
+  $('goto-max').textContent = 'из ' + problems.length;
+  $('reviewer').value = state.reviewer || '';
+
+  // Кнопки вердиктов строятся из манифеста — единственного источника категорий.
+  cats.forEach(function (c) {
+    var b = document.createElement('button');
+    b.className = 'vbtn ' + c.kind;
+    b.innerHTML = '<span class="key">' + c.hotkey + '</span><span>' + esc(c.label) +
+                  '</span><span class="cnt" data-cnt="' + c.key + '"></span>';
+    b.addEventListener('click', function () { setVerdict(c); });
+    $('buttons').appendChild(b);
+  });
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function reviewedCount() { return Object.keys(state.verdicts).length; }
+
+  function render() {
+    var p = problems[state.idx];
+    frame.src = p.file;
+    $('meta-pos').textContent = '№ ' + (state.idx + 1) + ' из ' + problems.length + ' · задача #' + p.id;
+    $('meta-title').textContent = p.title;
+    $('meta-source').textContent = p.source || '';
+
+    var done = reviewedCount();
+    $('progress-text').textContent = 'Проверено ' + done + ' из ' + problems.length;
+    $('progress-fill').style.width = (100 * done / problems.length) + '%';
+
+    var counts = {};
+    Object.keys(state.verdicts).forEach(function (id) {
+      var k = state.verdicts[id].category; counts[k] = (counts[k] || 0) + 1;
+    });
+    cats.forEach(function (c) {
+      document.querySelector('[data-cnt="' + c.key + '"]').textContent = counts[c.key] || '';
+    });
+
+    var v = state.verdicts[p.id];
+    var cv = $('current-verdict');
+    document.querySelectorAll('.vbtn').forEach(function (b, i) {
+      b.classList.toggle('active', !!v && cats[i].key === v.category);
+    });
+    if (v && byKey[v.category]) {
+      cv.textContent = 'Вердикт: ' + byKey[v.category].label + (v.comment ? ' — «' + v.comment + '»' : '');
+      cv.className = 'has ' + byKey[v.category].kind;
+      commentEl.value = v.comment || '';
+    } else {
+      cv.textContent = 'Вердикта пока нет';
+      cv.className = '';
+      commentEl.value = '';
+    }
+
+    $('download-hint').textContent = state.sinceDownload
+      ? 'Не выгружено вердиктов: ' + state.sinceDownload
+      : 'Все вердикты выгружены';
+  }
+
+  function flash(msg) {
+    var f = $('flash');
+    f.textContent = msg; f.classList.add('show');
+    clearTimeout(flash._t);
+    flash._t = setTimeout(function () { f.classList.remove('show'); }, 1800);
+  }
+
+  // ── Вердикты ──
+  function setVerdict(cat) {
+    var p = problems[state.idx];
+    var comment = commentEl.value.trim();
+    state.verdicts[p.id] = { category: cat.key, comment: comment, at: new Date().toISOString() };
+    state.sinceDownload = (state.sinceDownload || 0) + 1;
+    persist();
+    if (cat.key === 'other' && !comment) {
+      render();
+      flash('«Прочее» — допишите комментарий и нажмите Enter');
+      commentEl.focus();
+      return;
+    }
+    maybeAutoDownload();
+    go(state.idx + 1);
+  }
+
+  function attachComment() {
+    var p = problems[state.idx];
+    var v = state.verdicts[p.id];
+    if (!v) { flash('Сначала вердикт — клавиши 1–9'); return; }
+    v.comment = commentEl.value.trim();
+    v.at = new Date().toISOString();
+    persist();
+    commentEl.blur();
+    maybeAutoDownload();
+    go(state.idx + 1);
+  }
+
+  function removeVerdict() {
+    var p = problems[state.idx];
+    if (state.verdicts[p.id]) {
+      delete state.verdicts[p.id];
+      persist(); render(); flash('Вердикт убран');
+    }
+  }
+
+  // ── Навигация ──
+  function go(i) {
+    if (i < 0) i = 0;
+    if (i >= problems.length) { i = problems.length - 1; flash('Это последняя задача'); }
+    state.idx = i; persist(); render();
+  }
+  function firstUnreviewed() {
+    for (var i = 0; i < problems.length; i++) {
+      if (!state.verdicts[problems[i].id]) return go(i);
+    }
+    flash('Все задачи проверены — ура!');
+  }
+
+  // ── Выгрузка / импорт ──
+  function downloadVerdicts(auto) {
+    var list = Object.keys(state.verdicts).map(function (id) {
+      var v = state.verdicts[id];
+      return { problem_id: parseInt(id, 10), category: v.category, comment: v.comment || '', at: v.at };
+    });
+    var payload = {
+      format: 'qls-review-verdicts-v1',
+      bundle_id: M.bundle_id,
+      reviewer: state.reviewer || '',
+      exported_at: new Date().toISOString(),
+      count: list.length,
+      verdicts: list
+    };
+    var name = 'verdicts_' + M.bundle_id + '_' +
+      new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '') + '.json';
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 1)],
+                                          { type: 'application/json' }));
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    state.sinceDownload = 0; persist(); render();
+    flash(auto ? 'Автосохранение: скачан файл вердиктов' : 'Файл вердиктов скачан: ' + name);
+  }
+  function maybeAutoDownload() {
+    if ((state.sinceDownload || 0) >= 100) downloadVerdicts(true);
+  }
+
+  function importVerdicts(file) {
+    var r = new FileReader();
+    r.onload = function () {
+      var data;
+      try { data = JSON.parse(r.result); } catch (e) { flash('Файл не читается как JSON'); return; }
+      if (!data || data.format !== 'qls-review-verdicts-v1' || !Array.isArray(data.verdicts)) {
+        flash('Это не файл вердиктов этого формата'); return;
+      }
+      if (data.bundle_id && data.bundle_id !== M.bundle_id &&
+          !confirm('Файл от другого пакета (' + data.bundle_id + '). Всё равно импортировать?')) return;
+      var added = 0, updated = 0;
+      data.verdicts.forEach(function (v) {
+        if (!v || !v.problem_id || !byKey[v.category]) return;
+        var cur = state.verdicts[v.problem_id];
+        // новее — побеждает; так продолжение с другого компьютера не съедает свежее
+        if (!cur) { added++; }
+        else if ((v.at || '') > (cur.at || '')) { updated++; }
+        else return;
+        state.verdicts[v.problem_id] = { category: v.category, comment: v.comment || '', at: v.at || '' };
+      });
+      if (data.reviewer && !state.reviewer) {
+        state.reviewer = data.reviewer;
+        $('reviewer').value = data.reviewer;
+      }
+      persist(); render();
+      flash('Импорт: добавлено ' + added + ', обновлено ' + updated);
+    };
+    r.readAsText(file);
+  }
+
+  // ── Клавиатура ──
+  document.addEventListener('keydown', function (e) {
+    var a = document.activeElement;
+    var inField = a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
+    if (inField) {
+      if (e.key === 'Escape') { a.blur(); e.preventDefault(); }
+      else if (e.key === 'Enter' && a.id === 'comment') { attachComment(); e.preventDefault(); }
+      else if (e.key === 'Enter' && a.id === 'goto') {
+        var n = parseInt(a.value, 10);
+        if (n >= 1 && n <= problems.length) { go(n - 1); a.value = ''; a.blur(); }
+        e.preventDefault();
+      }
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (byHotkey[e.key]) { setVerdict(byHotkey[e.key]); e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { go(state.idx + 1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { go(state.idx - 1); e.preventDefault(); }
+    else if (e.key === 'Backspace') { removeVerdict(); e.preventDefault(); }
+    else if (e.key === 'c' || e.key === 'C' || e.key === 'с' || e.key === 'С') {
+      commentEl.focus(); e.preventDefault();
+    }
+  });
+
+  // Клик внутри iframe уводит фокус со страницы — клавиши перестают работать.
+  // Пока стоит галочка, возвращаем фокус себе; галочку можно снять, чтобы
+  // выделять текст в снимке.
+  window.addEventListener('blur', function () {
+    if ($('keys-lock').checked) setTimeout(function () { window.focus(); }, 60);
+  });
+
+  // В режиме «в памяти» закрытие вкладки теряет вердикты — предупреждаем.
+  window.addEventListener('beforeunload', function (e) {
+    if (memoryMode && reviewedCount() > 0 && (state.sinceDownload || 0) > 0) {
+      e.preventDefault(); e.returnValue = '';
+    }
+  });
+
+  // ── Обвязка кнопок ──
+  $('btn-prev').addEventListener('click', function () { go(state.idx - 1); });
+  $('btn-next').addEventListener('click', function () { go(state.idx + 1); });
+  $('btn-first-unreviewed').addEventListener('click', firstUnreviewed);
+  $('btn-download').addEventListener('click', function () { downloadVerdicts(false); });
+  $('btn-import').addEventListener('click', function () { $('import-file').click(); });
+  $('import-file').addEventListener('change', function () {
+    if (this.files[0]) importVerdicts(this.files[0]);
+    this.value = '';
+  });
+  $('reviewer').addEventListener('change', function () {
+    state.reviewer = this.value.trim(); persist();
+  });
+
+  // Возобновление: продолжаем с сохранённого места; если оно уже проверено,
+  // а есть непроверенные раньше/позже — ревьюер сам жмёт «К непроверенной».
+  render();
+})();
+</script>
+</body>
+</html>
