@@ -44,68 +44,121 @@ class OriginNormalizeTests(SimpleTestCase):
 
 
 class ClassifyFieldTests(SimpleTestCase):
+    """Критерий 2026-07-28: REVERT только по числам и знакам без
+    происхождения. Слова — никогда не основание для отката."""
+
     def _fund(self, *texts):
         return build_fund(list(texts))
 
     def test_table_with_origin_is_table_keep(self):
-        nums, words = self._fund(
-            'Цена облигации A равна 1047,62; купон 10 процентов.')
+        fund = self._fund('Цена облигации A равна 1047,62; купон 10 процентов.')
         old = 'Информация о них приведена ниже:'
         cur = (old + '\n\n' + r'\begin{array}{|l|c|}\hline'
                r'\text{Цена} & 1047{,}62 \\ \hline \text{купон} & 10 \\ '
                r'\hline\end{array}')
-        res = classify_field(old, cur, nums, words)
-        self.assertEqual(res['verdict'], 'TABLE_KEEP')
+        self.assertEqual(classify_field(old, cur, fund)['verdict'], 'TABLE_KEEP')
 
     def test_table_with_foreign_number_reverts(self):
-        nums, words = self._fund('Цена облигации A равна 1047,62.')
+        fund = self._fund('Цена облигации A равна 1047,62.')
         old = 'Информация:'
         cur = (old + r' \begin{array}{|c|}\hline \text{Цена} & 999 \\'
                r' \hline\end{array}')
-        res = classify_field(old, cur, nums, words)
-        self.assertEqual(res['verdict'], 'REVERT')
-        self.assertTrue(any('table_block_without_origin' in r
-                            for r in res['reasons']))
-
-    def test_table_with_foreign_word_reverts(self):
-        nums, words = self._fund('Цена равна 100.')
-        old = 'Информация:'
-        cur = (old + r' \begin{array}{|c|}\hline \text{Внезапный} & 100 \\'
-               r' \hline\end{array}')
-        res = classify_field(old, cur, nums, words)
-        self.assertEqual(res['verdict'], 'REVERT')
-
-    def test_moved_text_with_origin_is_moved_keep(self):
-        # слова и числа фрагмента живут в ДРУГОМ поле той же задачи (фонд)
-        nums, words = self._fund('Ответ: выпуск Increase, прибыль Decrease.')
-        old = 'Increase'
-        cur = 'Increase / Decrease / Increase'
-        res = classify_field(old, cur, nums, words)
-        self.assertEqual(res['verdict'], 'MOVED_KEEP')
-
-    def test_moved_new_number_without_origin_reverts(self):
-        nums, words = self._fund('В корзине было пять яблок и щенок Шарик.')
-        old = 'Сколько яблок в корзине?'
-        cur = 'Сколько яблок в корзине? Считайте, что яблок было 17 штук.'
-        res = classify_field(old, cur, nums, words)
+        res = classify_field(old, cur, fund)
         self.assertEqual(res['verdict'], 'REVERT')
         self.assertTrue(any('new_number_without_origin' in r
                             for r in res['reasons']))
 
-    def test_moved_low_word_coverage_reverts(self):
-        nums, words = self._fund('Спрос и предложение.')
-        old = 'Спрос.'
-        cur = ('Спрос. Совершенно посторонний выдуманный текст про '
-               'бабушкин компот и палисадник.')
-        res = classify_field(old, cur, nums, words)
+    def test_table_with_foreign_word_is_kept(self):
+        # ОТМЕНЁННОЕ поведение: раньше это был REVERT по слову «Внезапный»
+        fund = self._fund('Цена равна 100.')
+        old = 'Информация:'
+        cur = (old + r' \begin{array}{|c|}\hline \text{Внезапный} & 100 \\'
+               r' \hline\end{array}')
+        res = classify_field(old, cur, fund)
+        self.assertEqual(res['verdict'], 'TABLE_KEEP')
+        self.assertIn('внезапный', res['new_words'])
+        self.assertTrue(res['legacy_word_revert'])
+
+    def test_tikz_with_foreign_numbers_reverts(self):
+        # дорисованный с нуля чертёж (#4541): координат в ДО нет
+        fund = self._fund('Монополист максимизирует прибыль.')
+        old = 'Монополист максимизирует прибыль.'
+        cur = (old + '\n' + r'\begin{tikzpicture}\draw (0,0) -- (60,0);'
+               r'\draw (0,0) -- (0,40);\end{tikzpicture}')
+        res = classify_field(old, cur, fund)
+        self.assertEqual(res['verdict'], 'REVERT')
+        self.assertTrue(any('new_number_without_origin' in r
+                            for r in res['reasons']))
+
+    def test_tikz_with_origin_numbers_kept(self):
+        fund = self._fund('Оси до 60 и 40 единиц, начало в 0.')
+        old = 'Постройте график.'
+        cur = (old + '\n' + r'\begin{tikzpicture}\draw (0,0) -- (60,0);'
+               r'\draw (0,0) -- (0,40);\end{tikzpicture}')
+        self.assertEqual(classify_field(old, cur, fund)['verdict'], 'TABLE_KEEP')
+
+    def test_moved_text_with_origin_is_moved_keep(self):
+        fund = self._fund('Ответ: выпуск Increase, прибыль Decrease.')
+        old = 'Increase'
+        cur = 'Increase / Decrease / Increase'
+        self.assertEqual(classify_field(old, cur, fund)['verdict'], 'MOVED_KEEP')
+
+    def test_moved_new_number_without_origin_reverts(self):
+        fund = self._fund('В корзине было пять яблок и щенок Шарик.')
+        old = 'Сколько яблок в корзине?'
+        cur = 'Сколько яблок в корзине? Считайте, что яблок было 17 штук.'
+        res = classify_field(old, cur, fund)
         self.assertEqual(res['verdict'], 'REVERT')
 
+    def test_new_sign_without_origin_reverts(self):
+        fund = self._fund('Прибыль фирмы положительна при любом выпуске.')
+        old = 'Определите прибыль фирмы.'
+        cur = 'Определите прибыль фирмы. Известно, что она отрицательная.'
+        res = classify_field(old, cur, fund)
+        self.assertEqual(res['verdict'], 'REVERT')
+        self.assertTrue(any('new_sign_without_origin' in r
+                            for r in res['reasons']))
+
+    def test_sign_word_form_change_is_not_a_new_sign(self):
+        # «положительным» и «положительный» — один знак, не подмена
+        fund = self._fund('Сальдо будет положительным.')
+        old = 'Сальдо.'
+        cur = 'Сальдо. Ожидается положительный результат.'
+        self.assertEqual(classify_field(old, cur, fund)['verdict'], 'MOVED_KEEP')
+
+    def test_new_words_never_cause_revert(self):
+        # прямая проверка отменённого критерия: чужие слова, свои числа
+        fund = self._fund('Спрос и предложение.')
+        old = 'Спрос.'
+        cur = ('Спрос. Совершенно посторонний текст про бабушкин компот '
+               'и палисадник.')
+        res = classify_field(old, cur, fund)
+        self.assertEqual(res['verdict'], 'MOVED_KEEP')
+        self.assertTrue(res['legacy_word_revert'])
+        self.assertTrue(res['new_words'])
+
+    def test_typo_fix_is_kept(self):
+        # #28800: «Составте» → «составьте» — новое слово, но это починка
+        fund = self._fund('Составте таблицу для 5 значений.')
+        old = 'Составте таблицу для 5 значений.'
+        cur = 'Составьте таблицу для 5 значений.'
+        res = classify_field(old, cur, fund)
+        self.assertEqual(res['verdict'], 'MOVED_KEEP')
+
     def test_same_field_no_fragments_is_boundary_keep(self):
-        nums, words = self._fund('Текст задачи.')
-        res = classify_field('Текст задачи.', 'Текст задачи.', nums, words)
+        fund = self._fund('Текст задачи.')
+        res = classify_field('Текст задачи.', 'Текст задачи.', fund)
         self.assertEqual(res['verdict'], 'MOVED_KEEP')
         self.assertTrue(any('no_new_fragments_on_recheck' in r
                             for r in res['reasons']))
+
+    def test_short_numeric_chunk_is_checked(self):
+        # зубастость: кусок без букв («(60,0)») не должен проскакивать мимо
+        fund = self._fund('Начало координат в нуле.')
+        old = 'График.'
+        cur = 'График. (60,0)'
+        res = classify_field(old, cur, fund)
+        self.assertEqual(res['verdict'], 'REVERT')
 
 
 class WrapBareArraysTests(SimpleTestCase):

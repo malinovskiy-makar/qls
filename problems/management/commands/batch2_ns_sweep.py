@@ -142,8 +142,9 @@ class Command(BaseCommand):
                 continue
             if current != c["current"]:
                 stale.append((c["kind"], c.get("pk") or c["pid"]))
-            fund_nums, fund_words = funds.get(c["pid"], (set(), set()))
-            res = classify_field(c["old"], current, fund_nums, fund_words)
+            fund = funds.get(c["pid"],
+                             {"nums": set(), "signs": set(), "words": set()})
+            res = classify_field(c["old"], current, fund)
             classified.append({**c, "current": current, **res})
 
         by_verdict = defaultdict(list)
