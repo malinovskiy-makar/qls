@@ -8,8 +8,20 @@
   Оболочка ручного ревью внешнего вида задач. Открывается двойным кликом
   (file://) в Chrome, интернет не нужен. Список задач и категории вердиктов
   приходят из manifest.js (его пишет команда export_review_bundle) — здесь
-  НИЧЕГО не хардкодится. Вердикты живут в localStorage браузера и выгружаются
-  кнопкой в JSON-файл для команды import_review_verdicts.
+  НИЧЕГО не хардкодится, включая деление категорий на взаимоисключающие и
+  множественные (оно идёт по полю kind). Вердикты живут в localStorage
+  браузера и выгружаются кнопкой в JSON-файл для import_review_verdicts.
+
+  v2 (2026-07-28): у задачи может быть НЕСКОЛЬКО категорий сразу.
+    · «Идеально» (1) и «Гагно» (0) — вердикт из одного нажатия: отменяют всё
+      отмеченное и сразу уводят к следующей задаче;
+    · дефекты и «Спорно» (2–9) — переключаются, Enter подтверждает и листает;
+    · Enter без единой отмеченной категории не делает ничего;
+    · комментарий относится ко ВСЕЙ задаче, а не к отдельной категории.
+  Клавиша «Идеально» осталась прежней (1) — на ней наработана моторика
+  2 401 задачи, ломать её нельзя; «Гагно» посажено на дальнюю «0».
+  Формат выгрузки — qls-review-verdicts-v2 (список categories); импорт в
+  оболочку принимает и v1, и v2.
 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -59,6 +71,13 @@
   .vbtn.disputed .key { background: #777; }
   .vbtn .cnt { margin-left: auto; color: #999; font-size: 12px; }
   .vbtn.active { border-color: #BE185D; background: #fdf2f7; }
+  .vbtn.picked { border-color: #BE185D; background: #fdf2f7; box-shadow: inset 3px 0 0 #BE185D; }
+  .vbtn.picked .lbl::before { content: '✓ '; font-weight: 700; color: #BE185D; }
+  .vbtn .hint { color: #999; font-size: 11.5px; }
+  .vbtn.trash .key { background: #7c261b; }
+  #confirm-row { display: none; font-size: 12.5px; background: #fdf2f7;
+    border: 1px solid #BE185D; color: #9d1250; border-radius: 8px; padding: 8px 11px; }
+  #confirm-row.show { display: block; }
   /* комментарий */
   #comment { width: 100%; min-height: 52px; resize: vertical; padding: 8px 10px;
     border: 1px solid #d8d8de; border-radius: 8px; font: inherit; font-size: 13px; }
@@ -123,9 +142,10 @@
   <div id="current-verdict">Вердикта пока нет</div>
 
   <div id="buttons"></div>
+  <div id="confirm-row">Отмечено дефектов: <b id="confirm-count">0</b> — нажмите <b>Enter</b>, чтобы подтвердить и перейти дальше</div>
 
   <div>
-    <div class="row-label">Комментарий (обязателен для «Прочее», можно к любому вердикту; Enter — сохранить и дальше)</div>
+    <div class="row-label">Комментарий ко всей задаче (обязателен для «Прочее»; Enter — сохранить и дальше)</div>
     <textarea id="comment" placeholder="Что именно не так…"></textarea>
   </div>
 
@@ -155,10 +175,13 @@
   <button class="ghost-btn" id="btn-import">Импорт вердиктов (продолжить с другого компьютера)</button>
   <input type="file" id="import-file" accept=".json,application/json" hidden>
 
-  <details class="help">
+  <details class="help" open>
     <summary>Клавиши</summary>
     <table style="margin-top:6px">
-      <tr><td><b>1–9</b></td><td>вердикт (список выше) и переход дальше</td></tr>
+      <tr><td><b>1</b></td><td>«Идеально» — вердикт сразу, переход дальше</td></tr>
+      <tr><td><b>0</b></td><td>«Гагно» — в мусор целиком, переход дальше</td></tr>
+      <tr><td><b>2–9</b></td><td>отметить дефект (можно несколько), повторное нажатие снимает</td></tr>
+      <tr><td><b>Enter</b></td><td>подтвердить отмеченные дефекты и перейти дальше</td></tr>
       <tr><td><b>← →</b></td><td>листать без вердикта</td></tr>
       <tr><td><b>Backspace</b></td><td>убрать вердикт текущей задачи</td></tr>
       <tr><td><b>C</b></td><td>перейти в поле комментария</td></tr>
@@ -187,6 +210,13 @@
   var byKey = {};
   cats.forEach(function (c) { byHotkey[c.hotkey] = c; byKey[c.key] = c; });
 
+  // Взаимоисключающие виды приходят из манифеста (kind), а не зашиты списком
+  // ключей: категории живут в problems/review_categories.py и только там.
+  // «Идеально» и «Гагно» — вердикт из одного нажатия; всё остальное
+  // (дефекты и «Спорно») набирается пачкой и подтверждается Enter.
+  var EXCLUSIVE = { ok: true, trash: true };
+  function isExclusive(cat) { return !!EXCLUSIVE[cat.kind]; }
+
   // ── Хранилище: localStorage, а при его недоступности — режим «в памяти» ──
   var STORE_KEY = 'qls_review::' + M.bundle_id;
   var memoryMode = false;
@@ -208,6 +238,21 @@
 
   var state = loadState() || { reviewer: '', idx: 0, verdicts: {}, sinceDownload: 0 };
   if (state.idx >= problems.length) state.idx = 0;
+
+  // Наследие v1: в старом состоянии у вердикта одна `category`. Приводим к
+  // списку при загрузке — иначе ревьюер, продолживший начатый пакет, увидел
+  // бы пустые вердикты. Записывается всё уже только списком.
+  Object.keys(state.verdicts || {}).forEach(function (id) {
+    var v = state.verdicts[id];
+    if (v && !v.categories) v.categories = v.category ? [v.category] : [];
+    if (v) delete v.category;
+    if (v && !v.categories.length) delete state.verdicts[id];
+  });
+
+  function catsOf(pid) {
+    var v = state.verdicts[pid];
+    return (v && v.categories) ? v.categories : [];
+  }
 
   function showBanner() {
     var b = document.getElementById('banner');
@@ -235,9 +280,11 @@
   cats.forEach(function (c) {
     var b = document.createElement('button');
     b.className = 'vbtn ' + c.kind;
-    b.innerHTML = '<span class="key">' + c.hotkey + '</span><span>' + esc(c.label) +
+    b.setAttribute('data-key', c.key);
+    b.innerHTML = '<span class="key">' + esc(c.hotkey) + '</span><span class="lbl">' +
+                  esc(c.label) + (c.hint ? ' <span class="hint">— ' + esc(c.hint) + '</span>' : '') +
                   '</span><span class="cnt" data-cnt="' + c.key + '"></span>';
-    b.addEventListener('click', function () { setVerdict(c); });
+    b.addEventListener('click', function () { pick(c); });
     $('buttons').appendChild(b);
   });
 
@@ -260,26 +307,36 @@
 
     var counts = {};
     Object.keys(state.verdicts).forEach(function (id) {
-      var k = state.verdicts[id].category; counts[k] = (counts[k] || 0) + 1;
+      catsOf(id).forEach(function (k) { counts[k] = (counts[k] || 0) + 1; });
     });
     cats.forEach(function (c) {
       document.querySelector('[data-cnt="' + c.key + '"]').textContent = counts[c.key] || '';
     });
 
     var v = state.verdicts[p.id];
+    var chosen = catsOf(p.id);
     var cv = $('current-verdict');
-    document.querySelectorAll('.vbtn').forEach(function (b, i) {
-      b.classList.toggle('active', !!v && cats[i].key === v.category);
+    document.querySelectorAll('.vbtn').forEach(function (b) {
+      b.classList.toggle('picked', chosen.indexOf(b.getAttribute('data-key')) !== -1);
     });
-    if (v && byKey[v.category]) {
-      cv.textContent = 'Вердикт: ' + byKey[v.category].label + (v.comment ? ' — «' + v.comment + '»' : '');
-      cv.className = 'has ' + byKey[v.category].kind;
+    if (chosen.length) {
+      var names = chosen.map(function (k) { return byKey[k] ? byKey[k].label : k; });
+      cv.textContent = 'Вердикт: ' + names.join(' + ') +
+                       (v.comment ? ' — «' + v.comment + '»' : '');
+      cv.className = 'has ' + (byKey[chosen[0]] ? byKey[chosen[0]].kind : '');
       commentEl.value = v.comment || '';
     } else {
       cv.textContent = 'Вердикта пока нет';
       cv.className = '';
       commentEl.value = '';
     }
+    // Подсказку про Enter показываем только когда есть что подтверждать и
+    // это НЕ вердикт из одного нажатия (тот уже сам увёл бы дальше).
+    var pending = chosen.length && !chosen.some(function (k) {
+      return byKey[k] && isExclusive(byKey[k]);
+    });
+    $('confirm-row').classList.toggle('show', !!pending);
+    $('confirm-count').textContent = chosen.length;
 
     $('download-hint').textContent = state.sinceDownload
       ? 'Не выгружено вердиктов: ' + state.sinceDownload
@@ -294,26 +351,50 @@
   }
 
   // ── Вердикты ──
-  function setVerdict(cat) {
-    var p = problems[state.idx];
+  // Выбор сохраняется в state СРАЗУ, ещё до подтверждения: так набранные
+  // галочки переживают перезагрузку страницы, а не теряются вместе с вкладкой.
+  function writeVerdict(pid, categories) {
     var comment = commentEl.value.trim();
-    state.verdicts[p.id] = { category: cat.key, comment: comment, at: new Date().toISOString() };
+    if (!categories.length) { delete state.verdicts[pid]; }
+    else {
+      state.verdicts[pid] = { categories: categories, comment: comment,
+                              at: new Date().toISOString() };
+    }
     state.sinceDownload = (state.sinceDownload || 0) + 1;
     persist();
-    if (cat.key === 'other' && !comment) {
+  }
+
+  function pick(cat) {
+    var p = problems[state.idx];
+    if (isExclusive(cat)) {
+      // «Идеально»/«Гагно» отменяют всё отмеченное: перечислять дефекты у
+      // идеальной или у выброшенной задачи не нужно.
+      writeVerdict(p.id, [cat.key]);
       render();
+      confirmAndGo();
+      return;
+    }
+    var chosen = catsOf(p.id).slice();
+    // Дефект рядом с «Идеально»/«Гагно» — противоречие: снимаем исключающие.
+    chosen = chosen.filter(function (k) { return byKey[k] && !isExclusive(byKey[k]); });
+    var at = chosen.indexOf(cat.key);
+    if (at === -1) chosen.push(cat.key); else chosen.splice(at, 1);
+    writeVerdict(p.id, chosen);
+    render();
+  }
+
+  // Enter: подтвердить набранное и уйти дальше. Без единой отмеченной
+  // категории не делает ничего — пустой Enter не должен листать пакет.
+  function confirmAndGo() {
+    var p = problems[state.idx];
+    var chosen = catsOf(p.id);
+    if (!chosen.length) { flash('Сначала отметьте категорию — клавиши 1–9 или 0'); return; }
+    if (chosen.indexOf('other') !== -1 && !commentEl.value.trim()) {
       flash('«Прочее» — допишите комментарий и нажмите Enter');
       commentEl.focus();
       return;
     }
-    maybeAutoDownload();
-    go(state.idx + 1);
-  }
-
-  function attachComment() {
-    var p = problems[state.idx];
     var v = state.verdicts[p.id];
-    if (!v) { flash('Сначала вердикт — клавиши 1–9'); return; }
     v.comment = commentEl.value.trim();
     v.at = new Date().toISOString();
     persist();
@@ -347,10 +428,11 @@
   function downloadVerdicts(auto) {
     var list = Object.keys(state.verdicts).map(function (id) {
       var v = state.verdicts[id];
-      return { problem_id: parseInt(id, 10), category: v.category, comment: v.comment || '', at: v.at };
+      return { problem_id: parseInt(id, 10), categories: v.categories || [],
+               comment: v.comment || '', at: v.at };
     });
     var payload = {
-      format: 'qls-review-verdicts-v1',
+      format: 'qls-review-verdicts-v2',
       bundle_id: M.bundle_id,
       reviewer: state.reviewer || '',
       exported_at: new Date().toISOString(),
@@ -376,20 +458,27 @@
     r.onload = function () {
       var data;
       try { data = JSON.parse(r.result); } catch (e) { flash('Файл не читается как JSON'); return; }
-      if (!data || data.format !== 'qls-review-verdicts-v1' || !Array.isArray(data.verdicts)) {
+      // Принимаем оба формата: v1 (одна category) и v2 (список categories) —
+      // ревьюер может привезти файл, скачанный до обновления оболочки.
+      var known = { 'qls-review-verdicts-v1': 1, 'qls-review-verdicts-v2': 1 };
+      if (!data || !known[data.format] || !Array.isArray(data.verdicts)) {
         flash('Это не файл вердиктов этого формата'); return;
       }
       if (data.bundle_id && data.bundle_id !== M.bundle_id &&
           !confirm('Файл от другого пакета (' + data.bundle_id + '). Всё равно импортировать?')) return;
       var added = 0, updated = 0;
       data.verdicts.forEach(function (v) {
-        if (!v || !v.problem_id || !byKey[v.category]) return;
+        if (!v || !v.problem_id) return;
+        var list = Array.isArray(v.categories) ? v.categories
+                                               : (v.category ? [v.category] : []);
+        list = list.filter(function (k) { return !!byKey[k]; });
+        if (!list.length) return;
         var cur = state.verdicts[v.problem_id];
         // новее — побеждает; так продолжение с другого компьютера не съедает свежее
         if (!cur) { added++; }
         else if ((v.at || '') > (cur.at || '')) { updated++; }
         else return;
-        state.verdicts[v.problem_id] = { category: v.category, comment: v.comment || '', at: v.at || '' };
+        state.verdicts[v.problem_id] = { categories: list, comment: v.comment || '', at: v.at || '' };
       });
       if (data.reviewer && !state.reviewer) {
         state.reviewer = data.reviewer;
@@ -407,7 +496,7 @@
     var inField = a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
     if (inField) {
       if (e.key === 'Escape') { a.blur(); e.preventDefault(); }
-      else if (e.key === 'Enter' && a.id === 'comment') { attachComment(); e.preventDefault(); }
+      else if (e.key === 'Enter' && a.id === 'comment') { confirmAndGo(); e.preventDefault(); }
       else if (e.key === 'Enter' && a.id === 'goto') {
         var n = parseInt(a.value, 10);
         if (n >= 1 && n <= problems.length) { go(n - 1); a.value = ''; a.blur(); }
@@ -416,7 +505,8 @@
       return;
     }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (byHotkey[e.key]) { setVerdict(byHotkey[e.key]); e.preventDefault(); }
+    if (byHotkey[e.key]) { pick(byHotkey[e.key]); e.preventDefault(); }
+    else if (e.key === 'Enter') { confirmAndGo(); e.preventDefault(); }
     else if (e.key === 'ArrowRight') { go(state.idx + 1); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') { go(state.idx - 1); e.preventDefault(); }
     else if (e.key === 'Backspace') { removeVerdict(); e.preventDefault(); }

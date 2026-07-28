@@ -10,7 +10,16 @@
 Менять ключи (key) после начала ревью нельзя: они уже лежат в вердиктах.
 """
 
-# kind: 'ok' — задача идеальна; 'defect' — категория дефекта; 'disputed' — спорно.
+# kind: 'ok' — задача идеальна; 'defect' — категория дефекта; 'disputed' — спорно;
+#       'trash' — задачу выбрасываем целиком.
+#
+# Взаимоисключающие виды ('ok' и 'trash') — вердикт из одного нажатия: он
+# отменяет всё выбранное и сразу уводит к следующей задаче. Остальные виды
+# (дефекты и «Спорно») выбираются ПАЧКОЙ: нажатие переключает, Enter
+# подтверждает. Перечислять дефекты у выброшенной задачи бессмысленно, а
+# «идеально и сломанная формула» — противоречие, поэтому они и исключающие.
+EXCLUSIVE_KINDS = ('ok', 'trash')
+
 REVIEW_CATEGORIES = [
     {'key': 'perfect',          'hotkey': '1', 'kind': 'ok',
      'label': 'Идеально'},
@@ -30,12 +39,21 @@ REVIEW_CATEGORIES = [
      'label': 'Прочее (с комментарием)'},
     {'key': 'disputed',         'hotkey': '9', 'kind': 'disputed',
      'label': 'Спорно'},
+    # Клавиша «0» — намеренно ДАЛЬНЯЯ от «1»: промах по соседней клавише не
+    # должен превращать идеальную задачу в выброшенную и наоборот.
+    {'key': 'trash',            'hotkey': '0', 'kind': 'trash',
+     'label': 'Гагно', 'hint': 'в мусор целиком'},
 ]
 
 CATEGORY_KEYS = [c['key'] for c in REVIEW_CATEGORIES]
 CATEGORY_CHOICES = [(c['key'], c['label']) for c in REVIEW_CATEGORIES]
 CATEGORY_LABELS = {c['key']: c['label'] for c in REVIEW_CATEGORIES}
+EXCLUSIVE_KEYS = [c['key'] for c in REVIEW_CATEGORIES if c['kind'] in EXCLUSIVE_KINDS]
 
 # Версии форматов файлов — сверяются при импорте, чтобы не съесть чужой JSON.
 BUNDLE_FORMAT = 'qls-review-bundle-v1'
-VERDICTS_FORMAT = 'qls-review-verdicts-v1'
+# v1: у вердикта одна category (строка). v2: список categories.
+# Импорт понимает ОБА — 2 401 вердикт по ILE лежат в v1 и переводу не подлежат.
+VERDICTS_FORMAT_V1 = 'qls-review-verdicts-v1'
+VERDICTS_FORMAT = 'qls-review-verdicts-v2'
+VERDICTS_FORMATS = (VERDICTS_FORMAT_V1, VERDICTS_FORMAT)

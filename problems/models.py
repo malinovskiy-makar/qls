@@ -1171,14 +1171,24 @@ class ReviewVerdict(models.Model):
     пакета export_review_bundle) и жмёт клавишу вердикта. Вердикты приезжают
     JSON-файлом и импортируются командой import_review_verdicts.
 
-    На пару (задача, ревьюер) — ровно один вердикт: повторный импорт или
-    пересмотр решения ОБНОВЛЯЕТ запись, а не плодит дубли (это и делает
-    импорт идемпотентным). Категории — problems/review_categories.py.
+    СТРОКА НА ПАРУ «задача × категория». У задачи может быть несколько
+    дефектов сразу (оболочка v2 разрешает множественный выбор) — тогда это
+    несколько строк с одним и тем же комментарием: комментарий относится ко
+    всей задаче, а не к отдельной категории. Существующие 2 401 вердикт по
+    ILE устроены ровно так же (по одной категории на задачу), поэтому после
+    перехода на множественный выбор они остаются валидными без конвертации.
+
+    Ключ идемпотентности — (bundle, problem, category): повторный импорт того
+    же файла ничего не дублирует. Пакет в ключе потому, что одна и та же
+    задача может попасть в разные пакеты ревью, и это разные измерения, а не
+    переголосование. Категории — problems/review_categories.py.
     """
 
     problem = models.ForeignKey(Problem, on_delete=models.CASCADE,
                                 related_name='review_verdicts',
                                 verbose_name='Задача')
+    # Идентификатор пакета ревью (manifest.bundle_id), напр. 'ile_20260721'.
+    bundle = models.CharField('Пакет', max_length=64, blank=True, db_index=True)
     category = models.CharField('Категория', max_length=32,
                                 choices=CATEGORY_CHOICES)
     comment = models.TextField('Комментарий', blank=True)
@@ -1191,8 +1201,8 @@ class ReviewVerdict(models.Model):
         verbose_name = 'Вердикт ревью'
         verbose_name_plural = 'Вердикты ревью'
         constraints = [
-            models.UniqueConstraint(fields=['problem', 'reviewer'],
-                                    name='uniq_review_verdict_per_reviewer'),
+            models.UniqueConstraint(fields=['bundle', 'problem', 'category'],
+                                    name='uniq_review_verdict_per_category'),
         ]
 
     def __str__(self):

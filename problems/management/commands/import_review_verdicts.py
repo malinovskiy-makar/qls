@@ -1,18 +1,28 @@
 """Импорт вердиктов ручного ревью из JSON-файла оболочки reviewer.html.
 
 Файл создаёт кнопка «Скачать вердикты (JSON)» в офлайн-пакете
-(export_review_bundle). Импорт ИДЕМПОТЕНТЕН: на пару (задача, ревьюер) в базе
-живёт одна запись ReviewVerdict, повторный импорт того же файла ничего не
-дублирует, а более свежий вердикт по той же задаче обновляет существующий.
+(export_review_bundle). Понимаются ОБА формата:
 
-    ./venv/bin/python manage.py import_review_verdicts verdicts_ile.json
+  v1 (`qls-review-verdicts-v1`) — у вердикта одна `category` (строка).
+     Так лежат 2 401 вердикт Анича по ILE; конвертировать их не нужно.
+  v2 (`qls-review-verdicts-v2`) — у вердикта список `categories`: оболочка
+     разрешает отметить несколько дефектов сразу. В базе это несколько строк
+     ReviewVerdict с ОДНИМ И ТЕМ ЖЕ комментарием — комментарий относится ко
+     всей задаче, а не к отдельной категории.
+
+Импорт ИДЕМПОТЕНТЕН по ключу (bundle, problem, category): повторный импорт
+того же файла ничего не дублирует. Набор категорий задачи внутри пакета
+ЗАМЕЩАЕТСЯ содержимым файла — если ревьюер снял категорию и выгрузил заново,
+лишняя строка удаляется, иначе база показывала бы отменённый дефект.
+
+    ./venv/bin/python manage.py import_review_verdicts verdicts_aa.json
     ./venv/bin/python manage.py import_review_verdicts file.json --reviewer "Ксения"
 
 После импорта печатается сводка по категориям.
 """
 
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
 from typing import Optional
@@ -22,7 +32,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from problems.models import Problem, ReviewVerdict
-from problems.review_categories import CATEGORY_KEYS, CATEGORY_LABELS, VERDICTS_FORMAT
+from problems.review_categories import (CATEGORY_KEYS, CATEGORY_LABELS,
+                                        VERDICTS_FORMAT_V1, VERDICTS_FORMATS)
 
 
 def parse_at(value) -> Optional[datetime]:
@@ -39,6 +50,24 @@ def parse_at(value) -> Optional[datetime]:
     return dt
 
 
+def verdict_categories(entry, fmt):
+    """Список категорий вердикта независимо от версии формата файла."""
+    if fmt == VERDICTS_FORMAT_V1:
+        cat = entry.get('category')
+        return [cat] if cat is not None else []
+    cats = entry.get('categories')
+    if isinstance(cats, list):
+        # Порядок не важен, но дубли в файле превратились бы в лишний UPDATE.
+        seen, out = set(), []
+        for c in cats:
+            if c not in seen:
+                seen.add(c)
+                out.append(c)
+        return out
+    # v2-файл со старым полем — принимаем, чтобы не отказать из-за мелочи.
+    return [entry['category']] if entry.get('category') else []
+
+
 class Command(BaseCommand):
     help = 'Импортировать вердикты ревью из JSON-файла оболочки reviewer.html.'
 
@@ -46,6 +75,9 @@ class Command(BaseCommand):
         parser.add_argument('file', help='JSON-файл вердиктов из reviewer.html.')
         parser.add_argument('--reviewer', default=None,
                             help='Переопределить имя ревьюера из файла.')
+        parser.add_argument('--bundle', default=None,
+                            help='Переопределить пакет (по умолчанию — '
+                                 'bundle_id из файла).')
 
     def handle(self, *args, **opts):
         path = Path(opts['file'])
@@ -56,21 +88,25 @@ class Command(BaseCommand):
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise CommandError(f'Файл не читается как JSON: {exc}')
 
-        if data.get('format') != VERDICTS_FORMAT:
+        fmt = data.get('format')
+        if fmt not in VERDICTS_FORMATS:
             raise CommandError(
-                f'Неожиданный формат {data.get("format")!r} — '
-                f'жду {VERDICTS_FORMAT!r} (файл из reviewer.html).')
+                f'Неожиданный формат {fmt!r} — '
+                f'жду один из {list(VERDICTS_FORMATS)} (файл из reviewer.html).')
         verdicts = data.get('verdicts')
         if not isinstance(verdicts, list):
             raise CommandError('В файле нет списка verdicts.')
 
         reviewer = (opts['reviewer'] if opts['reviewer'] is not None
                     else data.get('reviewer') or '')
+        bundle = (opts['bundle'] if opts['bundle'] is not None
+                  else data.get('bundle_id') or '')
 
         # Категории проверяем ДО записи: незнакомый ключ — весь файл в отказ
         # (это рассинхрон версий пакета и кода, а не «плохая строчка»).
-        bad_cats = sorted({v.get('category') for v in verdicts
-                           if v.get('category') not in CATEGORY_KEYS})
+        bad_cats = sorted({c for v in verdicts
+                           for c in verdict_categories(v, fmt)
+                           if c not in CATEGORY_KEYS})
         if bad_cats:
             raise CommandError(f'Неизвестные категории: {bad_cats}. '
                                f'Допустимые: {CATEGORY_KEYS}')
@@ -79,39 +115,70 @@ class Command(BaseCommand):
         known_ids = set(Problem.objects.filter(id__in=[i for i in ids if i])
                         .values_list('id', flat=True))
 
-        created = updated = unchanged = 0
+        # Ключ идемпотентности не содержит ревьюера, поэтому чужой вердикт по
+        # той же (пакет, задача, категория) молча затёрся бы. Такое не решаем
+        # за человека: показываем и отказываемся целиком.
+        wanted = defaultdict(set)
+        for v in verdicts:
+            pid = v.get('problem_id')
+            if pid in known_ids:
+                wanted[pid].update(verdict_categories(v, fmt))
+        existing = list(ReviewVerdict.objects.filter(
+            bundle=bundle, problem_id__in=list(wanted.keys())))
+        foreign = [rv for rv in existing
+                   if rv.reviewer and reviewer and rv.reviewer != reviewer
+                   and rv.category in wanted.get(rv.problem_id, ())]
+        if foreign:
+            sample = ', '.join('#{} ({})'.format(rv.problem_id, rv.reviewer)
+                               for rv in foreign[:10])
+            raise CommandError(
+                f'В пакете {bundle!r} уже есть {len(foreign)} вердиктов другого '
+                f'ревьюера по тем же задачам и категориям: {sample}. '
+                f'Импорт от имени {reviewer!r} затёр бы их. Разведите ревьюеров '
+                f'по разным пакетам (--bundle) или импортируйте под тем же именем.')
+
+        by_key = {(rv.problem_id, rv.category): rv for rv in existing}
+        created = updated = unchanged = removed = 0
         skipped_ids = []
         summary = Counter()
+
         with transaction.atomic():
-            # Снимок «до» — чтобы честно посчитать обновлённые и не трогать
-            # записи, которые импорт не меняет (идемпотентность).
-            existing = {rv.problem_id: rv for rv in ReviewVerdict.objects
-                        .filter(reviewer=reviewer, problem_id__in=known_ids)}
             for v in verdicts:
                 pid = v.get('problem_id')
                 if pid not in known_ids:
                     skipped_ids.append(pid)
                     continue
-                category = v['category']
                 comment = v.get('comment') or ''
-                summary[category] += 1
-                prev = existing.get(pid)
-                if prev is not None and (prev.category, prev.comment) == (category, comment):
-                    unchanged += 1
-                    continue
-                _, was_created = ReviewVerdict.objects.update_or_create(
-                    problem_id=pid, reviewer=reviewer,
-                    defaults={'category': category, 'comment': comment,
-                              'created_at': parse_at(v.get('at')) or timezone.now()})
-                if was_created:
-                    created += 1
-                else:
-                    updated += 1
+                at = parse_at(v.get('at')) or timezone.now()
+                for category in verdict_categories(v, fmt):
+                    summary[category] += 1
+                    prev = by_key.get((pid, category))
+                    if prev is not None and (prev.comment, prev.reviewer) == (comment, reviewer):
+                        unchanged += 1
+                        continue
+                    _, was_created = ReviewVerdict.objects.update_or_create(
+                        bundle=bundle, problem_id=pid, category=category,
+                        defaults={'comment': comment, 'reviewer': reviewer,
+                                  'created_at': at})
+                    if was_created:
+                        created += 1
+                    else:
+                        updated += 1
+
+            # Снятые ревьюером категории убираем — иначе база показывала бы
+            # дефект, от которого он отказался. Чужие вердикты не трогаем.
+            for rv in existing:
+                if rv.category not in wanted.get(rv.problem_id, ()):
+                    if reviewer and rv.reviewer and rv.reviewer != reviewer:
+                        continue
+                    rv.delete()
+                    removed += 1
 
         self.stdout.write(self.style.SUCCESS(
-            f'Импорт {path.name} (ревьюер: {reviewer or "аноним"}): '
+            f'Импорт {path.name} (формат {fmt}, пакет {bundle or "—"}, '
+            f'ревьюер: {reviewer or "аноним"}): '
             f'новых {created}, обновлено {updated}, без изменений {unchanged}, '
-            f'пропущено (нет такой задачи) {len(skipped_ids)}.'))
+            f'снято {removed}, пропущено (нет такой задачи) {len(skipped_ids)}.'))
         if skipped_ids:
             self.stdout.write(self.style.WARNING(
                 f'Пропущенные id: {skipped_ids[:20]}'
