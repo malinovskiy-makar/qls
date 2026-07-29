@@ -743,6 +743,43 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 #params-body .hint { font-size: 11.5px; margin-top: 5px; }
 #params-body .seg { margin: 0; }
 
+/* Сворачиваемый блок в панели (расчёт площадей). */
+.fold-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 0; background: transparent; border: none;
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text3);
+}
+.fold-btn:hover { color: var(--text); }
+.fold-btn svg { width: 13px; height: 13px; transition: transform .18s var(--ease); }
+.fold-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.fold-body { display: none; padding-top: 4px; }
+.fold-body.open { display: block; }
+
+/* Список областей с пикерами цвета. */
+.ac-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.ac-name { font-size: 12px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chk.dim { opacity: .72; }
+
+/* Быстрая кнопка расчёта площади поверх графика. */
+.quick-area {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+  z-index: var(--z-float); padding: 7px 14px; font-size: 12px; font-weight: 600;
+  color: var(--on-btn); background: var(--btn-bg); border: none; border-radius: 18px;
+  box-shadow: var(--shadow-panel);
+}
+.quick-area:hover { background: var(--btn-bg-hover); }
+.quick-area[hidden] { display: none; }
+
+/* Поля координат своей точки. */
+.mark-xy { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+.mark-xy label { font-size: 11px; color: var(--text3); }
+.mark-xy input[type="number"] {
+  width: 100%; min-width: 0; padding: 4px 6px; font-size: 12px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
+}
+
 /* ── Кнопки над графиком: гаечный ключ и возврат масштаба ── */
 .graph-tools {
   position: absolute; top: 12px; right: 12px; z-index: var(--z-float);
@@ -2670,6 +2707,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div id="mark-list" style="margin-top:8px;"></div>
     </div>
 
+    <!-- Цвета закрашенных областей (Фаза 8). Список собирается из того, что
+         реально нарисовано на графике, поэтому подходит любой сцене. -->
+    <div class="section" id="sec-areacolors" style="display:none;">
+      <div class="section-title">Цвета областей</div>
+      <div id="area-colors"></div>
+    </div>
+
     <!-- Площади (Фаза 10): под кривой на отрезке или между отмеченными точками. -->
     <div class="section" id="sec-areascalc">
       <button class="fold-btn" id="areascalc-btn" type="button" aria-expanded="false" aria-controls="areascalc-body">
@@ -2732,6 +2776,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   <!-- ── ГРАФИК ────────────────────────────────────────────────────── -->
   <div class="graph-wrap" id="graph-wrap">
     <svg id="chart"></svg>
+
+    <!-- Быстрый расчёт площади: появляется, когда вершин набрано достаточно. -->
+    <button class="quick-area" id="quick-area" type="button" hidden>Площадь по точкам</button>
 
     <!-- Кнопки над графиком: настройки плоскости и возврат масштаба. -->
     <div class="graph-tools">
@@ -2963,6 +3010,11 @@ const STATE = {
   areaCalc: null,    // результат расчёта площади (Фаза 10)
   areaCalcColor: '', // и её цвет
   areaColor: {},     // свои цвета закрашенных областей: ключ легенды -> hex (Фаза 8)
+  areaCalcMode: 'curve',  // способ расчёта площади: под кривой или по точкам
+  areaPicked: [],    // отмеченные вершины многоугольника
+  crosses: [],       // найденные пересечения кривых
+  hotCross: null,    // какое пересечение раскрыто щелчком
+  roller: null,      // точка, катящаяся по кривой при перетаскивании
   // Форма записи следующей добавляемой кривой (Фаза 1б): 'PQ' — P = f(Q) (канон движка),
   // 'QP' — Q = f(P) (привычная запись спроса). Q(P) приводится к P=f(Q) при добавлении:
   // линейная — аналитически, любая другая — численным обращением (бисекция по P).
@@ -8702,9 +8754,19 @@ function initZoom() {
   /* Перетаскивание фона. Стартуем только на пустом месте: у кривых, точек и
      клина свои d3-drag, и перехватывать их нельзя. Порог в 3 пикселя не даёт
      обычному щелчку (постановка точки) превратиться в микро-сдвиг. */
-  let pan = null;
+  let pan = null, roll = null;
   gw.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || STATE.markArm) return;
+    // Нажали рядом с кривой — катим по ней точку, а не двигаем поле.
+    const r0 = gw.getBoundingClientRect();
+    const hit = (STATE.mode !== 'math') ? rollerTargetAt(e.clientX - r0.left, e.clientY - r0.top) : null;
+    if (hit) {
+      STATE.roller = { f: hit.f, name: hit.name, color: hit.color || null, x: 0, y: 0 };
+      roll = { id: e.pointerId };
+      gw.setPointerCapture(e.pointerId);
+      rollerMove(e.clientX - r0.left);
+      return;
+    }
     const t = e.target;
     if (t && t.closest && t.closest('.graph-tools, .wrench')) return;
     const tag = (t && t.tagName || '').toLowerCase();
@@ -8715,6 +8777,10 @@ function initZoom() {
     pan = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
   });
   gw.addEventListener('pointermove', (e) => {
+    if (roll && e.pointerId === roll.id) {
+      rollerMove(e.clientX - gw.getBoundingClientRect().left);
+      return;
+    }
     if (!pan || e.pointerId !== pan.id) return;
     const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
     if (!pan.moved && Math.hypot(dx, dy) < 3) return;
@@ -8723,6 +8789,11 @@ function initZoom() {
     panByPixels(dx, dy);
   });
   const endPan = (e) => {
+    if (roll && e.pointerId === roll.id) {
+      try { gw.releasePointerCapture(roll.id); } catch (err) {}
+      roll = null; STATE.roller = null; redrawAll();
+      return;
+    }
     if (!pan) return;
     if (pan.moved) { try { gw.releasePointerCapture(pan.id); } catch (err) {} gw.style.cursor = ''; }
     pan = null;
@@ -10420,11 +10491,17 @@ function mainScales() {
 
 function drawOverlays() {
   if (!svg || !svg.node()) return;
+  applyAreaColors();         // свои цвета заливок — одним проходом по data-legend
+  drawAreaCalc();            // посчитанная площадь (Фаза 10)
+  drawCrossPoints();         // пересечения кривых тусклыми точками
+  drawRoller();              // точка, катящаяся по кривой
   drawGraphTitle();
   drawLegend();
   drawMarks();
   syncAxisPlaceholders();
   syncSceneColorPickers();   // образцы в панели идут за темой и за своими цветами
+  syncAreaColorList();       // список областей с пикерами
+  syncAreaCalcUI();          // выпадашка кривых и список точек для расчёта площади
 }
 
 /* ---------------------------------------------------------------------
@@ -10438,47 +10515,461 @@ function drawOverlays() {
    заливку. Рисуется в том же SVG, поэтому попадает и в PNG, и в .tex.
    Место: верхнее поле под заголовком — там никогда не проходят кривые.
    --------------------------------------------------------------------- */
-function drawLegend() {
-  if (!STATE.showLegend) return;
-  const seen = [], byName = {};
+/* ── Цвета закрашенных областей (Фаза 8) ──────────────────────────────
+   Каждая заливка при отрисовке помечена data-legend. Отдельного пикера у
+   каждой из сорока с лишним заливок нет и не надо: после отрисовки один
+   проход перекрашивает те, у которых пользователь выбрал свой цвет. */
+function areaKey(name) { return String(name || '').trim(); }
+
+function applyAreaColors() {
+  const map = STATE.areaColor || {};
   svg.selectAll('[data-legend]').each(function () {
-    const name = this.getAttribute('data-legend');
-    if (!name || byName[name]) return;
-    byName[name] = 1;
-    seen.push({ name, color: this.getAttribute('fill'), opacity: +this.getAttribute('opacity') || 0.2 });
-  });
-  if (!seen.length) return;
-
-  const m = CONFIG.margin;
-  const avail = (W - m.right) - m.left;
-  // Ширина оценивается по числу букв: измерять текст до отрисовки дорого,
-  // а промах в пару пикселей на глаз не виден.
-  const CH = 6.0, SW = 11, GAP_IN = 5, GAP = 15;
-  const widths = seen.map(e => SW + GAP_IN + e.name.length * CH);
-  let total = widths.reduce((a, b) => a + b, 0) + GAP * (seen.length - 1);
-  let scale = Math.min(1, avail / Math.max(1, total));
-  const fs = Math.max(8.5, 11 * scale);
-
-  const y = Math.max(30, m.top - 26);
-  const g = svg.append('g').attr('class', 'legend').style('pointer-events', 'none');
-  let x = m.left + Math.max(0, (avail - total * scale) / 2);
-  seen.forEach((e, i) => {
-    g.append('rect')
-      .attr('x', x).attr('y', y - SW * scale + 2).attr('width', SW * scale).attr('height', SW * scale)
-      .attr('rx', 2).attr('fill', e.color).attr('opacity', Math.max(0.35, e.opacity * 2))
-      .attr('stroke', e.color).attr('stroke-opacity', 0.55).attr('stroke-width', 1);
-    g.append('text')
-      .attr('x', x + (SW + GAP_IN) * scale).attr('y', y)
-      .attr('font-size', fs).attr('font-weight', 500).attr('fill', COL.inkSoft)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
-      .text(e.name);
-    x += widths[i] * scale + GAP * scale;
+    const k = areaKey(this.getAttribute('data-legend'));
+    const c = map[k];
+    if (c) this.setAttribute('fill', c);
   });
 }
 
-/* Пикеры цвета у именованных кривых сцены (издержки, производство, вееры).
-   data-col = ключ в COL. Значение живёт в STATE.colorOverride и накладывается
-   поверх токена в refreshColors — правится ровно одна кривая, палитра цела. */
+// Какие области сейчас на графике: [{key, color, opacity}] без повторов.
+function currentAreas() {
+  const seen = [], by = {};
+  svg.selectAll('[data-legend]').each(function () {
+    const k = areaKey(this.getAttribute('data-legend'));
+    if (!k || by[k]) return;
+    by[k] = 1;
+    seen.push({ key: k, color: this.getAttribute('fill') || COL.ink, opacity: +this.getAttribute('opacity') || 0.2 });
+  });
+  return seen;
+}
+
+/* Короткие обозначения для легенды: на графике место дорого, а CS и DWL
+   школьник читает быстрее любой фразы. Полное название остаётся в подсказке. */
+const AREA_SHORT = {
+  'Излишек покупателя (CS)': 'CS',
+  'Излишек продавца (PS)': 'PS',
+  'Излишек производителя (TR - VC)': 'PS',
+  'Излишек работников': 'CS',
+  'Излишек фирм': 'PS',
+  'Излишек фирмы: весь излишек рынка': 'PS',
+  'Переменные издержки (VC)': 'VC',
+  'Потери общества (DWL)': 'DWL',
+  'Потери от внешнего эффекта (DWL)': 'DWL',
+  'Сбор бюджета': 'Tx',
+  'Поступления бюджета': 'Tx',
+  'Доход бюджета': 'Tx',
+  'Расход бюджета': 'GS',
+  'Рента квоты': 'R',
+  'Достижимые наборы': 'Дост.',
+  'Диапазон возможных зарплат': 'W',
+  'Площадь': 'S',
+};
+function areaShort(name) {
+  if (AREA_SHORT[name]) return AREA_SHORT[name];
+  const m = /\(([^)]{1,5})\)\s*$/.exec(name);      // «… (CS)» → CS
+  if (m) return m[1];
+  return name.length > 10 ? name.slice(0, 9) + '…' : name;
+}
+
+/* Легенда: столбик у правого нижнего угла поля графика. Раньше она лежала
+   поперёк верхнего поля и спорила с заголовком; внизу справа под кривыми
+   почти всегда пусто, и читать её удобнее. */
+function drawLegend() {
+  if (!STATE.showLegend) return;
+  const seen = currentAreas();
+  if (!seen.length) return;
+  const m = CONFIG.margin;
+  const SW = 11, GAP = 6, LH = 16, FS = 11;
+  const labels = seen.map(e => areaShort(e.key));
+  const wide = Math.max.apply(null, labels.map(s => s.length)) * 6.2;
+  const boxW = SW + GAP + wide + 12;
+  const boxH = seen.length * LH + 10;
+  const x = (W - m.right) - boxW - 6;
+  const y = (H - m.bottom) - boxH - 8;
+  const g = svg.append('g').attr('class', 'legend').style('pointer-events', 'none');
+  g.append('rect').attr('x', x).attr('y', y).attr('width', boxW).attr('height', boxH)
+    .attr('rx', 6).attr('fill', COL.halo).attr('opacity', 0.82)
+    .attr('stroke', COL.grid).attr('stroke-width', 1);
+  seen.forEach((e, i) => {
+    const cy = y + 6 + i * LH;
+    g.append('rect')
+      .attr('x', x + 7).attr('y', cy + 1).attr('width', SW).attr('height', SW)
+      .attr('rx', 2).attr('fill', e.color).attr('opacity', Math.max(0.35, e.opacity * 2))
+      .attr('stroke', e.color).attr('stroke-opacity', 0.55).attr('stroke-width', 1);
+    const t = g.append('text')
+      .attr('x', x + 7 + SW + GAP).attr('y', cy + 10)
+      .attr('font-size', FS).attr('font-weight', 600).attr('fill', COL.ink)
+      .text(labels[i]);
+    t.append('title').text(e.key);
+  });
+}
+
+/* Список областей с пикерами цвета — в панели ввода. Пересобирается после
+   каждой отрисовки, потому что набор областей зависит от сцены. */
+function syncAreaColorList() {
+  const box = document.getElementById('area-colors');
+  if (!box) return;
+  const seen = currentAreas();
+  const sig = seen.map(e => e.key).join('|');
+  if (box._sig === sig) {                       // набор тот же — только цвета
+    seen.forEach(e => {
+      const p = box.querySelector('input[data-area="' + CSS.escape(e.key) + '"]');
+      if (p && document.activeElement !== p) p.value = normHex(e.color);
+    });
+    return;
+  }
+  box._sig = sig;
+  box.innerHTML = '';
+  const sec = document.getElementById('sec-areacolors');
+  if (sec) sec.style.display = seen.length ? '' : 'none';
+  seen.forEach(e => {
+    const row = document.createElement('div');
+    row.className = 'ac-row';
+    const pick = makeColorPicker(e.color, (hex) => {
+      STATE.areaColor[e.key] = hex;
+      redrawAll();
+    }, 'Цвет области: ' + e.key);
+    const inp = pick.querySelector('input');
+    if (inp) inp.setAttribute('data-area', e.key);
+    const lab = document.createElement('span');
+    lab.className = 'ac-name'; lab.textContent = e.key;
+    row.append(pick, lab);
+    box.appendChild(row);
+  });
+}
+
+/* ── Точки пересечения кривых (Фаза 6) ────────────────────────────────
+   Считаются сами по всем видимым кривым сцены. Показываются тускло; по
+   щелчку точка становится яркой и подписывает свои координаты. */
+function crossPoints() {
+  const t = snapTargets();
+  if (t.length < 2) return [];
+  const [lo0, hi] = [Math.max(0, CONFIG.Qmin), CONFIG.Qmax];
+  const lo = lo0 + (hi - lo0) * 1e-6;
+  const out = [];
+  for (let a = 0; a < t.length; a++) {
+    for (let b = a + 1; b < t.length; b++) {
+      const g = (x) => { const p = t[a].f(x), q = t[b].f(x); return (isNaN(p) || isNaN(q)) ? NaN : p - q; };
+      const N = 240;
+      let prevX = lo, prevG = g(lo);
+      for (let i = 1; i <= N && out.length < 40; i++) {
+        const x = lo + (hi - lo) * i / N, cur = g(x);
+        if (!isNaN(prevG) && !isNaN(cur) && prevG * cur <= 0 && prevG !== cur) {
+          const r = (prevG === 0) ? prevX : (cur === 0 ? x : bisect(g, prevX, x));
+          const y = t[a].f(r);
+          if (isFinite(r) && isFinite(y) && y >= Math.max(0, CONFIG.Pmin) && y <= CONFIG.Pmax) {
+            // Одну и ту же точку три кривые дают трижды — рядом стоящие сливаем.
+            const dup = out.some(o => Math.abs(o.x - r) < (hi - lo) * 1e-3 && Math.abs(o.y - y) < (CONFIG.Pmax - CONFIG.Pmin) * 1e-3);
+            if (!dup) out.push({ x: r, y, a: t[a].name, b: t[b].name });
+          }
+        }
+        prevX = x; prevG = cur;
+      }
+    }
+  }
+  return out;
+}
+
+function drawCrossPoints() {
+  if (STATE.mode === 'math') return;
+  const pts = crossPoints();
+  STATE.crosses = pts;
+  if (!pts.length) return;
+  const { mx, my } = mainScales();
+  const g = svg.append('g').attr('class', 'crosses');
+  pts.forEach((p, i) => {
+    const hot = (STATE.hotCross === i);
+    const px = mx(p.x), py = my(p.y);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', hot ? 5 : 4)
+      .attr('fill', hot ? COL.ink : COL.halo)
+      .attr('stroke', hot ? COL.ink : COL.inkSoft)
+      .attr('stroke-width', hot ? 2 : 1.4)
+      .attr('opacity', hot ? 1 : 0.55)
+      .style('cursor', 'pointer')
+      .on('click', (ev) => { ev.stopPropagation(); STATE.hotCross = hot ? null : i; redrawAll(); })
+      .append('title').text(p.a + ' и ' + p.b);
+    if (hot) {
+      haloText(g, px + 9, py - 9, '(' + fmt(p.x) + '; ' + fmt(p.y) + ')', 'start', 'auto');
+    }
+  });
+}
+
+/* Прокатывание по кривой: нажали рядом с кривой и ведёте курсор — по ней
+   едет точка и показывает координаты. Если отпустить, точка исчезает;
+   чтобы оставить её, есть кнопка «Поставить точку». */
+function drawRoller() {
+  const r = STATE.roller;
+  if (!r) return;
+  const { mx, my } = mainScales();
+  const g = svg.append('g').attr('class', 'roller').style('pointer-events', 'none');
+  const px = mx(r.x), py = my(r.y);
+  g.append('line').attr('x1', mx(Math.max(0, CONFIG.Qmin))).attr('y1', py).attr('x2', px).attr('y2', py)
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', .55);
+  g.append('line').attr('x1', px).attr('y1', my(Math.max(0, CONFIG.Pmin))).attr('x2', px).attr('y2', py)
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', .55);
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5.5)
+    .attr('fill', COL.halo).attr('stroke', r.color || COL.ink).attr('stroke-width', 2.4);
+  haloText(g, px + 10, py - 10, r.name + ' (' + fmt(r.x) + '; ' + fmt(r.y) + ')', 'start', 'auto');
+}
+
+// Кривая под курсором (в пикселях) — для прокатывания.
+function rollerTargetAt(px, py) {
+  const { mx, my } = mainScales();
+  const targets = snapTargets();
+  if (!targets.length) return null;
+  const [xLo, xHi] = mx.domain();
+  let best = null;
+  targets.forEach(t => {
+    const N = 200;
+    for (let i = 0; i <= N; i++) {
+      const x = xLo + (xHi - xLo) * i / N;
+      const y = t.f(x);
+      if (!isFinite(y)) continue;
+      const d = Math.hypot(mx(x) - px, my(y) - py);
+      if (!best || d < best.d) best = { d, t };
+    }
+  });
+  return (best && best.d <= ROLL_PX) ? best.t : null;
+}
+
+const ROLL_PX = 26;   // на каком расстоянии нажатие считается «по кривой»
+
+function rollerMove(px) {
+  const r = STATE.roller;
+  if (!r) return;
+  const { mx } = mainScales();
+  const [xLo, xHi] = mx.domain();
+  const x = Math.max(xLo, Math.min(xHi, mx.invert(px)));
+  const y = r.f(x);
+  if (!isFinite(y)) return;
+  r.x = x; r.y = y;
+  redrawAll();
+}
+/* ── Расчёт площадей (Фаза 10) ────────────────────────────────────────
+   Два способа: под кривой на отрезке и по выбранным точкам. Оба считаются
+   численно тем же способом, что и излишки: трапециями и формулой площади
+   многоугольника. Результат уходит в «Аналитику» и закрашивается на графике. */
+
+// Правый край кривой в первой четверти: где она уходит вниз за ось.
+function curveRightEdge(f) {
+  const lo = Math.max(0, CONFIG.Qmin), hi = CONFIG.Qmax;
+  const N = 400;
+  let last = lo;
+  for (let i = 0; i <= N; i++) {
+    const x = lo + (hi - lo) * i / N;
+    const y = f(x);
+    if (!isFinite(y) || y < 0) break;
+    last = x;
+  }
+  return last;
+}
+
+function areaTargets() {
+  return snapTargets();
+}
+
+// Все точки, которые можно взять вершинами: свои и автоматические пересечения.
+function areaPointList() {
+  const out = [];
+  (STATE.marks || []).forEach(m => out.push({ id: 'm' + m.id, x: m.x, y: m.y, name: m.text || 'Точка', own: true }));
+  (STATE.crosses || []).forEach((c, i) => out.push({ id: 'c' + i, x: c.x, y: c.y, name: c.a + ' и ' + c.b, own: false }));
+  return out;
+}
+
+function calcAreaUnderCurve() {
+  const sel = document.getElementById('ac-pick');
+  const name = sel ? sel.value : '';
+  const t = areaTargets().filter(x => x.name === name)[0];
+  if (!t) return { error: 'Сначала постройте кривую и выберите её в списке.' };
+  const num = (id) => { const e = document.getElementById(id); const v = e ? parseFloat(e.value) : NaN; return isFinite(v) ? v : null; };
+  let a = num('ac-from'), b = num('ac-to');
+  if (a === null) a = Math.max(0, CONFIG.Qmin);
+  if (b === null) b = curveRightEdge(t.f);
+  if (!(b > a)) return { error: 'Правая граница должна быть больше левой.' };
+  const val = integrate((x) => { const y = t.f(x); return isFinite(y) ? Math.max(0, y) : 0; }, a, b);
+  if (!isFinite(val)) return { error: 'Не удалось посчитать: кривая не определена на этом отрезке.' };
+  return { kind: 'curve', value: val, a, b, name };
+}
+
+function calcAreaPolygon() {
+  const chosen = (STATE.areaPicked || []);
+  const pts = areaPointList().filter(p => chosen.indexOf(p.id) >= 0);
+  if (pts.length < 3) return { error: 'Нужно хотя бы три вершины: по двум точкам площади нет.' };
+  // Вершины обходим по кругу вокруг их общего центра, иначе многоугольник
+  // получится самопересекающимся и площадь выйдет меньше настоящей.
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+  const ring = pts.slice().sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx));
+  let s2 = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const p = ring[i], q = ring[(i + 1) % ring.length];
+    s2 += p.x * q.y - q.x * p.y;
+  }
+  return { kind: 'poly', value: Math.abs(s2) / 2, ring: ring.map(p => [p.x, p.y]) };
+}
+
+function runAreaCalc() {
+  const err = document.getElementById('ac-error');
+  const res = (STATE.areaCalcMode === 'poly') ? calcAreaPolygon() : calcAreaUnderCurve();
+  if (res.error) {
+    STATE.areaCalc = null;
+    if (err) { err.textContent = res.error; err.style.display = 'block'; }
+  } else {
+    STATE.areaCalc = res;
+    if (err) { err.textContent = ''; err.style.display = 'none'; }
+  }
+  redrawAll();
+}
+
+function clearAreaCalc() {
+  STATE.areaCalc = null;
+  const err = document.getElementById('ac-error');
+  if (err) { err.textContent = ''; err.style.display = 'none'; }
+  redrawAll();
+}
+
+function drawAreaCalc() {
+  const r = STATE.areaCalc;
+  if (!r) { updateAreaCalcPanel(); return; }
+  const { mx, my } = mainScales();
+  const color = STATE.areaCalcColor || COL.MR;
+  const g = svg.append('g').attr('class', 'areacalc').attr('clip-path', 'url(#plot-clip)');
+  if (r.kind === 'curve') {
+    const t = areaTargets().filter(x => x.name === r.name)[0];
+    if (t) {
+      const N = 160, pts = [];
+      for (let i = 0; i <= N; i++) pts.push(r.a + (r.b - r.a) * i / N);
+      const ar = d3.area().x(d => mx(d)).y0(my(Math.max(0, CONFIG.Pmin)))
+        .y1(d => my(Math.max(0, t.f(d) || 0)));
+      g.append('path').datum(pts).attr('d', ar).attr('fill', color).attr('opacity', 0.2)
+        .attr('data-legend', 'Площадь');
+    }
+  } else if (r.ring && r.ring.length > 2) {
+    const line = d3.line().x(d => mx(d[0])).y(d => my(d[1]));
+    g.append('path').datum(r.ring.concat([r.ring[0]])).attr('d', line)
+      .attr('fill', color).attr('opacity', 0.2).attr('stroke', color).attr('stroke-width', 1.5)
+      .attr('data-legend', 'Площадь');
+  }
+  updateAreaCalcPanel();
+}
+
+function updateAreaCalcPanel() {
+  const box = document.getElementById('info-areacalc');
+  if (!box) return;
+  const r = STATE.areaCalc;
+  if (!r) { box.innerHTML = ''; return; }
+  const rows = [];
+  if (r.kind === 'curve') {
+    rows.push(['Площадь под ' + r.name, fmt(r.value)]);
+    rows.push(['на отрезке', fmt(r.a) + ' … ' + fmt(r.b)]);
+  } else {
+    rows.push(['Площадь многоугольника', fmt(r.value)]);
+    rows.push(['вершин', String(r.ring.length)]);
+  }
+  box.innerHTML = '<div class="section-title">Площадь</div>' +
+    rows.map(([k, v]) => '<div class="stat"><span></span><b></b></div>').join('');
+  const stats = box.querySelectorAll('.stat');
+  rows.forEach(([k, v], i) => {
+    if (!stats[i]) return;
+    stats[i].querySelector('span').textContent = k;
+    stats[i].querySelector('b').textContent = v;
+  });
+}
+
+// Выпадашка кривых и список точек: пересобираются под текущую сцену.
+function syncAreaCalcUI() {
+  const sel = document.getElementById('ac-pick');
+  if (sel) {
+    const names = areaTargets().map(t => t.name);
+    const sig = names.join('|');
+    if (sel._sig !== sig) {
+      sel._sig = sig;
+      const prev = sel.value;
+      sel.innerHTML = '';
+      names.forEach(n => {
+        const o = document.createElement('option');
+        o.value = n; o.textContent = n;
+        sel.appendChild(o);
+      });
+      if (names.indexOf(prev) >= 0) sel.value = prev;
+    }
+  }
+  const box = document.getElementById('ac-points');
+  if (box) {
+    const pts = areaPointList();
+    const sig = pts.map(p => p.id + ':' + fmt(p.x) + ':' + fmt(p.y)).join('|');
+    if (box._sig !== sig) {
+      box._sig = sig;
+      box.innerHTML = '';
+      if (!pts.length) {
+        const d = document.createElement('div');
+        d.className = 'muted'; d.textContent = 'Пока нет ни своих точек, ни пересечений.';
+        box.appendChild(d);
+      }
+      pts.forEach(p => {
+        const lab = document.createElement('label');
+        lab.className = 'chk' + (p.own ? '' : ' dim');
+        const c = document.createElement('input');
+        c.type = 'checkbox';
+        c.checked = (STATE.areaPicked || []).indexOf(p.id) >= 0;
+        c.addEventListener('change', () => {
+          STATE.areaPicked = STATE.areaPicked || [];
+          if (c.checked) STATE.areaPicked.push(p.id);
+          else STATE.areaPicked = STATE.areaPicked.filter(id => id !== p.id);
+          updateQuickArea();
+        });
+        lab.append(c, document.createTextNode(p.name + ' (' + fmt(p.x) + '; ' + fmt(p.y) + ')'));
+        box.appendChild(lab);
+      });
+    }
+  }
+  updateQuickArea();
+}
+
+// Быстрая кнопка у графика, когда вершин набрано достаточно.
+function updateQuickArea() {
+  const b = document.getElementById('quick-area');
+  if (!b) return;
+  const n = (STATE.areaPicked || []).length;
+  const show = (STATE.areaCalcMode === 'poly') && n >= 3;
+  b.hidden = !show;
+  if (show) b.textContent = 'Площадь по ' + n + ' точкам';
+}
+
+function setAreaCalcMode(mode) {
+  STATE.areaCalcMode = (mode === 'poly') ? 'poly' : 'curve';
+  const c = document.getElementById('ac-curve'), p = document.getElementById('ac-poly');
+  if (c) c.classList.toggle('active', STATE.areaCalcMode === 'curve');
+  if (p) p.classList.toggle('active', STATE.areaCalcMode === 'poly');
+  const pc = document.getElementById('ac-pane-curve'), pp = document.getElementById('ac-pane-poly');
+  if (pc) pc.style.display = (STATE.areaCalcMode === 'curve') ? '' : 'none';
+  if (pp) pp.style.display = (STATE.areaCalcMode === 'poly') ? '' : 'none';
+  updateQuickArea();
+}
+
+function wireAreaCalc() {
+  const fold = document.getElementById('areascalc-btn');
+  const body = document.getElementById('areascalc-body');
+  if (fold && body) fold.addEventListener('click', () => {
+    const open = body.classList.toggle('open');
+    fold.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  const c = document.getElementById('ac-curve'), p = document.getElementById('ac-poly');
+  if (c) c.addEventListener('click', () => setAreaCalcMode('curve'));
+  if (p) p.addEventListener('click', () => setAreaCalcMode('poly'));
+  const calc = document.getElementById('ac-calc');
+  if (calc) calc.addEventListener('click', () => runAreaCalc());
+  const clr = document.getElementById('ac-clear');
+  if (clr) clr.addEventListener('click', () => clearAreaCalc());
+  const q = document.getElementById('quick-area');
+  if (q) q.addEventListener('click', () => { setAreaCalcMode('poly'); runAreaCalc(); });
+  const slot = document.getElementById('ac-color-slot');
+  if (slot && !slot.firstChild) {
+    slot.appendChild(makeColorPicker(STATE.areaCalcColor || cssVar('--curve-mr'),
+      (hex) => { STATE.areaCalcColor = hex; redrawAll(); }, 'Цвет посчитанной площади'));
+  }
+  setAreaCalcMode('curve');
+}
+
 function initSceneColorPickers() {
   document.querySelectorAll('input.swatch-pick[data-col]').forEach(inp => {
     inp.addEventListener('input', () => {
@@ -10510,7 +11001,7 @@ function drawGraphTitle() {
   svg.append('text')
     .attr('x', (m.left + (W - m.right)) / 2).attr('y', Math.max(17, m.top - 11))
     .attr('text-anchor', 'middle').attr('font-size', 15).attr('font-weight', 650)
-    .attr('fill', COL.ink)
+    .attr('fill', STATE.titleColor || COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
     .text(t);
 }
@@ -10570,15 +11061,18 @@ function drawMarks() {
   STATE.marks.forEach(mk => {
     if (mk.x < xLo || mk.x > xHi || mk.y < yLo || mk.y > yHi) return;
     const px = mx(mk.x), py = my(mk.y);
+    const col = mk.color || COL.ink;
     // Пунктирные проекции на оси — как у равновесия: так точка читается по осям.
-    g.append('line').attr('x1', mx(0)).attr('y1', py).attr('x2', px).attr('y2', py)
-      .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
-      .attr('stroke-dasharray', '3 3').attr('opacity', .5);
-    g.append('line').attr('x1', px).attr('y1', my(0)).attr('x2', px).attr('y2', py)
-      .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
-      .attr('stroke-dasharray', '3 3').attr('opacity', .5);
+    if (mk.showDash !== false) {
+      g.append('line').attr('x1', mx(0)).attr('y1', py).attr('x2', px).attr('y2', py)
+        .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3 3').attr('opacity', .5);
+      g.append('line').attr('x1', px).attr('y1', my(0)).attr('x2', px).attr('y2', py)
+        .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3 3').attr('opacity', .5);
+    }
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
-      .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.6)
+      .attr('fill', col).attr('stroke', COL.halo).attr('stroke-width', 1.6)
       .style('cursor', 'move')
       .call(d3.drag().container(() => svg.node()).on('drag', ev => {
         mk.x = Math.max(xLo, Math.min(xHi, mx.invert(ev.x)));
@@ -10594,7 +11088,7 @@ function drawMarks() {
     const lines = markCaption(mk);
     lines.forEach((s, i) => {
       g.append('text').attr('x', px + 9).attr('y', py - 9 - (lines.length - 1 - i) * 13)
-        .attr('font-size', 11.5).attr('font-weight', i === 0 ? 650 : 500).attr('fill', COL.ink)
+        .attr('font-size', 11.5).attr('font-weight', i === 0 ? 650 : 500).attr('fill', col)
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6)
         .text(s);
     });
@@ -10724,7 +11218,7 @@ function addMarkAt(x, y, snapTo) {
   markCounter++;
   STATE.marks.push({
     id: markCounter, x, y, text: 'Точка ' + markCounter,
-    showCoords: true, showCurves: false,
+    showCoords: true, showCurves: false, showDash: true, color: null,
     // Имя кривой, на которой сидит точка. Пока оно задано, точка при
     // перетаскивании скользит ПО кривой, а не отрывается от неё.
     snapTo: snapTo || null,
@@ -10740,13 +11234,15 @@ function markSnapFn(mk) {
   return t ? t.f : null;
 }
 
-// Список своих точек в панели: подпись, что показывать, удаление.
+// Список своих точек: координаты с клавиатуры, имя, цвет и три переключателя.
 function renderMarkList() {
   const box = document.getElementById('mark-list');
   if (!box) return;
   box.innerHTML = '';
   if (!STATE.marks.length) {
-    box.innerHTML = '<div class="muted">Пока нет своих точек.</div>';
+    const d = document.createElement('div');
+    d.className = 'muted'; d.textContent = 'Пока нет своих точек.';
+    box.appendChild(d);
     return;
   }
   STATE.marks.forEach(mk => {
@@ -10755,49 +11251,72 @@ function renderMarkList() {
 
     const top = document.createElement('div');
     top.className = 'mark-top';
+    const pick = makeColorPicker(mk.color || COL.ink, (hex) => { mk.color = hex; redrawAll(); }, 'Цвет точки');
     const co = document.createElement('span');
     co.className = 'mark-co';
-    co.textContent = '(' + fmt(mk.x) + '; ' + fmt(mk.y) + ')';
+    co.textContent = mk.snapTo ? ('на ' + mk.snapTo) : 'своя точка';
     const del = document.createElement('button');
     del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.title = 'Убрать точку';
     del.addEventListener('click', () => {
       STATE.marks = STATE.marks.filter(m => m.id !== mk.id);
       renderMarkList(); redrawAll();
     });
-    top.append(co, del);
+    top.append(pick, co, del);
 
     const inp = document.createElement('input');
     inp.type = 'text'; inp.value = mk.text; inp.placeholder = 'подпись точки';
     inp.addEventListener('input', () => { mk.text = inp.value; redrawAll(); });
 
-    const mk1 = document.createElement('label');
-    mk1.className = 'chk';
-    const c1 = document.createElement('input'); c1.type = 'checkbox'; c1.checked = mk.showCoords;
-    c1.addEventListener('change', () => { mk.showCoords = c1.checked; redrawAll(); });
-    mk1.append(c1, document.createTextNode('координаты'));
+    // Координаты можно задать с клавиатуры, а не только перетаскиванием.
+    const xy = document.createElement('div');
+    xy.className = 'mark-xy';
+    const mkNum = (key, label) => {
+      const l = document.createElement('label'); l.textContent = label;
+      const n = document.createElement('input');
+      n.type = 'number'; n.step = 'any'; n.value = Math.round(mk[key] * 1000) / 1000;
+      n.addEventListener('change', () => {
+        const v = parseFloat(n.value);
+        if (!isFinite(v)) return;
+        mk[key] = v;
+        // Точка на кривой держится за неё: меняем x, высоту берём с кривой.
+        const f = markSnapFn(mk);
+        if (f && key === 'x') { const y = f(v); if (isFinite(y)) mk.y = y; }
+        renderMarkList(); redrawAll();
+      });
+      xy.append(l, n);
+    };
+    mkNum('x', 'x');
+    mkNum('y', 'y');
 
-    const mk2 = document.createElement('label');
-    mk2.className = 'chk';
-    const c2 = document.createElement('input'); c2.type = 'checkbox'; c2.checked = mk.showCurves;
-    c2.addEventListener('change', () => { mk.showCurves = c2.checked; redrawAll(); });
-    mk2.append(c2, document.createTextNode('значения кривых'));
+    const toggle = (label, key, def) => {
+      const w = document.createElement('label');
+      w.className = 'chk';
+      const c = document.createElement('input');
+      c.type = 'checkbox';
+      c.checked = (mk[key] === undefined) ? def : !!mk[key];
+      c.addEventListener('change', () => { mk[key] = c.checked; redrawAll(); });
+      w.append(c, document.createTextNode(label));
+      return w;
+    };
 
-    row.append(top, inp, mk1, mk2);
+    row.append(top, inp, xy,
+      toggle('пунктир к осям', 'showDash', true),
+      toggle('координаты', 'showCoords', true),
+      toggle('значения кривых', 'showCurves', false));
 
     // Точка, посаженная на кривую, скользит по ней. Галочка отпускает её,
     // если нужно поставить отметку рядом, а не на самой кривой.
     if (mk.snapTo) {
-      const mk3 = document.createElement('label');
-      mk3.className = 'chk';
-      const c3 = document.createElement('input'); c3.type = 'checkbox'; c3.checked = true;
-      c3.addEventListener('change', () => { if (!c3.checked) mk.snapTo = null; renderMarkList(); redrawAll(); });
-      mk3.append(c3, document.createTextNode('держать на кривой ' + mk.snapTo));
-      row.appendChild(mk3);
+      const w = document.createElement('label');
+      w.className = 'chk';
+      const c = document.createElement('input'); c.type = 'checkbox'; c.checked = true;
+      c.addEventListener('change', () => { if (!c.checked) mk.snapTo = null; renderMarkList(); redrawAll(); });
+      w.append(c, document.createTextNode('держать на кривой ' + mk.snapTo));
+      row.appendChild(w);
     }
     box.appendChild(row);
   });
 }
-
 /* =====================================================================
    БЛОК 13. МАТЕМАТИКА (Фаза 7) — общий инструментарий, не привязанный ни к
    одной экономической модели. Шесть сюжетов по учебникам Сафронова и Бахарева:
@@ -12235,9 +12754,9 @@ function casesToMath(body) {
     const expr = latexToMath(cells[0] || '').trim();
     let cond = cells.length > 1 ? cells.slice(1).join('&') : '';
     cond = cond.replace(/\\quad|\\;|\\,/g, ' ')
-               .replace(/\\text\{[^}]*\}/g, (m) => (/иначе|otherwise/i.test(m) ? ' ELSE' : ' '))
+               .replace(/\\text\{[^}]*\}/g, (m) => (/иначе|otherwise/i.test(m) ? ' ELSE' : ' '))
                .replace(/\\mathrm\{[^}]*\}/g, ' ');
-    if (cond.indexOf(' ELSE') >= 0) cond = '';
+    if (cond.indexOf(' ELSE') >= 0) cond = '';
     cond = latexToMath(cond).replace(/[{}]/g, '').trim();
     parts.push({ expr: expr || '0', cond: condToMath(cond) });
   });
@@ -14502,6 +15021,7 @@ function wireControls() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && STATE.markArm) armMark(false); });
   renderMarkList();
   initSceneColorPickers();   // Фаза 2: пикеры у кривых издержек, производства, вееров
+  wireAreaCalc();            // расчёт площадей: под кривой и по точкам
   initZoom();                // колесо и тачпад приближают график, двойной щелчок возвращает масштаб
 
   // Регулируемая цена (потолок / пол): ползунок (целые) + числовое поле (дробные).
