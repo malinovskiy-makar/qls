@@ -521,15 +521,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
 /* ═══════════════════════════════════════════════════════════════════
    ЭКРАН 2 — РАБОЧЕЕ МЕСТО «СЦЕНА»
-   График во весь экран; управление и результаты — плавающими панелями
-   поверх холста. Все контролы — те же, лишь переставлены.
+   Четыре колонки в ряд:
+     [док 56] [Ввод функций + Аналитика 316] [график] [Основные параметры 268]
+   Панели больше не висят НАД холстом, они его соседи. Свернул панель,
+   график стал шире, и ни одна кривая не осталась под стеклом.
    ═══════════════════════════════════════════════════════════════════ */
-.app { position: relative; display: block; height: calc(100vh - 48px); overflow: hidden; }
-.graph-wrap { position: absolute; inset: 0; }
+.app { position: relative; display: flex; align-items: stretch; height: calc(100vh - 48px); overflow: hidden; }
+.graph-wrap { position: relative; flex: 1 1 auto; min-width: 0; background: var(--canvas); }
+#chart { display: block; width: 100%; height: 100%; }
 
-/* ── Левый док (тонкая полоса инструментов) ── */
+/* ── Левый док: постоянная полоса иконок ── */
 .dock {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 56px; z-index: var(--z-dock);
+  position: relative; flex: 0 0 56px; z-index: var(--z-dock);
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 12px 0; background: var(--surface-2);
   border-right: 1px solid var(--border);
@@ -553,215 +556,164 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   padding: 4px 8px; border-radius: 5px; white-space: nowrap; pointer-events: none;
   opacity: 0; transition: opacity .12s var(--ease), transform .12s var(--ease); z-index: var(--z-pop);
 }
-.dock-btn:hover[data-tip]::after { opacity: 1; transform: translateY(-50%) scale(1); }
+.dock-btn:hover[data-tip]::after,
+.dock-btn:focus-visible[data-tip]::after { opacity: 1; transform: translateY(-50%) scale(1); }
 
-/* ── Шапка сцены: «← Сценарии» + название ── */
-.scene-header {
-  position: absolute; top: 12px; left: 68px; z-index: var(--z-float);
-  display: flex; align-items: center; gap: 10px;
+/* ── Боковые панели ──────────────────────────────────────────────────
+   Обе устроены одинаково и различаются только стороной. Свёрнутая панель
+   ужимается до полосы 26px, на которой остаётся одна стрелка, поэтому
+   развернуть её можно всегда, не гадая, куда она делась. */
+.side {
+  position: relative; flex: 0 0 auto; z-index: var(--z-float);
+  display: flex; flex-direction: column; background: var(--surface);
+  transition: width .22s var(--ease);
 }
-.scene-back {
-  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 9px;
-  border: 1px solid var(--border); border-radius: 18px; background: var(--surface);
-  color: var(--text); font-size: 13px; font-weight: 600; box-shadow: var(--shadow-panel);
-  transition: border-color .12s var(--ease), color .12s var(--ease), transform .08s var(--ease);
-}
-.scene-back svg { width: 15px; height: 15px; }
-.scene-back:hover { border-color: var(--accent); color: var(--accent); }
-.scene-back:active { transform: scale(.97); }
-.scene-name { font-size: 13px; font-weight: 600; color: var(--text2); padding-left: 2px; }
+.side-left  { width: 316px; border-right: 1px solid var(--border); }
+.side-right { width: 268px; border-left:  1px solid var(--border); }
+.side.collapsed { width: 26px; }
+.side-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.side.collapsed .side-inner { display: none; }
 
-/* ── Плавающая панель управления (низ-слева) ── */
-.tools {
-  position: absolute; left: 68px; bottom: 14px; z-index: var(--z-float);
-  width: 300px; max-height: min(74vh, 720px);
-  display: flex; flex-direction: column;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
-  box-shadow: var(--shadow-panel); overflow: hidden;
-  transition: transform .26s var(--ease), opacity .2s var(--ease);
+.side-arrow {
+  position: absolute; top: 9px; width: 22px; height: 26px; z-index: 2;
+  display: grid; place-items: center; border: none; border-radius: var(--r-sm);
+  background: transparent; color: var(--text3);
+  transition: background .12s var(--ease), color .12s var(--ease);
 }
-.tools.collapsed { transform: translateX(-126%); opacity: 0; pointer-events: none; }
-.tools-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 14px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0;
+.side-left  .side-arrow { right: 2px; }
+.side-right .side-arrow { left: 2px; }
+.side-arrow:hover { background: var(--surface-2); color: var(--text); }
+.side-arrow svg { width: 15px; height: 15px; transition: transform .22s var(--ease); }
+.side.collapsed .side-arrow svg { transform: rotate(180deg); }
+
+.side-head {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  padding: 12px 32px 10px 14px; border-bottom: 1px solid var(--border-soft);
 }
-.tools-head h2 { font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
-.tools-body { overflow-y: auto; padding: 14px; }
-/* Панель внутри сцены: сбрасываем «старый» вид левой колонки */
-.tools.panel { width: 300px; border-right: none; }
+.side-head h2, .side-scene {
+  font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.side-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+/* Две части левой панели: ввод сверху, аналитика снизу. */
+.side-part { border-top: 1px solid var(--border-soft); }
+.side-part:first-child { border-top: none; }
+.part-title {
+  position: sticky; top: 0; z-index: 1; background: var(--surface);
+  padding: 11px 14px 5px;
+  font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--text3);
+}
+.tools-body { padding: 4px 14px 14px; }
 .tools .panel-only { display: none; }   /* h1/subtitle старой панели прячем */
 
-/* Кнопка-иконка закрытия панели */
-.tools-x {
-  width: 26px; height: 26px; border: none; border-radius: var(--r-sm); background: transparent;
-  color: var(--text2); display: grid; place-items: center;
-}
-.tools-x:hover { background: var(--surface-2); color: var(--text); }
-.tools-x svg { width: 16px; height: 16px; }
-
-/* «Все настройки» — раскрытие вторичных секций (режим/сцены/оси) */
-#tools-advanced { display: none; }
-.tools.show-all #tools-advanced { display: block; }
-.tools-allbtn {
-  width: 100%; margin-top: 6px; padding: 8px; border: 1px dashed var(--border);
-  border-radius: var(--r-sm); background: transparent; color: var(--text2);
-  font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;
-  transition: border-color .12s var(--ease), color .12s var(--ease);
-}
-.tools-allbtn:hover { border-color: var(--accent); color: var(--accent); }
-.tools-allbtn svg { width: 13px; height: 13px; transition: transform .2s var(--ease); }
-.tools.show-all .tools-allbtn svg { transform: rotate(180deg); }
-
-/* ── Плавающее табло результатов (право) ── */
-.scoreboard {
-  position: absolute; right: 14px; top: 12px; z-index: var(--z-float);
-  width: 252px; max-height: calc(100% - 24px);
-  display: flex; flex-direction: column;
-  background: var(--surface);   /* фолбэк для браузеров без color-mix — непрозрачно */
-  background: color-mix(in srgb, var(--surface) 84%, transparent);  /* frosted glass: график мягко просвечивает */
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  border: 1px solid var(--border); border-radius: var(--r-lg);
-  box-shadow: var(--shadow-panel); overflow: hidden;
-  transition: transform .26s var(--ease), opacity .2s var(--ease);
-}
-.scoreboard.collapsed { transform: translateX(126%); opacity: 0; pointer-events: none; }
-.sb-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 11px 14px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0;
-}
-.sb-head h2 {
-  font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text3);
-}
-.sb-body { overflow-y: auto; padding: 6px 14px 14px; }
+/* Аналитика читается как приборная панель: крупное число, тихая подпись. */
+#scoreboard.hidden { display: none; }
+.sb-body { padding: 4px 14px 16px; }
 .sb-body .section { margin-bottom: 12px; }
 .sb-body .section:last-child { margin-bottom: 0; }
 .sb-body .section-title { margin-top: 8px; }
-/* Крупные «приборные» цифры в табло */
-.scoreboard .stat { padding: 5px 0; align-items: baseline; gap: 10px; }
-.scoreboard .stat span { font-size: 12px; }
-.scoreboard .stat b { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.sb-body .stat { padding: 5px 0; align-items: baseline; gap: 10px; }
+.sb-body .stat span { font-size: 12px; }
+.sb-body .stat b { font-size: 16px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 .sb-empty { font-size: 12.5px; color: var(--text2); line-height: 1.5; padding: 6px 0; }
+.sb-body > div:not(:empty) { margin-bottom: 12px; }
+.sb-body > div:empty { margin: 0; }
 
-/* ── Плавающий пульт: горизонтальная лента (как пульт плеера) ──
-   Ручка слева, регуляторы в один ряд. Вся раскладка скоупится под #pult —
-   при возврате узлов в #sec-tax их обычный вертикальный вид НЕ меняется.
-   На боковых краях лента остаётся горизонтальной (рефлоу в вертикаль —
-   возможное будущее улучшение). */
-.pult {
-  position: absolute; left: 14px; bottom: 14px; z-index: var(--z-float);
-  display: flex; align-items: stretch;
-  /* Шире, чем раньше: у сцен с большим числом регуляторов (монополия, налог)
-     лента иначе переносится на 3 ряда и залезает на график (Фаза 3). */
-  min-width: 420px; max-width: min(880px, 94vw);
-  background: var(--surface);   /* фолбэк без color-mix */
-  background: color-mix(in srgb, var(--surface) 84%, transparent);  /* frosted glass */
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  border: 1px solid var(--border); border-radius: var(--r-lg);
-  box-shadow: var(--shadow-panel); overflow: hidden;
-  opacity: 0; transform: translateY(8px); pointer-events: none;
-  transition: opacity .2s var(--ease), transform .22s var(--ease);
+/* ── Правая панель «Основные параметры» ──────────────────────────────
+   Здесь живут живые регуляторы активной сцены. Каждый в две строки:
+   сверху имя и значение, снизу ползунок во всю ширину, так число видно
+   не щурясь, а тянуть удобно даже в узкой колонке. */
+#params-body { padding: 6px 14px 18px; display: flex; flex-direction: column; gap: 13px; }
+#params-empty { font-size: 12.5px; color: var(--text2); line-height: 1.5; }
+#params-curves, #params-extra { display: contents; }
+.pchip { display: flex; flex-direction: column; gap: 5px; }
+.pchip-top { display: flex; align-items: center; gap: 7px; }
+.pchip-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.pchip-label {
+  font-size: 12px; font-weight: 600; color: var(--text2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pult.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
-/* Ручка-шапка слева: за неё таскают; компактная вертикальная колонка. */
-.pult-head {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  width: 40px; flex-shrink: 0;                 /* фиксированная: иначе длинный заголовок
-                                                  двигал бы все регуляторы вбок */
-  border-right: 1px solid var(--border-soft);
-  cursor: grab; touch-action: none; user-select: none;
+.pchip-val {
+  margin-left: auto; font-size: 13px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums; flex-shrink: 0;
 }
-.pult-head:active { cursor: grabbing; }
-.pult-grip { display: inline-flex; flex-direction: column; gap: 3px; }
-.pult-grip i { width: 3px; height: 3px; border-radius: 50%; background: var(--text3); }
-/* Вертикальный заголовок ручки. max-height обязателен: без него длинный заголовок
-   («Монополия: потолок») растягивал ВСЮ ленту до ~150px и она залезала на график.
-   С ограничением текст переносится во второй вертикальный столбец. */
-.pult-head h2 {
-  font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--text3); writing-mode: vertical-rl; transform: rotate(180deg); margin: 0;
-  max-height: 74px; white-space: normal; line-height: 1.3; text-align: center;
-}
-/* Тело — регуляторы в один ряд, переносятся на узком экране.
-   Раскладка держится на ОДНОМ числе: базовая ширина регулятора 220px.
-   Раньше у трёх видов чипов стояли разные min-width (190 / 200 / 230) вместе
-   с flex:1 — при переносе последний ряд растягивался на всю ленту, а колонки
-   выходили разной ширины. Одна база + одинаковый рост даёт ровную сетку. */
-.pult-body {
-  flex: 1; display: flex; align-items: center; flex-wrap: wrap;
-  gap: 10px 18px; padding: 10px 16px;
-}
-/* Все регуляторы ленты, какой бы природы ни были, растут одинаково. */
-#pult .pult-cchip, #pult .pult-xchip, #pult .field { flex: 1 1 220px; max-width: 320px; }
-.pult-body .field { margin: 0; }
-/* Тумблеры «Налог платит» и «Вид ставки»: метка и сегменты в строку. */
-#pult #taxside-row, #pult #taxkind-row {
-  margin: 0 !important; display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-}
-#pult #taxside-row > label, #pult #taxkind-row > label { display: inline; margin: 0; white-space: nowrap; }
-#pult #taxside-row .seg-btn, #pult #taxkind-row .seg-btn { padding: 6px 10px; white-space: nowrap; }
-/* Под-режим монополии: в ленте — одна строка (в «Инструментах» остаются две). */
-#pult #mono-submode { margin: 0 !important; display: flex; flex-direction: row; gap: 6px; flex-shrink: 0; }
-#pult #mono-submode .seg { margin: 0 !important; }
-#pult #mono-submode .seg-btn { padding: 5px 9px; font-size: 11.5px; white-space: nowrap; }
-/* ЛЮБОЙ перенесённый .field (ставка, цена Pc, мировая цена, тариф, квота, МРОТ,
-   зарплата профсоюза, α) в ленте выкладывается в одну строку: метка + ползунок +
-   число. Без этого блок остаётся двухэтажным и лента вырастает вдвое. */
-#pult .field {
-  margin: 0 !important; display: flex; align-items: center; gap: 9px;
-}
-#pult .field > label {
-  margin: 0; white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--text2);
-}
-#pult .field > label b { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
-#pult .field > div { margin-top: 0 !important; flex: 1; min-width: 112px; }
-#pult .field > input[type="range"] { margin-top: 0; flex: 1; min-width: 112px; }
-#pult .field input[type="number"] { font-variant-numeric: tabular-nums; }
-/* Пояснения живут в «Инструментах»: внутри ленты длинный текст сжимался в узкую
-   колонку и растягивал её (сцена «Труд» доходила до 220px при полосе в 100px). */
-#pult .hint { display: none; }
+.pchip input[type="range"] { width: 100%; margin: 0; }
+/* Перенесённые сюда поля сцены (ставка, цена, зарплата, мировая цена, альфа)
+   уже свёрстаны в две строки, им хватает обнуления внешнего отступа. */
+#params-body .field { margin: 0; }
+#params-body .field > label { font-size: 12px; font-weight: 600; color: var(--text2); }
+#params-body .field > label b { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+#params-body .hint { font-size: 11.5px; margin-top: 5px; }
+#params-body .seg { margin: 0; }
 
-/* Контейнеры слайдеров кривых и сцен-слайдеров — прозрачны для flex (чипы текут рядом). */
-#pult #pult-curves, #pult #pult-extra {
-  display: contents;   /* дети становятся прямыми flex-детьми ленты (единый ряд/перенос) */
+/* ── Кнопки над графиком: гаечный ключ и возврат масштаба ── */
+.graph-tools {
+  position: absolute; top: 12px; right: 12px; z-index: var(--z-float);
+  display: flex; align-items: center; gap: 6px;
 }
-/* Сцен-слайдер (КПВ «Макс X/Y», мастер неравенства): метка + range(акцент) + число. */
-#pult .pult-xchip { margin: 0; display: flex; align-items: center; gap: 9px; }
-#pult .pult-xchip .xc-label {
-  font-size: 12px; font-weight: 600; color: var(--text2); white-space: nowrap;
+.gt-btn {
+  width: 34px; height: 34px; display: grid; place-items: center; position: relative;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text2); box-shadow: var(--shadow-panel);
+  transition: color .12s var(--ease), border-color .12s var(--ease), transform .08s var(--ease);
 }
-#pult .pult-xchip input[type="range"] { margin-top: 0; flex: 1; min-width: 112px; }
-#pult .pult-xchip .xc-val {
-  font-size: 13px; font-weight: 700; color: var(--text); min-width: 38px; text-align: right;
-  font-variant-numeric: tabular-nums;
+.gt-btn svg { width: 17px; height: 17px; }
+.gt-btn:hover { color: var(--accent); border-color: var(--accent); }
+.gt-btn:active { transform: scale(.94); }
+.gt-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-tint); }
+.gt-btn[hidden] { display: none; }
+.gt-btn[data-tip]::after {
+  content: attr(data-tip); position: absolute; top: calc(100% + 7px); right: 0;
+  background: var(--text); color: var(--surface); font-size: 11px; font-weight: 600;
+  padding: 4px 8px; border-radius: 5px; white-space: nowrap; pointer-events: none;
+  opacity: 0; transform: translateY(-3px); transition: opacity .12s var(--ease), transform .12s var(--ease);
+  z-index: var(--z-pop);
 }
-/* Чип кривой: цветной маркер + метка (роль/формула) + ползунок «b» + число. */
-#pult .pult-cchip { margin: 0; display: flex; align-items: center; gap: 9px; }
-#pult .pult-cchip .cc-dot {
-  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
-}
-#pult .pult-cchip .cc-label {
-  font-size: 12px; font-weight: 600; color: var(--text2); white-space: nowrap;
-  max-width: 84px; overflow: hidden; text-overflow: ellipsis;
-}
-#pult .pult-cchip input[type="range"] { margin-top: 0; flex: 1; min-width: 112px; }
-#pult .pult-cchip .cc-val {
-  font-size: 13px; font-weight: 700; color: var(--text); min-width: 38px; text-align: right;
-  font-variant-numeric: tabular-nums;
+.gt-btn:hover[data-tip]::after,
+.gt-btn:focus-visible[data-tip]::after { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .gt-btn.appear { animation: gtIn .18s var(--ease); }
+  @keyframes gtIn { from { opacity: 0; transform: scale(.9); } }
 }
 
-/* Перетаскивание/прилипание плавающих панелей (пульт + табло) — ручка = шапка. */
-.sb-head { cursor: grab; touch-action: none; user-select: none; }
-.scoreboard.dragging, .pult.dragging { cursor: grabbing; transition: none !important; }
-.scoreboard.snapping, .pult.snapping { transition: left .28s var(--ease), top .28s var(--ease); }
-@media (prefers-reduced-motion: reduce) {
-  .scoreboard.snapping, .pult.snapping { transition: none; }
-  .pult { transition: none; }
+/* ── Меню настроек координатной плоскости (гаечный ключ) ── */
+.wrench {
+  position: absolute; top: 52px; right: 12px; z-index: var(--z-pop);
+  width: 268px; max-height: calc(100% - 72px); overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop); padding: 4px 14px 14px;
+  transform-origin: top right;
+  display: none;
 }
+.wrench.open { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .wrench.open { animation: wrenchIn .16s var(--ease); }
+  @keyframes wrenchIn { from { opacity: 0; transform: scale(.96) translateY(-4px); } }
+}
+.wrench-group { padding: 10px 0; border-top: 1px solid var(--border-soft); }
+.wrench-group:first-of-type { padding-top: 10px; border-top: none; }
+.wrench-title {
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 7px;
+}
+.wrench-row { display: flex; align-items: center; gap: 7px; }
+.wrench-row + .wrench-row { margin-top: 7px; }
+.wrench-row > label { font-size: 12px; color: var(--text2); flex-shrink: 0; }
+.wrench-row input[type="number"], .wrench-row input[type="text"] {
+  flex: 1; min-width: 0; padding: 6px 7px; font-size: 12.5px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
+}
+.wrench .seg { margin: 0; }
+.wrench .seg-btn { padding: 6px 8px; font-size: 11.5px; }
+.wrench .chk { margin-top: 0; }
+.wrench .hint { margin-top: 5px; }
 
-@media (max-width: 760px) {
-  .tools { width: min(300px, calc(100vw - 80px)); max-height: 56vh; }
-  .scoreboard { width: 220px; max-height: 56vh; top: auto; bottom: 14px; }
-  .scene-name { display: none; }
+@media (max-width: 900px) {
+  .side-left  { width: 268px; }
+  .side-right { width: 232px; }
 }
 
 /* Интервал между блоками результатов; пустые блоки (чужой режим) не занимают места. */
@@ -822,10 +774,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 /* Тактильная отдача нажатия на кнопки дока. */
 .dock-btn:not(:disabled):active { transform: scale(.92); }
 
-/* Шапка сцены мягко въезжает один раз (у неё нет состояния сворачивания,
-   поэтому floatIn не конфликтует со слайдом панелей по горизонтали). */
+/* Кнопки над графиком мягко въезжают один раз при открытии сцены. */
 @keyframes floatIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.scene-header { animation: floatIn .34s var(--ease) .04s; }
+.graph-tools { animation: floatIn .34s var(--ease) .04s; }
+@media (prefers-reduced-motion: reduce) {
+  .side, .side-arrow svg { transition: none; }
+  .graph-tools, .picker-inner { animation: none; }
+}
   </style>
 </head>
 <body>
@@ -1503,53 +1458,44 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
 <div class="app">
 
-  <!-- ── ГРАФИК ВО ВЕСЬ ЭКРАН ──────────────────────────────────────── -->
-  <div class="graph-wrap" id="graph-wrap">
-    <svg id="chart"></svg>
-  </div>
-
-  <!-- ── ЛЕВЫЙ ДОК ─────────────────────────────────────────────────── -->
-  <nav class="dock" aria-label="Инструменты сцены">
-    <button class="dock-btn active" id="dock-tools" type="button" data-tip="Инструменты" aria-label="Показать или скрыть панель инструментов" aria-pressed="true">
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2.4" fill="var(--surface-2)"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2.4" fill="var(--surface-2)"/></svg>
+  <!-- ── ПОЛОСА ИКОНОК ─────────────────────────────────────────────────
+       Четыре постоянных действия: назад к сценариям, аналитика, сохранение
+       в профиль, скачивание. Тема живёт внизу отдельно: это не действие
+       со сценой, а настройка рабочего места. -->
+  <nav class="dock" aria-label="Действия со сценой">
+    <button class="dock-btn" id="scene-back" type="button" data-tip="Назад к сценариям" aria-label="Назад к сценариям">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l-6 7 6 7"/><path d="M7 12h11"/></svg>
     </button>
-    <button class="dock-btn active" id="dock-score" type="button" data-tip="Табло результатов" aria-label="Показать или скрыть табло результатов" aria-pressed="true">
+    <button class="dock-btn active" id="dock-score" type="button" data-tip="Включить аналитику" aria-label="Включить или выключить аналитику" aria-pressed="true">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 19V11"/><path d="M12 19V5"/><path d="M19 19v-6"/><path d="M4 19h16"/></svg>
     </button>
-    <div class="dock-sep"></div>
-    <button class="dock-btn" id="dock-grid" type="button" data-tip="Сетка" aria-label="Показать или скрыть сетку" aria-pressed="true">
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-    </button>
-    <button class="dock-btn" id="dock-save" type="button" data-tip="Сохранить (скоро)" aria-label="Сохранить график">
+    <button class="dock-btn" id="dock-save" type="button" data-tip="Сохранить график в профиль" aria-label="Сохранить график в профиль">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><rect x="8" y="13" width="8" height="6"/></svg>
     </button>
-    <button class="dock-btn" id="dock-export" type="button" data-tip="Сохранить график" aria-label="Сохранить график: PNG, TeX или PDF">
+    <button class="dock-btn" id="dock-export" type="button" data-tip="Скачивание графика" aria-label="Скачивание графика: PNG, TeX или PDF">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
     </button>
     <div class="dock-spacer"></div>
-    <button class="dock-btn" id="dock-theme" type="button" data-tip="Светлая / тёмная тема" aria-label="Переключить светлую или тёмную тему">
+    <button class="dock-btn" id="dock-theme" type="button" data-tip="Светлая или тёмная тема" aria-label="Переключить светлую или тёмную тему">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14a8 8 0 1 1-9.5-9.8A6.5 6.5 0 0 0 20 14z"/></svg>
     </button>
   </nav>
 
-  <!-- ── ШАПКА СЦЕНЫ ───────────────────────────────────────────────── -->
-  <div class="scene-header">
-    <button class="scene-back" id="scene-back" type="button" aria-label="Вернуться к выбору сценария">
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l-6 7 6 7"/><path d="M7 12h11"/></svg>
-      Сценарии
+  <!-- ── ЛЕВАЯ ПАНЕЛЬ: ВВОД ФУНКЦИЙ + АНАЛИТИКА ────────────────────── -->
+  <aside class="side side-left" id="tools-panel" aria-label="Ввод функций и аналитика">
+    <button class="side-arrow" id="tools-toggle" type="button"
+            aria-label="Свернуть или развернуть панель ввода" aria-expanded="true">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg>
     </button>
-    <span class="scene-name" id="scene-name">Свободный холст</span>
-  </div>
+    <div class="side-inner">
+      <div class="side-head">
+        <span class="side-scene" id="scene-name">Свободный холст</span>
+      </div>
+      <div class="side-scroll">
 
-  <!-- ── ПЛАВАЮЩАЯ ПАНЕЛЬ УПРАВЛЕНИЯ (бывшая левая колонка) ─────────── -->
-  <aside class="panel tools" id="tools-panel" aria-label="Инструменты">
-    <div class="tools-head">
-      <h2>Инструменты</h2>
-      <button class="tools-x" id="tools-close" type="button" aria-label="Свернуть панель инструментов">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
-      </button>
-    </div>
-    <div class="tools-body">
+        <section class="side-part">
+          <div class="part-title">Ввод функций</div>
+          <div class="tools-body">
     <h1 class="panel-only">Графический калькулятор&nbsp;2.0</h1>
     <div class="subtitle panel-only">бета · собственный движок (D3&nbsp;+&nbsp;Math.js)</div>
 
@@ -2620,91 +2566,177 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
     </div>
 
-    <!-- Оформление (Фаза 1): подписи графика и свои точки. Секции нет в groups[]
-         у setMode, поэтому она видна во всех режимах — эти настройки универсальны. -->
+    <!-- Свои точки и площади. Оформление плоскости (название, оси, сетка,
+         границы, легенда) переехало в меню гаечного ключа над графиком. -->
     <div class="section" id="sec-view">
-      <div class="section-title">Оформление</div>
-      <div class="field">
-        <label for="inp-gtitle">Заголовок графика</label>
-        <input type="text" id="inp-gtitle" placeholder="не показывать" autocomplete="off">
-      </div>
-      <div class="row">
-        <div class="field">
-          <label for="inp-xname">Ось X</label>
-          <input type="text" id="inp-xname" placeholder="Q" autocomplete="off">
-        </div>
-        <div class="field">
-          <label for="inp-yname">Ось Y</label>
-          <input type="text" id="inp-yname" placeholder="P" autocomplete="off">
-        </div>
-      </div>
-      <div class="hint">Оставьте пустым, чтобы взять названия из сцены.</div>
-
-      <label class="chk"><input type="checkbox" id="chk-legend" checked>
-        Легенда закрашенных областей</label>
-      <div class="hint">Подписывает, какая площадь что означает: излишки, сбор бюджета, потери.</div>
-
-      <div class="vsub">Свои точки</div>
+      <div class="section-title">Свои точки</div>
       <button class="btn-sm" id="btn-mark-add" type="button">Поставить точку</button>
-      <div class="hint" id="mark-hint">Нажмите кнопку, потом щёлкните по графику.</div>
+      <div class="hint" id="mark-hint">Нажмите кнопку, потом щёлкните по графику. Рядом с кривой точка сядет прямо на неё.</div>
       <div id="mark-list" style="margin-top:8px;"></div>
     </div>
 
-    <!-- Оси и сетка (шаг 2) -->
-    <div class="section" id="sec-axes">
-      <div class="section-title">Оси и сетка</div>
-      <div class="row">
-        <div class="field">
-          <label id="lbl-qmax">Q макс</label>
-          <input type="number" id="inp-qmax" min="1" step="1" value="100">
-        </div>
-        <div class="field">
-          <label id="lbl-pmax">P макс</label>
-          <input type="number" id="inp-pmax" min="1" step="1" value="100">
-        </div>
-      </div>
-      <label class="chk"><input type="checkbox" id="chk-grid" checked> Показывать сетку</label>
-      <!-- Фаза 1в: мелкая сетка — 5 дополнительных линий между подписанными
-           делениями (бледнее). Подписи остаются только у крупных линий. -->
-      <label class="chk"><input type="checkbox" id="chk-grid-dense"> Мелкая сетка (подробнее)</label>
-    </div>
-
-      <!-- «Все настройки»: раскрывает вторичные секции (режим/сцены/оси),
-           которые JS переносит в #tools-advanced при инициализации сцены. -->
-      <button class="tools-allbtn" id="tools-allbtn" type="button" aria-expanded="false">
-        Все настройки
+    <!-- Площади (Фаза 10): под кривой на отрезке или между отмеченными точками. -->
+    <div class="section" id="sec-areascalc">
+      <button class="fold-btn" id="areascalc-btn" type="button" aria-expanded="false" aria-controls="areascalc-body">
+        <span>Площади</span>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </button>
-      <div id="tools-advanced"></div>
-    </div><!-- /tools-body -->
+      <div class="fold-body" id="areascalc-body">
+        <div class="seg" id="ac-mode">
+          <button class="seg-btn active" id="ac-curve">Под кривой</button>
+          <button class="seg-btn" id="ac-poly">Между точками</button>
+        </div>
+
+        <div id="ac-pane-curve">
+          <div class="field">
+            <label for="ac-pick">Кривая</label>
+            <select id="ac-pick"></select>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="ac-from">От</label>
+              <input type="number" id="ac-from" step="any" placeholder="0" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="ac-to">До</label>
+              <input type="number" id="ac-to" step="any" placeholder="край" autocomplete="off">
+            </div>
+          </div>
+          <div class="hint">Границы можно не заполнять: тогда возьмём всю кривую в первой четверти.</div>
+        </div>
+
+        <div id="ac-pane-poly" style="display:none;">
+          <div class="hint">Отметьте галочками вершины. Точки пересечения кривых считаются сами
+            и лежат в списке серыми.</div>
+          <div id="ac-points" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="row" style="margin-top:8px;align-items:center;">
+          <button class="btn" id="ac-calc" type="button" style="flex:1;">Посчитать площадь</button>
+          <span id="ac-color-slot"></span>
+        </div>
+        <button class="btn-sm" id="ac-clear" type="button" style="margin-top:6px;">Убрать</button>
+        <div class="error" id="ac-error"></div>
+        <div id="info-areacalc" style="margin-top:8px;"></div>
+      </div>
+    </div>
+
+          </div><!-- /tools-body -->
+        </section>
+
+        <!-- Аналитика: сюда JS переносит блок равновесия и все #info-*. -->
+        <section class="side-part" id="scoreboard">
+          <div class="part-title">Аналитика</div>
+          <div class="sb-body" id="sb-body"><!-- JS переносит сюда #info-* и блок равновесия --></div>
+        </section>
+
+      </div><!-- /side-scroll -->
+    </div><!-- /side-inner -->
   </aside>
 
-  <!-- ── ПЛАВАЮЩЕЕ ТАБЛО РЕЗУЛЬТАТОВ ───────────────────────────────── -->
-  <aside class="scoreboard" id="scoreboard" aria-label="Результаты">
-    <div class="sb-head">
-      <h2>Результаты</h2>
-      <button class="tools-x" id="sb-close" type="button" aria-label="Свернуть табло результатов">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+  <!-- ── ГРАФИК ────────────────────────────────────────────────────── -->
+  <div class="graph-wrap" id="graph-wrap">
+    <svg id="chart"></svg>
+
+    <!-- Кнопки над графиком: настройки плоскости и возврат масштаба. -->
+    <div class="graph-tools">
+      <button class="gt-btn" id="btn-resetview" type="button" hidden
+              data-tip="Вернуться к изначальному масштабу" aria-label="Вернуться к изначальному масштабу">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9a8 8 0 1 1 .6 5"/><path d="M4 4v5h5"/></svg>
+      </button>
+      <button class="gt-btn" id="btn-wrench" type="button" aria-expanded="false" aria-controls="wrench-pop"
+              data-tip="Настройки координатной плоскости" aria-label="Настройки координатной плоскости">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 6.6a5 5 0 0 1-6.2 6.2L7 20a2.1 2.1 0 0 1-3-3l7.2-7.2a5 5 0 0 1 6.2-6.2l-3 3 .9 3.1 3.1.9z"/></svg>
       </button>
     </div>
-    <div class="sb-body" id="sb-body"><!-- JS переносит сюда #info-* и блок равновесия --></div>
-  </aside>
 
-  <!-- ── ПЛАВАЮЩИЙ ПУЛЬТ: живые регуляторы активного сценария ─────────── -->
-  <!-- Тело наполняется JS: при входе в сценарий «Налог/Субсидия» сюда
-       ПЕРЕНОСЯТСЯ (appendChild, без клонирования) живые узлы #taxside-row и
-       #tax-field из «Инструментов»; при выходе — возвращаются назад. -->
-  <aside class="pult" id="pult" aria-label="Регуляторы сценария" aria-hidden="true">
-    <div class="pult-head" id="pult-head">
-      <span class="pult-grip" aria-hidden="true"><i></i><i></i><i></i></span>
-      <h2 id="pult-title">Регуляторы</h2>
+    <!-- ── МЕНЮ НАСТРОЕК КООРДИНАТНОЙ ПЛОСКОСТИ (Фаза 2) ──────────────
+         Сюда переехали бывшие секции «Все настройки» и «Сетка», а из
+         «Инструментов» — всё, что относится к оформлению плоскости,
+         а не к модели. -->
+    <div class="wrench" id="wrench-pop" role="dialog" aria-label="Настройки координатной плоскости">
+
+      <div class="wrench-group">
+        <div class="wrench-title">Ось X</div>
+        <div class="wrench-row">
+          <label for="inp-qmin">от</label>
+          <input type="number" id="inp-qmin" step="any" value="0">
+          <label for="inp-qmax">до</label>
+          <input type="number" id="inp-qmax" step="any" value="100">
+        </div>
+        <div class="wrench-row">
+          <label for="inp-xstep">шаг делений</label>
+          <input type="number" id="inp-xstep" step="any" min="0" placeholder="авто">
+        </div>
+        <div class="wrench-row">
+          <label for="inp-xname">название</label>
+          <input type="text" id="inp-xname" placeholder="Q" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="wrench-group">
+        <div class="wrench-title">Ось Y</div>
+        <div class="wrench-row">
+          <label for="inp-pmin">от</label>
+          <input type="number" id="inp-pmin" step="any" value="0">
+          <label for="inp-pmax">до</label>
+          <input type="number" id="inp-pmax" step="any" value="100">
+        </div>
+        <div class="wrench-row">
+          <label for="inp-ystep">шаг делений</label>
+          <input type="number" id="inp-ystep" step="any" min="0" placeholder="авто">
+        </div>
+        <div class="wrench-row">
+          <label for="inp-yname">название</label>
+          <input type="text" id="inp-yname" placeholder="P" autocomplete="off">
+        </div>
+        <div class="hint">Названия осей пустые — берём те, что даёт сцена.</div>
+      </div>
+
+      <div class="wrench-group">
+        <div class="wrench-title">Сетка</div>
+        <div class="seg" id="grid-seg">
+          <button class="seg-btn" id="grid-dense" type="button">Подробная</button>
+          <button class="seg-btn active" id="grid-plain" type="button">Упрощённая</button>
+          <button class="seg-btn" id="grid-off" type="button">Нет</button>
+        </div>
+      </div>
+
+      <div class="wrench-group">
+        <div class="wrench-title">Подписи</div>
+        <label class="chk"><input type="checkbox" id="chk-legend" checked>
+          Легенда закрашенных областей</label>
+        <div class="wrench-row" style="margin-top:8px;">
+          <input type="text" id="inp-gtitle" placeholder="Название графика" autocomplete="off">
+          <span id="gtitle-color-slot"></span>
+        </div>
+        <div class="hint">Квадратик справа задаёт цвет названия.</div>
+      </div>
+
+      <!-- Сюда JS складывает вторичные секции сцены, если они есть. -->
+      <div id="tools-advanced"></div>
     </div>
-    <!-- Тело ленты: [слайдеры кривых] + [сцен-слайдеры] + [перенесённые регуляторы].
-         Два контейнера всегда первые и в фиксированном порядке (display:contents —
-         их дети текут прямым flex-рядом ленты); перенесённые узлы добавляются после. -->
-    <div class="pult-body" id="pult-body">
-      <div id="pult-curves"></div>
-      <div id="pult-extra"></div>
+  </div>
+
+  <!-- ── ПРАВАЯ ПАНЕЛЬ: ОСНОВНЫЕ ПАРАМЕТРЫ ─────────────────────────────
+       Живые регуляторы активной сцены. Часть узлов (ставка, цена, зарплата,
+       мировая цена) физически ПЕРЕНОСИТСЯ сюда из «Ввода функций» через
+       appendChild — обработчики и ID сохраняются, клонирования нет. -->
+  <aside class="side side-right" id="params-panel" aria-label="Основные параметры">
+    <button class="side-arrow" id="params-toggle" type="button"
+            aria-label="Свернуть или развернуть панель параметров" aria-expanded="true">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6l6 6-6 6"/></svg>
+    </button>
+    <div class="side-inner">
+      <div class="side-head"><h2>Основные параметры</h2></div>
+      <div class="side-scroll">
+        <div id="params-body">
+          <div id="params-curves"></div>
+          <div id="params-extra"></div>
+          <div id="params-empty">У этой сцены пока нет живых регуляторов. Добавьте линейную
+            кривую — её можно будет двигать ползунком.</div>
+        </div>
+      </div>
     </div>
   </aside>
 
@@ -2808,15 +2840,18 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
    БЛОК 1. CONFIG / STATE — настройки и состояние калькулятора
    --------------------------------------------------------------------- */
 const CONFIG = {
-  // Границы видимой области в «экономических» координатах.
-  // Только первая четверть: Q от 0 до Qmax, P от 0 до Pmax.
+  // Границы видимой области в «экономических» координатах. По умолчанию первая
+  // четверть (Qmin=Pmin=0), но нижние границы теперь настоящие переменные: их
+  // двигает панорамирование мышью и поля «от/до» в меню гаечного ключа.
+  Qmin: 0,
   Qmax: 100,
+  Pmin: 0,
   Pmax: 100,
-  // Поля (margins) области графика, в пикселях. Помимо места под подписи осей
-  // дают «воздух» у краёв: снизу — широкая полоса под горизонтальную ленту-пульт
-  // (ось Q с числами остаётся над лентой), слева — отступ от дока/«Инструментов».
+  // Поля (margins) области графика, в пикселях: место под цифры делений, буквы
+  // осей и «воздух» у краёв. Панели больше не висят над холстом, поэтому широкая
+  // нижняя полоса под ленту-пульт не нужна.
   // Меняют ТОЛЬКО геометрию холста (d3-range и clip) — масштабы/математику не трогают.
-  margin: { top: 72, right: 48, bottom: 100, left: 104 },
+  margin: { top: 56, right: 56, bottom: 62, left: 76 },
 };
 
 // Состояние: список кривых и настройки. Наполняется на следующих шагах.
@@ -2824,6 +2859,15 @@ const STATE = {
   curves: [],        // [{ id, expr, compiled, color, name, role, visible, linear }]
   showGrid: true,
   gridDense: false,  // мелкая сетка: 5 бледных линий между подписанными делениями (Фаза 1в)
+  xStep: 0,          // свой шаг делений по осям (0 = подбирать автоматически)
+  yStep: 0,
+  // Пользователь ушёл от масштаба сцены (колесо, панорама, ручные границы).
+  // Пока флаг стоит, авто-подгонка осей молчит и видна кнопка возврата.
+  viewDirty: false,
+  titleColor: '',    // свой цвет заголовка графика ('' = цвет текста темы)
+  areaCalc: null,    // результат расчёта площади (Фаза 10)
+  areaCalcColor: '', // и её цвет
+  areaColor: {},     // свои цвета закрашенных областей: ключ легенды -> hex (Фаза 8)
   // Форма записи следующей добавляемой кривой (Фаза 1б): 'PQ' — P = f(Q) (канон движка),
   // 'QP' — Q = f(P) (привычная запись спроса). Q(P) приводится к P=f(Q) при добавлении:
   // линейная — аналитически, любая другая — численным обращением (бисекция по P).
@@ -3512,13 +3556,12 @@ function computeSize() {
   svg.attr('width', W).attr('height', H);
 }
 
-// Линейные шкалы по двум осям.
-// X: Q из [0..Qmax] -> пиксели [левое поле .. правый край].
-// Y: P из [0..Pmax] -> пиксели [низ .. верх] (диапазон перевёрнут: больше P = выше).
+// Линейные шкалы по двум осям. Границы берём из CONFIG целиком: нижние
+// (Qmin/Pmin) двигает панорамирование и поля «от» в меню плоскости.
 function makeScales() {
   const m = CONFIG.margin;
-  sx = d3.scaleLinear().domain([0, CONFIG.Qmax]).range([m.left, W - m.right]);
-  sy = d3.scaleLinear().domain([0, CONFIG.Pmax]).range([H - m.bottom, m.top]);
+  sx = d3.scaleLinear().domain([CONFIG.Qmin, CONFIG.Qmax]).range([m.left, W - m.right]);
+  sy = d3.scaleLinear().domain([CONFIG.Pmin, CONFIG.Pmax]).range([H - m.bottom, m.top]);
 }
 
 // Перевод координат туда-обратно (пригодится для перетаскивания мышью).
@@ -3531,6 +3574,21 @@ function fmt(v) {
   return (Math.round(v * 100) / 100).toString();
 }
 
+/* Деления оси: свой шаг, если задан в меню плоскости, иначе автоподбор d3.
+   Свой шаг режем по числу линий — 400 подписей на экране никому не помогут. */
+function axisTicks(scale, count, step) {
+  const [lo, hi] = scale.domain();
+  if (step > 0 && (hi - lo) / step <= 400) {
+    const out = [];
+    const first = Math.ceil(lo / step - 1e-9) * step;
+    for (let v = first; v <= hi + 1e-9; v += step) out.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+    return out;
+  }
+  return scale.ticks(count);
+}
+function xTicks() { return axisTicks(sx, 10, STATE.xStep); }
+function yTicks() { return axisTicks(sy, 8, STATE.yStep); }
+
 // Стрелки на концах осей — один раз как <marker> в <defs>.
 function addDefs() {
   const defs = svg.append('defs');
@@ -3541,81 +3599,97 @@ function addDefs() {
     .attr('orient', 'auto-start-reverse')
     .append('path').attr('d', 'M0,0 L10,5 L0,10 z').attr('fill', COL.ink);
 
-  // Прямоугольник-«окно» первой четверти. Всё, что нарисовано с этим
-  // clip-path, обрезается ровно по осям (P от 0 до Pmax, Q от 0 до Qmax) —
-  // кривые и заливки не вылезают в отрицательную зону и за границы.
+  // Прямоугольник-«окно»: видимая часть первой четверти. Всё, что нарисовано
+  // с этим clip-path, обрезается по осям и по краям окна — кривые и заливки
+  // не вылезают в отрицательную зону и не выходят за границы вида.
+  const x0 = sx(Math.max(0, CONFIG.Qmin)), x1 = sx(CONFIG.Qmax);
+  const y1 = sy(CONFIG.Pmax), y0 = sy(Math.max(0, CONFIG.Pmin));
   defs.append('clipPath').attr('id', 'plot-clip').append('rect')
-    .attr('x', sx(0)).attr('y', sy(CONFIG.Pmax))
-    .attr('width', sx(CONFIG.Qmax) - sx(0))
-    .attr('height', sy(0) - sy(CONFIG.Pmax));
+    .attr('x', x0).attr('y', y1)
+    .attr('width', Math.max(0, x1 - x0))
+    .attr('height', Math.max(0, y0 - y1));
 }
 
 // Лёгкая сетка по делениям шкал. Рисуется под осями, поэтому первой.
 // Крупные линии совпадают с подписанными делениями осей (drawAxes берёт те же
-// sx.ticks(10)/sy.ticks(8)) — каждая линия сетки «читается» по числу на оси.
-// Мелкая сетка (Фаза 1в) добавляет 4 бледные линии между крупными, без подписей.
+// xTicks()/yTicks()) — каждая линия сетки «читается» по числу на оси.
+// Мелкая сетка добавляет 4 бледные линии между крупными, без подписей.
 function drawGrid() {
   if (!STATE.showGrid) return;
   const g = svg.append('g').attr('class', 'grid');
-  const x0 = sx(0), xMax = sx(CONFIG.Qmax);
-  const y0 = sy(0), yMax = sy(CONFIG.Pmax);
-  const tx = sx.ticks(10), ty = sy.ticks(8);
+  const m = CONFIG.margin;
+  const xLeft = m.left, xRight = W - m.right;
+  const yBot = H - m.bottom, yTop = m.top;
+  const tx = xTicks(), ty = yTicks();
+  const inX = (v) => v >= CONFIG.Qmin - 1e-9 && v <= CONFIG.Qmax + 1e-9;
+  const inY = (v) => v >= CONFIG.Pmin - 1e-9 && v <= CONFIG.Pmax + 1e-9;
   // Мелкие линии — сначала (крупные лягут поверх и останутся заметнее).
   if (STATE.gridDense) {
     const SUB = 5;                                    // делений между соседними подписями
-    const minor = (ticks, draw) => {
+    const minor = (ticks, lo, hi, ok, draw) => {
       if (ticks.length < 2) return;
       const step = (ticks[1] - ticks[0]) / SUB;
       if (!(step > 0)) return;
-      for (let v = 0; v <= (ticks === tx ? CONFIG.Qmax : CONFIG.Pmax) + 1e-9; v += step) {
-        // Пропускаем узлы, совпадающие с крупными делениями (там уже будет яркая линия).
-        if (ticks.some(t => Math.abs(t - v) < step * 1e-6)) continue;
-        if (v <= 0) continue;
+      const first = Math.ceil(lo / step - 1e-9) * step;
+      for (let v = first; v <= hi + 1e-9; v += step) {
+        if (!ok(v)) continue;
+        if (ticks.some(t => Math.abs(t - v) < step * 1e-6)) continue;   // тут уже яркая линия
         draw(v);
       }
     };
-    minor(tx, (v) => g.append('line').attr('x1', sx(v)).attr('y1', y0).attr('x2', sx(v)).attr('y2', yMax)
+    minor(tx, CONFIG.Qmin, CONFIG.Qmax, inX, (v) => g.append('line')
+      .attr('x1', sx(v)).attr('y1', yBot).attr('x2', sx(v)).attr('y2', yTop)
       .attr('stroke', COL.grid).attr('stroke-width', 1).attr('opacity', 0.45));
-    minor(ty, (v) => g.append('line').attr('x1', x0).attr('y1', sy(v)).attr('x2', xMax).attr('y2', sy(v))
+    minor(ty, CONFIG.Pmin, CONFIG.Pmax, inY, (v) => g.append('line')
+      .attr('x1', xLeft).attr('y1', sy(v)).attr('x2', xRight).attr('y2', sy(v))
       .attr('stroke', COL.grid).attr('stroke-width', 1).attr('opacity', 0.45));
   }
   tx.forEach(t => {                        // вертикальные линии (по оси Q)
-    if (t <= 0) return;
-    g.append('line').attr('x1', sx(t)).attr('y1', y0).attr('x2', sx(t)).attr('y2', yMax)
+    if (!inX(t) || Math.abs(t) < 1e-12) return;
+    g.append('line').attr('x1', sx(t)).attr('y1', yBot).attr('x2', sx(t)).attr('y2', yTop)
       .attr('stroke', COL.grid).attr('stroke-width', 1);
   });
   ty.forEach(t => {                        // горизонтальные линии (по оси P)
-    if (t <= 0) return;
-    g.append('line').attr('x1', x0).attr('y1', sy(t)).attr('x2', xMax).attr('y2', sy(t))
+    if (!inY(t) || Math.abs(t) < 1e-12) return;
+    g.append('line').attr('x1', xLeft).attr('y1', sy(t)).attr('x2', xRight).attr('y2', sy(t))
       .attr('stroke', COL.grid).attr('stroke-width', 1);
   });
 }
 
-// Положительные полуоси со стрелками, делениями, числами и подписями осей.
-// Подписи параметризованы: по умолчанию Q/P (рынок, издержки), для КПВ — X/Y (Задача 3).
+// Оси со стрелками, делениями, числами и подписями.
+// Подписи параметризованы: по умолчанию Q/P (рынок, издержки), для КПВ — X/Y.
+// Ось стоит на математическом нуле; если после панорамирования нуль уехал за
+// край, ось прижимается к краю окна и остаётся на виду.
 function drawAxes(xLabel, yLabel) {
   if (xLabel == null) xLabel = 'Q'; if (yLabel == null) yLabel = 'P';
-  // Оформление (Фаза 1): своё название оси перекрывает сценовое. Пустую строку ''
-  // сцена присылает намеренно («метку рисую сама») — её не трогаем, иначе получим
-  // две подписи. Заодно запоминаем сценовые названия для placeholder'ов в панели.
+  // Своё название оси перекрывает сценовое. Пустую строку '' сцена присылает
+  // намеренно («метку рисую сама») — её не трогаем, иначе получим две подписи.
+  // Заодно запоминаем сценовые названия для placeholder'ов в меню плоскости.
   if (xLabel) { STATE.axisXDefault = xLabel; if (STATE.axisXName) xLabel = STATE.axisXName; }
   if (yLabel) { STATE.axisYDefault = yLabel; if (STATE.axisYName) yLabel = STATE.axisYName; }
   const g = svg.append('g').attr('class', 'axes');
-  const ox = sx(0), oy = sy(0);            // пиксели начала координат (0,0)
-  const xEnd = sx(CONFIG.Qmax), yEnd = sy(CONFIG.Pmax);
+  const m = CONFIG.margin;
+  const xLeft = m.left, xRight = W - m.right, yBot = H - m.bottom, yTop = m.top;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const ox = clamp(sx(0), xLeft, xRight);   // положение оси Y
+  const oy = clamp(sy(0), yTop, yBot);      // положение оси X
   const AX = COL.ink, LBL = COL.inkSoft;
+  const atZeroX = Math.abs(sx(0) - ox) < 0.5;   // нуль по X действительно виден
+  const atZeroY = Math.abs(sy(0) - oy) < 0.5;
 
-  // Ось X (вправо) и ось Y (вверх) со стрелками на концах.
-  g.append('line').attr('x1', ox).attr('y1', oy).attr('x2', xEnd).attr('y2', oy)
+  // Ось X (вправо) и ось Y (вверх). Стрелка всегда на конце, смотрящем
+  // в сторону роста, и всегда внутри холста — при любом зуме и сдвиге.
+  g.append('line').attr('x1', xLeft).attr('y1', oy).attr('x2', xRight).attr('y2', oy)
     .attr('stroke', AX).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
-  g.append('line').attr('x1', ox).attr('y1', oy).attr('x2', ox).attr('y2', yEnd)
+  g.append('line').attr('x1', ox).attr('y1', yBot).attr('x2', ox).attr('y2', yTop)
     .attr('stroke', AX).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
 
-  // Деления и числа на оси X (0 пропускаем — он отдельно в начале координат).
-  // Деления ближе 14 px к концу оси не печатаем — иначе налезают на стрелку и букву Q.
-  sx.ticks(10).forEach(t => {
-    if (t <= 0 || t > CONFIG.Qmax) return;
-    if (sx(t) > xEnd - 14) return;
+  // Деления и числа на оси X. Ближе 14 px к концу оси не печатаем — иначе
+  // налезают на стрелку и на букву оси.
+  xTicks().forEach(t => {
+    if (t < CONFIG.Qmin - 1e-9 || t > CONFIG.Qmax + 1e-9) return;
+    if (atZeroX && Math.abs(t) < 1e-12) return;      // ноль подписываем один раз
+    if (sx(t) > xRight - 14 || sx(t) < xLeft + 2) return;
     g.append('line').attr('x1', sx(t)).attr('y1', oy).attr('x2', sx(t)).attr('y2', oy + 5)
       .attr('stroke', AX).attr('stroke-width', 1);
     g.append('text').attr('x', sx(t)).attr('y', oy + 8)
@@ -3623,27 +3697,30 @@ function drawAxes(xLabel, yLabel) {
       .attr('font-size', 10).attr('fill', LBL).text(fmt(t));
   });
   // Деления и числа на оси Y.
-  sy.ticks(8).forEach(t => {
-    if (t <= 0 || t > CONFIG.Pmax) return;
-    if (sy(t) < yEnd + 14) return;
+  yTicks().forEach(t => {
+    if (t < CONFIG.Pmin - 1e-9 || t > CONFIG.Pmax + 1e-9) return;
+    if (atZeroY && Math.abs(t) < 1e-12) return;
+    if (sy(t) < yTop + 14 || sy(t) > yBot - 2) return;
     g.append('line').attr('x1', ox).attr('y1', sy(t)).attr('x2', ox - 5).attr('y2', sy(t))
       .attr('stroke', AX).attr('stroke-width', 1);
     g.append('text').attr('x', ox - 8).attr('y', sy(t))
       .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
       .attr('font-size', 10).attr('fill', LBL).text(fmt(t));
   });
-  // Единственный «0» в начале координат.
-  g.append('text').attr('x', ox - 8).attr('y', oy + 8)
-    .attr('text-anchor', 'end').attr('dominant-baseline', 'hanging')
-    .attr('font-size', 10).attr('fill', LBL).text('0');
+  // Единственный «0» в начале координат (только если начало видно).
+  if (atZeroX && atZeroY) {
+    g.append('text').attr('x', ox - 8).attr('y', oy + 8)
+      .attr('text-anchor', 'end').attr('dominant-baseline', 'hanging')
+      .attr('font-size', 10).attr('fill', LBL).text('0');
+  }
 
   // Подписи осей: X-метка (справа от стрелки), Y-метка (над стрелкой слева).
   // Пустая строка '' — сигнал «без метки» (напр. неравенство и издержки добавляют свою).
-  if (xLabel) g.append('text').attr('x', xEnd + 6).attr('y', oy + 4)
+  if (xLabel) g.append('text').attr('x', xRight + 6).attr('y', oy + 4)
     .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
     .attr('font-size', 13).attr('font-weight', 600)
     .attr('fill', COL.ink).text(xLabel);
-  if (yLabel) g.append('text').attr('x', ox - 4).attr('y', yEnd - 12)
+  if (yLabel) g.append('text').attr('x', ox - 4).attr('y', yTop - 12)
     .attr('text-anchor', 'end').attr('font-size', 13).attr('font-weight', 600)
     .attr('fill', COL.ink).text(yLabel);
 }
@@ -3665,8 +3742,13 @@ function nextColor() {
 function curvePoints(curve) {
   const N = 400;
   const out = [];
+  // Считаем от видимого края, но не левее нуля: P = f(Q) для Q < 0 в экономике
+  // смысла не имеет, а после панорамирования вправо незачем считать то,
+  // что всё равно останется за кадром.
+  const lo = Math.max(0, CONFIG.Qmin), hi = CONFIG.Qmax;
+  if (!(hi > lo)) return out;
   for (let i = 0; i <= N; i++) {
-    const q = CONFIG.Qmax * i / N;
+    const q = lo + (hi - lo) * i / N;
     const p = evalCurve(curve, q);
     out.push(isNaN(p) ? null : [q, p]);
   }
@@ -8280,10 +8362,11 @@ function setMacroModel(m) {
    --------------------------------------------------------------------- */
 
 // Установить границы осей Qmax/Pmax (и поля ввода / пределы ползунков) разом.
+// Нижние границы сцена всегда хочет нулевые: она рисует первую четверть.
 function setRanges(qmax, pmax) {
   CONFIG.Qmax = qmax; CONFIG.Pmax = pmax;
-  const qi = document.getElementById('inp-qmax'); if (qi) qi.value = qmax;
-  const pi = document.getElementById('inp-pmax'); if (pi) pi.value = pmax;
+  CONFIG.Qmin = 0; CONFIG.Pmin = 0;
+  syncViewFields();
   // Адвалорная ставка меряется в ПРОЦЕНТАХ — её пределы к масштабу цены не привязаны
   // (ими управляет applyTaxRateBounds), поэтому поля ставки в этом случае пропускаем.
   const advRate = (STATE.taxKind === 'advalorem');
@@ -8295,6 +8378,37 @@ function setRanges(qmax, pmax) {
   });
   // Квота меряется в ЕДИНИЦАХ товара — её предел задаёт масштаб количества (Фаза 4в).
   ['open-quota-slider', 'open-quota-input'].forEach(id => { const e = document.getElementById(id); if (e) e.max = qmax; });
+}
+
+/* Поля границ в меню плоскости показывают то, что на экране прямо сейчас:
+   их двигают и колесо, и панорама, и сцена со своим авто-масштабом. */
+function syncViewFields() {
+  const math = (STATE.mode === 'math');
+  const v = math
+    ? [STATE.mathXmin, STATE.mathXmax, STATE.mathYmin, STATE.mathYmax]
+    : [CONFIG.Qmin, CONFIG.Qmax, CONFIG.Pmin, CONFIG.Pmax];
+  [['inp-qmin', v[0]], ['inp-qmax', v[1]], ['inp-pmin', v[2]], ['inp-pmax', v[3]]].forEach(([id, val]) => {
+    const e = document.getElementById(id);
+    if (e && document.activeElement !== e) e.value = Math.round(val * 1000) / 1000;
+  });
+  updateResetViewBtn();
+}
+
+// Кнопка возврата масштаба появляется, только когда есть куда возвращаться.
+function updateResetViewBtn() {
+  const b = document.getElementById('btn-resetview');
+  if (!b) return;
+  const show = !!STATE.viewDirty;
+  if (show === !b.hidden) return;
+  b.hidden = !show;
+  if (show) { b.classList.remove('appear'); void b.offsetWidth; b.classList.add('appear'); }
+}
+
+// Пользователь сам выбрал масштаб: авто-подгонка сцены отступает.
+function markViewDirty() {
+  STATE.viewDirty = true;
+  STATE.zoomLock = true;
+  updateResetViewBtn();
 }
 
 /* ---------------------------------------------------------------------
@@ -8389,16 +8503,16 @@ function applyAutoRanges(qmax, pmax) {
 }
 
 /* ---------------------------------------------------------------------
-   ЗУМ КОЛЕСОМ И ТАЧПАДОМ
-   Приближать и отдалять без ручной правки «Q макс» и «P макс».
-   Экономические сцены живут в первой четверти, поэтому ноль там остаётся на
-   месте, а меняется предел по осям: это и есть привычное «отдалить, чтобы
-   увидеть больше». Раздел «Математика» показывает полный план, и там окно
-   тянется К КУРСОРУ, как в обычном графопостроителе.
+   ЗУМ И ПАНОРАМИРОВАНИЕ
+   Колесо и щипок приближают, перетаскивание фона двигает окно вбок и вверх
+   вниз. Экономические сцены живут в первой четверти, поэтому зум растягивает
+   окно от начала координат: это привычное «отдалить, чтобы увидеть больше».
+   Раздел «Математика» показывает полный план, и там окно тянется К КУРСОРУ,
+   как в обычном графопостроителе.
    --------------------------------------------------------------------- */
 const ZOOM_MIN = 1e-3, ZOOM_MAX = 1e7;
 
-// Три значащие цифры: и полям «Оси» есть что показать, и мелкий шаг колеса
+// Три значащие цифры: и полям границ есть что показать, и мелкий шаг колеса
 // не залипает на округлении.
 function zoomRound(v) {
   if (!isFinite(v) || v <= 0) return v;
@@ -8422,24 +8536,54 @@ function zoomBy(factor, px, py) {
     const yc = (STATE.mathSub === 'tangent') ? (y0 + y1) / 2 : y1 - (y1 - y0) * ty;
     setMathWindow(xc - (xc - x0) * factor, xc + (x1 - xc) * factor,
                   yc - (yc - y0) * factor, yc + (y1 - yc) * factor);
+    markViewDirty();
     redrawAll();
     return;
   }
   const q = CONFIG.Qmax * factor, p = CONFIG.Pmax * factor;
   if (q < ZOOM_MIN || p < ZOOM_MIN || q > ZOOM_MAX || p > ZOOM_MAX) return;
-  STATE.zoomLock = true;
   cancelRangeAnim();          // отложенный переезд осей больше не нужен
+  // Всё окно растягивается от начала координат. Если панорамирования не было
+  // (Qmin = Pmin = 0), поведение ровно прежнее — сцена этого не заметит.
+  const qmin = CONFIG.Qmin * factor, pmin = CONFIG.Pmin * factor;
   setRanges(zoomRound(q), zoomRound(p));
+  CONFIG.Qmin = qmin; CONFIG.Pmin = pmin;
+  markViewDirty();
+  syncViewFields();
   redrawAll();
 }
 
-// Двойной щелчок по графику возвращает масштаб сцены: снимаем замок и даём
-// сцене снова подогнать оси под свои данные.
+/* Панорамирование: сдвиг окна на столько единиц, на сколько уехал курсор.
+   Тянем «бумагу под графиком», поэтому окно едет в противоположную сторону. */
+function panByPixels(dxPx, dyPx) {
+  const m = CONFIG.margin;
+  const w = Math.max(1, W - m.left - m.right), h = Math.max(1, H - m.top - m.bottom);
+  if (STATE.mode === 'math') {
+    const dx = (STATE.mathXmax - STATE.mathXmin) * dxPx / w;
+    const dy = (STATE.mathYmax - STATE.mathYmin) * dyPx / h;
+    setMathWindow(STATE.mathXmin - dx, STATE.mathXmax - dx,
+                  STATE.mathYmin + dy, STATE.mathYmax + dy);
+  } else {
+    const dq = (CONFIG.Qmax - CONFIG.Qmin) * dxPx / w;
+    const dp = (CONFIG.Pmax - CONFIG.Pmin) * dyPx / h;
+    CONFIG.Qmin -= dq; CONFIG.Qmax -= dq;
+    CONFIG.Pmin += dp; CONFIG.Pmax += dp;
+    cancelRangeAnim();
+  }
+  markViewDirty();
+  syncViewFields();
+  redrawAll();
+}
+
+// Двойной щелчок по графику (и кнопка над графиком) возвращают масштаб сцены:
+// снимаем замок и даём сцене снова подогнать оси под свои данные.
 function resetZoom() {
   STATE.zoomLock = false;
+  STATE.viewDirty = false;
   if (STATE.mode === 'math') { const p = MATH_PRESETS[STATE.mathSub]; if (p) setMathWindow(p.win[0], p.win[1], p.win[2], p.win[3]); }
   else if (STATE.mode === 'costs') setRanges(10, 50);
   else setRanges(100, 100);
+  syncViewFields();
   redrawAll();
 }
 
@@ -8448,16 +8592,48 @@ function initZoom() {
   if (!gw) return;
   gw.addEventListener('wheel', (e) => {
     e.preventDefault();
-    let dy = e.deltaY;
-    if (e.deltaMode === 1) dy *= 16;        // строки → пиксели
-    else if (e.deltaMode === 2) dy *= 100;  // страницы → пиксели
+    let dy = e.deltaY, dx = e.deltaX;
+    const k = (e.deltaMode === 1) ? 16 : (e.deltaMode === 2 ? 100 : 1);
+    dy *= k; dx *= k;
     // Щипок на тачпаде приходит сюда же, но с ctrlKey и мелкой дельтой,
-    // поэтому ему нужен более крупный шаг.
-    const k = e.ctrlKey ? 0.011 : 0.0022;
+    // поэтому ему нужен более крупный шаг. Двупальцевый свайп без ctrl и с
+    // заметным горизонтальным сдвигом — это прокрутка вбок, а не зум.
+    if (!e.ctrlKey && Math.abs(dx) > Math.abs(dy)) { panByPixels(-dx, dy); return; }
     const r = gw.getBoundingClientRect();
-    zoomBy(Math.exp(dy * k), e.clientX - r.left, e.clientY - r.top);
+    zoomBy(Math.exp(dy * (e.ctrlKey ? 0.011 : 0.0022)), e.clientX - r.left, e.clientY - r.top);
   }, { passive: false });
   gw.addEventListener('dblclick', () => resetZoom());
+
+  /* Перетаскивание фона. Стартуем только на пустом месте: у кривых, точек и
+     клина свои d3-drag, и перехватывать их нельзя. Порог в 3 пикселя не даёт
+     обычному щелчку (постановка точки) превратиться в микро-сдвиг. */
+  let pan = null;
+  gw.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || STATE.markArm) return;
+    const t = e.target;
+    if (t && t.closest && t.closest('.graph-tools, .wrench')) return;
+    const tag = (t && t.tagName || '').toLowerCase();
+    if (tag !== 'svg' && tag !== 'rect' && !(t && t.classList && t.classList.contains('grid'))) {
+      // Внутри SVG отзывчивы только сами фигуры; фон — это svg и прозрачные rect.
+      if (tag !== 'g' && tag !== 'div') return;
+    }
+    pan = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+  });
+  gw.addEventListener('pointermove', (e) => {
+    if (!pan || e.pointerId !== pan.id) return;
+    const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
+    if (!pan.moved && Math.hypot(dx, dy) < 3) return;
+    if (!pan.moved) { pan.moved = true; gw.setPointerCapture(pan.id); gw.style.cursor = 'grabbing'; }
+    pan.x = e.clientX; pan.y = e.clientY;
+    panByPixels(dx, dy);
+  });
+  const endPan = (e) => {
+    if (!pan) return;
+    if (pan.moved) { try { gw.releasePointerCapture(pan.id); } catch (err) {} gw.style.cursor = ''; }
+    pan = null;
+  };
+  gw.addEventListener('pointerup', endPan);
+  gw.addEventListener('pointercancel', endPan);
 }
 
 // Отменить и дебаунс, и текущий твин (при смене сцены/режима — чтобы отложенный
@@ -8509,11 +8685,6 @@ function setMode(mode) {
   all.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   (groups[mode] || []).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = ''; });
   applyScenarioVisibility();   // уточнить видимость интервенций/панелей по текущему сценарию
-  // Секция «Оси» бессмысленна в режиме неравенства (поле всегда 0..100 %) — прячем.
-  const axes = document.getElementById('sec-axes');
-  // «Оси» первой четверти не нужны там, где поле фиксировано (неравенство, макро)
-  // и в «Математике» — у неё свои четыре границы окна.
-  if (axes) axes.style.display = ['inequality', 'macro', 'math'].includes(mode) ? 'none' : '';
   // Рынок труда работает на общем списке кривых, поэтому при входе он обязан
   // получить спрос на труд и предложение труда. Раньше пресет ставился ТОЛЬКО
   // при первом входе, и сцена, открытая вторым заходом после монополии,
@@ -12452,13 +12623,18 @@ const SCENE_NAMES = {
 const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
   'info-prod', 'info-iso', 'info-plants', 'info-labor',
   'info-inequality', 'info-consumer', 'info-macro', 'info-math', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
-  'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
+  'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb', 'info-areacalc'];
+
+/* Записать значение в поле формулы и разбудить его слушателей. Отдельная
+   функция, потому что поле формулы со временем меняло природу (обычный input,
+   затем поле с набранной записью), а мест вставки много. */
+function setFieldValue(inp, text) {
+  if (!inp) return;
+  inp.value = text;
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+}
 
 function relocateForScene() {
-  const adv = document.getElementById('tools-advanced');
-  if (adv) ['sec-axes'].forEach(id => {
-    const el = document.getElementById(id); if (el) adv.appendChild(el);
-  });
   const sb = document.getElementById('sb-body');
   if (sb) {
     const eq = document.getElementById('sec-eq'); if (eq) sb.appendChild(eq);
@@ -12484,150 +12660,39 @@ function dockActive(id, on) {
   const b = document.getElementById(id);
   if (b) { b.classList.toggle('active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
 }
-function setToolsOpen(open) {
-  const t = document.getElementById('tools-panel'); if (t) t.classList.toggle('collapsed', !open);
-  dockActive('dock-tools', open);
+/* Сворачивание боковых панелей. Панель не уезжает за экран, а ужимается до
+   полосы со стрелкой — график при этом становится шире, поэтому после
+   анимации ширины его надо перерисовать (этим занимается ResizeObserver). */
+function setSideOpen(panelId, btnId, open) {
+  const p = document.getElementById(panelId);
+  if (p) p.classList.toggle('collapsed', !open);
+  const b = document.getElementById(btnId);
+  if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
+function setToolsOpen(open) { setSideOpen('tools-panel', 'tools-toggle', open); }
+function setParamsOpen(open) { setSideOpen('params-panel', 'params-toggle', open); }
+
+// Аналитика — нижняя часть левой панели, её включает иконка в полосе.
 function setScoreOpen(open) {
-  const s = document.getElementById('scoreboard'); if (s) s.classList.toggle('collapsed', !open);
+  const s = document.getElementById('scoreboard'); if (s) s.classList.toggle('hidden', !open);
   dockActive('dock-score', open);
-}
-
-/* ---------------------------------------------------------------------
-   ДВИЖОК ПЕРЕТАСКИВАНИЯ ПАНЕЛЕЙ — makeDockable(panel, handle, opts).
-   • Тащим panel за handle (pointer events: мышь и тач, setPointerCapture).
-   • Координаты — пиксельные left/top внутри контейнера-границ (.app).
-   • На отпускании — прилипание к ближайшему из 4 краёв; запоминаем
-     {edge, frac} (положение вдоль края) и пере-применяем при resize.
-   • Внутренние контролы (ползунки/кнопки) НЕ перехватываются: drag стартует
-     только на самой ручке и игнорируется, если нажата кнопка внутри ручки.
-   --------------------------------------------------------------------- */
-function makeDockable(panel, handle, opts) {
-  opts = opts || {};
-  const pad       = opts.pad ?? 14;        // отступ от краёв контейнера
-  const topInset  = opts.topInset ?? 14;   // верхний отступ (под шапку «← Сценарии»)
-  const leftInset = opts.leftInset ?? 14;  // левый отступ (вне дока 56px)
-
-  const container = () => panel.parentElement;            // .app
-  const cbox = () => container().getBoundingClientRect();
-
-  function setPos(left, top) {
-    panel.style.left = left + 'px';
-    panel.style.top = top + 'px';
-    panel.style.right = 'auto';
-    panel.style.bottom = 'auto';
-  }
-  function clamp(left, top, w, h) {
-    const c = cbox();
-    const maxL = c.width - w - pad, maxT = c.height - h - pad;
-    return {
-      left: Math.max(leftInset, Math.min(maxL, left)),
-      top:  Math.max(topInset,  Math.min(maxT, top)),
-    };
-  }
-  // Поставить панель по сохранённому краю и доле вдоль него.
-  function applyEdge() {
-    if (!panel._dock) return;
-    const c = cbox(), r = panel.getBoundingClientRect();
-    const w = r.width, h = r.height, { edge, frac } = panel._dock;
-    let left, top;
-    if (edge === 'left' || edge === 'right') {
-      left = (edge === 'left') ? leftInset : (c.width - w - pad);
-      const span = c.height - h - topInset - pad;
-      top = topInset + frac * Math.max(0, span);
-    } else {
-      top = (edge === 'top') ? topInset : (c.height - h - pad);
-      const span = c.width - w - leftInset - pad;
-      left = leftInset + frac * Math.max(0, span);
-    }
-    const cl = clamp(left, top, w, h);
-    setPos(cl.left, cl.top);
-  }
-  // Определить ближайший край и долю, прилипнуть.
-  function snap() {
-    const c = cbox(), r = panel.getBoundingClientRect();
-    const w = r.width, h = r.height;
-    const left = r.left - c.left, top = r.top - c.top;
-    const dl = left - leftInset;
-    const dr = (c.width - pad) - (left + w);
-    const dt = top - topInset;
-    const db = (c.height - pad) - (top + h);
-    const min = Math.min(dl, dr, dt, db);
-    let edge = 'right';
-    if (min === dl) edge = 'left';
-    else if (min === dt) edge = 'top';
-    else if (min === db) edge = 'bottom';
-    else edge = 'right';
-    let frac;
-    if (edge === 'left' || edge === 'right') {
-      const span = c.height - h - topInset - pad;
-      frac = span > 0 ? (top - topInset) / span : 0;
-    } else {
-      const span = c.width - w - leftInset - pad;
-      frac = span > 0 ? (left - leftInset) / span : 0;
-    }
-    panel._dock = { edge, frac: Math.max(0, Math.min(1, frac)) };
-    panel.classList.add('snapping');
-    applyEdge();
-    clearTimeout(panel._snapT);
-    panel._snapT = setTimeout(() => panel.classList.remove('snapping'), 320);
-  }
-
-  let dragging = false, sx, sy, sl, st, w0, h0;
-  handle.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    if (e.target.closest('button')) return;        // клик по кнопке-«×» в шапке — не drag
-    const c = cbox(), r = panel.getBoundingClientRect();
-    sl = r.left - c.left; st = r.top - c.top; w0 = r.width; h0 = r.height;
-    sx = e.clientX; sy = e.clientY;
-    dragging = true; panel._userMoved = true;
-    setPos(sl, st);
-    panel.classList.add('dragging');
-    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
-    e.preventDefault();
-  });
-  handle.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    const cl = clamp(sl + (e.clientX - sx), st + (e.clientY - sy), w0, h0);
-    setPos(cl.left, cl.top);
-  });
-  function end(e) {
-    if (!dragging) return;
-    dragging = false;
-    panel.classList.remove('dragging');
-    try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
-    snap();
-  }
-  handle.addEventListener('pointerup', end);
-  handle.addEventListener('pointercancel', end);
-
-  window.addEventListener('resize', () => { if (panel._dock) applyEdge(); });
-
-  return { applyEdge, snap, setDock(edge, frac) { panel._dock = { edge, frac }; applyEdge(); } };
+  if (open) setToolsOpen(true);   // включили аналитику — панель должна быть видна
 }
 
 function wireScene() {
   const tools = document.getElementById('tools-panel');
+  const params = document.getElementById('params-panel');
   const score = document.getElementById('scoreboard');
 
-  const dTools = document.getElementById('dock-tools');
-  if (dTools) dTools.addEventListener('click', () => setToolsOpen(tools.classList.contains('collapsed')));
-  const tClose = document.getElementById('tools-close');
-  if (tClose) tClose.addEventListener('click', () => setToolsOpen(false));
+  // Стрелки сворачивания у самих панелей.
+  const tTog = document.getElementById('tools-toggle');
+  if (tTog) tTog.addEventListener('click', () => setToolsOpen(tools.classList.contains('collapsed')));
+  const pTog = document.getElementById('params-toggle');
+  if (pTog) pTog.addEventListener('click', () => setParamsOpen(params.classList.contains('collapsed')));
 
+  // Аналитика — иконка в полосе.
   const dScore = document.getElementById('dock-score');
-  if (dScore) dScore.addEventListener('click', () => setScoreOpen(score.classList.contains('collapsed')));
-  const sClose = document.getElementById('sb-close');
-  if (sClose) sClose.addEventListener('click', () => setScoreOpen(false));
-
-  // Сетка — быстрый тумблер в доке (синхронен с галочкой «Показывать сетку»).
-  const dGrid = document.getElementById('dock-grid');
-  if (dGrid) dGrid.addEventListener('click', () => {
-    STATE.showGrid = !STATE.showGrid;
-    const cb = document.getElementById('chk-grid'); if (cb) cb.checked = STATE.showGrid;
-    dockActive('dock-grid', STATE.showGrid);
-    redrawAll();
-  });
+  if (dScore) dScore.addEventListener('click', () => setScoreOpen(score.classList.contains('hidden')));
 
   // Тема.
   const dTheme = document.getElementById('dock-theme');
@@ -12635,9 +12700,9 @@ function wireScene() {
 
   // Сохранение графиков в базу — задача следующей сессии, кнопка пока заглушка.
   const dSave = document.getElementById('dock-save');
-  if (dSave) dSave.addEventListener('click', () => toast('Сохранение графиков появится в следующей версии'));
+  if (dSave) dSave.addEventListener('click', () => toast('Сохранение графиков в профиль появится в следующей версии'));
 
-  // Экспорт (Фаза 5): окно с заголовком и подписью, затем PNG / .tex / PDF.
+  // Экспорт: окно с заголовком и подписью, затем PNG / .tex / PDF.
   const dExport = document.getElementById('dock-export');
   if (dExport) dExport.addEventListener('click', () => openExport());
   const expClose = document.getElementById('exp-close');
@@ -12660,8 +12725,7 @@ function wireScene() {
   const pwApply = document.getElementById('pw-apply');
   if (pwApply) pwApply.addEventListener('click', () => {
     if (PW.inp) {
-      PW.inp.value = pwFormula();
-      PW.inp.dispatchEvent(new Event('input', { bubbles: true }));
+      setFieldValue(PW.inp, pwFormula());
       PW.inp.focus();
     }
     closePiecewise();
@@ -12673,33 +12737,122 @@ function wireScene() {
   const expPdf = document.getElementById('exp-pdf');
   if (expPdf) expPdf.addEventListener('click', () => exportPDF());
 
-  // «← Сценарии» — вернуться к окну выбора.
+  // «Назад к сценариям».
   const back = document.getElementById('scene-back');
   if (back) back.addEventListener('click', () => openPicker());
 
-  // «Все настройки» — раскрыть вторичные секции (режим/сцены/оси).
-  const allBtn = document.getElementById('tools-allbtn');
-  if (allBtn) allBtn.addEventListener('click', () => {
-    const on = tools.classList.toggle('show-all');
-    allBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+  wireWrench();
+
+  // График перерисовываем, когда меняется его РАЗМЕР, а не только окно:
+  // сворачивание панели меняет ширину холста, и без этого кривые остались бы
+  // нарисованными по старой геометрии.
+  const gw = document.getElementById('graph-wrap');
+  if (gw && typeof ResizeObserver === 'function') {
+    let pending = false;
+    new ResizeObserver(() => {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => { pending = false; redrawAll(); });
+    }).observe(gw);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   МЕНЮ НАСТРОЕК КООРДИНАТНОЙ ПЛОСКОСТИ (Фаза 2).
+   Сюда переехали бывшие секции «Все настройки» и «Сетка»: границы осей,
+   шаг делений, названия осей, вид сетки, легенда и заголовок графика.
+   --------------------------------------------------------------------- */
+function setWrenchOpen(open) {
+  const pop = document.getElementById('wrench-pop');
+  const btn = document.getElementById('btn-wrench');
+  if (!pop) return;
+  pop.classList.toggle('open', open);
+  if (btn) { btn.classList.toggle('on', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+  if (open) syncViewFields();
+}
+
+// Применить границы из полей меню. Пустое или битое поле не трогает ось.
+function applyViewBounds() {
+  const num = (id) => {
+    const e = document.getElementById(id);
+    const v = e ? parseFloat(e.value) : NaN;
+    return isFinite(v) ? v : null;
+  };
+  const x0 = num('inp-qmin'), x1 = num('inp-qmax'), y0 = num('inp-pmin'), y1 = num('inp-pmax');
+  if (STATE.mode === 'math') {
+    const a = (x0 == null ? STATE.mathXmin : x0), b = (x1 == null ? STATE.mathXmax : x1);
+    const c = (y0 == null ? STATE.mathYmin : y0), d = (y1 == null ? STATE.mathYmax : y1);
+    if (!(b > a) || !(d > c)) return;
+    setMathWindow(a, b, c, d);
+  } else {
+    const a = (x0 == null ? CONFIG.Qmin : x0), b = (x1 == null ? CONFIG.Qmax : x1);
+    const c = (y0 == null ? CONFIG.Pmin : y0), d = (y1 == null ? CONFIG.Pmax : y1);
+    if (!(b > a) || !(d > c)) return;
+    CONFIG.Qmin = a; CONFIG.Qmax = b; CONFIG.Pmin = c; CONFIG.Pmax = d;
+    cancelRangeAnim();
+  }
+  markViewDirty();
+  redrawAll();
+}
+
+function setGridMode(mode) {
+  STATE.showGrid = (mode !== 'off');
+  STATE.gridDense = (mode === 'dense');
+  [['grid-dense', 'dense'], ['grid-plain', 'plain'], ['grid-off', 'off']].forEach(([id, m]) => {
+    const b = document.getElementById(id); if (b) b.classList.toggle('active', m === mode);
+  });
+  redrawAll();
+}
+
+function wireWrench() {
+  const btn = document.getElementById('btn-wrench');
+  const pop = document.getElementById('wrench-pop');
+  if (btn) btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setWrenchOpen(!pop.classList.contains('open'));
+  });
+  // Щелчок мимо меню закрывает его; внутри — нет.
+  document.addEventListener('pointerdown', (e) => {
+    if (!pop || !pop.classList.contains('open')) return;
+    if (pop.contains(e.target) || (btn && btn.contains(e.target))) return;
+    setWrenchOpen(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && pop && pop.classList.contains('open')) setWrenchOpen(false);
   });
 
-  // Перетаскивание «Результатов» за свою шапку (.sb-head). Фон/позиция по умолчанию
-  // не меняются — пока пользователь не потащит, держится правый-верхний угол из CSS.
-  const sbHead = document.getElementById('sb-head') || score.querySelector('.sb-head');
-  if (score && sbHead) makeDockable(score, sbHead, { topInset: 56 });
+  const rv = document.getElementById('btn-resetview');
+  if (rv) rv.addEventListener('click', () => resetZoom());
 
-  // Пульт — отдельная панель того же семейства, ручка = .pult-head.
-  const pult = document.getElementById('pult');
-  const pultHead = document.getElementById('pult-head');
-  if (pult && pultHead) {
-    pultDock = makeDockable(pult, pultHead, { topInset: 56 });
+  ['inp-qmin', 'inp-qmax', 'inp-pmin', 'inp-pmax'].forEach(id => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('change', () => applyViewBounds());
+  });
+  [['inp-xstep', 'xStep'], ['inp-ystep', 'yStep']].forEach(([id, key]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('input', () => {
+      const v = parseFloat(e.value);
+      STATE[key] = (isFinite(v) && v > 0) ? v : 0;
+      redrawAll();
+    });
+  });
+  [['inp-xname', 'axisXName'], ['inp-yname', 'axisYName']].forEach(([id, key]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('input', () => { STATE[key] = e.value.trim(); redrawAll(); });
+  });
+  [['grid-dense', 'dense'], ['grid-plain', 'plain'], ['grid-off', 'off']].forEach(([id, m]) => {
+    const b = document.getElementById(id); if (b) b.addEventListener('click', () => setGridMode(m));
+  });
+  const leg = document.getElementById('chk-legend');
+  if (leg) leg.addEventListener('change', () => { STATE.showLegend = leg.checked; redrawAll(); });
+  const gt = document.getElementById('inp-gtitle');
+  if (gt) gt.addEventListener('input', () => { STATE.graphTitle = gt.value; redrawAll(); });
+  // Цвет заголовка — тем же пикером, что и у кривых.
+  const slot = document.getElementById('gtitle-color-slot');
+  if (slot && !slot.firstChild) {
+    slot.appendChild(makeColorPicker(STATE.titleColor || cssVar('--ink'),
+      (hex) => { STATE.titleColor = hex; redrawAll(); }, 'Цвет названия графика'));
   }
-  // Resize пульта держит сам makeDockable (его _dock задаёт positionPultDefault),
-  // поэтому отдельный слушатель не нужен.
-
-  // Начальные состояния док-кнопок.
-  dockActive('dock-grid', STATE.showGrid);
 }
 
 /* ---------------------------------------------------------------------
@@ -12716,7 +12869,6 @@ function wireScene() {
        (ID и обработчики сохраняются — НЕ клонируем) и возвращаются домой.
    Всё вычисляется по текущему STATE — механизм единый для всех режимов.
    --------------------------------------------------------------------- */
-let pultDock = null;
 
 // Все переносимые экранные регуляторы (по всем сценам). «Дом» каждого запоминается
 // при первом обращении (исходный родитель + стабильный якорь) — поддержка любой секции.
@@ -12825,45 +12977,11 @@ function pultShouldShow() {
   return pultRegulatorIds().length > 0 || pultCurveList().length > 0 || pultExtraSig() !== '';
 }
 
-// Заголовок ленты (вертикально на ручке).
-function pultTitle() {
-  if (STATE.mode === 'ppf')        return (STATE.ppfSub === 'trade') ? 'Торговля' : 'КПВ';
-  if (STATE.mode === 'labor')      return 'Труд';
-  if (STATE.mode === 'inequality') return 'Неравенство';
-  if (STATE.mode === 'consumer')   return 'Слуцкий';
-  if (STATE.mode === 'costs')      return (STATE.costsSub === 'plants') ? 'Два завода' : 'Цена и прибыль';
-  if (STATE.mode === 'macro')      return (STATE.macroModel === 'fx') ? 'Курс' : 'Дефицит ΔG';
-  if (STATE.mode === 'market' && STATE.scenario === 'openecon') {
-    return ({ tariff: 'Тариф', quota: 'Квота' })[STATE.openTool] || 'Мировая цена';
-  }
-  const rate = ({ tax: 'налог', subsidy: 'субсидия', ceiling: 'потолок', floor: 'пол' })[STATE.intervType] || '';
-  // Монополия: заголовок ленты берёт контекст под-режима (Фаза 3б). Держим коротким —
-  // он печатается вертикально на ручке и определяет высоту ленты.
-  if (STATE.mode === 'market' && STATE.market === 'monopoly') {
-    if (STATE.monoMode === 'simple') return 'Монополия: ' + rate;
-    return ({ discr1: 'Дискр. 1°', discr3: 'Дискр. 3°', kinked: 'Составной', natural: 'Естественная' })[STATE.monoMode] || 'Монополия';
-  }
-  if (pultRegulatorIds().length) {
-    return ({ tax: 'Налог', subsidy: 'Субсидия', ceiling: 'Потолок', floor: 'Пол' })[STATE.intervType] || 'Регуляторы';
-  }
-  return 'Кривые';
-}
-
-// Поставить пульт по центру нижнего края (стартовая позиция).
-function positionPultDefault() {
-  const pult = document.getElementById('pult');
-  if (!pult) return;
-  // Лента ложится по центру нижнего края. frac=0.5 при равных отступах краёв
-  // даёт точный центр: left = (ширина − ширина_ленты) / 2. После ручного
-  // переноса _userMoved=true и эта функция не вызывается — позиция запоминается.
-  pult._dock = { edge: 'bottom', frac: 0.5 };
-  if (pultDock) pultDock.applyEdge();
-}
 
 // Короткая метка кривой для чипа: по роли, иначе усечённая формула.
 function curveChipLabel(c) {
   const f = curveShortName(c);   // своё имя → роль → формула (Фаза 1)
-  return f.length > 10 ? f.slice(0, 9) + '…' : f;
+  return f.length > 16 ? f.slice(0, 15) + '…' : f;
 }
 
 // Сигнатура набора кривых — чтобы НЕ пересобирать чипы на каждом кадре перетаскивания
@@ -12872,25 +12990,37 @@ function pultCurveSig(list) {
   return list.map(c => c.id + ':' + (c.role || '') + ':' + c.color + ':' + (c.label || '')).join('|');
 }
 
-// Построить (пересобрать) чипы слайдеров кривых в контейнере #pult-curves.
+/* Заготовка регулятора для правой панели: сверху имя и значение, снизу
+   ползунок во всю ширину. Одна форма на все виды регуляторов — колонка узкая,
+   и в одну строку метка с числом уже не помещаются. */
+function makePchip(labelText, valueText, color) {
+  const chip = document.createElement('div'); chip.className = 'pchip';
+  const top = document.createElement('div'); top.className = 'pchip-top';
+  if (color) {
+    const dot = document.createElement('span');
+    dot.className = 'pchip-dot'; dot.style.background = color;
+    top.appendChild(dot);
+  }
+  const lab = document.createElement('span'); lab.className = 'pchip-label'; lab.textContent = labelText;
+  const val = document.createElement('span'); val.className = 'pchip-val'; val.textContent = valueText;
+  top.append(lab, val);
+  chip.appendChild(top);
+  return { chip, lab, val };
+}
+
+// Построить (пересобрать) слайдеры кривых в контейнере #params-curves.
 function buildPultCurveChips(list) {
-  const body = document.getElementById('pult-body');
-  let box = document.getElementById('pult-curves');
+  const body = document.getElementById('params-body');
+  let box = document.getElementById('params-curves');
   if (!box) {
     box = document.createElement('div');
-    box.id = 'pult-curves';
-    if (body) body.appendChild(box);   // создаём первым; регуляторы добавятся после
+    box.id = 'params-curves';
+    if (body) body.insertBefore(box, body.firstChild);
   }
   box.innerHTML = '';
   list.forEach(c => {
-    const chip = document.createElement('div');
-    chip.className = 'pult-cchip'; chip.dataset.cid = c.id;
-
-    const dot = document.createElement('span');
-    dot.className = 'cc-dot'; dot.style.background = c.color;
-
-    const lab = document.createElement('span');
-    lab.className = 'cc-label'; lab.textContent = curveChipLabel(c);
+    const { chip, lab, val } = makePchip(curveChipLabel(c), fmt(c.linear.b), c.color);
+    chip.dataset.cid = c.id;
     lab.title = 'Сдвиг кривой: ' + (c.name || c.expr || '');
 
     const sl = document.createElement('input');
@@ -12899,16 +13029,13 @@ function buildPultCurveChips(list) {
     sl.style.accentColor = c.color;   // акцент ползунка в цвет кривой
     sl.title = 'Сдвиг кривой по вертикали (свободный член b)';
 
-    const val = document.createElement('span');
-    val.className = 'cc-val'; val.textContent = fmt(c.linear.b);
-
     // Слайдер → задаём b ТЕМ ЖЕ путём, что перетаскивание (по id, кривая могла пересоздаться).
     sl.addEventListener('input', () => {
       const cur = STATE.curves.find(x => x.id === c.id);
       if (cur && cur.linear) setCurveFreeTerm(cur, parseFloat(sl.value));
     });
 
-    chip.append(dot, lab, sl, val);
+    chip.appendChild(sl);
     box.appendChild(chip);
   });
 }
@@ -12916,13 +13043,13 @@ function buildPultCurveChips(list) {
 // Обновить ТОЛЬКО значения существующих чипов (после перетаскивания/redraw) — без пересборки.
 // Слайдер, который пользователь держит прямо сейчас, не трогаем (чтобы не спорить с рукой).
 function syncPultCurveValues(list) {
-  const box = document.getElementById('pult-curves');
+  const box = document.getElementById('params-curves');
   if (!box) return;
   list.forEach(c => {
-    const chip = box.querySelector('.pult-cchip[data-cid="' + c.id + '"]');
+    const chip = box.querySelector('.pchip[data-cid="' + c.id + '"]');
     if (!chip) return;
     const sl = chip.querySelector('input[type="range"]');
-    const val = chip.querySelector('.cc-val');
+    const val = chip.querySelector('.pchip-val');
     if (sl && document.activeElement !== sl) sl.value = Math.round(c.linear.b);
     if (val) val.textContent = fmt(c.linear.b);
   });
@@ -12958,7 +13085,7 @@ function returnPultHome(id) {
 // всегда видим (он здесь, потому что активен) — снимаем возможный inline display:none.
 function syncPultRegulators(activeIds) {
   capturePultHomes();
-  const body = document.getElementById('pult-body');
+  const body = document.getElementById('params-body');
   activeIds.forEach(id => {
     const n = document.getElementById(id);
     if (!n || !body) return;
@@ -13003,23 +13130,20 @@ function ppfSetSum(which, maxX, maxY) {
   redrawAll();
 }
 
-// Один сцен-слайдер (метка + range + число). onInput(value) применяет состояние.
+// Один сцен-слайдер (метка + число сверху, range снизу). onInput(value) применяет состояние.
 function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr) {
-  const chip = document.createElement('div'); chip.className = 'pult-xchip';
-  const lab = document.createElement('span'); lab.className = 'xc-label'; lab.textContent = label;
+  const { chip, val } = makePchip(label, fmt(value), null);
   const sl = document.createElement('input');
   sl.type = 'range'; sl.min = min; sl.max = max; sl.step = step;
-  sl.value = Math.round(value); sl.style.accentColor = color;
-  if (idAttr) sl.id = idAttr;
-  const val = document.createElement('span'); val.className = 'xc-val';
-  val.textContent = fmt(value); if (idAttr) val.id = idAttr + '-val';
+  sl.value = Math.round(value); sl.style.accentColor = color || cssVar('--accent');
+  if (idAttr) { sl.id = idAttr; val.id = idAttr + '-val'; }
   sl.addEventListener('input', () => { const v = parseFloat(sl.value); val.textContent = fmt(v); onInput(v); });
-  chip.append(lab, sl, val); box.appendChild(chip);
+  chip.appendChild(sl); box.appendChild(chip);
 }
 
 // Пересобрать сцен-слайдеры под текущую сцену.
 function buildPultExtra(sig) {
-  const box = document.getElementById('pult-extra'); if (!box) return;
+  const box = document.getElementById('params-extra'); if (!box) return;
   box.innerHTML = '';
   if (sig === 'ppf1') {                                   // одна КПВ: Макс X / Макс Y
     const ic = ppfInterceptsOf(STATE.ppfFormula);
@@ -13092,50 +13216,39 @@ function buildIneqMasterChip(box) {
   if (val) val.textContent = detached ? 'своё' : (pct + '%');
 }
 
-function showPult(on, title) {
-  const pult = document.getElementById('pult');
-  if (!pult) return;
-  if (on) {
-    const t = document.getElementById('pult-title'); if (t && title) t.textContent = title;
-    pult.setAttribute('aria-hidden', 'false');
-    if (!pult.classList.contains('show')) {
-      pult.classList.add('show');
-      if (!pult._userMoved) positionPultDefault();
-    }
-  } else {
+function showPult(on) {
+  const panel = document.getElementById('params-panel');
+  if (!panel) return;
+  const empty = document.getElementById('params-empty');
+  if (!on) {
     syncPultRegulators([]);   // все узлы — домой
-    const cc = document.getElementById('pult-curves'); if (cc) cc.innerHTML = '';
-    const ce = document.getElementById('pult-extra'); if (ce) ce.innerHTML = '';
-    pult._curveSig = ''; pult._extraSig = '';
-    pult.classList.remove('show');
-    pult.setAttribute('aria-hidden', 'true');
+    const cc = document.getElementById('params-curves'); if (cc) cc.innerHTML = '';
+    const ce = document.getElementById('params-extra'); if (ce) ce.innerHTML = '';
+    panel._curveSig = ''; panel._extraSig = '';
   }
+  if (empty) empty.style.display = on ? 'none' : '';
 }
 
-// Единая точка пересмотра состояния пульта — дёргается из renderCurveList (кривые)
-// и из set-функций режима/сцены/типа (регуляторы/сцен-слайдеры/видимость).
+// Единая точка пересмотра содержимого «Основных параметров» — дёргается из
+// renderCurveList (кривые) и из set-функций режима/сцены/типа.
 function updatePult() {
-  const pult = document.getElementById('pult');
-  if (!pult) return;
+  const panel = document.getElementById('params-panel');
+  if (!panel) return;
   if (!pultShouldShow()) { showPult(false); return; }
 
   // (1) слайдеры кривых: пересборка только при изменении набора, иначе синхронизация значений.
   const curves = pultCurveList();
   const csig = pultCurveSig(curves);
-  const curvesRebuilt = (pult._curveSig !== csig);
-  if (curvesRebuilt) { buildPultCurveChips(curves); pult._curveSig = csig; }
+  if (panel._curveSig !== csig) { buildPultCurveChips(curves); panel._curveSig = csig; }
   else { syncPultCurveValues(curves); }
 
   // (2) сцен-слайдеры: пересборка только при смене сцены/под-режима.
   const esig = pultExtraSig();
-  const extraRebuilt = (pult._extraSig !== esig);
-  if (extraRebuilt) { buildPultExtra(esig); pult._extraSig = esig; }
+  if (panel._extraSig !== esig) { buildPultExtra(esig); panel._extraSig = esig; }
 
-  // (3) экранные регуляторы сцены → в пульт (после контейнеров).
+  // (3) экранные регуляторы сцены → в панель (после контейнеров).
   syncPultRegulators(pultRegulatorIds());
-  showPult(true, pultTitle());
-  // Набор/ширина изменились — пере-центрировать ленту (пока пользователь её не таскал).
-  if ((curvesRebuilt || extraRebuilt) && !pult._userMoved) positionPultDefault();
+  showPult(true);
 }
 
 function wireControls() {
@@ -13160,44 +13273,22 @@ function wireControls() {
     }
   });
 
-  const qmax = document.getElementById('inp-qmax');
-  const pmax = document.getElementById('inp-pmax');
-  const grid = document.getElementById('chk-grid');
   const formula = document.getElementById('inp-formula');
   const addBtn = document.getElementById('btn-add-curve');
 
-  const legendChk = document.getElementById('chk-legend');
-  if (legendChk) legendChk.addEventListener('change', () => {
-    STATE.showLegend = legendChk.checked; redrawAll();
+  // Границы осей, сетка, легенда и названия осей живут в меню гаечного ключа
+  // (см. wireWrench). После ручной правки верхней границы цены пределы ползунков
+  // ставки и регулируемой цены обязаны догнать новый масштаб.
+  const pmaxField = document.getElementById('inp-pmax');
+  if (pmaxField) pmaxField.addEventListener('change', () => {
+    const v = parseFloat(pmaxField.value);
+    if (!(v > 0)) return;
+    ['tax-slider', 'tax-input', 'pc-slider', 'pc-input'].forEach(id => {
+      const e = document.getElementById(id); if (e) e.max = v;
+    });
+    const pl = document.getElementById('params-panel'); if (pl) pl._curveSig = '';   // форсируем пересборку
+    if (typeof updatePult === 'function') updatePult();   // слайдеры кривых: новый предел = Pmax
   });
-
-  qmax.addEventListener('change', () => {
-    const v = parseFloat(qmax.value);
-    // Ручная правда масштаба тоже главнее авто-подгонки сцены, как и колесо.
-    if (v > 0) { CONFIG.Qmax = v; STATE.zoomLock = true; redrawAll(); }
-  });
-  pmax.addEventListener('change', () => {
-    const v = parseFloat(pmax.value);
-    if (v > 0) {
-      CONFIG.Pmax = v;
-      STATE.zoomLock = true;   // как и у Q макс: ручной масштаб держится
-      const slider = document.getElementById('tax-slider');
-      if (slider) slider.max = v;     // верхний предел налога ≈ масштаб цены
-      const inp = document.getElementById('tax-input');
-      if (inp) inp.max = v;
-      const ps = document.getElementById('pc-slider');
-      if (ps) ps.max = v;             // верхний предел регулируемой цены — тоже Pmax
-      const pi = document.getElementById('pc-input');
-      if (pi) pi.max = v;             // потолок/пол в монополии используют тот же pc-slider
-      redrawAll();
-      const pl = document.getElementById('pult'); if (pl) pl._curveSig = '';   // форсируем пересборку
-      if (typeof updatePult === 'function') updatePult();   // слайдеры кривых: новый предел = Pmax
-    }
-  });
-  grid.addEventListener('change', () => { STATE.showGrid = grid.checked; dockActive('dock-grid', STATE.showGrid); redrawAll(); });
-  // Фаза 1в: мелкая сетка (бледные линии между подписанными делениями).
-  const gridDense = document.getElementById('chk-grid-dense');
-  if (gridDense) gridDense.addEventListener('change', () => { STATE.gridDense = gridDense.checked; redrawAll(); });
 
   // Фаза 1б: форма записи кривой P(Q) / Q(P).
   const cfPQ = document.getElementById('cf-pq'), cfQP = document.getElementById('cf-qp');
@@ -13521,7 +13612,7 @@ function wireControls() {
     STATE.ppfFormula = f;
     STATE.ppfX = null;
     redrawAll();
-    const pl = document.getElementById('pult'); if (pl) pl._extraSig = '';   // пере-инициализировать
+    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = '';   // пере-инициализировать
     if (typeof updatePult === 'function') updatePult();                      // ползунки Макс X/Y
   }
   const pApply = document.getElementById('btn-ppf-apply');
@@ -13544,7 +13635,7 @@ function wireControls() {
     STATE.ppf2 = ((ppf2Inp && ppf2Inp.value) || '').trim();
     STATE.ppfSumData = null;   // принудительный пересчёт
     redrawAll();
-    const pl = document.getElementById('pult'); if (pl) pl._extraSig = '';   // пере-инициализировать
+    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = '';   // пере-инициализировать
     if (typeof updatePult === 'function') updatePult();                      // 4 ползунка по странам
   }
   const sumApply = document.getElementById('btn-ppfsum-apply');
@@ -13887,14 +13978,16 @@ function init() {
   }
   console.log('calc2: D3', d3.version, '| Math.js загружен');
   refreshColors();   // наполнить карту цветов до первого рисования/добавления кривой
-  relocateForScene();   // перенести вторичные секции и блоки результатов в новые контейнеры
+  relocateForScene();   // перенести блоки результатов в панель аналитики
   wireControls();
-  wireScene();          // док, плавающие панели, шапка, тема
+  wireScene();          // полоса иконок, панели, меню плоскости, тема
+  initSceneColorPickers();
   renderCurveList();
   redrawAll();
+  syncViewFields();
   openPicker();   // при входе показываем окно выбора сценария (рабочее место — под ним)
-  // Перерисовываем при изменении размера окна, чтобы оси не «съезжали».
-  window.addEventListener('resize', redrawAll);
+  // Размер холста стерегёт ResizeObserver (см. wireScene): он ловит и окно,
+  // и сворачивание панелей. Отдельный слушатель resize больше не нужен.
 }
 
 document.addEventListener('DOMContentLoaded', init);
