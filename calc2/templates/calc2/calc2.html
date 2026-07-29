@@ -780,6 +780,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
 }
 
+/* Ползунок параметра: под ним строка настройки границ и шага. */
+.pchip-param .param-row { display: flex; gap: 4px; margin-top: 4px; }
+.pchip-param .param-row input {
+  min-width: 0; padding: 3px 4px; font-size: 11px; text-align: center;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text2); font-variant-numeric: tabular-nums;
+}
+.pchip-param .param-row input:nth-child(2) { color: var(--text); font-weight: 600; }
+
 /* ── Кнопки над графиком: гаечный ключ и возврат масштаба ── */
 .graph-tools {
   position: absolute; top: 12px; right: 12px; z-index: var(--z-float);
@@ -3010,6 +3019,7 @@ const STATE = {
   areaCalc: null,    // результат расчёта площади (Фаза 10)
   areaCalcColor: '', // и её цвет
   areaColor: {},     // свои цвета закрашенных областей: ключ легенды -> hex (Фаза 8)
+  params: {},        // ползунки-параметры формул: имя -> {value, min, max, step}
   areaCalcMode: 'curve',  // способ расчёта площади: под кривой или по точкам
   areaPicked: [],    // отмеченные вершины многоугольника
   crosses: [],       // найденные пересечения кривых
@@ -3332,7 +3342,12 @@ function toggleCalcTheme() {
 function compileFormula(expr) {
   try {
     const compiled = math.parse(expr).compile();
-    compiled.evaluate({ x: 1, Q: 1, L: 1 });   // пробный расчёт ловит опечатки сразу (L — синоним для рынка труда)
+    // Пробный расчёт ловит опечатки сразу (L — синоним для рынка труда).
+    // Там, где буквы становятся параметрами, незнакомая буква — не опечатка,
+    // а будущий ползунок, поэтому на пробу подставляем ей единицу.
+    const ctx = paramScope({ x: 1, Q: 1, L: 1 });
+    if (paramsAllowed()) freeSymbols(expr).forEach(n => { if (ctx[n] === undefined) ctx[n] = 1; });
+    compiled.evaluate(ctx);
     return { compiled, error: null };
   } catch (e) {
     return { compiled: null, error: e.message };
@@ -3348,7 +3363,7 @@ function evalCurve(curve, q) {
   // Быстрый путь для прямых (нужен и для плавного перетаскивания).
   if (curve.linear) return curve.linear.a * q + curve.linear.b;
   try {
-    const v = curve.compiled.evaluate({ x: q, Q: q, L: q });   // L — синоним переменной (рынок труда)
+    const v = evalWithParams(curve.compiled, { x: q, Q: q, L: q }, curve.expr);   // L — синоним переменной (рынок труда)
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) {
     return NaN;
@@ -3958,12 +3973,14 @@ function drawCurves() {
     const pts = curvePoints(curve);
     g.append('path').datum(pts)
       .attr('fill', 'none').attr('stroke', curve.color).attr('stroke-width', 2.5)
+      .attr('data-curve', curve.id)     // экспорт узнаёт кривую и пишет её формулой
       .attr('d', line);
     // Прямые можно перетаскивать: кладём поверх широкую невидимую «дорожку»
     // для удобного захвата мышью и вешаем на неё перетаскивание.
     if (curve.linear) {
       const hit = g.append('path').datum(pts)
         .attr('fill', 'none').attr('stroke', 'transparent').attr('stroke-width', 16)
+        .attr('data-skip-export', '1')    // это дорожка для мыши, а не линия графика
         .attr('d', line).style('cursor', 'ns-resize');
       attachDrag(hit, curve);
     }
@@ -8126,14 +8143,14 @@ function setConsumerType(t) {
 function compileVar(expr, names) {
   try {
     const compiled = math.parse(expr).compile();
-    const ctx = { x: 1 }; names.forEach(n => { ctx[n] = 1; });
+    const ctx = paramScope({ x: 1 }); names.forEach(n => { ctx[n] = 1; });
     compiled.evaluate(ctx);
     return { compiled, error: null };
   } catch (e) { return { compiled: null, error: e.message }; }
 }
 function evalVar(compiled, v, names) {
   try {
-    const ctx = { x: v }; names.forEach(n => { ctx[n] = v; });
+    const ctx = paramScope({ x: v }); names.forEach(n => { ctx[n] = v; });
     const r = compiled.evaluate(ctx);
     return (typeof r === 'number' && isFinite(r)) ? r : NaN;
   } catch (e) { return NaN; }
@@ -10346,6 +10363,7 @@ function renderIneqGroupsTable() {
    заголовок графика и свои точки рисуются НЕ внутри сцены, а обёрткой после неё:
    так они работают в любом режиме и ни одну сцену не пришлось трогать. */
 function redrawAll() {
+  syncParams();          // формулы могли завести или потерять буквы-параметры
   redrawScene();
   drawOverlays();
   // Последним: карточка блока прячет переключатели соседних моделей. Идёт после
@@ -10968,6 +10986,135 @@ function wireAreaCalc() {
       (hex) => { STATE.areaCalcColor = hex; redrawAll(); }, 'Цвет посчитанной площади'));
   }
   setAreaCalcMode('curve');
+}
+
+/* ── Ползунки параметров (Фаза 11) ────────────────────────────────────
+   Если в формуле встретилась буква, которая не переменная графика и не
+   известная функция, для неё заводится ползунок в «Основных параметрах».
+   Двигаешь — формула пересчитывается, график перерисовывается.
+
+   Осторожно с экономическими сценами: там у букв уже есть закреплённый
+   смысл (t — ставка налога, w — зарплата), и ими управляют свои поля.
+   Поэтому механика включена только там, где формулы произвольные:
+   в «Свободном холсте» и в разделе «Математика». */
+const PARAM_SCENES = { free: true };
+
+function paramsAllowed() {
+  if (STATE.mode === 'math') return true;
+  return !!PARAM_SCENES[baseScene()];
+}
+
+// Буквы, которые НИКОГДА не становятся параметром: переменные осей,
+// имена функций и констант Math.js, зарезервированные обозначения сцен.
+const PARAM_NEVER = new Set(['x', 'y', 'Q', 'P', 'L', 'K', 'X', 'Y', 'a', 'b',
+  'e', 'i', 'pi', 'PI', 'E', 'Infinity', 'NaN', 'true', 'false', 'null']);
+
+function isReservedName(n) {
+  if (PARAM_NEVER.has(n)) return true;
+  try { if (typeof math[n] !== 'undefined') return true; } catch (e) {}
+  return false;
+}
+
+// Свободные буквы формулы: то, что придётся чем-то заменить при расчёте.
+function freeSymbols(expr) {
+  const out = [];
+  try {
+    const node = math.parse(String(expr || ''));
+    node.traverse((n, path, parent) => {
+      if (n.type !== 'SymbolNode') return;
+      // Имя функции в вызове — не параметр.
+      if (parent && parent.type === 'FunctionNode' && parent.fn === n) return;
+      if (isReservedName(n.name)) return;
+      if (out.indexOf(n.name) < 0) out.push(n.name);
+    });
+  } catch (e) {}
+  return out;
+}
+
+// Значения параметров подмешиваются в КАЖДЫЙ расчёт формулы.
+function paramScope(ctx) {
+  const p = STATE.params || {};
+  Object.keys(p).forEach(k => { if (ctx[k] === undefined) ctx[k] = p[k].value; });
+  return ctx;
+}
+
+// Расчёт с параметрами: буква, для которой ползунка ещё нет, считается единицей.
+function evalWithParams(compiled, ctx, expr) {
+  const c = paramScope(ctx);
+  try { return compiled.evaluate(c); }
+  catch (e) {
+    if (!paramsAllowed()) throw e;
+    freeSymbols(expr).forEach(n => { if (c[n] === undefined) c[n] = 1; });
+    return compiled.evaluate(c);
+  }
+}
+
+// Завести ползунки для новых букв, забыть те, которых больше нигде нет.
+function syncParams() {
+  if (!paramsAllowed()) {
+    if (Object.keys(STATE.params || {}).length) { STATE.params = {}; updatePult(); }
+    return;
+  }
+  const names = [];
+  STATE.curves.forEach(c => { if (c.expr) freeSymbols(c.expr).forEach(n => { if (names.indexOf(n) < 0) names.push(n); }); });
+  if (STATE.mode === 'math') {
+    [STATE.mathFormula, STATE.mathG2, STATE.mathInvFormula].forEach(f => {
+      freeSymbols(f).forEach(n => { if (names.indexOf(n) < 0) names.push(n); });
+    });
+  }
+  STATE.params = STATE.params || {};
+  let changed = false;
+  names.forEach(n => {
+    if (!STATE.params[n]) { STATE.params[n] = { value: 1, min: -10, max: 10, step: 0.1 }; changed = true; }
+  });
+  Object.keys(STATE.params).forEach(n => {
+    if (names.indexOf(n) < 0) { delete STATE.params[n]; changed = true; }
+  });
+  if (changed) {
+    const panel = document.getElementById('params-panel');
+    if (panel) panel._extraSig = '';     // пересобрать правую панель
+    updatePult();
+  }
+}
+
+// Один ползунок параметра: значение, точный ввод и настройка границ.
+function buildParamChip(box, name) {
+  const p = STATE.params[name];
+  const { chip, val } = makePchip(name, fmt(p.value), null);
+  chip.classList.add('pchip-param');
+
+  const sl = document.createElement('input');
+  sl.type = 'range'; sl.min = p.min; sl.max = p.max; sl.step = p.step;
+  sl.value = p.value; sl.style.accentColor = cssVar('--accent');
+  sl.addEventListener('input', () => {
+    p.value = parseFloat(sl.value);
+    val.textContent = fmt(p.value);
+    redrawAll();
+  });
+  chip.appendChild(sl);
+
+  const row = document.createElement('div');
+  row.className = 'param-row';
+  const mkNum = (key, title, w) => {
+    const n = document.createElement('input');
+    n.type = 'number'; n.step = 'any'; n.value = p[key]; n.title = title;
+    n.style.flex = w;
+    n.addEventListener('change', () => {
+      const v = parseFloat(n.value);
+      if (!isFinite(v)) return;
+      p[key] = v;
+      if (key === 'value') { sl.value = v; val.textContent = fmt(v); }
+      else { sl.min = p.min; sl.max = p.max; sl.step = Math.max(1e-9, p.step); }
+      redrawAll();
+    });
+    return n;
+  };
+  row.append(mkNum('min', 'наименьшее значение', '1'),
+             mkNum('value', 'точное значение', '1.2'),
+             mkNum('max', 'наибольшее значение', '1'),
+             mkNum('step', 'шаг', '1'));
+  chip.appendChild(row);
+  box.appendChild(chip);
 }
 
 function initSceneColorPickers() {
@@ -12083,14 +12230,84 @@ function texSamplePath(el) {
   return runs;
 }
 
+/* ── Перевод выражения Math.js в язык pgfplots ────────────────────────
+   Кривая, записанную формулой, незачем выгружать сотнями координат: pgfplots
+   умеет рисовать её сам, и файл получается коротким и читаемым. Переводим
+   только то, что pgfplots точно понимает; всё остальное честно уходит
+   точками (см. комментарий в самом файле). */
+const PGF_FUNCS = {
+  sqrt: 'sqrt', abs: 'abs', exp: 'exp', ln: 'ln', log: 'ln',
+  min: 'min', max: 'max', sin: 'sin', cos: 'cos', tan: 'tan',
+};
+
+function mathToPgf(expr, varName) {
+  const src = String(expr || '').trim();
+  if (!src) return null;
+  let node;
+  try { node = math.parse(src); } catch (e) { return null; }
+  const vars = new Set([varName, 'x', 'Q', 'L', 'X']);
+  let bad = false;
+
+  const walk = (n) => {
+    if (bad) return '';
+    switch (n.type) {
+      case 'ConstantNode': return String(n.value);
+      case 'SymbolNode': {
+        if (vars.has(n.name)) return 'x';
+        if (n.name === 'pi') return 'pi';
+        if (n.name === 'e') return 'e';
+        const p = (STATE.params || {})[n.name];
+        if (p) return '(' + p.value + ')';       // параметр печатаем его значением
+        bad = true; return '';
+      }
+      case 'ParenthesisNode': return '(' + walk(n.content) + ')';
+      case 'OperatorNode': {
+        if (n.args.length === 1) return (n.op === '-' ? '(-' : '(+') + walk(n.args[0]) + ')';
+        if (n.args.length !== 2) { bad = true; return ''; }
+        if ('+-*/^'.indexOf(n.op) < 0) { bad = true; return ''; }
+        return '(' + walk(n.args[0]) + ' ' + n.op + ' ' + walk(n.args[1]) + ')';
+      }
+      case 'FunctionNode': {
+        const name = n.fn && n.fn.name;
+        if (name === 'nthRoot' && n.args.length === 2) {
+          return '((' + walk(n.args[0]) + ')^(1/(' + walk(n.args[1]) + ')))';
+        }
+        const f = PGF_FUNCS[name];
+        if (!f) { bad = true; return ''; }
+        // Тригонометрия в pgfplots считает В ГРАДУСАХ — переводим явно.
+        if (f === 'sin' || f === 'cos' || f === 'tan') {
+          return f + '(deg(' + n.args.map(walk).join(',') + '))';
+        }
+        return f + '(' + n.args.map(walk).join(',') + ')';
+      }
+      default: bad = true; return '';
+    }
+  };
+  const out = walk(node);
+  return bad ? null : out;
+}
+
+/* Свойства нарисованной линии для pgfplots. */
+function pgfStroke(el, cs, colorName) {
+  const o = ['color=' + colorName(cs.stroke)];
+  const w = parseFloat(cs.strokeWidth) || 1;
+  o.push('line width=' + (w * 0.35).toFixed(2) + 'pt');
+  const dash = (el.getAttribute('stroke-dasharray') || cs.strokeDasharray || '').trim();
+  if (dash && dash !== 'none') o.push('dashed');
+  const op = parseFloat(cs.strokeOpacity) * parseFloat(cs.opacity || 1);
+  if (isFinite(op) && op < 0.99) o.push('opacity=' + op.toFixed(2));
+  return o;
+}
+
+/* Главный сборщик .tex. Рисуется ровно то, что на экране: границы осей,
+   заливки, кривые, точки, подписи и легенда берутся из текущего состояния
+   и текущего холста. */
 function buildTex(title, label) {
   const svgEl = document.getElementById('chart');
   if (!svgEl) return '';
-  const W = svgEl.clientWidth || 1280, H = svgEl.clientHeight || 720;
-  const k = TEX_WIDTH_CM / W;                       // пиксели → сантиметры
-  const X = (x) => (x * k).toFixed(3);
-  const Y = (y) => ((H - y) * k).toFixed(3);        // в TikZ ось Y смотрит вверх
-  const pt = (p) => '(' + X(p[0]) + ',' + Y(p[1]) + ')';
+  const { mx, my } = mainScales();
+  const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
+  const notes = [];                       // пояснения, почему что-то ушло точками
 
   const defs = [];
   const colorName = (css) => {
@@ -12099,122 +12316,127 @@ function buildTex(title, label) {
     if (defs.indexOf(line) < 0) defs.push(line);
     return key;
   };
+  const num = (v) => (Math.round(v * 10000) / 10000);
+  const pt = (x, y) => '(' + num(x) + ',' + num(y) + ')';
+  const toData = (px, py) => [mx.invert(px), my.invert(py)];
 
-  // Прямоугольники обрезки: элементы внутри clip-path не должны вылезать
-  // за поле графика, поэтому оборачиваем их в scope с \clip.
-  const clipRect = (ref) => {
-    const id = String(ref || '').replace(/^url\(#?|\)$/g, '').replace(/^#/, '');
-    const cp = id && svgEl.querySelector('clipPath#' + CSS.escape(id));
-    const r = cp && cp.querySelector('rect');
-    if (!r) return null;
-    const x = +r.getAttribute('x'), y = +r.getAttribute('y');
-    const w = +r.getAttribute('width'), h = +r.getAttribute('height');
-    return '(' + X(x) + ',' + Y(y + h) + ') rectangle (' + X(x + w) + ',' + Y(y) + ')';
-  };
+  const body = [];
+  const inView = (x, y) => x >= xLo - 1e-9 && x <= xHi + 1e-9 && y >= yLo - 1e-9 && y <= yHi + 1e-9;
+  // Подписи и маркеры на бумаге должны занимать ту же долю картинки, что на
+  // экране. Без пересчёта они выходят вдвое крупнее и налезают друг на друга.
+  const mrg = CONFIG.margin;
+  const ptPerPx = (TEX_WIDTH_CM * 0.62 * 28.4527) / Math.max(1, H - mrg.top - mrg.bottom);
 
-  const items = [];   // {clip: строка-прямоугольник или null, code: строка TikZ}
-  const push = (clip, code) => { if (code) items.push({ clip, code }); };
+  // 1) Кривые, у которых есть формула, — одной строкой каждая.
+  const drawnByFormula = new Set();
+  if (STATE.mode !== 'math') {
+    STATE.curves.forEach(c => {
+      if (!c.visible || !c.expr || c.kind === 'vertical') return;
+      const pgf = mathToPgf(c.expr, 'Q');
+      if (!pgf) return;
+      drawnByFormula.add(c.id);
+      const lo = Math.max(0, xLo), hi = xHi;
+      body.push('\\addplot[' + colorName(c.color) + ', very thick, domain=' + num(lo) + ':' + num(hi) +
+                ', samples=120, restrict y to domain=' + num(Math.max(0, yLo)) + ':' + num(yHi) + '] {' + pgf + '};');
+      const nm = texText(curveShortName(c));
+      if (nm) body.push('\\addlegendentry{' + nm + '}');
+    });
+  }
 
-  // Общие свойства обводки: толщина, пунктир, прозрачность, стрелка на конце.
-  const strokeOpts = (el, cs) => {
-    const o = [];
-    o.push('color=' + colorName(cs.stroke));
-    const w = parseFloat(cs.strokeWidth) || 1;
-    o.push('line width=' + (w * k).toFixed(4) + 'cm');
-    const dash = (el.getAttribute('stroke-dasharray') || cs.strokeDasharray || '').trim();
-    if (dash && dash !== 'none') {
-      const nums = dash.split(/[\s,]+/).map(parseFloat).filter(v => v > 0);
-      if (nums.length >= 2) {
-        o.push('dash pattern=on ' + (nums[0] * k).toFixed(4) + 'cm off ' + (nums[1] * k).toFixed(4) + 'cm');
-      } else o.push('dashed');
-    }
-    const op = parseFloat(cs.strokeOpacity) * parseFloat(cs.opacity || 1);
-    if (isFinite(op) && op < 0.99) o.push('opacity=' + op.toFixed(2));
-    if (el.getAttribute('marker-end')) o.push('->');
-    if (String(cs.strokeLinecap) === 'round') o.push('line cap=round');
-    return o.join(', ');
-  };
-  const fillOpts = (el, cs) => {
-    const o = ['color=' + colorName(cs.fill)];
-    const op = parseFloat(cs.fillOpacity) * parseFloat(cs.opacity || 1);
-    if (isFinite(op) && op < 0.99) o.push('opacity=' + op.toFixed(2));
-    return o.join(', ');
-  };
-
-  const walk = (node, clip) => {
+  // 2) Всё остальное с холста: заливки, точки, пунктиры, подписи.
+  const walk = (node) => {
     for (const el of node.children) {
       const tag = el.tagName.toLowerCase();
       if (tag === 'defs' || tag === 'clippath' || tag === 'marker') continue;
-      const myClip = el.getAttribute('clip-path') ? (clipRect(el.getAttribute('clip-path')) || clip) : clip;
-      if (tag === 'g') { walk(el, myClip); continue; }
+      const cls = String(el.getAttribute('class') || '');
+      // Оси и сетку pgfplots рисует сам; легенда закрашенных областей нужна
+      // на бумаге ровно та же, что на экране, поэтому её переносим как есть.
+      if (cls === 'axes' || cls === 'grid') continue;
+      if (tag === 'g') { walk(el); continue; }
 
+      if (el.getAttribute('data-skip-export')) continue;
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || parseFloat(cs.opacity) === 0) continue;
-      const hasFill = cs.fill && cs.fill !== 'none' && parseFloat(cs.fillOpacity) > 0;
-      const hasStroke = cs.stroke && cs.stroke !== 'none' && (parseFloat(cs.strokeWidth) || 0) > 0;
+      // Полностью прозрачный цвет — это служебная фигура (дорожка для мыши,
+      // подложка под подсказку). На бумаге её быть не должно.
+      const solid = (c) => { const m = /rgba?\([^)]*?,\s*([\d.]+)\s*\)$/.exec(String(c || '')); return !m || parseFloat(m[1]) > 0.01; };
+      const hasFill = cs.fill && cs.fill !== 'none' && parseFloat(cs.fillOpacity) > 0 && solid(cs.fill);
+      const hasStroke = cs.stroke && cs.stroke !== 'none' && (parseFloat(cs.strokeWidth) || 0) > 0 && solid(cs.stroke);
 
       if (tag === 'path') {
-        const runs = texSamplePath(el);
-        if (hasFill) runs.forEach(r => push(myClip, '\\fill[' + fillOpts(el, cs) + '] ' + r.map(pt).join(' -- ') + ' -- cycle;'));
-        if (hasStroke) runs.forEach(r => push(myClip, '\\draw[' + strokeOpts(el, cs) + '] ' + r.map(pt).join(' -- ') + ';'));
+        const cid = el.getAttribute('data-curve');
+        if (cid && drawnByFormula.has(+cid)) continue;          // уже нарисована формулой
+        const runs = texSamplePath(el).map(r => {
+          // Плотность режем: на бумаге двадцати точек на кривую достаточно,
+          // а файл становится читаемым.
+          const step = Math.max(1, Math.ceil(r.length / 60));
+          return r.filter((p, i) => i % step === 0 || i === r.length - 1).map(p => toData(p[0], p[1]));
+        });
+        if (hasFill) {
+          runs.forEach(r => {
+            if (r.length < 3) return;
+            body.push('\\fill[' + colorName(cs.fill) + ', opacity=' +
+              (parseFloat(cs.fillOpacity) * parseFloat(cs.opacity || 1) || 0.2).toFixed(2) + '] ' +
+              r.map(p => '(axis cs:' + num(p[0]) + ',' + num(p[1]) + ')').join(' -- ') + ' -- cycle;');
+          });
+        }
+        if (hasStroke) {
+          runs.forEach(r => {
+            if (r.length < 2) return;
+            if (cid) notes.push('% кривая выгружена точками: её формулу pgfplots не понимает');
+            body.push('\\addplot[' + pgfStroke(el, cs, colorName).join(', ') + ', forget plot] coordinates {' +
+              r.map(p => pt(p[0], p[1])).join(' ') + '};');
+          });
+        }
       } else if (tag === 'line') {
         if (!hasStroke) continue;
-        const p1 = [+el.getAttribute('x1'), +el.getAttribute('y1')];
-        const p2 = [+el.getAttribute('x2'), +el.getAttribute('y2')];
-        push(myClip, '\\draw[' + strokeOpts(el, cs) + '] ' + pt(p1) + ' -- ' + pt(p2) + ';');
+        const a = toData(+el.getAttribute('x1'), +el.getAttribute('y1'));
+        const b = toData(+el.getAttribute('x2'), +el.getAttribute('y2'));
+        body.push('\\addplot[' + pgfStroke(el, cs, colorName).join(', ') + ', forget plot] coordinates {' +
+          pt(a[0], a[1]) + ' ' + pt(b[0], b[1]) + '};');
       } else if (tag === 'rect') {
         const x = +el.getAttribute('x'), y = +el.getAttribute('y');
         const w = +el.getAttribute('width'), h = +el.getAttribute('height');
-        if (!(w > 0 && h > 0)) continue;
-        const box = pt([x, y + h]) + ' rectangle ' + pt([x + w, y]);
-        if (hasFill) push(myClip, '\\fill[' + fillOpts(el, cs) + '] ' + box + ';');
-        if (hasStroke) push(myClip, '\\draw[' + strokeOpts(el, cs) + '] ' + box + ';');
+        if (!(w > 0 && h > 0) || !hasFill) continue;
+        const a = toData(x, y + h), b = toData(x + w, y);
+        if (!inView(a[0], a[1]) && !inView(b[0], b[1])) continue;
+        body.push('\\fill[' + colorName(cs.fill) + ', opacity=' +
+          (parseFloat(cs.fillOpacity) * parseFloat(cs.opacity || 1) || 0.2).toFixed(2) + '] ' +
+          '(axis cs:' + num(a[0]) + ',' + num(a[1]) + ') rectangle (axis cs:' + num(b[0]) + ',' + num(b[1]) + ');');
       } else if (tag === 'circle') {
-        const c = [+el.getAttribute('cx'), +el.getAttribute('cy')];
-        const rad = (+el.getAttribute('r') * k).toFixed(4) + 'cm';
-        if (hasFill) push(myClip, '\\fill[' + fillOpts(el, cs) + '] ' + pt(c) + ' circle[radius=' + rad + '];');
-        if (hasStroke) push(myClip, '\\draw[' + strokeOpts(el, cs) + '] ' + pt(c) + ' circle[radius=' + rad + '];');
+        const c = toData(+el.getAttribute('cx'), +el.getAttribute('cy'));
+        if (!inView(c[0], c[1])) continue;
+        const col = colorName(hasFill ? cs.fill : cs.stroke);
+        body.push('\\addplot[' + col + ', only marks, mark size=' +
+          Math.max(0.6, (+el.getAttribute('r') || 4) * ptPerPx).toFixed(1) + 'pt, forget plot] coordinates {' + pt(c[0], c[1]) + '};');
       } else if (tag === 'text') {
-        // Только собственные текстовые узлы: у подписи может висеть дочерний
-        // <title> с всплывающей подсказкой, и textContent втянул бы её в файл.
         const raw = Array.prototype.filter.call(el.childNodes, n => n.nodeType === 3)
           .map(n => n.nodeValue).join('');
         const txt = texText(raw);
         if (!txt.trim()) continue;
-        // Якорь узла собираем из text-anchor (по горизонтали) и dominant-baseline
-        // (по вертикали): в SVG y текста — это базовая линия.
-        const ha = { start: ' west', middle: '', end: ' east' }[cs.textAnchor] ?? '';
+        const c = toData(+el.getAttribute('x') || 0, +el.getAttribute('y') || 0);
+        if (!inView(c[0], c[1])) continue;
+        const ha = { start: 'west', middle: '', end: 'east' }[cs.textAnchor] ?? '';
         const bl = el.getAttribute('dominant-baseline') || cs.dominantBaseline || '';
         const va = (bl === 'hanging' || bl === 'text-before-edge') ? 'north'
-                 : (bl === 'middle' || bl === 'central') ? 'mid' : 'base';
-        const anchor = (va + ha).trim() || 'base';
-        const fs = (parseFloat(cs.fontSize) || 10) * k * 28.4527;   // сантиметры → пункты
-        const bold = (parseInt(cs.fontWeight, 10) || 400) >= 600 ? '\\bfseries ' : '';
-        const op = parseFloat(cs.opacity || 1);
-        const opt = ['anchor=' + anchor, 'text=' + colorName(cs.fill), 'inner sep=0pt'];
-        if (isFinite(op) && op < 0.99) opt.push('opacity=' + op.toFixed(2));
-        push(myClip, '\\node[' + opt.join(', ') + '] at ' + pt([+el.getAttribute('x') || 0, +el.getAttribute('y') || 0]) +
-                     ' {\\fontsize{' + fs.toFixed(1) + '}{' + (fs * 1.2).toFixed(1) + '}\\selectfont ' + bold + txt + '};');
+                 : (bl === 'middle' || bl === 'central') ? '' : 'base';
+        const anchor = (va + (va && ha ? ' ' : '') + ha).trim() || 'base';
+        const fs = Math.max(4, (parseFloat(cs.fontSize) || 11) * ptPerPx);
+        const opt = ['anchor=' + anchor, 'text=' + colorName(cs.fill),
+                     'font=\\fontsize{' + fs.toFixed(1) + '}{' + (fs * 1.15).toFixed(1) + '}\\selectfont',
+                     'inner sep=1pt'];
+        body.push('\\node[' + opt.join(', ') + '] at (axis cs:' + num(c[0]) + ',' + num(c[1]) + ') {' + txt + '};');
       }
     }
   };
-  walk(svgEl, null);
-
-  // Соседние элементы с одинаковой обрезкой заворачиваем в один scope.
-  const body = [];
-  let cur = null;
-  items.forEach(it => {
-    if (it.clip !== cur) {
-      if (cur) body.push('\\end{scope}');
-      if (it.clip) { body.push('\\begin{scope}'); body.push('\\clip ' + it.clip + ';'); }
-      cur = it.clip;
-    }
-    body.push(it.code);
-  });
-  if (cur) body.push('\\end{scope}');
+  walk(svgEl);
 
   const cap = texText(title || STATE.graphTitle || '');
   const lab = String(label || '').trim().replace(/[^A-Za-z0-9:_-]/g, '');
+  const xName = texText(STATE.axisXName || STATE.axisXDefault || 'Q');
+  const yName = texText(STATE.axisYName || STATE.axisYDefault || 'P');
+  const uniq = [];
+  notes.forEach(n => { if (uniq.indexOf(n) < 0) uniq.push(n); });
 
   return [
     '% Собран калькулятором «Экономика 2.0». Компилируется обычным pdflatex.',
@@ -12222,7 +12444,9 @@ function buildTex(title, label) {
     '\\usepackage[T2A]{fontenc}',
     '\\usepackage[utf8]{inputenc}',
     '\\usepackage[english,russian]{babel}',
-    '\\usepackage{tikz}',
+    '\\usepackage{pgfplots}',
+    '\\pgfplotsset{compat=1.18}',
+    '\\usetikzlibrary{arrows.meta}',
     '\\usepackage{geometry}',
     '\\geometry{margin=2cm}',
     ...defs,
@@ -12231,8 +12455,21 @@ function buildTex(title, label) {
     '',
     '\\begin{figure}[h]',
     '\\centering',
-    '\\begin{tikzpicture}[x=1cm, y=1cm]',
+    '\\begin{tikzpicture}',
+    '\\begin{axis}[',
+    '  width=' + TEX_WIDTH_CM + 'cm, height=' + Math.round(TEX_WIDTH_CM * 0.62 * 10) / 10 + 'cm,',
+    '  xmin=' + num(xLo) + ', xmax=' + num(xHi) + ', ymin=' + num(yLo) + ', ymax=' + num(yHi) + ',',
+    '  xlabel={' + xName + '}, ylabel={' + yName + '},',
+    '  axis lines=left, axis line style={-{Stealth[length=6pt]}},',
+    '  xlabel style={at={(axis description cs:1,0)}, anchor=west},',
+    '  ylabel style={at={(axis description cs:0,1)}, anchor=south, rotate=-90},',
+    STATE.showGrid ? '  grid=major, grid style={very thin, gray!25},' : '',
+    '  legend pos=north east, legend cell align=left,',
+    '  legend style={font=\\small, draw=gray!40},',
+    ']',
+    ...uniq,
     ...body,
+    '\\end{axis}',
     '\\end{tikzpicture}',
     cap ? '\\caption{' + cap + '}' : '',
     lab ? '\\label{' + lab + '}' : '',
@@ -12241,7 +12478,6 @@ function buildTex(title, label) {
     '\\end{document}',
   ].filter(s => s !== '').join('\n');
 }
-
 function exportTex() {
   const title = (document.getElementById('exp-title') || {}).value || '';
   const label = (document.getElementById('exp-label') || {}).value || '';
@@ -14158,6 +14394,12 @@ function pultCurveList() {
 
 // Сцен-слайдеры (#pult-extra): что определяет их НАБОР (для пере-сборки при смене).
 function pultExtraSig() {
+  const ps = Object.keys(STATE.params || {}).sort().join(',');
+  const tail = ps ? ('|par:' + ps) : '';
+  if (tail) return pultExtraSigBase() + tail;
+  return pultExtraSigBase();
+}
+function pultExtraSigBase() {
   if (STATE.mode === 'ppf') {
     if (STATE.ppfSub === 'single') return 'ppf1';   // одна КПВ → Макс X / Макс Y
     if (STATE.ppfSub === 'sum')    return 'ppf2';   // сумма → 4 ползунка по странам
@@ -14167,9 +14409,11 @@ function pultExtraSig() {
   return '';
 }
 
-// Пульт нужен, если есть хоть один регулятор / слайдер кривой / сцен-слайдер.
+// Панель нужна, если есть хоть один регулятор, слайдер кривой, сцен-слайдер
+// или ползунок параметра.
 function pultShouldShow() {
-  return pultRegulatorIds().length > 0 || pultCurveList().length > 0 || pultExtraSig() !== '';
+  return pultRegulatorIds().length > 0 || pultCurveList().length > 0 ||
+         pultExtraSig() !== '' || Object.keys(STATE.params || {}).length > 0;
 }
 
 
@@ -14340,6 +14584,9 @@ function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr)
 function buildPultExtra(sig) {
   const box = document.getElementById('params-extra'); if (!box) return;
   box.innerHTML = '';
+  // Ползунки параметров идут первыми: их только что завела формула.
+  Object.keys(STATE.params || {}).sort().forEach(n => buildParamChip(box, n));
+  sig = String(sig).split('|par:')[0];
   if (sig === 'ppf1') {                                   // одна КПВ: Макс X / Макс Y
     const ic = ppfInterceptsOf(STATE.ppfFormula);
     addPultXChip(box, 'Макс X', ic.maxX, COL.D, 5, 200, 5, v => ppfSetSingle(v, ppfInterceptsOf(STATE.ppfFormula).maxY));
