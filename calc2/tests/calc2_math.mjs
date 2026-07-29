@@ -742,6 +742,105 @@ const CASES = [
           return { a: o.a, b: o.b };`,
     checks: [['a*', 'a', 3, 0.2], ['b*', 'b', 6, 0.3]],
   },
+  {
+    name: 'Площадь под кривой · D = 100 − Q на [0; 100] ⇒ 5000',
+    run: `loadScene('sd'); redrawAll();
+          setAreaCalcMode('curve');
+          document.getElementById('ac-pick').value = 'D';
+          document.getElementById('ac-from').value = '0';
+          document.getElementById('ac-to').value = '100';
+          runAreaCalc();
+          return { S: STATE.areaCalc ? STATE.areaCalc.value : NaN };`,
+    checks: [['площадь', 'S', 5000, 5]],
+  },
+  {
+    name: 'Площадь по точкам · треугольник (0;0) (10;0) (0;10) ⇒ 50',
+    run: `loadScene('sd'); redrawAll();
+          STATE.marks = []; clearAreaCalc();
+          addMarkAt(0, 0, null); addMarkAt(10, 0, null); addMarkAt(0, 10, null);
+          STATE.areaPicked = STATE.marks.map(m => 'm' + m.id);
+          setAreaCalcMode('poly'); runAreaCalc();
+          var v = STATE.areaCalc ? STATE.areaCalc.value : NaN;
+          STATE.marks = []; STATE.areaPicked = []; clearAreaCalc(); setAreaCalcMode('curve');
+          return { S: v };`,
+    checks: [['площадь', 'S', 50, 0.01]],
+  },
+  {
+    name: 'Пересечение кривых · D = 100 − Q и S = Q ⇒ (50; 50)',
+    run: `loadScene('sd'); redrawAll();
+          var c = (STATE.crosses || [])[0] || {};
+          return { x: c.x, y: c.y, n: (STATE.crosses || []).length };`,
+    checks: [['x', 'x', 50, 0.2], ['y', 'y', 50, 0.2], ['сколько', 'n', 1, 0]],
+  },
+  {
+    name: 'Формула в pgfplots · 100 − 2*Q ⇒ (100 - (2 * x))',
+    run: `loadScene('sd');
+          var got = mathToPgf('100 - 2*Q', 'Q');
+          var bad = mathToPgf('Q < 20 ? 100 - Q : 60', 'Q');
+          var root = mathToPgf('sqrt(Q)', 'Q');
+          return { ok: (got === '(100 - (2 * x))') ? 1 : 0,
+                   rootOk: (root === 'sqrt(x)') ? 1 : 0,
+                   badIsNull: (bad === null) ? 1 : 0 };`,
+    checks: [['линейная', 'ok', 1, 0], ['корень', 'rootOk', 1, 0], ['кусочная отклонена', 'badIsNull', 1, 0]],
+  },
+  {
+    name: 'Кусочная функция · три куска с двумя границами ⇒ 90 / 60 / 20',
+    run: `loadScene('free');
+          PW.inp = document.getElementById('inp-formula'); PW.v = 'Q'; PW.n = 3;
+          PW.rows = [{f:'100 - Q', a:'0', b:'40'}, {f:'60', a:'40', b:'70'}, {f:'20', a:'70', b:''}];
+          var r = compileFormula(pwFormula());
+          var at = function (q) { return r.compiled.evaluate({ x: q, Q: q, L: q }); };
+          var back = compileFormula(latexToMath(pwLatex()));
+          var atB = function (q) { return back.compiled.evaluate({ x: q, Q: q, L: q }); };
+          return { a: at(10), b: at(50), c: at(90), ba: atB(10), bb: atB(50), bc: atB(90) };`,
+    checks: [['f(10)', 'a', 90, 0.01], ['f(50)', 'b', 60, 0.01], ['f(90)', 'c', 20, 0.01],
+             ['скобка f(10)', 'ba', 90, 0.01], ['скобка f(50)', 'bb', 60, 0.01], ['скобка f(90)', 'bc', 20, 0.01]],
+  },
+  {
+    name: 'Ползунок параметра · k*Q при k = 3 ⇒ 30 в точке 10',
+    run: `loadScene('free');
+          STATE.curves = []; STATE.params = {};
+          addCurve('k*Q'); redrawAll();
+          var c = STATE.curves[STATE.curves.length - 1];
+          var v1 = evalCurve(c, 10);
+          STATE.params.k.value = 3; redrawAll();
+          var v3 = evalCurve(c, 10);
+          return { v1: v1, v3: v3, n: Object.keys(STATE.params).length };`,
+    checks: [['k = 1', 'v1', 10, 0.01], ['k = 3', 'v3', 30, 0.01], ['ползунков', 'n', 1, 0]],
+  },
+  {
+    name: 'Ползунков нет там, где буква занята · сцена налога',
+    run: `loadScene('tax'); redrawAll();
+          return { n: Object.keys(STATE.params || {}).length, Q: STATE.eq.Q };`,
+    checks: [['ползунков', 'n', 0, 0], ['равновесие', 'Q', 50, 0.3]],
+  },
+  {
+    name: 'Наименьшая из трёх · min(x, 4 − x, 2) меняет ветвь при x = 2',
+    run: `setMode('math'); setMathSub('minmax');
+          STATE.mathFormula = 'x'; STATE.mathG2 = '4 - x'; STATE.mathG3 = '2'; STATE.mathG4 = '';
+          STATE.mathMinMax = 'min'; setMathWindow(-1, 6, -1, 6); redrawAll();
+          var r = STATE.mathRes;
+          return { n: r.count, sw: (r.switches || [])[0], k: (r.switches || []).length };`,
+    checks: [['функций', 'n', 3, 0], ['смена ветви', 'sw', 2, 0.05], ['точек смены', 'k', 1, 0]],
+  },
+  {
+    name: 'Оптимум при своём ограничении · max a·b на a² + b² = 25 ⇒ 12.5',
+    run: `setMode('math'); setMathSub('constraint');
+          STATE.mathFC = 'a*b'; STATE.mathConsKind = 'own'; STATE.mathGC = 'a^2 + b^2 = 25';
+          STATE.mathConsWantMax = true; redrawAll();
+          var o = STATE.mathRes.opt || {};
+          return { a: o.a, b: o.b, v: o.value };`,
+    checks: [['a', 'a', 3.536, 0.06], ['b', 'b', 3.536, 0.06], ['F', 'v', 12.5, 0.05]],
+  },
+  {
+    name: 'Оптимум при прямой не изменился · max √a·√b при a + b = 10 ⇒ (5; 5)',
+    run: `setMode('math'); setMathSub('constraint');
+          STATE.mathFC = 'a^0.5 * b^0.5'; STATE.mathConsKind = 'line';
+          STATE.mathPa = 1; STATE.mathPb = 1; STATE.mathM = 10; redrawAll();
+          var o = STATE.mathRes.opt || {};
+          return { a: o.a, b: o.b };`,
+    checks: [['a', 'a', 5, 0.05], ['b', 'b', 5, 0.05]],
+  },
 ];
 
 function approx(got, want, tol) {

@@ -55,14 +55,16 @@ await t('равновесие 50/50 не сломано', () => page.evaluate(()
 }));
 
 await t('заголовок графика рисуется', async () => {
-  await page.fill('#inp-gtitle', 'Рынок хлеба');
+  await page.evaluate(() => { const e = document.getElementById('inp-gtitle');
+    e.value = 'Рынок хлеба'; e.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.waitForTimeout(250);
   return await page.evaluate(() =>
     [...document.querySelectorAll('#chart text')].some(n => n.textContent === 'Рынок хлеба') || 'нет текста в SVG');
 });
 
 await t('своё имя оси X попадает на график', async () => {
-  await page.fill('#inp-xname', 'Батоны');
+  await page.evaluate(() => { const e = document.getElementById('inp-xname');
+    e.value = 'Батоны'; e.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.waitForTimeout(250);
   return await page.evaluate(() =>
     [...document.querySelectorAll('#chart text')].some(n => n.textContent === 'Батоны') || 'нет метки оси');
@@ -229,34 +231,35 @@ await page.evaluate(() => {
   if (s) s.scrollIntoView({ block: 'center' });
 });
 await page.waitForTimeout(300);
-await t('строка показывает формулу набранной, когда её не правят', async () => {
-  await page.fill('#inp-formula', '100 - 2*Q');
-  await page.evaluate(() => document.getElementById('inp-formula').blur());
-  await page.waitForTimeout(250);
+await t('формула показана набранной прямо в строке', async () => {
+  await page.evaluate(() => setFieldValue(document.getElementById('inp-formula'), '100 - 2*Q'));
+  await page.waitForTimeout(280);
   return await page.evaluate(() => {
+    const inp = document.getElementById('inp-formula');
+    if (inp._mf) {
+      // С MathLive формула живёт в самом поле: проверяем, что она туда доехала.
+      return /frac|cdot|100/.test(inp._mf.value) || 'поле пустое: ' + inp._mf.value;
+    }
     const ts = document.querySelector('#sec-curves .f-typeset');
-    return (ts && ts.classList.contains('show') && ts.querySelector('.katex') !== null)
-      || (ts ? 'не показана: ' + ts.className : 'нет .f-typeset');
+    return (ts && ts.classList.contains('has')) || 'запасная накладка пуста';
   });
 });
 
-// Накладка лежит поверх поля, поэтому щёлкают по ней: её обработчик и
-// передаёт фокус в поле, как это делает человек.
-await t('при правке строка снова обычный текст', async () => {
-  await page.locator('#sec-curves .f-typeset').click();
-  await page.waitForTimeout(200);
+await t('поле формулы можно править прямо в строке', async () => {
   return await page.evaluate(() => {
-    const ts = document.querySelector('#sec-curves .f-typeset');
-    return (!ts.classList.contains('show') && document.activeElement.id === 'inp-formula')
-      || 'накладка не убралась или фокус мимо поля';
+    const inp = document.getElementById('inp-formula');
+    if (!inp._mf) return true;                 // без MathLive правится обычный input
+    inp._mf.focusField();
+    return document.activeElement === inp._mf || 'фокус мимо поля';
   });
 });
 
-await t('пустое поле не показывает накладку', async () => {
-  await page.fill('#inp-formula', '');
-  await page.evaluate(() => document.getElementById('inp-formula').blur());
+await t('пустое поле остаётся пустым', async () => {
+  await page.evaluate(() => setFieldValue(document.getElementById('inp-formula'), ''));
   await page.waitForTimeout(200);
   return await page.evaluate(() => {
+    const inp = document.getElementById('inp-formula');
+    if (inp._mf) return !inp._mf.value.trim() || 'в поле осталось: ' + inp._mf.value;
     const ts = document.querySelector('#sec-curves .f-typeset');
     return !ts.classList.contains('show') || 'накладка на пустом поле';
   });
@@ -267,8 +270,11 @@ await t('пустое поле не показывает накладку', asyn
 // что между нажатием и отпусканием кнопка успевала сдвинуться. Проверяем
 // геометрию напрямую: строка формулы не меняет высоту при уходе фокуса.
 await t('уход фокуса из формулы не двигает кнопку «Добавить»', async () => {
-  await page.click('#inp-formula');
-  await page.fill('#inp-formula', '100 - 2*Q');
+  await page.evaluate(() => {
+    const inp = document.getElementById('inp-formula');
+    if (inp._mf) inp._mf.focusField(); else inp.focus();
+    setFieldValue(inp, '100 - 2*Q');
+  });
   await page.waitForTimeout(200);
   const before = await page.evaluate(() =>
     document.getElementById('btn-add-curve').getBoundingClientRect().top);
@@ -282,7 +288,7 @@ await t('уход фокуса из формулы не двигает кноп�
 await t('кривая добавляется настоящим щелчком по кнопке', async () => {
   await page.evaluate(() => { STATE.curves = []; renderCurveList(); redrawAll(); });
   await page.selectOption('#new-role', '');
-  await page.fill('#inp-formula', '100 - Q');
+  await page.evaluate(() => setFieldValue(document.getElementById('inp-formula'), '100 - Q'));
   // Панель прокручиваемая и кнопка может оказаться за её краем, поэтому
   // воспроизводим последовательность браузера: нажатие, потеря фокуса, щелчок.
   await page.evaluate(() => {
@@ -299,13 +305,43 @@ await t('кривая добавляется настоящим щелчком �
     || JSON.stringify(STATE.curves.map(c => c.expr)));
 });
 
-await t('в попапе примеры набраны математикой, не текстом', async () => {
+await t('кнопка открывает клавиатуру из трёх разделов', async () => {
   await page.evaluate(() => document.getElementById('fh-formula').click());
+  await page.waitForTimeout(250);
+  return await page.evaluate(() => {
+    const kb = document.querySelector('.mkbd.open');
+    if (!kb) return 'клавиатура не открылась';
+    const tabs = kb.querySelectorAll('.mkbd-tab').length;
+    const active = kb.querySelectorAll('.mkbd-pane.active').length;
+    const keys = kb.querySelectorAll('.mk').length;
+    return (tabs === 3 && active === 1 && keys > 60) || `разделов ${tabs}, открыт ${active}, клавиш ${keys}`;
+  });
+});
+
+await t('клавиша ставит символ в поле, не стирая набранное', async () => {
+  return await page.evaluate(() => {
+    const inp = document.getElementById('inp-formula');
+    if (inp._mf) inp._mf.value = '';
+    setFieldValue(inp, '');
+    const kb = document.querySelector('.mkbd.open');
+    const keys = [...kb.querySelectorAll('.mk')];
+    const hit = (t) => { const b = keys.find(x => x.textContent === t); if (b) b.click(); };
+    hit('1'); hit('0'); hit('0'); hit('−'); hit('Q');
+    return inp.value.replace(/\s/g, '') === '100-Q' || `в поле «${inp.value}»`;
+  });
+});
+
+await t('примеры формул открываются из подвала клавиатуры', async () => {
+  await page.evaluate(() => {
+    const kb = document.querySelector('.mkbd.open');
+    const b = [...kb.querySelectorAll('.mkbd-foot button')].find(x => /Примеры/.test(x.textContent));
+    if (b) b.click();
+  });
   await page.waitForTimeout(250);
   return await page.evaluate(() => {
     const pop = document.getElementById('fp-formula');
     const n = pop.querySelectorAll('.f-ex .f-ex-math .katex').length;
-    return n === 4 || `формул с KaTeX: ${n}`;
+    return (pop.classList.contains('open') && n === 4) || `формул с KaTeX: ${n}`;
   });
 });
 
@@ -319,13 +355,17 @@ await t('клик по примеру подставляет его в поле'
 
 await t('после подстановки строка набралась, попап закрылся', () => page.evaluate(() => {
   const pop = document.getElementById('fp-formula');
-  const ts = document.querySelector('#sec-curves .f-typeset');
-  return (!pop.classList.contains('open') && ts.classList.contains('has'))
-    || 'попап открыт или строка пуста';
+  const inp = document.getElementById('inp-formula');
+  const shown = inp._mf ? !!inp._mf.value.trim()
+                        : document.querySelector('#sec-curves .f-typeset').classList.contains('has');
+  return (!pop.classList.contains('open') && shown) || 'попап открыт или строка пуста';
 }));
 
 await t('своё имя кривой заменяет родовое D на графике', async () => {
-  await page.evaluate(() => { STATE.curves[0].label = 'Спрос молодёжи'; redrawAll(); });
+  await page.evaluate(() => {
+    if (!STATE.curves.length) { addCurve('100 - Q'); setRole(STATE.curves[0], 'demand'); }
+    STATE.curves[0].label = 'Спрос молодёжи'; redrawAll();
+  });
   await page.waitForTimeout(200);
   const tx = await svgTexts();
   return (tx.includes('Спрос молодёжи') && !tx.includes('D')) || 'есть: ' + tx.join('|');
@@ -387,8 +427,14 @@ await t('заголовок подставился из названия сце�
 
 await t('.tex собирается и содержит кривые', () => page.evaluate(() => {
   const tex = buildTex('Рынок хлеба', 'fig:bread');
-  const draws = (tex.match(/\\draw\[/g) || []).length;
-  return (draws >= 10 && tex.includes('\\begin{tikzpicture}')) || `\\draw: ${draws}`;
+  const plots = (tex.match(/\\addplot/g) || []).length;
+  return (plots >= 4 && tex.includes('\\begin{axis}')) || `\\addplot: ${plots}`;
+}));
+
+await t('кривая с формулой выгружается формулой, а не точками', () => page.evaluate(() => {
+  const tex = buildTex('', '');
+  const byFormula = (tex.match(/\\addplot\[[^\]]*domain=/g) || []).length;
+  return byFormula >= 2 || `формулой выгружено ${byFormula} кривых`;
 }));
 
 await t('.tex несёт заголовок, label и заливки', () => page.evaluate(() => {
@@ -401,28 +447,28 @@ await t('.tex несёт заголовок, label и заливки', () => pag
 await t('.tex под обычный pdflatex, кириллица через T2A', () => page.evaluate(() => {
   const tex = buildTex('Рынок хлеба', '');
   return (tex.includes('\\usepackage[T2A]{fontenc}') && tex.includes('\\usepackage[utf8]{inputenc}')
-          && !tex.includes('fontspec') && !tex.includes('pgfplots')) || tex.slice(0, 300);
+          && tex.includes('\\usepackage[english,russian]{babel}')
+          && tex.includes('\\usepackage{pgfplots}')
+          && !tex.includes('fontspec') && !tex.includes('unicode-math')) || tex.slice(0, 300);
 }));
 
 // Экранная геометрия и есть источник .tex, поэтому масштаб проверяем прямым
 // пересчётом: точка равновесия на холсте обязана попасть в ту же точку картинки.
-await t('масштаб .tex совпадает с экранным', () => page.evaluate(() => {
-  const svg = document.getElementById('chart');
-  const c = svg.querySelector('circle');
-  if (!c) return 'на сцене нет точек';
-  const W = svg.clientWidth, H = svg.clientHeight, k = 16 / W;
-  const wantX = (+c.getAttribute('cx') * k).toFixed(3);
-  const wantY = ((H - +c.getAttribute('cy')) * k).toFixed(3);
+await t('границы осей .tex совпадают с экранными', () => page.evaluate(() => {
   const tex = buildTex('', '');
-  return tex.includes('(' + wantX + ',' + wantY + ') circle') || `ждали (${wantX},${wantY})`;
+  const want = 'xmin=' + (Math.round(CONFIG.Qmin * 10000) / 10000) +
+               ', xmax=' + (Math.round(CONFIG.Qmax * 10000) / 10000);
+  return tex.includes(want) || 'ждали ' + want;
 }));
 
-await t('.tex обрезает кривые тем же прямоугольником, что экран', () => page.evaluate(() => {
-  const tex = buildTex('', '');
-  return (tex.includes('\\begin{scope}') && tex.includes('\\clip ')
-          && (tex.match(/\\begin\{scope\}/g) || []).length === (tex.match(/\\end\{scope\}/g) || []).length)
-         || 'обрезка не сошлась';
-}));
+await t('после зума .tex берёт НОВЫЕ границы, а не исходные', async () => {
+  await page.evaluate(() => { CONFIG.Qmax = 60; CONFIG.Pmax = 60; markViewDirty(); redrawAll(); });
+  await page.waitForTimeout(200);
+  const ok = await page.evaluate(() => buildTex('', '').includes('xmax=60'));
+  await page.evaluate(() => resetZoom());
+  await page.waitForTimeout(200);
+  return ok || 'в файле остались старые границы';
+});
 
 // Экспорт читает НАРИСОВАННЫЙ холст, поэтому подпись сначала должна попасть
 // на график: без redrawAll её в SVG ещё нет и проверять нечего.
@@ -446,7 +492,7 @@ await t('пунктирная кривая S+t попала в .tex при на�
   await page.waitForTimeout(300);
   return await page.evaluate(() => {
     const tex = buildTex('', '');
-    return tex.includes('dash pattern=on') || 'нет пунктира';
+    return tex.includes('dashed') || 'нет пунктира';
   });
 });
 
@@ -475,9 +521,9 @@ await t('.tex не пустой в любом режиме, не только р
     await page.waitForTimeout(260);
     const n = await page.evaluate(() => {
       const tex = buildTex('', '');
-      return (tex.match(/\\draw|\\fill|\\node/g) || []).length;
+      return (tex.match(/\\addplot|\\fill|\\node/g) || []).length;
     });
-    if (n < 20) thin.push(`${s}:${n}`);
+    if (n < 4) thin.push(`${s}:${n}`);
   }
   return thin.length === 0 || 'мало элементов — ' + thin.join(', ');
 });
@@ -539,30 +585,37 @@ await t('иконки: один радиус маркеров и один пун
 await page.evaluate(() => { openPicker(); pickScene('tax'); closePicker(); });
 await page.waitForTimeout(400);
 
-await t('лента-пульта укладывается в нижнее поле графика', () => page.evaluate(() => {
-  const h = document.getElementById('pult').getBoundingClientRect().height;
-  return h <= CONFIG.margin.bottom || `высота ленты ${Math.round(h)}px при поле ${CONFIG.margin.bottom}px`;
+await t('панели не перекрывают график', () => page.evaluate(() => {
+  const g = document.getElementById('graph-wrap').getBoundingClientRect();
+  const bad = [];
+  ['tools-panel', 'params-panel', 'dock'].forEach(id => {
+    const e = document.getElementById(id) || document.querySelector('.' + id);
+    if (!e) return;
+    const b = e.getBoundingClientRect();
+    const over = Math.min(g.right, b.right) - Math.max(g.left, b.left);
+    if (over > 1) bad.push(id + ' на ' + Math.round(over) + 'px');
+  });
+  return !bad.length || bad.join(', ');
 }));
 
-await t('все регуляторы ленты одной ширины по базе', () => page.evaluate(() => {
-  const els = [...document.querySelectorAll('#pult .pult-cchip, #pult .pult-xchip, #pult .field')];
-  const bases = new Set(els.map(e => getComputedStyle(e).flexBasis));
-  return (els.length > 0 && bases.size === 1) || `баз ${bases.size}: ${[...bases].join(',')}`;
+await t('регуляторы сцены живут в правой панели', () => page.evaluate(() => {
+  const n = document.querySelectorAll('#params-body .pchip, #params-body .field').length;
+  return n > 0 || 'в панели параметров пусто';
 }));
 
-await t('в табло число крупнее подписи', () => page.evaluate(() => {
+await t('в аналитике число крупнее подписи', () => page.evaluate(() => {
   const b = document.querySelector('#sb-body .stat b'), s = document.querySelector('#sb-body .stat span');
   if (!b || !s) return 'нет строк в табло';
   const bs = parseFloat(getComputedStyle(b).fontSize), ss = parseFloat(getComputedStyle(s).fontSize);
   return bs >= ss + 3 || `число ${bs}px, подпись ${ss}px`;
 }));
 
-await t('лента остаётся в поле и в сцене «Труд»', async () => {
+await t('панель параметров наполняется и в сцене «Труд»', async () => {
   await page.evaluate(() => { openPicker(); pickScene('labor'); closePicker(); });
   await page.waitForTimeout(450);
   return await page.evaluate(() => {
-    const h = document.getElementById('pult').getBoundingClientRect().height;
-    return h <= CONFIG.margin.bottom || `высота ${Math.round(h)}px при поле ${CONFIG.margin.bottom}px`;
+    const n = document.querySelectorAll('#params-body .pchip, #params-body .field').length;
+    return n > 0 || 'в панели параметров пусто';
   });
 });
 
@@ -701,7 +754,7 @@ await t('для издержек форма «объём от цены» скр�
 await t('кривая добавляется сразу со своей ролью', async () => {
   await page.evaluate(() => { STATE.curves = []; renderCurveList(); redrawAll(); });
   await page.selectOption('#new-role', 'mc');
-  await page.fill('#inp-formula', '20');
+  await page.evaluate(() => setFieldValue(document.getElementById('inp-formula'), '20'));
   await page.click('#btn-add-curve');
   await page.waitForTimeout(220);
   return await page.evaluate(() => {
@@ -715,8 +768,16 @@ await t('кривая добавляется сразу со своей роль
 await t('заголовок справки называет именно эту роль', async () => {
   await page.click('#fh-formula');
   await page.waitForTimeout(220);
+  await page.evaluate(() => {
+    const kb = document.querySelector('.mkbd.open');
+    const b = kb && [...kb.querySelectorAll('.mkbd-foot button')].find(x => /Примеры/.test(x.textContent));
+    if (b) b.click();
+  });
+  await page.waitForTimeout(220);
   const title = await page.locator('#fp-formula .f-pop-title').first().textContent();
-  await page.click('#fh-formula');   // закрыть, чтобы не мешал дальше
+  await page.evaluate(() => {
+    document.querySelectorAll('.f-pop.open, .mkbd.open').forEach(e => e.classList.remove('open'));
+  });
   await page.waitForTimeout(120);
   return title.includes('Предельные издержки') || title;
 });
@@ -779,18 +840,20 @@ await t('легенда называет области в сцене налог
   await page.evaluate(() => openPicker());
   await page.click('.scard[data-scene="tax"]');
   await page.waitForTimeout(350);
-  const names = await page.evaluate(() =>
-    [...document.querySelectorAll('#chart .legend text')].map(t => t.textContent));
-  const want = ['Излишек покупателя (CS)', 'Излишек продавца (PS)', 'Сбор бюджета', 'Потери общества (DWL)'];
+  const names = await page.evaluate(() => [...document.querySelectorAll('#chart .legend text')].map(t =>
+      [...t.childNodes].filter(n => n.nodeType === 3).map(n => n.nodeValue).join('')));
+  const want = ['CS', 'PS', 'Tx', 'DWL'];
   return want.every(w => names.includes(w)) || names.join(' | ');
 });
 
 await t('субсидия подписана расходом, а не сбором', async () => {
   await page.evaluate(() => { setType('subsidy'); setTax(20); });
   await page.waitForTimeout(300);
-  const names = await page.evaluate(() =>
-    [...document.querySelectorAll('#chart .legend text')].map(t => t.textContent));
-  const ok = names.includes('Расход бюджета') && !names.includes('Сбор бюджета');
+  const names = await page.evaluate(() => [...document.querySelectorAll('#chart .legend text')].map(t =>
+      [...t.childNodes].filter(n => n.nodeType === 3).map(n => n.nodeValue).join('')));
+  const titles = await page.evaluate(() =>
+    [...document.querySelectorAll('#chart .legend text title')].map(t => t.textContent));
+  const ok = names.includes('GS') && titles.includes('Расход бюджета') && !titles.includes('Сбор бюджета');
   await page.evaluate(() => { setType('tax'); setTax(20); });
   await page.waitForTimeout(200);
   return ok || names.join(' | ');
@@ -814,7 +877,7 @@ await t('легенда попадает в экспорт вместе с гр�
   await page.waitForTimeout(330);
   return await page.evaluate(() => {
     const tex = buildTex('', '');
-    return (tex.includes('Сбор бюджета') && tex.includes('Потери общества')) || 'подписей нет в .tex';
+    return (tex.includes('{Tx}') && tex.includes('{DWL}')) || 'подписей нет в .tex';
   });
 });
 
@@ -829,10 +892,13 @@ await t('легенда выключается галочкой', async () => {
 await t('легенда стоит выше поля графика, не поверх кривых', () => page.evaluate(() => {
   const t0 = document.querySelector('#chart .legend text');
   if (!t0) return 'легенды нет';
-  return (+t0.getAttribute('y') < CONFIG.margin.top) || 'заехала в поле графика';
+  const gw = document.getElementById('graph-wrap').getBoundingClientRect();
+  const b0 = t0.getBoundingClientRect();
+  return (b0.x > gw.x + gw.width / 2 && b0.y > gw.y + gw.height / 2)
+    || 'легенда не в правом нижнем углу';
 }));
 
-/* --- Справка «?»: палитра операций и конструктор кусочной -------------- */
+/* --- Клавиатура и конструктор кусочной функции ------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.evaluate(() => openPicker());
 await page.click('.scard[data-scene="free"]');
@@ -840,41 +906,74 @@ await page.waitForTimeout(320);
 await page.click('#fh-formula');
 await page.waitForTimeout(220);
 
-await t('в справке есть палитра операций', async () => {
-  const groups = await page.locator('#fp-formula .f-pal-group').count();
-  const btns = await page.locator('#fp-formula .f-pal').count();
-  return (groups >= 5 && btns >= 25) || `групп ${groups}, кнопок ${btns}`;
+await t('в разделе функций есть всё нужное экономике', async () => {
+  return await page.evaluate(() => {
+    const kb = document.querySelector('.mkbd.open');
+    if (!kb) return 'клавиатура закрыта';
+    const tabs = [...kb.querySelectorAll('.mkbd-tab')];
+    const fn = tabs.find(t => /Функц/.test(t.textContent));
+    if (!fn) return 'нет раздела функций';
+    fn.click();
+    const labels = [...kb.querySelectorAll('.mkbd-pane.active .mk')].map(b => b.textContent);
+    const need = ['√', '|x|', 'ln', 'log', 'sin', 'min', 'max', '≤', '≥', '≠'];
+    const miss = need.filter(n => labels.indexOf(n) < 0);
+    return !miss.length || 'нет: ' + miss.join(', ');
+  });
 });
 
-await t('кусочки подставляются по курсору, а не затирают строку', async () => {
-  await page.evaluate(() => {
-    const i = document.getElementById('inp-formula');
-    i.value = '100'; i.dispatchEvent(new Event('input', { bubbles: true }));
-    i.setSelectionRange(3, 3);
+await t('раздел букв даёт латиницу и греческие', async () => {
+  return await page.evaluate(() => {
+    const kb = document.querySelector('.mkbd.open');
+    const tabs = [...kb.querySelectorAll('.mkbd-tab')];
+    const ab = tabs.find(t => /Букв/.test(t.textContent));
+    if (!ab) return 'нет раздела букв';
+    ab.click();
+    const labels = [...kb.querySelectorAll('.mkbd-pane.active .mk')].map(b => b.textContent);
+    const need = ['a', 'z', 'α', 'β', 'π', 'Δ'];
+    const miss = need.filter(n => labels.indexOf(n) < 0);
+    return !miss.length || 'нет: ' + miss.join(', ');
   });
-  const btns = await page.locator('#fp-formula .f-pal').all();
-  for (const btn of btns) {
-    if ((await btn.textContent()).trim() === 'sqrt( )') { await btn.click(); break; }
-  }
-  await page.waitForTimeout(150);
-  const v = await page.inputValue('#inp-formula');
-  const caret = await page.evaluate(() => document.getElementById('inp-formula').selectionStart);
-  // Курсор должен встать ВНУТРИ скобок (между «(» и «)»), чтобы можно было
-  // сразу писать дальше: у «100sqrt()» это позиция 8.
-  return (v === '100sqrt()' && caret === 8) || `${v}, курсор ${caret}`;
+});
+
+await t('печать слэша даёт дробь, крышки — степень', async () => {
+  const has = await page.evaluate(() => !!document.getElementById('inp-formula')._mf);
+  if (!has) return true;                       // без MathLive поле обычное, проверять нечего
+  await page.evaluate(() => { const m = document.getElementById('inp-formula')._mf; m.value = ''; m.focusField(); });
+  await page.waitForTimeout(120);
+  await page.keyboard.type('100-Q/2', { delay: 25 });
+  await page.waitForTimeout(200);
+  const r1 = await page.evaluate(() => ({ tex: document.getElementById('inp-formula')._mf.value,
+                                          txt: document.getElementById('inp-formula').value }));
+  if (!/frac/.test(r1.tex)) return 'дроби нет: ' + r1.tex;
+  await page.evaluate(() => { const m = document.getElementById('inp-formula')._mf; m.value = ''; m.focusField(); });
+  await page.waitForTimeout(120);
+  await page.keyboard.type('Q^2', { delay: 25 });
+  await page.waitForTimeout(200);
+  const r2 = await page.evaluate(() => document.getElementById('inp-formula').value);
+  return r2.replace(/\s/g, '') === 'Q^(2)' || 'степень: ' + r2;
 });
 
 await t('конструктор кусочной собирает верную запись', async () => {
-  await page.locator('#fp-formula .f-pal.wide').click();
+  await page.evaluate(() => {
+    const kb = document.querySelector('.mkbd.open') || document.querySelector('.mkbd');
+    const b = [...kb.querySelectorAll('.mkbd-foot button')].find(x => /Кусочн/.test(x.textContent));
+    if (b) b.click(); else openPiecewise(document.getElementById('inp-formula'), 'Q');
+  });
   await page.waitForTimeout(280);
   const segs = await page.locator('#pw-count .seg-btn').all();
   await segs[1].click();                     // три куска
   await page.waitForTimeout(180);
   const rows = await page.locator('#pw-rows .pw-row').all();
   if (rows.length !== 3) return 'строк ' + rows.length;
+  // У каждого куска две границы: «от» и «до».
+  await rows[0].locator('input[type=text]').first().fill('100 - Q');
+  await rows[0].locator('input.pw-bound').nth(0).fill('0');
+  await rows[0].locator('input.pw-bound').nth(1).fill('40');
   await rows[1].locator('input[type=text]').first().fill('60');
-  await rows[1].locator('input.pw-bound').fill('70');
+  await rows[1].locator('input.pw-bound').nth(0).fill('40');
+  await rows[1].locator('input.pw-bound').nth(1).fill('70');
   await rows[2].locator('input[type=text]').first().fill('20');
+  await rows[2].locator('input.pw-bound').nth(0).fill('70');
   await page.waitForTimeout(220);
   await page.click('#pw-apply');
   await page.waitForTimeout(220);

@@ -38,8 +38,11 @@ await t('десять блоков плюс свободный холст', asyn
 await t('Математика идёт первым блоком', async () =>
   (await page.locator('.picker-group-label').first().textContent()).trim().startsWith('1 · Математика') || 'первый не Математика');
 
-await t('карточек «скоро» ровно 18', async () =>
-  (await page.locator('.scard.soon').count()) === 18 || 'их ' + (await page.locator('.scard.soon').count()));
+await t('карточек «скоро» ровно 19', async () =>
+  (await page.locator('.scard.soon').count()) === 19 || 'их ' + (await page.locator('.scard.soon').count()));
+
+await t('в потребителе есть заглушка про риск', async () =>
+  (await page.locator('.scard.soon[data-scene="cons-risk"]').count()) === 1 || 'карточки риска нет');
 
 await t('карточки «скоро» отключены', async () =>
   (await page.locator('.scard.soon:not([disabled])').count()) === 0 || 'есть нажимаемые');
