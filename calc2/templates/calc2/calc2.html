@@ -809,6 +809,43 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--input-bg); color: var(--text2); font-variant-numeric: tabular-nums;
 }
+/* Ползунок параметра: границы написаны по краям дорожки и открывают редактор. */
+.param-track { display: flex; align-items: center; gap: 6px; }
+.param-track input[type="range"] { flex: 1; min-width: 0; }
+.param-bound {
+  flex: 0 0 auto; padding: 1px 3px; border: none; background: transparent;
+  font-size: 10.5px; color: var(--text3); font-variant-numeric: tabular-nums;
+  border-bottom: 1px dashed var(--border); border-radius: 0; cursor: pointer;
+}
+.param-bound:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.param-editor { display: none; }
+.param-editor.open { display: block; margin-top: 6px; }
+.param-ed-line { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; font-size: 11px; color: var(--text2); }
+.param-ed-line input {
+  width: 100%; min-width: 0; flex: 1; padding: 3px 5px; font-size: 11px; text-align: center;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
+}
+.param-ed-name { flex: 0 0 auto; font-weight: 600; color: var(--text); }
+.param-ed-ok {
+  width: 100%; padding: 4px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--text2); cursor: pointer;
+}
+.param-ed-ok:hover { color: var(--accent); border-color: var(--accent); }
+.pchip-editable { cursor: text; border-bottom: 1px dashed var(--border); }
+.pchip-editable:hover { border-bottom-color: var(--accent); }
+.pchip-valedit {
+  margin-left: auto; width: 66px; padding: 1px 4px; font-size: 12px; font-weight: 700;
+  text-align: right; border: 1px solid var(--accent); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
+}
+/* Две группы в правой панели: регуляторы модели и буквы из формул. */
+.params-group-title {
+  font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--text3); margin: 12px 0 6px;
+}
+.params-group-title:first-child { margin-top: 0; }
 .pchip-param .param-row input:nth-child(2) { color: var(--text); font-weight: 600; }
 
 /* ── Кнопки над графиком: гаечный ключ и возврат масштаба ── */
@@ -3422,7 +3459,7 @@ function toggleCalcTheme() {
 // чтобы принимались оба варианта записи.
 function compileFormula(expr) {
   try {
-    const compiled = math.parse(expr).compile();
+    const compiled = math.parse(prepExpr(expr)).compile();
     // Пробный расчёт ловит опечатки сразу (L — синоним для рынка труда).
     // Там, где буквы становятся параметрами, незнакомая буква — не опечатка,
     // а будущий ползунок, поэтому на пробу подставляем ей единицу.
@@ -3456,7 +3493,9 @@ function evalCurve(curve, q) {
 // иначе null. Работает для ЛЮБОЙ записи формулы (не разбираем строку).
 function detectLinear(compiled) {
   const at = (q) => {
-    try { const v = compiled.evaluate({ x: q, Q: q, L: q }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+    // Значения ползунков подмешиваем: иначе «a*x» без них падает на неизвестной
+    // букве и прямая считалась бы кривой (а её нельзя ни таскать, ни двигать).
+    try { const v = compiled.evaluate(paramScope({ x: q, Q: q, L: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
     catch (e) { return NaN; }
   };
   const q1 = CONFIG.Qmax * 0.2, q2 = CONFIG.Qmax * 0.5, q3 = CONFIG.Qmax * 0.8;
@@ -8245,8 +8284,11 @@ function setConsumerType(t) {
 // Компиляция выражения с ИМЕНЕМ переменной модели (Y, u, i, r, e, Q) + синоним x.
 function compileVar(expr, names) {
   try {
-    const compiled = math.parse(expr).compile();
+    const compiled = math.parse(prepExpr(expr)).compile();
     const ctx = paramScope({ x: 1 }); names.forEach(n => { ctx[n] = 1; });
+    // Буква, у которой ползунка ещё нет, на пробе считается единицей: это будущий
+    // параметр, а не опечатка.
+    if (paramsAllowed()) freeSymbols(expr).forEach(n => { if (ctx[n] === undefined) ctx[n] = 1; });
     compiled.evaluate(ctx);
     return { compiled, error: null };
   } catch (e) { return { compiled: null, error: e.message }; }
@@ -11138,31 +11180,85 @@ function paramsAllowed() {
   return !!PARAM_SCENES[baseScene()];
 }
 
-// Буквы, которые НИКОГДА не становятся параметром: переменные осей,
-// имена функций и констант Math.js, зарезервированные обозначения сцен.
-const PARAM_NEVER = new Set(['x', 'y', 'Q', 'P', 'L', 'K', 'X', 'Y', 'a', 'b',
-  'e', 'i', 'pi', 'PI', 'E', 'Infinity', 'NaN', 'true', 'false', 'null']);
+/* Переменные графика: буквы, которыми подписаны оси. Параметром такая буква
+   стать не может — её значение задаёт сама точка на графике. */
+const AXIS_VARS = new Set(['x', 'y', 'Q', 'P', 'L', 'K', 'X', 'Y']);
+
+/* Настоящие математические константы. Только они из всего словаря Math.js
+   закрывают одиночную букву. Раньше проверка была «есть ли math[имя]», и под
+   неё попадало пол-алфавита: в Math.js есть и физические постоянные, и
+   короткие имена функций, поэтому «x^2 + 5 + c» не давал ползунка для c. */
+const MATH_CONSTS = new Set(['e', 'i', 'pi', 'PI', 'E', 'tau', 'phi',
+  'Infinity', 'NaN', 'true', 'false', 'null']);
+
+/* Многобуквенные обозначения, которые в экономике читаются как ОДНО имя,
+   а не как произведение букв: MC — предельные издержки, а не M·C. */
+const ECON_WORDS = new Set(['MC', 'MR', 'TC', 'ATC', 'AVC', 'AFC', 'FC', 'VC',
+  'TR', 'TP', 'MP', 'AP', 'MPL', 'MRP', 'Qd', 'Qs', 'Pd', 'Ps', 'Pb', 'Pw',
+  'CS', 'PS', 'DWL', 'AD', 'AS', 'IS', 'LM', 'GDP']);
 
 function isReservedName(n) {
-  if (PARAM_NEVER.has(n)) return true;
-  try { if (typeof math[n] !== 'undefined') return true; } catch (e) {}
+  if (AXIS_VARS.has(n) || MATH_CONSTS.has(n)) return true;
+  // Многобуквенное имя закрыто, если это функция Math.js (sqrt, log, min…).
+  if (n.length > 1) { try { if (typeof math[n] !== 'undefined') return true; } catch (e) {} }
   return false;
+}
+
+/* Неявное умножение. Math.js читает «bx» как ОДНО имя переменной, поэтому в
+   формуле «b*x^2», записанной по-школьному как «bx^2», параметром оказывалась
+   буква «bx». Это и была настоящая причина: не подпись в панели, а разбор.
+   Здесь склейка букв раскрывается в произведение: bx → b*x, abc → a*b*c.
+   Имена с цифрами и подчёркиванием (Q_1, x1), функции Math.js и экономические
+   обозначения из ECON_WORDS не трогаем. */
+function expandImplicitMul(expr) {
+  const s = String(expr || '');
+  if (!s) return s;
+  return s.replace(/[A-Za-z_][A-Za-z_]*/g, (name, at) => {
+    if (name.length < 2) return name;
+    if (ECON_WORDS.has(name) || MATH_CONSTS.has(name)) return name;
+    try { if (typeof math[name] !== 'undefined') return name; } catch (e) {}
+    // Имя перед скобкой — вызов функции, разбирать его на буквы нельзя.
+    const after = s.slice(at + name.length).match(/^\s*\(/);
+    if (after) return name;
+    if (!/^[A-Za-z]+$/.test(name)) return name;
+    return name.split('').join('*');
+  });
+}
+
+/* Формула в том виде, в каком её считает движок. Раскрытие неявного умножения
+   включается только там, где буквы и так становятся ползунками: в готовых
+   экономических сценах у обозначений свой смысл, и трогать их нельзя. */
+function prepExpr(expr) {
+  return paramsAllowed() ? expandImplicitMul(expr) : String(expr || '');
 }
 
 // Свободные буквы формулы: то, что придётся чем-то заменить при расчёте.
 function freeSymbols(expr) {
   const out = [];
   try {
-    const node = math.parse(String(expr || ''));
+    const node = math.parse(prepExpr(expr));
     node.traverse((n, path, parent) => {
       if (n.type !== 'SymbolNode') return;
       // Имя функции в вызове — не параметр.
       if (parent && parent.type === 'FunctionNode' && parent.fn === n) return;
       if (isReservedName(n.name)) return;
+      if (sceneReserved().has(n.name)) return;
       if (out.indexOf(n.name) < 0) out.push(n.name);
     });
   } catch (e) {}
   return out;
+}
+
+/* Буквы, занятые самой сценой. У сюжетов есть свои обозначения со своими
+   полями (ставка t, зарплата w, мировая цена Pw), и подсовывать им ползунок
+   нельзя: получится два хозяина у одного числа. */
+function sceneReserved() {
+  if (STATE.mode === 'math') {
+    // «Деформации» ведут параметр a своим ползунком сюжета.
+    if (STATE.mathSub === 'transform') return new Set(['a']);
+    return new Set();
+  }
+  return new Set(['t', 'w', 's']);
 }
 
 // Значения параметров подмешиваются в КАЖДЫЙ расчёт формулы.
@@ -11211,43 +11307,112 @@ function syncParams() {
   }
 }
 
-// Один ползунок параметра: значение, точный ввод и настройка границ.
+/* Один ползунок параметра. Обычный вид — только буква, её значение и ползунок,
+   по краям которого написаны границы. Щелчок по границе раскрывает маленький
+   редактор «−10 ≤ a ≤ 10» с шагом; закрыл — снова обычный ползунок.
+   Четыре числовых поля разом, как было раньше, читались как приборная панель,
+   хотя нужны один раз на всю задачу. */
 function buildParamChip(box, name) {
   const p = STATE.params[name];
   const { chip, val } = makePchip(name, fmt(p.value), null);
   chip.classList.add('pchip-param');
 
+  // Точное значение: щелчок по числу справа открывает поле ввода на его месте.
+  val.classList.add('pchip-editable');
+  val.title = 'Щёлкните, чтобы ввести точное значение';
+
+  const track = document.createElement('div');
+  track.className = 'param-track';
+  const loLab = document.createElement('button');
+  loLab.type = 'button'; loLab.className = 'param-bound';
+  loLab.title = 'Границы и шаг';
+  const hiLab = document.createElement('button');
+  hiLab.type = 'button'; hiLab.className = 'param-bound';
+  hiLab.title = 'Границы и шаг';
+
   const sl = document.createElement('input');
-  sl.type = 'range'; sl.min = p.min; sl.max = p.max; sl.step = p.step;
-  sl.value = p.value; sl.style.accentColor = cssVar('--accent');
+  sl.type = 'range'; sl.style.accentColor = cssVar('--accent');
+  track.append(loLab, sl, hiLab);
+  chip.appendChild(track);
+
+  const editor = document.createElement('div');
+  editor.className = 'param-editor';
+  chip.appendChild(editor);
+
+  const syncSlider = () => {
+    sl.min = p.min; sl.max = p.max; sl.step = Math.max(1e-9, p.step);
+    sl.value = p.value;
+    loLab.textContent = fmt(p.min);
+    hiLab.textContent = fmt(p.max);
+    val.textContent = fmt(p.value);
+  };
+  syncSlider();
+
   sl.addEventListener('input', () => {
     p.value = parseFloat(sl.value);
     val.textContent = fmt(p.value);
     redrawAll();
   });
-  chip.appendChild(sl);
 
-  const row = document.createElement('div');
-  row.className = 'param-row';
-  const mkNum = (key, title, w) => {
-    const n = document.createElement('input');
-    n.type = 'number'; n.step = 'any'; n.value = p[key]; n.title = title;
-    n.style.flex = w;
-    n.addEventListener('change', () => {
-      const v = parseFloat(n.value);
-      if (!isFinite(v)) return;
-      p[key] = v;
-      if (key === 'value') { sl.value = v; val.textContent = fmt(v); }
-      else { sl.min = p.min; sl.max = p.max; sl.step = Math.max(1e-9, p.step); }
+  val.addEventListener('click', () => {
+    const cur = p.value;
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.step = 'any'; inp.value = cur;
+    inp.className = 'pchip-valedit';
+    val.replaceWith(inp);
+    inp.focus(); inp.select();
+    const done = () => {
+      const v = parseFloat(inp.value);
+      if (isFinite(v)) {
+        p.value = v;
+        if (v < p.min) p.min = v;
+        if (v > p.max) p.max = v;
+      }
+      inp.replaceWith(val);
+      syncSlider();
       redrawAll();
-    });
-    return n;
+    };
+    inp.addEventListener('blur', done);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+  });
+
+  // Редактор границ: «мин ≤ имя ≤ макс» плюс шаг — прямо в строке.
+  const openEditor = () => {
+    if (editor.classList.contains('open')) { editor.classList.remove('open'); editor.innerHTML = ''; return; }
+    editor.classList.add('open');
+    editor.innerHTML = '';
+    const mk = (key) => {
+      const n = document.createElement('input');
+      n.type = 'number'; n.step = 'any'; n.value = p[key];
+      n.addEventListener('change', () => {
+        const v = parseFloat(n.value);
+        if (!isFinite(v)) return;
+        p[key] = v;
+        if (p.max <= p.min) p.max = p.min + 1;
+        p.value = Math.max(p.min, Math.min(p.max, p.value));
+        syncSlider();
+        redrawAll();
+      });
+      return n;
+    };
+    const line = document.createElement('div');
+    line.className = 'param-ed-line';
+    const nm = document.createElement('span'); nm.className = 'param-ed-name'; nm.textContent = name;
+    const le1 = document.createElement('span'); le1.textContent = '≤';
+    const le2 = document.createElement('span'); le2.textContent = '≤';
+    line.append(mk('min'), le1, nm, le2, mk('max'));
+    const line2 = document.createElement('div');
+    line2.className = 'param-ed-line';
+    const st = document.createElement('span'); st.className = 'param-ed-name'; st.textContent = 'шаг';
+    line2.append(st, mk('step'));
+    const ok = document.createElement('button');
+    ok.type = 'button'; ok.className = 'param-ed-ok'; ok.textContent = 'Готово';
+    ok.addEventListener('click', () => { editor.classList.remove('open'); editor.innerHTML = ''; });
+    editor.append(line, line2, ok);
   };
-  row.append(mkNum('min', 'наименьшее значение', '1'),
-             mkNum('value', 'точное значение', '1.2'),
-             mkNum('max', 'наибольшее значение', '1'),
-             mkNum('step', 'шаг', '1'));
-  chip.appendChild(row);
+  loLab.addEventListener('click', openEditor);
+  hiLab.addEventListener('click', openEditor);
+
   box.appendChild(chip);
 }
 
@@ -14748,6 +14913,12 @@ function buildPultCurveChips(list) {
     if (body) body.insertBefore(box, body.firstChild);
   }
   box.innerHTML = '';
+  // Заголовок группы нужен, только когда рядом есть вторая группа: буквы из формул.
+  if (list.length && Object.keys(STATE.params || {}).length) {
+    const t = document.createElement('div');
+    t.className = 'params-group-title'; t.textContent = 'Сдвиг кривых';
+    box.appendChild(t);
+  }
   list.forEach(c => {
     const { chip, lab, val } = makePchip(curveChipLabel(c), fmt(c.linear.b), c.color);
     chip.dataset.cid = c.id;
@@ -14875,8 +15046,21 @@ function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr)
 function buildPultExtra(sig) {
   const box = document.getElementById('params-extra'); if (!box) return;
   box.innerHTML = '';
-  // Ползунки параметров идут первыми: их только что завела формула.
-  Object.keys(STATE.params || {}).sort().forEach(n => buildParamChip(box, n));
+  /* Две разные вещи, поэтому и две группы: сверху регуляторы самой модели
+     (ставка, мировая цена, границы КПВ), ниже буквы, которые пользователь
+     завёл своей формулой. В общий список их мешать нельзя. */
+  const names = Object.keys(STATE.params || {}).sort();
+  const addTitle = (text) => {
+    const t = document.createElement('div');
+    t.className = 'params-group-title'; t.textContent = text;
+    box.appendChild(t);
+  };
+  const hasModel = /^(ppf1|ppf2|ineqM)$/.test(String(sig).split('|par:')[0]);
+  if (names.length) {
+    if (hasModel) addTitle('Буквы из формул');
+    names.forEach(n => buildParamChip(box, n));
+    if (hasModel) addTitle('Параметры модели');
+  }
   sig = String(sig).split('|par:')[0];
   if (sig === 'ppf1') {                                   // одна КПВ: Макс X / Макс Y
     const ic = ppfInterceptsOf(STATE.ppfFormula);

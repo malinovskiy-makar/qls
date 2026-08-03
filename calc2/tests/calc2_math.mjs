@@ -841,6 +841,47 @@ const CASES = [
           return { a: o.a, b: o.b };`,
     checks: [['a', 'a', 5, 0.05], ['b', 'b', 5, 0.05]],
   },
+  {
+    // Math.js читает «bx» как ОДНО имя переменной, поэтому параметр звался «bx».
+    // Теперь склейка букв раскрывается в произведение ещё до разбора.
+    name: 'Параметр из bx^2 · это b, а не bx',
+    run: `loadScene('free');
+          STATE.curves = []; STATE.params = {};
+          addCurve('bx^2'); redrawAll();
+          var names = Object.keys(STATE.params).sort();
+          var c = STATE.curves[STATE.curves.length - 1];
+          var v1 = evalCurve(c, 3);
+          STATE.params.b.value = 2; redrawAll();
+          var v2 = evalCurve(c, 3);
+          return { n: names.length, first: names[0] === 'b' ? 1 : 0, v1: v1, v2: v2 };`,
+    checks: [['параметров', 'n', 1, 0], ['имя = b', 'first', 1, 0],
+             ['b = 1 ⇒ 9', 'v1', 9, 0.01], ['b = 2 ⇒ 18', 'v2', 18, 0.01]],
+  },
+  {
+    // Свободный член: раньше «c» была занята словарём Math.js и ползунка не давала.
+    name: 'Параметр из x^2 + 5 + c · свободный член заводится',
+    run: `loadScene('free');
+          STATE.curves = []; STATE.params = {};
+          addCurve('x^2 + 5 + c'); redrawAll();
+          var names = Object.keys(STATE.params).sort();
+          var c = STATE.curves[STATE.curves.length - 1];
+          var v1 = evalCurve(c, 2);
+          STATE.params.c.value = 10; redrawAll();
+          var v2 = evalCurve(c, 2);
+          return { n: names.length, first: names[0] === 'c' ? 1 : 0, v1: v1, v2: v2 };`,
+    checks: [['параметров', 'n', 1, 0], ['имя = c', 'first', 1, 0],
+             ['c = 1 ⇒ 10', 'v1', 10, 0.01], ['c = 10 ⇒ 19', 'v2', 19, 0.01]],
+  },
+  {
+    // Экономические обозначения остаются одним именем: MC это не M·C.
+    name: 'MC не рассыпается на буквы · сцена свободного холста',
+    run: `loadScene('free');
+          STATE.curves = []; STATE.params = {};
+          addCurve('MC + 2*Q'); redrawAll();
+          return { n: Object.keys(STATE.params).length,
+                   mc: STATE.params.MC ? 1 : 0 };`,
+    checks: [['параметров', 'n', 1, 0], ['имя = MC', 'mc', 1, 0]],
+  },
 ];
 
 function approx(got, want, tol) {
