@@ -622,8 +622,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    график стал шире, и ни одна кривая не осталась под стеклом.
    ═══════════════════════════════════════════════════════════════════ */
 .app { position: relative; display: flex; align-items: stretch; height: calc(100vh - 48px); overflow: hidden; }
-.graph-wrap { position: relative; flex: 1 1 auto; min-width: 0; background: var(--canvas); }
+/* Выделение текста на холсте выключено: при панорамировании трекпадом иначе
+   подсвечиваются числа на осях и подписи кривых. Поля ввода поверх графика
+   (переименование точки, меню плоскости) выделение возвращают себе сами. */
+.graph-wrap {
+  position: relative; flex: 1 1 auto; min-width: 0; background: var(--canvas);
+  user-select: none; -webkit-user-select: none;
+}
+.graph-wrap input, .graph-wrap textarea, .graph-wrap select { user-select: text; -webkit-user-select: text; }
 #chart { display: block; width: 100%; height: 100%; }
+#chart text { user-select: none; -webkit-user-select: none; }
 
 /* ── Левый док: постоянная полоса иконок ── */
 .dock {
@@ -2750,14 +2758,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           чтобы ничего не подсказывать заранее.</div>
       </div>
 
-      <div class="row" style="margin-top:12px;">
-        <div class="field"><label>x от</label><input type="number" id="inp-mxmin" step="1" value="-10"></div>
-        <div class="field"><label>x до</label><input type="number" id="inp-mxmax" step="1" value="10"></div>
-      </div>
-      <div class="row">
-        <div class="field"><label>y от</label><input type="number" id="inp-mymin" step="1" value="-10"></div>
-        <div class="field"><label>y до</label><input type="number" id="inp-mymax" step="1" value="10"></div>
-      </div>
+      <!-- Границы окна живут только в меню гаечного ключа над графиком:
+           два места для одного и того же сбивали с толку. -->
     </div>
 
     <!-- Свои точки и площади. Оформление плоскости (название, оси, сетка,
@@ -2895,6 +2897,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <input type="text" id="inp-yname" placeholder="P" autocomplete="off">
         </div>
         <div class="hint">Оставьте название пустым, и возьмём то, что даёт сцена.</div>
+      </div>
+
+      <div class="wrench-group">
+        <div class="wrench-title">Область</div>
+        <label class="chk"><input type="checkbox" id="chk-quad" checked>
+          Только первая четверть</label>
+        <div class="hint">Снимите галочку, и станут видны отрицательные значения.</div>
       </div>
 
       <div class="wrench-group">
@@ -3065,6 +3074,9 @@ const STATE = {
   gridDense: false,  // мелкая сетка: 5 бледных линий между подписанными делениями (Фаза 1в)
   xStep: 0,          // свой шаг делений по осям (0 = подбирать автоматически)
   yStep: 0,
+  // Показывать только область x ≥ 0 и y ≥ 0. Для экономических сцен это норма,
+  // для «Математики» — выключено: там нужен полный план.
+  firstQuad: true,
   // Пользователь ушёл от масштаба сцены (колесо, панорама, ручные границы).
   // Пока флаг стоит, авто-подгонка осей молчит и видна кнопка возврата.
   viewDirty: false,
@@ -3783,6 +3795,12 @@ function makeScales() {
   sy = d3.scaleLinear().domain([CONFIG.Pmin, CONFIG.Pmax]).range([H - m.bottom, m.top]);
 }
 
+/* Нижняя граница отрисовки по оси. В режиме «только первая четверть» всё, что
+   левее и ниже нуля, не рисуется совсем; выключили режим — считаем и рисуем от
+   настоящей границы окна. Одна функция на весь движок, чтобы обрезка кривых,
+   clip-path и расчёты не разошлись между собой. */
+function quadLo(v) { return STATE.firstQuad ? Math.max(0, v) : v; }
+
 // Перевод координат туда-обратно (пригодится для перетаскивания мышью).
 function toPx(q, p) { return [sx(q), sy(p)]; }
 function toData(px, py) { return [sx.invert(px), sy.invert(py)]; }
@@ -3793,17 +3811,35 @@ function fmt(v) {
   return (Math.round(v * 100) / 100).toString();
 }
 
-/* Деления оси: свой шаг, если задан в меню плоскости, иначе автоподбор d3.
-   Свой шаг режем по числу линий — 400 подписей на экране никому не помогут. */
+/* Шаг делений из «красивой» лесенки 1–2–5. Считается только от размаха окна,
+   поэтому при плавном зуме он держится постоянным на целом диапазоне масштабов,
+   а деления просто съезжают. Раньше шаг подбирал d3 по числу делений, и на
+   каждом повороте колеса набор чисел мог перевыбраться заново — отсюда и
+   дёрганье подписей. */
+function niceTickStep(span, target) {
+  if (!(span > 0) || !isFinite(span)) return 1;
+  const raw = span / Math.max(1, target || 10);
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / mag;
+  return (n <= 1 ? 1 : (n <= 2 ? 2 : (n <= 5 ? 5 : 10))) * mag;
+}
+
+/* Деления оси: свой шаг, если задан в меню плоскости, иначе «красивая» лесенка.
+   Свой шаг режем по числу линий — 400 подписей на экране никому не помогут.
+   Значения считаем как first + i·step (а не накоплением +=): иначе на мелком
+   шаге копится погрешность и подписи расползаются. */
 function axisTicks(scale, count, step) {
   const [lo, hi] = scale.domain();
-  if (step > 0 && (hi - lo) / step <= 400) {
-    const out = [];
-    const first = Math.ceil(lo / step - 1e-9) * step;
-    for (let v = first; v <= hi + 1e-9; v += step) out.push(Math.abs(v) < step * 1e-9 ? 0 : v);
-    return out;
+  const s = (step > 0 && (hi - lo) / step <= 400) ? step : niceTickStep(hi - lo, count);
+  if (!(s > 0) || !isFinite(s)) return [];
+  const out = [];
+  const first = Math.ceil(lo / s - 1e-9) * s;
+  for (let i = 0; i < 500; i++) {
+    const v = first + i * s;
+    if (v > hi + 1e-9) break;
+    out.push(Math.abs(v) < s * 1e-6 ? 0 : v);
   }
-  return scale.ticks(count);
+  return out;
 }
 function xTicks() { return axisTicks(sx, 10, STATE.xStep); }
 function yTicks() { return axisTicks(sy, 8, STATE.yStep); }
@@ -3821,8 +3857,8 @@ function addDefs() {
   // Прямоугольник-«окно»: видимая часть первой четверти. Всё, что нарисовано
   // с этим clip-path, обрезается по осям и по краям окна — кривые и заливки
   // не вылезают в отрицательную зону и не выходят за границы вида.
-  const x0 = sx(Math.max(0, CONFIG.Qmin)), x1 = sx(CONFIG.Qmax);
-  const y1 = sy(CONFIG.Pmax), y0 = sy(Math.max(0, CONFIG.Pmin));
+  const x0 = sx(quadLo(CONFIG.Qmin)), x1 = sx(CONFIG.Qmax);
+  const y1 = sy(CONFIG.Pmax), y0 = sy(quadLo(CONFIG.Pmin));
   defs.append('clipPath').attr('id', 'plot-clip').append('rect')
     .attr('x', x0).attr('y', y1)
     .attr('width', Math.max(0, x1 - x0))
@@ -3877,8 +3913,9 @@ function drawGrid() {
 
 // Оси со стрелками, делениями, числами и подписями.
 // Подписи параметризованы: по умолчанию Q/P (рынок, издержки), для КПВ — X/Y.
-// Ось стоит на математическом нуле; если после панорамирования нуль уехал за
-// край, ось прижимается к краю окна и остаётся на виду.
+// Ось нарисована ровно там, где ноль. Уехал ноль за край при панорамировании —
+// ось уезжает вместе с ним и на экране её просто нет, как в Desmos. Раньше ось
+// прижималась к краю окна, и числа копились у границы, притворяясь осью.
 function drawAxes(xLabel, yLabel) {
   if (xLabel == null) xLabel = 'Q'; if (yLabel == null) yLabel = 'P';
   // Своё название оси перекрывает сценовое. Пустую строку '' сцена присылает
@@ -3889,23 +3926,20 @@ function drawAxes(xLabel, yLabel) {
   const g = svg.append('g').attr('class', 'axes');
   const m = CONFIG.margin;
   const xLeft = m.left, xRight = W - m.right, yBot = H - m.bottom, yTop = m.top;
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  const ox = clamp(sx(0), xLeft, xRight);   // положение оси Y
-  const oy = clamp(sy(0), yTop, yBot);      // положение оси X
+  const ox = sx(0), oy = sy(0);   // оси стоят там, где ноль, и ни к чему не липнут
   const AX = COL.ink, LBL = COL.inkSoft;
-  const atZeroX = Math.abs(sx(0) - ox) < 0.5;   // нуль по X действительно виден
-  const atZeroY = Math.abs(sy(0) - oy) < 0.5;
+  const atZeroX = ox >= xLeft - 1 && ox <= xRight + 1;   // ось Y попадает в кадр
+  const atZeroY = oy >= yTop - 1 && oy <= yBot + 1;      // ось X попадает в кадр
 
-  // Ось X (вправо) и ось Y (вверх). Стрелка всегда на конце, смотрящем
-  // в сторону роста, и всегда внутри холста — при любом зуме и сдвиге.
-  g.append('line').attr('x1', xLeft).attr('y1', oy).attr('x2', xRight).attr('y2', oy)
+  // Ось X (вправо) и ось Y (вверх). Стрелка на конце, смотрящем в сторону роста.
+  if (atZeroY) g.append('line').attr('x1', xLeft).attr('y1', oy).attr('x2', xRight).attr('y2', oy)
     .attr('stroke', AX).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
-  g.append('line').attr('x1', ox).attr('y1', yBot).attr('x2', ox).attr('y2', yTop)
+  if (atZeroX) g.append('line').attr('x1', ox).attr('y1', yBot).attr('x2', ox).attr('y2', yTop)
     .attr('stroke', AX).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
 
   // Деления и числа на оси X. Ближе 14 px к концу оси не печатаем — иначе
   // налезают на стрелку и на букву оси.
-  xTicks().forEach(t => {
+  if (atZeroY) xTicks().forEach(t => {
     if (t < CONFIG.Qmin - 1e-9 || t > CONFIG.Qmax + 1e-9) return;
     if (atZeroX && Math.abs(t) < 1e-12) return;      // ноль подписываем один раз
     if (sx(t) > xRight - 14 || sx(t) < xLeft + 2) return;
@@ -3916,7 +3950,7 @@ function drawAxes(xLabel, yLabel) {
       .attr('font-size', 10).attr('fill', LBL).text(fmt(t));
   });
   // Деления и числа на оси Y.
-  yTicks().forEach(t => {
+  if (atZeroX) yTicks().forEach(t => {
     if (t < CONFIG.Pmin - 1e-9 || t > CONFIG.Pmax + 1e-9) return;
     if (atZeroY && Math.abs(t) < 1e-12) return;
     if (sy(t) < yTop + 14 || sy(t) > yBot - 2) return;
@@ -3935,11 +3969,11 @@ function drawAxes(xLabel, yLabel) {
 
   // Подписи осей: X-метка (справа от стрелки), Y-метка (над стрелкой слева).
   // Пустая строка '' — сигнал «без метки» (напр. неравенство и издержки добавляют свою).
-  if (xLabel) g.append('text').attr('x', xRight + 6).attr('y', oy + 4)
+  if (xLabel && atZeroY) g.append('text').attr('x', xRight + 6).attr('y', oy + 4)
     .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
     .attr('font-size', 13).attr('font-weight', 600)
     .attr('fill', COL.ink).text(xLabel);
-  if (yLabel) g.append('text').attr('x', ox - 4).attr('y', yTop - 12)
+  if (yLabel && atZeroX) g.append('text').attr('x', ox - 4).attr('y', yTop - 12)
     .attr('text-anchor', 'end').attr('font-size', 13).attr('font-weight', 600)
     .attr('fill', COL.ink).text(yLabel);
 }
@@ -3964,7 +3998,7 @@ function curvePoints(curve) {
   // Считаем от видимого края, но не левее нуля: P = f(Q) для Q < 0 в экономике
   // смысла не имеет, а после панорамирования вправо незачем считать то,
   // что всё равно останется за кадром.
-  const lo = Math.max(0, CONFIG.Qmin), hi = CONFIG.Qmax;
+  const lo = quadLo(CONFIG.Qmin), hi = CONFIG.Qmax;
   if (!(hi > lo)) return out;
   for (let i = 0; i <= N; i++) {
     const q = lo + (hi - lo) * i / N;
@@ -8586,7 +8620,10 @@ function setMacroModel(m) {
 // Нижние границы сцена всегда хочет нулевые: она рисует первую четверть.
 function setRanges(qmax, pmax) {
   CONFIG.Qmax = qmax; CONFIG.Pmax = pmax;
-  CONFIG.Qmin = 0; CONFIG.Pmin = 0;
+  // В режиме «только первая четверть» окно начинается ровно в нуле. Режим сняли —
+  // оставляем немного места слева и снизу, чтобы ось не липла к самому краю.
+  CONFIG.Qmin = STATE.firstQuad ? 0 : -qmax * 0.08;
+  CONFIG.Pmin = STATE.firstQuad ? 0 : -pmax * 0.08;
   syncViewFields();
   // Адвалорная ставка меряется в ПРОЦЕНТАХ — её пределы к масштабу цены не привязаны
   // (ими управляет applyTaxRateBounds), поэтому поля ставки в этом случае пропускаем.
@@ -8789,6 +8826,12 @@ function panByPixels(dxPx, dyPx) {
     const dp = (CONFIG.Pmax - CONFIG.Pmin) * dyPx / h;
     CONFIG.Qmin -= dq; CONFIG.Qmax -= dq;
     CONFIG.Pmin += dp; CONFIG.Pmax += dp;
+    // Держим окно в первой четверти, если она включена: уехали влево или вниз —
+    // возвращаем начало в ноль, сохраняя ширину и высоту вида.
+    if (STATE.firstQuad) {
+      if (CONFIG.Qmin < 0) { CONFIG.Qmax -= CONFIG.Qmin; CONFIG.Qmin = 0; }
+      if (CONFIG.Pmin < 0) { CONFIG.Pmax -= CONFIG.Pmin; CONFIG.Pmin = 0; }
+    }
     cancelRangeAnim();
   }
   markViewDirty();
@@ -8808,6 +8851,18 @@ function resetZoom() {
   redrawAll();
 }
 
+/* Колесо и жест тачпада приходят пачками по несколько событий на кадр. Если
+   перерисовывать холст на каждое, экран моргает, а подписи дёргаются. Копим
+   события и применяем один раз за кадр — движение получается плавным. */
+let _wheelAcc = null;
+function flushWheel() {
+  const a = _wheelAcc;
+  _wheelAcc = null;
+  if (!a) return;
+  if (a.panX || a.panY) panByPixels(a.panX, a.panY);
+  else if (a.factor !== 1) zoomBy(a.factor, a.px, a.py);
+}
+
 function initZoom() {
   const gw = document.getElementById('graph-wrap');
   if (!gw) return;
@@ -8816,12 +8871,17 @@ function initZoom() {
     let dy = e.deltaY, dx = e.deltaX;
     const k = (e.deltaMode === 1) ? 16 : (e.deltaMode === 2 ? 100 : 1);
     dy *= k; dx *= k;
+    const r = gw.getBoundingClientRect();
+    if (!_wheelAcc) {
+      _wheelAcc = { factor: 1, panX: 0, panY: 0, px: e.clientX - r.left, py: e.clientY - r.top };
+      requestAnimationFrame(flushWheel);
+    }
     // Щипок на тачпаде приходит сюда же, но с ctrlKey и мелкой дельтой,
     // поэтому ему нужен более крупный шаг. Двупальцевый свайп без ctrl и с
     // заметным горизонтальным сдвигом — это прокрутка вбок, а не зум.
-    if (!e.ctrlKey && Math.abs(dx) > Math.abs(dy)) { panByPixels(-dx, dy); return; }
-    const r = gw.getBoundingClientRect();
-    zoomBy(Math.exp(dy * (e.ctrlKey ? 0.011 : 0.0022)), e.clientX - r.left, e.clientY - r.top);
+    if (!e.ctrlKey && Math.abs(dx) > Math.abs(dy)) { _wheelAcc.panX += -dx; _wheelAcc.panY += dy; return; }
+    _wheelAcc.px = e.clientX - r.left; _wheelAcc.py = e.clientY - r.top;
+    _wheelAcc.factor *= Math.exp(dy * (e.ctrlKey ? 0.011 : 0.0022));
   }, { passive: false });
   gw.addEventListener('dblclick', () => resetZoom());
 
@@ -8910,6 +8970,11 @@ function setMode(mode) {
   cancelRangeAnim();   // отложенный/идущий переезд осей прошлой сцены — отменить
   STATE.zoomLock = false;   // новая сцена показывает себя в своём масштабе
   STATE.mode = mode;
+  // Экономика живёт в первой четверти, «Математика» — на полном плане.
+  // Дальше это переключается галочкой в меню плоскости.
+  STATE.firstQuad = (mode !== 'math');
+  const quadChk = document.getElementById('chk-quad');
+  if (quadChk) quadChk.checked = STATE.firstQuad;
   // Какие секции панели показывать в каждом режиме (отсутствующие id просто игнорируются).
   const groups = {
     market: ['sec-curves', 'sec-eq', 'sec-areas', 'sec-analysis', 'sec-tax', 'sec-mono'],
@@ -11654,14 +11719,23 @@ function mathScales(yTop, yBot, yLo, yHi) {
 }
 function drawPlaneAxes(g, mx, my, xlab, ylab) {
   const [px0, px1] = mx.range(), [py0, py1] = my.range();
-  const ox = Math.max(px0, Math.min(px1, mx(0)));   // если ноль вне окна — прижимаем к краю
-  const oy = Math.max(py1, Math.min(py0, my(0)));
+  const ox = mx(0), oy = my(0);       // ось стоит в нуле и уезжает вместе с ним
+  const seeY = ox >= px0 - 1 && ox <= px1 + 1;
+  const seeX = oy >= py1 - 1 && oy <= py0 + 1;
   // Стрелка всегда на конце, смотрящем в сторону роста: вправо по x, вверх по y.
-  g.append('line').attr('x1', px0).attr('y1', oy).attr('x2', px1).attr('y2', oy)
+  if (seeX) g.append('line').attr('x1', px0).attr('y1', oy).attr('x2', px1).attr('y2', oy)
     .attr('stroke', COL.ink).attr('stroke-width', 1.4).attr('marker-end', 'url(#arrow)');
-  g.append('line').attr('x1', ox).attr('y1', py0).attr('x2', ox).attr('y2', py1)
+  if (seeY) g.append('line').attr('x1', ox).attr('y1', py0).attr('x2', ox).attr('y2', py1)
     .attr('stroke', COL.ink).attr('stroke-width', 1.4).attr('marker-end', 'url(#arrow)');
-  mx.ticks(10).forEach(t => {
+  if (seeX) planeTicksX(g, mx, oy);
+  if (seeY) planeTicksY(g, my, ox);
+  if (xlab && seeX) g.append('text').attr('x', px1 - 2).attr('y', oy - 7).attr('text-anchor', 'end')
+    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text(xlab || 'x');
+  if (ylab && seeY) g.append('text').attr('x', ox + 7).attr('y', py1 + 11)
+    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text(ylab || 'y');
+}
+function planeTicksX(g, mx, oy) {
+  axisTicks(mx, 10, STATE.xStep).forEach(t => {
     if (Math.abs(t) < 1e-9) return;
     g.append('line').attr('x1', mx(t)).attr('y1', oy - 3).attr('x2', mx(t)).attr('y2', oy + 3)
       .attr('stroke', COL.ink).attr('stroke-width', 1);
@@ -11670,7 +11744,9 @@ function drawPlaneAxes(g, mx, my, xlab, ylab) {
       .attr('font-size', 10).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
   });
-  my.ticks(8).forEach(t => {
+}
+function planeTicksY(g, my, ox) {
+  axisTicks(my, 8, STATE.yStep).forEach(t => {
     if (Math.abs(t) < 1e-9) return;
     g.append('line').attr('x1', ox - 3).attr('y1', my(t)).attr('x2', ox + 3).attr('y2', my(t))
       .attr('stroke', COL.ink).attr('stroke-width', 1);
@@ -11679,10 +11755,6 @@ function drawPlaneAxes(g, mx, my, xlab, ylab) {
       .attr('font-size', 10).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
   });
-  g.append('text').attr('x', px1 - 2).attr('y', oy - 7).attr('text-anchor', 'end')
-    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text(xlab || 'x');
-  g.append('text').attr('x', ox + 7).attr('y', py1 + 11)
-    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text(ylab || 'y');
 }
 
 // Кривая на полном плане: разрывы (NaN или далеко за окном) режут линию.
@@ -12237,9 +12309,14 @@ function setMathSub(sub, keepFormula) {
   redrawAll();
 }
 function setMathWindow(x0, x1, y0, y1) {
+  // «Только первая четверть» работает и здесь: окно не заходит в минус,
+  // ширина и высота при этом сохраняются.
+  if (STATE.firstQuad) {
+    if (x0 < 0) { x1 -= x0; x0 = 0; }
+    if (y0 < 0) { y1 -= y0; y0 = 0; }
+  }
   STATE.mathXmin = x0; STATE.mathXmax = x1; STATE.mathYmin = y0; STATE.mathYmax = y1;
-  [['inp-mxmin', x0], ['inp-mxmax', x1], ['inp-mymin', y0], ['inp-mymax', y1]]
-    .forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.value = v; });
+  syncViewFields();     // поля границ в меню плоскости идут за окном вживую
   const sl = document.getElementById('mathx0-slider');
   if (sl) { sl.min = x0; sl.max = x1; sl.step = (x1 - x0) / 200; }
   setMathX0(Math.max(x0, Math.min(x1, STATE.mathX0)));
@@ -14387,6 +14464,31 @@ function applyViewBounds() {
   redrawAll();
 }
 
+/* Переключатель «только первая четверть». Включили — окно подтягивается к нулю;
+   выключили — открывается отрицательная часть плоскости. Работает и в
+   экономических сценах, и в «Математике». */
+function setFirstQuad(on) {
+  STATE.firstQuad = !!on;
+  const c = document.getElementById('chk-quad');
+  if (c && c.checked !== STATE.firstQuad) c.checked = STATE.firstQuad;
+  if (STATE.mode === 'math') {
+    setMathWindow(STATE.mathXmin, STATE.mathXmax, STATE.mathYmin, STATE.mathYmax);
+    if (!STATE.firstQuad && STATE.mathXmin >= 0 && STATE.mathYmin >= 0) {
+      // Возвращаемся к полному плану: показываем и отрицательную часть.
+      const w = STATE.mathXmax - STATE.mathXmin, h = STATE.mathYmax - STATE.mathYmin;
+      setMathWindow(-w * 0.5, STATE.mathXmax, -h * 0.5, STATE.mathYmax);
+    }
+  } else if (STATE.firstQuad) {
+    if (CONFIG.Qmin < 0) { CONFIG.Qmax -= CONFIG.Qmin; CONFIG.Qmin = 0; }
+    if (CONFIG.Pmin < 0) { CONFIG.Pmax -= CONFIG.Pmin; CONFIG.Pmin = 0; }
+  } else {
+    if (CONFIG.Qmin >= 0) CONFIG.Qmin = -(CONFIG.Qmax - CONFIG.Qmin) * 0.25;
+    if (CONFIG.Pmin >= 0) CONFIG.Pmin = -(CONFIG.Pmax - CONFIG.Pmin) * 0.25;
+  }
+  syncViewFields();
+  redrawAll();
+}
+
 function setGridMode(mode) {
   STATE.showGrid = (mode !== 'off');
   STATE.gridDense = (mode === 'dense');
@@ -14437,6 +14539,8 @@ function wireWrench() {
   });
   const leg = document.getElementById('chk-legend');
   if (leg) leg.addEventListener('change', () => { STATE.showLegend = leg.checked; redrawAll(); });
+  const quad = document.getElementById('chk-quad');
+  if (quad) quad.addEventListener('change', () => setFirstQuad(quad.checked));
   const gt = document.getElementById('inp-gtitle');
   if (gt) gt.addEventListener('input', () => { STATE.graphTitle = gt.value; redrawAll(); });
   // Цвет заголовка — тем же пикером, что и у кривых.
@@ -15333,10 +15437,9 @@ function wireControls() {
     if (e) e.addEventListener('input', () => { STATE[key] = e.value; redrawAll(); });
   });
 
-  // Числовые поля раздела (границы окна, пределы по y, цены и ресурс).
-  [['inp-mxmin', 'mathXmin'], ['inp-mxmax', 'mathXmax'],
-   ['inp-mymin', 'mathYmin'], ['inp-mymax', 'mathYmax'],
-   ['inp-mathy0', 'mathY0'], ['inp-mathy1', 'mathY1'],
+  // Числовые поля раздела (пределы по y, цены и ресурс). Границы окна
+  // задаются в меню плоскости над графиком, здесь их больше нет.
+  [['inp-mathy0', 'mathY0'], ['inp-mathy1', 'mathY1'],
    ['inp-mathpa', 'mathPa'], ['inp-mathpb', 'mathPb'], ['inp-mathm', 'mathM']].forEach(([id, key]) => {
     const e = document.getElementById(id);
     if (e) e.addEventListener('change', () => {
