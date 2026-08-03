@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Графический калькулятор 2.0 (бета)</title>
+  <title>Графики по экономике</title>
 
   <!-- ── Внешние библиотеки (CDN, без сборки) ──────────────────────────
        D3.js v7   — рисование SVG, оси, кривые, перетаскивание мышью.
@@ -634,8 +634,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 #chart text { user-select: none; -webkit-user-select: none; }
 
 /* ── Левый док: постоянная полоса иконок ── */
+/* Полоса иконок лежит ВЫШЕ боковых панелей: её подсказки вылетают вправо и
+   раньше уходили под свёрнутую панель ввода. z-index у подсказки помочь не мог —
+   она внутри своего слоя, и весь слой был ниже панели. */
 .dock {
-  position: relative; flex: 0 0 56px; z-index: var(--z-dock);
+  position: relative; flex: 0 0 56px; z-index: var(--z-drawer);
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 12px 0; background: var(--surface-2);
   border-right: 1px solid var(--border);
@@ -689,14 +692,25 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .side-arrow svg { width: 15px; height: 15px; transition: transform .22s var(--ease); }
 .side.collapsed .side-arrow svg { transform: rotate(180deg); }
 
+/* Заголовок панели уступает место стрелке сворачивания: у левой панели стрелка
+   справа, у правой — слева, поэтому и отступы зеркальные. */
 .side-head {
   display: flex; align-items: center; gap: 8px; flex-shrink: 0;
   padding: 12px 32px 10px 14px; border-bottom: 1px solid var(--border-soft);
 }
+.side-right .side-head { padding: 12px 14px 10px 32px; }
 .side-head h2, .side-scene {
   font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Хлебная крошка над названием сцены: из какого она блока. */
+.side-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+.scene-block {
+  font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%;
+}
+.scene-block:empty { display: none; }
 .side-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
 /* Две части левой панели: ввод сверху, аналитика снизу. */
@@ -942,7 +956,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 <div class="picker" id="scene-picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
   <div class="picker-inner">
     <header class="picker-head">
-      <div class="picker-eyebrow">Графический калькулятор 2.0</div>
+      <div class="picker-eyebrow">Графики по экономике</div>
       <h1 class="picker-title" id="picker-title">С чего начнём?</h1>
       <p class="picker-sub">Выберите тип задачи, и график соберётся сам. Все настройки останутся
         под рукой, а любую сцену можно поменять или дополнить позже.</p>
@@ -1649,6 +1663,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     </button>
     <div class="side-inner">
       <div class="side-head">
+        <span class="scene-block" id="scene-block"></span>
         <span class="side-scene" id="scene-name">Свободный холст</span>
       </div>
       <div class="side-scroll">
@@ -1656,9 +1671,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <section class="side-part">
           <div class="part-title">Ввод функций</div>
           <div class="tools-body">
-    <h1 class="panel-only">Графический калькулятор&nbsp;2.0</h1>
-    <div class="subtitle panel-only">бета · собственный движок (D3&nbsp;+&nbsp;Math.js)</div>
-
     <!-- Выбор режима и готовой сцены живёт ТОЛЬКО в окне сценариев (#scene-picker).
          Раньше здесь стояли те же кнопки вторым экземпляром: два входа в одно
          действие сбивали с толку. Кнопка «Сценарии» в шапке возвращает к выбору. -->
@@ -14229,6 +14241,18 @@ function applyCardScope() {
   r.lock.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('scoped-off'); });
 }
 
+/* Из какого блока сцена. Название берём прямо из окна сценариев: карточка
+   лежит в своей секции, у секции есть заголовок. Отдельный список пришлось бы
+   держать в согласии с окном вручную, а так он всегда верен. */
+function sceneBlockLabel(key) {
+  const card = document.querySelector('.scard[data-scene="' + key + '"]');
+  const grp = card && card.closest('.picker-group');
+  const lab = grp && grp.querySelector('.picker-group-label');
+  if (!lab) return '';
+  const t = lab.textContent.replace(/^\s*\d+\s*·\s*/, '').trim();
+  return (t === 'Пустой холст') ? '' : t;
+}
+
 function pickScene(key) {
   resetDecor();           // новая сцена — чистое оформление (Фаза 1)
   STATE.zoomLock = false; // и свой масштаб, а не унаследованный от колеса
@@ -14239,6 +14263,8 @@ function pickScene(key) {
   STATE.sceneKey = key;
   const nm = document.getElementById('scene-name');
   if (nm) nm.textContent = SCENE_NAMES[key] || 'Сцена';
+  const bl = document.getElementById('scene-block');
+  if (bl) bl.textContent = sceneBlockLabel(key);
   if (typeof updatePult === 'function') updatePult();   // показать/спрятать пульт под выбранную сцену
   // Меньше загромождения: пресетные сцены открываются со свёрнутыми «Инструментами»
   // (разворачиваются иконкой-ползунками в доке). «Свободный холст» — развёрнуты сразу:
