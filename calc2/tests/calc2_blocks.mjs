@@ -38,8 +38,9 @@ await t('десять блоков плюс свободный холст', asyn
 await t('Математика идёт первым блоком', async () =>
   (await page.locator('.picker-group-label').first().textContent()).trim().startsWith('1 · Математика') || 'первый не Математика');
 
-await t('карточек «скоро» ровно 19', async () =>
-  (await page.locator('.scard.soon').count()) === 19 || 'их ' + (await page.locator('.scard.soon').count()));
+// Было 19; «Построение графиков» стало рабочей сценой, «Оси наоборот» удалены.
+await t('карточек «скоро» ровно 18', async () =>
+  (await page.locator('.scard.soon').count()) === 18 || 'их ' + (await page.locator('.scard.soon').count()));
 
 await t('в потребителе есть заглушка про риск', async () =>
   (await page.locator('.scard.soon[data-scene="cons-risk"]').count()) === 1 || 'карточки риска нет');
@@ -55,6 +56,7 @@ await t('у каждой карточки есть data-scene', async () => {
 /* --- 2. Каждая рабочая карточка открывается -------------------------- */
 // Ожидания: [ключ карточки, что должно быть в STATE, какие id спрятаны]
 const CARDS = [
+  ['m-graph',     s => s.mode === 'graph',                                       []],
   ['m-tangent',   s => s.mode === 'math'  && s.mathSub === 'tangent',            ['math-seg']],
   ['m-optimum',   s => s.mode === 'math'  && s.mathSub === 'optimum',            ['math-seg']],
   ['m-transform', s => s.mode === 'math'  && s.mathSub === 'transform',          ['math-seg']],

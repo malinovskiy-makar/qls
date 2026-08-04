@@ -1131,6 +1131,95 @@ await t('правка цвета не пересобирает список кр
 await t('цвет из пикера доехал до кривой', () => page.evaluate(() =>
   STATE.curves[0].color === '#123456' || STATE.curves[0].color));
 
+/* --- Построение графиков: список функций растёт сам --------------------- */
+await page.evaluate(() => openPicker());
+await page.click('.scard[data-scene="m-graph"]');
+await page.waitForTimeout(400);
+await page.evaluate(() => setToolsOpen(true));
+await page.waitForTimeout(180);
+
+await t('сцена открывается пустой: ни одной кривой', () => page.evaluate(() =>
+  (STATE.curves.length === 0 && STATE.mode === 'graph') || `кривых ${STATE.curves.length}, режим ${STATE.mode}`));
+
+await t('в списке ровно одна пустая строка', async () =>
+  (await page.locator('#graph-rows .grow').count()) === 1
+  || 'строк: ' + (await page.locator('#graph-rows .grow').count()));
+
+await t('начали печатать — строка стала кривой, снизу новая пустая', async () => {
+  await page.evaluate(() => {
+    const inp = document.querySelector('#graph-rows .grow .f-slot input');
+    inp.value = 'x^2 - 4';
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(300);
+  const rows = await page.locator('#graph-rows .grow').count();
+  const n = await page.evaluate(() => STATE.curves.length);
+  return (rows === 2 && n === 1) || `строк ${rows}, кривых ${n}`;
+});
+
+await t('вторая функция добавляется так же', async () => {
+  await page.evaluate(() => {
+    const inps = document.querySelectorAll('#graph-rows .grow .f-slot input');
+    const last = inps[inps.length - 1];
+    last.value = '2*x + 1';
+    last.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(300);
+  const rows = await page.locator('#graph-rows .grow').count();
+  const n = await page.evaluate(() => STATE.curves.length);
+  return (rows === 3 && n === 2) || `строк ${rows}, кривых ${n}`;
+});
+
+await t('обе кривые нарисованы', () => page.evaluate(() =>
+  document.querySelectorAll('#chart path[data-curve]').length === 2
+  || 'линий: ' + document.querySelectorAll('#chart path[data-curve]').length));
+
+await t('видна отрицательная часть плоскости', () => page.evaluate(() =>
+  (CONFIG.Qmin < 0 && CONFIG.Pmin < 0 && STATE.firstQuad === false)
+  || JSON.stringify({ q: CONFIG.Qmin, p: CONFIG.Pmin, fq: STATE.firstQuad })));
+
+await t('у сцены нет «Аналитики»', () => page.evaluate(() => {
+  const b = document.getElementById('dock-score');
+  const s = document.getElementById('scoreboard');
+  return (b.hidden && s.classList.contains('hidden')) || `иконка скрыта ${b.hidden}, панель скрыта ${s.classList.contains('hidden')}`;
+}));
+
+await t('свои точки и площади остались', () => page.evaluate(() => {
+  const view = document.getElementById('sec-view');
+  const area = document.getElementById('sec-areascalc');
+  return (view.style.display !== 'none' && area.style.display !== 'none')
+    || 'секции спрятаны';
+}));
+
+await t('буква из формулы даёт ползунок', async () => {
+  await page.evaluate(() => {
+    const inps = document.querySelectorAll('#graph-rows .grow .f-slot input');
+    const last = inps[inps.length - 1];
+    last.value = 'kx';
+    last.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(320);
+  return await page.evaluate(() => {
+    const names = Object.keys(STATE.params || {});
+    return (names.length === 1 && names[0] === 'k') || 'параметры: ' + names.join(',');
+  });
+});
+
+await t('удаление строки убирает кривую', async () => {
+  const before = await page.evaluate(() => STATE.curves.length);
+  await page.evaluate(() => document.querySelector('#graph-rows .grow .btn-icon').click());
+  await page.waitForTimeout(260);
+  const after = await page.evaluate(() => STATE.curves.length);
+  return after === before - 1 || `${before} → ${after}`;
+});
+
+await t('в других сценах «Аналитика» вернулась', async () => {
+  await page.evaluate(() => openPicker());
+  await page.click('.scard[data-scene="sd"]');
+  await page.waitForTimeout(340);
+  return await page.evaluate(() => !document.getElementById('dock-score').hidden || 'иконка всё ещё скрыта');
+});
+
 console.log('\n' + checks.map(([s, n, d]) => `${s.padEnd(4)} ${n}${d ? '  → ' + d : ''}`).join('\n'));
 const bad = checks.filter(c => c[0] !== 'OK').length;
 if (errors.length) console.log('\nОшибки страницы:\n' + errors.slice(0, 10).join('\n'));
