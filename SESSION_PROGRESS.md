@@ -9,7 +9,7 @@
 - [x] Фаза 2. Комментарии — `ProblemComment` + `ProblemCommentQuerySet.visible_for()`
 - [x] Фаза 3. Свои задачи и тесты — `CustomProblem`, `CustomProblemOption`, `AssignmentItem` (CheckConstraint «ровно одна задача»)
 - [x] Фаза 4. Сохранённое и папки — `SavedFolder` (плоские), `SavedProblem`, `SavedGraph`
-- [ ] Фаза 5. Решалка
+- [x] Фаза 5. Решалка — поля у `AssignmentItem` + `is_solution_visible_for()`; `Submission.problem_item` (новое поле), `Submission.problem` стал nullable
 - [ ] Фаза 6. Контрольные
 - [ ] Фаза 7. Логирование событий
 - [ ] Фаза 8. Миграция и тесты

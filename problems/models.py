@@ -648,9 +648,20 @@ class Submission(models.Model):
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE,
                                    related_name='submissions',
                                    verbose_name='Домашка')
+    # Задача каталога. Стала необязательной: домашка может содержать и
+    # СВОЮ задачу репетитора, у которой записи в Problem нет вовсе.
     problem = models.ForeignKey(Problem, on_delete=models.CASCADE,
+                                null=True, blank=True,
                                 related_name='submissions',
                                 verbose_name='Задача')
+    # Позиция задачи в домашке — новый, точный адрес решения (одна и та же
+    # задача может стоять в домашке дважды, и это разные позиции).
+    # Старые решения ссылаются только на `problem`, поэтому поле nullable.
+    problem_item = models.ForeignKey('problems.AssignmentItem',
+                                     on_delete=models.CASCADE,
+                                     null=True, blank=True,
+                                     related_name='submissions',
+                                     verbose_name='Задача в домашке')
     solution_text = models.TextField('Текст решения', blank=True)
     solution_file = models.FileField(
         'Прикреплённый файл', upload_to='submissions/%Y/%m/',
@@ -670,6 +681,15 @@ class Submission(models.Model):
         ordering = ['-submitted_at']
         # Один ученик — одно решение на задачу в рамках одной домашки.
         unique_together = ('student', 'assignment', 'problem')
+        constraints = [
+            # То же правило для нового адреса (позиции в домашке). Отдельным
+            # ограничением, а не расширением unique_together: у старых записей
+            # problem_item пустой, а NULL в уникальности не участвует.
+            models.UniqueConstraint(
+                fields=['student', 'problem_item'],
+                condition=models.Q(problem_item__isnull=False),
+                name='uniq_submission_per_item'),
+        ]
 
     def __str__(self):
         return f'{self.student} / {self.assignment} / {self.problem}'
@@ -1220,6 +1240,7 @@ from .models_platform import (  # noqa: E402,F401
     CustomProblem,
     CustomProblemOption,
     ProblemComment,
+    SolutionVisibility,
     SavedFolder,
     SavedGraph,
     SavedProblem,
