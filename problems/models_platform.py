@@ -431,3 +431,145 @@ class AssignmentItem(models.Model):
         if self.catalog_problem_id is None:
             return ''
         return self.catalog_problem.answer
+
+
+# ===========================================================================
+# Фаза 4. Сохранённое и папки
+# ===========================================================================
+
+class SavedFolder(models.Model):
+    """Папка «Сохранённого». ПЛОСКАЯ — вложенности нет.
+
+    Дерево папок соблазнительно, но у него всегда одна и та же судьба:
+    пользователь строит иерархию один раз, а потом не может вспомнить, куда
+    что положил. Плоский список + поиск закрывает задачу и не требует
+    ни хлебных крошек, ни перетаскивания, ни разрешения циклов.
+    """
+
+    class Kind(models.TextChoices):
+        PROBLEMS = 'problems', 'Задачи'
+        GRAPHS = 'graphs', 'Графики'
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='saved_folders', verbose_name='Владелец')
+    name = models.CharField('Название', max_length=120)
+    # Папки задач и папки графиков не смешиваются: список «переместить в
+    # папку» на странице задачи не должен предлагать папки для графиков.
+    kind = models.CharField('Для чего', max_length=16,
+                            choices=Kind.choices, default=Kind.PROBLEMS)
+    order = models.PositiveIntegerField('Порядок', default=0)
+    created_at = models.DateTimeField('Создана', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Папка сохранённого'
+        verbose_name_plural = 'Папки сохранённого'
+        ordering = ['order', 'name']
+        constraints = [
+            models.UniqueConstraint(fields=['owner', 'kind', 'name'],
+                                    name='uniq_saved_folder_name'),
+        ]
+
+    def __str__(self):
+        return f'{self.name} ({self.get_kind_display()})'
+
+
+class SavedProblem(models.Model):
+    """Задача, отложенная пользователем «к себе».
+
+    Как и позиция в домашке, ссылается либо на каталожную задачу, либо на
+    свою — ровно одну из двух (проверяется базой).
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='saved_problems', verbose_name='Владелец')
+    catalog_problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.CASCADE, null=True, blank=True,
+        related_name='saved_by', verbose_name='Задача каталога')
+    custom_problem = models.ForeignKey(
+        CustomProblem, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='saved_by', verbose_name='Своя задача')
+    # null = «Без папки». Отдельной служебной папки не заводим: она была бы
+    # неудаляемой и всё равно означала бы «не в папке».
+    folder = models.ForeignKey(
+        SavedFolder, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='problems', verbose_name='Папка')
+    note = models.TextField('Заметка', blank=True)
+    created_at = models.DateTimeField('Сохранена', auto_now_add=True)
+    is_deleted = models.BooleanField('Удалена', default=False)
+
+    class Meta:
+        verbose_name = 'Сохранённая задача'
+        verbose_name_plural = 'Сохранённые задачи'
+        ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(catalog_problem__isnull=False,
+                             custom_problem__isnull=True)
+                    | models.Q(catalog_problem__isnull=True,
+                               custom_problem__isnull=False)
+                ),
+                name='saved_problem_exactly_one_problem',
+            ),
+            # Одну и ту же задачу нельзя сохранить дважды.
+            models.UniqueConstraint(
+                fields=['owner', 'catalog_problem'],
+                condition=models.Q(catalog_problem__isnull=False),
+                name='uniq_saved_catalog_problem'),
+            models.UniqueConstraint(
+                fields=['owner', 'custom_problem'],
+                condition=models.Q(custom_problem__isnull=False),
+                name='uniq_saved_custom_problem'),
+        ]
+
+    def __str__(self):
+        return f'{self.owner}: {self.problem_title}'
+
+    @property
+    def problem(self):
+        return self.catalog_problem or self.custom_problem
+
+    @property
+    def problem_title(self):
+        problem = self.problem
+        if problem is None:
+            return '(задача удалена)'
+        return problem.title or f'Задача #{problem.pk}'
+
+
+class SavedGraph(models.Model):
+    """График, сохранённый пользователем из калькулятора.
+
+    ⚠️ Формат `scene` в этой сессии НЕ выясняется и calc2 НЕ трогается.
+    Здесь заведено только место для хранения: JSON произвольной формы.
+    Что именно в него кладёт калькулятор — вопрос отдельной задачи после
+    слияния ветки feat/calc2-shipu.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='saved_graphs', verbose_name='Владелец')
+    name = models.CharField('Название', max_length=200)
+    scene = models.JSONField('Сцена калькулятора', default=dict, blank=True)
+    # Путь к картинке-превью (например, PNG, снятый калькулятором).
+    preview = models.CharField('Превью (путь)', max_length=500, blank=True)
+    folder = models.ForeignKey(
+        SavedFolder, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='graphs', verbose_name='Папка')
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+    updated_at = models.DateTimeField('Изменён', auto_now=True)
+    is_deleted = models.BooleanField('Удалён', default=False)
+
+    class Meta:
+        verbose_name = 'Сохранённый график'
+        verbose_name_plural = 'Сохранённые графики'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['owner', '-created_at'],
+                         name='idx_savedgraph_owner'),
+        ]
+
+    def __str__(self):
+        return self.name

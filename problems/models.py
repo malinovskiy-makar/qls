@@ -1220,5 +1220,8 @@ from .models_platform import (  # noqa: E402,F401
     CustomProblem,
     CustomProblemOption,
     ProblemComment,
+    SavedFolder,
+    SavedGraph,
+    SavedProblem,
     UserProfile,
 )

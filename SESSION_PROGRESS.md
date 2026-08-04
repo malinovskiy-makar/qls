@@ -8,7 +8,7 @@
       админка `problems/admin_platform.py`
 - [x] Фаза 2. Комментарии — `ProblemComment` + `ProblemCommentQuerySet.visible_for()`
 - [x] Фаза 3. Свои задачи и тесты — `CustomProblem`, `CustomProblemOption`, `AssignmentItem` (CheckConstraint «ровно одна задача»)
-- [ ] Фаза 4. Сохранённое и папки
+- [x] Фаза 4. Сохранённое и папки — `SavedFolder` (плоские), `SavedProblem`, `SavedGraph`
 - [ ] Фаза 5. Решалка
 - [ ] Фаза 6. Контрольные
 - [ ] Фаза 7. Логирование событий

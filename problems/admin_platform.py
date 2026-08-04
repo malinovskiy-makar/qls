@@ -12,6 +12,9 @@ from .models_platform import (
     CustomProblem,
     CustomProblemOption,
     ProblemComment,
+    SavedFolder,
+    SavedGraph,
+    SavedProblem,
     UserProfile,
 )
 
@@ -56,3 +59,27 @@ class ProblemCommentAdmin(admin.ModelAdmin):
     search_fields = ['text', 'author__username']
     raw_id_fields = ['assignment', 'problem_item', 'author', 'recipient']
     date_hierarchy = 'created_at'
+
+
+@admin.register(SavedFolder)
+class SavedFolderAdmin(admin.ModelAdmin):
+    list_display = ['name', 'owner', 'kind', 'order', 'created_at']
+    list_filter = ['kind']
+    search_fields = ['name', 'owner__username']
+    raw_id_fields = ['owner']
+
+
+@admin.register(SavedProblem)
+class SavedProblemAdmin(admin.ModelAdmin):
+    list_display = ['owner', 'problem_title', 'folder', 'is_deleted',
+                    'created_at']
+    list_filter = ['is_deleted']
+    raw_id_fields = ['owner', 'catalog_problem', 'custom_problem', 'folder']
+
+
+@admin.register(SavedGraph)
+class SavedGraphAdmin(admin.ModelAdmin):
+    list_display = ['name', 'owner', 'folder', 'is_deleted', 'created_at']
+    list_filter = ['is_deleted']
+    search_fields = ['name', 'owner__username']
+    raw_id_fields = ['owner', 'folder']
