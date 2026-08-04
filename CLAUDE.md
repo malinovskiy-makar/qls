@@ -1235,6 +1235,73 @@ Notion 3abb11c92bc18133aea8c3ee9d8716bd: детекторы ловят 80% де�
   (13,2%). Отчёт `reports/batch2_sweep/applied_revert_audit.md`, список id
   `applied_revert_damage.txt`. Починка — карточка в Notion, НЕ сделана.
 
+## Платформа для репетиторов (ветка `feat/platform-foundation`, в `main` не влито)
+
+Каркас продукта «репетитор ↔ ученик ↔ родитель». Ветка создана от вершины
+`feat/batch2-sweep` (не от `main`: `main` не содержит ни одного коммита,
+которого нет в линии, а в базе применены `problems` 0018–0022, файлов которых
+на `main` нет — новая миграция от `main` столкнулась бы номером).
+
+**Новые модели — все в `problems/models_platform.py`** (отдельный модуль внутри
+приложения `problems`, импортируется одной строкой в конце `models.py`; так
+Django видит их с `app_label='problems'`, а гигантский `models.py` не растёт):
+`UserProfile` (роли tutor/student/parent + синхронизация со старым
+`User.role`), `ProblemComment` (+ менеджер `visible_for`), `CustomProblem` /
+`CustomProblemOption`, **`AssignmentItem`** (позиция задачи в домашке),
+`SavedFolder` / `SavedProblem` / `SavedGraph`, `ExamAttempt`, `AnswerDraft`,
+`LearningEvent`. Админка — `problems/admin_platform.py`.
+
+⚠️ **`AssignmentItem` — ключевая модель.** У `Assignment` остался старый
+простой M2M `problems` (обратная совместимость), но вся обвязка — порядок,
+балл, комментарии, решалка, график — висит на позиции. Новые экраны ходят
+через `assignment.items`.
+
+**Изменения существующих моделей (только добавления):** `Assignment` —
+`group`, `kind`, `exam_mode`, `starts_at`, `ends_at`, `duration_minutes`,
+`due_at`, `show_results_immediately` + методы `is_open_for`/`open_state_for`,
+`deadline_at`; `Submission` — `problem_item` (и `problem` стал nullable ради
+своих задач репетитора); `StudentGroup` — `description`.
+Миграции: **0023** (основная), **0024** (описание группы), **0025** (график
+у позиции). ⚠️ В 0023 пришлось вручную переставить операции — автодетектор
+поставил `AddConstraint uniq_submission_per_item` раньше `AddField
+submission.problem_item`.
+
+**Модули:** `problems/event_log.py` — единственная точка записи учебных
+событий, ⚠️ НЕБЛОКИРУЮЩАЯ (try/except: падение лога не имеет права уронить
+сдачу домашки); `problems/answer_check.py` — автопроверка (числа через
+`fractions.Fraction`, как в «Классике»; множественный выбор — «всё или
+ничего»); `teacher/access.py` — переиспользуемый `tutor_required`.
+
+**Страницы:** `/teacher/` — дашборд входящих (только навигация, проверять
+оттуда нельзя намеренно); `/teacher/groups/…` — вся работа с группой;
+`/teacher/groups/<g>/assignments/<a>/` — задание целиком ДО решений;
+`/teacher/problems/…` — редактор своих задач; `/profile/` — данные,
+сохранённое, статистика-заглушка.
+⚠️ Проверка решений ПЕРЕЕХАЛА под групповые URL; старые
+`/teacher/assignment/<pk>/` и `/teacher/submission/<pk>/review/` оставлены
+редиректом (`legacy_*`, помечены «устарело, удалить после сессии 5»).
+
+**MathLive 0.110.0** с CDN (UMD `mathlive.min.js`), партиал
+`problems/templates/platform/_mathfield.html` + `problems/static/platform/
+mathfield.js`. Компонент — «вставщик формул»: основной ввод остаётся
+textarea, формула ложится в текст как `$…$` — формат хранения тот же, что у
+всего банка. ⚠️ **calc2 не тронут ни одной строкой** (параллельная ветка
+`feat/calc2-shipu`); от графиков сделана только серверная половина —
+`SavedGraph`, `AssignmentItem.graph`, `POST /api/graphs/save/`, вставка
+плашки `[[График: имя]]`.
+
+**Команды:** `backfill_profiles`, `link_anonymous_events`,
+`seed_platform_demo` (идемпотентна; `tutor@test.local` и др., пароль
+`demo12345`).
+
+**Тесты:** `problems/tests/test_platform_models.py` (41) +
+`problems/tests/test_answer_check.py` (16). Полный прогон — **546/546**.
+
+⚠️ **Вылет навигации на 380px не чинили.** `templates/_nav.html` тянет
+страницу вбок (scrollWidth 936 при 380) на КАЖДОЙ странице сайта, включая
+нетронутые — карточка в Notion. Содержимое новых страниц в 380px
+укладывается, таблицы прокручиваются внутри `.table-wrap`/`.sub-table-wrap`.
+
 ## Прочие команды-замеры (только чтение)
 
 - `ile_forum_solutions` — ILE это форум, и в `solution` местами лежит реплика
