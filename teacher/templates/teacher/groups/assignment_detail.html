@@ -84,7 +84,7 @@
     <span class="problem-num">{{ forloop.counter }}.</span>
     <span class="problem-src">
       {% if row.item.is_custom %}своя задача{% else %}каталог{% endif %}
-      {% if row.item.points %} · {{ row.item.points|floatformat:"-2" }} балл{{ row.item.points|floatformat:0|pluralize:",а,ов" }}{% endif %}
+      {% if row.item.points %} · {{ row.item.points|floatformat:"-2" }} б.{% endif %}
       {% if row.item.is_test %} · тест{% endif %}
     </span>
   </div>

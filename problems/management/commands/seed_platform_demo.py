@@ -64,7 +64,8 @@ class Command(BaseCommand):
         self._exam_window(tutor, group, students, catalog, now)
         self._exam_limit(tutor, group, students, catalog, now)
         self._comments(homework, tutor, students[0])
-        self._saved(tutor, catalog, custom)
+        graph = self._saved(tutor, catalog, custom)
+        self._solutions_and_graph(homework, graph)
 
         self.stdout.write(self.style.SUCCESS('\nДемо-данные готовы.'))
         self.stdout.write('Вход (пароль у всех одинаковый):')
@@ -289,8 +290,39 @@ class Command(BaseCommand):
             owner=tutor, custom_problem=custom,
             defaults={'folder': folder_p})
 
-        SavedGraph.objects.get_or_create(
+        graph, _ = SavedGraph.objects.get_or_create(
             owner=tutor, name='Равновесие с налогом на продавца',
             defaults={'folder': folder_g,
                       'scene': {'note': 'формат сцены калькулятора пока '
                                         'не определён — см. Фазу 19'}})
+        return graph
+
+    def _solutions_and_graph(self, homework, graph):
+        """Решалка и график у позиций домашки — чтобы было что смотреть."""
+        items = list(homework.items.order_by('order'))
+        if not items:
+            return
+
+        # У первой задачи — своё решение вместо каталожного, открывается
+        # сразу после сдачи (режим уже проставлен в _homework).
+        first = items[0]
+        if not first.solution_override:
+            first.solution_override = (
+                'Приравниваем спрос и предложение: $120-2P = 3P-30$, откуда '
+                '$5P = 150$ и $P^*=30$. Подставляем в любую из функций: '
+                '$Q^* = 120 - 2\\cdot 30 = 60$. Проверка по второй функции '
+                'даёт то же самое — значит, решение верное.')
+            first.solution_steps = [
+                {'text': 'Приравнять Qd и Qs', 'result': '120-2P = 3P-30'},
+                {'text': 'Решить уравнение', 'result': 'P* = 30'},
+                {'text': 'Найти количество', 'result': 'Q* = 60'},
+            ]
+            first.graph = graph
+            first.save()
+
+        # У последней (своей задачи) решение открывается после дедлайна —
+        # значение по умолчанию, ничего не трогаем, только график.
+        last = items[-1]
+        if last.graph_id is None:
+            last.graph = graph
+            last.save()

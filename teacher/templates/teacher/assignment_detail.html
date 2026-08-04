@@ -3,6 +3,9 @@
 {% block title %}{{ assignment.name }} — проверка{% endblock %}
 
 {% block extra_style %}
+/* На узком экране таблица прокручивается ВНУТРИ себя, а не тянет страницу. */
+.sub-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.sub-table { min-width: 520px; }
 .page-header {
   display: flex;
   align-items: center;
@@ -135,6 +138,7 @@
 </div>
 
 {% if submissions %}
+<div class="sub-table-wrap">
 <table class="sub-table">
   <thead>
     <tr>
@@ -185,6 +189,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
 <div class="empty">Решений нет{% if status_filter %} с таким статусом{% endif %}.</div>
 {% endif %}

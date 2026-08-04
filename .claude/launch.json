@@ -2,25 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "qls-platform",
+      "name": "qls",
       "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
-      "runtimeArgs": ["/Users/makarmalinovskiy/Downloads/qls_platform/manage.py", "runserver", "8000"],
-      "port": 8000,
-      "autoPort": false
-    },
-    {
-      "name": "qls-preview",
-      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
-      "runtimeArgs": ["/Users/makarmalinovskiy/Downloads/qls_platform/manage.py", "runserver", "8001"],
-      "port": 8001,
-      "autoPort": false
-    },
-    {
-      "name": "reports-static",
-      "runtimeExecutable": "/usr/bin/python3",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "/Users/makarmalinovskiy/Downloads/qls_platform/reports"],
-      "port": 8765,
-      "autoPort": false
+      "runtimeArgs": ["manage.py", "runserver", "8123"],
+      "port": 8123
     }
   ]
 }
