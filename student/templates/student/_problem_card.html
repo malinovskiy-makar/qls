@@ -71,7 +71,8 @@
             <li>
               <label>
                 <input type="{{ row.answer_kind }}" name="{{ row.answer_name }}"
-                       value="{{ option.value }}">
+                       value="{{ option.value }}"
+                       {% if option.value in row.selected %}checked{% endif %}>
                 <span>{% if option.part_label %}<b>{{ option.part_label|partlabel }}</b> {% endif %}{% if option.is_html %}{{ option.label|safe }}{% else %}{{ option.label }}{% endif %}</span>
               </label>
             </li>
@@ -84,7 +85,7 @@
           <input type="text" class="answer-short" id="{{ row.answer_name }}"
                  name="{{ row.answer_name }}"
                  placeholder="Например: 4 штуки, 120 руб./ед."
-                 value="{{ row.sub.submitted_answer }}">
+                 value="{{ row.prefill_answer }}">
           <div class="field-hint">Кратко — число или короткая фраза. Проверяется автоматически.</div>
         {% endif %}
 
@@ -92,7 +93,7 @@
         {# data-mathfield: вставщик формул навесится сам, скрипты — раз на страницу #}
         <textarea class="answer-text" id="{{ row.solution_name }}"
                   name="{{ row.solution_name }}" data-mathfield
-                  placeholder="Запишите ход решения. Формулу можно вставить кнопкой ниже.">{{ row.sub.solution_text }}</textarea>
+                  placeholder="Запишите ход решения. Формулу можно вставить кнопкой ниже.">{{ row.prefill_solution }}</textarea>
 
         <label for="{{ row.file_name }}" style="margin-top:16px;">Прикрепить файл</label>
         <input class="answer-file" type="file" id="{{ row.file_name }}"

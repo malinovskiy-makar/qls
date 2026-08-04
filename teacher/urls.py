@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_groups, views_problems, views_stats
+from . import views, views_exams, views_groups, views_problems, views_stats
 
 app_name = 'teacher'
 
@@ -25,6 +25,12 @@ urlpatterns = [
 
     path('api/item/solution/', views_groups.api_item_solution,
          name='api_item_solution'),
+
+    # Контрольные (Часть C).
+    path('groups/<int:pk>/exams/new/', views_exams.exam_create,
+         name='exam_create'),
+    path('groups/<int:group_id>/exams/<int:exam_id>/results/',
+         views_exams.exam_results, name='group_exam_results'),
 
     # Статистика — БЕЗ геймификации (см. teacher/views_stats.py).
     path('groups/<int:pk>/stats/', views_stats.group_stats,

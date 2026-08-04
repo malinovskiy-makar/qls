@@ -139,6 +139,16 @@ def submitted_display(item, submission):
     return ', '.join(labels) if labels else raw
 
 
+def selected_values(answer):
+    """Множество выбранных вариантов из строки ответа.
+
+    Нужно, чтобы при возврате на страницу отметки в переключателях стояли
+    там же, где их поставил ученик.
+    """
+    return {value.strip() for value in (answer or '').split(',')
+            if value.strip()}
+
+
 def build_rows(assignment, student, user=None, with_comments=True):
     """Единый список позиций домашки — то, что рисуют обе стороны.
 
@@ -188,9 +198,15 @@ def build_rows(assignment, student, user=None, with_comments=True):
             'solution_name': solution_input_name(item),
             'file_name': file_input_name(item),
             'sub': submission,
+            # Чем заполнить поля. Обычно это уже отправленный ответ, но на
+            # контрольной сюда кладётся ЧЕРНОВИК: ученик, вернувшийся после
+            # обрыва связи, обязан увидеть написанное, а не пустую форму.
+            'prefill_answer': submission.submitted_answer or '',
+            'prefill_solution': submission.solution_text or '',
             'feedback': getattr(submission, 'feedback', None),
             'answer_display': submitted_display(item, submission),
             'is_done': submission.status in ('submitted', 'reviewed'),
+            'selected': selected_values(submission.submitted_answer),
             'comments': comments_by_item.get(item.pk, []),
             'solution_visible': item.is_solution_visible_for(user),
             'solution_hint': item.solution_unlock_hint(),

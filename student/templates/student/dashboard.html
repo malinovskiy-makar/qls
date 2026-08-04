@@ -182,7 +182,7 @@
       {% endif %}
     </div>
   </div>
-  <a href="{% url 'student:exam_intro' item.assignment.pk %}" class="btn-open">Результат</a>
+  <a href="{% url 'student:exam_result' item.assignment.pk %}" class="btn-open">Результат</a>
 </div>
 {% endfor %}
 {% endif %}

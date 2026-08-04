@@ -13,4 +13,10 @@ urlpatterns = [
 
     # Контрольные (Часть C). Свой раздел адресов: у контрольной свой цикл.
     path('exam/<int:pk>/', views_exam.exam_intro, name='exam_intro'),
+    path('exam/<int:pk>/start/', views_exam.exam_start, name='exam_start'),
+    path('exam/<int:pk>/take/', views_exam.exam_take, name='exam_take'),
+    path('exam/<int:pk>/autosave/', views_exam.exam_autosave,
+         name='exam_autosave'),
+    path('exam/<int:pk>/finish/', views_exam.exam_finish, name='exam_finish'),
+    path('exam/<int:pk>/result/', views_exam.exam_result, name='exam_result'),
 ]

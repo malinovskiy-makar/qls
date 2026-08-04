@@ -49,14 +49,28 @@
   {% elif not is_open %}
     <div class="pf-locked">{{ closed_reason|default:"Пока писать нельзя." }}</div>
   {% else %}
+    {% if will_be_cut %}
+    <div class="exam-warn">
+      ⚠️ До крайнего срока осталось меньше, чем лимит: на решение будет
+      <b>{{ minutes }} мин</b>, а не {{ assignment.duration_minutes }}.
+    </div>
+    {% endif %}
     <div class="exam-warn">
       ⏱ После старта таймер остановить нельзя — он идёт на сервере и не
-      зависит от вашего устройства. Ответы сохраняются сами, но время не
-      останавливается, даже если закрыть вкладку.
+      зависит от вашего устройства. Ответы сохраняются сами, но время идёт,
+      даже если закрыть вкладку.
     </div>
-    <div class="submit-row" style="margin-top:0;">
-      <span class="results-link">Прохождение контрольной появится в этой сессии (Часть C).</span>
-    </div>
+    <form method="post" action="{% url 'student:exam_start' assignment.pk %}">
+      {% csrf_token %}
+      <div class="submit-row" style="margin-top:0;">
+        <button type="submit" class="btn-submit">Начать</button>
+        {% if minutes is not None %}
+        <span style="font-size:13px;color:var(--text2);">
+          на решение — {{ minutes }} мин
+        </span>
+        {% endif %}
+      </div>
+    </form>
   {% endif %}
 </div>
 {% endblock %}

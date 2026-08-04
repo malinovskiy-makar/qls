@@ -1,0 +1,100 @@
+{% extends "student/base.html" %}
+
+{% block title %}{{ assignment.name }} — результат{% endblock %}
+
+{% block extra_style %}
+{% include "student/_work_style.html" %}
+.res-head { background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 22px 24px; margin-bottom: 22px; }
+.res-score { font-size: 38px; font-weight: 800; line-height: 1; }
+.res-cap { font-size: 13px; color: var(--text2); margin-top: 6px; }
+.res-meta { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px;
+            font-size: 13px; color: var(--text2); }
+.res-warn { margin-top: 14px; background: var(--amber-tint);
+            border: 1px solid var(--amber-border); border-radius: var(--r);
+            padding: 10px 14px; font-size: 13px; line-height: 1.6; }
+.res-row { display: flex; gap: 12px; align-items: flex-start;
+           padding: 14px 0; border-bottom: 1px solid var(--border-soft); }
+.res-row:last-child { border-bottom: none; }
+.res-num { font-weight: 700; color: var(--text2); min-width: 26px; }
+.res-body { flex: 1; min-width: 0; }
+.res-mark { font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .05em; padding: 3px 9px; border-radius: 999px;
+            white-space: nowrap; }
+.mark-correct { background: var(--green-tint); color: var(--green); }
+.mark-wrong   { background: var(--error-tint); color: var(--error); }
+.mark-pending { background: var(--amber-tint); color: var(--amber); }
+.mark-empty   { background: var(--chip-bg); color: var(--chip-text); }
+.res-answer { font-size: 13px; margin-top: 6px; }
+.res-answer b { color: var(--text2); font-weight: 600; }
+{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{% url 'student:dashboard' %}">← Все работы</a>
+
+<div class="res-head">
+  <div class="exam-bar-cap" style="font-size:11px;color:var(--text2);
+       text-transform:uppercase;letter-spacing:.06em;">Контрольная</div>
+  <h1 class="hw-title" style="margin:6px 0 16px;">{{ assignment.name }}</h1>
+
+  {% if show_results %}
+    <div class="res-score">{{ summary.scored }} / {{ summary.graded_max }}</div>
+    <div class="res-cap">баллов по проверенным задачам</div>
+  {% else %}
+    <div class="res-score">—</div>
+    <div class="res-cap">преподаватель откроет результат после проверки</div>
+  {% endif %}
+
+  <div class="res-meta">
+    <span>сдано {{ attempt.submitted_at|date:"d.m.Y, H:i" }}</span>
+    {% if spent_minutes is not None %}<span>затрачено {{ spent_minutes }} мин</span>{% endif %}
+    {% if attempt.is_auto_submitted %}<span>сдана автоматически — время вышло</span>{% endif %}
+    {% if group_average is not None %}<span>средний балл группы: {{ group_average }}</span>{% endif %}
+  </div>
+
+  {% if summary.pending %}
+  <div class="res-warn">
+    Это <b>предварительный результат</b>: задач, которые проверяет
+    преподаватель, — {{ summary.pending }}. Итоговый балл появится после
+    проверки.
+  </div>
+  {% endif %}
+</div>
+
+<div class="problem-card">
+  <div class="problem-card-head"><span class="problem-num">По задачам</span></div>
+  <div class="problem-card-body">
+    {% for row in summary.rows %}
+    <div class="res-row">
+      <span class="res-num">{{ forloop.counter }}.</span>
+      <div class="res-body">
+        <div class="problem-statement" style="font-size:14px;margin-bottom:6px;">
+          {{ row.item.statement|truncatechars:220 }}
+        </div>
+        <div class="res-answer"><b>Ваш ответ:</b>
+          {% if row.answer %}{{ row.answer }}{% else %}<span class="muted" style="color:var(--text2)">не отвечено</span>{% endif %}
+        </div>
+        {% if show_results and row.state != 'pending' and row.correct_answer %}
+        <div class="res-answer"><b>Правильный ответ:</b> {{ row.correct_answer }}</div>
+        {% endif %}
+
+        {% if row.item.has_solution %}
+          {% if row.solution_visible %}
+          <details class="pf-fold">
+            <summary>Эталонное решение</summary>
+            <div class="pf-fold-body">{{ row.item.solution_text|linebreaksbr }}</div>
+          </details>
+          {% else %}
+          <div class="pf-locked">{{ row.solution_hint }}</div>
+          {% endif %}
+        {% endif %}
+      </div>
+      <span class="res-mark mark-{{ row.state }}">
+        {% if row.state == 'correct' %}верно{% elif row.state == 'wrong' %}неверно
+        {% elif row.state == 'pending' %}на проверке{% else %}без ответа{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

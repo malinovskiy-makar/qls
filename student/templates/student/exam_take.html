@@ -1,0 +1,98 @@
+{% extends "student/base.html" %}
+{% load static %}
+
+{% block title %}{{ assignment.name }} — идёт контрольная{% endblock %}
+
+{% block extra_style %}
+{% include "student/_work_style.html" %}
+
+/* ── Липкая шапка с таймером ─────────────────────────
+   Таймер должен быть виден всегда: ученик, прокрутивший к пятой задаче,
+   не обязан помнить, сколько осталось. */
+.exam-bar {
+  position: sticky; top: 48px; z-index: 100;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 18px; margin-bottom: 20px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.exam-timer { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums;
+              letter-spacing: .02em; }
+.exam-timer.warn { color: var(--amber); }
+.exam-timer.danger { color: var(--error); }
+.exam-bar-cap { font-size: 11px; color: var(--text2); text-transform: uppercase;
+                letter-spacing: .06em; }
+.save-state { font-size: 12px; color: var(--text2); margin-left: auto; }
+.save-state.is-saving { color: var(--amber); }
+.save-state.is-offline { color: var(--error); font-weight: 600; }
+
+/* Навигация по номерам задач */
+.qnav { display: flex; gap: 6px; flex-wrap: wrap; }
+.qnav a {
+  width: 30px; height: 30px; display: flex; align-items: center;
+  justify-content: center; border-radius: 7px; font-size: 13px;
+  text-decoration: none; color: var(--text2);
+  border: 1px solid var(--border); background: var(--surface-2);
+}
+.qnav a.is-answered { border-color: var(--green-border);
+                      background: var(--green-tint); color: var(--green);
+                      font-weight: 700; }
+.qnav a:hover { border-color: var(--accent); color: var(--accent); }
+
+.exam-finish-row { margin-top: 28px; display: flex; align-items: center;
+                   gap: 16px; flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .exam-bar { top: 0; padding: 10px 14px; gap: 10px; }
+  .exam-timer { font-size: 22px; }
+  .save-state { margin-left: 0; flex-basis: 100%; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="exam-bar">
+  <div>
+    <div class="exam-bar-cap">осталось</div>
+    <div class="exam-timer" id="timer"
+         data-seconds="{{ seconds_left|default_if_none:'' }}">
+      {% if seconds_left is None %}без ограничения{% else %}—:—{% endif %}
+    </div>
+  </div>
+  <div class="qnav" id="qnav">
+    {% for row in rows %}
+    <a href="#item-{{ row.item.pk }}" data-item="{{ row.item.pk }}"
+       class="{% if row.answered %}is-answered{% endif %}">{{ row.number }}</a>
+    {% endfor %}
+  </div>
+  <span class="save-state" id="save-state">все ответы сохраняются сами</span>
+</div>
+
+<h1 class="hw-title" style="margin-bottom:20px;">{{ assignment.name }}</h1>
+
+<form method="post" action="{% url 'student:exam_finish' assignment.pk %}"
+      id="exam-form" enctype="multipart/form-data">
+  {% csrf_token %}
+  {% for row in rows %}
+    {% include "student/_problem_card.html" with row=row show_comments=0 %}
+  {% empty %}
+    <div class="pf-locked">В этой контрольной нет задач.</div>
+  {% endfor %}
+
+  <div class="exam-finish-row">
+    <button type="button" class="btn-submit" id="finish-btn">Завершить</button>
+    <span style="font-size:13px;color:var(--text2);">
+      После завершения дописать будет нельзя.
+    </span>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+{% include "platform/_mathfield.html" %}
+<script>
+window.EXAM = {
+  autosaveUrl: "{% url 'student:exam_autosave' assignment.pk %}",
+  itemIds: [{% for row in rows %}{{ row.item.pk }}{% if not forloop.last %},{% endif %}{% endfor %}],
+  totalItems: {{ rows|length }}
+};
+</script>
+<script src="{% static 'platform/exam.js' %}"></script>
+{% endblock %}

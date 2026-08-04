@@ -1,0 +1,117 @@
+{% extends "teacher/base.html" %}
+
+{% block title %}{{ exam.name }} — результаты{% endblock %}
+
+{% block extra_style %}
+{% include "platform/_stats_style.html" %}
+.cell-correct { background: var(--green-tint); color: var(--green); }
+.cell-wrong   { background: var(--error-tint); color: var(--error); }
+.cell-pending { background: var(--amber-tint); color: var(--amber); }
+.cell-empty   { background: var(--surface-2); color: var(--text3); }
+.cell-none    { background: transparent; color: var(--text3); }
+td.cell { text-align: center; }
+td.cell span { display: block; border-radius: 4px; padding: 5px 4px;
+               font-size: 11px; font-weight: 700; min-width: 42px; }
+tr.footer-row td { border-top: 1px solid var(--border); font-weight: 700; }
+{% endblock %}
+
+{% block content %}
+<div class="stats-head">
+  <div>
+    <h1 class="stats-title">{{ exam.name }}</h1>
+    <div class="stats-sub">
+      <a href="{% url 'teacher:group_detail' group.pk %}"
+         style="color:var(--accent);text-decoration:none;">← {{ group.name }}</a>
+      · результаты контрольной
+    </div>
+  </div>
+  <a href="{% url 'teacher:group_submissions' group.pk exam.pk %}"
+     class="btn-open" style="background:var(--btn-bg);color:var(--on-btn);
+     border-radius:var(--r);padding:9px 18px;font-size:13px;font-weight:600;
+     text-decoration:none;">Проверять открытые задачи</a>
+</div>
+
+<div class="panel panel--lead">
+  <div class="panel-head">
+    <div class="panel-title">Ученик × задача</div>
+    <div class="panel-hint">Нижняя строка — процент верных ПО ЗАДАЧЕ: сразу
+      видно, что провалили все</div>
+  </div>
+  <div class="stats-table-wrap">
+    <table class="stats-table">
+      <thead>
+        <tr>
+          <th class="no-sort">Ученик</th>
+          {% for item in items %}
+          <th class="no-sort" style="text-align:center;">{{ forloop.counter }}</th>
+          {% endfor %}
+          <th class="no-sort">Балл</th>
+          <th class="no-sort">Отметки</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            {{ row.student.get_full_name|default:row.student.username }}
+          </td>
+          {% if row.started %}
+            {% for cell in row.cells %}
+            <td class="cell">
+              <span class="cell-{{ cell.state }}"
+                    title="{{ cell.answer|default:'нет ответа' }}">
+                {% if cell.state == 'correct' %}✓{% elif cell.state == 'wrong' %}✗
+                {% elif cell.state == 'pending' %}?{% else %}—{% endif %}
+              </span>
+            </td>
+            {% endfor %}
+            <td><b>{{ row.scored }}</b> / {{ row.max_score }}</td>
+            <td class="muted">
+              {% if row.pending %}ждёт проверки: {{ row.pending }}{% endif %}
+              {% if row.attempt.is_auto_submitted %} · сдана автоматически{% endif %}
+              {% if not row.attempt.submitted_at %} · пишет сейчас{% endif %}
+            </td>
+          {% else %}
+            <td colspan="{{ items|length|add:2 }}" class="muted">не приступал</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+        <tr class="footer-row">
+          <td>верных по задаче</td>
+          {% for column in footer %}
+          <td class="cell">
+            <span class="{% if column.percent is None %}cell-none{% elif column.percent < 50 %}cell-wrong{% elif column.percent < 75 %}cell-pending{% else %}cell-correct{% endif %}">
+              {% if column.percent is not None %}{{ column.percent }}%{% else %}—{% endif %}
+            </span>
+          </td>
+          {% endfor %}
+          <td colspan="2"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Задачи контрольной</div></div>
+  <ul class="list-rows">
+    {% for item in items %}
+    <li>
+      <span><b>{{ forloop.counter }}.</b> {{ item.statement|truncatechars:150 }}</span>
+      <span class="muted">ответ: {{ item.correct_answer|default:"—" }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+
+{% if not_started %}
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Не приступали</div></div>
+  <ul class="list-rows">
+    {% for student in not_started %}
+    <li><span>{{ student.get_full_name|default:student.username }}</span></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

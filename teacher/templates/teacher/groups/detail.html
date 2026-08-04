@@ -57,13 +57,13 @@
 {% elif tab == 'assignments' %}
   <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px;">
     <a href="{% url 'teacher:assignment_create' %}?group={{ group.pk }}" class="btn-primary">+ Создать домашку</a>
-    <a href="{% url 'teacher:assignment_create' %}?group={{ group.pk }}&kind=exam" class="btn-outline">+ Создать контрольную</a>
+    <a href="{% url 'teacher:exam_create' group.pk %}" class="btn-outline">+ Создать контрольную</a>
   </div>
 
   {% if assignment_rows %}
   <div class="rows">
     {% for row in assignment_rows %}
-    <a class="row-link" href="{% url 'teacher:group_assignment' group.pk row.assignment.pk %}">
+    <a class="row-link" href="{% if row.is_exam %}{% url 'teacher:group_exam_results' group.pk row.assignment.pk %}{% else %}{% url 'teacher:group_assignment' group.pk row.assignment.pk %}{% endif %}">
       <span>
         <span class="row-main">{{ row.assignment.name }}</span>
         {% if row.is_exam %}<span class="badge badge-exam">контрольная</span>{% endif %}

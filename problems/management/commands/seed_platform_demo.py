@@ -21,9 +21,11 @@ from problems.models import (
     User,
 )
 from problems.models_platform import (
+    AnswerDraft,
     AssignmentItem,
     CustomProblem,
     CustomProblemOption,
+    ExamAttempt,
     ProblemComment,
     SavedFolder,
     SavedProblem,
@@ -69,6 +71,7 @@ class Command(BaseCommand):
         self._solutions_and_graph(homework, graph)
         self._parent_links(tutor, students)
         self._history(students, now)
+        self._finished_exam(tutor, group, students, now)
 
         self.stdout.write(self.style.SUCCESS('\nДемо-данные готовы.'))
         self.stdout.write('Вход (пароль у всех одинаковый):')
@@ -329,6 +332,64 @@ class Command(BaseCommand):
         if last.graph_id is None:
             last.graph = graph
             last.save()
+
+    def _finished_exam(self, tutor, group, students, now):
+        """ЗАВЕРШЁННАЯ контрольная «Окно» с результатами.
+
+        Без неё таблицу результатов репетитора не на чем посмотреть: две
+        существующие контрольные либо ещё идут, либо ещё не начались.
+        """
+        from problems import exam_engine
+
+        exam, created = Assignment.objects.get_or_create(
+            name='Контрольная №0 (прошедшая, с результатами)', author=tutor,
+            defaults={
+                'group': group,
+                'kind': Assignment.Kind.EXAM,
+                'exam_mode': Assignment.ExamMode.WINDOW,
+                'starts_at': now - timezone.timedelta(days=7, hours=1),
+                'ends_at': now - timezone.timedelta(days=7),
+                'deadline': now - timezone.timedelta(days=7),
+                'show_results_immediately': True,
+            })
+        exam.group = group
+        exam.save()
+        exam.students.set(students)
+        # Берём ТЕСТЫ репетитора, а не открытые задачи каталога: открытые
+        # ждут проверки человеком, и таблица результатов вышла бы сплошным
+        # «ждёт проверки» — то есть не показала бы ровно того, ради чего
+        # существует (какую задачу провалили все).
+        tests = list(CustomProblem.objects.filter(
+            owner=tutor, kind__in=[CustomProblem.Kind.SINGLE,
+                                   CustomProblem.Kind.TF]).order_by('pk')[:2])
+        if len(tests) < 2:
+            return
+        self._items(exam, [(None, tests[0], 3), (None, tests[1], 2)])
+        if not created:
+            return
+
+        items = list(exam.items.order_by('order'))
+        correct = [str(next(iter(t.correct_option_ids()), '')) for t in tests]
+        wrong = [str(o.pk) for t in tests
+                 for o in t.options.filter(is_correct=False)[:1]]
+        # Разные ответы у разных учеников — иначе таблица «ученик × задача»
+        # выйдет одноцветной и ничего не покажет.
+        answers = [
+            (students[0], [correct[0], correct[1]]),
+            (students[1], [correct[0], wrong[1]]),
+            (students[2], [wrong[0], wrong[1]]),
+        ]
+        for student, values in answers:
+            attempt = ExamAttempt.objects.create(
+                assignment=exam, student=student,
+                expires_at=exam.ends_at,
+                submitted_at=exam.ends_at - timezone.timedelta(minutes=8))
+            for item, value in zip(items, values):
+                AnswerDraft.objects.create(attempt=attempt, problem_item=item,
+                                           answer_draft=value,
+                                           solution_draft='Разбор ученика.')
+            exam_engine.grade_attempt(attempt)
+        self.stdout.write('  создана завершённая контрольная с результатами')
 
     # -- Фаза 18: связь родителя и история за 90 дней ----------------------
 
