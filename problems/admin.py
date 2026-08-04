@@ -787,3 +787,9 @@ class ReviewVerdictAdmin(admin.ModelAdmin):
     search_fields = ['problem__id', 'comment']
     raw_id_fields = ['problem']
     date_hierarchy = 'created_at'
+
+
+# ---------------------------------------------------------------------------
+# Платформа для репетиторов — админка вынесена в problems/admin_platform.py
+# ---------------------------------------------------------------------------
+from . import admin_platform  # noqa: E402,F401

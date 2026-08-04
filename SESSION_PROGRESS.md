@@ -3,7 +3,9 @@
 
 ## Часть A — данные
 - [x] Фаза 0. Разведка
-- [ ] Фаза 1. Профиль и роли
+- [x] Фаза 1. Профиль и роли — `UserProfile` в `problems/models_platform.py`,
+      сигнал в `problems/signals.py`, команда `backfill_profiles`,
+      админка `problems/admin_platform.py`
 - [ ] Фаза 2. Комментарии
 - [ ] Фаза 3. Свои задачи и тесты
 - [ ] Фаза 4. Сохранённое и папки

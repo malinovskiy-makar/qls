@@ -1207,3 +1207,14 @@ class ReviewVerdict(models.Model):
 
     def __str__(self):
         return f'#{self.problem_id}: {self.get_category_display()} ({self.reviewer or "аноним"})'
+
+
+# ===========================================================================
+# Платформа для репетиторов — модели вынесены в отдельный модуль.
+# Импорт в самом конце, чтобы Django их увидел (app_label='problems').
+# Файл: problems/models_platform.py
+# ===========================================================================
+
+from .models_platform import (  # noqa: E402,F401
+    UserProfile,
+)
