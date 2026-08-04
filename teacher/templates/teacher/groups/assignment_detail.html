@@ -1,0 +1,233 @@
+{% extends 'teacher/base.html' %}
+
+{% block title %}{{ assignment.name }} — ЭкЗадачи{% endblock %}
+
+{% block extra_style %}{% include 'teacher/groups/_style.html' %}
+.summary {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px; margin-bottom: 22px;
+}
+.summary-cell {
+  background: var(--surface); border: 0.5px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
+}
+.summary-label { font-size: 11px; color: var(--text2); text-transform: uppercase;
+                 letter-spacing: .04em; }
+.summary-value { font-size: 16px; font-weight: 600; margin-top: 4px; }
+{% endblock %}
+
+{% block content %}
+<div class="crumbs">
+  <a href="{% url 'teacher:groups' %}">Группы</a> →
+  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a> →
+  {{ assignment.name }}
+</div>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ assignment.name }}</h1>
+    <div class="page-sub">
+      Так задание выглядит целиком — ещё до того, как кто-то начал решать.
+    </div>
+  </div>
+  <a href="{% url 'teacher:group_submissions' group.pk assignment.pk %}" class="btn-primary">
+    Проверять решения{% if stats.pending %} ({{ stats.pending }}){% endif %}
+  </a>
+</div>
+
+<div class="summary">
+  <div class="summary-cell">
+    <div class="summary-label">Тип</div>
+    <div class="summary-value">
+      {% if assignment.is_exam %}Контрольная{% else %}Домашка{% endif %}
+    </div>
+    {% if assignment.is_exam %}
+      <div class="row-meta">{{ assignment.get_exam_mode_display|default:"режим не задан" }}</div>
+    {% endif %}
+  </div>
+  <div class="summary-cell">
+    <div class="summary-label">Дедлайн</div>
+    <div class="summary-value">
+      {% if stats.deadline %}{{ stats.deadline|date:"d.m H:i" }}{% else %}—{% endif %}
+    </div>
+  </div>
+  <div class="summary-cell">
+    <div class="summary-label">Кому выдана</div>
+    <div class="summary-value">{{ stats.students }}</div>
+  </div>
+  <div class="summary-cell">
+    <div class="summary-label">Сдали</div>
+    <div class="summary-value">{{ stats.submitted }}</div>
+  </div>
+  <div class="summary-cell">
+    <div class="summary-label">Ждёт проверки</div>
+    <div class="summary-value">{{ stats.pending }}</div>
+  </div>
+</div>
+
+{% if assignment.is_exam %}
+<div class="note" style="margin-bottom: 20px;">
+  {% if assignment.exam_mode == 'window' %}
+    Окно: {{ assignment.starts_at|date:"d.m.Y H:i"|default:"—" }} —
+    {{ assignment.ends_at|date:"d.m.Y H:i"|default:"—" }}. Пишут все одновременно.
+  {% else %}
+    Сдать до {{ assignment.due_at|date:"d.m.Y H:i"|default:"—" }},
+    на выполнение {{ assignment.duration_minutes|default:"—" }} минут
+    с момента старта. Время истечения считает сервер.
+  {% endif %}
+</div>
+{% endif %}
+
+{% for row in rows %}
+<div class="problem-block" id="item-{{ row.item.pk }}">
+  <div class="problem-head">
+    <span class="problem-num">{{ forloop.counter }}.</span>
+    <span class="problem-src">
+      {% if row.item.is_custom %}своя задача{% else %}каталог{% endif %}
+      {% if row.item.points %} · {{ row.item.points|floatformat:"-2" }} балл{{ row.item.points|floatformat:0|pluralize:",а,ов" }}{% endif %}
+      {% if row.item.is_test %} · тест{% endif %}
+    </span>
+  </div>
+
+  <div class="problem-statement">{{ row.item.statement|linebreaksbr }}</div>
+
+  {% if row.parts %}
+  <div style="margin-top: 10px;">
+    {% for part in row.parts %}
+      <div class="problem-statement" style="margin-top: 6px;">
+        <strong>{{ part.label }})</strong> {{ part.statement|linebreaksbr }}
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if row.options %}
+  <ul class="options">
+    {% for option in row.options %}
+      <li class="{% if option.is_correct %}correct{% endif %}">
+        {{ option.text }}{% if option.is_correct %} ✓{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <details class="fold">
+    <summary>Правильный ответ</summary>
+    <div class="fold-body">{{ row.item.correct_answer|default:"не задан"|linebreaksbr }}</div>
+  </details>
+
+  {% if row.item.has_solution %}
+  <details class="fold">
+    <summary>Эталонное решение
+      ({% if row.item.solution_source == 'catalog' %}из каталога{% else %}своё{% endif %})</summary>
+    <div class="fold-body">
+      {{ row.item.solution_text|linebreaksbr }}
+      <div class="row-meta" style="margin-top: 10px;">
+        Ученику: {{ row.item.get_solution_visible_after_display }}
+      </div>
+    </div>
+  </details>
+  {% else %}
+  <div class="row-meta" style="margin-top: 10px;">Решения нет.</div>
+  {% endif %}
+
+  {# --- Фаза 12: комментарии к задаче --- #}
+  <div class="comments" data-item="{{ row.item.pk }}">
+    <div class="comment-list">
+      {% for comment in row.comments %}
+      <div class="comment">
+        <div class="comment-head">
+          <span class="comment-author">{{ comment.author.get_full_name|default:comment.author.username }}</span>
+          · {{ comment.created_at|date:"d.m.Y H:i" }}
+          {% if comment.visibility == 'private' %}
+            · <span class="comment-private">только я и автор</span>
+          {% endif %}
+        </div>
+        <div>{{ comment.text|linebreaksbr }}</div>
+      </div>
+      {% empty %}
+      <div class="row-meta comment-empty">Комментариев пока нет.</div>
+      {% endfor %}
+    </div>
+
+    <form class="comment-form" data-item="{{ row.item.pk }}">
+      <textarea name="text" placeholder="Комментарий к задаче" required></textarea>
+      <div class="form-row">
+        <label>
+          Видимость:
+          <select name="visibility">
+            <option value="group">видят все</option>
+            <option value="private">только я и автор</option>
+          </select>
+        </label>
+        <button type="submit" class="btn-outline btn-small">Отправить</button>
+        <span class="form-status row-meta"></span>
+      </div>
+    </form>
+  </div>
+</div>
+{% empty %}
+<div class="empty-state">
+  <p>В задании нет задач.</p>
+  <p>Соберите его в конструкторе домашек.</p>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Отправка комментария без перезагрузки страницы.
+(function () {
+  const url = "{% url 'teacher:api_comment_create' %}";
+  const csrf = document.cookie.match(/csrftoken=([^;]+)/);
+
+  document.querySelectorAll('.comment-form').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      const status = form.querySelector('.form-status');
+      const textarea = form.querySelector('textarea');
+      const text = textarea.value.trim();
+      if (!text) { return; }
+      status.textContent = 'Отправляю…';
+
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrf ? csrf[1] : '',
+        },
+        body: JSON.stringify({
+          item_id: form.dataset.item,
+          text: text,
+          visibility: form.querySelector('[name=visibility]').value,
+        }),
+      })
+        .then(function (response) { return response.json().then(function (data) {
+          if (!response.ok) { throw new Error(data.error || 'Ошибка'); }
+          return data;
+        }); })
+        .then(function (data) {
+          const list = form.closest('.comments').querySelector('.comment-list');
+          const empty = list.querySelector('.comment-empty');
+          if (empty) { empty.remove(); }
+          const block = document.createElement('div');
+          block.className = 'comment';
+          const head = document.createElement('div');
+          head.className = 'comment-head';
+          head.textContent = data.author + ' · ' + data.created_at +
+            (data.visibility === 'private' ? ' · только я и автор' : '');
+          const body = document.createElement('div');
+          body.textContent = data.text;   // textContent, не innerHTML: текст чужой
+          block.appendChild(head);
+          block.appendChild(body);
+          list.appendChild(block);
+          textarea.value = '';
+          status.textContent = 'Готово';
+          setTimeout(function () { status.textContent = ''; }, 2000);
+        })
+        .catch(function (error) { status.textContent = error.message; });
+    });
+  });
+})();
+</script>
+{% endblock %}

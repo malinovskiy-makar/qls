@@ -273,6 +273,40 @@ input.answer-file {
   text-decoration: none;
 }
 .results-link:hover { color: var(--accent); }
+
+/* --- Платформа: решалка и вопросы по задаче --- */
+.pf-fold { margin-top: 12px; }
+.pf-fold > summary { cursor: pointer; font-size: 13px; color: var(--accent);
+                     list-style: none; padding: 4px 0; }
+.pf-fold > summary::-webkit-details-marker { display: none; }
+.pf-fold > summary::before { content: '▸ '; }
+.pf-fold[open] > summary::before { content: '▾ '; }
+.pf-fold-body { margin-top: 8px; padding: 12px 14px; background: var(--surface-2);
+                border-radius: var(--r); font-size: 13px; line-height: 1.7;
+                overflow-wrap: anywhere; }
+.pf-locked { margin-top: 12px; font-size: 12px; color: var(--text2);
+             background: var(--surface-2); border: 0.5px solid var(--border);
+             border-radius: var(--r); padding: 8px 12px; }
+.pf-comments { margin-top: 14px; border-top: 0.5px solid var(--border);
+               padding-top: 12px; }
+.pf-comment { font-size: 13px; line-height: 1.6; padding: 8px 0;
+              border-bottom: 0.5px solid var(--border); }
+.pf-comment:last-of-type { border-bottom: none; }
+.pf-comment-head { font-size: 12px; color: var(--text2); margin-bottom: 2px; }
+.pf-comment-form { margin-top: 10px; }
+.pf-comment-form textarea { width: 100%; min-height: 56px; resize: vertical;
+  font: inherit; font-size: 13px; padding: 8px 10px; border-radius: var(--r);
+  border: 0.5px solid var(--border); background: var(--surface-2);
+  color: var(--text); margin-bottom: 8px; }
+.pf-btn { border: 0.5px solid var(--border); border-radius: var(--r);
+          padding: 5px 12px; font-size: 12px; background: transparent;
+          color: var(--text); cursor: pointer; }
+.pf-btn:hover { background: var(--panel); }
+.pf-custom-head { font-size: 15px; font-weight: 600; margin: 26px 0 12px; }
+@media (max-width: 560px) {
+  .problem-card .problem-body { padding: 16px !important; }
+}
+
 {% endblock %}
 
 {% block content %}
@@ -447,6 +481,51 @@ input.answer-file {
         {% endwith %}
       {% endif %}
 
+      <!-- Эталонное решение (правила показа — на позиции задачи) -->
+      {% with sol=solutions_by_problem|dict_key:problem.pk %}
+      {% if sol and sol.has %}
+        {% if sol.visible %}
+        <details class="pf-fold">
+          <summary>Эталонное решение</summary>
+          <div class="pf-fold-body">{{ sol.text|linebreaksbr }}</div>
+        </details>
+        {% else %}
+        <div class="pf-locked">{{ sol.hint }}</div>
+        {% endif %}
+      {% endif %}
+      {% endwith %}
+
+      <!-- Вопрос по задаче -->
+      {% with item=solutions_by_problem|dict_key:problem.pk %}
+      {% if item %}
+      <div class="pf-comments" data-item="{{ item.item.pk }}">
+        <div class="pf-comment-list">
+          {% for comment in comments_by_problem|dict_key:problem.pk %}
+          <div class="pf-comment">
+            <div class="pf-comment-head">
+              <strong>{{ comment.author.get_full_name|default:comment.author.username }}</strong>
+              · {{ comment.created_at|date:"d.m.Y H:i" }}
+              {% if comment.visibility == 'private' %} · только вы и преподаватель{% endif %}
+            </div>
+            <div>{{ comment.text|linebreaksbr }}</div>
+          </div>
+          {% empty %}
+          <div class="pf-comment-empty" style="font-size:12px;color:var(--text2);">
+            Вопросов пока нет.
+          </div>
+          {% endfor %}
+        </div>
+        <form class="pf-comment-form" data-item="{{ item.item.pk }}">
+          <textarea name="text" placeholder="Вопрос по задаче — увидят только вы и преподаватель" required></textarea>
+          <div>
+            <button type="submit" class="pf-btn">Спросить</button>
+            <span class="pf-status" style="font-size:12px;color:var(--text2);"></span>
+          </div>
+        </form>
+      </div>
+      {% endif %}
+      {% endwith %}
+
       <!-- Подсказки -->
       {% if problem.hints.all and sub.status != 'submitted' and sub.status != 'reviewed' %}
       <div id="hints-{{ problem.pk }}">
@@ -465,6 +544,95 @@ input.answer-file {
   </div>
   {% endwith %}
   {% endfor %}
+
+  {% if custom_rows %}
+  <div class="pf-custom-head">Задачи от преподавателя</div>
+  {% for row in custom_rows %}
+  <div class="problem-card" id="item-{{ row.item.pk }}">
+    <div class="problem-body" style="padding:20px;">
+      <div style="font-weight:600;margin-bottom:8px;">
+        {{ forloop.counter }}. {{ row.problem.title|default:"Задача преподавателя" }}
+      </div>
+      <div class="problem-statement">{{ row.problem.statement|linebreaksbr }}</div>
+
+      {% if row.sub.status == 'not_started' or row.sub.status == 'in_progress' %}
+        <div class="answer-area">
+        {% if row.options %}
+          {% for option in row.options %}
+          <label style="display:block;font-size:14px;margin:4px 0;">
+            <input type="{% if row.problem.kind == 'multiple' %}checkbox{% else %}radio{% endif %}"
+                   name="answer_item_{{ row.item.pk }}" value="{{ option.pk }}">
+            {{ option.text }}
+          </label>
+          {% endfor %}
+        {% else %}
+          <label for="answer_item_{{ row.item.pk }}"
+                 style="font-size:13px;color:var(--text2);">Ответ:</label>
+          <input type="text" id="answer_item_{{ row.item.pk }}"
+                 name="answer_item_{{ row.item.pk }}"
+                 style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;font-size:14px;">
+          <label for="text_item_{{ row.item.pk }}"
+                 style="display:block;margin-top:10px;font-size:13px;color:var(--text2);">Моё решение:</label>
+          <textarea class="answer-text" id="text_item_{{ row.item.pk }}"
+                    name="text_item_{{ row.item.pk }}"></textarea>
+        {% endif %}
+        </div>
+      {% else %}
+        <div class="answer-area">
+          <div class="submitted-label">Мой ответ</div>
+          <div class="submitted-answer">{{ row.sub.submitted_answer|default:"—" }}</div>
+          {% if row.sub.solution_text %}
+          <div class="submitted-answer" style="margin-top:6px;white-space:pre-wrap;">{{ row.sub.solution_text }}</div>
+          {% endif %}
+        </div>
+        {% if row.feedback %}
+        <div class="feedback-block">
+          {% if row.feedback.score is not None %}<div class="feedback-score">{{ row.feedback.score }} б.</div>{% endif %}
+          {% if row.feedback.comment %}<div class="feedback-comment">{{ row.feedback.comment }}</div>{% endif %}
+        </div>
+        {% elif row.sub.status == 'submitted' %}
+        <div class="pf-locked">Ждёт проверки преподавателем.</div>
+        {% endif %}
+      {% endif %}
+
+      {% if row.item.has_solution %}
+        {% if row.solution_visible %}
+        <details class="pf-fold">
+          <summary>Эталонное решение</summary>
+          <div class="pf-fold-body">{{ row.item.solution_text|linebreaksbr }}</div>
+        </details>
+        {% else %}
+        <div class="pf-locked">{{ row.solution_hint }}</div>
+        {% endif %}
+      {% endif %}
+
+      <div class="pf-comments" data-item="{{ row.item.pk }}">
+        <div class="pf-comment-list">
+          {% for comment in row.comments %}
+          <div class="pf-comment">
+            <div class="pf-comment-head">
+              <strong>{{ comment.author.get_full_name|default:comment.author.username }}</strong>
+              · {{ comment.created_at|date:"d.m.Y H:i" }}
+              {% if comment.visibility == 'private' %} · только вы и преподаватель{% endif %}
+            </div>
+            <div>{{ comment.text|linebreaksbr }}</div>
+          </div>
+          {% empty %}
+          <div class="pf-comment-empty" style="font-size:12px;color:var(--text2);">Вопросов пока нет.</div>
+          {% endfor %}
+        </div>
+        <form class="pf-comment-form" data-item="{{ row.item.pk }}">
+          <textarea name="text" placeholder="Вопрос по задаче — увидят только вы и преподаватель" required></textarea>
+          <div>
+            <button type="submit" class="pf-btn">Спросить</button>
+            <span class="pf-status" style="font-size:12px;color:var(--text2);"></span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
 
   <!-- Кнопка отправки -->
   {% if not all_reviewed %}
@@ -556,4 +724,51 @@ function markInProgress(pk) {
   // Визуальный сигнал что пользователь начал вводить текст
 }
 </script>
+
+<script>
+// Вопрос ученика по задаче — без перезагрузки страницы.
+// Видимость всегда приватная: её ставит СЕРВЕР, клиент её не выбирает.
+(function () {
+  var url = "{% url 'teacher:api_comment_create' %}";
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+  document.querySelectorAll('.pf-comment-form').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var status = form.querySelector('.pf-status');
+      var textarea = form.querySelector('textarea');
+      var text = textarea.value.trim();
+      if (!text) { return; }
+      status.textContent = 'Отправляю…';
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+                   'X-CSRFToken': csrf ? csrf[1] : '' },
+        body: JSON.stringify({ item_id: form.dataset.item, text: text })
+      })
+      .then(function (r) { return r.json().then(function (d) {
+        if (!r.ok) { throw new Error(d.error || 'Ошибка'); } return d; }); })
+      .then(function (data) {
+        var list = form.closest('.pf-comments').querySelector('.pf-comment-list');
+        var empty = list.querySelector('.pf-comment-empty');
+        if (empty) { empty.remove(); }
+        var block = document.createElement('div');
+        block.className = 'pf-comment';
+        var head = document.createElement('div');
+        head.className = 'pf-comment-head';
+        head.textContent = data.author + ' · ' + data.created_at +
+          ' · только вы и преподаватель';
+        var body = document.createElement('div');
+        body.textContent = data.text;
+        block.appendChild(head); block.appendChild(body);
+        list.appendChild(block);
+        textarea.value = '';
+        status.textContent = 'Отправлено';
+        setTimeout(function () { status.textContent = ''; }, 2000);
+      })
+      .catch(function (error) { status.textContent = error.message; });
+    });
+  });
+})();
+</script>
+
 {% endblock %}

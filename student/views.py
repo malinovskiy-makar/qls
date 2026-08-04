@@ -62,6 +62,42 @@ def auto_check_submission(submission):
     submission.status = 'reviewed'
     submission.save()
 
+
+# ---------------------------------------------------------------------------
+# Автопроверка своей задачи репетитора
+# ---------------------------------------------------------------------------
+
+def auto_check_custom(submission, item):
+    """Проверяет ответ на свою задачу репетитора и ставит балл.
+
+    Тест проверяется всегда, открытая задача — только если репетитор задал
+    эталонный ответ. Иначе решение остаётся «ждёт проверки»: выдумывать за
+    репетитора, что считать верным, мы не имеем права.
+    """
+    from problems.answer_check import check_custom_problem
+    from problems.models import TeacherFeedback
+
+    problem = item.custom_problem
+    auto, is_correct = check_custom_problem(problem, submission.submitted_answer)
+    if not auto:
+        return
+
+    max_points = float(item.points) if item.points is not None else 1.0
+    score = max_points if is_correct else 0.0
+    comment = 'Верно ✓' if is_correct else 'Неверно.'
+
+    feedback, created = TeacherFeedback.objects.get_or_create(
+        submission=submission,
+        defaults={'score': score, 'comment': comment, 'reviewed_by': None})
+    if not created:
+        feedback.score = score
+        feedback.comment = comment
+        feedback.save()
+
+    submission.status = 'reviewed'
+    submission.save()
+
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -201,7 +237,7 @@ def dashboard(request):
 
 @student_required
 def assignment_detail(request, pk):
-    from problems.models import Assignment, Submission
+    from problems.models import Assignment, ProblemComment, Submission
 
     assignment = get_object_or_404(Assignment, pk=pk, students=request.user)
     problems = assignment.problems.prefetch_related('parts', 'hints').order_by('id')
@@ -230,6 +266,58 @@ def assignment_detail(request, pk):
         sub.status in ('submitted', 'reviewed') for sub in submissions.values()
     ) if submissions else False
 
+    # --- Платформа: позиции задачи в домашке -----------------------------
+    # Комментарии и решалка живут не у задачи каталога, а у ПОЗИЦИИ задачи
+    # в этой домашке. Собираем соответствие «задача → позиция» один раз.
+    items = list(assignment.items
+                 .select_related('catalog_problem', 'custom_problem')
+                 .order_by('order', 'id'))
+    items_by_problem = {i.catalog_problem_id: i for i in items
+                        if i.catalog_problem_id}
+
+    comments_by_problem = {}
+    solutions_by_problem = {}
+    for problem in problems:
+        item = items_by_problem.get(problem.pk)
+        if item is None:
+            continue
+        comments_by_problem[problem.pk] = list(
+            ProblemComment.objects.visible_for(request.user)
+            .filter(problem_item=item).select_related('author'))
+        solutions_by_problem[problem.pk] = {
+            'item': item,
+            'visible': item.is_solution_visible_for(request.user),
+            'text': item.solution_text,
+            'hint': item.solution_unlock_hint(),
+            'has': item.has_solution,
+        }
+
+    # Свои задачи репетитора идут отдельным блоком: в старом цикле их не
+    # показать (он ходит по `assignment.problems`, а записи в Problem у них
+    # нет вовсе). Порядок внутри блока — как в задании.
+    custom_rows = []
+    for item in items:
+        if not item.is_custom:
+            continue
+        sub, _ = Submission.objects.get_or_create(
+            student=request.user, assignment=assignment, problem_item=item,
+            defaults={'status': 'not_started'})
+        custom_rows.append({
+            'item': item,
+            'problem': item.custom_problem,
+            'sub': sub,
+            'feedback': getattr(sub, 'feedback', None),
+            'options': list(item.custom_problem.options.all())
+            if item.custom_problem.is_test else [],
+            'comments': list(ProblemComment.objects.visible_for(request.user)
+                             .filter(problem_item=item)
+                             .select_related('author')),
+            'solution_visible': item.is_solution_visible_for(request.user),
+            'solution_hint': item.solution_unlock_hint(),
+        })
+
+    is_open, closed_reason = assignment.open_state_for(request.user)
+
     return render(request, 'student/assignment_detail.html', {
         'assignment': assignment,
         'problems': problems,
@@ -237,6 +325,11 @@ def assignment_detail(request, pk):
         'feedbacks': feedbacks,
         'all_reviewed': all_reviewed,
         'all_submitted_or_reviewed': all_submitted_or_reviewed,
+        'comments_by_problem': comments_by_problem,
+        'solutions_by_problem': solutions_by_problem,
+        'custom_rows': custom_rows,
+        'is_open': is_open,
+        'closed_reason': closed_reason,
     })
 
 
@@ -280,6 +373,29 @@ def submit_assignment(request, pk):
             auto_check_submission(sub)
             saved += 1
             _log_submission_event(request, assignment, sub, problem)
+
+    # Свои задачи репетитора — у них нет записи в Problem, адресуются
+    # позицией в домашке.
+    for item in assignment.items.select_related('custom_problem'):
+        if not item.is_custom:
+            continue
+        sub = Submission.objects.filter(
+            student=request.user, assignment=assignment,
+            problem_item=item).first()
+        if not sub or sub.status in ('submitted', 'reviewed'):
+            continue
+        answer = ', '.join(request.POST.getlist(f'answer_item_{item.pk}'))
+        text = (request.POST.get(f'text_item_{item.pk}') or '').strip()
+        if answer or text:
+            sub.submitted_answer = answer
+            sub.solution_text = text
+            sub.status = 'submitted'
+            sub.submitted_at = timezone.now()
+            sub.save()
+            auto_check_custom(sub, item)
+            saved += 1
+            _log_submission_event(request, assignment, sub,
+                                  item.custom_problem)
 
     if saved:
         messages.success(request, 'Домашка отправлена! Преподаватель скоро проверит.')

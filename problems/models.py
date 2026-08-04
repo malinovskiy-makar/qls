@@ -1152,6 +1152,9 @@ class StudentGroup(models.Model):
     """Группа учеников у одного учителя. Учитель может иметь несколько групп."""
 
     name = models.CharField(max_length=100, verbose_name='Название группы')
+    # Добавлено вместе с вкладкой «Группы»: форма создания просит название
+    # и описание, а хранить описание было негде.
+    description = models.TextField('Описание', blank=True)
     teacher = models.ForeignKey(
         'User',
         on_delete=models.CASCADE,

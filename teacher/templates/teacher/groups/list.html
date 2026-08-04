@@ -1,0 +1,54 @@
+{% extends 'teacher/base.html' %}
+
+{% block title %}Группы — ЭкЗадачи{% endblock %}
+
+{% block extra_style %}{% include 'teacher/groups/_style.html' %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Группы</h1>
+    <div class="page-sub">Вся работа с группой — внутри этой вкладки.</div>
+  </div>
+  <a href="{% url 'teacher:group_create' %}" class="btn-primary">+ Создать группу</a>
+</div>
+
+{% if cards %}
+<div class="cards-grid">
+  {% for card in cards %}
+  <div class="card">
+    <div class="card-name">{{ card.group.name }}</div>
+    <div class="card-meta">
+      {{ card.students }} ученик{{ card.students|pluralize:",а,ов" }} ·
+      {{ card.assignments }} задани{{ card.assignments|pluralize:"е,я,й" }}<br>
+      {% if card.pending %}
+        <span class="badge badge-pending">{{ card.pending }} ждёт проверки</span><br>
+      {% else %}
+        <span class="badge badge-ok">Всё проверено</span><br>
+      {% endif %}
+      {% if card.next_deadline %}
+        Ближайший дедлайн: {{ card.next_deadline|date:"d.m.Y H:i" }}<br>
+      {% else %}
+        Ближайших дедлайнов нет<br>
+      {% endif %}
+      Активность: {{ card.last_activity|date:"d.m.Y" }}
+    </div>
+    <div class="card-footer">
+      <a href="{% url 'teacher:group_detail' card.group.pk %}" class="btn-outline">Открыть →</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Пока нет групп.</p>
+  <p>Создайте первую — внутри неё живут ученики, задания и проверка.</p>
+</div>
+{% endif %}
+
+<div class="note" style="margin-top: 24px;">
+  Подключение учеников (ссылки-приглашения) появится позже. Сейчас ученики
+  добавляются в группу через админку или командой
+  <code>seed_platform_demo</code>.
+</div>
+{% endblock %}

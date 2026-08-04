@@ -1,0 +1,43 @@
+{% extends 'teacher/base.html' %}
+
+{% block title %}Создать группу — ЭкЗадачи{% endblock %}
+
+{% block extra_style %}{% include 'teacher/groups/_style.html' %}
+.form-field { margin-bottom: 16px; }
+.form-field label { display: block; font-size: 13px; font-weight: 500;
+                    margin-bottom: 6px; }
+.form-field input, .form-field textarea {
+  width: 100%; font: inherit; font-size: 14px; padding: 9px 12px;
+  border-radius: var(--r); border: 0.5px solid var(--border);
+  background: var(--surface-2); color: var(--text);
+}
+.form-field textarea { min-height: 80px; resize: vertical; }
+{% endblock %}
+
+{% block content %}
+<div class="crumbs"><a href="{% url 'teacher:groups' %}">Группы</a> → Новая группа</div>
+
+<h1 class="page-title" style="margin-bottom: 20px;">Создать группу</h1>
+
+<div class="card" style="max-width: 520px;">
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-field">
+      <label for="id_name">Название группы</label>
+      <input type="text" id="id_name" name="name" required maxlength="100"
+             placeholder="Например: Экономика 10–11, вторник">
+    </div>
+    <div class="form-field">
+      <label for="id_description">Описание (необязательно)</label>
+      <textarea id="id_description" name="description"
+                placeholder="Для чего эта группа, какой курс"></textarea>
+    </div>
+    <button type="submit" class="btn-primary">Создать группу</button>
+    <a href="{% url 'teacher:groups' %}" class="btn-outline">Отмена</a>
+  </form>
+</div>
+
+<div class="note" style="margin-top: 20px; max-width: 520px;">
+  Подключение учеников появится позже — пока их добавляют через админку.
+</div>
+{% endblock %}

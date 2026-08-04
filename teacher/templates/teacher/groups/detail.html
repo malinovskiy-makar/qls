@@ -1,0 +1,95 @@
+{% extends 'teacher/base.html' %}
+
+{% block title %}{{ group.name }} — ЭкЗадачи{% endblock %}
+
+{% block extra_style %}{% include 'teacher/groups/_style.html' %}{% endblock %}
+
+{% block content %}
+<div class="crumbs"><a href="{% url 'teacher:groups' %}">Группы</a> → {{ group.name }}</div>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ group.name }}</h1>
+    {% if group.description %}<div class="page-sub">{{ group.description }}</div>{% endif %}
+  </div>
+</div>
+
+<nav class="tabs">
+  <a href="?tab=students"    class="{% if tab == 'students' %}active{% endif %}">Ученики</a>
+  <a href="?tab=assignments" class="{% if tab == 'assignments' %}active{% endif %}">Задания</a>
+  <a href="?tab=materials"   class="{% if tab == 'materials' %}active{% endif %}">Материалы</a>
+</nav>
+
+{% if tab == 'students' %}
+  {% if student_rows %}
+  <div class="card" style="padding: 0;">
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Ученик</th><th>Сдано</th><th>Ждёт проверки</th>
+            <th>Средний балл</th><th>Последний вход</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for row in student_rows %}
+          <tr>
+            <td>{{ row.student.get_full_name|default:row.student.username }}</td>
+            <td>{{ row.submitted }}</td>
+            <td>{% if row.pending %}<span class="badge badge-pending">{{ row.pending }}</span>{% else %}—{% endif %}</td>
+            <td>{% if row.avg_score is not None %}{{ row.avg_score }}{% else %}—{% endif %}</td>
+            <td>{% if row.last_login %}{{ row.last_login|date:"d.m.Y" }}{% else %}не заходил{% endif %}</td>
+            <td><a href="{% url 'teacher:student_progress' row.student.pk %}" class="btn-outline btn-small">Прогресс</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>В группе пока нет учеников.</p>
+    <p>Подключение учеников появится позже — сейчас их добавляют через админку.</p>
+  </div>
+  {% endif %}
+
+{% elif tab == 'assignments' %}
+  <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px;">
+    <a href="{% url 'teacher:assignment_create' %}?group={{ group.pk }}" class="btn-primary">+ Создать домашку</a>
+    <a href="{% url 'teacher:assignment_create' %}?group={{ group.pk }}&kind=exam" class="btn-outline">+ Создать контрольную</a>
+  </div>
+
+  {% if assignment_rows %}
+  <div class="rows">
+    {% for row in assignment_rows %}
+    <a class="row-link" href="{% url 'teacher:group_assignment' group.pk row.assignment.pk %}">
+      <span>
+        <span class="row-main">{{ row.assignment.name }}</span>
+        {% if row.is_exam %}<span class="badge badge-exam">контрольная</span>{% endif %}
+        <br>
+        <span class="row-meta">
+          {% if row.deadline %}Дедлайн {{ row.deadline|date:"d.m.Y H:i" }}{% else %}Без дедлайна{% endif %}
+          · Сдали {{ row.submitted }} из {{ row.students }}
+        </span>
+      </span>
+      <span>
+        {% if row.pending %}<span class="badge badge-pending">{{ row.pending }} на проверку</span>
+        {% else %}<span class="badge badge-ok">проверено</span>{% endif %}
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>В группе пока нет заданий.</p>
+    <p>Создайте домашку или контрольную — они появятся здесь.</p>
+  </div>
+  {% endif %}
+
+{% else %}
+  <div class="empty-state">
+    <p><strong>Материалы</strong></p>
+    <p>Появится позже. Сюда лягут сохранённые графики, доступные группе.</p>
+  </div>
+{% endif %}
+{% endblock %}

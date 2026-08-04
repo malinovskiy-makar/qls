@@ -79,6 +79,8 @@ def update_student_progress(submission, feedback):
 
 # ---------------------------------------------------------------------------
 # В3 — Дашборд учителя
+# устарело, удалить после сессии 5: маршрут `/teacher/` теперь ведёт на
+# дашборд входящих (`views_groups.dashboard`). Вьюха оставлена как справка.
 # ---------------------------------------------------------------------------
 
 @teacher_required
@@ -109,7 +111,14 @@ def dashboard(request):
 # ---------------------------------------------------------------------------
 
 @teacher_required
-def assignment_detail(request, pk):
+def assignment_detail(request, pk, group=None):
+    """Таблица решений по домашке.
+
+    Переехала под групповые URL (`/teacher/groups/<g>/assignments/<a>/
+    submissions/`). Логика проверки НЕ менялась — только адрес и навигация,
+    поэтому вьюха одна, а `group` определяет, куда ведут ссылки и хлебные
+    крошки. Старый адрес остался редиректом.
+    """
     from problems.models import Assignment, Submission
 
     assignment = get_object_or_404(Assignment, pk=pk, author=request.user)
@@ -126,6 +135,7 @@ def assignment_detail(request, pk):
         'assignment': assignment,
         'submissions': submissions,
         'status_filter': status_filter,
+        'group': group or assignment.group,
     })
 
 
@@ -134,7 +144,9 @@ def assignment_detail(request, pk):
 # ---------------------------------------------------------------------------
 
 @teacher_required
-def review_submission(request, pk):
+def review_submission(request, pk, group=None):
+    """Форма оценки решения. Переехала под групповые URL; логика оценки
+    не менялась."""
     from problems.models import MistakeTag, Submission, TeacherFeedback
 
     submission = get_object_or_404(Submission, pk=pk)
@@ -177,6 +189,11 @@ def review_submission(request, pk):
         update_student_progress(submission, feedback)
 
         messages.success(request, f'Решение проверено. Балл: {score}')
+        group_obj = group or submission.assignment.group
+        if group_obj is not None:
+            return redirect('teacher:group_submissions',
+                            group_id=group_obj.pk,
+                            assignment_id=submission.assignment.pk)
         return redirect('teacher:assignment_detail', pk=submission.assignment.pk)
 
     return render(request, 'teacher/review.html', {
@@ -184,11 +201,14 @@ def review_submission(request, pk):
         'problem': problem,
         'existing_feedback': existing_feedback,
         'mistake_tags': mistake_tags,
+        'group': group or submission.assignment.group,
     })
 
 
 # ---------------------------------------------------------------------------
 # Этап Е — Группы учеников
+# устарело, удалить после сессии 5: экраны групп переехали в
+# `teacher/views_groups.py` (список, страница группы, создание).
 # ---------------------------------------------------------------------------
 
 @teacher_required
@@ -589,3 +609,35 @@ def api_assignment_add_problem(request, pk):
     assignment.problems.add(problem)
 
     return JsonResponse({'ok': True, 'problem_id': problem.pk, 'assignment_id': assignment.pk})
+
+
+# ---------------------------------------------------------------------------
+# устарело, удалить после сессии 5
+# Старые адреса проверки решений. Ведут на новые (внутри группы). Оставлены
+# редиректом, а не удалены, чтобы не сломать закладки и ссылки в письмах.
+# ---------------------------------------------------------------------------
+
+@teacher_required
+def legacy_assignment_detail(request, pk):
+    """устарело, удалить после сессии 5 → teacher:group_submissions"""
+    from problems.models import Assignment
+
+    assignment = get_object_or_404(Assignment, pk=pk)
+    if assignment.group_id:
+        return redirect('teacher:group_submissions',
+                        group_id=assignment.group_id, assignment_id=pk)
+    # Задание вне группы (выдано до появления групп) — показываем как раньше.
+    return assignment_detail(request, pk)
+
+
+@teacher_required
+def legacy_review_submission(request, pk):
+    """устарело, удалить после сессии 5 → teacher:group_review_submission"""
+    from problems.models import Submission
+
+    submission = get_object_or_404(Submission, pk=pk)
+    group_id = submission.assignment.group_id
+    if group_id:
+        return redirect('teacher:group_review_submission',
+                        group_id=group_id, submission_id=pk)
+    return review_submission(request, pk)

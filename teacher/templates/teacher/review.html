@@ -221,7 +221,11 @@ input[type="number"].form-input {
 
 {% block content %}
 <div class="page-header">
-  <a href="{% url 'teacher:assignment_detail' submission.assignment.pk %}" class="btn-back">← Назад к списку</a>
+  {% if group %}
+    <a href="{% url 'teacher:group_submissions' group.pk submission.assignment.pk %}" class="btn-back">← Назад к списку</a>
+  {% else %}
+    <a href="{% url 'teacher:assignment_detail' submission.assignment.pk %}" class="btn-back">← Назад к списку</a>
+  {% endif %}
   <h1 class="page-title">
     {{ submission.student.get_full_name|default:submission.student.username }}
     —
@@ -296,7 +300,7 @@ input[type="number"].form-input {
 
   <!-- Правая часть — форма оценки -->
   <div>
-    <form method="post" action="{% url 'teacher:review_submission' submission.pk %}">
+    <form method="post" action="{% if group %}{% url 'teacher:group_review_submission' group.pk submission.pk %}{% else %}{% url 'teacher:review_submission' submission.pk %}{% endif %}">
       {% csrf_token %}
       <div class="form-card">
         <h3>Оценка</h3>

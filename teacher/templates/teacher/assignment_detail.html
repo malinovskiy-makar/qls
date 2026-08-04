@@ -1,6 +1,6 @@
 {% extends "teacher/base.html" %}
 
-{% block title %}{{ assignment.title }}{% endblock %}
+{% block title %}{{ assignment.name }} — проверка{% endblock %}
 
 {% block extra_style %}
 .page-header {
@@ -102,16 +102,35 @@
 
 {% block content %}
 <div class="page-header">
-  <a href="{% url 'teacher:dashboard' %}" class="btn-back">← Назад</a>
-  <h1 class="page-title">{{ assignment.title }}</h1>
+  {% if group %}
+    <a href="{% url 'teacher:group_assignment' group.pk assignment.pk %}" class="btn-back">← К заданию</a>
+  {% else %}
+    <a href="{% url 'teacher:dashboard' %}" class="btn-back">← Назад</a>
+  {% endif %}
+  <h1 class="page-title">{{ assignment.name }}</h1>
+</div>
+
+{% if group %}
+<div style="font-size:13px;color:var(--text2);margin:-12px 0 18px;">
+  <a href="{% url 'teacher:groups' %}" style="color:var(--accent);text-decoration:none;">Группы</a> →
+  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments" style="color:var(--accent);text-decoration:none;">{{ group.name }}</a> →
+  проверка решений
+</div>
+{% endif %}
+
+<div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:var(--r);padding:10px 14px;font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:18px;">
+  Тестовые задачи оценены автоматически сразу при сдаче — их баллы уже видны.
+  Открытые задачи ждут вашей оценки.
 </div>
 
 <div class="filter-tabs">
-  <a href="{% url 'teacher:assignment_detail' assignment.pk %}"
+  {% if group %}{% url 'teacher:group_submissions' group.pk assignment.pk as base_url %}
+  {% else %}{% url 'teacher:assignment_detail' assignment.pk as base_url %}{% endif %}
+  <a href="{{ base_url }}"
      class="filter-tab {% if not status_filter %}active{% endif %}">Все</a>
-  <a href="{% url 'teacher:assignment_detail' assignment.pk %}?status=submitted"
+  <a href="{{ base_url }}?status=submitted"
      class="filter-tab {% if status_filter == 'submitted' %}active{% endif %}">Ждут проверки</a>
-  <a href="{% url 'teacher:assignment_detail' assignment.pk %}?status=reviewed"
+  <a href="{{ base_url }}?status=reviewed"
      class="filter-tab {% if status_filter == 'reviewed' %}active{% endif %}">Проверено</a>
 </div>
 
@@ -154,10 +173,12 @@
         {% endif %}
       </td>
       <td>
+        {% if group %}{% url 'teacher:group_review_submission' group.pk sub.pk as review_url %}
+        {% else %}{% url 'teacher:review_submission' sub.pk as review_url %}{% endif %}
         {% if sub.status == 'submitted' %}
-          <a href="{% url 'teacher:review_submission' sub.pk %}" class="btn-action btn-review">Проверить</a>
+          <a href="{{ review_url }}" class="btn-action btn-review">Проверить</a>
         {% elif sub.status == 'reviewed' %}
-          <a href="{% url 'teacher:review_submission' sub.pk %}" class="btn-action btn-view">Смотреть</a>
+          <a href="{{ review_url }}" class="btn-action btn-view">Смотреть</a>
         {% endif %}
       </td>
     </tr>
