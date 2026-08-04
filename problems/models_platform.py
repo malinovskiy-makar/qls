@@ -334,6 +334,18 @@ class CustomProblemOption(models.Model):
         return f'{mark} {self.text[:40]}'
 
 
+def assignment_deadline(assignment):
+    """Срок сдачи домашки одним понятием.
+
+    У домашки исторически есть `deadline`, у контрольной типа Б добавился
+    `due_at` (Фаза 6). Спрашивать «а какое из двух полей смотреть» на каждом
+    экране — верный способ разъехаться, поэтому спрашиваем здесь.
+    """
+    if assignment is None:
+        return None
+    return getattr(assignment, 'due_at', None) or assignment.deadline
+
+
 class SolutionVisibility(models.TextChoices):
     """Когда ученик увидит эталонное решение."""
     DEADLINE = 'deadline', 'После дедлайна'
@@ -456,6 +468,102 @@ class AssignmentItem(models.Model):
         if self.catalog_problem_id is None:
             return ''
         return self.catalog_problem.answer
+
+    # --- Фаза 5. Решение: что показывать и кому --------------------------
+
+    @property
+    def solution_source(self):
+        """Откуда решение: 'own' — своё, 'catalog' — из каталога, '' — нет."""
+        if self.solution_override.strip():
+            return 'own'
+        problem = self.problem
+        if problem is not None and (problem.solution or '').strip():
+            return 'catalog' if not self.is_custom else 'own'
+        return ''
+
+    @property
+    def solution_text(self):
+        """Текст решения с учётом замены."""
+        if self.solution_override.strip():
+            return self.solution_override
+        problem = self.problem
+        return (problem.solution or '') if problem is not None else ''
+
+    @property
+    def has_solution(self):
+        return bool(self.solution_text.strip())
+
+    def is_tutor_for(self, user):
+        """Репетитор этой домашки: её автор или преподаватель её группы."""
+        if user is None or not user.is_authenticated:
+            return False
+        assignment = self.assignment
+        if assignment.author_id == user.pk:
+            return True
+        group = getattr(assignment, 'group', None)
+        return group is not None and group.teacher_id == user.pk
+
+    def _student_submitted(self, user):
+        """Сдал ли этот ученик эту позицию."""
+        from .models import Submission
+        return Submission.objects.filter(
+            student=user, assignment=self.assignment,
+            status__in=('submitted', 'reviewed'),
+        ).filter(
+            models.Q(problem_item=self)
+            | models.Q(problem_item__isnull=True,
+                       problem=self.catalog_problem_id)
+        ).exists()
+
+    def is_solution_visible_for(self, user, now=None):
+        """Можно ли ЭТОМУ пользователю показать эталонное решение.
+
+        Репетитор видит всегда — он его и написал. Для ученика:
+        * `deadline` — после дедлайна домашки. ЕСЛИ ДЕДЛАЙНА НЕТ, решение
+          НЕ показывается, пока репетитор не откроет вручную: «после
+          никогда» не наступает, а показать решение раньше времени —
+          необратимо (задачу уже не задать заново);
+        * `submit`   — после того, как ЭТОТ ученик сдал;
+        * `manual`   — только если репетитор нажал «Открыть решение»;
+        * `never`    — никогда, и ручное открытие тут не работает.
+        """
+        if user is None or not getattr(user, 'is_authenticated', False):
+            return False
+        if self.is_tutor_for(user):
+            return True
+        if not self.has_solution:
+            return False
+
+        now = now or timezone.now()
+        mode = self.solution_visible_after
+        released = (self.solution_released_at is not None
+                    and self.solution_released_at <= now)
+
+        if mode == SolutionVisibility.NEVER:
+            return False
+        if mode == SolutionVisibility.MANUAL:
+            return released
+        if mode == SolutionVisibility.SUBMIT:
+            return self._student_submitted(user)
+        # SolutionVisibility.DEADLINE
+        deadline = assignment_deadline(self.assignment)
+        if deadline is None:
+            return released
+        return now >= deadline or released
+
+    def solution_unlock_hint(self):
+        """Человеческая подсказка «когда откроется» — вместо пустоты."""
+        mode = self.solution_visible_after
+        if mode == SolutionVisibility.NEVER:
+            return 'Решение к этой задаче не показывается.'
+        if mode == SolutionVisibility.SUBMIT:
+            return 'Решение откроется сразу после того, как вы сдадите работу.'
+        if mode == SolutionVisibility.MANUAL:
+            return 'Решение откроет преподаватель.'
+        deadline = assignment_deadline(self.assignment)
+        if deadline is None:
+            return 'Дедлайна нет — решение откроет преподаватель.'
+        return f'Решение откроется после дедлайна {deadline:%d.%m.%Y %H:%M}.'
 
 
 # ===========================================================================
@@ -603,114 +711,6 @@ class SavedGraph(models.Model):
 # ===========================================================================
 # Фаза 5. Решалка — правила показа эталонного решения
 # ===========================================================================
-
-def assignment_deadline(assignment):
-    """Срок сдачи домашки одним понятием.
-
-    У домашки исторически есть `deadline`, у контрольной типа Б добавился
-    `due_at` (Фаза 6). Спрашивать «а какое из двух полей смотреть» на каждом
-    экране — верный способ разъехаться, поэтому спрашиваем здесь.
-    """
-    if assignment is None:
-        return None
-    return getattr(assignment, 'due_at', None) or assignment.deadline
-
-    # --- Фаза 5. Решение: что показывать и кому --------------------------
-
-    @property
-    def solution_source(self):
-        """Откуда решение: 'own' — своё, 'catalog' — из каталога, '' — нет."""
-        if self.solution_override.strip():
-            return 'own'
-        problem = self.problem
-        if problem is not None and (problem.solution or '').strip():
-            return 'catalog' if not self.is_custom else 'own'
-        return ''
-
-    @property
-    def solution_text(self):
-        """Текст решения с учётом замены."""
-        if self.solution_override.strip():
-            return self.solution_override
-        problem = self.problem
-        return (problem.solution or '') if problem is not None else ''
-
-    @property
-    def has_solution(self):
-        return bool(self.solution_text.strip())
-
-    def is_tutor_for(self, user):
-        """Репетитор этой домашки: её автор или преподаватель её группы."""
-        if user is None or not user.is_authenticated:
-            return False
-        assignment = self.assignment
-        if assignment.author_id == user.pk:
-            return True
-        group = getattr(assignment, 'group', None)
-        return group is not None and group.teacher_id == user.pk
-
-    def _student_submitted(self, user):
-        """Сдал ли этот ученик эту позицию."""
-        from .models import Submission
-        return Submission.objects.filter(
-            student=user, assignment=self.assignment,
-            status__in=('submitted', 'reviewed'),
-        ).filter(
-            models.Q(problem_item=self)
-            | models.Q(problem_item__isnull=True,
-                       problem=self.catalog_problem_id)
-        ).exists()
-
-    def is_solution_visible_for(self, user, now=None):
-        """Можно ли ЭТОМУ пользователю показать эталонное решение.
-
-        Репетитор видит всегда — он его и написал. Для ученика:
-        * `deadline` — после дедлайна домашки. ЕСЛИ ДЕДЛАЙНА НЕТ, решение
-          НЕ показывается, пока репетитор не откроет вручную: «после
-          никогда» не наступает, а показать решение раньше времени —
-          необратимо (задачу уже не задать заново);
-        * `submit`   — после того, как ЭТОТ ученик сдал;
-        * `manual`   — только если репетитор нажал «Открыть решение»;
-        * `never`    — никогда, и ручное открытие тут не работает.
-        """
-        if user is None or not getattr(user, 'is_authenticated', False):
-            return False
-        if self.is_tutor_for(user):
-            return True
-        if not self.has_solution:
-            return False
-
-        now = now or timezone.now()
-        mode = self.solution_visible_after
-        released = (self.solution_released_at is not None
-                    and self.solution_released_at <= now)
-
-        if mode == SolutionVisibility.NEVER:
-            return False
-        if mode == SolutionVisibility.MANUAL:
-            return released
-        if mode == SolutionVisibility.SUBMIT:
-            return self._student_submitted(user)
-        # SolutionVisibility.DEADLINE
-        deadline = assignment_deadline(self.assignment)
-        if deadline is None:
-            return released
-        return now >= deadline or released
-
-    def solution_unlock_hint(self):
-        """Человеческая подсказка «когда откроется» — вместо пустоты."""
-        mode = self.solution_visible_after
-        if mode == SolutionVisibility.NEVER:
-            return 'Решение к этой задаче не показывается.'
-        if mode == SolutionVisibility.SUBMIT:
-            return 'Решение откроется сразу после того, как вы сдадите работу.'
-        if mode == SolutionVisibility.MANUAL:
-            return 'Решение откроет преподаватель.'
-        deadline = assignment_deadline(self.assignment)
-        if deadline is None:
-            return 'Дедлайна нет — решение откроет преподаватель.'
-        return f'Решение откроется после дедлайна {deadline:%d.%m.%Y %H:%M}.'
-
 
 # ===========================================================================
 # Фаза 6. Контрольные: попытка и черновики ответов

@@ -12,7 +12,8 @@
 - [x] Фаза 5. Решалка — поля у `AssignmentItem` + `is_solution_visible_for()`; `Submission.problem_item` (новое поле), `Submission.problem` стал nullable
 - [x] Фаза 6. Контрольные — поля у `Assignment` (kind/exam_mode/окно/лимит/due_at/group) + `is_open_for()`, `ExamAttempt` (серверный `expires_at`), `AnswerDraft`
 - [x] Фаза 7. Логирование событий — `LearningEvent`, `problems/event_log.py` (неблокирующая запись), крючки в каталоге/сдаче домашки/финале Econ Rush, команда `link_anonymous_events`
-- [ ] Фаза 8. Миграция и тесты
+- [x] Фаза 8. Миграция и тесты — миграция `problems/0023_...`, 41 тест
+      в `problems/tests/test_platform_models.py`, команда `seed_platform_demo`
 
 ## Часть B — группы
 - [ ] Фаза 9. Каркас вкладки «Группы»
@@ -137,6 +138,21 @@
    nullable. Старый `unique_together` сохраняется.
 6. **Тем в базе 849, а не 21.** Ничего не ломает, но выпадающий список тем
    в редакторе задач фильтруется по каноническому набору.
+
+## Состояние после Части A
+- Миграция: `problems/migrations/0023_answerdraft_assignmentitem_customproblem_and_more.py`
+  ПРИМЕНЕНА к локальной базе. Бэкап до применения —
+  `backups/db_before_platform_foundation.sqlite3`.
+  ⚠️ В сгенерированной миграции пришлось вручную переставить операции:
+  автодетектор поставил `AddConstraint uniq_submission_per_item` РАНЬШЕ
+  `AddField submission.problem_item`, и migrate падал с
+  `Submission has no field named 'problem_item'`.
+- `makemigrations --check --dry-run` → «No changes detected».
+- Полный прогон тестов: **530/530**.
+- `backfill_profiles` выполнен: 3 профиля (admin→tutor, teacher1→tutor,
+  student1→student).
+- Демо-данные: `seed_platform_demo`, пароль у всех `demo12345`,
+  логины `tutor@test.local`, `student1..3@test.local`, `parent@test.local`.
 
 ## Заметки для следующего запуска
 - Все новые модели — в `problems/models.py`, одна миграция `problems/0023_*`.
