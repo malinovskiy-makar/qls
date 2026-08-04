@@ -380,6 +380,38 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 
 /* Конструктор кусочной функции: слева нарисованная фигурная скобка,
    справа строки «формула — на участке до границы». */
+/* Пояснение «как это устроено» прячется под вопросик рядом с полем ввода:
+   посреди панели такой абзац отвлекает, а нужен он один раз. */
+.hint-row { display: flex; align-items: center; gap: 7px; margin: 8px 0 2px; }
+.hint-btn {
+  flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center;
+  border: 1px solid var(--border); border-radius: 50%;
+  background: var(--surface); color: var(--text3);
+  font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer;
+  transition: color .12s var(--ease), border-color .12s var(--ease);
+}
+.hint-btn:hover, .hint-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.hint-lead { font-size: 11.5px; color: var(--text3); }
+.hint-pop {
+  display: none; margin: 6px 0 4px; padding: 9px 10px;
+  font-size: 11.5px; line-height: 1.5; color: var(--text2);
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+}
+.hint-pop.open { display: block; }
+.hint-pop p { margin: 0 0 6px; }
+.hint-pop p:last-child { margin-bottom: 0; }
+
+/* Разбор в «Аналитике»: как машина пришла к ответу. Стоит под числами и
+   читается сплошным текстом, поэтому набран мельче и с воздухом. */
+.sb-note {
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border-soft);
+  font-size: 11.5px; line-height: 1.55; color: var(--text2);
+}
+.sb-note b { display: block; margin-bottom: 5px; color: var(--text); font-size: 11px;
+  letter-spacing: .04em; text-transform: uppercase; }
+.sb-note p { margin: 0 0 6px; }
+.sb-note p:last-child { margin-bottom: 0; }
+
 /* Строка списка функций в режиме построения графиков: цвет, формула, крестик
    и своё имя под ними. Пустая строка внизу выглядит так же, только без имени
    и крестика — начал печатать, и она стала обычной. */
@@ -2707,8 +2739,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span class="swatch" style="background:var(--curve-d)"></span> Выпуклость и вогнутость</label>
         <label class="chk"><input type="checkbox" id="chk-inflect" checked>
           <span class="swatch" style="background:var(--curve-mr)"></span> Точки перегиба</label>
-        <div class="hint">Максимумы и минимумы ищутся по нулям производной, перегибы по смене
-          знака второй производной. Всё численно, поэтому годится любая функция.</div>
+        <div class="hint-row">
+          <button class="hint-btn" type="button" data-pop="hp-optimum" aria-label="Что здесь считается">?</button>
+          <span class="hint-lead">Как это считается</span>
+        </div>
+        <div class="hint-pop" id="hp-optimum">
+          <p>Пишите функцию от x в поле выше: x^2, x^3 - 3*x, sqrt(x), 1/x.
+            Отрезок задают границы окна в настройках плоскости.</p>
+          <p>Подписи на графике читаются так: x* это точка на оси x, y* это
+            значение функции в ней.</p>
+        </div>
       </div>
 
       <!-- 7в. Деформации графика -->
@@ -2728,7 +2768,23 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         </div>
         <div class="field" id="math-a-field">
           <label>Параметр a = <b id="matha-val">1</b></label>
-          <input type="range" id="matha-slider" min="-5" max="5" step="0.1" value="1" style="width:100%;">
+          <div class="param-track">
+            <button type="button" class="param-bound" id="matha-lo">-5</button>
+            <input type="range" id="matha-slider" min="-5" max="5" step="0.1" value="1">
+            <button type="button" class="param-bound" id="matha-hi">5</button>
+          </div>
+          <div class="param-editor" id="matha-editor">
+            <div class="param-ed-line">
+              <input type="number" step="any" id="matha-min" value="-5">
+              <span>≤</span><span class="param-ed-name">a</span><span>≤</span>
+              <input type="number" step="any" id="matha-max" value="5">
+            </div>
+            <div class="param-ed-line">
+              <span class="param-ed-name">шаг</span>
+              <input type="number" step="any" id="matha-step" value="0.1">
+            </div>
+            <button type="button" class="param-ed-ok" id="matha-ok">Готово</button>
+          </div>
         </div>
         <div class="hint" id="math-trans-hint"></div>
       </div>
@@ -3179,6 +3235,7 @@ const STATE = {
   mathInflect: true,             // отмечать перегибы
   mathTrans: 'up',               // вид деформации (7в)
   mathA: 1,                      // её параметр
+  mathABounds: { min: -5, max: 5, step: 0.1 },   // и его границы (настраиваются)
   mathG2: '4 - x',               // вторая функция (7д)
   mathG3: '', mathG4: '',        // третья и четвёртая — по желанию
   mathMinMax: 'min',
@@ -12353,15 +12410,18 @@ function drawMathOptimum(f) {
 
   const a = mathAnalyse(f, lo, hi);
   STATE.mathRes = a;
+  /* Подпись «максимум 2» не говорила, что это: координата точки или значение
+     функции. Пишем обе величины и называем их: x* — где, y* — сколько. */
+  const ptLabel = (kind, p) => kind + ': x* = ' + fmt(p.x) + ', y* = ' + fmt(p.y);
   a.ext.forEach((p, i) => {
     if (p.y < my.domain()[0] || p.y > my.domain()[1]) return;
     mathDot(g, mx, my, p.x, p.y, p.kind === 'max' ? COL.S : COL.MC,
-            (p.kind === 'max' ? 'max' : (p.kind === 'min' ? 'min' : 'плато')) + ' ' + fmt(p.y),
+            ptLabel(p.kind === 'max' ? 'max' : (p.kind === 'min' ? 'min' : 'плато'), p),
             null, 'ext' + i);
   });
   if (STATE.mathInflect) a.inf.forEach((p, i) => {
     if (p.y < my.domain()[0] || p.y > my.domain()[1]) return;
-    mathDot(g, mx, my, p.x, p.y, COL.MR, 'перегиб', 14, 'inf' + i);
+    mathDot(g, mx, my, p.x, p.y, COL.MR, ptLabel('перегиб', p), 14, 'inf' + i);
   });
   updateMathPanel();
 }
@@ -12583,6 +12643,38 @@ function drawLevelCurveOn(g, mx, my, f, level, color, width, opacity) {
     .attr('stroke-width', width).attr('opacity', opacity).attr('d', line);
 }
 
+/* Разбор «как получен ответ» для сюжета с экстремумами. Не пересказ учебника,
+   а ход именно этой задачи: где обнулилась производная, какой знак у второй
+   производной в каждой такой точке и что из этого следует. */
+function mathOptimumReasoning(r) {
+  const f = mathF();
+  if (!f) return '';
+  const ext = r.ext || [], inf = r.inf || [];
+  let h = '<div class="sb-note"><b>Как это получилось</b>';
+  h += '<p>Экстремум там, где касательная горизонтальна, то есть f′(x) = 0. '
+     + 'Корни ищутся численно: сетка по отрезку и уточнение делением пополам, '
+     + 'поэтому подходит любая функция, даже кусочная.</p>';
+  if (!ext.length) h += '<p>На этом отрезке производная в нуль не обращается: ни максимумов, ни минимумов.</p>';
+  ext.forEach(p => {
+    const s = d2Num(f, p.x);
+    const kind = p.kind === 'max' ? 'максимум' : (p.kind === 'min' ? 'минимум' : 'плато');
+    const sign = s > 0 ? 'больше нуля' : (s < 0 ? 'меньше нуля' : 'равна нулю');
+    h += `<p>x* = ${fmt(p.x)}: здесь f′ = 0, а f″ = ${fmt(s)}, то есть ${sign}. `
+       + `Значит, ${kind}. ${p.kind === 'max' ? 'Кривая выпукла вверх' : (p.kind === 'min' ? 'Кривая выпукла вниз' : 'Знак не определился')}.</p>`;
+  });
+  h += '<p>Перегиб это смена знака второй производной: до него кривая выгнута '
+     + 'в одну сторону, после в другую. Поэтому его и ищут как корень f″(x) = 0, '
+     + 'но засчитывают только там, где знак действительно поменялся.</p>';
+  if (inf.length) {
+    h += '<p>Найдено: ' + inf.map(p => 'x* = ' + fmt(p.x)).join(', ') + '.</p>';
+  } else {
+    h += '<p>Здесь вторая производная знак не меняет, поэтому перегибов нет.</p>';
+  }
+  h += '<p>Наибольшее и наименьшее на отрезке берутся не только по этим точкам, '
+     + 'но и по его концам: у школьных задач ответ часто именно на краю.</p>';
+  return h + '</div>';
+}
+
 // Табло раздела.
 function updateMathPanel() {
   const box = document.getElementById('info-math');
@@ -12603,12 +12695,14 @@ function updateMathPanel() {
       html += `<div class="hint">Уравнение касательной: y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '−'} ${fmt(Math.abs(r.k))}·(x ${r.x0 >= 0 ? '−' : '+'} ${fmt(Math.abs(r.x0))}).</div>`;
     }
   } else if (STATE.mathSub === 'optimum') {
-    if (r.gMax) html += `<div class="stat"><span>Наибольшее на отрезке</span><b>${fmt(r.gMax.y)} при x = ${fmt(r.gMax.x)}</b></div>`;
-    if (r.gMin) html += `<div class="stat"><span>Наименьшее на отрезке</span><b>${fmt(r.gMin.y)} при x = ${fmt(r.gMin.x)}</b></div>`;
+    if (r.gMax) html += `<div class="stat"><span>Наибольшее на отрезке</span><b>y* = ${fmt(r.gMax.y)} при x* = ${fmt(r.gMax.x)}</b></div>`;
+    if (r.gMin) html += `<div class="stat"><span>Наименьшее на отрезке</span><b>y* = ${fmt(r.gMin.y)} при x* = ${fmt(r.gMin.x)}</b></div>`;
     (r.ext || []).forEach(p => {
-      html += `<div class="stat"><span>${p.kind === 'max' ? 'Локальный максимум' : (p.kind === 'min' ? 'Локальный минимум' : 'Плато')}</span><b>x = ${fmt(p.x)}, y = ${fmt(p.y)}</b></div>`;
+      html += `<div class="stat"><span>${p.kind === 'max' ? 'Локальный максимум' : (p.kind === 'min' ? 'Локальный минимум' : 'Плато')}</span><b>x* = ${fmt(p.x)}, y* = ${fmt(p.y)}</b></div>`;
     });
-    (r.inf || []).forEach(p => { html += `<div class="stat"><span>Перегиб</span><b>x = ${fmt(p.x)}</b></div>`; });
+    (r.inf || []).forEach(p => { html += `<div class="stat"><span>Перегиб</span><b>x* = ${fmt(p.x)}, y* = ${fmt(p.y)}</b></div>`; });
+    // Разбор: как машина к этому пришла, шаг за шагом и с числами.
+    html += mathOptimumReasoning(r);
     if (!html) html = '<div class="muted">На этом отрезке ни экстремумов, ни перегибов.</div>';
   } else if (STATE.mathSub === 'transform') {
     const t = MATH_TRANS[STATE.mathTrans];
@@ -14834,6 +14928,7 @@ function wireScene() {
   if (back) back.addEventListener('click', () => openPicker());
 
   wireWrench();
+  wireHintButtons();
 
   // График перерисовываем, когда меняется его РАЗМЕР, а не только окно:
   // сворачивание панели меняет ширину холста, и без этого кривые остались бы
@@ -14919,6 +15014,20 @@ function setGridMode(mode) {
     const b = document.getElementById(id); if (b) b.classList.toggle('active', m === mode);
   });
   redrawAll();
+}
+
+/* Вопросики с пояснениями. Кнопка знает id своего блока, поэтому новый
+   вопросик добавляется одной парой тегов, без правки кода. */
+function wireHintButtons() {
+  document.querySelectorAll('.hint-btn[data-pop]').forEach(btn => {
+    const pop = document.getElementById(btn.getAttribute('data-pop'));
+    if (!pop) return;
+    btn.setAttribute('aria-expanded', 'false');
+    btn.addEventListener('click', () => {
+      const open = pop.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  });
 }
 
 function wireWrench() {
@@ -15922,12 +16031,43 @@ function wireControls() {
     if (h) h.textContent = MATH_TRANS[STATE.mathTrans].note;
     redrawAll();
   });
+  /* Параметр деформации живёт по тем же правилам, что и буквы из формул:
+     любое значение, свои границы и шаг. Раньше он был заперт в −5…5 с шагом
+     0.1, и «сдвинь на 12» показать было нечем. */
   const aSl = document.getElementById('matha-slider');
+  const aVal = document.getElementById('matha-val');
+  const aLo = document.getElementById('matha-lo'), aHi = document.getElementById('matha-hi');
+  const aEd = document.getElementById('matha-editor');
+  const syncA = () => {
+    const p = STATE.mathABounds;
+    if (aSl) { aSl.min = p.min; aSl.max = p.max; aSl.step = Math.max(1e-9, p.step); aSl.value = STATE.mathA; }
+    if (aVal) aVal.textContent = fmt(STATE.mathA);
+    if (aLo) aLo.textContent = fmt(p.min);
+    if (aHi) aHi.textContent = fmt(p.max);
+  };
   if (aSl) aSl.addEventListener('input', () => {
     STATE.mathA = parseFloat(aSl.value);
-    const v = document.getElementById('matha-val'); if (v) v.textContent = fmt(STATE.mathA);
+    if (aVal) aVal.textContent = fmt(STATE.mathA);
     redrawAll();
   });
+  const toggleAEd = () => { if (aEd) aEd.classList.toggle('open'); };
+  if (aLo) aLo.addEventListener('click', toggleAEd);
+  if (aHi) aHi.addEventListener('click', toggleAEd);
+  [['matha-min', 'min'], ['matha-max', 'max'], ['matha-step', 'step']].forEach(([id, key]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('change', () => {
+      const v = parseFloat(e.value);
+      if (!isFinite(v)) return;
+      STATE.mathABounds[key] = v;
+      const p = STATE.mathABounds;
+      if (p.max <= p.min) p.max = p.min + 1;
+      STATE.mathA = Math.max(p.min, Math.min(p.max, STATE.mathA));
+      syncA(); redrawAll();
+    });
+  });
+  const aOk = document.getElementById('matha-ok');
+  if (aOk) aOk.addEventListener('click', () => { if (aEd) aEd.classList.remove('open'); });
+  syncA();
   const mcLine = document.getElementById('mc-line'), mcOwn = document.getElementById('mc-own');
   const setConsKind = (k) => {
     STATE.mathConsKind = k;

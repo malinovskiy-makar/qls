@@ -696,7 +696,9 @@ await t('машина сама подписала максимум, миниму
     .map(n => n.nodeValue).join('');
   const names = [...document.querySelectorAll('#chart text')].map(own);
   const has = (re) => names.some(s => re.test(s));
-  return (has(/^max /) && has(/^min /) && has(/^перегиб/)) || names.join(' | ');
+  // Подпись называет обе величины: x* — где, y* — сколько.
+  return (has(/^max: x\* = /) && has(/^min: x\* = /) && has(/^перегиб: x\* = /))
+    || names.join(' | ');
 }));
 
 await t('двойной щелчок по подписи открывает переименование', async () => {
@@ -704,7 +706,7 @@ await t('двойной щелчок по подписи открывает пе
   await page.waitForTimeout(220);
   const n = await page.locator('#pt-rename').count();
   const v = n ? await page.locator('#pt-rename').inputValue() : '';
-  return (n === 1 && /^max /.test(v)) || `полей ${n}, значение «${v}»`;
+  return (n === 1 && /^max: /.test(v)) || `полей ${n}, значение «${v}»`;
 });
 
 await t('Enter сохраняет своё имя точки', async () => {
