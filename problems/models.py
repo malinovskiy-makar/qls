@@ -1330,6 +1330,7 @@ from .models_platform import (  # noqa: E402,F401
     CustomProblem,
     CustomProblemOption,
     ExamAttempt,
+    LearningEvent,
     ProblemComment,
     SolutionVisibility,
     SavedFolder,

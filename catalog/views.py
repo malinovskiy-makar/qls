@@ -250,6 +250,12 @@ def problem_detail(request, pk):
     problem = get_object_or_404(Problem, pk=pk, status=Problem.Status.PUBLISHED,
                                 needs_quality_review=False)
 
+    # Учебное событие: задачу открыли. Запись неблокирующая — см.
+    # problems/event_log.py (её падение не должно ронять страницу).
+    from problems.event_log import log_problem_event
+    log_problem_event('catalog', 'opened', request.user, problem,
+                      request=request)
+
     difficulty = problem.difficulty or 0
 
     # Похожие задачи из кеша (топ-5), без задач за качественным шлюзом

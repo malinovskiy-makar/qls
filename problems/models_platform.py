@@ -832,3 +832,86 @@ class AnswerDraft(models.Model):
 
     def __str__(self):
         return f'{self.attempt}: позиция {self.problem_item_id}'
+
+
+# ===========================================================================
+# Фаза 7. Логирование учебных событий
+# ===========================================================================
+
+class LearningEvent(models.Model):
+    """Одно учебное событие: кто, что, где, сколько времени.
+
+    Зачем собирать это ДО того, как появились экраны статистики: историю
+    нельзя восстановить задним числом. Экран можно нарисовать в любой
+    момент, а данные за прошлый месяц взять неоткуда.
+
+    Тема и сложность продублированы прямо в событии — намеренно. Статистика
+    «сколько верных по теме N за квартал» иначе требовала бы join через
+    задачу к M2M-темам на каждой строке; к тому же тема у задачи может
+    смениться, а событие должно остаться таким, каким было в момент решения.
+    """
+
+    class Source(models.TextChoices):
+        CATALOG = 'catalog', 'Каталог'
+        HOMEWORK = 'homework', 'Домашка'
+        EXAM = 'exam', 'Контрольная'
+        GAME = 'game', 'Игра'
+
+    class EventType(models.TextChoices):
+        OPENED = 'opened', 'Открыл'
+        ATTEMPTED = 'attempted', 'Попытался'
+        SOLVED = 'solved', 'Решил верно'
+        FAILED = 'failed', 'Ошибся'
+        HINT_USED = 'hint_used', 'Открыл подсказку'
+        SKIPPED = 'skipped', 'Пропустил'
+
+    # Пусто у анонимных партий игры — игра работает без входа.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='learning_events', verbose_name='Пользователь')
+    session_key = models.CharField('Ключ сессии', max_length=64,
+                                   blank=True, db_index=True)
+
+    source = models.CharField('Откуда', max_length=16, choices=Source.choices)
+    event_type = models.CharField('Событие', max_length=16,
+                                  choices=EventType.choices)
+
+    catalog_problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='learning_events', verbose_name='Задача каталога')
+    custom_problem = models.ForeignKey(
+        CustomProblem, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='learning_events', verbose_name='Своя задача')
+    assignment = models.ForeignKey(
+        'problems.Assignment', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='learning_events', verbose_name='Работа')
+
+    topic = models.ForeignKey(
+        'problems.Topic', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='learning_events', verbose_name='Тема')
+    difficulty = models.PositiveSmallIntegerField('Сложность',
+                                                  null=True, blank=True)
+    time_spent_seconds = models.PositiveIntegerField('Секунд потрачено',
+                                                     null=True, blank=True)
+    # Режим игры, комбо, номер вопроса — всё, что специфично для источника.
+    payload = models.JSONField('Подробности', default=dict, blank=True)
+
+    created_at = models.DateTimeField('Когда', auto_now_add=True,
+                                      db_index=True)
+
+    class Meta:
+        verbose_name = 'Учебное событие'
+        verbose_name_plural = 'Учебные события'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at'],
+                         name='idx_event_user_date'),
+            models.Index(fields=['user', 'topic'], name='idx_event_user_topic'),
+            models.Index(fields=['source', '-created_at'],
+                         name='idx_event_source_date'),
+        ]
+
+    def __str__(self):
+        who = self.user or f'аноним({self.session_key[:8]})'
+        return f'{who}: {self.get_event_type_display()} ({self.source})'

@@ -279,6 +279,7 @@ def submit_assignment(request, pk):
             sub.save()
             auto_check_submission(sub)
             saved += 1
+            _log_submission_event(request, assignment, sub, problem)
 
     if saved:
         messages.success(request, 'Домашка отправлена! Преподаватель скоро проверит.')
@@ -286,6 +287,28 @@ def submit_assignment(request, pk):
         messages.warning(request, 'Нет новых ответов для отправки.')
 
     return redirect('student:dashboard')
+
+
+# ---------------------------------------------------------------------------
+# Учебные события при сдаче домашки (запись неблокирующая)
+# ---------------------------------------------------------------------------
+
+def _log_submission_event(request, assignment, submission, problem):
+    """Пишет событие сдачи. Тест проверен автоматически — знаем сразу, верно
+    или нет; открытая задача ждёт репетитора, поэтому только «попытался»."""
+    from problems.event_log import log_problem_event
+
+    source = 'exam' if getattr(assignment, 'is_exam', False) else 'homework'
+    event_type = 'attempted'
+    feedback = getattr(submission, 'feedback', None)
+    if submission.status == 'reviewed' and feedback is not None:
+        score = feedback.score
+        if score is not None:
+            event_type = 'solved' if float(score) >= 1.0 else 'failed'
+
+    log_problem_event(source, event_type, request.user, problem,
+                      request=request, assignment=assignment,
+                      payload={'submission_id': submission.pk})
 
 
 # ---------------------------------------------------------------------------

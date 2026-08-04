@@ -13,6 +13,7 @@ from .models_platform import (
     CustomProblem,
     CustomProblemOption,
     ExamAttempt,
+    LearningEvent,
     ProblemComment,
     SavedFolder,
     SavedGraph,
@@ -100,3 +101,14 @@ class ExamAttemptAdmin(admin.ModelAdmin):
 class AnswerDraftAdmin(admin.ModelAdmin):
     list_display = ['attempt', 'problem_item', 'updated_at']
     raw_id_fields = ['attempt', 'problem_item']
+
+
+@admin.register(LearningEvent)
+class LearningEventAdmin(admin.ModelAdmin):
+    list_display = ['created_at', 'user', 'session_key', 'source',
+                    'event_type', 'topic', 'difficulty']
+    list_filter = ['source', 'event_type', 'difficulty']
+    search_fields = ['user__username', 'session_key']
+    raw_id_fields = ['user', 'catalog_problem', 'custom_problem',
+                     'assignment', 'topic']
+    date_hierarchy = 'created_at'

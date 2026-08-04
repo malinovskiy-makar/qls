@@ -703,7 +703,62 @@ def api_session_finish(request):
 
     summary = build_summary(state)
     share = _save_result(request, state, summary)
+    _log_learning_events(request, state)
     return JsonResponse({'summary': summary, 'share': share})
+
+
+def _log_learning_events(request, state):
+    """Учебные события по завершённому забегу — по одному на вопрос.
+
+    Пишем ОДИН раз, в момент завершения, а не на каждый ответ: журнал забега
+    и так лежит целиком в сессии, а сорок отдельных вставок посреди игры
+    добавили бы задержку туда, где меряют секунды.
+
+    Игра работает без входа, поэтому у анонимной партии `user=None`, а
+    привязка идёт по ключу сессии (команда link_anonymous_events свяжет её
+    с аккаунтом позже). Запись неблокирующая: сломанный лог не должен
+    отнимать у игрока результат забега.
+    """
+    from problems.event_log import log_event
+
+    OUTCOME_TO_EVENT = {
+        'correct': 'solved',
+        'wrong': 'failed',
+        'skip': 'skipped',
+    }
+    log = state.get('log') or []
+    if not log or state.get('events_logged'):
+        return
+    state['events_logged'] = True
+    request.session[SESSION_KEY] = state
+
+    try:
+        from problems.models import Topic
+        # Темы в журнале лежат ИМЕНАМИ (денормализованы в GameQuestion).
+        # Достаём их одним запросом, а не по одному на вопрос.
+        names = {t for entry in log for t in (entry.get('topics') or [])}
+        by_name = {t.name: t for t in Topic.objects.filter(name__in=names)}
+    except Exception:
+        by_name = {}
+
+    user = request.user if request.user.is_authenticated else None
+    for entry in log:
+        topics = entry.get('topics') or []
+        elapsed = entry.get('elapsed_ms') or 0
+        log_event(
+            'game', OUTCOME_TO_EVENT.get(entry.get('outcome'), 'attempted'),
+            user=user, request=request,
+            topic=by_name.get(topics[0]) if topics else None,
+            difficulty=entry.get('difficulty'),
+            time_spent_seconds=int(elapsed / 1000) if elapsed else None,
+            payload={
+                'mode': state.get('mode'),
+                'question_id': entry.get('question_id'),
+                'number': entry.get('number'),
+                'question_type': entry.get('question_type'),
+                'running_combo': entry.get('running_combo'),
+            },
+        )
 
 
 def _save_result(request, state, summary):
