@@ -76,11 +76,41 @@ await t('плейсхолдер оси Y = сценовое название', a
 await t('своя точка ставится и подписывается', async () => {
   await page.evaluate(() => { addMarkAt(30, 70); STATE.marks[0].text = 'Мой ориентир'; redrawAll(); });
   await page.waitForTimeout(200);
+  // У имени точки есть дочерний <title> с подсказкой о переименовании,
+  // поэтому сверяем собственные текстовые узлы.
   return await page.evaluate(() =>
-    [...document.querySelectorAll('#chart text')].some(n => n.textContent === 'Мой ориентир') || 'нет подписи точки');
+    [...document.querySelectorAll('#chart text')].some(n =>
+      [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.nodeValue).join('') === 'Мой ориентир')
+    || 'нет подписи точки');
 });
 
-await t('точка показывает координаты', () => page.evaluate(() =>
+// Название кривой и имя точки правятся двойным щелчком прямо на графике.
+await t('двойной щелчок по имени точки открывает правку', async () => {
+  await page.locator('#chart text', { hasText: 'Мой ориентир' }).first().dblclick();
+  await page.waitForTimeout(220);
+  const n = await page.locator('#pt-rename').count();
+  const v = n ? await page.locator('#pt-rename').inputValue() : '';
+  if (n) {
+    await page.fill('#pt-rename', 'Точка A');
+    await page.press('#pt-rename', 'Enter');
+    await page.waitForTimeout(220);
+  }
+  const saved = await page.evaluate(() => STATE.marks[0].text);
+  return (n === 1 && v === 'Мой ориентир' && saved === 'Точка A')
+    || `полей ${n}, было «${v}», стало «${saved}»`;
+});
+
+await t('своё имя точки вернулось в список слева', () => page.evaluate(() => {
+  const inp = document.querySelector('#mark-list input[type=text]');
+  return (inp && inp.value === 'Точка A') || 'в списке «' + (inp && inp.value) + '»';
+}));
+
+await t('точка показывает координаты', () => page.evaluate(() => {
+  STATE.marks[0].text = 'Мой ориентир'; redrawAll();
+  return true;
+}));
+
+await t('координаты точки на графике', () => page.evaluate(() =>
   [...document.querySelectorAll('#chart text')].some(n => n.textContent === '(30; 70)') || 'нет координат'));
 
 await t('точка показывает значения кривых', () => page.evaluate(() => {
@@ -169,7 +199,10 @@ await t('издержки: min AVC при Q=3 не сломан', () => page.eva
 }));
 
 // ── Фаза 3: подписи кривых не пропадают ─────────────────────────────────
-const svgTexts = () => page.evaluate(() => [...document.querySelectorAll('#chart text')].map(n => n.textContent));
+// У подписи бывает дочерний <title> с всплывающей подсказкой, и он попадает в
+// textContent. Берём только собственные текстовые узлы — то, что видно на холсте.
+const svgTexts = () => page.evaluate(() => [...document.querySelectorAll('#chart text')]
+  .map(n => [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.nodeValue).join('')));
 
 await t('подписи MC/ATC/AVC видны при обычном масштабе', async () => {
   const tx = await svgTexts();
@@ -666,8 +699,8 @@ await t('машина сама подписала максимум, миниму
   return (has(/^max /) && has(/^min /) && has(/^перегиб/)) || names.join(' | ');
 }));
 
-await t('щелчок по подписи открывает переименование', async () => {
-  await page.locator('#chart text', { hasText: 'max' }).first().click();
+await t('двойной щелчок по подписи открывает переименование', async () => {
+  await page.locator('#chart text', { hasText: 'max' }).first().dblclick();
   await page.waitForTimeout(220);
   const n = await page.locator('#pt-rename').count();
   const v = n ? await page.locator('#pt-rename').inputValue() : '';
@@ -695,7 +728,7 @@ await t('своё имя точки уходит в экспорт, подска
 }));
 
 await t('Esc отменяет переименование', async () => {
-  await page.locator('#chart text', { hasText: 'перегиб' }).first().click();
+  await page.locator('#chart text', { hasText: 'перегиб' }).first().dblclick();
   await page.waitForTimeout(200);
   await page.fill('#pt-rename', 'НЕ СОХРАНЯТЬ');
   await page.press('#pt-rename', 'Escape');

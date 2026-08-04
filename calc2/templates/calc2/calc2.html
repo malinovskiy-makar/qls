@@ -4106,12 +4106,21 @@ function labelCurve(g, f, txt, color, opts) {
   let y = py + (o.below ? 14 : -7);
   if (y < m.top + 12) y = py + 14;                // упёрлись в верх — под кривую
   if (y > H - m.bottom - 4) y = py - 7;           // упёрлись в низ — над кривой
-  g.append('text')
-    .attr('x', toLeft ? px - 6 : px + 6).attr('y', y)
+  const tx = toLeft ? px - 6 : px + 6;
+  const t = g.append('text')
+    .attr('x', tx).attr('y', y)
     .attr('text-anchor', toLeft ? 'end' : 'start')
     .attr('font-size', o.size || 11).attr('font-weight', 600).attr('fill', color)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6)
     .text(txt);
+  // Название кривой правится двойным щелчком прямо на графике.
+  if (o.curve) {
+    makeRenamable(t, txt, tx, y, (v) => {
+      if (v) o.curve.label = v; else delete o.curve.label;
+      if (!o.curve.label) o.curve.name = o.curve.expr;
+      renderCurveList();
+    });
+  }
   return a;
 }
 
@@ -4145,7 +4154,7 @@ function drawCurves() {
     let nm = curveShortName(curve);
     if (nm.length > 14) nm = nm.slice(0, 13) + '…';
     // Соседние кривые в одной точке — разводим по вертикали, иначе подписи слипнутся.
-    labelCurve(g, q => evalCurve(curve, q), nm, curve.color, { below: i % 2 === 1 });
+    labelCurve(g, q => evalCurve(curve, q), nm, curve.color, { below: i % 2 === 1, curve });
   });
 }
 
@@ -9043,6 +9052,7 @@ function setMode(mode) {
   cancelRangeAnim();   // отложенный/идущий переезд осей прошлой сцены — отменить
   STATE.zoomLock = false;   // новая сцена показывает себя в своём масштабе
   STATE.mode = mode;
+  STATE.roller = null;      // бегущая точка держалась за кривую прошлого режима
   // Экономика живёт в первой четверти, «Математика» — на полном плане.
   // Дальше это переключается галочкой в меню плоскости.
   STATE.firstQuad = (mode !== 'math');
@@ -10946,7 +10956,15 @@ function drawRoller() {
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', .55);
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5.5)
     .attr('fill', COL.halo).attr('stroke', r.color || COL.ink).attr('stroke-width', 2.4);
-  haloText(g, px + 10, py - 10, r.name + ' (' + fmt(r.x) + '; ' + fmt(r.y) + ')', 'start', 'auto');
+  // Подпись держим внутри поля: у правого края разворачиваем влево, у верхнего
+  // опускаем под точку. Иначе координаты уезжают за границу холста.
+  const txt = r.name + ' (' + fmt(r.x) + '; ' + fmt(r.y) + ')';
+  const m = CONFIG.margin;
+  const wide = txt.length * 6.3 + 12;
+  // Влево разворачиваем, только если слева и правда есть место.
+  const toLeft = (px + wide > W - m.right) && (px - wide > 2);
+  const ty = (py - 10 < m.top + 10) ? py + 18 : py - 10;
+  haloText(g, toLeft ? px - 10 : px + 10, ty, txt, toLeft ? 'end' : 'start', 'auto');
 }
 
 // Кривая под курсором (в пикселях) — для прокатывания.
@@ -11141,8 +11159,8 @@ function updateAreaCalcPanel() {
     rows.push(['Площадь многоугольника', fmt(r.value)]);
     rows.push(['вершин', String(r.ring.length)]);
   }
-  box.innerHTML = '<div class="section-title">Площадь</div>' +
-    rows.map(([k, v]) => '<div class="stat"><span></span><b></b></div>').join('');
+  // Заголовок секции уже есть у самой раскрывашки «Площади», второй не нужен.
+  box.innerHTML = rows.map(([k, v]) => '<div class="stat"><span></span><b></b></div>').join('');
   const stats = box.querySelectorAll('.stat');
   rows.forEach(([k, v], i) => {
     if (!stats[i]) return;
@@ -11615,10 +11633,13 @@ function drawMarks() {
     // Подпись растёт ВВЕРХ от точки, чтобы не накрывать её саму.
     const lines = markCaption(mk);
     lines.forEach((s, i) => {
-      g.append('text').attr('x', px + 9).attr('y', py - 9 - (lines.length - 1 - i) * 13)
+      const ty = py - 9 - (lines.length - 1 - i) * 13;
+      const t = g.append('text').attr('x', px + 9).attr('y', ty)
         .attr('font-size', 11.5).attr('font-weight', i === 0 ? 650 : 500).attr('fill', col)
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6)
         .text(s);
+      // Первая строка — имя точки, его и правим двойным щелчком.
+      if (i === 0) makeRenamable(t, mk.text, px + 9, ty, (v) => { mk.text = v; renderMarkList(); });
     });
   });
 }
@@ -11733,6 +11754,8 @@ function armMark(on) {
 function resetDecor() {
   STATE.graphTitle = ''; STATE.axisXName = ''; STATE.axisYName = '';
   STATE.marks = []; markCounter = 0;
+  // Бегущая точка помнит кривую прошлой сцены — в новой она бы врала.
+  STATE.roller = null; STATE.hotCross = null; STATE.hoverCross = null;
   STATE.pointNames = {};   // свои названия ключевых точек — тоже оформление сцены
   const ren = document.getElementById('pt-rename'); if (ren) ren.remove();
   armMark(false);
@@ -12048,13 +12071,32 @@ function mathDot(g, mx, my, x, y, color, label, dy, key) {
     .attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6).text(shown);
   if (!key) return;
-  t.style('cursor', 'text').append('title').text('Щёлкните, чтобы переименовать точку');
-  t.on('click', (ev) => { ev.stopPropagation(); editPointName(key, shown, tx, ty); });
+  makeRenamable(t, shown, tx, ty, (v) => {
+    if (v) STATE.pointNames[key] = v; else delete STATE.pointNames[key];
+  });
+}
+
+/* Любую подпись на графике переименовывают двойным щелчком прямо по ней.
+   Одиночный щелчок оставлен свободным: им ставят точки и включают области, и
+   переименование по нему срабатывало бы против воли. */
+function makeRenamable(t, current, px, py, apply) {
+  t.style('cursor', 'text').append('title').text('Двойной щелчок, чтобы переименовать');
+  t.on('dblclick', (ev) => {
+    ev.stopPropagation(); ev.preventDefault();
+    editInlineLabel(current, px, py, apply);
+  });
+}
+
+// Совместимость: прежнее имя оставлено, вызовы через него по-прежнему работают.
+function editPointName(key, current, px, py) {
+  editInlineLabel(current, px, py, (v) => {
+    if (v) STATE.pointNames[key] = v; else delete STATE.pointNames[key];
+  });
 }
 
 /* Поле ввода поверх графика на месте подписи. Enter и уход фокуса сохраняют,
    Esc отменяет, пустая строка возвращает машинное имя. */
-function editPointName(key, current, px, py) {
+function editInlineLabel(current, px, py, apply) {
   const wrap = document.getElementById('graph-wrap');
   if (!wrap) return;
   const old = document.getElementById('pt-rename');
@@ -12069,10 +12111,7 @@ function editPointName(key, current, px, py) {
   const finish = (save) => {
     if (done) return;
     done = true;
-    if (save) {
-      const v = inp.value.trim();
-      if (v) STATE.pointNames[key] = v; else delete STATE.pointNames[key];
-    }
+    if (save) apply(inp.value.trim());
     inp.remove();
     redrawAll();
   };
@@ -14563,10 +14602,12 @@ const SCENE_NAMES = {
 };
 // Блоки результатов в табло (порядок = порядок показа). info-eq переносим вместе
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
+// info-areacalc сюда НЕ входит: посчитанная площадь остаётся в своей секции
+// «Площади», рядом с кнопкой, которая её посчитала.
 const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
   'info-prod', 'info-iso', 'info-plants', 'info-labor',
   'info-inequality', 'info-consumer', 'info-macro', 'info-math', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
-  'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb', 'info-areacalc'];
+  'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
 
 /* Записать значение в поле формулы и разбудить его слушателей. Отдельная
    функция, потому что поле формулы со временем меняло природу (обычный input,
@@ -14589,6 +14630,8 @@ function relocateForScene() {
 // чужие останутся пустыми (CSS прячет пустые) — без устаревших чисел из прошлого режима.
 function clearResultPanels() {
   ['info-eq'].concat(RESULT_IDS).forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+  // Площадь живёт в своей секции и переживает перерисовку: её очищает
+  // только «Убрать» рядом с кнопкой расчёта.
 }
 
 // Маленький тост для заглушек («сохранить/экспорт — скоро»).
