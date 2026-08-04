@@ -881,6 +881,52 @@ const CASES = [
           return { n: pts.length, xq: onX.x, yp: onY.y };`,
     checks: [['точек', 'n', 2, 0], ['на оси Q', 'xq', 100, 0.05], ['на оси P', 'yp', 100, 0.05]],
   },
+  {
+    // Панели сюжета про производную независимы: зум над одной не трогает другую.
+    name: 'Производная · зум над верхней панелью не двигает нижнюю',
+    run: `setMode('math'); setMathSub('tangent'); resetZoom(); redrawAll();
+          var L = tangentLayout();
+          var b0 = JSON.stringify(tanWin('bot'));
+          zoomBy(0.5, 400, (L.top + L.yMid) / 2);
+          var top = tanWin('top'), bot = tanWin('bot');
+          return { topSpan: top.xmax - top.xmin,
+                   botSame: (JSON.stringify(bot) === b0) ? 1 : 0 };`,
+    checks: [['верхняя сжалась', 'topSpan', 6, 0.6], ['нижняя не тронута', 'botSame', 1, 0]],
+  },
+  {
+    name: 'Производная · зум над нижней панелью не двигает верхнюю',
+    run: `setMode('math'); setMathSub('tangent'); resetZoom(); redrawAll();
+          var L = tangentLayout();
+          var t0 = JSON.stringify(tanWin('top'));
+          zoomBy(0.5, 400, (L.botTop + L.bottom) / 2);
+          var bot = tanWin('bot');
+          return { botSpan: bot.xmax - bot.xmin,
+                   topSame: (JSON.stringify(tanWin('top')) === t0) ? 1 : 0 };`,
+    checks: [['нижняя сжалась', 'botSpan', 6, 0.6], ['верхняя не тронута', 'topSame', 1, 0]],
+  },
+  {
+    // Точку ведут и снизу: касательная сверху идёт за ней.
+    name: 'Производная · точка снизу перестраивает касательную сверху',
+    run: `setMode('math'); setMathSub('tangent'); resetZoom();
+          STATE.mathFormula = 'x^2'; setMathX0(1); redrawAll();
+          var k1 = STATE.mathRes.k;
+          setMathX0(3); redrawAll();
+          var r = STATE.mathRes;
+          return { k1: k1, k3: r.k, y3: r.y0, x3: r.x0 };`,
+    checks: [['наклон в 1', 'k1', 2, 0.02], ['наклон в 3', 'k3', 6, 0.02],
+             ['f(3)', 'y3', 9, 0.02], ['x₀', 'x3', 3, 0.001]],
+  },
+  {
+    // Шаг секущей опускается заметно ниже прежних 0.05.
+    name: 'Производная · при малом Δx секущая почти совпала с касательной',
+    run: `setMode('math'); setMathSub('tangent'); resetZoom();
+          STATE.mathFormula = 'x^2'; setMathX0(2); STATE.mathSecant = true;
+          STATE.mathDx = 0.001; redrawAll();
+          var r = STATE.mathRes;
+          return { k: r.k, sec: r.secant, diff: Math.abs(r.secant - r.k) };`,
+    checks: [['касательная', 'k', 4, 0.01], ['секущая', 'sec', 4.001, 0.01],
+             ['разница', 'diff', 0.001, 0.0005]],
+  },
 ];
 
 function approx(got, want, tol) {

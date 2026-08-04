@@ -380,6 +380,16 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 
 /* Конструктор кусочной функции: слева нарисованная фигурная скобка,
    справа строки «формула — на участке до границы». */
+/* Строка точки x₀: ползунок и поле точного значения. Поле широкое — в него
+   должно целиком влезать число вида -11.78, раньше последний знак обрезался. */
+.x0-row { display: flex; gap: 7px; align-items: center; margin-top: 4px; }
+.x0-row input[type="range"] { flex: 1; min-width: 0; margin: 0; }
+.x0-row input[type="number"] {
+  flex: 0 0 88px; width: 88px; padding: 5px 6px; font-size: 12.5px; text-align: center;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
+}
+
 /* Пояснение «как это устроено» прячется под вопросик рядом с полем ввода:
    посреди панели такой абзац отвлекает, а нужен он один раз. */
 .hint-row { display: flex; align-items: center; gap: 7px; margin: 8px 0 2px; }
@@ -2716,21 +2726,35 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <!-- 7а. Производная и касательная -->
       <div id="math-pane-tangent">
         <div class="field">
-          <label>Точка x₀ = <b id="mathx0-val">1</b></label>
-          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
-            <input type="range" id="mathx0-slider" min="-10" max="10" step="0.1" value="1" style="flex:1;margin-top:0;">
-            <input type="number" id="mathx0-input" step="0.1" value="1"
-                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+          <label>Точка x₀</label>
+          <div class="x0-row">
+            <input type="range" id="mathx0-slider" min="-10" max="10" step="0.01" value="1">
+            <input type="number" id="mathx0-input" step="any" value="1" aria-label="Точное значение x₀">
           </div>
         </div>
         <label class="chk"><input type="checkbox" id="chk-secant"> Секущая через две точки</label>
         <div class="field" id="mathdx-field" style="display:none;">
           <label>Шаг Δx = <b id="mathdx-val">1</b></label>
-          <input type="range" id="mathdx-slider" min="0.05" max="5" step="0.05" value="1" style="width:100%;">
+          <input type="range" id="mathdx-slider" min="0.001" max="5" step="0.001" value="1" style="width:100%;">
+          <div class="hint">Ведите ползунок влево: секущая ложится на касательную.</div>
         </div>
-        <div class="hint">Точку можно тянуть прямо по кривой. Треугольник у неё показывает Δx и Δy:
-          их отношение и есть тангенс угла наклона, он же значение производной.
-          Уменьшайте Δx, и секущая ложится на касательную.</div>
+        <div class="field">
+          <label>Цвета кривых</label>
+          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanF" title="Цвет функции">
+            f(x), сама функция</label>
+          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanD" title="Цвет производной">
+            f′(x), производная</label>
+        </div>
+        <div class="hint-row">
+          <button class="hint-btn" type="button" data-pop="hp-tangent" aria-label="Как этим пользоваться">?</button>
+          <span class="hint-lead">Как этим пользоваться</span>
+        </div>
+        <div class="hint-pop" id="hp-tangent">
+          <p>Формула пишется от x в поле выше. Точку можно тянуть и по самой
+            кривой сверху, и по производной снизу: это одна и та же точка x₀.</p>
+          <p>Панели независимы: колесо и перетаскивание меняют масштаб только той,
+            над которой стоит курсор. Двойной щелчок возвращает обе.</p>
+        </div>
       </div>
 
       <!-- 7б. Оптимизация -->
@@ -3477,6 +3501,8 @@ function refreshColors() {
     prodAP: cssVar('--cost-avc'),
     isoq:   cssVar('--curve-d'),
     indiff: cssVar('--curve-d'),
+    tanF:   cssVar('--curve-d'),    // сама функция в сюжете про производную
+    tanD:   cssVar('--cost-mc'),    // её производная на нижней панели
     // Структурные цвета (зависят от темы).
     ink:     cssVar('--ink'),       // оси, подписи осей, текст у точек
     inkSoft: cssVar('--ink-soft'),  // цифры делений, вторичные подписи
@@ -8906,16 +8932,38 @@ function zoomBy(factor, px, py) {
   if (!isFinite(factor) || factor <= 0) return;
   if (STATE.mode === 'math') {
     const m = CONFIG.margin;
-    const w = Math.max(1, W - m.left - m.right), h = Math.max(1, H - m.top - m.bottom);
+    const w = Math.max(1, W - m.left - m.right);
     const tx = Math.min(1, Math.max(0, (px - m.left) / w));
+    // Сюжет про производную: панели независимы, поэтому зумим ТУ, над которой
+    // стоит курсор, и только её. Мимо панелей — ничего не делаем.
+    if (STATE.mathSub === 'tangent') {
+      const which = tangentPanelAt(py);
+      if (!which) return;
+      const L = tangentLayout();
+      const pxTop = (which === 'top') ? L.top : L.botTop;
+      const pxBot = (which === 'top') ? L.yMid : L.bottom;
+      const hh = Math.max(1, pxBot - pxTop);
+      const ty2 = Math.min(1, Math.max(0, (py - pxTop) / hh));
+      const wn = tanWin(which);
+      const span = (wn.xmax - wn.xmin) * factor;
+      if (!(span > 1e-6 && span < 1e9)) return;
+      const xc = wn.xmin + (wn.xmax - wn.xmin) * tx;
+      const yc = wn.ymax - (wn.ymax - wn.ymin) * ty2;
+      const nx0 = xc - (xc - wn.xmin) * factor, nx1 = xc + (wn.xmax - xc) * factor;
+      const ny0 = yc - (yc - wn.ymin) * factor, ny1 = yc + (wn.ymax - yc) * factor;
+      wn.xmin = nx0; wn.xmax = nx1; wn.ymin = ny0; wn.ymax = ny1;
+      wn.auto = false;                     // масштаб выбрал человек, авто-подбор молчит
+      markViewDirty();
+      redrawAll();
+      return;
+    }
+    const h = Math.max(1, H - m.top - m.bottom);
     const ty = Math.min(1, Math.max(0, (py - m.top) / h));
     const x0 = STATE.mathXmin, x1 = STATE.mathXmax, y0 = STATE.mathYmin, y1 = STATE.mathYmax;
     const span = (x1 - x0) * factor;
     if (!(span > 1e-6 && span < 1e9)) return;
     const xc = x0 + (x1 - x0) * tx;
-    // В подрежиме «производная» панелей две, и курсор может стоять над нижней,
-    // поэтому по вертикали растягиваем от центра окна, а не от курсора.
-    const yc = (STATE.mathSub === 'tangent') ? (y0 + y1) / 2 : y1 - (y1 - y0) * ty;
+    const yc = y1 - (y1 - y0) * ty;
     setMathWindow(xc - (xc - x0) * factor, xc + (x1 - xc) * factor,
                   yc - (yc - y0) * factor, yc + (y1 - yc) * factor);
     markViewDirty();
@@ -8953,10 +9001,26 @@ function zoomBy(factor, px, py) {
 
 /* Панорамирование: сдвиг окна на столько единиц, на сколько уехал курсор.
    Тянем «бумагу под графиком», поэтому окно едет в противоположную сторону. */
-function panByPixels(dxPx, dyPx) {
+function panByPixels(dxPx, dyPx, panel) {
   const m = CONFIG.margin;
   const w = Math.max(1, W - m.left - m.right), h = Math.max(1, H - m.top - m.bottom);
   if (STATE.mode === 'math') {
+    // Сюжет про производную: двигаем только ту панель, с которой начали.
+    if (STATE.mathSub === 'tangent') {
+      if (!panel) return;
+      const L = tangentLayout();
+      const hh = Math.max(1, (panel === 'top') ? (L.yMid - L.top) : (L.bottom - L.botTop));
+      const wn = tanWin(panel);
+      const dx = (wn.xmax - wn.xmin) * dxPx / w;
+      const dy = (wn.ymax - wn.ymin) * dyPx / hh;
+      wn.xmin -= dx; wn.xmax -= dx;
+      wn.ymin += dy; wn.ymax += dy;
+      wn.auto = false;
+      markViewDirty();
+      syncViewFields();
+      redrawAll();
+      return;
+    }
     const dx = (STATE.mathXmax - STATE.mathXmin) * dxPx / w;
     const dy = (STATE.mathYmax - STATE.mathYmin) * dyPx / h;
     setMathWindow(STATE.mathXmin - dx, STATE.mathXmax - dx,
@@ -8984,6 +9048,7 @@ function panByPixels(dxPx, dyPx) {
 function resetZoom() {
   STATE.zoomLock = false;
   STATE.viewDirty = false;
+  tanResetWindows();
   if (STATE.mode === 'math') { const p = MATH_PRESETS[STATE.mathSub]; if (p) setMathWindow(p.win[0], p.win[1], p.win[2], p.win[3]); }
   else if (STATE.mode === 'costs') setRanges(10, 50);
   else setRanges(100, 100);
@@ -8999,7 +9064,8 @@ function flushWheel() {
   const a = _wheelAcc;
   _wheelAcc = null;
   if (!a) return;
-  if (a.panX || a.panY) panByPixels(a.panX, a.panY);
+  const panel = (STATE.mode === 'math' && STATE.mathSub === 'tangent') ? tangentPanelAt(a.py) : null;
+  if (a.panX || a.panY) panByPixels(a.panX, a.panY, panel);
   else if (a.factor !== 1) zoomBy(a.factor, a.px, a.py);
 }
 
@@ -9049,7 +9115,11 @@ function initZoom() {
       // Внутри SVG отзывчивы только сами фигуры; фон — это svg и прозрачные rect.
       if (tag !== 'g' && tag !== 'div') return;
     }
-    pan = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+    // Панель запоминаем в момент нажатия: у сюжета про производную их две,
+    // и вести надо ту, с которой начали, даже если курсор ушёл на соседнюю.
+    const panel = (STATE.mode === 'math' && STATE.mathSub === 'tangent')
+      ? tangentPanelAt(e.clientY - r0.top) : null;
+    pan = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId, panel };
   });
   gw.addEventListener('pointermove', (e) => {
     if (roll && e.pointerId === roll.id) {
@@ -9066,7 +9136,7 @@ function initZoom() {
     if (!pan.moved && Math.hypot(dx, dy) < 3) return;
     if (!pan.moved) { pan.moved = true; gw.setPointerCapture(pan.id); gw.style.cursor = 'grabbing'; }
     pan.x = e.clientX; pan.y = e.clientY;
-    panByPixels(dx, dy);
+    panByPixels(dx, dy, pan.panel);
   });
   const endPan = (e) => {
     if (roll && e.pointerId === roll.id) {
@@ -12310,38 +12380,108 @@ function editInlineLabel(current, px, py, apply) {
 }
 
 /* ── 7а. Производная и касательная ─────────────────────────────────────
-   Две панели с общей осью x: сверху f(x) с точкой и касательной, снизу
-   f′(x) численно. Треугольник у точки показывает Δx и Δy — то самое
-   «тангенс угла, и больше из тригонометрии ничего не нужно». */
-function drawMathTangent(f) {
+   Две панели: сверху f(x) с точкой и касательной, снизу f′(x) численно.
+   Панели РАЗДЕЛЬНЫЕ. У каждой своё окно (и по x, и по y), свой зум и своя
+   панорама, а рисование заперто в её прямоугольник через clip: раньше окно
+   было общим, колесо над одной панелью тянуло обе, и при отдалении верхняя
+   кривая заезжала на территорию нижней.
+   Связь между панелями осталась ровно одна и осмысленная — точка x₀: её
+   можно вести и сверху по кривой, и снизу по производной. */
+
+// Геометрия панелей. Одна функция на всех, чтобы отрисовка и попадание
+// курсора считали границы одинаково.
+function tangentLayout() {
   const m = CONFIG.margin;
   const top = m.top, bottom = H - m.bottom;
-  const gap = 30, hTop = (bottom - top - gap) * 0.6;
+  const gap = 34, hTop = (bottom - top - gap) * 0.58;
   const yMid = top + hTop;
-  const s1 = mathScales(top, yMid);
-  const dfun = (x) => dNum(f, x);
-  // Масштаб нижней панели — по реальному размаху производной в окне.
-  let dLo = 0, dHi = 0;
-  for (let i = 0; i <= 200; i++) {
-    const x = STATE.mathXmin + (STATE.mathXmax - STATE.mathXmin) * i / 200;
-    const v = dfun(x);
-    if (!isNaN(v) && isFinite(v)) { dLo = Math.min(dLo, v); dHi = Math.max(dHi, v); }
+  return { top, bottom, gap, yMid, botTop: yMid + gap };
+}
+
+// Какая панель под курсором: 'top', 'bot' или null (мимо обеих).
+function tangentPanelAt(py) {
+  const L = tangentLayout();
+  if (py >= L.top - 6 && py <= L.yMid + 6) return 'top';
+  if (py >= L.botTop - 6 && py <= L.bottom + 6) return 'bot';
+  return null;
+}
+
+// Окно панели. Заводится при первом обращении — из общего окна раздела.
+function tanWin(which) {
+  const key = (which === 'bot') ? 'tanBot' : 'tanTop';
+  if (!STATE[key]) {
+    STATE[key] = { xmin: STATE.mathXmin, xmax: STATE.mathXmax,
+                   ymin: STATE.mathYmin, ymax: STATE.mathYmax, auto: (which === 'bot') };
   }
-  const pad = Math.max(1, (dHi - dLo) * 0.15);
-  const s2 = mathScales(yMid + gap, bottom, dLo - pad, dHi + pad);
+  return STATE[key];
+}
 
-  const g = svg.append('g');
-  drawPlaneAxes(g, s1.mx, s1.my, 'x', 'y');
-  drawPlaneAxes(g, s2.mx, s2.my, 'x', 'f′');
+// Сбросить окна панелей (вход в сюжет, смена формулы, двойной щелчок).
+function tanResetWindows() {
+  STATE.tanTop = null; STATE.tanBot = null;
+}
+
+// Шкалы одной панели по её собственному окну.
+function tanScales(which, pxTop, pxBot) {
+  const m = CONFIG.margin, w = tanWin(which);
+  return {
+    mx: d3.scaleLinear().domain([w.xmin, w.xmax]).range([m.left, W - m.right]),
+    my: d3.scaleLinear().domain([w.ymin, w.ymax]).range([pxBot, pxTop]),
+  };
+}
+
+function drawMathTangent(f) {
+  const m = CONFIG.margin;
+  const L = tangentLayout();
+  const dfun = (x) => dNum(f, x);
+  const wTop = tanWin('top'), wBot = tanWin('bot');
+
+  // Нижняя панель по умолчанию подбирает высоту под размах производной. Как
+  // только пользователь сам покрутил колесо над ней, авто-подбор отступает.
+  if (wBot.auto) {
+    let dLo = 0, dHi = 0;
+    for (let i = 0; i <= 200; i++) {
+      const x = wBot.xmin + (wBot.xmax - wBot.xmin) * i / 200;
+      const v = dfun(x);
+      if (!isNaN(v) && isFinite(v)) { dLo = Math.min(dLo, v); dHi = Math.max(dHi, v); }
+    }
+    const pad = Math.max(1, (dHi - dLo) * 0.15);
+    wBot.ymin = dLo - pad; wBot.ymax = dHi + pad;
+  }
+
+  const s1 = tanScales('top', L.top, L.yMid);
+  const s2 = tanScales('bot', L.botTop, L.bottom);
+
+  // Каждая панель рисуется в своём прямоугольнике и за него не выходит.
+  const defs = svg.append('defs');
+  const clipRect = (id, y0, y1) => {
+    defs.append('clipPath').attr('id', id).append('rect')
+      .attr('x', m.left - 1).attr('y', y0)
+      .attr('width', Math.max(0, W - m.right - m.left + 2))
+      .attr('height', Math.max(0, y1 - y0));
+  };
+  clipRect('tan-clip-top', L.top, L.yMid);
+  clipRect('tan-clip-bot', L.botTop, L.bottom);
+
+  const gTop = svg.append('g').attr('clip-path', 'url(#tan-clip-top)');
+  const gBot = svg.append('g').attr('clip-path', 'url(#tan-clip-bot)');
+  const gUi  = svg.append('g');    // подписи панелей: им обрезка ни к чему
+
+  drawPlaneAxes(gTop, s1.mx, s1.my, 'x', 'y');
+  drawPlaneAxes(gBot, s2.mx, s2.my, 'x', 'f′');
+  // Тонкая черта между панелями: видно, что это две разные области.
+  gUi.append('line').attr('x1', m.left).attr('y1', L.yMid + L.gap / 2)
+    .attr('x2', W - m.right).attr('y2', L.yMid + L.gap / 2)
+    .attr('stroke', COL.grid).attr('stroke-width', 1);
   // Подписи панелей крупнее и в цвет своей кривой: сразу видно, где сама
-  // функция, а где производная (мелкий серый текст читался плохо).
-  g.append('text').attr('x', m.left + 4).attr('y', top + 14)
-    .attr('font-size', 13.5).attr('font-weight', 700).attr('fill', COL.D).text('f(x), сама функция');
-  g.append('text').attr('x', m.left + 4).attr('y', yMid + gap + 14)
-    .attr('font-size', 13.5).attr('font-weight', 700).attr('fill', COL.MC).text('f′(x), производная');
+  // функция, а где производная.
+  gUi.append('text').attr('x', m.left + 4).attr('y', L.top + 14)
+    .attr('font-size', 13.5).attr('font-weight', 700).attr('fill', COL.tanF).text('f(x), сама функция');
+  gUi.append('text').attr('x', m.left + 4).attr('y', L.botTop + 14)
+    .attr('font-size', 13.5).attr('font-weight', 700).attr('fill', COL.tanD).text('f′(x), производная');
 
-  mathLine(g, f, s1.mx, s1.my, COL.D, 2.6);
-  mathLine(g, dfun, s2.mx, s2.my, COL.MC, 2.4);
+  mathLine(gTop, f, s1.mx, s1.my, COL.tanF, 2.6);
+  mathLine(gBot, dfun, s2.mx, s2.my, COL.tanD, 2.4);
 
   const x0 = STATE.mathX0, y0 = f(x0), k = dfun(x0);
   STATE.mathRes = { x0, y0, k, secant: null };
@@ -12349,19 +12489,19 @@ function drawMathTangent(f) {
 
   // Касательная: y = y0 + k·(x − x0).
   if (!isNaN(k)) {
-    mathLine(g, (x) => y0 + k * (x - x0), s1.mx, s1.my, COL.reg, 2, null);
+    mathLine(gTop, (x) => y0 + k * (x - x0), s1.mx, s1.my, COL.reg, 2, null);
     // Треугольник Δx / Δy — наглядное «отношение катетов = тангенс = производная».
-    const dx = Math.min(STATE.mathDx, (STATE.mathXmax - STATE.mathXmin) * 0.25);
+    const dx = Math.min(STATE.mathDx, (wTop.xmax - wTop.xmin) * 0.25);
     const xa = x0, xb = x0 + dx, ya = y0, yb = y0 + k * dx;
     const tri = [[s1.mx(xa), s1.my(ya)], [s1.mx(xb), s1.my(ya)], [s1.mx(xb), s1.my(yb)]];
-    g.append('path').attr('d', 'M' + tri.map(p => p.join(',')).join('L') + 'Z')
+    gTop.append('path').attr('d', 'M' + tri.map(p => p.join(',')).join('L') + 'Z')
       .attr('fill', COL.reg).attr('opacity', 0.14)
       .attr('stroke', COL.reg).attr('stroke-width', 1.2).attr('stroke-dasharray', '4 3');
-    g.append('text').attr('x', (s1.mx(xa) + s1.mx(xb)) / 2).attr('y', s1.my(ya) + 13)
+    gTop.append('text').attr('x', (s1.mx(xa) + s1.mx(xb)) / 2).attr('y', s1.my(ya) + 13)
       .attr('text-anchor', 'middle').attr('font-size', 10.5).attr('fill', COL.reg)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.4)
       .text('Δx = ' + fmt(dx));
-    g.append('text').attr('x', s1.mx(xb) + 6).attr('y', (s1.my(ya) + s1.my(yb)) / 2)
+    gTop.append('text').attr('x', s1.mx(xb) + 6).attr('y', (s1.my(ya) + s1.my(yb)) / 2)
       .attr('dominant-baseline', 'middle').attr('font-size', 10.5).attr('fill', COL.reg)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.4)
       .text('Δy = ' + fmt(k * dx));
@@ -12372,19 +12512,29 @@ function drawMathTangent(f) {
     const dx = STATE.mathDx, y1 = f(x0 + dx);
     if (!isNaN(y1)) {
       const ks = (y1 - y0) / dx;
-      mathLine(g, (x) => y0 + ks * (x - x0), s1.mx, s1.my, COL.tax, 1.8, '6 4');
-      mathDot(g, s1.mx, s1.my, x0 + dx, y1, COL.tax, null);
+      mathLine(gTop, (x) => y0 + ks * (x - x0), s1.mx, s1.my, COL.tax, 1.8, '6 4');
+      mathDot(gTop, s1.mx, s1.my, x0 + dx, y1, COL.tax, null);
       STATE.mathRes.secant = ks;
     }
   }
 
-  // Точка касания тянется мышью вдоль кривой.
-  const dot = g.append('circle').attr('cx', s1.mx(x0)).attr('cy', s1.my(y0)).attr('r', 6)
-    .attr('fill', COL.D).attr('stroke', COL.halo).attr('stroke-width', 2).style('cursor', 'ew-resize');
-  dot.call(d3.drag().container(() => svg.node()).on('drag', (ev) => {
-    setMathX0(Math.max(STATE.mathXmin, Math.min(STATE.mathXmax, s1.mx.invert(ev.x))));
-  }));
-  if (!isNaN(k)) mathDot(g, s2.mx, s2.my, x0, k, COL.MC, 'f′ = ' + fmt(k), null, 'deriv');
+  /* Точку ведут и сверху, и снизу: обе тянут одно и то же x₀. Рекурсии нет —
+     перетаскивание меняет x₀ и просит перерисовку, а перерисовка обработчиков
+     не дёргает. */
+  const grabX = (sc, w) => (ev) => {
+    setMathX0(Math.max(w.xmin, Math.min(w.xmax, sc.invert(ev.x))));
+  };
+  const dot = gTop.append('circle').attr('cx', s1.mx(x0)).attr('cy', s1.my(y0)).attr('r', 6)
+    .attr('fill', COL.tanF).attr('stroke', COL.halo).attr('stroke-width', 2).style('cursor', 'ew-resize');
+  dot.call(d3.drag().container(() => svg.node()).on('drag', grabX(s1.mx, wTop)));
+  if (!isNaN(k)) {
+    mathDot(gBot, s2.mx, s2.my, x0, k, COL.tanD, 'f′ = ' + fmt(k), null, 'deriv');
+    const dot2 = gBot.append('circle').attr('cx', s2.mx(x0)).attr('cy', s2.my(k)).attr('r', 6)
+      .attr('fill', 'transparent').attr('stroke', COL.tanD).attr('stroke-width', 2.2)
+      .style('cursor', 'ew-resize');
+    dot2.append('title').text('Ведите её, и касательная сверху перестроится');
+    dot2.call(d3.drag().container(() => svg.node()).on('drag', grabX(s2.mx, wBot)));
+  }
   updateMathPanel();
 }
 
@@ -12692,7 +12842,23 @@ function updateMathPanel() {
         html += `<div class="stat"><span>Наклон секущей</span><b>${fmt(r.secant)}</b></div>`;
         html += `<div class="stat"><span>Разница с касательной</span><b>${fmt(Math.abs(r.secant - r.k))}</b></div>`;
       }
-      html += `<div class="hint">Уравнение касательной: y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '−'} ${fmt(Math.abs(r.k))}·(x ${r.x0 >= 0 ? '−' : '+'} ${fmt(Math.abs(r.x0))}).</div>`;
+      html += `<div class="stat"><span>Касательная</span><b>y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '-'} ${fmt(Math.abs(r.k))}·(x ${r.x0 >= 0 ? '-' : '+'} ${fmt(Math.abs(r.x0))})</b></div>`;
+      // Разбор: откуда взялось это число и что показывает треугольник.
+      html += '<div class="sb-note"><b>Как это получилось</b>'
+        + `<p>Производная это скорость: на сколько меняется y, если x подвинуть чуть-чуть. `
+        + `Берём две близкие точки слева и справа от x₀ и делим прирост y на прирост x. `
+        + `Шаг подбирается от ширины окна, поэтому счёт одинаково точен и на отрезке 0…0.1, и на 0…1000.</p>`
+        + `<p>Треугольник у точки и есть это отношение: горизонтальный катет Δx, `
+        + `вертикальный Δy = ${fmt(r.k)}·Δx. Их частное не зависит от размера треугольника, `
+        + `оно и равно наклону.</p>`
+        + (r.secant != null
+            ? `<p>Секущая проходит через две точки на расстоянии Δx и имеет наклон ${fmt(r.secant)}. `
+              + `Разница с касательной ${fmt(Math.abs(r.secant - r.k))}: уменьшайте Δx, и она стремится к нулю. `
+              + `Это и есть предел, которым определяют производную.</p>`
+            : '<p>Включите секущую, и будет видно, как при уменьшении Δx она ложится на касательную.</p>')
+        + `<p>Внизу нарисована f′(x) целиком: там, где она выше нуля, функция растёт, `
+        + `где ниже — убывает, а её собственные нули это максимумы и минимумы самой функции.</p>`
+        + '</div>';
     }
   } else if (STATE.mathSub === 'optimum') {
     if (r.gMax) html += `<div class="stat"><span>Наибольшее на отрезке</span><b>y* = ${fmt(r.gMax.y)} при x* = ${fmt(r.gMax.x)}</b></div>`;
@@ -12778,6 +12944,7 @@ function setMathSub(sub, keepFormula) {
   redrawAll();
 }
 function setMathWindow(x0, x1, y0, y1) {
+  tanResetWindows();     // окна панелей сюжета про производную считаются заново
   // «Только первая четверть» работает и здесь: окно не заходит в минус,
   // ширина и высота при этом сохраняются.
   if (STATE.firstQuad) {
@@ -12794,7 +12961,10 @@ function setMathX0(x) {
   STATE.mathX0 = x;
   const v = document.getElementById('mathx0-val'); if (v) v.textContent = fmt(x);
   const s = document.getElementById('mathx0-slider'); if (s) s.value = x;
-  const n = document.getElementById('mathx0-input'); if (n) n.value = Math.round(x * 100) / 100;
+  // Поле точного значения не трогаем, пока в нём печатают: иначе округление
+  // отгрызает у «-11.78» последний знак прямо под руками.
+  const n = document.getElementById('mathx0-input');
+  if (n && document.activeElement !== n) n.value = Math.round(x * 1000) / 1000;
   redrawAll();
 }
 
@@ -16002,9 +16172,11 @@ function wireControls() {
   const mx0s = document.getElementById('mathx0-slider');
   if (mx0s) mx0s.addEventListener('input', () => setMathX0(parseFloat(mx0s.value)));
   const mx0i = document.getElementById('mathx0-input');
-  if (mx0i) mx0i.addEventListener('change', () => {
-    const v = parseFloat(mx0i.value); if (!isNaN(v)) setMathX0(v);
-  });
+  // Реагируем на ввод, а не только на уход из поля: число видно на графике сразу.
+  if (mx0i) ['input', 'change'].forEach(ev => mx0i.addEventListener(ev, () => {
+    const v = parseFloat(mx0i.value);
+    if (!isNaN(v)) setMathX0(v);
+  }));
   // Секущая через две точки: ползунок Δx появляется вместе с галочкой.
   const secChk = document.getElementById('chk-secant');
   if (secChk) secChk.addEventListener('change', () => {
