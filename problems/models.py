@@ -1216,5 +1216,6 @@ class ReviewVerdict(models.Model):
 # ===========================================================================
 
 from .models_platform import (  # noqa: E402,F401
+    ProblemComment,
     UserProfile,
 )

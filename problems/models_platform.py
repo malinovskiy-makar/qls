@@ -126,3 +126,108 @@ class UserProfile(models.Model):
         if self.user.role != target:
             user_model.objects.filter(pk=self.user_id).update(role=target)
             self.user.role = target
+
+
+# ===========================================================================
+# Фаза 2. Комментарии к задачам в домашке
+# ===========================================================================
+
+class ProblemCommentQuerySet(models.QuerySet):
+    """Правила доступа к комментариям живут ЗДЕСЬ, а не в шаблоне.
+
+    Причина простая: шаблон легко забыть. Если правило доступа записано
+    один раз в queryset, то любой экран, любой JSON-эндпоинт и любой экспорт
+    получают его автоматически.
+    """
+
+    def alive(self):
+        """Без удалённых (удаление у нас мягкое)."""
+        return self.filter(is_deleted=False)
+
+    def visible_for(self, user):
+        """Что этот пользователь имеет право видеть.
+
+        Одним запросом на обе роли:
+        * репетитор (автор домашки или преподаватель её группы) видит ВСЁ;
+        * все видят комментарии с видимостью «группа»;
+        * автор видит свои;
+        * адресат приватного ответа видит ответ, обращённый к нему.
+
+        Ученик Б не увидит приватный вопрос ученика А ни при каких условиях:
+        он не автор, не адресат и не репетитор.
+        """
+        if not user or not user.is_authenticated:
+            return self.none()
+        return self.alive().filter(
+            models.Q(assignment__author=user)
+            | models.Q(assignment__group__teacher=user)
+            | models.Q(visibility=ProblemComment.Visibility.GROUP)
+            | models.Q(author=user)
+            | models.Q(recipient=user)
+        ).distinct()
+
+
+class ProblemComment(models.Model):
+    """Комментарий к КОНКРЕТНОЙ ЗАДАЧЕ В КОНКРЕТНОЙ ДОМАШКЕ.
+
+    Это не мессенджер: у разговора всегда есть предмет — вот эта задача вот
+    в этой домашке. Поэтому привязка идёт к ПОЗИЦИИ задачи в домашке
+    (`AssignmentItem`), а не к задаче каталога: одна и та же задача может
+    стоять в трёх разных домашках, и обсуждения у них разные.
+
+    `assignment` хранится отдельно (хотя выводится из позиции) — по нему
+    строятся выборки «все комментарии домашки» без лишнего JOIN, и по нему же
+    работает правило доступа.
+    """
+
+    class Visibility(models.TextChoices):
+        GROUP = 'group', 'Видят все в группе'
+        PRIVATE = 'private', 'Только репетитор и автор'
+
+    assignment = models.ForeignKey(
+        'problems.Assignment', on_delete=models.CASCADE,
+        related_name='problem_comments', verbose_name='Домашка')
+    problem_item = models.ForeignKey(
+        'problems.AssignmentItem', on_delete=models.CASCADE,
+        related_name='comments', verbose_name='Задача в домашке')
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='problem_comments', verbose_name='Автор')
+
+    # Кому адресован приватный ответ. Нужен ровно для одного случая: репетитор
+    # отвечает ученику приватно. Без этого поля ответ репетитора формально
+    # «принадлежит репетитору», и ученик своего же ответа не увидел бы.
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='problem_comments_received', verbose_name='Адресат')
+
+    text = models.TextField('Текст')
+    # По умолчанию 'group': это значение для репетитора. Комментарий ученика
+    # интерфейс создаёт с 'private' — публичные вопросы учеников это канал
+    # списывания («а что у тебя получилось в пункте б?»).
+    visibility = models.CharField('Видимость', max_length=16,
+                                  choices=Visibility.choices,
+                                  default=Visibility.GROUP)
+
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+    updated_at = models.DateTimeField('Изменён', auto_now=True)
+    # Удаление мягкое: переписка — это история проверки, физически её терять
+    # нельзя (в том числе на случай спора об оценке).
+    is_deleted = models.BooleanField('Удалён', default=False)
+
+    objects = ProblemCommentQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = 'Комментарий к задаче'
+        verbose_name_plural = 'Комментарии к задачам'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['assignment', 'problem_item'],
+                         name='idx_comment_assign_item'),
+            models.Index(fields=['author', 'created_at'],
+                         name='idx_comment_author_date'),
+        ]
+
+    def __str__(self):
+        return f'{self.author}: {self.text[:40]}'

@@ -6,7 +6,7 @@
 - [x] Фаза 1. Профиль и роли — `UserProfile` в `problems/models_platform.py`,
       сигнал в `problems/signals.py`, команда `backfill_profiles`,
       админка `problems/admin_platform.py`
-- [ ] Фаза 2. Комментарии
+- [x] Фаза 2. Комментарии — `ProblemComment` + `ProblemCommentQuerySet.visible_for()`
 - [ ] Фаза 3. Свои задачи и тесты
 - [ ] Фаза 4. Сохранённое и папки
 - [ ] Фаза 5. Решалка
