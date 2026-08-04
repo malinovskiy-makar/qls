@@ -8,9 +8,11 @@
 from django.contrib import admin
 
 from .models_platform import (
+    AnswerDraft,
     AssignmentItem,
     CustomProblem,
     CustomProblemOption,
+    ExamAttempt,
     ProblemComment,
     SavedFolder,
     SavedGraph,
@@ -83,3 +85,18 @@ class SavedGraphAdmin(admin.ModelAdmin):
     list_filter = ['is_deleted']
     search_fields = ['name', 'owner__username']
     raw_id_fields = ['owner', 'folder']
+
+
+@admin.register(ExamAttempt)
+class ExamAttemptAdmin(admin.ModelAdmin):
+    list_display = ['assignment', 'student', 'started_at', 'expires_at',
+                    'submitted_at', 'is_auto_submitted']
+    list_filter = ['is_auto_submitted']
+    raw_id_fields = ['assignment', 'student']
+    date_hierarchy = 'started_at'
+
+
+@admin.register(AnswerDraft)
+class AnswerDraftAdmin(admin.ModelAdmin):
+    list_display = ['attempt', 'problem_item', 'updated_at']
+    raw_id_fields = ['attempt', 'problem_item']

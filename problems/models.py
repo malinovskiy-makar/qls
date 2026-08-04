@@ -622,6 +622,45 @@ class Assignment(models.Model):
                                verbose_name='Автор')
     created_at = models.DateTimeField('Создано', auto_now_add=True)
 
+    # --- Платформа репетиторов: привязка к группе ------------------------
+    # Раньше домашка адресовалась списком учеников (`students`) и к группе
+    # отношения не имела. Вкладке «Группы» нужен обратный ход «группа → её
+    # задания», поэтому появилась прямая ссылка. Nullable: старые домашки
+    # выданы до появления групп.
+    group = models.ForeignKey('StudentGroup', on_delete=models.SET_NULL,
+                              null=True, blank=True,
+                              related_name='assignments',
+                              verbose_name='Группа')
+
+    # --- Контрольные (Фаза 6) --------------------------------------------
+    class Kind(models.TextChoices):
+        HOMEWORK = 'homework', 'Домашка'
+        EXAM = 'exam', 'Контрольная'
+
+    class ExamMode(models.TextChoices):
+        # Тип A: все пишут одновременно, окно задано жёстко.
+        WINDOW = 'window', 'Окно (все одновременно)'
+        # Тип Б: сдать до момента X, на выполнение N минут с момента старта.
+        LIMIT = 'limit', 'Дедлайн с лимитом времени'
+
+    kind = models.CharField('Тип работы', max_length=16,
+                            choices=Kind.choices, default=Kind.HOMEWORK)
+    exam_mode = models.CharField('Режим контрольной', max_length=16,
+                                 choices=ExamMode.choices,
+                                 null=True, blank=True)
+    starts_at = models.DateTimeField('Начало окна', null=True, blank=True)
+    ends_at = models.DateTimeField('Конец окна', null=True, blank=True)
+    duration_minutes = models.PositiveIntegerField(
+        'Лимит времени (минут)', null=True, blank=True)
+    # Срок сдачи для контрольной типа Б. У домашки срок по-прежнему в
+    # `deadline`; спрашивать оба поля сразу не нужно — есть
+    # `models_platform.assignment_deadline()`.
+    due_at = models.DateTimeField('Сдать до', null=True, blank=True)
+    show_results_immediately = models.BooleanField(
+        'Показывать результат сразу', default=True,
+        help_text='Тесты проверяются автоматически; на контрольной результат '
+                  'иногда лучше придержать до проверки открытых задач.')
+
     class Meta:
         verbose_name = 'Домашка / назначение'
         verbose_name_plural = 'Домашки / назначения'
@@ -629,6 +668,56 @@ class Assignment(models.Model):
 
     def __str__(self):
         return self.name
+
+    # --- Контрольные: когда работа открыта ------------------------------
+
+    @property
+    def is_exam(self):
+        return self.kind == self.Kind.EXAM
+
+    @property
+    def deadline_at(self):
+        """Срок сдачи одним понятием: у контрольной `due_at`, у домашки
+        `deadline`."""
+        return self.due_at or self.deadline
+
+    def open_state_for(self, user, now=None):
+        """(открыта ли, человеческая причина). Причина нужна экрану: «закрыто»
+        без объяснения выглядит как поломка."""
+        from django.utils import timezone as _tz
+        now = now or _tz.now()
+
+        # Домашку сдают когда угодно — дедлайн лишь помечает опоздание.
+        # Так работало до появления контрольных, и менять это нельзя:
+        # половина смысла домашки в том, что её можно дослать.
+        if not self.is_exam:
+            return True, ''
+
+        if self.exam_mode == self.ExamMode.WINDOW:
+            if self.starts_at and now < self.starts_at:
+                return False, f'Начало {self.starts_at:%d.%m.%Y %H:%M}.'
+            if self.ends_at and now > self.ends_at:
+                return False, 'Окно контрольной закрыто.'
+            return True, ''
+
+        if self.exam_mode == self.ExamMode.LIMIT:
+            if self.due_at and now > self.due_at:
+                return False, 'Срок сдачи прошёл.'
+            attempt = None
+            if user is not None and getattr(user, 'is_authenticated', False):
+                attempt = self.exam_attempts.filter(student=user).first()
+            if attempt is not None:
+                if attempt.submitted_at is not None:
+                    return False, 'Работа уже сдана.'
+                if attempt.expires_at and now >= attempt.expires_at:
+                    return False, 'Время на выполнение вышло.'
+            return True, ''
+
+        # Контрольная без режима — считаем обычной работой, не запираем.
+        return True, ''
+
+    def is_open_for(self, user, now=None):
+        return self.open_state_for(user, now)[0]
 
 
 class Submission(models.Model):
@@ -1236,9 +1325,11 @@ class ReviewVerdict(models.Model):
 # ===========================================================================
 
 from .models_platform import (  # noqa: E402,F401
+    AnswerDraft,
     AssignmentItem,
     CustomProblem,
     CustomProblemOption,
+    ExamAttempt,
     ProblemComment,
     SolutionVisibility,
     SavedFolder,

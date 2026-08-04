@@ -710,3 +710,125 @@ def assignment_deadline(assignment):
         if deadline is None:
             return 'Дедлайна нет — решение откроет преподаватель.'
         return f'Решение откроется после дедлайна {deadline:%d.%m.%Y %H:%M}.'
+
+
+# ===========================================================================
+# Фаза 6. Контрольные: попытка и черновики ответов
+# ===========================================================================
+
+class ExamAttempt(models.Model):
+    """Попытка ученика написать контрольную.
+
+    ⚠️ ГЛАВНОЕ: `expires_at` вычисляет СЕРВЕР в момент старта. Часам на
+    устройстве ученика доверия нет — перевести системное время на час назад
+    умеет любой школьник. Клиент получает готовый момент истечения и только
+    рисует обратный отсчёт; решение «время вышло» принимает сервер.
+    """
+
+    assignment = models.ForeignKey(
+        'problems.Assignment', on_delete=models.CASCADE,
+        related_name='exam_attempts', verbose_name='Работа')
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='exam_attempts', verbose_name='Ученик')
+
+    started_at = models.DateTimeField('Начата', auto_now_add=True)
+    expires_at = models.DateTimeField('Истекает', null=True, blank=True)
+    submitted_at = models.DateTimeField('Сдана', null=True, blank=True)
+    is_auto_submitted = models.BooleanField('Сдана автоматически',
+                                            default=False)
+    # Обновляется при автосохранении черновика: видно, что ученик жив и
+    # работа не брошена.
+    last_heartbeat = models.DateTimeField('Последняя активность',
+                                          null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Попытка контрольной'
+        verbose_name_plural = 'Попытки контрольных'
+        ordering = ['-started_at']
+        constraints = [
+            # Одна попытка на пару (работа, ученик). Вторая попытка — это
+            # уже другая контрольная, а не «ещё разок».
+            models.UniqueConstraint(fields=['assignment', 'student'],
+                                    name='uniq_exam_attempt'),
+        ]
+
+    def __str__(self):
+        return f'{self.student} — {self.assignment}'
+
+    @classmethod
+    def start(cls, assignment, student, now=None):
+        """Начинает попытку (или возвращает уже начатую).
+
+        Момент истечения считается ЗДЕСЬ, от серверного времени:
+        * окно (тип A) — до конца окна;
+        * лимит (тип Б) — старт + лимит, но не позже срока сдачи (иначе
+          ученик, стартовавший за минуту до дедлайна, получил бы лишний час).
+        """
+        now = now or timezone.now()
+        attempt = cls.objects.filter(assignment=assignment,
+                                     student=student).first()
+        if attempt is not None:
+            return attempt
+
+        expires_at = None
+        mode = assignment.exam_mode
+        if mode == assignment.ExamMode.WINDOW:
+            expires_at = assignment.ends_at
+        elif mode == assignment.ExamMode.LIMIT:
+            if assignment.duration_minutes:
+                expires_at = now + timezone.timedelta(
+                    minutes=assignment.duration_minutes)
+            if assignment.due_at and (expires_at is None
+                                      or expires_at > assignment.due_at):
+                expires_at = assignment.due_at
+
+        return cls.objects.create(assignment=assignment, student=student,
+                                  expires_at=expires_at, last_heartbeat=now)
+
+    def seconds_left(self, now=None):
+        """Сколько секунд осталось (None — без ограничения)."""
+        if self.expires_at is None:
+            return None
+        now = now or timezone.now()
+        return max(0, int((self.expires_at - now).total_seconds()))
+
+    @property
+    def is_expired(self):
+        left = self.seconds_left()
+        return left is not None and left <= 0
+
+    def touch(self, now=None):
+        """Отметка «ученик на связи» при автосохранении."""
+        self.last_heartbeat = now or timezone.now()
+        self.save(update_fields=['last_heartbeat'])
+
+
+class AnswerDraft(models.Model):
+    """Черновик ответа — автосохранение во время контрольной.
+
+    Требование, ради которого модель существует: при обрыве связи или
+    закрытии вкладки написанное НЕ теряется. Ученик возвращается, видит свои
+    ответы, а таймер идёт от `expires_at` попытки — не от нуля и не от того,
+    сколько он реально просидел за экраном.
+    """
+
+    attempt = models.ForeignKey(
+        ExamAttempt, on_delete=models.CASCADE,
+        related_name='drafts', verbose_name='Попытка')
+    problem_item = models.ForeignKey(
+        'problems.AssignmentItem', on_delete=models.CASCADE,
+        related_name='drafts', verbose_name='Задача в домашке')
+    answer_draft = models.TextField('Черновик ответа', blank=True)
+    updated_at = models.DateTimeField('Сохранён', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Черновик ответа'
+        verbose_name_plural = 'Черновики ответов'
+        constraints = [
+            models.UniqueConstraint(fields=['attempt', 'problem_item'],
+                                    name='uniq_answer_draft'),
+        ]
+
+    def __str__(self):
+        return f'{self.attempt}: позиция {self.problem_item_id}'
