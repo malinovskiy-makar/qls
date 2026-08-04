@@ -2850,48 +2850,43 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         </div>
       </div>
 
-      <!-- 7е. Оптимизация с ограничением -->
+      <!-- 7е. Оптимизация с ограничением. Пресета «прямой» больше нет:
+           ограничение сразу пишется своё, любое. Переменные x и y. -->
       <div id="math-pane-constraint" style="display:none;">
+        <div class="field">
+          <label>Что ищем</label>
+          <div class="seg">
+            <button class="seg-btn active" id="mc-max">Максимум</button>
+            <button class="seg-btn" id="mc-min">Минимум</button>
+          </div>
+        </div>
         <div class="field f-wrap">
-          <label>Целевая функция F(a, b)</label>
+          <label>Целевая функция f(x, y)</label>
           <div class="f-row">
-            <input type="text" id="inp-mathfc" value="a^0.5 * b^0.5" autocomplete="off">
+            <input type="text" id="inp-mathfc" value="x^0.5 * y^0.5" autocomplete="off">
             <button class="f-help" id="fh-mathfc" type="button" aria-expanded="false"
                     aria-controls="fp-mathfc" title="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-mathfc" role="region" aria-label="Примеры функций"></div>
         </div>
-        <div class="seg" style="margin-top:8px;">
-          <button class="seg-btn active" id="mc-line">Ограничение прямой</button>
-          <button class="seg-btn" id="mc-own">Своё ограничение</button>
-        </div>
-        <div id="mc-pane-line">
-          <div class="row">
-            <div class="field"><label>цена a</label><input type="number" id="inp-mathpa" min="0.1" step="0.5" value="1"></div>
-            <div class="field"><label>цена b</label><input type="number" id="inp-mathpb" min="0.1" step="0.5" value="1"></div>
-            <div class="field"><label>ресурс M</label><input type="number" id="inp-mathm" min="1" step="1" value="10"></div>
+        <div class="field f-wrap">
+          <label>Ограничение g(x, y)</label>
+          <div class="f-row">
+            <input type="text" id="inp-mathgc" value="x + y = 10" autocomplete="off">
+            <button class="f-help" id="fh-mathgc" type="button" aria-expanded="false"
+                    aria-controls="fp-mathgc" title="Как писать формулы">?</button>
           </div>
+          <div class="f-pop" id="fp-mathgc" role="region" aria-label="Примеры ограничений"></div>
         </div>
-        <div id="mc-pane-own" style="display:none;">
-          <div class="field f-wrap">
-            <label>Ограничение</label>
-            <div class="f-row">
-              <input type="text" id="inp-mathgc" value="a^2 + b^2 = 25" autocomplete="off">
-              <button class="f-help" id="fh-mathgc" type="button" aria-expanded="false"
-                      aria-controls="fp-mathgc" title="Как писать формулы">?</button>
-            </div>
-            <div class="f-pop" id="fp-mathgc" role="region" aria-label="Примеры ограничений"></div>
-          </div>
-          <div class="hint">Можно писать со знаком равенства: a^2 + b^2 = 25. Кривая ищется численно,
-            поэтому подойдёт любая, а не только прямая.</div>
+        <div class="hint-row">
+          <button class="hint-btn" type="button" data-pop="hp-constraint" aria-label="Как это работает">?</button>
+          <span class="hint-lead">Как записывать</span>
         </div>
-        <div class="seg" style="margin-top:8px;">
-          <button class="seg-btn active" id="mc-max">Ищем максимум</button>
-          <button class="seg-btn" id="mc-min">Ищем минимум</button>
+        <div class="hint-pop" id="hp-constraint">
+          <p>Обе формулы пишутся от x и y: цель x^0.5 * y^0.5, ограничение
+            x + y = 10 или x^2 + y^2 = 25. Знак равенства ставить можно.</p>
+          <p>Прямая это частный случай: 2*x + y = 12 задаёт ровно её.</p>
         </div>
-        <div class="hint">Тот же численный движок касания уровня, что рисует изокванты и кривые
-          безразличия, только без экономической привязки. Переменные названы a и b,
-          чтобы ничего не подсказывать заранее.</div>
       </div>
 
       <!-- Границы окна живут только в меню гаечного ключа над графиком:
@@ -3266,10 +3261,8 @@ const STATE = {
   mathG2: '4 - x',               // вторая функция (7д)
   mathG3: '', mathG4: '',        // третья и четвёртая — по желанию
   mathMinMax: 'min',
-  mathFC: 'a^0.5 * b^0.5',       // целевая функция двух переменных (7е)
-  mathPa: 1, mathPb: 1, mathM: 10,
-  mathConsKind: 'line',          // вид ограничения: прямая или своё
-  mathGC: 'a^2 + b^2 = 25',      // своё ограничение G(a, b) = 0
+  mathFC: 'x^0.5 * y^0.5',       // целевая функция двух переменных (7е)
+  mathGC: 'x + y = 10',          // ограничение g(x, y) = 0
   mathConsWantMax: true,         // ищем максимум или минимум
   mathRes: null,                 // результат текущего расчёта — для табло
   showCS: true,      // показывать заливку излишка потребителя
@@ -12720,18 +12713,19 @@ function drawMathMinMax(f) {
 }
 
 /* ── 7е. Оптимизация с ограничением ───────────────────────────────────
-   Переиспользует движок касания уровня Фазы 7 прошлой сессии
-   (optimizeAlongConstraint / traceLevelCurve). Своей математики здесь нет —
-   только нейтральные названия осей a и b вместо x, y или L, K. */
-// Своя компиляция F(a, b): общая compileTwoVar пробует формулу на x/y/L/K, и на
-// «a^0.5 * b^0.5» падает на неизвестном символе. Трогать её не стали — у неё свои
-// пользователи (потребитель, изокванты), а тут добавлены только имена a и b.
+   Переиспользует движок касания уровня (optimizeAlongConstraint /
+   traceLevelCurve). Своей математики здесь нет.
+   Переменные называются x и y: буквы a и b были нейтральны, но занимали имена,
+   которые школьник привычно берёт под параметры. */
+// Своя компиляция f(x, y): общая compileTwoVar пробует формулу на x/y/L/K и на
+// «x^0.5 * y^0.5» справляется, но здесь нужны ещё и старые имена a/b — записи
+// из прошлых версий должны продолжать считаться.
 function compileAB(expr) {
   try {
     const compiled = math.parse(expr).compile();
     compiled.evaluate({ a: 1, b: 1, x: 1, y: 1, L: 1, K: 1 });
     return { compiled, error: null };
-  } catch (e) { return { compiled: null, error: 'Не понял формулу F(a, b): ' + e.message }; }
+  } catch (e) { return { compiled: null, error: 'Не понял формулу f(x, y): ' + e.message }; }
 }
 
 /* Произвольное (неявное) ограничение G(a, b) = 0.
@@ -12754,16 +12748,18 @@ function parseConstraint(src) {
   };
 }
 
-// Точки ограничения в первой четверти: для каждого a — все b, где G меняет знак.
-function constraintPoints(G, aMax, bMax, N) {
+/* Точки ограничения в прямоугольнике окна: для каждого x — первый y, где
+   G(x, y) меняет знак. Границы приходят снаружи, поэтому кривую видно и в
+   отрицательной части плоскости, если пользователь снял первую четверть. */
+function constraintPointsIn(G, x0, x1, y0, y1, N) {
   N = N || 260;
   const out = [];
   for (let i = 0; i <= N; i++) {
-    const a = aMax * i / N;
+    const a = x0 + (x1 - x0) * i / N;
     const g = (b) => G(a, b);
-    let prevB = 0, prevV = g(0);
+    let prevB = y0, prevV = g(y0);
     for (let j = 1; j <= 160; j++) {
-      const b = bMax * j / 160, v = g(b);
+      const b = y0 + (y1 - y0) * j / 160, v = g(b);
       if (!isNaN(prevV) && !isNaN(v) && prevV * v <= 0 && prevV !== v) {
         const root = (prevV === 0) ? prevB : (v === 0 ? b : bisect(g, prevB, b));
         if (isFinite(root)) { out.push([a, root]); break; }
@@ -12772,6 +12768,10 @@ function constraintPoints(G, aMax, bMax, N) {
     }
   }
   return out;
+}
+// Прежняя форма вызова (от нуля до предела) — через общий вариант.
+function constraintPoints(G, aMax, bMax, N) {
+  return constraintPointsIn(G, 0, aMax, 0, bMax, N);
 }
 
 // Максимум (или минимум) F вдоль произвольного ограничения.
@@ -12785,65 +12785,73 @@ function optimizeAlongCurve(f, pts, wantMax) {
   return best;
 }
 
+/* Подогнать окно под ограничение. Делается ОДИН раз при входе в сюжет и при
+   смене формулы, а не на каждой перерисовке: иначе своё окно, выбранное
+   колесом, сцена возвращала бы себе обратно, и зум не работал бы вовсе. */
+function constraintFit() {
+  let xMax = 12, yMax = 12;
+  const G = parseConstraint(STATE.mathGC);
+  if (G) {
+    const probe = constraintPoints(G, 1e3, 1e3, 120);
+    if (probe.length) {
+      xMax = niceMax(Math.max.apply(null, probe.map(q => q[0])) * 1.2);
+      yMax = niceMax(Math.max.apply(null, probe.map(q => q[1])) * 1.2);
+    }
+  }
+  // Запоминаем размах задачи: по нему ищется оптимум независимо от того,
+  // насколько человек приблизил картинку.
+  STATE.consFit = { xMax: xMax || 12, yMax: yMax || 12 };
+  setMathWindow(0, xMax || 12, 0, yMax || 12);
+  STATE.viewDirty = false;
+  updateResetViewBtn();
+}
+
 function drawMathConstraint() {
   const g = svg.append('g');
   const { compiled, error } = compileAB(STATE.mathFC);
-  const m = CONFIG.margin;
-  const pa = Math.max(0.01, STATE.mathPa), pb = Math.max(0.01, STATE.mathPb), M = Math.max(0.01, STATE.mathM);
-  // Оси по ограничению: край = сколько получится купить на весь ресурс.
-  let aMax = niceMax(M / pa * 1.25), bMax = niceMax(M / pb * 1.25);
-  if (STATE.mathConsKind === 'own') {
-    // Окно под своё ограничение: сначала грубо ищем, докуда кривая доходит.
-    const G0 = parseConstraint(STATE.mathGC);
-    if (G0) {
-      const probe = constraintPoints(G0, 1e3, 1e3, 120);
-      if (probe.length) {
-        aMax = niceMax(Math.max.apply(null, probe.map(q => q[0])) * 1.2);
-        bMax = niceMax(Math.max.apply(null, probe.map(q => q[1])) * 1.2);
-      }
-    }
-  }
-  const mx = d3.scaleLinear().domain([0, aMax]).range([m.left, W - m.right]);
-  const my = d3.scaleLinear().domain([0, bMax]).range([H - m.bottom, m.top]);
-  drawPlaneAxes(g, mx, my, 'a', 'b');
+  // Окно общее для всего раздела, поэтому колесо и перетаскивание работают
+  // здесь ровно так же, как в остальных сюжетах.
+  const { mx, my } = mathScales();
+  drawPlaneAxes(g, mx, my, 'x', 'y');
   if (!compiled) {
     STATE.mathRes = { error: error || 'не понял формулу' };
     updateMathPanel(); return;
   }
   const f = (a, b) => {
     try {
-      const v = compiled.evaluate({ a, b, x: a, y: b, L: a, K: b });
+      const v = compiled.evaluate({ x: a, y: b, a, b, L: a, K: b });
       return (typeof v === 'number' && isFinite(v)) ? v : NaN;
     } catch (e) { return NaN; }
   };
   const line = d3.line().x(d => mx(d[0])).y(d => my(d[1]));
-  let opt = null;
-  if (STATE.mathConsKind === 'own') {
-    // Своё ограничение: рисуем найденную численно кривую и ищем на ней лучшее.
-    const G = parseConstraint(STATE.mathGC);
-    if (!G) {
-      STATE.mathRes = { error: 'Не понял ограничение. Пример: a^2 + b^2 = 25' };
-      updateMathPanel(); return;
-    }
-    const pts = constraintPoints(G, aMax, bMax);
-    if (pts.length > 1) {
-      g.append('path').datum(pts).attr('fill', 'none')
-        .attr('stroke', COL.S).attr('stroke-width', 2.6).attr('d', line);
-    }
-    opt = optimizeAlongCurve(f, pts, STATE.mathConsWantMax !== false);
-  } else {
-    // Линия ограничения pa·a + pb·b = M.
-    g.append('path').datum([[0, M / pb], [M / pa, 0]]).attr('fill', 'none')
-      .attr('stroke', COL.S).attr('stroke-width', 2.6).attr('d', line);
-    opt = optimizeAlongConstraint(f, pa, pb, M);
+  const G = parseConstraint(STATE.mathGC);
+  if (!G) {
+    STATE.mathRes = { error: 'Не понял ограничение. Пример: x^2 + y^2 = 25' };
+    updateMathPanel(); return;
   }
-  STATE.mathRes = { opt, pa, pb, M };
+  const [x0, x1] = mx.domain(), [y0, y1] = my.domain();
+  // Рисуем ту часть ограничения, что попала в окно.
+  const pts = constraintPointsIn(G, x0, x1, y0, y1);
+  if (pts.length > 1) {
+    g.append('path').datum(pts).attr('fill', 'none')
+      .attr('stroke', COL.S).attr('stroke-width', 2.6).attr('d', line);
+  }
+  /* А ищем по всей задаче, а не по видимому куску: приблизили картинку — ответ
+     не должен меняться. Область поиска это размах ограничения, объединённый с
+     текущим окном. */
+  const fit = STATE.consFit || { xMax: x1, yMax: y1 };
+  const sx0 = Math.min(x0, 0), sx1 = Math.max(x1, fit.xMax);
+  const sy0 = Math.min(y0, 0), sy1 = Math.max(y1, fit.yMax);
+  const searchPts = (sx0 === x0 && sx1 === x1 && sy0 === y0 && sy1 === y1)
+    ? pts : constraintPointsIn(G, sx0, sx1, sy0, sy1);
+  const opt = optimizeAlongCurve(f, searchPts, STATE.mathConsWantMax !== false);
+  STATE.mathRes = { opt, wantMax: STATE.mathConsWantMax !== false };
   if (opt) {
     // Веер линий уровня + линия, проходящая через оптимум (она и касается ограничения).
     [0.55, 0.78, 1.25].forEach(k => drawLevelCurveOn(g, mx, my, f, opt.value * k, COL.D, 1.5, 0.32));
     drawLevelCurveOn(g, mx, my, f, opt.value, COL.D, 2.6, 1);
     mathDot(g, mx, my, opt.a, opt.b, COL.ink,
-      (STATE.mathConsWantMax === false ? 'минимум (' : 'оптимум (') + fmt(opt.a) + '; ' + fmt(opt.b) + ')', null, 'opt');
+      (STATE.mathConsWantMax === false ? 'минимум (' : 'максимум (') + fmt(opt.a) + '; ' + fmt(opt.b) + ')', null, 'opt');
   }
   updateMathPanel();
 }
@@ -12959,12 +12967,21 @@ function updateMathPanel() {
     }
   } else if (STATE.mathSub === 'constraint') {
     if (r.error) html = `<div class="warn">${r.error}</div>`;
-    else if (!r.opt) html = '<div class="muted">Оптимум не нашёлся: проверьте формулу и ресурс.</div>';
+    else if (!r.opt) html = '<div class="muted">Точка не нашлась: проверьте формулы и границы окна.</div>';
     else {
-      html += `<div class="stat"><span>a*</span><b>${fmt(r.opt.a)}</b></div>`;
-      html += `<div class="stat"><span>b*</span><b>${fmt(r.opt.b)}</b></div>`;
-      html += `<div class="stat"><span>F(a*, b*)</span><b>${fmt(r.opt.value)}</b></div>`;
-      html += `<div class="stat"><span>Ограничение</span><b>${fmt(r.pa)}·a + ${fmt(r.pb)}·b = ${fmt(r.M)}</b></div>`;
+      html += `<div class="stat"><span>x*</span><b>${fmt(r.opt.a)}</b></div>`;
+      html += `<div class="stat"><span>y*</span><b>${fmt(r.opt.b)}</b></div>`;
+      html += `<div class="stat"><span>f(x*, y*)</span><b>${fmt(r.opt.value)}</b></div>`;
+      html += `<div class="stat"><span>Ищем</span><b>${r.wantMax ? 'максимум' : 'минимум'}</b></div>`;
+      html += '<div class="sb-note"><b>Как это получилось</b>'
+        + '<p>Ограничение это кривая: точки, где g(x, y) обращается в ноль. '
+        + 'Она ищется численно, для каждого x подбирается свой y, поэтому подходит '
+        + 'любая форма, а не только прямая.</p>'
+        + `<p>Вдоль этой кривой перебирается значение цели, и берётся ${r.wantMax ? 'наибольшее' : 'наименьшее'}. `
+        + 'Тонкими линиями нарисован веер линий уровня цели, жирной — та, что проходит через найденную точку.</p>'
+        + '<p>Она касается ограничения, а не пересекает его. Это и есть признак оптимума: '
+        + 'сдвинуться вдоль ограничения в любую сторону значит перейти на линию уровня хуже.</p>'
+        + '</div>';
     }
   }
   box.innerHTML = html;
@@ -13011,6 +13028,7 @@ function setMathSub(sub, keepFormula) {
   const rowF = document.getElementById('math-row-f');
   if (rowF) rowF.style.display = (sub === 'constraint' || sub === 'minmax') ? 'none' : '';
   if (sub === 'minmax') renderMmRows();
+  if (sub === 'constraint' && !keepFormula) { constraintFit(); redrawAll(); return; }
   const p = MATH_PRESETS[sub];
   if (p && !keepFormula) {
     STATE.mathFormula = p.f;
@@ -16230,16 +16248,6 @@ function wireControls() {
     if (e) e.addEventListener('input', () => { STATE[key] = e.value; redrawAll(); });
   });
 
-  // Числовые поля раздела (пределы по y, цены и ресурс). Границы окна
-  // задаются в меню плоскости над графиком, здесь их больше нет.
-  [   ['inp-mathpa', 'mathPa'], ['inp-mathpb', 'mathPb'], ['inp-mathm', 'mathM']].forEach(([id, key]) => {
-    const e = document.getElementById(id);
-    if (e) e.addEventListener('change', () => {
-      const v = parseFloat(e.value);
-      if (!isNaN(v)) { STATE[key] = v; redrawAll(); }
-    });
-  });
-
   // Точка касания: ползунок, числовое поле (её же тянут мышью по кривой).
   const mx0s = document.getElementById('mathx0-slider');
   if (mx0s) mx0s.addEventListener('input', () => setMathX0(parseFloat(mx0s.value)));
@@ -16312,18 +16320,6 @@ function wireControls() {
   const aOk = document.getElementById('matha-ok');
   if (aOk) aOk.addEventListener('click', () => { if (aEd) aEd.classList.remove('open'); });
   syncA();
-  const mcLine = document.getElementById('mc-line'), mcOwn = document.getElementById('mc-own');
-  const setConsKind = (k) => {
-    STATE.mathConsKind = k;
-    if (mcLine) mcLine.classList.toggle('active', k === 'line');
-    if (mcOwn) mcOwn.classList.toggle('active', k === 'own');
-    const pl = document.getElementById('mc-pane-line'), po = document.getElementById('mc-pane-own');
-    if (pl) pl.style.display = (k === 'line') ? '' : 'none';
-    if (po) po.style.display = (k === 'own') ? '' : 'none';
-    redrawAll();
-  };
-  if (mcLine) mcLine.addEventListener('click', () => setConsKind('line'));
-  if (mcOwn) mcOwn.addEventListener('click', () => setConsKind('own'));
   const mcMax = document.getElementById('mc-max'), mcMin = document.getElementById('mc-min');
   const setWantMax = (v) => {
     STATE.mathConsWantMax = v;
@@ -16333,8 +16329,13 @@ function wireControls() {
   };
   if (mcMax) mcMax.addEventListener('click', () => setWantMax(true));
   if (mcMin) mcMin.addEventListener('click', () => setWantMax(false));
+  // Ограничение сменилось — окно подгоняется заново, дальше им распоряжается человек.
   const gcField = document.getElementById('inp-mathgc');
-  if (gcField) gcField.addEventListener('input', () => { STATE.mathGC = gcField.value; redrawAll(); });
+  if (gcField) gcField.addEventListener('input', () => {
+    STATE.mathGC = gcField.value;
+    constraintFit();
+    redrawAll();
+  });
 
   const mmMin = document.getElementById('mm-min'), mmMax = document.getElementById('mm-max');
   if (mmMin) mmMin.addEventListener('click', () => {

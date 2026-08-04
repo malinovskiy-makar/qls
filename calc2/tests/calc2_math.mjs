@@ -709,22 +709,24 @@ const CASES = [
     checks: [['точек смены', 'n', 2, 0.01], ['правая точка', 'x', 1.5616, 0.01]],
   },
   {
-    name: 'Математика · max a^0.5·b^0.5 при a+b=10 ⇒ (5; 5)',
+    // Пресета «ограничение прямой» больше нет: прямая пишется как обычное
+    // ограничение, переменные называются x и y.
+    name: 'Математика · max x^0.5·y^0.5 при x+y=10 ⇒ (5; 5)',
     run: `setMode('math'); setMathSub('constraint');
-          STATE.mathFC='a^0.5 * b^0.5'; STATE.mathPa=1; STATE.mathPb=1; STATE.mathM=10;
-          redrawAll();
+          STATE.mathFC='x^0.5 * y^0.5'; STATE.mathGC='x + y = 10';
+          STATE.mathConsWantMax = true; constraintFit(); redrawAll();
           var o = STATE.mathRes.opt || {};
           return { a: o.a, b: o.b, F: o.value };`,
-    checks: [['a*', 'a', 5, 0.15], ['b*', 'b', 5, 0.15], ['F', 'F', 5, 0.15]],
+    checks: [['x*', 'a', 5, 0.15], ['y*', 'b', 5, 0.15], ['f', 'F', 5, 0.15]],
   },
   {
-    name: 'Математика · то же при pa=2, pb=1, M=12 ⇒ (3; 6)',
+    name: 'Математика · то же при 2x + y = 12 ⇒ (3; 6)',
     run: `setMode('math'); setMathSub('constraint');
-          STATE.mathFC='a^0.5 * b^0.5'; STATE.mathPa=2; STATE.mathPb=1; STATE.mathM=12;
-          redrawAll();
+          STATE.mathFC='x^0.5 * y^0.5'; STATE.mathGC='2*x + y = 12';
+          STATE.mathConsWantMax = true; constraintFit(); redrawAll();
           var o = STATE.mathRes.opt || {};
           return { a: o.a, b: o.b };`,
-    checks: [['a*', 'a', 3, 0.2], ['b*', 'b', 6, 0.3]],
+    checks: [['x*', 'a', 3, 0.2], ['y*', 'b', 6, 0.3]],
   },
   {
     name: 'Площадь под кривой · D = 100 − Q на [0; 100] ⇒ 5000',
@@ -811,22 +813,23 @@ const CASES = [
     checks: [['функций', 'n', 3, 0], ['смена ветви', 'sw', 2, 0.05], ['точек смены', 'k', 1, 0]],
   },
   {
-    name: 'Оптимум при своём ограничении · max a·b на a² + b² = 25 ⇒ 12.5',
+    name: 'Оптимум при кривом ограничении · max x·y на x² + y² = 25 ⇒ 12.5',
     run: `setMode('math'); setMathSub('constraint');
-          STATE.mathFC = 'a*b'; STATE.mathConsKind = 'own'; STATE.mathGC = 'a^2 + b^2 = 25';
-          STATE.mathConsWantMax = true; redrawAll();
+          STATE.mathFC = 'x*y'; STATE.mathGC = 'x^2 + y^2 = 25';
+          STATE.mathConsWantMax = true; constraintFit(); redrawAll();
           var o = STATE.mathRes.opt || {};
           return { a: o.a, b: o.b, v: o.value };`,
-    checks: [['a', 'a', 3.536, 0.06], ['b', 'b', 3.536, 0.06], ['F', 'v', 12.5, 0.05]],
+    checks: [['x*', 'a', 3.536, 0.06], ['y*', 'b', 3.536, 0.06], ['f', 'v', 12.5, 0.05]],
   },
   {
-    name: 'Оптимум при прямой не изменился · max √a·√b при a + b = 10 ⇒ (5; 5)',
+    // Минимум ищется так же, как максимум, только выбор другой.
+    name: 'Минимум при ограничении · min x² + y² на x + y = 10 ⇒ (5; 5)',
     run: `setMode('math'); setMathSub('constraint');
-          STATE.mathFC = 'a^0.5 * b^0.5'; STATE.mathConsKind = 'line';
-          STATE.mathPa = 1; STATE.mathPb = 1; STATE.mathM = 10; redrawAll();
+          STATE.mathFC = 'x^2 + y^2'; STATE.mathGC = 'x + y = 10';
+          STATE.mathConsWantMax = false; constraintFit(); redrawAll();
           var o = STATE.mathRes.opt || {};
-          return { a: o.a, b: o.b };`,
-    checks: [['a', 'a', 5, 0.05], ['b', 'b', 5, 0.05]],
+          return { a: o.a, b: o.b, v: o.value };`,
+    checks: [['x*', 'a', 5, 0.15], ['y*', 'b', 5, 0.15], ['f', 'v', 50, 1]],
   },
   {
     // Math.js читает «bx» как ОДНО имя переменной, поэтому параметр звался «bx».
@@ -880,6 +883,18 @@ const CASES = [
           var onY = pts.filter(function (p) { return Math.abs(p.x) < 1e-6; })[0] || {};
           return { n: pts.length, xq: onX.x, yp: onY.y };`,
     checks: [['точек', 'n', 2, 0], ['на оси Q', 'xq', 100, 0.05], ['на оси P', 'yp', 100, 0.05]],
+  },
+  {
+    // Раньше сцена строила свои шкалы на каждой перерисовке и не масштабировалась.
+    name: 'Ограничение · колесо меняет масштаб сцены',
+    run: `setMode('math'); setMathSub('constraint');
+          STATE.mathFC = 'x*y'; STATE.mathGC = 'x + y = 10';
+          STATE.mathConsWantMax = true; constraintFit(); redrawAll();
+          var before = STATE.mathXmax - STATE.mathXmin;
+          zoomBy(0.5, 400, 300); redrawAll();
+          var after = STATE.mathXmax - STATE.mathXmin;
+          return { ratio: after / before, opt: (STATE.mathRes.opt || {}).a };`,
+    checks: [['окно сжалось вдвое', 'ratio', 0.5, 0.02], ['оптимум на месте', 'opt', 5, 0.2]],
   },
   {
     // Функций может быть больше четырёх, и результат зовут как хочется.
