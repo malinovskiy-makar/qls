@@ -596,6 +596,14 @@
       </div>
 
       <div class="sidebar-card">
+        <div style="margin-bottom:10px;">
+          <a href="{% url 'teacher:problem_new' %}?to_cart=1"
+             style="display:inline-block;border:0.5px solid var(--border);
+                    border-radius:var(--r);padding:6px 12px;font-size:12px;
+                    color:var(--text);text-decoration:none;">
+            ✍ Написать свою задачу
+          </a>
+        </div>
         <div class="cart-header">
           <div class="sidebar-title" style="margin-bottom:0;">Выбранные задачи</div>
           <span class="cart-count">Выбрано: <strong id="cart-count">0</strong></span>
@@ -649,6 +657,18 @@ try {
   cart = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}');
 } catch(e) { cart = {}; }
 
+// ── Своя задача, вернувшаяся из редактора ─────────
+// Редактор открывается В ТОЙ ЖЕ вкладке и после сохранения возвращает сюда
+// с ?add_custom=<id>. sessionStorage переживает переход, поэтому корзина
+// цела и своя задача просто в неё ложится. Ключ с префиксом «c» — так
+// сервер отличает свою задачу от каталожной.
+{% if add_custom %}
+if (!cart['c{{ add_custom.pk }}']) {
+  cart['c{{ add_custom.pk }}'] = { title: "{{ add_custom.title|default:'Своя задача'|escapejs }}" };
+  saveCart();
+}
+{% endif %}
+
 // ── Preselect из URL ──────────────────────────────
 {% if preselect_id %}
 const preselectId = {{ preselect_id }};
@@ -685,7 +705,7 @@ function renderCart() {
     const title = (cart[id] && cart[id].title) || ('Задача #' + id);
     return `<div class="cart-item" id="cart-item-${id}">
       <span class="cart-item-title">${title}</span>
-      <button class="cart-remove" type="button" onclick="removeFromCart(${id})" title="Убрать">×</button>
+      <button class="cart-remove" type="button" onclick="removeFromCart('${id}')" title="Убрать">×</button>
     </div>`;
   }).join('');
 }

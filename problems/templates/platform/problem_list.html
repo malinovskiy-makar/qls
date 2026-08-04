@@ -1,0 +1,37 @@
+{% extends 'platform/base.html' %}
+
+{% block title %}Мои задачи{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Мои задачи</h1>
+    <div class="page-sub">Приватные — в общий каталог не попадают.</div>
+  </div>
+  <a href="{% url 'teacher:problem_new' %}" class="btn-primary">+ Написать свою задачу</a>
+</div>
+
+{% if problems %}
+<div class="rows">
+  {% for problem in problems %}
+  <a class="row-link" href="{% url 'teacher:problem_edit' problem.pk %}">
+    <span>
+      <span class="row-main">{{ problem.title|default:"Без названия" }}</span><br>
+      <span class="row-meta">
+        {{ problem.get_kind_display }}
+        {% if problem.topic %} · {{ problem.topic.name }}{% endif %}
+        {% if problem.difficulty %} · сложность {{ problem.difficulty }}{% endif %}
+        {% if problem.solution %} · есть решение{% endif %}
+      </span>
+    </span>
+    <span class="row-meta">{{ problem.created_at|date:"d.m.Y" }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Своих задач пока нет.</p>
+  <p>Напишите первую — она попадёт в вашу домашку, но не в общий каталог.</p>
+</div>
+{% endif %}
+{% endblock %}

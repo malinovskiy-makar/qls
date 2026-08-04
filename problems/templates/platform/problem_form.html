@@ -1,0 +1,455 @@
+{% extends 'platform/base.html' %}
+
+{% block title %}{% if problem %}Редактирование задачи{% else %}Своя задача{% endif %}{% endblock %}
+
+{% block extra_style %}
+.editor { display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+          align-items: start; }
+.form-field { margin-bottom: 16px; }
+.form-field label { display: block; font-size: 13px; font-weight: 500;
+                    margin-bottom: 6px; }
+.form-field input[type=text], .form-field input[type=number],
+.form-field select, .form-field textarea {
+  width: 100%; font: inherit; font-size: 14px; padding: 9px 12px;
+  border-radius: var(--r); border: 0.5px solid var(--border);
+  background: var(--surface-2); color: var(--text);
+}
+.form-field textarea { min-height: 130px; resize: vertical;
+                       line-height: 1.6; }
+.form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.errors { background: var(--error-tint); border: 1px solid var(--error-border);
+          color: var(--error); border-radius: var(--r); padding: 12px 14px;
+          font-size: 13px; line-height: 1.7; margin-bottom: 18px; }
+.errors ul { margin: 0; padding-left: 18px; }
+.preview {
+  position: sticky; top: 68px;
+  background: var(--surface); border: 0.5px solid var(--border);
+  border-radius: 10px; padding: 18px;
+}
+.preview-label { font-size: 11px; text-transform: uppercase;
+                 letter-spacing: .05em; color: var(--text2);
+                 margin-bottom: 10px; }
+.preview-body { font-size: 14px; line-height: 1.7; overflow-wrap: anywhere;
+                min-height: 60px; }
+.opt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.opt-row input[type=text] { flex: 1; }
+.opt-move { border: 0.5px solid var(--border); border-radius: var(--r);
+            background: transparent; color: var(--text2); cursor: pointer;
+            font: inherit; font-size: 12px; padding: 4px 7px; }
+.opt-move:hover { background: var(--panel); }
+.graph-plate {
+  display: inline-block; border: 1px dashed var(--border);
+  border-radius: var(--r); padding: 6px 12px; font-size: 13px;
+  color: var(--text2); background: var(--surface-2); margin: 6px 0;
+}
+dialog.modal { border: 0.5px solid var(--border); border-radius: 10px;
+               background: var(--surface); color: var(--text);
+               padding: 20px; max-width: 460px; width: 92vw; }
+dialog.modal::backdrop { background: rgba(0,0,0,.4); }
+.step-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px;
+            margin-bottom: 8px; }
+.step-row input { font: inherit; font-size: 13px; padding: 7px 10px;
+  border-radius: var(--r); border: 0.5px solid var(--border);
+  background: var(--surface-2); color: var(--text); }
+@media (max-width: 780px) {
+  .editor { grid-template-columns: 1fr; }
+  .preview { position: static; }
+  .form-row2, .step-row { grid-template-columns: 1fr; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="crumbs">
+  <a href="{% url 'teacher:problem_list' %}">Мои задачи</a> →
+  {% if problem %}правка{% else %}новая задача{% endif %}
+</div>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      {% if problem %}Своя задача{% else %}Написать свою задачу{% endif %}
+    </h1>
+    <div class="page-sub">
+      Задача приватная: в общий каталог не попадает, её видят только ваши
+      ученики в составе выданной домашки.
+    </div>
+  </div>
+</div>
+
+{% if errors %}
+<div class="errors">
+  <ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<form method="post" id="problem-form">
+  {% csrf_token %}
+  {% if to_cart %}<input type="hidden" name="to_cart" value="1">{% endif %}
+
+  <div class="editor">
+    <div>
+      <div class="form-field">
+        <label for="id_title">Название (необязательно)</label>
+        <input type="text" id="id_title" name="title" maxlength="300"
+               value="{{ form.title }}">
+      </div>
+
+      <div class="form-field">
+        <label for="id_statement">Условие</label>
+        <textarea id="id_statement" name="statement" data-mathfield
+                  required>{{ form.statement }}</textarea>
+        <div style="margin-top:8px;">
+          <button type="button" class="btn-outline btn-small" id="add-graph-btn">
+            Добавить график
+          </button>
+          <a href="/calc2/" target="_blank" rel="noopener"
+             class="btn-outline btn-small">Создать новый график ↗</a>
+          <div class="row-meta" style="margin-top:6px;">
+            Постройте график в калькуляторе, сохраните его, затем добавьте
+            из сохранённых.
+          </div>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label for="id_kind">Тип задачи</label>
+        <select id="id_kind" name="kind">
+          {% for value, label in kinds %}
+          <option value="{{ value }}"
+            {% if form.kind == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {# --- Открытая задача --- #}
+      <div id="open-block">
+        <div class="form-row2">
+          <div class="form-field">
+            <label for="id_correct_answer">Правильный ответ</label>
+            <input type="text" id="id_correct_answer" name="correct_answer"
+                   value="{{ form.correct_answer }}">
+          </div>
+          <div class="form-field">
+            <label for="id_answer_tolerance">Допуск сравнения</label>
+            <input type="text" id="id_answer_tolerance" name="answer_tolerance"
+                   value="{{ form.answer_tolerance }}">
+          </div>
+        </div>
+        <div class="row-meta" style="margin-top:-8px;margin-bottom:14px;">
+          Числа сравниваются точно (через дроби, не через плавающую точку).
+          Допуск 0 — совпадение до последнего знака.
+        </div>
+      </div>
+
+      {# --- Тест --- #}
+      <div id="test-block" hidden>
+        <div class="form-field">
+          <label>Варианты ответа</label>
+          <div id="options-list">
+            {% for option in options %}
+            <div class="opt-row">
+              <input type="checkbox" name="option_correct_{{ forloop.counter0 }}"
+                     {% if option.is_correct %}checked{% endif %} title="правильный">
+              <input type="text" name="option_text" value="{{ option.text }}">
+              <button type="button" class="opt-move" data-move="up">↑</button>
+              <button type="button" class="opt-move" data-move="down">↓</button>
+              <button type="button" class="opt-move" data-move="remove">×</button>
+            </div>
+            {% endfor %}
+          </div>
+          <button type="button" class="btn-outline btn-small" id="add-option-btn">
+            + Добавить вариант
+          </button>
+          <div class="row-meta" style="margin-top:6px;">
+            Галочка слева — правильный вариант. Множественный выбор
+            засчитывается по правилу «всё или ничего».
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row2">
+        <div class="form-field">
+          <label for="id_topic">Тема</label>
+          <select id="id_topic" name="topic">
+            <option value="">не указана</option>
+            {% for topic in topics %}
+            <option value="{{ topic.pk }}"
+              {% if form.topic_id == topic.pk %}selected{% endif %}>{{ topic.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="id_difficulty">Сложность</label>
+          <select id="id_difficulty" name="difficulty">
+            <option value="">не указана</option>
+            {% for d in difficulties %}
+            <option value="{{ d }}"
+              {% if form.difficulty == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      {# --- Фаза 20: решалка --- #}
+      <div class="form-field">
+        <label for="id_solution">Эталонное решение</label>
+        <textarea id="id_solution" name="solution"
+                  data-mathfield>{{ form.solution }}</textarea>
+        <button type="button" class="btn-outline btn-small" id="steps-btn"
+                style="margin-top:8px;">Разбить на шаги</button>
+        <div id="steps-block" hidden style="margin-top:10px;">
+          <div id="steps-list"></div>
+          <button type="button" class="btn-outline btn-small" id="add-step-btn">
+            + Шаг
+          </button>
+          <div class="row-meta" style="margin-top:6px;">
+            Шаги необязательны — свободный текст решения тоже принимается.
+          </div>
+        </div>
+        <input type="hidden" name="solution_steps" id="id_solution_steps"
+               value="{{ form.solution_steps }}">
+      </div>
+
+      <button type="submit" class="btn-primary">Сохранить задачу</button>
+      <a href="{% url 'teacher:problem_list' %}" class="btn-outline">Отмена</a>
+    </div>
+
+    {# --- Живой предпросмотр --- #}
+    <div class="preview">
+      <div class="preview-label">Так увидит ученик</div>
+      <div class="preview-body" id="preview-body"></div>
+      <div id="preview-options"></div>
+    </div>
+  </div>
+</form>
+
+<dialog class="modal" id="graph-modal">
+  <div class="card-name">Добавить график</div>
+  {% for group in graph_groups %}
+    {% if group.graphs %}
+    <div style="margin-top:12px;">
+      <div class="row-meta">{{ group.folder.name|default:"Без папки" }}</div>
+      {% for graph in group.graphs %}
+      <button type="button" class="btn-outline btn-small graph-pick"
+              data-id="{{ graph.pk }}" data-name="{{ graph.name }}"
+              style="display:block;width:100%;text-align:left;margin-top:6px;">
+        {{ graph.name }}
+      </button>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% empty %}
+  <div class="row-meta" style="margin-top:10px;">Сохранённых графиков нет.</div>
+  {% endfor %}
+  <div style="margin-top:16px;">
+    <button type="button" class="btn-outline btn-small" id="graph-close">Закрыть</button>
+  </div>
+</dialog>
+
+{% include 'platform/_mathfield.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var kind = document.getElementById('id_kind');
+  var openBlock = document.getElementById('open-block');
+  var testBlock = document.getElementById('test-block');
+  var optionsList = document.getElementById('options-list');
+  var statement = document.getElementById('id_statement');
+  var previewBody = document.getElementById('preview-body');
+  var previewOptions = document.getElementById('preview-options');
+
+  // ---- Переключение «открытая / тест» -------------------------------
+  function syncKind() {
+    var isTest = kind.value !== 'open';
+    openBlock.hidden = isTest;
+    testBlock.hidden = !isTest;
+    if (kind.value === 'tf') {
+      // Данетка: варианты фиксированы, редактируется только правильный.
+      if (optionsList.children.length !== 2 ||
+          !optionsList.dataset.tf) {
+        optionsList.innerHTML = '';
+        addOption('Верно', true);
+        addOption('Неверно', false);
+        optionsList.dataset.tf = '1';
+      }
+      optionsList.querySelectorAll('input[type=text]').forEach(function (i) {
+        i.readOnly = true;
+      });
+    } else {
+      delete optionsList.dataset.tf;
+      optionsList.querySelectorAll('input[type=text]').forEach(function (i) {
+        i.readOnly = false;
+      });
+      if (isTest && optionsList.children.length === 0) {
+        addOption(''); addOption('');
+      }
+    }
+    renumber();
+    renderPreview();
+  }
+
+  function addOption(text, correct) {
+    var row = document.createElement('div');
+    row.className = 'opt-row';
+    row.innerHTML =
+      '<input type="checkbox" title="правильный">' +
+      '<input type="text" name="option_text">' +
+      '<button type="button" class="opt-move" data-move="up">↑</button>' +
+      '<button type="button" class="opt-move" data-move="down">↓</button>' +
+      '<button type="button" class="opt-move" data-move="remove">×</button>';
+    row.querySelector('input[type=text]').value = text || '';
+    row.querySelector('input[type=checkbox]').checked = !!correct;
+    optionsList.appendChild(row);
+    renumber();
+  }
+
+  // Имена флажков должны совпадать с ПОЗИЦИЕЙ строки — сервер сопоставляет
+  // option_correct_<i> с i-м непустым текстом.
+  function renumber() {
+    Array.prototype.forEach.call(optionsList.children, function (row, index) {
+      row.querySelector('input[type=checkbox]').name =
+        'option_correct_' + index;
+    });
+  }
+
+  optionsList.addEventListener('click', function (event) {
+    var button = event.target.closest('.opt-move');
+    if (!button) { return; }
+    var row = button.closest('.opt-row');
+    if (button.dataset.move === 'up' && row.previousElementSibling) {
+      optionsList.insertBefore(row, row.previousElementSibling);
+    } else if (button.dataset.move === 'down' && row.nextElementSibling) {
+      optionsList.insertBefore(row.nextElementSibling, row);
+    } else if (button.dataset.move === 'remove') {
+      row.remove();
+    }
+    renumber();
+    renderPreview();
+  });
+  optionsList.addEventListener('input', function () { renderPreview(); });
+  optionsList.addEventListener('change', function () { renderPreview(); });
+
+  document.getElementById('add-option-btn')
+    .addEventListener('click', function () { addOption(''); renderPreview(); });
+  kind.addEventListener('change', syncKind);
+
+  // ---- Живой предпросмотр (задержка полсекунды) ---------------------
+  var timer = null;
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(renderPreview, 500);
+  }
+
+  function renderPreview() {
+    var text = statement.value || '';
+    // Плашка графика: [[График: имя]] — полноценная отрисовка появится,
+    // когда будет известен формат сцены калькулятора.
+    var html = text
+      .replace(/[&<>]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+      })
+      .replace(/\[\[График:\s*([^\]]+)\]\]/g,
+        '<span class="graph-plate">График: $1</span>')
+      .replace(/\n/g, '<br>');
+    previewBody.innerHTML = html || '<span class="row-meta">Пока пусто.</span>';
+
+    previewOptions.innerHTML = '';
+    if (kind.value !== 'open') {
+      var list = document.createElement('ul');
+      list.className = 'options';
+      Array.prototype.forEach.call(optionsList.children, function (row) {
+        var value = row.querySelector('input[type=text]').value.trim();
+        if (!value) { return; }
+        var item = document.createElement('li');
+        item.textContent = value +
+          (row.querySelector('input[type=checkbox]').checked ? ' ✓' : '');
+        if (row.querySelector('input[type=checkbox]').checked) {
+          item.className = 'correct';
+        }
+        list.appendChild(item);
+      });
+      previewOptions.appendChild(list);
+    }
+    if (window.renderMathInElement) {
+      renderMathInElement(previewBody, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false }
+        ],
+        throwOnError: false
+      });
+    }
+  }
+  statement.addEventListener('input', schedule);
+
+  // ---- График из сохранённых ----------------------------------------
+  var modal = document.getElementById('graph-modal');
+  document.getElementById('add-graph-btn').addEventListener('click', function () {
+    if (modal.showModal) { modal.showModal(); } else { modal.setAttribute('open', ''); }
+  });
+  document.getElementById('graph-close').addEventListener('click', function () {
+    if (modal.close) { modal.close(); } else { modal.removeAttribute('open'); }
+  });
+  document.querySelectorAll('.graph-pick').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var marker = '\n[[График: ' + button.dataset.name + ']]\n';
+      statement.value += marker;
+      statement.dispatchEvent(new Event('input', { bubbles: true }));
+      if (modal.close) { modal.close(); } else { modal.removeAttribute('open'); }
+    });
+  });
+
+  // ---- Шаги решения --------------------------------------------------
+  var stepsBlock = document.getElementById('steps-block');
+  var stepsList = document.getElementById('steps-list');
+  var stepsInput = document.getElementById('id_solution_steps');
+
+  function addStep(text, result) {
+    var row = document.createElement('div');
+    row.className = 'step-row';
+    row.innerHTML =
+      '<input type="text" class="step-text" placeholder="Что делаем">' +
+      '<input type="text" class="step-result" placeholder="Что получилось">' +
+      '<button type="button" class="opt-move" data-step-remove>×</button>';
+    row.querySelector('.step-text').value = text || '';
+    row.querySelector('.step-result').value = result || '';
+    stepsList.appendChild(row);
+  }
+
+  document.getElementById('steps-btn').addEventListener('click', function () {
+    stepsBlock.hidden = !stepsBlock.hidden;
+    if (!stepsBlock.hidden && stepsList.children.length === 0) { addStep(); }
+  });
+  document.getElementById('add-step-btn')
+    .addEventListener('click', function () { addStep(); });
+  stepsList.addEventListener('click', function (event) {
+    if (event.target.hasAttribute('data-step-remove')) {
+      event.target.closest('.step-row').remove();
+    }
+  });
+
+  document.getElementById('problem-form').addEventListener('submit', function () {
+    var steps = [];
+    Array.prototype.forEach.call(stepsList.children, function (row) {
+      var text = row.querySelector('.step-text').value.trim();
+      var result = row.querySelector('.step-result').value.trim();
+      if (text || result) { steps.push({ text: text, result: result }); }
+    });
+    stepsInput.value = steps.length ? JSON.stringify(steps) : '';
+  });
+
+  // Восстановление сохранённых шагов.
+  try {
+    var saved = JSON.parse(stepsInput.value || 'null');
+    if (Array.isArray(saved) && saved.length) {
+      saved.forEach(function (s) { addStep(s.text, s.result); });
+      stepsBlock.hidden = false;
+    }
+  } catch (e) { /* шагов не было */ }
+
+  syncKind();
+})();
+</script>
+{% endblock %}

@@ -116,20 +116,50 @@
     <div class="fold-body">{{ row.item.correct_answer|default:"не задан"|linebreaksbr }}</div>
   </details>
 
-  {% if row.item.has_solution %}
-  <details class="fold">
-    <summary>Эталонное решение
-      ({% if row.item.solution_source == 'catalog' %}из каталога{% else %}своё{% endif %})</summary>
+  {# --- Фаза 20: эталонное решение и правила показа --- #}
+  <details class="fold sol-block" data-item="{{ row.item.pk }}">
+    <summary>
+      Эталонное решение
+      {% if row.item.has_solution %}
+        ({% if row.item.solution_source == 'catalog' %}из каталога{% else %}своё{% endif %})
+      {% else %}— не задано{% endif %}
+    </summary>
     <div class="fold-body">
-      {{ row.item.solution_text|linebreaksbr }}
-      <div class="row-meta" style="margin-top: 10px;">
-        Ученику: {{ row.item.get_solution_visible_after_display }}
+      {% if row.item.has_solution and row.item.solution_source == 'catalog' %}
+      <div class="row-meta" style="margin-bottom:8px;">
+        Решение подгружено из каталога. Можно заменить своим — напишите
+        его ниже, оно станет главнее.
+      </div>
+      {% endif %}
+      <textarea class="sol-text" data-mathfield rows="5"
+                style="width:100%;font:inherit;font-size:13px;padding:8px 10px;
+                       border-radius:var(--r);border:0.5px solid var(--border);
+                       background:var(--surface);color:var(--text);"
+                placeholder="Своё решение (пусто — берётся решение каталога)">{{ row.item.solution_override }}</textarea>
+      {% if row.item.has_solution and row.item.solution_source == 'catalog' %}
+      <div style="margin-top:8px;padding:10px 12px;background:var(--surface);
+                  border-radius:var(--r);font-size:13px;line-height:1.7;">
+        {{ row.item.solution_text|linebreaksbr }}
+      </div>
+      {% endif %}
+      <div class="form-row" style="margin-top:10px;">
+        <label>
+          Показать ученику:
+          <select class="sol-mode">
+            {% for value, label in solution_visibility %}
+            <option value="{{ value }}"
+              {% if row.item.solution_visible_after == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="button" class="btn-outline btn-small sol-save">Сохранить</button>
+        <button type="button" class="btn-outline btn-small sol-release">Открыть решение сейчас</button>
+        <span class="sol-status row-meta">
+          {% if row.item.solution_released_at %}открыто {{ row.item.solution_released_at|date:"d.m.Y H:i" }}{% endif %}
+        </span>
       </div>
     </div>
   </details>
-  {% else %}
-  <div class="row-meta" style="margin-top: 10px;">Решения нет.</div>
-  {% endif %}
 
   {# --- Фаза 12: комментарии к задаче --- #}
   <div class="comments" data-item="{{ row.item.pk }}">
@@ -172,6 +202,7 @@
   <p>Соберите его в конструкторе домашек.</p>
 </div>
 {% endfor %}
+{% include 'platform/_mathfield.html' %}
 {% endblock %}
 
 {% block extra_js %}
@@ -230,4 +261,44 @@
   });
 })();
 </script>
+
+<script>
+// Решалка: сохранение и «Открыть решение сейчас».
+(function () {
+  var url = "{% url 'teacher:api_item_solution' %}";
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+
+  function send(block, payload, status) {
+    payload.item_id = block.dataset.item;
+    status.textContent = 'Сохраняю…';
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+                 'X-CSRFToken': csrf ? csrf[1] : '' },
+      body: JSON.stringify(payload)
+    })
+      .then(function (r) { return r.json().then(function (d) {
+        if (!r.ok) { throw new Error(d.error || 'Ошибка'); } return d; }); })
+      .then(function (d) {
+        status.textContent = d.released_at
+          ? 'открыто ' + d.released_at : 'сохранено';
+      })
+      .catch(function (e) { status.textContent = e.message; });
+  }
+
+  document.querySelectorAll('.sol-block').forEach(function (block) {
+    var status = block.querySelector('.sol-status');
+    block.querySelector('.sol-save').addEventListener('click', function () {
+      send(block, {
+        solution_override: block.querySelector('.sol-text').value,
+        solution_visible_after: block.querySelector('.sol-mode').value
+      }, status);
+    });
+    block.querySelector('.sol-release').addEventListener('click', function () {
+      send(block, { release_now: true }, status);
+    });
+  });
+})();
+</script>
+
 {% endblock %}

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_groups
+from . import views, views_groups, views_problems
 
 app_name = 'teacher'
 
@@ -23,9 +23,18 @@ urlpatterns = [
     path('api/comment/create/', views_groups.api_comment_create,
          name='api_comment_create'),
 
+    path('api/item/solution/', views_groups.api_item_solution,
+         name='api_item_solution'),
+
     # Прогресс ученика глазами учителя.
     path('student/<int:pk>/progress/', views.student_progress,
          name='student_progress'),
+
+    # Редактор своих задач.
+    path('problems/', views_problems.problem_list, name='problem_list'),
+    path('problems/new/', views_problems.problem_form, name='problem_new'),
+    path('problems/<int:pk>/edit/', views_problems.problem_form,
+         name='problem_edit'),
 
     # Конструктор домашек.
     path('assignment/create/', views.assignment_create,

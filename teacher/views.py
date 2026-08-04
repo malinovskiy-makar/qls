@@ -435,11 +435,15 @@ def assignment_create(request):
             messages.error(request, 'Укажите название домашки.')
             return redirect('teacher:assignment_create')
 
-        problem_ids = [
-            int(pid) for pid in problem_ids_str.split(',')
-            if pid.strip().isdigit()
-        ]
-        if not problem_ids:
+        # В корзине могут лежать И задачи каталога (числовой id), И свои
+        # задачи репетитора (id с префиксом «c»). Разделяем по префиксу,
+        # порядок в корзине сохраняем — он станет порядком в домашке.
+        cart_ids = [pid.strip() for pid in problem_ids_str.split(',')
+                    if pid.strip()]
+        problem_ids = [int(pid) for pid in cart_ids if pid.isdigit()]
+        custom_ids = [int(pid[1:]) for pid in cart_ids
+                      if pid.startswith('c') and pid[1:].isdigit()]
+        if not problem_ids and not custom_ids:
             messages.error(request, 'Добавьте хотя бы одну задачу.')
             return redirect('teacher:assignment_create')
 
@@ -459,15 +463,41 @@ def assignment_create(request):
             except ValueError:
                 deadline = None
 
+        groups = list(StudentGroup.objects.filter(pk__in=group_ids,
+                                                  teacher=request.user))
+
         assignment = Assignment.objects.create(
             name=title,
             deadline=deadline,
             author=request.user,
+            # Домашка привязывается к группе: без этого вкладка «Группы»
+            # её не увидит, а вся работа с группой живёт именно там.
+            # Если выбрано несколько групп — берём первую, остальные всё
+            # равно получают домашку через список учеников.
+            group=groups[0] if groups else None,
         )
         problems = Problem.objects.filter(pk__in=problem_ids)
         assignment.problems.set(problems)
 
-        groups = StudentGroup.objects.filter(pk__in=group_ids, teacher=request.user)
+        # Позиции задач в домашке — в порядке корзины.
+        from problems.models import AssignmentItem, CustomProblem
+        by_id = {p.pk: p for p in problems}
+        customs = {c.pk: c for c in CustomProblem.objects.filter(
+            pk__in=custom_ids, owner=request.user)}
+        order = 0
+        for raw in cart_ids:
+            if raw.isdigit() and int(raw) in by_id:
+                AssignmentItem.objects.create(
+                    assignment=assignment, order=order,
+                    catalog_problem=by_id[int(raw)])
+                order += 1
+            elif raw.startswith('c') and raw[1:].isdigit() \
+                    and int(raw[1:]) in customs:
+                AssignmentItem.objects.create(
+                    assignment=assignment, order=order,
+                    custom_problem=customs[int(raw[1:])])
+                order += 1
+
         for group in groups:
             assignment.students.add(*group.students.all())
 
@@ -537,6 +567,16 @@ def assignment_create(request):
     # Передаём preselect ID если задан
     preselect_id = request.GET.get('preselect', '').strip()
 
+    # Возврат из редактора своей задачи: ?add_custom=<id> — задача сразу
+    # ложится в собираемую корзину (та же вкладка, sessionStorage жив).
+    add_custom_id = request.GET.get('add_custom', '').strip()
+    add_custom = None
+    if add_custom_id.isdigit():
+        from problems.models import CustomProblem
+        add_custom = CustomProblem.objects.filter(
+            pk=int(add_custom_id), owner=request.user,
+            is_deleted=False).first()
+
     return render(request, 'teacher/assignment_create.html', {
         'page_obj':      page_obj,
         'cards':         cards,
@@ -551,6 +591,7 @@ def assignment_create(request):
         'f_sol':         f_sol,
         'groups':        groups,
         'preselect_id':  preselect_id,
+        'add_custom':    add_custom,
     })
 
 

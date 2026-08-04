@@ -1,0 +1,52 @@
+{% comment %}
+Подключение компонента набора формул (MathLive).
+
+Версия ЗАФИКСИРОВАНА: mathlive@0.110.0 (см. SESSION_PROGRESS.md). В ветке
+feat/calc2-shipu MathLive не используется вовсе (проверено git grep), поэтому
+взята последняя стабильная и записана здесь. Сборки нет — так же, как D3 и
+Math.js в calc2, подключаем с CDN одним <script src>. Файлы calc2 не тронуты.
+
+Использование: у textarea поставить атрибут data-mathfield, затем один раз
+на странице подключить этот партиал.
+{% endcomment %}
+{% load static %}
+
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/mathlive@0.110.0/mathlive-static.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/mathlive@0.110.0/mathlive.min.js"></script>
+<script defer src="{% static 'platform/mathfield.js' %}"></script>
+
+<style>
+.mf-panel { margin-top: 8px; }
+.mf-toggle, .mf-insert, .mf-kbd {
+  border: 0.5px solid var(--border); border-radius: var(--r);
+  background: transparent; color: var(--text); font: inherit; font-size: 12px;
+  padding: 5px 12px; cursor: pointer;
+}
+.mf-toggle:hover, .mf-insert:hover, .mf-kbd:hover { background: var(--panel); }
+.mf-body {
+  margin-top: 10px; padding: 12px; border: 0.5px solid var(--border);
+  border-radius: var(--r); background: var(--surface-2);
+}
+.mf-field {
+  display: block; width: 100%; min-height: 42px; font-size: 18px;
+  padding: 6px 10px; border: 0.5px solid var(--border);
+  border-radius: var(--r); background: var(--surface); color: var(--text);
+}
+.mf-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+          margin-top: 10px; }
+.mf-hint { font-size: 12px; color: var(--text2); }
+.mf-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+            margin-top: 10px; }
+.mf-group-name { font-size: 11px; color: var(--text2); min-width: 74px; }
+.mf-key {
+  min-width: 34px; padding: 4px 8px; font: inherit; font-size: 13px;
+  border: 0.5px solid var(--border); border-radius: var(--r);
+  background: var(--surface); color: var(--text); cursor: pointer;
+}
+.mf-key:hover { background: var(--panel); }
+@media (max-width: 560px) {
+  .mf-group-name { min-width: 100%; }
+  .mf-key { min-width: 40px; padding: 6px 10px; }
+}
+</style>

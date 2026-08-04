@@ -188,11 +188,14 @@ def group_assignment_detail(request, group_id, assignment_id):
             'comments': by_item.get(item.pk, []),
         })
 
+    from problems.models import SolutionVisibility
+
     return render(request, 'teacher/groups/assignment_detail.html', {
         'group': group,
         'assignment': assignment,
         'rows': rows,
         'stats': assignment_stats(assignment),
+        'solution_visibility': SolutionVisibility.choices,
     })
 
 
@@ -364,3 +367,52 @@ def group_review_submission(request, group_id, submission_id):
     submission = get_object_or_404(Submission, pk=submission_id,
                                    assignment__group=group)
     return review_submission(request, submission.pk, group=group)
+
+
+# ---------------------------------------------------------------------------
+# Фаза 20 — решалка прямо на странице задания
+# ---------------------------------------------------------------------------
+
+@require_POST
+@tutor_required
+def api_item_solution(request):
+    """Сохранить решение позиции и правило его показа.
+
+    Отдельным эндпоинтом, а не общей формой задания: решений в задании
+    может быть десять, и отправлять их все ради правки одного — верный
+    способ затереть чужую правку, сделанную в соседней вкладке.
+    """
+    from problems.models import AssignmentItem, SolutionVisibility
+
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({'error': 'Неверный формат'}, status=400)
+
+    item = get_object_or_404(
+        AssignmentItem.objects.select_related('assignment'),
+        pk=body.get('item_id'))
+    if not item.is_tutor_for(request.user):
+        return JsonResponse({'error': 'Нет доступа'}, status=403)
+
+    if 'solution_override' in body:
+        item.solution_override = body.get('solution_override') or ''
+
+    mode = body.get('solution_visible_after')
+    if mode in dict(SolutionVisibility.choices):
+        item.solution_visible_after = mode
+
+    if body.get('release_now'):
+        # «Открыть решение сейчас» — момент фиксирует СЕРВЕР.
+        item.solution_released_at = timezone.now()
+
+    item.save()
+    return JsonResponse({
+        'ok': True,
+        'source': item.solution_source,
+        'mode': item.solution_visible_after,
+        'mode_display': item.get_solution_visible_after_display(),
+        'released_at': (timezone.localtime(item.solution_released_at)
+                        .strftime('%d.%m.%Y %H:%M')
+                        if item.solution_released_at else None),
+    })
