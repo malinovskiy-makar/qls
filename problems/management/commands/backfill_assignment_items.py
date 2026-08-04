@@ -57,9 +57,10 @@ class Command(BaseCommand):
 
                 touched_assignments += 1
                 created_total += len(missing)
-                self.stdout.write(
-                    f'  #{assignment.pk} «{assignment.name}»: '
-                    f'+{len(missing)} позиц. (было {len(existing)})')
+                if options.get('verbosity', 1) >= 1:
+                    self.stdout.write(
+                        f'  #{assignment.pk} «{assignment.name}»: '
+                        f'+{len(missing)} позиц. (было {len(existing)})')
 
                 if dry:
                     continue
@@ -74,6 +75,7 @@ class Command(BaseCommand):
                 transaction.set_rollback(True)
 
         prefix = '[dry-run] ' if dry else ''
-        self.stdout.write(self.style.SUCCESS(
-            f'{prefix}Домашек затронуто: {touched_assignments}, '
-            f'позиций создано: {created_total}.'))
+        if options.get('verbosity', 1) >= 1:
+            self.stdout.write(self.style.SUCCESS(
+                f'{prefix}Домашек затронуто: {touched_assignments}, '
+                f'позиций создано: {created_total}.'))

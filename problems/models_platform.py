@@ -107,6 +107,20 @@ class UserProfile(models.Model):
         full = f'{self.user.first_name} {self.user.last_name}'.strip()
         return full or self.user.username
 
+    # --- Связь родитель ↔ ребёнок (Фаза 1) --------------------------------
+    # Методы на профиле, а на модели связи — только данные: экраны спрашивают
+    # «чьи дети» у профиля, а не собирают запрос сами.
+
+    def children(self):
+        """Дети этого родителя. У кого угодно другого — пусто."""
+        from .models import User
+        return User.objects.filter(parent_links__parent=self.user).distinct()
+
+    def parents(self):
+        """Родители этого ученика (их может быть несколько)."""
+        from .models import User
+        return User.objects.filter(children_links__student=self.user).distinct()
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         self.sync_user_role()

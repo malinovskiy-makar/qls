@@ -36,9 +36,16 @@ def log_event(source, event_type, user=None, request=None, **fields):
                     session.save()
                 session_key = session.session_key or ''
 
-        return LearningEvent.objects.create(
+        event = LearningEvent.objects.create(
             source=source, event_type=event_type, user=user,
             session_key=session_key or '', **fields)
+        # Начисление опыта висит на записи события — одна точка входа вместо
+        # крючков во всех вьюхах. Тоже неблокирующее (см. gamification.py):
+        # упавшее начисление не имеет права уронить сдачу домашки.
+        if event.user_id is not None:
+            from .gamification import process_learning_event
+            process_learning_event(event)
+        return event
     except Exception:
         logger.exception('Не удалось записать учебное событие '
                          '(%s/%s) — основной сценарий не тронут',

@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from problems.models import (
     Assignment,
+    ParentLink,
     Problem,
     StudentGroup,
     Submission,
@@ -66,6 +67,8 @@ class Command(BaseCommand):
         self._comments(homework, tutor, students[0])
         graph = self._saved(tutor, catalog, custom)
         self._solutions_and_graph(homework, graph)
+        self._parent_links(tutor, students)
+        self._history(students, now)
 
         self.stdout.write(self.style.SUCCESS('\nДемо-данные готовы.'))
         self.stdout.write('Вход (пароль у всех одинаковый):')
@@ -326,3 +329,111 @@ class Command(BaseCommand):
         if last.graph_id is None:
             last.graph = graph
             last.save()
+
+    # -- Фаза 18: связь родителя и история за 90 дней ----------------------
+
+    def _parent_links(self, tutor, students):
+        """Родитель связан с ДВУМЯ учениками — чтобы кабинет родителя было
+        на чём проверить (список детей, а не одна карточка)."""
+        parent = User.objects.get(username=PARENT)
+        for student in students[:2]:
+            ParentLink.objects.get_or_create(
+                parent=parent, student=student,
+                defaults={'created_by': tutor})
+
+    # Три ученика с РАЗНЫМ поведением. Ради этого история и нужна: на
+    # одинаковых данных графики выглядят одинаково, и понять, показывают ли
+    # они что-нибудь, нельзя.
+    #   1. занимается регулярно, доля верных высокая;
+    #   2. рывками — неделя работы, неделя тишины;
+    #   3. бросил месяц назад.
+    HISTORY_PROFILES = [
+        {'name': 'регулярный', 'active': lambda d: d % 7 not in (5, 6),
+         'accuracy': 0.85, 'per_day': (3, 6), 'stop_days_ago': 0},
+        {'name': 'рывками', 'active': lambda d: (d // 7) % 2 == 0,
+         'accuracy': 0.6, 'per_day': (2, 9), 'stop_days_ago': 0},
+        {'name': 'бросил', 'active': lambda d: d % 3 == 0,
+         'accuracy': 0.5, 'per_day': (1, 4), 'stop_days_ago': 30},
+    ]
+
+    def _history(self, students, now):
+        """История учебных событий за 90 дней.
+
+        ⚠️ Пишем СОБЫТИЯ, а не сразу свёртки: события — первоисточник, и
+        демо-данные обязаны проходить тот же путь, что боевые. Иначе
+        `recalculate_gamification` на демо-базе выдал бы другие числа, и
+        мы бы гонялись за несуществующим расхождением.
+
+        Случайность зафиксирована seed'ом: демо-данные обязаны быть
+        одинаковыми при каждом прогоне, иначе идемпотентность мнимая.
+        """
+        import random
+
+        from problems.models import LearningEvent
+
+        problems = list(Problem.objects.filter(
+            status=Problem.Status.PUBLISHED, needs_quality_review=False,
+            topics__isnull=False).distinct()[:60])
+        if len(problems) < 5:
+            self.stdout.write('  история пропущена: в банке мало задач '
+                              'с темами')
+            return
+
+        for index, student in enumerate(students[:3]):
+            if LearningEvent.objects.filter(
+                    user=student, payload__demo_history=True).exists():
+                continue        # идемпотентность: история уже насыпана
+
+            profile = self.HISTORY_PROFILES[index]
+            rng = random.Random(1000 + index)
+            events = []
+            # ⚠️ Задуманные даты держим ОТДЕЛЬНЫМ списком. `created_at` —
+            # auto_now_add, и bulk_create перетирает его прямо в переданных
+            # объектах: если потом читать дату из них же, вычитаешь то, что
+            # сам и хотел исправить (наступали 2026-08-04 — вся история
+            # схлопнулась в один день).
+            stamps = []
+            for days_ago in range(90, profile['stop_days_ago'], -1):
+                if not profile['active'](days_ago):
+                    continue
+                moment = now - timezone.timedelta(days=days_ago)
+                # Вечерние занятия — так у графика «по часам» появляется
+                # форма, а не ровная полка.
+                moment = moment.replace(hour=rng.choice([16, 17, 18, 19, 20]),
+                                        minute=rng.randint(0, 59))
+                count = rng.randint(*profile['per_day'])
+                for number in range(count):
+                    problem = rng.choice(problems)
+                    correct = rng.random() < profile['accuracy']
+                    topic = problem.topics.first()
+                    events.append(LearningEvent(
+                        user=student, source=rng.choice(
+                            ['catalog', 'homework', 'homework', 'exam']),
+                        event_type='solved' if correct else 'failed',
+                        catalog_problem=problem, topic=topic,
+                        difficulty=problem.difficulty or rng.randint(1, 4),
+                        time_spent_seconds=rng.randint(60, 900),
+                        payload={'demo_history': True}))
+                    stamps.append(moment + timezone.timedelta(
+                        minutes=number * 7))
+
+            created = LearningEvent.objects.bulk_create(events)
+            for event, stamp in zip(created, stamps):
+                LearningEvent.objects.filter(pk=event.pk).update(
+                    created_at=stamp)
+            self.stdout.write(
+                f'  история «{profile["name"]}» для {student.username}: '
+                f'{len(events)} событий')
+
+        # Партии игры — чтобы блок Econ Rush не был пустым.
+        for index, student in enumerate(students[:2]):
+            if LearningEvent.objects.filter(user=student,
+                                            source='game').exists():
+                continue
+            rng = random.Random(2000 + index)
+            for _ in range(rng.randint(20, 40)):
+                LearningEvent.objects.create(
+                    user=student, source='game',
+                    event_type='solved' if rng.random() < 0.7 else 'failed',
+                    payload={'mode': rng.choice(['bullet', 'blitz', 'rapid',
+                                                 'classic'])})
