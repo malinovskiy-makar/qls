@@ -1,0 +1,115 @@
+{% extends "platform/base.html" %}
+
+{% block title %}{{ student.get_full_name|default:student.username }}{% endblock %}
+
+{% block extra_style %}
+{% include "platform/_stats_style.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="stats-head">
+  <div>
+    <h1 class="stats-title">{{ student.get_full_name|default:student.username }}</h1>
+    <div class="stats-sub">
+      <a href="{% url 'parent_home' %}" style="color:var(--accent);text-decoration:none;">← все дети</a>
+    </div>
+  </div>
+  <div class="period-bar">
+    {% for key, label in periods %}
+    <a href="?period={{ key }}" style="text-decoration:none;">
+      <button type="button" class="{% if key == period %}is-active{% endif %}">{{ label }}</button>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="metric-grid">
+  <div class="metric">
+    <div class="cap">решено задач</div><div class="big">{{ overview.solved }}</div>
+    <div class="chg {{ overview.change.solved.direction }}">
+      {% if overview.change.solved %}{% if overview.change.solved.direction == 'up' %}↑{% elif overview.change.solved.direction == 'down' %}↓{% endif %}
+      {{ overview.change.solved.abs_diff }} к прошлому периоду{% endif %}
+    </div>
+  </div>
+  <div class="metric">
+    <div class="cap">доля верных</div>
+    <div class="big">{% if overview.accuracy is not None %}{{ overview.accuracy }}%{% else %}—{% endif %}</div>
+    <div class="chg {{ overview.change.accuracy.direction }}">
+      {% if overview.change.accuracy %}{% if overview.change.accuracy.direction == 'up' %}↑{% elif overview.change.accuracy.direction == 'down' %}↓{% endif %}
+      {{ overview.change.accuracy.abs_diff }} п.п.{% endif %}
+    </div>
+  </div>
+  <div class="metric">
+    <div class="cap">время за занятиями</div><div class="big">{{ overview.minutes }} мин</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Занимается ли регулярно</div>
+    <div class="panel-hint">Каждый квадрат — день; чем ярче, тем больше решено</div>
+  </div>
+  {% include "platform/_heatmap.html" with calendar=calendar %}
+</div>
+
+{% if ranking.enough_data %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Что получается, а что нет</div>
+    <div class="panel-hint">Показываем только темы, где ребёнок решил хотя бы
+      {{ ranking.min_attempts }} задач — иначе это не вывод, а случайность</div>
+  </div>
+  <div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
+    <div>
+      <div class="muted" style="margin-bottom:6px;">Получается хорошо</div>
+      <ul class="list-rows">
+        {% for topic in ranking.strong %}
+        <li><span>{{ topic.name }}</span><b style="color:var(--green)">{{ topic.accuracy }}%</b></li>
+        {% empty %}<li class="muted">пока мало данных</li>{% endfor %}
+      </ul>
+    </div>
+    <div>
+      <div class="muted" style="margin-bottom:6px;">Стоит подтянуть</div>
+      <ul class="list-rows">
+        {% for topic in ranking.weak %}
+        <li><span>{{ topic.name }}</span><b style="color:var(--error)">{{ topic.accuracy }}%</b></li>
+        {% empty %}<li class="muted">пока мало данных</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Сданные работы</div>
+  </div>
+  {% if works %}
+  <ul class="list-rows">
+    {% for row in works %}
+    <li>
+      <span>
+        {{ row.assignment.name }}
+        <span class="muted">· {{ row.submitted_at|date:"d.m.Y" }}</span>
+      </span>
+      <span>
+        {% if row.has_score %}
+          <b>{{ row.score|floatformat:1 }} б.</b>
+        {% else %}
+          <span class="muted">на проверке</span>
+        {% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty-note">Сданных работ пока нет.</div>
+  {% endif %}
+</div>
+
+{% comment %}
+⚠️ Здесь НЕТ и не будет: скорости проверки работ репетитором, времени его
+ответа на вопросы, числа занятий — ничего о работе репетитора. Обоснование —
+в докстринге `problems/views_parent.py`.
+{% endcomment %}
+{% endblock %}

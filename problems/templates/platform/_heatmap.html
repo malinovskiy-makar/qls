@@ -1,0 +1,35 @@
+{% comment %}
+Теплокарта активности за год — SVG РУКАМИ, без библиотеки.
+
+Причина ровно та же, что у графиков Econ Rush: цвета идут через `var(--accent)`,
+поэтому переключатель темы сайта перекрашивает карту сам. Canvas-библиотека
+держала бы цвета в JS в обход токенов и требовала перерисовки на смену темы.
+
+Ждёт `calendar` из `problems.stats.activity_calendar`.
+На узком экране карта прокручивается внутри своей обёртки — страница вбок
+не едет.
+{% endcomment %}
+<div class="heat-scroll">
+  <svg width="{{ calendar.width }}" height="118" role="img"
+       aria-label="Календарь активности за год">
+    {% for label in calendar.months %}
+    <text class="heat-month" x="{{ label.x }}" y="10">{{ label.name }}</text>
+    {% endfor %}
+    {% for cell in calendar.cells %}
+    <rect class="heat-cell-{{ cell.level }}" x="{{ cell.x }}" y="{{ cell.y }}"
+          width="11" height="11" rx="2">
+      <title>{{ cell.date|date:"d.m.Y" }}: решено {{ cell.solved }}, опыта {{ cell.xp }}</title>
+    </rect>
+    {% endfor %}
+  </svg>
+</div>
+<div class="heat-legend">
+  <span>Меньше</span>
+  <i class="heat-swatch" style="background:var(--surface-2)"></i>
+  <i style="background:var(--accent);opacity:.22"></i>
+  <i style="background:var(--accent);opacity:.45"></i>
+  <i style="background:var(--accent);opacity:.70"></i>
+  <i style="background:var(--accent)"></i>
+  <span>Больше</span>
+  <span style="margin-left:auto">{{ calendar.total_days }} дней с работой</span>
+</div>

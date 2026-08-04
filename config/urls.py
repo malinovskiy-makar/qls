@@ -9,7 +9,7 @@ from django.contrib.auth.views import LogoutView
 from django.urls import include, path
 
 from catalog import views as catalog_views
-from problems import views_platform
+from problems import views_parent, views_platform, views_stats
 from problems.views_auth import RoleBasedLoginView
 
 urlpatterns = [
@@ -28,6 +28,18 @@ urlpatterns = [
 
     # Платформа: профиль, сохранённое, папки.
     path('profile/', views_platform.profile, name='profile'),
+    # Статистика ученика — с геймификацией. Старая страница «Прогресс»
+    # ПОГЛОЩЕНА этой: /student/progress/ ведёт сюда редиректом.
+    path('profile/stats/', views_stats.student_stats, name='student_stats'),
+    path('profile/stats/data/', views_stats.student_stats_json,
+         name='student_stats_json'),
+    path('profile/stats/goal/', views_stats.set_weekly_goal,
+         name='set_weekly_goal'),
+    # Кабинет родителя — без геймификации и без единого показателя работы
+    # репетитора (см. problems/views_parent.py).
+    path('parent/', views_parent.parent_home, name='parent_home'),
+    path('parent/<int:pk>/', views_parent.parent_student,
+         name='parent_student'),
     path('api/saved/problem/', views_platform.api_save_problem,
          name='api_save_problem'),
     path('api/folders/create/', views_platform.api_folder_create,

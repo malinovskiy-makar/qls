@@ -153,7 +153,10 @@ def _delta(current, previous):
         return None
     diff = round(current - previous, 1)
     direction = 'up' if diff > 0 else ('down' if diff < 0 else 'flat')
-    return {'diff': diff, 'direction': direction, 'previous': previous}
+    # `abs_diff` — чтобы на экране не выходило «↓ -63 мин»: минус и стрелка
+    # вниз говорят одно и то же, а вместе читаются как двойное отрицание.
+    return {'diff': diff, 'abs_diff': abs(diff), 'direction': direction,
+            'previous': previous}
 
 
 # ===========================================================================
@@ -190,15 +193,18 @@ def topic_breakdown(user, period='month', now=None):
     return result
 
 
-def strongest_weakest(user, period='all', now=None, limit=3):
+def strongest_weakest(user, period='all', now=None, limit=3, rows=None):
     """Три сильные и три слабые темы.
 
     В выборку попадают только темы с ≥5 попытками: на трёх задачах «доля
     верных 100%» не значит ничего, а показывать это как сильную сторону —
     вводить в заблуждение и ученика, и родителя.
     """
-    rows = [r for r in topic_breakdown(user, period, now)
-            if r['attempted'] >= MIN_ATTEMPTS_FOR_RANKING]
+    # `rows` можно передать готовым: на экране разбивка по темам считается
+    # один раз и используется тремя блоками (карта тем, рейтинг, паутинка).
+    # Без этого один и тот же запрос уходил бы в базу трижды.
+    source = topic_breakdown(user, period, now) if rows is None else rows
+    rows = [r for r in source if r['attempted'] >= MIN_ATTEMPTS_FOR_RANKING]
     by_accuracy = sorted(rows, key=lambda r: (-r['accuracy'], -r['attempted']))
     return {
         'strong': by_accuracy[:limit],
@@ -209,9 +215,9 @@ def strongest_weakest(user, period='all', now=None, limit=3):
     }
 
 
-def section_radar(user, period='all', now=None):
+def section_radar(user, period='all', now=None, rows=None):
     """Паутинка по укрупнённым разделам."""
-    rows = topic_breakdown(user, period, now)
+    rows = topic_breakdown(user, period, now) if rows is None else rows
     buckets = {name: {'attempted': 0, 'solved': 0} for name, _ in SECTIONS}
     for row in rows:
         bucket = buckets[_section_of(row['name'])]
@@ -291,21 +297,48 @@ def activity_calendar(user, days=365, now=None):
     by_date = {r['date']: r for r in rows}
 
     peak = max([r['problems_solved'] for r in rows] or [0])
+
+    # Координаты клеток считает ПИТОН, а рисует шаблон. Так же, как чертежи
+    # генераторов Econ Rush: считать в шаблоне нечем, а держать вторую
+    # раскладку в JS значит завести второй источник правды о том, где какой
+    # день. Сетка как у GitHub: столбец — неделя, строка — день недели.
+    CELL, GAP, TOP = 11, 3, 16
+    step = CELL + GAP
+    # Начинаем с понедельника той недели, в которую попал старт.
+    first_monday = start - timedelta(days=start.weekday())
+
     cells = []
+    months = []
+    seen_months = set()
     day = start
     while day <= end:
         row = by_date.get(day)
         solved = row['problems_solved'] if row else 0
+        column = (day - first_monday).days // 7
         cells.append({
             'date': day,
             'solved': solved,
             'attempted': row['problems_attempted'] if row else 0,
             'xp': row['xp_earned'] if row else 0,
             'level': _heat_level(solved, peak),
+            'x': column * step,
+            'y': TOP + day.weekday() * step,
         })
+        key = (day.year, day.month)
+        if key not in seen_months and day.day <= 7:
+            seen_months.add(key)
+            months.append({'name': MONTHS_SHORT[day.month - 1],
+                           'x': column * step})
         day += timedelta(days=1)
+
+    columns = ((end - first_monday).days // 7) + 1
     return {'cells': cells, 'start': start, 'end': end, 'peak': peak,
+            'months': months, 'width': columns * step,
             'total_days': sum(1 for c in cells if c['solved'])}
+
+
+MONTHS_SHORT = ('янв', 'фев', 'мар', 'апр', 'май', 'июн',
+                'июл', 'авг', 'сен', 'окт', 'ноя', 'дек')
 
 
 def _heat_level(solved, peak):
@@ -493,6 +526,8 @@ def full_stats(user, period='month', now=None, use_cache=True):
     profile, _ = StudentProgressProfile.objects.get_or_create(user=user)
     remaining, next_threshold = xp_to_next_level(profile.xp_total)
     by_hour = activity_by_hour(user, period, now)
+    # Разбивка по темам за всё время — считаем ОДИН раз на три блока.
+    all_topics = topic_breakdown(user, 'all', now)
 
     data = {
         'period': period,
@@ -511,8 +546,8 @@ def full_stats(user, period='month', now=None, use_cache=True):
         'weekly': weekly_progress(user, profile, now),
         'overview': overview(user, period, now),
         'topics': topic_breakdown(user, period, now),
-        'ranking': strongest_weakest(user, 'all', now),
-        'radar': section_radar(user, 'all', now),
+        'ranking': strongest_weakest(user, 'all', now, rows=all_topics),
+        'radar': section_radar(user, 'all', now, rows=all_topics),
         'ring': answer_ring(user, period, now),
         'hardest': hardest_problems(user, 'all', now),
         'by_weekday': activity_by_weekday(user, period, now),
@@ -520,6 +555,10 @@ def full_stats(user, period='month', now=None, use_cache=True):
         'time_hint': best_time_hint(by_hour),
         'sources': source_split(user, period, now),
         'game': game_stats(user, 'all', now),
+        # Теплокарта и линия уровня всегда за ВСЮ историю, а не за период:
+        # календарь за один день и «рост уровня» из одной точки бессмысленны.
+        'calendar': activity_calendar(user, 365, now),
+        'level_history': level_history(user, now),
     }
     if use_cache:
         cache.set(key, data, CACHE_SECONDS)
@@ -704,8 +743,14 @@ def needs_attention(group, now=None):
     previous = {r['student'].pk: r for r in
                 group_table(group, 'month', now - timedelta(days=30))}
 
-    last_work = (Assignment.objects.filter(group=group)
-                 .order_by('-created_at').first())
+    # Последняя работа, СРОК КОТОРОЙ УЖЕ ПРОШЁЛ. Без этого условия экран
+    # ругался на всю группу за контрольную, которую ещё нельзя было писать:
+    # «не сдал» про работу с открытым сроком — не сигнал, а ложная тревога,
+    # а от ложных тревог список «требуют внимания» перестают читать.
+    last_work = (Assignment.objects
+                 .filter(group=group, deadline__isnull=False,
+                         deadline__lt=now)
+                 .order_by('-deadline').first())
     missed = set()
     if last_work is not None:
         done = set(Submission.objects.filter(

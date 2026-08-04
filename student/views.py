@@ -463,94 +463,13 @@ def submission_detail(request, pk):
 
 @student_required
 def progress(request):
-    from django.db.models import Count
-    from problems.models import (
-        StudentSkillProgress, StudentTopicProgress, Submission, TeacherFeedback,
-    )
+    """⚠️ УСТАРЕЛА. Страница «Прогресс» ПОГЛОЩЕНА экраном `/profile/stats/`.
 
-    topic_progress = (
-        StudentTopicProgress.objects
-        .filter(student=request.user)
-        .select_related('topic')
-        .order_by('-level')
-    )
+    Двух похожих разделов быть не должно: старая страница показывала владение
+    темами, навыки и замечания преподавателя — всё это есть на новом экране,
+    плюс история, теплокарта, достижения и переключатель периода. Адрес
+    оставлен редиректом ради закладок и старых ссылок.
+    """
+    return redirect('student_stats')
 
-    skill_progress = (
-        StudentSkillProgress.objects
-        .filter(student=request.user)
-        .select_related('skill')
-        .order_by('-level')
-    )
 
-    mistake_counts = (
-        TeacherFeedback.objects
-        .filter(submission__student=request.user)
-        .values('mistakes__name')
-        .annotate(count=Count('mistakes'))
-        .filter(mistakes__isnull=False)
-        .order_by('-count')[:10]
-    )
-
-    # Открытые задачи (не тесты)
-    open_reviewed = Submission.objects.filter(
-        student=request.user,
-        status='reviewed',
-    ).exclude(problem__problem_type__startswith='тест').count()
-
-    total_submitted = Submission.objects.filter(
-        student=request.user, status='submitted'
-    ).count()
-
-    # Статистика по тестам
-    test_subs = list(
-        Submission.objects.filter(
-            student=request.user,
-            status='reviewed',
-            problem__problem_type__startswith='тест',
-        ).select_related('problem', 'feedback').prefetch_related('problem__topics')
-    )
-
-    test_by_topic = {}
-    for sub in test_subs:
-        feedback = getattr(sub, 'feedback', None)
-        is_correct = feedback is not None and feedback.score is not None and feedback.score >= 1.0
-        for topic in sub.problem.topics.all():
-            if topic.name not in test_by_topic:
-                test_by_topic[topic.name] = {'correct': 0, 'total': 0}
-            test_by_topic[topic.name]['total'] += 1
-            if is_correct:
-                test_by_topic[topic.name]['correct'] += 1
-
-    test_topic_stats = []
-    for name, data in test_by_topic.items():
-        pct = round(data['correct'] / data['total'] * 100) if data['total'] > 0 else 0
-        test_topic_stats.append({
-            'topic': name,
-            'correct': data['correct'],
-            'total': data['total'],
-            'pct': pct,
-        })
-    test_topic_stats.sort(key=lambda x: -x['pct'])
-
-    total_test_subs = len(test_subs)
-    total_test_correct = sum(
-        1 for sub in test_subs
-        if getattr(sub, 'feedback', None) is not None
-        and sub.feedback.score is not None
-        and sub.feedback.score >= 1.0
-    )
-    test_overall_pct = (
-        round(total_test_correct / total_test_subs * 100) if total_test_subs > 0 else None
-    )
-
-    return render(request, 'student/progress.html', {
-        'topic_progress': topic_progress,
-        'skill_progress': skill_progress,
-        'mistake_counts': mistake_counts,
-        'open_reviewed': open_reviewed,
-        'total_submitted': total_submitted,
-        'test_topic_stats': test_topic_stats,
-        'total_test_subs': total_test_subs,
-        'total_test_correct': total_test_correct,
-        'test_overall_pct': test_overall_pct,
-    })

@@ -169,30 +169,41 @@ class Achievement(models.Model):
         return f'{self.icon} {self.title}'
 
     def rarity_percent(self):
-        """Доля учеников, у которых это достижение есть — как в Steam.
+        """Доля учеников, у которых это достижение есть — как в Steam."""
+        return rarity_map().get(self.pk, 0.0)
 
-        Считается по ученикам, у которых ВООБЩЕ есть учебный прогресс:
-        делить на всех зарегистрированных нечестно — аккаунты репетиторов и
-        родителей учебных достижений не получают в принципе, и любая награда
-        выглядела бы редчайшей.
 
-        Кэш на 10 минут: цифра меняется медленно, а запрос идёт на каждую из
-        двух с лишним десятков плиток экрана достижений.
-        """
-        key = 'achv_rarity_%s' % self.pk
-        cached = cache.get(key)
-        if cached is not None:
-            return cached
+RARITY_CACHE_KEY = 'achv_rarity_map'
+RARITY_CACHE_SECONDS = 600
 
-        total = StudentProgressProfile.objects.filter(xp_total__gt=0).count()
-        if not total:
-            value = 0.0
-        else:
-            owners = EarnedAchievement.objects.filter(
-                achievement=self).values('user').distinct().count()
-            value = round(owners * 100.0 / total, 1)
-        cache.set(key, value, 600)
-        return value
+
+def rarity_map():
+    """{id достижения: доля учеников, %} — ОДНИМ запросом на всю страницу.
+
+    ⚠️ Раньше редкость считалась в методе каждого достижения: два запроса
+    на плитку, а плиток на экране под тридцать — шестьдесят запросов на
+    ровном месте. Экран достижений это ровно тот случай, когда «по одному»
+    незаметно превращается в «страница думает секунду».
+
+    Знаменатель — ученики, у которых ВООБЩЕ есть учебный прогресс. Делить на
+    всех зарегистрированных нечестно: аккаунты репетиторов и родителей
+    учебных достижений не получают в принципе, и любая награда выглядела бы
+    редчайшей.
+    """
+    cached = cache.get(RARITY_CACHE_KEY)
+    if cached is not None:
+        return cached
+
+    total = StudentProgressProfile.objects.filter(xp_total__gt=0).count()
+    if not total:
+        result = {}
+    else:
+        rows = (EarnedAchievement.objects.values('achievement_id')
+                .annotate(owners=models.Count('user', distinct=True)))
+        result = {row['achievement_id']: round(row['owners'] * 100.0 / total, 1)
+                  for row in rows}
+    cache.set(RARITY_CACHE_KEY, result, RARITY_CACHE_SECONDS)
+    return result
 
 
 class EarnedAchievement(models.Model):

@@ -1,0 +1,343 @@
+{% extends "platform/base.html" %}
+{% load static %}
+
+{% block title %}Моя статистика{% endblock %}
+
+{% block extra_style %}
+{% include "platform/_stats_style.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="stats-head">
+  <div>
+    <h1 class="stats-title">Моя статистика</h1>
+    <div class="stats-sub">Что получается, что просело и что делать дальше.</div>
+  </div>
+  <div class="period-bar" id="period-bar">
+    {% for key, label in periods %}
+    <button type="button" data-period="{{ key }}"
+            class="{% if key == period %}is-active{% endif %}">{{ label }}</button>
+    {% endfor %}
+  </div>
+</div>
+
+{# ── Шапка героя: уровень, серия, опыт, недельная цель ─────────────── #}
+<div class="hero">
+  <div class="hero-main">
+    <div class="hero-level">
+      <b>{{ data.profile.level }}</b><span>уровень</span>
+    </div>
+    <div class="hero-bar"><i style="width:{{ data.profile.level_percent }}%"></i></div>
+    <div class="hero-note">
+      {% if data.profile.next_threshold %}
+        до {{ data.profile.level|add:1 }} уровня осталось {{ data.profile.xp_to_next }} опыта
+      {% else %}
+        максимальный уровень
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="hero-cell">
+    <div class="big">🔥 {{ data.profile.streak }}</div>
+    <div class="cap">{% if data.profile.streak == 1 %}день подряд{% else %}дней подряд{% endif %}</div>
+    <div class="tiny">заморозок: {{ data.profile.freezes }} · лучшая серия {{ data.profile.longest_streak }}</div>
+  </div>
+
+  <div class="hero-cell">
+    <div class="big">{{ data.profile.xp }}</div>
+    <div class="cap">всего опыта</div>
+  </div>
+
+  <div class="hero-cell">
+    {% with w=data.weekly %}
+    <svg class="goal-ring" width="72" height="72" viewBox="0 0 72 72" role="img"
+         aria-label="Недельная цель: {{ w.done }} из {{ w.goal }}">
+      <circle class="goal-ring-bg" cx="36" cy="36" r="30"></circle>
+      {# Длина окружности r=30 равна 188.5; заполнение — долей от неё.
+         Считаем через calc() в CSS: в шаблоне умножать нечем, а второе
+         место, где живёт число 188.5, разъехалось бы с первым. #}
+      <circle class="goal-ring-fg" cx="36" cy="36" r="30"
+              stroke-dasharray="188.5"
+              style="stroke-dashoffset: calc(188.5px - 1.885px * {{ w.percent }})"></circle>
+      <text x="36" y="34" text-anchor="middle" font-size="15" font-weight="800"
+            fill="currentColor">{{ w.done }}</text>
+      <text x="36" y="48" text-anchor="middle" font-size="10"
+            fill="currentColor" opacity=".6">из {{ w.goal }}</text>
+    </svg>
+    <div class="cap">цель на неделю</div>
+    <button type="button" class="goal-edit" id="goal-edit">изменить</button>
+    <form method="post" action="{% url 'set_weekly_goal' %}" id="goal-form" hidden
+          style="margin-top:6px;">
+      {% csrf_token %}
+      <input type="number" name="weekly_goal" min="1" max="500" value="{{ w.goal }}"
+             style="width:64px;padding:4px 6px;border:1px solid var(--border);
+                    border-radius:var(--r);background:var(--surface);color:var(--text);">
+      <button type="submit" class="goal-edit">ок</button>
+    </form>
+    {% endwith %}
+  </div>
+</div>
+
+{# ── Четыре карточки ───────────────────────────────────────────────── #}
+<div class="metric-grid" id="metric-grid">
+  {% with o=data.overview %}
+  <div class="metric">
+    <div class="cap">решено</div>
+    <div class="big" data-metric="solved">{{ o.solved }}</div>
+    <div class="chg {{ o.change.solved.direction }}" data-change="solved">
+      {% if o.change.solved %}{% if o.change.solved.direction == 'up' %}↑{% elif o.change.solved.direction == 'down' %}↓{% endif %}
+        {{ o.change.solved.abs_diff }} к прошлому периоду{% else %}&nbsp;{% endif %}
+    </div>
+  </div>
+  <div class="metric">
+    <div class="cap">доля верных</div>
+    <div class="big" data-metric="accuracy">{% if o.accuracy is not None %}{{ o.accuracy }}%{% else %}—{% endif %}</div>
+    <div class="chg {{ o.change.accuracy.direction }}" data-change="accuracy">
+      {% if o.change.accuracy %}{% if o.change.accuracy.direction == 'up' %}↑{% elif o.change.accuracy.direction == 'down' %}↓{% endif %}
+        {{ o.change.accuracy.abs_diff }} п.п.{% else %}&nbsp;{% endif %}
+    </div>
+  </div>
+  <div class="metric">
+    <div class="cap">время</div>
+    <div class="big" data-metric="minutes">{{ o.minutes }} мин</div>
+    <div class="chg {{ o.change.minutes.direction }}" data-change="minutes">
+      {% if o.change.minutes %}{% if o.change.minutes.direction == 'up' %}↑{% elif o.change.minutes.direction == 'down' %}↓{% endif %}
+        {{ o.change.minutes.abs_diff }} мин{% else %}&nbsp;{% endif %}
+    </div>
+  </div>
+  <div class="metric">
+    <div class="cap">опыт</div>
+    <div class="big" data-metric="xp">{{ o.xp }}</div>
+    <div class="chg {{ o.change.xp.direction }}" data-change="xp">
+      {% if o.change.xp %}{% if o.change.xp.direction == 'up' %}↑{% elif o.change.xp.direction == 'down' %}↓{% endif %}
+        {{ o.change.xp.abs_diff }}{% else %}&nbsp;{% endif %}
+    </div>
+  </div>
+  {% endwith %}
+</div>
+
+{# ── Карта тем: САМЫЙ ПОЛЕЗНЫЙ БЛОК ───────────────────────────────── #}
+<div class="panel panel--lead">
+  <div class="panel-head">
+    <div class="panel-title">Карта тем — что делать дальше</div>
+    <div class="panel-hint">Нажмите на тему, чтобы открыть её задачи в каталоге</div>
+  </div>
+  {% if data.topics %}
+  <div class="topic-grid">
+    {% for topic in data.topics %}
+    <a class="topic-card" href="{% url 'catalog:problem_list' %}?topic={{ topic.topic_id }}">
+      <div class="name">{{ topic.name }}</div>
+      <div class="row">
+        <span class="mastery mastery-{{ topic.mastery }}">{% if topic.mastery == 'mastered' %}разобрался{% elif topic.mastery == 'confident' %}уверенно{% elif topic.mastery == 'familiar' %}знаком{% else %}не начата{% endif %}</span>
+        <span>{{ topic.accuracy }}% · {{ topic.solved }}/{{ topic.attempted }}</span>
+      </div>
+      <div class="topic-bar"><i style="width:{{ topic.accuracy }}%"></i></div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-note">Ещё нет решённых задач с темой. Реши несколько
+    из каталога — карта заполнится сама.</div>
+  {% endif %}
+</div>
+
+{% if data.ranking.enough_data %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Сильные и слабые темы</div>
+    <div class="panel-hint">Только темы, где не меньше {{ data.ranking.min_attempts }} попыток —
+      на трёх задачах доля верных ничего не значит</div>
+  </div>
+  <div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
+    <div>
+      <div class="muted" style="margin-bottom:6px;">Получается лучше всего</div>
+      <ul class="list-rows">
+        {% for topic in data.ranking.strong %}
+        <li><span>{{ topic.name }}</span><b style="color:var(--green)">{{ topic.accuracy }}%</b></li>
+        {% empty %}<li class="muted">данных пока мало</li>{% endfor %}
+      </ul>
+    </div>
+    <div>
+      <div class="muted" style="margin-bottom:6px;">Стоит подтянуть</div>
+      <ul class="list-rows">
+        {% for topic in data.ranking.weak %}
+        <li><span>{{ topic.name }}</span><b style="color:var(--error)">{{ topic.accuracy }}%</b></li>
+        {% empty %}<li class="muted">данных пока мало</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Теплокарта ────────────────────────────────────────────────────── #}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Календарь занятий</div>
+    <div class="panel-hint">Год по неделям</div>
+  </div>
+  {% include "platform/_heatmap.html" with calendar=data.calendar %}
+</div>
+
+{# ── Графики ───────────────────────────────────────────────────────── #}
+<div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));">
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">Рост уровня</div></div>
+    {% if data.level_history %}
+      <div class="chart-box"><canvas id="chart-level"></canvas></div>
+    {% else %}
+      <div class="empty-note">Реши первую задачу — линия начнёт расти.</div>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">Разделы экономики</div></div>
+    <div class="chart-box"><canvas id="chart-radar"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">Ответы за период</div></div>
+    <div class="chart-box"><canvas id="chart-ring"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">Откуда задачи</div></div>
+    <div class="chart-box"><canvas id="chart-sources"></canvas></div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Когда занимаешься</div></div>
+  <div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));">
+    <div class="chart-box"><canvas id="chart-weekday"></canvas></div>
+    <div class="chart-box"><canvas id="chart-hour"></canvas></div>
+  </div>
+  <div class="panel-hint" id="time-hint" style="margin-top:10px;">{{ data.time_hint }}</div>
+</div>
+
+{# ── Достижения ────────────────────────────────────────────────────── #}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Достижения — {{ achievements_earned }} из {{ achievements|length }}</div>
+    <div class="achv-filter" id="achv-filter">
+      <button type="button" class="is-active" data-cat="all">Все</button>
+      <button type="button" data-cat="depth">Глубина</button>
+      <button type="button" data-cat="consistency">Постоянство</button>
+      <button type="button" data-cat="skill">Мастерство</button>
+      <button type="button" data-cat="milestone">Вехи</button>
+    </div>
+  </div>
+  <div class="achv-grid" id="achv-grid">
+    {% for row in achievements %}
+    <div class="achv {% if not row.earned %}is-locked{% endif %}"
+         data-cat="{{ row.achievement.category }}">
+      <div class="ico">{{ row.achievement.icon }}</div>
+      <div class="ttl">{{ row.achievement.title }}</div>
+      <div class="cond">{{ row.achievement.description }}</div>
+      <div class="meta">
+        {% if row.earned %}получено {{ row.earned_at|date:"d.m.Y" }} · {% endif %}
+        этого добились {{ row.rarity }}%
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ── Рекорды ───────────────────────────────────────────────────────── #}
+{% if records %}
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Личные рекорды</div></div>
+  <div class="record-grid">
+    {% for record in records %}
+    <div class="record">
+      <div class="big">{{ record.value|floatformat:0 }}</div>
+      <div class="cap">{{ record.get_kind_display }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Трудные задачи ────────────────────────────────────────────────── #}
+{% if data.hardest %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Стоит вернуться</div>
+    <div class="panel-hint">Задачи, на которых было больше всего попыток</div>
+  </div>
+  <ul class="list-rows">
+    {% for row in data.hardest %}
+    <li>
+      <a href="{% url 'catalog:problem_detail' row.problem_id %}">{{ row.title }}</a>
+      <span class="muted">
+        попыток мимо: {{ row.fails }}{% if row.solved %} · потом решена{% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{# ── Замечания преподавателя (переехали со старой страницы «Прогресс») ─ #}
+{% if mistakes or skills %}
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Что отмечает преподаватель</div></div>
+  <div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
+    {% if mistakes %}
+    <div>
+      <div class="muted" style="margin-bottom:6px;">Частые замечания</div>
+      <ul class="list-rows">
+        {% for row in mistakes %}
+        <li><span>{{ row.mistakes__name }}</span><b>{{ row.count }}</b></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% if skills %}
+    <div>
+      <div class="muted" style="margin-bottom:6px;">Навыки</div>
+      <ul class="list-rows">
+        {% for row in skills %}
+        <li><span>{{ row.skill.name }}</span><b>{{ row.level }}%</b></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Игра — ОТДЕЛЬНО и явно подписано ──────────────────────────────── #}
+<div class="panel game-panel">
+  <div class="panel-head">
+    <div class="panel-title">Econ Rush <span class="game-badge">игра</span></div>
+    <div class="panel-hint">Считается отдельно от учёбы: скорость узнавания и
+      решение задачи — разные вещи</div>
+  </div>
+  {% if data.game.has_data %}
+  <div class="record-grid">
+    <div class="record">
+      <div class="big">{{ data.game.attempted }}</div>
+      <div class="cap">вопросов в игре</div>
+    </div>
+    <div class="record">
+      <div class="big">{{ data.game.accuracy }}%</div>
+      <div class="cap">верных в игре</div>
+    </div>
+    {% for mode, count in data.game.by_mode.items %}
+    <div class="record">
+      <div class="big">{{ count }}</div>
+      <div class="cap">{{ mode }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-note">Ты ещё не играл. <a href="/game/" style="color:var(--accent)">Попробовать Econ Rush</a></div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script id="stats-data" type="application/json">{{ chart_json|safe }}</script>
+<script src="{% static 'platform/stats.js' %}"></script>
+{% endblock %}

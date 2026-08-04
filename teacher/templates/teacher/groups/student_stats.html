@@ -1,0 +1,137 @@
+{% extends "teacher/base.html" %}
+
+{% block title %}{{ student.get_full_name|default:student.username }} — статистика{% endblock %}
+
+{% block extra_style %}
+{% include "platform/_stats_style.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="stats-head">
+  <div>
+    <h1 class="stats-title">{{ student.get_full_name|default:student.username }}</h1>
+    <div class="stats-sub">
+      {% for group in groups %}
+      <a href="{% url 'teacher:group_stats' group.pk %}"
+         style="color:var(--accent);text-decoration:none;">{{ group.name }}</a>{% if not forloop.last %}, {% endif %}
+      {% endfor %}
+      · диагностика без геймификации
+    </div>
+  </div>
+  <div class="period-bar">
+    {% for key, label in periods %}
+    <a href="?period={{ key }}" style="text-decoration:none;">
+      <button type="button" class="{% if key == period %}is-active{% endif %}">{{ label }}</button>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="metric-grid">
+  <div class="metric">
+    <div class="cap">решено</div><div class="big">{{ overview.solved }}</div>
+  </div>
+  <div class="metric">
+    <div class="cap">попыток</div><div class="big">{{ overview.attempted }}</div>
+  </div>
+  <div class="metric">
+    <div class="cap">доля верных</div>
+    <div class="big">{% if overview.accuracy is not None %}{{ overview.accuracy }}%{% else %}—{% endif %}</div>
+  </div>
+  <div class="metric">
+    <div class="cap">время</div><div class="big">{{ overview.minutes }} мин</div>
+  </div>
+</div>
+
+<div class="panel panel--lead">
+  <div class="panel-head">
+    <div class="panel-title">Темы</div>
+    <div class="panel-hint">Что задавать дальше</div>
+  </div>
+  {% if topics %}
+  <div class="stats-table-wrap">
+    <table class="stats-table">
+      <thead><tr><th class="no-sort">Тема</th><th class="no-sort">Попыток</th>
+        <th class="no-sort">Верных</th><th class="no-sort">Доля</th>
+        <th class="no-sort">Владение</th></tr></thead>
+      <tbody>
+        {% for topic in topics %}
+        <tr>
+          <td>{{ topic.name }}</td>
+          <td>{{ topic.attempted }}</td>
+          <td>{{ topic.solved }}</td>
+          <td>
+            <span class="matrix-cell {% if topic.accuracy < 50 %}matrix-bad{% elif topic.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}">{{ topic.accuracy }}%</span>
+          </td>
+          <td><span class="mastery mastery-{{ topic.mastery }}">{% if topic.mastery == 'mastered' %}разобрался{% elif topic.mastery == 'confident' %}уверенно{% elif topic.mastery == 'familiar' %}знаком{% else %}не начата{% endif %}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-note">Ученик пока не решал задач с темами.</div>
+  {% endif %}
+</div>
+
+{% if ranking.enough_data %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Сильные и слабые стороны</div>
+    <div class="panel-hint">Только темы с {{ ranking.min_attempts }}+ попытками</div>
+  </div>
+  <div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
+    <div>
+      <div class="muted" style="margin-bottom:6px;">Сильные</div>
+      <ul class="list-rows">
+        {% for topic in ranking.strong %}
+        <li><span>{{ topic.name }}</span><b style="color:var(--green)">{{ topic.accuracy }}%</b></li>
+        {% empty %}<li class="muted">данных мало</li>{% endfor %}
+      </ul>
+    </div>
+    <div>
+      <div class="muted" style="margin-bottom:6px;">Слабые</div>
+      <ul class="list-rows">
+        {% for topic in ranking.weak %}
+        <li><span>{{ topic.name }}</span><b style="color:var(--error)">{{ topic.accuracy }}%</b></li>
+        {% empty %}<li class="muted">данных мало</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Активность за полгода</div>
+  </div>
+  {% include "platform/_heatmap.html" with calendar=calendar %}
+</div>
+
+{% if hardest %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Где спотыкается</div>
+    <div class="panel-hint">Больше всего неверных попыток</div>
+  </div>
+  <ul class="list-rows">
+    {% for row in hardest %}
+    <li>
+      <a href="{% url 'catalog:problem_detail' row.problem_id %}">{{ row.title }}</a>
+      <span class="muted">мимо: {{ row.fails }}{% if row.solved %} · затем решена{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Откуда задачи</div></div>
+  <ul class="list-rows">
+    {% for row in sources %}
+    <li><span>{{ row.label }}</span>
+      <span class="muted">{{ row.solved }} из {{ row.attempted }}</span></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

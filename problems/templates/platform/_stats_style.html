@@ -1,0 +1,186 @@
+{% comment %}
+Стили экранов статистики: ученик, репетитор, родитель.
+Один файл на три экрана — иначе три набора цифр разъедутся визуально.
+Все цвета через токены; своих hex здесь нет.
+{% endcomment %}
+.stats-head { display: flex; align-items: flex-start; justify-content: space-between;
+              gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.stats-title { font-size: 24px; font-weight: 700; }
+.stats-sub { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+/* ── Переключатель периода ──────────────────────────── */
+.period-bar { display: inline-flex; gap: 2px; background: var(--surface-2);
+              border: 1px solid var(--border); border-radius: 999px; padding: 3px; }
+.period-bar button {
+  border: none; background: transparent; color: var(--text2); font: inherit;
+  font-size: 13px; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+}
+.period-bar button.is-active { background: var(--accent); color: #fff; font-weight: 600; }
+
+/* ── Шапка героя ────────────────────────────────────── */
+.hero {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 22px 24px; margin-bottom: 22px;
+  display: grid; gap: 20px;
+  grid-template-columns: minmax(200px, 1.4fr) repeat(3, minmax(120px, 1fr));
+  align-items: center;
+}
+.hero-level { display: flex; align-items: baseline; gap: 10px; }
+.hero-level b { font-size: 40px; line-height: 1; font-weight: 800; }
+.hero-level span { font-size: 13px; color: var(--text2); }
+.hero-bar { height: 8px; background: var(--surface-2); border-radius: 999px;
+            overflow: hidden; margin-top: 10px; border: 1px solid var(--border-soft); }
+.hero-bar i { display: block; height: 100%; background: var(--accent); }
+.hero-note { font-size: 12px; color: var(--text2); margin-top: 6px; }
+.hero-cell { text-align: center; }
+.hero-cell .big { font-size: 26px; font-weight: 800; line-height: 1.1; }
+.hero-cell .cap { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.hero-cell .tiny { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.goal-ring { display: block; margin: 0 auto; }
+.goal-ring-bg { fill: none; stroke: var(--surface-2); stroke-width: 8; }
+.goal-ring-fg { fill: none; stroke: var(--accent); stroke-width: 8;
+                stroke-linecap: round; transform: rotate(-90deg);
+                transform-origin: 50% 50%; }
+.goal-edit { border: 1px solid var(--border); background: transparent;
+             color: var(--text2); font: inherit; font-size: 11px;
+             border-radius: var(--r); padding: 3px 8px; cursor: pointer;
+             margin-top: 6px; }
+.goal-edit:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Карточки-метрики ───────────────────────────────── */
+.metric-grid { display: grid; gap: 12px; margin-bottom: 26px;
+               grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.metric {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px 18px;
+}
+.metric .cap { font-size: 11px; color: var(--text2); text-transform: uppercase;
+               letter-spacing: .06em; }
+.metric .big { font-size: 26px; font-weight: 800; margin-top: 6px; }
+.metric .chg { font-size: 12px; margin-top: 4px; color: var(--text2); }
+.chg.up { color: var(--green); }
+.chg.down { color: var(--error); }
+
+/* ── Блоки ──────────────────────────────────────────── */
+.panel { background: var(--surface); border: 1px solid var(--border);
+         border-radius: 12px; padding: 20px 22px; margin-bottom: 20px; }
+.panel-head { display: flex; align-items: baseline; justify-content: space-between;
+              gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.panel-title { font-size: 15px; font-weight: 700; }
+.panel-hint { font-size: 12px; color: var(--text2); }
+.panel--lead { border-color: var(--accent); }
+.chart-box { position: relative; height: 240px; }
+.chart-box.tall { height: 300px; }
+.empty-note { font-size: 13px; color: var(--text2); text-align: center;
+              padding: 28px 12px; background: var(--surface-2);
+              border-radius: var(--r); }
+
+/* ── Карта тем ──────────────────────────────────────── */
+.topic-grid { display: grid; gap: 10px;
+              grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.topic-card {
+  display: block; text-decoration: none; color: inherit;
+  border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+  background: var(--surface-2); transition: border-color .12s, transform .12s;
+}
+.topic-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.topic-card .name { font-size: 13px; font-weight: 600; line-height: 1.35;
+                    margin-bottom: 8px; }
+.topic-card .row { display: flex; align-items: center; justify-content: space-between;
+                   font-size: 12px; color: var(--text2); }
+.mastery { font-size: 10px; font-weight: 700; text-transform: uppercase;
+           letter-spacing: .05em; padding: 2px 7px; border-radius: 999px; }
+.mastery-none      { background: var(--chip-bg); color: var(--chip-text); }
+.mastery-familiar  { background: var(--accent-tint); color: var(--accent); }
+.mastery-confident { background: var(--amber-tint); color: var(--amber); }
+.mastery-mastered  { background: var(--green-tint); color: var(--green); }
+.topic-bar { height: 4px; background: var(--surface); border-radius: 999px;
+             overflow: hidden; margin-top: 8px; border: 1px solid var(--border-soft); }
+.topic-bar i { display: block; height: 100%; background: var(--accent); }
+
+/* ── Теплокарта (SVG руками) ────────────────────────── */
+.heat-scroll { overflow-x: auto; padding-bottom: 6px; }
+.heat-cell-0 { fill: var(--surface-2); }
+.heat-cell-1 { fill: var(--accent); opacity: .22; }
+.heat-cell-2 { fill: var(--accent); opacity: .45; }
+.heat-cell-3 { fill: var(--accent); opacity: .70; }
+.heat-cell-4 { fill: var(--accent); opacity: 1; }
+.heat-month { font-size: 9px; fill: var(--text2); }
+.heat-legend { display: flex; align-items: center; gap: 6px; font-size: 11px;
+               color: var(--text2); margin-top: 8px; }
+.heat-legend i { width: 11px; height: 11px; border-radius: 2px; display: block; }
+
+/* ── Достижения ─────────────────────────────────────── */
+.achv-grid { display: grid; gap: 10px;
+             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.achv { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+        background: var(--surface-2); }
+.achv.is-locked { opacity: .55; }
+.achv .ico { font-size: 22px; }
+.achv .ttl { font-size: 13px; font-weight: 600; margin-top: 6px; }
+.achv .cond { font-size: 11px; color: var(--text2); margin-top: 4px; line-height: 1.4; }
+.achv .meta { font-size: 10px; color: var(--text3); margin-top: 6px; }
+.achv-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+.achv-filter button { border: 1px solid var(--border); background: transparent;
+  color: var(--text2); font: inherit; font-size: 12px; padding: 4px 10px;
+  border-radius: 999px; cursor: pointer; }
+.achv-filter button.is-active { border-color: var(--accent); color: var(--accent); }
+
+/* ── Рекорды и списки ───────────────────────────────── */
+.record-grid { display: grid; gap: 10px;
+               grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.record { border: 1px solid var(--border); border-radius: 10px; padding: 14px;
+          background: var(--surface-2); text-align: center; }
+.record .big { font-size: 24px; font-weight: 800; }
+.record .cap { font-size: 11px; color: var(--text2); margin-top: 4px; }
+.list-rows { list-style: none; margin: 0; padding: 0; }
+.list-rows li { display: flex; align-items: center; justify-content: space-between;
+                gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border-soft);
+                font-size: 13px; }
+.list-rows li:last-child { border-bottom: none; }
+.list-rows a { color: var(--text); text-decoration: none; }
+.list-rows a:hover { color: var(--accent); }
+.muted { color: var(--text2); font-size: 12px; }
+
+/* ── Блок игры — визуально отделён ──────────────────── */
+.game-panel { border-style: dashed; }
+.game-badge { font-size: 10px; font-weight: 700; letter-spacing: .06em;
+              text-transform: uppercase; color: var(--text2);
+              background: var(--chip-bg); border-radius: 999px; padding: 2px 8px; }
+
+/* ── Таблицы репетитора ─────────────────────────────── */
+.stats-table-wrap { overflow-x: auto; }
+table.stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.stats-table th, table.stats-table td {
+  padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap; }
+table.stats-table th { font-size: 11px; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text2); font-weight: 600; cursor: pointer;
+  user-select: none; }
+table.stats-table th.no-sort { cursor: default; }
+table.stats-table tbody tr:hover { background: var(--surface-2); }
+
+/* Тепловая матрица «ученики × темы» */
+.matrix-cell { font-size: 11px; text-align: center; border-radius: 4px;
+               padding: 5px 4px; min-width: 46px; display: block; color: var(--text); }
+.matrix-none { background: var(--surface-2); color: var(--text3); }
+.matrix-bad  { background: var(--error-tint); color: var(--error); font-weight: 700; }
+.matrix-mid  { background: var(--amber-tint); color: var(--amber); font-weight: 600; }
+.matrix-good { background: var(--green-tint); color: var(--green); font-weight: 600; }
+.matrix-head { font-size: 11px; color: var(--text2); writing-mode: vertical-rl;
+               transform: rotate(180deg); max-height: 120px; }
+
+.attention-row { border: 1px solid var(--amber-border); background: var(--amber-tint);
+                 border-radius: var(--r); padding: 10px 14px; margin-bottom: 8px;
+                 font-size: 13px; }
+.attention-row b { font-weight: 700; }
+
+@media (max-width: 720px) {
+  .hero { grid-template-columns: 1fr 1fr; }
+  .hero-main { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  .hero { grid-template-columns: 1fr; }
+  .stats-title { font-size: 20px; }
+  .chart-box { height: 220px; }
+}

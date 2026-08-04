@@ -18,6 +18,7 @@
   <a href="?tab=students"    class="{% if tab == 'students' %}active{% endif %}">Ученики</a>
   <a href="?tab=assignments" class="{% if tab == 'assignments' %}active{% endif %}">Задания</a>
   <a href="?tab=materials"   class="{% if tab == 'materials' %}active{% endif %}">Материалы</a>
+  <a href="{% url 'teacher:group_stats' group.pk %}">Статистика</a>
 </nav>
 
 {% if tab == 'students' %}

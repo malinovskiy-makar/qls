@@ -1,0 +1,41 @@
+{% extends "platform/base.html" %}
+
+{% block title %}Мои дети{% endblock %}
+
+{% block extra_style %}
+{% include "platform/_stats_style.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="stats-head">
+  <div>
+    <h1 class="stats-title">Мои дети</h1>
+    <div class="stats-sub">Как идут занятия за последний месяц</div>
+  </div>
+</div>
+
+{% if rows %}
+<div class="topic-grid">
+  {% for row in rows %}
+  <a class="topic-card" href="{% url 'parent_student' row.student.pk %}">
+    <div class="name">{{ row.student.get_full_name|default:row.student.username }}</div>
+    <div class="row">
+      <span>решено за месяц</span><b>{{ row.solved }}</b>
+    </div>
+    <div class="row" style="margin-top:4px;">
+      <span>доля верных</span>
+      <b>{% if row.accuracy is not None %}{{ row.accuracy }}%{% else %}—{% endif %}</b>
+    </div>
+    <div class="row" style="margin-top:4px;">
+      <span>время</span><b>{{ row.minutes }} мин</b>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-note">
+  К вашему аккаунту пока не привязан ни один ученик.<br>
+  Связь создаёт преподаватель — попросите его добавить вас.
+</div>
+{% endif %}
+{% endblock %}
