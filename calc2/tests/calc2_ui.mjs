@@ -331,34 +331,25 @@ await t('клавиша ставит символ в поле, не стирая
   });
 });
 
-await t('примеры формул открываются из подвала клавиатуры', async () => {
-  await page.evaluate(() => {
-    const kb = document.querySelector('.mkbd.open');
-    const b = [...kb.querySelectorAll('.mkbd-foot button')].find(x => /Примеры/.test(x.textContent));
-    if (b) b.click();
-  });
-  await page.waitForTimeout(250);
-  return await page.evaluate(() => {
-    const pop = document.getElementById('fp-formula');
-    const n = pop.querySelectorAll('.f-ex .f-ex-math .katex').length;
-    return (pop.classList.contains('open') && n === 4) || `формул с KaTeX: ${n}`;
-  });
-});
-
-await t('клик по примеру подставляет его в поле', async () => {
-  // Панель прокручиваемая, поэтому кликаем программно, а не курсором.
-  await page.evaluate(() => document.querySelector('#fp-formula .f-ex').click());
-  await page.waitForTimeout(200);
-  const v = await page.inputValue('#inp-formula');
-  return v === '100 - 2*Q' || `в поле «${v}»`;
-});
-
-await t('после подстановки строка набралась, попап закрылся', () => page.evaluate(() => {
-  const pop = document.getElementById('fp-formula');
+// Раздел «Примеры формул» из клавиатуры убран: он повторял раздел «Функции»,
+// а вернуться из него к клавиатуре было нечем. В подвале остался один вход —
+// конструктор кусочной функции.
+// Задвоенный рендер при первом входе: запасная накладка оставалась висеть
+// поверх собранного поля MathLive и уходила лишь после правки в строке.
+await t('формула показана один раз, накладки поверх поля нет', () => page.evaluate(() => {
   const inp = document.getElementById('inp-formula');
-  const shown = inp._mf ? !!inp._mf.value.trim()
-                        : document.querySelector('#sec-curves .f-typeset').classList.contains('has');
-  return (!pop.classList.contains('open') && shown) || 'попап открыт или строка пуста';
+  const ts = inp.closest('.f-slot').querySelector('.f-typeset');
+  if (!inp._mf) return true;                      // без MathLive накладка и есть поле
+  return !ts.classList.contains('show') || 'накладка видна поверх поля';
+}));
+
+await t('в подвале клавиатуры только кусочная функция', () => page.evaluate(() => {
+  const kb = document.querySelector('.mkbd.open');
+  if (!kb) return 'клавиатура не открыта';
+  const names = [...kb.querySelectorAll('.mkbd-foot button')].map(b => b.textContent.trim());
+  const ok = (names.length === 1 && /Кусочн/.test(names[0]));
+  kb.classList.remove('open');            // дальше тесты открывают её сами
+  return ok || 'в подвале: ' + names.join(' | ');
 }));
 
 await t('своё имя кривой заменяет родовое D на графике', async () => {
@@ -765,21 +756,17 @@ await t('кривая добавляется сразу со своей роль
   });
 });
 
-await t('заголовок справки называет именно эту роль', async () => {
-  await page.click('#fh-formula');
-  await page.waitForTimeout(220);
+// Подсказка формы записи идёт за выбранной ролью: примеров-попапа больше нет,
+// но роль по-прежнему объясняется прямо под полем.
+await t('подсказка под полем называет именно эту роль', async () => {
   await page.evaluate(() => {
-    const kb = document.querySelector('.mkbd.open');
-    const b = kb && [...kb.querySelectorAll('.mkbd-foot button')].find(x => /Примеры/.test(x.textContent));
-    if (b) b.click();
+    const sel = document.getElementById('new-role');
+    sel.value = 'mc'; sel.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  await page.waitForTimeout(220);
-  const title = await page.locator('#fp-formula .f-pop-title').first().textContent();
-  await page.evaluate(() => {
-    document.querySelectorAll('.f-pop.open, .mkbd.open').forEach(e => e.classList.remove('open'));
-  });
-  await page.waitForTimeout(120);
-  return title.includes('Предельные издержки') || title;
+  await page.waitForTimeout(200);
+  const hint = await page.locator('#curve-form-hint').textContent();
+  const ph = await page.getAttribute('#inp-formula', 'placeholder');
+  return (/Предельные издержки/.test(hint) && /20/.test(ph || '')) || (hint + ' | ' + ph);
 });
 
 /* --- Прилипание своих точек к кривым ----------------------------------- */
@@ -960,20 +947,30 @@ await t('конструктор кусочной собирает верную �
     if (b) b.click(); else openPiecewise(document.getElementById('inp-formula'), 'Q');
   });
   await page.waitForTimeout(280);
-  const segs = await page.locator('#pw-count .seg-btn').all();
-  await segs[1].click();                     // три куска
-  await page.waitForTimeout(180);
-  const rows = await page.locator('#pw-rows .pw-row').all();
-  if (rows.length !== 3) return 'строк ' + rows.length;
-  // У каждого куска две границы: «от» и «до».
-  await rows[0].locator('input[type=text]').first().fill('100 - Q');
-  await rows[0].locator('input.pw-bound').nth(0).fill('0');
-  await rows[0].locator('input.pw-bound').nth(1).fill('40');
-  await rows[1].locator('input[type=text]').first().fill('60');
-  await rows[1].locator('input.pw-bound').nth(0).fill('40');
-  await rows[1].locator('input.pw-bound').nth(1).fill('70');
-  await rows[2].locator('input[type=text]').first().fill('20');
-  await rows[2].locator('input.pw-bound').nth(0).fill('70');
+  // Число кусков задаётся числом, а не выбором из готовых вариантов.
+  const nOk = await page.evaluate(() => {
+    const c = document.getElementById('pw-count');
+    if (!c) return false;
+    c.value = '3'; c.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  });
+  if (!nOk) return 'нет поля числа кусков';
+  await page.waitForTimeout(220);
+  const rowsN = await page.evaluate(() => document.querySelectorAll('#pw-rows .pw-row').length);
+  if (rowsN !== 3) return 'строк ' + rowsN;
+  // Поля формул теперь набираются MathLive, а исходный input под ним скрыт,
+  // поэтому заполняем их так же, как это делает сам движок ввода.
+  await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#pw-rows .pw-row')];
+    const put = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const data = [['100 - Q', '0', '40'], ['60', '40', '70'], ['20', '70', '']];
+    rows.forEach((r, i) => {
+      put(r.querySelector('.f-slot input[type=text]'), data[i][0]);
+      const bs = r.querySelectorAll('input.pw-bound');
+      put(bs[0], data[i][1]);
+      put(bs[1], data[i][2]);
+    });
+  });
   await page.waitForTimeout(220);
   await page.click('#pw-apply');
   await page.waitForTimeout(220);

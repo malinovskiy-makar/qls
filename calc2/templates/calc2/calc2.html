@@ -380,20 +380,32 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 
 /* Конструктор кусочной функции: слева нарисованная фигурная скобка,
    справа строки «формула — на участке до границы». */
+.pw-count-field { display: flex; align-items: center; gap: 8px; }
+.pw-count-field label { margin: 0; }
+.pw-count-field input {
+  width: 62px; padding: 5px 7px; font-size: 12.5px; text-align: center;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text);
+}
 .pw-brace { display: flex; gap: 10px; margin: 4px 0 12px; }
 .pw-brace-mark {
   flex: 0 0 10px; border: 2px solid var(--border); border-right: none;
   border-radius: 8px 0 0 8px; min-height: 60px;
 }
 .pw-rows { flex: 1; display: grid; gap: 7px; }
-.pw-row { display: flex; align-items: center; gap: 7px; }
+.pw-row { display: flex; align-items: center; gap: 6px; }
+.pw-row .f-slot { flex: 1 1 auto; min-width: 90px; }
 .pw-row input[type=text] {
   flex: 1 1 120px; min-width: 0; padding: 5px 7px; font-size: 12px;
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--input-bg); color: var(--text);
 }
-.pw-row input.pw-bound { flex: 0 0 74px; }
+/* Поле формулы внутри строки — то же самое, что и в панели: набранная запись.
+   Ужимаем его по высоте, чтобы весь редактор помещался в один экран. */
+.pw-row math-field { font-size: 13px; padding: 3px 6px; }
+/* Границы участка узкие: это одно-два числа, а не формула. */
+.pw-row input.pw-bound { flex: 0 0 52px; text-align: center; padding: 5px 3px; }
 .pw-when { font-size: 11.5px; color: var(--text2); white-space: nowrap; }
 /* Живой предпросмотр формулы под полем (Фаза 4б): в поле остаётся синтаксис
    Math.js, а тут видно, как формула выглядит набранной. */
@@ -3048,9 +3060,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <p class="modal-sub">Функция задана по-разному на разных участках. Укажите, сколько
         кусков, впишите формулу каждого и границу, где он заканчивается.</p>
 
-      <div class="field">
-        <label>Сколько кусков</label>
-        <div class="seg" id="pw-count"></div>
+      <div class="field pw-count-field">
+        <label for="pw-count">Сколько кусков</label>
+        <input type="number" id="pw-count" min="2" max="12" step="1" value="2">
       </div>
 
       <div class="pw-brace">
@@ -3061,7 +3073,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="field">
         <label>Что получится</label>
         <div class="f-preview has" id="pw-preview"></div>
-        <div class="hint" id="pw-raw"></div>
       </div>
 
       <div class="modal-foot">
@@ -13378,7 +13389,9 @@ function pwFormula() {
   return out || '0';
 }
 
-// Та же запись одной фигурной скобкой — это и предпросмотр, и то, что уходит в поле.
+/* Та же запись одной фигурной скобкой — это и предпросмотр, и то, что уходит в
+   поле. Перед условием стоит «если»: без него формула и участок слипались в
+   одну строку и читались как продолжение друг друга. */
 function pwLatex() {
   const rows = pwRows();
   const lines = rows.map(r => {
@@ -13387,8 +13400,8 @@ function pwLatex() {
     if (r.a !== '' && r.b !== '') cond = mathToTex(r.a) + ' \\le ' + PW.v + ' < ' + mathToTex(r.b);
     else if (r.a !== '') cond = PW.v + ' \\ge ' + mathToTex(r.a);
     else if (r.b !== '') cond = PW.v + ' < ' + mathToTex(r.b);
-    else cond = '\\text{иначе}';
-    return f + ' & ' + cond;
+    else return f + ' & \\text{иначе}';
+    return f + ' & \\text{если } ' + cond;
   });
   return '\\begin{cases}' + lines.join('\\\\') + '\\end{cases}';
 }
@@ -13436,16 +13449,8 @@ function condToMath(t) {
 }
 
 function renderPw() {
-  const seg = document.getElementById('pw-count');
-  if (seg) {
-    seg.innerHTML = '';
-    [2, 3, 4, 5].forEach(n => {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'seg-btn' + (n === PW.n ? ' active' : ''); b.textContent = n;
-      b.addEventListener('click', () => { PW.n = n; renderPw(); });
-      seg.appendChild(b);
-    });
-  }
+  const cnt = document.getElementById('pw-count');
+  if (cnt && document.activeElement !== cnt) cnt.value = PW.n;
   while (PW.rows.length < PW.n) PW.rows.push({ f: '', a: '', b: '' });
   const box = document.getElementById('pw-rows');
   if (box) {
@@ -13453,30 +13458,36 @@ function renderPw() {
     for (let i = 0; i < PW.n; i++) {
       const row = document.createElement('div');
       row.className = 'pw-row';
+      // Формула куска набирается тем же движком, что и в панели: пользователь
+      // пишет 0.5*x и сразу видит точку умножения, дробь рисуется дробью.
+      const slot = document.createElement('div');
+      slot.className = 'f-slot';
       const f = document.createElement('input');
       f.type = 'text'; f.value = PW.rows[i].f; f.placeholder = 'формула куска';
+      f.setAttribute('aria-label', 'Формула куска ' + (i + 1));
       f.addEventListener('input', () => { PW.rows[i].f = f.value; pwPreview(); });
+      slot.appendChild(f);
       const from = document.createElement('span'); from.className = 'pw-when'; from.textContent = 'от';
       const a = document.createElement('input');
       a.type = 'text'; a.className = 'pw-bound'; a.value = PW.rows[i].a;
       a.placeholder = i === 0 ? '0' : '';
+      a.setAttribute('aria-label', 'Начало участка ' + (i + 1));
       a.addEventListener('input', () => { PW.rows[i].a = a.value; pwPreview(); });
       const to = document.createElement('span'); to.className = 'pw-when'; to.textContent = 'до';
       const b = document.createElement('input');
       b.type = 'text'; b.className = 'pw-bound'; b.value = PW.rows[i].b;
-      b.placeholder = i === PW.n - 1 ? 'и дальше' : '';
+      b.placeholder = i === PW.n - 1 ? '∞' : '';
+      b.setAttribute('aria-label', 'Конец участка ' + (i + 1));
       b.addEventListener('input', () => { PW.rows[i].b = b.value; pwPreview(); });
-      row.append(f, from, a, to, b);
+      row.append(slot, from, a, to, b);
       box.appendChild(row);
+      upgradeFormulaField(f);
     }
   }
   pwPreview();
 }
 
 function pwPreview() {
-  const expr = pwFormula();
-  const raw = document.getElementById('pw-raw');
-  if (raw) raw.textContent = expr;
   const prev = document.getElementById('pw-preview');
   if (prev) renderTexRaw(prev, pwLatex());
 }
@@ -13486,12 +13497,14 @@ function openPiecewise(inp, v) {
   if (!PW.rows.length) {
     PW.rows = [{ f: '100 - ' + PW.v, a: '0', b: '40' }, { f: '80 - 0.5*' + PW.v, a: '40', b: '' }];
   }
-  renderPw();
   const m = document.getElementById('pw-modal');
   if (!m) return;
+  // Окно открываем ДО сборки полей: MathLive, собранный внутри inert-подложки,
+  // остаётся без обработчика клавиш и потом не печатается.
   m.classList.add('open'); m.removeAttribute('inert');
-  const first = m.querySelector('.pw-row input');
-  if (first) first.focus();
+  renderPw();
+  const first = m.querySelector('.pw-row math-field, .pw-row input');
+  if (first) { if (first.focusField) first.focusField(); else first.focus(); }
 }
 function closePiecewise() {
   const m = document.getElementById('pw-modal');
@@ -13731,6 +13744,13 @@ function flushMathfields() {
 
 function buildMathfield(inp) {
   const slot = inp.parentNode;
+  /* Запасную накладку с набранной формулой убираем СРАЗУ. Она лежит абсолютом
+     поверх ячейки, и раньше оставалась висеть над только что собранным полем:
+     формула показывалась дважды и внахлёст. Уходила она лишь после правки в
+     поле, потому что пряталась в обработчике ввода — отсюда и «стёр символ,
+     набрал заново, и стало нормально». */
+  const ts = slot.querySelector('.f-typeset');
+  if (ts) ts.classList.remove('show');
   const mf = new window.MathfieldElement({
     mathVirtualKeyboardPolicy: 'manual',   // всплывающую клавиатуру ведём сами
     smartMode: false,                      // «e» и «x» — переменные, а не слова
@@ -13935,21 +13955,16 @@ function buildKeyboard(box, inp) {
   box.appendChild(tabs);
   panes.forEach(p => box.appendChild(p));
 
-  // Внизу — вход в примеры и в конструктор кусочной функции.
+  /* Внизу — только вход в конструктор кусочной функции. Раздел «Примеры формул»
+     убран: он повторял раздел «Функции», а вернуться из него обратно к
+     клавиатуре было нечем. */
   const foot = document.createElement('div'); foot.className = 'mkbd-foot';
-  const ex = document.createElement('button'); ex.type = 'button'; ex.textContent = 'Примеры формул';
-  ex.addEventListener('click', () => {
-    box.classList.remove('open');
-    const pop = box._pop, btn = box._helpBtn;
-    if (pop) { pop.classList.add('open'); if (pop._render) pop._render(); }
-    if (btn) btn.setAttribute('aria-expanded', 'true');
-  });
   const pw = document.createElement('button'); pw.type = 'button'; pw.textContent = 'Кусочная функция';
   pw.addEventListener('click', () => {
     box.classList.remove('open');
     openPiecewise(inp, box._var || 'x');
   });
-  foot.append(ex, pw);
+  foot.appendChild(pw);
   box.appendChild(foot);
 }
 
@@ -14578,6 +14593,14 @@ function wireScene() {
   if (pwModal) pwModal.addEventListener('click', (e) => { if (e.target === pwModal) closePiecewise(); });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && pwModal && pwModal.classList.contains('open')) closePiecewise();
+  });
+  // Число кусков задаётся числом: два, три, а понадобится семь — тоже можно.
+  const pwCount = document.getElementById('pw-count');
+  if (pwCount) pwCount.addEventListener('input', () => {
+    const n = parseInt(pwCount.value, 10);
+    if (!isFinite(n) || n < 2 || n > 12) return;
+    PW.n = n;
+    renderPw();
   });
   const pwApply = document.getElementById('pw-apply');
   if (pwApply) pwApply.addEventListener('click', () => {
