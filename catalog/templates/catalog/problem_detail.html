@@ -189,6 +189,18 @@
   {% if problem.title %}{{ problem.title }}{% else %}Задача #{{ problem.pk }}{% endif %}
 </h1>
 
+{% if user.is_authenticated %}
+{# Кнопка «Сохранить к себе» — маленькая и ненавязчивая, работает без
+   перезагрузки. Акцентом её делать нельзя: это мелочь на странице задачи. #}
+<button type="button" id="save-problem-btn" data-problem="{{ problem.pk }}"
+        style="border:0.5px solid var(--border);border-radius:var(--r);
+               background:transparent;color:var(--text2);font:inherit;
+               font-size:12px;padding:4px 10px;cursor:pointer;
+               margin-bottom:12px;">
+  <span id="save-problem-label">☆ Сохранить</span>
+</button>
+{% endif %}
+
 <div class="problem-meta">
   {% if problem.difficulty %}
   <span class="problem-stars" title="Сложность {{ problem.difficulty }} из 5">
@@ -346,4 +358,32 @@ function toggleReveal(id, btn) {
   }
 }
 </script>
+
+{% if user.is_authenticated %}
+<script>
+// Сохранить задачу к себе. Переключатель: повторное нажатие убирает.
+(function () {
+  var btn = document.getElementById('save-problem-btn');
+  if (!btn) { return; }
+  var label = document.getElementById('save-problem-label');
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    fetch("{% url 'api_save_problem' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+                 'X-CSRFToken': csrf ? csrf[1] : '' },
+      body: JSON.stringify({ catalog_problem_id: btn.dataset.problem })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        label.textContent = d.saved ? '★ Сохранено' : '☆ Сохранить';
+      })
+      .catch(function () { label.textContent = 'Не получилось'; })
+      .then(function () { btn.disabled = false; });
+  });
+})();
+</script>
+{% endif %}
+
 {% endblock %}

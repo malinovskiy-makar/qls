@@ -42,11 +42,25 @@ class TeacherPanelTests(TestCase):
         self.client.force_login(self.teacher)
 
     def test_dashboard_shows_pending_count(self):
+        """Дашборд входящих (Фаза 14) показывает, сколько работ ждёт.
+
+        Раньше контекст назывался `assignment_data` и строился по автору
+        домашки. Теперь дашборд ходит по ГРУППАМ репетитора — поэтому в
+        тесте домашка привязана к группе.
+        """
+        from problems.models import StudentGroup
+
+        group = StudentGroup.objects.create(name='Группа',
+                                            teacher=self.teacher)
+        group.students.add(self.student)
+        self.assignment.group = group
+        self.assignment.save()
+
         resp = self.client.get(reverse('teacher:dashboard'))
         self.assertEqual(resp.status_code, 200)
-        row = next(r for r in resp.context['assignment_data']
+        row = next(r for r in resp.context['pending_rows']
                    if r['assignment'].pk == self.assignment.pk)
-        self.assertEqual(row['pending'], 1)
+        self.assertEqual(row['count'], 1)
 
     def test_assignment_detail_lists_submissions(self):
         resp = self.client.get(

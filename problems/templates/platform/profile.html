@@ -1,0 +1,240 @@
+{% extends 'platform/base.html' %}
+
+{% block title %}Профиль{% endblock %}
+
+{% block extra_style %}
+.form-field { margin-bottom: 14px; }
+.form-field label { display: block; font-size: 13px; font-weight: 500;
+                    margin-bottom: 6px; }
+.form-field input, .form-field select {
+  width: 100%; font: inherit; font-size: 14px; padding: 9px 12px;
+  border-radius: var(--r); border: 0.5px solid var(--border);
+  background: var(--surface-2); color: var(--text);
+}
+.form-field .readonly {
+  padding: 9px 12px; border-radius: var(--r);
+  border: 0.5px solid var(--border); background: var(--panel);
+  color: var(--text2); font-size: 14px;
+}
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.saved-item {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+  padding: 10px 0; border-bottom: 0.5px solid var(--border); font-size: 13px;
+}
+.saved-item:last-child { border-bottom: none; }
+.saved-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.saved-actions select { font: inherit; font-size: 12px; padding: 4px 8px;
+  border-radius: var(--r); border: 0.5px solid var(--border);
+  background: var(--surface-2); color: var(--text); }
+.folder-block { margin-bottom: 20px; }
+.folder-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+               margin-bottom: 6px; }
+.folder-name { font-size: 14px; font-weight: 600; }
+@media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Профиль</h1>
+    <div class="page-sub">{{ profile.display_name }} · {{ profile.get_role_display }}</div>
+  </div>
+</div>
+
+<nav class="tabs">
+  <a href="?tab=data"  class="{% if tab == 'data' %}active{% endif %}">Данные</a>
+  <a href="?tab=saved" class="{% if tab == 'saved' %}active{% endif %}">Сохранённое</a>
+  <a href="?tab=stats" class="{% if tab == 'stats' %}active{% endif %}">Статистика</a>
+</nav>
+
+{% if tab == 'data' %}
+<div class="card" style="max-width: 620px;">
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-grid">
+      <div class="form-field">
+        <label for="id_first_name">Имя</label>
+        <input type="text" id="id_first_name" name="first_name"
+               value="{{ profile.user.first_name }}" maxlength="150">
+      </div>
+      <div class="form-field">
+        <label for="id_last_name">Фамилия</label>
+        <input type="text" id="id_last_name" name="last_name"
+               value="{{ profile.user.last_name }}" maxlength="150">
+      </div>
+      <div class="form-field">
+        <label for="id_phone">Телефон</label>
+        <input type="tel" id="id_phone" name="phone"
+               value="{{ profile.phone }}" maxlength="32"
+               placeholder="необязательно">
+      </div>
+      <div class="form-field">
+        <label for="id_grade">Класс</label>
+        <select id="id_grade" name="grade">
+          <option value="">не указан</option>
+          {% for g in grades %}
+          <option value="{{ g }}" {% if profile.grade == g %}selected{% endif %}>{{ g }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-field">
+      <label for="id_school">Школа</label>
+      <input type="text" id="id_school" name="school"
+             value="{{ profile.school }}" maxlength="200">
+    </div>
+
+    <div class="form-grid">
+      <div class="form-field">
+        <label>Почта</label>
+        <div class="readonly">{{ profile.user.email|default:"не указана" }}</div>
+      </div>
+      <div class="form-field">
+        <label>Роль</label>
+        <div class="readonly">{{ profile.get_role_display }}</div>
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label>Пароль</label>
+      <div class="readonly">
+        не показывается —
+        <a href="{% url 'password_change' %}" style="color:var(--accent);">сменить пароль</a>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-primary">Сохранить</button>
+  </form>
+</div>
+
+{% elif tab == 'saved' %}
+<nav class="tabs" style="margin-top:-8px;">
+  <a href="?tab=saved&sub=problems" class="{% if subtab == 'problems' %}active{% endif %}">Задачи</a>
+  <a href="?tab=saved&sub=graphs"   class="{% if subtab == 'graphs' %}active{% endif %}">Графики</a>
+</nav>
+
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
+  <input type="text" id="new-folder-name" placeholder="Название новой папки"
+         style="font:inherit;font-size:13px;padding:7px 10px;border-radius:var(--r);
+                border:0.5px solid var(--border);background:var(--surface-2);color:var(--text);">
+  <button type="button" class="btn-outline btn-small" id="new-folder-btn">+ Создать папку</button>
+  <span id="folder-status" class="row-meta"></span>
+</div>
+
+{% for group in groups %}
+  {% if group.items or group.folder %}
+  <div class="folder-block card">
+    <div class="folder-head">
+      <span class="folder-name">{{ group.folder.name|default:"Без папки" }}</span>
+      {% if group.folder %}
+      <button type="button" class="btn-outline btn-small rename-folder"
+              data-folder="{{ group.folder.pk }}"
+              data-name="{{ group.folder.name }}">Переименовать</button>
+      {% endif %}
+      <span class="row-meta">{{ group.items|length }}</span>
+    </div>
+    {% for item in group.items %}
+    <div class="saved-item" data-id="{{ item.pk }}"
+         data-kind="{% if subtab == 'graphs' %}graph{% else %}problem{% endif %}">
+      <span>
+        {% if subtab == 'graphs' %}{{ item.name }}
+        {% else %}{{ item.problem_title|truncatechars:70 }}{% endif %}
+        {% if item.note %}<span class="row-meta"> — {{ item.note }}</span>{% endif %}
+      </span>
+      <span class="saved-actions">
+        <select class="move-folder">
+          <option value="">Без папки</option>
+          {% for folder in folders %}
+          <option value="{{ folder.pk }}"
+                  {% if item.folder_id == folder.pk %}selected{% endif %}>{{ folder.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" class="btn-outline btn-small delete-saved">Убрать</button>
+      </span>
+    </div>
+    {% empty %}
+    <div class="row-meta">Пусто.</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% empty %}
+<div class="empty-state"><p>Пока ничего не сохранено.</p></div>
+{% endfor %}
+
+{% else %}
+<div class="empty-state">
+  <p><strong>Статистика</strong></p>
+  <p>Появится в следующем обновлении.</p>
+  <p class="row-meta">Учебные события уже собираются — когда экраны появятся,
+     им будет что показать за прошедшее время.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+  var kind = "{{ subtab }}" === 'graphs' ? 'graphs' : 'problems';
+
+  function post(url, payload) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+                 'X-CSRFToken': csrf ? csrf[1] : '' },
+      body: JSON.stringify(payload)
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok) { throw new Error(d.error || 'Ошибка'); }
+        return d;
+      });
+    });
+  }
+
+  var status = document.getElementById('folder-status');
+  var newBtn = document.getElementById('new-folder-btn');
+  if (newBtn) {
+    newBtn.addEventListener('click', function () {
+      var input = document.getElementById('new-folder-name');
+      var name = input.value.trim();
+      if (!name) { return; }
+      post("{% url 'api_folder_create' %}", { name: name, kind: kind })
+        .then(function () { window.location.reload(); })
+        .catch(function (e) { status.textContent = e.message; });
+    });
+  }
+
+  document.querySelectorAll('.rename-folder').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var name = window.prompt('Новое название папки', btn.dataset.name);
+      if (!name) { return; }
+      post("{% url 'api_folder_rename' %}",
+           { folder_id: btn.dataset.folder, name: name })
+        .then(function () { window.location.reload(); })
+        .catch(function (e) { status.textContent = e.message; });
+    });
+  });
+
+  document.querySelectorAll('.saved-item').forEach(function (row) {
+    var select = row.querySelector('.move-folder');
+    if (select) {
+      select.addEventListener('change', function () {
+        post("{% url 'api_saved_move' %}", {
+          id: row.dataset.id, kind: row.dataset.kind,
+          folder_id: select.value || null
+        }).then(function () { window.location.reload(); });
+      });
+    }
+    var del = row.querySelector('.delete-saved');
+    if (del) {
+      del.addEventListener('click', function () {
+        post("{% url 'api_saved_delete' %}",
+             { id: row.dataset.id, kind: row.dataset.kind })
+          .then(function () { row.remove(); });
+      });
+    }
+  });
+})();
+</script>
+{% endblock %}
