@@ -1074,14 +1074,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <span class="scard-name">Оптимум при ограничении</span>
           <span class="scard-desc">Максимум или минимум цели при заданном ограничении: касание линий уровня.</span>
         </button>
-        <button class="scard" data-scene="m-inverse">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M26 80 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M26 80 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="26" y="16" width="70" height="8" fill="var(--curve-d)" opacity=".16"/><rect x="26" y="28" width="84" height="8" fill="var(--curve-d)" opacity=".16"/><rect x="26" y="40" width="90" height="8" fill="var(--curve-d)" opacity=".16"/><rect x="26" y="52" width="86" height="8" fill="var(--curve-d)" opacity=".16"/><rect x="26" y="64" width="72" height="8" fill="var(--curve-d)" opacity=".16"/>
-            <path d="M96 14 Q124 46 96 74" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
-          <span class="scard-name">Оси наоборот</span>
-          <span class="scard-desc">Кривая задана как x = g(y): площадь берётся интегралом по y, а не по x.</span>
-        </button>
       </div>
     </section>
 
@@ -2648,7 +2640,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         </div>
         <div class="seg" style="margin-top:6px;">
           <button class="seg-btn" id="ms-transform">Деформации</button>
-          <button class="seg-btn" id="ms-inverse">Оси наоборот</button>
         </div>
         <div class="seg" style="margin-top:6px;">
           <button class="seg-btn" id="ms-minmax">min и max</button>
@@ -2719,26 +2710,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div class="hint" id="math-trans-hint"></div>
       </div>
 
-      <!-- 7г. Перевёрнутые оси -->
-      <div id="math-pane-inverse" style="display:none;">
-        <div class="field f-wrap">
-          <label>Кривая задана как x = g(y)</label>
-          <div class="f-row">
-            <input type="text" id="inp-mathg" value="10 - y^2/10" autocomplete="off">
-            <button class="f-help" id="fh-mathg" type="button" aria-expanded="false"
-                    aria-controls="fp-mathg" title="Как писать формулы">?</button>
-          </div>
-          <div class="f-pop" id="fp-mathg" role="region" aria-label="Примеры функций"></div>
-        </div>
-        <div class="row">
-          <div class="field"><label>от y</label><input type="number" id="inp-mathy0" step="0.5" value="0"></div>
-          <div class="field"><label>до y</label><input type="number" id="inp-mathy1" step="0.5" value="10"></div>
-        </div>
-        <div class="hint">Полоски лежат горизонтально, ширина каждой равна g(y), поэтому площадь
-          берётся интегралом по y. По x её здесь не посчитать: одному x отвечают два значения y.</div>
-      </div>
-
-      <!-- 7д. min и max нескольких функций -->
+ min и max нескольких функций -->
       <div id="math-pane-minmax" style="display:none;">
         <div class="field f-wrap">
           <label>Вторая функция g(x)</label>
@@ -3174,7 +3146,7 @@ const STATE = {
   pointNames: {},
   // ── Раздел «Математика» (Фаза 7). Единственный режим с полным планом:
   // окно задаётся четырьмя границами, а не Qmax/Pmax первой четверти.
-  mathSub: 'tangent',            // сюжет: tangent|optimum|transform|inverse|minmax|constraint
+  mathSub: 'tangent',            // сюжет: tangent|optimum|transform|minmax|constraint
   mathFormula: 'x^2',            // общая f(x)
   mathXmin: -6, mathXmax: 6, mathYmin: -4, mathYmax: 20,
   mathX0: 1,                     // точка касания (7а)
@@ -3184,8 +3156,6 @@ const STATE = {
   mathInflect: true,             // отмечать перегибы
   mathTrans: 'up',               // вид деформации (7в)
   mathA: 1,                      // её параметр
-  mathInvFormula: '10 - y^2/10', // x = g(y) (7г)
-  mathY0: 0, mathY1: 10,         // пределы интегрирования по y
   mathG2: '4 - x',               // вторая функция (7д)
   mathG3: '', mathG4: '',        // третья и четвёртая — по желанию
   mathMinMax: 'min',
@@ -11388,7 +11358,7 @@ function syncParams() {
   const names = [];
   STATE.curves.forEach(c => { if (c.expr) freeSymbols(c.expr).forEach(n => { if (names.indexOf(n) < 0) names.push(n); }); });
   if (STATE.mode === 'math') {
-    [STATE.mathFormula, STATE.mathG2, STATE.mathInvFormula].forEach(f => {
+    [STATE.mathFormula, STATE.mathG2, STATE.mathG3, STATE.mathG4].forEach(f => {
       freeSymbols(f).forEach(n => { if (names.indexOf(n) < 0) names.push(n); });
     });
   }
@@ -11874,7 +11844,6 @@ function renderMarkList() {
      'tangent'    — функция, касательная, производная снизу (7а);
      'optimum'    — максимумы, минимумы, выпуклость, перегибы (7б);
      'transform'  — деформации графика одним параметром a (7в);
-     'inverse'    — кривая x = g(y) и площадь интегралом ПО y (7г);
      'minmax'     — Z = min(f, g) или max(f, g) (7д);
      'constraint' — максимум F(a, b) при ограничении (7е).
 
@@ -12266,48 +12235,6 @@ function labelCurveMath(g, f, mx, my, txt, color) {
   }
 }
 
-/* ── 7г. Перевёрнутые оси: x = g(y), площадь интегралом ПО y ──────── */
-function drawMathInverse() {
-  const { compiled } = compileMath(STATE.mathInvFormula, 'y');
-  const g = svg.append('g');
-  const { mx, my } = mathScales();
-  drawPlaneAxes(g, mx, my, 'x', 'y');
-  if (!compiled) { STATE.mathRes = { error: true }; updateMathPanel(); return; }
-  const gy = (y) => evalMathAt(compiled, 'y', y);
-
-  // Кривая рисуется «по y»: для каждого y берём x = g(y).
-  const [ylo, yhi] = my.domain();
-  const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
-  const pts = [];
-  for (let i = 0; i <= 400; i++) {
-    const y = ylo + (yhi - ylo) * i / 400, x = gy(y);
-    pts.push(isNaN(x) ? null : [x, y]);
-  }
-  g.append('path').datum(pts).attr('fill', 'none')
-    .attr('stroke', COL.D).attr('stroke-width', 2.8).attr('d', line);
-
-  // Горизонтальные полоски — из них и складывается интеграл по y.
-  const y0 = Math.min(STATE.mathY0, STATE.mathY1), y1 = Math.max(STATE.mathY0, STATE.mathY1);
-  const N = 26;
-  for (let i = 0; i < N; i++) {
-    const ya = y0 + (y1 - y0) * i / N, yb = y0 + (y1 - y0) * (i + 1) / N;
-    const xw = gy((ya + yb) / 2);
-    if (isNaN(xw)) continue;
-    g.append('rect').attr('x', mx(0)).attr('y', my(yb))
-      .attr('width', Math.max(0, mx(xw) - mx(0))).attr('height', Math.max(0, my(ya) - my(yb)))
-      .attr('fill', COL.D).attr('opacity', 0.14)
-      .attr('stroke', COL.D).attr('stroke-width', 0.5).attr('stroke-opacity', 0.35);
-  }
-  // Та же самая integrate(), просто применённая к переменной y.
-  const area = integrate(gy, y0, y1);
-  STATE.mathRes = { area, y0, y1 };
-  g.append('text').attr('x', (mx(0) + mx(gy((y0 + y1) / 2) || 0)) / 2).attr('y', my((y0 + y1) / 2))
-    .attr('text-anchor', 'middle').attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.D)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
-    .text('S = ' + fmt(area));
-  updateMathPanel();
-}
-
 /* ── 7д. Z = min(f, g) или max(f, g) ──────────────────────────────── */
 // Наименьшая или наибольшая из нескольких функций. Третью и четвёртую можно
 // не заполнять: пустое поле просто не участвует.
@@ -12529,13 +12456,6 @@ function updateMathPanel() {
     html += `<div class="stat"><span>Преобразование</span><b>${t.tex}</b></div>`;
     html += `<div class="stat"><span>Параметр a</span><b>${fmt(STATE.mathA)}</b></div>`;
     html += `<div class="hint">${t.note}</div>`;
-  } else if (STATE.mathSub === 'inverse') {
-    if (r.error) html = '<div class="warn">Не понял формулу x = g(y).</div>';
-    else {
-      html += `<div class="stat"><span>Площадь</span><b>${fmt(r.area)}</b></div>`;
-      html += `<div class="stat"><span>Пределы по y</span><b>от ${fmt(r.y0)} до ${fmt(r.y1)}</b></div>`;
-      html += '<div class="hint">Считали ∫ g(y) dy по y, а не по x: полоски горизонтальные.</div>';
-    }
   } else if (STATE.mathSub === 'minmax') {
     if (r.error) html = '<div class="warn">Не понял формулу g(x).</div>';
     else {
@@ -12561,7 +12481,6 @@ function redrawMath() {
   const err = document.getElementById('math-error');
   // Сюжеты со своей формулой f(x) не нужны «Ограничению» и «Осям наоборот».
   if (STATE.mathSub === 'constraint') { if (err) err.style.display = 'none'; drawMathConstraint(); return; }
-  if (STATE.mathSub === 'inverse')    { if (err) err.style.display = 'none'; drawMathInverse();    return; }
   const f = mathF();
   if (!f) {
     if (err) { err.style.display = 'block'; err.textContent = 'Не понял формулу f(x).'; }
@@ -12581,22 +12500,21 @@ const MATH_PRESETS = {
   tangent:    { f: 'x^2',            win: [-6, 6, -4, 20] },
   optimum:    { f: 'x^3 - 3*x',      win: [-3, 3, -6, 6] },
   transform:  { f: 'x^2',            win: [-8, 8, -6, 14] },
-  inverse:    { f: 'x^2',            win: [-2, 12, -1, 11] },
   minmax:     { f: 'x^2',            win: [-5, 6, -3, 12] },
   constraint: { f: 'x^2',            win: [0, 12, 0, 12] },
 };
 function setMathSub(sub, keepFormula) {
   STATE.mathSub = sub;
   [['ms-tangent', 'tangent'], ['ms-optimum', 'optimum'], ['ms-transform', 'transform'],
-   ['ms-inverse', 'inverse'], ['ms-minmax', 'minmax'], ['ms-constraint', 'constraint']]
+   ['ms-minmax', 'minmax'], ['ms-constraint', 'constraint']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === sub); });
-  ['tangent', 'optimum', 'transform', 'inverse', 'minmax', 'constraint'].forEach(v => {
+  ['tangent', 'optimum', 'transform', 'minmax', 'constraint'].forEach(v => {
     const p = document.getElementById('math-pane-' + v);
     if (p) p.style.display = (v === sub) ? '' : 'none';
   });
-  // «Ограничение» и «Оси наоборот» пользуются своими полями, общее f(x) им не нужно.
+  // «Ограничение» пользуется своими полями, общее f(x) ему не нужно.
   const rowF = document.getElementById('math-row-f');
-  if (rowF) rowF.style.display = (sub === 'constraint' || sub === 'inverse') ? 'none' : '';
+  if (rowF) rowF.style.display = (sub === 'constraint') ? 'none' : '';
   const p = MATH_PRESETS[sub];
   if (p && !keepFormula) {
     STATE.mathFormula = p.f;
@@ -14444,7 +14362,6 @@ const SCENE_ROUTE = {
   'm-tangent':    { run: () => { setMode('math'); setMathSub('tangent'); },    lock: ['math-seg'] },
   'm-optimum':    { run: () => { setMode('math'); setMathSub('optimum'); },    lock: ['math-seg'] },
   'm-transform':  { run: () => { setMode('math'); setMathSub('transform'); },  lock: ['math-seg'] },
-  'm-inverse':    { run: () => { setMode('math'); setMathSub('inverse'); },    lock: ['math-seg'] },
   'm-minmax':     { run: () => { setMode('math'); setMathSub('minmax'); },     lock: ['math-seg'] },
   'm-constraint': { run: () => { setMode('math'); setMathSub('constraint'); }, lock: ['math-seg'] },
 
@@ -14588,7 +14505,7 @@ const SCENE_NAMES = {
   free: 'Свободный холст',
   // Математика (Фаза 7) — общий инструментарий, вне экономических моделей.
   'm-tangent': 'Функция и её производная наглядно', 'm-optimum': 'Максимумы и минимумы',
-  'm-transform': 'Деформации графика', 'm-inverse': 'Оси наоборот',
+  'm-transform': 'Деформации графика',
   'm-minmax': 'Функции min и max', 'm-constraint': 'Оптимум при ограничении',
   // Карточки, разложенные из подрежимов при переходе на 10 блоков.
   'tax-adv': 'Процентные налоги и субсидии',
@@ -15770,14 +15687,14 @@ function wireControls() {
 
   /* ── Раздел «Математика» (Фаза 7) ─────────────────────────────────── */
   [['ms-tangent', 'tangent'], ['ms-optimum', 'optimum'], ['ms-transform', 'transform'],
-   ['ms-inverse', 'inverse'], ['ms-minmax', 'minmax'], ['ms-constraint', 'constraint']]
+   ['ms-minmax', 'minmax'], ['ms-constraint', 'constraint']]
     .forEach(([id, sub]) => {
       const b = document.getElementById(id);
       if (b) b.addEventListener('click', () => setMathSub(sub));
     });
 
   // Поля формул раздела: правка сразу перерисовывает график.
-  [['inp-mathf', 'mathFormula'], ['inp-mathg', 'mathInvFormula'],
+  [['inp-mathf', 'mathFormula'],
    ['inp-mathg2', 'mathG2'], ['inp-mathg3', 'mathG3'], ['inp-mathg4', 'mathG4'],
    ['inp-mathfc', 'mathFC']].forEach(([id, key]) => {
     const e = document.getElementById(id);
@@ -15786,8 +15703,7 @@ function wireControls() {
 
   // Числовые поля раздела (пределы по y, цены и ресурс). Границы окна
   // задаются в меню плоскости над графиком, здесь их больше нет.
-  [['inp-mathy0', 'mathY0'], ['inp-mathy1', 'mathY1'],
-   ['inp-mathpa', 'mathPa'], ['inp-mathpb', 'mathPb'], ['inp-mathm', 'mathM']].forEach(([id, key]) => {
+  [   ['inp-mathpa', 'mathPa'], ['inp-mathpb', 'mathPb'], ['inp-mathm', 'mathM']].forEach(([id, key]) => {
     const e = document.getElementById(id);
     if (e) e.addEventListener('change', () => {
       const v = parseFloat(e.value);

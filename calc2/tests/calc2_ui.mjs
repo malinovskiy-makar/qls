@@ -648,7 +648,7 @@ await t('панель параметров наполняется и в сцен
 // а не исходник шаблона (в комментариях кода тире допустимы).
 const SCENES = ['sd', 'tax', 'ceil', 'mono', 'elast', 'ext', 'smallopen', 'costs', 'ppf',
                 'labor', 'ineq', 'consumer', 'adas', 'laffer', 'islm',
-                'm-tangent', 'm-optimum', 'm-transform', 'm-inverse', 'm-minmax', 'm-constraint'];
+                'm-tangent', 'm-optimum', 'm-transform', 'm-minmax', 'm-constraint'];
 const dashHits = [];
 for (const sc of SCENES) {
   await page.evaluate((s) => { openPicker(); pickScene(s); closePicker(); }, sc);

@@ -60,7 +60,6 @@ const CARDS = [
   ['m-transform', s => s.mode === 'math'  && s.mathSub === 'transform',          ['math-seg']],
   ['m-minmax',    s => s.mode === 'math'  && s.mathSub === 'minmax',             ['math-seg']],
   ['m-constraint',s => s.mode === 'math'  && s.mathSub === 'constraint',         ['math-seg']],
-  ['m-inverse',   s => s.mode === 'math'  && s.mathSub === 'inverse',            ['math-seg']],
   ['ppf',         s => s.mode === 'ppf'   && s.ppfSub === 'single',              ['ppf-seg']],
   ['ppfsum',      s => s.mode === 'ppf'   && s.ppfSub === 'sum',                 ['ppf-seg']],
   ['trade',       s => s.mode === 'ppf'   && s.ppfSub === 'trade',               ['ppf-seg']],

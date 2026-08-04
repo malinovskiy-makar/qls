@@ -701,22 +701,6 @@ const CASES = [
              ['f(|x|) при x=−3', 'absX', 9, 0.001], ['3·f(x) при x=2', 'scaleY', 12, 0.001]],
   },
   {
-    name: 'Математика · площадь под x = 10 − y²/10 интегралом ПО y ⇒ 66.67',
-    run: `setMode('math'); setMathSub('inverse');
-          STATE.mathInvFormula='10 - y^2/10'; STATE.mathY0=0; STATE.mathY1=10;
-          setMathWindow(-2,12,-1,11); redrawAll();
-          return { area: STATE.mathRes.area };`,
-    checks: [['площадь', 'area', 66.667, 0.05]],
-  },
-  {
-    name: 'Математика · x = 4 + 2y на [0;5] ⇒ трапеция 45',
-    run: `setMode('math'); setMathSub('inverse');
-          STATE.mathInvFormula='4 + 2*y'; STATE.mathY0=0; STATE.mathY1=5;
-          setMathWindow(-2,16,-1,7); redrawAll();
-          return { area: STATE.mathRes.area };`,
-    checks: [['площадь', 'area', 45, 0.02]],
-  },
-  {
     name: 'Математика · Z = min(x², 4−x): смена ветви при x ≈ 1.5616',
     run: `setMode('math'); setMathSub('minmax'); STATE.mathFormula='x^2'; STATE.mathG2='4 - x';
           STATE.mathMinMax='min'; setMathWindow(-5,6,-3,12); redrawAll();
