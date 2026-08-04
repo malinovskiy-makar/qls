@@ -2813,41 +2813,41 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div class="hint" id="math-trans-hint"></div>
       </div>
 
- min и max нескольких функций -->
+      <!-- 7д. Наименьшая или наибольшая из нескольких функций.
+           Порядок ввода: сначала что ищем, потом сколько функций, потом сами
+           функции. Раньше поля стояли перед вопросом, и было непонятно, зачем
+           их заполняют. -->
       <div id="math-pane-minmax" style="display:none;">
-        <div class="field f-wrap">
-          <label>Вторая функция g(x)</label>
-          <div class="f-row">
-            <input type="text" id="inp-mathg2" value="4 - x" autocomplete="off">
-            <button class="f-help" id="fh-mathg2" type="button" aria-expanded="false"
-                    aria-controls="fp-mathg2" title="Как писать формулы">?</button>
+        <div class="field">
+          <label>Что ищем</label>
+          <div class="seg">
+            <button class="seg-btn active" id="mm-min">Наименьшую</button>
+            <button class="seg-btn" id="mm-max">Наибольшую</button>
           </div>
-          <div class="f-pop" id="fp-mathg2" role="region" aria-label="Примеры функций"></div>
         </div>
-        <div class="field f-wrap">
-          <label>Третья функция h(x)</label>
-          <div class="f-row">
-            <input type="text" id="inp-mathg3" placeholder="не показывать" autocomplete="off">
-            <button class="f-help" id="fh-mathg3" type="button" aria-expanded="false"
-                    aria-controls="fp-mathg3" title="Как писать формулы">?</button>
-          </div>
-          <div class="f-pop" id="fp-mathg3" role="region" aria-label="Примеры функций"></div>
+        <div class="field pw-count-field">
+          <label for="mm-count">Сколько функций</label>
+          <input type="number" id="mm-count" min="2" max="8" step="1" value="2">
         </div>
-        <div class="field f-wrap">
-          <label>Четвёртая функция k(x)</label>
-          <div class="f-row">
-            <input type="text" id="inp-mathg4" placeholder="не показывать" autocomplete="off">
-            <button class="f-help" id="fh-mathg4" type="button" aria-expanded="false"
-                    aria-controls="fp-mathg4" title="Как писать формулы">?</button>
-          </div>
-          <div class="f-pop" id="fp-mathg4" role="region" aria-label="Примеры функций"></div>
+        <div class="field">
+          <label for="mm-name">Как назвать результат</label>
+          <input type="text" id="mm-name" value="Z" placeholder="Z, y или своё" autocomplete="off">
         </div>
-        <div class="seg">
-          <button class="seg-btn active" id="mm-min">Z = наименьшая</button>
-          <button class="seg-btn" id="mm-max">Z = наибольшая</button>
+        <div id="mm-rows"></div>
+        <div class="field">
+          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="mmZ" title="Цвет итоговой кривой">
+            Цвет итоговой кривой</label>
         </div>
-        <div class="hint">Жирным нарисована итоговая Z. Кружками отмечены точки, где функции меняются
-          местами. Третью и четвёртую можно оставить пустыми.</div>
+        <div class="hint-row">
+          <button class="hint-btn" type="button" data-pop="hp-minmax" aria-label="Как это работает">?</button>
+          <span class="hint-lead">Как это работает</span>
+        </div>
+        <div class="hint-pop" id="hp-minmax">
+          <p>Каждую функцию пишите от x: 4 - x, x^2, 2. Исходные кривые идут
+            пунктиром и подписаны f₁, f₂, f₃, итог рисуется жирной линией.</p>
+          <p>Кружками отмечены точки, где кривые меняются местами: слева главной
+            была одна, справа другая.</p>
+        </div>
       </div>
 
       <!-- 7е. Оптимизация с ограничением -->
@@ -3260,6 +3260,9 @@ const STATE = {
   mathTrans: 'up',               // вид деформации (7в)
   mathA: 1,                      // её параметр
   mathABounds: { min: -5, max: 5, step: 0.1 },   // и его границы (настраиваются)
+  mmCount: 2,                    // сколько функций участвует в min/max
+  mmName: 'Z',                   // как назвать результат
+  mathGmore: [],                 // пятая функция и дальше
   mathG2: '4 - x',               // вторая функция (7д)
   mathG3: '', mathG4: '',        // третья и четвёртая — по желанию
   mathMinMax: 'min',
@@ -3503,6 +3506,7 @@ function refreshColors() {
     indiff: cssVar('--curve-d'),
     tanF:   cssVar('--curve-d'),    // сама функция в сюжете про производную
     tanD:   cssVar('--cost-mc'),    // её производная на нижней панели
+    mmZ:    cssVar('--cost-mc'),    // итоговая огибающая в сюжете min/max
     // Структурные цвета (зависят от темы).
     ink:     cssVar('--ink'),       // оси, подписи осей, текст у точек
     inkSoft: cssVar('--ink-soft'),  // цифры делений, вторичные подписи
@@ -10848,6 +10852,41 @@ function redrawGraphMode() {
   drawCurves();
 }
 
+/* Строки функций сюжета min/max. Первая строка это общее поле f(x) раздела,
+   остальные свои; каждая со своим цветом и набирается тем же движком ввода. */
+function renderMmRows() {
+  const box = document.getElementById('mm-rows');
+  if (!box) return;
+  const n = Math.max(2, STATE.mmCount || 2);
+  box.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const row = document.createElement('div');
+    row.className = 'field';
+    const lab = document.createElement('label');
+    lab.textContent = 'Функция ' + mmLabel(i);
+    row.appendChild(lab);
+
+    const line = document.createElement('div');
+    line.className = 'grow';
+    line.appendChild(makeColorPicker(mmColor(i), (hex) => {
+      STATE.colorOverride['mm' + i] = hex; redrawAll();
+    }, 'Цвет ' + mmLabel(i)));
+    const slot = document.createElement('div');
+    slot.className = 'f-slot';
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.autocomplete = 'off';
+    inp.value = mmGet(i);
+    inp.placeholder = i === 0 ? 'например: x^2' : 'например: 4 - x';
+    inp.setAttribute('aria-label', 'Функция ' + mmLabel(i));
+    inp.addEventListener('input', () => { mmSet(i, inp.value); redrawAll(); });
+    slot.appendChild(inp);
+    line.appendChild(slot);
+    row.appendChild(line);
+    box.appendChild(row);
+    upgradeFormulaField(inp);
+  }
+}
+
 /* Список функций как в графопостроителе: внизу всегда одна пустая строка.
    Начали печатать — она превращается в обычную строку списка (цвет, имя,
    удаление, правка формулы), а под ней появляется новая пустая. */
@@ -12604,21 +12643,42 @@ function labelCurveMath(g, f, mx, my, txt, color) {
   }
 }
 
-/* ── 7д. Z = min(f, g) или max(f, g) ──────────────────────────────── */
-// Наименьшая или наибольшая из нескольких функций. Третью и четвёртую можно
-// не заполнять: пустое поле просто не участвует.
+/* ── 7д. Наименьшая или наибольшая из нескольких функций ─────────────
+   Функций может быть сколько угодно (не только две). Первые четыре живут в
+   отдельных полях состояния, остальные в массиве; пустое поле не участвует. */
+const MM_KEYS = ['mathFormula', 'mathG2', 'mathG3', 'mathG4'];
+const MM_SUB = ['₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈'];
+
+function mmSlots() { return Math.max(4, STATE.mmCount || 2); }
+function mmGet(i) {
+  return (i < 4) ? String(STATE[MM_KEYS[i]] || '') : String((STATE.mathGmore || [])[i - 4] || '');
+}
+function mmSet(i, v) {
+  if (i < 4) STATE[MM_KEYS[i]] = v;
+  else { STATE.mathGmore = STATE.mathGmore || []; STATE.mathGmore[i - 4] = v; }
+}
+// Как назвать i-ю исходную функцию: f₁, f₂, f₃…
+function mmLabel(i) { return 'f' + (MM_SUB[i] || ('_' + (i + 1))); }
+// Цвет i-й кривой: свой из пикера или очередной из палитры.
+function mmColor(i) {
+  const own = (STATE.colorOverride || {})['mm' + i];
+  if (own) return own;
+  const pal = [COL.D, COL.S, COL.reg, COL.MR, COL.tax, COL.MC, COL.costATC, COL.costAVC];
+  return pal[i % pal.length];
+}
+
 function drawMathMinMax(f) {
   const { mx, my } = mathScales();
   const g = svg.append('g');
   drawPlaneAxes(g, mx, my, 'x', 'y');
-  const parts = [{ fn: f, name: 'f', color: COL.D }];
-  [[STATE.mathG2, 'g', COL.S], [STATE.mathG3, 'h', COL.reg], [STATE.mathG4, 'k', COL.MR]]
-    .forEach(([expr, name, color]) => {
-      if (!String(expr || '').trim()) return;
-      const { compiled } = compileMath(expr, 'x');
-      if (!compiled) return;
-      parts.push({ fn: (x) => evalMathAt(compiled, 'x', x), name, color });
-    });
+  const parts = [{ fn: f, name: mmLabel(0), color: mmColor(0) }];
+  for (let i = 1; i < mmSlots(); i++) {
+    const expr = mmGet(i);
+    if (!expr.trim()) continue;
+    const { compiled } = compileMath(expr, 'x');
+    if (!compiled) continue;
+    parts.push({ fn: (x) => evalMathAt(compiled, 'x', x), name: mmLabel(i), color: mmColor(i) });
+  }
   if (parts.length < 2) { STATE.mathRes = { error: 'Нужна хотя бы вторая функция.' }; updateMathPanel(); return; }
   const isMin = (STATE.mathMinMax === 'min');
   const z = (x) => {
@@ -12635,7 +12695,10 @@ function drawMathMinMax(f) {
     mathLine(g, p.fn, mx, my, p.color, 1.8, '5 4');
     labelCurveMath(g, p.fn, mx, my, p.name, p.color);
   });
-  mathLine(g, z, mx, my, COL.MC, 3.2);
+  const zName = (STATE.mmName || 'Z').trim() || 'Z';
+  const zColor = COL.mmZ || COL.MC;
+  mathLine(g, z, mx, my, zColor, 3.2);
+  labelCurveMath(g, z, mx, my, zName, zColor);
   // Точки, где ветви меняются местами: корни разности каждой пары, но в зачёт
   // идут только те, где обе функции в этот момент и есть итоговая Z.
   const sw = [];
@@ -12876,10 +12939,23 @@ function updateMathPanel() {
     html += `<div class="stat"><span>Параметр a</span><b>${fmt(STATE.mathA)}</b></div>`;
     html += `<div class="hint">${t.note}</div>`;
   } else if (STATE.mathSub === 'minmax') {
-    if (r.error) html = '<div class="warn">Не понял формулу g(x).</div>';
+    if (r.error) html = `<div class="warn">${r.error}</div>`;
     else {
-      html += `<div class="stat"><span>Строим</span><b>Z = ${r.isMin ? 'min' : 'max'}(f, g)</b></div>`;
-      html += `<div class="stat"><span>Функции меняются местами</span><b>${(r.switches || []).length ? r.switches.map(fmt).join(', ') : 'нигде'}</b></div>`;
+      const nm = (STATE.mmName || 'Z').trim() || 'Z';
+      const names = [];
+      for (let i = 0; i < mmSlots(); i++) if (mmGet(i).trim()) names.push(mmLabel(i));
+      html += `<div class="stat"><span>Строим</span><b>${nm} = ${r.isMin ? 'min' : 'max'}(${names.join(', ')})</b></div>`;
+      html += `<div class="stat"><span>Функций участвует</span><b>${r.count}</b></div>`;
+      html += `<div class="stat"><span>Кривые меняются местами</span><b>${(r.switches || []).length ? r.switches.map(fmt).join(', ') : 'нигде'}</b></div>`;
+      html += '<div class="sb-note"><b>Как это получилось</b>'
+        + `<p>В каждой точке x берётся ${r.isMin ? 'наименьшее' : 'наибольшее'} из значений всех функций. `
+        + `Получается ломаная из кусков исходных кривых: ${r.isMin ? 'нижняя' : 'верхняя'} огибающая. `
+        + `${r.isMin ? 'Она всюду не выше любой из них' : 'Она всюду не ниже любой из них'}, и совпадает с той, что в этой точке главная.</p>`
+        + `<p>Точки перелома это корни разности пары функций: где f₁ − f₂ меняет знак, там кривые и меняются местами. `
+        + `Корни ищутся численно и засчитываются только там, где обе функции в этот момент и есть ${nm}.</p>`
+        + `<p>Экономический смысл тот же у нижней огибающей средних издержек: в каждой точке фирма выбирает `
+        + `самый дешёвый способ, и длинная кривая складывается из кусков коротких.</p>`
+        + '</div>';
     }
   } else if (STATE.mathSub === 'constraint') {
     if (r.error) html = `<div class="warn">${r.error}</div>`;
@@ -12931,9 +13007,10 @@ function setMathSub(sub, keepFormula) {
     const p = document.getElementById('math-pane-' + v);
     if (p) p.style.display = (v === sub) ? '' : 'none';
   });
-  // «Ограничение» пользуется своими полями, общее f(x) ему не нужно.
+  // Свои поля есть у «Ограничения» и у сюжета min/max: общее f(x) им не нужно.
   const rowF = document.getElementById('math-row-f');
-  if (rowF) rowF.style.display = (sub === 'constraint') ? 'none' : '';
+  if (rowF) rowF.style.display = (sub === 'constraint' || sub === 'minmax') ? 'none' : '';
+  if (sub === 'minmax') renderMmRows();
   const p = MATH_PRESETS[sub];
   if (p && !keepFormula) {
     STATE.mathFormula = p.f;
@@ -15728,10 +15805,6 @@ function wireControls() {
   attachFormulaHelp('fh-tc', 'fp-tc', 'inp-tc', 'TC');
   attachFormulaHelp('fh-ppf', 'fp-ppf', 'inp-ppf', 'PPF');
   attachFormulaHelp('fh-mathf', 'fp-mathf', 'inp-mathf', 'MATHF');
-  attachFormulaHelp('fh-mathg', 'fp-mathg', 'inp-mathg', 'MATHY');
-  attachFormulaHelp('fh-mathg2', 'fp-mathg2', 'inp-mathg2', 'MATHF');
-  attachFormulaHelp('fh-mathg3', 'fp-mathg3', 'inp-mathg3', 'MATHF');
-  attachFormulaHelp('fh-mathg4', 'fp-mathg4', 'inp-mathg4', 'MATHF');
   attachFormulaHelp('fh-mathfc', 'fp-mathfc', 'inp-mathfc', 'MATHAB');
   attachFormulaHelp('fh-mathgc', 'fp-mathgc', 'inp-mathgc', 'MATHAB');
 
@@ -16152,7 +16225,6 @@ function wireControls() {
 
   // Поля формул раздела: правка сразу перерисовывает график.
   [['inp-mathf', 'mathFormula'],
-   ['inp-mathg2', 'mathG2'], ['inp-mathg3', 'mathG3'], ['inp-mathg4', 'mathG4'],
    ['inp-mathfc', 'mathFC']].forEach(([id, key]) => {
     const e = document.getElementById(id);
     if (e) e.addEventListener('input', () => { STATE[key] = e.value; redrawAll(); });
@@ -16271,6 +16343,18 @@ function wireControls() {
   if (mmMax) mmMax.addEventListener('click', () => {
     STATE.mathMinMax = 'max'; mmMax.classList.add('active'); mmMin.classList.remove('active'); redrawAll();
   });
+  // Сколько функций участвует: любое число, не только две.
+  const mmCnt = document.getElementById('mm-count');
+  if (mmCnt) mmCnt.addEventListener('input', () => {
+    const n = parseInt(mmCnt.value, 10);
+    if (!isFinite(n) || n < 2 || n > 8) return;
+    STATE.mmCount = n;
+    renderMmRows();
+    redrawAll();
+  });
+  // Имя результата: Z по умолчанию, но можно назвать по-своему.
+  const mmName = document.getElementById('mm-name');
+  if (mmName) mmName.addEventListener('input', () => { STATE.mmName = mmName.value; redrawAll(); });
   { const h = document.getElementById('math-trans-hint');
     if (h) h.textContent = MATH_TRANS[STATE.mathTrans].note; }
 

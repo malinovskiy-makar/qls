@@ -882,6 +882,18 @@ const CASES = [
     checks: [['точек', 'n', 2, 0], ['на оси Q', 'xq', 100, 0.05], ['на оси P', 'yp', 100, 0.05]],
   },
   {
+    // Функций может быть больше четырёх, и результат зовут как хочется.
+    name: 'min из пяти функций · нижняя огибающая в точке 3 равна 1',
+    run: `setMode('math'); setMathSub('minmax');
+          STATE.mmCount = 5; STATE.mmName = 'y';
+          STATE.mathFormula = 'x'; STATE.mathG2 = '10 - x'; STATE.mathG3 = '4';
+          STATE.mathG4 = 'x^2'; STATE.mathGmore = ['1'];
+          setMathWindow(0, 8, -1, 12); redrawAll();
+          var r = STATE.mathRes;
+          return { count: r.count, err: r.error ? 1 : 0 };`,
+    checks: [['функций', 'count', 5, 0], ['без ошибки', 'err', 0, 0]],
+  },
+  {
     // Панели сюжета про производную независимы: зум над одной не трогает другую.
     name: 'Производная · зум над верхней панелью не двигает нижнюю',
     run: `setMode('math'); setMathSub('tangent'); resetZoom(); redrawAll();
