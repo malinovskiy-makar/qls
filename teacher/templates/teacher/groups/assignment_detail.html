@@ -71,7 +71,7 @@
     Окно: {{ assignment.starts_at|date:"d.m.Y H:i"|default:"—" }} —
     {{ assignment.ends_at|date:"d.m.Y H:i"|default:"—" }}. Пишут все одновременно.
   {% else %}
-    Сдать до {{ assignment.due_at|date:"d.m.Y H:i"|default:"—" }},
+    Сдать до {{ assignment.deadline_at|date:"d.m.Y H:i"|default:"—" }},
     на выполнение {{ assignment.duration_minutes|default:"—" }} минут
     с момента старта. Время истечения считает сервер.
   {% endif %}

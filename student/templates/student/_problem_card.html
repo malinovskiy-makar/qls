@@ -1,0 +1,177 @@
+{% load catalog_filters %}
+{% comment %}
+Карточка одной задачи в работе ученика. ОДНА на все виды задач.
+
+Раньше их было две — своя разметка для задач каталога и своя для задач
+репетитора, с разными полями. Отсюда и брались «две домашки на одной
+странице». Разница между видами задач осталась ровно одна: чем вводится
+ответ (переключатели у теста, строка у открытой задачи).
+
+Ждёт в контексте `row` из `problems.assignment_rows.build_rows` и флаг
+`readonly` (на контрольной после сдачи и в проверенной работе).
+{% endcomment %}
+<div class="problem-card" id="item-{{ row.item.pk }}" data-item="{{ row.item.pk }}">
+  <div class="problem-card-head">
+    <span class="problem-num">Задача {{ row.number }}</span>
+    {% if row.title %}<span class="problem-title-text">{{ row.title }}</span>{% endif %}
+    <span class="status-badge status-{{ row.sub.status }}">
+      {% if row.sub.status == 'not_started' %}Не начата
+      {% elif row.sub.status == 'in_progress' %}В процессе
+      {% elif row.sub.status == 'submitted' %}Отправлено
+      {% elif row.sub.status == 'reviewed' %}Проверено
+      {% endif %}
+    </span>
+  </div>
+
+  <div class="problem-card-body">
+    {% if row.statement %}
+    <div class="problem-statement">{{ row.statement|safe }}</div>
+    {% endif %}
+
+    {% if row.parts %}
+    <div class="problem-parts">
+      {% for part in row.parts %}
+      <div class="part-item">
+        <span class="part-label">{{ part.label|partlabel }}</span>
+        <span>{{ part.statement|safe }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if row.graph %}
+    <div class="pf-graph">📈 График: {{ row.graph.name }}</div>
+    {% endif %}
+
+    {% if row.is_done or readonly %}
+      {# ---- Работа сдана: показываем, что ответил ученик ---------------- #}
+      {% if row.answer_display or row.sub.solution_text or row.sub.solution_file %}
+      <div class="answer-area">
+        <div class="submitted-label">Мой ответ</div>
+        {% if row.answer_display %}
+        <div class="submitted-answer">{{ row.answer_display }}</div>
+        {% endif %}
+        {% if row.sub.solution_text %}
+        <div class="submitted-answer" style="margin-top:6px;white-space:pre-wrap;">{{ row.sub.solution_text }}</div>
+        {% endif %}
+        {% if row.sub.solution_file %}
+        <div style="margin-top:8px;font-size:13px;">
+          <a href="{{ row.sub.solution_file.url }}" target="_blank" style="color:var(--accent);">📎 Прикреплённый файл</a>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    {% else %}
+      {# ---- Единый набор полей ответа ---------------------------------- #}
+      <div class="answer-area">
+        <label for="{{ row.answer_name }}">Ответ</label>
+        {% if row.answer_kind == 'radio' or row.answer_kind == 'checkbox' %}
+          <ul class="choices-list">
+            {% for option in row.options %}
+            <li>
+              <label>
+                <input type="{{ row.answer_kind }}" name="{{ row.answer_name }}"
+                       value="{{ option.value }}">
+                <span>{% if option.part_label %}<b>{{ option.part_label|partlabel }}</b> {% endif %}{% if option.is_html %}{{ option.label|safe }}{% else %}{{ option.label }}{% endif %}</span>
+              </label>
+            </li>
+            {% endfor %}
+          </ul>
+          <div class="field-hint">
+            {% if row.answer_kind == 'radio' %}Выберите один вариант.{% else %}Отметьте все верные.{% endif %}
+          </div>
+        {% else %}
+          <input type="text" class="answer-short" id="{{ row.answer_name }}"
+                 name="{{ row.answer_name }}"
+                 placeholder="Например: 4 штуки, 120 руб./ед."
+                 value="{{ row.sub.submitted_answer }}">
+          <div class="field-hint">Кратко — число или короткая фраза. Проверяется автоматически.</div>
+        {% endif %}
+
+        <label for="{{ row.solution_name }}" style="margin-top:16px;">Моё решение</label>
+        {# data-mathfield: вставщик формул навесится сам, скрипты — раз на страницу #}
+        <textarea class="answer-text" id="{{ row.solution_name }}"
+                  name="{{ row.solution_name }}" data-mathfield
+                  placeholder="Запишите ход решения. Формулу можно вставить кнопкой ниже.">{{ row.sub.solution_text }}</textarea>
+
+        <label for="{{ row.file_name }}" style="margin-top:16px;">Прикрепить файл</label>
+        <input class="answer-file" type="file" id="{{ row.file_name }}"
+               name="{{ row.file_name }}" accept=".jpg,.jpeg,.png,.pdf">
+        <div class="field-hint">Фото или PDF — если решение удобнее написать на бумаге.</div>
+      </div>
+    {% endif %}
+
+    {% if row.sub.status == 'reviewed' and row.feedback %}
+    <div class="feedback-block">
+      {% if row.feedback.score is not None %}
+      <div class="feedback-score">{{ row.feedback.score }} б.</div>
+      {% endif %}
+      {% if row.feedback.comment %}
+      <div class="feedback-comment">{{ row.feedback.comment }}</div>
+      {% endif %}
+      {% if row.feedback.mistakes.all %}
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Замечания:</div>
+      <div class="mistake-tags">
+        {% for m in row.feedback.mistakes.all %}<span class="mistake-tag">{{ m.name }}</span>{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% elif row.sub.status == 'submitted' %}
+    <div class="pf-locked">Ждёт проверки преподавателем.</div>
+    {% endif %}
+
+    {% if row.has_solution %}
+      {% if row.solution_visible %}
+      <details class="pf-fold">
+        <summary>Эталонное решение</summary>
+        <div class="pf-fold-body">{{ row.solution_text|linebreaksbr }}</div>
+      </details>
+      {% else %}
+      <div class="pf-locked">{{ row.solution_hint }}</div>
+      {% endif %}
+    {% endif %}
+
+    {% if show_comments %}
+    {% comment %}
+    Вопрос по задаче. ⚠️ Здесь НЕ <form>: карточка стоит внутри формы отправки
+    домашки, а вложенную форму браузер выбрасывает — из-за этого поле
+    оставалось некрашеным, а кнопка отправляла всю домашку.
+    {% endcomment %}
+    <div class="pf-comments" data-item="{{ row.item.pk }}">
+      <div class="pf-comment-list">
+        {% for comment in row.comments %}
+        <div class="pf-comment">
+          <div class="pf-comment-head">
+            <strong>{{ comment.author.get_full_name|default:comment.author.username }}</strong>
+            · {{ comment.created_at|date:"d.m.Y H:i" }}
+            {% if comment.visibility == 'private' %} · только вы и преподаватель{% endif %}
+          </div>
+          <div>{{ comment.text|linebreaksbr }}</div>
+        </div>
+        {% empty %}
+        <div class="pf-comment-empty">Вопросов пока нет.</div>
+        {% endfor %}
+      </div>
+      <div class="pf-comment-form" data-item="{{ row.item.pk }}">
+        <label for="comment-{{ row.item.pk }}">Вопрос преподавателю</label>
+        <textarea id="comment-{{ row.item.pk }}" name="text"
+                  placeholder="Что именно непонятно? Вопрос увидят только вы и преподаватель."></textarea>
+        <div class="pf-comment-actions">
+          <button type="button" class="pf-btn pf-ask">Спросить</button>
+          <span class="pf-status"></span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if row.hints and not row.is_done and not readonly %}
+    <div id="hints-{{ row.item.pk }}">
+      {% for hint in row.hints %}
+      <template class="hint-tpl">{{ hint.text }}</template>
+      {% endfor %}
+      <button type="button" class="hint-btn" onclick="showHint({{ row.item.pk }})">💡 Подсказка</button>
+      <div id="hint-shown-{{ row.item.pk }}"></div>
+    </div>
+    {% endif %}
+  </div>
+</div>

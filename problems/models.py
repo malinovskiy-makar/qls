@@ -652,10 +652,13 @@ class Assignment(models.Model):
     ends_at = models.DateTimeField('Конец окна', null=True, blank=True)
     duration_minutes = models.PositiveIntegerField(
         'Лимит времени (минут)', null=True, blank=True)
-    # Срок сдачи для контрольной типа Б. У домашки срок по-прежнему в
-    # `deadline`; спрашивать оба поля сразу не нужно — есть
-    # `models_platform.assignment_deadline()`.
-    due_at = models.DateTimeField('Сдать до', null=True, blank=True)
+    # ⚠️ УСТАРЕЛО (Фаза 0.3). Источник правды по сроку — `deadline`, одно
+    # поле на домашку и на контрольную. Два поля уже дали видимый баг: список
+    # ученика печатал «без срока» у контрольной, у которой время было задано,
+    # просто в другом поле. Данные перенесены миграцией 0026; поле оставлено
+    # (не удаляем ничего, что может быть в чужой ветке), но НЕ читается и
+    # НЕ пишется нигде. Спрашивать срок — только через `deadline_at`.
+    due_at = models.DateTimeField('Сдать до (устарело)', null=True, blank=True)
     show_results_immediately = models.BooleanField(
         'Показывать результат сразу', default=True,
         help_text='Тесты проверяются автоматически; на контрольной результат '
@@ -677,9 +680,13 @@ class Assignment(models.Model):
 
     @property
     def deadline_at(self):
-        """Срок сдачи одним понятием: у контрольной `due_at`, у домашки
-        `deadline`."""
-        return self.due_at or self.deadline
+        """Срок сдачи. ЕДИНСТВЕННЫЙ способ его спросить.
+
+        Поле одно — `deadline`. Свойство оставлено (а не заменено на прямое
+        обращение к полю) намеренно: весь код уже ходит через него, и если
+        завтра срок снова усложнится, менять придётся одну строку, а не сорок.
+        """
+        return self.deadline
 
     def open_state_for(self, user, now=None):
         """(открыта ли, человеческая причина). Причина нужна экрану: «закрыто»
@@ -701,7 +708,7 @@ class Assignment(models.Model):
             return True, ''
 
         if self.exam_mode == self.ExamMode.LIMIT:
-            if self.due_at and now > self.due_at:
+            if self.deadline and now > self.deadline:
                 return False, 'Срок сдачи прошёл.'
             attempt = None
             if user is not None and getattr(user, 'is_authenticated', False):
@@ -828,6 +835,24 @@ class StudentTopicProgress(models.Model):
         'Уровень (0–100)', default=0,
         validators=[MinValueValidator(0), MaxValueValidator(100)])
     updated_at = models.DateTimeField('Обновлён', auto_now=True)
+
+    # --- Владение темой (Фаза 2.2) ---------------------------------------
+    # Второй модели «владение темой» не заводим: она разошлась бы с этой.
+    # Счётчики свёрнуты из учебных событий, пересобираются командой
+    # `recalculate_gamification`. Пороги перехода — в `problems/
+    # gamification.py` (MASTERY_RULES), там же и объяснение цифр.
+    attempted = models.PositiveIntegerField('Попыток', default=0)
+    solved = models.PositiveIntegerField('Решено верно', default=0)
+    # Решено верно среди задач сложности 4–5. Нужен отдельно: «разобрался»
+    # без единой трудной задачи — это не разобрался, а натренировался
+    # на лёгких.
+    solved_hard = models.PositiveIntegerField('Из них сложных', default=0)
+    mastery_level = models.CharField(
+        'Владение', max_length=16, default='none',
+        choices=[('none', 'Не начата'), ('familiar', 'Знаком'),
+                 ('confident', 'Уверенно'), ('mastered', 'Разобрался')])
+    last_activity_at = models.DateTimeField('Последняя активность',
+                                            null=True, blank=True)
 
     class Meta:
         verbose_name = 'Прогресс по теме'
@@ -1171,6 +1196,15 @@ class StudentGroup(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создана')
 
+    # Внутригрупповой рейтинг — ПО ВЫБОРУ РЕПЕТИТОРА и по умолчанию выключен.
+    # Соревнование помогает не всем: отстающему публичное место в таблице
+    # мешает, а решает это не платформа, а человек, который знает группу.
+    # Публичного рейтинга между группами нет и не планируется.
+    leaderboard_enabled = models.BooleanField(
+        'Показывать рейтинг в группе', default=False,
+        help_text='Ученик увидит топ-3 и своё место. Полный список '
+                  'с аутсайдерами не показывается никогда.')
+
     class Meta:
         verbose_name = 'Группа учеников'
         verbose_name_plural = 'Группы учеников'
@@ -1327,6 +1361,15 @@ class ReviewVerdict(models.Model):
 # Файл: problems/models_platform.py
 # ===========================================================================
 
+from .models_gamification import (  # noqa: E402,F401
+    Achievement,
+    DailySummary,
+    EarnedAchievement,
+    MasteryLevel,
+    ParentLink,
+    PersonalRecord,
+    StudentProgressProfile,
+)
 from .models_platform import (  # noqa: E402,F401
     AnswerDraft,
     AssignmentItem,

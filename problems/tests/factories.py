@@ -8,7 +8,8 @@
 from django.contrib.auth import get_user_model
 
 from problems.models import (
-    Assignment, Problem, Source, SourceReference, Submission, Topic,
+    Assignment, AssignmentItem, Problem, Source, SourceReference, Submission,
+    Topic,
 )
 
 User = get_user_model()
@@ -49,10 +50,27 @@ def link_source(problem, source, **kwargs):
 
 def make_assignment(teacher, students=(), problems=(), name='Тестовая домашка',
                     **kwargs):
+    """Домашка с задачами.
+
+    Заполняет И старый M2M, И позиции (`AssignmentItem`): источник правды —
+    позиции, а M2M оставлен для обратной совместимости. Если заполнять только
+    M2M, тесты будут создавать домашку, которой на экране нет ни одной задачи.
+    """
     assignment = Assignment.objects.create(name=name, author=teacher, **kwargs)
     assignment.students.set(students)
     assignment.problems.set(problems)
+    for order, problem in enumerate(problems):
+        AssignmentItem.objects.create(assignment=assignment,
+                                      catalog_problem=problem, order=order)
     return assignment
+
+
+def make_item(assignment, catalog_problem=None, custom_problem=None, **kwargs):
+    """Одна позиция задачи в домашке."""
+    kwargs.setdefault('order', assignment.items.count())
+    return AssignmentItem.objects.create(
+        assignment=assignment, catalog_problem=catalog_problem,
+        custom_problem=custom_problem, **kwargs)
 
 
 def make_submission(student, assignment, problem, **kwargs):

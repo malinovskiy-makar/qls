@@ -101,6 +101,7 @@ def auto_check_custom(submission, item):
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db import models
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -113,11 +114,16 @@ def calc_assignment_stats(assignment, student):
     """
     Считает статистику по домашке отдельно для тестов и открытых задач.
     Возвращает словарь с двумя независимыми метриками.
+
+    Ходит по ПОЗИЦИЯМ (`assignment.items`), а не по старому M2M: иначе свои
+    задачи репетитора не попадали бы в «сдано N из M» и прогресс-полоска
+    ученика врала бы ровно на их число.
     """
     from problems.models import Submission
 
-    problems = list(assignment.problems.all())
-    total = len(problems)
+    items = list(assignment.items.select_related('catalog_problem',
+                                                 'custom_problem'))
+    total = len(items)
 
     open_scores = []
     test_correct = 0
@@ -126,13 +132,16 @@ def calc_assignment_stats(assignment, student):
     test_count = 0
     total_reviewed = 0
 
-    for problem in problems:
-        is_test = bool(problem.problem_type and problem.problem_type.startswith('тест'))
+    for item in items:
+        is_test = item.is_test
 
         sub = Submission.objects.filter(
-            student=student,
-            assignment=assignment,
-            problem=problem,
+            student=student, assignment=assignment,
+        ).filter(
+            models.Q(problem_item=item)
+            | models.Q(problem_item__isnull=True,
+                       problem_id=item.catalog_problem_id,
+                       problem__isnull=False)
         ).first()
 
         if is_test:
@@ -185,34 +194,62 @@ def student_required(view_func):
 
 @student_required
 def dashboard(request):
+    """Список работ ученика.
+
+    Контрольные и домашки разведены (Фаза 0.4): у контрольной другой срок
+    (окно или лимит), другая цена ошибки и другой вход — «начать» вместо
+    «дописать когда угодно». Смешивать их в одном списке значило бы прятать
+    работу, которую нельзя пропустить, среди работ, которые можно дослать.
+    """
     from problems.models import Assignment, Submission
 
-    assignments = Assignment.objects.filter(
-        students=request.user
-    ).prefetch_related('problems').order_by('deadline')
+    assignments = (Assignment.objects
+                   .filter(students=request.user)
+                   .prefetch_related('items')
+                   .order_by('deadline'))
 
     now = timezone.now()
     active = []
     submitted_list = []
     completed = []
+    exams_upcoming = []
+    exams_open = []
+    exams_done = []
 
     for a in assignments:
         stats = calc_assignment_stats(a, request.user)
+        # Один источник срока на весь сайт — `deadline_at` (Фаза 0.3).
+        deadline = a.deadline_at
 
         deadline_soon = False
         deadline_passed = False
-        if a.deadline:
-            delta = a.deadline - now
+        if deadline:
+            delta = deadline - now
             deadline_passed = delta.total_seconds() < 0
             deadline_soon = not deadline_passed and delta.days <= 2
 
         item = {
             'assignment': a,
             'stats': stats,
-            'deadline': a.deadline,
+            'deadline': deadline,
             'deadline_soon': deadline_soon,
             'deadline_passed': deadline_passed,
+            'schedule': exam_schedule_label(a),
         }
+
+        if a.is_exam:
+            attempt = a.exam_attempts.filter(student=request.user).first()
+            item['attempt'] = attempt
+            is_open, reason = a.open_state_for(request.user, now)
+            item['closed_reason'] = reason
+            if attempt is not None and attempt.submitted_at is not None:
+                exams_done.append(item)
+            elif is_open:
+                exams_open.append(item)
+            else:
+                # Ещё нельзя начать (окно не открылось) или уже нельзя.
+                exams_upcoming.append(item)
+            continue
 
         if stats['all_reviewed']:
             completed.append(item)
@@ -227,8 +264,43 @@ def dashboard(request):
         'active': active,
         'submitted': submitted_list,
         'completed': completed,
+        'exams_open': exams_open,
+        'exams_upcoming': exams_upcoming,
+        'exams_done': exams_done,
+        'has_exams': bool(exams_open or exams_upcoming or exams_done),
         'now': now,
     })
+
+
+def exam_schedule_label(assignment):
+    """Время контрольной человеческими словами.
+
+    Ровно то, чего не хватало на карточке: у контрольной срок задан не
+    одним моментом, а окном или лимитом, и «до 20.03» без слова «90 минут»
+    вводит в заблуждение.
+    """
+    if not assignment.is_exam:
+        return ''
+    mode = assignment.exam_mode
+    if mode == assignment.ExamMode.WINDOW:
+        start, end = assignment.starts_at, assignment.ends_at
+        if start and end:
+            same_day = timezone.localtime(start).date() == \
+                timezone.localtime(end).date()
+            if same_day:
+                return (f'окно {start:%d.%m} {start:%H:%M}–{end:%H:%M}')
+            return f'окно {start:%d.%m %H:%M} — {end:%d.%m %H:%M}'
+        if end:
+            return f'до {end:%d.%m %H:%M}'
+        return 'окно не задано'
+    if mode == assignment.ExamMode.LIMIT:
+        parts = []
+        if assignment.deadline_at:
+            parts.append(f'до {assignment.deadline_at:%d.%m %H:%M}')
+        if assignment.duration_minutes:
+            parts.append(f'на решение {assignment.duration_minutes} мин')
+        return ', '.join(parts) or 'срок не задан'
+    return ''
 
 
 # ---------------------------------------------------------------------------
@@ -237,97 +309,39 @@ def dashboard(request):
 
 @student_required
 def assignment_detail(request, pk):
-    from problems.models import Assignment, ProblemComment, Submission
+    """Страница домашки — ОДИН список задач, ОДИН набор полей ответа.
+
+    Список строит `problems.assignment_rows.build_rows` — тот же модуль, что
+    и у репетитора. Двух сборок больше нет: они и разъехались.
+    """
+    from problems.assignment_rows import build_rows
+    from problems.models import Assignment
 
     assignment = get_object_or_404(Assignment, pk=pk, students=request.user)
-    problems = assignment.problems.prefetch_related('parts', 'hints').order_by('id')
 
-    submissions = {}
-    for problem in problems:
-        sub, _ = Submission.objects.get_or_create(
-            student=request.user,
-            assignment=assignment,
-            problem=problem,
-            defaults={'status': 'not_started'},
-        )
-        submissions[problem.pk] = sub
+    # Контрольная живёт на своей странице: у неё таймер, автосохранение и
+    # запрет дописывать после сдачи (Часть C).
+    if assignment.is_exam:
+        return redirect('student:exam_intro', pk=assignment.pk)
 
-    # Собираем feedback для проверенных работ
-    feedbacks = {}
-    for pk_p, sub in submissions.items():
-        if sub.status == 'reviewed':
-            feedbacks[pk_p] = getattr(sub, 'feedback', None)
+    rows = build_rows(assignment, request.user)
 
-    all_reviewed = all(
-        sub.status == 'reviewed' for sub in submissions.values()
-    ) if submissions else False
-
-    all_submitted_or_reviewed = all(
-        sub.status in ('submitted', 'reviewed') for sub in submissions.values()
-    ) if submissions else False
-
-    # --- Платформа: позиции задачи в домашке -----------------------------
-    # Комментарии и решалка живут не у задачи каталога, а у ПОЗИЦИИ задачи
-    # в этой домашке. Собираем соответствие «задача → позиция» один раз.
-    items = list(assignment.items
-                 .select_related('catalog_problem', 'custom_problem')
-                 .order_by('order', 'id'))
-    items_by_problem = {i.catalog_problem_id: i for i in items
-                        if i.catalog_problem_id}
-
-    comments_by_problem = {}
-    solutions_by_problem = {}
-    for problem in problems:
-        item = items_by_problem.get(problem.pk)
-        if item is None:
-            continue
-        comments_by_problem[problem.pk] = list(
-            ProblemComment.objects.visible_for(request.user)
-            .filter(problem_item=item).select_related('author'))
-        solutions_by_problem[problem.pk] = {
-            'item': item,
-            'visible': item.is_solution_visible_for(request.user),
-            'text': item.solution_text,
-            'hint': item.solution_unlock_hint(),
-            'has': item.has_solution,
-        }
-
-    # Свои задачи репетитора идут отдельным блоком: в старом цикле их не
-    # показать (он ходит по `assignment.problems`, а записи в Problem у них
-    # нет вовсе). Порядок внутри блока — как в задании.
-    custom_rows = []
-    for item in items:
-        if not item.is_custom:
-            continue
-        sub, _ = Submission.objects.get_or_create(
-            student=request.user, assignment=assignment, problem_item=item,
-            defaults={'status': 'not_started'})
-        custom_rows.append({
-            'item': item,
-            'problem': item.custom_problem,
-            'sub': sub,
-            'feedback': getattr(sub, 'feedback', None),
-            'options': list(item.custom_problem.options.all())
-            if item.custom_problem.is_test else [],
-            'comments': list(ProblemComment.objects.visible_for(request.user)
-                             .filter(problem_item=item)
-                             .select_related('author')),
-            'solution_visible': item.is_solution_visible_for(request.user),
-            'solution_hint': item.solution_unlock_hint(),
-        })
+    statuses = [row['sub'].status for row in rows]
+    all_reviewed = bool(statuses) and all(s == 'reviewed' for s in statuses)
+    all_submitted_or_reviewed = bool(statuses) and all(
+        s in ('submitted', 'reviewed') for s in statuses)
+    done_count = sum(1 for s in statuses if s in ('submitted', 'reviewed'))
 
     is_open, closed_reason = assignment.open_state_for(request.user)
 
     return render(request, 'student/assignment_detail.html', {
         'assignment': assignment,
-        'problems': problems,
-        'submissions': submissions,
-        'feedbacks': feedbacks,
+        'rows': rows,
+        'total': len(rows),
+        'done_count': done_count,
         'all_reviewed': all_reviewed,
         'all_submitted_or_reviewed': all_submitted_or_reviewed,
-        'comments_by_problem': comments_by_problem,
-        'solutions_by_problem': solutions_by_problem,
-        'custom_rows': custom_rows,
+        'deadline': assignment.deadline_at,
         'is_open': is_open,
         'closed_reason': closed_reason,
     })
@@ -345,57 +359,8 @@ def submit_assignment(request, pk):
     from problems.models import Assignment, Submission
 
     assignment = get_object_or_404(Assignment, pk=pk, students=request.user)
-    problems = assignment.problems.all()
 
-    saved = 0
-    for problem in problems:
-        sub = Submission.objects.filter(
-            student=request.user,
-            assignment=assignment,
-            problem=problem,
-        ).first()
-
-        if not sub or sub.status in ('submitted', 'reviewed'):
-            continue
-
-        answer = request.POST.get(f'answer_{problem.pk}', '').strip()
-        text = request.POST.get(f'text_{problem.pk}', '').strip()
-        file = request.FILES.get(f'file_{problem.pk}')
-
-        if answer or text or file:
-            sub.submitted_answer = answer
-            sub.solution_text = text
-            if file:
-                sub.solution_file = file
-            sub.status = 'submitted'
-            sub.submitted_at = timezone.now()
-            sub.save()
-            auto_check_submission(sub)
-            saved += 1
-            _log_submission_event(request, assignment, sub, problem)
-
-    # Свои задачи репетитора — у них нет записи в Problem, адресуются
-    # позицией в домашке.
-    for item in assignment.items.select_related('custom_problem'):
-        if not item.is_custom:
-            continue
-        sub = Submission.objects.filter(
-            student=request.user, assignment=assignment,
-            problem_item=item).first()
-        if not sub or sub.status in ('submitted', 'reviewed'):
-            continue
-        answer = ', '.join(request.POST.getlist(f'answer_item_{item.pk}'))
-        text = (request.POST.get(f'text_item_{item.pk}') or '').strip()
-        if answer or text:
-            sub.submitted_answer = answer
-            sub.solution_text = text
-            sub.status = 'submitted'
-            sub.submitted_at = timezone.now()
-            sub.save()
-            auto_check_custom(sub, item)
-            saved += 1
-            _log_submission_event(request, assignment, sub,
-                                  item.custom_problem)
+    saved = accept_answers(request, assignment, request.user)
 
     if saved:
         messages.success(request, 'Домашка отправлена! Преподаватель скоро проверит.')
@@ -403,6 +368,53 @@ def submit_assignment(request, pk):
         messages.warning(request, 'Нет новых ответов для отправки.')
 
     return redirect('student:dashboard')
+
+
+def accept_answers(request, assignment, student, source_item=None):
+    """Принимает ответы по ВСЕМ позициям работы одинаково.
+
+    Одна точка приёма на домашку и контрольную. Раньше их было две (каталог
+    и свои задачи), и поля у них назывались по-разному — отсюда и брались
+    «разные формы» на экране.
+
+    Возвращает число сохранённых позиций.
+    """
+    from problems.assignment_rows import get_or_create_submission, read_answer
+
+    items = list(assignment.items.select_related('catalog_problem',
+                                                 'custom_problem')
+                 .prefetch_related('catalog_problem__parts',
+                                   'custom_problem__options')
+                 .order_by('order', 'id'))
+    if source_item is not None:
+        items = [i for i in items if i.pk == source_item.pk]
+
+    saved = 0
+    for item in items:
+        sub = get_or_create_submission(student, assignment, item)
+        if sub.status in ('submitted', 'reviewed'):
+            continue
+
+        answer, text, file = read_answer(request, item)
+        if not (answer or text or file):
+            continue
+
+        sub.submitted_answer = answer
+        sub.solution_text = text
+        if file:
+            sub.solution_file = file
+        sub.status = 'submitted'
+        sub.submitted_at = timezone.now()
+        sub.save()
+
+        if item.is_custom:
+            auto_check_custom(sub, item)
+        elif sub.problem_id:
+            auto_check_submission(sub)
+        saved += 1
+        _log_submission_event(request, assignment, sub, item.problem)
+
+    return saved
 
 
 # ---------------------------------------------------------------------------

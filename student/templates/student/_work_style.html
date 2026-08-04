@@ -1,0 +1,194 @@
+{% comment %}
+Стили страницы работы ученика (домашка и контрольная) — один файл на обе.
+Все цвета через токены `var(--…)`: хардкод hex ломает тёмную тему.
+{% endcomment %}
+.back-link {
+  font-size: 13px; color: var(--text2); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px; margin-bottom: 20px;
+}
+.back-link:hover { color: var(--accent); }
+
+.hw-header { margin-bottom: 32px; }
+.hw-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+.hw-meta-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  font-size: 13px; color: var(--text2);
+}
+.deadline-badge {
+  padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+}
+.deadline-red    { background: var(--error-tint); color: var(--error); }
+.deadline-yellow { background: var(--amber-tint); color: var(--text); }
+.deadline-green  { background: var(--green-tint); color: var(--green); }
+.deadline-grey   { background: var(--panel); color: var(--text2); }
+
+.progress-bar {
+  width: 160px; max-width: 40vw; height: 5px;
+  background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.progress-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+
+/* ── Карточка задачи ─────────────────────────────── */
+.problem-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; margin-bottom: 20px; overflow: hidden;
+}
+.problem-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 14px 20px; background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.problem-num { font-size: 13px; font-weight: 700; color: var(--text2); }
+.problem-title-text { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; }
+.status-badge {
+  font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+  white-space: nowrap;
+}
+.status-not_started { background: var(--panel); color: var(--text2); border: 1px solid var(--border); }
+.status-in_progress { background: var(--amber-tint); color: var(--text); border: 1px solid var(--amber-border); }
+.status-submitted   { background: var(--accent-tint); color: var(--accent); border: 1px solid var(--accent); }
+.status-reviewed    { background: var(--green-tint); color: var(--green); border: 1px solid var(--green-border); }
+
+.problem-card-body { padding: 20px; }
+.problem-statement { font-size: 15px; line-height: 1.65; margin-bottom: 16px;
+                     overflow-wrap: anywhere; }
+.problem-parts { margin-bottom: 16px; }
+.part-item { display: flex; gap: 10px; margin-bottom: 8px; font-size: 14px;
+             line-height: 1.6; }
+.part-label { font-weight: 700; color: var(--accent); flex-shrink: 0; width: 22px; }
+.pf-graph { margin: 10px 0 16px; padding: 10px 14px; font-size: 13px;
+            background: var(--surface-2); border: 1px solid var(--border);
+            border-radius: var(--r); color: var(--text2); }
+
+/* ── Поля ответа (один набор на любую задачу) ────── */
+.answer-area { margin-top: 16px; padding-top: 16px;
+               border-top: 1px solid var(--border); }
+.answer-area > label {
+  display: block; font-size: 12px; font-weight: 600; color: var(--text2);
+  margin-bottom: 8px; text-transform: uppercase; letter-spacing: .05em;
+}
+.field-hint { font-size: 12px; color: var(--text2); margin-top: 6px; }
+textarea.answer-text, input.answer-short {
+  background: var(--surface); color: var(--text); width: 100%;
+  box-sizing: border-box; border: 1px solid var(--border);
+  border-radius: var(--r); padding: 10px 12px; font-size: 14px;
+  font-family: inherit; line-height: 1.5; outline: none;
+  transition: border-color .12s;
+}
+textarea.answer-text { resize: vertical; min-height: 90px; }
+textarea.answer-text:focus, input.answer-short:focus { border-color: var(--accent); }
+input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
+
+.choices-list { list-style: none; margin: 0; padding: 0; }
+.choices-list li { margin-bottom: 8px; }
+.choices-list label {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  font-size: 14px; line-height: 1.55; color: var(--text);
+  text-transform: none; letter-spacing: 0; font-weight: 400;
+}
+.choices-list input[type=radio], .choices-list input[type=checkbox] {
+  margin-top: 3px; flex-shrink: 0; accent-color: var(--accent);
+}
+
+/* ── Подсказки ───────────────────────────────────── */
+.hint-btn {
+  background: none; border: 1px solid var(--border); border-radius: var(--r);
+  padding: 6px 12px; font-size: 12px; color: var(--text2); cursor: pointer;
+  transition: border-color .12s, color .12s; margin-top: 12px;
+}
+.hint-btn:hover { border-color: var(--accent); color: var(--accent); }
+.hint-box {
+  margin-top: 10px; padding: 12px 14px; background: var(--amber-tint);
+  border: 1px solid var(--amber-border); border-radius: var(--r);
+  font-size: 13px; line-height: 1.6;
+}
+.hint-box + .hint-box { margin-top: 6px; }
+.hint-label { font-size: 11px; font-weight: 700; color: var(--amber);
+              margin-bottom: 4px; }
+
+/* ── Проверка ────────────────────────────────────── */
+.feedback-block {
+  margin-top: 16px; padding: 16px; background: var(--green-tint);
+  border: 1px solid var(--green-border); border-radius: var(--r);
+}
+.feedback-score { font-size: 20px; font-weight: 700; color: var(--green);
+                  margin-bottom: 8px; }
+.feedback-comment { font-size: 14px; line-height: 1.6; margin-bottom: 10px; }
+.mistake-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.mistake-tag {
+  background: var(--error-tint); border: 1px solid var(--error-border);
+  color: var(--error); border-radius: 20px; padding: 2px 9px; font-size: 12px;
+}
+.submitted-answer {
+  margin-top: 12px; padding: 12px 14px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: var(--r);
+  font-size: 14px; line-height: 1.6; overflow-wrap: anywhere;
+}
+.submitted-label {
+  font-size: 11px; font-weight: 700; color: var(--text2); margin-bottom: 4px;
+  text-transform: uppercase; letter-spacing: .05em;
+}
+
+/* ── Кнопка отправки ─────────────────────────────── */
+.submit-row { margin-top: 32px; display: flex; align-items: center;
+              gap: 16px; flex-wrap: wrap; }
+.btn-submit {
+  background: var(--btn-bg); color: var(--on-btn); border: none;
+  border-radius: var(--r); padding: 12px 28px; font-size: 15px;
+  font-weight: 700; cursor: pointer; transition: background .12s;
+}
+.btn-submit:hover { background: var(--btn-bg-hover); }
+.results-link { font-size: 14px; color: var(--text2); text-decoration: none; }
+.results-link:hover { color: var(--accent); }
+
+/* ── Решалка и вопросы по задаче ─────────────────── */
+.pf-fold { margin-top: 12px; }
+.pf-fold > summary { cursor: pointer; font-size: 13px; color: var(--accent);
+                     list-style: none; padding: 4px 0; }
+.pf-fold > summary::-webkit-details-marker { display: none; }
+.pf-fold > summary::before { content: '▸ '; }
+.pf-fold[open] > summary::before { content: '▾ '; }
+.pf-fold-body { margin-top: 8px; padding: 12px 14px; background: var(--surface-2);
+                border-radius: var(--r); font-size: 13px; line-height: 1.7;
+                overflow-wrap: anywhere; }
+.pf-locked { margin-top: 12px; font-size: 12px; color: var(--text2);
+             background: var(--surface-2); border: 1px solid var(--border);
+             border-radius: var(--r); padding: 8px 12px; }
+.pf-comments { margin-top: 14px; border-top: 1px solid var(--border);
+               padding-top: 12px; }
+.pf-comment { font-size: 13px; line-height: 1.6; padding: 8px 0;
+              border-bottom: 1px solid var(--border); }
+.pf-comment:last-of-type { border-bottom: none; }
+.pf-comment-head { font-size: 12px; color: var(--text2); margin-bottom: 2px; }
+.pf-comment-empty { font-size: 12px; color: var(--text2); }
+
+/* ⚠️ Раньше это была вложенная <form> внутри формы отправки домашки —
+   браузер её выбрасывал, вместе со стилями и обработчиком. Теперь это
+   обычный блок, поэтому правила ниже наконец применяются. */
+.pf-comment-form { margin-top: 12px; }
+.pf-comment-form label {
+  display: block; font-size: 12px; font-weight: 600; color: var(--text2);
+  margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em;
+}
+.pf-comment-form textarea {
+  display: block; width: 100%; box-sizing: border-box; min-height: 76px;
+  resize: vertical; font: inherit; font-size: 14px; line-height: 1.5;
+  padding: 10px 12px; border-radius: var(--r); border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); outline: none;
+  transition: border-color .12s;
+}
+.pf-comment-form textarea:focus { border-color: var(--accent); }
+.pf-comment-actions { display: flex; align-items: center; gap: 10px;
+                      margin-top: 8px; flex-wrap: wrap; }
+.pf-btn { border: 1px solid var(--border); border-radius: var(--r);
+          padding: 7px 14px; font: inherit; font-size: 13px;
+          background: transparent; color: var(--text); cursor: pointer; }
+.pf-btn:hover { background: var(--panel); border-color: var(--accent);
+                color: var(--accent); }
+.pf-status { font-size: 12px; color: var(--text2); }
+
+@media (max-width: 560px) {
+  .problem-card-body { padding: 16px; }
+  .problem-card-head { padding: 12px 16px; flex-wrap: wrap; }
+  .problem-title-text { flex-basis: 100%; margin: 0; }
+}

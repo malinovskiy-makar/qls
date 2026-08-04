@@ -246,19 +246,19 @@ class ExamOpenTests(TestCase):
 
     def test_limit_before_due(self):
         exam = self._exam(Assignment.ExamMode.LIMIT,
-                          due_at=self.now + timedelta(days=1),
+                          deadline=self.now + timedelta(days=1),
                           duration_minutes=60)
         self.assertTrue(exam.is_open_for(self.student, self.now))
 
     def test_limit_after_due(self):
         exam = self._exam(Assignment.ExamMode.LIMIT,
-                          due_at=self.now - timedelta(minutes=1),
+                          deadline=self.now - timedelta(minutes=1),
                           duration_minutes=60)
         self.assertFalse(exam.is_open_for(self.student, self.now))
 
     def test_limit_closes_when_personal_time_ran_out(self):
         exam = self._exam(Assignment.ExamMode.LIMIT,
-                          due_at=self.now + timedelta(days=1),
+                          deadline=self.now + timedelta(days=1),
                           duration_minutes=60)
         attempt = ExamAttempt.start(exam, self.student, now=self.now)
         # Через 61 минуту личное время вышло, хотя срок сдачи ещё не настал.
@@ -280,7 +280,7 @@ class ExamAttemptTests(TestCase):
         exam = Assignment.objects.create(
             name='КР', author=self.tutor, kind=Assignment.Kind.EXAM,
             exam_mode=Assignment.ExamMode.LIMIT, duration_minutes=45,
-            due_at=self.now + timedelta(days=1))
+            deadline=self.now + timedelta(days=1))
         before = timezone.now()
         attempt = ExamAttempt.start(exam, self.student)
         after = timezone.now()
@@ -295,9 +295,9 @@ class ExamAttemptTests(TestCase):
         exam = Assignment.objects.create(
             name='КР', author=self.tutor, kind=Assignment.Kind.EXAM,
             exam_mode=Assignment.ExamMode.LIMIT, duration_minutes=60,
-            due_at=timezone.now() + timedelta(minutes=1))
+            deadline=timezone.now() + timedelta(minutes=1))
         attempt = ExamAttempt.start(exam, self.student)
-        self.assertEqual(attempt.expires_at, exam.due_at)
+        self.assertEqual(attempt.expires_at, exam.deadline)
 
     def test_window_expires_at_end_of_window(self):
         exam = Assignment.objects.create(

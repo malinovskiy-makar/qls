@@ -243,7 +243,7 @@ class Command(BaseCommand):
                 'group': group,
                 'kind': Assignment.Kind.EXAM,
                 'exam_mode': Assignment.ExamMode.LIMIT,
-                'due_at': now + timezone.timedelta(days=2),
+                'deadline': now + timezone.timedelta(days=2),
                 'duration_minutes': 40,
                 'show_results_immediately': False,
             })

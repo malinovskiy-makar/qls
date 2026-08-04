@@ -335,15 +335,17 @@ class CustomProblemOption(models.Model):
 
 
 def assignment_deadline(assignment):
-    """Срок сдачи домашки одним понятием.
+    """Срок сдачи работы одним понятием — `Assignment.deadline`.
 
-    У домашки исторически есть `deadline`, у контрольной типа Б добавился
-    `due_at` (Фаза 6). Спрашивать «а какое из двух полей смотреть» на каждом
-    экране — верный способ разъехаться, поэтому спрашиваем здесь.
+    Полей срока когда-то было два (`deadline` у домашки и `due_at` у
+    контрольной типа Б), и они разъехались ровно так, как и должны были:
+    экран, спросивший не то поле, печатал «без срока» у работы со сроком.
+    С Фазы 0.3 поле одно, а эта функция осталась единственной точкой
+    вопроса — чтобы следующий такой раскол ловился в одном месте.
     """
     if assignment is None:
         return None
-    return getattr(assignment, 'due_at', None) or assignment.deadline
+    return assignment.deadline
 
 
 class SolutionVisibility(models.TextChoices):
@@ -788,9 +790,9 @@ class ExamAttempt(models.Model):
             if assignment.duration_minutes:
                 expires_at = now + timezone.timedelta(
                     minutes=assignment.duration_minutes)
-            if assignment.due_at and (expires_at is None
-                                      or expires_at > assignment.due_at):
-                expires_at = assignment.due_at
+            due = assignment.deadline
+            if due and (expires_at is None or expires_at > due):
+                expires_at = due
 
         return cls.objects.create(assignment=assignment, student=student,
                                   expires_at=expires_at, last_heartbeat=now)
@@ -829,6 +831,12 @@ class AnswerDraft(models.Model):
         'problems.AssignmentItem', on_delete=models.CASCADE,
         related_name='drafts', verbose_name='Задача в домашке')
     answer_draft = models.TextField('Черновик ответа', blank=True)
+    # Развёрнутый ход решения. Отдельным полем, а не в одном с ответом:
+    # набор полей ответа един для всех задач (ответ + решение + файл), и
+    # черновик обязан сохранять ровно то же, что покажет форма при возврате.
+    # Файл не автосохраняем — его нельзя переслать «по ходу набора»;
+    # прикреплённое уезжает при сдаче.
+    solution_draft = models.TextField('Черновик решения', blank=True)
     updated_at = models.DateTimeField('Сохранён', auto_now=True)
 
     class Meta:

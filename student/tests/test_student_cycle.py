@@ -12,6 +12,13 @@ from problems.tests.factories import (
 )
 
 
+def field(assignment, problem, prefix='answer'):
+    """Имя поля формы для задачи. Поля адресуются ПОЗИЦИЕЙ, а не задачей:
+    одна задача может стоять в домашке дважды."""
+    item = assignment.items.get(catalog_problem=problem)
+    return '%s_item_%d' % (prefix, item.pk)
+
+
 class StudentAccessTests(TestCase):
     def test_dashboard_requires_login(self):
         resp = self.client.get(reverse('student:dashboard'))
@@ -71,7 +78,7 @@ class StudentCycleTests(TestCase):
         self._open_assignment()
         resp = self.client.post(
             reverse('student:submit_assignment', args=[self.assignment.pk]),
-            {f'answer_{self.test_problem.pk}': 'б'})   # регистр не важен
+            {field(self.assignment, self.test_problem): 'б'})   # регистр не важен
         self.assertRedirects(resp, reverse('student:dashboard'))
         sub = Submission.objects.get(student=self.student,
                                      problem=self.test_problem)
@@ -82,7 +89,7 @@ class StudentCycleTests(TestCase):
         self._open_assignment()
         self.client.post(
             reverse('student:submit_assignment', args=[self.assignment.pk]),
-            {f'answer_{self.test_problem.pk}': 'А'})
+            {field(self.assignment, self.test_problem): 'А'})
         sub = Submission.objects.get(student=self.student,
                                      problem=self.test_problem)
         self.assertEqual(sub.status, 'reviewed')
@@ -93,7 +100,8 @@ class StudentCycleTests(TestCase):
         self._open_assignment()
         self.client.post(
             reverse('student:submit_assignment', args=[self.assignment.pk]),
-            {f'text_{self.open_problem.pk}': 'Моё развёрнутое решение.'})
+            {field(self.assignment, self.open_problem, 'text'):
+             'Моё развёрнутое решение.'})
         sub = Submission.objects.get(student=self.student,
                                      problem=self.open_problem)
         self.assertEqual(sub.status, 'submitted')
@@ -125,7 +133,7 @@ class AutoCheckMultiAnswerTests(TestCase):
             reverse('student:assignment_detail', args=[self.assignment.pk]))
         self.client.post(
             reverse('student:submit_assignment', args=[self.assignment.pk]),
-            {f'answer_{self.problem.pk}': 'в, а'})    # порядок не важен
+            {field(self.assignment, self.problem): ['в', 'а']})    # порядок не важен
         sub = Submission.objects.get(student=self.student,
                                      problem=self.problem)
         self.assertEqual(float(sub.feedback.score), 1.0)

@@ -1,6 +1,6 @@
 {% extends "student/base.html" %}
 
-{% block title %}Мои домашки{% endblock %}
+{% block title %}Мои работы{% endblock %}
 
 {% block extra_style %}
 .page-title {
@@ -104,20 +104,91 @@
 }
 .empty-state .emoji { font-size: 40px; margin-bottom: 12px; }
 .empty-state p { font-size: 15px; }
+
+/* ── Контрольные ─────────────────────────────────────────
+   Отдельный блок, а не пометка в общем списке: у контрольной
+   другое время (окно или лимит) и другая цена пропуска —
+   прятать её среди домашек, которые можно дослать, нельзя. */
+.exam-card { border-left: 3px solid var(--accent); }
+.kind-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; padding: 2px 7px; border-radius: 4px;
+  background: var(--accent-tint); color: var(--accent); margin-right: 8px;
+  vertical-align: middle;
+}
+.exam-schedule { font-size: 12px; color: var(--text2); }
+.btn-open.is-disabled {
+  background: var(--panel); color: var(--text2); cursor: default;
+  pointer-events: none;
+}
 {% endblock %}
 
 {% block content %}
-<h1 class="page-title">Мои домашки</h1>
+<h1 class="page-title">Мои работы</h1>
 
-{% if not active and not submitted and not completed %}
+{% if not active and not submitted and not completed and not has_exams %}
 <div class="empty-state">
   <div class="emoji">📚</div>
-  <p>Пока домашних заданий нет. Загляни позже!</p>
+  <p>Пока заданий нет. Загляни позже!</p>
 </div>
 {% else %}
 
+{% if exams_open %}
+<div class="section-label">Контрольные — можно писать сейчас</div>
+{% for item in exams_open %}
+<div class="hw-card exam-card">
+  <div class="hw-card-main">
+    <div class="hw-name"><span class="kind-badge">Контрольная</span>{{ item.assignment.name }}</div>
+    <div class="hw-meta">
+      <span class="exam-schedule">{{ item.schedule }}</span>
+      <span class="metric-progress">{{ item.stats.total }} задач</span>
+    </div>
+  </div>
+  <a href="{% url 'student:exam_intro' item.assignment.pk %}" class="btn-open">
+    {% if item.attempt %}Продолжить{% else %}Начать{% endif %}
+  </a>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if exams_upcoming %}
+<div class="section-label">Контрольные — ещё нельзя начать</div>
+{% for item in exams_upcoming %}
+<div class="hw-card exam-card">
+  <div class="hw-card-main">
+    <div class="hw-name"><span class="kind-badge">Контрольная</span>{{ item.assignment.name }}</div>
+    <div class="hw-meta">
+      <span class="exam-schedule">{{ item.schedule }}</span>
+      {% if item.closed_reason %}
+      <span class="deadline-badge deadline-grey">{{ item.closed_reason }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <a href="{% url 'student:exam_intro' item.assignment.pk %}" class="btn-open">Подробнее</a>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if exams_done %}
+<div class="section-label">Контрольные — написаны</div>
+{% for item in exams_done %}
+<div class="hw-card exam-card">
+  <div class="hw-card-main">
+    <div class="hw-name"><span class="kind-badge">Контрольная</span>{{ item.assignment.name }}</div>
+    <div class="hw-meta">
+      <span class="metric-progress">сдана {{ item.attempt.submitted_at|date:"d.m.Y, H:i" }}</span>
+      {% if item.attempt.is_auto_submitted %}
+      <span class="deadline-badge deadline-grey">сдана автоматически</span>
+      {% endif %}
+    </div>
+  </div>
+  <a href="{% url 'student:exam_intro' item.assignment.pk %}" class="btn-open">Результат</a>
+</div>
+{% endfor %}
+{% endif %}
+
 {% if active %}
-<div class="section-label">Активные</div>
+<div class="section-label">Домашки — активные</div>
 {% for item in active %}
 <div class="hw-card">
   <div class="hw-card-main">
@@ -149,7 +220,7 @@
 {% endif %}
 
 {% if submitted %}
-<div class="section-label">На проверке</div>
+<div class="section-label">Домашки — на проверке</div>
 {% for item in submitted %}
 <div class="hw-card">
   <div class="hw-card-main">
@@ -167,7 +238,7 @@
 {% endif %}
 
 {% if completed %}
-<div class="section-label">Завершённые</div>
+<div class="section-label">Домашки — завершённые</div>
 {% for item in completed %}
 <div class="hw-card">
   <div class="hw-card-main">
