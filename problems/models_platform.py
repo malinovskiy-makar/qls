@@ -231,3 +231,203 @@ class ProblemComment(models.Model):
 
     def __str__(self):
         return f'{self.author}: {self.text[:40]}'
+
+
+# ===========================================================================
+# Фаза 3. Собственные задачи репетитора, варианты ответа, позиция в домашке
+# ===========================================================================
+
+class CustomProblem(models.Model):
+    """Задача, написанная самим репетитором. ПРИВАТНАЯ.
+
+    В общий каталог не попадает НИКОГДА: каталог — это выверенный банк
+    олимпиадных задач, туда нельзя подмешивать чужой непроверенный контент.
+    Видят её автор и его ученики — и только в составе выданной домашки.
+
+    Отдельная модель, а не `Problem` с флагом: у `Problem` 30 полей импорта,
+    эмбеддинги, шлюз качества, дедупликация — всё это к задаче репетитора
+    отношения не имеет, а любой недосмотр в фильтрах вывалил бы её в каталог.
+    """
+
+    class Kind(models.TextChoices):
+        OPEN = 'open', 'Открытая задача'
+        TF = 'tf', 'Верно / неверно'
+        SINGLE = 'single', 'Один верный вариант'
+        MULTIPLE = 'multiple', 'Несколько верных вариантов'
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='custom_problems', verbose_name='Автор')
+    title = models.CharField('Название', max_length=300, blank=True,
+                             help_text='Необязательно.')
+    statement = models.TextField(
+        'Условие',
+        help_text='Формулы в долларах: $Q_d = 100 - P$. Рендерит KaTeX.')
+    kind = models.CharField('Тип', max_length=16,
+                            choices=Kind.choices, default=Kind.OPEN)
+
+    # Только для открытых задач.
+    correct_answer = models.TextField('Правильный ответ', blank=True)
+    # Допуск числового сравнения. По умолчанию 0 — точное совпадение.
+    # ⚠️ Сравнение чисел идёт через fractions.Fraction (как в «Классике»
+    # Econ Rush), а НЕ через float: 0,1 + 0,2 во float даёт 0.30000000000000004
+    # и честный ответ ученика был бы засчитан неверным.
+    answer_tolerance = models.DecimalField(
+        'Допуск', max_digits=12, decimal_places=6, default=0)
+
+    solution = models.TextField('Эталонное решение', blank=True)
+    # [{"text": "...", "result": "..."}, ...] — разбивка решения на шаги.
+    # Необязательна: свободный текст решения тоже принимается.
+    solution_steps = models.JSONField('Шаги решения', null=True, blank=True)
+
+    topic = models.ForeignKey(
+        'problems.Topic', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='custom_problems', verbose_name='Тема')
+    difficulty = models.PositiveSmallIntegerField(
+        'Сложность (1–5)', null=True, blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)])
+
+    created_at = models.DateTimeField('Создана', auto_now_add=True)
+    updated_at = models.DateTimeField('Изменена', auto_now=True)
+    is_deleted = models.BooleanField('Удалена', default=False)
+
+    class Meta:
+        verbose_name = 'Своя задача репетитора'
+        verbose_name_plural = 'Свои задачи репетиторов'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['owner', '-created_at'],
+                         name='idx_customprob_owner'),
+        ]
+
+    def __str__(self):
+        return self.title or f'Своя задача #{self.pk}'
+
+    @property
+    def is_test(self):
+        """Тест это или открытая задача (тесты проверяются автоматически)."""
+        return self.kind != self.Kind.OPEN
+
+    def correct_option_ids(self):
+        return set(self.options.filter(is_correct=True)
+                   .values_list('id', flat=True))
+
+
+class CustomProblemOption(models.Model):
+    """Вариант ответа у теста репетитора (tf / single / multiple)."""
+
+    problem = models.ForeignKey(
+        CustomProblem, on_delete=models.CASCADE,
+        related_name='options', verbose_name='Задача')
+    text = models.CharField('Текст варианта', max_length=500)
+    is_correct = models.BooleanField('Правильный', default=False)
+    order = models.PositiveIntegerField('Порядок', default=0)
+
+    class Meta:
+        verbose_name = 'Вариант ответа'
+        verbose_name_plural = 'Варианты ответа'
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        mark = '✓' if self.is_correct else '·'
+        return f'{mark} {self.text[:40]}'
+
+
+class AssignmentItem(models.Model):
+    """Позиция задачи в домашке.
+
+    Зачем нужна отдельная модель, а не просто M2M `Assignment.problems`:
+    в домашке рядом стоят задачи каталога и свои задачи репетитора, и у
+    КАЖДОЙ ПОЗИЦИИ своя обвязка — порядок, балл, комментарии, решалка,
+    график. Повесить это на M2M некуда, а на задачу каталога вешать нельзя:
+    одна и та же задача стоит в разных домашках с разными баллами и разными
+    обсуждениями.
+
+    Ровно одна из двух ссылок заполнена — это проверяется на уровне БАЗЫ
+    (CheckConstraint), а не только в коде: позиция без задачи или с двумя
+    задачами сразу — это порча данных, её надо ловить до записи.
+    """
+
+    assignment = models.ForeignKey(
+        'problems.Assignment', on_delete=models.CASCADE,
+        related_name='items', verbose_name='Домашка')
+    order = models.PositiveIntegerField('Порядок', default=0)
+
+    catalog_problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='assignment_items', verbose_name='Задача каталога')
+    custom_problem = models.ForeignKey(
+        CustomProblem, on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='assignment_items', verbose_name='Своя задача')
+
+    points = models.DecimalField('Балл', max_digits=6, decimal_places=2,
+                                 null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Задача в домашке'
+        verbose_name_plural = 'Задачи в домашке'
+        ordering = ['order', 'id']
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(catalog_problem__isnull=False,
+                             custom_problem__isnull=True)
+                    | models.Q(catalog_problem__isnull=True,
+                               custom_problem__isnull=False)
+                ),
+                name='assignment_item_exactly_one_problem',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.assignment}: {self.order}. {self.problem_title}'
+
+    # -- Единая точка доступа к задаче, какой бы она ни была ---------------
+    # Экраны не должны каждый раз писать «если каталожная — то так, если
+    # своя — то эдак»: расхождение в одном шаблоне и половина страницы пустая.
+
+    @property
+    def problem(self):
+        """Сама задача — каталожная или своя."""
+        return self.catalog_problem or self.custom_problem
+
+    @property
+    def is_custom(self):
+        return self.custom_problem_id is not None
+
+    @property
+    def problem_title(self):
+        problem = self.problem
+        if problem is None:
+            return '(задача удалена)'
+        return problem.title or f'Задача #{problem.pk}'
+
+    @property
+    def statement(self):
+        problem = self.problem
+        return problem.statement if problem is not None else ''
+
+    @property
+    def is_test(self):
+        """Тест ли это (тесты проверяются автоматически, сразу после сдачи)."""
+        if self.custom_problem_id is not None:
+            return self.custom_problem.is_test
+        if self.catalog_problem_id is None:
+            return False
+        ptype = self.catalog_problem.problem_type or ''
+        return ptype.startswith('тест')
+
+    @property
+    def correct_answer(self):
+        """Правильный ответ в человекочитаемом виде (для страницы репетитора)."""
+        if self.custom_problem_id is not None:
+            if self.custom_problem.is_test:
+                return ', '.join(
+                    o.text for o in self.custom_problem.options.filter(
+                        is_correct=True))
+            return self.custom_problem.correct_answer
+        if self.catalog_problem_id is None:
+            return ''
+        return self.catalog_problem.answer

@@ -7,7 +7,7 @@
       сигнал в `problems/signals.py`, команда `backfill_profiles`,
       админка `problems/admin_platform.py`
 - [x] Фаза 2. Комментарии — `ProblemComment` + `ProblemCommentQuerySet.visible_for()`
-- [ ] Фаза 3. Свои задачи и тесты
+- [x] Фаза 3. Свои задачи и тесты — `CustomProblem`, `CustomProblemOption`, `AssignmentItem` (CheckConstraint «ровно одна задача»)
 - [ ] Фаза 4. Сохранённое и папки
 - [ ] Фаза 5. Решалка
 - [ ] Фаза 6. Контрольные
