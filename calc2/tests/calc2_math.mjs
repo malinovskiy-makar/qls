@@ -766,11 +766,14 @@ const CASES = [
     checks: [['площадь', 'S', 50, 0.01]],
   },
   {
+    // Кроме равновесия в списке теперь и пересечения с осями: (100; 0), (0; 100), (0; 0).
     name: 'Пересечение кривых · D = 100 − Q и S = Q ⇒ (50; 50)',
     run: `loadScene('sd'); redrawAll();
-          var c = (STATE.crosses || [])[0] || {};
-          return { x: c.x, y: c.y, n: (STATE.crosses || []).length };`,
-    checks: [['x', 'x', 50, 0.2], ['y', 'y', 50, 0.2], ['сколько', 'n', 1, 0]],
+          var all = STATE.crosses || [];
+          var c = all.filter(function (p) {
+            return Math.abs(p.x - 50) < 0.2 && Math.abs(p.y - 50) < 0.2; })[0] || {};
+          return { x: c.x, y: c.y, n: all.length };`,
+    checks: [['x', 'x', 50, 0.2], ['y', 'y', 50, 0.2], ['всего точек', 'n', 4, 0]],
   },
   {
     name: 'Формула в pgfplots · 100 − 2*Q ⇒ (100 - (2 * x))',
@@ -881,6 +884,18 @@ const CASES = [
           return { n: Object.keys(STATE.params).length,
                    mc: STATE.params.MC ? 1 : 0 };`,
     checks: [['параметров', 'n', 1, 0], ['имя = MC', 'mc', 1, 0]],
+  },
+  {
+    // Пересечения считаются и между кривыми, и с осями координат.
+    name: 'Пересечения с осями · D = 100 − Q даёт (100; 0) и (0; 100)',
+    run: `loadScene('free');
+          STATE.curves = []; STATE.params = {};
+          addCurve('100 - Q'); redrawAll();
+          var pts = crossPoints();
+          var onX = pts.filter(function (p) { return Math.abs(p.y) < 1e-6; })[0] || {};
+          var onY = pts.filter(function (p) { return Math.abs(p.x) < 1e-6; })[0] || {};
+          return { n: pts.length, xq: onX.x, yp: onY.y };`,
+    checks: [['точек', 'n', 2, 0], ['на оси Q', 'xq', 100, 0.05], ['на оси P', 'yp', 100, 0.05]],
   },
 ];
 

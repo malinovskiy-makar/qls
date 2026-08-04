@@ -8960,7 +8960,8 @@ function initZoom() {
     const r0 = gw.getBoundingClientRect();
     const hit = (STATE.mode !== 'math') ? rollerTargetAt(e.clientX - r0.left, e.clientY - r0.top) : null;
     if (hit) {
-      STATE.roller = { f: hit.f, name: hit.name, color: hit.color || null, x: 0, y: 0 };
+      // pinned — точку ведут рукой, слежение за курсором в это время молчит.
+      STATE.roller = { f: hit.f, name: hit.name, color: hit.color || null, x: 0, y: 0, pinned: true };
       roll = { id: e.pointerId };
       gw.setPointerCapture(e.pointerId);
       rollerMove(e.clientX - r0.left);
@@ -8979,6 +8980,11 @@ function initZoom() {
     if (roll && e.pointerId === roll.id) {
       rollerMove(e.clientX - gw.getBoundingClientRect().left);
       return;
+    }
+    if (!pan) {
+      // Кнопку не держат — точка просто едет за курсором по ближайшей кривой.
+      const rb = gw.getBoundingClientRect();
+      hoverRoll(e.clientX - rb.left, e.clientY - rb.top);
     }
     if (!pan || e.pointerId !== pan.id) return;
     const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
@@ -8999,6 +9005,8 @@ function initZoom() {
   };
   gw.addEventListener('pointerup', endPan);
   gw.addEventListener('pointercancel', endPan);
+  // Курсор ушёл с холста — бегущая точка гаснет.
+  gw.addEventListener('pointerleave', () => hoverRollOff());
 }
 
 // Отменить и дебаунс, и текущий твин (при смене сцены/режима — чтобы отложенный
@@ -10842,35 +10850,55 @@ function syncAreaColorList() {
   });
 }
 
-/* ── Точки пересечения кривых (Фаза 6) ────────────────────────────────
-   Считаются сами по всем видимым кривым сцены. Показываются тускло; по
-   щелчку точка становится яркой и подписывает свои координаты. */
+/* ── Точки пересечения (Фаза 6, дополнено) ────────────────────────────
+   Считаются сами: кривые друг с другом И каждая кривая с осями координат.
+   Показываются тускло; наведение или щелчок делает точку яркой и подписывает
+   координаты, курсор ушёл — снова тускнеет. */
 function crossPoints() {
   const t = snapTargets();
-  if (t.length < 2) return [];
-  const [lo0, hi] = [Math.max(0, CONFIG.Qmin), CONFIG.Qmax];
+  if (!t.length) return [];
+  const [lo0, hi] = [quadLo(CONFIG.Qmin), CONFIG.Qmax];
   const lo = lo0 + (hi - lo0) * 1e-6;
+  const yLo = quadLo(CONFIG.Pmin), yHi = CONFIG.Pmax;
   const out = [];
+  const dupTol = (hi - lo) * 1e-3, dupTolY = (yHi - yLo) * 1e-3;
+  const push = (x, y, a, b) => {
+    if (!isFinite(x) || !isFinite(y)) return;
+    if (x < lo0 - 1e-9 || x > hi + 1e-9 || y < yLo - 1e-9 || y > yHi + 1e-9) return;
+    // Одну и ту же точку три кривые дают трижды — рядом стоящие сливаем.
+    if (out.some(o => Math.abs(o.x - x) < dupTol && Math.abs(o.y - y) < dupTolY)) return;
+    out.push({ x, y, a, b });
+  };
   for (let a = 0; a < t.length; a++) {
     for (let b = a + 1; b < t.length; b++) {
       const g = (x) => { const p = t[a].f(x), q = t[b].f(x); return (isNaN(p) || isNaN(q)) ? NaN : p - q; };
       const N = 240;
       let prevX = lo, prevG = g(lo);
-      for (let i = 1; i <= N && out.length < 40; i++) {
+      for (let i = 1; i <= N && out.length < 60; i++) {
         const x = lo + (hi - lo) * i / N, cur = g(x);
         if (!isNaN(prevG) && !isNaN(cur) && prevG * cur <= 0 && prevG !== cur) {
           const r = (prevG === 0) ? prevX : (cur === 0 ? x : bisect(g, prevX, x));
-          const y = t[a].f(r);
-          if (isFinite(r) && isFinite(y) && y >= Math.max(0, CONFIG.Pmin) && y <= CONFIG.Pmax) {
-            // Одну и ту же точку три кривые дают трижды — рядом стоящие сливаем.
-            const dup = out.some(o => Math.abs(o.x - r) < (hi - lo) * 1e-3 && Math.abs(o.y - y) < (CONFIG.Pmax - CONFIG.Pmin) * 1e-3);
-            if (!dup) out.push({ x: r, y, a: t[a].name, b: t[b].name });
-          }
+          push(r, t[a].f(r), t[a].name, t[b].name);
         }
         prevX = x; prevG = cur;
       }
     }
   }
+  // Пересечения с осями: где кривая садится на ось X (y = 0) и где начинается
+  // на оси Y (x = 0). В экономике это выпуск при нулевой цене и цена отсечения.
+  t.forEach(c => {
+    const N = 240;
+    let prevX = lo, prevV = c.f(lo);
+    for (let i = 1; i <= N && out.length < 60; i++) {
+      const x = lo + (hi - lo) * i / N, v = c.f(x);
+      if (!isNaN(prevV) && !isNaN(v) && prevV * v <= 0 && prevV !== v) {
+        const r = (prevV === 0) ? prevX : (v === 0 ? x : bisect((z) => c.f(z), prevX, x));
+        push(r, 0, c.name, 'ось Q');
+      }
+      prevX = x; prevV = v;
+    }
+    if (lo0 <= 1e-9) push(0, c.f(0), c.name, 'ось P');
+  });
   return out;
 }
 
@@ -10882,25 +10910,30 @@ function drawCrossPoints() {
   const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'crosses');
   pts.forEach((p, i) => {
-    const hot = (STATE.hotCross === i);
+    const hot = (STATE.hotCross === i) || (STATE.hoverCross === i);
     const px = mx(p.x), py = my(p.y);
-    g.append('circle').attr('cx', px).attr('cy', py).attr('r', hot ? 5 : 4)
+    const dot = g.append('circle').attr('cx', px).attr('cy', py).attr('r', hot ? 5 : 4)
       .attr('fill', hot ? COL.ink : COL.halo)
       .attr('stroke', hot ? COL.ink : COL.inkSoft)
       .attr('stroke-width', hot ? 2 : 1.4)
       .attr('opacity', hot ? 1 : 0.55)
       .style('cursor', 'pointer')
-      .on('click', (ev) => { ev.stopPropagation(); STATE.hotCross = hot ? null : i; redrawAll(); })
-      .append('title').text(p.a + ' и ' + p.b);
+      .on('click', (ev) => { ev.stopPropagation(); STATE.hotCross = (STATE.hotCross === i) ? null : i; redrawAll(); })
+      // Наведение показывает координаты, не требуя щелчка; ушли — снова тускло.
+      .on('pointerenter', () => { if (STATE.hoverCross !== i) { STATE.hoverCross = i; redrawAll(); } })
+      .on('pointerleave', () => { if (STATE.hoverCross === i) { STATE.hoverCross = null; redrawAll(); } });
+    dot.append('title').text(p.a + ' и ' + p.b);
     if (hot) {
       haloText(g, px + 9, py - 9, '(' + fmt(p.x) + '; ' + fmt(p.y) + ')', 'start', 'auto');
     }
   });
 }
 
-/* Прокатывание по кривой: нажали рядом с кривой и ведёте курсор — по ней
-   едет точка и показывает координаты. Если отпустить, точка исчезает;
-   чтобы оставить её, есть кнопка «Поставить точку». */
+/* Прокатывание по кривой: ведёте курсор над графиком — по ближайшей кривой
+   едет точка и показывает свои координаты. Нажимать не нужно, курсору не
+   обязательно быть ровно на линии: точка следит за горизонтальным положением
+   курсора и остаётся на функции. Чтобы точка осталась насовсем, есть кнопка
+   «Поставить точку». */
 function drawRoller() {
   const r = STATE.roller;
   if (!r) return;
@@ -10936,7 +10969,8 @@ function rollerTargetAt(px, py) {
   return (best && best.d <= ROLL_PX) ? best.t : null;
 }
 
-const ROLL_PX = 26;   // на каком расстоянии нажатие считается «по кривой»
+const ROLL_PX = 26;    // на каком расстоянии нажатие считается «по кривой»
+const HOVER_PX = 90;   // на каком расстоянии курсор ещё «ведёт» ближайшую кривую
 
 function rollerMove(px) {
   const r = STATE.roller;
@@ -10948,6 +10982,43 @@ function rollerMove(px) {
   if (!isFinite(y)) return;
   r.x = x; r.y = y;
   redrawAll();
+}
+
+/* Точка едет за курсором без нажатия. Кривую выбираем по вертикальной близости
+   в текущем положении курсора: так точка не перескакивает между кривыми, когда
+   те идут рядом, и уверенно держится той, над которой ведут мышь. */
+function hoverRoll(px, py) {
+  if (STATE.mode === 'math' || STATE.markArm) return hoverRollOff();
+  const { mx, my } = mainScales();
+  const [xLo, xHi] = mx.domain();
+  if (px < mx(xLo) - 2 || px > mx(xHi) + 2) return hoverRollOff();
+  const x = mx.invert(px);
+  let best = null;
+  snapTargets().forEach(t => {
+    const y = t.f(x);
+    if (!isFinite(y)) return;
+    const d = Math.abs(my(y) - py);
+    if (!best || d < best.d) best = { d, t, x, y };
+  });
+  if (!best || best.d > HOVER_PX) return hoverRollOff();
+  const r = STATE.roller;
+  if (r && r.pinned) return;                        // тянут точку рукой — не мешаем
+  if (r && r.name === best.t.name && Math.abs(r.x - best.x) < (xHi - xLo) * 1e-4) return;
+  STATE.roller = { f: best.t.f, name: best.t.name, color: best.t.color || null, x: best.x, y: best.y };
+  rollRedrawSoon();
+}
+function hoverRollOff() {
+  const r = STATE.roller;
+  if (!r || r.pinned) return;
+  STATE.roller = null;
+  rollRedrawSoon();
+}
+/* Курсор шлёт десятки событий в секунду, а перерисовка холста полная. Копим
+   и рисуем раз в кадр — иначе движение мыши по графику подтормаживает. */
+let _rollRaf = null;
+function rollRedrawSoon() {
+  if (_rollRaf != null) return;
+  _rollRaf = requestAnimationFrame(() => { _rollRaf = null; redrawAll(); });
 }
 /* ── Расчёт площадей (Фаза 10) ────────────────────────────────────────
    Два способа: под кривой на отрезке и по выбранным точкам. Оба считаются
