@@ -261,6 +261,38 @@ class AutosaveTests(TestCase):
                              exam_engine.seconds_remaining(attempt))
         self.assertGreater(response.context['seconds_left'], 0)
 
+    def test_task_with_a_draft_is_in_progress_not_not_started(self):
+        """ФАЗА 0.4. Ответ введён — значит задача «В работе».
+
+        Раньше состояние читалось из `Submission.status`, а он до самой
+        сдачи остаётся `not_started`: над задачей с введённым ответом
+        висело «Не начата».
+        """
+        self._start()
+        body = self.client.get(
+            reverse('student:exam_take', args=[self.exam.pk])).content.decode()
+        self.assertIn('Не начата', body)
+        self.assertIn('отвечено <b id="answered-count">0</b>', body)
+
+        self.client.post(
+            reverse('student:exam_autosave', args=[self.exam.pk]),
+            data=json.dumps({'item_id': self.item.pk, 'answer': '42'}),
+            content_type='application/json')
+
+        body = self.client.get(
+            reverse('student:exam_take', args=[self.exam.pk])).content.decode()
+        self.assertIn('В работе', body)
+        self.assertNotIn('Не начата', body)
+        self.assertIn('отвечено <b id="answered-count">1</b>', body)
+
+    def test_whitespace_only_draft_is_not_progress(self):
+        """Пробелы — не ответ."""
+        from problems.assignment_rows import work_status
+
+        submission = Submission(status='not_started')
+        self.assertEqual(work_status(submission, '   ', ' \n '), 'not_started')
+        self.assertEqual(work_status(submission, '', '5'), 'in_progress')
+
     def test_autosave_of_choices_restores_checked(self):
         problem = make_problem('Тест', problem_type='тест: один ответ')
         for order, label in enumerate(('а', 'б')):

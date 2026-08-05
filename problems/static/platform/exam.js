@@ -186,12 +186,39 @@
       });
   }
 
+  // Задача считается начатой по НАПИСАННОМУ, а не по отправленному —
+  // то же правило, что у сервера (`assignment_rows.work_status`). Иначе
+  // ученик видит «Не начата» над задачей, в которую только что вписал
+  // ответ.
+  function isAnswered(payload) {
+    return Boolean((payload.answer || '').trim()
+      || (payload.solution || '').trim());
+  }
+
   function markAnswered(itemId, payload) {
+    var answered = isAnswered(payload);
     var link = document.querySelector('#qnav a[data-item="' + itemId + '"]');
-    if (link) {
-      link.classList.toggle('is-answered',
-        Boolean(payload.answer || (payload.solution || '').trim()));
+    if (link) { link.classList.toggle('is-answered', answered); }
+
+    var badge = document.querySelector(
+      '[data-status-badge="' + itemId + '"]');
+    if (badge && !badge.dataset.locked) {
+      badge.textContent = answered ? 'В работе' : 'Не начата';
+      badge.className = 'status-badge status-'
+        + (answered ? 'in_progress' : 'not_started');
     }
+    repaintAnsweredCount();
+  }
+
+  function repaintAnsweredCount() {
+    var node = document.getElementById('answered-count');
+    if (!node) { return; }
+    var count = 0;
+    (config.itemIds || []).forEach(function (itemId) {
+      var payload = collect(itemId);
+      if (payload && isAnswered(payload)) { count += 1; }
+    });
+    node.textContent = count;
   }
 
   function retryPending() {
@@ -235,8 +262,17 @@
     (config.itemIds || []).forEach(function (itemId) {
       var card = document.getElementById('item-' + itemId);
       if (!card) { return; }
-      card.addEventListener('input', function () { schedule(itemId); });
-      card.addEventListener('change', function () { send(itemId); });
+      // Статус и счётчик красим СРАЗУ по вводу, не дожидаясь ответа
+      // сервера: ученик написал ответ — задача уже «в работе», даже если
+      // автосохранение ещё в полёте или сеть отвалилась.
+      card.addEventListener('input', function () {
+        markAnswered(itemId, collect(itemId) || {});
+        schedule(itemId);
+      });
+      card.addEventListener('change', function () {
+        markAnswered(itemId, collect(itemId) || {});
+        send(itemId);
+      });
       card.addEventListener('focusout', function () {
         clearTimeout(timers[itemId]);
         send(itemId);

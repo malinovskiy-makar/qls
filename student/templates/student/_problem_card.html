@@ -14,13 +14,13 @@
   <div class="problem-card-head">
     <span class="problem-num">Задача {{ row.number }}</span>
     {% if row.title %}<span class="problem-title-text">{{ row.title }}</span>{% endif %}
-    <span class="status-badge status-{{ row.sub.status }}">
-      {% if row.sub.status == 'not_started' %}Не начата
-      {% elif row.sub.status == 'in_progress' %}В процессе
-      {% elif row.sub.status == 'submitted' %}Отправлено
-      {% elif row.sub.status == 'reviewed' %}Проверено
-      {% endif %}
-    </span>
+    {# ⚠️ Состояние берётся из `row.status`, а НЕ из `row.sub.status`:
+       во время контрольной ответ лежит в черновике, и `Submission` до сдачи
+       остаётся «не начата». Правило одно на все экраны —
+       `assignment_rows.work_status`. #}
+    <span class="status-badge status-{{ row.status }}"
+          data-status-badge="{{ row.item.pk }}"
+          {% if row.is_done %}data-locked="1"{% endif %}>{{ row.status_label }}</span>
   </div>
 
   <div class="problem-card-body">

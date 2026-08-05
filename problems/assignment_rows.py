@@ -139,6 +139,50 @@ def submitted_display(item, submission):
     return ', '.join(labels) if labels else raw
 
 
+# Как называется состояние задачи для ученика. Ключи — те же, что у
+# `Submission.status`, плюс правило для «в работе».
+STATUS_LABELS = {
+    'not_started': 'Не начата',
+    'in_progress': 'В работе',
+    'submitted': 'Отправлено',
+    'reviewed': 'Проверено',
+}
+
+
+def work_status(submission, answer='', solution=''):
+    """Состояние задачи ГЛАЗАМИ УЧЕНИКА.
+
+    ⚠️ «В работе» считается по НАПИСАННОМУ, а не по отправленному. Во время
+    контрольной ответы лежат в черновике и `Submission.status` остаётся
+    `not_started` до самой сдачи — ученик видел «Не начата» над задачей, в
+    которую только что вписал ответ. Ничего страшнее непонимания это не
+    вызывало, но доверие к экрану ломало сразу.
+    """
+    status = submission.status if submission is not None else 'not_started'
+    if status in ('submitted', 'reviewed'):
+        return status
+    if (answer or '').strip() or (solution or '').strip():
+        return 'in_progress'
+    return status if status in STATUS_LABELS else 'not_started'
+
+
+def apply_draft(row, draft):
+    """Кладёт черновик контрольной в строку и пересчитывает состояние.
+
+    Одна точка: иначе экран прохождения и счётчик в шапке начнут считать
+    «начато» по разным правилам.
+    """
+    row['prefill_answer'] = draft.answer_draft if draft else ''
+    row['prefill_solution'] = draft.solution_draft if draft else ''
+    row['selected'] = selected_values(row['prefill_answer'])
+    row['answered'] = bool((row['prefill_answer'] or '').strip()
+                           or (row['prefill_solution'] or '').strip())
+    row['status'] = work_status(row['sub'], row['prefill_answer'],
+                                row['prefill_solution'])
+    row['status_label'] = STATUS_LABELS[row['status']]
+    return row
+
+
 def selected_values(answer):
     """Множество выбранных вариантов из строки ответа.
 
@@ -179,6 +223,8 @@ def build_rows(assignment, student, user=None, with_comments=True):
         submission = get_or_create_submission(student, assignment, item)
         kind, options = item_answer_form(item)
         problem = item.problem
+        status = work_status(submission, submission.submitted_answer,
+                             submission.solution_text)
         rows.append({
             'item': item,
             'number': number,
@@ -206,6 +252,10 @@ def build_rows(assignment, student, user=None, with_comments=True):
             'feedback': getattr(submission, 'feedback', None),
             'answer_display': submitted_display(item, submission),
             'is_done': submission.status in ('submitted', 'reviewed'),
+            'status': status,
+            'status_label': STATUS_LABELS[status],
+            'answered': bool((submission.submitted_answer or '').strip()
+                             or (submission.solution_text or '').strip()),
             'selected': selected_values(submission.submitted_answer),
             'comments': comments_by_item.get(item.pk, []),
             'solution_visible': item.is_solution_visible_for(user),

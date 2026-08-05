@@ -92,18 +92,15 @@ def exam_take(request, pk):
     if attempt.submitted_at is not None:
         return redirect('student:exam_result', pk=assignment.pk)
 
+    from problems.assignment_rows import apply_draft
+
     rows = build_rows(assignment, request.user, with_comments=False)
     drafts = exam_engine.drafts_map(attempt)
     for row in rows:
-        from problems.assignment_rows import selected_values
-
-        draft = drafts.get(row['item'].pk)
         # Форму заполняем ЧЕРНОВИКОМ: ученик вернулся после обрыва и должен
-        # увидеть написанное, а не пустые поля.
-        row['prefill_answer'] = draft.answer_draft if draft else ''
-        row['prefill_solution'] = draft.solution_draft if draft else ''
-        row['selected'] = selected_values(row['prefill_answer'])
-        row['answered'] = bool(row['prefill_answer'] or row['prefill_solution'])
+        # увидеть написанное, а не пустые поля. Заодно пересчитывается
+        # состояние задачи — «в работе» считается по черновику.
+        apply_draft(row, drafts.get(row['item'].pk))
 
     return render(request, 'student/exam_take.html', {
         'assignment': assignment,
