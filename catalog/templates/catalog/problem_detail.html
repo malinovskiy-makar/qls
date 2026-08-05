@@ -190,8 +190,10 @@
 </h1>
 
 {% if user.is_authenticated %}
-{# Кнопка «Сохранить к себе» — маленькая и ненавязчивая, работает без
-   перезагрузки. Акцентом её делать нельзя: это мелочь на странице задачи. #}
+{% comment %}
+Кнопка «Сохранить к себе» — маленькая и ненавязчивая, работает без
+перезагрузки. Акцентом её делать нельзя: это мелочь на странице задачи.
+{% endcomment %}
 <button type="button" id="save-problem-btn" data-problem="{{ problem.pk }}"
         style="border:0.5px solid var(--border);border-radius:var(--r);
                background:transparent;color:var(--text2);font:inherit;

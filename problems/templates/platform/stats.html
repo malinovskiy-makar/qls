@@ -53,9 +53,11 @@
     <svg class="goal-ring" width="72" height="72" viewBox="0 0 72 72" role="img"
          aria-label="Недельная цель: {{ w.done }} из {{ w.goal }}">
       <circle class="goal-ring-bg" cx="36" cy="36" r="30"></circle>
-      {# Длина окружности r=30 равна 188.5; заполнение — долей от неё.
-         Считаем через calc() в CSS: в шаблоне умножать нечем, а второе
-         место, где живёт число 188.5, разъехалось бы с первым. #}
+      {% comment %}
+      Длина окружности r=30 равна 188.5; заполнение — долей от неё.
+      Считаем через calc() в CSS: в шаблоне умножать нечем, а второе
+      место, где живёт число 188.5, разъехалось бы с первым.
+      {% endcomment %}
       <circle class="goal-ring-fg" cx="36" cy="36" r="30"
               stroke-dasharray="188.5"
               style="stroke-dashoffset: calc(188.5px - 1.885px * {{ w.percent }})"></circle>
