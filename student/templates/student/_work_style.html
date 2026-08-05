@@ -106,7 +106,28 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
 .hint-label { font-size: 11px; font-weight: 700; color: var(--amber);
               margin-bottom: 4px; }
 
-/* ── Проверка ────────────────────────────────────── */
+/* ── Проверка: единый блок обратной связи ────────── */
+/* Зелёная рамка — у проверки преподавателем, серая — у автопроверки.
+   Разница видна с первого взгляда: «машина сверила ответ» и «человек
+   прочитал решение» для ученика вещи очень разные. */
+.fb-block {
+  margin-top: 16px; padding: 14px 16px; border-radius: var(--r);
+  border: 1px solid var(--border); background: var(--surface-2);
+}
+.fb-block.fb-teacher { background: var(--green-tint);
+                       border-color: var(--green-border); }
+.fb-head { display: flex; align-items: baseline; gap: 10px;
+           flex-wrap: wrap; margin-bottom: 6px; }
+.fb-score { font-size: 20px; font-weight: 800; color: var(--text); }
+.fb-teacher .fb-score { color: var(--green); }
+.fb-source { font-size: 11px; font-weight: 700; text-transform: uppercase;
+             letter-spacing: .05em; color: var(--text2); }
+.fb-comment { font-size: 14px; line-height: 1.65; margin-top: 4px;
+              overflow-wrap: anywhere; }
+.fb-mistakes-cap { font-size: 12px; font-weight: 700; color: var(--text2);
+                   margin-top: 10px; margin-bottom: 6px; }
+
+/* ── Проверка (старый блок, ещё используется) ────── */
 .feedback-block {
   margin-top: 16px; padding: 16px; background: var(--green-tint);
   border: 1px solid var(--green-border); border-radius: var(--r);

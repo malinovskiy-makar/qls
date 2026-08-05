@@ -1,0 +1,37 @@
+{% comment %}
+Проверка одной задачи глазами ученика. ОДИН блок на домашку и контрольную.
+
+⚠️ ЗАЧЕМ ОТДЕЛЬНЫЙ ФАЙЛ. Репетитор ставил 10 баллов и писал комментарий, а
+ученик видел «верно» от автопроверки и больше ничего: на экране результата
+контрольной блока проверки не было вовсе, а на карточке домашки он был свой.
+Два места — две разные правды. Теперь блок один, и всё, что сделал
+преподаватель, доезжает до ученика везде одинаково.
+
+Ждёт в контексте:
+  fb      — TeacherFeedback или None
+  points  — максимум баллов за задачу (может отсутствовать)
+  pending_text — что написать, когда проверки ещё нет (необязательно)
+{% endcomment %}
+{% if fb %}
+<div class="fb-block {% if fb.reviewed_by_id %}fb-teacher{% else %}fb-auto{% endif %}">
+  <div class="fb-head">
+    {% if fb.score is not None %}
+    <span class="fb-score">{{ fb.score|floatformat:"-2" }}{% if points %} / {{ points|floatformat:"-2" }}{% endif %} б.</span>
+    {% endif %}
+    <span class="fb-source">
+      {% if fb.reviewed_by_id %}проверил преподаватель{% else %}проверено автоматически{% endif %}
+    </span>
+  </div>
+  {% if fb.comment %}
+  <div class="fb-comment">{{ fb.comment|linebreaksbr }}</div>
+  {% endif %}
+  {% if fb.mistakes.all %}
+  <div class="fb-mistakes-cap">Типовые ошибки, отмеченные преподавателем:</div>
+  <div class="mistake-tags">
+    {% for m in fb.mistakes.all %}<span class="mistake-tag">{{ m.name }}</span>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% elif pending_text %}
+<div class="pf-locked">{{ pending_text }}</div>
+{% endif %}

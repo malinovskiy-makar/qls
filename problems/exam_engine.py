@@ -294,14 +294,25 @@ def _autocheck(submission, item):
 
 
 def attempt_summary(attempt):
-    """Результат попытки для экрана ученика и таблицы репетитора."""
+    """Результат попытки для экрана ученика и таблицы репетитора.
+
+    ⚠️ В строке ЕСТЬ ВСЁ, ЧТО СДЕЛАЛ ПРЕПОДАВАТЕЛЬ: балл, комментарий,
+    отмеченные типовые ошибки и признак «проверял человек, а не машина».
+    Раньше отсюда уходил только `state` («верно»/«неверно»), и поставленные
+    репетитором десять баллов вместе с комментарием НЕ ДОЕЗЖАЛИ до ученика
+    вообще — экран показывал вердикт автопроверки и молчал про остальное.
+    Это рвало главный цикл продукта: проверил → увидел → понял.
+    """
     from .assignment_rows import get_or_create_submission, submitted_display
 
     rows = []
     scored = max_score = 0.0
     pending = 0
+    reviewed_by_teacher = 0
     for item in (attempt.assignment.items
                  .select_related('catalog_problem', 'custom_problem')
+                 .prefetch_related('catalog_problem__parts',
+                                   'custom_problem__options')
                  .order_by('order', 'id')):
         submission = get_or_create_submission(attempt.student,
                                               attempt.assignment, item)
@@ -316,6 +327,12 @@ def attempt_summary(attempt):
         else:
             state = 'pending'
             pending += 1
+        # Кто поставил балл. У автопроверки `reviewed_by` пуст — по нему и
+        # различаем: «машина сверила ответ» и «преподаватель прочитал
+        # решение» для ученика вещи очень разные.
+        by_teacher = bool(feedback is not None and feedback.reviewed_by_id)
+        if by_teacher:
+            reviewed_by_teacher += 1
         rows.append({
             'item': item,
             'submission': submission,
@@ -325,6 +342,10 @@ def attempt_summary(attempt):
             and feedback.score is not None else None,
             'points': points,
             'state': state,
+            'feedback': feedback,
+            'by_teacher': by_teacher,
+            'comment': (feedback.comment or '') if feedback else '',
+            'mistakes': list(feedback.mistakes.all()) if by_teacher else [],
         })
 
     return {
@@ -332,6 +353,7 @@ def attempt_summary(attempt):
         'scored': round(scored, 2),
         'max_score': round(max_score, 2),
         'pending': pending,
+        'reviewed_by_teacher': reviewed_by_teacher,
         'graded_max': round(max_score - sum(
             r['points'] for r in rows if r['state'] == 'pending'), 2),
     }

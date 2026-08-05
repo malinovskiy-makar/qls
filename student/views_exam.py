@@ -249,7 +249,11 @@ def exam_result(request, pk):
         'summary': summary,
         'spent_minutes': spent,
         'group_average': _group_average(assignment),
-        'show_results': assignment.show_results_immediately,
+        # ⚠️ «Придержать результат до проверки» относится к АВТОПРОВЕРКЕ.
+        # Как только преподаватель проверил хоть одну задачу руками, баллы
+        # показываем: он их и ставил для ученика.
+        'show_scores': (assignment.show_results_immediately
+                        or summary['reviewed_by_teacher'] > 0),
     })
 
 

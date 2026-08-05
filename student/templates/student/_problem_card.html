@@ -102,23 +102,8 @@
       </div>
     {% endif %}
 
-    {% if row.sub.status == 'reviewed' and row.feedback %}
-    <div class="feedback-block">
-      {% if row.feedback.score is not None %}
-      <div class="feedback-score">{{ row.feedback.score }} б.</div>
-      {% endif %}
-      {% if row.feedback.comment %}
-      <div class="feedback-comment">{{ row.feedback.comment }}</div>
-      {% endif %}
-      {% if row.feedback.mistakes.all %}
-      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Замечания:</div>
-      <div class="mistake-tags">
-        {% for m in row.feedback.mistakes.all %}<span class="mistake-tag">{{ m.name }}</span>{% endfor %}
-      </div>
-      {% endif %}
-    </div>
-    {% elif row.sub.status == 'submitted' %}
-    <div class="pf-locked">Ждёт проверки преподавателем.</div>
+    {% if row.is_done or readonly %}
+    {% include "student/_feedback_block.html" with fb=row.feedback points=row.item.points pending_text="Ждёт проверки преподавателем." %}
     {% endif %}
 
     {% if row.has_solution %}

@@ -37,7 +37,7 @@
        text-transform:uppercase;letter-spacing:.06em;">Контрольная</div>
   <h1 class="hw-title" style="margin:6px 0 16px;">{{ assignment.name }}</h1>
 
-  {% if show_results %}
+  {% if show_scores %}
     <div class="res-score">{{ summary.scored }} / {{ summary.graded_max }}</div>
     <div class="res-cap">баллов по проверенным задачам</div>
   {% else %}
@@ -74,8 +74,19 @@
         <div class="res-answer"><b>Ваш ответ:</b>
           {% if row.answer %}{{ row.answer }}{% else %}<span class="muted" style="color:var(--text2)">не отвечено</span>{% endif %}
         </div>
-        {% if show_results and row.state != 'pending' and row.correct_answer %}
+        {% if show_scores and row.state != 'pending' and row.correct_answer %}
         <div class="res-answer"><b>Правильный ответ:</b> {{ row.correct_answer }}</div>
+        {% endif %}
+
+        {# ⚠️ Проверка преподавателя показывается ВСЕГДА, автопроверка — по
+           настройке работы. Балл и комментарий, которые репетитор написал
+           руками, придержать «до открытия результатов» нельзя: он их для
+           ученика и писал. #}
+        {% if row.by_teacher or show_scores %}
+          {% include "student/_feedback_block.html" with fb=row.feedback points=row.points pending_text="" %}
+        {% endif %}
+        {% if row.state == 'pending' %}
+        <div class="pf-locked">Ждёт проверки преподавателем.</div>
         {% endif %}
 
         {% if row.item.has_solution %}
@@ -90,7 +101,8 @@
         {% endif %}
       </div>
       <span class="res-mark mark-{{ row.state }}">
-        {% if row.state == 'correct' %}верно{% elif row.state == 'wrong' %}неверно
+        {% if not show_scores and not row.by_teacher %}сдано
+        {% elif row.state == 'correct' %}верно{% elif row.state == 'wrong' %}неверно
         {% elif row.state == 'pending' %}на проверке{% else %}без ответа{% endif %}
       </span>
     </div>

@@ -416,6 +416,103 @@ class GradingTests(TestCase):
             reverse('student:exam_result', args=[self.exam.pk])).content.decode()
         self.assertIn('предварительный результат', body)
 
+    def _finish(self):
+        self.client.post(reverse('student:exam_start', args=[self.exam.pk]))
+        self.client.post(reverse('student:exam_finish', args=[self.exam.pk]),
+                         {'answer_item_%d' % self.item.pk: 'б',
+                          'text_item_%d' % self.open_item.pk: 'рассуждение'})
+
+    def _review_open_item(self, score='7', comment='Разобрано аккуратно',
+                          mistakes=()):
+        """Преподаватель проверяет открытую задачу — как в браузере, POSTом
+        на ту же форму, а не записью в базу напрямую."""
+        submission = Submission.objects.get(student=self.student,
+                                            problem_item=self.open_item)
+        self.client.force_login(self.tutor)
+        self.client.post(
+            reverse('teacher:review_submission', args=[submission.pk]),
+            {'score': score, 'comment': comment,
+             'mistakes': [m.pk for m in mistakes]})
+        self.client.force_login(self.student)
+        return submission
+
+    def test_teacher_score_and_comment_reach_the_student(self):
+        """ГЛАВНЫЙ ТЕСТ ФАЗЫ 0.2 — полный цикл.
+
+        Преподаватель ставит балл, пишет комментарий и отмечает типовую
+        ошибку. Ученик обязан увидеть ВСЁ ТРИ. Раньше на экране результата
+        не было ни одного из них — только «верно» от автопроверки.
+        """
+        from problems.models import MistakeTag
+
+        mistake = MistakeTag.objects.create(name='Перепутаны оси')
+        self._finish()
+        self._review_open_item(score='7', comment='Хорошо, но проверь единицы',
+                               mistakes=[mistake])
+
+        body = self.client.get(
+            reverse('student:exam_result', args=[self.exam.pk])).content.decode()
+        self.assertIn('Хорошо, но проверь единицы', body)
+        self.assertIn('Перепутаны оси', body)
+        self.assertIn('проверил преподаватель', body)
+        self.assertIn('7', body)
+
+    def test_zero_from_the_teacher_still_carries_the_comment(self):
+        """Ноль баллов — не повод прятать объяснение почему.
+
+        Второму ученику поставили 0, и он увидел только «неверно».
+        """
+        self._finish()
+        self._review_open_item(score='0', comment='Не хватает вывода')
+        body = self.client.get(
+            reverse('student:exam_result', args=[self.exam.pk])).content.decode()
+        self.assertIn('Не хватает вывода', body)
+        self.assertIn('проверил преподаватель', body)
+
+    def test_hidden_results_still_show_what_the_teacher_wrote(self):
+        """Настройка «не показывать результат сразу» относится к
+        АВТОПРОВЕРКЕ. Комментарий преподавателя она придержать не может."""
+        self.exam.show_results_immediately = False
+        self.exam.save(update_fields=['show_results_immediately'])
+        self._finish()
+
+        body = self.client.get(
+            reverse('student:exam_result', args=[self.exam.pk])).content.decode()
+        self.assertNotIn('проверено автоматически', body)
+
+        self._review_open_item(score='5', comment='Комментарий виден всегда')
+        body = self.client.get(
+            reverse('student:exam_result', args=[self.exam.pk])).content.decode()
+        self.assertIn('Комментарий виден всегда', body)
+
+    def test_homework_card_shows_teacher_feedback_too(self):
+        """Тот же блок проверки — на карточке домашки."""
+        from problems.models import Assignment, MistakeTag
+
+        homework = Assignment.objects.create(name='Домашка', author=self.tutor,
+                                             kind=Assignment.Kind.HOMEWORK)
+        homework.students.add(self.student)
+        item = AssignmentItem.objects.create(
+            assignment=homework, catalog_problem=make_problem('Открытая дз'),
+            order=0, points=4)
+        mistake = MistakeTag.objects.create(name='Забыт знак')
+        self.client.post(reverse('student:submit_assignment',
+                                 args=[homework.pk]),
+                         {'text_item_%d' % item.pk: 'моё решение'})
+        submission = Submission.objects.get(student=self.student,
+                                            problem_item=item)
+        self.client.force_login(self.tutor)
+        self.client.post(
+            reverse('teacher:review_submission', args=[submission.pk]),
+            {'score': '4', 'comment': 'Верный ход', 'mistakes': [mistake.pk]})
+        self.client.force_login(self.student)
+
+        body = self.client.get(reverse('student:assignment_detail',
+                                       args=[homework.pk])).content.decode()
+        self.assertIn('Верный ход', body)
+        self.assertIn('Забыт знак', body)
+        self.assertIn('проверил преподаватель', body)
+
     def test_exam_events_carry_exam_source(self):
         from problems.models import LearningEvent
 
