@@ -17,6 +17,7 @@ urlpatterns = [
     path('exam/<int:pk>/take/', views_exam.exam_take, name='exam_take'),
     path('exam/<int:pk>/autosave/', views_exam.exam_autosave,
          name='exam_autosave'),
+    path('exam/<int:pk>/time/', views_exam.exam_time, name='exam_time'),
     path('exam/<int:pk>/finish/', views_exam.exam_finish, name='exam_finish'),
     path('exam/<int:pk>/result/', views_exam.exam_result, name='exam_result'),
 ]

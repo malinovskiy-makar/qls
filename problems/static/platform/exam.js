@@ -2,11 +2,15 @@
  * Контрольная в браузере: таймер и автосохранение.
  *
  * ⚠️ КЛИЕНТ НЕ ИСТОЧНИК ПРАВДЫ О ВРЕМЕНИ. Он рисует обратный отсчёт, но
- * каждый ответ сервера несёт `seconds_remaining`, и по нему отсчёт молча
- * пересинхронизируется. Перевод часов на устройстве не меняет ничего:
- * мы считаем не от `Date.now()` абсолютным временем, а тикаем на единицу
- * раз в секунду и правимся по серверу. Даже если сбить системное время —
- * счётчик не сдвинется, а конец забега объявит сервер.
+ * решение «время вышло» принимает СЕРВЕР. Сама арифметика отсчёта живёт в
+ * `exam_timer.js` (её можно проверить без браузера): часы там МОНОТОННЫЕ,
+ * `Date.now()` не вызывается ни разу, а серверная сверка умеет только
+ * УМЕНЬШИТЬ остаток.
+ *
+ * ⚠️ СВЕРКА ИДЁТ ПО ТАЙМЕРУ, А НЕ ПО НАБОРУ ТЕКСТА. Раньше остаток
+ * пересинхронизировался только вместе с автосохранением — то есть лишь
+ * когда ученик печатал. Тот, кто просто смотрел на таймер, не сверялся с
+ * сервером ни разу. Теперь есть отдельный лёгкий запрос раз в 15 секунд.
  *
  * ⚠️ РАБОТА НЕ ТЕРЯЕТСЯ. Изменение уезжает через 2 секунды после остановки
  * ввода и при потере фокуса. Пропала сеть — накопленное лежит в памяти
@@ -29,45 +33,65 @@
   var timerNode = document.getElementById('timer');
 
   // ---------------------------------------------------------------- таймер
-  var secondsLeft = timerNode && timerNode.dataset.seconds !== ''
+  var rawSeconds = timerNode && timerNode.dataset.seconds !== ''
     ? parseInt(timerNode.dataset.seconds, 10) : null;
-
-  function pad(value) { return value < 10 ? '0' + value : String(value); }
+  var timer = window.ExamTimer.create({
+    seconds: (rawSeconds === null || isNaN(rawSeconds)) ? null : rawSeconds
+  });
+  var timeUp = false;
 
   function paintTimer() {
-    if (!timerNode || secondsLeft === null || isNaN(secondsLeft)) { return; }
-    var left = Math.max(0, secondsLeft);
-    var hours = Math.floor(left / 3600);
-    var minutes = Math.floor((left % 3600) / 60);
-    var seconds = left % 60;
-    timerNode.textContent = hours > 0
-      ? hours + ':' + pad(minutes) + ':' + pad(seconds)
-      : pad(minutes) + ':' + pad(seconds);
+    if (!timerNode || !timer.hasLimit()) { return; }
+    var left = timer.remaining();
+    timerNode.textContent = timeUp ? 'время вышло' : timer.text();
     // Предупреждающий цвет за 5 минут, тревожный за 1. Без звуков.
-    timerNode.classList.toggle('warn', left <= 300 && left > 60);
-    timerNode.classList.toggle('danger', left <= 60);
+    timerNode.classList.toggle('warn', !timeUp && left <= 300 && left > 60);
+    timerNode.classList.toggle('danger', timeUp || left <= 60);
   }
 
   function tick() {
-    if (secondsLeft === null || isNaN(secondsLeft)) { return; }
-    secondsLeft -= 1;
+    if (!timer.hasLimit() || timeUp) { return; }
     paintTimer();
-    if (secondsLeft <= 0) {
-      // Время кончилось по нашему счёту. Отправляем форму — решение
+    if (timer.expired()) {
+      // Время кончилось по нашему счёту. Уходим на сдачу — решение
       // «действительно ли вышло» принимает СЕРВЕР, мы только приходим
       // спросить.
-      flushAll(true);
+      enterTimeUp();
     }
   }
 
   function syncFromServer(value) {
-    if (value === null || value === undefined) { return; }
-    if (secondsLeft === null || Math.abs(secondsLeft - value) > 5) {
-      // Расхождение больше пяти секунд — молча поправляем. Молча потому,
-      // что ученику незачем знать про сетевые задержки посреди работы.
-      secondsLeft = value;
-      paintTimer();
+    if (timer.applyServer(value) === 'accepted') { paintTimer(); }
+  }
+
+  /** Время вышло по СЕРВЕРУ: страница сама уходит на сдачу.
+   *
+   * Раньше этого не было: истёкшая контрольная продолжала выглядеть живой,
+   * пока ученик не нажмёт что-нибудь сам. Ученик писал в поле, которое
+   * сервер уже не принимал. */
+  function enterTimeUp() {
+    if (timeUp) { return; }
+    timeUp = true;
+    paintTimer();
+    if (stateNode) {
+      stateNode.textContent = 'время вышло — работа сдаётся';
     }
+    flushAll(true);
+  }
+
+  /** Лёгкий запрос «сколько осталось» — раз в 15 секунд, независимо от
+   * того, печатает ученик или просто смотрит на таймер. */
+  function pollTime() {
+    if (timeUp || !config.timeUrl) { return; }
+    fetch(config.timeUrl, { headers: { 'X-Requested-With': 'fetch' } })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        offline = false;
+        if (data.expired) { enterTimeUp(); return; }
+        syncFromServer(data.seconds_remaining);
+        paintState();
+      })
+      .catch(function () { /* сеть отвалилась — отсчёт идёт своими часами */ });
   }
 
   // ------------------------------------------------------------ индикатор
@@ -140,7 +164,7 @@
         syncFromServer(result.data.seconds_remaining);
         if (result.status === 409 || result.data.expired) {
           // Сервер сказал «время вышло» — уходим на результат через сдачу.
-          flushAll(true);
+          enterTimeUp();
           return;
         }
         if (result.ok) {
@@ -199,8 +223,12 @@
   // ------------------------------------------------------------ подключение
   document.addEventListener('DOMContentLoaded', function () {
     paintTimer();
-    if (secondsLeft !== null && !isNaN(secondsLeft)) {
+    if (timer.hasLimit()) {
       setInterval(tick, 1000);
+      // Сверка с сервером — по таймеру, а не по вводу. Пятнадцать секунд:
+      // чаще незачем (расхождение внутри допуска), реже — ученик слишком
+      // долго смотрел бы на неправду.
+      setInterval(pollTime, 15000);
     }
     setInterval(retryPending, 10000);
 

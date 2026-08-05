@@ -114,6 +114,27 @@ def exam_take(request, pk):
     })
 
 
+@student_required
+def exam_time(request, pk):
+    """«Сколько осталось» — самый дешёвый запрос страницы.
+
+    Существует ради одного: сверка времени обязана идти по таймеру, а не
+    только вместе с автосохранением. Ученик, который смотрит на часы и
+    ничего не печатает, раньше не сверялся с сервером вообще.
+    """
+    assignment = _exam_or_404(request, pk)
+    attempt = assignment.exam_attempts.filter(student=request.user).first()
+    if attempt is None:
+        return JsonResponse({'expired': True, 'seconds_remaining': 0})
+
+    now = timezone.now()
+    expired = exam_engine.finalize_if_expired(attempt, now) \
+        or attempt.submitted_at is not None
+    left = exam_engine.seconds_remaining(attempt, now)
+    return JsonResponse({'expired': bool(expired),
+                         'seconds_remaining': 0 if expired else left})
+
+
 @require_POST
 @student_required
 def exam_autosave(request, pk):

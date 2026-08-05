@@ -18,6 +18,7 @@
 уснувший над работой, получил бы время сдачи в три часа ночи.
 """
 import logging
+import math
 
 from django.db import transaction
 from django.utils import timezone
@@ -120,11 +121,29 @@ def will_be_cut(assignment, now=None):
 
 
 def seconds_remaining(attempt, now=None):
-    """Сколько секунд осталось по СЕРВЕРНОМУ времени. None — без ограничения."""
+    """Сколько секунд осталось по СЕРВЕРНОМУ времени. None — без ограничения.
+
+    ⚠️ ОСТАТОК НЕ МОЖЕТ БЫТЬ БОЛЬШЕ ВЫДАННОГО. `expires_at` — момент
+    абсолютный и подделке не поддаётся, но `now` берётся у ЧАСОВ МАШИНЫ, а
+    на разработке сервер живёт на том же ноутбуке, что и браузер: ученик
+    перевёл системное время на десять минут назад — и сервер честно насчитал
+    себе десять лишних минут. Верхняя граница «сколько дали при старте»
+    закрывает этот случай: больше выданного не бывает никогда, ни по какой
+    законной причине.
+    """
     if attempt.expires_at is None:
         return None
     now = now or timezone.now()
-    return max(0, int((attempt.expires_at - now).total_seconds()))
+    left = max(0, int((attempt.expires_at - now).total_seconds()))
+    if attempt.started_at is not None:
+        # ⚠️ Округляем ВВЕРХ. `started_at` ставит база (`auto_now_add`) на
+        # доли секунды позже, чем считался `expires_at`, и округление вниз
+        # съедало бы у каждого ученика по секунде честного времени.
+        granted = int(math.ceil((attempt.expires_at - attempt.started_at)
+                                .total_seconds()))
+        if granted >= 0:
+            left = min(left, granted)
+    return left
 
 
 def can_accept(attempt, now=None):

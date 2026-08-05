@@ -140,6 +140,71 @@ class ServerTimerTests(TestCase):
             attempt, self.now + timedelta(minutes=10))
         self.assertEqual(left_before - left_after, 600)
 
+    def test_remaining_never_exceeds_what_was_granted(self):
+        """Часы САМОГО СЕРВЕРА уехали назад — остаток всё равно не растёт.
+
+        Так выглядит ручная проверка на одной машине: сервер запущен на том
+        же ноутбуке, ученик переводит системное время — и `timezone.now()`
+        сервера уезжает вместе с ним. Потолок «сколько дали при старте»
+        закрывает это: больше выданного не бывает никогда.
+        """
+        exam = make_exam(self.tutor, [self.student], mode='limit',
+                         now=self.now)
+        attempt = exam_engine.start_attempt(exam, self.student, self.now)
+        granted = exam_engine.seconds_remaining(attempt, self.now)
+        self.assertEqual(granted, 3600)
+
+        # «Перевели часы на 10 минут назад» — сервер видит прошлое.
+        back = exam_engine.seconds_remaining(attempt,
+                                             self.now - timedelta(minutes=10))
+        self.assertEqual(back, 3600, 'остаток вырос сверх выданного')
+
+        # И через час назад — тоже не растёт.
+        far_back = exam_engine.seconds_remaining(attempt,
+                                                 self.now - timedelta(hours=5))
+        self.assertEqual(far_back, 3600)
+
+    def test_time_endpoint_answers_without_typing_anything(self):
+        """Отдельный эндпоинт «сколько осталось».
+
+        Раньше сверка ехала только вместе с автосохранением, то есть только
+        когда ученик печатает. Человек смотрел на таймер, не печатая, и
+        сверки не было ни одной.
+        """
+        exam = make_exam(self.tutor, [self.student], mode='limit',
+                         now=self.now)
+        AssignmentItem.objects.create(assignment=exam, order=0,
+                                      catalog_problem=make_problem('Задача'))
+        self.client.force_login(self.student)
+        self.client.post(reverse('student:exam_start', args=[exam.pk]))
+
+        response = self.client.get(reverse('student:exam_time',
+                                           args=[exam.pk]))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload['expired'])
+        self.assertGreater(payload['seconds_remaining'], 0)
+
+    def test_time_endpoint_reports_expiry_and_closes_the_attempt(self):
+        """Истёкшую попытку эндпоинт закрывает сам — страница узнаёт об
+        этом, не дожидаясь действий ученика."""
+        exam = make_exam(self.tutor, [self.student], mode='limit',
+                         now=self.now)
+        AssignmentItem.objects.create(assignment=exam, order=0,
+                                      catalog_problem=make_problem('Задача'))
+        self.client.force_login(self.student)
+        self.client.post(reverse('student:exam_start', args=[exam.pk]))
+        attempt = ExamAttempt.objects.get(assignment=exam)
+        attempt.expires_at = self.now - timedelta(minutes=1)
+        attempt.save(update_fields=['expires_at'])
+
+        payload = self.client.get(
+            reverse('student:exam_time', args=[exam.pk])).json()
+        self.assertTrue(payload['expired'])
+        self.assertEqual(payload['seconds_remaining'], 0)
+        attempt.refresh_from_db()
+        self.assertIsNotNone(attempt.submitted_at)
+
 
 class AutosaveTests(TestCase):
     """Работа не теряется: черновики, возврат, повторная сдача."""
