@@ -15,6 +15,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from problems import timefmt
+
 from .access import group_assignment_or_404, own_group_or_404, tutor_required
 
 
@@ -256,8 +258,7 @@ def api_comment_create(request):
         'text': comment.text,
         'visibility': comment.visibility,
         'visibility_display': comment.get_visibility_display(),
-        'created_at': timezone.localtime(comment.created_at)
-        .strftime('%d.%m.%Y %H:%M'),
+        'created_at': timefmt.fmt(comment.created_at),
     })
 
 
@@ -412,7 +413,5 @@ def api_item_solution(request):
         'source': item.solution_source,
         'mode': item.solution_visible_after,
         'mode_display': item.get_solution_visible_after_display(),
-        'released_at': (timezone.localtime(item.solution_released_at)
-                        .strftime('%d.%m.%Y %H:%M')
-                        if item.solution_released_at else None),
+        'released_at': timefmt.fmt(item.solution_released_at, empty=None),
     })

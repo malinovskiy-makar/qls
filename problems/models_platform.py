@@ -588,7 +588,10 @@ class AssignmentItem(models.Model):
         deadline = assignment_deadline(self.assignment)
         if deadline is None:
             return 'Дедлайна нет — решение откроет преподаватель.'
-        return f'Решение откроется после дедлайна {deadline:%d.%m.%Y %H:%M}.'
+        # Через `timefmt`: f-строка напечатала бы UTC (см. `problems/timefmt.py`).
+        from .timefmt import fmt
+
+        return 'Решение откроется после дедлайна %s.' % fmt(deadline)
 
 
 # ===========================================================================

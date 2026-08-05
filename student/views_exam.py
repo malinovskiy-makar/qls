@@ -180,9 +180,10 @@ def exam_autosave(request, pk):
              'seconds_remaining': exam_engine.seconds_remaining(attempt, now)},
             status=503)
 
+    from problems import timefmt
+
     return JsonResponse({'ok': True, 'seconds_remaining': left,
-                         'saved_at': timezone.localtime(now)
-                         .strftime('%H:%M:%S')})
+                         'saved_at': timefmt.fmt(now, '%H:%M:%S')})
 
 
 @require_POST

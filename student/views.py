@@ -279,24 +279,33 @@ def exam_schedule_label(assignment):
     одним моментом, а окном или лимитом, и «до 20.03» без слова «90 минут»
     вводит в заблуждение.
     """
+    from problems import timefmt
+
     if not assignment.is_exam:
         return ''
     mode = assignment.exam_mode
     if mode == assignment.ExamMode.WINDOW:
-        start, end = assignment.starts_at, assignment.ends_at
+        # ⚠️ Через `timefmt`, а не f-строкой: в базе время в UTC, и
+        # `f'{dt:%H:%M}'` печатает UTC, тогда как шаблонный фильтр `date`
+        # переводит в пояс проекта сам. Отсюда и брались две строки на
+        # одной странице с разницей в три часа.
+        start, end = timefmt.local(assignment.starts_at), \
+            timefmt.local(assignment.ends_at)
         if start and end:
-            same_day = timezone.localtime(start).date() == \
-                timezone.localtime(end).date()
-            if same_day:
-                return (f'окно {start:%d.%m} {start:%H:%M}–{end:%H:%M}')
-            return f'окно {start:%d.%m %H:%M} — {end:%d.%m %H:%M}'
+            if start.date() == end.date():
+                return ('окно %s %s–%s'
+                        % (start.strftime('%d.%m'), start.strftime('%H:%M'),
+                           end.strftime('%H:%M')))
+            return 'окно %s — %s' % (start.strftime(timefmt.SHORT),
+                                     end.strftime(timefmt.SHORT))
         if end:
-            return f'до {end:%d.%m %H:%M}'
+            return 'до %s' % end.strftime(timefmt.SHORT)
         return 'окно не задано'
     if mode == assignment.ExamMode.LIMIT:
         parts = []
         if assignment.deadline_at:
-            parts.append(f'до {assignment.deadline_at:%d.%m %H:%M}')
+            parts.append('до %s' % timefmt.fmt(assignment.deadline_at,
+                                               timefmt.SHORT))
         if assignment.duration_minutes:
             parts.append(f'на решение {assignment.duration_minutes} мин')
         return ', '.join(parts) or 'срок не задан'

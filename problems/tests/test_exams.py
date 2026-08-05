@@ -821,6 +821,75 @@ class FinalizeCommandTests(TestCase):
                          moment)
 
 
+class TimeOnScreenTests(TestCase):
+    """ФАЗА 0.8. Одно время везде — в часовом поясе проекта.
+
+    На экране до старта две строки расходились на три часа: «Время: до
+    05.08 18:58» (собрана в питоне f-строкой, то есть UTC) и «Крайний срок:
+    05.08.2026, 21:58» (шаблонный фильтр `date`, который переводит в пояс
+    проекта сам). Ни один тест этого не видел: обе строки по отдельности
+    «работали».
+    """
+
+    def setUp(self):
+        self.tutor = make_user('tz_tutor', role='teacher')
+        self.student = make_user('tz_student', role='student')
+        self.client.force_login(self.student)
+
+    def test_schedule_line_and_deadline_line_agree(self):
+        from django.utils import timezone as tz
+
+        now = tz.now()
+        exam = make_exam(self.tutor, [self.student], mode='limit', now=now)
+        AssignmentItem.objects.create(assignment=exam, order=0,
+                                      catalog_problem=make_problem('З'))
+        body = self.client.get(
+            reverse('student:exam_intro', args=[exam.pk])).content.decode()
+
+        # Как выглядит крайний срок в часовом поясе проекта.
+        local = tz.localtime(exam.deadline)
+        short = local.strftime('%d.%m %H:%M')
+        full = local.strftime('%d.%m.%Y, %H:%M')
+        self.assertIn('до %s' % short, body,
+                      'строка расписания показывает не местное время')
+        self.assertIn(full, body)
+
+        # И ни одной строки с UTC-временем того же момента.
+        utc_short = exam.deadline.strftime('%d.%m %H:%M')
+        if utc_short != short:
+            self.assertNotIn('до %s' % utc_short, body)
+
+    def test_window_schedule_is_local(self):
+        from django.utils import timezone as tz
+
+        now = tz.now()
+        exam = make_exam(self.tutor, [self.student], mode='window', now=now)
+        label = exam_schedule_label_for(exam)
+        start = tz.localtime(exam.starts_at)
+        self.assertIn(start.strftime('%H:%M'), label)
+
+    def test_closed_reason_is_local(self):
+        """«Начало ...» в отказе открыть контрольную — тоже местное время."""
+        from datetime import timedelta as td
+
+        from django.utils import timezone as tz
+
+        now = tz.now()
+        exam = make_exam(self.tutor, [self.student], mode='window', now=now,
+                         starts_at=now + td(hours=2),
+                         ends_at=now + td(hours=3),
+                         deadline=now + td(hours=3))
+        _, reason = exam.open_state_for(self.student, now)
+        self.assertIn(tz.localtime(exam.starts_at).strftime('%d.%m.%Y %H:%M'),
+                      reason)
+
+
+def exam_schedule_label_for(assignment):
+    from student.views import exam_schedule_label
+
+    return exam_schedule_label(assignment)
+
+
 class TimezoneTests(TestCase):
     """Храним UTC, показываем в поясе проекта."""
 

@@ -702,7 +702,10 @@ class Assignment(models.Model):
 
         if self.exam_mode == self.ExamMode.WINDOW:
             if self.starts_at and now < self.starts_at:
-                return False, f'Начало {self.starts_at:%d.%m.%Y %H:%M}.'
+                # Через `timefmt`: f-строка напечатала бы UTC (см. модуль).
+                from .timefmt import fmt
+
+                return False, 'Начало %s.' % fmt(self.starts_at)
             if self.ends_at and now > self.ends_at:
                 return False, 'Окно контрольной закрыто.'
             return True, ''
