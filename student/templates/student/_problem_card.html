@@ -29,7 +29,13 @@
     <div class="problem-statement">{{ row.statement|safe }}</div>
     {% endif %}
 
-    {% if row.parts %}
+    {% comment %}
+    Пункты в условии показываем ТОЛЬКО когда у них нет своих полей ответа
+    (тест: там подпункты — это варианты). У обычной задачи условие пункта
+    стоит прямо над его полем ввода — иначе ученик читает «а)» в одном
+    месте, а отвечает в другом.
+    {% endcomment %}
+    {% if row.parts and not row.answer_parts %}
     <div class="problem-parts">
       {% for part in row.parts %}
       <div class="part-item">
@@ -49,7 +55,9 @@
       {% if row.answer_display or row.sub.solution_text or row.sub.solution_file %}
       <div class="answer-area">
         <div class="submitted-label">Мой ответ</div>
-        {% if row.answer_display %}
+        {% if row.has_real_parts %}
+          {% include "student/_part_results.html" with part_rows=row.answer_parts show_correct=row.show_correct %}
+        {% elif row.answer_display %}
         <div class="submitted-answer">{{ row.answer_display }}</div>
         {% endif %}
         {% if row.sub.solution_text %}
@@ -83,11 +91,29 @@
             {% if row.answer_kind == 'radio' %}Выберите один вариант.{% else %}Отметьте все верные.{% endif %}
           </div>
         {% else %}
-          <input type="text" class="answer-short" id="{{ row.answer_name }}"
-                 name="{{ row.answer_name }}"
-                 placeholder="Например: 4 штуки, 120 руб./ед."
-                 value="{{ row.prefill_answer }}">
-          <div class="field-hint">Кратко — число или короткая фраза. Проверяется автоматически.</div>
+          {% comment %}
+          Поле ответа СВОЁ НА КАЖДЫЙ ПУНКТ. Задача без пунктов — частный
+          случай «один пункт»: список `answer_parts` в ней ровно из одной
+          строки, и разметка та же. Двух веток («если пункты, то так»)
+          здесь быть не должно — на них проект уже обжигался.
+          {% endcomment %}
+          {% for part in row.answer_parts %}
+          <div class="part-answer">
+            {% if part.part %}
+            <div class="part-answer-q">
+              <span class="part-label">{{ part.label|partlabel }}</span>
+              <span>{{ part.statement|safe }}</span>
+            </div>
+            {% endif %}
+            <input type="text" class="answer-short" id="{{ part.name }}"
+                   name="{{ part.name }}"
+                   {% if part.part %}data-part="{{ part.part.pk }}"{% endif %}
+                   placeholder="{% if part.part %}Ответ на пункт {{ part.label|partlabel }}{% else %}Например: 4 штуки, 120 руб./ед.{% endif %}"
+                   value="{{ part.given }}">
+          </div>
+          {% endfor %}
+          <div class="field-hint">Кратко — число или короткая фраза. Числовой
+            ответ проверяется автоматически.</div>
         {% endif %}
 
         <label for="{{ row.solution_name }}" style="margin-top:16px;">Моё решение</label>

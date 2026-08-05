@@ -63,15 +63,17 @@ class Command(BaseCommand):
 
         catalog = self._catalog_problems()
         catalog_tests = self._catalog_tests()
+        costs = self._costs_problem()
         custom = self._custom_problem(tutor)
 
         homework = self._homework(tutor, group, students, catalog, custom,
-                                  catalog_tests, now)
+                                  catalog_tests, costs, now)
         self._exam_window(tutor, group, students, catalog, catalog_tests, now)
         self._exam_limit(tutor, group, students, catalog, now)
         self._comments(homework, tutor, students[0])
         graph = self._saved(tutor, catalog, custom)
         self._solutions_and_graph(homework, graph)
+        self._partly_correct_submission(homework, students[1], costs)
         self._parent_links(tutor, students)
         self._history(students, now)
         self._finished_exam(tutor, group, students, now)
@@ -173,6 +175,35 @@ class Command(BaseCommand):
              ('Мода на товар', False), ('Налог на производителя', True)])
         return problem
 
+    def _costs_problem(self):
+        """Задача С ПУНКТАМИ и числовым ответом на каждый.
+
+        Ровно та, на которой споткнулась ручная проверка: «а) TC, б) ATC» —
+        оба ответа числа, то есть задача полностью автопроверяема, а поле
+        ответа было одно на всю задачу.
+        """
+        topic, _ = Topic.objects.get_or_create(
+            name='Издержки фирмы', defaults={'slug': 'costs'})
+        problem, created = Problem.objects.get_or_create(
+            title='Демо: издержки фирмы по пунктам',
+            defaults={
+                'statement': 'Фирма за месяц произвела 100 единиц продукции. '
+                             'Постоянные издержки равны 2000 руб., '
+                             'переменные — 3000 руб.',
+                'answer': '', 'status': Problem.Status.PUBLISHED,
+                'difficulty': 2})
+        problem.topics.add(topic)
+        if created:
+            ProblemPart.objects.create(
+                problem=problem, label='а', order=0,
+                statement='Найдите общие издержки (TC).',
+                answer='5000', points='1')
+            ProblemPart.objects.create(
+                problem=problem, label='б', order=1,
+                statement='Найдите средние издержки (ATC).',
+                answer='50', points='1')
+        return problem
+
     def _catalog_tests(self):
         """Тесты КАТАЛОЖНОГО вида — по одному на каждый подвид.
 
@@ -264,7 +295,7 @@ class Command(BaseCommand):
         return items
 
     def _homework(self, tutor, group, students, catalog, custom,
-                  catalog_tests, now):
+                  catalog_tests, costs, now):
         homework, _ = Assignment.objects.get_or_create(
             name='Домашка №3: спрос, предложение, эластичность',
             author=tutor,
@@ -284,6 +315,7 @@ class Command(BaseCommand):
             (catalog_tests[0], None, 2),
             (catalog_tests[1], None, 1),
             (catalog_tests[2], None, 3),
+            (costs, None, 2),
         ])
         # У своей задачи решение открываем после дедлайна (значение по
         # умолчанию), у первой каталожной — сразу после сдачи.
@@ -483,6 +515,31 @@ class Command(BaseCommand):
         self.stdout.write('  создана завершённая контрольная с результатами')
 
     # -- Фаза 18: связь родителя и история за 90 дней ----------------------
+
+    def _partly_correct_submission(self, homework, student, costs):
+        """Сданная работа с ОДНИМ верным пунктом и одним неверным.
+
+        Без неё показ «а) верно, б) неверно» негде посмотреть глазами.
+        """
+        from problems.assignment_rows import answer_parts, get_or_create_submission
+        from problems.part_grading import apply_to_submission
+
+        item = homework.items.filter(catalog_problem=costs).first()
+        if item is None:
+            return
+        submission = get_or_create_submission(student, homework, item)
+        if submission.status in ('submitted', 'reviewed'):
+            return
+        parts = answer_parts(item)
+        values = {parts[0].pk: '5000', parts[1].pk: '60'}
+        submission.status = 'submitted'
+        submission.submitted_at = timezone.now()
+        submission.solution_text = ('TC = FC + VC = 2000 + 3000 = 5000. '
+                                    'ATC = TC / Q, посчитал 60.')
+        apply_to_submission(submission, item, values)
+        submission.save()
+        self.stdout.write('  создана частично верная сдача (а — верно, '
+                          'б — неверно)')
 
     def _parent_links(self, tutor, students):
         """Родитель связан с ДВУМЯ учениками — чтобы кабинет родителя было

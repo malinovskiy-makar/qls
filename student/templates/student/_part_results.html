@@ -1,0 +1,38 @@
+{% comment %}
+Результат ПО ПУНКТАМ: свой ответ рядом с верным и вердикт на каждый пункт.
+
+⚠️ Частично верная задача так и показывается — «а) верно, б) неверно», а
+не одним вердиктом на всю задачу. «Всё или ничего» осмысленно внутри
+одного теста с несколькими верными вариантами; между пунктами «а» и «б»
+это разные вопросы, и правильный ответ на «а» не перестаёт быть
+правильным из-за ошибки в «б».
+
+Ждёт в контексте `part_rows` из `problems.part_grading.part_rows()`.
+{% endcomment %}
+{% load catalog_filters %}
+<div class="part-results">
+  {% for part in part_rows %}
+  <div class="part-result part-result-{% if part.is_correct %}ok{% elif part.is_correct is False %}bad{% else %}wait{% endif %}">
+    <div class="part-result-head">
+      {% if part.label %}<span class="part-label">{{ part.label|partlabel }}</span>{% endif %}
+      <span class="part-mark">
+        {% if part.is_correct %}верно
+        {% elif part.is_correct is False %}неверно
+        {% else %}на проверке{% endif %}
+      </span>
+      {% if part.score is not None %}
+      <span class="part-points">{{ part.score|floatformat:"-2" }} / {{ part.max_score|floatformat:"-2" }} б.</span>
+      {% endif %}
+    </div>
+    {% if part.statement %}
+    <div class="part-result-q">{{ part.statement|safe }}</div>
+    {% endif %}
+    <div class="part-result-answers">
+      <span><b>ваш ответ:</b> {% if part.given %}{{ part.given }}{% else %}—{% endif %}</span>
+      {% if show_correct and part.correct %}
+      <span><b>верный:</b> {{ part.correct }}</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>

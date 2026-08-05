@@ -177,7 +177,8 @@ def finalize_if_expired(attempt, now=None):
     return True
 
 
-def save_draft(attempt, item, answer='', solution='', now=None):
+def save_draft(attempt, item, answer=None, solution=None, now=None,
+               part=None):
     """Автосохранение одного ответа. Возвращает секунды до конца.
 
     ⚠️ ГОНКА ДВУХ СОХРАНЕНИЙ — найдена браузерной проверкой, питон-тесты её
@@ -197,14 +198,24 @@ def save_draft(attempt, item, answer='', solution='', now=None):
 
     from .models import AnswerDraft
 
-    values = {'answer_draft': answer or '', 'solution_draft': solution or ''}
+    # ⚠️ `None` = «не трогать это поле». Ответ и решение уезжают РАЗНЫМИ
+    # запросами (у задачи с пунктами ответов вообще несколько), и запись
+    # обоих полей на каждый запрос затирала бы соседнее значение пустотой.
+    values = {}
+    if answer is not None:
+        values['answer_draft'] = answer
+    if solution is not None:
+        values['solution_draft'] = solution
+    if not values:
+        return seconds_remaining(attempt, now)
     try:
         with transaction.atomic():
             AnswerDraft.objects.update_or_create(
-                attempt=attempt, problem_item=item, defaults=values)
+                attempt=attempt, problem_item=item, part=part,
+                defaults=values)
     except IntegrityError:
-        AnswerDraft.objects.filter(attempt=attempt,
-                                   problem_item=item).update(**values)
+        AnswerDraft.objects.filter(attempt=attempt, problem_item=item,
+                                   part=part).update(**values)
 
     attempt.last_heartbeat = now or timezone.now()
     attempt.save(update_fields=['last_heartbeat'])
@@ -212,10 +223,15 @@ def save_draft(attempt, item, answer='', solution='', now=None):
 
 
 def drafts_map(attempt):
-    """{id позиции: черновик} — чем заполнить форму при возврате."""
+    """{(id позиции, id пункта): черновик} — чем заполнить форму.
+
+    Ключ парный: у задачи с пунктами черновик свой на каждый пункт.
+    `id пункта = None` — «задача целиком» (задача без пунктов и поле
+    «Моё решение», общее на задачу).
+    """
     from .models import AnswerDraft
 
-    return {d.problem_item_id: d
+    return {(d.problem_item_id, d.part_id): d
             for d in AnswerDraft.objects.filter(attempt=attempt)}
 
 
@@ -246,24 +262,39 @@ def grade_attempt(attempt):
     from .event_log import log_problem_event
     from .models import AnswerDraft
 
+    from .assignment_rows import answer_parts
+    from .part_grading import applies, join_answers
+
     assignment = attempt.assignment
     student = attempt.student
-    drafts = {d.problem_item_id: d
-              for d in AnswerDraft.objects.filter(attempt=attempt)}
+    drafts = {}
+    for draft in AnswerDraft.objects.filter(attempt=attempt):
+        drafts.setdefault(draft.problem_item_id, {})[draft.part_id] = draft
 
-    for item in assignment.items.select_related('catalog_problem',
-                                                'custom_problem'):
+    for item in assignment.items.select_related(
+            'catalog_problem', 'custom_problem').prefetch_related(
+                'catalog_problem__parts'):
         submission = get_or_create_submission(student, assignment, item)
         if submission.status in ('submitted', 'reviewed'):
             continue
-        draft = drafts.get(item.pk)
-        submission.submitted_answer = draft.answer_draft if draft else ''
-        submission.solution_text = draft.solution_draft if draft else ''
+        item_drafts = drafts.get(item.pk, {})
+        whole = item_drafts.get(None)
+        # Ответ собираем ИЗ ПУНКТОВ — так же, как при сдаче домашки.
+        values = {}
+        if applies(item):
+            for part in answer_parts(item):
+                key = part.pk if part is not None else None
+                draft = item_drafts.get(key)
+                values[key] = draft.answer_draft if draft else ''
+            submission.submitted_answer = join_answers(item, values)
+        else:
+            submission.submitted_answer = whole.answer_draft if whole else ''
+        submission.solution_text = whole.solution_draft if whole else ''
         submission.status = 'submitted'
         submission.submitted_at = attempt.submitted_at
         submission.save()
 
-        _autocheck(submission, item)
+        _autocheck(submission, item, values)
         try:
             feedback = getattr(submission, 'feedback', None)
             event_type = 'attempted'
@@ -279,15 +310,12 @@ def grade_attempt(attempt):
                              'сдача не тронута')
 
 
-def _autocheck(submission, item):
+def _autocheck(submission, item, values=None):
     """Машинная проверка — тем же движком, что у домашки. Второго не заводим."""
-    from student.views import auto_check_custom, auto_check_submission
+    from student.views import grade_submission
 
     try:
-        if item.is_custom:
-            auto_check_custom(submission, item)
-        elif submission.problem_id:
-            auto_check_submission(submission)
+        grade_submission(submission, item, values=values)
     except Exception:
         logger.exception('Автопроверка контрольной упала — решение осталось '
                          '«ждёт проверки»')

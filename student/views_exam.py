@@ -96,11 +96,14 @@ def exam_take(request, pk):
 
     rows = build_rows(assignment, request.user, with_comments=False)
     drafts = exam_engine.drafts_map(attempt)
+    by_item = {}
+    for (item_id, part_id), draft in drafts.items():
+        by_item.setdefault(item_id, {})[part_id] = draft
     for row in rows:
         # Форму заполняем ЧЕРНОВИКОМ: ученик вернулся после обрыва и должен
         # увидеть написанное, а не пустые поля. Заодно пересчитывается
         # состояние задачи — «в работе» считается по черновику.
-        apply_draft(row, drafts.get(row['item'].pk))
+        apply_draft(row, by_item.get(row['item'].pk))
 
     return render(request, 'student/exam_take.html', {
         'assignment': assignment,
@@ -161,11 +164,24 @@ def exam_autosave(request, pk):
 
     item = get_object_or_404(AssignmentItem, pk=body.get('item_id'),
                              assignment=assignment)
+    # Пункт задачи. Клиент шлёт `part_id`; его отсутствие = «задача целиком»
+    # (задача без пунктов и общее поле «Моё решение»).
+    part = None
+    raw_part = body.get('part_id')
+    if raw_part:
+        from problems.models import ProblemPart
+
+        part = ProblemPart.objects.filter(
+            pk=raw_part, problem_id=item.catalog_problem_id).first()
+        if part is None:
+            return JsonResponse({'error': 'Неизвестный пункт'}, status=400)
     try:
-        left = exam_engine.save_draft(attempt, item,
-                                      answer=body.get('answer') or '',
-                                      solution=body.get('solution') or '',
-                                      now=now)
+        # Отсутствие ключа = «не трогать это поле» (см. `save_draft`).
+        left = exam_engine.save_draft(
+            attempt, item,
+            answer=body['answer'] if 'answer' in body else None,
+            solution=body['solution'] if 'solution' in body else None,
+            now=now, part=part)
     except Exception:
         # ⚠️ Автосохранение НИКОГДА не отвечает пятисоткой. Пятисотка для
         # клиента неотличима от «сохранилось», и он выбросил бы значение из
@@ -207,11 +223,31 @@ def exam_finish(request, pk):
         return redirect('student:exam_result', pk=assignment.pk)
 
     if exam_engine.can_accept(attempt, now):
-        for item in assignment.items.select_related('catalog_problem',
-                                                    'custom_problem'):
+        from problems.assignment_rows import answer_parts
+        from problems.part_grading import applies, read_part_answers
+
+        for item in assignment.items.select_related(
+                'catalog_problem', 'custom_problem').prefetch_related(
+                    'catalog_problem__parts'):
             answer, solution, _ = read_answer(request, item)
-            if answer or solution:
-                exam_engine.save_draft(attempt, item, answer, solution, now)
+            # ⚠️ Передаём `None` тому полю, которое НЕ трогаем: пустая
+            # строка означала бы «очистить», и решение стёрлось бы вместе
+            # с сохранением ответа (поймано тестом).
+            if solution:
+                exam_engine.save_draft(attempt, item, None, solution, now)
+            if not applies(item):
+                if answer:
+                    exam_engine.save_draft(attempt, item, answer, None, now)
+                continue
+            # Ответы по пунктам сохраняем КАЖДЫЙ в свою строку — иначе
+            # последняя порция набранного склеилась бы в один черновик и
+            # автопроверка по пунктам получила бы кашу.
+            values = read_part_answers(request, item)
+            for part in answer_parts(item):
+                key = part.pk if part is not None else None
+                if values.get(key):
+                    exam_engine.save_draft(attempt, item, values[key], None,
+                                           now, part=part)
 
     exam_engine.submit_attempt(attempt, now)
     messages.success(request, 'Работа сдана.')

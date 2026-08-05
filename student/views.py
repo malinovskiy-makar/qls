@@ -107,6 +107,38 @@ from django.utils import timezone
 
 
 # ---------------------------------------------------------------------------
+# Машинная проверка сданной задачи — ОДНА точка входа
+# ---------------------------------------------------------------------------
+
+def grade_submission(submission, item, request=None, values=None):
+    """Проверяет сданную задачу тем способом, который ей подходит.
+
+    ⚠️ ОДНА ТОЧКА на домашку и контрольную. Раньше выбор ветки («тест —
+    так, своя задача — эдак») был написан в двух местах: в приёме домашки
+    и в `exam_engine.grade_attempt`. Разойтись им — вопрос времени.
+
+    Открытая задача идёт через проверку ПО ПУНКТАМ (`part_grading`): у
+    задачи с «а)» и «б)» ответ на каждый пункт свой и проверяется отдельно.
+    Тест остаётся на своей проверке «всё или ничего» по множеству
+    выбранных вариантов.
+    """
+    from problems import part_grading
+
+    if part_grading.applies(item):
+        if values is None:
+            values = (part_grading.read_part_answers(request, item)
+                      if request is not None else {})
+        part_grading.apply_to_submission(submission, item, values)
+        submission.save()
+        return
+
+    if item.is_custom:
+        auto_check_custom(submission, item)
+    elif submission.problem_id:
+        auto_check_submission(submission)
+
+
+# ---------------------------------------------------------------------------
 # Подсчёт статистики по домашке — раздельно для тестов и открытых задач
 # ---------------------------------------------------------------------------
 
@@ -416,10 +448,7 @@ def accept_answers(request, assignment, student, source_item=None):
         sub.submitted_at = timezone.now()
         sub.save()
 
-        if item.is_custom:
-            auto_check_custom(sub, item)
-        elif sub.problem_id:
-            auto_check_submission(sub)
+        grade_submission(sub, item, request=request)
         saved += 1
         _log_submission_event(request, assignment, sub, item.problem)
 

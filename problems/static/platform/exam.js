@@ -118,28 +118,71 @@
     return window.WorkForm.readCard(card);
   }
 
-  // По одной задаче — не больше ОДНОГО запроса в полёте. Второй не
+  /* Поля карточки, каждое со своим адресом на сервере.
+   *
+   * ⚠️ У задачи с пунктами ответ СВОЙ НА КАЖДЫЙ ПУНКТ, и уезжают они
+   * раздельно: склеить «а» и «б» в один черновик значит лишить
+   * автопроверку возможности проверить их по отдельности. Задача без
+   * пунктов — тот же код с одним полем без `part_id`. */
+  function cardFields(itemId) {
+    var card = document.getElementById('item-' + itemId);
+    if (!card) { return []; }
+    var fields = [];
+
+    var checked = card.querySelectorAll(
+      'input[type=radio], input[type=checkbox]');
+    if (checked.length) {
+      var chosen = Array.prototype.filter.call(checked, function (input) {
+        return input.checked;
+      }).map(function (input) { return input.value; }).join(', ');
+      fields.push({ key: itemId + ':опции', body: { answer: chosen } });
+    }
+
+    card.querySelectorAll('input.answer-short').forEach(function (input) {
+      var partId = input.dataset.part || '';
+      var body = { answer: input.value.trim() };
+      if (partId) { body.part_id = partId; }
+      fields.push({ key: itemId + ':a' + partId, body: body });
+    });
+
+    var area = card.querySelector('textarea.answer-text');
+    if (area) {
+      fields.push({ key: itemId + ':решение',
+                    body: { solution: area.value } });
+    }
+    return fields;
+  }
+
+  // По одному ПОЛЮ — не больше ОДНОГО запроса в полёте. Второй не
   // отменяется, а откладывается: когда первый вернётся, уйдёт свежее
-  // значение. Иначе два сохранения одной задачи стартуют одновременно и
+  // значение. Иначе два сохранения одного поля стартуют одновременно и
   // дерутся за одну строку черновика (сервер к этому готов, но лишний
   // запрос — лишний шанс потерять его в плохой сети).
   var inFlight = {};
 
   function send(itemId) {
+    cardFields(itemId).forEach(function (field) {
+      sendField(itemId, field);
+    });
+  }
+
+  function sendField(itemId, field) {
     var payload = collect(itemId);
-    if (!payload) { return; }
     pending[itemId] = payload;
-    if (inFlight[itemId]) { inFlight[itemId] = 'again'; return; }
-    inFlight[itemId] = true;
+    if (inFlight[field.key]) { inFlight[field.key] = 'again'; return; }
+    inFlight[field.key] = true;
     saving += 1;
     paintState();
+
+    var body = { item_id: itemId };
+    Object.keys(field.body).forEach(function (name) {
+      body[name] = field.body[name];
+    });
 
     fetch(config.autosaveUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-      body: JSON.stringify({
-        item_id: itemId, answer: payload.answer, solution: payload.solution
-      })
+      body: JSON.stringify(body)
     })
       .then(function (response) {
         return response.json().then(function (data) {
@@ -148,8 +191,8 @@
       })
       .then(function (result) {
         saving -= 1;
-        var again = inFlight[itemId] === 'again';
-        inFlight[itemId] = false;
+        var again = inFlight[field.key] === 'again';
+        inFlight[field.key] = false;
         offline = false;
         syncFromServer(result.data.seconds_remaining);
         if (result.status === 409 || result.data.expired) {
@@ -164,13 +207,13 @@
           // и уедет повтором — выбрасывать его нельзя ни при каких условиях.
           offline = true;
         }
-        markAnswered(itemId, payload);
+        markAnswered(itemId, collect(itemId) || {});
         paintState();
-        if (again) { send(itemId); }   // пока ждали, ученик дописал
+        if (again) { sendField(itemId, field); }  // пока ждали, дописал
       })
       .catch(function () {
         saving -= 1;
-        inFlight[itemId] = false;
+        inFlight[field.key] = false;
         offline = true;        // накопленное остаётся в `pending`
         paintState();
       });

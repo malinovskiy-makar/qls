@@ -31,10 +31,64 @@ ANSWER_RADIO = 'radio'        # один вариант
 ANSWER_CHECKBOX = 'checkbox'  # несколько вариантов
 
 
-def answer_input_name(item):
+def answer_input_name(item, part=None):
     """Имя поля ответа. Одно на все типы задач — иначе приёмник ответов
-    снова разъедется на «если каталожная, то так»."""
+    снова разъедется на «если каталожная, то так».
+
+    У задачи с пунктами поле СВОЁ НА КАЖДЫЙ ПУНКТ: `..._part_<pk>`. Иначе
+    ответы на «а» и «б» приходят одной строкой, и автопроверить их нельзя
+    в принципе.
+    """
+    if part is not None:
+        return 'answer_item_%d_part_%d' % (item.pk, part.pk)
     return 'answer_item_%d' % item.pk
+
+
+def answer_parts(item):
+    """Пункты, на которые ученик отвечает ОТДЕЛЬНО. Всегда непустой список.
+
+    ⚠️ Задача БЕЗ пунктов — частный случай «один пункт» (`None`). Так у
+    ввода, автопроверки и показа результата ровно ОДИН путь кода; ветка
+    «если пунктов нет, то по-другому» — то, из-за чего половина экранов
+    этого проекта уже расходилась между собой.
+
+    Пункты теста сюда НЕ попадают: там подпункты играют роль вариантов
+    ответа, и отдельного поля ввода у каждого быть не должно.
+    """
+    if item.is_custom or item.catalog_problem_id is None:
+        return [None]
+    kind, _ = item_answer_form(item)
+    if kind != ANSWER_TEXT:
+        return [None]
+    parts = list(item.catalog_problem.parts.all())
+    # Пункт без собственного условия — не вопрос, а мусор импорта
+    # («Ответ:» без содержания, ~150 таких задач в банке). Спрашивать по
+    # нему отдельный ответ не за что.
+    parts = [p for p in parts if (p.statement or '').strip()]
+    return parts or [None]
+
+
+def part_max_score(item, part, parts_count):
+    """Максимум баллов за пункт.
+
+    Свой балл пункта — если задан; иначе балл задачи делится поровну.
+    Делить нечего (балл задачи не задан) — считаем единицу, как везде.
+    """
+    from decimal import Decimal
+
+    if part is not None and part.points is not None:
+        return Decimal(part.points)
+    total = Decimal(item.points) if item.points is not None else Decimal('1')
+    if parts_count <= 1:
+        return total
+    return (total / Decimal(parts_count)).quantize(Decimal('0.01'))
+
+
+def part_correct_answer(item, part):
+    """Эталонный ответ на пункт (или на задачу целиком, если пункт None)."""
+    if part is not None:
+        return (part.answer or '').strip()
+    return (item.correct_answer or '').strip()
 
 
 def solution_input_name(item):
@@ -166,14 +220,30 @@ def work_status(submission, answer='', solution=''):
     return status if status in STATUS_LABELS else 'not_started'
 
 
-def apply_draft(row, draft):
-    """Кладёт черновик контрольной в строку и пересчитывает состояние.
+def apply_draft(row, drafts):
+    """Кладёт черновики контрольной в строку и пересчитывает состояние.
 
+    `drafts` — словарь {id пункта или None: черновик} по ЭТОЙ позиции.
     Одна точка: иначе экран прохождения и счётчик в шапке начнут считать
     «начато» по разным правилам.
     """
-    row['prefill_answer'] = draft.answer_draft if draft else ''
-    row['prefill_solution'] = draft.solution_draft if draft else ''
+    drafts = drafts or {}
+    whole = drafts.get(None)
+    row['prefill_solution'] = whole.solution_draft if whole else ''
+
+    # Ответы по пунктам. У задачи без пунктов в списке ровно одна строка
+    # с `part = None` — тот же код, что и для «а)/б)».
+    answers = []
+    for part_row in row.get('answer_parts') or []:
+        key = part_row['part'].pk if part_row['part'] is not None else None
+        draft = drafts.get(key)
+        part_row['given'] = draft.answer_draft if draft else ''
+        answers.append(part_row['given'])
+
+    if row.get('answer_parts'):
+        row['prefill_answer'] = '; '.join(a for a in answers if a.strip())
+    else:
+        row['prefill_answer'] = whole.answer_draft if whole else ''
     row['selected'] = selected_values(row['prefill_answer'])
     row['answered'] = bool((row['prefill_answer'] or '').strip()
                            or (row['prefill_solution'] or '').strip())
@@ -191,6 +261,22 @@ def selected_values(answer):
     """
     return {value.strip() for value in (answer or '').split(',')
             if value.strip()}
+
+
+def _part_rows(item, submission):
+    """Строки пунктов. Тестам не нужны — у них подпункты это варианты."""
+    from .part_grading import applies, part_rows
+
+    if not applies(item):
+        return []
+    return part_rows(item, submission)
+
+
+def _has_real_parts(item):
+    """Настоящие пункты «а)/б)», а не единственный «вся задача»."""
+    from .part_grading import applies, has_parts
+
+    return applies(item) and has_parts(item)
 
 
 def build_rows(assignment, student, user=None, with_comments=True):
@@ -240,6 +326,13 @@ def build_rows(assignment, student, user=None, with_comments=True):
                       if item.catalog_problem_id else []),
             'answer_kind': kind,
             'options': options,
+            # Пункты с ОТДЕЛЬНЫМ ответом на каждый. У задачи без пунктов —
+            # ровно одна строка «вся задача»: один путь кода на все случаи.
+            'answer_parts': _part_rows(item, submission),
+            'has_real_parts': _has_real_parts(item),
+            # Верный ответ показываем только после сдачи — до неё это
+            # подсказка, а не обратная связь.
+            'show_correct': submission.status in ('submitted', 'reviewed'),
             'answer_name': answer_input_name(item),
             'solution_name': solution_input_name(item),
             'file_name': file_input_name(item),
@@ -272,6 +365,10 @@ def read_answer(request, item):
 
     Галочки приходят несколькими значениями под одним именем, поэтому
     `getlist`; для строки и переключателя список из одного элемента.
+
+    У задачи с пунктами ответ СОБИРАЕТСЯ из полей пунктов — строка нужна
+    старым экранам (таблица решений, экспорт), а правда живёт в
+    `PartAnswer`. Двух независимых источников ответа не заводим.
     """
     kind, _ = item_answer_form(item)
     if kind == ANSWER_CHECKBOX:
@@ -279,7 +376,9 @@ def read_answer(request, item):
                            request.POST.getlist(answer_input_name(item))
                            if v.strip())
     else:
-        answer = (request.POST.get(answer_input_name(item)) or '').strip()
+        from .part_grading import join_answers, read_part_answers
+
+        answer = join_answers(item, read_part_answers(request, item))
     text = (request.POST.get(solution_input_name(item)) or '').strip()
     file = request.FILES.get(file_input_name(item))
     return answer, text, file

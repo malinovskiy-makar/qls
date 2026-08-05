@@ -197,12 +197,33 @@ def review_submission(request, pk, group=None):
                             assignment_id=submission.assignment.pk)
         return redirect('teacher:assignment_detail', pk=submission.assignment.pk)
 
+    # Ответы по пунктам — рядом с эталонными. Та же сборка, что у ученика:
+    # разъехавшиеся вердикты на двух экранах — это спор на пустом месте.
+    from problems import part_grading
+
+    item = submission.problem_item
+    part_rows = []
+    max_score = 10
+    auto_score = None
+    if item is not None:
+        if part_grading.applies(item):
+            part_rows = part_grading.part_rows(item, submission)
+            max_score = sum(row['max_score'] for row in part_rows)
+            scored = [row['score'] for row in part_rows
+                      if row['score'] is not None]
+            auto_score = sum(scored) if scored else None
+        elif item.points is not None:
+            max_score = item.points
+
     return render(request, 'teacher/review.html', {
         'submission': submission,
         'problem': problem,
         'existing_feedback': existing_feedback,
         'mistake_tags': mistake_tags,
         'group': group or submission.assignment.group,
+        'part_rows': part_rows,
+        'max_score': max_score,
+        'auto_score': auto_score,
     })
 
 

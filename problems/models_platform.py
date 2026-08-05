@@ -854,18 +854,89 @@ class AnswerDraft(models.Model):
     # Файл не автосохраняем — его нельзя переслать «по ходу набора»;
     # прикреплённое уезжает при сдаче.
     solution_draft = models.TextField('Черновик решения', blank=True)
+    # ⚠️ Пункт задачи (а/б/в). NULL = «задача целиком» — так выглядит
+    # задача БЕЗ пунктов, и это ЕДИНСТВЕННОЕ отличие: она обрабатывается
+    # тем же кодом как задача с одним безымянным пунктом. Двух веток логики
+    # («если есть пункты, то так, иначе эдак») в проекте уже хватило.
+    part = models.ForeignKey(
+        'problems.ProblemPart', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='drafts', verbose_name='Пункт')
     updated_at = models.DateTimeField('Сохранён', auto_now=True)
 
     class Meta:
         verbose_name = 'Черновик ответа'
         verbose_name_plural = 'Черновики ответов'
         constraints = [
-            models.UniqueConstraint(fields=['attempt', 'problem_item'],
-                                    name='uniq_answer_draft'),
+            # Два ограничения вместо одного: в SQL два NULL НЕ равны друг
+            # другу, поэтому обычный UNIQUE(attempt, item, part) не запретил
+            # бы два черновика «задачи целиком». Условные ограничения
+            # закрывают оба случая честно.
+            models.UniqueConstraint(
+                fields=['attempt', 'problem_item', 'part'],
+                condition=models.Q(part__isnull=False),
+                name='uniq_answer_draft_part'),
+            models.UniqueConstraint(
+                fields=['attempt', 'problem_item'],
+                condition=models.Q(part__isnull=True),
+                name='uniq_answer_draft_whole'),
         ]
 
     def __str__(self):
         return f'{self.attempt}: позиция {self.problem_item_id}'
+
+
+class PartAnswer(models.Model):
+    """Ответ ученика на ОДИН пункт задачи.
+
+    ⚠️ ЗАЧЕМ. Задача «а) найдите TC, б) найдите ATC» полностью
+    автопроверяема — в каждом пункте просят число. Но поле ответа было
+    ОДНО на всю задачу, и проверить её машина не могла: непонятно, где
+    кончается ответ на «а» и начинается ответ на «б». Ученик писал в одну
+    строку, репетитор разбирался руками.
+
+    `part = NULL` — «задача целиком»: так хранится ответ на задачу БЕЗ
+    пунктов. Это не костыль, а способ иметь ОДИН путь кода: список пунктов
+    для любой задачи возвращает хотя бы один элемент.
+
+    Развёрнутое решение («Моё решение») остаётся ОДНО на задачу и живёт в
+    `Submission.solution_text`: ход рассуждения общий, разрезать его по
+    пунктам — значит заставить ученика писать одно и то же дважды.
+    """
+
+    submission = models.ForeignKey(
+        'problems.Submission', on_delete=models.CASCADE,
+        related_name='part_answers', verbose_name='Решение')
+    part = models.ForeignKey(
+        'problems.ProblemPart', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='student_answers',
+        verbose_name='Пункт')
+    answer = models.TextField('Ответ ученика', blank=True)
+    # None — машина не проверяла (нет эталона или ответ словесный и
+    # эталона нет). Явное «не знаю» лучше молчаливого False.
+    is_correct = models.BooleanField('Верно', null=True, blank=True)
+    score = models.DecimalField('Балл за пункт', max_digits=6,
+                                decimal_places=2, null=True, blank=True)
+    max_score = models.DecimalField('Максимум за пункт', max_digits=6,
+                                    decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Ответ на пункт'
+        verbose_name_plural = 'Ответы на пункты'
+        ordering = ['part__order', 'part__label', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['submission', 'part'],
+                condition=models.Q(part__isnull=False),
+                name='uniq_part_answer_part'),
+            models.UniqueConstraint(
+                fields=['submission'],
+                condition=models.Q(part__isnull=True),
+                name='uniq_part_answer_whole'),
+        ]
+
+    def __str__(self):
+        label = self.part.label if self.part_id else 'вся задача'
+        return f'{self.submission_id}: {label}'
 
 
 # ===========================================================================
