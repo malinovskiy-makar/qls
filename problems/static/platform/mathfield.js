@@ -84,9 +84,68 @@
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
+  /* ── Живой предпросмотр ───────────────────────────────────────────────
+   *
+   * ⚠️ Вставленная формула ОБЯЗАНА сразу выглядеть формулой. Без этого
+   * ученик видит в поле «$\frac{TR}{Q}$» и не понимает, вставилось ли то,
+   * что он набирал: на экране проверки у преподавателя формула собрана, а
+   * в момент ввода — доллары и слэши.
+   *
+   * Почему предпросмотр ПОД полем, а не рендер поверх редактируемого
+   * текста: «поверх» — это отказ от textarea в пользу contenteditable, а
+   * с ним уезжают выделение, отмена, автосохранение по `input` и
+   * мобильная клавиатура. Цена не сопоставима с выигрышем; отдельная
+   * строка «как это будет выглядеть» решает ту же задачу и не ломает
+   * ввод. Ориентир IEO — там формула тоже показана собранной рядом.
+   */
+  function renderPreview(node, text) {
+    if (!text.trim()) {
+      node.hidden = true;
+      return;
+    }
+    node.hidden = false;
+    node.textContent = text;
+    if (typeof maskEscapedDollars === 'function') { maskEscapedDollars(node); }
+    if (typeof renderMathInElement !== 'undefined') {
+      renderMathInElement(node, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\[', right: '\\]', display: true },
+          { left: '\\(', right: '\\)', display: false }
+        ],
+        throwOnError: false
+      });
+    }
+    if (typeof fixCurrencyDollars === 'function') { fixCurrencyDollars(node); }
+  }
+
   window.attachMathfield = function (textarea) {
     if (!textarea || textarea.dataset.mathfieldReady === '1') { return; }
     textarea.dataset.mathfieldReady = '1';
+
+    // Предпросмотр можно выключить: у редактора своей задачи уже есть
+    // большая колонка «Так увидит ученик», и вторая строка под полем была
+    // бы тем же самым дважды.
+    var wantPreview = textarea.dataset.mathfieldPreview !== '0';
+    var preview = el('div', 'mf-preview');
+    preview.hidden = true;
+    if (wantPreview) {
+      textarea.parentNode.insertBefore(preview, textarea.nextSibling);
+    }
+
+    var previewTimer = null;
+    function schedulePreview() {
+      if (!wantPreview) { return; }
+      clearTimeout(previewTimer);
+      // Полторы десятых секунды: рендерить на каждую букву незачем, а
+      // ждать дольше — предпросмотр начинает «отставать» от набора.
+      previewTimer = setTimeout(function () {
+        renderPreview(preview, textarea.value || '');
+      }, 150);
+    }
+    textarea.addEventListener('input', schedulePreview);
+    if (wantPreview) { renderPreview(preview, textarea.value || ''); }
 
     var panel = el('div', 'mf-panel');
 
@@ -149,9 +208,14 @@
       if (!latex) { return; }
       insertAtCursor(textarea, '$' + latex + '$');
       field.value = '';
+      // Вставка — единственный момент, когда ждать 150 мс незачем: ученик
+      // нажал кнопку и смотрит на результат прямо сейчас.
+      clearTimeout(previewTimer);
+      if (wantPreview) { renderPreview(preview, textarea.value || ''); }
     });
 
-    textarea.parentNode.insertBefore(panel, textarea.nextSibling);
+    var anchor = wantPreview ? preview : textarea;
+    anchor.parentNode.insertBefore(panel, anchor.nextSibling);
   };
 
   // Автоподключение ко всему, что помечено data-mathfield.

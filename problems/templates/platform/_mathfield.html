@@ -17,6 +17,18 @@ Math.js в calc2, подключаем с CDN одним <script src>. Файл�
 <script defer src="{% static 'platform/mathfield.js' %}"></script>
 
 <style>
+/* Предпросмотр набранного: формула видна собранной сразу после вставки. */
+.mf-preview {
+  margin-top: 8px; padding: 10px 12px; border-radius: var(--r);
+  border: 1px dashed var(--border); background: var(--surface-2);
+  font-size: 14px; line-height: 1.7; overflow-x: auto; overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.mf-preview::before {
+  content: 'Как это будет выглядеть'; display: block; font-size: 11px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text2); margin-bottom: 6px;
+}
 .mf-panel { margin-top: 8px; }
 .mf-toggle, .mf-insert, .mf-kbd {
   border: 0.5px solid var(--border); border-radius: var(--r);
