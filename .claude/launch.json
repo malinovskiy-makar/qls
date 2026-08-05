@@ -4,14 +4,32 @@
     {
       "name": "qls",
       "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
-      "runtimeArgs": ["manage.py", "runserver", "8123"],
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8123"
+      ],
       "port": 8123
     },
     {
       "name": "qls-stats",
       "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
-      "runtimeArgs": ["manage.py", "runserver", "8127"],
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8127"
+      ],
       "port": 8127
+    },
+    {
+      "name": "qls-s3",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8131"
+      ],
+      "port": 8131
     }
   ]
 }

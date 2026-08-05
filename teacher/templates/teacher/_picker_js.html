@@ -1,0 +1,245 @@
+{% comment %}
+Корзина отбора и модалка условия. ОДИН скрипт на конструктор домашки и
+конструктор контрольной.
+
+Ждёт в контексте:
+  cart_key         — ключ sessionStorage («hw_cart» / «exam_cart»);
+                     у домашки и контрольной он РАЗНЫЙ, иначе недособранная
+                     домашка утекала бы в контрольную;
+  picker_form_id   — id формы, куда кладётся строка выбранных задач.
+Ждёт в разметке: #problem-ids-input, #cart-count, #cart-list, #submit-btn.
+{% endcomment %}
+<script>
+(function () {
+  'use strict';
+  var STORAGE_KEY = '{{ cart_key|default:"hw_cart" }}';
+  var FORM_ID = '{{ picker_form_id|default:"picker-form" }}';
+
+  var cart = {};
+  try { cart = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}'); }
+  catch (e) { cart = {}; }
+
+  function saveCart() {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
+  }
+
+  {% if add_custom %}
+  // Возврат из редактора своей задачи: та же вкладка, sessionStorage жив,
+  // поэтому корзина цела и задача просто в неё ложится. Префикс «c» —
+  // так сервер отличает свою задачу от каталожной.
+  if (!cart['c{{ add_custom.pk }}']) {
+    cart['c{{ add_custom.pk }}'] = { title: "{{ add_custom.title|default:'Своя задача'|escapejs }}" };
+    saveCart();
+  }
+  {% endif %}
+  {% if preselect_id %}
+  if (!cart['{{ preselect_id }}']) {
+    cart['{{ preselect_id }}'] = { title: 'Задача #{{ preselect_id }}' };
+    saveCart();
+  }
+  {% endif %}
+
+  function titleOf(pid) {
+    var card = document.querySelector('[data-pid="' + pid + '"]');
+    return card ? card.dataset.title : ('Задача #' + pid);
+  }
+
+  function renderCart() {
+    var ids = Object.keys(cart);
+    document.getElementById('cart-count').textContent = ids.length;
+    document.getElementById('problem-ids-input').value = ids.join(',');
+
+    var list = document.getElementById('cart-list');
+    var button = document.getElementById('submit-btn');
+    if (!ids.length) {
+      list.innerHTML = '<p class="cart-empty">Пока ничего не добавлено</p>';
+      if (button) { button.disabled = true; }
+      return;
+    }
+    if (button) { button.disabled = false; }
+    list.innerHTML = '';
+    ids.forEach(function (id) {
+      var row = document.createElement('div');
+      row.className = 'cart-item';
+      var title = document.createElement('span');
+      title.className = 'cart-item-title';
+      // Через textContent, а не innerHTML: название задачи приходит из
+      // базы, и кавычка в нём не должна разваливать разметку.
+      title.textContent = (cart[id] && cart[id].title) || ('Задача #' + id);
+      var remove = document.createElement('button');
+      remove.className = 'cart-remove';
+      remove.type = 'button';
+      remove.title = 'Убрать';
+      remove.textContent = '×';
+      remove.addEventListener('click', function () { removeFromCart(id); });
+      row.appendChild(title);
+      row.appendChild(remove);
+      list.appendChild(row);
+    });
+  }
+
+  // Подсвечиваем ВСЕ вхождения задачи — одна и та же может стоять и в
+  // каталоге, и во вкладке «Сохранённые».
+  function highlightAdded() {
+    document.querySelectorAll('[data-add]').forEach(function (button) {
+      var inCart = Boolean(cart[button.dataset.add]);
+      button.textContent = inCart ? '✓ Добавлено' : '+ Добавить';
+      button.classList.toggle('added', inCart);
+    });
+  }
+
+  function addToCart(pid) {
+    if (!cart[pid]) { cart[pid] = { title: titleOf(pid) }; saveCart(); }
+    renderCart();
+    highlightAdded();
+  }
+
+  function removeFromCart(pid) {
+    delete cart[pid];
+    saveCart();
+    renderCart();
+    highlightAdded();
+  }
+
+  document.addEventListener('click', function (event) {
+    var add = event.target.closest('[data-add]');
+    if (add) {
+      var pid = add.dataset.add;
+      if (cart[pid]) { removeFromCart(pid); } else { addToCart(pid); }
+      return;
+    }
+    var preview = event.target.closest('[data-preview]');
+    if (preview) { openModal(preview.dataset.preview); }
+  });
+
+  // ── Вкладки «Каталог / Сохранённые» ────────────────────────────────
+  var tabs = document.getElementById('picker-tabs');
+  if (tabs) {
+    tabs.addEventListener('click', function (event) {
+      var tab = event.target.closest('.picker-tab');
+      if (!tab) { return; }
+      tabs.querySelectorAll('.picker-tab').forEach(function (other) {
+        other.classList.toggle('is-on', other === tab);
+        var pane = document.getElementById(other.dataset.pane);
+        if (pane) { pane.hidden = other !== tab; }
+      });
+    });
+  }
+
+  // ── Форма ──────────────────────────────────────────────────────────
+  var form = document.getElementById(FORM_ID);
+  if (form) {
+    form.addEventListener('submit', function (event) {
+      var ids = Object.keys(cart);
+      if (!ids.length) { event.preventDefault(); return; }
+      document.getElementById('problem-ids-input').value = ids.join(',');
+      setTimeout(function () { sessionStorage.removeItem(STORAGE_KEY); }, 100);
+    });
+  }
+
+  // ── Модалка условия ────────────────────────────────────────────────
+  var modalCurrentId = null;
+  var backdrop = document.getElementById('modal-backdrop');
+
+  function openModal(pid) {
+    modalCurrentId = pid;
+    backdrop.classList.add('open');
+    document.getElementById('modal-title').textContent = '…';
+    document.getElementById('modal-meta').innerHTML = '';
+    document.getElementById('modal-source').textContent = '';
+    document.getElementById('modal-body').innerHTML =
+      '<div class="modal-loading">Загрузка…</div>';
+    updateModalBtn(pid);
+
+    fetch('/teacher/api/problem/' + pid + '/')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) {
+          document.getElementById('modal-body').textContent = 'Ошибка загрузки.';
+          return;
+        }
+        renderModal(data);
+      })
+      .catch(function () {
+        document.getElementById('modal-body').textContent = 'Ошибка сети.';
+      });
+  }
+
+  function renderModal(data) {
+    document.getElementById('modal-title').textContent = data.title;
+
+    var meta = '';
+    if (data.difficulty_str) {
+      meta += '<span style="font-size:13px;color:var(--amber);">'
+        + data.difficulty_str + '</span>';
+    }
+    (data.topics || []).forEach(function (t) {
+      meta += '<span class="modal-tag">' + t + '</span>';
+    });
+    if (data.problem_type) {
+      meta += '<span class="modal-tag type">' + data.problem_type + '</span>';
+    }
+    if (data.has_solution) {
+      meta += '<span class="modal-tag" style="background:var(--green-tint);'
+        + 'color:var(--green);">решение ✓</span>';
+    }
+    document.getElementById('modal-meta').innerHTML = meta;
+
+    if (data.sources && data.sources.length) {
+      document.getElementById('modal-source').textContent =
+        'Источник: ' + data.sources.join(', ');
+    }
+
+    var body = '<div>' + data.statement + '</div>';
+    (data.parts || []).forEach(function (part) {
+      var points = part.points
+        ? ' <span style="color:var(--text2);font-size:12px;">('
+          + part.points + ' б.)</span>' : '';
+      body += '<div class="modal-part"><div class="modal-part-label">'
+        + (part.label ? part.label.replace(/[).．。\s]+$/, '') + ')' : '')
+        + points + '</div><div>' + (part.text || '') + '</div></div>';
+    });
+    var node = document.getElementById('modal-body');
+    node.innerHTML = body;
+
+    maskEscapedDollars(node);
+    if (typeof renderMathInElement !== 'undefined') {
+      renderMathInElement(node, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\[', right: '\\]', display: true },
+          { left: '\\(', right: '\\)', display: false }
+        ],
+        throwOnError: false
+      });
+    }
+    fixCurrencyDollars(node);
+  }
+
+  function updateModalBtn(pid) {
+    var button = document.getElementById('modal-add-btn');
+    var inCart = Boolean(cart[pid]);
+    button.textContent = inCart ? '✓ Добавлено' : '+ Добавить';
+    button.classList.toggle('added', inCart);
+  }
+
+  document.getElementById('modal-add-btn').addEventListener('click', function () {
+    if (!modalCurrentId) { return; }
+    addToCart(modalCurrentId);
+    updateModalBtn(modalCurrentId);
+  });
+
+  function closeModal() { backdrop.classList.remove('open'); }
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  backdrop.addEventListener('click', function (event) {
+    if (event.target === backdrop) { closeModal(); }
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') { closeModal(); }
+  });
+
+  renderCart();
+  highlightAdded();
+})();
+</script>

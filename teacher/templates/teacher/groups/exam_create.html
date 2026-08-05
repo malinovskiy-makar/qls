@@ -3,154 +3,157 @@
 {% block title %}Новая контрольная — {{ group.name }}{% endblock %}
 
 {% block extra_style %}
-{% include "platform/_stats_style.html" %}
-.form-row { margin-bottom: 18px; }
-.form-row > label { display: block; font-size: 12px; font-weight: 600;
-  color: var(--text2); text-transform: uppercase; letter-spacing: .05em;
-  margin-bottom: 6px; }
-.form-row input[type=text], .form-row input[type=number],
-.form-row input[type=datetime-local] {
-  width: 100%; max-width: 340px; box-sizing: border-box; font: inherit;
-  font-size: 14px; padding: 9px 12px; border: 1px solid var(--border);
-  border-radius: var(--r); background: var(--surface); color: var(--text);
-}
-.kind-switch { display: flex; gap: 10px; flex-wrap: wrap; }
+{% include "teacher/_picker_style.html" %}
+
+.kind-switch { display: flex; flex-direction: column; gap: 8px; }
 .kind-switch label { display: flex; align-items: flex-start; gap: 8px;
-  border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
-  cursor: pointer; flex: 1; min-width: 240px; background: var(--surface-2); }
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  cursor: pointer; background: var(--surface-2); }
 .kind-switch label.is-on { border-color: var(--accent); }
-.kind-switch .t { font-size: 14px; font-weight: 600; }
-.kind-switch .d { font-size: 12px; color: var(--text2); margin-top: 3px; }
-.picker { display: grid; gap: 8px;
-          grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
-.picker label { display: flex; gap: 8px; align-items: flex-start;
-  border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
-  font-size: 13px; line-height: 1.45; cursor: pointer;
-  background: var(--surface-2); }
-.picker label.is-on { border-color: var(--accent); }
-.hint { font-size: 12px; color: var(--text2); margin-top: 6px; }
-.btn-primary { background: var(--btn-bg); color: var(--on-btn); border: none;
-  border-radius: var(--r); padding: 12px 26px; font-size: 15px;
-  font-weight: 700; cursor: pointer; }
-.btn-primary:hover { background: var(--btn-bg-hover); }
+.kind-switch .t { font-size: 13px; font-weight: 600; display: block; }
+.kind-switch .d { font-size: 12px; color: var(--text2); margin-top: 3px;
+                  display: block; line-height: 1.45; }
+.form-errors { background: var(--error-tint); border: 1px solid var(--error-border);
+  color: var(--error); border-radius: var(--r); padding: 10px 14px;
+  font-size: 13px; margin-bottom: 14px; }
+.form-errors ul { margin: 0; padding-left: 18px; }
 {% endblock %}
 
 {% block content %}
-<div class="stats-head">
-  <div>
-    <h1 class="stats-title">Новая контрольная</h1>
-    <div class="stats-sub">
-      <a href="{% url 'teacher:group_detail' group.pk %}"
-         style="color:var(--accent);text-decoration:none;">← {{ group.name }}</a>
-      · выдаётся всем ученикам группы
-    </div>
-  </div>
+<div class="page-header">
+  <a href="{% url 'teacher:group_detail' group.pk %}" class="back-link">← {{ group.name }}</a>
+  <h1 class="page-title">Новая контрольная</h1>
 </div>
 
-<form method="post" id="exam-form">
-  {% csrf_token %}
-
-  <div class="panel">
-    <div class="form-row">
-      <label for="id_name">Название</label>
-      <input type="text" id="id_name" name="name" required
-             value="{{ form.name|default:'' }}"
-             placeholder="Контрольная №1: спрос и предложение">
-    </div>
-
-    <div class="form-row">
-      <label>Как идёт время</label>
-      <div class="kind-switch" id="kind-switch">
-        <label class="{% if form.kind == 'window' %}is-on{% endif %}">
-          <input type="radio" name="kind" value="window"
-                 {% if form.kind == 'window' %}checked{% endif %}>
-          <span>
-            <span class="t">Окно</span>
-            <span class="d">Все пишут одновременно: задано начало и конец.
-              Подходит для урока.</span>
-          </span>
-        </label>
-        <label class="{% if form.kind == 'limit' %}is-on{% endif %}">
-          <input type="radio" name="kind" value="limit"
-                 {% if form.kind == 'limit' %}checked{% endif %}>
-          <span>
-            <span class="t">Дедлайн с лимитом</span>
-            <span class="d">Сдать до срока, на решение — заданное число минут
-              с момента старта.</span>
-          </span>
-        </label>
-      </div>
-    </div>
-
-    {# Лишние поля скрыты по типу: показывать оба набора сразу — верный
-       способ получить контрольную с окном И лимитом одновременно. #}
-    <div id="fields-window">
-      <div class="form-row">
-        <label for="id_starts_at">Начало окна</label>
-        <input type="datetime-local" id="id_starts_at" name="starts_at"
-               value="{{ form.starts_at|date:'Y-m-d\TH:i' }}">
-      </div>
-      <div class="form-row">
-        <label for="id_ends_at">Конец окна</label>
-        <input type="datetime-local" id="id_ends_at" name="ends_at"
-               value="{{ form.ends_at|date:'Y-m-d\TH:i' }}">
-        <div class="hint">Окно не короче {{ min_window }} минут и заканчивается
-          в будущем.</div>
-      </div>
-    </div>
-
-    <div id="fields-limit" hidden>
-      <div class="form-row">
-        <label for="id_deadline">Сдать до</label>
-        <input type="datetime-local" id="id_deadline" name="deadline"
-               value="{{ form.deadline|date:'Y-m-d\TH:i' }}">
-      </div>
-      <div class="form-row">
-        <label for="id_duration">Лимит времени, минут</label>
-        <input type="number" id="id_duration" name="duration"
-               min="{{ min_duration }}" max="{{ max_duration }}"
-               value="{{ form.duration|default:'60' }}">
-        <div class="hint">От {{ min_duration }} до {{ max_duration }} минут.
-          Если до крайнего срока останется меньше — время урежется, и ученика
-          предупредят ДО старта.</div>
-      </div>
-    </div>
-
-    <div class="form-row">
-      <label style="text-transform:none;letter-spacing:0;font-size:14px;
-                    font-weight:400;color:var(--text);">
-        <input type="checkbox" name="show_results"
-               {% if form.show_results %}checked{% endif %}>
-        Показывать ученику результат сразу
-      </label>
-      <div class="hint">Тесты проверяются автоматически. Снимите галочку, если
-        балл лучше придержать до проверки открытых задач.</div>
-    </div>
+<div class="hw-layout">
+  <div class="hw-main">
+    {% include "teacher/_picker_list.html" %}
   </div>
 
-  <div class="panel">
-    <div class="panel-head">
-      <div class="panel-title">Задачи</div>
-      <div class="panel-hint">Отмеченные пойдут в контрольную в этом порядке</div>
-    </div>
-    <div class="picker" id="picker">
-      {% for problem in candidates %}
-      <label>
-        <input type="checkbox" name="problem_ids" value="{{ problem.pk }}">
-        <span>{{ problem.title|default:problem.statement|truncatechars:110 }}</span>
-      </label>
-      {% empty %}
-      <div class="empty-note">Сохранённых задач нет. Отложите задачи из
-        каталога кнопкой «Сохранить», и они появятся здесь.</div>
-      {% endfor %}
-    </div>
-  </div>
+  <aside class="hw-sidebar">
+    <form method="post" id="picker-form" action="">
+      {% csrf_token %}
+      <input type="hidden" name="problem_ids" id="problem-ids-input">
 
-  <button type="submit" class="btn-primary">Создать контрольную</button>
-</form>
+      {% if errors %}
+      <div class="form-errors">
+        <ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+
+      <div class="sidebar-card">
+        <div class="sidebar-title">Настройки контрольной</div>
+
+        <div class="form-group">
+          <label class="form-label" for="id_name">Название *</label>
+          <input class="form-control" type="text" id="id_name" name="name" required
+                 value="{{ form.name|default:'' }}"
+                 placeholder="Контрольная №1: спрос и предложение">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Как идёт время</label>
+          <div class="kind-switch" id="kind-switch">
+            <label class="{% if form.kind == 'window' %}is-on{% endif %}">
+              <input type="radio" name="kind" value="window"
+                     {% if form.kind == 'window' %}checked{% endif %}>
+              <span>
+                <span class="t">Окно</span>
+                <span class="d">Все пишут одновременно: задано начало и конец.
+                  Подходит для урока.</span>
+              </span>
+            </label>
+            <label class="{% if form.kind == 'limit' %}is-on{% endif %}">
+              <input type="radio" name="kind" value="limit"
+                     {% if form.kind == 'limit' %}checked{% endif %}>
+              <span>
+                <span class="t">Дедлайн с лимитом</span>
+                <span class="d">Сдать до срока, на решение — заданное число
+                  минут с момента старта.</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        {# Лишние поля скрыты по типу. #}
+        {# Показывать оба набора сразу — верный способ получить контрольную #}
+        {# с окном И лимитом одновременно. #}
+        <div id="fields-window">
+          <div class="form-group">
+            <label class="form-label" for="id_starts_at">Начало окна</label>
+            <input class="form-control" type="datetime-local" id="id_starts_at"
+                   name="starts_at" value="{{ form.starts_at|date:'Y-m-d\TH:i' }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="id_ends_at">Конец окна</label>
+            <input class="form-control" type="datetime-local" id="id_ends_at"
+                   name="ends_at" value="{{ form.ends_at|date:'Y-m-d\TH:i' }}">
+            <div class="form-hint">Окно не короче {{ min_window }} минут и
+              заканчивается в будущем.</div>
+          </div>
+        </div>
+
+        <div id="fields-limit" hidden>
+          <div class="form-group">
+            <label class="form-label" for="id_deadline">Сдать до</label>
+            <input class="form-control" type="datetime-local" id="id_deadline"
+                   name="deadline" value="{{ form.deadline|date:'Y-m-d\TH:i' }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="id_duration">Лимит времени, минут</label>
+            <input class="form-control" type="number" id="id_duration"
+                   name="duration" min="{{ min_duration }}" max="{{ max_duration }}"
+                   value="{{ form.duration|default:'60' }}">
+            <div class="form-hint">От {{ min_duration }} до {{ max_duration }}
+              минут. Если до крайнего срока останется меньше — время урежется,
+              и ученика предупредят ДО старта.</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" name="show_results"
+                   {% if form.show_results %}checked{% endif %}>
+            Показывать ученику результат сразу
+          </label>
+          <div class="form-hint">Тесты проверяются автоматически. Снимите
+            галочку, если балл лучше придержать до проверки открытых задач.
+            Комментарий, который вы напишете руками, ученик увидит в любом
+            случае.</div>
+        </div>
+      </div>
+
+      <div class="sidebar-card">
+        <div style="margin-bottom:10px;">
+          <a href="{% url 'teacher:problem_new' %}?to_cart=1&amp;return_to={% url 'teacher:exam_create' group.pk %}"
+             style="display:inline-block;border:0.5px solid var(--border);
+                    border-radius:var(--r);padding:6px 12px;font-size:12px;
+                    color:var(--text);text-decoration:none;">
+            ✍ Написать свою задачу
+          </a>
+        </div>
+        <div class="cart-header">
+          <div class="sidebar-title" style="margin-bottom:0;">Задачи контрольной</div>
+          <span class="cart-count">Выбрано: <strong id="cart-count">0</strong></span>
+        </div>
+
+        <div class="cart-list" id="cart-list">
+          <p class="cart-empty">Пока ничего не добавлено</p>
+        </div>
+
+        <button type="submit" class="btn-submit" id="submit-btn" disabled>
+          Создать контрольную
+        </button>
+      </div>
+    </form>
+  </aside>
+</div>
+
+{% include "teacher/_picker_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}
+{% include "teacher/_picker_js.html" with cart_key="exam_cart" picker_form_id="picker-form" %}
 <script>
 (function () {
   var switcher = document.getElementById('kind-switch');
@@ -162,17 +165,11 @@
     windowFields.hidden = kind !== 'window';
     limitFields.hidden = kind !== 'limit';
     switcher.querySelectorAll('label').forEach(function (label) {
-      label.classList.toggle('is-on',
-        label.querySelector('input').checked);
+      label.classList.toggle('is-on', label.querySelector('input').checked);
     });
   }
   switcher.addEventListener('change', paint);
   paint();
-
-  document.getElementById('picker').addEventListener('change', function (e) {
-    var label = e.target.closest('label');
-    if (label) { label.classList.toggle('is-on', e.target.checked); }
-  });
 })();
 </script>
 {% endblock %}

@@ -12,6 +12,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 
@@ -422,36 +423,30 @@ def _strip_latex(text):
 
 @teacher_required
 def assignment_create(request):
-    from problems.management.commands.apply_topic_mapping import CANONICAL
-    from problems.models import Assignment, Problem, StudentGroup, Topic
+    """Конструктор домашки. Отбор задач — общий модуль `teacher/picker.py`."""
+    from problems.models import Assignment, StudentGroup
+
+    from .picker import create_items, parse_cart, picker_context
 
     if request.method == 'POST':
         title = request.POST.get('name', '').strip()
         deadline_str = request.POST.get('deadline', '').strip()
         group_ids = request.POST.getlist('groups')
-        problem_ids_str = request.POST.get('problem_ids', '').strip()
+        keys, catalog_ids, custom_ids = parse_cart(
+            request.POST.get('problem_ids'))
 
         if not title:
             messages.error(request, 'Укажите название домашки.')
             return redirect('teacher:assignment_create')
-
-        # В корзине могут лежать И задачи каталога (числовой id), И свои
-        # задачи репетитора (id с префиксом «c»). Разделяем по префиксу,
-        # порядок в корзине сохраняем — он станет порядком в домашке.
-        cart_ids = [pid.strip() for pid in problem_ids_str.split(',')
-                    if pid.strip()]
-        problem_ids = [int(pid) for pid in cart_ids if pid.isdigit()]
-        custom_ids = [int(pid[1:]) for pid in cart_ids
-                      if pid.startswith('c') and pid[1:].isdigit()]
-        if not problem_ids and not custom_ids:
+        if not (catalog_ids or custom_ids):
             messages.error(request, 'Добавьте хотя бы одну задачу.')
             return redirect('teacher:assignment_create')
-
         if not group_ids:
             messages.error(request, 'Выберите хотя бы одну группу.')
             return redirect('teacher:assignment_create')
 
         import datetime
+
         from django.utils import timezone
 
         deadline = None
@@ -476,27 +471,7 @@ def assignment_create(request):
             # равно получают домашку через список учеников.
             group=groups[0] if groups else None,
         )
-        problems = Problem.objects.filter(pk__in=problem_ids)
-        assignment.problems.set(problems)
-
-        # Позиции задач в домашке — в порядке корзины.
-        from problems.models import AssignmentItem, CustomProblem
-        by_id = {p.pk: p for p in problems}
-        customs = {c.pk: c for c in CustomProblem.objects.filter(
-            pk__in=custom_ids, owner=request.user)}
-        order = 0
-        for raw in cart_ids:
-            if raw.isdigit() and int(raw) in by_id:
-                AssignmentItem.objects.create(
-                    assignment=assignment, order=order,
-                    catalog_problem=by_id[int(raw)])
-                order += 1
-            elif raw.startswith('c') and raw[1:].isdigit() \
-                    and int(raw[1:]) in customs:
-                AssignmentItem.objects.create(
-                    assignment=assignment, order=order,
-                    custom_problem=customs[int(raw[1:])])
-                order += 1
+        create_items(assignment, request.user, keys, catalog_ids, custom_ids)
 
         for group in groups:
             assignment.students.add(*group.students.all())
@@ -504,95 +479,22 @@ def assignment_create(request):
         messages.success(request, f'Домашка «{title}» создана.')
         return redirect('teacher:dashboard')
 
-    # GET — фильтры и список задач (без задач за качественным шлюзом)
-    qs = Problem.objects.filter(status=Problem.Status.PUBLISHED,
-                                needs_quality_review=False)
+    from problems.models import SavedProblem
 
-    f_q     = request.GET.get('q',           '').strip()
-    f_topic = request.GET.get('topic',        '').strip()
-    f_diff  = request.GET.get('difficulty',   '').strip()
-    f_type  = request.GET.get('type',         '').strip()
-    f_sol   = request.GET.get('has_solution', '').strip()
+    saved = [item.catalog_problem for item in
+             SavedProblem.objects.filter(owner=request.user, is_deleted=False,
+                                         catalog_problem__isnull=False)
+             .select_related('catalog_problem')]
 
-    if f_q:
-        qs = qs.filter(Q(statement__icontains=f_q) | Q(title__icontains=f_q))
-    if f_topic:
-        qs = qs.filter(topics__id=f_topic)
-    if f_diff:
-        qs = qs.filter(difficulty=f_diff)
-    if f_type:
-        qs = qs.filter(problem_type=f_type)
-    if f_sol == '1':
-        qs = qs.exclude(solution='')
-
-    qs = qs.prefetch_related('topics').order_by('-id').distinct()
-
-    paginator = Paginator(qs, 20)
-    page_obj  = paginator.get_page(request.GET.get('page', 1))
-
-    cards = []
-    for p in page_obj:
-        raw     = _strip_latex(p.statement)
-        preview = raw[:100] + ('…' if len(raw) > 100 else '')
-        d       = p.difficulty or 0
-        cards.append({
-            'problem':          p,
-            'preview':          preview,
-            'topics':           list(p.topics.all())[:3],
-            'difficulty_stars': range(d),
-            'difficulty_empty': range(5 - d),
-        })
-
-    problem_types = list(
-        Problem.objects
-        .filter(status=Problem.Status.PUBLISHED)
-        .exclude(problem_type='')
-        .values_list('problem_type', flat=True)
-        .distinct()
-        .order_by('problem_type')
-    )
-
-    qp = request.GET.copy()
-    qp.pop('page', None)
-
-    groups = StudentGroup.objects.filter(
-        teacher=request.user
-    ).prefetch_related('students')
-
-    topics = sorted(
-        Topic.objects.filter(name__in=CANONICAL),
-        key=lambda t: CANONICAL.index(t.name),
-    )
-
-    # Передаём preselect ID если задан
-    preselect_id = request.GET.get('preselect', '').strip()
-
-    # Возврат из редактора своей задачи: ?add_custom=<id> — задача сразу
-    # ложится в собираемую корзину (та же вкладка, sessionStorage жив).
-    add_custom_id = request.GET.get('add_custom', '').strip()
-    add_custom = None
-    if add_custom_id.isdigit():
-        from problems.models import CustomProblem
-        add_custom = CustomProblem.objects.filter(
-            pk=int(add_custom_id), owner=request.user,
-            is_deleted=False).first()
-
-    return render(request, 'teacher/assignment_create.html', {
-        'page_obj':      page_obj,
-        'cards':         cards,
-        'total':         paginator.count,
-        'topics':        topics,
-        'problem_types': problem_types,
-        'base_query':    qp.urlencode(),
-        'f_q':           f_q,
-        'f_topic':       f_topic,
-        'f_diff':        f_diff,
-        'f_type':        f_type,
-        'f_sol':         f_sol,
-        'groups':        groups,
-        'preselect_id':  preselect_id,
-        'add_custom':    add_custom,
+    context = picker_context(request)
+    context.update({
+        'groups': StudentGroup.objects.filter(
+            teacher=request.user).prefetch_related('students'),
+        'show_saved': True,
+        'saved_problems': saved,
+        'picker_reset_url': reverse('teacher:assignment_create'),
     })
+    return render(request, 'teacher/assignment_create.html', context)
 
 
 @teacher_required

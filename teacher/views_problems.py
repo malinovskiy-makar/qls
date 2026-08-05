@@ -166,10 +166,14 @@ def problem_form(request, pk=None):
 
             messages.success(request, 'Задача сохранена.')
             if request.POST.get('to_cart'):
-                # Возврат в конструктор домашек — задача сразу ляжет
-                # в собираемую корзину (та же вкладка, sessionStorage жив).
-                return redirect(
-                    f"{'/teacher/assignment/create/'}?add_custom={problem.pk}")
+                # Возврат в ТОТ конструктор, откуда пришли — домашки или
+                # контрольной: задача сразу ляжет в собираемую корзину (та
+                # же вкладка, sessionStorage жив). Раньше адрес возврата был
+                # прибит к домашке, и своя задача в контрольную не попадала.
+                back = _safe_return(request.POST.get('return_to'))
+                joiner = '&' if '?' in back else '?'
+                return redirect('%s%sadd_custom=%d'
+                                % (back, joiner, problem.pk))
             return redirect('teacher:problem_edit', pk=problem.pk)
 
     # Сохранённые графики — для модального окна «Добавить график».
@@ -230,8 +234,24 @@ def problem_form(request, pk=None):
         'kinds': CustomProblem.Kind.choices,
         'graph_groups': graph_groups,
         'to_cart': request.GET.get('to_cart') or request.POST.get('to_cart'),
+        'return_to': _safe_return(request.GET.get('return_to')
+                                  or request.POST.get('return_to')),
         'solution_visibility': SolutionVisibility.choices,
     })
+
+
+def _safe_return(value):
+    """Куда вернуться после «Сохранить и в корзину».
+
+    ⚠️ Адрес приходит из строки запроса, поэтому проверяем: только свой
+    путь внутри `/teacher/`. Иначе это открытый редирект — ссылку с чужим
+    адресом можно подсунуть репетитору.
+    """
+    default = '/teacher/assignment/create/'
+    value = (value or '').strip()
+    if not value.startswith('/teacher/') or value.startswith('//'):
+        return default
+    return value
 
 
 @tutor_required

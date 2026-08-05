@@ -84,7 +84,8 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
 
 <form method="post" id="problem-form">
   {% csrf_token %}
-  {% if to_cart %}<input type="hidden" name="to_cart" value="1">{% endif %}
+  {% if to_cart %}<input type="hidden" name="to_cart" value="1">
+  <input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
 
   <div class="editor">
     <div>

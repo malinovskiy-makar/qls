@@ -614,6 +614,62 @@ class ExamCreationTests(TestCase):
         self._post(problem_ids=[])
         self.assertFalse(Assignment.objects.filter(kind='exam').exists())
 
+    def test_problems_are_picked_from_the_catalog_not_only_from_saved(self):
+        """ФАЗА 0.3. Задача, которую репетитор НЕ откладывал, тоже доступна.
+
+        Раньше конструктор предлагал только сохранённые — работать с этим
+        было нельзя. Теперь на странице есть поиск, фильтры по теме и
+        сложности и карточки задач каталога.
+        """
+        fresh = make_problem('Не сохранённая задача каталога', difficulty=4)
+        body = self.client.get(self.url).content.decode()
+        self.assertIn('Не сохранённая задача каталога', body)
+        self.assertIn('name="q"', body)          # поиск
+        self.assertIn('name="topic"', body)      # фильтр темы
+        self.assertIn('name="difficulty"', body)  # фильтр сложности
+
+        self._post(problem_ids=[str(fresh.pk)])
+        exam = Assignment.objects.filter(kind='exam').first()
+        self.assertIsNotNone(exam)
+        self.assertEqual([i.catalog_problem_id for i in exam.items.all()],
+                         [fresh.pk])
+
+    def test_search_filters_the_list(self):
+        make_problem('Монополия и её издержки')
+        make_problem('Совсем про другое')
+        body = self.client.get(self.url, {'q': 'Монополия'}).content.decode()
+        self.assertIn('Монополия и её издержки', body)
+        self.assertNotIn('Совсем про другое', body)
+
+    def test_saved_problems_stay_as_a_quick_tab(self):
+        """Сохранённые не исчезли — они стали вкладкой быстрого доступа."""
+        body = self.client.get(self.url).content.decode()
+        self.assertIn('Сохранённые', body)
+        self.assertIn('pane-saved', body)
+
+    def test_cart_order_becomes_problem_order(self):
+        """Порядок в корзине = порядок задач в контрольной."""
+        second = make_problem('Вторая')
+        third = make_problem('Третья')
+        self._post(problem_ids='%d,%d,%d' % (third.pk, self.problem.pk,
+                                             second.pk))
+        exam = Assignment.objects.filter(kind='exam').first()
+        self.assertEqual([i.catalog_problem_id
+                          for i in exam.items.order_by('order')],
+                         [third.pk, self.problem.pk, second.pk])
+
+    def test_own_problem_of_the_tutor_goes_into_the_exam(self):
+        """Своя задача репетитора — наравне с каталожной (префикс «c»)."""
+        from problems.models import CustomProblem
+
+        own = CustomProblem.objects.create(owner=self.tutor, title='Своя',
+                                           statement='Условие')
+        self._post(problem_ids='c%d,%d' % (own.pk, self.problem.pk))
+        exam = Assignment.objects.filter(kind='exam').first()
+        items = list(exam.items.order_by('order'))
+        self.assertEqual(items[0].custom_problem_id, own.pk)
+        self.assertEqual(items[1].catalog_problem_id, self.problem.pk)
+
     def test_end_before_start_is_rejected(self):
         now = timezone.localtime(timezone.now())
         self._post(starts_at=(now + timedelta(hours=3)).strftime('%Y-%m-%dT%H:%M'),

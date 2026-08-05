@@ -1,0 +1,104 @@
+{% comment %}
+Левая колонка отбора: фильтры, карточки задач, пагинация, вкладка
+«Сохранённые». ОДНА разметка на конструктор домашки и конструктор
+контрольной.
+
+Ждёт в контексте всё из `teacher.picker.picker_context()` плюс
+`picker_reset_url` (куда ведёт «Сброс») и необязательный `saved_problems`
+(быстрый доступ к отложенным задачам).
+{% endcomment %}
+{% if show_saved %}
+<div class="picker-tabs" id="picker-tabs">
+  <button type="button" class="picker-tab is-on" data-pane="pane-catalog">Каталог</button>
+  <button type="button" class="picker-tab" data-pane="pane-saved">Сохранённые ({{ saved_problems|length }})</button>
+</div>
+{% endif %}
+
+<div id="pane-catalog">
+  <form method="get" action="" id="filter-form">
+    <div class="filters-row">
+      <input class="filter-input" type="text" name="q"
+             value="{{ f_q }}" placeholder="Поиск по условию…">
+
+      <select class="filter-select" name="topic">
+        <option value="">Все темы</option>
+        {% for topic in topics %}
+        <option value="{{ topic.id }}"
+          {% if f_topic == topic.id|stringformat:"s" %}selected{% endif %}>
+          {{ topic.name }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <select class="filter-select" name="difficulty">
+        <option value="">Любая сложность</option>
+        <option value="1" {% if f_diff == "1" %}selected{% endif %}>★☆☆☆☆</option>
+        <option value="2" {% if f_diff == "2" %}selected{% endif %}>★★☆☆☆</option>
+        <option value="3" {% if f_diff == "3" %}selected{% endif %}>★★★☆☆</option>
+        <option value="4" {% if f_diff == "4" %}selected{% endif %}>★★★★☆</option>
+        <option value="5" {% if f_diff == "5" %}selected{% endif %}>★★★★★</option>
+      </select>
+
+      <select class="filter-select" name="type">
+        <option value="">Любой тип</option>
+        <option value="тест: один ответ" {% if f_type == "тест: один ответ" %}selected{% endif %}>Тест</option>
+        {% for pt in problem_types %}
+        {% if pt != "тест: один ответ" %}
+        <option value="{{ pt }}" {% if f_type == pt %}selected{% endif %}>{{ pt }}</option>
+        {% endif %}
+        {% endfor %}
+      </select>
+
+      <label class="checkbox-label">
+        <input type="checkbox" name="has_solution" value="1"
+               {% if f_sol == "1" %}checked{% endif %}>
+        С решением
+      </label>
+
+      <button class="filter-btn" type="submit">Найти</button>
+      <a href="{{ picker_reset_url }}" class="reset-link">✕ Сброс</a>
+    </div>
+  </form>
+
+  <p class="results-count">Найдено: <strong>{{ total }}</strong> задач</p>
+
+  {% for card in cards %}
+  {% include "teacher/_picker_card.html" with problem=card.problem preview=card.preview topics=card.topics stars=card.difficulty_stars empty_stars=card.difficulty_empty %}
+  {% empty %}
+  <div style="text-align:center;padding:60px 0;color:var(--text2);font-size:14px;">
+    Задач не найдено. <a href="{{ picker_reset_url }}">Сбросить фильтры</a>
+  </div>
+  {% endfor %}
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}
+    <a class="page-btn" href="?{{ base_query }}&page={{ page_obj.previous_page_number }}">←</a>
+    {% endif %}
+    {% for n in page_obj.paginator.page_range %}
+      {% if n == page_obj.number %}
+        <span class="page-btn active">{{ n }}</span>
+      {% elif n == 1 or n == page_obj.paginator.num_pages or n >= page_obj.number|add:"-2" and n <= page_obj.number|add:"2" %}
+        <a class="page-btn" href="?{{ base_query }}&page={{ n }}">{{ n }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+    <a class="page-btn" href="?{{ base_query }}&page={{ page_obj.next_page_number }}">→</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if show_saved %}
+<div id="pane-saved" hidden>
+  <p class="results-count">Отложено: <strong>{{ saved_problems|length }}</strong></p>
+  {% for problem in saved_problems %}
+  {% include "teacher/_picker_card.html" with problem=problem preview=problem.statement|truncatechars:160 %}
+  {% empty %}
+  <div style="text-align:center;padding:48px 0;color:var(--text2);font-size:14px;">
+    Сохранённых задач нет. Кнопка «Сохранить» есть на странице любой задачи
+    каталога.
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

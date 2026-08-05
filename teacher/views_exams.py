@@ -7,6 +7,7 @@
 """
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from problems import exam_engine
@@ -21,7 +22,9 @@ def exam_create(request, pk):
     Валидация — НА ФОРМЕ, а не 500-я: репетитор, поставивший конец окна
     раньше начала, должен увидеть подсказку, а не страницу ошибки.
     """
-    from problems.models import Assignment, AssignmentItem, Problem
+    from problems.models import Assignment
+
+    from .picker import create_items, parse_cart, picker_context
 
     group = own_group_or_404(request.user, pk)
     form = {'kind': 'window', 'show_results': True}
@@ -29,9 +32,9 @@ def exam_create(request, pk):
 
     if request.method == 'POST':
         form, errors = _read_exam_form(request)
-        problem_ids = [int(value) for value in
-                       request.POST.getlist('problem_ids') if value.isdigit()]
-        if not problem_ids:
+        keys, catalog_ids, custom_ids = parse_cart(
+            request.POST.get('problem_ids'))
+        if not (catalog_ids or custom_ids):
             errors.append('Добавьте хотя бы одну задачу.')
 
         if not errors:
@@ -45,17 +48,7 @@ def exam_create(request, pk):
                 deadline=form['deadline'],
                 show_results_immediately=form['show_results'])
             exam.students.set(group.students.all())
-            problems = {p.pk: p for p in
-                        Problem.objects.filter(pk__in=problem_ids)}
-            for order, problem_id in enumerate(problem_ids):
-                problem = problems.get(problem_id)
-                if problem is None:
-                    continue
-                AssignmentItem.objects.create(assignment=exam,
-                                              catalog_problem=problem,
-                                              order=order)
-            # Старый M2M заполняем тоже — на нём держатся прежние экраны.
-            exam.problems.set([p for p in problems.values()])
+            create_items(exam, request.user, keys, catalog_ids, custom_ids)
             messages.success(request, f'Контрольная «{exam.name}» создана.')
             return redirect('teacher:group_exam_results', group_id=group.pk,
                             exam_id=exam.pk)
@@ -63,27 +56,30 @@ def exam_create(request, pk):
         for error in errors:
             messages.error(request, error)
 
-    # Выбирать задачи предлагаем из СОХРАНЁННЫХ репетитором: собирать
-    # контрольную поиском по 31 тысяче задач прямо в форме — не выбор, а
-    # лотерея. Каталог для отбора уже есть, кнопка «Сохранить» на странице
-    # задачи тоже.
+    # ⚠️ Задачи берутся ИЗ КАТАЛОГА — тем же отбором, что у домашки
+    # (поиск, фильтры по теме и сложности, корзина, порядок). Прошлая
+    # версия предлагала только сохранённые, и работать с этим было нельзя.
+    # Сохранённые остались — отдельной вкладкой быстрого доступа.
     from problems.models import SavedProblem
 
-    candidates = [saved.catalog_problem for saved in
-                  SavedProblem.objects.filter(owner=request.user,
-                                              is_deleted=False,
-                                              catalog_problem__isnull=False)
-                  .select_related('catalog_problem')]
+    saved = [item.catalog_problem for item in
+             SavedProblem.objects.filter(owner=request.user, is_deleted=False,
+                                         catalog_problem__isnull=False)
+             .select_related('catalog_problem')]
 
-    return render(request, 'teacher/groups/exam_create.html', {
+    context = picker_context(request)
+    context.update({
         'group': group,
         'form': form,
         'errors': errors,
-        'candidates': candidates,
+        'show_saved': True,
+        'saved_problems': saved,
+        'picker_reset_url': reverse('teacher:exam_create', args=[group.pk]),
         'min_window': exam_engine.MIN_WINDOW_MINUTES,
         'min_duration': exam_engine.MIN_DURATION_MINUTES,
         'max_duration': exam_engine.MAX_DURATION_MINUTES,
     })
+    return render(request, 'teacher/groups/exam_create.html', context)
 
 
 def _read_exam_form(request):
