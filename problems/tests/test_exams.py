@@ -821,6 +821,92 @@ class FinalizeCommandTests(TestCase):
                          moment)
 
 
+class ReviewHeaderTests(TestCase):
+    """ФАЗА 0.9. На экране проверки — верный тип работы и её название.
+
+    Контрольная подписывалась «Домашка:», а название было пустым: шаблон
+    читал `assignment.title`, а поля с таким именем у `Assignment` нет
+    (оно называется `name`). Django на несуществующее поле не ругается —
+    подставляет пустую строку и рендерит 200.
+    """
+
+    def setUp(self):
+        self.tutor = make_user('rh_tutor', role='teacher')
+        self.student = make_user('rh_student', role='student')
+        self.client.force_login(self.tutor)
+
+    def _submission(self, assignment):
+        item = AssignmentItem.objects.create(
+            assignment=assignment, order=0,
+            catalog_problem=make_problem('Задача'))
+        return Submission.objects.create(
+            student=self.student, assignment=assignment, problem_item=item,
+            problem=item.catalog_problem, status='submitted')
+
+    def test_exam_is_called_an_exam_and_has_a_name(self):
+        exam = make_exam(self.tutor, [self.student], mode='window')
+        exam.name = 'Контрольная №7'
+        exam.save(update_fields=['name'])
+        submission = self._submission(exam)
+        body = self.client.get(
+            reverse('teacher:review_submission',
+                    args=[submission.pk])).content.decode()
+        self.assertIn('Контрольная: Контрольная №7', ' '.join(body.split()))
+        self.assertNotIn('Домашка: Контрольная', ' '.join(body.split()))
+
+    def test_homework_keeps_its_label(self):
+        homework = Assignment.objects.create(
+            name='Домашка №4', author=self.tutor,
+            kind=Assignment.Kind.HOMEWORK)
+        homework.students.add(self.student)
+        submission = self._submission(homework)
+        body = self.client.get(
+            reverse('teacher:review_submission',
+                    args=[submission.pk])).content.decode()
+        self.assertIn('Домашка: Домашка №4', ' '.join(body.split()))
+
+
+class DemoDataTests(TestCase):
+    """Демо-данные содержат тест каждого вида.
+
+    Их отсутствие уже стоило одной непроверенной починки: человек не смог
+    посмотреть множественный выбор, потому что таких задач в демо не было.
+    """
+
+    def test_seed_has_all_three_kinds_in_homework_and_exam(self):
+        from problems.assignment_rows import item_answer_form
+
+        call_command('seed_platform_demo', verbosity=0)
+
+        homework = Assignment.objects.get(
+            name__startswith='Домашка №3', kind=Assignment.Kind.HOMEWORK)
+        exam = Assignment.objects.get(name__startswith='Контрольная №1')
+
+        for work in (homework, exam):
+            kinds = set()
+            for item in work.items.all():
+                kind, options = item_answer_form(item)
+                if options:
+                    kinds.add(kind)
+            self.assertIn('radio', kinds, '%s: нет теста «один ответ»' % work)
+            self.assertIn('checkbox', kinds,
+                          '%s: нет теста с несколькими верными' % work)
+
+        titles = {item.problem_title for item in homework.items.all()}
+        self.assertIn('Демо-тест: верно/неверно', titles)
+        self.assertIn('Демо-тест: один ответ', titles)
+        self.assertIn('Демо-тест: все верные', titles)
+
+    def test_seed_is_idempotent(self):
+        call_command('seed_platform_demo', verbosity=0)
+        first = Assignment.objects.get(
+            name__startswith='Домашка №3').items.count()
+        call_command('seed_platform_demo', verbosity=0)
+        second = Assignment.objects.get(
+            name__startswith='Домашка №3').items.count()
+        self.assertEqual(first, second)
+
+
 class TimeOnScreenTests(TestCase):
     """ФАЗА 0.8. Одно время везде — в часовом поясе проекта.
 

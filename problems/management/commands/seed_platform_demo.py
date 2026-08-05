@@ -15,6 +15,7 @@ from problems.models import (
     Assignment,
     ParentLink,
     Problem,
+    ProblemPart,
     StudentGroup,
     Submission,
     Topic,
@@ -61,10 +62,12 @@ class Command(BaseCommand):
         group.students.set(students)
 
         catalog = self._catalog_problems()
+        catalog_tests = self._catalog_tests()
         custom = self._custom_problem(tutor)
 
-        homework = self._homework(tutor, group, students, catalog, custom, now)
-        self._exam_window(tutor, group, students, catalog, now)
+        homework = self._homework(tutor, group, students, catalog, custom,
+                                  catalog_tests, now)
+        self._exam_window(tutor, group, students, catalog, catalog_tests, now)
         self._exam_limit(tutor, group, students, catalog, now)
         self._comments(homework, tutor, students[0])
         graph = self._saved(tutor, catalog, custom)
@@ -170,6 +173,58 @@ class Command(BaseCommand):
              ('Мода на товар', False), ('Налог на производителя', True)])
         return problem
 
+    def _catalog_tests(self):
+        """Тесты КАТАЛОЖНОГО вида — по одному на каждый подвид.
+
+        ⚠️ Зачем отдельно от тестов репетитора. У каталожной задачи варианты
+        ответа — это `ProblemPart` (подпункты), и ветка автопроверки у неё
+        своя (`auto_check_submission` против `auto_check_custom`). Именно в
+        каталожной ветке жил дефект «разметка пишет `answer_<pk>_<метка>`, а
+        приёмник читает `answer_<pk>`», и проверить починку было не на чем:
+        в демо-данных тестов с множественным выбором не было вообще.
+        """
+        topic, _ = Topic.objects.get_or_create(
+            name='Спрос и предложение', defaults={'slug': 'demand-supply'})
+        made = []
+        for title, ptype, statement, answer, parts in [
+            ('Демо-тест: верно/неверно', 'тест: верно/неверно',
+             'Отметьте верные утверждения о рынке совершенной конкуренции.',
+             'а, в',
+             [('а', 'Фирма принимает цену как данность.', 'верно'),
+              ('б', 'Фирма может назначить любую цену.', 'неверно'),
+              ('в', 'В долгосрочном периоде прибыль стремится к нулю.',
+               'верно')]),
+            ('Демо-тест: один ответ', 'тест: один ответ',
+             'Доходы покупателей выросли. Что произойдёт с кривой спроса на '
+             'нормальный товар?',
+             'б',
+             [('а', 'Сдвинется влево', ''),
+              ('б', 'Сдвинется вправо', ''),
+              ('в', 'Станет вертикальной', ''),
+              ('г', 'Не изменится', '')]),
+            ('Демо-тест: все верные', 'тест: все верные',
+             'Какие факторы сдвигают кривую предложения?',
+             'а, б, г',
+             [('а', 'Технология производства', 'верно'),
+              ('б', 'Цены на ресурсы', 'верно'),
+              ('в', 'Мода на товар', 'неверно'),
+              ('г', 'Налог на производителя', 'верно')]),
+        ]:
+            problem, created = Problem.objects.get_or_create(
+                title=title,
+                defaults={'statement': statement, 'answer': answer,
+                          'problem_type': ptype,
+                          'status': Problem.Status.PUBLISHED,
+                          'difficulty': 2})
+            problem.topics.add(topic)
+            if created:
+                for order, (label, text, part_answer) in enumerate(parts):
+                    ProblemPart.objects.create(
+                        problem=problem, label=label, statement=text,
+                        answer=part_answer, order=order)
+            made.append(problem)
+        return made
+
     def _custom_test(self, tutor, statement, kind, options):
         problem, created = CustomProblem.objects.get_or_create(
             owner=tutor, statement=statement,
@@ -182,19 +237,34 @@ class Command(BaseCommand):
         return problem
 
     def _items(self, assignment, entries):
-        """entries: [(catalog_problem|None, custom_problem|None, points)]"""
+        """entries: [(catalog_problem|None, custom_problem|None, points)]
+
+        ⚠️ Ключ идемпотентности — ЗАДАЧА, а не порядковый номер. По номеру
+        было так: в существующей работе позиция №1 уже занята, новая задача
+        «попадает» в неё и молча не добавляется. Именно поэтому после
+        дополнения демо-данных тест «верно/неверно» не появился в
+        контрольной, хотя команда отработала без единой ошибки.
+        """
         items = []
+        used = set(assignment.items.values_list('order', flat=True))
         for order, (catalog, custom, points) in enumerate(entries):
-            item, _ = AssignmentItem.objects.get_or_create(
-                assignment=assignment, order=order,
-                defaults={'catalog_problem': catalog,
-                          'custom_problem': custom, 'points': points})
+            item = assignment.items.filter(catalog_problem=catalog,
+                                           custom_problem=custom).first()
+            if item is None:
+                free = order
+                while free in used:
+                    free += 1
+                item = AssignmentItem.objects.create(
+                    assignment=assignment, order=free, catalog_problem=catalog,
+                    custom_problem=custom, points=points)
+                used.add(free)
             items.append(item)
         # Старый M2M заполняем тоже — на нём держатся существующие экраны.
         assignment.problems.set([c for c, _, _ in entries if c is not None])
         return items
 
-    def _homework(self, tutor, group, students, catalog, custom, now):
+    def _homework(self, tutor, group, students, catalog, custom,
+                  catalog_tests, now):
         homework, _ = Assignment.objects.get_or_create(
             name='Домашка №3: спрос, предложение, эластичность',
             author=tutor,
@@ -205,10 +275,15 @@ class Command(BaseCommand):
         homework.save()
         homework.students.set(students)
 
+        # ⚠️ В домашке есть тест КАЖДОГО вида: верно/неверно, один ответ,
+        # множественный выбор. Без них проверять автопроверку было не на чем.
         items = self._items(homework, [
             (catalog[0], None, 2),
             (catalog[1], None, 3),
             (None, custom, 5),
+            (catalog_tests[0], None, 2),
+            (catalog_tests[1], None, 1),
+            (catalog_tests[2], None, 3),
         ])
         # У своей задачи решение открываем после дедлайна (значение по
         # умолчанию), у первой каталожной — сразу после сдачи.
@@ -226,7 +301,8 @@ class Command(BaseCommand):
                       'status': 'submitted', 'submitted_at': now})
         return homework
 
-    def _exam_window(self, tutor, group, students, catalog, now):
+    def _exam_window(self, tutor, group, students, catalog, catalog_tests,
+                     now):
         exam, _ = Assignment.objects.get_or_create(
             name='Контрольная №1 (окно, все одновременно)', author=tutor,
             defaults={
@@ -239,7 +315,14 @@ class Command(BaseCommand):
         exam.group = group
         exam.save()
         exam.students.set(students)
-        self._items(exam, [(catalog[0], None, 5), (catalog[1], None, 5)])
+        # Те же три вида тестов и в контрольной: автопроверка там идёт
+        # другим путём (через `grade_attempt`), и проверять её нужно тоже.
+        self._items(exam, [
+            (catalog[0], None, 5),
+            (catalog_tests[0], None, 2),
+            (catalog_tests[1], None, 1),
+            (catalog_tests[2], None, 3),
+        ])
         return exam
 
     def _exam_limit(self, tutor, group, students, catalog, now):

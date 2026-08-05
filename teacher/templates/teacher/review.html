@@ -242,7 +242,15 @@ input[type="number"].form-input {
   {% if submission.submitted_at %}
     Отправлено {{ submission.submitted_at|date:"d.m.Y в H:i" }}
   {% endif %}
-  · Домашка: {{ submission.assignment.title }}
+  {% comment %}
+  ⚠️ Тип работы и НАЗВАНИЕ. Здесь стояло «Домашка: {{ ...assignment.title }}»:
+  тип был прибит словом (контрольная подписывалась домашкой), а поля `title`
+  у `Assignment` нет вовсе — оно называется `name`, поэтому название было
+  пустым. Django на несуществующее поле не ругается, он молча подставляет
+  пустую строку.
+  {% endcomment %}
+  · {% if submission.assignment.is_exam %}Контрольная{% else %}Домашка{% endif %}:
+  {{ submission.assignment.name }}
 </div>
 
 <div class="review-layout">
