@@ -312,7 +312,13 @@ class Command(BaseCommand):
                 'starts_at': now - timezone.timedelta(minutes=10),
                 'ends_at': now + timezone.timedelta(hours=1),
             })
+        # ⚠️ Окно ПЕРЕСЧИТЫВАЕТСЯ на каждом запуске. Иначе демо-контрольная
+        # «живёт» ровно час после первого прогона seed, а потом навсегда
+        # закрыта — и посмотреть прохождение уже нельзя.
         exam.group = group
+        exam.starts_at = now - timezone.timedelta(minutes=10)
+        exam.ends_at = now + timezone.timedelta(hours=1)
+        exam.deadline = exam.ends_at
         exam.save()
         exam.students.set(students)
         # Те же три вида тестов и в контрольной: автопроверка там идёт
@@ -336,7 +342,9 @@ class Command(BaseCommand):
                 'duration_minutes': 40,
                 'show_results_immediately': False,
             })
+        # Срок тоже освежаем — по той же причине, что и окно у №1.
         exam.group = group
+        exam.deadline = now + timezone.timedelta(days=2)
         exam.save()
         exam.students.set(students)
         self._items(exam, [(catalog[1], None, 10)])
