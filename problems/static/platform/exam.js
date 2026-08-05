@@ -110,22 +110,12 @@
   }
 
   // ----------------------------------------------------------- отправка
+  // Читаем карточку ОБЩЕЙ меркой (`work_form.js`): иначе счётчик «без
+  // ответа» в диалоге подтверждения и автосохранение начнут расходиться.
   function collect(itemId) {
     var card = document.getElementById('item-' + itemId);
     if (!card) { return null; }
-    var answer = '';
-    var checked = card.querySelectorAll(
-      'input[type=radio]:checked, input[type=checkbox]:checked');
-    if (checked.length) {
-      answer = Array.prototype.map.call(checked, function (input) {
-        return input.value;
-      }).join(', ');
-    } else {
-      var text = card.querySelector('input.answer-short');
-      answer = text ? text.value.trim() : '';
-    }
-    var area = card.querySelector('textarea.answer-text');
-    return { answer: answer, solution: area ? area.value : '' };
+    return window.WorkForm.readCard(card);
   }
 
   // По одной задаче — не больше ОДНОГО запроса в полёте. Второй не
@@ -193,6 +183,15 @@
   function isAnswered(payload) {
     return Boolean((payload.answer || '').trim()
       || (payload.solution || '').trim());
+  }
+
+  function countUnanswered() {
+    var empty = 0;
+    (config.itemIds || []).forEach(function (itemId) {
+      var payload = collect(itemId);
+      if (!payload || !isAnswered(payload)) { empty += 1; }
+    });
+    return empty;
   }
 
   function markAnswered(itemId, payload) {
@@ -279,20 +278,22 @@
       });
     });
 
+    // Работу отправляет ТОЛЬКО кнопка. Enter в поле — перенос строки:
+    // Shift+Return однажды сдал контрольную посреди работы.
+    var form = document.getElementById('exam-form');
+    if (form) { window.WorkForm.guardEnter(form); }
+
     var finish = document.getElementById('finish-btn');
     if (finish) {
       finish.addEventListener('click', function () {
-        var empty = 0;
-        (config.itemIds || []).forEach(function (itemId) {
-          var payload = collect(itemId);
-          if (!payload || (!payload.answer && !(payload.solution || '').trim())) {
-            empty += 1;
-          }
-        });
-        var message = empty
-          ? 'Без ответа осталось задач: ' + empty + '. Завершить работу?'
-          : 'Завершить работу? Дописать будет нельзя.';
-        if (window.confirm(message)) { flushAll(true); }
+        if (!window.WorkForm.confirmSubmit({
+          unanswered: countUnanswered(),
+          secondsLeft: timer.remaining(),
+          warning: 'После завершения дописать будет нельзя, '
+            + 'вернуться к работе не получится.',
+          question: 'Завершить контрольную?'
+        })) { return; }
+        flushAll(true);
       });
     }
 

@@ -31,8 +31,9 @@
 <div class="pf-locked" style="margin-bottom:20px;">{{ closed_reason }}</div>
 {% endif %}
 
+{# data-work-form: Enter в поле — перенос строки, а не отправка домашки. #}
 <form method="post" action="{% url 'student:submit_assignment' assignment.pk %}"
-      enctype="multipart/form-data">
+      enctype="multipart/form-data" data-work-form>
   {% csrf_token %}
 
   {% for row in rows %}
@@ -44,7 +45,11 @@
   {% if not all_reviewed %}
     {% if not all_submitted_or_reviewed %}
     <div class="submit-row">
-      <button type="submit" class="btn-submit">Отправить домашку</button>
+      <button type="submit" class="btn-submit" data-work-submit
+              data-confirm-question="Отправить домашку на проверку?"
+              data-confirm-warning="Отправленные задачи дописать будет нельзя.">
+        Отправить домашку
+      </button>
       <span style="font-size:13px;color:var(--text2);">
         Все ответы будут отправлены на проверку преподавателю
       </span>
