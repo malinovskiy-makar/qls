@@ -1,6 +1,9 @@
 from django.urls import path
 
-from . import views, views_exams, views_groups, views_problems, views_stats
+from . import (
+    views, views_exams, views_generate, views_groups, views_problems,
+    views_stats,
+)
 
 app_name = 'teacher'
 
@@ -55,6 +58,9 @@ urlpatterns = [
     # Конструктор домашек.
     path('assignment/create/', views.assignment_create,
          name='assignment_create'),
+    # Подбор домашки по описанию словами (Часть C).
+    path('assignment/generate/', views_generate.assignment_generate,
+         name='assignment_generate'),
     path('api/problem/<int:pk>/', views.api_problem_detail,
          name='api_problem_detail'),
     path('api/assignment/<int:pk>/add_problem/',

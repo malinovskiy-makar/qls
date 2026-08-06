@@ -1,0 +1,282 @@
+{% extends "teacher/base.html" %}
+
+{% block title %}Подобрать домашку по описанию{% endblock %}
+
+{% block extra_style %}
+{% include "teacher/_picker_style.html" %}
+.gen-wrap { max-width: 860px; }
+.gen-step { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap;
+            font-size: 12px; }
+.gen-step span { padding: 5px 12px; border-radius: 999px;
+                 border: 1px solid var(--border); color: var(--text2); }
+.gen-step span.is-on { border-color: var(--accent); color: var(--accent);
+                       background: var(--accent-tint); font-weight: 700; }
+.gen-card { background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 22px 24px; margin-bottom: 18px; }
+.gen-card h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.gen-card .sub { font-size: 13px; color: var(--text2); margin-bottom: 16px;
+                 line-height: 1.6; }
+textarea.gen-text { width: 100%; box-sizing: border-box; min-height: 110px;
+  resize: vertical; font: inherit; font-size: 15px; line-height: 1.6;
+  padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); outline: none; }
+textarea.gen-text:focus { border-color: var(--accent); }
+.gen-params { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+.gen-params .form-group { margin-bottom: 0; min-width: 120px; }
+.plan-row { display: grid; grid-template-columns: auto 1fr 90px 90px;
+            gap: 10px; align-items: center; padding: 10px 0;
+            border-bottom: 1px solid var(--border-soft); }
+.plan-row:last-of-type { border-bottom: none; }
+.plan-row .q { grid-column: 2 / -1; }
+.plan-row input[type=text], .plan-row input[type=number],
+.plan-row select { width: 100%; box-sizing: border-box; font: inherit;
+  font-size: 13px; padding: 7px 10px; border-radius: var(--r);
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); }
+.gen-note { background: var(--surface-2); border: 1px solid var(--border);
+            border-radius: var(--r); padding: 10px 14px; font-size: 13px;
+            line-height: 1.6; margin-bottom: 14px; }
+.gen-cost { font-size: 12px; color: var(--text2); margin-top: 10px; }
+.res-card { border: 1px solid var(--border); border-radius: 10px;
+            padding: 12px 14px; margin-bottom: 8px; background: var(--surface); }
+.res-card.is-off { opacity: .45; }
+.res-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.res-title { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; }
+.res-body { font-size: 13px; color: var(--text2); line-height: 1.55;
+            margin-top: 6px; overflow-wrap: anywhere; }
+.gen-actions { display: flex; gap: 12px; align-items: center;
+               flex-wrap: wrap; margin-top: 18px; }
+@media (max-width: 560px) {
+  .plan-row { grid-template-columns: auto 1fr; }
+  .plan-row .q { grid-column: 1 / -1; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="gen-wrap">
+<div class="page-header">
+  <a href="{% url 'teacher:assignment_create' %}" class="back-link">← Конструктор домашки</a>
+  <h1 class="page-title">Подобрать домашку по описанию</h1>
+</div>
+
+<div class="gen-step">
+  <span class="{% if step == 'ask' %}is-on{% endif %}">1. Запрос</span>
+  <span class="{% if step == 'plan' %}is-on{% endif %}">2. Что понято</span>
+  <span class="{% if step == 'result' %}is-on{% endif %}">3. Задачи</span>
+</div>
+
+{% if not available %}
+<div class="gen-card">
+  <h2>Функция выключена</h2>
+  <div class="sub">{{ reason }}</div>
+  <a href="{% url 'teacher:assignment_create' %}" class="filter-btn"
+     style="display:inline-block;text-decoration:none;line-height:34px;">
+    Собрать домашку вручную
+  </a>
+</div>
+{% else %}
+
+{% if step == 'ask' %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="parse">
+  <div class="gen-card">
+    <h2>Опишите домашку словами</h2>
+    <div class="sub">
+      Мы НЕ придумываем новые задачи — подбираем существующие из каталога.
+      Пример: «домашка на монополию и эластичность, пять задач, одна
+      посложнее в конце».
+    </div>
+    <textarea class="gen-text" name="text" required
+              placeholder="Домашка на монополию и эластичность, пять задач, одна посложнее в конце">{{ form.text }}</textarea>
+
+    <div class="gen-params">
+      <div class="form-group">
+        <label class="form-label" for="id_count">Сколько задач</label>
+        <input class="form-control" type="number" id="id_count" name="count"
+               min="1" max="30" value="{{ form.count }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="id_min">Сложность от</label>
+        <input class="form-control" type="number" id="id_min"
+               name="min_difficulty" min="1" max="5" value="{{ form.min_difficulty }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="id_max">до</label>
+        <input class="form-control" type="number" id="id_max"
+               name="max_difficulty" min="1" max="5" value="{{ form.max_difficulty }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Решения</label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="has_solution"
+                 {% if form.has_solution %}checked{% endif %}>
+          только с решением
+        </label>
+      </div>
+    </div>
+
+    <div class="gen-actions">
+      <button type="submit" class="filter-btn">Разобрать запрос</button>
+      <span class="gen-cost">
+        сегодня использовано {{ used_today }} из {{ daily_limit }} обращений
+      </span>
+    </div>
+  </div>
+</form>
+{% endif %}
+
+{% if step == 'plan' %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="search">
+  <input type="hidden" name="text" value="{{ form.text }}">
+  <input type="hidden" name="count" value="{{ form.count }}">
+  <input type="hidden" name="min_difficulty" value="{{ form.min_difficulty }}">
+  <input type="hidden" name="max_difficulty" value="{{ form.max_difficulty }}">
+  {% if form.has_solution %}<input type="hidden" name="has_solution" value="on">{% endif %}
+
+  <div class="gen-card">
+    <h2>Вот что понято из запроса</h2>
+    <div class="sub">
+      Поправьте строки, если что-то не так, и только потом запускайте подбор.
+      Неверно понятый запрос иначе превратится в бессмысленные поиски.
+    </div>
+    {% if note %}<div class="gen-note">{{ note }}</div>{% endif %}
+
+    {% for row in plan_rows %}
+    <div class="plan-row">
+      <label class="checkbox-label" style="height:auto;">
+        <input type="checkbox" name="row_keep" value="{{ forloop.counter0 }}" checked>
+      </label>
+      <select name="row_topic">
+        {% for topic in topics %}
+        <option value="{{ topic }}" {% if topic == row.topic %}selected{% endif %}>{{ topic }}</option>
+        {% endfor %}
+      </select>
+      <input type="number" name="row_difficulty" min="1" max="5" value="{{ row.difficulty }}">
+      <input type="number" name="row_count" min="1" max="30" value="{{ row.count }}">
+      <input class="q" type="text" name="row_query" value="{{ row.query }}"
+             placeholder="о чём должны быть задачи">
+    </div>
+    {% endfor %}
+
+    <div class="gen-actions">
+      <button type="submit" class="filter-btn">Подобрать задачи</button>
+      <a href="{% url 'teacher:assignment_generate' %}" class="reset-link">✕ Начать заново</a>
+    </div>
+    {% if usage %}
+    <div class="gen-cost">
+      {% if cached %}ответ взят из кэша, обращения не было{% else %}
+      разбор запроса: {{ usage.input_tokens }} + {{ usage.output_tokens }} токенов,
+      ${{ usage.cost_usd|floatformat:6 }} ({{ usage.model }}){% endif %}
+    </div>
+    {% endif %}
+  </div>
+</form>
+{% endif %}
+
+{% if step == 'result' %}
+<div class="gen-card">
+  <h2>Найдено задач: {{ results|length }}</h2>
+  <div class="sub">
+    Снимите галочку у ненужной задачи. «Подобрать другие» ищет заново, минуя
+    уже показанные. Готово — отправьте в конструктор домашки.
+  </div>
+
+  <form method="post" id="again-form" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="replace">
+    {% for row in plan_rows %}
+    <input type="hidden" name="row_keep" value="{{ forloop.counter0 }}">
+    <input type="hidden" name="row_topic" value="{{ row.topic }}">
+    <input type="hidden" name="row_difficulty" value="{{ row.difficulty }}">
+    <input type="hidden" name="row_count" value="{{ row.count }}">
+    <input type="hidden" name="row_query" value="{{ row.query }}">
+    {% endfor %}
+    {% for item in results %}
+    <input type="hidden" name="exclude_ids" value="{{ item.problem.pk }}">
+    {% endfor %}
+    {% for pk in exclude_ids %}
+    <input type="hidden" name="exclude_ids" value="{{ pk }}">
+    {% endfor %}
+    {% if form.has_solution %}<input type="hidden" name="has_solution" value="on">{% endif %}
+  </form>
+
+  {% for item in results %}
+  <div class="res-card" data-pick="{{ item.problem.pk }}">
+    <div class="res-head">
+      <label class="checkbox-label" style="height:auto;">
+        <input type="checkbox" class="gen-pick" value="{{ item.problem.pk }}"
+               data-title="{% if item.problem.title %}{{ item.problem.title|truncatechars:60 }}{% else %}Задача #{{ item.problem.pk }}{% endif %}" checked>
+      </label>
+      <span class="res-title">
+        {% if item.problem.title %}{{ item.problem.title }}{% else %}Задача #{{ item.problem.pk }}{% endif %}
+      </span>
+      <span class="card-tag">{{ plan_rows|length }}</span>
+      {% if item.problem.difficulty %}
+      <span class="card-stars">сложность {{ item.problem.difficulty }}</span>
+      {% endif %}
+    </div>
+    <div class="res-body">{{ item.problem.statement|truncatechars:280 }}</div>
+  </div>
+  {% empty %}
+  <div class="empty-note">Ничего не нашлось. Поправьте план и попробуйте снова.</div>
+  {% endfor %}
+
+  <div class="gen-actions">
+    <button type="button" class="filter-btn" id="to-cart">
+      Отправить в конструктор домашки
+    </button>
+    <button type="button" class="btn-preview" id="again">Подобрать другие</button>
+    <a href="{% url 'teacher:assignment_generate' %}" class="reset-link">✕ Начать заново</a>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var again = document.getElementById('again');
+  if (again) {
+    again.addEventListener('click', function () {
+      document.getElementById('again-form').submit();
+    });
+  }
+
+  var toCart = document.getElementById('to-cart');
+  if (!toCart) { return; }
+  toCart.addEventListener('click', function () {
+    // Кладём выбранное в ТУ ЖЕ корзину, что и обычный конструктор
+    // (sessionStorage «hw_cart»), и уходим туда. Второго механизма
+    // добавления задач в домашку не заводим.
+    var cart = {};
+    try { cart = JSON.parse(sessionStorage.getItem('hw_cart') || '{}'); }
+    catch (e) { cart = {}; }
+    var added = 0;
+    document.querySelectorAll('.gen-pick').forEach(function (box) {
+      if (!box.checked) { return; }
+      cart[box.value] = { title: box.dataset.title };
+      added += 1;
+    });
+    if (!added) {
+      window.alert('Отметьте хотя бы одну задачу.');
+      return;
+    }
+    sessionStorage.setItem('hw_cart', JSON.stringify(cart));
+    window.location.href = '/teacher/assignment/create/';
+  });
+
+  document.addEventListener('change', function (event) {
+    var box = event.target.closest('.gen-pick');
+    if (!box) { return; }
+    var card = box.closest('.res-card');
+    if (card) { card.classList.toggle('is-off', !box.checked); }
+  });
+})();
+</script>
+{% endblock %}

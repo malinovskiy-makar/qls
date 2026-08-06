@@ -922,6 +922,39 @@ class WorkFeedback(models.Model):
         return f'{self.assignment}: {self.student}'
 
 
+class AiUsageLog(models.Model):
+    """Расход на обращения к ИИ — по одной строке на запрос.
+
+    ⚠️ Считаем ТОКЕНЫ И ДЕНЬГИ, а не «сколько раз нажали». Без этого нельзя
+    ни назвать цену функции, ни заметить, что она подорожала. Цена берётся
+    из настроек на момент записи: тариф поменяется — прошлые записи не
+    должны молча пересчитаться.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='ai_usage', verbose_name='Кто')
+    kind = models.CharField('Что делали', max_length=40,
+                            default='homework_plan')
+    model_name = models.CharField('Модель', max_length=80)
+    input_tokens = models.PositiveIntegerField('Токенов на входе', default=0)
+    output_tokens = models.PositiveIntegerField('Токенов на выходе', default=0)
+    cost_usd = models.DecimalField('Стоимость, $', max_digits=10,
+                                   decimal_places=6, default=0)
+    ok = models.BooleanField('Успешно', default=True)
+    note = models.CharField('Заметка', max_length=300, blank=True)
+    created_at = models.DateTimeField('Когда', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Расход на ИИ'
+        verbose_name_plural = 'Расходы на ИИ'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['user', 'created_at'])]
+
+    def __str__(self):
+        return f'{self.user}: {self.model_name} ${self.cost_usd}'
+
+
 class PartAnswer(models.Model):
     """Ответ ученика на ОДИН пункт задачи.
 

@@ -1374,6 +1374,7 @@ from .models_gamification import (  # noqa: E402,F401
     StudentProgressProfile,
 )
 from .models_platform import (  # noqa: E402,F401
+    AiUsageLog,
     AnswerDraft,
     AssignmentItem,
     CustomProblem,
