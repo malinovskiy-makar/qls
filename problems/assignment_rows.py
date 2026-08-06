@@ -78,10 +78,31 @@ def part_max_score(item, part, parts_count):
 
     if part is not None and part.points is not None:
         return Decimal(part.points)
-    total = Decimal(item.points) if item.points is not None else Decimal('1')
+    total = item_max_score(item)
     if parts_count <= 1:
         return total
     return (total / Decimal(parts_count)).quantize(Decimal('0.01'))
+
+
+def item_max_score(item):
+    """Сколько стоит задача целиком. ЕДИНСТВЕННАЯ точка вопроса.
+
+    ⚠️ Из-за отсутствия этой точки сессия 3 уехала в самый дорогой класс
+    ошибки — несправедливую оценку. Автопроверка каталожного теста
+    (`student/views.py::auto_check_submission`) была написана до появления
+    `AssignmentItem` и ставила за верный ответ жёстко зашитую ЕДИНИЦУ,
+    а максимум везде читался из `points`. Полностью верный ответ на тест
+    ценой 3 балла давал «1 / 3» и вердикт «ЧАСТИЧНО» — при комментарии
+    «Верно ✓» в той же карточке.
+
+    Балл не задан — задача стоит единицу: так считает вся остальная
+    система (`part_max_score`, `work_review._item_max`).
+    """
+    from decimal import Decimal
+
+    if item.points is not None:
+        return Decimal(str(item.points))
+    return Decimal('1')
 
 
 def part_correct_answer(item, part):

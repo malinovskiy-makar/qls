@@ -8,53 +8,66 @@ from functools import wraps
 # Автопроверка тестовых задач (В2)
 # ---------------------------------------------------------------------------
 
-def auto_check_submission(submission):
-    """Автоматически проверяет тестовые задачи и создаёт TeacherFeedback."""
-    from problems.models import TeacherFeedback
+def auto_check_submission(submission, item=None):
+    """Автоматически проверяет каталожный тест и создаёт TeacherFeedback.
+
+    ⚠️ БАЛЛ БЕРЁТСЯ У ПОЗИЦИИ, А НЕ ЗАШИТ ЕДИНИЦЕЙ. Раньше здесь стояло
+    `score = 1.0`, и полностью верный ответ на тест ценой 3 балла давал
+    «1 / 3 б.» с вердиктом «ЧАСТИЧНО» — при том, что эта же функция писала
+    в комментарий «Верно ✓». Функция старше модели `AssignmentItem`: когда
+    у задачи в работе появился собственный балл, обновили соседнюю
+    `auto_check_custom`, а эту — нет.
+
+    Правило множественного выбора — «всё или ничего», записано и объяснено
+    в `problems/answer_check.py`. Верно → ПОЛНЫЙ балл задачи, иначе ноль.
+    """
+    from problems.answer_check import check_catalog_test
+    from problems.assignment_rows import ANSWER_CHECKBOX, item_answer_form
 
     problem = submission.problem
-
-    if not problem.problem_type or not problem.problem_type.startswith('тест'):
-        return
-    if not problem.answer:
+    if problem is None:
         return
 
-    def normalize(s):
-        if not s:
-            return ''
-        return s.lower().strip().rstrip('.').rstrip(')').strip()
+    # Как ученик отмечал ответ — спрашиваем ровно ту функцию, которая рисовала
+    # ему форму: проверять надо то, что человек видел, а не то, что мы думаем
+    # про тип задачи.
+    multiple = None
+    if item is not None:
+        kind, _ = item_answer_form(item)
+        multiple = (kind == ANSWER_CHECKBOX)
 
-    correct = normalize(problem.answer)
-    given = normalize(submission.submitted_answer or '')
-
-    if not given:
+    auto, is_correct = check_catalog_test(problem, submission.submitted_answer,
+                                          multiple=multiple)
+    if not auto:
         return
 
-    if problem.problem_type == 'тест: все верные':
-        correct_labels = set(
-            normalize(p.label)
-            for p in problem.parts.all()
-            if normalize(p.answer) == 'верно'
-        )
-        given_labels = set(
-            normalize(x) for x in given.replace(' ', '').split(',')
-        )
-        is_correct = (correct_labels == given_labels)
-    else:
-        is_correct = (correct == given)
+    comment = ('Верно ✓' if is_correct
+               else 'Неверно. Правильный ответ: %s' % problem.answer)
+    _write_auto_feedback(submission, item, is_correct, comment)
 
-    score = 1.0 if is_correct else 0.0
-    comment = 'Верно ✓' if is_correct else f'Неверно. Правильный ответ: {problem.answer}'
+
+def _write_auto_feedback(submission, item, is_correct, comment):
+    """Записывает машинный балл за задачу целиком. Одна точка на оба вида.
+
+    Раньше баллы считались в двух функциях (каталожный тест и своя задача
+    репетитора) — и разошлись ровно так, как расходятся два места, где
+    записан один и тот же ответ на один и тот же вопрос.
+    """
+    from decimal import Decimal
+
+    from problems.assignment_rows import item_max_score
+    from problems.models import TeacherFeedback
+
+    maximum = item_max_score(item) if item is not None else Decimal('1')
+    score = maximum if is_correct else Decimal('0')
 
     feedback, created = TeacherFeedback.objects.get_or_create(
         submission=submission,
-        defaults={
-            'score': score,
-            'comment': comment,
-            'reviewed_by': None,
-        }
-    )
+        defaults={'score': score, 'comment': comment, 'reviewed_by': None})
     if not created:
+        if feedback.reviewed_by_id:
+            # Человек уже проверил руками — машина его не перебивает.
+            return
         feedback.score = score
         feedback.comment = comment
         feedback.save()
@@ -75,27 +88,14 @@ def auto_check_custom(submission, item):
     репетитора, что считать верным, мы не имеем права.
     """
     from problems.answer_check import check_custom_problem
-    from problems.models import TeacherFeedback
 
     problem = item.custom_problem
     auto, is_correct = check_custom_problem(problem, submission.submitted_answer)
     if not auto:
         return
 
-    max_points = float(item.points) if item.points is not None else 1.0
-    score = max_points if is_correct else 0.0
     comment = 'Верно ✓' if is_correct else 'Неверно.'
-
-    feedback, created = TeacherFeedback.objects.get_or_create(
-        submission=submission,
-        defaults={'score': score, 'comment': comment, 'reviewed_by': None})
-    if not created:
-        feedback.score = score
-        feedback.comment = comment
-        feedback.save()
-
-    submission.status = 'reviewed'
-    submission.save()
+    _write_auto_feedback(submission, item, is_correct, comment)
 
 
 from django.contrib import messages
@@ -135,7 +135,7 @@ def grade_submission(submission, item, request=None, values=None):
     if item.is_custom:
         auto_check_custom(submission, item)
     elif submission.problem_id:
-        auto_check_submission(submission)
+        auto_check_submission(submission, item)
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +151,7 @@ def calc_assignment_stats(assignment, student):
     задачи репетитора не попадали бы в «сдано N из M» и прогресс-полоска
     ученика врала бы ровно на их число.
     """
+    from problems.assignment_rows import item_max_score
     from problems.models import Submission
 
     items = list(assignment.items.select_related('catalog_problem',
@@ -182,7 +183,13 @@ def calc_assignment_stats(assignment, student):
                 total_reviewed += 1
                 test_answered += 1
                 feedback = getattr(sub, 'feedback', None)
-                if feedback is not None and feedback.score is not None and feedback.score >= 1.0:
+                # ⚠️ Верным тест считается по МАКСИМУМУ ЗАДАЧИ, а не по
+                # порогу «балл ≥ 1»: тест ценой 3 балла с зашитой единицей
+                # и был тем дефектом, из-за которого верный ответ показывался
+                # как «ЧАСТИЧНО».
+                maximum = float(item_max_score(item))
+                if (feedback is not None and feedback.score is not None
+                        and float(feedback.score) >= maximum > 0):
                     test_correct += 1
         else:
             open_count += 1

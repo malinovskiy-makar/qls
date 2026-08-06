@@ -92,13 +92,13 @@ def _item_max(item, row):
     Если баллы заданы по пунктам — сумма по ним; иначе балл позиции;
     иначе единица (так считает вся остальная система).
     """
+    from .assignment_rows import item_max_score
+
     part_rows = row.get('answer_parts') or []
     if part_rows and any(part['max_score'] is not None for part in part_rows):
         return sum((Decimal(str(part['max_score'] or 0))
                     for part in part_rows), Decimal('0'))
-    if item.points is not None:
-        return Decimal(str(item.points))
-    return Decimal('1')
+    return item_max_score(item)
 
 
 def _clean(value):
