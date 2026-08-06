@@ -51,6 +51,10 @@ async function main() {
   const page = await context.newPage();
   const consoleErrors = [];
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+  // ⚠️ Необработанное исключение в обработчике НЕ приходит как console-error —
+  // это отдельное событие `pageerror`. Без него страница «молча не работает»:
+  // ровно так и пропустилось `isAnswered is not defined` после рефакторинга.
+  page.on('pageerror', (error) => consoleErrors.push('pageerror: ' + error.message));
 
   await login(page, STUDENT);
 
@@ -134,7 +138,7 @@ async function main() {
     dialogText && /без ответа|осталось|Дописать/i.test(dialogText), dialogText);
   check('отмена подтверждения оставляет на странице', page.url() === urlBefore);
 
-  check('ошибок в консоли нет', consoleErrors.length === 0,
+  check('ошибок на странице нет', consoleErrors.length === 0,
     consoleErrors.slice(0, 5).join(' | '));
   await browser.close();
   report();

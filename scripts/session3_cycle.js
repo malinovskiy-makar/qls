@@ -63,7 +63,8 @@ async function login(page, [username, password]) {
   await page.screenshot({ path: path.join(OUT, 'exam-take.png'), fullPage: true });
 
   await Promise.all([page.waitForNavigation(), page.click('#finish-btn')]);
-  check('работа сдана', /result/.test(page.url()), page.url());
+  // Экран результата ПОГЛОЩЁН разбором работы (Часть B): /student/work/<pk>/.
+  check('работа сдана', /\/work\/|\/result\//.test(page.url()), page.url());
   await page.screenshot({ path: path.join(OUT, 'exam-result-before-review.png'), fullPage: true });
 
   // ── Преподаватель проверяет открытую задачу ─────────────────────────
@@ -90,7 +91,13 @@ async function login(page, [username, password]) {
       (header || '').replace(/\s+/g, ' ').trim().slice(0, 120));
     await page.screenshot({ path: path.join(OUT, 'tutor-review.png'), fullPage: true });
 
-    await page.fill('input[name=score], #id_score', '9');
+    // ⚠️ Балл ограничен максимумом задачи (Часть A) — браузер не даст
+    // отправить форму с превышением. Берём максимум со страницы.
+    const maxScore = await page.evaluate(() => {
+      const input = document.querySelector('input[name=score]');
+      return input ? Number(input.max) || 10 : 10;
+    });
+    await page.fill('input[name=score], #id_score', String(maxScore));
     await page.fill('textarea[name=comment], #id_comment',
       'Ход верный, но не хватает единиц измерения в ответе.');
     const mistake = await page.$('input[name=mistakes]');
@@ -103,20 +110,20 @@ async function login(page, [username, password]) {
 
   // ── Ученик видит оценку ─────────────────────────────────────────────
   await login(page, STUDENT);
-  await page.goto(`${BASE}/student/exam/${EXAM_ID}/result/`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/student/work/${EXAM_ID}/`, { waitUntil: 'domcontentloaded' });
   const body = await page.textContent('body');
   check('ученик видит комментарий преподавателя',
     /не хватает единиц измерения/i.test(body));
   check('ученик видит, что проверял человек',
     /проверил преподаватель/i.test(body));
-  check('ученик видит балл за задачу', /9(\s|,|\.)/.test(body));
+  check('ученик видит балл за задачу', /\d+\s*\/\s*\d+\s*б\./.test(body));
   await page.screenshot({ path: path.join(OUT, 'exam-result-after-review.png'), fullPage: true });
 
   await context.close();
   const mobile = await browser.newContext({ viewport: { width: 380, height: 900 } });
   const small = await mobile.newPage();
   await login(small, STUDENT);
-  await small.goto(`${BASE}/student/exam/${EXAM_ID}/result/`, { waitUntil: 'domcontentloaded' });
+  await small.goto(`${BASE}/student/work/${EXAM_ID}/`, { waitUntil: 'domcontentloaded' });
   await small.screenshot({ path: path.join(OUT, 'exam-result-380.png'), fullPage: true });
   await mobile.close();
 

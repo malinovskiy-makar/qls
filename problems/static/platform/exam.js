@@ -153,30 +153,42 @@
     return fields;
   }
 
-  // По одному ПОЛЮ — не больше ОДНОГО запроса в полёте. Второй не
-  // отменяется, а откладывается: когда первый вернётся, уйдёт свежее
-  // значение. Иначе два сохранения одного поля стартуют одновременно и
-  // дерутся за одну строку черновика (сервер к этому готов, но лишний
-  // запрос — лишний шанс потерять его в плохой сети).
-  var inFlight = {};
+  /* ⚠️ ОДИН ЗАПРОС В ПОЛЁТЕ НА ВСЮ СТРАНИЦУ.
+   *
+   * Раньше ограничение было «по одному запросу на задачу». После разбиения
+   * ответа по пунктам запросов стало кратно больше (пункт + пункт +
+   * решение), и параллельные записи упёрлись в блокировку SQLite: сервер
+   * честно отвечал 503 «повтори», клиент честно повторял, но три ошибки
+   * подряд посреди контрольной — не то, что должен видеть ученик.
+   *
+   * Очередь глобальная и «побеждает последний»: пока запрос в полёте,
+   * новые значения того же поля просто вытесняют старые в очереди, а не
+   * копятся. Ничего не теряется — уезжает всегда самое свежее.
+   */
+  var queue = {};          // ключ поля → {itemId, body}
+  var order = [];          // порядок ключей
+  var busy = false;
 
-  function send(itemId) {
-    cardFields(itemId).forEach(function (field) {
-      sendField(itemId, field);
-    });
+  function enqueue(itemId, field) {
+    if (!(field.key in queue)) { order.push(field.key); }
+    queue[field.key] = { itemId: itemId, body: field.body };
+    pump();
   }
 
-  function sendField(itemId, field) {
-    var payload = collect(itemId);
-    pending[itemId] = payload;
-    if (inFlight[field.key]) { inFlight[field.key] = 'again'; return; }
-    inFlight[field.key] = true;
+  function pump() {
+    if (busy) { return; }
+    var key = order.shift();
+    while (key !== undefined && !(key in queue)) { key = order.shift(); }
+    if (key === undefined) { return; }
+    var task = queue[key];
+    delete queue[key];
+    busy = true;
     saving += 1;
     paintState();
 
-    var body = { item_id: itemId };
-    Object.keys(field.body).forEach(function (name) {
-      body[name] = field.body[name];
+    var body = { item_id: task.itemId };
+    Object.keys(task.body).forEach(function (name) {
+      body[name] = task.body[name];
     });
 
     fetch(config.autosaveUrl, {
@@ -191,38 +203,43 @@
       })
       .then(function (result) {
         saving -= 1;
-        var again = inFlight[field.key] === 'again';
-        inFlight[field.key] = false;
+        busy = false;
         offline = false;
         syncFromServer(result.data.seconds_remaining);
         if (result.status === 409 || result.data.expired) {
-          // Сервер сказал «время вышло» — уходим на результат через сдачу.
           enterTimeUp();
           return;
         }
         if (result.ok) {
-          delete pending[itemId];
+          delete pending[task.itemId];
         } else if (result.data.retry) {
-          // Сервер честно сказал «не сохранил». Значение остаётся в очереди
-          // и уедет повтором — выбрасывать его нельзя ни при каких условиях.
+          // Сервер честно сказал «не сохранил» — возвращаем в очередь.
+          // Выбрасывать значение нельзя ни при каких условиях.
+          enqueue(task.itemId, { key: key, body: task.body });
           offline = true;
         }
-        markAnswered(itemId, collect(itemId) || {});
+        markAnswered(task.itemId, collect(task.itemId) || {});
         paintState();
-        if (again) { sendField(itemId, field); }  // пока ждали, дописал
+        pump();
       })
       .catch(function () {
         saving -= 1;
-        inFlight[field.key] = false;
-        offline = true;        // накопленное остаётся в `pending`
+        busy = false;
+        offline = true;
+        enqueue(task.itemId, { key: key, body: task.body });
         paintState();
       });
   }
 
+  function send(itemId) {
+    pending[itemId] = collect(itemId);
+    cardFields(itemId).forEach(function (field) {
+      enqueue(itemId, field);
+    });
+  }
+
   // Задача считается начатой по НАПИСАННОМУ, а не по отправленному —
-  // то же правило, что у сервера (`assignment_rows.work_status`). Иначе
-  // ученик видит «Не начата» над задачей, в которую только что вписал
-  // ответ.
+  // то же правило, что у сервера (`assignment_rows.work_status`).
   function isAnswered(payload) {
     return Boolean((payload.answer || '').trim()
       || (payload.solution || '').trim());
