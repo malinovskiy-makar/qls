@@ -999,6 +999,26 @@ const CASES = [
              ['от', 'a', 0, 0.001], ['до', 'b', 10, 0.001]],
   },
   {
+    // Фаза 9: масштаб в .tex — тот же, что на экране. Сверяем форму картинки:
+    // отношение «сантиметров на единицу X» к «сантиметрам на единицу Y».
+    name: 'Экспорт · масштаб .tex совпадает с экранным',
+    run: `pickScene('tax');
+          var tex = buildTex('Проверка', 'fig:t');
+          var ax = /xmin=([-\\d.]+), xmax=([-\\d.]+), ymin=([-\\d.]+), ymax=([-\\d.]+)/.exec(tex);
+          var sz = /width=([\\d.]+)cm, height=([\\d.]+)cm/.exec(tex);
+          var s = mainScales();
+          var xd = s.mx.domain(), yd = s.my.domain();
+          var xr = s.mx.range(), yr = s.my.range();
+          var scrX = Math.abs(xr[1] - xr[0]) / (xd[1] - xd[0]);
+          var scrY = Math.abs(yr[1] - yr[0]) / (yd[1] - yd[0]);
+          var papX = (+sz[1]) / ((+ax[2]) - (+ax[1]));
+          var papY = (+sz[2]) / ((+ax[4]) - (+ax[3]));
+          return { want: scrX / scrY, paper: papX / papY,
+                   only: tex.indexOf('scale only axis') >= 0 ? 1 : 0 };`,
+    checks: [['форма на бумаге', 'paper', 'WANT', 0.02],
+             ['поле графика, а не картинка', 'only', 1, 0]],
+  },
+  {
     // Фаза 2: ключевые точки считаются и в «Математике».
     name: 'Ключевые точки · в «Математике» пересечения находятся',
     run: `setMode('math'); setMathSub('minmax'); resetZoom();

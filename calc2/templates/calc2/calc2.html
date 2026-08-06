@@ -3165,7 +3165,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
        aria-labelledby="export-title" inert>
     <div class="modal-card">
       <h2 class="modal-title" id="export-title">Сохранить график</h2>
-      <p class="modal-sub">Заголовок и подпись попадут в файл .tex и в PDF.</p>
+      <p class="modal-sub">Заголовок и подпись попадут в файл .tex. Картинка выйдет в том
+        масштабе, который сейчас на экране: файл собирается обычным pdfLaTeX.</p>
 
       <div class="field">
         <label for="exp-title">Заголовок</label>
@@ -3181,12 +3182,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="btn btn-ghost" id="exp-tex" type="button">Скачать .tex</button>
         {% if has_pdflatex %}
           <button class="btn btn-ghost" id="exp-pdf" type="button">Скачать PDF</button>
-        {% else %}
-          <button class="btn btn-ghost" type="button" disabled>Скачать PDF</button>
-          <div class="hint">PDF на этом сервере не собирается: не установлен pdflatex.
-            Скачайте .tex и откройте в
-            <a href="https://overleaf.com" target="_blank" rel="noopener">Overleaf</a>,
-            там компилятор бесплатный и подходит стандартный pdfLaTeX.</div>
         {% endif %}
       </div>
 
@@ -13538,6 +13533,19 @@ const r2 = (v) => (Math.round(v * 100) / 100);
    Чистый TikZ без pgfplots: файл собирается обычным pdflatex.
    --------------------------------------------------------------------- */
 const TEX_WIDTH_CM = 16;      // ширина картинки на странице
+
+/* Высота картинки в файле — не константа, а пропорция того, что на экране.
+   Раньше стояло width × 0.62 при любом холсте: диапазоны осей уходили верные,
+   а вот сколько сантиметров приходится на единицу по X и по Y — уже нет, и
+   бумага показывала не тот масштаб, который видел пользователь (Фаза 9). */
+function texPlotSize() {
+  const m = CONFIG.margin;
+  const pw = Math.max(1, (W - m.right) - m.left);
+  const ph = Math.max(1, (H - m.bottom) - m.top);
+  // Слишком вытянутую картинку прижимаем к разумным пределам страницы.
+  const ratio = Math.max(0.28, Math.min(1.4, ph / pw));
+  return { w: TEX_WIDTH_CM, h: Math.round(TEX_WIDTH_CM * ratio * 10) / 10, ratio };
+}
 const TEX_MAX_SAMPLES = 420;  // точек на одну кривую при оцифровке
 
 // Символы, которых нет в кириллических шрифтах pdflatex: уводим их в математику.
@@ -13697,7 +13705,7 @@ function buildTex(title, label) {
   // Подписи и маркеры на бумаге должны занимать ту же долю картинки, что на
   // экране. Без пересчёта они выходят вдвое крупнее и налезают друг на друга.
   const mrg = CONFIG.margin;
-  const ptPerPx = (TEX_WIDTH_CM * 0.62 * 28.4527) / Math.max(1, H - mrg.top - mrg.bottom);
+  const ptPerPx = (texPlotSize().h * 28.4527) / Math.max(1, H - mrg.top - mrg.bottom);
 
   // 1) Кривые, у которых есть формула, — одной строкой каждая.
   const drawnByFormula = new Set();
@@ -13829,7 +13837,10 @@ function buildTex(title, label) {
     '\\centering',
     '\\begin{tikzpicture}',
     '\\begin{axis}[',
-    '  width=' + TEX_WIDTH_CM + 'cm, height=' + Math.round(TEX_WIDTH_CM * 0.62 * 10) / 10 + 'cm,',
+    '  width=' + texPlotSize().w + 'cm, height=' + texPlotSize().h + 'cm,',
+    // Размер относится к самому полю графика, а не ко всей картинке вместе
+    // с подписями: только так сантиметр на единицу совпадает с экраном.
+    '  scale only axis,',
     '  xmin=' + num(xLo) + ', xmax=' + num(xHi) + ', ymin=' + num(yLo) + ', ymax=' + num(yHi) + ',',
     '  xlabel={' + xName + '}, ylabel={' + yName + '},',
     '  axis lines=left, axis line style={-{Stealth[length=6pt]}},',
