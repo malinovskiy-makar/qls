@@ -954,6 +954,45 @@ const CASES = [
     checks: [['касательная', 'k', 4, 0.01], ['секущая', 'sec', 4.001, 0.01],
              ['разница', 'diff', 0.001, 0.0005]],
   },
+  {
+    // Фаза 3: прокатывание не выезжает за осмысленную область кривой. На КПВ
+    // 100 − X правее X = 100 кривой нет, левее нуля тоже.
+    name: 'Прокатывание · на КПВ точка не уходит в отрицательную зону',
+    run: `setMode('ppf'); setPpfSub('single');
+          STATE.ppfFormula = '100 - X'; redrawAll();
+          var t = snapTargets()[0];
+          return { right: rollerClampX(t.f, 200), left: rollerClampX(t.f, -5),
+                   yEdge: t.f(rollerClampX(t.f, 200)) };`,
+    checks: [['правый край', 'right', 100, 0.5], ['левый край', 'left', 0, 0.001],
+             ['y на краю', 'yEdge', 0, 0.5]],
+  },
+  {
+    // Фаза 2: буква в формуле экономической сцены даёт ползунок, а не ошибку.
+    name: 'Параметр в спросе · «a - Q» заводит ползунок a',
+    run: `loadScene('sd'); STATE.params = {};
+          var d = STATE.curves.find(function (c) { return c.role === 'demand'; });
+          updateCurveExpr(d, 'a - Q'); redrawAll();
+          var names = Object.keys(STATE.params);
+          var v1 = evalCurve(STATE.curves.find(function (c) { return c.role === 'demand'; }), 10);
+          STATE.params.a.value = 80; redrawAll();
+          var v2 = evalCurve(STATE.curves.find(function (c) { return c.role === 'demand'; }), 10);
+          return { n: names.length, isA: names[0] === 'a' ? 1 : 0, v1: v1, v2: v2 };`,
+    checks: [['параметров', 'n', 1, 0], ['имя = a', 'isA', 1, 0],
+             ['a = 1 ⇒ −9', 'v1', -9, 0.01], ['a = 80 ⇒ 70', 'v2', 70, 0.01]],
+  },
+  {
+    // Фаза 2: ключевые точки считаются и в «Математике».
+    name: 'Ключевые точки · в «Математике» пересечения находятся',
+    run: `setMode('math'); setMathSub('minmax'); resetZoom();
+          STATE.mathFormula = 'x'; STATE.mathG2 = '4 - x';
+          STATE.mathG3 = ''; STATE.mathG4 = ''; STATE.mathMinMax = 'min';
+          redrawAll();
+          var pts = crossPoints();
+          var mid = pts.filter(function (p) { return Math.abs(p.x - 2) < 0.1; })[0] || {};
+          return { n: pts.length > 0 ? 1 : 0, x: mid.x, y: mid.y };`,
+    checks: [['точки есть', 'n', 1, 0], ['x пересечения', 'x', 2, 0.05],
+             ['y пересечения', 'y', 2, 0.05]],
+  },
 ];
 
 function approx(got, want, tol) {
