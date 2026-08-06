@@ -406,7 +406,10 @@ await t('структура рынка и вмешательство вложе�
 }));
 
 await t('заголовок верхнего уровня в панели один', () => page.evaluate(() => {
-  const titles = [...document.querySelectorAll('#sec-analysis .section-title')].map(n => n.textContent);
+  // Берём собственный текст заголовка: рядом с ним теперь стоит вопросик-подсказка,
+  // и его «?» попал бы в textContent.
+  const own = (n) => [...n.childNodes].filter(x => x.nodeType === 3).map(x => x.nodeValue).join('').trim();
+  const titles = [...document.querySelectorAll('#sec-analysis .section-title')].map(own);
   return (titles.length === 1 && titles[0] === 'Что изучаем') || titles.join('|');
 }));
 

@@ -210,6 +210,29 @@ input:focus-visible, select:focus-visible {
 
 /* Подсказки, ошибки, код в подсказках */
 .hint { font-size: 11px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
+/* Инструкция ушла под вопросик (Фаза 5): абзац остаётся в разметке, чтобы
+   сцены по-прежнему правили его текстом, но с глаз убран. */
+.hint-hidden { display: none !important; }
+.help-dot {
+  width: 15px; height: 15px; margin-left: 6px; padding: 0; vertical-align: middle;
+  display: inline-grid; place-items: center; flex: 0 0 auto;
+  border: 1px solid var(--border); border-radius: 50%;
+  background: var(--surface); color: var(--text3);
+  font-size: 10px; font-weight: 700; line-height: 1; cursor: help;
+  transition: color .12s var(--ease), border-color .12s var(--ease);
+}
+.help-dot:hover, .help-dot:focus-visible { color: var(--accent); border-color: var(--accent); }
+/* Вопросик там, где заголовка рядом нет: занимает строку сам по себе. */
+.help-anchor { margin-top: 6px; }
+.help-anchor > .help-dot { margin-left: 0; }
+#hint-tip {
+  position: fixed; z-index: 200; display: none; max-width: 300px;
+  padding: 9px 11px; border-radius: var(--r-sm);
+  background: var(--surface); border: .5px solid var(--border);
+  box-shadow: 0 6px 22px rgba(0,0,0,.16);
+  font-size: 11.5px; line-height: 1.5; color: var(--text2);
+}
+#hint-tip hr { border: none; border-top: .5px solid var(--border); margin: 7px 0; }
 .hint code { background: var(--surface-2); border: 1px solid var(--border-soft);
   padding: 1px 4px; border-radius: 3px; font-size: 11px; }
 
@@ -2521,7 +2544,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <button class="btn-sm" id="btn-ppf-conc" style="flex:1;">Вогнутая</button>
         </div>
         <div class="hint">По осям стоят два товара: X (горизонталь), Y (вертикаль). Форму границы
-          задают ползунки «Макс X / Макс Y» в пульте-ленте. Наклон |dY/dX| (= Макс&nbsp;Y / Макс&nbsp;X) и есть
+          задают ползунки «Макс X / Макс Y» в пульте-ленте. Наклон $\left|\frac{dY}{dX}\right|$ (= Макс&nbsp;Y / Макс&nbsp;X) и есть
           альтернативные издержки X в единицах Y.</div>
         <div class="error" id="ppf-error"></div>
         <div id="info-ppf" style="margin-top:8px;"></div>
@@ -4796,7 +4819,7 @@ function updateOpenPanel() {
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
     html += `<div class="stat"><span>${isTar ? 'Тариф t' : 'Квота'}</span><b>${fmt(isTar ? STATE.openTariff : STATE.openQuota)}</b></div>`;
     html += `<div class="stat"><span>Внутренняя цена P₁</span><b>${fmt(o.P1)}</b></div>`;
-    html += `<div class="stat"><span>Qd′ / Qs′</span><b>${fmt(o.Qd1)} / ${fmt(o.Qs1)}</b></div>`;
+    html += `<div class="stat"><span>$Q_d^{\prime}$ / $Q_s^{\prime}$</span><b>${fmt(o.Qd1)} / ${fmt(o.Qs1)}</b></div>`;
     html += `<div class="stat"><span>Импорт после</span><b>${fmt(o.vol1)} (было ${fmt(o.volume)})</b></div>`;
     html += `<div class="stat"><span>${isTar ? 'Доход бюджета' : 'Рента от квоты'}</span><b>${fmt(o.money)}</b></div>`;
     if (!isTar) html += '<div class="hint">Рента от квоты это не доход государства: кому она достанется, ' +
@@ -4876,8 +4899,8 @@ function updateInfoPanel() {
     return;
   }
   box.innerHTML =
-    `<div class="stat"><span>Q* (количество)</span><b>${fmt(STATE.eq.Q)}</b></div>` +
-    `<div class="stat"><span>P* (цена)</span><b>${fmt(STATE.eq.P)}</b></div>`;
+    `<div class="stat"><span>$Q^*$ (количество)</span><b>${fmt(STATE.eq.Q)}</b></div>` +
+    `<div class="stat"><span>$P^*$ (цена)</span><b>${fmt(STATE.eq.P)}</b></div>`;
 }
 
 /* ---------------------------------------------------------------------
@@ -4914,9 +4937,9 @@ function updateAreasPanel() {
     return;
   }
   box.innerHTML =
-    `<div class="stat"><span>CS (потребитель)</span><b>${fmt(STATE.cs)}</b></div>` +
-    `<div class="stat"><span>PS (производитель)</span><b>${fmt(STATE.ps)}</b></div>` +
-    `<div class="stat"><span>SW = CS + PS</span><b>${fmt(STATE.sw)}</b></div>`;
+    `<div class="stat"><span>$CS$ (потребитель)</span><b>${fmt(STATE.cs)}</b></div>` +
+    `<div class="stat"><span>$PS$ (производитель)</span><b>${fmt(STATE.ps)}</b></div>` +
+    `<div class="stat"><span>$SW = CS + PS$</span><b>${fmt(STATE.sw)}</b></div>`;
 }
 
 /* ---------------------------------------------------------------------
@@ -5366,10 +5389,10 @@ function updateShiftPanel() {
   if (!r) { box.innerHTML = '<div class="warn">Равновесие после сдвигов не найдено в первой четверти.</div>'; return; }
   const sg = (v) => (v > 0 ? '+' : '') + fmt(v);
   let html = '';
-  html += `<div class="stat"><span>E₀ (исходное)</span><b>${fmt(r.E0.Q)}, ${fmt(r.E0.P)}</b></div>`;
-  html += `<div class="stat"><span>E_d (только спрос)</span><b>${fmt(r.Ed.Q)}, ${fmt(r.Ed.P)}</b></div>`;
-  html += `<div class="stat"><span>E_s (только предлож.)</span><b>${fmt(r.Es.Q)}, ${fmt(r.Es.P)}</b></div>`;
-  html += `<div class="stat"><span>E₁ (оба сдвига)</span><b>${fmt(r.E1.Q)}, ${fmt(r.E1.P)}</b></div>`;
+  html += `<div class="stat"><span>$E_0$ (исходное)</span><b>${fmt(r.E0.Q)}, ${fmt(r.E0.P)}</b></div>`;
+  html += `<div class="stat"><span>$E_d$ (только спрос)</span><b>${fmt(r.Ed.Q)}, ${fmt(r.Ed.P)}</b></div>`;
+  html += `<div class="stat"><span>$E_s$ (только предлож.)</span><b>${fmt(r.Es.Q)}, ${fmt(r.Es.P)}</b></div>`;
+  html += `<div class="stat"><span>$E_1$ (оба сдвига)</span><b>${fmt(r.E1.Q)}, ${fmt(r.E1.P)}</b></div>`;
   html += '<table class="tx-table" style="margin-top:6px;"><tr><th></th><th>спрос</th><th>предл.</th><th>итог</th></tr>';
   html += `<tr><td>ΔQ*</td><td>${sg(r.dQ.demand)}</td><td>${sg(r.dQ.supply)}</td><td>${sg(r.dQ.total)}</td></tr>`;
   html += `<tr><td>ΔP*</td><td>${sg(r.dP.demand)}</td><td>${sg(r.dP.supply)}</td><td>${sg(r.dP.total)}</td></tr>`;
@@ -5477,7 +5500,7 @@ function updateExtPanel() {
   html += `<div class="stat"><span>Qрын (${mktEq})</span><b>Q=${fmt(e.Qmkt)}, P=${fmt(e.Pmkt)}</b></div>`;
   if (e.Qopt != null) {
     html += `<div class="stat"><span>Qопт (${optEq})</span><b>Q=${fmt(e.Qopt)}, P=${fmt(e.Popt)}</b></div>`;
-    html += `<div class="stat"><span>DWL (потери)</span><b>${fmt(e.dwl)}</b></div>`;
+    html += `<div class="stat"><span>$DWL$ (потери)</span><b>${fmt(e.dwl)}</b></div>`;
     html += `<div class="stat"><span>${tool}</span><b>${fmt(e.corrective)}</b></div>`;
     const gap = e.Qopt - e.Qmkt;
     html += `<div class="hint" style="margin-top:4px;">${gap < -1e-6
@@ -5832,14 +5855,14 @@ function updateMonoPanel() {
   html += `<div class="stat"><span>Qm (монополия)</span><b>${fmt(m.Qm)}</b></div>`;
   html += `<div class="stat"><span>Pm (цена)</span><b>${fmt(m.Pm)}</b></div>`;
   if (m.Qc != null) {
-    html += `<div class="stat"><span>Qc (конкуренция)</span><b>${fmt(m.Qc)}</b></div>`;
-    html += `<div class="stat"><span>Pc (конкуренция)</span><b>${fmt(m.Pc)}</b></div>`;
+    html += `<div class="stat"><span>$Q_c$ (конкуренция)</span><b>${fmt(m.Qc)}</b></div>`;
+    html += `<div class="stat"><span>$P_c$ (конкуренция)</span><b>${fmt(m.Pc)}</b></div>`;
   }
-  if (m.dwl != null) html += `<div class="stat"><span>DWL (потери)</span><b>${fmt(m.dwl)}</b></div>`;
+  if (m.dwl != null) html += `<div class="stat"><span>$DWL$ (потери)</span><b>${fmt(m.dwl)}</b></div>`;
   // Области (Задача 1). PS — это излишек производителя (TR − VC), НЕ прибыль:
   // прибыль = TR − TC, и от PS она отличается на постоянные издержки FC.
-  html += `<div class="stat"><span>CS (потребитель)</span><b>${fmt(m.csM)}</b></div>`;
-  html += `<div class="stat"><span>VC (перем. издержки)</span><b>${fmt(m.vcM)}</b></div>`;
+  html += `<div class="stat"><span>$CS$ (потребитель)</span><b>${fmt(m.csM)}</b></div>`;
+  html += `<div class="stat"><span>$VC$ (перем. издержки)</span><b>${fmt(m.vcM)}</b></div>`;
   html += `<div class="stat"><span>Излишек произв. (TR&nbsp;−&nbsp;VC)</span><b>${fmt(m.psM)}</b></div>`;
   if (m.profit != null) html += `<div class="stat"><span>Прибыль (TR&nbsp;−&nbsp;TC)</span><b>${fmt(m.profit)}</b></div>`;
   // Вмешательство государства (потолок / пол / налог / субсидия) показывается отдельно —
@@ -6206,15 +6229,15 @@ function updateNaturalPanel() {
   const n = STATE.natural;
   if (!n) { box.innerHTML = '<div class="warn">Оптимум монополии не найден. Проверьте кривые.</div>'; return; }
   let html = `<div class="stat"><span>Постоянные издержки FC</span><b>${fmt(n.FC)}</b></div>`;
-  html += `<div class="stat"><span>1 · Монополия: Q / P</span><b>${fmt(n.Qm)} / ${fmt(n.Pm)}</b></div>`;
+  html += `<div class="stat"><span>1 · Монополия: $Q$ / $P$</span><b>${fmt(n.Qm)} / ${fmt(n.Pm)}</b></div>`;
   if (!isNaN(n.atcAtQm)) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;ATC(Qm) / прибыль</span><b>${fmt(n.atcAtQm)} / ${fmt(n.profit)}</b></div>`;
   if (n.mcReg) {
-    html += `<div class="stat" style="margin-top:4px;"><span>2 · P = MC: Q / P</span><b>${fmt(n.mcReg.Q)} / ${fmt(n.mcReg.P)}</b></div>`;
+    html += `<div class="stat" style="margin-top:4px;"><span>2 · $P = MC$: $Q$ / $P$</span><b>${fmt(n.mcReg.Q)} / ${fmt(n.mcReg.P)}</b></div>`;
     html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;ATC на этом Q</span><b>${fmt(n.mcReg.atc)}</b></div>`;
     if (n.mcReg.subsidy != null) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;Нужна субсидия</span><b>${fmt(n.mcReg.subsidy)}</b></div>`;
   }
   if (n.acReg) {
-    html += `<div class="stat" style="margin-top:4px;"><span>3 · P = ATC: Q / P</span><b>${fmt(n.acReg.Q)} / ${fmt(n.acReg.P)}</b></div>`;
+    html += `<div class="stat" style="margin-top:4px;"><span>3 · $P = ATC$: $Q$ / $P$</span><b>${fmt(n.acReg.Q)} / ${fmt(n.acReg.P)}</b></div>`;
     html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;Прибыль</span><b>0</b></div>`;
   } else if (n.acNote) {
     html += `<div class="warn" style="margin-top:4px;">${n.acNote}</div>`;
@@ -6371,7 +6394,7 @@ function updateMonoInterventionPanel() {
     html += `<div class="stat"><span>Выпуск</span><b>${fmt(mc.Qstar)} (было ${fmt(m.Qm)})</b></div>`;
     html += `<div class="stat"><span>Цена</span><b>${fmt(mc.price)} (было ${fmt(m.Pm)})</b></div>`;
     if (mc.shortage > 1e-6) html += `<div class="stat"><span>Дефицит</span><b>${fmt(mc.shortage)}</b></div>`;
-    if (mc.dwl != null) html += `<div class="stat"><span>DWL</span><b>${fmt(mc.dwl)} (было ${fmt(m.dwl)})</b></div>`;
+    if (mc.dwl != null) html += `<div class="stat"><span>$DWL$</span><b>${fmt(mc.dwl)} (было ${fmt(m.dwl)})</b></div>`;
     const dq = mc.Qstar - m.Qm;
     html += `<div class="hint" style="margin-top:6px;">${dq > 1e-6 ? 'Грамотный потолок увеличил выпуск (парадокс монополии).' : (dq < -1e-6 ? 'Слишком низкий потолок: выпуск упал, возник дефицит.' : 'Выпуск не изменился.')}</div>`;
     box.innerHTML = html;
@@ -6384,7 +6407,7 @@ function updateMonoInterventionPanel() {
     let html = `<div class="stat"><span>Пол Pf</span><b>${fmt(fl.Pf)}</b></div>`;
     html += `<div class="stat"><span>Цена</span><b>${fmt(fl.price)} (было ${fmt(m.Pm)})</b></div>`;
     html += `<div class="stat"><span>Выпуск</span><b>${fmt(fl.Q)} (было ${fmt(m.Qm)})</b></div>`;
-    if (fl.dwl != null) html += `<div class="stat"><span>DWL</span><b>${fmt(fl.dwl)} (было ${fmt(m.dwl)})</b></div>`;
+    if (fl.dwl != null) html += `<div class="stat"><span>$DWL$</span><b>${fmt(fl.dwl)} (было ${fmt(m.dwl)})</b></div>`;
     html += '<div class="hint" style="margin-top:6px;">Пол выше монопольной цены заставляет поднять цену ещё выше; выпуск падает (определяется спросом при поле).</div>';
     box.innerHTML = html;
     return;
@@ -6443,8 +6466,8 @@ function updateDiscr1Panel() {
   let html = '';
   html += `<div class="stat"><span>Выпуск (= конкурентному)</span><b>${fmt(d1.Qcomp)}</b></div>`;
   html += `<div class="stat"><span>Прибыль (весь излишек)</span><b>${fmt(d1.profit)}</b></div>`;
-  html += `<div class="stat"><span>CS (потребитель)</span><b>0</b></div>`;
-  html += `<div class="stat"><span>DWL (потери)</span><b>0</b></div>`;
+  html += `<div class="stat"><span>$CS$ (потребитель)</span><b>0</b></div>`;
+  html += `<div class="stat"><span>$DWL$ (потери)</span><b>0</b></div>`;
   // Сравнение с простой монополией (STATE.mono считается в recompute параллельно).
   if (STATE.mono) {
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
@@ -6580,7 +6603,7 @@ function updateDiscr3Panel() {
     html += `<div class="stat"><span>Внутри: q₁ / P₁</span><b>${fmt(d.q1)} / ${fmt(d.P1)}</b></div>`;
     html += `<div class="stat"><span>Экспорт q₂ (по Pw)</span><b>${fmt(d.q2)} / ${fmt(d.P2)}</b></div>`;
     html += `<div class="stat"><span>Σ выпуск</span><b>${fmt(d.Qtot)}</b></div>`;
-    html += `<div class="stat"><span>MR₁ = Pw = MC</span><b>${fmt(d.mcLevel)}</b></div>`;
+    html += `<div class="stat"><span>$MR_1 = P_w = MC$</span><b>${fmt(d.mcLevel)}</b></div>`;
     html += '<div class="hint">Мировой рынок для малой фирмы совершенно эластичен: продать за границей можно ' +
       'сколько угодно по цене Pw, поэтому предельный доход от экспорта постоянен и равен Pw. Условие оптимума такое: ' +
       '<b>MR внутри = Pw = MC(Σ выпуска)</b>: издержки считаются от ОБЩЕГО выпуска, поэтому экспорт влияет ' +
@@ -6594,7 +6617,7 @@ function updateDiscr3Panel() {
   html += `<div class="stat"><span>Рынок 1: q₁ / P₁</span><b>${fmt(d.q1)} / ${fmt(d.P1)}</b></div>`;
   html += `<div class="stat"><span>Рынок 2: q₂ / P₂</span><b>${fmt(d.q2)} / ${fmt(d.P2)}</b></div>`;
   html += `<div class="stat"><span>Σ выпуск</span><b>${fmt(d.Qtot)}</b></div>`;
-  html += `<div class="stat"><span>MR₁ = MR₂ = MC</span><b>${fmt(d.mcLevel)}</b></div>`;
+  html += `<div class="stat"><span>$MR_1 = MR_2 = MC$</span><b>${fmt(d.mcLevel)}</b></div>`;
   html += `<div class="hint">Цена выше на менее эластичном рынке (здесь это рынок&nbsp;${less}). Фирма выравнивает предельный доход: MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.</div>`;
   box.innerHTML = html;
 }
@@ -6736,8 +6759,8 @@ function updateKinkPanel() {
   if (!k) { box.innerHTML = '<div class="muted">Введите спрос и MC, нажмите «Построить».</div>'; return; }
   if (!k.found) { box.innerHTML = '<div class="warn">Оптимум не найден (нет кандидатов).</div>'; return; }
   let html = '';
-  html += `<div class="stat"><span>Q* (выпуск)</span><b>${fmt(k.Qstar)}</b></div>`;
-  html += `<div class="stat"><span>P* (цена)</span><b>${fmt(k.Pstar)}</b></div>`;
+  html += `<div class="stat"><span>$Q^*$ (выпуск)</span><b>${fmt(k.Qstar)}</b></div>`;
+  html += `<div class="stat"><span>$P^*$ (цена)</span><b>${fmt(k.Pstar)}</b></div>`;
   html += `<div class="stat"><span>Прибыль π</span><b>${fmt(k.profit)}</b></div>`;
   html += `<div class="stat"><span>Победил кандидат</span><b>${k.winKind} @ Q=${fmt(k.Qstar)}</b></div>`;
   // Таблица всех кандидатов с прибылью (видно сравнение).
@@ -6961,7 +6984,7 @@ function redrawCosts() {
    Три сюжета внутри режима «Фирма» (costsSub):
      'costs'      — прежние кривые из TC + долгосрочное равновесие (9в);
      'production' — Q = f(L): TP, MP = dQ/dL, AP = Q/L (9а);
-     'isoquant'   — Q(L,K), изокоста w·L + r·K = C, оптимум MRTS = w/r (9б).
+     'isoquant'   — Q(L,K), изокоста w·L + r·K = C, оптимум $MRTS = \frac{w}{r}$ (9б).
    9б переиспользует ДВИЖОК КАСАНИЯ УРОВНЯ из Фазы 7 без изменений — тот же,
    что рисует кривые безразличия потребителя.
    ===================================================================== */
@@ -7038,7 +7061,7 @@ function updateLongRunPanel(html) {
   html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
   html += `<div class="stat"><span>Цена P</span><b>${fmt(lr.P)}</b></div>`;
   html += `<div class="stat"><span>Выпуск Q (P = MC)</span><b>${fmt(lr.Q)}</b></div>`;
-  html += `<div class="stat"><span>ATC(Q)</span><b>${fmt(lr.atc)}</b></div>`;
+  html += `<div class="stat"><span>$ATC(Q)$</span><b>${fmt(lr.atc)}</b></div>`;
   html += `<div class="stat"><span>${lr.profit >= 0 ? 'Прибыль' : 'Убыток'} (P − ATC)·Q</span><b>${fmt(lr.profit)}</b></div>`;
   if (lr.breakeven != null) html += `<div class="stat"><span>Вход/выход: P = min ATC</span><b>${fmt(lr.breakeven)}</b></div>`;
   html += `<div class="hint" style="margin-top:4px;">${lr.shutdown
@@ -7175,7 +7198,7 @@ function updateProdPanel() {
   let html = '';
   if (p.maxMP) html += `<div class="stat"><span>Перегиб TP (max MP)</span><b>L=${fmt(p.maxMP.L)}, MP=${fmt(p.maxMP.val)}</b></div>`;
   if (p.maxAP) html += `<div class="stat"><span>Максимум AP</span><b>L=${fmt(p.maxAP.L)}, AP=${fmt(p.maxAP.val)}</b></div>`;
-  if (p.maxAP && !isNaN(p.mpAtMaxAP)) html += `<div class="stat"><span>MP в этой точке</span><b>${fmt(p.mpAtMaxAP)}</b></div>`;
+  if (p.maxAP && !isNaN(p.mpAtMaxAP)) html += `<div class="stat"><span>$MP$ в этой точке</span><b>${fmt(p.mpAtMaxAP)}</b></div>`;
   if (p.maxTP) html += `<div class="stat"><span>Максимум TP</span><b>L=${fmt(p.maxTP.L)}, Q=${fmt(p.maxTP.val)}</b></div>`;
   html += '<div class="hint" style="margin-top:4px;">С точки перегиба TP начинается <b>убывающая предельная отдача</b>: ' +
     'каждый следующий работник добавляет меньше предыдущего. В максимуме AP выполняется <b>AP = MP</b>, ' +
@@ -7219,11 +7242,11 @@ function updateIsoPanel() {
   let html = '';
   html += `<div class="stat"><span>Оптимум L* / K*</span><b>${fmt(iso.L)} / ${fmt(iso.K)}</b></div>`;
   html += `<div class="stat"><span>Выпуск Q</span><b>${fmt(iso.Q)}</b></div>`;
-  html += `<div class="stat"><span>MRTS в оптимуме</span><b>${fmt(iso.mrts)}</b></div>`;
-  html += `<div class="stat"><span>w/r</span><b>${fmt(STATE.isoW / STATE.isoR)}</b></div>`;
+  html += `<div class="stat"><span>$MRTS$ в оптимуме</span><b>${fmt(iso.mrts)}</b></div>`;
+  html += `<div class="stat"><span>$\frac{w}{r}$</span><b>${fmt(STATE.isoW / STATE.isoR)}</b></div>`;
   html += `<div class="stat"><span>Потрачено</span><b>${fmt(STATE.isoW * iso.L + STATE.isoR * iso.K)}</b></div>`;
   html += '<div class="hint" style="margin-top:4px;">Условие оптимума то же, что у потребителя, только вместо ' +
-    'полезности стоит выпуск, а вместо цен благ цены факторов: <b>MRTS = w/r</b>. Это буквально один и тот же ' +
+    'полезности стоит выпуск, а вместо цен благ цены факторов: <b>$MRTS = \frac{w}{r}$</b>. Это буквально один и тот же ' +
     'численный движок касания уровня.</div>';
   box.innerHTML = html;
 }
@@ -7392,8 +7415,8 @@ function updatePlantsPanel() {
     html += `<div class="stat"><span>Совокупный выпуск Q</span><b>${fmt(cur.Q)}</b></div>`;
     html += `<div class="stat"><span>Завод 1: Q₁</span><b>${fmt(cur.q1)}</b></div>`;
     html += `<div class="stat"><span>Завод 2: Q₂</span><b>${fmt(cur.q2)}</b></div>`;
-    html += `<div class="stat"><span>MC₁ = MC₂ = MC(Q)</span><b>${fmt(cur.m)}</b></div>`;
-    html += `<div class="stat"><span>TC(Q) = TC₁ + TC₂</span><b>${fmt(cur.tcDirect)}</b></div>`;
+    html += `<div class="stat"><span>$MC_1 = MC_2 = MC(Q)$</span><b>${fmt(cur.m)}</b></div>`;
+    html += `<div class="stat"><span>$TC(Q) = TC_1 + TC_2$</span><b>${fmt(cur.tcDirect)}</b></div>`;
     html += `<div class="stat"><span>∫ MC(q)dq (сверка)</span><b>${fmt(cur.vc)}</b></div>`;
     // Наглядная проверка: неверная «сумма в лоб» TC₁(Q)+TC₂(Q) заметно дороже.
     const naive = plantTC(p.c1, cur.Q) + plantTC(p.c2, cur.Q);
@@ -8048,11 +8071,11 @@ function updateLaborPanel() {
     const u = STATE.laborUnion;
     if (!u) { box.innerHTML = '<div class="warn">Оптимум профсоюза не найден.</div>'; return; }
     if (STATE.unionModel === 'monopoly') {
-      html += `<div class="stat"><span>Lп (занятость)</span><b>${fmt(u.Lu)}</b></div>`;
-      html += `<div class="stat"><span>Wп (зарплата)</span><b>${fmt(u.Wu)}</b></div>`;
-      if (u.Lk != null) html += `<div class="stat"><span>Lk (конкуренция)</span><b>${fmt(u.Lk)}</b></div>`;
-      if (u.Wk != null) html += `<div class="stat"><span>Wk (конкуренция)</span><b>${fmt(u.Wk)}</b></div>`;
-      if (u.dwl != null) html += `<div class="stat"><span>DWL (недозанятость)</span><b>${fmt(u.dwl)}</b></div>`;
+      html += `<div class="stat"><span>$L_п$ (занятость)</span><b>${fmt(u.Lu)}</b></div>`;
+      html += `<div class="stat"><span>$W_п$ (зарплата)</span><b>${fmt(u.Wu)}</b></div>`;
+      if (u.Lk != null) html += `<div class="stat"><span>$L_k$ (конкуренция)</span><b>${fmt(u.Lk)}</b></div>`;
+      if (u.Wk != null) html += `<div class="stat"><span>$W_k$ (конкуренция)</span><b>${fmt(u.Wk)}</b></div>`;
+      if (u.dwl != null) html += `<div class="stat"><span>$DWL$ (недозанятость)</span><b>${fmt(u.dwl)}</b></div>`;
       html += '<div class="hint">Профсоюз-монополист продаёт труд там, где MRL&nbsp;=&nbsp;S, и берёт зарплату Wп с кривой спроса, ВЫШЕ конкурентной, но занятость НИЖЕ. Зеркало монопсонии. Серым закрашены потери общества.</div>';
     } else {
       html += `<div class="stat"><span>Зарплата профсоюза Wп</span><b>${fmt(u.W)}</b></div>`;
@@ -8062,7 +8085,7 @@ function updateLaborPanel() {
         if (u.unemployment > 1e-6) html += `<div class="stat"><span>Безработица</span><b>${fmt(u.unemployment)}</b></div>`;
         html += '<div class="hint">Профсоюз диктует зарплату выше равновесия: занятость падает по спросу, возникает безработица (ценовой пол на рынке труда).</div>';
       } else {
-        html += `<div class="stat"><span>Lk (конкуренция)</span><b>${fmt(u.Lk)}</b></div>`;
+        html += `<div class="stat"><span>$L_k$ (конкуренция)</span><b>${fmt(u.Lk)}</b></div>`;
         html += '<div class="hint" style="margin-top:6px;">Зарплата профсоюза не выше конкурентной, поэтому не связывает. Рынок в равновесии.</div>';
       }
     }
@@ -8072,11 +8095,11 @@ function updateLaborPanel() {
   if (STATE.laborStruct === 'monopsony') {
     const m = STATE.laborMono;
     if (!m) { box.innerHTML = '<div class="warn">Оптимум монопсонии (MCL = D) не найден.</div>'; return; }
-    html += `<div class="stat"><span>Lм (занятость)</span><b>${fmt(m.Lm)}</b></div>`;
-    html += `<div class="stat"><span>Wм (зарплата)</span><b>${fmt(m.Wm)}</b></div>`;
-    if (m.Lk != null) html += `<div class="stat"><span>Lk (конкуренция)</span><b>${fmt(m.Lk)}</b></div>`;
-    if (m.Wk != null) html += `<div class="stat"><span>Wk (конкуренция)</span><b>${fmt(m.Wk)}</b></div>`;
-    if (m.dwl != null) html += `<div class="stat"><span>DWL (недозанятость)</span><b>${fmt(m.dwl)}</b></div>`;
+    html += `<div class="stat"><span>$L_м$ (занятость)</span><b>${fmt(m.Lm)}</b></div>`;
+    html += `<div class="stat"><span>$W_м$ (зарплата)</span><b>${fmt(m.Wm)}</b></div>`;
+    if (m.Lk != null) html += `<div class="stat"><span>$L_k$ (конкуренция)</span><b>${fmt(m.Lk)}</b></div>`;
+    if (m.Wk != null) html += `<div class="stat"><span>$W_k$ (конкуренция)</span><b>${fmt(m.Wk)}</b></div>`;
+    if (m.dwl != null) html += `<div class="stat"><span>$DWL$ (недозанятость)</span><b>${fmt(m.dwl)}</b></div>`;
     html += `<div class="hint">Монопсония занижает и занятость, и зарплату против конкуренции: рабочим платят Wм&nbsp;=&nbsp;W_s(Lм), ниже их предельного продукта. Серым закрашены потери общества.</div>`;
     if (bind) {
       html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
@@ -8088,7 +8111,7 @@ function updateLaborPanel() {
       if (w) {
         html += `<div class="stat"><span>Излишек рабочих</span><b>${fmt(w.workerCS)}</b></div>`;
         html += `<div class="stat"><span>Излишек фирм</span><b>${fmt(w.firmCS)}</b></div>`;
-        html += `<div class="stat"><span>DWL (потери)</span><b>${fmt(w.dwl)}</b></div>`;
+        html += `<div class="stat"><span>$DWL$ (потери)</span><b>${fmt(w.dwl)}</b></div>`;
       }
       const dl = min.Lstar - m.Lm;
       html += `<div class="hint">${dl > 1e-6 ? 'МРОТ увеличил занятость (парадокс монопсонии).' : (dl < -1e-6 ? 'МРОТ снизил занятость.' : 'Занятость не изменилась.')}</div>`;
@@ -8097,8 +8120,8 @@ function updateLaborPanel() {
     }
   } else {
     const eq = STATE.laborEq;
-    html += `<div class="stat"><span>Lk (занятость)</span><b>${fmt(eq.Q)}</b></div>`;
-    html += `<div class="stat"><span>Wk (зарплата)</span><b>${fmt(eq.P)}</b></div>`;
+    html += `<div class="stat"><span>$L_k$ (занятость)</span><b>${fmt(eq.Q)}</b></div>`;
+    html += `<div class="stat"><span>$W_k$ (зарплата)</span><b>${fmt(eq.P)}</b></div>`;
     if (STATE.laborWorkerCS != null) html += `<div class="stat"><span>Излишек рабочих</span><b>${fmt(STATE.laborWorkerCS)}</b></div>`;
     if (STATE.laborFirmCS != null) html += `<div class="stat"><span>Излишек фирм</span><b>${fmt(STATE.laborFirmCS)}</b></div>`;
     if (bind) {
@@ -8110,7 +8133,7 @@ function updateLaborPanel() {
       if (w) {
         html += `<div class="stat"><span>Излишек рабочих</span><b>${fmt(w.workerCS)}</b></div>`;
         html += `<div class="stat"><span>Излишек фирм</span><b>${fmt(w.firmCS)}</b></div>`;
-        html += `<div class="stat"><span>DWL (потери)</span><b>${fmt(w.dwl)}</b></div>`;
+        html += `<div class="stat"><span>$DWL$ (потери)</span><b>${fmt(w.dwl)}</b></div>`;
       }
       html += `<div class="hint">МРОТ выше равновесия: занятость падает до спроса при W_min, возникает безработица (избыток предложения труда).</div>`;
     } else if (STATE.laborMinOn && STATE.laborMinW > 0) {
@@ -8355,8 +8378,8 @@ function updateConsumerPanel() {
   let html = '';
   html += `<div class="stat"><span>Оптимум x* / y*</span><b>${fmt(b.x)} / ${fmt(b.y)}</b></div>`;
   html += `<div class="stat"><span>Полезность U</span><b>${fmt(b.U)}</b></div>`;
-  html += `<div class="stat"><span>MRS в оптимуме</span><b>${fmt(b.mrs)}</b></div>`;
-  html += `<div class="stat"><span>Px/Py</span><b>${fmt(b.px / b.py)}</b></div>`;
+  html += `<div class="stat"><span>$MRS$ в оптимуме</span><b>${fmt(b.mrs)}</b></div>`;
+  html += `<div class="stat"><span>$\frac{P_x}{P_y}$</span><b>${fmt(b.px / b.py)}</b></div>`;
   html += `<div class="stat"><span>Перехваты I/Px, I/Py</span><b>${fmt(b.xInt)}, ${fmt(b.yInt)}</b></div>`;
   // Свойство, характерное для выбранного типа предпочтений.
   const t = STATE.consType;
@@ -9342,7 +9365,7 @@ function setScenario(s) {
 /* ---------------------------------------------------------------------
    БЛОК 12. КПВ — граница производственных возможностей (Задача 3).
    Другой тип осей: по горизонтали товар X, по вертикали товар Y.
-   Граница Y = f(X). Наклон |dY/dX| — альтернативные издержки X в единицах Y.
+   Граница Y = f(X). Наклон $\left|\frac{dY}{dX}\right|$ — альтернативные издержки X в единицах Y.
    Своя компиляция (переменная X), но координаты/оси — общие (drawAxes('X','Y')).
    --------------------------------------------------------------------- */
 
@@ -10609,7 +10632,7 @@ function updateInequalityPanel() {
   html += `<div class="stat"><span>Квинтильный коэф. фондов</span><b>${s.quintile == null ? '∞' : fmt(s.quintile)}</b></div>`;
   const pp = inequalityP90P10();
   if (pp) {
-    html += `<div class="stat"><span>P90/P10 (пороги)</span><b>${fmt(pp.ratio)}</b></div>`;
+    html += `<div class="stat"><span>$\frac{P_{90}}{P_{10}}$ (пороги)</span><b>${fmt(pp.ratio)}</b></div>`;
     html += `<div class="hint">Это ДВЕ разные величины. <b>Коэффициент фондов</b> — отношение
       суммарного дохода верхних 10&nbsp;% населения к суммарному доходу нижних 10&nbsp;%
       (российская, росстатовская традиция; здесь ${fmt(s.decile)}). <b>P90/P10</b> — отношение
@@ -11074,6 +11097,46 @@ function drawOverlays() {
   syncSceneColorPickers();   // образцы в панели идут за темой и за своими цветами
   syncAreaColorList();       // список областей с пикерами
   syncAreaCalcUI();          // выпадашка кривых и список точек для расчёта площади
+  hintsToDots();             // подсказки, добавленные сценой, тоже уходят под вопросик
+  renderMathIn(document.getElementById('sb-body'));    // формулы в аналитике
+  renderMathIn(document.getElementById('tools-panel'));// и в подсказках панели
+}
+
+/* ── Общий рендер математики в тексте интерфейса (Фаза 4) ─────────────
+   Всё, что в тексте заключено в $…$, печатается формулой. Один проход по
+   контейнеру после того, как он заполнен, поэтому новому блоку аналитики
+   ничего дополнительно делать не нужно: достаточно поставить доллары.
+
+   Правится только текст, разметка не трогается: обходим текстовые узлы и
+   заменяем найденный кусок на span с формулой. Узлы, уже прошедшие обработку,
+   помечаются, чтобы статичные подсказки не разбирались заново на каждом кадре. */
+function renderMathIn(root) {
+  if (!root || typeof katex === 'undefined') return;
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => {
+      if (!n.nodeValue || n.nodeValue.indexOf('$') < 0) return NodeFilter.FILTER_REJECT;
+      const p = n.parentElement;
+      if (!p || p.closest('.katex, script, style, textarea, input')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  const jobs = [];
+  let n;
+  while ((n = walk.nextNode())) jobs.push(n);
+  jobs.forEach(node => {
+    const parts = String(node.nodeValue).split(/\$([^$]+)\$/);
+    if (parts.length < 3) return;
+    const frag = document.createDocumentFragment();
+    parts.forEach((piece, i) => {
+      if (i % 2 === 0) { if (piece) frag.appendChild(document.createTextNode(piece)); return; }
+      const span = document.createElement('span');
+      span.className = 'tex';
+      try { katex.render(piece, span, { throwOnError: false, displayMode: false }); }
+      catch (e) { span.textContent = piece; }
+      frag.appendChild(span);
+    });
+    node.parentNode.replaceChild(frag, node);
+  });
 }
 
 /* ---------------------------------------------------------------------
@@ -13124,9 +13187,9 @@ function updateMathPanel() {
   if (STATE.mathSub === 'tangent') {
     if (isNaN(r.y0)) html = '<div class="warn">В этой точке функция не определена.</div>';
     else {
-      html += `<div class="stat"><span>Точка x₀</span><b>${fmt(r.x0)}</b></div>`;
-      html += `<div class="stat"><span>f(x₀)</span><b>${fmt(r.y0)}</b></div>`;
-      html += `<div class="stat"><span>Наклон касательной f′(x₀)</span><b>${fmt(r.k)}</b></div>`;
+      html += `<div class="stat"><span>Точка $x_0$</span><b>${fmt(r.x0)}</b></div>`;
+      html += `<div class="stat"><span>$f(x_0)$</span><b>${fmt(r.y0)}</b></div>`;
+      html += `<div class="stat"><span>Наклон касательной $f'(x_0)$</span><b>${fmt(r.k)}</b></div>`;
       html += `<div class="stat"><span>Угол наклона</span><b>${fmt(Math.atan(r.k) * 180 / Math.PI)}°</b></div>`;
       if (r.secant != null) {
         html += `<div class="stat"><span>Наклон секущей</span><b>${fmt(r.secant)}</b></div>`;
@@ -13188,9 +13251,9 @@ function updateMathPanel() {
     if (r.error) html = `<div class="warn">${r.error}</div>`;
     else if (!r.opt) html = '<div class="muted">Точка не нашлась: проверьте формулы и границы окна.</div>';
     else {
-      html += `<div class="stat"><span>x*</span><b>${fmt(r.opt.a)}</b></div>`;
-      html += `<div class="stat"><span>y*</span><b>${fmt(r.opt.b)}</b></div>`;
-      html += `<div class="stat"><span>f(x*, y*)</span><b>${fmt(r.opt.value)}</b></div>`;
+      html += `<div class="stat"><span>$x^*$</span><b>${fmt(r.opt.a)}</b></div>`;
+      html += `<div class="stat"><span>$y^*$</span><b>${fmt(r.opt.b)}</b></div>`;
+      html += `<div class="stat"><span>$f(x^*,\, y^*)$</span><b>${fmt(r.opt.value)}</b></div>`;
       html += `<div class="stat"><span>Ищем</span><b>${r.wantMax ? 'максимум' : 'минимум'}</b></div>`;
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + '<p>Ограничение это кривая: точки, где g(x, y) обращается в ноль. '
@@ -15607,6 +15670,101 @@ function setGridMode(mode) {
 
 /* Вопросики с пояснениями. Кнопка знает id своего блока, поэтому новый
    вопросик добавляется одной парой тегов, без правки кода. */
+/* ── Инструкции под вопросиком (Фаза 5) ───────────────────────────────
+   Абзац-объяснение посреди панели нужен один раз, а висит всегда. Прячем его
+   и ставим у ближайшего заголовка вопросик: навёл — текст всплыл, увёл — исчез.
+
+   Сам абзац остаётся в разметке и только скрыт: сцены правят его текстом
+   (у внешнего эффекта он меняется со знаком), и подсказка всплывает уже с
+   новым содержимым. Формулы внутри печатаются как формулы (Фаза 4). */
+function hintTip() {
+  let t = document.getElementById('hint-tip');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'hint-tip';
+    t.setAttribute('role', 'tooltip');
+    document.body.appendChild(t);
+  }
+  return t;
+}
+
+function showHintTip(dot, html) {
+  const t = hintTip();
+  t.innerHTML = html;
+  renderMathIn(t);
+  t.style.display = 'block';
+  const b = dot.getBoundingClientRect();
+  const w = t.offsetWidth, h = t.offsetHeight;
+  let left = b.left + b.width / 2 - w / 2;
+  left = Math.max(8, Math.min(window.innerWidth - w - 8, left));
+  let top = b.bottom + 8;
+  if (top + h > window.innerHeight - 8) top = Math.max(8, b.top - h - 8);
+  t.style.left = Math.round(left) + 'px';
+  t.style.top = Math.round(top) + 'px';
+}
+function hideHintTip() {
+  const t = document.getElementById('hint-tip');
+  if (t) t.style.display = 'none';
+}
+
+// Куда повесить вопросик: заголовок секции, складной заголовок или подпись поля.
+function hintAnchor(hint) {
+  const sec = hint.closest('.section');
+  if (sec) {
+    const fold = sec.querySelector(':scope > .fold-btn > span');
+    if (fold) return fold;
+    const title = sec.querySelector(':scope > .section-title');
+    if (title) return title;
+  }
+  const field = hint.closest('.field, .f-wrap');
+  const lab = field && field.querySelector(':scope > label');
+  if (lab) return lab;
+  // Заголовка рядом нет (подсказка лежит в под-панели сцены) — ставим вопросик
+  // прямо на её место, тогда объяснение всё равно доступно, а панель чистая.
+  const own = document.createElement('div');
+  own.className = 'help-anchor';
+  hint.parentNode.insertBefore(own, hint);
+  return own;
+}
+
+function hintsToDots(root) {
+  root = root || document.getElementById('tools-panel');
+  if (!root) return;
+  root.querySelectorAll('.hint').forEach(hint => {
+    if (hint._dotted || hint.classList.contains('hint-keep')) return;
+    const anchor = hintAnchor(hint);
+    if (!anchor) return;                 // некуда вешать — оставляем абзац как был
+    hint._dotted = true;
+    hint.classList.add('hint-hidden');
+
+    let dot = anchor.querySelector(':scope > .help-dot');
+    if (!dot) {
+      dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'help-dot';
+      dot.textContent = '?';
+      dot.setAttribute('aria-label', 'Подсказка');
+      dot._hints = [];
+      anchor.appendChild(dot);
+      // У одного заголовка может висеть несколько подсказок, и часть из них
+      // сцена прячет (у внешнего эффекта свой текст на каждый знак). Показываем
+      // только те, что сейчас в силе; спрятана ли секция — решает fieldActive,
+      // а собственный display:none абзаца проверяем отдельно.
+      const live = (h) => h.style.display !== 'none' && fieldActive(h.parentElement || h);
+      const show = () => {
+        const on = dot._hints.filter(live);
+        showHintTip(dot, (on.length ? on : dot._hints).map(h => h.innerHTML).join('<hr>'));
+      };
+      dot.addEventListener('pointerenter', show);
+      dot.addEventListener('focus', show);
+      dot.addEventListener('pointerleave', hideHintTip);
+      dot.addEventListener('blur', hideHintTip);
+      dot.addEventListener('click', (e) => { e.preventDefault(); show(); });
+    }
+    dot._hints.push(hint);
+  });
+}
+
 function wireHintButtons() {
   document.querySelectorAll('.hint-btn[data-pop]').forEach(btn => {
     const pop = document.getElementById(btn.getAttribute('data-pop'));
@@ -16824,6 +16982,7 @@ function wireControls() {
   renderMarkList();
   initSceneColorPickers();   // Фаза 2: пикеры у кривых издержек, производства, вееров
   wireFolds();               // сворачивание любых секций со складным заголовком
+  hintsToDots();             // инструкции уходят под вопросик у заголовка
   wireAreaCalc();            // расчёт площадей: под кривой и по точкам
   initZoom();                // колесо и тачпад приближают график, двойной щелчок возвращает масштаб
 
