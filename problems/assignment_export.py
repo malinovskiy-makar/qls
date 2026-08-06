@@ -72,8 +72,27 @@ def _plate(text):
 PREAMBLE = [
     '% !TeX program = pdflatex',
     r'\documentclass[12pt,a4paper]{article}',
-    r'\usepackage[utf8]{inputenc}',
-    r'\usepackage[T2A]{fontenc}',
+    # ⚠️ ФАЙЛ ОБЯЗАН СОБИРАТЬСЯ ЛЮБЫМ КОМПИЛЯТОРОМ. Проверка руками показала
+    # худший исход: человек собрал наш .tex XeTeX-ом и получил PDF, где нет
+    # ни одного русского слова — только формулы и латиница. Настройки
+    # pdflatex (`inputenc`/`fontenc T2A`) XeTeX молча ИГНОРИРУЕТ, кириллица
+    # исчезает без единой ошибки. Функция, результат которой зависит от
+    # того, угадал ли пользователь движок, сломана — а слов «pdflatex» и
+    # «XeTeX» репетитор знать не должен вовсе.
+    r'\usepackage{iftex}',
+    r'\ifPDFTeX',
+    r'  \usepackage[utf8]{inputenc}',
+    r'  \usepackage[T2A]{fontenc}',
+    r'\else',
+    # XeTeX/LuaTeX: кириллицу даёт шрифт, а не кодировка. Latin Modern
+    # Roman — юникодная версия штатного шрифта LaTeX, она есть в любой
+    # установке TeX Live и на Overleaf, и кириллица в ней полная.
+    r'  \usepackage{fontspec}',
+    r'  \defaultfontfeatures{Ligatures=TeX}',
+    r'  \setmainfont{Latin Modern Roman}',
+    r'  \setsansfont{Latin Modern Sans}',
+    r'  \setmonofont{Latin Modern Mono}',
+    r'\fi',
     r'\usepackage[russian]{babel}',
     r'\usepackage{amsmath,amssymb}',
     r'\usepackage{geometry}',
@@ -247,3 +266,174 @@ def compile_pdf(tex):
             return None, ('LaTeX не смог собрать листок. Скачайте .tex и '
                           'посмотрите, какая задача мешает.')
         return pdf_path.read_bytes(), None
+
+
+# ---------------------------------------------------------------------------
+# Версия для печати — те же данные, что в `.tex`, но рисует их браузер
+# ---------------------------------------------------------------------------
+
+def print_rows(assignment, for_teacher=False):
+    """Строки задания для страницы печати. Возвращает (строки, пропущенные).
+
+    ⚠️ ОДНА СБОРКА С `.tex`. Порядок задач, номера, баллы, пункты и то,
+    какая задача пропущена из-за битой разметки, обязаны совпадать: лист,
+    напечатанный из браузера, и лист, собранный из `.tex`, — это ОДИН И ТОТ
+    ЖЕ листок, и расхождение между ними обнаружится на занятии.
+
+    Текст проходит через санитайзер (`text_clean.clean`): числа и знаки он
+    не трогает, а склеенные с формулами слова на бумаге видно особенно
+    хорошо.
+    """
+    from problems.text_clean import clean
+
+    items = list(assignment.items
+                 .select_related('catalog_problem', 'custom_problem', 'graph')
+                 .prefetch_related('catalog_problem__parts',
+                                   'custom_problem__options')
+                 .order_by('order', 'id'))
+
+    rows = []
+    skipped = []
+    number = 0
+    for position, item in enumerate(items, start=1):
+        statement = item.statement or ''
+        if looks_broken(statement):
+            skipped.append(position)
+            continue
+        number += 1
+        graph_name = ''
+        text = clean(statement)
+        plate = GRAPH_PLATE.search(text)
+        if plate:
+            graph_name = plate.group(1).strip()
+            text = GRAPH_PLATE.sub('', text).strip()
+        elif item.graph_id:
+            graph_name = item.graph.name
+
+        # ⚠️ ВАРИАНТЫ ТЕСТА — ЭТО ВАРИАНТЫ, А НЕ ПУНКТЫ ЗАДАЧИ. Спрашиваем
+        # ту же функцию, которая рисует форму ученику: у каталожного теста
+        # подпункты играют роль вариантов ответа, и печатать их списком
+        # «а) … Ответ: верно» значит выдать ключ прямо в условии.
+        from problems.assignment_rows import (
+            ANSWER_TEXT, correct_option_values, item_answer_form,
+        )
+        from problems.answer_check import normalize_label
+
+        options = []
+        parts = []
+        kind, raw_options = item_answer_form(item)
+        if kind != ANSWER_TEXT and raw_options:
+            correct = correct_option_values(item)
+            for position, option in enumerate(raw_options):
+                value = (str(option['value']) if item.is_custom
+                         else normalize_label(option['value']))
+                options.append({
+                    # Буква варианта — своя (а, б, в…): HTML-списки русских
+                    # букв не умеют, а ученик отвечает именно буквой.
+                    'label': (option.get('part_label')
+                              or _letter(position)).rstrip(').'),
+                    'text': clean(option['label']),
+                    'is_correct': value in correct})
+        elif item.catalog_problem_id:
+            for part in item.catalog_problem.parts.all():
+                if not (part.statement or '').strip():
+                    continue
+                if looks_broken(part.statement or ''):
+                    continue
+                parts.append({'label': (part.label or '').rstrip(').'),
+                              'statement': clean(part.statement),
+                              'answer': clean(part.answer or '')})
+
+        rows.append({
+            'number': number,
+            'title': item.problem_title if item.problem_title != item.statement
+                     else '',
+            'statement': text,
+            'points': item.points,
+            'parts': parts,
+            'options': options,
+            'graph': graph_name,
+            'answer': clean(item.correct_answer or ''),
+            'solution': clean(item.solution_text or ''),
+            # Место для решения: длинной задаче — больше строк. Полосок, а
+            # не пустоты: на пустом поле ученик пишет мельче и криво.
+            'space_lines': range(3 if len(text) < 400 else 5),
+        })
+    return rows, skipped
+
+
+RU_LETTERS = 'абвгдежзиклмнопрстуфхц'
+
+
+def _letter(position):
+    return (RU_LETTERS[position] if position < len(RU_LETTERS)
+            else str(position + 1))
+
+
+def total_points(rows):
+    from decimal import Decimal
+
+    total = Decimal('0')
+    for row in rows:
+        if row['points'] is not None:
+            total += Decimal(str(row['points']))
+    return total or None
+
+
+# ---------------------------------------------------------------------------
+# Кнопка «Скачать PDF» — ПОДГОТОВЛЕНА, НО ВЫКЛЮЧЕНА
+# ---------------------------------------------------------------------------
+
+def pdf_button_enabled():
+    """Включена ли кнопка «Скачать PDF».
+
+    ⚠️ ПО УМОЛЧАНИЮ ВЫКЛЮЧЕНА, и это не осторожность, а арифметика: на
+    бесплатном Render всему приложению отведено 512 МБ, а headless Chromium
+    на ОДИН документ берёт 200–400 МБ. Два учителя, нажавшие кнопку
+    одновременно, кладут сайт. Пока флаг снят, кнопки нет вовсе, а листок
+    берётся через «Версия для печати» — она ничего не стоит и работает у
+    всех.
+
+    Что нужно от хостинга, чтобы включить: ≥1 ГБ памяти на процесс,
+    установленный Chromium (`npx playwright install chromium`), доступ в
+    сеть за CDN KaTeX либо вендоренная копия. Включается настройкой
+    `ASSIGNMENT_PDF_ENABLED = True`.
+    """
+    return bool(getattr(settings, 'ASSIGNMENT_PDF_ENABLED', False))
+
+
+def browser_pdf(html):
+    """(pdf_bytes, None) или (None, «человеческое объяснение»).
+
+    Печатает НАСТОЯЩИМ браузером ту же страницу, которую видит репетитор:
+    второй вёрстки для PDF не заводим.
+    """
+    import os
+
+    if not pdf_button_enabled():
+        return None, ('Скачивание PDF на этом сервере выключено. Откройте '
+                      '«Версия для печати» и сохраните в PDF из браузера — '
+                      'получится тот же листок.')
+
+    script = Path(settings.BASE_DIR) / 'scripts' / 'print_to_pdf.js'
+    if not script.exists():
+        return None, 'Не найден сборщик PDF. Воспользуйтесь версией для печати.'
+
+    with tempfile.TemporaryDirectory() as folder:
+        source = Path(folder) / 'sheet.html'
+        target = Path(folder) / 'sheet.pdf'
+        source.write_text(html, encoding='utf-8')
+        try:
+            result = subprocess.run(
+                ['node', str(script), str(source), str(target)],
+                cwd=str(settings.BASE_DIR), capture_output=True, timeout=90)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            logger.warning('PDF не собрался: %s', error)
+            return None, ('Не удалось собрать PDF. Откройте «Версия для '
+                          'печати» и сохраните в PDF из браузера.')
+        if result.returncode != 0 or not target.exists():
+            logger.warning('PDF не собрался: %s',
+                           result.stderr.decode('utf-8', 'replace')[:400])
+            return None, ('Не удалось собрать PDF. Откройте «Версия для '
+                          'печати» и сохраните в PDF из браузера.')
+        return target.read_bytes(), None

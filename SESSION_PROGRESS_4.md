@@ -66,10 +66,19 @@ workspace «Макар Малиновский's Notion»). Задачи и ре�
       склеек перед обрезкой
 
 ## Часть C — печать и чистка текстов
-- [ ] C.1. Версия для печати
-- [ ] C.2. Кнопка «Скачать PDF» — подготовить, не включать
+- [x] C.1. `/teacher/groups/<g>/assignments/<a>/print/` — отдельная
+      страница без меню, KaTeX тем же конвейером, `break-inside: avoid`,
+      два варианта; кнопки на странице задания названы «Распечатать».
+      ⚠️ Браузер нашёл поломку, которую питон-тесты не видят: без
+      `<!doctype html>` страница уходит в quirks mode, и KaTeX ОТКАЗЫВАЕТСЯ
+      рисовать вообще («KaTeX doesn't work in quirks mode»)
+- [x] C.2. `scripts/print_to_pdf.js` + `export.browser_pdf()` за флагом
+      `ASSIGNMENT_PDF_ENABLED` (по умолчанию False); печатает ТУ ЖЕ
+      страницу. Локально проверено — PDF собран
 - [x] C.3. `problems/text_clean.py` + команда `text_defect_census`
-- [ ] C.4. Чиним `.tex`
+- [x] C.4. Преамбула ветвится `iftex`: pdflatex → `inputenc/fontenc T2A`,
+      XeTeX/LuaTeX → `fontspec` + Latin Modern Roman. ⚠️ TeX Live на машине
+      НЕТ — собрать локально нельзя, нужна проверка в Overleaf
 
 ---
 

@@ -1,0 +1,235 @@
+{% load catalog_filters %}<!doctype html>
+{% comment %}
+⚠️ `<!doctype html>` ОБЯЗАТЕЛЕН И СТОИТ ПЕРВЫМ. Без него браузер уходит в
+quirks mode, а KaTeX в quirks mode ОТКАЗЫВАЕТСЯ рисовать вообще
+(«KaTeX doesn't work in quirks mode») — на листке остаётся сырой текст
+«$120-2P = 3P-30$» вместо формул. Питон-тесты этого не видят: страница
+отдаёт 200, разметка на месте, ошибка живёт только в браузере. Найдено
+скриншот-проверкой, держится тестом `test_doctype_is_first`.
+{% endcomment %}
+<meta charset="utf-8">
+<title>{{ assignment.name }}{% if for_teacher %} — с ответами{% endif %}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+{% comment %}
+ВЕРСИЯ ДЛЯ ПЕЧАТИ. Отдельная страница, а НЕ обычный экран с
+`@media print { .nav { display:none } }`.
+
+⚠️ Почему отдельная. Сайт уже рисует эти формулы правильно — на экране
+проверки человек это отдельно похвалил. Значит переводить условия в LaTeX
+и собирать компилятором не обязательно: можно напечатать то, что уже есть.
+Учитель жмёт «Печать» в браузере и сохраняет в PDF. Работает у всех, на
+любом устройстве, нагрузки на сервер нет — а собранный не тем движком
+`.tex` молча теряет всю кириллицу (ровно это и произошло при проверке).
+
+⚠️ Страница НЕ наследует базовый шаблон намеренно: у него шапка, тема,
+переключатели и скрипты, которые на бумаге не нужны, а на 380px ещё и
+тянут документ вбок (известный баг `_nav.html`).
+
+KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: та же версия, те
+же разделители ($$ раньше $), тот же `throwOnError: false` и та же
+маскировка `\$`. Второй конвейер разошёлся бы с боевым, и на бумаге
+получалось бы не то, что на экране.
+{% endcomment %}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="initKaTeX()"></script>
+
+<style>
+  /* Бумага. Цвета здесь ЧЁРНЫЕ, а не токены темы: лист печатают, а не
+     смотрят в тёмной теме, и серый текст на бумаге просто бледный. */
+  :root { color-scheme: light; }
+  body { margin: 0; background: #fff; color: #000;
+         font: 12pt/1.5 Georgia, 'Times New Roman', serif; }
+  .sheet { max-width: 17cm; margin: 0 auto; padding: 1.5cm 1cm 2cm; }
+
+  .bar { position: sticky; top: 0; background: #f4f4f4;
+         border-bottom: 1px solid #ccc; padding: 10px 14px;
+         font: 14px/1.4 system-ui, -apple-system, sans-serif;
+         display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .bar button { font: inherit; font-weight: 600; padding: 7px 16px;
+                border: 1px solid #333; border-radius: 6px; background: #333;
+                color: #fff; cursor: pointer; }
+  .bar a { color: #333; }
+  .bar .hint { color: #555; font-size: 13px; }
+
+  h1 { font-size: 17pt; margin: 0 0 4px; }
+  .meta { font-size: 10.5pt; color: #333; margin-bottom: 4px; }
+  .who { margin: 14px 0 22px; font-size: 11pt; border-bottom: 1px solid #000;
+         padding-bottom: 22px; overflow-wrap: anywhere; }
+
+  /* ⚠️ Задача не рвётся пополам, ЕСЛИ ПОМЕЩАЕТСЯ. `break-inside: avoid`
+     именно на задаче, а не на всём списке: задача длиннее страницы иначе
+     не напечаталась бы вовсе. */
+  .task { break-inside: avoid; page-break-inside: avoid; margin: 0 0 18px;
+          padding-bottom: 4px; }
+  .task-head { font-weight: bold; margin-bottom: 6px; }
+  .task-points { font-weight: normal; color: #444; font-size: 10.5pt; }
+  .statement { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .parts { margin: 8px 0 0 0; padding-left: 1.2em; }
+  .parts li { margin-bottom: 4px; }
+  .options { margin: 8px 0 0; padding-left: 1.2em; list-style: none; }
+  .options li { margin-bottom: 3px; }
+  .space { border-bottom: 1px dotted #999; height: 1.1cm; }
+  .answer-line { margin-top: 8px; font-size: 11pt; }
+  .answer-line b { font-weight: bold; }
+  .solution { margin-top: 8px; font-size: 10.5pt; color: #222;
+              border-left: 2px solid #999; padding-left: 10px;
+              white-space: pre-wrap; }
+  .plate { border: 1px dashed #666; padding: 10px; margin-top: 8px;
+           font-size: 10.5pt; color: #333; }
+  .skipped { border: 1px solid #999; padding: 8px 10px; font-size: 10.5pt; }
+
+  @media print {
+    .bar { display: none; }
+    .sheet { max-width: none; padding: 0; }
+    @page { margin: 1.6cm 1.4cm; }
+  }
+  /* Узкий экран: документ не имеет права тянуться вбок. Длинные формулы
+     прокручиваются ВНУТРИ своего блока, а не растягивают страницу. */
+  @media (max-width: 480px) {
+    .sheet { padding: 12px; }
+    body { font-size: 15px; }
+    .bar { padding: 8px 10px; }
+  }
+  .statement, .parts li, .options li, .solution { max-width: 100%; }
+  .katex-display { overflow-x: auto; overflow-y: hidden; }
+  html, body { overflow-x: hidden; }
+</style>
+
+<div class="bar">
+  <button type="button" onclick="window.print()">Печать</button>
+  <span class="hint">
+    В окне печати выберите «Сохранить как PDF» — получится файл, который
+    можно отправить или распечатать.
+  </span>
+  <a href="{{ back_url }}">← к заданию</a>
+  {% if other_url %}<a href="{{ other_url }}">{{ other_label }}</a>{% endif %}
+</div>
+
+<div class="sheet">
+  <h1>{{ assignment.name }}</h1>
+  <div class="meta">
+    {% if assignment.is_exam %}Контрольная работа{% else %}Домашнее задание{% endif %}
+    {% if group %} · {{ group.name }}{% endif %}
+    {% if deadline %} · срок: {{ deadline|date:"d.m.Y, H:i" }}{% endif %}
+    · задач: {{ rows|length }}{% if total_points %} · всего баллов: {{ total_points|floatformat:"-2" }}{% endif %}
+  </div>
+  {% if for_teacher %}
+  <div class="meta"><b>Вариант преподавателя:</b> с ответами и решениями.</div>
+  {% else %}
+  <div class="who">Фамилия, имя: ________________________________________
+    &nbsp;&nbsp; Класс: __________ &nbsp;&nbsp; Дата: ____________</div>
+  {% endif %}
+
+  {% for row in rows %}
+  <div class="task">
+    <div class="task-head">
+      {{ row.number }}.
+      {% if row.title %}{{ row.title }}{% endif %}
+      {% if row.points %}<span class="task-points">({{ row.points|floatformat:"-2" }} б.)</span>{% endif %}
+    </div>
+    <div class="statement">{{ row.statement }}</div>
+
+    {% if row.options %}
+    <ul class="options">
+      {% for option in row.options %}
+      <li><b>{{ option.label }})</b> {{ option.text }}{% if for_teacher and option.is_correct %} <b>— верно</b>{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% elif row.parts %}
+    <ol class="parts" start="1">
+      {% for part in row.parts %}
+      <li value="{{ forloop.counter }}">
+        {{ part.statement }}
+        {% if for_teacher and part.answer %}<br><b>Ответ:</b> {{ part.answer }}{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+
+    {% if row.graph %}
+    <div class="plate">График: {{ row.graph }} — вклейте или начертите здесь.</div>
+    {% endif %}
+
+    {% if for_teacher %}
+      {% if row.answer %}
+      <div class="answer-line"><b>Ответ:</b> {{ row.answer }}</div>
+      {% endif %}
+      {% if row.solution %}
+      <div class="solution">{{ row.solution }}</div>
+      {% endif %}
+    {% else %}
+      {% for _ in row.space_lines %}<div class="space"></div>{% endfor %}
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% if skipped %}
+  <div class="skipped">
+    Не попало в листок из-за испорченной разметки: {{ skipped|length }} задач(и).
+    Их номера: {% for number in skipped %}{{ number }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+  </div>
+  {% endif %}
+</div>
+
+<script>
+// ⚠️ Один в один конвейер из `catalog/base.html`. Расхождение здесь значит,
+// что на бумаге напечатается не то, что видно на экране.
+var DOLLAR_SENTINEL = '';
+
+function walkText(root, fn) {
+  var walker = document.createTreeWalker(root || document.body,
+                                         NodeFilter.SHOW_TEXT, null);
+  var node;
+  while ((node = walker.nextNode())) {
+    var parent = node.parentNode && node.parentNode.nodeName;
+    if (parent === 'SCRIPT' || parent === 'STYLE' || parent === 'TEXTAREA') {
+      continue;
+    }
+    fn(node);
+  }
+}
+
+function maskEscapedDollars(root) {
+  walkText(root, function (node) {
+    if (node.nodeValue.indexOf('\\$') !== -1) {
+      node.nodeValue = node.nodeValue.split('\\$').join(DOLLAR_SENTINEL);
+    }
+  });
+}
+
+function fixCurrencyDollars(root) {
+  walkText(root, function (node) {
+    var value = node.nodeValue;
+    if (value.indexOf(DOLLAR_SENTINEL) !== -1 || value.indexOf('\\$') !== -1 ||
+        value.indexOf('\\_') !== -1 || value.indexOf('\\&') !== -1 ||
+        value.indexOf('\\#') !== -1) {
+      node.nodeValue = value.split(DOLLAR_SENTINEL).join('$')
+        .split('\\$').join('$').split('\\_').join('_')
+        .split('\\&').join('&').split('\\#').join('#');
+    }
+  });
+}
+
+function initKaTeX() {
+  maskEscapedDollars(document.body);
+  renderMathInElement(document.body, {
+    delimiters: [
+      // $$ строго РАНЬШЕ $, иначе auto-render режет $$…$$ на два пустых $…$
+      { left: '$$',  right: '$$',  display: true },
+      { left: '$',   right: '$',   display: false },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '\\(', right: '\\)', display: false }
+    ],
+    throwOnError: false
+  });
+  fixCurrencyDollars(document.body);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  fixCurrencyDollars(document.body);
+});
+</script>

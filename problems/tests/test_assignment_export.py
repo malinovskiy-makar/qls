@@ -63,13 +63,28 @@ class BuildTexTests(TestCase):
         tex, _ = export.build_tex(self.homework)
         self.assertIn('4 б.', tex)
 
-    def test_pdflatex_not_xelatex(self):
-        """Компиляция pdflatex — записанное решение проекта."""
+    def test_file_compiles_with_any_engine(self):
+        """⚠️ ИЗМЕНЕНИЕ КОНТРАКТА (Фаза C.4). Раньше здесь стояло «fontspec
+        быть не должно»: файл писался строго под pdflatex. Ручная проверка
+        показала худший исход — человек собрал его XeTeX-ом и получил PDF
+        БЕЗ ЕДИНОГО русского слова: настройки pdflatex XeTeX молча
+        игнорирует, и кириллица исчезает без ошибки. Репетитор не обязан
+        знать слов «pdflatex» и «XeTeX», поэтому преамбула теперь ветвится
+        сама.
+        """
         tex, _ = export.build_tex(self.homework)
         self.assertIn('% !TeX program = pdflatex', tex)
+        self.assertIn(r'\usepackage{iftex}', tex)
+        # Ветка pdflatex — кодировки; ветка XeTeX/LuaTeX — юникодный шрифт.
+        self.assertIn(r'\ifPDFTeX', tex)
         self.assertIn(r'\usepackage[T2A]{fontenc}', tex)
-        # fontspec работает только в xelatex/lualatex — его тут быть не должно.
-        self.assertNotIn('fontspec', tex)
+        self.assertIn(r'\usepackage{fontspec}', tex)
+        self.assertIn('Latin Modern Roman', tex)
+        self.assertIn(r'\fi', tex)
+        # Русский язык подключается ОДИН раз, после ветвления.
+        self.assertEqual(tex.count(r'\usepackage[russian]{babel}'), 1)
+        self.assertLess(tex.index(r'\ifPDFTeX'),
+                        tex.index(r'\usepackage[russian]{babel}'))
 
     def test_custom_problem_exports_too(self):
         own = CustomProblem.objects.create(
@@ -150,5 +165,7 @@ class ExportViewTests(TestCase):
         body = self.client.get(
             reverse('teacher:group_assignment',
                     args=[self.group.pk, self.exam.pk])).content.decode()
-        self.assertIn('PDF ученикам', body)
-        self.assertIn('PDF с ответами', body)
+        # Кнопка называется понятно: «Распечатать», а не «Экспорт в TeX».
+        self.assertIn('Распечатать', body)
+        self.assertIn('assignments/%d/print/' % self.exam.pk, body)
+        self.assertIn('.tex ученикам', body)

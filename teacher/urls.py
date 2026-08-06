@@ -63,6 +63,10 @@ urlpatterns = [
          name='problem_edit'),
 
     # Конструктор домашек.
+    # Версия для печати — основной способ получить листок (Фаза C.1).
+    path('groups/<int:group_id>/assignments/<int:assignment_id>/print/',
+         views_generate.assignment_print, name='assignment_print'),
+
     path('assignment/create/', views.assignment_create,
          name='assignment_create'),
     # Подбор домашки по описанию словами (Часть C).

@@ -22,6 +22,7 @@
 """
 from django.contrib import messages
 from django.shortcuts import redirect, render
+from django.urls import reverse
 
 from problems import hw_generator
 
@@ -191,8 +192,34 @@ def assignment_export(request, group_id, assignment_id):
     assignment = group_assignment_or_404(group, assignment_id)
 
     for_teacher = request.GET.get('for') == 'teacher'
-    tex, skipped = export.build_tex(assignment, for_teacher=for_teacher)
     stem = _safe_stem(assignment.name) + ('-ответы' if for_teacher else '')
+
+    if request.GET.get('fmt') == 'browser-pdf':
+        # Печать той же страницы, что и «Версия для печати», настоящим
+        # браузером. За выключенным по умолчанию флагом — см.
+        # `assignment_export.pdf_button_enabled`.
+        from django.template.loader import render_to_string
+
+        rows, skipped = export.print_rows(assignment, for_teacher=for_teacher)
+        html = render_to_string('teacher/assignment_print.html', {
+            'assignment': assignment, 'group': group, 'rows': rows,
+            'skipped': skipped, 'for_teacher': for_teacher,
+            'deadline': assignment.deadline_at,
+            'total_points': export.total_points(rows),
+            'back_url': '', 'other_url': '', 'other_label': '',
+        }, request=request)
+        pdf, error = export.browser_pdf(html)
+        if pdf is None:
+            messages.warning(request, error)
+            return redirect(reverse('teacher:assignment_print',
+                                    args=[group.pk, assignment.pk])
+                            + ('?for=teacher' if for_teacher else ''))
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = (
+            'attachment; filename*=UTF-8\'\'%s.pdf' % _urlquote(stem))
+        return response
+
+    tex, skipped = export.build_tex(assignment, for_teacher=for_teacher)
 
     if request.GET.get('fmt') == 'pdf':
         pdf, error = export.compile_pdf(tex)
@@ -211,6 +238,47 @@ def assignment_export(request, group_id, assignment_id):
             request, 'Пропущено задач из-за испорченной разметки: %d. '
                      'Остальные в листок вошли.' % len(skipped))
     return _tex_response(tex, stem)
+
+
+@tutor_required
+def assignment_print(request, group_id, assignment_id):
+    """Версия для печати: браузер печатает то, что уже умеет рисовать.
+
+    ⚠️ ЭТО ОСНОВНОЙ СПОСОБ ПОЛУЧИТЬ ЛИСТОК, а `.tex` — для тех, кто хочет
+    его доработать. Причина простая: сайт уже рисует эти формулы верно, а
+    собранный не тем компилятором `.tex` молча теряет всю кириллицу.
+    Функция, результат которой зависит от того, угадал ли пользователь
+    движок, сломана.
+    """
+    from problems import assignment_export as export
+
+    from .access import group_assignment_or_404, own_group_or_404
+
+    group = own_group_or_404(request.user, group_id)
+    assignment = group_assignment_or_404(group, assignment_id)
+    for_teacher = request.GET.get('for') == 'teacher'
+    rows, skipped = export.print_rows(assignment, for_teacher=for_teacher)
+
+    here = reverse('teacher:assignment_print', args=[group.pk, assignment.pk])
+    return render(request, 'teacher/assignment_print.html', {
+        'assignment': assignment,
+        'group': group,
+        'rows': rows,
+        'skipped': skipped,
+        'for_teacher': for_teacher,
+        'deadline': assignment.deadline_at,
+        'total_points': export.total_points(rows),
+        'back_url': reverse('teacher:group_assignment',
+                            args=[group.pk, assignment.pk]),
+        'other_url': here + ('' if for_teacher else '?for=teacher'),
+        'other_label': ('вариант ученикам' if for_teacher
+                        else 'вариант с ответами'),
+        'pdf_enabled': export.pdf_button_enabled(),
+        'pdf_url': (reverse('teacher:assignment_export',
+                            args=[group.pk, assignment.pk])
+                    + '?fmt=browser-pdf'
+                    + ('&for=teacher' if for_teacher else '')),
+    })
 
 
 def _tex_response(tex, stem):

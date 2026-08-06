@@ -72,14 +72,20 @@
 </div>
 
 {% comment %}
-Экспорт на бумагу. Два варианта одного задания: ученикам без ответов,
-себе — с ответами и решениями. PDF собирается там, где есть TeX Live;
-на бесплатном хостинге его нет, и вместо ошибки отдаётся .tex.
+Листок на бумагу. ОСНОВНОЙ способ — «Распечатать»: открывается версия для
+печати, и учитель сохраняет её в PDF прямо из браузера. Работает у всех, на
+любом устройстве, нагрузки на сервер нет.
+
+`.tex` остаётся для тех, кто хочет доработать листок в LaTeX. Кнопки
+«Скачать PDF» здесь нет намеренно: собирать PDF на сервере — это headless
+Chromium на 200–400 МБ при 512 МБ на всё приложение (см.
+`assignment_export.pdf_button_enabled`).
 {% endcomment %}
 <div class="export-row">
   <span class="export-cap">Распечатать:</span>
-  <a href="{% url 'teacher:assignment_export' group.pk assignment.pk %}?fmt=pdf">PDF ученикам</a>
-  <a href="{% url 'teacher:assignment_export' group.pk assignment.pk %}?fmt=pdf&amp;for=teacher">PDF с ответами</a>
+  <a href="{% url 'teacher:assignment_print' group.pk assignment.pk %}">ученикам</a>
+  <a href="{% url 'teacher:assignment_print' group.pk assignment.pk %}?for=teacher">с ответами</a>
+  <span class="export-cap">Файл LaTeX:</span>
   <a href="{% url 'teacher:assignment_export' group.pk assignment.pk %}">.tex ученикам</a>
   <a href="{% url 'teacher:assignment_export' group.pk assignment.pk %}?for=teacher">.tex с ответами</a>
 </div>
