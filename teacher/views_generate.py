@@ -2,14 +2,23 @@
 Подбор домашки по описанию — три шага на одном адресе.
 
   1. ЗАПРОС      — описание словами + параметры;
-  2. СТОП-ГЕЙТ   — показываем, ЧТО поняли, и даём поправить ДО поиска;
+  2. СТОП-ГЕЙТ   — показываем, ЧТО НАШЛОСЬ, и даём поправить ДО сборки;
   3. РЕЗУЛЬТАТ   — найденные задачи, их можно убрать, заменить, добавить
                    свои и отправить в обычный конструктор домашки.
 
-⚠️ Стоп-гейт не украшение. Неверно понятый запрос иначе превращается в пять
-бессмысленных поисков и подборку, которую репетитор всё равно выбросит.
+⚠️ СТОП-ГЕЙТ ПОКАЗЫВАЕТ ЗАДАЧИ, А НЕ ТЕМЫ. Раньше на нём стояли темы,
+выбранные моделью, — а проверить их репетитор не может: нашей таксономии он
+не знает, и именно там пряталась ошибка с КТВ («альтернативное название
+КПВ» выглядит правдоподобно ровно до того момента, как увидишь найденное).
+Теперь на экране: строка СЛОВАМИ РЕПЕТИТОРА, названия двух-трёх найденных
+задач и пометка уверенности.
 
-Обращение к модели ровно одно — на шаге 2. Шаг 3 ходит только в свой банк.
+⚠️ ПОВТОРНЫЙ ПОИСК ПО ОДНОЙ СТРОКЕ БЕСПЛАТЕН И НЕ ХОДИТ К МОДЕЛИ. Это самый
+частый сценарий: «нашлись про производственные возможности, а надо про
+торговые» — поправил формулировку, переискал. Платить за это второй раз
+не за что.
+
+Обращение к модели ровно одно — на шаге 2. Всё остальное ходит в свой банк.
 """
 from django.contrib import messages
 from django.shortcuts import redirect, render
@@ -49,6 +58,22 @@ def assignment_generate(request):
         context.update(step='plan', plan_rows=plan['rows'],
                        note=plan['note'], usage=plan.get('usage'),
                        cached=plan.get('cached'))
+        context['previews'] = hw_generator.preview_rows(
+            plan['rows'], has_solution=form['has_solution'])
+        return render(request, 'teacher/generate.html', context)
+
+    if action == 'research':
+        # Поправили формулировку строки и переискали. К модели НЕ ходим.
+        rows = _read_plan(request)
+        if not rows:
+            messages.error(request, 'В плане не осталось ни одной строки.')
+            context['step'] = 'ask'
+            return render(request, 'teacher/generate.html', context)
+        context.update(step='plan', plan_rows=rows)
+        context['previews'] = hw_generator.preview_rows(
+            rows, has_solution=form['has_solution'])
+        messages.success(request, 'Переискал по вашим формулировкам — '
+                                  'обращения к модели не потребовалось.')
         return render(request, 'teacher/generate.html', context)
 
     if action in ('search', 'replace'):
@@ -59,17 +84,27 @@ def assignment_generate(request):
             return render(request, 'teacher/generate.html', context)
 
         exclude = _read_ids(request, 'exclude_ids')
-        found, empty = hw_generator.find_problems(
+        found, short = hw_generator.find_problems(
             rows, has_solution=form['has_solution'], exclude=exclude)
-        context.update(step='result', plan_rows=rows, results=found,
-                       empty_rows=empty, exclude_ids=exclude)
-        if empty:
-            for gap in empty:
-                messages.warning(
-                    request,
-                    'По строке «%s» не хватило задач: %d. Поправьте тему или '
-                    'сложность и подберите ещё раз.'
-                    % (gap['topic'], gap['missing']))
+        cards = [hw_generator.problem_card(item['problem'],
+                                           item['confidence'],
+                                           item.get('how', ''))
+                 for item in found]
+        for card, item in zip(cards, found):
+            card['row'] = item['row']
+            card['row_label'] = rows[item['row']]['label']
+        context.update(step='result', plan_rows=rows, results=cards,
+                       empty_rows=short, exclude_ids=exclude,
+                       far_count=sum(1 for c in cards
+                                     if c['confidence'] == 'far'))
+        # ⚠️ Предупреждаем только о НАСТОЯЩЕМ недоборе. Он теперь редкость:
+        # квота добирается из общего поиска, а не оставляет дыру.
+        for gap in short:
+            messages.warning(
+                request,
+                'По строке «%s» в банке не нашлось задач: %d. Поправьте '
+                'формулировку и подберите ещё раз.'
+                % (gap['label'], gap['missing']))
         return render(request, 'teacher/generate.html', context)
 
     return redirect('teacher:assignment_generate')
@@ -94,26 +129,39 @@ def _read_form(request):
 
 
 def _read_plan(request):
-    """План со стоп-гейта — репетитор мог его поправить."""
+    """План со стоп-гейта — репетитор мог его поправить.
+
+    Ведущее поле теперь `row_query` (формулировка строки), а не тема:
+    тема стала подсказкой ранжированию и может быть пустой, а вот без
+    формулировки искать нечего.
+    """
+    queries = request.POST.getlist('row_query')
+    labels = request.POST.getlist('row_label')
     topics = request.POST.getlist('row_topic')
     difficulties = request.POST.getlist('row_difficulty')
     counts = request.POST.getlist('row_count')
-    queries = request.POST.getlist('row_query')
     keep = set(request.POST.getlist('row_keep'))
 
+    def at(values, index, default=''):
+        return values[index] if index < len(values) else default
+
     rows = []
-    for index, topic in enumerate(topics):
+    for index, query in enumerate(queries):
         if str(index) not in keep:
             continue
-        try:
-            difficulty = max(1, min(5, int(difficulties[index])))
-            count = max(1, min(hw_generator.MAX_PROBLEMS, int(counts[index])))
-        except (ValueError, IndexError):
+        query = (query or '').strip()
+        if not query:
             continue
-        rows.append({'topic': topic, 'difficulty': difficulty,
-                     'count': count,
-                     'query': (queries[index] if index < len(queries)
-                               else topic)})
+        try:
+            difficulty = max(1, min(5, int(at(difficulties, index, '3'))))
+            count = max(1, min(hw_generator.MAX_PROBLEMS,
+                               int(at(counts, index, '1'))))
+        except ValueError:
+            continue
+        rows.append({'query': query,
+                     'label': (at(labels, index) or query).strip(),
+                     'topic': at(topics, index).strip(),
+                     'difficulty': difficulty, 'count': count})
     return rows
 
 

@@ -50,6 +50,32 @@ textarea.gen-text:focus { border-color: var(--accent); }
   .plan-row { grid-template-columns: auto 1fr; }
   .plan-row .q { grid-column: 1 / -1; }
 }
+/* ── Стоп-гейт: найденные задачи, а не темы (Фаза B.5) ─────────
+   Пометка уверенности — про факт, а не про красоту: зелёный «точное»,
+   янтарь «близко», серый «ближайшее что нашлось». Акцентный малиновый
+   здесь не используется: это подписи, а не действия. */
+.plan-block { border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 12px; background: var(--surface); }
+.plan-said { font-size: 13px; color: var(--text2); margin: 8px 0 6px; }
+.plan-found { list-style: none; margin: 0; padding: 0; display: flex;
+  flex-direction: column; gap: 6px; }
+.plan-found li { display: flex; gap: 8px; align-items: baseline;
+  flex-wrap: wrap; font-size: 13px; }
+.pf-name { font-weight: 600; }
+.pf-topics { color: var(--text2); font-size: 12px; }
+.pf-none { color: var(--text2); font-style: italic; }
+.conf { font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; padding: 2px 8px; border-radius: 999px;
+  white-space: nowrap; }
+.conf-exact { background: var(--green-tint); color: var(--green); }
+.conf-close { background: var(--amber-tint); color: var(--amber); }
+.conf-far   { background: var(--chip-bg); color: var(--chip-text); }
+.res-row-label { font-size: 12px; color: var(--text2); margin: 2px 0 6px; }
+@media (max-width: 560px) {
+  .plan-block .plan-row { display: flex; flex-wrap: wrap; }
+  .plan-block .plan-row .q { flex-basis: 100%; min-width: 0; }
+  .conf { white-space: normal; }
+}
 {% endblock %}
 
 {% block content %}
@@ -61,7 +87,7 @@ textarea.gen-text:focus { border-color: var(--accent); }
 
 <div class="gen-step">
   <span class="{% if step == 'ask' %}is-on{% endif %}">1. Запрос</span>
-  <span class="{% if step == 'plan' %}is-on{% endif %}">2. Что понято</span>
+  <span class="{% if step == 'plan' %}is-on{% endif %}">2. Что нашлось</span>
   <span class="{% if step == 'result' %}is-on{% endif %}">3. Задачи</span>
 </div>
 
@@ -129,7 +155,6 @@ textarea.gen-text:focus { border-color: var(--accent); }
 {% if step == 'plan' %}
 <form method="post">
   {% csrf_token %}
-  <input type="hidden" name="action" value="search">
   <input type="hidden" name="text" value="{{ form.text }}">
   <input type="hidden" name="count" value="{{ form.count }}">
   <input type="hidden" name="min_difficulty" value="{{ form.min_difficulty }}">
@@ -137,38 +162,61 @@ textarea.gen-text:focus { border-color: var(--accent); }
   {% if form.has_solution %}<input type="hidden" name="has_solution" value="on">{% endif %}
 
   <div class="gen-card">
-    <h2>Вот что понято из запроса</h2>
+    <h2>Вот что нашлось по вашему запросу</h2>
     <div class="sub">
-      Поправьте строки, если что-то не так, и только потом запускайте подбор.
-      Неверно понятый запрос иначе превратится в бессмысленные поиски.
+      Под каждой строкой — реальные задачи из банка. Не то? Поправьте
+      формулировку строки своими словами и нажмите «Переискать»: обращения
+      к модели это не стоит.
     </div>
     {% if note %}<div class="gen-note">{{ note }}</div>{% endif %}
 
-    {% for row in plan_rows %}
-    <div class="plan-row">
-      <label class="checkbox-label" style="height:auto;">
-        <input type="checkbox" name="row_keep" value="{{ forloop.counter0 }}" checked>
-      </label>
-      <select name="row_topic">
-        {% for topic in topics %}
-        <option value="{{ topic }}" {% if topic == row.topic %}selected{% endif %}>{{ topic }}</option>
+    {% for preview in previews %}
+    <div class="plan-block">
+      <div class="plan-row">
+        <label class="checkbox-label" style="height:auto;">
+          <input type="checkbox" name="row_keep" value="{{ forloop.counter0 }}" checked>
+        </label>
+        <input class="q" type="text" name="row_query" value="{{ preview.row.query }}"
+               placeholder="о чём должны быть задачи">
+        <input type="number" name="row_difficulty" min="1" max="5"
+               value="{{ preview.row.difficulty }}" title="сложность">
+        <input type="number" name="row_count" min="1" max="30"
+               value="{{ preview.row.count }}" title="сколько задач">
+        <input type="hidden" name="row_label" value="{{ preview.row.label }}">
+        <input type="hidden" name="row_topic" value="{{ preview.row.topic }}">
+      </div>
+      <div class="plan-said">
+        Ваша строка: «{{ preview.row.label }}» — задач: {{ preview.row.count }}
+        <span class="conf conf-{{ preview.confidence|default:'far' }}">{{ preview.confidence_label }}</span>
+      </div>
+      <ul class="plan-found">
+        {% for card in preview.cards %}
+        <li>
+          <span class="pf-name">{{ card.title }}</span>
+          {% if card.topics %}<span class="pf-topics">{{ card.topics }}</span>{% endif %}
+          <span class="conf conf-{{ card.confidence }}">{{ card.confidence_label }}</span>
+        </li>
+        {% empty %}
+        <li class="pf-none">По этой строке в банке ничего не нашлось —
+          поправьте формулировку.</li>
         {% endfor %}
-      </select>
-      <input type="number" name="row_difficulty" min="1" max="5" value="{{ row.difficulty }}">
-      <input type="number" name="row_count" min="1" max="30" value="{{ row.count }}">
-      <input class="q" type="text" name="row_query" value="{{ row.query }}"
-             placeholder="о чём должны быть задачи">
+      </ul>
     </div>
     {% endfor %}
 
     <div class="gen-actions">
-      <button type="submit" class="filter-btn">Подобрать задачи</button>
+      <button type="submit" class="filter-btn" name="action" value="search">
+        Подобрать задачи
+      </button>
+      <button type="submit" class="btn-preview" name="action" value="research">
+        Переискать по моим формулировкам
+      </button>
       <a href="{% url 'teacher:assignment_generate' %}" class="reset-link">✕ Начать заново</a>
     </div>
     {% if usage %}
     <div class="gen-cost">
       {% if cached %}ответ взят из кэша, обращения не было{% else %}
-      разбор запроса: {{ usage.input_tokens }} + {{ usage.output_tokens }} токенов,
+      разбор запроса: {{ usage.input_tokens }} + {{ usage.output_tokens }} токенов{% if usage.cache_read_tokens %}, из кэша {{ usage.cache_read_tokens }}{% endif %},
       ${{ usage.cost_usd|floatformat:6 }} ({{ usage.model }}){% endif %}
     </div>
     {% endif %}
@@ -182,6 +230,11 @@ textarea.gen-text:focus { border-color: var(--accent); }
   <div class="sub">
     Снимите галочку у ненужной задачи. «Подобрать другие» ищет заново, минуя
     уже показанные. Готово — отправьте в конструктор домашки.
+    {% if far_count %}
+    <br><b>{{ far_count }}</b> из них помечены «ближайшее что нашлось»: по
+    вашей формулировке точнее в банке не оказалось, и вместо пустого места
+    подставлено самое близкое. Проверьте их первыми.
+    {% endif %}
   </div>
 
   <form method="post" id="again-form" style="display:none;">
@@ -189,13 +242,14 @@ textarea.gen-text:focus { border-color: var(--accent); }
     <input type="hidden" name="action" value="replace">
     {% for row in plan_rows %}
     <input type="hidden" name="row_keep" value="{{ forloop.counter0 }}">
+    <input type="hidden" name="row_label" value="{{ row.label }}">
     <input type="hidden" name="row_topic" value="{{ row.topic }}">
     <input type="hidden" name="row_difficulty" value="{{ row.difficulty }}">
     <input type="hidden" name="row_count" value="{{ row.count }}">
     <input type="hidden" name="row_query" value="{{ row.query }}">
     {% endfor %}
     {% for item in results %}
-    <input type="hidden" name="exclude_ids" value="{{ item.problem.pk }}">
+    <input type="hidden" name="exclude_ids" value="{{ item.id }}">
     {% endfor %}
     {% for pk in exclude_ids %}
     <input type="hidden" name="exclude_ids" value="{{ pk }}">
@@ -204,21 +258,20 @@ textarea.gen-text:focus { border-color: var(--accent); }
   </form>
 
   {% for item in results %}
-  <div class="res-card" data-pick="{{ item.problem.pk }}">
+  <div class="res-card" data-pick="{{ item.id }}">
     <div class="res-head">
       <label class="checkbox-label" style="height:auto;">
-        <input type="checkbox" class="gen-pick" value="{{ item.problem.pk }}"
-               data-title="{% if item.problem.title %}{{ item.problem.title|truncatechars:60 }}{% else %}Задача #{{ item.problem.pk }}{% endif %}" checked>
+        <input type="checkbox" class="gen-pick" value="{{ item.id }}"
+               data-title="{{ item.title }}" checked>
       </label>
-      <span class="res-title">
-        {% if item.problem.title %}{{ item.problem.title }}{% else %}Задача #{{ item.problem.pk }}{% endif %}
-      </span>
-      <span class="card-tag">{{ plan_rows|length }}</span>
-      {% if item.problem.difficulty %}
-      <span class="card-stars">сложность {{ item.problem.difficulty }}</span>
+      <span class="res-title">{{ item.title }}</span>
+      <span class="conf conf-{{ item.confidence }}">{{ item.confidence_label }}</span>
+      {% if item.difficulty %}
+      <span class="card-stars">сложность {{ item.difficulty }}</span>
       {% endif %}
     </div>
-    <div class="res-body">{{ item.problem.statement|truncatechars:280 }}</div>
+    <div class="res-row-label">по строке: «{{ item.row_label }}»</div>
+    <div class="res-body">{{ item.preview }}</div>
   </div>
   {% empty %}
   <div class="empty-note">Ничего не нашлось. Поправьте план и попробуйте снова.</div>

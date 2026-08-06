@@ -102,17 +102,23 @@ class ParseRequestTests(TestCase):
         self.assertIn('json_schema',
                       json.dumps(calls[0]['output_config']))
 
-    def test_invented_topic_is_dropped(self):
-        """Выдуманная тема отбрасывается — под неё ничего не найдётся."""
+    def test_invented_topic_empties_the_field_but_keeps_the_row(self):
+        """⚠️ ИЗМЕНЕНИЕ КОНТРАКТА (Фаза B.4). Раньше строка с выдуманной
+        темой ВЫБРАСЫВАЛАСЬ целиком — и вместе с ней исчезала часть просьбы
+        репетитора. Теперь тема — подсказка ранжированию, а не фильтр:
+        несопоставленная тема просто становится пустой, а строка остаётся
+        и ищется по СЛОВАМ репетитора."""
         payload = {'rows': [
             {'topic': 'Микроэкономика рынков', 'difficulty': 3, 'count': 2,
-             'query': 'что-то'},
+             'query': 'что-то', 'label': 'что-то'},
             {'topic': 'Эластичность', 'difficulty': 2, 'count': 1,
-             'query': 'эластичность'},
+             'query': 'эластичность', 'label': 'эластичность'},
         ], 'note': ''}
         plan, _ = self._run(payload=payload)
-        self.assertEqual([row['topic'] for row in plan['rows']],
-                         ['Эластичность'])
+        self.assertEqual(len(plan['rows']), 2, 'строка потеряна вместе с темой')
+        self.assertEqual(plan['rows'][0]['topic'], '')
+        self.assertEqual(plan['rows'][0]['query'], 'что-то')
+        self.assertEqual(plan['rows'][1]['topic'], 'Эластичность')
 
     def test_difficulty_is_clamped_to_the_tutors_range(self):
         payload = {'rows': [{'topic': 'Эластичность', 'difficulty': 5,
@@ -201,15 +207,15 @@ class FindProblemsTests(TestCase):
 
     def _rows(self, count):
         return [{'topic': 'Эластичность', 'difficulty': 3, 'count': count,
-                 'query': 'эластичность спроса'}]
+                 'query': 'эластичность спроса', 'label': 'эластичность'}]
 
     def test_no_duplicates_across_rows(self):
         """Две строки по одной теме не вернут одну задачу дважды."""
         rows = [
             {'topic': 'Эластичность', 'difficulty': 3, 'count': 3,
-             'query': 'эластичность спроса'},
+             'query': 'эластичность спроса', 'label': 'спрос'},
             {'topic': 'Эластичность', 'difficulty': 3, 'count': 3,
-             'query': 'эластичность предложения'},
+             'query': 'эластичность предложения', 'label': 'предложение'},
         ]
         found, empty = hw_generator.find_problems(rows)
         ids = [item['problem'].pk for item in found]
@@ -222,23 +228,52 @@ class FindProblemsTests(TestCase):
         second, _ = hw_generator.find_problems(self._rows(3), exclude=shown)
         self.assertFalse(set(shown) & {i['problem'].pk for i in second})
 
-    def test_missing_rows_are_reported_not_padded(self):
-        """Не нашлось — говорим прямо, а не подсовываем что попало."""
-        rows = [{'topic': 'Поведенческая экономика', 'difficulty': 5,
-                 'count': 4, 'query': 'нечто, чего в банке нет'}]
-        found, empty = hw_generator.find_problems(rows)
-        self.assertTrue(empty)
-        self.assertEqual(empty[0]['topic'], 'Поведенческая экономика')
+    def test_quota_is_filled_even_when_the_row_finds_nothing(self):
+        """⚠️ ИЗМЕНЕНИЕ КОНТРАКТА (Фаза B.4): «не хватило задач» больше не
+        результат. Просили четыре — получите четыре, а честность
+        обеспечивается ПОМЕТКОЙ, а не пустым местом."""
+        rows = [{'topic': 'Поведенческая экономика', 'difficulty': 3,
+                 'count': 4, 'query': 'нечто чего в банке нет',
+                 'label': 'нечто'}]
+        found, short = hw_generator.find_problems(rows)
+        self.assertEqual(len(found), 4)
+        self.assertFalse(short)
 
-    def test_no_more_than_three_from_one_source(self):
+    def test_padded_problems_are_honestly_marked(self):
+        """Молча подсунуть чужую задачу нельзя."""
+        rows = [{'topic': '', 'difficulty': 3, 'count': 4,
+                 'query': 'нечто чего в банке нет', 'label': 'нечто'}]
+        found, _ = hw_generator.find_problems(rows)
+        self.assertTrue(any(item['confidence'] == 'far' for item in found),
+                        'добор не помечен как «ближайшее что нашлось»')
+        for item in found:
+            self.assertIn(item['confidence'], ('exact', 'close', 'far'))
+
+    def test_nothing_at_all_is_still_not_a_crash(self):
+        """Пустой банк — не пятисотка, а честно пустой список."""
+        Problem.objects.all().delete()
+        found, short = hw_generator.find_problems(
+            [{'topic': '', 'difficulty': 3, 'count': 3, 'query': 'что угодно',
+              'label': 'что угодно'}])
+        self.assertEqual(found, [])
+        self.assertEqual(short[0]['missing'], 3)
+
+    def test_source_cap_yields_to_the_quota(self):
+        """Потолок «не больше трёх из источника» — ПРЕДПОЧТЕНИЕ, не запрет.
+
+        ⚠️ ИЗМЕНЕНИЕ КОНТРАКТА (Фаза B.4). Раньше потолок обрезал подборку
+        до трёх задач и репетитор получал три вместо восьми. Пять задач из
+        двух сборников лучше трёх и извинения; когда выбора нет — берём из
+        одного, потому что пустое место хуже однообразия.
+        """
         from problems.models import Source, SourceReference
 
         source = Source.objects.create(name='Один сборник')
         for problem in self.problems:
             SourceReference.objects.create(problem=problem, source=source)
-        found, _ = hw_generator.find_problems(self._rows(8))
-        self.assertLessEqual(len(found), 3,
-                             'больше трёх задач из одного источника')
+        found, short = hw_generator.find_problems(self._rows(8))
+        self.assertEqual(len(found), 8)
+        self.assertFalse(short)
 
 
 class GenerateScreenTests(TestCase):
@@ -270,9 +305,10 @@ class GenerateScreenTests(TestCase):
                 {'action': 'parse', 'text': 'монополия и эластичность',
                  'count': 5, 'min_difficulty': 1, 'max_difficulty': 5})
         body = response.content.decode()
-        self.assertIn('Вот что понято из запроса', body)
-        self.assertIn('Эластичность', body)
-        # На стоп-гейте задачи ЕЩЁ НЕ ИЩУТСЯ.
+        self.assertIn('Вот что нашлось по вашему запросу', body)
+        # ⚠️ Стоп-гейт показывает ЗАДАЧИ, а не темы: проверить нашу
+        # таксономию репетитор не может, а названия задач — за пять секунд.
+        self.assertIn('Ваша строка', body)
         self.assertNotIn('Найдено задач', body)
         self.assertEqual(len(calls), 1)
 
@@ -293,6 +329,7 @@ class GenerateScreenTests(TestCase):
                 {'action': 'search', 'text': 'x', 'count': 2,
                  'min_difficulty': 1, 'max_difficulty': 5,
                  'row_keep': ['0'], 'row_topic': ['Эластичность'],
+                 'row_label': ['эластичность'],
                  'row_difficulty': ['3'], 'row_count': ['2'],
                  'row_query': ['эластичность']})
         self.assertEqual(len(calls), 0)

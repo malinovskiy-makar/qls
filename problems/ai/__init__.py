@@ -18,5 +18,6 @@
     слой сделан ровно под то, чтобы вторая задача села на готовое.
 """
 from .core import (  # noqa: F401
-    AiUnavailable, available_profiles, is_available, run, unavailable_reason,
+    AiUnavailable, available_profiles, daily_limit, is_available, run,
+    unavailable_reason, used_today,
 )

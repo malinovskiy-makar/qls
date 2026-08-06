@@ -1,119 +1,50 @@
 """
-Подбор домашки по описанию словами.
+Подбор домашки по описанию словами: ПОИСК ПЕРВЫЙ, МОДЕЛЬ ВТОРАЯ.
 
 ⚠️ МЫ НЕ ПРИДУМЫВАЕМ ЗАДАЧИ. Мы подбираем существующие из проверенного
 каталога. Битая сгенерированная задача, выданная классу, стоит дороже, чем
-вся функция приносит — это принятое решение проекта, и здесь оно ровно то
-же самое: ИИ разбирает ФРАЗУ, а не сочиняет условия.
+вся функция приносит.
 
-АРХИТЕКТУРА (главное, ради чего файл существует):
-  1. ОДНО обращение к модели на всю домашку. Вход — вольный текст плюс
-     параметры, выход — СТРУКТУРА: список строк «тема · сложность ·
-     сколько задач». Обращение на каждую задачу было бы и дорого, и
-     медленно, и незачем.
-  2. Каждая строка структуры уходит в СУЩЕСТВУЮЩИЙ поиск по банку
-     отдельным запросом. Это бесплатно: эмбеддинги посчитаны заранее.
-  3. Результаты собираются в подборку с дедупликацией и разбросом по
-     источникам.
+⚠️ МОДЕЛЬ НЕ ДОЛЖНА ЗНАТЬ ЭКОНОМИКУ — И НЕ ЗНАЕТ. Живой запрос показал, во
+что обходится обратное: на фразу «домашка на КПВ и КТВ» модель написала
+«КТВ — альтернативное название КПВ», выдала всем трём строкам одну тему, а
+тема работала жёстким фильтром — пул схлопнулся, и вместо пяти задач
+нашлось три. КТВ — это кривая ТОРГОВЫХ возможностей, отдельное понятие из
+международной торговли.
 
-Две вещи, без которых схема разваливается:
-  * модель выбирает темы ИЗ ГОТОВОГО МЕНЮ 21 канонической темы. Иначе
-    вернёт «микроэкономика рынков», под которую в банке ничего нет;
-  * ДЕДУПЛИКАЦИЯ при сборке. Два запроса по монополии легко вернут одну
-    задачу дважды, а поиск — пять задач подряд из одного сборника.
+Вывод, ради которого файл переписан: подтем в олимпиадной экономике сотни,
+перечислить их в промпте невозможно, и попытка это сделать и есть источник
+ошибок. Словарь предметной области у нас уже есть, и он полный — это сами
+31 500 задач каталога. Поэтому порядок теперь такой:
+
+  1. ФРАЗА ЦЕЛИКОМ уходит в поиск ДО всякой модели (`catalog.hybrid`:
+     смысл + слова). Тот же поиск, ничего не зная про КТВ, нашёл задачу
+     «КТВ двух стран при торговле» — то есть банк знает то, чего не знает
+     модель.
+  2. Найденные задачи (названия и темы) показываются модели как СЛОВАРЬ.
+     Он строится сам и обновляется вместе с каталогом: добавили задачи по
+     новой подтеме — она сразу в подсказках, руками никто ничего не пишет.
+  3. Модель режет фразу на строки, ВИДЯ этот материал. Обращение
+     по-прежнему РОВНО ОДНО на домашку.
+  4. Каждая строка ищет себе задачи. Тема больше НЕ фильтр — только
+     подсказка ранжированию. Квота заполняется всегда.
 """
-import hashlib
-import json
 import logging
-import os
-import re
-from decimal import Decimal
 
-from django.conf import settings
-from django.core.cache import cache
-from django.utils import timezone
+from problems import ai
+from problems.text_clean import clean, preview_title
 
 logger = logging.getLogger(__name__)
 
-# Модель разбора — САМАЯ ДЕШЁВАЯ ИЗ ПОДХОДЯЩИХ. Задача простая: разложить
-# фразу по готовому меню тем, никакой экономики модель не считает.
-DEFAULT_MODEL = 'claude-haiku-4-5'
-# Цена за миллион токенов, доллары. Держим здесь, а не в коде расчёта:
-# тариф меняется, и он должен меняться в одном месте.
-DEFAULT_PRICES = {'claude-haiku-4-5': (1.0, 5.0)}
-
-# Потолок обращений в сутки на репетитора и время жизни кэша.
-DEFAULT_DAILY_LIMIT = 30
-DEFAULT_CACHE_SECONDS = 900
+# Оставлено ради обратной совместимости: вьюхи и тесты ловят эту ошибку.
+GeneratorUnavailable = ai.AiUnavailable
 
 MAX_ROWS = 8          # больше строк в плане домашки не бывает осмысленно
 MAX_PROBLEMS = 30     # верхняя граница числа задач в подборке
-
-
-class GeneratorUnavailable(Exception):
-    """Функция выключена или недоступна — сообщение уже человеческое."""
-
-
-def _setting(name, default):
-    return getattr(settings, name, default)
-
-
-def api_key():
-    """Ключ ТОЛЬКО из переменной окружения. Ни в коде, ни в репозитории."""
-    return os.environ.get('ANTHROPIC_API_KEY', '').strip()
-
-
-def is_available():
-    """Можно ли пользоваться. Нет ключа — функция аккуратно выключена."""
-    if not api_key():
-        return False
-    try:
-        import anthropic  # noqa: F401
-    except ImportError:
-        return False
-    return True
-
-
-def unavailable_reason():
-    if not api_key():
-        return ('Подбор по описанию выключен: не задан ключ ANTHROPIC_API_KEY. '
-                'Соберите домашку вручную — поиск и фильтры справа работают '
-                'как обычно.')
-    try:
-        import anthropic  # noqa: F401
-    except ImportError:
-        return ('Подбор по описанию выключен: на этом сервере не установлена '
-                'библиотека anthropic. Соберите домашку вручную.')
-    return ''
-
-
-def canonical_topics():
-    """21 каноническая тема — МЕНЮ, из которого выбирает модель."""
-    from problems.management.commands.apply_topic_mapping import CANONICAL
-
-    return list(CANONICAL)
-
-
-# ---------------------------------------------------------------------------
-# Шаг 1. Разбор запроса — ОДНО обращение к модели
-# ---------------------------------------------------------------------------
-
-SYSTEM_PROMPT = """Ты помогаешь репетитору по олимпиадной экономике собрать
-домашнее задание из уже существующего банка задач.
-
-Твоя работа — разложить его описание на строки плана. Ты НЕ придумываешь
-задачи и НЕ пишешь условия: задачи потом найдутся в банке поиском.
-
-Правила:
-1. Тема каждой строки — СТРОГО из предложенного списка тем. Ничего своего
-   не выдумывай: под выдуманную тему в банке ничего не найдётся.
-2. Сложность — целое от 1 до 5.
-3. Сумма задач по всем строкам должна равняться запрошенному числу задач.
-4. Если репетитор просит «одну посложнее в конце» — сделай отдельную строку
-   с большей сложностью и одной задачей, и поставь её последней.
-5. `query` — короткая фраза для поиска по смыслу (по-русски, 3–8 слов),
-   описывающая, о чём должны быть задачи этой строки.
-6. Тем в плане не больше четырёх, строк не больше восьми."""
+HINT_COUNT = 12       # сколько реальных задач показываем модели словарём
+# Потолок «не больше N задач из одного источника». Именно ПОТОЛОК, а не
+# запрет: если из-за него не набирается квота, он отступает (см. ниже).
+SOURCE_CAP = 3
 
 PLAN_SCHEMA = {
     'type': 'object',
@@ -123,12 +54,13 @@ PLAN_SCHEMA = {
             'items': {
                 'type': 'object',
                 'properties': {
+                    'label': {'type': 'string'},
+                    'query': {'type': 'string'},
                     'topic': {'type': 'string'},
                     'difficulty': {'type': 'integer'},
                     'count': {'type': 'integer'},
-                    'query': {'type': 'string'},
                 },
-                'required': ['topic', 'difficulty', 'count', 'query'],
+                'required': ['label', 'query', 'topic', 'difficulty', 'count'],
                 'additionalProperties': False,
             },
         },
@@ -139,137 +71,148 @@ PLAN_SCHEMA = {
 }
 
 
-def _cache_key(text, params):
-    payload = json.dumps([text, sorted(params.items())], ensure_ascii=False,
-                         sort_keys=True)
-    return 'hwgen:' + hashlib.sha256(payload.encode('utf-8')).hexdigest()[:32]
+def is_available():
+    return ai.is_available()
+
+
+def unavailable_reason():
+    return ai.unavailable_reason()
 
 
 def used_today(user):
-    from .models import AiUsageLog
-
-    start = timezone.localtime(timezone.now()).replace(
-        hour=0, minute=0, second=0, microsecond=0)
-    return AiUsageLog.objects.filter(user=user, created_at__gte=start).count()
+    return ai.used_today(user)
 
 
 def daily_limit():
-    return _setting('AI_GENERATOR_DAILY_LIMIT', DEFAULT_DAILY_LIMIT)
+    return ai.daily_limit()
 
+
+def canonical_topics():
+    """21 каноническая тема — подсказка модели, а НЕ фильтр выдачи."""
+    from problems.management.commands.apply_topic_mapping import CANONICAL
+
+    return list(CANONICAL)
+
+
+# ---------------------------------------------------------------------------
+# Шаг 1. Поиск — ДО модели
+# ---------------------------------------------------------------------------
+
+def search_hints(text, limit=HINT_COUNT):
+    """Реальные задачи банка по фразе целиком — словарь для модели.
+
+    ⚠️ Это НЕ примеры для подражания и не заготовка ответа. Это словарь:
+    по названиям и темам видно, какими словами в ЭТОМ банке называют то,
+    что просит репетитор. Заводить такой словарь руками бессмысленно —
+    он устареет в тот день, когда в каталог добавят новую подтему.
+    """
+    from catalog import hybrid
+    from problems.models import Problem
+
+    hits = hybrid.search(text, limit=limit)
+    if not hits:
+        return []
+    problems = {p.pk: p for p in Problem.objects.filter(
+        pk__in=[hit['id'] for hit in hits]).prefetch_related('topics')}
+    hints = []
+    for hit in hits:
+        problem = problems.get(hit['id'])
+        if problem is None:
+            continue
+        hints.append({
+            'title': preview_title(problem, limit=80),
+            'topics': [t.name for t in problem.topics.all()
+                       if t.name != 'Тест'],
+        })
+    return hints
+
+
+# ---------------------------------------------------------------------------
+# Шаг 2. Разбор фразы — ОДНО обращение к модели, уже со словарём на руках
+# ---------------------------------------------------------------------------
 
 def parse_request(text, params, user):
-    """Вольный текст → план домашки. ОДНО обращение к модели.
+    """Вольный текст → план домашки. Ровно ОДНО обращение к модели.
 
-    Возвращает `{'rows': [...], 'note': str, 'usage': {...}, 'cached': bool}`.
-    Бросает `GeneratorUnavailable` с человеческим текстом — белого экрана
-    не бывает ни при какой ошибке.
+    Возвращает `{'rows': [...], 'note': str, 'usage': {...},
+    'cached': bool, 'hints': [...]}`. Любой отказ приходит человеческим
+    текстом — белого экрана не бывает ни при какой ошибке.
     """
-    if not is_available():
-        raise GeneratorUnavailable(unavailable_reason())
-
     text = (text or '').strip()
     if not text:
-        raise GeneratorUnavailable('Опишите домашку словами — по пустому '
-                                   'описанию подбирать нечего.')
+        raise ai.AiUnavailable('Опишите домашку словами — по пустому '
+                               'описанию подбирать нечего.')
+    if not ai.is_available():
+        raise ai.AiUnavailable(ai.unavailable_reason())
 
-    key = _cache_key(text, params)
-    cached = cache.get(key)
-    if cached is not None:
-        # Тот же запрос в пределах короткого времени не гоняем повторно.
-        result = dict(cached)
-        result['cached'] = True
-        return result
+    hints = search_hints(text)
+    result = ai.run('homework_plan', _user_prompt(text, params, hints),
+                    PLAN_SCHEMA, user)
 
-    limit = daily_limit()
-    if used_today(user) >= limit:
-        raise GeneratorUnavailable(
-            'На сегодня лимит обращений исчерпан (%d в сутки). Соберите '
-            'домашку вручную или попробуйте завтра.' % limit)
-
-    plan = _ask_model(text, params, user)
-    cache.set(key, plan, _setting('AI_GENERATOR_CACHE_SECONDS',
-                                  DEFAULT_CACHE_SECONDS))
-    plan = dict(plan)
-    plan['cached'] = False
-    return plan
-
-
-def _ask_model(text, params, user):
-    import anthropic
-
-    from .models import AiUsageLog
-
-    model = _setting('AI_GENERATOR_MODEL', DEFAULT_MODEL)
-    topics = canonical_topics()
-    wanted = int(params.get('count') or 5)
-
-    user_prompt = (
-        'Список тем (выбирай ТОЛЬКО из него):\n'
-        + '\n'.join('- ' + name for name in topics)
-        + '\n\nПараметры от репетитора:\n'
-        + '- всего задач: %d\n' % wanted
-        + '- сложность: от %s до %s\n' % (params.get('min_difficulty') or 1,
-                                          params.get('max_difficulty') or 5)
-        + ('- заданные темы: %s\n' % ', '.join(params['topics'])
-           if params.get('topics') else '')
-        + '\nОписание домашки словами:\n' + text
-    )
-
-    client = anthropic.Anthropic(api_key=api_key())
-    try:
-        response = client.messages.create(
-            model=model,
-            max_tokens=2000,
-            system=SYSTEM_PROMPT,
-            messages=[{'role': 'user', 'content': user_prompt}],
-            output_config={'format': {'type': 'json_schema',
-                                      'schema': PLAN_SCHEMA}},
-        )
-    except anthropic.APIConnectionError:
-        _log_usage(user, model, 0, 0, ok=False, note='нет сети')
-        raise GeneratorUnavailable(
-            'Не удалось связаться с сервисом разбора запроса. Проверьте сеть '
-            'или соберите домашку вручную.')
-    except anthropic.RateLimitError:
-        _log_usage(user, model, 0, 0, ok=False, note='rate limit')
-        raise GeneratorUnavailable(
-            'Сервис разбора сейчас перегружен. Попробуйте через минуту или '
-            'соберите домашку вручную.')
-    except anthropic.APIStatusError as error:
-        _log_usage(user, model, 0, 0, ok=False,
-                   note='status %s' % error.status_code)
-        raise GeneratorUnavailable(
-            'Сервис разбора вернул ошибку (%s). Соберите домашку вручную.'
-            % error.status_code)
-
-    usage = _log_usage(user, model, response.usage.input_tokens,
-                       response.usage.output_tokens)
-
-    raw = ''.join(block.text for block in response.content
-                  if block.type == 'text')
-    try:
-        data = json.loads(raw)
-    except ValueError:
-        raise GeneratorUnavailable(
-            'Разбор запроса вернул неожиданный ответ. Попробуйте описать '
-            'домашку иначе или соберите её вручную.')
-
-    rows = _clean_rows(data.get('rows'), topics, params)
+    rows = _clean_rows(result.data.get('rows'), params)
     if not rows:
-        raise GeneratorUnavailable(
-            'Из описания не удалось понять, какие темы нужны. Уточните '
-            'описание или выберите темы в фильтрах.')
-    return {'rows': rows, 'note': (data.get('note') or '').strip(),
-            'usage': usage}
+        # Даже здесь не сдаёмся молча: одна строка на всю фразу — это
+        # ровно то, что репетитор и написал, и поиск с ней справится.
+        rows = [{'label': text[:120], 'query': text, 'topic': '',
+                 'difficulty': _middle(params),
+                 'count': int(params.get('count') or 5)}]
+    return {'rows': rows, 'note': (result.data.get('note') or '').strip(),
+            'usage': result.usage, 'cached': result.cached, 'hints': hints}
 
 
-def _clean_rows(rows, topics, params):
+def _middle(params):
+    low = int(params.get('min_difficulty') or 1)
+    high = int(params.get('max_difficulty') or 5)
+    return max(low, min(high, (low + high) // 2))
+
+
+def _user_prompt(text, params, hints):
+    """ВСЁ переменное живёт здесь и только здесь.
+
+    ⚠️ В системную часть (ядро + профиль) не попадает ни одно изменяемое
+    слово — иначе кэш префикса перестанет срабатывать: совпадение
+    проверяется побайтно.
+    """
+    lines = ['Параметры от репетитора:',
+             '- всего задач: %d' % int(params.get('count') or 5),
+             '- сложность: от %s до %s' % (params.get('min_difficulty') or 1,
+                                           params.get('max_difficulty') or 5)]
+    if params.get('topics'):
+        lines.append('- заданные темы: %s' % ', '.join(params['topics']))
+
+    lines.append('')
+    lines.append('Описание домашки словами репетитора:')
+    lines.append(text)
+
+    lines.append('')
+    lines.append('Список тем платформы (подсказка для поля topic; если '
+                 'подходящей нет — оставь пустую строку):')
+    lines.extend('- ' + name for name in canonical_topics())
+
+    lines.append('')
+    if hints:
+        lines.append('Задачи, которые УЖЕ НАШЛИСЬ в банке по этому описанию '
+                     '(название — темы). Это словарь банка, а не образец '
+                     'ответа:')
+        for hint in hints:
+            lines.append('- %s — %s' % (
+                hint['title'], ', '.join(hint['topics']) or 'тема не указана'))
+    else:
+        lines.append('По этому описанию поиск ничего не нашёл. Разбей фразу '
+                     'по словам репетитора, тему оставь пустой.')
+    return '\n'.join(lines)
+
+
+def _clean_rows(rows, params):
     """Приводим ответ модели к тому, что мы умеем искать.
 
-    ⚠️ Тему, которой нет в меню, НЕ выбрасываем молча и не подставляем
-    наугад: пытаемся сопоставить по названию, а не совпало — отбрасываем
-    строку. Придуманная тема всё равно ничего не найдёт.
+    ⚠️ Тема больше НЕ отбрасывает строку. Раньше строка с темой, которой
+    нет в меню, выбрасывалась целиком — и вместе с ней исчезала часть
+    просьбы репетитора. Теперь несопоставленная тема просто становится
+    пустой: искать всё равно будем по СЛОВАМ репетитора, а тема лишь
+    подсказывает порядок.
     """
+    topics = canonical_topics()
     by_lower = {name.lower(): name for name in topics}
     low = int(params.get('min_difficulty') or 1)
     high = int(params.get('max_difficulty') or 5)
@@ -278,90 +221,244 @@ def _clean_rows(rows, topics, params):
     for row in (rows or [])[:MAX_ROWS]:
         if not isinstance(row, dict):
             continue
+        query = str(row.get('query') or '').strip()[:200]
+        label = str(row.get('label') or query).strip()[:200]
+        if not query:
+            continue
         name = str(row.get('topic') or '').strip()
-        topic = by_lower.get(name.lower())
-        if topic is None:
+        topic = by_lower.get(name.lower(), '')
+        if not topic and name:
             for candidate in topics:
-                if name and (name.lower() in candidate.lower()
-                             or candidate.lower() in name.lower()):
+                if (name.lower() in candidate.lower()
+                        or candidate.lower() in name.lower()):
                     topic = candidate
                     break
-        if topic is None:
-            continue
         try:
             difficulty = int(row.get('difficulty'))
+        except (TypeError, ValueError):
+            difficulty = _middle(params)
+        try:
             count = int(row.get('count'))
         except (TypeError, ValueError):
-            continue
-        difficulty = max(1, min(5, difficulty))
-        # Границы сложности задал репетитор — модель их не переопределяет,
-        # кроме «одной посложнее», которая всё равно упирается в потолок.
-        difficulty = max(low, min(high, difficulty))
-        count = max(1, min(MAX_PROBLEMS, count))
-        cleaned.append({'topic': topic, 'difficulty': difficulty,
-                        'count': count,
-                        'query': str(row.get('query') or topic).strip()[:200]})
-    return cleaned
+            count = 1
+        cleaned.append({
+            'label': label,
+            'query': query,
+            'topic': topic,
+            'difficulty': max(low, min(high, max(1, min(5, difficulty)))),
+            'count': max(1, min(MAX_PROBLEMS, count)),
+        })
+    return _fit_total(cleaned, int(params.get('count') or 5))
 
 
-def _log_usage(user, model, input_tokens, output_tokens, ok=True, note=''):
-    from .models import AiUsageLog
+def _fit_total(rows, wanted):
+    """Сумма по строкам обязана равняться запрошенному числу задач.
 
-    prices = _setting('AI_GENERATOR_PRICES', DEFAULT_PRICES)
-    price_in, price_out = prices.get(model, DEFAULT_PRICES[DEFAULT_MODEL])
-    cost = (Decimal(input_tokens) * Decimal(str(price_in))
-            + Decimal(output_tokens) * Decimal(str(price_out))) / Decimal(10 ** 6)
-    cost = cost.quantize(Decimal('0.000001'))
-    try:
-        AiUsageLog.objects.create(
-            user=user, model_name=model, input_tokens=input_tokens,
-            output_tokens=output_tokens, cost_usd=cost, ok=ok, note=note)
-    except Exception:
-        logger.exception('Не удалось записать расход на ИИ — основной '
-                         'сценарий не тронут')
-    return {'input_tokens': input_tokens, 'output_tokens': output_tokens,
-            'cost_usd': float(cost), 'model': model}
+    Модель считает неплохо, но «пять задач» — это обещание пользователю, а
+    не пожелание модели. Расхождение правим сами: лишнее снимаем с конца,
+    недостающее добавляем в последнюю строку.
+    """
+    if not rows or wanted <= 0:
+        return rows
+    total = sum(row['count'] for row in rows)
+    while total > wanted:
+        for row in reversed(rows):
+            if row['count'] > 1 and total > wanted:
+                row['count'] -= 1
+                total -= 1
+            elif total > wanted and len(rows) > 1 and row['count'] == 1:
+                rows.remove(row)
+                total -= 1
+                break
+        else:
+            break
+    if total < wanted:
+        rows[-1]['count'] += wanted - total
+    return rows
 
 
 # ---------------------------------------------------------------------------
-# Шаг 2. Подбор задач — бесплатно, по уже посчитанным эмбеддингам
+# Шаг 3. Подбор задач — бесплатно, обращений к модели не стоит
 # ---------------------------------------------------------------------------
 
 def find_problems(rows, has_solution=False, sources=None, exclude=()):
-    """Каждая строка плана → свой поиск. Возвращает (найденное, пустые строки).
+    """Каждая строка плана → свой поиск. Возвращает (найденное, недобор).
 
-    ⚠️ ДЕДУПЛИКАЦИЯ И РАЗБРОС ПО ИСТОЧНИКАМ здесь, а не «как-нибудь потом».
-    Два запроса по монополии вернут одну задачу дважды, а поиск любит
-    отдавать подряд пять задач из одного сборника — на листке это видно
-    сразу.
+    ⚠️ КВОТА ЗАПОЛНЯЕТСЯ ВСЕГДА. «Не хватило задач» — не результат:
+    репетитор просил пять задач, а получал три и предупреждение. Порядок
+    отступления такой:
+      1. кандидаты своей строки (смысл + слова, тема — бонус к рангу);
+      2. те же кандидаты, но с ослабленным потолком по источнику;
+      3. добор из общего поиска по ФРАЗЕ ЦЕЛИКОМ.
+    Порога похожести как жёсткой отсечки нет вовсе — он и раньше только
+    прятал задачи, а не улучшал их.
+
+    ⚠️ НО ЧЕСТНО ПОМЕЧАЕМ. У каждой задачи есть `confidence`: точное
+    совпадение / близко / ближайшее что нашлось. Молча подсунуть чужую
+    задачу нельзя — репетитор потом не поймёт, откуда она взялась.
     """
+    from catalog import hybrid
+
     found = []
     taken = set(exclude)
     per_source = {}
-    empty_rows = []
+    short_rows = []
 
     for index, row in enumerate(rows):
-        candidates = _search_row(row, has_solution=has_solution,
-                                 sources=sources)
-        picked = 0
-        for problem in candidates:
-            if picked >= row['count']:
-                break
-            if problem.pk in taken:
-                continue
-            source = _source_of(problem)
-            # Не больше трёх задач подряд из одного источника на всю
-            # подборку: иначе «домашка» превращается в кусок одного сборника.
-            if source and per_source.get(source, 0) >= 3:
-                continue
-            taken.add(problem.pk)
-            per_source[source] = per_source.get(source, 0) + 1
-            found.append({'problem': problem, 'row': index})
-            picked += 1
+        candidates = search_row(row, has_solution=has_solution,
+                                sources=sources)
+        picked = _take(candidates, row['count'], taken, per_source,
+                       found, index, cap=SOURCE_CAP)
         if picked < row['count']:
-            empty_rows.append({'row': index, 'missing': row['count'] - picked,
-                               'topic': row['topic']})
-    return found, empty_rows
+            # Потолок по источнику — предпочтение, а не запрет. Лучше
+            # пять задач из двух сборников, чем три и извинение.
+            picked += _take(candidates, row['count'] - picked, taken,
+                            per_source, found, index, cap=None)
+        if picked < row['count']:
+            short_rows.append({'row': index, 'missing': row['count'] - picked,
+                               'label': row['label']})
+
+    # Добор: то, чего не хватило строкам, берём из общего поиска и честно
+    # помечаем как «ближайшее что нашлось».
+    missing = sum(item['missing'] for item in short_rows)
+    if missing:
+        whole = ' '.join(row['query'] for row in rows)
+        extra = _materialise(hybrid.search(whole, limit=missing * 6 + 12),
+                             has_solution, sources)
+        added = _take(extra, missing, taken, per_source, found,
+                      short_rows[0]['row'], cap=None, force_far=True)
+        if added:
+            missing -= added
+    if missing:
+        # Последний рубеж: просто опубликованные задачи подходящей
+        # сложности. Пустая строка в подборке хуже неточной задачи —
+        # неточную видно и можно заменить одной кнопкой.
+        extra = _materialise(_any_problems(rows, missing * 4), has_solution,
+                             sources)
+        _take(extra, missing, taken, per_source, found,
+              short_rows[0]['row'], cap=None, force_far=True)
+
+    still_short = _recount(rows, found)
+    return found, still_short
+
+
+def _recount(rows, found):
+    """Чего в итоге не хватило. Считаем ПО ФАКТУ, а не по намерению."""
+    by_row = {}
+    for item in found:
+        by_row[item['row']] = by_row.get(item['row'], 0) + 1
+    short = []
+    for index, row in enumerate(rows):
+        got = by_row.get(index, 0)
+        if got < row['count']:
+            short.append({'row': index, 'missing': row['count'] - got,
+                          'label': row['label']})
+    return short
+
+
+def _take(candidates, need, taken, per_source, found, row_index, cap,
+          force_far=False):
+    """Берёт до `need` задач, соблюдая потолок по источнику, если он задан."""
+    picked = 0
+    for candidate in candidates:
+        if picked >= need:
+            break
+        problem = candidate['problem']
+        if problem.pk in taken:
+            continue
+        source = _source_of(problem)
+        if cap is not None and source and per_source.get(source, 0) >= cap:
+            continue
+        taken.add(problem.pk)
+        if source:
+            per_source[source] = per_source.get(source, 0) + 1
+        found.append({
+            'problem': problem,
+            'row': row_index,
+            'confidence': 'far' if force_far else candidate['confidence'],
+            'how': candidate.get('how', ''),
+        })
+        picked += 1
+    return picked
+
+
+def search_row(row, has_solution=False, sources=None):
+    """Кандидаты под ОДНУ строку плана. Обращений к модели не стоит.
+
+    ⚠️ ТЕМА — БОНУС К РАНГУ, А НЕ ФИЛЬТР. Именно жёсткий фильтр по теме и
+    схлопнул выдачу на живом запросе: модель ошиблась темой, и правильные
+    задачи, которые поиск уже нашёл, были выброшены до показа.
+    """
+    from catalog import hybrid
+
+    limit = row['count'] * 8 + 12
+    hits = hybrid.search(row['query'], limit=limit)
+    items = _materialise(hits, has_solution, sources)
+    return _rank(items, row)
+
+
+def _materialise(hits, has_solution, sources):
+    """id из поиска → сами задачи, в том же порядке."""
+    from catalog import hybrid
+    from problems.models import Problem
+
+    ids = [hit['id'] for hit in hits]
+    if not ids:
+        return []
+    queryset = Problem.objects.filter(pk__in=ids).prefetch_related(
+        'topics', 'source_references')
+    if has_solution:
+        queryset = queryset.exclude(solution='').filter(solution__isnull=False)
+    by_id = {p.pk: p for p in queryset}
+
+    allowed = {int(s) for s in (sources or []) if str(s).isdigit()}
+    items = []
+    for hit in hits:
+        problem = by_id.get(hit['id'])
+        if problem is None:
+            continue
+        if allowed and not any(r.source_id in allowed
+                               for r in problem.source_references.all()):
+            continue
+        items.append({'problem': problem, 'hit': hit,
+                      'confidence': hybrid.confidence(hit),
+                      'how': hit.get('how', '')})
+    return items
+
+
+def _rank(items, row):
+    """Порядок с учётом темы и сложности. Ничего не выбрасывает."""
+    topic = (row.get('topic') or '').strip().lower()
+    wanted = row.get('difficulty')
+
+    def key(item, order=[0]):
+        problem = item['problem']
+        bonus = 0.0
+        if topic and any((t.name or '').lower() == topic
+                         for t in problem.topics.all()):
+            bonus += 0.5
+        if wanted and problem.difficulty:
+            # Близкая сложность лучше далёкой, но задача другой сложности
+            # всё равно лучше пустого места.
+            bonus += 0.25 / (1 + abs(int(problem.difficulty) - int(wanted)))
+        return -(item['hit']['score'] * 10 + bonus)
+
+    return sorted(items, key=key)
+
+
+def _any_problems(rows, limit):
+    """Последний рубеж добора: опубликованные задачи подходящей сложности."""
+    from problems.models import Problem
+
+    levels = {row['difficulty'] for row in rows if row.get('difficulty')}
+    queryset = Problem.objects.filter(status=Problem.Status.PUBLISHED,
+                                      needs_quality_review=False)
+    queryset = queryset.exclude(problem_type__istartswith='тест')
+    if levels:
+        queryset = queryset.filter(difficulty__in=list(levels))
+    ids = list(queryset.order_by('?').values_list('id', flat=True)[:limit])
+    return [{'id': pid, 'how': '', 'dense_score': None, 'term_hits': 0,
+             'term_total': 0, 'score': 0.0} for pid in ids]
 
 
 def _source_of(problem):
@@ -369,70 +466,51 @@ def _source_of(problem):
     return reference[0].source_id if reference else None
 
 
-def _search_row(row, has_solution=False, sources=None):
-    """Кандидаты под одну строку плана.
+def problem_card(problem, confidence='', how=''):
+    """Как задача выглядит на экране подтверждения и в корзине."""
+    from catalog import hybrid
 
-    Сначала пробуем семантический поиск (эмбеддинги уже посчитаны, платить
-    не за что). Модели нет на машине — честно откатываемся на фильтры и
-    поиск по тексту: это хуже, но работает и ничего не выдумывает.
+    return {
+        'problem': problem,
+        'id': problem.pk,
+        'title': preview_title(problem, limit=90),
+        'preview': clean((problem.statement or ''))[:220],
+        'topics': ', '.join(t.name for t in problem.topics.all()
+                            if t.name != 'Тест'),
+        'difficulty': problem.difficulty,
+        'confidence': confidence,
+        'confidence_label': hybrid.CONFIDENCE_LABELS.get(confidence, ''),
+        'how': how,
+    }
+
+
+def preview_rows(rows, has_solution=False, sources=None, per_row=3):
+    """Что нашлось по каждой строке — для экрана подтверждения.
+
+    ⚠️ СТОП-ГЕЙТ ПОКАЗЫВАЕТ ЗАДАЧИ, А НЕ ТЕМЫ. Раньше на нём стояли темы,
+    выбранные моделью, и проверить их репетитор не мог: нашей таксономии он
+    не знает. Именно там и пряталась ошибка с КТВ — «Альтернативные
+    издержки и КПВ» выглядит правдоподобно, пока не увидишь, что нашлось.
+    Названия двух-трёх задач репетитор проверяет за пять секунд.
+
+    Обращений к модели не стоит — это тот же поиск по банку.
     """
-    from problems.models import Problem
+    from catalog import hybrid
 
-    limit = row['count'] * 6 + 6
-    try:
-        from catalog import semantic
-
-        hits = semantic.search(row['query'], topic_id=_topic_id(row['topic']),
-                               difficulty=row['difficulty'],
-                               has_solution=has_solution, limit=limit)
-        problems = [hit['problem'] for hit in hits]
-        if problems:
-            return _apply_filters(problems, sources)
-    except Exception:
-        logger.info('Семантический поиск недоступен — идём по фильтрам',
-                    exc_info=True)
-
-    queryset = Problem.objects.filter(status=Problem.Status.PUBLISHED,
-                                      needs_quality_review=False)
-    topic_id = _topic_id(row['topic'])
-    if topic_id:
-        queryset = queryset.filter(topics__id=topic_id)
-    if row['difficulty']:
-        queryset = queryset.filter(difficulty=row['difficulty'])
-    if has_solution:
-        queryset = queryset.exclude(solution='')
-    words = [w for w in re.split(r'\W+', row['query']) if len(w) > 4][:2]
-    if words:
-        from django.db.models import Q
-
-        condition = Q()
-        for word in words:
-            condition |= Q(statement__icontains=word)
-        queryset = queryset.filter(condition)
-    problems = list(queryset.prefetch_related('topics', 'source_references')
-                    .order_by('?')[:limit])
-    if not problems and topic_id:
-        problems = list(
-            Problem.objects.filter(status=Problem.Status.PUBLISHED,
-                                   needs_quality_review=False,
-                                   topics__id=topic_id)
-            .prefetch_related('topics', 'source_references')
-            .order_by('?')[:limit])
-    return _apply_filters(problems, sources)
-
-
-def _apply_filters(problems, sources):
-    if not sources:
-        return problems
-    allowed = {int(s) for s in sources if str(s).isdigit()}
-    if not allowed:
-        return problems
-    return [p for p in problems
-            if any(r.source_id in allowed for r in p.source_references.all())]
-
-
-def _topic_id(name):
-    from problems.models import Topic
-
-    topic = Topic.objects.filter(name=name).first()
-    return topic.pk if topic else None
+    previews = []
+    for index, row in enumerate(rows):
+        items = search_row(row, has_solution=has_solution, sources=sources)
+        cards = [problem_card(item['problem'], item['confidence'],
+                              item.get('how', ''))
+                 for item in items[:per_row]]
+        best = items[0]['confidence'] if items else 'far'
+        previews.append({
+            'index': index,
+            'row': row,
+            'cards': cards,
+            'total': len(items),
+            'confidence': best if items else '',
+            'confidence_label': (hybrid.CONFIDENCE_LABELS.get(best, '')
+                                 if items else 'ничего не нашлось'),
+        })
+    return previews
