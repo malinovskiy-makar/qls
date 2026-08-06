@@ -378,10 +378,21 @@ input[type="number"].form-input {
         </div>
 
         {% if work_review_url %}
+        {% comment %}
+        Подпись говорит, ЧТО именно откроется и ЧЬЮ работу: раньше здесь
+        стояла одна строка ссылкой, и было непонятно, тот это экран или нет.
+        {% endcomment %}
         <div class="form-group">
-          <a href="{{ work_review_url }}" class="btn-back" style="display:inline-block;">
-            Посмотреть работу глазами ученика →
+          <a href="{{ work_review_url }}" class="btn-back"
+             style="display:inline-block;">
+            Открыть разбор всей работы глазами ученика →
           </a>
+          <div class="existing-note">
+            Та же страница, что видит
+            {{ work_review_student.get_full_name|default:work_review_student.username }}:
+            все задачи работы, его ответы, верные ответы и итоговый балл.
+            Проверять оттуда нельзя — оценка ставится здесь.
+          </div>
         </div>
         {% endif %}
 

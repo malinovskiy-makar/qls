@@ -106,7 +106,24 @@ def item_max_score(item):
 
 
 def part_correct_answer(item, part):
-    """Эталонный ответ на пункт (или на задачу целиком, если пункт None)."""
+    """Эталонный ответ на пункт (или на задачу целиком, если пункт None).
+
+    ⚠️ УТВЕРЖДЁННЫЙ РЕПЕТИТОРОМ ОТВЕТ ГЛАВНЕЕ КАТАЛОЖНОГО. Каталог
+    остаётся нетронутым, но проверяется то, что подтвердил живой человек
+    (`AssignmentItem.answer_override`). Так задача без ответа становится
+    автопроверяемой, а задача с «ответом», который на самом деле фраза из
+    решения, — перестаёт калечить оценку.
+    """
+    approved = item.approved_answer(part)
+    if approved:
+        return approved
+    if part is not None:
+        return (part.answer or '').strip()
+    return (item.correct_answer or '').strip()
+
+
+def catalog_answer_for(item, part):
+    """Что предлагает КАТАЛОГ — для показа рядом с полем утверждения."""
     if part is not None:
         return (part.answer or '').strip()
     return (item.correct_answer or '').strip()
@@ -149,11 +166,94 @@ def item_answer_form(item):
     options = [{'value': p.label, 'label': p.statement, 'is_html': True,
                 'part_label': p.label}
                for p in parts]
-    # «Один ответ» — переключатель; «все верные» и «верно/неверно» — галочки
-    # (в обоих случаях ученик отмечает ПОДМНОЖЕСТВО утверждений).
-    if ptype == 'тест: один ответ':
-        return ANSWER_RADIO, options
-    return ANSWER_CHECKBOX, options
+    # ⚠️ ГАЛОЧКИ ТОЛЬКО У «ВСЕХ ВЕРНЫХ». «Верно/неверно» раньше тоже рисовался
+    # галочками — и ученик мог отметить «Верно» И «Неверно» одновременно.
+    # Замер по банку: из 455 задач этого типа 454 устроены как ОДНО
+    # утверждение с двумя вариантами «Верно»/«Неверно», то есть это выбор
+    # ОДНОГО варианта, а не подмножества. Единственное исключение —
+    # наша собственная демо-задача с враньём в типе (починена в seed).
+    if ptype == 'тест: все верные':
+        return ANSWER_CHECKBOX, options
+    return ANSWER_RADIO, options
+
+
+def correct_option_values(item):
+    """Множество ЗНАЧЕНИЙ верных вариантов — в той же системе, что `value`
+    у `item_answer_form`. У каталожного теста это метки («а»), у своей
+    задачи — id вариантов.
+
+    Одна функция на оба вида: разбор работы, автопроверка и экспорт обязаны
+    считать «верное» одинаково, иначе ученик увидит зелёную галочку там, где
+    ему поставили ноль.
+    """
+    from .answer_check import catalog_test_correct_labels, normalize_label
+
+    if item.is_custom:
+        problem = item.custom_problem
+        if problem is None:
+            return set()
+        return {str(pk) for pk in problem.correct_option_ids()}
+    problem = item.catalog_problem
+    if problem is None:
+        return set()
+    return {normalize_label(label)
+            for label in catalog_test_correct_labels(problem)}
+
+
+def option_review(item, submission):
+    """Варианты глазами разбора: что ученик выбрал и что было верным.
+
+    ⚠️ ЗАЧЕМ. В разборе ответ ученика показывался ТЕКСТОМ («Технология
+    производства, Цены на ресурсы»), а верный ответ — БУКВАМИ («а, б, г»).
+    Сверить это глазами невозможно: чтобы понять, где ошибся, ученику надо
+    было держать в голове соответствие «буква ↔ формулировка».
+
+    Возвращает список вариантов с полем `state`, у которого ровно четыре
+    значения — по числу настоящих исходов:
+      `hit`    — выбрал, и это верный вариант;
+      `wrong`  — выбрал, а вариант неверный;
+      `missed` — не выбрал, а надо было;
+      `skip`   — не выбрал, и правильно сделал.
+    Пустой список означает «у задачи нет вариантов» — тогда разбор рисует
+    обычный ответ строкой.
+    """
+    from .answer_check import normalize_label
+
+    kind, options = item_answer_form(item)
+    if kind == ANSWER_TEXT or not options:
+        return []
+
+    raw = (submission.submitted_answer or '') if submission is not None else ''
+    chosen = selected_values(raw)
+    if not item.is_custom:
+        # У каталожного теста значение — метка, и она приходит из формы в
+        # том виде, в каком её напечатал шаблон: «б» и «Б)» это один вариант.
+        chosen = {normalize_label(value) for value in chosen}
+    correct = correct_option_values(item)
+
+    rows = []
+    for option in options:
+        value = (normalize_label(option['value']) if not item.is_custom
+                 else str(option['value']))
+        is_chosen = value in chosen
+        is_correct = value in correct
+        if is_chosen and is_correct:
+            state = 'hit'
+        elif is_chosen:
+            state = 'wrong'
+        elif is_correct:
+            state = 'missed'
+        else:
+            state = 'skip'
+        rows.append({
+            'label': option.get('part_label') or '',
+            'text': option['label'],
+            'is_html': option.get('is_html', False),
+            'chosen': is_chosen,
+            'correct': is_correct,
+            'state': state,
+        })
+    return rows
 
 
 def get_or_create_submission(student, assignment, item):
@@ -370,8 +470,13 @@ def build_rows(assignment, student, user=None, with_comments=True):
             'answer_parts': _part_rows(item, submission, stored),
             'has_real_parts': _has_real_parts(item),
             # Верный ответ показываем только после сдачи — до неё это
-            # подсказка, а не обратная связь.
+            # подсказка, а не обратная связь. По той же причине разбор
+            # вариантов СОБИРАЕТСЯ только после сдачи: положить его в
+            # контекст страницы решения значило бы отдать ответы браузеру.
             'show_correct': submission.status in ('submitted', 'reviewed'),
+            'option_review': (option_review(item, submission)
+                              if submission.status in ('submitted', 'reviewed')
+                              else []),
             'answer_name': answer_input_name(item),
             'solution_name': solution_input_name(item),
             'file_name': file_input_name(item),

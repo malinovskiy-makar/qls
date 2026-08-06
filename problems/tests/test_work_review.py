@@ -16,7 +16,7 @@ from problems.models import (
     Assignment, AssignmentItem, MistakeTag, ProblemPart, StudentGroup,
     Submission, WorkFeedback,
 )
-from problems.tests.factories import make_problem, make_user
+from problems.tests.factories import approve_answers, make_problem, make_user
 
 
 def costs_problem():
@@ -41,12 +41,12 @@ class WorkReviewTests(TestCase):
             name='Домашка №9', author=self.tutor, group=self.group,
             deadline=timezone.now() + timedelta(days=1))
         self.homework.students.add(self.student)
-        self.item = AssignmentItem.objects.create(
+        self.item = approve_answers(AssignmentItem.objects.create(
             assignment=self.homework, order=0, catalog_problem=costs_problem(),
-            points=Decimal('2'))
-        self.open_item = AssignmentItem.objects.create(
+            points=Decimal('2')))
+        self.open_item = approve_answers(AssignmentItem.objects.create(
             assignment=self.homework, order=1,
-            catalog_problem=make_problem('Открытая'), points=Decimal('8'))
+            catalog_problem=make_problem('Открытая'), points=Decimal('8')))
         self.parts = answer_parts(self.item)
         self.client.force_login(self.student)
 
@@ -155,9 +155,9 @@ class TutorSeesTheSameScreenTests(TestCase):
         self.homework = Assignment.objects.create(
             name='ДЗ', author=self.tutor, group=self.group)
         self.homework.students.add(self.student)
-        self.item = AssignmentItem.objects.create(
+        self.item = approve_answers(AssignmentItem.objects.create(
             assignment=self.homework, order=0,
-            catalog_problem=make_problem('Задача'), points=Decimal('5'))
+            catalog_problem=make_problem('Задача'), points=Decimal('5')))
         self.client.force_login(self.student)
         self.client.post(
             reverse('student:submit_assignment', args=[self.homework.pk]),
@@ -198,9 +198,9 @@ class ExamReviewTests(TestCase):
             ends_at=now + timedelta(hours=1),
             deadline=now + timedelta(hours=1))
         self.exam.students.add(self.student)
-        AssignmentItem.objects.create(
+        approve_answers(AssignmentItem.objects.create(
             assignment=self.exam, order=0,
-            catalog_problem=make_problem('Задача', answer='7'), points=3)
+            catalog_problem=make_problem('Задача', answer='7'), points=3))
         self.client.force_login(self.student)
 
     def test_exam_result_redirects_to_the_single_screen(self):
@@ -240,10 +240,10 @@ class QueryCountTests(TestCase):
         homework.students.add(student)
         payload = {}
         for index in range(8):
-            item = AssignmentItem.objects.create(
+            item = approve_answers(AssignmentItem.objects.create(
                 assignment=homework, order=index,
                 catalog_problem=make_problem('Задача %d' % index, answer='1'),
-                points=Decimal('2'))
+                points=Decimal('2')))
             payload[answer_input_name(item)] = '1'
         self.client.force_login(student)
         self.client.post(

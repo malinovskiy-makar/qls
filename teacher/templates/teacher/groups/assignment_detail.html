@@ -21,6 +21,35 @@
 .summary-label { font-size: 11px; color: var(--text2); text-transform: uppercase;
                  letter-spacing: .04em; }
 .summary-value { font-size: 16px; font-weight: 600; margin-top: 4px; }
+
+/* ── Утверждение ответов (Фаза 0.6) ────────────────────────────
+   Задача без утверждения обязана бросаться в глаза: репетитор должен
+   понимать, что она уйдёт на ручную проверку. Янтарь тут в своём смысле
+   «требует внимания», акцентный малиновый не используется. */
+.ap-badge { margin-left: auto; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; padding: 3px 9px;
+  border-radius: 999px; white-space: nowrap; }
+.ap-on  { background: var(--green-tint); color: var(--green); }
+.ap-off { background: var(--amber-tint); color: var(--amber);
+          border: 1px solid var(--amber-border); }
+.ans-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+           margin-bottom: 8px; }
+.ans-label { flex: none; min-width: 54px; font-size: 13px; font-weight: 600;
+             color: var(--text2); }
+.ans-input { flex: 1; min-width: 160px; font: inherit; font-size: 14px;
+  padding: 7px 10px; border-radius: var(--r); background: var(--surface-2);
+  border: 1px solid var(--border); color: var(--text); outline: none; }
+.ans-input:focus { border-color: var(--accent); }
+.ans-src { font-size: 12px; color: var(--text2); }
+.ans-none { font-style: italic; }
+.ans-actions { display: flex; gap: 10px; align-items: center;
+               flex-wrap: wrap; margin-top: 12px; }
+.ans-status { font-size: 12px; color: var(--text2); }
+@media (max-width: 560px) {
+  .ap-badge { margin-left: 0; }
+  .ans-label { min-width: 0; }
+  .ans-input { min-width: 0; width: 100%; }
+}
 {% endblock %}
 
 {% block content %}
@@ -107,6 +136,13 @@
       {% if row.item.points %} · {{ row.item.points|floatformat:"-2" }} б.{% endif %}
       {% if row.item.is_test %} · тест{% endif %}
     </span>
+    {% if row.answer_rows %}
+    <span class="ap-badge {% if row.answers_approved %}ap-on{% else %}ap-off{% endif %}"
+          data-badge="{{ row.item.pk }}">
+      {% if row.answers_approved %}проверяется автоматически
+      {% else %}уйдёт на ручную проверку{% endif %}
+    </span>
+    {% endif %}
   </div>
 
   <div class="problem-statement">{{ row.item.statement|linebreaksbr }}</div>
@@ -131,10 +167,54 @@
   </ul>
   {% endif %}
 
+  {% if row.answer_rows %}
+  {% comment %}
+  ⚠️ Здесь репетитор видит, ЧТО ИМЕННО уйдёт в автопроверку, и отвечает за
+  это своим нажатием. Без утверждения задача проверяется человеком — в
+  банке «ответом» нередко записана фраза целиком или число из середины
+  решения, и машина по такому эталону ставит незаслуженный ноль. Пишем в
+  позицию задания, каталог не трогаем.
+  {% endcomment %}
+  <details class="fold ans-block" data-item="{{ row.item.pk }}"
+           {% if not row.answers_approved %}open{% endif %}>
+    <summary>
+      Что проверяется автоматически
+      {% if not row.answers_approved %}— не утверждено{% endif %}
+    </summary>
+    <div class="fold-body">
+      <div class="row-meta" style="margin-bottom:10px;">
+        Ответ из каталога — подсказка, а не истина: проверять машина будет
+        только то, что вы утвердите. Правка здесь меняет ТОЛЬКО эту работу,
+        каталог остаётся как был.
+      </div>
+      {% for arow in row.answer_rows %}
+      <div class="ans-row">
+        <label class="ans-label">
+          {% if arow.label %}{{ arow.label }}){% else %}Ответ{% endif %}
+        </label>
+        <input type="text" class="ans-input" data-key="{{ arow.key }}"
+               value="{{ arow.approved|default:arow.from_catalog }}"
+               placeholder="{% if arow.from_catalog %}{{ arow.from_catalog }}{% else %}ответа в каталоге нет — впишите свой{% endif %}">
+        {% if arow.from_catalog %}
+        <span class="ans-src">из каталога: {{ arow.from_catalog }}</span>
+        {% else %}
+        <span class="ans-src ans-none">в каталоге ответа нет</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+      <div class="ans-actions">
+        <button type="button" class="pf-btn ans-save">Утвердить</button>
+        <button type="button" class="pf-btn ans-clear">Снять утверждение</button>
+        <span class="ans-status"></span>
+      </div>
+    </div>
+  </details>
+  {% else %}
   <details class="fold">
     <summary>Правильный ответ</summary>
     <div class="fold-body">{{ row.item.correct_answer|default:"не задан"|linebreaksbr }}</div>
   </details>
+  {% endif %}
 
   {# --- Фаза 20: эталонное решение и правила показа --- #}
   <details class="fold sol-block" data-item="{{ row.item.pk }}">
@@ -316,6 +396,62 @@
     });
     block.querySelector('.sol-release').addEventListener('click', function () {
       send(block, { release_now: true }, status);
+    });
+  });
+})();
+</script>
+
+<script>
+// Утверждение того, что уйдёт в автопроверку. Отдельным запросом на задачу:
+// в задании их бывает десять, и отправлять все ради правки одной — верный
+// способ затереть правку из соседней вкладки.
+(function () {
+  var url = "{% url 'teacher:api_item_answers' %}";
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+
+  function paintBadge(itemId, approved) {
+    var badge = document.querySelector('[data-badge="' + itemId + '"]');
+    if (!badge) { return; }
+    badge.textContent = approved
+      ? 'проверяется автоматически' : 'уйдёт на ручную проверку';
+    badge.className = 'ap-badge ' + (approved ? 'ap-on' : 'ap-off');
+  }
+
+  document.querySelectorAll('.ans-block').forEach(function (block) {
+    var status = block.querySelector('.ans-status');
+    var itemId = block.dataset.item;
+
+    function send(payload) {
+      payload.item_id = itemId;
+      status.textContent = 'Сохраняю…';
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+                   'X-CSRFToken': csrf ? csrf[1] : '' },
+        body: JSON.stringify(payload)
+      })
+        .then(function (r) { return r.json().then(function (d) {
+          if (!r.ok) { throw new Error(d.error || 'Ошибка'); } return d; }); })
+        .then(function (d) {
+          paintBadge(itemId, d.approved);
+          status.textContent = d.approved
+            ? 'утверждено' : 'снято — задача уйдёт на ручную проверку';
+        })
+        .catch(function (e) { status.textContent = e.message; });
+    }
+
+    block.querySelector('.ans-save').addEventListener('click', function () {
+      var answers = {};
+      block.querySelectorAll('.ans-input').forEach(function (input) {
+        answers[input.dataset.key] = input.value;
+      });
+      send({ answers: answers });
+    });
+    block.querySelector('.ans-clear').addEventListener('click', function () {
+      block.querySelectorAll('.ans-input').forEach(function (input) {
+        input.value = '';
+      });
+      send({ clear: true });
     });
   });
 })();

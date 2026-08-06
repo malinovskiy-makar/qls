@@ -28,6 +28,7 @@
   var offline = false;
   var saving = 0;
   var timers = {};
+  var intervals = [];      // чтобы их можно было погасить после сдачи
 
   var stateNode = document.getElementById('save-state');
   var timerNode = document.getElementById('timer');
@@ -168,15 +169,42 @@
   var queue = {};          // ключ поля → {itemId, body}
   var order = [];          // порядок ключей
   var busy = false;
+  var stopped = false;     // работа сдана — сохранять больше нечего и некуда
+
+  /* ⚠️ ПОСЛЕ СДАЧИ ОЧЕРЕДЬ ОСТАНАВЛИВАЕТСЯ НАВСЕГДА.
+   *
+   * В логе сервера: в 04:17:05 контрольная сдана, в 04:17:41 прилетел ещё
+   * один автосейв и получил 409. Сервер отработал верно — в сданную работу
+   * ответ не принял, — но стучаться в закрытую дверь полминуты клиент не
+   * должен: у ученика это рисуется значком «сохраняю», а в логе выглядит
+   * как попытка дописать после сдачи.
+   *
+   * Останавливаемся ОДНОЙ точкой (`stop()`), а не «перестаём вызывать
+   * send в кнопке»: сохранение уезжает из пяти мест (ввод, смена варианта,
+   * потеря фокуса, повтор раз в 10 секунд, восстановление связи), и любое
+   * из них переживёт сдачу. Возврат на страницу кнопкой «назад» (из
+   * bfcache) таймеры воскрешает — поэтому флаг проверяется в самой очереди.
+   */
+  function stop() {
+    stopped = true;
+    queue = {};
+    order = [];
+    pending = {};
+    Object.keys(timers).forEach(function (key) { clearTimeout(timers[key]); });
+    intervals.forEach(function (id) { clearInterval(id); });
+    intervals = [];
+    saving = 0;
+  }
 
   function enqueue(itemId, field) {
+    if (stopped) { return; }
     if (!(field.key in queue)) { order.push(field.key); }
     queue[field.key] = { itemId: itemId, body: field.body };
     pump();
   }
 
   function pump() {
-    if (busy) { return; }
+    if (busy || stopped) { return; }
     var key = order.shift();
     while (key !== undefined && !(key in queue)) { key = order.shift(); }
     if (key === undefined) { return; }
@@ -232,6 +260,7 @@
   }
 
   function send(itemId) {
+    if (stopped) { return; }
     pending[itemId] = collect(itemId);
     cardFields(itemId).forEach(function (field) {
       enqueue(itemId, field);
@@ -281,25 +310,32 @@
   }
 
   function retryPending() {
+    if (stopped) { return; }
     var ids = Object.keys(pending);
     if (!ids.length) { return; }
     ids.forEach(function (itemId) { send(parseInt(itemId, 10)); });
   }
 
   function flushAll(submit) {
-    (config.itemIds || []).forEach(function (itemId) {
-      pending[itemId] = collect(itemId) || { answer: '', solution: '' };
-    });
-    if (submit) {
-      var form = document.getElementById('exam-form');
-      if (form && !form.dataset.submitted) {
-        form.dataset.submitted = '1';
-        form.submit();
-      }
+    if (!submit) {
+      (config.itemIds || []).forEach(function (itemId) {
+        pending[itemId] = collect(itemId) || { answer: '', solution: '' };
+      });
+      return;
+    }
+    // Сдача. Автосохранение выключаем ДО отправки формы: терять при этом
+    // нечего — форма сдачи везёт содержимое всех полей ещё раз
+    // (`views_exam.exam_finish`), и именно она источник правды.
+    stop();
+    var form = document.getElementById('exam-form');
+    if (form && !form.dataset.submitted) {
+      form.dataset.submitted = '1';
+      form.submit();
     }
   }
 
   function schedule(itemId) {
+    if (stopped) { return; }
     clearTimeout(timers[itemId]);
     // Две секунды после остановки ввода: чаще — лишние запросы на каждую
     // букву, реже — слишком много можно потерять при обрыве.
@@ -310,13 +346,13 @@
   document.addEventListener('DOMContentLoaded', function () {
     paintTimer();
     if (timer.hasLimit()) {
-      setInterval(tick, 1000);
+      intervals.push(setInterval(tick, 1000));
       // Сверка с сервером — по таймеру, а не по вводу. Пятнадцать секунд:
       // чаще незачем (расхождение внутри допуска), реже — ученик слишком
       // долго смотрел бы на неправду.
-      setInterval(pollTime, 15000);
+      intervals.push(setInterval(pollTime, 15000));
     }
-    setInterval(retryPending, 10000);
+    intervals.push(setInterval(retryPending, 10000));
 
     (config.itemIds || []).forEach(function (itemId) {
       var card = document.getElementById('item-' + itemId);

@@ -241,10 +241,18 @@ def review_submission(request, pk, group=None):
         'work_feedback': WorkFeedback.objects.filter(
             assignment=submission.assignment,
             student=submission.student).first(),
-        'work_review_url': reverse(
-            'teacher:student_work_review',
-            args=[group_obj.pk, submission.assignment_id,
-                  submission.student_id]) if group_obj else None,
+        # ⚠️ Кнопка «глазами ученика» есть ВСЕГДА. Раньше её адрес считался
+        # только для работы в группе, и у работы без группы кнопка молча
+        # исчезала со страницы — для пользователя это неотличимо от
+        # «ведёт не туда».
+        'work_review_url': (
+            reverse('teacher:student_work_review',
+                    args=[group_obj.pk, submission.assignment_id,
+                          submission.student_id])
+            if group_obj else
+            reverse('teacher:student_work_review_plain',
+                    args=[submission.assignment_id, submission.student_id])),
+        'work_review_student': submission.student,
     })
 
 

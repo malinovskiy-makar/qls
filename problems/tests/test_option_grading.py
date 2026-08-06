@@ -51,9 +51,14 @@ def multi_problem():
 
 
 def statements_problem():
-    """«Несколько утверждений»: два верных из трёх, задача ценой 2 балла."""
+    """Два верных варианта из трёх — второй случай с ручной проверки.
+
+    Тип именно «все верные»: галочки в проекте рисует ТОЛЬКО он. Тип
+    «верно/неверно» — это одно утверждение с двумя вариантами (454 из 455
+    таких задач банка), и выбор там одиночный.
+    """
     return catalog_test(
-        'тест: несколько утверждений',
+        'тест: все верные',
         'Отметьте верные утверждения о совершенной конкуренции.', 'а, в',
         [('а', 'Фирма принимает цену как данность.', 'верно'),
          ('б', 'Фирма может назначить любую цену.', 'неверно'),
@@ -280,3 +285,128 @@ class CheckerContractTests(TestCase):
             assignment=homework, catalog_problem=single_problem(), order=1)
         self.assertEqual(item_answer_form(multi)[0], ANSWER_CHECKBOX)
         self.assertEqual(item_answer_form(single)[0], ANSWER_RADIO)
+
+
+class OptionReviewTests(TestCase):
+    """Разбор показывает ВАРИАНТЫ с двумя отметками, а не две строки текста."""
+
+    def setUp(self):
+        self.tutor = make_user('or_tutor', role='teacher')
+        self.student = make_user('or_student', role='student')
+        self.homework = Assignment.objects.create(name='ДЗ', author=self.tutor)
+        self.homework.students.add(self.student)
+        self.item = AssignmentItem.objects.create(
+            assignment=self.homework, catalog_problem=multi_problem(),
+            order=0, points=Decimal('3'))
+        self.client.force_login(self.student)
+
+    def _review_rows(self, values):
+        from problems.assignment_rows import answer_input_name, option_review
+
+        self.client.post(
+            reverse('student:submit_assignment', args=[self.homework.pk]),
+            {answer_input_name(self.item): values})
+        sub = Submission.objects.get(student=self.student,
+                                     problem_item=self.item)
+        return option_review(self.item, sub)
+
+    def test_four_states_are_distinguished(self):
+        """Верные «а, б, г»; ученик отметил «а, в» — все четыре исхода разом."""
+        rows = {r['label']: r['state'] for r in self._review_rows(['а', 'в'])}
+        self.assertEqual(rows['а'], 'hit')      # выбрал, верно
+        self.assertEqual(rows['в'], 'wrong')    # выбрал, неверно
+        self.assertEqual(rows['б'], 'missed')   # не выбрал, а надо было
+        self.assertEqual(rows['г'], 'missed')
+
+    def test_correctly_skipped_option(self):
+        """«Не выбрал и правильно» — четвёртое состояние, отдельный исход."""
+        clean = {r['label']: r['state']
+                 for r in self._review_rows(['а', 'б', 'г'])}
+        self.assertEqual(clean['в'], 'skip')
+        self.assertEqual(clean['а'], 'hit')
+
+    def test_option_text_is_shown_not_only_the_letter(self):
+        rows = self._review_rows(['а'])
+        self.assertIn('Технология производства',
+                      [r['text'] for r in rows])
+
+    def test_screen_renders_options(self):
+        from problems.assignment_rows import answer_input_name
+
+        self.client.post(
+            reverse('student:submit_assignment', args=[self.homework.pk]),
+            {answer_input_name(self.item): ['а', 'в']})
+        body = self.client.get(
+            reverse('student:work_review',
+                    args=[self.homework.pk])).content.decode()
+        self.assertIn('Технология производства', body)
+        self.assertIn('надо было выбрать', body)
+        self.assertIn('opt-missed', body)
+        self.assertIn('opt-wrong', body)
+
+    def test_options_are_not_leaked_before_submission(self):
+        """До сдачи разбор вариантов не собирается — это были бы ответы."""
+        from problems.assignment_rows import build_rows
+
+        row = build_rows(self.homework, self.student)[0]
+        self.assertEqual(row['option_review'], [])
+
+
+class TutorStudentViewTests(TestCase):
+    """«Глазами ученика»: ведёт на разбор ЭТОГО ученика и говорит об этом."""
+
+    def setUp(self):
+        from problems.models import StudentGroup
+
+        self.tutor = make_user('tsv_tutor', role='teacher')
+        self.student = make_user('tsv_student', role='student')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        self.group.students.add(self.student)
+        self.client.force_login(self.tutor)
+
+    def _work(self, group=None):
+        work = Assignment.objects.create(name='Работа', author=self.tutor,
+                                         group=group)
+        work.students.add(self.student)
+        item = AssignmentItem.objects.create(
+            assignment=work, catalog_problem=single_problem(), order=0,
+            points=Decimal('1'))
+        Submission.objects.create(student=self.student, assignment=work,
+                                  problem_item=item, status='submitted',
+                                  submitted_answer='б')
+        return work
+
+    def test_group_route_shows_banner_with_student_name(self):
+        work = self._work(group=self.group)
+        body = self.client.get(
+            reverse('teacher:student_work_review',
+                    args=[self.group.pk, work.pk,
+                          self.student.pk])).content.decode()
+        self.assertIn('глазами ученика', body)
+        self.assertIn(self.student.username, body)
+
+    def test_work_without_group_still_has_the_screen(self):
+        """У работы без группы кнопка раньше просто исчезала со страницы."""
+        work = self._work(group=None)
+        response = self.client.get(
+            reverse('teacher:student_work_review_plain',
+                    args=[work.pk, self.student.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('глазами ученика', response.content.decode())
+
+    def test_review_page_always_offers_the_link(self):
+        work = self._work(group=None)
+        sub = Submission.objects.get(assignment=work)
+        body = self.client.get(
+            reverse('teacher:review_submission',
+                    args=[sub.pk])).content.decode()
+        self.assertIn('глазами ученика', body)
+
+    def test_stranger_tutor_gets_404(self):
+        work = self._work(group=None)
+        other = make_user('tsv_other', role='teacher')
+        self.client.force_login(other)
+        response = self.client.get(
+            reverse('teacher:student_work_review_plain',
+                    args=[work.pk, self.student.pk]))
+        self.assertEqual(response.status_code, 404)

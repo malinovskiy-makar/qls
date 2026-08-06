@@ -237,6 +237,39 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
                 color: var(--accent); }
 .pf-status { font-size: 12px; color: var(--text2); }
 
+/* ── Разбор вариантов ответа (Фаза 0.2) ──────────────────────
+   Четыре исхода различаются рамкой, значком, фоном И подписью: одного
+   слова мало, если варианты просматривают бегло. Зелёный/красный/янтарь —
+   в своих законных смыслах, акцентный малиновый здесь не используется. */
+.opt-review { list-style: none; margin: 0; padding: 0; display: flex;
+              flex-direction: column; gap: 8px; }
+.opt-review .opt { display: flex; align-items: flex-start; gap: 10px;
+                   border: 1px solid var(--border); border-left-width: 3px;
+                   border-radius: var(--r); padding: 10px 12px;
+                   font-size: 14px; line-height: 1.55;
+                   background: var(--surface); }
+.opt-mark { flex: none; width: 18px; text-align: center; font-weight: 700;
+            color: var(--text2); }
+.opt-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.opt-label { color: var(--text2); }
+.opt-note { flex: none; font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: .04em;
+            color: var(--text2); white-space: nowrap; align-self: center; }
+
+.opt-hit    { border-left-color: var(--green); background: var(--green-tint); }
+.opt-hit    .opt-mark, .opt-hit .opt-note { color: var(--green); }
+.opt-wrong  { border-left-color: var(--error); background: var(--error-tint); }
+.opt-wrong  .opt-mark, .opt-wrong .opt-note { color: var(--error); }
+.opt-missed { border-left-color: var(--amber); background: var(--amber-tint); }
+.opt-missed .opt-mark, .opt-missed .opt-note { color: var(--amber); }
+.opt-skip   { border-left-color: var(--border); color: var(--text2); }
+
+@media (max-width: 560px) {
+  .opt-review .opt { flex-wrap: wrap; }
+  .opt-note { width: 100%; text-align: left; padding-left: 28px;
+              align-self: flex-start; }
+}
+
 @media (max-width: 560px) {
   .problem-card-body { padding: 16px; }
   .problem-card-head { padding: 12px 16px; flex-wrap: wrap; }

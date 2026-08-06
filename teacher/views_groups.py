@@ -10,7 +10,7 @@ import json
 from datetime import timedelta
 
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -151,6 +151,35 @@ def group_detail(request, pk):
 # Фаза 11 — просмотр задания ДО решений
 # ---------------------------------------------------------------------------
 
+def _answer_rows(item):
+    """Строки «пункт → что предлагает каталог → что утверждено».
+
+    Тесты и свои задачи сюда не идут: у теста верный вариант задан
+    разметкой, у своей задачи эталон писал сам репетитор.
+    """
+    from problems.assignment_rows import (
+        answer_parts, catalog_answer_for, part_max_score,
+    )
+
+    if item.is_custom or item.is_test or item.catalog_problem_id is None:
+        return []
+
+    parts = answer_parts(item)
+    rows = []
+    for part in parts:
+        rows.append({
+            'part': part,
+            'key': '' if part is None else str(part.pk),
+            'label': (part.label if part is not None else ''),
+            'statement': (part.statement if part is not None
+                          else item.statement),
+            'from_catalog': catalog_answer_for(item, part),
+            'approved': item.approved_answer(part),
+            'max_score': part_max_score(item, part, len(parts)),
+        })
+    return rows
+
+
 @tutor_required
 def group_assignment_detail(request, group_id, assignment_id):
     """Задание целиком глазами репетитора — ещё до того, как кто-то решал.
@@ -188,6 +217,10 @@ def group_assignment_detail(request, group_id, assignment_id):
             'parts': list(item.catalog_problem.parts.all())
             if item.catalog_problem_id else [],
             'comments': by_item.get(item.pk, []),
+            # Что именно уйдёт в автопроверку — по строке на пункт.
+            'answer_rows': _answer_rows(item),
+            'answers_approved': item.answers_approved,
+            'needs_approval': not item.answers_approved,
         })
 
     from problems.models import SolutionVisibility
@@ -358,28 +391,46 @@ def group_submissions(request, group_id, assignment_id):
 
 
 @tutor_required
-def student_work_review(request, group_id, assignment_id, student_id):
+def student_work_review(request, assignment_id, student_id, group_id=None):
     """Разбор работы ученика — ТОТ ЖЕ экран, что видит ученик.
 
     ⚠️ Именно тот же, а не «похожий»: если ученик спорит с оценкой, спорить
     надо об одном экране. Отдельная «версия для преподавателя» разошлась бы
     с ученической на первой же правке.
+
+    ⚠️ ГРУППА НЕОБЯЗАТЕЛЬНА. Раньше адрес был только групповым, и у работы
+    без группы (а такие есть — их создаёт старый конструктор домашек)
+    кнопка «посмотреть глазами ученика» просто ИСЧЕЗАЛА со страницы
+    проверки: `work_review_url` считался `None`. Пропавшая кнопка для
+    пользователя неотличима от сломанной, поэтому у экрана появился второй,
+    безгрупповой адрес, а права проверяются по автору работы.
     """
     from django.urls import reverse
 
-    from problems.models import User
+    from problems.models import Assignment, User
 
     from student.views import work_review_context
 
-    group = own_group_or_404(request.user, group_id)
-    assignment = group_assignment_or_404(group, assignment_id)
-    student = get_object_or_404(User, pk=student_id,
-                                enrolled_groups=group)
+    if group_id is not None:
+        group = own_group_or_404(request.user, group_id)
+        assignment = group_assignment_or_404(group, assignment_id)
+        student = get_object_or_404(User, pk=student_id,
+                                    enrolled_groups=group)
+        back_url = reverse('teacher:group_submissions',
+                           args=[group.pk, assignment.pk])
+    else:
+        assignment = get_object_or_404(Assignment, pk=assignment_id)
+        if not (request.user.is_staff or assignment.author_id == request.user.pk
+                or (assignment.group_id
+                    and assignment.group.teacher_id == request.user.pk)):
+            raise Http404
+        student = get_object_or_404(User, pk=student_id,
+                                    assignments_received=assignment)
+        back_url = reverse('teacher:assignment_detail', args=[assignment.pk])
+
     context = work_review_context(
         assignment, student, viewer=request.user, for_tutor=True,
-        back_url=reverse('teacher:group_submissions',
-                         args=[group.pk, assignment.pk]),
-        back_label='К решениям')
+        back_url=back_url, back_label='К решениям')
     return render(request, 'student/work_review.html', context)
 
 
@@ -399,6 +450,54 @@ def group_review_submission(request, group_id, submission_id):
 # ---------------------------------------------------------------------------
 # Фаза 20 — решалка прямо на странице задания
 # ---------------------------------------------------------------------------
+
+@require_POST
+@tutor_required
+def api_item_answers(request):
+    """Утвердить (или заменить своим) то, что будет проверяться машиной.
+
+    Пишем в ПОЗИЦИЮ задания, а не в каталог: каталог общий на всех
+    репетиторов, а утверждение — решение конкретного человека для
+    конкретной работы. `answers = {}` или `null` снимает утверждение и
+    возвращает задачу на ручную проверку.
+    """
+    from problems.assignment_rows import answer_parts
+    from problems.models import AssignmentItem
+
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({'error': 'Неверный формат'}, status=400)
+
+    item = get_object_or_404(
+        AssignmentItem.objects.select_related('assignment', 'catalog_problem',
+                                              'custom_problem'),
+        pk=body.get('item_id'))
+    if not item.is_tutor_for(request.user):
+        return JsonResponse({'error': 'Нет доступа'}, status=403)
+
+    if body.get('clear'):
+        item.answer_override = None
+        item.save(update_fields=['answer_override'])
+        return JsonResponse({'ok': True, 'approved': item.answers_approved,
+                             'answers': {}})
+
+    incoming = body.get('answers') or {}
+    if not isinstance(incoming, dict):
+        return JsonResponse({'error': 'Неверный формат'}, status=400)
+
+    # Ключи принимаем ТОЛЬКО те, что есть у этой задачи: чужой pk в JSON не
+    # должен превращаться в невидимую запись, которую потом никто не найдёт.
+    allowed = {('' if part is None else str(part.pk))
+               for part in answer_parts(item)}
+    answers = {key: str(value or '').strip()
+               for key, value in incoming.items() if key in allowed}
+    answers = {key: value for key, value in answers.items() if value}
+    item.answer_override = answers or None
+    item.save(update_fields=['answer_override'])
+    return JsonResponse({'ok': True, 'approved': item.answers_approved,
+                         'answers': item.answer_override or {}})
+
 
 @require_POST
 @tutor_required

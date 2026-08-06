@@ -218,13 +218,16 @@ class Command(BaseCommand):
             name='Спрос и предложение', defaults={'slug': 'demand-supply'})
         made = []
         for title, ptype, statement, answer, parts in [
+            # ⚠️ НАСТОЯЩИЙ «верно/неверно»: ОДНО утверждение и два варианта.
+            # Раньше здесь стояло «Отметьте верные утверждения» с тремя
+            # галочками — то есть множественный выбор под именем данетки.
+            # Название врало, и по этой демо-задаче человек делал выводы о
+            # работающем коде. Так устроены 454 из 455 таких задач банка.
             ('Демо-тест: верно/неверно', 'тест: верно/неверно',
-             'Отметьте верные утверждения о рынке совершенной конкуренции.',
-             'а, в',
-             [('а', 'Фирма принимает цену как данность.', 'верно'),
-              ('б', 'Фирма может назначить любую цену.', 'неверно'),
-              ('в', 'В долгосрочном периоде прибыль стремится к нулю.',
-               'верно')]),
+             'При росте ставки процента цены облигаций будут повышаться.',
+             'б',
+             [('а', 'Верно', 'неверно'),
+              ('б', 'Неверно', 'верно')]),
             ('Демо-тест: один ответ', 'тест: один ответ',
              'Доходы покупателей выросли. Что произойдёт с кривой спроса на '
              'нормальный товар?',
@@ -248,11 +251,30 @@ class Command(BaseCommand):
                           'status': Problem.Status.PUBLISHED,
                           'difficulty': 2})
             problem.topics.add(topic)
-            if created:
+            # ⚠️ ДЕМО-ЗАДАЧУ ПРИВОДИМ К СПЕЦИФИКАЦИИ, а не только создаём.
+            # `get_or_create` находит запись по названию и молча оставляет
+            # старое содержимое — так неверный тип «верно/неверно» и жил в
+            # базе после починки семечка. Ошибка в демо-данных стоит дорого:
+            # по ним человек проверяет продукт и делает выводы о коде.
+            expected = [(label, text, part_answer)
+                        for label, text, part_answer in parts]
+            actual = [(p.label, p.statement, p.answer)
+                      for p in problem.parts.order_by('order', 'id')]
+            if (created or problem.problem_type != ptype
+                    or problem.answer != answer or actual != expected):
+                problem.statement = statement
+                problem.answer = answer
+                problem.problem_type = ptype
+                problem.save(update_fields=['statement', 'answer',
+                                            'problem_type'])
+                problem.parts.all().delete()
                 for order, (label, text, part_answer) in enumerate(parts):
                     ProblemPart.objects.create(
                         problem=problem, label=label, statement=text,
                         answer=part_answer, order=order)
+                if not created:
+                    self.stdout.write(
+                        '  демо-тест «%s» приведён к своему типу' % title)
             made.append(problem)
         return made
 

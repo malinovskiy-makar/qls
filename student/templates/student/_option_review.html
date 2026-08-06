@@ -1,0 +1,32 @@
+{% comment %}
+Варианты ответа в разборе работы: список в том же виде, в каком его видел
+ученик, с ДВУМЯ отметками на каждом варианте — что выбрал он и что было
+верным.
+
+Четыре состояния различаются не только словом, но и цветом рамки, значком и
+фоном: «выбрал и верно» (зелёный ✓), «выбрал и неверно» (красный ✗), «не
+выбрал, а надо было» (янтарная рамка, значок ○ и подпись), «не выбрал и
+правильно» (нейтральный, без акцента).
+
+⚠️ Зелёный здесь в своём законном смысле — «верно» (правило проекта
+«сигналы священны»). Акцентный малиновый не используется вовсе.
+{% endcomment %}
+<ul class="opt-review">
+  {% for opt in option_rows %}
+  <li class="opt opt-{{ opt.state }}">
+    <span class="opt-mark" aria-hidden="true">
+      {% if opt.state == 'hit' %}✓{% elif opt.state == 'wrong' %}✗{% elif opt.state == 'missed' %}○{% else %}·{% endif %}
+    </span>
+    <span class="opt-body">
+      {% if opt.label %}<b class="opt-label">{{ opt.label }})</b> {% endif %}
+      {% if opt.is_html %}{{ opt.text|safe }}{% else %}{{ opt.text }}{% endif %}
+    </span>
+    <span class="opt-note">
+      {% if opt.state == 'hit' %}вы выбрали · верно
+      {% elif opt.state == 'wrong' %}вы выбрали · неверно
+      {% elif opt.state == 'missed' %}надо было выбрать
+      {% endif %}
+    </span>
+  </li>
+  {% endfor %}
+</ul>

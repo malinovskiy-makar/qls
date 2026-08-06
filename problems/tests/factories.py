@@ -73,6 +73,27 @@ def make_item(assignment, catalog_problem=None, custom_problem=None, **kwargs):
         custom_problem=custom_problem, **kwargs)
 
 
+def approve_answers(item):
+    """Утвердить каталожные ответы позиции — как это делает репетитор.
+
+    С Фазы 0.6 машина проверяет каталожную задачу ТОЛЬКО после утверждения
+    (`AssignmentItem.answer_override`): в банке «ответом» слишком часто
+    записана фраза целиком или число из середины решения. Тестам, которые
+    проверяют саму автопроверку, нужен утверждённый эталон — иначе они
+    честно упираются в «задача ушла человеку».
+    """
+    from problems.assignment_rows import answer_parts, catalog_answer_for
+
+    answers = {}
+    for part in answer_parts(item):
+        value = catalog_answer_for(item, part)
+        if value:
+            answers['' if part is None else str(part.pk)] = value
+    item.answer_override = answers or None
+    item.save(update_fields=['answer_override'])
+    return item
+
+
 def make_submission(student, assignment, problem, **kwargs):
     return Submission.objects.create(student=student, assignment=assignment,
                                      problem=problem, **kwargs)

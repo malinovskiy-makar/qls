@@ -25,6 +25,10 @@ urlpatterns = [
     path('groups/<int:group_id>/assignments/<int:assignment_id>/'
          'students/<int:student_id>/',
          views_groups.student_work_review, name='student_work_review'),
+    # Он же для работы БЕЗ группы: иначе кнопка «глазами ученика» пропадает
+    # со страницы проверки, а пропавшая кнопка неотличима от сломанной.
+    path('assignments/<int:assignment_id>/students/<int:student_id>/',
+         views_groups.student_work_review, name='student_work_review_plain'),
 
     # Комментарии к задачам (JSON, без перезагрузки страницы).
     path('api/comment/create/', views_groups.api_comment_create,
@@ -32,6 +36,9 @@ urlpatterns = [
 
     path('api/item/solution/', views_groups.api_item_solution,
          name='api_item_solution'),
+    # Утверждение того, что будет проверяться машиной (Фаза 0.6).
+    path('api/item/answers/', views_groups.api_item_answers,
+         name='api_item_answers'),
 
     # Контрольные (Часть C).
     path('groups/<int:pk>/exams/new/', views_exams.exam_create,

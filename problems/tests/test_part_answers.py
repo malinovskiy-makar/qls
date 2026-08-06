@@ -16,7 +16,7 @@ from problems.models import (
     Assignment, AssignmentItem, CustomProblem, PartAnswer, ProblemPart,
     Submission,
 )
-from problems.tests.factories import make_problem, make_user
+from problems.tests.factories import approve_answers, make_problem, make_user
 
 
 def costs_problem():
@@ -41,9 +41,9 @@ class PartFieldsTests(TestCase):
         self.student = make_user('pa_student', role='student')
         self.homework = Assignment.objects.create(name='ДЗ', author=self.tutor)
         self.homework.students.add(self.student)
-        self.item = AssignmentItem.objects.create(
+        self.item = approve_answers(AssignmentItem.objects.create(
             assignment=self.homework, order=0,
-            catalog_problem=costs_problem(), points=Decimal('2'))
+            catalog_problem=costs_problem(), points=Decimal('2')))
         self.client.force_login(self.student)
 
     def test_two_fields_for_two_parts(self):
@@ -56,9 +56,9 @@ class PartFieldsTests(TestCase):
 
     def test_problem_without_parts_is_one_pseudo_part(self):
         """Задача без пунктов — частный случай «один пункт», не вторая ветка."""
-        plain = AssignmentItem.objects.create(
+        plain = approve_answers(AssignmentItem.objects.create(
             assignment=self.homework, order=1,
-            catalog_problem=make_problem('Без пунктов', answer='7'))
+            catalog_problem=make_problem('Без пунктов', answer='7')))
         parts = answer_parts(plain)
         self.assertEqual(parts, [None])
         self.assertFalse(part_grading.has_parts(plain))
@@ -71,8 +71,8 @@ class PartFieldsTests(TestCase):
         problem = make_problem('С мусорным подпунктом', answer='1')
         ProblemPart.objects.create(problem=problem, label='а', order=0,
                                    statement='', answer='Ответ:')
-        item = AssignmentItem.objects.create(
-            assignment=self.homework, order=2, catalog_problem=problem)
+        item = approve_answers(AssignmentItem.objects.create(
+            assignment=self.homework, order=2, catalog_problem=problem))
         self.assertEqual(answer_parts(item), [None])
 
 
@@ -85,9 +85,9 @@ class PartGradingTests(TestCase):
         self.homework = Assignment.objects.create(name='ДЗ', author=self.tutor)
         self.homework.students.add(self.student)
         self.problem = costs_problem()
-        self.item = AssignmentItem.objects.create(
+        self.item = approve_answers(AssignmentItem.objects.create(
             assignment=self.homework, order=0, catalog_problem=self.problem,
-            points=Decimal('2'))
+            points=Decimal('2')))
         self.client.force_login(self.student)
         self.parts = answer_parts(self.item)
 
@@ -124,8 +124,8 @@ class PartGradingTests(TestCase):
         problem = make_problem('Дробный ответ')
         ProblemPart.objects.create(problem=problem, label='а', order=0,
                                    statement='Найдите долю.', answer='1/10')
-        item = AssignmentItem.objects.create(assignment=self.homework,
-                                             order=5, catalog_problem=problem)
+        item = approve_answers(AssignmentItem.objects.create(assignment=self.homework,
+                                             order=5, catalog_problem=problem))
         part = answer_parts(item)[0]
         self.client.post(
             reverse('student:submit_assignment', args=[self.homework.pk]),
@@ -139,6 +139,10 @@ class PartGradingTests(TestCase):
         В банке «ответ» сплошь и рядом это целая фраза («E ≈ −1,22 (по
         модулю больше 1) — спрос эластичен»). Сравнить её со строкой
         ученика — значит поставить ноль за верный ответ.
+
+        ⚠️ С Фазы 0.6 задачу спасает не догадка «похоже ли это на число», а
+        отсутствие утверждения: репетитор такой эталон не подтверждал,
+        поэтому `approve_answers` здесь намеренно НЕ вызывается.
         """
         problem = make_problem(
             'Словесный ответ',
@@ -165,9 +169,9 @@ class PartGradingTests(TestCase):
             ProblemPart.objects.create(problem=problem, label=label,
                                        statement='Найдите %s.' % label,
                                        answer=answer)
-        item = AssignmentItem.objects.create(
+        item = approve_answers(AssignmentItem.objects.create(
             assignment=self.homework, order=7, catalog_problem=problem,
-            points=Decimal('10'))
+            points=Decimal('10')))
         parts = answer_parts(item)
         self.client.post(
             reverse('student:submit_assignment', args=[self.homework.pk]),
@@ -199,8 +203,8 @@ class PartsDoNotBreakTestsTests(TestCase):
         for order, label in enumerate(('а', 'б')):
             ProblemPart.objects.create(problem=problem, label=label,
                                        statement='вариант', order=order)
-        item = AssignmentItem.objects.create(assignment=self.homework,
-                                             order=0, catalog_problem=problem)
+        item = approve_answers(AssignmentItem.objects.create(assignment=self.homework,
+                                             order=0, catalog_problem=problem))
         self.assertFalse(part_grading.applies(item))
         self.client.post(
             reverse('student:submit_assignment', args=[self.homework.pk]),
@@ -241,9 +245,9 @@ class PartsInExamTests(TestCase):
             starts_at=now - timedelta(minutes=1),
             ends_at=now + timedelta(hours=1), deadline=now + timedelta(hours=1))
         self.exam.students.add(self.student)
-        self.item = AssignmentItem.objects.create(
+        self.item = approve_answers(AssignmentItem.objects.create(
             assignment=self.exam, order=0, catalog_problem=costs_problem(),
-            points=Decimal('2'))
+            points=Decimal('2')))
         self.parts = answer_parts(self.item)
         self.client.force_login(self.student)
 
