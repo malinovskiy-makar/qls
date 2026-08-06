@@ -225,6 +225,27 @@ input:focus-visible, select:focus-visible {
 /* Вопросик там, где заголовка рядом нет: занимает строку сам по себе. */
 .help-anchor { margin-top: 6px; }
 .help-anchor > .help-dot { margin-left: 0; }
+
+/* Таблица посчитанных площадей (Фаза 6): что, на каком отрезке, сколько, каким цветом. */
+.area-table { margin-top: 10px; }
+.area-row {
+  display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1.2fr) auto 18px;
+  align-items: center; gap: 8px; padding: 6px 0;
+  border-bottom: .5px solid var(--border);
+}
+.area-row:last-child { border-bottom: none; }
+.area-head { font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
+  color: var(--text3); text-transform: uppercase; padding-bottom: 4px; }
+.area-row > span { font-size: 11.5px; color: var(--text2); min-width: 0; }
+.area-row > b { font-size: 13px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums; text-align: right; }
+.area-what { display: flex; align-items: center; gap: 6px; }
+.area-name {
+  flex: 1; min-width: 0; padding: 3px 5px; font-size: 11.5px; color: var(--text);
+  border: 1px solid transparent; border-radius: var(--r-sm); background: none;
+}
+.area-name:hover { border-color: var(--border); }
+.area-name:focus { border-color: var(--accent); background: var(--input-bg); outline: none; }
 #hint-tip {
   position: fixed; z-index: 200; display: none; max-width: 300px;
   padding: 9px 11px; border-radius: var(--r-sm);
@@ -2966,15 +2987,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           </div>
           <div class="row">
             <div class="field">
-              <label for="ac-from">От</label>
+              <label for="ac-from">Левая граница <span class="ac-var">x</span></label>
               <input type="number" id="ac-from" step="any" placeholder="0" autocomplete="off">
             </div>
             <div class="field">
-              <label for="ac-to">До</label>
+              <label for="ac-to">Правая граница <span class="ac-var">x</span></label>
               <input type="number" id="ac-to" step="any" placeholder="край" autocomplete="off">
             </div>
           </div>
-          <div class="hint">Границы можно не заполнять: тогда возьмём всю кривую в первой четверти.</div>
+          <div class="hint">Границы отмеряются по горизонтальной оси. Можно их не заполнять:
+            тогда возьмём всю кривую в первой четверти, от начала до места, где она садится на ось.</div>
         </div>
 
         <div id="ac-pane-poly" style="display:none;">
@@ -2983,11 +3005,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <div id="ac-points" style="margin-top:8px;"></div>
         </div>
 
-        <div class="row" style="margin-top:8px;align-items:center;">
-          <button class="btn" id="ac-calc" type="button" style="flex:1;">Посчитать площадь</button>
-          <span id="ac-color-slot"></span>
-        </div>
-        <button class="btn-sm" id="ac-clear" type="button" style="margin-top:6px;">Убрать</button>
+        <button class="btn" id="ac-calc" type="button" style="margin-top:8px;width:100%;">Посчитать площадь</button>
+        <button class="btn-sm" id="ac-clear" type="button" style="margin-top:6px;">Убрать все</button>
         <div class="error" id="ac-error"></div>
         <div id="info-areacalc" style="margin-top:8px;"></div>
       </div>
@@ -3251,8 +3270,7 @@ const STATE = {
   // Пока флаг стоит, авто-подгонка осей молчит и видна кнопка возврата.
   viewDirty: false,
   titleColor: '',    // свой цвет заголовка графика ('' = цвет текста темы)
-  areaCalc: null,    // результат расчёта площади (Фаза 10)
-  areaCalcColor: '', // и её цвет
+  areaCalcList: [],  // посчитанные площади: [{id, kind, name, a, b, value, color, label}]
   areaColor: {},     // свои цвета закрашенных областей: ключ легенды -> hex (Фаза 8)
   params: {},        // ползунки-параметры формул: имя -> {value, min, max, step}
   areaCalcMode: 'curve',  // способ расчёта площади: под кривой или по точкам
@@ -11491,15 +11509,30 @@ function rollerOff() {
 // Правый край кривой в первой четверти: где она уходит вниз за ось.
 function curveRightEdge(f) {
   const lo = Math.max(0, CONFIG.Qmin), hi = CONFIG.Qmax;
+  const ok = (x) => { const y = f(x); return isFinite(y) && y >= 0; };
+  if (!ok(lo)) return lo;
   const N = 400;
   let last = lo;
-  for (let i = 0; i <= N; i++) {
+  for (let i = 1; i <= N; i++) {
     const x = lo + (hi - lo) * i / N;
-    const y = f(x);
-    if (!isFinite(y) || y < 0) break;
+    if (!ok(x)) {
+      // Точный край — там, где кривая садится на ось. Сетка даёт только вилку
+      // между последней годной и первой негодной точкой, поэтому дожимаем её
+      // делением пополам. Без этого у 10 − x правая граница выходила 9.97
+      // вместо 10, и площадь получалась меньше настоящей.
+      let a = last, b = x;
+      for (let k = 0; k < 60; k++) { const m = (a + b) / 2; if (ok(m)) a = m; else b = m; }
+      return a;
+    }
     last = x;
   }
   return last;
+}
+
+// Как называется переменная горизонтальной оси в текущей сцене: границы отрезка
+// подписываются ею, а не безликими «от» и «до».
+function axisXLetter() {
+  return (STATE.axisXName || STATE.axisXDefault || 'x').trim() || 'x';
 }
 
 function areaTargets() {
@@ -11546,76 +11579,128 @@ function calcAreaPolygon() {
   return { kind: 'poly', value: Math.abs(s2) / 2, ring: ring.map(p => [p.x, p.y]) };
 }
 
+/* Порядок действий (Фаза 6): задал кривую и границы, нажал «Посчитать» — и
+   только тогда появилась карточка результата, где можно назвать площадь и
+   выбрать цвет. Раньше цвет выбирался ДО расчёта и потом не менялся.
+   Результатов может быть несколько: они складываются в список и показываются
+   таблицей «кривая · отрезок · площадь · цвет». */
+let areaCalcCounter = 0;
+const AREA_PALETTE = () => [COL.MR, COL.D, COL.S, COL.tax, COL.reg, COL.MC];
+
 function runAreaCalc() {
   const err = document.getElementById('ac-error');
   const res = (STATE.areaCalcMode === 'poly') ? calcAreaPolygon() : calcAreaUnderCurve();
   if (res.error) {
-    STATE.areaCalc = null;
     if (err) { err.textContent = res.error; err.style.display = 'block'; }
-  } else {
-    STATE.areaCalc = res;
-    if (err) { err.textContent = ''; err.style.display = 'none'; }
+    return;
   }
+  if (err) { err.textContent = ''; err.style.display = 'none'; }
+  STATE.areaCalcList = STATE.areaCalcList || [];
+  const pal = AREA_PALETTE();
+  res.id = ++areaCalcCounter;
+  res.color = pal[(STATE.areaCalcList.length) % pal.length];
+  res.label = (res.kind === 'curve') ? ('Площадь под ' + res.name) : 'Площадь по точкам';
+  STATE.areaCalcList.push(res);
   redrawAll();
 }
 
 function clearAreaCalc() {
-  STATE.areaCalc = null;
+  STATE.areaCalcList = [];
   const err = document.getElementById('ac-error');
   if (err) { err.textContent = ''; err.style.display = 'none'; }
   redrawAll();
 }
 
 function drawAreaCalc() {
-  const r = STATE.areaCalc;
-  if (!r) { updateAreaCalcPanel(); return; }
+  const list = STATE.areaCalcList || [];
+  if (!list.length) { updateAreaCalcPanel(); return; }
   const { mx, my } = mainScales();
-  const color = STATE.areaCalcColor || COL.MR;
   const g = svg.append('g').attr('class', 'areacalc').attr('clip-path', 'url(#plot-clip)');
-  if (r.kind === 'curve') {
-    const t = areaTargets().filter(x => x.name === r.name)[0];
-    if (t) {
+  list.forEach(r => {
+    const color = r.color || COL.MR;
+    if (r.kind === 'curve') {
+      const t = areaTargets().filter(x => x.name === r.name)[0];
+      if (!t) return;
       const N = 160, pts = [];
       for (let i = 0; i <= N; i++) pts.push(r.a + (r.b - r.a) * i / N);
       const ar = d3.area().x(d => mx(d)).y0(my(Math.max(0, CONFIG.Pmin)))
         .y1(d => my(Math.max(0, t.f(d) || 0)));
       g.append('path').datum(pts).attr('d', ar).attr('fill', color).attr('opacity', 0.2)
-        .attr('data-legend', 'Площадь');
+        .attr('data-legend', r.label);
+    } else if (r.ring && r.ring.length > 2) {
+      const line = d3.line().x(d => mx(d[0])).y(d => my(d[1]));
+      g.append('path').datum(r.ring.concat([r.ring[0]])).attr('d', line)
+        .attr('fill', color).attr('opacity', 0.2).attr('stroke', color).attr('stroke-width', 1.5)
+        .attr('data-legend', r.label);
     }
-  } else if (r.ring && r.ring.length > 2) {
-    const line = d3.line().x(d => mx(d[0])).y(d => my(d[1]));
-    g.append('path').datum(r.ring.concat([r.ring[0]])).attr('d', line)
-      .attr('fill', color).attr('opacity', 0.2).attr('stroke', color).attr('stroke-width', 1.5)
-      .attr('data-legend', 'Площадь');
-  }
+  });
   updateAreaCalcPanel();
 }
 
+/* Таблица результатов: что посчитано, на каком отрезке, сколько вышло и каким
+   цветом закрашено. Название и цвет правятся прямо здесь. */
 function updateAreaCalcPanel() {
   const box = document.getElementById('info-areacalc');
   if (!box) return;
-  const r = STATE.areaCalc;
-  if (!r) { box.innerHTML = ''; return; }
-  const rows = [];
-  if (r.kind === 'curve') {
-    rows.push(['Площадь под ' + r.name, fmt(r.value)]);
-    rows.push(['на отрезке', fmt(r.a) + ' … ' + fmt(r.b)]);
-  } else {
-    rows.push(['Площадь многоугольника', fmt(r.value)]);
-    rows.push(['вершин', String(r.ring.length)]);
-  }
-  // Заголовок секции уже есть у самой раскрывашки «Площади», второй не нужен.
-  box.innerHTML = rows.map(([k, v]) => '<div class="stat"><span></span><b></b></div>').join('');
-  const stats = box.querySelectorAll('.stat');
-  rows.forEach(([k, v], i) => {
-    if (!stats[i]) return;
-    stats[i].querySelector('span').textContent = k;
-    stats[i].querySelector('b').textContent = v;
+  const list = STATE.areaCalcList || [];
+  box.innerHTML = '';
+  if (!list.length) return;
+
+  const table = document.createElement('div');
+  table.className = 'area-table';
+  const head = document.createElement('div');
+  head.className = 'area-row area-head';
+  ['Что', 'Отрезок', 'Площадь', ''].forEach(t => {
+    const c = document.createElement('span'); c.textContent = t; head.appendChild(c);
   });
+  table.appendChild(head);
+
+  const v = axisXLetter();
+  list.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'area-row';
+
+    const c1 = document.createElement('span');
+    c1.className = 'area-what';
+    const pick = document.createElement('input');
+    pick.type = 'color'; pick.className = 'swatch-pick'; pick.value = normHex(r.color);
+    pick.title = 'Цвет площади';
+    pick.addEventListener('input', () => { r.color = pick.value; redrawAll(); });
+    const nameInp = document.createElement('input');
+    nameInp.type = 'text'; nameInp.className = 'area-name'; nameInp.value = r.label;
+    nameInp.title = 'Название площади';
+    nameInp.addEventListener('input', () => { r.label = nameInp.value; });
+    nameInp.addEventListener('change', () => redrawAll());
+    c1.append(pick, nameInp);
+
+    const c2 = document.createElement('span');
+    c2.textContent = (r.kind === 'curve')
+      ? (v + ' от ' + fmt(r.a) + ' до ' + fmt(r.b))
+      : (r.ring.length + ' вершины');
+
+    const c3 = document.createElement('b');
+    c3.textContent = fmt(r.value);
+
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'btn-icon'; del.textContent = '×';
+    del.title = 'Убрать эту площадь';
+    del.addEventListener('click', () => {
+      STATE.areaCalcList = STATE.areaCalcList.filter(x => x !== r);
+      redrawAll();
+    });
+
+    row.append(c1, c2, c3, del);
+    table.appendChild(row);
+  });
+  box.appendChild(table);
 }
 
 // Выпадашка кривых и список точек: пересобираются под текущую сцену.
 function syncAreaCalcUI() {
+  // Границы подписаны буквой горизонтальной оси текущей сцены: где-то это Q,
+  // где-то X, а в «Математике» x. Безликие «от» и «до» ничего не говорили.
+  const v = axisXLetter();
+  document.querySelectorAll('.ac-var').forEach(el => { el.textContent = v; });
   const sel = document.getElementById('ac-pick');
   if (sel) {
     const names = areaTargets().map(t => t.name);
@@ -11711,11 +11796,6 @@ function wireAreaCalc() {
   if (clr) clr.addEventListener('click', () => clearAreaCalc());
   const q = document.getElementById('quick-area');
   if (q) q.addEventListener('click', () => { setAreaCalcMode('poly'); runAreaCalc(); });
-  const slot = document.getElementById('ac-color-slot');
-  if (slot && !slot.firstChild) {
-    slot.appendChild(makeColorPicker(STATE.areaCalcColor || cssVar('--curve-mr'),
-      (hex) => { STATE.areaCalcColor = hex; redrawAll(); }, 'Цвет посчитанной площади'));
-  }
   setAreaCalcMode('curve');
 }
 

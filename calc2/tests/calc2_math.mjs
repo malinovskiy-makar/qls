@@ -735,8 +735,9 @@ const CASES = [
           document.getElementById('ac-pick').value = 'D';
           document.getElementById('ac-from').value = '0';
           document.getElementById('ac-to').value = '100';
-          runAreaCalc();
-          return { S: STATE.areaCalc ? STATE.areaCalc.value : NaN };`,
+          STATE.areaCalcList = []; runAreaCalc();
+          var r = STATE.areaCalcList[0];
+          return { S: r ? r.value : NaN };`,
     checks: [['площадь', 'S', 5000, 5]],
   },
   {
@@ -746,7 +747,8 @@ const CASES = [
           addMarkAt(0, 0, null); addMarkAt(10, 0, null); addMarkAt(0, 10, null);
           STATE.areaPicked = STATE.marks.map(m => 'm' + m.id);
           setAreaCalcMode('poly'); runAreaCalc();
-          var v = STATE.areaCalc ? STATE.areaCalc.value : NaN;
+          var r0 = STATE.areaCalcList[0];
+          var v = r0 ? r0.value : NaN;
           STATE.marks = []; STATE.areaPicked = []; clearAreaCalc(); setAreaCalcMode('curve');
           return { S: v };`,
     checks: [['площадь', 'S', 50, 0.01]],
@@ -979,6 +981,22 @@ const CASES = [
           return { n: names.length, isA: names[0] === 'a' ? 1 : 0, v1: v1, v2: v2 };`,
     checks: [['параметров', 'n', 1, 0], ['имя = a', 'isA', 1, 0],
              ['a = 1 ⇒ −9', 'v1', -9, 0.01], ['a = 80 ⇒ 70', 'v2', 70, 0.01]],
+  },
+  {
+    // Фаза 6: правая граница берётся точно, а не по узлу сетки. Раньше край
+    // выходил 9.97 вместо 10, и площадь получалась меньше настоящей.
+    name: 'Площадь · под 10 − x в первой четверти ровно 50',
+    run: `loadScene('free'); STATE.curves = []; STATE.params = {};
+          addCurve('10 - x'); redrawAll();
+          var t = snapTargets()[0];
+          document.getElementById('ac-from').value = '';
+          document.getElementById('ac-to').value = '';
+          document.getElementById('ac-pick').value = t.name;
+          STATE.areaCalcList = []; runAreaCalc();
+          var r = STATE.areaCalcList[0] || {};
+          return { edge: curveRightEdge(t.f), area: r.value, a: r.a, b: r.b };`,
+    checks: [['правый край', 'edge', 10, 0.001], ['площадь', 'area', 50, 0.01],
+             ['от', 'a', 0, 0.001], ['до', 'b', 10, 0.001]],
   },
   {
     // Фаза 2: ключевые точки считаются и в «Математике».
