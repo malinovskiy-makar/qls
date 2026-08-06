@@ -2600,26 +2600,63 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <button class="seg-btn" id="ppfsub-trade">КТВ</button>
       </div>
 
-      <!-- Под-режим «Одна КПВ» (исходное поведение) -->
+      <!-- Под-режим «Одна КПВ». Ввод один на все формы записи (Фаза 11). -->
       <div id="ppf-pane-single">
         <div class="field f-wrap">
-          <label>Граница Y&nbsp;=&nbsp;f(X)</label>
+          <label>КПВ <span class="swatch-slot" id="ppf-color1"></span></label>
           <div class="f-row">
-            <input type="text" id="inp-ppf" value="100 - X" autocomplete="off">
+            <input type="text" id="inp-ppf" value="y = 100 - x" autocomplete="off">
             <button class="f-help" id="fh-ppf" type="button" aria-expanded="false"
                     aria-controls="fp-ppf" title="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-ppf" role="region" aria-label="Примеры формул КПВ"></div>
         </div>
-        <button class="btn" id="btn-ppf-apply">Построить</button>
-        <div style="display:flex;gap:6px;margin-top:6px;">
-          <button class="btn-sm" id="btn-ppf-lin" style="flex:1;">Линейная</button>
-          <button class="btn-sm" id="btn-ppf-conc" style="flex:1;">Вогнутая</button>
+        <div class="field" id="ppf-name1-row">
+          <input type="text" id="inp-ppf-name1" placeholder="имя на графике, напр. КПВ" autocomplete="off">
         </div>
-        <div class="hint">По осям стоят два товара: X (горизонталь), Y (вертикаль). Форму границы
-          задают ползунки «Макс X / Макс Y» в пульте-ленте. Наклон $\left|\frac{dY}{dX}\right|$ (= Макс&nbsp;Y / Макс&nbsp;X) и есть
-          альтернативные издержки X в единицах Y.</div>
+
+        <!-- Вторая кривая для сравнения (Фаза 12) -->
+        <button class="btn-sm" id="btn-ppf-compare" type="button">Сравнить с другой КПВ</button>
+        <div id="ppf-second" style="display:none;margin-top:8px;">
+          <div class="field f-wrap">
+            <label>КПВ 2 <span class="swatch-slot" id="ppf-color2"></span></label>
+            <div class="f-row">
+              <input type="text" id="inp-ppf2b" value="y = 80 - 0.8*x" autocomplete="off">
+            </div>
+          </div>
+          <div class="field">
+            <input type="text" id="inp-ppf-name2" placeholder="имя на графике, напр. КПВ 2" autocomplete="off">
+          </div>
+        </div>
+
+        <button class="btn" id="btn-ppf-apply" style="margin-top:8px;width:100%;">Построить</button>
+        <div class="hint">По осям стоят два товара: X (горизонталь), Y (вертикаль).
+          Строка принимает уравнение целиком в любой из трёх форм: $y = 100 - x$,
+          $x = 50 - 0.5y$ и неявную вроде $x^2 + y^2 = 25$. Буква в формуле
+          становится ползунком в «Основных параметрах».</div>
         <div class="error" id="ppf-error"></div>
+
+        <!-- Потребление в комплектах (Фаза 11.4) -->
+        <div class="vsub">Потребление в комплектах</div>
+        <label class="chk"><input type="checkbox" id="chk-bundle">
+          <span class="swatch" style="background:var(--curve-mr)"></span> Показать луч потребления</label>
+        <div class="row" id="bundle-row" style="display:none;">
+          <div class="field"><label for="inp-bundle-x">Единиц X</label>
+            <input type="number" id="inp-bundle-x" min="0.1" step="0.1" value="3"></div>
+          <div class="field"><label for="inp-bundle-y">Единиц Y</label>
+            <input type="number" id="inp-bundle-y" min="0.1" step="0.1" value="1"></div>
+        </div>
+        <div class="hint">Комплект это фиксированная пропорция благ. Луч из начала координат
+          показывает все наборы этой пропорции; где он упирается в границу, там и лежит
+          самый большой доступный набор.</div>
+
+        <!-- Области (Фаза 11.5) -->
+        <div class="vsub">Области</div>
+        <label class="chk"><input type="checkbox" id="chk-ppf-in" checked>
+          <input type="color" class="swatch swatch-pick" data-col="ppfIn" title="Цвет достижимых наборов"> Достижимые наборы</label>
+        <label class="chk"><input type="checkbox" id="chk-ppf-out">
+          <input type="color" class="swatch swatch-pick" data-col="ppfOut" title="Цвет недостижимых наборов"> Недостижимые наборы</label>
+
         <div id="info-ppf" style="margin-top:8px;"></div>
       </div>
 
@@ -9454,6 +9491,103 @@ function setScenario(s) {
    --------------------------------------------------------------------- */
 
 // Компиляция Y = f(X). В отличие от рыночной — переменная X (и x как синоним).
+/* ── Единый ввод кривой КПВ (Фаза 11) ─────────────────────────────────
+   Одна строка на все случаи: пользователь пишет уравнение целиком, а какой
+   оно формы — разбираемся сами.
+
+     y = 100 - x        явная: сразу считаем
+     x = 50 - 0.5*y     обратная: приводим численно, для каждого x ищем свой y
+     x^2 + y^2 = 25     неявная: то же самое, но общий вид
+
+   Раньше форму надо было выбрать кнопками заранее, и поле принимало только
+   правую часть. Возвращаем { f(x), kind, error }; f — всегда «Y от X».  */
+function parsePpfEquation(src) {
+  const t = String(src || '').trim();
+  if (!t) return { error: 'Пустая строка.' };
+  const eq = t.indexOf('=');
+
+  // Явная запись: слева одинокая буква вертикальной оси.
+  if (eq >= 0) {
+    const lhs = t.slice(0, eq).trim(), rhs = t.slice(eq + 1).trim();
+    if (/^[yY]$/.test(lhs)) {
+      const r = compilePpf(rhs);
+      if (!r.compiled) return { error: r.error };
+      return { kind: 'explicit', src: rhs, f: (x) => ppfEvalWith(r.compiled, x) };
+    }
+    // Обратная запись x = g(y): считаем g и обращаем численно.
+    if (/^[xX]$/.test(lhs)) {
+      const g = parseYofX(rhs);
+      if (g.error) return { error: g.error };
+      return { kind: 'inverse', src: rhs, f: makeInverseF(g.f) };
+    }
+  }
+  // Без знака равенства — это просто правая часть «Y = …», как было раньше.
+  if (eq < 0) {
+    const r = compilePpf(t);
+    if (!r.compiled) return { error: r.error };
+    return { kind: 'explicit', src: t, f: (x) => ppfEvalWith(r.compiled, x) };
+  }
+  // Всё остальное — неявное уравнение F(x, y) = G(x, y).
+  const G = parseConstraint(t);
+  if (!G) return { error: 'Не понял уравнение.' };
+  return { kind: 'implicit', src: t, f: makeImplicitF(G) };
+}
+
+// Функция одной переменной, где переменная названа y (для записи x = g(y)).
+function parseYofX(rhs) {
+  try {
+    const compiled = math.parse(prepExpr(rhs)).compile();
+    const probe = scopeFor(rhs, { y: 1, Y: 1, x: 1, X: 1 });
+    compiled.evaluate(probe);
+    return { f: (y) => {
+      try {
+        const v = compiled.evaluate(scopeFor(rhs, { y: y, Y: y }));
+        return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+      } catch (e) { return NaN; }
+    } };
+  } catch (e) { return { error: e.message }; }
+}
+
+/* Обращение x = g(y) в y = f(x). Сканируем y сверху вниз и берём первую
+   смену знака у g(y) − x: КПВ убывает, поэтому корень там ровно один. */
+function makeInverseF(g) {
+  return (x) => {
+    const hi = Math.max(CONFIG.Pmax * 4, 1e3);
+    const h = (y) => { const v = g(y); return isFinite(v) ? v - x : NaN; };
+    const N = 400;
+    let prevY = 0, prevV = h(0);
+    for (let i = 1; i <= N; i++) {
+      const y = hi * i / N, v = h(y);
+      if (!isNaN(prevV) && !isNaN(v) && prevV * v <= 0 && prevV !== v) {
+        return (prevV === 0) ? prevY : (v === 0 ? y : bisect(h, prevY, y));
+      }
+      prevY = y; prevV = v;
+    }
+    return NaN;
+  };
+}
+
+/* Неявное F(x, y) = 0: для каждого x ищем наибольший неотрицательный корень
+   по y. Наибольший, а не первый: у окружности x² + y² = 25 нас интересует
+   верхняя дуга, она и есть граница возможностей. */
+function makeImplicitF(G) {
+  return (x) => {
+    const hi = Math.max(CONFIG.Pmax * 2, 1e2);
+    const g = (y) => G(x, y);
+    const N = 400;
+    let found = NaN, prevY = 0, prevV = g(0);
+    for (let i = 1; i <= N; i++) {
+      const y = hi * i / N, v = g(y);
+      if (!isNaN(prevV) && !isNaN(v) && prevV * v <= 0 && prevV !== v) {
+        const r = (prevV === 0) ? prevY : (v === 0 ? y : bisect(g, prevY, y));
+        if (isFinite(r)) found = r;
+      }
+      prevY = y; prevV = v;
+    }
+    return found;
+  };
+}
+
 function compilePpf(expr) {
   try {
     const compiled = math.parse(expr).compile();
@@ -9462,13 +9596,12 @@ function compilePpf(expr) {
   } catch (e) { return { compiled: null, error: e.message }; }
 }
 
-// Значение границы Y в точке X.
+// Значение границы Y в точке X. Считает разобранное уравнение (Фаза 11):
+// одинаково для явной, обратной и неявной записи.
 function evalPpf(x) {
-  if (!STATE.ppfCompiled) return NaN;
-  try {
-    const v = STATE.ppfCompiled.evaluate(scopeFor(STATE.ppfFormula, { x: x, X: x }));
-    return (typeof v === 'number' && isFinite(v)) ? v : NaN;
-  } catch (e) { return NaN; }
+  if (!STATE.ppfF) return NaN;
+  const v = STATE.ppfF(x);
+  return (typeof v === 'number' && isFinite(v)) ? v : NaN;
 }
 
 // Наклон границы dY/dX численно (центральная разность). |наклон| = альтернативные издержки X.
@@ -9496,45 +9629,212 @@ function ppfTypeLabel() {
 // Пересчёт КПВ: компиляция формулы, удержание точки в допустимой зоне.
 function recomputePpf() {
   STATE.ppfReady = false;
-  const { compiled } = compilePpf(STATE.ppfFormula);
-  if (!compiled) { STATE.ppfCompiled = null; return; }
-  STATE.ppfCompiled = compiled;
+  STATE.ppfF = null; STATE.ppfF2 = null; STATE.ppfErr = null;
+  // Единый ввод (Фаза 11): строка принимает и «y = …», и «x = …», и неявное
+  // уравнение. Разбирает parsePpfEquation, движку по-прежнему приходит Y от X.
+  const r = parsePpfEquation(STATE.ppfFormula);
+  if (r.error) { STATE.ppfCompiled = null; STATE.ppfErr = r.error; return; }
+  STATE.ppfF = r.f; STATE.ppfKind = r.kind;
+  STATE.ppfCompiled = true;      // прежний флаг «формула принята»
   STATE.ppfReady = true;
-  // Авто-масштаб под границу: рамка из перехватов Макс X / Макс Y (+10% воздуха).
-  // Плавно при кручении ползунка (applyAutoRanges), мгновенно на входе — теперь вся
-  // граница всегда в кадре (баг «линия за кадром» уходит вместе с авто-масштабом).
-  let mx = ppfXmaxOf((x) => evalPpf(x)); if (!(mx > 0) || !isFinite(mx)) mx = CONFIG.Qmax;
-  let my = evalPpf(0); if (!(my > 0) || isNaN(my)) my = CONFIG.Pmax;
+  // Вторая кривая для сравнения (Фаза 12) — по тому же стандарту ввода.
+  if (STATE.ppfCompare) {
+    const r2 = parsePpfEquation(STATE.ppfFormula2);
+    if (!r2.error) STATE.ppfF2 = r2.f; else STATE.ppfErr = r2.error;
+  }
+  // Авто-масштаб под границу: рамка из перехватов по обеим кривым (+10% воздуха).
+  const edges = [{ f: evalPpf }];
+  if (STATE.ppfF2) edges.push({ f: (x) => evalPpf2(x) });
+  let mx = 0, my = 0;
+  edges.forEach(e => {
+    const a = ppfXmaxOf(e.f); if (a > 0 && isFinite(a)) mx = Math.max(mx, a);
+    const b = e.f(0); if (b > 0 && !isNaN(b)) my = Math.max(my, b);
+  });
+  if (!(mx > 0)) mx = CONFIG.Qmax;
+  if (!(my > 0)) my = CONFIG.Pmax;
   applyAutoRanges(niceMax(mx * 1.1), niceMax(my * 1.1));
 }
 
-// Кривая КПВ + бледная заливка достижимой области под ней.
+// Вторая КПВ сцены сравнения.
+function evalPpf2(x) {
+  if (!STATE.ppfF2) return NaN;
+  const v = STATE.ppfF2(x);
+  return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+}
+
+/* Луч потребления в комплектах (Фаза 11.4). Пропорция «столько X на столько Y»
+   задаёт луч из начала координат y = (ky/kx)·x; где он пересекает границу, там
+   и лежит максимальный набор. Целых комплектов столько, сколько раз пропорция
+   укладывается в этот набор. */
+function bundleRay(f) {
+  const kx = +STATE.bundleX, ky = +STATE.bundleY;
+  if (!(kx > 0) || !(ky > 0)) return null;
+  const slope = ky / kx;
+  const g = (x) => { const y = f(x); return isFinite(y) ? y - slope * x : NaN; };
+  const hi = ppfXmaxOf(f);
+  if (!(hi > 0)) return null;
+  const x = findRootIn(g, 1e-6, hi);
+  if (x == null) return null;
+  const y = slope * x;
+  return { x, y, slope, kx, ky, whole: Math.floor(Math.min(x / kx, y / ky) + 1e-9) };
+}
+
+// Кривая КПВ, вторая кривая сравнения, области и луч комплектов.
 function drawPpfCurve() {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
-  const pts = [];
-  for (let i = 0; i <= 400; i++) { const x = CONFIG.Qmax * i / 400; const y = evalPpf(x); pts.push((isNaN(y) || y < 0) ? null : [x, y]); }
+  const mk = (f) => {
+    const pts = [];
+    for (let i = 0; i <= 400; i++) {
+      const x = CONFIG.Qmin + (CONFIG.Qmax - CONFIG.Qmin) * i / 400;
+      const y = f(x);
+      pts.push((isNaN(y) || y < 0 || x < 0) ? null : [x, y]);
+    }
+    return pts;
+  };
   const area = d3.area().defined(d => d !== null).x(d => sx(d[0])).y0(sy(0)).y1(d => sy(d[1]));
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
-  g.append('path').datum(pts).attr('d', area).attr('fill', COL.D).attr('opacity', 0.08).attr('data-legend', 'Достижимые наборы');   // достижимо
-  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line);
-  g.append('text').attr('x', sx(CONFIG.Qmax * 0.16)).attr('y', sy(CONFIG.Pmax * 0.16))
-    .attr('font-size', 11).attr('fill', COL.D).attr('opacity', 0.75).text('достижимо');
+  const c1 = STATE.ppfColor1 || COL.D, c2 = STATE.ppfColor2 || COL.S;
+  const pts = mk(evalPpf);
+
+  // Недостижимое — всё, что выше границы: рисуем полосой до верха окна.
+  if (STATE.ppfShowOut) {
+    const out = d3.area().defined(d => d !== null).x(d => sx(d[0]))
+      .y0(d => sy(d[1])).y1(sy(CONFIG.Pmax));
+    g.append('path').datum(pts).attr('d', out)
+      .attr('fill', STATE.areaColor.ppfOut || COL.DWL).attr('opacity', 0.13)
+      .attr('data-legend', 'Недостижимые наборы');
+  }
+  if (STATE.ppfShowIn) {
+    g.append('path').datum(pts).attr('d', area)
+      .attr('fill', STATE.areaColor.ppfIn || c1).attr('opacity', 0.1)
+      .attr('data-legend', 'Достижимые наборы');
+  }
+  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c1).attr('stroke-width', 2.5).attr('d', line);
+  labelCurve(g, evalPpf, STATE.ppfName1 || 'КПВ', c1, {});
+
+  if (STATE.ppfF2) {
+    const p2 = mk(evalPpf2);
+    g.append('path').datum(p2).attr('fill', 'none').attr('stroke', c2).attr('stroke-width', 2.5).attr('d', line);
+    labelCurve(g, evalPpf2, STATE.ppfName2 || 'КПВ 2', c2, { below: true });
+  }
+
+  // Подпись «достижимо» привязана к самой области, а не к доле окна: при
+  // сильном отдалении она уезжала в пустоту далеко от кривой (Фаза 12.4).
+  if (STATE.ppfShowIn) {
+    const xm = ppfXmaxOf(evalPpf), ym = evalPpf(0);
+    if (xm > 0 && ym > 0) {
+      const lx = xm * 0.28, ly = evalPpf(lx) * 0.4;
+      if (isFinite(ly) && ly > 0) {
+        g.append('text').attr('x', sx(lx)).attr('y', sy(ly))
+          .attr('font-size', 11).attr('fill', c1).attr('opacity', 0.75).text('достижимо');
+      }
+    }
+  }
+  if (STATE.bundleOn) drawBundleRay(g, evalPpf, c1);
+}
+
+// Луч комплектов и точка, где он упирается в границу.
+function drawBundleRay(g, f, color) {
+  const b = bundleRay(f);
+  if (!b) return;
+  const col = COL.MR;
+  g.append('line').attr('x1', sx(0)).attr('y1', sy(0))
+    .attr('x2', sx(b.x)).attr('y2', sy(b.y))
+    .attr('stroke', col).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
+  g.append('circle').attr('cx', sx(b.x)).attr('cy', sy(b.y)).attr('r', 5)
+    .attr('fill', COL.halo).attr('stroke', col).attr('stroke-width', 2.4);
+  haloText(g, sx(b.x) + 9, sy(b.y) - 9,
+           '(' + fmt(b.x) + '; ' + fmt(b.y) + ')', 'start', 'auto');
 }
 
 // Табло КПВ: тип, перехваты Макс X / Макс Y, альтернативные издержки X.
 // Форму границы задают ползунки пульта «Макс X / Макс Y» (точку производства убрали).
+/* Альтернативные издержки в точке — численно, через наклон касательной.
+   Раньше брался наклон в середине окна и выдавался за «издержки X» на всей
+   кривой: для нелинейной КПВ это просто неверно, и издержки Y не считались
+   вовсе. Теперь обе величины и в трёх точках (Фаза 12.5).
+     издержки X = |dY/dX|   (сколько Y теряется за единицу X)
+     издержки Y = |dX/dY| = 1 / |dY/dX|   (обратная величина) */
+function ppfOppAt(f, x) {
+  const k = Math.abs(ppfSlopeOf(f, x));
+  if (!isFinite(k) || k <= 0) return null;
+  return { x, y: f(x), oppX: k, oppY: 1 / k };
+}
+
 function updatePpfPanel() {
   const box = document.getElementById('info-ppf');
   if (!box) return;
-  if (!STATE.ppfReady) { box.innerHTML = '<div class="warn">Не понял формулу Y = f(X).</div>'; return; }
-  const maxY = evalPpf(0), maxX = ppfXmaxOf((x) => evalPpf(x));
-  const opp = Math.abs(ppfSlope(CONFIG.Qmax * 0.5));   // |наклон| в середине (для линейной — постоянен)
-  let html = `<div class="stat"><span>Тип КПВ</span><b>${ppfTypeLabel()}</b></div>`;
-  html += `<div class="stat"><span>Макс X</span><b>${fmt((maxX != null) ? maxX : NaN)}</b></div>`;
-  html += `<div class="stat"><span>Макс Y</span><b>${fmt(maxY)}</b></div>`;
-  html += `<div class="stat"><span>Альт. издержки X</span><b>${fmt(opp)} Y/ед.</b></div>`;
-  html += '<div class="hint">Альтернативные издержки X показывают, сколько Y теряется за +1 ед. X (|наклон| = Макс Y / Макс X). ' +
-    'Двигайте ползунки «Макс X / Макс Y» в пульте: наклон и альт. издержки меняются вживую.</div>';
+  if (!STATE.ppfReady) {
+    box.innerHTML = '<div class="warn">' + (STATE.ppfErr || 'Не понял уравнение КПВ.') + '</div>';
+    return;
+  }
+  const f = evalPpf;
+  const maxY = f(0), maxX = ppfXmaxOf(f);
+  const type = ppfTypeLabel();
+  const at = [0.2, 0.5, 0.8].map(k => ppfOppAt(f, maxX * k)).filter(Boolean);
+  const linear = /линей/i.test(type);
+
+  let html = `<div class="stat"><span>Тип КПВ</span><b>${type}</b></div>`;
+  html += `<div class="stat"><span>$X_{max}$ (весь ресурс на X)</span><b>${fmt(maxX)}</b></div>`;
+  html += `<div class="stat"><span>$Y_{max}$ (весь ресурс на Y)</span><b>${fmt(maxY)}</b></div>`;
+  if (at.length) {
+    const mid = at[Math.floor(at.length / 2)];
+    html += `<div class="stat"><span>Альт. издержки X в середине</span><b>${fmt(mid.oppX)} Y за ед. X</b></div>`;
+    html += `<div class="stat"><span>Альт. издержки Y в середине</span><b>${fmt(mid.oppY)} X за ед. Y</b></div>`;
+  }
+  if (STATE.ppfF2) {
+    const m2x = ppfXmaxOf(evalPpf2), m2y = evalPpf2(0);
+    html += `<div class="stat"><span>${STATE.ppfName2 || 'КПВ 2'}: $X_{max}$ / $Y_{max}$</span>`
+          + `<b>${fmt(m2x)} / ${fmt(m2y)}</b></div>`;
+    const k2 = Math.abs(ppfSlopeOf(evalPpf2, m2x * 0.5));
+    html += `<div class="stat"><span>${STATE.ppfName2 || 'КПВ 2'}: альт. издержки X</span><b>${fmt(k2)} Y за ед. X</b></div>`;
+  }
+  if (STATE.bundleOn) {
+    const b = bundleRay(f);
+    if (b) {
+      html += `<div class="stat"><span>Комплект ${fmt(b.kx)} X на ${fmt(b.ky)} Y</span>`
+            + `<b>${fmt(b.x)}; ${fmt(b.y)}</b></div>`;
+      html += `<div class="stat"><span>Целых комплектов</span><b>${b.whole}</b></div>`;
+    }
+  }
+
+  // Разбор: откуда взялись эти числа.
+  html += '<div class="sb-note"><b>Как это получилось</b>';
+  html += '<p>Граница возможностей это все наборы, при которых ресурс израсходован '
+        + 'полностью. Концы кривой и есть крайние случаи: весь ресурс на один товар. '
+        + `Здесь это $X_{max} = ${fmt(maxX)}$ и $Y_{max} = ${fmt(maxY)}$; они найдены численно, `
+        + 'как точки пересечения кривой с осями.</p>';
+  html += '<p>Альтернативные издержки это наклон касательной в точке. Берём две близкие '
+        + 'точки слева и справа и делим прирост Y на прирост X, поэтому счёт одинаково '
+        + 'работает и для прямой, и для дуги, и для неявного уравнения. '
+        + 'Издержки Y это та же величина наоборот: $|dX/dY| = 1 / |dY/dX|$.</p>';
+  if (linear) {
+    html += '<p>Кривая прямая, поэтому наклон один и тот же везде: за каждую единицу X '
+          + `теряется ${fmt(at.length ? at[0].oppX : NaN)} единиц Y, сколько бы X уже ни выпускали. `
+          + 'Ресурсы взаимозаменяемы, и специализация ничего не удорожает.</p>';
+  } else if (at.length >= 2) {
+    const grow = at[at.length - 1].oppX > at[0].oppX;
+    html += '<p>Наклон меняется вдоль кривой, поэтому и издержки не одни и те же:</p>';
+    html += '<div class="tbl">' + at.map(p =>
+      `<div><span>при X = ${fmt(p.x)}</span><b>${fmt(p.oppX)} Y за ед. X</b></div>`).join('') + '</div>';
+    html += grow
+      ? '<p>Издержки растут: чем больше X уже выпускают, тем дороже обходится следующая '
+        + 'единица. Так бывает, когда ресурсы не одинаково пригодны для обоих товаров, и в ход '
+        + 'идут всё менее подходящие. Кривая выпуклая к началу координат.</p>'
+      : '<p>Издержки убывают: следующая единица X обходится дешевле предыдущей. Это редкий '
+        + 'случай, он означает отдачу от масштаба в производстве X.</p>';
+  }
+  if (STATE.bundleOn) {
+    const b = bundleRay(f);
+    if (b) {
+      html += `<p>Комплект это фиксированная пропорция ${fmt(b.kx)} X на ${fmt(b.ky)} Y. Все такие наборы `
+            + `лежат на луче $y = ${fmt(b.slope)}x$ из начала координат. Луч упирается в границу в точке `
+            + `(${fmt(b.x)}; ${fmt(b.y)}) — это и есть самый большой доступный набор нужной пропорции.</p>`;
+      html += `<p>Если блага делимы, комплектов получается ${fmt(Math.min(b.x / b.kx, b.y / b.ky))}. `
+            + `Если брать только целые, то ${b.whole}: остаток ресурса на полный комплект уже не хватает.</p>`;
+    }
+  }
+  html += '</div>';
   box.innerHTML = html;
 }
 
@@ -12310,7 +12610,10 @@ function snapTargets() {
     return out;
   }
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'single' && STATE.ppfReady) {
-    out.push({ name: 'КПВ', f: evalPpf });
+    // Обе кривые сравнения: тогда и в площадях есть выбор, под какой считать,
+    // и точки пересечения между ними находятся сами (Фаза 12.6).
+    out.push({ name: STATE.ppfName1 || 'КПВ', f: evalPpf, color: STATE.ppfColor1 || null });
+    if (STATE.ppfF2) out.push({ name: STATE.ppfName2 || 'КПВ 2', f: evalPpf2, color: STATE.ppfColor2 || null });
     return out;
   }
   // Сумма КПВ: суммарная кривая посчитана по точкам (Минковский), исходные —
@@ -15453,8 +15756,17 @@ function loadScene(name) {
     setMode('costs');                  // setMode сам ставит setRanges(10, 50)
   } else if (name === 'ppf') {
     const ppfInp = document.getElementById('inp-ppf');
-    STATE.ppfFormula = '100 - X'; STATE.ppfX = null;   // линейная: форму задают ползунки Макс X/Y
+    // Уравнение целиком: строка принимает и такую запись, и «x = …», и неявную.
+    STATE.ppfFormula = 'y = 100 - x'; STATE.ppfX = null;
+    STATE.ppfCompare = false; STATE.ppfFormula2 = 'y = 80 - 0.8*x';
+    STATE.ppfName1 = 'КПВ'; STATE.ppfName2 = 'КПВ 2';
+    STATE.bundleOn = false; STATE.ppfShowIn = true; STATE.ppfShowOut = false;
     if (ppfInp) ppfInp.value = STATE.ppfFormula;
+    const i2 = document.getElementById('inp-ppf2b'); if (i2) i2.value = STATE.ppfFormula2;
+    const box = document.getElementById('ppf-second'); if (box) box.style.display = 'none';
+    const cb = document.getElementById('btn-ppf-compare'); if (cb) cb.textContent = 'Сравнить с другой КПВ';
+    const bo = document.getElementById('chk-bundle'); if (bo) bo.checked = false;
+    const br = document.getElementById('bundle-row'); if (br) br.style.display = 'none';
     setMode('ppf');                    // setMode сам ставит setRanges(100, 100)
     setPpfSub('single');               // сцена показывает одиночную КПВ
   }
@@ -16520,17 +16832,10 @@ function buildPultExtra(sig) {
     if (hasModel) addTitle('Параметры модели');
   }
   sig = String(sig).split('|par:')[0];
-  if (sig === 'ppf1') {                                   // одна КПВ: Макс X / Макс Y
-    const ic = ppfInterceptsOf(STATE.ppfFormula);
-    addPultXChip(box, 'Макс X', ic.maxX, COL.D, 5, 200, 5, v => ppfSetSingle(v, ppfInterceptsOf(STATE.ppfFormula).maxY));
-    addPultXChip(box, 'Макс Y', ic.maxY, COL.D, 5, 200, 5, v => ppfSetSingle(ppfInterceptsOf(STATE.ppfFormula).maxX, v));
-  } else if (sig === 'ppf2') {                            // сумма: 2 страны × (Макс X / Макс Y)
-    const a = ppfInterceptsOf(STATE.ppf1), b = ppfInterceptsOf(STATE.ppf2);
-    addPultXChip(box, 'Стр.1 X', a.maxX, COL.tax, 5, 200, 5, v => ppfSetSum(1, v, ppfInterceptsOf(STATE.ppf1).maxY));
-    addPultXChip(box, 'Стр.1 Y', a.maxY, COL.tax, 5, 200, 5, v => ppfSetSum(1, ppfInterceptsOf(STATE.ppf1).maxX, v));
-    addPultXChip(box, 'Стр.2 X', b.maxX, COL.reg, 5, 200, 5, v => ppfSetSum(2, v, ppfInterceptsOf(STATE.ppf2).maxY));
-    addPultXChip(box, 'Стр.2 Y', b.maxY, COL.reg, 5, 200, 5, v => ppfSetSum(2, ppfInterceptsOf(STATE.ppf2).maxX, v));
-  } else if (sig === 'ineqM') {                           // неравенство: мастер «Сила неравенства»
+  // В блоке КПВ ползунков модели нет: форму границы задаёт само уравнение,
+  // а «Макс X / Макс Y» для дуги или неявной кривой ничего осмысленного не
+  // двигали — было непонятно, что именно они меняют (Фаза 11.3).
+  if (sig === 'ineqM') {                                  // неравенство: мастер «Сила неравенства»
     buildIneqMasterChip(box);
   }
 }
@@ -16978,27 +17283,62 @@ function wireControls() {
     if (e) e.addEventListener('change', () => { const v = parseFloat(e.value); if (!isNaN(v) && v > 0) { STATE[key] = v; _wantRangeAnim = true; redrawAll(); } });
   });
 
-  // Режим КПВ (Задача 3): ввод границы Y=f(X), кнопка «Построить», пресеты.
+  // Режим КПВ: одна строка на любую форму уравнения (Фаза 11), вторая кривая
+  // для сравнения, луч комплектов и области.
   const ppfInp = document.getElementById('inp-ppf');
+  const ppfInp2 = document.getElementById('inp-ppf2b');
   function applyPpf() {
     const f = ((ppfInp && ppfInp.value) || '').trim();
-    const { error } = compilePpf(f);
+    const r = parsePpfEquation(f);
     const errBox = document.getElementById('ppf-error');
-    if (error) { if (errBox) { errBox.textContent = 'Не понял формулу: ' + error; errBox.style.display = 'block'; } return; }
+    if (r.error) { if (errBox) { errBox.textContent = 'Не понял уравнение: ' + r.error; errBox.style.display = 'block'; } return; }
     if (errBox) errBox.style.display = 'none';
     STATE.ppfFormula = f;
+    STATE.ppfFormula2 = ((ppfInp2 && ppfInp2.value) || '').trim();
     STATE.ppfX = null;
     redrawAll();
     const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = '';   // пере-инициализировать
-    if (typeof updatePult === 'function') updatePult();                      // ползунки Макс X/Y
+    if (typeof updatePult === 'function') updatePult();
   }
   const pApply = document.getElementById('btn-ppf-apply');
   if (pApply) pApply.addEventListener('click', applyPpf);
   if (ppfInp) ppfInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpf(); });
-  const pLin = document.getElementById('btn-ppf-lin');
-  if (pLin) pLin.addEventListener('click', () => { if (ppfInp) ppfInp.value = '100 - X'; applyPpf(); });
-  const pConc = document.getElementById('btn-ppf-conc');
-  if (pConc) pConc.addEventListener('click', () => { if (ppfInp) ppfInp.value = '100 - 0.01*X^2'; applyPpf(); });
+  if (ppfInp2) ppfInp2.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpf(); });
+
+  // Вторая КПВ: кнопка показывает второе поле и строит обе кривые (Фаза 12.2).
+  const cmp = document.getElementById('btn-ppf-compare');
+  if (cmp) cmp.addEventListener('click', () => {
+    STATE.ppfCompare = !STATE.ppfCompare;
+    const box = document.getElementById('ppf-second');
+    if (box) box.style.display = STATE.ppfCompare ? '' : 'none';
+    cmp.textContent = STATE.ppfCompare ? 'Убрать вторую КПВ' : 'Сравнить с другой КПВ';
+    applyPpf();
+  });
+
+  // Свои имена кривых.
+  [['inp-ppf-name1', 'ppfName1'], ['inp-ppf-name2', 'ppfName2']].forEach(([id, key]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('input', () => { STATE[key] = e.value.trim(); redrawAll(); });
+  });
+
+  // Потребление в комплектах.
+  const bOn = document.getElementById('chk-bundle');
+  if (bOn) bOn.addEventListener('change', () => {
+    STATE.bundleOn = bOn.checked;
+    const row = document.getElementById('bundle-row');
+    if (row) row.style.display = bOn.checked ? '' : 'none';
+    redrawAll();
+  });
+  [['inp-bundle-x', 'bundleX'], ['inp-bundle-y', 'bundleY']].forEach(([id, key]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('input', () => { STATE[key] = parseFloat(e.value); redrawAll(); });
+  });
+
+  // Показ областей.
+  [['chk-ppf-in', 'ppfShowIn'], ['chk-ppf-out', 'ppfShowOut']].forEach(([id, key]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('change', () => { STATE[key] = e.checked; redrawAll(); });
+  });
 
   // Под-режимы КПВ (Задачи 1–2): одна / сумма двух / КТВ.
   [['ppfsub-single', 'single'], ['ppfsub-sum', 'sum'], ['ppfsub-trade', 'trade']].forEach(([id, sub]) => {
