@@ -27,3 +27,7 @@ networkx==3.2.1
 # Other local tools
 PyYAML==6.0.3
 cryptography==48.0.0
+
+# Подбор домашки по описанию (Часть C сессии 3). На проде НЕ нужен:
+# без ключа ANTHROPIC_API_KEY функция сама выключается.
+anthropic>=0.113
