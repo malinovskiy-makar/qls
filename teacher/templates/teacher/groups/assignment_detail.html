@@ -3,6 +3,13 @@
 {% block title %}{{ assignment.name }} — ЭкЗадачи{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
+.export-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  margin: -8px 0 20px; font-size: 13px; }
+.export-cap { color: var(--text2); }
+.export-row a { color: var(--text); text-decoration: none;
+  border: 0.5px solid var(--border); border-radius: var(--r);
+  padding: 5px 12px; }
+.export-row a:hover { border-color: var(--accent); color: var(--accent); }
 .summary {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 12px; margin-bottom: 22px;
@@ -33,6 +40,19 @@
   <a href="{% url 'teacher:group_submissions' group.pk assignment.pk %}" class="btn-primary">
     Проверять решения{% if stats.pending %} ({{ stats.pending }}){% endif %}
   </a>
+</div>
+
+{% comment %}
+Экспорт на бумагу. Два варианта одного задания: ученикам без ответов,
+себе — с ответами и решениями. PDF собирается там, где есть TeX Live;
+на бесплатном хостинге его нет, и вместо ошибки отдаётся .tex.
+{% endcomment %}
+<div class="export-row">
+  <span class="export-cap">Распечатать:</span>
+  <a href="{% url 'teacher:assignment_export' group.pk assignment.pk %}?fmt=pdf">PDF ученикам</a>
+  <a href="{% url 'teacher:assignment_export' group.pk assignment.pk %}?fmt=pdf&amp;for=teacher">PDF с ответами</a>
+  <a href="{% url 'teacher:assignment_export' group.pk assignment.pk %}">.tex ученикам</a>
+  <a href="{% url 'teacher:assignment_export' group.pk assignment.pk %}?for=teacher">.tex с ответами</a>
 </div>
 
 <div class="summary">
