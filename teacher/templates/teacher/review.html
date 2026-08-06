@@ -370,6 +370,21 @@ input[type="number"].form-input {
                     placeholder="Что хорошо, что улучшить...">{% if existing_feedback %}{{ existing_feedback.comment }}{% endif %}</textarea>
         </div>
 
+        <div class="form-group">
+          <label class="form-label" for="work_comment">Комментарий ко всей работе</label>
+          <textarea id="work_comment" name="work_comment" class="form-input"
+                    placeholder="Общий вывод по работе — ученик увидит его сразу под баллом.">{% if work_feedback %}{{ work_feedback.comment }}{% endif %}</textarea>
+          <div class="existing-note">Один на всю работу, а не на эту задачу.</div>
+        </div>
+
+        {% if work_review_url %}
+        <div class="form-group">
+          <a href="{{ work_review_url }}" class="btn-back" style="display:inline-block;">
+            Посмотреть работу глазами ученика →
+          </a>
+        </div>
+        {% endif %}
+
         {% if mistake_tags %}
         <div class="form-group">
           <label class="form-label">Отметить ошибки</label>

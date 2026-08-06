@@ -1,0 +1,248 @@
+{% extends "student/base.html" %}
+{% load catalog_filters %}
+
+{% block title %}{{ assignment.name }} — разбор{% endblock %}
+
+{% block extra_style %}
+{% include "student/_work_style.html" %}
+
+/* ── Шапка: балл — самый крупный элемент экрана ──────────────
+   Если, открыв работу, непонятно сколько получил — экран не сделал
+   своей работы, как бы аккуратно ни был свёрстан. */
+.wr-head { background: var(--surface); border: 1px solid var(--border);
+           border-radius: 12px; padding: 24px 26px; margin-bottom: 22px; }
+.wr-kind { font-size: 11px; font-weight: 700; letter-spacing: .08em;
+           text-transform: uppercase; color: var(--text2); }
+.wr-name { font-size: 20px; font-weight: 700; margin: 6px 0 18px; }
+.wr-score { font-size: 56px; font-weight: 800; line-height: 1;
+            letter-spacing: -.02em; }
+.wr-score small { font-size: 26px; font-weight: 700; color: var(--text2); }
+.wr-cap { font-size: 13px; color: var(--text2); margin-top: 8px; }
+.wr-meta { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px;
+           font-size: 13px; color: var(--text2); }
+.wr-note { margin-top: 18px; background: var(--green-tint);
+           border: 1px solid var(--green-border); border-radius: var(--r);
+           padding: 14px 16px; }
+.wr-note-cap { font-size: 11px; font-weight: 700; text-transform: uppercase;
+               letter-spacing: .05em; color: var(--green); margin-bottom: 6px; }
+.wr-warn { margin-top: 14px; background: var(--amber-tint);
+           border: 1px solid var(--amber-border); border-radius: var(--r);
+           padding: 10px 14px; font-size: 13px; line-height: 1.6; }
+
+/* ── Задача ─────────────────────────────────────────────── */
+.wr-item { background: var(--surface); border: 1px solid var(--border);
+           border-left-width: 4px; border-radius: 10px; margin-bottom: 14px; }
+.wr-item[open] { box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+.wr-correct { border-left-color: var(--green); }
+.wr-partial { border-left-color: var(--amber); }
+.wr-wrong   { border-left-color: var(--error); }
+.wr-pending { border-left-color: var(--amber); }
+.wr-empty   { border-left-color: var(--border); }
+.wr-item > summary { cursor: pointer; list-style: none; padding: 14px 18px;
+                     display: flex; align-items: center; gap: 12px;
+                     flex-wrap: wrap; }
+.wr-item > summary::-webkit-details-marker { display: none; }
+.wr-item > summary::before { content: '▸'; color: var(--text2);
+                             font-size: 12px; }
+.wr-item[open] > summary::before { content: '▾'; }
+.wr-num { font-size: 13px; font-weight: 700; color: var(--text2); }
+.wr-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wr-flag { font-size: 11px; font-weight: 700; text-transform: uppercase;
+           letter-spacing: .05em; padding: 3px 9px; border-radius: 999px;
+           white-space: nowrap; }
+.flag-correct { background: var(--green-tint); color: var(--green); }
+.flag-partial { background: var(--amber-tint); color: var(--amber); }
+.flag-wrong   { background: var(--error-tint); color: var(--error); }
+.flag-pending { background: var(--amber-tint); color: var(--amber); }
+.flag-empty   { background: var(--chip-bg); color: var(--chip-text); }
+.wr-points { font-size: 16px; font-weight: 800; white-space: nowrap; }
+.wr-points small { font-size: 12px; font-weight: 600; color: var(--text2); }
+.wr-body { padding: 0 18px 18px; }
+.wr-block { margin-top: 16px; }
+.wr-block-cap { font-size: 11px; font-weight: 700; text-transform: uppercase;
+                letter-spacing: .05em; color: var(--text2); margin-bottom: 6px; }
+.wr-mine { background: var(--panel); border: 1px solid var(--border);
+           border-radius: var(--r); padding: 12px 14px; font-size: 14px;
+           line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wr-order { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+            margin-bottom: 16px; font-size: 13px; color: var(--text2); }
+.wr-order button { border: 1px solid var(--border); border-radius: var(--r);
+                   background: transparent; color: var(--text); font: inherit;
+                   font-size: 13px; padding: 5px 12px; cursor: pointer; }
+.wr-order button.is-on { border-color: var(--accent); color: var(--accent);
+                         background: var(--accent-tint); font-weight: 600; }
+@media (max-width: 560px) {
+  .wr-head { padding: 18px; }
+  .wr-score { font-size: 44px; }
+  .wr-item > summary { padding: 12px 14px; }
+  .wr-body { padding: 0 14px 14px; }
+  .wr-title { white-space: normal; }
+}
+{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{{ back_url }}">← {{ back_label }}</a>
+
+<div class="wr-head">
+  <div class="wr-kind">
+    {% if assignment.is_exam %}Контрольная{% else %}Домашка{% endif %}
+    {% if for_tutor %} · {{ student.get_full_name|default:student.username }}{% endif %}
+  </div>
+  <h1 class="wr-name">{{ assignment.name }}</h1>
+
+  {% if show_scores and summary.is_final %}
+  <div class="wr-score">{{ summary.scored }}<small> из {{ summary.max_score }}</small></div>
+  <div class="wr-cap">итоговый балл за работу</div>
+  {% elif show_scores and summary.graded_max %}
+  <div class="wr-score">{{ summary.scored }}<small> из {{ summary.graded_max }}</small></div>
+  <div class="wr-cap">по проверенным задачам · всего в работе {{ summary.max_score }} б.</div>
+  {% elif show_scores %}
+  {# Проверено пока НИЧЕГО. «0 из 0» — не результат, а недоразумение. #}
+  <div class="wr-score">—</div>
+  <div class="wr-cap">ещё ничего не проверено · всего в работе {{ summary.max_score }} б.</div>
+  {% else %}
+  <div class="wr-score">—</div>
+  <div class="wr-cap">преподаватель откроет результат после проверки</div>
+  {% endif %}
+
+  <div class="wr-meta">
+    {% if submitted_at %}<span>сдано {{ submitted_at|date:"d.m.Y, H:i" }}</span>{% endif %}
+    {% if spent_minutes is not None %}<span>затрачено {{ spent_minutes }} мин</span>{% endif %}
+    <span>задач: {{ summary.rows|length }}</span>
+    {% if summary.wrong %}<span>с ошибками: {{ summary.wrong }}</span>{% endif %}
+  </div>
+
+  {% if not summary.is_final %}
+  <div class="wr-warn">
+    Это <b>предварительный результат</b>: {{ summary.pending }} задач(и) ещё
+    проверяет преподаватель. Итоговый балл появится после проверки.
+  </div>
+  {% endif %}
+
+  {% if summary.work_comment and summary.work_comment.comment %}
+  <div class="wr-note">
+    <div class="wr-note-cap">Комментарий преподавателя к работе</div>
+    <div>{{ summary.work_comment.comment|linebreaksbr }}</div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="wr-order">
+  <span>Порядок:</span>
+  <button type="button" id="order-natural" class="is-on">как в работе</button>
+  <button type="button" id="order-errors">сначала с ошибками</button>
+</div>
+
+<div id="wr-list">
+{% for row in summary.rows %}
+<details class="wr-item wr-{{ row.state }}" data-state="{{ row.state }}"
+         data-attention="{% if row.needs_attention %}1{% else %}0{% endif %}"
+         {% if row.needs_attention %}open{% endif %}>
+  <summary>
+    <span class="wr-num">{{ row.number }}.</span>
+    <span class="wr-title">{{ row.title|default:row.statement|striptags|truncatechars:70 }}</span>
+    <span class="wr-flag flag-{% if not show_scores and not row.by_teacher %}empty{% else %}{{ row.state }}{% endif %}">
+      {% if not show_scores and not row.by_teacher %}сдано
+      {% elif row.state == 'correct' %}верно
+      {% elif row.state == 'partial' %}частично
+      {% elif row.state == 'wrong' %}неверно
+      {% elif row.state == 'pending' %}на проверке
+      {% else %}без ответа{% endif %}
+    </span>
+    <span class="wr-points">
+      {% if row.score is not None and show_scores or row.by_teacher %}{{ row.score|floatformat:"-2" }}{% else %}—{% endif %}<small> / {{ row.max_points|floatformat:"-2" }} б.</small>
+    </span>
+  </summary>
+
+  <div class="wr-body">
+    <div class="problem-statement">{{ row.statement|safe }}</div>
+
+    {% if row.parts and not row.answer_parts %}
+    <div class="problem-parts">
+      {% for part in row.parts %}
+      <div class="part-item">
+        <span class="part-label">{{ part.label|partlabel }}</span>
+        <span>{{ part.statement|safe }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="wr-block">
+      <div class="wr-block-cap">Мой ответ</div>
+      {% if row.has_real_parts %}
+        {% include "student/_part_results.html" with part_rows=row.answer_parts show_correct=1 %}
+      {% else %}
+        <div class="wr-mine">{% if row.answer_display %}{{ row.answer_display }}{% else %}— не отвечено{% endif %}</div>
+        {% if row.item.correct_answer %}
+        <div class="part-result-answers" style="margin-top:8px;">
+          <span><b>верный ответ:</b> {{ row.item.correct_answer }}</span>
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    {% if row.sub.solution_text %}
+    <div class="wr-block">
+      <div class="wr-block-cap">Мой ход решения</div>
+      <div class="wr-mine">{{ row.sub.solution_text }}</div>
+    </div>
+    {% endif %}
+
+    {% if row.sub.solution_file %}
+    <div class="wr-block">
+      <a href="{{ row.sub.solution_file.url }}" target="_blank"
+         style="color:var(--accent);font-size:13px;">📎 Прикреплённый файл</a>
+    </div>
+    {% endif %}
+
+    {% if show_scores or row.by_teacher %}
+      {% include "student/_feedback_block.html" with fb=row.feedback points=row.max_points pending_text="Эту задачу ещё проверяет преподаватель." %}
+    {% endif %}
+
+    {% if row.has_solution %}
+      {% if row.solution_visible %}
+      <details class="pf-fold">
+        <summary>Эталонное решение</summary>
+        <div class="pf-fold-body">{{ row.solution_text|linebreaksbr }}</div>
+      </details>
+      {% else %}
+      <div class="pf-locked">{{ row.solution_hint }}</div>
+      {% endif %}
+    {% endif %}
+  </div>
+</details>
+{% empty %}
+<div class="pf-locked">В этой работе нет задач.</div>
+{% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Порядок задач: как в работе или «сначала с ошибками».
+// Разбор начинается с того, что не получилось, — но ученик должен иметь
+// возможность вернуться к исходному порядку, иначе он потеряется.
+(function () {
+  var list = document.getElementById('wr-list');
+  if (!list) { return; }
+  var natural = Array.prototype.slice.call(list.children);
+  var byErrors = natural.slice().sort(function (a, b) {
+    return (b.dataset.attention || '0').localeCompare(a.dataset.attention || '0');
+  });
+
+  function paint(order, onButton) {
+    order.forEach(function (node) { list.appendChild(node); });
+    ['order-natural', 'order-errors'].forEach(function (id) {
+      var button = document.getElementById(id);
+      if (button) { button.classList.toggle('is-on', id === onButton); }
+    });
+  }
+  document.getElementById('order-natural')
+    .addEventListener('click', function () { paint(natural, 'order-natural'); });
+  document.getElementById('order-errors')
+    .addEventListener('click', function () { paint(byErrors, 'order-errors'); });
+})();
+</script>
+{% endblock %}

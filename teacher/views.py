@@ -148,7 +148,9 @@ def assignment_detail(request, pk, group=None):
 def review_submission(request, pk, group=None):
     """Форма оценки решения. Переехала под групповые URL; логика оценки
     не менялась."""
-    from problems.models import MistakeTag, Submission, TeacherFeedback
+    from problems.models import (
+        MistakeTag, Submission, TeacherFeedback, WorkFeedback,
+    )
 
     submission = get_object_or_404(Submission, pk=pk)
     if submission.assignment.author != request.user and not request.user.is_staff:
@@ -187,6 +189,17 @@ def review_submission(request, pk, group=None):
         submission.status = 'reviewed'
         submission.save()
 
+        # Комментарий КО ВСЕЙ РАБОТЕ. Пишется здесь же (репетитор уже на
+        # этом экране), но относится к работе целиком и показывается
+        # ученику сразу под итоговым баллом, а не в последней задаче.
+        work_comment = (request.POST.get('work_comment') or '').strip()
+        if work_comment or WorkFeedback.objects.filter(
+                assignment=submission.assignment,
+                student=submission.student).exists():
+            WorkFeedback.objects.update_or_create(
+                assignment=submission.assignment, student=submission.student,
+                defaults={'comment': work_comment, 'author': request.user})
+
         update_student_progress(submission, feedback)
 
         messages.success(request, f'Решение проверено. Балл: {score}')
@@ -215,15 +228,23 @@ def review_submission(request, pk, group=None):
         elif item.points is not None:
             max_score = item.points
 
+    group_obj = group or submission.assignment.group
     return render(request, 'teacher/review.html', {
         'submission': submission,
         'problem': problem,
         'existing_feedback': existing_feedback,
         'mistake_tags': mistake_tags,
-        'group': group or submission.assignment.group,
+        'group': group_obj,
         'part_rows': part_rows,
         'max_score': max_score,
         'auto_score': auto_score,
+        'work_feedback': WorkFeedback.objects.filter(
+            assignment=submission.assignment,
+            student=submission.student).first(),
+        'work_review_url': reverse(
+            'teacher:student_work_review',
+            args=[group_obj.pk, submission.assignment_id,
+                  submission.student_id]) if group_obj else None,
     })
 
 

@@ -120,21 +120,25 @@ def save_part_answers(submission, item, values):
     return scored, maximum, pending
 
 
-def part_rows(item, submission):
+def part_rows(item, submission, stored=None):
     """Строки «пункт → ответ ученика → эталон → вердикт» для показа.
 
     Одна сборка на экран ученика и на экран репетитора: разъехавшиеся
     вердикты на двух экранах — это спор ученика с преподавателем на пустом
     месте.
+
+    `stored` — уже загруженные ответы {id пункта: PartAnswer}. Передаётся
+    сборкой строк, чтобы не делать по запросу на задачу.
     """
     from .models import PartAnswer
 
     parts = answer_parts(item)
-    stored = {}
-    if submission is not None and submission.pk:
-        stored = {answer.part_id: answer
-                  for answer in PartAnswer.objects.filter(
-                      submission=submission).select_related('part')}
+    if stored is None:
+        stored = {}
+        if submission is not None and submission.pk:
+            stored = {answer.part_id: answer
+                      for answer in PartAnswer.objects.filter(
+                          submission=submission).select_related('part')}
 
     rows = []
     for number, part in enumerate(parts, start=1):

@@ -182,7 +182,7 @@
       {% endif %}
     </div>
   </div>
-  <a href="{% url 'student:exam_result' item.assignment.pk %}" class="btn-open">Результат</a>
+  <a href="{% url 'student:work_review' item.assignment.pk %}" class="btn-open">Разбор</a>
 </div>
 {% endfor %}
 {% endif %}
@@ -227,12 +227,13 @@
     <div class="hw-name">{{ item.assignment.name }}</div>
     <div class="hw-meta">
       <span class="metric-progress">Проверено: {{ item.stats.total_reviewed }} из {{ item.stats.total }}</span>
+      <span class="deadline-badge deadline-yellow">ждёт проверки</span>
       {% if item.deadline %}
         <span class="deadline-badge deadline-grey">дедлайн: {{ item.deadline|date:"d.m" }}</span>
       {% endif %}
     </div>
   </div>
-  <a href="{% url 'student:assignment_detail' item.assignment.pk %}" class="btn-open">Открыть</a>
+  <a href="{% url 'student:work_review' item.assignment.pk %}" class="btn-open">Разбор</a>
 </div>
 {% endfor %}
 {% endif %}
@@ -244,7 +245,9 @@
   <div class="hw-card-main">
     <div class="hw-name">{{ item.assignment.name }}</div>
     <div class="hw-meta">
-      <span class="metric-progress">{{ item.stats.total }} задач проверено</span>
+      <span class="metric-progress">
+        {% if item.score is not None %}<b>{{ item.score|floatformat:"-2" }} из {{ item.max_score|floatformat:"-2" }} б.</b>{% else %}{{ item.stats.total }} задач проверено{% endif %}
+      </span>
       {% if item.deadline %}
         <span class="deadline-badge deadline-grey">{{ item.deadline|date:"d.m.Y" }}</span>
       {% endif %}
@@ -261,7 +264,7 @@
       <span class="metric-pending">Ожидает проверки</span>
     {% endif %}
   </div>
-  <a href="{% url 'student:assignment_detail' item.assignment.pk %}" class="btn-open">Результаты</a>
+  <a href="{% url 'student:work_review' item.assignment.pk %}" class="btn-open">Разбор</a>
 </div>
 {% endfor %}
 {% endif %}

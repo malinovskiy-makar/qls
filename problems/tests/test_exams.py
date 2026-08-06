@@ -445,7 +445,8 @@ class GradingTests(TestCase):
                          {'answer_item_%d' % self.item.pk: 'б',
                           'text_item_%d' % self.open_item.pk: 'рассуждение'})
         body = self.client.get(
-            reverse('student:exam_result', args=[self.exam.pk])).content.decode()
+            reverse('student:exam_result', args=[self.exam.pk]),
+            follow=True).content.decode()
         self.assertIn('предварительный результат', body)
 
     def _finish(self):
@@ -483,7 +484,8 @@ class GradingTests(TestCase):
                                mistakes=[mistake])
 
         body = self.client.get(
-            reverse('student:exam_result', args=[self.exam.pk])).content.decode()
+            reverse('student:exam_result', args=[self.exam.pk]),
+            follow=True).content.decode()
         self.assertIn('Хорошо, но проверь единицы', body)
         self.assertIn('Перепутаны оси', body)
         self.assertIn('проверил преподаватель', body)
@@ -497,7 +499,8 @@ class GradingTests(TestCase):
         self._finish()
         self._review_open_item(score='0', comment='Не хватает вывода')
         body = self.client.get(
-            reverse('student:exam_result', args=[self.exam.pk])).content.decode()
+            reverse('student:exam_result', args=[self.exam.pk]),
+            follow=True).content.decode()
         self.assertIn('Не хватает вывода', body)
         self.assertIn('проверил преподаватель', body)
 
@@ -509,12 +512,14 @@ class GradingTests(TestCase):
         self._finish()
 
         body = self.client.get(
-            reverse('student:exam_result', args=[self.exam.pk])).content.decode()
+            reverse('student:exam_result', args=[self.exam.pk]),
+            follow=True).content.decode()
         self.assertNotIn('проверено автоматически', body)
 
         self._review_open_item(score='5', comment='Комментарий виден всегда')
         body = self.client.get(
-            reverse('student:exam_result', args=[self.exam.pk])).content.decode()
+            reverse('student:exam_result', args=[self.exam.pk]),
+            follow=True).content.decode()
         self.assertIn('Комментарий виден всегда', body)
 
     def test_homework_card_shows_teacher_feedback_too(self):

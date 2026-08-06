@@ -885,6 +885,43 @@ class AnswerDraft(models.Model):
         return f'{self.attempt}: позиция {self.problem_item_id}'
 
 
+class WorkFeedback(models.Model):
+    """Комментарий преподавателя КО ВСЕЙ РАБОТЕ одного ученика.
+
+    ⚠️ Зачем отдельно от `TeacherFeedback`. Тот привязан к решению ОДНОЙ
+    задачи, а «в целом разобрался, но следи за единицами» относится к
+    работе целиком. Класть такое в комментарий к последней задаче — значит
+    прятать главное в случайном месте: ученик открывает разбор и должен
+    видеть общий вывод сразу под баллом, а не искать его внизу страницы.
+
+    `ProblemComment` для этого не годится: он требует позицию задачи.
+    """
+
+    assignment = models.ForeignKey(
+        'problems.Assignment', on_delete=models.CASCADE,
+        related_name='work_feedback', verbose_name='Работа')
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='work_feedback', verbose_name='Ученик')
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='work_feedback_written',
+        verbose_name='Написал')
+    comment = models.TextField('Комментарий к работе', blank=True)
+    updated_at = models.DateTimeField('Обновлён', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Комментарий к работе'
+        verbose_name_plural = 'Комментарии к работам'
+        constraints = [
+            models.UniqueConstraint(fields=['assignment', 'student'],
+                                    name='uniq_work_feedback'),
+        ]
+
+    def __str__(self):
+        return f'{self.assignment}: {self.student}'
+
+
 class PartAnswer(models.Model):
     """Ответ ученика на ОДИН пункт задачи.
 

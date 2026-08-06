@@ -284,6 +284,13 @@ def dashboard(request):
             continue
 
         if stats['all_reviewed']:
+            # У завершённой работы в списке показываем ИТОГОВЫЙ БАЛЛ, а не
+            # «N задач проверено»: балл — то, ради чего список открывают.
+            from problems.work_review import work_summary
+
+            totals = work_summary(a, request.user)
+            item['score'] = totals['scored']
+            item['max_score'] = totals['max_score']
             completed.append(item)
         elif stats['total_reviewed'] > 0 or Submission.objects.filter(
             assignment=a, student=request.user, status='submitted'
@@ -483,16 +490,79 @@ def _log_submission_event(request, assignment, submission, problem):
 
 @student_required
 def submission_detail(request, pk):
+    """⚠️ УСТАРЕЛА. Разбор ОДНОЙ задачи поглощён разбором всей работы.
+
+    Двух похожих экранов результата быть не должно: этот показывал одну
+    задачу и не показывал ни итогового балла, ни остальных задач. Адрес
+    оставлен редиректом ради закладок.
+    """
     from problems.models import Submission
 
     submission = get_object_or_404(Submission, pk=pk, student=request.user)
-    feedback = getattr(submission, 'feedback', None)
+    return redirect('student:work_review', pk=submission.assignment_id)
 
-    return render(request, 'student/submission_detail.html', {
-        'submission': submission,
-        'feedback': feedback,
-        'problem': submission.problem,
-    })
+
+@student_required
+def work_review(request, pk):
+    """Разбор сданной работы — ОДИН экран на домашку и контрольную.
+
+    Главное на экране — БАЛЛ. Никакой геймификации: это разбор работы, а
+    не награда.
+    """
+    from problems import work_review as review
+    from problems.models import Assignment
+
+    assignment = get_object_or_404(Assignment, pk=pk, students=request.user)
+    if not review.is_submitted(assignment, request.user):
+        # Разбирать нечего, а верные ответы стали бы подсказкой.
+        target = ('student:exam_intro' if assignment.is_exam
+                  else 'student:assignment_detail')
+        return redirect(target, pk=assignment.pk)
+
+    return render(request, 'student/work_review.html',
+                  work_review_context(assignment, request.user))
+
+
+def work_review_context(assignment, student, viewer=None, for_tutor=False,
+                        back_url=None, back_label=None):
+    """Контекст экрана разбора. Общий для ученика и репетитора: обе стороны
+    обязаны видеть ОДНО И ТО ЖЕ — иначе спор об оценке превращается в спор
+    о том, у кого что на экране."""
+    from django.urls import reverse
+
+    from problems import work_review as review
+
+    submitted_at = None
+    if assignment.is_exam:
+        attempt = assignment.exam_attempts.filter(student=student).first()
+        submitted_at = attempt.submitted_at if attempt else None
+    else:
+        from problems.models import Submission
+
+        last = Submission.objects.filter(
+            assignment=assignment, student=student,
+            submitted_at__isnull=False).order_by('-submitted_at').first()
+        submitted_at = last.submitted_at if last else None
+
+    summary = review.work_summary(assignment, student, viewer=viewer or student)
+    # ⚠️ «Не показывать результат сразу» относится к АВТОПРОВЕРКЕ. Как
+    # только преподаватель проверил хоть одну задачу руками, баллы
+    # показываем: он их для ученика и ставил. Репетитор видит всегда.
+    show_scores = (for_tutor or not assignment.is_exam
+                   or assignment.show_results_immediately
+                   or summary['reviewed_by_teacher'] > 0)
+
+    return {
+        'assignment': assignment,
+        'student': student,
+        'for_tutor': for_tutor,
+        'show_scores': show_scores,
+        'summary': summary,
+        'spent_minutes': review.spent_minutes(assignment, student),
+        'submitted_at': submitted_at,
+        'back_url': back_url or reverse('student:dashboard'),
+        'back_label': back_label or 'Все работы',
+    }
 
 
 # ---------------------------------------------------------------------------

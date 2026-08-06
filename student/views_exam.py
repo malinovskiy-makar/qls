@@ -256,7 +256,12 @@ def exam_finish(request, pk):
 
 @student_required
 def exam_result(request, pk):
-    """Результат ученику. Честно помечает, что ещё не проверено человеком."""
+    """⚠️ ПОГЛОЩЁН разбором работы.
+
+    Экранов результата было два — свой у контрольной и карточки домашки, —
+    и оба показывали разное. Теперь он один: `/student/work/<pk>/`. Адрес
+    оставлен редиректом ради закладок и ссылок из писем.
+    """
     assignment = _exam_or_404(request, pk)
     attempt = assignment.exam_attempts.filter(student=request.user).first()
     if attempt is None:
@@ -265,30 +270,7 @@ def exam_result(request, pk):
     attempt.refresh_from_db()
     if attempt.submitted_at is None:
         return redirect('student:exam_take', pk=assignment.pk)
-
-    summary = exam_engine.attempt_summary(attempt)
-    for row in summary['rows']:
-        row['solution_visible'] = row['item'].is_solution_visible_for(
-            request.user)
-        row['solution_hint'] = row['item'].solution_unlock_hint()
-
-    spent = None
-    if attempt.started_at and attempt.submitted_at:
-        spent = int((attempt.submitted_at - attempt.started_at)
-                    .total_seconds() // 60)
-
-    return render(request, 'student/exam_result.html', {
-        'assignment': assignment,
-        'attempt': attempt,
-        'summary': summary,
-        'spent_minutes': spent,
-        'group_average': _group_average(assignment),
-        # ⚠️ «Придержать результат до проверки» относится к АВТОПРОВЕРКЕ.
-        # Как только преподаватель проверил хоть одну задачу руками, баллы
-        # показываем: он их и ставил для ученика.
-        'show_scores': (assignment.show_results_immediately
-                        or summary['reviewed_by_teacher'] > 0),
-    })
+    return redirect('student:work_review', pk=assignment.pk)
 
 
 def _group_average(assignment):

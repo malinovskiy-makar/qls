@@ -263,13 +263,13 @@ def selected_values(answer):
             if value.strip()}
 
 
-def _part_rows(item, submission):
+def _part_rows(item, submission, stored=None):
     """Строки пунктов. Тестам не нужны — у них подпункты это варианты."""
     from .part_grading import applies, part_rows
 
     if not applies(item):
         return []
-    return part_rows(item, submission)
+    return part_rows(item, submission, stored=stored)
 
 
 def _has_real_parts(item):
@@ -304,9 +304,27 @@ def build_rows(assignment, student, user=None, with_comments=True):
             comments_by_item.setdefault(comment.problem_item_id,
                                         []).append(comment)
 
+    # ⚠️ Решения, проверки и ответы по пунктам подтягиваем ОДНИМ заходом.
+    # Без этого экран разбора делал по три запроса на задачу и упирался в
+    # потолок 30 запросов на восьми задачах (поймано тестом бюджета).
+    known = {}
+    if items:
+        from .models import Submission
+
+        known = {s.problem_item_id: s for s in Submission.objects.filter(
+            student=student, assignment=assignment,
+            problem_item__in=[i.pk for i in items])
+            .select_related('feedback')
+            .prefetch_related('part_answers__part', 'feedback__mistakes')}
+
     rows = []
     for number, item in enumerate(items, start=1):
-        submission = get_or_create_submission(student, assignment, item)
+        submission = known.get(item.pk)
+        if submission is None:
+            submission = get_or_create_submission(student, assignment, item)
+            stored = None
+        else:
+            stored = {a.part_id: a for a in submission.part_answers.all()}
         kind, options = item_answer_form(item)
         problem = item.problem
         status = work_status(submission, submission.submitted_answer,
@@ -328,7 +346,7 @@ def build_rows(assignment, student, user=None, with_comments=True):
             'options': options,
             # Пункты с ОТДЕЛЬНЫМ ответом на каждый. У задачи без пунктов —
             # ровно одна строка «вся задача»: один путь кода на все случаи.
-            'answer_parts': _part_rows(item, submission),
+            'answer_parts': _part_rows(item, submission, stored),
             'has_real_parts': _has_real_parts(item),
             # Верный ответ показываем только после сдачи — до неё это
             # подсказка, а не обратная связь.

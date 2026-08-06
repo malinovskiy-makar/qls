@@ -358,6 +358,32 @@ def group_submissions(request, group_id, assignment_id):
 
 
 @tutor_required
+def student_work_review(request, group_id, assignment_id, student_id):
+    """Разбор работы ученика — ТОТ ЖЕ экран, что видит ученик.
+
+    ⚠️ Именно тот же, а не «похожий»: если ученик спорит с оценкой, спорить
+    надо об одном экране. Отдельная «версия для преподавателя» разошлась бы
+    с ученической на первой же правке.
+    """
+    from django.urls import reverse
+
+    from problems.models import User
+
+    from student.views import work_review_context
+
+    group = own_group_or_404(request.user, group_id)
+    assignment = group_assignment_or_404(group, assignment_id)
+    student = get_object_or_404(User, pk=student_id,
+                                enrolled_groups=group)
+    context = work_review_context(
+        assignment, student, viewer=request.user, for_tutor=True,
+        back_url=reverse('teacher:group_submissions',
+                         args=[group.pk, assignment.pk]),
+        back_label='К решениям')
+    return render(request, 'student/work_review.html', context)
+
+
+@tutor_required
 def group_review_submission(request, group_id, submission_id):
     """Форма оценки решения — внутри группы."""
     from problems.models import Submission

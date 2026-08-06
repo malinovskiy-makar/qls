@@ -18,6 +18,10 @@ urlpatterns = [
          views_groups.group_submissions, name='group_submissions'),
     path('groups/<int:group_id>/submissions/<int:submission_id>/',
          views_groups.group_review_submission, name='group_review_submission'),
+    # Тот же разбор работы, что видит ученик (Часть B).
+    path('groups/<int:group_id>/assignments/<int:assignment_id>/'
+         'students/<int:student_id>/',
+         views_groups.student_work_review, name='student_work_review'),
 
     # Комментарии к задачам (JSON, без перезагрузки страницы).
     path('api/comment/create/', views_groups.api_comment_create,
