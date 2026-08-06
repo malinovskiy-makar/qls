@@ -976,6 +976,17 @@ class AiUsageLog(models.Model):
     output_tokens = models.PositiveIntegerField('Токенов на выходе', default=0)
     cost_usd = models.DecimalField('Стоимость, $', max_digits=10,
                                    decimal_places=6, default=0)
+    # ⚠️ ТОКЕНЫ КЭША СЧИТАЕМ ОТДЕЛЬНО. Скидка за повторно отправляемое
+    # начало запроса — 90%, но она достаётся только при ПОБАЙТНОМ совпадении
+    # кэшируемого блока. Без отдельного счётчика «работает ли кэш вообще»
+    # проверить нечем: общая сумма входных токенов выглядит одинаково и при
+    # 100% попаданий, и при нуле.
+    cache_write_tokens = models.PositiveIntegerField(
+        'Токенов записано в кэш', default=0)
+    cache_read_tokens = models.PositiveIntegerField(
+        'Токенов прочитано из кэша', default=0)
+    provider = models.CharField('Поставщик', max_length=40, blank=True)
+    seconds = models.FloatField('Секунд', default=0)
     ok = models.BooleanField('Успешно', default=True)
     note = models.CharField('Заметка', max_length=300, blank=True)
     created_at = models.DateTimeField('Когда', auto_now_add=True)
