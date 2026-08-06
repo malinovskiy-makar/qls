@@ -35,13 +35,14 @@ for (const [key, name] of scenes) {
     // Все видимые поля ввода формул: текстовые поля внутри видимых секций.
     // Формульным считаем поле, у которого есть подпись/подсказка про формулу
     // либо значение похоже на выражение.
+    // Видимость считаем так же, как движок (fieldActive): сцена прячет секции
+    // через display:none, а свёрнутая панель поля не отменяет.
     const allText = [...document.querySelectorAll('#tools-panel input[type=text]')];
     const formulaInputs = allText.filter(i => {
-      const wrap = i.closest('.f-wrap') || i.parentElement;
-      const shown = vis(i) || (i.classList.contains('mf-hidden') && vis(wrap));
-      if (!shown) return false;
       if (i.classList.contains('pw-bound')) return false;   // границы куска, не формула
-      return true;
+      if (!/^(inp-|ext-input|ma-|cons-custom|ineq-formula|mm-|gr-)/.test(i.id)) return false;
+      if (/name|title|label/.test(i.id)) return false;
+      return typeof fieldActive === 'function' ? fieldActive(i) : vis(i);
     });
     const upgraded = formulaInputs.filter(i => !!i._mf);
     const kbd = formulaInputs.filter(i => {
@@ -53,9 +54,10 @@ for (const [key, name] of scenes) {
       return !!(w && w.querySelector('.f-help'));
     });
     let crosses = 0;
-    try { crosses = (typeof crossPoints === 'function' && STATE.mode !== 'math') ? crossPoints().length : 0; } catch (e) {}
+    try { crosses = (typeof crossPoints === 'function') ? crossPoints().length : 0; } catch (e) {}
     let snaps = 0;
     try { snaps = (typeof snapTargets === 'function') ? snapTargets().length : 0; } catch (e) {}
+    const drawnCrosses = document.querySelectorAll('.crosses circle').length;
     const pbody = document.getElementById('params-body') || document.getElementById('params-panel');
     const ranges = pbody ? [...pbody.querySelectorAll('input[type=range]')].filter(vis).length : 0;
     const bounds = pbody ? pbody.querySelectorAll('.param-bound').length : 0;
@@ -66,9 +68,9 @@ for (const [key, name] of scenes) {
       help: help.length,
       params: (typeof paramsAllowed === 'function') ? paramsAllowed() : null,
       ranges, bounds,
-      roller: STATE.mode !== 'math' && snaps > 0,
+      roller: snaps > 0,
       snaps,
-      crosses,
+      crosses, drawnCrosses,
       katex: document.querySelectorAll('#sb-body .katex').length,
       sbLen: (document.getElementById('sb-body') || {}).textContent?.trim().length || 0,
       foldPoints: !!document.querySelector('#sec-view .fold-btn'),
@@ -84,7 +86,7 @@ const frac = (a, b) => b === 0 ? '—' : (a === b ? '+ ' + a : a + '/' + b);
 console.log('| Сцена | режим | LaTeX-ввод | клавиатура | «?» | параметры | ползунки: с границами / всего | прокатывание | ключевые точки | KaTeX в аналитике | абзацы-инструкции | свернуть точки |');
 console.log('|---|---|---|---|---|---|---|---|---|---|---|---|');
 for (const [key, name, r] of rows) {
-  console.log(`| ${key} · ${name} | ${r.mode} | ${frac(r.mf, r.fields)} | ${frac(r.kbd, r.fields)} | ${frac(r.help, r.fields)} | ${yn(r.params)} | ${r.bounds} / ${r.ranges} | ${yn(r.roller)} | ${r.crosses} | ${r.katex} (текст ${r.sbLen}) | ${r.hints} | ${yn(r.foldPoints)} |`);
+  console.log(`| ${key} · ${name} | ${r.mode} | ${frac(r.mf, r.fields)} | ${frac(r.kbd, r.fields)} | ${frac(r.help, r.fields)} | ${yn(r.params)} | ${r.bounds} / ${r.ranges} | ${yn(r.roller)} | ${r.drawnCrosses}/${r.crosses} | ${r.katex} (текст ${r.sbLen}) | ${r.hints} | ${yn(r.foldPoints)} |`);
 }
 console.log('\nОшибок страницы: ' + errors.length);
 errors.slice(0, 10).forEach(e => console.log('  ' + e));

@@ -2896,10 +2896,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <!-- Свои точки и площади. Оформление плоскости (название, оси, сетка,
          границы, легенда) переехало в меню гаечного ключа над графиком. -->
     <div class="section" id="sec-view">
-      <div class="section-title">Свои точки</div>
-      <button class="btn-sm" id="btn-mark-add" type="button">Поставить точку</button>
-      <div class="hint" id="mark-hint">Нажмите кнопку, потом щёлкните по графику. Рядом с кривой точка сядет прямо на неё.</div>
-      <div id="mark-list" style="margin-top:8px;"></div>
+      <button class="fold-btn" id="marks-btn" type="button" aria-expanded="true" aria-controls="marks-body">
+        <span>Точки на графике</span>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="fold-body open" id="marks-body">
+        <button class="btn-sm" id="btn-mark-add" type="button">Поставить точку</button>
+        <div id="mark-list" style="margin-top:8px;"></div>
+      </div>
     </div>
 
     <!-- Цвета закрашенных областей (Фаза 8). Список собирается из того, что
@@ -3791,13 +3795,15 @@ function curveDeriv(curve, q) {
 
 // Внешние предельные издержки (Задача 4): константа или функция от Q (как спрос — переменная Q).
 function compileExt(expr) {
-  try { const c = math.parse(expr).compile(); c.evaluate({ x: 1, Q: 1 }); return { compiled: c, error: null }; }
+  try { const c = math.parse(expr).compile(); c.evaluate(scopeFor(expr, { x: 1, Q: 1 })); return { compiled: c, error: null }; }
   catch (e) { return { compiled: null, error: e.message }; }
 }
 function evalExt(q) {
   if (!STATE.extCompiled) return NaN;
-  try { const v = STATE.extCompiled.evaluate({ x: q, Q: q }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
-  catch (e) { return NaN; }
+  try {
+    const v = STATE.extCompiled.evaluate(scopeFor(STATE.extExpr, { x: q, Q: q }));
+    return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+  } catch (e) { return NaN; }
 }
 
 /* =====================================================================
@@ -3818,13 +3824,18 @@ function evalExt(q) {
 function compileTwoVar(expr) {
   try {
     const compiled = math.parse(expr).compile();
-    compiled.evaluate({ x: 1, y: 1, L: 1, K: 1 });   // пробный расчёт ловит опечатки
+    compiled.evaluate(scopeFor(expr, { x: 1, y: 1, L: 1, K: 1 }));   // пробный расчёт ловит опечатки
+    // Исходный текст носим на самом скомпилированном узле: evalTwoVar получает
+    // только его, а буквы-параметры надо подставлять по тексту формулы.
+    compiled._src = String(expr || '');
     return { compiled, error: null };
   } catch (e) { return { compiled: null, error: e.message }; }
 }
 function evalTwoVar(compiled, a, b) {
-  try { const v = compiled.evaluate({ x: a, y: b, L: a, K: b }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
-  catch (e) { return NaN; }
+  try {
+    const v = compiled.evaluate(scopeFor(compiled._src, { x: a, y: b, L: a, K: b }));
+    return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+  } catch (e) { return NaN; }
 }
 
 // Найти b ∈ [0, bMax], при котором f(a, b) = level — бисекцией по b.
@@ -7032,8 +7043,10 @@ function updateLongRunPanel(html) {
 /* --- 9а. Производственная функция Q = f(L) ------------------------------ */
 function prodEval(L) {
   if (!STATE.prodCompiled) return NaN;
-  try { const v = STATE.prodCompiled.evaluate({ L: L, x: L, Q: L }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
-  catch (e) { return NaN; }
+  try {
+    const v = STATE.prodCompiled.evaluate(scopeFor(STATE.prodExpr, { L: L, x: L, Q: L }));
+    return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+  } catch (e) { return NaN; }
 }
 // Предельный продукт MP = dQ/dL — центральная разность (как везде в движке).
 function prodMP(L) {
@@ -9333,7 +9346,7 @@ function setScenario(s) {
 function compilePpf(expr) {
   try {
     const compiled = math.parse(expr).compile();
-    compiled.evaluate({ x: 1, X: 1 });   // пробный расчёт ловит опечатки
+    compiled.evaluate(scopeFor(expr, { x: 1, X: 1 }));   // пробный расчёт ловит опечатки
     return { compiled, error: null };
   } catch (e) { return { compiled: null, error: e.message }; }
 }
@@ -9341,8 +9354,10 @@ function compilePpf(expr) {
 // Значение границы Y в точке X.
 function evalPpf(x) {
   if (!STATE.ppfCompiled) return NaN;
-  try { const v = STATE.ppfCompiled.evaluate({ x: x, X: x }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
-  catch (e) { return NaN; }
+  try {
+    const v = STATE.ppfCompiled.evaluate(scopeFor(STATE.ppfFormula, { x: x, X: x }));
+    return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+  } catch (e) { return NaN; }
 }
 
 // Наклон границы dY/dX численно (центральная разность). |наклон| = альтернативные издержки X.
@@ -11570,13 +11585,23 @@ function setAreaCalcMode(mode) {
   updateQuickArea();
 }
 
-function wireAreaCalc() {
-  const fold = document.getElementById('areascalc-btn');
-  const body = document.getElementById('areascalc-body');
-  if (fold && body) fold.addEventListener('click', () => {
-    const open = body.classList.toggle('open');
-    fold.setAttribute('aria-expanded', open ? 'true' : 'false');
+/* Сворачивание секций. Одна проводка на все складные заголовки: кнопка
+   .fold-btn знает свою начинку через aria-controls. Так новая складная секция
+   не требует ни строчки в JS. */
+function wireFolds() {
+  document.querySelectorAll('.fold-btn[aria-controls]').forEach(btn => {
+    if (btn._folded) return;
+    btn._folded = true;
+    const body = document.getElementById(btn.getAttribute('aria-controls'));
+    if (!body) return;
+    btn.addEventListener('click', () => {
+      const open = body.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
   });
+}
+
+function wireAreaCalc() {
   const c = document.getElementById('ac-curve'), p = document.getElementById('ac-poly');
   if (c) c.addEventListener('click', () => setAreaCalcMode('curve'));
   if (p) p.addEventListener('click', () => setAreaCalcMode('poly'));
@@ -11594,21 +11619,18 @@ function wireAreaCalc() {
   setAreaCalcMode('curve');
 }
 
-/* ── Ползунки параметров (Фаза 11) ────────────────────────────────────
+/* ── Ползунки параметров ──────────────────────────────────────────────
    Если в формуле встретилась буква, которая не переменная графика и не
    известная функция, для неё заводится ползунок в «Основных параметрах».
    Двигаешь — формула пересчитывается, график перерисовывается.
 
-   Осторожно с экономическими сценами: там у букв уже есть закреплённый
-   смысл (t — ставка налога, w — зарплата), и ими управляют свои поля.
-   Поэтому механика включена только там, где формулы произвольные:
-   в «Свободном холсте» и в разделе «Математика». */
-const PARAM_SCENES = { free: true, 'm-graph': true };
-
-function paramsAllowed() {
-  if (STATE.mode === 'math') return true;
-  return !!PARAM_SCENES[baseScene()];
-}
+   Механика общая для всех сцен. Раньше она работала только в «Свободном
+   холсте» и в «Математике» из опасения, что в экономике буквы уже заняты
+   (t — ставка, w — зарплата). Опасение не подтвердилось: ставку и зарплату
+   держат отдельные поля STATE, а в формулу их никто не пишет. Буквы внутри
+   формулы принадлежат тому, кто её набрал, поэтому «a - Q» в спросе теперь
+   даёт ползунок a, а не ошибку разбора. */
+function paramsAllowed() { return true; }
 
 /* Переменные графика: буквы, которыми подписаны оси. Параметром такая буква
    стать не может — её значение задаёт сама точка на графике. */
@@ -11686,9 +11708,20 @@ function sceneReserved() {
   if (STATE.mode === 'math') {
     // «Деформации» ведут параметр a своим ползунком сюжета.
     if (STATE.mathSub === 'transform') return new Set(['a']);
+    // В «Оптимуме при ограничении» a и b — это оси, а не параметры.
+    if (STATE.mathSub === 'constraint') return new Set(['a', 'b']);
     return new Set();
   }
-  return new Set(['t', 'w', 's']);
+  // Занято ровно там, где у буквы и правда есть свой хозяин: ставка налога и
+  // субсидии — пока на экране поле ставки, зарплата — на рынке труда. В остальных
+  // сценах те же буквы свободны и становятся обычными ползунками. Смотрим на
+  // само поле, а не на STATE.intervType: тип вмешательства держится в состоянии
+  // всегда, даже там, где блока вмешательства нет и в помине.
+  const s = new Set();
+  const taxField = document.getElementById('tax-field');
+  if (taxField && fieldActive(taxField)) { s.add('t'); s.add('s'); }
+  if (STATE.mode === 'labor') s.add('w');
+  return s;
 }
 
 // Значения параметров подмешиваются в КАЖДЫЙ расчёт формулы.
@@ -11696,6 +11729,16 @@ function paramScope(ctx) {
   const p = STATE.params || {};
   Object.keys(p).forEach(k => { if (ctx[k] === undefined) ctx[k] = p[k].value; });
   return ctx;
+}
+
+/* Контекст расчёта для конкретной формулы: сначала значения ползунков, потом
+   единица для буквы, ползунка у которой ещё нет. Второе нужно на пробном
+   расчёте при разборе: ползунок заводится уже ПОСЛЕ того, как формула принята,
+   и без этого «a - Q» падало бы с «Undefined symbol a». */
+function scopeFor(expr, ctx) {
+  const c = paramScope(ctx || {});
+  try { freeSymbols(expr).forEach(n => { if (c[n] === undefined) c[n] = 1; }); } catch (e) {}
+  return c;
 }
 
 // Расчёт с параметрами: буква, для которой ползунка ещё нет, считается единицей.
@@ -11716,12 +11759,14 @@ function syncParams() {
     return;
   }
   const names = [];
-  STATE.curves.forEach(c => { if (c.expr) freeSymbols(c.expr).forEach(n => { if (names.indexOf(n) < 0) names.push(n); }); });
-  if (STATE.mode === 'math') {
-    [STATE.mathFormula, STATE.mathG2, STATE.mathG3, STATE.mathG4].forEach(f => {
-      freeSymbols(f).forEach(n => { if (names.indexOf(n) < 0) names.push(n); });
-    });
-  }
+  const take = (expr) => { if (expr) freeSymbols(expr).forEach(n => { if (names.indexOf(n) < 0) names.push(n); }); };
+  STATE.curves.forEach(c => take(c.expr));
+  if (STATE.mode === 'math') [STATE.mathFormula, STATE.mathG2, STATE.mathG3, STATE.mathG4].forEach(take);
+  // Формулы сцен (КПВ, издержки, макро, полезность и прочие) живут не в
+  // STATE.curves, а в своих полях ввода. Берём их из общего реестра — только
+  // те поля, чья секция сейчас на экране, иначе спрятанные сцены наплодили бы
+  // ползунков для букв, которых пользователь не видит.
+  liveFormulaTexts().forEach(take);
   STATE.params = STATE.params || {};
   let changed = false;
   names.forEach(n => {
@@ -11996,18 +12041,112 @@ function snapTargets() {
     if (STATE.showAFC) out.push({ name: 'AFC', f: costAFC });
     return out;
   }
-  if (STATE.mode === 'costs' && STATE.costsSub === 'production' && STATE.prodReady) {
-    if (STATE.showTP) out.push({ name: 'TP', f: prodEval });
+  // Было условие на STATE.prodReady, которого в состоянии нет вовсе, поэтому
+  // ветка не срабатывала никогда и в «Производственной функции» точка не каталась.
+  if (STATE.mode === 'costs' && STATE.costsSub === 'production' && STATE.prodCompiled) {
+    out.push({ name: 'TP', f: prodEval });
+    return out;
+  }
+  // Изокванта задана уровнем выпуска, а не формулой K = f(L): её точки считает
+  // общий движок касания уровня, по ним и катаемся.
+  if (STATE.mode === 'costs' && STATE.costsSub === 'isoquant' && STATE.iso) {
+    const pts = traceLevelCurve(STATE.iso.f, STATE.iso.Q, CONFIG.Qmax, CONFIG.Pmax * 6, 220);
+    if (pts && pts.length) out.push({ name: 'изокванта', f: (l) => interpY(pts, l) });
+    return out;
+  }
+  // Два завода: совокупные предельные издержки — это горизонтальная сумма,
+  // и она уже посчитана таблицей. Катаемся по ней, а не по TC₁ и TC₂.
+  if (STATE.mode === 'costs' && STATE.costsSub === 'plants' && STATE.plants) {
+    const p = STATE.plants;
+    out.push({ name: 'MC', f: (q) => interpY(p.table.map(r => [r.Q, r.m]), q) });
     return out;
   }
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'single' && STATE.ppfReady) {
     out.push({ name: 'КПВ', f: evalPpf });
     return out;
   }
+  // Сумма КПВ: суммарная кривая посчитана по точкам (Минковский), исходные —
+  // тоже. Катаемся и по сумме, и по слагаемым.
+  if (STATE.mode === 'ppf' && STATE.ppfSub === 'sum') {
+    const d = STATE.ppfSumData;
+    if (d && d.ok) {
+      out.push({ name: 'Сумма', f: (x) => interpY(d.points, x) });
+      out.push({ name: 'КПВ 1', f: (x) => interpY(d.c1pts, x) });
+      out.push({ name: 'КПВ 2', f: (x) => interpY(d.c2pts, x) });
+    }
+    return out;
+  }
+  // Торговля: КПВ страны плюс линия торговых возможностей, если она построена.
+  if (STATE.mode === 'ppf' && STATE.ppfSub === 'trade') {
+    tradeSnapTargets(out);
+    return out;
+  }
+  if (STATE.mode === 'math') { mathSnapTargets(out); return out; }
   STATE.curves.filter(c => c.visible && !isVertical(c)).forEach(c => {
     out.push({ name: curveShortName(c), f: (q) => evalCurve(c, q) });
   });
   return out;
+}
+
+/* Кривые раздела «Математика» для прокатывания и пересечений. Берём то же,
+   что сцена рисует: саму функцию, а в сюжетах со сравнением — все участвующие
+   кривые. Вспомогательные линии (касательная, секущая) сюда не идут: по ним
+   не катаются, и пересечения с ними только загромождали бы поле. */
+function mathSnapTargets(out) {
+  const f = mathF();
+  const sub = STATE.mathSub;
+  if (sub === 'minmax') {
+    if (f) out.push({ name: mmLabel(0), f, color: mmColor(0) });
+    for (let i = 1; i < mmSlots(); i++) {
+      const expr = mmGet(i);
+      if (!expr.trim()) continue;
+      const { compiled } = compileMath(expr, 'x');
+      if (!compiled) continue;
+      out.push({ name: mmLabel(i), f: (x) => evalMathAt(compiled, 'x', x), color: mmColor(i) });
+    }
+    const isMin = (STATE.mathMinMax === 'min');
+    const parts = out.slice();
+    if (parts.length >= 2) {
+      out.push({
+        name: (STATE.mmName || 'Z').trim() || 'Z',
+        f: (x) => {
+          let best = NaN;
+          parts.forEach(p => {
+            const v = p.f(x);
+            if (!isFinite(v)) return;
+            if (!isFinite(best) || (isMin ? v < best : v > best)) best = v;
+          });
+          return best;
+        },
+      });
+    }
+    return;
+  }
+  if (sub === 'transform') {
+    if (f) {
+      out.push({ name: 'f', f });
+      out.push({ name: 'после', f: mathTransformed(f, STATE.mathTrans, STATE.mathA) });
+    }
+    return;
+  }
+  if (f) out.push({ name: 'f', f });
+}
+
+/* Кривые сцен торговли. Сама КПВ есть всегда; линия торговых возможностей —
+   когда сцена её посчитала. Обе заданы формулой или точками, поэтому
+   прокатывание и пересечения работают одинаково. */
+function tradeSnapTargets(out) {
+  const d = STATE.ppfTradeData;
+  if (d && d.ok) {
+    out.push({ name: 'КПВ', f: (x) => interpY(d.ppfPts, x) });
+    if (d.line) out.push({ name: 'КТВ', f: (x) => d.line.intercept - d.line.slope * x });
+    return;
+  }
+  const b = STATE.tradeBData;
+  if (b && b.ok) {
+    if (b.co1) out.push({ name: 'КПВ 1', f: (x) => interpY(b.co1.ppts, x) });
+    if (b.co2) out.push({ name: 'КПВ 2', f: (x) => interpY(b.co2.ppts, x) });
+  }
 }
 
 // Ближайшая точка НА кривых к пикселю (px, py) или null, если все далеко.
@@ -13839,6 +13978,14 @@ const FORMULA_EXAMPLES = {
     ['100 - 0.01*X^2',   'парабола, альт. издержки растут'],
     ['100 - 10*sqrt(X)', 'выпуклая, альт. издержки убывают'],
   ] },
+  // Макромодели: по горизонтали всегда выпуск, ставка или количество денег,
+  // по вертикали — уровень цен, ставка процента или курс. Запись одна и та же.
+  MACRO: { title: 'Кривая макромодели', items: [
+    ['120 - 0.6*Y',  'убывающая (AD, спрос на деньги)'],
+    ['10 + 0.5*Y',   'растущая (SRAS, предложение сбережений)'],
+    ['a - 0.6*Y',    'с буквой: a получит ползунок'],
+    ['200 / (Y + 1)', 'нелинейная'],
+  ] },
 };
 const FORMULA_FOOT = 'Умножение ставится звёздочкой (2*Q), степень знаком ^. Дробное значение пишется через точку: 0.5.';
 
@@ -13930,7 +14077,8 @@ function onKatexReady() { _texPending.forEach(fn => { try { fn(); } catch (e) {}
    Пример кликабелен: подставляется в поле, считать заново руками не нужно. */
 /* Как называется переменная в поле каждого вида: конструктор кусочной функции
    должен писать условие в тех же буквах, что и сама формула. */
-const FORMULA_VAR = { PQ: 'Q', QP: 'P', TC: 'Q', PROD: 'L', PPF: 'X', MATHF: 'x', ISO: 'L', UTIL: 'x' };
+const FORMULA_VAR = { PQ: 'Q', QP: 'P', TC: 'Q', PROD: 'L', PPF: 'X', MATHF: 'x', ISO: 'L', UTIL: 'x',
+  DEMAND: 'Q', SUPPLY: 'Q', MC: 'Q', ATC: 'Q', MACRO: 'Y', MATHY: 'y', MATHAB: 'a' };
 
 /* ── Конструктор кусочной функции ──────────────────────────────────────
    Движок понимает кусочную запись через условие «услвие ? то : иначе» и
@@ -14565,10 +14713,100 @@ function closeAllKeyboardsExcept(slot) {
   });
 }
 
+/* ── Реестр строк ввода формул ────────────────────────────────────────
+   Каждое поле, прошедшее через equipFormulaField, попадает сюда. По реестру
+   собираются буквы-параметры: формулы сцен лежат в своих полях, а не в
+   STATE.curves, и без реестра «a - Q» в КПВ или в макро ползунка бы не дало. */
+const FORMULA_FIELDS = [];
+function registerFormulaField(inp) {
+  if (inp && FORMULA_FIELDS.indexOf(inp) < 0) FORMULA_FIELDS.push(inp);
+}
+
+/* Поле «живо», если его секцию не спрятала сцена. Смотрим на display:none и
+   hidden по цепочке родителей, а не на offsetParent: свёрнутая боковая панель
+   тоже убирает элемент с экрана, но формулы при этом никуда не деваются, и
+   ползунки параметров не должны от этого пропадать. */
+function fieldActive(el) {
+  for (let n = el; n && n !== document.body; n = n.parentElement) {
+    if (n.hidden) return false;
+    if (n.style && n.style.display === 'none') return false;
+    if (n.classList && n.classList.contains('scoped-off')) return false;
+  }
+  return true;
+}
+
+function liveFormulaTexts() {
+  return FORMULA_FIELDS.filter(fieldActive).map(i => i.value);
+}
+
+/* Какой набор примеров и какая переменная у поля. Ключи — те же, что в
+   FORMULA_EXAMPLES; поле, которого здесь нет, общей оснастки не получает
+   (имена, заголовки и списки чисел формулами не являются). */
+const FORMULA_FIELD_KINDS = {
+  'ext-input': 'PQ',
+  'inp-d3-1': 'DEMAND', 'inp-d3-2': 'DEMAND', 'inp-d3-mc': 'MC',
+  'inp-ki-1': 'DEMAND', 'inp-ki-2': 'DEMAND', 'inp-ki-3': 'DEMAND',
+  'inp-kp-1': 'DEMAND', 'inp-kp-2': 'DEMAND', 'inp-kink-mc': 'MC',
+  'inp-pl1': 'TC', 'inp-pl2': 'TC',
+  'ineq-formula': 'MATHF',
+  'inp-ppf1': 'PPF', 'inp-ppf2': 'PPF', 'inp-ppft': 'PPF',
+  'inp-tb1': 'PPF', 'inp-tb2': 'PPF',
+  'ma-sras': 'MACRO', 'ma-ad': 'MACRO', 'ma-md': 'MACRO', 'ma-ls': 'MACRO',
+  'ma-ld': 'MACRO', 'ma-fxd': 'MACRO', 'ma-fxs': 'MACRO',
+  'ma-lafd': 'MACRO', 'ma-lafs': 'MACRO', 'ma-is': 'MACRO', 'ma-lm': 'MACRO',
+};
+
+/* Достроить недостающую обвязку и подключить общую механику.
+   Поля сцен размечены просто («label + input»), а attachFormulaHelp ждёт
+   готовых кнопки и всплывашки. Здесь их создаём, дальше работает ровно тот же
+   код, что у полей, размеченных вручную: набранная формула в строке, LaTeX-ввод,
+   клавиатура, примеры и конструктор кусочной функции. */
+function equipFormulaField(inputId, kind) {
+  const inp = document.getElementById(inputId);
+  if (!inp || inp._equipped) return;
+  inp._equipped = true;
+
+  let wrap = inp.closest('.f-wrap');
+  if (!wrap) { wrap = inp.parentElement; wrap.classList.add('f-wrap'); }
+  let row = inp.closest('.f-row');
+  if (!row) {
+    row = document.createElement('div');
+    row.className = 'f-row';
+    inp.parentNode.insertBefore(row, inp);
+    row.appendChild(inp);
+  }
+  let btn = row.querySelector('.f-help');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'f-help'; btn.id = 'fh-auto-' + inputId;
+    btn.setAttribute('aria-expanded', 'false');
+    btn.title = 'Как писать формулы';
+    btn.textContent = '?';
+    row.appendChild(btn);
+  }
+  let pop = wrap.querySelector('.f-pop');
+  if (!pop) {
+    pop = document.createElement('div');
+    pop.className = 'f-pop'; pop.id = 'fp-auto-' + inputId;
+    pop.setAttribute('role', 'region');
+    pop.setAttribute('aria-label', 'Примеры формул');
+    wrap.appendChild(pop);
+  }
+  btn.setAttribute('aria-controls', pop.id);
+  attachFormulaHelp(btn.id, pop.id, inputId, kind);
+  registerFormulaField(inp);
+}
+
+// Оснастить разом все формульные поля сцен из таблицы выше.
+function equipAllFormulaFields() {
+  Object.keys(FORMULA_FIELD_KINDS).forEach(id => equipFormulaField(id, FORMULA_FIELD_KINDS[id]));
+}
+
 function attachFormulaHelp(btnId, popId, inputId, kind) {
   const btn = document.getElementById(btnId), pop = document.getElementById(popId);
   if (!btn || !pop) return;
   const inp = document.getElementById(inputId);
+  registerFormulaField(inp);
 
   // Набранная формула в САМОЙ строке. Пока в поле не пишут, поверх него лежит
   // та же формула, но напечатанная как в учебнике; стоит щёлкнуть или перейти
@@ -14803,7 +15041,13 @@ function loadScene(name) {
   const tv = document.getElementById('tax-val'); if (tv) tv.textContent = '0';
   const pv = document.getElementById('pc-val'); if (pv) pv.textContent = '0';
 
-  if (name === 'sd' || name === 'tax' || name === 'ceil' || name === 'mono') {
+  if (name === 'free') {
+    // Пустой холст: обычный рынок без готовых кривых. Режим ставим явно, иначе
+    // он остаётся от прошлой сцены («Математика» после математического сюжета),
+    // и холст ведёт себя не как холст.
+    setMode('market');
+    setMarket('comp'); setType('tax'); setScenario('none');
+  } else if (name === 'sd' || name === 'tax' || name === 'ceil' || name === 'mono') {
     setMode('market');                 // setMode сам ставит setRanges(100, 100)
     addCurve('100 - Q'); setRole(STATE.curves[0], 'demand');   // спрос — всегда первая кривая
     if (name === 'mono') {
@@ -15584,8 +15828,37 @@ function buildPultCurveChips(list) {
       if (cur && cur.linear) setCurveFreeTerm(cur, parseFloat(sl.value));
     });
 
-    chip.appendChild(sl);
+    // Дорожка с кликабельными границами — как у букв-параметров: один и тот же
+    // ползунок во всех сценах, а не два похожих вида.
+    const track = document.createElement('div');
+    track.className = 'param-track';
+    track.appendChild(sl);
+    chip.appendChild(track);
+    // Точное значение по щелчку на числе справа.
+    val.classList.add('pchip-editable');
+    val.title = 'Щёлкните, чтобы ввести точное значение';
+    val.addEventListener('click', () => {
+      const inp = document.createElement('input');
+      inp.type = 'number'; inp.step = 'any'; inp.value = sl.value;
+      inp.className = 'pchip-valedit';
+      val.replaceWith(inp);
+      inp.focus(); inp.select();
+      const done = () => {
+        const v = parseFloat(inp.value);
+        const cur = STATE.curves.find(x => x.id === c.id);
+        if (isFinite(v) && cur && cur.linear) {
+          if (v < +sl.min) sl.min = v;
+          if (v > +sl.max) sl.max = v;
+          sl.value = v;
+          setCurveFreeTerm(cur, v);
+        }
+        inp.replaceWith(val);
+      };
+      inp.addEventListener('blur', done);
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+    });
     box.appendChild(chip);
+    upgradeRegulator(chip);
   });
 }
 
@@ -15640,8 +15913,77 @@ function syncPultRegulators(activeIds) {
     if (!n || !body) return;
     if (n.parentElement !== body) body.appendChild(n);
     n.style.display = '';
+    upgradeRegulator(n);
   });
   PULT_MOVABLE.forEach(id => { if (!activeIds.includes(id)) returnPultHome(id); });
+}
+
+/* Регулятор сцены (ставка, регулируемая цена, зарплата, мировая цена) в том же
+   виде, что и ползунок буквы-параметра: по краям дорожки написаны границы, щелчок
+   по границе раскрывает «мин ≤ … ≤ макс» с шагом. Разметка у регуляторов своя и
+   у каждого разная, поэтому не переписываем её, а достраиваем: границы читаются
+   и пишутся прямо в атрибуты min/max/step ползунка, то есть остаются ровно тем,
+   чем и были. Сама сцена об этом ничего не знает. */
+function upgradeRegulator(field) {
+  if (!field || field._regUpgraded) return;
+  const sl = field.querySelector('input[type=range]');
+  if (!sl) return;
+  field._regUpgraded = true;
+  const num = field.querySelector('input[type=number]');
+
+  const track = sl.parentElement;
+  track.classList.add('param-track');
+  const lo = document.createElement('button');
+  lo.type = 'button'; lo.className = 'param-bound'; lo.title = 'Границы и шаг';
+  const hi = document.createElement('button');
+  hi.type = 'button'; hi.className = 'param-bound'; hi.title = 'Границы и шаг';
+  track.insertBefore(lo, sl);
+  track.insertBefore(hi, sl.nextSibling);
+
+  const editor = document.createElement('div');
+  editor.className = 'param-editor';
+  field.appendChild(editor);
+
+  const sync = () => { lo.textContent = fmt(+sl.min); hi.textContent = fmt(+sl.max); };
+  sync();
+  // Сцена сама двигает границы ползунка (например, при смене формул) — держим
+  // подписи в согласии с ними.
+  new MutationObserver(sync).observe(sl, { attributes: true, attributeFilter: ['min', 'max', 'step'] });
+
+  const open = () => {
+    if (editor.classList.contains('open')) { editor.classList.remove('open'); editor.innerHTML = ''; return; }
+    editor.classList.add('open');
+    editor.innerHTML = '';
+    const mk = (attr) => {
+      const n = document.createElement('input');
+      n.type = 'number'; n.step = 'any'; n.value = sl[attr];
+      n.addEventListener('change', () => {
+        const v = parseFloat(n.value);
+        if (!isFinite(v)) return;
+        sl[attr] = v;
+        if (+sl.max <= +sl.min) sl.max = +sl.min + 1;
+        if (num) { if (attr === 'min') num.min = sl.min; if (attr === 'max') num.max = sl.max; if (attr === 'step') num.step = sl.step; }
+        const cur = Math.max(+sl.min, Math.min(+sl.max, +sl.value));
+        if (+sl.value !== cur) { sl.value = cur; sl.dispatchEvent(new Event('input', { bubbles: true })); }
+        sync();
+      });
+      return n;
+    };
+    const line = document.createElement('div');
+    line.className = 'param-ed-line';
+    const nm = document.createElement('span');
+    nm.className = 'param-ed-name';
+    const lab = field.querySelector('label');
+    nm.textContent = (lab ? lab.textContent.split('=')[0] : '').trim() || 'значение';
+    line.append(mk('min'), document.createTextNode('≤'), nm, document.createTextNode('≤'), mk('max'));
+    const step = document.createElement('div');
+    step.className = 'param-ed-line';
+    const sLab = document.createElement('span'); sLab.textContent = 'шаг';
+    step.append(sLab, mk('step'));
+    editor.append(line, step);
+  };
+  lo.addEventListener('click', open);
+  hi.addEventListener('click', open);
 }
 
 /* --- Сцен-слайдеры (#pult-extra): КПВ «Макс X/Y» и мастер «Сила неравенства».
@@ -15864,6 +16206,9 @@ function wireControls() {
   attachFormulaHelp('fh-formula', 'fp-formula', 'inp-formula', () => curveHelpKind());
   attachFormulaHelp('fh-tc', 'fp-tc', 'inp-tc', 'TC');
   attachFormulaHelp('fh-ppf', 'fp-ppf', 'inp-ppf', 'PPF');
+  // Остальные формульные поля сцен: обвязку им достраиваем на месте, дальше
+  // работает та же механика (LaTeX-ввод, клавиатура, примеры, кусочные).
+  equipAllFormulaFields();
   attachFormulaHelp('fh-mathf', 'fp-mathf', 'inp-mathf', 'MATHF');
   attachFormulaHelp('fh-mathfc', 'fp-mathfc', 'inp-mathfc', 'MATHAB');
   attachFormulaHelp('fh-mathgc', 'fp-mathgc', 'inp-mathgc', 'MATHAB');
@@ -16440,6 +16785,7 @@ function wireControls() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && STATE.markArm) armMark(false); });
   renderMarkList();
   initSceneColorPickers();   // Фаза 2: пикеры у кривых издержек, производства, вееров
+  wireFolds();               // сворачивание любых секций со складным заголовком
   wireAreaCalc();            // расчёт площадей: под кривой и по точкам
   initZoom();                // колесо и тачпад приближают график, двойной щелчок возвращает масштаб
 
