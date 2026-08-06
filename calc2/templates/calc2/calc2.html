@@ -91,6 +91,9 @@
   --accent-deep: #9D1450;
   --accent-tint: rgba(190,24,93,.10);
   --accent-ring: rgba(190,24,93,.34);
+  /* Плотная подсветка выделенного куска формулы: тинт в 10% по белому
+     фону поля был не виден совсем (Фаза 8). */
+  --pick: rgba(190,24,93,.28);
   --on-accent:   #ffffff;
   /* Кнопки действий (крупные .btn) — графитовые, НЕ малиновые.
      Малиновый — только мелкие элементы: чекбоксы, фокус-кольцо, кнопка «←». */
@@ -131,6 +134,7 @@
   --accent-deep: #FF6BA6;
   --accent-tint: rgba(255,77,148,.16);
   --accent-ring: rgba(255,77,148,.42);
+  --pick: rgba(255,77,148,.40);
   --on-accent:   #190810;
   --btn-bg:       #334155;
   --btn-bg-hover: #3e4f69;
@@ -335,8 +339,10 @@ math-field {
   border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--input-bg); color: var(--text);
   --caret-color: var(--accent);
-  --selection-background-color: var(--accent-tint);
-  --contains-highlight-background-color: var(--accent-tint);
+  /* Выделение в поле формулы: 10% малинового по белому было не различить,
+     поэтому берём отдельный, заметно более плотный тон (Фаза 8). */
+  --selection-background-color: var(--pick);
+  --contains-highlight-background-color: var(--pick);
   --smart-fence-color: var(--text2);
   --placeholder-color: var(--text3);
 }
@@ -487,11 +493,8 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
   border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--input-bg); color: var(--text);
 }
-.pw-brace { display: flex; gap: 10px; margin: 4px 0 12px; }
-.pw-brace-mark {
-  flex: 0 0 10px; border: 2px solid var(--border); border-right: none;
-  border-radius: 8px 0 0 8px; min-height: 60px;
-}
+.pw-brace { display: flex; gap: 10px; margin: 4px 0 12px; align-items: stretch; }
+.pw-brace-mark { flex: 0 0 12px; align-self: stretch; color: var(--text3); min-height: 56px; }
 .pw-rows { flex: 1; display: grid; gap: 7px; }
 .pw-row { display: flex; align-items: center; gap: 6px; }
 .pw-row .f-slot { flex: 1 1 auto; min-width: 90px; }
@@ -804,7 +807,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .side.collapsed .side-inner { display: none; }
 
 .side-arrow {
-  position: absolute; top: 9px; width: 22px; height: 26px; z-index: 2;
+  /* Вровень с первой иконкой дока: её центр на 10 px ниже, и стрелки
+     читались как случайно расставленные (Фаза 8). */
+  position: absolute; top: 19px; width: 22px; height: 26px; z-index: 2;
   display: grid; place-items: center; border: none; border-radius: var(--r-sm);
   background: transparent; color: var(--text3);
   transition: background .12s var(--ease), color .12s var(--ease);
@@ -812,6 +817,23 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .side-left  .side-arrow { right: 2px; }
 .side-right .side-arrow { left: 2px; }
 .side-arrow:hover { background: var(--surface-2); color: var(--text); }
+/* Подпись всплывает не сразу: она нужна тому, кто задумался над иконкой,
+   и мешала бы при обычном движении мыши через панель. */
+.side-arrow[data-tip]::after {
+  content: attr(data-tip); position: absolute; top: 50%;
+  transform: translateY(-50%) scale(.96);
+  background: var(--text); color: var(--surface); font-size: 11px; font-weight: 600;
+  padding: 4px 8px; border-radius: 5px; white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity .12s var(--ease) 0s, transform .12s var(--ease) 0s;
+  z-index: var(--z-pop);
+}
+.side-left  .side-arrow[data-tip]::after { left: calc(100% + 8px); transform-origin: left center; }
+.side-right .side-arrow[data-tip]::after { right: calc(100% + 8px); transform-origin: right center; }
+.side-arrow:hover[data-tip]::after,
+.side-arrow:focus-visible[data-tip]::after {
+  opacity: 1; transform: translateY(-50%) scale(1);
+  transition-delay: .9s;
+}
 .side-arrow svg { width: 15px; height: 15px; transition: transform .22s var(--ease); }
 .side.collapsed .side-arrow svg { transform: rotate(180deg); }
 
@@ -1069,7 +1091,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .modal-sub { font-size: 12px; color: var(--text2); margin: 0 0 16px; line-height: 1.5; }
 .modal-opts { display: grid; gap: 8px; margin-top: 16px; }
 .modal-opts .hint { margin-top: 2px; }
-.modal-foot { margin-top: 16px; display: flex; justify-content: flex-end; }
+.modal-foot { margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
 .btn-ghost {
   background: var(--surface); color: var(--text);
   border: 1px solid var(--border); font-weight: 600;
@@ -1809,7 +1831,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
   <!-- ── ЛЕВАЯ ПАНЕЛЬ: ВВОД ФУНКЦИЙ + АНАЛИТИКА ────────────────────── -->
   <aside class="side side-left" id="tools-panel" aria-label="Ввод функций и аналитика">
-    <button class="side-arrow" id="tools-toggle" type="button"
+    <button class="side-arrow" id="tools-toggle" type="button" data-tip="Закрыть меню"
             aria-label="Свернуть или развернуть панель ввода" aria-expanded="true">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg>
     </button>
@@ -2200,7 +2222,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
     <!-- Издержки фирмы (Задача 2) — отдельный режим -->
     <div class="section" id="sec-costs" style="display:none;">
-      <div class="section-title">Фирма</div>
       <!-- Фаза 9: три сюжета на одной базе. «Издержки» — прежний режим (кривые из TC)
            плюс долгосрочное равновесие; «Производство» — TP/MP/AP от труда;
            «Изокванты» — тот же движок касания уровня, что у потребителя. -->
@@ -2341,7 +2362,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <!-- Рынок труда (Чекпоинт 1) — отдельный режим. Оси: труд L и зарплата W.
          Структура: совершенная конкуренция / монопсония + минимальная зарплата (МРОТ). -->
     <div class="section" id="sec-labor" style="display:none;">
-      <div class="section-title">Рынок труда</div>
       <div id="labor-seg">
         <div class="seg">
           <button class="seg-btn active" id="lab-comp">Конкуренция</button>
@@ -2401,7 +2421,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <!-- Неравенство доходов (ЧК1–3) — отдельный режим. Оси: доля населения / доля
          дохода (обе 0..100 %). Кривая Лоренца, коэффициенты Джини / Робин Гуда. -->
     <div class="section" id="sec-inequality" style="display:none;">
-      <div class="section-title">Неравенство доходов</div>
       <!-- Способ ввода данных -->
       <div class="seg">
         <button class="seg-btn active" id="ineq-in-groups">Доли по группам</button>
@@ -2488,7 +2507,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
          Бюджетная линия Px·x + Py·y = I, кривые безразличия и оптимум считаются
          ОБЩИМ движком касания уровня (Фаза 7) — тем же, что изокванты фирмы. -->
     <div class="section" id="sec-consumer" style="display:none;">
-      <div class="section-title">Потребитель</div>
       <div class="row">
         <div class="field"><label>Цена Px</label><input type="number" id="cons-px" min="0.01" step="0.1" value="1"></div>
         <div class="field"><label>Цена Py</label><input type="number" id="cons-py" min="0.01" step="0.1" value="2"></div>
@@ -2541,7 +2559,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <!-- КПВ — граница производственных возможностей — отдельный режим.
          Три под-режима: одна КПВ / сумма двух КПВ / КТВ (торговля). -->
     <div class="section" id="sec-ppf" style="display:none;">
-      <div class="section-title">КПВ: производственные возможности</div>
       <div class="seg" id="ppf-seg" style="margin-bottom:8px;">
         <button class="seg-btn active" id="ppfsub-single">Одна КПВ</button>
         <button class="seg-btn" id="ppfsub-sum">Сумма двух</button>
@@ -2661,7 +2678,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <!-- Макроэкономика (Фазы 16–22) — отдельный режим. Семь моделей, общая механика:
          две кривые на своих осях + пересечение. Форма ввода подписана у каждой. -->
     <div class="section" id="sec-macro" style="display:none;">
-      <div class="section-title">Макроэкономика</div>
       <div id="macro-seg">
         <div class="seg">
           <button class="seg-btn active" id="mm-adas">AD–AS</button>
@@ -2752,7 +2768,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
          а не только первая четверть: без отрицательных x не показать ни f(−x),
          ни f(|x|), ни привычную параболу. Поэтому у режима свои шкалы и свои оси. -->
     <div class="section" id="sec-math" style="display:none;">
-      <div class="section-title">Математика</div>
       <div id="math-seg">
         <div class="seg">
           <button class="seg-btn active" id="ms-tangent">Производная</button>
@@ -3035,7 +3050,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     <!-- Кнопки над графиком: настройки плоскости и возврат масштаба. -->
     <div class="graph-tools">
       <button class="gt-btn" id="btn-resetview" type="button" hidden
-              data-tip="Вернуться к изначальному масштабу" aria-label="Вернуться к изначальному масштабу">
+              data-tip="Вернуться к изначальному масштабу (или двойной клик)" aria-label="Вернуться к изначальному масштабу, то же делает двойной щелчок по графику">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9a8 8 0 1 1 .6 5"/><path d="M4 4v5h5"/></svg>
       </button>
       <button class="gt-btn" id="btn-wrench" type="button" aria-expanded="false" aria-controls="wrench-pop"
@@ -3053,17 +3068,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="wrench-group">
         <div class="wrench-title">Ось X</div>
         <div class="wrench-row">
-          <label for="inp-qmin">от</label>
+          <label for="inp-qmin">От</label>
           <input type="number" id="inp-qmin" step="any" value="0">
           <label for="inp-qmax">до</label>
           <input type="number" id="inp-qmax" step="any" value="100">
         </div>
         <div class="wrench-row">
-          <label for="inp-xstep">шаг делений</label>
-          <input type="number" id="inp-xstep" step="any" min="0" placeholder="авто">
+          <label for="inp-xstep">Шаг делений</label>
+          <input type="number" id="inp-xstep" step="any" min="0" placeholder="Авто">
         </div>
         <div class="wrench-row">
-          <label for="inp-xname">название</label>
+          <label for="inp-xname">Название оси</label>
           <input type="text" id="inp-xname" placeholder="Q" autocomplete="off">
         </div>
       </div>
@@ -3071,17 +3086,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <div class="wrench-group">
         <div class="wrench-title">Ось Y</div>
         <div class="wrench-row">
-          <label for="inp-pmin">от</label>
+          <label for="inp-pmin">От</label>
           <input type="number" id="inp-pmin" step="any" value="0">
           <label for="inp-pmax">до</label>
           <input type="number" id="inp-pmax" step="any" value="100">
         </div>
         <div class="wrench-row">
-          <label for="inp-ystep">шаг делений</label>
-          <input type="number" id="inp-ystep" step="any" min="0" placeholder="авто">
+          <label for="inp-ystep">Шаг делений</label>
+          <input type="number" id="inp-ystep" step="any" min="0" placeholder="Авто">
         </div>
         <div class="wrench-row">
-          <label for="inp-yname">название</label>
+          <label for="inp-yname">Название оси</label>
           <input type="text" id="inp-yname" placeholder="P" autocomplete="off">
         </div>
         <div class="hint">Оставьте название пустым, и возьмём то, что даёт сцена.</div>
@@ -3111,7 +3126,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
           <input type="text" id="inp-gtitle" placeholder="Название графика" autocomplete="off">
           <span id="gtitle-color-slot"></span>
         </div>
-        <div class="hint">Квадратик справа задаёт цвет названия.</div>
+        <div class="wrench-row">
+          <label for="inp-lblsize">Кегль подписей кривых</label>
+          <input type="number" id="inp-lblsize" min="8" max="22" step="1" value="11">
+        </div>
+        <div class="hint">Квадратик справа задаёт цвет названия. Кегль общий на все подписи кривых.</div>
       </div>
 
       <!-- Сюда JS складывает вторичные секции сцены, если они есть. -->
@@ -3124,7 +3143,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
        мировая цена) физически ПЕРЕНОСИТСЯ сюда из «Ввода функций» через
        appendChild — обработчики и ID сохраняются, клонирования нет. -->
   <aside class="side side-right" id="params-panel" aria-label="Основные параметры">
-    <button class="side-arrow" id="params-toggle" type="button"
+    <button class="side-arrow" id="params-toggle" type="button" data-tip="Закрыть меню"
             aria-label="Свернуть или развернуть панель параметров" aria-expanded="true">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6l6 6-6 6"/></svg>
     </button>
@@ -3193,9 +3212,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
 
       <div class="pw-brace">
-        <div class="pw-brace-mark" aria-hidden="true"></div>
+        <!-- Настоящая фигурная скобка системы. Рамка со скруглёнными углами,
+             стоявшая тут раньше, читалась как знак объединения. -->
+        <svg class="pw-brace-mark" viewBox="0 0 12 100" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M11 1 C6 1 7 8 7 20 C7 40 1 44 1 50 C1 56 7 60 7 80 C7 92 6 99 11 99"
+                fill="none" stroke="currentColor" stroke-width="1.6"
+                vector-effect="non-scaling-stroke" stroke-linecap="round"/>
+        </svg>
         <div class="pw-rows" id="pw-rows"></div>
       </div>
+      <!-- Клавиатура одна на весь редактор: она переезжает к той строке,
+           в которой стоит курсор, а не висит пятью иконками сразу. -->
+      <div class="mkbd" id="pw-kbd"></div>
 
       <div class="field">
         <label>Что получится</label>
@@ -3203,8 +3231,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       </div>
 
       <div class="modal-foot">
-        <button class="btn" id="pw-apply" type="button">Поставить в поле</button>
         <button class="btn-sm" id="pw-close" type="button">Отмена</button>
+        <button class="btn" id="pw-apply" type="button">Поставить в поле</button>
       </div>
     </div>
   </div>
@@ -3270,6 +3298,7 @@ const STATE = {
   // Пока флаг стоит, авто-подгонка осей молчит и видна кнопка возврата.
   viewDirty: false,
   titleColor: '',    // свой цвет заголовка графика ('' = цвет текста темы)
+  labelSize: 11,     // кегль подписей кривых на графике (меню плоскости)
   areaCalcList: [],  // посчитанные площади: [{id, kind, name, a, b, value, color, label}]
   areaColor: {},     // свои цвета закрашенных областей: ключ легенды -> hex (Фаза 8)
   params: {},        // ползунки-параметры формул: имя -> {value, min, max, step}
@@ -4264,6 +4293,13 @@ function curveAnchor(f, fromFrac, toFrac) {
 /* Подпись у якоря, зажатая внутрь поля графика: у правого края текст
    разворачивается влево, у верхнего — переезжает под кривую. Так подпись
    переносится, а не исчезает. */
+// Кегль подписей кривых. Один на весь график: настройка у каждой строки списка
+// дала бы десяток одинаковых полей ради того, что меняют раз на задачу.
+function curveLabelSize() {
+  const v = +STATE.labelSize;
+  return (isFinite(v) && v >= 8 && v <= 22) ? v : 11;
+}
+
 function labelCurve(g, f, txt, color, opts) {
   const o = opts || {};
   const a = curveAnchor(f, o.from, o.to);
@@ -4280,7 +4316,7 @@ function labelCurve(g, f, txt, color, opts) {
   const t = g.append('text')
     .attr('x', tx).attr('y', y)
     .attr('text-anchor', toLeft ? 'end' : 'start')
-    .attr('font-size', o.size || 11).attr('font-weight', 600).attr('fill', color)
+    .attr('font-size', o.size || curveLabelSize()).attr('font-weight', 600).attr('fill', color)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6)
     .text(txt);
   // Название кривой правится двойным щелчком прямо на графике.
@@ -11231,25 +11267,27 @@ function drawLegend() {
   const seen = currentAreas();
   if (!seen.length) return;
   const m = CONFIG.margin;
-  const SW = 11, GAP = 6, LH = 16, FS = 11;
+  // Легенда крупнее и выше нижнего края: у самой оси она наезжала на подписи
+  // делений и читалась хуже, чем должна (Фаза 8).
+  const SW = 12, GAP = 7, LH = 18, FS = 12;
   const labels = seen.map(e => areaShort(e.key));
-  const wide = Math.max.apply(null, labels.map(s => s.length)) * 6.2;
-  const boxW = SW + GAP + wide + 12;
-  const boxH = seen.length * LH + 10;
-  const x = (W - m.right) - boxW - 6;
-  const y = (H - m.bottom) - boxH - 8;
+  const wide = Math.max.apply(null, labels.map(s => s.length)) * 6.8;
+  const boxW = SW + GAP + wide + 14;
+  const boxH = seen.length * LH + 12;
+  const x = (W - m.right) - boxW - 8;
+  const y = (H - m.bottom) - boxH - 26;
   const g = svg.append('g').attr('class', 'legend').style('pointer-events', 'none');
   g.append('rect').attr('x', x).attr('y', y).attr('width', boxW).attr('height', boxH)
     .attr('rx', 6).attr('fill', COL.halo).attr('opacity', 0.82)
     .attr('stroke', COL.grid).attr('stroke-width', 1);
   seen.forEach((e, i) => {
-    const cy = y + 6 + i * LH;
+    const cy = y + 7 + i * LH;
     g.append('rect')
-      .attr('x', x + 7).attr('y', cy + 1).attr('width', SW).attr('height', SW)
+      .attr('x', x + 8).attr('y', cy + 2).attr('width', SW).attr('height', SW)
       .attr('rx', 2).attr('fill', e.color).attr('opacity', Math.max(0.35, e.opacity * 2))
       .attr('stroke', e.color).attr('stroke-opacity', 0.55).attr('stroke-width', 1);
     const t = g.append('text')
-      .attr('x', x + 7 + SW + GAP).attr('y', cy + 10)
+      .attr('x', x + 8 + SW + GAP).attr('y', cy + 11)
       .attr('font-size', FS).attr('font-weight', 600).attr('fill', COL.ink)
       .text(labels[i]);
     t.append('title').text(e.key);
@@ -12991,7 +13029,7 @@ function labelCurveMath(g, f, mx, my, txt, color) {
     const v = f(x);
     if (!isNaN(v) && v >= ylo && v <= yhi) {
       g.append('text').attr('x', mx(x) - 4).attr('y', my(v) - 7).attr('text-anchor', 'end')
-        .attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
+        .attr('font-size', curveLabelSize()).attr('font-weight', 600).attr('fill', color)
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6).text(txt);
       return;
     }
@@ -14293,11 +14331,12 @@ function pwRows() {
 
 function pwFormula() {
   const rows = pwRows();
+  const v = pwVar();       // условие пишем той же буквой, что и сами куски
   // Идём с конца: последний кусок без условия становится веткой «иначе».
   let out = null;
   for (let i = rows.length - 1; i >= 0; i--) {
     const f = rows[i].f || '0';
-    const cond = pwCond(PW.v, rows[i].a, rows[i].b, i === rows.length - 1);
+    const cond = pwCond(v, rows[i].a, rows[i].b, i === rows.length - 1);
     if (out === null) { out = cond ? (cond + ' ? ' + f + ' : NaN') : f; continue; }
     if (!cond) { out = f; continue; }              // кусок без границ перекрывает всё ниже
     const tail = out.indexOf('?') >= 0 ? '(' + out + ')' : out;
@@ -14311,16 +14350,34 @@ function pwFormula() {
    одну строку и читались как продолжение друг друга. */
 function pwLatex() {
   const rows = pwRows();
+  const v = pwVar();
   const lines = rows.map(r => {
     const f = mathToTex(r.f || '0');
     let cond;
-    if (r.a !== '' && r.b !== '') cond = mathToTex(r.a) + ' \\le ' + PW.v + ' < ' + mathToTex(r.b);
-    else if (r.a !== '') cond = PW.v + ' \\ge ' + mathToTex(r.a);
-    else if (r.b !== '') cond = PW.v + ' < ' + mathToTex(r.b);
-    else return f + ' & \\text{иначе}';
-    return f + ' & \\text{если } ' + cond;
+    if (r.a !== '' && r.b !== '') cond = mathToTex(r.a) + ' \\le ' + v + ' < ' + mathToTex(r.b);
+    else if (r.a !== '') cond = v + ' \\ge ' + mathToTex(r.a);
+    else if (r.b !== '') cond = v + ' < ' + mathToTex(r.b);
+    // Запятая стоит ПОСЛЕ формулы, перед «если»: так читается «сто минус Q,
+    // если Q меньше сорока». Раньше её не было вовсе, и формула с условием
+    // слипались в одну строку.
+    else return f + ', & \\text{иначе}';
+    return f + ', & \\text{если } ' + cond;
   });
   return '\\begin{cases}' + lines.join('\\\\') + '\\end{cases}';
+}
+
+/* Какой буквой писать условие. По умолчанию берём переменную поля, но если в
+   формулах кусков пользователь пишет ту же букву в другом регистре («x» там,
+   где поле ждёт «X»), условие идёт за ним: иначе в одной строке оказывались
+   и x, и X, и это читалось как две разные величины. */
+function pwVar() {
+  const want = PW.v;
+  const alt = new RegExp('(?:^|[^A-Za-z0-9_])(' + want.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')(?![A-Za-z0-9_])', 'i');
+  for (const r of pwRows()) {
+    const m = alt.exec(r.f || '');
+    if (m && m[1] !== want) return m[1];
+  }
+  return want;
 }
 
 /* Разбор одной фигурной скобки обратно в выражение Math.js. Нужен и для
@@ -14332,7 +14389,9 @@ function casesToMath(body) {
   rows.forEach(row => {
     if (!row.trim()) return;
     const cells = row.split('&');
-    const expr = latexToMath(cells[0] || '').trim();
+    // Запятая после формулы — часть записи «сто минус Q, если …», а не часть
+    // выражения: перед разбором её убираем.
+    const expr = latexToMath(cells[0] || '').trim().replace(/,\s*$/, '');
     let cond = cells.length > 1 ? cells.slice(1).join('&') : '';
     cond = cond.replace(/\\quad|\\;|\\,/g, ' ')
                .replace(/\\text\{[^}]*\}/g, (m) => (/иначе|otherwise/i.test(m) ? ' ELSE' : ' '))
@@ -14399,9 +14458,41 @@ function renderPw() {
       row.append(slot, from, a, to, b);
       box.appendChild(row);
       upgradeFormulaField(f);
+      // Клавиатура переезжает в ту строку, где стоит курсор (Фаза 7).
+      const focusRow = () => pwAttachKeyboard(row, f);
+      f.addEventListener('focus', focusRow);
+      if (f._mf) f._mf.addEventListener('focusin', focusRow);
+      if (i === 0) focusRow();
     }
   }
   pwPreview();
+}
+
+/* Одна кнопка клавиатуры на весь редактор: она переезжает к строке, в которой
+   стоит курсор. Пять иконок на пять кусков читались как пять разных настроек,
+   хотя клавиатура нужна ровно одной строке за раз. */
+function pwAttachKeyboard(row, inp) {
+  const kbd = document.getElementById('pw-kbd');
+  if (!kbd) return;
+  let btn = document.getElementById('pw-kbd-btn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.type = 'button'; btn.id = 'pw-kbd-btn'; btn.className = 'f-help f-kbd';
+    btn.title = 'Клавиатура';
+    btn.setAttribute('aria-label', 'Открыть математическую клавиатуру');
+    btn.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+      + ' stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/>'
+      + '<path d="M6 9.5h.01M9.5 9.5h.01M13 9.5h.01M16.5 9.5h.01M6 12.8h.01M9.5 12.8h.01M13 12.8h.01M16.5 12.8h.01"/>'
+      + '<path d="M8.2 15.6h7.6"/></svg>';
+    btn.addEventListener('click', () => {
+      const open = kbd.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open && btn._inp) buildKeyboard(kbd, btn._inp);
+    });
+  }
+  if (btn.parentElement !== row) row.appendChild(btn);
+  btn._inp = inp;
+  if (kbd.classList.contains('open')) buildKeyboard(kbd, inp);
 }
 
 function pwPreview() {
@@ -15559,7 +15650,11 @@ function setSideOpen(panelId, btnId, open) {
   const p = document.getElementById(panelId);
   if (p) p.classList.toggle('collapsed', !open);
   const b = document.getElementById(btnId);
-  if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (b) {
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    // Подпись идёт за состоянием: свёрнутая панель предлагает открыть, открытая — закрыть.
+    b.setAttribute('data-tip', open ? 'Закрыть меню' : 'Открыть меню');
+  }
 }
 function setToolsOpen(open) { setSideOpen('tools-panel', 'tools-toggle', open); }
 function setParamsOpen(open) { setSideOpen('params-panel', 'params-toggle', open); }
@@ -15902,6 +15997,8 @@ function wireWrench() {
   if (quad) quad.addEventListener('change', () => setFirstQuad(quad.checked));
   const gt = document.getElementById('inp-gtitle');
   if (gt) gt.addEventListener('input', () => { STATE.graphTitle = gt.value; redrawAll(); });
+  const ls = document.getElementById('inp-lblsize');
+  if (ls) ls.addEventListener('input', () => { STATE.labelSize = parseFloat(ls.value); redrawAll(); });
   // Цвет заголовка — тем же пикером, что и у кривых.
   const slot = document.getElementById('gtitle-color-slot');
   if (slot && !slot.firstChild) {
