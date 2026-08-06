@@ -170,10 +170,11 @@ input, select { font: inherit; }
 }
 
 /* Секции внутри панели */
-.section { margin-bottom: 20px; }
+.section { margin-bottom: 16px; }
 .section-title {
-  font-size: 11px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: .04em; color: var(--text2); margin-bottom: 8px;
+  display: flex; align-items: center;
+  font-size: 12.5px; font-weight: 650; letter-spacing: -.005em;
+  color: var(--text); margin-bottom: 8px;
 }
 /* Вложенная секция (Фаза 8): «Структура рынка» и «Вмешательство» живут внутри
    «Что изучаем», поэтому у них нет собственных отступов верхнего уровня —
@@ -226,8 +227,10 @@ input:focus-visible, select:focus-visible {
   transition: color .12s var(--ease), border-color .12s var(--ease);
 }
 .help-dot:hover, .help-dot:focus-visible { color: var(--accent); border-color: var(--accent); }
-/* Вопросик там, где заголовка рядом нет: занимает строку сам по себе. */
-.help-anchor { margin-top: 6px; }
+/* Вопросик там, где заголовка рядом нет. Прижимаем его к предыдущему контролу
+   вместо отдельной строки: сам по себе он читался как обломок. */
+.help-inline { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 2px; }
+.help-anchor { margin-top: 4px; line-height: 1; }
 .help-anchor > .help-dot { margin-left: 0; }
 
 /* Таблица посчитанных площадей (Фаза 6): что, на каком отрезке, сколько, каким цветом. */
@@ -531,11 +534,21 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 
 /* Список кривых (две строки: формула + роль) */
 .curve-row {
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 8px 0; border-bottom: .5px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 7px 0; border-bottom: .5px solid var(--border);
 }
 .curve-row:last-child { border-bottom: none; }
-.crow-top { display: flex; align-items: center; gap: 8px; }
+.crow-top { display: flex; align-items: center; gap: 7px; }
+/* Второй ряд строки кривой: имя на графике и роль. Открывается шевроном —
+   нужны они заметно реже формулы (Фаза 10). */
+.crow-more { display: none; gap: 6px; margin-top: 6px; padding-left: 22px; }
+.crow-more.open { display: flex; }
+.crow-more > * { flex: 1 1 0; min-width: 0; width: auto; }
+.crow-gear { color: var(--text3); }
+.crow-gear svg { width: 13px; height: 13px; display: block; transition: transform .18s var(--ease); }
+.crow-gear[aria-expanded="true"] svg { transform: rotate(180deg); }
+.crow-gear:hover { color: var(--accent); }
+.crow-top > .curve-expr-inp { flex: 1 1 auto; min-width: 0; }
 .role-sel {
   width: 100%; padding: 4px 6px; border: 1px solid var(--border);
   border-radius: var(--r-sm); background: var(--input-bg); font-size: 12px; color: var(--text2);
@@ -577,9 +590,12 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 .btn-icon:hover { color: var(--c-bad); }
 
 /* Подзаголовок внутри секции («Свои точки» в «Оформлении»). */
+/* Подзаголовок ВНУТРИ секции: ступень ниже её заголовка, поэтому мельче и
+   приглушён. Капитель здесь читалась бы как уровень выше, а не ниже. */
 .vsub {
-  font-size: 11px; font-weight: 600; letter-spacing: .03em; color: var(--text3);
-  margin: 14px 0 7px; padding-top: 11px; border-top: .5px solid var(--border);
+  display: flex; align-items: center;
+  font-size: 11.5px; font-weight: 600; color: var(--text2);
+  margin: 12px 0 7px; padding-top: 10px; border-top: .5px solid var(--border);
 }
 /* Кнопка «Поставить точку» во взведённом состоянии — ждёт щелчка по графику. */
 .btn-sm.armed { color: var(--accent); border-color: var(--accent); background: var(--accent-tint); }
@@ -863,8 +879,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .side-part:first-child { border-top: none; }
 .part-title {
   position: sticky; top: 0; z-index: 1; background: var(--surface);
-  padding: 11px 14px 5px;
-  font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  padding: 12px 14px 6px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
   color: var(--text3);
 }
 .tools-body { padding: 4px 14px 14px; }
@@ -904,9 +920,27 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .pchip input[type="range"] { width: 100%; margin: 0; }
 /* Перенесённые сюда поля сцены (ставка, цена, зарплата, мировая цена, альфа)
    уже свёрстаны в две строки, им хватает обнуления внешнего отступа. */
-#params-body .field { margin: 0; }
-#params-body .field > label { font-size: 12px; font-weight: 600; color: var(--text2); }
-#params-body .field > label b { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+/* Регулятор сцены выглядит ровно как ползунок буквы-параметра: имя слева,
+   значение справа крупным, дорожка во всю ширину под ними. Раньше это были две
+   разные на вид штуки в одной колонке (Фаза 10). */
+#params-body .field { margin: 0; display: flex; flex-direction: column; gap: 5px; }
+/* Подпись регулятора читается одной фразой («Ставка t = 20»), поэтому она
+   обычная строка, а не колонки: разгонять её по краям было бы враньём про
+   структуру — там не «имя и значение», там предложение. */
+#params-body .field > label {
+  font-size: 12px; font-weight: 600; color: var(--text2); margin: 0;
+}
+#params-body .field > label b {
+  font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;
+}
+/* Поле точного значения: спокойное, пока в него не целятся. */
+#params-body .field input[type="number"] {
+  width: 56px; padding: 3px 5px; font-size: 11.5px; text-align: right;
+  border: 1px solid transparent; background: none; color: var(--text);
+  font-variant-numeric: tabular-nums; border-radius: var(--r-sm);
+}
+#params-body .field input[type="number"]:hover { border-color: var(--border); }
+#params-body .field input[type="number"]:focus { border-color: var(--accent); background: var(--input-bg); outline: none; }
 #params-body .hint { font-size: 11.5px; margin-top: 5px; }
 #params-body .seg { margin: 0; }
 
@@ -914,10 +948,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .fold-btn {
   width: 100%; display: flex; align-items: center; justify-content: space-between;
   padding: 7px 0; background: transparent; border: none;
-  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--text3);
+  font-size: 12.5px; font-weight: 650; letter-spacing: -.005em;
+  color: var(--text);
 }
-.fold-btn:hover { color: var(--text); }
+.fold-btn:hover { color: var(--accent); }
+.fold-btn > span { display: flex; align-items: center; }
 .fold-btn svg { width: 13px; height: 13px; transition: transform .18s var(--ease); }
 .fold-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
 .fold-body { display: none; padding-top: 4px; }
@@ -14100,8 +14135,34 @@ function renderCurveList() {
       if (typeof updatePult === 'function') updatePult();
     });
 
-    if (fInp) row.append(top, fInp, nameInp, sel);
-    else row.append(top, nameInp, sel);
+    /* Плотность строки (Фаза 10). Раньше на каждую кривую приходилось четыре
+       контрола во всю ширину подряд, и три кривые занимали весь экран панели.
+       Главное в строке — формула, она встаёт наверх рядом с цветом. Своё имя
+       и роль нужны заметно реже, поэтому уходят во второй ряд под галочку. */
+    const more = document.createElement('div');
+    more.className = 'crow-more';
+    more.append(nameInp, sel);
+
+    const gear = document.createElement('button');
+    gear.type = 'button'; gear.className = 'btn-icon crow-gear';
+    gear.title = 'Имя на графике и роль кривой';
+    gear.setAttribute('aria-expanded', 'false');
+    gear.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+      + ' stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+    gear.addEventListener('click', () => {
+      const open = more.classList.toggle('open');
+      gear.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    if (fInp) {
+      // Имя-подпись рядом с формулой было бы дублем: формула и есть подпись.
+      top.replaceChild(fInp, nm);
+      top.insertBefore(gear, del);
+      row.append(top, more);
+    } else {
+      top.insertBefore(gear, del);
+      row.append(top, more);
+    }
     list.appendChild(row);
   });
   if (typeof updatePult === 'function') updatePult();   // пересобрать слайдеры кривых в пульте
@@ -15893,8 +15954,25 @@ function hideHintTip() {
   if (t) t.style.display = 'none';
 }
 
-// Куда повесить вопросик: заголовок секции, складной заголовок или подпись поля.
+/* Куда повесить вопросик. Порядок от самого крупного заголовка к самому
+   мелкому: подпись, стоящая ближе всего к объяснению, и есть его хозяин.
+   Отдельная строка с одним «?» посреди панели читается как обломок, поэтому
+   она — последнее средство. */
 function hintAnchor(hint) {
+  // 1. Подзаголовок своего блока: ближайший .vsub ВЫШЕ подсказки.
+  let n = hint;
+  while (n && n !== document.body) {
+    let prev = n.previousElementSibling;
+    while (prev) {
+      if (prev.classList && prev.classList.contains('vsub')) return prev;
+      const inner = prev.querySelector && prev.querySelector('.vsub');
+      if (inner) return inner;
+      prev = prev.previousElementSibling;
+    }
+    if (n.classList && n.classList.contains('section')) break;
+    n = n.parentElement;
+  }
+  // 2. Заголовок секции (обычный или складной).
   const sec = hint.closest('.section');
   if (sec) {
     const fold = sec.querySelector(':scope > .fold-btn > span');
@@ -15902,11 +15980,17 @@ function hintAnchor(hint) {
     const title = sec.querySelector(':scope > .section-title');
     if (title) return title;
   }
+  // 3. Подпись поля, внутри которого лежит объяснение.
   const field = hint.closest('.field, .f-wrap');
   const lab = field && field.querySelector(':scope > label');
   if (lab) return lab;
-  // Заголовка рядом нет (подсказка лежит в под-панели сцены) — ставим вопросик
-  // прямо на её место, тогда объяснение всё равно доступно, а панель чистая.
+  // 4. Предыдущая подпись-галочка: вопросик встаёт прямо в её строку.
+  let prev = hint.previousElementSibling;
+  while (prev) {
+    if (prev.tagName === 'LABEL') return prev;
+    prev = prev.previousElementSibling;
+  }
+  // 5. Своя строка. Сюда попадают подсказки, у которых заголовка нет вовсе.
   const own = document.createElement('div');
   own.className = 'help-anchor';
   hint.parentNode.insertBefore(own, hint);
