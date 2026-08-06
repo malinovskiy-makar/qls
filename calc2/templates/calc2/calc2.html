@@ -3190,11 +3190,13 @@ const CONFIG = {
   Qmax: 100,
   Pmin: 0,
   Pmax: 100,
-  // Поля (margins) области графика, в пикселях: место под цифры делений, буквы
-  // осей и «воздух» у краёв. Панели больше не висят над холстом, поэтому широкая
-  // нижняя полоса под ленту-пульт не нужна.
+  // Поля (margins) области графика, в пикселях: место под цифры делений и буквы
+  // осей. Числа здесь стартовые: перед каждой отрисовкой их пересчитывает
+  // fitMargins() под то, что в поля реально печатается. Пустой рамки вокруг
+  // плоскости не остаётся, и место, освободившееся от свёрнутой панели,
+  // достаётся графику целиком.
   // Меняют ТОЛЬКО геометрию холста (d3-range и clip) — масштабы/математику не трогают.
-  margin: { top: 56, right: 56, bottom: 62, left: 76 },
+  margin: { top: 26, right: 32, bottom: 30, left: 44 },
 };
 
 // Состояние: список кривых и настройки. Наполняется на следующих шагах.
@@ -3920,6 +3922,38 @@ function computeSize() {
   W = wrap.clientWidth;
   H = wrap.clientHeight;
   svg.attr('width', W).attr('height', H);
+  fitMargins();
+}
+
+/* Поля холста ровно под то, что в них печатается (Фаза 1).
+   Считаем в два прохода: сначала пробные шкалы со старыми полями — по ним
+   узнаём, какие деления будут подписаны; потом по самой широкой подписи
+   ставим левое поле и пересобираем шкалы. Проход дешёвый (две линейные
+   шкалы), зато рамка вокруг плоскости исчезает: «100» и «12 500» получают
+   разное место, а не одинаковые 76 px на всякий случай. */
+function fitMargins() {
+  const m = CONFIG.margin;
+  makeScales();
+  let wide = 1;
+  try {
+    // Деления зависят только от диапазона, поэтому в «Математике» берём её
+    // окно: там по вертикали свои границы, а не первая четверть.
+    const dom = (STATE.mode === 'math')
+      ? [STATE.mathYmin, STATE.mathYmax]
+      : [CONFIG.Pmin, CONFIG.Pmax];
+    const probe = d3.scaleLinear().domain(dom).range([0, 1]);
+    axisTicks(probe, 8, STATE.yStep).forEach(t => {
+      const s = fmt(t);
+      if (s.length > wide) wide = s.length;
+    });
+  } catch (e) { /* сцена ещё не готова — останемся со стартовыми полями */ }
+  // 6.2 px на знак при кегле 10 + 8 px отступа от оси + 6 px запаса у края.
+  m.left = Math.max(30, Math.min(88, Math.round(wide * 6.2) + 14));
+  m.right = 32;                        // буква оси X справа от стрелки
+  m.bottom = 30;                       // строка чисел под осью X
+  // Своё название графика печатается над плоскостью — ему нужна полоса.
+  m.top = (STATE.graphTitle || '').trim() ? 44 : 26;
+  makeScales();
 }
 
 // Линейные шкалы по двум осям. Границы берём из CONFIG целиком: нижние
@@ -4783,20 +4817,28 @@ function drawEquilibrium() {
 }
 
 // Текст с белой обводкой (halo) — чтобы подписи равновесия читались над сеткой.
+// Подпись держится внутри холста: поля стали узкими (Фаза 1), и длинная строка
+// вроде «P*=50» у оси Y иначе обрезалась бы левым краем. Не влезла слева —
+// разворачиваем ту же подпись внутрь графика; у верхнего и нижнего края
+// опускаем и поднимаем. Это только про место на экране, не про математику.
 function haloText(g, x, y, txt, anchor, baseline) {
-  g.append('text').attr('x', x).attr('y', y)
-    .attr('text-anchor', anchor).attr('dominant-baseline', baseline)
+  const w = String(txt).length * 5.9 + 6;      // ширина строки при кегле 10
+  let ax = anchor, px = x;
+  if (ax === 'end' && x - w < 2) { ax = 'start'; px = x + 8; }
+  else if (ax === 'start' && x + w > W - 2) { ax = 'end'; px = x - 8; }
+  else if (ax === 'middle') px = Math.max(w / 2 + 2, Math.min(W - w / 2 - 2, x));
+  const py = Math.max(9, Math.min(H - 4, y));
+  g.append('text').attr('x', px).attr('y', py)
+    .attr('text-anchor', ax).attr('dominant-baseline', baseline)
     .attr('font-size', 10).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
     .text(txt);
 }
 
-// Подпись значения у оси Y (зарплата/цена): короткая — слева от оси («end»),
-// длинная с десятичной частью («Wм=33.33») уводится ВНУТРЬ справа («start»),
-// чтобы не клиппиться за левым полем (52px). Только позиция подписи, не математика.
+// Подпись значения у оси Y (зарплата/цена). Разворот внутрь графика теперь
+// умеет сам haloText, поэтому здесь остался только вызов.
 function yWageLabel(g, ox, py, txt) {
-  if (String(txt).length > 7) haloText(g, ox + 6, py, txt, 'start', 'middle');
-  else                        haloText(g, ox - 8, py, txt, 'end',   'middle');
+  haloText(g, ox - 8, py, txt, 'end', 'middle');
 }
 
 // Табло слева: показываем Q* и P* (или подсказку / «не найдено»).
