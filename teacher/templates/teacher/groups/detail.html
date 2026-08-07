@@ -29,7 +29,16 @@
         <thead>
           <tr>
             <th>Ученик</th><th>Сдано</th><th>Ждёт проверки</th>
-            <th>Средний балл</th><th>Последний вход</th><th></th>
+            <th>Средний балл</th>
+            {% comment %}
+            ⚠️ Это НЕ «последняя активность» со страницы статистики. Здесь —
+            момент, когда ученик В ПОСЛЕДНИЙ РАЗ ВОШЁЛ на сайт (его пишет
+            система входа). Там — когда он в последний раз ЧТО-ТО ДЕЛАЛ
+            учебного (журнал учебных событий). Числа законно расходятся:
+            можно зайти и ничего не решить. Раньше обе колонки назывались
+            почти одинаково, и разница выглядела ошибкой.
+            {% endcomment %}
+            <th title="Момент входа на сайт. Это не то же, что учебная активность.">Последний вход на сайт</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -56,8 +65,12 @@
 
 {% elif tab == 'assignments' %}
   <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px;">
-    <a href="{% url 'teacher:assignment_create' %}?group={{ group.pk }}" class="btn-primary">+ Создать домашку</a>
-    <a href="{% url 'teacher:exam_create' group.pk %}" class="btn-outline">+ Создать контрольную</a>
+    {% comment %}
+    Два РАВНОПРАВНЫХ действия — значит и вес одинаковый. Раньше одна была
+    тёмной, другая светлой, и это читалось как «контрольная тут не главное».
+    {% endcomment %}
+    <a href="{% url 'teacher:assignment_create' %}?group={{ group.pk }}" class="k-btn k-btn--main">Создать домашку</a>
+    <a href="{% url 'teacher:exam_create' group.pk %}" class="k-btn k-btn--main">Создать контрольную</a>
   </div>
 
   {% if assignment_rows %}
@@ -69,12 +82,23 @@
         {% if row.is_exam %}<span class="badge badge-exam">контрольная</span>{% endif %}
         <br>
         <span class="row-meta">
-          {% if row.deadline %}Дедлайн {{ row.deadline|date:"d.m.Y H:i" }}{% else %}Без дедлайна{% endif %}
+          {% comment %}
+          Срок по-человечески; точная дата — в подсказке при наведении.
+          Раньше везде стояло «08.08.2026 20:56», и, чтобы понять, горит ли
+          срок, приходилось вычитать даты в уме на каждой строке.
+          {% endcomment %}
+          {% if row.deadline %}<span title="{{ row.deadline_exact }}">{{ row.deadline_human }}</span>{% else %}Без срока{% endif %}
           · Сдали {{ row.submitted }} из {{ row.students }}
         </span>
       </span>
       <span>
+        {% comment %}
+        «Проверено» — только когда было что проверять. Раньше этот бейдж
+        стоял и там, где сдали 0 из 3: проверять было нечего, а выглядело
+        как заслуга.
+        {% endcomment %}
         {% if row.pending %}<span class="badge badge-pending">{{ row.pending }} на проверку</span>
+        {% elif row.nobody_submitted %}<span class="badge badge-quiet">никто не сдал</span>
         {% else %}<span class="badge badge-ok">проверено</span>{% endif %}
       </span>
     </a>

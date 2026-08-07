@@ -6,12 +6,16 @@
 id это молчаливо сломанный `getElementById` (браузер вернёт первый). Ищем
 по `data-pid`, подсвечиваем ВСЕ вхождения сразу.
 {% endcomment %}
+{% comment %}
+Название приходит готовым из `picker.build_cards` (`text_clean.preview_title`):
+оно обрезано ПО ГРАНИЦЕ СЛОВА и, если заголовка нет, собрано из начала
+условия. Шаблонный `truncatechars` здесь стоять не должен — он режет по
+символам и рвёт числа.
+{% endcomment %}
 <div class="problem-card" data-pid="{{ problem.pk }}"
-     data-title="{% if problem.title %}{{ problem.title|truncatechars:60 }}{% else %}Задача #{{ problem.pk }}{% endif %}">
+     data-title="{{ card_title }}">
   <div class="card-top">
-    <span class="card-title">
-      {% if problem.title %}{{ problem.title }}{% else %}Задача #{{ problem.pk }}{% endif %}
-    </span>
+    <span class="card-title">{{ card_title }}</span>
     {% if problem.difficulty %}
     <span class="card-stars">
       {% for i in stars %}★{% endfor %}{% for i in empty_stars %}☆{% endfor %}
@@ -26,7 +30,7 @@ id это молчаливо сломанный `getElementById` (браузер
     {% endif %}
   </div>
   <div class="card-actions">
-    <button class="btn-preview" type="button" data-preview="{{ problem.pk }}">👁 Условие</button>
-    <button class="btn-add" type="button" data-add="{{ problem.pk }}">+ Добавить</button>
+    <button class="btn-preview" type="button" data-preview="{{ problem.pk }}">Условие</button>
+    <button class="btn-add" type="button" data-add="{{ problem.pk }}">Добавить</button>
   </div>
 </div>

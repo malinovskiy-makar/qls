@@ -34,6 +34,7 @@ def _pending_count(assignments):
 def assignment_stats(assignment):
     """Сводка по заданию: сдано / из скольких / ждёт проверки."""
     from problems.models import Submission
+    from problems.timefmt import deadline_pair
 
     students = assignment.students.count()
     submitted_students = (Submission.objects
@@ -42,12 +43,21 @@ def assignment_stats(assignment):
                           .values('student').distinct().count())
     pending = Submission.objects.filter(assignment=assignment,
                                         status='submitted').count()
+    deadline = assignment.deadline_at
+    human, exact = deadline_pair(deadline)
     return {
         'assignment': assignment,
         'students': students,
         'submitted': submitted_students,
         'pending': pending,
-        'deadline': assignment.deadline_at,
+        'deadline': deadline,
+        'deadline_human': human,
+        'deadline_exact': exact,
+        # ⚠️ «Проверено» имеет смысл ТОЛЬКО когда было что проверять.
+        # Раньше бейдж «проверено» стоял у заданий, где сдали 0 из 3, — это
+        # не заслуга, а пустота, и читалось как «всё в порядке».
+        'nobody_submitted': submitted_students == 0,
+        'all_checked': submitted_students > 0 and pending == 0,
         'is_exam': assignment.is_exam,
     }
 
@@ -118,9 +128,15 @@ def group_detail(request, pk):
     if tab not in ('students', 'assignments', 'materials'):
         tab = 'students'
 
-    assignments = list(Assignment.objects.filter(group=group)
-                       .prefetch_related('students')
-                       .order_by('-created_at'))
+    # ⚠️ СОРТИРОВКА ПО ДЕДЛАЙНУ, БЛИЖАЙШИЕ ПЕРВЫМИ. Раньше стоял порядок по
+    # дате создания, и список выглядел случайным: 08.08, 07.08, 05.08, 28.07,
+    # 09.08 — ни по дате, ни по типу.
+    #
+    # Задания БЕЗ срока уходят в конец: у них нет места на шкале времени, и
+    # ставить их первыми значило бы прятать за ними то, что горит.
+    assignments = sorted(
+        Assignment.objects.filter(group=group).prefetch_related('students'),
+        key=lambda a: (a.deadline_at is None, a.deadline_at or a.created_at))
 
     student_rows = []
     if tab == 'students':

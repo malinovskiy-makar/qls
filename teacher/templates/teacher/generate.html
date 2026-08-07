@@ -4,6 +4,12 @@
 
 {% block extra_style %}
 {% include "teacher/_picker_style.html" %}
+/* ⚠️ Класс из чужой таблицы стилей (`platform/_stats_style.html`), которую
+   эта страница НЕ подключает — тот же класс дефекта, что дал баг 7.6 с
+   кнопками `.pf-btn`. Правило приведено сюда, а не добавлен лишний include:
+   тянуть ради одной строки весь набор стилей статистики незачем. */
+.empty-note { font-size: 13px; color: var(--text2); text-align: center;
+              padding: 18px; }
 .gen-wrap { max-width: 860px; }
 .gen-step { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap;
             font-size: 12px; }

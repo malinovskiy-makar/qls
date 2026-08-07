@@ -129,10 +129,21 @@ def assignment_detail(request, pk, group=None):
     status_filter = request.GET.get('status', '')
     submissions = Submission.objects.filter(
         assignment=assignment
-    ).select_related('student', 'problem').order_by('student__username', 'problem__id')
+    ).select_related('student', 'problem', 'problem_item',
+                     'problem_item__catalog_problem',
+                     'problem_item__custom_problem'
+                     ).order_by('student__username', 'problem__id')
 
     if status_filter:
         submissions = submissions.filter(status=status_filter)
+
+    # ⚠️ НОРМАЛЬНОЕ НАЗВАНИЕ ВМЕСТО «Задача #». В банке у части задач
+    # заголовка нет вовсе, и таблица показывала «Задача #40131» — по такой
+    # строке нельзя понять, что проверяешь. Берём заголовок, а если его
+    # нет — первые слова условия, обрезкой по границе слова.
+    submissions = list(submissions)
+    for sub in submissions:
+        sub.display_title = _submission_title(sub)
 
     return render(request, 'teacher/assignment_detail.html', {
         'assignment': assignment,
@@ -347,6 +358,37 @@ def group_detail(request, pk):
 # Этап Е — Прогресс ученика глазами учителя
 # ---------------------------------------------------------------------------
 
+def _submission_title(submission):
+    """Читаемое название сданной задачи. Никаких «Задача #123»."""
+    from problems.text_clean import preview_title
+
+    item = submission.problem_item
+    problem = (item.problem if item is not None else None) or submission.problem
+    if problem is None:
+        return '(задача удалена)'
+    return preview_title(problem, limit=70)
+
+
+def _submission_is_test(submission):
+    """Тест ли эта сданная работа.
+
+    ⚠️ ЭТО ЧИНИТ ОШИБКУ 500 НА «ПРОГРЕССЕ УЧЕНИКА». Раньше здесь стояло
+    `submission.problem.problem_type`, а поле `problem` с появлением своих
+    задач репетитора стало необязательным: у работы по своей задаче ссылки
+    на каталог нет вовсе, и страница падала на первой же такой записи.
+
+    Спрашиваем ПОЗИЦИЮ задания — она знает про оба вида задач. Старое поле
+    остаётся запасным путём для работ, сданных до появления позиций.
+    """
+    item = submission.problem_item
+    if item is not None:
+        return item.is_test
+    problem = submission.problem
+    if problem is None:
+        return False
+    return (problem.problem_type or '').startswith('тест')
+
+
 @teacher_required
 def student_progress(request, pk):
     from problems.models import (
@@ -391,22 +433,24 @@ def student_progress(request, pk):
         .order_by('-count')[:5]
     )
 
-    all_reviewed = Submission.objects.filter(
+    all_reviewed = list(Submission.objects.filter(
         student=student,
         status='reviewed',
         assignment__author=request.user,
-    )
-    open_reviewed = all_reviewed.exclude(problem__problem_type__startswith='тест')
-    test_reviewed = all_reviewed.filter(problem__problem_type__startswith='тест')
+    ).select_related('feedback', 'problem', 'problem_item',
+                     'problem_item__catalog_problem',
+                     'problem_item__custom_problem'))
+    open_reviewed = [s for s in all_reviewed if not _submission_is_test(s)]
+    test_reviewed = [s for s in all_reviewed if _submission_is_test(s)]
 
     open_scores = [
         float(s.feedback.score)
-        for s in open_reviewed.select_related('feedback')
+        for s in open_reviewed
         if hasattr(s, 'feedback') and s.feedback
     ]
     test_scores = [
         float(s.feedback.score)
-        for s in test_reviewed.select_related('feedback')
+        for s in test_reviewed
         if hasattr(s, 'feedback') and s.feedback
     ]
 
@@ -421,10 +465,12 @@ def student_progress(request, pk):
             student=student,
             assignment=a,
             status='reviewed',
-        ).select_related('feedback', 'problem')
+        ).select_related('feedback', 'problem', 'problem_item',
+                         'problem_item__catalog_problem',
+                         'problem_item__custom_problem')
 
-        open_s = [s for s in subs if not (s.problem.problem_type or '').startswith('тест')]
-        test_s = [s for s in subs if (s.problem.problem_type or '').startswith('тест')]
+        open_s = [s for s in subs if not _submission_is_test(s)]
+        test_s = [s for s in subs if _submission_is_test(s)]
 
         o_scores = [
             float(s.feedback.score)

@@ -383,9 +383,13 @@ input[type="number"].form-input {
         стояла одна строка ссылкой, и было непонятно, тот это экран или нет.
         {% endcomment %}
         <div class="form-group">
-          <a href="{{ work_review_url }}" class="btn-back"
-             style="display:inline-block;">
-            Открыть разбор всей работы глазами ученика →
+          {% comment %}
+          ⚠️ Кнопка НЕ .btn-back. У того класса `white-space: nowrap` — он
+          рассчитан на короткие «← Назад», и длинная надпись вылезала за
+          границы. Заодно сокращена до сути: «Глазами ученика».
+          {% endcomment %}
+          <a href="{{ work_review_url }}" class="k-btn k-btn--plain">
+            Глазами ученика →
           </a>
           <div class="existing-note">
             Та же страница, что видит

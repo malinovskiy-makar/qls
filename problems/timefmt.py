@@ -46,3 +46,78 @@ def fmt(value, pattern=FULL, empty=''):
     if moment is None:
         return empty
     return moment.strftime(pattern)
+
+
+# ---------------------------------------------------------------------------
+# Срок по-человечески (фаза 7.10)
+# ---------------------------------------------------------------------------
+# ⚠️ ЗАЧЕМ. Везде показывалось «08.08.2026 20:56». Чтобы понять, горит срок
+# или нет, репетитору приходилось вычитать даты в уме — на каждой карточке.
+# Человек думает не датами, а расстоянием: «завтра», «через три дня»,
+# «просрочено на два дня».
+#
+# ТОЧНАЯ ДАТА НЕ ПРОПАДАЕТ: она уходит в подсказку при наведении (`title`),
+# потому что иногда нужна именно она — например, при разговоре с учеником.
+
+def _plural(number, one, few, many):
+    """Русское склонение: 1 день, 2 дня, 5 дней."""
+    number = abs(number)
+    if number % 10 == 1 and number % 100 != 11:
+        return one
+    if 2 <= number % 10 <= 4 and not 12 <= number % 100 <= 14:
+        return few
+    return many
+
+
+def human_deadline(value, now=None):
+    """Срок словами: «завтра до 20:00», «через 3 дня», «прошёл 2 дня назад».
+
+    Возвращает пустую строку, если срока нет — вызывающий сам решает, писать
+    ли «без срока».
+    """
+    moment = local(value)
+    if moment is None:
+        return ''
+    now = local(now or timezone.now())
+
+    # Считаем по КАЛЕНДАРНЫМ дням, а не по «24 часа»: срок сегодня в 23:00 и
+    # срок завтра в 01:00 разделены двумя часами, но для человека это
+    # «сегодня» и «завтра», и путать их нельзя.
+    days = (moment.date() - now.date()).days
+    clock = moment.strftime(TIME)
+
+    if days == 0:
+        if moment < now:
+            return 'сегодня, срок прошёл'
+        return 'сегодня до %s' % clock
+    if days == 1:
+        return 'завтра до %s' % clock
+    if days == -1:
+        return 'прошёл вчера'
+    if days > 1:
+        if days < 7:
+            return 'через %d %s' % (days, _plural(days, 'день', 'дня', 'дней'))
+        if days < 14:
+            return 'через неделю'
+        if days < 60:
+            weeks = days // 7
+            return 'через %d %s' % (weeks,
+                                    _plural(weeks, 'неделю', 'недели', 'недель'))
+        return 'до %s' % moment.strftime(DATE)
+    past = -days
+    if past < 7:
+        return 'прошёл %d %s назад' % (past,
+                                       _plural(past, 'день', 'дня', 'дней'))
+    if past < 60:
+        weeks = past // 7
+        return 'прошёл %d %s назад' % (
+            weeks, _plural(weeks, 'неделю', 'недели', 'недель'))
+    return 'прошёл %s' % moment.strftime(DATE)
+
+
+def deadline_pair(value, now=None):
+    """(человеческая фраза, точная дата для подсказки). Обе строки сразу.
+
+    Одной функцией, чтобы фраза и подсказка не разъехались по экранам.
+    """
+    return human_deadline(value, now), fmt(value, FULL)

@@ -16,6 +16,23 @@
 from django.core.paginator import Paginator
 from django.db.models import Q
 
+from problems.text_clean import preview_title
+
+
+def word_cut(text, limit):
+    """Обрезка по границе слова. Пусто/коротко — возвращаем как есть.
+
+    Отдельной функцией, потому что нужна в нескольких местах, а рвать числа
+    посередине нельзя нигде.
+    """
+    text = (text or '').strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    space = cut.rfind(' ')
+    if space > limit // 2:
+        cut = cut[:space]
+    return cut.rstrip(' ,;:.-–—') + '…'
 
 def strip_latex(text):
     """Условие без формул — для превью в карточке."""
@@ -60,12 +77,18 @@ def picker_context(request, per_page=20):
 
     cards = []
     for problem in page_obj:
-        raw = strip_latex(problem.statement)
-        preview = raw[:100] + ('…' if len(raw) > 100 else '')
+        # ⚠️ ОБРЕЗКА ПО СЛОВАМ. Резать по символам нельзя: `raw[:100]` рвёт
+        # числа посередине, и в карточке появлялось «переменные — 300…»
+        # вместо 3000. Число, обрезанное на цифре, — это не «немного
+        # короче», это ДРУГОЕ ЧИСЛО.
+        preview = word_cut(strip_latex(problem.statement), 100)
         difficulty = problem.difficulty or 0
         cards.append({
             'problem': problem,
             'preview': preview,
+            # Название задачи — общей функцией: она умеет и по границе слова
+            # обрезать, и подставлять начало условия вместо «Задача #123».
+            'card_title': preview_title(problem, limit=60),
             'topics': list(problem.topics.all())[:3],
             'difficulty_stars': range(difficulty),
             'difficulty_empty': range(5 - difficulty),

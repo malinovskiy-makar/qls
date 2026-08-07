@@ -153,13 +153,7 @@
     {% for sub in submissions %}
     <tr>
       <td>{{ sub.student.get_full_name|default:sub.student.username }}</td>
-      <td>
-        {% if sub.problem.title %}
-          {{ sub.problem.title|truncatechars:60 }}
-        {% else %}
-          Задача #{{ sub.problem.pk }}
-        {% endif %}
-      </td>
+      <td>{{ sub.display_title }}</td>
       <td>
         <span class="badge badge-{{ sub.status }}">
           {% if sub.status == 'not_started' %}Не начато

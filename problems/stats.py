@@ -18,7 +18,7 @@
 from datetime import timedelta
 
 from django.core.cache import cache
-from django.db.models import Avg, Count, Max, Q, Sum
+from django.db.models import Avg, Count, Max, Min, Q, Sum
 from django.utils import timezone
 
 CACHE_SECONDS = 300
@@ -727,8 +727,30 @@ def group_topic_matrix(group, period='all', now=None, limit_topics=12):
     return {'students': students, 'columns': columns, 'matrix': matrix}
 
 
+# Сколько дней сданная работа может ждать проверки, прежде чем это станет
+# поводом для плашки. Три дня — рабочая неделя минус выходные: ученик успел
+# забыть, что решал, и обратная связь уже почти бесполезна.
+STALE_REVIEW_DAYS = 3
+
+
+def _days_word(number):
+    """1 день, 2 дня, 5 дней."""
+    if number % 10 == 1 and number % 100 != 11:
+        return 'день'
+    if 2 <= number % 10 <= 4 and not 12 <= number % 100 <= 14:
+        return 'дня'
+    return 'дней'
+
+
 def needs_attention(group, now=None):
-    """Кому нужно внимание: пропал, просел, не сдал последнюю работу."""
+    """Кому нужно внимание: пропал, просел, не сдал, ЖДЁТ ВАШЕЙ ПРОВЕРКИ.
+
+    ⚠️ Четвёртое условие — про САМОГО РЕПЕТИТОРА, а не про ученика.
+    Остальные три говорят «ученик не сделал», а это — «вы не сделали»:
+    работа сдана и лежит непроверенной дольше трёх дней. Формулировка
+    поэтому тоже про него: «работа Петра ждёт вашей проверки 4 дня».
+    Прятать такое в общий список «ученик виноват» было бы нечестно.
+    """
     from .models import Assignment, Submission
 
     now = now or timezone.now()
@@ -751,6 +773,17 @@ def needs_attention(group, now=None):
                  .filter(group=group, deadline__isnull=False,
                          deadline__lt=now)
                  .order_by('-deadline').first())
+    # Сданное, но не проверенное дольше трёх дней — это к репетитору.
+    stale_threshold = now - timedelta(days=STALE_REVIEW_DAYS)
+    stale = {}
+    for row in (Submission.objects
+                .filter(assignment__group=group, status='submitted',
+                        submitted_at__isnull=False,
+                        submitted_at__lt=stale_threshold)
+                .values('student_id')
+                .annotate(oldest=Min('submitted_at'))):
+        stale[row['student_id']] = row['oldest']
+
     missed = set()
     if last_work is not None:
         done = set(Submission.objects.filter(
@@ -771,6 +804,14 @@ def needs_attention(group, now=None):
                            % (before, current))
         if student.pk in missed and last_work is not None:
             reasons.append('не сдал «%s»' % last_work.name)
+        waiting = stale.get(student.pk)
+        if waiting is not None:
+            days = max(1, (now - waiting).days)
+            # Имя в причину не вставляем: список и так сгруппирован по
+            # ученику, а склонять фамилию в родительный падеж программно
+            # нельзя — «работа Пётр Иванов» читается как ошибка.
+            reasons.append('работа ждёт вашей проверки %d %s'
+                           % (days, _days_word(days)))
         if reasons:
             flagged.append({'student': student, 'reasons': reasons,
                             'last_active': seen})
