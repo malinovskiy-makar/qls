@@ -2703,10 +2703,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
       <!-- Под-режим «КТВ / торговля». Сценарий А — мировая цена задана извне (исходный);
            сценарий Б (ЧК5) — две страны сами определяют равновесную мировую цену. -->
       <div id="ppf-pane-trade" style="display:none;">
-        <div class="seg" style="margin-bottom:8px;">
-          <button class="seg-btn active" id="trade-a">Сценарий А (цена задана)</button>
-          <button class="seg-btn" id="trade-b">Сценарий Б (цена эндогенна)</button>
-        </div>
+        <!-- Переключателя сценариев здесь нет: «цена задана» и «цена эндогенна» —
+             это две разные карточки окна сценариев, и выбор делается там. -->
         <!-- Сценарий А — одна страна, мировая цена Px/Py вводится. -->
         <div id="trade-pane-a">
           <div class="field">
@@ -10558,9 +10556,9 @@ function cornerByValue(Xmax, Ymax, ratio) {
 // Расчёт КТВ: точка производства и линия торговых возможностей.
 function recomputePpfTrade() {
   STATE.ppfTradeData = null;
-  const r = compilePpf(STATE.ppftFormula);
-  if (!r.compiled) { STATE.ppfTradeData = { ok: false, error: r.error }; return; }
-  const f = (x) => ppfEvalWith(r.compiled, x);
+  const r = parsePpfEquation(STATE.ppftFormula);
+  if (r.error) { STATE.ppfTradeData = { ok: false, error: r.error }; return; }
+  const f = r.f;
   const c = classifyPpf(f);
   if (c.Xmax == null || !(c.Xmax > 0)) { STATE.ppfTradeData = { ok: false, error: 'Не удалось определить границы КПВ.' }; return; }
   const Xmax = c.Xmax, Ymax = f(0);
@@ -10625,13 +10623,16 @@ function drawPpfTradeMarks(d) {
     dash(px, py, px, oy); dash(px, py, ox, py);
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 2);
     g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Произв.');
-    haloText(g, px, oy + 8, 'X=' + fmt(d.xp), 'middle', 'hanging');
-    haloText(g, ox - 8, py, 'Y=' + fmt(d.yp), 'end', 'middle');
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('производство');
+    // Индекс «п» — производство, «макс» — предел потребления. Нулевую координату
+    // не подписываем: в начале координат уже стоит ноль оси, и «Y=0» читалось
+    // как непонятный «y0» (Фаза 14.5).
+    if (Math.abs(d.xp) > 1e-9) haloText(g, px, oy + 8, 'Xп=' + fmt(d.xp), 'middle', 'hanging');
+    if (Math.abs(d.yp) > 1e-9) haloText(g, ox - 8, py, 'Yп=' + fmt(d.yp), 'end', 'middle');
   }
   if (d.line) {
-    haloText(g, ox - 8, sy(d.yint), 'Cy=' + fmt(d.yint), 'end', 'middle');
-    haloText(g, sx(d.xint), oy + 8, 'Cx=' + fmt(d.xint), 'middle', 'hanging');
+    haloText(g, ox - 8, sy(d.yint), 'Yмакс=' + fmt(d.yint), 'end', 'middle');
+    haloText(g, sx(d.xint), oy + 8, 'Xмакс=' + fmt(d.xint), 'middle', 'hanging');
   }
 }
 
@@ -10641,17 +10642,65 @@ function updatePpfTradePanel() {
   const d = STATE.ppfTradeData;
   if (!d) { box.innerHTML = '<div class="muted">Введите КПВ и мировую цену, нажмите «Построить КТВ».</div>'; return; }
   if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось.') + '</div>'; return; }
+  // Внутренняя (автарктическая) цена X: наклон КПВ. У прямой он один, у дуги
+  // берём его в точке производства — там и происходит сравнение с мировой.
+  const inner = (d.c.type === 'linear' && d.c.b > 0)
+    ? d.c.b
+    : ((d.xp != null && d.xp > 0) ? Math.abs(ppfSlopeOf((x) => interpY(d.ppfPts, x), d.xp))
+                                  : (d.Ymax / d.Xmax));
   let html = '';
   html += `<div class="stat"><span>Режим</span><b>${d.regime}</b></div>`;
-  html += `<div class="stat"><span>Мировая цена Px/Py</span><b>${fmt(d.ratio)}</b></div>`;
-  if (d.xp != null) html += `<div class="stat"><span>Производство (X, Y)</span><b>${fmt(d.xp)}, ${fmt(d.yp)}</b></div>`;
-  if (d.line) {
-    html += `<div class="stat"><span>Макс потребление X</span><b>${fmt(d.xint)}</b></div>`;
-    html += `<div class="stat"><span>Макс потребление Y</span><b>${fmt(d.yint)}</b></div>`;
-    html += `<div class="hint" style="margin-top:6px;"><b>КТВ:</b> Y = ${fmt(d.line.intercept)} − ${fmt(d.ratio)}·X</div>`;
-  } else {
-    html += '<div class="hint" style="margin-top:6px;">Мировая цена равна внутренней, торговать невыгодно: КТВ совпадает с КПВ.</div>';
+  html += `<div class="stat"><span>Мировая цена $P_x/P_y$</span><b>${fmt(d.ratio)}</b></div>`;
+  html += `<div class="stat"><span>Внутренняя цена X (наклон КПВ)</span><b>${fmt(inner)}</b></div>`;
+  if (d.xp != null) {
+    html += `<div class="stat"><span>Производство $X_п$ / $Y_п$</span><b>${fmt(d.xp)} / ${fmt(d.yp)}</b></div>`;
   }
+  if (d.line) {
+    html += `<div class="stat"><span>Предел потребления $X_{макс}$</span><b>${fmt(d.xint)}</b></div>`;
+    html += `<div class="stat"><span>Предел потребления $Y_{макс}$</span><b>${fmt(d.yint)}</b></div>`;
+    html += `<div class="stat"><span>Прирост против автаркии по X</span><b>+${fmt(d.xint - d.Xmax)}</b></div>`;
+    html += `<div class="stat"><span>Прирост против автаркии по Y</span><b>+${fmt(d.yint - d.Ymax)}</b></div>`;
+  }
+
+  html += '<div class="sb-note"><b>Как это получилось</b>';
+  html += `<p>Внутренняя цена X это альтернативные издержки: сколько Y страна теряет за `
+        + `единицу X, если делает всё сама. Здесь ${fmt(inner)}. Мировая цена ${fmt(d.ratio)}: `
+        + (Math.abs(d.ratio - inner) < 1e-6
+            ? 'она совпала с внутренней, поэтому торговать нечем.'
+            : (d.ratio > inner
+                ? 'за X дают больше, чем он стоит внутри, значит X выгодно производить и продавать.'
+                : 'за X дают меньше, чем он стоит внутри, значит выгоднее производить Y и покупать X.'))
+        + '</p>';
+
+  if (d.xp != null) {
+    if (/касание/.test(d.regime)) {
+      html += `<p>КПВ вогнутая, поэтому специализация неполная: страна наращивает X, пока `
+            + `следующая единица обходится дешевле мировой цены. Останавливается там, где `
+            + `издержки сравнялись с ней, то есть где наклон касательной к КПВ равен $P_x/P_y$. `
+            + `Точка найдена численно: $X_п = ${fmt(d.xp)}$, $Y_п = ${fmt(d.yp)}$.</p>`;
+    } else if (/нет торговли/.test(d.regime)) {
+      html += '<p>Цены совпали, торговля ничего не меняет: линия возможностей ложится на КПВ.</p>';
+    } else {
+      html += `<p>КПВ прямая: издержки не растут, поэтому выгодно уйти в специализацию целиком. `
+            + `Всё производство идёт в ${d.yp === 0 ? 'X' : 'Y'}: $X_п = ${fmt(d.xp)}$, $Y_п = ${fmt(d.yp)}$.</p>`;
+    }
+  }
+
+  if (d.line) {
+    html += `<p>Из точки производства страна может обменивать один товар на другой по мировой `
+          + `цене, поэтому линия торговых возможностей проходит через неё с наклоном, равным `
+          + `$P_x/P_y = ${fmt(d.ratio)}$. Её уравнение: `
+          + `$Y = ${fmt(d.line.intercept)} - ${fmt(d.ratio)}\\,X$. `
+          + `Наклон КТВ это и есть мировая цена: продав единицу X, получаешь ${fmt(d.ratio)} единиц Y.</p>`;
+    html += `<p>Концы линии показывают предел потребления, если всё продать: `
+          + `$X_{макс} = ${fmt(d.xint)}$ против ${fmt(d.Xmax)} в автаркии `
+          + `и $Y_{макс} = ${fmt(d.yint)}$ против ${fmt(d.Ymax)}. `
+          + `Выигрыш от торговли и есть этот зазор: КТВ лежит выше КПВ везде, кроме самой точки `
+          + 'производства, где они соприкасаются.</p>';
+  } else {
+    html += '<p>Мировая цена равна внутренней, торговать невыгодно: КТВ совпадает с КПВ.</p>';
+  }
+  html += '</div>';
   box.innerHTML = html;
 }
 
