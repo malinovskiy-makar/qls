@@ -57,8 +57,17 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
 
   h1 { font-size: 17pt; margin: 0 0 4px; }
   .meta { font-size: 10.5pt; color: #333; margin-bottom: 4px; }
-  .who { margin: 14px 0 22px; font-size: 11pt; border-bottom: 1px solid #000;
-         padding-bottom: 22px; overflow-wrap: anywhere; }
+  /* Шапка ученического листка: три поля в одну строку, черты под ними нет.
+     Линейку каждого поля рисует <i> — так она кончается ровно там, где
+     кончается поле, а не уходит через всю страницу. */
+  .who { margin: 16px 0 24px; font-size: 11pt; display: flex;
+         align-items: baseline; gap: 18px; flex-wrap: wrap; }
+  .who-f { display: flex; align-items: baseline; gap: 6px; flex: 1 1 auto;
+           min-width: 0; white-space: nowrap; }
+  .who-f i { border-bottom: 1px solid #000; flex: 1 1 auto; min-width: 3cm;
+             height: 0.9em; display: inline-block; }
+  .who-short { flex: 0 1 4.5cm; }
+  .who-short i { min-width: 2cm; }
 
   /* ⚠️ Задача не рвётся пополам, ЕСЛИ ПОМЕЩАЕТСЯ. `break-inside: avoid`
      именно на задаче, а не на всём списке: задача длиннее страницы иначе
@@ -80,6 +89,30 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
               white-space: pre-wrap; }
   .plate { border: 1px dashed #666; padding: 10px; margin-top: 8px;
            font-size: 10.5pt; color: #333; }
+  /* Учительский вариант: просто напоминание, какой график к задаче. Рамки
+     «вклейте здесь» тут нет — вклеивать нечего. */
+  .graph-note { margin-top: 8px; font-size: 10.5pt; color: #333;
+                font-style: italic; }
+
+  /* Пункты нумеруются буквами: метка своя, поэтому список без маркеров. */
+  .parts { list-style: none; }
+  .part-label { font-weight: bold; }
+
+  /* ⚠️ Верный вариант помечается ГАЛОЧКОЙ СЛЕВА, а не словом в строке.
+     Раньше к тексту варианта дописывалось слово-пометка, и на тесте
+     «верно/неверно» это читалось кашей: слово ответа и слово пометки
+     совпадали. Галочка стоит в своей колонке и с текстом не смешивается. */
+  .options li { position: relative; }
+  .options li.is-right::before { content: '✓'; position: absolute;
+                                 left: -1.15em; font-weight: bold; }
+  .options li.is-right { font-weight: bold; }
+
+  /* Свой подвал. Без него браузер печатает вверху и внизу собственные
+     колонтитулы с адресом ТЕКУЩЕЙ страницы (то есть внутренним адресом
+     раздела) — на листке ученика ему делать нечего. */
+  .foot { margin-top: 26px; padding-top: 8px; border-top: 1px solid #999;
+          font-size: 9.5pt; color: #444; display: flex; gap: 10px;
+          justify-content: space-between; flex-wrap: wrap; }
   .skipped { border: 1px solid #999; padding: 8px 10px; font-size: 10.5pt; }
 
   /* Разделитель частей листка: подпись + пунктир. Служебный, поэтому
@@ -112,7 +145,8 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
   <button type="button" onclick="window.print()">Печать</button>
   <span class="hint">
     В окне печати выберите «Сохранить как PDF» — получится файл, который
-    можно отправить или распечатать.
+    можно отправить или распечатать. Там же снимите галочку
+    «Колонтитулы» — иначе браузер допишет сверху и снизу свой адрес.
   </span>
   <a href="{{ back_url }}">← к заданию</a>
   {% if other_url %}<a href="{{ other_url }}">{{ other_label }}</a>{% endif %}
@@ -129,8 +163,17 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
   {% if for_teacher %}
   <div class="meta"><b>Вариант преподавателя:</b> с ответами и решениями.</div>
   {% else %}
-  <div class="who">Фамилия, имя: ________________________________________
-    &nbsp;&nbsp; Класс: __________ &nbsp;&nbsp; Дата: ____________</div>
+  {% comment %}
+  Три поля в ОДНУ строку и без черты под ними. Черта уходила вправо дальше
+  самих полей и читалась как обрез страницы; «Дата» при этом сваливалась на
+  вторую строку. Подчёркивания рисует CSS (border-bottom), а не ряд знаков
+  «_»: так поля тянутся ровно и не ломают строку.
+  {% endcomment %}
+  <div class="who">
+    <span class="who-f">Фамилия, имя<i></i></span>
+    <span class="who-f who-short">Класс<i></i></span>
+    <span class="who-f who-short">Дата<i></i></span>
+  </div>
   {% endif %}
 
   {% for row in rows %}
@@ -153,22 +196,33 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
     {% if row.options %}
     <ul class="options">
       {% for option in row.options %}
-      <li><b>{{ option.label }})</b> {{ option.text }}{% if for_teacher and option.is_correct %} <b>— верно</b>{% endif %}</li>
+      <li{% if for_teacher and option.is_correct %} class="is-right"{% endif %}><b>{{ option.label }})</b> {{ option.text }}</li>
       {% endfor %}
     </ul>
     {% elif row.parts %}
-    <ol class="parts" start="1">
+    {% comment %}
+    Пункты нумеруются БУКВАМИ, как на экране: <ul> со своей меткой, а не
+    <ol>. Нумерованный список рисовал «1.» и «2.» там, где ученик видит
+    «а)» и «б)», — на занятии это спор о том, какой пункт он решал.
+    {% endcomment %}
+    <ul class="parts">
       {% for part in row.parts %}
-      <li value="{{ forloop.counter }}">
+      <li><b class="part-label">{{ part.label }})</b>
         {{ part.statement }}
         {% if for_teacher and part.answer %}<br><b>Ответ:</b> {{ part.answer }}{% endif %}
       </li>
       {% endfor %}
-    </ol>
+    </ul>
     {% endif %}
 
-    {% if row.graph %}
+    {% if row.graph and not for_teacher %}
+    {% comment %}
+    Только ученику. Преподавателю с ключом вклеивать нечего — пустая
+    пунктирная рамка в его варианте занимала место и сбивала с толку.
+    {% endcomment %}
     <div class="plate">График: {{ row.graph }} — вклейте или начертите здесь.</div>
+    {% elif row.graph %}
+    <div class="graph-note">График: {{ row.graph }}</div>
     {% endif %}
 
     {% if for_teacher %}
@@ -183,6 +237,16 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
     {% endif %}
   </div>
   {% endfor %}
+
+  {% comment %}
+  Собственный подвал листка. Адрес — ГЛАВНАЯ страница сайта, а не адрес
+  этого раздела: листок попадает к ученику и родителю, и вести он должен
+  туда, куда по нему можно прийти.
+  {% endcomment %}
+  <div class="foot">
+    <span><b>ЭкЗадачи</b> — задачи по олимпиадной экономике</span>
+    <span>{{ site_home }}</span>
+  </div>
 
   {% if skipped %}
   <div class="skipped">

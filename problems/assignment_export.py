@@ -363,7 +363,16 @@ def print_rows(assignment, for_teacher=False):
                     continue
                 if looks_broken(part.statement or ''):
                     continue
-                parts.append({'label': (part.label or '').rstrip(').'),
+                # ⚠️ БУКВА ПУНКТА БЕРЁТСЯ ИЗ ЗАДАЧИ, а не выдумывается
+                # нумерацией списка. На экране пункты идут «а)» и «б)», и
+                # в листке обязаны идти так же: расхождение всплывёт на
+                # занятии, когда ученик назовёт «пункт б», а в листке под
+                # этим местом стоит «2». Метки нет — подставляем букву по
+                # порядку, но НИКОГДА не цифру.
+                label = (part.label or '').rstrip(').')
+                if not label:
+                    label = _letter(len(parts))
+                parts.append({'label': label,
                               'statement': clean(part.statement),
                               'answer': clean(part.answer or '')})
 
@@ -384,11 +393,43 @@ def print_rows(assignment, for_teacher=False):
             'graph': graph_name,
             'answer': clean(item.correct_answer or ''),
             'solution': clean(item.solution_text or ''),
-            # Место для решения: длинной задаче — больше строк. Полосок, а
-            # не пустоты: на пустом поле ученик пишет мельче и криво.
-            'space_lines': range(3 if len(text) < 400 else 5),
+            # Место для решения — ПО ВЕСУ ЗАДАЧИ, а не по длине условия.
+            # Полосок, а не пустоты: на пустом поле ученик пишет мельче и
+            # криво. У теста линеек нет вовсе — вариант ответа уже написан,
+            # обводить его негде.
+            'space_lines': range(solution_lines(item)),
         })
     return rows, skipped
+
+
+MIN_SPACE_LINES = 3
+MAX_SPACE_LINES = 12
+
+
+def solution_lines(item):
+    """Сколько пунктирных линеек дать под решение.
+
+    ⚠️ ПО МАКСИМАЛЬНОМУ БАЛЛУ, а не по длине условия. Длина условия — не
+    мера работы: «Найдите равновесие, если D: 100−Q, S: Q» короче любого
+    сюжета, а решать её дольше. Балл же репетитор ставит именно за объём
+    рассуждения, которого он ждёт.
+
+    У ТЕСТА ЛИНЕЕК НЕТ. Варианты ответа уже напечатаны, ученик обводит
+    букву — три пустые полоски под ней просто съедали бумагу (раньше они
+    стояли у всех позиций подряд).
+
+    Шкала: балл 2 → 3 линейки (низ шкалы), балл 10 → 11, дальше упор в 12.
+    Задача на 10 баллов получает заметно больше места, чем на 2.
+    """
+    from .assignment_rows import item_section, SECTION_TEST
+
+    if item_section(item) == SECTION_TEST:
+        return 0
+    points = item.points
+    if points is None:
+        return MIN_SPACE_LINES
+    lines = int(float(points)) + 1
+    return max(MIN_SPACE_LINES, min(MAX_SPACE_LINES, lines))
 
 
 RU_LETTERS = 'абвгдежзиклмнопрстуфхц'

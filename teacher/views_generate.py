@@ -268,6 +268,11 @@ def assignment_print(request, group_id, assignment_id):
         'for_teacher': for_teacher,
         'deadline': assignment.deadline_at,
         'total_points': export.total_points(rows),
+        # Подвал листка ведёт на ГЛАВНУЮ, а не на этот раздел: листок
+        # попадает к ученику и родителю, и адрес внутренней страницы
+        # кабинета им бесполезен. Собираем абсолютный — распечатанный
+        # относительный путь никуда не ведёт.
+        'site_home': request.build_absolute_uri('/'),
         'back_url': reverse('teacher:group_assignment',
                             args=[group.pk, assignment.pk]),
         'other_url': here + ('' if for_teacher else '?for=teacher'),
