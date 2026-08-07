@@ -286,3 +286,77 @@ class Bug711StaleReviewTests(TestCase):
         sub.status = 'reviewed'
         sub.save()
         self.assertFalse([r for r in self._reasons() if 'вашей проверки' in r])
+
+
+class DemoSeedTests(TestCase):
+    """Фаза 8 — витрина. Мусор в демо читается как поломка кода."""
+
+    def _seed(self):
+        from django.core.management import call_command
+        from io import StringIO
+
+        call_command('seed_platform_demo', stdout=StringIO())
+
+    def test_seed_is_idempotent_for_the_graph(self):
+        """8.3 — второй прогон не добавляет второй плашки графика.
+
+        Раньше график цеплялся на «первую» и «последнюю» позицию, а состав
+        домашки за сессии менялся: каждый прогон делал «последней» новую
+        позицию, со старых плашку никто не снимал. Так одна плашка
+        оказалась на четырёх задачах.
+        """
+        from problems.models import SavedGraph
+
+        self._seed()
+        first = {g.pk: AssignmentItem.objects.filter(graph=g).count()
+                 for g in SavedGraph.objects.all()}
+        self._seed()
+        second = {g.pk: AssignmentItem.objects.filter(graph=g).count()
+                  for g in SavedGraph.objects.all()}
+        self.assertEqual(first, second)
+        for count in second.values():
+            self.assertLessEqual(count, 1, 'график не должен дублироваться')
+
+    def test_students_have_different_surnames(self):
+        """8.4 — три Иванова подряд выглядят как ошибка выборки."""
+        from django.contrib.auth import get_user_model
+
+        self._seed()
+        User = get_user_model()
+        surnames = [u.last_name for u in User.objects.filter(
+            username__in=['student1@test.local', 'student2@test.local',
+                          'student3@test.local'])]
+        self.assertEqual(len(surnames), 3)
+        self.assertEqual(len(set(surnames)), 3, surnames)
+
+    def test_custom_problem_answer_matches_its_own_solution(self):
+        """8.2 — стояло «-0,54», а решение под ним даёт −0,57."""
+        self._seed()
+        problem = CustomProblem.objects.get(
+            title='Эластичность спроса на проездные')
+        self.assertEqual(problem.correct_answer, '-0,57')
+        self.assertIn('0{,}57', problem.solution)
+
+    def test_solution_matches_its_problem(self):
+        """8.1 — под задачей про эластичность стоял разбор равновесия."""
+        self._seed()
+        item = (AssignmentItem.objects
+                .filter(solution_override__gt='')
+                .select_related('catalog_problem').first())
+        if item is None:
+            self.skipTest('в демо нет позиции со своим решением')
+        title = (item.problem_title or '').lower()
+        text = item.solution_override
+        if 'эластич' in title:
+            self.assertIn('эластичност', text.lower())
+            # Разбора равновесия под задачей об эластичности быть не должно.
+            self.assertNotIn('Приравниваем спрос и предложение', text)
+
+    def test_second_run_does_not_multiply_users(self):
+        from django.contrib.auth import get_user_model
+
+        self._seed()
+        User = get_user_model()
+        before = User.objects.count()
+        self._seed()
+        self.assertEqual(User.objects.count(), before)
