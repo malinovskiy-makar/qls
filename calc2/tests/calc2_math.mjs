@@ -1057,6 +1057,41 @@ const CASES = [
              ['самые дорогие издержки', 'last', 3, 0.01]],
   },
   {
+    /* Фаза 15.6: предел торговли и излом КТВ.
+       КПВ 1: y = 100 − x  (альт. цена X = 1, страна дешёвая по X, экспортирует X)
+       КПВ 2: y = 120 − 4x (альт. цена X = 4, экспортирует Y, Ymax = 120)
+       Возьмём Pw = 2. Страна 1 специализируется: производство (100; 0).
+       Партнёр может отдать не больше 120 единиц Y, значит продать X можно
+       не больше 120 / 2 = 60 при своих 100 — предел СРАБАТЫВАЕТ.
+       Излом стоит в (100 − 60; 2·60) = (40; 120). */
+    name: 'Торговля двух стран · предел обмена ломает КТВ в (40; 120)',
+    run: `setMode('ppf'); setPpfSub('trade'); setTradeScenario('B');
+          STATE.tbF1 = 'y = 100 - x'; STATE.tbF2 = 'y = 120 - 4*x';
+          STATE.tbManualPrice = 2; STATE.tradeBData = null; redrawAll();
+          var d = STATE.tradeBData;
+          var lo = d.lowCo;
+          return { ok: d.ok ? 1 : 0, Pw: d.Pw, lowIdx: d.lowIdx,
+                   exportX: d.E_L, binding: lo.limit.binding ? 1 : 0,
+                   kx: lo.limit.kink[0], ky: lo.limit.kink[1] };`,
+    checks: [['посчиталось', 'ok', 1, 0], ['мировая цена', 'Pw', 2, 0.001],
+             ['экспортёр X это страна 1', 'lowIdx', 1, 0],
+             ['предел обмена X', 'exportX', 60, 0.05],
+             ['предел сработал', 'binding', 1, 0],
+             ['излом по X', 'kx', 40, 0.05], ['излом по Y', 'ky', 120, 0.05]],
+  },
+  {
+    // Тот же случай, но партнёра хватает: Pw = 1.2, предел 120/1.2 = 100 = весь
+    // свой X, значит излома нет и линия идёт прямой до оси.
+    name: 'Торговля двух стран · партнёра хватило, излома нет',
+    run: `setMode('ppf'); setPpfSub('trade'); setTradeScenario('B');
+          STATE.tbF1 = 'y = 100 - x'; STATE.tbF2 = 'y = 120 - 4*x';
+          STATE.tbManualPrice = 1.2; STATE.tradeBData = null; redrawAll();
+          var lo = STATE.tradeBData.lowCo;
+          return { exportX: STATE.tradeBData.E_L, binding: lo.limit.binding ? 1 : 0 };`,
+    checks: [['обменять можно весь X', 'exportX', 100, 0.05],
+             ['предел не сработал', 'binding', 0, 0]],
+  },
+  {
     // Фаза 9: масштаб в .tex — тот же, что на экране. Сверяем форму картинки:
     // отношение «сантиметров на единицу X» к «сантиметрам на единицу Y».
     name: 'Экспорт · масштаб .tex совпадает с экранным',

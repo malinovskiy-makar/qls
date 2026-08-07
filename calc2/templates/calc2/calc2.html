@@ -3595,6 +3595,7 @@ const STATE = {
   tbF2: '100 - 2*X',     // КПВ страны 2 (сценарий Б)
   tbManualPrice: null,   // своя мировая цена (Задача 4); null = равновесная (эндогенная)
   tradeBData: null,      // результат расчёта сценария Б
+  tbNames: [],           // свои имена стран (Фаза 15.2)
   // Неравенство доходов (ЧК1–3). Оси — доля населения / доля дохода (обе 0..100 %).
   ineqInput: 'groups',   // способ ввода: 'groups' / 'incomes' / 'formula'
   ineqGroupN: 5,         // число групп равного населения (5 квинтилей / 10 децилей)
@@ -10778,38 +10779,153 @@ function recomputeTradeB() {
   // Линия торговых возможностей через точку производства, наклон −Pw: Y = c0 − Pw·X.
   const cpf = (co) => { const c0 = co.prod[1] + Pw * co.prod[0]; return { intercept: c0, yint: c0, xint: c0 / Pw }; };
   lowCo.cpf = cpf(lowCo); highCo.cpf = cpf(highCo);
-  STATE.tradeBData = { ok: true, Pw, Pweq, manual, inInterval, noTradeMsg, priceMin, priceMax, bL, bH, b1, b2, co1, co2, lowIdx: lowCo.idx, highIdx: highCo.idx };
+
+  /* Предел торговли (Фаза 15.6). Линия возможностей не может уходить в
+     бесконечность: партнёр физически не выпускает столько, сколько нужно
+     выменять. Страна L специализируется на X и меняет его на Y, но взять Y
+     больше, чем весь выпуск страны H, неоткуда, и наоборот.
+
+       L отдаёт E единиц X, получает Pw·E единиц Y.  Ограничение: Pw·E ≤ Y_H
+       H отдаёт S единиц Y, получает S/Pw единиц X.  Ограничение: S/Pw ≤ X_L
+
+     Дойдя до предела, страна упирается: чтобы получить ещё, ей придётся
+     производить второй товар самой, то есть двигаться по СВОЕЙ КПВ, но уже
+     из смещённой точки. Поэтому дальше предела линия ломается и идёт
+     параллельно собственной КПВ страны, сдвинутой на объём состоявшейся
+     торговли. Всё считается численно, без готовых формул. */
+  const Ymax_H = highCo.c.Ymax, Xmax_L = lowCo.c.Xmax;
+  // Сколько X реально удастся продать стране L и сколько Y — стране H.
+  const E_L = Math.min(Xmax_L, (Pw > 0 ? Ymax_H / Pw : 0));   // экспорт X страной L
+  const S_H = Math.min(Ymax_H, Pw * Xmax_L);                  // экспорт Y страной H
+  lowCo.limit = {
+    trade: E_L,
+    // Точка, где партнёр исчерпал свой товар: дальше по прямой не пойти.
+    kink: [Xmax_L - E_L, Pw * E_L],
+    binding: E_L < Xmax_L - 1e-9,        // предел реально сработал
+    shift: [-E_L, Pw * E_L],             // на сколько сдвинута своя КПВ за изломом
+  };
+  highCo.limit = {
+    trade: S_H,
+    kink: [S_H / Pw, Ymax_H - S_H],
+    binding: S_H < Ymax_H - 1e-9,
+    shift: [S_H / Pw, -S_H],
+  };
+
+  STATE.tradeBData = { ok: true, Pw, Pweq, manual, inInterval, noTradeMsg, priceMin, priceMax,
+    bL, bH, b1, b2, co1, co2, lowIdx: lowCo.idx, highIdx: highCo.idx,
+    lowCo, highCo, Ymax_H, Xmax_L, E_L, S_H };
   const xm = Math.max(c1.Xmax, c2.Xmax, lowCo.cpf.xint, highCo.cpf.xint);
   const ym = Math.max(c1.Ymax, c2.Ymax, lowCo.cpf.yint, highCo.cpf.yint);
   applyTradeRanges(niceMax(xm * 1.08), niceMax(ym * 1.08));  // плавно при смене Pw, иначе мгновенно
 }
 
-// Отрисовка сценария Б: КПВ обеих стран (сплошные) + линии торговых возможностей (пунктир).
+/* Линия торговых возможностей страны с учётом предела торговли (Фаза 15.6).
+   От точки производства идём по прямой с наклоном мировой цены, пока партнёру
+   есть чем меняться; в точке излома торговля упирается в его выпуск, и дальше
+   набор наращивается только собственным производством — по своей КПВ,
+   сдвинутой на объём уже состоявшегося обмена. */
+function tradeCpfPoints(co) {
+  const k = co.limit;
+  const pts = [[co.prod[0], co.prod[1]], [k.kink[0], k.kink[1]]];
+  if (!k.binding) return pts;                 // партнёра хватило: прямая до конца
+  // Хвост: своя КПВ, сдвинутая на вектор торговли.
+  const own = co.ppts.filter(p => p && isFinite(p[1]));
+  const tail = own.map(p => [p[0] + k.shift[0], p[1] + k.shift[1]])
+                  .filter(p => p[0] >= -1e-9 && p[1] >= -1e-9);
+  // Оставляем только ту часть хвоста, что дальше излома по X (или по Y вверх).
+  const useX = (co.exports === 'X');
+  const cut = tail.filter(p => useX ? (p[0] <= k.kink[0] + 1e-9) : (p[0] >= k.kink[0] - 1e-9));
+  return pts.concat(cut.sort((a, b) => useX ? (b[0] - a[0]) : (a[0] - b[0])));
+}
+
+/* Два графика рядом: слева страна 1, справа страна 2 (Фаза 15.3). У каждой
+   свои шкалы и своя область отрисовки с обрезкой, поэтому кривые одной страны
+   не заезжают на территорию другой. Устроено как две панели у производной. */
+function tradeBPanels() {
+  const m = CONFIG.margin;
+  // Заголовку панели нужна своя полоса сверху, иначе он ляжет на кривую.
+  m.top = Math.max(m.top, 34);
+  const gap = 44;
+  const total = (W - m.right) - m.left;
+  const half = (total - gap) / 2;
+  const yTop = m.top, yBot = H - m.bottom;
+  const mk = (x0, d, co) => {
+    const xm = Math.max(co.c.Xmax, co.cpf.xint) * 1.08;
+    const ym = Math.max(co.c.Ymax, co.cpf.yint) * 1.08;
+    return {
+      mx: d3.scaleLinear().domain([0, xm]).range([x0, x0 + half]),
+      my: d3.scaleLinear().domain([0, ym]).range([yBot, yTop]),
+      x0, x1: x0 + half, yTop, yBot,
+    };
+  };
+  return [mk(m.left, 0, STATE.tradeBData.co1), mk(m.left + half + gap, 1, STATE.tradeBData.co2)];
+}
+
+// Отрисовка сценария Б: два графика рядом, у каждого своя КПВ и своя КТВ.
 function drawTradeB(d) {
-  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
-  const line = d3.line().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y(p => sy(p[1]));
-  [d.co1, d.co2].forEach(co => {
-    g.append('path').datum(co.ppts).attr('fill', 'none').attr('stroke', co.color).attr('stroke-width', 2.2).attr('d', line);
-    const cpfpts = [[0, co.cpf.yint], [co.cpf.xint, 0]];
-    g.append('path').datum(cpfpts).attr('fill', 'none').attr('stroke', co.color).attr('stroke-width', 1.8)
-      .attr('stroke-dasharray', '6 4').attr('opacity', 0.85).attr('d', line);
-    // Задача 2: линии цены больше не перетаскиваются мышью — управление ползунком Pw.
+  const panels = tradeBPanels();
+  [d.co1, d.co2].forEach((co, i) => {
+    const p = panels[i];
+    const clipId = 'tb-clip-' + i;
+    const defs = svg.append('defs');
+    defs.append('clipPath').attr('id', clipId).append('rect')
+      .attr('x', p.x0 - 2).attr('y', p.yTop - 8)
+      .attr('width', (p.x1 - p.x0) + 12).attr('height', (p.yBot - p.yTop) + 10);
+    const g = svg.append('g').attr('clip-path', 'url(#' + clipId + ')');
+    const line = d3.line().defined(q => q && isFinite(q[1])).x(q => p.mx(q[0])).y(q => p.my(q[1]));
+
+    drawPlaneAxes(g, p.mx, p.my, 'X', 'Y');
+    // Числа делений: у каждой панели свой масштаб, поэтому и подписи свои.
+    // Подписи делений рисуем ВНЕ обрезки: они стоят за краем поля, и обрезка
+    // срезала бы их вместе с воздухом.
+    const gl = svg.append('g');
+    const tk = (scale, horiz) => {
+      const [lo, hi] = scale.domain();
+      const step = niceTickStep(hi - lo, 5);
+      for (let v = step; v <= hi + 1e-9; v += step) {
+        if (horiz) haloText(gl, scale(v), p.yBot + 8, fmt(v), 'middle', 'hanging');
+        else       haloText(gl, p.x0 - 6, scale(v), fmt(v), 'end', 'middle');
+      }
+    };
+    tk(p.mx, true); tk(p.my, false);
+    // Заголовок панели рисуем ВНЕ обрезки: она начинается у верхней границы
+    // поля, и текст над ней срезался бы вместе с воздухом.
+    svg.append('text').attr('x', (p.x0 + p.x1) / 2).attr('y', p.yTop - 6)
+      .attr('text-anchor', 'middle').attr('font-size', 12.5).attr('font-weight', 700)
+      .attr('fill', co.color).text(tbName(co.idx));
+
+    // КПВ и КТВ обе сплошные (Фаза 15.4): пунктир читался как «ненастоящая».
+    g.append('path').datum(co.ppts).attr('fill', 'none')
+      .attr('stroke', co.color).attr('stroke-width', 2.2).attr('d', line);
+    g.append('path').datum(tradeCpfPoints(co)).attr('fill', 'none')
+      .attr('stroke', COL.reg).attr('stroke-width', 2.2).attr('d', line);
+
+    // Точка производства и точка предела торговли.
+    const pp = [p.mx(co.prod[0]), p.my(co.prod[1])];
+    g.append('circle').attr('cx', pp[0]).attr('cy', pp[1]).attr('r', 5)
+      .attr('fill', co.color).attr('stroke', COL.halo).attr('stroke-width', 2);
+    haloText(g, pp[0] + 8, pp[1] + (co.prod[1] > 0 ? -8 : 16), 'производство', 'start', 'auto');
+
+    if (co.limit.binding) {
+      const kp = [p.mx(co.limit.kink[0]), p.my(co.limit.kink[1])];
+      g.append('circle').attr('cx', kp[0]).attr('cy', kp[1]).attr('r', 4.5)
+        .attr('fill', COL.halo).attr('stroke', COL.reg).attr('stroke-width', 2.4);
+      haloText(g, kp[0] + 8, kp[1] - 8, 'предел обмена', 'start', 'auto');
+    }
+    // Ярлык КТВ у середины прямого участка.
+    const mxp = (co.prod[0] + co.limit.kink[0]) / 2, myp = (co.prod[1] + co.limit.kink[1]) / 2;
+    haloText(g, p.mx(mxp) + 6, p.my(myp) - 6, 'КТВ', 'start', 'auto');
   });
 }
 
-// Подписи сценария Б: точки производства (специализация), ярлыки стран и КТВ.
-function drawTradeBMarks(d) {
-  const ox = sx(0), oy = sy(0), g = svg.append('g');
-  [d.co1, d.co2].forEach(co => {
-    const px = sx(co.prod[0]), py = sy(co.prod[1]);
-    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', co.color).attr('stroke', COL.halo).attr('stroke-width', 2);
-    g.append('text').attr('x', px + 8).attr('y', py + (co.prod[1] > 0 ? -8 : 16)).attr('font-size', 11).attr('font-weight', 600).attr('fill', co.color)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Стр.' + co.idx + ' (эксп. ' + co.exports + ')');
-    // ярлык КТВ у середины линии торговых возможностей
-    const mx = co.cpf.xint * 0.5, my = co.cpf.yint * 0.5;
-    g.append('text').attr('x', sx(mx)).attr('y', sy(my) - 4).attr('font-size', 10).attr('fill', co.color).attr('opacity', 0.9)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2).text('КТВ' + co.idx);
-  });
+// Подписи рисуются вместе с панелями (drawTradeB): отдельный проход по общим
+// шкалам врал бы, у каждой страны теперь своя система координат.
+function drawTradeBMarks() {}
+
+// Имя страны на графике: своё или родовое.
+function tbName(idx) {
+  const own = (STATE.tbNames || [])[idx - 1];
+  return (own && own.trim()) || ('КПВ ' + idx);
 }
 
 // Табло сценария Б.
@@ -10824,7 +10940,38 @@ function updateTradeBPanel() {
   html += `<div class="stat"><span>Автарк. цена X стр.2</span><b>${fmt(d.b2)}</b></div>`;
   html += `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(d.Pw)}</b>${d.manual ? ' <span style="color:var(--curve-reg);">(своя)</span>' : ' <span style="color:var(--text2);">(равновесная)</span>'}</div>`;
   if (d.manual) html += `<div class="stat"><span>Равновесная Pw</span><b>${fmt(d.Pweq)}</b></div>`;
-  html += `<div class="stat"><span>Экспортируют</span><b>Стр.${d.lowIdx} → X, Стр.${d.highIdx} → Y</b></div>`;
+  html += `<div class="stat"><span>Экспортируют</span><b>${tbName(d.lowIdx)} → X, ${tbName(d.highIdx)} → Y</b></div>`;
+  // Предел торговли (Фаза 15.6): сколько товара реально удаётся обменять.
+  html += `<div class="stat"><span>Обмен X (макс.)</span><b>${fmt(d.E_L)}</b></div>`;
+  html += `<div class="stat"><span>Обмен Y (макс.)</span><b>${fmt(d.S_H)}</b></div>`;
+  if (d.lowCo.limit.binding || d.highCo.limit.binding) {
+    const co = d.lowCo.limit.binding ? d.lowCo : d.highCo;
+    html += `<div class="stat"><span>Излом КТВ у ${tbName(co.idx)}</span>`
+          + `<b>${fmt(co.limit.kink[0])}; ${fmt(co.limit.kink[1])}</b></div>`;
+  }
+
+  html += '<div class="sb-note"><b>Почему КТВ ломается</b>';
+  html += `<p>Страна ${tbName(d.lowIdx)} специализируется на X и меняет его на Y по мировой цене `
+        + `$P_w = ${fmt(d.Pw)}$: за каждую отданную единицу X она получает ${fmt(d.Pw)} единиц Y. `
+        + 'Пока идёт этот обмен, набор движется по прямой с наклоном мировой цены.</p>';
+  html += `<p>Но взять Y больше, чем партнёр вообще выпускает, неоткуда. У ${tbName(d.highIdx)} `
+        + `весь возможный Y это ${fmt(d.Ymax_H)}, значит продать X можно самое большее `
+        + `$${fmt(d.Ymax_H)} / ${fmt(d.Pw)} = ${fmt(d.Ymax_H / d.Pw)}$ единиц. `
+        + `Своих X у страны ${fmt(d.Xmax_L)}, поэтому фактический предел обмена это меньшее из двух: `
+        + `${fmt(d.E_L)}.</p>`;
+  if (d.lowCo.limit.binding) {
+    html += `<p>Здесь предел сработал: партнёр кончился раньше, чем свой X. Прямая обрывается в `
+          + `точке (${fmt(d.lowCo.limit.kink[0])}; ${fmt(d.lowCo.limit.kink[1])}) — это и есть излом. `
+          + 'Дальше набор можно наращивать только собственным производством второго товара, '
+          + 'то есть двигаясь по своей КПВ, но уже из смещённой точки: к ней прибавлено то, '
+          + 'что удалось выменять. Поэтому хвост линии идёт параллельно собственной КПВ страны.</p>';
+  } else {
+    html += '<p>Здесь предел не сработал: партнёра хватает, чтобы выменять весь выпуск, '
+          + 'и линия возможностей идёт прямой до самой оси. Излома нет.</p>';
+  }
+  html += '<p>Рисовать КТВ бесконечной прямой от края до края неверно: это означало бы, что '
+        + 'обменять можно сколько угодно, хотя партнёр физически столько не производит.</p>';
+  html += '</div>';
   // Фаза 4б: не просто число, а КАК оно получается — логика избыточного спроса
   // и предложения, границы интервала и честная оговорка о том, чего модель не знает.
   html += '<div class="hint" style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);">' +
@@ -10865,9 +11012,12 @@ function syncTbPriceUI(d) {
 function redrawTradeB() {
   recomputeTradeB();
   makeScales();
-  svg.selectAll('*').remove(); addDefs(); drawGrid(); drawAxes('X', 'Y');
+  svg.selectAll('*').remove(); addDefs();
   const d = STATE.tradeBData;
-  if (d && d.ok) { drawTradeB(d); drawTradeBMarks(d); }
+  // Два графика рядом (Фаза 15.3): общие оси и сетка тут не годятся, каждая
+  // панель рисует свои. Ошибку разбора показываем на пустом поле.
+  if (d && d.ok) drawTradeB(d);
+  else { drawGrid(); drawAxes('X', 'Y'); }
   updateTradeBPanel();
   syncTbPriceUI(d);
   _wantRangeAnim = false;   // страховка: гасим запрос, даже если recompute вышел по ошибке
