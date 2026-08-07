@@ -96,13 +96,18 @@ def item_max_score(item):
     «Верно ✓» в той же карточке.
 
     Балл не задан — задача стоит единицу: так считает вся остальная
-    система (`part_max_score`, `work_review._item_max`).
+    система (`part_max_score`, `work_review._item_max`). После миграции
+    0032 пустых баллов в базе нет (новым позициям балл проставляет
+    `AssignmentItem.save()`: 10 задаче, 3 тесту), но запасной путь оставлен —
+    позиция может прийти из старой фикстуры.
     """
     from decimal import Decimal
 
+    from .models_platform import LEGACY_POINTS
+
     if item.points is not None:
         return Decimal(str(item.points))
-    return Decimal('1')
+    return LEGACY_POINTS
 
 
 def part_correct_answer(item, part):

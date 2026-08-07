@@ -11,7 +11,9 @@ from django.test import TestCase
 from django.urls import reverse
 
 from problems import part_grading
-from problems.assignment_rows import answer_input_name, answer_parts
+from problems.assignment_rows import (
+    answer_input_name, answer_parts, item_max_score,
+)
 from problems.models import (
     Assignment, AssignmentItem, CustomProblem, PartAnswer, ProblemPart,
     Submission,
@@ -211,7 +213,11 @@ class PartsDoNotBreakTestsTests(TestCase):
             {answer_input_name(item): 'б'})
         submission = Submission.objects.get(problem_item=item)
         self.assertEqual(submission.status, 'reviewed')
-        self.assertEqual(float(submission.feedback.score), 1.0)
+        # Полностью верный ответ стоит ПОЛНОГО балла позиции, каким бы он ни
+        # был. Раньше здесь стояла жёсткая единица — она совпадала с ответом
+        # только потому, что балла по умолчанию не было вовсе.
+        self.assertEqual(Decimal(str(submission.feedback.score)),
+                         item_max_score(item))
 
     def test_custom_open_problem_with_word_answer_still_checked(self):
         """У СВОЕЙ задачи словесный эталон разрешён: его писал человек."""

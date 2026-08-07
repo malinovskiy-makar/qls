@@ -23,7 +23,7 @@ from problems.models import (
     Assignment, AssignmentItem, CustomProblem, CustomProblemOption, Problem,
     ProblemPart, Submission,
 )
-from problems.tests.factories import make_user
+from problems.tests.factories import make_problem, make_user
 from problems.work_review import work_summary
 
 
@@ -180,12 +180,44 @@ class OptionScoringTests(TestCase):
     # -- балл не задан -----------------------------------------------------
 
     def test_missing_points_means_one(self):
+        """Старая позиция без балла по-прежнему стоит единицу.
+
+        Новым позициям балл проставляет `AssignmentItem.save()` (10 задаче,
+        3 тесту), поэтому пустой балл приходится вернуть через `update()` —
+        он идёт мимо save() и точно повторяет строку, лежавшую в базе до
+        миграции 0032. Правило «пусто = единица» стережём именно ради таких
+        строк: они могут приехать из старой фикстуры.
+        """
         item = AssignmentItem.objects.create(
             assignment=self.homework, catalog_problem=multi_problem(),
-            order=99, points=None)
+            order=99)
+        AssignmentItem.objects.filter(pk=item.pk).update(points=None)
+        item.refresh_from_db()
         self.assertEqual(item_max_score(item), Decimal('1'))
         sub = self._submit(item, ['а', 'б', 'г'])
         self.assertEqual(Decimal(str(sub.feedback.score)), Decimal('1'))
+
+    def test_new_item_gets_default_points(self):
+        """Значения по умолчанию: 10 открытой задаче, 3 тесту."""
+        test_item = AssignmentItem.objects.create(
+            assignment=self.homework, catalog_problem=multi_problem(),
+            order=101)
+        open_item = AssignmentItem.objects.create(
+            assignment=self.homework, order=102,
+            catalog_problem=make_problem('Открытая задача'))
+        self.assertEqual(item_max_score(test_item), Decimal('3'))
+        self.assertEqual(item_max_score(open_item), Decimal('10'))
+
+    def test_explicit_points_are_not_overwritten(self):
+        """Балл, выставленный репетитором, значение по умолчанию не трогает."""
+        item = AssignmentItem.objects.create(
+            assignment=self.homework, catalog_problem=multi_problem(),
+            order=103, points=7)
+        self.assertEqual(item_max_score(item), Decimal('7'))
+        item.points = 4
+        item.save()
+        item.refresh_from_db()
+        self.assertEqual(item_max_score(item), Decimal('4'))
 
 
 class CustomOptionScoringTests(TestCase):

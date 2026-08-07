@@ -6,6 +6,7 @@
 from django.test import TestCase
 from django.urls import reverse
 
+from problems.assignment_rows import item_max_score
 from problems.models import ProblemPart, Submission
 from problems.tests.factories import (
     make_assignment, make_problem, make_user,
@@ -83,7 +84,10 @@ class StudentCycleTests(TestCase):
         sub = Submission.objects.get(student=self.student,
                                      problem=self.test_problem)
         self.assertEqual(sub.status, 'reviewed')
-        self.assertEqual(float(sub.feedback.score), 1.0)
+        # Верный ответ стоит ПОЛНОГО балла позиции. Жёсткая единица тут
+        # совпадала с истиной только пока балла по умолчанию не было.
+        self.assertEqual(float(sub.feedback.score),
+                         float(item_max_score(sub.problem_item)))
 
     def test_submit_wrong_test_answer_scored_zero(self):
         self._open_assignment()
@@ -136,4 +140,5 @@ class AutoCheckMultiAnswerTests(TestCase):
             {field(self.assignment, self.problem): ['в', 'а']})    # порядок не важен
         sub = Submission.objects.get(student=self.student,
                                      problem=self.problem)
-        self.assertEqual(float(sub.feedback.score), 1.0)
+        self.assertEqual(float(sub.feedback.score),
+                         float(item_max_score(sub.problem_item)))

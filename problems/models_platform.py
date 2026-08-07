@@ -9,6 +9,8 @@
 
 Все новые модели этой сессии живут здесь.
 """
+from decimal import Decimal
+
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -370,6 +372,23 @@ class SolutionVisibility(models.TextChoices):
     NEVER = 'never', 'Никогда'
 
 
+# --- Максимальный балл за позицию: значения по умолчанию -------------------
+# Открытая задача дороже теста: тест — одно попадание, задача — рассуждение
+# с подпунктами. Числа согласованы с владельцем, менять их можно только тут:
+# они же показываются в интерфейсе и складываются в «всего баллов».
+DEFAULT_POINTS_PROBLEM = Decimal('10')
+DEFAULT_POINTS_TEST = Decimal('3')
+# Чего стоит позиция, у которой балл не проставлен вовсе. Единица —
+# историческое поведение всей системы, менять нельзя: иначе задним числом
+# переоценятся все работы, собранные до появления баллов.
+LEGACY_POINTS = Decimal('1')
+
+
+def default_points(is_test):
+    """Балл по умолчанию для НОВОЙ позиции."""
+    return DEFAULT_POINTS_TEST if is_test else DEFAULT_POINTS_PROBLEM
+
+
 class AssignmentItem(models.Model):
     """Позиция задачи в домашке.
 
@@ -399,6 +418,9 @@ class AssignmentItem(models.Model):
         null=True, blank=True,
         related_name='assignment_items', verbose_name='Своя задача')
 
+    # Максимальный балл за позицию. Правится репетитором прямо на странице
+    # задания. Пусто бывает только у позиций, созданных до появления значений
+    # по умолчанию, — миграция 0032 их заполнила, а новые заполняет save().
     points = models.DecimalField('Балл', max_digits=6, decimal_places=2,
                                  null=True, blank=True)
 
@@ -461,6 +483,17 @@ class AssignmentItem(models.Model):
 
     def __str__(self):
         return f'{self.assignment}: {self.order}. {self.problem_title}'
+
+    def save(self, *args, **kwargs):
+        """Новой позиции проставляем балл по умолчанию: 10 задаче, 3 тесту.
+
+        ⚠️ Только при СОЗДАНИИ и только если балл не задан. Уже собранные
+        задания править нельзя: репетитор мог поставить свои числа, и
+        «умное» переназначение молча переоценило бы сданные работы.
+        """
+        if self._state.adding and self.points is None:
+            self.points = default_points(self.is_test)
+        return super().save(*args, **kwargs)
 
     # -- Единая точка доступа к задаче, какой бы она ни была ---------------
     # Экраны не должны каждый раз писать «если каталожная — то так, если

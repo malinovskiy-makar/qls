@@ -371,12 +371,20 @@ def _letter(position):
 
 
 def total_points(rows):
+    """Сумма максимальных баллов задания.
+
+    Позиция без проставленного балла считается за единицу — ровно так же,
+    как её считает `assignment_rows.item_max_score`. Без этого «всего
+    баллов» на листке расходилось бы с суммой оценок в журнале.
+    """
     from decimal import Decimal
+
+    from .models_platform import LEGACY_POINTS
 
     total = Decimal('0')
     for row in rows:
-        if row['points'] is not None:
-            total += Decimal(str(row['points']))
+        points = row.get('points')
+        total += Decimal(str(points)) if points is not None else LEGACY_POINTS
     return total or None
 
 
