@@ -98,11 +98,36 @@ def grade_part(item, part, given, parts_count):
     return ok, (maximum if ok else Decimal('0')), maximum
 
 
+def wrote_anything(submission):
+    """Написал ли ученик хоть что-нибудь по этой задаче.
+
+    Смотрим на РАЗВЁРНУТОЕ РЕШЕНИЕ и на прикреплённый файл — то есть на то,
+    что репетитору можно прочитать. Поле короткого ответа сюда не входит:
+    оно разбирается отдельно, по каждому пункту.
+
+    Файл считается написанным текстом намеренно: скан тетради — это работа,
+    и ставить за него автоматический ноль было бы прямой несправедливостью.
+    """
+    if (submission.solution_text or '').strip():
+        return True
+    return bool(getattr(submission, 'solution_file', None))
+
+
 def save_part_answers(submission, item, values):
     """Пишет ответы по пунктам и проверяет то, что проверяется машиной.
 
     Возвращает (набранный балл, максимум, сколько пунктов ждёт человека).
     Идемпотентна: повторный вызов обновляет те же строки.
+
+    ⚠️ ПУСТОЙ ПУНКТ ПОЛУЧАЕТ НОЛЬ АВТОМАТОМ И НЕ ИДЁТ В ОЧЕРЕДЬ. Если по
+    пункту не написано НИЧЕГО — ни ответа, ни решения, ни файла, — читать
+    репетитору нечего, и держать такую пустоту в очереди ручной проверки
+    значит тратить его время на пустое место.
+
+    Ровно одно исключение, и оно важное: ответ пуст, но решение НАПИСАНО.
+    Тогда пункт идёт человеку, как раньше. Ученик рассуждал — значит есть
+    что читать и есть за что ставить балл. Именно этот случай лежит в
+    демо-данных (Пётр, «Эластичность спроса по цене»).
     """
     from .models import PartAnswer
 
@@ -110,11 +135,17 @@ def save_part_answers(submission, item, values):
     scored = Decimal('0')
     maximum = Decimal('0')
     pending = 0
+    # Решение одно на всю задачу, поэтому признак считается один раз: если
+    # ученик написал разбор, ни один пункт не обнуляется автоматически.
+    has_text = wrote_anything(submission)
 
     for part in parts:
         key = part.pk if part is not None else None
         given = (values.get(key) or '').strip()
         ok, score, part_max = grade_part(item, part, given, len(parts))
+        auto_zero = False
+        if score is None and not given and not has_text:
+            ok, score, auto_zero = False, Decimal('0'), True
         maximum += part_max
         if score is not None:
             scored += score
@@ -123,7 +154,7 @@ def save_part_answers(submission, item, values):
         PartAnswer.objects.update_or_create(
             submission=submission, part=part,
             defaults={'answer': given, 'is_correct': ok, 'score': score,
-                      'max_score': part_max})
+                      'max_score': part_max, 'auto_zero': auto_zero})
     return scored, maximum, pending
 
 
@@ -164,6 +195,9 @@ def part_rows(item, submission, stored=None):
             'max_score': (answer.max_score if answer
                           else part_max_score(item, part, len(parts))),
             'auto': bool(part_correct_answer(item, part)),
+            # Ноль за пустоту, а не за ошибку — экран проверки показывает это
+            # отдельной строкой и даёт кнопку «изменить».
+            'auto_zero': bool(answer.auto_zero) if answer else False,
         })
     return rows
 
@@ -227,6 +261,10 @@ def apply_to_submission(submission, item, values):
 def _auto_comment(item, submission):
     """Что машина пишет ученику: по пунктам, а не одним вердиктом."""
     rows = part_rows(item, submission)
+    # Работа пустая целиком — говорим об этом прямо, а не «неверно,
+    # правильный ответ …». Ученик ничего не отвечал, и «неверно» тут ложь.
+    if rows and all(row['auto_zero'] for row in rows):
+        return 'Ноль поставлен автоматически: ответа не было.'
     if len(rows) == 1 and rows[0]['part'] is None:
         row = rows[0]
         if row['is_correct']:
