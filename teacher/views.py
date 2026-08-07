@@ -15,6 +15,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from .access import tutor_required
+
 
 # ---------------------------------------------------------------------------
 # Декоратор: только учитель (или суперпользователь)
@@ -634,3 +636,13 @@ def legacy_review_submission(request, pk):
         return redirect('teacher:group_review_submission',
                         group_id=group_id, submission_id=pk)
     return review_submission(request, pk)
+
+
+@tutor_required
+def styleguide(request):
+    """Демонстрация набора деталей интерфейса (_kit.html).
+
+    Нужна для приёмки владельцем и для самопроверки: все повторяющиеся
+    элементы кабинета видны рядом и переключаются вместе с темой сайта.
+    """
+    return render(request, 'teacher/styleguide.html')

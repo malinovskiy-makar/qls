@@ -56,6 +56,9 @@ urlpatterns = [
     path('student/<int:pk>/progress/', views.student_progress,
          name='student_progress'),
 
+    # Набор деталей интерфейса — витрина для приёмки, ничего не сохраняет.
+    path('styleguide/', views.styleguide, name='styleguide'),
+
     # Редактор своих задач.
     path('problems/', views_problems.problem_list, name='problem_list'),
     path('problems/new/', views_problems.problem_form, name='problem_new'),

@@ -1,0 +1,180 @@
+{% extends 'teacher/base.html' %}
+{% comment %}
+Демонстрационная страница набора деталей (_kit.html).
+Нужна для приёмки владельцем: все повторяющиеся элементы кабинета показаны
+рядом, в одном месте, и переключаются вместе с темой сайта.
+Ничего не сохраняет и никуда не ведёт — только показывает.
+{% endcomment %}
+{% block title %}Набор деталей{% endblock %}
+
+{% block extra_style %}{% include 'teacher/groups/_style.html' %}
+.sg-block { margin-bottom: 34px; }
+.sg-h { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.sg-d { font-size: 12px; color: var(--text2); margin-bottom: 12px;
+        line-height: 1.6; max-width: 640px; }
+.sg-demo { background: var(--bg); border: 0.5px solid var(--border);
+           border-radius: 10px; padding: 18px; }
+.sg-grid { display: grid; gap: 14px;
+           grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Набор деталей</h1>
+    <p class="page-sub">Из этих элементов собраны экраны кабинета.
+      Переключите тему в шапке — всё должно остаться читаемым.</p>
+  </div>
+</div>
+
+<div class="sg-block">
+  <div class="sg-h">Кнопки</div>
+  <div class="sg-d">Три веса. Главная — сплошная заливка, одна на экран.
+    Обычная — тонкая рамка. Тихая — только текст, для необязательных действий.</div>
+  <div class="sg-demo k-row">
+    <button class="k-btn k-btn--main" type="button">Сохранить и дальше</button>
+    <button class="k-btn k-btn--plain" type="button">Проверять вручную</button>
+    <button class="k-btn k-btn--quiet" type="button">Глазами ученика</button>
+    <button class="k-btn k-btn--main k-btn--sm" type="button">Добавить</button>
+    <button class="k-btn k-btn--main" type="button" disabled>Создать домашку</button>
+  </div>
+</div>
+
+<div class="sg-block">
+  <div class="sg-h">Поля ввода</div>
+  <div class="sg-d">Ни одного браузерного элемента по умолчанию: список и
+    галочка нарисованы своими, иначе в тёмной теме просвечивает светлый
+    системный виджет.</div>
+  <div class="sg-demo sg-grid">
+    <div>
+      <label class="k-label" for="sg1">Название работы</label>
+      <input class="k-input" id="sg1" type="text" placeholder="Например: КПВ и альтернативные издержки">
+    </div>
+    <div>
+      <label class="k-label" for="sg2">Сколько задач</label>
+      <input class="k-input k-input--num" id="sg2" type="number" value="4">
+    </div>
+    <div>
+      <label class="k-label" for="sg3">Тема</label>
+      <span class="k-select-wrap">
+        <select class="k-select" id="sg3">
+          <option>Любая тема</option>
+          <option>Спрос и предложение</option>
+          <option>Эластичность</option>
+        </select>
+      </span>
+    </div>
+    <div style="grid-column: 1 / -1">
+      <label class="k-label" for="sg4">Комментарий ученику</label>
+      <textarea class="k-area" id="sg4" placeholder="Что получилось, что стоит повторить"></textarea>
+      <div class="k-hint">Ученик увидит это на разборе работы.</div>
+    </div>
+    <div>
+      <label class="k-check">
+        <input type="checkbox" checked> брать только с разбором
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="sg-block">
+  <div class="sg-h">Пометка состояния</div>
+  <div class="sg-d">Тонкая цветная полоса слева и значок. Панель целиком не
+    заливается: залитая цветом панель читается как ошибка, даже когда это
+    обычное рабочее состояние.</div>
+  <div class="sg-demo k-stack">
+    <div class="k-state k-state--warn">
+      <span class="k-state__icon">!</span>
+      <div class="k-state__body">
+        <div class="k-state__title">Проверять придётся вам, вручную</div>
+        <div class="k-state__note">Ответ этой задачи взят из каталога и записан
+          фразой — машине сверять нечего.</div>
+      </div>
+    </div>
+    <div class="k-state k-state--ok">
+      <span class="k-state__icon">✓</span>
+      <div class="k-state__body">
+        <div class="k-state__title">Проверяется само</div>
+        <div class="k-state__note">Эталон: 30</div>
+      </div>
+    </div>
+    <div class="k-state k-state--bad">
+      <span class="k-state__icon">×</span>
+      <div class="k-state__body">
+        <div class="k-state__title">Ответа нет</div>
+        <div class="k-state__note">Но решение ученик написал — прочитайте.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sg-block">
+  <div class="sg-h">Крупное числовое поле</div>
+  <div class="sg-d">Максимальный балл за позицию. Цифра крупная, подпись мелкой:
+    так балл и метка источника перестают сливаться в серую кашу.</div>
+  <div class="sg-demo k-row" style="gap:26px">
+    <label class="k-score">
+      <input type="number" value="10" min="0" max="100">
+      <span class="k-score__cap">баллов</span>
+    </label>
+    <label class="k-score">
+      <input type="number" value="3" min="0" max="100">
+      <span class="k-score__cap">баллов</span>
+    </label>
+    <span class="k-score">
+      <span class="k-score__value">6</span>
+      <span class="k-score__cap">из 6</span>
+    </span>
+  </div>
+</div>
+
+<div class="sg-block">
+  <div class="sg-h">Ряд плиток-переключателей</div>
+  <div class="sg-d">Равноправные способы что-то сделать. Выбранная плитка —
+    единственное место, где акцент заливает поверхность.</div>
+  <div class="sg-demo k-tiles">
+    <span class="k-tile k-tile--on">
+      <span class="k-tile__name">Описать словами</span>
+      <span class="k-tile__note">сайт подберёт из каталога</span>
+    </span>
+    <span class="k-tile">
+      <span class="k-tile__name">Искать самому</span>
+      <span class="k-tile__note">фильтры по каталогу</span>
+    </span>
+    <span class="k-tile">
+      <span class="k-tile__name">Написать свою</span>
+      <span class="k-tile__note">условие и ответ вручную</span>
+    </span>
+  </div>
+</div>
+
+<div class="sg-block">
+  <div class="sg-h">Карточки</div>
+  <div class="sg-d">Обычная и «просит внимания» — вторая отличается только
+    тонкой рамкой, без заливки.</div>
+  <div class="sg-demo sg-grid">
+    <div class="k-card">
+      <div class="sg-h">Обычная карточка</div>
+      <div class="k-quiet">Белая подложка, тонкая рамка, скругление.</div>
+    </div>
+    <div class="k-card k-card--calls">
+      <div class="sg-h">Просит внимания</div>
+      <div class="k-quiet">Рамка акцентом. Заливки нет.</div>
+    </div>
+  </div>
+</div>
+
+<div class="sg-block">
+  <div class="sg-h">Служебный разделитель</div>
+  <div class="sg-d">Подпись плюс пунктир. Разделяет части листка и части
+    карточки. Намеренно не жирный — это служебная линия, а не заголовок.</div>
+  <div class="sg-demo">
+    <div class="k-sep"><span class="k-sep__cap">Тестовая часть</span>
+      <span class="k-sep__line"></span></div>
+    <div class="k-quiet">…три теста…</div>
+    <div class="k-sep"><span class="k-sep__cap">Задачи</span>
+      <span class="k-sep__line"></span></div>
+    <div class="k-quiet">…четыре открытые задачи…</div>
+  </div>
+</div>
+{% endblock %}

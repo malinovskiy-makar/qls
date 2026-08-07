@@ -86,6 +86,27 @@
       "Bash(/Users/makarmalinovskiy/Applications/pandoc/pandoc '/Users/makarmalinovskiy/Downloads/qls_platform/materials/Archive 6/Archive 5/Archive 3/drive-download-20260513T172045Z-3-001 copy/Эластичность/Листок эластичность. Версия 3.docx' -t latex --wrap=none)",
       "Bash(/Users/makarmalinovskiy/Applications/pandoc/pandoc '/Users/makarmalinovskiy/Downloads/qls_platform/materials/Archive 6/Archive 5/Archive 3/drive-download-20260513T172045Z-3-001 copy/Потребитель/Потребитель-1.docx' -t latex --wrap=none)",
       "Bash(./venv/bin/python manage.py import_docx_listki)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*.p12)",
+      "Read(**/*.pfx)",
+      "Read(**/id_rsa)",
+      "Read(**/id_ed25519)",
+      "Read(**/*credentials*)",
+      "Read(//Users/makarmalinovskiy/.ssh/**)",
+      "Read(//Users/makarmalinovskiy/.aws/**)",
+      "Read(//Users/makarmalinovskiy/.config/gh/**)",
+      "Bash(cat .env*)",
+      "Bash(cat **/.env*)",
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(./venv/bin/python manage.py makemigrations game*)"
     ]
   }
 }

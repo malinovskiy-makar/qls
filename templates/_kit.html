@@ -1,0 +1,213 @@
+{% comment %}
+  _kit.html — набор деталей интерфейса кабинета преподавателя.
+
+  Зачем отдельным файлом. Из этих деталей собираются десять экранов кабинета.
+  Если владельцу не понравится вид кнопки или пометки состояния — чинится ОДИН
+  файл, а не десять шаблонов. Демонстрационная страница — /teacher/styleguide/.
+
+  Правила, которые тут закреплены (нарушать их в экранах нельзя):
+  • Все цвета — через var(--…) из _tokens.html. Ни одного hex.
+  • Розовый акцент (--accent) — навигации, фокус-кольцу, активной плитке и
+    галочке. Крупные кнопки — графитовые (--btn-bg): так во всём проекте.
+  • Пометка состояния — ТОНКАЯ цветная полоса слева плюс значок, фон
+    нейтральный. Панель целиком не заливаем: залитая панель читается как
+    ошибка, даже когда это рабочее состояние.
+  • Капслока нет нигде. Эмодзи нет нигде.
+
+  Подключается в <style> базовых шаблонов teacher/base.html и platform/base.html.
+{% endcomment %}
+/* ═══ НАБОР ДЕТАЛЕЙ (kit) ══════════════════════════════════════════════ */
+
+/* ── Кнопки: три веса ───────────────────────────────────────────────── */
+.k-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px;
+  font: inherit; font-size: 13px; font-weight: 500; line-height: 1.2;
+  padding: 8px 16px; border-radius: var(--r);
+  border: 0.5px solid transparent; background: transparent; color: var(--text);
+  text-decoration: none; cursor: pointer; white-space: nowrap;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+.k-btn:disabled, .k-btn[aria-disabled="true"] {
+  opacity: .45; cursor: not-allowed;
+}
+
+/* Главная — сплошная графитовая заливка (крупные действия во всём проекте) */
+.k-btn--main { background: var(--btn-bg); color: var(--on-btn);
+               border-color: var(--btn-bg); }
+.k-btn--main:hover:not(:disabled) { background: var(--btn-bg-hover);
+                                    border-color: var(--btn-bg-hover); }
+.k-btn--main:active:not(:disabled) { background: var(--btn-bg);
+                                     transform: translateY(1px); }
+
+/* Обычная — тонкая рамка */
+.k-btn--plain { border-color: var(--border); background: var(--surface);
+                color: var(--text); }
+.k-btn--plain:hover:not(:disabled) { background: var(--surface-2);
+                                     border-color: var(--text3); }
+.k-btn--plain:active:not(:disabled) { transform: translateY(1px); }
+
+/* Тихая — только текст */
+.k-btn--quiet { color: var(--text2); padding: 6px 10px; }
+.k-btn--quiet:hover:not(:disabled) { color: var(--text);
+                                     background: var(--surface-2); }
+.k-btn--quiet:active:not(:disabled) { transform: translateY(1px); }
+
+.k-btn--sm { font-size: 12px; padding: 5px 11px; }
+.k-btn--wide { width: 100%; }
+
+/* ── Поля ввода ─────────────────────────────────────────────────────── */
+.k-input, .k-area, .k-select {
+  font: inherit; font-size: 13px; color: var(--text);
+  background: var(--surface-2);
+  border: 0.5px solid var(--border); border-radius: var(--r);
+  padding: 8px 10px; width: 100%;
+  transition: border-color .12s ease, background .12s ease;
+}
+.k-input:hover, .k-area:hover, .k-select:hover { border-color: var(--text3); }
+.k-input:focus, .k-area:focus, .k-select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring); background: var(--surface);
+}
+.k-input::placeholder, .k-area::placeholder { color: var(--text3); }
+.k-area { min-height: 84px; resize: vertical; line-height: 1.6; }
+.k-input--num { width: 88px; text-align: center;
+                font-variant-numeric: tabular-nums; }
+
+/* Выпадающий список: браузерная стрелка убрана, своя рисуется обёрткой.
+   Без appearance:none в тёмной теме просвечивает системный светлый виджет. */
+.k-select { appearance: none; -webkit-appearance: none; -moz-appearance: none;
+            padding-right: 28px; cursor: pointer; }
+.k-select-wrap { position: relative; display: inline-block; width: 100%; }
+.k-select-wrap::after {
+  content: '▾'; position: absolute; right: 10px; top: 50%;
+  transform: translateY(-50%); font-size: 11px; color: var(--text2);
+  pointer-events: none;
+}
+
+.k-label { display: block; font-size: 12px; font-weight: 600;
+           color: var(--text2); margin-bottom: 5px; }
+.k-hint { font-size: 12px; color: var(--text3); line-height: 1.5;
+          margin-top: 5px; }
+
+/* Переключатель-галочка */
+.k-check { display: inline-flex; align-items: center; gap: 8px;
+           font-size: 13px; color: var(--text); cursor: pointer;
+           user-select: none; }
+.k-check input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
+  width: 17px; height: 17px; flex-shrink: 0; margin: 0;
+  border: 1.5px solid var(--border); border-radius: 4px;
+  background: var(--surface); cursor: pointer;
+  transition: background .12s ease, border-color .12s ease;
+  position: relative;
+}
+.k-check input[type="checkbox"]:hover { border-color: var(--accent); }
+.k-check input[type="checkbox"]:checked {
+  background: var(--accent); border-color: var(--accent);
+}
+.k-check input[type="checkbox"]:checked::after {
+  content: ''; position: absolute; left: 5px; top: 1px;
+  width: 4px; height: 9px; border: solid #fff;
+  border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.k-check input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+/* ── Карточка ───────────────────────────────────────────────────────── */
+.k-card {
+  background: var(--surface); border: 0.5px solid var(--border);
+  border-radius: 10px; padding: 18px 20px;
+}
+.k-card--flat { background: var(--surface-2); }
+/* Карточка, которая просит внимания: тонкая рамка акцентом, БЕЗ заливки */
+.k-card--calls { border-color: var(--accent); border-width: 1px; }
+
+/* ── Пометка состояния ──────────────────────────────────────────────────
+   Тонкая цветная полоса слева + значок. Фон нейтральный: панель, залитая
+   цветом, читается как ошибка, даже когда это рабочее состояние. */
+.k-state {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--surface-2); border: 0.5px solid var(--border);
+  border-left: 3px solid var(--text3);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 12px 14px; font-size: 13px; line-height: 1.6; color: var(--text);
+}
+.k-state__icon { flex-shrink: 0; width: 16px; text-align: center;
+                 font-size: 13px; line-height: 1.55; font-weight: 700; }
+.k-state__body { flex: 1; min-width: 0; }
+.k-state__title { font-weight: 600; margin-bottom: 2px; }
+.k-state__note { color: var(--text2); font-size: 12px; }
+.k-state--warn { border-left-color: var(--amber); }
+.k-state--warn .k-state__icon { color: var(--amber); }
+.k-state--ok   { border-left-color: var(--green); }
+.k-state--ok   .k-state__icon { color: var(--green); }
+.k-state--bad  { border-left-color: var(--error); }
+.k-state--bad  .k-state__icon { color: var(--error); }
+
+/* ── Крупное числовое поле (баллы) ──────────────────────────────────── */
+.k-score { display: inline-flex; flex-direction: column; align-items: center;
+           gap: 1px; }
+.k-score input, .k-score__value {
+  font: inherit; font-size: 28px; font-weight: 600; line-height: 1.1;
+  font-variant-numeric: tabular-nums; text-align: center;
+  color: var(--text); background: transparent;
+  border: 0.5px solid transparent; border-radius: var(--r);
+  width: 62px; padding: 2px 4px;
+  transition: border-color .12s ease, background .12s ease;
+}
+.k-score input { cursor: text; }
+.k-score input:hover { border-color: var(--border); background: var(--surface-2); }
+.k-score input:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring); background: var(--surface);
+}
+.k-score__cap { font-size: 11px; color: var(--text3); }
+/* Скрыть браузерные стрелки у number — они ломают крупную цифру */
+.k-score input::-webkit-outer-spin-button,
+.k-score input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.k-score input[type=number] { -moz-appearance: textfield; }
+
+/* ── Ряд плиток-переключателей ──────────────────────────────────────── */
+.k-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+           gap: 10px; }
+.k-tile {
+  display: block; text-align: left; cursor: pointer;
+  background: var(--surface); border: 0.5px solid var(--border);
+  border-radius: 10px; padding: 13px 15px; color: var(--text);
+  text-decoration: none; font: inherit;
+  transition: border-color .12s ease, background .12s ease;
+}
+.k-tile:hover { border-color: var(--text3); background: var(--surface-2); }
+/* display:block обязателен: плитку часто собирают из <span>, а инлайновые
+   имя и подпись слипаются в одну строку. */
+.k-tile__name { display: block; font-size: 14px; font-weight: 600;
+                margin-bottom: 3px; }
+.k-tile__note { display: block; font-size: 12px; color: var(--text2);
+                line-height: 1.45; }
+.k-tile--on {
+  border-color: var(--accent); border-width: 1px;
+  background: var(--accent-tint);
+}
+.k-tile--on .k-tile__name { color: var(--accent); }
+.k-tile--on:hover { background: var(--accent-tint); border-color: var(--accent); }
+.k-tile input { position: absolute; opacity: 0; pointer-events: none; }
+
+/* ── Служебный разделитель: подпись + тонкая пунктирная линия ───────── */
+.k-sep { display: flex; align-items: center; gap: 10px;
+         margin: 20px 0 12px; }
+.k-sep__cap { font-size: 12px; font-weight: 600; color: var(--text2);
+              white-space: nowrap; }
+.k-sep__line { flex: 1; border-top: 1px dashed var(--border);
+               min-width: 20px; }
+
+/* ── Мелочи, нужные во многих экранах ───────────────────────────────── */
+.k-quiet { font-size: 12px; color: var(--text3); }
+.k-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.k-stack { display: flex; flex-direction: column; gap: 10px; }
+
+@media (max-width: 560px) {
+  .k-tiles { grid-template-columns: 1fr; }
+  .k-card { padding: 15px 16px; }
+}
