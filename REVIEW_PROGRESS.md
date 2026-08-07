@@ -57,3 +57,22 @@ problems/migrations/0033_partanswer_auto_zero.py,
 problems/management/commands/apply_auto_zero.py,
 problems/tests/test_auto_zero.py
 Осталось/сомнения: нет. Тестов 877, все зелёные.
+
+## Фаза 4 — группировка тестов и задач — ГОТОВО — 2026-08-08
+Сделано: в домашке и контрольной тесты теперь идут первыми, открытые задачи —
+следом, с подписями «Тестовая часть» и «Задачи» и тонкой пунктирной линией.
+Одинаково на экране, в листке для печати и в файле .tex — порядок собирает одна
+функция на всех. Если в работе только тесты или только задачи, ни подписей, ни
+линии нет. У задания появился признак «порядок задан вручную»: когда репетитор
+расставил задачи сам, перестановки не происходит (понадобится в фазе 18).
+Демо-домашка №3 показывает три теста в начале и четыре задачи в конце.
+Файлы: problems/assignment_rows.py, problems/assignment_export.py,
+problems/models.py, problems/migrations/0034_assignment_manual_order.py,
+templates/_section_sep.html, teacher/templates/teacher/assignment_print.html,
+teacher/templates/teacher/groups/assignment_detail.html,
+student/templates/student/assignment_detail.html,
+student/templates/student/_work_style.html, problems/tests/test_section_order.py
+Осталось/сомнения: подпись части рисуется, только если список ДЕЙСТВИТЕЛЬНО
+поделён на две сплошные части. При ручном порядке тесты и задачи чередуются, и
+подпись «Тестовая часть» встала бы посреди списка перед одним тестом — обещала бы
+часть, которой нет. Это нашёл собственный тест.

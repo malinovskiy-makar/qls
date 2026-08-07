@@ -108,11 +108,17 @@ def build_tex(assignment, for_teacher=False, solution_space=True):
     """Готовый `.tex` для задания. Возвращает (текст, список пропущенных)."""
     from problems.timefmt import DATE, fmt
 
-    items = list(assignment.items
-                 .select_related('catalog_problem', 'custom_problem', 'graph')
-                 .prefetch_related('catalog_problem__parts',
-                                   'custom_problem__options')
-                 .order_by('order', 'id'))
+    from problems.assignment_rows import ordered_items, section_marks
+
+    # Порядок и деление на части — ТА ЖЕ функция, что у экрана и у страницы
+    # печати. Три разных порядка одной работы — это три разных работы.
+    items = ordered_items(assignment, list(
+        assignment.items
+        .select_related('catalog_problem', 'custom_problem', 'graph')
+        .prefetch_related('catalog_problem__parts',
+                          'custom_problem__options')
+        .order_by('order', 'id')))
+    marks = section_marks(items)
 
     kind = 'Контрольная работа' if assignment.is_exam else 'Домашнее задание'
     group = assignment.group.name if assignment.group_id else ''
@@ -139,11 +145,20 @@ def build_tex(assignment, for_teacher=False, solution_space=True):
 
     skipped = []
     number = 0
-    for item in items:
+    for index, item in enumerate(items):
         statement = item.statement or ''
         if looks_broken(statement):
             skipped.append({'item': item, 'why': 'битая разметка в условии'})
             continue
+        # Подпись части плюс пунктирная линия. Подпись обязательна: в печати
+        # одна линия без слов теряется и читается как случайная черта.
+        title = marks.get(index)
+        if title:
+            out.append(r'\smallskip{\small\bfseries ' + escape_latex(title)
+                       + r'}\nobreak')
+            out.append(r'\nobreak\vspace{-4pt}'
+                       r'\hrule height 0pt \dotfill \vspace{2pt}')
+            out.append('')
         number += 1
         points = ''
         if item.points is not None:
@@ -286,11 +301,19 @@ def print_rows(assignment, for_teacher=False):
     """
     from problems.text_clean import clean
 
-    items = list(assignment.items
-                 .select_related('catalog_problem', 'custom_problem', 'graph')
-                 .prefetch_related('catalog_problem__parts',
-                                   'custom_problem__options')
-                 .order_by('order', 'id'))
+    from problems.assignment_rows import (
+        item_section, ordered_items, section_marks,
+    )
+
+    # Порядок и подписи частей — ТА ЖЕ функция, что у экрана. Иначе на
+    # странице задача №4, а в листке под этим номером другая.
+    items = ordered_items(assignment, list(
+        assignment.items
+        .select_related('catalog_problem', 'custom_problem', 'graph')
+        .prefetch_related('catalog_problem__parts',
+                          'custom_problem__options')
+        .order_by('order', 'id')))
+    marks = section_marks(items)
 
     rows = []
     skipped = []
@@ -346,6 +369,12 @@ def print_rows(assignment, for_teacher=False):
 
         rows.append({
             'number': number,
+            'section': item_section(item),
+            # Подпись части у первой позиции части; пусто, если часть одна.
+            # Нумерация подписей идёт по ИСХОДНОМУ индексу позиции, а не по
+            # номеру в листке: задача с битой разметкой пропускается, и
+            # номера разъезжаются с индексами.
+            'section_title': marks.get(position - 1, ''),
             'title': item.problem_title if item.problem_title != item.statement
                      else '',
             'statement': text,

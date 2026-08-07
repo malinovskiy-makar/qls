@@ -82,6 +82,15 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
            font-size: 10.5pt; color: #333; }
   .skipped { border: 1px solid #999; padding: 8px 10px; font-size: 10.5pt; }
 
+  /* Разделитель частей листка: подпись + пунктир. Служебный, поэтому
+     мелкий и не жирнее задачи. Не отрывается от того, что под ним. */
+  .part-sep { display: flex; align-items: center; gap: 8px;
+              margin: 4px 0 12px; break-after: avoid;
+              page-break-after: avoid; }
+  .part-sep span { font-size: 10.5pt; font-weight: bold; color: #333;
+                   white-space: nowrap; }
+  .part-sep i { flex: 1; border-top: 1px dotted #999; }
+
   @media print {
     .bar { display: none; }
     .sheet { max-width: none; padding: 0; }
@@ -125,6 +134,14 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
   {% endif %}
 
   {% for row in rows %}
+  {% if row.section_title %}
+  {% comment %}
+  Подпись части плюс пунктир. Подпись обязательна: на бумаге одна линия без
+  слов теряется и читается как случайная черта. Служебная — поэтому мелкая
+  и не жирнее задачи.
+  {% endcomment %}
+  <div class="part-sep"><span>{{ row.section_title }}</span><i></i></div>
+  {% endif %}
   <div class="task">
     <div class="task-head">
       {{ row.number }}.

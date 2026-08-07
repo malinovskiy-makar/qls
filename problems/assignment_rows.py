@@ -68,6 +68,72 @@ def answer_parts(item):
     return parts or [None]
 
 
+# ---------------------------------------------------------------------------
+# Порядок задач в работе: сначала тесты, потом открытые задачи
+# ---------------------------------------------------------------------------
+# ⚠️ ОДНА СБОРКА НА ЭКРАН И НА ПЕЧАТЬ. Порядок задач на странице и порядок
+# задач в листке обязаны совпадать: расхождение обнаружится на занятии, когда
+# ученик назовёт номер задачи, а у репетитора под этим номером другая.
+
+SECTION_TEST = 'test'
+SECTION_TASK = 'task'
+SECTION_TITLES = {SECTION_TEST: 'Тестовая часть', SECTION_TASK: 'Задачи'}
+
+
+def item_section(item):
+    """К какой части работы относится позиция."""
+    return SECTION_TEST if item.is_test else SECTION_TASK
+
+
+def ordered_items(assignment, items=None):
+    """Позиции работы в том порядке, в котором их видит человек.
+
+    По умолчанию тесты идут первыми, открытые задачи — следом. Внутри
+    каждой части сохраняется порядок, заданный репетитором (`order`, `id`):
+    перестановка групповая, а не сортировка всего подряд.
+
+    Если у работы поднят `manual_order` — не трогаем НИЧЕГО. Репетитор
+    расставил задачи сам, и «умная» перестановка сломала бы замысел урока.
+    """
+    if items is None:
+        items = list(assignment.items.order_by('order', 'id'))
+    if getattr(assignment, 'manual_order', False):
+        return list(items)
+    tests = [i for i in items if item_section(i) == SECTION_TEST]
+    tasks = [i for i in items if item_section(i) == SECTION_TASK]
+    return tests + tasks
+
+
+def section_marks(items):
+    """Подписи частей: {индекс позиции: «Тестовая часть» | «Задачи»}.
+
+    Подпись выдаётся ТОЛЬКО первой позиции каждой части и ТОЛЬКО когда
+    список ДЕЙСТВИТЕЛЬНО поделён на две сплошные части.
+
+    ⚠️ Проверяем сам список, а не флаг `manual_order`. Причина конкретная:
+    при ручном порядке тесты и задачи чередуются, и подпись «Тестовая
+    часть» встала бы посреди списка перед одним-единственным тестом, обещая
+    часть, которой нет. Подпись обязана быть правдой о том, что под ней
+    лежит, а не о том, какое правило мы применяли.
+
+    Одни тесты или одни задачи — делить нечего, ни подписи, ни линии.
+    """
+    sections = [item_section(i) for i in items]
+    if SECTION_TEST not in sections or SECTION_TASK not in sections:
+        return {}
+    # Две сплошные части — значит ровно одна смена признака по списку.
+    switches = sum(1 for a, b in zip(sections, sections[1:]) if a != b)
+    if switches != 1:
+        return {}
+    marks = {}
+    seen = set()
+    for index, section in enumerate(sections):
+        if section not in seen:
+            seen.add(section)
+            marks[index] = SECTION_TITLES[section]
+    return marks
+
+
 def part_max_score(item, part, parts_count):
     """Максимум баллов за пункт.
 
@@ -415,12 +481,13 @@ def build_rows(assignment, student, user=None, with_comments=True):
 
     user = user or student
 
-    items = list(
+    items = ordered_items(assignment, list(
         assignment.items
         .select_related('catalog_problem', 'custom_problem', 'graph')
         .prefetch_related('catalog_problem__parts', 'catalog_problem__hints',
                           'custom_problem__options')
-        .order_by('order', 'id'))
+        .order_by('order', 'id')))
+    marks = section_marks(items)
 
     comments_by_item = {}
     if with_comments and items:
@@ -458,6 +525,11 @@ def build_rows(assignment, student, user=None, with_comments=True):
         rows.append({
             'item': item,
             'number': number,
+            # Подпись части («Тестовая часть» / «Задачи») стоит у ПЕРВОЙ
+            # позиции части и только когда частей две. Пусто — рисовать
+            # нечего.
+            'section': item_section(item),
+            'section_title': marks.get(number - 1, ''),
             'problem': problem,
             'title': item.problem_title,
             'statement': item.statement,

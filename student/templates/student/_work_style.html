@@ -275,3 +275,12 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
   .problem-card-head { padding: 12px 16px; flex-wrap: wrap; }
   .problem-title-text { flex-basis: 100%; margin: 0; }
 }
+
+/* Разделитель частей работы («Тестовая часть» / «Задачи»).
+   Дубль правила `.k-sep` из templates/_kit.html: базовый шаблон ученика
+   набор деталей не подключает, а разметка партиала _section_sep.html
+   одна на обе стороны — расходиться им нельзя. */
+.k-sep { display: flex; align-items: center; gap: 10px; margin: 22px 0 12px; }
+.k-sep__cap { font-size: 12px; font-weight: 600; color: var(--text2);
+              white-space: nowrap; }
+.k-sep__line { flex: 1; border-top: 1px dashed var(--border); min-width: 20px; }

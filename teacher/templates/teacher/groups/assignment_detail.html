@@ -134,6 +134,7 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
 {% endif %}
 
 {% for row in rows %}
+{% include "_section_sep.html" with title=row.section_title %}
 <div class="problem-block" id="item-{{ row.item.pk }}">
   <div class="problem-head">
     <span class="problem-num">{{ forloop.counter }}.</span>
