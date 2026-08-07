@@ -253,6 +253,16 @@ input:focus-visible, select:focus-visible {
 }
 .area-name:hover { border-color: var(--border); }
 .area-name:focus { border-color: var(--accent); background: var(--input-bg); outline: none; }
+
+/* Имя складываемой кривой правится прямо в подписи поля (Фаза 13.2). */
+.ppfsum-name {
+  flex: 1; min-width: 0; margin-left: 6px; padding: 2px 5px;
+  font-size: 12px; font-weight: 600; color: var(--text2);
+  border: 1px solid transparent; border-radius: var(--r-sm); background: none;
+}
+.ppfsum-name:hover { border-color: var(--border); }
+.ppfsum-name:focus { border-color: var(--accent); background: var(--input-bg); color: var(--text); outline: none; }
+#ppfsum-rows .field > label { display: flex; align-items: center; }
 #hint-tip {
   position: fixed; z-index: 200; display: none; max-width: 300px;
   padding: 9px 11px; border-radius: var(--r-sm);
@@ -2660,30 +2670,33 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
         <div id="info-ppf" style="margin-top:8px;"></div>
       </div>
 
-      <!-- Под-режим «Сумма двух КПВ» (Задача 1) -->
+      <!-- Под-режим «Сложение КПВ». Сколько кривых складываем — числом (Фаза 13). -->
       <div id="ppf-pane-sum" style="display:none;">
+        <div class="field pw-count-field">
+          <label for="inp-ppfsum-n">Сколько кривых</label>
+          <input type="number" id="inp-ppfsum-n" min="2" max="5" step="1" value="2">
+        </div>
+        <div id="ppfsum-rows"></div>
         <div class="field">
-          <label>КПВ страны&nbsp;1: Y&nbsp;=&nbsp;f₁(X)</label>
-          <input type="text" id="inp-ppf1" value="100 - X" autocomplete="off">
+          <label>Суммарная кривая <span class="swatch-slot" id="ppfsum-color"></span></label>
+          <input type="text" id="inp-ppfsum-name" placeholder="имя на графике, напр. Сумма" autocomplete="off">
         </div>
-        <div class="field">
-          <label>КПВ страны&nbsp;2: Y&nbsp;=&nbsp;f₂(X)</label>
-          <input type="text" id="inp-ppf2" value="60 - 3*X" autocomplete="off">
-        </div>
-        <button class="btn" id="btn-ppfsum-apply">Построить сумму</button>
-        <div style="display:flex;gap:6px;margin-top:6px;">
-          <button class="btn-sm" id="btn-ppfsum-lin" style="flex:1;">Две линейные</button>
-          <button class="btn-sm" id="btn-ppfsum-circ" style="flex:1;">Две дуги</button>
-        </div>
-        <!-- Вид суммарной КПВ: в масштабе / аккуратная схема (Задача 2) -->
-        <div class="seg" style="margin-top:8px;">
-          <button class="seg-btn active" id="ppfsumview-scale">В масштабе</button>
-          <button class="seg-btn" id="ppfsumview-schema">Схема</button>
-        </div>
-        <div class="hint">Совместная КПВ двух стран: при каждом выпуске X производство
-          делится так, чтобы суммарный Y был максимален (X наращивает страна с меньшими
-          альтернативными издержками X). Это НЕ вертикальная сумма кривых.</div>
+        <button class="btn" id="btn-ppfsum-apply" style="width:100%;">Построить сумму</button>
+        <div class="hint">Совместная КПВ: при каждом суммарном выпуске X производство делится
+          так, чтобы общий Y был максимален. X наращивает тот, у кого альтернативные издержки X
+          меньше. Это НЕ вертикальная сумма кривых.</div>
         <div class="error" id="ppfsum-error"></div>
+
+        <div class="vsub">Потребление в комплектах</div>
+        <label class="chk"><input type="checkbox" id="chk-bundle-sum">
+          <span class="swatch" style="background:var(--curve-mr)"></span> Показать луч потребления</label>
+        <div class="row" id="bundle-row-sum" style="display:none;">
+          <div class="field"><label for="inp-bundle-x2">Единиц X</label>
+            <input type="number" id="inp-bundle-x2" min="0.1" step="0.1" value="3"></div>
+          <div class="field"><label for="inp-bundle-y2">Единиц Y</label>
+            <input type="number" id="inp-bundle-y2" min="0.1" step="0.1" value="1"></div>
+        </div>
+
         <div id="info-ppfsum" style="margin-top:8px;"></div>
       </div>
 
@@ -3570,7 +3583,10 @@ const STATE = {
   ppf2: '60 - 3*X',      // КПВ страны 2 (режим суммы)
   ppfSumData: null,      // результат расчёта суммарной КПВ (кэшируется, тяжёлый расчёт)
   ppfSumKinks: null,     // изломы суммарной КПВ [{x,y}] (надёжный детектор, Задача 1)
-  ppfSumView: 'scale',   // вид суммы: 'scale': в масштабе, 'schema' — аккуратная схема (Задача 2)
+  ppfSumView: 'scale',   // вид суммы оставлен только «в масштабе» (Фаза 13.3)
+  // Сложение произвольного числа кривых (Фаза 13)
+  ppfSumCount: 2, ppfSumMore: [], ppfSumNames: [], ppfSumColors: [],
+  ppfSumName: 'Сумма', ppfSumColor: '',
   ppftFormula: '100 - X',// КПВ страны (режим КТВ)
   ppftPrice: 2,          // мировое соотношение цен Px/Py (режим КТВ)
   ppfTradeData: null,    // результат расчёта КТВ
@@ -10140,78 +10156,272 @@ function detectKinks(points) {
 }
 
 // Тяжёлый расчёт суммарной КПВ (кэшируется в STATE.ppfSumData; запускается по «Построить»).
+/* Сколько кривых складываем (Фаза 13.1) и их формулы. Первые две живут в
+   прежних STATE.ppf1 / STATE.ppf2, чтобы ничего из проверенной пары не
+   поехало; остальные — в массиве. */
+function ppfSumCount() { return Math.max(2, Math.min(5, +STATE.ppfSumCount || 2)); }
+function ppfSumGet(i) {
+  if (i === 0) return STATE.ppf1;
+  if (i === 1) return STATE.ppf2;
+  return (STATE.ppfSumMore || [])[i - 2] || '';
+}
+function ppfSumSet(i, v) {
+  if (i === 0) STATE.ppf1 = v;
+  else if (i === 1) STATE.ppf2 = v;
+  else { STATE.ppfSumMore = STATE.ppfSumMore || []; STATE.ppfSumMore[i - 2] = v; }
+}
+function ppfSumName(i) {
+  const own = (STATE.ppfSumNames || [])[i];
+  return (own && own.trim()) || ('КПВ ' + (i + 1));
+}
+function ppfSumColor(i) {
+  const own = (STATE.ppfSumColors || [])[i];
+  if (own) return own;
+  const pal = [COL.tax, COL.reg, COL.MR, COL.MC, COL.S];
+  return pal[i % pal.length];
+}
+
 function recomputePpfSum() {
   STATE.ppfSumData = null;
-  const r1 = compilePpf(STATE.ppf1), r2 = compilePpf(STATE.ppf2);
-  if (!r1.compiled || !r2.compiled) { STATE.ppfSumData = { ok: false, error: r1.error || r2.error }; return; }
-  const f1 = (x) => ppfEvalWith(r1.compiled, x), f2 = (x) => ppfEvalWith(r2.compiled, x);
-  const c1 = classifyPpf(f1), c2 = classifyPpf(f2);
-  if (c1.Xmax == null || c2.Xmax == null || !(c1.Xmax > 0) || !(c2.Xmax > 0)) {
-    STATE.ppfSumData = { ok: false, error: 'Не удалось определить границы КПВ (нужны убывающие кривые, пересекающие оси).' };
-    return;
+  const n = ppfSumCount();
+  // Разбираем все кривые общим вводом блока (Фаза 11): каждая строка может быть
+  // «y = …», «x = …» или неявным уравнением.
+  const fs = [], cs = [], xmax = [], pts = [];
+  for (let i = 0; i < n; i++) {
+    const r = parsePpfEquation(ppfSumGet(i));
+    if (r.error) { STATE.ppfSumData = { ok: false, error: (ppfSumName(i) + ': ' + r.error) }; return; }
+    const c = classifyPpf(r.f);
+    if (c.Xmax == null || !(c.Xmax > 0)) {
+      STATE.ppfSumData = { ok: false, error: 'Не удалось определить границы ' + ppfSumName(i)
+        + ' (нужна убывающая кривая, пересекающая обе оси).' };
+      return;
+    }
+    fs.push(r.f); cs.push(c); xmax.push(c.Xmax);
+    pts.push(singlePpfPoints(r.f, c.Xmax));
   }
-  const x1max = c1.Xmax, x2max = c2.Xmax, Xtot = x1max + x2max, Ytot = f1(0) + f2(0);
-  const points = combinedPpfPoints(f1, f2, x1max, x2max, 240);
-  const fr = combinedPpfFormula(c1, c2);
-  let formulaText = fr.text;
-  if (fr.evalY) {                                   // распознали форму — проверяем численно
-    if (!verifyFormula(fr.evalY, points)) formulaText = 'Аналитическая форма не подтвердилась, кривая построена численно.';
-  } else { formulaText = 'Построена численно (аналитическая форма для этой пары не распознана).'; }
-  // Изломы — надёжным режимным детектором (Задача 1); кэшируем для панели и «Схемы».
-  const kinksXY = detectCombinedKinks(f1, f2, x1max, x2max);
+
+  /* Складываем по Минковскому попарно: сумма ассоциативна, поэтому свёртка
+     слева направо даёт тот же результат, что и разом. Для двух кривых путь
+     буквально прежний — проверенные контрольные числа не сдвигаются. */
+  let accF = fs[0], accX = xmax[0];
+  let points = pts[0];
+  for (let i = 1; i < n; i++) {
+    points = combinedPpfPoints(accF, fs[i], accX, xmax[i], 240);
+    accX = accX + xmax[i];
+    const snapshot = points;
+    accF = (x) => interpY(snapshot, x);
+  }
+
+  const Xtot = xmax.reduce((s, v) => s + v, 0);
+  const Ytot = fs.reduce((s, f) => s + f(0), 0);
+
+  // Аналитическая форма и изломы — только для пары: для трёх и больше кривых
+  // закрытой формы не выводим, кривая честно строится численно.
+  let formulaText, kinksXY;
+  if (n === 2) {
+    const fr = combinedPpfFormula(cs[0], cs[1]);
+    formulaText = fr.text;
+    if (fr.evalY) {
+      if (!verifyFormula(fr.evalY, points)) formulaText = 'Аналитическая форма не подтвердилась, кривая построена численно.';
+    } else { formulaText = 'Построена численно (аналитическая форма для этой пары не распознана).'; }
+    kinksXY = detectCombinedKinks(fs[0], fs[1], xmax[0], xmax[1]);
+  } else {
+    formulaText = 'Построена численно: складываем по очереди, ' + n + ' кривые.';
+    kinksXY = detectSumKinks(points);
+  }
   STATE.ppfSumKinks = kinksXY;
   const kinks = kinksXY.map(k => [k.x, k.y]);       // [x,y]-пары для существующей отрисовки/панели
+
+  // Порядок специализации: кто дешевле производит X, тот и наращивает его первым.
+  const order = cs.map((c, i) => ({
+    i, name: ppfSumName(i), color: ppfSumColor(i),
+    Xmax: xmax[i], Ymax: fs[i](0),
+    opp: (c.type === 'linear' && c.b > 0) ? c.b : (fs[i](0) / xmax[i]),
+    type: c.type,
+  })).sort((a, b) => a.opp - b.opp);
+
   STATE.ppfSumData = {
-    ok: true, points, c1pts: singlePpfPoints(f1, x1max), c2pts: singlePpfPoints(f2, x2max),
-    Xtot, Ytot, x1max, x2max, formulaText, kinks, type: fr.type,
+    ok: true, points, n, parts: pts,
+    c1pts: pts[0], c2pts: pts[1],                   // прежние имена для старой отрисовки
+    Xtot, Ytot, x1max: xmax[0], x2max: xmax[1], xmax,
+    formulaText, kinks, type: (n === 2 ? combinedPpfFormula(cs[0], cs[1]).type : 'numeric'),
+    order,
   };
-  applyAutoRanges(niceMax(Xtot * 1.05), niceMax(Ytot * 1.05));   // плавно при смене Макс X/Y, иначе мгновенно
+  applyAutoRanges(niceMax(Xtot * 1.05), niceMax(Ytot * 1.05));
+}
+
+/* Строки ввода складываемых кривых. Заводятся по числу в поле «Сколько кривых»,
+   каждая по общему стандарту блока: своё имя, свой цвет, уравнение в любой из
+   трёх форм и серый пример в пустой строке. */
+function renderPpfSumRows() {
+  const box = document.getElementById('ppfsum-rows');
+  if (!box) return;
+  const n = ppfSumCount();
+  const DEF = ['y = 100 - x', 'y = 60 - 3*x', 'y = 40 - 0.5*x', 'y = 90 - 2*x', 'y = 50 - x'];
+  STATE.ppfSumNames = STATE.ppfSumNames || [];
+  STATE.ppfSumColors = STATE.ppfSumColors || [];
+  box.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    if (!ppfSumGet(i)) ppfSumSet(i, DEF[i] || 'y = 50 - x');
+    const wrap = document.createElement('div');
+    wrap.className = 'field f-wrap';
+
+    const lab = document.createElement('label');
+    const nameInp = document.createElement('input');
+    nameInp.type = 'text'; nameInp.className = 'ppfsum-name';
+    nameInp.value = STATE.ppfSumNames[i] || '';
+    nameInp.placeholder = 'КПВ ' + (i + 1);
+    nameInp.title = 'Имя кривой на графике';
+    nameInp.addEventListener('input', () => { STATE.ppfSumNames[i] = nameInp.value; redrawAll(); });
+    const pick = makeColorPicker(ppfSumColor(i), (hex) => { STATE.ppfSumColors[i] = hex; redrawAll(); },
+                                 'Цвет кривой ' + (i + 1));
+    lab.append(pick, nameInp);
+
+    const row = document.createElement('div');
+    row.className = 'f-row';
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.id = 'inp-ppfsum-' + i;
+    inp.value = ppfSumGet(i);
+    inp.placeholder = 'например: ' + (DEF[i] || 'y = 50 - x');
+    inp.autocomplete = 'off';
+    inp.addEventListener('input', () => { ppfSumSet(i, inp.value.trim()); });
+    inp.addEventListener('change', () => { STATE.ppfSumData = null; redrawAll(); });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { ppfSumSet(i, inp.value.trim()); STATE.ppfSumData = null; redrawAll(); }
+    });
+    row.appendChild(inp);
+    wrap.append(lab, row);
+    box.appendChild(wrap);
+    equipFormulaField(inp.id, 'PPF');
+  }
+}
+
+/* Изломы численной суммы: точки, где заметно меняется наклон ломаной.
+   Для пары кривых работает режимный детектор detectCombinedKinks, он точнее;
+   здесь общий запасной путь для трёх и более. */
+function detectSumKinks(points) {
+  const out = [];
+  const p = points.filter(q => q && isFinite(q[1]));
+  if (p.length < 5) return out;
+  const slope = (i) => (p[i + 1][1] - p[i][1]) / Math.max(1e-9, p[i + 1][0] - p[i][0]);
+  const span = Math.abs(p[p.length - 1][0] - p[0][0]);
+  for (let i = 1; i < p.length - 2; i++) {
+    const a = slope(i - 1), b = slope(i + 1);
+    if (!isFinite(a) || !isFinite(b)) continue;
+    if (Math.abs(b - a) > 0.06 * (1 + Math.abs(a))) {
+      const x = p[i][0], y = p[i][1];
+      if (!out.some(k => Math.abs(k.x - x) < span * 0.02)) out.push({ x, y });
+    }
+  }
+  return out.slice(0, 8);
 }
 
 // Отрисовка суммарной КПВ: бледные исходные кривые + жирная синяя суммарная + заливка.
 function drawPpfSumCurves(d) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y(p => sy(p[1]));
-  g.append('path').datum(d.c1pts).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 1.5)
-    .attr('stroke-dasharray', '5 4').attr('opacity', 0.5).attr('d', line);
-  g.append('path').datum(d.c2pts).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 1.5)
-    .attr('stroke-dasharray', '5 4').attr('opacity', 0.5).attr('d', line);
+  // Все слагаемые бледным пунктиром, каждое своим цветом и со своим именем.
+  (d.parts || []).forEach((pts, i) => {
+    const c = ppfSumColor(i);
+    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c).attr('stroke-width', 1.6)
+      .attr('stroke-dasharray', '5 4').attr('opacity', 0.6).attr('d', line);
+    labelCurve(g, (x) => interpY(pts, x), ppfSumName(i), c, { below: i % 2 === 1 });
+  });
   const area = d3.area().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y0(sy(0)).y1(p => sy(p[1]));
-  g.append('path').datum(d.points).attr('d', area).attr('fill', COL.D).attr('opacity', 0.07);
-  g.append('path').datum(d.points).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.8).attr('d', line);
+  const sumC = STATE.ppfSumColor || COL.D;
+  g.append('path').datum(d.points).attr('d', area).attr('fill', sumC).attr('opacity', 0.07)
+    .attr('data-legend', 'Достижимые наборы');
+  g.append('path').datum(d.points).attr('fill', 'none').attr('stroke', sumC).attr('stroke-width', 2.8).attr('d', line);
+  if (STATE.bundleOn) drawBundleRay(g, (x) => interpY(d.points, x), sumC);
 }
 
-// Подписи суммарной КПВ: концы (X макс / Y макс), изломы, ярлык «Σ КПВ».
+/* Подписи суммарной КПВ. От каждого излома идёт пунктир к обеим осям с
+   координатами (Фаза 13.4): слово «излом» рядом с точкой ничего не добавляло,
+   а вот сами числа на осях и есть ответ задачи. */
 function drawPpfSumMarks(d) {
   const ox = sx(0), oy = sy(0), g = svg.append('g');
   (d.kinks || []).forEach(k => {
     const px = sx(k[0]), py = sy(k[1]);
-    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    haloText(g, px, oy + 8, 'X=' + fmt(k[0]), 'middle', 'hanging');
-    haloText(g, ox - 8, py, 'Y=' + fmt(k[1]), 'end', 'middle');
-    g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('излом');
+    g.append('line').attr('x1', ox).attr('y1', py).attr('x2', px).attr('y2', py)
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3').attr('opacity', .7);
+    g.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', py)
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3').attr('opacity', .7);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.ink)
+      .attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    haloText(g, px, oy + 8, fmt(k[0]), 'middle', 'hanging');
+    haloText(g, ox - 8, py, fmt(k[1]), 'end', 'middle');
   });
   // концы суммарной кривой
-  haloText(g, ox - 8, sy(d.Ytot), 'Y=' + fmt(d.Ytot), 'end', 'middle');
-  haloText(g, sx(d.Xtot), oy + 8, 'X=' + fmt(d.Xtot), 'middle', 'hanging');
+  haloText(g, ox - 8, sy(d.Ytot), fmt(d.Ytot), 'end', 'middle');
+  haloText(g, sx(d.Xtot), oy + 8, fmt(d.Xtot), 'middle', 'hanging');
   const midX = d.Xtot * 0.5, midY = interpY(d.points, midX);
-  if (!isNaN(midY)) g.append('text').attr('x', sx(midX)).attr('y', sy(midY) - 8).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.D)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Σ КПВ');
+  const nm = (STATE.ppfSumName || '').trim() || 'Сумма';
+  if (!isNaN(midY)) g.append('text').attr('x', sx(midX)).attr('y', sy(midY) - 8)
+    .attr('font-size', curveLabelSize()).attr('font-weight', 600).attr('fill', STATE.ppfSumColor || COL.D)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(nm);
 }
 
-// Табло суммарной КПВ: тип, X/Y макс, изломы, текст формулы.
+/* Разбор суммарной КПВ (Фаза 13.5). Панель ОБЪЯСНЯЕТ то, что посчитал
+   проверенный алгоритм сложения по Минковскому, и ничего не считает заново:
+   изломы, концы и порядок специализации берутся из его же результата. */
 function updatePpfSumPanel() {
   const box = document.getElementById('info-ppfsum'); if (!box) return;
   const d = STATE.ppfSumData;
-  if (!d) { box.innerHTML = '<div class="muted">Введите две КПВ и нажмите «Построить сумму».</div>'; return; }
+  if (!d) { box.innerHTML = '<div class="muted">Введите кривые и нажмите «Построить сумму».</div>'; return; }
   if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось построить.') + '</div>'; return; }
+  const ord = d.order || [];
   let html = '';
-  html += `<div class="stat"><span>Тип</span><b>${d.type}</b></div>`;
-  html += `<div class="stat"><span>X макс (сумма)</span><b>${fmt(d.Xtot)}</b></div>`;
-  html += `<div class="stat"><span>Y макс (сумма)</span><b>${fmt(d.Ytot)}</b></div>`;
-  (d.kinks || []).forEach((k, i) => { html += `<div class="stat"><span>Излом ${i + 1}</span><b>X=${fmt(k[0])}, Y=${fmt(k[1])}</b></div>`; });
-  html += `<div class="hint" style="margin-top:6px;"><b>Суммарная КПВ:</b><br>${d.formulaText || 'не подобралась'}</div>`;
+  html += `<div class="stat"><span>Складываем кривых</span><b>${d.n}</b></div>`;
+  html += `<div class="stat"><span>$X_{max}$ суммарной</span><b>${fmt(d.Xtot)}</b></div>`;
+  html += `<div class="stat"><span>$Y_{max}$ суммарной</span><b>${fmt(d.Ytot)}</b></div>`;
+  (d.kinks || []).forEach((k, i) => {
+    html += `<div class="stat"><span>Точка излома ${i + 1}</span><b>${fmt(k[0])}; ${fmt(k[1])}</b></div>`;
+  });
+  if (STATE.bundleOn) {
+    const b = bundleRay((x) => interpY(d.points, x));
+    if (b) {
+      html += `<div class="stat"><span>Комплект ${fmt(b.kx)} X на ${fmt(b.ky)} Y</span><b>${fmt(b.x)}; ${fmt(b.y)}</b></div>`;
+      html += `<div class="stat"><span>Целых комплектов</span><b>${b.whole}</b></div>`;
+    }
+  }
+
+  html += '<div class="sb-note"><b>Как это получилось</b>';
+  html += '<p>Складываем не по вертикали, а по Минковскому: для каждого суммарного выпуска '
+        + '$X$ перебираем все способы разделить его между участниками и берём тот, где общий '
+        + '$Y$ наибольший. Формально это '
+        + '$Y(X) = \\max\\{\\, \\sum_i f_i(x_i) \\;:\\; \\sum_i x_i = X \\,\\}$. '
+        + 'Вертикальная сумма $f_1(X) + f_2(X)$ дала бы другую и неверную кривую: '
+        + 'она означала бы, что каждый выпускает по $X$ единиц, а не что они делят общий выпуск.</p>';
+
+  if (ord.length) {
+    html += '<p>Порядок специализации задают альтернативные издержки $X$: первым наращивает '
+          + 'тот, кому единица $X$ обходится дешевле в единицах $Y$.</p>';
+    html += '<div class="tbl">' + ord.map((o, i) =>
+      `<div><span>${i + 1}. ${o.name}</span><b>${fmt(o.opp)} Y за ед. X</b></div>`).join('') + '</div>';
+    html += `<p>Поэтому кривая начинается с самого пологого участка (${ord[0].name}, `
+          + `${fmt(ord[0].opp)} Y за единицу X) и дальше становится круче: дешёвые возможности `
+          + 'кончаются, в дело идут те, у кого X дороже.</p>';
+  }
+
+  if ((d.kinks || []).length) {
+    html += '<p>Излом появляется там, где очередной участник исчерпал свои возможности по $X$ '
+          + 'и эстафету принимает следующий, с более высокими издержками. Координаты изломов '
+          + 'следующие:</p>';
+    html += '<div class="tbl">' + d.kinks.map((k, i) =>
+      `<div><span>излом ${i + 1}</span><b>X = ${fmt(k[0])}, Y = ${fmt(k[1])}</b></div>`).join('') + '</div>';
+    if (ord.length >= 2) {
+      html += `<p>Первый излом стоит ровно там, где ${ord[0].name} отдал под X весь свой ресурс: `
+            + `$X = ${fmt(ord[0].Xmax)}$. Дальше X может наращивать только ${ord[1].name}.</p>`;
+    }
+  } else {
+    html += '<p>Изломов нет: кривые гладкие, издержки меняются непрерывно, и участники '
+          + 'наращивают X одновременно, а не по очереди. Так бывает у дуг и парабол.</p>';
+  }
+
+  html += `<p>Концы суммарной кривой это просто суммы концов: $X_{max} = ${fmt(d.Xtot)}$ `
+        + `и $Y_{max} = ${fmt(d.Ytot)}$. Если все отдадут ресурс одному товару, выпуски складываются.</p>`;
+  html += `<p><b>Форма кривой:</b> ${d.formulaText || 'не подобралась'}</p>`;
+  html += '</div>';
   box.innerHTML = html;
 }
 
@@ -10320,12 +10530,10 @@ function redrawPpfSum() {
   makeScales();                                     // setRanges мог изменить границы
   svg.selectAll('*').remove(); addDefs();
   const d = STATE.ppfSumData;
-  if (STATE.ppfSumView === 'schema' && d && d.ok) {
-    drawPpfSumSchema();                             // своя отрисовка осей (без чисел) + схема
-  } else {
-    drawGrid(); drawAxes('X', 'Y');
-    if (d && d.ok) { drawPpfSumCurves(d); drawPpfSumMarks(d); }
-  }
+  // Всегда в масштабе (Фаза 13.3): «схема» показывала ту же кривую без чисел
+  // и только заставляла выбирать между правдой и картинкой.
+  drawGrid(); drawAxes('X', 'Y');
+  if (d && d.ok) { drawPpfSumCurves(d); drawPpfSumMarks(d); }
   updatePpfSumPanel();
 }
 
@@ -17345,29 +17553,35 @@ function wireControls() {
     const b = document.getElementById(id); if (b) b.addEventListener('click', () => setPpfSub(sub));
   });
 
-  // Сумма двух КПВ (Задача 1): два поля, «Построить сумму», пресеты.
-  const ppf1Inp = document.getElementById('inp-ppf1'), ppf2Inp = document.getElementById('inp-ppf2');
+  // Сложение КПВ: число кривых задаётся числом, строки заводятся сами (Фаза 13).
   function applyPpfSum() {
-    STATE.ppf1 = ((ppf1Inp && ppf1Inp.value) || '').trim();
-    STATE.ppf2 = ((ppf2Inp && ppf2Inp.value) || '').trim();
     STATE.ppfSumData = null;   // принудительный пересчёт
     redrawAll();
-    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = '';   // пере-инициализировать
-    if (typeof updatePult === 'function') updatePult();                      // 4 ползунка по странам
+    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = '';
+    if (typeof updatePult === 'function') updatePult();
   }
   const sumApply = document.getElementById('btn-ppfsum-apply');
   if (sumApply) sumApply.addEventListener('click', applyPpfSum);
-  if (ppf1Inp) ppf1Inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpfSum(); });
-  if (ppf2Inp) ppf2Inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpfSum(); });
-  const sumLin = document.getElementById('btn-ppfsum-lin');
-  if (sumLin) sumLin.addEventListener('click', () => { if (ppf1Inp) ppf1Inp.value = '100 - X'; if (ppf2Inp) ppf2Inp.value = '60 - 3*X'; applyPpfSum(); });
-  const sumCirc = document.getElementById('btn-ppfsum-circ');
-  if (sumCirc) sumCirc.addEventListener('click', () => { if (ppf1Inp) ppf1Inp.value = 'sqrt(100 - X^2)'; if (ppf2Inp) ppf2Inp.value = 'sqrt(64 - X^2)'; applyPpfSum(); });
-
-  // Вид суммарной КПВ: в масштабе / схема (Задача 2). Переключатель внутри панели «Сумма двух».
-  [['ppfsumview-scale', 'scale'], ['ppfsumview-schema', 'schema']].forEach(([id, v]) => {
-    const b = document.getElementById(id); if (b) b.addEventListener('click', () => setPpfSumView(v));
+  const sumN = document.getElementById('inp-ppfsum-n');
+  if (sumN) sumN.addEventListener('input', () => {
+    STATE.ppfSumCount = Math.max(2, Math.min(5, parseInt(sumN.value, 10) || 2));
+    renderPpfSumRows(); applyPpfSum();
   });
+  const sumNm = document.getElementById('inp-ppfsum-name');
+  if (sumNm) sumNm.addEventListener('input', () => { STATE.ppfSumName = sumNm.value.trim(); redrawAll(); });
+  const bOn2 = document.getElementById('chk-bundle-sum');
+  if (bOn2) bOn2.addEventListener('change', () => {
+    STATE.bundleOn = bOn2.checked;
+    const row = document.getElementById('bundle-row-sum');
+    if (row) row.style.display = bOn2.checked ? '' : 'none';
+    redrawAll();
+  });
+  [['inp-bundle-x2', 'bundleX'], ['inp-bundle-y2', 'bundleY']].forEach(([id, key]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('input', () => { STATE[key] = parseFloat(e.value); redrawAll(); });
+  });
+  renderPpfSumRows();
+
 
   // КТВ — торговые возможности (Задача 2): КПВ + мировая цена Px/Py.
   const ppftInp = document.getElementById('inp-ppft'), ppftPriceInp = document.getElementById('inp-ppft-price');
