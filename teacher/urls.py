@@ -39,6 +39,9 @@ urlpatterns = [
     # Утверждение того, что будет проверяться машиной (Фаза 0.6).
     path('api/item/answers/', views_groups.api_item_answers,
          name='api_item_answers'),
+    # Максимальный балл за позицию — правится на странице задания.
+    path('api/item/points/', views_groups.api_item_points,
+         name='api_item_points'),
 
     # Контрольные (Часть C).
     path('groups/<int:pk>/exams/new/', views_exams.exam_create,

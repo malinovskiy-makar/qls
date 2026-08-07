@@ -31,6 +31,15 @@
 .k-btn:disabled, .k-btn[aria-disabled="true"] {
   opacity: .45; cursor: not-allowed;
 }
+/* ⚠️ `display` из правила выше СИЛЬНЕЕ браузерного `[hidden]{display:none}`,
+   поэтому спрятанная кнопка продолжала рисоваться. Поймано глазами на
+   карточке позиции: у неутверждённой задачи висела кнопка «Проверять
+   вручную», хотя снимать там нечего. Правило нужно всем элементам набора,
+   у которых мы задаём display. */
+.k-btn[hidden], .k-tile[hidden], .k-state[hidden], .k-sep[hidden],
+.k-card[hidden], .k-score[hidden], .k-row[hidden], .k-stack[hidden] {
+  display: none;
+}
 
 /* Главная — сплошная графитовая заливка (крупные действия во всём проекте) */
 .k-btn--main { background: var(--btn-bg); color: var(--on-btn);

@@ -151,6 +151,31 @@ def group_detail(request, pk):
 # Фаза 11 — просмотр задания ДО решений
 # ---------------------------------------------------------------------------
 
+def _item_title(item):
+    """Заголовок задачи для экрана. Пусто — берём начало условия.
+
+    В банке у части задач заголовка нет вовсе, а у части он совпадает с
+    условием. Показывать «Задача #40131» бессмысленно, поэтому подставляем
+    первые слова условия — обрезкой ПО ГРАНИЦЕ СЛОВА, чтобы не рвать числа
+    («переменные — 300…» вместо 3000).
+    """
+    from problems.text_clean import preview_title
+
+    problem = item.problem
+    if problem is None:
+        return '(задача удалена)'
+    return preview_title(problem, limit=70)
+
+
+def _source_label(item):
+    """Откуда задача: «своя» / «тест» / «каталог». Одно слово, мелким."""
+    if item.is_custom:
+        return 'своя'
+    if item.is_test:
+        return 'тест'
+    return 'каталог'
+
+
 def _answer_rows(item):
     """Строки «пункт → что предлагает каталог → что утверждено».
 
@@ -193,11 +218,16 @@ def group_assignment_detail(request, group_id, assignment_id):
     group = own_group_or_404(request.user, group_id)
     assignment = group_assignment_or_404(group, assignment_id)
 
-    items = list(assignment.items
-                 .select_related('catalog_problem', 'custom_problem')
-                 .prefetch_related('custom_problem__options',
-                                   'catalog_problem__parts')
-                 .order_by('order', 'id'))
+    from problems.assignment_rows import ordered_items, section_marks
+
+    # Порядок и деление на части — та же функция, что у ученика и у листка.
+    items = ordered_items(assignment, list(
+        assignment.items
+        .select_related('catalog_problem', 'custom_problem')
+        .prefetch_related('custom_problem__options',
+                          'catalog_problem__parts')
+        .order_by('order', 'id')))
+    marks = section_marks(items)
 
     comments = (ProblemComment.objects.visible_for(request.user)
                 .filter(assignment=assignment)
@@ -207,12 +237,19 @@ def group_assignment_detail(request, group_id, assignment_id):
         by_item.setdefault(comment.problem_item_id, []).append(comment)
 
     rows = []
-    for item in items:
+    for index, item in enumerate(items):
         options = []
         if item.is_custom and item.custom_problem.is_test:
             options = list(item.custom_problem.options.all())
         rows.append({
             'item': item,
+            'number': index + 1,
+            'section_title': marks.get(index, ''),
+            # ⚠️ Заголовок задачи на экране РАНЬШЕ НЕ ПОКАЗЫВАЛСЯ, хотя в
+            # печатном листке был. Из-за этого страница из семи позиций
+            # читалась сплошной простынёй: зацепиться глазом не за что.
+            'title': _item_title(item),
+            'source_label': _source_label(item),
             'options': options,
             'parts': list(item.catalog_problem.parts.all())
             if item.catalog_problem_id else [],
@@ -497,6 +534,63 @@ def api_item_answers(request):
     item.save(update_fields=['answer_override'])
     return JsonResponse({'ok': True, 'approved': item.answers_approved,
                          'answers': item.answer_override or {}})
+
+
+@tutor_required
+@require_POST
+def api_item_points(request):
+    """Максимальный балл за позицию — правится прямо на странице задания.
+
+    Балл и есть максимум: два отдельных элемента «показать балл» и «задать
+    максимум» были бы одним и тем же числом в двух местах, а два места для
+    одного числа всегда расходятся.
+
+    Отрицательный балл не принимаем: за задачу нельзя получить меньше нуля,
+    и такое число сломало бы и сумму работы, и проценты.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    from problems.models import AssignmentItem
+
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({'error': 'Неверный формат'}, status=400)
+
+    item = get_object_or_404(
+        AssignmentItem.objects.select_related('assignment'),
+        pk=body.get('item_id'))
+    if not item.is_tutor_for(request.user):
+        return JsonResponse({'error': 'Нет доступа'}, status=403)
+
+    raw = str(body.get('points', '')).strip().replace(',', '.')
+    try:
+        points = Decimal(raw)
+    except (InvalidOperation, ValueError):
+        return JsonResponse({'error': 'Нужно число'}, status=400)
+    if points < 0:
+        return JsonResponse({'error': 'Балл не может быть меньше нуля'},
+                            status=400)
+    if points > 1000:
+        return JsonResponse({'error': 'Слишком большой балл'}, status=400)
+
+    item.points = points
+    item.save(update_fields=['points'])
+
+    from problems.assignment_export import total_points, print_rows
+
+    rows, _ = print_rows(item.assignment)
+    return JsonResponse({'ok': True,
+                         'points': _clean_points(item.points),
+                         'total': _clean_points(total_points(rows))})
+
+
+def _clean_points(value):
+    """«3.00» → «3», «2.50» → «2.5». Хвостовые нули на экране — шум."""
+    if value is None:
+        return ''
+    text = ('%s' % value)
+    return text.rstrip('0').rstrip('.') if '.' in text else text
 
 
 @require_POST

@@ -22,31 +22,68 @@
                  letter-spacing: .04em; }
 .summary-value { font-size: 16px; font-weight: 600; margin-top: 4px; }
 
-/* ── Утверждение ответов (Фаза 0.6) ────────────────────────────
-   Задача без утверждения обязана бросаться в глаза: репетитор должен
-   понимать, что она уйдёт на ручную проверку. Янтарь тут в своём смысле
-   «требует внимания», акцентный малиновый не используется. */
-.ap-badge { margin-left: auto; font-size: 11px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .04em; padding: 3px 9px;
-  border-radius: 999px; white-space: nowrap; }
-.ap-on  { background: var(--green-tint); color: var(--green); }
-.ap-off { background: var(--amber-tint); color: var(--amber);
-          border: 1px solid var(--amber-border); }
+/* ── Карточка позиции задания (фаза 6) ─────────────────────────
+   Слева узкая рейка: номер, крупный балл, откуда задача. Справа всё
+   остальное. Раньше балл и метка источника стояли одним мелким серым
+   текстом и были неразличимы. */
+.item-card { display: grid; grid-template-columns: 84px 1fr; gap: 18px;
+             align-items: start; }
+.item-rail { display: flex; flex-direction: column; align-items: center;
+             gap: 2px; text-align: center; }
+.item-num { font-size: 12px; color: var(--text3); font-weight: 600; }
+.item-src { font-size: 11px; color: var(--text3); }
+.item-body { min-width: 0; }
+.item-title { font-size: 15px; font-weight: 600; line-height: 1.35;
+              margin: 0 0 8px; }
+.pts-status { font-size: 11px; min-height: 14px; }
+
+/* ── Блок состояния проверки ───────────────────────────────────
+   ⚠️ ОДИН блок: и статус, и кнопка. Пока их было двое (бейдж-капслок
+   вверху и кнопки внутри раскрывашки), они расходились — после нажатия
+   «Утвердить» надпись оставалась «не утверждено».
+
+   Пометка — ТОНКАЯ полоса слева плюс значок, фон нейтральный. Панель,
+   залитая янтарём целиком, читается как ошибка, хотя это рабочее
+   состояние. Малиновый акцент здесь не используется вовсе. */
+.check-state { margin-top: 14px; background: var(--surface-2);
+  border: 0.5px solid var(--border); border-left: 3px solid var(--text3);
+  border-radius: 0 var(--r) var(--r) 0; }
+.check-state.is-warn { border-left-color: var(--amber); }
+.check-state.is-ok   { border-left-color: var(--green); }
+.check-fold > summary { list-style: none; cursor: pointer; }
+.check-fold > summary::-webkit-details-marker { display: none; }
+.check-head { display: flex; align-items: baseline; gap: 8px;
+              padding: 11px 14px; flex-wrap: wrap; }
+.check-head--static { cursor: default; }
+.check-icon { font-weight: 700; flex-shrink: 0; }
+.is-warn .check-icon { color: var(--amber); }
+.is-ok   .check-icon { color: var(--green); }
+.check-title { font-size: 13px; font-weight: 600; }
+.check-gist { font-size: 12px; color: var(--text2); min-width: 0;
+              overflow-wrap: anywhere; }
+.check-fold > summary::after { content: '▾'; margin-left: auto;
+  color: var(--text3); font-size: 11px; }
+.check-fold[open] > summary::after { content: '▴'; }
+.check-body { padding: 0 14px 13px; }
+.check-why { font-size: 12px; color: var(--text2); line-height: 1.6;
+             margin: 0 0 12px; }
+
 .ans-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
            margin-bottom: 8px; }
 .ans-label { flex: none; min-width: 54px; font-size: 13px; font-weight: 600;
              color: var(--text2); }
-.ans-input { flex: 1; min-width: 160px; font: inherit; font-size: 14px;
-  padding: 7px 10px; border-radius: var(--r); background: var(--surface-2);
-  border: 1px solid var(--border); color: var(--text); outline: none; }
-.ans-input:focus { border-color: var(--accent); }
+.ans-input { flex: 1; min-width: 160px; width: auto; }
 .ans-src { font-size: 12px; color: var(--text2); }
 .ans-none { font-style: italic; }
 .ans-actions { display: flex; gap: 10px; align-items: center;
                flex-wrap: wrap; margin-top: 12px; }
-.ans-status { font-size: 12px; color: var(--text2); }
+.ans-status { font-size: 12px; }
+
 @media (max-width: 560px) {
-  .ap-badge { margin-left: 0; }
+  /* Рейка уезжает наверх строкой: 84px колонки на 380px экрана съедают
+     четверть ширины условия. */
+  .item-card { grid-template-columns: 1fr; gap: 10px; }
+  .item-rail { flex-direction: row; align-items: baseline; gap: 12px; }
   .ans-label { min-width: 0; }
   .ans-input { min-width: 0; width: 100%; }
 }
@@ -139,92 +176,128 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
 
 {% for row in rows %}
 {% include "_section_sep.html" with title=row.section_title %}
-<div class="problem-block" id="item-{{ row.item.pk }}">
-  <div class="problem-head">
-    <span class="problem-num">{{ forloop.counter }}.</span>
-    <span class="problem-src">
-      {% if row.item.is_custom %}своя задача{% else %}каталог{% endif %}
-      {% if row.item.points %} · {{ row.item.points|floatformat:"-2" }} б.{% endif %}
-      {% if row.item.is_test %} · тест{% endif %}
-    </span>
-    {% if row.answer_rows %}
-    <span class="ap-badge {% if row.answers_approved %}ap-on{% else %}ap-off{% endif %}"
-          data-badge="{{ row.item.pk }}">
-      {% if row.answers_approved %}проверяется автоматически
-      {% else %}уйдёт на ручную проверку{% endif %}
-    </span>
+<div class="problem-block item-card" id="item-{{ row.item.pk }}">
+
+  {% comment %}
+  ЛЕВАЯ РЕЙКА: номер, максимальный балл, откуда задача.
+  Раньше балл и метка источника стояли рядом одним мелким серым текстом и
+  были неразличимы. Теперь они разнесены ПО ВЕСУ: балл — крупная цифра,
+  которую и правят, источник — мелкая подпись.
+  {% endcomment %}
+  <div class="item-rail">
+    <div class="item-num">{{ row.number }}</div>
+    <label class="k-score" title="Максимальный балл за задачу">
+      <input type="number" class="pts-input" data-item="{{ row.item.pk }}"
+             value="{{ row.item.points|floatformat:"-2" }}" min="0" max="1000" step="0.5">
+      <span class="k-score__cap">баллов</span>
+    </label>
+    <div class="item-src">{{ row.source_label }}</div>
+    <div class="pts-status k-quiet" data-pts-status="{{ row.item.pk }}"></div>
+  </div>
+
+  <div class="item-body">
+    <h2 class="item-title">{{ row.title }}</h2>
+
+    <div class="problem-statement">{{ row.item.statement|linebreaksbr }}</div>
+
+    {% if row.parts %}
+    <div style="margin-top: 10px;">
+      {% for part in row.parts %}
+        <div class="problem-statement" style="margin-top: 6px;">
+          <strong>{{ part.label }})</strong> {{ part.statement|linebreaksbr }}
+        </div>
+      {% endfor %}
+    </div>
     {% endif %}
-  </div>
 
-  <div class="problem-statement">{{ row.item.statement|linebreaksbr }}</div>
-
-  {% if row.parts %}
-  <div style="margin-top: 10px;">
-    {% for part in row.parts %}
-      <div class="problem-statement" style="margin-top: 6px;">
-        <strong>{{ part.label }})</strong> {{ part.statement|linebreaksbr }}
-      </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  {% if row.options %}
-  <ul class="options">
-    {% for option in row.options %}
-      <li class="{% if option.is_correct %}correct{% endif %}">
-        {{ option.text }}{% if option.is_correct %} ✓{% endif %}
-      </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
+    {% if row.options %}
+    <ul class="options">
+      {% for option in row.options %}
+        <li class="{% if option.is_correct %}correct{% endif %}">
+          {{ option.text }}{% if option.is_correct %} ✓{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
 
   {% if row.answer_rows %}
   {% comment %}
-  ⚠️ Здесь репетитор видит, ЧТО ИМЕННО уйдёт в автопроверку, и отвечает за
-  это своим нажатием. Без утверждения задача проверяется человеком — в
-  банке «ответом» нередко записана фраза целиком или число из середины
-  решения, и машина по такому эталону ставит незаслуженный ноль. Пишем в
-  позицию задания, каталог не трогаем.
+  ⚠️ ОДИН БЛОК СОСТОЯНИЯ, А НЕ БЕЙДЖ ОТДЕЛЬНО И КНОПКИ ОТДЕЛЬНО.
+  Раньше статус жил в бейдже-капслоке справа вверху, а кнопки «Утвердить» и
+  «Снять утверждение» — внутри раскрывашки. Они были независимы, поэтому и
+  расходились: после нажатия «Утвердить» надпись оставалась «не утверждено».
+  Слияние делает рассинхрон невозможным ПО УСТРОЙСТВУ, а не заплаткой.
+
+  Раскрыт у неутверждённых (там нужно вмешательство), свёрнут в одну строку
+  у утверждённых: разворачивать все семь позиций удвоило бы страницу.
+
+  Кнопки названы по РЕЗУЛЬТАТУ действия, а не внутренним словом «утвердить».
   {% endcomment %}
-  <details class="fold ans-block" data-item="{{ row.item.pk }}"
-           {% if not row.answers_approved %}open{% endif %}>
-    <summary>
-      Что проверяется автоматически
-      {% if not row.answers_approved %}— не утверждено{% endif %}
-    </summary>
-    <div class="fold-body">
-      <div class="row-meta" style="margin-bottom:10px;">
-        Ответ из каталога — подсказка, а не истина: проверять машина будет
-        только то, что вы утвердите. Правка здесь меняет ТОЛЬКО эту работу,
-        каталог остаётся как был.
+  <div class="check-state {% if row.answers_approved %}is-ok{% else %}is-warn{% endif %}"
+       data-check="{{ row.item.pk }}">
+    <details class="check-fold" {% if not row.answers_approved %}open{% endif %}>
+      <summary class="check-head">
+        <span class="check-icon">{% if row.answers_approved %}✓{% else %}!{% endif %}</span>
+        <span class="check-title">
+          {% if row.answers_approved %}Проверяется само{% else %}Проверять придётся вам, вручную{% endif %}
+        </span>
+        <span class="check-gist">
+          {% if row.answers_approved %}эталон: {{ row.item.answer_override.values|join:" · " }}{% endif %}
+        </span>
+      </summary>
+
+      <div class="check-body">
+        <p class="check-why">
+          Ответ этой задачи взят из каталога, и там это часто не ответ, а
+          фраза целиком или число из середины решения — машина по такому
+          эталону ставит незаслуженный ноль. Подтвердите, что проверять,
+          и она начнёт справляться сама. Правка здесь меняет ТОЛЬКО эту
+          работу, каталог остаётся как был.
+        </p>
+
+        {% for arow in row.answer_rows %}
+        <div class="ans-row">
+          <label class="ans-label" for="ans-{{ row.item.pk }}-{{ forloop.counter }}">
+            {% if arow.label %}{{ arow.label }}){% else %}Ответ{% endif %}
+          </label>
+          <input type="text" class="k-input ans-input"
+                 id="ans-{{ row.item.pk }}-{{ forloop.counter }}"
+                 data-key="{{ arow.key }}"
+                 value="{{ arow.approved|default:arow.from_catalog }}"
+                 placeholder="{% if arow.from_catalog %}{{ arow.from_catalog }}{% else %}ответа в каталоге нет — впишите свой{% endif %}">
+          {% if arow.from_catalog %}
+          <span class="ans-src">в каталоге: {{ arow.from_catalog }}</span>
+          {% else %}
+          <span class="ans-src ans-none">в каталоге ответа нет</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="ans-actions">
+          <button type="button" class="k-btn k-btn--main ans-save">
+            Подтвердить и включить автопроверку
+          </button>
+          {% comment %}
+          Кнопка возврата к ручной проверке есть ТОЛЬКО у утверждённых: у
+          неутверждённой снимать нечего, и раньше она стояла там впустую.
+          {% endcomment %}
+          <button type="button" class="k-btn k-btn--quiet ans-clear"
+                  {% if not row.answers_approved %}hidden{% endif %}>
+            Проверять вручную
+          </button>
+          <span class="ans-status k-quiet"></span>
+        </div>
       </div>
-      {% for arow in row.answer_rows %}
-      <div class="ans-row">
-        <label class="ans-label">
-          {% if arow.label %}{{ arow.label }}){% else %}Ответ{% endif %}
-        </label>
-        <input type="text" class="ans-input" data-key="{{ arow.key }}"
-               value="{{ arow.approved|default:arow.from_catalog }}"
-               placeholder="{% if arow.from_catalog %}{{ arow.from_catalog }}{% else %}ответа в каталоге нет — впишите свой{% endif %}">
-        {% if arow.from_catalog %}
-        <span class="ans-src">из каталога: {{ arow.from_catalog }}</span>
-        {% else %}
-        <span class="ans-src ans-none">в каталоге ответа нет</span>
-        {% endif %}
-      </div>
-      {% endfor %}
-      <div class="ans-actions">
-        <button type="button" class="pf-btn ans-save">Утвердить</button>
-        <button type="button" class="pf-btn ans-clear">Снять утверждение</button>
-        <span class="ans-status"></span>
-      </div>
-    </div>
-  </details>
+    </details>
+  </div>
   {% else %}
-  <details class="fold">
-    <summary>Правильный ответ</summary>
-    <div class="fold-body">{{ row.item.correct_answer|default:"не задан"|linebreaksbr }}</div>
-  </details>
+  <div class="check-state is-ok">
+    <div class="check-head check-head--static">
+      <span class="check-icon">✓</span>
+      <span class="check-title">Проверяется само</span>
+      <span class="check-gist">эталон: {{ row.item.correct_answer|default:"задан разметкой" }}</span>
+    </div>
+  </div>
   {% endif %}
 
   {# --- Фаза 20: эталонное решение и правила показа --- #}
@@ -272,7 +345,13 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
     </div>
   </details>
 
-  {# --- Фаза 12: комментарии к задаче --- #}
+  {% comment %}
+  ⚠️ ПЕРЕПИСКА ОТДЕЛЕНА ОТ НАСТРОЙКИ. Раньше комментарии начинались сразу
+  после эталона, без границы, и в одной карточке подряд шли четыре разных
+  занятия: читать условие, задавать балл, настраивать проверку, переписываться.
+  {% endcomment %}
+  <div class="k-sep"><span class="k-sep__cap">Переписка по задаче</span>
+    <span class="k-sep__line"></span></div>
   <div class="comments" data-item="{{ row.item.pk }}">
     <div class="comment-list">
       {% for comment in row.comments %}
@@ -294,17 +373,20 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
     <form class="comment-form" data-item="{{ row.item.pk }}">
       <textarea name="text" placeholder="Комментарий к задаче" required></textarea>
       <div class="form-row">
-        <label>
-          Видимость:
-          <select name="visibility">
-            <option value="group">видят все</option>
-            <option value="private">только я и автор</option>
-          </select>
+        <label class="k-row" style="gap:6px">
+          <span class="k-quiet">Видимость:</span>
+          <span class="k-select-wrap" style="width:auto">
+            <select class="k-select" name="visibility" style="width:auto">
+              <option value="group">видят все</option>
+              <option value="private">только я и автор</option>
+            </select>
+          </span>
         </label>
-        <button type="submit" class="btn-outline btn-small">Отправить</button>
-        <span class="form-status row-meta"></span>
+        <button type="submit" class="k-btn k-btn--plain k-btn--sm">Отправить</button>
+        <span class="form-status k-quiet"></span>
       </div>
     </form>
+  </div>
   </div>
 </div>
 {% empty %}
@@ -420,17 +502,32 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
   var url = "{% url 'teacher:api_item_answers' %}";
   var csrf = document.cookie.match(/csrftoken=([^;]+)/);
 
-  function paintBadge(itemId, approved) {
-    var badge = document.querySelector('[data-badge="' + itemId + '"]');
-    if (!badge) { return; }
-    badge.textContent = approved
-      ? 'проверяется автоматически' : 'уйдёт на ручную проверку';
-    badge.className = 'ap-badge ' + (approved ? 'ap-on' : 'ap-off');
+  // ⚠️ ОДНА ФУНКЦИЯ КРАСИТ ВСЁ СОСТОЯНИЕ СРАЗУ. Отдельного бейджа больше
+  // нет: пока статус и кнопка были двумя независимыми элементами, они
+  // расходились — после «Утвердить» надпись оставалась «не утверждено».
+  function paintState(itemId, approved, gist) {
+    var box = document.querySelector('[data-check="' + itemId + '"]');
+    if (!box) { return; }
+    box.classList.toggle('is-ok', approved);
+    box.classList.toggle('is-warn', !approved);
+    box.querySelector('.check-icon').textContent = approved ? '✓' : '!';
+    box.querySelector('.check-title').textContent = approved
+      ? 'Проверяется само' : 'Проверять придётся вам, вручную';
+    box.querySelector('.check-gist').textContent =
+      approved && gist ? 'эталон: ' + gist : '';
+    // Утверждённая позиция сворачивается: вмешательство нужно только там,
+    // где не сделано. Развёрнутые семь позиций удвоили бы страницу.
+    var fold = box.querySelector('.check-fold');
+    if (fold) { fold.open = !approved; }
+    // Кнопка возврата к ручной проверке нужна только когда есть что снимать.
+    var clear = box.querySelector('.ans-clear');
+    if (clear) { clear.hidden = !approved; }
   }
 
-  document.querySelectorAll('.ans-block').forEach(function (block) {
+  document.querySelectorAll('[data-check]').forEach(function (block) {
     var status = block.querySelector('.ans-status');
-    var itemId = block.dataset.item;
+    var itemId = block.dataset.check;
+    if (!status) { return; }
 
     function send(payload) {
       payload.item_id = itemId;
@@ -444,9 +541,12 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
         .then(function (r) { return r.json().then(function (d) {
           if (!r.ok) { throw new Error(d.error || 'Ошибка'); } return d; }); })
         .then(function (d) {
-          paintBadge(itemId, d.approved);
+          var values = Object.keys(d.answers || {}).map(function (k) {
+            return d.answers[k];
+          });
+          paintState(itemId, d.approved, values.join(' · '));
           status.textContent = d.approved
-            ? 'утверждено' : 'снято — задача уйдёт на ручную проверку';
+            ? 'готово' : 'снято — задачу проверяете вы';
         })
         .catch(function (e) { status.textContent = e.message; });
     }
@@ -463,6 +563,51 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
         input.value = '';
       });
       send({ clear: true });
+    });
+  });
+})();
+
+// Максимальный балл за позицию — правится прямо в рейке.
+(function () {
+  var url = "{% url 'teacher:api_item_points' %}";
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+
+  document.querySelectorAll('.pts-input').forEach(function (input) {
+    var itemId = input.dataset.item;
+    var status = document.querySelector('[data-pts-status="' + itemId + '"]');
+    var saved = input.value;
+
+    function save() {
+      if (input.value === saved) { return; }
+      status.textContent = '…';
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+                   'X-CSRFToken': csrf ? csrf[1] : '' },
+        body: JSON.stringify({ item_id: itemId, points: input.value })
+      })
+        .then(function (r) { return r.json().then(function (d) {
+          if (!r.ok) { throw new Error(d.error || 'Ошибка'); } return d; }); })
+        .then(function (d) {
+          saved = d.points;
+          input.value = d.points;
+          status.textContent = 'сохранено';
+          setTimeout(function () { status.textContent = ''; }, 1500);
+        })
+        .catch(function (e) {
+          // Возвращаем прежнее число: показывать на экране балл, которого
+          // нет в базе, значит врать о стоимости задачи.
+          input.value = saved;
+          status.textContent = e.message;
+        });
+    }
+
+    input.addEventListener('change', save);
+    input.addEventListener('blur', save);
+    // Enter сохраняет и снимает фокус — иначе он отправлял бы форму
+    // страницы (встроенная «неявная отправка» HTML).
+    input.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') { event.preventDefault(); input.blur(); }
     });
   });
 })();

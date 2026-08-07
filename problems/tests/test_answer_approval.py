@@ -229,17 +229,50 @@ class ApprovalScreenTests(TestCase):
                     args=[self.group.pk, self.work.pk])).content.decode()
 
     def test_unapproved_item_is_marked(self):
+        """Неутверждённая позиция говорит, что проверять будет человек.
+
+        ⚠️ Проверка переписана под фазу 6: отдельного бейджа-капслока
+        больше нет. Статус и кнопка слиты в ОДИН блок состояния — пока их
+        было двое, они расходились, и это и был баг «после утверждения всё
+        ещё написано не утверждено».
+        """
         body = self._body()
-        self.assertIn('уйдёт на ручную проверку', body)
-        self.assertIn('ap-off', body)
+        self.assertIn('Проверять придётся вам, вручную', body)
+        self.assertIn('check-state is-warn', body)
+        self.assertNotIn('check-state is-ok', body)
 
     def test_catalog_answer_is_offered_as_a_hint(self):
-        self.assertIn('из каталога: 42', self._body())
+        self.assertIn('в каталоге: 42', self._body())
 
     def test_approved_item_says_so(self):
         self.item.answer_override = {'': '42'}
         self.item.save()
         body = self._body()
-        self.assertIn('проверяется автоматически', body)
-        self.assertIn('ap-badge ap-on', body)
-        self.assertNotIn('ap-badge ap-off', body)
+        self.assertIn('Проверяется само', body)
+        self.assertIn('check-state is-ok', body)
+        self.assertNotIn('check-state is-warn', body)
+
+    def test_unapproved_block_is_open_and_approved_one_is_folded(self):
+        """Раскрыт там, где нужно вмешательство; свёрнут там, где сделано.
+
+        Разворачивать все семь позиций нельзя — страница удвоится.
+        """
+        self.assertIn('<details class="check-fold" open>', self._body())
+        self.item.answer_override = {'': '42'}
+        self.item.save()
+        self.assertNotIn('<details class="check-fold" open>', self._body())
+
+    def test_manual_button_only_when_there_is_something_to_undo(self):
+        """У неутверждённой снимать нечего — кнопка спрятана."""
+        body = self._body()
+        self.assertIn('ans-clear', body)
+        self.assertIn('ans-clear"\n                  hidden', body)
+        self.item.answer_override = {'': '42'}
+        self.item.save()
+        self.assertNotIn('ans-clear"\n                  hidden', self._body())
+
+    def test_buttons_are_named_by_their_result(self):
+        """«Утвердить» — внутреннее слово; человеку нужен результат."""
+        body = self._body()
+        self.assertIn('Подтвердить и включить автопроверку', body)
+        self.assertIn('Проверять вручную', body)
