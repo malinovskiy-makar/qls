@@ -74,6 +74,7 @@ class Command(BaseCommand):
         graph = self._saved(tutor, catalog, custom)
         self._solutions_and_graph(homework, graph)
         self._partly_correct_submission(homework, students[1], costs)
+        self._submitted_tests(homework, students[0])
         self._parent_links(tutor, students)
         self._history(students, now)
         self._finished_exam(tutor, group, students, now)
@@ -562,6 +563,50 @@ class Command(BaseCommand):
         submission.save()
         self.stdout.write('  создана частично верная сдача (а — верно, '
                           'б — неверно)')
+
+    def _submitted_tests(self, homework, student):
+        """Сданные ТЕСТЫ — иначе разбор вариантов негде посмотреть глазами.
+
+        ⚠️ Разбор вариантов («что выбрал» × «что было верно») собирается
+        только ПОСЛЕ сдачи: до неё это выдача ответов. Пока в демо-данных
+        ни один тест не был сдан, экран разбора нечем было проверить, и
+        браузерная проверка честно показывала пустоту.
+
+        Ответы подобраны так, чтобы на одном экране встретились ВСЕ ЧЕТЫРЕ
+        исхода варианта: выбрал и верно, выбрал и неверно, не выбрал а надо
+        было, не выбрал и правильно.
+        """
+        from problems.assignment_rows import (
+            answer_input_name, get_or_create_submission, item_answer_form,
+        )
+        from student.views import grade_submission
+
+        # Каким будет ответ: у «все верные» намеренно ошибочный набор
+        # (взят лишний вариант и пропущен нужный), остальные — верные.
+        wanted = {
+            'Демо-тест: все верные': ['а', 'в'],       # верно «а, б, г»
+            'Демо-тест: один ответ': ['б'],            # верно
+            'Демо-тест: верно/неверно': ['б'],         # верно
+        }
+        made = 0
+        for item in homework.items.select_related('catalog_problem'):
+            problem = item.catalog_problem
+            if problem is None or problem.title not in wanted:
+                continue
+            submission = get_or_create_submission(student, homework, item)
+            if submission.status in ('submitted', 'reviewed'):
+                continue
+            kind, _ = item_answer_form(item)
+            submission.submitted_answer = ', '.join(wanted[problem.title])
+            submission.status = 'submitted'
+            submission.submitted_at = timezone.now()
+            submission.save()
+            grade_submission(submission, item, values={})
+            submission.save()
+            made += 1
+        if made:
+            self.stdout.write('  сданы демо-тесты (%d): на экране разбора '
+                              'видны все четыре исхода варианта' % made)
 
     def _parent_links(self, tutor, students):
         """Родитель связан с ДВУМЯ учениками — чтобы кабинет родителя было
