@@ -46,6 +46,14 @@ def assignment_stats(assignment):
                                         status='submitted').count()
     deadline = assignment.deadline_at
     human, exact = deadline_pair(deadline)
+
+    # Средний балл по группе — показывается на карточке завершённой работы:
+    # она уже не требует внимания, и единственное, что от неё нужно, — итог.
+    from django.db.models import Avg
+
+    average = (Submission.objects
+               .filter(assignment=assignment, feedback__score__isnull=False)
+               .aggregate(value=Avg('feedback__score'))['value'])
     return {
         'assignment': assignment,
         'students': students,
@@ -57,6 +65,7 @@ def assignment_stats(assignment):
         # ⚠️ «Проверено» имеет смысл ТОЛЬКО когда было что проверять.
         # Раньше бейдж «проверено» стоял у заданий, где сдали 0 из 3, — это
         # не заслуга, а пустота, и читалось как «всё в порядке».
+        'avg_score': round(float(average), 2) if average is not None else None,
         'nobody_submitted': submitted_students == 0,
         'all_checked': submitted_students > 0 and pending == 0,
         'is_exam': assignment.is_exam,
@@ -151,10 +160,12 @@ def group_detail(request, pk):
         Assignment.objects.filter(group=group).prefetch_related('students'),
         key=lambda a: (a.deadline_at is None, a.deadline_at or a.created_at))
 
+    rows = [assignment_stats(a) for a in assignments]
     context = {
         'group': group,
         'tab': tab,
-        'assignment_rows': [assignment_stats(a) for a in assignments],
+        'assignment_rows': rows,
+        'assignment_groups': group_assignments_by_state(rows),
     }
 
     # Обзор = прежняя статистика группы. Считаем только когда её смотрят:
@@ -174,6 +185,51 @@ def group_detail(request, pk):
 
     return render(request, 'teacher/groups/detail.html', context)
 
+
+
+# ---------------------------------------------------------------------------
+# Фаза 11 — задания группируются ПО СОСТОЯНИЮ, а не лежат плоским списком
+# ---------------------------------------------------------------------------
+# ⚠️ ЗАЧЕМ. Плоский список из семи одинаковых строк не отвечает на вопрос,
+# ради которого репетитор сюда зашёл: «что мне сейчас делать». Домашки и
+# контрольные шли вперемешку, прошедшие и будущие — тоже. Дело не в форме
+# списка: группировка по состоянию превращает его в очередь работы.
+
+ASSIGNMENT_STATES = (
+    ('needs_you', 'Требуют вас'),
+    ('running', 'Идут сейчас'),
+    ('done', 'Завершены'),
+)
+
+
+def assignment_state(row, now=None):
+    """Одно из трёх состояний задания.
+
+    Порядок проверок важен: «требуют вас» ГЛАВНЕЕ срока. Работа с прошедшим
+    сроком, где лежит непроверенное, — это всё ещё работа для репетитора, а
+    не архив.
+    """
+    if row['pending']:
+        return 'needs_you'
+    deadline = row['deadline']
+    now = now or timezone.now()
+    if deadline is None or deadline >= now:
+        return 'running'
+    return 'done'
+
+
+def group_assignments_by_state(rows, now=None):
+    """[(ключ, заголовок, [строки]), …]. Пустые группы не возвращаются.
+
+    Внутри группы — по сроку, ближайшие первыми (порядок уже задан
+    сортировкой в `group_detail`, здесь он только сохраняется).
+    """
+    now = now or timezone.now()
+    buckets = {key: [] for key, _ in ASSIGNMENT_STATES}
+    for row in rows:
+        buckets[assignment_state(row, now)].append(row)
+    return [(key, title, buckets[key])
+            for key, title in ASSIGNMENT_STATES if buckets[key]]
 
 # ---------------------------------------------------------------------------
 # Фаза 11 — просмотр задания ДО решений

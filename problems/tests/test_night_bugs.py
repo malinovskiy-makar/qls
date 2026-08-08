@@ -129,13 +129,21 @@ class Bug75CheckedBadgeTests(TestCase):
         self.assertTrue(row['nobody_submitted'])
         self.assertFalse(row['all_checked'])
 
-    def test_badge_says_nobody_submitted(self):
-        response = self.client.get(
+    def test_finished_work_without_submissions_says_so(self):
+        """«Проверено» там, где никто не сдал, — ложь. Пишем правду.
+
+        ⚠️ Проверка переписана под фазу 11: плоского списка с бейджами
+        больше нет, задания сгруппированы по состоянию. Работа с прошедшим
+        сроком, которую никто не сдал, попадает в «Завершены», и надпись на
+        её строке — «никто не сдал», а не «средний балл».
+        """
+        self.work.deadline = timezone.now() - timedelta(days=2)
+        self.work.save(update_fields=['deadline'])
+        body = self.client.get(
             reverse('teacher:group_detail', args=[self.group.pk])
-            + '?tab=assignments')
-        body = response.content.decode()
+            + '?tab=assignments').content.decode()
         self.assertIn('никто не сдал', body)
-        self.assertNotIn('>проверено<', body)
+        self.assertNotIn('средний балл', body)
 
     def test_checked_only_after_a_real_submission(self):
         Submission.objects.create(student=self.student, assignment=self.work,
@@ -433,3 +441,100 @@ class GroupOverviewTests(TestCase):
         self.assertIn('writing-mode: vertical-rl', css)
         matrix = css[css.index('.matrix-head'):css.index('.matrix-head') + 260]
         self.assertIn('text-transform: none', matrix)
+
+
+class AssignmentGroupingTests(TestCase):
+    """Фаза 11 — задания группируются по состоянию, а не лежат списком."""
+
+    def setUp(self):
+        self.tutor = make_user('ag_tutor', role='teacher')
+        self.student = make_user('ag_student', role='student')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        self.group.students.add(self.student)
+        self.client.force_login(self.tutor)
+        self.now = timezone.now()
+
+    def _work(self, name, days, pending=0, submitted=0):
+        work = Assignment.objects.create(
+            name=name, author=self.tutor, group=self.group,
+            deadline=self.now + timedelta(days=days))
+        work.students.add(self.student)
+        item = AssignmentItem.objects.create(
+            assignment=work, order=0,
+            catalog_problem=make_problem('Условие ' + name))
+        for _ in range(pending):
+            Submission.objects.create(student=self.student, assignment=work,
+                                      problem_item=item, status='submitted')
+        for _ in range(submitted):
+            Submission.objects.create(student=self.student, assignment=work,
+                                      problem_item=item, status='reviewed')
+        return work
+
+    def _groups(self):
+        response = self.client.get(
+            reverse('teacher:group_detail', args=[self.group.pk])
+            + '?tab=assignments')
+        return {key: [r['assignment'].name for r in rows]
+                for key, _, rows in response.context['assignment_groups']}
+
+    def test_unchecked_work_goes_to_needs_you(self):
+        self._work('С непроверенным', days=5, pending=1)
+        self.assertEqual(self._groups()['needs_you'], ['С непроверенным'])
+
+    def test_future_deadline_without_work_is_running(self):
+        self._work('Идёт', days=5)
+        self.assertEqual(self._groups()['running'], ['Идёт'])
+
+    def test_past_deadline_all_checked_is_done(self):
+        self._work('Закрыта', days=-5, submitted=1)
+        self.assertEqual(self._groups()['done'], ['Закрыта'])
+
+    def test_past_deadline_nobody_submitted_is_done(self):
+        self._work('Никто не сдал', days=-5)
+        self.assertEqual(self._groups()['done'], ['Никто не сдал'])
+
+    def test_needs_you_beats_a_passed_deadline(self):
+        """Срок прошёл, но непроверенное лежит — это всё ещё ваша работа."""
+        self._work('Просрочена и не проверена', days=-5, pending=1)
+        self.assertEqual(self._groups()['needs_you'],
+                         ['Просрочена и не проверена'])
+
+    def test_empty_group_is_not_shown(self):
+        self._work('Только эта', days=5)
+        self.assertNotIn('needs_you', self._groups())
+        self.assertNotIn('done', self._groups())
+
+    def test_groups_go_in_order_of_urgency(self):
+        self._work('Требует', days=3, pending=1)
+        self._work('Идёт', days=4)
+        self._work('Закрыта', days=-2, submitted=1)
+        response = self.client.get(
+            reverse('teacher:group_detail', args=[self.group.pk])
+            + '?tab=assignments')
+        keys = [key for key, _, _ in response.context['assignment_groups']]
+        self.assertEqual(keys, ['needs_you', 'running', 'done'])
+
+    def test_exam_kind_is_quiet_text_not_an_accent_badge(self):
+        work = self._work('Контрольная', days=4)
+        work.kind = Assignment.Kind.EXAM
+        work.save(update_fields=['kind'])
+        body = self.client.get(
+            reverse('teacher:group_detail', args=[self.group.pk])
+            + '?tab=assignments').content.decode()
+        self.assertIn('class="ass-kind"', body)
+        # Розового бейджа нет ни в разметке, ни в стилях страницы.
+        self.assertNotIn('badge-exam', body)
+        self.assertNotIn('badge badge-exam', body)
+
+    def test_finished_card_shows_the_average(self):
+        from problems.models import TeacherFeedback
+
+        work = self._work('Закрыта', days=-3)
+        item = work.items.first()
+        sub = Submission.objects.create(student=self.student, assignment=work,
+                                        problem_item=item, status='reviewed')
+        TeacherFeedback.objects.create(submission=sub, score=Decimal('4'))
+        body = self.client.get(
+            reverse('teacher:group_detail', args=[self.group.pk])
+            + '?tab=assignments').content.decode()
+        self.assertIn('средний балл', body)

@@ -3,6 +3,39 @@
 {% block title %}{{ group.name }} — ЭкЗадачи{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
+/* ── Вкладка «Задания»: три группы по состоянию (фаза 11) ───────────── */
+.ass-group { margin-bottom: 26px; }
+.ass-group-head { display: flex; align-items: baseline; gap: 8px;
+                  margin-bottom: 10px; }
+.ass-group-title { font-size: 14px; font-weight: 600; }
+.ass-group-count { font-size: 12px; color: var(--text3); }
+
+.ass-card { display: flex; align-items: center; justify-content: space-between;
+            gap: 14px; flex-wrap: wrap; margin-bottom: 8px; padding: 14px 16px; }
+.ass-main { min-width: 0; flex: 1; }
+.ass-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+/* Тип работы — тихой подписью, не бейджем: акцент оставлен навигации. */
+.ass-kind { font-size: 12px; font-weight: 400; color: var(--text3);
+            margin-left: 8px; }
+.ass-meta { font-size: 12px; color: var(--text2); }
+.ass-waiting { font-size: 12px; }
+
+/* Завершённые — одна компактная строка: внимания они уже не требуют, и
+   давать им тот же вес значило бы прятать за ними то, что горит. */
+.ass-done-list { display: flex; flex-direction: column; gap: 1px; }
+.ass-done { display: flex; align-items: baseline; justify-content: space-between;
+            gap: 12px; flex-wrap: wrap; padding: 8px 16px; font-size: 13px;
+            color: var(--text2); text-decoration: none;
+            border-bottom: 0.5px solid var(--border-soft); }
+.ass-done:last-child { border-bottom: none; }
+.ass-done:hover { background: var(--surface-2); color: var(--text); }
+.ass-done-name { color: var(--text); }
+.ass-done-score { font-size: 12px; color: var(--text3); white-space: nowrap; }
+
+@media (max-width: 560px) {
+  .ass-card { align-items: stretch; }
+  .ass-card .k-btn { width: 100%; }
+}
 {% comment %}
 Стили статистики нужны вкладке «Обзор» — она теперь живёт здесь. Раньше они
 подключались на отдельной странице статистики; эта страница осталась только
@@ -43,37 +76,69 @@
     <a href="{% url 'teacher:exam_create' group.pk %}" class="k-btn k-btn--main">Создать контрольную</a>
   </div>
 
-  {% if assignment_rows %}
-  <div class="rows">
-    {% for row in assignment_rows %}
-    <a class="row-link" href="{% if row.is_exam %}{% url 'teacher:group_exam_results' group.pk row.assignment.pk %}{% else %}{% url 'teacher:group_assignment' group.pk row.assignment.pk %}{% endif %}">
-      <span>
-        <span class="row-main">{{ row.assignment.name }}</span>
-        {% if row.is_exam %}<span class="badge badge-exam">контрольная</span>{% endif %}
-        <br>
-        <span class="row-meta">
-          {% comment %}
-          Срок по-человечески; точная дата — в подсказке при наведении.
-          Раньше везде стояло «08.08.2026 20:56», и, чтобы понять, горит ли
-          срок, приходилось вычитать даты в уме на каждой строке.
-          {% endcomment %}
-          {% if row.deadline %}<span title="{{ row.deadline_exact }}">{{ row.deadline_human }}</span>{% else %}Без срока{% endif %}
-          · Сдали {{ row.submitted }} из {{ row.students }}
+  {% comment %}
+  ⚠️ ЗАДАНИЯ СГРУППИРОВАНЫ ПО СОСТОЯНИЮ, а не лежат плоским списком.
+  Плоский список из семи одинаковых строк не отвечает на вопрос, ради
+  которого репетитор сюда зашёл: «что мне сейчас делать». Группы идут в
+  порядке срочности, пустая группа не показывается вообще.
+
+  Вес карточки падает вместе со срочностью: «требуют вас» — рамка акцентом
+  и кнопка заливкой, «идут сейчас» — обычная карточка, «завершены» — одна
+  компактная строка. Одинаковый вес у работы, которую надо проверить, и у
+  той, что закрыта месяц назад, — это и есть «бесконечный список».
+  {% endcomment %}
+  {% if assignment_groups %}
+  {% for key, title, items in assignment_groups %}
+  <div class="ass-group">
+    <div class="ass-group-head">
+      <span class="ass-group-title">{{ title }}</span>
+      <span class="ass-group-count">{{ items|length }}</span>
+    </div>
+
+    {% if key == 'done' %}
+    <div class="ass-done-list">
+      {% for row in items %}
+      <a class="ass-done" href="{% if row.is_exam %}{% url 'teacher:group_exam_results' group.pk row.assignment.pk %}{% else %}{% url 'teacher:group_assignment' group.pk row.assignment.pk %}{% endif %}">
+        <span class="ass-done-name">{{ row.assignment.name }}{% if row.is_exam %}<span class="ass-kind">контрольная</span>{% endif %}</span>
+        <span class="ass-done-score">
+          {% if row.avg_score is not None %}средний балл {{ row.avg_score }}
+          {% else %}никто не сдал{% endif %}
         </span>
-      </span>
-      <span>
-        {% comment %}
-        «Проверено» — только когда было что проверять. Раньше этот бейдж
-        стоял и там, где сдали 0 из 3: проверять было нечего, а выглядело
-        как заслуга.
-        {% endcomment %}
-        {% if row.pending %}<span class="badge badge-pending">{{ row.pending }} на проверку</span>
-        {% elif row.nobody_submitted %}<span class="badge badge-quiet">никто не сдал</span>
-        {% else %}<span class="badge badge-ok">проверено</span>{% endif %}
-      </span>
-    </a>
+      </a>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    {% for row in items %}
+    <div class="k-card ass-card {% if key == 'needs_you' %}k-card--calls{% endif %}">
+      <div class="ass-main">
+        <div class="ass-name">
+          {{ row.assignment.name }}
+          {% comment %}
+          Тип — тихой серой подписью, а не розовым бейджем: акцент оставлен
+          навигации, а «контрольная» это уточнение, а не сигнал тревоги.
+          {% endcomment %}
+          {% if row.is_exam %}<span class="ass-kind">контрольная</span>{% endif %}
+        </div>
+        <div class="ass-meta">
+          сдали {{ row.submitted }} из {{ row.students }} ·
+          {% if row.deadline %}<span title="{{ row.deadline_exact }}">{{ row.deadline_human }}</span>{% else %}без срока{% endif %}
+        </div>
+      </div>
+      {% if key == 'needs_you' %}
+      <a class="k-btn k-btn--main"
+         href="{% url 'teacher:group_submissions' group.pk row.assignment.pk %}">
+        Проверить {{ row.pending }}
+      </a>
+      {% else %}
+      <span class="k-quiet ass-waiting">ждём</span>
+      {% endif %}
+    </div>
     {% endfor %}
+    {% endif %}
   </div>
+  {% endfor %}
+
   {% else %}
   <div class="empty-state">
     <p>В группе пока нет заданий.</p>
