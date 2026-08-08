@@ -237,6 +237,28 @@ def _score_presets(max_score):
     return values
 
 
+def _max_score_for(submission):
+    """Максимальный балл за эту задачу в этой работе.
+
+    Вынесено отдельно, потому что число нужно ДВАЖДЫ: при показе формы (для
+    пресетов и подписи «максимум N») и при приёме POST (чтобы обрезать
+    введённое). Считать его в двух местах — верный способ получить два
+    разных числа.
+    """
+    from problems import part_grading
+
+    item = submission.problem_item
+    if item is None:
+        return 10
+    if part_grading.applies(item):
+        rows = part_grading.part_rows(item, submission)
+        if rows:
+            return sum(row['max_score'] for row in rows)
+    if item.points is not None:
+        return item.points
+    return 10
+
+
 def _is_auto_zero(submission, part_rows):
     """Ноль поставлен машиной ЗА ПУСТОТУ, а не за ошибку (правило фазы 3)."""
     if part_rows:
@@ -281,6 +303,14 @@ def review_submission(request, pk, group=None):
             score = float(score_str)
         except ValueError:
             score = 0.0
+
+        # ⚠️ БАЛЛ ОБРЕЗАЕТСЯ ПО МАКСИМУМУ ЗАДАЧИ, И ЭТО ДЕЛАЕТ СЕРВЕР.
+        # В базе нашлась оценка «9 из 5»: поле «своё» принимало любое число,
+        # а разметке (`max=`) верить нельзя — форму можно отправить в обход
+        # браузера. Балл выше максимума ломает и сумму работы, и проценты в
+        # статистике; отрицательный означал бы штраф, которого в правилах нет.
+        top = float(_max_score_for(submission) or 0)
+        score = max(0.0, min(score, top))
 
         if existing_feedback:
             existing_feedback.score = score
@@ -345,17 +375,13 @@ def review_submission(request, pk, group=None):
 
     item = submission.problem_item
     part_rows = []
-    max_score = 10
     auto_score = None
-    if item is not None:
-        if part_grading.applies(item):
-            part_rows = part_grading.part_rows(item, submission)
-            max_score = sum(row['max_score'] for row in part_rows)
-            scored = [row['score'] for row in part_rows
-                      if row['score'] is not None]
-            auto_score = sum(scored) if scored else None
-        elif item.points is not None:
-            max_score = item.points
+    max_score = _max_score_for(submission)
+    if item is not None and part_grading.applies(item):
+        part_rows = part_grading.part_rows(item, submission)
+        scored = [row['score'] for row in part_rows
+                  if row['score'] is not None]
+        auto_score = sum(scored) if scored else None
 
     group_obj = group or submission.assignment.group
     number, total, previous, following, unchecked = review_position(
