@@ -510,8 +510,8 @@ function drawEquilibrium() {
   // Сама точка и подпись E*.
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
     .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  g.append('text').attr('x', px + 8).attr('y', py - 8)
-    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('E*');
+  mathTspans(g.append('text').attr('x', px + 8).attr('y', py - 8)
+    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink), 'E*');
 }
 
 // Текст с белой обводкой (halo) — чтобы подписи равновесия читались над сеткой.
@@ -519,6 +519,58 @@ function drawEquilibrium() {
 // вроде «P*=50» у оси Y иначе обрезалась бы левым краем. Не влезла слева —
 // разворачиваем ту же подпись внутрь графика; у верхнего и нижнего края
 // опускаем и поднимаем. Это только про место на экране, не про математику.
+/* ── Математика в подписях на графике (Фаза 9) ────────────────────────
+   Разбираем лёгкую разметку и рисуем настоящие индексы: «x*» — звёздочка
+   верхним индексом, «Q_1» — нижним, «x^2» — верхним. Фигурные скобки после
+   ^ и _ берут несколько символов: «Q_{макс}».
+
+   Почему tspan, а не KaTeX: KaTeX печатает HTML, его пришлось бы класть в
+   foreignObject. Такая подпись не попала бы ни в PNG (снимок холста рисует
+   SVG в canvas, а foreignObject там не отрисовывается), ни в выгрузку .tex,
+   и ещё ловила бы щелчки поверх графика. tspan остаётся частью SVG: ездит
+   вместе с точкой, попадает во все выгрузки и щелчкам не мешает. */
+function mathTspans(sel, txt) {
+  const s = String(txt == null ? '' : txt);
+  const parts = [];
+  let buf = '', i = 0;
+  while (i < s.length) {
+    const ch = s[i];
+    if (ch === '*' && buf && /[A-Za-zА-Яа-яЁё0-9)\]]$/.test(buf)) {
+      parts.push({ t: 'txt', v: buf }); buf = '';
+      parts.push({ t: 'sup', v: '∗' }); i++; continue;
+    }
+    if ((ch === '^' || ch === '_') && i + 1 < s.length) {
+      let j = i + 1, v;
+      if (s[j] === '{') { const k = s.indexOf('}', j); v = s.slice(j + 1, k < 0 ? s.length : k); j = (k < 0 ? s.length : k) + 1; }
+      else { v = s[j]; j++; }
+      parts.push({ t: 'txt', v: buf }); buf = '';
+      parts.push({ t: ch === '^' ? 'sup' : 'sub', v: v });
+      i = j; continue;
+    }
+    buf += ch; i++;
+  }
+  parts.push({ t: 'txt', v: buf });
+  // dy у tspan накапливается, поэтому после индекса возвращаем базовую линию.
+  let shift = 0;
+  parts.forEach(p => {
+    if (!p.v) return;
+    if (p.t === 'txt') {
+      const ts = sel.append('tspan').text(p.v);
+      if (shift) { ts.attr('dy', (-shift).toFixed(2) + 'em'); shift = 0; }
+    } else {
+      const d = (p.t === 'sup') ? -0.42 : 0.26;
+      sel.append('tspan').attr('dy', (d - shift).toFixed(2) + 'em')
+        .attr('font-size', '76%').text(p.v);
+      shift = d;
+    }
+  });
+  if (shift) sel.append('tspan').attr('dy', (-shift).toFixed(2) + 'em').text('\u200b');
+  return sel;
+}
+
+// Есть ли в подписи что-то математическое: иначе не стоит и разбирать.
+function hasMathMarkup(txt) { return /[*^_]/.test(String(txt == null ? '' : txt)); }
+
 function haloText(g, x, y, txt, anchor, baseline) {
   const w = String(txt).length * 5.9 + 6;      // ширина строки при кегле 10
   let ax = anchor, px = x;
@@ -526,11 +578,12 @@ function haloText(g, x, y, txt, anchor, baseline) {
   else if (ax === 'start' && x + w > W - 2) { ax = 'end'; px = x - 8; }
   else if (ax === 'middle') px = Math.max(w / 2 + 2, Math.min(W - w / 2 - 2, x));
   const py = Math.max(9, Math.min(H - 4, y));
-  g.append('text').attr('x', px).attr('y', py)
+  const t = g.append('text').attr('x', px).attr('y', py)
     .attr('text-anchor', ax).attr('dominant-baseline', baseline)
     .attr('font-size', 10).attr('font-weight', 600).attr('fill', COL.ink)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
-    .text(txt);
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3);
+  if (hasMathMarkup(txt)) mathTspans(t, txt); else t.text(txt);
+  return t;
 }
 
 // Подпись значения у оси Y (зарплата/цена). Разворот внутрь графика теперь

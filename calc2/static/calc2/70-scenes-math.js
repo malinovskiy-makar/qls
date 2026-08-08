@@ -190,16 +190,38 @@ function mathLine(g, f, mx, my, color, width, dash) {
    то, что нашла машина, а назвать точку в своей задаче человек хочет по-своему
    («точка выхода», «оптимум фирмы»). Имена живут в STATE.pointNames и
    сбрасываются вместе с остальным оформлением при смене сцены. */
+/* Куда поставить подпись, чтобы она не легла на ось и на соседнюю подпись.
+   Занятые места помнит список, который обнуляется на каждой перерисовке. */
+let _labelBoxes = [];
+function resetLabelBoxes() { _labelBoxes = []; }
+function dodgeLabel(x, y, axisY, w) {
+  const H_ = 18;                       // под осью идут числа делений — им нужно место
+  const hitsAxis = (v) => Math.abs(v - axisY) < H_;
+  const hitsOther = (v) => _labelBoxes.some(b => Math.abs(b.y - v) < 13 && Math.abs(b.x - x) < (b.w + w) / 2);
+  let v = y;
+  // Уводим ВВЕРХ: под осью стоят числа делений, там подпись всё равно ляжет на них.
+  if (hitsAxis(v)) v = axisY - H_ - 4;
+  for (let k = 0; k < 6 && (hitsOther(v) || hitsAxis(v)); k++) v -= H_ + 2;
+  _labelBoxes.push({ x, y: v, w });
+  return v;
+}
+
 function mathDot(g, mx, my, x, y, color, label, dy, key) {
   g.append('circle').attr('cx', mx(x)).attr('cy', my(y)).attr('r', 4.5)
     .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.6);
   if (!label) return;
   const shown = (key && STATE.pointNames[key] != null) ? STATE.pointNames[key] : label;
   if (!shown) return;
-  const tx = mx(x) + 8, ty = my(y) + (dy == null ? -8 : dy);
+  const tx = mx(x) + 8;
+  let ty = my(y) + (dy == null ? -8 : dy);
+  // Подпись не должна лежать на оси: там уже стоят числа делений, и «перегиб:
+  // x∗ = 0» садился прямо на деление «1». Уводим её от оси и от соседних
+  // подписей, вниз по одной строке, пока место не освободится.
+  ty = dodgeLabel(tx, ty, my(0), String(shown).length * 6 + 8);
   const t = g.append('text').attr('x', tx).attr('y', ty)
     .attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6).text(shown);
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6);
+  if (hasMathMarkup(shown)) mathTspans(t, shown); else t.text(shown);
   if (!key) return;
   makeRenamable(t, shown, tx, ty, (v) => {
     if (v) STATE.pointNames[key] = v; else delete STATE.pointNames[key];

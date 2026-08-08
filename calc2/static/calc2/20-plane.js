@@ -106,7 +106,11 @@ function xTicks() { return axisTicks(sx, 10, STATE.xStep); }
 function yTicks() { return axisTicks(sy, 8, STATE.yStep); }
 
 // Стрелки на концах осей — один раз как <marker> в <defs>.
-function addDefs() {
+function addDefs(mx, my) {
+  // Шкалы приходят аргументом: у «Математики» и у панелей окно своё, и
+  // прямоугольник обрезки, посчитанный от CONFIG, резал бы не там. Без
+  // аргументов работает как раньше — по главным шкалам сцены.
+  mx = mx || sx; my = my || sy;
   const defs = svg.append('defs');
   defs.append('marker')
     .attr('id', 'arrow').attr('viewBox', '0 0 10 10')
@@ -118,8 +122,9 @@ function addDefs() {
   // Прямоугольник-«окно»: видимая часть первой четверти. Всё, что нарисовано
   // с этим clip-path, обрезается по осям и по краям окна — кривые и заливки
   // не вылезают в отрицательную зону и не выходят за границы вида.
-  const x0 = sx(quadLo(CONFIG.Qmin)), x1 = sx(CONFIG.Qmax);
-  const y1 = sy(CONFIG.Pmax), y0 = sy(quadLo(CONFIG.Pmin));
+  const [dx0, dx1] = mx.domain(), [dy0, dy1] = my.domain();
+  const x0 = mx(quadLo(dx0)), x1 = mx(dx1);
+  const y1 = my(dy1), y0 = my(quadLo(dy0));
   defs.append('clipPath').attr('id', 'plot-clip').append('rect')
     .attr('x', x0).attr('y', y1)
     .attr('width', Math.max(0, x1 - x0))
@@ -233,7 +238,7 @@ function drawAxes(xLabel, yLabel) {
   // Деления и числа на оси X. Ближе 14 px к концу оси не печатаем — иначе
   // налезают на стрелку и на букву оси.
   if (atZeroY) xTicks().forEach(t => {
-    if (t < CONFIG.Qmin - 1e-9 || t > CONFIG.Qmax + 1e-9) return;
+    if (t < sx.domain()[0] - 1e-9 || t > sx.domain()[1] + 1e-9) return;
     if (atZeroX && Math.abs(t) < 1e-12) return;      // ноль подписываем один раз
     if (sx(t) > xRight - 14 || sx(t) < xLeft + 2) return;
     g.append('line').attr('x1', sx(t)).attr('y1', oy).attr('x2', sx(t)).attr('y2', oy + 5)
@@ -244,7 +249,7 @@ function drawAxes(xLabel, yLabel) {
   });
   // Деления и числа на оси Y.
   if (atZeroX) yTicks().forEach(t => {
-    if (t < CONFIG.Pmin - 1e-9 || t > CONFIG.Pmax + 1e-9) return;
+    if (t < sy.domain()[0] - 1e-9 || t > sy.domain()[1] + 1e-9) return;
     if (atZeroY && Math.abs(t) < 1e-12) return;
     if (sy(t) < yTop + 14 || sy(t) > yBot - 2) return;
     g.append('line').attr('x1', ox).attr('y1', sy(t)).attr('x2', ox - 5).attr('y2', sy(t))

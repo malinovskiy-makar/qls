@@ -737,15 +737,19 @@ await page.evaluate(() => openPicker());
 await clickUI('.scard[data-scene="m-optimum"]');
 await page.waitForTimeout(420);
 
-// У подписи висит дочерний <title> с всплывающей подсказкой, поэтому всюду
-// ниже берём только собственные текстовые узлы, а не textContent.
+/* У подписи висит дочерний <title> с всплывающей подсказкой, поэтому берём
+   текст без него. Собственными текстовыми узлами больше не обойтись: с Фазы 9
+   индексы печатаются отдельными tspan, и «x» со звёздочкой лежит в трёх узлах. */
 await t('машина сама подписала максимум, минимум и перегиб', () => page.evaluate(() => {
-  const own = (el) => Array.prototype.filter.call(el.childNodes, n => n.nodeType === 3)
-    .map(n => n.nodeValue).join('');
+  const own = (el) => {
+    const c = el.cloneNode(true);
+    [...c.querySelectorAll('title')].forEach(t => t.remove());
+    return c.textContent;
+  };
   const names = [...document.querySelectorAll('#chart text')].map(own);
   const has = (re) => names.some(s => re.test(s));
-  // Подпись называет обе величины: x* — где, y* — сколько.
-  return (has(/^max: x\* = /) && has(/^min: x\* = /) && has(/^перегиб: x\* = /))
+  // Подпись называет обе величины: x∗ — где, y∗ — сколько (звёздочка верхним индексом).
+  return (has(/^max: x[*∗] = /) && has(/^min: x[*∗] = /) && has(/^перегиб: x[*∗] = /))
     || names.join(' | ');
 }));
 
@@ -1584,6 +1588,60 @@ await t('ползунок и точное поле мировой цены си�
   const v = await page.evaluate(() => parseFloat(document.getElementById('inp-tb-price').value));
   await page.evaluate(() => { STATE.tbManualPrice = null; redrawAll(); });
   return Math.abs(v - 1.8) < 0.06 || 'в поле ' + v;
+});
+
+/* ── Фаза 9. Математика в подписях и остатки CONFIG ──────────────────
+   Звёздочка на графике стала верхним индексом, подпись не лежит на оси,
+   прямоугольник обрезки считается по шкалам сцены. */
+await t('в подписях на графике нет звёздочки вместо индекса', async () => {
+  await page.evaluate(() => openPicker());
+  await clickUI('.scard[data-scene="m-optimum"]');
+  await page.waitForTimeout(420);
+  return await page.evaluate(() => {
+    STATE.mathFormula = 'x^3 - 3*x'; setMathWindow(-3, 3, -6, 6);
+    STATE.mathInflect = true; redrawAll();
+    const raw = [...document.querySelectorAll('#chart text')].filter(t => {
+      const own = [...t.childNodes].filter(n => n.nodeType === 3).map(n => n.nodeValue).join('');
+      return /[*]/.test(own);
+    }).map(t => t.textContent.slice(0, 30));
+    if (raw.length) return 'сырая звёздочка в: ' + raw.join(' | ');
+    const sup = [...document.querySelectorAll('#chart text')].filter(t => t.querySelector('tspan[dy]'));
+    return sup.length >= 3 || 'подписей с индексом: ' + sup.length;
+  });
+});
+
+await t('подпись перегиба не лежит на оси', () => page.evaluate(() => {
+  const { my } = mathScales();
+  const axisY = my(0);
+  const inf = [...document.querySelectorAll('#chart text')].filter(t => /перегиб/.test(t.textContent))[0];
+  if (!inf) return 'подписи перегиба нет';
+  const d = Math.abs(parseFloat(inf.getAttribute('y')) - axisY);
+  return d >= 18 || 'до оси всего ' + Math.round(d) + ' px';
+}));
+
+await t('прямоугольник обрезки считается по шкалам сцены', () => page.evaluate(() => {
+  const r = document.querySelector('#plot-clip rect');
+  if (!r) return 'обрезки нет';
+  const { mx } = mathScales();
+  const [px0, px1] = mx.range();
+  const x = parseFloat(r.getAttribute('x')), w = parseFloat(r.getAttribute('width'));
+  // Окно «Математики» уходит в минус: прямоугольник обязан начинаться у левого
+  // края поля, а не там, куда его увела бы граница из CONFIG.
+  return (Math.abs(x - px0) < 2 && Math.abs(w - (px1 - px0)) < 2)
+    || 'обрезка ' + Math.round(x) + '…' + Math.round(x + w) + ', поле ' + Math.round(px0) + '…' + Math.round(px1);
+}));
+
+await t('в рыночной сцене подпись равновесия тоже с индексом', async () => {
+  await page.evaluate(() => openPicker());
+  await clickUI('.scard[data-scene="sd"]');
+  await page.waitForTimeout(400);
+  return await page.evaluate(() => {
+    const raw = [...document.querySelectorAll('#chart text')].filter(t => {
+      const own = [...t.childNodes].filter(n => n.nodeType === 3).map(n => n.nodeValue).join('');
+      return /[*]/.test(own);
+    });
+    return !raw.length || 'сырых звёздочек: ' + raw.length;
+  });
 });
 
 console.log('\n' + checks.map(([s, n, d]) => `${s.padEnd(4)} ${n}${d ? '  → ' + d : ''}`).join('\n'));

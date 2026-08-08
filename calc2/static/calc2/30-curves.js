@@ -19,7 +19,7 @@ function curvePoints(curve) {
   // Считаем от видимого края, но не левее нуля: P = f(Q) для Q < 0 в экономике
   // смысла не имеет, а после панорамирования вправо незачем считать то,
   // что всё равно останется за кадром.
-  const lo = quadLo(CONFIG.Qmin), hi = CONFIG.Qmax;
+  const lo = quadLo(sx.domain()[0]), hi = sx.domain()[1];
   if (!(hi > lo)) return out;
   for (let i = 0; i <= N; i++) {
     const q = lo + (hi - lo) * i / N;
@@ -43,9 +43,9 @@ function curveAnchor(f, fromFrac, toFrac) {
   const to   = (toFrac   == null) ? 0.04 : toFrac;
   const N = 72;
   for (let i = 0; i <= N; i++) {
-    const q = CONFIG.Qmax * (from + (to - from) * i / N);
+    const q = sx.domain()[1] * (from + (to - from) * i / N);
     const v = f(q);
-    if (!isNaN(v) && v >= 0 && v <= CONFIG.Pmax) return { q, v };
+    if (!isNaN(v) && v >= 0 && v <= sy.domain()[1]) return { q, v };
   }
   return null;
 }

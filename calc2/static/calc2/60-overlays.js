@@ -308,6 +308,7 @@ function mainScales() {
 function drawOverlays() {
   if (!svg || !svg.node()) return;
   invalidateKeyTargets();    // особые точки считаются заново под новую картинку
+  if (typeof resetLabelBoxes === 'function') resetLabelBoxes();   // подписи расставляются заново
   applyAreaColors();         // свои цвета заливок — одним проходом по data-legend
   drawAreaCalc();            // посчитанная площадь (Фаза 10)
   drawAreaVerts();           // набранные вершины будущей площади
@@ -777,9 +778,13 @@ function drawRoller() {
   const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'roller').style('pointer-events', 'none');
   const px = mx(r.x), py = my(r.y);
-  g.append('line').attr('x1', mx(Math.max(0, CONFIG.Qmin))).attr('y1', py).attr('x2', px).attr('y2', py)
+  // Проекции ведём до самой оси, а если ноль ушёл за край окна — до края.
+  // Раньше начало брали из CONFIG, и в «Математике» отрезки начинались не там.
+  const [dx0, dx1] = mx.domain(), [dy0, dy1] = my.domain();
+  const xAxis = Math.max(dx0, Math.min(0, dx1)), yAxis = Math.max(dy0, Math.min(0, dy1));
+  g.append('line').attr('x1', mx(xAxis)).attr('y1', py).attr('x2', px).attr('y2', py)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', .55);
-  g.append('line').attr('x1', px).attr('y1', my(Math.max(0, CONFIG.Pmin))).attr('x2', px).attr('y2', py)
+  g.append('line').attr('x1', px).attr('y1', my(yAxis)).attr('x2', px).attr('y2', py)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', .55);
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5.5)
     .attr('fill', COL.halo).attr('stroke', r.color || COL.ink).attr('stroke-width', 2.4);
@@ -892,7 +897,8 @@ function rollerOff() {
 
 // Правый край кривой в первой четверти: где она уходит вниз за ось.
 function curveRightEdge(f) {
-  const lo = Math.max(0, CONFIG.Qmin), hi = CONFIG.Qmax;
+  const w = viewWindow();
+  const lo = Math.max(0, w.x0), hi = w.x1;
   const ok = (x) => { const y = f(x); return isFinite(y) && y >= 0; };
   if (!ok(lo)) return lo;
   const N = 400;
@@ -993,7 +999,7 @@ function calcAreaUnderCurve() {
   if (!t) return { error: 'Сначала постройте кривую и выберите её в списке.' };
   const num = (id) => { const e = document.getElementById(id); const v = e ? parseFloat(e.value) : NaN; return isFinite(v) ? v : null; };
   let a = num('ac-from'), b = num('ac-to');
-  if (a === null) a = Math.max(0, CONFIG.Qmin);
+  if (a === null) a = Math.max(0, viewWindow().x0);
   if (b === null) b = curveRightEdge(t.f);
   if (!(b > a)) return { error: 'Правая граница должна быть больше левой.' };
   const val = integrate((x) => { const y = t.f(x); return isFinite(y) ? Math.max(0, y) : 0; }, a, b);
@@ -1061,7 +1067,8 @@ function drawAreaCalc() {
       if (!t) return;
       const N = 160, pts = [];
       for (let i = 0; i <= N; i++) pts.push(r.a + (r.b - r.a) * i / N);
-      const ar = d3.area().x(d => mx(d)).y0(my(Math.max(0, CONFIG.Pmin)))
+      const yBase = Math.max(my.domain()[0], Math.min(0, my.domain()[1]));
+      const ar = d3.area().x(d => mx(d)).y0(my(yBase))
         .y1(d => my(Math.max(0, t.f(d) || 0)));
       g.append('path').datum(pts).attr('d', ar).attr('fill', color).attr('opacity', 0.2)
         .attr('data-legend', r.label);
@@ -1646,7 +1653,8 @@ function snapTargets() {
   // Изокванта задана уровнем выпуска, а не формулой K = f(L): её точки считает
   // общий движок касания уровня, по ним и катаемся.
   if (STATE.mode === 'costs' && STATE.costsSub === 'isoquant' && STATE.iso) {
-    const pts = traceLevelCurve(STATE.iso.f, STATE.iso.Q, CONFIG.Qmax, CONFIG.Pmax * 6, 220);
+    const s = mainScales();
+    const pts = traceLevelCurve(STATE.iso.f, STATE.iso.Q, s.mx.domain()[1], s.my.domain()[1] * 6, 220);
     if (pts && pts.length) out.push({ name: 'изокванта', f: (l) => interpY(pts, l) });
     return out;
   }
