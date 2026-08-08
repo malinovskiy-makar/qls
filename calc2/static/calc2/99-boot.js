@@ -11,6 +11,7 @@ function init() {
   console.log('calc2: D3', d3.version, '| Math.js загружен');
   refreshColors();   // наполнить карту цветов до первого рисования/добавления кривой
   relocateForScene();   // перенести блоки результатов в панель аналитики
+  cardifySections();    // панель ввода — список закрытых карточек
   wireControls();
   wireScene();          // полоса иконок, панели, меню плоскости, тема
   initSceneColorPickers();

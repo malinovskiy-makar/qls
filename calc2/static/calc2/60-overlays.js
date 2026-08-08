@@ -319,6 +319,7 @@ function drawOverlays() {
   syncAreaColorList();       // список областей с пикерами
   syncAreaCalcUI();          // выпадашка кривых и список точек для расчёта площади
   hintsToDots();             // подсказки, добавленные сценой, тоже уходят под вопросик
+  syncFirstCard();                                     // ярче та карточка, что сверху
   syncAnalyticsPanel();                                // разбор уезжает в свой блок
   renderMathIn(document.getElementById('sb-body'));    // формулы в аналитике
   renderMathIn(document.getElementById('ex-body'));    // и в объяснении модели
@@ -1041,6 +1042,10 @@ function wireFolds() {
     btn.addEventListener('click', () => {
       const open = body.classList.toggle('open');
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      // Раскрытая карточка меняет фон: видно, что это по-прежнему свой блок,
+      // а не продолжение ленты.
+      const card = btn.closest('.section, .side-part');
+      if (card) card.classList.toggle('open-card', open);
     });
   });
 }

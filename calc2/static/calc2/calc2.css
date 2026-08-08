@@ -930,6 +930,23 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .fold-body { display: none; padding-top: 4px; }
 .fold-body.open { display: block; }
 
+/* ── Карточки панели ввода (Фаза 5) ──────────────────────────────────
+   Каждая часть — отдельный блок с ярким заголовком. Закрытая карточка
+   спокойная, раскрытая меняет фон: видно, что это своя карточка, а не
+   продолжение ленты. Первая видимая — ярче остальных. */
+.tools-body > .section.card {
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+  background: var(--surface); margin-bottom: 7px; overflow: hidden;
+}
+.tools-body > .section.card:last-child { margin-bottom: 0; }
+.tools-body > .section.card > .fold-btn {
+  padding: 10px 11px; font-size: 13.5px; font-weight: 700; letter-spacing: -.01em;
+}
+.tools-body > .section.card > .fold-body { padding: 0 11px 11px; }
+.tools-body > .section.card.open-card { background: var(--surface-2); border-color: var(--border); }
+.tools-body > .section.card.first-card > .fold-btn { font-size: 14.5px; color: var(--accent); }
+.tools-body > .section.card.first-card { border-color: var(--accent-ring); }
+
 /* Список областей с пикерами цвета. */
 .ac-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
 .ac-name { font-size: 12px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

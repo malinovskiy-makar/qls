@@ -25,6 +25,9 @@ const errors = [];
 page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
 page.on('console', m => { if (m.type() === 'error') errors.push('CONSOLE: ' + m.text()); });
 
+// Действие, которое не проходит, должно падать быстро: иначе прогон из-за
+// пары сломанных проверок растягивается на десятки минут.
+page.setDefaultTimeout(12000);
 await page.setViewportSize({ width: 1280, height: 900 });
 await page.goto(`${BASE}/login/`, { waitUntil: 'networkidle', timeout: 30000 });
 await page.fill('#id_username', USER);
@@ -37,9 +40,38 @@ if (!ready) { console.error('SKIP: функции calc2 не загрузили�
 
 const checks = [];
 const t = async (name, fn) => {
-  try { const r = await fn(); checks.push([r === true ? 'OK' : 'FAIL', name, r === true ? '' : String(r)]); }
-  catch (e) { checks.push(['ERR', name, e.message]); }
+  // Пишем результат сразу: по обрыву прогона видно, на чём он встал.
+  let row;
+  const t0 = Date.now();
+  try { const r = await fn(); row = [r === true ? 'OK' : 'FAIL', name, r === true ? '' : String(r)]; }
+  catch (e) { row = ['ERR', name, e.message]; }
+  checks.push(row);
+  process.stdout.write(row[0].padEnd(4) + ' [' + (Date.now() - t0) + 'ms] ' + name + (row[2] ? '  -> ' + row[2].slice(0, 120) : '') + String.fromCharCode(10));
 };
+
+/* Панель ввода открывается со всеми свёрнутыми карточками, поэтому перед
+   настоящим щелчком нужно развернуть панель и все складные блоки над целью.
+   Щелчок из page.evaluate этого не требует: он проходит и по скрытому узлу. */
+const reveal = async (sel) => {
+  await page.evaluate((s) => {
+    if (typeof setToolsOpen === 'function') setToolsOpen(true);
+    const el = document.querySelector(s);
+    if (!el) return;
+    let n = el;
+    while (n && n !== document.body) {
+      if (n.classList && n.classList.contains('fold-body') && !n.classList.contains('open') && n.id) {
+        const btn = document.querySelector('[aria-controls="' + n.id + '"]');
+        if (btn) btn.click();
+      }
+      n = n.parentElement;
+    }
+    el.scrollIntoView({ block: 'center' });
+  }, sel);
+  await page.waitForTimeout(140);
+};
+const clickUI = async (sel, opts) => { await reveal(sel); return page.click(sel, opts); };
+const selectUI = async (sel, val) => { await reveal(sel); return page.selectOption(sel, val); };
+const fillUI = async (sel, val) => { await reveal(sel); return page.fill(sel, val); };
 
 await t('окно сценариев открыто', () => page.locator('#scene-picker').isVisible());
 await t('#sec-mode удалён', async () => (await page.locator('#sec-mode').count()) === 0 || 'ещё есть');
@@ -47,7 +79,7 @@ await t('#sec-scenes удалён', async () => (await page.locator('#sec-scenes
 await t('#sec-view есть', async () => (await page.locator('#sec-view').count()) === 1 || 'нет секции');
 
 // Входим в сцену «Спрос и предложение».
-await page.click('.scard[data-scene="sd"]');
+await clickUI('.scard[data-scene="sd"]');
 await page.waitForTimeout(400);
 
 await t('равновесие 50/50 не сломано', () => page.evaluate(() => {
@@ -86,16 +118,23 @@ await t('своя точка ставится и подписывается', as
 
 // Название кривой и имя точки правятся двойным щелчком прямо на графике.
 await t('двойной щелчок по имени точки открывает правку', async () => {
+  const dbg = (m) => process.stdout.write('    .. ' + m + String.fromCharCode(10));
+  dbg('before dblclick');
   await page.locator('#chart text', { hasText: 'Мой ориентир' }).first().dblclick();
+  dbg('after dblclick');
   await page.waitForTimeout(220);
   const n = await page.locator('#pt-rename').count();
+  dbg('count=' + n);
   const v = n ? await page.locator('#pt-rename').inputValue() : '';
   if (n) {
-    await page.fill('#pt-rename', 'Точка A');
+    await fillUI('#pt-rename', 'Точка A');
+    dbg('filled');
     await page.press('#pt-rename', 'Enter');
+    dbg('pressed');
     await page.waitForTimeout(220);
   }
   const saved = await page.evaluate(() => STATE.marks[0].text);
+  dbg('saved=' + saved);
   return (n === 1 && v === 'Мой ориентир' && saved === 'Точка A')
     || `полей ${n}, было «${v}», стало «${saved}»`;
 });
@@ -279,6 +318,7 @@ await t('формула показана набранной прямо в стр
 });
 
 await t('поле формулы можно править прямо в строке', async () => {
+  await reveal('#inp-formula');
   return await page.evaluate(() => {
     const inp = document.getElementById('inp-formula');
     if (!inp._mf) return true;                 // без MathLive правится обычный input
@@ -320,7 +360,7 @@ await t('уход фокуса из формулы не двигает кноп�
 
 await t('кривая добавляется настоящим щелчком по кнопке', async () => {
   await page.evaluate(() => { STATE.curves = []; renderCurveList(); redrawAll(); });
-  await page.selectOption('#new-role', '');
+  await selectUI('#new-role', '');
   await page.evaluate(() => setFieldValue(document.getElementById('inp-formula'), '100 - Q'));
   // Панель прокручиваемая и кнопка может оказаться за её краем, поэтому
   // воспроизводим последовательность браузера: нажатие, потеря фокуса, щелчок.
@@ -406,11 +446,15 @@ await t('структура рынка и вмешательство вложе�
 }));
 
 await t('заголовок верхнего уровня в панели один', () => page.evaluate(() => {
-  // Берём собственный текст заголовка: рядом с ним теперь стоит вопросик-подсказка,
-  // и его «?» попал бы в textContent.
+  // Заголовок секции стал складной кнопкой карточки (Фаза 5). Берём его
+  // собственный текст: рядом стоит вопросик-подсказка, и его «?» попал бы в
+  // textContent. Внутри «Что изучаем» заголовков верхнего уровня быть не должно.
   const own = (n) => [...n.childNodes].filter(x => x.nodeType === 3).map(x => x.nodeValue).join('').trim();
-  const titles = [...document.querySelectorAll('#sec-analysis .section-title')].map(own);
-  return (titles.length === 1 && titles[0] === 'Что изучаем') || titles.join('|');
+  const head = document.querySelector('#sec-analysis > .fold-btn > span');
+  const inner = document.querySelectorAll('#sec-analysis .section-title').length;
+  if (!head) return 'у секции нет складного заголовка';
+  if (own(head) !== 'Что изучаем') return 'заголовок: ' + own(head);
+  return inner === 0 || 'внутри ещё ' + inner + ' заголовков верхнего уровня';
 }));
 
 await t('вмешательство работает: налог t=20 даёт Q1=40', () => page.evaluate(() => {
@@ -515,7 +559,7 @@ await t('label чистится от посторонних символов', (
 
 await t('пунктирная кривая S+t попала в .tex при налоге', async () => {
   await page.evaluate(() => openPicker());
-  await page.click('.scard[data-scene="tax"]');
+  await clickUI('.scard[data-scene="tax"]');
   await page.waitForTimeout(300);
   return await page.evaluate(() => {
     const tex = buildTex('', '');
@@ -544,7 +588,7 @@ await t('.tex не пустой в любом режиме, не только р
   const thin = [];
   for (const s of scenes) {
     await page.evaluate(() => openPicker());
-    await page.click(`.scard[data-scene="${s}"]`);
+    await clickUI(`.scard[data-scene="${s}"]`);
     await page.waitForTimeout(260);
     const n = await page.evaluate(() => {
       const tex = buildTex('', '');
@@ -689,7 +733,7 @@ await t('нет ИИ-штампов в видимом тексте', () => page.
 /* --- Переименование ключевых точек прямо на графике --------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.evaluate(() => openPicker());
-await page.click('.scard[data-scene="m-optimum"]');
+await clickUI('.scard[data-scene="m-optimum"]');
 await page.waitForTimeout(420);
 
 // У подписи висит дочерний <title> с всплывающей подсказкой, поэтому всюду
@@ -713,7 +757,7 @@ await t('двойной щелчок по подписи открывает пе
 });
 
 await t('Enter сохраняет своё имя точки', async () => {
-  await page.fill('#pt-rename', 'Точка выхода');
+  await fillUI('#pt-rename', 'Точка выхода');
   await page.press('#pt-rename', 'Enter');
   await page.waitForTimeout(300);
   return await page.evaluate(() => {
@@ -735,7 +779,7 @@ await t('своё имя точки уходит в экспорт, подска
 await t('Esc отменяет переименование', async () => {
   await page.locator('#chart text', { hasText: 'перегиб' }).first().dblclick();
   await page.waitForTimeout(200);
-  await page.fill('#pt-rename', 'НЕ СОХРАНЯТЬ');
+  await fillUI('#pt-rename', 'НЕ СОХРАНЯТЬ');
   await page.press('#pt-rename', 'Escape');
   await page.waitForTimeout(260);
   return await page.evaluate(() =>
@@ -744,7 +788,7 @@ await t('Esc отменяет переименование', async () => {
 
 await t('смена сцены сбрасывает свои имена точек', async () => {
   await page.evaluate(() => openPicker());
-  await page.click('.scard[data-scene="m-tangent"]');
+  await clickUI('.scard[data-scene="m-tangent"]');
   await page.waitForTimeout(330);
   return await page.evaluate(() =>
     Object.keys(STATE.pointNames).length === 0 || JSON.stringify(STATE.pointNames));
@@ -753,14 +797,14 @@ await t('смена сцены сбрасывает свои имена точе
 /* --- Роль кривой спрашивается до формулы -------------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.evaluate(() => openPicker());
-await page.click('.scard[data-scene="free"]');
+await clickUI('.scard[data-scene="free"]');
 await page.waitForTimeout(320);
 
 await t('справка подстраивается под выбранную роль', async () => {
   const want = { '': 'PQ', demand: 'DEMAND', supply: 'SUPPLY', mc: 'MC', tc: 'TC', atc: 'ATC' };
   const bad = [];
   for (const role of Object.keys(want)) {
-    await page.selectOption('#new-role', role);
+    await selectUI('#new-role', role);
     await page.waitForTimeout(120);
     const k = await page.evaluate(() => curveHelpKind());
     if (k !== want[role]) bad.push(`${role || 'обычная'}: ${k}`);
@@ -769,11 +813,11 @@ await t('справка подстраивается под выбранную �
 });
 
 await t('для издержек форма «объём от цены» скрыта', async () => {
-  await page.selectOption('#new-role', 'mc');
+  await selectUI('#new-role', 'mc');
   await page.waitForTimeout(140);
   const hidden = await page.evaluate(() =>
     document.getElementById('curve-form-seg').style.display === 'none' && STATE.curveForm === 'PQ');
-  await page.selectOption('#new-role', 'demand');
+  await selectUI('#new-role', 'demand');
   await page.waitForTimeout(140);
   const shown = await page.evaluate(() =>
     document.getElementById('curve-form-seg').style.display !== 'none');
@@ -782,9 +826,9 @@ await t('для издержек форма «объём от цены» скр�
 
 await t('кривая добавляется сразу со своей ролью', async () => {
   await page.evaluate(() => { STATE.curves = []; renderCurveList(); redrawAll(); });
-  await page.selectOption('#new-role', 'mc');
+  await selectUI('#new-role', 'mc');
   await page.evaluate(() => setFieldValue(document.getElementById('inp-formula'), '20'));
-  await page.click('#btn-add-curve');
+  await clickUI('#btn-add-curve');
   await page.waitForTimeout(220);
   return await page.evaluate(() => {
     const c = STATE.curves[0];
@@ -810,7 +854,7 @@ await t('подсказка под полем называет именно эт
 /* --- Прилипание своих точек к кривым ----------------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.evaluate(() => openPicker());
-await page.click('.scard[data-scene="sd"]');   // D = 100 − Q, S = Q, равновесие (50; 50)
+await clickUI('.scard[data-scene="sd"]');   // D = 100 − Q, S = Q, равновесие (50; 50)
 await page.waitForTimeout(340);
 
 await t('щелчок рядом с кривой садится на кривую', () => page.evaluate(() => {
@@ -863,7 +907,7 @@ await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => 
 
 await t('легенда называет области в сцене налога', async () => {
   await page.evaluate(() => openPicker());
-  await page.click('.scard[data-scene="tax"]');
+  await clickUI('.scard[data-scene="tax"]');
   await page.waitForTimeout(350);
   const names = await page.evaluate(() => [...document.querySelectorAll('#chart .legend text')].map(t =>
       [...t.childNodes].filter(n => n.nodeType === 3).map(n => n.nodeValue).join('')));
@@ -888,7 +932,7 @@ await t('легенда собирается и в других режимах',
   const thin = [];
   for (const s of ['mono', 'labor', 'ppf', 'laffer', 'ext']) {
     await page.evaluate(() => openPicker());
-    await page.click(`.scard[data-scene="${s}"]`);
+    await clickUI(`.scard[data-scene="${s}"]`);
     await page.waitForTimeout(300);
     const n = await page.evaluate(() => document.querySelectorAll('#chart .legend text').length);
     if (n < 1) thin.push(s);
@@ -898,7 +942,7 @@ await t('легенда собирается и в других режимах',
 
 await t('легенда попадает в экспорт вместе с графиком', async () => {
   await page.evaluate(() => openPicker());
-  await page.click('.scard[data-scene="tax"]');
+  await clickUI('.scard[data-scene="tax"]');
   await page.waitForTimeout(330);
   return await page.evaluate(() => {
     const tex = buildTex('', '');
@@ -926,9 +970,9 @@ await t('легенда стоит выше поля графика, не пов
 /* --- Клавиатура и конструктор кусочной функции ------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.evaluate(() => openPicker());
-await page.click('.scard[data-scene="free"]');
+await clickUI('.scard[data-scene="free"]');
 await page.waitForTimeout(320);
-await page.click('#fh-formula');
+await clickUI('#fh-formula');
 await page.waitForTimeout(220);
 
 await t('в разделе функций есть всё нужное экономике', async () => {
@@ -1054,7 +1098,7 @@ await t('конструктор кусочной собирает верную �
     });
   });
   await page.waitForTimeout(220);
-  await page.click('#pw-apply');
+  await clickUI('#pw-apply');
   await page.waitForTimeout(220);
   return await page.evaluate(() => {
     const expr = document.getElementById('inp-formula').value;
@@ -1078,7 +1122,7 @@ await t('кусочная кривая строится движком', () => p
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.waitForTimeout(150);
 await page.evaluate(() => openPicker());
-await page.click('.scard[data-scene="sd"]');
+await clickUI('.scard[data-scene="sd"]');
 await page.waitForTimeout(320);
 
 await t('колесо к себе приближает график', async () => {
@@ -1109,7 +1153,7 @@ await t('двойной щелчок возвращает масштаб сце�
 
 await t('в математике окно тянется к курсору', async () => {
   await page.evaluate(() => openPicker());
-  await page.click('.scard[data-scene="m-optimum"]');
+  await clickUI('.scard[data-scene="m-optimum"]');
   await page.waitForTimeout(320);
   const b = await page.evaluate(() => [STATE.mathXmin, STATE.mathXmax]);
   await page.mouse.move(500, 400);
@@ -1124,7 +1168,7 @@ await t('в математике окно тянется к курсору', asy
 
 await t('авто-подгонка сцены не сбивает ручной зум', async () => {
   await page.evaluate(() => openPicker());
-  await page.click('.scard[data-scene="adas"]');
+  await clickUI('.scard[data-scene="adas"]');
   await page.waitForTimeout(360);
   await page.mouse.move(700, 450);
   await page.mouse.wheel(0, -400);
@@ -1138,7 +1182,7 @@ await t('авто-подгонка сцены не сбивает ручной �
 
 /* --- Правка формулы прямо в карточке кривой ---------------------------- */
 await page.evaluate(() => openPicker());
-await page.click('.scard[data-scene="sd"]');
+await clickUI('.scard[data-scene="sd"]');
 await page.waitForTimeout(320);
 await page.evaluate(() => setToolsOpen(true));
 await page.waitForTimeout(180);
@@ -1182,7 +1226,7 @@ await t('цвет из пикера доехал до кривой', () => page.
 
 /* --- Построение графиков: список функций растёт сам --------------------- */
 await page.evaluate(() => openPicker());
-await page.click('.scard[data-scene="m-graph"]');
+await clickUI('.scard[data-scene="m-graph"]');
 await page.waitForTimeout(400);
 await page.evaluate(() => setToolsOpen(true));
 await page.waitForTimeout(180);
@@ -1265,7 +1309,7 @@ await t('удаление строки убирает кривую', async () =>
 
 await t('в других сценах «Аналитика» вернулась', async () => {
   await page.evaluate(() => openPicker());
-  await page.click('.scard[data-scene="sd"]');
+  await clickUI('.scard[data-scene="sd"]');
   await page.waitForTimeout(340);
   return await page.evaluate(() => {
     const p = document.getElementById('params-panel');
@@ -1304,14 +1348,14 @@ await t('расчёты и разбор свёрнуты по умолчанию
 }));
 
 await t('блок «Ключевые значения» раскрывается щелчком', async () => {
-  await page.click('#sb-btn');
+  await clickUI('#sb-btn');
   await page.waitForTimeout(180);
   const r = await page.evaluate(() => {
     const box = document.getElementById('sb-fold');
     const txt = document.getElementById('sb-body').textContent;
     return { open: box.classList.contains('open'), len: txt.trim().length };
   });
-  await page.click('#sb-btn');
+  await clickUI('#sb-btn');
   return (r.open && r.len > 0) || JSON.stringify(r);
 });
 
@@ -1327,7 +1371,7 @@ await t('панели левая и правая одной ширины', async
 
 await t('разбор уезжает из расчётов в «Объяснение модели»', async () => {
   await page.evaluate(() => openPicker());
-  await page.click('.scard[data-scene="ppf"]');
+  await clickUI('.scard[data-scene="ppf"]');
   await page.waitForTimeout(420);
   return await page.evaluate(() => {
     const sb = document.getElementById('sb-body'), ex = document.getElementById('ex-body');
@@ -1336,6 +1380,49 @@ await t('разбор уезжает из расчётов в «Объяснен
     if (/Как это получилось/.test(ex.textContent)) return 'внутренний заголовок не снят';
     return document.getElementById('explain').classList.contains('hidden') ? 'блок разбора спрятан' : true;
   });
+});
+
+/* ── Фаза 5. Панель ввода — список карточек ───────────────────────────
+   Все блоки закрыты, у каждого свой заголовок, раскрытый меняет фон,
+   первая видимая карточка выделена. */
+await t('все карточки панели ввода закрыты', async () => {
+  await page.evaluate(() => openPicker());
+  await clickUI('.scard[data-scene="sd"]');
+  await page.waitForTimeout(340);
+  await page.evaluate(() => setToolsOpen(true));
+  await page.waitForTimeout(200);
+  return await page.evaluate(() => {
+    const bad = [];
+    document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
+      const btn = sec.querySelector(':scope > .fold-btn');
+      if (!btn) { bad.push((sec.id || '?') + ': нет заголовка'); return; }
+      if (btn.getAttribute('aria-expanded') !== 'false') bad.push((sec.id || '?') + ': раскрыт');
+      if (!(btn.querySelector('span') || {}).textContent) bad.push((sec.id || '?') + ': заголовок пуст');
+    });
+    return !bad.length || bad.join('; ');
+  });
+});
+
+await t('первая видимая карточка выделена одна', () => page.evaluate(() => {
+  const all = [...document.querySelectorAll('#tools-panel .tools-body > .section')];
+  const marked = all.filter(s => s.classList.contains('first-card'));
+  const firstVisible = all.find(s => s.style.display !== 'none');
+  return (marked.length === 1 && marked[0] === firstVisible)
+    || 'выделено ' + marked.length + ', первая видимая ' + (firstVisible ? firstVisible.id : 'нет');
+}));
+
+await t('раскрытая карточка отличается фоном', async () => {
+  await clickUI('#sec-curves > .fold-btn');
+  await page.waitForTimeout(180);
+  const r = await page.evaluate(() => {
+    const sec = document.getElementById('sec-curves');
+    const body = sec.querySelector(':scope > .fold-body');
+    return { open: body.classList.contains('open'), card: sec.classList.contains('open-card'),
+             bg: getComputedStyle(sec).backgroundColor };
+  });
+  await page.evaluate(() => document.querySelector('#sec-curves > .fold-btn').click());
+  const closed = await page.evaluate(() => getComputedStyle(document.getElementById('sec-curves')).backgroundColor);
+  return (r.open && r.card && r.bg !== closed) || JSON.stringify(r) + ' закрытая ' + closed;
 });
 
 console.log('\n' + checks.map(([s, n, d]) => `${s.padEnd(4)} ${n}${d ? '  → ' + d : ''}`).join('\n'));

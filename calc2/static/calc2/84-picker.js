@@ -265,6 +265,7 @@ function pickScene(key) {
   if (nm) nm.textContent = SCENE_NAMES[key] || 'Сцена';
   const bl = document.getElementById('scene-block');
   if (bl) bl.textContent = sceneBlockLabel(key);
+  if (typeof collapseCards === 'function') collapseCards();   // новая сцена — все карточки закрыты
   if (typeof updatePult === 'function') updatePult();   // показать/спрятать пульт под выбранную сцену
   // Меньше загромождения: пресетные сцены открываются со свёрнутыми «Инструментами»
   // (разворачиваются иконкой-ползунками в доке). «Свободный холст» — развёрнуты сразу:

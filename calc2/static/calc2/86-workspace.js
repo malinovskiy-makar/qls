@@ -143,6 +143,85 @@ function syncAnalyticsPanel() {
   if (panel) panel.classList.toggle('empty', !(hasKnobs || hasValues || hasExplain));
 }
 
+/* ── Панель ввода: список карточек (Фаза 5) ──────────────────────────
+   Раньше в панели вперемешку жили три разных вида блока: складные секции,
+   нескладные подзаголовки и безымянные куски. Отличались они только кеглем,
+   поэтому панель читалась сплошной лентой. Теперь каждая смысловая часть —
+   своя карточка с ярким заголовком, и все они закрыты: сцена открывается
+   спокойной, а нужное разворачивается щелчком.
+
+   Заголовки превращаются в складные кнопки одним проходом, поэтому новая
+   секция получает карточку бесплатно, без единой строчки в разметке. */
+const FOLD_CHEVRON = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+  ' stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+
+// Имена для секций, у которых своего заголовка в разметке нет.
+const SECTION_NAMES = {
+  'sec-costs': 'Фирма',
+  'sec-labor': 'Рынок труда',
+  'sec-inequality': 'Неравенство доходов',
+  'sec-consumer': 'Выбор потребителя',
+  'sec-ppf': 'КПВ и торговля',
+  'sec-macro': 'Макроэкономика',
+  'sec-math': 'Математика',
+};
+
+function cardifySections() {
+  document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
+    if (sec._card) return;
+    sec._card = true;
+    sec.classList.add('card');
+    const had = sec.querySelector(':scope > .fold-btn');
+    if (had) {                                   // складной заголовок уже был
+      had.setAttribute('aria-expanded', 'false');
+      const box = document.getElementById(had.getAttribute('aria-controls'));
+      if (box) box.classList.remove('open');
+      sec.classList.remove('open-card');
+      return;
+    }
+    const title = sec.querySelector(':scope > .section-title');
+    const name = (title ? title.textContent.trim() : '') || SECTION_NAMES[sec.id] || 'Настройки';
+    const bodyId = (sec.id || 'sec') + '-fold';
+    const btn = document.createElement('button');
+    btn.className = 'fold-btn';
+    btn.type = 'button';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', bodyId);
+    btn.innerHTML = '<span></span>' + FOLD_CHEVRON;
+    btn.querySelector('span').textContent = name;
+    const body = document.createElement('div');
+    body.className = 'fold-body';
+    body.id = bodyId;
+    if (title) title.remove();
+    while (sec.firstChild) body.appendChild(sec.firstChild);
+    sec.appendChild(btn);
+    sec.appendChild(body);
+  });
+  wireFolds();
+  syncFirstCard();
+}
+
+// Новая сцена открывается со всеми закрытыми карточками: что было развёрнуто
+// в прошлом сюжете, к новому отношения не имеет.
+function collapseCards() {
+  document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
+    const btn = sec.querySelector(':scope > .fold-btn');
+    const box = sec.querySelector(':scope > .fold-body');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    if (box) box.classList.remove('open');
+    sec.classList.remove('open-card');
+  });
+}
+
+/* Первая видимая карточка ярче остальных: сцена открывается со всеми
+   закрытыми блоками, и глаз должен сразу видеть, куда нажимать. */
+function syncFirstCard() {
+  const all = document.querySelectorAll('#tools-panel .tools-body > .section');
+  let first = null;
+  all.forEach(s => { if (!first && s.style.display !== 'none') first = s; });
+  all.forEach(s => s.classList.toggle('first-card', s === first));
+}
+
 function wireScene() {
   const tools = document.getElementById('tools-panel');
   const params = document.getElementById('params-panel');
