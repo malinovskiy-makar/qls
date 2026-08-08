@@ -177,6 +177,33 @@ function drawGrid(mx, my, parent) {
   });
 }
 
+/* Дополнительное деление на оси (Фаза 8). Важная координата не всегда попадает
+   на «красивый» шаг, а подпись вида «Xмакс=100» прямо на поле только мешает и
+   налезает на соседнее число. Ставим на самой оси ещё одно деление с числом.
+   Если такое число на оси уже есть, ничего не рисуем. */
+function extraTickX(g, v, color) {
+  if (!isFinite(v)) return;
+  const [lo, hi] = sx.domain();
+  if (v < lo || v > hi) return;
+  const span = Math.abs(hi - lo);
+  if (xTicks().some(t => Math.abs(t - v) < span * 0.025)) return;
+  const oy = sy(0);
+  g.append('line').attr('x1', sx(v)).attr('y1', oy - 4).attr('x2', sx(v)).attr('y2', oy + 4)
+    .attr('stroke', color || COL.ink).attr('stroke-width', 1.4);
+  haloText(g, sx(v), oy + 8, fmt(v), 'middle', 'hanging');
+}
+function extraTickY(g, v, color) {
+  if (!isFinite(v)) return;
+  const [lo, hi] = sy.domain();
+  if (v < lo || v > hi) return;
+  const span = Math.abs(hi - lo);
+  if (yTicks().some(t => Math.abs(t - v) < span * 0.025)) return;
+  const ox = sx(0);
+  g.append('line').attr('x1', ox - 4).attr('y1', sy(v)).attr('x2', ox + 4).attr('y2', sy(v))
+    .attr('stroke', color || COL.ink).attr('stroke-width', 1.4);
+  haloText(g, ox - 8, sy(v), fmt(v), 'end', 'middle');
+}
+
 // Оси со стрелками, делениями, числами и подписями.
 // Подписи параметризованы: по умолчанию Q/P (рынок, издержки), для КПВ — X/Y.
 // Ось нарисована ровно там, где ноль. Уехал ноль за край при панорамировании —

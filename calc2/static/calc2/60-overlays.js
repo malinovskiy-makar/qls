@@ -756,6 +756,21 @@ function drawCrossPoints() {
    точка выскакивала от одного движения мыши в радиусе 90 пикселей и мешала
    попадать по всему остальному. Чтобы точка осталась насовсем, есть кнопка
    «Поставить точку». */
+/* Подпись, которая всплывает только при наведении на точку (Фаза 8). Тот же
+   приём, что у ключевых точек: подпись живёт в своей группе со display:none,
+   наведение меняет ТОЛЬКО её. Звать redrawAll из обработчика наведения нельзя:
+   он снесёт кружок вместе с обработчиком, pointerleave с удалённого узла не
+   придёт, и подпись останется гореть навсегда — эта ошибка уже была. */
+function hoverLabel(g, dot, x, y, text, anchor, baseline) {
+  const lab = g.append('g').attr('class', 'hover-label').style('display', 'none');
+  haloText(lab, x, y, text, anchor || 'start', baseline || 'auto');
+  dot.style('cursor', 'pointer')
+     .on('pointerenter', () => lab.style('display', null))
+     .on('pointerleave', () => lab.style('display', 'none'));
+  dot.append('title').text(text);
+  return lab;
+}
+
 function drawRoller() {
   const r = STATE.roller;
   if (!r) return;

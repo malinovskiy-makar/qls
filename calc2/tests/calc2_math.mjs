@@ -1202,6 +1202,30 @@ const CASES = [
              ['максимум x', 'xmax', -1, 0.02], ['максимум y', 'ymax', 2, 0.02],
              ['минимум x', 'xmin', 1, 0.02], ['минимум y', 'ymin', -2, 0.02]],
   },
+  {
+    // Автарктические цены 1 и 2: мировая обязана лежать между ними. Раньше
+    // введённая девятка молча обрезалась до предела ползунка и рисовалась
+    // состоявшаяся торговля.
+    name: 'Торговля Б · цена вне промежутка не обрезается и торговли нет',
+    run: `pickScene('trade'); setTradeScenario('B');
+          STATE.tbF1 = '100 - X'; STATE.tbF2 = '100 - 2*X';
+          STATE.tbManualPrice = null; redrawAll();
+          var d0 = STATE.tradeBData || {};
+          STATE.tbManualPrice = 9; redrawAll();
+          var d1 = STATE.tradeBData || {};
+          var sl = document.getElementById('tb-price-slider');
+          var res = { lo: d0.priceMin, hi: d0.priceMax, eq: d0.Pw,
+                      slLo: parseFloat(sl.min), slHi: parseFloat(sl.max),
+                      pw: d1.Pw, noTrade: d1.noTrade ? 1 : 0,
+                      msg: /между 1 и 2/.test(d1.noTradeMsg || '') ? 1 : 0 };
+          STATE.tbManualPrice = null; redrawAll();
+          return res;`,
+    checks: [['нижняя граница', 'lo', 1, 0.001], ['верхняя граница', 'hi', 2, 0.001],
+             ['равновесная', 'eq', 1.41421, 0.001],
+             ['ползунок от', 'slLo', 1, 0.001], ['ползунок до', 'slHi', 2, 0.001],
+             ['цена не обрезана', 'pw', 9, 0.001],
+             ['торговли нет', 'noTrade', 1, 0], ['промежуток назван', 'msg', 1, 0]],
+  },
 ];
 
 function approx(got, want, tol) {

@@ -1540,6 +1540,52 @@ await t('надписи «Пока нет своих точек» нет', () =>
   !/Пока нет своих точек/.test(document.getElementById('mark-list').textContent)
   || 'надпись на месте'));
 
+/* ── Фаза 8. Сцены КТВ ────────────────────────────────────────────────
+   На графике нет подписей вида «Xмакс=», «производство» всплывает по
+   наведению, регулятор мировой цены собран в одном месте. */
+await t('на графике КТВ нет подписей вида «Xмакс=»', async () => {
+  await page.evaluate(() => openPicker());
+  await clickUI('.scard[data-scene="tradeprice"]');
+  await page.waitForTimeout(420);
+  return await page.evaluate(() => {
+    setTradeScenario('A'); redrawAll();
+    const bad = [...document.querySelectorAll('#chart text')]
+      .map(n => n.textContent).filter(t => /макс\s*=|п\s*=/.test(t));
+    return !bad.length || 'остались: ' + bad.join(', ');
+  });
+});
+
+await t('«производство» спрятано и всплывает по наведению', () => page.evaluate(() => {
+  const lab = [...document.querySelectorAll('#chart .hover-label')]
+    .filter(g => /производство/.test(g.textContent))[0];
+  if (!lab) return 'подписи «производство» нет вовсе';
+  return getComputedStyle(lab).display === 'none' || 'подпись видна сразу';
+}));
+
+await t('регулятор мировой цены собран в правой панели', async () => {
+  await page.evaluate(() => { setTradeScenario('B'); redrawAll(); });
+  await page.waitForTimeout(260);
+  return await page.evaluate(() => {
+    const f = document.getElementById('tb-price-field');
+    if (!f) return 'поля цены нет';
+    if (!f.querySelector('#tb-price-slider')) return 'ползунка нет в поле';
+    if (!f.querySelector('#inp-tb-price')) return 'точного поля нет рядом';
+    return !!f.closest('#params-body') || 'поле не в правой панели';
+  });
+});
+
+await t('ползунок и точное поле мировой цены синхронны', async () => {
+  await page.evaluate(() => {
+    const sl = document.getElementById('tb-price-slider');
+    sl.value = '1.8';
+    sl.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(300);
+  const v = await page.evaluate(() => parseFloat(document.getElementById('inp-tb-price').value));
+  await page.evaluate(() => { STATE.tbManualPrice = null; redrawAll(); });
+  return Math.abs(v - 1.8) < 0.06 || 'в поле ' + v;
+});
+
 console.log('\n' + checks.map(([s, n, d]) => `${s.padEnd(4)} ${n}${d ? '  → ' + d : ''}`).join('\n'));
 const bad = checks.filter(c => c[0] !== 'OK').length;
 if (errors.length) console.log('\nОшибки страницы:\n' + errors.slice(0, 10).join('\n'));

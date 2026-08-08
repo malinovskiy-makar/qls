@@ -1567,11 +1567,8 @@
           </div>
           <!-- Задача 2: мировая цена — ползунок (основное управление) + синхронное поле. -->
           <div class="field" id="ppft-price-field" style="margin-top:8px;">
-            <label>Мировая цена Px/Py = <b id="ppft-price-val">2</b></label>
+            <label for="inp-ppft-price">Мировая цена Px/Py = <b id="ppft-price-val">2</b></label>
             <input type="range" id="ppft-price-slider" min="0.1" max="4" step="0.01" value="2">
-          </div>
-          <div class="field">
-            <label>Px/Py (точное значение)</label>
             <input type="number" id="inp-ppft-price" min="0.1" step="0.05" value="2">
           </div>
           <button class="btn" id="btn-ppft-apply">Построить КТВ</button>
@@ -1594,14 +1591,11 @@
           <button class="btn" id="btn-tb-apply">Построить торговлю</button>
           <!-- Задача 2: своя мировая цена — ползунок + синхронное поле + сброс к равновесной. -->
           <div class="field" id="tb-price-field" style="margin-top:8px;">
-            <label>Мировая цена Pw = <b id="tb-price-val">не найдена</b></label>
+            <label for="inp-tb-price">Мировая цена Pw = <b id="tb-price-val">не найдена</b></label>
             <input type="range" id="tb-price-slider" min="0.1" max="4" step="0.01" value="1.41">
-          </div>
-          <div class="field">
-            <label>Pw (точное значение)</label>
             <input type="number" id="inp-tb-price" min="0.1" step="0.05" placeholder="равновесная (авто)">
+            <button class="btn-sm" id="btn-tb-reset">Сбросить к равновесной</button>
           </div>
-          <button class="btn-sm" id="btn-tb-reset" style="margin-top:2px;">Сбросить к равновесной</button>
           <div class="hint">Линейные КПВ. Автарктическая цена X каждой страны равна наклону её КПВ.
             Мировая цена Pw устанавливается МЕЖДУ автарктическими (эндогенно). Страна с меньшими
             альт. издержками X специализируется на X и экспортирует его, другая на Y. Линии

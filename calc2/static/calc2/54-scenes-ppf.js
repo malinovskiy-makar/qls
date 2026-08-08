@@ -1123,18 +1123,19 @@ function drawPpfTradeMarks(d) {
     const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
       .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     dash(px, py, px, oy); dash(px, py, ox, py);
-    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 2);
-    g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('производство');
-    // Индекс «п» — производство, «макс» — предел потребления. Нулевую координату
-    // не подписываем: в начале координат уже стоит ноль оси, и «Y=0» читалось
-    // как непонятный «y0» (Фаза 14.5).
-    if (Math.abs(d.xp) > 1e-9) haloText(g, px, oy + 8, 'Xп=' + fmt(d.xp), 'middle', 'hanging');
-    if (Math.abs(d.yp) > 1e-9) haloText(g, ox - 8, py, 'Yп=' + fmt(d.yp), 'end', 'middle');
+    const dot = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5)
+      .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 2);
+    // Слово «производство» висело на графике всегда и загораживало кривую.
+    // Теперь всплывает при наведении на саму точку.
+    hoverLabel(g, dot, px + 8, py - 8, 'производство');
+    // Координаты точки производства и пределы потребления — обычными делениями
+    // на осях. Подписи вида «Xмакс=100» налезали на соседние числа оси.
+    if (Math.abs(d.xp) > 1e-9) extraTickX(g, d.xp);
+    if (Math.abs(d.yp) > 1e-9) extraTickY(g, d.yp);
   }
   if (d.line) {
-    haloText(g, ox - 8, sy(d.yint), 'Yмакс=' + fmt(d.yint), 'end', 'middle');
-    haloText(g, sx(d.xint), oy + 8, 'Xмакс=' + fmt(d.xint), 'middle', 'hanging');
+    extraTickY(g, d.yint, COL.S);
+    extraTickX(g, d.xint, COL.S);
   }
 }
 
@@ -1260,20 +1261,24 @@ function recomputeTradeB() {
   const lowCo = lowIs1 ? co1 : co2, highCo = lowIs1 ? co2 : co1;
   const bL = lowCo.b, bH = highCo.b;
   const Pweq = Math.sqrt(bL * bH);                     // равновесная (эндогенная) мировая цена в (bL, bH)
-  // Задача 2: зажать мировую цену в [0.1, 2×макс. автарктической] — страховка от «улёта».
-  const priceMin = 0.1, priceMax = 2 * Math.max(b1, b2);
-  // Своя цена (ручной ввод / ползунок) или равновесная.
+  /* Границы регулятора — сам экономически допустимый промежуток (Фаза 8).
+     Раньше ползунок ходил по [0.1, 2×макс. автарктической], а введённое вручную
+     число молча обрезалось до этого предела: набрал 9 при автарктических 1 и 2,
+     получил 4 и картинку состоявшейся торговли. Теперь ползунок не выпускает
+     за интервал, а введённое вручную число остаётся как есть и получает
+     объяснение вместо тихой подмены. */
+  const priceMin = bL, priceMax = bH;
   let manual = (STATE.tbManualPrice != null && STATE.tbManualPrice > 0);
-  if (manual) {
-    const clamped = Math.max(priceMin, Math.min(priceMax, STATE.tbManualPrice));
-    STATE.tbManualPrice = Math.round(clamped * 1000) / 1000;
-  }
   const Pw = manual ? STATE.tbManualPrice : Pweq;
   const inInterval = (Pw > bL + 1e-9 && Pw < bH - 1e-9);
-  // Подсветка нерыночной цены: вне интервала автаркических — одной стране торговать невыгодно.
+  // Цена вне интервала: одной из стран выгоднее автаркия, обмена не будет.
   let noTradeMsg = null;
-  if (Pw <= bL + 1e-9) noTradeMsg = 'При этой цене страна ' + lowCo.idx + ' не торгует: Pw ≤ её автаркической цены ' + fmt(bL) + '.';
-  else if (Pw >= bH - 1e-9) noTradeMsg = 'При этой цене страна ' + highCo.idx + ' не торгует: Pw ≥ её автаркической цены ' + fmt(bH) + '.';
+  if (!inInterval) {
+    const who = (Pw <= bL + 1e-9) ? lowCo.idx : highCo.idx;
+    noTradeMsg = 'Цена ' + fmt(Pw) + ' лежит вне промежутка: она обязана быть между ' +
+      fmt(bL) + ' и ' + fmt(bH) + '. При такой цене стране ' + who +
+      ' выгоднее автаркия, торговать она не станет, поэтому обмена нет.';
+  }
   // Специализация (углы линейной КПВ): низкая страна → весь X, высокая → весь Y.
   lowCo.prod = [lowCo.c.Xmax, 0]; lowCo.exports = 'X';
   highCo.prod = [0, highCo.c.Ymax]; highCo.exports = 'Y';
@@ -1312,7 +1317,7 @@ function recomputeTradeB() {
     shift: [S_H / Pw, -S_H],
   };
 
-  STATE.tradeBData = { ok: true, Pw, Pweq, manual, inInterval, noTradeMsg, priceMin, priceMax,
+  STATE.tradeBData = { ok: true, Pw, Pweq, manual, inInterval, noTrade: !inInterval, noTradeMsg, priceMin, priceMax,
     bL, bH, b1, b2, co1, co2, lowIdx: lowCo.idx, highIdx: highCo.idx,
     lowCo, highCo, Ymax_H, Xmax_L, E_L, S_H };
   const xm = Math.max(c1.Xmax, c2.Xmax, lowCo.cpf.xint, highCo.cpf.xint);
@@ -1399,14 +1404,17 @@ function drawTradeB(d) {
     // КПВ и КТВ обе сплошные (Фаза 15.4): пунктир читался как «ненастоящая».
     g.append('path').datum(co.ppts).attr('fill', 'none')
       .attr('stroke', co.color).attr('stroke-width', 2.2).attr('d', line);
-    g.append('path').datum(tradeCpfPoints(co)).attr('fill', 'none')
+    // Торговли нет — нет и линии возможностей: рисовать её значило бы показывать
+    // обмен, которого при такой цене не будет.
+    if (!d.noTrade) g.append('path').datum(tradeCpfPoints(co)).attr('fill', 'none')
       .attr('stroke', COL.reg).attr('stroke-width', 2.2).attr('d', line);
 
     // Точка производства и точка предела торговли.
+    if (d.noTrade) return;      // дальше только про состоявшийся обмен
     const pp = [p.mx(co.prod[0]), p.my(co.prod[1])];
-    g.append('circle').attr('cx', pp[0]).attr('cy', pp[1]).attr('r', 5)
+    const pdot = g.append('circle').attr('cx', pp[0]).attr('cy', pp[1]).attr('r', 5)
       .attr('fill', co.color).attr('stroke', COL.halo).attr('stroke-width', 2);
-    haloText(g, pp[0] + 8, pp[1] + (co.prod[1] > 0 ? -8 : 16), 'производство', 'start', 'auto');
+    hoverLabel(g, pdot, pp[0] + 8, pp[1] + (co.prod[1] > 0 ? -8 : 16), 'производство');
 
     if (co.limit.binding) {
       const kp = [p.mx(co.limit.kink[0]), p.my(co.limit.kink[1])];
@@ -1505,9 +1513,11 @@ function syncTbPriceUI(d) {
         num = document.getElementById('inp-tb-price'),
         val = document.getElementById('tb-price-val');
   if (!d || !d.ok) return;
-  if (sl) { sl.min = d.priceMin; sl.max = d.priceMax; sl.value = d.Pw; }
-  if (num) { num.min = d.priceMin; num.max = d.priceMax; if (d.manual) num.value = d.Pw; else num.value = ''; }
-  if (val) val.textContent = fmt(d.Pw);
+  // Ползунок ходит только по допустимому промежутку, поле принимает любое
+  // число: набранное вручную не подменяем, а объясняем (см. recomputeTradeB).
+  if (sl) { sl.min = d.priceMin; sl.max = d.priceMax; sl.step = Math.max((d.priceMax - d.priceMin) / 200, 0.001); sl.value = Math.max(d.priceMin, Math.min(d.priceMax, d.Pw)); }
+  if (num) { num.removeAttribute('max'); num.min = 0; if (d.manual) num.value = d.Pw; else num.value = ''; }
+  if (val) val.textContent = fmt(d.Pw) + (d.inInterval ? '' : ' (вне промежутка)');
 }
 
 // Полная перерисовка сценария Б.
