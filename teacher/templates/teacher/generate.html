@@ -29,7 +29,10 @@ textarea.gen-text { width: 100%; box-sizing: border-box; min-height: 110px;
 textarea.gen-text:focus { border-color: var(--accent); }
 .gen-params { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
 .gen-params .form-group { margin-bottom: 0; min-width: 120px; }
-.plan-row { display: grid; grid-template-columns: auto 1fr 90px 90px;
+/* Подписи полей строки плана: два голых числа читались загадкой. */
+.plan-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.plan-cap { font-size: 11px; color: var(--text3); white-space: nowrap; }
+.plan-row { display: grid; grid-template-columns: auto 1fr 110px 110px;
             gap: 10px; align-items: center; padding: 10px 0;
             border-bottom: 1px solid var(--border-soft); }
 .plan-row:last-of-type { border-bottom: none; }
@@ -70,7 +73,8 @@ textarea.gen-text:focus { border-color: var(--accent); }
 .pf-name { font-weight: 600; }
 .pf-topics { color: var(--text2); font-size: 12px; }
 .pf-none { color: var(--text2); font-style: italic; }
-.conf { font-size: 11px; font-weight: 700; text-transform: uppercase;
+/* Капслоком не кричим: пометка уверенности — уточнение, а не тревога. */
+.conf { font-size: 11px; font-weight: 600;
   letter-spacing: .04em; padding: 2px 8px; border-radius: 999px;
   white-space: nowrap; }
 .conf-exact { background: var(--green-tint); color: var(--green); }
@@ -241,19 +245,40 @@ textarea.gen-text:focus { border-color: var(--accent); }
       к модели это не стоит.
     </div>
     {% if note %}<div class="gen-note">{{ note }}</div>{% endif %}
+    {% comment %}
+    Честная подпись — один раз на список. Та же, что на первом шаге:
+    сложность это предпочтение, а «сколько задач» — точное число.
+    {% endcomment %}
+    <div class="k-hint" style="margin-bottom:10px">
+      «Сколько задач» — точное число. «Сложность» — предпочтение, а не
+      жёсткий отбор: задачи другой сложности встанут ниже, но могут попасть.
+    </div>
 
     {% for preview in previews %}
     <div class="plan-block">
+      {% comment %}
+      ⚠️ ОБА ПОЛЯ ПОДПИСАНЫ. Раньше под строкой стояли два голых числа, и
+      что они значат, понять было нельзя — подпись жила только в подсказке
+      при наведении, которой на телефоне нет вовсе. Владелец так и спросил:
+      зачем их два и чем они отличаются.
+      {% endcomment %}
       <div class="plan-row">
-        <label class="checkbox-label" style="height:auto;">
+        <label class="k-check" style="height:auto;">
           <input type="checkbox" name="row_keep" value="{{ forloop.counter0 }}" checked>
         </label>
-        <input class="q" type="text" name="row_query" value="{{ preview.row.query }}"
+        <input class="q k-input" type="text" name="row_query"
+               value="{{ preview.row.query }}"
                placeholder="о чём должны быть задачи">
-        <input type="number" name="row_difficulty" min="1" max="5"
-               value="{{ preview.row.difficulty }}" title="сложность">
-        <input type="number" name="row_count" min="1" max="30"
-               value="{{ preview.row.count }}" title="сколько задач">
+        <label class="plan-field">
+          <span class="plan-cap">сложность</span>
+          <input class="k-input" type="number" name="row_difficulty" min="1" max="5"
+                 value="{{ preview.row.difficulty }}">
+        </label>
+        <label class="plan-field">
+          <span class="plan-cap">сколько задач</span>
+          <input class="k-input" type="number" name="row_count" min="1" max="30"
+                 value="{{ preview.row.count }}">
+        </label>
         <input type="hidden" name="row_label" value="{{ preview.row.label }}">
         <input type="hidden" name="row_topic" value="{{ preview.row.topic }}">
       </div>
@@ -277,10 +302,10 @@ textarea.gen-text:focus { border-color: var(--accent); }
     {% endfor %}
 
     <div class="gen-actions">
-      <button type="submit" class="filter-btn" name="action" value="search">
+      <button type="submit" class="k-btn k-btn--main" name="action" value="search">
         Подобрать задачи
       </button>
-      <button type="submit" class="btn-preview" name="action" value="research">
+      <button type="submit" class="k-btn k-btn--plain" name="action" value="research">
         Переискать по моим формулировкам
       </button>
       <a href="{% url 'teacher:assignment_generate' %}" class="reset-link">✕ Начать заново</a>
@@ -350,11 +375,12 @@ textarea.gen-text:focus { border-color: var(--accent); }
   {% endfor %}
 
   <div class="gen-actions">
-    <button type="button" class="filter-btn" id="to-cart">
-      Отправить в конструктор домашки
+    <button type="button" class="k-btn k-btn--main" id="to-cart"
+            data-manual-order="{% if manual_order %}1{% else %}0{% endif %}">
+      Отправить в конструктор {% if is_exam %}контрольной{% else %}домашки{% endif %}
     </button>
-    <button type="button" class="btn-preview" id="again">Подобрать другие</button>
-    <a href="{% url 'teacher:assignment_generate' %}" class="reset-link">✕ Начать заново</a>
+    <button type="button" class="k-btn k-btn--plain" id="again">Подобрать другие</button>
+    <a href="{% url 'teacher:assignment_generate' %}" class="k-btn k-btn--quiet">Начать заново</a>
   </div>
 </div>
 {% endif %}
@@ -382,6 +408,14 @@ textarea.gen-text:focus { border-color: var(--accent); }
     var cart = {};
     try { cart = JSON.parse(sessionStorage.getItem('hw_cart') || '{}'); }
     catch (e) { cart = {}; }
+    // ⚠️ Признак «порядок задан вручную» едет вместе с корзиной. Если
+    // репетитор в описании расставил порядок («вторая задача — тест»),
+    // автоматическая перестановка «сначала тесты» отменяется (правило
+    // фазы 4): он расставлял по смыслу урока, а мы — по формальному признаку.
+    try {
+      sessionStorage.setItem('hw_manual_order',
+                             toCart.dataset.manualOrder === '1' ? '1' : '');
+    } catch (e) {}
     var added = 0;
     document.querySelectorAll('.gen-pick').forEach(function (box) {
       if (!box.checked) { return; }

@@ -23,6 +23,11 @@
     <form method="post" id="picker-form" action="">
       {% csrf_token %}
       <input type="hidden" name="problem_ids" id="problem-ids-input">
+      {% comment %}
+      Признак «порядок задан вручную» приезжает из подбора по описанию
+      (фаза 18.5) и отменяет перестановку «сначала тесты, потом задачи».
+      {% endcomment %}
+      <input type="hidden" name="manual_order" id="manual-order-input">
 
       <div class="sidebar-card">
         <div class="sidebar-title">Настройки домашки</div>

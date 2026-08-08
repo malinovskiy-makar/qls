@@ -711,6 +711,10 @@ def assignment_create(request):
             # Если выбрано несколько групп — берём первую, остальные всё
             # равно получают домашку через список учеников.
             group=groups[0] if groups else None,
+            # ⚠️ Порядок задан репетитором словами («вторая задача — тест»)
+            # → автоматическая перестановка «сначала тесты» отменяется
+            # (правило фазы 4). Признак приезжает из подбора по описанию.
+            manual_order=request.POST.get('manual_order') == '1',
         )
         create_items(assignment, request.user, keys, catalog_ids, custom_ids)
 

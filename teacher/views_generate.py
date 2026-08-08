@@ -143,9 +143,16 @@ def assignment_generate(request):
                                            item['confidence'],
                                            item.get('how', ''))
                  for item in found]
+        # ⚠️ Подпись строки берём из ТОГО ЖЕ плана, по которому искали.
+        # После деления квоты по типу (`split_by_kind`) строк становится
+        # больше, чем в исходном плане, и обращение к `rows` по этому
+        # индексу вылетает за границу. Поймано браузером: экран третьего
+        # шага падал пятисоткой.
+        used = plan or rows
         for card, item in zip(cards, found):
             card['row'] = item['row']
-            card['row_label'] = rows[item['row']]['label']
+            card['row_label'] = used[item['row']]['label']
+        context['manual_order'] = hw_generator.describes_order(form['text'])
         context.update(step='result', plan_rows=rows, results=cards,
                        empty_rows=short, exclude_ids=exclude,
                        far_count=sum(1 for c in cards

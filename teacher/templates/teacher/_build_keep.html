@@ -60,13 +60,23 @@
     });
   }
 
+  // Признак ручного порядка приезжает из подбора по описанию.
+  var orderInput = document.getElementById('manual-order-input');
+  if (orderInput) {
+    try { orderInput.value = sessionStorage.getItem('hw_manual_order') || ''; }
+    catch (e) {}
+  }
+
   // Работа создана — память чистим, иначе следующая домашка откроется с
   // названием предыдущей.
   var form = document.getElementById('picker-form');
   if (form) {
     form.addEventListener('submit', function () {
       setTimeout(function () {
-        try { sessionStorage.removeItem(KEY); } catch (e) {}
+        try {
+          sessionStorage.removeItem(KEY);
+          sessionStorage.removeItem('hw_manual_order');
+        } catch (e) {}
       }, 100);
     });
   }

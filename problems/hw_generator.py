@@ -320,30 +320,36 @@ def find_problems(rows, has_solution=False, sources=None, exclude=()):
 
     # Добор: то, чего не хватило строкам, берём из общего поиска и честно
     # помечаем как «ближайшее что нашлось».
-    missing = sum(item['missing'] for item in short_rows)
-    if missing:
-        whole = ' '.join(row['query'] for row in rows)
-        extra = _materialise(hybrid.search(whole, limit=missing * 12 + 24),
-                             has_solution, sources)
-        # Добор идёт под тип той строки, которой не хватило: иначе вместо
-        # недостающего теста приедет открытая задача.
-        gap_kind = rows[short_rows[0]['row']].get('kind')
-        if gap_kind == 'open':
-            extra = [i for i in extra if not is_test_problem(i['problem'])]
-        elif gap_kind == 'test':
-            extra = [i for i in extra if is_test_problem(i['problem'])]
-        added = _take(extra, missing, taken, per_source, found,
-                      short_rows[0]['row'], cap=None, force_far=True)
-        if added:
-            missing -= added
-    if missing:
-        # Последний рубеж: просто опубликованные задачи подходящей
-        # сложности. Пустая строка в подборке хуже неточной задачи —
-        # неточную видно и можно заменить одной кнопкой.
-        extra = _materialise(_any_problems(rows, missing * 4), has_solution,
-                             sources)
-        _take(extra, missing, taken, per_source, found,
-              short_rows[0]['row'], cap=None, force_far=True)
+    # ⚠️ ДОБОР ИДЁТ ПО КАЖДОЙ НЕДОБРАВШЕЙ СТРОКЕ ОТДЕЛЬНО И УВАЖАЕТ ТИП.
+    # Раньше весь недобор сваливался на первую короткую строку общим куском,
+    # а последний рубеж («просто опубликованные задачи») не смотрел на тип
+    # вовсе. Итог: репетитор просил три теста, а получал три открытые
+    # задачи — молча, под видом выполненной просьбы. Тип нельзя подменять:
+    # тест и задача — разная работа для ученика.
+    whole = ' '.join(row['query'] for row in rows)
+    for gap in list(short_rows):
+        need = gap['missing']
+        if need <= 0:
+            continue
+        index = gap['row']
+        kind = rows[index].get('kind')
+
+        for source in ('search', 'any'):
+            if need <= 0:
+                break
+            if source == 'search':
+                pool = _materialise(hybrid.search(whole, limit=need * 12 + 24),
+                                    has_solution, sources)
+            else:
+                pool = _materialise(_any_problems(rows, need * 8, kind),
+                                    has_solution, sources)
+            if kind == 'open':
+                pool = [i for i in pool if not is_test_problem(i['problem'])]
+            elif kind == 'test':
+                pool = [i for i in pool if is_test_problem(i['problem'])]
+            added = _take(pool, need, taken, per_source, found, index,
+                          cap=None, force_far=True)
+            need -= added
 
     still_short = _recount(rows, found)
     return found, still_short
@@ -388,6 +394,28 @@ def _take(candidates, need, taken, per_source, found, row_index, cap,
         picked += 1
     return picked
 
+
+
+# Слова, которыми репетитор расставляет порядок задач прямо в описании.
+# ⚠️ Ищем ИМЕННО порядковые указания, а не любые числительные: «две задачи
+# на КПВ» — это количество, а «вторая задача — тест» это порядок.
+ORDER_WORDS = (
+    'перв', 'втор', 'треть', 'четвёрт', 'четверт', 'пят',
+    'шест', 'седьм', 'восьм', 'девят', 'десят',
+    'последн', 'в конце', 'в начале', 'сначала', 'затем', 'потом',
+    'вначале', 'первым', 'последним',
+)
+
+
+def describes_order(text):
+    """Задал ли репетитор порядок задач словами.
+
+    Если задал — автоматическая перестановка «сначала тесты, потом задачи»
+    ОТМЕНЯЕТСЯ (`Assignment.manual_order`, правило фазы 4). Он расставлял
+    задачи по смыслу урока, и наш формальный признак тут не главнее.
+    """
+    low = (text or '').lower()
+    return any(word in low for word in ORDER_WORDS)
 
 def is_test_problem(problem):
     """Тест ли это. Признак — ТИП задачи, как во всём проекте."""
@@ -521,14 +549,25 @@ def _rank(items, row):
     return sorted(items, key=key)
 
 
-def _any_problems(rows, limit):
-    """Последний рубеж добора: опубликованные задачи подходящей сложности."""
+def _any_problems(rows, limit, kind=None):
+    """Последний рубеж добора: опубликованные задачи подходящей сложности.
+
+    ⚠️ `kind` ОБЯЗАТЕЛЕН, когда строка просит тесты. Раньше эта выборка
+    жёстко ИСКЛЮЧАЛА тесты — и была права, пока подбор умел просить только
+    открытые задачи. С появлением поля «сколько тестов» это исключение
+    превратилось в тихую подмену: репетитор просил три теста, а последний
+    рубеж подсовывал три открытые задачи. Тест и задача — разная работа
+    для ученика, подменять их нельзя.
+    """
     from problems.models import Problem
 
     levels = {row['difficulty'] for row in rows if row.get('difficulty')}
     queryset = Problem.objects.filter(status=Problem.Status.PUBLISHED,
                                       needs_quality_review=False)
-    queryset = queryset.exclude(problem_type__istartswith='тест')
+    if kind == 'test':
+        queryset = queryset.filter(problem_type__istartswith='тест')
+    else:
+        queryset = queryset.exclude(problem_type__istartswith='тест')
     if levels:
         queryset = queryset.filter(difficulty__in=list(levels))
     ids = list(queryset.order_by('?').values_list('id', flat=True)[:limit])

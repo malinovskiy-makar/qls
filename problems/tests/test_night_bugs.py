@@ -777,3 +777,102 @@ class ReviewFlowTests(TestCase):
 
         rows = part_grading.part_rows(self.items[0], self.subs[0])
         self.assertEqual(rows[0]['given'], 'ответ')
+
+
+class QuotaByKindTests(TestCase):
+    """Фаза 17–18: ровно столько тестов и столько открытых задач."""
+
+    def test_allocation_never_loses_or_adds_places(self):
+        from problems.hw_generator import allocate
+
+        self.assertEqual(sum(allocate(7, [2, 3])), 7)
+        self.assertEqual(sum(allocate(4, [1, 1, 1])), 4)
+        self.assertEqual(allocate(0, [1, 2]), [0, 0])
+
+    def test_split_gives_exact_totals(self):
+        from problems.hw_generator import split_by_kind
+
+        rows = [{'label': 'A', 'query': 'a', 'topic': '', 'difficulty': 3,
+                 'count': 2},
+                {'label': 'B', 'query': 'b', 'topic': '', 'difficulty': 4,
+                 'count': 3}]
+        plan = split_by_kind(rows, 4, 3)
+        opens = sum(r['count'] for r in plan if r['kind'] == 'open')
+        tests = sum(r['count'] for r in plan if r['kind'] == 'test')
+        self.assertEqual((opens, tests), (4, 3))
+
+    def test_zero_tests_means_no_test_rows(self):
+        from problems.hw_generator import split_by_kind
+
+        rows = [{'label': 'A', 'query': 'a', 'topic': '', 'difficulty': 3,
+                 'count': 5}]
+        plan = split_by_kind(rows, 5, 0)
+        self.assertTrue(all(r['kind'] == 'open' for r in plan))
+
+    def test_last_resort_respects_the_kind(self):
+        """⚠️ Последний рубеж ИСКЛЮЧАЛ тесты — и молча подменял их задачами.
+
+        Найдено проверкой в браузере: репетитор просил три теста, получал
+        три открытые задачи под видом выполненной просьбы.
+        """
+        from problems.hw_generator import _any_problems, is_test_problem
+        from problems.models import Problem
+
+        make_problem('Открытая задача про спрос', difficulty=3)
+        make_problem('Верно ли утверждение?', difficulty=3,
+                     problem_type='тест: один ответ')
+        rows = [{'label': 'x', 'query': 'спрос', 'topic': '', 'difficulty': 3,
+                 'count': 2}]
+
+        want_tests = _any_problems(rows, 20, kind='test')
+        ids = [hit['id'] for hit in want_tests]
+        for problem in Problem.objects.filter(pk__in=ids):
+            self.assertTrue(is_test_problem(problem))
+
+        want_open = _any_problems(rows, 20, kind='open')
+        ids = [hit['id'] for hit in want_open]
+        for problem in Problem.objects.filter(pk__in=ids):
+            self.assertFalse(is_test_problem(problem))
+
+
+class ManualOrderDetectionTests(TestCase):
+    """Фаза 18.5 — порядок, заданный словами, отменяет перестановку."""
+
+    def test_order_words_are_detected(self):
+        from problems.hw_generator import describes_order
+
+        self.assertTrue(describes_order(
+            'Первая задача — вывод функции КПВ, вторая и третья на сложение'))
+        self.assertTrue(describes_order('одна посложнее в конце'))
+        self.assertTrue(describes_order('сначала тесты, затем задачи'))
+
+    def test_plain_counts_are_not_an_order(self):
+        """«Две задачи на КПВ» — это количество, а не порядок."""
+        from problems.hw_generator import describes_order
+
+        self.assertFalse(describes_order(
+            'Домашка на КПВ и эластичность, четыре задачи и три теста'))
+        self.assertFalse(describes_order('монополия и олигополия'))
+        self.assertFalse(describes_order(''))
+
+    def test_flag_reaches_the_assignment(self):
+        tutor = make_user('mo_tutor', role='teacher')
+        group = StudentGroup.objects.create(name='Гр', teacher=tutor)
+        problem = make_problem('Условие')
+        self.client.force_login(tutor)
+        self.client.post(reverse('teacher:assignment_create'), {
+            'name': 'С порядком', 'problem_ids': str(problem.pk),
+            'groups': [str(group.pk)], 'manual_order': '1'})
+        work = Assignment.objects.get(name='С порядком')
+        self.assertTrue(work.manual_order)
+
+    def test_without_the_flag_grouping_still_applies(self):
+        tutor = make_user('mo_tutor2', role='teacher')
+        group = StudentGroup.objects.create(name='Гр2', teacher=tutor)
+        problem = make_problem('Условие')
+        self.client.force_login(tutor)
+        self.client.post(reverse('teacher:assignment_create'), {
+            'name': 'Без порядка', 'problem_ids': str(problem.pk),
+            'groups': [str(group.pk)]})
+        work = Assignment.objects.get(name='Без порядка')
+        self.assertFalse(work.manual_order)
