@@ -12,6 +12,7 @@ function init() {
   refreshColors();   // наполнить карту цветов до первого рисования/добавления кривой
   relocateForScene();   // перенести блоки результатов в панель аналитики
   cardifySections();    // панель ввода — список закрытых карточек
+  foldPickerGroups();   // окно сценариев — десять закрытых блоков
   wireControls();
   wireScene();          // полоса иконок, панели, меню плоскости, тема
   initSceneColorPickers();

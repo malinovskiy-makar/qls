@@ -19,13 +19,7 @@ function loadScene(name) {
   const tv = document.getElementById('tax-val'); if (tv) tv.textContent = '0';
   const pv = document.getElementById('pc-val'); if (pv) pv.textContent = '0';
 
-  if (name === 'free') {
-    // Пустой холст: обычный рынок без готовых кривых. Режим ставим явно, иначе
-    // он остаётся от прошлой сцены («Математика» после математического сюжета),
-    // и холст ведёт себя не как холст.
-    setMode('market');
-    setMarket('comp'); setType('tax'); setScenario('none');
-  } else if (name === 'sd' || name === 'tax' || name === 'ceil' || name === 'mono') {
+  if (name === 'sd' || name === 'tax' || name === 'ceil' || name === 'mono') {
     setMode('market');                 // setMode сам ставит setRanges(100, 100)
     addCurve('100 - Q'); setRole(STATE.curves[0], 'demand');   // спрос — всегда первая кривая
     if (name === 'mono') {
@@ -219,8 +213,6 @@ const SCENE_ROUTE = {
   laffer: { run: () => { setMode('macro'); setMacroModel('laffer'); }, lock: ['macro-seg'] },
 
   /* --- Свободный холст: ничего не заперто ------------------------------ */
-  free: { run: () => { STATE.curves = []; curveCounter = 0; STATE.scenario = 'none';
-                       setMode('market'); renderCurveList(); } },
 };
 
 /* Базовая сцена карточки. Пульт-лента и прочая логика различают сюжеты по
@@ -244,6 +236,41 @@ function applyCardScope() {
 /* Из какого блока сцена. Название берём прямо из окна сценариев: карточка
    лежит в своей секции, у секции есть заголовок. Отдельный список пришлось бы
    держать в согласии с окном вручную, а так он всегда верен. */
+/* ── Блоки окна сценариев (Фаза 6) ───────────────────────────────────
+   Десять блоков, шестьдесят карточек. Всё сразу на экране не читается,
+   поэтому блоки сворачиваются, а открываются по одному. Заголовок из
+   разметки превращается в кнопку, сетка карточек — в её тело: новому блоку
+   ничего дополнительно делать не нужно. */
+function foldPickerGroups() {
+  document.querySelectorAll('#scene-picker .picker-group').forEach((g, i) => {
+    if (g._folded) return;
+    g._folded = true;
+    const lab = g.querySelector(':scope > .picker-group-label');
+    const grid = g.querySelector(':scope > .picker-grid');
+    if (!lab || !grid) return;
+    const name = lab.textContent.trim();
+    if (!grid.id) grid.id = 'pgrid-' + i;
+    const btn = document.createElement('button');
+    btn.className = 'picker-group-label';
+    btn.type = 'button';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', grid.id);
+    btn.innerHTML = '<span></span>' + FOLD_CHEVRON;
+    btn.querySelector('span').textContent = name;
+    btn.addEventListener('click', () => {
+      const open = !grid.classList.contains('open');
+      // Открыт один блок за раз: иначе список снова растянется на три экрана.
+      document.querySelectorAll('#scene-picker .picker-grid.open').forEach(x => x.classList.remove('open'));
+      document.querySelectorAll('#scene-picker .picker-group-label[aria-expanded="true"]')
+        .forEach(x => x.setAttribute('aria-expanded', 'false'));
+      grid.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) btn.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+    lab.replaceWith(btn);
+  });
+}
+
 function sceneBlockLabel(key) {
   const card = document.querySelector('.scard[data-scene="' + key + '"]');
   const grp = card && card.closest('.picker-group');
@@ -256,7 +283,7 @@ function sceneBlockLabel(key) {
 function pickScene(key) {
   resetDecor();           // новая сцена — чистое оформление (Фаза 1)
   STATE.zoomLock = false; // и свой масштаб, а не унаследованный от колеса
-  const r = SCENE_ROUTE[key] || SCENE_ROUTE.free;
+  const r = SCENE_ROUTE[key] || SCENE_ROUTE.sd;
   r.run();
   // Ключ карточки ставим ПОСЛЕ run: loadScene внутри пишет туда своё имя
   // базовой сцены, и составной ключ ('mono-nat') иначе бы потерялся.
@@ -267,10 +294,9 @@ function pickScene(key) {
   if (bl) bl.textContent = sceneBlockLabel(key);
   if (typeof collapseCards === 'function') collapseCards();   // новая сцена — все карточки закрыты
   if (typeof updatePult === 'function') updatePult();   // показать/спрятать пульт под выбранную сцену
-  // Меньше загромождения: пресетные сцены открываются со свёрнутыми «Инструментами»
-  // (разворачиваются иконкой-ползунками в доке). «Свободный холст» — развёрнуты сразу:
-  // там пользователь сам добавляет кривые, настройка нужна под рукой.
-  setToolsOpen(key === 'free');
+  // Панель ввода открыта, но все карточки в ней закрыты: список заголовков
+  // виден сразу, а разворачивается только нужное.
+  setToolsOpen(true);
   closePicker();
 }
 

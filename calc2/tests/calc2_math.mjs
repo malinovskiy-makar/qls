@@ -776,7 +776,7 @@ const CASES = [
   },
   {
     name: 'Кусочная функция · три куска с двумя границами ⇒ 90 / 60 / 20',
-    run: `loadScene('free');
+    run: `loadScene('sd');
           PW.inp = document.getElementById('inp-formula'); PW.v = 'Q'; PW.n = 3;
           PW.rows = [{f:'100 - Q', a:'0', b:'40'}, {f:'60', a:'40', b:'70'}, {f:'20', a:'70', b:''}];
           var r = compileFormula(pwFormula());
@@ -789,7 +789,7 @@ const CASES = [
   },
   {
     name: 'Ползунок параметра · k*Q при k = 3 ⇒ 30 в точке 10',
-    run: `loadScene('free');
+    run: `loadScene('sd');
           STATE.curves = []; STATE.params = {};
           addCurve('k*Q'); redrawAll();
           var c = STATE.curves[STATE.curves.length - 1];
@@ -837,7 +837,7 @@ const CASES = [
     // Math.js читает «bx» как ОДНО имя переменной, поэтому параметр звался «bx».
     // Теперь склейка букв раскрывается в произведение ещё до разбора.
     name: 'Параметр из bx^2 · это b, а не bx',
-    run: `loadScene('free');
+    run: `loadScene('sd');
           STATE.curves = []; STATE.params = {};
           addCurve('bx^2'); redrawAll();
           var names = Object.keys(STATE.params).sort();
@@ -852,7 +852,7 @@ const CASES = [
   {
     // Свободный член: раньше «c» была занята словарём Math.js и ползунка не давала.
     name: 'Параметр из x^2 + 5 + c · свободный член заводится',
-    run: `loadScene('free');
+    run: `loadScene('sd');
           STATE.curves = []; STATE.params = {};
           addCurve('x^2 + 5 + c'); redrawAll();
           var names = Object.keys(STATE.params).sort();
@@ -867,7 +867,7 @@ const CASES = [
   {
     // Экономические обозначения остаются одним именем: MC это не M·C.
     name: 'MC не рассыпается на буквы · сцена свободного холста',
-    run: `loadScene('free');
+    run: `loadScene('sd');
           STATE.curves = []; STATE.params = {};
           addCurve('MC + 2*Q'); redrawAll();
           return { n: Object.keys(STATE.params).length,
@@ -877,7 +877,7 @@ const CASES = [
   {
     // Пересечения считаются и между кривыми, и с осями координат.
     name: 'Пересечения с осями · D = 100 − Q даёт (100; 0) и (0; 100)',
-    run: `loadScene('free');
+    run: `loadScene('sd');
           STATE.curves = []; STATE.params = {};
           addCurve('100 - Q'); redrawAll();
           var pts = crossPoints();
@@ -986,7 +986,7 @@ const CASES = [
     // Фаза 6: правая граница берётся точно, а не по узлу сетки. Раньше край
     // выходил 9.97 вместо 10, и площадь получалась меньше настоящей.
     name: 'Площадь · под 10 − x в первой четверти ровно 50',
-    run: `loadScene('free'); STATE.curves = []; STATE.params = {};
+    run: `loadScene('sd'); STATE.curves = []; STATE.params = {};
           addCurve('10 - x'); redrawAll();
           var t = snapTargets()[0];
           document.getElementById('ac-from').value = '';

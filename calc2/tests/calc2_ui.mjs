@@ -59,7 +59,8 @@ const reveal = async (sel) => {
     if (!el) return;
     let n = el;
     while (n && n !== document.body) {
-      if (n.classList && n.classList.contains('fold-body') && !n.classList.contains('open') && n.id) {
+      const foldable = n.classList && (n.classList.contains('fold-body') || n.classList.contains('picker-grid'));
+      if (foldable && !n.classList.contains('open') && n.id) {
         const btn = document.querySelector('[aria-controls="' + n.id + '"]');
         if (btn) btn.click();
       }
@@ -797,7 +798,8 @@ await t('смена сцены сбрасывает свои имена точе
 /* --- Роль кривой спрашивается до формулы -------------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.evaluate(() => openPicker());
-await clickUI('.scard[data-scene="free"]');
+await clickUI('.scard[data-scene="sd"]');
+await page.evaluate(() => { STATE.curves = []; curveCounter = 0; STATE.params = {}; renderCurveList(); redrawAll(); });
 await page.waitForTimeout(320);
 
 await t('справка подстраивается под выбранную роль', async () => {
@@ -970,7 +972,8 @@ await t('легенда стоит выше поля графика, не пов
 /* --- Клавиатура и конструктор кусочной функции ------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.evaluate(() => openPicker());
-await clickUI('.scard[data-scene="free"]');
+await clickUI('.scard[data-scene="sd"]');
+await page.evaluate(() => { STATE.curves = []; curveCounter = 0; STATE.params = {}; renderCurveList(); redrawAll(); });
 await page.waitForTimeout(320);
 await clickUI('#fh-formula');
 await page.waitForTimeout(220);
@@ -1424,6 +1427,38 @@ await t('раскрытая карточка отличается фоном', a
   const closed = await page.evaluate(() => getComputedStyle(document.getElementById('sec-curves')).backgroundColor);
   return (r.open && r.card && r.bg !== closed) || JSON.stringify(r) + ' закрытая ' + closed;
 });
+
+/* ── Фаза 6. Окно сценариев ───────────────────────────────────────────
+   Десять блоков без нумерации, все свёрнуты, открыт один за раз. */
+await t('блоки окна свёрнуты, заголовки без номеров', async () => {
+  await page.evaluate(() => openPicker());
+  await page.waitForTimeout(200);
+  return await page.evaluate(() => {
+    const bad = [];
+    document.querySelectorAll('#scene-picker .picker-group').forEach(g => {
+      const b = g.querySelector(':scope > .picker-group-label');
+      const grid = g.querySelector(':scope > .picker-grid');
+      if (!b || b.tagName !== 'BUTTON') { bad.push('заголовок не кнопка'); return; }
+      if (/^ *[0-9]+ *·/.test(b.textContent)) bad.push('номер в «' + b.textContent.trim() + '»');
+      if (grid && grid.classList.contains('open')) bad.push('«' + b.textContent.trim() + '» раскрыт');
+    });
+    return !bad.length || bad.join('; ');
+  });
+});
+
+await t('открыт один блок за раз', async () => {
+  await page.click('#scene-picker .picker-group:nth-of-type(1) > .picker-group-label');
+  await page.waitForTimeout(160);
+  await page.click('#scene-picker .picker-group:nth-of-type(2) > .picker-group-label');
+  await page.waitForTimeout(160);
+  return await page.evaluate(() =>
+    document.querySelectorAll('#scene-picker .picker-grid.open').length === 1
+    || 'открытых блоков: ' + document.querySelectorAll('#scene-picker .picker-grid.open').length);
+});
+
+await t('свободного холста нет ни в окне, ни в маршрутах', () => page.evaluate(() =>
+  (!document.querySelector('.scard[data-scene="free"]') && typeof SCENE_ROUTE.free === 'undefined')
+  || 'холст ещё на месте'));
 
 console.log('\n' + checks.map(([s, n, d]) => `${s.padEnd(4)} ${n}${d ? '  → ' + d : ''}`).join('\n'));
 const bad = checks.filter(c => c[0] !== 'OK').length;

@@ -26,17 +26,42 @@ await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle', timeout: 30000 });
 await page.waitForTimeout(900);
 
 const checks = [];
+// Блоки окна сценариев свёрнуты (Фаза 6) — раскрываем их перед щелчком по карточке.
+const openGroups = async () => {
+  await page.evaluate(() => {
+    document.querySelectorAll('#scene-picker .picker-grid').forEach(g => g.classList.add('open'));
+    document.querySelectorAll('#scene-picker .picker-group-label[aria-expanded]')
+      .forEach(b => b.setAttribute('aria-expanded', 'true'));
+  });
+  await page.waitForTimeout(50);
+};
 const t = async (name, fn) => {
   try { const r = await fn(); checks.push([r === true ? 'OK' : 'FAIL', name, r === true ? '' : String(r)]); }
   catch (e) { checks.push(['ERR', name, e.message]); }
 };
 
 /* --- 1. Состав окна ------------------------------------------------- */
-await t('десять блоков плюс свободный холст', async () =>
-  (await page.locator('.picker-group').count()) === 11 || 'групп: ' + (await page.locator('.picker-group').count()));
+await t('в окне ровно десять блоков', async () =>
+  (await page.locator('.picker-group').count()) === 10 || 'групп: ' + (await page.locator('.picker-group').count()));
 
 await t('Математика идёт первым блоком', async () =>
-  (await page.locator('.picker-group-label').first().textContent()).trim().startsWith('1 · Математика') || 'первый не Математика');
+  (await page.locator('.picker-group-label').first().textContent()).trim() === 'Математика' || 'первый не Математика');
+
+await t('блоки окна свёрнуты и без нумерации', () => page.evaluate(() => {
+  const bad = [];
+  document.querySelectorAll('#scene-picker .picker-group').forEach(g => {
+    const b = g.querySelector(':scope > .picker-group-label');
+    const grid = g.querySelector(':scope > .picker-grid');
+    if (!b || b.tagName !== 'BUTTON') { bad.push('заголовок не кнопка'); return; }
+    if (/^\s*\d+\s*·/.test(b.textContent)) bad.push('номер в «' + b.textContent.trim() + '»');
+    if (grid && grid.classList.contains('open')) bad.push('«' + b.textContent.trim() + '» раскрыт');
+  });
+  return !bad.length || bad.join('; ');
+}));
+
+await t('свободного холста больше нет', () => page.evaluate(() =>
+  (!document.querySelector('.scard[data-scene="free"]') && typeof SCENE_ROUTE.free === 'undefined')
+  || 'холст ещё на месте'));
 
 // Было 19; «Построение графиков» стало рабочей сценой, «Оси наоборот» удалены.
 await t('карточек «скоро» ровно 18', async () =>
@@ -97,13 +122,13 @@ const CARDS = [
   ['fx',          s => s.mode === 'macro' && s.macroModel === 'fx',              ['macro-seg']],
   ['ineq',        s => s.mode === 'inequality',                                  []],
   ['laffer',      s => s.mode === 'macro' && s.macroModel === 'laffer',          ['macro-seg']],
-  ['free',        s => s.mode === 'market' && s.curves.length === 0,             []],
 ];
 
 for (const [key, want, lock] of CARDS) {
   await t(`карточка ${key}`, async () => {
     await page.evaluate(() => openPicker());
     await page.waitForTimeout(60);
+    await openGroups();
     await page.click(`.scard[data-scene="${key}"]`);
     await page.waitForTimeout(220);
 
@@ -134,9 +159,11 @@ for (const [key, want, lock] of CARDS) {
 await t('труд после монополии остаётся рабочим', async () => {
   for (let pass = 0; pass < 2; pass++) {
     await page.evaluate(() => openPicker());
+    await openGroups();
     await page.click('.scard[data-scene="mono"]');
     await page.waitForTimeout(300);
     await page.evaluate(() => openPicker());
+    await openGroups();
     await page.click('.scard[data-scene="labor"]');
     await page.waitForTimeout(700);
     const st = await page.evaluate(() => ({
@@ -148,10 +175,12 @@ await t('труд после монополии остаётся рабочим'
   return true;
 });
 
-/* --- 3. Возврат к свободному холсту снимает все запреты --------------- */
-await t('свободный холст ничего не прячет', async () => {
+/* --- 3. Сцена без запретов ничего не прячет --------------------------- */
+await t('сцена без запретов ничего не прячет', async () => {
   await page.evaluate(() => openPicker());
-  await page.click('.scard[data-scene="free"]');
+  await openGroups();
+  await openGroups();
+  await page.click('.scard[data-scene="ineq"]');
   await page.waitForTimeout(250);
   const n = await page.evaluate(() => document.querySelectorAll('.scoped-off').length);
   return n === 0 || (n + ' элементов остались спрятанными');
@@ -160,6 +189,7 @@ await t('свободный холст ничего не прячет', async ()
 /* --- 4. Заголовок сцены совпадает с именем карточки ------------------- */
 await t('заголовок сцены берётся из карточки', async () => {
   await page.evaluate(() => openPicker());
+  await openGroups();
   await page.click('.scard[data-scene="mono-nat"]');
   await page.waitForTimeout(200);
   const txt = (await page.locator('#scene-name').textContent()).trim();
