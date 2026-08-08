@@ -319,7 +319,9 @@ function drawOverlays() {
   syncAreaColorList();       // список областей с пикерами
   syncAreaCalcUI();          // выпадашка кривых и список точек для расчёта площади
   hintsToDots();             // подсказки, добавленные сценой, тоже уходят под вопросик
+  syncAnalyticsPanel();                                // разбор уезжает в свой блок
   renderMathIn(document.getElementById('sb-body'));    // формулы в аналитике
+  renderMathIn(document.getElementById('ex-body'));    // и в объяснении модели
   renderMathIn(document.getElementById('tools-panel'));// и в подсказках панели
 }
 

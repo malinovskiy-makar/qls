@@ -1228,9 +1228,10 @@ await t('видна отрицательная часть плоскости', (
   || JSON.stringify({ q: CONFIG.Qmin, p: CONFIG.Pmin, fq: STATE.firstQuad })));
 
 await t('у сцены нет «Аналитики»', () => page.evaluate(() => {
-  const b = document.getElementById('dock-score');
+  const p = document.getElementById('params-panel');
   const s = document.getElementById('scoreboard');
-  return (b.hidden && s.classList.contains('hidden')) || `иконка скрыта ${b.hidden}, панель скрыта ${s.classList.contains('hidden')}`;
+  return (p.classList.contains('empty') && s.classList.contains('hidden'))
+    || `панель пустая ${p.classList.contains('empty')}, расчёты скрыты ${s.classList.contains('hidden')}`;
 }));
 
 await t('свои точки и площади остались', () => page.evaluate(() => {
@@ -1266,7 +1267,75 @@ await t('в других сценах «Аналитика» вернулась'
   await page.evaluate(() => openPicker());
   await page.click('.scard[data-scene="sd"]');
   await page.waitForTimeout(340);
-  return await page.evaluate(() => !document.getElementById('dock-score').hidden || 'иконка всё ещё скрыта');
+  return await page.evaluate(() => {
+    const p = document.getElementById('params-panel');
+    const s = document.getElementById('scoreboard');
+    return (!p.classList.contains('empty') && !s.classList.contains('hidden')) || 'панель всё ещё пустая';
+  });
+});
+
+/* ── Фаза 4. Правая панель — «Аналитика» ──────────────────────────────
+   Ползунки сверху и всегда открыты, ниже два свёрнутых блока: расчёты и
+   разбор. Кнопки «включить аналитику» в полосе иконок больше нет. */
+await t('правая панель называется «Аналитика»', () => page.evaluate(() => {
+  const h = document.querySelector('#params-panel .side-head h2');
+  return (h && h.textContent.trim() === 'Аналитика') || 'заголовок: ' + (h ? h.textContent : 'нет');
+}));
+
+await t('кнопки аналитики в полосе иконок нет', () => page.evaluate(() =>
+  !document.getElementById('dock-score') || 'кнопка ещё есть'));
+
+await t('ползунки открыты и не сворачиваются', () => page.evaluate(() => {
+  const body = document.getElementById('params-body');
+  if (!body) return 'нет #params-body';
+  if (body.closest('.fold-body')) return 'ползунки внутри складного блока';
+  return getComputedStyle(body).display !== 'none' || 'ползунки спрятаны';
+}));
+
+await t('расчёты и разбор свёрнуты по умолчанию', () => page.evaluate(() => {
+  const bad = [];
+  [['sb-btn', 'sb-fold'], ['ex-btn', 'ex-fold']].forEach(([b, f]) => {
+    const btn = document.getElementById(b), box = document.getElementById(f);
+    if (!btn || !box) { bad.push(b + ': нет узла'); return; }
+    if (btn.getAttribute('aria-expanded') !== 'false') bad.push(b + ': развёрнут');
+    if (box.classList.contains('open')) bad.push(f + ': открыт');
+  });
+  return !bad.length || bad.join('; ');
+}));
+
+await t('блок «Ключевые значения» раскрывается щелчком', async () => {
+  await page.click('#sb-btn');
+  await page.waitForTimeout(180);
+  const r = await page.evaluate(() => {
+    const box = document.getElementById('sb-fold');
+    const txt = document.getElementById('sb-body').textContent;
+    return { open: box.classList.contains('open'), len: txt.trim().length };
+  });
+  await page.click('#sb-btn');
+  return (r.open && r.len > 0) || JSON.stringify(r);
+});
+
+await t('панели левая и правая одной ширины', async () => {
+  await page.evaluate(() => { setToolsOpen(true); setParamsOpen(true); });
+  await page.waitForTimeout(320);
+  return await page.evaluate(() => {
+    const l = document.getElementById('tools-panel').getBoundingClientRect().width;
+    const r = document.getElementById('params-panel').getBoundingClientRect().width;
+    return Math.abs(l - r) < 1.5 || `слева ${Math.round(l)}, справа ${Math.round(r)}`;
+  });
+});
+
+await t('разбор уезжает из расчётов в «Объяснение модели»', async () => {
+  await page.evaluate(() => openPicker());
+  await page.click('.scard[data-scene="ppf"]');
+  await page.waitForTimeout(420);
+  return await page.evaluate(() => {
+    const sb = document.getElementById('sb-body'), ex = document.getElementById('ex-body');
+    if (sb.querySelector('.sb-note')) return 'врезка осталась в расчётах';
+    if (!ex.querySelector('.sb-note')) return 'врезки нет в объяснении';
+    if (/Как это получилось/.test(ex.textContent)) return 'внутренний заголовок не снят';
+    return document.getElementById('explain').classList.contains('hidden') ? 'блок разбора спрятан' : true;
+  });
 });
 
 console.log('\n' + checks.map(([s, n, d]) => `${s.padEnd(4)} ${n}${d ? '  → ' + d : ''}`).join('\n'));

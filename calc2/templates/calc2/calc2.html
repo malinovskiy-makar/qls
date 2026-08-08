@@ -723,15 +723,12 @@
 <div class="app">
 
   <!-- ── ПОЛОСА ИКОНОК ─────────────────────────────────────────────────
-       Четыре постоянных действия: назад к сценариям, аналитика, сохранение
-       в профиль, скачивание. Тема живёт внизу отдельно: это не действие
-       со сценой, а настройка рабочего места. -->
+       Три постоянных действия: назад к сценариям, сохранение в профиль,
+       скачивание. Аналитика больше не кнопка: она живёт в правой панели.
+       Тема внизу отдельно: это не действие со сценой, а настройка места. -->
   <nav class="dock" aria-label="Действия со сценой">
     <button class="dock-btn" id="scene-back" type="button" data-tip="Назад к сценариям" aria-label="Назад к сценариям">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l-6 7 6 7"/><path d="M7 12h11"/></svg>
-    </button>
-    <button class="dock-btn active" id="dock-score" type="button" data-tip="Включить аналитику" aria-label="Включить или выключить аналитику" aria-pressed="true">
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 19V11"/><path d="M12 19V5"/><path d="M19 19v-6"/><path d="M4 19h16"/></svg>
     </button>
     <button class="dock-btn" id="dock-save" type="button" data-tip="Сохранить график в профиль" aria-label="Сохранить график в профиль">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><rect x="8" y="13" width="8" height="6"/></svg>
@@ -745,8 +742,8 @@
     </button>
   </nav>
 
-  <!-- ── ЛЕВАЯ ПАНЕЛЬ: ВВОД ФУНКЦИЙ + АНАЛИТИКА ────────────────────── -->
-  <aside class="side side-left" id="tools-panel" aria-label="Ввод функций и аналитика">
+  <!-- ── ЛЕВАЯ ПАНЕЛЬ: ВВОД ФУНКЦИЙ ────────────────────────────────── -->
+  <aside class="side side-left" id="tools-panel" aria-label="Ввод функций">
     <button class="side-arrow" id="tools-toggle" type="button" data-tip="Закрыть меню"
             aria-label="Свернуть или развернуть панель ввода" aria-expanded="true">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg>
@@ -1984,12 +1981,6 @@
           </div><!-- /tools-body -->
         </section>
 
-        <!-- Аналитика: сюда JS переносит блок равновесия и все #info-*. -->
-        <section class="side-part" id="scoreboard">
-          <div class="part-title">Аналитика</div>
-          <div class="sb-body" id="sb-body"><!-- JS переносит сюда #info-* и блок равновесия --></div>
-        </section>
-
       </div><!-- /side-scroll -->
     </div><!-- /side-inner -->
   </aside>
@@ -2092,17 +2083,19 @@
     </div>
   </div>
 
-  <!-- ── ПРАВАЯ ПАНЕЛЬ: ОСНОВНЫЕ ПАРАМЕТРЫ ─────────────────────────────
-       Живые регуляторы активной сцены. Часть узлов (ставка, цена, зарплата,
-       мировая цена) физически ПЕРЕНОСИТСЯ сюда из «Ввода функций» через
-       appendChild — обработчики и ID сохраняются, клонирования нет. -->
-  <aside class="side side-right" id="params-panel" aria-label="Основные параметры">
+  <!-- ── ПРАВАЯ ПАНЕЛЬ: АНАЛИТИКА ──────────────────────────────────────
+       Сверху живые регуляторы сцены: это основное управление, поэтому они
+       всегда открыты. Ниже два складных блока: расчёты и разбор. Часть узлов
+       (ставка, цена, зарплата, мировая цена) физически ПЕРЕНОСИТСЯ сюда из
+       «Ввода функций» через appendChild — обработчики и ID сохраняются,
+       клонирования нет. -->
+  <aside class="side side-right" id="params-panel" aria-label="Аналитика">
     <button class="side-arrow" id="params-toggle" type="button" data-tip="Закрыть меню"
-            aria-label="Свернуть или развернуть панель параметров" aria-expanded="true">
+            aria-label="Свернуть или развернуть панель аналитики" aria-expanded="true">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6l6 6-6 6"/></svg>
     </button>
     <div class="side-inner">
-      <div class="side-head"><h2>Основные параметры</h2></div>
+      <div class="side-head"><h2>Аналитика</h2></div>
       <div class="side-scroll">
         <div id="params-body">
           <div id="params-curves"></div>
@@ -2110,6 +2103,28 @@
           <div id="params-empty">У этой сцены пока нет живых регуляторов. Добавьте линейную
             кривую, и её можно будет двигать ползунком.</div>
         </div>
+
+        <!-- Расчёты сцены: сюда JS переносит блок равновесия и все #info-*. -->
+        <section class="side-part" id="scoreboard">
+          <button class="fold-btn" id="sb-btn" type="button" aria-expanded="false" aria-controls="sb-fold">
+            <span>Ключевые значения</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="fold-body" id="sb-fold">
+            <div class="sb-body" id="sb-body"><!-- JS переносит сюда #info-* и блок равновесия --></div>
+          </div>
+        </section>
+
+        <!-- Разбор: врезки «как это получилось» уезжают сюда из расчётов. -->
+        <section class="side-part" id="explain">
+          <button class="fold-btn" id="ex-btn" type="button" aria-expanded="false" aria-controls="ex-fold">
+            <span>Объяснение модели</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="fold-body" id="ex-fold">
+            <div class="sb-body" id="ex-body"></div>
+          </div>
+        </section>
       </div>
     </div>
   </aside>

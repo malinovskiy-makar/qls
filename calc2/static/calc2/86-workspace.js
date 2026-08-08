@@ -99,42 +99,59 @@ function setSideOpen(panelId, btnId, open) {
 function setToolsOpen(open) { setSideOpen('tools-panel', 'tools-toggle', open); }
 function setParamsOpen(open) { setSideOpen('params-panel', 'params-toggle', open); }
 
-/* Где считать нечего, «Аналитики» нет вовсе: пустую панель не показываем и
-   иконку в полосе прячем. Это построение графиков и деформации — там нет ни
-   равновесия, ни площадей, ни разбора, только сама кривая. */
+/* Где считать нечего, «Аналитики» нет вовсе. Это построение графиков и
+   деформации — там нет ни равновесия, ни площадей, ни разбора, только сама
+   кривая. */
 const NO_ANALYTICS = { 'm-graph': true, 'm-transform': true };
 function hasAnalytics() { return !NO_ANALYTICS[STATE.sceneKey]; }
 
-// Аналитика — нижняя часть левой панели, её включает иконка в полосе.
-function setScoreOpen(open) {
-  if (!hasAnalytics()) open = false;
-  const s = document.getElementById('scoreboard'); if (s) s.classList.toggle('hidden', !open);
-  dockActive('dock-score', open);
-  if (open) setToolsOpen(true);   // включили аналитику — панель должна быть видна
+/* Разбор «как это получилось» сцены пишут внутрь своего блока расчётов. Здесь
+   он одним проходом уезжает в «Объяснение модели»: так новому блоку аналитики
+   ничего дополнительно делать не нужно, достаточно поставить врезку .sb-note.
+   Внутренний заголовок «Как это получилось» снимаем — он стал дублем названия
+   блока; свои заголовки («Почему КТВ ломается») остаются. */
+function moveExplanations() {
+  const from = document.getElementById('sb-body');
+  const to = document.getElementById('ex-body');
+  if (!from || !to) return;
+  to.innerHTML = '';
+  from.querySelectorAll('.sb-note').forEach(note => {
+    const h = note.querySelector('b');
+    if (h && h.textContent.trim() === 'Как это получилось') h.remove();
+    to.appendChild(note);
+  });
 }
 
-// Показать или спрятать иконку аналитики под текущую сцену.
-function syncAnalyticsIcon() {
-  const b = document.getElementById('dock-score');
+/* Правая панель показывает ровно то, что есть: ползунки, расчёты, разбор.
+   Пустых блоков не бывает, а если пусто всё — панели на экране нет. */
+function syncAnalyticsPanel() {
+  moveExplanations();
   const on = hasAnalytics();
-  if (b) b.hidden = !on;
-  if (!on) setScoreOpen(false);
+  const sb = document.getElementById('sb-body');
+  const ex = document.getElementById('ex-body');
+  const hasValues = on && !!sb && sb.textContent.trim().length > 0;
+  const hasExplain = on && !!ex && ex.textContent.trim().length > 0;
+  const score = document.getElementById('scoreboard');
+  if (score) score.classList.toggle('hidden', !hasValues);
+  const expl = document.getElementById('explain');
+  if (expl) expl.classList.toggle('hidden', !hasExplain);
+  const body = document.getElementById('params-body');
+  const hasKnobs = !!body && !!body.querySelector('input, select, button');
+  const empty = document.getElementById('params-empty');
+  if (empty) empty.style.display = (hasKnobs || !(hasValues || hasExplain)) ? 'none' : '';
+  const panel = document.getElementById('params-panel');
+  if (panel) panel.classList.toggle('empty', !(hasKnobs || hasValues || hasExplain));
 }
 
 function wireScene() {
   const tools = document.getElementById('tools-panel');
   const params = document.getElementById('params-panel');
-  const score = document.getElementById('scoreboard');
 
   // Стрелки сворачивания у самих панелей.
   const tTog = document.getElementById('tools-toggle');
   if (tTog) tTog.addEventListener('click', () => setToolsOpen(tools.classList.contains('collapsed')));
   const pTog = document.getElementById('params-toggle');
   if (pTog) pTog.addEventListener('click', () => setParamsOpen(params.classList.contains('collapsed')));
-
-  // Аналитика — иконка в полосе.
-  const dScore = document.getElementById('dock-score');
-  if (dScore) dScore.addEventListener('click', () => setScoreOpen(score.classList.contains('hidden')));
 
   // Тема.
   const dTheme = document.getElementById('dock-theme');
