@@ -359,6 +359,9 @@ def group_assignment_detail(request, group_id, assignment_id):
         'group': group,
         'assignment': assignment,
         'rows': rows,
+        # Баллы правятся ДО первой сдачи. После — цифра остаётся крупной и
+        # видной, но не редактируется: оценки уже выставлены по этой шкале.
+        'points_locked': assignment.points_locked,
         'stats': assignment_stats(assignment),
         'solution_visibility': SolutionVisibility.choices,
     })
@@ -804,6 +807,13 @@ def api_item_points(request):
         pk=body.get('item_id'))
     if not item.is_tutor_for(request.user):
         return JsonResponse({'error': 'Нет доступа'}, status=403)
+
+    # ⚠️ ЗАЩИТА СТОИТ НА СЕРВЕРЕ, А НЕ ТОЛЬКО В РАЗМЕТКЕ. Спрятать поле мало:
+    # запрос можно отправить в обход браузера, а балл, изменённый после
+    # первой сдачи, переписывает знаменатель уже выставленным оценкам.
+    if item.assignment.points_locked:
+        return JsonResponse(
+            {'error': 'Баллы заперты — работу уже сдавали'}, status=409)
 
     raw = str(body.get('points', '')).strip().replace(',', '.')
     try:

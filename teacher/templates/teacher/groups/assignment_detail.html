@@ -31,6 +31,10 @@
              gap: 2px; text-align: center; }
 .item-num { font-size: 12px; color: var(--text3); font-weight: 600; }
 .item-src { font-size: 11px; color: var(--text3); }
+/* Тихая подпись у запертого балла: цифра осталась крупной, а править её
+   нельзя — без объяснения это читается как поломка. */
+.pts-lock { font-size: 11px; cursor: help;
+            border-bottom: 1px dotted var(--text3); }
 .item-body { min-width: 0; }
 .item-title { font-size: 15px; font-weight: 600; line-height: 1.35;
               margin: 0 0 8px; }
@@ -179,6 +183,20 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
   </div>
 </div>
 
+{% if points_locked %}
+{% comment %}
+Объяснение стоит ОДИН раз наверху, а у каждой цифры — короткое «заперто».
+Полная фраза на каждой из семи карточек была бы семью одинаковыми абзацами.
+{% endcomment %}
+<div class="k-state k-state--warn" style="margin-bottom: 16px;">
+  <span class="k-state__icon">!</span>
+  <span class="k-state__note">
+    Баллы заперты — работу уже сдавали. Оценки выставлены по этой шкале, и
+    менять максимум задним числом значило бы переписать их всем.
+  </span>
+</div>
+{% endif %}
+
 {% if assignment.is_exam %}
 <div class="note" style="margin-bottom: 20px;">
   {% if assignment.exam_mode == 'window' %}
@@ -204,6 +222,20 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
   {% endcomment %}
   <div class="item-rail">
     <div class="item-num">{{ row.number }}</div>
+    {% if points_locked %}
+    {% comment %}
+    ⚠️ ПОСЛЕ ПЕРВОЙ СДАЧИ БАЛЛ НЕ ПРАВИТСЯ, НО ОСТАЁТСЯ КРУПНЫМ И ВИДНЫМ.
+    Спрятать его нельзя: это по-прежнему главное число задачи. Подпись рядом
+    обязательна — без неё нередактируемое поле читается как поломка.
+    {% endcomment %}
+    <div class="k-score" title="Максимальный балл за задачу">
+      <span class="k-score__value">{{ row.item.points|floatformat:"-2" }}</span>
+      <span class="k-score__cap">баллов</span>
+    </div>
+    <div class="item-src">{{ row.source_label }}</div>
+    <div class="pts-lock k-quiet"
+         title="Работу уже сдавали. Оценки выставлены по этой шкале, и менять максимум задним числом значило бы переписать их всем.">заперто</div>
+    {% else %}
     <label class="k-score" title="Максимальный балл за задачу">
       <input type="number" class="pts-input" data-item="{{ row.item.pk }}"
              value="{{ row.item.points|floatformat:"-2" }}" min="0" max="1000" step="0.5">
@@ -211,6 +243,7 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
     </label>
     <div class="item-src">{{ row.source_label }}</div>
     <div class="pts-status k-quiet" data-pts-status="{{ row.item.pk }}"></div>
+    {% endif %}
   </div>
 
   <div class="item-body">
