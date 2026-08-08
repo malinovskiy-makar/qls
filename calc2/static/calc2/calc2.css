@@ -1,0 +1,1128 @@
+/* ═══════════════════════════════════════════════════════════════════
+   ТОКЕНЫ ДИЗАЙНА — «Чертёжный инструмент»
+   Кривые — единственный источник цвета на холсте; интерфейс намеренно
+   нейтрально-графитовый, с одним смелым малиновым акцентом, который не
+   совпадает ни с одним цветом кривой (его нельзя спутать с D/S/MR/MC…).
+   Светлая тема — по умолчанию (класс/проектор), тёмная — вечерняя работа.
+   ═══════════════════════════════════════════════════════════════════ */
+:root {
+  color-scheme: light;
+
+  /* ── Палитра кривых (ЗАФИКСИРОВАНА — одинакова в обеих темах) ── */
+  --curve-d:     #2F6FED;   /* спрос D                       */
+  --curve-s:     #E0563B;   /* предложение S                 */
+  --curve-mr:    #8B3FE0;   /* предельный доход MR           */
+  --curve-mc:    #119C8A;   /* предельные издержки MC        */
+  --curve-tax:   #2E9E44;   /* налог / субсидия / бюджет     */
+  --curve-dwl:   #8C8C84;   /* потери общества DWL           */
+  --curve-reg:   #B5791F;   /* регулируемая цена (потолок/пол/МРОТ) */
+  --curve-ghost: #9AA0A6;   /* «было» (исходное состояние)   */
+  --c-warn:      #C2680F;   /* предупреждение                */
+  --c-bad:       #D23B3B;   /* дефицит / ошибка              */
+  /* Кривые издержек — пять различимых вторичных цветов. */
+  --cost-mc:  #119C8A;  --cost-atc: #2F6FED;  --cost-avc: #B5791F;
+  --cost-afc: #8B3FE0;  --cost-vc:  #5B6472;
+
+  /* ── Структурные цвета холста (зависят от темы) ── */
+  --ink:      #2a2f3a;   /* оси, подписи осей, текст у точек  */
+  --ink-soft: #5e6675;   /* цифры делений, вторичные подписи  */
+  --grid:     #ebebef;   /* линии сетки                       */
+  --halo:     #ffffff;   /* обводка-фон под подписями         */
+  --canvas:   #ffffff;   /* фон графика                       */
+
+  /* ── Интерфейс ── */
+  --text:        #1a1a1a;
+  --text2:       #5b6472;
+  --text3:       #687180;   /* затемнён до контраста AA для мелких подписей */
+  --bg:          #eceef2;   /* оболочка за холстом            */
+  --surface:     #ffffff;   /* плавающие панели               */
+  --surface-2:   #f5f5f3;   /* док, вложенные блоки           */
+  --input-bg:    #ffffff;
+  --border:      rgba(22,26,38,.12);
+  --border-soft: rgba(22,26,38,.07);
+  /* Малиновый — действия интерфейса. Глубокий тон: белый текст на нём даёт 6:1
+     (AA), а сам он как текст — 5:1 на светлых поверхностях. Отличим от всех кривых. */
+  --accent:      #BE185D;
+  --accent-deep: #9D1450;
+  --accent-tint: rgba(190,24,93,.10);
+  --accent-ring: rgba(190,24,93,.34);
+  /* Плотная подсветка выделенного куска формулы: тинт в 10% по белому
+     фону поля был не виден совсем (Фаза 8). */
+  --pick: rgba(190,24,93,.28);
+  --on-accent:   #ffffff;
+  /* Кнопки действий (крупные .btn) — графитовые, НЕ малиновые.
+     Малиновый — только мелкие элементы: чекбоксы, фокус-кольцо, кнопка «←». */
+  --btn-bg:       #1e293b;
+  --btn-bg-hover: #293548;
+  --on-btn:       #ffffff;
+
+  /* ── Радиусы / тени / слои ── */
+  --r:    8px;
+  --r-sm: 6px;
+  --r-lg: 14px;
+  --shadow-panel: 0 1px 2px rgba(15,18,28,.06), 0 8px 28px -8px rgba(15,18,28,.18);
+  --shadow-pop:   0 2px 6px rgba(15,18,28,.10), 0 14px 40px -10px rgba(15,18,28,.28);
+  --z-canvas: 1; --z-dock: 20; --z-float: 30; --z-drawer: 40; --z-pop: 50; --z-picker: 60;
+  /* совместимость со старыми именами */
+  --sb: #1a1f2e;  --panel: var(--surface-2);
+
+  --ease: cubic-bezier(.23,1,.32,1);
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --ink:      #d7dbe3;
+  --ink-soft: #98a1b0;
+  --grid:     rgba(255,255,255,.075);
+  --halo:     #10141c;
+  --canvas:   #10141c;
+
+  --text:        #e7e9ef;
+  --text2:       #a7aebc;
+  --text3:       #8e96a4;   /* осветлён до контраста AA на тёмных поверхностях */
+  --bg:          #07090e;
+  --surface:     #161b25;
+  --surface-2:   #1d2330;
+  --input-bg:    #11151d;
+  --border:      rgba(255,255,255,.13);
+  --border-soft: rgba(255,255,255,.07);
+  --accent:      #FF4D94;
+  --accent-deep: #FF6BA6;
+  --accent-tint: rgba(255,77,148,.16);
+  --accent-ring: rgba(255,77,148,.42);
+  --pick: rgba(255,77,148,.40);
+  --on-accent:   #190810;
+  --btn-bg:       #334155;
+  --btn-bg-hover: #3e4f69;
+  --on-btn:       #ffffff;
+  --shadow-panel: 0 0 0 1px rgba(255,255,255,.05), 0 10px 34px -10px rgba(0,0,0,.6);
+  --shadow-pop:   0 0 0 1px rgba(255,255,255,.07), 0 16px 46px -12px rgba(0,0,0,.7);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px; color: var(--text); background: var(--bg);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+button { cursor: pointer; font: inherit; color: inherit; }
+input, select { font: inherit; }
+:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
+
+/* ── Основной макет: левая панель + область графика ────────────────── */
+.app { display: flex; height: calc(100vh - 48px); background: var(--bg); }
+
+/* Левая панель управления (~300px) */
+.panel {
+  width: 300px; flex-shrink: 0; background: var(--panel);
+  border-right: .5px solid var(--border);
+  overflow-y: auto; padding: 16px;
+}
+.panel h1 {
+  font-size: 15px; font-weight: 600; margin-bottom: 2px;
+}
+.panel .subtitle {
+  font-size: 12px; color: var(--text2); margin-bottom: 16px;
+}
+
+/* Секции внутри панели */
+.section { margin-bottom: 16px; }
+.section-title {
+  display: flex; align-items: center;
+  font-size: 12.5px; font-weight: 650; letter-spacing: -.005em;
+  color: var(--text); margin-bottom: 8px;
+}
+/* Вложенная секция (Фаза 8): «Структура рынка» и «Вмешательство» живут внутри
+   «Что изучаем», поэтому у них нет собственных отступов верхнего уровня —
+   их роль обозначает подзаголовок .vsub. */
+.section .section { margin-bottom: 0; }
+.section .section:last-child { margin-bottom: 0; }
+
+/* Элементы управления в панели */
+.field { margin-bottom: 8px; }
+.field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 3px; }
+.field input[type="text"], .field input[type="number"], .field select {
+  width: 100%; padding: 6px 8px; border: 1px solid var(--border);
+  border-radius: var(--r-sm); background: var(--input-bg); color: var(--text);
+  transition: border-color .12s var(--ease), box-shadow .12s var(--ease);
+}
+.field input:focus-visible, .field select:focus-visible,
+input:focus-visible, select:focus-visible {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.row { display: flex; gap: 8px; }
+.row .field { flex: 1; }
+.chk { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; margin-bottom: 6px; }
+.chk input { cursor: pointer; accent-color: var(--accent); }
+.btn {
+  width: 100%; padding: 8px 10px; border: none; border-radius: var(--r-sm);
+  background: var(--btn-bg); color: var(--on-btn); font-weight: 600; font-size: 13px;
+  transition: background .12s var(--ease), transform .08s var(--ease);
+}
+.btn:hover { background: var(--btn-bg-hover); }
+.btn:active { transform: scale(.98); }
+.btn-sm {
+  padding: 4px 9px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text2); font-size: 12px;
+  transition: color .12s var(--ease), border-color .12s var(--ease), background .12s var(--ease);
+}
+.btn-sm:hover { color: var(--accent); border-color: var(--accent); }
+.btn-sm:active { transform: scale(.98); }
+
+/* Подсказки, ошибки, код в подсказках */
+.hint { font-size: 11px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
+/* Инструкция ушла под вопросик (Фаза 5): абзац остаётся в разметке, чтобы
+   сцены по-прежнему правили его текстом, но с глаз убран. */
+.hint-hidden { display: none !important; }
+.help-dot {
+  width: 15px; height: 15px; margin-left: 6px; padding: 0; vertical-align: middle;
+  display: inline-grid; place-items: center; flex: 0 0 auto;
+  border: 1px solid var(--border); border-radius: 50%;
+  background: var(--surface); color: var(--text3);
+  font-size: 10px; font-weight: 700; line-height: 1; cursor: help;
+  transition: color .12s var(--ease), border-color .12s var(--ease);
+}
+.help-dot:hover, .help-dot:focus-visible { color: var(--accent); border-color: var(--accent); }
+/* Вопросик там, где заголовка рядом нет. Прижимаем его к предыдущему контролу
+   вместо отдельной строки: сам по себе он читался как обломок. */
+.help-inline { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 2px; }
+.help-anchor { margin-top: 4px; line-height: 1; }
+.help-anchor > .help-dot { margin-left: 0; }
+
+/* Таблица посчитанных площадей (Фаза 6): что, на каком отрезке, сколько, каким цветом. */
+.area-table { margin-top: 10px; }
+.area-row {
+  display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1.2fr) auto 18px;
+  align-items: center; gap: 8px; padding: 6px 0;
+  border-bottom: .5px solid var(--border);
+}
+.area-row:last-child { border-bottom: none; }
+.area-head { font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
+  color: var(--text3); text-transform: uppercase; padding-bottom: 4px; }
+.area-row > span { font-size: 11.5px; color: var(--text2); min-width: 0; }
+.area-row > b { font-size: 13px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums; text-align: right; }
+.area-what { display: flex; align-items: center; gap: 6px; }
+.area-name {
+  flex: 1; min-width: 0; padding: 3px 5px; font-size: 11.5px; color: var(--text);
+  border: 1px solid transparent; border-radius: var(--r-sm); background: none;
+}
+.area-name:hover { border-color: var(--border); }
+.area-name:focus { border-color: var(--accent); background: var(--input-bg); outline: none; }
+
+/* Имя складываемой кривой правится прямо в подписи поля (Фаза 13.2). */
+.ppfsum-name {
+  flex: 1; min-width: 0; margin-left: 6px; padding: 2px 5px;
+  font-size: 12px; font-weight: 600; color: var(--text2);
+  border: 1px solid transparent; border-radius: var(--r-sm); background: none;
+}
+.ppfsum-name:hover { border-color: var(--border); }
+.ppfsum-name:focus { border-color: var(--accent); background: var(--input-bg); color: var(--text); outline: none; }
+#ppfsum-rows .field > label { display: flex; align-items: center; }
+#hint-tip {
+  position: fixed; z-index: 200; display: none; max-width: 300px;
+  padding: 9px 11px; border-radius: var(--r-sm);
+  background: var(--surface); border: .5px solid var(--border);
+  box-shadow: 0 6px 22px rgba(0,0,0,.16);
+  font-size: 11.5px; line-height: 1.5; color: var(--text2);
+}
+#hint-tip hr { border: none; border-top: .5px solid var(--border); margin: 7px 0; }
+.hint code { background: var(--surface-2); border: 1px solid var(--border-soft);
+  padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+
+/* ── Подсказка формата формулы (Фаза 1а) ──────────────────────────────
+   Кнопка «?» рядом с полем ввода; всплывающая карточка с примерами
+   синтаксиса Math.js. Поле НЕ заслоняется — карточка раскрывается под ним.
+   Пример кликабелен: подставляется прямо в поле. */
+.f-wrap { position: relative; }
+.f-row { display: flex; gap: 6px; align-items: stretch; }
+.f-row > input { flex: 1; min-width: 0; }
+/* Набранная формула поверх самого поля: пока в поле не пишут, строка
+   показывает формулу так, как её печатают в учебнике. Стоит в потоке рядом с
+   input'ом (не поверх него абсолютом), поэтому ничего не съезжает при смене
+   темы и масштаба шрифта. Сам input продолжает хранить текст Math.js —
+   считается ровно то, что написано. */
+.f-slot { position: relative; flex: 1; min-width: 0; }
+.f-slot > input { width: 100%; }
+.f-typeset {
+  position: absolute; inset: 0; display: none; align-items: center;
+  padding: 0 8px; overflow-x: auto; overflow-y: hidden; cursor: text;
+  background: var(--input-bg); border: 1px solid var(--border);
+  border-radius: var(--r-sm); color: var(--text); font-size: 14px; line-height: 1;
+}
+.f-typeset.show { display: flex; }
+.f-typeset:hover { border-color: var(--accent-ring); }
+.f-help {
+  flex-shrink: 0; width: 30px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text2); font-size: 13px; font-weight: 700; line-height: 1;
+  transition: color .12s var(--ease), border-color .12s var(--ease);
+}
+.f-help:hover, .f-help[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.f-pop {
+  display: none; margin-top: 8px; padding: 11px 11px 10px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: var(--shadow-pop);
+}
+.f-pop.open { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .f-pop.open { animation: fpop .16s var(--ease); }
+  @keyframes fpop { from { opacity: 0; transform: translateY(-4px); } }
+}
+.f-pop-title {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 9px;
+}
+/* Примеры — ровная колонка карточек: набранная формула сверху, за что её берут снизу.
+   Раньше формула и пояснение стояли в строку и на длинных примерах ломали ряд. */
+.f-grid { display: grid; gap: 5px; }
+.f-ex {
+  display: grid; gap: 3px; width: 100%; text-align: left; cursor: pointer;
+  padding: 8px 10px; border: 1px solid transparent; border-radius: var(--r-sm);
+  background: var(--surface-2);
+  transition: background .12s var(--ease), border-color .12s var(--ease), transform .1s var(--ease);
+}
+.f-ex:hover { background: var(--accent-tint); border-color: var(--accent-ring); }
+.f-ex:active { transform: scale(.99); }
+.f-ex:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.f-ex-math { font-size: 13px; color: var(--text); line-height: 1.35; overflow-x: auto; }
+.f-ex-note { font-size: 10.5px; color: var(--text2); line-height: 1.35; }
+.f-pop-foot {
+  font-size: 10.5px; color: var(--text3); line-height: 1.5;
+  margin-top: 9px; padding-top: 8px; border-top: .5px solid var(--border);
+}
+/* Палитра операций: кусочки формулы, которые подставляются по нажатию.
+   Плотный ряд плиток, чтобы весь набор помещался в панель шириной 256px. */
+.f-pal-lead { font-size: 10.5px; color: var(--text2); line-height: 1.45; margin: -4px 0 8px; }
+.f-pal-group {
+  font-size: 10px; font-weight: 600; color: var(--text3);
+  margin: 8px 0 4px; letter-spacing: .03em;
+}
+/* ── Поле формулы на MathLive ─────────────────────────────────────────
+   Само поле показывает формулу так, как её печатают в учебнике, и растёт
+   в высоту, когда запись многоэтажная (дробь в дроби, кусочная функция).
+   Обычный input остаётся рядом скрытым: в нём лежит текст для движка,
+   и весь остальной код по-прежнему читает и пишет именно его. */
+math-field {
+  display: block; width: 100%; box-sizing: border-box;
+  padding: 5px 8px; font-size: 15px; line-height: 1.2;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text);
+  --caret-color: var(--accent);
+  /* Выделение в поле формулы: 10% малинового по белому было не различить,
+     поэтому берём отдельный, заметно более плотный тон (Фаза 8). */
+  --selection-background-color: var(--pick);
+  --contains-highlight-background-color: var(--pick);
+  --smart-fence-color: var(--text2);
+  --placeholder-color: var(--text3);
+}
+math-field:focus, math-field:focus-within {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring);
+}
+/* Свои кнопки уже есть в строке — встроенные не нужны. */
+math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { display: none; }
+.f-slot > input.mf-hidden { display: none; }
+
+/* Кнопка клавиатуры в правой части строки. */
+.f-kbd {
+  flex-shrink: 0; width: 32px; display: grid; place-items: center;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text2);
+  transition: color .12s var(--ease), border-color .12s var(--ease);
+}
+.f-kbd svg { width: 17px; height: 17px; }
+.f-kbd:hover, .f-kbd[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+
+/* ── Клавиатура ───────────────────────────────────────────────────────
+   Три раздела, раскрывается ОДИН за раз на всю ширину панели. */
+.mkbd {
+  display: none; margin-top: 8px; padding: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: var(--shadow-pop);
+}
+.mkbd.open { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .mkbd.open { animation: fpop .16s var(--ease); }
+}
+.mkbd-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+.mkbd-tab {
+  flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--text2);
+  transition: background .12s var(--ease), color .12s var(--ease), border-color .12s var(--ease);
+}
+.mkbd-tab:hover { color: var(--text); }
+.mkbd-tab.active { background: var(--accent-tint); border-color: var(--accent); color: var(--accent); }
+.mkbd-pane { display: none; }
+.mkbd-pane.active { display: block; }
+.mkbd-row { display: flex; gap: 4px; }
+.mkbd-row + .mkbd-row { margin-top: 4px; }
+.mkbd-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+.mkbd-lab {
+  font-size: 10px; font-weight: 600; color: var(--text3);
+  margin: 8px 0 4px; letter-spacing: .03em;
+}
+.mkbd-lab:first-child { margin-top: 0; }
+.mk {
+  flex: 1 1 auto; min-width: 30px; min-height: 32px; padding: 3px 6px;
+  display: grid; place-items: center; font-size: 13.5px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+  transition: background .1s var(--ease), border-color .1s var(--ease), transform .08s var(--ease);
+}
+.mk:hover { background: var(--accent-tint); border-color: var(--accent-ring); }
+.mk:active { transform: scale(.94); }
+.mk.wide { flex: 2 1 auto; }
+.mk.op { font-weight: 600; }
+.mk.fn { font-size: 12px; }
+.mkbd-grid .mk { flex: 0 0 auto; min-width: 32px; }
+.mkbd-foot {
+  display: flex; gap: 6px; margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+.mkbd-foot button {
+  flex: 1; padding: 6px; font-size: 11px; font-weight: 600; color: var(--text2);
+  background: transparent; border: 1px dashed var(--border); border-radius: var(--r-sm);
+  transition: color .12s var(--ease), border-color .12s var(--ease);
+}
+.mkbd-foot button:hover { color: var(--accent); border-color: var(--accent); }
+
+.f-pal-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.f-pal {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11.5px;
+  padding: 4px 7px; cursor: pointer; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+  transition: background .12s var(--ease), border-color .12s var(--ease), transform .1s var(--ease);
+}
+.f-pal:hover { background: var(--accent-tint); border-color: var(--accent-ring); }
+.f-pal:active { transform: scale(.96); }
+.f-pal:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.f-pal.wide { font-family: inherit; font-size: 11.5px; font-weight: 600; }
+
+/* Конструктор кусочной функции: слева нарисованная фигурная скобка,
+   справа строки «формула — на участке до границы». */
+/* Строка точки x₀: ползунок и поле точного значения. Поле широкое — в него
+   должно целиком влезать число вида -11.78, раньше последний знак обрезался. */
+.x0-row { display: flex; gap: 7px; align-items: center; margin-top: 4px; }
+.x0-row input[type="range"] { flex: 1; min-width: 0; margin: 0; }
+.x0-row input[type="number"] {
+  flex: 0 0 88px; width: 88px; padding: 5px 6px; font-size: 12.5px; text-align: center;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
+}
+
+/* Пояснение «как это устроено» прячется под вопросик рядом с полем ввода:
+   посреди панели такой абзац отвлекает, а нужен он один раз. */
+.hint-row { display: flex; align-items: center; gap: 7px; margin: 8px 0 2px; }
+.hint-btn {
+  flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center;
+  border: 1px solid var(--border); border-radius: 50%;
+  background: var(--surface); color: var(--text3);
+  font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer;
+  transition: color .12s var(--ease), border-color .12s var(--ease);
+}
+.hint-btn:hover, .hint-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.hint-lead { font-size: 11.5px; color: var(--text3); }
+.hint-pop {
+  display: none; margin: 6px 0 4px; padding: 9px 10px;
+  font-size: 11.5px; line-height: 1.5; color: var(--text2);
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+}
+.hint-pop.open { display: block; }
+.hint-pop p { margin: 0 0 6px; }
+.hint-pop p:last-child { margin-bottom: 0; }
+
+/* Разбор в «Аналитике»: как машина пришла к ответу. Стоит под числами и
+   читается сплошным текстом, поэтому набран мельче и с воздухом. */
+.sb-note {
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border-soft);
+  font-size: 11.5px; line-height: 1.55; color: var(--text2);
+}
+.sb-note b { display: block; margin-bottom: 5px; color: var(--text); font-size: 11px;
+  letter-spacing: .04em; text-transform: uppercase; }
+.sb-note p { margin: 0 0 6px; }
+.sb-note p:last-child { margin-bottom: 0; }
+
+/* Строка списка функций в режиме построения графиков: цвет, формула, крестик
+   и своё имя под ними. Пустая строка внизу выглядит так же, только без имени
+   и крестика — начал печатать, и она стала обычной. */
+.grow {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  gap: 6px; margin-bottom: 8px;
+}
+.grow .f-slot { min-width: 0; }
+.grow math-field { font-size: 14px; padding: 4px 7px; }
+.grow-name {
+  grid-column: 2 / 3; width: 100%; min-width: 0; padding: 3px 7px; font-size: 11.5px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text2);
+}
+.pw-count-field { display: flex; align-items: center; gap: 8px; }
+.pw-count-field label { margin: 0; }
+.pw-count-field input {
+  width: 62px; padding: 5px 7px; font-size: 12.5px; text-align: center;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text);
+}
+.pw-brace { display: flex; gap: 10px; margin: 4px 0 12px; align-items: stretch; }
+.pw-brace-mark { flex: 0 0 12px; align-self: stretch; color: var(--text3); min-height: 56px; }
+.pw-rows { flex: 1; display: grid; gap: 7px; }
+.pw-row { display: flex; align-items: center; gap: 6px; }
+.pw-row .f-slot { flex: 1 1 auto; min-width: 90px; }
+.pw-row input[type=text] {
+  flex: 1 1 120px; min-width: 0; padding: 5px 7px; font-size: 12px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text);
+}
+/* Поле формулы внутри строки — то же самое, что и в панели: набранная запись.
+   Ужимаем его по высоте, чтобы весь редактор помещался в один экран. */
+.pw-row math-field { font-size: 13px; padding: 3px 6px; }
+/* Границы участка узкие: это одно-два числа, а не формула. */
+.pw-row input.pw-bound { flex: 0 0 52px; text-align: center; padding: 5px 3px; }
+.pw-when { font-size: 11.5px; color: var(--text2); white-space: nowrap; }
+/* Живой предпросмотр формулы под полем (Фаза 4б): в поле остаётся синтаксис
+   Math.js, а тут видно, как формула выглядит набранной. */
+.f-preview { margin-top: 6px; font-size: 14px; color: var(--text); overflow-x: auto; }
+.f-preview:not(.has) { display: none; }
+.f-preview.has {
+  padding: 7px 9px; background: var(--surface-2);
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+}
+.f-preview .katex { font-size: 1.04em; }
+
+/* Бейдж формы ввода кривой (Q(P) — введена как объём от цены). */
+.form-badge {
+  flex-shrink: 0; font-size: 9.5px; font-weight: 700; letter-spacing: .02em;
+  color: var(--accent); background: var(--accent-tint);
+  border-radius: 3px; padding: 1px 4px;
+}
+.muted { font-size: 12px; color: var(--text2); }
+.error { font-size: 12px; color: var(--c-bad); margin-top: 8px; display: none; line-height: 1.4; }
+
+/* Список кривых (две строки: формула + роль) */
+.curve-row {
+  display: flex; flex-direction: column;
+  padding: 7px 0; border-bottom: .5px solid var(--border);
+}
+.curve-row:last-child { border-bottom: none; }
+.crow-top { display: flex; align-items: center; gap: 7px; }
+/* Второй ряд строки кривой: имя на графике и роль. Открывается шевроном —
+   нужны они заметно реже формулы (Фаза 10). */
+.crow-more { display: none; gap: 6px; margin-top: 6px; padding-left: 22px; }
+.crow-more.open { display: flex; }
+.crow-more > * { flex: 1 1 0; min-width: 0; width: auto; }
+.crow-gear { color: var(--text3); }
+.crow-gear svg { width: 13px; height: 13px; display: block; transition: transform .18s var(--ease); }
+.crow-gear[aria-expanded="true"] svg { transform: rotate(180deg); }
+.crow-gear:hover { color: var(--accent); }
+.crow-top > .curve-expr-inp { flex: 1 1 auto; min-width: 0; }
+.role-sel {
+  width: 100%; padding: 4px 6px; border: 1px solid var(--border);
+  border-radius: var(--r-sm); background: var(--input-bg); font-size: 12px; color: var(--text2);
+}
+.swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+/* Кликабельный образец = нативный input[type=color] (Фаза 2). */
+.swatch-pick {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; padding: 0; cursor: pointer;
+  border: 1px solid var(--border-soft); border-radius: 3px; background: none;
+  transition: border-color .12s var(--ease), transform .12s var(--ease);
+}
+.swatch-pick::-webkit-color-swatch-wrapper { padding: 0; }
+.swatch-pick::-webkit-color-swatch { border: none; border-radius: 2px; }
+.swatch-pick::-moz-color-swatch { border: none; border-radius: 2px; }
+.swatch-pick:hover { border-color: var(--accent); transform: scale(1.12); }
+/* Поле «имя кривой на графике» в списке кривых (Фаза 1). */
+.curve-label-inp {
+  width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-size: 12px;
+}
+/* Формула кривой правится на месте. Моноширинный шрифт как у подписи кривой,
+   красная рамка = формулу пока не поняли и старая кривая осталась на графике. */
+.curve-expr-inp {
+  width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-size: 12px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+.curve-expr-inp.bad { border-color: var(--c-bad); }
+.curve-name {
+  flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-family: ui-monospace, 'SF Mono', Menlo, monospace; color: var(--text);
+}
+.btn-icon {
+  border: none; background: none; color: var(--text2);
+  font-size: 14px; padding: 2px 4px; line-height: 1; flex-shrink: 0;
+  transition: color .12s var(--ease);
+}
+.btn-icon:hover { color: var(--c-bad); }
+
+/* Подзаголовок внутри секции («Свои точки» в «Оформлении»). */
+/* Подзаголовок ВНУТРИ секции: ступень ниже её заголовка, поэтому мельче и
+   приглушён. Капитель здесь читалась бы как уровень выше, а не ниже. */
+.vsub {
+  display: flex; align-items: center;
+  font-size: 11.5px; font-weight: 600; color: var(--text2);
+  margin: 12px 0 7px; padding-top: 10px; border-top: .5px solid var(--border);
+}
+/* Кнопка «Поставить точку» во взведённом состоянии — ждёт щелчка по графику. */
+.btn-sm.armed { color: var(--accent); border-color: var(--accent); background: var(--accent-tint); }
+/* Строка своей точки: координаты, подпись, что показывать, удаление. */
+.mark-row { padding: 8px 0; border-bottom: .5px solid var(--border); }
+.mark-row:last-child { border-bottom: none; }
+.mark-top { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.mark-co {
+  flex: 1; font-size: 11.5px; color: var(--text2); white-space: nowrap;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+.mark-row input[type="text"] {
+  width: 100%; padding: 5px 7px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-size: 12px;
+}
+.mark-row .chk { font-size: 11.5px; margin: 6px 0 0; }
+
+/* Табло результатов (равновесие, площади, налог) */
+.stat { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0; font-size: 13px; }
+.stat span { color: var(--text2); }
+.stat b { font-variant-numeric: tabular-nums; color: var(--text); }
+/* В табло результатов число — главное, что человек ищет глазами, поэтому оно
+   крупнее и тяжелее подписи. В «Инструментах» те же .stat остаются мелкими:
+   там они справочные, а не отсчёт прибора. */
+.sb-body .stat { padding: 5px 0; }
+.sb-body .stat span { font-size: 12px; font-weight: 500; }
+.sb-body .stat b { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.warn { font-size: 12px; color: var(--c-warn); line-height: 1.4; }
+
+/* Таблица «До / После / Δ» для налога */
+.tx-table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 4px; }
+.tx-table th, .tx-table td { padding: 3px 4px; text-align: right; border-bottom: .5px solid var(--border); }
+.tx-table th:first-child, .tx-table td:first-child { text-align: left; color: var(--text2); }
+.tx-table th { color: var(--text2); font-weight: 600; }
+.tx-table td { font-variant-numeric: tabular-nums; }
+
+/* Ползунок */
+input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px; }
+
+/* Переключатель «Налог / Субсидия» */
+.seg { display: flex; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+.seg-btn { flex: 1; padding: 6px 0; border: none; background: var(--surface); color: var(--text2); font-size: 12px;
+  transition: background .12s var(--ease), color .12s var(--ease); }
+.seg-btn:hover { color: var(--text); }
+.seg-btn.active { background: var(--accent); color: var(--on-accent); }
+.seg-btn.active:hover { color: var(--on-accent); }
+.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+
+/* Область графика справа */
+.graph-wrap {
+  flex: 1; position: relative; background: var(--canvas); overflow: hidden;
+}
+#chart { display: block; width: 100%; height: 100%; }
+
+/* Окошко с координатами у курсора, пока катят точку по кривой (Фаза 3).
+   Обычный div поверх холста: SVG на каждом движении мыши не трогаем. */
+#roll-tip {
+  position: absolute; z-index: 30; display: none; pointer-events: none;
+  padding: 4px 8px; border-radius: var(--r-sm);
+  background: var(--surface); border: .5px solid var(--border);
+  box-shadow: 0 2px 10px rgba(0,0,0,.14);
+  font-size: 12px; font-weight: 600; color: var(--text);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+/* Заглушка-подсказка по центру пустого графика (шаг 1) */
+.empty-hint {
+  position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center;
+  color: var(--text2); font-size: 13px; pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ЭКРАН 1 — ОКНО ВЫБОРА СЦЕНАРИЯ
+   Полноэкранный слой поверх рабочего места. Каждая карточка — мини-график
+   в визуальном языке движка (тот же набор цветов кривых).
+   ═══════════════════════════════════════════════════════════════════ */
+.picker {
+  position: fixed; inset: 48px 0 0 0; z-index: var(--z-picker);
+  background: var(--bg); overflow-y: auto;
+  opacity: 1; transition: opacity .26s var(--ease), visibility .26s var(--ease);
+}
+/* visibility:hidden убирает скрытое окно из дерева доступности и из таб-порядка
+   (одного opacity:0 для этого недостаточно). */
+.picker.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.picker-inner { max-width: 1100px; margin: 0 auto; padding: 44px 28px 64px; }
+.picker-head { margin-bottom: 28px; }
+.picker-eyebrow {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 12px;
+}
+.picker-eyebrow::before {
+  content: ""; width: 18px; height: 2px; border-radius: 2px; background: var(--accent);
+}
+.picker-title { font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+.picker-sub { font-size: 15px; color: var(--text2); margin-top: 6px; max-width: 56ch; line-height: 1.5; }
+
+.picker-group { margin-top: 30px; }
+.picker-group-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 12px;
+}
+.picker-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+}
+
+.scard {
+  display: flex; flex-direction: column; text-align: left;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: 14px; gap: 12px; cursor: pointer; color: inherit;
+  transition: transform .16s var(--ease), border-color .16s var(--ease), box-shadow .16s var(--ease);
+}
+.scard:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: var(--shadow-pop); }
+.scard:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); transform: translateY(-3px); }
+.scard:active { transform: translateY(-1px) scale(.995); }
+.scard-spec {
+  border-radius: var(--r); background: var(--canvas);
+  border: 1px solid var(--border-soft); overflow: hidden; aspect-ratio: 16 / 9;
+}
+.scard-spec svg { display: block; width: 100%; height: 100%; }
+.scard-name { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -.01em; }
+.scard-desc { font-size: 12.5px; color: var(--text2); line-height: 1.45; margin-top: -4px; }
+
+/* «Свободный холст» — отдельная широкая карточка с пунктирной рамкой. */
+.scard.free { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 18px;
+  border-style: dashed; background: transparent; }
+.scard.free .scard-spec { width: 132px; flex-shrink: 0; aspect-ratio: 16 / 9; }
+.scard.free .scard-body { display: flex; flex-direction: column; gap: 4px; }
+.scard.free:hover { background: var(--surface); }
+
+/* Карточка сюжета, который ещё готовится. Видна, чтобы карта блоков была
+   полной, но не нажимается: disabled + приглушение + бейдж «скоро». */
+/* Переключатель, который карточка блока уже зафиксировала. Класс, а не
+   инлайновый display: обычная логика видимости продолжает распоряжаться
+   style.display, а этот класс просто перекрывает её сверху. */
+.scoped-off { display: none !important; }
+
+.scard.soon { cursor: default; opacity: .5; border-style: dashed; background: transparent; }
+.scard.soon:hover, .scard.soon:active { transform: none; border-color: var(--border); box-shadow: none; }
+.scard-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.scard-soon {
+  flex-shrink: 0; font-size: 10px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text3);
+  border: 1px solid var(--border); border-radius: 999px; padding: 2px 7px;
+}
+
+@media (max-width: 640px) {
+  .picker-inner { padding: 28px 16px 48px; }
+  .picker-title { font-size: 24px; }
+  .picker-grid { grid-template-columns: 1fr; }
+  .scard.free { flex-direction: column; align-items: stretch; }
+  .scard.free .scard-spec { width: 100%; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ЭКРАН 2 — РАБОЧЕЕ МЕСТО «СЦЕНА»
+   Четыре колонки в ряд:
+     [док 56] [Ввод функций + Аналитика 316] [график] [Основные параметры 268]
+   Панели больше не висят НАД холстом, они его соседи. Свернул панель,
+   график стал шире, и ни одна кривая не осталась под стеклом.
+   ═══════════════════════════════════════════════════════════════════ */
+.app { position: relative; display: flex; align-items: stretch; height: calc(100vh - 48px); overflow: hidden; }
+/* Выделение текста на холсте выключено: при панорамировании трекпадом иначе
+   подсвечиваются числа на осях и подписи кривых. Поля ввода поверх графика
+   (переименование точки, меню плоскости) выделение возвращают себе сами. */
+.graph-wrap {
+  position: relative; flex: 1 1 auto; min-width: 0; background: var(--canvas);
+  user-select: none; -webkit-user-select: none;
+}
+.graph-wrap input, .graph-wrap textarea, .graph-wrap select { user-select: text; -webkit-user-select: text; }
+#chart { display: block; width: 100%; height: 100%; }
+#chart text { user-select: none; -webkit-user-select: none; }
+
+/* ── Левый док: постоянная полоса иконок ── */
+/* Полоса иконок лежит ВЫШЕ боковых панелей: её подсказки вылетают вправо и
+   раньше уходили под свёрнутую панель ввода. z-index у подсказки помочь не мог —
+   она внутри своего слоя, и весь слой был ниже панели. */
+.dock {
+  position: relative; flex: 0 0 56px; z-index: var(--z-drawer);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 12px 0; background: var(--surface-2);
+  border-right: 1px solid var(--border);
+}
+.dock-sep { width: 24px; height: 1px; background: var(--border); margin: 6px 0; }
+.dock-spacer { flex: 1; }
+.dock-btn {
+  width: 40px; height: 40px; border: 1px solid transparent; border-radius: var(--r-sm);
+  background: transparent; color: var(--text2); display: grid; place-items: center;
+  position: relative; transition: background .12s var(--ease), color .12s var(--ease);
+}
+.dock-btn svg { width: 20px; height: 20px; }
+.dock-btn:hover { background: var(--surface); color: var(--text); }
+.dock-btn.active { background: var(--accent-tint); color: var(--accent); }
+.dock-btn:disabled { opacity: .4; cursor: not-allowed; }
+/* Подпись-тултип справа от кнопки */
+.dock-btn[data-tip]::after {
+  content: attr(data-tip); position: absolute; left: calc(100% + 8px); top: 50%;
+  transform: translateY(-50%) scale(.96); transform-origin: left center;
+  background: var(--text); color: var(--surface); font-size: 11px; font-weight: 600;
+  padding: 4px 8px; border-radius: 5px; white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity .12s var(--ease), transform .12s var(--ease); z-index: var(--z-pop);
+}
+.dock-btn:hover[data-tip]::after,
+.dock-btn:focus-visible[data-tip]::after { opacity: 1; transform: translateY(-50%) scale(1); }
+
+/* ── Боковые панели ──────────────────────────────────────────────────
+   Обе устроены одинаково и различаются только стороной. Свёрнутая панель
+   ужимается до полосы 26px, на которой остаётся одна стрелка, поэтому
+   развернуть её можно всегда, не гадая, куда она делась. */
+.side {
+  position: relative; flex: 0 0 auto; z-index: var(--z-float);
+  display: flex; flex-direction: column; background: var(--surface);
+  transition: width .22s var(--ease);
+}
+.side-left  { width: 316px; border-right: 1px solid var(--border); }
+.side-right { width: 268px; border-left:  1px solid var(--border); }
+.side.collapsed { width: 26px; }
+.side-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.side.collapsed .side-inner { display: none; }
+
+.side-arrow {
+  /* Вровень с первой иконкой дока: её центр на 10 px ниже, и стрелки
+     читались как случайно расставленные (Фаза 8). */
+  position: absolute; top: 19px; width: 22px; height: 26px; z-index: 2;
+  display: grid; place-items: center; border: none; border-radius: var(--r-sm);
+  background: transparent; color: var(--text3);
+  transition: background .12s var(--ease), color .12s var(--ease);
+}
+.side-left  .side-arrow { right: 2px; }
+.side-right .side-arrow { left: 2px; }
+.side-arrow:hover { background: var(--surface-2); color: var(--text); }
+/* Подпись всплывает не сразу: она нужна тому, кто задумался над иконкой,
+   и мешала бы при обычном движении мыши через панель. */
+.side-arrow[data-tip]::after {
+  content: attr(data-tip); position: absolute; top: 50%;
+  transform: translateY(-50%) scale(.96);
+  background: var(--text); color: var(--surface); font-size: 11px; font-weight: 600;
+  padding: 4px 8px; border-radius: 5px; white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity .12s var(--ease) 0s, transform .12s var(--ease) 0s;
+  z-index: var(--z-pop);
+}
+.side-left  .side-arrow[data-tip]::after { left: calc(100% + 8px); transform-origin: left center; }
+.side-right .side-arrow[data-tip]::after { right: calc(100% + 8px); transform-origin: right center; }
+.side-arrow:hover[data-tip]::after,
+.side-arrow:focus-visible[data-tip]::after {
+  opacity: 1; transform: translateY(-50%) scale(1);
+  transition-delay: .9s;
+}
+.side-arrow svg { width: 15px; height: 15px; transition: transform .22s var(--ease); }
+.side.collapsed .side-arrow svg { transform: rotate(180deg); }
+
+/* Заголовок панели уступает место стрелке сворачивания: у левой панели стрелка
+   справа, у правой — слева, поэтому и отступы зеркальные. */
+.side-head {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  padding: 12px 32px 10px 14px; border-bottom: 1px solid var(--border-soft);
+}
+.side-right .side-head { padding: 12px 14px 10px 32px; }
+.side-head h2, .side-scene {
+  font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Хлебная крошка над названием сцены: из какого она блока. */
+.side-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+.scene-block {
+  font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%;
+}
+.scene-block:empty { display: none; }
+.side-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+/* Две части левой панели: ввод сверху, аналитика снизу. */
+.side-part { border-top: 1px solid var(--border-soft); }
+.side-part:first-child { border-top: none; }
+.part-title {
+  position: sticky; top: 0; z-index: 1; background: var(--surface);
+  padding: 12px 14px 6px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text3);
+}
+.tools-body { padding: 4px 14px 14px; }
+.tools .panel-only { display: none; }   /* h1/subtitle старой панели прячем */
+
+/* Аналитика читается как приборная панель: крупное число, тихая подпись. */
+#scoreboard.hidden { display: none; }
+.sb-body { padding: 4px 14px 16px; }
+.sb-body .section { margin-bottom: 12px; }
+.sb-body .section:last-child { margin-bottom: 0; }
+.sb-body .section-title { margin-top: 8px; }
+.sb-body .stat { padding: 5px 0; align-items: baseline; gap: 10px; }
+.sb-body .stat span { font-size: 12px; }
+.sb-body .stat b { font-size: 16px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.sb-empty { font-size: 12.5px; color: var(--text2); line-height: 1.5; padding: 6px 0; }
+.sb-body > div:not(:empty) { margin-bottom: 12px; }
+.sb-body > div:empty { margin: 0; }
+
+/* ── Правая панель «Основные параметры» ──────────────────────────────
+   Здесь живут живые регуляторы активной сцены. Каждый в две строки:
+   сверху имя и значение, снизу ползунок во всю ширину, так число видно
+   не щурясь, а тянуть удобно даже в узкой колонке. */
+#params-body { padding: 6px 14px 18px; display: flex; flex-direction: column; gap: 13px; }
+#params-empty { font-size: 12.5px; color: var(--text2); line-height: 1.5; }
+#params-curves, #params-extra { display: contents; }
+.pchip { display: flex; flex-direction: column; gap: 5px; }
+.pchip-top { display: flex; align-items: center; gap: 7px; }
+.pchip-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.pchip-label {
+  font-size: 12px; font-weight: 600; color: var(--text2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pchip-val {
+  margin-left: auto; font-size: 13px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums; flex-shrink: 0;
+}
+.pchip input[type="range"] { width: 100%; margin: 0; }
+/* Перенесённые сюда поля сцены (ставка, цена, зарплата, мировая цена, альфа)
+   уже свёрстаны в две строки, им хватает обнуления внешнего отступа. */
+/* Регулятор сцены выглядит ровно как ползунок буквы-параметра: имя слева,
+   значение справа крупным, дорожка во всю ширину под ними. Раньше это были две
+   разные на вид штуки в одной колонке (Фаза 10). */
+#params-body .field { margin: 0; display: flex; flex-direction: column; gap: 5px; }
+/* Подпись регулятора читается одной фразой («Ставка t = 20»), поэтому она
+   обычная строка, а не колонки: разгонять её по краям было бы враньём про
+   структуру — там не «имя и значение», там предложение. */
+#params-body .field > label {
+  font-size: 12px; font-weight: 600; color: var(--text2); margin: 0;
+}
+#params-body .field > label b {
+  font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;
+}
+/* Поле точного значения: спокойное, пока в него не целятся. */
+#params-body .field input[type="number"] {
+  width: 56px; padding: 3px 5px; font-size: 11.5px; text-align: right;
+  border: 1px solid transparent; background: none; color: var(--text);
+  font-variant-numeric: tabular-nums; border-radius: var(--r-sm);
+}
+#params-body .field input[type="number"]:hover { border-color: var(--border); }
+#params-body .field input[type="number"]:focus { border-color: var(--accent); background: var(--input-bg); outline: none; }
+#params-body .hint { font-size: 11.5px; margin-top: 5px; }
+#params-body .seg { margin: 0; }
+
+/* Сворачиваемый блок в панели (расчёт площадей). */
+.fold-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 0; background: transparent; border: none;
+  font-size: 12.5px; font-weight: 650; letter-spacing: -.005em;
+  color: var(--text);
+}
+.fold-btn:hover { color: var(--accent); }
+.fold-btn > span { display: flex; align-items: center; }
+.fold-btn svg { width: 13px; height: 13px; transition: transform .18s var(--ease); }
+.fold-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.fold-body { display: none; padding-top: 4px; }
+.fold-body.open { display: block; }
+
+/* Список областей с пикерами цвета. */
+.ac-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.ac-name { font-size: 12px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chk.dim { opacity: .72; }
+
+/* Быстрая кнопка расчёта площади поверх графика. */
+.quick-area {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+  z-index: var(--z-float); padding: 7px 14px; font-size: 12px; font-weight: 600;
+  color: var(--on-btn); background: var(--btn-bg); border: none; border-radius: 18px;
+  box-shadow: var(--shadow-panel);
+}
+.quick-area:hover { background: var(--btn-bg-hover); }
+.quick-area[hidden] { display: none; }
+
+/* Поля координат своей точки. */
+.mark-xy { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+.mark-xy label { font-size: 11px; color: var(--text3); }
+.mark-xy input[type="number"] {
+  width: 100%; min-width: 0; padding: 4px 6px; font-size: 12px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
+}
+
+/* Ползунок параметра: под ним строка настройки границ и шага. */
+.pchip-param .param-row { display: flex; gap: 4px; margin-top: 4px; }
+.pchip-param .param-row input {
+  min-width: 0; padding: 3px 4px; font-size: 11px; text-align: center;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text2); font-variant-numeric: tabular-nums;
+}
+/* Ползунок параметра: границы написаны по краям дорожки и открывают редактор. */
+.param-track { display: flex; align-items: center; gap: 6px; }
+.param-track input[type="range"] { flex: 1; min-width: 0; }
+.param-bound {
+  flex: 0 0 auto; padding: 1px 3px; border: none; background: transparent;
+  font-size: 10.5px; color: var(--text3); font-variant-numeric: tabular-nums;
+  border-bottom: 1px dashed var(--border); border-radius: 0; cursor: pointer;
+}
+.param-bound:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.param-editor { display: none; }
+.param-editor.open { display: block; margin-top: 6px; }
+.param-ed-line { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; font-size: 11px; color: var(--text2); }
+.param-ed-line input {
+  width: 100%; min-width: 0; flex: 1; padding: 3px 5px; font-size: 11px; text-align: center;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
+}
+.param-ed-name { flex: 0 0 auto; font-weight: 600; color: var(--text); }
+.param-ed-ok {
+  width: 100%; padding: 4px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--text2); cursor: pointer;
+}
+.param-ed-ok:hover { color: var(--accent); border-color: var(--accent); }
+.pchip-editable { cursor: text; border-bottom: 1px dashed var(--border); }
+.pchip-editable:hover { border-bottom-color: var(--accent); }
+.pchip-valedit {
+  margin-left: auto; width: 66px; padding: 1px 4px; font-size: 12px; font-weight: 700;
+  text-align: right; border: 1px solid var(--accent); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
+}
+/* Две группы в правой панели: регуляторы модели и буквы из формул. */
+.params-group-title {
+  font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--text3); margin: 12px 0 6px;
+}
+.params-group-title:first-child { margin-top: 0; }
+.pchip-param .param-row input:nth-child(2) { color: var(--text); font-weight: 600; }
+
+/* ── Кнопки над графиком: гаечный ключ и возврат масштаба ── */
+.graph-tools {
+  position: absolute; top: 12px; right: 12px; z-index: var(--z-float);
+  display: flex; align-items: center; gap: 6px;
+}
+.gt-btn {
+  width: 34px; height: 34px; display: grid; place-items: center; position: relative;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text2); box-shadow: var(--shadow-panel);
+  transition: color .12s var(--ease), border-color .12s var(--ease), transform .08s var(--ease);
+}
+.gt-btn svg { width: 17px; height: 17px; }
+.gt-btn:hover { color: var(--accent); border-color: var(--accent); }
+.gt-btn:active { transform: scale(.94); }
+.gt-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-tint); }
+.gt-btn[hidden] { display: none; }
+.gt-btn[data-tip]::after {
+  content: attr(data-tip); position: absolute; top: calc(100% + 7px); right: 0;
+  background: var(--text); color: var(--surface); font-size: 11px; font-weight: 600;
+  padding: 4px 8px; border-radius: 5px; white-space: nowrap; pointer-events: none;
+  opacity: 0; transform: translateY(-3px); transition: opacity .12s var(--ease), transform .12s var(--ease);
+  z-index: var(--z-pop);
+}
+.gt-btn:hover[data-tip]::after,
+.gt-btn:focus-visible[data-tip]::after { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .gt-btn.appear { animation: gtIn .18s var(--ease); }
+  @keyframes gtIn { from { opacity: 0; transform: scale(.9); } }
+}
+
+/* ── Меню настроек координатной плоскости (гаечный ключ) ── */
+.wrench {
+  position: absolute; top: 52px; right: 12px; z-index: var(--z-pop);
+  width: 268px; max-height: calc(100% - 72px); overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop); padding: 4px 14px 14px;
+  transform-origin: top right;
+  display: none;
+}
+.wrench.open { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .wrench.open { animation: wrenchIn .16s var(--ease); }
+  @keyframes wrenchIn { from { opacity: 0; transform: scale(.96) translateY(-4px); } }
+}
+.wrench-group { padding: 10px 0; border-top: 1px solid var(--border-soft); }
+.wrench-group:first-of-type { padding-top: 10px; border-top: none; }
+.wrench-title {
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 7px;
+}
+.wrench-row { display: flex; align-items: center; gap: 7px; }
+.wrench-row + .wrench-row { margin-top: 7px; }
+.wrench-row > label { font-size: 12px; color: var(--text2); flex-shrink: 0; }
+.wrench-row input[type="number"], .wrench-row input[type="text"] {
+  flex: 1; min-width: 0; padding: 6px 7px; font-size: 12.5px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
+}
+.wrench .seg { margin: 0; }
+.wrench .seg-btn { padding: 6px 8px; font-size: 11.5px; }
+.wrench .chk { margin-top: 0; }
+.wrench .hint { margin-top: 5px; }
+
+@media (max-width: 900px) {
+  .side-left  { width: 268px; }
+  .side-right { width: 232px; }
+}
+
+/* Интервал между блоками результатов; пустые блоки (чужой режим) не занимают места. */
+.sb-body > div:not(:empty) { margin-bottom: 12px; }
+.sb-body > div:empty { margin: 0; }
+
+/* Тост-уведомление (заглушки «сохранить/экспорт») */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 12px); z-index: var(--z-pop);
+  background: var(--text); color: var(--surface); font-size: 13px; font-weight: 600;
+  padding: 9px 16px; border-radius: 20px; box-shadow: var(--shadow-pop);
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s var(--ease), transform .2s var(--ease);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ── Модальное окно (экспорт, Фаза 5) ────────────────────────────────── */
+.modal {
+  position: fixed; inset: 0; z-index: var(--z-picker);
+  display: none; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(15, 18, 26, .42); backdrop-filter: blur(2px);
+}
+.modal.open { display: flex; }
+.modal-card {
+  width: min(380px, 100%); max-height: 90vh; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-pop); padding: 20px;
+}
+.modal-title { font-size: 17px; font-weight: 650; color: var(--text); margin: 0 0 4px; }
+.modal-sub { font-size: 12px; color: var(--text2); margin: 0 0 16px; line-height: 1.5; }
+.modal-opts { display: grid; gap: 8px; margin-top: 16px; }
+.modal-opts .hint { margin-top: 2px; }
+.modal-foot { margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
+.btn-ghost {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); font-weight: 600;
+}
+.btn-ghost:hover:not(:disabled) { background: var(--surface-2); border-color: var(--accent); color: var(--accent); }
+.btn:disabled, .btn-ghost:disabled { opacity: .45; cursor: not-allowed; }
+@media (prefers-reduced-motion: no-preference) {
+  .modal.open .modal-card { animation: modalIn .18s var(--ease); }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ДВИЖЕНИЕ — целенаправленное, ease-out, <300мс; уважает reduced-motion.
+   ═══════════════════════════════════════════════════════════════════ */
+/* Окно выбора: мягкое появление содержимого (один раз при загрузке).
+   Без fill-mode — если анимация не сыграет, карточки уже видимы (не пусто). */
+@keyframes pickerIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+.picker-inner { animation: pickerIn .42s var(--ease); }
+/* Закрытие окна — лёгкий «отъезд назад», открывая готовую сцену. */
+.picker.hidden { transform: scale(.99); }
+
+/* Тактильная отдача нажатия на кнопки дока. */
+.dock-btn:not(:disabled):active { transform: scale(.92); }
+
+/* Кнопки над графиком мягко въезжают один раз при открытии сцены. */
+@keyframes floatIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.graph-tools { animation: floatIn .34s var(--ease) .04s; }
+@media (prefers-reduced-motion: reduce) {
+  .side, .side-arrow svg { transition: none; }
+  .graph-tools, .picker-inner { animation: none; }
+}
