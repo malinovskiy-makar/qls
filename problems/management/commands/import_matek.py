@@ -180,7 +180,48 @@ def _strip_wrapper(text: str, cmd: str) -> str:
     return ''.join(result)
 
 
+# Математические регионы. Внутри них чистка ЗАПРЕЩЕНА: там командует KaTeX,
+# и то, что вне формулы — служебный мусор, внутри может быть значащим.
+_MATH_REGION_RE = re.compile(
+    r'\$\$[\s\S]{0,3000}?\$\$'
+    r'|\$[^\$]{0,600}?\$'
+    r'|\\\[[\s\S]{0,3000}?\\\]'
+    r'|\\\([\s\S]{0,800}?\\\)'
+    r'|\\begin\{(equation|align|aligned|cases|gather|multline|array)\*?\}'
+    r'[\s\S]{0,5000}?\\end\{\1\*?\}')
+
+
 def clean_latex(text: str) -> str:
+    """Чистка LaTeX-обвязки ВНЕ формул. Содержимое формул не трогается.
+
+    ⚠️ Раньше чистка шла по всему тексту подряд, и это портило математику:
+    `\\quad` вне формулы — служебный отступ и мусор, а ВНУТРИ формулы это
+    зазор, который рисует KaTeX. Без него `$0{,}5x \\quad x \\leqslant 16$`
+    превращается в `$0{,}5x x \\leqslant 16$` и на экране слипается в
+    «0,5xx ⩽ 16» (найдено на #29026 сверкой с оригинальным .tex). Та же беда
+    с `\\\\`: вне формулы это перенос строки, внутри `cases`/`array` —
+    разделитель строк матрицы.
+
+    Поэтому формулы прячем под заглушки, чистим текст вокруг и возвращаем
+    формулы дословно.
+
+    ⚠️ Та же вырезающая регулярка скопирована ещё в пять импортёров
+    (import_archive3, import_olmat_reshalki, import_tex, update_lsh_solutions,
+    update_inline_answers) — там она НЕ исправлена: это отдельные конвейеры
+    других источников, и менять их без повторной сверки выхода нельзя.
+    """
+    stash: list = []
+
+    def _hide(m):
+        stash.append(m.group())
+        return '\x00{}\x00'.format(len(stash) - 1)
+
+    text = _MATH_REGION_RE.sub(_hide, text)
+    text = _clean_outside_math(text)
+    return re.sub(r'\x00(\d+)\x00', lambda m: stash[int(m.group(1))], text).strip()
+
+
+def _clean_outside_math(text: str) -> str:
     for cmd in _FORMAT_CMDS:
         text = _strip_wrapper(text, cmd)
 

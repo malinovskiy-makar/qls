@@ -57,36 +57,10 @@ CHOICES = {}
 
 MEASURE_JS = 'scripts/katex_measure_texts.js'
 
-# Математические регионы: внутри них чистка запрещена — там командует KaTeX.
-_MATH_REGION = re.compile(
-    r'\$\$[\s\S]{0,3000}?\$\$'
-    r'|\$[^\$]{0,600}?\$'
-    r'|\\\[[\s\S]{0,3000}?\\\]'
-    r'|\\\([\s\S]{0,800}?\\\)'
-    r'|\\begin\{(equation|align|aligned|cases|gather|multline|array)\*?\}'
-    r'[\s\S]{0,5000}?\\end\{\1\*?\}')
-
-
-def clean_keep_math(text):
-    """`clean_latex`, но НЕ трогающий содержимое формул.
-
-    ⚠️ Боевой `clean_latex` вырезает `\\quad`/`\\qquad` и превращает `\\\\`
-    в перенос строки по ВСЕМУ тексту, включая математику. Вне формул это
-    верно, внутри — порча: `\\quad` там задаёт зазор (без него `0{,}5x \\quad
-    x \\leqslant 16` слипается в «0,5xx ⩽ 16»), а `\\\\` разделяет строки
-    `cases`. Поэтому формулы прячем под заглушки, чистим только текст вокруг
-    и возвращаем формулы дословно.
-    """
-    stash = []
-
-    def _hide(m):
-        stash.append(m.group())
-        return '\x00{}\x00'.format(len(stash) - 1)
-
-    masked = _MATH_REGION.sub(_hide, text or '')
-    cleaned = clean_latex(masked)
-    return re.sub(r'\x00(\d+)\x00', lambda m: stash[int(m.group(1))], cleaned)
-
+# Содержимое формул `clean_latex` больше не трогает — защита живёт в самом
+# импортёре (см. его докстринг). Второй копии здесь нет намеренно: две чистки
+# разошлись бы, и превью показывало бы не то, что даёт импорт.
+clean_keep_math = clean_latex
 
 _WS = re.compile(r'\s+')
 _NUM_SIGN = re.compile(r'[-+−]?\d+(?:[.,]\d+)?')
@@ -137,6 +111,11 @@ class Command(BaseCommand):
                             help='Записать выбранные версии в базу.')
         parser.add_argument('--no-measure', action='store_true',
                             help='Не гонять рендер (быстрее, но без цифр поломок).')
+        parser.add_argument('--skip-pid', default='',
+                            help='Задачи, которые НЕ записывать (через запятую). '
+                                 'Нужно, когда по одной из трёх решение отложено: '
+                                 'у #27998 числа .tex и Sonnet расходятся в записи '
+                                 'индекса, и владелец смотрит это отдельно.')
 
     # ── исходники ───────────────────────────────────────────────────────
 
@@ -317,7 +296,12 @@ class Command(BaseCommand):
         self.stdout.write('Превью → {}'.format(OUT_HTML))
 
         if opts['confirm']:
-            self._apply(rows)
+            skip = {int(x) for x in opts['skip_pid'].split(',') if x.strip().isdigit()}
+            if skip:
+                self.stdout.write(self.style.WARNING(
+                    'Не записываю (решение отложено): {}'.format(
+                        ', '.join('#{}'.format(p) for p in sorted(skip)))))
+            self._apply([r for r in rows if r['pid'] not in skip])
         else:
             self.stdout.write(self.style.WARNING(
                 'Это ПРЕВЬЮ. В базу ничего не записано. Для записи: --confirm'))
