@@ -21,8 +21,15 @@
     <span class="k-tile__name">Описать словами</span>
     <span class="k-tile__note">сайт подберёт из каталога</span>
   </a>
+  {% comment %}
+  ⚠️ У контрольной конструктор живёт ВНУТРИ группы, и без её номера адрес
+  не собирается — страница падала ошибкой ровно на этом. Группа известна не
+  всегда (на подбор можно прийти и не из группы), поэтому без неё «искать
+  самому» ведёт в конструктор домашки: там способ выбирается заново, и
+  ничего не теряется.
+  {% endcomment %}
   <a class="k-tile {% if mode == 'search' %}k-tile--on{% endif %}"
-     href="{% if exam %}{% url 'teacher:exam_create' group.pk %}{% else %}{% url 'teacher:assignment_create' %}{% endif %}">
+     href="{% if exam and group %}{% url 'teacher:exam_create' group.pk %}{% else %}{% url 'teacher:assignment_create' %}{% endif %}">
     <span class="k-tile__name">Искать самому</span>
     <span class="k-tile__note">фильтры по каталогу</span>
   </a>

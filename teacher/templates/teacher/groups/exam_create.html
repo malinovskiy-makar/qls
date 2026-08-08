@@ -155,6 +155,7 @@
 
 {% block extra_js %}
 {% include "teacher/_picker_js.html" with cart_key="exam_cart" picker_form_id="picker-form" %}
+{% include "teacher/_build_keep.html" %}
 <script>
 (function () {
   var switcher = document.getElementById('kind-switch');

@@ -134,6 +134,7 @@ textarea.gen-text:focus { border-color: var(--accent); }
   {% csrf_token %}
   <input type="hidden" name="action" value="parse">
   <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="group" value="{{ group_id }}">
   <div class="gen-card">
     <h2>Опишите {% if is_exam %}контрольную{% else %}домашку{% endif %} словами</h2>
     <div class="sub">
@@ -230,6 +231,7 @@ textarea.gen-text:focus { border-color: var(--accent); }
 <form method="post">
   {% csrf_token %}
   <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="group" value="{{ group_id }}">
   <input type="hidden" name="text" value="{{ form.text }}">
   <input type="hidden" name="count_open" value="{{ form.count_open }}">
   <input type="hidden" name="count_test" value="{{ form.count_test }}">
@@ -375,8 +377,30 @@ textarea.gen-text:focus { border-color: var(--accent); }
   {% endfor %}
 
   <div class="gen-actions">
+    {% comment %}
+    ⚠️ ДАЛЬШЕ — В ТОТ ЖЕ КОНСТРУКТОР, что и всегда. Второй формы настроек
+    времени не заводим: контрольная забирает найденное в свой обычный
+    конструктор (`exam_create`), где окно, лимит и «показывать результат
+    сразу» уже спрошены и провалидированы. Отличается только адрес и ключ
+    корзины.
+    {% endcomment %}
+    {% if is_exam and not group_id %}
+    <label class="k-row" style="gap:8px">
+      <span class="k-quiet">Группа:</span>
+      <span class="k-select-wrap" style="width:auto">
+        <select class="k-select" id="exam-group" style="width:auto">
+          {% for g in groups %}
+          <option value="{{ g.pk }}">{{ g.name }}</option>
+          {% endfor %}
+        </select>
+      </span>
+    </label>
+    {% endif %}
     <button type="button" class="k-btn k-btn--main" id="to-cart"
-            data-manual-order="{% if manual_order %}1{% else %}0{% endif %}">
+            data-manual-order="{% if manual_order %}1{% else %}0{% endif %}"
+            data-exam="{% if is_exam %}1{% else %}0{% endif %}"
+            data-group="{{ group_id }}"
+            data-hw-url="{% url 'teacher:assignment_create' %}">
       Отправить в конструктор {% if is_exam %}контрольной{% else %}домашки{% endif %}
     </button>
     <button type="button" class="k-btn k-btn--plain" id="again">Подобрать другие</button>
@@ -403,10 +427,17 @@ textarea.gen-text:focus { border-color: var(--accent); }
   if (!toCart) { return; }
   toCart.addEventListener('click', function () {
     // Кладём выбранное в ТУ ЖЕ корзину, что и обычный конструктор
-    // (sessionStorage «hw_cart»), и уходим туда. Второго механизма
-    // добавления задач в домашку не заводим.
+    // (sessionStorage) и уходим туда. Второго механизма добавления задач
+    // не заводим.
+    //
+    // ⚠️ У контрольной СВОЙ ключ корзины («exam_cart») и свой конструктор:
+    // там уже спрошены окно, лимит времени и «показывать результат сразу».
+    // Второй формы настроек времени мы не пишем — это была бы та же форма,
+    // обречённая разойтись с первой.
+    var isExam = toCart.dataset.exam === '1';
+    var cartKey = isExam ? 'exam_cart' : 'hw_cart';
     var cart = {};
-    try { cart = JSON.parse(sessionStorage.getItem('hw_cart') || '{}'); }
+    try { cart = JSON.parse(sessionStorage.getItem(cartKey) || '{}'); }
     catch (e) { cart = {}; }
     // ⚠️ Признак «порядок задан вручную» едет вместе с корзиной. Если
     // репетитор в описании расставил порядок («вторая задача — тест»),
@@ -426,8 +457,19 @@ textarea.gen-text:focus { border-color: var(--accent); }
       window.alert('Отметьте хотя бы одну задачу.');
       return;
     }
-    sessionStorage.setItem('hw_cart', JSON.stringify(cart));
-    window.location.href = '/teacher/assignment/create/';
+    sessionStorage.setItem(cartKey, JSON.stringify(cart));
+
+    if (!isExam) {
+      window.location.href = toCart.dataset.hwUrl;
+      return;
+    }
+    var chooser = document.getElementById('exam-group');
+    var group = toCart.dataset.group || (chooser && chooser.value) || '';
+    if (!group) {
+      window.alert('Выберите группу: контрольная выдаётся группе.');
+      return;
+    }
+    window.location.href = '/teacher/groups/' + group + '/exams/new/';
   });
 
   document.addEventListener('change', function (event) {

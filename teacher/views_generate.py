@@ -44,6 +44,16 @@ EXAMPLE_QUERIES = [
 ]
 
 
+
+def _group_or_none(user, raw):
+    """Группа по номеру из адреса — или None. Чужая группа не находится."""
+    from problems.models import StudentGroup
+
+    if not raw or not str(raw).isdigit():
+        return None
+    return StudentGroup.objects.filter(pk=int(raw), teacher=user).first()
+
+
 def _tutor_groups(user):
     """Группы репетитора — нужны на последнем шаге, кому выдать работу."""
     from problems.models import StudentGroup
@@ -82,6 +92,14 @@ def assignment_generate(request):
         'is_exam': is_exam,
         'kind': kind,
         'groups': _tutor_groups(request.user),
+        # Группа, из которой пришли (кнопки «Создать домашку/контрольную»
+        # ведут сюда с ?group=). Контрольной она обязательна: её конструктор
+        # живёт внутри группы.
+        'group_id': (request.POST.get('group') or request.GET.get('group')
+                     or ''),
+        'group': _group_or_none(request.user,
+                                request.POST.get('group')
+                                or request.GET.get('group')),
         'problem_count': _catalog_size(),
         'form': {'count': 4, 'count_open': 4, 'count_test': 0,
                  'min_difficulty': 1, 'max_difficulty': 5,
