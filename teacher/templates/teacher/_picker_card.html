@@ -1,36 +1,36 @@
 {% comment %}
-Карточка задачи в отборе.
+Карточка задачи в отборе (переделана в фазе 16).
 
 ⚠️ У кнопки «Добавить» НЕТ уникального id. Одна и та же задача может стоять
 и во вкладке «Каталог», и во вкладке «Сохранённые» — два элемента с одним
 id это молчаливо сломанный `getElementById` (браузер вернёт первый). Ищем
 по `data-pid`, подсвечиваем ВСЕ вхождения сразу.
-{% endcomment %}
-{% comment %}
-Название приходит готовым из `picker.build_cards` (`text_clean.preview_title`):
-оно обрезано ПО ГРАНИЦЕ СЛОВА и, если заголовка нет, собрано из начала
-условия. Шаблонный `truncatechars` здесь стоять не должен — он режет по
-символам и рвёт числа.
+
+⚠️ «Добавить» — ГЛАВНОЕ действие экрана, поэтому заливкой. Раньше оно было
+нарисовано мелкой второстепенной кнопкой, а рядом ряд тегов и звёздочки
+перетягивали внимание на себя.
+
+Название и строка «тема · тип · сложность словами» приходят готовыми из
+`picker.build_cards`: обрезка по границе слова живёт в питоне, а не в
+шаблонном фильтре, который режет по символам и рвёт числа.
 {% endcomment %}
 <div class="problem-card" data-pid="{{ problem.pk }}"
      data-title="{{ card_title }}">
   <div class="card-top">
     <span class="card-title">{{ card_title }}</span>
-    {% if problem.difficulty %}
-    <span class="card-stars">
-      {% for i in stars %}★{% endfor %}{% for i in empty_stars %}☆{% endfor %}
-    </span>
-    {% endif %}
   </div>
+
   {% if preview %}<p class="card-preview">{{ preview }}</p>{% endif %}
-  <div class="card-tags">
-    {% for topic in topics %}<span class="card-tag">{{ topic.name }}</span>{% endfor %}
-    {% if problem.problem_type %}
-    <span class="card-tag source">{{ problem.problem_type }}</span>
-    {% endif %}
-  </div>
+
+  {% comment %}
+  Одна тихая строка вместо ряда тегов и звёздочек. Сложность — СЛОВАМИ:
+  «сложность 2 из 5» читается сразу, а пять звёздочек надо пересчитывать.
+  {% endcomment %}
+  <div class="card-meta">{{ meta }}</div>
+
   <div class="card-actions">
     <button class="btn-preview" type="button" data-preview="{{ problem.pk }}">Условие</button>
-    <button class="btn-add" type="button" data-add="{{ problem.pk }}">Добавить</button>
+    <button class="k-btn k-btn--main k-btn--sm btn-add" type="button"
+            data-add="{{ problem.pk }}">Добавить</button>
   </div>
 </div>

@@ -19,6 +19,24 @@ from django.db.models import Q
 from problems.text_clean import preview_title
 
 
+
+def card_meta(topics, problem_type, difficulty):
+    """Тема · тип · сложность СЛОВАМИ — одной тихой строкой.
+
+    ⚠️ Сложность словами, а не звёздочками: «сложность 2 из 5» читается
+    сразу, а пять символов ★☆☆☆☆ приходится пересчитывать глазами. Ряд
+    цветных тегов рядом с ними перетягивал внимание с кнопки «Добавить»,
+    которая и есть главное действие экрана.
+    """
+    parts = []
+    if topics:
+        parts.append(topics[0].name)
+    if problem_type:
+        parts.append(problem_type)
+    if difficulty:
+        parts.append('сложность %d из 5' % difficulty)
+    return ' · '.join(parts)
+
 def word_cut(text, limit):
     """Обрезка по границе слова. Пусто/коротко — возвращаем как есть.
 
@@ -83,13 +101,16 @@ def picker_context(request, per_page=20):
         # короче», это ДРУГОЕ ЧИСЛО.
         preview = word_cut(strip_latex(problem.statement), 100)
         difficulty = problem.difficulty or 0
+        topics = list(problem.topics.all())[:3]
         cards.append({
             'problem': problem,
             'preview': preview,
             # Название задачи — общей функцией: она умеет и по границе слова
             # обрезать, и подставлять начало условия вместо «Задача #123».
             'card_title': preview_title(problem, limit=60),
-            'topics': list(problem.topics.all())[:3],
+            'topics': topics,
+            # Одна тихая строка вместо ряда тегов и звёздочек.
+            'meta': card_meta(topics, problem.problem_type, difficulty),
             'difficulty_stars': range(difficulty),
             'difficulty_empty': range(5 - difficulty),
         })
@@ -119,6 +140,10 @@ def picker_context(request, per_page=20):
         'page_obj': page_obj,
         'cards': cards,
         'total': paginator.count,
+        # ⚠️ Был ли ЗАПРОС. Число «найдено» показываем только после него:
+        # при пустом поиске это просто размер каталога, и на экране сборки
+        # домашки оно читается как «в домашке 18865 задач».
+        'has_query': bool(f_q or f_topic or f_diff or f_type or f_sol),
         'topics': topics,
         'problem_types': problem_types,
         'base_query': query.urlencode(),

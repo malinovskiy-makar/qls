@@ -17,10 +17,15 @@
 <div id="pane-catalog">
   <form method="get" action="" id="filter-form">
     <div class="filters-row">
-      <input class="filter-input" type="text" name="q"
+      {% comment %}
+      Поля из набора деталей (_kit.html). Раньше это были три серых `select`
+      браузера в ряд — именно они давали ощущение неоформленной формы.
+      {% endcomment %}
+      <input class="k-input filter-input" type="text" name="q"
              value="{{ f_q }}" placeholder="Поиск по условию…">
 
-      <select class="filter-select" name="topic">
+      <span class="k-select-wrap filter-select">
+      <select class="k-select" name="topic">
         <option value="">Все темы</option>
         {% for topic in topics %}
         <option value="{{ topic.id }}"
@@ -29,8 +34,10 @@
         </option>
         {% endfor %}
       </select>
+      </span>
 
-      <select class="filter-select" name="difficulty">
+      <span class="k-select-wrap filter-select">
+      <select class="k-select" name="difficulty">
         <option value="">Любая сложность</option>
         <option value="1" {% if f_diff == "1" %}selected{% endif %}>★☆☆☆☆</option>
         <option value="2" {% if f_diff == "2" %}selected{% endif %}>★★☆☆☆</option>
@@ -38,8 +45,10 @@
         <option value="4" {% if f_diff == "4" %}selected{% endif %}>★★★★☆</option>
         <option value="5" {% if f_diff == "5" %}selected{% endif %}>★★★★★</option>
       </select>
+      </span>
 
-      <select class="filter-select" name="type">
+      <span class="k-select-wrap filter-select">
+      <select class="k-select" name="type">
         <option value="">Любой тип</option>
         <option value="тест: один ответ" {% if f_type == "тест: один ответ" %}selected{% endif %}>Тест</option>
         {% for pt in problem_types %}
@@ -48,22 +57,30 @@
         {% endif %}
         {% endfor %}
       </select>
+      </span>
 
-      <label class="checkbox-label">
+      <label class="k-check">
         <input type="checkbox" name="has_solution" value="1"
                {% if f_sol == "1" %}checked{% endif %}>
-        С решением
+        с решением
       </label>
 
-      <button class="filter-btn" type="submit">Найти</button>
-      <a href="{{ picker_reset_url }}" class="reset-link">✕ Сброс</a>
+      <button class="k-btn k-btn--main k-btn--sm" type="submit">Найти</button>
+      <a href="{{ picker_reset_url }}" class="k-btn k-btn--quiet k-btn--sm">Сброс</a>
     </div>
   </form>
 
+  {% comment %}
+  ⚠️ «Найдено: N» показываем ТОЛЬКО после запроса. При пустом поиске это
+  просто размер каталога — число ни о чём не говорит и читается как ошибка
+  («почему 18865 задач в моей домашке?»).
+  {% endcomment %}
+  {% if has_query %}
   <p class="results-count">Найдено: <strong>{{ total }}</strong> задач</p>
+  {% endif %}
 
   {% for card in cards %}
-  {% include "teacher/_picker_card.html" with problem=card.problem preview=card.preview topics=card.topics stars=card.difficulty_stars empty_stars=card.difficulty_empty %}
+  {% include "teacher/_picker_card.html" with problem=card.problem preview=card.preview topics=card.topics card_title=card.card_title meta=card.meta %}
   {% empty %}
   <div style="text-align:center;padding:60px 0;color:var(--text2);font-size:14px;">
     Задач не найдено. <a href="{{ picker_reset_url }}">Сбросить фильтры</a>
