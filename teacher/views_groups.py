@@ -276,14 +276,23 @@ def _answer_rows(item):
     parts = answer_parts(item)
     rows = []
     for part in parts:
+        catalog = catalog_answer_for(item, part)
+        approved = item.approved_answer(part)
         rows.append({
             'part': part,
             'key': '' if part is None else str(part.pk),
             'label': (part.label if part is not None else ''),
             'statement': (part.statement if part is not None
                           else item.statement),
-            'from_catalog': catalog_answer_for(item, part),
-            'approved': item.approved_answer(part),
+            'from_catalog': catalog,
+            'approved': approved,
+            # ⚠️ Подпись «в каталоге: …» показывается ТОЛЬКО когда каталог
+            # говорит НЕ ТО, что стоит в поле. Совпадает — это третье место,
+            # где написано одно и то же (поле, подпись и свёрнутый заголовок),
+            # и глазу приходится сравнивать три одинаковые строки, чтобы
+            # понять, что сравнивать нечего.
+            'catalog_differs': bool(catalog) and bool(approved) \
+            and catalog.strip() != approved.strip(),
             'max_score': part_max_score(item, part, len(parts)),
         })
     return rows

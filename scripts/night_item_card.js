@@ -54,19 +54,34 @@ function check(name, ok, extra) {
         titles.length === 7 && titles.every((t) => t.length > 0),
         `${titles.length} шт.`);
 
-  // 3. Неутверждённая позиция: блок янтарный, раскрытый, кнопки возврата нет.
+  // 3. Неутверждённая позиция: блок янтарный, раскрытый, КНОПКА ОДНА.
   const warn = await page.$('.check-state.is-warn');
   check('есть янтарное состояние', !!warn);
   if (warn) {
     const itemId = await warn.getAttribute('data-check');
     check('янтарный блок раскрыт',
           await warn.$eval('.check-fold', (d) => d.open));
-    const clearShown = await warn.$eval('.ans-clear',
-      (b) => getComputedStyle(b).display !== 'none');
-    check('кнопки «Проверять вручную» у неутверждённой НЕТ', !clearShown);
 
-    // 4. Нажимаем главную кнопку — состояние обязано смениться на месте.
-    await warn.$eval('.ans-save', (b) => b.click());
+    // ФАЗА 3.1 — кнопка ровно одна, надпись по состоянию.
+    const buttons = await warn.$$eval('.ans-actions .k-btn',
+      (n) => n.filter((b) => getComputedStyle(b).display !== 'none')
+              .map((b) => b.textContent.trim()));
+    check('кнопка в блоке ровно ОДНА', buttons.length === 1,
+          buttons.join(' | '));
+    check('надпись кнопки — «Включить автопроверку»',
+          buttons[0] === 'Включить автопроверку', buttons[0]);
+
+    // ФАЗА 3.3 — статус написан ОДИН раз, только в заголовке.
+    const status = await warn.$eval('.ans-status', (e) => e.textContent.trim());
+    check('подписи у кнопки нет', status === '', status);
+
+    // ФАЗА 3.5 — правка полей ПЕРЕЖИВАЕТ переключение режима.
+    const probe = 'проверка сохранения 12345';
+    await warn.$eval('.ans-input', (e) => { e.value = ''; });
+    await warn.$eval('.ans-input', (e, v) => { e.value = v; }, probe);
+
+    // 4. Нажимаем кнопку — состояние обязано смениться на месте.
+    await warn.$eval('.ans-toggle', (b) => b.click());
     await page.waitForFunction(
       (id) => {
         const box = document.querySelector('[data-check="' + id + '"]');
@@ -83,25 +98,42 @@ function check(name, ok, extra) {
           (await after.$eval('.check-icon', (e) => e.textContent.trim())) === '✓');
     check('блок свернулся',
           !(await after.$eval('.check-fold', (d) => d.open)));
-    check('появилась кнопка «Проверять вручную»',
-          await after.$eval('.ans-clear',
-            (b) => getComputedStyle(b).display !== 'none'));
-    check('эталон показан в свёрнутой строке',
-          (await after.$eval('.check-gist', (e) => e.textContent.trim()))
+
+    const shown = await after.$$eval('.ans-actions .k-btn',
+      (n) => n.filter((b) => getComputedStyle(b).display !== 'none')
+              .map((b) => b.textContent.trim()));
+    check('кнопка по-прежнему ОДНА', shown.length === 1, shown.join(' | '));
+    check('надпись сменилась на «Проверять вручную»',
+          shown[0] === 'Проверять вручную', shown[0]);
+    check('в свёрнутой строке эталон БЕЗ слова «эталон:»',
+          !(await after.$eval('.check-gist', (e) => e.textContent.trim()))
             .startsWith('эталон:'));
 
     const bodyAfter = await visibleText();
     check('после нажатия нигде нет «не утверждено»',
           !bodyAfter.includes('не утверждено'));
+    // ФАЗА 3.2 — слова «готово» в блоке нет ни в каком состоянии.
+    check('слова «готово» на странице нет',
+          !/\bготово\b/i.test(bodyAfter));
 
-    // 5. Возврат к ручной проверке — обратно в янтарь.
-    await after.$eval('.ans-clear', (b) => b.click());
+    // 5. Возврат к ручной проверке — обратно в янтарь, ПОЛЯ ЦЕЛЫ.
+    await after.$eval('.ans-toggle', (b) => b.click());
     await page.waitForFunction(
       (id) => {
         const box = document.querySelector('[data-check="' + id + '"]');
         return box && box.classList.contains('is-warn');
       }, itemId, { timeout: 5000 });
     check('вернулось в янтарное состояние', true);
+    const kept = await after.$eval('.ans-input', (e) => e.value);
+    check('ФАЗА 3.5: введённое в поле НЕ стёрлось', kept === probe,
+          `в поле «${kept}»`);
+
+    // ФАЗА 3.7 — кликабельна вся строка заголовка.
+    const cursor = await after.$eval('.check-head',
+      (e) => getComputedStyle(e).cursor);
+    check('курсор над заголовком — указатель', cursor === 'pointer', cursor);
+    const openMark = await after.$('.check-open');
+    check('значок раскрытия виден', !!openMark);
   }
 
   // 6. Правка максимального балла сохраняется.

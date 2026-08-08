@@ -262,17 +262,37 @@ class ApprovalScreenTests(TestCase):
         self.item.save()
         self.assertNotIn('<details class="check-fold" open>', self._body())
 
-    def test_manual_button_only_when_there_is_something_to_undo(self):
-        """У неутверждённой снимать нечего — кнопка спрятана."""
-        body = self._body()
-        self.assertIn('ans-clear', body)
-        self.assertIn('ans-clear"\n                  hidden', body)
+    def _visible_buttons(self):
+        """Надписи кнопок блока проверки БЕЗ скрипта страницы.
+
+        В скрипте лежат обе надписи — он их и переключает; искать по всему
+        исходнику значит всегда находить обе и не проверить ничего.
+        """
+        import re
+
+        markup = re.sub(r'<script.*?</script>', '', self._body(), flags=re.S)
+        block = re.search(r'class="ans-actions">(.*?)</div>', markup, re.S)
+        if block is None:
+            return []
+        return [re.sub(r'\s+', ' ', text).strip() for text
+                in re.findall(r'<button[^>]*>(.*?)</button>', block.group(1),
+                              re.S)]
+
+    def test_one_button_whose_label_follows_the_state(self):
+        """КНОПКА ОДНА, надпись меняется по состоянию.
+
+        ⚠️ Тест переписан по правилу фазы 3 сессии фиксов. Раньше кнопок было
+        две, и вторая пряталась атрибутом: в зелёном состоянии одна из них
+        предлагала включить то, что уже включено. Смысл прежней проверки —
+        «в блоке нет кнопки, которой сейчас нечего делать» — сохранён, но
+        теперь он выполняется по устройству, а не прятаньем.
+        """
+        self.assertEqual(self._visible_buttons(), ['Включить автопроверку'])
         self.item.answer_override = {'': '42'}
         self.item.save()
-        self.assertNotIn('ans-clear"\n                  hidden', self._body())
+        self.assertEqual(self._visible_buttons(), ['Проверять вручную'])
 
-    def test_buttons_are_named_by_their_result(self):
+    def test_button_is_named_by_its_result(self):
         """«Утвердить» — внутреннее слово; человеку нужен результат."""
-        body = self._body()
-        self.assertIn('Подтвердить и включить автопроверку', body)
-        self.assertIn('Проверять вручную', body)
+        for label in self._visible_buttons():
+            self.assertNotIn('утверд', label.lower())

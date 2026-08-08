@@ -49,10 +49,17 @@
   border-radius: 0 var(--r) var(--r) 0; }
 .check-state.is-warn { border-left-color: var(--amber); }
 .check-state.is-ok   { border-left-color: var(--green); }
+/* Раскрывашка: кликабельна ВСЯ строка заголовка, и это видно.
+   Раньше зацепкой был бледный треугольник 8×8 в правом углу, а внутри —
+   единственное содержательное действие карточки. */
 .check-fold > summary { list-style: none; cursor: pointer; }
 .check-fold > summary::-webkit-details-marker { display: none; }
+.check-fold > summary:hover { background: var(--surface); }
+.check-fold > summary:focus-visible { outline: 2px solid var(--text3);
+  outline-offset: -2px; }
 .check-head { display: flex; align-items: baseline; gap: 8px;
-              padding: 11px 14px; flex-wrap: wrap; }
+              padding: 11px 14px; flex-wrap: wrap;
+              border-radius: 0 var(--r) 0 0; }
 .check-head--static { cursor: default; }
 .check-icon { font-weight: 700; flex-shrink: 0; }
 .is-warn .check-icon { color: var(--amber); }
@@ -60,12 +67,24 @@
 .check-title { font-size: 13px; font-weight: 600; }
 .check-gist { font-size: 12px; color: var(--text2); min-width: 0;
               overflow-wrap: anywhere; }
-.check-fold > summary::after { content: '▾'; margin-left: auto;
-  color: var(--text3); font-size: 11px; }
-.check-fold[open] > summary::after { content: '▴'; }
-.check-body { padding: 0 14px 13px; }
+/* Значок раскрытия со словом рядом: сам по себе треугольник владелец
+   не нашёл. Слово прячется на узком экране, значок остаётся. */
+.check-open { margin-left: auto; display: inline-flex; align-items: center;
+  gap: 5px; font-size: 12px; font-weight: 600; color: var(--text2);
+  flex-shrink: 0; }
+.check-open::after { content: '▾'; font-size: 12px; }
+.check-fold[open] .check-open::after { content: '▴'; }
+.check-fold[open] .check-open { font-size: 0; gap: 0; }
+.check-fold[open] .check-open::after { font-size: 12px; }
+/* ⚠️ Заголовок — это СОСТОЯНИЕ, тело — ДЕЙСТВИЕ. В раскрытом виде они
+   стояли встык, и «Проверяется само» читалось как подпись к кнопке,
+   которая это самое и выключает. Черта разводит «что сейчас» и «что
+   сделать». */
+.check-fold[open] .check-head { border-bottom: 0.5px solid var(--border); }
+.check-body { padding: 12px 14px 13px; }
 .check-why { font-size: 12px; color: var(--text2); line-height: 1.6;
              margin: 0 0 12px; }
+.check-hint { border-bottom: 1px dotted var(--text3); cursor: help; }
 
 .ans-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
            margin-bottom: 8px; }
@@ -235,23 +254,32 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
   <div class="check-state {% if row.answers_approved %}is-ok{% else %}is-warn{% endif %}"
        data-check="{{ row.item.pk }}">
     <details class="check-fold" {% if not row.answers_approved %}open{% endif %}>
+      {% comment %}
+      Кликабельна ВСЯ строка заголовка, а не один треугольник: внутри
+      единственное содержательное действие карточки, и искать его глазами
+      по бледному значку 8×8 не должно приходиться.
+      {% endcomment %}
       <summary class="check-head">
         <span class="check-icon">{% if row.answers_approved %}✓{% else %}!{% endif %}</span>
         <span class="check-title">
           {% if row.answers_approved %}Проверяется само{% else %}Проверять придётся вам, вручную{% endif %}
         </span>
+        {% comment %}
+        В свёрнутой строке — НЕ весь эталон, а только первое значение.
+        Эталон целиком стоит в полях ввода тремя строками ниже, и повторять
+        его здесь значит заставлять глаз сверять две одинаковые строки.
+        {% endcomment %}
         <span class="check-gist">
-          {% if row.answers_approved %}эталон: {{ row.item.answer_override.values|join:" · " }}{% endif %}
+          {% if row.answers_approved %}{{ row.item.answer_override.values|join:" · "|truncatechars:34 }}{% endif %}
         </span>
+        <span class="check-open">развернуть</span>
       </summary>
 
       <div class="check-body">
         <p class="check-why">
-          Ответ этой задачи взят из каталога, и там это часто не ответ, а
-          фраза целиком или число из середины решения — машина по такому
-          эталону ставит незаслуженный ноль. Подтвердите, что проверять,
-          и она начнёт справляться сама. Правка здесь меняет ТОЛЬКО эту
-          работу, каталог остаётся как был.
+          Ответ взят из каталога. Советуем проверить его до выдачи работы —
+          <span class="check-hint" tabindex="0"
+                title="Правка здесь меняет только эту работу. Каталог остаётся как был.">почему</span>.
         </p>
 
         {% for arow in row.answer_rows %}
@@ -262,29 +290,36 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
           <input type="text" class="k-input ans-input"
                  id="ans-{{ row.item.pk }}-{{ forloop.counter }}"
                  data-key="{{ arow.key }}"
+                 data-catalog="{{ arow.from_catalog }}"
                  value="{{ arow.approved|default:arow.from_catalog }}"
                  placeholder="{% if arow.from_catalog %}{{ arow.from_catalog }}{% else %}ответа в каталоге нет — впишите свой{% endif %}">
-          {% if arow.from_catalog %}
-          <span class="ans-src">в каталоге: {{ arow.from_catalog }}</span>
-          {% else %}
+          {% comment %}
+          Подпись «в каталоге» — только когда каталог говорит НЕ ТО, что
+          стоит в поле. Совпадает — сравнивать нечего, и подпись была бы
+          третьим местом с одним и тем же текстом.
+          {% endcomment %}
+          <span class="ans-src" {% if not arow.catalog_differs %}hidden{% endif %}>
+            в каталоге: {{ arow.from_catalog }}
+          </span>
+          {% if not arow.from_catalog %}
           <span class="ans-src ans-none">в каталоге ответа нет</span>
           {% endif %}
         </div>
         {% endfor %}
 
+        {% comment %}
+        ⚠️ КНОПКА ОДНА, НАДПИСЬ МЕНЯЕТСЯ ПО СОСТОЯНИЮ. Двух кнопок быть не
+        может: в зелёном состоянии одна из них предлагала включить то, что
+        уже включено. Статус при этом живёт ТОЛЬКО в заголовке блока —
+        подписи у кнопки нет, иначе одно и то же написано дважды в одном
+        блоке.
+        {% endcomment %}
         <div class="ans-actions">
-          <button type="button" class="k-btn k-btn--main ans-save">
-            Подтвердить и включить автопроверку
+          <button type="button"
+                  class="k-btn ans-toggle {% if row.answers_approved %}k-btn--plain{% else %}k-btn--main{% endif %}">
+            {% if row.answers_approved %}Проверять вручную{% else %}Включить автопроверку{% endif %}
           </button>
-          {% comment %}
-          Кнопка возврата к ручной проверке есть ТОЛЬКО у утверждённых: у
-          неутверждённой снимать нечего, и раньше она стояла там впустую.
-          {% endcomment %}
-          <button type="button" class="k-btn k-btn--quiet ans-clear"
-                  {% if not row.answers_approved %}hidden{% endif %}>
-            Проверять вручную
-          </button>
-          <span class="ans-status k-quiet"></span>
+          <span class="ans-status k-quiet" role="status"></span>
         </div>
       </div>
     </details>
@@ -512,15 +547,31 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
     box.querySelector('.check-icon').textContent = approved ? '✓' : '!';
     box.querySelector('.check-title').textContent = approved
       ? 'Проверяется само' : 'Проверять придётся вам, вручную';
-    box.querySelector('.check-gist').textContent =
-      approved && gist ? 'эталон: ' + gist : '';
+    box.querySelector('.check-gist').textContent = approved && gist
+      ? (gist.length > 34 ? gist.slice(0, 33) + '…' : gist) : '';
     // Утверждённая позиция сворачивается: вмешательство нужно только там,
     // где не сделано. Развёрнутые семь позиций удвоили бы страницу.
     var fold = box.querySelector('.check-fold');
     if (fold) { fold.open = !approved; }
-    // Кнопка возврата к ручной проверке нужна только когда есть что снимать.
-    var clear = box.querySelector('.ans-clear');
-    if (clear) { clear.hidden = !approved; }
+
+    // ⚠️ КНОПКА ОДНА, И ЕЁ НАДПИСЬ — ЭТО ДЕЙСТВИЕ, А НЕ СОСТОЯНИЕ.
+    // Пока кнопок было две, в зелёном состоянии одна из них предлагала
+    // включить то, что уже включено.
+    var toggle = box.querySelector('.ans-toggle');
+    if (toggle) {
+      toggle.textContent = approved
+        ? 'Проверять вручную' : 'Включить автопроверку';
+      toggle.classList.toggle('k-btn--plain', approved);
+      toggle.classList.toggle('k-btn--main', !approved);
+    }
+    // Подпись «в каталоге» — только там, где каталог расходится с полем.
+    box.querySelectorAll('.ans-row').forEach(function (row) {
+      var input = row.querySelector('.ans-input');
+      var src = row.querySelector('.ans-src:not(.ans-none)');
+      if (!input || !src) { return; }
+      var catalog = (input.dataset.catalog || '').trim();
+      src.hidden = !catalog || catalog === input.value.trim();
+    });
   }
 
   document.querySelectorAll('[data-check]').forEach(function (block) {
@@ -544,24 +595,28 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
             return d.answers[k];
           });
           paintState(itemId, d.approved, values.join(' · '));
-          status.textContent = d.approved
-            ? 'готово' : 'снято — задачу проверяете вы';
+          // ⚠️ СОСТОЯНИЕ ПИШЕТСЯ ТОЛЬКО В ЗАГОЛОВКЕ БЛОКА. Здесь стояли
+          // «готово» и «снято — задачу проверяете вы»: первое не несло
+          // смысла вовсе, второе повторяло заголовок другими словами.
+          status.textContent = '';
         })
         .catch(function (e) { status.textContent = e.message; });
     }
 
-    block.querySelector('.ans-save').addEventListener('click', function () {
+    // ⚠️ ПЕРЕКЛЮЧЕНИЕ РЕЖИМА НЕ ТРОГАЕТ СОДЕРЖИМОЕ ПОЛЕЙ. Раньше возврат к
+    // ручной проверке ОЧИЩАЛ их: репетитор правил эталон, передумывал,
+    // возвращал ручную — и терял набранное. Снимается утверждение, а не
+    // текст; текст остаётся ждать следующего «Включить автопроверку».
+    block.querySelector('.ans-toggle').addEventListener('click', function () {
+      if (block.classList.contains('is-ok')) {
+        send({ clear: true });
+        return;
+      }
       var answers = {};
       block.querySelectorAll('.ans-input').forEach(function (input) {
         answers[input.dataset.key] = input.value;
       });
       send({ answers: answers });
-    });
-    block.querySelector('.ans-clear').addEventListener('click', function () {
-      block.querySelectorAll('.ans-input').forEach(function (input) {
-        input.value = '';
-      });
-      send({ clear: true });
     });
   });
 })();
