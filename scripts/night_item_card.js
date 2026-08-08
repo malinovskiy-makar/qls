@@ -136,25 +136,50 @@ function check(name, ok, extra) {
     check('значок раскрытия виден', !!openMark);
   }
 
-  // 6. Правка максимального балла сохраняется.
+  // 6. ФАЗА 4 — баллы заперты, потому что работу уже сдавали.
+  //
+  // ⚠️ Демо-домашка №3 сдана, значит поле балла в ней НЕ редактируется.
+  // Проверяем оба состояния: здесь запертое, ниже — правку в работе, по
+  // которой ещё никто не отвечал.
+  check('в сданной работе поля балла нет',
+        !(await page.$('.pts-input')));
+  check('крупная цифра балла осталась видна',
+        !!(await page.$('.k-score__value')));
+  const lockedText = await visibleText();
+  check('экран объясняет, почему заперто',
+        lockedText.toLowerCase().includes('работу уже сдавали'));
+
+  // 7. Правка максимального балла в НЕсданной работе сохраняется.
+  await page.goto(`${BASE}/teacher/groups/2/assignments/12/`,
+                  { waitUntil: 'networkidle' });
   const input = await page.$('.pts-input');
-  const wasValue = await input.inputValue();
-  await input.fill('7');
-  await input.evaluate((e) => e.blur());
-  await page.waitForFunction(
-    () => {
-      const s = document.querySelector('.pts-status');
-      return s && s.textContent.trim() === 'сохранено';
-    }, null, { timeout: 5000 }).catch(() => {});
-  await page.reload({ waitUntil: 'networkidle' });
-  const nowValue = await page.$eval('.pts-input', (e) => e.value);
-  check('балл сохранился после перезагрузки', nowValue === '7',
-        `было ${wasValue}, стало ${nowValue}`);
-  // Возвращаем как было, чтобы сценарий можно было гонять повторно.
-  const back = await page.$('.pts-input');
-  await back.fill(wasValue);
-  await back.evaluate((e) => e.blur());
-  await page.waitForTimeout(600);
+  check('в несданной работе поле балла есть', !!input);
+  if (input) {
+    const wasValue = await input.inputValue();
+    await input.fill('7');
+    await input.evaluate((e) => e.blur());
+    await page.waitForFunction(
+      () => {
+        const s = document.querySelector('.pts-status');
+        return s && s.textContent.trim() === 'сохранено';
+      }, null, { timeout: 5000 }).catch(() => {});
+    await page.reload({ waitUntil: 'networkidle' });
+    const nowValue = await page.$eval('.pts-input', (e) => e.value);
+    check('балл сохранился после перезагрузки', nowValue === '7',
+          `было ${wasValue}, стало ${nowValue}`);
+    // Возвращаем как было, чтобы сценарий можно было гонять повторно.
+    const back = await page.$('.pts-input');
+    await back.fill(wasValue);
+    await back.evaluate((e) => e.blur());
+    await page.waitForTimeout(600);
+  }
+
+  // 8. ФАЗА 7 — номер стоит у названия, а не над баллом.
+  await page.goto(BASE + URL, { waitUntil: 'networkidle' });
+  const numInTitle = await page.$('.item-title .item-num');
+  check('номер позиции стоит у названия задачи', !!numInTitle);
+  const numInRail = await page.$('.item-rail > .item-num');
+  check('в рейке номера больше нет', !numInRail);
 
   check('ошибок в консоли нет', errors.length === 0, errors.slice(0, 3).join(' | '));
 

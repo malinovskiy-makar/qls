@@ -7,8 +7,11 @@
 
   Правила, которые тут закреплены (нарушать их в экранах нельзя):
   • Все цвета — через var(--…) из _tokens.html. Ни одного hex.
-  • Розовый акцент (--accent) — навигации, фокус-кольцу, активной плитке и
-    галочке. Крупные кнопки — графитовые (--btn-bg): так во всём проекте.
+  • Розовый акцент (--accent) — навигации, активной плитке и галочке.
+    Крупные кнопки — графитовые (--btn-bg): так во всём проекте.
+    ⚠️ КОЛЬЦО ФОКУСА — НЕЙТРАЛЬНОЕ (--focus / --focus-ring), НЕ акцентное:
+    поле, обведённое малиновым, — крупное акцентное пятно на каждом клике,
+    а за одну проверку работы их сотни.
   • Пометка состояния — ТОНКАЯ цветная полоса слева плюс значок, фон
     нейтральный. Панель целиком не заливаем: залитая панель читается как
     ошибка, даже когда это рабочее состояние.
@@ -75,9 +78,12 @@
   transition: border-color .12s ease, background .12s ease;
 }
 .k-input:hover, .k-area:hover, .k-select:hover { border-color: var(--text3); }
+/* ⚠️ ФОКУС — НЕЙТРАЛЬНЫЙ, НЕ МАЛИНОВЫЙ. Акцент оставлен навигации и
+   мелочам, а поле ввода, обведённое акцентом, — крупное акцентное пятно
+   на каждом клике; за одну проверку работы их сотни. */
 .k-input:focus, .k-area:focus, .k-select:focus {
-  outline: none; border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-ring); background: var(--surface);
+  outline: none; border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-ring); background: var(--surface);
 }
 .k-input::placeholder, .k-area::placeholder { color: var(--text3); }
 .k-area { min-height: 84px; resize: vertical; line-height: 1.6; }
@@ -122,7 +128,7 @@
   border-width: 0 2px 2px 0; transform: rotate(45deg);
 }
 .k-check input[type="checkbox"]:focus-visible {
-  outline: 2px solid var(--accent); outline-offset: 2px;
+  outline: 2px solid var(--focus); outline-offset: 2px;
 }
 
 /* ── Карточка ───────────────────────────────────────────────────────── */
@@ -170,8 +176,8 @@
 .k-score input { cursor: text; }
 .k-score input:hover { border-color: var(--border); background: var(--surface-2); }
 .k-score input:focus {
-  outline: none; border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-ring); background: var(--surface);
+  outline: none; border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-ring); background: var(--surface);
 }
 .k-score__cap { font-size: 11px; color: var(--text3); }
 /* Скрыть браузерные стрелки у number — они ломают крупную цифру */

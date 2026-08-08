@@ -37,6 +37,9 @@
 .stu-score { text-align: center; min-width: 84px; }
 .stu-score-value { font-size: 26px; font-weight: 600; line-height: 1.1;
                    font-variant-numeric: tabular-nums; }
+/* Тихая ссылка «глазами ученика» рядом с главной кнопкой: это второй,
+   необязательный переход, и весом он должен быть заметно меньше. */
+.stu-eyes { font-size: 12px; color: var(--text2); white-space: nowrap; }
 .stu-score-cap { font-size: 11px; color: var(--text3); line-height: 1.3;
                  display: block; margin-top: 2px; }
 
@@ -94,6 +97,14 @@
 
   <a class="k-btn {% if card.button.kind == 'main' %}k-btn--main{% else %}k-btn--plain{% endif %}"
      href="{{ card.button.url }}">{{ card.button.label }}</a>
+  {% comment %}
+  Разбор глазами ученика — ОТДЕЛЬНАЯ тихая ссылка. Главная кнопка ведёт
+  туда, где работают; раньше она открывала экран ученика, на котором сверху
+  написано «оценки ставятся на странице проверки».
+  {% endcomment %}
+  {% if card.student_view %}
+  <a class="stu-eyes" href="{{ card.student_view }}">глазами ученика</a>
+  {% endif %}
 </div>
 {% empty %}
 <div class="empty-state">

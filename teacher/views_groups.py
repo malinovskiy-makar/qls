@@ -621,17 +621,28 @@ def student_cards(assignment, group):
             state = 'checked'
             state_label = 'проверено'
 
+        # Ссылка «глазами ученика» — тихая и ОТДЕЛЬНАЯ. Главная кнопка ведёт
+        # туда, где работают, а не туда, где смотрят.
+        student_view = None
+
         if pending:
             button = {'label': 'Проверить %d %s' % (len(pending),
                                                     _tasks_word(len(pending))),
                       'kind': 'main',
                       'url': reverse('teacher:group_review_submission',
                                      args=[group.pk, pending[0].pk])}
+            student_view = reverse('teacher:student_work_review',
+                                   args=[group.pk, assignment.pk, student.pk])
         elif done:
+            # ⚠️ «СМОТРЕТЬ РАБОТУ» ВЕДЁТ НА ПРОВЕРКУ, А НЕ НА РАЗБОР ГЛАЗАМИ
+            # УЧЕНИКА. Раньше кнопка открывала экран ученика, где сверху
+            # написано «оценки ставятся на странице проверки», — то есть
+            # честно сообщала, что привела не туда.
             button = {'label': 'Смотреть работу', 'kind': 'quiet',
-                      'url': reverse('teacher:student_work_review',
-                                     args=[group.pk, assignment.pk,
-                                           student.pk])}
+                      'url': reverse('teacher:group_review_submission',
+                                     args=[group.pk, done[0].pk])}
+            student_view = reverse('teacher:student_work_review',
+                                   args=[group.pk, assignment.pk, student.pk])
         else:
             # Написать ученику сегодня можно ровно одним способом —
             # комментарием к задаче на странице задания. Отдельной переписки
@@ -656,6 +667,7 @@ def student_cards(assignment, group):
             'state': state,
             'state_label': state_label,
             'button': button,
+            'student_view': student_view,
         })
 
     # Сначала требующие проверки, потом проверенные, в конце не приступавшие:

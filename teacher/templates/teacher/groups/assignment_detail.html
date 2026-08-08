@@ -29,8 +29,17 @@
              align-items: start; }
 .item-rail { display: flex; flex-direction: column; align-items: center;
              gap: 2px; text-align: center; }
-.item-num { font-size: 12px; color: var(--text3); font-weight: 600; }
-.item-src { font-size: 11px; color: var(--text3); }
+/* Номер стоит у НАЗВАНИЯ задачи, не над баллом: два числа друг под другом
+   читались как одно («1 · 2»). */
+.item-num { font-size: 12px; color: var(--text3); font-weight: 600;
+            margin-right: 7px; }
+/* ⚠️ «баллов» и «тест» шли двумя подписями подряд и склеивались в фразу
+   «2 баллов тест». «баллов» — единица измерения числа, «тест» — вид
+   задачи; разводим отступом и делаем метку источника отдельным объектом,
+   а не третьей строкой того же текста. */
+.item-src { font-size: 11px; color: var(--chip-text); margin-top: 9px;
+            background: var(--chip-bg); border-radius: 999px;
+            padding: 2px 9px; }
 /* Тихая подпись у запертого балла: цифра осталась крупной, а править её
    нельзя — без объяснения это читается как поломка. */
 .pts-lock { font-size: 11px; cursor: help;
@@ -221,7 +230,11 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
   которую и правят, источник — мелкая подпись.
   {% endcomment %}
   <div class="item-rail">
-    <div class="item-num">{{ row.number }}</div>
+    {% comment %}
+    ⚠️ НОМЕР ПОЗИЦИИ УЕХАЛ К НАЗВАНИЮ ЗАДАЧИ. В рейке он стоял НАД крупной
+    цифрой балла, и два числа друг под другом читались как одно: «1 · 2».
+    В рейке остался только балл с подписями.
+    {% endcomment %}
     {% if points_locked %}
     {% comment %}
     ⚠️ ПОСЛЕ ПЕРВОЙ СДАЧИ БАЛЛ НЕ ПРАВИТСЯ, НО ОСТАЁТСЯ КРУПНЫМ И ВИДНЫМ.
@@ -247,7 +260,7 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
   </div>
 
   <div class="item-body">
-    <h2 class="item-title">{{ row.title }}</h2>
+    <h2 class="item-title"><span class="item-num">{{ row.number }}.</span>{{ row.title }}</h2>
 
     <div class="problem-statement">{{ row.item.statement|linebreaksbr }}</div>
 
