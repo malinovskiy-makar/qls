@@ -318,10 +318,15 @@ def print_rows(assignment, for_teacher=False):
     rows = []
     skipped = []
     number = 0
-    for position, item in enumerate(items, start=1):
+    # ⚠️ ИНДЕКС СТРОКИ НАЗЫВАЕТСЯ `index`, А НЕ `position`. Внутри цикла
+    # есть ВЛОЖЕННЫЙ перебор вариантов ответа, который раньше тоже звался
+    # `position` и затирал внешний: после него подпись части бралась по
+    # номеру последнего варианта, и «Тестовая часть» пропадала, а «Задачи»
+    # печаталось над тестами. Поймано сквозным сценарием.
+    for index, item in enumerate(items):
         statement = item.statement or ''
         if looks_broken(statement):
-            skipped.append(position)
+            skipped.append(index + 1)
             continue
         number += 1
         graph_name = ''
@@ -383,7 +388,7 @@ def print_rows(assignment, for_teacher=False):
             # Нумерация подписей идёт по ИСХОДНОМУ индексу позиции, а не по
             # номеру в листке: задача с битой разметкой пропускается, и
             # номера разъезжаются с индексами.
-            'section_title': marks.get(position - 1, ''),
+            'section_title': marks.get(index, ''),
             'title': item.problem_title if item.problem_title != item.statement
                      else '',
             'statement': text,

@@ -14,6 +14,8 @@
             gap: 14px; flex-wrap: wrap; margin-bottom: 8px; padding: 14px 16px; }
 .ass-main { min-width: 0; flex: 1; }
 .ass-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+.ass-link { color: var(--text); text-decoration: none; }
+.ass-link:hover { text-decoration: underline; }
 /* Тип работы — тихой подписью, не бейджем: акцент оставлен навигации. */
 .ass-kind { font-size: 12px; font-weight: 400; color: var(--text3);
             margin-left: 8px; }
@@ -117,8 +119,15 @@
     {% for row in items %}
     <div class="k-card ass-card {% if key == 'needs_you' %}k-card--calls{% endif %}">
       <div class="ass-main">
+        {% comment %}
+        ⚠️ Название — ССЫЛКА на само задание. Без неё открыть работу можно
+        было только через «Проверить N», то есть ТОЛЬКО когда есть что
+        проверять: у идущей работы способа посмотреть её состав не было
+        вовсе. Найдено сквозным сценарием.
+        {% endcomment %}
         <div class="ass-name">
-          {{ row.assignment.name }}
+          <a href="{% if row.is_exam %}{% url 'teacher:group_exam_results' group.pk row.assignment.pk %}{% else %}{% url 'teacher:group_assignment' group.pk row.assignment.pk %}{% endif %}"
+             class="ass-link">{{ row.assignment.name }}</a>
           {% comment %}
           Тип — тихой серой подписью, а не розовым бейджем: акцент оставлен
           навигации, а «контрольная» это уточнение, а не сигнал тревоги.
