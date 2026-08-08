@@ -12,6 +12,7 @@ from datetime import timedelta
 from django.contrib import messages
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -119,14 +120,26 @@ def group_create(request):
 # Фаза 10 — страница группы (три вкладки)
 # ---------------------------------------------------------------------------
 
+# Вкладок ТРИ. «Ученики» удалена: она была обеднённой копией таблицы со
+# статистики (те же люди, но без «решено» и «доли верных»), да ещё и с
+# другим числом в колонке активности — расхождение выглядело как баг.
+GROUP_TABS = ('overview', 'assignments', 'materials')
+
+
 @tutor_required
 def group_detail(request, pk):
     from problems.models import Assignment, Submission, TeacherFeedback
+    from problems import stats as stats_module
 
     group = own_group_or_404(request.user, pk)
-    tab = request.GET.get('tab', 'students')
-    if tab not in ('students', 'assignments', 'materials'):
-        tab = 'students'
+    tab = request.GET.get('tab', 'overview')
+    # ⚠️ Старый адрес `?tab=students` НЕ ломаем: он может быть в закладках и
+    # в переписке. Уводим редиректом на обзор, а не показываем пустоту.
+    if tab == 'students':
+        return redirect(reverse('teacher:group_detail', args=[group.pk])
+                        + '?tab=overview')
+    if tab not in GROUP_TABS:
+        tab = 'overview'
 
     # ⚠️ СОРТИРОВКА ПО ДЕДЛАЙНУ, БЛИЖАЙШИЕ ПЕРВЫМИ. Раньше стоял порядок по
     # дате создания, и список выглядел случайным: 08.08, 07.08, 05.08, 28.07,
@@ -138,29 +151,28 @@ def group_detail(request, pk):
         Assignment.objects.filter(group=group).prefetch_related('students'),
         key=lambda a: (a.deadline_at is None, a.deadline_at or a.created_at))
 
-    student_rows = []
-    if tab == 'students':
-        for student in group.students.all().order_by('last_name', 'username'):
-            subs = Submission.objects.filter(assignment__group=group,
-                                             student=student)
-            scores = [float(f.score) for f in TeacherFeedback.objects.filter(
-                submission__in=subs, score__isnull=False)]
-            student_rows.append({
-                'student': student,
-                'submitted': subs.filter(
-                    status__in=('submitted', 'reviewed')).count(),
-                'pending': subs.filter(status='submitted').count(),
-                'avg_score': round(sum(scores) / len(scores), 2)
-                if scores else None,
-                'last_login': student.last_login,
-            })
-
-    return render(request, 'teacher/groups/detail.html', {
+    context = {
         'group': group,
         'tab': tab,
-        'student_rows': student_rows,
         'assignment_rows': [assignment_stats(a) for a in assignments],
-    })
+    }
+
+    # Обзор = прежняя статистика группы. Считаем только когда её смотрят:
+    # тепловая матрица — не бесплатный запрос, а на вкладке «Задания» она
+    # не нужна.
+    if tab == 'overview':
+        period = request.GET.get('period') or 'month'
+        if period not in dict(stats_module.PERIODS):
+            period = 'month'
+        context.update({
+            'period': period,
+            'periods': stats_module.PERIODS,
+            'rows': stats_module.group_table(group, period),
+            'matrix': stats_module.group_topic_matrix(group, 'all'),
+            'attention': stats_module.needs_attention(group),
+        })
+
+    return render(request, 'teacher/groups/detail.html', context)
 
 
 # ---------------------------------------------------------------------------

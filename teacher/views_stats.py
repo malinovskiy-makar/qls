@@ -7,7 +7,8 @@
 секунд понять, КОМУ ЧТО ЗАДАТЬ, — для этого есть тепловая матрица
 «ученики × темы» и список «требуют внимания».
 """
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from problems import stats as stats_module
 
@@ -16,20 +17,23 @@ from .access import own_group_or_404, tutor_required
 
 @tutor_required
 def group_stats(request, pk):
-    """Статистика группы: таблица, тепловая матрица, кто требует внимания."""
-    group = own_group_or_404(request.user, pk)
-    period = request.GET.get('period') or 'month'
-    if period not in dict(stats_module.PERIODS):
-        period = 'month'
+    """устарело → вкладка «Обзор» страницы группы.
 
-    return render(request, 'teacher/groups/stats.html', {
-        'group': group,
-        'period': period,
-        'periods': stats_module.PERIODS,
-        'rows': stats_module.group_table(group, period),
-        'matrix': stats_module.group_topic_matrix(group, 'all'),
-        'attention': stats_module.needs_attention(group),
-    })
+    ⚠️ Статистика ПЕРЕЕХАЛА на первую вкладку группы и стала вкладкой по
+    умолчанию. Причина: это самый содержательный экран кабинета (тепловая
+    матрица «ученики × темы» и «требуют внимания»), а лежал он четвёртым, и
+    на нём ПРОПАДАЛ ряд вкладок — у страницы был свой шаблон без навигации.
+
+    Адрес оставлен редиректом: он мог попасть в закладки и в переписку, а
+    страница, отвечающая 404 там, где вчера был экран, — это сломанный
+    продукт, а не «мы переехали».
+    """
+    group = own_group_or_404(request.user, pk)
+    period = request.GET.get('period') or ''
+    url = reverse('teacher:group_detail', args=[group.pk]) + '?tab=overview'
+    if period:
+        url += '&period=%s' % period
+    return redirect(url)
 
 
 @tutor_required

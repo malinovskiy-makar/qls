@@ -360,3 +360,76 @@ class DemoSeedTests(TestCase):
         before = User.objects.count()
         self._seed()
         self.assertEqual(User.objects.count(), before)
+
+
+class GroupOverviewTests(TestCase):
+    """Фаза 10 — вкладка «Ученики» удалена, статистика стала обзором."""
+
+    def setUp(self):
+        self.tutor = make_user('go_tutor', role='teacher')
+        self.student = make_user('go_student', role='student')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        self.group.students.add(self.student)
+        self.client.force_login(self.tutor)
+
+    def _url(self, query=''):
+        return reverse('teacher:group_detail', args=[self.group.pk]) + query
+
+    def test_overview_is_the_default_tab(self):
+        response = self.client.get(self._url())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['tab'], 'overview')
+
+    def test_three_tabs_and_no_students_tab(self):
+        body = self.client.get(self._url()).content.decode()
+        self.assertIn('?tab=overview', body)
+        self.assertIn('?tab=assignments', body)
+        self.assertIn('?tab=materials', body)
+        self.assertNotIn('?tab=students', body)
+
+    def test_tabs_visible_on_the_overview(self):
+        """Раньше на статистике ряд вкладок пропадал совсем."""
+        body = self.client.get(self._url('?tab=overview')).content.decode()
+        self.assertIn('class="tabs"', body)
+
+    def test_old_students_tab_redirects(self):
+        """Адрес мог попасть в закладки — 404 там недопустима."""
+        response = self.client.get(self._url('?tab=students'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('tab=overview', response['Location'])
+
+    def test_old_stats_url_redirects(self):
+        response = self.client.get(
+            reverse('teacher:group_stats', args=[self.group.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('tab=overview', response['Location'])
+
+    def test_old_stats_url_keeps_the_period(self):
+        response = self.client.get(
+            reverse('teacher:group_stats', args=[self.group.pk])
+            + '?period=week')
+        self.assertIn('period=week', response['Location'])
+
+    def test_one_students_table_with_full_columns(self):
+        """Таблица одна и полная: «решено» и «доля верных» были только тут."""
+        body = self.client.get(self._url()).content.decode()
+        self.assertIn('Решено', body)
+        self.assertIn('Доля верных', body)
+        self.assertIn('Сдано работ', body)
+        self.assertIn('Последняя активность', body)
+        # Прежней колонки «Последний вход на сайт» из вкладки «Ученики» нет.
+        self.assertNotIn('Последний вход на сайт', body)
+
+    def test_open_button_leads_to_student_progress(self):
+        body = self.client.get(self._url()).content.decode()
+        self.assertIn(
+            reverse('teacher:student_progress', args=[self.student.pk]), body)
+
+    def test_heatmap_headers_are_not_shouting(self):
+        """Заголовки тем остались вертикальными, но без капслока."""
+        from django.template.loader import render_to_string
+
+        css = render_to_string('platform/_stats_style.html')
+        self.assertIn('writing-mode: vertical-rl', css)
+        matrix = css[css.index('.matrix-head'):css.index('.matrix-head') + 260]
+        self.assertIn('text-transform: none', matrix)

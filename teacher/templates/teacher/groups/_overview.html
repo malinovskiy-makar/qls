@@ -1,0 +1,152 @@
+{% comment %}
+Содержимое вкладки «Обзор» — то, что раньше было отдельной страницей
+статистики группы.
+
+⚠️ ПОЧЕМУ ПЕРЕЕХАЛО. Статистика — самый содержательный экран кабинета
+(тепловая карта «ученики × темы» и список «требуют внимания»), а лежала она
+на четвёртой вкладке, где вдобавок ПРОПАДАЛ ряд вкладок: у неё был свой
+шаблон без навигации. Вкладка «Ученики» при этом была обеднённой копией
+таблицы отсюда — те же люди, но без «решено» и «доли верных».
+
+Теперь это вкладка по умолчанию, а «Ученики» удалена: таблица учеников
+здесь одна и полная.
+{% endcomment %}
+<div class="period-bar" style="margin-bottom:18px;">
+  {% for key, label in periods %}
+  <a href="?tab=overview&period={{ key }}" style="text-decoration:none;">
+    <button type="button" class="{% if key == period %}is-active{% endif %}">{{ label }}</button>
+  </a>
+  {% endfor %}
+</div>
+
+{# ── Требуют внимания — первым блоком: это и есть работа ───────────── #}
+{% if attention %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Требуют внимания</div>
+    <div class="panel-hint">Пропал, просел, не сдал последнюю работу
+      или ждёт вашей проверки дольше трёх дней</div>
+  </div>
+  {% for row in attention %}
+  <div class="attention-row">
+    <b>{{ row.student.get_full_name|default:row.student.username }}</b> —
+    {{ row.reasons|join:"; " }}.
+    <a href="{% url 'teacher:student_stats' row.student.pk %}">посмотреть</a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Тепловая матрица «ученики × темы» ─────────────────────────────── #}
+<div class="panel panel--lead">
+  <div class="panel-head">
+    <div class="panel-title">Ученики × темы</div>
+    <div class="panel-hint">За всё время. Красный столбец целиком — тему
+      провалила вся группа; одна красная клетка — провалил один</div>
+  </div>
+  {% if matrix.columns %}
+  <div class="stats-table-wrap">
+    <table class="stats-table">
+      <thead>
+        <tr>
+          <th class="no-sort">Ученик</th>
+          {% for column in matrix.columns %}
+          <th class="no-sort" style="text-align:center;">
+            <span class="matrix-head">{{ column.name|truncatechars:26 }}</span>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in matrix.matrix %}
+        <tr>
+          <td>{{ row.student.get_full_name|default:row.student.username }}</td>
+          {% for cell in row.cells %}
+          <td>
+            {% if cell %}
+            <span class="matrix-cell {% if cell.accuracy < 50 %}matrix-bad{% elif cell.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}"
+                  title="{{ cell.solved }} из {{ cell.attempted }}">{{ cell.accuracy }}%</span>
+            {% else %}
+            <span class="matrix-cell matrix-none" title="нет попыток">—</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+        <tr>
+          <td class="muted">по группе</td>
+          {% for column in matrix.columns %}
+          <td>
+            <span class="matrix-cell {% if column.accuracy < 50 %}matrix-bad{% elif column.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}">
+              {{ column.accuracy }}%
+            </span>
+          </td>
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-note">Ученики ещё не решали задач с темами — матрице
+    нечего показать.</div>
+  {% endif %}
+</div>
+
+{# ── Таблица учеников ──────────────────────────────────────────────── #}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Ученики</div>
+    <div class="panel-hint">Нажмите на заголовок столбца, чтобы отсортировать</div>
+  </div>
+  <div class="stats-table-wrap">
+    <table class="stats-table" id="students-table">
+      <thead>
+        <tr>
+          <th data-type="text">Ученик</th>
+          <th data-type="num">Решено</th>
+          <th data-type="num">Доля верных</th>
+          <th data-type="num">Сдано работ</th>
+          <th data-type="num">Средний балл</th>
+          <th data-type="date">Последняя активность</th>
+          <th class="no-sort"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>{{ row.student.get_full_name|default:row.student.username }}</td>
+          <td data-sort="{{ row.solved }}">{{ row.solved }}</td>
+          <td data-sort="{{ row.accuracy|default:-1 }}">
+            {% if row.accuracy is not None %}{{ row.accuracy }}%{% else %}—{% endif %}
+          </td>
+          <td data-sort="{{ row.submitted }}">
+            {{ row.submitted }}{% if row.pending %} <span class="muted">({{ row.pending }} ждёт)</span>{% endif %}
+          </td>
+          <td data-sort="{{ row.avg_score|default:-1 }}">
+            {% if row.avg_score is not None %}{{ row.avg_score }}{% else %}—{% endif %}
+          </td>
+          <td data-sort="{{ row.last_active|date:'U'|default:0 }}">
+            {% if row.last_active %}{{ row.last_active|date:"d.m.Y" }}{% else %}не заходил{% endif %}
+          </td>
+          <td><a href="{% url 'teacher:student_progress' row.student.pk %}"
+                 class="k-btn k-btn--plain k-btn--sm">открыть</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="muted">В группе пока нет учеников.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── Рейтинг: включает РЕПЕТИТОР, по умолчанию выключен ────────────── #}
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Рейтинг внутри группы</div></div>
+  <p class="muted" style="line-height:1.6;">
+    Сейчас рейтинг {% if group.leaderboard_enabled %}<b>включён</b>: ученики видят
+    топ-3 и своё место{% else %}<b>выключен</b>: ученики не видят ничьих
+    результатов, кроме своих{% endif %}. Переключается в админке, у поля
+    «Показывать рейтинг в группе». Полный список с аутсайдерами не
+    показывается никогда, публичного рейтинга между группами нет.
+  </p>
+</div>

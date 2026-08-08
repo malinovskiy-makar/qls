@@ -2,7 +2,13 @@
 
 {% block title %}{{ group.name }} — ЭкЗадачи{% endblock %}
 
-{% block extra_style %}{% include 'teacher/groups/_style.html' %}{% endblock %}
+{% block extra_style %}{% include 'teacher/groups/_style.html' %}
+{% comment %}
+Стили статистики нужны вкладке «Обзор» — она теперь живёт здесь. Раньше они
+подключались на отдельной странице статистики; эта страница осталась только
+редиректом.
+{% endcomment %}
+{% include 'platform/_stats_style.html' %}{% endblock %}
 
 {% block content %}
 <div class="crumbs"><a href="{% url 'teacher:groups' %}">Группы</a> → {{ group.name }}</div>
@@ -14,54 +20,18 @@
   </div>
 </div>
 
+{% comment %}
+Вкладок ТРИ, и ряд виден на всех — включая «Обзор». Раньше статистика жила
+отдельной страницей со своим шаблоном, и на ней навигация пропадала совсем.
+{% endcomment %}
 <nav class="tabs">
-  <a href="?tab=students"    class="{% if tab == 'students' %}active{% endif %}">Ученики</a>
+  <a href="?tab=overview"    class="{% if tab == 'overview' %}active{% endif %}">Обзор</a>
   <a href="?tab=assignments" class="{% if tab == 'assignments' %}active{% endif %}">Задания</a>
   <a href="?tab=materials"   class="{% if tab == 'materials' %}active{% endif %}">Материалы</a>
-  <a href="{% url 'teacher:group_stats' group.pk %}">Статистика</a>
 </nav>
 
-{% if tab == 'students' %}
-  {% if student_rows %}
-  <div class="card" style="padding: 0;">
-    <div class="table-wrap">
-      <table class="data">
-        <thead>
-          <tr>
-            <th>Ученик</th><th>Сдано</th><th>Ждёт проверки</th>
-            <th>Средний балл</th>
-            {% comment %}
-            ⚠️ Это НЕ «последняя активность» со страницы статистики. Здесь —
-            момент, когда ученик В ПОСЛЕДНИЙ РАЗ ВОШЁЛ на сайт (его пишет
-            система входа). Там — когда он в последний раз ЧТО-ТО ДЕЛАЛ
-            учебного (журнал учебных событий). Числа законно расходятся:
-            можно зайти и ничего не решить. Раньше обе колонки назывались
-            почти одинаково, и разница выглядела ошибкой.
-            {% endcomment %}
-            <th title="Момент входа на сайт. Это не то же, что учебная активность.">Последний вход на сайт</th><th></th>
-          </tr>
-        </thead>
-        <tbody>
-        {% for row in student_rows %}
-          <tr>
-            <td>{{ row.student.get_full_name|default:row.student.username }}</td>
-            <td>{{ row.submitted }}</td>
-            <td>{% if row.pending %}<span class="badge badge-pending">{{ row.pending }}</span>{% else %}—{% endif %}</td>
-            <td>{% if row.avg_score is not None %}{{ row.avg_score }}{% else %}—{% endif %}</td>
-            <td>{% if row.last_login %}{{ row.last_login|date:"d.m.Y" }}{% else %}не заходил{% endif %}</td>
-            <td><a href="{% url 'teacher:student_progress' row.student.pk %}" class="btn-outline btn-small">Прогресс</a></td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% else %}
-  <div class="empty-state">
-    <p>В группе пока нет учеников.</p>
-    <p>Подключение учеников появится позже — сейчас их добавляют через админку.</p>
-  </div>
-  {% endif %}
+{% if tab == 'overview' %}
+  {% include 'teacher/groups/_overview.html' %}
 
 {% elif tab == 'assignments' %}
   <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px;">
@@ -117,4 +87,38 @@
     <p>Появится позже. Сюда лягут сохранённые графики, доступные группе.</p>
   </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% comment %}
+Сортировка таблицы учеников — переехала сюда вместе с самой таблицей.
+{% endcomment %}
+<script>
+// Сортировка таблицы. Сортируем по data-sort (число), а не по тексту:
+// «12%» и «9%» как строки сравниваются неверно.
+(function () {
+  var table = document.getElementById('students-table');
+  if (!table) { return; }
+  var direction = {};
+  table.querySelectorAll('th:not(.no-sort)').forEach(function (th, index) {
+    th.addEventListener('click', function () {
+      var body = table.tBodies[0];
+      var rows = Array.prototype.slice.call(body.rows);
+      var asc = !direction[index];
+      direction = {}; direction[index] = asc;
+      rows.sort(function (a, b) {
+        var x = a.cells[index], y = b.cells[index];
+        if (!x || !y) { return 0; }
+        var xv = x.dataset.sort, yv = y.dataset.sort;
+        if (xv !== undefined && yv !== undefined) {
+          return (asc ? 1 : -1) * (parseFloat(xv) - parseFloat(yv));
+        }
+        return (asc ? 1 : -1) *
+          x.textContent.trim().localeCompare(y.textContent.trim(), 'ru');
+      });
+      rows.forEach(function (row) { body.appendChild(row); });
+    });
+  });
+})();
+</script>
 {% endblock %}
