@@ -307,6 +307,7 @@ def group_assignment_detail(request, group_id, assignment_id):
     ответ, своя решалка и своё обсуждение.
     """
     from problems.models import ProblemComment
+    from problems.models_platform import visibility_choices_for
 
     group = own_group_or_404(request.user, group_id)
     assignment = group_assignment_or_404(group, assignment_id)
@@ -327,6 +328,9 @@ def group_assignment_detail(request, group_id, assignment_id):
                 .select_related('author'))
     by_item = {}
     for comment in comments:
+        # Пометка видимости считается ЗДЕСЬ, один раз на комментарий: шаблон
+        # не должен решать, кому что видно, — это правило доступа.
+        comment.note = comment.note_for(request.user)
         by_item.setdefault(comment.problem_item_id, []).append(comment)
 
     rows = []
@@ -362,6 +366,11 @@ def group_assignment_detail(request, group_id, assignment_id):
         # Баллы правятся ДО первой сдачи. После — цифра остаётся крупной и
         # видной, но не редактируется: оценки уже выставлены по этой шкале.
         'points_locked': assignment.points_locked,
+        # Видимость комментария — от лица того, кто пишет. «Видно только
+        # этому ученику» требует ученика, поэтому список тут же.
+        'visibility_choices': visibility_choices_for('tutor'),
+        'recipients': list(assignment.students.order_by('last_name',
+                                                        'first_name')),
         'stats': assignment_stats(assignment),
         'solution_visibility': SolutionVisibility.choices,
     })
@@ -379,6 +388,7 @@ def api_comment_create(request):
     входа одна: два почти одинаковых эндпоинта разъехались бы.
     """
     from problems.models import AssignmentItem, ProblemComment
+    from problems.models_platform import visibility_choices_for
 
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Нужен вход'}, status=403)
@@ -404,14 +414,33 @@ def api_comment_create(request):
 
     if tutor:
         # Репетитор выбирает видимость сам, по умолчанию — «видят все».
-        visibility = (ProblemComment.Visibility.PRIVATE
-                      if body.get('visibility') == 'private'
-                      else ProblemComment.Visibility.GROUP)
+        allowed = {value for value, _ in visibility_choices_for('tutor')}
+        visibility = body.get('visibility')
+        if visibility not in allowed:
+            visibility = ProblemComment.Visibility.GROUP
         recipient_id = body.get('recipient_id') or None
+
+        # ⚠️ «ВИДНО ТОЛЬКО ЭТОМУ УЧЕНИКУ» ТРЕБУЕТ УЧЕНИКА. Именно отсутствие
+        # адресата и было ошибкой прежней модели: комментарий репетитора «в
+        # узкий круг» без адресата означал «только я и я» — ученик его не
+        # видел, хотя по названию должен был. Теперь такой запрос честно
+        # отвергается, а не сохраняется в состояние, которого нет.
+        if visibility == ProblemComment.Visibility.PRIVATE:
+            if not recipient_id or not assignment.students.filter(
+                    pk=recipient_id).exists():
+                return JsonResponse(
+                    {'error': 'Выберите ученика, которому это видно'},
+                    status=400)
+        else:
+            # У «всей группе» и «заметки для себя» адресата быть не может.
+            recipient_id = None
     else:
-        # Вопрос ученика ВСЕГДА приватный: публичные вопросы учеников —
-        # это канал списывания, а не обсуждение.
-        visibility = ProblemComment.Visibility.PRIVATE
+        # Вопрос ученика ВСЕГДА личный: публичные вопросы учеников —
+        # это канал списывания, а не обсуждение. Заметку для себя ученик
+        # завести может — это его собственные пометки по задаче.
+        visibility = (ProblemComment.Visibility.SELF
+                      if body.get('visibility') == ProblemComment.Visibility.SELF
+                      else ProblemComment.Visibility.PRIVATE)
         recipient_id = None
 
     comment = ProblemComment.objects.create(
@@ -424,6 +453,7 @@ def api_comment_create(request):
         'text': comment.text,
         'visibility': comment.visibility,
         'visibility_display': comment.get_visibility_display(),
+        'note': comment.note_for(request.user),
         'created_at': timefmt.fmt(comment.created_at),
     })
 

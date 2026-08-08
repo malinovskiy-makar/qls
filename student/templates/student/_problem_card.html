@@ -157,7 +157,8 @@
           <div class="pf-comment-head">
             <strong>{{ comment.author.get_full_name|default:comment.author.username }}</strong>
             · {{ comment.created_at|date:"d.m.Y H:i" }}
-            {% if comment.visibility == 'private' %} · только вы и преподаватель{% endif %}
+            {# Пометку считает модель — та же, что на экране репетитора. #}
+            {% if comment.note %} · {{ comment.note }}{% endif %}
           </div>
           <div>{{ comment.text|linebreaksbr }}</div>
         </div>

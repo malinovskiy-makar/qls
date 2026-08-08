@@ -498,6 +498,12 @@ class Command(BaseCommand):
             text='Да, приравняйте Qd и Qs и решите уравнение.',
             defaults={'visibility': ProblemComment.Visibility.PRIVATE,
                       'recipient': student})
+        # Третий вариант видимости — иначе «заметку для себя» негде увидеть
+        # глазами, а видеть её надо: она не видна НИКОМУ, кроме автора.
+        ProblemComment.objects.get_or_create(
+            assignment=homework, problem_item=first, author=tutor,
+            text='На занятии разобрать среднюю точку — путаются каждый раз.',
+            defaults={'visibility': ProblemComment.Visibility.SELF})
 
     def _saved(self, tutor, catalog, custom):
         folder_p, _ = SavedFolder.objects.get_or_create(

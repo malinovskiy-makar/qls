@@ -426,9 +426,13 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
         <div class="comment-head">
           <span class="comment-author">{{ comment.author.get_full_name|default:comment.author.username }}</span>
           · {{ comment.created_at|date:"d.m.Y H:i" }}
-          {% if comment.visibility == 'private' %}
-            · <span class="comment-private">только я и автор</span>
-          {% endif %}
+          {% comment %}
+          Пометка ставится ТОЛЬКО у исключений: обычный комментарий виден
+          всей группе, и подписывать это под каждым сообщением значит писать
+          одно и то же снова и снова. Текст пометки считает модель —
+          `note_for` знает и про адресата, и про заметку для себя.
+          {% endcomment %}
+          {% if comment.note %} · <span class="comment-private">{{ comment.note }}</span>{% endif %}
         </div>
         <div>{{ comment.text|linebreaksbr }}</div>
       </div>
@@ -440,15 +444,36 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
     <form class="comment-form" data-item="{{ row.item.pk }}">
       <textarea name="text" placeholder="Комментарий к задаче" required></textarea>
       <div class="form-row">
+        {% comment %}
+        ⚠️ ВАРИАНТЫ НАЗВАНЫ ОТ ЛИЦА ТОГО, КТО ПИШЕТ. Прежнее «только я и
+        автор» написано от лица УЧЕНИКА: когда пишет репетитор, «автор» это
+        он сам, и вариант означал «только я и я» — ученик такого комментария
+        не видел, хотя по названию должен был.
+        {% endcomment %}
         <label class="k-row" style="gap:6px">
           <span class="k-quiet">Видимость:</span>
           <span class="k-select-wrap" style="width:auto">
-            <select class="k-select" name="visibility" style="width:auto">
-              <option value="group">видят все</option>
-              <option value="private">только я и автор</option>
+            <select class="k-select vis-select" name="visibility" style="width:auto">
+              {% for value, label in visibility_choices %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
             </select>
           </span>
         </label>
+        {% comment %}
+        «Видно только этому ученику» требует УЧЕНИКА — иначе это снова
+        «только я и я». Список появляется вместе с выбором и не занимает
+        места в остальное время.
+        {% endcomment %}
+        <span class="k-select-wrap vis-who" style="width:auto" hidden>
+          <select class="k-select" name="recipient_id" style="width:auto">
+            {% for student in recipients %}
+            <option value="{{ student.pk }}">{{ student.get_full_name|default:student.username }}</option>
+            {% empty %}
+            <option value="">в группе нет учеников</option>
+            {% endfor %}
+          </select>
+        </span>
         <button type="submit" class="k-btn k-btn--plain k-btn--sm">Отправить</button>
         <span class="form-status k-quiet"></span>
       </div>
@@ -473,6 +498,15 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
   const csrf = document.cookie.match(/csrftoken=([^;]+)/);
 
   document.querySelectorAll('.comment-form').forEach(function (form) {
+    // Список учеников показывается только у варианта «видно только этому
+    // ученику»: у остальных адресата нет и выбирать нечего.
+    const picker = form.querySelector('.vis-who');
+    const select = form.querySelector('.vis-select');
+    function syncWho() {
+      if (picker) { picker.hidden = select.value !== 'private'; }
+    }
+    if (select) { select.addEventListener('change', syncWho); syncWho(); }
+
     form.addEventListener('submit', function (event) {
       event.preventDefault();
       const status = form.querySelector('.form-status');
@@ -481,17 +515,23 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
       if (!text) { return; }
       status.textContent = 'Отправляю…';
 
+      const payload = {
+        item_id: form.dataset.item,
+        text: text,
+        visibility: select ? select.value : 'group',
+      };
+      if (payload.visibility === 'private') {
+        const who = form.querySelector('[name=recipient_id]');
+        payload.recipient_id = who ? who.value : '';
+      }
+
       fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRFToken': csrf ? csrf[1] : '',
         },
-        body: JSON.stringify({
-          item_id: form.dataset.item,
-          text: text,
-          visibility: form.querySelector('[name=visibility]').value,
-        }),
+        body: JSON.stringify(payload),
       })
         .then(function (response) { return response.json().then(function (data) {
           if (!response.ok) { throw new Error(data.error || 'Ошибка'); }
@@ -505,8 +545,10 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
           block.className = 'comment';
           const head = document.createElement('div');
           head.className = 'comment-head';
+          // Пометку считает СЕРВЕР (`ProblemComment.note_for`) — иначе она
+          // разошлась бы с той, что нарисована у остальных сообщений.
           head.textContent = data.author + ' · ' + data.created_at +
-            (data.visibility === 'private' ? ' · только я и автор' : '');
+            (data.note ? ' · ' + data.note : '');
           const body = document.createElement('div');
           body.textContent = data.text;   // textContent, не innerHTML: текст чужой
           block.appendChild(head);
