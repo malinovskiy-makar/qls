@@ -1124,6 +1124,48 @@ const CASES = [
     checks: [['точки есть', 'n', 1, 0], ['x пересечения', 'x', 2, 0.05],
              ['y пересечения', 'y', 2, 0.05]],
   },
+  {
+    // Окно сюжета уходит в минус, и корни там настоящие. Раньше поиск шёл по
+    // CONFIG (0..100) и всё, что левее нуля, терялось.
+    name: 'Ключевые точки · корни в отрицательной части плана',
+    run: `setMode('math'); setMathSub('optimum'); resetZoom();
+          STATE.mathFormula = 'x^3 - 3*x'; setMathWindow(-3, 3, -6, 6); redrawAll();
+          var xs = crossPoints().filter(function (p) { return Math.abs(p.y) < 1e-6; })
+                     .map(function (p) { return p.x; }).sort(function (a, b) { return a - b; });
+          return { n: xs.length, x0: xs[0], x1: xs[1], x2: xs[2] };`,
+    checks: [['корней три', 'n', 3, 0], ['левый корень', 'x0', -1.7321, 0.01],
+             ['средний корень', 'x1', 0, 0.01], ['правый корень', 'x2', 1.7321, 0.01]],
+  },
+  {
+    // Z = min(f1, f2) совпадает с f1 слева и с f2 справа. Совпадение на отрезке —
+    // не пересечение: раньше на его краях появлялись узлы расчётной сетки
+    // (1.2501 и 1.6668) и выдавали себя за ответ.
+    name: 'Ключевые точки · совпадение кривых не выдаётся за пересечение',
+    run: `setMode('math'); setMathSub('minmax'); resetZoom();
+          STATE.mathFormula = 'x^2'; STATE.mathG2 = '4 - x';
+          STATE.mathG3 = ''; STATE.mathG4 = ''; STATE.mathMinMax = 'min';
+          setMathWindow(-5, 6, -3, 12); redrawAll();
+          var pts = crossPoints();
+          var near = function (v) { return pts.filter(function (p) { return Math.abs(p.x - v) < 0.08; }).length; };
+          var real = pts.filter(function (p) { return Math.abs(p.x - 1.5616) < 0.01; })[0] || {};
+          return { grid1: near(1.2501), grid2: near(1.6668), x: real.x, y: real.y };`,
+    checks: [['узел сетки 1.25 — не точка', 'grid1', 0, 0], ['узел сетки 1.667 — не точка', 'grid2', 0, 0],
+             ['настоящее пересечение x', 'x', 1.5616, 0.005], ['настоящее пересечение y', 'y', 2.4384, 0.005]],
+  },
+  {
+    // Сетка рисуется по шкалам сцены. В «Математике» её не было совсем:
+    // drawGrid считала линии от CONFIG и до полного плана не доходила.
+    name: 'Сетка · работает в «Математике» во всех трёх режимах',
+    run: `setMode('math'); setMathSub('optimum'); redrawAll();
+          var n = function () { return document.querySelectorAll('svg#chart g.grid line').length; };
+          setGridMode('dense'); var d = n();
+          setGridMode('plain'); var o = n();
+          setGridMode('off');   var f = n();
+          setGridMode('plain');
+          return { dense: d > 0 ? 1 : 0, plain: o > 0 ? 1 : 0, off: f, denser: d > o ? 1 : 0 };`,
+    checks: [['подробная сетка есть', 'dense', 1, 0], ['упрощённая сетка есть', 'plain', 1, 0],
+             ['без сетки — ноль линий', 'off', 0, 0], ['подробная гуще упрощённой', 'denser', 1, 0]],
+  },
 ];
 
 function approx(got, want, tol) {

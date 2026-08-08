@@ -78,16 +78,31 @@ for (const [key, name] of scenes) {
       mode: STATE.mode,
     };
   });
+  // Сетка: считаем линии в трёх режимах переключателя. Раньше в «Математике»
+  // и в панелях торговли сетки не было совсем, и это не ловилось ничем.
+  r.grid = await page.evaluate(() => {
+    const n = () => document.querySelectorAll('svg#chart g.grid line').length;
+    const was = STATE.gridDense ? 'dense' : (STATE.showGrid ? 'plain' : 'off');
+    setGridMode('dense'); const dense = n();
+    setGridMode('plain'); const plain = n();
+    setGridMode('off');   const off = n();
+    setGridMode(was);
+    return { dense, plain, off };
+  });
   rows.push([key, name, r]);
 }
 
 const yn = v => v ? '+' : '–';
+// Сетка считается рабочей, если подробная гуще простой, простая есть, а «нет» — это ноль линий.
+const gridOk = r => r.grid.dense > r.grid.plain && r.grid.plain > 0 && r.grid.off === 0;
 const frac = (a, b) => b === 0 ? '—' : (a === b ? '+ ' + a : a + '/' + b);
-console.log('| Сцена | режим | LaTeX-ввод | клавиатура | «?» | параметры | ползунки: с границами / всего | прокатывание | ключевые точки | KaTeX в аналитике | абзацы-инструкции | свернуть точки |');
-console.log('|---|---|---|---|---|---|---|---|---|---|---|---|');
+console.log('| Сцена | режим | LaTeX-ввод | клавиатура | «?» | параметры | ползунки: с границами / всего | прокатывание | ключевые точки | сетка: подробно/просто/нет | KaTeX в аналитике | абзацы-инструкции | свернуть точки |');
+console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|');
 for (const [key, name, r] of rows) {
-  console.log(`| ${key} · ${name} | ${r.mode} | ${frac(r.mf, r.fields)} | ${frac(r.kbd, r.fields)} | ${frac(r.help, r.fields)} | ${yn(r.params)} | ${r.bounds} / ${r.ranges} | ${yn(r.roller)} | ${r.drawnCrosses}/${r.crosses} | ${r.katex} (текст ${r.sbLen}) | ${r.hints} | ${yn(r.foldPoints)} |`);
+  console.log(`| ${key} · ${name} | ${r.mode} | ${frac(r.mf, r.fields)} | ${frac(r.kbd, r.fields)} | ${frac(r.help, r.fields)} | ${yn(r.params)} | ${r.bounds} / ${r.ranges} | ${yn(r.roller)} | ${r.drawnCrosses}/${r.crosses} | ${r.grid.dense}/${r.grid.plain}/${r.grid.off}${gridOk(r) ? ' +' : ' !'} | ${r.katex} (текст ${r.sbLen}) | ${r.hints} | ${yn(r.foldPoints)} |`);
 }
-console.log('\nОшибок страницы: ' + errors.length);
+const badGrid = rows.filter(([, , r]) => !gridOk(r));
+console.log('\nСцен со сломанной сеткой: ' + badGrid.length + (badGrid.length ? ' (' + badGrid.map(x => x[0]).join(', ') + ')' : ''));
+console.log('Ошибок страницы: ' + errors.length);
 errors.slice(0, 10).forEach(e => console.log('  ' + e));
 await browser.close();

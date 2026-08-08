@@ -4212,15 +4212,20 @@ function addDefs() {
 // Крупные линии совпадают с подписанными делениями осей (drawAxes берёт те же
 // xTicks()/yTicks()) — каждая линия сетки «читается» по числу на оси.
 // Мелкая сетка добавляет 4 бледные линии между крупными, без подписей.
-function drawGrid() {
+function drawGrid(mx, my, parent) {
   if (!STATE.showGrid) return;
-  const g = svg.append('g').attr('class', 'grid');
-  const m = CONFIG.margin;
-  const xLeft = m.left, xRight = W - m.right;
-  const yBot = H - m.bottom, yTop = m.top;
-  const tx = xTicks(), ty = yTicks();
-  const inX = (v) => v >= CONFIG.Qmin - 1e-9 && v <= CONFIG.Qmax + 1e-9;
-  const inY = (v) => v >= CONFIG.Pmin - 1e-9 && v <= CONFIG.Pmax + 1e-9;
+  // Шкалы приходят аргументом: у «Математики» и у сцен с двумя панелями окно
+  // своё, и сетка, посчитанная от CONFIG, там просто не появлялась. Без
+  // аргументов работает как раньше — по главным шкалам сцены.
+  mx = mx || sx; my = my || sy;
+  const g = (parent || svg).append('g').attr('class', 'grid');
+  const [xLeft, xRight] = mx.range();
+  const [yBot, yTop] = my.range();
+  const [xLo, xHi] = mx.domain();
+  const [yLo, yHi] = my.domain();
+  const tx = axisTicks(mx, 10, STATE.xStep), ty = axisTicks(my, 8, STATE.yStep);
+  const inX = (v) => v >= xLo - 1e-9 && v <= xHi + 1e-9;
+  const inY = (v) => v >= yLo - 1e-9 && v <= yHi + 1e-9;
   // Мелкие линии — сначала (крупные лягут поверх и останутся заметнее).
   if (STATE.gridDense) {
     const SUB = 5;                                    // делений между соседними подписями
@@ -4235,21 +4240,21 @@ function drawGrid() {
         draw(v);
       }
     };
-    minor(tx, CONFIG.Qmin, CONFIG.Qmax, inX, (v) => g.append('line')
-      .attr('x1', sx(v)).attr('y1', yBot).attr('x2', sx(v)).attr('y2', yTop)
+    minor(tx, xLo, xHi, inX, (v) => g.append('line')
+      .attr('x1', mx(v)).attr('y1', yBot).attr('x2', mx(v)).attr('y2', yTop)
       .attr('stroke', COL.grid).attr('stroke-width', 1).attr('opacity', 0.45));
-    minor(ty, CONFIG.Pmin, CONFIG.Pmax, inY, (v) => g.append('line')
-      .attr('x1', xLeft).attr('y1', sy(v)).attr('x2', xRight).attr('y2', sy(v))
+    minor(ty, yLo, yHi, inY, (v) => g.append('line')
+      .attr('x1', xLeft).attr('y1', my(v)).attr('x2', xRight).attr('y2', my(v))
       .attr('stroke', COL.grid).attr('stroke-width', 1).attr('opacity', 0.45));
   }
   tx.forEach(t => {                        // вертикальные линии (по оси Q)
     if (!inX(t) || Math.abs(t) < 1e-12) return;
-    g.append('line').attr('x1', sx(t)).attr('y1', yBot).attr('x2', sx(t)).attr('y2', yTop)
+    g.append('line').attr('x1', mx(t)).attr('y1', yBot).attr('x2', mx(t)).attr('y2', yTop)
       .attr('stroke', COL.grid).attr('stroke-width', 1);
   });
   ty.forEach(t => {                        // горизонтальные линии (по оси P)
     if (!inY(t) || Math.abs(t) < 1e-12) return;
-    g.append('line').attr('x1', xLeft).attr('y1', sy(t)).attr('x2', xRight).attr('y2', sy(t))
+    g.append('line').attr('x1', xLeft).attr('y1', my(t)).attr('x2', xRight).attr('y2', my(t))
       .attr('stroke', COL.grid).attr('stroke-width', 1);
   });
 }
@@ -6662,6 +6667,7 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
   const lx = d3.scaleLinear().domain([0, Xmax]).range([left, right]);
   const ly = d3.scaleLinear().domain([0, Ymax]).range([bottom, top]);
   const g = svg.append('g');
+  drawGrid(lx, ly, g);               // у мини-рынка свои шкалы — сетку считаем по ним
   const cid = 'mini-clip-' + idx;
   svg.select('defs').append('clipPath').attr('id', cid).append('rect').attr('x', left).attr('y', top).attr('width', right - left).attr('height', bottom - top);
   // Оси.
@@ -7273,6 +7279,7 @@ function redrawProduction() {
   const t2 = d3.scaleLinear().domain([0, mpMax]).range([yBot0, yTop0 + gap]);
   const panel = (scale, y0, title) => {
     const g = svg.append('g');
+    drawGrid(lx, scale, g);          // у панели свои шкалы — сетку считаем по ним
     g.append('line').attr('x1', left).attr('y1', y0).attr('x2', right).attr('y2', y0)
       .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
     g.append('line').attr('x1', left).attr('y1', y0).attr('x2', left).attr('y2', scale.range()[1])
@@ -10874,6 +10881,7 @@ function drawTradeB(d) {
     const g = svg.append('g').attr('clip-path', 'url(#' + clipId + ')');
     const line = d3.line().defined(q => q && isFinite(q[1])).x(q => p.mx(q[0])).y(q => p.my(q[1]));
 
+    drawGrid(p.mx, p.my, g);
     drawPlaneAxes(g, p.mx, p.my, 'X', 'Y');
     // Числа делений: у каждой панели свой масштаб, поэтому и подписи свои.
     // Подписи делений рисуем ВНЕ обрезки: они стоят за краем поля, и обрезка
@@ -12069,14 +12077,42 @@ function syncAreaColorList() {
    Считаются сами: кривые друг с другом И каждая кривая с осями координат.
    Показываются тускло; наведение или щелчок делает точку яркой и подписывает
    координаты, курсор ушёл — снова тускнеет. */
+/* Окно, в котором сцена РЕАЛЬНО рисует. Берём у главных шкал, а не у CONFIG:
+   в «Математике» и в сценах с двумя панелями окно своё, и всё, что считалось
+   от CONFIG, искалось не там, где нарисованы кривые (отсюда терялись корни
+   в отрицательной части плана). Нижние границы режем по правилу первой
+   четверти — тем же quadLo, что и остальной движок. */
+function viewWindow() {
+  const { mx, my } = mainScales();
+  const [dx0, dx1] = mx.domain(), [dy0, dy1] = my.domain();
+  const [px0, px1] = mx.range();
+  return {
+    x0: quadLo(dx0), x1: dx1,
+    y0: quadLo(dy0), y1: dy1,
+    px: Math.abs(px1 - px0),
+  };
+}
+
+// Как назвать оси в подписи ключевой точки: в «Математике» это x и y.
+function axisWords() {
+  if (STATE.mode === 'math') return ['ось x', 'ось y'];
+  if (STATE.mode === 'ppf') return ['ось X', 'ось Y'];
+  return ['ось Q', 'ось P'];
+}
+
 function crossPoints() {
   const t = snapTargets();
   if (!t.length) return [];
-  const [lo0, hi] = [quadLo(CONFIG.Qmin), CONFIG.Qmax];
+  const w = viewWindow();
+  const lo0 = w.x0, hi = w.x1, yLo = w.y0, yHi = w.y1;
+  if (!(hi > lo0) || !isFinite(hi - lo0)) return [];
   const lo = lo0 + (hi - lo0) * 1e-6;
-  const yLo = quadLo(CONFIG.Pmin), yHi = CONFIG.Pmax;
+  // Узлов столько, чтобы шаг был около двух пикселей: жёсткие 240 в широком
+  // окне пропускали корни, а в узком считались впустую.
+  const N = Math.max(240, Math.min(900, Math.round(w.px / 2)));
   const out = [];
   const dupTol = (hi - lo) * 1e-3, dupTolY = (yHi - yLo) * 1e-3;
+  const [xAxis, yAxis] = axisWords();
   const push = (x, y, a, b) => {
     if (!isFinite(x) || !isFinite(y)) return;
     if (x < lo0 - 1e-9 || x > hi + 1e-9 || y < yLo - 1e-9 || y > yHi + 1e-9) return;
@@ -12084,35 +12120,59 @@ function crossPoints() {
     if (out.some(o => Math.abs(o.x - x) < dupTol && Math.abs(o.y - y) < dupTolY)) return;
     out.push({ x, y, a, b });
   };
+  // Считаем каждую кривую по сетке ОДИН раз и переиспользуем во всех парах:
+  // иначе при большем числе узлов расчёт кривых умножался бы на число пар.
+  const xs = new Array(N + 1), vals = [];
+  for (let i = 0; i <= N; i++) xs[i] = lo + (hi - lo) * i / N;
+  t.forEach(c => { const arr = new Array(N + 1); for (let i = 0; i <= N; i++) arr[i] = c.f(xs[i]); vals.push(arr); });
+
+  // Совпадение двух кривых на целом отрезке — это НЕ пересечение. Раньше край
+  // такого отрезка выдавался за точку, и на экране появлялся узел расчётной
+  // сетки: у min(f, g) кривая Z совпадает с f слева и с g справа, и обе
+  // «точки» были просто числами вида 1.25 и 1.6667 — шагом сетки.
+  const zTol = Math.max(1e-12, (yHi - yLo) * 1e-9);
   for (let a = 0; a < t.length; a++) {
     for (let b = a + 1; b < t.length; b++) {
-      const g = (x) => { const p = t[a].f(x), q = t[b].f(x); return (isNaN(p) || isNaN(q)) ? NaN : p - q; };
-      const N = 240;
-      let prevX = lo, prevG = g(lo);
+      const va = vals[a], vb = vals[b];
+      const gs = new Array(N + 1), zero = new Array(N + 1);
+      for (let i = 0; i <= N; i++) {
+        const p = va[i], q = vb[i];
+        gs[i] = (isNaN(p) || isNaN(q)) ? NaN : p - q;
+        zero[i] = !isNaN(gs[i]) && Math.abs(gs[i]) <= zTol;
+      }
+      const runAt = (i) => {                 // длина участка совпадения вокруг узла
+        let n = 1;
+        for (let k = i - 1; k >= 0 && zero[k]; k--) n++;
+        for (let k = i + 1; k <= N && zero[k]; k++) n++;
+        return n;
+      };
+      const gf = (x) => { const p = t[a].f(x), q = t[b].f(x); return (isNaN(p) || isNaN(q)) ? NaN : p - q; };
       for (let i = 1; i <= N && out.length < 60; i++) {
-        const x = lo + (hi - lo) * i / N, cur = g(x);
-        if (!isNaN(prevG) && !isNaN(cur) && prevG * cur <= 0 && prevG !== cur) {
-          const r = (prevG === 0) ? prevX : (cur === 0 ? x : bisect(g, prevX, x));
-          push(r, t[a].f(r), t[a].name, t[b].name);
+        const p = gs[i - 1], c = gs[i];
+        if (isNaN(p) || isNaN(c)) continue;
+        if (zero[i - 1] && zero[i]) continue;                    // идём внутри совпадения
+        if (zero[i - 1] || zero[i]) {                            // касание или край совпадения
+          const j = zero[i - 1] ? i - 1 : i;
+          if (runAt(j) > 1) continue;                            // край — не точка
+          push(xs[j], va[j], t[a].name, t[b].name);
+          continue;
         }
-        prevX = x; prevG = cur;
+        if (p * c < 0) { const r = bisect(gf, xs[i - 1], xs[i]); push(r, t[a].f(r), t[a].name, t[b].name); }
       }
     }
   }
   // Пересечения с осями: где кривая садится на ось X (y = 0) и где начинается
   // на оси Y (x = 0). В экономике это выпуск при нулевой цене и цена отсечения.
-  t.forEach(c => {
-    const N = 240;
-    let prevX = lo, prevV = c.f(lo);
+  t.forEach((c, k) => {
+    const arr = vals[k];
     for (let i = 1; i <= N && out.length < 60; i++) {
-      const x = lo + (hi - lo) * i / N, v = c.f(x);
-      if (!isNaN(prevV) && !isNaN(v) && prevV * v <= 0 && prevV !== v) {
-        const r = (prevV === 0) ? prevX : (v === 0 ? x : bisect((z) => c.f(z), prevX, x));
-        push(r, 0, c.name, 'ось Q');
-      }
-      prevX = x; prevV = v;
+      const p = arr[i - 1], v = arr[i];
+      if (isNaN(p) || isNaN(v)) continue;
+      if (p === 0) push(xs[i - 1], 0, c.name, xAxis);
+      else if (v === 0) push(xs[i], 0, c.name, xAxis);
+      else if (p * v < 0) { const r = bisect((z) => c.f(z), xs[i - 1], xs[i]); push(r, 0, c.name, xAxis); }
     }
-    if (lo0 <= 1e-9) push(0, c.f(0), c.name, 'ось P');
+    if (lo0 <= 1e-9 && hi >= -1e-9) push(0, c.f(0), c.name, yAxis);
   });
   return out;
 }
@@ -13639,6 +13699,7 @@ function drawMathTangent(f) {
   const gBot = svg.append('g').attr('clip-path', 'url(#tan-clip-bot)');
   const gUi  = svg.append('g');    // подписи панелей: им обрезка ни к чему
 
+  drawGrid(s1.mx, s1.my, gTop); drawGrid(s2.mx, s2.my, gBot);
   drawPlaneAxes(gTop, s1.mx, s1.my, 'x', 'y');
   drawPlaneAxes(gBot, s2.mx, s2.my, 'x', 'f′');
   // Тонкая черта между панелями: видно, что это две разные области.
@@ -13714,6 +13775,7 @@ function drawMathTangent(f) {
 function drawMathOptimum(f) {
   const { mx, my } = mathScales();
   const g = svg.append('g');
+  drawGrid(mx, my, g);
   drawPlaneAxes(g, mx, my, 'x', 'y');
   const lo = STATE.mathXmin, hi = STATE.mathXmax;
 
@@ -13752,6 +13814,7 @@ function drawMathOptimum(f) {
 function drawMathTransform(f) {
   const { mx, my } = mathScales();
   const g = svg.append('g');
+  drawGrid(mx, my, g);
   drawPlaneAxes(g, mx, my, 'x', 'y');
   const t = mathTransformed(f, STATE.mathTrans, STATE.mathA);
   mathLine(g, f, mx, my, COL.ghost, 2.2, '6 4');   // исходная — бледным пунктиром
@@ -13803,6 +13866,7 @@ function mmColor(i) {
 function drawMathMinMax(f) {
   const { mx, my } = mathScales();
   const g = svg.append('g');
+  drawGrid(mx, my, g);
   drawPlaneAxes(g, mx, my, 'x', 'y');
   const parts = [{ fn: f, name: mmLabel(0), color: mmColor(0) }];
   for (let i = 1; i < mmSlots(); i++) {
@@ -13952,6 +14016,7 @@ function drawMathConstraint() {
   // Окно общее для всего раздела, поэтому колесо и перетаскивание работают
   // здесь ровно так же, как в остальных сюжетах.
   const { mx, my } = mathScales();
+  drawGrid(mx, my, g);
   drawPlaneAxes(g, mx, my, 'x', 'y');
   if (!compiled) {
     STATE.mathRes = { error: error || 'не понял формулу' };
@@ -14137,7 +14202,9 @@ function redrawMath() {
   if (!f) {
     if (err) { err.style.display = 'block'; err.textContent = 'Не понял формулу f(x).'; }
     const { mx, my } = mathScales();
-    drawPlaneAxes(svg.append('g'), mx, my, 'x', 'y');
+    const gErr = svg.append('g');
+    drawGrid(mx, my, gErr);
+    drawPlaneAxes(gErr, mx, my, 'x', 'y');
     STATE.mathRes = {}; updateMathPanel(); return;
   }
   if (err) err.style.display = 'none';
@@ -15592,6 +15659,33 @@ function buildMathfield(inp) {
       }
     } finally { syncing = false; }
   };
+
+  /* Русская раскладка ломала ввод десятичных чисел: точка превращалась в дробь.
+     MathLive не находит кириллическую раскладку в своих таблицах и переходит на
+     запасной путь, где смотрит на ФИЗИЧЕСКИЙ код клавиши, а не на набранный
+     символ. В русской раскладке точка сидит на той же клавише, где в английской
+     слэш, — отсюда и дробь вместо «0.5». Настройками MathLive это не лечится:
+     подмена происходит раньше. Решаем сами и по e.key, то есть по тому, что
+     человек НАБРАЛ. */
+  const layoutGuard = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    let tex = null;
+    if (e.key === '.' || e.key === ',') tex = '.';               // десятичный разделитель
+    else if (e.key === '/') tex = '\\frac{#@}{#?}';              // дробь — только настоящий слэш
+    if (tex == null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    mf.executeCommand(['insert', tex, { focus: true, feedback: false }]);
+    mf.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  // Перехват в фазе погружения: до того, как клавиша дойдёт до приёмника внутри
+  // теневого дерева, где её разбирает сам MathLive.
+  mf.addEventListener('keydown', layoutGuard, true);
+  const armSink = () => {
+    const s = sink();
+    if (s && !s._layoutGuard) { s._layoutGuard = 1; s.addEventListener('keydown', layoutGuard, true); }
+  };
+  armSink(); setTimeout(armSink, 0);
 
   mf.addEventListener('input', toInput);
   inp.addEventListener('input', fromInput);
