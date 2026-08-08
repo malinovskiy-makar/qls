@@ -295,14 +295,51 @@ function wireScene() {
   // График перерисовываем, когда меняется его РАЗМЕР, а не только окно:
   // сворачивание панели меняет ширину холста, и без этого кривые остались бы
   // нарисованными по старой геометрии.
+  /* Наблюдатель за размером холста. Тонкое место: redrawAll пересоздаёт всё
+     содержимое #graph-wrap, наблюдаемый размер от этого «меняется», и
+     наблюдатель зовёт перерисовку снова. Флаг с requestAnimationFrame такой
+     цикл НЕ разрывает — он лишь ограничивает его одной перерисовкой за кадр,
+     и страница никогда не приходит в покой. Поэтому три предохранителя. */
   const gw = document.getElementById('graph-wrap');
   if (gw && typeof ResizeObserver === 'function') {
-    let pending = false;
-    new ResizeObserver(() => {
-      if (pending) return;
+    let lastW = 0, lastH = 0, pending = false, burst = 0, off = false;
+    const size = () => { const r = gw.getBoundingClientRect(); return [r.width, r.height]; };
+    const ro = new ResizeObserver(() => {
+      if (off || pending) return;
+      const [w, h] = size();
+      // 1. Меньше пикселя по обеим осям — считаем, что размер не менялся.
+      if (Math.abs(w - lastW) < 1 && Math.abs(h - lastH) < 1) return;
+      lastW = w; lastH = h;
+      // 3. Пять срабатываний подряд без участия человека — это самоподдержка.
+      if (++burst > 5) {
+        off = true;
+        ro.unobserve(gw);
+        console.warn('calc2: холст перерисовывал сам себя пять раз подряд — наблюдатель размера выключен до следующего действия.');
+        return;
+      }
       pending = true;
-      requestAnimationFrame(() => { pending = false; redrawAll(); });
-    }).observe(gw);
+      // 2. На время перерисовки наблюдение снимаем: перерисовка физически не
+      //    может вызвать сама себя. Возвращаем уже в следующем кадре.
+      ro.unobserve(gw);
+      requestAnimationFrame(() => {
+        STATE.resizeRedraws = (STATE.resizeRedraws || 0) + 1;
+        redrawAll();
+        requestAnimationFrame(() => {
+          pending = false;
+          const s = size(); lastW = s[0]; lastH = s[1];
+          if (!off) ro.observe(gw);
+        });
+      });
+    });
+    const s0 = size(); lastW = s0[0]; lastH = s0[1];
+    ro.observe(gw);
+    // Счётчик обнуляет любое действие человека: настоящее изменение окна,
+    // щелчок или клавиша. Выключенный предохранителем наблюдатель тогда же
+    // возвращается к работе.
+    const calm = () => { burst = 0; if (off) { off = false; ro.observe(gw); } };
+    window.addEventListener('resize', calm);
+    document.addEventListener('pointerdown', calm, true);
+    document.addEventListener('keydown', calm, true);
   }
 }
 

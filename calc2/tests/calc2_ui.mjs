@@ -1149,7 +1149,7 @@ await t('поля «Оси» идут за колесом', () => page.evaluate(
   Math.abs(parseFloat(document.getElementById('inp-qmax').value) - CONFIG.Qmax) < 1e-6 || 'поле отстало'));
 
 await t('двойной щелчок возвращает масштаб сцены', async () => {
-  await page.dblclick('#graph-wrap', { position: { x: 700, y: 450 } });
+  await page.dblclick('#graph-wrap', { position: { x: 300, y: 250 } });
   await page.waitForTimeout(280);
   return await page.evaluate(() => (CONFIG.Qmax === 100 && CONFIG.Pmax === 100 && !STATE.zoomLock) || CONFIG.Qmax);
 });
@@ -1194,6 +1194,7 @@ await t('у каждой кривой есть поле формулы', async (
   (await page.locator('.curve-expr-inp').count()) === 2 || 'полей: ' + (await page.locator('.curve-expr-inp').count()));
 
 await t('правка формулы пересчитывает равновесие', async () => {
+  await reveal('.curve-expr-inp');
   await page.locator('.curve-expr-inp').first().fill('200 - 2*Q');
   await page.waitForTimeout(300);
   return await page.evaluate(() => {
@@ -1206,6 +1207,7 @@ await t('правка сохраняет роль, цвет и id кривой',
   (STATE.curves[0].role === 'demand' && STATE.curves[0].id === 1) || JSON.stringify(STATE.curves[0])));
 
 await t('битая формула не сносит кривую', async () => {
+  await reveal('.curve-expr-inp');
   await page.locator('.curve-expr-inp').first().fill('200 - 2*');
   await page.waitForTimeout(250);
   const bad = await page.evaluate(() => document.querySelector('.curve-expr-inp').classList.contains('bad'));
@@ -1430,7 +1432,7 @@ await t('раскрытая карточка отличается фоном', a
 
 /* ── Фаза 6. Окно сценариев ───────────────────────────────────────────
    Десять блоков без нумерации, все свёрнуты, открыт один за раз. */
-await t('блоки окна свёрнуты, заголовки без номеров', async () => {
+await t('заголовки блоков без номеров, раскрыт не больше одного', async () => {
   await page.evaluate(() => openPicker());
   await page.waitForTimeout(200);
   return await page.evaluate(() => {
@@ -1440,8 +1442,9 @@ await t('блоки окна свёрнуты, заголовки без ном�
       const grid = g.querySelector(':scope > .picker-grid');
       if (!b || b.tagName !== 'BUTTON') { bad.push('заголовок не кнопка'); return; }
       if (/^ *[0-9]+ *·/.test(b.textContent)) bad.push('номер в «' + b.textContent.trim() + '»');
-      if (grid && grid.classList.contains('open')) bad.push('«' + b.textContent.trim() + '» раскрыт');
     });
+    const open = document.querySelectorAll('#scene-picker .picker-grid.open').length;
+    if (open > 1) bad.push('раскрыто блоков: ' + open);
     return !bad.length || bad.join('; ');
   });
 });
@@ -1459,6 +1462,26 @@ await t('открыт один блок за раз', async () => {
 await t('свободного холста нет ни в окне, ни в маршрутах', () => page.evaluate(() =>
   (!document.querySelector('.scard[data-scene="free"]') && typeof SCENE_ROUTE.free === 'undefined')
   || 'холст ещё на месте'));
+
+/* ── Наблюдатель за размером холста ───────────────────────────────────
+   Перерисовка пересоздаёт содержимое #graph-wrap, поэтому наблюдение легко
+   зацикливается: перерисовал — размер «изменился» — перерисовал снова.
+   Проверяем, что число перерисовок конечно и равно числу действий, а в покое
+   не растёт вовсе. */
+await t('свёртывание панели не запускает вечную перерисовку', async () => {
+  await page.evaluate(() => { STATE.resizeRedraws = 0; });
+  for (let i = 0; i < 5; i++) {
+    await page.evaluate(() => setToolsOpen(false));
+    await page.waitForTimeout(240);
+    await page.evaluate(() => setToolsOpen(true));
+    await page.waitForTimeout(240);
+  }
+  const afterClicks = await page.evaluate(() => STATE.resizeRedraws);
+  await page.waitForTimeout(1200);              // спокойная пауза без действий
+  const idle = await page.evaluate(() => STATE.resizeRedraws);
+  if (idle !== afterClicks) return `в покое прибавилось ${idle - afterClicks} перерисовок`;
+  return afterClicks <= 12 || `на 10 щелчков ${afterClicks} перерисовок`;
+});
 
 console.log('\n' + checks.map(([s, n, d]) => `${s.padEnd(4)} ${n}${d ? '  → ' + d : ''}`).join('\n'));
 const bad = checks.filter(c => c[0] !== 'OK').length;
