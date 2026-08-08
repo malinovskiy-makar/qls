@@ -179,16 +179,24 @@ def part_rows(item, submission, stored=None):
                           submission=submission).select_related('part')}
 
     rows = []
+    single = len(parts) == 1 and parts[0] is None
     for number, part in enumerate(parts, start=1):
         key = part.pk if part is not None else None
         answer = stored.get(key)
+        # ⚠️ ЗАПАСНОЙ ПУТЬ К ОТВЕТУ. У задачи БЕЗ пунктов ответ живёт и в
+        # `Submission.submitted_answer` — например, у работ, сданных до
+        # появления ответов по пунктам, и у демо-данных. Без этого запасного
+        # пути экран проверки писал «ответа нет» ученику, который ответил.
+        given = answer.answer if answer else ''
+        if not given and single:
+            given = (submission.submitted_answer or '') if submission else ''
         rows.append({
             'part': part,
             'label': (part.label if part is not None else ''),
             'statement': (part.statement if part is not None else ''),
             'number': number,
             'name': answer_input_name(item, part),
-            'given': answer.answer if answer else '',
+            'given': given,
             'correct': part_correct_answer(item, part),
             'is_correct': answer.is_correct if answer else None,
             'score': answer.score if answer else None,

@@ -1,0 +1,79 @@
+{% extends 'teacher/base.html' %}
+{% comment %}
+Экран завершения работы (фаза 13.1).
+
+Появляется после последней задачи. Здесь и только здесь живёт «Комментарий ко
+всей работе»: раньше он стоял на экране проверки ОДНОЙ задачи с извиняющейся
+подписью «Один на всю работу, а не на эту задачу», и сама необходимость такой
+подписи говорила, что элемент стоит не там.
+
+Главное на экране — итоговый балл.
+{% endcomment %}
+
+{% block title %}Работа проверена — {{ student.get_full_name|default:student.username }}{% endblock %}
+
+{% block extra_style %}{% include 'teacher/groups/_style.html' %}
+.done-total { text-align: center; padding: 26px 20px 22px; }
+.done-score { font-size: 46px; font-weight: 700; line-height: 1;
+              font-variant-numeric: tabular-nums; }
+.done-cap { font-size: 13px; color: var(--text2); margin-top: 6px; }
+.done-list { margin-top: 16px; }
+.done-row { display: flex; justify-content: space-between; gap: 12px;
+            padding: 8px 0; font-size: 13px;
+            border-bottom: 0.5px solid var(--border-soft); }
+.done-row:last-child { border-bottom: none; }
+.done-row-name { color: var(--text2); min-width: 0; overflow-wrap: anywhere; }
+.done-row-score { font-variant-numeric: tabular-nums; white-space: nowrap; }
+{% endblock %}
+
+{% block content %}
+<div class="crumbs">
+  <a href="{% url 'teacher:groups' %}">Группы</a> →
+  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a> →
+  <a href="{% url 'teacher:group_submissions' group.pk assignment.pk %}">{{ assignment.name }}</a> →
+  готово
+</div>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ student.get_full_name|default:student.username }}</h1>
+    <div class="page-sub">Работа «{{ assignment.name }}» пройдена целиком.</div>
+  </div>
+</div>
+
+<div class="k-card done-total">
+  <div class="done-score">{{ total }} / {{ maximum }}</div>
+  <div class="done-cap">итоговый балл за работу</div>
+</div>
+
+<div class="k-card done-list" style="margin-top:14px">
+  {% for sub in rows %}
+  <div class="done-row">
+    <span class="done-row-name">{{ forloop.counter }}. {{ sub.problem_item.problem_title }}</span>
+    <span class="done-row-score">
+      {% if sub.feedback and sub.feedback.score is not None %}
+        {{ sub.feedback.score|floatformat:"-2" }}
+      {% else %}—{% endif %}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+
+<form method="post" class="k-card" style="margin-top:14px">
+  {% csrf_token %}
+  <label class="k-label" for="work-comment">Комментарий ко всей работе</label>
+  <textarea class="k-area" id="work-comment" name="work_comment" rows="4"
+            placeholder="Что получилось, что стоит повторить">{% if work_feedback %}{{ work_feedback.comment }}{% endif %}</textarea>
+  <div class="k-hint">Ученик увидит это на разборе работы, сразу под итоговым баллом.</div>
+
+  <div class="k-row" style="margin-top:16px">
+    <button type="submit" class="k-btn k-btn--main">Готово</button>
+    {% if next_student %}
+    <span class="k-quiet">дальше:
+      {{ next_student.get_full_name|default:next_student.username }}</span>
+    {% else %}
+    <span class="k-quiet">это была последняя работа, ждущая проверки</span>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}

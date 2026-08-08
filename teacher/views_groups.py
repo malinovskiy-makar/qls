@@ -867,3 +867,76 @@ def api_item_solution(request):
         'mode_display': item.get_solution_visible_after_display(),
         'released_at': timefmt.fmt(item.solution_released_at, empty=None),
     })
+
+
+# ---------------------------------------------------------------------------
+# Фаза 13 — экран завершения работы
+# ---------------------------------------------------------------------------
+
+@tutor_required
+def work_done(request, group_id, assignment_id, student_id):
+    """Работа пройдена насквозь: итог, общий комментарий, следующий ученик.
+
+    ⚠️ ЗДЕСЬ ЖИВЁТ «КОММЕНТАРИЙ КО ВСЕЙ РАБОТЕ». Раньше он стоял на экране
+    проверки ОДНОЙ задачи с извиняющейся подписью «Один на всю работу, а не
+    на эту задачу» — сама необходимость такой подписи говорила, что элемент
+    стоит не там. Написать про работу целиком можно только тогда, когда она
+    прочитана целиком, то есть ровно здесь.
+    """
+    from decimal import Decimal
+
+    from problems.models import User, WorkFeedback
+    from teacher.views import review_queue
+
+    group = own_group_or_404(request.user, group_id)
+    assignment = group_assignment_or_404(group, assignment_id)
+    student = get_object_or_404(User, pk=student_id)
+
+    if request.method == 'POST':
+        comment = (request.POST.get('work_comment') or '').strip()
+        WorkFeedback.objects.update_or_create(
+            assignment=assignment, student=student,
+            defaults={'comment': comment, 'author': request.user})
+        messages.success(request, 'Работа проверена.')
+        following = _next_student_to_check(assignment, student)
+        if following is not None:
+            return redirect('teacher:group_submissions',
+                            group_id=group.pk, assignment_id=assignment.pk)
+        return redirect('teacher:group_submissions',
+                        group_id=group.pk, assignment_id=assignment.pk)
+
+    queue = review_queue(assignment, student)
+    total = Decimal('0')
+    maximum = Decimal('0')
+    from problems.assignment_rows import item_max_score
+    for sub in queue:
+        feedback = getattr(sub, 'feedback', None)
+        if feedback is not None and feedback.score is not None:
+            total += Decimal(str(feedback.score))
+        if sub.problem_item_id:
+            maximum += item_max_score(sub.problem_item)
+
+    return render(request, 'teacher/groups/work_done.html', {
+        'group': group,
+        'assignment': assignment,
+        'student': student,
+        'rows': queue,
+        'total': _clean_points(total),
+        'maximum': _clean_points(maximum),
+        'work_feedback': WorkFeedback.objects.filter(
+            assignment=assignment, student=student).first(),
+        'next_student': _next_student_to_check(assignment, student),
+    })
+
+
+def _next_student_to_check(assignment, current):
+    """Следующий ученик, у которого есть что проверять. None — все пройдены."""
+    from problems.models import Submission
+
+    pending = (Submission.objects
+               .filter(assignment=assignment, status='submitted')
+               .exclude(student=current)
+               .select_related('student')
+               .order_by('student__last_name', 'student__username'))
+    first = pending.first()
+    return first.student if first is not None else None

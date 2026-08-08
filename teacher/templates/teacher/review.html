@@ -1,431 +1,260 @@
-{% extends "teacher/base.html" %}
-{% load catalog_filters %}
+{% extends 'teacher/base.html' %}
+{% comment %}
+Экран проверки работы (переделан в фазе 13).
 
-{% block title %}Проверка — {{ submission.student.username }}{% endblock %}
+⚠️ ЭТО ПОТОК, А НЕ ОДНА ЗАДАЧА. Раньше экран проверял одну задачу и уводил
+обратно в список: работа из семи задач стоила семи заходов. Теперь наверху
+«задача N из M» со стрелками, внизу «Сохранить и дальше», а комментарий ко
+всей работе переехал на экран завершения — писать про работу целиком можно
+только тогда, когда она прочитана целиком.
 
-{% block extra_style %}
-.parts-table { width: 100%; border-collapse: collapse; margin-top: 6px;
-               font-size: 13px; }
-.parts-table th { text-align: left; font-size: 11px; text-transform: uppercase;
-                  letter-spacing: .05em; color: var(--text2);
-                  padding: 4px 8px 4px 0; font-weight: 700; }
-.parts-table td { padding: 6px 8px 6px 0; border-top: 1px solid var(--border);
-                  vertical-align: top; overflow-wrap: anywhere; }
-.part-row-ok  td:first-child { border-left: 3px solid var(--green);
-                               padding-left: 6px; }
-.part-row-bad td:first-child { border-left: 3px solid var(--error);
-                               padding-left: 6px; }
-.part-row-wait td:first-child { border-left: 3px solid var(--amber);
-                                padding-left: 6px; }
+⚠️ СРАВНЕНИЕ — ГЛАВНОЕ НА ЭКРАНЕ. Ответ ученика и эталон стоят двумя
+карточками рядом, крупным текстом. Раньше они лежали в мелкой таблице из
+четырёх колонок, хотя сравнение — единственное, чем тут занят человек.
 
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
-}
-.btn-back {
-  color: var(--text2);
-  text-decoration: none;
-  font-size: 13px;
-  padding: 5px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  transition: color .12s, border-color .12s;
-  white-space: nowrap;
-}
-.btn-back:hover { color: var(--text); border-color: var(--border); }
-.page-title {
-  font-size: 18px;
-  font-weight: 700;
-  flex: 1;
-}
-.sub-meta {
-  font-size: 13px;
-  color: var(--text2);
-  margin-bottom: 28px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.badge {
-  display: inline-block;
-  padding: 2px 9px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.badge-submitted { background: var(--amber-tint); color: var(--text); }
-.badge-reviewed  { background: var(--green-tint); color: var(--green); }
+⚠️ «ОТМЕТИТЬ ОШИБКИ» УБРАНО СОВСЕМ. Список ошибок не связан с темой задачи:
+у задачи про эластичность предлагалось отметить «игнорирует доминирующую
+стратегию». Карточка на связывание списка с темой заведена в Notion.
+{% endcomment %}
 
-/* Двухколоночный макет */
-.review-layout {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 24px;
-  align-items: start;
-}
+{% block title %}Проверка — {{ submission.student.get_full_name|default:submission.student.username }}{% endblock %}
+
+{% block extra_style %}{% include 'teacher/groups/_style.html' %}
+.rv-head { display: flex; align-items: flex-start; justify-content: space-between;
+           gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.rv-who { font-size: 20px; font-weight: 600; }
+.rv-sub { font-size: 13px; color: var(--text2); margin-top: 3px; }
+.rv-nav { display: flex; align-items: center; gap: 8px; }
+.rv-pos { font-size: 13px; color: var(--text2); white-space: nowrap; }
+.rv-arrow { display: inline-flex; align-items: center; justify-content: center;
+            width: 32px; height: 32px; border-radius: var(--r);
+            border: 0.5px solid var(--border); background: var(--surface);
+            color: var(--text); text-decoration: none; font-size: 15px; }
+.rv-arrow:hover { background: var(--surface-2); }
+.rv-arrow.is-off { opacity: .35; pointer-events: none; }
+
+.rv-statement { font-size: 14px; line-height: 1.75; overflow-wrap: anywhere; }
+.rv-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+           margin: 14px 0; }
+.rv-box { background: var(--surface); border: 0.5px solid var(--border);
+          border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.rv-box-cap { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+/* Крупно — потому что именно это и сравнивают. */
+.rv-value { font-size: 19px; line-height: 1.5; overflow-wrap: anywhere; }
+.rv-value.is-empty { color: var(--text3); font-size: 15px; font-style: italic; }
+.rv-value.is-missing { color: var(--error); font-style: normal; }
+.rv-solution { margin-top: 12px; padding-top: 12px;
+               border-top: 0.5px dashed var(--border); font-size: 14px;
+               line-height: 1.7; overflow-wrap: anywhere; }
+.rv-solution-text { white-space: pre-wrap; }
+.rv-solution-cap { font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+
+.rv-part { border-top: 0.5px solid var(--border); padding-top: 14px;
+           margin-top: 14px; }
+.rv-part:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+.rv-part-q { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+
+/* Балл ставится НАЖАТИЕМ: 21 оценка за работу — это 21 набранное число. */
+.rv-score { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rv-preset { font: inherit; font-size: 15px; font-weight: 600;
+             min-width: 52px; padding: 9px 14px; cursor: pointer;
+             border: 0.5px solid var(--border); border-radius: var(--r);
+             background: var(--surface); color: var(--text);
+             font-variant-numeric: tabular-nums; }
+.rv-preset:hover { border-color: var(--text3); }
+.rv-preset.is-on { background: var(--btn-bg); color: var(--on-btn);
+                   border-color: var(--btn-bg); }
+.rv-own { display: flex; align-items: center; gap: 6px; font-size: 12px;
+          color: var(--text2); }
+.rv-own input { width: 74px; }
+.rv-max { font-size: 12px; color: var(--text3); }
+
+.rv-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+              margin-top: 18px; }
+
 @media (max-width: 720px) {
-  .review-layout { grid-template-columns: 1fr; }
-}
-
-/* Левая часть — условие и ответ ученика */
-.section-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--text2);
-  margin-bottom: 8px;
-}
-.problem-block {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 18px 20px;
-  margin-bottom: 16px;
-  font-size: 14px;
-  line-height: 1.65;
-}
-.problem-title {
-  font-size: 15px;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-.parts-list {
-  margin-top: 12px;
-  padding-left: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.parts-list li {
-  padding: 8px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  font-size: 13px;
-}
-.part-label {
-  font-weight: 700;
-  color: var(--accent);
-  margin-right: 6px;
-}
-.answer-block {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px 20px;
-  font-size: 14px;
-  line-height: 1.6;
-}
-.answer-field {
-  margin-bottom: 10px;
-}
-.answer-field:last-child { margin-bottom: 0; }
-.answer-field strong {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text2);
-  margin-bottom: 4px;
-}
-.file-link {
-  color: var(--accent);
-  text-decoration: none;
-  font-size: 13px;
-}
-.file-link:hover { text-decoration: underline; }
-.no-answer {
-  color: var(--text2);
-  font-size: 13px;
-  font-style: italic;
-}
-
-/* Правая часть — форма оценки */
-.form-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px;
-  position: sticky;
-  top: 68px;
-}
-.form-card h3 {
-  font-size: 15px;
-  font-weight: 700;
-  margin-bottom: 16px;
-}
-.form-group {
-  margin-bottom: 14px;
-}
-.form-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text2);
-  margin-bottom: 5px;
-}
-.form-input {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  font-size: 14px;
-  font-family: inherit;
-  background: var(--surface);
-  color: var(--text);
-  transition: border-color .12s;
-}
-.form-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-textarea.form-input {
-  resize: vertical;
-  min-height: 80px;
-}
-input[type="number"].form-input {
-  width: 100px;
-}
-/* Ошибки — чекбоксы */
-.mistakes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 2px 0;
-}
-.mistake-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.mistake-item input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-.btn-save {
-  display: block;
-  width: 100%;
-  padding: 10px;
-  background: var(--btn-bg);
-  color: var(--on-btn);
-  border: none;
-  border-radius: var(--r);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  margin-top: 18px;
-  transition: opacity .12s;
-}
-.btn-save:hover { opacity: .85; }
-.existing-note {
-  font-size: 12px;
-  color: var(--text2);
-  margin-top: 4px;
+  .rv-pair { grid-template-columns: 1fr; }
 }
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="crumbs">
   {% if group %}
-    <a href="{% url 'teacher:group_submissions' group.pk submission.assignment.pk %}" class="btn-back">← Назад к списку</a>
+  <a href="{% url 'teacher:groups' %}">Группы</a> →
+  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a> →
+  <a href="{% url 'teacher:group_submissions' group.pk submission.assignment.pk %}">{{ submission.assignment.name }}</a> →
+  проверка
   {% else %}
-    <a href="{% url 'teacher:assignment_detail' submission.assignment.pk %}" class="btn-back">← Назад к списку</a>
+  <a href="{% url 'teacher:dashboard' %}">Проверка</a> → {{ submission.assignment.name }}
   {% endif %}
-  <h1 class="page-title">
-    {{ submission.student.get_full_name|default:submission.student.username }}
-    —
-    {% if problem.title %}{{ problem.title|truncatechars:50 }}{% else %}Задача #{{ problem.pk }}{% endif %}
-  </h1>
 </div>
 
-<div class="sub-meta">
-  <span class="badge badge-{{ submission.status }}">
-    {% if submission.status == 'submitted' %}Ждёт проверки
-    {% elif submission.status == 'reviewed' %}Проверено
-    {% else %}{{ submission.status }}{% endif %}
-  </span>
-  {% if submission.submitted_at %}
-    Отправлено {{ submission.submitted_at|date:"d.m.Y в H:i" }}
-  {% endif %}
-  {% comment %}
-  ⚠️ Тип работы и НАЗВАНИЕ. Здесь стояло «Домашка: {{ ...assignment.title }}»:
-  тип был прибит словом (контрольная подписывалась домашкой), а поля `title`
-  у `Assignment` нет вовсе — оно называется `name`, поэтому название было
-  пустым. Django на несуществующее поле не ругается, он молча подставляет
-  пустую строку.
-  {% endcomment %}
-  · {% if submission.assignment.is_exam %}Контрольная{% else %}Домашка{% endif %}:
-  {{ submission.assignment.name }}
-</div>
-
-<div class="review-layout">
-
-  <!-- Левая часть -->
+<div class="rv-head">
   <div>
-    <div class="section-label">Условие задачи</div>
-    <div class="problem-block">
-      {% if problem.title %}
-        <div class="problem-title">{{ problem.title }}</div>
-      {% endif %}
-      {% if problem.statement %}
-        <div>{{ problem.statement }}</div>
-      {% endif %}
-      {% if problem.parts.exists %}
-        <ul class="parts-list">
-          {% for part in problem.parts.all %}
-          <li>
-            <span class="part-label">{{ part.label|partlabel }}</span>
-            {{ part.statement }}
-            {% if part.points %}<span style="color:var(--text2);font-size:12px;">({{ part.points }} б.)</span>{% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    </div>
-
-    <div class="section-label">Ответ ученика</div>
-    <div class="answer-block">
+    <div class="rv-who">{{ submission.student.get_full_name|default:submission.student.username }}</div>
+    <div class="rv-sub">
       {% comment %}
-      Ответы ПО ПУНКТАМ — рядом с эталонными, с вердиктом машины на каждый.
-      Раньше здесь была одна строка на всю задачу, и репетитор сам искал,
-      где кончается ответ на «а» и начинается ответ на «б».
+      Тип работы и её название. Подпись «Контрольная:» / «Домашка:» стоит тут
+      с фазы 0.9: до неё контрольная подписывалась «Домашка», а название было
+      пустым — шаблон читал несуществующее поле `title`, и Django молча
+      подставлял пустую строку.
       {% endcomment %}
-      {% if part_rows %}
-        <div class="answer-field">
-          <strong>По пунктам</strong>
-          <table class="parts-table">
-            <tr><th>Пункт</th><th>Ответ ученика</th><th>Эталон</th><th>Балл</th></tr>
-            {% for part in part_rows %}
-            <tr class="part-row-{% if part.is_correct %}ok{% elif part.is_correct is False %}bad{% else %}wait{% endif %}">
-              <td>{% if part.label %}{{ part.label|partlabel }}{% else %}вся задача{% endif %}</td>
-              <td>{% if part.given %}{{ part.given }}{% else %}<span class="no-answer">—</span>{% endif %}</td>
-              <td>{{ part.correct|default:"—" }}</td>
-              <td>{% if part.score is not None %}{{ part.score|floatformat:"-2" }} / {{ part.max_score|floatformat:"-2" }}{% else %}на проверке{% endif %}</td>
-            </tr>
-            {% endfor %}
-          </table>
-        </div>
-      {% elif submission.submitted_answer %}
-        <div class="answer-field">
-          <strong>Выбранный ответ</strong>
-          {{ submission.submitted_answer }}
-        </div>
-      {% endif %}
-      {% if submission.solution_text %}
-        <div class="answer-field">
-          <strong>Текст решения</strong>
-          <div style="white-space:pre-wrap;">{{ submission.solution_text }}</div>
-        </div>
-      {% endif %}
-      {% if submission.solution_file %}
-        <div class="answer-field">
-          <strong>Прикреплённый файл</strong>
-          <a href="{{ submission.solution_file.url }}" class="file-link" target="_blank">
-            Скачать файл
-          </a>
-        </div>
-      {% endif %}
-      {% if not submission.submitted_answer and not submission.solution_text and not submission.solution_file %}
-        <span class="no-answer">Ученик ничего не отправил</span>
-      {% endif %}
+      {% if submission.assignment.is_exam %}Контрольная{% else %}Домашка{% endif %}:
+      {{ submission.assignment.name }}
+      {% if submission.submitted_at %} · сдана {{ submission.submitted_at|date:"d.m.Y H:i" }}{% endif %}
     </div>
   </div>
+  <div class="rv-nav">
+    {% comment %}
+    Стрелки ходят В ПРЕДЕЛАХ РАБОТЫ ОДНОГО УЧЕНИКА. Так проверку и ведут:
+    сначала все задачи Пети, потом все задачи Ани.
+    {% endcomment %}
+    <a class="rv-arrow {% if not prev_sub %}is-off{% endif %}"
+       {% if prev_sub and group %}href="{% url 'teacher:group_review_submission' group.pk prev_sub.pk %}"{% endif %}
+       title="предыдущая задача">←</a>
+    <span class="rv-pos">задача {{ number }} из {{ total }}</span>
+    <a class="rv-arrow {% if not next_sub %}is-off{% endif %}"
+       {% if next_sub and group %}href="{% url 'teacher:group_review_submission' group.pk next_sub.pk %}"{% endif %}
+       title="следующая задача">→</a>
+  </div>
+</div>
 
-  <!-- Правая часть — форма оценки -->
-  <div>
-    <form method="post" action="{% if group %}{% url 'teacher:group_review_submission' group.pk submission.pk %}{% else %}{% url 'teacher:review_submission' submission.pk %}{% endif %}">
-      {% csrf_token %}
-      <div class="form-card">
-        <h3>Оценка</h3>
+<div class="k-card" style="margin-bottom:14px">
+  <div class="rv-box-cap">Условие</div>
+  <div class="rv-statement">{{ statement|linebreaksbr }}</div>
+</div>
 
-        <div class="form-group">
-          <label class="form-label" for="score">Балл</label>
-          {% comment %}
-          Потолок — МАКСИМУМ ЭТОЙ ЗАДАЧИ, а не абстрактная десятка. Ручная
-          проверка показала, как легко поставить 9 за задачу с максимумом 5
-          и получить в шапке у ученика «9,0 / 11,0».
-          {% endcomment %}
-          <input type="number" id="score" name="score" class="form-input"
-                 min="0" max="{{ max_score|floatformat:'-2' }}" step="0.5"
-                 value="{% if existing_feedback and existing_feedback.score is not None %}{{ existing_feedback.score }}{% endif %}"
-                 placeholder="0–{{ max_score|floatformat:'-2' }}">
-          <div class="form-hint" style="font-size:12px;color:var(--text2);margin-top:4px;">
-            максимум за задачу — {{ max_score|floatformat:"-2" }}
-            {% if auto_score is not None %}· машина насчитала {{ auto_score|floatformat:"-2" }}{% endif %}
+<form method="post">
+  {% csrf_token %}
+
+  <div class="k-card">
+    {% if part_rows %}
+      {% for row in part_rows %}
+      <div class="rv-part">
+        {% if row.label %}<div class="rv-part-q">{{ row.label }}) {{ row.statement }}</div>{% endif %}
+        <div class="rv-pair">
+          <div class="rv-box">
+            <div class="rv-box-cap">ответил ученик</div>
+            {% if row.given %}
+            <div class="rv-value">{{ row.given }}</div>
+            {% else %}
+            <div class="rv-value is-empty {% if wrote_solution_without_answer %}is-missing{% endif %}">ответа нет</div>
+            {% endif %}
+          </div>
+          <div class="rv-box">
+            <div class="rv-box-cap">верный ответ</div>
+            <div class="rv-value">{{ row.correct|default:"эталон не задан" }}</div>
           </div>
         </div>
-
-        <div class="form-group">
-          <label class="form-label" for="comment">Комментарий</label>
-          <textarea id="comment" name="comment" class="form-input"
-                    placeholder="Что хорошо, что улучшить...">{% if existing_feedback %}{{ existing_feedback.comment }}{% endif %}</textarea>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="work_comment">Комментарий ко всей работе</label>
-          <textarea id="work_comment" name="work_comment" class="form-input"
-                    placeholder="Общий вывод по работе — ученик увидит его сразу под баллом.">{% if work_feedback %}{{ work_feedback.comment }}{% endif %}</textarea>
-          <div class="existing-note">Один на всю работу, а не на эту задачу.</div>
-        </div>
-
-        {% if work_review_url %}
-        {% comment %}
-        Подпись говорит, ЧТО именно откроется и ЧЬЮ работу: раньше здесь
-        стояла одна строка ссылкой, и было непонятно, тот это экран или нет.
-        {% endcomment %}
-        <div class="form-group">
-          {% comment %}
-          ⚠️ Кнопка НЕ .btn-back. У того класса `white-space: nowrap` — он
-          рассчитан на короткие «← Назад», и длинная надпись вылезала за
-          границы. Заодно сокращена до сути: «Глазами ученика».
-          {% endcomment %}
-          <a href="{{ work_review_url }}" class="k-btn k-btn--plain">
-            Глазами ученика →
-          </a>
-          <div class="existing-note">
-            Та же страница, что видит
-            {{ work_review_student.get_full_name|default:work_review_student.username }}:
-            все задачи работы, его ответы, верные ответы и итоговый балл.
-            Проверять оттуда нельзя — оценка ставится здесь.
-          </div>
-        </div>
-        {% endif %}
-
-        {% if mistake_tags %}
-        <div class="form-group">
-          <label class="form-label">Отметить ошибки</label>
-          <div class="mistakes-list">
-            {% for tag in mistake_tags %}
-            <label class="mistake-item">
-              <input type="checkbox" name="mistakes" value="{{ tag.pk }}"
-                     {% if existing_feedback and tag in existing_feedback.mistakes.all %}checked{% endif %}>
-              {{ tag.name }}
-            </label>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
-
-        {% if existing_feedback %}
-          <div class="existing-note">
-            Уже проверено {{ existing_feedback.reviewed_at|date:"d.m.Y" }}
-            {% if existing_feedback.reviewed_by %} — {{ existing_feedback.reviewed_by.username }}{% endif %}
-          </div>
-        {% endif %}
-
-        <button type="submit" class="btn-save">Сохранить оценку</button>
       </div>
-    </form>
+      {% endfor %}
+    {% else %}
+      <div class="rv-pair">
+        <div class="rv-box">
+          <div class="rv-box-cap">ответил ученик</div>
+          {% if submission.submitted_answer %}
+          <div class="rv-value">{{ submission.submitted_answer }}</div>
+          {% else %}
+          <div class="rv-value is-empty {% if wrote_solution_without_answer %}is-missing{% endif %}">ответа нет</div>
+          {% endif %}
+        </div>
+        <div class="rv-box">
+          <div class="rv-box-cap">верный ответ</div>
+          <div class="rv-value">{% if submission.problem_item %}{{ submission.problem_item.correct_answer|default:"эталон не задан" }}{% else %}эталон не задан{% endif %}</div>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if submission.solution_text %}
+    <div class="rv-solution">
+      <div class="rv-solution-cap">{% if wrote_solution_without_answer %}но решение написал:{% else %}решение ученика{% endif %}</div>
+      {% comment %}
+      ⚠️ Текст ВПЛОТНУЮ к тегу: у блока `white-space: pre-wrap`, и отступы
+      самого шаблона рисуются на экране пустотой в пол-экрана.
+      {% endcomment %}
+      <div class="rv-solution-text">{{ submission.solution_text }}</div>
+    </div>
+    {% endif %}
+
+    {% if submission.solution_file %}
+    <div class="rv-solution">
+      <div class="rv-solution-cap">прикреплённый файл</div>
+      <a href="{{ submission.solution_file.url }}">{{ submission.solution_file.name }}</a>
+    </div>
+    {% endif %}
+
+    {% if auto_zero %}
+    {% comment %}
+    Ноль поставила машина ЗА ПУСТОТУ (правило фазы 3). Говорим прямо: это не
+    «неверно», ученик просто ничего не написал. Переставить можно тут же.
+    {% endcomment %}
+    <div class="k-state k-state--warn" style="margin-top:14px">
+      <span class="k-state__icon">!</span>
+      <div class="k-state__body">
+        <div class="k-state__title">Ноль поставлен автоматически</div>
+        <div class="k-state__note">Ответа не было. Если это ошибка — поставьте
+          балл ниже и сохраните.</div>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
-</div>
+  <div class="k-card" style="margin-top:14px">
+    <label class="k-label">Балл за задачу</label>
+    <div class="rv-score">
+      {% for preset in score_presets %}
+      <button type="button" class="rv-preset" data-score="{{ preset.value }}">{{ preset.label }}</button>
+      {% endfor %}
+      <span class="rv-own">
+        своё
+        <input type="number" step="0.5" min="0" name="score" id="score-input"
+               class="k-input"
+               value="{% if existing_feedback %}{{ existing_feedback.score|floatformat:'-2' }}{% elif auto_score is not None %}{{ auto_score|floatformat:'-2' }}{% endif %}">
+      </span>
+      <span class="rv-max">максимум {{ max_score|floatformat:"-2" }}</span>
+    </div>
+
+    <label class="k-label" style="margin-top:16px">Комментарий к задаче</label>
+    <textarea name="comment" class="k-area" rows="3"
+              placeholder="Что не так и как надо">{% if existing_feedback %}{{ existing_feedback.comment }}{% endif %}</textarea>
+
+    <div class="rv-actions">
+      <button type="submit" name="go" value="next" class="k-btn k-btn--main">
+        {% if has_unchecked %}Сохранить и дальше{% else %}Сохранить и завершить{% endif %}
+      </button>
+      <button type="submit" name="go" value="list" class="k-btn k-btn--plain">
+        Сохранить и выйти
+      </button>
+      <a href="{{ work_review_url }}" class="k-btn k-btn--quiet">Глазами ученика</a>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Пресет подставляет число в поле и подсвечивается. Поле остаётся истиной:
+// отправляется всегда оно, поэтому «своё» и пресеты не могут разойтись.
+(function () {
+  var input = document.getElementById('score-input');
+  var presets = document.querySelectorAll('.rv-preset');
+  if (!input) { return; }
+
+  function paint() {
+    var current = (input.value || '').trim();
+    presets.forEach(function (button) {
+      button.classList.toggle('is-on', button.dataset.score === current);
+    });
+  }
+
+  presets.forEach(function (button) {
+    button.addEventListener('click', function () {
+      input.value = button.dataset.score;
+      paint();
+    });
+  });
+  input.addEventListener('input', paint);
+  paint();
+})();
+</script>
 {% endblock %}

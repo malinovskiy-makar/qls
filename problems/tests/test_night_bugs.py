@@ -650,3 +650,130 @@ class SubmissionsByStudentTests(TestCase):
         for body in (by_student, by_problem):
             self.assertIn('?view=students', body)
             self.assertIn('?view=problems', body)
+
+
+class ReviewFlowTests(TestCase):
+    """Фаза 13 — проверка стала потоком по работе одного ученика."""
+
+    def setUp(self):
+        self.tutor = make_user('rf_tutor', role='teacher')
+        self.student = make_user('rf_student', role='student')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        self.group.students.add(self.student)
+        self.work = Assignment.objects.create(name='ДЗ', author=self.tutor,
+                                              group=self.group)
+        self.work.students.add(self.student)
+        self.items = [
+            AssignmentItem.objects.create(
+                assignment=self.work, order=i,
+                catalog_problem=make_problem('Условие %d' % i),
+                points=Decimal('4'))
+            for i in range(3)]
+        self.subs = [
+            Submission.objects.create(student=self.student,
+                                      assignment=self.work, problem_item=item,
+                                      status='submitted',
+                                      submitted_answer='ответ')
+            for item in self.items]
+        self.client.force_login(self.tutor)
+
+    def _review(self, sub):
+        return reverse('teacher:group_review_submission',
+                       args=[self.group.pk, sub.pk])
+
+    def test_screen_knows_its_place_in_the_work(self):
+        response = self.client.get(self._review(self.subs[1]))
+        self.assertEqual(response.context['number'], 2)
+        self.assertEqual(response.context['total'], 3)
+        self.assertEqual(response.context['prev_sub'].pk, self.subs[0].pk)
+        self.assertEqual(response.context['next_sub'].pk, self.subs[2].pk)
+
+    def test_first_has_no_previous_and_last_has_no_next(self):
+        first = self.client.get(self._review(self.subs[0])).context
+        last = self.client.get(self._review(self.subs[2])).context
+        self.assertIsNone(first['prev_sub'])
+        self.assertIsNone(last['next_sub'])
+
+    def test_save_and_next_goes_to_the_next_unchecked(self):
+        response = self.client.post(self._review(self.subs[0]),
+                                    {'score': '4', 'comment': '', 'go': 'next'})
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(str(self.subs[1].pk), response['Location'])
+
+    def test_save_and_next_skips_the_already_checked(self):
+        """Проверенное пропускаем: «дальше» ведёт к работе, а не по кругу."""
+        self.subs[1].status = 'reviewed'
+        self.subs[1].save(update_fields=['status'])
+        response = self.client.post(self._review(self.subs[0]),
+                                    {'score': '4', 'comment': '', 'go': 'next'})
+        self.assertIn(str(self.subs[2].pk), response['Location'])
+
+    def test_last_one_leads_to_the_completion_screen(self):
+        for sub in self.subs[:2]:
+            sub.status = 'reviewed'
+            sub.save(update_fields=['status'])
+        response = self.client.post(self._review(self.subs[2]),
+                                    {'score': '4', 'comment': '', 'go': 'next'})
+        self.assertIn('/done/', response['Location'])
+
+    def test_completion_screen_shows_the_total(self):
+        from problems.models import TeacherFeedback
+
+        for sub in self.subs:
+            sub.status = 'reviewed'
+            sub.save(update_fields=['status'])
+            TeacherFeedback.objects.create(submission=sub, score=Decimal('3'),
+                                           reviewed_by=self.tutor)
+        response = self.client.get(
+            reverse('teacher:work_done',
+                    args=[self.group.pk, self.work.pk, self.student.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total'], '9')
+        self.assertEqual(response.context['maximum'], '12')
+
+    def test_work_comment_lives_on_the_completion_screen(self):
+        from problems.models import WorkFeedback
+
+        url = reverse('teacher:work_done',
+                      args=[self.group.pk, self.work.pk, self.student.pk])
+        self.client.post(url, {'work_comment': 'Повтори эластичность.'})
+        feedback = WorkFeedback.objects.get(assignment=self.work,
+                                            student=self.student)
+        self.assertEqual(feedback.comment, 'Повтори эластичность.')
+
+    def test_review_screen_no_longer_asks_for_the_work_comment(self):
+        """Поле переехало: писать про работу целиком можно, прочитав её."""
+        body = self.client.get(self._review(self.subs[0])).content.decode()
+        self.assertNotIn('work_comment', body)
+        self.assertNotIn('Комментарий ко всей работе', body)
+
+    def test_mistake_tags_are_gone(self):
+        """13.5 — список ошибок не связан с темой задачи, убран совсем."""
+        body = self.client.get(self._review(self.subs[0])).content.decode()
+        self.assertNotIn('Отметить ошибки', body)
+        self.assertNotIn('name="mistakes"', body)
+
+    def test_score_presets_are_zero_half_max(self):
+        presets = self.client.get(
+            self._review(self.subs[0])).context['score_presets']
+        self.assertEqual([p['value'] for p in presets], ['0', '2', '4'])
+
+    def test_presets_do_not_repeat_when_max_is_tiny(self):
+        """Максимум 1: половина округляется в 1, дубля кнопок быть не должно."""
+        self.items[0].points = Decimal('1')
+        self.items[0].save(update_fields=['points'])
+        presets = self.client.get(
+            self._review(self.subs[0])).context['score_presets']
+        self.assertEqual([p['value'] for p in presets], ['0', '1'])
+
+    def test_answer_falls_back_to_the_submission(self):
+        """Ответ есть в работе — экран обязан его показать.
+
+        ⚠️ Найдено глазами: у задачи без пунктов запись `PartAnswer` может
+        отсутствовать (старые и демо-данные), и экран писал «ответа нет»
+        ученику, который ответил.
+        """
+        from problems import part_grading
+
+        rows = part_grading.part_rows(self.items[0], self.subs[0])
+        self.assertEqual(rows[0]['given'], 'ответ')

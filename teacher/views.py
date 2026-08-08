@@ -37,10 +37,22 @@ def teacher_required(view_func):
 # ---------------------------------------------------------------------------
 
 def update_student_progress(submission, feedback):
-    """Обновляет StudentTopicProgress и StudentSkillProgress после проверки."""
+    """Обновляет StudentTopicProgress и StudentSkillProgress после проверки.
+
+    ⚠️ РАБОТА БЕЗ КАТАЛОЖНОЙ ЗАДАЧИ ПРОПУСКАЕТСЯ. У своей задачи репетитора
+    записи в каталоге нет вовсе, а прогресс считается по темам и навыкам
+    каталожной задачи — брать их неоткуда. Раньше функция падала на такой
+    работе прямо при сохранении оценки: ровно тот же класс, что ошибка 500
+    на «Прогрессе ученика» (баг 7.1).
+
+    Своя задача не попадает в прогресс по темам — это осознанная плата за
+    то, что тем у неё нет. Придумывать их за репетитора нельзя.
+    """
     from problems.models import StudentSkillProgress, StudentTopicProgress
 
     problem = submission.problem
+    if problem is None:
+        return
     student = submission.student
 
     max_score = 5.0
@@ -157,6 +169,93 @@ def assignment_detail(request, pk, group=None):
 # В3 — Форма проверки решения
 # ---------------------------------------------------------------------------
 
+
+# ---------------------------------------------------------------------------
+# Фаза 13 — проверка становится ПОТОКОМ
+# ---------------------------------------------------------------------------
+# ⚠️ ЗАЧЕМ. Экран проверял ОДНУ задачу, а не работу. Чтобы пройти работу из
+# семи задач, репетитор семь раз возвращался в список и открывал заново. На
+# этом же экране стояло поле «Комментарий ко всей работе» с извиняющейся
+# подписью «Один на всю работу, а не на эту задачу» — сама необходимость
+# такой подписи говорит, что элемент стоит не там. Он переехал на экран
+# завершения работы.
+
+def review_queue(assignment, student):
+    """Решения ученика по работе В ТОМ ЖЕ ПОРЯДКЕ, что и задачи на экране.
+
+    Порядок берём у `ordered_items` — той же функции, что рисует задание и
+    печатает листок. Иначе «задача 3 из 7» на проверке означала бы не ту
+    задачу, что под номером 3 у ученика.
+    """
+    from problems.assignment_rows import ordered_items
+    from problems.models import Submission
+
+    items = ordered_items(assignment, list(
+        assignment.items.select_related('catalog_problem', 'custom_problem')
+        .order_by('order', 'id')))
+    subs = {s.problem_item_id: s for s in Submission.objects.filter(
+        assignment=assignment, student=student).select_related('feedback')}
+    return [subs[i.pk] for i in items if i.pk in subs]
+
+
+def review_position(assignment, student, submission):
+    """(номер с 1, всего, предыдущее, следующее, следующее НЕПРОВЕРЕННОЕ)."""
+    queue = review_queue(assignment, student)
+    ids = [s.pk for s in queue]
+    if submission.pk not in ids:
+        return 1, len(queue) or 1, None, None, None
+    index = ids.index(submission.pk)
+    previous = queue[index - 1] if index > 0 else None
+    following = queue[index + 1] if index + 1 < len(queue) else None
+    # Следующее НЕПРОВЕРЕННОЕ ищем по кругу от текущего: репетитор мог
+    # начать с середины, и «дальше» обязано увести к работе, а не в конец.
+    unchecked = None
+    for offset in range(1, len(queue) + 1):
+        candidate = queue[(index + offset) % len(queue)]
+        if candidate.pk != submission.pk and candidate.status == 'submitted':
+            unchecked = candidate
+            break
+    return index + 1, len(queue), previous, following, unchecked
+
+
+
+def _score_presets(max_score):
+    """Три кнопки: ноль, половина, максимум. Половина — округлённая.
+
+    Дробную половину («1.5 из 3») кнопкой не предлагаем: такой балл ставят
+    осознанно, и для него есть поле «своё».
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+
+    top = Decimal(str(max_score or 0))
+    half = (top / 2).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+    values = []
+    for value in (Decimal('0'), half, top):
+        text = str(value.normalize()) if value else '0'
+        if text not in [v['value'] for v in values]:
+            values.append({'value': text, 'label': text})
+    return values
+
+
+def _is_auto_zero(submission, part_rows):
+    """Ноль поставлен машиной ЗА ПУСТОТУ, а не за ошибку (правило фазы 3)."""
+    if part_rows:
+        return all(row.get('auto_zero') for row in part_rows)
+    feedback = getattr(submission, 'feedback', None)
+    if feedback is None or feedback.reviewed_by_id is not None:
+        return False
+    return 'автоматически' in (feedback.comment or '')
+
+
+def _solution_without_answer(submission):
+    """Ответа нет, а решение написано — это НЕ пустышка, её надо прочитать."""
+    from problems import part_grading
+
+    if (submission.submitted_answer or '').strip():
+        return False
+    return part_grading.wrote_anything(submission)
+
+
 @teacher_required
 def review_submission(request, pk, group=None):
     """Форма оценки решения. Переехала под групповые URL; логика оценки
@@ -215,8 +314,25 @@ def review_submission(request, pk, group=None):
 
         update_student_progress(submission, feedback)
 
-        messages.success(request, f'Решение проверено. Балл: {score}')
         group_obj = group or submission.assignment.group
+
+        # ⚠️ «Сохранить и дальше» ведёт к СЛЕДУЮЩЕЙ НЕПРОВЕРЕННОЙ задаче
+        # этого же ученика, а не обратно в список. Возврат в список после
+        # каждой задачи и был тем, из-за чего работа из семи задач стоила
+        # семи заходов.
+        if request.POST.get('go') == 'next' and group_obj is not None:
+            _, _, _, _, unchecked = review_position(
+                submission.assignment, submission.student, submission)
+            if unchecked is not None:
+                return redirect('teacher:group_review_submission',
+                                group_id=group_obj.pk,
+                                submission_id=unchecked.pk)
+            # Непроверенного больше нет — работа пройдена насквозь.
+            return redirect('teacher:work_done', group_id=group_obj.pk,
+                            assignment_id=submission.assignment_id,
+                            student_id=submission.student_id)
+
+        messages.success(request, f'Решение проверено. Балл: {score}')
         if group_obj is not None:
             return redirect('teacher:group_submissions',
                             group_id=group_obj.pk,
@@ -242,15 +358,42 @@ def review_submission(request, pk, group=None):
             max_score = item.points
 
     group_obj = group or submission.assignment.group
+    number, total, previous, following, unchecked = review_position(
+        submission.assignment, submission.student, submission)
+
+    # ⚠️ Условие собираем ЗДЕСЬ, а не цепочкой фильтров в шаблоне.
+    # `{{ a.statement|default:problem.statement }}` падает, когда `problem`
+    # пуст (работа по своей задаче репетитора): аргумент фильтра, в отличие
+    # от самой переменной, Django молча не проглатывает.
+    statement = ''
+    if item is not None:
+        statement = item.statement or ''
+    if not statement and problem is not None:
+        statement = problem.statement or ''
+
     return render(request, 'teacher/review.html', {
         'submission': submission,
         'problem': problem,
+        'statement': statement,
         'existing_feedback': existing_feedback,
-        'mistake_tags': mistake_tags,
         'group': group_obj,
         'part_rows': part_rows,
         'max_score': max_score,
         'auto_score': auto_score,
+        # Поток проверки: где мы в работе и куда идти дальше.
+        'number': number,
+        'total': total,
+        'prev_sub': previous,
+        'next_sub': following,
+        'has_unchecked': unchecked is not None,
+        # Балл ставится НАЖАТИЕМ: 0, половина, максимум. Двадцать одна
+        # оценка за работу — это двадцать одно набранное руками число,
+        # если оставить только поле ввода.
+        'score_presets': _score_presets(max_score),
+        # Пусто и в ответе, и в решении → ноль поставила машина, и это
+        # надо сказать прямо, а не показывать «неверно».
+        'auto_zero': _is_auto_zero(submission, part_rows),
+        'wrote_solution_without_answer': _solution_without_answer(submission),
         'work_feedback': WorkFeedback.objects.filter(
             assignment=submission.assignment,
             student=submission.student).first(),
