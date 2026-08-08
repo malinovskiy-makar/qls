@@ -1,0 +1,74 @@
+{% comment %}
+Настройки задания переживают смену способа набора (фаза 15.3).
+
+⚠️ ЗАЧЕМ. Три способа живут на разных экранах, и переход между ними — это
+обычный переход по ссылке. Корзина задач уже переживала его (sessionStorage,
+`_picker_js.html`), а название, срок и выбранные группы — нет: репетитор,
+начавший подбором и решивший добить руками из каталога, терял всё, что вписал.
+
+Храним ровно те поля, что видит человек. Ключ один на домашку и контрольную
+— собирают их по очереди, а не одновременно.
+{% endcomment %}
+<script>
+(function () {
+  var KEY = 'hw_settings';
+  // Поля, которые надо помнить. Имена — как в форме: второго списка,
+  // способного разъехаться с разметкой, не заводим.
+  var FIELDS = ['name', 'deadline', 'starts_at', 'ends_at',
+                'duration_minutes', 'exam_mode'];
+
+  function read() {
+    try { return JSON.parse(sessionStorage.getItem(KEY) || '{}'); }
+    catch (e) { return {}; }
+  }
+
+  function write(data) {
+    try { sessionStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
+  }
+
+  var saved = read();
+
+  FIELDS.forEach(function (name) {
+    var field = document.querySelector('[name="' + name + '"]');
+    if (!field) { return; }
+    // Подставляем сохранённое ТОЛЬКО в пустое поле: значение, пришедшее с
+    // сервера (правка существующей работы), главнее нашей памяти.
+    if (!field.value && saved[name]) { field.value = saved[name]; }
+    field.addEventListener('input', function () {
+      var data = read();
+      data[name] = field.value;
+      write(data);
+    });
+  });
+
+  // Группы — набор галочек, поэтому список значений.
+  var boxes = document.querySelectorAll('input[name="groups"]');
+  if (boxes.length) {
+    var chosen = saved.groups || [];
+    boxes.forEach(function (box) {
+      if (!box.checked && chosen.indexOf(box.value) !== -1) {
+        box.checked = true;
+      }
+      box.addEventListener('change', function () {
+        var data = read();
+        data.groups = Array.prototype.filter
+          .call(document.querySelectorAll('input[name="groups"]'),
+                function (b) { return b.checked; })
+          .map(function (b) { return b.value; });
+        write(data);
+      });
+    });
+  }
+
+  // Работа создана — память чистим, иначе следующая домашка откроется с
+  // названием предыдущей.
+  var form = document.getElementById('picker-form');
+  if (form) {
+    form.addEventListener('submit', function () {
+      setTimeout(function () {
+        try { sessionStorage.removeItem(KEY); } catch (e) {}
+      }, 100);
+    });
+  }
+})();
+</script>

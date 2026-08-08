@@ -72,8 +72,13 @@
     Два РАВНОПРАВНЫХ действия — значит и вес одинаковый. Раньше одна была
     тёмной, другая светлой, и это читалось как «контрольная тут не главное».
     {% endcomment %}
-    <a href="{% url 'teacher:assignment_create' %}?group={{ group.pk }}" class="k-btn k-btn--main">Создать домашку</a>
-    <a href="{% url 'teacher:exam_create' group.pk %}" class="k-btn k-btn--main">Создать контрольную</a>
+    {% comment %}
+    Обе кнопки ведут на способ «Описать словами» — он выбран по умолчанию
+    (фаза 15). Остальные два способа стоят там же наверху равными плитками,
+    и уйти на них можно в один клик, ничего не потеряв.
+    {% endcomment %}
+    <a href="{% url 'teacher:assignment_generate' %}?group={{ group.pk }}" class="k-btn k-btn--main">Создать домашку</a>
+    <a href="{% url 'teacher:assignment_generate' %}?kind=exam&amp;group={{ group.pk }}" class="k-btn k-btn--main">Создать контрольную</a>
   </div>
 
   {% comment %}

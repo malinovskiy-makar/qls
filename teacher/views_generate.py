@@ -29,9 +29,34 @@ from problems import hw_generator
 from .access import tutor_required
 
 
+def _tutor_groups(user):
+    """Группы репетитора — нужны на последнем шаге, кому выдать работу."""
+    from problems.models import StudentGroup
+
+    return list(StudentGroup.objects.filter(teacher=user)
+                .prefetch_related('students').order_by('name'))
+
+
+def _catalog_size():
+    """Сколько задач в каталоге СЕЙЧАС. Число не зашиваем в текст.
+
+    Считаем ровно то, из чего идёт подбор: опубликованные и не
+    зафлагованные шлюзом качества.
+    """
+    from problems.models import Problem
+
+    return Problem.objects.filter(status=Problem.Status.PUBLISHED,
+                                  needs_quality_review=False).count()
+
+
 @tutor_required
 def assignment_generate(request):
     """Экран подбора. Шаг определяется тем, что пришло в POST."""
+    # Домашка или контрольная. Движок подбора один и тот же (фаза 19);
+    # отличается только то, какие настройки спрашиваем на последнем шаге.
+    kind = request.POST.get('kind') or request.GET.get('kind') or 'homework'
+    is_exam = kind == 'exam'
+
     context = {
         'available': hw_generator.is_available(),
         'reason': hw_generator.unavailable_reason(),
@@ -39,6 +64,10 @@ def assignment_generate(request):
         'used_today': hw_generator.used_today(request.user),
         'daily_limit': hw_generator.daily_limit(),
         'step': 'ask',
+        'is_exam': is_exam,
+        'kind': kind,
+        'groups': _tutor_groups(request.user),
+        'problem_count': _catalog_size(),
         'form': {'count': 5, 'min_difficulty': 1, 'max_difficulty': 5,
                  'text': '', 'has_solution': False, 'topics': []},
     }

@@ -1,0 +1,34 @@
+{% comment %}
+Три способа собрать задание — ряд равноправных плиток (фаза 15).
+
+⚠️ ЗАЧЕМ. Способов было три и раньше, но они были НЕ РАВНЫ: каталог занимал
+всё полотно, а «написать свою» и «подобрать по описанию» сидели мелкими
+кнопками с эмодзи в правой колонке под настройками. Владелец просил вынести
+умный подбор отдельно; согласованное решение — поставить все три в один ряд
+наверху, подбором вперёд.
+
+Ждёт переменную `mode`: describe | search | own — какая плитка активна.
+`exam` = 1, если собирается контрольная (тогда ссылки ведут в конструктор
+контрольной).
+
+Плитки — ССЫЛКИ, а не вкладки: способы живут на разных экранах. Набранное не
+теряется, потому что корзина и настройки лежат в sessionStorage (см.
+`_picker_js.html` и `_build_keep.html`), а не в состоянии страницы.
+{% endcomment %}
+<div class="k-tiles" style="margin-bottom:22px">
+  <a class="k-tile {% if mode == 'describe' %}k-tile--on{% endif %}"
+     href="{% url 'teacher:assignment_generate' %}{% if exam %}?kind=exam{% endif %}">
+    <span class="k-tile__name">Описать словами</span>
+    <span class="k-tile__note">сайт подберёт из каталога</span>
+  </a>
+  <a class="k-tile {% if mode == 'search' %}k-tile--on{% endif %}"
+     href="{% if exam %}{% url 'teacher:exam_create' group.pk %}{% else %}{% url 'teacher:assignment_create' %}{% endif %}">
+    <span class="k-tile__name">Искать самому</span>
+    <span class="k-tile__note">фильтры по каталогу</span>
+  </a>
+  <a class="k-tile {% if mode == 'own' %}k-tile--on{% endif %}"
+     href="{% url 'teacher:problem_new' %}?to_cart=1">
+    <span class="k-tile__name">Написать свою</span>
+    <span class="k-tile__note">условие и ответ вручную</span>
+  </a>
+</div>

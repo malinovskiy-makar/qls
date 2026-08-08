@@ -44,19 +44,55 @@
     return card ? card.dataset.title : ('Задача #' + pid);
   }
 
+  // ⚠️ НЕАКТИВНАЯ КНОПКА ОБЪЯСНЯЕТ, ЧЕГО НЕ ХВАТАЕТ. Раньше она была
+  // просто серой, и понять причину — нет названия? группы? задач? — было
+  // нельзя. Список пересчитывается на каждое изменение формы.
+  function missingParts(count) {
+    var missing = [];
+    if (!count) { missing.push('добавьте хотя бы одну задачу'); }
+    var name = document.querySelector('[name="name"]');
+    if (name && !name.value.trim()) { missing.push('впишите название'); }
+    var groups = document.querySelectorAll('input[name="groups"]');
+    if (groups.length) {
+      var chosen = Array.prototype.some.call(groups, function (b) {
+        return b.checked;
+      });
+      if (!chosen) { missing.push('выберите группу'); }
+    }
+    return missing;
+  }
+
+  function refreshSubmit() {
+    var count = Object.keys(cart).length;
+    var button = document.getElementById('submit-btn');
+    var why = document.getElementById('submit-why');
+    var missing = missingParts(count);
+    if (button) { button.disabled = missing.length > 0; }
+    if (why) {
+      why.textContent = missing.length
+        ? missing.join(', ').replace(/^./, function (c) {
+            return c.toUpperCase();
+          }) + '.'
+        : '';
+    }
+  }
+
+  // Пересчитываем на любое изменение формы: причина «нет названия» обязана
+  // исчезать в тот момент, когда название вписали.
+  document.addEventListener('input', refreshSubmit);
+  document.addEventListener('change', refreshSubmit);
+
   function renderCart() {
     var ids = Object.keys(cart);
     document.getElementById('cart-count').textContent = ids.length;
     document.getElementById('problem-ids-input').value = ids.join(',');
 
     var list = document.getElementById('cart-list');
-    var button = document.getElementById('submit-btn');
+    refreshSubmit();
     if (!ids.length) {
       list.innerHTML = '<p class="cart-empty">Пока ничего не добавлено</p>';
-      if (button) { button.disabled = true; }
       return;
     }
-    if (button) { button.disabled = false; }
     list.innerHTML = '';
     ids.forEach(function (id) {
       var row = document.createElement('div');

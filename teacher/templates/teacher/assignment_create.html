@@ -12,6 +12,8 @@
   <h1 class="page-title">Новая домашка</h1>
 </div>
 
+{% include "teacher/_build_modes.html" with mode='search' %}
+
 <div class="hw-layout">
   <div class="hw-main">
     {% include "teacher/_picker_list.html" %}
@@ -60,20 +62,11 @@
       </div>
 
       <div class="sidebar-card">
-        <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">
-          <a href="{% url 'teacher:problem_new' %}?to_cart=1"
-             style="display:inline-block;border:0.5px solid var(--border);
-                    border-radius:var(--r);padding:6px 12px;font-size:12px;
-                    color:var(--text);text-decoration:none;">
-            ✍ Написать свою задачу
-          </a>
-          <a href="{% url 'teacher:assignment_generate' %}"
-             style="display:inline-block;border:0.5px solid var(--border);
-                    border-radius:var(--r);padding:6px 12px;font-size:12px;
-                    color:var(--text);text-decoration:none;">
-            ✨ Подобрать по описанию
-          </a>
-        </div>
+        {% comment %}
+        Мелкие кнопки «Написать свою задачу» и «Подобрать по описанию» убраны
+        отсюда: способы набора переехали наверх в ряд равных плиток. Правая
+        колонка держит ТОЛЬКО настройки и корзину — больше ничего.
+        {% endcomment %}
         <div class="cart-header">
           <div class="sidebar-title" style="margin-bottom:0;">Выбранные задачи</div>
           <span class="cart-count">Выбрано: <strong id="cart-count">0</strong></span>
@@ -83,7 +76,14 @@
           <p class="cart-empty">Пока ничего не добавлено</p>
         </div>
 
-        <button type="submit" class="btn-submit" id="submit-btn" disabled>
+        {% comment %}
+        Неактивная кнопка ОБЪЯСНЯЕТ, чего не хватает. Раньше она была просто
+        серой, и понять — нет названия? группы? задач? — было нельзя.
+        Список пересчитывается на лету в `_picker_js.html`.
+        {% endcomment %}
+        <div class="k-hint" id="submit-why" style="margin-bottom:8px"></div>
+        <button type="submit" class="k-btn k-btn--main k-btn--wide"
+                id="submit-btn" disabled>
           Создать домашку
         </button>
       </div>
@@ -96,4 +96,5 @@
 
 {% block extra_js %}
 {% include "teacher/_picker_js.html" with cart_key="hw_cart" picker_form_id="picker-form" %}
+{% include "teacher/_build_keep.html" %}
 {% endblock %}

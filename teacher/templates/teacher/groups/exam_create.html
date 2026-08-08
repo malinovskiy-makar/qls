@@ -25,6 +25,8 @@
   <h1 class="page-title">Новая контрольная</h1>
 </div>
 
+{% include "teacher/_build_modes.html" with mode='search' exam=1 %}
+
 <div class="hw-layout">
   <div class="hw-main">
     {% include "teacher/_picker_list.html" %}
@@ -124,14 +126,11 @@
       </div>
 
       <div class="sidebar-card">
-        <div style="margin-bottom:10px;">
-          <a href="{% url 'teacher:problem_new' %}?to_cart=1&amp;return_to={% url 'teacher:exam_create' group.pk %}"
-             style="display:inline-block;border:0.5px solid var(--border);
-                    border-radius:var(--r);padding:6px 12px;font-size:12px;
-                    color:var(--text);text-decoration:none;">
-            ✍ Написать свою задачу
-          </a>
-        </div>
+        {% comment %}
+        Кнопка «Написать свою задачу» убрана отсюда: способы набора переехали
+        наверх в ряд равных плиток (фаза 15). Эмодзи в интерфейсе не
+        используем.
+        {% endcomment %}
         <div class="cart-header">
           <div class="sidebar-title" style="margin-bottom:0;">Задачи контрольной</div>
           <span class="cart-count">Выбрано: <strong id="cart-count">0</strong></span>
@@ -141,7 +140,9 @@
           <p class="cart-empty">Пока ничего не добавлено</p>
         </div>
 
-        <button type="submit" class="btn-submit" id="submit-btn" disabled>
+        <div class="k-hint" id="submit-why" style="margin-bottom:8px"></div>
+        <button type="submit" class="k-btn k-btn--main k-btn--wide"
+                id="submit-btn" disabled>
           Создать контрольную
         </button>
       </div>
