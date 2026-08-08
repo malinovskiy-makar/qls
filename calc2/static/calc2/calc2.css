@@ -948,6 +948,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .tools-body > .section.card.first-card > .fold-btn { font-size: 14.5px; color: var(--accent); }
 .tools-body > .section.card.first-card { border-color: var(--accent-ring); }
 
+/* Стрелки-крутилки у числовых полей внутри калькулятора не нужны: значения
+   здесь набирают и тянут ползунком, а не щёлкают по микроскопическим стрелкам.
+   Только внутри .app: на остальных страницах сайта они на месте. */
+.app input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.app input[type="number"]::-webkit-outer-spin-button,
+.app input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Набранные вершины будущей площади. */
+.vert-btns { display: flex; gap: 6px; margin-top: 8px; }
+.vert-row { display: flex; gap: 7px; align-items: baseline; padding: 2px 0; font-size: 12px; color: var(--text2); }
+.vert-row b { color: var(--text); font-variant-numeric: tabular-nums; }
+
 /* Список областей с пикерами цвета. */
 .ac-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
 .ac-name { font-size: 12px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -742,16 +742,18 @@ const CASES = [
   },
   {
     name: 'Площадь по точкам · треугольник (0;0) (10;0) (0;10) ⇒ 50',
+    // Вершины набираются щелчками по графику (Фаза 7); здесь ставим их через
+    // ту же функцию, что и щелчок, — галочек в списке больше нет.
     run: `loadScene('sd'); redrawAll();
-          STATE.marks = []; clearAreaCalc();
-          addMarkAt(0, 0, null); addMarkAt(10, 0, null); addMarkAt(0, 10, null);
-          STATE.areaPicked = STATE.marks.map(m => 'm' + m.id);
-          setAreaCalcMode('poly'); runAreaCalc();
+          clearAreaCalc(); setAreaCalcMode('poly'); clearAreaVerts();
+          addAreaVert(0, 0, ''); addAreaVert(10, 0, ''); addAreaVert(0, 10, '');
+          var armed = STATE.vertArm ? 1 : 0;
+          runAreaCalc();
           var r0 = STATE.areaCalcList[0];
           var v = r0 ? r0.value : NaN;
-          STATE.marks = []; STATE.areaPicked = []; clearAreaCalc(); setAreaCalcMode('curve');
-          return { S: v };`,
-    checks: [['площадь', 'S', 50, 0.01]],
+          clearAreaVerts(); clearAreaCalc(); setAreaCalcMode('curve');
+          return { S: v, armed: armed };`,
+    checks: [['площадь', 'S', 50, 0.01], ['режим набора взведён', 'armed', 1, 0]],
   },
   {
     // Кроме равновесия в списке теперь и пересечения с осями: (100; 0), (0; 100), (0; 0).
@@ -1165,6 +1167,40 @@ const CASES = [
           return { dense: d > 0 ? 1 : 0, plain: o > 0 ? 1 : 0, off: f, denser: d > o ? 1 : 0 };`,
     checks: [['подробная сетка есть', 'dense', 1, 0], ['упрощённая сетка есть', 'plain', 1, 0],
              ['без сетки — ноль линий', 'off', 0, 0], ['подробная гуще упрощённой', 'denser', 1, 0]],
+  },
+  {
+    // Правая граница обязана включаться: у 10 − x кривая садится на ось ровно
+    // в 10, и площадь треугольника равна 50, а не «почти 50».
+    name: 'Площадь · под 10 − x на 0…10 ровно 50',
+    run: `loadScene('sd'); STATE.curves = []; curveCounter = 0; renderCurveList();
+          addCurve('10 - Q'); setRole(STATE.curves[0], 'demand');
+          setRanges(20, 20); redrawAll();
+          setAreaCalcMode('curve');
+          var sel = document.getElementById('ac-pick');
+          sel.value = sel.options[0].value;
+          document.getElementById('ac-from').value = '';
+          document.getElementById('ac-to').value = '';
+          clearAreaCalc(); runAreaCalc();
+          var r = (STATE.areaCalcList || [])[0] || {};
+          var res = { a: r.a, b: r.b, s: r.value };
+          clearAreaCalc(); setAreaCalcMode('curve');
+          return res;`,
+    checks: [['левая граница', 'a', 0, 0.001], ['правая граница', 'b', 10, 0.001],
+             ['площадь', 's', 50, 0.01]],
+  },
+  {
+    // Особые точки: у x³ − 3x в окне −3…3 три корня, максимум и минимум.
+    name: 'Особые точки · корни, максимум и минимум x³ − 3x',
+    run: `setMode('math'); setMathSub('optimum'); resetZoom();
+          STATE.mathFormula = 'x^3 - 3*x'; setMathWindow(-3, 3, -6, 6); redrawAll();
+          var k = keyTargets();
+          var mx = k.filter(function (p) { return /максимум/.test(p.name); })[0] || {};
+          var mn = k.filter(function (p) { return /минимум/.test(p.name); })[0] || {};
+          var ax = k.filter(function (p) { return /осью/.test(p.name); });
+          return { roots: ax.length, xmax: mx.x, ymax: mx.y, xmin: mn.x, ymin: mn.y };`,
+    checks: [['пересечений с осями', 'roots', 3, 0],
+             ['максимум x', 'xmax', -1, 0.02], ['максимум y', 'ymax', 2, 0.02],
+             ['минимум x', 'xmin', 1, 0.02], ['минимум y', 'ymin', -2, 0.02]],
   },
 ];
 

@@ -1173,11 +1173,29 @@ function wireControls() {
     // бы её из перекрестья, а смысл отметки именно в нём.
     addMarkAt(x, y, hit && !hit.cross ? hit.name : null);
   });
+  // Набор вершин площади: щелчок ставит вершину и режим не снимается —
+  // вершин надо хотя бы три, и каждый раз жать кнопку было бы издевательством.
+  if (chartEl) chartEl.addEventListener('click', (ev) => {
+    if (!STATE.vertArm || STATE.markArm) return;
+    const { mx, my } = mainScales();
+    const [px, py] = d3.pointer(ev, chartEl);
+    const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
+    const hit = snapVertexAt(px, py);
+    const x = hit ? hit.x : mx.invert(px);
+    const y = hit ? hit.y : my.invert(py);
+    if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
+    addAreaVert(x, y, hit && hit.key ? hit.name : '');
+  });
+  const vUndo = document.getElementById('ac-vert-undo');
+  if (vUndo) vUndo.addEventListener('click', () => undoAreaVert());
+  const vClear = document.getElementById('ac-vert-clear');
+  if (vClear) vClear.addEventListener('click', () => clearAreaVerts());
+
   // Подсказка: пока режим взведён, показываем кружком, куда сядет точка.
   if (chartEl) chartEl.addEventListener('mousemove', (ev) => {
-    if (!STATE.markArm) return;
+    if (!STATE.markArm && !STATE.vertArm) return;
     const [px, py] = d3.pointer(ev, chartEl);
-    showSnapHint(snapPointAt(px, py));
+    showSnapHint(STATE.vertArm && !STATE.markArm ? snapVertexAt(px, py) : snapPointAt(px, py));
   });
   if (chartEl) chartEl.addEventListener('mouseleave', () => showSnapHint(null));
   // Esc снимает взведённый режим — иначе курсор-перекрестие остаётся «залипшим».

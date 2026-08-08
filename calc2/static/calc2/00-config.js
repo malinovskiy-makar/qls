@@ -71,6 +71,8 @@ const STATE = {
   axisYDefault: 'P',
   marks: [],         // свои точки: {id, x, y, text, showCoords, showCurves}
   markArm: false,    // взведён режим «следующий щелчок по графику ставит точку»
+  vertArm: false,    // взведён набор вершин площади (режим «Между точками»)
+  areaVerts: [],     // набранные вершины: {x, y, name}
   // Свои цвета кривых сцены (Фаза 2): ключ = поле COL, значение = hex из пикера.
   // Накладывается в refreshColors поверх токенов; токены остаются как есть.
   colorOverride: {},

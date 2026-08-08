@@ -307,8 +307,10 @@ function mainScales() {
 
 function drawOverlays() {
   if (!svg || !svg.node()) return;
+  invalidateKeyTargets();    // особые точки считаются заново под новую картинку
   applyAreaColors();         // свои цвета заливок — одним проходом по data-legend
   drawAreaCalc();            // посчитанная площадь (Фаза 10)
+  drawAreaVerts();           // набранные вершины будущей площади
   drawCrossPoints();         // пересечения кривых тусклыми точками
   drawRoller();              // точка, катящаяся по кривой
   drawGraphTitle();
@@ -610,12 +612,119 @@ function crossPoints() {
    тот сносил весь SVG вместе с кружком под курсором, и pointerleave с
    удалённого элемента уже не приходил — точка оставалась гореть навсегда.
    Теперь меняем только атрибуты самого кружка и подпись рядом с ним. */
+/* ── Особые точки сцены (Фаза 7) ──────────────────────────────────────
+   Раньше они считались в трёх местах и не знали друг о друге: crossPoints —
+   пересечения кривых и с осями, mathAnalyse — экстремумы и только в
+   «Математике», snapTargets — сами кривые. Доводке вершины нужен один список
+   с человеческими именами, поэтому он здесь.
+
+   Экстремумы ищем во ВСЕХ сценах, а не только в математических: минимум
+   средних издержек и вершина кривой Лаффера ничем не отличаются от вершины
+   параболы. Границы — у шкал сцены (viewWindow), как и всё остальное.
+
+   Список кэшируется до следующей перерисовки: его дёргает движение мыши,
+   а пересчёт по всем кривым стоит несколько тысяч вычислений. */
+let _keyPtsCache = null;
+function invalidateKeyTargets() { _keyPtsCache = null; }
+
+// Изломы кривой: там, где наклон меняется скачком (кусочная запись, min и max).
+function kinksOf(f, lo, hi) {
+  const out = [];
+  if (!(hi > lo)) return out;
+  const N = 240, h = (hi - lo) / (N * 4);
+  const slope = (x) => {
+    const a = f(x + h), b = f(x - h);
+    return (isFinite(a) && isFinite(b)) ? (a - b) / (2 * h) : NaN;
+  };
+  const xs = [], ss = [], mag = [];
+  for (let i = 0; i <= N; i++) {
+    const x = lo + (hi - lo) * i / N, s = slope(x);
+    xs.push(x); ss.push(s);
+    if (isFinite(s)) mag.push(Math.abs(s));
+  }
+  if (mag.length < 3) return out;
+  mag.sort((a, b) => a - b);
+  const med = mag[Math.floor(mag.length / 2)] || 1;
+  // Порог берём от типичного наклона: иначе он зависел бы от единиц измерения.
+  const jump = Math.max(med * 0.6, 1e-9);
+  for (let i = 1; i <= N; i++) {
+    if (!isFinite(ss[i]) || !isFinite(ss[i - 1])) continue;
+    if (Math.abs(ss[i] - ss[i - 1]) <= jump) continue;
+    const xr = (xs[i] + xs[i - 1]) / 2;
+    if (!out.some(v => Math.abs(v - xr) < (hi - lo) * 0.01)) out.push(xr);
+  }
+  return out;
+}
+
+function keyTargets() {
+  if (_keyPtsCache) return _keyPtsCache;
+  const out = [];
+  const w = viewWindow();
+  const dx = (w.x1 - w.x0) * 1e-3, dy = (w.y1 - w.y0) * 1e-3;
+  const push = (x, y, name) => {
+    if (!isFinite(x) || !isFinite(y)) return;
+    if (x < w.x0 - 1e-9 || x > w.x1 + 1e-9 || y < w.y0 - 1e-9 || y > w.y1 + 1e-9) return;
+    if (out.some(o => Math.abs(o.x - x) < dx && Math.abs(o.y - y) < dy)) return;
+    out.push({ x, y, name });
+  };
+  (STATE.crosses && STATE.crosses.length ? STATE.crosses : crossPoints()).forEach(p => {
+    push(p.x, p.y, /^ось /.test(p.b)
+      ? ('пересечение с ' + p.b.replace('ось ', 'осью '))
+      : ('пересечение ' + p.a + ' и ' + p.b));
+  });
+  if (!(w.x1 > w.x0)) { _keyPtsCache = out; return out; }
+  const lo = w.x0 + (w.x1 - w.x0) * 1e-4, hi = w.x1;
+  const h = (w.x1 - w.x0) * 1e-4;
+  const h2 = Math.max(h * 20, (w.x1 - w.x0) * 1e-3);
+  snapTargets().forEach(t => {
+    let ext = [];
+    try { ext = rootsOf((x) => dNum(t.f, x, h), lo, hi, 400); } catch (e) { ext = []; }
+    ext.forEach(x => {
+      const y = t.f(x);
+      if (!isFinite(y)) return;
+      const s = d2Num(t.f, x, h2);
+      const kind = (s > 0) ? 'минимум ' : (s < 0 ? 'максимум ' : 'плато ');
+      push(x, y, kind + t.name);
+    });
+    // Излом, совпавший с уже найденным пересечением, не добавляем: у Z = min(f, g)
+    // ветвь переключается ровно там, где кривые пересекаются, а пересечение и
+    // посчитано точнее (бисекцией), и названо понятнее.
+    const near = (w.x1 - w.x0) * 0.02;
+    kinksOf(t.f, lo, hi).forEach(x => {
+      if (out.some(o => Math.abs(o.x - x) < near)) return;
+      push(x, t.f(x), 'излом ' + t.name);
+    });
+  });
+  _keyPtsCache = out;
+  return out;
+}
+
+/* Куда сядет вершина площади. Рядом с особой точкой прыгает точно в неё,
+   иначе садится просто на ближайшую кривую. Радиус у особой точки чуть
+   больше, чтобы попадать в неё было легче, чем промахнуться мимо. */
+const KEY_SNAP_PX = 18;
+function snapVertexAt(px, py) {
+  const { mx, my } = mainScales();
+  let best = null;
+  keyTargets().forEach(p => {
+    const d = Math.hypot(mx(p.x) - px, my(p.y) - py);
+    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: p.x, y: p.y, name: p.name, key: true, d };
+  });
+  if (best) return best;
+  const hit = snapPointAt(px, py);
+  return hit ? { x: hit.x, y: hit.y, name: hit.name, key: false, cross: hit.cross } : null;
+}
+
 function drawCrossPoints() {
   const pts = crossPoints();
   STATE.crosses = pts;
   if (!pts.length) return;
   const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'crosses');
+  // Пока набирают вершины или ставят свою точку, кружки ключевых точек не ловят
+  // щелчок: иначе щелчок рядом с пересечением уходил в кружок и вершина не
+  // ставилась вовсе. Прилипание к этим же точкам работает и без их кликабельности.
+  if (STATE.vertArm || STATE.markArm) g.style('pointer-events', 'none');
   pts.forEach((p, i) => {
     const px = mx(p.x), py = my(p.y);
     const dot = g.append('circle').attr('cx', px).attr('cy', py)
@@ -795,16 +904,71 @@ function axisXLetter() {
   return (STATE.axisXName || STATE.axisXDefault || 'x').trim() || 'x';
 }
 
-function areaTargets() {
-  return snapTargets();
+/* ── Вершины площади щелчками (Фаза 7) ────────────────────────────────
+   Режим «Между точками» переводит график в набор вершин: каждый щелчок
+   ставит вершину, рядом с особой точкой она прыгает точно в неё. Галочки
+   в списке для этого больше не нужны. */
+function armVerts(on) {
+  STATE.vertArm = !!on;
+  const wrap = document.getElementById('graph-wrap');
+  if (wrap) wrap.style.cursor = STATE.vertArm ? 'crosshair' : '';
+  if (!STATE.vertArm) showSnapHint(null);
+  renderVertList();
 }
 
-// Все точки, которые можно взять вершинами: свои и автоматические пересечения.
-function areaPointList() {
-  const out = [];
-  (STATE.marks || []).forEach(m => out.push({ id: 'm' + m.id, x: m.x, y: m.y, name: m.text || 'Точка', own: true }));
-  (STATE.crosses || []).forEach((c, i) => out.push({ id: 'c' + i, x: c.x, y: c.y, name: c.a + ' и ' + c.b, own: false }));
-  return out;
+function addAreaVert(x, y, name) {
+  STATE.areaVerts = STATE.areaVerts || [];
+  STATE.areaVerts.push({ x, y, name: name || '' });
+  renderVertList();
+  redrawAll();
+}
+
+function undoAreaVert() { (STATE.areaVerts || []).pop(); renderVertList(); redrawAll(); }
+function clearAreaVerts() { STATE.areaVerts = []; renderVertList(); redrawAll(); }
+
+// Список набранных вершин под кнопками: видно, что уже отмечено.
+function renderVertList() {
+  const box = document.getElementById('ac-verts');
+  if (!box) return;
+  const list = STATE.areaVerts || [];
+  box.innerHTML = '';
+  if (!list.length) return;
+  list.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'vert-row';
+    const n = document.createElement('b'); n.textContent = (i + 1) + '.';
+    const t = document.createElement('span');
+    t.textContent = (p.name ? p.name + ' ' : '') + '(' + fmt(p.x) + '; ' + fmt(p.y) + ')';
+    row.append(n, t);
+    box.appendChild(row);
+  });
+}
+
+// Набранные вершины на графике: номер у каждой и бледный контур будущей фигуры.
+function drawAreaVerts() {
+  const list = STATE.areaVerts || [];
+  if (!list.length) return;
+  const { mx, my } = mainScales();
+  const g = svg.append('g').attr('class', 'area-verts').style('pointer-events', 'none');
+  if (list.length >= 3) {
+    g.append('path')
+      .attr('d', 'M' + list.map(p => mx(p.x) + ',' + my(p.y)).join('L') + 'Z')
+      .attr('fill', COL.reg).attr('fill-opacity', 0.1)
+      .attr('stroke', COL.reg).attr('stroke-width', 1.4).attr('stroke-dasharray', '5 4');
+  } else if (list.length === 2) {
+    g.append('line').attr('x1', mx(list[0].x)).attr('y1', my(list[0].y))
+      .attr('x2', mx(list[1].x)).attr('y2', my(list[1].y))
+      .attr('stroke', COL.reg).attr('stroke-width', 1.4).attr('stroke-dasharray', '5 4');
+  }
+  list.forEach((p, i) => {
+    g.append('circle').attr('cx', mx(p.x)).attr('cy', my(p.y)).attr('r', 4.5)
+      .attr('fill', COL.halo).attr('stroke', COL.reg).attr('stroke-width', 2);
+    haloText(g, mx(p.x) + 8, my(p.y) - 8, String(i + 1), 'start', 'auto');
+  });
+}
+
+function areaTargets() {
+  return snapTargets();
 }
 
 function calcAreaUnderCurve() {
@@ -823,9 +987,8 @@ function calcAreaUnderCurve() {
 }
 
 function calcAreaPolygon() {
-  const chosen = (STATE.areaPicked || []);
-  const pts = areaPointList().filter(p => chosen.indexOf(p.id) >= 0);
-  if (pts.length < 3) return { error: 'Нужно хотя бы три вершины: по двум точкам площади нет.' };
+  const pts = (STATE.areaVerts || []).slice();
+  if (pts.length < 3) return { error: 'Нужно хотя бы три вершины: щёлкните по графику ещё раз.' };
   // Вершины обходим по кругу вокруг их общего центра, иначе многоугольник
   // получится самопересекающимся и площадь выйдет меньше настоящей.
   const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
@@ -977,35 +1140,7 @@ function syncAreaCalcUI() {
       if (names.indexOf(prev) >= 0) sel.value = prev;
     }
   }
-  const box = document.getElementById('ac-points');
-  if (box) {
-    const pts = areaPointList();
-    const sig = pts.map(p => p.id + ':' + fmt(p.x) + ':' + fmt(p.y)).join('|');
-    if (box._sig !== sig) {
-      box._sig = sig;
-      box.innerHTML = '';
-      if (!pts.length) {
-        const d = document.createElement('div');
-        d.className = 'muted'; d.textContent = 'Пока нет ни своих точек, ни пересечений.';
-        box.appendChild(d);
-      }
-      pts.forEach(p => {
-        const lab = document.createElement('label');
-        lab.className = 'chk' + (p.own ? '' : ' dim');
-        const c = document.createElement('input');
-        c.type = 'checkbox';
-        c.checked = (STATE.areaPicked || []).indexOf(p.id) >= 0;
-        c.addEventListener('change', () => {
-          STATE.areaPicked = STATE.areaPicked || [];
-          if (c.checked) STATE.areaPicked.push(p.id);
-          else STATE.areaPicked = STATE.areaPicked.filter(id => id !== p.id);
-          updateQuickArea();
-        });
-        lab.append(c, document.createTextNode(p.name + ' (' + fmt(p.x) + '; ' + fmt(p.y) + ')'));
-        box.appendChild(lab);
-      });
-    }
-  }
+  renderVertList();
   updateQuickArea();
 }
 
@@ -1013,7 +1148,7 @@ function syncAreaCalcUI() {
 function updateQuickArea() {
   const b = document.getElementById('quick-area');
   if (!b) return;
-  const n = (STATE.areaPicked || []).length;
+  const n = (STATE.areaVerts || []).length;
   const show = (STATE.areaCalcMode === 'poly') && n >= 3;
   b.hidden = !show;
   if (show) b.textContent = 'Площадь по ' + n + ' точкам';
@@ -1027,7 +1162,9 @@ function setAreaCalcMode(mode) {
   const pc = document.getElementById('ac-pane-curve'), pp = document.getElementById('ac-pane-poly');
   if (pc) pc.style.display = (STATE.areaCalcMode === 'curve') ? '' : 'none';
   if (pp) pp.style.display = (STATE.areaCalcMode === 'poly') ? '' : 'none';
+  armVerts(STATE.areaCalcMode === 'poly');
   updateQuickArea();
+  redrawAll();   // кружки ключевых точек перестают ловить щелчок (см. drawCrossPoints)
 }
 
 /* Сворачивание секций. Одна проводка на все складные заголовки: кнопка
@@ -1636,21 +1773,19 @@ function snapPointAt(px, py) {
 // Двигаем отдельный элемент, а не перерисовываем весь холст: перерисовка на
 // каждое движение мыши заметно тормозила бы.
 function showSnapHint(hit) {
-  let c = document.getElementById('snap-hint');
-  if (!hit) { if (c) c.remove(); return; }
+  const old = document.getElementById('snap-hint');
+  if (!hit) { if (old) old.remove(); return; }
+  if (old) old.remove();
   const { mx, my } = mainScales();
-  if (!c) {
-    c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    c.setAttribute('id', 'snap-hint');
-    c.setAttribute('r', '7');
-    c.setAttribute('fill', 'none');
-    c.setAttribute('stroke-width', '2');
-    c.setAttribute('pointer-events', 'none');
-    svg.node().appendChild(c);
-  }
-  c.setAttribute('cx', mx(hit.x));
-  c.setAttribute('cy', my(hit.y));
-  c.setAttribute('stroke', hit.cross ? COL.reg : COL.ink);
+  const g = svg.append('g').attr('id', 'snap-hint').style('pointer-events', 'none');
+  const px = mx(hit.x), py = my(hit.y);
+  const hot = !!(hit.key || hit.cross);
+  g.append('circle').attr('cx', px).attr('cy', py).attr('r', hot ? 8 : 7)
+    .attr('fill', 'none').attr('stroke-width', hot ? 2.6 : 2)
+    .attr('stroke', hot ? COL.reg : COL.ink);
+  // Особая точка называет себя: «максимум MC», «пересечение D и S». Так видно,
+  // куда именно сядет вершина, и не надо целиться пикселем.
+  if (hit.key && hit.name) haloText(g, px + 12, py - 12, hit.name, 'start', 'auto');
 }
 
 let markCounter = 0;
@@ -1707,12 +1842,7 @@ function renderMarkList() {
   const box = document.getElementById('mark-list');
   if (!box) return;
   box.innerHTML = '';
-  if (!STATE.marks.length) {
-    const d = document.createElement('div');
-    d.className = 'muted'; d.textContent = 'Пока нет своих точек.';
-    box.appendChild(d);
-    return;
-  }
+  if (!STATE.marks.length) return;
   STATE.marks.forEach(mk => {
     const row = document.createElement('div');
     row.className = 'mark-row';

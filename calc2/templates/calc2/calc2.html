@@ -1952,9 +1952,13 @@
         </div>
 
         <div id="ac-pane-poly" style="display:none;">
-          <div class="hint">Отметьте галочками вершины. Точки пересечения кривых считаются сами
-            и лежат в списке серыми.</div>
-          <div id="ac-points" style="margin-top:8px;"></div>
+          <div class="hint">Щёлкайте по графику: каждый щелчок ставит вершину. Рядом с особой
+            точкой (пересечение, максимум, излом) вершина прыгает точно в неё и подписывается.</div>
+          <div class="vert-btns">
+            <button class="btn-sm" id="ac-vert-undo" type="button">Убрать последнюю</button>
+            <button class="btn-sm" id="ac-vert-clear" type="button">Убрать все вершины</button>
+          </div>
+          <div id="ac-verts"></div>
         </div>
 
         <button class="btn" id="ac-calc" type="button" style="margin-top:8px;width:100%;">Посчитать площадь</button>

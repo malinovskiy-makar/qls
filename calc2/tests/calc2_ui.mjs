@@ -1483,6 +1483,63 @@ await t('свёртывание панели не запускает вечну�
   return afterClicks <= 12 || `на 10 щелчков ${afterClicks} перерисовок`;
 });
 
+/* ── Фаза 7. Площади ──────────────────────────────────────────────────
+   Вершины набираются щелчками по графику с примагничиванием к особым точкам,
+   списка с галочками нет, у числовых полей нет крутилок. */
+await t('списка вершин с галочками больше нет', () => page.evaluate(() =>
+  !document.getElementById('ac-points') || 'список ещё в разметке'));
+
+await t('у числовых полей калькулятора нет крутилок', () => page.evaluate(() => {
+  const inp = document.querySelector('.app input[type=number]');
+  if (!inp) return 'числовых полей не нашлось';
+  const st = getComputedStyle(inp);
+  const look = st.appearance || st.MozAppearance || st.webkitAppearance;
+  return look === 'textfield' || 'appearance: ' + look;
+}));
+
+await t('режим «Между точками» взводит набор вершин', async () => {
+  await page.evaluate(() => { openPicker(); });
+  await clickUI('.scard[data-scene="sd"]');
+  await page.waitForTimeout(340);
+  return await page.evaluate(() => {
+    setAreaCalcMode('poly');
+    const ok = STATE.vertArm === true;
+    return ok || 'режим не взведён';
+  });
+});
+
+await t('щелчок по графику ставит вершину', async () => {
+  await page.evaluate(() => { clearAreaVerts(); setAreaCalcMode('poly'); });
+  const box = await page.locator('#chart').boundingBox();
+  await page.mouse.click(box.x + box.width * 0.35, box.y + box.height * 0.45);
+  await page.waitForTimeout(380);
+  await page.mouse.click(box.x + box.width * 0.55, box.y + box.height * 0.62);
+  await page.waitForTimeout(380);
+  const n = await page.evaluate(() => (STATE.areaVerts || []).length);
+  return n === 2 || 'вершин набрано: ' + n;
+});
+
+await t('вершина садится в особую точку и называет её', async () => {
+  // Проверяем сам механизм доводки: щелчок мимо на десяток пикселей обязан
+  // дать ровно ту особую точку. Настоящий щелчок по холсту проверен выше,
+  // здесь важна арифметика примагничивания, а не попадание мышью.
+  return await page.evaluate(() => {
+    setAreaCalcMode('poly'); clearAreaVerts();
+    const { mx, my } = mainScales();
+    const p = keyTargets().filter(k => /пересечение D и S/.test(k.name))[0];
+    if (!p) return 'особой точки «пересечение D и S» нет';
+    const hit = snapVertexAt(mx(p.x) + 9, my(p.y) - 8);
+    setAreaCalcMode('curve');
+    if (!hit || !hit.key) return 'вершина не прилипла к особой точке';
+    if (Math.abs(hit.x - p.x) > 1e-6 || Math.abs(hit.y - p.y) > 1e-6) return 'прилипла не туда';
+    return /пересечение D и S/.test(hit.name) || 'без имени: ' + hit.name;
+  });
+});
+
+await t('надписи «Пока нет своих точек» нет', () => page.evaluate(() =>
+  !/Пока нет своих точек/.test(document.getElementById('mark-list').textContent)
+  || 'надпись на месте'));
+
 console.log('\n' + checks.map(([s, n, d]) => `${s.padEnd(4)} ${n}${d ? '  → ' + d : ''}`).join('\n'));
 const bad = checks.filter(c => c[0] !== 'OK').length;
 if (errors.length) console.log('\nОшибки страницы:\n' + errors.slice(0, 10).join('\n'));
