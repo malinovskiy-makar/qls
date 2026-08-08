@@ -218,10 +218,18 @@ class StopGateTests(TestCase):
         self.assertIn('КТВ двух стран при торговле', body)
 
     def test_result_screen_marks_confidence(self):
+        """⚠️ Число задач задаётся ФОРМОЙ, а не строкой плана (фаза 17).
+
+        Полей теперь два — «открытых задач» и «тестов», — и именно они
+        договор с репетитором: ищется ровно столько того и другого.
+        Счётчики строк плана распределяют эту квоту по темам, а не задают
+        её. Раньше поле было одно, и разделить было нельзя никак.
+        """
         with override_settings(AI_PROVIDER='fake'):
             body = self.client.post(
                 reverse('teacher:assignment_generate'),
-                {'action': 'search', 'text': 'x', 'count': 2,
+                {'action': 'search', 'text': 'x',
+                 'count_open': 2, 'count_test': 0,
                  'min_difficulty': 1, 'max_difficulty': 5,
                  'row_keep': ['0'], 'row_query': ['построение КТВ'],
                  'row_label': ['КТВ'], 'row_topic': [''],

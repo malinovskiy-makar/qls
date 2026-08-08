@@ -29,6 +29,21 @@ from problems import hw_generator
 from .access import tutor_required
 
 
+
+# Примеры запросов — настоящие для олимпиадной экономики. Нажатие
+# подставляет текст в поле: это единственное место, где пустоту стоит
+# занять полезным.
+EXAMPLE_QUERIES = [
+    'Домашка на КПВ и альтернативные издержки, задачи на построение и на '
+    'сложение кривых двух стран',
+    'Эластичность спроса по цене и по доходу: расчёт коэффициента и вывод '
+    'о выручке',
+    'Монополия: максимизация прибыли, сравнение с совершенной конкуренцией, '
+    'потери общества',
+    'Рынок труда и МРОТ, одна задача посложнее в конце',
+]
+
+
 def _tutor_groups(user):
     """Группы репетитора — нужны на последнем шаге, кому выдать работу."""
     from problems.models import StudentGroup
@@ -68,8 +83,12 @@ def assignment_generate(request):
         'kind': kind,
         'groups': _tutor_groups(request.user),
         'problem_count': _catalog_size(),
-        'form': {'count': 5, 'min_difficulty': 1, 'max_difficulty': 5,
+        'form': {'count': 4, 'count_open': 4, 'count_test': 0,
+                 'min_difficulty': 1, 'max_difficulty': 5,
                  'text': '', 'has_solution': False, 'topics': []},
+        # Примеры запросов — кнопками под полем. Репетитор, впервые
+        # открывший подбор, не знает, насколько подробно можно писать.
+        'examples': EXAMPLE_QUERIES,
     }
 
     if request.method != 'POST':
@@ -114,8 +133,12 @@ def assignment_generate(request):
             return render(request, 'teacher/generate.html', context)
 
         exclude = _read_ids(request, 'exclude_ids')
+        # Квота делится по типу: ровно столько тестов и ровно столько
+        # открытых задач, сколько попросили.
+        plan = hw_generator.split_by_kind(rows, form['count_open'],
+                                          form['count_test'])
         found, short = hw_generator.find_problems(
-            rows, has_solution=form['has_solution'], exclude=exclude)
+            plan or rows, has_solution=form['has_solution'], exclude=exclude)
         cards = [hw_generator.problem_card(item['problem'],
                                            item['confidence'],
                                            item.get('how', ''))
@@ -148,9 +171,20 @@ def _read_form(request):
         except ValueError:
             return default
 
+    # ⚠️ ДВА ОТДЕЛЬНЫХ ЧИСЛА: открытых задач и тестов. Поле было одно
+    # («сколько задач»), и разделить было нельзя никак — репетитор,
+    # которому нужны четыре задачи и три теста, получал семь чего попало.
+    count_open = number('count_open', 4, 0, hw_generator.MAX_PROBLEMS)
+    count_test = number('count_test', 0, 0, hw_generator.MAX_PROBLEMS)
+    if not count_open and not count_test:
+        # Ноль и ноль — это не запрос. Возвращаемся к разумному минимуму,
+        # а не показываем пустой результат.
+        count_open = 1
     return {
         'text': (request.POST.get('text') or '').strip(),
-        'count': number('count', 5, 1, hw_generator.MAX_PROBLEMS),
+        'count_open': count_open,
+        'count_test': count_test,
+        'count': min(hw_generator.MAX_PROBLEMS, count_open + count_test),
         'min_difficulty': number('min_difficulty', 1, 1, 5),
         'max_difficulty': number('max_difficulty', 5, 1, 5),
         'has_solution': request.POST.get('has_solution') == 'on',

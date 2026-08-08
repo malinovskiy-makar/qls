@@ -323,8 +323,15 @@ def find_problems(rows, has_solution=False, sources=None, exclude=()):
     missing = sum(item['missing'] for item in short_rows)
     if missing:
         whole = ' '.join(row['query'] for row in rows)
-        extra = _materialise(hybrid.search(whole, limit=missing * 6 + 12),
+        extra = _materialise(hybrid.search(whole, limit=missing * 12 + 24),
                              has_solution, sources)
+        # Добор идёт под тип той строки, которой не хватило: иначе вместо
+        # недостающего теста приедет открытая задача.
+        gap_kind = rows[short_rows[0]['row']].get('kind')
+        if gap_kind == 'open':
+            extra = [i for i in extra if not is_test_problem(i['problem'])]
+        elif gap_kind == 'test':
+            extra = [i for i in extra if is_test_problem(i['problem'])]
         added = _take(extra, missing, taken, per_source, found,
                       short_rows[0]['row'], cap=None, force_far=True)
         if added:
@@ -382,6 +389,63 @@ def _take(candidates, need, taken, per_source, found, row_index, cap,
     return picked
 
 
+def is_test_problem(problem):
+    """Тест ли это. Признак — ТИП задачи, как во всём проекте."""
+    return (problem.problem_type or '').startswith('тест')
+
+
+def allocate(total, weights):
+    """Раздать `total` мест по весам МЕТОДОМ НАИБОЛЬШЕГО ОСТАТКА.
+
+    Тот же приём, что в работе над ошибками игры. Обычное округление теряет
+    или добавляет места: репетитор просит четыре задачи, а получает три или
+    пять. Здесь сумма ВСЕГДА равна total.
+    """
+    if total <= 0 or not weights:
+        return [0] * len(weights)
+    pool = sum(weights) or len(weights)
+    weights = weights if sum(weights) else [1] * len(weights)
+    exact = [total * w / pool for w in weights]
+    base = [int(value) for value in exact]
+    left = total - sum(base)
+    order = sorted(range(len(weights)),
+                   key=lambda i: (exact[i] - base[i]), reverse=True)
+    for i in range(left):
+        base[order[i % len(order)]] += 1
+    return base
+
+
+def split_by_kind(rows, want_open, want_test):
+    """План → два плана: под открытые задачи и под тесты.
+
+    ⚠️ ЗАЧЕМ. Поле «сколько задач» было ОДНО, и разделить нельзя было
+    никак: репетитор, которому нужны четыре задачи и три теста, получал
+    семь чего попало. Темы при этом остаются те же — делим только квоту,
+    по весам исходных строк.
+    """
+    if not rows:
+        return []
+    weights = [row.get('count', 1) or 1 for row in rows]
+    opens = allocate(want_open, weights)
+    tests = allocate(want_test, weights)
+
+    plan = []
+    for row, count in zip(rows, opens):
+        if count:
+            item = dict(row)
+            item['count'] = count
+            item['kind'] = 'open'
+            plan.append(item)
+    for row, count in zip(rows, tests):
+        if count:
+            item = dict(row)
+            item['count'] = count
+            item['kind'] = 'test'
+            item['label'] = '%s — тест' % row['label']
+            plan.append(item)
+    return plan
+
+
 def search_row(row, has_solution=False, sources=None):
     """Кандидаты под ОДНУ строку плана. Обращений к модели не стоит.
 
@@ -391,9 +455,20 @@ def search_row(row, has_solution=False, sources=None):
     """
     from catalog import hybrid
 
+    # Просим с запасом: часть кандидатов отсеется по типу задачи.
     limit = row['count'] * 8 + 12
+    kind = row.get('kind')
+    if kind in ('open', 'test'):
+        limit = row['count'] * 20 + 30
     hits = hybrid.search(row['query'], limit=limit)
     items = _materialise(hits, has_solution, sources)
+    # ⚠️ Тип — ЖЁСТКИЙ отбор, в отличие от темы. «Три теста» это просьба
+    # именно про тесты: подсунуть вместо теста открытую задачу нельзя, это
+    # другая работа для ученика.
+    if kind == 'open':
+        items = [i for i in items if not is_test_problem(i['problem'])]
+    elif kind == 'test':
+        items = [i for i in items if is_test_problem(i['problem'])]
     return _rank(items, row)
 
 

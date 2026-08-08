@@ -93,6 +93,21 @@ textarea.gen-text:focus { border-color: var(--accent); }
 
 {% include "teacher/_build_modes.html" with mode='describe' exam=is_exam %}
 
+{% comment %}
+Домашка или контрольная. Движок подбора один и тот же — отличается только то,
+какие настройки спросим на последнем шаге (фаза 19).
+{% endcomment %}
+<div class="k-tiles" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:16px">
+  <a class="k-tile {% if not is_exam %}k-tile--on{% endif %}" href="?kind=homework">
+    <span class="k-tile__name">Домашка</span>
+    <span class="k-tile__note">решают дома, срок сдачи</span>
+  </a>
+  <a class="k-tile {% if is_exam %}k-tile--on{% endif %}" href="?kind=exam">
+    <span class="k-tile__name">Контрольная</span>
+    <span class="k-tile__note">ограниченное время, окно</span>
+  </a>
+</div>
+
 <div class="gen-step">
   <span class="{% if step == 'ask' %}is-on{% endif %}">1. Запрос</span>
   <span class="{% if step == 'plan' %}is-on{% endif %}">2. Что нашлось</span>
@@ -114,47 +129,94 @@ textarea.gen-text:focus { border-color: var(--accent); }
 <form method="post">
   {% csrf_token %}
   <input type="hidden" name="action" value="parse">
+  <input type="hidden" name="kind" value="{{ kind }}">
   <div class="gen-card">
-    <h2>Опишите домашку словами</h2>
+    <h2>Опишите {% if is_exam %}контрольную{% else %}домашку{% endif %} словами</h2>
     <div class="sub">
-      Мы НЕ придумываем новые задачи — подбираем существующие из каталога.
-      Пример: «домашка на монополию и эластичность, пять задач, одна
-      посложнее в конце».
+      Новые задачи не сочиняются. Сайт разбирает вашу фразу и ищет среди
+      {{ problem_count }} задач каталога.
     </div>
-    <textarea class="gen-text" name="text" required
-              placeholder="Домашка на монополию и эластичность, пять задач, одна посложнее в конце">{{ form.text }}</textarea>
+    <textarea class="gen-text" name="text" id="gen-text" required
+              placeholder="Например: домашка на монополию и эластичность, четыре задачи и три теста, одна посложнее в конце">{{ form.text }}</textarea>
 
     <div class="gen-params">
+      {% comment %}
+      ⚠️ ДВА ОТДЕЛЬНЫХ ПОЛЯ. Раньше поле было одно — «сколько задач», — и
+      разделить нельзя было никак: репетитор, которому нужны четыре задачи
+      и три теста, получал семь чего попало.
+      {% endcomment %}
       <div class="form-group">
-        <label class="form-label" for="id_count">Сколько задач</label>
-        <input class="form-control" type="number" id="id_count" name="count"
-               min="1" max="30" value="{{ form.count }}">
+        <label class="form-label" for="id_open">Открытых задач</label>
+        <input class="k-input k-input--num" type="number" id="id_open"
+               name="count_open" min="0" max="30" value="{{ form.count_open }}">
       </div>
       <div class="form-group">
-        <label class="form-label" for="id_min">Сложность от</label>
-        <input class="form-control" type="number" id="id_min"
-               name="min_difficulty" min="1" max="5" value="{{ form.min_difficulty }}">
+        <label class="form-label" for="id_test">Тестов</label>
+        <input class="k-input k-input--num" type="number" id="id_test"
+               name="count_test" min="0" max="30" value="{{ form.count_test }}">
       </div>
       <div class="form-group">
-        <label class="form-label" for="id_max">до</label>
-        <input class="form-control" type="number" id="id_max"
-               name="max_difficulty" min="1" max="5" value="{{ form.max_difficulty }}">
+        {% comment %}
+        Сложность — ОДНА пара в одну строку. Раньше это были два поля с
+        подписями «СЛОЖНОСТЬ ОТ» и «ДО» капслоком над каждым, и они
+        читались как два независимых числа.
+        {% endcomment %}
+        <label class="form-label">Сложность</label>
+        <div class="k-row" style="gap:6px;flex-wrap:nowrap">
+          <input class="k-input k-input--num" type="number" name="min_difficulty"
+                 min="1" max="5" value="{{ form.min_difficulty }}"
+                 aria-label="сложность от">
+          <span class="k-quiet">—</span>
+          <input class="k-input k-input--num" type="number" name="max_difficulty"
+                 min="1" max="5" value="{{ form.max_difficulty }}"
+                 aria-label="сложность до">
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">Решения</label>
-        <label class="checkbox-label">
+        <label class="k-check">
           <input type="checkbox" name="has_solution"
                  {% if form.has_solution %}checked{% endif %}>
-          только с решением
+          брать только с разбором
         </label>
       </div>
     </div>
 
+    {% comment %}
+    ⚠️ ЧЕСТНАЯ ПОДПИСЬ. Сложность работает как ПРЕДПОЧТЕНИЕ, а не отбор:
+    задача вне диапазона встанет ниже, но может попасть. Именно так оно и
+    написано в коде — а интерфейс раньше обещал фильтр, которого нет.
+    {% endcomment %}
+    <div class="k-hint">
+      Сложность — это предпочтение, а не жёсткий отбор: задачи вне диапазона
+      встанут ниже, но могут попасть.
+    </div>
+
     <div class="gen-actions">
-      <button type="submit" class="filter-btn">Разобрать запрос</button>
-      <span class="gen-cost">
-        сегодня использовано {{ used_today }} из {{ daily_limit }} обращений
-      </span>
+      <button type="submit" class="k-btn k-btn--main">Разобрать запрос</button>
+    </div>
+    {% comment %}
+    Счётчик обращений — техническая деталь, ей место тихой подписью под
+    кнопкой, а не на видном месте рядом с ней.
+    {% endcomment %}
+    <div class="k-hint">
+      сегодня использовано {{ used_today }} из {{ daily_limit }} обращений
+    </div>
+  </div>
+
+  {% comment %}
+  Примеры запросов. Нажатие подставляет текст в поле — единственное место,
+  где пустоту снизу стоит занять полезным: репетитор, впервые открывший
+  подбор, не знает, насколько подробно можно писать.
+  {% endcomment %}
+  <div class="gen-card">
+    <h2 style="font-size:14px;margin-bottom:10px">Так тоже можно</h2>
+    <div class="k-stack" style="gap:6px">
+      {% for example in examples %}
+      <button type="button" class="k-btn k-btn--plain gen-example"
+              style="text-align:left;justify-content:flex-start"
+              data-example="{{ example }}">{{ example }}</button>
+      {% endfor %}
     </div>
   </div>
 </form>
@@ -163,8 +225,10 @@ textarea.gen-text:focus { border-color: var(--accent); }
 {% if step == 'plan' %}
 <form method="post">
   {% csrf_token %}
+  <input type="hidden" name="kind" value="{{ kind }}">
   <input type="hidden" name="text" value="{{ form.text }}">
-  <input type="hidden" name="count" value="{{ form.count }}">
+  <input type="hidden" name="count_open" value="{{ form.count_open }}">
+  <input type="hidden" name="count_test" value="{{ form.count_test }}">
   <input type="hidden" name="min_difficulty" value="{{ form.min_difficulty }}">
   <input type="hidden" name="max_difficulty" value="{{ form.max_difficulty }}">
   {% if form.has_solution %}<input type="hidden" name="has_solution" value="on">{% endif %}
@@ -339,5 +403,18 @@ textarea.gen-text:focus { border-color: var(--accent); }
     if (card) { card.classList.toggle('is-off', !box.checked); }
   });
 })();
+</script>
+
+<script>
+// Пример подставляется в поле описания — и только. Ничего не отправляем:
+// человек должен увидеть текст и поправить его под себя.
+document.querySelectorAll('.gen-example').forEach(function (button) {
+  button.addEventListener('click', function () {
+    var field = document.getElementById('gen-text');
+    if (!field) { return; }
+    field.value = button.dataset.example;
+    field.focus();
+  });
+});
 </script>
 {% endblock %}
