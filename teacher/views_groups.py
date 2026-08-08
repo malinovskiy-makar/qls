@@ -501,14 +501,163 @@ def dashboard(request):
 # вкладки Группы»: раньше репетитор из группы проваливался в /teacher/
 # assignment/<pk>/ и терял контекст, в какой он вообще группе.
 
+# ---------------------------------------------------------------------------
+# Фаза 12 — сводка решений: вид «по ученикам»
+# ---------------------------------------------------------------------------
+# ⚠️ ЗАЧЕМ. Таблица «ученик × задача» на трёх учениках и семи задачах — это
+# 21 строка, из которых действия требует ОДНА. Остальные двадцать — «не
+# начато» с прочерком, и занимают они столько же места.
+#
+# Строки и раньше шли по ученикам, но этого не было ВИДНО: имя повторялось в
+# каждой строке, между учениками не было границы. Проблема в подаче, а не в
+# данных, поэтому таблица никуда не делась — она осталась вторым видом.
+
+SUBMISSIONS_VIEW_KEY = 'submissions_view'
+
+
+def _machine_totals(subs, items_by_id):
+    """(насчитала машина, могла насчитать). Считаем только МАШИННЫЕ проверки.
+
+    Признак машинной проверки — `reviewed_by is None`: человек, поставивший
+    оценку, всегда записан. Смешивать их нельзя, иначе подпись «машина уже
+    насчитала» будет включать в себя и то, что поставил репетитор.
+    """
+    from decimal import Decimal
+
+    from problems.assignment_rows import item_max_score
+
+    got = Decimal('0')
+    could = Decimal('0')
+    for sub in subs:
+        feedback = getattr(sub, 'feedback', None)
+        if feedback is None or feedback.reviewed_by_id is not None:
+            continue
+        item = items_by_id.get(sub.problem_item_id)
+        if item is None:
+            continue
+        got += Decimal(str(feedback.score or 0))
+        could += item_max_score(item)
+    return got, could
+
+
+def student_cards(assignment, group):
+    """Карточка на каждого ученика: что сдал, что насчитала машина, что делать.
+
+    Содержимое намеренно скупое — владелец просил не захламлять.
+    """
+    from django.urls import reverse
+
+    from problems.models import Submission
+
+    items = list(assignment.items.select_related('catalog_problem',
+                                                 'custom_problem'))
+    items_by_id = {i.pk: i for i in items}
+    total = len(items)
+
+    subs_by_student = {}
+    for sub in (Submission.objects
+                .filter(assignment=assignment)
+                .select_related('feedback', 'student')
+                .order_by('problem_item__order', 'pk')):
+        subs_by_student.setdefault(sub.student_id, []).append(sub)
+
+    cards = []
+    for student in assignment.students.all().order_by('last_name', 'username'):
+        subs = subs_by_student.get(student.pk, [])
+        done = [s for s in subs if s.status in ('submitted', 'reviewed')]
+        pending = [s for s in subs if s.status == 'submitted']
+        checked = [s for s in subs if s.status == 'reviewed']
+        got, could = _machine_totals(subs, items_by_id)
+
+        if not done:
+            state = 'not_started'
+            state_label = 'не начата'
+        elif pending:
+            state = 'partial'
+            state_label = 'проверено %d из %d' % (len(checked), len(done))
+        else:
+            state = 'checked'
+            state_label = 'проверено'
+
+        if pending:
+            button = {'label': 'Проверить %d %s' % (len(pending),
+                                                    _tasks_word(len(pending))),
+                      'kind': 'main',
+                      'url': reverse('teacher:group_review_submission',
+                                     args=[group.pk, pending[0].pk])}
+        elif done:
+            button = {'label': 'Смотреть работу', 'kind': 'quiet',
+                      'url': reverse('teacher:student_work_review',
+                                     args=[group.pk, assignment.pk,
+                                           student.pk])}
+        else:
+            # Написать ученику сегодня можно ровно одним способом —
+            # комментарием к задаче на странице задания. Отдельной переписки
+            # в продукте нет, и выдумывать кнопку, которая никуда не ведёт,
+            # нельзя.
+            button = {'label': 'Написать', 'kind': 'quiet',
+                      'url': reverse('teacher:group_assignment',
+                                     args=[group.pk, assignment.pk])}
+
+        submitted_at = max([s.submitted_at for s in done if s.submitted_at]
+                           or [None])
+        cards.append({
+            'student': student,
+            'submitted': len(done),
+            'total': total,
+            'submitted_at': submitted_at,
+            'submitted_human': timefmt.fmt(submitted_at, timefmt.SHORT),
+            'machine_got': _clean_points(got),
+            'machine_could': _clean_points(could),
+            'has_machine': could > 0,
+            'pending': len(pending),
+            'state': state,
+            'state_label': state_label,
+            'button': button,
+        })
+
+    # Сначала требующие проверки, потом проверенные, в конце не приступавшие:
+    # порядок карточек — это и есть очередь работы.
+    order = {'partial': 0, 'checked': 1, 'not_started': 2}
+    cards.sort(key=lambda c: (0 if c['pending'] else 1, order[c['state']],
+                              (c['student'].last_name or '').lower()))
+    return cards
+
+
+def _tasks_word(number):
+    if number % 10 == 1 and number % 100 != 11:
+        return 'задачу'
+    if 2 <= number % 10 <= 4 and not 12 <= number % 100 <= 14:
+        return 'задачи'
+    return 'задач'
+
+
 @tutor_required
 def group_submissions(request, group_id, assignment_id):
-    """Таблица решений по заданию — внутри группы."""
+    """Сводка решений: два вида — по ученикам и по задачам."""
     from .views import assignment_detail
 
     group = own_group_or_404(request.user, group_id)
     assignment = group_assignment_or_404(group, assignment_id)
-    return assignment_detail(request, assignment.pk, group=group)
+
+    # Выбор вида запоминается между заходами: репетитор выбирает способ
+    # работы один раз, а не на каждом экране заново.
+    view = request.GET.get('view')
+    if view in ('students', 'problems'):
+        request.session[SUBMISSIONS_VIEW_KEY] = view
+    else:
+        view = request.session.get(SUBMISSIONS_VIEW_KEY) or 'students'
+
+    if view == 'problems':
+        return assignment_detail(request, assignment.pk, group=group)
+
+    return render(request, 'teacher/groups/submissions_by_student.html', {
+        'group': group,
+        'assignment': assignment,
+        'cards': student_cards(assignment, group),
+        'view': 'students',
+        'stats': assignment_stats(assignment),
+    })
 
 
 @tutor_required

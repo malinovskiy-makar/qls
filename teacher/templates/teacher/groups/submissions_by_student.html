@@ -1,0 +1,103 @@
+{% extends 'teacher/base.html' %}
+{% comment %}
+Сводка решений, вид «по ученикам» (фаза 12).
+
+⚠️ ЗАЧЕМ ОН ГЛАВНЫЙ. Проверять домашки привычно ПО ОЧЕРЕДИ: сначала все
+задачи Пети, затем все задачи Ани. Таблица «ученик × задача» это и делала,
+но было не видно: имя повторялось в каждой строке, границы между учениками
+не было, а из 21 строки действия требовала ОДНА.
+
+Таблица никуда не делась — она второй вид, переключатель справа вверху, и
+выбор запоминается между заходами.
+{% endcomment %}
+
+{% block title %}{{ assignment.name }} — решения{% endblock %}
+
+{% block extra_style %}{% include 'teacher/groups/_style.html' %}
+.sub-switch { display: flex; gap: 2px; background: var(--surface-2);
+              border: 0.5px solid var(--border); border-radius: var(--r);
+              padding: 2px; }
+.sub-switch a { font-size: 12px; padding: 5px 12px; border-radius: 4px;
+                color: var(--text2); text-decoration: none; white-space: nowrap; }
+.sub-switch a:hover { color: var(--text); }
+.sub-switch a.is-on { background: var(--surface); color: var(--text);
+                      font-weight: 600; }
+
+.stu-card { display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+            padding: 16px 18px; margin-bottom: 10px; }
+/* Не приступавшие — приглушённо: это не работа, это её отсутствие. */
+.stu-card.is-idle { opacity: .62; }
+.stu-main { flex: 1; min-width: 180px; }
+.stu-name { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
+.stu-meta { font-size: 12px; color: var(--text2); }
+.stu-state { font-size: 12px; color: var(--text2); margin-top: 3px; }
+
+/* Крупно — то, что машина УЖЕ насчитала. Это единственное число, ради
+   которого репетитор смотрит на карточку до того, как открыл работу. */
+.stu-score { text-align: center; min-width: 84px; }
+.stu-score-value { font-size: 26px; font-weight: 600; line-height: 1.1;
+                   font-variant-numeric: tabular-nums; }
+.stu-score-cap { font-size: 11px; color: var(--text3); line-height: 1.3;
+                 display: block; margin-top: 2px; }
+
+@media (max-width: 560px) {
+  .stu-card { align-items: stretch; }
+  .stu-score { text-align: left; }
+  .stu-card .k-btn { width: 100%; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="crumbs">
+  <a href="{% url 'teacher:groups' %}">Группы</a> →
+  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a> →
+  <a href="{% url 'teacher:group_assignment' group.pk assignment.pk %}">{{ assignment.name }}</a> →
+  решения
+</div>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ assignment.name }}</h1>
+    <div class="page-sub">Кто что сдал и что осталось проверить.</div>
+  </div>
+  <div class="sub-switch">
+    <a href="?view=students" class="is-on">по ученикам</a>
+    <a href="?view=problems">по задачам</a>
+  </div>
+</div>
+
+{% comment %}
+Пояснение — одной тихой строкой. Раньше это была плашка на три строки, и она
+занимала верх экрана каждый раз, хотя читается один раз в жизни.
+{% endcomment %}
+<div class="k-hint" style="margin-bottom:16px">
+  Тесты и утверждённые задачи оценены автоматически — вам остаются
+  открытые задачи.
+</div>
+
+{% for card in cards %}
+<div class="k-card stu-card {% if card.pending %}k-card--calls{% endif %}{% if card.state == 'not_started' %} is-idle{% endif %}">
+  <div class="stu-main">
+    <div class="stu-name">{{ card.student.get_full_name|default:card.student.username }}</div>
+    <div class="stu-meta">
+      сдал {{ card.submitted }} из {{ card.total }}{% if card.submitted_human %} · {{ card.submitted_human }}{% endif %}
+    </div>
+    <div class="stu-state">{{ card.state_label }}</div>
+  </div>
+
+  {% if card.has_machine %}
+  <div class="stu-score">
+    <div class="stu-score-value">{{ card.machine_got }} / {{ card.machine_could }}</div>
+    <span class="stu-score-cap">машина уже насчитала</span>
+  </div>
+  {% endif %}
+
+  <a class="k-btn {% if card.button.kind == 'main' %}k-btn--main{% else %}k-btn--plain{% endif %}"
+     href="{{ card.button.url }}">{{ card.button.label }}</a>
+</div>
+{% empty %}
+<div class="empty-state">
+  <p>Задание никому не выдано.</p>
+</div>
+{% endfor %}
+{% endblock %}

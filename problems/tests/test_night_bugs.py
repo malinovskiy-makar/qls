@@ -170,9 +170,11 @@ class Bug78TitlesTests(TestCase):
                                   problem=problem, problem_item=item,
                                   status='submitted')
         self.client.force_login(tutor)
+        # ⚠️ Названия задач живут в виде «по задачам». С фазы 12 сводка по
+        # умолчанию открывается видом «по ученикам», где задач нет вовсе.
         body = self.client.get(
-            reverse('teacher:group_submissions',
-                    args=[group.pk, work.pk])).content.decode()
+            reverse('teacher:group_submissions', args=[group.pk, work.pk])
+            + '?view=problems').content.decode()
         self.assertIn('Фирма выпускает', body)
         self.assertNotIn('Задача #%d' % problem.pk, body)
 
@@ -538,3 +540,113 @@ class AssignmentGroupingTests(TestCase):
             reverse('teacher:group_detail', args=[self.group.pk])
             + '?tab=assignments').content.decode()
         self.assertIn('средний балл', body)
+
+
+class SubmissionsByStudentTests(TestCase):
+    """Фаза 12 — сводка решений карточками по ученикам."""
+
+    def setUp(self):
+        self.tutor = make_user('sbs_tutor', role='teacher')
+        self.a = make_user('sbs_a', role='student')
+        self.b = make_user('sbs_b', role='student')
+        self.c = make_user('sbs_c', role='student')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        for s in (self.a, self.b, self.c):
+            self.group.students.add(s)
+        self.work = Assignment.objects.create(name='ДЗ', author=self.tutor,
+                                              group=self.group)
+        self.work.students.set([self.a, self.b, self.c])
+        self.items = [
+            AssignmentItem.objects.create(
+                assignment=self.work, order=i,
+                catalog_problem=make_problem('Условие %d' % i),
+                points=Decimal('3'))
+            for i in range(2)]
+        self.client.force_login(self.tutor)
+
+    def _url(self, query='?view=students'):
+        return reverse('teacher:group_submissions',
+                       args=[self.group.pk, self.work.pk]) + query
+
+    def _cards(self):
+        return {c['student'].username: c
+                for c in self.client.get(self._url()).context['cards']}
+
+    def _submit(self, student, item, status='submitted', score=None,
+                by_machine=True):
+        from problems.models import TeacherFeedback
+
+        sub = Submission.objects.create(
+            student=student, assignment=self.work, problem_item=item,
+            status=status, submitted_at=timezone.now())
+        if score is not None:
+            TeacherFeedback.objects.create(
+                submission=sub, score=Decimal(str(score)),
+                reviewed_by=None if by_machine else self.tutor)
+        return sub
+
+    def test_one_card_per_student(self):
+        cards = self._cards()
+        self.assertEqual(len(cards), 3)
+
+    def test_not_started_card(self):
+        card = self._cards()['sbs_c']
+        self.assertEqual(card['state'], 'not_started')
+        self.assertEqual(card['button']['label'], 'Написать')
+        self.assertEqual(card['button']['kind'], 'quiet')
+
+    def test_pending_card_offers_checking(self):
+        self._submit(self.a, self.items[0])
+        card = self._cards()['sbs_a']
+        self.assertEqual(card['state'], 'partial')
+        self.assertEqual(card['button']['kind'], 'main')
+        self.assertIn('Проверить 1 задачу', card['button']['label'])
+
+    def test_button_leads_to_the_first_unchecked(self):
+        self._submit(self.a, self.items[0], status='reviewed', score=3)
+        pending = self._submit(self.a, self.items[1])
+        card = self._cards()['sbs_a']
+        self.assertIn(str(pending.pk), card['button']['url'])
+
+    def test_all_checked_card(self):
+        for item in self.items:
+            self._submit(self.a, item, status='reviewed', score=3)
+        card = self._cards()['sbs_a']
+        self.assertEqual(card['state'], 'checked')
+        self.assertEqual(card['button']['label'], 'Смотреть работу')
+
+    def test_machine_score_counts_only_machine_marks(self):
+        """«Машина уже насчитала» — только машинные проверки.
+
+        Оценку человека сюда мешать нельзя: подпись перестала бы быть
+        правдой ровно в тот момент, когда репетитор поставит первый балл.
+        """
+        self._submit(self.a, self.items[0], status='reviewed', score=3)
+        self._submit(self.a, self.items[1], status='reviewed', score=2,
+                     by_machine=False)
+        card = self._cards()['sbs_a']
+        self.assertEqual(card['machine_got'], '3')
+        self.assertEqual(card['machine_could'], '3')
+
+    def test_order_is_the_work_queue(self):
+        """Сначала требующие проверки, потом проверенные, в конце пустые."""
+        self._submit(self.a, self.items[0])                       # ждёт
+        self._submit(self.b, self.items[0], status='reviewed', score=3)
+        cards = self.client.get(self._url()).context['cards']
+        self.assertEqual([c['student'].username for c in cards],
+                         ['sbs_a', 'sbs_b', 'sbs_c'])
+
+    def test_view_choice_is_remembered(self):
+        self.client.get(self._url('?view=problems'))
+        # Без параметра должен открыться запомненный вид «по задачам».
+        response = self.client.get(self._url(''))
+        self.assertContains(response, 'по задачам')
+        self.assertContains(response, 'is-on')
+        self.assertNotIn('cards', response.context)
+
+    def test_both_views_offer_the_switch_back(self):
+        by_student = self.client.get(self._url('?view=students')).content.decode()
+        by_problem = self.client.get(self._url('?view=problems')).content.decode()
+        for body in (by_student, by_problem):
+            self.assertIn('?view=students', body)
+            self.assertIn('?view=problems', body)

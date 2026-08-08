@@ -11,7 +11,17 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 24px;
+  flex-wrap: wrap;
 }
+.page-header .sub-switch { margin-left: auto; }
+.sub-switch { display: flex; gap: 2px; background: var(--surface-2);
+              border: 0.5px solid var(--border); border-radius: var(--r);
+              padding: 2px; }
+.sub-switch a { font-size: 12px; padding: 5px 12px; border-radius: 4px;
+                color: var(--text2); text-decoration: none; white-space: nowrap; }
+.sub-switch a:hover { color: var(--text); }
+.sub-switch a.is-on { background: var(--surface); color: var(--text);
+                      font-weight: 600; }
 .btn-back {
   color: var(--text2);
   text-decoration: none;
@@ -111,6 +121,17 @@
     <a href="{% url 'teacher:dashboard' %}" class="btn-back">← Назад</a>
   {% endif %}
   <h1 class="page-title">{{ assignment.name }}</h1>
+  {% if group %}
+  {% comment %}
+  Переключатель вида. Тот же, что в виде «по ученикам»: без него из таблицы
+  нельзя вернуться обратно, а выбор запоминается в сессии — значит человек
+  застрял бы в ней навсегда.
+  {% endcomment %}
+  <div class="sub-switch">
+    <a href="?view=students">по ученикам</a>
+    <a href="?view=problems" class="is-on">по задачам</a>
+  </div>
+  {% endif %}
 </div>
 
 {% if group %}
@@ -121,9 +142,9 @@
 </div>
 {% endif %}
 
-<div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:var(--r);padding:10px 14px;font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:18px;">
-  Тестовые задачи оценены автоматически сразу при сдаче — их баллы уже видны.
-  Открытые задачи ждут вашей оценки.
+<div class="k-hint" style="margin-bottom:18px">
+  Тесты и утверждённые задачи оценены автоматически — вам остаются
+  открытые задачи.
 </div>
 
 <div class="filter-tabs">
