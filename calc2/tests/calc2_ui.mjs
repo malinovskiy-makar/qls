@@ -978,6 +978,50 @@ await t('печать слэша даёт дробь, крышки — степ�
   return r2.replace(/\s/g, '') === 'Q^(2)' || 'степень: ' + r2;
 });
 
+/* ── Русская раскладка ────────────────────────────────────────────────
+   MathLive не находит кириллическую раскладку в своих таблицах и переходит на
+   запасной путь, где читает ФИЗИЧЕСКИЙ код клавиши. Точка в русской раскладке
+   сидит на той же клавише, где слэш в английской, — и вместо «0.5» получалась
+   дробь. Проверяем настоящими событиями клавиатуры через CDP: обычный
+   page.keyboard задать key и code по отдельности не умеет. */
+const cdp = await page.context().newCDPSession(page);
+const rawKey = async (key, code, vk) => {
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, text: key,
+                                             windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code,
+                                             windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
+};
+const clearFormula = async () => {
+  await page.evaluate(() => { const m = document.getElementById('inp-formula')._mf; m.value = ''; m.focusField(); });
+  await page.waitForTimeout(150);
+};
+
+await t('русская точка остаётся точкой, а не дробью', async () => {
+  const has = await page.evaluate(() => !!document.getElementById('inp-formula')._mf);
+  if (!has) return true;                       // без MathLive поле обычное, проверять нечего
+  await clearFormula();
+  await rawKey('0', 'Digit0', 48);
+  await rawKey('.', 'Slash', 191);             // русская раскладка: точка на клавише слэша
+  await rawKey('5', 'Digit5', 53);
+  await page.waitForTimeout(220);
+  const r = await page.evaluate(() => ({ tex: document.getElementById('inp-formula')._mf.value,
+                                         txt: document.getElementById('inp-formula').value }));
+  if (/frac/.test(r.tex)) return 'вышла дробь: ' + r.tex;
+  return r.txt.replace(/\s/g, '') === '0.5' || 'в поле: ' + r.txt;
+});
+
+await t('настоящий слэш по-прежнему даёт дробь', async () => {
+  const has = await page.evaluate(() => !!document.getElementById('inp-formula')._mf);
+  if (!has) return true;
+  await clearFormula();
+  await rawKey('1', 'Digit1', 49);
+  await rawKey('/', 'Slash', 191);
+  await rawKey('2', 'Digit2', 50);
+  await page.waitForTimeout(220);
+  const tex = await page.evaluate(() => document.getElementById('inp-formula')._mf.value);
+  return /frac/.test(tex) || 'дроби нет: ' + tex;
+});
+
 await t('конструктор кусочной собирает верную запись', async () => {
   await page.evaluate(() => {
     const kb = document.querySelector('.mkbd.open') || document.querySelector('.mkbd');
