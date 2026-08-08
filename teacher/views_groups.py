@@ -325,7 +325,7 @@ def group_assignment_detail(request, group_id, assignment_id):
 
     comments = (ProblemComment.objects.visible_for(request.user)
                 .filter(assignment=assignment)
-                .select_related('author'))
+                .select_related('author', 'assignment', 'assignment__group'))
     by_item = {}
     for comment in comments:
         # Пометка видимости считается ЗДЕСЬ, один раз на комментарий: шаблон

@@ -151,16 +151,20 @@
     оставалось некрашеным, а кнопка отправляла всю домашку.
     {% endcomment %}
     <div class="pf-comments" data-item="{{ row.item.pk }}">
+      <div class="pf-comments-cap">Переписка по задаче</div>
       <div class="pf-comment-list">
         {% for comment in row.comments %}
-        <div class="pf-comment">
+        <div class="pf-comment {% if not comment.by_tutor %}pf-comment--student{% endif %}">
           <div class="pf-comment-head">
-            <strong>{{ comment.author.get_full_name|default:comment.author.username }}</strong>
-            · {{ comment.created_at|date:"d.m.Y H:i" }}
-            {# Пометку считает модель — та же, что на экране репетитора. #}
-            {% if comment.note %} · {{ comment.note }}{% endif %}
+            <span class="pf-comment-author">{{ comment.author.get_full_name|default:comment.author.username }}</span>
+            <span class="pf-comment-when">{{ comment.created_at|date:"d.m.Y H:i" }}</span>
+            {% comment %}
+            Пометку считает модель — та же, что на экране репетитора,
+            и ставится она ТОЛЬКО у исключений.
+            {% endcomment %}
+            {% if comment.note %}<span class="pf-comment-note">{{ comment.note }}</span>{% endif %}
           </div>
-          <div>{{ comment.text|linebreaksbr }}</div>
+          <div class="pf-comment-text">{{ comment.text|linebreaksbr }}</div>
         </div>
         {% empty %}
         <div class="pf-comment-empty">Вопросов пока нет.</div>

@@ -271,6 +271,24 @@ class ProblemComment(models.Model):
     def __str__(self):
         return f'{self.author}: {self.text[:40]}'
 
+    @property
+    def by_tutor(self):
+        """Написано преподавателем.
+
+        Нужно ровно для одного — отличить на экране реплику преподавателя от
+        реплики ученика. Признак считается ПО РОЛИ В ЭТОЙ РАБОТЕ, а не по
+        `User.role`: автор домашки и преподаватель группы это и есть здешний
+        преподаватель, кем бы он ни был записан в профиле.
+
+        Требует `select_related('assignment', 'assignment__group')`, иначе
+        выйдет запрос на каждое сообщение.
+        """
+        assignment = self.assignment
+        if assignment.author_id == self.author_id:
+            return True
+        group = assignment.group
+        return group is not None and group.teacher_id == self.author_id
+
     def note_for(self, viewer):
         """Пометка видимости для читающего — или пустая строка.
 

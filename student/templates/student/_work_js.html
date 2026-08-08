@@ -79,13 +79,31 @@ function showHint(itemPk) {
       var list = block.closest('.pf-comments').querySelector('.pf-comment-list');
       var empty = list.querySelector('.pf-comment-empty');
       if (empty) { empty.remove(); }
+      // Свежее сообщение собираем ТЕМИ ЖЕ классами, что и остальные:
+      // иначе оно выглядело бы иначе до перезагрузки страницы. Пишет
+      // ученик — значит подложка.
       var wrap = document.createElement('div');
-      wrap.className = 'pf-comment';
+      wrap.className = 'pf-comment pf-comment--student';
       var head = document.createElement('div');
       head.className = 'pf-comment-head';
-      head.textContent = data.author + ' · ' + data.created_at +
-        ' · только вы и преподаватель';
+      var who = document.createElement('span');
+      who.className = 'pf-comment-author';
+      who.textContent = data.author;
+      var when = document.createElement('span');
+      when.className = 'pf-comment-when';
+      when.textContent = data.created_at;
+      head.appendChild(who);
+      head.appendChild(when);
+      // Пометку считает СЕРВЕР — иначе она разошлась бы с той, что
+      // нарисована у остальных сообщений.
+      if (data.note) {
+        var note = document.createElement('span');
+        note.className = 'pf-comment-note';
+        note.textContent = data.note;
+        head.appendChild(note);
+      }
       var body = document.createElement('div');
+      body.className = 'pf-comment-text';
       body.textContent = data.text;
       wrap.appendChild(head);
       wrap.appendChild(body);

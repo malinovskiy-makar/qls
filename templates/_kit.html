@@ -37,7 +37,8 @@
    вручную», хотя снимать там нечего. Правило нужно всем элементам набора,
    у которых мы задаём display. */
 .k-btn[hidden], .k-tile[hidden], .k-state[hidden], .k-sep[hidden],
-.k-card[hidden], .k-score[hidden], .k-row[hidden], .k-stack[hidden] {
+.k-card[hidden], .k-score[hidden], .k-row[hidden], .k-stack[hidden],
+.k-select-wrap[hidden] {
   display: none;
 }
 
@@ -210,6 +211,13 @@
               white-space: nowrap; }
 .k-sep__line { flex: 1; border-top: 1px dashed var(--border);
                min-width: 20px; }
+/* Весомый вариант: разделяет не строки, а ЗАНЯТИЯ. Настройка проверки и
+   разговор с учеником — разные дела, и тонкий пунктир с мелкой серой
+   подписью оказался самым бледным элементом карточки. */
+.k-sep--loud { margin: 26px 0 14px; }
+.k-sep--loud .k-sep__cap { font-size: 13px; font-weight: 700;
+                           color: var(--text); }
+.k-sep--loud .k-sep__line { border-top-style: solid; }
 
 /* ── Мелочи, нужные во многих экранах ───────────────────────────────── */
 .k-quiet { font-size: 12px; color: var(--text3); }

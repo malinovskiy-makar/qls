@@ -417,24 +417,25 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
   после эталона, без границы, и в одной карточке подряд шли четыре разных
   занятия: читать условие, задавать балл, настраивать проверку, переписываться.
   {% endcomment %}
-  <div class="k-sep"><span class="k-sep__cap">Переписка по задаче</span>
+  <div class="k-sep k-sep--loud">
+    <span class="k-sep__cap">Переписка по задаче</span>
     <span class="k-sep__line"></span></div>
   <div class="comments" data-item="{{ row.item.pk }}">
     <div class="comment-list">
       {% for comment in row.comments %}
-      <div class="comment">
+      <div class="comment {% if not comment.by_tutor %}comment--student{% endif %}">
         <div class="comment-head">
           <span class="comment-author">{{ comment.author.get_full_name|default:comment.author.username }}</span>
-          · {{ comment.created_at|date:"d.m.Y H:i" }}
+          <span class="comment-when">{{ comment.created_at|date:"d.m.Y H:i" }}</span>
           {% comment %}
           Пометка ставится ТОЛЬКО у исключений: обычный комментарий виден
           всей группе, и подписывать это под каждым сообщением значит писать
           одно и то же снова и снова. Текст пометки считает модель —
           `note_for` знает и про адресата, и про заметку для себя.
           {% endcomment %}
-          {% if comment.note %} · <span class="comment-private">{{ comment.note }}</span>{% endif %}
+          {% if comment.note %}<span class="comment-private">{{ comment.note }}</span>{% endif %}
         </div>
-        <div>{{ comment.text|linebreaksbr }}</div>
+        <div class="comment-text">{{ comment.text|linebreaksbr }}</div>
       </div>
       {% empty %}
       <div class="row-meta comment-empty">Комментариев пока нет.</div>
@@ -541,15 +542,30 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
           const list = form.closest('.comments').querySelector('.comment-list');
           const empty = list.querySelector('.comment-empty');
           if (empty) { empty.remove(); }
+          // Свежее сообщение собираем ТЕМИ ЖЕ классами, что и остальные:
+          // иначе оно выглядело бы иначе до перезагрузки страницы.
           const block = document.createElement('div');
-          block.className = 'comment';
+          block.className = 'comment';   // пишет преподаватель — без подложки
           const head = document.createElement('div');
           head.className = 'comment-head';
+          const who = document.createElement('span');
+          who.className = 'comment-author';
+          who.textContent = data.author;
+          const when = document.createElement('span');
+          when.className = 'comment-when';
+          when.textContent = data.created_at;
+          head.appendChild(who);
+          head.appendChild(when);
           // Пометку считает СЕРВЕР (`ProblemComment.note_for`) — иначе она
           // разошлась бы с той, что нарисована у остальных сообщений.
-          head.textContent = data.author + ' · ' + data.created_at +
-            (data.note ? ' · ' + data.note : '');
+          if (data.note) {
+            const note = document.createElement('span');
+            note.className = 'comment-private';
+            note.textContent = data.note;
+            head.appendChild(note);
+          }
           const body = document.createElement('div');
+          body.className = 'comment-text';
           body.textContent = data.text;   // textContent, не innerHTML: текст чужой
           block.appendChild(head);
           block.appendChild(body);

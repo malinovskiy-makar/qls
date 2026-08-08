@@ -523,7 +523,8 @@ def build_rows(assignment, student, user=None, with_comments=True):
     if with_comments and items:
         for comment in (ProblemComment.objects.visible_for(user)
                         .filter(assignment=assignment)
-                        .select_related('author')):
+                        .select_related('author', 'assignment',
+                                        'assignment__group')):
             # Пометка видимости — ТА ЖЕ функция, что у репетитора. Два
             # места, решающих «как это подписать», разошлись бы, и один
             # экран говорил бы про сообщение не то, что соседний.
