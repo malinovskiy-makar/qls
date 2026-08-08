@@ -169,6 +169,17 @@ class Command(BaseCommand):
             item["katex_new"] = r["errors_new"]
             if r["errors_new"] > r["errors_old"] and "katex_errors_up" not in item["flags"]:
                 item["flags"].append("katex_errors_up")
+            # Второй режим поломки: неизвестная команда внутри разобравшейся
+            # формулы. Узла .katex-error она не создаёт, поэтому до
+            # 2026-08-08 замер её не видел вовсе (решение Notion
+            # 3b6b11c92bc181839c18ddaceb1e19f3). Старые render_result.json
+            # этих полей не содержат — тогда признак просто не считается.
+            item["red_old"] = r.get("red_old")
+            item["red_new"] = r.get("red_new")
+            if (r.get("red_new") is not None
+                    and r["red_new"] > r["red_old"]
+                    and "katex_red_macro_up" not in item["flags"]):
+                item["flags"].append("katex_red_macro_up")
 
     # ── отчёт ───────────────────────────────────────────────────────────
 
@@ -216,8 +227,9 @@ class Command(BaseCommand):
         lines.append("|---|---:|")
         for key in ("bare_table_markup", "raw_latex_noslash", "shrunk_15",
                     "bad_start", "collapsed_to_stub", "lost_list_header",
-                    "katex_errors_up"):
-            mark = "" if has_render or key != "katex_errors_up" else " *(рендер не прогонялся)*"
+                    "katex_errors_up", "katex_red_macro_up"):
+            mark = ("" if has_render or not key.startswith("katex_")
+                    else " *(рендер не прогонялся)*")
             lines.append("| {}{} | {} |".format(labels[key], mark, by_flag.get(key, 0)))
         lines.append("")
 
