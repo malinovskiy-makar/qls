@@ -59,6 +59,12 @@ def work_summary(assignment, student, viewer=None):
             row['state'] = 'correct'
         elif score > 0:
             row['state'] = 'partial'
+        elif _is_blank(row):
+            # ⚠️ НОЛЬ ЗА ПУСТОТУ — ЭТО НЕ «НЕВЕРНО». Балл одинаковый (ноль
+            # за «не брался» и ноль за ошибку не различаются — решение
+            # владельца), но писать «неверно» тому, кто ничего не отвечал,
+            # неправда: ошибиться он не успел.
+            row['state'] = 'blank'
         else:
             row['state'] = 'wrong'
 
@@ -84,6 +90,13 @@ def work_summary(assignment, student, viewer=None):
         'reviewed_by_teacher': by_teacher,
         'work_comment': work_comment,
     }
+
+
+def _is_blank(row):
+    """Ноль поставлен машиной за пустоту. Признак общий с экраном проверки."""
+    from . import part_grading
+
+    return part_grading.is_auto_zero(row['sub'], row.get('answer_parts'))
 
 
 def _item_max(item, row):

@@ -143,8 +143,15 @@ def save_part_answers(submission, item, values):
         key = part.pk if part is not None else None
         given = (values.get(key) or '').strip()
         ok, score, part_max = grade_part(item, part, given, len(parts))
+        # ⚠️ НЕ НАПИСАНО НИЧЕГО — ЭТО НОЛЬ ЗА ПУСТОТУ, А НЕ ЗА ОШИБКУ, И
+        # УТВЕРЖДЁННЫЙ ЭТАЛОН ЭТОГО НЕ МЕНЯЕТ. Проверка стояла на `score is
+        # None`, то есть срабатывала только там, где машина СУДИТЬ НЕ МОГЛА.
+        # Стоило репетитору утвердить эталон — и ученик, не написавший ни
+        # строчки, получал «неверно, правильный ответ: 5000» вместо «ответа
+        # не было». Балл одинаковый, но это разные вещи, и ошибиться он не
+        # успел.
         auto_zero = False
-        if score is None and not given and not has_text:
+        if not given and not has_text:
             ok, score, auto_zero = False, Decimal('0'), True
         maximum += part_max
         if score is not None:
@@ -266,13 +273,93 @@ def apply_to_submission(submission, item, values):
     return scored, maximum, pending
 
 
+# Что машина пишет за позицию, по которой ученик не написал ничего.
+# Одна строка на все экраны: по ней же `teacher/views.py::_is_auto_zero`
+# отличает ноль за пустоту от нуля за ошибку у задач без пунктов.
+BLANK_COMMENT = 'Ноль поставлен автоматически: ответа не было.'
+
+
+def is_auto_zero(submission, part_rows=None):
+    """Ноль поставлен машиной ЗА ПУСТОТУ, а не за ошибку.
+
+    Ноль тут и там ОДИН И ТОТ ЖЕ (решение владельца: «не брался» и
+    «написал ерунду» считаются одинаково) — различается только подпись на
+    экране. Писать «неверно» тому, кто ничего не отвечал, — неправда.
+
+    Два источника признака, потому что путей проверки два: у задачи с
+    пунктами это отметка `auto_zero` на каждом пункте, у теста и своей
+    задачи репетитора — комментарий машины.
+    """
+    if part_rows:
+        return all(row.get('auto_zero') for row in part_rows)
+    feedback = getattr(submission, 'feedback', None)
+    if feedback is None or feedback.reviewed_by_id is not None:
+        return False
+    return (feedback.comment or '').strip() == BLANK_COMMENT
+
+
+def close_blank_position(submission, item):
+    """Закрыть НОЛЁМ позицию, по которой не написано ничего.
+
+    ⚠️ ЗАЧЕМ. Правило «пусто и в ответе, и в решении, и файла нет → ноль
+    ставит машина» работало только для позиций, которые ученик хотя бы
+    открыл. Приём работы (`student/views.py::accept_answers`) пропускал
+    пустую позицию ЦЕЛИКОМ — `continue` до всякой проверки, — и она
+    оставалась в состоянии «не начата»: на экране прочерк вместо балла,
+    в очередь проверки не попадает, в сумму не входит. Худшее из двух:
+    балла нет, и увидеть позицию тоже нельзя.
+
+    Ноль за «не брался» и ноль за «написал ерунду» — ОДИН И ТОТ ЖЕ НОЛЬ,
+    отдельного поля для различия нет (решение владельца). Отличается
+    только комментарий машины: писать «неверно, правильный ответ …» тому,
+    кто ничего не отвечал, — неправда.
+
+    Возвращает True, если что-то изменилось.
+    """
+    from django.utils import timezone
+
+    from .models import TeacherFeedback
+
+    if submission.status in ('submitted', 'reviewed'):
+        return False
+    if (submission.submitted_answer or '').strip() or wrote_anything(submission):
+        # Что-то написано — это не пустая позиция, её принимает обычный путь.
+        return False
+
+    submission.status = 'submitted'
+    submission.submitted_at = submission.submitted_at or timezone.now()
+    submission.save()
+
+    if applies(item):
+        # Открытая задача — через обычную сборку по пунктам: она сама
+        # проставит `auto_zero` каждому пункту и напишет верный комментарий.
+        values = {(part.pk if part is not None else None): ''
+                  for part in answer_parts(item)}
+        apply_to_submission(submission, item, values)
+        submission.save()
+        return True
+
+    # Тест и своя задача репетитора идут мимо пунктов — балл пишем здесь.
+    feedback = getattr(submission, 'feedback', None)
+    if feedback is None:
+        TeacherFeedback.objects.create(submission=submission, score=0,
+                                       comment=BLANK_COMMENT, reviewed_by=None)
+    elif not feedback.reviewed_by_id:
+        feedback.score = 0
+        feedback.comment = BLANK_COMMENT
+        feedback.save(update_fields=['score', 'comment'])
+    submission.status = 'reviewed'
+    submission.save()
+    return True
+
+
 def _auto_comment(item, submission):
     """Что машина пишет ученику: по пунктам, а не одним вердиктом."""
     rows = part_rows(item, submission)
     # Работа пустая целиком — говорим об этом прямо, а не «неверно,
     # правильный ответ …». Ученик ничего не отвечал, и «неверно» тут ложь.
     if rows and all(row['auto_zero'] for row in rows):
-        return 'Ноль поставлен автоматически: ответа не было.'
+        return BLANK_COMMENT
     if len(rows) == 1 and rows[0]['part'] is None:
         row = rows[0]
         if row['is_correct']:

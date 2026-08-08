@@ -260,13 +260,15 @@ def _max_score_for(submission):
 
 
 def _is_auto_zero(submission, part_rows):
-    """Ноль поставлен машиной ЗА ПУСТОТУ, а не за ошибку (правило фазы 3)."""
-    if part_rows:
-        return all(row.get('auto_zero') for row in part_rows)
-    feedback = getattr(submission, 'feedback', None)
-    if feedback is None or feedback.reviewed_by_id is not None:
-        return False
-    return 'автоматически' in (feedback.comment or '')
+    """Ноль поставлен машиной ЗА ПУСТОТУ, а не за ошибку (правило фазы 3).
+
+    Признак живёт в `part_grading` — им пользуется и разбор работы. Два
+    места, решающих один вопрос, разъехались бы, и один экран писал бы
+    «без ответа», а соседний «неверно» про одну и ту же задачу.
+    """
+    from problems import part_grading
+
+    return part_grading.is_auto_zero(submission, part_rows)
 
 
 def _solution_without_answer(submission):

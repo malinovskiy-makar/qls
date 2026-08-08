@@ -138,6 +138,7 @@ class Command(BaseCommand):
         self._solutions_and_graph(homework, graph)
         self._partly_correct_submission(homework, students[1], costs)
         self._submitted_tests(homework, students[0])
+        self._four_states(homework, students[0], catalog, custom, costs, now)
         self._parent_links(tutor, students)
         self._history(students, now)
         self._finished_exam(tutor, group, students, now)
@@ -425,15 +426,9 @@ class Command(BaseCommand):
         items[0].solution_visible_after = SolutionVisibility.SUBMIT
         items[0].save()
 
-        # Один ученик уже сдал первую задачу — чтобы дашборд репетитора не
-        # был пустым и было что проверять.
-        Submission.objects.get_or_create(
-            student=students[0], assignment=homework,
-            problem=catalog[0],
-            defaults={'problem_item': items[0],
-                      'submitted_answer': '30',
-                      'solution_text': 'Приравнял спрос и предложение.',
-                      'status': 'submitted', 'submitted_at': now})
+        # Сданные работы первого ученика собирает `_four_states`: там они
+        # стоят все рядом и видно, что состояний ровно четыре. Здесь их
+        # заводить нельзя — получилось бы два места, задающих одно и то же.
         return homework
 
     def _exam_window(self, tutor, group, students, catalog, catalog_tests,
@@ -700,6 +695,110 @@ class Command(BaseCommand):
         if made:
             self.stdout.write('  сданы демо-тесты (%d): на экране разбора '
                               'видны все четыре исхода варианта' % made)
+
+    def _four_states(self, homework, student, catalog, custom, costs, now):
+        """ЧЕТЫРЕ СОСТОЯНИЯ ПРОВЕРКИ НА ОДНОМ ЭКРАНЕ.
+
+        ⚠️ ЗАЧЕМ. Без этой сборки правило автонуля и янтарный вид карточки
+        нельзя было увидеть глазами вовсе: счётчик «Ждёт проверки» показывал
+        ноль, а неутверждённую позицию владелец получил только после того,
+        как снял утверждение руками. Демо обязано показывать всё, что умеет
+        продукт, иначе приёмка проверяет не продукт, а везение.
+
+        Состояния (все — у первого ученика, в одной домашке):
+
+        1. пусто и в ответе, и в решении → автоматический ноль, помечен
+           автоматическим, в очередь ручной проверки НЕ идёт;
+        2. ответ пуст, а решение написано → ЖДЁТ ЧЕЛОВЕКА (то самое
+           исключение, ради которого правило и писалось);
+        3. каталожная задача с НЕутверждённым эталоном → человеку же,
+           карточка позиции янтарная;
+        4. неверный ответ на задачу с эталоном → ноль, проверено машиной.
+
+        Метод ПЕРЕЗАПИСЫВАЕТ решения этого ученика в этой домашке: демо —
+        витрина, и её состояние задаётся здесь, а не накапливается от
+        случайных прогонов браузерных сценариев. Именно так в базе завелась
+        оценка «2 из 2» за неверный ответ `30`: её поставил ночной сценарий
+        проверки экрана, нажав кнопку «максимум».
+        """
+        from problems.assignment_rows import get_or_create_submission
+        from problems.models import TeacherFeedback
+        from problems.part_grading import close_blank_position
+        from student.views import grade_submission
+
+        by_problem = {}
+        for item in homework.items.select_related('catalog_problem',
+                                                  'custom_problem'):
+            key = ('c', item.catalog_problem_id) if item.catalog_problem_id \
+                else ('u', item.custom_problem_id)
+            by_problem[key] = item
+
+        elasticity = by_problem.get(('c', catalog[0].pk))
+        firm = by_problem.get(('c', catalog[1].pk))
+        own = by_problem.get(('u', custom.pk))
+        by_parts = by_problem.get(('c', costs.pk))
+        if not all([elasticity, firm, own, by_parts]):
+            return
+
+        # Чистим прошлое состояние ЭТОГО ученика в ЭТОЙ домашке. Оценки
+        # других учеников и других работ не трогаем.
+        wiped = Submission.objects.filter(assignment=homework, student=student,
+                                          problem_item__in=[elasticity, firm,
+                                                            own, by_parts])
+        TeacherFeedback.objects.filter(submission__in=wiped).delete()
+        wiped.update(status='not_started', submitted_answer='',
+                     solution_text='', submitted_at=None)
+
+        # Состояние 3: каталожная задача, эталон НЕ утверждён. Ответ неверный
+        # (`30` — это ответ на задачу про равновесие, а не про эластичность),
+        # но судить об этом машина не имеет права: в поле «ответ» каталога
+        # лежит фраза целиком, а не ответ.
+        for item in (elasticity, firm):
+            item.answer_override = None
+            item.save(update_fields=['answer_override'])
+        sub = get_or_create_submission(student, homework, elasticity)
+        sub.submitted_answer = '30'
+        sub.solution_text = 'Приравнял спрос и предложение.'
+        sub.status = 'submitted'
+        sub.submitted_at = now
+        sub.save()
+
+        # Состояние 2: ответа нет, а решение написано — ученик рассуждал,
+        # значит человеку есть что читать.
+        sub = get_or_create_submission(student, homework, firm)
+        sub.submitted_answer = ''
+        sub.solution_text = ('Постоянные не зависят от выпуска, переменные '
+                             'растут вместе с ним. Дальше запутался в '
+                             'единицах и не досчитал.')
+        sub.status = 'submitted'
+        sub.submitted_at = now
+        sub.save()
+
+        # Состояние 4: у своей задачи репетитора эталон писал он сам —
+        # машина проверяет сразу и ставит ноль за неверный ответ.
+        sub = get_or_create_submission(student, homework, own)
+        sub.submitted_answer = '-0,3'
+        sub.solution_text = 'Поделил проценты, кажется, не в ту сторону.'
+        sub.status = 'submitted'
+        sub.submitted_at = now
+        sub.save()
+        grade_submission(sub, own, values={None: sub.submitted_answer})
+
+        # Состояние 1: не написано НИЧЕГО. Эталон по пунктам утверждаем —
+        # иначе нечем показать, что утверждённая позиция считается сама.
+        by_parts.answer_override = {'': ''}
+        parts = list(by_parts.problem.parts.order_by('order')) \
+            if by_parts.problem else []
+        if len(parts) >= 2:
+            by_parts.answer_override = {str(parts[0].pk): '5000',
+                                        str(parts[1].pk): '50'}
+            by_parts.save(update_fields=['answer_override'])
+        sub = get_or_create_submission(student, homework, by_parts)
+        close_blank_position(sub, by_parts)
+
+        self.stdout.write('  собраны четыре состояния проверки: '
+                          'автоноль, решение-без-ответа, неутверждённый '
+                          'эталон, неверный ответ')
 
     def _parent_links(self, tutor, students):
         """Родитель связан с ДВУМЯ учениками — чтобы кабинет родителя было

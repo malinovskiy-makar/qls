@@ -47,6 +47,8 @@
 .wr-wrong   { border-left-color: var(--error); }
 .wr-pending { border-left-color: var(--amber); }
 .wr-empty   { border-left-color: var(--border); }
+/* Ноль за пустоту: балл ноль, но это не ошибка — цвета опасности нет. */
+.wr-blank   { border-left-color: var(--border); }
 .wr-item > summary { cursor: pointer; list-style: none; padding: 14px 18px;
                      display: flex; align-items: center; gap: 12px;
                      flex-wrap: wrap; }
@@ -65,6 +67,7 @@
 .flag-wrong   { background: var(--error-tint); color: var(--error); }
 .flag-pending { background: var(--amber-tint); color: var(--amber); }
 .flag-empty   { background: var(--chip-bg); color: var(--chip-text); }
+.flag-blank   { background: var(--chip-bg); color: var(--chip-text); }
 .wr-points { font-size: 16px; font-weight: 800; white-space: nowrap; }
 .wr-points small { font-size: 12px; font-weight: 600; color: var(--text2); }
 .wr-body { padding: 0 18px 18px; }
@@ -174,6 +177,8 @@
       {% else %}без ответа{% endif %}
     </span>
     <span class="wr-points">
+      {# Прочерк остался ровно там, где балла ещё НЕТ: задача не сдана или #}
+      {# ждёт преподавателя. Пустая задача сданной работы получает честный 0. #}
       {% if row.score is not None and show_scores or row.by_teacher %}{{ row.score|floatformat:"-2" }}{% else %}—{% endif %}<small> / {{ row.max_points|floatformat:"-2" }} б.</small>
     </span>
   </summary>

@@ -445,6 +445,7 @@ def accept_answers(request, assignment, student, source_item=None):
         items = [i for i in items if i.pk == source_item.pk]
 
     saved = 0
+    blank = []
     for item in items:
         sub = get_or_create_submission(student, assignment, item)
         if sub.status in ('submitted', 'reviewed'):
@@ -452,6 +453,10 @@ def accept_answers(request, assignment, student, source_item=None):
 
         answer, text, file = read_answer(request, item)
         if not (answer or text or file):
+            # Ничего не написано. Закрыть нолём можно только ПОСЛЕ того, как
+            # выяснится, что работа вообще отправлена: иначе случайное
+            # нажатие «Отправить» на пустой домашке раздало бы нули.
+            blank.append((sub, item))
             continue
 
         sub.submitted_answer = answer
@@ -465,6 +470,18 @@ def accept_answers(request, assignment, student, source_item=None):
         grade_submission(sub, item, request=request)
         saved += 1
         _log_submission_event(request, assignment, sub, item.problem)
+
+    # ⚠️ ПУСТЫЕ ПОЗИЦИИ ОТПРАВЛЕННОЙ РАБОТЫ ПОЛУЧАЮТ ЧЕСТНЫЙ НОЛЬ.
+    # Раньше они молча оставались «не начатыми»: на экране прочерк вместо
+    # балла, в очередь проверки не попадают, в сумму не входят. Отправка
+    # работы — это заявление «я закончил», и незаполненная задача в ней
+    # стоит ноль. Пустую работу целиком (saved == 0) не трогаем: она не
+    # отправлена, а значит и оценивать нечего.
+    if saved and source_item is None:
+        from problems import part_grading
+
+        for sub, item in blank:
+            part_grading.close_blank_position(sub, item)
 
     return saved
 

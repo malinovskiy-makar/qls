@@ -137,17 +137,47 @@ def section_marks(items):
 def part_max_score(item, part, parts_count):
     """Максимум баллов за пункт.
 
-    Свой балл пункта — если задан; иначе балл задачи делится поровну.
-    Делить нечего (балл задачи не задан) — считаем единицу, как везде.
+    ⚠️ БАЛЛ ПОЗИЦИИ — ЕДИНСТВЕННАЯ ПРАВДА, А `ProblemPart.points` — ТОЛЬКО
+    ВЕС ПУНКТА ВНУТРИ НЕЁ. Раньше балл пункта, если он был задан в
+    каталоге, брался КАК ЕСТЬ и молча перебивал то, что поставил репетитор:
+    демо-задача «Издержки фирмы» стоила на карточке 3 балла, а в сумме
+    работы — 2, потому что у обоих её пунктов в каталоге стоит по единице.
+    Крупная цифра на экране и итог работы расходились, а поле «максимум»
+    из фазы 4 запирало бы число, которым система не пользуется.
+
+    Каталог общий на всех репетиторов, позиция — решение конкретного
+    человека для конкретной работы; спорить им нельзя, и выигрывает
+    позиция. Веса при этом уважаются: если у «а» в каталоге стоит 1, а у
+    «б» — 3, то из пяти баллов позиции пункты возьмут 1,25 и 3,75.
+
+    Веса заданы не у всех пунктов — делим поровну: половина размеченных
+    весов означает, что размечавший до конца не дошёл, и достраивать за
+    него мы не имеем права.
     """
     from decimal import Decimal
 
-    if part is not None and part.points is not None:
-        return Decimal(part.points)
     total = item_max_score(item)
-    if parts_count <= 1:
+    if parts_count <= 1 or part is None:
         return total
-    return (total / Decimal(parts_count)).quantize(Decimal('0.01'))
+
+    parts = [p for p in answer_parts(item) if p is not None]
+    if len(parts) != parts_count:
+        return (total / Decimal(parts_count)).quantize(Decimal('0.01'))
+
+    weights = [p.points for p in parts]
+    if all(w is not None for w in weights) and sum(weights) > 0:
+        shares = [Decimal(w) / Decimal(sum(weights)) for w in weights]
+    else:
+        # Вес есть не у всех пунктов — делим поровну, а не достраиваем за
+        # того, кто размечал каталог и не дошёл до конца.
+        shares = [Decimal(1) / Decimal(parts_count)] * parts_count
+
+    # ⚠️ ОСТАТОК ОКРУГЛЕНИЯ ОТДАЁМ ПОСЛЕДНЕМУ ПУНКТУ. Иначе задача на 10
+    # баллов из трёх пунктов складывается в «9,99 б.» — ровно это и стояло
+    # на экране разбора работы.
+    values = [(total * share).quantize(Decimal('0.01')) for share in shares]
+    values[-1] = total - sum(values[:-1])
+    return values[parts.index(part)]
 
 
 def item_max_score(item):
