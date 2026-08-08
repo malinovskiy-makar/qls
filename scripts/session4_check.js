@@ -14,6 +14,7 @@
  */
 const { chromium } = require('playwright');
 const fs = require('fs');
+const { livePageCounterSource } = require('./katex_damage');
 
 const PORT = process.argv[2] || '8124';
 const BASE = 'http://127.0.0.1:' + PORT;
@@ -98,14 +99,18 @@ async function width(page) {
   // 2. Версия для печати.
   await page.goto(BASE + '/teacher/groups/2/assignments/6/print/?for=teacher',
                   { waitUntil: 'networkidle' });
+  // Считаем ОБА режима поломки: .katex-error и красноту неизвестной команды
+  // (см. scripts/katex_damage.js — второй режим узла .katex-error не создаёт).
+  const damage = await page.evaluate(livePageCounterSource());
   const printStats = await page.evaluate(() => ({
     katex: document.querySelectorAll('.katex').length,
-    katexErrors: document.querySelectorAll('.katex-error').length,
     quirks: document.compatMode !== 'CSS1Compat',
   }));
   check('на листке отрисованы формулы', printStats.katex > 0,
         'формул: ' + printStats.katex);
-  check('ошибок KaTeX на листке нет', printStats.katexErrors === 0);
+  check('ошибок KaTeX на листке нет', damage.errors === 0);
+  check('красных неизвестных команд на листке нет',
+        damage.redCandidates === 0, 'красных: ' + damage.redCandidates);
   check('страница НЕ в quirks mode (иначе KaTeX молчит)',
         !printStats.quirks);
   await page.screenshot({ path: SHOTS + '/print-teacher-live.png',
