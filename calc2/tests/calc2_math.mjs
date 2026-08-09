@@ -1121,6 +1121,33 @@ const CASES = [
              ['у каждой вершины крестик', 'verts', 3, 0]],
   },
   {
+    /* П40. Разбор построен как вопрос с ответом, и кусочная кривая его не
+       ломает. Контрольная КПВ «x < 50 ? 100 − x : 75 − 0.5x»: излом при 50,
+       пересечение с осью X при 150, издержки ПАДАЮТ с 1 до 0.5 — значит
+       кривая выпуклая, а не вогнутая (раньше всё, что не прямая, называлось
+       вогнутым, и подпись противоречила таблице под ней). */
+    name: 'Разбор · вопрос в начале абзаца и кусочная КПВ',
+    run: `resetSceneMemory(); openPicker(); pickScene('ppf'); closePicker();
+          var inp = document.getElementById('inp-ppf');
+          inp.value = 'y = x < 50 ? 100 - x : 75 - 0.5*x';
+          inp.dispatchEvent(new Event('input', { bubbles: true }));
+          document.getElementById('btn-ppf-apply').click();
+          var f = parsePpfEquation(STATE.ppfFormula).f;
+          var ex = document.getElementById('ex-body');
+          var qs = [].map.call(ex.querySelectorAll('p > b'), function (b) { return b.textContent; });
+          var withQ = qs.filter(function (s) { return /\\?$/.test(s.trim()); }).length;
+          var junk = /NaN|undefined|Infinity/.test(ex.textContent) ? 1 : 0;
+          return { f60: f(60), xmax: ppfXmaxOf(f),
+                   type: /выпуклая/.test(ppfTypeLabel()) ? 1 : 0,
+                   qs: qs.length, withQ: withQ, junk: junk };`,
+    checks: [['кусочная считается верно', 'f60', 45, 0.01],
+             ['и кончается там, где надо', 'xmax', 150, 0.5],
+             ['тип КПВ выпуклая, а не вогнутая', 'type', 1, 0],
+             ['абзацев с заголовком', 'qs', 3, 0],
+             ['и все начинаются вопросом', 'withQ', 3, 0],
+             ['мусора в разборе нет', 'junk', 0, 0]],
+  },
+  {
     /* П20, П51. При переходе между моделями настройки сбрасываются ВСЕГДА, а
        возврат в модель возвращает именно её изменения. Раньше площади,
        галочки заливок и цвета переживали смену сцены и всплывали в чужой
