@@ -242,7 +242,7 @@ function drawPpfCurve() {
       const lx = xm * 0.28, ly = evalPpf(lx) * 0.4;
       if (isFinite(ly) && ly > 0) {
         g.append('text').attr('x', sx(lx)).attr('y', sy(ly))
-          .attr('font-size', 11).attr('fill', c1).attr('opacity', 0.75).text('достижимо');
+          .attr('font-size', 11).attr('fill', c1).attr('opacity', 0.75).text('Достижимо');
       }
     }
   }
@@ -782,7 +782,7 @@ function renderPpfSumRows() {
     const inp = document.createElement('input');
     inp.type = 'text'; inp.id = 'inp-ppfsum-' + i;
     inp.value = ppfSumGet(i);
-    inp.placeholder = 'например: ' + (DEF[i] || 'y = 50 - x');
+    inp.placeholder = 'Например: ' + (DEF[i] || 'y = 50 - x');
     inp.autocomplete = 'off';
     inp.addEventListener('input', () => { ppfSumSet(i, inp.value.trim()); });
     inp.addEventListener('change', () => { STATE.ppfSumData = null; redrawAll(); });

@@ -414,7 +414,7 @@ function drawOpenLines() {
     const [px, py] = toPx(o.aut.Q, o.aut.P);
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
     g.append('text').attr('x', px + 7).attr('y', py - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('автаркия');
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Автаркия');
   }
   // Зона захвата мировой цены (перетаскивание линии Pw).
   const hit = g.append('rect').attr('x', ox).attr('y', yPw - 12).attr('width', xMax - ox).attr('height', 24)

@@ -190,14 +190,37 @@ await page.evaluate(() => { openPicker(); pickScene('costs'); closePicker(); });
 await page.waitForTimeout(400);
 
 await t('у пяти кривых издержек есть пикеры', async () => {
-  const n = await page.locator('#sec-costs input[type=color][data-col^="cost"]').count();
+  const n = await page.locator('#sec-costs .cpick[data-col^="cost"]').count();
   return n === 5 || `пикеров ${n}`;
 });
 
 await t('ключи цвета уникальны (MP ≠ MC и т.п.)', () => page.evaluate(() => {
-  const keys = [...document.querySelectorAll('input.swatch-pick[data-col]')].map(i => i.dataset.col);
+  const keys = [...document.querySelectorAll('.cpick[data-col]')].map(i => i.dataset.col);
   const dup = keys.filter((k, i) => keys.indexOf(k) !== i);
   return dup.length === 0 || 'дубли: ' + dup.join(',');
+}));
+
+/* --- П34: шесть предложенных цветов везде, где выбирают цвет ------------ */
+await t('в меню цвета шесть образцов и «Свой цвет»', () => page.evaluate(() => {
+  const btn = document.querySelector('.cpick[data-col="costMC"] .cpick-btn');
+  if (!btn) return 'кнопки цвета нет';
+  btn.click();
+  const menu = document.querySelector('.cpick-menu');
+  if (!menu) return 'меню не открылось';
+  const n = menu.querySelectorAll('.cpick-sw').length;
+  const own = !!menu.querySelector('.cpick-own input[type=color]');
+  const inBody = menu.parentElement === document.body;   // не обрезается панелью
+  closeColorMenu();
+  return (n === 6 && own && inBody) || `образцов ${n}, свой ${own}, в body ${inBody}`;
+}));
+
+await t('светлая и тёмная тема дают разные шесть цветов', () => page.evaluate(() => {
+  const root = document.documentElement, was = root.getAttribute('data-theme');
+  root.setAttribute('data-theme', 'light');  const light = paletteSix().join(',');
+  root.setAttribute('data-theme', 'dark');   const dark = paletteSix().join(',');
+  if (was) root.setAttribute('data-theme', was); else root.removeAttribute('data-theme');
+  refreshColors();
+  return (light !== dark && /#c74440/i.test(light)) || `светлая ${light} / тёмная ${dark}`;
 }));
 
 // Пикер лежит внутри <label class="chk"> рядом с галочкой. Проверяем, что клик по
@@ -205,10 +228,12 @@ await t('ключи цвета уникальны (MP ≠ MC и т.п.)', () => 
 // интерактивного элемента на элемент, к которому привязан label).
 await t('клик по пикеру не сбрасывает галочку кривой', () => page.evaluate(() => {
   const chk = document.getElementById('chk-mc');
-  const pick = document.querySelector('input[data-col="costMC"]');
+  const pick = document.querySelector('.cpick[data-col="costMC"] .cpick-btn');
   const before = chk.checked;
   pick.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-  return chk.checked === before || `галочка была ${before}, стала ${chk.checked}`;
+  const after = chk.checked;
+  closeColorMenu();
+  return after === before || `галочка была ${before}, стала ${after}`;
 }));
 
 await t('цвет MP не тянет за собой MC', () => page.evaluate(() => {

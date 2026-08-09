@@ -535,11 +535,11 @@ function drawLaborBilateral() {
   gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2)
     .attr('text-anchor', 'middle').attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.warn)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
-    .text('диапазон возможных исходов');
+    .text('Диапазон возможных исходов');
   gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2 + 15)
     .attr('text-anchor', 'middle').attr('font-size', 10.5).attr('fill', COL.inkSoft)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
-    .text('конкретная точка зависит от переговорной силы, а её модель не определяет');
+    .text('Конкретная точка зависит от переговорной силы, а её модель не определяет');
   // Две граничные точки: решение монопсониста и решение профсоюза.
   laborPoint(gg, b.Lm, b.Wm, COL.S, 'М', { lText: 'Lм=' + fmt(b.Lm), wText: null });
   laborPoint(gg, b.Lu, b.Wu, COL.MR, 'П', { lText: 'Lп=' + fmt(b.Lu), wText: null });

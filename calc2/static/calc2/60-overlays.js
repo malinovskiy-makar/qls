@@ -174,7 +174,7 @@ function renderMmRows() {
     const inp = document.createElement('input');
     inp.type = 'text'; inp.autocomplete = 'off';
     inp.value = mmGet(i);
-    inp.placeholder = i === 0 ? 'например: x^2' : 'например: 4 - x';
+    inp.placeholder = i === 0 ? 'Например: x^2' : 'Например: 4 - x';
     inp.setAttribute('aria-label', 'Функция ' + mmLabel(i));
     inp.addEventListener('input', () => { mmSet(i, inp.value); redrawAll(); });
     slot.appendChild(inp);
@@ -223,7 +223,7 @@ function buildGraphRow(curve) {
   const inp = document.createElement('input');
   inp.type = 'text'; inp.autocomplete = 'off';
   inp.value = curve ? curve.expr : '';
-  inp.placeholder = curve ? '' : 'например: x^2 - 4';
+  inp.placeholder = curve ? '' : 'Например: x^2 - 4';
   inp.setAttribute('aria-label', 'Формула функции');
   slot.appendChild(inp);
   row.appendChild(slot);
@@ -242,7 +242,7 @@ function buildGraphRow(curve) {
 
   const name = document.createElement('input');
   name.type = 'text'; name.className = 'grow-name';
-  name.placeholder = 'имя на графике';
+  name.placeholder = 'Имя на графике';
   name.value = (curve && curve.label) || '';
   name.addEventListener('input', () => {
     if (!row._curve) return;
@@ -476,8 +476,8 @@ function syncAreaColorList() {
   const sig = seen.map(e => e.key).join('|');
   if (box._sig === sig) {                       // набор тот же — только цвета
     seen.forEach(e => {
-      const p = box.querySelector('input[data-area="' + CSS.escape(e.key) + '"]');
-      if (p && document.activeElement !== p) p.value = normHex(e.color);
+      const p = box.querySelector('.cpick[data-area="' + CSS.escape(e.key) + '"]');
+      if (p && p._setValue) p._setValue(e.color);
     });
     return;
   }
@@ -492,8 +492,7 @@ function syncAreaColorList() {
       STATE.areaColor[e.key] = hex;
       redrawAll();
     }, 'Цвет области: ' + e.key);
-    const inp = pick.querySelector('input');
-    if (inp) inp.setAttribute('data-area', e.key);
+    pick.setAttribute('data-area', e.key);
     const lab = document.createElement('span');
     lab.className = 'ac-name'; lab.textContent = e.key;
     row.append(pick, lab);
@@ -1107,10 +1106,8 @@ function updateAreaCalcPanel() {
 
     const c1 = document.createElement('span');
     c1.className = 'area-what';
-    const pick = document.createElement('input');
-    pick.type = 'color'; pick.className = 'swatch-pick'; pick.value = normHex(r.color);
-    pick.title = 'Цвет площади';
-    pick.addEventListener('input', () => { r.color = pick.value; redrawAll(); });
+    // Шесть образцов, как и у всех остальных мест выбора цвета (П34).
+    const pick = makeColorPicker(r.color, (hex) => { r.color = hex; redrawAll(); }, 'Цвет площади');
     const nameInp = document.createElement('input');
     nameInp.type = 'text'; nameInp.className = 'area-name'; nameInp.value = r.label;
     nameInp.title = 'Название площади';
@@ -1481,7 +1478,7 @@ function buildParamChip(box, name) {
     line.append(mk('min'), le1, nm, le2, mk('max'));
     const line2 = document.createElement('div');
     line2.className = 'param-ed-line';
-    const st = document.createElement('span'); st.className = 'param-ed-name'; st.textContent = 'шаг';
+    const st = document.createElement('span'); st.className = 'param-ed-name'; st.textContent = 'Шаг';
     line2.append(st, mk('step'));
     const ok = document.createElement('button');
     ok.type = 'button'; ok.className = 'param-ed-ok'; ok.textContent = 'Готово';
@@ -1494,19 +1491,25 @@ function buildParamChip(box, name) {
   box.appendChild(chip);
 }
 
+/* Цвета кривых сцены (издержки, производство, вееры, «Математика»).
+   В шаблоне это нативные input[type=color]; подменяем их на общий компонент
+   с шестью образцами (П34), сохраняя data-col — по нему идёт синхронизация. */
 function initSceneColorPickers() {
   document.querySelectorAll('input.swatch-pick[data-col]').forEach(inp => {
-    inp.addEventListener('input', () => {
-      STATE.colorOverride[inp.dataset.col] = inp.value;
+    const key = inp.dataset.col;
+    const pick = makeColorPicker(COL[key] || inp.value, (hex) => {
+      STATE.colorOverride[key] = hex;
       redrawAll();
-    });
+    }, inp.title || 'Цвет кривой');
+    pick.setAttribute('data-col', key);
+    inp.replaceWith(pick);
   });
   syncSceneColorPickers();
 }
 function syncSceneColorPickers() {
-  document.querySelectorAll('input.swatch-pick[data-col]').forEach(inp => {
-    const v = COL[inp.dataset.col];
-    if (v) inp.value = normHex(v);
+  document.querySelectorAll('.cpick[data-col]').forEach(pick => {
+    const v = COL[pick.dataset.col];
+    if (v && pick._setValue) pick._setValue(v);
   });
 }
 
@@ -1543,14 +1546,121 @@ function normHex(c) {
   if (m) return '#' + [1, 2, 3].map(i => (+m[i]).toString(16).padStart(2, '0')).join('');
   return '#888888';
 }
+/* Шесть предложенных цветов (П34). Значения живут в токенах --pal-1…--pal-6,
+   поэтому светлая и тёмная тема дают РАЗНЫЕ образцы, а перекрашивание темы
+   само подтягивает новые. Читаем через cssVar на каждый показ меню: тему
+   переключают прямо во время работы. */
+function paletteSix() {
+  const out = [];
+  for (let i = 1; i <= 6; i++) out.push(normHex(cssVar('--pal-' + i)));
+  return out;
+}
+
+let openCPick = null;   // единственное открытое меню цвета
+
+function closeColorMenu() {
+  if (!openCPick) return;
+  // Нативный input живёт в обёртке кнопки, а в меню только гостит: иначе он
+  // уехал бы в мусор вместе с меню и «Свой цвет» перестал бы работать.
+  if (openCPick._own && openCPick._owner) {
+    openCPick._own.style.display = 'none';
+    openCPick._owner.appendChild(openCPick._own);
+  }
+  openCPick.remove();
+  openCPick = null;
+  document.removeEventListener('pointerdown', onDocClosePick, true);
+  window.removeEventListener('resize', closeColorMenu);
+  window.removeEventListener('keydown', onEscClosePick, true);
+}
+function onDocClosePick(e) {
+  if (openCPick && (openCPick.contains(e.target) || (openCPick._owner && openCPick._owner.contains(e.target)))) return;
+  closeColorMenu();
+}
+function onEscClosePick(e) { if (e.key === 'Escape') closeColorMenu(); }
+
+/* Выбор цвета: ряд из шести образцов плюс «Свой цвет» (П34).
+   Возвращает ОБЁРТКУ, а не сам input: меню уезжает в <body> с position:fixed,
+   иначе панель с прокруткой обрезала бы его по своему краю.
+   ВАЖНО: из onChange нельзя перерисовывать список, в котором живёт эта кнопка,
+   иначе нативная палитра «Своего цвета» захлопнется на первом же клике. */
 function makeColorPicker(value, onChange, title) {
-  const inp = document.createElement('input');
-  inp.type = 'color';
-  inp.className = 'swatch swatch-pick';
-  inp.value = normHex(value);
-  inp.title = title || 'Цвет кривой';
-  inp.addEventListener('input', () => onChange(inp.value));
-  return inp;
+  const wrap = document.createElement('span');
+  wrap.className = 'cpick';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'swatch cpick-btn';
+  btn.title = title || 'Цвет кривой';
+  btn.setAttribute('aria-label', btn.title);
+
+  // Скрытый нативный input — только под кнопку «Свой цвет». Держим его тут,
+  // чтобы пикер цвета не пропадал вместе с меню при переоткрытии.
+  const own = document.createElement('input');
+  own.type = 'color';
+
+  let cur = normHex(value);
+  const paint = () => { btn.style.background = cur; own.value = cur; };
+  paint();
+
+  const apply = (hex) => { cur = normHex(hex); paint(); onChange(cur); };
+  own.addEventListener('input', () => apply(own.value));
+
+  btn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const was = openCPick && openCPick._owner === wrap;
+    closeColorMenu();
+    if (was) return;                       // повторный щелчок закрывает меню
+
+    const menu = document.createElement('div');
+    menu.className = 'cpick-menu';
+    menu.setAttribute('role', 'dialog');
+    menu.setAttribute('aria-label', btn.title);
+    const grid = document.createElement('div');
+    grid.className = 'cpick-grid';
+    paletteSix().forEach((hex) => {
+      const sw = document.createElement('button');
+      sw.type = 'button';
+      sw.className = 'cpick-sw';
+      sw.style.background = hex;
+      sw.setAttribute('role', 'radio');
+      sw.setAttribute('aria-checked', hex.toLowerCase() === cur.toLowerCase() ? 'true' : 'false');
+      sw.title = hex;
+      sw.addEventListener('click', (ev) => { ev.stopPropagation(); apply(hex); closeColorMenu(); });
+      grid.appendChild(sw);
+    });
+    menu.appendChild(grid);
+
+    const ownRow = document.createElement('label');
+    ownRow.className = 'cpick-own';
+    own.style.display = '';
+    ownRow.append(own, document.createTextNode('Свой цвет'));
+    ownRow.addEventListener('click', (ev) => ev.stopPropagation());
+    menu.appendChild(ownRow);
+
+    document.body.appendChild(menu);
+    menu._owner = wrap;
+    menu._own = own;
+    openCPick = menu;
+
+    // Ставим под кнопкой, а если снизу не хватает места — над ней.
+    const r = btn.getBoundingClientRect();
+    const mh = menu.offsetHeight, mw = menu.offsetWidth;
+    let top = r.bottom + 6;
+    if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6);
+    let left = r.left;
+    if (left + mw > window.innerWidth - 8) left = Math.max(8, window.innerWidth - mw - 8);
+    menu.style.top = top + 'px';
+    menu.style.left = left + 'px';
+
+    document.addEventListener('pointerdown', onDocClosePick, true);
+    window.addEventListener('resize', closeColorMenu);
+    window.addEventListener('keydown', onEscClosePick, true);
+  });
+
+  own.style.display = 'none';
+  wrap.append(btn, own);
+  wrap._setValue = (hex) => { cur = normHex(hex); paint(); };
+  return wrap;
 }
 
 // Короткое имя кривой для подписей: своё имя → роль → формула.
@@ -1875,7 +1985,7 @@ function renderMarkList() {
     const pick = makeColorPicker(mk.color || COL.ink, (hex) => { mk.color = hex; redrawAll(); }, 'Цвет точки');
     const co = document.createElement('span');
     co.className = 'mark-co';
-    co.textContent = mk.snapTo ? ('на ' + mk.snapTo) : 'своя точка';
+    co.textContent = mk.snapTo ? ('На ' + mk.snapTo) : 'Своя точка';
     const del = document.createElement('button');
     del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.title = 'Убрать точку';
     del.addEventListener('click', () => {
@@ -1885,7 +1995,7 @@ function renderMarkList() {
     top.append(pick, co, del);
 
     const inp = document.createElement('input');
-    inp.type = 'text'; inp.value = mk.text; inp.placeholder = 'подпись точки';
+    inp.type = 'text'; inp.value = mk.text; inp.placeholder = 'Подпись точки';
     inp.addEventListener('input', () => { mk.text = inp.value; redrawAll(); });
 
     // Координаты можно задать с клавиатуры, а не только перетаскиванием.

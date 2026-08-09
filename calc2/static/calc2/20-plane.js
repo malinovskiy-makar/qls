@@ -66,10 +66,24 @@ function quadLo(v) { return STATE.firstQuad ? Math.max(0, v) : v; }
 function toPx(q, p) { return [sx(q), sy(p)]; }
 function toData(px, py) { return [sx.invert(px), sy.invert(py)]; }
 
-// Формат числа для подписей делений (без длинных хвостов после точки).
+/* Формат числа для подписей делений (без длинных хвостов после точки).
+   Числа пишем целиком: «5000», а не «5k» (П45). Раньше от тысячи включался
+   формат `.2~s`, и сокращение вылезало и на осях, и в координатах точек, и в
+   таблице площадей. Тысячи разделяем узким неразрывным пробелом — так
+   «12 500» читается с одного взгляда и не разваливается по переносу строки.
+   Ширину подписи меряет fitMargins по длине этой строки, поэтому поле слева
+   само раздвинется под новые, более длинные числа. */
+const NBTHIN = ' ';        // узкий неразрывный пробел — разделитель разрядов
 function fmt(v) {
-  if (Math.abs(v) >= 1000) return d3.format('.2~s')(v);
-  return (Math.round(v * 100) / 100).toString();
+  const r = Math.round(v * 100) / 100;
+  if (!isFinite(r)) return String(v);
+  const sign = r < 0 ? '-' : '';
+  const a = Math.abs(r);
+  const whole = Math.floor(a);
+  let s = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, NBTHIN);
+  const frac = Math.round((a - whole) * 100) / 100;
+  if (frac > 0) s += String(frac).slice(1);   // «.5», «.25» — без ведущего нуля
+  return sign + s;
 }
 
 /* Шаг делений из «красивой» лесенки 1–2–5. Считается только от размаха окна,

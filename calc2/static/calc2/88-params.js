@@ -339,11 +339,11 @@ function upgradeRegulator(field) {
     const nm = document.createElement('span');
     nm.className = 'param-ed-name';
     const lab = field.querySelector('label');
-    nm.textContent = (lab ? lab.textContent.split('=')[0] : '').trim() || 'значение';
+    nm.textContent = (lab ? lab.textContent.split('=')[0] : '').trim() || 'Значение';
     line.append(mk('min'), document.createTextNode('≤'), nm, document.createTextNode('≤'), mk('max'));
     const step = document.createElement('div');
     step.className = 'param-ed-line';
-    const sLab = document.createElement('span'); sLab.textContent = 'шаг';
+    const sLab = document.createElement('span'); sLab.textContent = 'Шаг';
     step.append(sLab, mk('step'));
     editor.append(line, step);
   };
@@ -471,14 +471,14 @@ function ineqMasterApply(sliderVal) { // движение мастера (отв
 function ineqMasterDetach() {         // ручная правка профиля → одним числом не выразить
   STATE.ineqMasterDetached = true;
   const sl = document.getElementById('ineq-master-slider'); if (sl) sl.value = 100;
-  const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = 'своё';
+  const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = 'Своё';
 }
 function buildIneqMasterChip(box) {
   const detached = !!STATE.ineqMasterDetached;
   const pct = detached ? 100 : Math.round((STATE.ineqMasterS != null ? STATE.ineqMasterS : 1) * 100);
   addPultXChip(box, 'Сила неравенства', pct, COL.D, 0, 200, 1, v => ineqMasterApply(v), 'ineq-master-slider');
   const val = document.getElementById('ineq-master-slider-val');
-  if (val) val.textContent = detached ? 'своё' : (pct + '%');
+  if (val) val.textContent = detached ? 'Своё' : (pct + '%');
 }
 
 function showPult(on) {

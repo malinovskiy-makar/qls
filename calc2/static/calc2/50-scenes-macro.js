@@ -256,7 +256,7 @@ function redrawMacro() {
     haloText(og, px, oy + 8, 't=' + fmt(r.best.t), 'middle', 'hanging');
     haloText(og, ox - 8, py, fmt(r.best.rev), 'end', 'middle');
     og.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', 12).attr('font-weight', 700).attr('fill', COL.ink)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('максимум');
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Максимум');
     updateMacroPanel();
     return;
   }
@@ -292,7 +292,7 @@ function redrawMacro() {
     const g = svg.append('g'), [bx, by] = toPx(r.base.Q, r.base.P);
     g.append('circle').attr('cx', bx).attr('cy', by).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
     g.append('text').attr('x', bx + 7).attr('y', by + 14).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('было');
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Было');
   }
   if (r.eq) drawEquilibriumAt(r.eq.Q, r.eq.P, (r.kind === 'phillips') ? 'u*' : 'E');
   updateMacroPanel();

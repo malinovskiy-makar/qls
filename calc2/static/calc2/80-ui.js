@@ -189,7 +189,7 @@ function renderCurveList() {
     const nameInp = document.createElement('input');
     nameInp.type = 'text'; nameInp.className = 'curve-label-inp';
     nameInp.value = curve.label || '';
-    nameInp.placeholder = 'имя на графике, напр. D₁';
+    nameInp.placeholder = 'Имя на графике, напр. D₁';
     nameInp.addEventListener('input', () => {
       curve.label = nameInp.value;
       nm.textContent = curveShortName(curve);

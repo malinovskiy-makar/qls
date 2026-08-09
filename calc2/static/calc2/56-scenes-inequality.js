@@ -211,16 +211,16 @@ function drawInequalityDiagonal() {
   g.append('line').attr('x1', sx(0)).attr('y1', sy(0)).attr('x2', sx(100)).attr('y2', sy(100))
     .attr('stroke', COL.tax).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
   g.append('text').attr('x', sx(80)).attr('y', sy(86)).attr('font-size', 11).attr('fill', COL.tax)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('равенство');
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Равенство');
 }
 
 // Подписи осей (длинные, рисуем сами; drawAxes вызываем без меток).
 function drawInequalityCaptions() {
   const g = svg.append('g'), ox = sx(0), oy = sy(0), xMid = (sx(0) + sx(100)) / 2, yTop = sy(100);
   g.append('text').attr('x', xMid).attr('y', oy + 30).attr('text-anchor', 'middle')
-    .attr('font-size', 11).attr('fill', COL.inkSoft).text('доля населения, %');
+    .attr('font-size', 11).attr('fill', COL.inkSoft).text('Доля населения, %');
   g.append('text').attr('x', ox + 6).attr('y', yTop - 5).attr('text-anchor', 'start')
-    .attr('font-size', 11).attr('fill', COL.inkSoft).text('доля дохода, %');
+    .attr('font-size', 11).attr('fill', COL.inkSoft).text('Доля дохода, %');
 }
 
 // Заливки A (между диагональю и кривой) и B (под кривой) — смысл Джини.
@@ -339,7 +339,7 @@ function drawRedistArrow(base, redist) {
   g.append('path').attr('d', `M${x - 4},${y1 + 6} L${x},${y1} L${x + 4},${y1 + 6}`)
     .attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 1.6);
   g.append('text').attr('x', x + 8).attr('y', (y0 + y1) / 2).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', COL.tax)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('к равенству');
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('К равенству');
 }
 
 // Снимок текущей кривой как «было» (для сравнения двух кривых, ЧК2).

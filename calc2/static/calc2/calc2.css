@@ -23,6 +23,17 @@
   --cost-mc:  #119C8A;  --cost-atc: #2F6FED;  --cost-avc: #B5791F;
   --cost-afc: #8B3FE0;  --cost-vc:  #5B6472;
 
+  /* ── Шесть предложенных цветов (П34). Светлая палитра — значения Desmos,
+     снятые с их страницы. Тёмная подобрана вручную под наш холст #10141c:
+     инверсию всего контейнера, как делает Desmos, копировать нельзя — она
+     вывернула бы малиновый акцент. Контраст каждого тёмного к холсту ≥ 6,7:1. */
+  --pal-1: #c74440;   /* красный    */
+  --pal-2: #2d70b3;   /* синий      */
+  --pal-3: #348543;   /* зелёный    */
+  --pal-4: #fa7e19;   /* оранжевый  */
+  --pal-5: #6042a6;   /* фиолетовый */
+  --pal-6: #000000;   /* чёрный     */
+
   /* ── Структурные цвета холста (зависят от темы) ── */
   --ink:      #2a2f3a;   /* оси, подписи осей, текст у точек  */
   --ink-soft: #5e6675;   /* цифры делений, вторичные подписи  */
@@ -96,6 +107,13 @@
   --on-btn:       #ffffff;
   --shadow-panel: 0 0 0 1px rgba(255,255,255,.05), 0 10px 34px -10px rgba(0,0,0,.6);
   --shadow-pop:   0 0 0 1px rgba(255,255,255,.07), 0 16px 46px -12px rgba(0,0,0,.7);
+  /* Шесть цветов в тёмной теме — свои значения, а не инверсия светлых. */
+  --pal-1: #ff6b66;
+  --pal-2: #5aa3e8;
+  --pal-3: #4fbf6a;
+  --pal-4: #ffa94d;
+  --pal-5: #a78bfa;
+  --pal-6: #ffffff;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
@@ -530,6 +548,55 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 .swatch-pick::-webkit-color-swatch { border: none; border-radius: 2px; }
 .swatch-pick::-moz-color-swatch { border: none; border-radius: 2px; }
 .swatch-pick:hover { border-color: var(--accent); transform: scale(1.12); }
+
+/* ── Выбор цвета: шесть образцов + свой (П34) ──────────────────────────
+   Обёртка держит место в строке, а само меню уезжает в <body> с fixed —
+   иначе панель с прокруткой обрезала бы его по своему краю. */
+.cpick { display: inline-flex; align-items: center; flex-shrink: 0; vertical-align: middle; }
+.cpick-btn {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; padding: 0; cursor: pointer;
+  border: 1px solid var(--border-soft); border-radius: 3px;
+  transition: border-color .12s var(--ease), transform .12s var(--ease);
+}
+.cpick-btn:hover { border-color: var(--accent); transform: scale(1.12); }
+.cpick-menu {
+  position: fixed; z-index: var(--z-picker);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); box-shadow: var(--shadow-pop);
+  padding: 8px; width: 148px;
+}
+.cpick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.cpick-sw {
+  position: relative; height: 30px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-soft); cursor: pointer; padding: 0;
+  transition: transform .12s var(--ease);
+}
+.cpick-sw:hover { transform: scale(1.06); }
+/* Галочка на текущем цвете — как у Desmos. Рисуем двумя полосками, чтобы
+   не тащить иконку и чтобы она читалась на любом фоне образца. */
+.cpick-sw[aria-checked="true"]::after {
+  content: ''; position: absolute; left: 50%; top: 47%;
+  width: 6px; height: 11px; margin: -7px 0 0 -3px;
+  border: solid #fff; border-width: 0 2.2px 2.2px 0;
+  transform: rotate(42deg);
+  filter: drop-shadow(0 0 1.5px rgba(0,0,0,.55));
+}
+.cpick-own {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  margin-top: 8px; padding: 6px 7px; font-size: 12px; color: var(--text2);
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm); cursor: pointer; text-align: left;
+}
+.cpick-own:hover { border-color: var(--accent); color: var(--text); }
+.cpick-own input[type="color"] {
+  -webkit-appearance: none; appearance: none;
+  width: 15px; height: 15px; padding: 0; border: none; border-radius: 3px;
+  background: none; cursor: pointer; flex-shrink: 0;
+}
+.cpick-own input::-webkit-color-swatch-wrapper { padding: 0; }
+.cpick-own input::-webkit-color-swatch { border: 1px solid var(--border); border-radius: 3px; }
+.cpick-own input::-moz-color-swatch { border: 1px solid var(--border); border-radius: 3px; }
 /* Поле «имя кривой на графике» в списке кривых (Фаза 1). */
 .curve-label-inp {
   width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--r-sm);
@@ -954,6 +1021,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .app input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .app input[type="number"]::-webkit-outer-spin-button,
 .app input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Полосы прокрутки внутри калькулятора не показываем (П35, П48). Сама
+   прокрутка остаётся: и колесом, и клавишами, и тачпадом. Правило только
+   внутри .app и у меню, которые уезжают в <body>, — остальные страницы
+   сайта со своими полосами не трогаем. */
+.app *, .cpick-menu, .modal-card {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.app *::-webkit-scrollbar,
+.cpick-menu::-webkit-scrollbar,
+.modal-card::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
 /* Набранные вершины будущей площади. */
 .vert-btns { display: flex; gap: 6px; margin-top: 8px; }

@@ -193,17 +193,17 @@ function renderPw() {
       const slot = document.createElement('div');
       slot.className = 'f-slot';
       const f = document.createElement('input');
-      f.type = 'text'; f.value = PW.rows[i].f; f.placeholder = 'формула куска';
+      f.type = 'text'; f.value = PW.rows[i].f; f.placeholder = 'Формула куска';
       f.setAttribute('aria-label', 'Формула куска ' + (i + 1));
       f.addEventListener('input', () => { PW.rows[i].f = f.value; pwPreview(); });
       slot.appendChild(f);
-      const from = document.createElement('span'); from.className = 'pw-when'; from.textContent = 'от';
+      const from = document.createElement('span'); from.className = 'pw-when'; from.textContent = 'От';
       const a = document.createElement('input');
       a.type = 'text'; a.className = 'pw-bound'; a.value = PW.rows[i].a;
       a.placeholder = i === 0 ? '0' : '';
       a.setAttribute('aria-label', 'Начало участка ' + (i + 1));
       a.addEventListener('input', () => { PW.rows[i].a = a.value; pwPreview(); });
-      const to = document.createElement('span'); to.className = 'pw-when'; to.textContent = 'до';
+      const to = document.createElement('span'); to.className = 'pw-when'; to.textContent = 'До';
       const b = document.createElement('input');
       b.type = 'text'; b.className = 'pw-bound'; b.value = PW.rows[i].b;
       b.placeholder = i === PW.n - 1 ? '∞' : '';
@@ -1053,10 +1053,10 @@ function applyNewRoleUI() {
   if (!qpOk && STATE.curveForm === 'QP') { STATE.curveForm = 'PQ'; setCurveForm('PQ'); return; }
 
   const inp = document.getElementById('inp-formula');
-  const ph = { demand: 'например: 100 - Q', supply: 'например: Q',
-               mc: 'например: 20', tc: 'например: Q^2 + 10*Q + 50',
-               atc: 'например: Q - 10 + 100/Q' };
-  if (inp) inp.placeholder = (STATE.curveForm === 'QP') ? 'например: 100 - 2*P' : (ph[role] || 'например: 100 - Q');
+  const ph = { demand: 'Например: 100 - Q', supply: 'Например: Q',
+               mc: 'Например: 20', tc: 'Например: Q^2 + 10*Q + 50',
+               atc: 'Например: Q - 10 + 100/Q' };
+  if (inp) inp.placeholder = (STATE.curveForm === 'QP') ? 'Например: 100 - 2*P' : (ph[role] || 'Например: 100 - Q');
 
   const h = document.getElementById('curve-form-hint');
   const note = {

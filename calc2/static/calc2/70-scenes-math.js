@@ -484,7 +484,7 @@ function drawMathTransform(f) {
   const t = mathTransformed(f, STATE.mathTrans, STATE.mathA);
   mathLine(g, f, mx, my, COL.ghost, 2.2, '6 4');   // исходная — бледным пунктиром
   mathLine(g, t, mx, my, COL.D, 2.8);
-  labelCurveMath(g, f, mx, my, 'исходная', COL.ghost);
+  labelCurveMath(g, f, mx, my, 'Исходная', COL.ghost);
   labelCurveMath(g, t, mx, my, MATH_TRANS[STATE.mathTrans].tex, COL.D);
   STATE.mathRes = { trans: STATE.mathTrans, a: STATE.mathA };
   updateMathPanel();

@@ -89,6 +89,62 @@ for (const [key, name] of scenes) {
     setGridMode(was);
     return { dense, plain, off };
   });
+  // ── Сквозные правила (П55): проверяем их на КАЖДОЙ сцене, а не выборочно.
+  r.rules = await page.evaluate(() => {
+    const vis = el => !!(el && el.getClientRects().length);
+
+    // П45: нигде на экране нет «k» вместо тысяч. Смотрим и подписи внутри
+    // графика, и числа в панелях: сокращение вылезало и там, и там.
+    const kRe = /(^|[\s(;=])\d+(?:[.,]\d+)?\s?[kKкК]\b/;
+    let noK = true;
+    const texts = [...document.querySelectorAll('svg#chart text')].map(t => t.textContent || '');
+    document.querySelectorAll('#params-body .pchip-val, #sb-body b, .area-cell, .vert-row')
+      .forEach(e => texts.push(e.textContent || ''));
+    // Проверяем и сам форматтер: он общий на все числа калькулятора.
+    if (typeof fmt === 'function' && (/[kK]/.test(fmt(5000)) || /[kK]/.test(fmt(12345)))) noK = false;
+    if (texts.some(t => kRe.test(t))) noK = false;
+
+    // П35, П48: полос прокрутки не видно ни в панелях, ни в гаечном ключе.
+    // Смотрим фактическую ширину полосы, а не наличие overflow.
+    const bars = [...document.querySelectorAll('.app *')].filter(el => {
+      if (!vis(el)) return false;
+      return (el.offsetWidth - el.clientWidth > 2 && el.scrollHeight > el.clientHeight)
+          || (el.offsetHeight - el.clientHeight > 2 && el.scrollWidth > el.clientWidth);
+    });
+
+    // П34: у каждого места выбора цвета шесть образцов и кнопка «Свой цвет».
+    // Считаем и в свёрнутых карточках: карточки закрыты по умолчанию, а голый
+    // input[type=color] внутри закрытой карточки — такое же нарушение.
+    const scope = '#tools-panel, #params-body, #wrench-pop';
+    const picks = [...document.querySelectorAll(scope)]
+      .reduce((n, box) => n + box.querySelectorAll('.cpick').length, 0);
+    const rawColor = [...document.querySelectorAll(scope)]
+      .reduce((n, box) => n + [...box.querySelectorAll('input[type=color]')]
+        .filter(i => !i.closest('.cpick')).length, 0);
+
+    // П16: числовое поле не листается колесом и стрелками.
+    const nums = [...document.querySelectorAll('.app input[type=number]')].filter(vis);
+    let wheelOk = true, keyOk = true;
+    if (nums.length) {
+      const el = nums[0], before = el.value;
+      el.focus();
+      el.dispatchEvent(new WheelEvent('wheel', { deltaY: -120, bubbles: true, cancelable: true }));
+      if (el.value !== before) wheelOk = false;
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+      if (el.value !== before) keyOk = false;
+      el.blur();
+    }
+
+    // П31: точки липнут к кривым И к осям; П54: зум и панорама живут везде.
+    let snapAxes = false;
+    try { snapAxes = (typeof snapTargets === 'function') && snapTargets().some(t => t.kind === 'axis'); } catch (e) {}
+    const zoomOk = typeof zoomBy === 'function' && typeof resetZoom === 'function';
+    let panOk = false;
+    try { panOk = typeof panByPixels === 'function'; } catch (e) {}
+
+    return { noK, bars: bars.length, picks: picks.length, rawColor,
+             wheelOk, keyOk, nums: nums.length, snapAxes, zoomOk, panOk };
+  });
   rows.push([key, name, r]);
 }
 
@@ -103,6 +159,31 @@ for (const [key, name, r] of rows) {
 }
 const badGrid = rows.filter(([, , r]) => !gridOk(r));
 console.log('\nСцен со сломанной сеткой: ' + badGrid.length + (badGrid.length ? ' (' + badGrid.map(x => x[0]).join(', ') + ')' : ''));
-console.log('Ошибок страницы: ' + errors.length);
+
+// ── Таблица «сквозное правило × сцена» (П55) ──────────────────────────
+console.log('\n## Сквозные правила по сценам\n');
+console.log('| Сцена | П45 нет «k» | П35/П48 полос прокрутки | П34 выборов цвета (голых) | П16 колесо/стрелки | П31 оси как цель | П53/П54 зум и панорама |');
+console.log('|---|---|---|---|---|---|---|');
+const broken = { noK: [], bars: [], color: [], num: [], snap: [], zoom: [] };
+for (const [key, name, r] of rows) {
+  const u = r.rules;
+  if (!u.noK) broken.noK.push(key);
+  if (u.bars > 0) broken.bars.push(key);
+  if (u.rawColor > 0) broken.color.push(key);
+  if (!u.wheelOk || !u.keyOk) broken.num.push(key);
+  if (!u.snapAxes) broken.snap.push(key);
+  if (!u.zoomOk || !u.panOk) broken.zoom.push(key);
+  console.log(`| ${key} · ${name} | ${yn(u.noK)} | ${u.bars === 0 ? '+ нет' : '! ' + u.bars} | ${u.picks}${u.rawColor ? ' (! ' + u.rawColor + ')' : ''} | ${yn(u.wheelOk && u.keyOk)} (${u.nums}) | ${yn(u.snapAxes)} | ${yn(u.zoomOk && u.panOk)} |`);
+}
+const say = (t, arr) => console.log(`${t}: ${arr.length ? arr.length + ' (' + arr.slice(0, 8).join(', ') + ')' : 'нарушений нет'}`);
+console.log('');
+say('П45 «k» в числах', broken.noK);
+say('П35/П48 видимая полоса прокрутки', broken.bars);
+say('П34 голый выбор цвета', broken.color);
+say('П16 числовое поле листается', broken.num);
+say('П31 оси не цель прилипания', broken.snap);
+say('П53/П54 зум или панорама недоступны', broken.zoom);
+
+console.log('\nОшибок страницы: ' + errors.length);
 errors.slice(0, 10).forEach(e => console.log('  ' + e));
 await browser.close();

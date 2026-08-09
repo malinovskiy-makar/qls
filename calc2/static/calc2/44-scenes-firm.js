@@ -126,7 +126,7 @@ function redrawCosts() {
   drawGrid();
   drawAxes('Q', '');
   svg.append('text').attr('x', sx(0) + 6).attr('y', sy(CONFIG.Pmax) - 5)
-    .attr('text-anchor', 'start').attr('font-size', 11).attr('fill', COL.inkSoft).text('издержки, цена');
+    .attr('text-anchor', 'start').attr('font-size', 11).attr('fill', COL.inkSoft).text('Издержки, цена');
   drawLongRunArea();      // прямоугольник прибыли/убытка — под кривыми
   drawCostCurves();
   if (STATE.lrOn) drawLongRunMarks();
