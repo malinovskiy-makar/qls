@@ -72,7 +72,9 @@ const STATE = {
   axisYName: '',     // своё название оси Y
   axisXDefault: 'Q', // что сцена нарисовала бы сама — идёт в placeholder полей
   axisYDefault: 'P',
-  marks: [],         // свои точки: {id, x, y, text, showCoords, showCurves}
+  // Свои точки: {id, x, y, text, color, showCoords, showDash, mode, pending, snapTo}.
+  // Значений кривых у точки больше нет (П29).
+  marks: [],
   markArm: false,    // взведён режим «следующий щелчок по графику ставит точку»
   vertArm: false,    // взведён набор вершин площади (режим «Между точками»)
   areaVerts: [],     // набранные вершины: {x, y, name}
