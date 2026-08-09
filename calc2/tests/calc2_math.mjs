@@ -1028,6 +1028,56 @@ const CASES = [
              ['на холсте есть точки', 'drawn', 4, 0]],
   },
   {
+    /* П28. Пайплайн добавления точки: кнопка → тумблер → два поля координат.
+       Точка появляется, как только заполнены ОБА поля, и переезжает на каждый
+       введённый символ. Кнопка «Добавить точку» стоит ПОД созданными точками. */
+    name: 'Точки · точка появляется, как только заполнены оба поля',
+    run: `openPicker(); pickScene('sd'); closePicker();
+          STATE.marks = []; renderMarkList();
+          var box = document.getElementById('mark-list');
+          var only = box.children.length === 1 && box.firstElementChild.classList.contains('btn-mark-add') ? 1 : 0;
+          box.querySelector('.btn-mark-add').click();
+          var noBtn = box.querySelector('.btn-mark-add') ? 0 : 1;
+          var f = box.querySelectorAll('.mark-draft .mark-xy input');
+          f[0].value = '50'; f[0].dispatchEvent(new Event('input', { bubbles: true }));
+          var half = STATE.marks.filter(function (m) { return !m.pending; }).length;
+          f[1].value = '5'; f[1].dispatchEvent(new Event('input', { bubbles: true }));
+          var live = STATE.marks.filter(function (m) { return !m.pending; })[0];
+          var y1 = live ? live.y : -1;
+          f[1].value = '50'; f[1].dispatchEvent(new Event('input', { bubbles: true }));
+          var y2 = STATE.marks.filter(function (m) { return !m.pending; })[0].y;
+          var back = document.getElementById('mark-list').querySelector('.btn-mark-add') ? 1 : 0;
+          var lastIsBtn = document.getElementById('mark-list').lastElementChild.classList.contains('btn-mark-add') ? 1 : 0;
+          return { only: only, noBtn: noBtn, half: half, y1: y1, y2: y2, back: back, last: lastIsBtn };`,
+    checks: [['сначала только кнопка', 'only', 1, 0], ['после щелчка кнопки нет', 'noBtn', 1, 0],
+             ['одно поле — точки нет', 'half', 0, 0], ['«5» ⇒ точка (50; 5)', 'y1', 5, 0.001],
+             ['дописали «0» ⇒ (50; 50)', 'y2', 50, 0.001],
+             ['кнопка вернулась', 'back', 1, 0], ['и стоит последней', 'last', 1, 0]],
+  },
+  {
+    /* П31. Точка липнет и к кривым, и к ОСЯМ, а оторвать её труднее, чем
+       прилепить: радиус отрыва заметно больше радиуса захвата. */
+    name: 'Точки · прилипание к осям и сопротивление при отрыве',
+    run: `openPicker(); pickScene('sd'); closePicker();
+          var s = mainScales();
+          var onX = axisSnapAt(s.mx(40), s.my(0) + 5);
+          var onY = axisSnapAt(s.mx(0) - 4, s.my(60));
+          var zero = axisSnapAt(s.mx(0) + 3, s.my(0) - 3);
+          var far = axisSnapAt(s.mx(40), s.my(40));
+          return { xName: onX && onX.name === 'ось X' ? 1 : 0,
+                   xy: onX ? onX.y : -1,
+                   yName: onY && onY.name === 'ось Y' ? 1 : 0,
+                   yx: onY ? onY.x : -1,
+                   zero: zero && zero.name === 'начало координат' ? 1 : 0,
+                   far: far ? 1 : 0,
+                   ratio: RELEASE_PX / SNAP_PX };`,
+    checks: [['у оси X прилипает', 'xName', 1, 0], ['и садится на y = 0', 'xy', 0, 0],
+             ['у оси Y прилипает', 'yName', 1, 0], ['и садится на x = 0', 'yx', 0, 0],
+             ['у нуля — в начало координат', 'zero', 1, 0],
+             ['вдали от осей не липнет', 'far', 0, 0],
+             ['оторвать труднее, чем прилипнуть', 'ratio', 2.5, 0.01]],
+  },
+  {
     /* П38. Закрепка кладёт ключевую точку в список своих точек последней и
        раскрывает блок «Точки на графике», если он был закрыт. */
     name: 'Ключевые точки · закрепка кладёт точку в список',

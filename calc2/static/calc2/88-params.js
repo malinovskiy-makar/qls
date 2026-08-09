@@ -1118,9 +1118,8 @@ function wireControls() {
   const yName = document.getElementById('inp-yname');
   if (yName) yName.addEventListener('input', () => { STATE.axisYName = yName.value; redrawAll(); });
 
-  // Своя точка: кнопка взводит режим, следующий щелчок по графику ставит точку.
-  const markBtn = document.getElementById('btn-mark-add');
-  if (markBtn) markBtn.addEventListener('click', () => armMark(!STATE.markArm));
+  /* Своя точка (П28): режим взводит тумблер «Указать на графике» в самой
+     строке заготовки, отдельной кнопки над списком больше нет. */
   const chartEl = document.getElementById('chart');
   if (chartEl) chartEl.addEventListener('click', (ev) => {
     if (!STATE.markArm) return;

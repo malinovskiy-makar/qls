@@ -1825,12 +1825,8 @@ function markCaption(mk) {
   const parts = [];
   if (mk.text) parts.push(mk.text);
   if (mk.showCoords) parts.push('(' + fmt(mk.x) + '; ' + fmt(mk.y) + ')');
-  if (mk.showCurves) {
-    STATE.curves.filter(c => c.visible).slice(0, 3).forEach(c => {
-      const v = evalCurve(c, mk.x);
-      if (!isNaN(v)) parts.push(curveShortName(c) + ' = ' + fmt(v));
-    });
-  }
+  // Значения кривых в точке убраны по П29: подпись из четырёх строк накрывала
+  // сам график, а нужное число всегда видно по кривой и осям.
   return parts;
 }
 
@@ -1840,6 +1836,8 @@ function drawMarks() {
   const g = svg.append('g').attr('class', 'marks');
   const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
   STATE.marks.forEach(mk => {
+    // Точка, у которой заполнено ещё не всё, на плоскости не появляется (П28).
+    if (mk.pending || !isFinite(mk.x) || !isFinite(mk.y)) return;
     if (mk.x < xLo || mk.x > xHi || mk.y < yLo || mk.y > yHi) return;
     const px = mx(mk.x), py = my(mk.y);
     const col = mk.color || COL.ink;
@@ -1855,14 +1853,35 @@ function drawMarks() {
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
       .attr('fill', col).attr('stroke', COL.halo).attr('stroke-width', 1.6)
       .style('cursor', 'move')
+      /* Перетаскивание (П30) с сопротивлением при отрыве (П31).
+         Пока точка сидит на линии, она скользит по ней и НЕ срывается от
+         небольшого увода курсора: оторвать её можно, только уведя дальше
+         RELEASE_PX (в два с половиной раза больше радиуса захвата). Свободная
+         точка, наоборот, прилипает, как только курсор подошёл ближе SNAP_PX —
+         и к кривым, и к осям. */
       .call(d3.drag().container(() => svg.node()).on('drag', ev => {
-        mk.x = Math.max(xLo, Math.min(xHi, mx.invert(ev.x)));
-        // Точка, посаженная на кривую, при перетаскивании скользит ПО ней:
-        // тянем только вдоль оси X, высоту берём с самой кривой.
-        const f = markSnapFn(mk);
-        const onCurve = f ? f(mk.x) : NaN;
-        mk.y = isFinite(onCurve) ? onCurve
-             : Math.max(yLo, Math.min(yHi, my.invert(ev.y)));
+        if (mk.snapTo && snapDistPx(mk.snapTo, ev.x, ev.y) > RELEASE_PX) mk.snapTo = null;
+        if (!mk.snapTo) {
+          const hit = snapPointAt(ev.x, ev.y);
+          if (hit && !hit.cross) mk.snapTo = hit.name;
+        }
+        if (mk.snapTo === 'ось Y') {
+          mk.x = 0;
+          mk.y = Math.max(yLo, Math.min(yHi, my.invert(ev.y)));
+        } else if (mk.snapTo === 'ось X') {
+          mk.x = Math.max(xLo, Math.min(xHi, mx.invert(ev.x)));
+          mk.y = 0;
+        } else if (mk.snapTo === 'начало координат') {
+          mk.x = 0; mk.y = 0;
+        } else {
+          mk.x = Math.max(xLo, Math.min(xHi, mx.invert(ev.x)));
+          // Точка на кривой скользит ПО ней: тянем вдоль оси X, высоту берём
+          // с самой кривой.
+          const f = markSnapFn(mk);
+          const onCurve = f ? f(mk.x) : NaN;
+          mk.y = isFinite(onCurve) ? onCurve
+               : Math.max(yLo, Math.min(yHi, my.invert(ev.y)));
+        }
         renderMarkList(); redrawAll();
       }));
     // Подпись растёт ВВЕРХ от точки, чтобы не накрывать её саму.
@@ -1888,7 +1907,8 @@ function drawMarks() {
    Если рядом сразу две кривые, метят почти наверняка в их пересечение:
    там и ставим, честно решая f1(x) = f2(x).
    --------------------------------------------------------------------- */
-const SNAP_PX = 14;   // на каком расстоянии от кривой щелчок считается «в неё»
+const SNAP_PX = 14;      // на каком расстоянии от линии щелчок считается «в неё»
+const RELEASE_PX = 35;   // а на каком уже отрывается (П31: отпустить труднее, чем прилипнуть)
 
 // К чему можно прилипнуть в текущей сцене. Кривые берём готовыми функциями:
 // откуда они взялись, прилипанию знать не нужно.
@@ -2014,10 +2034,54 @@ function tradeSnapTargets(out) {
 }
 
 // Ближайшая точка НА кривых к пикселю (px, py) или null, если все далеко.
+/* Оси как цель прилипания (П31). В snapTargets их нет и быть не должно: там
+   лежат кривые вида y = f(x), по ним ищутся экстремумы и изломы, а у прямой
+   y = 0 производная нулевая всюду и «экстремумом» оказался бы каждый узел.
+   Поэтому оси считаем отдельно, и ось Y — вертикаль, для которой f(x) вообще
+   не определена. */
+function axisSnapAt(px, py) {
+  const { mx, my } = mainScales();
+  const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
+  const zx = (0 >= xLo && 0 <= xHi) ? mx(0) : null;
+  const zy = (0 >= yLo && 0 <= yHi) ? my(0) : null;
+  const out = [];
+  if (zy !== null && Math.abs(py - zy) <= SNAP_PX) {
+    out.push({ x: mx.invert(px), y: 0, name: 'ось X', kind: 'axis', d: Math.abs(py - zy) });
+  }
+  if (zx !== null && Math.abs(px - zx) <= SNAP_PX) {
+    out.push({ x: 0, y: my.invert(py), name: 'ось Y', kind: 'axis', d: Math.abs(px - zx) });
+  }
+  // Обе рядом — метят в начало координат.
+  if (out.length === 2) return { x: 0, y: 0, name: 'начало координат', kind: 'axis', d: Math.hypot(px - zx, py - zy) };
+  return out[0] || null;
+}
+
+// Расстояние в пикселях от курсора до линии, на которой сидит точка. Нужно
+// для сопротивления при отрыве: пока курсор ближе порога, точка не срывается.
+function snapDistPx(name, px, py) {
+  const { mx, my } = mainScales();
+  if (name === 'ось X') return Math.abs(py - my(0));
+  if (name === 'ось Y') return Math.abs(px - mx(0));
+  if (name === 'начало координат') return Math.hypot(px - mx(0), py - my(0));
+  const t = snapTargets().filter(t => t.name === name)[0];
+  if (!t) return Infinity;
+  const [xLo, xHi] = mx.domain();
+  let best = Infinity;
+  const N = 200;
+  for (let i = 0; i <= N; i++) {
+    const x = xLo + (xHi - xLo) * i / N, y = t.f(x);
+    if (!isFinite(y)) continue;
+    const d = Math.hypot(mx(x) - px, my(y) - py);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
 function snapPointAt(px, py) {
   const { mx, my } = mainScales();
   const targets = snapTargets();
-  if (!targets.length) return null;
+  const ax = axisSnapAt(px, py);
+  if (!targets.length) return ax;
   const [xLo, xHi] = mx.domain();
   const near = [];
   targets.forEach(t => {
@@ -2032,8 +2096,10 @@ function snapPointAt(px, py) {
     }
     if (bx !== null && bd <= SNAP_PX) near.push({ t, d: bd, x: bx, y: by });
   });
-  if (!near.length) return null;
+  // Ось ближе любой кривой — садимся на неё.
+  if (!near.length) return ax;
   near.sort((a, b) => a.d - b.d);
+  if (ax && ax.d < near[0].d) return ax;
 
   // Две кривые в пределах допуска — метят в пересечение. Ищем его в окне
   // вокруг щелчка шириной в тот же допуск, переведённый в единицы данных.
@@ -2073,8 +2139,6 @@ let markCounter = 0;
 // Взвести/снять режим «следующий щелчок по графику ставит точку».
 function armMark(on) {
   STATE.markArm = on;
-  const b = document.getElementById('btn-mark-add');
-  if (b) { b.classList.toggle('armed', on); b.textContent = on ? 'Щёлкните по графику' : 'Поставить точку'; }
   const wrap = document.getElementById('graph-wrap');
   if (wrap) wrap.style.cursor = on ? 'crosshair' : '';
   if (!on) showSnapHint(null);   // снятый режим не оставляет кружок-подсказку
@@ -2098,16 +2162,45 @@ function resetDecor() {
 }
 
 function addMarkAt(x, y, snapTo) {
+  // Щелчок по графику в режиме «Указать на графике» достраивает уже заведённую
+  // заготовку, а не плодит вторую точку (П28).
+  const draft = pendingMark();
+  if (draft) {
+    draft.x = x; draft.y = y; draft.snapTo = snapTo || null;
+    draft.pending = false;
+    renderMarkList();
+    redrawAll();
+    return;
+  }
+  STATE.marks.push(newMark(x, y, snapTo, 'graph'));
+  renderMarkList();
+  redrawAll();
+}
+
+/* Заготовка точки: строка списка уже есть, а на плоскости точки ещё нет.
+   Так работает пайплайн П28 — тумблер и поля координат живут в той же строке,
+   которая потом станет обычной строкой точки, и фокус при наборе не теряется. */
+function newMark(x, y, snapTo, mode) {
   markCounter++;
-  STATE.marks.push({
+  return {
     id: markCounter, x, y, text: 'Точка ' + markCounter,
-    showCoords: true, showCurves: false, showDash: true, color: null,
+    showCoords: true, showDash: true, color: null,
+    mode: mode || 'coords',      // как её создавали: тумблер после этого заперт
+    pending: false,
     // Имя кривой, на которой сидит точка. Пока оно задано, точка при
     // перетаскивании скользит ПО кривой, а не отрывается от неё.
     snapTo: snapTo || null,
-  });
+  };
+}
+function pendingMark() { return (STATE.marks || []).filter(m => m.pending)[0] || null; }
+
+// «Добавить точку»: заводим заготовку и ждём координаты или щелчок по графику.
+function startMarkDraft() {
+  if (pendingMark()) return;
+  const m = newMark(NaN, NaN, null, 'coords');
+  m.pending = true;
+  STATE.marks.push(m);
   renderMarkList();
-  redrawAll();
 }
 
 // Функция кривой, к которой привязана точка (или null, если привязки нет).
@@ -2117,81 +2210,145 @@ function markSnapFn(mk) {
   return t ? t.f : null;
 }
 
-// Список своих точек: координаты с клавиатуры, имя, цвет и три переключателя.
+/* Список своих точек (П28, П29).
+   Порядок на экране: сначала уже созданные точки, потом заготовка, если она
+   есть, и в самом низу кнопка «Добавить точку». Пока заготовка не превратилась
+   в точку, кнопки нет: два незаконченных ввода разом только путают. */
 function renderMarkList() {
   const box = document.getElementById('mark-list');
   if (!box) return;
   box.innerHTML = '';
-  if (!STATE.marks.length) return;
-  STATE.marks.forEach(mk => {
-    const row = document.createElement('div');
-    row.className = 'mark-row';
+  (STATE.marks || []).forEach(mk => box.appendChild(buildMarkRow(mk)));
 
-    const top = document.createElement('div');
-    top.className = 'mark-top';
-    const pick = makeColorPicker(mk.color || COL.ink, (hex) => { mk.color = hex; redrawAll(); }, 'Цвет точки');
-    const co = document.createElement('span');
-    co.className = 'mark-co';
-    co.textContent = mk.snapTo ? ('На ' + mk.snapTo) : 'Своя точка';
-    const del = document.createElement('button');
-    del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.title = 'Убрать точку';
-    del.addEventListener('click', () => {
-      STATE.marks = STATE.marks.filter(m => m.id !== mk.id);
-      renderMarkList(); redrawAll();
-    });
-    top.append(pick, co, del);
+  const add = document.createElement('button');
+  add.type = 'button'; add.className = 'btn-sm btn-mark-add';
+  add.textContent = 'Добавить точку';
+  add.addEventListener('click', () => startMarkDraft());
+  if (!pendingMark()) box.appendChild(add);
+}
 
-    const inp = document.createElement('input');
-    inp.type = 'text'; inp.value = mk.text; inp.placeholder = 'Подпись точки';
-    inp.addEventListener('input', () => { mk.text = inp.value; redrawAll(); });
+function buildMarkRow(mk) {
+  const row = document.createElement('div');
+  row.className = 'mark-row';
+  if (mk.pending) row.classList.add('mark-draft');
 
-    // Координаты можно задать с клавиатуры, а не только перетаскиванием.
-    const xy = document.createElement('div');
-    xy.className = 'mark-xy';
-    const mkNum = (key, label) => {
-      const l = document.createElement('label'); l.textContent = label;
-      const n = document.createElement('input');
-      n.type = 'number'; n.step = 'any'; n.value = Math.round(mk[key] * 1000) / 1000;
-      n.addEventListener('change', () => {
-        const v = parseFloat(n.value);
-        if (!isFinite(v)) return;
-        mk[key] = v;
-        // Точка на кривой держится за неё: меняем x, высоту берём с кривой.
-        const f = markSnapFn(mk);
-        if (f && key === 'x') { const y = f(v); if (isFinite(y)) mk.y = y; }
-        renderMarkList(); redrawAll();
+  /* Тумблер «Ввести координаты | Указать на графике» (П28). Он живёт только
+     у заготовки: как только точка появилась на плоскости, способ ввода уже
+     выбран и менять его нечем — тумблер из строки уходит совсем. Держать его
+     навсегда серым в каждой строке было бы мёртвым элементом. */
+  let seg = null;
+  if (mk.pending) {
+    seg = document.createElement('div');
+    seg.className = 'seg mark-mode';
+    const mkBtn = (mode, text) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'seg-btn' + (mk.mode === mode ? ' active' : '');
+      b.textContent = text;
+      b.addEventListener('click', () => {
+        if (!mk.pending) return;
+        mk.mode = mode;
+        armMark(mode === 'graph');
+        renderMarkList();
       });
-      xy.append(l, n);
+      return b;
     };
-    mkNum('x', 'x');
-    mkNum('y', 'y');
+    seg.append(mkBtn('coords', 'Ввести координаты'), mkBtn('graph', 'Указать на графике'));
+    row.appendChild(seg);
+  }
 
-    const toggle = (label, key, def) => {
-      const w = document.createElement('label');
-      w.className = 'chk';
-      const c = document.createElement('input');
-      c.type = 'checkbox';
-      c.checked = (mk[key] === undefined) ? def : !!mk[key];
-      c.addEventListener('change', () => { mk[key] = c.checked; redrawAll(); });
-      w.append(c, document.createTextNode(label));
-      return w;
-    };
+  if (mk.pending && mk.mode === 'graph') {
+    const hint = document.createElement('div');
+    hint.className = 'mark-hint';
+    hint.textContent = 'Нажмите на график!';
+    row.appendChild(hint);
+    return row;
+  }
 
-    row.append(top, inp, xy,
-      toggle('пунктир к осям', 'showDash', true),
-      toggle('координаты', 'showCoords', true),
-      toggle('значения кривых', 'showCurves', false));
+  /* Координаты. У заготовки они и есть способ создания: точка появляется, как
+     только оба поля заполнены, и переезжает на каждый введённый символ —
+     поэтому слушаем input, а не change, и НЕ пересобираем список (иначе
+     потерялся бы фокус посреди набора). */
+  const xy = document.createElement('div');
+  xy.className = 'mark-xy';
+  const nums = {};
+  const mkNum = (key, label) => {
+    const l = document.createElement('label'); l.textContent = label;
+    const n = document.createElement('input');
+    n.type = 'number'; n.step = 'any';
+    n.value = isFinite(mk[key]) ? Math.round(mk[key] * 1000) / 1000 : '';
+    n.addEventListener('input', () => {
+      const v = parseFloat(n.value);
+      mk[key] = isFinite(v) ? v : NaN;
+      // Точка на кривой держится за неё: меняем x, высоту берём с кривой.
+      const f = markSnapFn(mk);
+      if (f && key === 'x' && isFinite(v)) { const y = f(v); if (isFinite(y)) mk.y = y; }
+      const ready = isFinite(mk.x) && isFinite(mk.y);
+      if (mk.pending && ready) {
+        mk.pending = false;
+        if (seg) seg.remove();          // способ ввода выбран, тумблер больше не нужен
+        row.classList.remove('mark-draft');
+        const box = document.getElementById('mark-list');
+        if (box && !box.querySelector('.btn-mark-add')) {
+          const add = document.createElement('button');
+          add.type = 'button'; add.className = 'btn-sm btn-mark-add';
+          add.textContent = 'Добавить точку';
+          add.addEventListener('click', () => startMarkDraft());
+          box.appendChild(add);
+        }
+      } else if (!ready && !mk.pending) {
+        mk.pending = true;                     // стёрли координату — точка ушла
+      }
+      redrawAll();
+    });
+    nums[key] = n;
+    xy.append(l, n);
+  };
+  mkNum('x', 'X');
+  mkNum('y', 'Y');
+  if (mk.pending) { row.appendChild(xy); return row; }   // остальное — когда точка встанет
 
-    // Точка, посаженная на кривую, скользит по ней. Галочка отпускает её,
-    // если нужно поставить отметку рядом, а не на самой кривой.
-    if (mk.snapTo) {
-      const w = document.createElement('label');
-      w.className = 'chk';
-      const c = document.createElement('input'); c.type = 'checkbox'; c.checked = true;
-      c.addEventListener('change', () => { if (!c.checked) mk.snapTo = null; renderMarkList(); redrawAll(); });
-      w.append(c, document.createTextNode('держать на кривой ' + mk.snapTo));
-      row.appendChild(w);
-    }
-    box.appendChild(row);
+  const top = document.createElement('div');
+  top.className = 'mark-top';
+  const pick = makeColorPicker(mk.color || COL.ink, (hex) => { mk.color = hex; redrawAll(); }, 'Цвет точки');
+  const co = document.createElement('span');
+  co.className = 'mark-co';
+  co.textContent = mk.snapTo ? ('На ' + mk.snapTo) : 'Своя точка';
+  const del = document.createElement('button');
+  del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.title = 'Убрать точку';
+  del.addEventListener('click', () => {
+    STATE.marks = STATE.marks.filter(m => m.id !== mk.id);
+    renderMarkList(); redrawAll();
   });
+  top.append(pick, co, del);
+
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.value = mk.text; inp.placeholder = 'Подпись точки';
+  inp.addEventListener('input', () => { mk.text = inp.value; redrawAll(); });
+
+  const toggle = (label, key, def) => {
+    const w = document.createElement('label');
+    w.className = 'chk';
+    const c = document.createElement('input');
+    c.type = 'checkbox';
+    c.checked = (mk[key] === undefined) ? def : !!mk[key];
+    c.addEventListener('change', () => { mk[key] = c.checked; redrawAll(); });
+    w.append(c, document.createTextNode(label));
+    return w;
+  };
+
+  row.append(top, inp, xy,
+    toggle('Пунктир к осям', 'showDash', true),
+    toggle('Координаты', 'showCoords', true));
+
+  // Точка, посаженная на кривую или ось, скользит по ней. Галочка отпускает её,
+  // если нужно поставить отметку рядом, а не на самой линии.
+  if (mk.snapTo) {
+    const w = document.createElement('label');
+    w.className = 'chk';
+    const c = document.createElement('input'); c.type = 'checkbox'; c.checked = true;
+    c.addEventListener('change', () => { if (!c.checked) mk.snapTo = null; renderMarkList(); redrawAll(); });
+    w.append(c, document.createTextNode('Держать на линии ' + mk.snapTo));
+    row.appendChild(w);
+  }
+  return row;
 }

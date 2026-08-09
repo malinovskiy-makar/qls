@@ -153,9 +153,14 @@ await t('точка показывает координаты', () => page.evalu
 await t('координаты точки на графике', () => page.evaluate(() =>
   [...document.querySelectorAll('#chart text')].some(n => n.textContent === '(30; 70)') || 'нет координат'));
 
-await t('точка показывает значения кривых', () => page.evaluate(() => {
+/* П29: значений кривых у точки больше нет — ни галочки в списке, ни строк на
+   графике. Подпись из четырёх строк накрывала сам график. */
+await t('значений кривых у точки нет', () => page.evaluate(() => {
   STATE.marks[0].showCurves = true; redrawAll();
-  return [...document.querySelectorAll('#chart text')].some(n => /^D = 70$/.test(n.textContent)) || 'нет значения D';
+  const onChart = [...document.querySelectorAll('#chart text')].some(n => /^D = /.test(n.textContent));
+  const inList = [...document.querySelectorAll('#mark-list .chk')].some(l => /значения кривых/i.test(l.textContent));
+  delete STATE.marks[0].showCurves; redrawAll();
+  return (!onChart && !inList) || `на графике ${onChart}, в списке ${inList}`;
 }));
 
 await t('пикеры цвета есть у каждой кривой', async () =>

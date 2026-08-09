@@ -135,9 +135,14 @@ for (const [key, name] of scenes) {
       el.blur();
     }
 
-    // П31: точки липнут к кривым И к осям; П54: зум и панорама живут везде.
+    /* П31: точки липнут к кривым И к осям. Оси лежат не в snapTargets (там
+       кривые вида y = f(x), по ним ищутся экстремумы), а считаются отдельно —
+       проверяем, что прилипание к ним реально срабатывает у самой оси. */
     let snapAxes = false;
-    try { snapAxes = (typeof snapTargets === 'function') && snapTargets().some(t => t.kind === 'axis'); } catch (e) {}
+    try {
+      const s = (typeof mainScales === 'function') ? mainScales() : null;
+      if (s) snapAxes = !!axisSnapAt(s.mx(0) + 2, s.my(0) - 40);
+    } catch (e) {}
     const zoomOk = typeof zoomBy === 'function' && typeof resetZoom === 'function';
     let panOk = false;
     try { panOk = typeof panByPixels === 'function'; } catch (e) {}

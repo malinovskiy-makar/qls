@@ -634,6 +634,14 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 /* Строка своей точки: координаты, подпись, что показывать, удаление. */
 .mark-row { padding: 8px 0; border-bottom: .5px solid var(--border); }
 .mark-row:last-child { border-bottom: none; }
+/* Пайплайн добавления точки (П28): тумблер способа ввода, подсказка и
+   кнопка «Добавить точку», которая всегда стоит под уже созданными точками. */
+.mark-mode { margin: 0 0 7px; }
+.mark-mode .seg-btn { font-size: 11px; padding: 5px 6px; }
+.mark-mode .seg-btn:disabled { cursor: default; opacity: .75; }
+.mark-draft { background: var(--accent-tint); border-radius: var(--r-sm); padding: 8px; }
+.mark-hint { font-size: 12px; font-weight: 600; color: var(--accent); padding: 4px 0 2px; }
+.btn-mark-add { margin-top: 8px; }
 .mark-top { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
 .mark-co {
   flex: 1; font-size: 11.5px; color: var(--text2); white-space: nowrap;

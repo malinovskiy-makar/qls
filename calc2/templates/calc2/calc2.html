@@ -1881,9 +1881,10 @@
         <span>Точки на графике</span>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </button>
+      <!-- П28: список точек и кнопка «Добавить точку» собираются целиком в
+           renderMarkList — кнопка обязана стоять ПОД уже созданными точками. -->
       <div class="fold-body open" id="marks-body">
-        <button class="btn-sm" id="btn-mark-add" type="button">Поставить точку</button>
-        <div id="mark-list" style="margin-top:8px;"></div>
+        <div id="mark-list"></div>
       </div>
     </div>
 
