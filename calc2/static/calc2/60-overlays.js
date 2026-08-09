@@ -642,15 +642,35 @@ function kinksOf(f, lo, hi) {
     xs.push(x); ss.push(s);
     if (isFinite(s)) mag.push(Math.abs(s));
   }
-  if (mag.length < 3) return out;
+  if (mag.length < 5) return out;
   mag.sort((a, b) => a - b);
   const med = mag[Math.floor(mag.length / 2)] || 1;
   // Порог берём от типичного наклона: иначе он зависел бы от единиц измерения.
   const jump = Math.max(med * 0.6, 1e-9);
-  for (let i = 1; i <= N; i++) {
-    if (!isFinite(ss[i]) || !isFinite(ss[i - 1])) continue;
-    if (Math.abs(ss[i] - ss[i - 1]) <= jump) continue;
-    const xr = (xs[i] + xs[i - 1]) / 2;
+  /* Скачок наклона ищем через ОДИН узел, а не между соседними.
+     Производная считается центральной разностью с шагом h, поэтому у самого
+     излома есть узел, где окно ±h лежит по обе стороны от него: наклон там
+     смешанный, и весь скачок делится на две половинки, каждая ниже порога.
+     На «Q < 40 ? 100 - Q : 80 - 0.5*Q» так и было — 0.264 и 0.236 при пороге
+     0.3, и излом не находился вовсе. Смотрим ss[i+1] против ss[i-1]: смазанный
+     узел остаётся посередине и в сравнение не попадает. Чтобы гладкая кривая
+     не сошла за излом, требуем ещё и «полки» с обеих сторон. */
+  for (let i = 2; i <= N - 2; i++) {
+    const l = ss[i - 1], r = ss[i + 1];
+    if (!isFinite(l) || !isFinite(r)) continue;
+    if (Math.abs(r - l) <= jump) continue;
+    const lFlat = isFinite(ss[i - 2]) && Math.abs(l - ss[i - 2]) < jump / 3;
+    const rFlat = isFinite(ss[i + 2]) && Math.abs(r - ss[i + 2]) < jump / 3;
+    if (!lFlat || !rFlat) continue;
+    // Точное место излома — пересечение продолжений левой и правой ветвей.
+    // Для кусочно-линейной записи это ровно точка стыка.
+    const xL = xs[i - 2], xR = xs[i + 2];
+    const yL = f(xL), yR = f(xR);
+    let xr = xs[i];
+    if (isFinite(yL) && isFinite(yR) && Math.abs(l - r) > 1e-12) {
+      const cand = (yR - yL + l * xL - r * xR) / (l - r);
+      if (isFinite(cand) && cand >= xs[i - 2] && cand <= xs[i + 2]) xr = cand;
+    }
     if (!out.some(v => Math.abs(v - xr) < (hi - lo) * 0.01)) out.push(xr);
   }
   return out;
@@ -661,16 +681,19 @@ function keyTargets() {
   const out = [];
   const w = viewWindow();
   const dx = (w.x1 - w.x0) * 1e-3, dy = (w.y1 - w.y0) * 1e-3;
-  const push = (x, y, name) => {
+  /* Вид точки нужен отрисовке (П36–П38): излом рисуется по-особому, у
+     остальных вид одинаковый. Перегибы сюда не попадают и не попадут:
+     договорились их ключевыми точками не считать. */
+  const push = (x, y, name, kind) => {
     if (!isFinite(x) || !isFinite(y)) return;
     if (x < w.x0 - 1e-9 || x > w.x1 + 1e-9 || y < w.y0 - 1e-9 || y > w.y1 + 1e-9) return;
     if (out.some(o => Math.abs(o.x - x) < dx && Math.abs(o.y - y) < dy)) return;
-    out.push({ x, y, name });
+    out.push({ x, y, name, kind: kind || 'cross' });
   };
   (STATE.crosses && STATE.crosses.length ? STATE.crosses : crossPoints()).forEach(p => {
     push(p.x, p.y, /^ось /.test(p.b)
       ? ('пересечение с ' + p.b.replace('ось ', 'осью '))
-      : ('пересечение ' + p.a + ' и ' + p.b));
+      : ('пересечение ' + p.a + ' и ' + p.b), 'cross');
   });
   if (!(w.x1 > w.x0)) { _keyPtsCache = out; return out; }
   const lo = w.x0 + (w.x1 - w.x0) * 1e-4, hi = w.x1;
@@ -684,7 +707,7 @@ function keyTargets() {
       if (!isFinite(y)) return;
       const s = d2Num(t.f, x, h2);
       const kind = (s > 0) ? 'минимум ' : (s < 0 ? 'максимум ' : 'плато ');
-      push(x, y, kind + t.name);
+      push(x, y, kind + t.name, 'extremum');
     });
     // Излом, совпавший с уже найденным пересечением, не добавляем: у Z = min(f, g)
     // ветвь переключается ровно там, где кривые пересекаются, а пересечение и
@@ -692,7 +715,7 @@ function keyTargets() {
     const near = (w.x1 - w.x0) * 0.02;
     kinksOf(t.f, lo, hi).forEach(x => {
       if (out.some(o => Math.abs(o.x - x) < near)) return;
-      push(x, t.f(x), 'излом ' + t.name);
+      push(x, t.f(x), 'излом ' + t.name, 'kink');
     });
   });
   _keyPtsCache = out;
@@ -715,9 +738,20 @@ function snapVertexAt(px, py) {
   return hit ? { x: hit.x, y: hit.y, name: hit.name, key: false, cross: hit.cross } : null;
 }
 
+/* Ключевые точки на холсте (П36–П38).
+
+   Что считаем ключевой точкой (П36): любое пересечение — кривой с кривой,
+   кривой с осью, оси с осью; излом кусочно заданной кривой; любой экстремум.
+   ПЕРЕГИБЫ ключевыми точками не считаем и не отмечаем. Ровно это и возвращает
+   keyTargets(); раньше на холсте рисовался более бедный crossPoints() — без
+   экстремумов и изломов, — и договорённость держалась только на словах.
+
+   Излом (П37) особый: у него сразу, без всякого щелчка, проводится пунктир к
+   обеим осям и подписываются координаты НА ОСЯХ. У остальных точек так не
+   делается: они серые, а координаты и «закрепка» появляются по щелчку. */
 function drawCrossPoints() {
-  const pts = crossPoints();
-  STATE.crosses = pts;
+  STATE.crosses = crossPoints();
+  const pts = keyTargets();
   if (!pts.length) return;
   const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'crosses');
@@ -725,13 +759,57 @@ function drawCrossPoints() {
   // щелчок: иначе щелчок рядом с пересечением уходил в кружок и вершина не
   // ставилась вовсе. Прилипание к этим же точкам работает и без их кликабельности.
   if (STATE.vertArm || STATE.markArm) g.style('pointer-events', 'none');
+
+  const [x0] = mx.domain(), [y0] = my.domain();
+  const zx = mx(Math.max(0, x0)), zy = my(Math.max(0, y0));   // где стоят оси
+
   pts.forEach((p, i) => {
     const px = mx(p.x), py = my(p.y);
+
+    if (p.kind === 'kink') {
+      // Пунктир к обеим осям и числа прямо на осях — без щелчка.
+      g.append('line').attr('x1', zx).attr('y1', py).attr('x2', px).attr('y2', py)
+        .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3 3').attr('opacity', .6);
+      g.append('line').attr('x1', px).attr('y1', zy).attr('x2', px).attr('y2', py)
+        .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3 3').attr('opacity', .6);
+      /* Числа на осях. Если ровно там уже стоит деление, второй раз его не
+         печатаем: вышло бы одно число поверх другого. Делаем как extraTickX —
+         засечка и подпись, только по шкалам сцены, а не по глобальным. */
+      const axg = g.append('g').attr('class', 'kink-axis');
+      const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
+      const spanX = Math.abs(xHi - xLo), spanY = Math.abs(yHi - yLo);
+      if (!xTicks().some(t => Math.abs(t - p.x) < spanX * 0.025)) {
+        axg.append('line').attr('x1', px).attr('y1', zy - 4).attr('x2', px).attr('y2', zy + 4)
+          .attr('stroke', COL.ink).attr('stroke-width', 1.4);
+        haloText(axg, px, zy + 8, fmt(p.x), 'middle', 'hanging');
+      }
+      if (!yTicks().some(t => Math.abs(t - p.y) < spanY * 0.025)) {
+        axg.append('line').attr('x1', zx - 4).attr('y1', py).attr('x2', zx + 4).attr('y2', py)
+          .attr('stroke', COL.ink).attr('stroke-width', 1.4);
+        haloText(axg, zx - 8, py, fmt(p.y), 'end', 'middle');
+      }
+      g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
+        .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.6);
+      return;
+    }
+
     const dot = g.append('circle').attr('cx', px).attr('cy', py)
       .style('cursor', 'pointer');
     // Подпись живёт в своей группе: её показываем и прячем, не трогая остальное.
     const lab = g.append('g').attr('class', 'cross-label').style('display', 'none');
     haloText(lab, px + 9, py - 9, '(' + fmt(p.x) + '; ' + fmt(p.y) + ')', 'start', 'auto');
+    // «Закрепка» рядом с координатами: кладёт точку в список своих точек.
+    const pin = lab.append('g').attr('class', 'cross-pin').style('cursor', 'pointer');
+    pin.append('rect').attr('x', px + 9).attr('y', py - 5).attr('width', 15).attr('height', 15)
+      .attr('rx', 3).attr('fill', COL.halo).attr('stroke', COL.inkSoft).attr('stroke-width', 1);
+    pin.append('path')
+      .attr('d', `M${px + 12.5},${py + 7} l0,-3 l6,-6 l3,3 l-6,6 z`)
+      .attr('fill', 'none').attr('stroke', COL.inkSoft).attr('stroke-width', 1.2)
+      .attr('stroke-linejoin', 'round');
+    pin.append('title').text('Добавить в список точек');
+    pin.on('click', (ev) => { ev.stopPropagation(); pinKeyPoint(p); });
 
     const paint = () => {
       const hot = (STATE.hotCross === i) || (STATE.hoverCross === i);
@@ -740,14 +818,25 @@ function drawCrossPoints() {
          .attr('stroke', hot ? COL.ink : COL.inkSoft)
          .attr('stroke-width', hot ? 2 : 1.4)
          .attr('opacity', hot ? 1 : 0.55);
-      lab.style('display', hot ? null : 'none');
+      // Координаты и закрепка — только у закреплённой щелчком точки: при простом
+      // наведении показывать нечего, а всплывающая подсказка «КТВ и ось Y»
+      // раньше только мешала (её больше нет совсем).
+      lab.style('display', (STATE.hotCross === i) ? null : 'none');
     };
     paint();
-    dot.on('click', (ev) => { ev.stopPropagation(); STATE.hotCross = (STATE.hotCross === i) ? null : i; paint(); })
+    dot.on('click', (ev) => { ev.stopPropagation(); STATE.hotCross = (STATE.hotCross === i) ? null : i; redrawAll(); })
        .on('pointerenter', () => { STATE.hoverCross = i; paint(); })
        .on('pointerleave', () => { if (STATE.hoverCross === i) STATE.hoverCross = null; paint(); });
-    dot.append('title').text(p.a + ' и ' + p.b);
   });
+}
+
+/* Закрепка: ключевая точка становится обычной своей точкой — последней в
+   списке. Блок «Точки на графике» при этом раскрывается сразу же, иначе точка
+   уходит в закрытую карточку и выглядит как «ничего не произошло». */
+function pinKeyPoint(p) {
+  STATE.hotCross = null;
+  addMarkAt(p.x, p.y, null);              // последней в списке, как обычная точка
+  openSection('sec-view');
 }
 
 /* Прокатывание по кривой: нажимаете НА кривую и, не отпуская, ведёте — по ней

@@ -1156,6 +1156,17 @@ function wireControls() {
   const vClear = document.getElementById('ac-vert-clear');
   if (vClear) vClear.addEventListener('click', () => clearAreaVerts());
 
+  /* П38: щелчок по пустому месту снимает выделение ключевой точки — она снова
+     серая и без координат. Раньше выделение гасил только повторный щелчок по
+     самой точке, и координаты оставались висеть, пока в неё не попадёшь снова.
+     Сами кружки останавливают всплытие, поэтому сюда доходит только «мимо». */
+  if (chartEl) chartEl.addEventListener('click', () => {
+    if (STATE.markArm || STATE.vertArm) return;      // взведённые режимы заняты своим
+    if (STATE.hotCross === null) return;
+    STATE.hotCross = null;
+    redrawAll();
+  });
+
   // Подсказка: пока режим взведён, показываем кружком, куда сядет точка.
   if (chartEl) chartEl.addEventListener('mousemove', (ev) => {
     if (!STATE.markArm && !STATE.vertArm) return;

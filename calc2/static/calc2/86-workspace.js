@@ -212,6 +212,21 @@ function collapseCards() {
   });
 }
 
+/* Раскрыть карточку по её id. Нужна, когда блок должен открыться не от щелчка
+   по заголовку, а сам: закрепка ключевой точки кладёт точку в «Точки на
+   графике», и закрытый блок читался бы как «ничего не произошло» (П38). */
+function openSection(secId) {
+  const sec = document.getElementById(secId);
+  if (!sec) return;
+  const btn = sec.querySelector(':scope > .fold-btn');
+  const box = sec.querySelector(':scope > .fold-body');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+  if (box) box.classList.add('open');
+  sec.classList.add('open-card');
+  setToolsOpen(true);                     // сама панель тоже могла быть свёрнута
+  if (box && box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
+}
+
 /* Первая видимая карточка ярче остальных: сцена открывается со всеми
    закрытыми блоками, и глаз должен сразу видеть, куда нажимать. */
 function syncFirstCard() {

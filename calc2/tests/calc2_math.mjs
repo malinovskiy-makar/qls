@@ -1009,6 +1009,42 @@ const CASES = [
              ['a = 2 ⇒ Xmax вдвое меньше', 'x2', 50, 0.01]],
   },
   {
+    /* П36–П37. Договорённость о ключевых точках: пересечения, изломы и
+       экстремумы — да, перегибы — нет. Излом кусочной кривой раньше не
+       находился совсем: скачок наклона размазывался по двум узлам сетки и не
+       проходил порог. Проверяем и сам факт, и точное место стыка. */
+    name: 'Ключевые точки · излом кусочной кривой найден в точке стыка',
+    run: `openPicker(); pickScene('sd'); closePicker();
+          var d = STATE.curves.find(function (c) { return c.role === 'demand'; });
+          updateCurveExpr(d, 'Q < 40 ? 100 - Q : 80 - 0.5*Q'); redrawAll();
+          var k = keyTargets();
+          var kinks = k.filter(function (p) { return p.kind === 'kink'; });
+          var infl = k.filter(function (p) { return /перегиб/.test(p.name); });
+          return { n: kinks.length, x: kinks.length ? kinks[0].x : -1,
+                   y: kinks.length ? kinks[0].y : -1, infl: infl.length,
+                   drawn: document.querySelectorAll('.crosses circle').length };`,
+    checks: [['излом ровно один', 'n', 1, 0], ['стык при Q = 40', 'x', 40, 0.2],
+             ['цена в стыке 60', 'y', 60, 0.2], ['перегибов не отмечаем', 'infl', 0, 0],
+             ['на холсте есть точки', 'drawn', 4, 0]],
+  },
+  {
+    /* П38. Закрепка кладёт ключевую точку в список своих точек последней и
+       раскрывает блок «Точки на графике», если он был закрыт. */
+    name: 'Ключевые точки · закрепка кладёт точку в список',
+    run: `openPicker(); pickScene('sd'); closePicker();
+          STATE.marks = []; redrawAll();
+          var before = STATE.marks.length;
+          var p = keyTargets().filter(function (t) { return /D и S/.test(t.name); })[0];
+          pinKeyPoint(p);
+          var m = STATE.marks[STATE.marks.length - 1];
+          var open = document.getElementById('sec-view').classList.contains('open-card') ? 1 : 0;
+          return { added: STATE.marks.length - before, x: m.x, y: m.y, open: open,
+                   hot: STATE.hotCross === null ? 1 : 0 };`,
+    checks: [['точка добавлена', 'added', 1, 0], ['координата Q', 'x', 50, 0.1],
+             ['координата P', 'y', 50, 0.1], ['блок раскрылся', 'open', 1, 0],
+             ['выделение снято', 'hot', 1, 0]],
+  },
+  {
     /* П26. «Деформации графика» ведёт общий механизм параметров: своего
        ползунка у сюжета больше нет, буква a приходит из sceneExtraParams. */
     name: 'Деформации · параметр a идёт из общего механизма',
