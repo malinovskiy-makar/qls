@@ -57,6 +57,17 @@ const reveal = async (sel) => {
     if (typeof setToolsOpen === 'function') setToolsOpen(true);
     const el = document.querySelector(s);
     if (!el) return;
+    // П2: карточка модели живёт внутри блока, а блоки на главном экране
+    // закрыты. Открываем нужный блок (и убираем сетку карточек блоков).
+    const grp = el.closest && el.closest('.picker-group');
+    if (grp && !grp.classList.contains('open')) {
+      const blocks = document.getElementById('picker-blocks');
+      if (blocks) blocks.classList.add('hidden');
+      document.querySelectorAll('#scene-picker .picker-group')
+        .forEach(g => g.classList.toggle('open', g === grp));
+      const back = document.getElementById('picker-back');
+      if (back) back.classList.add('shown');
+    }
     let n = el;
     while (n && n !== document.body) {
       const foldable = n.classList && (n.classList.contains('fold-body') || n.classList.contains('picker-grid'));
@@ -1469,33 +1480,37 @@ await t('раскрытая карточка отличается фоном', a
   return (r.open && r.card && r.bg !== closed) || JSON.stringify(r) + ' закрытая ' + closed;
 });
 
-/* ── Фаза 6. Окно сценариев ───────────────────────────────────────────
-   Десять блоков без нумерации, все свёрнуты, открыт один за раз. */
-await t('заголовки блоков без номеров, раскрыт не больше одного', async () => {
+/* ── П2. Первый экран: десять карточек блоков по две в ряд ───────────
+   Щелчок по карточке убирает остальные и показывает модели этого блока. */
+await t('карточки блоков без номеров, ни один блок не раскрыт', async () => {
   await page.evaluate(() => openPicker());
   await page.waitForTimeout(200);
   return await page.evaluate(() => {
     const bad = [];
-    document.querySelectorAll('#scene-picker .picker-group').forEach(g => {
-      const b = g.querySelector(':scope > .picker-group-label');
-      const grid = g.querySelector(':scope > .picker-grid');
-      if (!b || b.tagName !== 'BUTTON') { bad.push('заголовок не кнопка'); return; }
-      if (/^ *[0-9]+ *·/.test(b.textContent)) bad.push('номер в «' + b.textContent.trim() + '»');
+    const cards = [...document.querySelectorAll('#picker-blocks .bcard')];
+    if (cards.length !== 10) bad.push('карточек ' + cards.length);
+    cards.forEach(c => {
+      const nm = (c.querySelector('.bcard-name') || {}).textContent || '';
+      if (/^ *[0-9]+ *·/.test(nm)) bad.push('номер в «' + nm.trim() + '»');
     });
-    const open = document.querySelectorAll('#scene-picker .picker-grid.open').length;
-    if (open > 1) bad.push('раскрыто блоков: ' + open);
+    const open = document.querySelectorAll('#scene-picker .picker-group.open').length;
+    if (open) bad.push('раскрыто блоков: ' + open);
     return !bad.length || bad.join('; ');
   });
 });
 
-await t('открыт один блок за раз', async () => {
-  await page.click('#scene-picker .picker-group:nth-of-type(1) > .picker-group-label');
+await t('открыт один блок за раз, есть возврат', async () => {
+  await page.click('#picker-blocks .bcard:nth-child(1)');
   await page.waitForTimeout(160);
-  await page.click('#scene-picker .picker-group:nth-of-type(2) > .picker-group-label');
+  await page.evaluate(() => document.getElementById('picker-back').click());
+  await page.waitForTimeout(120);
+  await page.click('#picker-blocks .bcard:nth-child(2)');
   await page.waitForTimeout(160);
-  return await page.evaluate(() =>
-    document.querySelectorAll('#scene-picker .picker-grid.open').length === 1
-    || 'открытых блоков: ' + document.querySelectorAll('#scene-picker .picker-grid.open').length);
+  return await page.evaluate(() => {
+    const open = document.querySelectorAll('#scene-picker .picker-group.open').length;
+    const back = document.getElementById('picker-back').classList.contains('shown');
+    return (open === 1 && back) || `открытых блоков: ${open}, возврат ${back}`;
+  });
 });
 
 await t('свободного холста нет ни в окне, ни в маршрутах', () => page.evaluate(() =>

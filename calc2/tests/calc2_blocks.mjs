@@ -27,11 +27,13 @@ await page.waitForTimeout(900);
 
 const checks = [];
 // Блоки окна сценариев свёрнуты (Фаза 6) — раскрываем их перед щелчком по карточке.
+// П2: на главном экране видны карточки блоков, модели живут внутри открытого
+// блока. Для щелчка по карточке модели раскрываем все блоки разом.
 const openGroups = async () => {
   await page.evaluate(() => {
-    document.querySelectorAll('#scene-picker .picker-grid').forEach(g => g.classList.add('open'));
-    document.querySelectorAll('#scene-picker .picker-group-label[aria-expanded]')
-      .forEach(b => b.setAttribute('aria-expanded', 'true'));
+    const b = document.getElementById('picker-blocks');
+    if (b) b.classList.add('hidden');
+    document.querySelectorAll('#scene-picker .picker-group').forEach(g => g.classList.add('open'));
   });
   await page.waitForTimeout(50);
 };
@@ -44,28 +46,56 @@ const t = async (name, fn) => {
 await t('в окне ровно десять блоков', async () =>
   (await page.locator('.picker-group').count()) === 10 || 'групп: ' + (await page.locator('.picker-group').count()));
 
-await t('Математика идёт первым блоком', async () =>
-  (await page.locator('.picker-group-label').first().textContent()).trim() === 'Математика' || 'первый не Математика');
+await t('Математика идёт первой карточкой блока', async () =>
+  (await page.locator('.bcard-name').first().textContent()).trim() === 'Математика' || 'первый не Математика');
 
-await t('блоки окна свёрнуты и без нумерации', () => page.evaluate(() => {
+/* П2: главный экран — десять больших карточек блоков с картинками, по две в
+   ряд, без нумерации; ни один блок не раскрыт, кнопки возврата не видно. */
+await t('главный экран — карточки блоков с картинками', () => page.evaluate(() => {
+  const cards = [...document.querySelectorAll('#picker-blocks .bcard')];
   const bad = [];
-  document.querySelectorAll('#scene-picker .picker-group').forEach(g => {
-    const b = g.querySelector(':scope > .picker-group-label');
-    const grid = g.querySelector(':scope > .picker-grid');
-    if (!b || b.tagName !== 'BUTTON') { bad.push('заголовок не кнопка'); return; }
-    if (/^\s*\d+\s*·/.test(b.textContent)) bad.push('номер в «' + b.textContent.trim() + '»');
-    if (grid && grid.classList.contains('open')) bad.push('«' + b.textContent.trim() + '» раскрыт');
+  if (cards.length !== 10) bad.push('карточек ' + cards.length);
+  cards.forEach(c => {
+    const nm = (c.querySelector('.bcard-name') || {}).textContent || '';
+    if (!c.querySelector('.bcard-spec svg')) bad.push('без картинки: ' + nm.trim());
+    if (/^\s*\d+\s*·/.test(nm)) bad.push('номер в «' + nm.trim() + '»');
   });
+  if (document.querySelectorAll('#scene-picker .picker-group.open').length) bad.push('блок уже раскрыт');
+  if (document.getElementById('picker-back').classList.contains('shown')) bad.push('кнопка возврата видна');
   return !bad.length || bad.join('; ');
 }));
+
+await t('щелчок по блоку показывает его модели и возврат', () => page.evaluate(() => {
+  const card = document.querySelectorAll('#picker-blocks .bcard')[1];
+  card.click();
+  const open = document.querySelectorAll('#scene-picker .picker-group.open');
+  const hidden = document.getElementById('picker-blocks').classList.contains('hidden');
+  const back = document.getElementById('picker-back');
+  const shown = back.classList.contains('shown');
+  const models = open.length ? open[0].querySelectorAll('.scard').length : 0;
+  back.click();                                   // и возврат работает
+  const restored = !document.getElementById('picker-blocks').classList.contains('hidden')
+                && !document.querySelectorAll('#scene-picker .picker-group.open').length;
+  return (open.length === 1 && hidden && shown && models > 0 && restored)
+    || `открыто ${open.length}, блоки скрыты ${hidden}, возврат ${shown}, моделей ${models}, вернулись ${restored}`;
+}));
+
+await t('модель «Потребление в комплектах» вырезана', () => page.evaluate(() =>
+  (!document.querySelector('.scard[data-scene="bundles"]') && typeof SCENE_ROUTE.bundles === 'undefined')
+  || 'карточка ещё на месте'));
+
+await t('модели КТВ переименованы', () => page.evaluate(() =>
+  (SCENE_NAMES.trade === 'КТВ. Одна страна' && SCENE_NAMES.tradeprice === 'КТВ. Две страны-партнёра')
+  || (SCENE_NAMES.trade + ' / ' + SCENE_NAMES.tradeprice)));
 
 await t('свободного холста больше нет', () => page.evaluate(() =>
   (!document.querySelector('.scard[data-scene="free"]') && typeof SCENE_ROUTE.free === 'undefined')
   || 'холст ещё на месте'));
 
-// Было 19; «Построение графиков» стало рабочей сценой, «Оси наоборот» удалены.
-await t('карточек «скоро» ровно 18', async () =>
-  (await page.locator('.scard.soon').count()) === 18 || 'их ' + (await page.locator('.scard.soon').count()));
+// Было 19; «Построение графиков» стало рабочей сценой, «Оси наоборот» удалены,
+// «Потребление в комплектах» вырезано по П3 — функционал переехал в кривую комплектов.
+await t('карточек «скоро» ровно 17', async () =>
+  (await page.locator('.scard.soon').count()) === 17 || 'их ' + (await page.locator('.scard.soon').count()));
 
 await t('в потребителе есть заглушка про риск', async () =>
   (await page.locator('.scard.soon[data-scene="cons-risk"]').count()) === 1 || 'карточки риска нет');

@@ -120,7 +120,17 @@ function openPicker() {
   p.removeAttribute('inert');
   const app = document.querySelector('.app');
   if (app) app.setAttribute('inert', '');   // рабочее место под окном — не фокусируется
-  const first = p.querySelector('.scard:not([disabled])');
+  /* Окно всегда открывается на списке блоков, а не на том, куда заходили в
+     прошлый раз: кнопка называется «Назад к сценариям», и человек ждёт
+     полную карту, а не последний открытый раздел (П2). */
+  const blocks = document.getElementById('picker-blocks');
+  if (blocks) {
+    blocks.classList.remove('hidden');
+    p.querySelectorAll('.picker-group').forEach(g => g.classList.remove('open'));
+    const back = document.getElementById('picker-back');
+    if (back) back.classList.remove('shown');
+  }
+  const first = p.querySelector('.bcard') || p.querySelector('.scard:not([disabled])');
   if (first) first.focus();
 }
 /* ---------------------------------------------------------------------
@@ -241,34 +251,154 @@ function applyCardScope() {
    поэтому блоки сворачиваются, а открываются по одному. Заголовок из
    разметки превращается в кнопку, сетка карточек — в её тело: новому блоку
    ничего дополнительно делать не нужно. */
+/* Картинки блоков (П2). Это НЕ повтор превью моделей: каждая — саммари того,
+   что внутри блока. Геометрия та же, что у карточек моделей и у иконок
+   панели: оси и вспомогательное 1.5 · пунктир и второстепенная кривая 2.2 ·
+   главная кривая 2.6 · маркер r 3.6 · пунктир «5 4» · заливка-подсказка .16. */
+const BLOCK_SPECS = {
+  'Математика':
+    '<path d="M20 50 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M46 84 V8" stroke="var(--ink-soft)" stroke-width="1.5"/>' +
+    '<path d="M20 14 C60 92 84 92 130 20" stroke="var(--curve-d)" stroke-width="2.6"/>' +
+    '<path d="M62 84 L128 20" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>' +
+    '<circle cx="95" cy="52" r="3.6" fill="var(--ink)" stroke="none"/>',
+  'КПВ и КТВ':
+    '<path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>' +
+    '<path d="M24 16 C86 22 118 44 132 76 L24 76 Z" fill="var(--curve-d)" fill-opacity=".16" stroke="none"/>' +
+    '<path d="M24 16 C86 22 118 44 132 76" stroke="var(--curve-d)" stroke-width="2.6"/>' +
+    '<path d="M20 40 L146 70" stroke="var(--curve-tax)" stroke-width="2.2" stroke-dasharray="5 4"/>' +
+    '<circle cx="76" cy="53" r="3.6" fill="var(--ink)" stroke="none"/>',
+  'Совершенная конкуренция':
+    '<path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>' +
+    '<path d="M26 16 L140 72" stroke="var(--curve-d)" stroke-width="2.6"/>' +
+    '<path d="M26 72 L140 16" stroke="var(--curve-s)" stroke-width="2.6"/>' +
+    '<circle cx="83" cy="44" r="3.6" fill="var(--ink)" stroke="none"/>',
+  'Теория фирмы':
+    '<path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>' +
+    '<path d="M28 22 C60 84 92 84 138 30" stroke="var(--cost-atc)" stroke-width="2.6"/>' +
+    '<path d="M28 70 C74 74 106 46 138 16" stroke="var(--cost-mc)" stroke-width="2.2"/>' +
+    '<circle cx="83" cy="66" r="3.6" fill="var(--ink)" stroke="none"/>',
+  'Несовершенная конкуренция':
+    '<path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>' +
+    '<path d="M26 16 L140 72" stroke="var(--curve-d)" stroke-width="2.6"/>' +
+    '<path d="M26 16 L83 72" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>' +
+    '<path d="M22 58 H146" stroke="var(--curve-mc)" stroke-width="2.2"/>' +
+    '<circle cx="57" cy="37" r="3.6" fill="var(--ink)" stroke="none"/>',
+  'Рынок труда':
+    '<path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>' +
+    '<path d="M26 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>' +
+    '<path d="M26 70 L140 18" stroke="var(--curve-s)" stroke-width="2.6"/>' +
+    '<path d="M22 32 H146" stroke="var(--curve-reg)" stroke-width="2.2" stroke-dasharray="5 4"/>' +
+    '<circle cx="83" cy="44" r="3.6" fill="var(--ink)" stroke="none"/>',
+  'Международная торговля':
+    '<path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>' +
+    '<path d="M26 16 L140 72" stroke="var(--curve-d)" stroke-width="2.6"/>' +
+    '<path d="M26 72 L140 16" stroke="var(--curve-s)" stroke-width="2.6"/>' +
+    '<rect x="52" y="54" width="62" height="8" fill="var(--curve-tax)" fill-opacity=".16"/>' +
+    '<path d="M22 58 H146" stroke="var(--curve-tax)" stroke-width="2.2" stroke-dasharray="5 4"/>',
+  'Выбор потребителя':
+    '<path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>' +
+    '<path d="M26 20 L138 74" stroke="var(--curve-s)" stroke-width="2.2"/>' +
+    '<path d="M30 74 C74 70 96 52 100 18" stroke="var(--curve-d)" stroke-width="2.6"/>' +
+    '<path d="M52 76 C104 72 126 54 132 22" stroke="var(--curve-d)" stroke-width="2.2" opacity=".4"/>' +
+    '<circle cx="72" cy="43" r="3.6" fill="var(--ink)" stroke="none"/>',
+  'Макроэкономика':
+    '<path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>' +
+    '<path d="M26 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>' +
+    '<path d="M26 70 L140 24" stroke="var(--curve-s)" stroke-width="2.2"/>' +
+    '<path d="M100 12 V76" stroke="var(--curve-reg)" stroke-width="2.2" stroke-dasharray="5 4"/>' +
+    '<circle cx="88" cy="46" r="3.6" fill="var(--ink)" stroke="none"/>',
+  'Избранные сюжеты':
+    '<path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>' +
+    '<path d="M18 78 L134 14" stroke="var(--ink-soft)" stroke-width="2.2" stroke-dasharray="5 4"/>' +
+    '<path d="M18 78 C74 74 112 56 134 14 Z" fill="var(--curve-mr)" fill-opacity=".16" stroke="none"/>' +
+    '<path d="M18 78 C74 74 112 56 134 14" stroke="var(--curve-mr)" stroke-width="2.6"/>',
+};
+
+function blockSpec(name) {
+  const d = BLOCK_SPECS[name];
+  if (!d) return '';
+  return '<span class="bcard-spec" aria-hidden="true"><svg viewBox="0 0 160 90">'
+       + '<g fill="none" stroke-linecap="round">' + d + '</g></svg></span>';
+}
+
+/* П2. Главный экран — десять больших карточек блоков по две в ряд. Щелчок по
+   карточке плавно убирает остальные и на их месте показывает модели этого
+   блока; появляется «Назад ко всем блокам». Второго экрана и маршрутов нет:
+   всё на одной странице. Механика та же, что была у сворачивания блоков, —
+   поменялось только оформление и то, что открытый блок остаётся один на экране. */
 function foldPickerGroups() {
-  document.querySelectorAll('#scene-picker .picker-group').forEach((g, i) => {
-    if (g._folded) return;
-    g._folded = true;
+  const inner = document.querySelector('#scene-picker .picker-inner');
+  if (!inner || inner._blocks) return;
+  inner._blocks = true;
+
+  const blocks = document.createElement('div');
+  blocks.className = 'picker-blocks';
+  blocks.id = 'picker-blocks';
+
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.className = 'picker-back';
+  back.id = 'picker-back';
+  back.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+                 + 'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">'
+                 + '<path d="M14 6l-6 6 6 6"/></svg><span>Назад ко всем блокам</span>';
+
+  const showBlocks = () => {
+    document.querySelectorAll('#scene-picker .picker-group').forEach(x => x.classList.remove('open'));
+    blocks.classList.remove('hidden');
+    back.classList.remove('shown');
+    inner.scrollIntoView({ block: 'start' });
+  };
+  back.addEventListener('click', showBlocks);
+
+  const groups = [...document.querySelectorAll('#scene-picker .picker-group')];
+  groups.forEach((g, i) => {
     const lab = g.querySelector(':scope > .picker-group-label');
     const grid = g.querySelector(':scope > .picker-grid');
     if (!lab || !grid) return;
     const name = lab.textContent.trim();
     if (!grid.id) grid.id = 'pgrid-' + i;
-    const btn = document.createElement('button');
-    btn.className = 'picker-group-label';
-    btn.type = 'button';
-    btn.setAttribute('aria-expanded', 'false');
-    btn.setAttribute('aria-controls', grid.id);
-    btn.innerHTML = '<span></span>' + FOLD_CHEVRON;
-    btn.querySelector('span').textContent = name;
-    btn.addEventListener('click', () => {
-      const open = !grid.classList.contains('open');
-      // Открыт один блок за раз: иначе список снова растянется на три экрана.
-      document.querySelectorAll('#scene-picker .picker-grid.open').forEach(x => x.classList.remove('open'));
-      document.querySelectorAll('#scene-picker .picker-group-label[aria-expanded="true"]')
-        .forEach(x => x.setAttribute('aria-expanded', 'false'));
-      grid.classList.toggle('open', open);
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (open) btn.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    grid.classList.add('open');          // внутри открытого блока сетка видна всегда
+    lab.remove();
+
+    const n = grid.querySelectorAll('.scard:not(.soon)').length;
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'bcard';
+    card.setAttribute('aria-controls', grid.id);
+    card.innerHTML = blockSpec(name)
+      + '<span class="bcard-name"></span><span class="bcard-count"></span>';
+    card.querySelector('.bcard-name').textContent = name;
+    card.querySelector('.bcard-count').textContent = n + ' ' + plural(n, ['модель', 'модели', 'моделей']);
+    card.addEventListener('click', () => {
+      blocks.classList.add('hidden');
+      groups.forEach(x => x.classList.remove('open'));
+      g.classList.add('open');
+      back.classList.add('shown');
+      inner.scrollIntoView({ block: 'start' });
     });
-    lab.replaceWith(btn);
+    blocks.appendChild(card);
+
+    // Заголовок внутри открытого блока: понятно, куда попал.
+    const h = document.createElement('div');
+    h.className = 'picker-group-open-name';
+    h.textContent = name;
+    g.insertBefore(h, grid);
   });
+
+  if (groups.length) {
+    inner.insertBefore(back, groups[0]);
+    inner.insertBefore(blocks, groups[0]);
+  }
+}
+
+// Склонение числительных: «1 модель», «2 модели», «5 моделей».
+function plural(n, forms) {
+  const a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return forms[2];
+  if (b > 1 && b < 5) return forms[1];
+  if (b === 1) return forms[0];
+  return forms[2];
 }
 
 function pickScene(key) {
