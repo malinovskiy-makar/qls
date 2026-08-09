@@ -1907,36 +1907,25 @@
           <button class="seg-btn" id="ac-poly">Между точками</button>
         </div>
 
+        <!-- П41: выбор кривой узкий, справа от него — отрезок в скобках.
+             Границы первой четверти подставляются сами, поля «от/до» больше
+             не нужны: их прежний смысл целиком в этой подписи. -->
         <div id="ac-pane-curve">
-          <div class="field">
-            <label for="ac-pick">Кривая</label>
+          <div class="ac-pick-row">
             <select id="ac-pick"></select>
+            <span class="ac-range" id="ac-range">Выберите кривую</span>
           </div>
-          <div class="row">
-            <div class="field">
-              <label for="ac-from">Левая граница <span class="ac-var">x</span></label>
-              <input type="number" id="ac-from" step="any" placeholder="0" autocomplete="off">
-            </div>
-            <div class="field">
-              <label for="ac-to">Правая граница <span class="ac-var">x</span></label>
-              <input type="number" id="ac-to" step="any" placeholder="Край" autocomplete="off">
-            </div>
-          </div>
-          <div class="hint">Границы отмеряются по горизонтальной оси. Можно их не заполнять:
-            тогда возьмём всю кривую в первой четверти, от начала до места, где она садится на ось.</div>
         </div>
 
         <div id="ac-pane-poly" style="display:none;">
-          <div class="hint">Щёлкайте по графику: каждый щелчок ставит вершину. Рядом с особой
-            точкой (пересечение, максимум, излом) вершина прыгает точно в неё и подписывается.</div>
-          <div class="vert-btns">
-            <button class="btn-sm" id="ac-vert-undo" type="button">Убрать последнюю</button>
+          <div class="ac-empty" id="ac-verts-empty">Выберите точки на графике</div>
+          <div class="vert-btns" id="ac-vert-btns" style="display:none;">
             <button class="btn-sm" id="ac-vert-clear" type="button">Убрать все вершины</button>
           </div>
           <div id="ac-verts"></div>
         </div>
 
-        <button class="btn" id="ac-calc" type="button" style="margin-top:8px;width:100%;">Посчитать площадь</button>
+        <button class="btn" id="ac-calc" type="button" style="margin-top:8px;width:100%;" disabled>Посчитать площадь</button>
         <button class="btn-sm" id="ac-clear" type="button" style="margin-top:6px;">Убрать все</button>
         <div class="error" id="ac-error"></div>
         <div id="info-areacalc" style="margin-top:8px;"></div>

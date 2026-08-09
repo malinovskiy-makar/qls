@@ -725,7 +725,8 @@ function keyTargets() {
 /* Куда сядет вершина площади. Рядом с особой точкой прыгает точно в неё,
    иначе садится просто на ближайшую кривую. Радиус у особой точки чуть
    больше, чтобы попадать в неё было легче, чем промахнуться мимо. */
-const KEY_SNAP_PX = 18;
+// В ключевую точку попасть должно быть заметно легче, чем просто в кривую (П42).
+const KEY_SNAP_PX = 22;
 function snapVertexAt(px, py) {
   const { mx, my } = mainScales();
   let best = null;
@@ -1032,25 +1033,112 @@ function addAreaVert(x, y, name) {
   redrawAll();
 }
 
-function undoAreaVert() { (STATE.areaVerts || []).pop(); renderVertList(); redrawAll(); }
 function clearAreaVerts() { STATE.areaVerts = []; renderVertList(); redrawAll(); }
 
-// Список набранных вершин под кнопками: видно, что уже отмечено.
+/* Список набранных вершин (П42). Пока не выбрана ни одна точка, вместо списка
+   стоит надпись «Выберите точки на графике»; с первой же вершиной вместо неё
+   появляется кнопка «Убрать все вершины», а под ней сам список: у каждой
+   строки крестик, а по двойному щелчку координата правится прямо в строке. */
 function renderVertList() {
   const box = document.getElementById('ac-verts');
   if (!box) return;
   const list = STATE.areaVerts || [];
+  const empty = document.getElementById('ac-verts-empty');
+  const btns = document.getElementById('ac-vert-btns');
+  if (empty) empty.style.display = list.length ? 'none' : '';
+  if (btns) btns.style.display = list.length ? '' : 'none';
   box.innerHTML = '';
-  if (!list.length) return;
   list.forEach((p, i) => {
     const row = document.createElement('div');
     row.className = 'vert-row';
     const n = document.createElement('b'); n.textContent = (i + 1) + '.';
+
     const t = document.createElement('span');
-    t.textContent = (p.name ? p.name + ' ' : '') + '(' + fmt(p.x) + '; ' + fmt(p.y) + ')';
-    row.append(n, t);
+    t.className = 'vert-co';
+    t.title = 'Двойной щелчок — поправить координаты';
+    const paint = () => {
+      t.textContent = (p.name ? p.name + ' ' : '') + '(' + fmt(p.x) + '; ' + fmt(p.y) + ')';
+    };
+    paint();
+    t.addEventListener('dblclick', () => {
+      const ed = document.createElement('span');
+      ed.className = 'vert-edit';
+      const mk = (key) => {
+        const inp = document.createElement('input');
+        inp.type = 'number'; inp.step = 'any'; inp.value = Math.round(p[key] * 1000) / 1000;
+        inp.addEventListener('input', () => {
+          const v = parseFloat(inp.value);
+          if (isFinite(v)) { p[key] = v; p.name = ''; redrawAll(); }
+        });
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+        return inp;
+      };
+      const ix = mk('x'), iy = mk('y');
+      ed.append(ix, document.createTextNode(';'), iy);
+      t.replaceWith(ed);
+      ix.focus(); ix.select();
+      const done = () => {
+        // Уходим из строки, только когда фокус ушёл из обоих полей.
+        setTimeout(() => {
+          if (document.activeElement === ix || document.activeElement === iy) return;
+          paint(); ed.replaceWith(t); redrawAll();
+        }, 0);
+      };
+      ix.addEventListener('blur', done); iy.addEventListener('blur', done);
+    });
+
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'btn-icon'; del.textContent = '✕';
+    del.title = 'Убрать эту вершину';
+    del.addEventListener('click', () => {
+      STATE.areaVerts = (STATE.areaVerts || []).filter(v => v !== p);
+      renderVertList(); syncAreaCalcButton(); redrawAll();
+    });
+
+    row.append(n, t, del);
     box.appendChild(row);
   });
+  syncAreaCalcButton();
+}
+
+/* П41: «Посчитать площадь» не горит и не нажимается, пока считать нечего.
+   Раньше кнопка была активна всегда и при пустом выборе просто выдавала
+   ошибку текстом — сначала жмёшь, потом узнаёшь, что рано. */
+function syncAreaCalcButton() {
+  const btn = document.getElementById('ac-calc');
+  if (!btn) return;
+  const ready = (STATE.areaCalcMode === 'poly')
+    ? ((STATE.areaVerts || []).length >= 3)
+    : !!areaPickedCurve();
+  btn.disabled = !ready;
+  btn.title = ready ? '' : (STATE.areaCalcMode === 'poly'
+    ? 'Отметьте на графике хотя бы три точки'
+    : 'Сначала выберите кривую');
+}
+
+function areaPickedCurve() {
+  const sel = document.getElementById('ac-pick');
+  const name = sel ? sel.value : '';
+  return areaTargets().filter(x => x.name === name)[0] || null;
+}
+
+/* Отрезок, на котором считается площадь под кривой (П41). Показываем его
+   рядом с выбором кривой в виде [0; Xmax] — это границы первой четверти для
+   выбранной кривой. */
+function areaCurveRange() {
+  const t = areaPickedCurve();
+  if (!t) return null;
+  const a = Math.max(0, viewWindow().x0);
+  const b = curveRightEdge(t.f);
+  return (isFinite(a) && isFinite(b) && b > a) ? { a, b } : null;
+}
+function syncAreaRangeLabel() {
+  const el = document.getElementById('ac-range');
+  if (!el) return;
+  const r = areaCurveRange();
+  el.textContent = r
+    ? ('на отрезке [' + fmt(r.a) + '; ' + fmt(r.b) + ']')
+    : (areaTargets().length ? 'Выберите кривую' : 'Сначала постройте кривую');
 }
 
 // Набранные вершины на графике: номер у каждой и бледный контур будущей фигуры.
@@ -1060,8 +1148,12 @@ function drawAreaVerts() {
   const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'area-verts').style('pointer-events', 'none');
   if (list.length >= 3) {
+    /* П43: контур показывает РОВНО ту фигуру, которая будет посчитана.
+       Раньше пунктир соединял вершины в порядке щелчков, а площадь считалась
+       по другому обходу — картинка и число расходились. */
+    const ring = bestAreaRing(list).ring;
     g.append('path')
-      .attr('d', 'M' + list.map(p => mx(p.x) + ',' + my(p.y)).join('L') + 'Z')
+      .attr('d', 'M' + ring.map(p => mx(p.x) + ',' + my(p.y)).join('L') + 'Z')
       .attr('fill', COL.reg).attr('fill-opacity', 0.1)
       .attr('stroke', COL.reg).attr('stroke-width', 1.4).attr('stroke-dasharray', '5 4');
   } else if (list.length === 2) {
@@ -1069,10 +1161,39 @@ function drawAreaVerts() {
       .attr('x2', mx(list[1].x)).attr('y2', my(list[1].y))
       .attr('stroke', COL.reg).attr('stroke-width', 1.4).attr('stroke-dasharray', '5 4');
   }
+  /* Вершины на графике (П42): при наведении явно выделяются, щелчок по уже
+     выбранной снимает её, а зажатую можно перетащить — координата в списке
+     меняется сама. Рядом с кривой вершина катится по ней, как и при постановке. */
+  const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
   list.forEach((p, i) => {
-    g.append('circle').attr('cx', mx(p.x)).attr('cy', my(p.y)).attr('r', 4.5)
-      .attr('fill', COL.halo).attr('stroke', COL.reg).attr('stroke-width', 2);
+    const dot = g.append('circle').attr('cx', mx(p.x)).attr('cy', my(p.y)).attr('r', 4.5)
+      .attr('fill', COL.halo).attr('stroke', COL.reg).attr('stroke-width', 2)
+      .style('pointer-events', 'all').style('cursor', 'grab');
     haloText(g, mx(p.x) + 8, my(p.y) - 8, String(i + 1), 'start', 'auto');
+
+    dot.on('pointerenter', () => dot.attr('r', 6.5).attr('stroke-width', 3))
+       .on('pointerleave', () => dot.attr('r', 4.5).attr('stroke-width', 2));
+
+    let moved = false;
+    dot.call(d3.drag().container(() => svg.node())
+      .on('start', () => { moved = false; })
+      .on('drag', (ev) => {
+        moved = true;
+        const hit = snapVertexAt(ev.x, ev.y);
+        p.x = hit ? hit.x : Math.max(xLo, Math.min(xHi, mx.invert(ev.x)));
+        p.y = hit ? hit.y : Math.max(yLo, Math.min(yHi, my.invert(ev.y)));
+        p.name = (hit && hit.key) ? hit.name : '';
+        renderVertList(); redrawAll();
+      })
+      .on('end', () => {
+        if (moved) return;
+        // Щелчок без движения по уже выбранной вершине снимает её. Щелчок по
+        // холсту, который придёт следом, надо погасить: иначе на том же месте
+        // тут же появится новая вершина.
+        STATE._vertClickEaten = true;
+        STATE.areaVerts = (STATE.areaVerts || []).filter(v => v !== p);
+        renderVertList(); redrawAll();
+      }));
   });
 }
 
@@ -1081,34 +1202,91 @@ function areaTargets() {
 }
 
 function calcAreaUnderCurve() {
-  const sel = document.getElementById('ac-pick');
-  const name = sel ? sel.value : '';
-  const t = areaTargets().filter(x => x.name === name)[0];
+  const t = areaPickedCurve();
   if (!t) return { error: 'Сначала постройте кривую и выберите её в списке.' };
-  const num = (id) => { const e = document.getElementById(id); const v = e ? parseFloat(e.value) : NaN; return isFinite(v) ? v : null; };
-  let a = num('ac-from'), b = num('ac-to');
-  if (a === null) a = Math.max(0, viewWindow().x0);
-  if (b === null) b = curveRightEdge(t.f);
-  if (!(b > a)) return { error: 'Правая граница должна быть больше левой.' };
+  const name = t.name;
+  const r = areaCurveRange();
+  if (!r) return { error: 'Не удалось определить отрезок для этой кривой.' };
+  const a = r.a, b = r.b;
   const val = integrate((x) => { const y = t.f(x); return isFinite(y) ? Math.max(0, y) : 0; }, a, b);
   if (!isFinite(val)) return { error: 'Не удалось посчитать: кривая не определена на этом отрезке.' };
   return { kind: 'curve', value: val, a, b, name };
 }
 
-function calcAreaPolygon() {
-  const pts = (STATE.areaVerts || []).slice();
-  if (pts.length < 3) return { error: 'Нужно хотя бы три вершины: щёлкните по графику ещё раз.' };
-  // Вершины обходим по кругу вокруг их общего центра, иначе многоугольник
-  // получится самопересекающимся и площадь выйдет меньше настоящей.
-  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-  const ring = pts.slice().sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx));
+// Площадь замкнутого обхода по формуле шнурков.
+function ringArea(ring) {
   let s2 = 0;
   for (let i = 0; i < ring.length; i++) {
     const p = ring[i], q = ring[(i + 1) % ring.length];
     s2 += p.x * q.y - q.x * p.y;
   }
-  return { kind: 'poly', value: Math.abs(s2) / 2, ring: ring.map(p => [p.x, p.y]) };
+  return Math.abs(s2) / 2;
+}
+
+// Пересекаются ли отрезки p1p2 и q1q2 (без учёта общих концов).
+function segCross(p1, p2, q1, q2) {
+  const d = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const d1 = d(q1, q2, p1), d2 = d(q1, q2, p2), d3 = d(p1, p2, q1), d4 = d(p1, p2, q2);
+  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+         ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+}
+// Есть ли у обхода самопересечение (несоседние стороны пересекаются).
+function ringSelfCrosses(ring) {
+  const n = ring.length;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (i === j || (i + 1) % n === j || (j + 1) % n === i) continue;
+      if (segCross(ring[i], ring[(i + 1) % n], ring[j], ring[(j + 1) % n])) return true;
+    }
+  }
+  return false;
+}
+
+/* Площадь по отмеченным точкам (П43).
+
+   Все выбранные точки остаются вершинами: выпуклую оболочку не берём. Ищем
+   многоугольник НАИБОЛЬШЕЙ площади без самопересечений, у которого вершины —
+   ровно все отмеченные точки. До восьми вершин включительно перебираем все
+   циклические обходы ((n−1)!/2 штук, при восьми это 2520 — считается мгновенно),
+   отбрасываем самопересекающиеся и берём максимум. От девяти вершин перебор
+   растёт факториально, поэтому остаётся прежняя сортировка по углу, и рядом с
+   результатом честно пишется, что это приближение. */
+const AREA_EXACT_MAX = 8;
+
+function angleRing(pts) {
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+  return pts.slice().sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx));
+}
+
+function bestAreaRing(pts) {
+  if (pts.length > AREA_EXACT_MAX) return { ring: angleRing(pts), exact: false };
+  // Первую вершину закрепляем и перебираем перестановки остальных: так каждый
+  // цикл встречается ровно дважды (в двух направлениях), а не n·2 раз.
+  const rest = pts.slice(1);
+  let best = null;
+  const perm = (arr, cur) => {
+    if (!arr.length) {
+      const ring = [pts[0]].concat(cur);
+      if (ringSelfCrosses(ring)) return;
+      const a = ringArea(ring);
+      if (!best || a > best.a) best = { a, ring };
+      return;
+    }
+    for (let i = 0; i < arr.length; i++) {
+      perm(arr.slice(0, i).concat(arr.slice(i + 1)), cur.concat([arr[i]]));
+    }
+  };
+  perm(rest, []);
+  return best ? { ring: best.ring, exact: true } : { ring: angleRing(pts), exact: false };
+}
+
+function calcAreaPolygon() {
+  const pts = (STATE.areaVerts || []).slice();
+  if (pts.length < 3) return { error: 'Нужно хотя бы три вершины: щёлкните по графику ещё раз.' };
+  const r = bestAreaRing(pts);
+  return { kind: 'poly', value: ringArea(r.ring), exact: r.exact,
+           ring: r.ring.map(p => [p.x, p.y]) };
 }
 
 /* Порядок действий (Фаза 6): задал кривую и границы, нажал «Посчитать» — и
@@ -1181,14 +1359,14 @@ function updateAreaCalcPanel() {
 
   const table = document.createElement('div');
   table.className = 'area-table';
+  // П44: столбцы «Названия» и «Площадь». «Отрезок» убран — он и так виден
+  // рядом с выбором кривой, а в таблице только занимал место.
   const head = document.createElement('div');
   head.className = 'area-row area-head';
-  ['Что', 'Отрезок', 'Площадь', ''].forEach(t => {
+  ['Названия', 'Площадь', ''].forEach(t => {
     const c = document.createElement('span'); c.textContent = t; head.appendChild(c);
   });
   table.appendChild(head);
-
-  const v = axisXLetter();
   list.forEach(r => {
     const row = document.createElement('div');
     row.className = 'area-row';
@@ -1204,13 +1382,13 @@ function updateAreaCalcPanel() {
     nameInp.addEventListener('change', () => redrawAll());
     c1.append(pick, nameInp);
 
-    const c2 = document.createElement('span');
-    c2.textContent = (r.kind === 'curve')
-      ? (v + ' от ' + fmt(r.a) + ' до ' + fmt(r.b))
-      : (r.ring.length + ' вершины');
-
     const c3 = document.createElement('b');
     c3.textContent = fmt(r.value);
+    if (r.kind === 'poly' && r.exact === false) {
+      c3.classList.add('area-approx');
+      c3.title = 'Вершин больше восьми: полный перебор обходов слишком долгий, '
+               + 'поэтому берётся приближение — обход вершин по кругу.';
+    }
 
     const del = document.createElement('button');
     del.type = 'button'; del.className = 'btn-icon'; del.textContent = '×';
@@ -1220,7 +1398,7 @@ function updateAreaCalcPanel() {
       redrawAll();
     });
 
-    row.append(c1, c2, c3, del);
+    row.append(c1, c3, del);
     table.appendChild(row);
   });
   box.appendChild(table);
@@ -1240,15 +1418,22 @@ function syncAreaCalcUI() {
       sel._sig = sig;
       const prev = sel.value;
       sel.innerHTML = '';
+      // Пустой первый пункт: пока кривая не выбрана, «Посчитать площадь» не
+      // горит — выбор должен быть осознанным, а не «первая попавшаяся» (П41).
+      const none = document.createElement('option');
+      none.value = ''; none.textContent = 'Выберите кривую';
+      sel.appendChild(none);
       names.forEach(n => {
         const o = document.createElement('option');
         o.value = n; o.textContent = n;
         sel.appendChild(o);
       });
-      if (names.indexOf(prev) >= 0) sel.value = prev;
+      sel.value = (names.indexOf(prev) >= 0) ? prev : '';
     }
   }
   renderVertList();
+  syncAreaRangeLabel();
+  syncAreaCalcButton();
   updateQuickArea();
 }
 
@@ -1305,6 +1490,11 @@ function wireAreaCalc() {
   if (clr) clr.addEventListener('click', () => clearAreaCalc());
   const q = document.getElementById('quick-area');
   if (q) q.addEventListener('click', () => { setAreaCalcMode('poly'); runAreaCalc(); });
+  // Выбрали кривую — сразу видно, на каком отрезке считаем, и кнопка загорается.
+  const pick = document.getElementById('ac-pick');
+  if (pick) pick.addEventListener('change', () => { syncAreaRangeLabel(); syncAreaCalcButton(); });
+  const vClear = document.getElementById('ac-vert-clear');
+  if (vClear) vClear.addEventListener('click', () => clearAreaVerts());
   setAreaCalcMode('curve');
 }
 

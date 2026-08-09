@@ -732,9 +732,8 @@ const CASES = [
     name: 'Площадь под кривой · D = 100 − Q на [0; 100] ⇒ 5000',
     run: `loadScene('sd'); redrawAll();
           setAreaCalcMode('curve');
+          syncAreaCalcUI();
           document.getElementById('ac-pick').value = 'D';
-          document.getElementById('ac-from').value = '0';
-          document.getElementById('ac-to').value = '100';
           STATE.areaCalcList = []; runAreaCalc();
           var r = STATE.areaCalcList[0];
           return { S: r ? r.value : NaN };`,
@@ -1055,6 +1054,73 @@ const CASES = [
              ['кнопка вернулась', 'back', 1, 0], ['и стоит последней', 'last', 1, 0]],
   },
   {
+    /* П43. Площадь по отмеченным точкам — НАИБОЛЬШАЯ из возможных без
+       самопересечений, при этом вершинами остаются ВСЕ отмеченные точки
+       (выпуклую оболочку не берём). Прежняя сортировка по углу вокруг центра
+       тяжести на 3000 случайных пятёрках проигрывала перебору в 673 случаях.
+       Контрольный набор — худший из найденных. */
+    name: 'Площадь · по пяти точкам берётся наибольшая, а не по углу',
+    run: `openPicker(); pickScene('sd'); closePicker();
+          var pts = [[60,58],[61,17],[94,90],[70,20],[7,89]].map(function (p) {
+            return { x: p[0], y: p[1], name: '' }; });
+          var best = bestAreaRing(pts);
+          var byAngle = ringArea(angleRing(pts));
+          var self = ringSelfCrosses(best.ring) ? 1 : 0;
+          // Внутренний набор: квадрат с точкой внутри — все пять остаются вершинами.
+          var sq = [[0,0],[40,0],[40,40],[0,40],[20,15]].map(function (p) {
+            return { x: p[0], y: p[1], name: '' }; });
+          var sqBest = bestAreaRing(sq);
+          return { best: ringArea(best.ring), angle: byAngle, exact: best.exact ? 1 : 0,
+                   self: self, n: best.ring.length,
+                   sq: ringArea(sqBest.ring), sqN: sqBest.ring.length };`,
+    checks: [['перебор даёт 3252', 'best', 3252, 1],
+             ['сортировка по углу дала бы 2063', 'angle', 2063, 1],
+             ['до восьми вершин перебор точный', 'exact', 1, 0],
+             ['самопересечений нет', 'self', 0, 0],
+             ['вершины все пять', 'n', 5, 0],
+             ['квадрат с точкой внутри ⇒ 1300', 'sq', 1300, 0.01],
+             ['и в нём тоже все пять', 'sqN', 5, 0]],
+  },
+  {
+    /* П41, П42, П44. Кнопка расчёта заперта, пока считать нечего; отрезок
+       показан рядом с выбором кривой; в таблице два столбца. */
+    name: 'Площадь · кнопка заперта до выбора, отрезок и таблица',
+    run: `openPicker(); pickScene('sd'); closePicker();
+          clearAreaCalc(); clearAreaVerts(); setAreaCalcMode('curve');
+          syncAreaCalcUI();
+          var btn = document.getElementById('ac-calc');
+          var lockedCurve = btn.disabled ? 1 : 0;
+          var sel = document.getElementById('ac-pick');
+          sel.value = 'D'; syncAreaRangeLabel(); syncAreaCalcButton();
+          var openCurve = btn.disabled ? 0 : 1;
+          var range = document.getElementById('ac-range').textContent;
+          btn.click();
+          var head = [].map.call(document.querySelectorAll('.area-head span'),
+                                 function (s) { return s.textContent; }).join('|');
+          var areaVal = STATE.areaCalcList[0].value;
+          setAreaCalcMode('poly');
+          var lockedPoly = btn.disabled ? 1 : 0;
+          addAreaVert(0, 0, ''); addAreaVert(10, 0, ''); addAreaVert(10, 10, '');
+          var openPoly = btn.disabled ? 0 : 1;
+          var crosses = document.querySelectorAll('.vert-row .btn-icon').length;
+          // Возвращаем секцию в исходное состояние: следующие случаи считают
+          // площадь под кривой, а оставленный режим «между точками» их сломал бы.
+          clearAreaVerts(); setAreaCalcMode('curve'); clearAreaCalc();
+          return { lockedCurve: lockedCurve, openCurve: openCurve, lockedPoly: lockedPoly,
+                   openPoly: openPoly, area: areaVal,
+                   rangeOk: /\\[0; 100\\]/.test(range) ? 1 : 0,
+                   headOk: head === 'Названия|Площадь|' ? 1 : 0,
+                   verts: crosses };`,
+    checks: [['без кривой кнопка заперта', 'lockedCurve', 1, 0],
+             ['выбрали кривую — открылась', 'openCurve', 1, 0],
+             ['отрезок [0; 100]', 'rangeOk', 1, 0],
+             ['площадь под D = 5000', 'area', 5000, 1],
+             ['заголовки «Названия» и «Площадь»', 'headOk', 1, 0],
+             ['без вершин кнопка заперта', 'lockedPoly', 1, 0],
+             ['три вершины — открылась', 'openPoly', 1, 0],
+             ['у каждой вершины крестик', 'verts', 3, 0]],
+  },
+  {
     /* П31. Точка липнет и к кривым, и к ОСЯМ, а оторвать её труднее, чем
        прилепить: радиус отрыва заметно больше радиуса захвата. */
     name: 'Точки · прилипание к осям и сопротивление при отрыве',
@@ -1115,8 +1181,7 @@ const CASES = [
     run: `loadScene('sd'); STATE.curves = []; STATE.params = {};
           addCurve('10 - x'); redrawAll();
           var t = snapTargets()[0];
-          document.getElementById('ac-from').value = '';
-          document.getElementById('ac-to').value = '';
+          syncAreaCalcUI();
           document.getElementById('ac-pick').value = t.name;
           STATE.areaCalcList = []; runAreaCalc();
           var r = STATE.areaCalcList[0] || {};
@@ -1301,9 +1366,8 @@ const CASES = [
           setRanges(20, 20); redrawAll();
           setAreaCalcMode('curve');
           var sel = document.getElementById('ac-pick');
-          sel.value = sel.options[0].value;
-          document.getElementById('ac-from').value = '';
-          document.getElementById('ac-to').value = '';
+          syncAreaCalcUI();
+          sel.value = sel.options[1].value;
           clearAreaCalc(); runAreaCalc();
           var r = (STATE.areaCalcList || [])[0] || {};
           var res = { a: r.a, b: r.b, s: r.value };

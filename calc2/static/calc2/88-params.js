@@ -1141,6 +1141,8 @@ function wireControls() {
   // вершин надо хотя бы три, и каждый раз жать кнопку было бы издевательством.
   if (chartEl) chartEl.addEventListener('click', (ev) => {
     if (!STATE.vertArm || STATE.markArm) return;
+    // Только что сняли вершину щелчком по ней — этот щелчок уже отработан (П42).
+    if (STATE._vertClickEaten) { STATE._vertClickEaten = false; return; }
     const { mx, my } = mainScales();
     const [px, py] = d3.pointer(ev, chartEl);
     const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
@@ -1150,10 +1152,8 @@ function wireControls() {
     if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
     addAreaVert(x, y, hit && hit.key ? hit.name : '');
   });
-  const vUndo = document.getElementById('ac-vert-undo');
-  if (vUndo) vUndo.addEventListener('click', () => undoAreaVert());
-  const vClear = document.getElementById('ac-vert-clear');
-  if (vClear) vClear.addEventListener('click', () => clearAreaVerts());
+  // «Убрать последнюю» убрана по П42: у каждой вершины в списке свой крестик.
+  // «Убрать все вершины» подключается в wireAreaCalc вместе с остальной секцией.
 
   /* П38: щелчок по пустому месту снимает выделение ключевой точки — она снова
      серая и без координат. Раньше выделение гасил только повторный щелчок по
