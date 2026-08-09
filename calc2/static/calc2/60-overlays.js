@@ -2339,22 +2339,96 @@ function armMark(on) {
   if (!on) showSnapHint(null);   // снятый режим не оставляет кружок-подсказку
 }
 
-// Сброс оформления при выборе новой сцены: чужие подписи осей и точки
-// в другой модели читались бы как ошибка.
+/* П20. Сброс при переходе между моделями. Раньше сбрасывалось только
+   «оформление»: название графика, подписи осей, свои точки, прокатывание.
+   Всё остальное переживало смену сцены и всплывало в чужой модели: галочки
+   заливок, свои цвета кривых и областей, размер подписей, режим первой
+   четверти, шаги делений, кэши расчётов и — самое заметное — уже посчитанные
+   площади. Посчитал площадь в «Спросе и предложении», ушёл в «Монополию», а
+   она там же. Теперь сбрасывается ВСЁ, что не относится к самой сцене.
+
+   Что НЕ сбрасываем сознательно: тему (общая на весь сайт) и состояние
+   панелей (свёрнута или нет) — это настройки рабочего места, а не модели. */
+const SCENE_DEFAULTS = {
+  // Оформление графика.
+  graphTitle: '', axisXName: '', axisYName: '', titleColor: null,
+  // Точки, вершины и посчитанные площади.
+  marks: [], areaVerts: [], areaCalcList: [], areaCalcMode: 'curve',
+  roller: null, hotCross: null, hoverCross: null, pointNames: {},
+  markArm: false, vertArm: false,
+  // Заливки и цвета.
+  showCS: true, showPS: true, showGhost: false,
+  showMonoCS: true, showMonoPS: true, showMonoVC: false,
+  colorOverride: {}, areaColor: {},
+  // Плоскость и подписи.
+  labelSize: 12, firstQuad: true, xStep: null, yStep: null,
+  showLegend: true, zoomLock: false, viewDirty: false,
+  // Буквы-параметры и кэши расчётов.
+  params: {}, ppfSumData: null, ppfTradeData: null, mathRes: null,
+  bundleOn: false, bundleX: null, bundleY: null,
+  ineqMasterBase: null, ineqMasterDetached: false, ineqMasterS: 1,
+};
+
 function resetDecor() {
-  STATE.graphTitle = ''; STATE.axisXName = ''; STATE.axisYName = '';
-  STATE.marks = []; markCounter = 0;
-  // Бегущая точка помнит кривую прошлой сцены — в новой она бы врала.
-  STATE.roller = null; STATE.hotCross = null; STATE.hoverCross = null;
+  Object.keys(SCENE_DEFAULTS).forEach(k => {
+    const v = SCENE_DEFAULTS[k];
+    STATE[k] = Array.isArray(v) ? [] : (v && typeof v === 'object' ? {} : v);
+  });
+  markCounter = 0; areaCalcCounter = 0;
   hideRollTip();
-  STATE.pointNames = {};   // свои названия ключевых точек — тоже оформление сцены
   resetLabelPositions();   // сглаживание подписей не тянет места из прошлой сцены
   const ren = document.getElementById('pt-rename'); if (ren) ren.remove();
   armMark(false);
   [['inp-gtitle', ''], ['inp-xname', ''], ['inp-yname', '']].forEach(([id, v]) => {
     const e = document.getElementById(id); if (e) e.value = v;
   });
+  if (typeof syncLabelSizeSeg === 'function') syncLabelSizeSeg();
   renderMarkList();
+  renderVertList();
+}
+
+/* П51. Память внутри модели, но не между моделями.
+   Поработал в «КТВ. Две страны», ушёл в «Совершенную конкуренцию», поработал
+   там, вернулся — в КТВ остались ТВОИ изменения именно этой модели.
+
+   Сохраняем не весь STATE, а явный список полей: иначе вместе с полезным
+   утечёт и то, что утекать не должно (режимы, подрежимы, ключ сцены). Список
+   тот же, что и у сброса, плюс формулы и границы окна — то, что человек в
+   этой модели действительно менял. */
+const SNAPSHOT_KEYS = Object.keys(SCENE_DEFAULTS).concat([
+  'curves', 'ppfFormula', 'ppfFormula2', 'ppftFormula', 'ppftPrice',
+  'costsTC', 'costsFC', 'ineqIncomes', 'ineqFormula', 'mathFormula',
+  'tax', 'pReg', 'taxKind', 'intervType',
+]);
+const _sceneSnaps = {};
+
+// Забыть, что помнилось по моделям. Нужно, когда состояние надо начать с нуля
+// (например, в контрольных прогонах, где каждый случай ставит свою обстановку).
+function resetSceneMemory() { Object.keys(_sceneSnaps).forEach(k => { delete _sceneSnaps[k]; }); }
+
+function saveSceneSnapshot(key) {
+  if (!key) return;
+  const snap = {};
+  SNAPSHOT_KEYS.forEach(k => { snap[k] = STATE[k]; });
+  snap._view = { Qmin: CONFIG.Qmin, Qmax: CONFIG.Qmax, Pmin: CONFIG.Pmin, Pmax: CONFIG.Pmax };
+  snap._counters = { mark: markCounter, area: areaCalcCounter };
+  _sceneSnaps[key] = snap;
+}
+
+function restoreSceneSnapshot(key) {
+  const snap = key && _sceneSnaps[key];
+  if (!snap) return false;
+  SNAPSHOT_KEYS.forEach(k => { STATE[k] = snap[k]; });
+  if (snap._view) {
+    CONFIG.Qmin = snap._view.Qmin; CONFIG.Qmax = snap._view.Qmax;
+    CONFIG.Pmin = snap._view.Pmin; CONFIG.Pmax = snap._view.Pmax;
+  }
+  if (snap._counters) { markCounter = snap._counters.mark; areaCalcCounter = snap._counters.area; }
+  if (typeof syncLabelSizeSeg === 'function') syncLabelSizeSeg();
+  renderMarkList();
+  renderVertList();
+  renderCurveList();
+  return true;
 }
 
 function addMarkAt(x, y, snapTo) {

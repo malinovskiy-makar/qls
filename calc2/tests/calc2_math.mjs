@@ -1121,6 +1121,41 @@ const CASES = [
              ['у каждой вершины крестик', 'verts', 3, 0]],
   },
   {
+    /* П20, П51. При переходе между моделями настройки сбрасываются ВСЕГДА, а
+       возврат в модель возвращает именно её изменения. Раньше площади,
+       галочки заливок и цвета переживали смену сцены и всплывали в чужой
+       модели, а собственной памяти у моделей не было вовсе. */
+    name: 'Сцены · переход чистит, возврат возвращает своё',
+    run: `resetSceneMemory();
+          openPicker(); pickScene('sd'); closePicker();
+          setAreaCalcMode('curve'); syncAreaCalcUI();
+          document.getElementById('ac-pick').value = 'D'; syncAreaCalcButton();
+          document.getElementById('ac-calc').click();
+          addMarkAt(30, 70, null);
+          STATE.showCS = false; STATE.labelSize = 20; redrawAll();
+          var mine = { a: STATE.areaCalcList.length, m: STATE.marks.length,
+                       cs: STATE.showCS ? 1 : 0, s: STATE.labelSize };
+          openPicker(); pickScene('mono'); closePicker();
+          var clean = { a: STATE.areaCalcList.length, m: STATE.marks.length,
+                        cs: STATE.showCS ? 1 : 0, s: STATE.labelSize };
+          openPicker(); pickScene('sd'); closePicker();
+          var back = { a: STATE.areaCalcList.length, m: STATE.marks.length,
+                       cs: STATE.showCS ? 1 : 0, s: STATE.labelSize };
+          resetSceneMemory();
+          return { mineA: mine.a, mineM: mine.m,
+                   cleanA: clean.a, cleanM: clean.m, cleanCS: clean.cs, cleanS: clean.s,
+                   backA: back.a, backM: back.m, backCS: back.cs, backS: back.s };`,
+    checks: [['площадь посчитана', 'mineA', 1, 0], ['точка поставлена', 'mineM', 1, 0],
+             ['в другой модели площадей нет', 'cleanA', 0, 0],
+             ['и точек нет', 'cleanM', 0, 0],
+             ['и галочка заливки на месте', 'cleanCS', 1, 0],
+             ['и размер подписей свой', 'cleanS', 12, 0],
+             ['вернулись — площадь на месте', 'backA', 1, 0],
+             ['и точка на месте', 'backM', 1, 0],
+             ['и снятая галочка', 'backCS', 0, 0],
+             ['и свой размер подписей', 'backS', 20, 0]],
+  },
+  {
     /* П4. Кривая комплектов: строится только по кнопке, поля пустые, луч идёт
        ДО КРАЯ плоскости, и в сцене с КПВ и КТВ он пересекает обе кривые —
        обе точки показаны с координатами. Комплект 1 к 1 на КПВ y = 100 − x
@@ -1544,6 +1579,10 @@ const failures = [];
 for (const c of CASES) {
   let res;
   try {
+    /* П51 завёл память состояния на каждую модель: вернулся в сцену — вернулись
+       и твои изменения. Контрольный прогон от этого зависеть не должен: каждый
+       случай ставит свою обстановку сам, поэтому память забываем перед каждым. */
+    await page.evaluate(() => { if (typeof resetSceneMemory === 'function') resetSceneMemory(); });
     res = await page.evaluate('(function(){ ' + c.run + ' })()');
   } catch (e) {
     fail++; failures.push(`${c.name}\n    setup упал: ${e.message}`);

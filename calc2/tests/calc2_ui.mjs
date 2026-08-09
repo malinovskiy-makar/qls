@@ -191,7 +191,7 @@ await t('своё имя кривой идёт в чип пульта', () => pa
 }));
 
 await t('смена сцены очищает оформление', async () => {
-  await page.evaluate(() => { openPicker(); pickScene('mono'); closePicker(); });
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('mono'); closePicker(); });
   await page.waitForTimeout(300);
   return await page.evaluate(() =>
     (STATE.graphTitle === '' && STATE.axisXName === '' && STATE.marks.length === 0) ||
@@ -202,7 +202,7 @@ await t('монополия 40/60 не сломана', () => page.evaluate(() =
   (Math.abs(STATE.mono.Qm - 40) < .3 && Math.abs(STATE.mono.Pm - 60) < .3) || JSON.stringify(STATE.mono)));
 
 // ── Фаза 2: пикеры у кривых издержек ────────────────────────────────────
-await page.evaluate(() => { openPicker(); pickScene('costs'); closePicker(); });
+await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('costs'); closePicker(); });
 await page.waitForTimeout(400);
 
 await t('у пяти кривых издержек есть пикеры', async () => {
@@ -315,7 +315,7 @@ await t('подписи не вылезают за поле графика', () 
 }));
 
 await t('D и S подписаны на рыночном графике', async () => {
-  await page.evaluate(() => { openPicker(); pickScene('sd'); closePicker(); });
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('sd'); closePicker(); });
   await page.waitForTimeout(350);
   const tx = await svgTexts();
   return (tx.includes('D') && tx.includes('S')) || 'есть: ' + tx.join('|');
@@ -478,7 +478,7 @@ await t('своё имя кривой заменяет родовое D на г�
 });
 
 // ── Фаза 8: один вход вместо двух ───────────────────────────────────────
-await page.evaluate(() => { openPicker(); pickScene('sd'); closePicker(); });
+await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('sd'); closePicker(); });
 await page.waitForTimeout(350);
 
 await t('структура рынка и вмешательство вложены в «Что изучаем»', () => page.evaluate(() => {
@@ -531,7 +531,7 @@ await t('возврат к «Равновесию» возвращает вме�
 }));
 
 // ── Фаза 5: экспорт ─────────────────────────────────────────────────────
-await page.evaluate(() => { openPicker(); pickScene('tax'); closePicker(); });
+await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('tax'); closePicker(); });
 await page.waitForTimeout(400);
 
 await t('окно экспорта открывается по кнопке дока', async () => {
@@ -605,7 +605,7 @@ await t('label чистится от посторонних символов', (
 }));
 
 await t('пунктирная кривая S+t попала в .tex при налоге', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="tax"]');
   await page.waitForTimeout(300);
   return await page.evaluate(() => {
@@ -622,7 +622,7 @@ await t('свои точки попадают в .tex с подписью', () =
 }));
 
 await t('в режиме издержек выгружаются кривые издержек', () => page.evaluate(() => {
-  openPicker(); pickScene('costs'); closePicker(); redrawAll();
+  resetSceneMemory(); openPicker(); pickScene('costs'); closePicker(); redrawAll();
   const tex = buildTex('', '');
   // Названия кривых уходят в .tex подписями узлов, как и на экране.
   return (tex.includes('{MC}') || tex.includes('MC};')) && tex.includes('ATC') || tex.slice(0, 200);
@@ -634,7 +634,7 @@ await t('.tex не пустой в любом режиме, не только р
   const scenes = ['m-optimum', 'adas', 'consumer', 'labor-mono', 'ppf', 'ineq', 'prod'];
   const thin = [];
   for (const s of scenes) {
-    await page.evaluate(() => openPicker());
+    await page.evaluate(() => { resetSceneMemory(); openPicker(); });
     await clickUI(`.scard[data-scene="${s}"]`);
     await page.waitForTimeout(260);
     const n = await page.evaluate(() => {
@@ -700,7 +700,7 @@ await t('иконки: один радиус маркеров и один пун
   return (r.size <= 1 && d.size <= 1) || `радиусов ${r.size}, пунктиров ${d.size}`;
 }));
 
-await page.evaluate(() => { openPicker(); pickScene('tax'); closePicker(); });
+await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('tax'); closePicker(); });
 await page.waitForTimeout(400);
 
 await t('панели не перекрывают график', () => page.evaluate(() => {
@@ -729,7 +729,7 @@ await t('в аналитике число крупнее подписи', () => 
 }));
 
 await t('панель параметров наполняется и в сцене «Труд»', async () => {
-  await page.evaluate(() => { openPicker(); pickScene('labor'); closePicker(); });
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('labor'); closePicker(); });
   await page.waitForTimeout(450);
   return await page.evaluate(() => {
     const n = document.querySelectorAll('#params-body .pchip, #params-body .field').length;
@@ -745,7 +745,7 @@ const SCENES = ['sd', 'tax', 'ceil', 'mono', 'elast', 'ext', 'smallopen', 'costs
                 'm-tangent', 'm-optimum', 'm-transform', 'm-minmax', 'm-constraint'];
 const dashHits = [];
 for (const sc of SCENES) {
-  await page.evaluate((s) => { openPicker(); pickScene(s); closePicker(); }, sc);
+  await page.evaluate((s) => { resetSceneMemory(); openPicker(); pickScene(s); closePicker(); }, sc);
   await page.waitForTimeout(160);
   const hit = await page.evaluate(() => {
     const bad = [];
@@ -779,7 +779,7 @@ await t('нет ИИ-штампов в видимом тексте', () => page.
 
 /* --- Переименование ключевых точек прямо на графике --------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
-await page.evaluate(() => openPicker());
+await page.evaluate(() => { resetSceneMemory(); openPicker(); });
 await clickUI('.scard[data-scene="m-optimum"]');
 await page.waitForTimeout(420);
 
@@ -838,7 +838,7 @@ await t('Esc отменяет переименование', async () => {
 });
 
 await t('смена сцены сбрасывает свои имена точек', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="m-tangent"]');
   await page.waitForTimeout(330);
   return await page.evaluate(() =>
@@ -847,7 +847,7 @@ await t('смена сцены сбрасывает свои имена точе
 
 /* --- Роль кривой спрашивается до формулы -------------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
-await page.evaluate(() => openPicker());
+await page.evaluate(() => { resetSceneMemory(); openPicker(); });
 await clickUI('.scard[data-scene="sd"]');
 await page.evaluate(() => { STATE.curves = []; curveCounter = 0; STATE.params = {}; renderCurveList(); redrawAll(); });
 await page.waitForTimeout(320);
@@ -905,7 +905,7 @@ await t('подсказка под полем называет именно эт
 
 /* --- Прилипание своих точек к кривым ----------------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
-await page.evaluate(() => openPicker());
+await page.evaluate(() => { resetSceneMemory(); openPicker(); });
 await clickUI('.scard[data-scene="sd"]');   // D = 100 − Q, S = Q, равновесие (50; 50)
 await page.waitForTimeout(340);
 
@@ -958,7 +958,7 @@ await t('подсказка показывает, куда сядет точка
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 
 await t('легенда называет области в сцене налога', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="tax"]');
   await page.waitForTimeout(350);
   const names = await page.evaluate(() => [...document.querySelectorAll('#chart .legend text')].map(t =>
@@ -983,7 +983,7 @@ await t('субсидия подписана расходом, а не сбор�
 await t('легенда собирается и в других режимах', async () => {
   const thin = [];
   for (const s of ['mono', 'labor', 'ppf', 'laffer', 'ext']) {
-    await page.evaluate(() => openPicker());
+    await page.evaluate(() => { resetSceneMemory(); openPicker(); });
     await clickUI(`.scard[data-scene="${s}"]`);
     await page.waitForTimeout(300);
     const n = await page.evaluate(() => document.querySelectorAll('#chart .legend text').length);
@@ -993,7 +993,7 @@ await t('легенда собирается и в других режимах',
 });
 
 await t('легенда попадает в экспорт вместе с графиком', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="tax"]');
   await page.waitForTimeout(330);
   return await page.evaluate(() => {
@@ -1021,7 +1021,7 @@ await t('легенда стоит выше поля графика, не пов
 
 /* --- Клавиатура и конструктор кусочной функции ------------------------- */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
-await page.evaluate(() => openPicker());
+await page.evaluate(() => { resetSceneMemory(); openPicker(); });
 await clickUI('.scard[data-scene="sd"]');
 await page.evaluate(() => { STATE.curves = []; curveCounter = 0; STATE.params = {}; renderCurveList(); redrawAll(); });
 await page.waitForTimeout(320);
@@ -1174,7 +1174,7 @@ await t('кусочная кривая строится движком', () => p
 // указатель поверх графика. Закрываем, иначе колесо до холста не доедет.
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.waitForTimeout(150);
-await page.evaluate(() => openPicker());
+await page.evaluate(() => { resetSceneMemory(); openPicker(); });
 await clickUI('.scard[data-scene="sd"]');
 await page.waitForTimeout(320);
 
@@ -1205,7 +1205,7 @@ await t('двойной щелчок возвращает масштаб сце�
 });
 
 await t('в математике окно тянется к курсору', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="m-optimum"]');
   await page.waitForTimeout(320);
   const b = await page.evaluate(() => [STATE.mathXmin, STATE.mathXmax]);
@@ -1220,7 +1220,7 @@ await t('в математике окно тянется к курсору', asy
 });
 
 await t('авто-подгонка сцены не сбивает ручной зум', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="adas"]');
   await page.waitForTimeout(360);
   await page.mouse.move(700, 450);
@@ -1234,7 +1234,7 @@ await t('авто-подгонка сцены не сбивает ручной �
 });
 
 /* --- Правка формулы прямо в карточке кривой ---------------------------- */
-await page.evaluate(() => openPicker());
+await page.evaluate(() => { resetSceneMemory(); openPicker(); });
 await clickUI('.scard[data-scene="sd"]');
 await page.waitForTimeout(320);
 await page.evaluate(() => setToolsOpen(true));
@@ -1280,7 +1280,7 @@ await t('цвет из пикера доехал до кривой', () => page.
   STATE.curves[0].color === '#123456' || STATE.curves[0].color));
 
 /* --- Построение графиков: список функций растёт сам --------------------- */
-await page.evaluate(() => openPicker());
+await page.evaluate(() => { resetSceneMemory(); openPicker(); });
 await clickUI('.scard[data-scene="m-graph"]');
 await page.waitForTimeout(400);
 await page.evaluate(() => setToolsOpen(true));
@@ -1363,7 +1363,7 @@ await t('удаление строки убирает кривую', async () =>
 });
 
 await t('в других сценах «Аналитика» вернулась', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="sd"]');
   await page.waitForTimeout(340);
   return await page.evaluate(() => {
@@ -1425,7 +1425,7 @@ await t('панели левая и правая одной ширины', async
 });
 
 await t('разбор уезжает из расчётов в «Объяснение модели»', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="ppf"]');
   await page.waitForTimeout(420);
   return await page.evaluate(() => {
@@ -1441,7 +1441,7 @@ await t('разбор уезжает из расчётов в «Объяснен
    Все блоки закрыты, у каждого свой заголовок, раскрытый меняет фон,
    первая видимая карточка выделена. */
 await t('все карточки панели ввода закрыты', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="sd"]');
   await page.waitForTimeout(340);
   await page.evaluate(() => setToolsOpen(true));
@@ -1483,7 +1483,7 @@ await t('раскрытая карточка отличается фоном', a
 /* ── П2. Первый экран: десять карточек блоков по две в ряд ───────────
    Щелчок по карточке убирает остальные и показывает модели этого блока. */
 await t('карточки блоков без номеров, ни один блок не раскрыт', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await page.waitForTimeout(200);
   return await page.evaluate(() => {
     const bad = [];
@@ -1598,7 +1598,7 @@ await t('надписи «Пока нет своих точек» нет', () =>
    На графике нет подписей вида «Xмакс=», «производство» всплывает по
    наведению, регулятор мировой цены собран в одном месте. */
 await t('на графике КТВ нет подписей вида «Xмакс=»', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="tradeprice"]');
   await page.waitForTimeout(420);
   return await page.evaluate(() => {
@@ -1644,7 +1644,7 @@ await t('ползунок и точное поле мировой цены си�
    Звёздочка на графике стала верхним индексом, подпись не лежит на оси,
    прямоугольник обрезки считается по шкалам сцены. */
 await t('в подписях на графике нет звёздочки вместо индекса', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="m-optimum"]');
   await page.waitForTimeout(420);
   return await page.evaluate(() => {
@@ -1682,7 +1682,7 @@ await t('прямоугольник обрезки считается по шк�
 }));
 
 await t('в рыночной сцене подпись равновесия тоже с индексом', async () => {
-  await page.evaluate(() => openPicker());
+  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="sd"]');
   await page.waitForTimeout(400);
   return await page.evaluate(() => {
