@@ -11,6 +11,7 @@ function redrawAll() {
   syncParams();          // формулы могли завести или потерять буквы-параметры
   redrawScene();
   drawOverlays();
+  applyLabelSize();      // общий размер подписей — одним проходом по холсту (П50)
   // Последним: карточка блока прячет переключатели соседних моделей. Идёт после
   // обычной логики видимости, иначе та вернула бы их на место.
   applyCardScope();
@@ -440,13 +441,17 @@ function drawLegend() {
   const seen = currentAreas();
   if (!seen.length) return;
   const m = CONFIG.margin;
-  // Легенда крупнее и выше нижнего края: у самой оси она наезжала на подписи
-  // делений и читалась хуже, чем должна (Фаза 8).
-  const SW = 12, GAP = 7, LH = 18, FS = 12;
+  /* П47: легенда вдвое крупнее прежнего — кегль 24 вместо 12, квадратик 24
+     вместо 12, шаг строк 36 вместо 18. Ширину подложки считаем от РЕАЛЬНОГО
+     кегля, а не по прежней прикидке «длина строки × 6.8»: с удвоенным
+     размером текст просто вылезал бы за рамку.
+     Подложка не залезает на конец оси: это то же правило про отступ, что и
+     в П33, только здесь его соблюдает сама легенда. */
+  const SW = 24, GAP = 12, LH = 36, FS = 24;
   const labels = seen.map(e => areaShort(e.key));
-  const wide = Math.max.apply(null, labels.map(s => s.length)) * 6.8;
-  const boxW = SW + GAP + wide + 14;
-  const boxH = seen.length * LH + 12;
+  const wide = Math.max.apply(null, labels.map(s => s.length)) * FS * 0.62;
+  const boxW = SW + GAP + wide + 20;
+  const boxH = seen.length * LH + 16;
   const x = (W - m.right) - boxW - 8;
   const y = (H - m.bottom) - boxH - 26;
   const g = svg.append('g').attr('class', 'legend').style('pointer-events', 'none');
@@ -454,13 +459,13 @@ function drawLegend() {
     .attr('rx', 6).attr('fill', COL.halo).attr('opacity', 0.82)
     .attr('stroke', COL.grid).attr('stroke-width', 1);
   seen.forEach((e, i) => {
-    const cy = y + 7 + i * LH;
+    const cy = y + 8 + i * LH;
     g.append('rect')
-      .attr('x', x + 8).attr('y', cy + 2).attr('width', SW).attr('height', SW)
-      .attr('rx', 2).attr('fill', e.color).attr('opacity', Math.max(0.35, e.opacity * 2))
+      .attr('x', x + 10).attr('y', cy + 4).attr('width', SW).attr('height', SW)
+      .attr('rx', 4).attr('fill', e.color).attr('opacity', Math.max(0.35, e.opacity * 2))
       .attr('stroke', e.color).attr('stroke-opacity', 0.55).attr('stroke-width', 1);
     const t = g.append('text')
-      .attr('x', x + 8 + SW + GAP).attr('y', cy + 11)
+      .attr('x', x + 10 + SW + GAP).attr('y', cy + SW * 0.82)
       .attr('font-size', FS).attr('font-weight', 600).attr('fill', COL.ink)
       .text(labels[i]);
     t.append('title').text(e.key);

@@ -263,7 +263,7 @@ function drawAxes(xLabel, yLabel) {
       .attr('stroke', AX).attr('stroke-width', 1);
     g.append('text').attr('x', sx(t)).attr('y', oy + 8)
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
-      .attr('font-size', 10).attr('fill', LBL).text(fmt(t));
+      .attr('class', 'axis-num').attr('font-size', 10).attr('fill', LBL).text(fmt(t));
   });
   // Деления и числа на оси Y.
   if (atZeroX) yTicks().forEach(t => {
@@ -274,13 +274,13 @@ function drawAxes(xLabel, yLabel) {
       .attr('stroke', AX).attr('stroke-width', 1);
     g.append('text').attr('x', ox - 8).attr('y', sy(t))
       .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
-      .attr('font-size', 10).attr('fill', LBL).text(fmt(t));
+      .attr('class', 'axis-num').attr('font-size', 10).attr('fill', LBL).text(fmt(t));
   });
   // Единственный «0» в начале координат (только если начало видно).
   if (atZeroX && atZeroY) {
     g.append('text').attr('x', ox - 8).attr('y', oy + 8)
       .attr('text-anchor', 'end').attr('dominant-baseline', 'hanging')
-      .attr('font-size', 10).attr('fill', LBL).text('0');
+      .attr('class', 'axis-num').attr('font-size', 10).attr('fill', LBL).text('0');
   }
 
   /* Подписи осей: X-метка за стрелкой справа, Y-метка над стрелкой сверху.

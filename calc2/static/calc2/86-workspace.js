@@ -165,6 +165,55 @@ const SECTION_NAMES = {
   'sec-math': 'Математика',
 };
 
+/* П9. Иконка у каждого блока панели ввода — в той же геометрии, что превью
+   моделей в окне сценариев: только три толщины линии (оси 1.5 · вспомогательная
+   2.2 · главная кривая 2.6), маркер r 3.6, пунктир «5 4». Так иконки читаются
+   как одна семья с карточками, а не как набор из случайных наборов.
+   Рисуем в viewBox 24×24 и красим currentColor: цвет берётся у заголовка. */
+const SECTION_ICONS = {
+  // Кривые: оси и одна кривая.
+  'sec-curves': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 17c5 0 9-4 13-11" stroke-width="2.6"/>',
+  // Построение графиков: две кривые.
+  'sec-graph': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 18c4-2 6-8 13-12" stroke-width="2.6"/><path d="M5 8c5 4 8 7 13 9" stroke-width="2.2" stroke-dasharray="5 4"/>',
+  // Равновесие: пересечение и точка.
+  'sec-eq': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 6l13 12M5 18L18 6" stroke-width="2.2"/><circle cx="11.5" cy="12" r="3.6" stroke-width="2.6"/>',
+  // Излишки: закрашенная область.
+  'sec-areas': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 6l12 12H5z" fill="currentColor" fill-opacity=".16" stroke-width="2.6"/>',
+  // Что изучаем: кривая и штриховая «до».
+  'sec-analysis': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 17c5 0 9-4 13-11" stroke-width="2.6"/><path d="M5 12c5 0 9-3 13-7" stroke-width="2.2" stroke-dasharray="5 4" opacity=".4"/>',
+  // Монополия: спрос и вдвое круче MR.
+  'sec-mono': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 6l13 12" stroke-width="2.6"/><path d="M5 6l7 12" stroke-width="2.2" stroke-dasharray="5 4"/>',
+  // Вмешательство: клин между кривыми.
+  'sec-tax': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 6l13 12M5 18L18 6" stroke-width="2.2"/><rect x="8" y="9" width="7" height="6" fill="currentColor" fill-opacity=".16" stroke-width="2.6"/>',
+  // Фирма: U-образные средние издержки.
+  'sec-costs': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 7c4 9 8 9 13 1" stroke-width="2.6"/>',
+  // Рынок труда: спрос и предложение труда.
+  'sec-labor': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 7l13 10" stroke-width="2.6"/><path d="M5 17L18 7" stroke-width="2.2"/>',
+  // Неравенство: кривая Лоренца под диагональю.
+  'sec-inequality': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M4 20L18 5" stroke-width="2.2" stroke-dasharray="5 4"/><path d="M4 20c7 0 11-5 14-15" stroke-width="2.6"/>',
+  // Потребитель: бюджетная линия и кривая безразличия.
+  'sec-consumer': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 17L18 6" stroke-width="2.2"/><path d="M6 18c6 0 10-4 11-11" stroke-width="2.6"/>',
+  // КПВ: вогнутая граница.
+  'sec-ppf': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 5c8 1 12 6 13 14" stroke-width="2.6"/>',
+  // Макро: AD и вертикальная LRAS.
+  'sec-macro': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 6l13 12" stroke-width="2.6"/><path d="M13 5v14" stroke-width="2.2"/>',
+  // Математика: парабола.
+  'sec-math': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 5c3 12 8 12 13 1" stroke-width="2.6"/>',
+  // Точки на графике: точка с проекциями.
+  'sec-view': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M4 10h9M13 20v-10" stroke-width="2.2" stroke-dasharray="5 4"/><circle cx="13" cy="10" r="3.6" stroke-width="2.6"/>',
+  // Цвета областей: три образца.
+  'sec-areacolors': '<rect x="4" y="6" width="16" height="4" rx="1.5" fill="currentColor" fill-opacity=".16" stroke-width="2.2"/><rect x="4" y="14" width="16" height="4" rx="1.5" fill="currentColor" fill-opacity=".16" stroke-width="2.6"/>',
+  // Площади: заштрихованная фигура под кривой.
+  'sec-areascalc': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 8c5 1 9 5 12 11H5z" fill="currentColor" fill-opacity=".16" stroke-width="2.6"/>',
+};
+
+function sectionIcon(secId) {
+  const d = SECTION_ICONS[secId];
+  if (!d) return '';
+  return '<svg class="sec-ico" aria-hidden="true" viewBox="0 0 24 24" fill="none" '
+       + 'stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
+}
+
 function cardifySections() {
   document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
     if (sec._card) return;
@@ -176,6 +225,14 @@ function cardifySections() {
       const box = document.getElementById(had.getAttribute('aria-controls'));
       if (box) box.classList.remove('open');
       sec.classList.remove('open-card');
+      // Иконку такому заголовку тоже даём: он размечен в шаблоне вручную,
+      // но выглядеть должен как остальные (П9).
+      const sp = had.querySelector(':scope > span');
+      if (sp && !sp.querySelector('.sec-ico')) {
+        const txt = sp.textContent.trim();
+        sp.innerHTML = sectionIcon(sec.id) + '<b></b>';
+        sp.querySelector('b').textContent = txt;
+      }
       return;
     }
     const title = sec.querySelector(':scope > .section-title');
@@ -186,8 +243,8 @@ function cardifySections() {
     btn.type = 'button';
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-controls', bodyId);
-    btn.innerHTML = '<span></span>' + FOLD_CHEVRON;
-    btn.querySelector('span').textContent = name;
+    btn.innerHTML = '<span>' + sectionIcon(sec.id) + '<b></b></span>' + FOLD_CHEVRON;
+    btn.querySelector('span > b').textContent = name;
     const body = document.createElement('div');
     body.className = 'fold-body';
     body.id = bodyId;
@@ -210,6 +267,14 @@ function collapseCards() {
     if (box) box.classList.remove('open');
     sec.classList.remove('open-card');
   });
+}
+
+// Отметить активную букву «А» под текущий размер подписей (П50).
+function syncLabelSizeSeg() {
+  const map = { 12: 'lbl-s', 16: 'lbl-m', 20: 'lbl-l' };
+  const want = map[+STATE.labelSize] || 'lbl-s';
+  document.querySelectorAll('#lblsize-seg .seg-btn')
+    .forEach(b => b.classList.toggle('active', b.id === want));
 }
 
 /* Раскрыть карточку по её id. Нужна, когда блок должен открыться не от щелчка
@@ -614,6 +679,18 @@ function wireWrench() {
   if (gt) gt.addEventListener('input', () => { STATE.graphTitle = gt.value; redrawAll(); });
   const ls = document.getElementById('inp-lblsize');
   if (ls) ls.addEventListener('input', () => { STATE.labelSize = parseFloat(ls.value); redrawAll(); });
+  // П50: три буквы А вместо числового поля. 12 · 16 · 20.
+  [['lbl-s', 12], ['lbl-m', 16], ['lbl-l', 20]].forEach(([id, size]) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.addEventListener('click', () => {
+      STATE.labelSize = size;
+      document.querySelectorAll('#lblsize-seg .seg-btn')
+        .forEach(x => x.classList.toggle('active', x === b));
+      redrawAll();
+    });
+  });
+  syncLabelSizeSeg();
   // Цвет заголовка — тем же пикером, что и у кривых.
   const slot = document.getElementById('gtitle-color-slot');
   if (slot && !slot.firstChild) {

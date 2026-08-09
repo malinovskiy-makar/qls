@@ -1121,6 +1121,36 @@ const CASES = [
              ['у каждой вершины крестик', 'verts', 3, 0]],
   },
   {
+    /* П50. Размер подписей меняет ВСЁ внутри графика, кроме отметок координат
+       на осях. Полсотни мест задают размер числом прямо в коде, поэтому
+       множитель применяется одним проходом по холсту после отрисовки. */
+    name: 'Подписи · три размера меняют весь график, кроме отметок осей',
+    run: `openPicker(); pickScene('tax'); closePicker();
+          function pick() {
+            var t = [].slice.call(document.querySelectorAll('#chart text'));
+            var curve = null, axis = null, other = null;
+            t.forEach(function (n) {
+              if (n.classList.contains('axis-num')) { if (axis === null) axis = +n.getAttribute('font-size'); return; }
+              var s = n.firstChild && n.firstChild.nodeValue;
+              if (s === 'S' && curve === null) curve = +n.getAttribute('font-size');
+              else if (other === null) other = +n.getAttribute('font-size');
+            });
+            return { curve: curve, axis: axis, other: other };
+          }
+          document.getElementById('lbl-s').click(); var s = pick();
+          document.getElementById('lbl-m').click(); var m = pick();
+          document.getElementById('lbl-l').click(); var l = pick();
+          var ratio = (s.other > 0) ? (l.other / s.other) : 0;
+          document.getElementById('lbl-s').click();
+          return { s: s.curve, m: m.curve, l: l.curve,
+                   ax: s.axis, axM: m.axis, axL: l.axis, ratio: ratio };`,
+    checks: [['маленькая — 12', 's', 12, 0], ['средняя — 16', 'm', 16, 0],
+             ['крупная — 20', 'l', 20, 0],
+             ['отметки осей не трогаем', 'ax', 10, 0],
+             ['и на средней', 'axM', 10, 0], ['и на крупной', 'axL', 10, 0],
+             ['прочие подписи растут в той же мере', 'ratio', 20 / 12, 0.01]],
+  },
+  {
     /* П32, П33. Возврат масштаба показывает всё нарисованное и делает это
        ИДЕМПОТЕНТНО: повторное нажатие ничего не двигает. Кривые в подгонке
        намеренно не участвуют — растущая кривая раздвигала бы окно бесконечно.

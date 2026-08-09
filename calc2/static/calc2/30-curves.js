@@ -55,9 +55,35 @@ function curveAnchor(f, fromFrac, toFrac) {
    переносится, а не исчезает. */
 // Кегль подписей кривых. Один на весь график: настройка у каждой строки списка
 // дала бы десяток одинаковых полей ради того, что меняют раз на задачу.
-function curveLabelSize() {
+/* П50. Размер подписей задаётся тремя буквами А: маленькая 12, средняя 16,
+   большая 20. Меняется ВСЁ внутри графика — подписи кривых и точек,
+   координаты, названия осей, легенда, врезки, подписи областей, — кроме
+   отметок координат на осях: их размер оставлен как есть.
+
+   Полсотни мест рисуют текст с размером, вбитым числом прямо в коде. Вместо
+   того чтобы править каждое (и промахнуться на следующем), после отрисовки
+   идёт один проход по всем <text> внутри холста и множит их размер на общий
+   коэффициент. Новая подпись получает его бесплатно, ничего не зная о нём.
+   Отметки осей помечены классом axis-num и в проход не попадают. */
+const LABEL_BASE = 12;                       // «маленькая А» — базовый размер
+function curveLabelSize() { return LABEL_BASE; }
+function labelScale() {
   const v = +STATE.labelSize;
-  return (isFinite(v) && v >= 8 && v <= 22) ? v : 11;
+  return (isFinite(v) && v >= 8 && v <= 40) ? v / LABEL_BASE : 1;
+}
+
+function applyLabelSize() {
+  const k = labelScale();
+  if (Math.abs(k - 1) < 1e-6) return;
+  const node = svg.node();
+  if (!node) return;
+  node.querySelectorAll('text').forEach(t => {
+    if (t.classList.contains('axis-num')) return;      // отметки координат не трогаем
+    const cur = parseFloat(t.getAttribute('font-size'));
+    const base = isFinite(cur) ? cur : parseFloat(getComputedStyle(t).fontSize);
+    if (!isFinite(base) || base <= 0) return;
+    t.setAttribute('font-size', Math.round(base * k * 10) / 10);
+  });
 }
 
 /* Сглаживание подписей (П25).

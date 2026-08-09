@@ -477,10 +477,15 @@ await t('структура рынка и вмешательство вложе�
 }));
 
 await t('заголовок верхнего уровня в панели один', () => page.evaluate(() => {
-  // Заголовок секции стал складной кнопкой карточки (Фаза 5). Берём его
-  // собственный текст: рядом стоит вопросик-подсказка, и его «?» попал бы в
-  // textContent. Внутри «Что изучаем» заголовков верхнего уровня быть не должно.
-  const own = (n) => [...n.childNodes].filter(x => x.nodeType === 3).map(x => x.nodeValue).join('').trim();
+  // Заголовок секции стал складной кнопкой карточки (Фаза 5), а название внутри
+  // неё лежит в <b> рядом с иконкой блока (П9). Берём именно его: рядом стоит
+  // вопросик-подсказка, и его «?» попал бы в textContent всей кнопки.
+  // Внутри «Что изучаем» заголовков верхнего уровня быть не должно.
+  const own = (n) => {
+    const b = n.querySelector(':scope > b');
+    if (b) return b.textContent.trim();
+    return [...n.childNodes].filter(x => x.nodeType === 3).map(x => x.nodeValue).join('').trim();
+  };
   const head = document.querySelector('#sec-analysis > .fold-btn > span');
   const inner = document.querySelectorAll('#sec-analysis .section-title').length;
   if (!head) return 'у секции нет складного заголовка';

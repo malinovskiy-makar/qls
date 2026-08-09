@@ -867,9 +867,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .side.collapsed .side-inner { display: none; }
 
 .side-arrow {
-  /* Вровень с первой иконкой дока: её центр на 10 px ниже, и стрелки
-     читались как случайно расставленные (Фаза 8). */
-  position: absolute; top: 19px; width: 22px; height: 26px; z-index: 2;
+  /* П7. Стрелка стоит по ЦЕНТРУ шапки, а не на отмеренных сверху 19 пикселях:
+     высота шапки зависела от содержимого, и стрелка съезжала. Шапка теперь
+     фиксированной высоты (.side-head), поэтому центр считается от неё. */
+  position: absolute; top: 0; height: 46px; width: 22px; z-index: 2;
   display: grid; place-items: center; border: none; border-radius: var(--r-sm);
   background: transparent; color: var(--text3);
   transition: background .12s var(--ease), color .12s var(--ease);
@@ -899,23 +900,21 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
 /* Заголовок панели уступает место стрелке сворачивания: у левой панели стрелка
    справа, у правой — слева, поэтому и отступы зеркальные. */
+/* П6. Обе шапки — одной высоты, одного кегля и с линией на одном уровне.
+   Слева заголовок это название модели, справа «Аналитика»; раньше слева было
+   две строки в колонку, справа одна, и подписи стояли на разной высоте.
+   Высота задана явно (не «сколько получится»), чтобы линии сошлись пиксель
+   в пиксель при любой длине названия. */
 .side-head {
   display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-  padding: 12px 32px 10px 14px; border-bottom: 1px solid var(--border-soft);
+  height: 46px; padding: 0 34px 0 14px;
+  border-bottom: 1px solid var(--border-soft);
 }
-.side-right .side-head { padding: 12px 14px 10px 32px; }
+.side-right .side-head { padding: 0 14px 0 34px; }
 .side-head h2, .side-scene {
-  font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--text);
+  font-size: 16px; font-weight: 750; letter-spacing: -.015em; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* Хлебная крошка над названием сцены: из какого она блока. */
-.side-head { flex-direction: column; align-items: flex-start; gap: 2px; }
-.scene-block {
-  font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
-  color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  max-width: 100%;
-}
-.scene-block:empty { display: none; }
 .side-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
 /* Две части левой панели: ввод сверху, аналитика снизу. */
@@ -937,8 +936,22 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .side.empty { display: none; }
 /* Складные блоки правой панели: заголовок с отступами панели, тело без
    лишнего верхнего зазора — .sb-body свой отступ уже несёт. */
-#params-panel .side-part > .fold-btn { padding: 11px 14px 9px; }
-#params-panel .fold-body { padding-top: 0; }
+/* П14. «Ключевые значения» и «Объяснение модели» обрамлены так же, как блоки
+   левой панели: рамка, скругление, свой фон, тот же кегль заголовка, раскрытая
+   карточка меняет фон. Эталон — блок «КПВ и торговля» в панели ввода. Раньше
+   справа не было ни рамки, ни фона, только верхняя линия, и два столбца
+   читались как разные интерфейсы. */
+#params-panel .side-part {
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+  background: var(--surface); margin: 0 14px 7px; overflow: hidden;
+}
+#params-panel .side-part:first-child { margin-top: 10px; }
+#params-panel .side-part > .fold-btn {
+  padding: 10px 11px; font-size: 13.5px; font-weight: 700; letter-spacing: -.01em;
+}
+#params-panel .side-part.open-card { background: var(--surface-2); border-color: var(--border); }
+#params-panel .fold-body { padding: 0 11px 11px; }
+#params-panel .sb-body { padding: 4px 0 6px; }
 .sb-body { padding: 4px 14px 16px; }
 .sb-body .section { margin-bottom: 12px; }
 .sb-body .section:last-child { margin-bottom: 0; }
@@ -1003,7 +1016,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   color: var(--text);
 }
 .fold-btn:hover { color: var(--accent); }
-.fold-btn > span { display: flex; align-items: center; }
+.fold-btn > span { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fold-btn > span > b { font: inherit; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* П9: иконка блока — та же геометрия, что у превью моделей в окне сценариев. */
+.sec-ico { width: 17px; height: 17px; flex-shrink: 0; color: var(--text3); }
+.section.open-card > .fold-btn .sec-ico,
+.section.first-card > .fold-btn .sec-ico { color: currentColor; }
 .fold-btn svg { width: 13px; height: 13px; transition: transform .18s var(--ease); }
 .fold-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
 .fold-body { display: none; padding-top: 4px; }

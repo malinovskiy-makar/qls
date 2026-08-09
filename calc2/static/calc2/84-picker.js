@@ -271,15 +271,6 @@ function foldPickerGroups() {
   });
 }
 
-function sceneBlockLabel(key) {
-  const card = document.querySelector('.scard[data-scene="' + key + '"]');
-  const grp = card && card.closest('.picker-group');
-  const lab = grp && grp.querySelector('.picker-group-label');
-  if (!lab) return '';
-  const t = lab.textContent.replace(/^\s*\d+\s*·\s*/, '').trim();
-  return (t === 'Пустой холст') ? '' : t;
-}
-
 function pickScene(key) {
   resetDecor();           // новая сцена — чистое оформление (Фаза 1)
   STATE.zoomLock = false; // и свой масштаб, а не унаследованный от колеса
@@ -290,8 +281,6 @@ function pickScene(key) {
   STATE.sceneKey = key;
   const nm = document.getElementById('scene-name');
   if (nm) nm.textContent = SCENE_NAMES[key] || 'Сцена';
-  const bl = document.getElementById('scene-block');
-  if (bl) bl.textContent = sceneBlockLabel(key);
   if (typeof collapseCards === 'function') collapseCards();   // новая сцена — все карточки закрыты
   if (typeof updatePult === 'function') updatePult();   // показать/спрятать пульт под выбранную сцену
   // Панель ввода открыта, но все карточки в ней закрыты: список заголовков
