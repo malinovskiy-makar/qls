@@ -481,12 +481,12 @@ function drawMathTransform(f) {
   const g = svg.append('g');
   drawGrid(mx, my, g);
   drawPlaneAxes(g, mx, my, 'x', 'y');
-  const t = mathTransformed(f, STATE.mathTrans, STATE.mathA);
+  const t = mathTransformed(f, STATE.mathTrans, paramValue('a', 1));
   mathLine(g, f, mx, my, COL.ghost, 2.2, '6 4');   // исходная — бледным пунктиром
   mathLine(g, t, mx, my, COL.D, 2.8);
   labelCurveMath(g, f, mx, my, 'Исходная', COL.ghost);
   labelCurveMath(g, t, mx, my, MATH_TRANS[STATE.mathTrans].tex, COL.D);
-  STATE.mathRes = { trans: STATE.mathTrans, a: STATE.mathA };
+  STATE.mathRes = { trans: STATE.mathTrans, a: paramValue('a', 1) };
   updateMathPanel();
 }
 // Подпись кривой на полном плане: ищем видимый участок, как в Фазе 3.
@@ -592,7 +592,7 @@ function drawMathMinMax(f) {
 function compileAB(expr) {
   try {
     const compiled = math.parse(expr).compile();
-    compiled.evaluate({ a: 1, b: 1, x: 1, y: 1, L: 1, K: 1 });
+    compiled.evaluate(scopeFor(expr, { a: 1, b: 1, x: 1, y: 1, L: 1, K: 1 }));
     return { compiled, error: null };
   } catch (e) { return { compiled: null, error: 'Не понял формулу f(x, y): ' + e.message }; }
 }
@@ -611,7 +611,7 @@ function parseConstraint(src) {
   if (!r.compiled) return null;
   return (a, b) => {
     try {
-      const v = r.compiled.evaluate({ a, b, x: a, y: b, L: a, K: b });
+      const v = r.compiled.evaluate(paramScope({ a, b, x: a, y: b, L: a, K: b }));
       return (typeof v === 'number' && isFinite(v)) ? v : NaN;
     } catch (e) { return NaN; }
   };
@@ -689,7 +689,7 @@ function drawMathConstraint() {
   }
   const f = (a, b) => {
     try {
-      const v = compiled.evaluate({ x: a, y: b, a, b, L: a, K: b });
+      const v = compiled.evaluate(paramScope({ x: a, y: b, a, b, L: a, K: b }));
       return (typeof v === 'number' && isFinite(v)) ? v : NaN;
     } catch (e) { return NaN; }
   };
@@ -814,7 +814,7 @@ function updateMathPanel() {
   } else if (STATE.mathSub === 'transform') {
     const t = MATH_TRANS[STATE.mathTrans];
     html += `<div class="stat"><span>Преобразование</span><b>${t.tex}</b></div>`;
-    html += `<div class="stat"><span>Параметр a</span><b>${fmt(STATE.mathA)}</b></div>`;
+    html += `<div class="stat"><span>Параметр $a$</span><b>${fmt(paramValue('a', 1))}</b></div>`;
     html += `<div class="hint">${t.note}</div>`;
   } else if (STATE.mathSub === 'minmax') {
     if (r.error) html = `<div class="warn">${r.error}</div>`;

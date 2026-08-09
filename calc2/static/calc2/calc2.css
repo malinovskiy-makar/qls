@@ -1101,6 +1101,29 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   text-align: right; border: 1px solid var(--accent); border-radius: var(--r-sm);
   background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
 }
+/* Поле точного значения открывается на месте формулы, поэтому прижато влево. */
+.pchip-param .pchip-valedit { margin-left: 0; text-align: left; }
+/* ── Ползунок параметра в духе Desmos (П23) ──────────────────────────
+   Строка «a = 1» набрана формулой, справа серый крестик, под ними дорожка
+   с серыми границами по краям. Раскрытый редактор границ печатает настоящие
+   знаки неравенства. */
+.param-eq { font-size: 14px; color: var(--text); }
+.param-eq .katex { font-size: 1.02em; }
+.pchip-param .pchip-top { gap: 6px; }
+.param-kill {
+  margin-left: auto; flex: 0 0 auto; width: 18px; height: 18px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; line-height: 1; color: var(--text3);
+  background: transparent; border: none; border-radius: var(--r-sm);
+}
+.param-kill:hover { color: var(--accent); background: var(--accent-tint); }
+/* Свёрнутый параметр: остаётся только строка «a = 1». */
+.pchip-param.folded .param-track,
+.pchip-param.folded .param-editor,
+.pchip-param.folded .pchip-val { display: none; }
+.pchip-param.folded .param-eq { cursor: pointer; opacity: .72; }
+.param-ed-tex { flex: 0 0 auto; color: var(--text); }
+
 /* Две группы в правой панели: регуляторы модели и буквы из формул. */
 .params-group-title {
   font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;

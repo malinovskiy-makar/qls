@@ -55,13 +55,13 @@ function lorenzFromShares(shares) {
 // Кривая Лоренца из функции L(p) (переменная p, x — синоним). Возвращает { pts, warn, error }.
 function lorenzFromFormula(expr) {
   let compiled;
-  try { compiled = math.parse(expr).compile(); compiled.evaluate({ p: 0.5, x: 0.5 }); }
+  try { compiled = math.parse(expr).compile(); compiled.evaluate(scopeFor(expr, { p: 0.5, x: 0.5 })); }
   catch (e) { return { pts: null, error: e.message }; }
   const N = 100, pts = [];
   for (let i = 0; i <= N; i++) {
     const p = i / N;
     let L;
-    try { const v = compiled.evaluate({ p: p, x: p }); L = (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+    try { const v = compiled.evaluate(paramScope({ p: p, x: p })); L = (typeof v === 'number' && isFinite(v)) ? v : NaN; }
     catch (e) { L = NaN; }
     pts.push([p, L]);
   }

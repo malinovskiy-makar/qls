@@ -1306,8 +1306,6 @@ function freeSymbols(expr) {
    нельзя: получится два хозяина у одного числа. */
 function sceneReserved() {
   if (STATE.mode === 'math') {
-    // «Деформации» ведут параметр a своим ползунком сюжета.
-    if (STATE.mathSub === 'transform') return new Set(['a']);
     // В «Оптимуме при ограничении» a и b — это оси, а не параметры.
     if (STATE.mathSub === 'constraint') return new Set(['a', 'b']);
     return new Set();
@@ -1322,6 +1320,22 @@ function sceneReserved() {
   if (taxField && fieldActive(taxField)) { s.add('t'); s.add('s'); }
   if (STATE.mode === 'labor') s.add('w');
   return s;
+}
+
+/* Буквы, которые нужны САМОЙ сцене, даже если в формуле их нет (П26).
+   «Деформации графика» двигают кривую параметром a, а формулу пишут без него —
+   раньше у сюжета был свой ползунок с собственной разметкой и обвязкой, копия
+   общего механизма. Теперь сцена просто заявляет букву, а всё остальное —
+   вид, границы, шаг, точный ввод, крестик — берётся из общего кода. */
+function sceneExtraParams() {
+  if (STATE.mode === 'math' && STATE.mathSub === 'transform') return ['a'];
+  return [];
+}
+
+// Значение параметра с запасным вариантом: сцены читают его вместо своего поля.
+function paramValue(name, fallback) {
+  const p = (STATE.params || {})[name];
+  return (p && isFinite(p.value)) ? p.value : fallback;
 }
 
 // Значения параметров подмешиваются в КАЖДЫЙ расчёт формулы.
@@ -1367,6 +1381,7 @@ function syncParams() {
   // те поля, чья секция сейчас на экране, иначе спрятанные сцены наплодили бы
   // ползунков для букв, которых пользователь не видит.
   liveFormulaTexts().forEach(take);
+  sceneExtraParams().forEach(n => { if (names.indexOf(n) < 0) names.push(n); });
   STATE.params = STATE.params || {};
   let changed = false;
   names.forEach(n => {
@@ -1389,12 +1404,38 @@ function syncParams() {
    хотя нужны один раз на всю задачу. */
 function buildParamChip(box, name) {
   const p = STATE.params[name];
-  const { chip, val } = makePchip(name, fmt(p.value), null);
+  const { chip, lab, val } = makePchip(name, fmt(p.value), null);
   chip.classList.add('pchip-param');
 
-  // Точное значение: щелчок по числу справа открывает поле ввода на его месте.
-  val.classList.add('pchip-editable');
-  val.title = 'Щёлкните, чтобы ввести точное значение';
+  /* П23. Значение — набранная формула «a = 1», как у Desmos: курсивная буква,
+     знак равенства, число. Раньше буква и число были обычным текстом в разных
+     углах строки. Печатает KaTeX; нет CDN — остаётся тот же текст, что и был. */
+  lab.classList.add('param-eq');
+  const paintEq = () => {
+    if (typeof katex === 'undefined') { lab.textContent = name + ' = ' + fmt(p.value); return; }
+    try { katex.render(name + ' = ' + fmt(p.value).replace(/ /g, '\\,'), lab,
+                       { throwOnError: false, displayMode: false }); }
+    catch (e) { lab.textContent = name + ' = ' + fmt(p.value); }
+  };
+
+  /* Точное значение (П24): отдельного поля нет, щёлкают прямо по формуле.
+     Число справа при этом лишнее — вся строка «a = 1» и есть значение. */
+  val.style.display = 'none';
+  lab.classList.add('pchip-editable');
+  lab.title = 'Щёлкните, чтобы ввести точное значение';
+
+  /* Крестик справа вверху — как у Desmos. У нас параметр не объявляют строкой,
+     а выводят из формулы, поэтому «удалить» его насовсем нельзя: syncParams
+     завёл бы его заново на следующей перерисовке, а формула осталась бы без
+     значения. Поэтому крестик СВОРАЧИВАЕТ ползунок: буква держит своё нынешнее
+     значение, строка ужимается до «a = 1», а щелчок по ней разворачивает
+     обратно. Чтобы убрать параметр совсем, букву стирают из формулы (П18). */
+  const kill = document.createElement('button');
+  kill.type = 'button'; kill.className = 'param-kill';
+  kill.textContent = '✕';
+  kill.title = 'Свернуть ползунок (буква останется с этим значением)';
+  kill.setAttribute('aria-label', kill.title);
+  chip.querySelector('.pchip-top').appendChild(kill);
 
   const track = document.createElement('div');
   track.className = 'param-track';
@@ -1420,8 +1461,19 @@ function buildParamChip(box, name) {
     loLab.textContent = fmt(p.min);
     hiLab.textContent = fmt(p.max);
     val.textContent = fmt(p.value);
+    paintEq();
   };
   syncSlider();
+
+  // Свёрнутое состояние: остаётся только строка «a = 1» и знак развернуть.
+  const applyFold = () => {
+    chip.classList.toggle('folded', !!p.folded);
+    kill.textContent = p.folded ? '＋' : '✕';
+    kill.title = p.folded ? 'Показать ползунок' : 'Свернуть ползунок (буква останется с этим значением)';
+    kill.setAttribute('aria-label', kill.title);
+  };
+  applyFold();
+  kill.addEventListener('click', (e) => { e.stopPropagation(); p.folded = !p.folded; applyFold(); });
 
   sl.addEventListener('input', () => {
     p.value = parseFloat(sl.value);
@@ -1429,21 +1481,21 @@ function buildParamChip(box, name) {
     redrawAll();
   });
 
-  val.addEventListener('click', () => {
-    const cur = p.value;
+  lab.addEventListener('click', () => {
+    if (p.folded) { p.folded = false; applyFold(); return; }   // свёрнутый — сначала разворачиваем
     const inp = document.createElement('input');
-    inp.type = 'number'; inp.step = 'any'; inp.value = cur;
+    inp.type = 'number'; inp.step = 'any'; inp.value = p.value;
     inp.className = 'pchip-valedit';
-    val.replaceWith(inp);
+    lab.replaceWith(inp);
     inp.focus(); inp.select();
     const done = () => {
       const v = parseFloat(inp.value);
       if (isFinite(v)) {
         p.value = v;
-        if (v < p.min) p.min = v;
+        if (v < p.min) p.min = v;      // вышли за границу — она раздвигается сама
         if (v > p.max) p.max = v;
       }
-      inp.replaceWith(val);
+      inp.replaceWith(lab);
       syncSlider();
       redrawAll();
     };
@@ -1470,12 +1522,18 @@ function buildParamChip(box, name) {
       });
       return n;
     };
+    /* Строка «−10 ≤ a ≤ 10» набрана формулой целиком, а не собрана из текстовых
+       знаков: неравенства и курсивная буква печатаются KaTeX, как у Desmos. */
+    const tex = (t) => {
+      const s = document.createElement('span'); s.className = 'param-ed-tex';
+      if (typeof katex === 'undefined') { s.textContent = t.replace(/\\le/g, '≤'); return s; }
+      try { katex.render(t, s, { throwOnError: false, displayMode: false }); }
+      catch (e) { s.textContent = t.replace(/\\le/g, '≤'); }
+      return s;
+    };
     const line = document.createElement('div');
     line.className = 'param-ed-line';
-    const nm = document.createElement('span'); nm.className = 'param-ed-name'; nm.textContent = name;
-    const le1 = document.createElement('span'); le1.textContent = '≤';
-    const le2 = document.createElement('span'); le2.textContent = '≤';
-    line.append(mk('min'), le1, nm, le2, mk('max'));
+    line.append(mk('min'), tex('\\le ' + name + ' \\le'), mk('max'));
     const line2 = document.createElement('div');
     line2.className = 'param-ed-line';
     const st = document.createElement('span'); st.className = 'param-ed-name'; st.textContent = 'Шаг';
@@ -1842,7 +1900,7 @@ function mathSnapTargets(out) {
   if (sub === 'transform') {
     if (f) {
       out.push({ name: 'f', f });
-      out.push({ name: 'после', f: mathTransformed(f, STATE.mathTrans, STATE.mathA) });
+      out.push({ name: 'после', f: mathTransformed(f, STATE.mathTrans, paramValue('a', 1)) });
     }
     return;
   }

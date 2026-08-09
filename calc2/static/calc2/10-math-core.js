@@ -86,7 +86,7 @@ function fmtLinear(a, b, varName) {
 function compileFormulaP(expr) {
   try {
     const compiled = math.parse(expr).compile();
-    compiled.evaluate({ P: 1, p: 1, x: 1 });   // пробный расчёт ловит опечатки сразу
+    compiled.evaluate(scopeFor(expr, { P: 1, p: 1, x: 1 }));   // пробный расчёт ловит опечатки
     return { compiled, error: null };
   } catch (e) {
     return { compiled: null, error: e.message };
@@ -95,7 +95,7 @@ function compileFormulaP(expr) {
 
 // Значение Q(P) в точке P. NaN — на ошибке/разрыве.
 function evalQofP(compiled, p) {
-  try { const v = compiled.evaluate({ P: p, p: p, x: p }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  try { const v = compiled.evaluate(paramScope({ P: p, p: p, x: p })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
   catch (e) { return NaN; }
 }
 

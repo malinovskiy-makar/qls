@@ -9,7 +9,7 @@
 // Значение TC(Q) по компилированной формуле (Q и x — обе переменные).
 function evalTC(q) {
   if (!STATE.costsCompiled) return NaN;
-  try { const v = STATE.costsCompiled.evaluate({ x: q, Q: q }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  try { const v = STATE.costsCompiled.evaluate(paramScope({ x: q, Q: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
   catch (e) { return NaN; }
 }
 function costVC(q)  { const tc = evalTC(q); return isNaN(tc) ? NaN : tc - STATE.costsFC; }   // переменные = TC − FC
@@ -428,12 +428,12 @@ function updateIsoPanel() {
 // Предельные издержки завода по его TC (центральная разность).
 function plantMC(compiled, q) {
   const h = Math.max(1e-5, q * 1e-5 || 1e-5), lo = Math.max(0, q - h);
-  const at = (x) => { try { const v = compiled.evaluate({ Q: x, x: x, L: x }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; } catch (e) { return NaN; } };
+  const at = (x) => { try { const v = compiled.evaluate(paramScope({ Q: x, x: x, L: x })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; } catch (e) { return NaN; } };
   const a = at(q + h), b = at(lo);
   return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / ((q + h) - lo);
 }
 function plantTC(compiled, q) {
-  try { const v = compiled.evaluate({ Q: q, x: q, L: q }); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  try { const v = compiled.evaluate(paramScope({ Q: q, x: q, L: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
   catch (e) { return NaN; }
 }
 // Объём завода при уровне предельных издержек m: MC(q) = m. MC растёт по q,

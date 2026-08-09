@@ -771,8 +771,24 @@ function closeAllKeyboardsExcept(slot) {
    собираются буквы-параметры: формулы сцен лежат в своих полях, а не в
    STATE.curves, и без реестра «a - Q» в КПВ или в макро ползунка бы не дало. */
 const FORMULA_FIELDS = [];
+/* П19: панель ползунков обновляется прямо во время набора формулы.
+   Раньше буква становилась ползунком только после «Построить» или Enter:
+   syncParams живёт внутри redrawAll, а сценовые поля перерисовку по каждому
+   символу не запускают. Вешаем на каждое формульное поле отложенный вызов
+   syncParams — он сам ничего не перестраивает, пока НАБОР букв не изменился
+   (флаг changed внутри), поэтому печатать «100 - 2*Q» так же дёшево, как было.
+   График по-прежнему строится кнопкой: здесь обновляется только панель. */
+let _paramsSyncTimer = null;
+function scheduleParamsSync() {
+  clearTimeout(_paramsSyncTimer);
+  _paramsSyncTimer = setTimeout(() => {
+    try { if (typeof syncParams === 'function') syncParams(); } catch (e) {}
+  }, 200);
+}
 function registerFormulaField(inp) {
-  if (inp && FORMULA_FIELDS.indexOf(inp) < 0) FORMULA_FIELDS.push(inp);
+  if (!inp || FORMULA_FIELDS.indexOf(inp) >= 0) return;
+  FORMULA_FIELDS.push(inp);
+  inp.addEventListener('input', scheduleParamsSync);
 }
 
 /* Поле «живо», если его секцию не спрятала сцена. Смотрим на display:none и

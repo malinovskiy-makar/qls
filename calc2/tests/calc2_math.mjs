@@ -985,6 +985,44 @@ const CASES = [
              ['a = 1 ⇒ −9', 'v1', -9, 0.01], ['a = 80 ⇒ 70', 'v2', 70, 0.01]],
   },
   {
+    /* П21. Параметр в КПВ раньше ломал сцену: формула разбиралась, а каждый
+       расчёт точки падал на неизвестной букве и отдавал NaN, поэтому границы
+       КПВ не находились и холст оставался пустым. Проверяем ровно то, что
+       обещано: при a = 1 картинка совпадает с «100 - X», при a = 2 наклон
+       меняется вдвое. Через ppfEvalWith идут все четыре сцены КПВ и КТВ. */
+    name: 'Параметр в КПВ · «100 - a*X» строится и меняет наклон',
+    run: `openPicker(); pickScene('trade'); closePicker();
+          STATE.params = {};
+          var inp = document.getElementById('inp-ppft');
+          var apply = document.getElementById('btn-ppft-apply');
+          inp.value = '100 - X'; inp.dispatchEvent(new Event('input', { bubbles: true })); apply.click();
+          var plain = STATE.ppfTradeData.Xmax;
+          inp.value = '100 - a*X'; inp.dispatchEvent(new Event('input', { bubbles: true })); apply.click();
+          var ok1 = STATE.ppfTradeData.ok ? 1 : 0;
+          var x1 = STATE.ppfTradeData.Xmax;
+          STATE.params.a.value = 2; redrawAll();
+          var x2 = STATE.ppfTradeData.Xmax;
+          return { plain: plain, ok1: ok1, x1: x1, x2: x2 };`,
+    checks: [['«100 - X» даёт Xmax = 100', 'plain', 100, 0.01],
+             ['с параметром сцена строится', 'ok1', 1, 0],
+             ['a = 1 ⇒ тот же Xmax', 'x1', 100, 0.01],
+             ['a = 2 ⇒ Xmax вдвое меньше', 'x2', 50, 0.01]],
+  },
+  {
+    /* П26. «Деформации графика» ведёт общий механизм параметров: своего
+       ползунка у сюжета больше нет, буква a приходит из sceneExtraParams. */
+    name: 'Деформации · параметр a идёт из общего механизма',
+    run: `openPicker(); pickScene('m-transform'); closePicker();
+          STATE.params = {}; redrawAll();
+          var has = STATE.params.a ? 1 : 0;
+          var own = document.getElementById('math-a-field') ? 1 : 0;
+          STATE.params.a.value = 4; redrawAll();
+          return { has: has, own: own, a: STATE.mathRes.a };`,
+    checks: [['буква a заведена', 'has', 1, 0],
+             ['своего поля у сцены нет', 'own', 0, 0],
+             ['ползунок доехал до расчёта', 'a', 4, 0.001]],
+  },
+  {
     // Фаза 6: правая граница берётся точно, а не по узлу сетки. Раньше край
     // выходил 9.97 вместо 10, и площадь получалась меньше настоящей.
     name: 'Площадь · под 10 − x в первой четверти ровно 50',

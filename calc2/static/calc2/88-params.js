@@ -1069,43 +1069,8 @@ function wireControls() {
     if (h) h.textContent = MATH_TRANS[STATE.mathTrans].note;
     redrawAll();
   });
-  /* Параметр деформации живёт по тем же правилам, что и буквы из формул:
-     любое значение, свои границы и шаг. Раньше он был заперт в −5…5 с шагом
-     0.1, и «сдвинь на 12» показать было нечем. */
-  const aSl = document.getElementById('matha-slider');
-  const aVal = document.getElementById('matha-val');
-  const aLo = document.getElementById('matha-lo'), aHi = document.getElementById('matha-hi');
-  const aEd = document.getElementById('matha-editor');
-  const syncA = () => {
-    const p = STATE.mathABounds;
-    if (aSl) { aSl.min = p.min; aSl.max = p.max; aSl.step = Math.max(1e-9, p.step); aSl.value = STATE.mathA; }
-    if (aVal) aVal.textContent = fmt(STATE.mathA);
-    if (aLo) aLo.textContent = fmt(p.min);
-    if (aHi) aHi.textContent = fmt(p.max);
-  };
-  if (aSl) aSl.addEventListener('input', () => {
-    STATE.mathA = parseFloat(aSl.value);
-    if (aVal) aVal.textContent = fmt(STATE.mathA);
-    redrawAll();
-  });
-  const toggleAEd = () => { if (aEd) aEd.classList.toggle('open'); };
-  if (aLo) aLo.addEventListener('click', toggleAEd);
-  if (aHi) aHi.addEventListener('click', toggleAEd);
-  [['matha-min', 'min'], ['matha-max', 'max'], ['matha-step', 'step']].forEach(([id, key]) => {
-    const e = document.getElementById(id);
-    if (e) e.addEventListener('change', () => {
-      const v = parseFloat(e.value);
-      if (!isFinite(v)) return;
-      STATE.mathABounds[key] = v;
-      const p = STATE.mathABounds;
-      if (p.max <= p.min) p.max = p.min + 1;
-      STATE.mathA = Math.max(p.min, Math.min(p.max, STATE.mathA));
-      syncA(); redrawAll();
-    });
-  });
-  const aOk = document.getElementById('matha-ok');
-  if (aOk) aOk.addEventListener('click', () => { if (aEd) aEd.classList.remove('open'); });
-  syncA();
+  /* П26. Параметр деформаций ведёт общий механизм параметров (sceneExtraParams заявляет
+     букву a, buildParamChip рисует ползунок). Своей обвязки у сюжета больше нет. */
   const mcMax = document.getElementById('mc-max'), mcMin = document.getElementById('mc-min');
   const setWantMax = (v) => {
     STATE.mathConsWantMax = v;
