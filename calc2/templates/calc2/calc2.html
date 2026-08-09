@@ -1492,19 +1492,15 @@
           становится ползунком в «Основных параметрах».</div>
         <div class="error" id="ppf-error"></div>
 
-        <!-- Потребление в комплектах (Фаза 11.4) -->
-        <div class="vsub">Потребление в комплектах</div>
-        <label class="chk"><input type="checkbox" id="chk-bundle">
-          <span class="swatch" style="background:var(--curve-mr)"></span> Показать луч потребления</label>
-        <div class="row" id="bundle-row" style="display:none;">
+        <!-- П4: кривая комплектов. Поля пустые, без кнопки ничего
+             не строится, луч идёт до края плоскости. -->
+        <div class="row" id="bundle-row">
           <div class="field"><label for="inp-bundle-x">Единиц X</label>
-            <input type="number" id="inp-bundle-x" min="0.1" step="0.1" value="3"></div>
+            <input type="number" id="inp-bundle-x" min="0.1" step="0.1" placeholder="Например: 3"></div>
           <div class="field"><label for="inp-bundle-y">Единиц Y</label>
-            <input type="number" id="inp-bundle-y" min="0.1" step="0.1" value="1"></div>
+            <input type="number" id="inp-bundle-y" min="0.1" step="0.1" placeholder="Например: 1"></div>
         </div>
-        <div class="hint">Комплект это фиксированная пропорция благ. Луч из начала координат
-          показывает все наборы этой пропорции; где он упирается в границу, там и лежит
-          самый большой доступный набор.</div>
+        <button class="btn-sm" id="btn-bundle" type="button">Построить кривую комплектов</button>
 
         <!-- Области (Фаза 11.5) -->
         <div class="vsub">Области</div>
@@ -1533,15 +1529,13 @@
           меньше. Это НЕ вертикальная сумма кривых.</div>
         <div class="error" id="ppfsum-error"></div>
 
-        <div class="vsub">Потребление в комплектах</div>
-        <label class="chk"><input type="checkbox" id="chk-bundle-sum">
-          <span class="swatch" style="background:var(--curve-mr)"></span> Показать луч потребления</label>
-        <div class="row" id="bundle-row-sum" style="display:none;">
+        <div class="row" id="bundle-row-sum">
           <div class="field"><label for="inp-bundle-x2">Единиц X</label>
-            <input type="number" id="inp-bundle-x2" min="0.1" step="0.1" value="3"></div>
+            <input type="number" id="inp-bundle-x2" min="0.1" step="0.1" placeholder="Например: 3"></div>
           <div class="field"><label for="inp-bundle-y2">Единиц Y</label>
-            <input type="number" id="inp-bundle-y2" min="0.1" step="0.1" value="1"></div>
+            <input type="number" id="inp-bundle-y2" min="0.1" step="0.1" placeholder="Например: 1"></div>
         </div>
+        <button class="btn-sm" id="btn-bundle-sum" type="button">Построить кривую комплектов</button>
 
         <div id="info-ppfsum" style="margin-top:8px;"></div>
       </div>
@@ -1564,6 +1558,15 @@
             <input type="number" id="inp-ppft-price" min="0.1" step="0.05" value="2">
           </div>
           <button class="btn" id="btn-ppft-apply">Построить КТВ</button>
+          <!-- П4: кривая комплектов есть во всех моделях блока КПВ и КТВ.
+               Здесь она обязана пересечь и КПВ, и КТВ. -->
+          <div class="row" style="margin-top:8px;">
+            <div class="field"><label for="inp-bundle-xt">Единиц X</label>
+              <input type="number" id="inp-bundle-xt" min="0.1" step="0.1" placeholder="Например: 3"></div>
+            <div class="field"><label for="inp-bundle-yt">Единиц Y</label>
+              <input type="number" id="inp-bundle-yt" min="0.1" step="0.1" placeholder="Например: 1"></div>
+          </div>
+          <button class="btn-sm" id="btn-bundle-trade" type="button">Построить кривую комплектов</button>
           <div class="hint">КТВ это граница потребления при торговле по мировой цене.
             Линейная КПВ → полная специализация (угол). Нелинейная → точка касания, где
             |наклон КПВ|&nbsp;=&nbsp;Px/Py. Линия КТВ лежит выше КПВ: это и есть выигрыш от торговли.</div>

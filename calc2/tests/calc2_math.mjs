@@ -1121,6 +1121,34 @@ const CASES = [
              ['у каждой вершины крестик', 'verts', 3, 0]],
   },
   {
+    /* П4. Кривая комплектов: строится только по кнопке, поля пустые, луч идёт
+       ДО КРАЯ плоскости, и в сцене с КПВ и КТВ он пересекает обе кривые —
+       обе точки показаны с координатами. Комплект 1 к 1 на КПВ y = 100 − x
+       даёт (50; 50), на КТВ при мировой цене 2 — (66.67; 66.67). */
+    name: 'Комплекты · луч до края и пересечение КПВ и КТВ',
+    run: `openPicker(); pickScene('trade'); closePicker();
+          STATE.bundleOn = false; redrawAll();
+          var chk = document.querySelectorAll('[id^="chk-bundle"]').length;
+          var off = STATE.bundleOn ? 1 : 0;
+          document.getElementById('inp-bundle-xt').value = '1';
+          document.getElementById('inp-bundle-yt').value = '1';
+          document.getElementById('btn-bundle-trade').click();
+          var texts = [].map.call(document.querySelectorAll('#chart text'), function (t) { return t.textContent; });
+          var ppf = texts.filter(function (s) { return s.indexOf('КПВ (') === 0; })[0] || '';
+          var ktv = texts.filter(function (s) { return s.indexOf('КТВ (') === 0; })[0] || '';
+          var nums = function (s) { var m = s.match(/([-\\d.]+); ([-\\d.]+)/); return m ? [+m[1], +m[2]] : [-1, -1]; };
+          return { chk: chk, off: off, on: STATE.bundleOn ? 1 : 0,
+                   px: nums(ppf)[0], py: nums(ppf)[1],
+                   tx: nums(ktv)[0], ty: nums(ktv)[1],
+                   ray: texts.filter(function (s) { return s.indexOf('Комплекты') === 0; }).length };`,
+    checks: [['галочек луча не осталось', 'chk', 0, 0],
+             ['без кнопки кривой нет', 'off', 0, 0],
+             ['кнопка построила', 'on', 1, 0],
+             ['пересечение с КПВ по X', 'px', 50, 0.2], ['и по Y', 'py', 50, 0.2],
+             ['пересечение с КТВ по X', 'tx', 66.67, 0.3], ['и по Y', 'ty', 66.67, 0.3],
+             ['луч подписан', 'ray', 1, 0]],
+  },
+  {
     /* П50. Размер подписей меняет ВСЁ внутри графика, кроме отметок координат
        на осях. Полсотни мест задают размер числом прямо в коде, поэтому
        множитель применяется одним проходом по холсту после отрисовки. */

@@ -90,8 +90,11 @@ function loadScene(name) {
     const i2 = document.getElementById('inp-ppf2b'); if (i2) i2.value = STATE.ppfFormula2;
     const box = document.getElementById('ppf-second'); if (box) box.style.display = 'none';
     const cb = document.getElementById('btn-ppf-compare'); if (cb) cb.textContent = 'Сравнить с другой КПВ';
-    const bo = document.getElementById('chk-bundle'); if (bo) bo.checked = false;
-    const br = document.getElementById('bundle-row'); if (br) br.style.display = 'none';
+    // П4: поля единиц в новой сцене пустые, кривой комплектов нет.
+    ['inp-bundle-x', 'inp-bundle-y', 'inp-bundle-x2', 'inp-bundle-y2',
+     'inp-bundle-xt', 'inp-bundle-yt'].forEach(id => {
+      const e = document.getElementById(id); if (e) e.value = '';
+    });
     setMode('ppf');                    // setMode сам ставит setRanges(100, 100)
     setPpfSub('single');               // сцена показывает одиночную КПВ
   }

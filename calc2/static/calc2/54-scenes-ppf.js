@@ -249,18 +249,41 @@ function drawPpfCurve() {
   if (STATE.bundleOn) drawBundleRay(g, evalPpf, c1);
 }
 
-// Луч комплектов и точка, где он упирается в границу.
-function drawBundleRay(g, f, color) {
+/* Кривая комплектов (П4).
+   Это луч из начала координат с наклоном Y/X по введённым единицам, и он идёт
+   ДО КРАЯ ПЛОСКОСТИ, а не до КПВ: раньше он обрывался на границе, и было
+   непонятно, что это прямая, а не отрезок. Точка, где он упирается в границу,
+   по-прежнему отмечена и подписана. Если в сцене есть и КПВ, и КТВ, луч
+   обязан пересечь обе, и обе точки показываются (второй аргумент curves —
+   список пар «функция, имя»). */
+function drawBundleRay(g, f, color, curves) {
   const b = bundleRay(f);
-  if (!b) return;
+  const slope = (+STATE.bundleY > 0 && +STATE.bundleX > 0) ? (+STATE.bundleY / +STATE.bundleX) : null;
+  if (slope == null) return;
   const col = COL.MR;
+
+  // Луч до края видимой плоскости: упираемся либо в правый край, либо в верхний.
+  const [, xHi] = sx.domain(), [, yHi] = sy.domain();
+  const xEnd = Math.min(xHi, (slope > 0) ? yHi / slope : xHi);
   g.append('line').attr('x1', sx(0)).attr('y1', sy(0))
-    .attr('x2', sx(b.x)).attr('y2', sy(b.y))
+    .attr('x2', sx(xEnd)).attr('y2', sy(slope * xEnd))
     .attr('stroke', col).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
-  g.append('circle').attr('cx', sx(b.x)).attr('cy', sy(b.y)).attr('r', 5)
-    .attr('fill', COL.halo).attr('stroke', col).attr('stroke-width', 2.4);
-  haloText(g, sx(b.x) + 9, sy(b.y) - 9,
-           '(' + fmt(b.x) + '; ' + fmt(b.y) + ')', 'start', 'auto');
+  labelCurve(g, (x) => slope * x, 'Комплекты', col, { key: 'bundle', from: 0.8, to: 0.2 });
+
+  // Пересечения со всеми заданными кривыми — как ключевые точки, с координатами.
+  const list = (curves && curves.length) ? curves : [{ f, name: 'КПВ' }];
+  list.forEach(c => {
+    if (typeof c.f !== 'function') return;
+    const hi = ppfXmaxOf(c.f) || xHi;
+    const x = findRootIn((t) => { const y = c.f(t); return isFinite(y) ? y - slope * t : NaN; }, 1e-6, hi);
+    if (x == null) return;
+    const y = slope * x;
+    g.append('circle').attr('cx', sx(x)).attr('cy', sy(y)).attr('r', 5)
+      .attr('fill', COL.halo).attr('stroke', col).attr('stroke-width', 2.4);
+    haloText(g, sx(x) + 9, sy(y) - 9,
+             (c.name ? c.name + ' ' : '') + '(' + fmt(x) + '; ' + fmt(y) + ')', 'start', 'auto');
+  });
+  void b; void color;
 }
 
 // Табло КПВ: тип, перехваты Макс X / Макс Y, альтернативные издержки X.
@@ -1116,6 +1139,17 @@ function drawPpfTrade(d) {
     const pts = [[0, d.line.intercept], [d.xint, 0]];          // прямая КТВ от (0,c0) до (xint,0)
     g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line);
     // Задача 2: линия цены больше не перетаскивается мышью — управление ползунком Px/Py.
+  }
+  /* П4: в сцене есть и КПВ, и КТВ — луч комплектов обязан пересечь ОБЕ,
+     и обе точки показываются с координатами. */
+  if (STATE.bundleOn) {
+    const ppfF = (x) => interpY(d.ppfPts, x);
+    const list = [{ f: ppfF, name: 'КПВ' }];
+    if (d.line) {
+      const c0 = d.line.intercept, k = (d.xint > 0) ? (c0 / d.xint) : 0;
+      list.push({ f: (x) => c0 - k * x, name: 'КТВ' });
+    }
+    drawBundleRay(g, ppfF, null, list);
   }
 }
 

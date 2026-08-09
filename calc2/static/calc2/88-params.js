@@ -906,18 +906,19 @@ function wireControls() {
     if (e) e.addEventListener('input', () => { STATE[key] = e.value.trim(); redrawAll(); });
   });
 
-  // Потребление в комплектах.
-  const bOn = document.getElementById('chk-bundle');
-  if (bOn) bOn.addEventListener('change', () => {
-    STATE.bundleOn = bOn.checked;
-    const row = document.getElementById('bundle-row');
-    if (row) row.style.display = bOn.checked ? '' : 'none';
+  /* П4. Кривая комплектов строится ТОЛЬКО по кнопке и только когда
+     заполнены обе единицы. Галочки «Показать луч потребления» больше нет. */
+  const bundleBuild = (idX, idY) => {
+    const x = parseFloat((document.getElementById(idX) || {}).value);
+    const y = parseFloat((document.getElementById(idY) || {}).value);
+    if (!(x > 0) || !(y > 0)) { toast('Заполните обе единицы: сколько X и сколько Y в комплекте'); return; }
+    STATE.bundleX = x; STATE.bundleY = y; STATE.bundleOn = true;
     redrawAll();
-  });
-  [['inp-bundle-x', 'bundleX'], ['inp-bundle-y', 'bundleY']].forEach(([id, key]) => {
-    const e = document.getElementById(id);
-    if (e) e.addEventListener('input', () => { STATE[key] = parseFloat(e.value); redrawAll(); });
-  });
+  };
+  const bBtn = document.getElementById('btn-bundle');
+  if (bBtn) bBtn.addEventListener('click', () => bundleBuild('inp-bundle-x', 'inp-bundle-y'));
+  const bBtnT = document.getElementById('btn-bundle-trade');
+  if (bBtnT) bBtnT.addEventListener('click', () => bundleBuild('inp-bundle-xt', 'inp-bundle-yt'));
 
   // Показ областей.
   [['chk-ppf-in', 'ppfShowIn'], ['chk-ppf-out', 'ppfShowOut']].forEach(([id, key]) => {
@@ -946,17 +947,8 @@ function wireControls() {
   });
   const sumNm = document.getElementById('inp-ppfsum-name');
   if (sumNm) sumNm.addEventListener('input', () => { STATE.ppfSumName = sumNm.value.trim(); redrawAll(); });
-  const bOn2 = document.getElementById('chk-bundle-sum');
-  if (bOn2) bOn2.addEventListener('change', () => {
-    STATE.bundleOn = bOn2.checked;
-    const row = document.getElementById('bundle-row-sum');
-    if (row) row.style.display = bOn2.checked ? '' : 'none';
-    redrawAll();
-  });
-  [['inp-bundle-x2', 'bundleX'], ['inp-bundle-y2', 'bundleY']].forEach(([id, key]) => {
-    const e = document.getElementById(id);
-    if (e) e.addEventListener('input', () => { STATE[key] = parseFloat(e.value); redrawAll(); });
-  });
+  const bBtn2 = document.getElementById('btn-bundle-sum');
+  if (bBtn2) bBtn2.addEventListener('click', () => bundleBuild('inp-bundle-x2', 'inp-bundle-y2'));
   renderPpfSumRows();
 
 
