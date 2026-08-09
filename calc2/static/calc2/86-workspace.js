@@ -579,6 +579,11 @@ function wireWrench() {
     if (e.key === 'Escape' && pop && pop.classList.contains('open')) setWrenchOpen(false);
   });
 
+  // П53: приблизить и отдалить — от центра видимой области, как клавиши «+»/«−».
+  const zi = document.getElementById('btn-zoomin');
+  if (zi) zi.addEventListener('click', () => zoomStep(1 / 1.25));
+  const zo = document.getElementById('btn-zoomout');
+  if (zo) zo.addEventListener('click', () => zoomStep(1.25));
   const rv = document.getElementById('btn-resetview');
   if (rv) rv.addEventListener('click', () => resetZoom());
 

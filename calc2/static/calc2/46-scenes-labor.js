@@ -179,7 +179,7 @@ function recomputeLabor() {
   const sEnd = evalCurve(S, Lmax); if (sEnd > Wmax) Wmax = sEnd;        // предложение на правом краю
   if (STATE.laborMinOn && STATE.laborMinW > Wmax) Wmax = STATE.laborMinW;
   if (STATE.laborStruct === 'union' && STATE.unionModel === 'wagefloor' && STATE.unionWage > Wmax) Wmax = STATE.unionWage;
-  applyAutoRanges(niceMax(Lmax * 1.1), niceMax(Wmax * 1.1));
+  applyAutoRanges(padMax(Lmax), padMax(Wmax));
 }
 
 // Точка рынка труда с проекциями к осям и подписями L/W.

@@ -168,7 +168,7 @@ function recomputePpf() {
   });
   if (!(mx > 0)) mx = CONFIG.Qmax;
   if (!(my > 0)) my = CONFIG.Pmax;
-  applyAutoRanges(niceMax(mx * 1.1), niceMax(my * 1.1));
+  applyAutoRanges(padMax(mx), padMax(my));
 }
 
 // Вторая КПВ сцены сравнения.
@@ -755,7 +755,7 @@ function recomputePpfSum() {
     formulaText, kinks, type: (n === 2 ? combinedPpfFormula(cs[0], cs[1]).type : 'numeric'),
     order,
   };
-  applyAutoRanges(niceMax(Xtot * 1.05), niceMax(Ytot * 1.05));
+  applyAutoRanges(padMax(Xtot), padMax(Ytot));
 }
 
 /* Строки ввода складываемых кривых. Заводятся по числу в поле «Сколько кривых»,
@@ -1102,7 +1102,7 @@ function recomputePpfTrade() {
   }
   STATE.ppfTradeData = { ok: true, c, Xmax, Ymax, ratio, xp, yp, regime, line, xint, yint, priceMin, priceMax, ppfPts: singlePpfPoints(f, Xmax) };
   const xm = Math.max(Xmax, xint || 0), ym = Math.max(Ymax, yint || 0);
-  applyTradeRanges(niceMax(xm * 1.05), niceMax(ym * 1.05));  // плавно при смене Pw, иначе мгновенно
+  applyTradeRanges(padMax(xm), padMax(ym));  // плавно при смене Pw, иначе мгновенно
 }
 
 // Отрисовка КТВ: КПВ страны (синяя) + линия торговых возможностей (красная).
@@ -1330,7 +1330,7 @@ function recomputeTradeB() {
     lowCo, highCo, Ymax_H, Xmax_L, E_L, S_H };
   const xm = Math.max(c1.Xmax, c2.Xmax, lowCo.cpf.xint, highCo.cpf.xint);
   const ym = Math.max(c1.Ymax, c2.Ymax, lowCo.cpf.yint, highCo.cpf.yint);
-  applyTradeRanges(niceMax(xm * 1.08), niceMax(ym * 1.08));  // плавно при смене Pw, иначе мгновенно
+  applyTradeRanges(padMax(xm), padMax(ym));  // плавно при смене Pw, иначе мгновенно
 }
 
 /* Линия торговых возможностей страны с учётом предела торговли (Фаза 15.6).

@@ -62,6 +62,10 @@ function makeScales() {
    clip-path и расчёты не разошлись между собой. */
 function quadLo(v) { return STATE.firstQuad ? Math.max(0, v) : v; }
 
+/* Отступ подписи оси от конца оси (П22). Один на обе оси и на все режимы,
+   включая полный план в «Математике» и панели с двумя графиками. */
+const AXIS_LABEL_GAP = 10;
+
 // Перевод координат туда-обратно (пригодится для перетаскивания мышью).
 function toPx(q, p) { return [sx(q), sy(p)]; }
 function toData(px, py) { return [sx.invert(px), sy.invert(py)]; }
@@ -279,14 +283,20 @@ function drawAxes(xLabel, yLabel) {
       .attr('font-size', 10).attr('fill', LBL).text('0');
   }
 
-  // Подписи осей: X-метка (справа от стрелки), Y-метка (над стрелкой слева).
-  // Пустая строка '' — сигнал «без метки» (напр. неравенство и издержки добавляют свою).
-  if (xLabel && atZeroY) g.append('text').attr('x', xRight + 6).attr('y', oy + 4)
+  /* Подписи осей: X-метка за стрелкой справа, Y-метка над стрелкой сверху.
+     П22: отступ у обеих ОДИН и тот же и задан одной константой. Раньше стояло
+     6 пикселей вправо у одной и 12 вверх плюс 4 влево у другой — числами по
+     месту, и на разных сценах они читались по-разному.
+     Пустая строка '' — сигнал «без метки» (неравенство и издержки ставят свою). */
+  if (xLabel && atZeroY) g.append('text')
+    .attr('x', xRight + AXIS_LABEL_GAP).attr('y', oy)
     .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
     .attr('font-size', 13).attr('font-weight', 600)
     .attr('fill', COL.ink).text(xLabel);
-  if (yLabel && atZeroX) g.append('text').attr('x', ox - 4).attr('y', yTop - 12)
-    .attr('text-anchor', 'end').attr('font-size', 13).attr('font-weight', 600)
+  if (yLabel && atZeroX) g.append('text')
+    .attr('x', ox).attr('y', yTop - AXIS_LABEL_GAP)
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
+    .attr('font-size', 13).attr('font-weight', 600)
     .attr('fill', COL.ink).text(yLabel);
 }
 

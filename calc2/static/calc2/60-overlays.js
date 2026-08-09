@@ -2343,6 +2343,7 @@ function resetDecor() {
   STATE.roller = null; STATE.hotCross = null; STATE.hoverCross = null;
   hideRollTip();
   STATE.pointNames = {};   // свои названия ключевых точек — тоже оформление сцены
+  resetLabelPositions();   // сглаживание подписей не тянет места из прошлой сцены
   const ren = document.getElementById('pt-rename'); if (ren) ren.remove();
   armMark(false);
   [['inp-gtitle', ''], ['inp-xname', ''], ['inp-yname', '']].forEach(([id, v]) => {

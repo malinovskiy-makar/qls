@@ -60,19 +60,68 @@ function curveLabelSize() {
   return (isFinite(v) && v >= 8 && v <= 22) ? v : 11;
 }
 
+/* Сглаживание подписей (П25).
+
+   Якорь ищется перебором 72 проб в ДОЛЯХ от текущих границ. При изменении
+   масштаба условие «точка внутри окна» срабатывает на соседнем узле сетки, и
+   подпись прыгает сразу на процент с лишним ширины. Поэтому помним, где
+   подпись стояла в прошлый раз, и подтягиваем её к новому месту постепенно:
+   на глаз она едет за кривой, а не перескакивает.
+
+   Второй источник дёрганья — мгновенный переворот выравнивания у правого края.
+   Ему добавлен запас: переворот происходит только когда текст залезает за край
+   на 12 пикселей, а возвращается обратно, лишь когда до края остаётся столько
+   же с другой стороны. На самой границе подпись больше не мигает. */
+const _labelPos = new Map();
+const LABEL_EASE = 0.35;       // доля пути к новому месту за одну перерисовку
+const LABEL_JUMP = 60;         // дальше этого едем сразу: масштаб сменился резко
+const FLIP_HYST = 12;          // запас на переворот выравнивания, px
+
+function smoothLabel(key, px, py, toLeft) {
+  if (!key) return { px, py, toLeft };
+  const prev = _labelPos.get(key);
+  if (!prev) { _labelPos.set(key, { px, py, toLeft }); return { px, py, toLeft }; }
+  const far = Math.hypot(px - prev.px, py - prev.py) > LABEL_JUMP;
+  const nx = far ? px : prev.px + (px - prev.px) * LABEL_EASE;
+  const ny = far ? py : prev.py + (py - prev.py) * LABEL_EASE;
+  // Гистерезис переворота: меняем сторону, только если новое решение уверенное.
+  const flip = (toLeft !== prev.toLeft) ? toLeft : prev.toLeft;
+  const out = { px: nx, py: ny, toLeft: flip };
+  _labelPos.set(key, out);
+  // Пока подпись едет, просим следующий кадр — иначе она застынет на полпути.
+  if (!far && Math.hypot(px - nx, py - ny) > 0.5) requestLabelFrame();
+  return out;
+}
+let _labelFrame = null;
+function requestLabelFrame() {
+  if (_labelFrame != null) return;
+  _labelFrame = requestAnimationFrame(() => { _labelFrame = null; redrawAll(); });
+}
+// Сцена сменилась — прошлые места подписей к ней отношения не имеют.
+function resetLabelPositions() { _labelPos.clear(); }
+
 function labelCurve(g, f, txt, color, opts) {
   const o = opts || {};
   const a = curveAnchor(f, o.from, o.to);
   if (!a) return null;
-  const px = sx(a.q), py = sy(a.v);
   const m = CONFIG.margin;
   const right = W - m.right;
   const wide = txt.length * 6.3 + 8;              // грубая ширина текста, px
-  const toLeft = (px + wide > right);
+  const rawPx = sx(a.q), rawPy = sy(a.v);
+  // Переворот с запасом: у самой границы решение не меняется туда-сюда.
+  const over = rawPx + wide - right;
+  const wantLeft = over > FLIP_HYST ? true : (over < -FLIP_HYST ? false : null);
+  const key = o.key || (o.curve && o.curve.id) || txt;
+  const prevLeft = (_labelPos.get(key) || {}).toLeft;
+  const sm = smoothLabel(key, rawPx, rawPy,
+                         wantLeft === null ? (prevLeft === undefined ? over > 0 : prevLeft) : wantLeft);
+  const px = sm.px, py = sm.py;
+  const toLeft = sm.toLeft;
   let y = py + (o.below ? 14 : -7);
   if (y < m.top + 12) y = py + 14;                // упёрлись в верх — под кривую
   if (y > H - m.bottom - 4) y = py - 7;           // упёрлись в низ — над кривой
   const tx = toLeft ? px - 6 : px + 6;
+  void rawPy;                                     // сырое место нужно было только для сглаживания
   const t = g.append('text')
     .attr('x', tx).attr('y', y)
     .attr('text-anchor', toLeft ? 'end' : 'start')

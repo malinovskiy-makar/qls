@@ -284,8 +284,8 @@ function redrawProduction() {
   const gap = 34, hTop = (bottom - top - gap) * 0.55, hBot = (bottom - top - gap) - hTop;
   const yTop0 = top + hTop, yBot0 = bottom;
   const Lmax = p.Lmax || CONFIG.Qmax;
-  const tpMax = niceMax((p.maxTP ? p.maxTP.val : 1) * 1.12);
-  const mpMax = niceMax(Math.max(p.maxMP ? p.maxMP.val : 1, p.maxAP ? p.maxAP.val : 1) * 1.15);
+  const tpMax = padMax(p.maxTP ? p.maxTP.val : 1);
+  const mpMax = padMax(Math.max(p.maxMP ? p.maxMP.val : 1, p.maxAP ? p.maxAP.val : 1));
   const lx = d3.scaleLinear().domain([0, Lmax]).range([left, right]);
   const t1 = d3.scaleLinear().domain([0, tpMax]).range([yTop0, top]);
   const t2 = d3.scaleLinear().domain([0, mpMax]).range([yBot0, yTop0 + gap]);
@@ -371,7 +371,7 @@ function recomputeIsoquant() {
   const r = optimizeAlongConstraint(f, STATE.isoW, STATE.isoR, STATE.isoC);
   if (!r) { STATE.isoErr = 'Проверьте цены факторов и бюджет: должны быть положительными.'; return; }
   STATE.iso = { f, L: r.a, K: r.b, Q: r.value, mrts: r.mrs, Lint: r.aMax, Kint: r.bMax };
-  applyAutoRanges(niceMax(r.aMax * 1.12), niceMax(r.bMax * 1.12));
+  applyAutoRanges(padMax(r.aMax), padMax(r.bMax));
 }
 
 function redrawIsoquant() {
@@ -450,12 +450,24 @@ function plantQatMC(compiled, m, qMax) {
   return (lo + hi) / 2;
 }
 
+/* До какого выпуска сканируется один завод. Число постоянное и от вида не
+   зависит: 100 — тот же предел, с которым сцена открывалась и раньше. */
+const PLANT_SCAN_Q = 100;
+
 function recomputePlants() {
   STATE.plants = null; STATE.plErr = null;
   const r1 = compileFormula(STATE.pl1), r2 = compileFormula(STATE.pl2);
   if (r1.error || r2.error) { STATE.plErr = r1.error || r2.error; return; }
   const c1 = r1.compiled, c2 = r2.compiled;
-  const qMax = CONFIG.Qmax;                          // предел выпуска ОДНОГО завода
+  /* Предел выпуска ОДНОГО завода. Раньше здесь стоял CONFIG.Qmax — предел
+     брался из текущего окна, а окно потом подгонялось под совокупный выпуск
+     двух заводов, то есть примерно под удвоенный предел. Получалась обратная
+     связь: каждая перерисовка раздвигала окно, окно поднимало предел, предел
+     снова раздвигал окно. Со старым запасом ×1.05 «красивое» округление это
+     почти гасило, с общим запасом ×1.12 (П33) расхождение стало явным: за
+     несколько перерисовок ось уезжала на десятки тысяч, и колесо на сцене
+     переставало что-либо менять. Теперь предел не зависит от вида. */
+  const qMax = PLANT_SCAN_Q;                         // предел выпуска ОДНОГО завода
   const mMax = Math.max(plantMC(c1, qMax), plantMC(c2, qMax));
   if (!(mMax > 0)) { STATE.plErr = 'Предельные издержки не растут. Проверьте формулы TC.'; return; }
   // Таблица горизонтального сложения: по уровню предельных издержек m.
@@ -499,7 +511,7 @@ function redrawPlants() {
   // Масштаб: по совокупной кривой (она самая длинная по Q).
   if (p) {
     const yTop = (STATE.plView === 'mc') ? p.mMax : Math.max(p.table[p.table.length - 1].tcDirect, 1);
-    applyAutoRanges(niceMax(p.Qtot * 1.05), niceMax(yTop * 1.1));
+    applyAutoRanges(padMax(p.Qtot), padMax(yTop));
   }
   makeScales();
   svg.selectAll('*').remove();

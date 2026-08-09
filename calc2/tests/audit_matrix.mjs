@@ -90,7 +90,8 @@ for (const [key, name] of scenes) {
     return { dense, plain, off };
   });
   // ── Сквозные правила (П55): проверяем их на КАЖДОЙ сцене, а не выборочно.
-  r.rules = await page.evaluate(() => {
+  r.rules = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
     const vis = el => !!(el && el.getClientRects().length);
 
     // П45: нигде на экране нет «k» вместо тысяч. Смотрим и подписи внутри
@@ -143,9 +144,36 @@ for (const [key, name] of scenes) {
       const s = (typeof mainScales === 'function') ? mainScales() : null;
       if (s) snapAxes = !!axisSnapAt(s.mx(0) + 2, s.my(0) - 40);
     } catch (e) {}
-    const zoomOk = typeof zoomBy === 'function' && typeof resetZoom === 'function';
-    let panOk = false;
-    try { panOk = typeof panByPixels === 'function'; } catch (e) {}
+    /* П53, П54: зум и панорама должны РАБОТАТЬ на каждом графике, а не просто
+       существовать функциями. Меряем окно сцены до и после: колесо обязано
+       менять размах, панорама — сдвигать окно, возврат масштаба — вернуть. */
+    let zoomOk = false, panOk = false;
+    try {
+      // У сюжета про производную две независимые панели: и зум, и сдвиг ведут
+      // ТУ, над которой курсор, а главные шкалы сцены при этом не двигаются.
+      // Поэтому там меряем окно самой панели, а не mainScales.
+      const panel = (STATE.mode === 'math' && STATE.mathSub === 'tangent') ? 'top' : null;
+      const span = () => {
+        if (panel) { const w = tanWin(panel); return [w.xmax - w.xmin, w.xmin]; }
+        const s = mainScales();
+        return [s.mx.domain()[1] - s.mx.domain()[0], s.mx.domain()[0]];
+      };
+      const gw = document.getElementById('graph-wrap');
+      const r = gw.getBoundingClientRect();
+      const py = panel ? (tangentLayout().top + 20) : r.height / 2;
+      // Ждём между шагами: у части сцен переезд осей идёт с задержкой (дебаунс
+      // и плавный твин), и мгновенный замер поймал бы состояние на полпути.
+      const [w0] = span();
+      zoomBy(0.8, r.width / 2, py); await wait(520);
+      const [w1] = span();
+      zoomOk = Math.abs(w1 - w0) > Math.abs(w0) * 1e-3;
+      resetZoom(); await wait(520);
+      const [, x1] = span();
+      panByPixels(-60, 0, panel); await wait(520);
+      const [, x2] = span();
+      panOk = Math.abs(x2 - x1) > 1e-9;
+      resetZoom(); await wait(120);
+    } catch (e) {}
 
     return { noK, bars: bars.length, picks: picks.length, rawColor,
              wheelOk, keyOk, nums: nums.length, snapAxes, zoomOk, panOk };

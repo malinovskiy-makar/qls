@@ -490,13 +490,20 @@ function drawMathTransform(f) {
   updateMathPanel();
 }
 // Подпись кривой на полном плане: ищем видимый участок, как в Фазе 3.
-function labelCurveMath(g, f, mx, my, txt, color) {
+/* П25. Здесь и скакали подписи сильнее всего: якорь ищется перебором 60 проб
+   в ДОЛЯХ от окна, и при зуме условие «точка внутри окна» срабатывает на
+   соседнем узле — подпись прыгает сразу на процент с лишним ширины. Место
+   ищется по-прежнему, но едет к нему подпись плавно, тем же сглаживанием, что
+   и у экономических сцен (smoothLabel). Ключ у каждой подписи свой — иначе
+   «Исходная» и «После» тянули бы одну и ту же память. */
+function labelCurveMath(g, f, mx, my, txt, color, key) {
   const [lo, hi] = mx.domain(), [ylo, yhi] = my.domain();
   for (let i = 0; i <= 60; i++) {
     const x = hi - (hi - lo) * (0.06 + i * 0.014);
     const v = f(x);
     if (!isNaN(v) && v >= ylo && v <= yhi) {
-      g.append('text').attr('x', mx(x) - 4).attr('y', my(v) - 7).attr('text-anchor', 'end')
+      const sm = smoothLabel('math:' + (key || txt), mx(x), my(v), true);
+      g.append('text').attr('x', sm.px - 4).attr('y', sm.py - 7).attr('text-anchor', 'end')
         .attr('font-size', curveLabelSize()).attr('font-weight', 600).attr('fill', color)
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6).text(txt);
       return;
@@ -663,8 +670,8 @@ function constraintFit() {
   if (G) {
     const probe = constraintPoints(G, 1e3, 1e3, 120);
     if (probe.length) {
-      xMax = niceMax(Math.max.apply(null, probe.map(q => q[0])) * 1.2);
-      yMax = niceMax(Math.max.apply(null, probe.map(q => q[1])) * 1.2);
+      xMax = padMax(Math.max.apply(null, probe.map(q => q[0])));
+      yMax = padMax(Math.max.apply(null, probe.map(q => q[1])));
     }
   }
   // Запоминаем размах задачи: по нему ищется оптимум независимо от того,

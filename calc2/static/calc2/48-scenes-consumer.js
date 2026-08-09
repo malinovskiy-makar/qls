@@ -74,7 +74,7 @@ function recomputeConsumer() {
     xm = Math.max(xm, res.slutsky.comp.xInt, res.slutsky.fin.xInt);
     ym = Math.max(ym, res.slutsky.comp.yInt, res.slutsky.fin.yInt);
   }
-  applyAutoRanges(niceMax(xm * 1.12), niceMax(ym * 1.12));
+  applyAutoRanges(padMax(xm), padMax(ym));
 }
 
 // Бюджетная линия от (I/Px, 0) до (0, I/Py) + подписи перехватов.

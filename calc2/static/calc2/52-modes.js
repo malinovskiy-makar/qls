@@ -108,6 +108,10 @@ function animateRanges(targetQmax, targetPmax) {
 // либо выставить мгновенно. Вызывается ВМЕСТО прямого setRanges в recompute КТВ.
 function applyTradeRanges(targetQmax, targetPmax) {
   if (_rangeAnimating) return;                 // внутри кадра анимации границами управляет цикл
+  /* П54. Масштаб, выбранный человеком, главнее авто-подгонки — ровно как в
+     applyAutoRanges. Без этой проверки сцены торговли возвращали свой вид на
+     первой же перерисовке, и колесо на них не работало совсем. */
+  if (STATE.zoomLock) { _wantRangeAnim = false; return; }
   const wantAnim = _wantRangeAnim;
   _wantRangeAnim = false;                       // запрос одноразовый — гасим сразу
   if (wantAnim && !prefersReducedMotion()) animateRanges(targetQmax, targetPmax);
@@ -137,6 +141,50 @@ function scheduleRangeAnim(qmax, pmax) {
 
 // Аналог applyTradeRanges для сцен с авто-масштабом: вход на сцену / reduce-motion —
 // мгновенно; живое кручение ползунка (_wantRangeAnim) — плавно с дебаунсом.
+/* Запас у конца оси (П33). Раньше он был раскидан по сценам множителями
+   ×1.05, ×1.1, ×1.12, ×1.15, ×1.2 — где-то подпись «Y» налезала на кривую,
+   где-то оставалось полполя пустоты. Одна функция на весь калькулятор:
+   к самому дальнему числу добавляем 12 %, потом округляем до «красивого».
+   Через неё же считает возврат масштаба, поэтому вид всегда один и тот же. */
+const AXIS_PAD = 1.12;
+function padMax(v) {
+  // На пустом или отрицательном входе ведём себя как niceMax: он в таком
+  // случае отдаёт 10. Это не косметика — в «Оптимуме при ограничении» зонд
+  // ограничения находит всего одну точку с x = 0, и сцена всегда жила на этом
+  // запасном значении. Верни сюда 1.5 (то есть niceMax(1·1.12)) — окно
+  // схлопнется, и оптимум уедет на границу.
+  if (!(isFinite(v) && v > 0)) return niceMax(0);
+  return niceMax(v * AXIS_PAD);
+}
+
+/* Границы по тому, что РЕАЛЬНО нарисовано (П32): свои точки, вершины будущей
+   площади, посчитанные площади и ключевые точки. Отсчёт идёт от собственного
+   масштаба сцены и только РАСШИРЯЕТСЯ — до того, что за него вылезло.
+
+   Кривые здесь НЕ опрашиваются намеренно. Растущая кривая вроде S = Q не
+   кончается никогда, и «посмотреть, куда она уходит за краем» превращает
+   возврат масштаба в бесконечное расширение: каждое нажатие раздвигало бы
+   окно ещё раз. Кривые и так попадают сюда своими ключевыми точками —
+   пересечениями друг с другом и с осями. */
+function boundsOfDrawn(baseQ, baseP) {
+  let mx = baseQ, my = baseP, grew = false;
+  const eat = (x, y) => {
+    if (!isFinite(x) || !isFinite(y)) return;
+    if (x > mx) { mx = x; grew = true; }
+    if (y > my) { my = y; grew = true; }
+  };
+  (STATE.marks || []).forEach(m => { if (!m.pending) eat(m.x, m.y); });
+  (STATE.areaVerts || []).forEach(v => eat(v.x, v.y));
+  (STATE.areaCalcList || []).forEach(r => {
+    if (r.ring) r.ring.forEach(p => eat(p[0], p[1]));
+    else if (isFinite(r.b)) eat(r.b, 0);
+  });
+  try { (keyTargets() || []).forEach(p => eat(p.x, p.y)); } catch (e) {}
+  if (!grew) return null;                      // всё и так помещается
+  return { qmax: mx > baseQ ? padMax(mx) : baseQ,
+           pmax: my > baseP ? padMax(my) : baseP };
+}
+
 function applyAutoRanges(qmax, pmax) {
   if (_rangeAnimating) return;
   // Пользователь покрутил колесо — его масштаб главнее авто-подгонки, иначе
@@ -284,13 +332,25 @@ function panByPixels(dxPx, dyPx, panel) {
 
 // Двойной щелчок по графику (и кнопка над графиком) возвращают масштаб сцены:
 // снимаем замок и даём сцене снова подогнать оси под свои данные.
+/* П32. Возврат масштаба показывает ВСЁ, что нарисовано: кривые, свои точки,
+   вершины, посчитанные площади и ключевые точки. Раньше здесь стояли жёстко
+   зашитые числа (издержки 10 на 50, остальное 100 на 100), и точка за краем
+   после возврата так и оставалась за краем. Сцены с собственной авто-подгонкой
+   работают как прежде: у них подгонка отработает на первой же перерисовке,
+   как только снят замок. */
 function resetZoom() {
   STATE.zoomLock = false;
   STATE.viewDirty = false;
   tanResetWindows();
-  if (STATE.mode === 'math') { const p = MATH_PRESETS[STATE.mathSub]; if (p) setMathWindow(p.win[0], p.win[1], p.win[2], p.win[3]); }
-  else if (STATE.mode === 'costs') setRanges(10, 50);
-  else setRanges(100, 100);
+  if (STATE.mode === 'math') {
+    const p = MATH_PRESETS[STATE.mathSub];
+    if (p) setMathWindow(p.win[0], p.win[1], p.win[2], p.win[3]);
+  } else {
+    const baseQ = (STATE.mode === 'costs') ? 10 : 100;
+    const baseP = (STATE.mode === 'costs') ? 50 : 100;
+    const b = boundsOfDrawn(baseQ, baseP);
+    setRanges(b ? b.qmax : baseQ, b ? b.pmax : baseP);
+  }
   syncViewFields();
   redrawAll();
 }
@@ -321,9 +381,13 @@ function initZoom() {
       _wheelAcc = { factor: 1, panX: 0, panY: 0, px: e.clientX - r.left, py: e.clientY - r.top };
       requestAnimationFrame(flushWheel);
     }
-    // Щипок на тачпаде приходит сюда же, но с ctrlKey и мелкой дельтой,
-    // поэтому ему нужен более крупный шаг. Двупальцевый свайп без ctrl и с
-    // заметным горизонтальным сдвигом — это прокрутка вбок, а не зум.
+    /* Щипок на тачпаде приходит сюда же, но с ctrlKey и мелкой дельтой,
+       поэтому ему нужен более крупный шаг. Двупальцевый свайп без ctrl и с
+       заметным горизонтальным сдвигом — это прокрутка вбок, а не зум.
+       П10: с обычной мышью горизонтальной дельты не бывает вовсе, поэтому
+       колесо на Windows всегда оказывалось зумом и никогда сдвигом. Добавлен
+       Shift: с ним колесо двигает поле по горизонтали, как в любом редакторе. */
+    if (e.shiftKey && !e.ctrlKey) { _wheelAcc.panX += -(dx || dy); return; }
     if (!e.ctrlKey && Math.abs(dx) > Math.abs(dy)) { _wheelAcc.panX += -dx; _wheelAcc.panY += dy; return; }
     _wheelAcc.px = e.clientX - r.left; _wheelAcc.py = e.clientY - r.top;
     _wheelAcc.factor *= Math.exp(dy * (e.ctrlKey ? 0.011 : 0.0022));
@@ -334,7 +398,23 @@ function initZoom() {
      клина свои d3-drag, и перехватывать их нельзя. Порог в 3 пикселя не даёт
      обычному щелчку (постановка точки) превратиться в микро-сдвиг. */
   let pan = null, roll = null;
+  // Правая кнопка двигает поле — своё меню браузера тут только мешает (П10).
+  gw.addEventListener('contextmenu', (e) => e.preventDefault());
   gw.addEventListener('pointerdown', (e) => {
+    /* П10. На Windows тянуть поле было нечем: левая кнопка рядом с кривой
+       уходила в прокатывание точки, а кривые на приближённом графике повсюду.
+       Теперь поле двигают ПРАВОЙ кнопкой или левой с зажатым пробелом либо
+       Shift — и тогда прокатывание не перехватывает нажатие. */
+    const forcePan = (e.button === 2) || _spaceDown || e.shiftKey;
+    if (forcePan) {
+      if (STATE.markArm || STATE.vertArm) return;
+      const rp = gw.getBoundingClientRect();
+      const panel = (STATE.mode === 'math' && STATE.mathSub === 'tangent')
+        ? tangentPanelAt(e.clientY - rp.top) : null;
+      pan = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId, panel };
+      e.preventDefault();
+      return;
+    }
     if (e.button !== 0 || STATE.markArm) return;
     // Нажали ПО кривой — катим по ней точку, а не двигаем поле. Радиус захвата
     // маленький: рядом лежат ключевые точки, и попадать по ним ничто не мешает.
@@ -368,7 +448,13 @@ function initZoom() {
     if (!pan || e.pointerId !== pan.id) return;
     const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
     if (!pan.moved && Math.hypot(dx, dy) < 3) return;
-    if (!pan.moved) { pan.moved = true; gw.setPointerCapture(pan.id); gw.style.cursor = 'grabbing'; }
+    // Захват указателя не критичен: без него сдвиг просто оборвётся за краем
+    // холста. А исключение здесь останавливало бы само движение.
+    if (!pan.moved) {
+      pan.moved = true;
+      try { gw.setPointerCapture(pan.id); } catch (err) {}
+      gw.style.cursor = 'grabbing';
+    }
     pan.x = e.clientX; pan.y = e.clientY;
     panByPixels(dx, dy, pan.panel);
   });
@@ -384,6 +470,40 @@ function initZoom() {
   };
   gw.addEventListener('pointerup', endPan);
   gw.addEventListener('pointercancel', endPan);
+
+  /* Клавиатура (П10): стрелки двигают поле, плюс и минус меняют масштаб.
+     Пробел, пока зажат, превращает левую кнопку в «руку» — привычный жест
+     из графических редакторов. Слушаем на окне, но игнорируем набор в полях. */
+  window.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '')) return;
+    if (t && t.isContentEditable) return;
+    if (document.getElementById('scene-picker') &&
+        !document.getElementById('scene-picker').classList.contains('hidden')) return;
+    if (e.code === 'Space') { _spaceDown = true; gw.style.cursor = 'grab'; return; }
+    const step = e.shiftKey ? 120 : 40;   // с Shift шаг крупнее
+    if (e.key === 'ArrowLeft')  { panByPixels(step, 0); e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { panByPixels(-step, 0); e.preventDefault(); }
+    else if (e.key === 'ArrowUp')    { panByPixels(0, step); e.preventDefault(); }
+    else if (e.key === 'ArrowDown')  { panByPixels(0, -step); e.preventDefault(); }
+    else if (e.key === '+' || e.key === '=') { zoomStep(1 / 1.25); e.preventDefault(); }
+    else if (e.key === '-' || e.key === '_') { zoomStep(1.25); e.preventDefault(); }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') { _spaceDown = false; gw.style.cursor = ''; }
+  });
+  window.addEventListener('blur', () => { _spaceDown = false; gw.style.cursor = ''; });
+}
+
+let _spaceDown = false;
+
+/* Приблизить или отдалить на шаг — от центра видимой области.
+   Через неё работают и кнопки «+»/«−» над графиком (П53), и клавиши. */
+function zoomStep(factor) {
+  const gw = document.getElementById('graph-wrap');
+  if (!gw) return;
+  const r = gw.getBoundingClientRect();
+  zoomBy(factor, r.width / 2, r.height / 2);
 }
 
 // Отменить и дебаунс, и текущий твин (при смене сцены/режима — чтобы отложенный

@@ -810,8 +810,8 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
   const ml = 46, mr = 18, mt = 64, mb = 42;
   const left = gx0 + ml, right = gx1 - mr, top = mt, bottom = H - mb;
   if (right <= left || bottom <= top) return;
-  let Xmax = invCurve(D, 0); if (Xmax == null || !(Xmax > 0)) Xmax = CONFIG.Qmax; Xmax = niceMax(Xmax * 1.1);
-  let Ymax = evalCurve(D, 0); if (isNaN(Ymax) || !(Ymax > 0)) Ymax = CONFIG.Pmax; Ymax = niceMax(Ymax * 1.1);
+  let Xmax = invCurve(D, 0); if (Xmax == null || !(Xmax > 0)) Xmax = CONFIG.Qmax; Xmax = padMax(Xmax);
+  let Ymax = evalCurve(D, 0); if (isNaN(Ymax) || !(Ymax > 0)) Ymax = CONFIG.Pmax; Ymax = padMax(Ymax);
   const lx = d3.scaleLinear().domain([0, Xmax]).range([left, right]);
   const ly = d3.scaleLinear().domain([0, Ymax]).range([bottom, top]);
   const g = svg.append('g');

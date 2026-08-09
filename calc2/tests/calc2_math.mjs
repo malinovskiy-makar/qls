@@ -1121,6 +1121,40 @@ const CASES = [
              ['у каждой вершины крестик', 'verts', 3, 0]],
   },
   {
+    /* П32, П33. Возврат масштаба показывает всё нарисованное и делает это
+       ИДЕМПОТЕНТНО: повторное нажатие ничего не двигает. Кривые в подгонке
+       намеренно не участвуют — растущая кривая раздвигала бы окно бесконечно.
+       П53: шаг зума работает и туда, и обратно. */
+    name: 'Масштаб · возврат показывает всё и не расползается',
+    run: `openPicker(); pickScene('sd'); closePicker();
+          STATE.marks = []; STATE.areaVerts = []; STATE.areaCalcList = [];
+          resetZoom();
+          var base = [CONFIG.Qmax, CONFIG.Pmax];
+          resetZoom();
+          var again = [CONFIG.Qmax, CONFIG.Pmax];
+          addMarkAt(240, 180, null); resetZoom();
+          var wide = [CONFIG.Qmax, CONFIG.Pmax];
+          resetZoom();
+          var wideAgain = [CONFIG.Qmax, CONFIG.Pmax];
+          var before = CONFIG.Qmax;
+          zoomStep(1 / 1.25);
+          var zin = CONFIG.Qmax;
+          zoomStep(1.25);
+          var zout = CONFIG.Qmax;
+          STATE.marks = []; resetZoom();
+          return { bq: base[0], bp: base[1], aq: again[0], ap: again[1],
+                   wq: wide[0], wp: wide[1], w2q: wideAgain[0], w2p: wideAgain[1],
+                   grew: (zin < before) ? 1 : 0, back: (Math.abs(zout - before) < 1e-6) ? 1 : 0,
+                   pad: padMax(200), padZero: padMax(0) };`,
+    checks: [['базовое окно по Q', 'bq', 100, 0], ['по P', 'bp', 100, 0],
+             ['повтор ничего не двигает', 'aq', 100, 0], ['и по P', 'ap', 100, 0],
+             ['точка (240;180) уместилась', 'wq', 300, 0], ['и по высоте', 'wp', 250, 0],
+             ['повтор с точкой тоже', 'w2q', 300, 0], ['и по высоте', 'w2p', 250, 0],
+             ['«+» приближает', 'grew', 1, 0], ['«−» возвращает', 'back', 1, 0],
+             ['общий запас у конца оси', 'pad', 250, 0],
+             ['пустой вход — как у niceMax', 'padZero', 10, 0]],
+  },
+  {
     /* П31. Точка липнет и к кривым, и к ОСЯМ, а оторвать её труднее, чем
        прилепить: радиус отрыва заметно больше радиуса захвата. */
     name: 'Точки · прилипание к осям и сопротивление при отрыве',
