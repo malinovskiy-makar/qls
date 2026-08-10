@@ -223,12 +223,12 @@ def exam_finish(request, pk):
         return redirect('student:exam_result', pk=assignment.pk)
 
     if exam_engine.can_accept(attempt, now):
-        from problems.assignment_rows import answer_parts
+        from problems.assignment_rows import answer_parts, part_key
         from problems.part_grading import applies, read_part_answers
 
         for item in assignment.items.select_related(
                 'catalog_problem', 'custom_problem').prefetch_related(
-                    'catalog_problem__parts'):
+                    'catalog_problem__parts', 'custom_problem__parts'):
             answer, solution, _ = read_answer(request, item)
             # ⚠️ Передаём `None` тому полю, которое НЕ трогаем: пустая
             # строка означала бы «очистить», и решение стёрлось бы вместе
@@ -244,7 +244,7 @@ def exam_finish(request, pk):
             # автопроверка по пунктам получила бы кашу.
             values = read_part_answers(request, item)
             for part in answer_parts(item):
-                key = part.pk if part is not None else None
+                key = part_key(part)
                 if values.get(key):
                     exam_engine.save_draft(attempt, item, values[key], None,
                                            now, part=part)

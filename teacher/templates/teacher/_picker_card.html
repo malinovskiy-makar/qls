@@ -11,26 +11,34 @@ id это молчаливо сломанный `getElementById` (браузер
 перетягивали внимание на себя.
 
 Название и строка «тема · тип · сложность словами» приходят готовыми из
-`picker.build_cards`: обрезка по границе слова живёт в питоне, а не в
+`picker.picker_context`: обрезка по границе слова живёт в питоне, а не в
 шаблонном фильтре, который режет по символам и рвёт числа.
+
+Сессия 8, п. 13: вид приведён к строке разбора работы глазами ученика —
+название, тихая мета, кнопки СПРАВА. Функционал не тронут: те же две
+кнопки, те же данные.
 {% endcomment %}
 <div class="problem-card" data-pid="{{ problem.pk }}"
      data-title="{{ card_title }}">
-  <div class="card-top">
-    <span class="card-title">{{ card_title }}</span>
+  <div class="card-main">
+    <div class="card-title">{{ card_title }}</div>
+    {% comment %}
+    Одна тихая строка «тема · тип · сложность» — как в строке разбора
+    работы глазами ученика. Сложность СЛОВАМИ: «сложность 2 из 5»
+    читается сразу, а пять звёздочек надо пересчитывать глазами.
+    {% endcomment %}
+    <div class="card-meta">{{ meta }}</div>
+    {% if preview %}<p class="card-preview">{{ preview }}</p>{% endif %}
   </div>
 
-  {% if preview %}<p class="card-preview">{{ preview }}</p>{% endif %}
-
   {% comment %}
-  Одна тихая строка вместо ряда тегов и звёздочек. Сложность — СЛОВАМИ:
-  «сложность 2 из 5» читается сразу, а пять звёздочек надо пересчитывать.
+  ⚠️ Кнопки СПРАВА, а не под текстом: список читается сверху вниз по
+  названиям, и действие обязано стоять на одной высоте с названием — как
+  значение в строке разбора работы.
   {% endcomment %}
-  <div class="card-meta">{{ meta }}</div>
-
   <div class="card-actions">
     <button class="btn-preview" type="button" data-preview="{{ problem.pk }}">Условие</button>
     <button class="k-btn k-btn--main k-btn--sm btn-add" type="button"
-            data-add="{{ problem.pk }}">Добавить</button>
+            data-add="{{ problem.pk }}">+ Добавить</button>
   </div>
 </div>

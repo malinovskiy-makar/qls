@@ -1,13 +1,27 @@
 {% extends 'platform/base.html' %}
 
+{% comment %}
+Экран своей задачи репетитора.
+
+Сессия 8, п. 15.1–15.2. Было: сплошная лента полей слева и голое превью
+справа, уезжавшее вверх при прокрутке. Владелец: «невероятно скудный
+экран», но превью «очень нравится — можно как-то это обыграть: слева
+создание, справа превью».
+
+Стало: поля собраны в карточки набора («Условие», «Ответ», «Тема и
+сложность», «Эталонное решение»), превью липкое и показывает то же, что
+увидит ученик, — условие, пункты и эталонное решение.
+{% endcomment %}
+
 {% block title %}{% if problem %}Редактирование задачи{% else %}Своя задача{% endif %}{% endblock %}
 
 {% block extra_style %}
-.editor { display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
-          align-items: start; }
-.form-field { margin-bottom: 16px; }
-.form-field label { display: block; font-size: 13px; font-weight: 500;
-                    margin-bottom: 6px; }
+.editor { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+          gap: 20px; align-items: start; }
+.form-field { margin-bottom: 14px; }
+.form-field:last-child { margin-bottom: 0; }
+.form-field label { display: block; font-size: 12px; font-weight: 600;
+                    color: var(--text2); margin-bottom: 5px; }
 .form-field input[type=text], .form-field input[type=number],
 .form-field select, .form-field textarea {
   width: 100%; font: inherit; font-size: 14px; padding: 9px 12px;
@@ -21,22 +35,62 @@
           color: var(--error); border-radius: var(--r); padding: 12px 14px;
           font-size: 13px; line-height: 1.7; margin-bottom: 18px; }
 .errors ul { margin: 0; padding-left: 18px; }
-.preview {
-  position: sticky; top: 68px;
-  background: var(--surface); border: 0.5px solid var(--border);
-  border-radius: 10px; padding: 18px;
-}
+
+/* Карточки левой колонки — из набора деталей, со своим заголовком. */
+.ed-card { margin-bottom: 14px; }
+.ed-card__head { display: flex; align-items: baseline; gap: 10px;
+                 margin-bottom: 12px; }
+.ed-card__name { font-size: 13px; font-weight: 700; }
+.ed-card__note { font-size: 12px; color: var(--text3); }
+
+/* Кнопки формул и графиков — ОДНА тихая строка под полем условия. */
+.ed-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+            margin-top: 8px; }
+
+/* ⚠️ ЛИПКОЕ ПРЕВЬЮ. `position: sticky` держится только пока элемент —
+   прямой потомок колонки сетки и колонка не растянута (`align-items:
+   start`). Раньше превью уезжало вверх при прокрутке. */
+.preview { position: sticky; top: 68px; max-height: calc(100vh - 88px);
+           overflow: auto; }
 .preview-label { font-size: 11px; text-transform: uppercase;
                  letter-spacing: .05em; color: var(--text2);
                  margin-bottom: 10px; }
 .preview-body { font-size: 14px; line-height: 1.7; overflow-wrap: anywhere;
                 min-height: 60px; }
+.pv-parts { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.pv-part { font-size: 14px; line-height: 1.6; }
+.pv-part b { margin-right: 4px; }
+.pv-sol { margin-top: 16px; padding-top: 12px;
+          border-top: 1px solid var(--border-soft); }
+.pv-sol__cap { font-size: 11px; text-transform: uppercase;
+               letter-spacing: .05em; color: var(--text2);
+               margin-bottom: 6px; }
+.pv-sol__body { font-size: 13px; line-height: 1.65; color: var(--text2);
+                overflow-wrap: anywhere; }
+
 .opt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .opt-row input[type=text] { flex: 1; }
 .opt-move { border: 0.5px solid var(--border); border-radius: var(--r);
             background: transparent; color: var(--text2); cursor: pointer;
             font: inherit; font-size: 12px; padding: 4px 7px; }
 .opt-move:hover { background: var(--panel); }
+
+/* Пункт задачи: своя карточка со своим ответом, допуском и весом. */
+.part-row { border: 0.5px solid var(--border); border-radius: 10px;
+            padding: 12px 14px; margin-bottom: 10px;
+            background: var(--surface-2); }
+.part-head { display: flex; align-items: center; gap: 8px;
+             margin-bottom: 8px; }
+.part-letter { font-weight: 700; font-size: 14px; min-width: 18px; }
+.part-label-input { width: 54px; }
+.part-drop { margin-left: auto; background: none; border: 0;
+             color: var(--text3); cursor: pointer; font-size: 17px;
+             line-height: 1; padding: 2px 6px; }
+.part-drop:hover { color: var(--error); }
+.part-row textarea { min-height: 64px; }
+.part-grid { display: grid; grid-template-columns: 1fr 90px 90px; gap: 10px;
+             margin-top: 8px; }
+
 .graph-plate {
   display: inline-block; border: 1px dashed var(--border);
   border-radius: var(--r); padding: 6px 12px; font-size: 13px;
@@ -46,15 +100,10 @@ dialog.modal { border: 0.5px solid var(--border); border-radius: 10px;
                background: var(--surface); color: var(--text);
                padding: 20px; max-width: 460px; width: 92vw; }
 dialog.modal::backdrop { background: rgba(0,0,0,.4); }
-.step-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px;
-            margin-bottom: 8px; }
-.step-row input { font: inherit; font-size: 13px; padding: 7px 10px;
-  border-radius: var(--r); border: 0.5px solid var(--border);
-  background: var(--surface-2); color: var(--text); }
-@media (max-width: 780px) {
-  .editor { grid-template-columns: 1fr; }
-  .preview { position: static; }
-  .form-row2, .step-row { grid-template-columns: 1fr; }
+@media (max-width: 900px) {
+  .editor { grid-template-columns: minmax(0,1fr); }
+  .preview { position: static; max-height: none; }
+  .form-row2, .part-grid { grid-template-columns: 1fr; }
 }
 {% endblock %}
 
@@ -89,133 +138,222 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
 
   <div class="editor">
     <div>
-      <div class="form-field">
-        <label for="id_title">Название (необязательно)</label>
-        <input type="text" id="id_title" name="title" maxlength="300"
-               value="{{ form.title }}">
-      </div>
-
-      <div class="form-field">
-        <label for="id_statement">Условие</label>
-        <textarea id="id_statement" name="statement" data-mathfield
-                  data-mathfield-preview="0"
-                  required>{{ form.statement }}</textarea>
-        <div style="margin-top:8px;">
-          <button type="button" class="btn-outline btn-small" id="add-graph-btn">
-            Добавить график
-          </button>
-          <a href="/calc2/" target="_blank" rel="noopener"
-             class="btn-outline btn-small">Создать новый график ↗</a>
-          <div class="row-meta" style="margin-top:6px;">
-            Постройте график в калькуляторе, сохраните его, затем добавьте
-            из сохранённых.
-          </div>
+      {# ── Условие ───────────────────────────────────────────────── #}
+      <div class="k-card ed-card">
+        <div class="ed-card__head">
+          <span class="ed-card__name">Условие</span>
+          <span class="ed-card__note">формулы в долларах: $Q_d = 100 - P$</span>
         </div>
-      </div>
 
-      <div class="form-field">
-        <label for="id_kind">Тип задачи</label>
-        <select id="id_kind" name="kind">
-          {% for value, label in kinds %}
-          <option value="{{ value }}"
-            {% if form.kind == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      {# --- Открытая задача --- #}
-      <div id="open-block">
-        <div class="form-row2">
-          <div class="form-field">
-            <label for="id_correct_answer">Правильный ответ</label>
-            <input type="text" id="id_correct_answer" name="correct_answer"
-                   value="{{ form.correct_answer }}">
-          </div>
-          <div class="form-field">
-            <label for="id_answer_tolerance">Допуск сравнения</label>
-            <input type="text" id="id_answer_tolerance" name="answer_tolerance"
-                   value="{{ form.answer_tolerance }}">
-          </div>
-        </div>
-        <div class="row-meta" style="margin-top:-8px;margin-bottom:14px;">
-          Числа сравниваются точно (через дроби, не через плавающую точку).
-          Допуск 0 — совпадение до последнего знака.
-        </div>
-      </div>
-
-      {# --- Тест --- #}
-      <div id="test-block" hidden>
         <div class="form-field">
-          <label>Варианты ответа</label>
-          <div id="options-list">
-            {% for option in options %}
-            <div class="opt-row">
-              <input type="checkbox" name="option_correct_{{ forloop.counter0 }}"
-                     {% if option.is_correct %}checked{% endif %} title="правильный">
-              <input type="text" name="option_text" value="{{ option.text }}">
-              <button type="button" class="opt-move" data-move="up">↑</button>
-              <button type="button" class="opt-move" data-move="down">↓</button>
-              <button type="button" class="opt-move" data-move="remove">×</button>
+          <label for="id_title">Название (необязательно)</label>
+          <input type="text" id="id_title" name="title" maxlength="300"
+                 value="{{ form.title }}">
+        </div>
+
+        <div class="form-field">
+          <label for="id_statement">Текст задачи</label>
+          <textarea id="id_statement" name="statement" data-mathfield
+                    data-mathfield-preview="0"
+                    required>{{ form.statement }}</textarea>
+          {% comment %}
+          Кнопки формул и графиков — ОДНА тихая строка под полем, а не три
+          разных блока с пояснениями между ними.
+          {% endcomment %}
+          <div class="ed-tools" id="statement-tools">
+            <button type="button" class="k-btn k-btn--plain k-btn--sm"
+                    id="add-graph-btn">Добавить график</button>
+            <a href="/calc2/" target="_blank" rel="noopener"
+               class="k-btn k-btn--quiet k-btn--sm">Создать новый график ↗</a>
+          </div>
+        </div>
+      </div>
+
+      {# ── Ответ ─────────────────────────────────────────────────── #}
+      <div class="k-card ed-card">
+        <div class="ed-card__head">
+          <span class="ed-card__name">Ответ</span>
+          <span class="ed-card__note" id="answer-note"></span>
+        </div>
+
+        <div class="form-field">
+          <label for="id_kind">Тип задачи</label>
+          <select id="id_kind" name="kind">
+            {% for value, label in kinds %}
+            <option value="{{ value }}"
+              {% if form.kind == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {# --- Открытая задача --- #}
+        <div id="open-block">
+          {% comment %}
+          ⚠️ ПУНКТЫ ЕСТЬ ТОЛЬКО У ОТКРЫТОЙ ЗАДАЧИ. У теста подпункты играют
+          роль вариантов ответа, и второго поля ввода у каждого быть не
+          должно — это то же правило, что для задач каталога.
+          ⚠️ НОЛЬ ПУНКТОВ — ЗАДАЧА БЕЗ ПУНКТОВ, как раньше. Это частный
+          случай «одного пункта», а не вторая ветка логики.
+          {% endcomment %}
+          <div id="whole-answer">
+            <div class="form-row2">
+              <div class="form-field">
+                <label for="id_correct_answer">Правильный ответ</label>
+                <input type="text" id="id_correct_answer" name="correct_answer"
+                       value="{{ form.correct_answer }}">
+              </div>
+              <div class="form-field">
+                <label for="id_answer_tolerance">Допуск сравнения</label>
+                <input type="text" id="id_answer_tolerance"
+                       name="answer_tolerance"
+                       value="{{ form.answer_tolerance }}">
+              </div>
+            </div>
+            <div class="k-hint">
+              Числа сравниваются точно (через дроби, не через плавающую
+              точку). Допуск 0 — совпадение до последнего знака.
+            </div>
+          </div>
+
+          <div id="parts-list">
+            {% for part in parts %}
+            <div class="part-row">
+              <div class="part-head">
+                <span class="part-letter"></span>
+                <input class="part-label-input" type="text" name="part_label"
+                       value="{{ part.label }}" aria-label="метка пункта">
+                <button type="button" class="part-drop" title="Убрать пункт">×</button>
+              </div>
+              <textarea name="part_statement"
+                        placeholder="Вопрос пункта">{{ part.statement }}</textarea>
+              <div class="part-grid">
+                <div class="form-field" style="margin:0">
+                  <label>Правильный ответ</label>
+                  <input type="text" name="part_answer" value="{{ part.answer }}">
+                </div>
+                <div class="form-field" style="margin:0">
+                  <label>Допуск</label>
+                  <input type="text" name="part_tolerance"
+                         value="{{ part.answer_tolerance }}">
+                </div>
+                <div class="form-field" style="margin:0">
+                  <label>Вес</label>
+                  <input type="text" name="part_points"
+                         value="{% if part.points %}{{ part.points }}{% endif %}">
+                </div>
+              </div>
             </div>
             {% endfor %}
           </div>
-          <button type="button" class="btn-outline btn-small" id="add-option-btn">
-            + Добавить вариант
-          </button>
-          <div class="row-meta" style="margin-top:6px;">
-            Галочка слева — правильный вариант. Множественный выбор
-            засчитывается по правилу «всё или ничего».
+
+          <div class="ed-tools">
+            <button type="button" class="k-btn k-btn--plain k-btn--sm"
+                    id="add-part-btn">+ Пункт</button>
+            <span class="k-hint" style="margin:0">Вес — доля балла задачи.
+              Пусто у всех — баллы делятся поровну.</span>
+          </div>
+        </div>
+
+        {# --- Тест --- #}
+        <div id="test-block" hidden>
+          <div class="form-field">
+            <label>Варианты ответа</label>
+            <div id="options-list">
+              {% for option in options %}
+              <div class="opt-row">
+                <input type="checkbox" name="option_correct_{{ forloop.counter0 }}"
+                       {% if option.is_correct %}checked{% endif %} title="правильный">
+                <input type="text" name="option_text" value="{{ option.text }}">
+                <button type="button" class="opt-move" data-move="up">↑</button>
+                <button type="button" class="opt-move" data-move="down">↓</button>
+                <button type="button" class="opt-move" data-move="remove">×</button>
+              </div>
+              {% endfor %}
+            </div>
+            <button type="button" class="k-btn k-btn--plain k-btn--sm"
+                    id="add-option-btn">+ Добавить вариант</button>
+            <div class="k-hint">
+              Галочка слева — правильный вариант. Множественный выбор
+              засчитывается по правилу «всё или ничего».
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="form-row2">
-        <div class="form-field">
-          <label for="id_topic">Тема</label>
-          <select id="id_topic" name="topic">
-            <option value="">не указана</option>
-            {% for topic in topics %}
-            <option value="{{ topic.pk }}"
-              {% if form.topic_id == topic.pk %}selected{% endif %}>{{ topic.name }}</option>
-            {% endfor %}
-          </select>
+      {# ── Тема и сложность ──────────────────────────────────────── #}
+      <div class="k-card ed-card">
+        <div class="ed-card__head">
+          <span class="ed-card__name">Тема и сложность</span>
+          <span class="ed-card__note">обе необязательны</span>
         </div>
-        <div class="form-field">
-          <label for="id_difficulty">Сложность</label>
-          <select id="id_difficulty" name="difficulty">
-            <option value="">не указана</option>
-            {% for d in difficulties %}
-            <option value="{{ d }}"
-              {% if form.difficulty == d %}selected{% endif %}>{{ d }}</option>
-            {% endfor %}
-          </select>
+        <div class="form-row2">
+          <div class="form-field">
+            <label for="id_topic">Тема</label>
+            <select id="id_topic" name="topic">
+              <option value="">не указана</option>
+              {% for topic in topics %}
+              <option value="{{ topic.pk }}"
+                {% if form.topic_id == topic.pk %}selected{% endif %}>{{ topic.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="id_difficulty">Сложность</label>
+            <select id="id_difficulty" name="difficulty">
+              <option value="">не указана</option>
+              {% for d in difficulties %}
+              <option value="{{ d }}"
+                {% if form.difficulty == d %}selected{% endif %}>{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
       </div>
 
-      {# --- Фаза 20: решалка --- #}
-      <div class="form-field">
-        <label for="id_solution">Эталонное решение</label>
-        <textarea id="id_solution" name="solution"
-                  data-mathfield>{{ form.solution }}</textarea>
-        {% comment %}
-        Разбиение решения на шаги убрано из интерфейса по ревью владельца
-        (сессия 7, фаза 1). Модель шагов НЕ удалена: поле едет скрытым и
-        возвращается на сервер без изменений, поэтому у задач, где шаги уже
-        заведены, они сохраняются. Вернуть кнопку — снова показать этот блок.
-        {% endcomment %}
-        <input type="hidden" name="solution_steps" id="id_solution_steps"
-               value="{{ form.solution_steps }}">
+      {# ── Эталонное решение ─────────────────────────────────────── #}
+      <div class="k-card ed-card">
+        <div class="ed-card__head">
+          <span class="ed-card__name">Эталонное решение</span>
+          <span class="ed-card__note">ученик увидит его после срока сдачи</span>
+        </div>
+        <div class="form-field">
+          {% comment %}
+          ⚠️ `data-mathfield-preview="0"`: решение теперь рисуется в общей
+          колонке «Так увидит ученик». Второй блок «Как это будет выглядеть»
+          прямо под полем показывал бы то же самое дважды.
+          {% endcomment %}
+          <textarea id="id_solution" name="solution" data-mathfield
+                    data-mathfield-preview="0">{{ form.solution }}</textarea>
+          {% comment %}
+          Разбиение решения на шаги убрано из интерфейса по ревью владельца
+          (сессия 7, фаза 1). Модель шагов НЕ удалена: поле едет скрытым и
+          возвращается на сервер без изменений, поэтому у задач, где шаги уже
+          заведены, они сохраняются. ⚠️ Обработчик отправки, который
+          ПЕРЕЗАПИСЫВАЛ это поле из DOM, снят намеренно — без него
+          сохранённые шаги стирались бы при каждом сохранении задачи.
+          {% endcomment %}
+          <input type="hidden" name="solution_steps" id="id_solution_steps"
+                 value="{{ form.solution_steps }}">
+        </div>
       </div>
 
-      <button type="submit" class="btn-primary">Сохранить задачу</button>
-      <a href="{% url 'teacher:problem_list' %}" class="btn-outline">Отмена</a>
+      <div class="k-row" style="gap:10px">
+        <button type="submit" class="k-btn k-btn--main">Сохранить задачу</button>
+        <a href="{% url 'teacher:problem_list' %}"
+           class="k-btn k-btn--quiet">Отмена</a>
+      </div>
     </div>
 
     {# --- Живой предпросмотр --- #}
-    <div class="preview">
+    <div class="k-card preview">
       <div class="preview-label">Так увидит ученик</div>
       <div class="preview-body" id="preview-body"></div>
+      <div class="pv-parts" id="preview-parts"></div>
       <div id="preview-options"></div>
+      <div class="pv-sol" id="preview-solution" hidden>
+        <div class="pv-sol__cap">Эталонное решение</div>
+        <div class="pv-sol__body" id="preview-solution-body"></div>
+      </div>
     </div>
   </div>
 </form>
@@ -253,9 +391,17 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
   var openBlock = document.getElementById('open-block');
   var testBlock = document.getElementById('test-block');
   var optionsList = document.getElementById('options-list');
+  var partsList = document.getElementById('parts-list');
+  var wholeAnswer = document.getElementById('whole-answer');
   var statement = document.getElementById('id_statement');
+  var solution = document.getElementById('id_solution');
   var previewBody = document.getElementById('preview-body');
+  var previewParts = document.getElementById('preview-parts');
   var previewOptions = document.getElementById('preview-options');
+  var previewSolution = document.getElementById('preview-solution');
+  var previewSolutionBody = document.getElementById('preview-solution-body');
+  var answerNote = document.getElementById('answer-note');
+  var LETTERS = 'абвгдежзик';
 
   // ---- Переключение «открытая / тест» -------------------------------
   function syncKind() {
@@ -284,8 +430,66 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
       }
     }
     renumber();
+    syncParts();
     renderPreview();
   }
+
+  // ---- Пункты (а, б, в) ----------------------------------------------
+  // ⚠️ Ноль пунктов — задача БЕЗ пунктов: тогда работает общее поле ответа.
+  // Как только пункт появился, общее поле прячется: два эталона на одну
+  // задачу — это обещание проверить дважды по-разному.
+  function syncParts() {
+    var rows = partsList.children;
+    Array.prototype.forEach.call(rows, function (row, index) {
+      var letter = row.querySelector('.part-letter');
+      var input = row.querySelector('.part-label-input');
+      if (!input.value.trim()) {
+        input.value = index < LETTERS.length ? LETTERS[index] : String(index + 1);
+      }
+      letter.textContent = (index + 1) + '.';
+    });
+    var has = rows.length > 0;
+    wholeAnswer.hidden = has;
+    if (answerNote) {
+      answerNote.textContent = kind.value !== 'open' ? ''
+        : (has ? 'ученик отвечает на каждый пункт отдельно'
+               : 'один ответ на всю задачу');
+    }
+  }
+
+  function addPart() {
+    var row = document.createElement('div');
+    row.className = 'part-row';
+    row.innerHTML =
+      '<div class="part-head">' +
+      '<span class="part-letter"></span>' +
+      '<input class="part-label-input" type="text" name="part_label" aria-label="метка пункта">' +
+      '<button type="button" class="part-drop" title="Убрать пункт">×</button>' +
+      '</div>' +
+      '<textarea name="part_statement" placeholder="Вопрос пункта"></textarea>' +
+      '<div class="part-grid">' +
+      '<div class="form-field" style="margin:0"><label>Правильный ответ</label>' +
+      '<input type="text" name="part_answer"></div>' +
+      '<div class="form-field" style="margin:0"><label>Допуск</label>' +
+      '<input type="text" name="part_tolerance" value="0"></div>' +
+      '<div class="form-field" style="margin:0"><label>Вес</label>' +
+      '<input type="text" name="part_points"></div>' +
+      '</div>';
+    partsList.appendChild(row);
+    syncParts();
+    renderPreview();
+    row.querySelector('textarea').focus();
+  }
+
+  document.getElementById('add-part-btn')
+    .addEventListener('click', function () { addPart(); });
+  partsList.addEventListener('click', function (event) {
+    if (!event.target.closest('.part-drop')) { return; }
+    event.target.closest('.part-row').remove();
+    syncParts();
+    renderPreview();
+  });
+  partsList.addEventListener('input', function () { schedule(); });
 
   function addOption(text, correct) {
     var row = document.createElement('div');
@@ -339,18 +543,39 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
     timer = setTimeout(renderPreview, 500);
   }
 
-  function renderPreview() {
-    var text = statement.value || '';
+  function escapeHtml(text) {
+    return (text || '').replace(/[&<>]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+    });
+  }
+
+  function asHtml(text) {
     // Плашка графика: [[График: имя]] — полноценная отрисовка появится,
     // когда будет известен формат сцены калькулятора.
-    var html = text
-      .replace(/[&<>]/g, function (c) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
-      })
+    return escapeHtml(text)
       .replace(/\[\[График:\s*([^\]]+)\]\]/g,
         '<span class="graph-plate">График: $1</span>')
       .replace(/\n/g, '<br>');
-    previewBody.innerHTML = html || '<span class="row-meta">Пока пусто.</span>';
+  }
+
+  function renderPreview() {
+    previewBody.innerHTML = asHtml(statement.value)
+      || '<span class="row-meta">Пока пусто.</span>';
+
+    // Пункты — ровно так, как их увидит ученик: буквой и отдельным вопросом.
+    previewParts.innerHTML = '';
+    if (kind.value === 'open') {
+      Array.prototype.forEach.call(partsList.children, function (row, index) {
+        var text = row.querySelector('[name=part_statement]').value.trim();
+        if (!text) { return; }
+        var label = row.querySelector('.part-label-input').value.trim()
+          || (index < LETTERS.length ? LETTERS[index] : String(index + 1));
+        var block = document.createElement('div');
+        block.className = 'pv-part';
+        block.innerHTML = '<b>' + escapeHtml(label) + ')</b> ' + asHtml(text);
+        previewParts.appendChild(block);
+      });
+    }
 
     previewOptions.innerHTML = '';
     if (kind.value !== 'open') {
@@ -369,17 +594,42 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
       });
       previewOptions.appendChild(list);
     }
+
+    // ⚠️ Решение показываем В ТОМ ЖЕ превью: у репетитора должна быть ОДНА
+    // картина того, что увидит ученик, а не две в разных местах экрана.
+    var solutionText = (solution && solution.value || '').trim();
+    previewSolution.hidden = !solutionText;
+    if (solutionText) {
+      previewSolutionBody.innerHTML = asHtml(solutionText);
+    }
+
     if (window.renderMathInElement) {
-      renderMathInElement(previewBody, {
-        delimiters: [
-          { left: '$$', right: '$$', display: true },
-          { left: '$', right: '$', display: false }
-        ],
-        throwOnError: false
+      [previewBody, previewParts, previewSolutionBody].forEach(function (node) {
+        renderMathInElement(node, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false }
+          ],
+          throwOnError: false
+        });
       });
     }
   }
   statement.addEventListener('input', schedule);
+  if (solution) { solution.addEventListener('input', schedule); }
+
+  // ---- Кнопки под полем условия — ОДНОЙ строкой ----------------------
+  // ⚠️ Панель формул вставляет себя сразу после textarea, поэтому строка
+  // собирается ПОСЛЕ её появления. Ждём кадр: `attachMathfield` вызывается
+  // на загрузке страницы.
+  function packTools() {
+    var tools = document.getElementById('statement-tools');
+    var panel = statement.parentNode.querySelector('.mf-panel');
+    if (tools && panel && panel.parentNode !== tools) {
+      tools.insertBefore(panel, tools.firstChild);
+    }
+  }
+  setTimeout(packTools, 0);
 
   // ---- График из сохранённых ----------------------------------------
   var modal = document.getElementById('graph-modal');

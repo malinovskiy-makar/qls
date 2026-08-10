@@ -14,6 +14,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from problems.models_platform import (
     CustomProblem,
     CustomProblemOption,
+    CustomProblemPart,
     SavedFolder,
     SavedGraph,
     SolutionVisibility,
@@ -51,6 +52,66 @@ def _parse_options(request):
             'order': len(options),
         })
     return options
+
+
+# Метки пунктов по умолчанию — те же буквы, что во всём банке.
+PART_LABELS = 'абвгдежзик'
+
+
+def _parse_parts(request):
+    """Пункты (а, б, в) из формы. Пустая строка условия — пункта нет.
+
+    ⚠️ НОЛЬ ПУНКТОВ — ЭТО ЗАДАЧА БЕЗ ПУНКТОВ, а не ошибка. Второй ветки
+    логики она не заводит: список пунктов любой задачи возвращает хотя бы
+    один элемент (`assignment_rows.answer_parts`).
+    """
+    statements = request.POST.getlist('part_statement')
+    answers = request.POST.getlist('part_answer')
+    tolerances = request.POST.getlist('part_tolerance')
+    weights = request.POST.getlist('part_points')
+    labels = request.POST.getlist('part_label')
+
+    def at(values, index, default=''):
+        return values[index] if index < len(values) else default
+
+    parts = []
+    for index, statement in enumerate(statements):
+        statement = (statement or '').strip()
+        if not statement:
+            continue
+        order = len(parts)
+        label = (at(labels, index) or '').strip() or (
+            PART_LABELS[order] if order < len(PART_LABELS) else str(order + 1))
+        parts.append({
+            'label': label[:10],
+            'statement': statement,
+            'answer': (at(answers, index) or '').strip(),
+            'answer_tolerance': _number(at(tolerances, index, '0'), '0'),
+            'points': _weight(at(weights, index)),
+            'order': order,
+        })
+    return parts
+
+
+def _number(raw, default='0'):
+    raw = (raw or '').strip().replace(',', '.') or default
+    try:
+        float(raw)
+    except ValueError:
+        return default
+    return raw
+
+
+def _weight(raw):
+    """Вес пункта. Пусто — None: тогда баллы делятся поровну."""
+    raw = (raw or '').strip().replace(',', '.')
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    return raw if value > 0 else None
 
 
 def _validate(kind, statement, correct_answer, options):
@@ -123,6 +184,7 @@ def problem_form(request, pk=None):
         statement = request.POST.get('statement') or ''
         correct_answer = (request.POST.get('correct_answer') or '').strip()
         options = _parse_options(request)
+        parts = _parse_parts(request)
         errors = _validate(kind, statement, correct_answer, options)
 
         if not errors:
@@ -163,6 +225,14 @@ def problem_form(request, pk=None):
             problem.options.all().delete()
             for option in options:
                 CustomProblemOption.objects.create(problem=problem, **option)
+
+            # Пункты переписываем целиком — по той же причине, что и
+            # варианты: сопоставлять старые с новыми по порядку значит
+            # незаметно переставить ответы, если репетитор двигал строки.
+            problem.parts.all().delete()
+            if kind == CustomProblem.Kind.OPEN:
+                for part in parts:
+                    CustomProblemPart.objects.create(problem=problem, **part)
 
             messages.success(request, 'Задача сохранена.')
             if request.POST.get('to_cart'):
@@ -217,6 +287,17 @@ def problem_form(request, pk=None):
     }
 
     if request.method == 'POST':
+        shown_parts = _parse_parts(request)
+    elif problem is not None:
+        shown_parts = [{'label': p.label, 'statement': p.statement,
+                        'answer': p.answer,
+                        'answer_tolerance': p.answer_tolerance,
+                        'points': p.points}
+                       for p in problem.parts.all()]
+    else:
+        shown_parts = []
+
+    if request.method == 'POST':
         shown_options = _parse_options(request)
     elif problem is not None:
         shown_options = [{'text': o.text, 'is_correct': o.is_correct}
@@ -228,6 +309,7 @@ def problem_form(request, pk=None):
         'problem': problem,
         'form': form,
         'options': shown_options,
+        'parts': shown_parts,
         'errors': errors,
         'topics': _canonical_topics(),
         'difficulties': range(1, 6),

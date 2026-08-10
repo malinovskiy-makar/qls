@@ -426,6 +426,52 @@ class CustomProblem(models.Model):
                    .values_list('id', flat=True))
 
 
+class CustomProblemPart(models.Model):
+    """Пункт (а, б, в) в СВОЕЙ задаче репетитора.
+
+    ⚠️ ЗАЧЕМ ОТДЕЛЬНАЯ ТАБЛИЦА, А НЕ `ProblemPart`. `ProblemPart` ссылается
+    на `Problem` — задачу общего каталога, куда задача репетитора не
+    попадает НИКОГДА. Повесить пункт своей задачи на каталожную строку
+    значит завести в каталоге запись, которой там быть не должно.
+
+    ⚠️ НОЛЬ ПУНКТОВ — ЗАДАЧА БЕЗ ПУНКТОВ, и это ЧАСТНЫЙ СЛУЧАЙ «одного
+    пункта», а не вторая ветка логики: список пунктов любой задачи
+    возвращает хотя бы один элемент (`assignment_rows.answer_parts`).
+    Так у ввода, автопроверки и показа результата ровно один путь кода.
+
+    Поля названы КАК У `ProblemPart` (`label`, `statement`, `answer`,
+    `points`, `order`) намеренно: весь конвейер проверки по пунктам
+    обращается к ним по именам, и совпадение имён избавляет от ветки «если
+    пункт свой — спрашивать иначе».
+    """
+
+    problem = models.ForeignKey(
+        CustomProblem, on_delete=models.CASCADE, related_name='parts',
+        verbose_name='Задача')
+    label = models.CharField('Метка пункта', max_length=10,
+                             help_text='Например: а, б, в')
+    statement = models.TextField('Условие пункта', blank=True)
+    answer = models.TextField('Правильный ответ', blank=True)
+    # Свой допуск на каждый пункт: «а» может просить целое, «б» — процент
+    # с точностью до десятых.
+    answer_tolerance = models.DecimalField(
+        'Допуск', max_digits=12, decimal_places=6, default=0)
+    # ⚠️ ТОЛЬКО ВЕС. Сколько стоит задача целиком — решает балл позиции
+    # (`AssignmentItem.points`), а `points` пункта делит его между пунктами
+    # (`assignment_rows.part_max_score`). То же правило, что у каталожных.
+    points = models.DecimalField('Вес пункта', max_digits=5, decimal_places=2,
+                                 null=True, blank=True)
+    order = models.PositiveIntegerField('Порядок', default=0)
+
+    class Meta:
+        verbose_name = 'Пункт своей задачи'
+        verbose_name_plural = 'Пункты своих задач'
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return '%s — пункт (%s)' % (self.problem, self.label)
+
+
 class CustomProblemOption(models.Model):
     """Вариант ответа у теста репетитора (tf / single / multiple)."""
 
@@ -1025,6 +1071,12 @@ class AnswerDraft(models.Model):
     part = models.ForeignKey(
         'problems.ProblemPart', on_delete=models.CASCADE,
         null=True, blank=True, related_name='drafts', verbose_name='Пункт')
+    # Пункт СВОЕЙ задачи репетитора — своя таблица, своя ссылка
+    # (см. объяснение у `PartAnswer.custom_part`).
+    custom_part = models.ForeignKey(
+        'problems.CustomProblemPart', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='drafts',
+        verbose_name='Пункт своей задачи')
     updated_at = models.DateTimeField('Сохранён', auto_now=True)
 
     class Meta:
@@ -1040,8 +1092,16 @@ class AnswerDraft(models.Model):
                 condition=models.Q(part__isnull=False),
                 name='uniq_answer_draft_part'),
             models.UniqueConstraint(
+                fields=['attempt', 'problem_item', 'custom_part'],
+                condition=models.Q(custom_part__isnull=False),
+                name='uniq_answer_draft_custom'),
+            # ⚠️ «Задача целиком» — это когда пусты ОБЕ ссылки. Без второго
+            # условия три пункта своей задачи (part=NULL) считались бы тремя
+            # черновиками одной задачи и ломались об уникальность.
+            models.UniqueConstraint(
                 fields=['attempt', 'problem_item'],
-                condition=models.Q(part__isnull=True),
+                condition=models.Q(part__isnull=True,
+                                   custom_part__isnull=True),
                 name='uniq_answer_draft_whole'),
         ]
 
@@ -1155,6 +1215,14 @@ class PartAnswer(models.Model):
         'problems.ProblemPart', on_delete=models.CASCADE,
         null=True, blank=True, related_name='student_answers',
         verbose_name='Пункт')
+    # ⚠️ ПУНКТ СВОЕЙ ЗАДАЧИ ЖИВЁТ В ДРУГОЙ ТАБЛИЦЕ, поэтому ссылка вторая.
+    # Заполнена ровно одна из двух (или ни одной — тогда это «вся задача»).
+    # Складывать их в одно поле нельзя: номера в двух таблицах свои, и
+    # пункт №3 каталога перепутался бы с пунктом №3 своей задачи.
+    custom_part = models.ForeignKey(
+        CustomProblemPart, on_delete=models.CASCADE,
+        null=True, blank=True, related_name='student_answers',
+        verbose_name='Пункт своей задачи')
     answer = models.TextField('Ответ ученика', blank=True)
     # None — машина не проверяла (нет эталона или ответ словесный и
     # эталона нет). Явное «не знаю» лучше молчаливого False.
@@ -1182,13 +1250,20 @@ class PartAnswer(models.Model):
                 condition=models.Q(part__isnull=False),
                 name='uniq_part_answer_part'),
             models.UniqueConstraint(
+                fields=['submission', 'custom_part'],
+                condition=models.Q(custom_part__isnull=False),
+                name='uniq_part_answer_custom'),
+            # ⚠️ «Задача целиком» — это когда пусты ОБЕ ссылки (см. выше).
+            models.UniqueConstraint(
                 fields=['submission'],
-                condition=models.Q(part__isnull=True),
+                condition=models.Q(part__isnull=True,
+                                   custom_part__isnull=True),
                 name='uniq_part_answer_whole'),
         ]
 
     def __str__(self):
-        label = self.part.label if self.part_id else 'вся задача'
+        part = self.part or self.custom_part
+        label = part.label if part is not None else 'вся задача'
         return f'{self.submission_id}: {label}'
 
 

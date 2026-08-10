@@ -29,37 +29,41 @@
       {% endcomment %}
       <input type="hidden" name="manual_order" id="manual-order-input">
 
+      {% comment %}
+      ⚠️ ПРАВАЯ КОЛОНКА — КАК В КОНСТРУКТОРЕ ПОДБОРКИ (сессия 8, п. 13):
+      это один и тот же по смыслу блок, и выглядеть он обязан одинаково.
+      Ни одного поля не убрано и не добавлено — только вид.
+      {% endcomment %}
       <div class="sidebar-card">
         <div class="sidebar-title">Настройки домашки</div>
 
         <div class="form-group">
           <label class="form-label" for="id_name">Название *</label>
-          <input class="form-control" type="text" id="id_name" name="name"
+          <input class="k-input" type="text" id="id_name" name="name"
                  placeholder="Например: Домашка 5 — КПВ" required>
         </div>
 
         <div class="form-group">
           <label class="form-label" for="id_deadline">Дедлайн</label>
-          <input class="form-control" type="datetime-local" id="id_deadline"
+          <input class="k-input" type="datetime-local" id="id_deadline"
                  name="deadline">
         </div>
 
-        <div class="form-group">
+        <div class="form-group" style="margin-bottom:0">
           <label class="form-label">Группы *</label>
           {% if groups %}
           <div class="groups-list">
             {% for group in groups %}
-            <label class="group-row">
+            <label class="k-check k-check--box">
               <input type="checkbox" name="groups" value="{{ group.pk }}">
-              <span>
-                {{ group.name }}
-                <span class="group-count">({{ group.students.count }} уч.)</span>
+              <span>{{ group.name }}
+                <span class="k-quiet">· {{ group.students.count }} уч.</span>
               </span>
             </label>
             {% endfor %}
           </div>
           {% else %}
-          <p class="form-hint">
+          <p class="k-hint">
             Нет групп. <a href="{% url 'teacher:group_create' %}">Создать группу</a>
           </p>
           {% endif %}

@@ -26,8 +26,13 @@
 /* ── Фильтры ─────────────────────────────────────── */
 /* Ряд фильтров. Поля и списки теперь из набора деталей (`_kit.html`) —
    здесь остались только размеры, чтобы ряд не разъезжался на две строки. */
+/* ⚠️ Ряд компактнее и ОДНОЙ высоты: поля набора и кнопки стоят на общей
+   базовой линии, а не разной высоты друг рядом с другом. */
 .filters-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
                align-items: center; }
+.filters-row .k-input, .filters-row .k-select,
+.filters-row .k-btn { height: 34px; }
+.filters-row .k-check { height: 34px; }
 .filters-row .filter-input { flex: 1 1 190px; min-width: 150px; width: auto; }
 .filters-row .k-select-wrap { flex: 0 1 155px; width: auto; min-width: 120px; }
 .filters-row .k-select { min-width: 0; }
@@ -44,39 +49,47 @@
 .results-count { font-size: 13px; color: var(--text2); margin-bottom: 10px; }
 .results-count strong { color: var(--text); font-weight: 600; }
 
-/* ── Карточка задачи ─────────────────────────────── */
+/* ── Карточка задачи (сессия 8, п. 13) ────────────────────────────────
+   Вид приведён к строке разбора работы глазами ученика: название, тихая
+   мета, действия СПРАВА на одной высоте с названием. Функционал не
+   тронут — те же две кнопки. */
 .problem-card {
   background: var(--surface); border: .5px solid var(--border);
-  border-radius: 10px; padding: 14px 16px; margin-bottom: 8px;
-  display: flex; flex-direction: column; gap: 8px;
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+  display: flex; align-items: flex-start; gap: 12px;
 }
-.card-top { display: flex; align-items: flex-start; gap: 10px; }
-.card-title { flex: 1; font-size: 14px; font-weight: 600; color: var(--text);
+.problem-card:hover { border-color: var(--border); background: var(--surface); }
+.card-main { flex: 1; min-width: 0; }
+.card-title { font-size: 14px; font-weight: 600; color: var(--text);
               line-height: 1.4; overflow-wrap: anywhere; }
+.card-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
 .card-stars { font-size: 12px; color: var(--amber); white-space: nowrap;
               flex-shrink: 0; }
 .card-preview { font-size: 12px; color: var(--text2); line-height: 1.5;
-                overflow-wrap: anywhere; }
+                margin-top: 6px; overflow-wrap: anywhere; }
 .card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .card-tag { background: var(--chip-bg); color: var(--chip-text);
             border-radius: 20px; padding: 2px 8px; font-size: 11px;
             font-weight: 500; }
 .card-tag.source { background: var(--surface-2); color: var(--text2); }
-.card-actions { display: flex; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
+.card-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
 .btn-preview {
   padding: 5px 12px; border: .5px solid var(--border); border-radius: var(--r);
   background: var(--surface); font-size: 12px; color: var(--text2);
-  cursor: pointer; transition: border-color .12s, color .12s;
+  cursor: pointer; white-space: nowrap;
+  transition: border-color .12s, color .12s;
 }
 .btn-preview:hover { border-color: var(--text3); color: var(--text); }
 /* ⚠️ «Добавить» — ГЛАВНОЕ действие экрана, поэтому сплошная заливка из
-   набора деталей (.k-btn--main). Прежнее правило рисовало его мелкой
-   малиновой обводкой: на такую кнопку не хочется нажимать, а рядом ещё и
-   ряд цветных тегов перетягивал внимание.
-   Здесь остаётся только состояние «уже добавлено». */
+   набора деталей (.k-btn--main). Здесь остаётся только состояние
+   «уже добавлено». */
 .btn-add.added { background: var(--green-tint) !important;
                  border-color: var(--green-border) !important;
                  color: var(--green) !important; pointer-events: none; }
+@media (max-width: 620px) {
+  .problem-card { flex-direction: column; }
+  .card-actions { width: 100%; }
+}
 
 /* ── Пагинация ───────────────────────────────────── */
 .pagination { display: flex; gap: 4px; justify-content: center;
@@ -93,26 +106,28 @@
 .page-btn.disabled { opacity: .35; pointer-events: none; }
 
 /* ── Сайдбар ─────────────────────────────────────── */
+/* ⚠️ ПРАВАЯ КОЛОНКА ВЫГЛЯДИТ КАК В КОНСТРУКТОРЕ ПОДБОРКИ (фаза 3): это
+   один и тот же по смыслу блок — настройки работы и её состав. Размеры и
+   отступы совпадают с `.k-card`, поля — с `.k-input`. */
 .sidebar-card { background: var(--surface); border: .5px solid var(--border);
-                border-radius: 10px; padding: 20px; margin-bottom: 14px; }
-.sidebar-title { font-size: 14px; font-weight: 700; color: var(--text);
-                 margin-bottom: 14px; }
+                border-radius: 10px; padding: 18px 20px; margin-bottom: 12px; }
+.sidebar-title { font-size: 12px; font-weight: 600; color: var(--text2);
+                 margin-bottom: 10px; }
 .form-group { margin-bottom: 14px; }
 .form-label { display: block; font-size: 12px; font-weight: 600;
               color: var(--text2); margin-bottom: 6px; }
 .form-control {
   width: 100%; box-sizing: border-box; border: .5px solid var(--border);
-  border-radius: var(--r); padding: 8px 10px; font-size: 13px;
-  color: var(--text); background: var(--surface); transition: border-color .12s;
-  font-family: inherit;
+  border-radius: var(--r); padding: 9px 12px; font-size: 14px;
+  color: var(--text); background: var(--surface-2);
+  transition: border-color .12s; font-family: inherit;
 }
 .form-control:focus { outline: none; border-color: var(--focus); }
 .form-hint { font-size: 12px; color: var(--text2); margin-top: 6px; }
 
 .groups-list {
-  background: var(--surface); display: flex; flex-direction: column; gap: 6px;
-  max-height: 180px; overflow-y: auto; border: .5px solid var(--border);
-  border-radius: var(--r); padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: 200px; overflow-y: auto;
 }
 .group-row { display: flex; align-items: center; gap: 8px; font-size: 13px;
              cursor: pointer; }

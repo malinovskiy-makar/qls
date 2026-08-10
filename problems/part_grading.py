@@ -24,8 +24,12 @@ from .answer_check import check_open_answer
 from .assignment_rows import (
     answer_input_name,
     answer_parts,
+    answer_row_key,
     part_correct_answer,
+    part_key,
+    part_link,
     part_max_score,
+    part_tolerance,
 )
 
 
@@ -35,7 +39,7 @@ def read_part_answers(request, item):
     values = {}
     for part in parts:
         raw = request.POST.get(answer_input_name(item, part))
-        values[part.pk if part is not None else None] = (raw or '').strip()
+        values[part_key(part)] = (raw or '').strip()
     return values
 
 
@@ -51,7 +55,7 @@ def join_answers(item, values):
         return values.get(None, '') or ''
     chunks = []
     for part in parts:
-        text = (values.get(part.pk) or '').strip()
+        text = (values.get(part_key(part)) or '').strip()
         if text:
             chunks.append('%s) %s' % ((part.label or '').rstrip(').'), text))
     return '; '.join(chunks)
@@ -91,10 +95,9 @@ def grade_part(item, part, given, parts_count):
     if not (given or '').strip():
         # Не ответил — это не «на проверке», это ноль баллов.
         return False, Decimal('0'), maximum
-    tolerance = 0
-    if item.is_custom and item.custom_problem is not None:
-        tolerance = item.custom_problem.answer_tolerance
-    ok = check_open_answer(correct, given, tolerance)
+    # ⚠️ Допуск СВОЙ у каждого пункта: «а» может просить целое, «б» —
+    # процент с точностью до десятых.
+    ok = check_open_answer(correct, given, part_tolerance(item, part))
     return ok, (maximum if ok else Decimal('0')), maximum
 
 
@@ -140,8 +143,7 @@ def save_part_answers(submission, item, values):
     has_text = wrote_anything(submission)
 
     for part in parts:
-        key = part.pk if part is not None else None
-        given = (values.get(key) or '').strip()
+        given = (values.get(part_key(part)) or '').strip()
         ok, score, part_max = grade_part(item, part, given, len(parts))
         # ⚠️ НЕ НАПИСАНО НИЧЕГО — ЭТО НОЛЬ ЗА ПУСТОТУ, А НЕ ЗА ОШИБКУ, И
         # УТВЕРЖДЁННЫЙ ЭТАЛОН ЭТОГО НЕ МЕНЯЕТ. Проверка стояла на `score is
@@ -159,7 +161,7 @@ def save_part_answers(submission, item, values):
         else:
             pending += 1
         PartAnswer.objects.update_or_create(
-            submission=submission, part=part,
+            submission=submission, **part_link(part),
             defaults={'answer': given, 'is_correct': ok, 'score': score,
                       'max_score': part_max, 'auto_zero': auto_zero})
     return scored, maximum, pending
@@ -181,15 +183,15 @@ def part_rows(item, submission, stored=None):
     if stored is None:
         stored = {}
         if submission is not None and submission.pk:
-            stored = {answer.part_id: answer
+            stored = {answer_row_key(answer): answer
                       for answer in PartAnswer.objects.filter(
-                          submission=submission).select_related('part')}
+                          submission=submission)
+                      .select_related('part', 'custom_part')}
 
     rows = []
     single = len(parts) == 1 and parts[0] is None
     for number, part in enumerate(parts, start=1):
-        key = part.pk if part is not None else None
-        answer = stored.get(key)
+        answer = stored.get(part_key(part))
         # ⚠️ ЗАПАСНОЙ ПУТЬ К ОТВЕТУ. У задачи БЕЗ пунктов ответ живёт и в
         # `Submission.submitted_answer` — например, у работ, сданных до
         # появления ответов по пунктам, и у демо-данных. Без этого запасного
@@ -333,8 +335,7 @@ def close_blank_position(submission, item):
     if applies(item):
         # Открытая задача — через обычную сборку по пунктам: она сама
         # проставит `auto_zero` каждому пункту и напишет верный комментарий.
-        values = {(part.pk if part is not None else None): ''
-                  for part in answer_parts(item)}
+        values = {part_key(part): '' for part in answer_parts(item)}
         apply_to_submission(submission, item, values)
         submission.save()
         return True

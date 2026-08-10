@@ -208,14 +208,18 @@ def save_draft(attempt, item, answer=None, solution=None, now=None,
         values['solution_draft'] = solution
     if not values:
         return seconds_remaining(attempt, now)
+    # Ссылка на пункт своя у каталожного и у пункта своей задачи —
+    # см. `assignment_rows.part_link`.
+    from .assignment_rows import part_link
+
+    link = part_link(part)
     try:
         with transaction.atomic():
             AnswerDraft.objects.update_or_create(
-                attempt=attempt, problem_item=item, part=part,
-                defaults=values)
+                attempt=attempt, problem_item=item, defaults=values, **link)
     except IntegrityError:
         AnswerDraft.objects.filter(attempt=attempt, problem_item=item,
-                                   part=part).update(**values)
+                                   **link).update(**values)
 
     attempt.last_heartbeat = now or timezone.now()
     attempt.save(update_fields=['last_heartbeat'])
@@ -231,7 +235,9 @@ def drafts_map(attempt):
     """
     from .models import AnswerDraft
 
-    return {(d.problem_item_id, d.part_id): d
+    from .assignment_rows import answer_row_key
+
+    return {(d.problem_item_id, answer_row_key(d)): d
             for d in AnswerDraft.objects.filter(attempt=attempt)}
 
 
@@ -268,12 +274,15 @@ def grade_attempt(attempt):
     assignment = attempt.assignment
     student = attempt.student
     drafts = {}
+    from .assignment_rows import answer_row_key
+
     for draft in AnswerDraft.objects.filter(attempt=attempt):
-        drafts.setdefault(draft.problem_item_id, {})[draft.part_id] = draft
+        drafts.setdefault(draft.problem_item_id,
+                          {})[answer_row_key(draft)] = draft
 
     for item in assignment.items.select_related(
             'catalog_problem', 'custom_problem').prefetch_related(
-                'catalog_problem__parts'):
+                'catalog_problem__parts', 'custom_problem__parts'):
         submission = get_or_create_submission(student, assignment, item)
         if submission.status in ('submitted', 'reviewed'):
             continue
@@ -282,8 +291,10 @@ def grade_attempt(attempt):
         # Ответ собираем ИЗ ПУНКТОВ — так же, как при сдаче домашки.
         values = {}
         if applies(item):
+            from .assignment_rows import part_key
+
             for part in answer_parts(item):
-                key = part.pk if part is not None else None
+                key = part_key(part)
                 draft = item_drafts.get(key)
                 values[key] = draft.answer_draft if draft else ''
             submission.submitted_answer = join_answers(item, values)

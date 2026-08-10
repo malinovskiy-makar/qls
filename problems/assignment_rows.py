@@ -40,8 +40,45 @@ def answer_input_name(item, part=None):
     в принципе.
     """
     if part is not None:
-        return 'answer_item_%d_part_%d' % (item.pk, part.pk)
+        return 'answer_item_%d_part_%s' % (item.pk, part_key(part))
     return 'answer_item_%d' % item.pk
+
+
+def is_custom_part(part):
+    """Пункт своей задачи репетитора? Признак — своя таблица."""
+    from .models_platform import CustomProblemPart
+
+    return isinstance(part, CustomProblemPart)
+
+
+def part_key(part):
+    """Ключ пункта в словарях ответов и в именах полей формы.
+
+    ⚠️ ДВЕ ТАБЛИЦЫ — ДВА ПРОСТРАНСТВА НОМЕРОВ. Пункт №3 каталожной задачи и
+    пункт №3 своей задачи репетитора — разные пункты, и голый номер их не
+    различает. Пункт своей задачи помечаем «c».
+    """
+    if part is None:
+        return None
+    return ('c%d' % part.pk) if is_custom_part(part) else part.pk
+
+
+def answer_row_key(answer):
+    """Тот же ключ, но у сохранённой строки ответа (`PartAnswer`/черновик)."""
+    if answer.part_id:
+        return answer.part_id
+    if getattr(answer, 'custom_part_id', None):
+        return 'c%d' % answer.custom_part_id
+    return None
+
+
+def part_link(part):
+    """Как записать ссылку на пункт: {'part': …} или {'custom_part': …}."""
+    if part is None:
+        return {'part': None, 'custom_part': None}
+    if is_custom_part(part):
+        return {'part': None, 'custom_part': part}
+    return {'part': part, 'custom_part': None}
 
 
 def answer_parts(item):
@@ -55,7 +92,17 @@ def answer_parts(item):
     Пункты теста сюда НЕ попадают: там подпункты играют роль вариантов
     ответа, и отдельного поля ввода у каждого быть не должно.
     """
-    if item.is_custom or item.catalog_problem_id is None:
+    if item.is_custom:
+        # ⚠️ У СВОЕЙ ЗАДАЧИ ПУНКТЫ В СВОЕЙ ТАБЛИЦЕ (`CustomProblemPart`):
+        # `ProblemPart` ссылается на каталог, куда задача репетитора не
+        # попадает никогда. Поля названы одинаково, поэтому дальше по
+        # конвейеру ветки «если пункт свой» нет.
+        if item.custom_problem is None or item.custom_problem.is_test:
+            return [None]
+        parts = list(item.custom_problem.parts.all())
+        parts = [p for p in parts if (p.statement or '').strip()]
+        return parts or [None]
+    if item.catalog_problem_id is None:
         return [None]
     kind, _ = item_answer_form(item)
     if kind != ANSWER_TEXT:
@@ -221,6 +268,21 @@ def part_correct_answer(item, part):
     if part is not None:
         return (part.answer or '').strip()
     return (item.correct_answer or '').strip()
+
+
+def part_tolerance(item, part):
+    """Допуск сравнения. У пункта СВОЙ, у задачи целиком — общий.
+
+    ⚠️ Допуск спрашиваем только у СВОЕЙ задачи: там его писал живой человек
+    именно как допуск. У каталожной задачи такого поля нет вовсе.
+    """
+    if not item.is_custom:
+        return 0
+    if part is not None and is_custom_part(part):
+        return part.answer_tolerance
+    if item.custom_problem is not None:
+        return item.custom_problem.answer_tolerance
+    return 0
 
 
 def catalog_answer_for(item, part):
@@ -457,8 +519,7 @@ def apply_draft(row, drafts):
     # с `part = None` — тот же код, что и для «а)/б)».
     answers = []
     for part_row in row.get('answer_parts') or []:
-        key = part_row['part'].pk if part_row['part'] is not None else None
-        draft = drafts.get(key)
+        draft = drafts.get(part_key(part_row['part']))
         part_row['given'] = draft.answer_draft if draft else ''
         answers.append(part_row['given'])
 
@@ -543,7 +604,8 @@ def build_rows(assignment, student, user=None, with_comments=True):
             student=student, assignment=assignment,
             problem_item__in=[i.pk for i in items])
             .select_related('feedback')
-            .prefetch_related('part_answers__part', 'feedback__mistakes')}
+            .prefetch_related('part_answers__part', 'part_answers__custom_part',
+            'feedback__mistakes')}
 
     rows = []
     for number, item in enumerate(items, start=1):
@@ -552,7 +614,8 @@ def build_rows(assignment, student, user=None, with_comments=True):
             submission = get_or_create_submission(student, assignment, item)
             stored = None
         else:
-            stored = {a.part_id: a for a in submission.part_answers.all()}
+            stored = {answer_row_key(a): a
+                      for a in submission.part_answers.all()}
         kind, options = item_answer_form(item)
         problem = item.problem
         status = work_status(submission, submission.submitted_answer,
