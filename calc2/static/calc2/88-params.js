@@ -1262,14 +1262,17 @@ function wireControls() {
     const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
     armMark(false);
     showSnapHint(null);
-    // Рядом с кривой точка садится НА неё, в пустом месте остаётся где щёлкнули.
-    const hit = snapPointAt(px, py);
+    /* Рядом с кривой точка садится НА неё, в пустом месте остаётся где щёлкнули.
+       Магнит тот же, что у вершин площади (Н41, Н54): в ключевую точку попасть
+       должно быть заметно легче, чем мимо, и правило это одно на все три случая
+       (своя точка, вершина площади, перетаскивание готовой). */
+    const hit = snapVertexAt(px, py);
     const x = hit ? hit.x : mx.invert(px);
     const y = hit ? hit.y : my.invert(py);
     if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
-    // К пересечению точку не привязываем: скольжение по одной из кривых увело
-    // бы её из перекрестья, а смысл отметки именно в нём.
-    addMarkAt(x, y, hit && !hit.cross ? hit.name : null);
+    // К пересечению и к особой точке не привязываем: скольжение по одной из
+    // кривых увело бы точку из перекрестья, а смысл отметки именно в нём.
+    addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null);
   });
   // Набор вершин площади: щелчок ставит вершину и режим не снимается —
   // вершин надо хотя бы три, и каждый раз жать кнопку было бы издевательством.
@@ -1304,7 +1307,9 @@ function wireControls() {
   if (chartEl) chartEl.addEventListener('mousemove', (ev) => {
     if (!STATE.markArm && !STATE.vertArm) return;
     const [px, py] = d3.pointer(ev, chartEl);
-    showSnapHint(STATE.vertArm && !STATE.markArm ? snapVertexAt(px, py) : snapPointAt(px, py));
+    // Н55: подсказка показывает ключевую точку в обоих режимах, а не только при
+    // наборе вершин — иначе не видно, куда именно сядет своя точка.
+    showSnapHint(snapVertexAt(px, py));
   });
   if (chartEl) chartEl.addEventListener('mouseleave', () => showSnapHint(null));
   // Esc снимает взведённый режим — иначе курсор-перекрестие остаётся «залипшим».

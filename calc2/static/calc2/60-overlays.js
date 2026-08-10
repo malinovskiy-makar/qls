@@ -701,6 +701,11 @@ function keyTargets() {
       ? ('пересечение с ' + p.b.replace('ось ', 'осью '))
       : ('пересечение ' + p.a + ' и ' + p.b), 'cross');
   });
+  /* Н40: начало координат тоже ключевая точка. Добавляем ПОСЛЕ пересечений:
+     если кривая и так пересекает ось в нуле, это одна и та же точка, и имя у
+     неё должно остаться содержательным, а не превратиться в «начало координат».
+     Сам push отсеет повтор по координатам. */
+  push(0, 0, 'начало координат', 'cross');
   if (!(w.x1 > w.x0)) { _keyPtsCache = out; return out; }
   const lo = w.x0 + (w.x1 - w.x0) * 1e-4, hi = w.x1;
   const h = (w.x1 - w.x0) * 1e-4;
@@ -818,17 +823,24 @@ function drawCrossPoints() {
     pin.append('title').text('Добавить в список точек');
     pin.on('click', (ev) => { ev.stopPropagation(); pinKeyPoint(p); });
 
+    /* Поведение как у Desmos (Н42–Н44): по умолчанию кружок серый и пустой
+       внутри; при наведении показываются координаты; щелчок их закрепляет, и
+       тогда точка заливается и становится чуть крупнее. Щелчок в стороне
+       гасит закрепку. Закрепка-значок появляется только у закреплённой точки:
+       на пролёте курсора её некуда нажимать. */
     const paint = () => {
-      const hot = (STATE.hotCross === i) || (STATE.hoverCross === i);
+      const pinned = (STATE.hotCross === i);
+      const hover = (STATE.hoverCross === i);
+      // Координаты видны — значит точка залита и чуть крупнее (Н44). Верно и
+      // для наведения, и для закреплённой щелчком: состояние одно и то же.
+      const hot = pinned || hover;
       dot.attr('r', hot ? 5 : 4)
          .attr('fill', hot ? COL.ink : COL.halo)
          .attr('stroke', hot ? COL.ink : COL.inkSoft)
          .attr('stroke-width', hot ? 2 : 1.4)
          .attr('opacity', hot ? 1 : 0.55);
-      // Координаты и закрепка — только у закреплённой щелчком точки: при простом
-      // наведении показывать нечего, а всплывающая подсказка «КТВ и ось Y»
-      // раньше только мешала (её больше нет совсем).
-      lab.style('display', (STATE.hotCross === i) ? null : 'none');
+      lab.style('display', hot ? null : 'none');
+      pin.style('display', pinned ? null : 'none');
     };
     paint();
     dot.on('click', (ev) => { ev.stopPropagation(); STATE.hotCross = (STATE.hotCross === i) ? null : i; redrawAll(); })
@@ -2030,6 +2042,11 @@ function drawMarks() {
          и к кривым, и к осям. */
       .call(d3.drag().container(() => svg.node()).on('drag', ev => {
         if (mk.snapTo && snapDistPx(mk.snapTo, ev.x, ev.y) > RELEASE_PX) mk.snapTo = null;
+        /* Н41: тот же магнит, что при постановке. Ключевая точка перехватывает
+           первой — в неё точка «падает» и стоит ровно в ней, а не скользит по
+           одной из кривых мимо перекрестья. */
+        const key = snapVertexAt(ev.x, ev.y);
+        if (key && key.key) { mk.snapTo = null; mk.x = key.x; mk.y = key.y; renderMarkList(); redrawAll(); return; }
         if (!mk.snapTo) {
           const hit = snapPointAt(ev.x, ev.y);
           if (hit && !hit.cross) mk.snapTo = hit.name;
@@ -2180,6 +2197,15 @@ function mathSnapTargets(out) {
       out.push({ name: 'f', f });
       out.push({ name: 'после', f: mathTransformed(f, STATE.mathTrans, paramValue('a', 1)) });
     }
+    return;
+  }
+  /* Н66. «Оптимум при ограничении» поля #inp-mathf не использует: там своя цель
+     и своё ограничение. Раньше сюжет проваливался в общую ветку и катал точку
+     по СПРЯТАННОЙ формуле из чужого поля, то есть по кривой, которой на экране
+     нет. Катаем по самому ограничению: его точки сцена уже посчитала. */
+  if (sub === 'constraint') {
+    const pts = (STATE.mathRes && STATE.mathRes.conPts) || [];
+    if (pts.length >= 2) out.push({ name: 'ограничение', f: (x) => interpY(pts, x) });
     return;
   }
   if (f) out.push({ name: 'f', f });
@@ -2584,15 +2610,9 @@ function buildMarkRow(mk) {
     toggle('Пунктир к осям', 'showDash', true),
     toggle('Координаты', 'showCoords', true));
 
-  // Точка, посаженная на кривую или ось, скользит по ней. Галочка отпускает её,
-  // если нужно поставить отметку рядом, а не на самой линии.
-  if (mk.snapTo) {
-    const w = document.createElement('label');
-    w.className = 'chk';
-    const c = document.createElement('input'); c.type = 'checkbox'; c.checked = true;
-    c.addEventListener('change', () => { if (!c.checked) mk.snapTo = null; renderMarkList(); redrawAll(); });
-    w.append(c, document.createTextNode('Держать на линии ' + mk.snapTo));
-    row.appendChild(w);
-  }
+  /* Н45. Точка, посаженная на кривую, скользит по ней, и это видно по самому
+     поведению — отдельная строка «Удерживать точку на КПВ» ничего не добавляла
+     и только занимала место в списке. Отпустить точку по-прежнему можно:
+     достаточно оттащить её от линии дальше порога отрыва. */
   return row;
 }

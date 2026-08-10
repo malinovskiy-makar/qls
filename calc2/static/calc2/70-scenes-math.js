@@ -722,7 +722,10 @@ function drawMathConstraint() {
   const searchPts = (sx0 === x0 && sx1 === x1 && sy0 === y0 && sy1 === y1)
     ? pts : constraintPointsIn(G, sx0, sx1, sy0, sy1);
   const opt = optimizeAlongCurve(f, searchPts, STATE.mathConsWantMax !== false);
-  STATE.mathRes = { opt, wantMax: STATE.mathConsWantMax !== false };
+  /* Точки ограничения кладём в состояние: по ним катается точка и по ним же
+     ищутся ключевые точки сюжета (Н66). Пересчитывать их второй раз в
+     mathSnapTargets значило бы делать ту же тяжёлую работу дважды за кадр. */
+  STATE.mathRes = { opt, wantMax: STATE.mathConsWantMax !== false, conPts: pts };
   if (opt) {
     // Веер линий уровня + линия, проходящая через оптимум (она и касается ограничения).
     [0.55, 0.78, 1.25].forEach(k => drawLevelCurveOn(g, mx, my, f, opt.value * k, COL.D, 1.5, 0.32));
