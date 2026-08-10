@@ -19,7 +19,7 @@
   <a class="k-tile {% if mode == 'describe' %}k-tile--on{% endif %}"
      href="{% url 'teacher:assignment_generate' %}{% if exam %}?kind=exam{% endif %}">
     <span class="k-tile__name">Описать словами</span>
-    <span class="k-tile__note">сайт подберёт из каталога</span>
+    <span class="k-tile__note">Умный поиск по каталогу</span>
   </a>
   {% comment %}
   ⚠️ У контрольной конструктор живёт ВНУТРИ группы, и без её номера адрес
@@ -31,11 +31,11 @@
   <a class="k-tile {% if mode == 'search' %}k-tile--on{% endif %}"
      href="{% if exam and group %}{% url 'teacher:exam_create' group.pk %}{% else %}{% url 'teacher:assignment_create' %}{% endif %}">
     <span class="k-tile__name">Искать самому</span>
-    <span class="k-tile__note">фильтры по каталогу</span>
+    <span class="k-tile__note">Ручной поиск по каталогу</span>
   </a>
   <a class="k-tile {% if mode == 'own' %}k-tile--on{% endif %}"
      href="{% url 'teacher:problem_new' %}?to_cart=1">
     <span class="k-tile__name">Написать свою</span>
-    <span class="k-tile__note">условие и ответ вручную</span>
+    <span class="k-tile__note">Создание задачи с нуля</span>
   </a>
 </div>

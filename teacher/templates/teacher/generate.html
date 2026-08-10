@@ -27,8 +27,12 @@ textarea.gen-text { width: 100%; box-sizing: border-box; min-height: 110px;
   padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--border);
   background: var(--surface); color: var(--text); outline: none; }
 textarea.gen-text:focus { border-color: var(--focus); }
-.gen-params { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+.gen-params { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px;
+              align-items: flex-end; }
 .gen-params .form-group { margin-bottom: 0; min-width: 120px; }
+/* Флажок без заголовка сверху — выравниваем по низу соседних полей, иначе
+   он всплывает к их подписям и читается как подпись к «Сложности». */
+.gen-params .form-group--check { min-width: 0; padding-bottom: 7px; }
 /* Подписи полей строки плана: два голых числа читались загадкой. */
 .plan-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .plan-cap { font-size: 11px; color: var(--text3); white-space: nowrap; }
@@ -177,12 +181,16 @@ textarea.gen-text:focus { border-color: var(--focus); }
                  aria-label="сложность до">
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Решения</label>
+      {% comment %}
+      ⚠️ ФЛАЖОК ОТБИРАЕТ ПО ОТВЕТУ, А НЕ ПО РЕШЕНИЮ (сессия 7, фаза 1).
+      Заголовка над ним нет намеренно: у флажка подпись справа от квадратика
+      и есть, а «Решения» сверху обещали раздел настроек, которого не было.
+      {% endcomment %}
+      <div class="form-group form-group--check">
         <label class="k-check">
-          <input type="checkbox" name="has_solution"
-                 {% if form.has_solution %}checked{% endif %}>
-          брать только с разбором
+          <input type="checkbox" name="has_answer"
+                 {% if form.has_answer %}checked{% endif %}>
+          Искать только задачи с ответом
         </label>
       </div>
     </div>
@@ -237,7 +245,7 @@ textarea.gen-text:focus { border-color: var(--focus); }
   <input type="hidden" name="count_test" value="{{ form.count_test }}">
   <input type="hidden" name="min_difficulty" value="{{ form.min_difficulty }}">
   <input type="hidden" name="max_difficulty" value="{{ form.max_difficulty }}">
-  {% if form.has_solution %}<input type="hidden" name="has_solution" value="on">{% endif %}
+  {% if form.has_answer %}<input type="hidden" name="has_answer" value="on">{% endif %}
 
   <div class="gen-card">
     <h2>Вот что нашлось по вашему запросу</h2>
@@ -353,7 +361,7 @@ textarea.gen-text:focus { border-color: var(--focus); }
     {% for pk in exclude_ids %}
     <input type="hidden" name="exclude_ids" value="{{ pk }}">
     {% endfor %}
-    {% if form.has_solution %}<input type="hidden" name="has_solution" value="on">{% endif %}
+    {% if form.has_answer %}<input type="hidden" name="has_answer" value="on">{% endif %}
   </form>
 
   {% for item in results %}

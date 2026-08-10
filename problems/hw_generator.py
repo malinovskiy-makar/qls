@@ -281,7 +281,7 @@ def _fit_total(rows, wanted):
 # Шаг 3. Подбор задач — бесплатно, обращений к модели не стоит
 # ---------------------------------------------------------------------------
 
-def find_problems(rows, has_solution=False, sources=None, exclude=()):
+def find_problems(rows, has_answer=False, sources=None, exclude=()):
     """Каждая строка плана → свой поиск. Возвращает (найденное, недобор).
 
     ⚠️ КВОТА ЗАПОЛНЯЕТСЯ ВСЕГДА. «Не хватило задач» — не результат:
@@ -305,7 +305,7 @@ def find_problems(rows, has_solution=False, sources=None, exclude=()):
     short_rows = []
 
     for index, row in enumerate(rows):
-        candidates = search_row(row, has_solution=has_solution,
+        candidates = search_row(row, has_answer=has_answer,
                                 sources=sources)
         picked = _take(candidates, row['count'], taken, per_source,
                        found, index, cap=SOURCE_CAP)
@@ -339,10 +339,10 @@ def find_problems(rows, has_solution=False, sources=None, exclude=()):
                 break
             if source == 'search':
                 pool = _materialise(hybrid.search(whole, limit=need * 12 + 24),
-                                    has_solution, sources)
+                                    has_answer, sources)
             else:
                 pool = _materialise(_any_problems(rows, need * 8, kind),
-                                    has_solution, sources)
+                                    has_answer, sources)
             if kind == 'open':
                 pool = [i for i in pool if not is_test_problem(i['problem'])]
             elif kind == 'test':
@@ -474,7 +474,7 @@ def split_by_kind(rows, want_open, want_test):
     return plan
 
 
-def search_row(row, has_solution=False, sources=None):
+def search_row(row, has_answer=False, sources=None):
     """Кандидаты под ОДНУ строку плана. Обращений к модели не стоит.
 
     ⚠️ ТЕМА — БОНУС К РАНГУ, А НЕ ФИЛЬТР. Именно жёсткий фильтр по теме и
@@ -489,7 +489,7 @@ def search_row(row, has_solution=False, sources=None):
     if kind in ('open', 'test'):
         limit = row['count'] * 20 + 30
     hits = hybrid.search(row['query'], limit=limit)
-    items = _materialise(hits, has_solution, sources)
+    items = _materialise(hits, has_answer, sources)
     # ⚠️ Тип — ЖЁСТКИЙ отбор, в отличие от темы. «Три теста» это просьба
     # именно про тесты: подсунуть вместо теста открытую задачу нельзя, это
     # другая работа для ученика.
@@ -500,8 +500,16 @@ def search_row(row, has_solution=False, sources=None):
     return _rank(items, row)
 
 
-def _materialise(hits, has_solution, sources):
-    """id из поиска → сами задачи, в том же порядке."""
+def _materialise(hits, has_answer, sources):
+    """id из поиска → сами задачи, в том же порядке.
+
+    ⚠️ ФИЛЬТР ИДЁТ ПО ОТВЕТУ, А НЕ ПО РЕШЕНИЮ (сессия 7, фаза 1). Раньше
+    флажок отбирал задачи с непустым `solution`, а назывался «брать только с
+    разбором». Репетитору на самом деле нужно другое: задача, которую можно
+    ПРОВЕРИТЬ, то есть у которой есть эталонный `answer` — по нему работает
+    автопроверка. Поле есть у 4 412 из 18 865 видимых задач, отбирать по нему
+    можно.
+    """
     from catalog import hybrid
     from problems.models import Problem
 
@@ -510,8 +518,8 @@ def _materialise(hits, has_solution, sources):
         return []
     queryset = Problem.objects.filter(pk__in=ids).prefetch_related(
         'topics', 'source_references')
-    if has_solution:
-        queryset = queryset.exclude(solution='').filter(solution__isnull=False)
+    if has_answer:
+        queryset = queryset.exclude(answer='').filter(answer__isnull=False)
     by_id = {p.pk: p for p in queryset}
 
     allowed = {int(s) for s in (sources or []) if str(s).isdigit()}
@@ -598,7 +606,7 @@ def problem_card(problem, confidence='', how=''):
     }
 
 
-def preview_rows(rows, has_solution=False, sources=None, per_row=3):
+def preview_rows(rows, has_answer=False, sources=None, per_row=3):
     """Что нашлось по каждой строке — для экрана подтверждения.
 
     ⚠️ СТОП-ГЕЙТ ПОКАЗЫВАЕТ ЗАДАЧИ, А НЕ ТЕМЫ. Раньше на нём стояли темы,
@@ -613,7 +621,7 @@ def preview_rows(rows, has_solution=False, sources=None, per_row=3):
 
     previews = []
     for index, row in enumerate(rows):
-        items = search_row(row, has_solution=has_solution, sources=sources)
+        items = search_row(row, has_answer=has_answer, sources=sources)
         cards = [problem_card(item['problem'], item['confidence'],
                               item.get('how', ''))
                  for item in items[:per_row]]

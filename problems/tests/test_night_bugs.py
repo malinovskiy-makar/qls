@@ -636,20 +636,28 @@ class SubmissionsByStudentTests(TestCase):
         self.assertEqual([c['student'].username for c in cards],
                          ['sbs_a', 'sbs_b', 'sbs_c'])
 
-    def test_view_choice_is_remembered(self):
-        self.client.get(self._url('?view=problems'))
-        # Без параметра должен открыться запомненный вид «по задачам».
-        response = self.client.get(self._url(''))
-        self.assertContains(response, 'по задачам')
-        self.assertContains(response, 'is-on')
-        self.assertNotIn('cards', response.context)
+    def test_view_choice_is_not_remembered(self):
+        """Выбор вида БОЛЬШЕ НЕ ЗАПОМИНАЕТСЯ (сессия 7, фаза 1).
 
-    def test_both_views_offer_the_switch_back(self):
+        Раньше запоминался. С удалением переключателя это стало ловушкой:
+        один заход по прямой ссылке `?view=problems` — и репетитор навсегда
+        оставался на таблице, с которой некуда вернуться.
+        """
+        self.client.get(self._url('?view=problems'))
+        response = self.client.get(self._url(''))
+        self.assertIn('cards', response.context)
+
+    def test_switch_is_gone_but_the_table_still_opens(self):
+        """Переключателя в интерфейсе нет, а вид «по задачам» жив.
+
+        Владелец просил убрать выбор, а не функцию: таблица «ученик × задача»
+        остаётся рабочей поверхностью и открывается прямой ссылкой.
+        """
         by_student = self.client.get(self._url('?view=students')).content.decode()
-        by_problem = self.client.get(self._url('?view=problems')).content.decode()
-        for body in (by_student, by_problem):
-            self.assertIn('?view=students', body)
-            self.assertIn('?view=problems', body)
+        self.assertNotIn('?view=problems', by_student)
+        self.assertNotIn('sub-switch', by_student)
+        self.assertEqual(
+            self.client.get(self._url('?view=problems')).status_code, 200)
 
 
 class ReviewFlowTests(TestCase):

@@ -14,15 +14,6 @@
 {% block title %}{{ assignment.name }} — решения{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
-.sub-switch { display: flex; gap: 2px; background: var(--surface-2);
-              border: 0.5px solid var(--border); border-radius: var(--r);
-              padding: 2px; }
-.sub-switch a { font-size: 12px; padding: 5px 12px; border-radius: 4px;
-                color: var(--text2); text-decoration: none; white-space: nowrap; }
-.sub-switch a:hover { color: var(--text); }
-.sub-switch a.is-on { background: var(--surface); color: var(--text);
-                      font-weight: 600; }
-
 .stu-card { display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
             padding: 16px 18px; margin-bottom: 10px; }
 /* Не приступавшие — приглушённо: это не работа, это её отсутствие. */
@@ -58,14 +49,16 @@
   решения
 </div>
 
+{% comment %}
+Переключатель видов убран из интерфейса по ревью владельца (сессия 7, фаза 1):
+вид «по ученикам» стал единственным. Код второго вида и адрес `?view=problems`
+НЕ удалены — таблица «ученик × задача» остаётся рабочей поверхностью и
+открывается по прямой ссылке; удалять её значило бы потерять функцию, а
+владелец просил только убрать выбор.
+{% endcomment %}
 <div class="page-header">
   <div>
     <h1 class="page-title">{{ assignment.name }}</h1>
-    <div class="page-sub">Кто что сдал и что осталось проверить.</div>
-  </div>
-  <div class="sub-switch">
-    <a href="?view=students" class="is-on">по ученикам</a>
-    <a href="?view=problems">по задачам</a>
   </div>
 </div>
 
@@ -83,7 +76,7 @@
   <div class="stu-main">
     <div class="stu-name">{{ card.student.get_full_name|default:card.student.username }}</div>
     <div class="stu-meta">
-      сдал {{ card.submitted }} из {{ card.total }}{% if card.submitted_human %} · {{ card.submitted_human }}{% endif %}
+      сдано {{ card.submitted }} из {{ card.total }}{% if card.submitted_human %} · {{ card.submitted_human }}{% endif %}
     </div>
     <div class="stu-state">{{ card.state_label }}</div>
   </div>
@@ -91,7 +84,7 @@
   {% if card.has_machine %}
   <div class="stu-score">
     <div class="stu-score-value">{{ card.machine_got }} / {{ card.machine_could }}</div>
-    <span class="stu-score-cap">машина уже насчитала</span>
+    <span class="stu-score-cap">Результат автопроверки</span>
   </div>
   {% endif %}
 

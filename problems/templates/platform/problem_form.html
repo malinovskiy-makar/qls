@@ -197,17 +197,12 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
         <label for="id_solution">Эталонное решение</label>
         <textarea id="id_solution" name="solution"
                   data-mathfield>{{ form.solution }}</textarea>
-        <button type="button" class="btn-outline btn-small" id="steps-btn"
-                style="margin-top:8px;">Разбить на шаги</button>
-        <div id="steps-block" hidden style="margin-top:10px;">
-          <div id="steps-list"></div>
-          <button type="button" class="btn-outline btn-small" id="add-step-btn">
-            + Шаг
-          </button>
-          <div class="row-meta" style="margin-top:6px;">
-            Шаги необязательны — свободный текст решения тоже принимается.
-          </div>
-        </div>
+        {% comment %}
+        Разбиение решения на шаги убрано из интерфейса по ревью владельца
+        (сессия 7, фаза 1). Модель шагов НЕ удалена: поле едет скрытым и
+        возвращается на сервер без изменений, поэтому у задач, где шаги уже
+        заведены, они сохраняются. Вернуть кнопку — снова показать этот блок.
+        {% endcomment %}
         <input type="hidden" name="solution_steps" id="id_solution_steps"
                value="{{ form.solution_steps }}">
       </div>
@@ -404,52 +399,10 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
   });
 
   // ---- Шаги решения --------------------------------------------------
-  var stepsBlock = document.getElementById('steps-block');
-  var stepsList = document.getElementById('steps-list');
-  var stepsInput = document.getElementById('id_solution_steps');
-
-  function addStep(text, result) {
-    var row = document.createElement('div');
-    row.className = 'step-row';
-    row.innerHTML =
-      '<input type="text" class="step-text" placeholder="Что делаем">' +
-      '<input type="text" class="step-result" placeholder="Что получилось">' +
-      '<button type="button" class="opt-move" data-step-remove>×</button>';
-    row.querySelector('.step-text').value = text || '';
-    row.querySelector('.step-result').value = result || '';
-    stepsList.appendChild(row);
-  }
-
-  document.getElementById('steps-btn').addEventListener('click', function () {
-    stepsBlock.hidden = !stepsBlock.hidden;
-    if (!stepsBlock.hidden && stepsList.children.length === 0) { addStep(); }
-  });
-  document.getElementById('add-step-btn')
-    .addEventListener('click', function () { addStep(); });
-  stepsList.addEventListener('click', function (event) {
-    if (event.target.hasAttribute('data-step-remove')) {
-      event.target.closest('.step-row').remove();
-    }
-  });
-
-  document.getElementById('problem-form').addEventListener('submit', function () {
-    var steps = [];
-    Array.prototype.forEach.call(stepsList.children, function (row) {
-      var text = row.querySelector('.step-text').value.trim();
-      var result = row.querySelector('.step-result').value.trim();
-      if (text || result) { steps.push({ text: text, result: result }); }
-    });
-    stepsInput.value = steps.length ? JSON.stringify(steps) : '';
-  });
-
-  // Восстановление сохранённых шагов.
-  try {
-    var saved = JSON.parse(stepsInput.value || 'null');
-    if (Array.isArray(saved) && saved.length) {
-      saved.forEach(function (s) { addStep(s.text, s.result); });
-      stepsBlock.hidden = false;
-    }
-  } catch (e) { /* шагов не было */ }
+  // Управление шагами убрано вместе с кнопками (сессия 7, фаза 1). Скрытое
+  // поле `solution_steps` едет как есть: раньше обработчик отправки
+  // ПЕРЕЗАПИСЫВАЛ его содержимым списка на странице — теперь списка нет, и
+  // такой обработчик стирал бы уже сохранённые шаги при каждом сохранении.
 
   syncKind();
 })();

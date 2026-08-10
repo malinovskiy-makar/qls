@@ -103,7 +103,7 @@ def assignment_generate(request):
         'problem_count': _catalog_size(),
         'form': {'count': 4, 'count_open': 4, 'count_test': 0,
                  'min_difficulty': 1, 'max_difficulty': 5,
-                 'text': '', 'has_solution': False, 'topics': []},
+                 'text': '', 'has_answer': False, 'topics': []},
         # Примеры запросов — кнопками под полем. Репетитор, впервые
         # открывший подбор, не знает, насколько подробно можно писать.
         'examples': EXAMPLE_QUERIES,
@@ -126,7 +126,7 @@ def assignment_generate(request):
                        note=plan['note'], usage=plan.get('usage'),
                        cached=plan.get('cached'))
         context['previews'] = hw_generator.preview_rows(
-            plan['rows'], has_solution=form['has_solution'])
+            plan['rows'], has_answer=form['has_answer'])
         return render(request, 'teacher/generate.html', context)
 
     if action == 'research':
@@ -138,7 +138,7 @@ def assignment_generate(request):
             return render(request, 'teacher/generate.html', context)
         context.update(step='plan', plan_rows=rows)
         context['previews'] = hw_generator.preview_rows(
-            rows, has_solution=form['has_solution'])
+            rows, has_answer=form['has_answer'])
         messages.success(request, 'Переискал по вашим формулировкам — '
                                   'обращения к модели не потребовалось.')
         return render(request, 'teacher/generate.html', context)
@@ -156,7 +156,7 @@ def assignment_generate(request):
         plan = hw_generator.split_by_kind(rows, form['count_open'],
                                           form['count_test'])
         found, short = hw_generator.find_problems(
-            plan or rows, has_solution=form['has_solution'], exclude=exclude)
+            plan or rows, has_answer=form['has_answer'], exclude=exclude)
         cards = [hw_generator.problem_card(item['problem'],
                                            item['confidence'],
                                            item.get('how', ''))
@@ -212,7 +212,7 @@ def _read_form(request):
         'count': min(hw_generator.MAX_PROBLEMS, count_open + count_test),
         'min_difficulty': number('min_difficulty', 1, 1, 5),
         'max_difficulty': number('max_difficulty', 5, 1, 5),
-        'has_solution': request.POST.get('has_solution') == 'on',
+        'has_answer': request.POST.get('has_answer') == 'on',
         'topics': request.POST.getlist('topics'),
     }
 

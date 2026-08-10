@@ -196,9 +196,9 @@ def group_detail(request, pk):
 # списка: группировка по состоянию превращает его в очередь работы.
 
 ASSIGNMENT_STATES = (
-    ('needs_you', 'Требуют вас'),
+    ('needs_you', 'Требуют проверки'),
     ('running', 'Идут сейчас'),
-    ('done', 'Завершены'),
+    ('done', 'Проверены'),
 )
 
 
@@ -694,13 +694,12 @@ def group_submissions(request, group_id, assignment_id):
     group = own_group_or_404(request.user, group_id)
     assignment = group_assignment_or_404(group, assignment_id)
 
-    # Выбор вида запоминается между заходами: репетитор выбирает способ
-    # работы один раз, а не на каждом экране заново.
+    # ⚠️ ВИД ПО УЧЕНИКАМ — ЕДИНСТВЕННЫЙ В ИНТЕРФЕЙСЕ (сессия 7, фаза 1).
+    # Переключатель убран по ревью владельца, поэтому выбор БОЛЬШЕ НЕ
+    # ЗАПОМИНАЕТСЯ: запомненный «по задачам» открывал бы таблицу, с которой
+    # некуда вернуться — кнопки-то нет. Таблица остаётся рабочей и
+    # открывается прямой ссылкой `?view=problems`.
     view = request.GET.get('view')
-    if view in ('students', 'problems'):
-        request.session[SUBMISSIONS_VIEW_KEY] = view
-    else:
-        view = request.session.get(SUBMISSIONS_VIEW_KEY) or 'students'
 
     if view == 'problems':
         return assignment_detail(request, assignment.pk, group=group)

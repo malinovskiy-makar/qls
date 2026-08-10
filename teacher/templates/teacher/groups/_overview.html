@@ -41,8 +41,6 @@
 <div class="panel panel--lead">
   <div class="panel-head">
     <div class="panel-title">Ученики × темы</div>
-    <div class="panel-hint">За всё время. Красный столбец целиком — тему
-      провалила вся группа; одна красная клетка — провалил один</div>
   </div>
   {% if matrix.columns %}
   <div class="stats-table-wrap">
@@ -106,7 +104,6 @@
           <th data-type="num">Решено</th>
           <th data-type="num">Доля верных</th>
           <th data-type="num">Сдано работ</th>
-          <th data-type="num">Средний балл</th>
           <th data-type="date">Последняя активность</th>
           <th class="no-sort"></th>
         </tr>
@@ -122,9 +119,6 @@
           <td data-sort="{{ row.submitted }}">
             {{ row.submitted }}{% if row.pending %} <span class="muted">({{ row.pending }} ждёт)</span>{% endif %}
           </td>
-          <td data-sort="{{ row.avg_score|default:-1 }}">
-            {% if row.avg_score is not None %}{{ row.avg_score }}{% else %}—{% endif %}
-          </td>
           <td data-sort="{{ row.last_active|date:'U'|default:0 }}">
             {% if row.last_active %}{{ row.last_active|date:"d.m.Y" }}{% else %}не заходил{% endif %}
           </td>
@@ -132,21 +126,16 @@
                  class="k-btn k-btn--plain k-btn--sm">открыть</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="muted">В группе пока нет учеников.</td></tr>
+        <tr><td colspan="6" class="muted">В группе пока нет учеников.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-{# ── Рейтинг: включает РЕПЕТИТОР, по умолчанию выключен ────────────── #}
-<div class="panel">
-  <div class="panel-head"><div class="panel-title">Рейтинг внутри группы</div></div>
-  <p class="muted" style="line-height:1.6;">
-    Сейчас рейтинг {% if group.leaderboard_enabled %}<b>включён</b>: ученики видят
-    топ-3 и своё место{% else %}<b>выключен</b>: ученики не видят ничьих
-    результатов, кроме своих{% endif %}. Переключается в админке, у поля
-    «Показывать рейтинг в группе». Полный список с аутсайдерами не
-    показывается никогда, публичного рейтинга между группами нет.
-  </p>
-</div>
+{% comment %}
+Блок «Рейтинг внутри группы» удалён по ревью владельца (сессия 7, фаза 1).
+Он ничего не переключал — только пересказывал состояние поля
+`group.leaderboard_enabled`, которое правится в админке. Само поле и правило
+«полного списка с аутсайдерами не бывает» не тронуты.
+{% endcomment %}
