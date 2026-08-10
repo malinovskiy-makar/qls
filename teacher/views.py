@@ -253,6 +253,23 @@ def _score_presets(max_score):
     return values
 
 
+def _answer_state(feedback, max_score, auto_zero):
+    """verdict строки: correct / partial / wrong / blank / pending.
+
+    Совпадает по смыслу и по названиям с `work_review.work_summary`, чтобы
+    экран проверки и экран разбора красили одну задачу одинаково.
+    """
+    if feedback is None or feedback.score is None:
+        return 'blank' if auto_zero else 'pending'
+    score = float(feedback.score)
+    top = float(max_score or 0)
+    if top and score >= top:
+        return 'correct'
+    if score > 0:
+        return 'partial'
+    return 'blank' if auto_zero else 'wrong'
+
+
 def _max_score_for(submission):
     """Максимальный балл за эту задачу в этой работе.
 
@@ -437,6 +454,14 @@ def review_submission(request, pk, group=None):
         # Пусто и в ответе, и в решении → ноль поставила машина, и это
         # надо сказать прямо, а не показывать «неверно».
         'auto_zero': _is_auto_zero(submission, part_rows),
+        # ⚠️ СОСТОЯНИЕ СТРОКИ — ТЕ ЖЕ ПЯТЬ, ЧТО В РАЗБОРЕ РАБОТЫ (фаза 14.3).
+        # Цвета и названия берутся из набора деталей (.k-mark--*, .k-flag--*):
+        # два набора состояний для одного и того же разошлись бы на первой
+        # же правке, и репетитор с учеником спорили бы, глядя на разные
+        # экраны об одной задаче.
+        'answer_state': _answer_state(
+            existing_feedback, max_score,
+            _is_auto_zero(submission, part_rows)),
         'wrote_solution_without_answer': _solution_without_answer(submission),
         'work_feedback': WorkFeedback.objects.filter(
             assignment=submission.assignment,

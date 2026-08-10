@@ -968,3 +968,97 @@ class StudentCardTests(TestCase):
         block = body[start:body.index('</div>', start)]
         self.assertNotIn('не указано', block.lower())
         self.assertNotIn('—', block)
+
+
+# ===========================================================================
+# Фаза 14 — экран проверки работы
+# ===========================================================================
+
+class ReviewSkeletonTests(TestCase):
+    """Скелет задачи ОДИН И ТОТ ЖЕ, что бы ученик ни написал."""
+
+    def setUp(self):
+        from problems.models import (Assignment, AssignmentItem, StudentGroup,
+                                     Submission)
+        from problems.tests.factories import make_user
+        from problems.tests.factories import make_problem as factory_problem
+
+        self.tutor = make_user('rs_tutor', role='teacher')
+        self.student = make_user('rs_student', role='student')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        self.group.students.add(self.student)
+        self.work = Assignment.objects.create(name='ДЗ', author=self.tutor,
+                                              group=self.group)
+        self.work.students.add(self.student)
+        self.item = AssignmentItem.objects.create(
+            assignment=self.work, order=0,
+            catalog_problem=factory_problem('Условие'), points=Decimal('6'))
+        self.sub = Submission.objects.create(
+            student=self.student, assignment=self.work,
+            problem_item=self.item, status='submitted')
+        self.client.force_login(self.tutor)
+
+    def _body(self):
+        from django.urls import reverse
+        return self.client.get(
+            reverse('teacher:group_review_submission',
+                    args=[self.group.pk, self.sub.pk])).content.decode()
+
+    def test_skeleton_is_the_same_with_and_without_a_solution(self):
+        """⚠️ Раньше блок решения появлялся по условию, и экран ПЛАВАЛ."""
+        empty = self._body()
+        self.assertIn('Решение ученика', empty)
+        self.assertIn('решение не написано', empty)
+
+        self.sub.solution_text = 'Считаем по формуле'
+        self.sub.save(update_fields=['solution_text'])
+        filled = self._body()
+        self.assertIn('Решение ученика', filled)
+        self.assertNotIn('решение не написано', filled)
+
+    def test_the_caption_no_longer_changes_shape(self):
+        """«но решение написал:» меняла ЗАГОЛОВОК блока — то есть скелет."""
+        self.sub.solution_text = 'Рассуждение без ответа'
+        self.sub.save(update_fields=['solution_text'])
+        self.assertNotIn('но решение написал', self._body())
+
+    def test_answer_block_is_always_there(self):
+        self.assertIn('ответил ученик', self._body())
+        self.assertIn('ответа нет', self._body())
+
+    def test_grading_block_is_separated(self):
+        body = self._body()
+        self.assertIn('rv-grade', body)
+        self.assertIn('Оценивание', body)
+
+    def test_state_uses_the_shared_kit_classes(self):
+        """Цвета — те же, что в разборе работы; своих на экране нет."""
+        body = self._body()
+        self.assertIn('k-mark k-mark--pending', body)
+        self.assertIn('k-flag k-flag--pending', body)
+
+    def test_states_match_the_review_screen(self):
+        from decimal import Decimal as D
+
+        from problems.models import TeacherFeedback
+        from teacher.views import _answer_state
+
+        feedback = TeacherFeedback.objects.create(submission=self.sub,
+                                                  score=D('6'))
+        self.assertEqual(_answer_state(feedback, 6, False), 'correct')
+        feedback.score = D('3')
+        self.assertEqual(_answer_state(feedback, 6, False), 'partial')
+        feedback.score = D('0')
+        self.assertEqual(_answer_state(feedback, 6, False), 'wrong')
+        # ⚠️ Ноль за ПУСТОТУ — не «неверно»: балл тот же, но ошибиться
+        # ученик не успел.
+        self.assertEqual(_answer_state(feedback, 6, True), 'blank')
+        self.assertEqual(_answer_state(None, 6, False), 'pending')
+
+    def test_image_solution_is_shown_whole(self):
+        """Решение картинкой показываем целиком, а не ссылкой (14.2)."""
+        import io
+        template = io.open('teacher/templates/teacher/review.html',
+                           encoding='utf-8').read()
+        self.assertIn('rv-solution-img', template)
+        self.assertIn('max-width: 100%', template)

@@ -69,6 +69,22 @@
 .rv-own input { width: 74px; }
 .rv-max { font-size: 12px; color: var(--text3); }
 
+/* Картинка-решение показывается ЦЕЛИКОМ (фаза 14.2): решение под ссылкой
+   пришлось бы открывать в новой вкладке на каждой задаче. */
+.rv-solution-img { display: block; max-width: 100%; height: auto;
+                   margin-top: 8px; border-radius: var(--r);
+                   border: 1px solid var(--border); }
+
+/* ── Оценивание: явно отдельный блок (фаза 14.3) ──────────────────────
+   Тонкая черта сверху и свой заголовок отделяют «что я ставлю» от «что
+   написал ученик». Без этого граница между ними на экране отсутствовала. */
+.rv-grade { border-top: 3px solid var(--border); }
+.rv-grade-head { display: flex; align-items: center; gap: 12px;
+                 flex-wrap: wrap; margin-bottom: 16px;
+                 padding-bottom: 14px;
+                 border-bottom: 1px solid var(--border-soft); }
+.rv-grade-title { font-size: 15px; font-weight: 700; flex: 1; min-width: 0; }
+
 .rv-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
               margin-top: 18px; }
 
@@ -127,7 +143,11 @@
 <form method="post">
   {% csrf_token %}
 
-  <div class="k-card">
+  {% comment %}
+  Полоса слева по состоянию ответа — те же пять состояний и те же цвета, что
+  в разборе работы глазами ученика (классы набора `.k-mark--*`).
+  {% endcomment %}
+  <div class="k-card k-mark k-mark--{{ answer_state }}">
     {% if part_rows %}
       {% for row in part_rows %}
       <div class="rv-part">
@@ -165,21 +185,46 @@
       </div>
     {% endif %}
 
-    {% if submission.solution_text %}
+    {% comment %}
+    ⚠️ БЛОК РЕШЕНИЯ ЕСТЬ ВСЕГДА (сессия 7, фаза 14.1). Раньше он появлялся
+    по условию, и структура экрана ПЛАВАЛА: на одной задаче четыре блока,
+    на другой три, и глаз каждый раз искал заново. Пусто — так и написано.
+
+    Надпись «но решение написал:» тоже убрана: она меняла ЗАГОЛОВОК блока в
+    зависимости от того, что написал ученик, — то есть меняла скелет.
+    То же самое теперь говорит пометка состояния в шапке блока оценивания.
+    {% endcomment %}
     <div class="rv-solution">
-      <div class="rv-solution-cap">{% if wrote_solution_without_answer %}но решение написал:{% else %}Решение ученика{% endif %}</div>
+      <div class="rv-solution-cap">Решение ученика</div>
+      {% if submission.solution_text %}
       {% comment %}
       ⚠️ Текст ВПЛОТНУЮ к тегу: у блока `white-space: pre-wrap`, и отступы
       самого шаблона рисуются на экране пустотой в пол-экрана.
       {% endcomment %}
       <div class="rv-solution-text">{{ submission.solution_text }}</div>
+      {% else %}
+      <div class="rv-value is-empty">решение не написано</div>
+      {% endif %}
     </div>
-    {% endif %}
 
+    {% comment %}
+    Прикреплённый файл. ⚠️ Картинку показываем ЦЕЛИКОМ (фаза 14.2): решение,
+    спрятанное под ссылку, приходится открывать в новой вкладке на каждой
+    задаче, а проверять надо здесь.
+    {% endcomment %}
     {% if submission.solution_file %}
     <div class="rv-solution">
-      <div class="rv-solution-cap">прикреплённый файл</div>
+      <div class="rv-solution-cap">Прикреплённый файл</div>
+      {% with name=submission.solution_file.name|lower %}
+      {% if name|slice:"-4:" == ".png" or name|slice:"-4:" == ".jpg" or name|slice:"-5:" == ".jpeg" or name|slice:"-5:" == ".webp" or name|slice:"-4:" == ".gif" %}
+      <a href="{{ submission.solution_file.url }}">
+        <img class="rv-solution-img" src="{{ submission.solution_file.url }}"
+             alt="решение ученика, прикреплённое картинкой">
+      </a>
+      {% else %}
       <a href="{{ submission.solution_file.url }}">{{ submission.solution_file.name }}</a>
+      {% endif %}
+      {% endwith %}
     </div>
     {% endif %}
 
@@ -199,7 +244,29 @@
     {% endif %}
   </div>
 
-  <div class="k-card" style="margin-top:14px">
+  {% comment %}
+  ⚠️ ОЦЕНИВАНИЕ ЯВНО ОТДЕЛЕНО ОТ УСЛОВИЯ, ОТВЕТОВ И РЕШЕНИЯ (фаза 14.3).
+  Владелец просил «более явно отделить оценивание от них самих»: раньше это
+  была такая же карточка, как соседние, и граница между «что написал ученик»
+  и «что я ставлю» на экране отсутствовала.
+  {% endcomment %}
+  <div class="k-card rv-grade" style="margin-top:20px">
+    <div class="rv-grade-head">
+      <div class="rv-grade-title">Оценивание</div>
+      <span class="k-flag k-flag--{{ answer_state }}">
+        {% if answer_state == 'correct' %}верно
+        {% elif answer_state == 'partial' %}частично
+        {% elif answer_state == 'wrong' %}неверно
+        {% elif answer_state == 'blank' %}не отвечал
+        {% else %}ждёт проверки{% endif %}
+      </span>
+      <span class="k-score">
+        <span class="k-score__value">{% if existing_feedback and existing_feedback.score is not None %}{{ existing_feedback.score|floatformat:"-2" }}{% else %}—{% endif %}<span
+          class="k-score__of">из</span><span
+          class="k-score__max">{{ max_score|floatformat:"-2" }}</span></span>
+        <span class="k-score__cap">балл за задачу</span>
+      </span>
+    </div>
     <label class="k-label">Балл за задачу</label>
     <div class="rv-score">
       {% for preset in score_presets %}
