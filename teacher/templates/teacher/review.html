@@ -40,6 +40,11 @@
    `<br>` стоял на каждом «\n», `pre-line` их и показывает. */
 .rv-statement { font-size: 14px; line-height: 1.75; overflow-wrap: anywhere;
                 white-space: pre-line; }
+/* ⚠️ ШИРОКАЯ ФОРМУЛА ПРОКРУЧИВАЕТСЯ ВНУТРИ СЕБЯ, а не тянет страницу вбок.
+   Таблица КПВ (`\begin{array}`) шире 380px, и на телефоне она выносила весь
+   экран проверки за край окна (замер: содержимое 457px при окне 380px).
+   Та же строка уже стоит у `.problem-statement` на странице задания. */
+.rv-statement :is(table, .katex-display) { max-width: 100%; overflow-x: auto; }
 .rv-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
            margin: 14px 0; }
 .rv-box { background: var(--surface); border: 0.5px solid var(--border);

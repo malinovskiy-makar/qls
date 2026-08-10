@@ -185,6 +185,27 @@
 }
 .k-check--box:has(input:disabled) { cursor: not-allowed; color: var(--text3); }
 
+/* Переключатель-кружок. Там, где выбрать можно только ОДНО (вид работы,
+   группа контрольной), браузерная радиокнопка просвечивала системным
+   виджетом — в тёмной теме особенно заметно. */
+.k-check input[type="radio"] {
+  appearance: none; -webkit-appearance: none;
+  width: 17px; height: 17px; flex-shrink: 0; margin: 0;
+  border: 1.5px solid var(--border); border-radius: 50%;
+  background: var(--surface); cursor: pointer; position: relative;
+  transition: border-color .12s ease;
+}
+.k-check--box input[type="radio"] { width: 19px; height: 19px; }
+.k-check input[type="radio"]:hover { border-color: var(--accent); }
+.k-check input[type="radio"]:checked { border-color: var(--accent); }
+.k-check input[type="radio"]:checked::after {
+  content: ''; position: absolute; inset: 3px;
+  border-radius: 50%; background: var(--accent);
+}
+.k-check input[type="radio"]:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 2px;
+}
+
 /* ── Карточка ───────────────────────────────────────────────────────── */
 .k-card {
   background: var(--surface); border: 0.5px solid var(--border);
@@ -366,3 +387,15 @@
   .k-tiles { grid-template-columns: 1fr; }
   .k-card { padding: 15px 16px; }
 }
+
+/* ── Шапка страницы ─────────────────────────────────────────────────────
+   ⚠️ ПРАВИЛА ЖИВУТ ЗДЕСЬ, А НЕ В ПАРТИАЛЕ ОТБОРА. Классы `.page-header`,
+   `.page-title`, `.back-link` стоят на десятке экранов кабинета, а правила
+   лежали в `teacher/_picker_style.html`, который подключают не все: на
+   конструкторе подборки ссылка «← Подбор» вышла синей подчёркнутой,
+   браузерной. Тот же класс дефекта, что баг 7.6. */
+.page-header { display: flex; align-items: center; gap: 16px;
+               margin-bottom: 22px; flex-wrap: wrap; }
+.page-title { font-size: 20px; font-weight: 700; }
+.back-link { font-size: 13px; color: var(--text2); text-decoration: none; }
+.back-link:hover { color: var(--text); }

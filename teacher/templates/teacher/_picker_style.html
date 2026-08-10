@@ -5,11 +5,9 @@
 {% endcomment %}
 .page-wrap { max-width: 1280px; padding: 24px 24px 80px; }
 
-.page-header { display: flex; align-items: center; gap: 16px;
-               margin-bottom: 22px; flex-wrap: wrap; }
-.page-title { font-size: 20px; font-weight: 700; }
-.back-link  { font-size: 13px; color: var(--text2); text-decoration: none; }
-.back-link:hover { color: var(--text); }
+/* Шапка страницы (`.page-header`, `.page-title`, `.back-link`) переехала
+   в набор деталей `_kit.html`: её классы стоят и на экранах, которые этот
+   файл не подключают. */
 
 /* ── Двухколоночный макет ────────────────────────── */
 .hw-layout { display: flex; gap: 20px; align-items: flex-start; }
