@@ -58,7 +58,9 @@
   color: var(--text);
   transition: border-color .12s;
 }
-.search-input:focus { outline: none; border-color: var(--accent); }
+/* Кольцо фокуса нейтральное (сессия 7, фаза 6). */
+.search-input:focus { outline: none; border-color: var(--focus);
+                      box-shadow: 0 0 0 3px var(--focus-ring); }
 .search-btn {
   padding: 7px 12px;
   background: var(--btn-bg);
@@ -81,7 +83,7 @@
   color: var(--text);
   cursor: pointer;
 }
-.topic-select:focus { outline: none; border-color: var(--accent); }
+.topic-select:focus { outline: none; border-color: var(--focus); }
 
 /* Сложность — кнопки-звёздочки: сетка 3×2 (ровные колонки), а не рваный wrap */
 .diff-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
@@ -349,7 +351,7 @@
   padding: 5px 8px; font-size: 12px; background: var(--surface);
   color: var(--text); cursor: pointer;
 }
-.sort-select:focus { outline: none; border-color: var(--accent); }
+.sort-select:focus { outline: none; border-color: var(--focus); }
 
 /* Переключатель вида (сегментированный контрол) */
 .view-seg {

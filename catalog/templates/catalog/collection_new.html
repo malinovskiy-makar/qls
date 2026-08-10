@@ -90,7 +90,12 @@
   transition: border-color .12s;
   margin-bottom: 20px;
 }
-.name-input:focus { outline: none; border-color: var(--accent); }
+/* Кольцо фокуса нейтральное (сессия 7, фаза 6). ⚠️ Подсветка ВЫБРАННОЙ
+   карточки шаблона (.tpl-card.selected) остаётся акцентной: это не
+   фокус, а активное состояние, и правило проекта прямо разрешает
+   акцент на активном. */
+.name-input:focus { outline: none; border-color: var(--focus);
+                    box-shadow: 0 0 0 3px var(--focus-ring); }
 .submit-btn {
   display: inline-flex;
   align-items: center;

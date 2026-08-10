@@ -1,0 +1,55 @@
+- generic [ref=f15e1]:
+  - navigation [ref=f15e2]:
+    - link "Эк" [ref=f15e3] [cursor=pointer]:
+      - /url: /
+    - link "Проверка" [ref=f15e4] [cursor=pointer]:
+      - /url: /teacher/
+    - link "Группы" [ref=f15e5] [cursor=pointer]:
+      - /url: /teacher/groups/
+    - link "Каталог" [ref=f15e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f15e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f15e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f15e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f15e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f15e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f15e12]:
+      - button "Сменить тему" [ref=f15e13] [cursor=pointer]: ☾
+      - generic [ref=f15e14]: Марина Петрова
+      - link "Выйти" [ref=f15e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f15e16]:
+    - generic [ref=f15e17]:
+      - heading "ЭкЗадачи" [level=1] [ref=f15e18]
+      - paragraph [ref=f15e19]: Платформа задач по олимпиадной экономике
+      - generic [ref=f15e20]:
+        - textbox "Поиск по условиям задач…" [active] [ref=f15e21]
+        - button "Найти" [ref=f15e22] [cursor=pointer]
+      - generic [ref=f15e23]:
+        - generic [ref=f15e24]:
+          - generic [ref=f15e25]: 31 694
+          - generic [ref=f15e26]: задач в базе
+        - generic [ref=f15e27]:
+          - generic [ref=f15e28]: "23"
+          - generic [ref=f15e29]: источников
+        - generic [ref=f15e30]:
+          - generic [ref=f15e31]: "21"
+          - generic [ref=f15e32]: тем
+      - generic [ref=f15e33]:
+        - link "Каталог задач Фильтры по теме, сложности и источнику, поиск по тексту" [ref=f15e34] [cursor=pointer]:
+          - /url: /catalog/
+          - generic [ref=f15e38]: Каталог задач
+          - generic [ref=f15e39]: Фильтры по теме, сложности и источнику, поиск по тексту
+        - link "Графический калькулятор Кривые спроса и предложения, благосостояние, экспорт" [ref=f15e40] [cursor=pointer]:
+          - /url: /desmos/
+          - generic [ref=f15e45]: Графический калькулятор
+          - generic [ref=f15e46]: Кривые спроса и предложения, благосостояние, экспорт
+        - link "Случайная задача Открыть случайную опубликованную задачу из базы" [ref=f15e47] [cursor=pointer]:
+          - /url: /catalog/random/
+          - generic [ref=f15e55]: Случайная задача
+          - generic [ref=f15e56]: Открыть случайную опубликованную задачу из базы

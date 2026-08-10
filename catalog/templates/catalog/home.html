@@ -46,9 +46,13 @@
   outline: none;
   transition: border-color .15s, box-shadow .15s;
 }
+/* ⚠️ КОЛЬЦО ФОКУСА НЕЙТРАЛЬНОЕ (сессия 7, фаза 6). Форма ореола прежняя
+   (3px halo, как предписывает DESIGN.md), меняется только цвет: акцент
+   оставлен навигации и мелочам. Малиновый ореол на главном поле — крупное
+   акцентное пятно, и именно его владелец просил убрать. */
 .home-search input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-ring);
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 .home-search button {
   position: absolute;

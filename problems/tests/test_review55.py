@@ -399,3 +399,39 @@ class OneCreateButtonTests(TestCase):
             + '?kind=exam&group=%d' % self.group.pk).content.decode()
         self.assertIn(reverse('teacher:exam_create', args=[self.group.pk]),
                       body)
+
+
+# ===========================================================================
+# Фаза 6 — кольцо фокуса в каталоге нейтральное
+# ===========================================================================
+
+class CatalogFocusRingTests(TestCase):
+    """Малиновое кольцо фокуса убрано со всех четырёх страниц каталога."""
+
+    PAGES = (
+        'catalog/templates/catalog/home.html',
+        'catalog/templates/catalog/smart_search.html',
+        'catalog/templates/catalog/problem_list.html',
+        'catalog/templates/catalog/collection_new.html',
+        'catalog/templates/catalog/collection_detail.html',
+    )
+
+    def test_no_accent_in_any_focus_rule(self):
+        import io, re
+        for path in self.PAGES:
+            css = io.open(path, encoding='utf-8').read()
+            for chunk in re.findall(r'([^{}]*:focus[^{}]*)\{([^}]*)\}', css):
+                self.assertNotIn('--accent', chunk[1],
+                                 '%s: %s' % (path, chunk[0].strip()))
+
+    def test_selected_state_keeps_the_accent(self):
+        """⚠️ Подсветка ВЫБРАННОГО — не фокус.
+
+        Правило проекта прямо разрешает акцент на активном состоянии;
+        вычищать его заодно значило бы лечить не ту болезнь.
+        """
+        import io
+        css = io.open('catalog/templates/catalog/collection_new.html',
+                      encoding='utf-8').read()
+        self.assertIn('.tpl-card.selected', css)
+        self.assertIn('var(--accent)', css)

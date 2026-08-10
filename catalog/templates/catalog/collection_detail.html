@@ -39,7 +39,9 @@
   background: var(--surface);
   color: var(--text);
 }
-.col-search-input:focus { outline: none; border-color: var(--accent); }
+/* Кольцо фокуса нейтральное (сессия 7, фаза 6). */
+.col-search-input:focus { outline: none; border-color: var(--focus);
+                          box-shadow: 0 0 0 3px var(--focus-ring); }
 .col-search-btn {
   padding: 7px 12px;
   background: var(--btn-bg);
@@ -58,7 +60,7 @@
   color: var(--text);
   cursor: pointer;
 }
-.col-select:focus { outline: none; border-color: var(--accent); }
+.col-select:focus { outline: none; border-color: var(--focus); }
 .col-reset {
   font-size: 12px;
   color: var(--text2);
