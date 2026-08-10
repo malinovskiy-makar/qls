@@ -153,43 +153,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 </main>
 
 <script>
-// fix-v2 (сессия E). Литеральные LaTeX-эскейпы «\$ \_ \& \#»: после KaTeX
-// показываем $ _ & # (только отображение, данные не трогаем).
-// fix-v3 (сессия H3). Корень: KaTeX auto-render при поиске разделителя $
-// разрезает «\$» по границе доллара на два текстовых узла («4.53\» и «$...»),
-// поэтому пост-проходный fixCurrencyDollars не видит «\$» как одну строку — слэш
-// остаётся виден. Решение: ДО KaTeX маскируем «\$» приватным символом \uE000
-// (KaTeX его не считает разделителем), ПОСЛЕ KaTeX возвращаем «$».
-var DOLLAR_SENTINEL = '\uE000';
+// Литеральные доллары и эскейпы «\$ \_ \& \#» — в общем партиале
+// `_katex_dollars.html` (он подключён ниже). Там же объяснение, почему
+// маскировать «\$» внутри формул нельзя.
+</script>
 
-function maskEscapedDollars(root) {
-  var walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT, null);
-  var node;
-  while ((node = walker.nextNode())) {
-    var p = node.parentNode && node.parentNode.nodeName;
-    if (p === 'SCRIPT' || p === 'STYLE' || p === 'TEXTAREA') continue;
-    if (node.nodeValue.indexOf('\\$') !== -1) {
-      node.nodeValue = node.nodeValue.split('\\$').join(DOLLAR_SENTINEL);
-    }
-  }
-}
+{% include '_katex_dollars.html' %}
 
-function fixCurrencyDollars(root) {
-  var walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT, null);
-  var node;
-  while ((node = walker.nextNode())) {
-    var p = node.parentNode && node.parentNode.nodeName;
-    if (p === 'SCRIPT' || p === 'STYLE' || p === 'TEXTAREA') continue;
-    var v = node.nodeValue;
-    if (v.indexOf(DOLLAR_SENTINEL) !== -1 || v.indexOf('\\$') !== -1 ||
-        v.indexOf('\\_') !== -1 || v.indexOf('\\&') !== -1 ||
-        v.indexOf('\\#') !== -1) {
-      node.nodeValue = v.split(DOLLAR_SENTINEL).join('$').split('\\$').join('$')
-                        .split('\\_').join('_').split('\\&').join('&')
-                        .split('\\#').join('#');
-    }
-  }
-}
+<script>
 
 function initKaTeX() {
   maskEscapedDollars(document.body);

@@ -257,44 +257,12 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
 </div>
 
 <script>
-// ⚠️ Один в один конвейер из `catalog/base.html`. Расхождение здесь значит,
-// что на бумаге напечатается не то, что видно на экране.
-var DOLLAR_SENTINEL = '';
+</script>
 
-function walkText(root, fn) {
-  var walker = document.createTreeWalker(root || document.body,
-                                         NodeFilter.SHOW_TEXT, null);
-  var node;
-  while ((node = walker.nextNode())) {
-    var parent = node.parentNode && node.parentNode.nodeName;
-    if (parent === 'SCRIPT' || parent === 'STYLE' || parent === 'TEXTAREA') {
-      continue;
-    }
-    fn(node);
-  }
-}
+{# Конвейер долларов ОДИН на экран и на бумагу — иначе напечатается не то. #}
+{% include '_katex_dollars.html' %}
 
-function maskEscapedDollars(root) {
-  walkText(root, function (node) {
-    if (node.nodeValue.indexOf('\\$') !== -1) {
-      node.nodeValue = node.nodeValue.split('\\$').join(DOLLAR_SENTINEL);
-    }
-  });
-}
-
-function fixCurrencyDollars(root) {
-  walkText(root, function (node) {
-    var value = node.nodeValue;
-    if (value.indexOf(DOLLAR_SENTINEL) !== -1 || value.indexOf('\\$') !== -1 ||
-        value.indexOf('\\_') !== -1 || value.indexOf('\\&') !== -1 ||
-        value.indexOf('\\#') !== -1) {
-      node.nodeValue = value.split(DOLLAR_SENTINEL).join('$')
-        .split('\\$').join('$').split('\\_').join('_')
-        .split('\\&').join('&').split('\\#').join('#');
-    }
-  });
-}
-
+<script>
 function initKaTeX() {
   maskEscapedDollars(document.body);
   renderMathInElement(document.body, {

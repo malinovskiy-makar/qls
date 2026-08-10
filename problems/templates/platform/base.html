@@ -57,8 +57,11 @@ select:focus-visible, textarea:focus-visible {
   {% block content %}{% endblock %}
 </main>
 
+{% include '_katex_dollars.html' %}
+
 <script>
 function initKaTeX() {
+  maskEscapedDollars(document.body);
   renderMathInElement(document.body, {
     delimiters: [
       { left: '$$',  right: '$$',  display: true  },
@@ -68,6 +71,7 @@ function initKaTeX() {
     ],
     throwOnError: false
   });
+  fixCurrencyDollars(document.body);
 }
 </script>
 {% block extra_js %}{% endblock %}

@@ -1,0 +1,95 @@
+{% comment %}
+Литеральный доллар и KaTeX — ЕДИНСТВЕННАЯ точка правды.
+
+Зачем это вообще нужно. В текстах задач валюта записана как «\$» (эскейп
+сессии C). Авторендер KaTeX про эскейпы не знает: увидев «\$», он считает
+доллар разделителем формулы и режет текст пополам — «4.53\» и «$…». Поэтому
+ДО рендера литеральные доллары маскируются приватным символом \uE000, а
+ПОСЛЕ рендера возвращаются на место.
+
+⚠️ ЛОВУШКА, ИЗ-ЗА КОТОРОЙ ЭТОТ ФАЙЛ И ПОЯВИЛСЯ (2026-08-10). Маскировать
+подряд ВСЕ «\$» нельзя. Внутри формулы «\$» — законная запись доллара, KaTeX
+рисует её сам; а вот приватный символ \uE000 KaTeX не принимает вовсе
+(«Unexpected character») и при throwOnError: false печатает ВСЮ формулу
+красным исходником. Так экран проверки показывал таблицу КПВ сырым кодом.
+
+Поэтому маскируем только те «\$», что стоят ВНЕ формул. Границы формул
+ищутся ровно теми же парами и в том же порядке, что и у авторендера
+($$ раньше $), — значит наша разметка совпадает с его разметкой.
+{% endcomment %}
+<script>
+var DOLLAR_SENTINEL = '\uE000';
+
+/* Найти закрывающий разделитель, ПРОПУСКАЯ «\$»: экранированный доллар —
+   не разделитель. Так же его увидит и авторендер, потому что к нему строка
+   приезжает уже с приватным символом вместо «\$». */
+function findClose(s, from, close) {
+  var i = from;
+  while (i < s.length) {
+    if (s.charAt(i) === '\\' && s.charAt(i + 1) === '$') { i += 2; continue; }
+    if (s.substr(i, close.length) === close) return i;
+    i++;
+  }
+  return -1;
+}
+
+/* Если по позиции i начинается формула — вернуть индекс ЗА её концом.
+   Иначе вернуть i. Незакрытый разделитель формулой не считается. */
+function mathSpanEnd(s, i) {
+  var pairs = [['$$', '$$'], ['\\[', '\\]'], ['\\(', '\\)'], ['$', '$']];
+  for (var k = 0; k < pairs.length; k++) {
+    var open = pairs[k][0], close = pairs[k][1];
+    if (s.substr(i, open.length) !== open) continue;
+    var end = findClose(s, i + open.length, close);
+    if (end === -1) continue;
+    return end + close.length;
+  }
+  return i;
+}
+
+/* Замаскировать «\$» вне формул; внутри формул оставить как есть. */
+function maskOutsideMath(s) {
+  if (s.indexOf('\\$') === -1) return s;   // быстрый выход: маскировать нечего
+  var out = '', i = 0, n = s.length;
+  while (i < n) {
+    if (s.charAt(i) === '\\' && s.charAt(i + 1) === '$') {
+      out += DOLLAR_SENTINEL; i += 2; continue;
+    }
+    var end = mathSpanEnd(s, i);
+    if (end > i) { out += s.slice(i, end); i = end; continue; }
+    out += s.charAt(i); i++;
+  }
+  return out;
+}
+
+function maskEscapedDollars(root) {
+  var walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT, null);
+  var node;
+  while ((node = walker.nextNode())) {
+    var p = node.parentNode && node.parentNode.nodeName;
+    if (p === 'SCRIPT' || p === 'STYLE' || p === 'TEXTAREA') continue;
+    if (node.nodeValue.indexOf('\\$') !== -1) {
+      node.nodeValue = maskOutsideMath(node.nodeValue);
+    }
+  }
+}
+
+/* Обратный проход: вернуть доллары и снять эскейпы, которые KaTeX
+   обрабатывает только внутри формул, а в тексте оставляет со слэшем. */
+function fixCurrencyDollars(root) {
+  var walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT, null);
+  var node;
+  while ((node = walker.nextNode())) {
+    var p = node.parentNode && node.parentNode.nodeName;
+    if (p === 'SCRIPT' || p === 'STYLE' || p === 'TEXTAREA') continue;
+    var v = node.nodeValue;
+    if (v.indexOf(DOLLAR_SENTINEL) !== -1 || v.indexOf('\\$') !== -1 ||
+        v.indexOf('\\_') !== -1 || v.indexOf('\\&') !== -1 ||
+        v.indexOf('\\#') !== -1) {
+      node.nodeValue = v.split(DOLLAR_SENTINEL).join('$').split('\\$').join('$')
+                        .split('\\_').join('_').split('\\&').join('&')
+                        .split('\\#').join('#');
+    }
+  }
+}
+</script>

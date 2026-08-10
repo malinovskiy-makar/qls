@@ -165,8 +165,13 @@ class HomePageTests(TestCase):
 
 class CurrencyEscapeFrontendTests(TestCase):
     """Сессия E: страница задачи с литеральными \\$ отдаёт и данные,
-    и скрипт fix-v2 (расширенная чистка \\$ \\_ \\& \\#) с страховочным
-    вызовом на DOMContentLoaded."""
+    и расширенную чистку \\$ \\_ \\& \\# со страховочным вызовом
+    на DOMContentLoaded.
+
+    ⚠️ С 2026-08-10 сам конвейер живёт в общем партиале
+    `templates/_katex_dollars.html` — проверяем его содержимое на странице,
+    а не старую метку версии «fix-v2».
+    """
 
     def test_page_contains_escaped_data_and_fix_v2_script(self):
         p = make_problem(
@@ -177,8 +182,8 @@ class CurrencyEscapeFrontendTests(TestCase):
         html = resp.content.decode()
         # данные с эскейпом дошли до страницы
         self.assertIn('\\$10,000', html)
-        # скрипт исправленной версии и расширенная чистка
-        self.assertIn('fix-v2', html)
+        # конвейер чистки на странице есть
+        self.assertIn('function fixCurrencyDollars', html)
         self.assertIn("split('\\\\_').join('_')", html)
         # страховочный вызов после KaTeX / при недоступном CDN
         self.assertIn("addEventListener('DOMContentLoaded'", html)
