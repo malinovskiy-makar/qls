@@ -207,7 +207,13 @@
       {% endfor %}
       <span class="rv-own">
         своё
-        <input type="number" step="0.5" min="0" name="score" id="score-input"
+        {% comment %}
+        ⚠️ step="any", а не 0.5 (сессия 7, фаза 3). Ровная половина от
+        максимума 2,5 — это 1,25, и при шаге 0,5 браузер счёл бы поле
+        недействительным: кнопка «половина» просто не отправила бы форму.
+        Границы держит сервер (`_max_score_for`), а не разметка.
+        {% endcomment %}
+        <input type="number" step="any" min="0" name="score" id="score-input"
                class="k-input"
                value="{% if existing_feedback %}{{ existing_feedback.score|floatformat:'-2' }}{% elif auto_score is not None %}{{ auto_score|floatformat:'-2' }}{% endif %}">
       </span>

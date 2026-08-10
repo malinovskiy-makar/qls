@@ -220,20 +220,36 @@ def review_position(assignment, student, submission):
 
 
 def _score_presets(max_score):
-    """Три кнопки: ноль, половина, максимум. Половина — округлённая.
+    """Три кнопки: ноль, РОВНО половина, максимум задачи.
 
-    Дробную половину («1.5 из 3») кнопкой не предлагаем: такой балл ставят
-    осознанно, и для него есть поле «своё».
+    ⚠️ ПОЛОВИНА БОЛЬШЕ НЕ ОКРУГЛЯЕТСЯ (сессия 7, фаза 3). Раньше при
+    максимуме 3 кнопки давали 0 / 2 / 3: округление вверх делало среднюю
+    кнопку щедрой без причины — «два из трёх» это не половина. Дробный балл
+    в базе допустим и так (веса пунктов дают 1,25 и 3,75), заводить ради
+    середины отдельное правило незачем.
+
+    ⚠️ У ЗНАЧЕНИЯ И ПОДПИСИ РАЗНЫЕ ФОРМЫ ЗАПИСИ. Подпись русская, через
+    запятую («1,5»); значение — с точкой, потому что его кладут в
+    `<input type="number">` и разбирают на сервере через `float()`. Запятая
+    в значении означала бы пустое поле в браузере и ноль на сервере — то
+    есть кнопка «половина» тихо ставила бы ноль.
     """
-    from decimal import Decimal, ROUND_HALF_UP
+    from decimal import Decimal
 
     top = Decimal(str(max_score or 0))
-    half = (top / 2).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+    half = top / 2
+
+    def show(value):
+        """Один знак после запятой, без хвостового нуля: 5, 3,5, 1,5."""
+        text = ('%.1f' % value).rstrip('0').rstrip('.')
+        return text or '0'
+
     values = []
     for value in (Decimal('0'), half, top):
-        text = str(value.normalize()) if value else '0'
-        if text not in [v['value'] for v in values]:
-            values.append({'value': text, 'label': text})
+        raw = show(value)              # с точкой — для поля и сервера
+        if raw in [v['value'] for v in values]:
+            continue
+        values.append({'value': raw, 'label': raw.replace('.', ',')})
     return values
 
 
