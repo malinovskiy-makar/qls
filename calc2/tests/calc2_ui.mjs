@@ -151,9 +151,16 @@ await t('двойной щелчок по имени точки открывае
     || `полей ${n}, было «${v}», стало «${saved}»`;
 });
 
+/* Н46: имя точки в списке — не текстовое поле, а редактируемое значение сразу
+   после цвета. Читаем видимую запись (у KaTeX в textContent рядом лежат MathML
+   и исходный TeX). */
 await t('своё имя точки вернулось в список слева', () => page.evaluate(() => {
-  const inp = document.querySelector('#mark-list input[type=text]');
-  return (inp && inp.value === 'Точка A') || 'в списке «' + (inp && inp.value) + '»';
+  const el = document.querySelector('#mark-list .mark-name');
+  // KaTeX ставит собственные пробельные символы, поэтому сверяем по смыслу.
+  const raw = el && ((el.querySelector('.katex-html') || el).textContent || '');
+  const shown = raw.replace(/\s+/g, ' ').trim();
+  return (shown === 'Точка A') || 'в списке «' + shown + '» (коды: '
+    + [...raw.trim()].map(c => c.charCodeAt(0)).join(',') + ')';
 }));
 
 await t('точка показывает координаты', () => page.evaluate(() => {

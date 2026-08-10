@@ -2691,7 +2691,9 @@ function buildMarkRow(mk) {
     kind: 'text',
     get: () => mk.text || '',
     set: (v) => { mk.text = String(v).trim(); redrawAll(); },
-    tex: (v, text) => (text ? String(text) : '{—}'),
+    // Имя это ТЕКСТ, а не формула: в математическом наборе KaTeX съедает
+    // пробелы, и «Точка A» превратилась бы в «ТочкаA».
+    tex: (v, text) => (text ? '\\text{' + String(text).replace(/([{}\\$&#^_~%])/g, '\\$1') + '}' : '\\text{без имени}'),
     title: 'Имя точки',
   });
   nameEl.classList.add('mark-name');

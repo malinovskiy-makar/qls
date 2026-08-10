@@ -968,11 +968,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    в пиксель при любой длине названия. */
 .side-head {
   display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-  height: 46px; padding: 0 34px 0 14px;
+  /* Отступы симметричные: стрелка лежит поверх шапки только с одной стороны, но
+     при 34px и 14px заголовок вставал на десяток пикселей мимо центра (Н4). */
+  height: 46px; padding: 0 34px;
   border-bottom: 1px solid var(--border-soft);
 }
-.side-right .side-head { padding: 0 14px 0 34px; }
+/* Н4. Название модели слева и «Аналитика» справа — одним кеглем и по центру
+   своей панели. Стрелка-сворачивалка лежит поверх шапки в отступе 34px, поэтому
+   ширину под заголовок занимает вся строка, а flex:1 с центрированием ставит
+   его ровно посередине панели независимо от длины названия. */
 .side-head h2, .side-scene {
+  flex: 1; min-width: 0; text-align: center;
   font-size: 16px; font-weight: 750; letter-spacing: -.015em; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -1106,8 +1112,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 }
 .tools-body > .section.card > .fold-body { padding: 0 11px 11px; }
 .tools-body > .section.card.open-card { background: var(--surface-2); border-color: var(--border); }
-.tools-body > .section.card.first-card > .fold-btn { font-size: 14.5px; color: var(--accent); }
-.tools-body > .section.card.first-card { border-color: var(--accent-ring); }
+/* Н2. Первая карточка выделена РАЗМЕРОМ, а не цветом. Прежде у неё были и
+   акцентная рамка, и акцентный текст, и карточка читалась как нажатая, хотя
+   ничего не выбрано. Акцент в этой системе — для мелких точек управления, а не
+   для заливки целого блока. */
+.tools-body > .section.card.first-card > .fold-btn { font-size: 14.5px; color: var(--text); }
+.tools-body > .section.card.first-card { border-color: var(--border); }
+/* Н35. Первой кнопке нужен воздух от линии-разделителя под заголовком панели:
+   она стояла к ней вплотную и читалась как её продолжение. */
+.tools-body > .section.card:first-child { margin-top: 8px; }
 
 /* Стрелки-крутилки у числовых полей внутри калькулятора не нужны: значения
    здесь набирают и тянут ползунком, а не щёлкают по микроскопическим стрелкам.
