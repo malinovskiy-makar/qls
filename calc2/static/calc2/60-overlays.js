@@ -321,7 +321,6 @@ function drawOverlays() {
   drawMarks();
   syncAxisPlaceholders();
   syncSceneColorPickers();   // образцы в панели идут за темой и за своими цветами
-  syncAreaColorList();       // список областей с пикерами
   syncAreaCalcUI();          // выпадашка кривых и список точек для расчёта площади
   hintsToDots();             // подсказки, добавленные сценой, тоже уходят под вопросик
   syncFirstCard();                                     // ярче та карточка, что сверху
@@ -385,6 +384,14 @@ function renderMathIn(root) {
    проход перекрашивает те, у которых пользователь выбрал свой цвет. */
 function areaKey(name) { return String(name || '').trim(); }
 
+/* Настоящие подстрочные цифры (Н27). Имя площади уходит и в легенду на холст,
+   и в подпись рядом с кривой, поэтому нужен готовый символ, а не разметка:
+   в SVG вложенный <tspan> пришлось бы тащить через все места сразу. */
+function subDigits(n) {
+  const S = '₀₁₂₃₄₅₆₇₈₉';
+  return String(n).replace(/\d/g, (d) => S[+d]);
+}
+
 function applyAreaColors() {
   const map = STATE.areaColor || {};
   svg.selectAll('[data-legend]').each(function () {
@@ -394,16 +401,46 @@ function applyAreaColors() {
   });
 }
 
-// Какие области сейчас на графике: [{key, color, opacity}] без повторов.
+// Какие области сейчас на графике: [{key, color, opacity, value}] без повторов.
 function currentAreas() {
   const seen = [], by = {};
   svg.selectAll('[data-legend]').each(function () {
     const k = areaKey(this.getAttribute('data-legend'));
     if (!k || by[k]) return;
     by[k] = 1;
-    seen.push({ key: k, color: this.getAttribute('fill') || COL.ink, opacity: +this.getAttribute('opacity') || 0.2 });
+    seen.push({ key: k, color: this.getAttribute('fill') || COL.ink,
+                opacity: +this.getAttribute('opacity') || 0.2,
+                value: areaOfPathEl(this), el: this });
   });
   return seen;
+}
+
+/* Площадь закрашенной фигуры В ЕДИНИЦАХ ЗАДАЧИ (Свх-5). Сцена рисует область
+   готовым путём в пикселях и число нигде не хранит, поэтому считаем прямо по
+   нарисованному: разбираем путь на точки, переводим их обратно через шкалы и
+   берём формулу площади многоугольника. Способ общий, поэтому число появляется
+   у ЛЮБОЙ области любой сцены, и заводить реестр на каждый сюжет не нужно. */
+function areaOfPathEl(el) {
+  try {
+    const d = el.getAttribute('d') || '';
+    if (!d) return null;
+    const nums = d.match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/gi);
+    if (!nums || nums.length < 6) return null;
+    const { mx, my } = mainScales();
+    const pts = [];
+    for (let i = 0; i + 1 < nums.length; i += 2) {
+      const x = mx.invert(+nums[i]), y = my.invert(+nums[i + 1]);
+      if (isFinite(x) && isFinite(y)) pts.push([x, y]);
+    }
+    if (pts.length < 3) return null;
+    let s = 0;
+    for (let i = 0, n = pts.length; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      s += a[0] * b[1] - b[0] * a[1];
+    }
+    const v = Math.abs(s) / 2;
+    return isFinite(v) ? v : null;
+  } catch (e) { return null; }
 }
 
 /* Короткие обозначения для легенды: на графике место дорого, а CS и DWL
@@ -442,13 +479,14 @@ function drawLegend() {
   const seen = currentAreas();
   if (!seen.length) return;
   const m = CONFIG.margin;
-  /* П47: легенда вдвое крупнее прежнего — кегль 24 вместо 12, квадратик 24
-     вместо 12, шаг строк 36 вместо 18. Ширину подложки считаем от РЕАЛЬНОГО
-     кегля, а не по прежней прикидке «длина строки × 6.8»: с удвоенным
-     размером текст просто вылезал бы за рамку.
+  /* Н58: середина между прежними размерами. В П47 легенду увеличили вдвое (24
+     против 12), и на реальных сценах она заняла угол поля и стала спорить с
+     кривыми. Берём 16: подписи по-прежнему читаются с проектора, а места
+     занимают вдвое меньше. Ширину подложки считаем от РЕАЛЬНОГО кегля, иначе
+     текст вылезает за рамку.
      Подложка не залезает на конец оси: это то же правило про отступ, что и
      в П33, только здесь его соблюдает сама легенда. */
-  const SW = 24, GAP = 12, LH = 36, FS = 24;
+  const SW = 16, GAP = 8, LH = 24, FS = 16;
   const labels = seen.map(e => areaShort(e.key));
   const wide = Math.max.apply(null, labels.map(s => s.length)) * FS * 0.62;
   const boxW = SW + GAP + wide + 20;
@@ -473,38 +511,6 @@ function drawLegend() {
   });
 }
 
-/* Список областей с пикерами цвета — в панели ввода. Пересобирается после
-   каждой отрисовки, потому что набор областей зависит от сцены. */
-function syncAreaColorList() {
-  const box = document.getElementById('area-colors');
-  if (!box) return;
-  const seen = currentAreas();
-  const sig = seen.map(e => e.key).join('|');
-  if (box._sig === sig) {                       // набор тот же — только цвета
-    seen.forEach(e => {
-      const p = box.querySelector('.cpick[data-area="' + CSS.escape(e.key) + '"]');
-      if (p && p._setValue) p._setValue(e.color);
-    });
-    return;
-  }
-  box._sig = sig;
-  box.innerHTML = '';
-  const sec = document.getElementById('sec-areacolors');
-  if (sec) sec.style.display = seen.length ? '' : 'none';
-  seen.forEach(e => {
-    const row = document.createElement('div');
-    row.className = 'ac-row';
-    const pick = makeColorPicker(e.color, (hex) => {
-      STATE.areaColor[e.key] = hex;
-      redrawAll();
-    }, 'Цвет области: ' + e.key);
-    pick.setAttribute('data-area', e.key);
-    const lab = document.createElement('span');
-    lab.className = 'ac-name'; lab.textContent = e.key;
-    row.append(pick, lab);
-    box.appendChild(row);
-  });
-}
 
 /* ── Точки пересечения (Фаза 6, дополнено) ────────────────────────────
    Считаются сами: кривые друг с другом И каждая кривая с осями координат.
@@ -1327,7 +1333,10 @@ function runAreaCalc() {
   const pal = AREA_PALETTE();
   res.id = ++areaCalcCounter;
   res.color = pal[(STATE.areaCalcList.length) % pal.length];
-  res.label = (res.kind === 'curve') ? ('Площадь под ' + res.name) : 'Площадь по точкам';
+  /* Н27: короткое имя с настоящим индексом — S₁, S₂, S₃. Прежние «Площадь под
+     D» и «Площадь по точкам» не помещались в легенду и вытесняли из неё сами
+     области. Что именно посчитано, видно рядом в строке таблицы. */
+  res.label = 'S' + subDigits(STATE.areaCalcList.length + 1);
   STATE.areaCalcList.push(res);
   redrawAll();
 }
@@ -1372,19 +1381,48 @@ function updateAreaCalcPanel() {
   const box = document.getElementById('info-areacalc');
   if (!box) return;
   const list = STATE.areaCalcList || [];
+  /* Свх-5, Н59. Таблица это единый список ВСЕГО закрашенного на графике: и
+     посчитанного пользователем, и нарисованного самой сценой (излишки, сбор
+     бюджета, потери общества). Раньше сценовые области жили только в отдельном
+     разделе «Цвета областей», и там у них не было ни числа, ни соседства с
+     посчитанными площадями. Раздел удалён, ничего не потеряно. */
+  const scene = currentAreas();
   box.innerHTML = '';
-  if (!list.length) return;
+  if (!list.length && !scene.length) return;
 
   const table = document.createElement('div');
   table.className = 'area-table';
-  // П44: столбцы «Названия» и «Площадь». «Отрезок» убран — он и так виден
+  // П44: столбцы «Название» и «Площадь». «Отрезок» убран — он и так виден
   // рядом с выбором кривой, а в таблице только занимал место.
   const head = document.createElement('div');
   head.className = 'area-row area-head';
-  ['Названия', 'Площадь', ''].forEach(t => {
+  ['Название', 'Площадь', ''].forEach(t => {
     const c = document.createElement('span'); c.textContent = t; head.appendChild(c);
   });
   table.appendChild(head);
+
+  // Сначала области сцены: их не удаляют (их рисует сама модель), поэтому
+  // вместо крестика пустая клетка, а цвет правится тем же пикером.
+  scene.forEach(e => {
+    const row = document.createElement('div');
+    row.className = 'area-row';
+    const c1 = document.createElement('span');
+    c1.className = 'area-what';
+    const pick = makeColorPicker(e.color, (hex) => { STATE.areaColor[e.key] = hex; redrawAll(); },
+                                 'Цвет области: ' + e.key);
+    pick.setAttribute('data-area', e.key);
+    const lab = document.createElement('span');
+    lab.className = 'area-name-fixed';
+    lab.textContent = areaShort(e.key);
+    lab.title = e.key;
+    c1.append(pick, lab);
+    const c2 = document.createElement('b');
+    c2.textContent = (e.value == null) ? '' : fmt(e.value);
+    const c3 = document.createElement('span');
+    row.append(c1, c2, c3);
+    table.appendChild(row);
+  });
+
   list.forEach(r => {
     const row = document.createElement('div');
     row.className = 'area-row';

@@ -229,6 +229,12 @@ input:focus-visible, select:focus-visible {
 }
 .area-name:hover { border-color: var(--border); }
 .area-name:focus { border-color: var(--accent); background: var(--input-bg); outline: none; }
+/* Область рисует сама сцена, её имя не правят: показываем аббревиатуру, полное
+   название остаётся подсказкой (Н59). */
+.area-name-fixed {
+  flex: 1; min-width: 0; padding: 3px 5px; font-size: 11.5px; color: var(--text);
+  font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* Имя складываемой кривой правится прямо в подписи поля (Фаза 13.2). */
 .ppfsum-name {

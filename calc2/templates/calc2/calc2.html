@@ -1888,12 +1888,8 @@
       </div>
     </div>
 
-    <!-- Цвета закрашенных областей (Фаза 8). Список собирается из того, что
-         реально нарисовано на графике, поэтому подходит любой сцене. -->
-    <div class="section" id="sec-areacolors" style="display:none;">
-      <div class="section-title">Цвета областей</div>
-      <div id="area-colors"></div>
-    </div>
+    <!-- Раздел «Цвета областей» удалён (Н59): области сцены переехали строками в
+         таблицу площадей, где у них есть и число, и тот же выбор цвета. -->
 
     <!-- Площади (Фаза 10): под кривой на отрезке или между отмеченными точками. -->
     <div class="section" id="sec-areascalc">
@@ -1926,9 +1922,11 @@
         </div>
 
         <button class="btn" id="ac-calc" type="button" style="margin-top:8px;width:100%;" disabled>Посчитать площадь</button>
-        <button class="btn-sm" id="ac-clear" type="button" style="margin-top:6px;">Убрать все</button>
         <div class="error" id="ac-error"></div>
         <div id="info-areacalc" style="margin-top:8px;"></div>
+        <!-- Н57: «Убрать все» стоит ПОД таблицей, к которой относится. Над ней
+             она читалась как продолжение кнопки расчёта. -->
+        <button class="btn-sm" id="ac-clear" type="button" style="margin-top:6px;">Убрать все</button>
       </div>
     </div>
 
