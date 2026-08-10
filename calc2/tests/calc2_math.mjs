@@ -1242,6 +1242,40 @@ const CASES = [
              ['прочие подписи растут в той же мере', 'ratio', 18 / 10, 0.01]],
   },
   {
+    /* Н16. Выигрыш от торговли это разница ПОТРЕБЛЕНИЯ, а его задаёт кривая
+       комплектов. Сравниваем две точки на одном луче: где он встречает КПВ
+       (автаркия) и где встречает КТВ (торговля). Раньше здесь стояла разность
+       перехватов линий с осями, то есть сравнивались крайние точки, в которых
+       страна потребляет ровно один товар, и кривая комплектов в расчёте не
+       участвовала: при КПВ Y = 100 − X, цене 2 и комплекте 1:1 выходило
+       «+0 по X и +100 по Y», хотя верный ответ +16.67 по обоим. */
+    name: 'Торговля · прирост считается по кривой комплектов (Н16)',
+    run: `resetSceneMemory();
+          openPicker(); pickScene('trade'); closePicker();
+          var f = document.getElementById('inp-ppft');
+          f.value = '100 - X';
+          ['input','change'].forEach(function (t) { f.dispatchEvent(new Event(t, {bubbles:true})); });
+          f.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true}));
+          var p = document.getElementById('ppft-price');
+          if (p) { p.value = 2; p.dispatchEvent(new Event('input', {bubbles:true})); }
+          STATE.bundleOn = true; STATE.bundleX = 1; STATE.bundleY = 1;
+          redrawAll();
+          var g = tradeBundleGain(STATE.ppfTradeData) || {};
+          STATE.bundleOn = false; redrawAll();
+          var noBundle = document.getElementById('sb-body').textContent;
+          resetSceneMemory();
+          return { ax: g.aut && g.aut.x, ay: g.aut && g.aut.y,
+                   tx: g.tr && g.tr.x, ty: g.tr && g.tr.y,
+                   dx: g.dx, dy: g.dy,
+                   hint: /Постройте кривую комплектов/.test(noBundle) ? 1 : 0,
+                   quiet: /Прирост против автаркии по X/.test(noBundle) ? 1 : 0 };`,
+    checks: [['автаркия X', 'ax', 50, 0.01], ['автаркия Y', 'ay', 50, 0.01],
+             ['торговля X', 'tx', 66.667, 0.01], ['торговля Y', 'ty', 66.667, 0.01],
+             ['прирост по X', 'dx', 16.667, 0.01], ['прирост по Y', 'dy', 16.667, 0.01],
+             ['без луча — подсказка', 'hint', 1, 0],
+             ['и без чисел', 'quiet', 0, 0]],
+  },
+  {
     /* Н59, Свх-5. Области сцены переехали строками в таблицу площадей, и число у
        них считается по САМОЙ нарисованной фигуре: путь разбирается на точки,
        точки переводятся обратно через шкалы, дальше формула площади

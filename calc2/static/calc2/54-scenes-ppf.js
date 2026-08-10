@@ -204,6 +204,29 @@ function bundleRay(f) {
   return { x, y, slope, kx, ky, whole: Math.floor(Math.min(x / kx, y / ky) + 1e-9) };
 }
 
+/* Н16. Выигрыш от торговли по кривой комплектов: две точки на одном луче.
+   Луч задан пропорцией потребления (единиц X к единицам Y), поэтому его наклон
+   s = ky / kx. С КПВ он встречается там, где страна потребляет только своё
+   (автаркия), с КТВ — там, где она уже обменяла часть выпуска (торговля).
+   Возвращает null, если луч не построен: тогда прирост считать нечем. */
+function tradeBundleGain(d) {
+  if (!d || !d.line || !d.ppfPts || !d.ppfPts.length) return null;
+  const kx = +STATE.bundleX, ky = +STATE.bundleY;
+  if (!STATE.bundleOn || !(kx > 0) || !(ky > 0)) return null;
+  const s = ky / kx;
+  // Автаркия: луч встречает саму КПВ (ищем численно, форма любая).
+  const aut = bundleRay((x) => interpY(d.ppfPts, x));
+  if (!aut) return null;
+  /* Торговля: луч встречает прямую КТВ y = intercept − slope·x. Здесь пересечение
+     берётся явно: s·x = intercept − slope·x  ⇒  x = intercept / (s + slope). */
+  const den = s + d.line.slope;
+  if (!(Math.abs(den) > 1e-12)) return null;
+  const tx = d.line.intercept / den;
+  if (!isFinite(tx) || tx < 0) return null;
+  const tr = { x: tx, y: s * tx };
+  return { aut: { x: aut.x, y: aut.y }, tr, dx: tr.x - aut.x, dy: tr.y - aut.y };
+}
+
 // Кривая КПВ, вторая кривая сравнения, области и луч комплектов.
 function drawPpfCurve() {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
@@ -1211,8 +1234,26 @@ function updatePpfTradePanel() {
   if (d.line) {
     html += `<div class="stat"><span>Предел потребления $X_{макс}$</span><b>${fmt(d.xint)}</b></div>`;
     html += `<div class="stat"><span>Предел потребления $Y_{макс}$</span><b>${fmt(d.yint)}</b></div>`;
-    html += `<div class="stat"><span>Прирост против автаркии по X</span><b>+${fmt(d.xint - d.Xmax)}</b></div>`;
-    html += `<div class="stat"><span>Прирост против автаркии по Y</span><b>+${fmt(d.yint - d.Ymax)}</b></div>`;
+    /* Н16. Прирост от торговли это разница ПОТРЕБЛЕНИЯ, а его задаёт кривая
+       комплектов: страна потребляет X и Y в заданной пропорции. Сравнивать надо
+       две точки на одном луче — где он встречает КТВ (потребление при торговле)
+       и где встречает КПВ (потребление при автаркии). Раньше здесь стояла
+       разность перехватов линий с осями (xint − Xmax), то есть сравнивались
+       крайние точки, в которых страна потребляет только один товар, а кривая
+       комплектов в расчёте не участвовала вовсе. */
+    const gain = tradeBundleGain(d);
+    if (gain) {
+      html += `<div class="stat"><span>Потребление при автаркии $(X; Y)$</span>`
+            + `<b>(${fmt(gain.aut.x)}; ${fmt(gain.aut.y)})</b></div>`;
+      html += `<div class="stat"><span>Потребление при торговле $(X; Y)$</span>`
+            + `<b>(${fmt(gain.tr.x)}; ${fmt(gain.tr.y)})</b></div>`;
+      const sign = (v) => (v >= 0 ? '+' : '') + fmt(v);
+      html += `<div class="stat"><span>Прирост против автаркии по X</span><b>${sign(gain.dx)}</b></div>`;
+      html += `<div class="stat"><span>Прирост против автаркии по Y</span><b>${sign(gain.dy)}</b></div>`;
+    } else {
+      html += '<div class="stat stat-hint"><span>Прирост против автаркии</span>'
+            + '<b>Постройте кривую комплектов</b></div>';
+    }
   }
 
   html += '<div class="sb-note"><b>Как это получилось</b>';
