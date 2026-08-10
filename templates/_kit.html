@@ -90,6 +90,38 @@
 .k-input--num { width: 88px; text-align: center;
                 font-variant-numeric: tabular-nums; }
 
+/* ⚠️ БРАУЗЕРНЫЕ СТРЕЛОЧКИ У ЧИСЛОВЫХ ПОЛЕЙ УБРАНЫ (сессия 7, фаза 2).
+   Владелец просил дважды: балл и количество набирают с клавиатуры, а
+   стрелочки съедают треть узкого поля и в тёмной теме просвечивают
+   системным светлым виджетом.
+
+   ⚠️ ПРАВИЛО ВИСИТ НА КЛАССЕ НАБОРА, А НЕ НА `input[type=number]` по всему
+   сайту: голый селектор задел бы публичный каталог и калькулятор, у
+   которых свои миры токенов и свои поля. Кабинету класс проставлен.
+
+   `appearance: textfield` — для Firefox и современных браузеров,
+   `::-webkit-*-spin-button` — для Safari и Chrome; нужны оба.
+
+   Перечислены ВСЕ классы полей кабинета: `.k-input` (набор), `.k-score input`
+   (крупный балл), `.form-control` (старый класс, живёт в конструкторе
+   контрольной и в подборщике). Ни один из них в публичном каталоге и в
+   calc2 не встречается. */
+.k-input[type="number"],
+.k-score input[type="number"],
+.form-control[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.k-input[type="number"]::-webkit-outer-spin-button,
+.k-input[type="number"]::-webkit-inner-spin-button,
+.k-score input[type="number"]::-webkit-outer-spin-button,
+.k-score input[type="number"]::-webkit-inner-spin-button,
+.form-control[type="number"]::-webkit-outer-spin-button,
+.form-control[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* Выпадающий список: браузерная стрелка убрана, своя рисуется обёрткой.
    Без appearance:none в тёмной теме просвечивает системный светлый виджет. */
 .k-select { appearance: none; -webkit-appearance: none; -moz-appearance: none;
@@ -180,10 +212,8 @@
   box-shadow: 0 0 0 3px var(--focus-ring); background: var(--surface);
 }
 .k-score__cap { font-size: 11px; color: var(--text3); }
-/* Скрыть браузерные стрелки у number — они ломают крупную цифру */
-.k-score input::-webkit-outer-spin-button,
-.k-score input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.k-score input[type=number] { -moz-appearance: textfield; }
+/* Стрелки у крупного балла прячет общее правило числовых полей выше
+   (сессия 7, фаза 2) — здесь второй копии больше нет. */
 
 /* ── Ряд плиток-переключателей ──────────────────────────────────────── */
 .k-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));

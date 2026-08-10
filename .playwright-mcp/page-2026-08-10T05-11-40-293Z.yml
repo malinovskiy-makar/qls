@@ -1,0 +1,53 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Page not found (404)" [level=1] [ref=e3]
+    - table [ref=e4]:
+      - rowgroup [ref=e5]:
+        - row [ref=e6]:
+          - rowheader "Request Method:" [ref=e7]
+          - cell "GET" [ref=e8]
+        - row [ref=e9]:
+          - rowheader "Request URL:" [ref=e10]
+          - cell "http://127.0.0.1:8199/accounts/login/?next=/teacher/" [ref=e11]
+  - generic [ref=e12]:
+    - paragraph [ref=e13]:
+      - text: Using the URLconf defined in
+      - code [ref=e14]: config.urls
+      - text: ", Django tried these URL patterns, in this order:"
+    - list [ref=e15]:
+      - listitem [ref=e16]: "[name='home']"
+      - listitem [ref=e17]: admin/
+      - listitem [ref=e18]: login/ [name='login']
+      - listitem [ref=e19]: logout/ [name='logout']
+      - listitem [ref=e20]: password/change/ [name='password_change']
+      - listitem [ref=e21]: password/change/done/ [name='password_change_done']
+      - listitem [ref=e22]: profile/ [name='profile']
+      - listitem [ref=e23]: profile/stats/ [name='student_stats']
+      - listitem [ref=e24]: profile/stats/data/ [name='student_stats_json']
+      - listitem [ref=e25]: profile/stats/goal/ [name='set_weekly_goal']
+      - listitem [ref=e26]: parent/ [name='parent_home']
+      - listitem [ref=e27]: parent/<int:pk>/ [name='parent_student']
+      - listitem [ref=e28]: api/saved/problem/ [name='api_save_problem']
+      - listitem [ref=e29]: api/folders/create/ [name='api_folder_create']
+      - listitem [ref=e30]: api/folders/rename/ [name='api_folder_rename']
+      - listitem [ref=e31]: api/saved/move/ [name='api_saved_move']
+      - listitem [ref=e32]: api/saved/delete/ [name='api_saved_delete']
+      - listitem [ref=e33]: api/graphs/save/ [name='api_graph_save']
+      - listitem [ref=e34]: student/
+      - listitem [ref=e35]: teacher/
+      - listitem [ref=e36]: desmos/
+      - listitem [ref=e37]: calc2/
+      - listitem [ref=e38]: catalog/
+      - listitem [ref=e39]: calendar/
+      - listitem [ref=e40]: game/
+      - listitem [ref=e41]: ^media/(?P<path>.*)$
+    - paragraph [ref=e42]:
+      - text: The current path,
+      - code [ref=e43]: accounts/login/
+      - text: ", didn’t match any of these."
+  - paragraph [ref=e45]:
+    - text: You’re seeing this error because you have
+    - code [ref=e46]: DEBUG = True
+    - text: in your Django settings file. Change that to
+    - code [ref=e47]: "False"
+    - text: ", and Django will display a standard 404 page."

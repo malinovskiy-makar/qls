@@ -1,0 +1,128 @@
+- generic [active] [ref=f4e1]:
+  - navigation [ref=f4e2]:
+    - link "Эк" [ref=f4e3] [cursor=pointer]:
+      - /url: /
+    - link "Проверка" [ref=f4e4] [cursor=pointer]:
+      - /url: /teacher/
+    - link "Группы" [ref=f4e5] [cursor=pointer]:
+      - /url: /teacher/groups/
+    - link "Каталог" [ref=f4e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f4e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f4e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f4e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f4e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f4e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f4e12]:
+      - button "Сменить тему" [ref=f4e13] [cursor=pointer]: ☾
+      - generic [ref=f4e14]: Марина Петрова
+      - link "Выйти" [ref=f4e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f4e16]:
+    - generic [ref=f4e18]:
+      - heading "Набор деталей" [level=1] [ref=f4e19]
+      - paragraph [ref=f4e20]: Из этих элементов собраны экраны кабинета. Переключите тему в шапке — всё должно остаться читаемым.
+    - generic [ref=f4e21]:
+      - generic [ref=f4e22]: Кнопки
+      - generic [ref=f4e23]: Три веса. Главная — сплошная заливка, одна на экран. Обычная — тонкая рамка. Тихая — только текст, для необязательных действий.
+      - generic [ref=f4e24]:
+        - button "Сохранить и дальше" [ref=f4e25] [cursor=pointer]
+        - button "Проверять вручную" [ref=f4e26] [cursor=pointer]
+        - button "Глазами ученика" [ref=f4e27] [cursor=pointer]
+        - button "Добавить" [ref=f4e28] [cursor=pointer]
+        - button "Создать домашку" [disabled] [ref=f4e29]
+    - generic [ref=f4e30]:
+      - generic [ref=f4e31]: Поля ввода
+      - generic [ref=f4e32]: "Ни одного браузерного элемента по умолчанию: список и галочка нарисованы своими, иначе в тёмной теме просвечивает светлый системный виджет."
+      - generic [ref=f4e33]:
+        - generic [ref=f4e34]:
+          - generic [ref=f4e35]: Название работы
+          - textbox "Название работы" [ref=f4e36]:
+            - /placeholder: "Например: КПВ и альтернативные издержки"
+        - generic [ref=f4e37]:
+          - generic [ref=f4e38]: Сколько задач
+          - spinbutton "Сколько задач" [ref=f4e39]: "4"
+        - generic [ref=f4e40]:
+          - generic [ref=f4e41]: Тема
+          - generic [ref=f4e42]:
+            - combobox "Тема" [ref=f4e43] [cursor=pointer]:
+              - option "Любая тема" [selected]
+              - option "Спрос и предложение"
+              - option "Эластичность"
+            - text: ▾
+        - generic [ref=f4e44]:
+          - generic [ref=f4e45]: Комментарий ученику
+          - textbox "Комментарий ученику" [ref=f4e46]:
+            - /placeholder: Что получилось, что стоит повторить
+          - generic [ref=f4e47]: Ученик увидит это на разборе работы.
+        - generic [ref=f4e49] [cursor=pointer]:
+          - checkbox "брать только с разбором" [checked] [ref=f4e50]
+          - text: брать только с разбором
+    - generic [ref=f4e51]:
+      - generic [ref=f4e52]: Пометка состояния
+      - generic [ref=f4e53]: "Тонкая цветная полоса слева и значок. Панель целиком не заливается: залитая цветом панель читается как ошибка, даже когда это обычное рабочее состояние."
+      - generic [ref=f4e54]:
+        - generic [ref=f4e55]:
+          - generic [ref=f4e56]: "!"
+          - generic [ref=f4e57]:
+            - generic [ref=f4e58]: Проверять придётся вам, вручную
+            - generic [ref=f4e59]: Ответ этой задачи взят из каталога и записан фразой — машине сверять нечего.
+        - generic [ref=f4e60]:
+          - generic [ref=f4e61]: ✓
+          - generic [ref=f4e62]:
+            - generic [ref=f4e63]: Проверяется само
+            - generic [ref=f4e64]: "Эталон: 30"
+        - generic [ref=f4e65]:
+          - generic [ref=f4e66]: ×
+          - generic [ref=f4e67]:
+            - generic [ref=f4e68]: Ответа нет
+            - generic [ref=f4e69]: Но решение ученик написал — прочитайте.
+    - generic [ref=f4e70]:
+      - generic [ref=f4e71]: Крупное числовое поле
+      - generic [ref=f4e72]: "Максимальный балл за позицию. Цифра крупная, подпись мелкой: так балл и метка источника перестают сливаться в серую кашу."
+      - generic [ref=f4e73]:
+        - generic [ref=f4e74]:
+          - spinbutton "баллов" [ref=f4e75]: "10"
+          - generic [ref=f4e76]: баллов
+        - generic [ref=f4e77]:
+          - spinbutton "баллов" [ref=f4e78]: "3"
+          - generic [ref=f4e79]: баллов
+        - generic [ref=f4e80]:
+          - generic [ref=f4e81]: "6"
+          - generic [ref=f4e82]: из 6
+    - generic [ref=f4e83]:
+      - generic [ref=f4e84]: Ряд плиток-переключателей
+      - generic [ref=f4e85]: Равноправные способы что-то сделать. Выбранная плитка — единственное место, где акцент заливает поверхность.
+      - generic [ref=f4e86]:
+        - generic [ref=f4e87] [cursor=pointer]:
+          - generic [ref=f4e88]: Описать словами
+          - generic [ref=f4e89]: Умный поиск по каталогу
+        - generic [ref=f4e90] [cursor=pointer]:
+          - generic [ref=f4e91]: Искать самому
+          - generic [ref=f4e92]: Ручной поиск по каталогу
+        - generic [ref=f4e93] [cursor=pointer]:
+          - generic [ref=f4e94]: Написать свою
+          - generic [ref=f4e95]: Создание задачи с нуля
+    - generic [ref=f4e96]:
+      - generic [ref=f4e97]: Карточки
+      - generic [ref=f4e98]: Обычная и «просит внимания» — вторая отличается только тонкой рамкой, без заливки.
+      - generic [ref=f4e99]:
+        - generic [ref=f4e100]:
+          - generic [ref=f4e101]: Обычная карточка
+          - generic [ref=f4e102]: Белая подложка, тонкая рамка, скругление.
+        - generic [ref=f4e103]:
+          - generic [ref=f4e104]: Просит внимания
+          - generic [ref=f4e105]: Рамка акцентом. Заливки нет.
+    - generic [ref=f4e106]:
+      - generic [ref=f4e107]: Служебный разделитель
+      - generic [ref=f4e108]: Подпись плюс пунктир. Разделяет части листка и части карточки. Намеренно не жирный — это служебная линия, а не заголовок.
+      - generic [ref=f4e109]:
+        - generic [ref=f4e110]: Тестовая часть
+        - generic [ref=f4e113]: …три теста…
+        - generic [ref=f4e114]: Задачи
+        - generic [ref=f4e117]: …четыре открытые задачи…

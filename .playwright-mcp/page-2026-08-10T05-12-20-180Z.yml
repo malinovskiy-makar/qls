@@ -1,0 +1,206 @@
+- generic [active] [ref=f5e1]:
+  - navigation [ref=f5e2]:
+    - link "Эк" [ref=f5e3] [cursor=pointer]:
+      - /url: /
+    - link "Проверка" [ref=f5e4] [cursor=pointer]:
+      - /url: /teacher/
+    - link "Группы" [ref=f5e5] [cursor=pointer]:
+      - /url: /teacher/groups/
+    - link "Каталог" [ref=f5e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f5e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f5e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f5e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f5e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f5e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f5e12]:
+      - button "Сменить тему" [ref=f5e13] [cursor=pointer]: ☾
+      - generic [ref=f5e14]: Марина Петрова
+      - link "Выйти" [ref=f5e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f5e16]:
+    - generic [ref=f5e17]:
+      - complementary [ref=f5e18]:
+        - generic [ref=f5e20]:
+          - generic [ref=f5e21]:
+            - generic [ref=f5e22]: Поиск
+            - generic [ref=f5e23]:
+              - textbox "Слово из условия…" [ref=f5e24]
+              - button "→" [ref=f5e25] [cursor=pointer]
+          - generic [ref=f5e26]:
+            - generic [ref=f5e27]: Тема
+            - combobox "Тема" [ref=f5e28] [cursor=pointer]:
+              - option "Все темы" [selected]
+              - option "Альтернативные издержки и КПВ"
+              - option "Спрос и предложение"
+              - option "Эластичность"
+              - option "Теория потребителя и полезность"
+              - 'option "Теория фирмы: производство и издержки"'
+              - option "Совершенная конкуренция"
+              - option "Монополия и ценовая дискриминация"
+              - option "Олигополия и теория игр"
+              - option "Вмешательство государства"
+              - option "Международная торговля"
+              - option "Рынок труда"
+              - option "Неравенство доходов"
+              - option "ВВП и национальные счета"
+              - option "Инфляция и безработица"
+              - option "Фискальная политика"
+              - option "Монетарная политика"
+              - option "Экономический рост и циклы"
+              - option "Финансы и финансовые инструменты"
+              - option "Эконометрика и анализ данных"
+              - option "Поведенческая экономика"
+              - option "Математика и оптимизация"
+          - generic [ref=f5e29]:
+            - generic [ref=f5e30]: Источник
+            - combobox "Источник" [ref=f5e31] [cursor=pointer]:
+              - option "Все источники" [selected]
+              - option "AP Economics — CollegeBoard Exams"
+              - option "AP Economics — Course Mocks 2026"
+              - option "AP Economics — Homeworks"
+              - option "AP Economics — Mock FRQ"
+              - option "AP Economics — Real Exams 2026"
+              - option "IEO — International Economics Olympiad"
+              - option "ILE / iloveeconomics.ru"
+              - option "Overleaf Archive 3 (ОШ/ЛШ Олмат)"
+              - option "Акимова — Задания по экономике"
+              - option "Бахарев — Сборник тренировочных задач"
+              - option "ВсОШ — региональный этап"
+              - option "Задачник Бахарева"
+              - option "КСИ — Задачи Кыльчик"
+              - option "КСИГМА — Решалки"
+              - option "Курс 822 — Введение в экономику (Олмат)"
+              - option "ЛШ Олмат 2025 (Overleaf)"
+              - option "МатЭк — Overleaf архивы (2021–2025)"
+              - option "ОЭШ Олмат 2022"
+              - option "Решалки Олмат (olmat41)"
+              - option "Сборник тестов АА"
+              - option "Фридман — Задачи по микроэкономике (ВШЭ 2020)"
+              - option "Шпицруттен — Сложные олимпиадные задачи"
+          - generic [ref=f5e32]:
+            - generic [ref=f5e33]: Сложность
+            - generic [ref=f5e34]:
+              - link "★" [ref=f5e35] [cursor=pointer]:
+                - /url: "?difficulty=1"
+              - link "★★" [ref=f5e36] [cursor=pointer]:
+                - /url: "?difficulty=2"
+              - link "★★★" [ref=f5e37] [cursor=pointer]:
+                - /url: "?difficulty=3"
+              - link "★★★★" [ref=f5e38] [cursor=pointer]:
+                - /url: "?difficulty=4"
+              - link "★★★★★" [ref=f5e39] [cursor=pointer]:
+                - /url: "?difficulty=5"
+          - generic [ref=f5e40]:
+            - generic [ref=f5e41]: Тип задачи
+            - generic [ref=f5e42]:
+              - link "расчётная" [ref=f5e43] [cursor=pointer]:
+                - /url: "?type=%D1%80%D0%B0%D1%81%D1%87%D1%91%D1%82%D0%BD%D0%B0%D1%8F"
+              - link "теоретическая" [ref=f5e44] [cursor=pointer]:
+                - /url: "?type=%D1%82%D0%B5%D0%BE%D1%80%D0%B5%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F"
+              - 'link "тест: верно/неверно" [ref=f5e45] [cursor=pointer]':
+                - /url: "?type=%D1%82%D0%B5%D1%81%D1%82%3A+%D0%B2%D0%B5%D1%80%D0%BD%D0%BE%2F%D0%BD%D0%B5%D0%B2%D0%B5%D1%80%D0%BD%D0%BE"
+              - 'link "тест: все верные" [ref=f5e46] [cursor=pointer]':
+                - /url: "?type=%D1%82%D0%B5%D1%81%D1%82%3A+%D0%B2%D1%81%D0%B5+%D0%B2%D0%B5%D1%80%D0%BD%D1%8B%D0%B5"
+              - 'link "тест: один ответ" [ref=f5e47] [cursor=pointer]':
+                - /url: "?type=%D1%82%D0%B5%D1%81%D1%82%3A+%D0%BE%D0%B4%D0%B8%D0%BD+%D0%BE%D1%82%D0%B2%D0%B5%D1%82"
+              - 'link "тест: числовой ответ" [ref=f5e48] [cursor=pointer]':
+                - /url: "?type=%D1%82%D0%B5%D1%81%D1%82%3A+%D1%87%D0%B8%D1%81%D0%BB%D0%BE%D0%B2%D0%BE%D0%B9+%D0%BE%D1%82%D0%B2%D0%B5%D1%82"
+          - generic [ref=f5e50] [cursor=pointer]:
+            - checkbox "Только с решением" [ref=f5e51]
+            - text: Только с решением
+          - link "✕ Сбросить фильтры" [ref=f5e52] [cursor=pointer]:
+            - /url: /catalog/
+      - generic [ref=f5e53]:
+        - heading "Каталог задач" [level=1] [ref=f5e54]
+        - paragraph [ref=f5e55]: Выберите тему — или воспользуйтесь поиском и фильтрами слева
+        - generic [ref=f5e56]:
+          - link "Альтернативные издержки и КПВ 972" [ref=f5e57] [cursor=pointer]:
+            - /url: "?topic=841"
+            - generic [ref=f5e58]: Альтернативные издержки и КПВ
+            - generic [ref=f5e59]: "972"
+          - link "Спрос и предложение 345" [ref=f5e60] [cursor=pointer]:
+            - /url: "?topic=1"
+            - generic [ref=f5e61]: Спрос и предложение
+            - generic [ref=f5e62]: "345"
+          - link "Эластичность 508" [ref=f5e63] [cursor=pointer]:
+            - /url: "?topic=11"
+            - generic [ref=f5e64]: Эластичность
+            - generic [ref=f5e65]: "508"
+          - link "Теория потребителя и полезность 246" [ref=f5e66] [cursor=pointer]:
+            - /url: "?topic=88"
+            - generic [ref=f5e67]: Теория потребителя и полезность
+            - generic [ref=f5e68]: "246"
+          - 'link "Теория фирмы: производство и издержки 818" [ref=f5e69] [cursor=pointer]':
+            - /url: "?topic=842"
+            - generic [ref=f5e70]: "Теория фирмы: производство и издержки"
+            - generic [ref=f5e71]: "818"
+          - link "Совершенная конкуренция 623" [ref=f5e72] [cursor=pointer]:
+            - /url: "?topic=20"
+            - generic [ref=f5e73]: Совершенная конкуренция
+            - generic [ref=f5e74]: "623"
+          - link "Монополия и ценовая дискриминация 551" [ref=f5e75] [cursor=pointer]:
+            - /url: "?topic=843"
+            - generic [ref=f5e76]: Монополия и ценовая дискриминация
+            - generic [ref=f5e77]: "551"
+          - link "Олигополия и теория игр 591" [ref=f5e78] [cursor=pointer]:
+            - /url: "?topic=99"
+            - generic [ref=f5e79]: Олигополия и теория игр
+            - generic [ref=f5e80]: "591"
+          - link "Вмешательство государства 573" [ref=f5e81] [cursor=pointer]:
+            - /url: "?topic=32"
+            - generic [ref=f5e82]: Вмешательство государства
+            - generic [ref=f5e83]: "573"
+          - link "Международная торговля 290" [ref=f5e84] [cursor=pointer]:
+            - /url: "?topic=56"
+            - generic [ref=f5e85]: Международная торговля
+            - generic [ref=f5e86]: "290"
+          - link "Рынок труда 217" [ref=f5e87] [cursor=pointer]:
+            - /url: "?topic=29"
+            - generic [ref=f5e88]: Рынок труда
+            - generic [ref=f5e89]: "217"
+          - link "Неравенство доходов 398" [ref=f5e90] [cursor=pointer]:
+            - /url: "?topic=145"
+            - generic [ref=f5e91]: Неравенство доходов
+            - generic [ref=f5e92]: "398"
+          - link "ВВП и национальные счета 307" [ref=f5e93] [cursor=pointer]:
+            - /url: "?topic=844"
+            - generic [ref=f5e94]: ВВП и национальные счета
+            - generic [ref=f5e95]: "307"
+          - link "Инфляция и безработица 217" [ref=f5e96] [cursor=pointer]:
+            - /url: "?topic=845"
+            - generic [ref=f5e97]: Инфляция и безработица
+            - generic [ref=f5e98]: "217"
+          - link "Фискальная политика 113" [ref=f5e99] [cursor=pointer]:
+            - /url: "?topic=110"
+            - generic [ref=f5e100]: Фискальная политика
+            - generic [ref=f5e101]: "113"
+          - link "Монетарная политика 307" [ref=f5e102] [cursor=pointer]:
+            - /url: "?topic=111"
+            - generic [ref=f5e103]: Монетарная политика
+            - generic [ref=f5e104]: "307"
+          - link "Экономический рост и циклы 199" [ref=f5e105] [cursor=pointer]:
+            - /url: "?topic=846"
+            - generic [ref=f5e106]: Экономический рост и циклы
+            - generic [ref=f5e107]: "199"
+          - link "Финансы и финансовые инструменты 673" [ref=f5e108] [cursor=pointer]:
+            - /url: "?topic=847"
+            - generic [ref=f5e109]: Финансы и финансовые инструменты
+            - generic [ref=f5e110]: "673"
+          - link "Эконометрика и анализ данных 54" [ref=f5e111] [cursor=pointer]:
+            - /url: "?topic=848"
+            - generic [ref=f5e112]: Эконометрика и анализ данных
+            - generic [ref=f5e113]: "54"
+          - link "Поведенческая экономика 45" [ref=f5e114] [cursor=pointer]:
+            - /url: "?topic=424"
+            - generic [ref=f5e115]: Поведенческая экономика
+            - generic [ref=f5e116]: "45"
+          - link "Математика и оптимизация 472" [ref=f5e117] [cursor=pointer]:
+            - /url: "?topic=849"
+            - generic [ref=f5e118]: Математика и оптимизация
+            - generic [ref=f5e119]: "472"
