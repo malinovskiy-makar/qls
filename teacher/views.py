@@ -760,7 +760,7 @@ def assignment_create(request):
     """Конструктор домашки. Отбор задач — общий модуль `teacher/picker.py`."""
     from problems.models import Assignment, StudentGroup
 
-    from .picker import create_items, parse_cart, picker_context
+    from .picker import create_items, parse_cart, parse_points, picker_context
 
     if request.method == 'POST':
         title = request.POST.get('name', '').strip()
@@ -809,11 +809,25 @@ def assignment_create(request):
             # (правило фазы 4). Признак приезжает из подбора по описанию.
             manual_order=request.POST.get('manual_order') == '1',
         )
-        create_items(assignment, request.user, keys, catalog_ids, custom_ids)
+        create_items(assignment, request.user, keys, catalog_ids, custom_ids,
+                     points=parse_points(request.POST.get('problem_points')))
 
         for group in groups:
             assignment.students.add(*group.students.all())
 
+        # ⚠️ ПОСЛЕ СОЗДАНИЯ — НА СТРАНИЦУ САМОЙ РАБОТЫ (сессия 8, п. 12.3).
+        # Раньше репетитора уводило на дашборд, и увидеть, что получилось,
+        # можно было только найдя работу в списке. На странице задания уже
+        # есть всё нужное: состав, баллы позиций, печать ученикам и с
+        # ответами, файлы LaTeX. Нового экрана ради новизны не заводим.
+        if assignment.group_id:
+            messages.success(
+                request,
+                'Работа «%s» создана и выдана группе «%s».'
+                % (title, groups[0].name))
+            return redirect('teacher:group_assignment',
+                            group_id=assignment.group_id,
+                            assignment_id=assignment.pk)
         messages.success(request, f'Домашка «{title}» создана.')
         return redirect('teacher:dashboard')
 

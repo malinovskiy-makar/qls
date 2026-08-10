@@ -163,6 +163,28 @@
   outline: 2px solid var(--focus); outline-offset: 2px;
 }
 
+/* ── Галочка-квадрат: крупнее и заметнее обычной ────────────────────────
+   Там, где галочка — ГЛАВНОЕ действие строки (выбор задачи в подборку,
+   выбор группы), обычная 17-пиксельная теряется рядом с названием.
+   Здесь она 19px со скруглением 6 и своим недоступным состоянием:
+   пунктирная рамка и приглушение — «сюда нажимать нечего», а не «сломано».
+   ⚠️ Отдельным модификатором, а не правкой `.k-check`: у обычной галочки
+   («искать только с ответом») размер верный, и трогать его незачем. */
+.k-check--box input[type="checkbox"] {
+  width: 19px; height: 19px; border-radius: 6px;
+}
+.k-check--box input[type="checkbox"]:checked::after {
+  left: 6px; top: 2px; width: 4px; height: 10px;
+}
+.k-check--box input[type="checkbox"]:disabled {
+  border-style: dashed; background: var(--surface-2);
+  cursor: not-allowed; opacity: .55;
+}
+.k-check--box input[type="checkbox"]:disabled:hover {
+  border-color: var(--border);
+}
+.k-check--box:has(input:disabled) { cursor: not-allowed; color: var(--text3); }
+
 /* ── Карточка ───────────────────────────────────────────────────────── */
 .k-card {
   background: var(--surface); border: 0.5px solid var(--border);

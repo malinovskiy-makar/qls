@@ -1,0 +1,401 @@
+{% extends "teacher/base.html" %}
+
+{% comment %}
+Конструктор подборки (сессия 8, п. 12.2).
+
+Слева — работа так, как её увидит ученик: позиции в том же порядке, с теми
+же подписями частей. Справа — настройки работы. Задачи сюда приезжают из
+корзины (`sessionStorage`), той же самой, что у остальных конструкторов.
+
+⚠️ РАБОТУ СОЗДАЁТ НЕ ЭТОТ ЭКРАН: форма уходит в `assignment_create`
+(домашка) или `exam_create` (контрольная). Второй точки создания нет.
+{% endcomment %}
+
+{% block title %}Конструктор подборки — ЭкЗадачи{% endblock %}
+
+{% block extra_style %}
+.bd-wrap { max-width: 1100px; }
+.bd-layout { display: grid; grid-template-columns: minmax(0,1fr) 340px;
+             gap: 20px; align-items: start; }
+.bd-head { display: flex; align-items: baseline; gap: 10px;
+           flex-wrap: wrap; margin-bottom: 14px; }
+.bd-head h2 { font-size: 16px; font-weight: 700; flex: 1; min-width: 0; }
+.bd-tally { font-size: 13px; color: var(--text2); white-space: nowrap; }
+
+/* Позиция работы — строка-карточка, как в разборе глазами ученика:
+   цветная полоса слева по типу, название, тихая мета, значение справа. */
+.bd-item { display: flex; gap: 12px; align-items: flex-start;
+           background: var(--surface); border: 0.5px solid var(--border);
+           border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.bd-num { font-size: 13px; font-weight: 700; color: var(--text3);
+          min-width: 18px; }
+.bd-main { flex: 1; min-width: 0; }
+.bd-name { font-size: 14px; font-weight: 600; line-height: 1.4; }
+.bd-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.bd-right { display: flex; align-items: center; gap: 8px; }
+.bd-drop { background: none; border: 0; color: var(--text3); cursor: pointer;
+           font-size: 17px; line-height: 1; padding: 2px 4px; }
+.bd-drop:hover { color: var(--error); }
+
+/* Подпись части — тем же пунктиром, что на экране ученика и в листке. */
+.bd-sep { display: flex; align-items: center; gap: 10px; margin: 16px 0 8px;
+          font-size: 12px; font-weight: 600; color: var(--text2); }
+.bd-sep::after { content: ''; flex: 1; height: 0;
+                 border-top: 1px dashed var(--border); }
+
+.bd-empty { border: 1px dashed var(--border); border-radius: 10px;
+            padding: 26px 20px; text-align: center; color: var(--text2);
+            font-size: 13px; line-height: 1.6; }
+.bd-side { position: sticky; top: 68px; }
+.bd-side .k-card { margin-bottom: 12px; }
+.bd-groups { display: flex; flex-direction: column; gap: 8px;
+             max-height: 200px; overflow-y: auto; }
+.bd-when { display: none; }
+.bd-when.is-on { display: block; }
+@media (max-width: 900px) {
+  .bd-layout { grid-template-columns: minmax(0,1fr); }
+  .bd-side { position: static; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="bd-wrap">
+<div class="page-header">
+  <a href="{% url 'teacher:assignment_generate' %}?kind={{ kind }}{% if group_id %}&amp;group={{ group_id }}{% endif %}"
+     class="back-link">← Подбор</a>
+  <h1 class="page-title">Конструктор подборки</h1>
+</div>
+
+<div class="bd-layout">
+  <div>
+    <div class="bd-head">
+      <h2>Работа глазами ученика</h2>
+      {# Формы «1 позиция / 2 позиции / 5 позиций» в шаблоне не различить,
+         поэтому число ставим ПОСЛЕ слова: так верно при любом числе. #}
+      <span class="bd-tally">позиций: <b id="bd-count">0</b> ·
+        баллов: <b id="bd-points">0</b></span>
+    </div>
+
+    <div id="bd-list"></div>
+
+    <div class="bd-empty" id="bd-empty">
+      Пока ничего не выбрано.<br>
+      Вернитесь в подбор и отметьте задачи — или добавьте их из каталога.
+    </div>
+
+    <div class="k-row" style="gap:10px;margin-top:14px;flex-wrap:wrap">
+      <a class="k-btn k-btn--plain"
+         href="{% if is_exam and group_id %}{% url 'teacher:exam_create' group_id %}{% else %}{% url 'teacher:assignment_create' %}{% endif %}">
+        Добавить из каталога
+      </a>
+      <a class="k-btn k-btn--plain" href="{% url 'teacher:problem_new' %}">
+        Написать свою
+      </a>
+    </div>
+  </div>
+
+  <aside class="bd-side">
+    {% comment %}
+    ⚠️ ФОРМА УХОДИТ В ПРЕЖНИЙ ОБРАБОТЧИК. Адрес выбирается по виду работы,
+    а у контрольной — ещё и по выбранной группе: её конструктор живёт
+    ВНУТРИ группы. Адрес проставляет скрипт (`bd-form`), потому что группу
+    выбирают прямо здесь.
+    {% endcomment %}
+    <form method="post" id="picker-form"
+          action="{% url 'teacher:assignment_create' %}"
+          data-hw-url="{% url 'teacher:assignment_create' %}"
+          data-exam-url-template="/teacher/groups/0/exams/new/"
+          data-exam="{% if is_exam %}1{% else %}0{% endif %}">
+      {% csrf_token %}
+      <input type="hidden" name="problem_ids" id="problem-ids-input">
+      <input type="hidden" name="problem_points" id="problem-points-input">
+      <input type="hidden" name="manual_order" id="manual-order-input">
+
+      <div class="k-card">
+        <div class="k-label" style="margin-bottom:8px">Вид работы</div>
+        <div class="k-tiles" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+          {% comment %}
+          ⚠️ НОМЕР ГРУППЫ ЕДЕТ ЧЕРЕЗ ПЕРЕКЛЮЧАТЕЛЬ. Голая ссылка `?kind=…`
+          теряла группу, и контрольная молча собиралась в конструкторе
+          домашки — без окна и лимита времени.
+          {% endcomment %}
+          <a class="k-tile {% if not is_exam %}k-tile--on{% endif %}"
+             href="?kind=homework{% if group_id %}&amp;group={{ group_id }}{% endif %}">
+            <span class="k-tile__name">Домашка</span>
+            <span class="k-tile__note">срок сдачи</span>
+          </a>
+          <a class="k-tile {% if is_exam %}k-tile--on{% endif %}"
+             href="?kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}">
+            <span class="k-tile__name">Контрольная</span>
+            <span class="k-tile__note">окно и время</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="k-card">
+        <div class="k-label">Название</div>
+        <input class="k-input" type="text" name="name" id="id_name"
+               placeholder="{% if is_exam %}Например: Контрольная — эластичность{% else %}Например: Домашка 5 — КПВ{% endif %}"
+               required>
+
+        {% if is_exam %}
+        {% comment %}
+        Контрольная: окно (с — по) или лимит времени. Поля и правила — те
+        же, что в обычном конструкторе контрольной, и проверяет их тот же
+        обработчик.
+        {% endcomment %}
+        <div class="k-label" style="margin-top:14px">Как ограничим время</div>
+        <div class="k-row" style="gap:14px;flex-wrap:wrap">
+          <label class="k-check k-check--box">
+            <input type="radio" name="kind" value="window" checked
+                   class="bd-mode"> окно
+          </label>
+          <label class="k-check k-check--box">
+            <input type="radio" name="kind" value="limit" class="bd-mode">
+            лимит времени
+          </label>
+        </div>
+
+        <div class="bd-when is-on" data-mode="window">
+          <div class="k-label" style="margin-top:12px">Начало окна</div>
+          <input class="k-input" type="datetime-local" name="starts_at">
+          <div class="k-label" style="margin-top:10px">Конец окна</div>
+          <input class="k-input" type="datetime-local" name="ends_at">
+          <div class="k-hint">Окно не короче {{ min_window }} минут.</div>
+        </div>
+
+        <div class="bd-when" data-mode="limit">
+          <div class="k-label" style="margin-top:12px">Крайний срок</div>
+          <input class="k-input" type="datetime-local" name="deadline">
+          <div class="k-label" style="margin-top:10px">Сколько минут на работу</div>
+          <input class="k-input k-input--num" type="number" name="duration"
+                 min="{{ min_duration }}" max="{{ max_duration }}" value="45">
+        </div>
+
+        <label class="k-check k-check--box" style="margin-top:12px">
+          <input type="checkbox" name="show_results" checked>
+          показать результат сразу после сдачи
+        </label>
+        {% else %}
+        <div class="k-label" style="margin-top:14px">Срок сдачи</div>
+        <input class="k-input" type="datetime-local" name="deadline">
+        <div class="k-hint">Можно не задавать — тогда срока нет.</div>
+        {% endif %}
+      </div>
+
+      <div class="k-card">
+        <div class="k-label">Кому выдать</div>
+        {% if groups %}
+        <div class="bd-groups">
+          {% for g in groups %}
+          <label class="k-check k-check--box">
+            {% comment %}
+            ⚠️ У домашки группы — ГАЛОЧКИ (её можно выдать нескольким), у
+            контрольной — переключатели: контрольная живёт внутри одной
+            группы, её конструктор так и устроен. Обещать выбор, которого
+            система не держит, нельзя.
+            {% endcomment %}
+            <input type="{% if is_exam %}radio{% else %}checkbox{% endif %}"
+                   name="groups" value="{{ g.pk }}"
+                   {% if group_id and g.pk == group.pk %}checked{% endif %}>
+            <span>{{ g.name }}
+              <span class="k-quiet">· {{ g.students.count }} уч.</span></span>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="k-hint">Нет групп.
+          <a href="{% url 'teacher:group_create' %}">Создать группу</a>
+        </div>
+        {% endif %}
+
+        <div class="k-hint" id="submit-why" style="margin:10px 0 8px"></div>
+        <button type="submit" class="k-btn k-btn--main k-btn--wide"
+                id="submit-btn" disabled>
+          Создать {% if is_exam %}контрольную{% else %}работу{% endif %}
+        </button>
+      </div>
+    </form>
+  </aside>
+</div>
+</div>
+
+{% comment %}Разметка позиции — одна, скрипт клонирует её же.{% endcomment %}
+<template id="bd-item-tpl">
+  <div class="bd-item">
+    <span class="bd-num"></span>
+    <div class="bd-main">
+      <div class="bd-name"></div>
+      <div class="bd-meta"></div>
+    </div>
+    <div class="bd-right">
+      <input class="k-input k-input--num bd-points" type="number" min="0"
+             max="1000" step="any" aria-label="балл за задачу">
+      <button type="button" class="bd-drop" title="Убрать">×</button>
+    </div>
+  </div>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  'use strict';
+  var CART_KEY = '{{ cart_key }}';
+  var ROWS_URL = '{% url "teacher:api_cart_rows" %}';
+  var IS_EXAM = {% if is_exam %}true{% else %}false{% endif %};
+  var form = document.getElementById('picker-form');
+  var CSRF = document.querySelector('[name=csrfmiddlewaretoken]');
+
+  var cart = {};
+  try { cart = JSON.parse(sessionStorage.getItem(CART_KEY) || '{}'); }
+  catch (e) { cart = {}; }
+  var manualOrder = '';
+  try { manualOrder = sessionStorage.getItem('hw_manual_order') || ''; }
+  catch (e) {}
+  document.getElementById('manual-order-input').value = manualOrder;
+
+  var points = {};   // ключ корзины → балл, поставленный репетитором
+  var rows = [];
+
+  function saveCart() {
+    try { sessionStorage.setItem(CART_KEY, JSON.stringify(cart)); }
+    catch (e) {}
+  }
+
+  function keys() { return Object.keys(cart); }
+
+  function load() {
+    var list = keys();
+    if (!list.length) { rows = []; render(); return; }
+    var data = new FormData();
+    data.append('csrfmiddlewaretoken', CSRF ? CSRF.value : '');
+    data.append('keys', list.join(','));
+    data.append('manual_order', manualOrder === '1' ? '1' : '');
+    fetch(ROWS_URL, { method: 'POST', body: data })
+      .then(function (r) { return r.json(); })
+      .then(function (payload) { rows = payload.rows || []; render(); })
+      .catch(function () { rows = []; render(); });
+  }
+
+  function render() {
+    var host = document.getElementById('bd-list');
+    var tpl = document.getElementById('bd-item-tpl');
+    host.innerHTML = '';
+    document.getElementById('bd-empty').hidden = rows.length > 0;
+
+    rows.forEach(function (row, index) {
+      if (row.section) {
+        var sep = document.createElement('div');
+        sep.className = 'bd-sep';
+        sep.textContent = row.section;
+        host.appendChild(sep);
+      }
+      var node = tpl.content.firstElementChild.cloneNode(true);
+      node.dataset.key = row.key;
+      node.querySelector('.bd-num').textContent = (index + 1) + '.';
+      node.querySelector('.bd-name').textContent = row.title;
+      node.querySelector('.bd-meta').textContent = row.meta;
+      var field = node.querySelector('.bd-points');
+      field.value = (points[row.key] !== undefined)
+        ? points[row.key] : row.points;
+      points[row.key] = parseFloat(field.value) || 0;
+      host.appendChild(node);
+    });
+    recount();
+  }
+
+  function recount() {
+    var total = 0;
+    rows.forEach(function (row) { total += points[row.key] || 0; });
+    document.getElementById('bd-count').textContent = rows.length;
+    // Целое печатаем без хвоста: «24», а не «24.0».
+    document.getElementById('bd-points').textContent =
+      (Math.round(total * 100) / 100).toString().replace('.', ',');
+    document.getElementById('problem-ids-input').value =
+      rows.map(function (r) { return r.key; }).join(',');
+    document.getElementById('problem-points-input').value =
+      rows.map(function (r) { return r.key + ':' + (points[r.key] || 0); })
+        .join(',');
+    refreshSubmit();
+  }
+
+  // ⚠️ Неактивная кнопка ОБЪЯСНЯЕТ, чего не хватает — то же правило, что в
+  // прежних конструкторах: просто серая кнопка не говорит, чего ждут.
+  function refreshSubmit() {
+    var missing = [];
+    if (!rows.length) { missing.push('добавьте хотя бы одну задачу'); }
+    var name = form.querySelector('[name=name]');
+    if (name && !name.value.trim()) { missing.push('впишите название'); }
+    var boxes = form.querySelectorAll('[name=groups]');
+    if (boxes.length && ![].some.call(boxes, function (b) { return b.checked; })) {
+      missing.push(IS_EXAM ? 'выберите группу' : 'выберите группу');
+    }
+    var button = document.getElementById('submit-btn');
+    button.disabled = missing.length > 0;
+    var why = document.getElementById('submit-why');
+    why.textContent = missing.length
+      ? missing.join(', ').replace(/^./, function (c) { return c.toUpperCase(); }) + '.'
+      : '';
+  }
+
+  document.addEventListener('click', function (event) {
+    var drop = event.target.closest('.bd-drop');
+    if (!drop) { return; }
+    var item = drop.closest('.bd-item');
+    delete cart[item.dataset.key];
+    delete points[item.dataset.key];
+    saveCart();
+    rows = rows.filter(function (r) { return r.key !== item.dataset.key; });
+    render();
+  });
+
+  document.addEventListener('input', function (event) {
+    var field = event.target.closest('.bd-points');
+    if (field) {
+      var item = field.closest('.bd-item');
+      points[item.dataset.key] = parseFloat(field.value) || 0;
+      recount();
+      return;
+    }
+    refreshSubmit();
+  });
+  document.addEventListener('change', function (event) {
+    // Окно или лимит — показываем только нужные поля.
+    if (event.target.closest('.bd-mode')) {
+      var mode = event.target.value;
+      document.querySelectorAll('.bd-when').forEach(function (block) {
+        block.classList.toggle('is-on', block.dataset.mode === mode);
+      });
+    }
+    // ⚠️ У контрольной адрес формы зависит от группы: её конструктор живёт
+    // внутри группы. Без этого работа ушла бы в конструктор домашки.
+    if (event.target.name === 'groups' && IS_EXAM) {
+      form.action = form.dataset.examUrlTemplate
+        .replace('/groups/0/', '/groups/' + event.target.value + '/');
+    }
+    refreshSubmit();
+  });
+
+  form.addEventListener('submit', function () {
+    // Работа создана — корзину и память настроек чистим, иначе следующая
+    // откроется с задачами предыдущей.
+    setTimeout(function () {
+      try {
+        sessionStorage.removeItem(CART_KEY);
+        sessionStorage.removeItem('hw_settings');
+        sessionStorage.removeItem('hw_manual_order');
+      } catch (e) {}
+    }, 100);
+  });
+
+  {% if is_exam and group_id %}
+  form.action = form.dataset.examUrlTemplate
+    .replace('/groups/0/', '/groups/{{ group_id }}/');
+  {% endif %}
+
+  load();
+})();
+</script>
+{% include "teacher/_build_keep.html" %}
+{% endblock %}

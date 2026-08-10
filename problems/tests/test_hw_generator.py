@@ -308,7 +308,9 @@ class GenerateScreenTests(TestCase):
         self.assertIn('Вот что нашлось по вашему запросу', body)
         # ⚠️ Стоп-гейт показывает ЗАДАЧИ, а не темы: проверить нашу
         # таксономию репетитор не может, а названия задач — за пять секунд.
-        self.assertIn('Ваша строка', body)
+        # С сессии 8 каждая строка — раскрывающаяся карточка запроса.
+        self.assertIn('class="q-head"', body)
+        self.assertIn('cand-pick', body)
         self.assertNotIn('Найдено задач', body)
         self.assertEqual(len(calls), 1)
 

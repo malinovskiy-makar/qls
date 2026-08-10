@@ -33,7 +33,13 @@
 .rv-arrow:hover { background: var(--surface-2); }
 .rv-arrow.is-off { opacity: .35; pointer-events: none; }
 
-.rv-statement { font-size: 14px; line-height: 1.75; overflow-wrap: anywhere; }
+/* ⚠️ ПЕРЕНОСЫ ЧЕРЕЗ `pre-line`, А НЕ ЧЕРЕЗ `<br>`. Фильтр `linebreaksbr`
+   резал текст тегами, и авторендер KaTeX переставал видеть формулу
+   целиком: «\[» оставалось в одном текстовом узле, «\]» в другом, и на
+   экране проверки висел сырой TeX. Переносы при этом ровно те же —
+   `<br>` стоял на каждом «\n», `pre-line` их и показывает. */
+.rv-statement { font-size: 14px; line-height: 1.75; overflow-wrap: anywhere;
+                white-space: pre-line; }
 .rv-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
            margin: 14px 0; }
 .rv-box { background: var(--surface); border: 0.5px solid var(--border);
@@ -137,7 +143,7 @@
 
 <div class="k-card" style="margin-bottom:14px">
   <div class="rv-box-cap">Условие</div>
-  <div class="rv-statement">{{ statement|linebreaksbr }}</div>
+  <div class="rv-statement">{{ statement }}</div>
 </div>
 
 <form method="post">

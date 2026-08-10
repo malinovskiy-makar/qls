@@ -24,7 +24,7 @@ def exam_create(request, pk):
     """
     from problems.models import Assignment
 
-    from .picker import create_items, parse_cart, picker_context
+    from .picker import create_items, parse_cart, parse_points, picker_context
 
     group = own_group_or_404(request.user, pk)
     form = {'kind': 'window', 'show_results': True}
@@ -46,12 +46,23 @@ def exam_create(request, pk):
                 starts_at=form['starts_at'], ends_at=form['ends_at'],
                 duration_minutes=form['duration'],
                 deadline=form['deadline'],
-                show_results_immediately=form['show_results'])
+                show_results_immediately=form['show_results'],
+                # Порядок задан репетитором словами в описании — автоматическую
+                # перестановку «сначала тесты» отменяем (правило фазы 4).
+                manual_order=request.POST.get('manual_order') == '1')
             exam.students.set(group.students.all())
-            create_items(exam, request.user, keys, catalog_ids, custom_ids)
-            messages.success(request, f'Контрольная «{exam.name}» создана.')
-            return redirect('teacher:group_exam_results', group_id=group.pk,
-                            exam_id=exam.pk)
+            create_items(exam, request.user, keys, catalog_ids, custom_ids,
+                         points=parse_points(
+                             request.POST.get('problem_points')))
+            # ⚠️ ПОСЛЕ СОЗДАНИЯ — НА СТРАНИЦУ САМОЙ РАБОТЫ (сессия 8, п. 12.3),
+            # как и у домашки. Экран результатов сразу после создания пуст по
+            # построению: работу ещё никто не писал.
+            messages.success(
+                request,
+                'Работа «%s» создана и выдана группе «%s».'
+                % (exam.name, group.name))
+            return redirect('teacher:group_assignment', group_id=group.pk,
+                            assignment_id=exam.pk)
 
         for error in errors:
             messages.error(request, error)

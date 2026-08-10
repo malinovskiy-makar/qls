@@ -112,7 +112,10 @@ table.data tr:last-child td { border-bottom: none; }
 }
 .problem-num { font-size: 15px; font-weight: 600; }
 .problem-src { font-size: 12px; color: var(--text2); }
-.problem-statement { font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+/* Переносы — `pre-line`, а не `<br>`: тег внутри формулы разрывает её
+   для авторендера KaTeX, и на экране остаётся сырой TeX (см. review.html). */
+.problem-statement { font-size: 14px; line-height: 1.7; overflow-wrap: anywhere;
+                     white-space: pre-line; }
 .problem-statement :is(table, .katex-display) { max-width: 100%; overflow-x: auto; }
 .options { list-style: none; margin: 12px 0 0; padding: 0;
            display: flex; flex-direction: column; gap: 6px; }

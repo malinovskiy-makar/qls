@@ -1,0 +1,30 @@
+{% comment %}
+Строка кандидата на шаге «Что нашлось».
+
+Ждёт в контексте: card — карточка из `hw_generator.problem_card`
+(плюс поля `checked` и `taken_by`, которые проставляет `preview_rows`).
+
+Разметка ОДНА на серверный рендер и на догрузку «Показать ещё 5»: скрипт
+клонирует эту же строку из <template>, а не собирает свою. Вторая разметка
+разошлась бы с первой на первой же правке.
+{% endcomment %}
+<li class="cand{% if card.checked %} is-picked{% endif %}{% if card.taken_by %} is-taken{% endif %}"
+    data-pid="{{ card.id }}">
+  <label class="k-check k-check--box">
+    <input type="checkbox" class="cand-pick" value="{{ card.id }}"
+           data-title="{{ card.title }}"
+           {% if card.checked %}checked{% endif %}
+           {% if card.taken_by %}disabled{% endif %}>
+  </label>
+  <div class="cand-main">
+    {% comment %}
+    Название — кнопка: нажатие раскрывает начало условия прямо здесь.
+    Прямое требование владельца «задачи нужно иметь возможность отсмотреть».
+    {% endcomment %}
+    <div class="cand-name" role="button" tabindex="0">{{ card.title }}</div>
+    <div class="cand-meta">{{ card.meta }}</div>
+    <div class="cand-taken">уже выбрана в строке «<span class="cand-taken-row">{{ card.taken_by }}</span>»</div>
+    <div class="cand-body">{{ card.body }}</div>
+  </div>
+  <span class="conf conf-{{ card.confidence }}">{{ card.confidence_label }}</span>
+</li>

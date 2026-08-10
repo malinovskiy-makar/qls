@@ -164,11 +164,18 @@ def assignment_generate(request):
                            getattr(error, 'kind', 'other'), error)
             context['ai_error'] = _human_error(error)
             return render(request, 'teacher/generate.html', context)
-        context.update(step='plan', plan_rows=plan['rows'],
+        # ⚠️ КВОТА ДЕЛИТСЯ ПО ТИПУ ПРЯМО ЗДЕСЬ, а не на последнем шаге.
+        # Раньше репетитор видел строки модели, а деление на «открытые» и
+        # «тесты» происходило потом, невидимо. Теперь он ВЫБИРАЕТ задачи
+        # руками, и строка обязана честно говорить, что именно под ней
+        # ищется: тип — жёсткий отбор, и кандидаты под строку-тест другие.
+        rows = _split(plan['rows'], form)
+        context.update(step='plan', plan_rows=rows,
                        note=plan['note'], usage=plan.get('usage'),
                        cached=plan.get('cached'))
         context['previews'] = hw_generator.preview_rows(
-            plan['rows'], has_answer=form['has_answer'])
+            rows, has_answer=form['has_answer'])
+        context['manual_order'] = hw_generator.describes_order(form['text'])
         return render(request, 'teacher/generate.html', context)
 
     if action == 'research':
@@ -181,6 +188,7 @@ def assignment_generate(request):
         context.update(step='plan', plan_rows=rows)
         context['previews'] = hw_generator.preview_rows(
             rows, has_answer=form['has_answer'])
+        context['manual_order'] = hw_generator.describes_order(form['text'])
         messages.success(request, 'Переискал по вашим формулировкам — '
                                   'обращения к модели не потребовалось.')
         return render(request, 'teacher/generate.html', context)
@@ -194,9 +202,10 @@ def assignment_generate(request):
 
         exclude = _read_ids(request, 'exclude_ids')
         # Квота делится по типу: ровно столько тестов и ровно столько
-        # открытых задач, сколько попросили.
-        plan = hw_generator.split_by_kind(rows, form['count_open'],
-                                          form['count_test'])
+        # открытых задач, сколько попросили. ⚠️ Если строки УЖЕ поделены
+        # (шаг «Что нашлось» делит их сразу), второй раз делить нельзя —
+        # получилась бы четверть квоты на строку.
+        plan = _split(rows, form)
         found, short = hw_generator.find_problems(
             plan or rows, has_answer=form['has_answer'], exclude=exclude)
         cards = [hw_generator.problem_card(item['problem'],
@@ -228,6 +237,19 @@ def assignment_generate(request):
         return render(request, 'teacher/generate.html', context)
 
     return redirect('teacher:assignment_generate')
+
+
+def _split(rows, form):
+    """Строки плана → строки с типом. Уже поделённые не делим повторно.
+
+    ⚠️ Повторное деление — не мелочь: `split_by_kind` раздаёт квоту по
+    весам, и второй проход дал бы по четверти запрошенного на строку.
+    Признак «уже поделено» — заполненный `kind` хоть у одной строки.
+    """
+    if any(row.get('kind') for row in rows):
+        return list(rows)
+    return hw_generator.split_by_kind(rows, form['count_open'],
+                                      form['count_test']) or list(rows)
 
 
 def _read_form(request):
@@ -271,6 +293,7 @@ def _read_plan(request):
     topics = request.POST.getlist('row_topic')
     difficulties = request.POST.getlist('row_difficulty')
     counts = request.POST.getlist('row_count')
+    kinds = request.POST.getlist('row_kind')
     keep = set(request.POST.getlist('row_keep'))
 
     def at(values, index, default=''):
@@ -289,16 +312,131 @@ def _read_plan(request):
                                int(at(counts, index, '1'))))
         except ValueError:
             continue
-        rows.append({'query': query,
-                     'label': (at(labels, index) or query).strip(),
-                     'topic': at(topics, index).strip(),
-                     'difficulty': difficulty, 'count': count})
+        row = {'query': query,
+               'label': (at(labels, index) or query).strip(),
+               'topic': at(topics, index).strip(),
+               'difficulty': difficulty, 'count': count}
+        # ⚠️ Тип строки едет через форму. Без него «Переискать» превращало
+        # строку-тест в обычную, и под ней находились открытые задачи —
+        # ровно та подмена, которую чинили в прошлой сессии.
+        kind = at(kinds, index).strip()
+        if kind in ('open', 'test'):
+            row['kind'] = kind
+        rows.append(row)
     return rows
 
 
 def _read_ids(request, name):
     return [int(value) for value in request.POST.getlist(name)
             if value.isdigit()]
+
+
+@tutor_required
+def assignment_build(request):
+    """Конструктор подборки: слева превью работы, справа её настройки.
+
+    ⚠️ ЗАЧЕМ ОТДЕЛЬНЫЙ ЭКРАН. Раньше после «описать словами» репетитора
+    перекидывало в «Искать самому» — то есть в другой способ набора, с
+    поиском по каталогу во весь экран. Владелец: «странно, что мы прошли
+    весь путь описания словами, а нас перекидывает в «Искать самому»».
+
+    ⚠️ РАБОТУ СОЗДАЁТ НЕ ЭТОТ ЭКРАН. Форма уходит в те же обработчики, что
+    и у прежних конструкторов (`assignment_create` / `exam_create`): второй
+    точки создания работы нет, иначе правила разъедутся — сегодня в одной
+    появится проверка срока, завтра в другой нет.
+    """
+    from problems import exam_engine
+    from problems.models import StudentGroup
+
+    kind = request.GET.get('kind') or 'homework'
+    is_exam = kind == 'exam'
+    group = _group_or_none(request.user, request.GET.get('group'))
+    groups = _tutor_groups(request.user)
+    return render(request, 'teacher/assignment_build.html', {
+        'is_exam': is_exam,
+        'kind': kind,
+        'group': group,
+        'group_id': group.pk if group else '',
+        'groups': groups,
+        'cart_key': 'exam_cart' if is_exam else 'hw_cart',
+        'min_window': exam_engine.MIN_WINDOW_MINUTES,
+        'min_duration': exam_engine.MIN_DURATION_MINUTES,
+        'max_duration': exam_engine.MAX_DURATION_MINUTES,
+        'has_groups': bool(groups),
+        'group_model': StudentGroup,
+    })
+
+
+@tutor_required
+def api_cart_rows(request):
+    """Корзина → позиции работы в порядке, который увидит ученик.
+
+    Корзина живёт в `sessionStorage` (один механизм на все конструкторы),
+    поэтому названия и порядок приходится спрашивать у сервера: на клиенте
+    нет ни тем, ни признака «тест», ни правила расстановки частей.
+    """
+    from django.http import JsonResponse
+
+    from .picker import cart_rows
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'only POST'}, status=405)
+    keys = [key.strip() for key in
+            (request.POST.get('keys') or '').split(',') if key.strip()]
+    rows = cart_rows(keys, request.user,
+                     manual_order=request.POST.get('manual_order') == '1')
+    return JsonResponse({'rows': rows})
+
+
+@tutor_required
+def api_more_candidates(request):
+    """«Показать ещё 5» — СЛЕДУЮЩАЯ порция кандидатов под одну строку.
+
+    ⚠️ К МОДЕЛИ НЕ ХОДИМ И СЧЁТЧИК НЕ ТРОГАЕМ. Поиск по своему банку
+    обращений не стоит, и расходовать на него суточный лимит было бы
+    прямым обманом: репетитор увидел бы «использовано 7 из 30» после
+    единственного разбора запроса.
+    """
+    from django.http import JsonResponse
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'only POST'}, status=405)
+
+    def number(name, default, low, high):
+        try:
+            return max(low, min(high, int(request.POST.get(name) or default)))
+        except ValueError:
+            return default
+
+    query = (request.POST.get('query') or '').strip()
+    if not query:
+        return JsonResponse({'error': 'пустая строка запроса'}, status=400)
+    kind = (request.POST.get('kind') or '').strip()
+    row = {
+        'query': query,
+        'label': (request.POST.get('label') or query).strip(),
+        'topic': (request.POST.get('topic') or '').strip(),
+        'difficulty': number('difficulty', 3, 1, 5),
+        'count': number('count', 1, 1, hw_generator.MAX_PROBLEMS),
+    }
+    if kind in ('open', 'test'):
+        row['kind'] = kind
+
+    offset = number('offset', 0, 0, 500)
+    cards, has_more = hw_generator.row_candidates(
+        row, has_answer=request.POST.get('has_answer') == 'on',
+        offset=offset)
+    return JsonResponse({
+        'has_more': has_more,
+        'cards': [{
+            'id': card['id'],
+            'title': card['title'],
+            'meta': card['meta'],
+            'body': card['body'],
+            'confidence': card['confidence'],
+            'confidence_label': card['confidence_label'],
+        } for card in cards],
+    })
 
 
 # ---------------------------------------------------------------------------

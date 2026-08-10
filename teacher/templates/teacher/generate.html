@@ -65,16 +65,21 @@ textarea.gen-text:focus { border-color: var(--focus); }
 /* Подписи полей строки плана: два голых числа читались загадкой. */
 .plan-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .plan-cap { font-size: 11px; color: var(--text3); white-space: nowrap; }
-.plan-row { display: grid; grid-template-columns: auto 1fr 110px 110px;
-            gap: 10px; align-items: center; padding: 10px 0;
+/* ⚠️ ПОЛЕ «НУЖНО ЗАДАЧ» — УЗКОЕ. Сетка `auto 1fr 110px 110px` роняла его
+   во вторую колонку (1fr), и в поле на одну цифру уезжала половина ширины
+   карточки. Строка собрана флексом: формулировка занимает всю ширину,
+   два числовых поля стоят рядом и оба узкие. */
+.plan-row { display: flex; flex-wrap: wrap; gap: 10px;
+            align-items: flex-end; padding: 10px 0;
             border-bottom: 1px solid var(--border-soft); }
 .plan-row:last-of-type { border-bottom: none; }
-.plan-row .q { grid-column: 2 / -1; }
-.plan-row input[type=text], .plan-row input[type=number],
-.plan-row select { width: 100%; box-sizing: border-box; font: inherit;
+.plan-row .q { flex: 1 1 100%; order: -1; }
+.plan-row input[type=text], .plan-row select {
+  width: 100%; box-sizing: border-box; font: inherit;
   font-size: 13px; padding: 7px 10px; border-radius: var(--r);
   border: 1px solid var(--border); background: var(--surface);
   color: var(--text); }
+.plan-row .k-input--num { width: 68px; }
 .gen-note { background: var(--surface-2); border: 1px solid var(--border);
             border-radius: var(--r); padding: 10px 14px; font-size: 13px;
             line-height: 1.6; margin-bottom: 14px; }
@@ -91,24 +96,58 @@ textarea.gen-text:focus { border-color: var(--focus); }
 /* Сообщение об отказе модели — прямо над кнопкой, а не вверху страницы. */
 .gen-error { margin-top: 18px; }
 .gen-error a { color: var(--accent); }
-@media (max-width: 560px) {
-  .plan-row { grid-template-columns: auto 1fr; }
-  .plan-row .q { grid-column: 1 / -1; }
-}
 /* ── Стоп-гейт: найденные задачи, а не темы (Фаза B.5) ─────────
    Пометка уверенности — про факт, а не про красоту: зелёный «точное»,
    янтарь «близко», серый «ближайшее что нашлось». Акцентный малиновый
    здесь не используется: это подписи, а не действия. */
 .plan-block { border: 1px solid var(--border); border-radius: 10px;
-  padding: 12px 14px; margin-bottom: 12px; background: var(--surface); }
-.plan-said { font-size: 13px; color: var(--text2); margin: 8px 0 6px; }
+  padding: 0; margin-bottom: 10px; background: var(--surface);
+  overflow: hidden; }
 .plan-found { list-style: none; margin: 0; padding: 0; display: flex;
   flex-direction: column; gap: 6px; }
-.plan-found li { display: flex; gap: 8px; align-items: baseline;
-  flex-wrap: wrap; font-size: 13px; }
-.pf-name { font-weight: 600; }
-.pf-topics { color: var(--text2); font-size: 12px; }
-.pf-none { color: var(--text2); font-style: italic; }
+.pf-none { color: var(--text2); font-style: italic; font-size: 13px; }
+
+/* ── Карточка запроса: свёрнута/раскрыта ПРЯМО ЗДЕСЬ ──────────────────
+   Раскрытие без перезагрузки: репетитор сравнивает строки между собой,
+   и уход на другую страницу за каждой из них ломает сравнение. */
+.q-head { display: flex; gap: 10px; align-items: center; width: 100%;
+  padding: 12px 14px; background: none; border: 0; cursor: pointer;
+  font: inherit; color: var(--text); text-align: left; }
+.q-head:hover { background: var(--surface-2); }
+.q-arrow { color: var(--text3); font-size: 11px; width: 10px;
+  flex-shrink: 0; }
+.q-text { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; }
+.q-tally { font-size: 12px; color: var(--text3); white-space: nowrap;
+  padding: 3px 8px; border-radius: 999px; }
+/* Недобрали — тихая жёлтая плашка. Не тревога, а «здесь ещё не готово». */
+.q-tally.is-short { background: var(--amber-tint); color: var(--amber); }
+.q-body { display: none; padding: 0 14px 14px;
+  border-top: 1px solid var(--border-soft); }
+.plan-block.is-open .q-body { display: block; }
+.plan-block.is-open .q-arrow { transform: rotate(90deg); }
+.q-arrow { display: inline-block; transition: transform .12s ease; }
+
+/* Строка кандидата: галочка · название и мета · пометка уверенности. */
+.cand { display: flex; gap: 10px; align-items: flex-start;
+  padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; }
+.cand:hover { background: var(--surface-2); }
+.cand.is-picked { background: var(--accent-tint);
+  border-color: var(--accent-ring); }
+.cand.is-taken { opacity: .5; }
+.cand.is-taken:hover { background: none; }
+.cand-main { flex: 1; min-width: 0; }
+.cand-name { font-size: 13px; font-weight: 600; line-height: 1.4;
+  cursor: pointer; }
+.cand-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.cand-body { display: none; font-size: 13px; color: var(--text2);
+  line-height: 1.55; margin-top: 6px; padding-left: 10px;
+  border-left: 2px solid var(--border); overflow-wrap: anywhere; }
+.cand.is-shown .cand-body { display: block; }
+.cand-taken { display: none; font-size: 12px; color: var(--text3);
+  font-style: italic; margin-top: 2px; }
+.cand.is-taken .cand-taken { display: block; }
+.cand.is-taken .cand-meta { display: none; }
+.q-more { margin-top: 8px; }
 /* Капслоком не кричим: пометка уверенности — уточнение, а не тревога. */
 .conf { font-size: 11px; font-weight: 600;
   letter-spacing: .04em; padding: 2px 8px; border-radius: 999px;
@@ -118,8 +157,6 @@ textarea.gen-text:focus { border-color: var(--focus); }
 .conf-far   { background: var(--chip-bg); color: var(--chip-text); }
 .res-row-label { font-size: 12px; color: var(--text2); margin: 2px 0 6px; }
 @media (max-width: 560px) {
-  .plan-block .plan-row { display: flex; flex-wrap: wrap; }
-  .plan-block .plan-row .q { flex-basis: 100%; min-width: 0; }
   .conf { white-space: normal; }
 }
 {% endblock %}
@@ -344,56 +381,93 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
       жёсткий отбор: задачи другой сложности встанут ниже, но могут попасть.
     </div>
 
+    {% comment %}
+    ⚠️ КАРТОЧКА ЗАПРОСА РАСКРЫВАЕТСЯ НА МЕСТЕ (сессия 8, фаза 2 / п. 12.1).
+    Раньше под строкой висели три названия без выбора и серая строка
+    «Ваша строка: «…»», дословно повторявшая поле ввода выше. Владелец:
+    «непонятно, что вообще происходит на этом экране; сами задачи, которые
+    предлагает сайт, нужно иметь возможность отсмотреть».
+    {% endcomment %}
     {% for preview in previews %}
-    <div class="plan-block">
-      {% comment %}
-      ⚠️ ОБА ПОЛЯ ПОДПИСАНЫ. Раньше под строкой стояли два голых числа, и
-      что они значат, понять было нельзя — подпись жила только в подсказке
-      при наведении, которой на телефоне нет вовсе. Владелец так и спросил:
-      зачем их два и чем они отличаются.
-      {% endcomment %}
-      <div class="plan-row">
-        <label class="k-check" style="height:auto;">
-          <input type="checkbox" name="row_keep" value="{{ forloop.counter0 }}" checked>
-        </label>
-        <input class="q k-input" type="text" name="row_query"
-               value="{{ preview.row.query }}"
-               placeholder="о чём должны быть задачи">
-        <label class="plan-field">
-          <span class="plan-cap">сложность</span>
-          <input class="k-input" type="number" name="row_difficulty" min="1" max="5"
-                 value="{{ preview.row.difficulty }}">
-        </label>
-        <label class="plan-field">
-          <span class="plan-cap">сколько задач</span>
-          <input class="k-input" type="number" name="row_count" min="1" max="30"
-                 value="{{ preview.row.count }}">
-        </label>
-        <input type="hidden" name="row_label" value="{{ preview.row.label }}">
-        <input type="hidden" name="row_topic" value="{{ preview.row.topic }}">
+    <div class="plan-block" data-row="{{ preview.index }}"
+         data-label="{{ preview.row.label }}">
+      <button type="button" class="q-head" aria-expanded="false">
+        <span class="q-arrow" aria-hidden="true">▶</span>
+        <span class="q-text">{{ preview.row.label }}</span>
+        <span class="q-tally">сложность {{ preview.row.difficulty }} ·
+          нужно {{ preview.row.count }} ·
+          выбрано <b class="q-picked">{{ preview.picked }}</b></span>
+      </button>
+
+      <div class="q-body">
+        {% comment %}
+        ⚠️ ОБА ПОЛЯ ПОДПИСАНЫ И ОБА УЗКИЕ. Раньше под строкой стояли два
+        голых числа, и что они значат, понять было нельзя — подпись жила
+        только в подсказке при наведении, которой на телефоне нет вовсе.
+        {% endcomment %}
+        <div class="plan-row">
+          <label class="k-check" style="height:auto;">
+            <input type="checkbox" name="row_keep" value="{{ forloop.counter0 }}" checked>
+          </label>
+          <input class="q k-input" type="text" name="row_query"
+                 value="{{ preview.row.query }}"
+                 placeholder="о чём должны быть задачи">
+          <label class="plan-field">
+            <span class="plan-cap">сложность</span>
+            <input class="k-input k-input--num" type="number" name="row_difficulty"
+                   min="1" max="5" value="{{ preview.row.difficulty }}">
+          </label>
+          <label class="plan-field">
+            <span class="plan-cap">нужно задач</span>
+            <input class="k-input k-input--num" type="number" name="row_count"
+                   min="1" max="30" value="{{ preview.row.count }}">
+          </label>
+          <input type="hidden" name="row_label" value="{{ preview.row.label }}">
+          <input type="hidden" name="row_topic" value="{{ preview.row.topic }}">
+          <input type="hidden" name="row_kind" value="{{ preview.row.kind|default:'' }}">
+        </div>
+
+        <ul class="plan-found">
+          {% for card in preview.cards %}
+          {% include "teacher/_cand_row.html" with card=card %}
+          {% empty %}
+          <li class="pf-none">По этой строке в банке ничего не нашлось —
+            поправьте формулировку.</li>
+          {% endfor %}
+        </ul>
+
+        {% if preview.cards %}
+        <div class="q-more">
+          <button type="button" class="k-btn k-btn--plain k-btn--sm q-more-btn"
+                  data-offset="{{ preview.want }}"
+                  {% if not preview.has_more %}disabled{% endif %}>
+            Показать ещё 5
+          </button>
+          <span class="k-hint" style="margin-left:8px">поиск по банку —
+            обращений к модели не стоит</span>
+        </div>
+        {% endif %}
       </div>
-      <div class="plan-said">
-        Ваша строка: «{{ preview.row.label }}» — задач: {{ preview.row.count }}
-        <span class="conf conf-{{ preview.confidence|default:'far' }}">{{ preview.confidence_label }}</span>
-      </div>
-      <ul class="plan-found">
-        {% for card in preview.cards %}
-        <li>
-          <span class="pf-name">{{ card.title }}</span>
-          {% if card.topics %}<span class="pf-topics">{{ card.topics }}</span>{% endif %}
-          <span class="conf conf-{{ card.confidence }}">{{ card.confidence_label }}</span>
-        </li>
-        {% empty %}
-        <li class="pf-none">По этой строке в банке ничего не нашлось —
-          поправьте формулировку.</li>
-        {% endfor %}
-      </ul>
     </div>
     {% endfor %}
 
+    {% comment %}
+    Заготовка строки кандидата для догрузки. Разметка ОДНА: скрипт клонирует
+    ровно тот же партиал, что рисует сервер.
+    {% endcomment %}
+    <template id="cand-tpl">{% include "teacher/_cand_row.html" %}</template>
+
     <div class="gen-actions">
-      <button type="submit" class="k-btn k-btn--main" name="step_action" value="search">
-        Подобрать задачи
+      {% comment %}
+      Кнопка ведёт в КОНСТРУКТОР ПОДБОРКИ (фаза 3), а не собирает работу
+      сама: настройки работы спрашиваются там, на одном экране с превью.
+      {% endcomment %}
+      <button type="button" class="k-btn k-btn--main" id="to-cart"
+              data-manual-order="{% if manual_order %}1{% else %}0{% endif %}"
+              data-exam="{% if is_exam %}1{% else %}0{% endif %}"
+              data-group="{{ group_id }}"
+              data-build-url="{% url 'teacher:assignment_build' %}">
+        Отправить в конструктор подборок
       </button>
       <button type="submit" class="k-btn k-btn--plain" name="step_action" value="research">
         Переискать по моим формулировкам
@@ -488,8 +562,8 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
             data-manual-order="{% if manual_order %}1{% else %}0{% endif %}"
             data-exam="{% if is_exam %}1{% else %}0{% endif %}"
             data-group="{{ group_id }}"
-            data-hw-url="{% url 'teacher:assignment_create' %}">
-      Отправить в конструктор {% if is_exam %}контрольной{% else %}домашки{% endif %}
+            data-build-url="{% url 'teacher:assignment_build' %}">
+      Отправить в конструктор подборок
     </button>
     <button type="button" class="k-btn k-btn--plain" id="again">Подобрать другие</button>
     <a href="{% url 'teacher:assignment_generate' %}" class="k-btn k-btn--quiet">Начать заново</a>
@@ -524,13 +598,11 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
   if (!toCart) { return; }
   toCart.addEventListener('click', function () {
     // Кладём выбранное в ТУ ЖЕ корзину, что и обычный конструктор
-    // (sessionStorage) и уходим туда. Второго механизма добавления задач
-    // не заводим.
+    // (sessionStorage), и уходим в конструктор подборки. Второго механизма
+    // передачи задач не заводим.
     //
-    // ⚠️ У контрольной СВОЙ ключ корзины («exam_cart») и свой конструктор:
-    // там уже спрошены окно, лимит времени и «показывать результат сразу».
-    // Второй формы настроек времени мы не пишем — это была бы та же форма,
-    // обречённая разойтись с первой.
+    // ⚠️ У контрольной СВОЙ ключ корзины («exam_cart»): недособранная
+    // домашка не должна утекать в контрольную.
     var isExam = toCart.dataset.exam === '1';
     var cartKey = isExam ? 'exam_cart' : 'hw_cart';
     var cart = {};
@@ -545,8 +617,8 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
                              toCart.dataset.manualOrder === '1' ? '1' : '');
     } catch (e) {}
     var added = 0;
-    document.querySelectorAll('.gen-pick').forEach(function (box) {
-      if (!box.checked) { return; }
+    document.querySelectorAll('.gen-pick, .cand-pick').forEach(function (box) {
+      if (!box.checked || box.disabled) { return; }
       cart[box.value] = { title: box.dataset.title };
       added += 1;
     });
@@ -556,17 +628,11 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     }
     sessionStorage.setItem(cartKey, JSON.stringify(cart));
 
-    if (!isExam) {
-      window.location.href = toCart.dataset.hwUrl;
-      return;
-    }
+    var url = toCart.dataset.buildUrl + '?kind=' + (isExam ? 'exam' : 'homework');
     var chooser = document.getElementById('exam-group');
     var group = toCart.dataset.group || (chooser && chooser.value) || '';
-    if (!group) {
-      window.alert('Выберите группу: контрольная выдаётся группе.');
-      return;
-    }
-    window.location.href = '/teacher/groups/' + group + '/exams/new/';
+    if (group) { url += '&group=' + group; }
+    window.location.href = url;
   });
 
   document.addEventListener('change', function (event) {
@@ -575,6 +641,176 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     var card = box.closest('.res-card');
     if (card) { card.classList.toggle('is-off', !box.checked); }
   });
+})();
+</script>
+
+{% comment %}
+Шаг «Что нашлось»: раскрытие карточек, просмотр условия, выбор галочками,
+дедупликация на всю подборку и догрузка кандидатов.
+{% endcomment %}
+<script>
+(function () {
+  var blocks = document.querySelectorAll('.plan-block');
+  if (!blocks.length) { return; }
+  var MORE_URL = '{% url "teacher:api_more_candidates" %}';
+  var CSRF = document.querySelector('[name=csrfmiddlewaretoken]');
+
+  function tokenOf(name) {
+    var input = document.querySelector('[name="' + name + '"]');
+    return input ? input.value : '';
+  }
+
+  // ── Дедупликация НА ВСЮ ПОДБОРКУ ────────────────────────────────────
+  // Одна и та же задача честно попадает в две строки. Пока выбирать было
+  // нельзя, это только смущало; с выбором репетитор взял бы её дважды.
+  // Первая отметка «занимает» задачу, остальные её вхождения гаснут и
+  // объясняют, где она уже выбрана.
+  function syncPicks() {
+    // Владелец задачи — та галочка, что отмечена ПЕРВОЙ по странице.
+    var owner = {};
+    document.querySelectorAll('.cand-pick').forEach(function (box) {
+      if (!box.checked) { return; }
+      if (owner[box.value]) { box.checked = false; }   // второй раз не берём
+      else { owner[box.value] = box; }
+    });
+    document.querySelectorAll('.cand').forEach(function (item) {
+      var box = item.querySelector('.cand-pick');
+      if (!box) { return; }
+      var holder = owner[box.value];
+      var taken = Boolean(holder) && holder !== box;
+      box.disabled = taken;
+      item.classList.toggle('is-taken', taken);
+      item.classList.toggle('is-picked', box.checked);
+      if (taken) {
+        var row = holder.closest('.plan-block');
+        var note = item.querySelector('.cand-taken-row');
+        if (note) { note.textContent = row ? row.dataset.label : ''; }
+      }
+    });
+    blocks.forEach(function (block) {
+      var picked = block.querySelectorAll('.cand-pick:checked').length;
+      var need = parseInt(
+        (block.querySelector('[name=row_count]') || {}).value || '0', 10) || 0;
+      var counter = block.querySelector('.q-picked');
+      if (counter) { counter.textContent = picked; }
+      var tally = block.querySelector('.q-tally');
+      if (tally) { tally.classList.toggle('is-short', picked < need); }
+    });
+  }
+
+  // ── Раскрытие карточки запроса ──────────────────────────────────────
+  document.addEventListener('click', function (event) {
+    var head = event.target.closest('.q-head');
+    if (head) {
+      var block = head.closest('.plan-block');
+      var open = block.classList.toggle('is-open');
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+      return;
+    }
+    // Название кандидата — раскрыть начало условия прямо здесь.
+    var name = event.target.closest('.cand-name');
+    if (name) {
+      var cand = name.closest('.cand');
+      cand.classList.toggle('is-shown');
+      if (cand.classList.contains('is-shown')
+          && typeof renderMathInElement !== 'undefined') {
+        var body = cand.querySelector('.cand-body');
+        maskEscapedDollars(body);
+        renderMathInElement(body, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\[', right: '\\]', display: true },
+            { left: '\\(', right: '\\)', display: false }
+          ],
+          throwOnError: false
+        });
+        fixCurrencyDollars(body);
+      }
+      return;
+    }
+    var more = event.target.closest('.q-more-btn');
+    if (more) { loadMore(more); }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter' && event.key !== ' ') { return; }
+    var name = event.target.closest('.cand-name');
+    if (!name) { return; }
+    event.preventDefault();
+    name.click();
+  });
+
+  document.addEventListener('change', function (event) {
+    if (event.target.closest('.cand-pick')) { syncPicks(); }
+    if (event.target.closest('[name=row_count]')) { syncPicks(); }
+  });
+
+  // ── «Показать ещё 5» ────────────────────────────────────────────────
+  // ⚠️ Ходит В БАНК, а не к модели: счётчик обращений от этого не растёт.
+  function loadMore(button) {
+    var block = button.closest('.plan-block');
+    var offset = parseInt(button.dataset.offset || '0', 10) || 0;
+    var data = new FormData();
+    data.append('csrfmiddlewaretoken', CSRF ? CSRF.value : '');
+    data.append('query', (block.querySelector('[name=row_query]') || {}).value || '');
+    data.append('label', block.dataset.label || '');
+    data.append('topic', (block.querySelector('[name=row_topic]') || {}).value || '');
+    data.append('kind', (block.querySelector('[name=row_kind]') || {}).value || '');
+    data.append('difficulty', (block.querySelector('[name=row_difficulty]') || {}).value || '3');
+    data.append('count', (block.querySelector('[name=row_count]') || {}).value || '1');
+    data.append('offset', String(offset));
+    if (tokenOf('has_answer')) { data.append('has_answer', 'on'); }
+
+    button.disabled = true;
+    button.textContent = 'Ищу…';
+    fetch(MORE_URL, { method: 'POST', body: data,
+                      headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        var list = block.querySelector('.plan-found');
+        (payload.cards || []).forEach(function (card) {
+          list.appendChild(makeRow(card));
+        });
+        button.dataset.offset = String(offset + (payload.cards || []).length);
+        button.textContent = 'Показать ещё 5';
+        button.disabled = !payload.has_more || !(payload.cards || []).length;
+        syncPicks();
+      })
+      .catch(function () {
+        button.textContent = 'Не получилось — нажмите ещё раз';
+        button.disabled = false;
+      });
+  }
+
+  // Разметка строки — КЛОН серверной (`_cand_row.html` в <template>).
+  // Вторая разметка разошлась бы с первой на первой же правке.
+  function makeRow(card) {
+    var tpl = document.getElementById('cand-tpl');
+    var node = tpl.content.firstElementChild.cloneNode(true);
+    node.dataset.pid = card.id;
+    var box = node.querySelector('.cand-pick');
+    box.value = card.id;
+    box.dataset.title = card.title;
+    box.checked = false;
+    box.disabled = false;
+    node.querySelector('.cand-name').textContent = card.title;
+    node.querySelector('.cand-meta').textContent = card.meta;
+    node.querySelector('.cand-body').textContent = card.body;
+    var conf = node.querySelector('.conf');
+    conf.className = 'conf conf-' + card.confidence;
+    conf.textContent = card.confidence_label;
+    node.classList.remove('is-picked', 'is-taken', 'is-shown');
+    return node;
+  }
+
+  // Первая карточка раскрыта: экран, на котором всё свёрнуто, выглядит
+  // пустым, а посмотреть найденное — и есть смысл этого шага.
+  if (blocks.length) {
+    blocks[0].classList.add('is-open');
+    blocks[0].querySelector('.q-head').setAttribute('aria-expanded', 'true');
+  }
+  syncPicks();
 })();
 </script>
 

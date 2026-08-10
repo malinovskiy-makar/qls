@@ -194,7 +194,12 @@ class StopGateTests(TestCase):
                 reverse('teacher:assignment_generate'),
                 {'step_action': 'parse', 'text': 'домашка про КТВ', 'count': 2,
                  'min_difficulty': 1, 'max_difficulty': 5}).content.decode()
-        self.assertIn('Ваша строка: «построение КТВ»', body)
+        # ⚠️ Серая строка «Ваша строка: «…»» УБРАНА (сессия 8, п. 12.1): она
+        # дословно повторяла поле ввода, стоявшее строкой выше. Формулировка
+        # репетитора никуда не делась — она стала заголовком карточки
+        # запроса, по которому карточка раскрывается.
+        self.assertNotIn('Ваша строка', body)
+        self.assertIn('q-text">построение КТВ<', body)
         self.assertIn('КТВ двух стран при торговле', body)
 
     def test_research_one_row_does_not_call_the_model(self):

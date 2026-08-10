@@ -103,3 +103,4 @@ ocr_pdf.swift
 
 # Аудит чистых задач
 clean_audit.txt
+db_check.sqlite3

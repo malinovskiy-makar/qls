@@ -262,14 +262,17 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
   <div class="item-body">
     <h2 class="item-title"><span class="item-num">{{ row.number }}.</span>{{ row.title }}</h2>
 
-    <div class="problem-statement">{{ row.item.statement|linebreaksbr }}</div>
+    <div class="problem-statement">{{ row.item.statement }}</div>
 
     {% if row.parts %}
     <div style="margin-top: 10px;">
+      {% comment %}
+      ⚠️ Содержимое блока — БЕЗ отступов и переносов внутри тега: у него
+      `white-space: pre-line`, и отступы шаблона превратились бы в пустые
+      строки на экране.
+      {% endcomment %}
       {% for part in row.parts %}
-        <div class="problem-statement" style="margin-top: 6px;">
-          <strong>{{ part.label }})</strong> {{ part.statement|linebreaksbr }}
-        </div>
+        <div class="problem-statement" style="margin-top: 6px;"><strong>{{ part.label }})</strong> {{ part.statement }}</div>
       {% endfor %}
     </div>
     {% endif %}

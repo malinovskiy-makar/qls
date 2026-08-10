@@ -46,6 +46,16 @@ HINT_COUNT = 12       # сколько реальных задач показы�
 # запрет: если из-за него не набирается квота, он отступает (см. ниже).
 SOURCE_CAP = 3
 
+# ⚠️ КАНДИДАТОВ ПОКАЗЫВАЕМ ВДВОЕ БОЛЬШЕ, ЧЕМ ПРОСИЛИ, НО НЕ МЕНЬШЕ ПЯТИ.
+# Причина в самом смысле экрана: репетитор ВЫБИРАЕТ. Показать ровно столько,
+# сколько нужно, — значит не дать выбора вовсе, а показать одну задачу на
+# просьбу «одна задача» — тем более. Просят одну → пять, просят десять →
+# двадцать.
+CANDIDATES_MIN = 5
+CANDIDATES_FACTOR = 2
+# Порция кнопки «Показать ещё». Ходит в БАНК, не к модели.
+CANDIDATES_MORE = 5
+
 PLAN_SCHEMA = {
     'type': 'object',
     'properties': {
@@ -516,8 +526,10 @@ def _materialise(hits, has_answer, sources):
     ids = [hit['id'] for hit in hits]
     if not ids:
         return []
+    # `source_references__source` — карточке нужно НАЗВАНИЕ источника
+    # («тема · сложность · источник»), а не только его номер.
     queryset = Problem.objects.filter(pk__in=ids).prefetch_related(
-        'topics', 'source_references')
+        'topics', 'source_references__source')
     if has_answer:
         queryset = queryset.exclude(answer='').filter(answer__isnull=False)
     by_id = {p.pk: p for p in queryset}
@@ -588,49 +600,128 @@ def _source_of(problem):
     return reference[0].source_id if reference else None
 
 
+def card_source(problem):
+    """Название источника задачи — одно, первое. Нет источника → ''."""
+    reference = problem.source_references.all()[:1]
+    if not reference:
+        return ''
+    source = reference[0].source
+    return source.name if source else ''
+
+
 def problem_card(problem, confidence='', how=''):
     """Как задача выглядит на экране подтверждения и в корзине."""
     from catalog import hybrid
 
+    topics = ', '.join(t.name for t in problem.topics.all()
+                       if t.name != 'Тест')
+    source = card_source(problem)
+    meta = ' · '.join(part for part in (
+        topics,
+        'сложность %s' % problem.difficulty if problem.difficulty else '',
+        source,
+    ) if part)
     return {
         'problem': problem,
         'id': problem.pk,
         'title': preview_title(problem, limit=90),
         'preview': clean((problem.statement or ''))[:220],
-        'topics': ', '.join(t.name for t in problem.topics.all()
-                            if t.name != 'Тест'),
+        # Начало условия целиком — репетитор ОТСМАТРИВАЕТ задачу, а по
+        # 220 символам понять, годится ли она, нельзя.
+        'body': clean((problem.statement or ''))[:900],
+        'topics': topics,
+        'source': source,
+        # Одна тихая строка «тема · сложность N · источник» — как в карточке
+        # ручного поиска: это один и тот же по смыслу объект.
+        'meta': meta,
         'difficulty': problem.difficulty,
+        'is_test': is_test_problem(problem),
         'confidence': confidence,
         'confidence_label': hybrid.CONFIDENCE_LABELS.get(confidence, ''),
         'how': how,
     }
 
 
-def preview_rows(rows, has_answer=False, sources=None, per_row=3):
-    """Что нашлось по каждой строке — для экрана подтверждения.
+def candidates_wanted(count):
+    """Сколько кандидатов показать под строкой, которая просит `count` задач."""
+    return max(CANDIDATES_MIN, CANDIDATES_FACTOR * max(1, int(count or 1)))
+
+
+def row_candidates(row, has_answer=False, sources=None, offset=0, size=None):
+    """Порция кандидатов под ОДНУ строку. Обращений к модели не стоит.
+
+    Порядок выдачи детерминированный (`search_row` сортирует по рангу),
+    поэтому «показать ещё» — это честное продолжение того же списка, а не
+    новая случайная выборка.
+    """
+    size = size or CANDIDATES_MORE
+    # Просим у поиска с запасом на всю прочитанную часть списка: лимит
+    # считается от `count`, а нам нужен хвост за `offset`.
+    deep = dict(row)
+    deep['count'] = max(1, offset + size)
+    items = search_row(deep, has_answer=has_answer, sources=sources)
+    chunk = items[offset:offset + size]
+    cards = [problem_card(item['problem'], item['confidence'],
+                          item.get('how', ''))
+             for item in chunk]
+    return cards, len(items) > offset + size
+
+
+def preview_rows(rows, has_answer=False, sources=None, per_row=None):
+    """Что нашлось по каждой строке — карточки запроса с выбором.
 
     ⚠️ СТОП-ГЕЙТ ПОКАЗЫВАЕТ ЗАДАЧИ, А НЕ ТЕМЫ. Раньше на нём стояли темы,
     выбранные моделью, и проверить их репетитор не мог: нашей таксономии он
     не знает. Именно там и пряталась ошибка с КТВ — «Альтернативные
     издержки и КПВ» выглядит правдоподобно, пока не увидишь, что нашлось.
-    Названия двух-трёх задач репетитор проверяет за пять секунд.
+
+    ⚠️ ДЕДУПЛИКАЦИЯ — НА ВСЮ ПОДБОРКУ, А НЕ ВНУТРИ СТРОКИ. Раньше здесь её
+    не было вовсе: каждая строка искала независимо, и одна и та же задача
+    честно попадала в две строки («Малая открытая экономика и импортный
+    тариф» встала и в строку про малую экономику, и в строку про параметр).
+    Пока выбирать было нельзя, это только смущало; с выбором репетитор
+    взял бы её дважды. Настоящий подбор (`find_problems`) дедуплицировал на
+    всю подборку всегда — расходились именно эти два места.
+
+    Повтор из списка НЕ выбрасываем: он показывается приглушённым с
+    пометкой, в какой строке уже выбран. Спрятать его — значит оставить
+    репетитора гадать, почему задача, которую он тут ждал, не пришла.
 
     Обращений к модели не стоит — это тот же поиск по банку.
     """
     from catalog import hybrid
 
     previews = []
+    chosen = {}   # id задачи → подпись строки, в которой она уже выбрана
     for index, row in enumerate(rows):
+        want = per_row or candidates_wanted(row.get('count', 1))
         items = search_row(row, has_answer=has_answer, sources=sources)
         cards = [problem_card(item['problem'], item['confidence'],
                               item.get('how', ''))
-                 for item in items[:per_row]]
+                 for item in items[:want]]
+
+        # Предварительно отмечаем ровно столько, сколько попросили, —
+        # экран открывается готовым к отправке, но выбор можно поменять.
+        need = int(row.get('count', 1) or 1)
+        for card in cards:
+            taken_by = chosen.get(card['id'])
+            card['taken_by'] = taken_by or ''
+            card['checked'] = False
+            if taken_by or need <= 0:
+                continue
+            card['checked'] = True
+            chosen[card['id']] = row.get('label') or row.get('query') or ''
+            need -= 1
+
         best = items[0]['confidence'] if items else 'far'
         previews.append({
             'index': index,
             'row': row,
             'cards': cards,
             'total': len(items),
+            'want': want,
+            'has_more': len(items) > want,
+            'picked': sum(1 for c in cards if c['checked']),
             'confidence': best if items else '',
             'confidence_label': (hybrid.CONFIDENCE_LABELS.get(best, '')
                                  if items else 'ничего не нашлось'),

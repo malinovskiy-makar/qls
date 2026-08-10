@@ -170,28 +170,134 @@ def parse_cart(raw):
     return keys, catalog, custom
 
 
-def create_items(assignment, owner, keys, catalog_ids, custom_ids):
+def cart_rows(keys, owner, manual_order=False):
+    """Корзина → позиции будущей работы В ТОМ ЖЕ ПОРЯДКЕ, что увидит ученик.
+
+    ⚠️ СБОРКА ОДНА НА ВСЕХ. Порядок и подписи частей считает
+    `assignment_rows.ordered_items` + `section_marks` — те же функции, что
+    рисуют работу ученику, репетитору, печатному листку и `.tex`. Второй
+    сборки нет намеренно: превью, которое расходится с готовой работой,
+    хуже отсутствия превью.
+
+    Позиции создаются В ПАМЯТИ (никаких записей в базу): работы ещё нет,
+    а порядок показать надо.
+    """
+    from types import SimpleNamespace
+
+    from problems import assignment_rows
+    from problems.models import AssignmentItem, CustomProblem, Problem
+    from problems.models_platform import default_points
+
+    keys = [key for key in keys if key]
+    catalog_ids = [int(k) for k in keys if k.isdigit()]
+    custom_ids = [int(k[1:]) for k in keys
+                  if k.startswith('c') and k[1:].isdigit()]
+    catalog = {p.pk: p for p in Problem.objects.filter(pk__in=catalog_ids)
+               .prefetch_related('topics', 'source_references__source')}
+    custom = {c.pk: c for c in CustomProblem.objects.filter(
+        pk__in=custom_ids, owner=owner, is_deleted=False)}
+
+    items, by_item = [], {}
+    for order, key in enumerate(keys):
+        item = None
+        if key.isdigit() and int(key) in catalog:
+            item = AssignmentItem(order=order,
+                                  catalog_problem=catalog[int(key)])
+        elif key.startswith('c') and key[1:].isdigit() \
+                and int(key[1:]) in custom:
+            item = AssignmentItem(order=order,
+                                  custom_problem=custom[int(key[1:])])
+        if item is None:
+            continue
+        items.append(item)
+        by_item[id(item)] = key
+
+    shell = SimpleNamespace(manual_order=bool(manual_order))
+    ordered = assignment_rows.ordered_items(shell, items)
+    marks = assignment_rows.section_marks(ordered)
+
+    rows = []
+    for index, item in enumerate(ordered):
+        problem = item.problem
+        # ⚠️ У своей задачи репетитора тема ОДНА (`topic`), у каталожной —
+        # набор (`topics`). Одна строка «тема · тип · сложность» на обе,
+        # чтобы превью не разъезжалось по виду задачи.
+        if item.is_custom:
+            topics = [problem.topic] if problem.topic_id else []
+            kind = problem.get_kind_display()
+        else:
+            topics = list(problem.topics.all())[:1]
+            kind = problem.problem_type
+        rows.append({
+            'key': by_item[id(item)],
+            'title': preview_title(problem, limit=90),
+            'meta': card_meta(topics, kind, problem.difficulty or 0),
+            'is_test': item.is_test,
+            'points': float(default_points(item.is_test)),
+            'section': marks.get(index, ''),
+        })
+    return rows
+
+
+def parse_points(raw):
+    """Разбор строки «12:3,c7:10» → {ключ корзины: балл}.
+
+    Пустая строка и мусор дают пустой словарь: балл позиции тогда ставит
+    `AssignmentItem.save()` по умолчанию (10 задаче, 3 тесту). Отдельного
+    правила «сколько стоит задача» здесь нет и быть не должно.
+    """
+    points = {}
+    for chunk in (raw or '').split(','):
+        key, _, value = chunk.partition(':')
+        key = key.strip()
+        value = value.strip().replace(',', '.')
+        if not key or not value:
+            continue
+        try:
+            number = float(value)
+        except ValueError:
+            continue
+        if number < 0 or number > 1000:
+            continue
+        points[key] = number
+    return points
+
+
+def create_items(assignment, owner, keys, catalog_ids, custom_ids,
+                 points=None):
     """Создаёт позиции работы в порядке корзины. Возвращает их число.
 
     Одна точка на домашку и контрольную: раньше контрольная умела класть
     только каталожные задачи, и своя задача репетитора в неё не попадала.
+
+    `points` — {ключ корзины: балл} из конструктора подборки. Не задан —
+    балл проставит `AssignmentItem.save()` по умолчанию.
     """
+    from decimal import Decimal
+
     from problems.models import AssignmentItem, CustomProblem, Problem
 
     catalog = {p.pk: p for p in Problem.objects.filter(pk__in=catalog_ids)}
     custom = {c.pk: c for c in CustomProblem.objects.filter(
         pk__in=custom_ids, owner=owner, is_deleted=False)}
+    points = points or {}
+
+    def score(key):
+        value = points.get(key)
+        return None if value is None else Decimal(str(value))
 
     order = 0
     for key in keys:
         if key.isdigit() and int(key) in catalog:
             AssignmentItem.objects.create(assignment=assignment, order=order,
-                                          catalog_problem=catalog[int(key)])
+                                          catalog_problem=catalog[int(key)],
+                                          points=score(key))
             order += 1
         elif key.startswith('c') and key[1:].isdigit() \
                 and int(key[1:]) in custom:
             AssignmentItem.objects.create(assignment=assignment, order=order,
-                                          custom_problem=custom[int(key[1:])])
+                                          custom_problem=custom[int(key[1:])],
+                                          points=score(key))
             order += 1
 
     # Старый M2M заполняем тоже — на нём держатся прежние экраны.

@@ -83,6 +83,13 @@ urlpatterns = [
     # Подбор домашки по описанию словами (Часть C).
     path('assignment/generate/', views_generate.assignment_generate,
          name='assignment_generate'),
+    # Конструктор подборки: превью работы + её настройки (сессия 8, 12.2).
+    path('assignment/build/', views_generate.assignment_build,
+         name='assignment_build'),
+    path('api/generate/more/', views_generate.api_more_candidates,
+         name='api_more_candidates'),
+    path('api/cart/rows/', views_generate.api_cart_rows,
+         name='api_cart_rows'),
     # Экспорт задания в .tex / PDF (Часть D).
     path('groups/<int:group_id>/assignments/<int:assignment_id>/export/',
          views_generate.assignment_export, name='assignment_export'),
