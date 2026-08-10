@@ -123,17 +123,28 @@ function openPicker() {
   p.removeAttribute('inert');
   const app = document.querySelector('.app');
   if (app) app.setAttribute('inert', '');   // рабочее место под окном — не фокусируется
-  /* Окно всегда открывается на списке блоков, а не на том, куда заходили в
-     прошлый раз: кнопка называется «Назад к сценариям», и человек ждёт
-     полную карту, а не последний открытый раздел (П2). */
+  /* Н5. Из сюжета возвращаемся РОВНО на предыдущий экран, то есть в тот блок,
+     где этот сюжет лежит, а не в общий список десяти блоков. (Прежнее правило
+     П2 говорило обратное; оно отменено.) Блок ищем по самой карточке текущей
+     сцены: так он верен всегда, в том числе после восстановления состояния.
+     Если сцены ещё не выбирали, открывается полная карта. */
   const blocks = document.getElementById('picker-blocks');
-  if (blocks) {
-    blocks.classList.remove('hidden');
-    p.querySelectorAll('.picker-group').forEach(g => g.classList.remove('open'));
-    const back = document.getElementById('picker-back');
+  const back = document.getElementById('picker-back');
+  p.querySelectorAll('.picker-group').forEach(g => g.classList.remove('open'));
+  const card = STATE.sceneKey
+    ? p.querySelector('.scard[data-scene="' + CSS.escape(STATE.sceneKey) + '"]') : null;
+  const group = card ? card.closest('.picker-group') : null;
+  if (group) {
+    group.classList.add('open');
+    if (blocks) blocks.classList.add('hidden');
+    if (back) back.classList.add('shown');
+  } else {
+    if (blocks) blocks.classList.remove('hidden');
     if (back) back.classList.remove('shown');
   }
-  const first = p.querySelector('.bcard') || p.querySelector('.scard:not([disabled])');
+  const first = group
+    ? (group.querySelector('.scard:not([disabled])') || p.querySelector('.bcard'))
+    : (p.querySelector('.bcard') || p.querySelector('.scard:not([disabled])'));
   if (first) first.focus();
 }
 /* ---------------------------------------------------------------------
@@ -364,7 +375,10 @@ function foldPickerGroups() {
     grid.classList.add('open');          // внутри открытого блока сетка видна всегда
     lab.remove();
 
-    const n = grid.querySelectorAll('.scard:not(.soon)').length;
+    // Н1: считаем ВСЕ модели блока, вместе с запланированными. Карточка обещает
+    // содержимое блока, а не только то, что уже готово: «2 модели» при трёх
+    // видимых читалось как ошибка.
+    const n = grid.querySelectorAll('.scard').length;
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'bcard';

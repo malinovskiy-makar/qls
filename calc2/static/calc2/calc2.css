@@ -745,7 +745,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   content: ""; width: 18px; height: 2px; border-radius: 2px; background: var(--accent);
 }
 .picker-title { font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
-.picker-sub { font-size: 15px; color: var(--text2); margin-top: 6px; max-width: 56ch; line-height: 1.5; }
+/* Н3: подзаголовок укладывается ровно в две строки. При 56ch «экономике!»
+   уезжало одно на третью; 68ch хватает, чтобы фраза легла надвое. */
+.picker-sub { font-size: 15px; color: var(--text2); margin-top: 6px; max-width: 68ch; line-height: 1.5; }
 
 /* ── П2. Главный экран: десять больших карточек блоков по две в ряд ────
    Щелчок по карточке убирает остальные и на их месте показывает модели этого
@@ -1076,8 +1078,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .sec-ico { width: 17px; height: 17px; flex-shrink: 0; color: var(--text3); }
 .section.open-card > .fold-btn .sec-ico,
 .section.first-card > .fold-btn .sec-ico { color: currentColor; }
-.fold-btn svg { width: 13px; height: 13px; transition: transform .18s var(--ease); }
-.fold-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+/* Н67: переворачивается ТОЛЬКО шеврон, у него поворот и означает «раскрыто».
+   Смысловая иконка блока остаётся на месте: перевёрнутая площадь или точка
+   ничего не сообщают, а читать их вверх ногами мешают. Шеврон лежит прямым
+   потомком кнопки, иконка внутри <span>, поэтому хватает дочернего селектора. */
+.fold-btn > svg { width: 13px; height: 13px; transition: transform .18s var(--ease); }
+.fold-btn[aria-expanded="true"] > svg { transform: rotate(180deg); }
 .fold-body { display: none; padding-top: 4px; }
 .fold-body.open { display: block; }
 

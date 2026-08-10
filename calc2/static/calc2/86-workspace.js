@@ -305,6 +305,20 @@ function syncFirstCard() {
   let first = null;
   all.forEach(s => { if (!first && s.style.display !== 'none') first = s; });
   all.forEach(s => s.classList.toggle('first-card', s === first));
+  /* Н34. Первая карточка везде называется одинаково. У сцен она была подписана
+     по-своему («Макроэкономика» у Лаффера, «КПВ и торговля» у КТВ), и человек
+     каждый раз заново искал, где вводить формулу, хотя место одно и то же.
+     Своё имя карточки помним: если она перестанет быть первой, оно вернётся. */
+  all.forEach(s => {
+    const b = s.querySelector(':scope > .fold-btn span > b');
+    if (!b) return;
+    if (s === first) {
+      if (b.dataset.ownName === undefined) b.dataset.ownName = b.textContent;
+      b.textContent = 'Ввод функций';
+    } else if (b.dataset.ownName !== undefined) {
+      b.textContent = b.dataset.ownName;
+    }
+  });
 }
 
 function wireScene() {

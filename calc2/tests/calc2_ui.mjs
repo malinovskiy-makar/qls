@@ -1483,7 +1483,9 @@ await t('раскрытая карточка отличается фоном', a
 /* ── П2. Первый экран: десять карточек блоков по две в ряд ───────────
    Щелчок по карточке убирает остальные и показывает модели этого блока. */
 await t('карточки блоков без номеров, ни один блок не раскрыт', async () => {
-  await page.evaluate(() => { resetSceneMemory(); openPicker(); });
+  // Первый вход: сцены ещё не выбирали, поэтому видна полная карта блоков.
+  // Возврат ИЗ сюжета ведёт в его блок — это проверяет следующий случай (Н5).
+  await page.evaluate(() => { resetSceneMemory(); STATE.sceneKey = null; openPicker(); });
   await page.waitForTimeout(200);
   return await page.evaluate(() => {
     const bad = [];
@@ -1499,7 +1501,30 @@ await t('карточки блоков без номеров, ни один бл
   });
 });
 
+/* Н5. Из сюжета «назад» ведёт РОВНО на предыдущий экран: в тот блок, где этот
+   сюжет лежит, а не в общий список десяти. Прежнее правило (П2, всегда полная
+   карта) отменено. */
+await t('из сюжета возврат ведёт в его блок (Н5)', async () => {
+  return await page.evaluate(() => {
+    const bad = [];
+    [['laffer', 'Избранные сюжеты'], ['mono-nat', 'Несовершенная конкуренция'],
+     ['m-tangent', 'Математика']].forEach(([key, want]) => {
+      closePicker(); pickScene(key); openPicker();
+      const g = document.querySelector('#scene-picker .picker-group.open');
+      const got = g ? (g.querySelector('.picker-group-open-name') || {}).textContent : null;
+      if (got !== want) bad.push(key + ': «' + got + '» вместо «' + want + '»');
+      if (!document.getElementById('picker-blocks').classList.contains('hidden')) {
+        bad.push(key + ': список блоков не спрятан');
+      }
+    });
+    closePicker();
+    return !bad.length || bad.join('; ');
+  });
+});
+
 await t('открыт один блок за раз, есть возврат', async () => {
+  await page.evaluate(() => { STATE.sceneKey = null; openPicker(); });
+  await page.waitForTimeout(120);
   await page.click('#picker-blocks .bcard:nth-child(1)');
   await page.waitForTimeout(160);
   await page.evaluate(() => document.getElementById('picker-back').click());
