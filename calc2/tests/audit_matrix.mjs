@@ -304,6 +304,19 @@ say('П34 голый выбор цвета', broken.color);
 say('П16 числовое поле листается', broken.num);
 say('П31 оси не цель прилипания', broken.snap);
 say('П53/П54 зум или панорама недоступны', broken.zoom);
+/* Н70: кнопка умной клавиатуры обязана быть у КАЖДОГО поля формулы в каждой
+   сцене. Поля сюжета «Функции min и max» собирались вручную и получали только
+   математический набор, без кнопки и без вопросика. */
+const noKbd = [], noHelp = [];
+let fFields = 0;
+for (const [key, , r] of rows) {
+  fFields += r.fields;
+  if (r.kbd < r.fields) noKbd.push(key + ' (' + r.kbd + '/' + r.fields + ')');
+  if (r.help < r.fields) noHelp.push(key + ' (' + r.help + '/' + r.fields + ')');
+}
+say('Н70 поле формулы без кнопки клавиатуры', noKbd);
+say('Н70 поле формулы без вопросика', noHelp);
+console.log('  (полей формул всего: ' + fFields + ')');
 console.log('Н75 прямоугольное поле ввода: '
   + (broken.boxed.length ? broken.boxed.length + '\n  ' + broken.boxed.join('\n  ') : 'нарушений нет')
   + '\n  (проверено полей: '

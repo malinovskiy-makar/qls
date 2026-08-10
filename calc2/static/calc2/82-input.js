@@ -787,6 +787,13 @@ function scheduleParamsSync() {
 }
 function registerFormulaField(inp) {
   if (!inp || FORMULA_FIELDS.indexOf(inp) >= 0) return;
+  /* Часть полей собирается заново при каждой перерисовке сюжета (строки «min и
+     max», страны в сумме КПВ). Прежние узлы из разметки уходят, но в реестре
+     оставались, и liveFormulaTexts читала формулы у оторванных полей: буквы
+     старых формул продолжали заводить ползунки. Чистим при каждой записи. */
+  for (let i = FORMULA_FIELDS.length - 1; i >= 0; i--) {
+    if (!FORMULA_FIELDS[i].isConnected) FORMULA_FIELDS.splice(i, 1);
+  }
   FORMULA_FIELDS.push(inp);
   inp.addEventListener('input', scheduleParamsSync);
 }

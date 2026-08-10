@@ -184,7 +184,12 @@ function renderMmRows() {
     line.appendChild(slot);
     row.appendChild(line);
     box.appendChild(row);
-    upgradeFormulaField(inp);
+    /* Н70. Поля этого сюжета собираются здесь, вручную, и раньше получали
+       только upgradeFormulaField — то есть математический набор, но БЕЗ кнопки
+       клавиатуры и без вопросика. Клавиатура должна быть у каждого поля формулы
+       в каждой сцене, поэтому подключаем общую оснастку: ей нужен id. */
+    if (!inp.id) inp.id = 'mm-f' + i;
+    equipFormulaField(inp.id, 'MATHF');
   }
 }
 
