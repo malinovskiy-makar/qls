@@ -9,6 +9,7 @@
    так они работают в любом режиме и ни одну сцену не пришлось трогать. */
 function redrawAll() {
   syncParams();          // формулы могли завести или потерять буквы-параметры
+  refreshLinearForParams();   // Н7: прямые с буквой пересобрать под новое значение
   redrawScene();
   drawOverlays();
   applyLabelSize();      // общий размер подписей — одним проходом по холсту (П50)
@@ -1568,20 +1569,32 @@ function prepExpr(expr) {
   return paramsAllowed() ? expandImplicitMul(expr) : String(expr || '');
 }
 
-// Свободные буквы формулы: то, что придётся чем-то заменить при расчёте.
+/* Свободные буквы формулы: то, что придётся чем-то заменить при расчёте.
+
+   Запись уравнением («x + y = 10», «x^2 + y^2 = 25») разбираем по частям.
+   Math.js считает «=» присваиванием и требует слева одно имя, поэтому на целом
+   уравнении parse падал, а мы молча возвращали пустой список — и у формул,
+   записанных уравнением (ограничение, неявная КПВ), буква-параметр не
+   заводилась совсем (Н7). */
 function freeSymbols(expr) {
   const out = [];
-  try {
-    const node = math.parse(prepExpr(expr));
-    node.traverse((n, path, parent) => {
-      if (n.type !== 'SymbolNode') return;
-      // Имя функции в вызове — не параметр.
-      if (parent && parent.type === 'FunctionNode' && parent.fn === n) return;
-      if (isReservedName(n.name)) return;
-      if (sceneReserved().has(n.name)) return;
-      if (out.indexOf(n.name) < 0) out.push(n.name);
-    });
-  } catch (e) {}
+  const scan = (src) => {
+    try {
+      const node = math.parse(prepExpr(src));
+      node.traverse((n, path, parent) => {
+        if (n.type !== 'SymbolNode') return;
+        // Имя функции в вызове — не параметр.
+        if (parent && parent.type === 'FunctionNode' && parent.fn === n) return;
+        if (isReservedName(n.name)) return;
+        if (sceneReserved().has(n.name)) return;
+        if (out.indexOf(n.name) < 0) out.push(n.name);
+      });
+    } catch (e) {}
+  };
+  const s = String(expr || '');
+  // Только одиночное «=»; «==», «<=», «>=», «!=» это сравнения, их не делим.
+  const parts = s.split(/(?<![<>=!])=(?!=)/);
+  if (parts.length === 2) { scan(parts[0]); scan(parts[1]); } else scan(s);
   return out;
 }
 

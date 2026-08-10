@@ -58,6 +58,54 @@ function detectLinear(compiled) {
   return { a, b };
 }
 
+/* Н7. Прямая запоминается коэффициентами один раз, и дальше evalCurve идёт
+   быстрым путём. Если в формуле есть буква-параметр («100 - a*Q»), то запомнены
+   коэффициенты при ТОМ значении, которое буква имела в момент разбора: ползунок
+   потом двигал только число в состоянии, а кривая на графике стояла на месте.
+   Ломались ровно те формулы, которые выглядят прямыми, — «100 - a*Q^2» работала,
+   потому что быстрого пути у неё нет.
+
+   Быстрый путь нужен (по нему идёт плавное перетаскивание), поэтому не убираем
+   его, а обновляем: перед каждой перерисовкой сверяем значения букв, от которых
+   кривая зависит, с теми, при которых её раскладывали, и пересчитываем при
+   расхождении. */
+function curveParamNames(curve) {
+  if (curve._pNames === undefined || curve._pNamesFor !== curve.expr) {
+    curve._pNamesFor = curve.expr;
+    curve._pNames = (typeof freeSymbols === 'function' && curve.expr) ? freeSymbols(curve.expr) : [];
+  }
+  return curve._pNames;
+}
+
+function paramSignature(names) {
+  const p = STATE.params || {};
+  return names.map(n => n + '=' + (p[n] ? p[n].value : '?')).join(',');
+}
+
+function refreshLinearForParams() {
+  /* Сумма КПВ считается один раз и живёт в кэше до следующей правки поля
+     (`if (!STATE.ppfSumData) recomputePpfSum()`). Буква-параметр поля не
+     трогает, поэтому кэш переживал движение ползунка и сумма стояла на месте.
+     Сбрасываем его, когда хоть одно значение изменилось. */
+  const allSig = paramSignature(Object.keys(STATE.params || {}).sort());
+  if (allSig !== STATE._paramsSig) {
+    STATE._paramsSig = allSig;
+    STATE.ppfSumData = null;
+  }
+  (STATE.curves || []).forEach(curve => {
+    // Синтетические кривые (curve.fn) считают себя сами, вертикали не про Q.
+    if (!curve.compiled || curve.fn || curve.kind === 'vertical') return;
+    const names = curveParamNames(curve);
+    if (!names.length) return;
+    const sig = paramSignature(names);
+    if (sig === curve._pSig) return;
+    curve._pSig = sig;
+    curve.linear = detectLinear(curve.compiled);
+    // Запись Q(P) держит свой разбор отдельно — обновляем и его.
+    if (curve.srcForm === 'QP' && curve.srcCompiled) curve.srcLinear = detectLinearP(curve.srcCompiled);
+  });
+}
+
 // Красивая запись прямой по a и b (для подписи в списке при перетаскивании).
 // varName — имя переменной ('Q' по умолчанию; 'P' для записи Q(P), Фаза 1б).
 function fmtLinear(a, b, varName) {

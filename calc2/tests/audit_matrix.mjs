@@ -81,6 +81,58 @@ for (const [key, name] of scenes) {
       mode: STATE.mode,
     };
   });
+  /* Н7: буква-параметр обязана менять КАЖДУЮ формулу сцены. Подставляем в поле
+     букву вместо числового коэффициента, отдаём полю те же события, что и
+     живой ввод (сцены применяют формулу по change/Enter, а не по вводу), потом
+     двигаем ползунок и смотрим, изменилась ли картинка. */
+  r.par = await page.evaluate(() => {
+    const commit = (f) => { ['input', 'change'].forEach(t => f.dispatchEvent(new Event(t, { bubbles: true })));
+                            f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); };
+    /* Отпечаток картинки. Берём геометрию кривых ЦЕЛИКОМ (обрезанный путь прячет
+       расхождение в хвосте) и текст табло: у части сюжетов буква меняет числа
+       разбора, а линии остаются на месте, потому что оси подстроились. */
+    const shot = () => [...document.querySelectorAll('#chart path')].map(p => p.getAttribute('d') || '').join('|')
+      + '#' + ((document.getElementById('sb-body') || {}).textContent || '').trim();
+    const fields = (typeof FORMULA_FIELDS !== 'undefined' ? FORMULA_FIELDS : [])
+      .filter(i => typeof fieldActive === 'function' && fieldActive(i) && (i.value || '').trim().length > 2);
+    /* Буква для пробы — свободная: у сцены есть свои занятые обозначения
+       (ставка t, зарплата w, а в «Оптимуме при ограничении» a и b это оси),
+       и подставлять их нельзя, иначе проверка ругалась бы на замысел. */
+    const busy = (typeof sceneReserved === 'function') ? sceneReserved() : new Set();
+    const P = ['a', 'k', 'm', 'n', 'z'].find(n => !busy.has(n)) || 'z';
+    const dead = [];
+    let tested = 0;
+    for (const f of fields) {
+      const orig = f.value;
+      /* Буква встаёт на место первого числового множителя, а ползунок ставим
+         РЯДОМ с прежним числом. Ставить наугад единицу нельзя: у «20 − 0.1·Y»
+         это даёт отвесную IS, пересечения с LM нет, и проверка ругалась бы на
+         собственную подстановку, а не на калькулятор. */
+      let num = null;
+      // Буква ВМЕСТО множителя: её естественное значение — сам этот множитель.
+      let mod = orig.replace(/(?<![\w.])(\d+(?:\.\d+)?)\s*\*/, (m0, d) => { num = +d; return P + '*'; });
+      // Буква ПЕРЕД числом: она множитель, её естественное значение — единица.
+      if (mod === orig) mod = orig.replace(/(?<![\w.^])(\d+(?:\.\d+)?)(?![\d.])/, (m0, d) => { num = 1; return P + '*' + d; });
+      if (mod === orig || num === null) continue;
+      const base = (isFinite(num) && num !== 0) ? num : 1;
+      try {
+        f.value = mod; commit(f); redrawAll();
+        if (!STATE.params || !STATE.params[P]) { dead.push(f.id + ':нет-ползунка'); }
+        else {
+          tested++;
+          const p = STATE.params[P];
+          p.min = Math.min(p.min, base * 0.4); p.max = Math.max(p.max, base * 2);
+          p.value = base; redrawAll(); const s1 = shot();
+          p.value = base * 1.6; redrawAll(); const s2 = shot();
+          if (s1 === s2) dead.push(f.id + ':не-влияет');
+        }
+      } catch (e) { dead.push(f.id + ':!' + String(e.message).slice(0, 20)); }
+      f.value = orig; commit(f);
+    }
+    redrawAll();
+    return { tested, dead };
+  });
+
   // Сетка: считаем линии в трёх режимах переключателя. Раньше в «Математике»
   // и в панелях торговли сетки не было совсем, и это не ловилось ничем.
   r.grid = await page.evaluate(() => {
@@ -200,8 +252,9 @@ console.log('\nСцен со сломанной сеткой: ' + badGrid.length
 console.log('\n## Сквозные правила по сценам\n');
 console.log('| Сцена | П45 нет «k» | П35/П48 полос прокрутки | П34 выборов цвета (голых) | П16 колесо/стрелки | П31 оси как цель | П53/П54 зум и панорама |');
 console.log('|---|---|---|---|---|---|---|');
-const broken = { noK: [], bars: [], color: [], num: [], snap: [], zoom: [] };
+const broken = { noK: [], bars: [], color: [], num: [], snap: [], zoom: [], par: [] };
 for (const [key, name, r] of rows) {
+  if (r.par && r.par.dead.length) broken.par.push(key + ' (' + r.par.dead.join(', ') + ')');
   const u = r.rules;
   if (!u.noK) broken.noK.push(key);
   if (u.bars > 0) broken.bars.push(key);
@@ -219,6 +272,9 @@ say('П34 голый выбор цвета', broken.color);
 say('П16 числовое поле листается', broken.num);
 say('П31 оси не цель прилипания', broken.snap);
 say('П53/П54 зум или панорама недоступны', broken.zoom);
+console.log('Н7 буква-параметр не влияет на формулу: '
+  + (broken.par.length ? broken.par.length + '\n  ' + broken.par.join('\n  ') : 'нарушений нет')
+  + '\n  (проверено полей: ' + rows.reduce((s, [, , r]) => s + (r.par ? r.par.tested : 0), 0) + ')');
 
 /* ── Свх-4б: оборванные связи ────────────────────────────────────────────
    Класс дефекта, который не даёт ни ошибки, ни следа: контрол переделали,

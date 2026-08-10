@@ -1242,6 +1242,37 @@ const CASES = [
              ['прочие подписи растут в той же мере', 'ratio', 18 / 10, 0.01]],
   },
   {
+    /* Н7. Буква-параметр обязана менять саму функцию. Прямая раскладывается на
+       коэффициенты один раз, и дальше evalCurve идёт быстрым путём; если в
+       формуле есть буква, коэффициенты запоминались при её тогдашнем значении,
+       и ползунок двигал только число в состоянии. Ломались ровно те формулы,
+       которые ВЫГЛЯДЯТ прямыми: «100 − a·Q²» работала и раньше.
+       Проверяем и кусочную запись: у неё буква живёт внутри ветви. */
+    name: 'Параметры · буква меняет значение функции (Н7)',
+    run: `resetSceneMemory();
+          openPicker(); pickScene('sd'); closePicker();
+          addCurve('100 - a*Q'); redrawAll();
+          var c = STATE.curves[STATE.curves.length - 1];
+          function at(v) { STATE.params.a.value = v; redrawAll(); return evalCurve(c, 10); }
+          var one = at(1), five = at(5), half = at(0.5);
+          var linA = c.linear ? c.linear.a : NaN;      // быстрый путь жив и едет за буквой
+          addCurve('Q < 50 ? 100 - a*Q : 50'); redrawAll();
+          var pw = STATE.curves[STATE.curves.length - 1];
+          STATE.params.a.value = 1; redrawAll(); var pw1 = evalCurve(pw, 10);
+          STATE.params.a.value = 2; redrawAll(); var pw2 = evalCurve(pw, 10);
+          var pwTail = evalCurve(pw, 60);              // вторая ветвь буквы не знает
+          var eqLetters = freeSymbols('x^2 + y^2 = k*25').join(',');
+          resetSceneMemory();
+          return { one: one, five: five, half: half, linA: linA,
+                   pw1: pw1, pw2: pw2, pwTail: pwTail, eq: eqLetters === 'k' ? 1 : 0 };`,
+    checks: [['a=1 → f(10)', 'one', 90, 0.001], ['a=5 → f(10)', 'five', 50, 0.001],
+             ['a=0.5 → f(10)', 'half', 95, 0.001],
+             ['быстрый путь пересобран', 'linA', -0.5, 0.001],
+             ['кусочная при a=1', 'pw1', 90, 0.001], ['кусочная при a=2', 'pw2', 80, 0.001],
+             ['вторая ветвь не тронута', 'pwTail', 50, 0.001],
+             ['буквы находятся и в записи уравнением', 'eq', 1, 0]],
+  },
+  {
     /* П32, П33. Возврат масштаба показывает всё нарисованное и делает это
        ИДЕМПОТЕНТНО: повторное нажатие ничего не двигает. Кривые в подгонке
        намеренно не участвуют — растущая кривая раздвигала бы окно бесконечно.
