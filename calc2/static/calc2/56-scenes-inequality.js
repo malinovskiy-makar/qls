@@ -511,7 +511,9 @@ function renderIneqGroupsTable() {
     lab.textContent = 'Группа ' + (i + 1);
     const inp = document.createElement('input');
     inp.type = 'number'; inp.step = '0.1'; inp.value = v;
-    inp.style.cssText = 'flex:1;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);';
+    // Вид берём из общего правила панели (Н75): рамки нет, снизу пунктир.
+    // Своя рамка в inline-стиле била бы любое правило по специфичности.
+    inp.style.flex = '1';
     inp.addEventListener('change', () => { const nv = parseFloat(inp.value); if (!isNaN(nv)) { STATE.ineqGroups[i] = nv; if (typeof ineqMasterDetach === 'function') ineqMasterDetach(); redrawAll(); } });
     row.appendChild(lab); row.appendChild(inp); box.appendChild(row);
   });

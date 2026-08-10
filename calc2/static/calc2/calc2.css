@@ -1326,10 +1326,22 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .wrench-row { display: flex; align-items: center; gap: 7px; }
 .wrench-row + .wrench-row { margin-top: 7px; }
 .wrench-row > label { font-size: 12px; color: var(--text2); flex-shrink: 0; }
+/* Н75, Н60. Границы окна, шаг делений, названия осей и заголовок графика
+   правятся прямо в строке: рамки нет, фона нет, намёк несёт пунктир снизу —
+   ровно как у компонента .edval. Сами поля остались нативными: к ним привязана
+   обвязка сцен по id, и подменять их на contenteditable значило бы переучивать
+   десяток обработчиков ради одного и того же вида. */
 .wrench-row input[type="number"], .wrench-row input[type="text"] {
-  flex: 1; min-width: 0; padding: 6px 7px; font-size: 12.5px;
-  border: 1px solid var(--border); border-radius: var(--r-sm);
-  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
+  flex: 1; min-width: 0; padding: 4px 2px; font-size: 12.5px;
+  border: none; border-bottom: 1px dashed var(--border); border-radius: 0;
+  background: transparent; color: var(--text); font-variant-numeric: tabular-nums;
+  transition: color .12s var(--ease), border-color .12s var(--ease);
+}
+.wrench-row input[type="number"]:hover, .wrench-row input[type="text"]:hover {
+  color: var(--accent); border-bottom-color: var(--accent);
+}
+.wrench-row input[type="number"]:focus, .wrench-row input[type="text"]:focus {
+  outline: none; border-bottom-color: var(--accent);
 }
 .wrench .seg { margin: 0; }
 .wrench .seg-btn { padding: 6px 8px; font-size: 11.5px; }
@@ -1405,4 +1417,49 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 @media (prefers-reduced-motion: reduce) {
   .side, .side-arrow svg { transition: none; }
   .graph-tools, .picker-inner { animation: none; }
+}
+
+/* ── Н75, Н60, Н72. Редактируемое значение ────────────────────────────────
+   Ни в одном состоянии не появляется прямоугольная рамка поля ввода: значение
+   живёт прямо в тексте, а править его можно щелчком. Намёк на это несёт только
+   пунктир снизу. */
+.edval {
+  display: inline-block; min-width: 1.6em; padding: 0 1px;
+  border-bottom: 1px dashed var(--border);
+  color: var(--text); font-variant-numeric: tabular-nums;
+  cursor: text; outline: none; white-space: nowrap;
+  transition: color .12s var(--ease), border-color .12s var(--ease);
+}
+.edval:hover, .edval:focus { color: var(--accent); border-bottom-color: var(--accent); }
+/* В правке остаётся тот же кегль и тот же пунктир: рамка не появляется, и
+   строка не дёргается по высоте. */
+.edval.editing { border-bottom-color: var(--accent); color: var(--text); }
+.edval.editing .katex { display: none; }
+/* Неполный ввод («−», «1e») подсвечивается самим подчёркиванием, без всплывашек. */
+.edval.bad { border-bottom-color: var(--error, #d14343); }
+.edval-row { display: flex; align-items: baseline; gap: 4px; flex-wrap: nowrap; }
+
+/* Н60, Н72, Н75. Общее правило на всю панель: короткое значение правится прямо
+   в строке, без прямоугольной рамки и фона — намёк несёт пунктир снизу, как у
+   компонента .edval. Поля ФОРМУЛ сюда не попадают: они живут внутри .f-wrap и
+   работают через MathLive, у них своя оснастка. */
+#tools-panel input[type="number"], #tools-panel input[type="text"],
+#params-body input[type="number"], #params-body input[type="text"] {
+  padding: 3px 2px;
+  border: none; border-bottom: 1px dashed var(--border); border-radius: 0;
+  background: transparent; color: var(--text); font-variant-numeric: tabular-nums;
+  transition: color .12s var(--ease), border-color .12s var(--ease);
+}
+#tools-panel .f-wrap input, #params-body .f-wrap input,
+#tools-panel input.curve-expr-inp {
+  /* формульные поля оставляем как есть */
+  padding: revert; border: revert; border-radius: revert; background: revert;
+}
+#tools-panel input[type="number"]:hover, #tools-panel input[type="text"]:hover,
+#params-body input[type="number"]:hover, #params-body input[type="text"]:hover {
+  color: var(--accent); border-bottom-color: var(--accent);
+}
+#tools-panel input[type="number"]:focus, #tools-panel input[type="text"]:focus,
+#params-body input[type="number"]:focus, #params-body input[type="text"]:focus {
+  outline: none; border-bottom-color: var(--accent);
 }

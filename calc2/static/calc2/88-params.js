@@ -184,7 +184,10 @@ function editEqValue(lab, name, current, apply) {
   inp.type = 'number'; inp.step = 'any'; inp.value = current;
   inp.className = 'param-eq-input';
   lab.append(head, inp);
-  inp.focus(); inp.select();
+  /* Курсор в конец, а не выделение всей строки: синяя заливка поверх значения
+     читается как «сейчас всё сотрётся» и выглядит как обычное поле ввода (Н75). */
+  inp.focus();
+  try { const n = inp.value.length; inp.setSelectionRange(n, n); } catch (e) {}
   let closed = false;
   const done = () => {
     if (closed) return; closed = true;
@@ -230,31 +233,27 @@ function attachBoundsEditor(chip, editor, name, get, set) {
     if (editor.classList.contains('open')) { close(); return; }
     editor.classList.add('open');
     editor.innerHTML = '';
-    const mk = (key) => {
-      const n = document.createElement('input');
-      n.type = 'number'; n.step = 'any'; n.value = get(key);
-      n.className = 'param-ed-num';
-      // Живое обновление: на каждый символ. Незаконченный ввод («−», «1e»)
-      // просто пропускаем, ничего не трогая.
-      n.addEventListener('input', () => {
-        const v = parseFloat(n.value);
-        // Незаконченный ввод («−», «1e») пропускаем, но помечаем ошибкой:
-        // подчёркивание краснеет, всплывающих сообщений нет.
-        n.classList.toggle('bad', n.value !== '' && !isFinite(v));
-        if (!isFinite(v)) return;
+    /* Три значения интервала — тем же компонентом, что и всюду: пунктир снизу,
+       правка на месте, ни одной прямоугольной рамки (Н75). Живое обновление на
+       каждый символ; неполный ввод («−», «1e») компонент не применяет и красит
+       подчёркивание. */
+    const mk = (key) => makeEditableValue({
+      get: () => get(key),
+      set: (v) => {
         /* Пока идёт правка, меню закрывать нельзя: set() может зажать значение
            ползунка и разбудить «input», а тот закрыл бы меню и снёс поле, в
            котором прямо сейчас печатают. */
         editor._busy = true;
         try { set(key, v); } finally { editor._busy = false; }
-      });
-      return n;
-    };
+      },
+      tex: (v, text) => text,
+      title: key === 'step' ? 'Шаг' : (key === 'min' ? 'Нижняя граница' : 'Верхняя граница'),
+    });
+    // C.5: «мин ≤ имя ≤ макс с шагом …» одной строкой.
     const line = document.createElement('div'); line.className = 'param-ed-line';
-    line.append(mk('min'), tex('\\le ' + texifyName(name) + ' \\le'), mk('max'));
-    const line2 = document.createElement('div'); line2.className = 'param-ed-line';
-    line2.append(tex('\\text{с шагом}'), mk('step'));
-    editor.append(line, line2);
+    line.append(mk('min'), tex('\\le ' + texifyName(name) + ' \\le'), mk('max'),
+                tex('\\text{с шагом}'), mk('step'));
+    editor.append(line);
     document.addEventListener('pointerdown', onOutside, true);
   };
   return { open, close };
@@ -263,10 +262,12 @@ function attachBoundsEditor(chip, editor, name, get, set) {
 /* Строка «имя = значение» у всех регуляторов идёт за фактическим значением
    ползунка. Нужен общий проход: сцена ставит значение свойством, а не событием
    и не атрибутом, поэтому ни слушатель, ни наблюдатель такого не видят. */
+const UPGRADED_REGULATORS = new Set();
 function refreshRegulators() {
-  document.querySelectorAll('.param-track').forEach(track => {
-    const field = track.parentElement;
-    if (field && typeof field._regSync === 'function') field._regSync();
+  UPGRADED_REGULATORS.forEach(field => {
+    // Панели пересобираются целиком: то, что уехало из разметки, забываем.
+    if (!field.isConnected) { UPGRADED_REGULATORS.delete(field); return; }
+    if (typeof field._regSync === 'function') field._regSync();
   });
 }
 
@@ -406,8 +407,21 @@ function upgradeRegulator(field) {
   field._regUpgraded = true;
   const num = field.querySelector('input[type=number]');
 
-  const track = sl.parentElement;
-  track.classList.add('param-track');
+  /* Н74. Дорожке нужна СВОЯ строка. У регуляторов сцен ползунок лежит прямо в
+     поле, и раньше классом .param-track помечалось само поле; но поле в правой
+     панели выстроено колонкой (#params-body .field), и колонка побеждала — имя,
+     левая граница, ползунок и правая граница вставали друг под другом и по
+     центру. Заводим отдельную дорожку и переносим ползунок в неё: тогда строк
+     ровно две, а границы стоят по краям ползунка. */
+  let track = sl.parentElement;
+  if (!track.classList.contains('param-track') || track === field) {
+    const own = document.createElement('div');
+    own.className = 'param-track';
+    sl.parentElement.insertBefore(own, sl);
+    own.appendChild(sl);
+    track = own;
+  }
+  field.classList.remove('param-track');   // поле дорожкой больше не притворяется
   const lo = document.createElement('button');
   lo.type = 'button'; lo.className = 'param-bound'; lo.title = 'Границы и шаг';
   const hi = document.createElement('button');
@@ -463,6 +477,7 @@ function upgradeRegulator(field) {
      общего прохода refreshRegulators(), он идёт после каждой перерисовки. */
   new MutationObserver(sync).observe(sl, { attributes: true, attributeFilter: ['min', 'max', 'step'] });
   field._regSync = sync;
+  UPGRADED_REGULATORS.add(field);
   sl.addEventListener('input', () => {
     paint();
     // Правку границ ведут прямо в этом меню, и наш же clamp дёргает «input».

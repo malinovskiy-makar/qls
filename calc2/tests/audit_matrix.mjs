@@ -191,6 +191,29 @@ for (const [key, name] of scenes) {
       el.blur();
     }
 
+    /* Н75, Н60: короткое значение правится прямо в строке, прямоугольного поля
+       ввода не видно ни в одном состоянии. Поля ФОРМУЛ не в счёт: они живут в
+       .f-wrap и работают через MathLive. Раскрываем все складные блоки и меню
+       плоскости, иначе половина полей просто не на экране. */
+    document.querySelectorAll('#tools-panel .fold-btn').forEach(b => {
+      if (b.getAttribute('aria-expanded') !== 'true') b.click();
+    });
+    const wr = document.getElementById('btn-wrench');
+    if (wr && wr.getAttribute('aria-expanded') !== 'true') wr.click();
+    const boxed = [];
+    let fieldsSeen = 0;
+    document.querySelectorAll('input[type=number], input[type=text]').forEach(i => {
+      if (!vis(i) || i.closest('.f-wrap') || i.classList.contains('curve-expr-inp')) return;
+      fieldsSeen++;
+      const cs = getComputedStyle(i);
+      const bg = cs.backgroundColor;
+      if (cs.borderTopWidth !== '0px' || cs.borderLeftWidth !== '0px'
+          || (bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')) {
+        boxed.push(i.id || i.className || '(без имени)');
+      }
+    });
+    if (wr && wr.getAttribute('aria-expanded') === 'true') wr.click();
+
     /* П31: точки липнут к кривым И к осям. Оси лежат не в snapTargets (там
        кривые вида y = f(x), по ним ищутся экстремумы), а считаются отдельно —
        проверяем, что прилипание к ним реально срабатывает у самой оси. */
@@ -238,7 +261,8 @@ for (const [key, name] of scenes) {
     } catch (e) {}
 
     return { noK, bars: bars.length, picks: picks.length, rawColor,
-             wheelOk, keyOk, nums: nums.length, snapAxes, zoomOk, panOk };
+             wheelOk, keyOk, nums: nums.length, snapAxes, zoomOk, panOk,
+             boxed, fieldsSeen };
   });
   rows.push([key, name, r]);
 }
@@ -259,9 +283,10 @@ console.log('\nСцен со сломанной сеткой: ' + badGrid.length
 console.log('\n## Сквозные правила по сценам\n');
 console.log('| Сцена | П45 нет «k» | П35/П48 полос прокрутки | П34 выборов цвета (голых) | П16 колесо/стрелки | П31 оси как цель | П53/П54 зум и панорама |');
 console.log('|---|---|---|---|---|---|---|');
-const broken = { noK: [], bars: [], color: [], num: [], snap: [], zoom: [], par: [] };
+const broken = { noK: [], bars: [], color: [], num: [], snap: [], zoom: [], par: [], boxed: [] };
 for (const [key, name, r] of rows) {
   if (r.par && r.par.dead.length) broken.par.push(key + ' (' + r.par.dead.join(', ') + ')');
+  if (r.rules && r.rules.boxed && r.rules.boxed.length) broken.boxed.push(key + ' (' + r.rules.boxed.join(', ') + ')');
   const u = r.rules;
   if (!u.noK) broken.noK.push(key);
   if (u.bars > 0) broken.bars.push(key);
@@ -279,6 +304,10 @@ say('П34 голый выбор цвета', broken.color);
 say('П16 числовое поле листается', broken.num);
 say('П31 оси не цель прилипания', broken.snap);
 say('П53/П54 зум или панорама недоступны', broken.zoom);
+console.log('Н75 прямоугольное поле ввода: '
+  + (broken.boxed.length ? broken.boxed.length + '\n  ' + broken.boxed.join('\n  ') : 'нарушений нет')
+  + '\n  (проверено полей: '
+  + rows.reduce((s2, [, , r]) => s2 + ((r.rules && r.rules.fieldsSeen) || 0), 0) + ')');
 console.log('Н7 буква-параметр не влияет на формулу: '
   + (broken.par.length ? broken.par.length + '\n  ' + broken.par.join('\n  ') : 'нарушений нет')
   + '\n  (проверено полей: ' + rows.reduce((s, [, , r]) => s + (r.par ? r.par.tested : 0), 0) + ')');

@@ -1090,3 +1090,100 @@ function applyNewRoleUI() {
   if (pop && pop.classList.contains('open') && typeof pop._render === 'function') pop._render();
 }
 
+
+/* ── Н75, Н60, Н72. Редактируемое значение ────────────────────────────────
+   Один компонент на все места, где человек правит число или короткий текст.
+   До него интерфейс был засыпан обычными прямоугольными полями: шаг «0.01» в
+   рамке, координаты точки в двух рамках, значение параметра при щелчке
+   превращалось в подсвеченное поле с рамкой и синим выделением. Выглядит это
+   как черновик, а не как инструмент.
+
+   Правила компонента:
+     • в покое   — отрендеренная формула, без рамки и фона, снизу пунктир;
+     • наведение — пунктир и само значение становятся акцентными, курсор текстовый;
+     • щелчок    — правка НА МЕСТЕ: тот же кегль, тот же пунктир, рамки нет,
+                   курсор в конце, выделения всего текста нет;
+     • ввод      — применяется на каждый символ, если значение уже осмысленно;
+                   неполное («−», «1e») не применяется, пунктир краснеет;
+     • выход     — Enter и потеря фокуса применяют, Esc возвращает прежнее.
+
+   Во время набора показываем обычный текст того же кегля, а формулу собираем
+   заново по выходе: KaTeX умеет рендерить и на каждый символ (так сделано в его
+   собственном примере), но менять разметку под курсором значит терять каретку.
+
+   opts: { get, set, tex, fmt, title, kind:'number'|'text', min, max } */
+function makeEditableValue(opts) {
+  const el = document.createElement('span');
+  el.className = 'edval';
+  el.tabIndex = 0;
+  el.setAttribute('role', 'textbox');
+  if (opts.title) el.title = opts.title;
+  const isNum = (opts.kind || 'number') === 'number';
+
+  const shown = () => {
+    const v = opts.get();
+    return (typeof opts.fmt === 'function') ? opts.fmt(v)
+         : (isNum ? fmt(v) : String(v == null ? '' : v));
+  };
+  const paint = () => {
+    if (el.classList.contains('editing')) return;
+    const text = shown();
+    if (typeof katex === 'undefined' || typeof opts.tex !== 'function') { el.textContent = text; return; }
+    try { katex.render(opts.tex(opts.get(), text), el, { throwOnError: false, displayMode: false }); }
+    catch (e) { el.textContent = text; }
+  };
+  el._repaint = paint;
+  paint();
+
+  const parse = (raw) => {
+    if (!isNum) return raw;
+    const v = parseFloat(String(raw).replace(',', '.'));
+    if (!isFinite(v)) return null;
+    if (opts.min != null && v < opts.min) return null;
+    if (opts.max != null && v > opts.max) return null;
+    return v;
+  };
+
+  const begin = () => {
+    if (el.classList.contains('editing')) return;
+    const before = opts.get();
+    el.classList.add('editing');
+    el.textContent = isNum ? String(shown()).replace(/ /g, '') : String(before == null ? '' : before);
+    el.contentEditable = 'plaintext-only';
+    if (el.contentEditable !== 'plaintext-only') el.contentEditable = 'true';   // Firefox
+    el.focus();
+    // Курсор в конец, а не выделение всей строки.
+    const r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+
+    const live = () => {
+      const v = parse(el.textContent.trim());
+      el.classList.toggle('bad', el.textContent.trim() !== '' && v === null);
+      if (v !== null) opts.set(v);
+    };
+    const finish = (cancel) => {
+      el.removeEventListener('input', live);
+      el.removeEventListener('keydown', onKey);
+      el.removeEventListener('blur', onBlur);
+      el.classList.remove('editing', 'bad');
+      el.contentEditable = 'false';
+      if (cancel) opts.set(before);
+      else { const v = parse(el.textContent.trim()); if (v !== null) opts.set(v); else opts.set(before); }
+      paint();
+    };
+    function onKey(e) {
+      if (e.key === 'Enter') { e.preventDefault(); finish(false); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(true); }
+    }
+    function onBlur() { finish(false); }
+    el.addEventListener('input', live);
+    el.addEventListener('keydown', onKey);
+    el.addEventListener('blur', onBlur);
+  };
+
+  el.addEventListener('click', begin);
+  el.addEventListener('keydown', (e) => {
+    if (!el.classList.contains('editing') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); begin(); }
+  });
+  return el;
+}
