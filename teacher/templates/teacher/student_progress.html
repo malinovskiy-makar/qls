@@ -91,18 +91,10 @@
   .tp-bar { grid-column: 1 / -1; }
 }
 
-/* ── История работ ──────────────────────────────────────────────────── */
-.wk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.wk-table th { text-align: left; padding: 8px 10px; font-size: 11px;
-               font-weight: 600; color: var(--text2);
-               border-bottom: 1px solid var(--border); white-space: nowrap; }
-.wk-table td { padding: 10px; border-bottom: 1px solid var(--border-soft);
-               vertical-align: middle; }
-.wk-table tr:last-child td { border-bottom: none; }
-/* Не сданная работа приглушена: это отсутствие работы, а не её результат. */
-.wk-table tr.is-idle td { opacity: .55; }
-.wk-name { font-weight: 600; }
-.wk-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Стили таблицы «История работ» переехали в общий
+   `platform/_stats_style.html`: та же таблица стоит и в обзоре группы.
+   Класс, чей стиль лежит в неподключённом файле, — уже знакомый нам
+   класс дефекта (баг 7.6). */
 
 /* ── Заметки о ученике ──────────────────────────────────────────────── */
 .note-said { font-size: 12px; color: var(--text2); margin-left: 10px; }
@@ -254,44 +246,12 @@
 </div>
 
 {% comment %}
-История работ, семь столбцов (фаза 10.5).
-⚠️ «Оценка» — ПРОЦЕНТ, а не сырые баллы: у разных работ разный максимум.
-⚠️ Срок берётся ТОЛЬКО через `deadline_at`; поле `due_at` устарело.
+История работ (фаза 10.5). Разметка и сборка ОБЩИЕ с обзором группы:
+партиал `teacher/_work_history.html` + `problems.stats.work_history`.
 {% endcomment %}
 <div class="panel">
   <div class="panel-head"><div class="panel-title">История работ</div></div>
-  {% if works %}
-  <div class="stats-table-wrap">
-    <table class="wk-table">
-      <thead>
-        <tr>
-          <th>Работа</th>
-          <th>Тип</th>
-          <th>% верных задач</th>
-          <th>% верных тестов</th>
-          <th>Оценка</th>
-          <th>Дата сдачи</th>
-          <th>Дедлайн</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in works %}
-        <tr{% if row.not_submitted %} class="is-idle"{% endif %}>
-          <td class="wk-name">{{ row.work.name }}</td>
-          <td>{% if row.is_exam %}контрольная{% else %}домашка{% endif %}</td>
-          <td class="wk-num">{% if row.open_percent is not None %}{{ row.open_percent }} %{% else %}—{% endif %}</td>
-          <td class="wk-num">{% if row.test_percent is not None %}{{ row.test_percent }} %{% else %}—{% endif %}</td>
-          <td class="wk-num">{% if row.mark is not None %}{{ row.mark }} %{% else %}—{% endif %}</td>
-          <td class="wk-num">{% if row.submitted_at %}{{ row.submitted_at|date:"d.m.Y" }}{% else %}—{% endif %}</td>
-          <td class="wk-num">{% if row.deadline %}{{ row.deadline|date:"d.m.Y" }}{% else %}без срока{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="empty-note">Работ ещё не было.</div>
-  {% endif %}
+  {% include "teacher/_work_history.html" with works=works for_group=False %}
 </div>
 
 {% comment %}

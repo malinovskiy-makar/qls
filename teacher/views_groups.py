@@ -236,6 +236,9 @@ def group_detail(request, pk):
             'rows': stats_module.group_table(group, period),
             'matrix': stats_module.group_topic_matrix(group, 'all'),
             'attention': stats_module.needs_attention(group),
+            # История работ группы (п. 11.5) — та же сборка и та же
+            # разметка, что у истории в карточке ученика.
+            'group_works': stats_module.group_work_history(group),
         })
 
     return render(request, 'teacher/groups/detail.html', context)

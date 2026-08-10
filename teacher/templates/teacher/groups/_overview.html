@@ -176,6 +176,20 @@
 </div>
 
 {% comment %}
+История работ группы (п. 11.5). Устроена как история в карточке ученика —
+та же разметка (`teacher/_work_history.html`) и та же сборка
+(`problems.stats`); отличие ровно одно: вместо даты сдачи два числа
+«невовремя / не сдано».
+{% endcomment %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">История работ</div>
+    <div class="panel-hint">Проценты — средние по группе</div>
+  </div>
+  {% include "teacher/_work_history.html" with works=group_works for_group=True %}
+</div>
+
+{% comment %}
 Блок «Рейтинг внутри группы» удалён по ревью владельца (сессия 7, фаза 1).
 Он ничего не переключал — только пересказывал состояние поля
 `group.leaderboard_enabled`, которое правится в админке. Само поле и правило

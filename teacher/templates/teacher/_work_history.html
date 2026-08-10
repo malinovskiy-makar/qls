@@ -1,0 +1,58 @@
+{% comment %}
+История работ — ОДНА разметка на карточку ученика и на обзор группы.
+
+Ждёт в контексте:
+  works    — строки из `problems.stats.work_history` или `group_work_history`;
+  for_group — True на экране группы: тогда вместо «Даты сдачи» показываем
+              два числа «невовремя / не сдано».
+
+⚠️ «Оценка» — ПРОЦЕНТ, а не сырые баллы: у разных работ разный максимум, и
+«12» за одну работу и «8» за другую несопоставимы ничем.
+⚠️ Срок берётся ТОЛЬКО через `deadline_at`; поле `due_at` устарело.
+{% endcomment %}
+{% if works %}
+<div class="stats-table-wrap">
+  <table class="wk-table">
+    <thead>
+      <tr>
+        <th>Работа</th>
+        <th>Тип</th>
+        <th>% верных задач</th>
+        <th>% верных тестов</th>
+        <th>Оценка</th>
+        {% if for_group %}
+        <th>Невовремя / не сдано
+          {% include "_hint.html" with hint="Первое число — сдали после срока. Второе — не сдали совсем." %}
+        </th>
+        {% else %}
+        <th>Дата сдачи</th>
+        {% endif %}
+        <th>Дедлайн</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in works %}
+      <tr{% if row.not_submitted %} class="is-idle"{% endif %}>
+        <td class="wk-name">{{ row.work.name }}</td>
+        <td>{% if row.is_exam %}контрольная{% else %}домашка{% endif %}</td>
+        <td class="wk-num">{% if row.open_percent is not None %}{{ row.open_percent }} %{% else %}—{% endif %}</td>
+        <td class="wk-num">{% if row.test_percent is not None %}{{ row.test_percent }} %{% else %}—{% endif %}</td>
+        <td class="wk-num">{% if row.mark is not None %}{{ row.mark }} %{% else %}—{% endif %}</td>
+        {% if for_group %}
+        {% comment %}
+        ⚠️ Работа без срока в столбец «невовремя» не попадает вообще —
+        прочерк, а не ноль: без срока опоздать нельзя.
+        {% endcomment %}
+        <td class="wk-num">{% if row.late is not None %}{{ row.late }}{% else %}—{% endif %} / {{ row.missing }}</td>
+        {% else %}
+        <td class="wk-num">{% if row.submitted_at %}{{ row.submitted_at|date:"d.m.Y" }}{% else %}—{% endif %}</td>
+        {% endif %}
+        <td class="wk-num">{% if row.deadline %}{{ row.deadline|date:"d.m.Y" }}{% else %}без срока{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-note">Работ ещё не было.</div>
+{% endif %}

@@ -74,6 +74,25 @@
         <input type="checkbox" checked> брать только с разбором
       </label>
     </div>
+    <div>
+      {% comment %}
+      Крупная галочка — там, где отметка и есть главное действие строки
+      (выбор задачи в подборку, выбор группы). Обычная 17-пиксельная рядом с
+      названием задачи теряется.
+      {% endcomment %}
+      <div class="k-label">Галочка-квадрат (выбор задачи, выбор группы)</div>
+      <div class="k-stack" style="gap:8px">
+        <label class="k-check k-check--box">
+          <input type="checkbox" checked> выбрана
+        </label>
+        <label class="k-check k-check--box">
+          <input type="checkbox"> не выбрана
+        </label>
+        <label class="k-check k-check--box">
+          <input type="checkbox" disabled> уже выбрана в другой строке
+        </label>
+      </div>
+    </div>
   </div>
 </div>
 

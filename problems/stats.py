@@ -1106,3 +1106,127 @@ def group_accuracy(group, tutor=None, kind=None):
     if not solved:
         return None
     return int(round(correct * 100.0 / solved))
+
+
+# ---------------------------------------------------------------------------
+# История работ — ОДНА сборка на карточку ученика и на обзор группы
+# ---------------------------------------------------------------------------
+# ⚠️ Столбцы «% верных задач», «% верных тестов» и «Оценка» считаются здесь
+# один раз. Раньше история работ жила только в карточке ученика
+# (`teacher/views.py::_work_history`); обзору группы нужна ТА ЖЕ таблица,
+# и второй её сборки быть не должно — расходиться начали бы не экраны, а
+# числа, по которым репетитор судит о группе.
+
+def _work_scores(work, students):
+    """Баллы по одной работе: (набрано, максимум) по типам + кто когда сдал.
+
+    Возвращает (got, could, submitted_at_by_student). `got`/`could` —
+    словари {'open': …, 'test': …}. Считаем ТОЛЬКО оценённые позиции:
+    непроверенная задача не «ноль», а «ещё не знаем».
+    """
+    from decimal import Decimal
+
+    from problems.assignment_rows import item_max_score
+    from problems.models import Submission
+
+    got = {'open': Decimal('0'), 'test': Decimal('0')}
+    could = {'open': Decimal('0'), 'test': Decimal('0')}
+    when = {}
+    subs = (Submission.objects
+            .filter(assignment=work, student__in=students)
+            .select_related('feedback', 'problem_item',
+                            'problem_item__catalog_problem',
+                            'problem_item__custom_problem'))
+    for sub in subs:
+        item = sub.problem_item
+        if item is None:
+            continue
+        if sub.submitted_at:
+            previous = when.get(sub.student_id)
+            if previous is None or sub.submitted_at > previous:
+                when[sub.student_id] = sub.submitted_at
+        feedback = getattr(sub, 'feedback', None)
+        if feedback is None or feedback.score is None:
+            continue
+        key = 'test' if item.is_test else 'open'
+        got[key] += Decimal(str(feedback.score))
+        could[key] += item_max_score(item)
+    return got, could, when
+
+
+def _work_percents(got, could):
+    """Три процента строки: по задачам, по тестам и итог. Нет базы → None."""
+    def share(key):
+        return (int(round(float(got[key] / could[key]) * 100))
+                if could[key] else None)
+
+    total_got = got['open'] + got['test']
+    total_could = could['open'] + could['test']
+    return {
+        'open_percent': share('open'),
+        'test_percent': share('test'),
+        'mark': (int(round(float(total_got / total_could) * 100))
+                 if total_could else None),
+    }
+
+
+def work_history(student, tutor):
+    """История работ ОДНОГО ученика (карточка ученика, фаза 10.5).
+
+    ⚠️ ОЦЕНКА — ПРОЦЕНТ, А НЕ СЫРЫЕ БАЛЛЫ. У разных работ разный максимум, и
+    «12» за одну работу и «8» за другую несопоставимы ничем.
+
+    ⚠️ СРОК СПРАШИВАЕМ ТОЛЬКО ЧЕРЕЗ `deadline_at`. Поле `due_at` устарело и
+    не читается нигде — два поля уже давали видимый баг «без срока» у работы
+    со сроком.
+    """
+    from problems.models import Assignment
+
+    works = (Assignment.objects.filter(author=tutor, students=student)
+             .order_by('-id'))
+    rows = []
+    for work in works:
+        got, could, when = _work_scores(work, [student])
+        submitted_at = when.get(student.pk)
+        row = {'work': work, 'is_exam': work.is_exam,
+               'submitted_at': submitted_at,
+               'deadline': work.deadline_at,
+               'not_submitted': submitted_at is None}
+        row.update(_work_percents(got, could))
+        rows.append(row)
+    return rows
+
+
+def group_work_history(group):
+    """История работ ГРУППЫ (обзор группы, п. 11.5).
+
+    Отличие от карточки ученика ровно одно: вместо даты сдачи — два числа
+    «невовремя / не сдано».
+
+    ⚠️ РАБОТА БЕЗ СРОКА В СТОЛБЕЦ «НЕВОВРЕМЯ» НЕ ПОПАДАЕТ ВООБЩЕ — прочерк,
+    а не ноль: без срока опоздать нельзя, и ноль тут был бы утверждением о
+    том, чего система не знает.
+    """
+    from problems.models import Assignment
+
+    students = list(group.students.all())
+    works = Assignment.objects.filter(group=group).order_by('-id')
+    rows = []
+    for work in works:
+        got, could, when = _work_scores(work, students)
+        deadline = work.deadline_at
+        issued = set(work.students.values_list('id', flat=True)) or {
+            s.pk for s in students}
+        watched = [s for s in students if s.pk in issued] or students
+        late = None
+        if deadline is not None:
+            late = sum(1 for s in watched
+                       if when.get(s.pk) and when[s.pk] > deadline)
+        missing = sum(1 for s in watched if when.get(s.pk) is None)
+        row = {'work': work, 'is_exam': work.is_exam,
+               'deadline': deadline, 'late': late, 'missing': missing,
+               'people': len(watched),
+               'not_submitted': missing == len(watched)}
+        row.update(_work_percents(got, could))
+        rows.append(row)
+    return rows

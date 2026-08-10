@@ -678,64 +678,15 @@ def _difficulty_label(value):
 
 
 def _work_history(student, tutor):
-    """История работ ученика: семь столбцов (фаза 10.5).
+    """История работ ученика — ОДНА сборка на карточку ученика и на группу.
 
-    ⚠️ ОЦЕНКА — ПРОЦЕНТ, А НЕ СЫРЫЕ БАЛЛЫ. У разных работ разный максимум, и
-    «12» за одну работу и «8» за другую несопоставимы ничем.
-
-    ⚠️ СРОК СПРАШИВАЕМ ТОЛЬКО ЧЕРЕЗ `deadline_at`. Поле `due_at` устарело и
-    не читается нигде — два поля уже давали видимый баг «без срока» у работы
-    со сроком.
+    Сама сборка живёт в `problems/stats.py` (`work_history`): обзору группы
+    нужна та же таблица, и второй её сборки быть не должно — расходиться
+    начали бы не экраны, а числа, по которым репетитор судит о группе.
     """
-    from decimal import Decimal
+    from problems import stats as stats_module
 
-    from problems.assignment_rows import item_max_score
-    from problems.models import Assignment, Submission
-
-    works = (Assignment.objects.filter(author=tutor, students=student)
-             .order_by('-id'))
-    rows = []
-    for work in works:
-        subs = list(Submission.objects
-                    .filter(student=student, assignment=work)
-                    .select_related('feedback', 'problem_item',
-                                    'problem_item__catalog_problem',
-                                    'problem_item__custom_problem'))
-        got = {'open': Decimal('0'), 'test': Decimal('0')}
-        could = {'open': Decimal('0'), 'test': Decimal('0')}
-        submitted_at = None
-        for sub in subs:
-            item = sub.problem_item
-            if item is None:
-                continue
-            if sub.submitted_at and (submitted_at is None
-                                     or sub.submitted_at > submitted_at):
-                submitted_at = sub.submitted_at
-            feedback = getattr(sub, 'feedback', None)
-            if feedback is None or feedback.score is None:
-                continue
-            key = 'test' if item.is_test else 'open'
-            got[key] += Decimal(str(feedback.score))
-            could[key] += item_max_score(item)
-
-        def share(key):
-            return (int(round(float(got[key] / could[key]) * 100))
-                    if could[key] else None)
-
-        total_got = got['open'] + got['test']
-        total_could = could['open'] + could['test']
-        rows.append({
-            'work': work,
-            'is_exam': work.is_exam,
-            'open_percent': share('open'),
-            'test_percent': share('test'),
-            'mark': (int(round(float(total_got / total_could) * 100))
-                     if total_could else None),
-            'submitted_at': submitted_at,
-            'deadline': work.deadline_at,
-            'not_submitted': submitted_at is None,
-        })
-    return rows
+    return stats_module.work_history(student, tutor)
 
 
 # ---------------------------------------------------------------------------
