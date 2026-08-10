@@ -1264,3 +1264,78 @@ class LearningEvent(models.Model):
     def __str__(self):
         who = self.user or f'аноним({self.session_key[:8]})'
         return f'{who}: {self.get_event_type_display()} ({self.source})'
+
+
+# ===========================================================================
+# Сессия 7, фаза 9 — субъективная сложность работы
+# ===========================================================================
+
+class WorkDifficulty(models.Model):
+    """Насколько сложной работа показалась УЧЕНИКУ. Шкала 1–10.
+
+    ⚠️ ЭТО ЕДИНСТВЕННЫЙ ИСТОЧНИК МЕТРИКИ «СРЕДНЯЯ СЛОЖНОСТЬ». Вычислить её
+    из баллов нельзя: низкий балл говорит о том, что ученик не справился, а
+    не о том, что задача трудная — он мог не разобраться в лёгкой теме или
+    не успеть. Спрашиваем прямо.
+
+    ⚠️ ВОПРОС НЕОБЯЗАТЕЛЬНЫЙ. Строки нет — значит ученик не ответил, и это
+    нормальное состояние, а не пропущенные данные. Поэтому «нет оценок»
+    пишется словами, а не нулём: ноль по шкале 1–10 означал бы оценку.
+
+    Одна оценка на пару (работа, ученик): повторная отправка ОБНОВЛЯЕТ, а не
+    плодит записи.
+    """
+
+    MIN = 1
+    MAX = 10
+
+    assignment = models.ForeignKey(
+        'problems.Assignment', on_delete=models.CASCADE,
+        related_name='difficulty_votes', verbose_name='Работа')
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='work_difficulty_votes', verbose_name='Ученик')
+    value = models.PositiveSmallIntegerField(
+        'Сложность', validators=[MinValueValidator(MIN),
+                                 MaxValueValidator(MAX)],
+        help_text='1 — легко, 10 — очень сложно.')
+    created_at = models.DateTimeField('Когда', auto_now_add=True)
+    updated_at = models.DateTimeField('Изменено', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Оценка сложности работы'
+        verbose_name_plural = 'Оценки сложности работ'
+        constraints = [
+            models.UniqueConstraint(fields=['assignment', 'student'],
+                                    name='uniq_difficulty_per_work'),
+        ]
+
+    def __str__(self):
+        return '%s — %s: %d' % (self.assignment, self.student, self.value)
+
+
+def average_difficulty(votes):
+    """Среднее по оценкам сложности. Пусто — None, а не ноль.
+
+    Одна функция на оба места показа (карточка ученика и блок «Проверены»),
+    чтобы «4,3 из 10» считалось одинаково.
+    """
+    values = [vote.value if hasattr(vote, 'value') else vote for vote in votes]
+    values = [v for v in values if v is not None]
+    if not values:
+        return None
+    return round(sum(values) / float(len(values)), 1)
+
+
+def difficulty_for_work(assignment):
+    """Средняя сложность ОДНОЙ работы по всем ответившим ученикам."""
+    return average_difficulty(
+        list(WorkDifficulty.objects.filter(assignment=assignment)))
+
+
+def difficulty_for_student(student, tutor=None):
+    """Средняя сложность по всем работам ОДНОГО ученика."""
+    queryset = WorkDifficulty.objects.filter(student=student)
+    if tutor is not None:
+        queryset = queryset.filter(assignment__author=tutor)
+    return average_difficulty(list(queryset))

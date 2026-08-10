@@ -706,3 +706,113 @@ class StatsFormulaTests(TestCase):
         self.assertEqual(stats.level_of(40), 'mid')
         self.assertEqual(stats.level_of(39), 'bad')
         self.assertEqual(stats.level_of(None), 'none')
+
+
+# ===========================================================================
+# Фаза 9 — субъективная сложность работы
+# ===========================================================================
+
+class WorkDifficultyTests(TestCase):
+    """Ученик сам оценивает работу по шкале 1–10. Вопрос необязательный."""
+
+    def setUp(self):
+        from problems.models import Assignment, StudentGroup
+        from problems.tests.factories import make_user
+
+        self.tutor = make_user('wd_tutor', role='teacher')
+        self.student = make_user('wd_student', role='student')
+        self.other = make_user('wd_other', role='student')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        self.group.students.add(self.student, self.other)
+        self.work = Assignment.objects.create(name='ДЗ', author=self.tutor,
+                                              group=self.group)
+        self.work.students.add(self.student, self.other)
+        self.client.force_login(self.student)
+
+    def _url(self):
+        from django.urls import reverse
+        return reverse('student:rate_difficulty', args=[self.work.pk])
+
+    def test_vote_is_saved(self):
+        from problems.models_platform import WorkDifficulty
+
+        response = self.client.post(self._url(), {'value': '7'})
+        self.assertEqual(response.status_code, 200)
+        vote = WorkDifficulty.objects.get(assignment=self.work,
+                                          student=self.student)
+        self.assertEqual(vote.value, 7)
+
+    def test_second_vote_updates_instead_of_duplicating(self):
+        from problems.models_platform import WorkDifficulty
+
+        self.client.post(self._url(), {'value': '3'})
+        self.client.post(self._url(), {'value': '9'})
+        votes = WorkDifficulty.objects.filter(assignment=self.work,
+                                              student=self.student)
+        self.assertEqual(votes.count(), 1)
+        self.assertEqual(votes.first().value, 9)
+
+    def test_out_of_range_is_refused_politely(self):
+        from problems.models_platform import WorkDifficulty
+
+        for bad in ('0', '11', '-3', 'много', ''):
+            response = self.client.post(self._url(), {'value': bad})
+            self.assertEqual(response.status_code, 400, bad)
+        self.assertFalse(WorkDifficulty.objects.exists())
+
+    def test_average_over_a_work(self):
+        from problems.models_platform import (WorkDifficulty,
+                                              difficulty_for_work)
+
+        WorkDifficulty.objects.create(assignment=self.work,
+                                      student=self.student, value=4)
+        WorkDifficulty.objects.create(assignment=self.work,
+                                      student=self.other, value=5)
+        self.assertEqual(difficulty_for_work(self.work), 4.5)
+
+    def test_average_over_a_student(self):
+        from problems.models import Assignment
+        from problems.models_platform import (WorkDifficulty,
+                                              difficulty_for_student)
+
+        second = Assignment.objects.create(name='ДЗ2', author=self.tutor,
+                                           group=self.group)
+        WorkDifficulty.objects.create(assignment=self.work,
+                                      student=self.student, value=4)
+        WorkDifficulty.objects.create(assignment=second,
+                                      student=self.student, value=7)
+        self.assertEqual(difficulty_for_student(self.student), 5.5)
+
+    def test_empty_state_is_none_not_zero(self):
+        """⚠️ Ноль по шкале 1–10 означал бы оценку, а её нет.
+
+        Поэтому «нет оценок» пишется словами, а функция отдаёт None.
+        """
+        from problems.models_platform import (difficulty_for_student,
+                                              difficulty_for_work)
+
+        self.assertIsNone(difficulty_for_work(self.work))
+        self.assertIsNone(difficulty_for_student(self.student))
+
+    def test_the_question_is_a_div_not_a_nested_form(self):
+        """Вложенную форму браузер выбрасывает — на этом уже обжигались."""
+        import io, re
+        template = io.open('student/templates/student/work_review.html',
+                           encoding='utf-8').read()
+        # Режем по РАЗМЕТКЕ, а не по первому вхождению имени класса: выше по
+        # файлу лежит его же CSS, и срез от него ничего не проверял бы.
+        start = template.index('<div class="wr-diff"')
+        block = template[start:template.index('<div class="wr-order">')]
+        self.assertNotIn('<form', block)
+        self.assertIn('type="button"', block)
+
+    def test_tutor_is_not_asked(self):
+        """Репетитор работу не решал — спрашивать его не о чем."""
+        from django.urls import reverse
+
+        self.client.force_login(self.tutor)
+        body = self.client.get(
+            reverse('teacher:student_work_review',
+                    args=[self.group.pk, self.work.pk,
+                          self.student.pk])).content.decode()
+        self.assertNotIn('Насколько сложной была работа', body)

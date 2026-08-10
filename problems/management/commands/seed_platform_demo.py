@@ -142,6 +142,7 @@ class Command(BaseCommand):
         self._parent_links(tutor, students)
         self._history(students, now)
         self._finished_exam(tutor, group, students, now)
+        self._work_difficulty(tutor, students)
 
         self.stdout.write(self.style.SUCCESS('\nДемо-данные готовы.'))
         self.stdout.write('Вход (пароль у всех одинаковый):')
@@ -805,6 +806,49 @@ class Command(BaseCommand):
         self.stdout.write('  собраны четыре состояния проверки: '
                           'автоноль, решение-без-ответа, неутверждённый '
                           'эталон, неверный ответ')
+
+    def _work_difficulty(self, tutor, students):
+        """Оценки субъективной сложности работ (сессия 7, фаза 9).
+
+        ⚠️ Без них два места показа стоят пустыми: карточка «Средняя
+        сложность работ» у ученика и правая часть проверенной работы в
+        списке заданий. На презентации пустое место читается как
+        недоделанная функция.
+
+        Значения правдоподобные (3–8) и РАЗНЫЕ: одинаковые пятёрки везде
+        выглядят как заглушка, которой они и были бы.
+        """
+        from problems.models_platform import WorkDifficulty
+
+        works = list(Assignment.objects.filter(author=tutor).order_by('pk'))
+        if not works or not students:
+            return
+        # Одна оценка на пару (работа, ученик); ученик отвечает не всегда —
+        # часть работ намеренно остаётся без оценки, чтобы на экране было
+        # видно и состояние «нет оценок».
+        pattern = [4, 7, 3, 8, 5, 6, None, 5, 4, None, 7, 3]
+        created = 0
+        index = 0
+        for work in works:
+            for student in students:
+                value = pattern[index % len(pattern)]
+                index += 1
+                if value is None:
+                    continue
+                # ⚠️ Оценку ставит только тот, кто РАБОТУ СДАВАЛ. Иначе на
+                # экране выходит «никто не сдал · сложность 4,7 из 10» —
+                # оценка работы, которую никто не открывал.
+                if not Submission.objects.filter(
+                        assignment=work, student=student,
+                        status__in=('submitted', 'reviewed')).exists():
+                    continue
+                _, made = WorkDifficulty.objects.get_or_create(
+                    assignment=work, student=student,
+                    defaults={'value': value})
+                created += int(made)
+        if created:
+            self.stdout.write('  проставлены оценки сложности работ (%d)'
+                              % created)
 
     def _parent_links(self, tutor, students):
         """Родитель связан с ДВУМЯ учениками — чтобы кабинет родителя было

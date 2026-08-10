@@ -11,6 +11,9 @@ urlpatterns = [
     path('submission/<int:pk>/', views.submission_detail, name='submission_detail'),
     # Разбор сданной работы — ОДИН экран на домашку и контрольную.
     path('work/<int:pk>/', views.work_review, name='work_review'),
+    # Ученик оценивает сложность работы (сессия 7, фаза 9). Без перезагрузки.
+    path('work/<int:pk>/difficulty/', views.rate_difficulty,
+         name='rate_difficulty'),
     path('progress/', views.progress, name='progress'),
 
     # Контрольные (Часть C). Свой раздел адресов: у контрольной свой цикл.

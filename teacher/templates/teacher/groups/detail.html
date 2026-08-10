@@ -3,36 +3,56 @@
 {% block title %}{{ group.name }} — ЭкЗадачи{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
-/* ── Вкладка «Задания»: три группы по состоянию (фаза 11) ───────────── */
+/* ── Вкладка «Задания»: три группы по состоянию ─────────────────────────
+   ⚠️ ВСЕ ТРИ ГРУППЫ — ОДИН ВИД КАРТОЧКИ (сессия 7, фаза 11.2). Раньше
+   «требуют проверки» были карточками с акцентной рамкой, а «проверены» —
+   плоскими строками, и два разных объекта на одном экране означали одно и
+   то же. Владелец просил привести к одному виду.
+
+   Состояние теперь несёт ЦВЕТНАЯ ПОЛОСА СЛЕВА — тот же приём, что в разборе
+   работы глазами ученика (классы набора `.k-mark--*`), а не разная вёрстка.
+   Срочность различается ФОНОМ и весом правой части, но объект один.
+
+   Заголовки групп — ТИХИЕ подписи: вес должен быть у карточек, а не у
+   надписей над ними. */
 .ass-group { margin-bottom: 26px; }
 .ass-group-head { display: flex; align-items: baseline; gap: 8px;
                   margin-bottom: 10px; }
-.ass-group-title { font-size: 14px; font-weight: 600; }
+.ass-group-title { font-size: 12px; font-weight: 600; color: var(--text2); }
 .ass-group-count { font-size: 12px; color: var(--text3); }
+/* Счётчик ждущих проверки — справа над списком (фаза 11.1). Спокойная
+   плашка нейтрального фона: красный кружок здесь читался бы как авария. */
+.ass-head { display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.ass-waiting-count { display: inline-flex; align-items: baseline; gap: 6px;
+                     background: var(--surface-2);
+                     border: 1px solid var(--border);
+                     border-radius: 999px; padding: 5px 12px; }
+.ass-waiting-count b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.ass-waiting-count span { font-size: 12px; color: var(--text2); }
 
 .ass-card { display: flex; align-items: center; justify-content: space-between;
-            gap: 14px; flex-wrap: wrap; margin-bottom: 8px; padding: 14px 16px; }
+            gap: 14px; flex-wrap: wrap; margin-bottom: 8px; padding: 14px 16px;
+            border-radius: 0 10px 10px 0; }
+/* Идущие и проверенные — приглушены: внимания они не требуют. */
+.ass-card--quiet { background: var(--surface-2); }
 .ass-main { min-width: 0; flex: 1; }
 .ass-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
 .ass-link { color: var(--text); text-decoration: none; }
 .ass-link:hover { text-decoration: underline; }
-/* Тип работы — тихой подписью, не бейджем: акцент оставлен навигации. */
-.ass-kind { font-size: 12px; font-weight: 400; color: var(--text3);
-            margin-left: 8px; }
+/* Тип работы — маленький чип тонкой рамкой, а не заливка: это уточнение. */
+.ass-kind { font-size: 11px; font-weight: 500; color: var(--text2);
+            border: 1px solid var(--border); border-radius: 999px;
+            padding: 1px 8px; margin-left: 8px; white-space: nowrap; }
 .ass-meta { font-size: 12px; color: var(--text2); }
 .ass-waiting { font-size: 12px; }
-
-/* Завершённые — одна компактная строка: внимания они уже не требуют, и
-   давать им тот же вес значило бы прятать за ними то, что горит. */
-.ass-done-list { display: flex; flex-direction: column; gap: 1px; }
-.ass-done { display: flex; align-items: baseline; justify-content: space-between;
-            gap: 12px; flex-wrap: wrap; padding: 8px 16px; font-size: 13px;
-            color: var(--text2); text-decoration: none;
-            border-bottom: 0.5px solid var(--border-soft); }
-.ass-done:last-child { border-bottom: none; }
-.ass-done:hover { background: var(--surface-2); color: var(--text); }
-.ass-done-name { color: var(--text); }
-.ass-done-score { font-size: 12px; color: var(--text3); white-space: nowrap; }
+/* Правая часть проверенной работы — два значения в две строки. */
+.ass-figures { text-align: right; font-size: 12px; color: var(--text2);
+               white-space: nowrap; line-height: 1.5; }
+.ass-figures b { display: block; font-size: 15px; color: var(--text);
+                 font-variant-numeric: tabular-nums; }
+/* «Посмотреть все» — тихая кнопка под свёрнутым списком проверенных. */
+.ass-more { margin-top: 6px; }
 
 @media (max-width: 560px) {
   .ass-card { align-items: stretch; }
@@ -90,35 +110,39 @@
   которого репетитор сюда зашёл: «что мне сейчас делать». Группы идут в
   порядке срочности, пустая группа не показывается вообще.
 
-  Вес карточки падает вместе со срочностью: «требуют вас» — рамка акцентом
-  и кнопка заливкой, «идут сейчас» — обычная карточка, «завершены» — одна
-  компактная строка. Одинаковый вес у работы, которую надо проверить, и у
-  той, что закрыта месяц назад, — это и есть «бесконечный список».
+  ⚠️ ВИД КАРТОЧКИ У ВСЕХ ТРЁХ ГРУПП ОДИН (сессия 7, фаза 11.2). Состояние
+  несёт цветная полоса слева — тот же приём, что в разборе работы глазами
+  ученика. Срочность различается фоном и правой частью, но объект один:
+  раньше «требуют проверки» и «проверены» были РАЗНЫМИ объектами на одном
+  экране, хотя означают одно и то же.
   {% endcomment %}
   {% if assignment_groups %}
-  {% for key, title, items in assignment_groups %}
+  {% comment %}
+  Счётчик ждущих проверки — справа над списком (фаза 11.1). Спокойная
+  плашка: красный кружок читался бы как авария, а это обычная работа.
+  {% endcomment %}
+  <div class="ass-head">
+    <span></span>
+    {% if waiting_total %}
+    <span class="ass-waiting-count">
+      <b>{{ waiting_total }}</b><span>ждут проверки</span>
+    </span>
+    {% endif %}
+  </div>
+
+  {% for group_row in assignment_groups %}
   <div class="ass-group">
     <div class="ass-group-head">
-      <span class="ass-group-title">{{ title }}</span>
-      <span class="ass-group-count">{{ items|length }}</span>
+      <span class="ass-group-title">{{ group_row.title }}</span>
+      <span class="ass-group-count">{{ group_row.caption }}</span>
     </div>
 
-    {% if key == 'done' %}
-    <div class="ass-done-list">
-      {% for row in items %}
-      <a class="ass-done" href="{% if row.is_exam %}{% url 'teacher:group_exam_results' group.pk row.assignment.pk %}{% else %}{% url 'teacher:group_assignment' group.pk row.assignment.pk %}{% endif %}">
-        <span class="ass-done-name">{{ row.assignment.name }}{% if row.is_exam %}<span class="ass-kind">контрольная</span>{% endif %}</span>
-        <span class="ass-done-score">
-          {% if row.avg_score is not None %}средний балл {{ row.avg_score }}
-          {% else %}никто не сдал{% endif %}
-        </span>
-      </a>
-      {% endfor %}
-    </div>
-
-    {% else %}
-    {% for row in items %}
-    <div class="k-card ass-card {% if key == 'needs_you' %}k-card--calls{% endif %}">
+    {% for row in group_row.shown %}
+    {% comment %}
+    Полоса состояния: жёлтая — ждёт проверки, серая — идёт, зелёная —
+    проверена. Классы из набора деталей, своих цветов здесь нет.
+    {% endcomment %}
+    <div class="k-card ass-card k-mark k-mark--{{ group_row.mark }}{% if group_row.key != 'needs_you' %} ass-card--quiet{% endif %}">
       <div class="ass-main">
         {% comment %}
         ⚠️ Название — ССЫЛКА на само задание. Без неё открыть работу можно
@@ -129,27 +153,46 @@
         <div class="ass-name">
           <a href="{% if row.is_exam %}{% url 'teacher:group_exam_results' group.pk row.assignment.pk %}{% else %}{% url 'teacher:group_assignment' group.pk row.assignment.pk %}{% endif %}"
              class="ass-link">{{ row.assignment.name }}</a>
-          {% comment %}
-          Тип — тихой серой подписью, а не розовым бейджем: акцент оставлен
-          навигации, а «контрольная» это уточнение, а не сигнал тревоги.
-          {% endcomment %}
-          {% if row.is_exam %}<span class="ass-kind">контрольная</span>{% endif %}
+          {% if row.is_exam %}<span class="ass-kind">контрольная</span>{% else %}<span class="ass-kind">домашка</span>{% endif %}
         </div>
         <div class="ass-meta">
           сдали {{ row.submitted }} из {{ row.students }} ·
-          {% if row.deadline %}<span title="{{ row.deadline_exact }}">{{ row.deadline_human }}</span>{% else %}без срока{% endif %}
+          {% if group_row.key == 'done' %}{% if row.deadline %}<span title="{{ row.deadline_exact }}">{{ row.deadline_human }}</span>{% else %}без срока{% endif %}
+          {% else %}{% if row.deadline %}<span title="{{ row.deadline_exact }}">{{ row.deadline_human }}</span>{% else %}без срока{% endif %}{% endif %}
         </div>
       </div>
-      {% if key == 'needs_you' %}
+
+      {% if group_row.key == 'needs_you' %}
       <a class="k-btn k-btn--main"
          href="{% url 'teacher:group_submissions' group.pk row.assignment.pk %}">
         Проверить {{ row.pending }}
       </a>
+      {% elif group_row.key == 'running' %}
+      <span class="k-quiet ass-waiting">ждём сдач</span>
       {% else %}
-      <span class="k-quiet ass-waiting">ждём</span>
+      {% comment %}
+      ⚠️ ДВА ЗНАЧЕНИЯ В ДВЕ СТРОКИ, И СРЕДНЕГО БАЛЛА СРЕДИ НИХ НЕТ
+      (поправка 4 владельца). Сырой средний балл несопоставим между
+      работами: у них разный максимум. Поэтому процент — и субъективная
+      сложность, которую ученики поставили сами.
+      {% endcomment %}
+      <div class="ass-figures">
+        {% if row.percent is not None %}<b>{{ row.percent }}%</b>средняя оценка{% else %}<b>—</b>никто не сдал{% endif %}
+        <div>{{ row.difficulty_label }}</div>
+      </div>
       {% endif %}
     </div>
     {% endfor %}
+
+    {% if group_row.hidden_count %}
+    {% comment %}
+    «Проверены» показываются последние пять (фаза 11.3). Полный список — по
+    кнопке, а не бесконечной лентой: закрытые работы внимания не требуют.
+    {% endcomment %}
+    <div class="ass-more">
+      <a class="k-btn k-btn--plain k-btn--sm"
+         href="?tab=assignments&amp;all_done=1">Посмотреть все</a>
+    </div>
     {% endif %}
   </div>
   {% endfor %}

@@ -63,6 +63,30 @@
 .wr-mine { background: var(--panel); border: 1px solid var(--border);
            border-radius: var(--r); padding: 12px 14px; font-size: 14px;
            line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* ── Вопрос о сложности работы (сессия 7, фаза 9) ────────────────────
+   Тихий блок между шапкой и списком задач: он не главнее балла и не
+   главнее разбора. Акцент — только на выбранной отметке (правило проекта
+   прямо разрешает акцент на активном). */
+.wr-diff { background: var(--surface); border: 1px solid var(--border);
+           border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; }
+.wr-diff-q { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.wr-diff-scale { display: flex; align-items: center; gap: 12px;
+                 flex-wrap: wrap; }
+.wr-diff-end { font-size: 12px; color: var(--text3); white-space: nowrap; }
+.wr-diff-marks { display: flex; gap: 4px; flex-wrap: wrap; }
+.wr-diff-mark { font: inherit; font-size: 13px; font-variant-numeric: tabular-nums;
+                width: 32px; height: 32px; cursor: pointer;
+                border: 1px solid var(--border); border-radius: var(--r);
+                background: var(--surface-2); color: var(--text2);
+                transition: border-color .12s, background .12s, color .12s; }
+.wr-diff-mark:hover { border-color: var(--text3); color: var(--text); }
+.wr-diff-mark:focus-visible { outline: 2px solid var(--focus);
+                              outline-offset: 2px; }
+.wr-diff-mark.is-on { background: var(--accent); border-color: var(--accent);
+                      color: #fff; font-weight: 700; }
+.wr-diff-said { font-size: 12px; color: var(--text2); margin-top: 8px; }
+.wr-diff-said[hidden] { display: none; }
+
 .wr-order { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
             margin-bottom: 16px; font-size: 13px; color: var(--text2); }
 .wr-order button { border: 1px solid var(--border); border-radius: var(--r);
@@ -139,6 +163,43 @@
   </div>
   {% endif %}
 </div>
+
+{% if not for_tutor %}
+{% comment %}
+Вопрос о субъективной сложности (сессия 7, фаза 9).
+
+⚠️ ЭТО `<div>`, А НЕ `<form>`. Экран разбора уже содержит формы (комментарии
+к задачам), а вложенные формы браузер молча выбрасывает — на этом уже
+обжигались с блоком вопроса к задаче.
+
+⚠️ ВОПРОС НЕОБЯЗАТЕЛЬНЫЙ. Ничего не отвечать — нормально, работа от этого не
+меняется, и никакой блокировки экрана здесь нет.
+{% endcomment %}
+<div class="wr-diff" id="wr-diff"
+     data-url="{% url 'student:rate_difficulty' assignment.pk %}"
+     data-chosen="{% if difficulty_vote %}{{ difficulty_vote.value }}{% endif %}">
+  <div class="wr-diff-q">Насколько сложной была работа?</div>
+  <div class="wr-diff-scale">
+    <span class="wr-diff-end">1 — легко</span>
+    <span class="wr-diff-marks">
+      {% for value in difficulty_range %}
+      <button type="button" class="wr-diff-mark{% if difficulty_vote and difficulty_vote.value == value %} is-on{% endif %}"
+              data-value="{{ value }}"
+              aria-label="сложность {{ value }} из 10">{{ value }}</button>
+      {% endfor %}
+    </span>
+    <span class="wr-diff-end">10 — очень сложно</span>
+  </div>
+  <div class="wr-diff-said" id="wr-diff-said"
+       {% if not difficulty_vote %}hidden{% endif %}>Спасибо, записали.</div>
+  {% comment %}
+  Свой токен, а не чужой из соседней формы: на экране разбора форм может не
+  быть вовсе (у контрольной комментариев нет), и тогда отправка молча
+  отвечала бы 403. Скрытое поле вне формы — валидный HTML.
+  {% endcomment %}
+  {% csrf_token %}
+</div>
+{% endif %}
 
 <div class="wr-order">
   <span>Порядок:</span>
@@ -245,6 +306,47 @@
 
 {% block extra_js %}
 <script>
+// Оценка сложности работы (сессия 7, фаза 9).
+// ⚠️ Кнопки, а не форма: блок стоит на странице, где формы уже есть, а
+// вложенную форму браузер выбрасывает. Отправка без перезагрузки.
+(function () {
+  var box = document.getElementById('wr-diff');
+  if (!box) { return; }
+  var said = document.getElementById('wr-diff-said');
+  var marks = box.querySelectorAll('.wr-diff-mark');
+
+  function token() {
+    var field = document.querySelector('[name=csrfmiddlewaretoken]');
+    return field ? field.value : '';
+  }
+
+  marks.forEach(function (button) {
+    button.addEventListener('click', function () {
+      var value = button.dataset.value;
+      // Отметку показываем СРАЗУ: ученик нажал, и экран обязан ответить,
+      // не дожидаясь сети. Отказ сервера снимет её обратно.
+      marks.forEach(function (other) { other.classList.remove('is-on'); });
+      button.classList.add('is-on');
+      said.hidden = false;
+      said.textContent = 'Спасибо, записали.';
+
+      var body = new FormData();
+      body.append('value', value);
+      body.append('csrfmiddlewaretoken', token());
+      fetch(box.dataset.url, {method: 'POST', body: body,
+                              credentials: 'same-origin'})
+        .then(function (response) {
+          if (!response.ok) { throw new Error('нет'); }
+        })
+        .catch(function () {
+          button.classList.remove('is-on');
+          said.hidden = false;
+          said.textContent = 'Не удалось сохранить — попробуйте ещё раз.';
+        });
+    });
+  });
+})();
+
 // Порядок задач: как в работе или «сначала с ошибками».
 // Разбор начинается с того, что не получилось, — но ученик должен иметь
 // возможность вернуться к исходному порядку, иначе он потеряется.

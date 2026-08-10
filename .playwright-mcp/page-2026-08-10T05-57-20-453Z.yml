@@ -1,0 +1,108 @@
+- generic [ref=f25e1]:
+  - navigation [ref=f25e2]:
+    - link "Эк" [ref=f25e3] [cursor=pointer]:
+      - /url: /
+    - link "Домашки" [ref=f25e4] [cursor=pointer]:
+      - /url: /student/
+    - link "Статистика" [ref=f25e5] [cursor=pointer]:
+      - /url: /profile/stats/
+    - link "Каталог" [ref=f25e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f25e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f25e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f25e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f25e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f25e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f25e12]:
+      - button "Сменить тему" [ref=f25e13] [cursor=pointer]: ☾
+      - generic [ref=f25e14]: Пётр Иванов
+      - link "Выйти" [ref=f25e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f25e16]:
+    - link "← Все работы" [ref=f25e17] [cursor=pointer]:
+      - /url: /student/
+    - generic [ref=f25e18]:
+      - generic [ref=f25e19]: Домашка
+      - heading "Сквозная домашка (ночная сессия)" [level=1] [ref=f25e20]
+      - generic [ref=f25e21]: 0из9
+      - generic [ref=f25e22]: по проверенным задачам · всего в работе 49 б.
+      - generic [ref=f25e23]:
+        - generic [ref=f25e24]: сдано 08.08.2026, 16:28
+        - generic [ref=f25e25]: "задач: 7"
+      - generic [ref=f25e26]: "Это предварительный результат: 4 задач(и) ещё проверяет преподаватель. Итоговый балл появится после проверки."
+    - generic [ref=f25e27]:
+      - generic [ref=f25e28]: Насколько сложной была работа?
+      - generic [ref=f25e29]:
+        - generic [ref=f25e30]: 1 — легко
+        - generic [ref=f25e31]:
+          - button "сложность 1 из 10" [ref=f25e32] [cursor=pointer]: "1"
+          - button "сложность 2 из 10" [ref=f25e33] [cursor=pointer]: "2"
+          - button "сложность 3 из 10" [ref=f25e34] [cursor=pointer]: "3"
+          - button "сложность 4 из 10" [ref=f25e35] [cursor=pointer]: "4"
+          - button "сложность 5 из 10" [ref=f25e36] [cursor=pointer]: "5"
+          - button "сложность 6 из 10" [active] [ref=f25e37] [cursor=pointer]: "6"
+          - button "сложность 7 из 10" [ref=f25e38] [cursor=pointer]: "7"
+          - button "сложность 8 из 10" [ref=f25e39] [cursor=pointer]: "8"
+          - button "сложность 9 из 10" [ref=f25e40] [cursor=pointer]: "9"
+          - button "сложность 10 из 10" [ref=f25e41] [cursor=pointer]: "10"
+        - generic [ref=f25e42]: 10 — очень сложно
+      - generic [ref=f25e90]: Спасибо, записали.
+    - generic [ref=f25e43]:
+      - generic [ref=f25e44]: "Порядок:"
+      - button "как в работе" [ref=f25e45] [cursor=pointer]
+      - button "сначала с ошибками" [ref=f25e46] [cursor=pointer]
+    - generic [ref=f25e47]:
+      - group [ref=f25e48]:
+        - 'generic "▸ 1. Операции открытого рынка: цены облигаций и ставки без ответа 0 / 3 б." [ref=f25e49] [cursor=pointer]':
+          - text: ▸
+          - generic [ref=f25e50]: "1."
+          - generic [ref=f25e51]: "Операции открытого рынка: цены облигаций и ставки"
+          - generic [ref=f25e52]: без ответа
+          - generic [ref=f25e53]: 0 / 3 б.
+      - group [ref=f25e54]:
+        - generic "▸ 2. Номинальный и реальный ВВП, ценовые индексы без ответа 0 / 3 б." [ref=f25e55] [cursor=pointer]:
+          - text: ▸
+          - generic [ref=f25e56]: "2."
+          - generic [ref=f25e57]: Номинальный и реальный ВВП, ценовые индексы
+          - generic [ref=f25e58]: без ответа
+          - generic [ref=f25e59]: 0 / 3 б.
+      - group [ref=f25e60]:
+        - 'generic "▸ 3. Задача #49071 без ответа 0 / 3 б." [ref=f25e61] [cursor=pointer]':
+          - text: ▸
+          - generic [ref=f25e62]: "3."
+          - generic [ref=f25e63]: "Задача #49071"
+          - generic [ref=f25e64]: без ответа
+          - generic [ref=f25e65]: 0 / 3 б.
+      - group [ref=f25e66]:
+        - generic "▸ 4. Другая задача на КПВ на проверке — / 10 б." [ref=f25e67] [cursor=pointer]:
+          - text: ▸
+          - generic [ref=f25e68]: "4."
+          - generic [ref=f25e69]: Другая задача на КПВ
+          - generic [ref=f25e70]: на проверке
+          - generic [ref=f25e71]: — / 10 б.
+      - group [ref=f25e72]:
+        - generic "▸ 5. Мировая КПВ или абсолютно мобильная рабочая сила на проверке — / 10 б." [ref=f25e73] [cursor=pointer]:
+          - text: ▸
+          - generic [ref=f25e74]: "5."
+          - generic [ref=f25e75]: Мировая КПВ или абсолютно мобильная рабочая сила
+          - generic [ref=f25e76]: на проверке
+          - generic [ref=f25e77]: — / 10 б.
+      - group [ref=f25e78]:
+        - generic "▸ 6. \"Вычитание\" КПВ на проверке — / 9,99 б." [ref=f25e79] [cursor=pointer]:
+          - text: ▸
+          - generic [ref=f25e80]: "6."
+          - generic [ref=f25e81]: "\"Вычитание\" КПВ"
+          - generic [ref=f25e82]: на проверке
+          - generic [ref=f25e83]: — / 9,99 б.
+      - group [ref=f25e84]:
+        - 'generic "▸ 7. Международная торговля звездолётами: равновесие и налоговая политика на проверке — / 10,01 б." [ref=f25e85] [cursor=pointer]':
+          - text: ▸
+          - generic [ref=f25e86]: "7."
+          - generic [ref=f25e87]: "Международная торговля звездолётами: равновесие и налоговая политика"
+          - generic [ref=f25e88]: на проверке
+          - generic [ref=f25e89]: — / 10,01 б.

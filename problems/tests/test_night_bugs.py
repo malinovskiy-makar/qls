@@ -476,8 +476,11 @@ class AssignmentGroupingTests(TestCase):
         response = self.client.get(
             reverse('teacher:group_detail', args=[self.group.pk])
             + '?tab=assignments')
-        return {key: [r['assignment'].name for r in rows]
-                for key, _, rows in response.context['assignment_groups']}
+        # ⚠️ Группа стала СЛОВАРЁМ, а не тройкой (сессия 7, фаза 11): ей
+        # понадобились цвет полосы, подпись «последние 5 из 6» и список
+        # показанных отдельно от полного.
+        return {row['key']: [r['assignment'].name for r in row['items']]
+                for row in response.context['assignment_groups']}
 
     def test_unchecked_work_goes_to_needs_you(self):
         self._work('С непроверенным', days=5, pending=1)
@@ -513,7 +516,7 @@ class AssignmentGroupingTests(TestCase):
         response = self.client.get(
             reverse('teacher:group_detail', args=[self.group.pk])
             + '?tab=assignments')
-        keys = [key for key, _, _ in response.context['assignment_groups']]
+        keys = [row['key'] for row in response.context['assignment_groups']]
         self.assertEqual(keys, ['needs_you', 'running', 'done'])
 
     def test_exam_kind_is_quiet_text_not_an_accent_badge(self):
@@ -528,18 +531,39 @@ class AssignmentGroupingTests(TestCase):
         self.assertNotIn('badge-exam', body)
         self.assertNotIn('badge badge-exam', body)
 
-    def test_finished_card_shows_the_average(self):
+    def test_finished_card_shows_percent_and_difficulty(self):
+        """⚠️ СЫРОГО СРЕДНЕГО БАЛЛА БОЛЬШЕ НЕТ (поправка 4 владельца).
+
+        Он был несопоставим между работами: у них разный максимум, и «1,33»
+        против «1,4» соседней работы не значило ничего. На карточке
+        проверенной работы теперь процент и субъективная сложность.
+        """
         from problems.models import TeacherFeedback
+        from problems.models_platform import WorkDifficulty
 
         work = self._work('Закрыта', days=-3)
         item = work.items.first()
+        item.points = Decimal('8')
+        item.save(update_fields=['points'])
         sub = Submission.objects.create(student=self.student, assignment=work,
                                         problem_item=item, status='reviewed')
         TeacherFeedback.objects.create(submission=sub, score=Decimal('4'))
+        WorkDifficulty.objects.create(assignment=work, student=self.student,
+                                      value=6)
         body = self.client.get(
             reverse('teacher:group_detail', args=[self.group.pk])
             + '?tab=assignments').content.decode()
-        self.assertIn('средний балл', body)
+        self.assertNotIn('средний балл', body)
+        self.assertIn('50%', body)                    # 4 из 8
+        self.assertIn('сложность 6,0 из 10', body)
+
+    def test_finished_card_without_votes_says_so(self):
+        """Нет оценок — пишем словами, а не нулём: ноль означал бы оценку."""
+        work = self._work('Без оценок', days=-3, submitted=1)
+        body = self.client.get(
+            reverse('teacher:group_detail', args=[self.group.pk])
+            + '?tab=assignments').content.decode()
+        self.assertIn('нет оценок', body)
 
 
 class SubmissionsByStudentTests(TestCase):

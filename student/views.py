@@ -102,8 +102,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import models
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from problems.models_platform import WorkDifficulty
 
 
 # ---------------------------------------------------------------------------
@@ -586,7 +590,45 @@ def work_review_context(assignment, student, viewer=None, for_tutor=False,
         'submitted_at': submitted_at,
         'back_url': back_url or reverse('student:dashboard'),
         'back_label': back_label or 'Все работы',
+        # ⚠️ Вопрос о сложности показываем ТОЛЬКО ученику и ТОЛЬКО пока он
+        # не ответил (сессия 7, фаза 9). Репетитору спрашивать нечего — он
+        # работу не решал; ответившему второй раз тоже: ответ уже есть, и
+        # повторный вопрос читался бы как «нам не понравилось».
+        'difficulty_vote': (
+            None if for_tutor else
+            WorkDifficulty.objects.filter(assignment=assignment,
+                                          student=student).first()),
+        'difficulty_range': range(WorkDifficulty.MIN, WorkDifficulty.MAX + 1),
     }
+
+
+@student_required
+@require_POST
+def rate_difficulty(request, pk):
+    """Ученик оценил сложность работы. Без перезагрузки страницы.
+
+    ⚠️ ОДНА ОЦЕНКА НА РАБОТУ: повторная отправка ОБНОВЛЯЕТ запись, а не
+    плодит вторую. Уникальность держится и на уровне базы
+    (`uniq_difficulty_per_work`) — разъехаться им нельзя.
+
+    ⚠️ Вопрос НЕОБЯЗАТЕЛЬНЫЙ, поэтому отказ здесь ничего не ломает: работа
+    от него не меняется, и ошибка отвечает по-человечески, а не пятисоткой.
+    """
+    from problems.models import Assignment
+
+    assignment = get_object_or_404(Assignment, pk=pk, students=request.user)
+    try:
+        value = int(request.POST.get('value') or 0)
+    except (TypeError, ValueError):
+        value = 0
+    if not (WorkDifficulty.MIN <= value <= WorkDifficulty.MAX):
+        return JsonResponse({'ok': False,
+                             'error': 'Оценка бывает от 1 до 10.'}, status=400)
+
+    WorkDifficulty.objects.update_or_create(
+        assignment=assignment, student=request.user,
+        defaults={'value': value})
+    return JsonResponse({'ok': True, 'value': value})
 
 
 # ---------------------------------------------------------------------------

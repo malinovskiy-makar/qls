@@ -47,13 +47,27 @@ def assignment_stats(assignment):
     deadline = assignment.deadline_at
     human, exact = deadline_pair(deadline)
 
-    # Средний балл по группе — показывается на карточке завершённой работы:
-    # она уже не требует внимания, и единственное, что от неё нужно, — итог.
+    # ⚠️ СРЕДНИЙ БАЛЛ БОЛЬШЕ НЕ ПОКАЗЫВАЕТСЯ (поправка 4 владельца к
+    # сессии 7). Он вводил в заблуждение: у разных работ разный максимум, и
+    # сырое «средний балл 1,33» несопоставимо с «1,4» соседней работы. На
+    # его месте теперь средняя субъективная сложность — по той же причине,
+    # по которой в истории работ баллы заменены процентами.
+    # Значение остаётся в словаре: по нему считается сортировка и его ждут
+    # существующие проверки; из ИНТЕРФЕЙСА оно убрано.
     from django.db.models import Avg
+
+    from problems import models_platform
 
     average = (Submission.objects
                .filter(assignment=assignment, feedback__score__isnull=False)
                .aggregate(value=Avg('feedback__score'))['value'])
+    difficulty = models_platform.difficulty_for_work(assignment)
+
+    # ⚠️ СРЕДНЯЯ ОЦЕНКА — В ПРОЦЕНТАХ, А НЕ В СЫРЫХ БАЛЛАХ. У разных работ
+    # разный максимум, и «1,33» против «1,4» соседней работы не сравнимы
+    # ничем. Тот же довод, по которому в истории работ баллы заменены
+    # процентами.
+    percent = _assignment_percent(assignment)
     return {
         'assignment': assignment,
         'students': students,
@@ -66,10 +80,46 @@ def assignment_stats(assignment):
         # Раньше бейдж «проверено» стоял у заданий, где сдали 0 из 3, — это
         # не заслуга, а пустота, и читалось как «всё в порядке».
         'avg_score': round(float(average), 2) if average is not None else None,
+        # Средняя субъективная сложность работы: спрашиваем у учеников
+        # (`WorkDifficulty`), вычислить её из баллов нельзя. Нет ответов —
+        # пишем словами, а не нулём: ноль по шкале 1–10 означал бы оценку.
+        'difficulty': difficulty,
+        'difficulty_label': ('сложность %s из 10' % str(difficulty).replace('.', ',')
+                             if difficulty is not None else 'нет оценок'),
+        'percent': percent,
         'nobody_submitted': submitted_students == 0,
         'all_checked': submitted_students > 0 and pending == 0,
         'is_exam': assignment.is_exam,
     }
+
+
+def _assignment_percent(assignment):
+    """Средняя оценка за работу В ПРОЦЕНТАХ по всем сдавшим ученикам.
+
+    Считаем «набрано ÷ максимум» отдельно по каждому ученику и усредняем:
+    так работа, которую сдали двое, не перевешивается тем, у кого больше
+    задач. Никто не оценён — None, и экран пишет «никто не сдал».
+    """
+    from decimal import Decimal
+
+    from problems.assignment_rows import item_max_score
+    from problems.models import Submission
+
+    by_student = {}
+    for sub in (Submission.objects
+                .filter(assignment=assignment, feedback__score__isnull=False)
+                .select_related('feedback', 'problem_item')):
+        if sub.problem_item_id is None:
+            continue
+        got, could = by_student.setdefault(sub.student_id,
+                                           [Decimal('0'), Decimal('0')])
+        by_student[sub.student_id][0] = got + Decimal(str(sub.feedback.score))
+        by_student[sub.student_id][1] = could + item_max_score(sub.problem_item)
+
+    shares = [float(got / could) for got, could in by_student.values() if could]
+    if not shares:
+        return None
+    return int(round(sum(shares) * 100.0 / len(shares)))
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +215,12 @@ def group_detail(request, pk):
         'group': group,
         'tab': tab,
         'assignment_rows': rows,
-        'assignment_groups': group_assignments_by_state(rows),
+        'assignment_groups': group_assignments_by_state(
+            rows, show_all_done=request.GET.get('all_done') == '1'),
+        # Счётчик над списком: сколько работ ждут проверки прямо сейчас
+        # (фаза 11.1). Считаем РАБОТЫ, а не решения: репетитор открывает
+        # работу целиком, и «17 решений» ему ни о чём не говорит.
+        'waiting_total': sum(1 for row in rows if row['pending']),
     }
 
     # Обзор = прежняя статистика группы. Считаем только когда её смотрят:
@@ -218,18 +273,51 @@ def assignment_state(row, now=None):
     return 'done'
 
 
-def group_assignments_by_state(rows, now=None):
-    """[(ключ, заголовок, [строки]), …]. Пустые группы не возвращаются.
+# Сколько проверенных работ показываем сразу. Остальные — по кнопке
+# «Посмотреть все»: закрытая работа внимания не требует, и лента из
+# двадцати таких прячет за собой то, что горит.
+DONE_SHOWN = 5
+
+# Цвет полосы состояния. Берутся классы набора деталей (`.k-mark--*`), те же
+# пять состояний, что на разборе работы: два набора цветов для одного и того
+# же разъехались бы на первой же правке.
+STATE_MARKS = {'needs_you': 'pending', 'running': 'empty', 'done': 'correct'}
+
+
+def group_assignments_by_state(rows, now=None, show_all_done=False):
+    """Список групп заданий для экрана: заголовок, полоса, что показать.
 
     Внутри группы — по сроку, ближайшие первыми (порядок уже задан
     сортировкой в `group_detail`, здесь он только сохраняется).
+    Пустые группы не возвращаются.
     """
     now = now or timezone.now()
     buckets = {key: [] for key, _ in ASSIGNMENT_STATES}
     for row in rows:
         buckets[assignment_state(row, now)].append(row)
-    return [(key, title, buckets[key])
-            for key, title in ASSIGNMENT_STATES if buckets[key]]
+
+    result = []
+    for key, title in ASSIGNMENT_STATES:
+        items = buckets[key]
+        if not items:
+            continue
+        shown = items
+        hidden = 0
+        if key == 'done' and not show_all_done and len(items) > DONE_SHOWN:
+            shown = items[:DONE_SHOWN]
+            hidden = len(items) - DONE_SHOWN
+        caption = ('последние %d из %d' % (len(shown), len(items))
+                   if hidden else str(len(items)))
+        result.append({
+            'key': key,
+            'title': title,
+            'items': items,
+            'shown': shown,
+            'hidden_count': hidden,
+            'caption': caption,
+            'mark': STATE_MARKS[key],
+        })
+    return result
 
 # ---------------------------------------------------------------------------
 # Фаза 11 — просмотр задания ДО решений
