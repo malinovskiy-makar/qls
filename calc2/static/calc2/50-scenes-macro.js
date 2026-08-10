@@ -317,7 +317,7 @@ function updateMacroPanel() {
   const P = macroP();
   let html = '';
   if (r.kind === 'adas') {
-    html += `<div class="stat"><span>Краткосрочно: Y / P</span><b>${fmt(r.eq.Q)} / ${fmt(r.eq.P)}</b></div>`;
+    html += `<div class="stat"><span>Краткосрочно: (Y; P)</span><b>(${fmt(r.eq.Q)}; ${fmt(r.eq.P)})</b></div>`;
     html += `<div class="stat"><span>Потенциальный выпуск Y*</span><b>${fmt(r.Ystar)}</b></div>`;
     const g = r.gap;
     html += `<div class="stat"><span>Разрыв выпуска</span><b>${(g >= 0 ? '+' : '') + fmt(g)}</b></div>`;
@@ -343,7 +343,7 @@ function updateMacroPanel() {
     html += '<div class="hint">Предложение денег задаёт ЦБ, оно не зависит от ставки и поэтому вертикально. ' +
       'Ставка уравновешивает спрос на деньги с этим фиксированным предложением.</div>';
   } else if (r.kind === 'loanable') {
-    html += `<div class="stat"><span>База: r / объём</span><b>${fmt(r.base.P)} / ${fmt(r.base.Q)}</b></div>`;
+    html += `<div class="stat"><span>База: (r; объём)</span><b>(${fmt(r.base.P)}; ${fmt(r.base.Q)})</b></div>`;
     if (r.dg > 0) {
       html += `<div class="stat"><span>Дефицит бюджета ΔG</span><b>${fmt(r.dg)}</b></div>`;
       html += `<div class="stat"><span>Новая ставка r</span><b>${fmt(r.eq.P)}</b></div>`;
@@ -360,7 +360,7 @@ function updateMacroPanel() {
     html += `<div class="stat"><span>Объём при плавающем</span><b>${fmt(r.eq.Q)}</b></div>`;
     if (r.fixed) {
       html += `<div class="stat" style="margin-top:4px;"><span>Фиксированный курс</span><b>${fmt(r.fixed.e)}</b></div>`;
-      html += `<div class="stat"><span>Спрос / предложение</span><b>${fmt(r.fixed.Qd)} / ${fmt(r.fixed.Qs)}</b></div>`;
+      html += `<div class="stat"><span>(Спрос; предложение)</span><b>(${fmt(r.fixed.Qd)}; ${fmt(r.fixed.Qs)})</b></div>`;
       html += `<div class="stat"><span>${r.fixed.deficit ? 'Дефицит валюты' : 'Избыток валюты'}</span><b>${fmt(r.fixed.gap)}</b></div>`;
       html += `<div class="hint">Это ровно та же геометрия, что потолок и пол цены на обычном рынке: торгуется ` +
         `короткая сторона, а разрыв ${r.fixed.deficit ? 'ЦБ покрывает продажей резервов' : 'ЦБ скупает, наращивая резервы'}.</div>`;

@@ -518,8 +518,8 @@ function updateNaturalPanel() {
   const n = STATE.natural;
   if (!n) { box.innerHTML = '<div class="warn">Оптимум монополии не найден. Проверьте кривые.</div>'; return; }
   let html = `<div class="stat"><span>Постоянные издержки FC</span><b>${fmt(n.FC)}</b></div>`;
-  html += `<div class="stat"><span>1 · Монополия: $Q$ / $P$</span><b>${fmt(n.Qm)} / ${fmt(n.Pm)}</b></div>`;
-  if (!isNaN(n.atcAtQm)) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;ATC(Qm) / прибыль</span><b>${fmt(n.atcAtQm)} / ${fmt(n.profit)}</b></div>`;
+  html += `<div class="stat"><span>1 · Монополия: ($Q$; $P$)</span><b>(${fmt(n.Qm)}; ${fmt(n.Pm)})</b></div>`;
+  if (!isNaN(n.atcAtQm)) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;(ATC(Qm); прибыль)</span><b>(${fmt(n.atcAtQm)}; ${fmt(n.profit)})</b></div>`;
   if (n.mcReg) {
     html += `<div class="stat" style="margin-top:4px;"><span>2 · $P = MC$: $Q$ / $P$</span><b>${fmt(n.mcReg.Q)} / ${fmt(n.mcReg.P)}</b></div>`;
     html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;ATC на этом Q</span><b>${fmt(n.mcReg.atc)}</b></div>`;
@@ -890,7 +890,7 @@ function updateDiscr3Panel() {
   if (world) {
     // Экспорт по мировой цене: сегмент 2 — горизонтальный спрос, поэтому MR₂ = Pw.
     let html = '';
-    html += `<div class="stat"><span>Внутри: q₁ / P₁</span><b>${fmt(d.q1)} / ${fmt(d.P1)}</b></div>`;
+    html += `<div class="stat"><span>Внутри: (q₁; P₁)</span><b>(${fmt(d.q1)}; ${fmt(d.P1)})</b></div>`;
     html += `<div class="stat"><span>Экспорт q₂ (по Pw)</span><b>${fmt(d.q2)} / ${fmt(d.P2)}</b></div>`;
     html += `<div class="stat"><span>Σ выпуск</span><b>${fmt(d.Qtot)}</b></div>`;
     html += `<div class="stat"><span>$MR_1 = P_w = MC$</span><b>${fmt(d.mcLevel)}</b></div>`;
@@ -904,8 +904,8 @@ function updateDiscr3Panel() {
   // Эластичность в точке оптимума: |E| = |P / (Q·dP/dQ)|. Меньше эластичный → выше цена.
   const less = (d.P1 >= d.P2) ? '1' : '2';
   let html = '';
-  html += `<div class="stat"><span>Рынок 1: q₁ / P₁</span><b>${fmt(d.q1)} / ${fmt(d.P1)}</b></div>`;
-  html += `<div class="stat"><span>Рынок 2: q₂ / P₂</span><b>${fmt(d.q2)} / ${fmt(d.P2)}</b></div>`;
+  html += `<div class="stat"><span>Рынок 1: (q₁; P₁)</span><b>(${fmt(d.q1)}; ${fmt(d.P1)})</b></div>`;
+  html += `<div class="stat"><span>Рынок 2: (q₂; P₂)</span><b>(${fmt(d.q2)}; ${fmt(d.P2)})</b></div>`;
   html += `<div class="stat"><span>Σ выпуск</span><b>${fmt(d.Qtot)}</b></div>`;
   html += `<div class="stat"><span>$MR_1 = MR_2 = MC$</span><b>${fmt(d.mcLevel)}</b></div>`;
   html += `<div class="hint">Цена выше на менее эластичном рынке (здесь это рынок&nbsp;${less}). Фирма выравнивает предельный доход: MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.</div>`;

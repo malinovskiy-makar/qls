@@ -191,7 +191,7 @@ function updateConsumerPanel() {
   if (!c) { box.innerHTML = '<div class="warn">' + (STATE.consErr || 'Задайте цены и доход.') + '</div>'; return; }
   const b = c.base;
   let html = '';
-  html += `<div class="stat"><span>Оптимум x* / y*</span><b>${fmt(b.x)} / ${fmt(b.y)}</b></div>`;
+  html += `<div class="stat"><span>Оптимум $(x^*; y^*)$</span><b>(${fmt(b.x)}; ${fmt(b.y)})</b></div>`;
   html += `<div class="stat"><span>Полезность U</span><b>${fmt(b.U)}</b></div>`;
   html += `<div class="stat"><span>$MRS$ в оптимуме</span><b>${fmt(b.mrs)}</b></div>`;
   html += `<div class="stat"><span>$\frac{P_x}{P_y}$</span><b>${fmt(b.px / b.py)}</b></div>`;

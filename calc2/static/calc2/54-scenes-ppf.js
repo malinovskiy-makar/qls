@@ -1298,7 +1298,7 @@ function updatePpfTradePanel() {
   html += `<div class="stat"><span>Мировая цена $P_x/P_y$</span><b>${fmt(d.ratio)}</b></div>`;
   html += `<div class="stat"><span>Внутренняя цена X (наклон КПВ)</span><b>${fmt(inner)}</b></div>`;
   if (d.xp != null) {
-    html += `<div class="stat"><span>Производство $X_п$ / $Y_п$</span><b>${fmt(d.xp)} / ${fmt(d.yp)}</b></div>`;
+    html += `<div class="stat"><span>Производство $(X_п; Y_п)$</span><b>(${fmt(d.xp)}; ${fmt(d.yp)})</b></div>`;
   }
   if (d.line) {
     html += `<div class="stat"><span>Предел потребления $X_{макс}$</span><b>${fmt(d.xint)}</b></div>`;

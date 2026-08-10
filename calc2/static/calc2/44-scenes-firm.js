@@ -395,7 +395,7 @@ function updateIsoPanel() {
   const iso = STATE.iso;
   if (!iso) { box.innerHTML = '<div class="warn">' + (STATE.isoErr || 'Задайте цены факторов и бюджет.') + '</div>'; return; }
   let html = '';
-  html += `<div class="stat"><span>Оптимум L* / K*</span><b>${fmt(iso.L)} / ${fmt(iso.K)}</b></div>`;
+  html += `<div class="stat"><span>Оптимум $(L^*; K^*)$</span><b>(${fmt(iso.L)}; ${fmt(iso.K)})</b></div>`;
   html += `<div class="stat"><span>Выпуск Q</span><b>${fmt(iso.Q)}</b></div>`;
   html += `<div class="stat"><span>$MRTS$ в оптимуме</span><b>${fmt(iso.mrts)}</b></div>`;
   html += `<div class="stat"><span>$\frac{w}{r}$</span><b>${fmt(STATE.isoW / STATE.isoR)}</b></div>`;

@@ -461,10 +461,10 @@ function updateOpenPanel() {
   if (!o) { box.innerHTML = '<div class="muted">Задайте мировую цену Pw.</div>'; return; }
   if (o.error) { box.innerHTML = '<div class="warn">' + o.error + '</div>'; return; }
   let html = `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(o.Pw)}</b></div>`;
-  if (o.aut) html += `<div class="stat"><span>Автаркия: Q* / P*</span><b>${fmt(o.aut.Q)} / ${fmt(o.aut.P)}</b></div>`;
-  html += `<div class="stat"><span>При Pw: Qd / Qs</span><b>${fmt(o.Qd)} / ${fmt(o.Qs)}</b></div>`;
+  if (o.aut) html += `<div class="stat"><span>Автаркия: (Q*; P*)</span><b>(${fmt(o.aut.Q)}; ${fmt(o.aut.P)})</b></div>`;
+  html += `<div class="stat"><span>При Pw: (Qd; Qs)</span><b>(${fmt(o.Qd)}; ${fmt(o.Qs)})</b></div>`;
   html += `<div class="stat"><span>${o.importing ? 'Импорт' : 'Экспорт'}</span><b>${fmt(o.volume)}</b></div>`;
-  html += `<div class="stat"><span>CS / PS при своб. торговле</span><b>${fmt(o.csFree)} / ${fmt(o.psFree)}</b></div>`;
+  html += `<div class="stat"><span>(CS; PS) при своб. торговле</span><b>(${fmt(o.csFree)}; ${fmt(o.psFree)})</b></div>`;
   if (o.gain != null) html += `<div class="stat"><span>Выигрыш от торговли</span><b>${(o.gain >= 0 ? '+' : '') + fmt(o.gain)}</b></div>`;
   if (o.note) html += `<div class="warn" style="margin-top:6px;">${o.note}</div>`;
   if (o.P1 != null) {
@@ -472,7 +472,7 @@ function updateOpenPanel() {
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
     html += `<div class="stat"><span>${isTar ? 'Тариф t' : 'Квота'}</span><b>${fmt(isTar ? STATE.openTariff : STATE.openQuota)}</b></div>`;
     html += `<div class="stat"><span>Внутренняя цена P₁</span><b>${fmt(o.P1)}</b></div>`;
-    html += `<div class="stat"><span>$Q_d^{\prime}$ / $Q_s^{\prime}$</span><b>${fmt(o.Qd1)} / ${fmt(o.Qs1)}</b></div>`;
+    html += `<div class="stat"><span>($Q_d^{\prime}$; $Q_s^{\prime}$)</span><b>(${fmt(o.Qd1)}; ${fmt(o.Qs1)})</b></div>`;
     html += `<div class="stat"><span>Импорт после</span><b>${fmt(o.vol1)} (было ${fmt(o.volume)})</b></div>`;
     html += `<div class="stat"><span>${isTar ? 'Доход бюджета' : 'Рента от квоты'}</span><b>${fmt(o.money)}</b></div>`;
     if (!isTar) html += '<div class="hint">Рента от квоты это не доход государства: кому она достанется, ' +
