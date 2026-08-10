@@ -592,10 +592,9 @@ function setMode(mode) {
   else if (mode === 'graph') setRanges(10, 10);   // чистый лист: привычные −10…10
   else if (mode === 'costs') setRanges(10, 50);
   else setRanges(100, 100);   // market / labor / ppf / inequality — стандартный масштаб 0..100
-  // Подписи полей масштаба в секции «Оси»: КПВ — X/Y, рынок труда — L/W, иначе Q/P.
-  const lq = document.getElementById('lbl-qmax'), lp = document.getElementById('lbl-pmax');
-  if (lq) lq.textContent = (mode === 'ppf') ? 'X макс' : (mode === 'labor' ? 'L макс' : (mode === 'consumer' ? 'x макс' : 'Q макс'));
-  if (lp) lp.textContent = (mode === 'ppf') ? 'Y макс' : (mode === 'labor' ? 'W макс' : (mode === 'consumer' ? 'y макс' : 'P макс'));
+  // Секция «Оси» с полями «Q макс»/«P макс» уехала в меню гаечного ключа, где
+  // группы называются просто «Ось X» и «Ось Y», а буквы задаются своими полями
+  // названий осей. Подписи под режим здесь больше некуда ставить (Свх-4б).
   if (mode === 'consumer') applyConsumerTypeUI();   // показать поля под текущий тип предпочтений
   if (mode === 'macro') setMacroModel(STATE.macroModel);   // подписи осей и панель полей модели
   if (typeof updatePult === 'function') updatePult();   // вне рыночного режима пульт скрыт

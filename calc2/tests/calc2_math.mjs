@@ -1159,7 +1159,7 @@ const CASES = [
           document.getElementById('ac-pick').value = 'D'; syncAreaCalcButton();
           document.getElementById('ac-calc').click();
           addMarkAt(30, 70, null);
-          STATE.showCS = false; STATE.labelSize = 20; redrawAll();
+          STATE.showCS = false; STATE.labelSize = 18; redrawAll();
           var mine = { a: STATE.areaCalcList.length, m: STATE.marks.length,
                        cs: STATE.showCS ? 1 : 0, s: STATE.labelSize };
           openPicker(); pickScene('mono'); closePicker();
@@ -1176,11 +1176,11 @@ const CASES = [
              ['в другой модели площадей нет', 'cleanA', 0, 0],
              ['и точек нет', 'cleanM', 0, 0],
              ['и галочка заливки на месте', 'cleanCS', 1, 0],
-             ['и размер подписей свой', 'cleanS', 12, 0],
+             ['и размер подписей свой', 'cleanS', 14, 0],
              ['вернулись — площадь на месте', 'backA', 1, 0],
              ['и точка на месте', 'backM', 1, 0],
              ['и снятая галочка', 'backCS', 0, 0],
-             ['и свой размер подписей', 'backS', 20, 0]],
+             ['и свой размер подписей', 'backS', 18, 0]],
   },
   {
     /* П4. Кривая комплектов: строится только по кнопке, поля пустые, луч идёт
@@ -1234,11 +1234,12 @@ const CASES = [
           document.getElementById('lbl-s').click();
           return { s: s.curve, m: m.curve, l: l.curve,
                    ax: s.axis, axM: m.axis, axL: l.axis, ratio: ratio };`,
-    checks: [['маленькая — 12', 's', 12, 0], ['средняя — 16', 'm', 16, 0],
-             ['крупная — 20', 'l', 20, 0],
+    // Н31: три буквы дают 10 · 14 · 18 (прежние 12 · 16 · 20 заменены).
+    checks: [['маленькая — 10', 's', 10, 0], ['средняя — 14', 'm', 14, 0],
+             ['крупная — 18', 'l', 18, 0],
              ['отметки осей не трогаем', 'ax', 10, 0],
              ['и на средней', 'axM', 10, 0], ['и на крупной', 'axL', 10, 0],
-             ['прочие подписи растут в той же мере', 'ratio', 20 / 12, 0.01]],
+             ['прочие подписи растут в той же мере', 'ratio', 18 / 10, 0.01]],
   },
   {
     /* П32, П33. Возврат масштаба показывает всё нарисованное и делает это

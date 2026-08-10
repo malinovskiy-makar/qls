@@ -1865,6 +1865,11 @@
         </div>
       </div>
 
+      <!-- Табло раздела «Математика». Без него updateMathPanel() писала в
+           пустоту, и весь блок оставался без «Ключевых значений» (Н29).
+           relocateForScene переносит этот div в правую панель. -->
+      <div id="info-math" style="margin-top:8px;"></div>
+
       <!-- Границы окна живут только в меню гаечного ключа над графиком:
            два места для одного и того же сбивали с толку. -->
     </div>
@@ -2037,7 +2042,7 @@
           <label>Размер подписей</label>
           <div class="seg lblsize-seg" id="lblsize-seg">
             <button class="seg-btn" id="lbl-s" type="button" aria-label="Мелкие подписи"
-                    style="font-size:11px;font-weight:700;">А</button>
+                    style="font-size:10px;font-weight:700;">А</button>
             <button class="seg-btn active" id="lbl-m" type="button" aria-label="Средние подписи"
                     style="font-size:14px;font-weight:700;">А</button>
             <button class="seg-btn" id="lbl-l" type="button" aria-label="Крупные подписи"

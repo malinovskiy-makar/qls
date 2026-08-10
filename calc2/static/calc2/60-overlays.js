@@ -2361,7 +2361,7 @@ const SCENE_DEFAULTS = {
   showMonoCS: true, showMonoPS: true, showMonoVC: false,
   colorOverride: {}, areaColor: {},
   // Плоскость и подписи.
-  labelSize: 12, firstQuad: true, xStep: null, yStep: null,
+  labelSize: LABEL_SIZE_DEFAULT, firstQuad: true, xStep: null, yStep: null,
   showLegend: true, zoomLock: false, viewDirty: false,
   // Буквы-параметры и кэши расчётов.
   params: {}, ppfSumData: null, ppfTradeData: null, mathRes: null,

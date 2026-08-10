@@ -974,10 +974,8 @@ function wireControls() {
     redrawAll();
   });
 
-  // ЧК5: сценарий торговли А / Б + две страны (эндогенная мировая цена).
-  const tradeA = document.getElementById('trade-a'), tradeB = document.getElementById('trade-b');
-  if (tradeA) tradeA.addEventListener('click', () => setTradeScenario('A'));
-  if (tradeB) tradeB.addEventListener('click', () => setTradeScenario('B'));
+  // ЧК5: две страны (эндогенная мировая цена). Сценарий А/Б задаёт карточка
+  // сюжета через setTradeScenario, кнопок в разметке нет (Свх-4б).
   const tb1 = document.getElementById('inp-tb1'), tb2 = document.getElementById('inp-tb2');
   function applyTradeB() {
     if (tb1) STATE.tbF1 = (tb1.value || '').trim();

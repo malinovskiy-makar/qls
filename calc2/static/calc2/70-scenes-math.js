@@ -933,7 +933,8 @@ function setMathWindow(x0, x1, y0, y1) {
 }
 function setMathX0(x) {
   STATE.mathX0 = x;
-  const v = document.getElementById('mathx0-val'); if (v) v.textContent = fmt(x);
+  // Точное значение показывает поле #mathx0-input рядом с ползунком, отдельной
+  // подписи-значения в разметке нет (Свх-4б).
   const s = document.getElementById('mathx0-slider'); if (s) s.value = x;
   // Поле точного значения не трогаем, пока в нём печатают: иначе округление
   // отгрызает у «-11.78» последний знак прямо под руками.

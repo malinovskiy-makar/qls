@@ -5,6 +5,9 @@
 //   ./venv/Scripts/python.exe manage.py runserver 8099 --noreload
 //   node calc2/tests/audit_matrix.mjs > reports/calc2_matrix_before.md
 import { chromium } from 'playwright';
+import { readFileSync, readdirSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
@@ -216,6 +219,60 @@ say('П34 голый выбор цвета', broken.color);
 say('П16 числовое поле листается', broken.num);
 say('П31 оси не цель прилипания', broken.snap);
 say('П53/П54 зум или панорама недоступны', broken.zoom);
+
+/* ── Свх-4б: оборванные связи ────────────────────────────────────────────
+   Класс дефекта, который не даёт ни ошибки, ни следа: контрол переделали,
+   а обработчик остался висеть на элементе, которого в разметке уже нет, и
+   кнопка молча ничего не делает. Проверка статическая: сверяем каждый
+   getElementById и querySelector('#…') из скриптов с id в шаблоне и с теми,
+   что скрипты создают сами. */
+const HERE = dirname(fileURLToPath(import.meta.url));
+const CALC2 = join(HERE, '..');
+const tpl = readFileSync(join(CALC2, 'templates', 'calc2', 'calc2.html'), 'utf8');
+const jsFiles = readdirSync(join(CALC2, 'static', 'calc2')).filter(f => f.endsWith('.js')).sort();
+const jsAll = jsFiles.map(f => readFileSync(join(CALC2, 'static', 'calc2', f), 'utf8')).join('\n');
+
+const known = new Set();
+for (const m of tpl.matchAll(/\sid=["']([^"']+)["']/g)) known.add(m[1]);
+// id, которые скрипты вешают сами: el.id = '…', .attr('id', '…'), разметка в
+// шаблонных строках и суффикс-имена, собранные из idAttr.
+for (const re of [/\.id\s*=\s*["'`]([A-Za-z][\w:.-]*)["'`]/g,
+                  /\.attr\(\s*['"]id['"]\s*,\s*['"]([\w-]+)['"]/g,
+                  /id=\\?["']([A-Za-z][\w-]*)/g]) {
+  for (const m of jsAll.matchAll(re)) known.add(m[1]);
+}
+/* Часть id приезжает в помощник аргументом: addPultXChip(…, 'ineq-master-slider')
+   ставит его ползунку, а подпись значения получает тот же id с суффиксом.
+   Находим такие помощники по телу (в нём есть «.id = <имя параметра>»), затем
+   собираем строки из их вызовов и все суффиксы, которые помощник приклеивает. */
+const suffixes = [''];
+for (const m of jsAll.matchAll(/\.id\s*=\s*(\w+)\s*\+\s*['"]([\w-]+)['"]/g)) suffixes.push(m[2]);
+for (const fn of jsAll.matchAll(/function\s+(\w+)\s*\(([^)]*)\)\s*\{/g)) {
+  const [name, params] = [fn[1], fn[2].split(',').map(s => s.trim())];
+  const body = jsAll.slice(fn.index, fn.index + 2500);
+  const idParam = params.find(p => new RegExp(`\\.id\\s*=\\s*${p}\\b`).test(body));
+  if (!idParam) continue;
+  for (const call of jsAll.matchAll(new RegExp(`\\b${name}\\s*\\(([^;]*?)\\)\\s*;`, 'g'))) {
+    for (const s of call[1].matchAll(/['"]([\w-]+)['"]/g)) {
+      suffixes.forEach(suf => known.add(s[1] + suf));
+    }
+  }
+}
+const orphans = [];
+for (const f of jsFiles) {
+  const src = readFileSync(join(CALC2, 'static', 'calc2', f), 'utf8').split('\n');
+  src.forEach((line, i) => {
+    for (const m of line.matchAll(/getElementById\(\s*["']([^"']+)["']\s*\)/g)) {
+      if (!known.has(m[1])) orphans.push(`${f}:${i + 1} ${m[1]}`);
+    }
+    for (const m of line.matchAll(/querySelector(?:All)?\(\s*["']#([\w-]+)/g)) {
+      if (!known.has(m[1])) orphans.push(`${f}:${i + 1} #${m[1]}`);
+    }
+  });
+}
+console.log('\n## Оборванные связи (Свх-4б)\n');
+console.log('Свх-4б обработчик на несуществующем элементе: '
+  + (orphans.length ? orphans.length + '\n  ' + orphans.join('\n  ') : 'нарушений нет'));
 
 console.log('\nОшибок страницы: ' + errors.length);
 errors.slice(0, 10).forEach(e => console.log('  ' + e));

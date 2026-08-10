@@ -1079,10 +1079,9 @@ function redrawPpfSum() {
 
 // Переключение вида суммарной КПВ (в масштабе / схема) — только перерисовка, без пересчёта.
 function setPpfSumView(view) {
+  // Кнопок выбора вида в разметке нет: со времён Фазы 13.3 вид один,
+  // «в масштабе», и переключать нечего (Свх-4б).
   STATE.ppfSumView = view;
-  const scl = document.getElementById('ppfsumview-scale'), sch = document.getElementById('ppfsumview-schema');
-  if (scl) scl.classList.toggle('active', view === 'scale');
-  if (sch) sch.classList.toggle('active', view === 'schema');
   redrawAll();
 }
 
@@ -1588,10 +1587,9 @@ function redrawTradeB() {
 
 // Переключатель сценария торговли А / Б (ЧК5).
 function setTradeScenario(s) {
+  // Сценарий выбирает карточка сюжета, отдельных кнопок А/Б в разметке нет
+  // (Свх-4б). Здесь остаётся только показать нужную панель полей.
   STATE.tradeScenario = s;
-  const a = document.getElementById('trade-a'), b = document.getElementById('trade-b');
-  if (a) a.classList.toggle('active', s === 'A');
-  if (b) b.classList.toggle('active', s === 'B');
   const pa = document.getElementById('trade-pane-a'), pb = document.getElementById('trade-pane-b');
   if (pa) pa.style.display = (s === 'A') ? '' : 'none';
   if (pb) pb.style.display = (s === 'B') ? '' : 'none';

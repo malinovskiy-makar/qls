@@ -269,10 +269,16 @@ function collapseCards() {
   });
 }
 
+/* Три буквы «А» и размер, который каждая ставит (Н31). Список один на файл:
+   раньше кнопки и функция отметки активной знали разные числа, и активной
+   подсвечивалась не та буква, по которой щёлкнули. */
+const LABEL_SIZES = [['lbl-s', 10], ['lbl-m', 14], ['lbl-l', 18]];
+
 // Отметить активную букву «А» под текущий размер подписей (П50).
 function syncLabelSizeSeg() {
-  const map = { 12: 'lbl-s', 16: 'lbl-m', 20: 'lbl-l' };
-  const want = map[+STATE.labelSize] || 'lbl-s';
+  const map = {};
+  LABEL_SIZES.forEach(([id, size]) => { map[size] = id; });
+  const want = map[+STATE.labelSize] || 'lbl-m';
   document.querySelectorAll('#lblsize-seg .seg-btn')
     .forEach(b => b.classList.toggle('active', b.id === want));
 }
@@ -677,10 +683,8 @@ function wireWrench() {
   if (quad) quad.addEventListener('change', () => setFirstQuad(quad.checked));
   const gt = document.getElementById('inp-gtitle');
   if (gt) gt.addEventListener('input', () => { STATE.graphTitle = gt.value; redrawAll(); });
-  const ls = document.getElementById('inp-lblsize');
-  if (ls) ls.addEventListener('input', () => { STATE.labelSize = parseFloat(ls.value); redrawAll(); });
-  // П50: три буквы А вместо числового поля. 12 · 16 · 20.
-  [['lbl-s', 12], ['lbl-m', 16], ['lbl-l', 20]].forEach(([id, size]) => {
+  // П50 · Н31: три буквы А вместо числового поля. 10 · 14 · 18.
+  LABEL_SIZES.forEach(([id, size]) => {
     const b = document.getElementById(id);
     if (!b) return;
     b.addEventListener('click', () => {
