@@ -21,6 +21,8 @@ from django.core.cache import cache
 from django.db.models import Avg, Count, Max, Min, Q, Sum
 from django.utils import timezone
 
+from . import timefmt
+
 CACHE_SECONDS = 300
 
 # Периоды, которые понимает переключатель на экране.
@@ -640,16 +642,29 @@ def group_table(group, period='month', now=None):
         attempted = stats.get('attempted', 0)
         solved = stats.get('solved', 0)
         subs = subs_by_user.get(student.pk, {})
+        # ⚠️ ДВА ЧИСЛА ДОЛИ ВЕРНЫХ (фаза 8.8): по всему сайту и по работам
+        # этого репетитора. Одно число отвечало на вопрос, которого никто не
+        # задавал: репетитору нужно знать, как ученик решает У НЕГО, и
+        # отдельно — каков он вообще.
+        pair = accuracy_pair(student, tutor=group.teacher)
         rows.append({
             'student': student,
             'solved': solved,
             'attempted': attempted,
+            'accuracy_all': pair['all'],
+            'accuracy_mine': pair['mine'],
+            'level_all': level_of(pair['all']),
             'accuracy': round(solved * 100.0 / attempted) if attempted else None,
             'submitted': subs.get('submitted', 0),
             'pending': subs.get('pending', 0),
             'avg_score': (round(float(score_by_user[student.pk]), 2)
                           if student.pk in score_by_user else None),
             'last_active': last_seen.get(student.pk),
+            # ⚠️ «Последняя активность» — ЛЮБОЕ решение задачи на сайте,
+            # ВКЛЮЧАЯ игру (фаза 8.5): `_last_activity` берёт все события
+            # без исключений. Человеческая формулировка — из `timefmt`,
+            # второй точки форматирования не заводим.
+            'last_active_human': timefmt.human_ago(last_seen.get(student.pk)),
         })
     return rows
 
@@ -665,6 +680,22 @@ def _problem_events_for(students, start):
     return queryset
 
 
+def _topic_events_for(students, start):
+    """События для ТЕПЛОКАРТЫ — все четыре источника, ВКЛЮЧАЯ игру.
+
+    ⚠️ Отличается от `_problem_events_for` двумя вещами, и обе намеренные:
+    игра не исключается, и не требуется ссылка на задачу (у вопроса игры её
+    нет — есть тема). Для теплокарты важно, трогал ли ученик тему вообще;
+    для «Решено» и долей верных игра по-прежнему не считается.
+    """
+    from .models import LearningEvent
+
+    queryset = LearningEvent.objects.filter(user__in=students)
+    if start is not None:
+        queryset = queryset.filter(created_at__gte=start)
+    return queryset
+
+
 def _last_activity(students):
     from .models import LearningEvent
 
@@ -674,19 +705,29 @@ def _last_activity(students):
     return {r['user_id']: r['last'] for r in rows}
 
 
-def group_topic_matrix(group, period='all', now=None, limit_topics=12):
+def group_topic_matrix(group, period='all', now=None, limit_topics=None):
     """Тепловая матрица «ученики × темы»: цвет — доля верных.
 
     Самый полезный экран репетитора: сразу видно, какую тему провалила вся
     группа (столбец красный целиком), а какую — один человек (одна клетка).
-    Темы отобраны по числу попыток в группе: показывать все 849 бессмысленно.
+
+    ⚠️ ПОКАЗЫВАЕМ ВСЕ 21 КАНОНИЧЕСКУЮ ТЕМУ (фаза 8.1), а не двенадцать самых
+    трогаемых. Тема без попыток — это ответ на вопрос «что задать дальше»,
+    и вырезать её значило прятать именно то, ради чего сюда смотрят.
+    Таблица прокручивается внутри `.table-wrap`, вбок страницу не тянет.
+
+    ⚠️ ИГРА ВХОДИТ (фаза 8.6). У вопросов Econ Rush есть привязка к
+    каноническим темам (денормализована в `GameQuestion.topics`, покрыто
+    7 219 вопросов из 8 782), и `game/views.py` резолвит её в
+    `LearningEvent.topic`. В доли верных и в «Решено» игра по-прежнему НЕ
+    входит — там другой формат ответа и другая цена ошибки.
     """
     start, _ = period_bounds(period, now)
     students = list(group.students.all().order_by('last_name', 'username'))
     if not students:
         return {'students': [], 'topics': [], 'cells': {}, 'columns': []}
 
-    rows = (_problem_events_for(students, start)
+    rows = (_topic_events_for(students, start)
             .filter(topic__isnull=False,
                     event_type__in=('solved', 'failed'))
             .values('user_id', 'topic_id', 'topic__name')
@@ -706,16 +747,41 @@ def group_topic_matrix(group, period='all', now=None, limit_topics=12):
             'accuracy': round(row['solved'] * 100.0 / row['attempted']),
         }
 
-    topics = sorted(totals.items(), key=lambda kv: -kv[1]['attempted'])
-    topics = topics[:limit_topics]
-
-    columns = [{
-        'topic_id': topic_id,
-        'name': name,
-        'attempted': data['attempted'],
-        'accuracy': round(data['solved'] * 100.0 / data['attempted'])
-        if data['attempted'] else 0,
-    } for (topic_id, name), data in topics]
+    # Колонки — ВСЕ канонические темы в каноническом порядке, а не только
+    # те, где что-то происходило. Порядок один и тот же на всех экранах,
+    # поэтому колонка не «переезжает» между заходами.
+    #
+    # ⚠️ НЕКАНОНИЧЕСКИЕ ТЕМЫ С ДАННЫМИ ДОБАВЛЯЮТСЯ В КОНЕЦ. В базе тем сильно
+    # больше двадцати одной (канон — это верхний уровень), и у части задач
+    # стоит тема вне канона. Показать только канон значило бы СПРЯТАТЬ
+    # настоящие попытки ученика — а «21 тема всегда» просили ради обратного:
+    # чтобы ничего не пропадало.
+    columns = []
+    seen = set()
+    for topic in canonical_topics():
+        data = totals.get((topic.pk, topic.name), {'attempted': 0,
+                                                   'solved': 0})
+        seen.add(topic.pk)
+        columns.append({
+            'topic_id': topic.pk,
+            'name': topic.name,
+            'attempted': data['attempted'],
+            'accuracy': (round(data['solved'] * 100.0 / data['attempted'])
+                         if data['attempted'] else None),
+        })
+    extra = [((topic_id, name), data)
+             for (topic_id, name), data in totals.items()
+             if topic_id not in seen]
+    for (topic_id, name), data in sorted(extra, key=lambda kv: -kv[1]['attempted']):
+        columns.append({
+            'topic_id': topic_id,
+            'name': name,
+            'attempted': data['attempted'],
+            'accuracy': (round(data['solved'] * 100.0 / data['attempted'])
+                         if data['attempted'] else None),
+        })
+    if limit_topics:
+        columns = columns[:limit_topics]
 
     matrix = []
     for student in students:
@@ -816,3 +882,227 @@ def needs_attention(group, now=None):
             flagged.append({'student': student, 'reasons': reasons,
                             'last_active': seen})
     return flagged
+
+
+# ===========================================================================
+# Сессия 7, фаза 8 — как считается статистика
+# ===========================================================================
+#
+# ⚠️ ЧТО ВО ЧТО ВХОДИТ (решения владельца, таблица продублирована в
+# REVIEW_PROGRESS.md — здесь она рядом с кодом, который её выполняет):
+#
+#   показатель            | входит                        | НЕ входит
+#   ----------------------|-------------------------------|-------------
+#   «Решено»              | домашки, контрольные, каталог | ИГРА
+#   «Доля верных» (оба)   | домашки, контрольные, каталог | ИГРА
+#   «Последняя активность»| всё, ВКЛЮЧАЯ игру             | —
+#   теплокарта по темам   | всё, ВКЛЮЧАЯ игру             | —
+#
+# Игра исключена из долей верных не по забывчивости: в ней другой формат
+# ответа и другая цена ошибки, и смешивание портит обе шкалы. В теплокарту
+# владения темами она входит — там важно, трогал ли ученик тему вообще.
+
+# Доля верных ниже этого — красный, ниже следующего — жёлтый, выше — зелёный.
+# Пороги владельца; едины для шкал прогресса и меток в таблицах.
+LEVEL_GOOD = 70
+LEVEL_MID = 40
+
+
+def level_of(percent):
+    """Уровень по доле верных: good / mid / bad. Ничего не знает про цвет."""
+    if percent is None:
+        return 'none'
+    if percent >= LEVEL_GOOD:
+        return 'good'
+    if percent >= LEVEL_MID:
+        return 'mid'
+    return 'bad'
+
+
+def canonical_topics():
+    """21 каноническая тема каталога, в каноническом порядке.
+
+    ⚠️ ПОКАЗЫВАЕМ ВСЕ, А НЕ ТОЛЬКО ТЕ, ГДЕ ЕСТЬ ДАННЫЕ (фаза 8.1). Тема без
+    попыток — это не отсутствие строки, а факт: её не проходили. Список из
+    трёх строк вместо двадцати одной выглядит как «вот и весь предмет».
+    """
+    from problems.management.commands.apply_topic_mapping import CANONICAL
+    from .models import Topic
+
+    by_name = {t.name: t for t in Topic.objects.filter(name__in=CANONICAL)}
+    return [by_name[name] for name in CANONICAL if name in by_name]
+
+
+def _graded_ratios(user, tutor=None, kind=None):
+    """Оценённые задачи ученика → [(topic_id, доля от максимума), …].
+
+    ⚠️ НЕПОЛНЫЙ БАЛЛ ИДЁТ ВЕСОМ (фаза 8.2): 8 из 10 — это вклад 0,8, а не
+    «неверно» и не «верно». Двоичное «решил / не решил» на открытых задачах
+    было неправдой: половина работы там обычное дело.
+
+    `tutor` — считать только работы этого репетитора (второе число доли
+    верных, фаза 8.8). `kind` — 'test' или 'open', иначе всё.
+    """
+    from decimal import Decimal
+
+    from .assignment_rows import item_max_score
+    from .models import Submission
+
+    queryset = (Submission.objects
+                .filter(student=user, feedback__score__isnull=False)
+                .select_related('feedback', 'problem_item',
+                                'problem_item__catalog_problem',
+                                'problem_item__custom_problem')
+                .prefetch_related('problem_item__catalog_problem__topics'))
+    if tutor is not None:
+        queryset = queryset.filter(assignment__author=tutor)
+
+    rows = []
+    for sub in queryset:
+        item = sub.problem_item
+        if item is None:
+            continue
+        if kind == 'test' and not item.is_test:
+            continue
+        if kind == 'open' and item.is_test:
+            continue
+        maximum = item_max_score(item)
+        if not maximum:
+            continue
+        ratio = min(Decimal('1'), Decimal(str(sub.feedback.score)) / maximum)
+        rows.append((_first_canonical_topic_id(item), float(ratio)))
+    return rows
+
+
+def _first_canonical_topic_id(item):
+    """Тема позиции. У своей задачи репетитора тем нет — это не ошибка.
+
+    ⚠️ Каноническая тема ГЛАВНЕЕ, но если её нет — берём первую любую, а не
+    None. Иначе задача считалась бы в строке «Всего» и не попадала ни в одну
+    строку темы, и сумма строк перестала бы сходиться с итогом.
+    """
+    from problems.management.commands.apply_topic_mapping import CANONICAL
+
+    problem = getattr(item, 'catalog_problem', None)
+    if problem is None:
+        return None
+    topics = list(problem.topics.all())
+    for topic in topics:
+        if topic.name in CANONICAL:
+            return topic.pk
+    return topics[0].pk if topics else None
+
+
+def _catalog_ratios(user, kind=None):
+    """Задачи каталога: решил — 1, ошибся — 0. Игра сюда НЕ входит."""
+    from .models import LearningEvent
+
+    rows = (LearningEvent.objects
+            .filter(user=user, source='catalog',
+                    event_type__in=('solved', 'failed'),
+                    topic__isnull=False)
+            .values('topic_id', 'event_type'))
+    return [(row['topic_id'], 1.0 if row['event_type'] == 'solved' else 0.0)
+            for row in rows]
+
+
+def accuracy_pair(user, tutor=None, kind=None):
+    """Два числа доли верных: по всему сайту и по работам этого репетитора.
+
+    ⚠️ ИГРА НЕ ВХОДИТ НИ В ОДНО ИЗ НИХ (поправка владельца к фазе 8.8).
+    «По всему сайту» — это каталог плюс домашки и контрольные ВСЕХ
+    репетиторов, а не «вообще всё, что человек делал на сайте».
+    """
+    everywhere = _graded_ratios(user, kind=kind) + _catalog_ratios(user, kind)
+    mine = _graded_ratios(user, tutor=tutor, kind=kind) if tutor else []
+    return {'all': _percent(everywhere), 'mine': _percent(mine),
+            'all_count': len(everywhere), 'mine_count': len(mine)}
+
+
+def _percent(rows):
+    """Среднее по долям → проценты. Пусто — None, а не ноль."""
+    if not rows:
+        return None
+    return int(round(sum(ratio for _, ratio in rows) * 100.0 / len(rows)))
+
+
+def topic_progress(user, kind=None, tutor=None):
+    """Прогресс по ВСЕМ 21 темам: доля верных, решено, уровень.
+
+    Строка на каждую каноническую тему, даже пустую. Неполный балл идёт
+    весом (см. `_graded_ratios`). Внизу отдельной строкой — «Всего».
+    """
+    rows = _graded_ratios(user, tutor=tutor, kind=kind) + \
+        _catalog_ratios(user, kind)
+
+    buckets = {}
+    for topic_id, ratio in rows:
+        if topic_id is None:
+            continue
+        bucket = buckets.setdefault(topic_id, [])
+        bucket.append(ratio)
+
+    def make_row(topic_id, name, topic=None):
+        ratios = buckets.get(topic_id, [])
+        percent = (int(round(sum(ratios) * 100.0 / len(ratios)))
+                   if ratios else None)
+        return {
+            'topic': topic,
+            'name': name,
+            'solved': len(ratios),
+            # «Верных» дробное: 8 из 10 это 0,8 задачи, а не одна и не ноль.
+            'correct': round(sum(ratios), 1) if ratios else 0,
+            'percent': percent,
+            'level': level_of(percent),
+            'empty': not ratios,
+        }
+
+    result = []
+    seen = set()
+    for topic in canonical_topics():
+        seen.add(topic.pk)
+        result.append(make_row(topic.pk, topic.name, topic))
+
+    # Неканонические темы с данными — в конец (см. `group_topic_matrix`):
+    # прятать реальные попытки нельзя, а порядок канона держим неизменным.
+    from .models import Topic
+    extra_ids = [tid for tid in buckets if tid not in seen]
+    if extra_ids:
+        extra = {t.pk: t for t in Topic.objects.filter(pk__in=extra_ids)}
+        for topic_id in sorted(extra_ids,
+                               key=lambda tid: -len(buckets[tid])):
+            topic = extra.get(topic_id)
+            if topic is not None:
+                result.append(make_row(topic.pk, topic.name, topic))
+
+    # ⚠️ «ВСЕГО» СЧИТАЕТСЯ ПО ВСЕМ ЗАДАЧАМ, А НЕ КАК СРЕДНЕЕ ИЗ ПРОЦЕНТОВ
+    # ТЕМ (фаза 8.7). Среднее из процентов дало бы теме с одной задачей тот
+    # же вес, что теме с сорока.
+    everything = [ratio for _, ratio in rows]
+    total_percent = (int(round(sum(everything) * 100.0 / len(everything)))
+                     if everything else None)
+    total = {
+        'name': 'Всего', 'solved': len(everything),
+        'correct': round(sum(everything), 1) if everything else 0,
+        'percent': total_percent, 'level': level_of(total_percent),
+        'empty': not everything,
+    }
+    return {'rows': result, 'total': total}
+
+
+def group_accuracy(group, tutor=None, kind=None):
+    """Средневзвешенное по группе — ПО КОЛИЧЕСТВУ РЕШЁННЫХ ЗАДАЧ (фаза 8.3).
+
+    Среднее из процентов учеников дало бы тому, кто решил три задачи, тот же
+    вес, что решившему триста.
+    """
+    correct = 0.0
+    solved = 0
+    for student in group.students.all():
+        rows = (_graded_ratios(student, tutor=tutor, kind=kind)
+                + _catalog_ratios(student, kind))
+        correct += sum(ratio for _, ratio in rows)
+        solved += len(rows)
+    if not solved:
+        return None
+    return int(round(correct * 100.0 / solved))

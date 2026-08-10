@@ -121,3 +121,34 @@ def deadline_pair(value, now=None):
     Одной функцией, чтобы фраза и подсказка не разъехались по экранам.
     """
     return human_deadline(value, now), fmt(value, FULL)
+
+
+def human_ago(value, now=None):
+    """Когда это было, словами: «сегодня», «вчера», «2 дня назад».
+
+    ⚠️ Отдельная функция от `human_deadline`, а не флаг у неё: срок смотрит
+    ВПЕРЁД («завтра до 20:00»), а активность — НАЗАД, и у них разные слова
+    для одного и того же дня. Общее у них только склонение (`_plural`),
+    которое обе и берут отсюда.
+
+    Пусто — пустая строка; писать «не заходил» решает вызывающий.
+    """
+    moment = local(value)
+    if moment is None:
+        return ''
+    now = local(now or timezone.now())
+
+    # По КАЛЕНДАРНЫМ дням: вчера в 23:00 и сегодня в 01:00 разделены двумя
+    # часами, но для человека это разные дни.
+    days = (now.date() - moment.date()).days
+    if days <= 0:
+        return 'сегодня'
+    if days == 1:
+        return 'вчера'
+    if days < 7:
+        return '%d %s назад' % (days, _plural(days, 'день', 'дня', 'дней'))
+    if days < 60:
+        weeks = days // 7
+        return '%d %s назад' % (weeks,
+                                _plural(weeks, 'неделю', 'недели', 'недель'))
+    return moment.strftime(DATE)

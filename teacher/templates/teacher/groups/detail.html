@@ -200,5 +200,20 @@
     });
   });
 })();
+
+// Строка ученика открывает его карточку (фаза 11.4).
+// ⚠️ Клик по ССЫЛКЕ или КНОПКЕ внутри строки обрабатывает сама ссылка —
+// иначе «открыть» срабатывала бы дважды, а выделение текста мышью
+// превращалось бы в переход.
+(function () {
+  var table = document.getElementById('students-table');
+  if (!table) { return; }
+  table.addEventListener('click', function (event) {
+    if (event.target.closest('a, button')) { return; }
+    if (window.getSelection && String(window.getSelection())) { return; }
+    var row = event.target.closest('tr[data-href]');
+    if (row) { window.location.href = row.dataset.href; }
+  });
+})();
 </script>
 {% endblock %}

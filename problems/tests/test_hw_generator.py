@@ -302,7 +302,7 @@ class GenerateScreenTests(TestCase):
                 mock.patch.dict('os.environ', {'ANTHROPIC_API_KEY': 'test'}):
             response = self.client.post(
                 reverse('teacher:assignment_generate'),
-                {'action': 'parse', 'text': 'монополия и эластичность',
+                {'step_action': 'parse', 'text': 'монополия и эластичность',
                  'count': 5, 'min_difficulty': 1, 'max_difficulty': 5})
         body = response.content.decode()
         self.assertIn('Вот что нашлось по вашему запросу', body)
@@ -326,7 +326,7 @@ class GenerateScreenTests(TestCase):
                 mock.patch.dict('os.environ', {'ANTHROPIC_API_KEY': 'test'}):
             response = self.client.post(
                 reverse('teacher:assignment_generate'),
-                {'action': 'search', 'text': 'x', 'count': 2,
+                {'step_action': 'search', 'text': 'x', 'count': 2,
                  'min_difficulty': 1, 'max_difficulty': 5,
                  'row_keep': ['0'], 'row_topic': ['Эластичность'],
                  'row_label': ['эластичность'],

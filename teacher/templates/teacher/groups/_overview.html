@@ -57,7 +57,8 @@
         <tr>
           <th class="no-sort">Ученик</th>
           {% for column in matrix.columns %}
-          <th class="no-sort" style="text-align:center;">
+          {# Длинное имя темы обрезается, полное — подсказкой при наведении. #}
+          <th class="no-sort" style="text-align:center;" title="{{ column.name }}">
             <span class="matrix-head">{{ column.name|truncatechars:26 }}</span>
           </th>
           {% endfor %}
@@ -81,11 +82,21 @@
         {% endfor %}
         <tr>
           <td class="muted">по группе</td>
+          {% comment %}
+          ⚠️ Строка «по группе» считается СРЕДНЕВЗВЕШЕННО по числу попыток
+          (фаза 8.3): она собирается из сумм по колонке, а не как среднее из
+          процентов учеников. Среднее из процентов дало бы решившему три
+          задачи тот же вес, что решившему триста.
+          {% endcomment %}
           {% for column in matrix.columns %}
           <td>
+            {% if column.accuracy is not None %}
             <span class="matrix-cell {% if column.accuracy < 50 %}matrix-bad{% elif column.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}">
               {{ column.accuracy }}%
             </span>
+            {% else %}
+            <span class="matrix-cell matrix-none" title="нет попыток">—</span>
+            {% endif %}
           </td>
           {% endfor %}
         </tr>
@@ -110,7 +121,7 @@
         <tr>
           <th data-type="text">Ученик</th>
           <th data-type="num">Решено</th>
-          <th data-type="num">Доля верных</th>
+          <th data-type="num">Доля верных{% include '_hint.html' with hint='Первое число — по всем задачам, решённым на сайте. Второе — только по домашкам и контрольным этой группы. Игра не входит ни в одно из них.' %}</th>
           <th data-type="num">Сдано работ</th>
           <th data-type="date">Последняя активность</th>
           <th class="no-sort"></th>
@@ -118,17 +129,40 @@
       </thead>
       <tbody>
         {% for row in rows %}
-        <tr>
-          <td>{{ row.student.get_full_name|default:row.student.username }}</td>
+        {% comment %}
+        Строка целиком кликабельна (фаза 11.4) — `data-href` подхватывает
+        общий скрипт таблицы. Кнопка «открыть» ОСТАЛАСЬ: кликабельная строка
+        нигде не подписана, и без кнопки способ открыть ученика пришлось бы
+        угадывать.
+        {% endcomment %}
+        <tr data-href="{% url 'teacher:student_progress' row.student.pk %}"
+            class="row-click">
+          <td>
+            <span class="stu-line">
+              <span class="stu-ava" aria-hidden="true">{{ row.student.first_name|first|default:row.student.username|first|upper }}</span>
+              {{ row.student.get_full_name|default:row.student.username }}
+            </span>
+          </td>
           <td data-sort="{{ row.solved }}">{{ row.solved }}</td>
-          <td data-sort="{{ row.accuracy|default:-1 }}">
-            {% if row.accuracy is not None %}{{ row.accuracy }}%{% else %}—{% endif %}
+          <td data-sort="{{ row.accuracy_all|default:-1 }}">
+            <span class="k-pair">
+              {% if row.accuracy_all is not None %}
+              <span class="k-level k-level--{{ row.level_all }}">{{ row.accuracy_all }}%</span>
+              {% else %}<span class="k-level k-level--none">—</span>{% endif %}
+              <span class="k-pair__slash">/</span>
+              <span class="k-pair__mine">{% if row.accuracy_mine is not None %}{{ row.accuracy_mine }}%{% else %}—{% endif %}</span>
+            </span>
           </td>
           <td data-sort="{{ row.submitted }}">
             {{ row.submitted }}{% if row.pending %} <span class="muted">({{ row.pending }} ждёт)</span>{% endif %}
           </td>
-          <td data-sort="{{ row.last_active|date:'U'|default:0 }}">
-            {% if row.last_active %}{{ row.last_active|date:"d.m.Y" }}{% else %}не заходил{% endif %}
+          {% comment %}
+          Время по-человечески — `problems/timefmt.py`, второй точки
+          форматирования не заводим. Точная дата уходит в подсказку.
+          {% endcomment %}
+          <td data-sort="{{ row.last_active|date:'U'|default:0 }}"
+              title="{% if row.last_active %}{{ row.last_active|date:'d.m.Y, H:i' }}{% endif %}">
+            {% if row.last_active %}{{ row.last_active_human }}{% else %}не заходил{% endif %}
           </td>
           <td><a href="{% url 'teacher:student_progress' row.student.pk %}"
                  class="k-btn k-btn--plain k-btn--sm">открыть</a></td>

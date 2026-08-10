@@ -534,3 +534,175 @@ class AiErrorTextTests(TestCase):
         for kind in ('no_key', 'limit', 'other'):
             self.assertNotIn('401', self._text(kind))
             self.assertNotIn('(', self._text(kind).replace('(30 в сутки)', ''))
+
+
+# ===========================================================================
+# Фаза 8 — как считается статистика
+# ===========================================================================
+
+class StatsFormulaTests(TestCase):
+    """Формулы владельца: вес неполного балла, состав, «Всего», два числа."""
+
+    def setUp(self):
+        from problems.management.commands.apply_topic_mapping import CANONICAL
+        from problems.models import (Assignment, AssignmentItem, StudentGroup,
+                                     Submission, TeacherFeedback, Topic)
+        from problems.tests.factories import make_user
+        from problems.tests.factories import make_problem as factory_problem
+
+        self.tutor = make_user('sf_tutor', role='teacher')
+        self.other = make_user('sf_other', role='teacher')
+        self.student = make_user('sf_student', role='student')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        self.group.students.add(self.student)
+        # Темы каталога должны существовать: строки строятся по ним.
+        # ⚠️ slug уникален и не заполняется сам — без него все 21 тема
+        # получили бы пустой slug и вторая упала бы на ограничении.
+        for index, name in enumerate(CANONICAL):
+            Topic.objects.get_or_create(name=name,
+                                        defaults={'slug': 'topic-%d' % index})
+        self.topic = Topic.objects.get(name='Эластичность')
+
+        self.work = Assignment.objects.create(name='ДЗ', author=self.tutor,
+                                              group=self.group)
+        self.work.students.add(self.student)
+        problem = factory_problem('Условие про эластичность')
+        problem.topics.add(self.topic)
+        self.item = AssignmentItem.objects.create(
+            assignment=self.work, order=0, catalog_problem=problem,
+            points=Decimal('10'))
+        self.sub = Submission.objects.create(
+            student=self.student, assignment=self.work,
+            problem_item=self.item, status='reviewed')
+        TeacherFeedback.objects.create(submission=self.sub,
+                                       score=Decimal('8'),
+                                       reviewed_by=self.tutor)
+
+    def test_partial_score_counts_as_a_weight(self):
+        """8 из 10 — это вклад 0,8, а не «верно» и не «неверно»."""
+        from problems import stats
+
+        rows = stats.topic_progress(self.student)['rows']
+        row = [r for r in rows if r['name'] == 'Эластичность'][0]
+        self.assertEqual(row['solved'], 1)
+        self.assertEqual(row['percent'], 80)
+
+    def test_all_twenty_one_topics_are_present(self):
+        """Тема без попыток — пустая строка, а не пропуск (8.1)."""
+        from problems import stats
+
+        result = stats.topic_progress(self.student)
+        self.assertEqual(len(result['rows']), 21)
+        empty = [r for r in result['rows'] if r['empty']]
+        self.assertEqual(len(empty), 20)
+
+    def test_total_row_counts_over_all_tasks(self):
+        """«Всего» — по всем задачам, а не среднее из процентов тем (8.7)."""
+        from problems import stats
+
+        total = stats.topic_progress(self.student)['total']
+        self.assertEqual(total['name'], 'Всего')
+        self.assertEqual(total['solved'], 1)
+        self.assertEqual(total['percent'], 80)
+
+    def test_two_numbers_of_accuracy(self):
+        """По всему сайту и по работам ЭТОГО репетитора (8.8)."""
+        from problems import stats
+
+        pair = stats.accuracy_pair(self.student, tutor=self.tutor)
+        self.assertEqual(pair['all'], 80)
+        self.assertEqual(pair['mine'], 80)
+        # Чужой репетитор своих работ не имеет — второе число пусто.
+        other = stats.accuracy_pair(self.student, tutor=self.other)
+        self.assertEqual(other['all'], 80)
+        self.assertIsNone(other['mine'])
+
+    def test_game_is_in_neither_number(self):
+        """⚠️ Поправка владельца: игра не входит НИ В ОДНО из двух чисел.
+
+        В игре другой формат ответа и другая цена ошибки; смешивание портит
+        обе шкалы.
+        """
+        from problems import stats
+        from problems.models import LearningEvent
+
+        for _ in range(20):
+            LearningEvent.objects.create(user=self.student, source='game',
+                                         event_type='failed',
+                                         topic=self.topic)
+        pair = stats.accuracy_pair(self.student, tutor=self.tutor)
+        self.assertEqual(pair['all'], 80)     # не поехало от двадцати ошибок
+        self.assertEqual(pair['mine'], 80)
+
+    def test_game_is_in_the_heatmap(self):
+        """…но в теплокарту владения темами игра ВХОДИТ (8.6).
+
+        Привязка есть: 7 219 вопросов пула из 8 782 несут каноническую тему,
+        и game/views.py резолвит её в LearningEvent.topic.
+        """
+        from problems import stats
+        from problems.models import LearningEvent
+
+        LearningEvent.objects.create(user=self.student, source='game',
+                                     event_type='solved', topic=self.topic)
+        matrix = stats.group_topic_matrix(self.group)
+        cells = {c['topic_id']: c for c in matrix['columns']}
+        self.assertGreater(cells[self.topic.pk]['attempted'], 0)
+
+    def test_heatmap_shows_every_canonical_topic(self):
+        from problems import stats
+
+        matrix = stats.group_topic_matrix(self.group)
+        self.assertEqual(len(matrix['columns']), 21)
+
+    def test_group_average_is_weighted_by_solved_count(self):
+        """8.3 — средневзвешенное по числу решённых, не среднее из процентов.
+
+        Второй ученик решает одну задачу на 0 из 10. Среднее из процентов
+        дало бы 40 %; правильный ответ — 40 % только если у них поровну
+        задач, а здесь их поровну и есть, поэтому добавляем третьего с
+        двумя верными: среднее из процентов дало бы 60 %, взвешенное — 65 %.
+        """
+        from problems import stats
+        from problems.models import (Assignment, AssignmentItem, Submission,
+                                     TeacherFeedback)
+        from problems.tests.factories import make_problem as factory_problem
+        from problems.tests.factories import make_user
+
+        weak = make_user('sf_weak', role='student')
+        self.group.students.add(weak)
+        self.work.students.add(weak)
+        sub = Submission.objects.create(student=weak, assignment=self.work,
+                                        problem_item=self.item,
+                                        status='reviewed')
+        TeacherFeedback.objects.create(submission=sub, score=Decimal('0'),
+                                       reviewed_by=self.tutor)
+        # Двое: 0,8 и 0,0 по одной задаче каждый → 40 %.
+        self.assertEqual(stats.group_accuracy(self.group, tutor=self.tutor),
+                         40)
+
+        strong = make_user('sf_strong', role='student')
+        self.group.students.add(strong)
+        self.work.students.add(strong)
+        for _ in range(2):
+            item = AssignmentItem.objects.create(
+                assignment=self.work, order=AssignmentItem.objects.count(),
+                catalog_problem=factory_problem('Ещё условие'),
+                points=Decimal('10'))
+            s = Submission.objects.create(student=strong, assignment=self.work,
+                                          problem_item=item, status='reviewed')
+            TeacherFeedback.objects.create(submission=s, score=Decimal('10'),
+                                           reviewed_by=self.tutor)
+        # Взвешенно: (0,8 + 0 + 1 + 1) / 4 = 70 %.
+        # Среднее из процентов дало бы (80 + 0 + 100) / 3 = 60 %.
+        self.assertEqual(stats.group_accuracy(self.group, tutor=self.tutor),
+                         70)
+
+    def test_levels_follow_the_owner_thresholds(self):
+        from problems import stats
+
+        self.assertEqual(stats.level_of(70), 'good')
+        self.assertEqual(stats.level_of(69), 'mid')
+        self.assertEqual(stats.level_of(40), 'mid')
+        self.assertEqual(stats.level_of(39), 'bad')
+        self.assertEqual(stats.level_of(None), 'none')

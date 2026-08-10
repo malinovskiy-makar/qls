@@ -202,3 +202,16 @@ table.stats-table tbody tr:hover { background: var(--surface-2); }
   .stats-title { font-size: 20px; }
   .chart-box { height: 220px; }
 }
+
+/* ── Оживление таблицы учеников (сессия 7, фаза 11.4) ──────────────────
+   Владелец: «выглядит суховато, добавьте цвета и иконки, только не эмодзи».
+   Отсюда кружок-инициал (буква, а не картинка) и цветная метка уровня;
+   больше ничего — таблица остаётся таблицей. */
+.stu-line { display: inline-flex; align-items: center; gap: 8px; }
+.stu-ava { display: inline-flex; align-items: center; justify-content: center;
+           width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%;
+           background: var(--chip-bg); color: var(--text2);
+           font-size: 12px; font-weight: 700; }
+/* Строка целиком кликабельна. Кнопка «открыть» остаётся: кликабельность
+   строки нигде не подписана, и без кнопки способ пришлось бы угадывать. */
+tr.row-click { cursor: pointer; }

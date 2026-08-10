@@ -1,0 +1,325 @@
+- generic [active] [ref=f21e1]:
+  - navigation [ref=f21e2]:
+    - link "Эк" [ref=f21e3] [cursor=pointer]:
+      - /url: /
+    - link "Проверка" [ref=f21e4] [cursor=pointer]:
+      - /url: /teacher/
+    - link "Группы" [ref=f21e5] [cursor=pointer]:
+      - /url: /teacher/groups/
+    - link "Каталог" [ref=f21e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f21e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f21e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f21e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f21e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f21e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f21e12]:
+      - button "Сменить тему" [ref=f21e13] [cursor=pointer]: ☾
+      - generic [ref=f21e14]: Марина Петрова
+      - link "Выйти" [ref=f21e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f21e16]:
+    - generic [ref=f21e17]:
+      - link "Группы" [ref=f21e18] [cursor=pointer]:
+        - /url: /teacher/groups/
+      - text: → Экономика 10–11, вторник
+    - heading "Экономика 10–11, вторник" [level=1] [ref=f21e21]
+    - navigation [ref=f21e22]:
+      - link "Обзор" [ref=f21e23] [cursor=pointer]:
+        - /url: "?tab=overview"
+      - link "Задания" [ref=f21e24] [cursor=pointer]:
+        - /url: "?tab=assignments"
+      - link "Материалы" [ref=f21e25] [cursor=pointer]:
+        - /url: "?tab=materials"
+    - generic [ref=f21e26]:
+      - link [ref=f21e27] [cursor=pointer]:
+        - /url: "?tab=overview&period=day"
+        - button "День" [ref=f21e28]
+      - link [ref=f21e29] [cursor=pointer]:
+        - /url: "?tab=overview&period=week"
+        - button "Неделя" [ref=f21e30]
+      - link [ref=f21e31] [cursor=pointer]:
+        - /url: "?tab=overview&period=month"
+        - button "Месяц" [ref=f21e32]
+      - link [ref=f21e33] [cursor=pointer]:
+        - /url: "?tab=overview&period=all"
+        - button "Всё время" [ref=f21e34]
+    - generic [ref=f21e35]:
+      - generic [ref=f21e36]:
+        - generic [ref=f21e37]: Требуют внимания
+        - generic [ref=f21e38]: Пропал, просел, не сдал последнюю работу или ждёт вашей проверки дольше трёх дней
+      - generic [ref=f21e39]:
+        - text: "Сергей Дмитриев — доля верных упала с 33% до 13%; не сдал «Домашка №3: спрос, предложение, эластичность»; работа ждёт вашей проверки 4 дня."
+        - link "посмотреть" [ref=f21e40] [cursor=pointer]:
+          - /url: /teacher/students/11/stats/
+    - generic [ref=f21e41]:
+      - generic [ref=f21e42]: Ученики × темы за всё время
+      - table [ref=f21e45]:
+        - rowgroup [ref=f21e46]:
+          - row [ref=f21e47]:
+            - columnheader "Ученик" [ref=f21e48]
+            - columnheader "Альтернативные издержки и…" [ref=f21e49]
+            - columnheader "Спрос и предложение" [ref=f21e51]
+            - columnheader "Эластичность" [ref=f21e53]
+            - columnheader "Теория потребителя и поле…" [ref=f21e55]
+            - 'columnheader "Теория фирмы: производств…" [ref=f21e57]'
+            - columnheader "Совершенная конкуренция" [ref=f21e59]
+            - columnheader "Монополия и ценовая дискр…" [ref=f21e61]
+            - columnheader "Олигополия и теория игр" [ref=f21e63]
+            - columnheader "Вмешательство государства" [ref=f21e65]
+            - columnheader "Международная торговля" [ref=f21e67]
+            - columnheader "Рынок труда" [ref=f21e69]
+            - columnheader "Неравенство доходов" [ref=f21e71]
+            - columnheader "ВВП и национальные счета" [ref=f21e73]
+            - columnheader "Инфляция и безработица" [ref=f21e75]
+            - columnheader "Фискальная политика" [ref=f21e77]
+            - columnheader "Монетарная политика" [ref=f21e79]
+            - columnheader "Экономический рост и циклы" [ref=f21e81]
+            - columnheader "Финансы и финансовые инст…" [ref=f21e83]
+            - columnheader "Эконометрика и анализ дан…" [ref=f21e85]
+            - columnheader "Поведенческая экономика" [ref=f21e87]
+            - columnheader "Математика и оптимизация" [ref=f21e89]
+        - rowgroup [ref=f21e91]:
+          - row [ref=f21e92]:
+            - cell "Сергей Дмитриев" [ref=f21e93]
+            - cell "—" [ref=f21e94]:
+              - generic "нет попыток" [ref=f21e95]: —
+            - cell "14%" [ref=f21e96]:
+              - generic "3 из 21" [ref=f21e97]: 14%
+            - cell "—" [ref=f21e98]:
+              - generic "нет попыток" [ref=f21e99]: —
+            - cell "—" [ref=f21e100]:
+              - generic "нет попыток" [ref=f21e101]: —
+            - cell "—" [ref=f21e102]:
+              - generic "нет попыток" [ref=f21e103]: —
+            - cell "—" [ref=f21e104]:
+              - generic "нет попыток" [ref=f21e105]: —
+            - cell "—" [ref=f21e106]:
+              - generic "нет попыток" [ref=f21e107]: —
+            - cell "—" [ref=f21e108]:
+              - generic "нет попыток" [ref=f21e109]: —
+            - cell "—" [ref=f21e110]:
+              - generic "нет попыток" [ref=f21e111]: —
+            - cell "100%" [ref=f21e112]:
+              - generic "5 из 5" [ref=f21e113]: 100%
+            - cell "—" [ref=f21e114]:
+              - generic "нет попыток" [ref=f21e115]: —
+            - cell "—" [ref=f21e116]:
+              - generic "нет попыток" [ref=f21e117]: —
+            - cell "—" [ref=f21e118]:
+              - generic "нет попыток" [ref=f21e119]: —
+            - cell "—" [ref=f21e120]:
+              - generic "нет попыток" [ref=f21e121]: —
+            - cell "—" [ref=f21e122]:
+              - generic "нет попыток" [ref=f21e123]: —
+            - cell "—" [ref=f21e124]:
+              - generic "нет попыток" [ref=f21e125]: —
+            - cell "—" [ref=f21e126]:
+              - generic "нет попыток" [ref=f21e127]: —
+            - cell "—" [ref=f21e128]:
+              - generic "нет попыток" [ref=f21e129]: —
+            - cell "—" [ref=f21e130]:
+              - generic "нет попыток" [ref=f21e131]: —
+            - cell "—" [ref=f21e132]:
+              - generic "нет попыток" [ref=f21e133]: —
+            - cell "—" [ref=f21e134]:
+              - generic "нет попыток" [ref=f21e135]: —
+          - row [ref=f21e136]:
+            - cell "Пётр Иванов" [ref=f21e137]
+            - cell "—" [ref=f21e138]:
+              - generic "нет попыток" [ref=f21e139]: —
+            - cell "—" [ref=f21e140]:
+              - generic "нет попыток" [ref=f21e141]: —
+            - cell "—" [ref=f21e142]:
+              - generic "нет попыток" [ref=f21e143]: —
+            - cell "—" [ref=f21e144]:
+              - generic "нет попыток" [ref=f21e145]: —
+            - cell "—" [ref=f21e146]:
+              - generic "нет попыток" [ref=f21e147]: —
+            - cell "—" [ref=f21e148]:
+              - generic "нет попыток" [ref=f21e149]: —
+            - cell "—" [ref=f21e150]:
+              - generic "нет попыток" [ref=f21e151]: —
+            - cell "—" [ref=f21e152]:
+              - generic "нет попыток" [ref=f21e153]: —
+            - cell "—" [ref=f21e154]:
+              - generic "нет попыток" [ref=f21e155]: —
+            - cell "71%" [ref=f21e156]:
+              - generic "10 из 14" [ref=f21e157]: 71%
+            - cell "—" [ref=f21e158]:
+              - generic "нет попыток" [ref=f21e159]: —
+            - cell "—" [ref=f21e160]:
+              - generic "нет попыток" [ref=f21e161]: —
+            - cell "—" [ref=f21e162]:
+              - generic "нет попыток" [ref=f21e163]: —
+            - cell "—" [ref=f21e164]:
+              - generic "нет попыток" [ref=f21e165]: —
+            - cell "—" [ref=f21e166]:
+              - generic "нет попыток" [ref=f21e167]: —
+            - cell "—" [ref=f21e168]:
+              - generic "нет попыток" [ref=f21e169]: —
+            - cell "—" [ref=f21e170]:
+              - generic "нет попыток" [ref=f21e171]: —
+            - cell "—" [ref=f21e172]:
+              - generic "нет попыток" [ref=f21e173]: —
+            - cell "—" [ref=f21e174]:
+              - generic "нет попыток" [ref=f21e175]: —
+            - cell "—" [ref=f21e176]:
+              - generic "нет попыток" [ref=f21e177]: —
+            - cell "—" [ref=f21e178]:
+              - generic "нет попыток" [ref=f21e179]: —
+          - row [ref=f21e180]:
+            - cell "Анна Соколова" [ref=f21e181]
+            - cell "—" [ref=f21e182]:
+              - generic "нет попыток" [ref=f21e183]: —
+            - cell "—" [ref=f21e184]:
+              - generic "нет попыток" [ref=f21e185]: —
+            - cell "—" [ref=f21e186]:
+              - generic "нет попыток" [ref=f21e187]: —
+            - cell "—" [ref=f21e188]:
+              - generic "нет попыток" [ref=f21e189]: —
+            - cell "—" [ref=f21e190]:
+              - generic "нет попыток" [ref=f21e191]: —
+            - cell "—" [ref=f21e192]:
+              - generic "нет попыток" [ref=f21e193]: —
+            - cell "—" [ref=f21e194]:
+              - generic "нет попыток" [ref=f21e195]: —
+            - cell "—" [ref=f21e196]:
+              - generic "нет попыток" [ref=f21e197]: —
+            - cell "—" [ref=f21e198]:
+              - generic "нет попыток" [ref=f21e199]: —
+            - cell "67%" [ref=f21e200]:
+              - generic "6 из 9" [ref=f21e201]: 67%
+            - cell "—" [ref=f21e202]:
+              - generic "нет попыток" [ref=f21e203]: —
+            - cell "—" [ref=f21e204]:
+              - generic "нет попыток" [ref=f21e205]: —
+            - cell "—" [ref=f21e206]:
+              - generic "нет попыток" [ref=f21e207]: —
+            - cell "—" [ref=f21e208]:
+              - generic "нет попыток" [ref=f21e209]: —
+            - cell "—" [ref=f21e210]:
+              - generic "нет попыток" [ref=f21e211]: —
+            - cell "—" [ref=f21e212]:
+              - generic "нет попыток" [ref=f21e213]: —
+            - cell "—" [ref=f21e214]:
+              - generic "нет попыток" [ref=f21e215]: —
+            - cell "—" [ref=f21e216]:
+              - generic "нет попыток" [ref=f21e217]: —
+            - cell "—" [ref=f21e218]:
+              - generic "нет попыток" [ref=f21e219]: —
+            - cell "—" [ref=f21e220]:
+              - generic "нет попыток" [ref=f21e221]: —
+            - cell "—" [ref=f21e222]:
+              - generic "нет попыток" [ref=f21e223]: —
+          - row [ref=f21e224]:
+            - cell "по группе" [ref=f21e225]
+            - cell "—" [ref=f21e226]:
+              - generic "нет попыток" [ref=f21e227]: —
+            - cell "14%" [ref=f21e228]
+            - cell "—" [ref=f21e230]:
+              - generic "нет попыток" [ref=f21e231]: —
+            - cell "—" [ref=f21e232]:
+              - generic "нет попыток" [ref=f21e233]: —
+            - cell "—" [ref=f21e234]:
+              - generic "нет попыток" [ref=f21e235]: —
+            - cell "—" [ref=f21e236]:
+              - generic "нет попыток" [ref=f21e237]: —
+            - cell "—" [ref=f21e238]:
+              - generic "нет попыток" [ref=f21e239]: —
+            - cell "—" [ref=f21e240]:
+              - generic "нет попыток" [ref=f21e241]: —
+            - cell "—" [ref=f21e242]:
+              - generic "нет попыток" [ref=f21e243]: —
+            - cell "75%" [ref=f21e244]
+            - cell "—" [ref=f21e246]:
+              - generic "нет попыток" [ref=f21e247]: —
+            - cell "—" [ref=f21e248]:
+              - generic "нет попыток" [ref=f21e249]: —
+            - cell "—" [ref=f21e250]:
+              - generic "нет попыток" [ref=f21e251]: —
+            - cell "—" [ref=f21e252]:
+              - generic "нет попыток" [ref=f21e253]: —
+            - cell "—" [ref=f21e254]:
+              - generic "нет попыток" [ref=f21e255]: —
+            - cell "—" [ref=f21e256]:
+              - generic "нет попыток" [ref=f21e257]: —
+            - cell "—" [ref=f21e258]:
+              - generic "нет попыток" [ref=f21e259]: —
+            - cell "—" [ref=f21e260]:
+              - generic "нет попыток" [ref=f21e261]: —
+            - cell "—" [ref=f21e262]:
+              - generic "нет попыток" [ref=f21e263]: —
+            - cell "—" [ref=f21e264]:
+              - generic "нет попыток" [ref=f21e265]: —
+            - cell "—" [ref=f21e266]:
+              - generic "нет попыток" [ref=f21e267]: —
+    - generic [ref=f21e268]:
+      - generic [ref=f21e269]:
+        - generic [ref=f21e270]: Ученики
+        - generic [ref=f21e271]: Нажмите на заголовок столбца, чтобы отсортировать
+      - table [ref=f21e273]:
+        - rowgroup [ref=f21e274]:
+          - row [ref=f21e275]:
+            - columnheader "Ученик" [ref=f21e276] [cursor=pointer]
+            - columnheader "Решено" [ref=f21e277] [cursor=pointer]
+            - columnheader [ref=f21e278] [cursor=pointer]:
+              - text: Доля верных
+              - note "Первое число — по всем задачам, решённым на сайте. Второе — только по домашкам и контрольным этой группы. Игра не входит ни в одно из них." [ref=f21e279]: "?"
+            - columnheader "Сдано работ" [ref=f21e280] [cursor=pointer]
+            - columnheader "Последняя активность" [ref=f21e281] [cursor=pointer]
+            - columnheader [ref=f21e282]
+        - rowgroup [ref=f21e283]:
+          - row [ref=f21e284] [cursor=pointer]:
+            - cell [ref=f21e285]:
+              - generic [ref=f21e286]:
+                - generic [ref=f21e287]: С
+                - text: Сергей Дмитриев
+            - cell "3" [ref=f21e288]
+            - cell "40% / 32%" [ref=f21e289]:
+              - generic [ref=f21e290]:
+                - generic [ref=f21e291]: 40%
+                - generic [ref=f21e292]: /
+                - generic [ref=f21e293]: 32%
+            - cell "8 (1 ждёт)" [ref=f21e294]
+            - cell "2 дня назад" [ref=f21e295]
+            - cell [ref=f21e296]:
+              - link "открыть" [ref=f21e297]:
+                - /url: /teacher/student/11/progress/
+          - row [ref=f21e298] [cursor=pointer]:
+            - cell [ref=f21e299]:
+              - generic [ref=f21e300]:
+                - generic [ref=f21e301]: П
+                - text: Пётр Иванов
+            - cell "77" [ref=f21e302]
+            - cell "69% / 36%" [ref=f21e303]:
+              - generic [ref=f21e304]:
+                - generic [ref=f21e305]: 69%
+                - generic [ref=f21e306]: /
+                - generic [ref=f21e307]: 36%
+            - cell "22 (4 ждёт)" [ref=f21e308]
+            - cell "2 дня назад" [ref=f21e309]
+            - cell [ref=f21e310]:
+              - link "открыть" [ref=f21e311]:
+                - /url: /teacher/student/9/progress/
+          - row [ref=f21e312] [cursor=pointer]:
+            - cell [ref=f21e313]:
+              - generic [ref=f21e314]:
+                - generic [ref=f21e315]: А
+                - text: Анна Соколова
+            - cell "46" [ref=f21e316]
+            - cell "57% / 15%" [ref=f21e317]:
+              - generic [ref=f21e318]:
+                - generic [ref=f21e319]: 57%
+                - generic [ref=f21e320]: /
+                - generic [ref=f21e321]: 15%
+            - cell "10" [ref=f21e322]
+            - cell "3 дня назад" [ref=f21e323]
+            - cell [ref=f21e324]:
+              - link "открыть" [ref=f21e325]:
+                - /url: /teacher/student/10/progress/

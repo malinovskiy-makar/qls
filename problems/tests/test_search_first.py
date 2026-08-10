@@ -192,7 +192,7 @@ class StopGateTests(TestCase):
         with override_settings(AI_PROVIDER='fake', AI_FAKE_REPLY=reply):
             body = self.client.post(
                 reverse('teacher:assignment_generate'),
-                {'action': 'parse', 'text': 'домашка про КТВ', 'count': 2,
+                {'step_action': 'parse', 'text': 'домашка про КТВ', 'count': 2,
                  'min_difficulty': 1, 'max_difficulty': 5}).content.decode()
         self.assertIn('Ваша строка: «построение КТВ»', body)
         self.assertIn('КТВ двух стран при торговле', body)
@@ -207,7 +207,7 @@ class StopGateTests(TestCase):
         with override_settings(AI_PROVIDER='fake', AI_FAKE_REPLY=reply):
             body = self.client.post(
                 reverse('teacher:assignment_generate'),
-                {'action': 'research', 'text': 'домашка', 'count': 2,
+                {'step_action': 'research', 'text': 'домашка', 'count': 2,
                  'min_difficulty': 1, 'max_difficulty': 5,
                  'row_keep': ['0'], 'row_query': ['построение КТВ'],
                  'row_label': ['моя строка'], 'row_topic': [''],
@@ -228,7 +228,7 @@ class StopGateTests(TestCase):
         with override_settings(AI_PROVIDER='fake'):
             body = self.client.post(
                 reverse('teacher:assignment_generate'),
-                {'action': 'search', 'text': 'x',
+                {'step_action': 'search', 'text': 'x',
                  'count_open': 2, 'count_test': 0,
                  'min_difficulty': 1, 'max_difficulty': 5,
                  'row_keep': ['0'], 'row_query': ['построение КТВ'],
