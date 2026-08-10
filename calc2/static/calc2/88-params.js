@@ -1089,19 +1089,44 @@ function wireControls() {
     if (e) e.addEventListener('input', () => { STATE[key] = e.value.trim(); redrawAll(); });
   });
 
-  /* П4. Кривая комплектов строится ТОЛЬКО по кнопке и только когда
-     заполнены обе единицы. Галочки «Показать луч потребления» больше нет. */
-  const bundleBuild = (idX, idY) => {
-    const x = parseFloat((document.getElementById(idX) || {}).value);
-    const y = parseFloat((document.getElementById(idY) || {}).value);
-    if (!(x > 0) || !(y > 0)) { toast('Заполните обе единицы: сколько X и сколько Y в комплекте'); return; }
+  /* Н17. Кривая комплектов во ВСЕХ моделях блока «КПВ и КТВ» заводится
+     одинаково: галочка (по умолчанию снята) раскрывает два пустых значения, и
+     как только введены оба, луч строится САМ и перестраивается при любой
+     правке. Отдельной кнопки «Построить» больше нет: она была лишним шагом
+     между «ввёл» и «увидел». */
+  const BUNDLE_BLOCKS = [
+    ['chk-bundle-1', 'bundle-row',  'inp-bundle-x',  'inp-bundle-y'],
+    ['chk-bundle-2', 'bundle-row2', 'inp-bundle-x2', 'inp-bundle-y2'],
+    ['chk-bundle-t', 'bundle-rowt', 'inp-bundle-xt', 'inp-bundle-yt'],
+  ];
+  const bundleApply = (idX, idY) => {
+    const ex = document.getElementById(idX), ey = document.getElementById(idY);
+    const rawX = (ex && ex.value || '').trim(), rawY = (ey && ey.value || '').trim();
+    const x = parseFloat(rawX), y = parseFloat(rawY);
+    const err = document.getElementById('bundle-error');
+    const bad = (rawX !== '' && !(x > 0)) || (rawY !== '' && !(y > 0));
+    if (err) {
+      err.textContent = bad ? 'Единиц в комплекте не может быть меньше нуля' : '';
+      err.style.display = bad ? 'block' : 'none';
+    }
+    if (bad) { STATE.bundleOn = false; redrawAll(); return; }
+    if (!(x > 0) || !(y > 0)) { STATE.bundleOn = false; redrawAll(); return; }
     STATE.bundleX = x; STATE.bundleY = y; STATE.bundleOn = true;
     redrawAll();
   };
-  const bBtn = document.getElementById('btn-bundle');
-  if (bBtn) bBtn.addEventListener('click', () => bundleBuild('inp-bundle-x', 'inp-bundle-y'));
-  const bBtnT = document.getElementById('btn-bundle-trade');
-  if (bBtnT) bBtnT.addEventListener('click', () => bundleBuild('inp-bundle-xt', 'inp-bundle-yt'));
+  BUNDLE_BLOCKS.forEach(([chkId, rowId, idX, idY]) => {
+    const chk = document.getElementById(chkId), row = document.getElementById(rowId);
+    if (!chk || !row) return;
+    chk.addEventListener('change', () => {
+      row.style.display = chk.checked ? '' : 'none';
+      if (!chk.checked) { STATE.bundleOn = false; redrawAll(); return; }
+      bundleApply(idX, idY);
+    });
+    [idX, idY].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', () => bundleApply(idX, idY));
+    });
+  });
 
   // Показ областей.
   [['chk-ppf-in', 'ppfShowIn'], ['chk-ppf-out', 'ppfShowOut']].forEach(([id, key]) => {
@@ -1130,8 +1155,6 @@ function wireControls() {
   });
   const sumNm = document.getElementById('inp-ppfsum-name');
   if (sumNm) sumNm.addEventListener('input', () => { STATE.ppfSumName = sumNm.value.trim(); redrawAll(); });
-  const bBtn2 = document.getElementById('btn-bundle-sum');
-  if (bBtn2) bBtn2.addEventListener('click', () => bundleBuild('inp-bundle-x2', 'inp-bundle-y2'));
   renderPpfSumRows();
 
 

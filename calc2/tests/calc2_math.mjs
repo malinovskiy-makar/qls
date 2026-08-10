@@ -1211,9 +1211,14 @@ const CASES = [
           STATE.bundleOn = false; redrawAll();
           var chk = document.querySelectorAll('[id^="chk-bundle"]').length;
           var off = STATE.bundleOn ? 1 : 0;
-          document.getElementById('inp-bundle-xt').value = '1';
-          document.getElementById('inp-bundle-yt').value = '1';
-          document.getElementById('btn-bundle-trade').click();
+          /* Н17: кнопки «Построить» больше нет — галочка раскрывает поля, и луч
+             строится сам, как только заполнены оба числа. */
+          var chkT = document.getElementById('chk-bundle-t');
+          chkT.checked = true; chkT.dispatchEvent(new Event('change', { bubbles: true }));
+          var xt = document.getElementById('inp-bundle-xt');
+          var yt = document.getElementById('inp-bundle-yt');
+          xt.value = '1'; xt.dispatchEvent(new Event('input', { bubbles: true }));
+          yt.value = '1'; yt.dispatchEvent(new Event('input', { bubbles: true }));
           var texts = [].map.call(document.querySelectorAll('#chart text'), function (t) { return t.textContent; });
           var ppf = texts.filter(function (s) { return s.indexOf('КПВ (') === 0; })[0] || '';
           var ktv = texts.filter(function (s) { return s.indexOf('КТВ (') === 0; })[0] || '';
@@ -1222,7 +1227,9 @@ const CASES = [
                    px: nums(ppf)[0], py: nums(ppf)[1],
                    tx: nums(ktv)[0], ty: nums(ktv)[1],
                    ray: texts.filter(function (s) { return s.indexOf('Комплекты') === 0; }).length };`,
-    checks: [['галочек луча не осталось', 'chk', 0, 0],
+    // Н17 отменяет прежнее правило «галочки нет»: она есть в каждой из трёх
+    // моделей блока и по умолчанию снята.
+    checks: [['галочка луча в каждой модели блока', 'chk', 3, 0],
              ['без кнопки кривой нет', 'off', 0, 0],
              ['кнопка построила', 'on', 1, 0],
              ['пересечение с КПВ по X', 'px', 50, 0.2], ['и по Y', 'py', 50, 0.2],
@@ -1259,6 +1266,58 @@ const CASES = [
              ['отметки осей не трогаем', 'ax', 10, 0],
              ['и на средней', 'axM', 10, 0], ['и на крупной', 'axL', 10, 0],
              ['прочие подписи растут в той же мере', 'ratio', 18 / 10, 0.01]],
+  },
+  {
+    /* Н17, Н18, Н19. Кривая комплектов: галочка снята по умолчанию, поля пустые,
+       луч строится САМ по двум числам и перестраивается при правке; на
+       отрицательное значение ошибка и луча нет; луч крутится вокруг начала
+       координат и падает в излом КПВ.
+       КПВ с изломом: X < 20 ? 100 − X : 120 − 2X. Стык в (20; 80), значит наклон
+       луча через него 80/20 = 4. */
+    name: 'Комплекты · галочка, автопостроение, вращение и магнит излома (Н17–Н19)',
+    run: `resetSceneMemory();
+          openPicker(); pickScene('ppf'); closePicker(); setToolsOpen(true);
+          var f = document.getElementById('inp-ppf');
+          f.value = 'X < 20 ? 100 - X : 120 - 2*X';
+          ['input','change'].forEach(function (t) { f.dispatchEvent(new Event(t, {bubbles:true})); });
+          f.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true}));
+          var chk = document.getElementById('chk-bundle-1');
+          var row = document.getElementById('bundle-row');
+          var offAtStart = (!chk.checked && getComputedStyle(row).display === 'none') ? 1 : 0;
+          chk.checked = true; chk.dispatchEvent(new Event('change', {bubbles:true}));
+          var ex = document.getElementById('inp-bundle-x'), ey = document.getElementById('inp-bundle-y');
+          var emptyFields = (ex.value === '' && ey.value === '') ? 1 : 0;
+          var noRayYet = STATE.bundleOn ? 0 : 1;
+          ex.value = '2'; ex.dispatchEvent(new Event('input', {bubbles:true}));
+          var halfNoRay = STATE.bundleOn ? 0 : 1;
+          ey.value = '1'; ey.dispatchEvent(new Event('input', {bubbles:true}));
+          var auto = STATE.bundleOn ? 1 : 0;
+          var kinks = (STATE._bundleKinks || []).length;
+          var kslope = kinks ? STATE._bundleKinks[0] : -1;
+          bundleDragTo(30, 45); var free = STATE.bundleY / STATE.bundleX;
+          bundleDragTo(20, 78); var snapped = STATE.bundleY / STATE.bundleX;
+          bundleDragTo(20, 30); var away = STATE.bundleY / STATE.bundleX;
+          var neg = (bundleSlopeAt(-5, 20) === null) ? 1 : 0;
+          ey.value = '-3'; ey.dispatchEvent(new Event('input', {bubbles:true}));
+          var err = document.getElementById('bundle-error');
+          var badShown = (err && err.style.display !== 'none' && err.textContent.length > 5) ? 1 : 0;
+          var badNoRay = STATE.bundleOn ? 0 : 1;
+          resetSceneMemory();
+          return { offAtStart: offAtStart, emptyFields: emptyFields, noRayYet: noRayYet,
+                   halfNoRay: halfNoRay, auto: auto, kinks: kinks, kslope: kslope,
+                   free: free, snapped: snapped, away: away, neg: neg,
+                   badShown: badShown, badNoRay: badNoRay };`,
+    checks: [['галочка снята, поля скрыты', 'offAtStart', 1, 0],
+             ['поля пустые', 'emptyFields', 1, 0], ['и луча ещё нет', 'noRayYet', 1, 0],
+             ['одно число — луча нет', 'halfNoRay', 1, 0],
+             ['два числа — луч сам', 'auto', 1, 0],
+             ['излом найден', 'kinks', 1, 0], ['его наклон 4', 'kslope', 4, 0.02],
+             ['поворот мимо излома', 'free', 1.5, 0.01],
+             ['рядом с изломом падает в него', 'snapped', 4, 0.02],
+             ['вдали не липнет', 'away', 1.5, 0.01],
+             ['в минус не крутится', 'neg', 1, 0],
+             ['на отрицательное — ошибка', 'badShown', 1, 0],
+             ['и луч убран', 'badNoRay', 1, 0]],
   },
   {
     /* Н16. Выигрыш от торговли это разница ПОТРЕБЛЕНИЯ, а его задаёт кривая

@@ -204,6 +204,37 @@ function bundleRay(f) {
   return { x, y, slope, kx, ky, whole: Math.floor(Math.min(x / kx, y / ky) + 1e-9) };
 }
 
+/* Н18, Н19. Поворот луча комплектов в точку (x, y) плоскости.
+
+   Отдельной функцией, а не замыканием внутри обработчика: так поворот можно
+   проверить числом, не изображая жест мышью. Правила: в отрицательные значения
+   луч не поворачивается (комплекта из минус единиц не бывает); подойдя ближе
+   KEY_SNAP_PX к излому КПВ или КТВ, наклон падает ровно в него; единицы X
+   остаются как задал человек, меняется только Y, поэтому поле «Единиц X» не
+   прыгает под рукой. */
+function bundleSlopeAt(x, y) {
+  if (!(x > 0)) return null;                    // левее оси Y наклона нет
+  let s = Math.max(1e-6, y / x);                // в минус не поворачиваем
+  const kinks = STATE._bundleKinks || [];
+  const near = kinks.find(k => Math.abs(sy(k * x) - sy(s * x)) <= KEY_SNAP_PX);
+  return (near != null) ? near : s;
+}
+function bundleDragTo(x, y) {
+  const s = bundleSlopeAt(x, y);
+  if (s == null || !isFinite(s)) return;
+  const kx = Math.max(1e-6, +STATE.bundleX || 1);
+  STATE.bundleX = kx;
+  STATE.bundleY = Math.round(s * kx * 1000) / 1000;
+  // Поля единиц идут за лучом во время вращения — во всех трёх моделях блока.
+  [['inp-bundle-x', 'inp-bundle-y'], ['inp-bundle-x2', 'inp-bundle-y2'],
+   ['inp-bundle-xt', 'inp-bundle-yt']].forEach(([ix, iy]) => {
+    const ex = document.getElementById(ix), ey = document.getElementById(iy);
+    if (ex && ex.value !== '') ex.value = fmt(STATE.bundleX);
+    if (ey && ey.value !== '') ey.value = fmt(STATE.bundleY);
+  });
+  redrawAll();
+}
+
 /* Н16. Выигрыш от торговли по кривой комплектов: две точки на одном луче.
    Луч задан пропорцией потребления (единиц X к единицам Y), поэтому его наклон
    s = ky / kx. С КПВ он встречается там, где страна потребляет только своё
@@ -301,6 +332,44 @@ function drawBundleRay(g, f, color, curves) {
     .attr('x2', sx(xEnd)).attr('y2', sy(slope * xEnd))
     .attr('stroke', col).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
   labelCurve(g, (x) => slope * x, 'Комплекты', col, { key: 'bundle', from: 0.8, to: 0.2 });
+
+  /* Н18, Н19. Луч крутится мышью вокруг начала координат. Тянуть тонкую
+     пунктирную линию неудобно, поэтому поверх неё лежит широкая прозрачная
+     «дорожка» — она и ловит захват (в выгрузку не идёт, помечена data-skip-export).
+     В отрицательные значения луч не поворачивается: комплект из отрицательного
+     числа единиц не бывает. Подойдя близко к излому КПВ или КТВ, наклон падает
+     ровно в него — тот же магнит, что у ключевых точек. */
+  /* Изломы ищем своим частым сканом, а не общим kinksOf: тот настроен на окно
+     «Математики» и на широком диапазоне КПВ (здесь 0…60) стык при X = 20
+     проскакивал между узлами. Здесь нужен только наклон луча через излом, и
+     достаточно сравнить наклон слева и справа от узла. */
+  const kinkSlopes = [];
+  (curves && curves.length ? curves : [{ f, name: 'КПВ' }]).forEach(c => {
+    if (typeof c.f !== 'function') return;
+    const hi = ppfXmaxOf(c.f);
+    if (!(hi > 0)) return;
+    const N = 600, h = hi / N;
+    let prev = null;
+    for (let i = 1; i < N; i++) {
+      const x = h * i;
+      const a = c.f(x - h), b = c.f(x), d = c.f(x + h);
+      if (!isFinite(a) || !isFinite(b) || !isFinite(d)) { prev = null; continue; }
+      const left = (b - a) / h, right = (d - b) / h;
+      if (prev !== null && Math.abs(right - left) > 0.15 * (1 + Math.abs(left)) && b > 0) {
+        kinkSlopes.push(b / x);
+        i += 3;                                  // один стык — одна запись
+      }
+      prev = left;
+    }
+  });
+  STATE._bundleKinks = kinkSlopes;      // наклоны изломов для магнита (и для проверки)
+  g.append('line').attr('class', 'bundle-grab').attr('data-skip-export', '1')
+    .attr('x1', sx(0)).attr('y1', sy(0))
+    .attr('x2', sx(xEnd)).attr('y2', sy(slope * xEnd))
+    .attr('stroke', 'transparent').attr('stroke-width', 14)
+    .style('cursor', 'grab').style('pointer-events', 'stroke')
+    .call(d3.drag().container(() => svg.node())
+      .on('drag', (ev) => bundleDragTo(sx.invert(ev.x), sy.invert(ev.y))));
 
   // Пересечения со всеми заданными кривыми — как ключевые точки, с координатами.
   const list = (curves && curves.length) ? curves : [{ f, name: 'КПВ' }];
