@@ -76,6 +76,15 @@ class UserProfile(models.Model):
         help_text='5–11, необязательно.',
     )
     school = models.CharField('Школа', max_length=200, blank=True)
+    # ⚠️ ГОРОД И ЦЕЛЬ — ПЕРСОНАЛЬНЫЕ ДАННЫЕ НЕСОВЕРШЕННОЛЕТНЕГО (сессия 7,
+    # фаза 10.2). Оба НЕОБЯЗАТЕЛЬНЫ, наружу не отдаются и в родительский
+    # кабинет не добавляются. Заполняет их сам ученик в своём профиле;
+    # репетитор только смотрит.
+    city = models.CharField('Город', max_length=120, blank=True,
+                            help_text='Необязательно.')
+    goal = models.CharField(
+        'Цель на год', max_length=200, blank=True,
+        help_text='Например: «призёр регионального этапа». Необязательно.')
     # Телефон НЕОБЯЗАТЕЛЕН. Телефон несовершеннолетнего собираем только по
     # желанию: лишние персональные данные ребёнка — лишний риск по 152-ФЗ.
     phone = models.CharField('Телефон', max_length=32, blank=True,
@@ -1339,3 +1348,35 @@ def difficulty_for_student(student, tutor=None):
     if tutor is not None:
         queryset = queryset.filter(assignment__author=tutor)
     return average_difficulty(list(queryset))
+
+
+class TutorNote(models.Model):
+    """Заметка репетитора об ученике. ВИДНА ТОЛЬКО АВТОРУ.
+
+    ⚠️ «Только автору» здесь — обещание, которое система держит: у группы
+    один преподаватель (решение владельца), второго не бывает, и заметка
+    физически не попадает ни на один чужой экран. Ученик её не видит и не
+    узнаёт о её существовании.
+
+    Одна заметка на пару (репетитор, ученик): это блокнот, а не переписка.
+    """
+
+    tutor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='tutor_notes', verbose_name='Репетитор')
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='notes_about_me', verbose_name='Ученик')
+    text = models.TextField('Заметка', blank=True)
+    updated_at = models.DateTimeField('Изменено', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Заметка об ученике'
+        verbose_name_plural = 'Заметки об учениках'
+        constraints = [
+            models.UniqueConstraint(fields=['tutor', 'student'],
+                                    name='uniq_note_per_student'),
+        ]
+
+    def __str__(self):
+        return 'заметка %s об %s' % (self.tutor, self.student)

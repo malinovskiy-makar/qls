@@ -578,115 +578,139 @@ def _submission_is_test(submission):
 
 @teacher_required
 def student_progress(request, pk):
-    from problems.models import (
-        Assignment,
-        StudentGroup,
-        StudentSkillProgress,
-        StudentTopicProgress,
-        Submission,
-        TeacherFeedback,
-        User as PlatformUser,
-    )
-    from django.db.models import Count
+    """Карточка ученика глазами репетитора — ЕДИНСТВЕННЫЙ такой экран.
+
+    ⚠️ РЕШЕНИЕ СТОП-ГЕЙТА ФАЗЫ 10.1: экранов об одном ученике было ДВА —
+    этот и `/teacher/students/<id>/stats/`. Основным оставлен ЭТОТ, потому
+    что на него ведёт кнопка «открыть» из таблицы учеников и именно его
+    ревьюил владелец (все требования фаз 10.2–10.6 описывают его вёрстку).
+    Со второго перенесено то, чего здесь не было, — «сильные и слабые
+    стороны» и теплокарта активности за полгода; сам он стал редиректом.
+    Третьего экрана нет и не будет.
+    """
+    from problems import stats as stats_module
+    from problems.models import StudentGroup, User as PlatformUser
+    from problems.models_platform import TutorNote, difficulty_for_student
 
     student = get_object_or_404(PlatformUser, pk=pk, role='student')
 
     in_group = StudentGroup.objects.filter(
-        teacher=request.user,
-        students=student,
-    ).exists()
+        teacher=request.user, students=student).exists()
     if not in_group and not request.user.is_staff:
         raise PermissionDenied
 
-    topic_progress = (
-        StudentTopicProgress.objects.filter(student=student)
-        .select_related('topic')
-        .order_by('-level')
-    )
-    skill_progress = (
-        StudentSkillProgress.objects.filter(student=student)
-        .select_related('skill')
-        .order_by('-level')
-    )
+    # Заметка репетитора — сохраняется без перезагрузки, но и обычную
+    # отправку формы принимаем: без JavaScript экран обязан работать.
+    if request.method == 'POST':
+        text = (request.POST.get('note') or '').strip()
+        TutorNote.objects.update_or_create(
+            tutor=request.user, student=student, defaults={'text': text})
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'ok': True})
+        return redirect('teacher:student_progress', pk=student.pk)
 
-    mistake_counts = (
-        TeacherFeedback.objects.filter(
-            submission__student=student,
-            reviewed_by=request.user,
-        )
-        .values('mistakes__name')
-        .annotate(count=Count('mistakes'))
-        .filter(mistakes__name__isnull=False)
-        .order_by('-count')[:5]
-    )
+    profile = getattr(student, 'profile', None)
+    note = TutorNote.objects.filter(tutor=request.user,
+                                    student=student).first()
 
-    all_reviewed = list(Submission.objects.filter(
-        student=student,
-        status='reviewed',
-        assignment__author=request.user,
-    ).select_related('feedback', 'problem', 'problem_item',
-                     'problem_item__catalog_problem',
-                     'problem_item__custom_problem'))
-    open_reviewed = [s for s in all_reviewed if not _submission_is_test(s)]
-    test_reviewed = [s for s in all_reviewed if _submission_is_test(s)]
-
-    open_scores = [
-        float(s.feedback.score)
-        for s in open_reviewed
-        if hasattr(s, 'feedback') and s.feedback
-    ]
-    test_scores = [
-        float(s.feedback.score)
-        for s in test_reviewed
-        if hasattr(s, 'feedback') and s.feedback
-    ]
-
-    assignments = Assignment.objects.filter(
-        author=request.user,
-        students=student,
-    ).order_by('-id')
-
-    homework_history = []
-    for a in assignments:
-        subs = Submission.objects.filter(
-            student=student,
-            assignment=a,
-            status='reviewed',
-        ).select_related('feedback', 'problem', 'problem_item',
-                         'problem_item__catalog_problem',
-                         'problem_item__custom_problem')
-
-        open_s = [s for s in subs if not _submission_is_test(s)]
-        test_s = [s for s in subs if _submission_is_test(s)]
-
-        o_scores = [
-            float(s.feedback.score)
-            for s in open_s
-            if hasattr(s, 'feedback') and s.feedback
-        ]
-        t_scores = [
-            float(s.feedback.score)
-            for s in test_s
-            if hasattr(s, 'feedback') and s.feedback
-        ]
-
-        homework_history.append({
-            'assignment': a,
-            'open_avg': round(sum(o_scores) / len(o_scores), 1) if o_scores else None,
-            'test_pct': round(sum(t_scores) / len(t_scores) * 100) if t_scores else None,
-        })
+    # ⚠️ ДВА ЧИСЛА В КАЖДОЙ КАРТОЧКЕ: по всему сайту и по работам ЭТОГО
+    # репетитора. Игра не входит ни в одно из них (поправка 3 владельца).
+    open_pair = stats_module.accuracy_pair(student, tutor=request.user,
+                                           kind='open')
+    test_pair = stats_module.accuracy_pair(student, tutor=request.user,
+                                           kind='test')
 
     return render(request, 'teacher/student_progress.html', {
         'student': student,
-        'topic_progress': topic_progress,
-        'skill_progress': skill_progress,
-        'mistake_counts': mistake_counts,
-        'open_count': len(open_scores),
-        'open_avg': round(sum(open_scores) / len(open_scores), 1) if open_scores else None,
-        'test_count': len(test_scores),
-        'test_pct': round(sum(test_scores) / len(test_scores) * 100) if test_scores else None,
-        'homework_history': homework_history,
+        'profile': profile,
+        'note': note,
+        'open_pair': open_pair,
+        'test_pair': test_pair,
+        # Формат «4,3 из 10» — русская запятая. Собираем строку ЗДЕСЬ:
+        # шаблонный `floatformat` даёт запятую только при русской локали,
+        # и полагаться на неё ради одного числа не стоит.
+        'difficulty': _difficulty_label(difficulty_for_student(student)),
+        # Две карточки прогресса: по задачам и по тестам. Устроены ОДИНАКОВО
+        # и собираются одной функцией — различаются только числами.
+        'progress_cards': [
+            {'title': 'Прогресс по задачам',
+             'data': stats_module.topic_progress(student, kind='open')},
+            {'title': 'Прогресс по тестам',
+             'data': stats_module.topic_progress(student, kind='test')},
+        ],
+        'works': _work_history(student, request.user),
+        # Перенесено со второго экрана (см. решение стоп-гейта выше).
+        'ranking': stats_module.strongest_weakest(student, 'all'),
+        'calendar': stats_module.activity_calendar(student),
     })
+
+
+def _difficulty_label(value):
+    """«4,3 из 10» или None. Нет оценок — None, а не ноль."""
+    if value is None:
+        return None
+    return ('%.1f' % value).replace('.', ',') + ' из 10'
+
+
+def _work_history(student, tutor):
+    """История работ ученика: семь столбцов (фаза 10.5).
+
+    ⚠️ ОЦЕНКА — ПРОЦЕНТ, А НЕ СЫРЫЕ БАЛЛЫ. У разных работ разный максимум, и
+    «12» за одну работу и «8» за другую несопоставимы ничем.
+
+    ⚠️ СРОК СПРАШИВАЕМ ТОЛЬКО ЧЕРЕЗ `deadline_at`. Поле `due_at` устарело и
+    не читается нигде — два поля уже давали видимый баг «без срока» у работы
+    со сроком.
+    """
+    from decimal import Decimal
+
+    from problems.assignment_rows import item_max_score
+    from problems.models import Assignment, Submission
+
+    works = (Assignment.objects.filter(author=tutor, students=student)
+             .order_by('-id'))
+    rows = []
+    for work in works:
+        subs = list(Submission.objects
+                    .filter(student=student, assignment=work)
+                    .select_related('feedback', 'problem_item',
+                                    'problem_item__catalog_problem',
+                                    'problem_item__custom_problem'))
+        got = {'open': Decimal('0'), 'test': Decimal('0')}
+        could = {'open': Decimal('0'), 'test': Decimal('0')}
+        submitted_at = None
+        for sub in subs:
+            item = sub.problem_item
+            if item is None:
+                continue
+            if sub.submitted_at and (submitted_at is None
+                                     or sub.submitted_at > submitted_at):
+                submitted_at = sub.submitted_at
+            feedback = getattr(sub, 'feedback', None)
+            if feedback is None or feedback.score is None:
+                continue
+            key = 'test' if item.is_test else 'open'
+            got[key] += Decimal(str(feedback.score))
+            could[key] += item_max_score(item)
+
+        def share(key):
+            return (int(round(float(got[key] / could[key]) * 100))
+                    if could[key] else None)
+
+        total_got = got['open'] + got['test']
+        total_could = could['open'] + could['test']
+        rows.append({
+            'work': work,
+            'is_exam': work.is_exam,
+            'open_percent': share('open'),
+            'test_percent': share('test'),
+            'mark': (int(round(float(total_got / total_could) * 100))
+                     if total_could else None),
+            'submitted_at': submitted_at,
+            'deadline': work.deadline_at,
+            'not_submitted': submitted_at is None,
+        })
+    return rows
 
 
 # ---------------------------------------------------------------------------

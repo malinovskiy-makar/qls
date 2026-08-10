@@ -816,3 +816,155 @@ class WorkDifficultyTests(TestCase):
                     args=[self.group.pk, self.work.pk,
                           self.student.pk])).content.decode()
         self.assertNotIn('Насколько сложной была работа', body)
+
+
+# ===========================================================================
+# Фаза 10 — карточка ученика
+# ===========================================================================
+
+class StudentCardTests(TestCase):
+    """Один экран об ученике вместо двух; шкалы не малиновые; заметки."""
+
+    def setUp(self):
+        from problems.management.commands.apply_topic_mapping import CANONICAL
+        from problems.models import (Assignment, AssignmentItem, StudentGroup,
+                                     Submission, TeacherFeedback, Topic)
+        from problems.tests.factories import make_user
+        from problems.tests.factories import make_problem as factory_problem
+
+        self.tutor = make_user('sc_tutor', role='teacher')
+        self.student = make_user('sc_student', role='student')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        self.group.students.add(self.student)
+        for index, name in enumerate(CANONICAL):
+            Topic.objects.get_or_create(name=name,
+                                        defaults={'slug': 'sc-%d' % index})
+        self.work = Assignment.objects.create(name='ДЗ', author=self.tutor,
+                                              group=self.group)
+        self.work.students.add(self.student)
+        item = AssignmentItem.objects.create(
+            assignment=self.work, order=0,
+            catalog_problem=factory_problem('Условие'), points=Decimal('10'))
+        sub = Submission.objects.create(student=self.student,
+                                        assignment=self.work,
+                                        problem_item=item, status='reviewed')
+        TeacherFeedback.objects.create(submission=sub, score=Decimal('8'),
+                                       reviewed_by=self.tutor)
+        self.client.force_login(self.tutor)
+
+    def _url(self):
+        from django.urls import reverse
+        return reverse('teacher:student_progress', args=[self.student.pk])
+
+    def test_the_second_screen_redirects_here(self):
+        """⚠️ Стоп-гейт 10.1: экран об ученике ровно ОДИН."""
+        from django.urls import reverse
+
+        response = self.client.get(
+            reverse('teacher:student_stats', args=[self.student.pk]))
+        self.assertRedirects(response, self._url())
+
+    def test_three_cards_replaced_the_old_four(self):
+        body = self.client.get(self._url()).content.decode()
+        self.assertIn('Процент верно решённых задач', body)
+        self.assertIn('Процент верно решённых тестов', body)
+        self.assertIn('Средняя сложность работ', body)
+        for gone in ('Открытых проверено', 'Тестов пройдено',
+                     'Верных ответов'):
+            self.assertNotIn(gone, body, gone)
+
+    def test_two_progress_cards(self):
+        body = self.client.get(self._url()).content.decode()
+        self.assertIn('Прогресс по задачам', body)
+        self.assertIn('Прогресс по тестам', body)
+
+    def test_bars_are_not_magenta(self):
+        """⚠️ Малиновый в шкалах ЗАПРЕЩЁН — это и просили убрать.
+
+        Проверяем правила заливки шкалы: цвет берётся из сигнальных токенов
+        (зелёный / янтарь / красный), акцентного среди них нет.
+        """
+        import io, re
+        template = io.open(
+            'teacher/templates/teacher/student_progress.html',
+            encoding='utf-8').read()
+        for rule in re.findall(r'\.tp-fill--\w+\s*\{([^}]*)\}', template):
+            self.assertNotIn('--accent', rule)
+        self.assertIn('.tp-fill--good', template)
+        self.assertIn('.tp-fill--mid', template)
+        self.assertIn('.tp-fill--bad', template)
+
+    def test_topic_column_has_a_fixed_width(self):
+        """«Все шкалы начинаются от одной вертикали» — это и есть колонка."""
+        import io
+        template = io.open(
+            'teacher/templates/teacher/student_progress.html',
+            encoding='utf-8').read()
+        self.assertIn('grid-template-columns: 230px 1fr 76px', template)
+
+    def test_hover_swap_is_pure_css(self):
+        import io
+        template = io.open(
+            'teacher/templates/teacher/student_progress.html',
+            encoding='utf-8').read()
+        self.assertIn('.tp-row:hover .tp-value .frac', template)
+
+    def test_work_history_has_seven_columns(self):
+        body = self.client.get(self._url()).content.decode()
+        for column in ('Работа', 'Тип', '% верных задач', '% верных тестов',
+                       'Оценка', 'Дата сдачи', 'Дедлайн'):
+            self.assertIn(column, body, column)
+
+    def test_mark_is_a_percent_not_raw_points(self):
+        """У разных работ разный максимум — сырые баллы несопоставимы."""
+        rows = self.client.get(self._url()).context['works']
+        self.assertEqual(rows[0]['mark'], 80)
+
+    def test_note_saves_and_is_private(self):
+        from problems.models_platform import TutorNote
+        from problems.tests.factories import make_user
+
+        self.client.post(self._url(), {'note': 'быстро считает, но спешит'})
+        note = TutorNote.objects.get(tutor=self.tutor, student=self.student)
+        self.assertEqual(note.text, 'быстро считает, но спешит')
+
+        # Чужой репетитор своей заметки здесь не заводил — и видит пустое.
+        other = make_user('sc_other', role='teacher')
+        self.group.students.add(self.student)
+        from problems.models import StudentGroup
+        StudentGroup.objects.create(name='Гр2',
+                                    teacher=other).students.add(self.student)
+        self.client.force_login(other)
+        self.assertNotIn('быстро считает',
+                         self.client.get(self._url()).content.decode())
+
+    def test_note_uses_the_kit_field(self):
+        """Владелец просил поле из набора, а не голую textarea."""
+        body = self.client.get(self._url()).content.decode()
+        self.assertIn('class="k-area" name="note"', body)
+        self.assertIn('Видно только вам', body)
+
+    def test_personal_facts_are_shown_when_filled(self):
+        profile = self.student.profile
+        profile.grade = 10
+        profile.city = 'Казань'
+        profile.goal = 'победитель региона'
+        profile.save()
+        body = self.client.get(self._url()).content.decode()
+        self.assertIn('Казань', body)
+        self.assertIn('победитель региона', body)
+
+    def test_empty_facts_are_not_written_as_unset(self):
+        """«Не указано» — строка ни о чём; пустое поле просто не рисуется.
+
+        Смотрим САМ БЛОК фактов, а не всю страницу: выше по ней идёт
+        таблица стилей, и в её комментарии это выражение упоминается как
+        раз затем, чтобы объяснить, почему его нет в разметке.
+        """
+        body = self.client.get(self._url()).content.decode()
+        start = body.find('<div class="student-facts">')
+        if start == -1:
+            return                       # ни одно поле не заполнено — блока нет
+        block = body[start:body.index('</div>', start)]
+        self.assertNotIn('не указано', block.lower())
+        self.assertNotIn('—', block)

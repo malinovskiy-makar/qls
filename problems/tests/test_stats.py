@@ -237,10 +237,19 @@ class AccessTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_own_tutor_ok(self):
+        """Свой репетитор доходит до карточки ученика.
+
+        ⚠️ С сессии 7 `student_stats` — РЕДИРЕКТ на неё: экранов об одном
+        ученике было два, остался один (решение стоп-гейта 10.1). Проверка
+        та же по смыслу — «свой репетитор проходит», — поэтому идём по
+        редиректу до конца, а не сверяем код 200 у промежуточного адреса.
+        Отказ чужому проверяется соседним тестом и остался 404: доступ
+        режется на уровне queryset ДО редиректа.
+        """
         self.client.force_login(self.tutor)
         self.assertEqual(self.client.get(
-            reverse('teacher:student_stats',
-                    args=[self.student.pk])).status_code, 200)
+            reverse('teacher:student_stats', args=[self.student.pk]),
+            follow=True).status_code, 200)
 
     def test_foreign_parent_gets_404(self):
         self.client.force_login(self.other_parent)
