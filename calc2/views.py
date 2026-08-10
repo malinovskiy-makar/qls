@@ -64,10 +64,15 @@ def compile_pdf_pdflatex(tex_content):
         log_path = Path(tmpdir) / 'graph.log'
         tex_path.write_text(tex_content, encoding='utf-8')
         try:
-            subprocess.run(
+            proc = subprocess.run(
                 [binary, '-interaction=nonstopmode', '-halt-on-error',
                  '-output-directory', tmpdir, str(tex_path)],
                 capture_output=True, timeout=40,
+                # Рабочая папка — сама временная. Без неё MiKTeX на Windows
+                # пытается писать вспомогательные файлы туда, откуда запущен
+                # сервер, и на первом же промахе прав тихо падает, не оставляя
+                # даже .log: сообщение об ошибке выходило пустым.
+                cwd=tmpdir,
             )
         except FileNotFoundError:
             return None, 'pdflatex не найден на сервере'
@@ -75,8 +80,13 @@ def compile_pdf_pdflatex(tex_content):
             return None, 'pdflatex превысил лимит времени (40 с)'
         if pdf_path.exists():
             return pdf_path.read_bytes(), None
-        log = log_path.read_text(encoding='utf-8', errors='replace') if log_path.exists() else ''
-        return None, log
+        # Лога может не быть вовсе (компилятор упал до его создания) — тогда
+        # показываем код возврата и вывод, иначе диагностировать нечем.
+        if log_path.exists():
+            return None, log_path.read_text(encoding='utf-8', errors='replace')
+        out = (proc.stdout or b'').decode('utf-8', 'replace')
+        err = (proc.stderr or b'').decode('utf-8', 'replace')
+        return None, 'код возврата {}\n{}\n{}'.format(proc.returncode, out[-800:], err[-800:])
 
 
 @method_decorator(login_required, name='dispatch')
