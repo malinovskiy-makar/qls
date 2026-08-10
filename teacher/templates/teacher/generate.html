@@ -15,11 +15,31 @@
             font-size: 12px; }
 .gen-step span { padding: 5px 12px; border-radius: 999px;
                  border: 1px solid var(--border); color: var(--text2); }
-.gen-step span.is-on { border-color: var(--accent); color: var(--accent);
-                       background: var(--accent-tint); font-weight: 700; }
+/* ⚠️ АКТИВНЫЙ ШАГ НЕ МАЛИНОВЫЙ (поправка 5 владельца): это не навигация
+   сайта, а положение внутри одной формы. Активный — графитовая заливка
+   (как крупные кнопки), пройденный — тихая галочка, будущий — приглушён. */
+.gen-step span.is-on { border-color: var(--btn-bg); color: var(--on-btn);
+                       background: var(--btn-bg); font-weight: 600; }
+.gen-step span.is-done { border-color: var(--border); color: var(--text2); }
+.gen-step span.is-done::before { content: '✓ '; color: var(--green); }
+.gen-step span.is-next { opacity: .55; }
 .gen-card { background: var(--surface); border: 1px solid var(--border);
             border-radius: 12px; padding: 22px 24px; margin-bottom: 18px; }
 .gen-card h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+/* Заголовок карточки первого шага — тихая подпись, а не крупный заголовок:
+   вес должен быть у поля ввода, а не у надписи над ним. */
+.gen-cap { font-size: 12px; font-weight: 600; color: var(--text2);
+           margin-bottom: 6px; }
+/* Примеры — тихая раскрывашка: это подсказка, а не второй раздел формы. */
+.gen-examples { margin-top: 14px; }
+.gen-examples > summary { cursor: pointer; font-size: 13px;
+                          color: var(--text2); list-style: none; }
+.gen-examples > summary::-webkit-details-marker { display: none; }
+.gen-examples > summary::before { content: '▸ '; }
+.gen-examples[open] > summary::before { content: '▾ '; }
+.gen-examples > summary:hover { color: var(--text); }
+/* Счётчик обращений — рядом с кнопкой и заметно тише её. */
+.gen-used { font-size: 12px; color: var(--text3); }
 .gen-card .sub { font-size: 13px; color: var(--text2); margin-bottom: 16px;
                  line-height: 1.6; }
 textarea.gen-text { width: 100%; box-sizing: border-box; min-height: 110px;
@@ -33,6 +53,11 @@ textarea.gen-text:focus { border-color: var(--focus); }
 /* Флажок без заголовка сверху — выравниваем по низу соседних полей, иначе
    он всплывает к их подписям и читается как подпись к «Сложности». */
 .gen-params .form-group--check { min-width: 0; padding-bottom: 7px; }
+/* ⚠️ ЧИСЛОВЫЕ ПОЛЯ ОДНОЙ ШИРИНЫ И ОДНОЙ ВЫСОТЫ (поправка 5): раньше они
+   были разного размера и «болтались». Ширину задаём здесь, а не в наборе:
+   у набора `.k-input--num` шире, и он нужен таким на других экранах. */
+.gen-params .k-input--num { width: 68px; }
+.gen-params .form-label { display: block; margin-bottom: 5px; }
 /* Подписи полей строки плана: два голых числа читались загадкой. */
 .plan-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .plan-cap { font-size: 11px; color: var(--text3); white-space: nowrap; }
@@ -129,9 +154,9 @@ textarea.gen-text:focus { border-color: var(--focus); }
 </div>
 
 <div class="gen-step">
-  <span class="{% if step == 'ask' %}is-on{% endif %}">1. Запрос</span>
-  <span class="{% if step == 'plan' %}is-on{% endif %}">2. Что нашлось</span>
-  <span class="{% if step == 'result' %}is-on{% endif %}">3. Задачи</span>
+  <span class="{% if step == 'ask' %}is-on{% else %}is-done{% endif %}">1. Запрос</span>
+  <span class="{% if step == 'plan' %}is-on{% elif step == 'result' %}is-done{% else %}is-next{% endif %}">2. Что нашлось</span>
+  <span class="{% if step == 'result' %}is-on{% else %}is-next{% endif %}">3. Задачи</span>
 </div>
 
 {% if not available %}
@@ -159,14 +184,42 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
   <input type="hidden" name="step_action" value="parse">
   <input type="hidden" name="kind" value="{{ kind }}">
   <input type="hidden" name="group" value="{{ group_id }}">
+  {% comment %}
+  ⚠️ ПЕРВЫЙ ШАГ СОБРАН В КАРТОЧКИ (сессия 7, фаза 12.0 — поправка 5).
+  Раньше это была сплошная лента: заголовок, поле, четыре разнокалиберных
+  числа, флажок, две подписи и стопка примеров той же высоты, что само поле
+  ввода. Полей НЕ убрано и НЕ добавлено ни одного — переделан только вид.
+  Ориентир — экран разбора работы глазами ученика: белые карточки, тихие
+  подписи, крупное только там, где действие.
+  {% endcomment %}
+
   <div class="gen-card">
-    <h2>Опишите {% if is_exam %}контрольную{% else %}домашку{% endif %} словами</h2>
+    <div class="gen-cap">Опишите словами</div>
     <div class="sub">
       Новые задачи не сочиняются. Сайт разбирает вашу фразу и ищет среди
       {{ problem_count }} задач каталога.
     </div>
     <textarea class="gen-text" name="text" id="gen-text" required
               placeholder="Например: домашка на монополию и эластичность, четыре задачи и три теста, одна посложнее в конце">{{ form.text }}</textarea>
+
+    {% comment %}
+    Примеры — под ТИХОЙ раскрывашкой. Это подсказка, а она занимала столько
+    же места, сколько само поле ввода.
+    {% endcomment %}
+    <details class="gen-examples">
+      <summary>Так тоже можно</summary>
+      <div class="k-stack" style="gap:6px;margin-top:10px">
+        {% for example in examples %}
+        <button type="button" class="k-btn k-btn--plain gen-example"
+                style="text-align:left;justify-content:flex-start"
+                data-example="{{ example }}">{{ example }}</button>
+        {% endfor %}
+      </div>
+    </details>
+  </div>
+
+  <div class="gen-card">
+    <div class="gen-cap">Сколько и какой сложности</div>
 
     <div class="gen-params">
       {% comment %}
@@ -245,31 +298,14 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     </div>
     {% endif %}
 
+    {% comment %}
+    Счётчик обращений — РЯДОМ С КНОПКОЙ и тише её (поправка 5): это
+    техническая деталь, а отдельной строкой под кнопкой она читалась как
+    предупреждение.
+    {% endcomment %}
     <div class="gen-actions">
       <button type="submit" class="k-btn k-btn--main">Разобрать запрос</button>
-    </div>
-    {% comment %}
-    Счётчик обращений — техническая деталь, ей место тихой подписью под
-    кнопкой, а не на видном месте рядом с ней.
-    {% endcomment %}
-    <div class="k-hint">
-      сегодня использовано {{ used_today }} из {{ daily_limit }} обращений
-    </div>
-  </div>
-
-  {% comment %}
-  Примеры запросов. Нажатие подставляет текст в поле — единственное место,
-  где пустоту снизу стоит занять полезным: репетитор, впервые открывший
-  подбор, не знает, насколько подробно можно писать.
-  {% endcomment %}
-  <div class="gen-card">
-    <h2 style="font-size:14px;margin-bottom:10px">Так тоже можно</h2>
-    <div class="k-stack" style="gap:6px">
-      {% for example in examples %}
-      <button type="button" class="k-btn k-btn--plain gen-example"
-              style="text-align:left;justify-content:flex-start"
-              data-example="{{ example }}">{{ example }}</button>
-      {% endfor %}
+      <span class="gen-used">сегодня использовано {{ used_today }} из {{ daily_limit }}</span>
     </div>
   </div>
 </form>

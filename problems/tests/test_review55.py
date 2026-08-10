@@ -1062,3 +1062,80 @@ class ReviewSkeletonTests(TestCase):
                            encoding='utf-8').read()
         self.assertIn('rv-solution-img', template)
         self.assertIn('max-width: 100%', template)
+
+
+# ===========================================================================
+# Фаза 12.0 — вид первого шага подбора (поправка 5 владельца)
+# ===========================================================================
+
+class PickerFirstStepTests(TestCase):
+    """Переделан ВИД. Полей не убрано и не добавлено ни одного."""
+
+    # Список полей ДО правки — выписан из шаблона перед переделкой.
+    FIELDS = ('text', 'count_open', 'count_test',
+              'min_difficulty', 'max_difficulty', 'has_answer',
+              'step_action', 'kind', 'group')
+
+    def setUp(self):
+        from problems.models import StudentGroup
+        from problems.tests.factories import make_user
+
+        self.tutor = make_user('pf_tutor', role='teacher')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        self.client.force_login(self.tutor)
+
+    def _body(self):
+        """⚠️ С ПОДСТАВНЫМ ПОСТАВЩИКОМ. Без него слой модели выключен, экран
+        честно показывает «Функция выключена», и проверять на нём нечего."""
+        from django.test import override_settings
+        from django.urls import reverse
+
+        with override_settings(AI_PROVIDER='fake'):
+            return self.client.get(
+                reverse('teacher:assignment_generate')
+                + '?group=%d' % self.group.pk).content.decode()
+
+    def test_every_field_survived(self):
+        body = self._body()
+        for name in self.FIELDS:
+            self.assertIn('name="%s"' % name, body, name)
+
+    def test_no_extra_fields_appeared(self):
+        import re
+        names = set(re.findall(r'<(?:input|textarea|select)[^>]*name="([^"]+)"',
+                               self._body()))
+        names.discard('csrfmiddlewaretoken')
+        self.assertEqual(names, set(self.FIELDS))
+
+    def test_fields_are_grouped_into_cards(self):
+        body = self._body()
+        self.assertIn('Опишите словами', body)
+        self.assertIn('Сколько и какой сложности', body)
+
+    def test_examples_are_behind_a_quiet_disclosure(self):
+        """Подсказка занимала столько же места, сколько само поле ввода."""
+        body = self._body()
+        self.assertIn('gen-examples', body)
+        self.assertIn('<summary>Так тоже можно</summary>', body)
+
+    def test_usage_counter_sits_next_to_the_button(self):
+        import re
+        body = self._body()
+        actions = re.search(r'<div class="gen-actions">(.*?)</div>', body,
+                            re.S).group(1)
+        self.assertIn('сегодня использовано', actions)
+
+    def test_active_step_is_not_magenta(self):
+        """⚠️ Шаги формы — не навигация сайта, акцент им не полагается."""
+        import io, re
+        template = io.open('teacher/templates/teacher/generate.html',
+                           encoding='utf-8').read()
+        rule = re.search(r'\.gen-step span\.is-on\s*\{([^}]*)\}', template)
+        self.assertIsNotNone(rule)
+        self.assertNotIn('--accent', rule.group(1))
+
+    def test_number_fields_share_one_width(self):
+        import io
+        template = io.open('teacher/templates/teacher/generate.html',
+                           encoding='utf-8').read()
+        self.assertIn('.gen-params .k-input--num { width: 68px; }', template)

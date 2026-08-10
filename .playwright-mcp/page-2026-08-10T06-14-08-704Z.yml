@@ -1,0 +1,86 @@
+- generic [active] [ref=f33e1]:
+  - navigation [ref=f33e2]:
+    - link "Эк" [ref=f33e3] [cursor=pointer]:
+      - /url: /
+    - link "Проверка" [ref=f33e4] [cursor=pointer]:
+      - /url: /teacher/
+    - link "Группы" [ref=f33e5] [cursor=pointer]:
+      - /url: /teacher/groups/
+    - link "Каталог" [ref=f33e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f33e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f33e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f33e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f33e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f33e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f33e12]:
+      - button "Сменить тему" [ref=f33e13] [cursor=pointer]: ☾
+      - generic [ref=f33e14]: Марина Петрова
+      - link "Выйти" [ref=f33e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f33e16]:
+    - generic [ref=f33e17]:
+      - generic [ref=f33e18]:
+        - link "← Домашки" [ref=f33e19] [cursor=pointer]:
+          - /url: /teacher/
+        - heading "Новая домашка" [level=1] [ref=f33e20]
+      - generic [ref=f33e21]:
+        - link "Описать словами Умный поиск по каталогу" [ref=f33e22] [cursor=pointer]:
+          - /url: /teacher/assignment/generate/?kind=homework&group=2
+          - generic [ref=f33e23]: Описать словами
+          - generic [ref=f33e24]: Умный поиск по каталогу
+        - link "Искать самому Ручной поиск по каталогу" [ref=f33e25] [cursor=pointer]:
+          - /url: /teacher/assignment/create/
+          - generic [ref=f33e26]: Искать самому
+          - generic [ref=f33e27]: Ручной поиск по каталогу
+        - link "Написать свою Создание задачи с нуля" [ref=f33e28] [cursor=pointer]:
+          - /url: /teacher/problems/new/?to_cart=1
+          - generic [ref=f33e29]: Написать свою
+          - generic [ref=f33e30]: Создание задачи с нуля
+      - generic [ref=f33e31]:
+        - link "Домашка решают дома, срок сдачи" [ref=f33e32] [cursor=pointer]:
+          - /url: "?kind=homework&group=2"
+          - generic [ref=f33e33]: Домашка
+          - generic [ref=f33e34]: решают дома, срок сдачи
+        - link "Контрольная ограниченное время, окно" [ref=f33e35] [cursor=pointer]:
+          - /url: "?kind=exam&group=2"
+          - generic [ref=f33e36]: Контрольная
+          - generic [ref=f33e37]: ограниченное время, окно
+      - generic [ref=f33e38]:
+        - generic [ref=f33e39]: 1. Запрос
+        - generic [ref=f33e40]: 2. Что нашлось
+        - generic [ref=f33e41]: 3. Задачи
+      - generic [ref=f33e42]:
+        - generic [ref=f33e43]:
+          - generic [ref=f33e44]: Опишите словами
+          - generic [ref=f33e45]: Новые задачи не сочиняются. Сайт разбирает вашу фразу и ищет среди 18865 задач каталога.
+          - 'textbox "Например: домашка на монополию и эластичность, четыре задачи и три теста, одна посложнее в конце" [ref=f33e46]'
+          - group [ref=f33e47]:
+            - generic "▸ Так тоже можно" [ref=f33e48] [cursor=pointer]
+        - generic [ref=f33e49]:
+          - generic [ref=f33e50]: Сколько и какой сложности
+          - generic [ref=f33e51]:
+            - generic [ref=f33e52]:
+              - generic [ref=f33e53]: Открытых задач
+              - spinbutton "Открытых задач" [ref=f33e54]: "4"
+            - generic [ref=f33e55]:
+              - generic [ref=f33e56]: Тестов
+              - spinbutton "Тестов" [ref=f33e57]: "0"
+            - generic [ref=f33e58]:
+              - generic [ref=f33e59]: Сложность
+              - generic [ref=f33e60]:
+                - spinbutton "сложность от" [ref=f33e61]: "1"
+                - generic [ref=f33e62]: —
+                - spinbutton "сложность до" [ref=f33e63]: "5"
+            - generic [ref=f33e65] [cursor=pointer]:
+              - checkbox "Искать только задачи с ответом" [ref=f33e66]
+              - text: Искать только задачи с ответом
+          - generic [ref=f33e67]: "Сложность — это предпочтение, а не жёсткий отбор: задачи вне диапазона встанут ниже, но могут попасть."
+          - generic [ref=f33e68]:
+            - button "Разобрать запрос" [ref=f33e69] [cursor=pointer]
+            - generic [ref=f33e70]: сегодня использовано 1 из 30
