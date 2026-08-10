@@ -20,6 +20,8 @@
 
 Обращение к модели ровно одно — на шаге 2. Всё остальное ходит в свой банк.
 """
+import logging
+
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -27,6 +29,32 @@ from django.urls import reverse
 from problems import hw_generator
 
 from .access import tutor_required
+
+logger = logging.getLogger(__name__)
+
+
+# ⚠️ ТРИ СОВЕТА НА ТРИ ВИДА ОТКАЗА (сессия 7, фаза 7.4). Репетитору нужен не
+# код ошибки, а ответ на вопрос «что мне теперь делать». Во всех трёх случаях
+# ответ есть, и он один: собрать работу руками — поэтому ссылка на ручной
+# поиск стоит в каждом тексте, а не только в двух из трёх.
+AI_ERROR_TEXTS = {
+    'no_key': 'Умный поиск сейчас недоступен — не настроен доступ к модели.',
+    'limit': 'На сегодня закончились обращения к умному поиску '
+             '(%(limit)d в сутки).',
+    'other': 'Умный поиск не ответил. Попробуйте ещё раз или соберите '
+             'работу вручную.',
+}
+
+
+def _human_error(error):
+    """Отказ модели → текст для экрана. Код ошибки на экран НЕ выходит."""
+    from problems import ai
+
+    kind = getattr(error, 'kind', 'other')
+    text = AI_ERROR_TEXTS.get(kind, AI_ERROR_TEXTS['other'])
+    if kind == 'limit':
+        text = text % {'limit': ai.daily_limit()}
+    return {'kind': kind, 'text': text}
 
 
 
@@ -114,13 +142,27 @@ def assignment_generate(request):
 
     form = _read_form(request)
     context['form'] = form
-    action = request.POST.get('action') or 'parse'
+    # ⚠️ ПОЛЕ НАЗЫВАЕТСЯ `step_action`, А НЕ `action` (сессия 7, фаза 7.1).
+    # Поле формы с именем `action` затеняет свойство `form.action` в
+    # JavaScript — обращение к нему отдаёт сам input вместо адреса, и
+    # форма уходила на «…/generate/[object HTMLInputElement]» с 404.
+    action = request.POST.get('step_action') or 'parse'
 
     if action == 'parse':
         try:
             plan = hw_generator.parse_request(form['text'], form, request.user)
         except hw_generator.GeneratorUnavailable as error:
-            messages.error(request, str(error))
+            # ⚠️ ОШИБКА ПОКАЗЫВАЕТСЯ РЯДОМ С КНОПКОЙ, А НЕ ВВЕРХУ СТРАНИЦЫ
+            # (сессия 7, фаза 7.2). Плашка `messages` прилипает к верху, а
+            # репетитор в этот момент смотрит на кнопку внизу — на экране
+            # для него не происходило НИЧЕГО.
+            #
+            # ⚠️ ТЕКСТ — ЧЕЛОВЕЧЕСКИЙ, КОД ОШИБКИ ОСТАЁТСЯ В ЖУРНАЛЕ
+            # (фаза 7.4). «Сервис разбора вернул ошибку (401)» репетитору не
+            # говорит ничего и не подсказывает, что делать дальше.
+            logger.warning('Подбор по описанию не удался (%s): %s',
+                           getattr(error, 'kind', 'other'), error)
+            context['ai_error'] = _human_error(error)
             return render(request, 'teacher/generate.html', context)
         context.update(step='plan', plan_rows=plan['rows'],
                        note=plan['note'], usage=plan.get('usage'),

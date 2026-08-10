@@ -59,6 +59,9 @@ textarea.gen-text:focus { border-color: var(--focus); }
             margin-top: 6px; overflow-wrap: anywhere; }
 .gen-actions { display: flex; gap: 12px; align-items: center;
                flex-wrap: wrap; margin-top: 18px; }
+/* Сообщение об отказе модели — прямо над кнопкой, а не вверху страницы. */
+.gen-error { margin-top: 18px; }
+.gen-error a { color: var(--accent); }
 @media (max-width: 560px) {
   .plan-row { grid-template-columns: auto 1fr; }
   .plan-row .q { grid-column: 1 / -1; }
@@ -143,9 +146,17 @@ textarea.gen-text:focus { border-color: var(--focus); }
 {% else %}
 
 {% if step == 'ask' %}
-<form method="post">
+{% comment %}
+⚠️ У ФОРМЫ ЯВНЫЙ АДРЕС, А ПОЛЯ С ИМЕНЕМ `action` БОЛЬШЕ НЕТ
+(сессия 7, фаза 7.1). Поле `name="action"` ЗАТЕНЯЕТ свойство
+`form.action`: обращение к нему возвращает сам input, а не адрес,
+и форма уходила на «/teacher/assignment/generate/[object
+HTMLInputElement]» — 404. Чиним обеими сторонами: имя поля стало
+`step_action`, а адрес формы задан явно.
+{% endcomment %}
+<form method="post" action="{% url 'teacher:assignment_generate' %}">
   {% csrf_token %}
-  <input type="hidden" name="action" value="parse">
+  <input type="hidden" name="step_action" value="parse">
   <input type="hidden" name="kind" value="{{ kind }}">
   <input type="hidden" name="group" value="{{ group_id }}">
   <div class="gen-card">
@@ -214,6 +225,26 @@ textarea.gen-text:focus { border-color: var(--focus); }
       встанут ниже, но могут попасть.
     </div>
 
+    {% comment %}
+    ⚠️ ОШИБКА СТОИТ РЯДОМ С КНОПКОЙ, А НЕ ВВЕРХУ СТРАНИЦЫ (сессия 7, фаза 7.2).
+    Плашка `messages` прилипает к верху; репетитор в этот момент смотрит на
+    кнопку внизу, и для него на экране не происходило РОВНО НИЧЕГО.
+    Текст человеческий, код ошибки остался в журнале сервера (фаза 7.4), а
+    выход из положения — ссылкой прямо здесь.
+    {% endcomment %}
+    {% if ai_error %}
+    <div class="k-state k-state--warn gen-error" id="gen-error"
+         role="alert" tabindex="-1">
+      <span class="k-state__icon" aria-hidden="true">!</span>
+      <span class="k-state__body">
+        <span class="k-state__title">{{ ai_error.text }}</span>
+        <span class="k-state__note">Соберите работу вручную:
+          <a href="{% if is_exam and group_id %}{% url 'teacher:exam_create' group_id %}{% else %}{% url 'teacher:assignment_create' %}{% endif %}">Ручной поиск по каталогу</a>.
+        </span>
+      </span>
+    </div>
+    {% endif %}
+
     <div class="gen-actions">
       <button type="submit" class="k-btn k-btn--main">Разобрать запрос</button>
     </div>
@@ -245,7 +276,7 @@ textarea.gen-text:focus { border-color: var(--focus); }
 {% endif %}
 
 {% if step == 'plan' %}
-<form method="post">
+<form method="post" action="{% url 'teacher:assignment_generate' %}">
   {% csrf_token %}
   <input type="hidden" name="kind" value="{{ kind }}">
   <input type="hidden" name="group" value="{{ group_id }}">
@@ -321,10 +352,10 @@ textarea.gen-text:focus { border-color: var(--focus); }
     {% endfor %}
 
     <div class="gen-actions">
-      <button type="submit" class="k-btn k-btn--main" name="action" value="search">
+      <button type="submit" class="k-btn k-btn--main" name="step_action" value="search">
         Подобрать задачи
       </button>
-      <button type="submit" class="k-btn k-btn--plain" name="action" value="research">
+      <button type="submit" class="k-btn k-btn--plain" name="step_action" value="research">
         Переискать по моим формулировкам
       </button>
       <a href="{% url 'teacher:assignment_generate' %}" class="reset-link">✕ Начать заново</a>
@@ -353,9 +384,9 @@ textarea.gen-text:focus { border-color: var(--focus); }
     {% endif %}
   </div>
 
-  <form method="post" id="again-form" style="display:none;">
+  <form method="post" action="{% url 'teacher:assignment_generate' %}" id="again-form" style="display:none;">
     {% csrf_token %}
-    <input type="hidden" name="action" value="replace">
+    <input type="hidden" name="step_action" value="replace">
     {% for row in plan_rows %}
     <input type="hidden" name="row_keep" value="{{ forloop.counter0 }}">
     <input type="hidden" name="row_label" value="{{ row.label }}">
@@ -433,6 +464,15 @@ textarea.gen-text:focus { border-color: var(--focus); }
 {% block extra_js %}
 <script>
 (function () {
+  // ⚠️ Сообщение об отказе не только СТОИТ рядом с кнопкой, но и уводит
+  // экран к себе: у длинной формы кнопка бывает ниже сгиба, и молчаливая
+  // страница неотличима от неработающей.
+  var genError = document.getElementById('gen-error');
+  if (genError) {
+    genError.scrollIntoView({ block: 'center' });
+    genError.focus();
+  }
+
   var again = document.getElementById('again');
   if (again) {
     again.addEventListener('click', function () {

@@ -435,3 +435,102 @@ class CatalogFocusRingTests(TestCase):
                       encoding='utf-8').read()
         self.assertIn('.tpl-card.selected', css)
         self.assertIn('var(--accent)', css)
+
+
+# ===========================================================================
+# Фаза 7 — четыре бага подбора по описанию
+# ===========================================================================
+
+class PickerFormActionTests(TestCase):
+    """7.1 — поле `action` затеняло `form.action` и форма уходила в 404."""
+
+    def setUp(self):
+        from problems.tests.factories import make_user
+        self.tutor = make_user('pfa_tutor', role='teacher')
+        self.client.force_login(self.tutor)
+
+    def test_no_field_named_action_in_the_picker(self):
+        import io
+        template = io.open('teacher/templates/teacher/generate.html',
+                           encoding='utf-8').read()
+        import re
+        rules = re.sub(r'\{%\s*comment\s*%\}.*?\{%\s*endcomment\s*%\}', '',
+                       template, flags=re.S)
+        self.assertNotIn('name="action"', rules)
+        self.assertIn('name="step_action"', rules)
+
+    def test_every_form_has_an_explicit_address(self):
+        """Без атрибута `action` у формы нет строкового адреса вовсе."""
+        import io, re
+        template = io.open('teacher/templates/teacher/generate.html',
+                           encoding='utf-8').read()
+        for tag in re.findall(r'<form[^>]*>', template):
+            self.assertIn('action=', tag, tag)
+
+    def test_the_server_reads_the_new_name(self):
+        from django.urls import reverse
+
+        response = self.client.post(reverse('teacher:assignment_generate'),
+                                    {'step_action': 'research'})
+        # Строк плана нет — но это ОБРАБОТАННЫЙ запрос, а не 404.
+        self.assertEqual(response.status_code, 200)
+
+
+class AiQuotaTests(TestCase):
+    """7.3 — неудачная попытка не тратит суточное обращение."""
+
+    def setUp(self):
+        from problems.tests.factories import make_user
+        self.tutor = make_user('quota_tutor', role='teacher')
+
+    def _log(self, ok):
+        from problems.models import AiUsageLog
+        AiUsageLog.objects.create(user=self.tutor, kind='homework_plan',
+                                  model_name='claude-haiku-4-5', ok=ok)
+
+    def test_failed_calls_do_not_count(self):
+        from problems import ai
+
+        for _ in range(5):
+            self._log(ok=False)
+        self.assertEqual(ai.used_today(self.tutor), 0)
+
+    def test_successful_calls_count(self):
+        from problems import ai
+
+        self._log(ok=True)
+        self._log(ok=False)
+        self._log(ok=True)
+        self.assertEqual(ai.used_today(self.tutor), 2)
+
+    def test_failures_stay_in_the_journal(self):
+        """Строки отказов не удаляем — по ним чинят поломку."""
+        from problems.models import AiUsageLog
+
+        self._log(ok=False)
+        self.assertEqual(AiUsageLog.objects.filter(user=self.tutor).count(), 1)
+
+
+class AiErrorTextTests(TestCase):
+    """7.4 — три человеческих текста вместо кода ошибки."""
+
+    def _text(self, kind):
+        from problems.ai import AiUnavailable
+        from teacher.views_generate import _human_error
+        return _human_error(AiUnavailable('Сервис вернул ошибку (401)',
+                                          kind=kind))['text']
+
+    def test_no_key(self):
+        self.assertIn('не настроен доступ', self._text('no_key'))
+
+    def test_limit_names_the_number(self):
+        from problems import ai
+        self.assertIn(str(ai.daily_limit()), self._text('limit'))
+
+    def test_other(self):
+        self.assertIn('не ответил', self._text('other'))
+
+    def test_the_error_code_never_reaches_the_screen(self):
+        for kind in ('no_key', 'limit', 'other'):
+            self.assertNotIn('401', self._text(kind))
+            self.assertNotIn('(', self._text(kind).replace('(30 в сутки)', ''))

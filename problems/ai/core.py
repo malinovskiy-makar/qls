@@ -36,7 +36,16 @@ DEFAULT_MAX_TOKENS = 2000
 
 
 class AiUnavailable(Exception):
-    """Модель недоступна или выключена. Текст уже человеческий."""
+    """Модель недоступна или выключена. Текст уже человеческий.
+
+    `kind` — вид отказа для экрана: `no_key` (доступ не настроен или ключ не
+    принят), `limit` (кончилась суточная квота), `other` (всё прочее).
+    Экран по нему выбирает совет; сам текст исключения идёт в журнал.
+    """
+
+    def __init__(self, message, kind='other'):
+        super(AiUnavailable, self).__init__(message)
+        self.kind = kind
 
 
 class AiResult(object):
@@ -78,11 +87,23 @@ def unavailable_reason():
 
 
 def used_today(user):
+    """Сколько обращений израсходовано сегодня.
+
+    ⚠️ СЧИТАЮТСЯ ТОЛЬКО УДАЧНЫЕ (`ok=True`) — сессия 7, фаза 7.3. Раньше
+    считались все строки расхода подряд, и репетитор видел «использовано 5
+    из 30», не получив ни одного разбора: неверный ключ, лимит поставщика
+    или таймаут съедали суточную квоту так же, как настоящая работа.
+    Обращение, за которое ничего не пришло, — не расход.
+
+    Неудачные строки из журнала НЕ убираем: они нужны, чтобы понять, что
+    именно сломалось. Меняется только то, что считает лимит.
+    """
     from problems.models import AiUsageLog
 
     start = timezone.localtime(timezone.now()).replace(
         hour=0, minute=0, second=0, microsecond=0)
-    return AiUsageLog.objects.filter(user=user, created_at__gte=start).count()
+    return AiUsageLog.objects.filter(user=user, created_at__gte=start,
+                                     ok=True).count()
 
 
 def daily_limit():
@@ -109,7 +130,7 @@ def run(profile, user_text, schema, user, max_tokens=None,
     """
     provider = _provider()
     if not provider.is_available():
-        raise AiUnavailable(provider.unavailable_reason())
+        raise AiUnavailable(provider.unavailable_reason(), kind='no_key')
 
     user_text = (user_text or '').strip()
     if not user_text:
@@ -125,8 +146,8 @@ def run(profile, user_text, schema, user, max_tokens=None,
         limit = daily_limit()
         if used_today(user) >= limit:
             raise AiUnavailable(
-                'На сегодня лимит обращений исчерпан (%d в сутки). Соберите '
-                'домашку вручную или попробуйте завтра.' % limit)
+                'На сегодня лимит обращений исчерпан (%d в сутки).' % limit,
+                kind='limit')
 
     blocks = system_blocks(profile)
     started = time.monotonic()
@@ -137,7 +158,7 @@ def run(profile, user_text, schema, user, max_tokens=None,
     except providers.ProviderError as error:
         _log(user, profile, provider.name, model, None,
              time.monotonic() - started, ok=False, note=str(error)[:290])
-        raise AiUnavailable(str(error))
+        raise AiUnavailable(str(error), kind=getattr(error, 'kind', 'other'))
 
     seconds = time.monotonic() - started
     usage = _log(user, profile, provider.name, model, reply, seconds)
