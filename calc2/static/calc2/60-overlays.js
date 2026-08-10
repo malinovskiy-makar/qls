@@ -13,6 +13,7 @@ function redrawAll() {
   redrawScene();
   drawOverlays();
   applyLabelSize();      // общий размер подписей — одним проходом по холсту (П50)
+  refreshRegulators();   // строки «имя = значение» идут за значениями ползунков
   // Последним: карточка блока прячет переключатели соседних моделей. Идёт после
   // обычной логики видимости, иначе та вернула бы их на место.
   applyCardScope();
@@ -1795,6 +1796,11 @@ function buildParamChip(box, name) {
   const editor = document.createElement('div');
   editor.className = 'param-editor';
   chip.appendChild(editor);
+  /* Объявлено ЗАРАНЕЕ: обработчики ниже читают bounds, а создаётся он в
+     конце функции. С const это была бы временная мёртвая зона, и охрана
+     «bounds && bounds.close» бросала бы ReferenceError вместо того, чтобы
+     тихо пропустить вызов. */
+  let bounds = null;
 
   const syncSlider = () => {
     sl.min = p.min; sl.max = p.max; sl.step = Math.max(1e-9, p.step);
@@ -1842,7 +1848,7 @@ function buildParamChip(box, name) {
   /* Меню интервала — общее с регуляторами сцен: «мин ≤ a ≤ макс» и шаг, всё
      набрано формулой, без кнопки «Готово» (Н9), с живым обновлением на каждый
      введённый символ и закрытием по щелчку мимо (Н10). */
-  const bounds = attachBoundsEditor(chip, editor, name,
+  bounds = attachBoundsEditor(chip, editor, name,
     (key) => p[key],
     (key, v) => {
       p[key] = v;
@@ -2030,12 +2036,28 @@ function makeColorPicker(value, onChange, title) {
 }
 
 // Короткое имя кривой для подписей: своё имя → роль → формула.
+/* Короткое имя кривой: своё, потом по роли, потом автоимя. Свх-2: у кривой,
+   которую пользователь добавил сам, роли нет, и раньше именем становилась вся
+   формула — в чипе панели и в легенде стояло «100 - a*Q» вместо обозначения.
+   Даём буквы f, g, h… (общепринятое «некоторая функция»), они не спорят ни с
+   одной ролью. Имя закрепляется за кривой один раз, поэтому при правке формулы
+   не прыгает; полная формула остаётся подсказкой при наведении. */
+const AUTO_CURVE_LETTERS = ['f', 'g', 'h', 'k', 'u', 'v', 'w', 'z'];
+function autoCurveName(c) {
+  if (c._auto) return c._auto;
+  // Заняты только буквы кривых, которые СЕЙЧАС живут без роли: получившая роль
+  // кривая зовётся по ней, и держать за собой букву ей незачем.
+  const taken = new Set((STATE.curves || []).filter(x => x !== c && !x.role).map(x => x._auto).filter(Boolean));
+  const free = AUTO_CURVE_LETTERS.find(l => !taken.has(l));
+  c._auto = free || ('Кривая ' + ((STATE.curves || []).indexOf(c) + 1));
+  return c._auto;
+}
 function curveShortName(c) {
   const custom = (c.label || '').trim();
   if (custom) return custom;
   const byRole = { demand: 'D', supply: 'S', mc: 'MC', tc: 'TC', atc: 'ATC' };
   if (c.role && byRole[c.role]) return byRole[c.role];
-  return (c.name || c.expr || '').trim() || '?';
+  return autoCurveName(c);
 }
 
 // Строки подписи своей точки: текст пользователя + по галочкам координаты

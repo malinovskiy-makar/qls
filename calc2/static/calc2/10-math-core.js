@@ -70,8 +70,15 @@ function detectLinear(compiled) {
    кривая зависит, с теми, при которых её раскладывали, и пересчитываем при
    расхождении. */
 function curveParamNames(curve) {
-  if (curve._pNames === undefined || curve._pNamesFor !== curve.expr) {
-    curve._pNamesFor = curve.expr;
+  /* Ключ кэша — формула И набор занятых сценой букв: freeSymbols отсеивает то,
+     что занято сюжетом (ставка t, зарплата w), а это зависит от сцены. Кривая
+     «t*Q», разобранная при видимом поле ставки, дала бы пустой список, и после
+     перехода в сцену, где t свободна, кэш продолжал бы утверждать, что букв
+     нет, — и Н7 к ней не применялся бы вовсе. */
+  const busy = (typeof sceneReserved === 'function') ? [...sceneReserved()].sort().join(',') : '';
+  const key = curve.expr + '|' + busy;
+  if (curve._pNames === undefined || curve._pNamesFor !== key) {
+    curve._pNamesFor = key;
     curve._pNames = (typeof freeSymbols === 'function' && curve.expr) ? freeSymbols(curve.expr) : [];
   }
   return curve._pNames;

@@ -818,7 +818,7 @@ const FORMULA_FIELD_KINDS = {
   'inp-kp-1': 'DEMAND', 'inp-kp-2': 'DEMAND', 'inp-kink-mc': 'MC',
   'inp-pl1': 'TC', 'inp-pl2': 'TC',
   'ineq-formula': 'MATHF',
-  'inp-ppf1': 'PPF', 'inp-ppf2': 'PPF', 'inp-ppft': 'PPF',
+  'inp-ppft': 'PPF',   // строки стран собираются на лету и оснащаются там же
   'inp-tb1': 'PPF', 'inp-tb2': 'PPF',
   'ma-sras': 'MACRO', 'ma-ad': 'MACRO', 'ma-md': 'MACRO', 'ma-ls': 'MACRO',
   'ma-ld': 'MACRO', 'ma-fxd': 'MACRO', 'ma-fxs': 'MACRO',

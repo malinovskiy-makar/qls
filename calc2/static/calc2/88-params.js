@@ -216,7 +216,15 @@ function attachBoundsEditor(chip, editor, name, get, set) {
     editor.classList.remove('open'); editor.innerHTML = '';
     document.removeEventListener('pointerdown', onOutside, true);
   };
-  function onOutside(e) { if (!editor.contains(e.target) && !chip.querySelector('.param-track').contains(e.target)) close(); }
+  /* Слушатель снимается и когда чип уехал из разметки: правая панель
+     пересобирается целиком (innerHTML = ''), и открытое меню может исчезнуть
+     вместе с ней, а слушатель остался бы висеть на документе и звать close()
+     у оторванного узла. */
+  function onOutside(e) {
+    if (!chip.isConnected) { document.removeEventListener('pointerdown', onOutside, true); return; }
+    const track = chip.querySelector('.param-track');
+    if (!editor.contains(e.target) && !(track && track.contains(e.target))) close();
+  }
   editor._close = close;
   const open = () => {
     if (editor.classList.contains('open')) { close(); return; }
@@ -230,8 +238,15 @@ function attachBoundsEditor(chip, editor, name, get, set) {
       // просто пропускаем, ничего не трогая.
       n.addEventListener('input', () => {
         const v = parseFloat(n.value);
+        // Незаконченный ввод («−», «1e») пропускаем, но помечаем ошибкой:
+        // подчёркивание краснеет, всплывающих сообщений нет.
+        n.classList.toggle('bad', n.value !== '' && !isFinite(v));
         if (!isFinite(v)) return;
-        set(key, v);
+        /* Пока идёт правка, меню закрывать нельзя: set() может зажать значение
+           ползунка и разбудить «input», а тот закрыл бы меню и снёс поле, в
+           котором прямо сейчас печатают. */
+        editor._busy = true;
+        try { set(key, v); } finally { editor._busy = false; }
       });
       return n;
     };
@@ -243,6 +258,16 @@ function attachBoundsEditor(chip, editor, name, get, set) {
     document.addEventListener('pointerdown', onOutside, true);
   };
   return { open, close };
+}
+
+/* Строка «имя = значение» у всех регуляторов идёт за фактическим значением
+   ползунка. Нужен общий проход: сцена ставит значение свойством, а не событием
+   и не атрибутом, поэтому ни слушатель, ни наблюдатель такого не видят. */
+function refreshRegulators() {
+  document.querySelectorAll('.param-track').forEach(track => {
+    const field = track.parentElement;
+    if (field && typeof field._regSync === 'function') field._regSync();
+  });
 }
 
 /* Заготовка регулятора для правой панели: сверху имя и значение, снизу
@@ -282,7 +307,9 @@ function buildPultCurveChips(list) {
   list.forEach(c => {
     const { chip, lab, val } = makePchip(curveChipLabel(c), fmt(c.linear.b), c.color);
     chip.dataset.cid = c.id;
-    lab.title = 'Сдвиг кривой: ' + (c.name || c.expr || '');
+    // Подсказку вешаем на сам чип: подпись .pchip-label заменяет
+    // upgradeRegulator строкой «имя = значение», и title на ней пропал бы.
+    chip.title = 'Сдвиг кривой: ' + (c.name || c.expr || '');
 
     const sl = document.createElement('input');
     sl.type = 'range'; sl.min = 0; sl.max = CONFIG.Pmax; sl.step = 1;
@@ -302,29 +329,9 @@ function buildPultCurveChips(list) {
     track.className = 'param-track';
     track.appendChild(sl);
     chip.appendChild(track);
-    // Точное значение по щелчку на числе справа.
-    val.classList.add('pchip-editable');
-    val.title = 'Щёлкните, чтобы ввести точное значение';
-    val.addEventListener('click', () => {
-      const inp = document.createElement('input');
-      inp.type = 'number'; inp.step = 'any'; inp.value = sl.value;
-      inp.className = 'pchip-valedit';
-      val.replaceWith(inp);
-      inp.focus(); inp.select();
-      const done = () => {
-        const v = parseFloat(inp.value);
-        const cur = STATE.curves.find(x => x.id === c.id);
-        if (isFinite(v) && cur && cur.linear) {
-          if (v < +sl.min) sl.min = v;
-          if (v > +sl.max) sl.max = v;
-          sl.value = v;
-          setCurveFreeTerm(cur, v);
-        }
-        inp.replaceWith(val);
-      };
-      inp.addEventListener('blur', done);
-      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
-    });
+    /* Точное значение вводится щелчком по строке «D = 100», её ставит
+       upgradeRegulator ниже. Собственный обработчик на числе справа был
+       недостижим: тот же upgradeRegulator это число и прячет. */
     box.appendChild(chip);
     upgradeRegulator(chip);
   });
@@ -448,10 +455,20 @@ function upgradeRegulator(field) {
   const paint = () => paintEqLabel(eq, name, +sl.value);
   const sync = () => { lo.textContent = fmt(+sl.min); hi.textContent = fmt(+sl.max); paint(); };
   sync();
-  // Сцена сама двигает границы ползунка (например, при смене формул) — держим
-  // подписи в согласии с ними.
-  new MutationObserver(sync).observe(sl, { attributes: true, attributeFilter: ['min', 'max', 'step', 'value'] });
-  sl.addEventListener('input', () => { paint(); if (editor._close) editor._close(); });
+  /* Границы сцена двигает атрибутами, и наблюдатель их ловит. А вот САМО
+     значение сцена присваивает свойством (`sl.value = …` в setTax, в сбросе
+     сцены, в syncPultCurveValues): ни события, ни изменения атрибута при этом
+     нет, поэтому наблюдателем такое не поймать, и строка «t = 20» показывала
+     то, что было при сборке чипа. Держим строку в согласии со значением из
+     общего прохода refreshRegulators(), он идёт после каждой перерисовки. */
+  new MutationObserver(sync).observe(sl, { attributes: true, attributeFilter: ['min', 'max', 'step'] });
+  field._regSync = sync;
+  sl.addEventListener('input', () => {
+    paint();
+    // Правку границ ведут прямо в этом меню, и наш же clamp дёргает «input».
+    // Закрыть меню сейчас значило бы снести поле из-под пальцев (см. _busy).
+    if (editor._close && !editor._busy) editor._close();
+  });
 
   eq.addEventListener('click', () => {
     if (editor._close) editor._close();          // Н10: точное значение закрывает интервал
@@ -481,7 +498,7 @@ function upgradeRegulator(field) {
 /* Короткие обозначения длинных регуляторов (Н8). Полное название остаётся в
    подсказке; в колонке 268px помещается только обозначение. */
 const REGULATOR_SHORT = {
-  'ppft-price-field': 'Pw', 'tb-price-field': 'Pw', 'so-price-field': 'Pw',
+  'ppft-price-field': 'Pw', 'tb-price-field': 'Pw', 'open-pw-field': 'Pw',
   'tax-field': 't', 'pc-field': 'Preg', 'union-wage-field': 'Wu',
   'labmin-field': 'Wmin', 'ineq-alpha-field': 'alpha',
 };
@@ -523,7 +540,14 @@ function ppfSetSingle(maxX, maxY) {
 // Задать КПВ страны (1/2) в режиме суммы — ТОТ ЖЕ путь, что applyPpfSum.
 function ppfSetSum(which, maxX, maxY) {
   const formula = ppfLinearFormula(maxX, maxY);
-  const inp = document.getElementById(which === 1 ? 'inp-ppf1' : 'inp-ppf2'); if (inp) inp.value = formula;
+  /* Долг-2. Здесь стояли id «inp-ppf1»/«inp-ppf2», которых в разметке нет:
+     строки стран собираются на лету и называются «inp-ppfsum-N». Ползунки
+     «Макс X/Y» меняли состояние и график, а формула в поле оставалась прежней,
+     и человек видел одно, а считалось другое. Пишем и в состояние, и в поле
+     тем же путём, что ручной ввод. */
+  const inp = document.getElementById('inp-ppfsum-' + (which - 1));
+  if (inp) inp.value = formula;
+  if (typeof ppfSumSet === 'function') ppfSumSet(which - 1, formula);
   if (which === 1) STATE.ppf1 = formula; else STATE.ppf2 = formula;
   STATE.ppfSumData = null;   // форс пересчёт суммы (как applyPpfSum)
   _wantRangeAnim = true;     // смена формы страны → плавный переезд осей (с дебаунсом)

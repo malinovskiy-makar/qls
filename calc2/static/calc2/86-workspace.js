@@ -201,8 +201,6 @@ const SECTION_ICONS = {
   'sec-math': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 5c3 12 8 12 13 1" stroke-width="2.6"/>',
   // Точки на графике: точка с проекциями.
   'sec-view': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M4 10h9M13 20v-10" stroke-width="2.2" stroke-dasharray="5 4"/><circle cx="13" cy="10" r="3.6" stroke-width="2.6"/>',
-  // Цвета областей: три образца.
-  'sec-areacolors': '<rect x="4" y="6" width="16" height="4" rx="1.5" fill="currentColor" fill-opacity=".16" stroke-width="2.2"/><rect x="4" y="14" width="16" height="4" rx="1.5" fill="currentColor" fill-opacity=".16" stroke-width="2.6"/>',
   // Площади: заштрихованная фигура под кривой.
   'sec-areascalc': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 8c5 1 9 5 12 11H5z" fill="currentColor" fill-opacity=".16" stroke-width="2.6"/>',
 };

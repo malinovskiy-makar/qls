@@ -325,8 +325,17 @@ const orphans = [];
 for (const f of jsFiles) {
   const src = readFileSync(join(CALC2, 'static', 'calc2', f), 'utf8').split('\n');
   src.forEach((line, i) => {
-    for (const m of line.matchAll(/getElementById\(\s*["']([^"']+)["']\s*\)/g)) {
-      if (!known.has(m[1])) orphans.push(`${f}:${i + 1} ${m[1]}`);
+    /* Сверяем две формы записи: одиночную строку и тернарник. Раньше ловилась
+       только первая, и getElementById(k === 1 ? 'inp-ppf1' : 'inp-ppf2')
+       проезжал мимо — оба id были мёртвыми, а проверка молчала. Склейку
+       ('mm-' + i) и вложенный вызов (getAttribute) не трогаем: там имя
+       собирается на лету, сверять статически нечего. */
+    for (const call of line.matchAll(/getElementById\(([^()]*)\)/g)) {
+      const arg = call[1].trim();
+      const one = arg.match(/^["']([\w:.-]+)["']$/);
+      const tern = arg.match(/\?\s*["']([\w:.-]+)["']\s*:\s*["']([\w:.-]+)["']\s*$/);
+      const ids = one ? [one[1]] : (tern ? [tern[1], tern[2]] : []);
+      for (const id of ids) if (!known.has(id)) orphans.push(`${f}:${i + 1} ${id}`);
     }
     for (const m of line.matchAll(/querySelector(?:All)?\(\s*["']#([\w-]+)/g)) {
       if (!known.has(m[1])) orphans.push(`${f}:${i + 1} #${m[1]}`);
@@ -336,6 +345,47 @@ for (const f of jsFiles) {
 console.log('\n## Оборванные связи (Свх-4б)\n');
 console.log('Свх-4б обработчик на несуществующем элементе: '
   + (orphans.length ? orphans.length + '\n  ' + orphans.join('\n  ') : 'нарушений нет'));
+
+/* ── Долг-2: та же проверка со стороны РЕЕСТРОВ ─────────────────────────────
+   Прошлый раз показал, что бывает и обратная потеря: div#info-math числился в
+   RESULT_IDS, но в разметке его не было совсем, и весь блок «Математика»
+   месяцами оставался без «Ключевых значений». Обработчика там нет, поэтому
+   проверка «каждый getElementById указывает на живой элемент» такое не ловит.
+   Здесь идём от списков: каждый id, перечисленный в реестре кода, обязан
+   существовать в разметке (или создаваться скриптами). */
+const REGISTRIES = [
+  ['RESULT_IDS', /const RESULT_IDS = \[([\s\S]*?)\];/],
+  ['SECTION_NAMES', /const SECTION_NAMES = \{([\s\S]*?)\n\};/],
+  ['SECTION_ICONS', /const SECTION_ICONS = \{([\s\S]*?)\n\};/],
+  ['FORMULA_FIELD_KINDS', /const FORMULA_FIELD_KINDS = \{([\s\S]*?)\n\};/],
+  ['REGULATOR_SHORT', /const REGULATOR_SHORT = \{([\s\S]*?)\n\};/],
+  ['PULT_MOVABLE', /const PULT_MOVABLE = \[([\s\S]*?)\];/],
+  ['LABEL_SIZES', /const LABEL_SIZES = \[([\s\S]*?)\];/],
+  ['SCENE_ROUTE.lock', /const SCENE_ROUTE = \{([\s\S]*?)\n\};/],
+];
+const regMissing = [];
+let regChecked = 0, regIds = 0;
+for (const [name, re] of REGISTRIES) {
+  const m = jsAll.match(re);
+  if (!m) { regMissing.push(name + ': реестр не найден в коде'); continue; }
+  regChecked++;
+  // Ключи-строки реестра. Для SCENE_ROUTE берём только содержимое lock: [...].
+  const body = (name === 'SCENE_ROUTE.lock')
+    ? (m[1].match(/lock:\s*\[([^\]]*)\]/g) || []).join(' ')
+    : m[1];
+  const ids = new Set();
+  for (const s of body.matchAll(/['"]([a-z][\w-]*)['"]/gi)) ids.add(s[1]);
+  for (const id of ids) {
+    // В реестрах лежат и не-id (имена сцен, подписи) — сверяем только те, что
+    // похожи на id разметки: с дефисом либо уже известные.
+    if (!/-/.test(id)) continue;
+    regIds++;
+    if (!known.has(id)) regMissing.push(name + ': ' + id);
+  }
+}
+console.log('\nДолг-2 реестр ссылается на несуществующий элемент: '
+  + (regMissing.length ? regMissing.length + '\n  ' + regMissing.join('\n  ') : 'нарушений нет')
+  + '\n  (реестров проверено: ' + regChecked + ', сверено id: ' + regIds + ')');
 
 console.log('\nОшибок страницы: ' + errors.length);
 errors.slice(0, 10).forEach(e => console.log('  ' + e));

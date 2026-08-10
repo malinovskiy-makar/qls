@@ -1159,9 +1159,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 /* Кнопка расчёта не горит, пока считать нечего. */
 #ac-calc:disabled { opacity: .45; cursor: not-allowed; }
 
-/* Список областей с пикерами цвета. */
-.ac-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
-.ac-name { font-size: 12px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chk.dim { opacity: .72; }
 
 /* Быстрая кнопка расчёта площади поверх графика. */
@@ -1207,7 +1204,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
 }
-.param-ed-name { flex: 0 0 auto; font-weight: 600; color: var(--text); }
 /* Поля интервала — те же тонкие числа, что по краям дорожки, а не текстовые
    прямоугольники: границу несёт подчёркивание (Н9, Н60). */
 .param-ed-line input.param-ed-num {
@@ -1217,18 +1213,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   border-radius: 0;
 }
 .param-ed-line input.param-ed-num:focus { outline: none; border-bottom-color: var(--accent); }
+/* Неполный ввод («−», «1e») подсвечивается самим подчёркиванием: всплывающих
+   сообщений в этом меню нет, значение просто ещё не применилось. */
+.param-ed-line input.param-ed-num.bad { border-bottom-color: var(--error, #d14343); }
 /* Точное значение регулятора вводится щелчком по строке «t = 20», поэтому
    собственное числовое поле сцены рядом с ползунком лишнее (Н8, Н60). */
 .reg-num-hidden { display: none !important; }
 .pchip-editable { cursor: text; border-bottom: 1px dashed var(--border); }
 .pchip-editable:hover { border-bottom-color: var(--accent); }
-.pchip-valedit {
-  margin-left: auto; width: 66px; padding: 1px 4px; font-size: 12px; font-weight: 700;
-  text-align: right; border: 1px solid var(--accent); border-radius: var(--r-sm);
-  background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
-}
-/* Поле точного значения открывается на месте формулы, поэтому прижато влево. */
-.pchip-param .pchip-valedit { margin-left: 0; text-align: left; }
 /* ── Ползунок параметра в духе Desmos (П23) ──────────────────────────
    Строка «a = 1» набрана формулой, справа серый крестик, под ними дорожка
    с серыми границами по краям. Раскрытый редактор границ печатает настоящие
