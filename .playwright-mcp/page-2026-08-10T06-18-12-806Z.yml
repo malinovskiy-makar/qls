@@ -1,0 +1,142 @@
+- generic [active] [ref=f43e1]:
+  - navigation [ref=f43e2]:
+    - link "Эк" [ref=f43e3] [cursor=pointer]:
+      - /url: /
+    - link "Проверка" [ref=f43e4] [cursor=pointer]:
+      - /url: /teacher/
+    - link "Группы" [ref=f43e5] [cursor=pointer]:
+      - /url: /teacher/groups/
+    - link "Каталог" [ref=f43e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f43e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f43e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f43e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f43e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f43e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f43e12]:
+      - button "Сменить тему" [ref=f43e13] [cursor=pointer]: ☀
+      - generic [ref=f43e14]: Марина Петрова
+      - link "Выйти" [ref=f43e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f43e16]:
+    - generic [ref=f43e17]:
+      - link "Группы" [ref=f43e18] [cursor=pointer]:
+        - /url: /teacher/groups/
+      - text: → Экономика 10–11, вторник
+    - heading "Экономика 10–11, вторник" [level=1] [ref=f43e21]
+    - navigation [ref=f43e22]:
+      - link "Обзор" [ref=f43e23] [cursor=pointer]:
+        - /url: "?tab=overview"
+      - link "Задания" [ref=f43e24] [cursor=pointer]:
+        - /url: "?tab=assignments"
+      - link "Материалы" [ref=f43e25] [cursor=pointer]:
+        - /url: "?tab=materials"
+    - link "Создание работы" [ref=f43e27] [cursor=pointer]:
+      - /url: /teacher/assignment/generate/?group=2
+    - generic [ref=f43e29]:
+      - generic [ref=f43e30]: "3"
+      - generic [ref=f43e31]: ждут проверки
+    - generic [ref=f43e32]:
+      - generic [ref=f43e33]:
+        - generic [ref=f43e34]: Требуют проверки
+        - generic [ref=f43e35]: "3"
+      - generic [ref=f43e36]:
+        - generic [ref=f43e37]:
+          - generic [ref=f43e38]:
+            - 'link "Домашка №3: спрос, предложение, эластичность" [ref=f43e39] [cursor=pointer]':
+              - /url: /teacher/groups/2/assignments/6/
+            - text: домашка
+          - generic [ref=f43e40]: сдали 2 из 3 · прошёл вчера
+        - link "Проверить 2" [ref=f43e41] [cursor=pointer]:
+          - /url: /teacher/groups/2/assignments/6/submissions/
+      - generic [ref=f43e42]:
+        - generic [ref=f43e43]:
+          - generic [ref=f43e44]:
+            - link "Контрольная №2 (дедлайн + 40 минут)" [ref=f43e45] [cursor=pointer]:
+              - /url: /teacher/groups/2/exams/8/results/
+            - text: контрольная
+          - generic [ref=f43e46]: сдали 3 из 3 · через 2 дня
+        - link "Проверить 1" [ref=f43e47] [cursor=pointer]:
+          - /url: /teacher/groups/2/assignments/8/submissions/
+      - generic [ref=f43e48]:
+        - generic [ref=f43e49]:
+          - generic [ref=f43e50]:
+            - link "Сквозная домашка (ночная сессия)" [ref=f43e51] [cursor=pointer]:
+              - /url: /teacher/groups/2/assignments/16/
+            - text: домашка
+          - generic [ref=f43e52]: сдали 1 из 3 · без срока
+        - link "Проверить 4" [ref=f43e53] [cursor=pointer]:
+          - /url: /teacher/groups/2/assignments/16/submissions/
+    - generic [ref=f43e54]:
+      - generic [ref=f43e55]:
+        - generic [ref=f43e56]: Идут сейчас
+        - generic [ref=f43e57]: "2"
+      - generic [ref=f43e58]:
+        - generic [ref=f43e59]:
+          - generic [ref=f43e60]:
+            - link "Контрольная №1 (окно, все одновременно)" [ref=f43e61] [cursor=pointer]:
+              - /url: /teacher/groups/2/exams/7/results/
+            - text: контрольная
+          - generic [ref=f43e62]: сдали 2 из 3 · сегодня до 09:55
+        - generic [ref=f43e63]: ждём сдач
+      - generic [ref=f43e64]:
+        - generic [ref=f43e65]:
+          - generic [ref=f43e66]:
+            - link "Домашка тест торговля" [ref=f43e67] [cursor=pointer]:
+              - /url: /teacher/groups/2/assignments/17/
+            - text: домашка
+          - generic [ref=f43e68]: сдали 0 из 3 · завтра до 06:28
+        - generic [ref=f43e69]: ждём сдач
+    - generic [ref=f43e70]:
+      - generic [ref=f43e71]:
+        - generic [ref=f43e72]: Проверены
+        - generic [ref=f43e73]: "4"
+      - generic [ref=f43e74]:
+        - generic [ref=f43e75]:
+          - generic [ref=f43e76]:
+            - link "Контрольная №0 (прошедшая, с результатами)" [ref=f43e77] [cursor=pointer]:
+              - /url: /teacher/groups/2/exams/10/results/
+            - text: контрольная
+          - generic [ref=f43e78]: сдали 3 из 3 · прошёл 1 неделю назад
+        - generic [ref=f43e79]:
+          - generic [ref=f43e80]: 53%
+          - text: средняя оценка
+          - generic [ref=f43e81]: сложность 5,0 из 10
+      - generic [ref=f43e82]:
+        - generic [ref=f43e83]:
+          - generic [ref=f43e84]:
+            - link "Контрольная 67 (первое создание)" [ref=f43e85] [cursor=pointer]:
+              - /url: /teacher/groups/2/exams/11/results/
+            - text: контрольная
+          - generic [ref=f43e86]: сдали 0 из 3 · прошёл 5 дней назад
+        - generic [ref=f43e87]:
+          - generic [ref=f43e88]: —
+          - text: никто не сдал
+          - generic [ref=f43e89]: нет оценок
+      - generic [ref=f43e90]:
+        - generic [ref=f43e91]:
+          - generic [ref=f43e92]:
+            - link "Домашка КПВ" [ref=f43e93] [cursor=pointer]:
+              - /url: /teacher/groups/2/assignments/12/
+            - text: домашка
+          - generic [ref=f43e94]: сдали 0 из 3 · прошёл 3 дня назад
+        - generic [ref=f43e95]:
+          - generic [ref=f43e96]: —
+          - text: никто не сдал
+          - generic [ref=f43e97]: нет оценок
+      - generic [ref=f43e98]:
+        - generic [ref=f43e99]:
+          - generic [ref=f43e100]:
+            - link "Домашка 5 — КТВ" [ref=f43e101] [cursor=pointer]:
+              - /url: /teacher/groups/2/assignments/13/
+            - text: домашка
+          - generic [ref=f43e102]: сдали 0 из 3 · прошёл 2 дня назад
+        - generic [ref=f43e103]:
+          - generic [ref=f43e104]: —
+          - text: никто не сдал
+          - generic [ref=f43e105]: нет оценок
