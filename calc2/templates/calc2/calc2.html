@@ -1796,7 +1796,9 @@
       <div id="math-pane-minmax" style="display:none;">
         <div class="field">
           <label>Что ищем</label>
-          <div class="seg">
+          <!-- Н73: показывается тумблером (segToToggle). Кнопки остаются
+               источником правды: к ним привязана обвязка сюжета. -->
+          <div class="seg" id="mm-mode">
             <button class="seg-btn active" id="mm-min">Наименьшую</button>
             <button class="seg-btn" id="mm-max">Наибольшую</button>
           </div>

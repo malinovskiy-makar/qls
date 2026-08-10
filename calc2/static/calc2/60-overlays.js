@@ -1153,17 +1153,42 @@ function areaPickedCurve() {
 function areaCurveRange() {
   const t = areaPickedCurve();
   if (!t) return null;
-  const a = Math.max(0, viewWindow().x0);
-  const b = curveRightEdge(t.f);
+  /* Н52. По умолчанию отрезок это первая четверть выбранной кривой: от нуля до
+     её правого края. Но человек вправе задать свой, и тогда его границы главнее
+     умолчания. Держим их в состоянии, а не в разметке: список площадей
+     пересобирается, и подпись живёт недолго. */
+  const a0 = Math.max(0, viewWindow().x0);
+  const b0 = curveRightEdge(t.f);
+  // Именно typeof: isFinite(null) это true, и пустое умолчание прошло бы за
+  // настоящую границу, обнулив отрезок.
+  const num = (v) => (typeof v === 'number' && isFinite(v));
+  const a = num(STATE.acFrom) ? STATE.acFrom : a0;
+  const b = num(STATE.acTo) ? STATE.acTo : b0;
   return (isFinite(a) && isFinite(b) && b > a) ? { a, b } : null;
 }
+/* Н51, Н52. Одна строка: «на отрезке [0; 100]», где обе границы правятся тем же
+   компонентом, что и всюду. Прежде здесь стоял неизменяемый текст. */
 function syncAreaRangeLabel() {
   const el = document.getElementById('ac-range');
   if (!el) return;
   const r = areaCurveRange();
-  el.textContent = r
-    ? ('на отрезке [' + fmt(r.a) + '; ' + fmt(r.b) + ']')
-    : (areaTargets().length ? 'Выберите кривую' : 'Сначала постройте кривую');
+  el.innerHTML = '';
+  if (!r) {
+    el.textContent = areaTargets().length ? 'Выберите кривую' : 'Сначала постройте кривую';
+    return;
+  }
+  const bound = (key, get) => makeEditableValue({
+    get,
+    set: (v) => { STATE[key] = v; syncAreaRangeLabel(); },
+    tex: (v, text) => text,
+    title: key === 'acFrom' ? 'Начало отрезка' : 'Конец отрезка',
+  });
+  const word = document.createElement('span');
+  word.className = 'ac-range-word'; word.textContent = 'на отрезке';
+  const open = document.createElement('span'); open.textContent = '[';
+  const semi = document.createElement('span'); semi.textContent = ';';
+  const close = document.createElement('span'); close.textContent = ']';
+  el.append(word, open, bound('acFrom', () => r.a), semi, bound('acTo', () => r.b), close);
 }
 
 // Набранные вершины на графике: номер у каждой и бледный контур будущей фигуры.
@@ -2416,6 +2441,7 @@ const SCENE_DEFAULTS = {
   marks: [], areaVerts: [], areaCalcList: [], areaCalcMode: 'curve',
   roller: null, hotCross: null, hoverCross: null, pointNames: {},
   markArm: false, vertArm: false,
+  acFrom: null, acTo: null,   // свой отрезок «Под кривой» (Н52); null = вся первая четверть
   // Заливки и цвета.
   showCS: true, showPS: true, showGhost: false,
   showMonoCS: true, showMonoPS: true, showMonoVC: false,
@@ -2550,11 +2576,21 @@ function renderMarkList() {
   box.innerHTML = '';
   (STATE.marks || []).forEach(mk => box.appendChild(buildMarkRow(mk)));
 
+  if (!pendingMark()) ensureAddMarkButton();
+}
+
+/* Н38. Кнопка «Добавить точку» всегда стоит ПОД списком: новая точка появляется
+   выше неё, а кнопка съезжает вниз. Отдельная функция, потому что кнопку надо
+   вернуть и в тот момент, когда заготовка превратилась в точку прямо во время
+   набора координат, без пересборки всего списка (иначе теряется фокус). */
+function ensureAddMarkButton() {
+  const box = document.getElementById('mark-list');
+  if (!box || box.querySelector('.btn-mark-add')) return;
   const add = document.createElement('button');
   add.type = 'button'; add.className = 'btn-sm btn-mark-add';
   add.textContent = 'Добавить точку';
   add.addEventListener('click', () => startMarkDraft());
-  if (!pendingMark()) box.appendChild(add);
+  box.appendChild(add);
 }
 
 function buildMarkRow(mk) {
@@ -2568,28 +2604,19 @@ function buildMarkRow(mk) {
      навсегда серым в каждой строке было бы мёртвым элементом. */
   let seg = null;
   if (mk.pending) {
-    seg = document.createElement('div');
-    seg.className = 'seg mark-mode';
-    const mkBtn = (mode, text) => {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'seg-btn' + (mk.mode === mode ? ' active' : '');
-      b.textContent = text;
-      b.addEventListener('click', () => {
-        if (!mk.pending) return;
-        mk.mode = mode;
-        armMark(mode === 'graph');
-        renderMarkList();
-      });
-      return b;
-    };
-    seg.append(mkBtn('coords', 'Ввести координаты'), mkBtn('graph', 'Указать на графике'));
+    seg = makeToggle('Ввести координаты', 'Указать на графике', mk.mode === 'graph', (v) => {
+      if (!mk.pending) return;
+      mk.mode = (v === 'right') ? 'graph' : 'coords';
+      armMark(mk.mode === 'graph');
+      renderMarkList();
+    });
     row.appendChild(seg);
   }
 
   if (mk.pending && mk.mode === 'graph') {
     const hint = document.createElement('div');
     hint.className = 'mark-hint';
-    hint.textContent = 'Нажмите на график!';
+    hint.textContent = 'Нажмите на график';
     row.appendChild(hint);
     return row;
   }
@@ -2601,59 +2628,75 @@ function buildMarkRow(mk) {
   const xy = document.createElement('div');
   xy.className = 'mark-xy';
   const nums = {};
-  const mkNum = (key, label) => {
-    const l = document.createElement('label'); l.textContent = label;
-    const n = document.createElement('input');
-    n.type = 'number'; n.step = 'any';
-    n.value = isFinite(mk[key]) ? Math.round(mk[key] * 1000) / 1000 : '';
-    n.addEventListener('input', () => {
-      const v = parseFloat(n.value);
-      mk[key] = isFinite(v) ? v : NaN;
-      // Точка на кривой держится за неё: меняем x, высоту берём с кривой.
-      const f = markSnapFn(mk);
-      if (f && key === 'x' && isFinite(v)) { const y = f(v); if (isFinite(y)) mk.y = y; }
-      const ready = isFinite(mk.x) && isFinite(mk.y);
-      if (mk.pending && ready) {
-        mk.pending = false;
-        if (seg) seg.remove();          // способ ввода выбран, тумблер больше не нужен
-        row.classList.remove('mark-draft');
-        const box = document.getElementById('mark-list');
-        if (box && !box.querySelector('.btn-mark-add')) {
-          const add = document.createElement('button');
-          add.type = 'button'; add.className = 'btn-sm btn-mark-add';
-          add.textContent = 'Добавить точку';
-          add.addEventListener('click', () => startMarkDraft());
-          box.appendChild(add);
+  /* Н47, Н36. Координата это набранное «x = 50», а не подпись и прямоугольное
+     поле рядом. Правится тем же компонентом, что и всюду: пунктир снизу, правка
+     на месте, применение на каждый символ. */
+  const mkNum = (key) => {
+    const n = makeEditableValue({
+      get: () => (isFinite(mk[key]) ? Math.round(mk[key] * 1000) / 1000 : ''),
+      tex: (v, text) => key + ' = ' + (text === '' ? '{?}' : text),
+      title: 'Координата ' + key,
+      set: (v) => {
+        mk[key] = isFinite(v) ? v : NaN;
+        // Точка на кривой держится за неё: меняем x, высоту берём с кривой.
+        const f = markSnapFn(mk);
+        if (f && key === 'x' && isFinite(v)) { const y = f(v); if (isFinite(y)) mk.y = y; }
+        const ready = isFinite(mk.x) && isFinite(mk.y);
+        if (mk.pending && ready) {
+          mk.pending = false;
+          if (seg) seg.remove();          // способ ввода выбран, тумблер больше не нужен
+          row.classList.remove('mark-draft');
+          ensureAddMarkButton();
+        } else if (!ready && !mk.pending) {
+          mk.pending = true;                     // стёрли координату — точка ушла
         }
-      } else if (!ready && !mk.pending) {
-        mk.pending = true;                     // стёрли координату — точка ушла
-      }
-      redrawAll();
+        redrawAll();
+      },
     });
     nums[key] = n;
-    xy.append(l, n);
+    xy.append(n);
   };
-  mkNum('x', 'X');
-  mkNum('y', 'Y');
-  if (mk.pending) { row.appendChild(xy); return row; }   // остальное — когда точка встанет
+  mkNum('x');
+  mkNum('y');
+  if (mk.pending) {
+    /* Н37. Галочка подтверждения. Точка встаёт и сама, как только заполнены обе
+       координаты, но без видимого «готово» заготовка выглядит незавершённой. */
+    const ok = document.createElement('button');
+    ok.type = 'button'; ok.className = 'btn-icon mark-ok';
+    ok.textContent = '✓';
+    ok.title = 'Поставить точку';
+    ok.addEventListener('click', () => {
+      if (!isFinite(mk.x) || !isFinite(mk.y)) return;
+      mk.pending = false;
+      ensureAddMarkButton();
+      renderMarkList(); redrawAll();
+    });
+    xy.appendChild(ok);
+    row.appendChild(xy);
+    return row;                                  // остальное — когда точка встанет
+  }
 
+  /* Н46. Сразу после цвета идёт ИМЯ точки, и правится оно щелчком по самому
+     имени, а не в отдельном текстовом поле под строкой. Надписи «Своя точка»
+     больше нет: она ничего не сообщала. */
   const top = document.createElement('div');
   top.className = 'mark-top';
   const pick = makeColorPicker(mk.color || COL.ink, (hex) => { mk.color = hex; redrawAll(); }, 'Цвет точки');
-  const co = document.createElement('span');
-  co.className = 'mark-co';
-  co.textContent = mk.snapTo ? ('На ' + mk.snapTo) : 'Своя точка';
+  const nameEl = makeEditableValue({
+    kind: 'text',
+    get: () => mk.text || '',
+    set: (v) => { mk.text = String(v).trim(); redrawAll(); },
+    tex: (v, text) => (text ? String(text) : '{—}'),
+    title: 'Имя точки',
+  });
+  nameEl.classList.add('mark-name');
   const del = document.createElement('button');
   del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.title = 'Убрать точку';
   del.addEventListener('click', () => {
     STATE.marks = STATE.marks.filter(m => m.id !== mk.id);
     renderMarkList(); redrawAll();
   });
-  top.append(pick, co, del);
-
-  const inp = document.createElement('input');
-  inp.type = 'text'; inp.value = mk.text; inp.placeholder = 'Подпись точки';
-  inp.addEventListener('input', () => { mk.text = inp.value; redrawAll(); });
+  top.append(pick, nameEl, del);
 
   const toggle = (label, key, def) => {
     const w = document.createElement('label');
@@ -2666,9 +2709,17 @@ function buildMarkRow(mk) {
     return w;
   };
 
-  row.append(top, inp, xy,
-    toggle('Пунктир к осям', 'showDash', true),
-    toggle('Координаты', 'showCoords', true));
+  /* Н48. Координаты в столбик, галочки правее: две строки вместо четырёх, и
+     строка точки перестала быть самой высокой в панели. */
+  const body = document.createElement('div');
+  body.className = 'mark-body';
+  const chks = document.createElement('div');
+  chks.className = 'mark-chks';
+  chks.append(toggle('Пунктир к осям', 'showDash', true),
+              toggle('Координаты', 'showCoords', true));
+  xy.classList.add('mark-xy-col');
+  body.append(xy, chks);
+  row.append(top, body);
 
   /* Н45. Точка, посаженная на кривую, скользит по ней, и это видно по самому
      поведению — отдельная строка «Удерживать точку на КПВ» ничего не добавляла

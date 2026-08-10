@@ -1037,13 +1037,21 @@ const CASES = [
           var only = box.children.length === 1 && box.firstElementChild.classList.contains('btn-mark-add') ? 1 : 0;
           box.querySelector('.btn-mark-add').click();
           var noBtn = box.querySelector('.btn-mark-add') ? 0 : 1;
-          var f = box.querySelectorAll('.mark-draft .mark-xy input');
-          f[0].value = '50'; f[0].dispatchEvent(new Event('input', { bubbles: true }));
+          /* Н36, Н47: координаты — не поля в рамке, а редактируемые значения
+             (contenteditable внутри .edval). Печатаем в них так же, как человек:
+             ставим текст и будим «input». */
+          var f = box.querySelectorAll('.mark-draft .mark-xy .edval');
+          function type(el, text) {
+            el.click();                                   // открыть правку на месте
+            el.textContent = text;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          type(f[0], '50');
           var half = STATE.marks.filter(function (m) { return !m.pending; }).length;
-          f[1].value = '5'; f[1].dispatchEvent(new Event('input', { bubbles: true }));
+          type(f[1], '5');
           var live = STATE.marks.filter(function (m) { return !m.pending; })[0];
           var y1 = live ? live.y : -1;
-          f[1].value = '50'; f[1].dispatchEvent(new Event('input', { bubbles: true }));
+          type(f[1], '50');
           var y2 = STATE.marks.filter(function (m) { return !m.pending; })[0].y;
           var back = document.getElementById('mark-list').querySelector('.btn-mark-add') ? 1 : 0;
           var lastIsBtn = document.getElementById('mark-list').lastElementChild.classList.contains('btn-mark-add') ? 1 : 0;
@@ -1093,7 +1101,16 @@ const CASES = [
           var sel = document.getElementById('ac-pick');
           sel.value = 'D'; syncAreaRangeLabel(); syncAreaCalcButton();
           var openCurve = btn.disabled ? 0 : 1;
-          var range = document.getElementById('ac-range').textContent;
+          /* Н51, Н52: отрезок стал редактируемым, обе границы набраны формулой.
+             Читаем сами значения, а не строку целиком: у KaTeX в textContent
+             рядом с видимой записью лежат MathML и исходный TeX. */
+          var rangeEl = document.getElementById('ac-range');
+          var rangeNums = [].map.call(rangeEl.querySelectorAll('.edval'), function (e) {
+            var h = e.querySelector('.katex-html');
+            return (h ? h.textContent : e.textContent).trim();
+          });
+          var range = '[' + rangeNums.join('; ') + ']';
+          var rangeEditable = rangeEl.querySelectorAll('.edval').length;
           btn.click();
           var head = [].map.call(document.querySelectorAll('.area-head span'),
                                  function (s) { return s.textContent; }).join('|');
@@ -1108,12 +1125,14 @@ const CASES = [
           clearAreaVerts(); setAreaCalcMode('curve'); clearAreaCalc();
           return { lockedCurve: lockedCurve, openCurve: openCurve, lockedPoly: lockedPoly,
                    openPoly: openPoly, area: areaVal,
-                   rangeOk: /\\[0; 100\\]/.test(range) ? 1 : 0,
+                   rangeOk: range === '[0; 100]' ? 1 : 0,
+                   rangeEd: rangeEditable,
                    headOk: head === 'Название|Площадь|' ? 1 : 0,
                    verts: crosses };`,
     checks: [['без кривой кнопка заперта', 'lockedCurve', 1, 0],
              ['выбрали кривую — открылась', 'openCurve', 1, 0],
              ['отрезок [0; 100]', 'rangeOk', 1, 0],
+             ['и обе границы правятся (Н52)', 'rangeEd', 2, 0],
              ['площадь под D = 5000', 'area', 5000, 1],
              ['заголовки «Название» и «Площадь» (Н53)', 'headOk', 1, 0],
              ['без вершин кнопка заперта', 'lockedPoly', 1, 0],

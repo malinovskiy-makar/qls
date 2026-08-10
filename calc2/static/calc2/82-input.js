@@ -1187,3 +1187,62 @@ function makeEditableValue(opts) {
   });
   return el;
 }
+
+/* ── Н15, Н50, Н73. Настоящий тумблер ──────────────────────────────────────
+   Переключатель-пилюля с кружком, который ездит из края в край, вместо двух
+   сегментных кнопок. Один компонент на все места: точки, площади, «min и max».
+   Возвращает обёртку;值 читается как el.value ('left' | 'right'). */
+function makeToggle(leftText, rightText, startRight, onChange) {
+  const wrap = document.createElement('div');
+  wrap.className = 'tgl';
+  const l = document.createElement('span'); l.className = 'tgl-lab'; l.textContent = leftText;
+  const r = document.createElement('span'); r.className = 'tgl-lab'; r.textContent = rightText;
+  const sw = document.createElement('button');
+  sw.type = 'button'; sw.className = 'tgl-sw';
+  sw.setAttribute('role', 'switch');
+  const knob = document.createElement('span'); knob.className = 'tgl-knob';
+  sw.appendChild(knob);
+  wrap.append(l, sw, r);
+
+  const paint = () => {
+    const right = wrap.value === 'right';
+    wrap.classList.toggle('is-right', right);
+    sw.setAttribute('aria-checked', right ? 'true' : 'false');
+    sw.setAttribute('aria-label', right ? rightText : leftText);
+    l.classList.toggle('on', !right);
+    r.classList.toggle('on', right);
+  };
+  const set = (right, fire) => {
+    wrap.value = right ? 'right' : 'left';
+    paint();
+    if (fire && typeof onChange === 'function') onChange(wrap.value);
+  };
+  wrap._set = (right) => set(right, false);
+  sw.addEventListener('click', () => set(wrap.value !== 'right', true));
+  // Щелчок по самой подписи тоже переключает: попасть в слово проще, чем в кружок.
+  l.addEventListener('click', () => set(false, true));
+  r.addEventListener('click', () => set(true, true));
+  set(!!startRight, false);
+  return wrap;
+}
+
+/* Заменить пару сегментных кнопок настоящим тумблером (Н50, Н73), НЕ трогая
+   обвязку. Кнопки остаются в разметке и продолжают быть источником правды:
+   сцены читают и ставят у них класс .active, а тумблер лишь щёлкает по ним и
+   показывает их состояние. Так переключатель стал другим на вид, а логика
+   сцен осталась ровно та же. */
+function segToToggle(segId, leftId, rightId, leftText, rightText) {
+  const seg = document.getElementById(segId);
+  const l = document.getElementById(leftId), r = document.getElementById(rightId);
+  if (!seg || !l || !r || seg._tgl) return;
+  const tgl = makeToggle(leftText, rightText, r.classList.contains('active'), (v) => {
+    (v === 'right' ? r : l).click();
+  });
+  seg.parentElement.insertBefore(tgl, seg);
+  seg.style.display = 'none';
+  seg._tgl = tgl;
+  // Сцена могла переключить режим сама — держим тумблер в согласии с кнопками.
+  const sync = () => tgl._set(r.classList.contains('active'));
+  new MutationObserver(sync).observe(l, { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(sync).observe(r, { attributes: true, attributeFilter: ['class'] });
+}

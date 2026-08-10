@@ -36,6 +36,10 @@ function init() {
   foldPickerGroups();   // окно сценариев — десять закрытых блоков
   wireControls();
   wireScene();          // полоса иконок, панели, меню плоскости, тема
+  // Н50, Н73: пары сегментных кнопок показываем настоящим тумблером. Идёт после
+  // wireControls: к самим кнопкам к этому моменту уже привязаны обработчики.
+  segToToggle('ac-mode', 'ac-curve', 'ac-poly', 'Под кривой', 'Между точками');
+  segToToggle('mm-mode', 'mm-min', 'mm-max', 'Наименьшую', 'Наибольшую');
   initSceneColorPickers();
   renderCurveList();
   redrawAll();
