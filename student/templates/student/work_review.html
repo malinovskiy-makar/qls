@@ -58,6 +58,17 @@
 .wr-points small { font-size: 12px; font-weight: 600; color: var(--text2); }
 .wr-body { padding: 0 18px 18px; }
 .wr-block { margin-top: 16px; }
+/* ── Оценивание внутри разбора (репетитору, п. 14.4) ────────────────── */
+.gi-block { margin-top: 14px; padding-top: 12px;
+            border-top: 2px solid var(--border); }
+.gi-head { display: flex; align-items: baseline; gap: 10px; }
+.gi-said { font-size: 12px; color: var(--green); }
+.gi-score { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            margin: 8px 0 10px; }
+.gi-preset.is-on { background: var(--btn-bg); color: var(--on-btn);
+                   border-color: var(--btn-bg); }
+.gi-comment { width: 100%; }
+.gi-actions { margin-top: 8px; }
 .wr-block-cap { font-size: 11px; font-weight: 700; text-transform: uppercase;
                 letter-spacing: .05em; color: var(--text2); margin-bottom: 6px; }
 .wr-mine { background: var(--panel); border: 1px solid var(--border);
@@ -115,9 +126,16 @@
 <div class="wr-asstudent">
   <b>Вы смотрите работу глазами ученика.</b>
   {{ student.get_full_name|default:student.username }} видит эту страницу
-  ровно так же. Оценки и комментарии ставятся на странице проверки —
+  ровно так же. Задачи свёрнуты — раскройте нужную, чтобы поставить балл
+  прямо здесь; сплошной поток проверки живёт на
   <a href="{{ back_url }}">{{ back_label|lower }}</a>.
 </div>
+{% comment %}
+Свой токен: на экране разбора форм может не быть вовсе (вопрос о сложности
+показывается только ученику), и без него сохранение оценки молча отвечало
+бы 403. Скрытое поле вне формы — валидный HTML.
+{% endcomment %}
+{% csrf_token %}
 {% endif %}
 
 <div class="wr-head">
@@ -209,9 +227,15 @@
 
 <div id="wr-list">
 {% for row in summary.rows %}
+{% comment %}
+⚠️ У РЕПЕТИТОРА ВСЁ СВЁРНУТО ПРИ ОТКРЫТИИ (сессия 8, п. 14.4). Он пришёл
+проверять работу целиком, и семь раскрытых задач — это стена текста, в
+которой не видно ни списка, ни порядка. У ученика прежнее поведение:
+задачи с ошибкой раскрыты, с них и начинается разбор.
+{% endcomment %}
 <details class="wr-item k-mark k-mark--{{ row.state }}" data-state="{{ row.state }}"
          data-attention="{% if row.needs_attention %}1{% else %}0{% endif %}"
-         {% if row.needs_attention %}open{% endif %}>
+         {% if row.needs_attention and not for_tutor %}open{% endif %}>
   <summary>
     <span class="wr-num">{{ row.number }}.</span>
     <span class="wr-title">{{ row.title|default:row.statement|striptags|truncatechars:70 }}</span>
@@ -286,6 +310,10 @@
       {% include "student/_feedback_block.html" with fb=row.feedback points=row.max_points pending_text="Эту задачу ещё проверяет преподаватель." %}
     {% endif %}
 
+    {% if for_tutor %}
+      {% include "teacher/_grade_inline.html" with row=row %}
+    {% endif %}
+
     {% if row.has_solution %}
       {% if row.solution_visible %}
       <details class="pf-fold">
@@ -305,6 +333,71 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if for_tutor %}
+{% comment %}
+Оценка задачи прямо в разборе: сохраняется без ухода со страницы, рядом
+тихая отметка «сохранено». Балл обрезает СЕРВЕР.
+{% endcomment %}
+<script>
+(function () {
+  var URL = '{% url "teacher:api_grade_submission" %}';
+  var CSRF = document.querySelector('[name=csrfmiddlewaretoken]');
+
+  function paint(block) {
+    var value = (block.querySelector('.gi-input').value || '').trim();
+    block.querySelectorAll('.gi-preset').forEach(function (button) {
+      button.classList.toggle('is-on', button.dataset.score === value);
+    });
+  }
+
+  document.addEventListener('click', function (event) {
+    var preset = event.target.closest('.gi-preset');
+    if (preset) {
+      var block = preset.closest('.gi-block');
+      block.querySelector('.gi-input').value = preset.dataset.score;
+      paint(block);
+      return;
+    }
+    var save = event.target.closest('.gi-save');
+    if (!save) { return; }
+    var block = save.closest('.gi-block');
+    var said = block.querySelector('.gi-said');
+    var data = new FormData();
+    data.append('csrfmiddlewaretoken', CSRF ? CSRF.value : '');
+    data.append('submission', block.dataset.submission);
+    data.append('score', block.querySelector('.gi-input').value || '0');
+    data.append('comment', block.querySelector('.gi-comment').value || '');
+    save.disabled = true;
+    fetch(URL, { method: 'POST', body: data })
+      .then(function (r) { return r.json(); })
+      .then(function (payload) {
+        save.disabled = false;
+        if (payload.error) { said.textContent = payload.error; said.hidden = false; return; }
+        // Сервер мог ОБРЕЗАТЬ балл по максимуму — показываем то, что он
+        // записал, а не то, что было введено.
+        block.querySelector('.gi-input').value = payload.label;
+        paint(block);
+        said.textContent = 'сохранено';
+        said.hidden = false;
+        setTimeout(function () { said.hidden = true; }, 2500);
+      })
+      .catch(function () {
+        save.disabled = false;
+        said.textContent = 'не сохранилось — попробуйте ещё раз';
+        said.hidden = false;
+      });
+  });
+
+  document.addEventListener('input', function (event) {
+    if (event.target.closest('.gi-input')) {
+      paint(event.target.closest('.gi-block'));
+    }
+  });
+  document.querySelectorAll('.gi-block').forEach(paint);
+})();
+</script>
+{% endif %}
+
 <script>
 // Оценка сложности работы (сессия 7, фаза 9).
 // ⚠️ Кнопки, а не форма: блок стоит на странице, где формы уже есть, а

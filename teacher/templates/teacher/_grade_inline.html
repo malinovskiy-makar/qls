@@ -1,0 +1,49 @@
+{% comment %}
+Оценивание ПРЯМО В РАЗБОРЕ РАБОТЫ глазами ученика (сессия 8, п. 14.4).
+
+Ждёт в контексте `row` — строку сводки `problems.work_review.work_summary`.
+
+⚠️ ЭТО НЕ ФОРМА, А `<div>` С КНОПКАМИ `type="button"`. Блок стоит внутри
+страницы, где формы уже есть (оценка сложности работы, комментарии), а
+вложенную форму браузер выбрасывает молча — обработчик просто не навесится.
+
+⚠️ ПРЕСЕТЫ БАЛЛА — ТЕ ЖЕ, что на экране проверки: их считает одна функция
+`work_review.score_presets`. Две «половины» на двух экранах означали бы две
+разные оценки за одну работу.
+
+⚠️ БАЛЛ ОБРЕЗАЕТСЯ ПО МАКСИМУМУ НА СЕРВЕРЕ (`teacher/views.py::
+_max_score_for`), а не атрибутом `max=`: запрос можно отправить в обход
+браузера, и в базе однажды нашлась оценка «9 из 5».
+{% endcomment %}
+<div class="gi-block" data-submission="{{ row.sub.pk }}"
+     data-max="{{ row.max_points|floatformat:'-2' }}">
+  <div class="gi-head">
+    <span class="wr-block-cap">Оценивание</span>
+    <span class="gi-said" hidden>сохранено</span>
+  </div>
+
+  <div class="gi-score">
+    {% for preset in row.score_presets %}
+    <button type="button" class="k-btn k-btn--plain k-btn--sm gi-preset"
+            data-score="{{ preset.value }}">{{ preset.label }}</button>
+    {% endfor %}
+    <span class="k-quiet">своё</span>
+    {% comment %}
+    `step="any"`, а не 0.5: ровная половина от 2,5 — это 1,25, и при шаге
+    0,5 браузер счёл бы поле недействительным.
+    {% endcomment %}
+    <input type="number" step="any" min="0" class="k-input k-input--num gi-input"
+           value="{% if row.score is not None %}{{ row.score|floatformat:'-2' }}{% endif %}"
+           aria-label="балл за задачу">
+    <span class="k-quiet">максимум {{ row.max_points|floatformat:"-2" }}</span>
+  </div>
+
+  <textarea class="k-area gi-comment" rows="2"
+            placeholder="Комментарий к задаче">{{ row.comment }}</textarea>
+
+  <div class="gi-actions">
+    <button type="button" class="k-btn k-btn--main k-btn--sm gi-save">
+      Сохранить оценку
+    </button>
+  </div>
+</div>

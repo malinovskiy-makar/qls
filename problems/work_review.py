@@ -15,6 +15,36 @@
 from decimal import Decimal
 
 
+def score_presets(max_score):
+    """Три кнопки балла: ноль, РОВНО половина, максимум задачи.
+
+    ⚠️ ЕДИНСТВЕННАЯ ТОЧКА. Тот же список рисует экран проверки
+    (`teacher/views.py::_score_presets` делегирует сюда): расхождение
+    «половины» на двух экранах — это две разные оценки за одну работу.
+
+    ⚠️ У ЗНАЧЕНИЯ И ПОДПИСИ РАЗНЫЕ ФОРМЫ ЗАПИСИ. Подпись русская, через
+    запятую («1,5»); значение — с точкой, потому что его кладут в
+    `<input type="number">` и разбирают на сервере через `float()`. Запятая
+    в значении означала бы пустое поле в браузере и ноль на сервере — то
+    есть кнопка «половина» тихо ставила бы ноль.
+    """
+    top = Decimal(str(max_score or 0))
+    half = top / 2
+
+    def show(value):
+        """Один знак после запятой, без хвостового нуля: 5, 3,5, 1,5."""
+        text = ('%.1f' % value).rstrip('0').rstrip('.')
+        return text or '0'
+
+    values = []
+    for value in (Decimal('0'), half, top):
+        if any(abs(value - other) < Decimal('0.001') for other in values):
+            continue
+        values.append(value)
+    return [{'value': show(value).replace(',', '.'),
+             'label': show(value).replace('.', ',')} for value in values]
+
+
 def work_summary(assignment, student, viewer=None):
     """Всё, что нужно экрану разбора: строки задач, итог, состояние проверки.
 
@@ -75,6 +105,10 @@ def work_summary(assignment, student, viewer=None):
             wrong += 1
         # Задачи с ошибкой должны бросаться в глаза: с них начинается разбор.
         row['needs_attention'] = row['state'] in ('wrong', 'partial')
+        # Пресеты балла — ТЕ ЖЕ, что на экране проверки (`_score_presets`),
+        # чтобы «половина» на двух экранах не разошлась.
+        row['score_presets'] = score_presets(points)
+        row['comment'] = (feedback.comment if feedback is not None else '')
 
     work_comment = WorkFeedback.objects.filter(assignment=assignment,
                                                student=student).first()

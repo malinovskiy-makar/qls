@@ -7,6 +7,7 @@
 где её проверяют.
 """
 import json
+import logging
 from datetime import timedelta
 
 from django.contrib import messages
@@ -19,6 +20,8 @@ from django.views.decorators.http import require_POST
 from problems import timefmt
 
 from .access import group_assignment_or_404, own_group_or_404, tutor_required
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -1108,3 +1111,70 @@ def _next_student_to_check(assignment, current):
                .order_by('student__last_name', 'student__username'))
     first = pending.first()
     return first.student if first is not None else None
+
+
+# ---------------------------------------------------------------------------
+# Оценка ПРЯМО В РАЗБОРЕ РАБОТЫ глазами ученика (сессия 8, п. 14.4)
+# ---------------------------------------------------------------------------
+# ⚠️ ЗАЧЕМ. Режим «глазами ученика» был только для чтения, и репетитор,
+# заметивший ошибку оценки, уходил на другой экран, искал там ту же задачу и
+# возвращался. Балл ставится там, где смотрят работу.
+
+@tutor_required
+@require_POST
+def api_grade_submission(request):
+    """Балл и комментарий за ОДНУ задачу. Возвращает JSON, страницу не рвёт.
+
+    ⚠️ БАЛЛ ОБРЕЗАЕТСЯ ПО МАКСИМУМУ ЗАДАЧИ, И ЭТО ДЕЛАЕТ СЕРВЕР — той же
+    функцией `_max_score_for`, что и обычный экран проверки. В базе однажды
+    нашлась оценка «9 из 5»: разметке (`max=`) верить нельзя, запрос можно
+    отправить в обход браузера.
+
+    ⚠️ `Assignment.points_locked` тут НИ ПРИ ЧЁМ: он про МАКСИМУМ позиции, а
+    не про выставляемую оценку. Проверять работы после первой сдачи — это и
+    есть обычный ход дела.
+    """
+    from problems.models import Submission, TeacherFeedback
+
+    from .views import _max_score_for, update_student_progress
+
+    submission = get_object_or_404(
+        Submission.objects.select_related('assignment', 'problem_item'),
+        pk=request.POST.get('submission') or 0)
+    assignment = submission.assignment
+    allowed = (request.user.is_staff
+               or assignment.author_id == request.user.pk
+               or (assignment.group_id
+                   and assignment.group.teacher_id == request.user.pk))
+    if not allowed:
+        raise Http404
+
+    raw = (request.POST.get('score') or '').strip().replace(',', '.')
+    try:
+        score = float(raw)
+    except ValueError:
+        return JsonResponse({'error': 'балл не число'}, status=400)
+    top = float(_max_score_for(submission) or 0)
+    score = max(0.0, min(score, top))
+    comment = (request.POST.get('comment') or '').strip()
+
+    feedback = getattr(submission, 'feedback', None)
+    if feedback is None:
+        feedback = TeacherFeedback.objects.create(
+            submission=submission, score=score, comment=comment,
+            reviewed_by=request.user)
+    else:
+        feedback.score = score
+        feedback.comment = comment
+        feedback.reviewed_by = request.user
+        feedback.save(update_fields=['score', 'comment', 'reviewed_by'])
+
+    submission.status = 'reviewed'
+    submission.save(update_fields=['status'])
+    try:
+        update_student_progress(submission, feedback)
+    except Exception:      # прогресс по темам не имеет права уронить оценку
+        logger.exception('Прогресс по темам не обновился — оценка сохранена')
+
+    return JsonResponse({'score': score, 'max': top,
+                         'label': ('%.2f' % score).rstrip('0').rstrip('.')})

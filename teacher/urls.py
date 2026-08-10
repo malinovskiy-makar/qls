@@ -47,6 +47,9 @@ urlpatterns = [
     # Максимальный балл за позицию — правится на странице задания.
     path('api/item/points/', views_groups.api_item_points,
          name='api_item_points'),
+    # Оценка прямо в разборе работы глазами ученика (сессия 8, п. 14.4).
+    path('api/grade/', views_groups.api_grade_submission,
+         name='api_grade_submission'),
 
     # Контрольные (Часть C).
     path('groups/<int:pk>/exams/new/', views_exams.exam_create,
