@@ -99,18 +99,27 @@ textarea.gen-text:focus { border-color: var(--focus); }
   <h1 class="page-title">{% if is_exam %}Новая контрольная{% else %}Новая домашка{% endif %}</h1>
 </div>
 
-{% include "teacher/_build_modes.html" with mode='describe' exam=is_exam %}
+{% include "teacher/_build_modes.html" with mode='describe' exam=is_exam group_id=group_id %}
 
 {% comment %}
 Домашка или контрольная. Движок подбора один и тот же — отличается только то,
 какие настройки спросим на последнем шаге (фаза 19).
 {% endcomment %}
 <div class="k-tiles" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:16px">
-  <a class="k-tile {% if not is_exam %}k-tile--on{% endif %}" href="?kind=homework">
+  {% comment %}
+  ⚠️ НОМЕР ГРУППЫ ЕДЕТ ЧЕРЕЗ ПЕРЕКЛЮЧАТЕЛЬ (сессия 7, фаза 5). Раньше
+  ссылки были голыми `?kind=…` и теряли `group`. Пока входов было два
+  («Создать домашку» / «Создать контрольную»), группа приходила в адресе
+  каждого. Теперь вход ОДИН, и потеря группы означала бы, что контрольная
+  тихо собирается в конструкторе домашки — без окна и лимита времени.
+  {% endcomment %}
+  <a class="k-tile {% if not is_exam %}k-tile--on{% endif %}"
+     href="?kind=homework{% if group_id %}&amp;group={{ group_id }}{% endif %}">
     <span class="k-tile__name">Домашка</span>
     <span class="k-tile__note">решают дома, срок сдачи</span>
   </a>
-  <a class="k-tile {% if is_exam %}k-tile--on{% endif %}" href="?kind=exam">
+  <a class="k-tile {% if is_exam %}k-tile--on{% endif %}"
+     href="?kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}">
     <span class="k-tile__name">Контрольная</span>
     <span class="k-tile__note">ограниченное время, окно</span>
   </a>

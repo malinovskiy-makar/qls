@@ -1,0 +1,16 @@
+- generic [ref=f10e2]:
+  - generic [ref=f10e3]:
+    - generic [ref=f10e4]: Эк
+    - generic [ref=f10e5]: ЭкЗадачи
+  - heading "Войти" [level=1] [ref=f10e6]
+  - paragraph [ref=f10e7]: Введите логин и пароль
+  - generic [ref=f10e8]:
+    - generic [ref=f10e9]:
+      - generic [ref=f10e10]: Логин
+      - textbox "Логин" [active] [ref=f10e11]
+    - generic [ref=f10e12]:
+      - generic [ref=f10e13]: Пароль
+      - textbox "Пароль" [ref=f10e14]
+    - button "Войти" [ref=f10e15] [cursor=pointer]
+  - link "← На главную" [ref=f10e16] [cursor=pointer]:
+    - /url: /

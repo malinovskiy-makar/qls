@@ -9,7 +9,9 @@
 
 Ждёт переменную `mode`: describe | search | own — какая плитка активна.
 `exam` = 1, если собирается контрольная (тогда ссылки ведут в конструктор
-контрольной).
+контрольной). `group_id` — номер группы, если он известен; он обязан
+переживать переход между способами, иначе контрольная теряет свой
+конструктор (см. предупреждение ниже).
 
 Плитки — ССЫЛКИ, а не вкладки: способы живут на разных экранах. Набранное не
 теряется, потому что корзина и настройки лежат в sessionStorage (см.
@@ -17,7 +19,7 @@
 {% endcomment %}
 <div class="k-tiles" style="margin-bottom:22px">
   <a class="k-tile {% if mode == 'describe' %}k-tile--on{% endif %}"
-     href="{% url 'teacher:assignment_generate' %}{% if exam %}?kind=exam{% endif %}">
+     href="{% url 'teacher:assignment_generate' %}?kind={% if exam %}exam{% else %}homework{% endif %}{% if group_id %}&amp;group={{ group_id }}{% endif %}">
     <span class="k-tile__name">Описать словами</span>
     <span class="k-tile__note">Умный поиск по каталогу</span>
   </a>
@@ -29,7 +31,7 @@
   ничего не теряется.
   {% endcomment %}
   <a class="k-tile {% if mode == 'search' %}k-tile--on{% endif %}"
-     href="{% if exam and group %}{% url 'teacher:exam_create' group.pk %}{% else %}{% url 'teacher:assignment_create' %}{% endif %}">
+     href="{% if exam and group_id %}{% url 'teacher:exam_create' group_id %}{% else %}{% url 'teacher:assignment_create' %}{% endif %}">
     <span class="k-tile__name">Искать самому</span>
     <span class="k-tile__note">Ручной поиск по каталогу</span>
   </a>

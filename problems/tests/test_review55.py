@@ -338,3 +338,64 @@ class CompletionScreenColourTests(TestCase):
         blank = re.search(r'\.k-mark\.k-mark--blank\s*\{([^}]*)\}', kit)
         self.assertIsNotNone(blank)
         self.assertNotIn('--error', blank.group(1))
+
+
+# ===========================================================================
+# Фаза 5 — одна кнопка «Создание работы»
+# ===========================================================================
+
+class OneCreateButtonTests(TestCase):
+    """Вход один, но ни один путь не потерян."""
+
+    def setUp(self):
+        from problems.models import StudentGroup
+        from problems.tests.factories import make_user
+
+        self.tutor = make_user('ocb_tutor', role='teacher')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        self.client.force_login(self.tutor)
+
+    def _tab(self):
+        from django.urls import reverse
+        return self.client.get(
+            reverse('teacher:group_detail', args=[self.group.pk])
+            + '?tab=assignments').content.decode()
+
+    def test_one_button_instead_of_two(self):
+        body = self._tab()
+        self.assertIn('Создание работы', body)
+        self.assertNotIn('Создать домашку', body)
+        self.assertNotIn('Создать контрольную', body)
+
+    def test_the_button_carries_the_group(self):
+        self.assertIn('/teacher/assignment/generate/?group=%d' % self.group.pk,
+                      self._tab())
+
+    def test_the_kind_switch_keeps_the_group(self):
+        """⚠️ Пока входов было два, группа приходила в адресе каждого.
+
+        Со ОДНИМ входом потеря `group` на переключателе означала бы, что
+        контрольная тихо собирается в конструкторе домашки — без окна и
+        лимита времени.
+        """
+        from django.urls import reverse
+
+        body = self.client.get(
+            reverse('teacher:assignment_generate')
+            + '?group=%d' % self.group.pk).content.decode()
+        self.assertIn('?kind=exam&amp;group=%d' % self.group.pk, body)
+        self.assertIn('?kind=homework&amp;group=%d' % self.group.pk, body)
+
+    def test_exam_path_reaches_its_own_constructor(self):
+        """«Искать самому» у контрольной ведёт в конструктор ВНУТРИ группы.
+
+        Без номера группы адрес не собирается, и раньше плитка молча
+        уводила в конструктор домашки: настройки времени спросить было негде.
+        """
+        from django.urls import reverse
+
+        body = self.client.get(
+            reverse('teacher:assignment_generate')
+            + '?kind=exam&group=%d' % self.group.pk).content.decode()
+        self.assertIn(reverse('teacher:exam_create', args=[self.group.pk]),
+                      body)

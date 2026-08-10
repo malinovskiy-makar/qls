@@ -1,0 +1,99 @@
+- generic [active] [ref=f12e1]:
+  - navigation [ref=f12e2]:
+    - link "Эк" [ref=f12e3] [cursor=pointer]:
+      - /url: /
+    - link "Проверка" [ref=f12e4] [cursor=pointer]:
+      - /url: /teacher/
+    - link "Группы" [ref=f12e5] [cursor=pointer]:
+      - /url: /teacher/groups/
+    - link "Каталог" [ref=f12e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f12e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f12e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f12e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f12e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f12e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f12e12]:
+      - button "Сменить тему" [ref=f12e13] [cursor=pointer]: ☾
+      - generic [ref=f12e14]: Марина Петрова
+      - link "Выйти" [ref=f12e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f12e16]:
+    - generic [ref=f12e17]:
+      - link "Группы" [ref=f12e18] [cursor=pointer]:
+        - /url: /teacher/groups/
+      - text: → Экономика 10–11, вторник
+    - heading "Экономика 10–11, вторник" [level=1] [ref=f12e21]
+    - navigation [ref=f12e22]:
+      - link "Обзор" [ref=f12e23] [cursor=pointer]:
+        - /url: "?tab=overview"
+      - link "Задания" [ref=f12e24] [cursor=pointer]:
+        - /url: "?tab=assignments"
+      - link "Материалы" [ref=f12e25] [cursor=pointer]:
+        - /url: "?tab=materials"
+    - link "Создание работы" [ref=f12e27] [cursor=pointer]:
+      - /url: /teacher/assignment/generate/?group=2
+    - generic [ref=f12e28]:
+      - generic [ref=f12e29]:
+        - generic [ref=f12e30]: Требуют проверки
+        - generic [ref=f12e31]: "2"
+      - generic [ref=f12e32]:
+        - generic [ref=f12e33]:
+          - generic [ref=f12e34]:
+            - link "Контрольная №2 (дедлайн + 40 минут)" [ref=f12e35] [cursor=pointer]:
+              - /url: /teacher/groups/2/exams/8/results/
+            - text: контрольная
+          - generic [ref=f12e36]: сдали 3 из 3 · сегодня до 20:20
+        - link "Проверить 1" [ref=f12e37] [cursor=pointer]:
+          - /url: /teacher/groups/2/assignments/8/submissions/
+      - generic [ref=f12e38]:
+        - generic [ref=f12e39]:
+          - link "Сквозная домашка (ночная сессия)" [ref=f12e41] [cursor=pointer]:
+            - /url: /teacher/groups/2/assignments/16/
+          - generic [ref=f12e42]: сдали 1 из 3 · без срока
+        - link "Проверить 4" [ref=f12e43] [cursor=pointer]:
+          - /url: /teacher/groups/2/assignments/16/submissions/
+    - generic [ref=f12e44]:
+      - generic [ref=f12e45]:
+        - generic [ref=f12e46]: Идут сейчас
+        - generic [ref=f12e47]: "1"
+      - generic [ref=f12e48]:
+        - generic [ref=f12e49]:
+          - link "Домашка тест торговля" [ref=f12e51] [cursor=pointer]:
+            - /url: /teacher/groups/2/assignments/17/
+          - generic [ref=f12e52]: сдали 0 из 3 · завтра до 06:28
+        - generic [ref=f12e53]: ждём
+    - generic [ref=f12e54]:
+      - generic [ref=f12e55]:
+        - generic [ref=f12e56]: Проверены
+        - generic [ref=f12e57]: "6"
+      - generic [ref=f12e58]:
+        - link "Контрольная №0 (прошедшая, с результатами)контрольная средний балл 1,33" [ref=f12e59] [cursor=pointer]:
+          - /url: /teacher/groups/2/exams/10/results/
+          - generic [ref=f12e60]: Контрольная №0 (прошедшая, с результатами)контрольная
+          - generic [ref=f12e61]: средний балл 1,33
+        - link "Контрольная 67 (первое создание)контрольная никто не сдал" [ref=f12e62] [cursor=pointer]:
+          - /url: /teacher/groups/2/exams/11/results/
+          - generic [ref=f12e63]: Контрольная 67 (первое создание)контрольная
+          - generic [ref=f12e64]: никто не сдал
+        - link "Домашка КПВ никто не сдал" [ref=f12e65] [cursor=pointer]:
+          - /url: /teacher/groups/2/assignments/12/
+          - generic [ref=f12e66]: Домашка КПВ
+          - generic [ref=f12e67]: никто не сдал
+        - link "Домашка 5 — КТВ никто не сдал" [ref=f12e68] [cursor=pointer]:
+          - /url: /teacher/groups/2/assignments/13/
+          - generic [ref=f12e69]: Домашка 5 — КТВ
+          - generic [ref=f12e70]: никто не сдал
+        - link "Контрольная №1 (окно, все одновременно)контрольная средний балл 1,4" [ref=f12e71] [cursor=pointer]:
+          - /url: /teacher/groups/2/exams/7/results/
+          - generic [ref=f12e72]: Контрольная №1 (окно, все одновременно)контрольная
+          - generic [ref=f12e73]: средний балл 1,4
+        - 'link "Домашка №3: спрос, предложение, эластичность средний балл 0,36" [ref=f12e74] [cursor=pointer]':
+          - /url: /teacher/groups/2/assignments/6/
+          - generic [ref=f12e75]: "Домашка №3: спрос, предложение, эластичность"
+          - generic [ref=f12e76]: средний балл 0,36

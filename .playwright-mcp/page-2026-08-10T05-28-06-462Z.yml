@@ -1,0 +1,88 @@
+- generic [active] [ref=f14e1]:
+  - navigation [ref=f14e2]:
+    - link "Эк" [ref=f14e3] [cursor=pointer]:
+      - /url: /
+    - link "Проверка" [ref=f14e4] [cursor=pointer]:
+      - /url: /teacher/
+    - link "Группы" [ref=f14e5] [cursor=pointer]:
+      - /url: /teacher/groups/
+    - link "Каталог" [ref=f14e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f14e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f14e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f14e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f14e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f14e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f14e12]:
+      - button "Сменить тему" [ref=f14e13] [cursor=pointer]: ☾
+      - generic [ref=f14e14]: Марина Петрова
+      - link "Выйти" [ref=f14e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f14e16]:
+    - generic [ref=f14e17]:
+      - generic [ref=f14e18]:
+        - link "← Домашки" [ref=f14e19] [cursor=pointer]:
+          - /url: /teacher/
+        - heading "Новая контрольная" [level=1] [ref=f14e20]
+      - generic [ref=f14e21]:
+        - link "Описать словами Умный поиск по каталогу" [ref=f14e22] [cursor=pointer]:
+          - /url: /teacher/assignment/generate/?kind=exam&group=2
+          - generic [ref=f14e23]: Описать словами
+          - generic [ref=f14e24]: Умный поиск по каталогу
+        - link "Искать самому Ручной поиск по каталогу" [ref=f14e25] [cursor=pointer]:
+          - /url: /teacher/groups/2/exams/new/
+          - generic [ref=f14e26]: Искать самому
+          - generic [ref=f14e27]: Ручной поиск по каталогу
+        - link "Написать свою Создание задачи с нуля" [ref=f14e28] [cursor=pointer]:
+          - /url: /teacher/problems/new/?to_cart=1
+          - generic [ref=f14e29]: Написать свою
+          - generic [ref=f14e30]: Создание задачи с нуля
+      - generic [ref=f14e31]:
+        - link "Домашка решают дома, срок сдачи" [ref=f14e32] [cursor=pointer]:
+          - /url: "?kind=homework&group=2"
+          - generic [ref=f14e33]: Домашка
+          - generic [ref=f14e34]: решают дома, срок сдачи
+        - link "Контрольная ограниченное время, окно" [ref=f14e35] [cursor=pointer]:
+          - /url: "?kind=exam&group=2"
+          - generic [ref=f14e36]: Контрольная
+          - generic [ref=f14e37]: ограниченное время, окно
+      - generic [ref=f14e38]:
+        - generic [ref=f14e39]: 1. Запрос
+        - generic [ref=f14e40]: 2. Что нашлось
+        - generic [ref=f14e41]: 3. Задачи
+      - generic [ref=f14e42]:
+        - generic [ref=f14e43]:
+          - heading "Опишите контрольную словами" [level=2] [ref=f14e44]
+          - generic [ref=f14e45]: Новые задачи не сочиняются. Сайт разбирает вашу фразу и ищет среди 18865 задач каталога.
+          - 'textbox "Например: домашка на монополию и эластичность, четыре задачи и три теста, одна посложнее в конце" [ref=f14e46]'
+          - generic [ref=f14e47]:
+            - generic [ref=f14e48]:
+              - generic [ref=f14e49]: Открытых задач
+              - spinbutton "Открытых задач" [ref=f14e50]: "4"
+            - generic [ref=f14e51]:
+              - generic [ref=f14e52]: Тестов
+              - spinbutton "Тестов" [ref=f14e53]: "0"
+            - generic [ref=f14e54]:
+              - generic [ref=f14e55]: Сложность
+              - generic [ref=f14e56]:
+                - spinbutton "сложность от" [ref=f14e57]: "1"
+                - generic [ref=f14e58]: —
+                - spinbutton "сложность до" [ref=f14e59]: "5"
+            - generic [ref=f14e61] [cursor=pointer]:
+              - checkbox "Искать только задачи с ответом" [ref=f14e62]
+              - text: Искать только задачи с ответом
+          - generic [ref=f14e63]: "Сложность — это предпочтение, а не жёсткий отбор: задачи вне диапазона встанут ниже, но могут попасть."
+          - button "Разобрать запрос" [ref=f14e65] [cursor=pointer]
+          - generic [ref=f14e66]: сегодня использовано 7 из 30 обращений
+        - generic [ref=f14e67]:
+          - heading "Так тоже можно" [level=2] [ref=f14e68]
+          - generic [ref=f14e69]:
+            - button "Домашка на КПВ и альтернативные издержки, задачи на построение и на сложение кривых двух стран" [ref=f14e70] [cursor=pointer]
+            - 'button "Эластичность спроса по цене и по доходу: расчёт коэффициента и вывод о выручке" [ref=f14e71] [cursor=pointer]'
+            - 'button "Монополия: максимизация прибыли, сравнение с совершенной конкуренцией, потери общества" [ref=f14e72] [cursor=pointer]'
+            - button "Рынок труда и МРОТ, одна задача посложнее в конце" [ref=f14e73] [cursor=pointer]
