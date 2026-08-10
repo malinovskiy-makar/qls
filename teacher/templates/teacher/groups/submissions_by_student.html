@@ -23,20 +23,16 @@
 .stu-meta { font-size: 12px; color: var(--text2); }
 .stu-state { font-size: 12px; color: var(--text2); margin-top: 3px; }
 
-/* Крупно — то, что машина УЖЕ насчитала. Это единственное число, ради
-   которого репетитор смотрит на карточку до того, как открыл работу. */
-.stu-score { text-align: center; min-width: 84px; }
-.stu-score-value { font-size: 26px; font-weight: 600; line-height: 1.1;
-                   font-variant-numeric: tabular-nums; }
+/* Крупные числа карточки — класс набора `.k-score--pair` (сессия 7, фаза 4).
+   Свои `.stu-score*` удалены: они задавали ТО ЖЕ САМОЕ вторым способом, и
+   починка пробелов вокруг «из» в наборе сюда бы не доехала. */
 /* Тихая ссылка «глазами ученика» рядом с главной кнопкой: это второй,
    необязательный переход, и весом он должен быть заметно меньше. */
 .stu-eyes { font-size: 12px; color: var(--text2); white-space: nowrap; }
-.stu-score-cap { font-size: 11px; color: var(--text3); line-height: 1.3;
-                 display: block; margin-top: 2px; }
 
 @media (max-width: 560px) {
   .stu-card { align-items: stretch; }
-  .stu-score { text-align: left; }
+  .stu-card .k-score--pair { align-items: flex-start; }
   .stu-card .k-btn { width: 100%; }
 }
 {% endblock %}
@@ -81,11 +77,28 @@
     <div class="stu-state">{{ card.state_label }}</div>
   </div>
 
+  {% comment %}
+  Два крупных числа в ОДНОМ начертании (сессия 7, фаза 4): слева итог за
+  работу, справа то, что насчитала машина. Оба — класс набора `.k-score`,
+  а не свой шрифт: разные кегли у соседних чисел читались бы как разная
+  важность, хотя это просто два показателя одной работы.
+  {% endcomment %}
+  {% if card.has_scored %}
+  <span class="k-score k-score--pair">
+    <span class="k-score__value">{{ card.scored }}<span
+      class="k-score__of">из</span><span
+      class="k-score__max">{{ card.scored_max }}</span></span>
+    <span class="k-score__cap">Итоговый балл</span>
+  </span>
+  {% endif %}
+
   {% if card.has_machine %}
-  <div class="stu-score">
-    <div class="stu-score-value">{{ card.machine_got }} / {{ card.machine_could }}</div>
-    <span class="stu-score-cap">Результат автопроверки</span>
-  </div>
+  <span class="k-score k-score--pair">
+    <span class="k-score__value">{{ card.machine_got }}<span
+      class="k-score__of">из</span><span
+      class="k-score__max">{{ card.machine_could }}</span></span>
+    <span class="k-score__cap">Результат автопроверки</span>
+  </span>
   {% endif %}
 
   <a class="k-btn {% if card.button.kind == 'main' %}k-btn--main{% else %}k-btn--plain{% endif %}"

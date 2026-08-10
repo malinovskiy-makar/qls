@@ -217,3 +217,124 @@ class ScoreRoundTripTests(TestCase):
         self.client.post(self._url(), {'score': '99', 'comment': ''})
         self.sub.refresh_from_db()
         self.assertEqual(self.sub.feedback.score, Decimal('3.00'))
+
+
+# ===========================================================================
+# Фаза 4 — крупный балл: итог в сводке, пробелы, цвет в итогах проверки
+# ===========================================================================
+
+class BigScoreTests(TestCase):
+    """Итог и автопроверка — два числа в одном начертании, «N из M»."""
+
+    def setUp(self):
+        from problems.models import (Assignment, AssignmentItem, StudentGroup,
+                                     Submission, TeacherFeedback)
+        from problems.tests.factories import make_user
+        from problems.tests.factories import make_problem as factory_problem
+
+        self.tutor = make_user('bs_tutor', role='teacher')
+        self.student = make_user('bs_student', role='student')
+        self.group = StudentGroup.objects.create(name='Гр', teacher=self.tutor)
+        self.group.students.add(self.student)
+        self.work = Assignment.objects.create(name='ДЗ', author=self.tutor,
+                                              group=self.group)
+        self.work.students.add(self.student)
+        self.items = [
+            AssignmentItem.objects.create(
+                assignment=self.work, order=i,
+                catalog_problem=factory_problem('Условие %d' % i),
+                points=Decimal('4'))
+            for i in range(3)]
+        self.subs = []
+        for index, item in enumerate(self.items):
+            sub = Submission.objects.create(
+                student=self.student, assignment=self.work, problem_item=item,
+                status='reviewed', submitted_answer='ответ')
+            TeacherFeedback.objects.create(submission=sub,
+                                           score=Decimal('2'),
+                                           reviewed_by=self.tutor)
+            self.subs.append(sub)
+        self.client.force_login(self.tutor)
+
+    def _cards(self):
+        from teacher.views_groups import student_cards
+        return {c['student'].username: c
+                for c in student_cards(self.work, self.group)}
+
+    def test_summary_card_carries_the_work_total(self):
+        card = self._cards()['bs_student']
+        self.assertEqual(card['scored'], '6')
+        self.assertEqual(card['scored_max'], '12')
+        self.assertTrue(card['has_scored'])
+
+    def test_total_matches_the_completion_screen(self):
+        """Два экрана об одной работе обязаны показывать один итог.
+
+        Раньше итога в сводке не было вовсе; появившись, он не имеет права
+        разойтись с экраном итогов проверки — там сумма считается по той же
+        сборке `work_review.work_summary`.
+        """
+        from django.urls import reverse
+
+        card = self._cards()['bs_student']
+        response = self.client.get(
+            reverse('teacher:work_done',
+                    args=[self.group.pk, self.work.pk, self.student.pk]))
+        self.assertEqual(str(response.context['total']), card['scored'])
+        self.assertEqual(str(response.context['maximum']), card['scored_max'])
+
+    def test_both_numbers_use_the_same_kit_class(self):
+        """Одно начертание на оба числа — прямое требование владельца."""
+        from django.urls import reverse
+
+        # Одну оценку делаем МАШИННОЙ (`reviewed_by=None`), иначе блока
+        # автопроверки на карточке не будет и сравнивать будет нечего.
+        machine = self.subs[0].feedback
+        machine.reviewed_by = None
+        machine.save(update_fields=['reviewed_by'])
+
+        body = self.client.get(
+            reverse('teacher:group_submissions',
+                    args=[self.group.pk, self.work.pk])).content.decode()
+        self.assertEqual(body.count('k-score k-score--pair'), 2)
+        self.assertIn('Итоговый балл', body)
+        self.assertIn('Результат автопроверки', body)
+        # Своего шрифта у сводки больше нет — только класс набора.
+        self.assertNotIn('stu-score-value', body)
+
+    def test_the_denominator_is_a_separate_element(self):
+        """«из» отдельным узлом, а не пробелом внутри <small>.
+
+        Пробел на крупном кегле с отрицательным letter-spacing съедался, и
+        на экране читалось «4из18». За разделитель отвечают отступы.
+        """
+        from django.urls import reverse
+
+        body = self.client.get(
+            reverse('teacher:group_submissions',
+                    args=[self.group.pk, self.work.pk])).content.decode()
+        self.assertIn('k-score__of', body)
+        self.assertIn('k-score__max', body)
+
+
+class CompletionScreenColourTests(TestCase):
+    """Итоги проверки красятся ТЕМИ ЖЕ состояниями, что разбор ученика."""
+
+    def test_states_come_from_the_shared_assembly(self):
+        import io
+        template = io.open(
+            'teacher/templates/teacher/groups/work_done.html',
+            encoding='utf-8').read()
+        # Полоса и бейдж — классы набора, своих цветов на экране нет.
+        self.assertIn('k-mark k-mark--{{ row.state }}', template)
+        self.assertIn('k-flag k-flag--{{ row.state }}', template)
+        # Балл и максимум, а не одинокое число.
+        self.assertIn('row.max_points', template)
+
+    def test_blank_is_not_painted_as_wrong(self):
+        """«Не отвечал» — не ошибка: балл тот же, но цвета опасности нет."""
+        import io, re
+        kit = io.open('templates/_kit.html', encoding='utf-8').read()
+        blank = re.search(r'\.k-mark\.k-mark--blank\s*\{([^}]*)\}', kit)
+        self.assertIsNotNone(blank)
+        self.assertNotIn('--error', blank.group(1))

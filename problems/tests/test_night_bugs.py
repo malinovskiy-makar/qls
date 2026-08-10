@@ -736,8 +736,11 @@ class ReviewFlowTests(TestCase):
             reverse('teacher:work_done',
                     args=[self.group.pk, self.work.pk, self.student.pk]))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context['total'], '9')
-        self.assertEqual(response.context['maximum'], '12')
+        # Сравниваем ЗНАЧЕНИЕ, а не тип: с сессии 7 итог собирает
+        # `work_review.work_summary` (одна сборка на все экраны) и отдаёт
+        # Decimal вместо строки. На экране это то же самое число.
+        self.assertEqual(str(response.context['total']), '9')
+        self.assertEqual(str(response.context['maximum']), '12')
 
     def test_work_comment_lives_on_the_completion_screen(self):
         from problems.models import WorkFeedback
@@ -767,12 +770,18 @@ class ReviewFlowTests(TestCase):
         self.assertEqual([p['value'] for p in presets], ['0', '2', '4'])
 
     def test_presets_do_not_repeat_when_max_is_tiny(self):
-        """Максимум 1: половина округляется в 1, дубля кнопок быть не должно."""
+        """Максимум 1 — три РАЗНЫЕ кнопки, дубля быть не должно.
+
+        Проверка про дубли, а не про округление: с сессии 7 половина не
+        округляется вовсе, и при максимуме 1 середина — это 0,5.
+        """
         self.items[0].points = Decimal('1')
         self.items[0].save(update_fields=['points'])
         presets = self.client.get(
             self._review(self.subs[0])).context['score_presets']
-        self.assertEqual([p['value'] for p in presets], ['0', '1'])
+        values = [p['value'] for p in presets]
+        self.assertEqual(values, ['0', '0.5', '1'])
+        self.assertEqual(len(values), len(set(values)))
 
     def test_answer_falls_back_to_the_submission(self):
         """Ответ есть в работе — экран обязан его показать.

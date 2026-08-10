@@ -1,0 +1,69 @@
+- generic [active] [ref=f6e1]:
+  - navigation [ref=f6e2]:
+    - link "Эк" [ref=f6e3] [cursor=pointer]:
+      - /url: /
+    - link "Проверка" [ref=f6e4] [cursor=pointer]:
+      - /url: /teacher/
+    - link "Группы" [ref=f6e5] [cursor=pointer]:
+      - /url: /teacher/groups/
+    - link "Каталог" [ref=f6e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f6e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f6e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f6e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f6e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f6e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f6e12]:
+      - button "Сменить тему" [ref=f6e13] [cursor=pointer]: ☾
+      - generic [ref=f6e14]: Марина Петрова
+      - link "Выйти" [ref=f6e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f6e16]:
+    - generic [ref=f6e17]:
+      - link "Группы" [ref=f6e18] [cursor=pointer]:
+        - /url: /teacher/groups/
+      - text: →
+      - link "Экономика 10–11, вторник" [ref=f6e19] [cursor=pointer]:
+        - /url: /teacher/groups/2/?tab=assignments
+      - text: →
+      - 'link "Домашка №3: спрос, предложение, эластичность" [ref=f6e20] [cursor=pointer]':
+        - /url: /teacher/groups/2/assignments/6/
+      - text: → решения
+    - 'heading "Домашка №3: спрос, предложение, эластичность" [level=1] [ref=f6e23]'
+    - generic [ref=f6e24]: Тесты и утверждённые задачи оценены автоматически — вам остаются открытые задачи.
+    - generic [ref=f6e25]:
+      - generic [ref=f6e26]:
+        - generic [ref=f6e27]: Пётр Иванов
+        - generic [ref=f6e28]: сдано 7 из 7 · 08.08 20:20
+        - generic [ref=f6e29]: проверено
+      - generic [ref=f6e30]:
+        - generic [ref=f6e31]: 3из13
+        - generic [ref=f6e32]: Результат автопроверки
+      - link "Смотреть работу" [ref=f6e33] [cursor=pointer]:
+        - /url: /teacher/groups/2/submissions/16/
+      - link "глазами ученика" [ref=f6e34] [cursor=pointer]:
+        - /url: /teacher/groups/2/assignments/6/students/9/
+    - generic [ref=f6e35]:
+      - generic [ref=f6e36]:
+        - generic [ref=f6e37]: Анна Соколова
+        - generic [ref=f6e38]: сдано 7 из 7 · 08.08 16:28
+        - generic [ref=f6e39]: проверено
+      - generic [ref=f6e40]:
+        - generic [ref=f6e41]: 1из18
+        - generic [ref=f6e42]: Результат автопроверки
+      - link "Смотреть работу" [ref=f6e43] [cursor=pointer]:
+        - /url: /teacher/groups/2/submissions/97/
+      - link "глазами ученика" [ref=f6e44] [cursor=pointer]:
+        - /url: /teacher/groups/2/assignments/6/students/10/
+    - generic [ref=f6e45]:
+      - generic [ref=f6e46]:
+        - generic [ref=f6e47]: Сергей Дмитриев
+        - generic [ref=f6e48]: сдано 0 из 7
+        - generic [ref=f6e49]: не начата
+      - link "Написать" [ref=f6e50] [cursor=pointer]:
+        - /url: /teacher/groups/2/assignments/6/

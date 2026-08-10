@@ -18,12 +18,25 @@
               font-variant-numeric: tabular-nums; }
 .done-cap { font-size: 13px; color: var(--text2); margin-top: 6px; }
 .done-list { margin-top: 16px; }
-.done-row { display: flex; justify-content: space-between; gap: 12px;
-            padding: 8px 0; font-size: 13px;
-            border-bottom: 0.5px solid var(--border-soft); }
-.done-row:last-child { border-bottom: none; }
-.done-row-name { color: var(--text2); min-width: 0; overflow-wrap: anywhere; }
-.done-row-score { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Строка задачи — как в разборе глазами ученика: цветная полоса слева по
+   состоянию, бейдж состояния, балл справа. Цвета и бейдж — из набора
+   деталей (.k-mark--*, .k-flag--*), своих здесь нет. */
+.done-row { display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; padding: 10px 14px; font-size: 13px;
+            margin-bottom: 6px; border-radius: 0 var(--r) var(--r) 0;
+            background: var(--surface-2); }
+.done-row:last-child { margin-bottom: 0; }
+.done-row-name { color: var(--text); min-width: 0; flex: 1;
+                 overflow-wrap: anywhere; }
+.done-row-right { display: flex; align-items: center; gap: 10px;
+                  flex-shrink: 0; }
+.done-row-score { font-variant-numeric: tabular-nums; white-space: nowrap;
+                  font-weight: 700; }
+.done-row-score small { font-size: 11px; font-weight: 600;
+                        color: var(--text2); }
+@media (max-width: 560px) {
+  .done-row { flex-wrap: wrap; }
+}
 {% endblock %}
 
 {% block content %}
@@ -42,18 +55,35 @@
 </div>
 
 <div class="k-card done-total">
-  <div class="done-score">{{ total }} / {{ maximum }}</div>
+  <div class="done-score">{{ total }}<span class="k-score__of">из</span><span
+    class="k-score__max">{{ maximum }}</span></div>
   <div class="done-cap">итоговый балл за работу</div>
 </div>
 
+{% comment %}
+Строки собраны той же функцией `work_review.work_summary`, что кормит разбор
+глазами ученика: состояние строки, балл и максимум приходят оттуда. Второй
+сборки нет намеренно — раньше здесь был свой цикл, который знал только балл,
+и поэтому справа стояло одинокое число без признака верности.
+{% endcomment %}
 <div class="k-card done-list" style="margin-top:14px">
-  {% for sub in rows %}
-  <div class="done-row">
-    <span class="done-row-name">{{ forloop.counter }}. {{ sub.problem_item.problem_title }}</span>
-    <span class="done-row-score">
-      {% if sub.feedback and sub.feedback.score is not None %}
-        {{ sub.feedback.score|floatformat:"-2" }}
-      {% else %}—{% endif %}
+  {% for row in rows %}
+  <div class="done-row k-mark k-mark--{{ row.state }}">
+    <span class="done-row-name">{{ forloop.counter }}. {{ row.title|default:row.statement|striptags|truncatechars:70 }}</span>
+    <span class="done-row-right">
+      <span class="k-flag k-flag--{{ row.state }}">
+        {% if row.state == 'correct' %}верно
+        {% elif row.state == 'partial' %}частично
+        {% elif row.state == 'wrong' %}неверно
+        {% elif row.state == 'pending' %}на проверке
+        {% elif row.state == 'blank' %}не отвечал
+        {% else %}не сдана{% endif %}
+      </span>
+      <span class="done-row-score">
+        {% if row.score is not None %}{{ row.score|floatformat:"-2" }}<small>
+          / {{ row.max_points|floatformat:"-2" }} б.</small>
+        {% else %}—{% endif %}
+      </span>
     </span>
   </div>
   {% endfor %}

@@ -1,0 +1,179 @@
+- generic [active] [ref=f8e1]:
+  - navigation [ref=f8e2]:
+    - link "Эк" [ref=f8e3] [cursor=pointer]:
+      - /url: /
+    - link "Проверка" [ref=f8e4] [cursor=pointer]:
+      - /url: /teacher/
+    - link "Группы" [ref=f8e5] [cursor=pointer]:
+      - /url: /teacher/groups/
+    - link "Каталог" [ref=f8e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f8e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f8e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f8e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f8e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f8e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f8e12]:
+      - button "Сменить тему" [ref=f8e13] [cursor=pointer]: ☾
+      - generic [ref=f8e14]: Марина Петрова
+      - link "Выйти" [ref=f8e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f8e16]:
+    - link "← К решениям" [ref=f8e17] [cursor=pointer]:
+      - /url: /teacher/groups/2/assignments/6/submissions/
+    - generic [ref=f8e18]:
+      - text: Вы смотрите работу глазами ученика. Пётр Иванов видит эту страницу ровно так же. Оценки и комментарии ставятся на странице проверки —
+      - link "к решениям" [ref=f8e19] [cursor=pointer]:
+        - /url: /teacher/groups/2/assignments/6/submissions/
+      - text: .
+    - generic [ref=f8e20]:
+      - generic [ref=f8e21]: Домашка · Пётр Иванов
+      - 'heading "Домашка №3: спрос, предложение, эластичность" [level=1] [ref=f8e22]'
+      - generic [ref=f8e23]: 4из18
+      - generic [ref=f8e24]: итоговый балл за работу
+      - generic [ref=f8e25]:
+        - generic [ref=f8e26]: сдано 08.08.2026, 20:20
+        - generic [ref=f8e27]: "задач: 7"
+        - generic [ref=f8e28]: "с ошибками: 4"
+    - generic [ref=f8e29]:
+      - generic [ref=f8e30]: "Порядок:"
+      - button "как в работе" [ref=f8e31] [cursor=pointer]
+      - button "сначала с ошибками" [ref=f8e32] [cursor=pointer]
+    - generic [ref=f8e33]:
+      - group [ref=f8e34]:
+        - 'generic "▸ 1. Демо-тест: верно/неверно верно 2 / 2 б." [ref=f8e35] [cursor=pointer]':
+          - text: ▸
+          - generic [ref=f8e36]: "1."
+          - generic [ref=f8e37]: "Демо-тест: верно/неверно"
+          - generic [ref=f8e38]: верно
+          - generic [ref=f8e39]: 2 / 2 б.
+      - group [ref=f8e40]:
+        - 'generic "▸ 2. Демо-тест: один ответ верно 1 / 1 б." [ref=f8e41] [cursor=pointer]':
+          - text: ▸
+          - generic [ref=f8e42]: "2."
+          - generic [ref=f8e43]: "Демо-тест: один ответ"
+          - generic [ref=f8e44]: верно
+          - generic [ref=f8e45]: 1 / 1 б.
+      - group [ref=f8e46]:
+        - 'generic "▾ 3. Демо-тест: все верные неверно 0 / 3 б." [ref=f8e47] [cursor=pointer]':
+          - text: ▾
+          - generic [ref=f8e48]: "3."
+          - generic [ref=f8e49]: "Демо-тест: все верные"
+          - generic [ref=f8e50]: неверно
+          - generic [ref=f8e51]: 0 / 3 б.
+        - generic [ref=f8e52]:
+          - generic [ref=f8e53]: Какие факторы сдвигают кривую предложения?
+          - generic [ref=f8e54]:
+            - generic [ref=f8e55]: Мой ответ
+            - list [ref=f8e56]:
+              - listitem [ref=f8e57]:
+                - generic [ref=f8e58]: ✓
+                - generic [ref=f8e59]: а) Технология производства
+                - generic [ref=f8e60]: вы выбрали · верно
+              - listitem [ref=f8e61]:
+                - generic [ref=f8e62]: ○
+                - generic [ref=f8e63]: б) Цены на ресурсы
+                - generic [ref=f8e64]: надо было выбрать
+              - listitem [ref=f8e65]:
+                - generic [ref=f8e66]: ✗
+                - generic [ref=f8e67]: в) Мода на товар
+                - generic [ref=f8e68]: вы выбрали · неверно
+              - listitem [ref=f8e69]:
+                - generic [ref=f8e70]: ○
+                - generic [ref=f8e71]: г) Налог на производителя
+                - generic [ref=f8e72]: надо было выбрать
+          - generic [ref=f8e73]:
+            - generic [ref=f8e74]:
+              - generic [ref=f8e75]: 0 / 3 б.
+              - generic [ref=f8e76]: проверено автоматически
+            - generic [ref=f8e77]: "Неверно. Правильный ответ: а, б, г"
+      - group [ref=f8e78]:
+        - generic "▾ 4. Эластичность спроса по цене частично 1 / 2 б." [ref=f8e79] [cursor=pointer]:
+          - text: ▾
+          - generic [ref=f8e80]: "4."
+          - generic [ref=f8e81]: Эластичность спроса по цене
+          - generic [ref=f8e82]: частично
+          - generic [ref=f8e83]: 1 / 2 б.
+        - generic [ref=f8e84]:
+          - generic [ref=f8e85]: Цена товара выросла с 100 до 120 рублей, а объём спроса упал с 50 до 40 единиц. Найдите коэффициент ценовой эластичности спроса (по средней точке) и определите, эластичен спрос или нет.
+          - generic [ref=f8e86]:
+            - generic [ref=f8e87]: Мой ответ
+            - generic [ref=f8e88]: "30"
+            - generic [ref=f8e89]: "верный ответ: E ≈ −1,22 (по модулю больше 1) — спрос эластичен."
+          - generic [ref=f8e91]:
+            - generic [ref=f8e92]: Мой ход решения
+            - generic [ref=f8e93]: Приравнял спрос и предложение.
+          - generic [ref=f8e95]:
+            - generic [ref=f8e96]: 1 / 2 б.
+            - generic [ref=f8e97]: проверил преподаватель
+          - group [ref=f8e98]:
+            - generic "▸ Эталонное решение" [ref=f8e99] [cursor=pointer]
+      - group [ref=f8e100]:
+        - generic "▾ 5. Издержки фирмы неверно 0 / 3 б." [ref=f8e101] [cursor=pointer]:
+          - text: ▾
+          - generic [ref=f8e102]: "5."
+          - generic [ref=f8e103]: Издержки фирмы
+          - generic [ref=f8e104]: неверно
+          - generic [ref=f8e105]: 0 / 3 б.
+        - generic [ref=f8e106]:
+          - generic [ref=f8e107]: Фирма за месяц произвела 100 единиц продукции. Постоянные издержки равны 2000 руб., переменные — 3000 руб.
+          - generic [ref=f8e108]:
+            - generic [ref=f8e109]: Мой ответ
+            - generic [ref=f8e110]:
+              - generic [ref=f8e111]:
+                - generic [ref=f8e112]:
+                  - generic [ref=f8e113]: а)
+                  - generic [ref=f8e114]: на проверке
+                - generic [ref=f8e115]: Найдите общие издержки (TC).
+                - generic [ref=f8e116]:
+                  - generic [ref=f8e117]: "ваш ответ: —"
+                  - generic [ref=f8e118]: "верный: TC = 2000 + 3000 = 5000 руб."
+              - generic [ref=f8e119]:
+                - generic [ref=f8e120]:
+                  - generic [ref=f8e121]: б)
+                  - generic [ref=f8e122]: на проверке
+                - generic [ref=f8e123]: Найдите средние общие издержки (ATC).
+                - generic [ref=f8e124]:
+                  - generic [ref=f8e125]: "ваш ответ: —"
+                  - generic [ref=f8e126]: "верный: ATC = 5000 / 100 = 50 руб. за единицу."
+          - generic [ref=f8e127]:
+            - generic [ref=f8e128]: Мой ход решения
+            - generic [ref=f8e129]: Постоянные не зависят от выпуска, переменные растут вместе с ним. Дальше запутался в единицах и не досчитал.
+          - generic [ref=f8e131]:
+            - generic [ref=f8e132]: 0 / 3 б.
+            - generic [ref=f8e133]: проверил преподаватель
+      - group [ref=f8e134]:
+        - generic "▾ 6. Эластичность спроса на проездные неверно 0 / 5 б." [ref=f8e135] [cursor=pointer]:
+          - text: ▾
+          - generic [ref=f8e136]: "6."
+          - generic [ref=f8e137]: Эластичность спроса на проездные
+          - generic [ref=f8e138]: неверно
+          - generic [ref=f8e139]: 0 / 5 б.
+        - generic [ref=f8e140]:
+          - generic [ref=f8e141]: Городской перевозчик поднял цену проездного с 800 до 1000 рублей. Число проданных проездных упало с 50 000 до 44 000 в месяц. Посчитайте дуговую эластичность спроса по цене и скажите, вырастет ли выручка.
+          - generic [ref=f8e142]:
+            - generic [ref=f8e143]: Мой ответ
+            - generic [ref=f8e144]: "-0,3"
+            - generic [ref=f8e145]: "верный ответ: -0,57"
+          - generic [ref=f8e147]:
+            - generic [ref=f8e148]: Мой ход решения
+            - generic [ref=f8e149]: Поделил проценты, кажется, не в ту сторону.
+          - generic [ref=f8e150]:
+            - generic [ref=f8e151]:
+              - generic [ref=f8e152]: 0 / 5 б.
+              - generic [ref=f8e153]: проверено автоматически
+            - generic [ref=f8e154]: "Неверно. Правильный ответ: -0,57"
+          - group [ref=f8e155]:
+            - generic "▸ Эталонное решение" [ref=f8e156] [cursor=pointer]
+      - group [ref=f8e157]:
+        - 'generic "▸ 7. Демо: издержки фирмы по пунктам без ответа 0 / 2 б." [ref=f8e158] [cursor=pointer]':
+          - text: ▸
+          - generic [ref=f8e159]: "7."
+          - generic [ref=f8e160]: "Демо: издержки фирмы по пунктам"
+          - generic [ref=f8e161]: без ответа
+          - generic [ref=f8e162]: 0 / 2 б.

@@ -215,6 +215,53 @@
 /* Стрелки у крупного балла прячет общее правило числовых полей выше
    (сессия 7, фаза 2) — здесь второй копии больше нет. */
 
+/* ── Крупный балл вида «4 из 18» (сессия 7, фаза 4) ─────────────────────
+   ⚠️ ТРИ ЧАСТИ РАЗВЕДЕНЫ ЯВНО. Раньше знаменатель писали как
+   `4<small> из 18</small>`, и на крупном кегле с отрицательным
+   letter-spacing пробел съедался: на экране читалось «4из18». Пробел в
+   разметке — не разделитель, за разделитель отвечают отступы.
+   Классы живут ЗДЕСЬ, чтобы «из» выглядело одинаково на разборе работы,
+   в сводке решений и на итогах проверки. */
+.k-score__of { font-size: .46em; font-weight: 700; color: var(--text2);
+               letter-spacing: 0; margin: 0 .22em 0 .26em; }
+.k-score__max { font-size: .52em; font-weight: 700; color: var(--text2);
+                letter-spacing: 0; }
+/* Пара «итог» и «автопроверка» в сводке — одно начертание на оба числа. */
+.k-score--pair { min-width: 96px; }
+.k-score--pair .k-score__value { font-size: 26px; letter-spacing: -.01em; }
+.k-score--pair .k-score__cap { line-height: 1.3; display: block;
+                               margin-top: 2px; max-width: 120px; }
+
+/* ── Пометка состояния строки: полоса слева + таблетка ──────────────────
+   ⚠️ ОДИН НАБОР ЦВЕТОВ НА ВЕСЬ КАБИНЕТ. Эти пять состояний рисуются на
+   разборе работы глазами ученика, на итогах проверки и в списках заданий.
+   Пока правила лежали внутри одного шаблона, соседние экраны либо красили
+   то же самое иначе, либо не красили вовсе.
+   `blank` («не отвечал») — намеренно НЕ красный: балл там ноль, но ошибиться
+   ученик не успел, и цвет опасности был бы неправдой. */
+/* ⚠️ МОДИФИКАТОРЫ ЗАПИСАНЫ ДВУМЯ КЛАССАМИ (.k-mark.k-mark--…) НАРОЧНО.
+   Экраны, которые их применяют, задают у той же карточки `border`
+   сокращённой записью, а сокращённая запись сбрасывает и цвет левой
+   границы. При равной силе побеждала бы она — то есть полоса состояния
+   молча теряла бы цвет на всех экранах сразу. */
+.k-mark { border-left: 4px solid var(--border); }
+.k-mark.k-mark--correct { border-left-color: var(--green); }
+.k-mark.k-mark--partial { border-left-color: var(--amber); }
+.k-mark.k-mark--wrong   { border-left-color: var(--error); }
+.k-mark.k-mark--pending { border-left-color: var(--amber); }
+.k-mark.k-mark--empty   { border-left-color: var(--border); }
+.k-mark.k-mark--blank   { border-left-color: var(--border); }
+
+.k-flag { font-size: 11px; font-weight: 700; text-transform: uppercase;
+          letter-spacing: .05em; padding: 3px 9px; border-radius: 999px;
+          white-space: nowrap; }
+.k-flag.k-flag--correct { background: var(--green-tint); color: var(--green); }
+.k-flag.k-flag--partial { background: var(--amber-tint); color: var(--amber); }
+.k-flag.k-flag--wrong   { background: var(--error-tint); color: var(--error); }
+.k-flag.k-flag--pending { background: var(--amber-tint); color: var(--amber); }
+.k-flag.k-flag--empty   { background: var(--chip-bg); color: var(--chip-text); }
+.k-flag.k-flag--blank   { background: var(--chip-bg); color: var(--chip-text); }
+
 /* ── Ряд плиток-переключателей ──────────────────────────────────────── */
 .k-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
            gap: 10px; }

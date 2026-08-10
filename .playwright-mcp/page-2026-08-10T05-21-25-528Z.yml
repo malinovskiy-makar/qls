@@ -1,0 +1,86 @@
+- generic [active] [ref=f9e1]:
+  - navigation [ref=f9e2]:
+    - link "Эк" [ref=f9e3] [cursor=pointer]:
+      - /url: /
+    - link "Проверка" [ref=f9e4] [cursor=pointer]:
+      - /url: /teacher/
+    - link "Группы" [ref=f9e5] [cursor=pointer]:
+      - /url: /teacher/groups/
+    - link "Каталог" [ref=f9e6] [cursor=pointer]:
+      - /url: /catalog/
+    - link "Подобрать похожие" [ref=f9e7] [cursor=pointer]:
+      - /url: /catalog/smart-search/
+    - link "Календарь" [ref=f9e8] [cursor=pointer]:
+      - /url: /calendar/
+    - link "Калькулятор" [ref=f9e9] [cursor=pointer]:
+      - /url: /desmos/
+    - link "Калькулятор 2.0" [ref=f9e10] [cursor=pointer]:
+      - /url: /calc2/
+    - link "Игра" [ref=f9e11] [cursor=pointer]:
+      - /url: /game/
+    - generic [ref=f9e12]:
+      - button "Сменить тему" [ref=f9e13] [cursor=pointer]: ☾
+      - generic [ref=f9e14]: Марина Петрова
+      - link "Выйти" [ref=f9e15] [cursor=pointer]:
+        - /url: /logout/
+  - main [ref=f9e16]:
+    - generic [ref=f9e17]:
+      - link "Группы" [ref=f9e18] [cursor=pointer]:
+        - /url: /teacher/groups/
+      - text: →
+      - link "Экономика 10–11, вторник" [ref=f9e19] [cursor=pointer]:
+        - /url: /teacher/groups/2/?tab=assignments
+      - text: →
+      - 'link "Домашка №3: спрос, предложение, эластичность" [ref=f9e20] [cursor=pointer]':
+        - /url: /teacher/groups/2/assignments/6/submissions/
+      - text: → готово
+    - generic [ref=f9e22]:
+      - heading "Пётр Иванов" [level=1] [ref=f9e23]
+      - generic [ref=f9e24]: "Работа «Домашка №3: спрос, предложение, эластичность» пройдена целиком."
+    - generic [ref=f9e25]:
+      - generic [ref=f9e26]: 4из18
+      - generic [ref=f9e27]: итоговый балл за работу
+    - generic [ref=f9e28]:
+      - generic [ref=f9e29]:
+        - generic [ref=f9e30]: "1. Демо-тест: верно/неверно"
+        - generic [ref=f9e31]:
+          - generic [ref=f9e32]: верно
+          - generic [ref=f9e33]: 2 / 2 б.
+      - generic [ref=f9e34]:
+        - generic [ref=f9e35]: "2. Демо-тест: один ответ"
+        - generic [ref=f9e36]:
+          - generic [ref=f9e37]: верно
+          - generic [ref=f9e38]: 1 / 1 б.
+      - generic [ref=f9e39]:
+        - generic [ref=f9e40]: "3. Демо-тест: все верные"
+        - generic [ref=f9e41]:
+          - generic [ref=f9e42]: неверно
+          - generic [ref=f9e43]: 0 / 3 б.
+      - generic [ref=f9e44]:
+        - generic [ref=f9e45]: 4. Эластичность спроса по цене
+        - generic [ref=f9e46]:
+          - generic [ref=f9e47]: частично
+          - generic [ref=f9e48]: 1 / 2 б.
+      - generic [ref=f9e49]:
+        - generic [ref=f9e50]: 5. Издержки фирмы
+        - generic [ref=f9e51]:
+          - generic [ref=f9e52]: неверно
+          - generic [ref=f9e53]: 0 / 3 б.
+      - generic [ref=f9e54]:
+        - generic [ref=f9e55]: 6. Эластичность спроса на проездные
+        - generic [ref=f9e56]:
+          - generic [ref=f9e57]: неверно
+          - generic [ref=f9e58]: 0 / 5 б.
+      - generic [ref=f9e59]:
+        - generic [ref=f9e60]: "7. Демо: издержки фирмы по пунктам"
+        - generic [ref=f9e61]:
+          - generic [ref=f9e62]: не отвечал
+          - generic [ref=f9e63]: 0 / 2 б.
+    - generic [ref=f9e64]:
+      - generic [ref=f9e65]: Комментарий ко всей работе
+      - textbox "Комментарий ко всей работе" [ref=f9e66]:
+        - /placeholder: Что получилось, что стоит повторить
+      - generic [ref=f9e67]: Ученик увидит это на разборе работы, сразу под итоговым баллом.
+      - generic [ref=f9e68]:
+        - button "Готово" [ref=f9e69] [cursor=pointer]
+        - generic [ref=f9e70]: это была последняя работа, ждущая проверки

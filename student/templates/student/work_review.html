@@ -16,7 +16,6 @@
 .wr-name { font-size: 20px; font-weight: 700; margin: 6px 0 18px; }
 .wr-score { font-size: 56px; font-weight: 800; line-height: 1;
             letter-spacing: -.02em; }
-.wr-score small { font-size: 26px; font-weight: 700; color: var(--text2); }
 .wr-cap { font-size: 13px; color: var(--text2); margin-top: 8px; }
 .wr-meta { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px;
            font-size: 13px; color: var(--text2); }
@@ -42,13 +41,9 @@
 .wr-item { background: var(--surface); border: 1px solid var(--border);
            border-left-width: 4px; border-radius: 10px; margin-bottom: 14px; }
 .wr-item[open] { box-shadow: 0 1px 3px rgba(0,0,0,.05); }
-.wr-correct { border-left-color: var(--green); }
-.wr-partial { border-left-color: var(--amber); }
-.wr-wrong   { border-left-color: var(--error); }
-.wr-pending { border-left-color: var(--amber); }
-.wr-empty   { border-left-color: var(--border); }
-/* Ноль за пустоту: балл ноль, но это не ошибка — цвета опасности нет. */
-.wr-blank   { border-left-color: var(--border); }
+/* Цвета состояний переехали в набор деталей (.k-mark--*, .k-flag--*):
+   те же пять состояний рисуются на итогах проверки и в списках заданий,
+   и держать их в одном шаблоне значило дать соседним экранам разойтись. */
 .wr-item > summary { cursor: pointer; list-style: none; padding: 14px 18px;
                      display: flex; align-items: center; gap: 12px;
                      flex-wrap: wrap; }
@@ -59,15 +54,6 @@
 .wr-num { font-size: 13px; font-weight: 700; color: var(--text2); }
 .wr-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wr-flag { font-size: 11px; font-weight: 700; text-transform: uppercase;
-           letter-spacing: .05em; padding: 3px 9px; border-radius: 999px;
-           white-space: nowrap; }
-.flag-correct { background: var(--green-tint); color: var(--green); }
-.flag-partial { background: var(--amber-tint); color: var(--amber); }
-.flag-wrong   { background: var(--error-tint); color: var(--error); }
-.flag-pending { background: var(--amber-tint); color: var(--amber); }
-.flag-empty   { background: var(--chip-bg); color: var(--chip-text); }
-.flag-blank   { background: var(--chip-bg); color: var(--chip-text); }
 .wr-points { font-size: 16px; font-weight: 800; white-space: nowrap; }
 .wr-points small { font-size: 12px; font-weight: 600; color: var(--text2); }
 .wr-body { padding: 0 18px 18px; }
@@ -118,10 +104,10 @@
   <h1 class="wr-name">{{ assignment.name }}</h1>
 
   {% if show_scores and summary.is_final %}
-  <div class="wr-score">{{ summary.scored }}<small> из {{ summary.max_score }}</small></div>
+  <div class="wr-score">{{ summary.scored }}<span class="k-score__of">из</span><span class="k-score__max">{{ summary.max_score }}</span></div>
   <div class="wr-cap">итоговый балл за работу</div>
   {% elif show_scores and summary.graded_max %}
-  <div class="wr-score">{{ summary.scored }}<small> из {{ summary.graded_max }}</small></div>
+  <div class="wr-score">{{ summary.scored }}<span class="k-score__of">из</span><span class="k-score__max">{{ summary.graded_max }}</span></div>
   <div class="wr-cap">по проверенным задачам · всего в работе {{ summary.max_score }} б.</div>
   {% elif show_scores %}
   {# Проверено пока НИЧЕГО. «0 из 0» — не результат, а недоразумение. #}
@@ -162,13 +148,13 @@
 
 <div id="wr-list">
 {% for row in summary.rows %}
-<details class="wr-item wr-{{ row.state }}" data-state="{{ row.state }}"
+<details class="wr-item k-mark k-mark--{{ row.state }}" data-state="{{ row.state }}"
          data-attention="{% if row.needs_attention %}1{% else %}0{% endif %}"
          {% if row.needs_attention %}open{% endif %}>
   <summary>
     <span class="wr-num">{{ row.number }}.</span>
     <span class="wr-title">{{ row.title|default:row.statement|striptags|truncatechars:70 }}</span>
-    <span class="wr-flag flag-{% if not show_scores and not row.by_teacher %}empty{% else %}{{ row.state }}{% endif %}">
+    <span class="wr-flag k-flag k-flag--{% if not show_scores and not row.by_teacher %}empty{% else %}{{ row.state }}{% endif %}">
       {% if not show_scores and not row.by_teacher %}сдано
       {% elif row.state == 'correct' %}верно
       {% elif row.state == 'partial' %}частично

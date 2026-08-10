@@ -587,6 +587,8 @@ def student_cards(assignment, group):
 
     Содержимое намеренно скупое — владелец просил не захламлять.
     """
+    from decimal import Decimal
+
     from django.urls import reverse
 
     from problems.models import Submission
@@ -652,6 +654,22 @@ def student_cards(assignment, group):
                       'url': reverse('teacher:group_assignment',
                                      args=[group.pk, assignment.pk])}
 
+        # ⚠️ ИТОГОВЫЙ БАЛЛ — ВТОРОЕ КРУПНОЕ ЧИСЛО КАРТОЧКИ (сессия 7, фаза 4).
+        # Считается ТАК ЖЕ, как на экране итогов проверки (`work_done`): в
+        # числителе всё выставленное — и машиной, и человеком, — в
+        # знаменателе сумма максимумов позиций. Иначе два экрана об одной
+        # работе показывали бы два разных итога.
+        from problems.assignment_rows import item_max_score
+
+        scored = Decimal('0')
+        scored_max = Decimal('0')
+        for sub in done:
+            feedback = getattr(sub, 'feedback', None)
+            if feedback is not None and feedback.score is not None:
+                scored += Decimal(str(feedback.score))
+            if sub.problem_item_id and sub.problem_item_id in items_by_id:
+                scored_max += item_max_score(items_by_id[sub.problem_item_id])
+
         submitted_at = max([s.submitted_at for s in done if s.submitted_at]
                            or [None])
         cards.append({
@@ -660,6 +678,9 @@ def student_cards(assignment, group):
             'total': total,
             'submitted_at': submitted_at,
             'submitted_human': timefmt.fmt(submitted_at, timefmt.SHORT),
+            'scored': _clean_points(scored),
+            'scored_max': _clean_points(scored_max),
+            'has_scored': scored_max > 0,
             'machine_got': _clean_points(got),
             'machine_could': _clean_points(could),
             'has_machine': could > 0,
@@ -943,10 +964,7 @@ def work_done(request, group_id, assignment_id, student_id):
     стоит не там. Написать про работу целиком можно только тогда, когда она
     прочитана целиком, то есть ровно здесь.
     """
-    from decimal import Decimal
-
     from problems.models import User, WorkFeedback
-    from teacher.views import review_queue
 
     group = own_group_or_404(request.user, group_id)
     assignment = group_assignment_or_404(group, assignment_id)
@@ -965,24 +983,23 @@ def work_done(request, group_id, assignment_id, student_id):
         return redirect('teacher:group_submissions',
                         group_id=group.pk, assignment_id=assignment.pk)
 
-    queue = review_queue(assignment, student)
-    total = Decimal('0')
-    maximum = Decimal('0')
-    from problems.assignment_rows import item_max_score
-    for sub in queue:
-        feedback = getattr(sub, 'feedback', None)
-        if feedback is not None and feedback.score is not None:
-            total += Decimal(str(feedback.score))
-        if sub.problem_item_id:
-            maximum += item_max_score(sub.problem_item)
+    # ⚠️ СБОРКА СТРОК ОДНА НА ВСЕ ЭКРАНЫ (сессия 7, фаза 4). Раньше здесь
+    # был собственный цикл по очереди проверки: он знал только балл и не
+    # знал СОСТОЯНИЯ строки, поэтому справа стояло одинокое число без
+    # признака «верно / частично / неверно / не отвечал». Теперь берём то
+    # же `work_summary`, что кормит разбор глазами ученика, — и цвета, и
+    # знаменатель приходят оттуда же, без второго вычисления.
+    from problems.work_review import work_summary
+
+    summary = work_summary(assignment, student, viewer=request.user)
 
     return render(request, 'teacher/groups/work_done.html', {
         'group': group,
         'assignment': assignment,
         'student': student,
-        'rows': queue,
-        'total': _clean_points(total),
-        'maximum': _clean_points(maximum),
+        'rows': summary['rows'],
+        'total': summary['scored'],
+        'maximum': summary['max_score'],
         'work_feedback': WorkFeedback.objects.filter(
             assignment=assignment, student=student).first(),
         'next_student': _next_student_to_check(assignment, student),
