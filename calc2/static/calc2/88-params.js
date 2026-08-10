@@ -142,6 +142,109 @@ function pultCurveSig(list) {
   return list.map(c => c.id + ':' + (c.role || '') + ':' + c.color + ':' + (c.label || '')).join('|');
 }
 
+/* Строка «имя = значение», набранная формулой (Н8, Н11, Н12). Одна на все виды
+   регуляторов: и на буквы из формул, и на встроенные ставки, зарплаты и мировые
+   цены — раньше они выглядели по-разному, хотя делают одно и то же. */
+function paintEqLabel(lab, name, value) {
+  lab.classList.add('param-eq');
+  lab.dataset.eqName = name;
+  const plain = name + ' = ' + fmt(value);
+  if (typeof katex === 'undefined') { lab.textContent = plain; return; }
+  try {
+    katex.render(texifyName(name) + ' = ' + String(fmt(value)).replace(/ /g, '\\,'), lab,
+                 { throwOnError: false, displayMode: false });
+  } catch (e) { lab.textContent = plain; }
+}
+
+/* Имя регулятора в математическом наборе. Одна латинская буква идёт как есть
+   (курсивная переменная), обозначение вида «Pw» или «Wmin» становится буквой с
+   индексом. Слово («Ставка», «Значение») набирается прямым текстом: разложить
+   его на букву с индексом значило бы прочитать слово как произведение букв. */
+function texifyName(name) {
+  const s = String(name || '').trim();
+  if (/^[A-Za-z]$/.test(s)) return s;
+  const m = s.match(/^([A-Za-z])([A-Za-z0-9]{1,4})$/);
+  if (m && !/[А-Яа-я]/.test(s)) return m[1] + '_{\\text{' + m[2] + '}}';
+  return '\\text{' + s.replace(/([{}\\$&#^_~%])/g, '\\$1') + '}';
+}
+
+/* Правка точного значения по щелчку на строке (Н12): «имя =» остаётся на месте,
+   меняется только число справа, и набор при этом не превращается в системный
+   шрифт — поле лежит ВНУТРИ той же формулы. */
+function editEqValue(lab, name, current, apply) {
+  if (lab.querySelector('input')) return;
+  lab.innerHTML = '';
+  const head = document.createElement('span');
+  head.className = 'param-eq-head';
+  if (typeof katex !== 'undefined') {
+    try { katex.render(texifyName(name) + ' =', head, { throwOnError: false, displayMode: false }); }
+    catch (e) { head.textContent = name + ' ='; }
+  } else head.textContent = name + ' =';
+  const inp = document.createElement('input');
+  inp.type = 'number'; inp.step = 'any'; inp.value = current;
+  inp.className = 'param-eq-input';
+  lab.append(head, inp);
+  inp.focus(); inp.select();
+  let closed = false;
+  const done = () => {
+    if (closed) return; closed = true;
+    const v = parseFloat(inp.value);
+    apply(isFinite(v) ? v : current);
+  };
+  inp.addEventListener('blur', done);
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+    if (e.key === 'Escape') { e.preventDefault(); inp.value = current; inp.blur(); }
+  });
+}
+
+/* Меню интервала (Н9, Н10). Одно на все регуляторы: «мин ≤ имя ≤ макс» и шаг,
+   всё набрано формулой. Кнопки «Готово» нет — правка применяется на каждый
+   введённый символ, поэтому «−12» проезжает через «−» (неполное значение,
+   пропускаем), «−1» и «−12». Закрывается тремя способами: тронули этот ползунок,
+   ввели точное значение, щёлкнули мимо полей интервала. */
+function attachBoundsEditor(chip, editor, name, get, set) {
+  const tex = (t) => {
+    const s = document.createElement('span'); s.className = 'param-ed-tex';
+    if (typeof katex === 'undefined') { s.textContent = t.replace(/\\le/g, '≤'); return s; }
+    try { katex.render(t, s, { throwOnError: false, displayMode: false }); }
+    catch (e) { s.textContent = t.replace(/\\le/g, '≤'); }
+    return s;
+  };
+  const close = () => {
+    if (!editor.classList.contains('open')) return;
+    editor.classList.remove('open'); editor.innerHTML = '';
+    document.removeEventListener('pointerdown', onOutside, true);
+  };
+  function onOutside(e) { if (!editor.contains(e.target) && !chip.querySelector('.param-track').contains(e.target)) close(); }
+  editor._close = close;
+  const open = () => {
+    if (editor.classList.contains('open')) { close(); return; }
+    editor.classList.add('open');
+    editor.innerHTML = '';
+    const mk = (key) => {
+      const n = document.createElement('input');
+      n.type = 'number'; n.step = 'any'; n.value = get(key);
+      n.className = 'param-ed-num';
+      // Живое обновление: на каждый символ. Незаконченный ввод («−», «1e»)
+      // просто пропускаем, ничего не трогая.
+      n.addEventListener('input', () => {
+        const v = parseFloat(n.value);
+        if (!isFinite(v)) return;
+        set(key, v);
+      });
+      return n;
+    };
+    const line = document.createElement('div'); line.className = 'param-ed-line';
+    line.append(mk('min'), tex('\\le ' + texifyName(name) + ' \\le'), mk('max'));
+    const line2 = document.createElement('div'); line2.className = 'param-ed-line';
+    line2.append(tex('\\text{с шагом}'), mk('step'));
+    editor.append(line, line2);
+    document.addEventListener('pointerdown', onOutside, true);
+  };
+  return { open, close };
+}
+
 /* Заготовка регулятора для правой панели: сверху имя и значение, снизу
    ползунок во всю ширину. Одна форма на все виды регуляторов — колонка узкая,
    и в одну строку метка с числом уже не помещаются. */
@@ -309,46 +412,87 @@ function upgradeRegulator(field) {
   editor.className = 'param-editor';
   field.appendChild(editor);
 
-  const sync = () => { lo.textContent = fmt(+sl.min); hi.textContent = fmt(+sl.max); };
+  /* Имя регулятора для строки «имя = значение». Длинные подписи сокращаем по
+     реестру (Н8): «Мировая цена Px/Py» в колонке 268px не помещается, а смысл
+     несёт короткое обозначение. Полное название остаётся подсказкой. */
+  const labEl = field.querySelector('label');
+  const chipLab = field.querySelector('.pchip-label');
+  // У регуляторов сцен подпись это <label>, у чипов кривых — .pchip-label.
+  const rawName = ((labEl ? labEl.textContent : (chipLab ? chipLab.textContent : ''))
+                    .split('=')[0]).replace(/[:\s]+$/, '').trim();
+  const name = shortRegulatorName(field.id, rawName);
+
+  /* Значение показываем строкой «имя = значение», как у буквы-параметра, а не
+     подписью слева и числом справа. Собственную подпись поля прячем, иначе имя
+     стояло бы дважды. */
+  let eq = field.querySelector('.reg-eq');
+  if (!eq) {
+    eq = document.createElement('span');
+    eq.className = 'pchip-label reg-eq pchip-editable';
+    eq.title = rawName ? (rawName + '. Щёлкните, чтобы ввести точное значение') : 'Щёлкните, чтобы ввести точное значение';
+    /* Куда встать: у чипа есть верхняя строка, у поля сцены её нет. Дорожка
+       ползунка может лежать глубже, поэтому вставляем в САМОЕ НАЧАЛО поля, а не
+       перед дорожкой: она не всегда прямой потомок, и insertBefore на чужом
+       родителе падает. */
+    const top = field.querySelector('.pchip-top');
+    if (top) { const old = top.querySelector('.pchip-label'); if (old) old.remove(); top.insertBefore(eq, top.firstChild); }
+    else field.insertBefore(eq, field.firstChild);
+    if (labEl) labEl.classList.add('reg-label-hidden');
+    const oldVal = field.querySelector('.pchip-val');
+    if (oldVal) oldVal.style.display = 'none';
+    // Своё числовое поле сцены теперь дублирует строку «t = 20» — прячем, но
+    // держим в разметке: сцена пишет в него значение, и слушатели живы.
+    if (num) num.classList.add('reg-num-hidden');
+  }
+
+  const paint = () => paintEqLabel(eq, name, +sl.value);
+  const sync = () => { lo.textContent = fmt(+sl.min); hi.textContent = fmt(+sl.max); paint(); };
   sync();
   // Сцена сама двигает границы ползунка (например, при смене формул) — держим
   // подписи в согласии с ними.
-  new MutationObserver(sync).observe(sl, { attributes: true, attributeFilter: ['min', 'max', 'step'] });
+  new MutationObserver(sync).observe(sl, { attributes: true, attributeFilter: ['min', 'max', 'step', 'value'] });
+  sl.addEventListener('input', () => { paint(); if (editor._close) editor._close(); });
 
-  const open = () => {
-    if (editor.classList.contains('open')) { editor.classList.remove('open'); editor.innerHTML = ''; return; }
-    editor.classList.add('open');
-    editor.innerHTML = '';
-    const mk = (attr) => {
-      const n = document.createElement('input');
-      n.type = 'number'; n.step = 'any'; n.value = sl[attr];
-      n.addEventListener('change', () => {
-        const v = parseFloat(n.value);
-        if (!isFinite(v)) return;
-        sl[attr] = v;
-        if (+sl.max <= +sl.min) sl.max = +sl.min + 1;
-        if (num) { if (attr === 'min') num.min = sl.min; if (attr === 'max') num.max = sl.max; if (attr === 'step') num.step = sl.step; }
-        const cur = Math.max(+sl.min, Math.min(+sl.max, +sl.value));
-        if (+sl.value !== cur) { sl.value = cur; sl.dispatchEvent(new Event('input', { bubbles: true })); }
-        sync();
-      });
-      return n;
-    };
-    const line = document.createElement('div');
-    line.className = 'param-ed-line';
-    const nm = document.createElement('span');
-    nm.className = 'param-ed-name';
-    const lab = field.querySelector('label');
-    nm.textContent = (lab ? lab.textContent.split('=')[0] : '').trim() || 'Значение';
-    line.append(mk('min'), document.createTextNode('≤'), nm, document.createTextNode('≤'), mk('max'));
-    const step = document.createElement('div');
-    step.className = 'param-ed-line';
-    const sLab = document.createElement('span'); sLab.textContent = 'Шаг';
-    step.append(sLab, mk('step'));
-    editor.append(line, step);
-  };
+  eq.addEventListener('click', () => {
+    if (editor._close) editor._close();          // Н10: точное значение закрывает интервал
+    editEqValue(eq, name, +sl.value, (v) => {
+      if (v < +sl.min) sl.min = v;
+      if (v > +sl.max) sl.max = v;
+      sl.value = v;
+      sl.dispatchEvent(new Event('input', { bubbles: true }));
+      sync();
+    });
+  });
+
+  const { open } = attachBoundsEditor(field, editor, name,
+    (key) => sl[key],
+    (key, v) => {
+      sl[key] = v;
+      if (+sl.max <= +sl.min) sl.max = +sl.min + 1;
+      if (num) { if (key === 'min') num.min = sl.min; if (key === 'max') num.max = sl.max; if (key === 'step') num.step = sl.step; }
+      const cur = Math.max(+sl.min, Math.min(+sl.max, +sl.value));
+      if (+sl.value !== cur) { sl.value = cur; sl.dispatchEvent(new Event('input', { bubbles: true })); }
+      sync();
+    });
   lo.addEventListener('click', open);
   hi.addEventListener('click', open);
+}
+
+/* Короткие обозначения длинных регуляторов (Н8). Полное название остаётся в
+   подсказке; в колонке 268px помещается только обозначение. */
+const REGULATOR_SHORT = {
+  'ppft-price-field': 'Pw', 'tb-price-field': 'Pw', 'so-price-field': 'Pw',
+  'tax-field': 't', 'pc-field': 'Preg', 'union-wage-field': 'Wu',
+  'labmin-field': 'Wmin', 'ineq-alpha-field': 'alpha',
+};
+function shortRegulatorName(id, raw) {
+  if (REGULATOR_SHORT[id]) return REGULATOR_SHORT[id];
+  const s = String(raw || '').trim();
+  if (!s) return 'Значение';
+  // «Ставка налога t» и подобное: если в конце стоит обозначение, берём его.
+  const tail = s.match(/([A-Za-z][A-Za-z0-9]{0,3})$/);
+  if (tail && s.length > 12) return tail[1];
+  return s.length > 12 ? s.slice(0, 11) + '…' : s;
 }
 
 /* --- Сцен-слайдеры (#pult-extra): КПВ «Макс X/Y» и мастер «Сила неравенства».

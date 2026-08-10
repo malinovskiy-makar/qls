@@ -1191,12 +1191,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   background: var(--input-bg); color: var(--text); font-variant-numeric: tabular-nums;
 }
 .param-ed-name { flex: 0 0 auto; font-weight: 600; color: var(--text); }
-.param-ed-ok {
-  width: 100%; padding: 4px; font-size: 11px; font-weight: 600;
-  border: 1px solid var(--border); border-radius: var(--r-sm);
-  background: var(--surface-2); color: var(--text2); cursor: pointer;
+/* Поля интервала — те же тонкие числа, что по краям дорожки, а не текстовые
+   прямоугольники: границу несёт подчёркивание (Н9, Н60). */
+.param-ed-line input.param-ed-num {
+  flex: 1 1 0; min-width: 0; width: 100%; padding: 2px 4px; text-align: center;
+  font-size: 11.5px; color: var(--text); font-variant-numeric: tabular-nums;
+  background: transparent; border: none; border-bottom: 1px solid var(--border);
+  border-radius: 0;
 }
-.param-ed-ok:hover { color: var(--accent); border-color: var(--accent); }
+.param-ed-line input.param-ed-num:focus { outline: none; border-bottom-color: var(--accent); }
+/* Точное значение регулятора вводится щелчком по строке «t = 20», поэтому
+   собственное числовое поле сцены рядом с ползунком лишнее (Н8, Н60). */
+.reg-num-hidden { display: none !important; }
 .pchip-editable { cursor: text; border-bottom: 1px dashed var(--border); }
 .pchip-editable:hover { border-bottom-color: var(--accent); }
 .pchip-valedit {
@@ -1210,8 +1216,25 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    Строка «a = 1» набрана формулой, справа серый крестик, под ними дорожка
    с серыми границами по краям. Раскрытый редактор границ печатает настоящие
    знаки неравенства. */
-.param-eq { font-size: 14px; color: var(--text); }
+/* Н11: строка значения чуть крупнее прочих подписей панели — это главное, что
+   читают в регуляторе, но не заголовок, поэтому прибавка ровно в пункт. */
+.param-eq { font-size: 15px; color: var(--text); display: inline-flex; align-items: baseline; gap: 3px; }
 .param-eq .katex { font-size: 1.02em; }
+/* Н12: правка значения идёт ВНУТРИ формулы — «a =» остаётся набранным, меняется
+   только число. Поле подхватывает тот же кегль, поэтому строка не дёргается. */
+.param-eq-head { flex: 0 0 auto; }
+.param-eq-input {
+  flex: 1 1 0; min-width: 0; width: 100%; padding: 0 2px;
+  font-size: 15px; font-family: 'KaTeX_Main', var(--font, inherit);
+  color: var(--text); background: transparent;
+  border: none; border-bottom: 1px solid var(--accent); border-radius: 0;
+  font-variant-numeric: tabular-nums;
+}
+.param-eq-input:focus { outline: none; }
+/* Регулятор сцены носит ту же строку «имя = значение», поэтому собственная
+   подпись поля больше не нужна: имя стояло бы дважды (Н8). */
+.reg-label-hidden { display: none !important; }
+.reg-eq { display: inline-flex; align-items: baseline; gap: 3px; font-size: 15px; color: var(--text); }
 .pchip-param .pchip-top { gap: 6px; }
 .param-kill {
   margin-left: auto; flex: 0 0 auto; width: 18px; height: 18px; padding: 0;

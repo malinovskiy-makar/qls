@@ -1707,13 +1707,7 @@ function buildParamChip(box, name) {
   /* П23. Значение — набранная формула «a = 1», как у Desmos: курсивная буква,
      знак равенства, число. Раньше буква и число были обычным текстом в разных
      углах строки. Печатает KaTeX; нет CDN — остаётся тот же текст, что и был. */
-  lab.classList.add('param-eq');
-  const paintEq = () => {
-    if (typeof katex === 'undefined') { lab.textContent = name + ' = ' + fmt(p.value); return; }
-    try { katex.render(name + ' = ' + fmt(p.value).replace(/ /g, '\\,'), lab,
-                       { throwOnError: false, displayMode: false }); }
-    catch (e) { lab.textContent = name + ' = ' + fmt(p.value); }
-  };
+  const paintEq = () => paintEqLabel(lab, name, p.value);
 
   /* Точное значение (П24): отдельного поля нет, щёлкают прямо по формуле.
      Число справа при этом лишнее — вся строка «a = 1» и есть значение. */
@@ -1775,73 +1769,40 @@ function buildParamChip(box, name) {
   sl.addEventListener('input', () => {
     p.value = parseFloat(sl.value);
     val.textContent = fmt(p.value);
+    paintEq();
+    if (bounds && bounds.close) bounds.close();   // Н10: тронули ползунок — меню закрылось
     redrawAll();
   });
 
+  /* Н12: щёлкнули по значению — «a =» остаётся на месте, правится только число
+     справа, и набор не превращается в системный шрифт. Н10: точный ввод
+     закрывает меню интервала. */
   lab.addEventListener('click', () => {
     if (p.folded) { p.folded = false; applyFold(); return; }   // свёрнутый — сначала разворачиваем
-    const inp = document.createElement('input');
-    inp.type = 'number'; inp.step = 'any'; inp.value = p.value;
-    inp.className = 'pchip-valedit';
-    lab.replaceWith(inp);
-    inp.focus(); inp.select();
-    const done = () => {
-      const v = parseFloat(inp.value);
-      if (isFinite(v)) {
-        p.value = v;
-        if (v < p.min) p.min = v;      // вышли за границу — она раздвигается сама
-        if (v > p.max) p.max = v;
-      }
-      inp.replaceWith(lab);
+    if (bounds && bounds.close) bounds.close();
+    editEqValue(lab, name, p.value, (v) => {
+      p.value = v;
+      if (v < p.min) p.min = v;      // вышли за границу — она раздвигается сама
+      if (v > p.max) p.max = v;
       syncSlider();
       redrawAll();
-    };
-    inp.addEventListener('blur', done);
-    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+    });
   });
 
-  // Редактор границ: «мин ≤ имя ≤ макс» плюс шаг — прямо в строке.
-  const openEditor = () => {
-    if (editor.classList.contains('open')) { editor.classList.remove('open'); editor.innerHTML = ''; return; }
-    editor.classList.add('open');
-    editor.innerHTML = '';
-    const mk = (key) => {
-      const n = document.createElement('input');
-      n.type = 'number'; n.step = 'any'; n.value = p[key];
-      n.addEventListener('change', () => {
-        const v = parseFloat(n.value);
-        if (!isFinite(v)) return;
-        p[key] = v;
-        if (p.max <= p.min) p.max = p.min + 1;
-        p.value = Math.max(p.min, Math.min(p.max, p.value));
-        syncSlider();
-        redrawAll();
-      });
-      return n;
-    };
-    /* Строка «−10 ≤ a ≤ 10» набрана формулой целиком, а не собрана из текстовых
-       знаков: неравенства и курсивная буква печатаются KaTeX, как у Desmos. */
-    const tex = (t) => {
-      const s = document.createElement('span'); s.className = 'param-ed-tex';
-      if (typeof katex === 'undefined') { s.textContent = t.replace(/\\le/g, '≤'); return s; }
-      try { katex.render(t, s, { throwOnError: false, displayMode: false }); }
-      catch (e) { s.textContent = t.replace(/\\le/g, '≤'); }
-      return s;
-    };
-    const line = document.createElement('div');
-    line.className = 'param-ed-line';
-    line.append(mk('min'), tex('\\le ' + name + ' \\le'), mk('max'));
-    const line2 = document.createElement('div');
-    line2.className = 'param-ed-line';
-    const st = document.createElement('span'); st.className = 'param-ed-name'; st.textContent = 'Шаг';
-    line2.append(st, mk('step'));
-    const ok = document.createElement('button');
-    ok.type = 'button'; ok.className = 'param-ed-ok'; ok.textContent = 'Готово';
-    ok.addEventListener('click', () => { editor.classList.remove('open'); editor.innerHTML = ''; });
-    editor.append(line, line2, ok);
-  };
-  loLab.addEventListener('click', openEditor);
-  hiLab.addEventListener('click', openEditor);
+  /* Меню интервала — общее с регуляторами сцен: «мин ≤ a ≤ макс» и шаг, всё
+     набрано формулой, без кнопки «Готово» (Н9), с живым обновлением на каждый
+     введённый символ и закрытием по щелчку мимо (Н10). */
+  const bounds = attachBoundsEditor(chip, editor, name,
+    (key) => p[key],
+    (key, v) => {
+      p[key] = v;
+      if (p.max <= p.min) p.max = p.min + 1;
+      p.value = Math.max(p.min, Math.min(p.max, p.value));
+      syncSlider();
+      redrawAll();
+    });
+  loLab.addEventListener('click', bounds.open);
+  hiLab.addEventListener('click', bounds.open);
 
   box.appendChild(chip);
 }
