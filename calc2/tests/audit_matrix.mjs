@@ -222,11 +222,18 @@ for (const [key, name] of scenes) {
       zoomBy(0.8, r.width / 2, py); await wait(520);
       const [w1] = span();
       zoomOk = Math.abs(w1 - w0) > Math.abs(w0) * 1e-3;
+      /* Панорама проверяется В ОБЕ стороны и на ПРИБЛИЖЁННОМ поле. Раньше тянули
+         только влево на полном масштабе, и проверка молчала о том, что после
+         зума окно стоит началом в нуле, а возврат в первую четверть гасит тягу
+         вправо и вверх: две стороны из четырёх не работали вовсе. */
       resetZoom(); await wait(520);
-      const [, x1] = span();
-      panByPixels(-60, 0, panel); await wait(520);
-      const [, x2] = span();
-      panOk = Math.abs(x2 - x1) > 1e-9;
+      zoomBy(0.5, r.width / 2, py); await wait(520);
+      const [, xA] = span();
+      panByPixels(-60, 0, panel); await wait(320);
+      const [, xB] = span();
+      panByPixels(120, 0, panel); await wait(320);
+      const [, xC] = span();
+      panOk = Math.abs(xB - xA) > 1e-9 && Math.abs(xC - xB) > 1e-9;
       resetZoom(); await wait(120);
     } catch (e) {}
 
