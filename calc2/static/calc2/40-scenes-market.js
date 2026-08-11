@@ -472,7 +472,7 @@ function updateOpenPanel() {
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
     html += `<div class="stat"><span>${isTar ? 'Тариф t' : 'Квота'}</span><b>${fmt(isTar ? STATE.openTariff : STATE.openQuota)}</b></div>`;
     html += `<div class="stat"><span>Внутренняя цена P₁</span><b>${fmt(o.P1)}</b></div>`;
-    html += `<div class="stat"><span>($Q_d^{\prime}$; $Q_s^{\prime}$)</span><b>(${fmt(o.Qd1)}; ${fmt(o.Qs1)})</b></div>`;
+    html += `<div class="stat"><span>($Q_d^{\\prime}$; $Q_s^{\\prime}$)</span><b>(${fmt(o.Qd1)}; ${fmt(o.Qs1)})</b></div>`;
     html += `<div class="stat"><span>Импорт после</span><b>${fmt(o.vol1)} (было ${fmt(o.volume)})</b></div>`;
     html += `<div class="stat"><span>${isTar ? 'Доход бюджета' : 'Рента от квоты'}</span><b>${fmt(o.money)}</b></div>`;
     if (!isTar) html += '<div class="hint">Рента от квоты это не доход государства: кому она достанется, ' +

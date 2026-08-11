@@ -371,7 +371,7 @@ function updateInequalityPanel() {
   html += `<div class="stat"><span>Квинтильный коэф. фондов</span><b>${s.quintile == null ? '∞' : fmt(s.quintile)}</b></div>`;
   const pp = inequalityP90P10();
   if (pp) {
-    html += `<div class="stat"><span>$\frac{P_{90}}{P_{10}}$ (пороги)</span><b>${fmt(pp.ratio)}</b></div>`;
+    html += `<div class="stat"><span>$\\frac{P_{90}}{P_{10}}$ (пороги)</span><b>${fmt(pp.ratio)}</b></div>`;
     html += `<div class="hint">Это ДВЕ разные величины. <b>Коэффициент фондов</b> — отношение
       суммарного дохода верхних 10&nbsp;% населения к суммарному доходу нижних 10&nbsp;%
       (российская, росстатовская традиция; здесь ${fmt(s.decile)}). <b>P90/P10</b> — отношение

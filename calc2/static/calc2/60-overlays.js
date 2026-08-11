@@ -359,9 +359,15 @@ function typesetStats(root) {
     const lab = row.querySelector(':scope > span');
     const val = row.querySelector(':scope > b');
     if (!lab || !val) return;
+    row._typeset = true;
+    /* Значение уже набрано формулой самой сценой (renderMathIn прошёл раньше
+       нас). Тогда трогать его нельзя: textContent у готового KaTeX это тройка
+       «MathML + исходная запись + видимый текст», и мы напечатали бы её целиком.
+       И знак равенства не ставим: в таком значении он обычно уже есть, вышло бы
+       «Наибольшее = y* = 5». */
+    if (val.querySelector('.katex')) { row.classList.add('stat-eq', 'stat-own'); return; }
     const raw = (val.textContent || '').trim();
     if (!raw) return;
-    row._typeset = true;
     // Числовое ли значение: число, пара, проценты, знак — да; фраза — нет.
     const numeric = /^[(\[]?\s*[-−+]?[\d.,]/.test(raw) || /^[-−+]?\d/.test(raw);
     if (numeric && typeof katex !== 'undefined') {
@@ -371,6 +377,8 @@ function typesetStats(root) {
       } catch (e) { /* остаётся прежним текстом */ }
     }
     row.classList.add('stat-eq');
+    // Своё равенство внутри значения («SW = CS + PS») тоже не удваиваем.
+    if (raw.indexOf('=') >= 0) return;
     const eq = document.createElement('i');
     eq.className = 'stat-sign';
     eq.setAttribute('aria-hidden', 'true');
@@ -779,16 +787,19 @@ function keyTargets() {
   snapTargets().forEach(t => {
     /* У постоянной кривой (горизонтальная MC, потолок цены, мировая цена)
        производная равна нулю ВЕЗДЕ, и экстремумом объявлялся каждый узел сетки:
-       на холсте вдоль такой линии выстраивались сотни серых кружков, а в
-       выгрузку уходило четыреста маркеров, сливавшихся в чёрную полосу.
+       на холсте вдоль такой линии выстраивались сотни серых кружков.
        У прямой линии экстремумов нет по определению, поэтому просто пропускаем
        поиск, если функция на всём окне постоянна. */
     let flat = true;
-    const y0f = t.f(lo);
-    for (let i = 1; i <= 12 && flat; i++) {
-      const v = t.f(lo + (hi - lo) * i / 12);
-      if (!isFinite(v) || !isFinite(y0f) || Math.abs(v - y0f) > 1e-9 * (1 + Math.abs(y0f))) flat = false;
-    }
+    // Кривая сцены может бросить на негодном аргументе: без обёртки такой
+    // случай обрывал бы весь обход ключевых точек.
+    try {
+      const y0f = t.f(lo);
+      for (let i = 1; i <= 12 && flat; i++) {
+        const v = t.f(lo + (hi - lo) * i / 12);
+        if (!isFinite(v) || !isFinite(y0f) || Math.abs(v - y0f) > 1e-9 * (1 + Math.abs(y0f))) flat = false;
+      }
+    } catch (e) { flat = false; }
     let ext = [];
     if (!flat) {
       try { ext = rootsOf((x) => dNum(t.f, x, h), lo, hi, 400); } catch (e) { ext = []; }

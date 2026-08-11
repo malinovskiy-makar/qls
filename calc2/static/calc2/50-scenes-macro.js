@@ -106,7 +106,7 @@ function recomputeMacro() {
     return;
   }
   if (m === 'phillips') {
-    // $\pi = \pi_e - \beta(u - u^*)$: прямая с наклоном −β через точку $(u^*;\ \pi_e)$.
+    // $\pi = \pi_e - \beta(u - u^*)$: прямая с наклоном −β через точку $(u^*;\\ \\pi_e)$.
     const f = (u) => P.pe - P.beta * (u - P.ustar);
     const sr = { fn: f };
     const lrp = makeVerticalCurve(P.ustar);
@@ -331,10 +331,12 @@ function updateMacroPanel() {
     html += `<div class="stat"><span>Ожидаемая инфляция πe</span><b>${fmt(P.pe)}</b></div>`;
     html += `<div class="stat"><span>Естественный уровень $u^*$</span><b>${fmt(P.ustar)}</b></div>`;
     html += `<div class="stat"><span>Наклон β</span><b>${fmt(P.beta)}</b></div>`;
-    html += '<table class="tx-table" style="margin-top:6px;"><tr><th>u</th><th>$\pi = \pi_e - \beta(u - u^*)$</th></tr>';
+    // Обратные слэши УДВОЕНЫ: в строке JS «\p» схлопывается в «p», а «\b» это
+    // вовсе символ забоя, и KaTeX на нём падает красной рамкой.
+    html += '<table class="tx-table" style="margin-top:6px;"><tr><th>u</th><th>$\\pi = \\pi_e - \\beta(u - u^*)$</th></tr>';
     [P.ustar - 2, P.ustar, P.ustar + 2].forEach(u => { html += `<tr><td>${fmt(u)}</td><td>${fmt(f(u))}</td></tr>`; });
     html += '</table>';
-    html += '<div class="hint">Краткосрочная кривая проходит через точку $(u^*;\ \pi_e)$ с наклоном $-\beta$: снизить ' +
+    html += '<div class="hint">Краткосрочная кривая проходит через точку $(u^*;\\ \\pi_e)$ с наклоном $-\\beta$: снизить ' +
       'безработицу ниже естественной можно только ценой более высокой инфляции. Долгосрочная идёт вертикалью ' +
       'при u = u*: в долгом периоде ожидания подстраиваются, и размена нет.</div>';
   } else if (r.kind === 'money') {

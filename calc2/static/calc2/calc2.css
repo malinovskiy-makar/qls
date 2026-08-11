@@ -1524,7 +1524,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    колонкой их левый край одинаков во всех строках, то есть колонка знаков
    стоит ровно. */
 .sb-body .stat.stat-eq {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto 78px;
+  /* Колонка числа не уже 78px, но растёт под длинное значение: с жёсткой
+     шириной семизначное число вылезало за дорожку. */
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(78px, max-content);
   align-items: baseline; column-gap: 6px;
 }
 .sb-body .stat.stat-eq > span { text-align: right; }

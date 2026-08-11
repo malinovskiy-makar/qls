@@ -398,10 +398,10 @@ function updateIsoPanel() {
   html += `<div class="stat"><span>Оптимум $(L^*; K^*)$</span><b>(${fmt(iso.L)}; ${fmt(iso.K)})</b></div>`;
   html += `<div class="stat"><span>Выпуск Q</span><b>${fmt(iso.Q)}</b></div>`;
   html += `<div class="stat"><span>$MRTS$ в оптимуме</span><b>${fmt(iso.mrts)}</b></div>`;
-  html += `<div class="stat"><span>$\frac{w}{r}$</span><b>${fmt(STATE.isoW / STATE.isoR)}</b></div>`;
+  html += `<div class="stat"><span>$\\frac{w}{r}$</span><b>${fmt(STATE.isoW / STATE.isoR)}</b></div>`;
   html += `<div class="stat"><span>Потрачено</span><b>${fmt(STATE.isoW * iso.L + STATE.isoR * iso.K)}</b></div>`;
   html += '<div class="hint" style="margin-top:4px;">Условие оптимума то же, что у потребителя, только вместо ' +
-    'полезности стоит выпуск, а вместо цен благ цены факторов: <b>$MRTS = \frac{w}{r}$</b>. Это буквально один и тот же ' +
+    'полезности стоит выпуск, а вместо цен благ цены факторов: <b>$MRTS = \\frac{w}{r}$</b>. Это буквально один и тот же ' +
     'численный движок касания уровня.</div>';
   box.innerHTML = html;
 }
@@ -594,7 +594,7 @@ function updatePlantsPanel() {
     'Совокупные издержки это не TC₁(Q)&nbsp;+&nbsp;TC₂(Q) (столько стоило бы выпустить <i>по Q</i> на каждом заводе, ' +
     'то есть 2Q всего), а минимум суммы при делении выпуска:<br>' +
     '<code>TC(Q) = min[Q₁+Q₂=Q] { TC₁(Q₁) + TC₂(Q₂) }</code>.<br><br>' +
-    'Пока $MC_1 \ne MC_2$, единицу выгодно перебросить с дорогого завода на дешёвый, значит в оптимуме ' +
+    'Пока $MC_1 \\ne MC_2$, единицу выгодно перебросить с дорогого завода на дешёвый, значит в оптимуме ' +
     '<b>$MC_1 = MC_2 = MC(Q)$</b>. Поэтому совокупную кривую строят так: фиксируют уровень ' +
     'предельных издержек m, у каждого завода берут его объём Qᵢ(m)&nbsp;=&nbsp;MCᵢ⁻¹(m) и складывают ' +
     '<b>объёмы</b>, а не высоты, ровно как рыночное предложение из предложений фирм.<br><br>' +
