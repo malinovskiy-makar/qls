@@ -288,12 +288,15 @@ function drawAxes(xLabel, yLabel) {
      6 пикселей вправо у одной и 12 вверх плюс 4 влево у другой — числами по
      месту, и на разных сценах они читались по-разному.
      Пустая строка '' — сигнал «без метки» (неравенство и издержки ставят свою). */
-  if (xLabel && atZeroY) g.append('text')
+  /* Н24: подпись оси помечена классом. Во-первых, по нему проверка ловит
+     наложения; во-вторых, общий проход размера подписей (applyLabelSize) и
+     выгрузка отличают её от прочих надписей. */
+  if (xLabel && atZeroY) g.append('text').attr('class', 'axis-name')
     .attr('x', xRight + AXIS_LABEL_GAP).attr('y', oy)
     .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
     .attr('font-size', 13).attr('font-weight', 600)
     .attr('fill', COL.ink).text(xLabel);
-  if (yLabel && atZeroX) g.append('text')
+  if (yLabel && atZeroX) g.append('text').attr('class', 'axis-name')
     .attr('x', ox).attr('y', yTop - AXIS_LABEL_GAP)
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
     .attr('font-size', 13).attr('font-weight', 600)

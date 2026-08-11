@@ -214,6 +214,21 @@ for (const [key, name] of scenes) {
     });
     if (wr && wr.getAttribute('aria-expanded') === 'true') wr.click();
 
+    /* Н24: подпись оси не налезает ни на что. Сравниваем её прямоугольник со
+       всеми прочими надписями холста и с легендой. Пустых подписей не бывает:
+       у каждой сцены есть имя обеих осей (или сцена ставит своё). */
+    const axisNames = [...document.querySelectorAll('#chart text.axis-name')];
+    const otherTexts = [...document.querySelectorAll('#chart text')]
+      .filter(t => !t.classList.contains('axis-name'));
+    const legendEl = document.querySelector('#chart .legend');
+    const rc = (e) => e.getBoundingClientRect();
+    const hits = (a, b) => !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
+    const axisClash = [];
+    axisNames.forEach(an => {
+      otherTexts.forEach(o => { if (hits(rc(an), rc(o))) axisClash.push(an.textContent + '/' + o.textContent.slice(0, 10)); });
+      if (legendEl && hits(rc(an), rc(legendEl))) axisClash.push(an.textContent + '/легенда');
+    });
+
     /* П31: точки липнут к кривым И к осям. Оси лежат не в snapTargets (там
        кривые вида y = f(x), по ним ищутся экстремумы), а считаются отдельно —
        проверяем, что прилипание к ним реально срабатывает у самой оси. */
@@ -262,7 +277,7 @@ for (const [key, name] of scenes) {
 
     return { noK, bars: bars.length, picks: picks.length, rawColor,
              wheelOk, keyOk, nums: nums.length, snapAxes, zoomOk, panOk,
-             boxed, fieldsSeen };
+             boxed, fieldsSeen, axisNames: axisNames.length, axisClash };
   });
   rows.push([key, name, r]);
 }
@@ -304,6 +319,16 @@ say('П34 голый выбор цвета', broken.color);
 say('П16 числовое поле листается', broken.num);
 say('П31 оси не цель прилипания', broken.snap);
 say('П53/П54 зум или панорама недоступны', broken.zoom);
+const axClash = [], noAxName = [];
+let axTotal = 0;
+for (const [key, , r] of rows) {
+  const u = r.rules || {};
+  axTotal += (u.axisNames || 0);
+  if (!u.axisNames) noAxName.push(key);
+  if (u.axisClash && u.axisClash.length) axClash.push(key + ' (' + u.axisClash.join(', ') + ')');
+}
+say('Н24 подпись оси налезает', axClash);
+console.log('  (подписей осей всего: ' + axTotal + ', сцен без подписи: ' + noAxName.length + ')');
 /* Н70: кнопка умной клавиатуры обязана быть у КАЖДОГО поля формулы в каждой
    сцене. Поля сюжета «Функции min и max» собирались вручную и получали только
    математический набор, без кнопки и без вопросика. */

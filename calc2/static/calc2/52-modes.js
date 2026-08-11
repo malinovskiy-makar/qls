@@ -166,6 +166,30 @@ function padMax(v) {
    возврат масштаба в бесконечное расширение: каждое нажатие раздвигало бы
    окно ещё раз. Кривые и так попадают сюда своими ключевыми точками —
    пересечениями друг с другом и с осями. */
+/* Н20. Перехваты ВСЕХ построенных кривых с осями. Именно перехваты, а не размах
+   кривой: растущая кривая вроде S = Q не кончается никогда, и по её протяжённости
+   окно раздувалось бы бесконечно. А точка, где кривая встречает ось, конечна и
+   как раз задаёт, сколько места модели нужно.
+
+   Ищем два числа на кривую: значение в нуле (перехват с осью Y) и первый
+   положительный корень (перехват с осью X). Корень ищем численно в окне втрое
+   шире текущего: этого хватает и когда сцену только что открыли. */
+function curveAxisBounds() {
+  let mx = 0, my = 0, any = false;
+  let targets = [];
+  try { targets = (typeof snapTargets === 'function') ? snapTargets() : []; } catch (e) { targets = []; }
+  const hi = Math.max(10, (CONFIG.Qmax - CONFIG.Qmin) * 3);
+  targets.forEach(t => {
+    if (typeof t.f !== 'function') return;
+    const y0 = t.f(0);
+    if (isFinite(y0) && y0 > 0) { my = Math.max(my, y0); any = true; }
+    let root = null;
+    try { root = findRootIn((x) => t.f(x), 1e-6, hi); } catch (e) { root = null; }
+    if (root != null && isFinite(root) && root > 0) { mx = Math.max(mx, root); any = true; }
+  });
+  return any ? { qmax: mx, pmax: my } : null;
+}
+
 function boundsOfDrawn(baseQ, baseP) {
   let mx = baseQ, my = baseP, grew = false;
   const eat = (x, y) => {
@@ -348,11 +372,30 @@ function resetZoom() {
   STATE.viewDirty = false;
   tanResetWindows();
   if (STATE.mode === 'math') {
+    /* Н20: подбор работает и здесь. Пресет сюжета берём за основу (в
+       «Математике» нужен полный план, а не только первая четверть), но окно
+       раздвигаем, если построенное в него не помещается. */
     const p = MATH_PRESETS[STATE.mathSub];
-    if (p) setMathWindow(p.win[0], p.win[1], p.win[2], p.win[3]);
+    if (p) {
+      let [x0, x1, y0, y1] = p.win;
+      const b = boundsOfDrawn(x1, y1);
+      if (b) { x1 = Math.max(x1, b.qmax); y1 = Math.max(y1, b.pmax); }
+      setMathWindow(x0, x1, y0, y1);
+    }
   } else {
-    const baseQ = (STATE.mode === 'costs') ? 10 : 100;
-    const baseP = (STATE.mode === 'costs') ? 50 : 100;
+    /* Н20, Н21. Порядок ровно такой: сначала перехваты кривых с осями, затем
+       проверка, влезли ли точки и площади, и только если нет — отдаляемся.
+       Жёсткие числа (издержки 10 на 50, остальное 100 на 100) остались лишь
+       как запасной вариант, когда кривых ещё нет вовсе. */
+    const fallbackQ = (STATE.mode === 'costs') ? 10 : 100;
+    const fallbackP = (STATE.mode === 'costs') ? 50 : 100;
+    /* Привычный масштаб сцены остаётся, пока кривые в него помещаются: у
+       стандартного спроса перехваты ровно на краях окна, и раздвигать его
+       незачем. Раздвигаем только тогда, когда перехват ВЫШЕ края, то есть
+       кривая иначе не поместилась бы. */
+    const c = curveAxisBounds();
+    const baseQ = (c && c.qmax > fallbackQ) ? padMax(c.qmax) : fallbackQ;
+    const baseP = (c && c.pmax > fallbackP) ? padMax(c.pmax) : fallbackP;
     const b = boundsOfDrawn(baseQ, baseP);
     setRanges(b ? b.qmax : baseQ, b ? b.pmax : baseP);
   }
