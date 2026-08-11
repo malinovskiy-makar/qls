@@ -461,7 +461,7 @@ function drawMathOptimum(f) {
   STATE.mathRes = a;
   /* Подпись «максимум 2» не говорила, что это: координата точки или значение
      функции. Пишем обе величины и называем их: x* — где, y* — сколько. */
-  const ptLabel = (kind, p) => kind + ': $(x^*; y^*) = (' + fmt(p.x) + '; ' + fmt(p.y) + ')$';
+  const ptLabel = (kind, p) => kind + ': (x*; y*) = (' + fmt(p.x) + '; ' + fmt(p.y) + ')';
   a.ext.forEach((p, i) => {
     if (p.y < my.domain()[0] || p.y > my.domain()[1]) return;
     mathDot(g, mx, my, p.x, p.y, p.kind === 'max' ? COL.S : COL.MC,

@@ -179,7 +179,7 @@ const SECTION_NAMES = {
    Рисуем в viewBox 24×24 и красим currentColor: цвет берётся у заголовка. */
 const SECTION_ICONS = {
   // Кривые: оси и одна кривая.
-  'sec-curves': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 17c5 0 9-4 13-11" stroke-width="2.6"/>',
+  'sec-curves': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 18C10 18 13 9 18 6" stroke-width="2.6"/>',
   // Построение графиков: две кривые.
   'sec-graph': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 18c4-2 6-8 13-12" stroke-width="2.6"/><path d="M5 8c5 4 8 7 13 9" stroke-width="2.2" stroke-dasharray="5 4"/>',
   // Равновесие: пересечение и точка.
@@ -207,9 +207,9 @@ const SECTION_ICONS = {
   // Математика: парабола.
   'sec-math': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 5c3 12 8 12 13 1" stroke-width="2.6"/>',
   // Точки на графике: точка с проекциями.
-  'sec-view': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M4 10h9M13 20v-10" stroke-width="2.2" stroke-dasharray="5 4"/><circle cx="13" cy="10" r="3.6" stroke-width="2.6"/>',
+  'sec-view': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><circle cx="9" cy="14" r="3.6" fill="currentColor" stroke="none"/><circle cx="16" cy="8" r="3.6" fill="currentColor" stroke="none"/>',
   // Площади: заштрихованная фигура под кривой.
-  'sec-areascalc': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 8c5 1 9 5 12 11H5z" fill="currentColor" fill-opacity=".16" stroke-width="2.6"/>',
+  'sec-areascalc': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 19V9l13 10z" fill="currentColor" fill-opacity=".16" stroke="none"/><path d="M5 9l13 10" stroke-width="2.6"/>',
 };
 
 function sectionIcon(secId) {
