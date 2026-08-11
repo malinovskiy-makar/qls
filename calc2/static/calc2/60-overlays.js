@@ -1977,16 +1977,100 @@ function syncAxisPlaceholders() {
 }
 
 // Заголовок графика по центру верхнего поля.
+/* Н22. Название графика правится и переносится прямо на холсте.
+
+   Место хранится в ДОЛЯХ поля (0…1), а не в пикселях: холст меняет размер при
+   сворачивании панелей, и пиксельные координаты уехали бы. Пока пользователь
+   подпись не двигал, она стоит по центру верхнего поля, как раньше.
+
+   Двойной щелчок по холсту возвращает масштаб, поэтому на самой подписи он
+   останавливается (stopPropagation) и вместо этого открывает правку. */
+function titleAnchorPx() {
+  const m = CONFIG.margin;
+  const x0 = m.left, x1 = W - m.right, y0 = 0, y1 = H - m.bottom;
+  const p = STATE.titlePos;
+  if (p && isFinite(p.fx) && isFinite(p.fy)) {
+    return { x: x0 + (x1 - x0) * p.fx, y: y0 + (y1 - y0) * p.fy };
+  }
+  return { x: (x0 + x1) / 2, y: Math.max(17, m.top - 11) };
+}
+
 function drawGraphTitle() {
   const t = (STATE.graphTitle || '').trim();
   if (!t) return;
-  const m = CONFIG.margin;
-  svg.append('text')
-    .attr('x', (m.left + (W - m.right)) / 2).attr('y', Math.max(17, m.top - 11))
+  const at = titleAnchorPx();
+  const el = svg.append('text').attr('class', 'graph-title')
+    .attr('x', at.x).attr('y', at.y)
     .attr('text-anchor', 'middle').attr('font-size', 15).attr('font-weight', 650)
     .attr('fill', STATE.titleColor || COL.ink)
+    /* Обводка цветом холста: если подпись всё же легла на кривую, она читается
+       поверх неё, а не сливается (Н22). */
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
+    .style('cursor', 'move')
     .text(t);
+
+  el.append('title').text('Потяните, чтобы перенести. Двойной щелчок правит название');
+
+  // Перетаскивание: запоминаем долю поля, а не пиксели.
+  el.call(d3.drag().container(() => svg.node())
+    .on('start', (ev) => { ev.sourceEvent.stopPropagation(); })
+    .on('drag', (ev) => {
+      ev.sourceEvent.stopPropagation();      // не тянем ни поле, ни кривую
+      const m = CONFIG.margin;
+      const x0 = m.left, x1 = W - m.right, y0 = 0, y1 = H - m.bottom;
+      const fx = Math.max(0, Math.min(1, (ev.x - x0) / Math.max(1, x1 - x0)));
+      const fy = Math.max(0, Math.min(1, (ev.y - y0) / Math.max(1, y1 - y0)));
+      STATE.titlePos = { fx, fy };
+      redrawAll();
+    }));
+
+  el.on('dblclick', (ev) => {
+    ev.stopPropagation();                    // двойной щелчок НЕ сбрасывает масштаб
+    ev.preventDefault();
+    editGraphTitleOnCanvas(at);
+  });
+}
+
+/* Правка названия на месте: поле ввода поверх холста, ровно там, где стоит сама
+   подпись, тем же кеглем. Рядом выбор цвета, чтобы не искать его в меню. */
+function editGraphTitleOnCanvas(at) {
+  const wrap = document.getElementById('graph-wrap');
+  if (!wrap || wrap.querySelector('.title-edit')) return;
+  const box = document.createElement('div');
+  box.className = 'title-edit';
+  box.style.left = at.x + 'px';
+  box.style.top = (at.y - 14) + 'px';
+
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = STATE.graphTitle || '';
+  inp.setAttribute('aria-label', 'Название графика');
+
+  const pick = makeColorPicker(STATE.titleColor || COL.ink, (hex) => {
+    STATE.titleColor = hex;
+    const f = document.getElementById('gtitle-color-slot');
+    if (f && f._setValue) f._setValue(hex);
+    redrawAll();
+  }, 'Цвет названия');
+
+  const close = () => {
+    STATE.graphTitle = inp.value;
+    const f = document.getElementById('inp-gtitle');
+    if (f) f.value = inp.value;              // поле в меню плоскости идёт следом
+    box.remove();
+    redrawAll();
+  };
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); close(); }
+    if (e.key === 'Escape') { e.preventDefault(); box.remove(); }
+  });
+  inp.addEventListener('blur', () => setTimeout(() => { if (box.isConnected && !box.contains(document.activeElement)) close(); }, 120));
+
+  box.append(inp, pick);
+  wrap.appendChild(box);
+  inp.focus();
+  const n = inp.value.length;
+  try { inp.setSelectionRange(n, n); } catch (e) {}
 }
 
 /* Пикер цвета (Фаза 2) — переиспользуемый для ЛЮБОГО списка кривых.
@@ -2504,7 +2588,7 @@ const SCENE_DEFAULTS = {
   // Заливки и цвета.
   showCS: true, showPS: true, showGhost: false,
   showMonoCS: true, showMonoPS: true, showMonoVC: false,
-  colorOverride: {}, areaColor: {},
+  colorOverride: {}, areaColor: {}, titlePos: null,   // своё место названия (доли поля, Н22)
   // Плоскость и подписи.
   labelSize: LABEL_SIZE_DEFAULT, firstQuad: true, xStep: null, yStep: null,
   showLegend: true, zoomLock: false, viewDirty: false,

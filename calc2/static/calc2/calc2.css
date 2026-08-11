@@ -1532,3 +1532,20 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .sb-body .stat.stat-eq > b { text-align: left; font-weight: 700; }
 /* Число, набранное KaTeX: кегль табло, но без жирности самого шрифта формул. */
 .sb-body .stat b.stat-tex .katex { font-size: 1em; }
+
+/* Н22. Правка названия графика прямо на холсте: поле стоит там же, где сама
+   подпись, тем же кеглем, без рамки — как и все остальные значения. */
+.title-edit {
+  position: absolute; z-index: var(--z-float);
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 6px; border-radius: var(--r-sm);
+  background: var(--surface); border: 1px solid var(--border);
+  box-shadow: var(--shadow-panel);
+}
+.title-edit input[type="text"] {
+  min-width: 160px; padding: 2px 4px; font-size: 15px; font-weight: 650;
+  color: var(--text); background: transparent;
+  border: none; border-bottom: 1px dashed var(--border); border-radius: 0;
+}
+.title-edit input[type="text"]:focus { outline: none; border-bottom-color: var(--accent); }
