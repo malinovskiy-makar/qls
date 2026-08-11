@@ -1514,3 +1514,21 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .mark-chks { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .mark-chks .chk { font-size: 11px; }
 .mark-ok { margin-left: 2px; color: var(--accent); font-size: 13px; }
+
+/* Н6. «Ключевые значения» набраны как в учебнике: подпись, знак равенства,
+   число. Знаки стоят в одной колонке, поэтому числа не пляшут лесенкой, а
+   читаются столбиком. Прежде подпись и число разносило по краям строки
+   (justify-content: space-between), и у каждой строки был свой отступ. */
+/* Колонка числа фиксированной ширины: сетка у каждой строки своя, и без этого
+   знаки равенства вставали каждый на своём месте. С постоянной третьей
+   колонкой их левый край одинаков во всех строках, то есть колонка знаков
+   стоит ровно. */
+.sb-body .stat.stat-eq {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto 78px;
+  align-items: baseline; column-gap: 6px;
+}
+.sb-body .stat.stat-eq > span { text-align: right; }
+.stat-sign { font-style: normal; color: var(--text3); font-size: 12px; }
+.sb-body .stat.stat-eq > b { text-align: left; font-weight: 700; }
+/* Число, набранное KaTeX: кегль табло, но без жирности самого шрифта формул. */
+.sb-body .stat b.stat-tex .katex { font-size: 1em; }

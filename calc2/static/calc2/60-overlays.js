@@ -334,6 +334,60 @@ function drawOverlays() {
   renderMathIn(document.getElementById('sb-body'));    // формулы в аналитике
   renderMathIn(document.getElementById('ex-body'));    // и в объяснении модели
   renderMathIn(document.getElementById('tools-panel'));// и в подсказках панели
+  typesetStats(document.getElementById('sb-body'));    // Н6: числа тоже формулой
+}
+
+/* ── Н6. Правая колонка «Ключевых значений» ───────────────────────────────
+   Подписи слева и раньше шли через рендер формул, а числа справа печатались
+   обычным жирным текстом и разметка растягивала их по краям строки. Отсюда и
+   «далеко стоят», и «жирные», и «скачут по вертикали»: у каждой строки своя
+   длина подписи, и числа вставали лесенкой.
+
+   Пройтись по 244 местам, где сцены собирают строки, невозможно и не нужно:
+   один проход по готовому табло делает то же самое для всех сразу. Каждое
+   число печатается KaTeX (значит, настоящие индексы и минусы), между подписью
+   и числом ставится знак равенства, и колонка знаков стоит на одной линии —
+   как в учебнике.
+
+   Что НЕ трогаем: строки-подсказки без числа (там нечего приравнивать),
+   уже обработанные строки и значения, которые сами являются словом («да»,
+   «дефицит»): равенство между подписью и словом читалось бы неверно. */
+function typesetStats(root) {
+  if (!root) return;
+  root.querySelectorAll('.stat').forEach(row => {
+    if (row._typeset) return;
+    const lab = row.querySelector(':scope > span');
+    const val = row.querySelector(':scope > b');
+    if (!lab || !val) return;
+    const raw = (val.textContent || '').trim();
+    if (!raw) return;
+    row._typeset = true;
+    // Числовое ли значение: число, пара, проценты, знак — да; фраза — нет.
+    const numeric = /^[(\[]?\s*[-−+]?[\d.,]/.test(raw) || /^[-−+]?\d/.test(raw);
+    if (numeric && typeof katex !== 'undefined') {
+      try {
+        katex.render(statToTex(raw), val, { throwOnError: false, displayMode: false });
+        val.classList.add('stat-tex');
+      } catch (e) { /* остаётся прежним текстом */ }
+    }
+    row.classList.add('stat-eq');
+    const eq = document.createElement('i');
+    eq.className = 'stat-sign';
+    eq.setAttribute('aria-hidden', 'true');
+    eq.textContent = '=';
+    row.insertBefore(eq, val);
+  });
+}
+
+/* Значение табло в запись для KaTeX. Числа и разделители оставляем как есть,
+   проценты и градусы экранируем, юникодный минус переводим в математический. */
+function statToTex(s) {
+  return String(s)
+    .replace(/−/g, '-')
+    .replace(/ /g, '\\,')
+    .replace(/%/g, '\\%')
+    .replace(/°/g, '^{\\circ}')
+    .replace(/([A-Za-zА-Яа-я ]{2,})/g, (w) => '\\text{' + w + '}');
 }
 
 /* ── Общий рендер математики в тексте интерфейса (Фаза 4) ─────────────
