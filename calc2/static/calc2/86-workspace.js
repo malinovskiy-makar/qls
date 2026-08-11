@@ -119,6 +119,13 @@ function moveExplanations() {
     if (h && h.textContent.trim() === 'Как это получилось') h.remove();
     to.appendChild(note);
   });
+  /* Н29. Сцена, которая разбор не пишет, берёт его из общего реестра
+     (90-explain.js). Свой разбор сцены главнее: если она что-то положила в
+     табло, реестр не подключается. */
+  if (!to.children.length && typeof sceneExplainHtml === 'function') {
+    const html = sceneExplainHtml();
+    if (html) to.innerHTML = html;
+  }
 }
 
 /* Правая панель показывает ровно то, что есть: ползунки, расчёты, разбор.
