@@ -102,8 +102,15 @@ await t('заголовок графика рисуется', async () => {
   await page.evaluate(() => { const e = document.getElementById('inp-gtitle');
     e.value = 'Рынок хлеба'; e.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.waitForTimeout(250);
+  /* Читаем СОБСТВЕННЫЙ текст узла: у заголовка появился дочерний <title> с
+     подсказкой про перенос и правку (Н22), а он попадает в textContent — та же
+     ловушка, что уже описана для легенды. */
   return await page.evaluate(() =>
-    [...document.querySelectorAll('#chart text')].some(n => n.textContent === 'Рынок хлеба') || 'нет текста в SVG');
+    [...document.querySelectorAll('#chart text')].some(n => {
+      const c = n.cloneNode(true);
+      [...c.querySelectorAll('title')].forEach(t => t.remove());
+      return c.textContent === 'Рынок хлеба';
+    }) || 'нет текста в SVG');
 });
 
 await t('своё имя оси X попадает на график', async () => {

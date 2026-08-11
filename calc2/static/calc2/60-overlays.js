@@ -777,8 +777,22 @@ function keyTargets() {
   const h = (w.x1 - w.x0) * 1e-4;
   const h2 = Math.max(h * 20, (w.x1 - w.x0) * 1e-3);
   snapTargets().forEach(t => {
+    /* У постоянной кривой (горизонтальная MC, потолок цены, мировая цена)
+       производная равна нулю ВЕЗДЕ, и экстремумом объявлялся каждый узел сетки:
+       на холсте вдоль такой линии выстраивались сотни серых кружков, а в
+       выгрузку уходило четыреста маркеров, сливавшихся в чёрную полосу.
+       У прямой линии экстремумов нет по определению, поэтому просто пропускаем
+       поиск, если функция на всём окне постоянна. */
+    let flat = true;
+    const y0f = t.f(lo);
+    for (let i = 1; i <= 12 && flat; i++) {
+      const v = t.f(lo + (hi - lo) * i / 12);
+      if (!isFinite(v) || !isFinite(y0f) || Math.abs(v - y0f) > 1e-9 * (1 + Math.abs(y0f))) flat = false;
+    }
     let ext = [];
-    try { ext = rootsOf((x) => dNum(t.f, x, h), lo, hi, 400); } catch (e) { ext = []; }
+    if (!flat) {
+      try { ext = rootsOf((x) => dNum(t.f, x, h), lo, hi, 400); } catch (e) { ext = []; }
+    }
     ext.forEach(x => {
       const y = t.f(x);
       if (!isFinite(y)) return;
