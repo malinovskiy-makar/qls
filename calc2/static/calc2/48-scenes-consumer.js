@@ -218,14 +218,14 @@ function updateConsumerPanel() {
   if (s) {
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
     html += `<div class="stat"><span>A: старый выбор (Px=${fmt(b.px)})</span><b>${fmt(b.x)} / ${fmt(b.y)}</b></div>`;
-    html += `<div class="stat"><span>B: компенсированный (I′=${fmt(s.Icomp)})</span><b>${fmt(s.comp.x)} / ${fmt(s.comp.y)}</b></div>`;
+    html += `<div class="stat"><span>B: компенсированный ($I'$=${fmt(s.Icomp)})</span><b>${fmt(s.comp.x)} / ${fmt(s.comp.y)}</b></div>`;
     html += `<div class="stat"><span>C: новый выбор (Px=${fmt(s.px1)})</span><b>${fmt(s.fin.x)} / ${fmt(s.fin.y)}</b></div>`;
     const sg = (v) => (v > 0 ? '+' : '') + fmt(v);
     html += '<table class="tx-table" style="margin-top:6px;"><tr><th></th><th>замещ.</th><th>доход</th><th>итог</th></tr>';
     html += `<tr><td>Δx</td><td>${sg(s.subX)}</td><td>${sg(s.incX)}</td><td>${sg(s.totX)}</td></tr>`;
     html += `<tr><td>Δy</td><td>${sg(s.subY)}</td><td>${sg(s.incY)}</td><td>${sg(s.totY)}</td></tr>`;
     html += '</table>';
-    html += `<div class="hint">Компенсированный доход по Слуцкому I′&nbsp;=&nbsp;Px₁·x₀&nbsp;+&nbsp;Py·y₀&nbsp;=&nbsp;${fmt(s.Icomp)}:
+    html += `<div class="hint">Компенсированный доход по Слуцкому $I' = P_{x_1} x_0 + P_y y_0 = ${fmt(s.Icomp)}$:
       столько нужно, чтобы СТАРЫЙ набор остался доступен при НОВЫХ ценах. Переход A→B — чистый эффект
       замещения (полезность меняется, покупательная способность старого набора сохранена), B→C — эффект
       дохода. Их сумма равна общему изменению.</div>`;

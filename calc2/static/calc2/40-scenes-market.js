@@ -461,7 +461,7 @@ function updateOpenPanel() {
   if (!o) { box.innerHTML = '<div class="muted">Задайте мировую цену Pw.</div>'; return; }
   if (o.error) { box.innerHTML = '<div class="warn">' + o.error + '</div>'; return; }
   let html = `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(o.Pw)}</b></div>`;
-  if (o.aut) html += `<div class="stat"><span>Автаркия: (Q*; P*)</span><b>(${fmt(o.aut.Q)}; ${fmt(o.aut.P)})</b></div>`;
+  if (o.aut) html += `<div class="stat"><span>Автаркия: $(Q^*; P^*)$</span><b>(${fmt(o.aut.Q)}; ${fmt(o.aut.P)})</b></div>`;
   html += `<div class="stat"><span>При Pw: (Qd; Qs)</span><b>(${fmt(o.Qd)}; ${fmt(o.Qs)})</b></div>`;
   html += `<div class="stat"><span>${o.importing ? 'Импорт' : 'Экспорт'}</span><b>${fmt(o.volume)}</b></div>`;
   html += `<div class="stat"><span>(CS; PS) при своб. торговле</span><b>(${fmt(o.csFree)}; ${fmt(o.psFree)})</b></div>`;

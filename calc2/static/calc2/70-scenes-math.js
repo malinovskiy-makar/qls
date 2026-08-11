@@ -277,7 +277,7 @@ function editInlineLabel(current, px, py, apply) {
 }
 
 /* ── 7а. Производная и касательная ─────────────────────────────────────
-   Две панели: сверху f(x) с точкой и касательной, снизу f′(x) численно.
+   Две панели: сверху f(x) с точкой и касательной, снизу $f'(x)$ численно.
    Панели РАЗДЕЛЬНЫЕ. У каждой своё окно (и по x, и по y), свой зум и своя
    панорама, а рисование заперто в её прямоугольник через clip: раньше окно
    было общим, колесо над одной панелью тянуло обе, и при отдалении верхняя
@@ -376,7 +376,7 @@ function drawMathTangent(f) {
   gUi.append('text').attr('x', m.left + 4).attr('y', L.top + 14)
     .attr('font-size', 13.5).attr('font-weight', 700).attr('fill', COL.tanF).text('f(x), сама функция');
   gUi.append('text').attr('x', m.left + 4).attr('y', L.botTop + 14)
-    .attr('font-size', 13.5).attr('font-weight', 700).attr('fill', COL.tanD).text('f′(x), производная');
+    .attr('font-size', 13.5).attr('font-weight', 700).attr('fill', COL.tanD).text("$f'(x)$, производная");
 
   mathLine(gTop, f, s1.mx, s1.my, COL.tanF, 2.6);
   mathLine(gBot, dfun, s2.mx, s2.my, COL.tanD, 2.4);
@@ -461,7 +461,7 @@ function drawMathOptimum(f) {
   STATE.mathRes = a;
   /* Подпись «максимум 2» не говорила, что это: координата точки или значение
      функции. Пишем обе величины и называем их: x* — где, y* — сколько. */
-  const ptLabel = (kind, p) => kind + ': x* = ' + fmt(p.x) + ', y* = ' + fmt(p.y);
+  const ptLabel = (kind, p) => kind + ': $(x^*; y^*) = (' + fmt(p.x) + '; ' + fmt(p.y) + ')$';
   a.ext.forEach((p, i) => {
     if (p.y < my.domain()[0] || p.y > my.domain()[1]) return;
     mathDot(g, mx, my, p.x, p.y, p.kind === 'max' ? COL.S : COL.MC,
@@ -752,7 +752,7 @@ function mathOptimumReasoning(r) {
   if (!f) return '';
   const ext = r.ext || [], inf = r.inf || [];
   let h = '<div class="sb-note"><b>Как это получилось</b>';
-  h += '<p><b>По чему ищутся экстремумы?</b> Экстремум там, где касательная горизонтальна, то есть f′(x) = 0. '
+  h += "<p><b>По чему ищутся экстремумы?</b> Экстремум там, где касательная горизонтальна, то есть $f'(x) = 0$. "
      + 'Корни ищутся численно: сетка по отрезку и уточнение делением пополам, '
      + 'поэтому подходит любая функция, даже кусочная.</p>';
   if (!ext.length) h += '<p><b>А если ничего не нашлось?</b> На этом отрезке производная в нуль не обращается: ни максимумов, ни минимумов.</p>';
@@ -760,14 +760,14 @@ function mathOptimumReasoning(r) {
     const s = d2Num(f, p.x);
     const kind = p.kind === 'max' ? 'максимум' : (p.kind === 'min' ? 'минимум' : 'плато');
     const sign = s > 0 ? 'больше нуля' : (s < 0 ? 'меньше нуля' : 'равна нулю');
-    h += `<p>x* = ${fmt(p.x)}: здесь f′ = 0, а f″ = ${fmt(s)}, то есть ${sign}. `
+    h += `<p>$x^* = ${fmt(p.x)}$: здесь $f' = 0$, а $f'' = ${fmt(s)}$, то есть ${sign}. `
        + `Значит, ${kind}. ${p.kind === 'max' ? 'Кривая выпукла вверх' : (p.kind === 'min' ? 'Кривая выпукла вниз' : 'Знак не определился')}.</p>`;
   });
-  h += '<p>Перегиб это смена знака второй производной: до него кривая выгнута '
+  h += "<p>Перегиб это смена знака второй производной $f''$: до него кривая выгнута "
      + 'в одну сторону, после в другую. Поэтому его и ищут как корень f″(x) = 0, '
      + 'но засчитывают только там, где знак действительно поменялся.</p>';
   if (inf.length) {
-    h += '<p>Найдено: ' + inf.map(p => 'x* = ' + fmt(p.x)).join(', ') + '.</p>';
+    h += '<p>Найдено: ' + inf.map(p => '$x^* = ' + fmt(p.x) + '$').join(', ') + '.</p>';
   } else {
     h += '<p>Здесь вторая производная знак не меняет, поэтому перегибов нет.</p>';
   }
@@ -807,17 +807,17 @@ function updateMathPanel() {
               + `Разница с касательной ${fmt(Math.abs(r.secant - r.k))}: уменьшайте Δx, и она стремится к нулю. `
               + `Это и есть предел, которым определяют производную.</p>`
             : '<p>Включите секущую, и будет видно, как при уменьшении Δx она ложится на касательную.</p>')
-        + `<p>Внизу нарисована f′(x) целиком: там, где она выше нуля, функция растёт, `
+        + `<p>Внизу нарисована $f'(x)$ целиком: там, где она выше нуля, функция растёт, `
         + `где ниже, там убывает. А её собственные нули это максимумы и минимумы самой функции.</p>`
         + '</div>';
     }
   } else if (STATE.mathSub === 'optimum') {
-    if (r.gMax) html += `<div class="stat"><span>Наибольшее на отрезке</span><b>y* = ${fmt(r.gMax.y)} при x* = ${fmt(r.gMax.x)}</b></div>`;
-    if (r.gMin) html += `<div class="stat"><span>Наименьшее на отрезке</span><b>y* = ${fmt(r.gMin.y)} при x* = ${fmt(r.gMin.x)}</b></div>`;
+    if (r.gMax) html += `<div class="stat"><span>Наибольшее на отрезке</span><b>$y^* = ${fmt(r.gMax.y)}$ при $x^* = ${fmt(r.gMax.x)}$</b></div>`;
+    if (r.gMin) html += `<div class="stat"><span>Наименьшее на отрезке</span><b>$y^* = ${fmt(r.gMin.y)}$ при $x^* = ${fmt(r.gMin.x)}$</b></div>`;
     (r.ext || []).forEach(p => {
-      html += `<div class="stat"><span>${p.kind === 'max' ? 'Локальный максимум' : (p.kind === 'min' ? 'Локальный минимум' : 'Плато')}</span><b>x* = ${fmt(p.x)}, y* = ${fmt(p.y)}</b></div>`;
+      html += `<div class="stat"><span>${p.kind === 'max' ? 'Локальный максимум' : (p.kind === 'min' ? 'Локальный минимум' : 'Плато')}</span><b>$(x^*; y^*) = (${fmt(p.x)}; ${fmt(p.y)})$</b></div>`;
     });
-    (r.inf || []).forEach(p => { html += `<div class="stat"><span>Перегиб</span><b>x* = ${fmt(p.x)}, y* = ${fmt(p.y)}</b></div>`; });
+    (r.inf || []).forEach(p => { html += `<div class="stat"><span>Перегиб</span><b>$(x^*; y^*) = (${fmt(p.x)}; ${fmt(p.y)})$</b></div>`; });
     // Разбор: как машина к этому пришла, шаг за шагом и с числами.
     html += mathOptimumReasoning(r);
     if (!html) html = '<div class="muted">На этом отрезке ни экстремумов, ни перегибов.</div>';

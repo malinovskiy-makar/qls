@@ -106,7 +106,7 @@ function recomputeMacro() {
     return;
   }
   if (m === 'phillips') {
-    // π = πe − β(u − u*): прямая с наклоном −β через точку (u*, πe).
+    // $\pi = \pi_e - \beta(u - u^*)$: прямая с наклоном −β через точку $(u^*;\ \pi_e)$.
     const f = (u) => P.pe - P.beta * (u - P.ustar);
     const sr = { fn: f };
     const lrp = makeVerticalCurve(P.ustar);
@@ -318,7 +318,7 @@ function updateMacroPanel() {
   let html = '';
   if (r.kind === 'adas') {
     html += `<div class="stat"><span>Краткосрочно: (Y; P)</span><b>(${fmt(r.eq.Q)}; ${fmt(r.eq.P)})</b></div>`;
-    html += `<div class="stat"><span>Потенциальный выпуск Y*</span><b>${fmt(r.Ystar)}</b></div>`;
+    html += `<div class="stat"><span>Потенциальный выпуск $Y^*$</span><b>${fmt(r.Ystar)}</b></div>`;
     const g = r.gap;
     html += `<div class="stat"><span>Разрыв выпуска</span><b>${(g >= 0 ? '+' : '') + fmt(g)}</b></div>`;
     html += `<div class="hint" style="margin-top:4px;">${Math.abs(g) < 1e-6
@@ -329,12 +329,12 @@ function updateMacroPanel() {
   } else if (r.kind === 'phillips') {
     const f = r.f;
     html += `<div class="stat"><span>Ожидаемая инфляция πe</span><b>${fmt(P.pe)}</b></div>`;
-    html += `<div class="stat"><span>Естественный уровень u*</span><b>${fmt(P.ustar)}</b></div>`;
+    html += `<div class="stat"><span>Естественный уровень $u^*$</span><b>${fmt(P.ustar)}</b></div>`;
     html += `<div class="stat"><span>Наклон β</span><b>${fmt(P.beta)}</b></div>`;
-    html += '<table class="tx-table" style="margin-top:6px;"><tr><th>u</th><th>π = πe − β(u − u*)</th></tr>';
+    html += '<table class="tx-table" style="margin-top:6px;"><tr><th>u</th><th>$\pi = \pi_e - \beta(u - u^*)$</th></tr>';
     [P.ustar - 2, P.ustar, P.ustar + 2].forEach(u => { html += `<tr><td>${fmt(u)}</td><td>${fmt(f(u))}</td></tr>`; });
     html += '</table>';
-    html += '<div class="hint">Краткосрочная кривая проходит через точку (u*, πe) с наклоном −β: снизить ' +
+    html += '<div class="hint">Краткосрочная кривая проходит через точку $(u^*;\ \pi_e)$ с наклоном $-\beta$: снизить ' +
       'безработицу ниже естественной можно только ценой более высокой инфляции. Долгосрочная идёт вертикалью ' +
       'при u = u*: в долгом периоде ожидания подстраиваются, и размена нет.</div>';
   } else if (r.kind === 'money') {
