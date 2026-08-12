@@ -118,7 +118,7 @@
   {% if group %}
     <a href="{% url 'teacher:group_assignment' group.pk assignment.pk %}" class="btn-back">← К заданию</a>
   {% else %}
-    <a href="{% url 'teacher:dashboard' %}" class="btn-back">← Назад</a>
+    <a href="{% url 'teacher:groups' %}" class="btn-back">← Ученики</a>
   {% endif %}
   <h1 class="page-title">{{ assignment.name }}</h1>
   {% if group %}

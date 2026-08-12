@@ -759,7 +759,7 @@ def assignment_create(request):
                             group_id=assignment.group_id,
                             assignment_id=assignment.pk)
         messages.success(request, f'Домашка «{title}» создана.')
-        return redirect('teacher:dashboard')
+        return redirect('teacher:groups')
 
     from problems.models import SavedProblem
 

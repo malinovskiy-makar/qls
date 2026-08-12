@@ -1,6 +1,11 @@
 """
-Тесты панели учителя: доступ, дашборд, список решений, проверка работы,
+Тесты панели учителя: доступ, список решений, проверка работы,
 обновление прогресса ученика.
+
+⚠️ Вкладка «Проверка» (дашборд входящих) удалена в сессии 9. Адрес
+`teacher:dashboard` остался редиректом на список учеников — после входа
+преподаватель попадает ровно на него. Проверки доступа переехали на живой
+экран, а проверка содержимого дашборда снята: содержимого больше нет.
 """
 
 from django.test import TestCase
@@ -13,16 +18,24 @@ from problems.tests.factories import (
 
 
 class TeacherAccessTests(TestCase):
-    def test_dashboard_requires_login(self):
-        resp = self.client.get(reverse('teacher:dashboard'))
+    def test_cabinet_requires_login(self):
+        resp = self.client.get(reverse('teacher:groups'))
         self.assertEqual(resp.status_code, 302)
         self.assertIn('/login/', resp['Location'])
 
     def test_student_gets_403(self):
         student = make_user('s1', role='student')
         self.client.force_login(student)
-        resp = self.client.get(reverse('teacher:dashboard'))
+        resp = self.client.get(reverse('teacher:groups'))
         self.assertEqual(resp.status_code, 403)
+
+    def test_cabinet_root_leads_to_students(self):
+        """Корень кабинета — вход преподавателя, своего экрана у него нет."""
+        teacher = make_user('t_root', role='teacher')
+        self.client.force_login(teacher)
+        resp = self.client.get(reverse('teacher:dashboard'))
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp['Location'], reverse('teacher:groups'))
 
 
 class TeacherPanelTests(TestCase):
@@ -41,12 +54,11 @@ class TeacherPanelTests(TestCase):
     def setUp(self):
         self.client.force_login(self.teacher)
 
-    def test_dashboard_shows_pending_count(self):
-        """Дашборд входящих (Фаза 14) показывает, сколько работ ждёт.
+    def test_students_screen_shows_pending_count(self):
+        """Сколько работ ждёт проверки — теперь на экране «Ученики».
 
-        Раньше контекст назывался `assignment_data` и строился по автору
-        домашки. Теперь дашборд ходит по ГРУППАМ репетитора — поэтому в
-        тесте домашка привязана к группе.
+        Раньше это проверялось на дашборде входящих; вкладка удалена, а
+        счётчик остался — он же и стал единым для всего кабинета (фаза 4).
         """
         from problems.models import StudentGroup
 
@@ -56,11 +68,11 @@ class TeacherPanelTests(TestCase):
         self.assignment.group = group
         self.assignment.save()
 
-        resp = self.client.get(reverse('teacher:dashboard'))
+        resp = self.client.get(reverse('teacher:groups'))
         self.assertEqual(resp.status_code, 200)
-        row = next(r for r in resp.context['pending_rows']
-                   if r['assignment'].pk == self.assignment.pk)
-        self.assertEqual(row['count'], 1)
+        card = next(c for c in resp.context['cards']
+                    if c['group'].pk == group.pk)
+        self.assertEqual(card['pending'], 1)
 
     def test_assignment_detail_lists_submissions(self):
         resp = self.client.get(

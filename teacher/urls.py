@@ -8,10 +8,14 @@ from . import (
 app_name = 'teacher'
 
 urlpatterns = [
-    # Дашборд входящих — НАВИГАЦИЯ, а не рабочая поверхность.
-    path('', views_groups.dashboard, name='dashboard'),
+    # ⚠️ ВКЛАДКА «ПРОВЕРКА» УБРАНА (сессия 9, фаза 3): вьюха, шаблон и пункт
+    # меню удалены. Сам адрес оставлен редиректом НЕ ради закладок, а потому
+    # что после входа преподаватель попадает ровно на `/teacher/`
+    # (`problems/views_auth.py`) — удалить его насухо значило встретить
+    # вошедшего четырёхсотой.
+    path('', views_groups.teacher_home, name='dashboard'),
 
-    # ---- Вкладка «Группы»: вся работа с группой живёт здесь --------------
+    # ---- Вкладка «Ученики»: вся работа с занятием живёт здесь ------------
     path('groups/', views_groups.groups_list, name='groups'),
     path('groups/create/', views_groups.group_create, name='group_create'),
     path('groups/<int:pk>/', views_groups.group_detail, name='group_detail'),

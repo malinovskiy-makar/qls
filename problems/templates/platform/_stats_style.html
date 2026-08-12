@@ -73,7 +73,11 @@
    сказать об этом сам — иначе он выглядит сломанным. */
 .panel-allt { font-size: 11px; font-weight: 500; color: var(--text3);
               margin-left: 8px; white-space: nowrap; }
-.panel--lead { border-color: var(--accent); }
+/* ⚠️ ПРАВИЛА `.panel--lead` БОЛЬШЕ НЕТ (сессия 9, фаза 3). Оно обводило
+   «главный» блок экрана малиновой рамкой. Владелец: выделен оказывался
+   ровно один блок из десяти, и это читалось не как «сюда смотреть», а как
+   «здесь что-то не так» — либо все, либо никакие. Убрано у всех: акцент
+   в проекте не для рамок блоков. */
 .chart-box { position: relative; height: 240px; }
 .chart-box.tall { height: 300px; }
 .empty-note { font-size: 13px; color: var(--text2); text-align: center;

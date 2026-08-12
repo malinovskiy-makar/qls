@@ -112,7 +112,8 @@
   <a href="{% url 'teacher:group_submissions' group.pk submission.assignment.pk %}">{{ submission.assignment.name }}</a> →
   проверка
   {% else %}
-  <a href="{% url 'teacher:dashboard' %}">Проверка</a> → {{ submission.assignment.name }}
+  {# Занятия без группы: вести назад некуда, кроме списка учеников. #}
+  <a href="{% url 'teacher:groups' %}">Ученики</a> → {{ submission.assignment.name }}
   {% endif %}
 </div>
 

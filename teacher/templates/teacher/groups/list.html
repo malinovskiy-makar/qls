@@ -1,14 +1,15 @@
 {% extends 'teacher/base.html' %}
 
-{% block title %}Группы — ЭкЗадачи{% endblock %}
+{% load ru %}
+
+{% block title %}Ученики — ЭкЗадачи{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="page-title">Группы</h1>
-    <div class="page-sub">Вся работа с группой — внутри этой вкладки.</div>
+    <h1 class="page-title">Ученики</h1>
   </div>
   <a href="{% url 'teacher:group_create' %}" class="btn-primary">+ Создать группу</a>
 </div>
@@ -19,8 +20,8 @@
   <div class="card">
     <div class="card-name">{{ card.group.name }}</div>
     <div class="card-meta">
-      {{ card.students }} ученик{{ card.students|pluralize:",а,ов" }} ·
-      {{ card.assignments }} задани{{ card.assignments|pluralize:"е,я,й" }}<br>
+      {{ card.students|count_ru:"ученик,ученика,учеников" }} ·
+      {{ card.assignments|count_ru:"задание,задания,заданий" }}<br>
       {% if card.pending %}
         <span class="badge badge-pending">{{ card.pending }} ждёт проверки</span><br>
       {% else %}
@@ -45,10 +46,4 @@
   <p>Создайте первую — внутри неё живут ученики, задания и проверка.</p>
 </div>
 {% endif %}
-
-<div class="note" style="margin-top: 24px;">
-  Подключение учеников (ссылки-приглашения) появится позже. Сейчас ученики
-  добавляются в группу через админку или командой
-  <code>seed_platform_demo</code>.
-</div>
 {% endblock %}

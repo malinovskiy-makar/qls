@@ -553,79 +553,22 @@ def api_comment_create(request):
 
 
 # ---------------------------------------------------------------------------
-# Фаза 14 — дашборд входящих
+# Вкладка «Проверка» удалена (сессия 9, фаза 3)
 # ---------------------------------------------------------------------------
+# Владелец: смысл был только для репетитора с несколькими группами, а всё то
+# же видно через открытие каждого занятия. Дашборд входящих был ЧЕТВЁРТЫМ
+# местом, где считаются ждущие проверки работы, и считал он их по-своему —
+# именно из-за таких копий три экрана показывали три разных числа (фаза 4).
+#
+# ⚠️ Адрес `/teacher/` оставлен редиректом НЕ ради закладок: после входа
+# преподаватель попадает ровно сюда (`problems/views_auth.py`). Удалить
+# насухо значило встретить вошедшего четырёхсотой.
+
 
 @tutor_required
-def dashboard(request):
-    """Где что ждёт. Только НАВИГАЦИЯ: проверять и оценивать отсюда нельзя.
-
-    Соблазн «проверю прямо здесь» велик, но тогда работа с группой уехала
-    бы из вкладки «Группы» и разъехалась по двум местам.
-    """
-    from problems.models import Assignment, StudentGroup, Submission
-
-    now = timezone.now()
-    groups = list(StudentGroup.objects.filter(teacher=request.user))
-    assignments = list(Assignment.objects.filter(group__in=groups)
-                       .select_related('group'))
-
-    # 1. Ждёт проверки.
-    pending_rows = []
-    for assignment in assignments:
-        count = Submission.objects.filter(assignment=assignment,
-                                          status='submitted').count()
-        if count:
-            pending_rows.append({'assignment': assignment,
-                                 'group': assignment.group, 'count': count})
-    pending_rows.sort(key=lambda r: -r['count'])
-
-    # 2. Просроченные дедлайны — кто не сдал вовремя.
-    overdue_rows = []
-    for assignment in assignments:
-        deadline = assignment.deadline_at
-        if not deadline or deadline >= now:
-            continue
-        done = set(Submission.objects
-                   .filter(assignment=assignment,
-                           status__in=('submitted', 'reviewed'))
-                   .values_list('student_id', flat=True))
-        missing = [s for s in assignment.students.all() if s.pk not in done]
-        if missing:
-            overdue_rows.append({'assignment': assignment,
-                                 'group': assignment.group,
-                                 'students': missing,
-                                 'deadline': deadline})
-    overdue_rows.sort(key=lambda r: r['deadline'], reverse=True)
-
-    # 3. Ближайшие дедлайны — на неделю вперёд.
-    week = now + timedelta(days=7)
-    upcoming = sorted(
-        ({'assignment': a, 'group': a.group, 'deadline': a.deadline_at}
-         for a in assignments
-         if a.deadline_at and now <= a.deadline_at <= week),
-        key=lambda r: r['deadline'])
-
-    # 4. Давно не заходили — больше 14 дней.
-    threshold = now - timedelta(days=14)
-    quiet = []
-    seen = set()
-    for group in groups:
-        for student in group.students.all():
-            if student.pk in seen:
-                continue
-            seen.add(student.pk)
-            if student.last_login is None or student.last_login < threshold:
-                quiet.append({'student': student, 'group': group,
-                              'last_login': student.last_login})
-
-    return render(request, 'teacher/dashboard_inbox.html', {
-        'pending_rows': pending_rows,
-        'overdue_rows': overdue_rows,
-        'upcoming_rows': upcoming,
-        'quiet_rows': quiet,
-        'groups_count': len(groups),
-    })
+def teacher_home(request):
+    """Корень кабинета. Своего экрана у него больше нет — уводим к ученикам."""
+    return redirect('teacher:groups')
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 {% extends 'teacher/base.html' %}
+{% load ru %}
 {% comment %}
 Карточка ученика — ЕДИНСТВЕННЫЙ экран об одном ученике (сессия 7, фаза 10).
 
@@ -96,7 +97,7 @@
    Класс, чей стиль лежит в неподключённом файле, — уже знакомый нам
    класс дефекта (баг 7.6). */
 
-/* ── Заметки о ученике ──────────────────────────────────────────────── */
+/* ── Заметки об ученике ──────────────────────────────────────────────── */
 .note-said { font-size: 12px; color: var(--text2); margin-left: 10px; }
 .note-said[hidden] { display: none; }
 {% endblock %}
@@ -163,7 +164,7 @@
 <div class="panel">
   <div class="panel-head">
     <div class="panel-title">{{ card.title }}</div>
-    <div class="panel-hint">при наведении процент сменяется дробью</div>
+    <div class="panel-hint">Попробуйте навестись на шкалу</div>
   </div>
 
   {% for row in card.data.rows %}
@@ -207,14 +208,14 @@
 {% endfor %}
 
 {% comment %}
-«Сильные и слабые стороны» — перенесено со второго экрана статистики
+«Сильные и слабые темы» — перенесено со второго экрана статистики
 (решение стоп-гейта 10.1). Показывается только когда данных достаточно:
 на трёх задачах «100 % верных» не значит ничего.
 {% endcomment %}
 {% if ranking.enough_data %}
 <div class="panel">
   <div class="panel-head">
-    <div class="panel-title">Сильные и слабые стороны</div>
+    <div class="panel-title">Сильные и слабые темы</div>
     <div class="panel-hint">только темы с {{ ranking.min_attempts }}+ попытками</div>
   </div>
   <div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
@@ -255,20 +256,20 @@
 </div>
 
 {% comment %}
-Заметки о ученике — последний блок экрана (фаза 10.6).
+Заметки об ученике — последний блок экрана (фаза 10.6).
 Поле из набора деталей (`.k-area`), а не голая браузерная textarea.
 Сохранение без перезагрузки; форма настоящая, поэтому без JavaScript экран
 всё равно работает.
 {% endcomment %}
 <div class="panel">
   <div class="panel-head">
-    <div class="panel-title">Заметки о ученике</div>
+    <div class="panel-title">Заметки об ученике</div>
     <div class="panel-hint">Видно только вам</div>
   </div>
   <form method="post" id="note-form">
     {% csrf_token %}
     <textarea class="k-area" name="note" id="note-text" rows="4"
-              placeholder="Что помнить об этом ученике">{% if note %}{{ note.text }}{% endif %}</textarea>
+              placeholder="Полезная информация {{ student.get_full_name|default:student.username|prep_o }} {{ student.get_full_name|default:student.username }}">{% if note %}{{ note.text }}{% endif %}</textarea>
     <div class="k-row" style="margin-top:10px;align-items:center">
       <button type="submit" class="k-btn k-btn--plain k-btn--sm">Сохранить</button>
       <span class="note-said" id="note-said" hidden>сохранено</span>
