@@ -321,6 +321,26 @@
   outline: 2px solid var(--focus); outline-offset: 2px;
 }
 
+/* Сама подсказка. Рисует её `templates/_hint_js.html` — ОДИН блок на
+   страницу, положенный в конец <body>.
+   ⚠️ `position: fixed` обязателен: знаки вопроса стоят в шапках таблиц,
+   а таблицы лежат внутри `overflow-x: auto` (теплокарта, история работ), и
+   любой вложенный блок эта рамка обрезала бы.
+   ⚠️ `pointer-events: none` — подсказка не должна перехватывать курсор:
+   иначе наведение на неё саму считалось бы уходом со знака и она мигала бы. */
+.k-tip {
+  position: fixed; z-index: 900; max-width: 260px;
+  padding: 8px 11px; border-radius: var(--r);
+  border: 0.5px solid var(--border); background: var(--surface-2);
+  color: var(--text); font-size: 12px; line-height: 1.45;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+  pointer-events: none; white-space: normal; text-align: left;
+  font-weight: 400; letter-spacing: 0;
+}
+/* Явное правило: `display` из набора сильнее браузерного [hidden] —
+   на кнопках и списках этим уже обжигались дважды. */
+.k-tip[hidden] { display: none; }
+
 /* ── Пара чисел «по всему сайту / у этого репетитора» ──────────────────
    Второе число тише первого: главное — как ученик решает вообще, второе
    уточняет. Разделитель — косая черта, а не два отдельных столбца:

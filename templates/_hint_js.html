@@ -1,0 +1,106 @@
+{% comment %}
+Своя всплывашка для знаков вопроса (`.k-hintmark`, партиал `_hint.html`).
+Подключается ОДИН раз в базовом шаблоне, рядом с закрывающим </body>.
+
+Почему не CSS-псевдоэлемент. Знаки вопроса стоят в шапках таблиц, а таблицы
+живут внутри `overflow-x: auto` (теплокарта «ученики × темы», история работ).
+Псевдоэлемент обрезался бы этой рамкой, и подсказка пропадала бы ровно там,
+где нужнее всего. Плавающий блок в конце `<body>` с `position: fixed` не
+обрезается ничем и умеет отодвинуться от края экрана.
+
+Подсказка ОДНА на страницу — переиспользуется. Сотня знаков вопроса не
+создаёт сотню узлов.
+{% endcomment %}
+<script>
+(function () {
+  'use strict';
+
+  var tip = null;          // единственный блок подсказки
+  var current = null;      // знак вопроса, который её сейчас показывает
+
+  function box() {
+    if (tip) return tip;
+    tip = document.createElement('div');
+    tip.className = 'k-tip';
+    tip.setAttribute('role', 'tooltip');
+    tip.hidden = true;
+    document.body.appendChild(tip);
+    return tip;
+  }
+
+  function hide() {
+    current = null;
+    if (tip) { tip.hidden = true; tip.style.transform = ''; }
+  }
+
+  function show(mark) {
+    var text = mark.getAttribute('data-hint');
+    if (!text) return;
+    var el = box();
+    el.textContent = text;
+    el.hidden = false;
+    current = mark;
+
+    // Считаем место ПОСЛЕ показа: у скрытого блока нет размеров.
+    var anchor = mark.getBoundingClientRect();
+    var size = el.getBoundingClientRect();
+    var pad = 8;                       // отступ от края окна
+    var gap = 8;                       // зазор между знаком и подсказкой
+
+    // По горизонтали — по центру знака, но не вылезая за края окна.
+    var left = anchor.left + anchor.width / 2 - size.width / 2;
+    var maxLeft = window.innerWidth - size.width - pad;
+    if (left > maxLeft) left = maxLeft;
+    if (left < pad) left = pad;
+
+    // По вертикали — сверху; не помещается сверху — снизу.
+    var top = anchor.top - size.height - gap;
+    if (top < pad) top = anchor.bottom + gap;
+
+    el.style.left = Math.round(left) + 'px';
+    el.style.top = Math.round(top) + 'px';
+  }
+
+  // ⚠️ Делегирование, а не обработчик на каждом знаке: подсказки появляются
+  // и в кусках разметки, подгруженных без перезагрузки страницы (карточки
+  // кандидатов, строки проверки), и вешать слушателей заново было бы негде.
+  document.addEventListener('mouseover', function (e) {
+    var mark = e.target.closest && e.target.closest('.k-hintmark');
+    if (mark) show(mark);
+  });
+  document.addEventListener('mouseout', function (e) {
+    var mark = e.target.closest && e.target.closest('.k-hintmark');
+    if (mark && mark === current) hide();
+  });
+
+  // Клавиатура: подсказка обязана появляться и без мыши.
+  document.addEventListener('focusin', function (e) {
+    var mark = e.target.closest && e.target.closest('.k-hintmark');
+    if (mark) show(mark);
+  });
+  document.addEventListener('focusout', function (e) {
+    var mark = e.target.closest && e.target.closest('.k-hintmark');
+    if (mark && mark === current) hide();
+  });
+
+  // Сенсорный экран: наведения там нет вовсе, работает нажатие.
+  // ⚠️ Нажатие ВСЕГДА показывает, а не переключает. Мобильные браузеры перед
+  // `click` шлют искусственный `mouseover` — подсказка к этому моменту уже
+  // открыта, и «переключение» закрывало бы её ровно в момент касания.
+  // Поймано сценарием: клик на знак давал пустой экран.
+  // Убирается нажатием мимо, уходом курсора или клавишей Esc.
+  document.addEventListener('click', function (e) {
+    var mark = e.target.closest && e.target.closest('.k-hintmark');
+    if (mark) { show(mark); return; }
+    hide();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') hide();
+  });
+  // Прокрутка и поворот экрана: подсказка привязана к месту на экране, а
+  // знак под ней уехал — держать её висящей в пустоте нельзя.
+  window.addEventListener('scroll', hide, true);
+  window.addEventListener('resize', hide);
+})();
+</script>
