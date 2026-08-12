@@ -587,14 +587,21 @@ class StatsFormulaTests(TestCase):
         self.assertEqual(row['solved'], 1)
         self.assertEqual(row['percent'], 80)
 
-    def test_all_twenty_one_topics_are_present(self):
-        """Тема без попыток — пустая строка, а не пропуск (8.1)."""
+    def test_every_canonical_topic_is_present(self):
+        """Тема без попыток — пустая строка, а не пропуск (8.1).
+
+        ⚠️ Число берётся ИЗ САМОГО СПИСКА, а не зашито цифрой. Раньше здесь
+        стояла 21, и расширение атласа до 23 (сессия 9, фаза 2) покрасило
+        тест, который на самом деле проверяет другое: что показаны ВСЕ темы
+        канона, а не сколько их сегодня.
+        """
+        from problems.management.commands.apply_topic_mapping import CANONICAL
         from problems import stats
 
         result = stats.topic_progress(self.student)
-        self.assertEqual(len(result['rows']), 21)
+        self.assertEqual(len(result['rows']), len(CANONICAL))
         empty = [r for r in result['rows'] if r['empty']]
-        self.assertEqual(len(empty), 20)
+        self.assertEqual(len(empty), len(CANONICAL) - 1)
 
     def test_total_row_counts_over_all_tasks(self):
         """«Всего» — по всем задачам, а не среднее из процентов тем (8.7)."""
@@ -650,10 +657,11 @@ class StatsFormulaTests(TestCase):
         self.assertGreater(cells[self.topic.pk]['attempted'], 0)
 
     def test_heatmap_shows_every_canonical_topic(self):
+        from problems.management.commands.apply_topic_mapping import CANONICAL
         from problems import stats
 
         matrix = stats.group_topic_matrix(self.group)
-        self.assertEqual(len(matrix['columns']), 21)
+        self.assertEqual(len(matrix['columns']), len(CANONICAL))
 
     def test_group_average_is_weighted_by_solved_count(self):
         """8.3 — средневзвешенное по числу решённых, не среднее из процентов.
