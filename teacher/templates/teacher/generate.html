@@ -10,7 +10,16 @@
    тянуть ради одной строки весь набор стилей статистики незачем. */
 .empty-note { font-size: 13px; color: var(--text2); text-align: center;
               padding: 18px; }
-.gen-wrap { max-width: 860px; }
+.gen-wrap { max-width: 1060px; }
+/* Две колонки первого шага: слева рабочая область, справа «Что получится». */
+.gen-two { display: grid; grid-template-columns: minmax(0,1fr) 300px;
+           gap: 20px; align-items: start; }
+.gen-left { min-width: 0; }
+.gen-side { position: sticky; top: 68px; }
+.gen-sum__line { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.gen-sum__line.k-quiet { font-weight: 400; }
+@media (max-width: 900px) { .gen-two { grid-template-columns: 1fr; }
+                            .gen-side { position: static; } }
 .gen-step { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap;
             font-size: 12px; }
 .gen-step span { padding: 5px 12px; border-radius: 999px;
@@ -163,41 +172,12 @@ textarea.gen-text:focus { border-color: var(--focus); }
 
 {% block content %}
 <div class="gen-wrap">
-<div class="page-header">
-  <a href="{% url 'teacher:groups' %}" class="back-link">← Ученики</a>
-  <h1 class="page-title">{% if is_exam %}Новая контрольная{% else %}Новая домашка{% endif %}</h1>
-</div>
-
-{% include "teacher/_build_modes.html" with mode='describe' exam=is_exam group_id=group_id %}
-
-{% comment %}
-Домашка или контрольная. Движок подбора один и тот же — отличается только то,
-какие настройки спросим на последнем шаге (фаза 19).
-{% endcomment %}
-<div class="k-tiles" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:16px">
-  {% comment %}
-  ⚠️ НОМЕР ГРУППЫ ЕДЕТ ЧЕРЕЗ ПЕРЕКЛЮЧАТЕЛЬ (сессия 7, фаза 5). Раньше
-  ссылки были голыми `?kind=…` и теряли `group`. Пока входов было два
-  («Создать домашку» / «Создать контрольную»), группа приходила в адресе
-  каждого. Теперь вход ОДИН, и потеря группы означала бы, что контрольная
-  тихо собирается в конструкторе домашки — без окна и лимита времени.
-  {% endcomment %}
-  <a class="k-tile {% if not is_exam %}k-tile--on{% endif %}"
-     href="?kind=homework{% if group_id %}&amp;group={{ group_id }}{% endif %}">
-    <span class="k-tile__name">Домашка</span>
-    <span class="k-tile__note">решают дома, срок сдачи</span>
-  </a>
-  <a class="k-tile {% if is_exam %}k-tile--on{% endif %}"
-     href="?kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}">
-    <span class="k-tile__name">Контрольная</span>
-    <span class="k-tile__note">ограниченное время, окно</span>
-  </a>
-</div>
+{% include "teacher/_build_head.html" with mode='describe' is_exam=is_exam group_id=group_id %}
 
 <div class="gen-step">
   <span class="{% if step == 'ask' %}is-on{% else %}is-done{% endif %}">1. Запрос</span>
   <span class="{% if step == 'plan' %}is-on{% elif step == 'result' %}is-done{% else %}is-next{% endif %}">2. Что нашлось</span>
-  <span class="{% if step == 'result' %}is-on{% else %}is-next{% endif %}">3. Задачи</span>
+  <span class="{% if step == 'result' %}is-on{% else %}is-next{% endif %}">3. Конструктор</span>
 </div>
 
 {% if not available %}
@@ -234,6 +214,14 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
   подписи, крупное только там, где действие.
   {% endcomment %}
 
+  {% comment %}
+  ⚠️ ДВЕ КОЛОНКИ (сессия 9, фаза 10.1). Правая половина экрана пустовала, а
+  на соседних способах там панель. Слева — рабочая область, справа карточка
+  «Что получится»: она отвечает на вопрос «что я сейчас соберу» ДО того, как
+  запрос уйдёт в разбор. Полей не убрано и не добавлено ни одного.
+  {% endcomment %}
+  <div class="gen-two">
+  <div class="gen-left">
   <div class="gen-card">
     <div class="gen-cap">Опишите словами</div>
     <div class="sub">
@@ -349,7 +337,60 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
       <span class="gen-used">сегодня использовано {{ used_today }} из {{ daily_limit }}</span>
     </div>
   </div>
+  </div>
+
+  <aside class="gen-side">
+    <div class="gen-card gen-sum">
+      <div class="gen-cap">Что получится</div>
+      <div class="gen-sum__line" id="sum-count">—</div>
+      <div class="gen-sum__line k-quiet" id="sum-hard">—</div>
+      <div class="k-hint">Задачи выберете на следующем шаге.</div>
+    </div>
+  </aside>
+  </div>
 </form>
+
+{% comment %}
+Карточка «Что получится» пересчитывается ПРЯМО В БРАУЗЕРЕ по тем же полям,
+что уйдут на сервер. Своих чисел у неё нет — она их только складывает.
+{% endcomment %}
+<script>
+(function () {
+  var open = document.getElementById('id_open');
+  var test = document.getElementById('id_test');
+  var lo = document.querySelector('[name=min_difficulty]');
+  var hi = document.querySelector('[name=max_difficulty]');
+  var count = document.getElementById('sum-count');
+  var hard = document.getElementById('sum-hard');
+  if (!open || !count) { return; }
+
+  // Склонение — то же правило, что у шаблонного фильтра `count_ru`.
+  function word(n, one, few, many) {
+    n = Math.abs(n | 0);
+    if (n % 100 >= 11 && n % 100 <= 14) { return many; }
+    if (n % 10 === 1) { return one; }
+    if (n % 10 >= 2 && n % 10 <= 4) { return few; }
+    return many;
+  }
+  function paint() {
+    var o = parseInt(open.value, 10) || 0;
+    var t = parseInt(test.value, 10) || 0;
+    var parts = [];
+    if (o) { parts.push(o + ' ' + word(o, 'открытая задача', 'открытые задачи',
+                                       'открытых задач')); }
+    if (t) { parts.push(t + ' ' + word(t, 'тест', 'теста', 'тестов')); }
+    count.textContent = parts.length ? parts.join(', ') : 'ничего не выбрано';
+    var a = parseInt(lo && lo.value, 10) || 1;
+    var b = parseInt(hi && hi.value, 10) || 5;
+    hard.textContent = a === b ? ('сложность ' + a)
+                               : ('сложность ' + a + '–' + b);
+  }
+  [open, test, lo, hi].forEach(function (field) {
+    if (field) { field.addEventListener('input', paint); }
+  });
+  paint();
+})();
+</script>
 {% endif %}
 
 {% if step == 'plan' %}

@@ -119,8 +119,15 @@
   function highlightAdded() {
     document.querySelectorAll('[data-add]').forEach(function (button) {
       var inCart = Boolean(cart[button.dataset.add]);
-      button.textContent = inCart ? '✓ Добавлено' : '+ Добавить';
+      button.textContent = inCart ? 'Добавлена' : '+ Добавить';
       button.classList.toggle('added', inCart);
+      // ⚠️ Кнопка ВЫКЛЮЧАЕТСЯ, а карточка гаснет целиком (сессия 9,
+      // фаза 10.3). Повторное нажатие и раньше не плодило дубль
+      // (`addToCart` проверяет корзину), но на экране этому ничто не
+      // мешало — репетитор жал второй раз и не понимал, сработало ли.
+      button.disabled = inCart;
+      var card = button.closest('.problem-card');
+      if (card) { card.classList.toggle('is-added', inCart); }
     });
   }
 

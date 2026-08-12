@@ -1,19 +1,14 @@
 {% extends "teacher/base.html" %}
 {% load ru %}
 
-{% block title %}Новая домашка — ЭкЗадачи{% endblock %}
+{% block title %}Новая работа — ЭкЗадачи{% endblock %}
 
 {% block extra_style %}
 {% include "teacher/_picker_style.html" %}
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <a href="{% url 'teacher:groups' %}" class="back-link">← Ученики</a>
-  <h1 class="page-title">Новая домашка</h1>
-</div>
-
-{% include "teacher/_build_modes.html" with mode='search' %}
+{% include "teacher/_build_head.html" with mode='search' is_exam=False group_id=group_id %}
 
 <div class="hw-layout">
   <div class="hw-main">

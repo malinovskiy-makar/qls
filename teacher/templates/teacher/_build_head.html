@@ -1,0 +1,48 @@
+{% comment %}
+Общая шапка трёх экранов создания работы (сессия 9, фаза 10.0).
+
+⚠️ ЗАЧЕМ. Экраны одного шага были устроены по-разному, и главное —
+ПЕРЕКЛЮЧАТЕЛЬ «Домашка / Контрольная» стоял только на «Описать словами» и
+ПРОПАДАЛ на «Искать самому» и «Написать свою». Из-за этого у контрольной,
+собранной вручную, негде было спросить окно и длительность: репетитор просто
+не мог сказать, что собирает контрольную.
+
+⚠️ ЗАГОЛОВОК ОДИН — «Новая работа», а не «Новая домашка». Тип выбирается
+тут же, ниже; заголовок, называющий тип до выбора, спорит с переключателем.
+
+Ждёт в контексте:
+  mode      — describe | search | own: какая плитка активна;
+  is_exam   — собирается контрольная;
+  group_id  — номер группы, если известен.
+
+Куда ведёт переключатель, зависит от экрана: у «Описать словами» это свой
+адрес с `?kind=`, у «Искать самому» — конструктор контрольной ВНУТРИ группы
+(без номера группы такого адреса нет вовсе, поэтому остаётся конструктор
+домашки — то же правило, что в `_build_modes.html`).
+{% endcomment %}
+<div class="crumbs">
+  <a href="{% url 'teacher:groups' %}">Ученики</a> →
+  {% if group_id %}<a href="{% url 'teacher:group_detail' group_id %}?tab=assignments">занятие</a> → {% endif %}
+  новая работа
+</div>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Новая работа</h1>
+  </div>
+
+  <div class="k-tiles bh-kind" style="margin-left:auto">
+    <a class="k-tile {% if not is_exam %}k-tile--on{% endif %}"
+       href="{% if mode == 'describe' %}{% url 'teacher:assignment_generate' %}?kind=homework{% if group_id %}&amp;group={{ group_id }}{% endif %}{% elif mode == 'own' %}{% url 'teacher:problem_new' %}?to_cart=1{% else %}{% url 'teacher:assignment_create' %}{% endif %}">
+      <span class="k-tile__name">Домашка</span>
+      <span class="k-tile__note">решают дома, срок сдачи</span>
+    </a>
+    <a class="k-tile {% if is_exam %}k-tile--on{% endif %}"
+       href="{% if mode == 'describe' %}{% url 'teacher:assignment_generate' %}?kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}{% elif mode == 'search' and group_id %}{% url 'teacher:exam_create' group_id %}{% elif mode == 'own' %}{% url 'teacher:problem_new' %}?to_cart=1&amp;kind=exam{% else %}{% url 'teacher:assignment_generate' %}?kind=exam{% endif %}">
+      <span class="k-tile__name">Контрольная</span>
+      <span class="k-tile__note">ограниченное время, окно</span>
+    </a>
+  </div>
+</div>
+
+{% include "teacher/_build_modes.html" with mode=mode exam=is_exam group_id=group_id %}

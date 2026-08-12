@@ -113,16 +113,25 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
   {% if problem %}правка{% else %}новая задача{% endif %}
 </div>
 
+{% comment %}
+⚠️ Общая шапка — ТОЛЬКО когда задача пишется ДЛЯ РАБОТЫ (`to_cart`).
+Правка уже существующей задачи из «Моих задач» к сборке работы отношения не
+имеет, и ряд плиток с переключателем «домашка / контрольная» там врал бы.
+{% endcomment %}
+{% if to_cart %}
+{% include "teacher/_build_head.html" with mode='own' is_exam=is_exam group_id=group_id %}
+{% else %}
 <div class="page-header">
   <div>
     <h1 class="page-title">
       {% if problem %}Своя задача{% else %}Написать свою задачу{% endif %}
     </h1>
-    <div class="page-sub">
-      Задача приватная: в общий каталог не попадает, её видят только ваши
-      ученики в составе выданной домашки.
-    </div>
   </div>
+</div>
+{% endif %}
+<div class="page-sub" style="margin:-14px 0 18px">
+  Задача приватная: в общий каталог не попадает, её видят только ваши
+  ученики в составе выданной домашки.
 </div>
 
 {% if errors %}

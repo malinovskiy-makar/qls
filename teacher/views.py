@@ -824,6 +824,9 @@ def assignment_create(request):
         'saved_problems': saved,
         'picker_reset_url': reverse('teacher:assignment_create'),
     })
+    # Номер группы нужен общей шапке: без него переключатель «контрольная»
+    # не соберёт адрес её конструктора (он живёт ВНУТРИ группы).
+    context.setdefault('group_id', request.GET.get('group') or '')
     return render(request, 'teacher/assignment_create.html', context)
 
 

@@ -316,6 +316,13 @@ def problem_form(request, pk=None):
         'kinds': CustomProblem.Kind.choices,
         'graph_groups': graph_groups,
         'to_cart': request.GET.get('to_cart') or request.POST.get('to_cart'),
+        # ⚠️ Тип работы и группа ЕДУТ ЧЕРЕЗ ЭТОТ ЭКРАН (сессия 9, фаза 10.0).
+        # Переключатель «домашка / контрольная» виден на всех трёх способах,
+        # и если бы «написать свою» его терял, репетитор возвращался бы к
+        # подбору уже без контрольной — ровно та потеря, которую и чинили.
+        'is_exam': (request.GET.get('kind') or request.POST.get('kind_work')
+                    ) == 'exam',
+        'group_id': request.GET.get('group') or request.POST.get('group'),
         'return_to': _safe_return(request.GET.get('return_to')
                                   or request.POST.get('return_to')),
         'solution_visibility': SolutionVisibility.choices,

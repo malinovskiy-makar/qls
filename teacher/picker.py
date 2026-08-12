@@ -16,6 +16,7 @@
 from django.core.paginator import Paginator
 from django.db.models import Q
 
+from problems.hw_generator import is_test_problem
 from problems.text_clean import preview_title
 
 
@@ -113,6 +114,9 @@ def picker_context(request, per_page=20):
             'meta': card_meta(topics, problem.problem_type, difficulty),
             'difficulty_stars': range(difficulty),
             'difficulty_empty': range(5 - difficulty),
+            # Тип красит полосу слева у карточки (фаза 10.3). Признак тот
+            # же, что везде в проекте: «тест: …» в `problem_type`.
+            'is_test': is_test_problem(problem),
         })
 
     problem_types = list(
