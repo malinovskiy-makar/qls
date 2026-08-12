@@ -1,49 +1,121 @@
 {% extends 'teacher/base.html' %}
-
 {% load ru %}
+{% comment %}
+Экран «Ученики» (сессия 9, фаза 8). Группы и индивидуальные занятия — одной
+сеткой карточек, вперемешку.
+
+⚠️ СПИСОК ОСТАЁТСЯ ВСЕГДА, даже при одном занятии — решение владельца.
+Иначе появление второго меняло бы всю навигацию, а первое занятие
+невозможно было бы открыть привычным путём.
+
+⚠️ ВМЕСТО СТРОКИ «АКТИВНОСТЬ» — ПРЕДУПРЕЖДЕНИЯ. Дата последней сдачи не
+отвечает на вопрос «надо ли что-то делать»; «не сдал последнюю работу»
+отвечает. Список берётся из той же `stats.needs_attention`, что рисует блок
+«Требуют внимания» внутри занятия: два списка «что не так» разъехались бы
+формулировками.
+{% endcomment %}
 
 {% block title %}Ученики — ЭкЗадачи{% endblock %}
 
-{% block extra_style %}{% include 'teacher/groups/_style.html' %}{% endblock %}
+{% block extra_style %}{% include 'teacher/groups/_style.html' %}
+/* ── Карточка занятия ──────────────────────────────────────────────────
+   Жёлтая полоса слева — ТОЛЬКО когда есть предупреждения. Тот же приём,
+   что у карточек работ (`.k-mark--*`): состояние несёт полоса, а не
+   заливка карточки целиком. */
+.gc-grid { display: grid; gap: 14px;
+           grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+.gc-card { display: flex; flex-direction: column; gap: 10px;
+           padding: 16px 18px; }
+.gc-card.is-calls { border-left: 3px solid var(--amber); }
+.gc-head { display: flex; align-items: flex-start; gap: 10px; }
+.gc-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
+.gc-meta { font-size: 12px; color: var(--text2); margin-top: 3px; }
+.gc-ava { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+          background: var(--chip-bg); color: var(--text2);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 13px; font-weight: 700; }
+/* Предупреждение — короткая строка с жёлтой чертой слева. */
+.gc-warn { display: flex; flex-direction: column; gap: 5px; }
+.gc-warn div { font-size: 12px; color: var(--text); line-height: 1.4;
+               border-left: 2px solid var(--amber); padding-left: 8px; }
+.gc-more { border-left-color: var(--border) !important; color: var(--text3); }
+.gc-calm { font-size: 12px; color: var(--text3); }
+.gc-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+           margin-top: auto; padding-top: 4px; }
+.gc-wait { font-size: 12px; font-weight: 600; border-radius: 999px;
+           padding: 2px 10px; background: var(--amber-tint);
+           color: var(--amber); white-space: nowrap; }
+.gc-when { font-size: 12px; color: var(--text2); margin-left: auto;
+           white-space: nowrap; }
+.gc-open { align-self: flex-start; }
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
     <h1 class="page-title">Ученики</h1>
   </div>
-  <a href="{% url 'teacher:group_create' %}" class="btn-primary">+ Создать группу</a>
+  {% comment %}
+  Две кнопки: группа и один ученик. Экран создания при этом ОДИН — форма
+  ветвится параметром, второго места создания не заводим.
+  {% endcomment %}
+  <div class="k-row" style="margin-left:auto">
+    <a href="{% url 'teacher:group_create' %}" class="k-btn k-btn--plain">+ Группа</a>
+    <a href="{% url 'teacher:group_create' %}?kind=individual" class="k-btn k-btn--main">+ Ученик</a>
+  </div>
 </div>
 
 {% if cards %}
-<div class="cards-grid">
+<div class="gc-grid">
   {% for card in cards %}
-  <div class="card">
-    <div class="card-name">{{ card.group.name }}</div>
-    <div class="card-meta">
-      {{ card.students|count_ru:"ученик,ученика,учеников" }} ·
-      {{ card.assignments|count_ru:"задание,задания,заданий" }}<br>
+  <div class="k-card gc-card{% if card.warnings %} is-calls{% endif %}">
+    <div class="gc-head">
+      {% if card.solo %}
+      <span class="gc-ava" aria-hidden="true">{{ card.solo.first_name|first|default:card.solo.username|first|upper }}</span>
+      {% endif %}
+      <div style="min-width:0">
+        <div class="gc-title">{{ card.group.name }}</div>
+        {% comment %}
+        ⚠️ Числительные СКЛОНЯЮТСЯ (фильтр `count_ru`). Раньше здесь стоял
+        встроенный `pluralize` с тремя формами — он возвращает ПУСТУЮ строку
+        при любом числе, и на экране было «3 ученик · 11 задани».
+        {% endcomment %}
+        <div class="gc-meta">
+          {% if card.solo %}{% if card.solo_profile.grade %}{{ card.solo_profile.grade }} класс · {% endif %}{% else %}{{ card.students|count_ru:"ученик,ученика,учеников" }} · {% endif %}{{ card.assignments|count_ru:"задание,задания,заданий" }}
+        </div>
+      </div>
+      <span class="k-chip-kind" style="margin-left:auto">{{ card.group.kind_label }}</span>
+    </div>
+
+    {% if card.warnings %}
+    <div class="gc-warn">
+      {% for warning in card.warnings %}<div>{{ warning }}</div>{% endfor %}
+      {% if card.hidden_warnings %}
+      <div class="gc-more">и ещё {{ card.hidden_warnings }}</div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="gc-calm">Всё вовремя, ничего не ждёт проверки.</div>
+    {% endif %}
+
+    <div class="gc-foot">
       {% if card.pending %}
-        <span class="badge badge-pending">{{ card.pending|count_ru:"работа,работы,работ" }} {{ card.pending|plural_ru:"ждёт,ждут,ждут" }} проверки</span><br>
-      {% else %}
-        <span class="badge badge-ok">Всё проверено</span><br>
+      <span class="gc-wait">{{ card.pending|count_ru:"работа,работы,работ" }} {{ card.pending|plural_ru:"ждёт,ждут,ждут" }} проверки</span>
       {% endif %}
       {% if card.next_deadline %}
-        Ближайший дедлайн: {{ card.next_deadline|date:"d.m.Y H:i" }}<br>
-      {% else %}
-        Ближайших дедлайнов нет<br>
+      <span class="gc-when" title="{{ card.deadline_exact }}">срок: {{ card.next_deadline|date:"d.m, H:i" }}</span>
       {% endif %}
-      Активность: {{ card.last_activity|date:"d.m.Y" }}
     </div>
-    <div class="card-footer">
-      <a href="{% url 'teacher:group_detail' card.group.pk %}" class="btn-outline">Открыть →</a>
-    </div>
+
+    <a href="{% url 'teacher:group_detail' card.group.pk %}"
+       class="k-btn k-btn--plain k-btn--sm gc-open">Открыть →</a>
   </div>
   {% endfor %}
 </div>
 {% else %}
 <div class="empty-state">
-  <p>Пока нет групп.</p>
-  <p>Создайте первую — внутри неё живут ученики, задания и проверка.</p>
+  <p>Пока нет ни групп, ни индивидуальных учеников.</p>
+  <p>Заведите первое занятие — внутри него живут задания и проверка.</p>
 </div>
 {% endif %}
 {% endblock %}

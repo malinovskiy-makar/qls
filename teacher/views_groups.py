@@ -138,9 +138,27 @@ def _assignment_percent(assignment):
 # Фаза 9 — список групп
 # ---------------------------------------------------------------------------
 
+# Сколько предупреждений показываем на карточке. Больше трёх — это уже не
+# сигнал, а список, и карточка перестаёт читаться с одного взгляда.
+CARD_WARNINGS = 3
+
+
 @tutor_required
 def groups_list(request):
-    from problems.models import Assignment, StudentGroup, Submission
+    """Экран «Ученики»: группы и индивидуальные занятия одной сеткой.
+
+    ⚠️ СПИСОК ОСТАЁТСЯ ВСЕГДА, даже при одном занятии (решение владельца):
+    иначе появление второго меняло бы всю навигацию, а первое занятие
+    невозможно было бы открыть привычным путём.
+
+    ⚠️ ВМЕСТО СТРОКИ «АКТИВНОСТЬ» — ПРЕДУПРЕЖДЕНИЯ. Дата последней сдачи
+    ничего не говорит о том, надо ли что-то делать; «не сдал последнюю
+    работу» говорит. Берём их из `stats.needs_attention` — той же функции,
+    что рисует блок «Требуют внимания» внутри занятия: два списка
+    «что не так» разъехались бы формулировками.
+    """
+    from problems.models import Assignment, StudentGroup
+    from problems.stats import needs_attention
 
     groups = (StudentGroup.objects
               .filter(teacher=request.user)
@@ -153,17 +171,31 @@ def groups_list(request):
         assignments = list(Assignment.objects.filter(group=group))
         deadlines = [a.deadline_at for a in assignments
                      if a.deadline_at and a.deadline_at >= now]
-        last_submission = (Submission.objects
-                           .filter(assignment__group=group)
-                           .order_by('-submitted_at')
-                           .values_list('submitted_at', flat=True).first())
+        solo = group.single_student
+
+        warnings = []
+        for row in needs_attention(group, now):
+            for reason in row['reasons']:
+                # У индивидуального имя не повторяем: оно и есть заголовок.
+                warnings.append(reason if solo is not None else '%s — %s' % (
+                    row['student'].get_full_name()
+                    or row['student'].username, reason))
+        next_deadline = min(deadlines) if deadlines else None
+        human, exact = timefmt.deadline_pair(next_deadline)
         cards.append({
             'group': group,
+            'solo': solo,
+            'solo_profile': getattr(solo, 'profile', None) if solo else None,
             'students': group.students.count(),
             'pending': _pending_count(assignments),
-            'next_deadline': min(deadlines) if deadlines else None,
-            'last_activity': last_submission or group.created_at,
+            'next_deadline': next_deadline,
+            'deadline_human': human,
+            'deadline_exact': exact,
             'assignments': len(assignments),
+            'warnings': warnings[:CARD_WARNINGS],
+            # Считаем скрытое ЗДЕСЬ: шаблонная арифметика через `add`
+            # читается хуже, чем одно вычитание в питоне, и легко врёт.
+            'hidden_warnings': max(0, len(warnings) - CARD_WARNINGS),
         })
 
     return render(request, 'teacher/groups/list.html', {'cards': cards})
