@@ -171,20 +171,57 @@ def groups_list(request):
 
 @tutor_required
 def group_create(request):
-    from problems.models import StudentGroup
+    """Создание занятия: группы или индивидуального (сессия 9, фаза 9).
+
+    Форм две, вьюха одна: различаются они полем «кто учится» — у группы это
+    название, у индивидуального занятия ученик. Всё остальное (владелец,
+    описание, права) общее, и разводить это по двум вьюхам значило бы
+    поддерживать два места создания.
+
+    ⚠️ У индивидуального занятия название по умолчанию — ИМЯ УЧЕНИКА. Поле
+    названия остаётся, но обязательным не становится: заставлять
+    придумывать имя занятию с одним человеком незачем.
+    """
+    from problems.models import StudentGroup, User
+
+    kind = request.GET.get('kind') or request.POST.get('kind') or 'group'
+    if kind not in dict(StudentGroup.Kind.choices):
+        kind = 'group'
+    individual = kind == StudentGroup.Kind.INDIVIDUAL
+
+    # Кого можно взять на индивидуальное занятие: ученики этого репетитора
+    # плюс те, кто пока ни в одном его занятии не состоит.
+    students = User.objects.filter(role='student').order_by(
+        'last_name', 'first_name', 'username')
 
     if request.method == 'POST':
         name = (request.POST.get('name') or '').strip()
+        student = None
+        if individual:
+            student = students.filter(pk=request.POST.get('student')).first()
+            if student is None:
+                messages.error(request, 'Выберите ученика.')
+                return render(request, 'teacher/groups/create.html',
+                              {'kind': kind, 'individual': individual,
+                               'students': students})
+            name = name or (student.get_full_name() or student.username)
         if not name:
             messages.error(request, 'Название группы не может быть пустым.')
         else:
             group = StudentGroup.objects.create(
-                name=name, teacher=request.user,
+                name=name, teacher=request.user, kind=kind,
                 description=(request.POST.get('description') or '').strip())
-            messages.success(request, f'Группа «{group.name}» создана.')
+            if student is not None:
+                group.students.add(student)
+            messages.success(
+                request,
+                'Ученик «%s» добавлен.' % group.name if individual
+                else 'Группа «%s» создана.' % group.name)
             return redirect('teacher:group_detail', pk=group.pk)
 
-    return render(request, 'teacher/groups/create.html')
+    return render(request, 'teacher/groups/create.html',
+                  {'kind': kind, 'individual': individual,
+                   'students': students})
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +237,7 @@ GROUP_TABS = ('overview', 'assignments', 'materials')
 @tutor_required
 def group_detail(request, pk):
     from problems.models import Assignment, Submission, TeacherFeedback
+    from problems import models_platform
     from problems import stats as stats_module
 
     group = own_group_or_404(request.user, pk)
@@ -244,6 +282,27 @@ def group_detail(request, pk):
         period = request.GET.get('period') or 'month'
         if period not in dict(stats_module.PERIODS):
             period = 'month'
+        # ⚠️ ВЕТВЛЕНИЕ — В ШАБЛОНАХ, А НЕ КОПИЕЙ ВЬЮХИ (фаза 9). Логика у
+        # группы и у индивидуального занятия одна, различается НАБОР
+        # БЛОКОВ: у одного на один сравнивать не с кем, поэтому теплокарта
+        # «ученики × темы», таблица учеников и строка «по группе» теряют
+        # смысл. Вместо них — тот же блок «Прогресс по темам», что на
+        # карточке ученика, и четыре карточки-показателя.
+        solo = group.single_student
+        if group.is_individual and solo is not None:
+            context.update({
+                'solo': solo,
+                'solo_profile': getattr(solo, 'profile', None),
+                'progress': stats_module.topic_progress_pairs(solo,
+                                                              period=period),
+                'solo_open': stats_module.accuracy_pair(
+                    solo, tutor=request.user, kind='open', period=period),
+                'solo_test': stats_module.accuracy_pair(
+                    solo, tutor=request.user, kind='test', period=period),
+                'solo_minutes': stats_module.minutes_on_site(solo, period),
+                'solo_difficulty': models_platform.difficulty_for_student(solo),
+            })
+
         context.update({
             'period': period,
             'periods': stats_module.PERIODS,
@@ -478,7 +537,8 @@ def group_assignment_detail(request, group_id, assignment_id):
         'points_locked': assignment.points_locked,
         # Видимость комментария — от лица того, кто пишет. «Видно только
         # этому ученику» требует ученика, поэтому список тут же.
-        'visibility_choices': visibility_choices_for('tutor'),
+        'visibility_choices': visibility_choices_for(
+            'tutor', individual=group.is_individual),
         'recipients': list(assignment.students.order_by('last_name',
                                                         'first_name')),
         'stats': assignment_stats(assignment),
@@ -767,6 +827,20 @@ def group_submissions(request, group_id, assignment_id):
 
     group = own_group_or_404(request.user, group_id)
     assignment = group_assignment_or_404(group, assignment_id)
+
+    # ⚠️ СПИСОК ИЗ ОДНОГО УЧЕНИКА ВЫРОЖДАЕТСЯ (сессия 9, фаза 9). У занятия
+    # один на один эта страница — одна карточка с одной кнопкой; открывать
+    # её ради того, чтобы нажать единственное, что на ней есть, значит
+    # ставить лишний клик на каждом заходе. Уводим сразу к работе.
+    # ⚠️ Прямой адрес не ломаем: `?view=problems` и `?list=1` продолжают
+    # показывать сводку — она остаётся рабочей поверхностью.
+    solo = group.single_student
+    if (solo is not None and request.GET.get('view') != 'problems'
+            and request.GET.get('list') != '1'):
+        cards = student_cards(assignment, group)
+        card = next((c for c in cards if c['student'].pk == solo.pk), None)
+        if card and card.get('button', {}).get('url'):
+            return redirect(card['button']['url'])
 
     # ⚠️ ВИД ПО УЧЕНИКАМ — ЕДИНСТВЕННЫЙ В ИНТЕРФЕЙСЕ (сессия 7, фаза 1).
     # Переключатель убран по ревью владельца, поэтому выбор БОЛЬШЕ НЕ

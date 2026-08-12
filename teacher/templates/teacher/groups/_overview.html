@@ -1,3 +1,4 @@
+{% load ru %}
 {% comment %}
 Содержимое вкладки «Обзор» — то, что раньше было отдельной страницей
 статистики группы.
@@ -27,9 +28,14 @@
     <div class="panel-hint">Пропал, просел, не сдал последнюю работу
       или ждёт вашей проверки дольше трёх дней</div>
   </div>
+  {% comment %}
+  ⚠️ У индивидуального занятия имя НЕ повторяется в каждой строке: оно уже
+  стоит в шапке экрана, и «Пётр Иванов — не сдал» превращалось бы в
+  «Пётр Иванов — Пётр Иванов».
+  {% endcomment %}
   {% for row in attention %}
   <div class="attention-row">
-    <b>{{ row.student.get_full_name|default:row.student.username }}</b> —
+    {% if not solo %}<b>{{ row.student.get_full_name|default:row.student.username }}</b> — {% endif %}
     {{ row.reasons|join:"; " }}.
     <a href="{% url 'teacher:student_stats' row.student.pk %}">посмотреть</a>
   </div>
@@ -37,6 +43,81 @@
 </div>
 {% endif %}
 
+{% if solo %}
+{% comment %}
+⚠️ У ЗАНЯТИЯ ОДИН НА ОДИН ТЕПЛОКАРТЫ И ТАБЛИЦЫ УЧЕНИКОВ НЕТ (сессия 9,
+фаза 9). Обе показывают ученика в сравнении с другими, а сравнивать не с
+кем: теплокарта из одной строки — это список тем, набранный в строчку, а
+таблица из одного человека — карточка, притворившаяся таблицей. Строка «по
+группе» убрана по той же причине: усреднять не с чем.
+
+Вместо них — четыре карточки-показателя и тот же блок «Прогресс по темам»,
+что на карточке ученика: разметка общая (`_tp_half.html`), сборка общая
+(`stats.topic_progress_pairs`).
+{% endcomment %}
+<div class="cards3">
+  <div class="card3">
+    <div class="card3-cap">Процент верно решённых задач{% include '_hint.html' with hint='Первое число — по всем задачам, решённым на сайте. Второе — только по вашим домашкам и контрольным. Игра не входит ни в одно из них.' %}</div>
+    <div class="card3-value">
+      <span class="k-pair">
+        {% if solo_open.all is not None %}{{ solo_open.all }}%{% else %}—{% endif %}
+        <span class="k-pair__slash">/</span>
+        <span class="k-pair__mine">{% if solo_open.mine is not None %}{{ solo_open.mine }}%{% else %}—{% endif %}</span>
+      </span>
+    </div>
+  </div>
+  <div class="card3">
+    <div class="card3-cap">Процент верно решённых тестов{% include '_hint.html' with hint='Первое число — по всем тестам, решённым на сайте. Второе — только по вашим домашкам и контрольным. Игра не входит ни в одно из них.' %}</div>
+    <div class="card3-value">
+      <span class="k-pair">
+        {% if solo_test.all is not None %}{{ solo_test.all }}%{% else %}—{% endif %}
+        <span class="k-pair__slash">/</span>
+        <span class="k-pair__mine">{% if solo_test.mine is not None %}{{ solo_test.mine }}%{% else %}—{% endif %}</span>
+      </span>
+    </div>
+  </div>
+  <div class="card3">
+    <div class="card3-cap">Средняя сложность работ{% include '_hint.html' with hint='Ученик сам оценивает каждую сданную работу по шкале от 1 до 10.' %}</div>
+    <div class="card3-value">
+      {% if solo_difficulty %}{{ solo_difficulty|stringformat:"s"|cut:"." }}{% else %}нет оценок{% endif %}
+    </div>
+  </div>
+  <div class="card3">
+    <div class="card3-cap">Минут на сайте{% include '_hint.html' with hint='Время между действиями ученика: перерыв дольше 30 минут считается уходом с сайта. Сюда входит вся работа, включая игру.' %}</div>
+    <div class="card3-value">
+      {% if solo_minutes %}{{ solo_minutes|count_ru:"минута,минуты,минут" }}{% else %}нет данных{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Прогресс по темам</div>
+    <div class="panel-hint">Попробуйте навестись на шкалу</div>
+  </div>
+  <div class="tp-row tp-head">
+    <span></span>
+    <span class="tp-half">Задачи</span>
+    <span></span>
+    <span class="tp-half">Тесты</span>
+  </div>
+  {% for row in progress.rows %}
+  <div class="tp-row{% if row.empty %} tp-empty{% endif %}">
+    <span class="tp-name">{{ row.name }}</span>
+    {% include 'teacher/_tp_half.html' with cell=row.open cap='Задачи' %}
+    <span class="tp-split"></span>
+    {% include 'teacher/_tp_half.html' with cell=row.test cap='Тесты' %}
+  </div>
+  {% endfor %}
+  <div class="tp-row tp-total">
+    <span class="tp-name">Всего</span>
+    {% include 'teacher/_tp_half.html' with cell=progress.total_open cap='Задачи' %}
+    <span class="tp-split"></span>
+    {% include 'teacher/_tp_half.html' with cell=progress.total_test cap='Тесты' %}
+  </div>
+</div>
+
+{% else %}
 {# ── Тепловая матрица «ученики × темы» ─────────────────────────────── #}
 <div class="panel">
   <div class="panel-head">
@@ -182,6 +263,8 @@
   </div>
 </div>
 
+{% endif %}
+
 {% comment %}
 История работ группы (п. 11.5). Устроена как история в карточке ученика —
 та же разметка (`teacher/_work_history.html`) и та же сборка
@@ -191,10 +274,10 @@
 <div class="panel">
   <div class="panel-head">
     <div class="panel-title">История работ</div>
-    <div class="panel-hint">Проценты — средние по группе.
-      Нажмите на заголовок столбца, чтобы отсортировать</div>
+    <div class="panel-hint">{% if not solo %}Проценты — средние по группе.
+      {% endif %}Нажмите на заголовок столбца, чтобы отсортировать</div>
   </div>
-  {% include "teacher/_work_history.html" with works=group_works for_group=True %}
+  {% include "teacher/_work_history.html" with works=group_works for_group=True solo=solo %}
 </div>
 
 {% comment %}

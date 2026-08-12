@@ -1,4 +1,5 @@
 {% extends "teacher/base.html" %}
+{% load ru %}
 
 {% comment %}
 Конструктор подборки (сессия 8, п. 12.2).
@@ -200,8 +201,14 @@
             <input type="{% if is_exam %}radio{% else %}checkbox{% endif %}"
                    name="groups" value="{{ g.pk }}"
                    {% if group_id and g.pk == group.pk %}checked{% endif %}>
+            {% comment %}
+            ⚠️ В списке И ГРУППЫ, И ИНДИВИДУАЛЬНЫЕ ЗАНЯТИЯ, вперемешку и с
+            чипом типа (сессия 9, фаза 9). Заводить второй список значило бы
+            заставить репетитора помнить, где кто лежит.
+            {% endcomment %}
             <span>{{ g.name }}
-              <span class="k-quiet">· {{ g.students.count }} уч.</span></span>
+              <span class="k-chip-kind">{{ g.kind_label }}</span>
+              {% if not g.is_individual %}<span class="k-quiet">· {{ g.students.count|count_ru:"ученик,ученика,учеников" }}</span>{% endif %}</span>
           </label>
           {% endfor %}
         </div>

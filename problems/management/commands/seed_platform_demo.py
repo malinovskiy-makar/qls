@@ -39,6 +39,9 @@ DEMO_PASSWORD = 'demo12345'
 
 TUTOR = 'tutor@test.local'
 STUDENTS = ['student1@test.local', 'student2@test.local', 'student3@test.local']
+# Индивидуальные ученики (сессия 9, фаза 9): экран занятия один на один
+# должно быть на чём смотреть, и «пустой ученик» этого не даёт.
+SOLO_STUDENTS = ['solo1@test.local', 'solo2@test.local']
 PARENT = 'parent@test.local'
 
 
@@ -123,6 +126,12 @@ class Command(BaseCommand):
         group, _ = StudentGroup.objects.get_or_create(
             name='Экономика 10–11, вторник', teacher=tutor)
         group.students.set(students)
+        # Существующая группа могла быть заведена до появления типа занятия.
+        if group.kind != StudentGroup.Kind.GROUP:
+            group.kind = StudentGroup.Kind.GROUP
+            group.save(update_fields=['kind'])
+
+        solo_groups = self._solo_lessons(tutor, now)
 
         catalog = self._catalog_problems()
         catalog_tests = self._catalog_tests()
@@ -141,6 +150,8 @@ class Command(BaseCommand):
         self._four_states(homework, students[0], catalog, custom, costs, now)
         self._parent_links(tutor, students)
         self._history(students, now)
+        self._history([g.students.first() for g in solo_groups], now,
+                      seed_offset=50)
         self._finished_exam(tutor, group, students, now)
         self._work_difficulty(tutor, students)
 
@@ -149,9 +160,84 @@ class Command(BaseCommand):
         self.stdout.write(f'  репетитор: {TUTOR} / {DEMO_PASSWORD}')
         for login in STUDENTS:
             self.stdout.write(f'  ученик:    {login} / {DEMO_PASSWORD}')
+        for login in SOLO_STUDENTS:
+            self.stdout.write(f'  индивид.:  {login} / {DEMO_PASSWORD}')
         self.stdout.write(f'  родитель:  {PARENT} / {DEMO_PASSWORD}')
 
     # -- кирпичики ---------------------------------------------------------
+
+    def _solo_lessons(self, tutor, now):
+        """Два индивидуальных занятия с историей (сессия 9, фаза 9).
+
+        ⚠️ У каждого СВОЯ работа: экран занятия один на один показывает
+        историю работ со столбцом «Сдано», и без сданных работ проверять
+        там нечего. Одна работа сдана вовремя, вторая — после срока: обе
+        пометки должны быть видны глазами.
+
+        Идемпотентно: занятия и работы ищутся по имени.
+        """
+        from problems.models import (Assignment, AssignmentItem, StudentGroup,
+                                     Submission, TeacherFeedback)
+
+        catalog = self._catalog_problems()
+        if len(catalog) < 2:
+            self.stdout.write('  индивидуальные занятия пропущены: '
+                              'в банке мало задач')
+            return []
+
+        people = [
+            (SOLO_STUDENTS[0], 'Мария', 'Ким', 11, 'Санкт-Петербург',
+             'заключительный этап ВсОШ'),
+            (SOLO_STUDENTS[1], 'Тимур', 'Ахметов', 9, 'Казань',
+             'призёр регионального этапа'),
+        ]
+        lessons = []
+        for index, (login, name, surname, grade, city, goal) in enumerate(people):
+            student = self._user(login, name, surname, 'student', grade=grade)
+            profile = student.profile
+            profile.city = city
+            profile.goal = goal
+            profile.save(update_fields=['city', 'goal'])
+
+            lesson, _ = StudentGroup.objects.get_or_create(
+                name=f'{name} {surname}', teacher=tutor,
+                defaults={'kind': StudentGroup.Kind.INDIVIDUAL})
+            lesson.kind = StudentGroup.Kind.INDIVIDUAL
+            lesson.save(update_fields=['kind'])
+            lesson.students.set([student])
+            lessons.append(lesson)
+
+            work, created = Assignment.objects.get_or_create(
+                name=f'Занятие {index + 1}: разбор задач', author=tutor,
+                group=lesson,
+                defaults={'deadline': now - timezone.timedelta(days=2)})
+            work.students.set([student])
+            if created:
+                for order, problem in enumerate(catalog[:2]):
+                    AssignmentItem.objects.create(
+                        assignment=work, order=order, catalog_problem=problem,
+                        points=10)
+            for item in work.items.all():
+                sub, made = Submission.objects.get_or_create(
+                    student=student, assignment=work, problem_item=item,
+                    defaults={'status': 'reviewed',
+                              'submitted_answer': '42',
+                              'solution_text': 'Решение ученика.'})
+                if made:
+                    # ⚠️ Первый сдал ВОВРЕМЯ, второй ПОСЛЕ СРОКА: обе пометки
+                    # столбца «Сдано» должны быть видны на демо-экране.
+                    late = timezone.timedelta(days=1 if index else -1)
+                    sub.submitted_at = (work.deadline_at or now) + late
+                    sub.status = 'reviewed'
+                    sub.save()
+                    TeacherFeedback.objects.get_or_create(
+                        submission=sub,
+                        defaults={'score': 8 - index * 3,
+                                  'comment': 'Разобрали на занятии.',
+                                  'reviewed_by': tutor})
+        self.stdout.write('  заведены два индивидуальных занятия '
+                          '(вовремя и после срока)')
+        return lessons
 
     def _user(self, username, first_name, last_name, role, grade=None):
         user, created = User.objects.get_or_create(
@@ -874,7 +960,7 @@ class Command(BaseCommand):
          'accuracy': 0.5, 'per_day': (1, 4), 'stop_days_ago': 30},
     ]
 
-    def _history(self, students, now):
+    def _history(self, students, now, seed_offset=0):
         """История учебных событий за 90 дней.
 
         ⚠️ Пишем СОБЫТИЯ, а не сразу свёртки: события — первоисточник, и
@@ -898,12 +984,14 @@ class Command(BaseCommand):
             return
 
         for index, student in enumerate(students[:3]):
+            if student is None:
+                continue
             if LearningEvent.objects.filter(
                     user=student, payload__demo_history=True).exists():
                 continue        # идемпотентность: история уже насыпана
 
             profile = self.HISTORY_PROFILES[index]
-            rng = random.Random(1000 + index)
+            rng = random.Random(1000 + index + seed_offset)
             events = []
             # ⚠️ Задуманные даты держим ОТДЕЛЬНЫМ списком. `created_at` —
             # auto_now_add, и bulk_create перетирает его прямо в переданных

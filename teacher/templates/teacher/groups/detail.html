@@ -69,11 +69,38 @@
 {% block content %}
 <div class="crumbs"><a href="{% url 'teacher:groups' %}">Ученики</a> → {{ group.name }}</div>
 
+{% comment %}
+⚠️ ШАПКА ВЕТВИТСЯ ПО ТИПУ ЗАНЯТИЯ (сессия 9, фаза 9). У группы это её
+название; у занятия один на один — имя ученика, а под ним то, что репетитор
+смотрит перед занятием: класс, город, цель на год. Название занятия у
+индивидуального уходит в подпись: оно по умолчанию совпадает с именем, и
+показывать его дважды незачем.
+{% endcomment %}
 <div class="page-header">
+  {% if solo %}
+  <div class="avatar" aria-hidden="true">{{ solo.first_name|first|default:solo.username|first|upper }}</div>
+  {% endif %}
   <div>
-    <h1 class="page-title">{{ group.name }}</h1>
-    {% if group.description %}<div class="page-sub">{{ group.description }}</div>{% endif %}
+    <h1 class="page-title">
+      {% if solo %}{{ solo.get_full_name|default:solo.username }}{% else %}{{ group.name }}{% endif %}
+    </h1>
+    {% if solo %}
+      {% if solo_profile %}
+      <div class="student-facts">
+        {% if solo_profile.grade %}<span><span class="cap">класс</span>{{ solo_profile.grade }}</span>{% endif %}
+        {% if solo_profile.city %}<span><span class="cap">город</span>{{ solo_profile.city }}</span>{% endif %}
+        {% if solo_profile.goal %}<span><span class="cap">цель на год</span>{{ solo_profile.goal }}</span>{% endif %}
+      </div>
+      {% endif %}
+      <div class="page-sub">
+        <a href="{% url 'teacher:student_progress' solo.pk %}">карточка ученика</a>
+        {% if group.description %} · {{ group.description }}{% endif %}
+      </div>
+    {% elif group.description %}
+      <div class="page-sub">{{ group.description }}</div>
+    {% endif %}
   </div>
+  <span class="k-chip-kind">{{ group.kind_label }}</span>
 </div>
 
 {% comment %}

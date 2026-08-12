@@ -552,7 +552,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
       <span class="k-select-wrap" style="width:auto">
         <select class="k-select" id="exam-group" style="width:auto">
           {% for g in groups %}
-          <option value="{{ g.pk }}">{{ g.name }}</option>
+          <option value="{{ g.pk }}">{{ g.name }} · {{ g.kind_label }}</option>
           {% endfor %}
         </select>
       </span>

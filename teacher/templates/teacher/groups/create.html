@@ -1,43 +1,72 @@
 {% extends 'teacher/base.html' %}
+{% comment %}
+Создание занятия — группы или индивидуального (сессия 9, фаза 9).
 
-{% block title %}Создать группу — ЭкЗадачи{% endblock %}
+Форма одна, ветвится по `individual`: у группы спрашиваем название, у
+индивидуального занятия — ученика, а название подставляется само.
+{% endcomment %}
+
+{% block title %}{% if individual %}Новый ученик{% else %}Создать группу{% endif %} — ЭкЗадачи{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .form-field { margin-bottom: 16px; }
 .form-field label { display: block; font-size: 13px; font-weight: 500;
                     margin-bottom: 6px; }
-.form-field input, .form-field textarea {
-  width: 100%; font: inherit; font-size: 14px; padding: 9px 12px;
-  border-radius: var(--r); border: 0.5px solid var(--border);
-  background: var(--surface-2); color: var(--text);
-}
-.form-field textarea { min-height: 80px; resize: vertical; }
+.form-field .k-hint { margin-top: 5px; }
 {% endblock %}
 
 {% block content %}
-<div class="crumbs"><a href="{% url 'teacher:groups' %}">Группы</a> → Новая группа</div>
-
-<h1 class="page-title" style="margin-bottom: 20px;">Создать группу</h1>
-
-<div class="card" style="max-width: 520px;">
-  <form method="post">
-    {% csrf_token %}
-    <div class="form-field">
-      <label for="id_name">Название группы</label>
-      <input type="text" id="id_name" name="name" required maxlength="100"
-             placeholder="Например: Экономика 10–11, вторник">
-    </div>
-    <div class="form-field">
-      <label for="id_description">Описание (необязательно)</label>
-      <textarea id="id_description" name="description"
-                placeholder="Для чего эта группа, какой курс"></textarea>
-    </div>
-    <button type="submit" class="btn-primary">Создать группу</button>
-    <a href="{% url 'teacher:groups' %}" class="btn-outline">Отмена</a>
-  </form>
+<div class="crumbs">
+  <a href="{% url 'teacher:groups' %}">Ученики</a> →
+  {% if individual %}Новый ученик{% else %}Новая группа{% endif %}
 </div>
 
-<div class="note" style="margin-top: 20px; max-width: 520px;">
-  Подключение учеников появится позже — пока их добавляют через админку.
+<h1 class="page-title" style="margin-bottom: 20px;">
+  {% if individual %}Добавить ученика{% else %}Создать группу{% endif %}
+</h1>
+
+<div class="k-card" style="max-width: 520px;">
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="kind" value="{{ kind }}">
+
+    {% if individual %}
+    <div class="form-field">
+      <label for="id_student">Ученик</label>
+      <span class="k-select-wrap">
+        <select class="k-select" id="id_student" name="student" required>
+          <option value="">— выберите —</option>
+          {% for student in students %}
+          <option value="{{ student.pk }}">{{ student.get_full_name|default:student.username }}</option>
+          {% endfor %}
+        </select>
+      </span>
+    </div>
+    <div class="form-field">
+      <label for="id_name">Название занятия (необязательно)</label>
+      <input type="text" class="k-input" id="id_name" name="name" maxlength="100"
+             placeholder="По умолчанию — имя ученика">
+      <div class="k-hint">Пригодится, если у вас два занятия с одним человеком.</div>
+    </div>
+    {% else %}
+    <div class="form-field">
+      <label for="id_name">Название группы</label>
+      <input type="text" class="k-input" id="id_name" name="name" required maxlength="100"
+             placeholder="Например: Экономика 10–11, вторник">
+    </div>
+    {% endif %}
+
+    <div class="form-field">
+      <label for="id_description">Описание (необязательно)</label>
+      <textarea class="k-area" id="id_description" name="description"
+                placeholder="{% if individual %}Что важно помнить об этих занятиях{% else %}Для чего эта группа, какой курс{% endif %}"></textarea>
+    </div>
+    <div class="k-row">
+      <button type="submit" class="k-btn k-btn--main">
+        {% if individual %}Добавить ученика{% else %}Создать группу{% endif %}
+      </button>
+      <a href="{% url 'teacher:groups' %}" class="k-btn k-btn--plain">Отмена</a>
+    </div>
+  </form>
 </div>
 {% endblock %}

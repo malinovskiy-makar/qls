@@ -321,7 +321,7 @@ class ProblemComment(models.Model):
         return 'личный вопрос'
 
 
-def visibility_choices_for(role):
+def visibility_choices_for(role, individual=False):
     """Варианты видимости ОТ ЛИЦА ТОГО, КТО ПИШЕТ.
 
     ⚠️ Формулировка зависит от роли, и это не украшение. Прежнее «Только
@@ -332,11 +332,18 @@ def visibility_choices_for(role):
     `role` — 'tutor' или 'student'. Ученику выбор не показывается вовсе
     (его вопрос всегда личный), но список ему тоже нужен: по нему
     подписывается поле ввода.
+
+    ⚠️ `individual` — занятие один на один (сессия 9, фаза 9). Круг
+    читателей у `GROUP` там ТОТ ЖЕ, что у `PRIVATE`, но надпись «видно всей
+    группе» обещает группу, которой нет. Меняется ТОЛЬКО подпись; правило
+    доступа не трогаем — иначе уже написанные комментарии сменили бы
+    видимость задним числом.
     """
     visibility = ProblemComment.Visibility
     if role == 'tutor':
         return [
-            (visibility.GROUP, 'видно всей группе'),
+            (visibility.GROUP,
+             'видно ученику' if individual else 'видно всей группе'),
             (visibility.PRIVATE, 'видно только этому ученику'),
             (visibility.SELF, 'заметка для себя'),
         ]

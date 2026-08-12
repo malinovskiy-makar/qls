@@ -1380,9 +1380,16 @@ def group_work_history(group):
             late = sum(1 for s in watched
                        if when.get(s.pk) and when[s.pk] > deadline)
         missing = sum(1 for s in watched if when.get(s.pk) is None)
+        # ⚠️ У ИНДИВИДУАЛЬНОГО ЗАНЯТИЯ «невовремя / не сдано» вырождается:
+        # два числа из одного человека это «0/1» или «1/0», и читать их
+        # труднее, чем сам факт. Отдаём момент сдачи и две пометки —
+        # опоздал / не сдал; какой столбец рисовать, решает разметка.
+        solo = when.get(watched[0].pk) if len(watched) == 1 else None
         row = {'work': work, 'is_exam': work.is_exam,
                'deadline': deadline, 'late': late, 'missing': missing,
                'people': len(watched),
+               'submitted_at': solo,
+               'is_late': bool(solo and deadline and solo > deadline),
                'not_submitted': missing == len(watched)}
         row.update(_work_percents(got, could))
         rows.append(row)

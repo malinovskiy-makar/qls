@@ -898,8 +898,11 @@ class StudentCardTests(TestCase):
         (зелёный / янтарь / красный), акцентного среди них нет.
         """
         import io, re
+        # ⚠️ Правила `.tp-*` переехали в общий `platform/_stats_style.html`
+        # (сессия 9, фаза 9): тот же блок прогресса стоит и на обзоре
+        # индивидуального занятия.
         template = io.open(
-            'teacher/templates/teacher/student_progress.html',
+            'problems/templates/platform/_stats_style.html',
             encoding='utf-8').read()
         for rule in re.findall(r'\.tp-fill--\w+\s*\{([^}]*)\}', template):
             self.assertNotIn('--accent', rule)
@@ -917,7 +920,7 @@ class StudentCardTests(TestCase):
         """
         import io
         template = io.open(
-            'teacher/templates/teacher/student_progress.html',
+            'problems/templates/platform/_stats_style.html',
             encoding='utf-8').read()
         self.assertIn('grid-template-columns: 200px 1fr 1px 1fr', template)
         self.assertIn('.tp-half .tp-value { width: 58px', template)
@@ -930,7 +933,7 @@ class StudentCardTests(TestCase):
         """
         import io
         template = io.open(
-            'teacher/templates/teacher/student_progress.html',
+            'problems/templates/platform/_stats_style.html',
             encoding='utf-8').read()
         self.assertIn('.tp-half:hover .tp-value .frac', template)
         self.assertNotIn('.tp-row:hover .tp-value .frac', template)

@@ -35,10 +35,17 @@
         <th data-type="num">% верных задач</th>
         <th data-type="num">% верных тестов</th>
         <th data-type="num">Оценка</th>
-        {% if for_group %}
+        {% if for_group and not solo %}
         <th data-type="num">Невовремя / не сдано
           {% include "_hint.html" with hint="Первое число — сдали после срока. Второе — не сдали совсем." %}
         </th>
+        {% elif solo %}
+        {% comment %}
+        ⚠️ «Сдано» — только у ИНДИВИДУАЛЬНОГО ЗАНЯТИЯ (сессия 9, фаза 9):
+        здесь в ячейке не только дата, но и пометки «после срока» / «не
+        сдал». На карточке ученика столбец прежний — «Дата сдачи».
+        {% endcomment %}
+        <th data-type="date">Сдано</th>
         {% else %}
         <th data-type="date">Дата сдачи</th>
         {% endif %}
@@ -65,12 +72,23 @@
           <span class="k-level k-level--{{ row.mark_level }}">{{ row.mark }} %</span>
           {% else %}—{% endif %}
         </td>
-        {% if for_group %}
+        {% if for_group and not solo %}
         {% comment %}
         ⚠️ Работа без срока в столбец «невовремя» не попадает вообще —
         прочерк, а не ноль: без срока опоздать нельзя.
         {% endcomment %}
         <td class="wk-num" data-sort="{{ row.missing }}">{% if row.late is not None %}{{ row.late }}{% else %}—{% endif %} / {{ row.missing }}</td>
+        {% elif solo %}
+        {% comment %}
+        ⚠️ У ОДНОГО УЧЕНИКА два числа «невовремя / не сдано» вырождаются в
+        «0/1» — читать это труднее, чем сам факт. Поэтому здесь момент
+        сдачи, а опоздание и несдача — чипы перед датой (сессия 9, фаза 9).
+        {% endcomment %}
+        <td class="wk-num" data-sort="{{ row.submitted_at|date:'U'|default:0 }}">
+          {% if row.submitted_at %}
+          {% if row.is_late %}<span class="wk-flag wk-flag--late">после срока</span> {% endif %}{{ row.submitted_at|date:"d.m.Y, H:i" }}
+          {% else %}<span class="wk-flag wk-flag--none">не сдал</span>{% endif %}
+        </td>
         {% else %}
         <td class="wk-num" data-sort="{{ row.submitted_at|date:'U'|default:0 }}">{% if row.submitted_at %}{{ row.submitted_at|date:"d.m.Y" }}{% else %}—{% endif %}</td>
         {% endif %}

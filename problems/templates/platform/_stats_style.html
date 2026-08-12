@@ -160,6 +160,113 @@
               background: var(--chip-bg); border-radius: 999px; padding: 2px 8px; }
 
 /* ── Таблицы репетитора ─────────────────────────────── */
+/* Аватар-инициал и строка личных фактов — общие у карточки ученика и у
+   шапки индивидуального занятия. */
+.avatar { width: 44px; height: 44px; border-radius: 50%;
+          background: var(--chip-bg); color: var(--text2);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 17px; font-weight: 700; flex-shrink: 0; }
+.student-facts { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px;
+                 font-size: 13px; color: var(--text); }
+.student-facts span { display: inline-flex; align-items: baseline; gap: 5px; }
+.student-facts .cap { font-size: 11px; color: var(--text3); }
+/* Чип типа занятия `.k-chip-kind` живёт в НАБОРЕ ДЕТАЛЕЙ (`_kit.html`):
+   он стоит и на конструкторе подборки, и в ручном конструкторе, а те
+   стили статистики не подключают. Здесь только то, что нужно шапке. */
+.page-header .k-chip-kind { margin-left: auto; }
+
+/* ── Карточки-показатели верхнего ряда ─────────────────────────────────
+   ⚠️ ПЕРЕЕХАЛИ СЮДА ИЗ `teacher/student_progress.html` (сессия 9, фаза 9):
+   те же карточки теперь стоят и на обзоре индивидуального занятия. Класс,
+   чей стиль лежит в файле, который подключает только один экран, — уже
+   знакомая нам поломка (баг 7.6, история работ в сессии 8). */
+.cards3 { display: grid; gap: 12px; margin-bottom: 24px;
+          grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.card3 { background: var(--surface); border: 1px solid var(--border);
+         border-radius: 10px; padding: 16px 18px; }
+.card3-cap { font-size: 12px; color: var(--text2); margin-bottom: 8px;
+             display: flex; align-items: center; }
+.card3-value { font-size: 26px; font-weight: 700;
+               font-variant-numeric: tabular-nums; }
+.card3-value .k-pair { font-size: 26px; }
+.card3-value .k-pair__mine { font-size: 20px; }
+
+/* ── Прогресс по темам: имя · задачи · тесты (сессия 9, фаза 7.3) ────
+   ⚠️ ИМЯ ТЕМЫ — КОЛОНКА ФИКСИРОВАННОЙ ШИРИНЫ. Это и есть выполнение
+   требования «все шкалы начинаются от одной вертикали»: при плавающей
+   ширине каждая шкала стартовала со своего места, и сравнить их глазом
+   было нельзя.
+   ⚠️ ДВЕ КОЛОНКИ ВМЕСТО ДВУХ КАРТОЧЕК. Было два блока по 23 строки один
+   под другим, с пустым местом по бокам; стало по половине на задачи и на
+   тесты в одной строке темы. Каждая половина растёт слева направо от СВОЕЙ
+   вертикали. */
+.tp-row { display: grid; grid-template-columns: 200px 1fr 1px 1fr;
+          gap: 14px; align-items: center; padding: 5px 0; }
+/* ⚠️ ПОЛОВИНА — ОДНА ЯЧЕЙКА, а не две колонки сетки. У ячейки есть
+   настоящий бокс, и на неё можно повесить `:hover`; обёртка с
+   `display: contents` бокса не создаёт, и наведение на неё не ловится. */
+.tp-half { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.tp-half .tp-bar { flex: 1; }
+.tp-half .tp-value { width: 58px; flex-shrink: 0; }
+/* Шапка колонок: без неё две одинаковые шкалы в строке неразличимы. */
+.tp-head { font-size: 11px; font-weight: 600; color: var(--text2);
+           padding-bottom: 6px; border-bottom: 1px solid var(--border);
+           margin-bottom: 6px; }
+/* Разделитель половин — тонкая вертикаль, а не отступ: без неё взгляд
+   склеивает значение задач с началом шкалы тестов. */
+.tp-split { background: var(--border); align-self: stretch; min-height: 18px; }
+.tp-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis;
+           white-space: nowrap; }
+.tp-empty .tp-name { color: var(--text3); }
+/* ⚠️ ШКАЛА ДВУХЦВЕТНАЯ И НЕ АКЦЕНТНАЯ. Слева доля верных — цвет по уровню
+   (зелёный от 70 %, жёлтый 40–69 %, красный ниже 40 %), справа доля
+   неверных — ВСЕГДА серая. Малиновый здесь запрещён: раньше шкалы были
+   малиновые, и это ровно то, что владелец просил убрать. */
+.tp-bar { height: 14px; border-radius: 999px; overflow: hidden;
+          background: var(--surface-2); border: 1px solid var(--border-soft);
+          display: flex; }
+.tp-bar i { display: block; height: 100%; }
+.tp-fill--good { background: var(--green); }
+.tp-fill--mid  { background: var(--amber); }
+.tp-fill--bad  { background: var(--error); }
+.tp-rest { background: var(--chip-bg); }
+/* Тема без попыток — пустая шкала пунктиром: это факт, а не ноль процентов. */
+.tp-bar--empty { border: 1px dashed var(--border); background: transparent; }
+.tp-value { font-size: 13px; text-align: right;
+            font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tp-value .frac { display: none; color: var(--text2); }
+.tp-value .pct { display: inline; }
+/* ⚠️ Смена процента на дробь — ЧИСТЫМ CSS, без JS: это подсказка при
+   наведении, а не состояние, которое надо где-то хранить.
+   ⚠️ НАВЕДЕНИЕ РАБОТАЕТ НА СВОЕЙ ПОЛОВИНЕ, А НЕ НА ВСЕЙ СТРОКЕ (фаза 7.3):
+   половин теперь две, и подмена сразу в обеих означала бы, что репетитор
+   не может посмотреть дробь только по тестам. Отсюда обёртка `.tp-half` —
+   `:hover` вешается на неё. */
+.tp-half:hover .tp-value .pct { display: none; }
+.tp-half:hover .tp-value .frac { display: inline; }
+.tp-row:hover .tp-name { color: var(--text); }
+.tp-none { font-size: 12px; color: var(--text3); }
+/* Строка «Всего» — отделена чертой, шкала выше, значение полужирным. */
+.tp-total { border-top: 1px solid var(--border); margin-top: 10px;
+            padding-top: 12px; }
+.tp-total .tp-bar { height: 18px; }
+.tp-total .tp-name, .tp-total .tp-value { font-weight: 700; }
+/* ⚠️ УЗКИЙ ЭКРАН: две колонки не помещаются — строка разворачивается в
+   блок «тема, под ней подписанные шкалы». Полноценных двух карточек здесь
+   нет намеренно: они означали бы вывод одних и тех же данных в разметку
+   дважды, а так рядом с темой сразу обе половины и сравнивать удобнее. */
+@media (max-width: 900px) {
+  .tp-row { grid-template-columns: 1fr; row-gap: 6px;
+            padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+  .tp-name { font-weight: 600; white-space: normal; }
+  .tp-split, .tp-head { display: none; }
+  /* Подпись половины появляется ТОЛЬКО здесь — в широком виде её роль
+     играет шапка колонок. */
+  .tp-half::before { content: attr(data-cap); font-size: 11px;
+                     color: var(--text3); width: 46px; flex-shrink: 0; }
+}
+
+
 .stats-table-wrap { overflow-x: auto; }
 /* ── Прокрутка без полосы (сессия 9, фаза 6.2) ─────────────────────────
    Владелец: полоса под теплокартой бесполезна и засоряет экран.
@@ -272,3 +379,10 @@ tr.row-click { cursor: pointer; }
 .wk-kind { font-size: 11px; font-weight: 500; color: var(--text2);
            border: 1px solid var(--border); border-radius: 999px;
            padding: 1px 8px; white-space: nowrap; }
+/* Пометки в столбце «Сдано» у индивидуального занятия: опоздание и
+   несдача. Чип, а не слово в строке: дата рядом, и два текста подряд
+   читались бы как одно предложение. */
+.wk-flag { font-size: 11px; font-weight: 600; border-radius: 999px;
+           padding: 1px 8px; white-space: nowrap; }
+.wk-flag--late { background: var(--amber-tint); color: var(--amber); }
+.wk-flag--none { background: var(--error-tint); color: var(--error); }
