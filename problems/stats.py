@@ -124,8 +124,7 @@ def _period_totals(user, period, now):
 
     counts = events.aggregate(
         solved=Count('pk', filter=Q(event_type='solved')),
-        failed=Count('pk', filter=Q(event_type='failed')),
-        seconds=Sum('time_spent_seconds'))
+        failed=Count('pk', filter=Q(event_type='failed')))
     solved = counts['solved'] or 0
     failed = counts['failed'] or 0
     attempted = solved + failed
@@ -144,9 +143,64 @@ def _period_totals(user, period, now):
         # просто открытая задача точность не портят — тот же принцип, что
         # в сводке Econ Rush.
         'accuracy': round(solved * 100.0 / attempted, 1) if attempted else None,
-        'minutes': int(round((counts['seconds'] or 0) / 60)),
+        # ⚠️ НЕ `Sum('time_spent_seconds')`: боевой код это поле не пишет,
+        # и карточка «время» показывала «0 мин» при десятках попыток.
+        # Считаем по расстоянию между событиями — см. `minutes_on_site`.
+        'minutes': minutes_on_site(user, period, now),
         'xp': xp,
     }
+
+
+# Пауза, после которой считаем, что человек ушёл с сайта. Меньше — и
+# «подумал над задачей» рвало бы сессию; больше — и одна забытая вкладка
+# давала бы сутки на сайте.
+SESSION_GAP_MINUTES = 30
+
+
+def minutes_on_site(user, period='month', now=None):
+    """Сколько минут человек провёл на сайте за период.
+
+    ⚠️ СЧИТАЕМ ПО РАССТОЯНИЮ МЕЖДУ СОБЫТИЯМИ, А НЕ ПО СЧЁТЧИКУ. Поле
+    `LearningEvent.time_spent_seconds` существует и агрегировалось, но
+    заполняли его только игра и демо-скрипт: ни домашка
+    (`student/views.py::_log_submission_event`), ни контрольная
+    (`exam_engine`), ни открытие задачи в каталоге секунд не передают.
+    Отсюда и «0 мин при десятках попыток», с которого началась фаза 7.2.
+
+    Чинить запись в трёх боевых точках значило бы завести на клиенте три
+    секундомера и доверять им. Расстояние между событиями честнее: оно
+    считается по данным, которые уже есть, работает задним числом и не
+    зависит от того, закрыл ли ученик вкладку.
+
+    Правило: события одного человека выстраиваются по времени; промежуток
+    короче `SESSION_GAP_MINUTES` идёт в зачёт, длиннее — считается уходом.
+    Одинокое событие даёт ноль минут — и это честно: мы знаем момент, но не
+    длительность.
+
+    ⚠️ ИГРА ВХОДИТ. Это время НА САЙТЕ, а не «учебное время»: тот же
+    принцип, что у «Последней активности». В «Решено» и «Долю верных» игра
+    по-прежнему не входит.
+
+    ⚠️ Единственное место модуля, где мы перебираем события в питоне.
+    Сессии нельзя собрать одним `aggregate`, а тянем мы только один
+    проиндексированный столбец.
+    """
+    from .models import LearningEvent
+
+    start, end = period_bounds(period, now)
+    queryset = LearningEvent.objects.filter(user=user)
+    if start is not None:
+        queryset = queryset.filter(created_at__gte=start, created_at__lt=end)
+    stamps = list(queryset.order_by('created_at')
+                  .values_list('created_at', flat=True))
+
+    gap = timedelta(minutes=SESSION_GAP_MINUTES)
+    total = timedelta()
+    for previous, current in zip(stamps, stamps[1:]):
+        step = current - previous
+        if step <= gap:
+            total += step
+    return int(round(total.total_seconds() / 60))
 
 
 def _delta(current, previous):
@@ -215,10 +269,15 @@ def strongest_weakest(user, period='all', now=None, limit=RANKING_LIMIT,
     source = topic_breakdown(user, period, now) if rows is None else rows
     rows = [r for r in source if r['attempted'] >= MIN_ATTEMPTS_FOR_RANKING]
     by_accuracy = sorted(rows, key=lambda r: (-r['accuracy'], -r['attempted']))
+    # ⚠️ ПОЛОВИНЫ НЕ ПЕРЕСЕКАЮТСЯ. Пока показывали по три темы, это не
+    # всплывало; на пяти (сессия 9, фаза 3) тема с восемью тем в списке
+    # попадала И в «сильные», И в «слабые» — сразу и похвала, и упрёк за
+    # одно и то же. Слабые берём из ОСТАТКА после сильных.
+    strong = by_accuracy[:limit]
+    weak = list(reversed(by_accuracy[len(strong):]))[:limit]
     return {
-        'strong': by_accuracy[:limit],
-        'weak': list(reversed(by_accuracy[-limit:])) if len(rows) > limit
-        else [],
+        'strong': strong,
+        'weak': weak,
         'enough_data': len(rows) >= 2,
         'min_attempts': MIN_ATTEMPTS_FOR_RANKING,
     }
@@ -966,7 +1025,7 @@ def canonical_topics():
     return [by_name[name] for name in CANONICAL if name in by_name]
 
 
-def _graded_ratios(user, tutor=None, kind=None):
+def _graded_ratios(user, tutor=None, kind=None, period='all', now=None):
     """Оценённые задачи ученика → [(topic_id, доля от максимума), …].
 
     ⚠️ НЕПОЛНЫЙ БАЛЛ ИДЁТ ВЕСОМ (фаза 8.2): 8 из 10 — это вклад 0,8, а не
@@ -989,6 +1048,11 @@ def _graded_ratios(user, tutor=None, kind=None):
                 .prefetch_related('problem_item__catalog_problem__topics'))
     if tutor is not None:
         queryset = queryset.filter(assignment__author=tutor)
+    # Период — по моменту СДАЧИ работы: он и есть «когда ученик это решал».
+    start, end = period_bounds(period, now)
+    if start is not None:
+        queryset = queryset.filter(submitted_at__gte=start,
+                                   submitted_at__lt=end)
 
     rows = []
     for sub in queryset:
@@ -1026,28 +1090,33 @@ def _first_canonical_topic_id(item):
     return topics[0].pk if topics else None
 
 
-def _catalog_ratios(user, kind=None):
+def _catalog_ratios(user, kind=None, period='all', now=None):
     """Задачи каталога: решил — 1, ошибся — 0. Игра сюда НЕ входит."""
     from .models import LearningEvent
 
     rows = (LearningEvent.objects
             .filter(user=user, source='catalog',
                     event_type__in=('solved', 'failed'),
-                    topic__isnull=False)
-            .values('topic_id', 'event_type'))
+                    topic__isnull=False))
+    start, end = period_bounds(period, now)
+    if start is not None:
+        rows = rows.filter(created_at__gte=start, created_at__lt=end)
+    rows = rows.values('topic_id', 'event_type')
     return [(row['topic_id'], 1.0 if row['event_type'] == 'solved' else 0.0)
             for row in rows]
 
 
-def accuracy_pair(user, tutor=None, kind=None):
+def accuracy_pair(user, tutor=None, kind=None, period='all', now=None):
     """Два числа доли верных: по всему сайту и по работам этого репетитора.
 
     ⚠️ ИГРА НЕ ВХОДИТ НИ В ОДНО ИЗ НИХ (поправка владельца к фазе 8.8).
     «По всему сайту» — это каталог плюс домашки и контрольные ВСЕХ
     репетиторов, а не «вообще всё, что человек делал на сайте».
     """
-    everywhere = _graded_ratios(user, kind=kind) + _catalog_ratios(user, kind)
-    mine = _graded_ratios(user, tutor=tutor, kind=kind) if tutor else []
+    everywhere = (_graded_ratios(user, kind=kind, period=period, now=now)
+                  + _catalog_ratios(user, kind, period=period, now=now))
+    mine = (_graded_ratios(user, tutor=tutor, kind=kind, period=period,
+                           now=now) if tutor else [])
     return {'all': _percent(everywhere), 'mine': _percent(mine),
             'all_count': len(everywhere), 'mine_count': len(mine)}
 
@@ -1059,14 +1128,15 @@ def _percent(rows):
     return int(round(sum(ratio for _, ratio in rows) * 100.0 / len(rows)))
 
 
-def topic_progress(user, kind=None, tutor=None):
+def topic_progress(user, kind=None, tutor=None, period='all', now=None):
     """Прогресс по ВСЕМ 21 темам: доля верных, решено, уровень.
 
     Строка на каждую каноническую тему, даже пустую. Неполный балл идёт
     весом (см. `_graded_ratios`). Внизу отдельной строкой — «Всего».
     """
-    rows = _graded_ratios(user, tutor=tutor, kind=kind) + \
-        _catalog_ratios(user, kind)
+    rows = (_graded_ratios(user, tutor=tutor, kind=kind, period=period,
+                           now=now)
+            + _catalog_ratios(user, kind, period=period, now=now))
 
     buckets = {}
     for topic_id, ratio in rows:
@@ -1121,6 +1191,48 @@ def topic_progress(user, kind=None, tutor=None):
         'empty': not everything,
     }
     return {'rows': result, 'total': total}
+
+
+def topic_progress_pairs(user, tutor=None, period='all', now=None):
+    """Прогресс по темам ОДНОЙ таблицей: тема · задачи · тесты.
+
+    Владелец согласовал макет: вместо двух карточек одна под другой (по 23
+    строки в каждой, и много пустого места по бокам) — один блок, где у
+    строки темы две половины.
+
+    ⚠️ ВТОРОЙ СБОРКИ НЕТ. Обе половины считает та же `topic_progress`, что
+    считала карточки: здесь только сшивка по теме. Иначе «задачи» и «тесты»
+    начали бы расходиться правилами.
+
+    ⚠️ Строка приглушается, только когда попыток нет В ОБЕИХ половинах:
+    пустая половина при заполненной соседке — это факт про одну колонку, а
+    не про тему целиком.
+    """
+    open_data = topic_progress(user, kind='open', tutor=tutor, period=period,
+                               now=now)
+    test_data = topic_progress(user, kind='test', tutor=tutor, period=period,
+                               now=now)
+    by_name = {row['name']: row for row in test_data['rows']}
+
+    rows = []
+    for left in open_data['rows']:
+        right = by_name.get(left['name'])
+        rows.append({
+            'name': left['name'],
+            'topic': left['topic'],
+            'open': left,
+            'test': right,
+            'empty': left['empty'] and (right is None or right['empty']),
+        })
+    # Неканоническая тема, попавшая только в тесты, потерялась бы молча.
+    seen = {row['name'] for row in open_data['rows']}
+    for name, right in by_name.items():
+        if name not in seen and not right['empty']:
+            rows.append({'name': name, 'topic': right['topic'],
+                         'open': None, 'test': right, 'empty': False})
+    return {'rows': rows,
+            'total_open': open_data['total'],
+            'total_test': test_data['total']}
 
 
 def group_accuracy(group, tutor=None, kind=None):

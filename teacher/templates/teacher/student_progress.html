@@ -48,13 +48,30 @@
 .card3-value .k-pair { font-size: 26px; }
 .card3-value .k-pair__mine { font-size: 20px; }
 
-/* ── Прогресс по темам: имя · шкала · значение ───────────────────────
+/* ── Прогресс по темам: имя · задачи · тесты (сессия 9, фаза 7.3) ────
    ⚠️ ИМЯ ТЕМЫ — КОЛОНКА ФИКСИРОВАННОЙ ШИРИНЫ. Это и есть выполнение
    требования «все шкалы начинаются от одной вертикали»: при плавающей
    ширине каждая шкала стартовала со своего места, и сравнить их глазом
-   было нельзя. */
-.tp-row { display: grid; grid-template-columns: 230px 1fr 76px;
+   было нельзя.
+   ⚠️ ДВЕ КОЛОНКИ ВМЕСТО ДВУХ КАРТОЧЕК. Было два блока по 23 строки один
+   под другим, с пустым местом по бокам; стало по половине на задачи и на
+   тесты в одной строке темы. Каждая половина растёт слева направо от СВОЕЙ
+   вертикали. */
+.tp-row { display: grid; grid-template-columns: 200px 1fr 1px 1fr;
           gap: 14px; align-items: center; padding: 5px 0; }
+/* ⚠️ ПОЛОВИНА — ОДНА ЯЧЕЙКА, а не две колонки сетки. У ячейки есть
+   настоящий бокс, и на неё можно повесить `:hover`; обёртка с
+   `display: contents` бокса не создаёт, и наведение на неё не ловится. */
+.tp-half { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.tp-half .tp-bar { flex: 1; }
+.tp-half .tp-value { width: 58px; flex-shrink: 0; }
+/* Шапка колонок: без неё две одинаковые шкалы в строке неразличимы. */
+.tp-head { font-size: 11px; font-weight: 600; color: var(--text2);
+           padding-bottom: 6px; border-bottom: 1px solid var(--border);
+           margin-bottom: 6px; }
+/* Разделитель половин — тонкая вертикаль, а не отступ: без неё взгляд
+   склеивает значение задач с началом шкалы тестов. */
+.tp-split { background: var(--border); align-self: stretch; min-height: 18px; }
 .tp-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis;
            white-space: nowrap; }
 .tp-empty .tp-name { color: var(--text3); }
@@ -76,10 +93,14 @@
             font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tp-value .frac { display: none; color: var(--text2); }
 .tp-value .pct { display: inline; }
-/* ⚠️ Смена процента на дробь — ЧИСТЫМ CSS по :hover строки, без JS: это
-   подсказка при наведении, а не состояние, которое надо где-то хранить. */
-.tp-row:hover .tp-value .pct { display: none; }
-.tp-row:hover .tp-value .frac { display: inline; }
+/* ⚠️ Смена процента на дробь — ЧИСТЫМ CSS, без JS: это подсказка при
+   наведении, а не состояние, которое надо где-то хранить.
+   ⚠️ НАВЕДЕНИЕ РАБОТАЕТ НА СВОЕЙ ПОЛОВИНЕ, А НЕ НА ВСЕЙ СТРОКЕ (фаза 7.3):
+   половин теперь две, и подмена сразу в обеих означала бы, что репетитор
+   не может посмотреть дробь только по тестам. Отсюда обёртка `.tp-half` —
+   `:hover` вешается на неё. */
+.tp-half:hover .tp-value .pct { display: none; }
+.tp-half:hover .tp-value .frac { display: inline; }
 .tp-row:hover .tp-name { color: var(--text); }
 .tp-none { font-size: 12px; color: var(--text3); }
 /* Строка «Всего» — отделена чертой, шкала выше, значение полужирным. */
@@ -87,9 +108,19 @@
             padding-top: 12px; }
 .tp-total .tp-bar { height: 18px; }
 .tp-total .tp-name, .tp-total .tp-value { font-weight: 700; }
-@media (max-width: 620px) {
-  .tp-row { grid-template-columns: 1fr 60px; }
-  .tp-bar { grid-column: 1 / -1; }
+/* ⚠️ УЗКИЙ ЭКРАН: две колонки не помещаются — строка разворачивается в
+   блок «тема, под ней подписанные шкалы». Полноценных двух карточек здесь
+   нет намеренно: они означали бы вывод одних и тех же данных в разметку
+   дважды, а так рядом с темой сразу обе половины и сравнивать удобнее. */
+@media (max-width: 900px) {
+  .tp-row { grid-template-columns: 1fr; row-gap: 6px;
+            padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+  .tp-name { font-weight: 600; white-space: normal; }
+  .tp-split, .tp-head { display: none; }
+  /* Подпись половины появляется ТОЛЬКО здесь — в широком виде её роль
+     играет шапка колонок. */
+  .tp-half::before { content: attr(data-cap); font-size: 11px;
+                     color: var(--text3); width: 46px; flex-shrink: 0; }
 }
 
 /* Стили таблицы «История работ» переехали в общий
@@ -123,9 +154,23 @@
 </div>
 
 {% comment %}
-Три карточки вместо прежних четырёх (фаза 10.3). Ушли «Открытых проверено»,
-«Средний балл», «Тестов пройдено», «Верных ответов»: первые три считали
-штуки и сырые баллы, несопоставимые между работами.
+⚠️ ПЕРЕКЛЮЧАТЕЛЬ ПЕРИОДА (сессия 9, фаза 7.1) — ТОТ ЖЕ, что на экране
+группы: те же значения из `stats.PERIODS`, та же разметка `.period-bar`.
+Ему подчиняются верхние карточки, прогресс по темам и «сильные и слабые»;
+теплокарта активности намеренно остаётся за полгода — так и подписана.
+{% endcomment %}
+<div class="period-bar" style="margin-bottom:18px;">
+  {% for key, label in periods %}
+  <a href="?period={{ key }}" style="text-decoration:none;">
+    <button type="button" class="{% if key == period %}is-active{% endif %}">{{ label }}</button>
+  </a>
+  {% endfor %}
+</div>
+
+{% comment %}
+Четыре карточки верхнего ряда. Прежние «Открытых проверено», «Средний
+балл», «Тестов пройдено», «Верных ответов» ушли ещё в фазе 10.3: они
+считали штуки и сырые баллы, несопоставимые между работами.
 {% endcomment %}
 <div class="cards3">
   <div class="card3">
@@ -154,58 +199,63 @@
       {% if difficulty %}{{ difficulty }}{% else %}нет оценок{% endif %}
     </div>
   </div>
+  {% comment %}
+  ⚠️ МИНУТЫ НА САЙТЕ (фаза 7.2). Считаются по расстоянию между событиями
+  ученика, а не по счётчику `time_spent_seconds`: его боевой код не пишет
+  вовсе, и карточка показывала «0 мин» при десятках попыток. Подробности —
+  в `stats.minutes_on_site`.
+  {% endcomment %}
+  <div class="card3">
+    <div class="card3-cap">Минут на сайте{% include '_hint.html' with hint='Время между действиями ученика: перерыв дольше 30 минут считается уходом с сайта. Сюда входит вся работа, включая игру.' %}</div>
+    <div class="card3-value">
+      {% if minutes %}{{ minutes|count_ru:"минута,минуты,минут" }}{% else %}нет данных{% endif %}
+    </div>
+  </div>
 </div>
 
 {% comment %}
-Две карточки прогресса — по задачам и по тестам. Устроены ОДИНАКОВО и
-собираются одной функцией `stats.topic_progress`: различаются только числами.
+ОДИН блок прогресса вместо двух карточек (сессия 9, фаза 7.3). У строки темы
+две половины — задачи и тесты; обе считает та же `topic_progress`, сшивку по
+теме делает `topic_progress_pairs`. Второй сборки нет: иначе половины начали
+бы расходиться правилами.
+
+⚠️ Шкала двухцветная и НЕ акцентная: слева доля верных (цвет по уровню),
+справа доля неверных — всегда серая. Малиновый здесь запрещён.
+⚠️ Тема без попыток в этой половине — пустая шкала пунктиром и прочерк
+вместо числа. Без попыток в ОБЕИХ — строка приглушается целиком.
 {% endcomment %}
-{% for card in progress_cards %}
 <div class="panel">
   <div class="panel-head">
-    <div class="panel-title">{{ card.title }}</div>
+    <div class="panel-title">Прогресс по темам</div>
     <div class="panel-hint">Попробуйте навестись на шкалу</div>
   </div>
 
-  {% for row in card.data.rows %}
+  <div class="tp-row tp-head">
+    <span></span>
+    <span class="tp-half">Задачи</span>
+    <span></span>
+    <span class="tp-half">Тесты</span>
+  </div>
+
+  {% for row in progress.rows %}
   <div class="tp-row{% if row.empty %} tp-empty{% endif %}">
-    <span class="tp-name" title="{{ row.name }}">{{ row.name }}</span>
-    {% if row.empty %}
-    <span class="tp-bar tp-bar--empty"></span>
-    <span class="tp-value tp-none">нет попыток</span>
-    {% else %}
-    <span class="tp-bar">
-      <i class="tp-fill--{{ row.level }}" style="width: {{ row.percent }}%"></i>
-      <i class="tp-rest" style="flex: 1"></i>
-    </span>
-    <span class="tp-value">
-      <span class="pct">{{ row.percent }} %</span>
-      <span class="frac">{{ row.correct }} / {{ row.solved }}</span>
-    </span>
-    {% endif %}
+    <span class="tp-name">{{ row.name }}</span>
+    {% include 'teacher/_tp_half.html' with cell=row.open cap='Задачи' %}
+    <span class="tp-split"></span>
+    {% include 'teacher/_tp_half.html' with cell=row.test cap='Тесты' %}
   </div>
   {% endfor %}
 
-  {% with total=card.data.total %}
-  <div class="tp-row tp-total{% if total.empty %} tp-empty{% endif %}">
+  {% comment %}
+  Строка «Всего» — та же вёрстка, шкалы чуть выше, значения полужирным.
+  {% endcomment %}
+  <div class="tp-row tp-total">
     <span class="tp-name">Всего</span>
-    {% if total.empty %}
-    <span class="tp-bar tp-bar--empty"></span>
-    <span class="tp-value tp-none">нет попыток</span>
-    {% else %}
-    <span class="tp-bar">
-      <i class="tp-fill--{{ total.level }}" style="width: {{ total.percent }}%"></i>
-      <i class="tp-rest" style="flex: 1"></i>
-    </span>
-    <span class="tp-value">
-      <span class="pct">{{ total.percent }} %</span>
-      <span class="frac">{{ total.correct }} / {{ total.solved }}</span>
-    </span>
-    {% endif %}
+    {% include 'teacher/_tp_half.html' with cell=progress.total_open cap='Задачи' %}
+    <span class="tp-split"></span>
+    {% include 'teacher/_tp_half.html' with cell=progress.total_test cap='Тесты' %}
   </div>
-  {% endwith %}
 </div>
-{% endfor %}
 
 {% comment %}
 «Сильные и слабые темы» — перенесено со второго экрана статистики
@@ -269,7 +319,7 @@
   <form method="post" id="note-form">
     {% csrf_token %}
     <textarea class="k-area" name="note" id="note-text" rows="4"
-              placeholder="Полезная информация {{ student.get_full_name|default:student.username|prep_o }} {{ student.get_full_name|default:student.username }}">{% if note %}{{ note.text }}{% endif %}</textarea>
+              placeholder="Полезная информация {% with name=student.get_full_name|default:student.username %}{{ name|prep_o }} {{ name|prepositional }}{% endwith %}">{% if note %}{{ note.text }}{% endif %}</textarea>
     <div class="k-row" style="margin-top:10px;align-items:center">
       <button type="submit" class="k-btn k-btn--plain k-btn--sm">Сохранить</button>
       <span class="note-said" id="note-said" hidden>сохранено</span>

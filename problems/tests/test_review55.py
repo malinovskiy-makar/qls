@@ -881,10 +881,15 @@ class StudentCardTests(TestCase):
                      'Верных ответов'):
             self.assertNotIn(gone, body, gone)
 
-    def test_two_progress_cards(self):
+    def test_progress_shows_tasks_and_tests(self):
+        """⚠️ Было ДВЕ карточки, стал ОДИН блок в две колонки (сессия 9,
+        фаза 7.3). Требование то же: на экране есть и задачи, и тесты —
+        просто теперь в одной строке темы, а не в двух списках по 23 строки.
+        """
         body = self.client.get(self._url()).content.decode()
-        self.assertIn('Прогресс по задачам', body)
-        self.assertIn('Прогресс по тестам', body)
+        self.assertIn('Прогресс по темам', body)
+        self.assertIn('>Задачи<', body)
+        self.assertIn('>Тесты<', body)
 
     def test_bars_are_not_magenta(self):
         """⚠️ Малиновый в шкалах ЗАПРЕЩЁН — это и просили убрать.
@@ -903,19 +908,32 @@ class StudentCardTests(TestCase):
         self.assertIn('.tp-fill--bad', template)
 
     def test_topic_column_has_a_fixed_width(self):
-        """«Все шкалы начинаются от одной вертикали» — это и есть колонка."""
+        """«Все шкалы начинаются от одной вертикали» — это и есть колонка.
+
+        ⚠️ Ширины изменились в сессии 9 (фаза 7.3): строка стала двухколоночной
+        (тема · задачи · разделитель · тесты), поэтому имя темы 200px, а
+        значение 58px внутри половины. Требование то же — колонка имени
+        ФИКСИРОВАННАЯ, иначе шкалы стартуют каждая со своего места.
+        """
         import io
         template = io.open(
             'teacher/templates/teacher/student_progress.html',
             encoding='utf-8').read()
-        self.assertIn('grid-template-columns: 230px 1fr 76px', template)
+        self.assertIn('grid-template-columns: 200px 1fr 1px 1fr', template)
+        self.assertIn('.tp-half .tp-value { width: 58px', template)
 
     def test_hover_swap_is_pure_css(self):
+        """⚠️ Наведение теперь на ПОЛОВИНЕ, а не на всей строке (фаза 7.3).
+
+        Половин две, и подмена процента на дробь сразу в обеих означала бы,
+        что посмотреть дробь только по тестам нельзя.
+        """
         import io
         template = io.open(
             'teacher/templates/teacher/student_progress.html',
             encoding='utf-8').read()
-        self.assertIn('.tp-row:hover .tp-value .frac', template)
+        self.assertIn('.tp-half:hover .tp-value .frac', template)
+        self.assertNotIn('.tp-row:hover .tp-value .frac', template)
 
     def test_work_history_has_seven_columns(self):
         body = self.client.get(self._url()).content.decode()

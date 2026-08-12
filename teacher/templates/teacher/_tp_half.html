@@ -1,0 +1,26 @@
+{% comment %}
+Половина строки прогресса по темам: шкала плюс значение.
+
+Ждёт `cell` — строку из `stats.topic_progress` (или её итог) и `cap` —
+подпись половины для узкого экрана.
+
+⚠️ ОДИН ПАРТИАЛ НА ОБЕ ПОЛОВИНЫ И НА СТРОКУ «ВСЕГО». Три копии одной
+разметки означали бы три разных вида шкалы после первой же правки.
+⚠️ `cell` может быть пустым (тема есть только в другой половине) — рисуем
+то же, что для темы без попыток.
+{% endcomment %}
+<span class="tp-half" data-cap="{{ cap }}">
+  {% if not cell or cell.empty %}
+  <span class="tp-bar tp-bar--empty"></span>
+  <span class="tp-value tp-none">—</span>
+  {% else %}
+  <span class="tp-bar">
+    <i class="tp-fill--{{ cell.level }}" style="width: {{ cell.percent }}%"></i>
+    <i class="tp-rest" style="flex: 1"></i>
+  </span>
+  <span class="tp-value">
+    <span class="pct">{{ cell.percent }} %</span>
+    <span class="frac">{{ cell.correct }} / {{ cell.solved }}</span>
+  </span>
+  {% endif %}
+</span>

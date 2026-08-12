@@ -135,7 +135,12 @@ class QueryBudgetTests(TestCase):
             for problem in problems[:3]:
                 solve(self.student, problem, now - timedelta(days=day))
 
-    BUDGET = 30
+    # ⚠️ Было 30, стало 32 (сессия 9, фаза 7.2). Ровно два запроса добавила
+    # карточка «время»: минуты считаются по расстоянию между событиями, а
+    # `overview` считает их дважды — за период и за предыдущий, ради стрелки
+    # изменения. Смысл потолка не в числе, а в защите от N+1: он по-прежнему
+    # не зависит от количества задач и событий.
+    BUDGET = 32
 
     def _count(self, action):
         from django.db import connection

@@ -656,34 +656,43 @@ def student_progress(request, pk):
     note = TutorNote.objects.filter(tutor=request.user,
                                     student=student).first()
 
+    # ⚠️ ПЕРИОД — ТОТ ЖЕ ПЕРЕКЛЮЧАТЕЛЬ, ЧТО НА ЭКРАНЕ ГРУППЫ (фаза 7.1).
+    # Списком периодов владеет `stats.PERIODS`, второго набора нет.
+    # Неизвестное значение — месяц, а не пятисотка.
+    period = request.GET.get('period') or 'month'
+    if period not in dict(stats_module.PERIODS):
+        period = 'month'
+
     # ⚠️ ДВА ЧИСЛА В КАЖДОЙ КАРТОЧКЕ: по всему сайту и по работам ЭТОГО
     # репетитора. Игра не входит ни в одно из них (поправка 3 владельца).
     open_pair = stats_module.accuracy_pair(student, tutor=request.user,
-                                           kind='open')
+                                           kind='open', period=period)
     test_pair = stats_module.accuracy_pair(student, tutor=request.user,
-                                           kind='test')
+                                           kind='test', period=period)
 
     return render(request, 'teacher/student_progress.html', {
         'student': student,
         'profile': profile,
         'note': note,
+        'period': period,
+        'periods': stats_module.PERIODS,
         'open_pair': open_pair,
         'test_pair': test_pair,
         # Формат «4,3 из 10» — русская запятая. Собираем строку ЗДЕСЬ:
         # шаблонный `floatformat` даёт запятую только при русской локали,
         # и полагаться на неё ради одного числа не стоит.
         'difficulty': _difficulty_label(difficulty_for_student(student)),
-        # Две карточки прогресса: по задачам и по тестам. Устроены ОДИНАКОВО
-        # и собираются одной функцией — различаются только числами.
-        'progress_cards': [
-            {'title': 'Прогресс по задачам',
-             'data': stats_module.topic_progress(student, kind='open')},
-            {'title': 'Прогресс по тестам',
-             'data': stats_module.topic_progress(student, kind='test')},
-        ],
+        # ⚠️ Минуты на сайте — по расстоянию между событиями, а не по
+        # счётчику `time_spent_seconds`: боевой код его не пишет (см.
+        # `stats.minutes_on_site`).
+        'minutes': stats_module.minutes_on_site(student, period),
+        # ⚠️ ОДИН БЛОК ВМЕСТО ДВУХ КАРТОЧЕК (фаза 7.3): у строки темы две
+        # половины — задачи и тесты. Сборка та же `topic_progress`, сшивка
+        # по теме — в `topic_progress_pairs`.
+        'progress': stats_module.topic_progress_pairs(student, period=period),
         'works': _work_history(student, request.user),
         # Перенесено со второго экрана (см. решение стоп-гейта выше).
-        'ranking': stats_module.strongest_weakest(student, 'all'),
+        'ranking': stats_module.strongest_weakest(student, period),
         'calendar': stats_module.activity_calendar(student),
     })
 
