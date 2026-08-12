@@ -287,13 +287,21 @@
       <span class="rv-own">
         своё
         {% comment %}
-        ⚠️ step="any", а не 0.5 (сессия 7, фаза 3). Ровная половина от
-        максимума 2,5 — это 1,25, и при шаге 0,5 браузер счёл бы поле
-        недействительным: кнопка «половина» просто не отправила бы форму.
+        ⚠️ ПОЛЕ ТЕКСТОВОЕ, А НЕ ЧИСЛОВОЕ (сессия 9, фаза 5.2). Владелец:
+        «нельзя поставить нецелый балл». Причин было две, и обе наши.
+        1. `type="number"` не считает запятую допустимой и молча стирает
+           набранное «1,5» — а соседняя кнопка-пресет подписана «1,5».
+        2. Хуже: начальное значение печатается через `floatformat`, язык
+           проекта русский, и фильтр отдаёт «1,50». То есть УЖЕ
+           поставленный дробный балл не показывался в форме вовсе —
+           браузер отвергал собственное значение как недействительное.
+        `inputmode="decimal"` даёт на телефоне ту же цифровую клавиатуру.
+        Запятую приводит к точке сервер (`views.normalize_decimal`) —
+        форму можно отправить и в обход браузера.
         Границы держит сервер (`_max_score_for`), а не разметка.
         {% endcomment %}
-        <input type="number" step="any" min="0" name="score" id="score-input"
-               class="k-input"
+        <input type="text" inputmode="decimal" name="score" id="score-input"
+               class="k-input" data-decimal autocomplete="off"
                value="{% if existing_feedback %}{{ existing_feedback.score|floatformat:'-2' }}{% elif auto_score is not None %}{{ auto_score|floatformat:'-2' }}{% endif %}">
       </span>
       <span class="rv-max">максимум {{ max_score|floatformat:"-2" }}</span>
@@ -326,15 +334,20 @@
   if (!input) { return; }
 
   function paint() {
-    var current = (input.value || '').trim();
+    var current = dot(input.value);
     presets.forEach(function (button) {
-      button.classList.toggle('is-on', button.dataset.score === current);
+      button.classList.toggle('is-on', dot(button.dataset.score) === current);
     });
   }
 
+  // ⚠️ Сравнение и подстановка идут в ОДНОЙ записи — с точкой. Поле
+  // показывает по-русски, с запятой, поэтому нормализуем обе стороны:
+  // иначе пресет «1,5» никогда не подсветился бы для значения «1.5».
+  function dot(value) { return (value || '').trim().replace(',', '.'); }
+
   presets.forEach(function (button) {
     button.addEventListener('click', function () {
-      input.value = button.dataset.score;
+      input.value = button.dataset.score.replace('.', ',');
       paint();
     });
   });

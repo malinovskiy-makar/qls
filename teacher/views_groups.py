@@ -820,9 +820,15 @@ def student_work_review(request, assignment_id, student_id, group_id=None):
                                     assignments_received=assignment)
         back_url = reverse('teacher:assignment_detail', args=[assignment.pk])
 
+    # Какую задачу раскрыть: приходит с экрана проверки (`?open=<позиция>`).
+    try:
+        open_item = int(request.GET.get('open') or 0) or None
+    except ValueError:
+        open_item = None
+
     context = work_review_context(
         assignment, student, viewer=request.user, for_tutor=True,
-        back_url=back_url, back_label='К решениям')
+        back_url=back_url, back_label='К решениям', open_item=open_item)
     return render(request, 'student/work_review.html', context)
 
 
@@ -1103,9 +1109,12 @@ def api_grade_submission(request):
     if not allowed:
         raise Http404
 
-    raw = (request.POST.get('score') or '').strip().replace(',', '.')
+    # Запятая — законный ввод: нормализует её ОДНА функция на форму и на
+    # этот эндпоинт (`teacher.views.normalize_decimal`).
+    from .views import normalize_decimal
+
     try:
-        score = float(raw)
+        score = float(normalize_decimal(request.POST.get('score')))
     except ValueError:
         return JsonResponse({'error': 'балл не число'}, status=400)
     top = float(_max_score_for(submission) or 0)
@@ -1130,5 +1139,9 @@ def api_grade_submission(request):
     except Exception:      # прогресс по темам не имеет права уронить оценку
         logger.exception('Прогресс по темам не обновился — оценка сохранена')
 
-    return JsonResponse({'score': score, 'max': top,
-                         'label': ('%.2f' % score).rstrip('0').rstrip('.')})
+    # ⚠️ `label` уезжает ОБРАТНО В ПОЛЕ, а поле показывает число по-русски —
+    # значит и здесь запятая. С точкой сервер возвращал бы «1.5» туда, где
+    # репетитор только что набрал «1,5», и число дёргалось бы после каждого
+    # сохранения.
+    label = ('%.2f' % score).rstrip('0').rstrip('.').replace('.', ',')
+    return JsonResponse({'score': score, 'max': top, 'label': label})

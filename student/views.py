@@ -552,7 +552,7 @@ def work_review(request, pk):
 
 
 def work_review_context(assignment, student, viewer=None, for_tutor=False,
-                        back_url=None, back_label=None):
+                        back_url=None, back_label=None, open_item=None):
     """Контекст экрана разбора. Общий для ученика и репетитора: обе стороны
     обязаны видеть ОДНО И ТО ЖЕ — иначе спор об оценке превращается в спор
     о том, у кого что на экране."""
@@ -599,6 +599,13 @@ def work_review_context(assignment, student, viewer=None, for_tutor=False,
             WorkDifficulty.objects.filter(assignment=assignment,
                                           student=student).first()),
         'difficulty_range': range(WorkDifficulty.MIN, WorkDifficulty.MAX + 1),
+        # ⚠️ КАКУЮ ЗАДАЧУ РАСКРЫТЬ ПРИ ОТКРЫТИИ (сессия 9, фаза 5.3).
+        # Ссылка «глазами ученика» ведёт сюда с экрана проверки конкретной
+        # задачи, и раньше открывала разбор со всеми задачами свёрнутыми:
+        # репетитор терял место и искал заново. Адресуемся ПОЗИЦИЕЙ
+        # (`AssignmentItem.pk`), а не порядковым номером: номер зависит от
+        # сортировки, а позиция — нет.
+        'open_item': open_item,
     }
 
 

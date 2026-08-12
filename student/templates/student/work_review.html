@@ -234,8 +234,9 @@
 задачи с ошибкой раскрыты, с них и начинается разбор.
 {% endcomment %}
 <details class="wr-item k-mark k-mark--{{ row.state }}" data-state="{{ row.state }}"
+         id="task-{{ row.item.pk }}"
          data-attention="{% if row.needs_attention %}1{% else %}0{% endif %}"
-         {% if row.needs_attention and not for_tutor %}open{% endif %}>
+         {% if row.item.pk == open_item %}open data-open-target="1"{% elif row.needs_attention and not for_tutor %}open{% endif %}>
   <summary>
     <span class="wr-num">{{ row.number }}.</span>
     <span class="wr-title">{{ row.title|default:row.statement|striptags|truncatechars:70 }}</span>
@@ -343,10 +344,15 @@
   var URL = '{% url "teacher:api_grade_submission" %}';
   var CSRF = document.querySelector('[name=csrfmiddlewaretoken]');
 
+  // ⚠️ Поле балла показывает число ПО-РУССКИ, с запятой, а пресеты хранят
+  // его с точкой. Сравниваем и подставляем в одной записи, иначе пресет
+  // «1,5» никогда не подсветится для значения «1.5».
+  function dot(value) { return (value || '').trim().replace(',', '.'); }
+
   function paint(block) {
-    var value = (block.querySelector('.gi-input').value || '').trim();
+    var value = dot(block.querySelector('.gi-input').value);
     block.querySelectorAll('.gi-preset').forEach(function (button) {
-      button.classList.toggle('is-on', button.dataset.score === value);
+      button.classList.toggle('is-on', dot(button.dataset.score) === value);
     });
   }
 
@@ -354,7 +360,8 @@
     var preset = event.target.closest('.gi-preset');
     if (preset) {
       var block = preset.closest('.gi-block');
-      block.querySelector('.gi-input').value = preset.dataset.score;
+      block.querySelector('.gi-input').value =
+        preset.dataset.score.replace('.', ',');
       paint(block);
       return;
     }
@@ -462,6 +469,20 @@
     .addEventListener('click', function () { paint(natural, 'order-natural'); });
   document.getElementById('order-errors')
     .addEventListener('click', function () { paint(byErrors, 'order-errors'); });
+})();
+
+// Переход с экрана проверки: нужная задача уже раскрыта разметкой
+// (`?open=<позиция>`), остаётся довести её до глаз.
+// ⚠️ Прокрутку делает КЛИЕНТ, а не якорь в адресе: якорь прыгает мгновенно
+// и ставит задачу вплотную к шапке, которая липкая и накрывает заголовок.
+(function () {
+  var target = document.querySelector('[data-open-target]');
+  if (!target) { return; }
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var top = target.getBoundingClientRect().top + window.pageYOffset - 68;
+  window.scrollTo({ top: Math.max(0, top),
+                    behavior: reduce ? 'auto' : 'smooth' });
 })();
 </script>
 {% endblock %}

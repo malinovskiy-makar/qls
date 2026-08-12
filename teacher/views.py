@@ -249,6 +249,43 @@ def _answer_state(feedback, max_score, auto_zero):
     return 'blank' if auto_zero else 'wrong'
 
 
+def parse_score(raw):
+    """Балл из поля формы. ЕДИНСТВЕННАЯ точка разбора.
+
+    ⚠️ ЗАПЯТАЯ — ЗАКОННЫЙ ВВОД. Владелец: «нельзя поставить нецелый балл».
+    Причин было две, и обе в нашем коде.
+
+    1. Поле было `type="number"`, а браузер не считает запятую допустимой:
+       набранное «1,5» он молча стирал. При этом соседняя кнопка-пресет
+       подписана «1,5» — пользователь видит запятую, набирает запятую, поле
+       пустеет.
+    2. Хуже: значение в поле печаталось через `{{ score|floatformat:"-2" }}`,
+       а язык проекта русский — фильтр отдаёт «1,50». То есть УЖЕ
+       ПОСТАВЛЕННЫЙ дробный балл не показывался в форме вовсе: браузер
+       отвергал собственное начальное значение как недействительное.
+
+    Поэтому поле стало текстовым (`inputmode="decimal"`), а запятая
+    приводится к точке ЗДЕСЬ, на сервере: форму можно отправить и в обход
+    браузера, и надеяться на клиентскую нормализацию нельзя.
+    """
+    try:
+        return float(normalize_decimal(raw))
+    except ValueError:
+        return 0.0
+
+
+def normalize_decimal(raw):
+    """«1,5» → «1.5». Общая нормализация для формы и для JSON-эндпоинта.
+
+    Отдельно от `parse_score`, потому что на мусоре у них разное
+    поведение: форма ставит ноль и живёт дальше, а эндпоинт обязан
+    ответить 400 — молчаливый ноль по сети неотличим от «оценил в ноль».
+    """
+    text = (raw or '').strip().replace(',', '.')
+    # Пробелы-разделители разрядов приезжают вставкой из таблицы.
+    return text.replace(' ', '').replace(' ', '').replace(' ', '')
+
+
 def _max_score_for(submission):
     """Максимальный балл за эту задачу в этой работе.
 
@@ -313,10 +350,7 @@ def review_submission(request, pk, group=None):
         comment = request.POST.get('comment', '').strip()
         mistake_ids = request.POST.getlist('mistakes')
 
-        try:
-            score = float(score_str)
-        except ValueError:
-            score = 0.0
+        score = parse_score(score_str)
 
         # ⚠️ БАЛЛ ОБРЕЗАЕТСЯ ПО МАКСИМУМУ ЗАДАЧИ, И ЭТО ДЕЛАЕТ СЕРВЕР.
         # В базе нашлась оценка «9 из 5»: поле «своё» принимало любое число,
@@ -449,13 +483,18 @@ def review_submission(request, pk, group=None):
         # только для работы в группе, и у работы без группы кнопка молча
         # исчезала со страницы — для пользователя это неотличимо от
         # «ведёт не туда».
+        # ⚠️ Адрес несёт `?open=<позиция>` — разбор откроется НА ТОЙ ЖЕ
+        # задаче, которую репетитор сейчас смотрит (сессия 9, фаза 5.3).
+        # Раньше он открывался целиком свёрнутым, и место терялось.
         'work_review_url': (
-            reverse('teacher:student_work_review',
-                    args=[group_obj.pk, submission.assignment_id,
-                          submission.student_id])
-            if group_obj else
-            reverse('teacher:student_work_review_plain',
-                    args=[submission.assignment_id, submission.student_id])),
+            (reverse('teacher:student_work_review',
+                     args=[group_obj.pk, submission.assignment_id,
+                           submission.student_id])
+             if group_obj else
+             reverse('teacher:student_work_review_plain',
+                     args=[submission.assignment_id, submission.student_id]))
+            + ('?open=%d' % submission.problem_item_id
+               if submission.problem_item_id else '')),
         'work_review_student': submission.student,
     })
 

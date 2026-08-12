@@ -29,10 +29,13 @@ _max_score_for`), а не атрибутом `max=`: запрос можно о�
     {% endfor %}
     <span class="k-quiet">своё</span>
     {% comment %}
-    `step="any"`, а не 0.5: ровная половина от 2,5 — это 1,25, и при шаге
-    0,5 браузер счёл бы поле недействительным.
+    ⚠️ Поле ТЕКСТОВОЕ — как на экране проверки (сессия 9, фаза 5.2).
+    `type="number"` отвергает запятую и стирал бы и набранное «1,5», и
+    собственное начальное значение: `floatformat` на русском языке отдаёт
+    «1,50». Запятую приводит к точке сервер.
     {% endcomment %}
-    <input type="number" step="any" min="0" class="k-input k-input--num gi-input"
+    <input type="text" inputmode="decimal" class="k-input k-input--num gi-input"
+           data-decimal autocomplete="off"
            value="{% if row.score is not None %}{{ row.score|floatformat:'-2' }}{% endif %}"
            aria-label="балл за задачу">
     <span class="k-quiet">максимум {{ row.max_points|floatformat:"-2" }}</span>
