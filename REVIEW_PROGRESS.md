@@ -1208,3 +1208,139 @@ problems/tests/test_eyes_grading.py (15)
 Снимки: reports/review/ф09-глазами-ученика-свёрнуто.png,
 ф09-оценка-в-разборе.png
 Проверка браузером: node scripts/eyes_grade.js 8199 — 8 из 8.
+
+---
+---
+
+# СЕССИЯ 9 — второй проход владельца по кабинету (2026-08-12)
+
+Ветка `feat/platform-foundation`. 32 новые правки + три сквозные мысли.
+Тестов на старте: **1235**.
+
+## Инвентаризация — ГОТОВО — 2026-08-12 (только чтение, кода не тронуто)
+
+### 1. Карта кабинета репетитора
+
+| Адрес | Вьюха | Шаблон |
+|---|---|---|
+| `/teacher/` (вкладка «Проверка») | `views_groups.dashboard` | `teacher/dashboard_inbox.html` |
+| `/teacher/groups/` | `views_groups.groups_list` | `teacher/groups/list.html` |
+| `/teacher/groups/<id>/?tab=overview` | `views_groups.group_detail` | `teacher/groups/detail.html` + `groups/_overview.html` |
+| `/teacher/groups/<id>/?tab=assignments` | та же | `groups/detail.html` (блок «Задания») |
+| `/teacher/groups/<id>/?tab=materials` | та же | `groups/detail.html` (блок «Материалы») |
+| `/teacher/student/<id>/progress/` | `views.student_progress` | `teacher/student_progress.html` |
+| `/teacher/groups/<g>/assignments/<a>/submissions/` | `views_groups.group_submissions` | `teacher/groups/submissions_by_student.html` |
+| `/teacher/groups/<g>/submissions/<id>/` | `views_groups.group_review_submission` | `teacher/review.html` |
+| `/teacher/assignment/generate/` | `views_generate.assignment_generate` | `teacher/generate.html` |
+| `/teacher/assignment/create/` | `views.assignment_create` | `teacher/assignment_create.html` |
+| `/teacher/problems/new/` | `views_problems.problem_form` | `platform/problem_form.html` |
+
+**Мёртвый код найден попутно** (не подключён ни к одному маршруту, вьюхи
+перекрыты одноимёнными из `views_groups`): `teacher/views.py::dashboard`,
+`groups_list`, `group_create`, `group_detail` и их шаблоны
+`teacher/dashboard.html`, `teacher/groups_list.html`, `teacher/group_create.html`,
+`teacher/group_detail.html`; шаблоны `teacher/groups/stats.html` и
+`teacher/groups/student_stats.html` (вьюхи стали редиректами в сессии 7),
+`views_stats._student_stats_legacy`.
+
+### 2. Что из прошлых сессий доехало ПО ФАКТУ КОДА
+
+Проверено чтением кода, а не отчётов. **Всё шесть пунктов сделаны в сессии 8**
+— текст задания на эту сессию писался до неё и здесь устарел:
+
+| Пункт | Состояние | Чем подтверждается |
+|---|---|---|
+| 12.1 карточки запросов с галочками | ЕСТЬ | `teacher/_cand_row.html`, `.k-check--box` в `_kit.html`, `api_more_candidates` |
+| 12.2 отдельный экран конструктора | ЕСТЬ | `/teacher/assignment/build/` → `assignment_build.html` (403 строки) |
+| 12.3 куда ведёт кнопка после создания | ЕСТЬ | `views.py:758` → `redirect('teacher:group_assignment', …)` |
+| 13 вид ручного поиска | ЕСТЬ | `_picker_card.html`, `_picker_style.html`, опись 24=24 |
+| 15.1 пункты в своей задаче | ЕСТЬ | модель `CustomProblemPart`, `#parts-list` и кнопка «+ Пункт» в `problem_form.html:218,251` |
+| 15.2 вид экрана своей задачи, липкое превью | ЕСТЬ | `.preview { position: sticky }` в `problem_form.html:53` |
+
+Вывод: фазы 9 и 10 этой сессии не «делают заново», а **доводят вид** уже
+работающих экранов.
+
+### 3. Темы: откуда берётся список
+
+**Источник ОДИН на все четыре поверхности** — список `CANONICAL` в
+`problems/management/commands/apply_topic_mapping.py` (21 имя):
+- каталог: `catalog/views.py:12` импортирует `CANONICAL`, атлас и фильтр
+  строятся из него;
+- статистика: `problems/stats.py::canonical_topics()` (строка 922) — тот же
+  импорт;
+- подбор домашки: `problems/hw_generator.py::canonical_topics()` (строка 100);
+- чипы тем Econ Rush: `game/views.py:106` — тот же `CANONICAL`.
+
+**Тогда откуда 31 колонка?** Не из второго списка. `group_topic_matrix`
+(`stats.py:754`) намеренно добавляет В КОНЕЦ неканонические темы, У КОТОРЫХ
+ЕСТЬ ДАННЫЕ. В базе **849** записей `Topic`, канонических из них 21; данные
+учеников легли на неканонические.
+
+⚠️ **Тема в статистике берётся НЕ из задачи, а из СНИМКА в событии**
+(`LearningEvent.topic` — FK, денормализация «какая тема была в момент
+решения»). Значит одного перевешивания задач НЕДОСТАТОЧНО: пока события
+показывают на старую строку темы, посторонняя колонка в теплокарте
+останется. Перевешивать надо и события. Это главный вывод разведки к фазе 2.
+
+Неканонические темы, несущие учебные события (точные имена из базы):
+
+| id | Тема | событий | задач |
+|---|---|---|---|
+| 834 | Совокупный спрос и совокупное предложение | 111 | 10 |
+| 836 | Безработица | 106 | 11 |
+| 74 | Деньги и банки | 72 | 43 |
+| 839 | Государственный бюджет и бюджетно-налоговая политика | 69 | 9 |
+| 837 | Инфляция | 62 | 9 |
+| 835 | Экономический рост. Экономический цикл | 50 | 11 |
+| 838 | Денежный рынок. Кредитно-денежная политика | 43 | 8 |
+| 833 | Система национальных счетов | 29 | 17 |
+| 126 | Введение в экономическую теорию. Модель спроса и предложения | 22 | 7 |
+| 2 | Издержки фирмы | 15 | 2 |
+| 189 | Взаимодействие на уровне рынков | 1 | 16 |
+| 454 | Worst of тачки | 1 | 10 |
+
+⚠️ Две поправки к списку владельца. Первая: колонка, названная владельцем
+«Введение в экономическую теорию», в базе называется **«Введение в
+экономическую теорию. Модель спроса и предложения»** (id 126); голая
+«Введение в экономическую теорию» тоже существует (id 125, 6 задач, событий
+нет) — она и станет новой канонической. Вторая: кроме девяти названных есть
+ещё две темы с ОДНИМ событием каждая — «Взаимодействие на уровне рынков» и
+«Worst of тачки»; без них обещание «ни одной посторонней колонки» не
+выполняется.
+
+### 4. Время на сайте — счётчик ЕСТЬ, но боевой код в него не пишет
+
+Поле есть: `LearningEvent.time_spent_seconds`
+(`models_platform.py:1328`), агрегируется в `stats._period_totals`
+(`stats.py:128`) и показывается карточкой «время» в `platform/stats.html:103`.
+
+**Пишут в него только двое:**
+- `game/views.py:753` — реальный `elapsed_ms` от клиента игры;
+- `seed_platform_demo.py:933` — синтетика для демо.
+
+**Не пишет НИКТО из боевых путей:** `student/views.py::_log_submission_event`
+(домашка), `problems/exam_engine.py:316` (контрольная),
+`catalog/views.py:256` (открытие задачи) — все три зовут `log_problem_event`
+без секунд.
+
+Отсюда и «0 мин при десятках попыток»: у `student3@test.local` за месяц
+**23 попытки и 0 минут** — все свежие события пришли из контрольной, где
+время не пишется. У `student1@test.local` за месяц 554 минуты только потому,
+что его события насеял демо-скрипт.
+
+→ Решение фазы 7.2 принимается по этому факту, см. саму фазу.
+
+### 5. Вкладка «Проверка»
+
+- Маршрут: `teacher/urls.py:12` `path('', views_groups.dashboard, name='dashboard')`.
+- Вьюха: `views_groups.dashboard` (строки 560–630), четыре блока: ждёт
+  проверки, просроченные, ближайшие сроки, давно не заходили.
+- Шаблон: `teacher/dashboard_inbox.html` (103 строки).
+- **Ссылки на неё (все):** `templates/_nav.html:6` (пункт меню),
+  `teacher/review.html:115` (хлебные крошки), `teacher/assignment_detail.html:121`
+  («← Назад», мёртвый шаблон), `teacher/generate.html:167` («← Домашки»),
+  `teacher/assignment_create.html:11` («← Домашки»), `teacher/views.py:762`
+  (редирект после создания работы без группы).
+- ⚠️ Плюс НЕОЧЕВИДНОЕ: `problems/views_auth.py:16` — после входа
+  преподаватель попадает ровно на `/teacher/`. Удалить маршрут «насухо»
+  нельзя: вход упрётся в 404.
