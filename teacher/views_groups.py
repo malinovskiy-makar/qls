@@ -248,7 +248,12 @@ def group_detail(request, pk):
             'period': period,
             'periods': stats_module.PERIODS,
             'rows': stats_module.group_table(group, period),
-            'matrix': stats_module.group_topic_matrix(group, 'all'),
+            # ⚠️ ТЕПЛОКАРТА СЛУШАЕТСЯ ПЕРЕКЛЮЧАТЕЛЯ ПЕРИОДА (сессия 9,
+            # фаза 6.1). Раньше здесь был прибит `'all'`, а над блоком стоял
+            # переключатель День / Неделя / Месяц / Всё время: владелец
+            # выбирал «Месяц», числа не менялись, и это выглядело поломкой.
+            # Пометка «за всё время» у заголовка убрана — она стала враньём.
+            'matrix': stats_module.group_topic_matrix(group, period),
             'attention': stats_module.needs_attention(group),
             # История работ группы (п. 11.5) — та же сборка и та же
             # разметка, что у истории в карточке ученика.

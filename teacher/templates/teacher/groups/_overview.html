@@ -41,17 +41,23 @@
 <div class="panel">
   <div class="panel-head">
     {% comment %}
-    ⚠️ ДВА СЛОВА У ЗАГОЛОВКА — НЕ УКРАШЕНИЕ. Теплокарта СЧИТАЕТСЯ ЗА ВСЁ
-    ВРЕМЯ и переключателю периода над ней не подчиняется
-    (`group_topic_matrix(group, 'all')` — период прибит в коде вьюхи).
-    Без пометки репетитор переключит период, увидит те же числа и решит,
-    что сайт сломался. Абзаца с объяснением здесь не нужно — нужен факт.
+    ⚠️ Пометки «за всё время» здесь БОЛЬШЕ НЕТ (сессия 9, фаза 6.1):
+    теплокарта теперь слушается переключателя периода над ней, и пометка
+    стала бы враньём. До этого период был прибит в коде вьюхи, владелец
+    выбирал «Месяц», числа не менялись — и это выглядело поломкой.
     {% endcomment %}
-    <div class="panel-title">Ученики × темы
-      <span class="panel-allt">за всё время</span></div>
+    <div class="panel-title">Ученики × темы</div>
   </div>
   {% if matrix.columns %}
-  <div class="stats-table-wrap">
+  {% comment %}
+  ⚠️ ПОЛОСА ПРОКРУТКИ СПРЯТАНА, ПРОКРУТКА ОСТАЛАСЬ (фаза 6.2). Вместе с
+  полосой исчезал единственный признак, что справа есть ещё колонки, — а их
+  теперь 23. Поэтому у правого края блока стоит мягкое растворение, и оно
+  само гаснет, когда доскроллили до конца (класс `is-end` вешает скрипт
+  внизу шаблона группы).
+  {% endcomment %}
+  <div class="fade-box" data-fade>
+  <div class="stats-table-wrap no-bar">
     <table class="stats-table">
       <thead>
         <tr>
@@ -103,6 +109,7 @@
       </tbody>
     </table>
   </div>
+  </div>
   {% else %}
   <div class="empty-note">Ученики ещё не решали задач с темами — матрице
     нечего показать.</div>
@@ -116,7 +123,7 @@
     <div class="panel-hint">Нажмите на заголовок столбца, чтобы отсортировать</div>
   </div>
   <div class="stats-table-wrap">
-    <table class="stats-table" id="students-table">
+    <table class="stats-table" data-sortable id="students-table">
       <thead>
         <tr>
           <th data-type="text">Ученик</th>
@@ -184,7 +191,8 @@
 <div class="panel">
   <div class="panel-head">
     <div class="panel-title">История работ</div>
-    <div class="panel-hint">Проценты — средние по группе</div>
+    <div class="panel-hint">Проценты — средние по группе.
+      Нажмите на заголовок столбца, чтобы отсортировать</div>
   </div>
   {% include "teacher/_work_history.html" with works=group_works for_group=True %}
 </div>

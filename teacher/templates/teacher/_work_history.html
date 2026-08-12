@@ -9,45 +9,72 @@
 ⚠️ «Оценка» — ПРОЦЕНТ, а не сырые баллы: у разных работ разный максимум, и
 «12» за одну работу и «8» за другую несопоставимы ничем.
 ⚠️ Срок берётся ТОЛЬКО через `deadline_at`; поле `due_at` устарело.
+
+⚠️ ВИД ПЕРЕРАБОТАН (сессия 9, фаза 6.4). Владелец: «не нравится, добавить
+цветов, референс — уже удачные блоки платформы». Референс взят буквально:
+проценты красятся меткой `.k-level--*` ИЗ НАБОРА ДЕТАЛЕЙ — теми же цветами и
+по тому же правилу, что шкалы прогресса (зелёный от 70 %, жёлтый 40–69 %,
+красный ниже 40 %). Своей палитры здесь нет ни одной.
+
+⚠️ ПРОЧЕРК МЕТКОЙ НЕ КРАСИТСЯ. «Нет данных» — это не плохой результат, и
+серая плашка на месте числа читалась бы как «ноль процентов».
+
+⚠️ СОРТИРОВКА — ОБЩИЙ ПАРТИАЛ `templates/_table_sort.html`, тот же, что у
+таблицы «Ученики». Второго механизма не пишем: две сортировки на одном
+экране разъехались бы поведением. Таблица объявляет себя меткой
+`data-sortable`, ячейки несут `data-sort` — сортировать «58 %» как текст
+неправильно, а «нет данных» уходит в −1, чтобы не оказаться между 0 и 1 %.
 {% endcomment %}
 {% if works %}
 <div class="stats-table-wrap">
-  <table class="wk-table">
+  <table class="wk-table" data-sortable id="{% if for_group %}group-works-table{% else %}student-works-table{% endif %}">
     <thead>
       <tr>
-        <th>Работа</th>
-        <th>Тип</th>
-        <th>% верных задач</th>
-        <th>% верных тестов</th>
-        <th>Оценка</th>
+        <th data-type="text">Работа</th>
+        <th data-type="text">Тип</th>
+        <th data-type="num">% верных задач</th>
+        <th data-type="num">% верных тестов</th>
+        <th data-type="num">Оценка</th>
         {% if for_group %}
-        <th>Невовремя / не сдано
+        <th data-type="num">Невовремя / не сдано
           {% include "_hint.html" with hint="Первое число — сдали после срока. Второе — не сдали совсем." %}
         </th>
         {% else %}
-        <th>Дата сдачи</th>
+        <th data-type="date">Дата сдачи</th>
         {% endif %}
-        <th>Дедлайн</th>
+        <th data-type="date">Дедлайн</th>
       </tr>
     </thead>
     <tbody>
       {% for row in works %}
       <tr{% if row.not_submitted %} class="is-idle"{% endif %}>
         <td class="wk-name">{{ row.work.name }}</td>
-        <td>{% if row.is_exam %}контрольная{% else %}домашка{% endif %}</td>
-        <td class="wk-num">{% if row.open_percent is not None %}{{ row.open_percent }} %{% else %}—{% endif %}</td>
-        <td class="wk-num">{% if row.test_percent is not None %}{{ row.test_percent }} %{% else %}—{% endif %}</td>
-        <td class="wk-num">{% if row.mark is not None %}{{ row.mark }} %{% else %}—{% endif %}</td>
+        <td><span class="wk-kind">{% if row.is_exam %}контрольная{% else %}домашка{% endif %}</span></td>
+        <td class="wk-num" data-sort="{{ row.open_percent|default:-1 }}">
+          {% if row.open_percent is not None %}
+          <span class="k-level k-level--{{ row.open_level }}">{{ row.open_percent }} %</span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="wk-num" data-sort="{{ row.test_percent|default:-1 }}">
+          {% if row.test_percent is not None %}
+          <span class="k-level k-level--{{ row.test_level }}">{{ row.test_percent }} %</span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="wk-num" data-sort="{{ row.mark|default:-1 }}">
+          {% if row.mark is not None %}
+          <span class="k-level k-level--{{ row.mark_level }}">{{ row.mark }} %</span>
+          {% else %}—{% endif %}
+        </td>
         {% if for_group %}
         {% comment %}
         ⚠️ Работа без срока в столбец «невовремя» не попадает вообще —
         прочерк, а не ноль: без срока опоздать нельзя.
         {% endcomment %}
-        <td class="wk-num">{% if row.late is not None %}{{ row.late }}{% else %}—{% endif %} / {{ row.missing }}</td>
+        <td class="wk-num" data-sort="{{ row.missing }}">{% if row.late is not None %}{{ row.late }}{% else %}—{% endif %} / {{ row.missing }}</td>
         {% else %}
-        <td class="wk-num">{% if row.submitted_at %}{{ row.submitted_at|date:"d.m.Y" }}{% else %}—{% endif %}</td>
+        <td class="wk-num" data-sort="{{ row.submitted_at|date:'U'|default:0 }}">{% if row.submitted_at %}{{ row.submitted_at|date:"d.m.Y" }}{% else %}—{% endif %}</td>
         {% endif %}
-        <td class="wk-num">{% if row.deadline %}{{ row.deadline|date:"d.m.Y" }}{% else %}без срока{% endif %}</td>
+        <td class="wk-num" data-sort="{{ row.deadline|date:'U'|default:0 }}">{% if row.deadline %}{{ row.deadline|date:"d.m.Y" }}{% else %}без срока{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>

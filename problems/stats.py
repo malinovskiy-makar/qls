@@ -953,11 +953,11 @@ def level_of(percent):
 
 
 def canonical_topics():
-    """21 каноническая тема каталога, в каноническом порядке.
+    """Канонические темы каталога (их 23), в каноническом порядке.
 
     ⚠️ ПОКАЗЫВАЕМ ВСЕ, А НЕ ТОЛЬКО ТЕ, ГДЕ ЕСТЬ ДАННЫЕ (фаза 8.1). Тема без
     попыток — это не отсутствие строки, а факт: её не проходили. Список из
-    трёх строк вместо двадцати одной выглядит как «вот и весь предмет».
+    трёх строк вместо двадцати трёх выглядит как «вот и весь предмет».
     """
     from problems.management.commands.apply_topic_mapping import CANONICAL
     from .models import Topic
@@ -1188,18 +1188,30 @@ def _work_scores(work, students):
 
 
 def _work_percents(got, could):
-    """Три процента строки: по задачам, по тестам и итог. Нет базы → None."""
+    """Три процента строки: по задачам, по тестам и итог. Нет базы → None.
+
+    Рядом с каждым числом отдаём УРОВЕНЬ (`level_of`) — тот же, что красит
+    шкалы прогресса. Так история работ берёт цвета из общего правила, а не
+    заводит своё: два правила «когда зелёный» разъехались бы на первой
+    правке. Прочерку уровень не нужен — «нет данных» не красится вовсе.
+    """
     def share(key):
         return (int(round(float(got[key] / could[key]) * 100))
                 if could[key] else None)
 
     total_got = got['open'] + got['test']
     total_could = could['open'] + could['test']
+    open_percent = share('open')
+    test_percent = share('test')
+    mark = (int(round(float(total_got / total_could) * 100))
+            if total_could else None)
     return {
-        'open_percent': share('open'),
-        'test_percent': share('test'),
-        'mark': (int(round(float(total_got / total_could) * 100))
-                 if total_could else None),
+        'open_percent': open_percent,
+        'open_level': level_of(open_percent),
+        'test_percent': test_percent,
+        'test_level': level_of(test_percent),
+        'mark': mark,
+        'mark_level': level_of(mark),
     }
 
 

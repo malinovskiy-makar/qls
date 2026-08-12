@@ -68,11 +68,13 @@
               gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .panel-title { font-size: 15px; font-weight: 700; }
 .panel-hint { font-size: 12px; color: var(--text2); }
-/* Пометка «за всё время» у заголовка блока: очень тихо, но обязательно.
-   Блок, который не подчиняется переключателю периода над ним, обязан
-   сказать об этом сам — иначе он выглядит сломанным. */
-.panel-allt { font-size: 11px; font-weight: 500; color: var(--text3);
-              margin-left: 8px; white-space: nowrap; }
+/* ⚠️ Правила пометки периода у заголовка блока БОЛЬШЕ НЕТ (сессия 9,
+   фаза 6.1). Оно требовалось, пока теплокарта игнорировала переключатель
+   периода; теперь она его слушается, и пометка стала бы враньём. Удалено
+   вместе с разметкой — оставленный «на всякий случай» мёртвый класс
+   однажды вернётся на экран.
+   Текст пометки здесь намеренно не повторяется: этот файл вклеивается в
+   <style> страницы, и тест «надписи на экране нет» ловил бы комментарий. */
 /* ⚠️ ПРАВИЛА `.panel--lead` БОЛЬШЕ НЕТ (сессия 9, фаза 3). Оно обводило
    «главный» блок экрана малиновой рамкой. Владелец: выделен оказывался
    ровно один блок из десяти, и это читалось не как «сюда смотреть», а как
@@ -159,6 +161,24 @@
 
 /* ── Таблицы репетитора ─────────────────────────────── */
 .stats-table-wrap { overflow-x: auto; }
+/* ── Прокрутка без полосы (сессия 9, фаза 6.2) ─────────────────────────
+   Владелец: полоса под теплокартой бесполезна и засоряет экран.
+   ⚠️ Прячем ТОЛЬКО полосу — прокрутка обязана остаться рабочей, иначе на
+   узком экране 23 колонки просто некуда деть. */
+.stats-table-wrap.no-bar { scrollbar-width: none; -ms-overflow-style: none; }
+.stats-table-wrap.no-bar::-webkit-scrollbar { display: none; }
+/* ⚠️ ЗАМЕНА ПРОПАВШЕЙ ПОЛОСЕ. Полоса была единственным признаком, что
+   справа есть ещё колонки. Растворение правого края говорит то же самое и
+   гаснет, когда прокрутка доведена до конца (класс `is-end` вешает скрипт).
+   Обёртка нужна, потому что сам блок прокручивается: градиент внутри него
+   уезжал бы вместе с содержимым. */
+.fade-box { position: relative; }
+.fade-box::after {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 44px;
+  pointer-events: none; opacity: 1; transition: opacity .18s ease;
+  background: linear-gradient(to right, transparent, var(--surface));
+}
+.fade-box.is-end::after { opacity: 0; }
 table.stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.stats-table th, table.stats-table td {
   padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border-soft);
@@ -233,5 +253,22 @@ tr.row-click { cursor: pointer; }
 .wk-table tr:last-child td { border-bottom: none; }
 /* Не сданная работа приглушена: это отсутствие работы, а не её результат. */
 .wk-table tr.is-idle td { opacity: .55; }
-.wk-name { font-weight: 600; }
+.wk-name { font-weight: 700; }
 .wk-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* ── Вид истории работ (сессия 9, фаза 6.4) ────────────────────────────
+   Владелец: «не нравится, надо переработать, добавить цветов, референс —
+   уже удачные блоки платформы». Референс взят буквально: проценты красятся
+   меткой `.k-level--*` из набора деталей — теми же цветами и по тому же
+   правилу, что шкалы (зелёный от 70 %, жёлтый 40–69 %, красный ниже 40 %).
+   Своей палитры здесь нет.
+   ⚠️ Прочерк меткой НЕ красится: «нет данных» — это не плохой результат. */
+.wk-table thead th { cursor: pointer; user-select: none; }
+.wk-table thead th.no-sort { cursor: default; }
+/* Очень слабая зебра: на семи столбцах взгляд теряет строку. Заливка
+   должна быть на грани заметности — это подсказка, а не разметка. */
+.wk-table tbody tr:nth-child(even) { background: var(--border-soft); }
+.wk-table tbody tr:hover { background: var(--surface-2); }
+/* Тип работы — тихий чип тонкой рамкой, как на карточках заданий. */
+.wk-kind { font-size: 11px; font-weight: 500; color: var(--text2);
+           border: 1px solid var(--border); border-radius: 999px;
+           padding: 1px 8px; white-space: nowrap; }
