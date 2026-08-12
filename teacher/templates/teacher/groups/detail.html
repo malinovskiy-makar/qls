@@ -165,12 +165,20 @@
       <span class="ass-group-count">{{ group_row.caption }}</span>
     </div>
 
-    {% for row in group_row.shown %}
+    {% comment %}
+    ⚠️ РАСКРЫВАЕМ НА МЕСТЕ, БЕЗ ПЕРЕЗАГРУЗКИ (сессия 9, фаза 12.2). Раньше
+    кнопка «Посмотреть все» уводила на `?all_done=1`, то есть перезагружала
+    страницу целиком ради того, чтобы показать ещё пять строк. Рисуем ВСЕ
+    карточки сразу, лишние прячем атрибутом `hidden` — данные для них вьюха
+    и так уже посчитала.
+    {% endcomment %}
+    {% for row in group_row.items %}
     {% comment %}
     Полоса состояния: жёлтая — ждёт проверки, серая — идёт, зелёная —
     проверена. Классы из набора деталей, своих цветов здесь нет.
     {% endcomment %}
-    <div class="k-card ass-card k-mark k-mark--{{ group_row.mark }}{% if group_row.key != 'needs_you' %} ass-card--quiet{% endif %}">
+    <div class="k-card ass-card k-mark k-mark--{{ group_row.mark }}{% if group_row.key != 'needs_you' %} ass-card--quiet{% endif %}"
+         {% if forloop.counter0 >= group_row.shown|length %}hidden data-extra="1"{% endif %}>
       <div class="ass-main">
         {% comment %}
         ⚠️ Название — ССЫЛКА на само задание. Без неё открыть работу можно
@@ -218,8 +226,8 @@
     кнопке, а не бесконечной лентой: закрытые работы внимания не требуют.
     {% endcomment %}
     <div class="ass-more">
-      <a class="k-btn k-btn--plain k-btn--sm"
-         href="?tab=assignments&amp;all_done=1">Посмотреть все</a>
+      <button type="button" class="k-btn k-btn--plain k-btn--sm js-show-all"
+              data-more="{{ group_row.hidden_count }}">Посмотреть все</button>
     </div>
     {% endif %}
   </div>
@@ -260,6 +268,25 @@
     if (window.getSelection && String(window.getSelection())) { return; }
     var row = event.target.closest('tr[data-href]');
     if (row) { window.location.href = row.dataset.href; }
+  });
+})();
+
+// «Посмотреть все» раскрывает остальные работы НА МЕСТЕ (фаза 12.2).
+// ⚠️ Карточка `.ass-card` — элемент набора деталей, а у набора `display`
+// сильнее браузерного `[hidden]`; поэтому список правил `.k-card[hidden]`
+// в `_kit.html` уже есть, и снятие атрибута действительно показывает
+// карточку. Этой ловушкой обжигались дважды.
+(function () {
+  document.querySelectorAll('.js-show-all').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var group = button.closest('.ass-group');
+      if (!group) { return; }
+      group.querySelectorAll('[data-extra]').forEach(function (card) {
+        card.hidden = false;
+        card.removeAttribute('data-extra');
+      });
+      button.parentNode.removeChild(button);
+    });
   });
 })();
 

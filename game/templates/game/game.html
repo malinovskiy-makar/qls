@@ -156,7 +156,9 @@ a:focus-visible, button:focus-visible {
   align-items: baseline;
   gap: 7px;
 }
-.mode-name .mode-emoji { font-size: 15px; }
+.mt-hearts .qi { width: 12px; height: 12px; vertical-align: -.1em; }
+.mode-name .mode-icon { display: inline-flex; align-items: center; }
+.mode-name .mode-icon .qi { width: 18px; height: 18px; }
 .mode-kind {
   margin-top: 3px;
   font-size: 12.5px;
@@ -272,6 +274,7 @@ a:focus-visible, button:focus-visible {
   font-size: 15px;
   line-height: 1;
 }
+.heart .qi { width: 15px; height: 15px; display: block; }
 .heart {
   color: var(--rush-bad);
   transition: color .2s ease, transform .2s var(--rush-ease);
@@ -405,7 +408,12 @@ a:focus-visible, button:focus-visible {
   color: #fff;
   padding: 28px 40px;
 }
-.go-hearts { font-size: 38px; letter-spacing: 6px; margin-bottom: 10px; }
+.go-hearts { margin-bottom: 10px; display: flex; justify-content: center; }
+.go-hearts .qi { width: 38px; height: 38px; }
+/* Иконки в гнёздах статической разметки: логотип, комбо, рекорд. */
+.rush-logo .bolt .qi { width: .9em; height: .9em; vertical-align: -.1em; }
+.hud-combo .qi, .record-badge .qi { width: 1em; height: 1em;
+                                    vertical-align: -.15em; }
 .go-card h2 { font-size: 30px; font-weight: 800; margin: 0 0 6px; }
 .go-card p { font-size: 15px; opacity: .8; margin: 0; }
 @media (prefers-reduced-motion: reduce) {
@@ -980,7 +988,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   <!-- ЭКРАН 1: СТАРТ -->
   <section id="screen-start" class="screen active">
     <div class="col">
-      <h1 class="rush-logo">ECON<span class="bolt">⚡</span><span class="rush">RUSH</span></h1>
+      <h1 class="rush-logo">ECON<span class="bolt"></span><span class="rush">RUSH</span></h1>
       <p class="rush-sub">Вопросы по экономике на время. Четыре режима — как в шахматах.</p>
       <div class="topic-chips" id="topic-chips">
         <button class="topic-chip active" data-topic="">Все темы</button>
@@ -1004,7 +1012,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <span class="timer-box"><span class="timer-num" id="hud-timer">60</span><span class="time-delta" id="time-delta"></span></span>
           <div class="hud-lives" id="hud-lives" aria-label="Жизни"></div>
         </div>
-        <div class="hud-combo" id="hud-combo">🔥 ×1</div>
+        <div class="hud-combo" id="hud-combo"><span class="qi-slot"></span> ×1</div>
       </div>
       <div class="combo-toast" id="combo-toast"></div>
       <div class="q-card" id="q-card"><span class="gen-chip" id="gen-chip" hidden>Тренировочный</span><div class="q-text" id="q-text"></div></div>
@@ -1055,7 +1063,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         <div class="metric metric-main">
           <small>Итоговый счёт</small>
           <b class="final-score" id="final-score">0</b>
-          <span class="record-badge" id="record-badge">🏆 личный рекорд</span>
+          <span class="record-badge" id="record-badge"><span class="qi-slot"></span> личный рекорд</span>
         </div>
         <div class="metric">
           <small>Верных</small>
@@ -1156,10 +1164,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
 </div>
 
+{% include '_icons.html' %}
 <div class="vignette" id="vignette"></div>
 <div class="gameover-overlay" id="gameover-overlay" hidden>
   <div class="go-card">
-    <div class="go-hearts">💔</div>
+    <div class="go-hearts"><span class="qi-slot"></span></div>
     <h2>Забег окончен</h2>
     <p id="go-sub">Жизни кончились</p>
   </div>
@@ -1181,13 +1190,39 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var MISTAKES_RUN_SIZE = CFG.mistakes_run_size;  // размер целевого забега (config.py)
 
   /* Подписи карточек режимов (сама механика — только из CFG.modes) */
+  /* ⚠️ ИКОНКИ, А НЕ ЭМОДЗИ (сессия 9, фаза 11). Эмодзи рисует система:
+     одна и та же «🔥» выглядит по-разному на Windows, macOS и Android,
+     всегда цветная мимо палитры и не подчиняется теме. Картинки берём из
+     общего набора `templates/_icons.html` — там же, откуда их берёт
+     разметка через `_icon.html`. */
+  var ICONS = window.QLS_ICONS || {};
   var MODE_META = {
-    bullet:  { emoji: '⚡', kind: 'Данетки: Верно или Неверно' },
-    blitz:   { emoji: '🔥', kind: 'Один верный из вариантов' },
-    rapid:   { emoji: '🎯', kind: 'Несколько верных из вариантов' },
-    classic: { emoji: '🧮', kind: 'Числовой ответ — впиши сам' }
+    bullet:  { icon: 'bolt',   kind: 'Данетки: Верно или Неверно' },
+    blitz:   { icon: 'flame',  kind: 'Один верный из вариантов' },
+    rapid:   { icon: 'target', kind: 'Несколько верных из вариантов' },
+    classic: { icon: 'keypad', kind: 'Числовой ответ — впиши сам' }
   };
   var MODE_ORDER = ['bullet', 'blitz', 'rapid', 'classic'];
+
+  /* Гнёзда под иконки в статической разметке: логотип, комбо, рекорд,
+     конец забега. Заполняем ОДИН раз — рисовать их в разметке значило бы
+     держать второй набор путей. */
+  (function fillIconSlots() {
+    var slots = {
+      'rush-logo-bolt': 'bolt', 'hud-combo': 'flame',
+      'record-badge': 'trophy', 'go-hearts': 'heart'
+    };
+    document.querySelectorAll('.bolt').forEach(function (el) {
+      el.innerHTML = ICONS.bolt || '';
+    });
+    Object.keys(slots).forEach(function (id) {
+      var host = document.getElementById(id);
+      var slot = host && host.querySelector('.qi-slot');
+      if (slot) slot.innerHTML = ICONS[slots[id]] || '';
+    });
+    var over = document.querySelector('.go-hearts .qi-slot');
+    if (over) over.innerHTML = ICONS.heart || '';
+  })();
 
   /* Рекорды — отдельно на режим; старый общий ключ считаем рекордом блица */
   function bestKey(m) { return 'econ_rush_best_' + m; }
@@ -1309,7 +1344,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   /* Что показать у таймера на ошибке: сейчас время за ошибку не снимается,
      поэтому показываем потерянную жизнь. Вернут штраф временем в конфиг —
      покажем секунды. */
-  function wrongDeltaText(d) { return d.time_delta ? d.time_delta + ' с' : '−1 ♥'; }
+  /* «−1 ♥» на всплывашке ошибки: иконка вместо типографского сердца. */
+  function wrongDeltaHTML(d) {
+    return d.time_delta ? (d.time_delta + ' с')
+                        : ('−1 ' + (ICONS.heart || ''));
+  }
 
   /* Цена пропуска берётся из конфига: сейчас 0 (пропуск бесплатный),
      но если режим снова начнут тюнить временем — подсказка не соврёт. */
@@ -1332,8 +1371,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
       var name = document.createElement('div');
       name.className = 'mode-name';
-      name.innerHTML = '<span class="mode-emoji"></span><span class="mode-title"></span>';
-      name.querySelector('.mode-emoji').textContent = meta.emoji;
+      name.innerHTML = '<span class="mode-icon"></span><span class="mode-title"></span>';
+      name.querySelector('.mode-icon').innerHTML = ICONS[meta.icon] || '';
       name.querySelector('.mode-title').textContent = m.title;
       card.appendChild(name);
 
@@ -1350,7 +1389,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       var bs = terms.querySelectorAll('b');
       bs[0].textContent = (m.duration >= 60 ? (m.duration / 60) + ' мин' : m.duration + ' с');
       bs[1].textContent = formatSec(m.time_correct);
-      bs[2].textContent = new Array(m.lives + 1).join('♥');
+      // Запас жизней на карточке режима — теми же иконками, что в игре.
+      bs[2].innerHTML = new Array(m.lives + 1).join(ICONS.heart || '');
       card.appendChild(terms);
 
       var bestEl = document.createElement('div');
@@ -1362,7 +1402,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         card.appendChild(soon);
       } else {
         var best = parseInt(localStorage.getItem(bestKey(key)) || '0', 10);
-        bestEl.textContent = best > 0 ? '🏆 рекорд ' + best.toLocaleString('ru-RU') : '';
+        bestEl.innerHTML = best > 0
+          ? (ICONS.trophy || '') + ' рекорд ' + best.toLocaleString('ru-RU') : '';
       }
       card.appendChild(bestEl);
       grid.appendChild(card);
@@ -1436,7 +1477,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('hud-score').textContent = score.toLocaleString('ru-RU');
     var mult = comboMult(streak);
     var combo = $('hud-combo');
-    combo.textContent = '🔥 ×' + mult;
+    combo.innerHTML = (ICONS.flame || '') + ' ×' + mult;
     combo.classList.toggle('hot', mult > 1);
     combo.classList.toggle('show', mult > 1);
     var fill = $('time-fill');
@@ -1455,8 +1496,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       var h = document.createElement('span');
       var lost = i >= lives;
       h.className = 'heart' + (lost ? ' lost' : '');
-      // погасшее сердце — контур, живое — сплошное
-      h.textContent = lost ? '♡' : '♥';
+      // ⚠️ Погашенная жизнь — ТА ЖЕ иконка с прозрачностью, а не другой
+      // символ: запас виден целиком, «сколько было и сколько осталось».
+      h.innerHTML = ICONS.heart || '';
       if (pop && !REDUCED && i === lives) h.classList.add('pop');
       box.appendChild(h);
     }
@@ -1665,7 +1707,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         registerWrong(q, d);
         buttons[choice].classList.add('is-wrong');
         if (buttons[d.correct_index]) buttons[d.correct_index].classList.add('show-right');
-        showDelta(wrongDeltaText(d), 'minus');
+        showDelta(wrongDeltaHTML(d), 'minus');
         flashTrack(true);
         vignette();
         setTimeout(advance, REDUCED ? 0 : 900);
@@ -1723,7 +1765,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         setTimeout(advance, REDUCED ? 0 : 1500);
       } else {
         registerWrong(q, d);
-        showDelta(wrongDeltaText(d), 'minus');
+        showDelta(wrongDeltaHTML(d), 'minus');
         flashTrack(true);
         vignette();
         setTimeout(advance, REDUCED ? 0 : 1500);
@@ -1754,7 +1796,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         registerWrong(q, d);
         fb.textContent = 'Правильный ответ: ' + d.correct_value;
         fb.className = 'num-feedback bad';
-        showDelta(wrongDeltaText(d), 'minus');
+        showDelta(wrongDeltaHTML(d), 'minus');
         flashTrack(true);
         vignette();
         setTimeout(advance, REDUCED ? 0 : 1300);
@@ -1795,7 +1837,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   function showDelta(text, kind) {
     var chip = $('time-delta');
     var num = $('hud-timer');
-    chip.textContent = text;
+    // ⚠️ `innerHTML`, а не `textContent`: в потере жизни едет иконка-картинка.
+    // Строка собирается НАМИ (`wrongDeltaHTML`), пользовательского текста тут
+    // нет — подставить чужую разметку неоткуда.
+    chip.innerHTML = text;
     num.className = 'timer-num flash-' + kind;
     if (REDUCED) {
       chip.className = 'time-delta ' + kind;
@@ -1947,7 +1992,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       var h = document.createElement('span');
       var lost = i >= left;
       h.className = 'heart' + (lost ? ' lost' : '');
-      h.textContent = lost ? '♡' : '♥';
+      // ⚠️ Погашенная жизнь — ТА ЖЕ иконка с прозрачностью, а не другой
+      // символ: запас виден целиком, «сколько было и сколько осталось».
+      h.innerHTML = ICONS.heart || '';
       box.appendChild(h);
     }
     box.setAttribute('aria-label', 'Жизни: ' + left + ' из ' + max);

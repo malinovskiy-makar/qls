@@ -38,7 +38,11 @@
   </div>
 
   <div class="hero-cell">
-    <div class="big">🔥 {{ data.profile.streak }}</div>
+    {% comment %}
+    ⚠️ Огонёк — РИСОВАННАЯ ИКОНКА, не эмодзи (сессия 9, фаза 11): эмодзи
+    рисует система, он всегда цветной мимо палитры и не подчиняется теме.
+    {% endcomment %}
+    <div class="big"><span class="qi-inline">{% include '_icon.html' with name='flame' %}</span> {{ data.profile.streak }}</div>
     <div class="cap">{% if data.profile.streak == 1 %}день подряд{% else %}дней подряд{% endif %}</div>
     <div class="tiny">заморозок: {{ data.profile.freezes }} · лучшая серия {{ data.profile.longest_streak }}</div>
   </div>
@@ -248,10 +252,18 @@
 <div class="panel">
   <div class="panel-head"><div class="panel-title">Личные рекорды</div></div>
   <div class="record-grid">
+    {% comment %}
+    ⚠️ У «Лучшего дня» голое число ни о чём не говорит: «7» — семь чего и
+    когда? Дата уже лежит в `payload` (её кладёт `gamification.py`), просто
+    не показывалась. Плюс знак вопроса: по какому показателю день лучший.
+    {% endcomment %}
     {% for record in records %}
     <div class="record">
       <div class="big">{{ record.value|floatformat:0 }}</div>
-      <div class="cap">{{ record.get_kind_display }}</div>
+      <div class="cap">{{ record.get_kind_display }}{% if record.kind == 'most_productive_day' %}{% include '_hint.html' with hint='Лучшим считается день, когда решено больше всего задач. Игра сюда не входит.' %}{% endif %}</div>
+      {% if record.when %}
+      <div class="when">{{ record.when|date:"j E Y" }}</div>
+      {% endif %}
     </div>
     {% endfor %}
   </div>

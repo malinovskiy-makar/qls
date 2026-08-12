@@ -64,6 +64,29 @@ def set_weekly_goal(request):
     return redirect('student_stats')
 
 
+def _records(queryset):
+    """Личные рекорды с человеческой датой.
+
+    ⚠️ Дата лежит в `payload` СТРОКОЙ («2026-08-04»), поэтому шаблонный
+    фильтр `date` к ней неприменим — он ждёт объект. Переводим здесь:
+    «7» без дня это не рекорд, а число, а «2026-08-04» посреди русского
+    экрана читается как код.
+    """
+    from datetime import date as date_cls
+
+    rows = []
+    for record in queryset:
+        raw = (record.payload or {}).get('date')
+        record.when = None
+        if raw:
+            try:
+                record.when = date_cls(*[int(part) for part in raw.split('-')])
+            except (TypeError, ValueError):
+                record.when = None
+        rows.append(record)
+    return rows
+
+
 def _student_payload(user, period):
     """Контекст экрана ученика: статистика + геймификация."""
     from .models import (Achievement, EarnedAchievement, PersonalRecord,
@@ -102,7 +125,7 @@ def _student_payload(user, period):
         'periods': stats_module.PERIODS,
         'achievements': achievements,
         'achievements_earned': sum(1 for a in achievements if a['earned']),
-        'records': list(PersonalRecord.objects.filter(user=user)),
+        'records': _records(PersonalRecord.objects.filter(user=user)),
         'mistakes': mistakes,
         'skills': skills,
         'chart_json': json.dumps(_chart_payload(data), ensure_ascii=False),

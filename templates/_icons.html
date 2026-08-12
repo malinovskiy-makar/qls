@@ -1,0 +1,36 @@
+{% comment %}
+Набор рисованных иконок ученической части (сессия 9, фаза 11).
+
+⚠️ ЗАЧЕМ. Владелец: эмодзи в интерфейсе запрещены, включая ученическую
+часть. Эмодзи рисует ОПЕРАЦИОННАЯ СИСТЕМА: на Windows, macOS и Android
+одна и та же «🔥» выглядит по-разному, всегда цветная (мимо палитры
+проекта) и не подчиняется теме.
+
+Эталон взят с главной страницы: контурный SVG, сетка `0 0 24 24`,
+`stroke-width="1.75"`, `fill="none"`, `stroke="currentColor"`, скруглённые
+концы. Цвет через `currentColor`, поэтому тема переключается сама.
+
+Два способа использования, ОДИН источник:
+  • в разметке — `{% include '_icon.html' with name='flame' %}`;
+  • в скриптах — `window.QLS_ICONS.flame` (та же строка).
+Второй набор картинок «только для JS» разошёлся бы с первым.
+
+⚠️ Блок достижений на `/profile/stats/` НЕ ТРОГАЕМ — он идёт отдельной
+переработкой (29 штук), и владелец просил оставить его как есть.
+{% endcomment %}
+<script>
+window.QLS_ICONS = {
+  // Пуля — молния. Быстрый режим.
+  bolt: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3 5 13.5h5.5L11 21l8-10.5h-5.5L13 3Z"/></svg>',
+  // Блиц — огонь. Он же серия дней и комбо.
+  flame: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s4.5 3.6 4.5 8a4.5 4.5 0 0 1-9 0c0-1.4.5-2.6 1.2-3.5.3 1.1 1 1.9 1.8 1.9 1.2 0 1.6-1.4 1.5-6.4Z"/><path d="M12 21a6.5 6.5 0 0 0 6.5-6.5c0-1.2-.3-2.4-.8-3.5"/><path d="M12 21a6.5 6.5 0 0 1-6.5-6.5c0-1.2.3-2.4.8-3.5"/></svg>',
+  // Рапид — мишень.
+  target: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></svg>',
+  // Классика — счёты: ответ вписывают числом.
+  keypad: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 7.5h8"/><circle cx="8.5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="8.5" cy="16.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="16.5" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="16.5" r="1" fill="currentColor" stroke="none"/></svg>',
+  // Жизнь. Погашенная — та же иконка с прозрачностью (класс `is-lost`).
+  heart: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.3A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.7C19 15.6 12 20 12 20Z"/></svg>',
+  // Личный рекорд.
+  trophy: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4.5v1A3.5 3.5 0 0 0 7 10.4"/><path d="M17 6h2.5v1a3.5 3.5 0 0 1-2.5 3.4"/><path d="M12 14v3"/><path d="M8.5 20h7"/><path d="M10 17h4l1 3H9l1-3Z"/></svg>'
+};
+</script>
