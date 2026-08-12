@@ -29,10 +29,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _pending_count(assignments):
-    """Сколько работ ждёт проверки среди переданных заданий."""
-    from problems.models import Submission
-    return Submission.objects.filter(
-        assignment__in=assignments, status='submitted').count()
+    """Сколько СДАННЫХ РАБОТ ждёт проверки среди переданных заданий.
+
+    ⚠️ Делегирует `stats.works_waiting` — единственной точке счёта. Раньше
+    считал ЗАДАЧИ (`Submission.count()`), и карточка группы писала «6 ждёт
+    проверки» там, где вкладка «Задания» писала «3»: считались разные вещи.
+    """
+    from problems.stats import works_waiting
+    return works_waiting(assignments)
 
 
 def assignment_stats(assignment):
@@ -40,13 +44,18 @@ def assignment_stats(assignment):
     from problems.models import Submission
     from problems.timefmt import deadline_pair
 
+    from problems.stats import works_waiting
+
     students = assignment.students.count()
     submitted_students = (Submission.objects
                           .filter(assignment=assignment,
                                   status__in=('submitted', 'reviewed'))
                           .values('student').distinct().count())
-    pending = Submission.objects.filter(assignment=assignment,
-                                        status='submitted').count()
+    # ⚠️ РАБОТЫ, А НЕ ЗАДАЧИ. Кнопка «Проверить N» показывает, сколько
+    # сданных работ этого задания ждут репетитора; раньше здесь стояло число
+    # непроверенных ЗАДАЧ, и оно не сходилось со счётчиком над списком.
+    # Разбивка по задачам осталась на своём месте — в сводке решений.
+    pending = works_waiting([assignment])
     deadline = assignment.deadline_at
     human, exact = deadline_pair(deadline)
 
@@ -220,10 +229,12 @@ def group_detail(request, pk):
         'assignment_rows': rows,
         'assignment_groups': group_assignments_by_state(
             rows, show_all_done=request.GET.get('all_done') == '1'),
-        # Счётчик над списком: сколько работ ждут проверки прямо сейчас
-        # (фаза 11.1). Считаем РАБОТЫ, а не решения: репетитор открывает
-        # работу целиком, и «17 решений» ему ни о чём не говорит.
-        'waiting_total': sum(1 for row in rows if row['pending']),
+        # Счётчик над списком и кружок у вкладки «Задания». ОДНО число на
+        # оба места и на карточку группы — `stats.works_waiting`.
+        # ⚠️ Раньше здесь стояло `sum(1 for row in rows if row['pending'])`,
+        # то есть считались ЗАДАНИЯ, а кнопки внутри считали задачи. Сумма
+        # по кнопкам не сходилась со счётчиком — это и заметил владелец.
+        'waiting_total': stats_module.works_waiting(assignments),
     }
 
     # Обзор = прежняя статистика группы. Считаем только когда её смотрят:

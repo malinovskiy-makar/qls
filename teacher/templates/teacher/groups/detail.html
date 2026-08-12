@@ -1,4 +1,5 @@
 {% extends 'teacher/base.html' %}
+{% load ru %}
 
 {% block title %}{{ group.name }} — ЭкЗадачи{% endblock %}
 
@@ -66,7 +67,7 @@
 {% include 'platform/_stats_style.html' %}{% endblock %}
 
 {% block content %}
-<div class="crumbs"><a href="{% url 'teacher:groups' %}">Группы</a> → {{ group.name }}</div>
+<div class="crumbs"><a href="{% url 'teacher:groups' %}">Ученики</a> → {{ group.name }}</div>
 
 <div class="page-header">
   <div>
@@ -81,7 +82,7 @@
 {% endcomment %}
 <nav class="tabs">
   <a href="?tab=overview"    class="{% if tab == 'overview' %}active{% endif %}">Обзор</a>
-  <a href="?tab=assignments" class="{% if tab == 'assignments' %}active{% endif %}">Задания</a>
+  <a href="?tab=assignments" class="{% if tab == 'assignments' %}active{% endif %}">Задания{% if waiting_total %}<span class="k-count">{{ waiting_total }}</span>{% endif %}</a>
   <a href="?tab=materials"   class="{% if tab == 'materials' %}active{% endif %}">Материалы</a>
 </nav>
 
@@ -125,7 +126,7 @@
     <span></span>
     {% if waiting_total %}
     <span class="ass-waiting-count">
-      <b>{{ waiting_total }}</b><span>ждут проверки</span>
+      <b>{{ waiting_total }}</b><span>{{ waiting_total|plural_ru:"работа ждёт,работы ждут,работ ждут" }} проверки</span>
     </span>
     {% endif %}
   </div>
@@ -165,7 +166,7 @@
       {% if group_row.key == 'needs_you' %}
       <a class="k-btn k-btn--main"
          href="{% url 'teacher:group_submissions' group.pk row.assignment.pk %}">
-        Проверить {{ row.pending }}
+        Проверить {{ row.pending|count_ru:"работу,работы,работ" }}
       </a>
       {% elif group_row.key == 'running' %}
       <span class="k-quiet ass-waiting">ждём сдач</span>

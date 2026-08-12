@@ -321,6 +321,24 @@
   outline: 2px solid var(--focus); outline-offset: 2px;
 }
 
+/* ── Кружок-уведомление у заголовка вкладки ────────────────────────────
+   Сколько сданных работ ждёт проверки. Как в мессенджерах: маленький
+   кружок с числом у самого слова.
+   ⚠️ НЕ ЯРКО-КРАСНЫЙ. Красный кружок читается как авария, а это обычная
+   работа репетитора. Янтарь здесь в своём законном смысле — «ждёт вас»,
+   тот же, что у полосы состояния `.k-mark--pending` на карточке работы.
+   ⚠️ Ноль не показывается вовсе — пустой кружок это не «ноль дел»,
+   а мусор на экране; шаблон не рисует его при нулевом числе. */
+.k-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: var(--amber-tint); color: var(--amber);
+  border: 1px solid var(--amber-border);
+  font-size: 11px; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums; vertical-align: middle;
+  margin-left: 6px;
+}
+
 /* Сама подсказка. Рисует её `templates/_hint_js.html` — ОДИН блок на
    страницу, положенный в конец <body>.
    ⚠️ `position: fixed` обязателен: знаки вопроса стоят в шапках таблиц,

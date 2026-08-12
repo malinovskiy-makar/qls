@@ -23,7 +23,7 @@
       {{ card.students|count_ru:"ученик,ученика,учеников" }} ·
       {{ card.assignments|count_ru:"задание,задания,заданий" }}<br>
       {% if card.pending %}
-        <span class="badge badge-pending">{{ card.pending }} ждёт проверки</span><br>
+        <span class="badge badge-pending">{{ card.pending|count_ru:"работа,работы,работ" }} {{ card.pending|plural_ru:"ждёт,ждут,ждут" }} проверки</span><br>
       {% else %}
         <span class="badge badge-ok">Всё проверено</span><br>
       {% endif %}
