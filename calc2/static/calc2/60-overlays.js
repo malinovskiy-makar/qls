@@ -18,6 +18,9 @@ function redrawAll() {
   // а не только в рыночном пересчёте: иначе в сцене, куда пришли из монополии,
   // до первого пересчёта висел бы чужой заголовок.
   if (typeof updateEqSectionTitle === 'function') updateEqSectionTitle();
+  // Поля формул собираются лениво (А56): те, что стали видны после смены
+  // сцены или раскрытия секции, разбираются здесь.
+  if (typeof flushMathfields === 'function') flushMathfields();
   // Последним: карточка блока прячет переключатели соседних моделей. Идёт после
   // обычной логики видимости, иначе та вернула бы их на место.
   applyCardScope();
@@ -1690,6 +1693,10 @@ function wireFolds() {
       // а не продолжение ленты.
       const card = btn.closest('.section, .side-part');
       if (card) card.classList.toggle('open-card', open);
+      /* Поля формул собираются лениво (А56): пока секция была свёрнута, поле
+         оставалось в очереди. Раскрыли — собираем то, что стало видно.
+         Перерисовку тут не зовём: раскрытие карточки график не меняет. */
+      if (open && typeof flushMathfields === 'function') flushMathfields();
     });
   });
 }
@@ -1784,7 +1791,32 @@ function prepExpr(expr) {
    уравнении parse падал, а мы молча возвращали пустой список — и у формул,
    записанных уравнением (ограничение, неявная КПВ), буква-параметр не
    заводилась совсем (Н7). */
+/* Память разбора (А1 · А55). Разбор формулы через math.parse дорогой, а
+   freeSymbols звалась из scopeFor, то есть на КАЖДОМ вычислении функции. При
+   трассировке кривой уровня это десятки тысяч разборов одной и той же строки
+   за одну перерисовку: изокванта открывалась семь секунд.
+
+   Ответ зависит от строки и от того, какие буквы заняты сценой, поэтому ключ
+   составной. Набор занятых букв меняется редко (смена режима, появление поля
+   ставки), и его подпись считается дёшево — без разбора формулы. */
+const _freeSymCache = new Map();
+function sceneReservedKey() {
+  const s = sceneReserved();
+  return STATE.mode + '|' + (STATE.mathSub || '') + '|' + Array.from(s).sort().join(',');
+}
 function freeSymbols(expr) {
+  const key = sceneReservedKey() + '\u0000' + String(expr || '');
+  const hit = _freeSymCache.get(key);
+  if (hit) return hit;
+  const res = freeSymbolsUncached(expr);
+  // Память не растёт бесконечно: формул на экране единицы, а ключей за сессию
+  // набирается много (каждое нажатие в поле формулы даёт новую строку).
+  if (_freeSymCache.size > 400) _freeSymCache.clear();
+  _freeSymCache.set(key, res);
+  return res;
+}
+
+function freeSymbolsUncached(expr) {
   const out = [];
   const scan = (src) => {
     try {

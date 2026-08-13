@@ -104,12 +104,23 @@ function makeImplicitF(G) {
   };
 }
 
+/* Разбор формулы КПВ запоминается по тексту (А2). Кривые складываются по
+   Минковскому, и на каждую точку суммы приходится несколько сотен вычислений
+   слагаемых; сам разбор при этом шёл заново на каждую перерисовку. */
+const _ppfCompileCache = new Map();
 function compilePpf(expr) {
+  const key = String(expr || '');
+  const hit = _ppfCompileCache.get(key);
+  if (hit) return hit;
+  let res;
   try {
     const compiled = math.parse(expr).compile();
     compiled.evaluate(scopeFor(expr, { x: 1, X: 1 }));   // пробный расчёт ловит опечатки
-    return { compiled, error: null };
-  } catch (e) { return { compiled: null, error: e.message }; }
+    res = { compiled, error: null };
+  } catch (e) { res = { compiled: null, error: e.message }; }
+  if (_ppfCompileCache.size > 200) _ppfCompileCache.clear();
+  _ppfCompileCache.set(key, res);
+  return res;
 }
 
 // Значение границы Y в точке X. Считает разобранное уравнение (Фаза 11):
@@ -469,7 +480,7 @@ function updatePpfPanel() {
     if (b) {
       html += `<p>Комплект это фиксированная пропорция ${fmt(b.kx)} X на ${fmt(b.ky)} Y. Все такие наборы `
             + `лежат на луче $y = ${fmt(b.slope)}x$ из начала координат. Луч упирается в границу в точке `
-            + `(${fmt(b.x)}; ${fmt(b.y)}) — это и есть самый большой доступный набор нужной пропорции.</p>`;
+            + `(${fmt(b.x)}; ${fmt(b.y)}) это и есть самый большой доступный набор нужной пропорции.</p>`;
       html += `<p>Если блага делимы, комплектов получается ${fmt(Math.min(b.x / b.kx, b.y / b.ky))}. `
             + `Если брать только целые, то ${b.whole}: остаток ресурса на полный комплект уже не хватает.</p>`;
     }
@@ -477,14 +488,14 @@ function updatePpfPanel() {
   html += '<p><b>Что означают точки ВНУТРИ кривой и снаружи?</b> Точка внутри достижима, но там '
         + 'ресурс использован не полностью: можно выпустить больше хотя бы одного товара, ничего '
         + 'не теряя. Точка снаружи при нынешних ресурсах и технологии недостижима вовсе. Сама '
-        + 'граница — это наборы, где выигрыш в одном товаре обязательно оплачен потерей в другом.</p>';
+        + 'граница это наборы, где выигрыш в одном товаре обязательно оплачен потерей в другом.</p>';
   html += '<p><b>Что двигает саму кривую?</b> Рост количества ресурсов или улучшение технологии. '
         + 'Если улучшение касается только одного товара, кривая уезжает наружу не целиком, а лишь '
         + 'по своей оси, и наклон меняется. Именно поэтому в задачах спрашивают не «выросла ли '
         + 'экономика», а «по какому товару выросла»: от ответа зависит, изменились ли '
         + 'альтернативные издержки.</p>';
   html += '<p><b>Вывод.</b> Кривая отвечает сразу на три вопроса: что достижимо, чем приходится '
-        + 'платить за каждую единицу и что считать полным использованием ресурса. Форма кривой — '
+        + 'платить за каждую единицу и что считать полным использованием ресурса. Форма кривой это '
         + 'это ответ на второй вопрос, и в задачах спрашивают почти всегда именно его.</p>';
   html += '</div>';
   box.innerHTML = html;
@@ -639,8 +650,12 @@ function maxAllocY(f1, f2, X, x1max, x2max) {
   let best = -Infinity, bx = lo;
   const M = 200;
   for (let j = 0; j <= M; j++) { const x1 = lo + (hi - lo) * j / M; const v = obj(x1); if (v > best) { best = v; bx = x1; } }
-  const step = (hi - lo) / M;                       // уточнение вокруг лучшего узла
-  const lo2 = Math.max(lo, bx - step), hi2 = Math.min(hi, bx + step), M2 = 200;
+  /* Уточнение вокруг лучшего узла. Сорока точек здесь достаточно: отрезок уже
+     сузился в сто раз, и сороковая доля от него это одна четырёхтысячная
+     исходного диапазона — на экране такой разницы нет. Было двести, то есть
+     ровно та же сетка, что и на грубом проходе, и это удваивало счёт (А2). */
+  const step = (hi - lo) / M;
+  const lo2 = Math.max(lo, bx - step), hi2 = Math.min(hi, bx + step), M2 = 40;
   for (let j = 0; j <= M2; j++) { const x1 = lo2 + (hi2 - lo2) * j / M2; const v = obj(x1); if (v > best) best = v; }
   return best === -Infinity ? NaN : best;
 }
@@ -825,7 +840,34 @@ function ppfSumColor(i) {
   return pal[i % pal.length];
 }
 
+/* Подпись входа суммы КПВ: формулы стран плюс значения ползунков (А2).
+
+   Кэш суммы был устроен на «пусто значит пересчитать», и этого не хватало:
+   открытие сцены перерисовывает её дважды (сначала переключение под-режима,
+   потом общая перерисовка карточки), а между перерисовками сброс параметров
+   обнулял кэш. Получалось ДВА полных пересчёта Минковского на одно открытие —
+   380 миллисекунд из 433. По подписи второй пересчёт не нужен. */
+function ppfSumSignature() {
+  const parts = [];
+  const n = ppfSumCount();
+  for (let i = 0; i < n; i++) parts.push(ppfSumGet(i));
+  const names = Object.keys(STATE.params || {}).sort();
+  // Разделители — служебные символы, которых в формулах не бывает: иначе
+  // подписи «100 - X»+«60» и «100»+«- X60» дали бы одну строку.
+  return n + '\u0001' + parts.join('\u0001') + '\u0002' + paramSignature(names);
+}
+
 function recomputePpfSum() {
+  recomputePpfSumRaw();
+  if (STATE.ppfSumData) STATE.ppfSumData.sig = ppfSumSignature();
+}
+
+// Пересчитать, только если вход изменился с прошлого раза.
+function ensurePpfSum() {
+  if (!STATE.ppfSumData || STATE.ppfSumData.sig !== ppfSumSignature()) recomputePpfSum();
+}
+
+function recomputePpfSumRaw() {
   STATE.ppfSumData = null;
   const n = ppfSumCount();
   // Разбираем все кривые общим вводом блока (Фаза 11): каждая строка может быть
@@ -1168,9 +1210,9 @@ function drawPpfSumSchema() {
   schemaNote('Схема · не в масштабе');
 }
 
-// Полная перерисовка под-режима «Сумма двух КПВ» (тяжёлый расчёт — только если кэш пуст).
+// Полная перерисовка под-режима «Сумма двух КПВ» (тяжёлый расчёт — только если вход изменился).
 function redrawPpfSum() {
-  if (!STATE.ppfSumData) recomputePpfSum();
+  ensurePpfSum();
   makeScales();                                     // setRanges мог изменить границы
   svg.selectAll('*').remove(); addDefs();
   const d = STATE.ppfSumData;
@@ -1643,7 +1685,7 @@ function updateTradeBPanel() {
         + `${fmt(d.E_L)}.</p>`;
   if (d.lowCo.limit.binding) {
     html += `<p>Здесь предел сработал: партнёр кончился раньше, чем свой X. Прямая обрывается в `
-          + `точке (${fmt(d.lowCo.limit.kink[0])}; ${fmt(d.lowCo.limit.kink[1])}) — это и есть излом. `
+          + `точке (${fmt(d.lowCo.limit.kink[0])}; ${fmt(d.lowCo.limit.kink[1])}) это и есть излом. `
           + 'Дальше набор можно наращивать только собственным производством второго товара, '
           + 'то есть двигаясь по своей КПВ, но уже из смещённой точки: к ней прибавлено то, '
           + 'что удалось выменять. Поэтому хвост линии идёт параллельно собственной КПВ страны.</p>';
@@ -1729,7 +1771,8 @@ function setPpfSub(sub) {
   const panes = { single: 'ppf-pane-single', sum: 'ppf-pane-sum', trade: 'ppf-pane-trade' };
   Object.values(panes).forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   const ap = document.getElementById(panes[sub]); if (ap) ap.style.display = '';
-  if (sub === 'sum') STATE.ppfSumData = null;        // пересчитать при показе
+  // Пересчёт при показе больше не форсируем: кэш сам сверяет подпись входа
+  // (ppfSumSignature) и пересчитывает ровно тогда, когда вход изменился.
   if (typeof updatePult === 'function') updatePult();   // сцен-слайдеры КПВ / мировая цена
   redrawAll();
 }

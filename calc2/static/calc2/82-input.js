@@ -497,14 +497,33 @@ function upgradeFormulaField(inp) {
   flushMathfields();
 }
 
+/* Собираем только те поля, которые ПРЯМО СЕЙЧАС на экране (А56).
+
+   Полей формул в разметке четыре десятка, а видно в любой сцене три-четыре:
+   остальные лежат в спрятанных секциях других моделей. MathLive это тяжёлый
+   веб-компонент, и собирать их все разом ради трёх видимых незачем. Поле,
+   которого не видно, остаётся в очереди и соберётся, когда его секция
+   откроется, — очередь разбирается после каждой перерисовки. */
+function fieldOnScreen(inp) {
+  const slot = inp && inp.parentNode;
+  if (!slot || !slot.getBoundingClientRect) return false;
+  if (!slot.offsetParent && getComputedStyle(slot).position !== 'fixed') return false;
+  const r = slot.getBoundingClientRect();
+  return r.width > 0 && r.height > 0;
+}
+
 function flushMathfields() {
   if (!MATHLIVE_READY || !_sceneOpen || !_mfWaiting.length) return;
   const app = document.querySelector('.app');
   if (app && app.hasAttribute('inert')) return;    // сцена ещё под окном выбора
+  const keep = [];
   while (_mfWaiting.length) {
     const inp = _mfWaiting.shift();
+    if (!inp.isConnected) continue;                // строку успели пересобрать
+    if (!fieldOnScreen(inp)) { keep.push(inp); continue; }
     try { buildMathfield(inp); } catch (e) { console.warn('Поле формулы:', e); inp._mfDone = false; }
   }
+  keep.forEach(inp => _mfWaiting.push(inp));
 }
 
 function buildMathfield(inp) {

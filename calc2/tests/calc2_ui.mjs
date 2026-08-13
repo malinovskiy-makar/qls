@@ -638,8 +638,10 @@ await t('свои точки попадают в .tex с подписью', () =
 await t('в режиме издержек выгружаются кривые издержек', () => page.evaluate(() => {
   resetSceneMemory(); openPicker(); pickScene('costs'); closePicker(); redrawAll();
   const tex = buildTex('', '');
-  // Названия кривых уходят в .tex подписями узлов, как и на экране.
-  return (tex.includes('{MC}') || tex.includes('MC};')) && tex.includes('ATC') || tex.slice(0, 200);
+  /* Названия кривых уходят в .tex подписями узлов, как и на экране, и с А46
+     они набраны МАТЕМАТИКОЙ: было {MC}, стало {$MC$}. Проверка ждала прежнюю
+     запись и потому падала на верном поведении. */
+  return (tex.includes('{$MC$}') && tex.includes('{$ATC$}')) || tex.slice(0, 200);
 }));
 
 // Раньше .tex собирался из формул рыночной сцены, поэтому во всех остальных
@@ -1014,7 +1016,11 @@ await t('легенда попадает в экспорт вместе с гр�
   await page.waitForTimeout(330);
   return await page.evaluate(() => {
     const tex = buildTex('', '');
-    return (tex.includes('{Tx}') && tex.includes('{DWL}')) || 'подписей нет в .tex';
+    /* Подписи легенды тоже набраны математикой (А46): было {Tx} и {DWL},
+       стало {$T_x$} и {$DWL$}. Заодно убеждаемся, что вторая легенда, которую
+       рисовал сам pgfplots, из файла ушла (А48). */
+    return (tex.includes('{$T_x$}') && tex.includes('{$DWL$}')
+            && !tex.includes('addlegendentry')) || 'подписей нет в .tex';
   });
 });
 
@@ -1342,11 +1348,26 @@ await t('видна отрицательная часть плоскости', (
   (CONFIG.Qmin < 0 && CONFIG.Pmin < 0 && STATE.firstQuad === false)
   || JSON.stringify({ q: CONFIG.Qmin, p: CONFIG.Pmin, fq: STATE.firstQuad })));
 
-await t('у сцены нет «Аналитики»', () => page.evaluate(() => {
-  const p = document.getElementById('params-panel');
-  const s = document.getElementById('scoreboard');
-  return (p.classList.contains('empty') && s.classList.contains('hidden'))
-    || `панель пустая ${p.classList.contains('empty')}, расчёты скрыты ${s.classList.contains('hidden')}`;
+/* А53. РАНЬШЕ здесь проверялось, что у «Построения графиков» «Аналитики» нет
+   вовсе. Это отменено: блоки всё равно открывались и оказывались ПУСТЫМИ, а
+   это первая сцена, которую открывает новый человек, и первое, что он про
+   калькулятор узнавал, — что тут ничего нет.
+
+   Считать здесь есть что: нули функции, её вершины, пересечения кривых.
+   Проверяем теперь наполнение, а не отсутствие. */
+await t('у сцены есть «Аналитика» и она не пустая', () => page.evaluate(() => {
+  // Раскрываем и ОБЯЗАТЕЛЬНО возвращаем как было: следующие проверки ждут
+  // блоки свёрнутыми, а тест, меняющий состояние за собой, роняет соседей.
+  const opened = [];
+  ['sb-btn', 'ex-btn'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b && b.getAttribute('aria-expanded') !== 'true') { b.click(); opened.push(b); }
+  });
+  const s = (document.getElementById('sb-body') || {}).textContent || '';
+  const e = (document.getElementById('ex-body') || {}).textContent || '';
+  opened.forEach(b => b.click());
+  return (s.trim().length > 40 && e.trim().length > 400)
+    || `ключевые ${s.trim().length}, объяснение ${e.trim().length}`;
 }));
 
 await t('свои точки и площади остались', () => page.evaluate(() => {

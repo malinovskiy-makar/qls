@@ -90,15 +90,16 @@ function paramSignature(names) {
 }
 
 function refreshLinearForParams() {
-  /* Сумма КПВ считается один раз и живёт в кэше до следующей правки поля
-     (`if (!STATE.ppfSumData) recomputePpfSum()`). Буква-параметр поля не
-     трогает, поэтому кэш переживал движение ползунка и сумма стояла на месте.
-     Сбрасываем его, когда хоть одно значение изменилось. */
+  /* Сумма КПВ считается один раз и живёт в кэше. Раньше кэш сбрасывался
+     ЗДЕСЬ, как только менялось значение любого ползунка, и это давало ДВА
+     полных пересчёта Минковского на одно открытие сцены: карточка
+     перерисовывает её дважды, а между перерисовками сброс параметров успевал
+     обнулить кэш (А2). Теперь у кэша есть подпись входа (ppfSumSignature), и
+     значения ползунков в неё уже входят: отдельный сброс не нужен и только
+     вредит. Подпись параметров всё равно ведём — по ней пересобираются
+     прямые с буквой ниже. */
   const allSig = paramSignature(Object.keys(STATE.params || {}).sort());
-  if (allSig !== STATE._paramsSig) {
-    STATE._paramsSig = allSig;
-    STATE.ppfSumData = null;
-  }
+  if (allSig !== STATE._paramsSig) STATE._paramsSig = allSig;
   (STATE.curves || []).forEach(curve => {
     // Синтетические кривые (curve.fn) считают себя сами, вертикали не про Q.
     if (!curve.compiled || curve.fn || curve.kind === 'vertical') return;
@@ -337,7 +338,22 @@ function evalExt(q) {
 
 // Компиляция функции двух переменных. Пользователь пишет через x,y (потребитель)
 // или L,K (фирма) — внутрь подаём обе пары синонимов, поэтому годятся обе записи.
+/* Скомпилированная формула двух переменных запоминается по тексту (А55).
+   Сцены зовут compileTwoVar из своего пересчёта, а пересчёт идёт на каждую
+   перерисовку: изокванта разбирала и компилировала одну и ту же строку
+   заново по десять раз в секунду, пока пользователь просто двигал ползунок. */
+const _twoVarCache = new Map();
 function compileTwoVar(expr) {
+  const key = String(expr || '');
+  const hit = _twoVarCache.get(key);
+  if (hit) return hit;
+  const res = compileTwoVarUncached(expr);
+  if (_twoVarCache.size > 200) _twoVarCache.clear();
+  _twoVarCache.set(key, res);
+  return res;
+}
+
+function compileTwoVarUncached(expr) {
   try {
     const compiled = math.parse(expr).compile();
     compiled.evaluate(scopeFor(expr, { x: 1, y: 1, L: 1, K: 1 }));   // пробный расчёт ловит опечатки
@@ -368,7 +384,13 @@ function solveLevelB(f, level, a, bMax) {
   if (isNaN(glo) || isNaN(ghi)) return null;
   if (glo > 0) return null;    // уровень достигнут уже при b=0 — кривая ниже сетки
   if (ghi < 0) return null;    // даже при b=bMax уровня не достичь
-  for (let k = 0; k < 80; k++) {
+  /* Восьмидесяти делений пополам не нужно никогда: интервал [0, bMax] за 40
+     шагов сжимается до триллионной доли, а на экране различима миллионная.
+     Выходим, как только точность заведомо избыточна, — это вдвое меньше
+     вычислений функции на каждой точке кривой уровня (А55). */
+  const eps = Math.max(1e-12, Math.abs(bMax) * 1e-9);
+  for (let k = 0; k < 60; k++) {
+    if (hi - lo < eps) break;
     const mid = (lo + hi) / 2, gm = g(mid);
     if (isNaN(gm)) { lo = mid; continue; }
     if (gm === 0) return mid;
@@ -377,15 +399,34 @@ function solveLevelB(f, level, a, bMax) {
   return (lo + hi) / 2;
 }
 
-// Трассировка НЕЯВНОЙ кривой уровня f(a, b) = level по сетке значений a.
-// Возвращает массив [a, b] или null в точках, где уровень недостижим.
+/* Трассировка НЕЯВНОЙ кривой уровня f(a, b) = level по сетке значений a.
+   Возвращает массив [a, b] или null в точках, где уровень недостижим.
+
+   Результат запоминается на одну перерисовку (А55). Одна и та же кривая
+   уровня считается по нескольку раз за кадр: её рисует сцена, её же просит
+   движок прокатывания точки, её же берут ключевые точки. Ключ памяти —
+   САМА ФУНКЦИЯ плюс параметры: функция пересоздаётся при смене формулы,
+   поэтому устареть запись не может. */
+const _levelCache = new WeakMap();
 function traceLevelCurve(f, level, aMax, bMax, steps) {
-  const N = steps || 200, out = [];
+  const N = steps || 200;
+  const key = level + '|' + aMax + '|' + bMax + '|' + N;
+  let box = _levelCache.get(f);
+  if (box) {
+    const hit = box.get(key);
+    if (hit) return hit;
+  } else {
+    box = new Map();
+    _levelCache.set(f, box);
+  }
+  const out = [];
   for (let i = 0; i <= N; i++) {
     const a = aMax * i / N;
     const b = solveLevelB(f, level, a, bMax);
     out.push((b == null) ? null : [a, b]);
   }
+  if (box.size > 32) box.clear();
+  box.set(key, out);
   return out;
 }
 

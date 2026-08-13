@@ -22,7 +22,21 @@ let scanned = 0;
 let scannedLiterals = 0;
 
 for (const file of readdirSync(DIR).filter(f => f.endsWith('.js')).sort()) {
-  const lines = readFileSync(join(DIR, file), 'utf8').split('\n');
+  const raw = readFileSync(join(DIR, file), 'utf8');
+  /* Управляющий символ, набранный в исходнике БУКВАЛЬНО, а не escape-записью.
+     Так в код попадали разделители ключей кэша: файл при этом остаётся
+     синтаксически верным, но становится «двоичным» для обычных инструментов
+     (grep перестаёт его читать), а в системе контроля версий выглядит мусором.
+     Пишем '\\u0001', а не сам символ. */
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw.charCodeAt(i);
+    if (c < 9 || (c > 10 && c < 13) || (c > 13 && c < 32)) {
+      const line = raw.slice(0, i).split('\n').length;
+      bad.push(`${file}:${line}  управляющий символ U+${c.toString(16).padStart(4, '0')} набран буквально`);
+      break;
+    }
+  }
+  const lines = raw.split('\n');
   /* Комментарии пропускаем: там слэши живут в человеческом тексте и никуда не
      деваются. Блочные считаем по состоянию, построчно их не отличить. */
   let inBlock = false;
