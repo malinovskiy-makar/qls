@@ -110,7 +110,7 @@ function drawMonopolyPoints() {
     g.append('circle').attr('cx', pxc).attr('cy', pyc).attr('r', 4)
       .attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
     g.append('text').attr('x', pxc + 7).attr('y', pyc + 13)
-      .attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+      .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('К');
     haloText(g, pxc, oy + 8, 'Qc=' + fmt(m.Qc), 'middle', 'hanging');
   }
@@ -125,7 +125,7 @@ function drawMonopolyPoints() {
   g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5)
     .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   g.append('text').attr('x', pxm + 8).attr('y', pym - 8)
-    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+    .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
   haloText(g, pxm, oy + 8, 'Qm=' + fmt(m.Qm), 'middle', 'hanging');
   haloText(g, ox - 8, pym, 'Pm=' + fmt(m.Pm), 'end', 'middle');
 }
@@ -276,7 +276,7 @@ function drawMonoKinkedMR() {
     g.append('line').attr('x1', sx(mc.Qhat)).attr('y1', yPc).attr('x2', sx(mc.Qhat)).attr('y2', sy(Math.max(0, mrHat)))
       .attr('stroke', COL.MR).attr('stroke-width', 1.5).attr('stroke-dasharray', '2 2').attr('opacity', 0.6);
   }
-  g.append('text').attr('x', sx(mc.Qhat * 0.4)).attr('y', yPc - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.MR)
+  g.append('text').attr('x', sx(mc.Qhat * 0.4)).attr('y', yPc - 5).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.MR)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MRэфф = Pc');
 }
 
@@ -291,7 +291,7 @@ function drawMonoCeilingPoints() {
   if (STATE.showGhost) {
     const [px0, py0] = toPx(m.Qm, m.Pm);
     g.append('circle').attr('cx', px0).attr('cy', py0).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
-    g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+    g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('M₀');
   }
   // Новый выпуск/цена (Qstar, price).
@@ -299,7 +299,7 @@ function drawMonoCeilingPoints() {
     const [pxm, pym] = toPx(mc.Qstar, mc.price);
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
     haloText(g, pxm, oy + 8, 'Q=' + fmt(mc.Qstar), 'middle', 'hanging');
   }
   // Дефицит на оси Q между Qstar и Q̂ (объём спроса при цене Pc).
@@ -491,7 +491,7 @@ function drawNaturalPoints() {
       .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     g.append('text').attr('x', px + (side < 0 ? -9 : 9)).attr('y', py - 9)
       .attr('text-anchor', side < 0 ? 'end' : 'start')
-      .attr('font-size', 12).attr('font-weight', 700).attr('fill', color)
+      .attr('font-size', FS.base).attr('font-weight', 700).attr('fill', color)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
     haloText(g, px, oy + 8, fmt(Q), 'middle', 'hanging');
   };
@@ -571,7 +571,7 @@ function drawMonoTaxShiftedMC() {
   g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.MC).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
   // Подпись сдвинутой кривой.
   const qLab = CONFIG.Qmax * 0.62, vLab = mcAt(qLab) + t.shift;
-  if (!isNaN(vLab) && vLab > 0) g.append('text').attr('x', sx(qLab)).attr('y', sy(vLab) - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.MC)
+  if (!isNaN(vLab) && vLab > 0) g.append('text').attr('x', sx(qLab)).attr('y', sy(vLab) - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.MC)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(t.isTax ? 'MC+t' : 'MC−s');
 }
 
@@ -584,13 +584,13 @@ function drawMonoTaxPoints() {
   if (STATE.showGhost) {
     const [px0, py0] = toPx(m.Qm, m.Pm);
     g.append('circle').attr('cx', px0).attr('cy', py0).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
-    g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft).attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('M₀');
+    g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft).attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('M₀');
   }
   if (t.Qt > 1e-6) {
     const [pxm, pym] = toPx(t.Qt, t.Pt);
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
     haloText(g, pxm, oy + 8, 'Q=' + fmt(t.Qt), 'middle', 'hanging');
     haloText(g, ox - 8, pym, 'P=' + fmt(t.Pt), 'end', 'middle');
   }
@@ -620,13 +620,13 @@ function drawMonoFloorPoints() {
   if (STATE.showGhost) {
     const [px0, py0] = toPx(m.Qm, m.Pm);
     g.append('circle').attr('cx', px0).attr('cy', py0).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
-    g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft).attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('M₀');
+    g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft).attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('M₀');
   }
   if (fl.Q > 1e-6) {
     const [pxm, pym] = toPx(fl.Q, fl.price);
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
     haloText(g, pxm, oy + 8, 'Q=' + fmt(fl.Q), 'middle', 'hanging');
   }
 }
@@ -821,11 +821,11 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
   // Оси.
   g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', right).attr('y2', bottom).attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
   g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', left).attr('y2', top).attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
-  g.append('text').attr('x', (left + right) / 2).attr('y', top - 12).attr('text-anchor', 'middle').attr('font-size', 12.5).attr('font-weight', 600).attr('fill', COL.ink).text(title);
-  g.append('text').attr('x', right + 4).attr('y', bottom + 4).attr('font-size', 11).attr('fill', COL.inkSoft).text('Q');
-  g.append('text').attr('x', left - 4).attr('y', top - 2).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', COL.inkSoft).text('P');
-  [0.25, 0.5, 0.75, 1].forEach(t => { const xq = Xmax * t; g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('font-size', 9).attr('fill', COL.inkSoft).text(fmt(xq)); });
-  [0.25, 0.5, 0.75, 1].forEach(t => { const yp = Ymax * t; g.append('text').attr('x', left - 5).attr('y', ly(yp)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').attr('font-size', 9).attr('fill', COL.inkSoft).text(fmt(yp)); });
+  g.append('text').attr('x', (left + right) / 2).attr('y', top - 12).attr('text-anchor', 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink).text(title);
+  g.append('text').attr('x', right + 4).attr('y', bottom + 4).attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Q');
+  g.append('text').attr('x', left - 4).attr('y', top - 2).attr('text-anchor', 'end').attr('font-size', FS.base).attr('fill', COL.inkSoft).text('P');
+  [0.25, 0.5, 0.75, 1].forEach(t => { const xq = Xmax * t; g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(xq)); });
+  [0.25, 0.5, 0.75, 1].forEach(t => { const yp = Ymax * t; g.append('text').attr('x', left - 5).attr('y', ly(yp)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(yp)); });
   const gc = svg.append('g').attr('clip-path', 'url(#' + cid + ')');
   const line = d3.line().defined(d => d !== null).x(d => lx(d[0])).y(d => ly(d[1]));
   const sample = (f) => { const o = []; for (let i = 0; i <= 300; i++) { const q = Xmax * i / 300; const v = f(q); o.push((isNaN(v) || v < 0) ? null : [q, v]); } return o; };
@@ -1036,7 +1036,7 @@ function drawKinkedFull() {
     const dash = (x1, y1, x2, y2) => og.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     dash(px, py, px, oy); dash(px, py, ox, py);
     og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    og.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+    og.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
     haloText(og, px, oy + 8, 'Q*=' + fmt(k.Qstar), 'middle', 'hanging');
     haloText(og, ox - 8, py, 'P*=' + fmt(k.Pstar), 'end', 'middle');
   }

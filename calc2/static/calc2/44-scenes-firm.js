@@ -94,7 +94,7 @@ function drawCostCurves() {
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
       .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     g.append('text').attr('x', px).attr('y', py - 9)
-      .attr('text-anchor', 'middle').attr('font-size', 9.5).attr('font-weight', 600).attr('fill', color)
+      .attr('text-anchor', 'middle').attr('font-size', FS.small).attr('font-weight', 600).attr('fill', color)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
   };
   if (STATE.showATC) mark(STATE.minATC, COL.costATC, 'безубыт.');
@@ -126,7 +126,7 @@ function redrawCosts() {
   drawGrid();
   drawAxes('Q', '');
   svg.append('text').attr('x', sx(0) + 6).attr('y', sy(CONFIG.Pmax) - 5)
-    .attr('text-anchor', 'start').attr('font-size', 11).attr('fill', COL.inkSoft).text('Издержки, цена');
+    .attr('text-anchor', 'start').attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Издержки, цена');
   drawLongRunArea();      // прямоугольник прибыли/убытка — под кривыми
   drawCostCurves();
   if (STATE.lrOn) drawLongRunMarks();
@@ -296,14 +296,14 @@ function redrawProduction() {
       .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
     g.append('line').attr('x1', left).attr('y1', y0).attr('x2', left).attr('y2', scale.range()[1])
       .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
-    g.append('text').attr('x', left + 4).attr('y', scale.range()[1] - 6).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink).text(title);
-    g.append('text').attr('x', right + 6).attr('y', y0 + 4).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('L');
+    g.append('text').attr('x', left + 4).attr('y', scale.range()[1] - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink).text(title);
+    g.append('text').attr('x', right + 6).attr('y', y0 + 4).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('L');
     scale.ticks(5).forEach(t => { if (t <= 0) return;
       g.append('text').attr('x', left - 6).attr('y', scale(t)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
-        .attr('font-size', 10).attr('fill', COL.inkSoft).text(fmt(t)); });
+        .attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(t)); });
     lx.ticks(8).forEach(t => { if (t <= 0) return;
       g.append('text').attr('x', lx(t)).attr('y', y0 + 8).attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
-        .attr('font-size', 10).attr('fill', COL.inkSoft).text(fmt(t)); });
+        .attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(t)); });
     return g;
   };
   const curve = (g, f, scale, color, on, width) => {
@@ -328,7 +328,7 @@ function redrawProduction() {
     svg.append('line').attr('x1', x).attr('y1', top).attr('x2', x).attr('y2', bottom)
       .attr('stroke', color).attr('stroke-width', 1.2).attr('stroke-dasharray', '5 4').attr('opacity', 0.8);
     const g = svg.append('g');
-    g.append('text').attr('x', x + 5).attr('y', top + 10).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', color)
+    g.append('text').attr('x', x + 5).attr('y', top + 10).attr('font-size', FS.small).attr('font-weight', 600).attr('fill', color)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
   };
   if (p.maxMP) vline(p.maxMP.L, COL.prodMP, 'перегиб TP · max MP · L=' + fmt(p.maxMP.L));
@@ -523,7 +523,7 @@ function redrawPlants() {
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const label = (x, y, txt, color) => {
     if (isNaN(y) || y > CONFIG.Pmax || y < 0) return;
-    g.append('text').attr('x', sx(x)).attr('y', sy(y) - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
+    g.append('text').attr('x', sx(x)).attr('y', sy(y) - 5).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(txt);
   };
   if (STATE.plView === 'mc') {

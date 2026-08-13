@@ -192,7 +192,7 @@ function laborPoint(g, L, W, color, label, opts) {
   if (opts.lText !== null) haloText(g, px, oy + 8, opts.lText || ('L=' + fmt(L)), 'middle', 'hanging');
   if (opts.wText !== null) yWageLabel(g, ox, py, opts.wText || ('W=' + fmt(W)));
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  if (label) g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', color).text(label);
+  if (label) g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', color).text(label);
 }
 
 // Бледный конкурентный ориентир (Lk, Wk) — точка «К» (по галочке «было → стало»).
@@ -200,7 +200,7 @@ function drawLaborGhost(L, W, label) {
   if (!STATE.showGhost || L == null || W == null) return;
   const oy = sy(0), g = svg.append('g'), [px, py] = toPx(L, W);
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
-  g.append('text').attr('x', px + 7).attr('y', py + 13).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+  g.append('text').attr('x', px + 7).attr('y', py + 13).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label || 'К');
   haloText(g, px, oy + 8, 'Lk=' + fmt(L), 'middle', 'hanging');
 }
@@ -259,7 +259,7 @@ function drawLaborMCL() {
   const ptsFull = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; const v = laborMCL(S, l); ptsFull.push(isNaN(v) ? null : [l, v]); }
   g.append('path').datum(ptsFull).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
   const ql = CONFIG.Qmax * 0.85, vl = laborMCL(S, ql);
-  if (!isNaN(vl) && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.reg)
+  if (!isNaN(vl) && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.reg)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MCL');
   // (2) Эффективная ломаная MCL_eff — поверх настоящей, при связывающем МРОТ.
   const min = STATE.laborMin;
@@ -275,7 +275,7 @@ function drawLaborMCL() {
     const mclHat = laborMCL(S, min.Lhat);
     if (!isNaN(mclHat)) g.append('line').attr('x1', sx(min.Lhat)).attr('y1', yW).attr('x2', sx(min.Lhat)).attr('y2', sy(mclHat))
       .attr('stroke', COL.warn).attr('stroke-width', 2).attr('stroke-dasharray', '3 2').attr('opacity', 0.7);
-    g.append('text').attr('x', sx(min.Lhat * 0.4)).attr('y', yW - 5).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.warn)
+    g.append('text').attr('x', sx(min.Lhat * 0.4)).attr('y', yW - 5).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.warn)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MCLэфф');
   }
 }
@@ -308,7 +308,7 @@ function drawLaborMonopsonyPoints() {
     if (STATE.showGhost) {
       const [px0, py0] = toPx(mono.Lm, mono.Wm);
       g.append('circle').attr('cx', px0).attr('cy', py0).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
-      g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+      g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('M₀');
     }
     // Новый оптимум при МРОТ.
@@ -332,7 +332,7 @@ function drawLaborMonopsonyPoints() {
     // Зарплата опускается вертикально на кривую предложения: точка M(Lm, Wm).
     dash(ox, pyW, pxm, pyW);
     g.append('circle').attr('cx', pxm).attr('cy', pyW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pyW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+    g.append('text').attr('x', pxm + 8).attr('y', pyW - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
     haloText(g, pxm, oy + 8, 'Lм=' + fmt(mono.Lm), 'middle', 'hanging');
     yWageLabel(g, ox, pyW, 'Wм=' + fmt(mono.Wm));
   }
@@ -413,7 +413,7 @@ function drawLaborUnionMRL() {
   const pts = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; const v = marginalRevenue(D, l); pts.push(isNaN(v) ? null : [l, v]); }
   g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
   const ql = CONFIG.Qmax * 0.28, vl = marginalRevenue(D, ql);
-  if (!isNaN(vl) && vl >= 0 && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.MR)
+  if (!isNaN(vl) && vl >= 0 && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.MR)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MRL');
 }
 
@@ -444,7 +444,7 @@ function drawLaborUnionPoints() {
     // Зарплата профсоюза Wп на кривой спроса (выше конкурентной).
     dash(ox, pyW, px, pyW);
     g.append('circle').attr('cx', px).attr('cy', pyW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', px + 8).attr('y', pyW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('П');
+    g.append('text').attr('x', px + 8).attr('y', pyW - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('П');
     haloText(g, px, oy + 8, 'Lп=' + fmt(u.Lu), 'middle', 'hanging');
     yWageLabel(g, ox, pyW, 'Wп=' + fmt(u.Wu));
   } else if (u.binding) {
@@ -457,7 +457,7 @@ function drawLaborUnionPoints() {
     g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
     if (u.unemployment > 1e-6) haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(u.unemployment), 'middle', 'hanging');
     g.append('circle').attr('cx', xL).attr('cy', yW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', xL + 8).attr('y', yW - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('П');
+    g.append('text').attr('x', xL + 8).attr('y', yW - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('П');
   }
 }
 
@@ -533,11 +533,11 @@ function drawLaborBilateral() {
   haloText(gg, ox - 8, yLo, 'Wм=' + fmt(b.Wm), 'end', 'middle');
   haloText(gg, ox - 8, yHi, 'Wп=' + fmt(b.Wu), 'end', 'middle');
   gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2)
-    .attr('text-anchor', 'middle').attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.warn)
+    .attr('text-anchor', 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.warn)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
     .text('Диапазон возможных исходов');
   gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2 + 15)
-    .attr('text-anchor', 'middle').attr('font-size', 10.5).attr('fill', COL.inkSoft)
+    .attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
     .text('Конкретная точка зависит от переговорной силы, а её модель не определяет');
   // Две граничные точки: решение монопсониста и решение профсоюза.

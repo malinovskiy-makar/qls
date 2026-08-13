@@ -434,3 +434,110 @@ function optimizeAlongConstraint(f, priceA, priceB, income) {
   return { a: bestA, b, value: bestV, aMax, bMax, mrs: mrsAt(f, bestA, b) };
 }
 
+
+/* =====================================================================
+   ВЕЛИЧИНЫ: одна логика набора для экрана, панели и файла (А28 · А46)
+
+   Было: одна и та же величина писалась тремя разными способами. В правой
+   панели «P_b» набиралось формулой, на холсте то же самое стояло обычным
+   текстом «Pb=60», а в файле .tex не было ни одного математического режима
+   вовсе: двенадцать узлов подписи, из них с индексами ноль. Даже внутри
+   холста не было согласия: «Q₁» пользовалось юникодной цифрой, а «Pb» и
+   «Ps» — обычными буквами.
+
+   Здесь разбор подписи на части и три способа её напечатать. Кто рисует —
+   тот и выбирает способ, но РЕШЕНИЕ, что здесь величина, а что проза,
+   принимается один раз и в одном месте.
+   ===================================================================== */
+
+// Юникодные индексы и степени, которые приходят из подписей сцен.
+const QTY_SUB = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9' };
+const QTY_SUP = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9' };
+const QTY_GREEK = {
+  'α': '\\alpha', 'β': '\\beta', 'γ': '\\gamma', 'δ': '\\delta', 'ε': '\\varepsilon',
+  'θ': '\\theta', 'λ': '\\lambda', 'μ': '\\mu', 'π': '\\pi', 'ρ': '\\rho',
+  'σ': '\\sigma', 'τ': '\\tau', 'φ': '\\varphi', 'ω': '\\omega',
+  'Δ': '\\Delta', 'Σ': '\\Sigma', 'Ω': '\\Omega', 'Π': '\\Pi',
+};
+// Операторы и служебные знаки, которые в формуле печатаются как есть.
+const QTY_OPS = {
+  '−': '-', '–': '-', '·': '\\cdot ', '×': '\\times ', '÷': '\\div ',
+  '≈': '\\approx ', '≤': '\\le ', '≥': '\\ge ', '≠': '\\ne ', '→': '\\to ',
+  '±': '\\pm ', '∞': '\\infty ', '∈': '\\in ', '∗': '^*', '*': '^*',
+};
+
+function qtyHasCyrillic(s) { return /[А-Яа-яЁё]/.test(String(s || '')); }
+
+/* Подпись — это величина? Величиной считаем запись, где есть латинская буква
+   или греческая, нет кириллицы, и нет длинных слов латиницей (иначе «Solution»
+   уехало бы в математику). Проза остаётся прозой. */
+function qtyIsQuantity(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s || qtyHasCyrillic(s)) return false;
+  if (!/[A-Za-zα-ωΑ-Ω]/.test(s)) return false;      // одни цифры — не величина
+  if (/[A-Za-z]{5,}/.test(s)) return false;          // длинное слово — это слово
+  return true;
+}
+
+/* Разбор записи на куски: {kind:'sym'|'num'|'op'|'txt', s, sub, sup}.
+   Правило имени: пробег заглавными (MC, ATC, DWL) — это аббревиатура, её не
+   трогаем; «Заглавная + строчные» (Pb, Qd, Wmin) — это символ с индексом;
+   цифры сразу после символа — тоже индекс (Q1 → Q с индексом 1). */
+function qtyParts(raw) {
+  const s = String(raw == null ? '' : raw);
+  const out = [];
+  let i = 0;
+  while (i < s.length) {
+    const ch = s[i];
+    if (QTY_GREEK[ch]) { out.push({ kind: 'sym', s: ch, greek: QTY_GREEK[ch], sub: '', sup: '' }); i++; }
+    else if (/[A-Za-z]/.test(ch)) {
+      let run = '';
+      while (i < s.length && /[A-Za-z]/.test(s[i])) { run += s[i]; i++; }
+      let name = run, sub = '';
+      if (run.length > 1 && !/^[A-Z]+$/.test(run)) { name = run[0]; sub = run.slice(1); }
+      const part = { kind: 'sym', s: name, sub, sup: '' };
+      // Индексы и степени сразу за именем.
+      while (i < s.length && (QTY_SUB[s[i]] || QTY_SUP[s[i]] || /[0-9]/.test(s[i]))) {
+        if (QTY_SUB[s[i]]) part.sub += QTY_SUB[s[i]];
+        else if (QTY_SUP[s[i]]) part.sup += QTY_SUP[s[i]];
+        else part.sub += s[i];
+        i++;
+      }
+      if (s[i] === '*' || s[i] === '∗') { part.sup += '*'; i++; }
+      out.push(part);
+    } else if (/[0-9]/.test(ch)) {
+      let run = '';
+      while (i < s.length && /[0-9.,]/.test(s[i])) { run += s[i]; i++; }
+      out.push({ kind: 'num', s: run });
+    } else { out.push({ kind: 'op', s: ch }); i++; }
+  }
+  return out;
+}
+
+/* Запись величины в LaTeX. Проза возвращается как обычный текст (\text{}),
+   поэтому функцию можно звать на любой подписи не разбираясь заранее. */
+function qtyLatex(raw) {
+  const parts = qtyParts(raw);
+  let out = '';
+  parts.forEach(p => {
+    if (p.kind === 'sym') {
+      out += (p.greek || p.s);
+      if (p.sub) out += (p.sub.length > 1 ? '_{' + p.sub + '}' : '_' + p.sub);
+      if (p.sup) out += (p.sup.length > 1 ? '^{' + p.sup + '}' : '^' + p.sup);
+    } else if (p.kind === 'num') out += p.s;
+    else {
+      const ch = p.s;
+      // Пробел внутри математики LaTeX игнорирует, поэтому «S + t» без явной
+      // отбивки склеилось бы в «S+t». Ставим тонкий пробел.
+      if (ch === ' ') out += '\\,';
+      else if (QTY_OPS[ch] !== undefined) out += QTY_OPS[ch];
+      else if (ch === '%') out += '\\%';
+      // Знак равенства отбивается с обеих сторон: «P_b = 60» читается, а
+      // «P_b=60» выглядит как машинный вывод.
+      else if (ch === '=') out += ' = ';
+      else out += ch;
+    }
+  });
+  // Двойная отбивка около знака равенства ни к чему.
+  return out.replace(/\\,\s*=\s*/g, ' = ').replace(/\s*=\s*\\,/g, ' = ').replace(/ {2,}/g, ' ');
+}

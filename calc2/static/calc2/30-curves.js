@@ -38,6 +38,28 @@ function curvePoints(curve) {
    нет в кадре — подписывать тогда нечего.
 
    Якорь: идём от правого края влево, берём первую точку внутри окна. */
+/* Пометить нарисованный путь формулой кривой (А49).
+
+   Выгрузка в LaTeX по этой пометке рисует кривую ФОРМУЛОЙ (\addplot{...}), а
+   не таблицей из шестидесяти точек. Раньше формулой уходили только кривые из
+   списка (D и S), а всё, что рисует сама сцена, — сдвинутая S + t, MR,
+   кривые издержек, — оцифровывалось точками, хотя выражение у них есть.
+
+   Это общий способ: любая сцена может подключиться одной строкой, ничего не
+   зная про экспорт. Кривые, у которых аналитического выражения нет вовсе
+   (изокванта, сумма КПВ по Минковскому, горизонтальная сумма заводов),
+   по-прежнему честно уходят точками. */
+function markExpr(sel, curveOrExpr, varName) {
+  const expr = (curveOrExpr && typeof curveOrExpr === 'object')
+    ? (curveOrExpr.texExpr || curveOrExpr.expr)
+    : curveOrExpr;
+  if (expr) {
+    sel.attr('data-expr', String(expr));
+    if (varName) sel.attr('data-expr-var', varName);
+  }
+  return sel;
+}
+
 function curveAnchor(f, fromFrac, toFrac) {
   const from = (fromFrac == null) ? 0.97 : fromFrac;
   const to   = (toFrac   == null) ? 0.04 : toFrac;

@@ -2109,16 +2109,31 @@
        aria-labelledby="export-title" inert>
     <div class="modal-card">
       <h2 class="modal-title" id="export-title">Сохранить график</h2>
-      <p class="modal-sub">Заголовок и подпись попадут в файл .tex. Картинка выйдет в том
-        масштабе, который сейчас на экране: файл собирается обычным pdfLaTeX.</p>
+      <p class="modal-sub">Заголовок попадёт в подпись под картинкой. Размер картинки
+        постоянный, 12 на 8 сантиметров: файл собирается обычным pdfLaTeX.</p>
 
       <div class="field">
-        <label for="exp-title">Заголовок</label>
-        <input type="text" id="exp-title" placeholder="Например: Рынок хлеба" autocomplete="off">
+        <label id="exp-title-lab">Заголовок</label>
+        <span id="exp-title-slot"></span>
+        <input type="hidden" id="exp-title">
       </div>
       <div class="field">
-        <label for="exp-label">Подпись для ссылки (label)</label>
-        <input type="text" id="exp-label" placeholder="Например: fig:bread" autocomplete="off">
+        <div class="hint-row">
+          <span class="hint-lead">Метка для перекрёстной ссылки</span>
+          <button class="hint-btn" type="button" data-pop="hp-exp-label" aria-label="Зачем метка">?</button>
+        </div>
+        <div class="hint-pop" id="hp-exp-label">
+          <p>Нужна только тем, кто вставляет график в большой документ: по
+            метке на картинку потом ссылаются из текста, и номер рисунка
+            проставляется сам. Для одиночной картинки поле можно не трогать.</p>
+        </div>
+        <span id="exp-label-slot"></span>
+        <input type="hidden" id="exp-label">
+      </div>
+
+      <div class="field">
+        <label>Что уйдёт в файл</label>
+        <div class="exp-preview" id="exp-preview" aria-live="polite"></div>
       </div>
 
       <div class="modal-opts">

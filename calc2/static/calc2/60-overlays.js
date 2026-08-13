@@ -547,36 +547,79 @@ function drawLegend() {
   const seen = currentAreas();
   if (!seen.length) return;
   const m = CONFIG.margin;
-  /* Н58: середина между прежними размерами. В П47 легенду увеличили вдвое (24
-     против 12), и на реальных сценах она заняла угол поля и стала спорить с
-     кривыми. Берём 16: подписи по-прежнему читаются с проектора, а места
-     занимают вдвое меньше. Ширину подложки считаем от РЕАЛЬНОГО кегля, иначе
-     текст вылезает за рамку.
-     Подложка не залезает на конец оси: это то же правило про отступ, что и
-     в П33, только здесь его соблюдает сама легенда. */
-  const SW = 16, GAP = 8, LH = 24, FS = 16;
+  /* А27 · А59. Легенда кричала громче графика: кегль 18.7 против 10 у делений
+     осей и 14 у подписей кривых, коробка 75×112 при поле 262×344 — девять
+     процентов площади, поверх линии S + t и поверх подписи координат.
+
+     Кегль — ступень «обычный», не крупнее подписей значений. Размер числом
+     здесь больше не пишется: раньше локальная переменная с именем FS ещё и
+     перекрывала общую шкалу кеглей.
+
+     Угол выбирается СВОБОДНЫЙ: считаем, сколько нарисованных кривых попадает
+     в коробку в каждом из четырёх углов, и садимся туда, где их меньше всего.
+     Подложка не залезает на конец оси — то же правило про отступ, что и в П33. */
+  const SW = 12, GAP = 6, LH = 18, PAD = 8;
+  const fsz = FS.base;
   const labels = seen.map(e => areaShort(e.key));
-  const wide = Math.max.apply(null, labels.map(s => s.length)) * FS * 0.62;
-  const boxW = SW + GAP + wide + 20;
-  const boxH = seen.length * LH + 16;
-  const x = (W - m.right) - boxW - 8;
-  const y = (H - m.bottom) - boxH - 26;
+  const wide = Math.max.apply(null, labels.map(s => s.length)) * fsz * 0.62;
+  const boxW = SW + GAP + wide + 2 * PAD;
+  const boxH = seen.length * LH + 2 * PAD;
+  const { x, y } = legendCorner(boxW, boxH);
   const g = svg.append('g').attr('class', 'legend').style('pointer-events', 'none');
   g.append('rect').attr('x', x).attr('y', y).attr('width', boxW).attr('height', boxH)
     .attr('rx', 6).attr('fill', COL.halo).attr('opacity', 0.82)
     .attr('stroke', COL.grid).attr('stroke-width', 1);
   seen.forEach((e, i) => {
-    const cy = y + 8 + i * LH;
+    const cy = y + PAD + i * LH;
     g.append('rect')
-      .attr('x', x + 10).attr('y', cy + 4).attr('width', SW).attr('height', SW)
-      .attr('rx', 4).attr('fill', e.color).attr('opacity', Math.max(0.35, e.opacity * 2))
+      .attr('x', x + PAD).attr('y', cy + 3).attr('width', SW).attr('height', SW)
+      .attr('rx', 3).attr('fill', e.color).attr('opacity', Math.max(0.35, e.opacity * 2))
       .attr('stroke', e.color).attr('stroke-opacity', 0.55).attr('stroke-width', 1);
     const t = g.append('text')
-      .attr('x', x + 10 + SW + GAP).attr('y', cy + SW * 0.82)
-      .attr('font-size', FS).attr('font-weight', 600).attr('fill', COL.ink)
+      .attr('x', x + PAD + SW + GAP).attr('y', cy + SW * 0.95)
+      .attr('font-size', fsz).attr('font-weight', 600).attr('fill', COL.ink)
       .text(labels[i]);
     t.append('title').text(e.key);
   });
+}
+
+/* Свободный угол под легенду (А59). Кривые уже нарисованы, поэтому просто
+   считаем, сколько их точек попадает в коробку в каждом из четырёх углов, и
+   садимся в самый пустой. При равенстве побеждает правый нижний — привычное
+   место, к которому глаз уже приучен. */
+function legendCorner(boxW, boxH) {
+  const m = CONFIG.margin, EDGE = 8;
+  const corners = [
+    { x: (W - m.right) - boxW - EDGE, y: (H - m.bottom) - boxH - 26 },  // правый нижний
+    { x: (W - m.right) - boxW - EDGE, y: m.top + EDGE },                // правый верхний
+    { x: m.left + EDGE,               y: m.top + EDGE },                // левый верхний
+    { x: m.left + EDGE,               y: (H - m.bottom) - boxH - 26 },  // левый нижний
+  ];
+  // Точки нарисованных кривых в пикселях холста, разреженно: для выбора угла
+  // этого хватает, обходить каждый узел каждой кривой незачем.
+  const pts = [];
+  const node = svg.node();
+  if (node) {
+    node.querySelectorAll('path').forEach(p => {
+      const cs = getComputedStyle(p);
+      if (!cs.stroke || cs.stroke === 'none' || parseFloat(cs.strokeWidth) < 1) return;
+      let len = 0;
+      try { len = p.getTotalLength(); } catch (err) { return; }
+      if (!(len > 0) || len > 1e5) return;
+      for (let i = 0; i <= 24; i++) {
+        try { const q = p.getPointAtLength(len * i / 24); pts.push([q.x, q.y]); } catch (err) { return; }
+      }
+    });
+  }
+  let best = corners[0], bestHits = Infinity;
+  corners.forEach(c => {
+    let hits = 0;
+    pts.forEach(([px, py]) => {
+      if (px >= c.x && px <= c.x + boxW && py >= c.y && py <= c.y + boxH) hits++;
+    });
+    if (hits < bestHits) { bestHits = hits; best = c; }
+  });
+  return best;
 }
 
 
@@ -2026,7 +2069,7 @@ function drawGraphTitle() {
   const at = titleAnchorPx();
   const el = svg.append('text').attr('class', 'graph-title')
     .attr('x', at.x).attr('y', at.y)
-    .attr('text-anchor', 'middle').attr('font-size', 15).attr('font-weight', 650)
+    .attr('text-anchor', 'middle').attr('font-size', FS.large).attr('font-weight', 650)
     .attr('fill', STATE.titleColor || COL.ink)
     /* Обводка цветом холста: если подпись всё же легла на кривую, она читается
        поверх неё, а не сливается (Н22). */
@@ -2328,7 +2371,7 @@ function drawMarks() {
     lines.forEach((s, i) => {
       const ty = py - 9 - (lines.length - 1 - i) * 13;
       const t = g.append('text').attr('x', px + 9).attr('y', ty)
-        .attr('font-size', 11.5).attr('font-weight', i === 0 ? 650 : 500).attr('fill', col)
+        .attr('font-size', FS.base).attr('font-weight', i === 0 ? 650 : 500).attr('fill', col)
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6)
         .text(s);
       // Первая строка — имя точки, его и правим двойным щелчком.

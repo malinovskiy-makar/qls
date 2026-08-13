@@ -43,9 +43,15 @@ function recompute() {
     //    получает в (1+τ) раз больше, чем платит покупатель ⇒ S_после = S/(1+τ).
     //    Вертикальный разрыв между S и S_после = τ·S(Q) — растёт вместе с Q.
     const factor = isSub ? 1 / (1 + tau) : (1 + tau);
+    // texExpr — запись той же кривой формулой, для выгрузки в LaTeX (А49).
+    // Отдельное поле, а не expr: движок кривых поле expr понимает по-своему,
+    // и подкладывать ему выражение в объект, у которого есть только fn, нельзя.
+    const sSrc = (STATE.S && STATE.S.expr) ? String(STATE.S.expr) : '';
     const sAfter = adv
-      ? { fn: q => { const s = evalCurve(STATE.S, q); return isNaN(s) ? NaN : s * factor; } }
-      : { fn: q => evalCurve(STATE.S, q) + shift };
+      ? { fn: q => { const s = evalCurve(STATE.S, q); return isNaN(s) ? NaN : s * factor; },
+          texExpr: sSrc ? '(' + sSrc + ') * ' + factor : '' }
+      : { fn: q => evalCurve(STATE.S, q) + shift,
+          texExpr: sSrc ? '(' + sSrc + ') + (' + shift + ')' : '' };
     const te = findEquilibrium(STATE.D, sAfter);
     if (te) {
       const Q1 = te.Q, Q0 = STATE.eq.Q;
@@ -58,9 +64,12 @@ function recompute() {
       STATE.taxAfterS = sAfter;                   // ту же функцию рисует drawShiftedSupply
       // Эквивалентная запись «налог платит покупатель» (для рисования): при потоварном —
       // D − t, при адвалорном — D/(1+τ). Объём и цены получаются те же самые.
+      const dSrc = (STATE.D && STATE.D.expr) ? String(STATE.D.expr) : '';
       STATE.taxAfterD = adv
-        ? { fn: q => { const d = evalCurve(STATE.D, q); return isNaN(d) ? NaN : d / factor; } }
-        : { fn: q => evalCurve(STATE.D, q) - STATE.tax };
+        ? { fn: q => { const d = evalCurve(STATE.D, q); return isNaN(d) ? NaN : d / factor; },
+            texExpr: dSrc ? '(' + dSrc + ') / ' + factor : '' }
+        : { fn: q => evalCurve(STATE.D, q) - STATE.tax,
+            texExpr: dSrc ? '(' + dSrc + ') - (' + STATE.tax + ')' : '' };
       STATE.taxEq = { Q: Q1, Pb, Ps };
       // Объём денег = площадь прямоугольника между ценами покупателя и продавца.
       // Для потоварного это в точности ставка·Q1, для адвалорного — τ·Ps·Q1 (налог).
@@ -413,7 +422,7 @@ function drawOpenLines() {
   if (STATE.showGhost && o.aut) {
     const [px, py] = toPx(o.aut.Q, o.aut.P);
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
-    g.append('text').attr('x', px + 7).attr('y', py - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+    g.append('text').attr('x', px + 7).attr('y', py - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Автаркия');
   }
   // Зона захвата мировой цены (перетаскивание линии Pw).
@@ -511,7 +520,7 @@ function drawEquilibrium() {
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
     .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   mathTspans(g.append('text').attr('x', px + 8).attr('y', py - 8)
-    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink), 'E*');
+    .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink), 'E*');
 }
 
 // Текст с белой обводкой (halo) — чтобы подписи равновесия читались над сеткой.
@@ -580,7 +589,7 @@ function haloText(g, x, y, txt, anchor, baseline) {
   const py = Math.max(9, Math.min(H - 4, y));
   const t = g.append('text').attr('x', px).attr('y', py)
     .attr('text-anchor', ax).attr('dominant-baseline', baseline)
-    .attr('font-size', 10).attr('font-weight', 600).attr('fill', COL.ink)
+    .attr('font-size', FS.small).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3);
   if (hasMathMarkup(txt)) mathTspans(t, txt); else t.text(txt);
   return t;
@@ -672,8 +681,9 @@ function drawShiftedSupply() {
     const v = evalCurve(after, q);
     pts.push(isNaN(v) ? null : [q, v]);
   }
-  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', base.color)
-    .attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  // Формулу объявляем экспорту: на бумагу кривая уйдёт формулой, а не таблицей.
+  markExpr(g.append('path').datum(pts).attr('fill', 'none').attr('stroke', base.color)
+    .attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line), after);
   // Ярлык сдвинутой кривой. Ищем видимый якорь (Фаза 3): при адвалорной ставке
   // кривая круто уходит вверх и на фиксированной точке ярлык раньше пропадал.
   const adv = (STATE.taxKind === 'advalorem');
@@ -941,7 +951,7 @@ function drawElasticityZones() {
   // Подписи зон у оси Q.
   const oy = sy(0);
   const elText = (q, txt, color) => g.append('text').attr('x', sx(q)).attr('y', oy - 8).attr('text-anchor', 'middle')
-    .attr('font-size', 10).attr('font-weight', 600).attr('fill', color).attr('opacity', 0.8)
+    .attr('font-size', FS.small).attr('font-weight', 600).attr('fill', color).attr('opacity', 0.8)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(txt);
   elText(e.unit.Q * 0.5, 'эластичный', COL.tax);
   elText((e.unit.Q + e.qDmax) / 2, 'неэластичный', COL.reg);
@@ -957,7 +967,7 @@ function drawElasticityPoint() {
     g.append('line').attr('x1', ux).attr('y1', uy).attr('x2', ux).attr('y2', oy)
       .attr('stroke', COL.MR).attr('stroke-width', 1).attr('stroke-dasharray', '3 3');
     g.append('circle').attr('cx', ux).attr('cy', uy).attr('r', 4).attr('fill', COL.MR).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', ux + 7).attr('y', uy - 7).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', COL.MR)
+    g.append('text').attr('x', ux + 7).attr('y', uy - 7).attr('font-size', FS.small).attr('font-weight', 600).attr('fill', COL.MR)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Ed|=1 · MR=0 · TR макс');
   }
   // Перетаскиваемая точка вдоль спроса.
@@ -967,7 +977,7 @@ function drawElasticityPoint() {
   dash(px, py, px, oy); dash(px, py, ox, py);
   haloText(g, px, oy + 8, 'Q=' + fmt(e.q), 'middle', 'hanging');
   haloText(g, ox - 8, py, 'P=' + fmt(e.p), 'end', 'middle');
-  g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink)
+  g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Ed|=' + fmt(e.absEd));
   const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
   attachElastDrag(hit);
@@ -991,7 +1001,7 @@ function drawElasticityPointS() {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
-  g.append('text').attr('x', px + 9).attr('y', py + 15).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.S)
+  g.append('text').attr('x', px + 9).attr('y', py + 15).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.S)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Es|=' + fmt(e.absEs));
   const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
   attachElastDragS(hit);
@@ -1060,7 +1070,7 @@ function shiftMark(g, pt, label, color) {
   g.append('line').attr('x1', px).attr('y1', py).attr('x2', ox).attr('y2', py)
     .attr('stroke', color).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', 0.55);
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', color)
+  g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
 }
 
@@ -1165,7 +1175,7 @@ function drawExtPoints(e) {
   const [pxm, pym] = toPx(e.Qmkt, e.Pmkt);
   dash(pxm, pym, pxm, oy); dash(pxm, pym, ox, pym);
   g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink)
+  g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Qрын');
   haloText(g, pxm, oy + 8, fmt(e.Qmkt), 'middle', 'hanging');
   // Общественный оптимум (Qопт, Pопт) — на пересечении D и MSC.
@@ -1173,7 +1183,7 @@ function drawExtPoints(e) {
     const [pxo, pyo] = toPx(e.Qopt, e.Popt);
     dash(pxo, pyo, pxo, oy, COL.tax); dash(pxo, pyo, ox, pyo, COL.tax);
     g.append('circle').attr('cx', pxo).attr('cy', pyo).attr('r', 4.5).attr('fill', COL.tax).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxo + 8).attr('y', pyo - 8).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.tax)
+    g.append('text').attr('x', pxo + 8).attr('y', pyo - 8).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.tax)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Qопт');
     haloText(g, pxo, oy + 8, fmt(e.Qopt), 'middle', 'hanging');
     // С налогом Пигу новое равновесие совпадает с Qопт — отмечаем кольцом.
@@ -1412,7 +1422,7 @@ function drawGhost() {
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
     .attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
   g.append('text').attr('x', px + 7).attr('y', py - 6)
-    .attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+    .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('E₀');
 }
 

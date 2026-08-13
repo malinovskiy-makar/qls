@@ -440,7 +440,10 @@ function latexToMath(tex) {
     if (name === 'begin') {
       const g = texGroup(s, j);
       const env = g ? g.body.trim() : '';
-      const endTag = '\end{' + env + '}';
+      // Слэш обязан быть удвоен: '\end{' разбирается как 'end{' (у \e нет
+      // значения в JS), поиск закрывающей команды промахивался на один символ,
+      // и в разобранное тело кусочной функции попадал лишний слэш.
+      const endTag = '\\end{' + env + '}';
       const close = s.indexOf(endTag, g ? g.end : j);
       const body = (close >= 0) ? s.slice(g.end, close) : s.slice(g ? g.end : j);
       i = (close >= 0) ? close + endTag.length : s.length;

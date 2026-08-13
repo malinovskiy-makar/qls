@@ -210,7 +210,7 @@ function drawInequalityDiagonal() {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   g.append('line').attr('x1', sx(0)).attr('y1', sy(0)).attr('x2', sx(100)).attr('y2', sy(100))
     .attr('stroke', COL.tax).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
-  g.append('text').attr('x', sx(80)).attr('y', sy(86)).attr('font-size', 11).attr('fill', COL.tax)
+  g.append('text').attr('x', sx(80)).attr('y', sy(86)).attr('font-size', FS.base).attr('fill', COL.tax)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Равенство');
 }
 
@@ -218,9 +218,9 @@ function drawInequalityDiagonal() {
 function drawInequalityCaptions() {
   const g = svg.append('g'), ox = sx(0), oy = sy(0), xMid = (sx(0) + sx(100)) / 2, yTop = sy(100);
   g.append('text').attr('x', xMid).attr('y', oy + 30).attr('text-anchor', 'middle')
-    .attr('font-size', 11).attr('fill', COL.inkSoft).text('Доля населения, %');
+    .attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Доля населения, %');
   g.append('text').attr('x', ox + 6).attr('y', yTop - 5).attr('text-anchor', 'start')
-    .attr('font-size', 11).attr('fill', COL.inkSoft).text('Доля дохода, %');
+    .attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Доля дохода, %');
 }
 
 // Заливки A (между диагональю и кривой) и B (под кривой) — смысл Джини.
@@ -230,8 +230,8 @@ function drawInequalityAreas(pts) {
   g.append('path').datum(pts).attr('d', bArea).attr('fill', COL.dwl).attr('opacity', 0.15);
   const aArea = d3.area().defined(d => !isNaN(d[1])).x(d => sx(d[0] * 100)).y0(d => sy(d[0] * 100)).y1(d => sy(d[1] * 100));
   g.append('path').datum(pts).attr('d', aArea).attr('fill', COL.D).attr('opacity', 0.12);
-  g.append('text').attr('x', sx(33)).attr('y', sy(52)).attr('font-size', 14).attr('font-weight', 600).attr('fill', COL.D).attr('opacity', 0.85).text('A');
-  g.append('text').attr('x', sx(66)).attr('y', sy(18)).attr('font-size', 14).attr('font-weight', 600).attr('fill', COL.dwl).attr('opacity', 0.85).text('B');
+  g.append('text').attr('x', sx(33)).attr('y', sy(52)).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.D).attr('opacity', 0.85).text('A');
+  g.append('text').attr('x', sx(66)).attr('y', sy(18)).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.dwl).attr('opacity', 0.85).text('B');
 }
 
 // Кривая Лоренца (доли 0..1 → проценты). dashed — для «было»/исходной.
@@ -253,7 +253,7 @@ function drawRobinHood() {
   g.append('circle').attr('cx', x).attr('cy', sy(L * 100)).attr('r', 3).attr('fill', COL.S);
   g.append('circle').attr('cx', x).attr('cy', sy(p * 100)).attr('r', 3).attr('fill', COL.S);
   const ymid = sy((L + p) / 2 * 100);
-  g.append('text').attr('x', x + 7).attr('y', ymid).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.S)
+  g.append('text').attr('x', x + 7).attr('y', ymid).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.S)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Робин Гуд ' + fmt(st.hoover));
 }
 
@@ -338,7 +338,7 @@ function drawRedistArrow(base, redist) {
     .attr('stroke', COL.tax).attr('stroke-width', 1.6);
   g.append('path').attr('d', `M${x - 4},${y1 + 6} L${x},${y1} L${x + 4},${y1 + 6}`)
     .attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 1.6);
-  g.append('text').attr('x', x + 8).attr('y', (y0 + y1) / 2).attr('font-size', 10.5).attr('font-weight', 600).attr('fill', COL.tax)
+  g.append('text').attr('x', x + 8).attr('y', (y0 + y1) / 2).attr('font-size', FS.small).attr('font-weight', 600).attr('fill', COL.tax)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('К равенству');
 }
 

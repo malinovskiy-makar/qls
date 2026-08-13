@@ -142,9 +142,9 @@ function drawPlaneAxes(g, mx, my, xlab, ylab) {
   if (seeX) planeTicksX(g, mx, oy);
   if (seeY) planeTicksY(g, my, ox);
   if (xlab && seeX) g.append('text').attr('x', px1 - 2).attr('y', oy - 7).attr('text-anchor', 'end')
-    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text(xlab || 'x');
+    .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text(xlab || 'x');
   if (ylab && seeY) g.append('text').attr('x', ox + 7).attr('y', py1 + 11)
-    .attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text(ylab || 'y');
+    .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text(ylab || 'y');
 }
 function planeTicksX(g, mx, oy) {
   axisTicks(mx, 10, STATE.xStep).forEach(t => {
@@ -153,7 +153,7 @@ function planeTicksX(g, mx, oy) {
       .attr('stroke', COL.ink).attr('stroke-width', 1);
     g.append('text').attr('x', mx(t)).attr('y', oy + 7)
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
-      .attr('font-size', 10).attr('fill', COL.inkSoft)
+      .attr('font-size', FS.small).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
   });
 }
@@ -164,7 +164,7 @@ function planeTicksY(g, my, ox) {
       .attr('stroke', COL.ink).attr('stroke-width', 1);
     g.append('text').attr('x', ox - 6).attr('y', my(t))
       .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
-      .attr('font-size', 10).attr('fill', COL.inkSoft)
+      .attr('font-size', FS.small).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
   });
 }
@@ -219,7 +219,7 @@ function mathDot(g, mx, my, x, y, color, label, dy, key) {
   // подписей, вниз по одной строке, пока место не освободится.
   ty = dodgeLabel(tx, ty, my(0), String(shown).length * 6 + 8);
   const t = g.append('text').attr('x', tx).attr('y', ty)
-    .attr('font-size', 11).attr('font-weight', 600).attr('fill', color)
+    .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6);
   if (hasMathMarkup(shown)) mathTspans(t, shown); else t.text(shown);
   if (!key) return;
@@ -374,9 +374,9 @@ function drawMathTangent(f) {
   // Подписи панелей крупнее и в цвет своей кривой: сразу видно, где сама
   // функция, а где производная.
   gUi.append('text').attr('x', m.left + 4).attr('y', L.top + 14)
-    .attr('font-size', 13.5).attr('font-weight', 700).attr('fill', COL.tanF).text('f(x), сама функция');
+    .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanF).text('f(x), сама функция');
   gUi.append('text').attr('x', m.left + 4).attr('y', L.botTop + 14)
-    .attr('font-size', 13.5).attr('font-weight', 700).attr('fill', COL.tanD).text("$f'(x)$, производная");
+    .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanD).text("$f'(x)$, производная");
 
   mathLine(gTop, f, s1.mx, s1.my, COL.tanF, 2.6);
   mathLine(gBot, dfun, s2.mx, s2.my, COL.tanD, 2.4);
@@ -396,11 +396,11 @@ function drawMathTangent(f) {
       .attr('fill', COL.reg).attr('opacity', 0.14)
       .attr('stroke', COL.reg).attr('stroke-width', 1.2).attr('stroke-dasharray', '4 3');
     gTop.append('text').attr('x', (s1.mx(xa) + s1.mx(xb)) / 2).attr('y', s1.my(ya) + 13)
-      .attr('text-anchor', 'middle').attr('font-size', 10.5).attr('fill', COL.reg)
+      .attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.reg)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.4)
       .text('Δx = ' + fmt(dx));
     gTop.append('text').attr('x', s1.mx(xb) + 6).attr('y', (s1.my(ya) + s1.my(yb)) / 2)
-      .attr('dominant-baseline', 'middle').attr('font-size', 10.5).attr('fill', COL.reg)
+      .attr('dominant-baseline', 'middle').attr('font-size', FS.small).attr('fill', COL.reg)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.4)
       .text('Δy = ' + fmt(k * dx));
   }
@@ -1020,21 +1020,29 @@ const r2 = (v) => (Math.round(v * 100) / 100);
    получается ровно то же, что на экране, сразу для любой сцены.
    Чистый TikZ без pgfplots: файл собирается обычным pdflatex.
    --------------------------------------------------------------------- */
-const TEX_WIDTH_CM = 16;      // ширина картинки на странице
+/* Размер картинки на странице — ОДНА величина на весь калькулятор (А45).
 
-/* Высота картинки в файле — не константа, а пропорция того, что на экране.
-   Раньше стояло width × 0.62 при любом холсте: диапазоны осей уходили верные,
-   а вот сколько сантиметров приходится на единицу по X и по Y — уже нет, и
-   бумага показывала не тот масштаб, который видел пользователь (Фаза 9). */
+   Было: ширина 16 см, а высота бралась из пропорций холста браузера и при
+   узком окне упиралась в верхний предел — выходило 16 × 22,4 см. На A4 с
+   полями 2 см текстовый блок 17 × 25,7 см, то есть картинка занимала 87
+   процентов высоты страницы. От той же пропорции считался и коэффициент
+   пересчёта подписей: деления осей выходили 25,9 пункта, легенда 41,4 — при
+   основном тексте статьи в 10–12.
+
+   Хуже того, размер картинки и кегли зависели от ШИРИНЫ ОКНА БРАУЗЕРА в
+   момент выгрузки: один и тот же график из разных окон давал разные файлы.
+
+   Теперь размер постоянный. Это то же правило, что и в вёрстке научных
+   работ: одна договорённость о размере на весь проект, чтобы все рисунки
+   выстраивались в ряд. Диапазоны осей приходят из шкал сцены и от окна
+   браузера не зависят, поэтому файл выходит одинаковым при любой ширине. */
+const TEX_WIDTH_CM = 12;      // ширина поля графика на странице
+const TEX_HEIGHT_CM = 8;      // высота поля графика на странице
+
 function texPlotSize() {
-  const m = CONFIG.margin;
-  const pw = Math.max(1, (W - m.right) - m.left);
-  const ph = Math.max(1, (H - m.bottom) - m.top);
-  // Слишком вытянутую картинку прижимаем к разумным пределам страницы.
-  const ratio = Math.max(0.28, Math.min(1.4, ph / pw));
-  return { w: TEX_WIDTH_CM, h: Math.round(TEX_WIDTH_CM * ratio * 10) / 10, ratio };
+  return { w: TEX_WIDTH_CM, h: TEX_HEIGHT_CM };
 }
-const TEX_MAX_SAMPLES = 420;  // точек на одну кривую при оцифровке
+const TEX_SAMPLES = 240;      // точек на одну кривую при оцифровке (постоянно)
 
 // Символы, которых нет в кириллических шрифтах pdflatex: уводим их в математику.
 // Применяется ПОСЛЕ texEscape, потому что подстановки содержат $ и обратный слэш.
@@ -1058,6 +1066,19 @@ function texText(s) {
   return out;
 }
 
+/* Подпись с холста → запись для .tex (А46).
+
+   Величина уходит математикой ($P_b = 60$), проза — обычным текстом. Решает
+   ОДНА функция на весь калькулятор (qtyIsQuantity), та же, что решает это на
+   экране, поэтому одна и та же величина не может быть написана на экране
+   одним способом, а в файле другим. */
+function quantityTex(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return '';
+  if (!qtyIsQuantity(s)) return texText(s);
+  return '$' + qtyLatex(s) + '$';
+}
+
 // Любой CSS-цвет → шесть шестнадцатеричных цифр. Браузер уже отдаёт
 // вычисленное значение, поэтому переменные темы разворачивать не нужно.
 function texHex(css) {
@@ -1079,7 +1100,9 @@ function texSamplePath(el) {
   let len = 0;
   try { len = el.getTotalLength(); } catch (e) { return []; }
   if (!(len > 0)) return [];
-  const n = Math.max(2, Math.min(TEX_MAX_SAMPLES, Math.ceil(len / 2)));
+  // Число точек ПОСТОЯННО, а не «по длине в пикселях»: иначе один и тот же
+  // график из окна пошире и поуже давал разные файлы (А45).
+  const n = TEX_SAMPLES;
   const m = el.getCTM();
   const pts = [];
   for (let i = 0; i <= n; i++) {
@@ -1096,6 +1119,46 @@ function texSamplePath(el) {
   }
   if (run.length > 1) runs.push(run);
   return runs;
+}
+
+/* Прореживание ломаной в КООРДИНАТАХ ДАННЫХ до постоянного числа точек.
+
+   Оцифровка холста идёт по длине дуги в пикселях, а она зависит от пропорций
+   окна браузера: та же кривая из широкого и узкого окна давала чуть разные
+   наборы точек. Здесь ломаная переразбивается по собственной длине в
+   координатах данных — величине, от окна не зависящей. Файл выходит
+   одинаковым при любой ширине. */
+function texResample(pts, want) {
+  if (!pts || pts.length <= 2) return pts || [];
+  const n = Math.min(want, pts.length);
+  // Накопленная длина по данным. Оси разного масштаба, поэтому нормируем
+  // каждую координату её размахом: иначе длинная ось съест короткую.
+  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+  pts.forEach(([x, y]) => {
+    if (x < xMin) xMin = x; if (x > xMax) xMax = x;
+    if (y < yMin) yMin = y; if (y > yMax) yMax = y;
+  });
+  const sx = (xMax - xMin) || 1, sy = (yMax - yMin) || 1;
+  const acc = [0];
+  for (let i = 1; i < pts.length; i++) {
+    const dx = (pts[i][0] - pts[i - 1][0]) / sx, dy = (pts[i][1] - pts[i - 1][1]) / sy;
+    acc.push(acc[i - 1] + Math.hypot(dx, dy));
+  }
+  const total = acc[acc.length - 1];
+  if (!(total > 0)) return [pts[0], pts[pts.length - 1]];
+  const out = [];
+  let j = 0;
+  for (let i = 0; i < n; i++) {
+    const target = total * i / (n - 1);
+    while (j < acc.length - 2 && acc[j + 1] < target) j++;
+    const span = acc[j + 1] - acc[j];
+    const t = span > 0 ? (target - acc[j]) / span : 0;
+    out.push([
+      pts[j][0] + (pts[j + 1][0] - pts[j][0]) * t,
+      pts[j][1] + (pts[j + 1][1] - pts[j][1]) * t,
+    ]);
+  }
+  return out;
 }
 
 /* ── Перевод выражения Math.js в язык pgfplots ────────────────────────
@@ -1184,16 +1247,42 @@ function buildTex(title, label) {
     if (defs.indexOf(line) < 0) defs.push(line);
     return key;
   };
-  const num = (v) => (Math.round(v * 10000) / 10000);
+  // Два знака после запятой: на картинке шириной 12 см это одна сотая доля
+  // процента ширины, глазу не видно вовсе, зато мелкая разница от округления
+  // пикселей перестаёт менять файл при другой ширине окна.
+  const num = (v) => (Math.round(v * 100) / 100);
   const pt = (x, y) => '(' + num(x) + ',' + num(y) + ')';
   const toData = (px, py) => [mx.invert(px), my.invert(py)];
 
   const body = [];
   const inView = (x, y) => x >= xLo - 1e-9 && x <= xHi + 1e-9 && y >= yLo - 1e-9 && y <= yHi + 1e-9;
-  // Подписи и маркеры на бумаге должны занимать ту же долю картинки, что на
-  // экране. Без пересчёта они выходят вдвое крупнее и налезают друг на друга.
-  const mrg = CONFIG.margin;
-  const ptPerPx = (texPlotSize().h * 28.4527) / Math.max(1, H - mrg.top - mrg.bottom);
+
+  /* Кегли на бумаге берутся из ОБЩЕЙ шкалы (FS → FS_PT), а не из пропорций
+     окна браузера: экранный размер сводится к своей ступени, ступень даёт
+     пункты. Пользовательский множитель подписей на бумагу не переносится —
+     иначе файл снова зависел бы от настройки экрана. */
+  const uiScale = (typeof labelScale === 'function') ? labelScale() : 1;
+  const texPt = (el, cs) => {
+    const px = parseFloat(cs.fontSize) || FS.base;
+    // Отметки осей общий множитель не трогает, поэтому и делить их не на что.
+    const k = el.classList && el.classList.contains('axis-num') ? 1 : uiScale;
+    return FS_PT[fsStep(px, k)];
+  };
+  // Маркеры: постоянный перевод пикселей холста в пункты страницы. Точка
+  // радиусом 4 px выходит примерно в 2 пункта — читается и не спорит с кривой.
+  const markPt = (r) => Math.min(3, Math.max(1, (r || 4) * 0.55));
+
+  /* Видно ли это человеку (А47). Раньше отбор шёл только по координатам
+     (inView), поэтому в файл попадали подписи координат ключевых точек, у
+     которых галочка «Координаты» выключена, а видимая подпись Q₁=40 в файл не
+     попадала вовсе. Спрашиваем у браузера: есть ли у элемента размер на
+     экране. Скрытый родитель, display:none и нулевая прозрачность отсекаются
+     сами. */
+  const onScreen = (el) => {
+    if (typeof el.getBoundingClientRect !== 'function') return true;
+    const r = el.getBoundingClientRect();
+    return r.width > 0.5 && r.height > 0.5;
+  };
 
   // 1) Кривые, у которых есть формула, — одной строкой каждая.
   const drawnByFormula = new Set();
@@ -1226,7 +1315,7 @@ function buildTex(title, label) {
 
       if (el.getAttribute('data-skip-export')) continue;
       const cs = getComputedStyle(el);
-      if (cs.display === 'none' || parseFloat(cs.opacity) === 0) continue;
+      if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) continue;
       // Полностью прозрачный цвет — это служебная фигура (дорожка для мыши,
       // подложка под подсказку). На бумаге её быть не должно.
       const solid = (c) => { const m = /rgba?\([^)]*?,\s*([\d.]+)\s*\)$/.exec(String(c || '')); return !m || parseFloat(m[1]) > 0.01; };
@@ -1236,12 +1325,28 @@ function buildTex(title, label) {
       if (tag === 'path') {
         const cid = el.getAttribute('data-curve');
         if (cid && drawnByFormula.has(+cid)) continue;          // уже нарисована формулой
-        const runs = texSamplePath(el).map(r => {
-          // Плотность режем: на бумаге двадцати точек на кривую достаточно,
-          // а файл становится читаемым.
-          const step = Math.max(1, Math.ceil(r.length / 60));
-          return r.filter((p, i) => i % step === 0 || i === r.length - 1).map(p => toData(p[0], p[1]));
-        });
+        /* А49. Кривая сцены, объявившая свою формулу, уходит формулой, а не
+           таблицей из шестидесяти точек. Так на бумагу попадает настоящая
+           линия: она гладкая, файл читаемый, и правку в редакторе видно.
+           Помечает путь сама сцена (markExpr при отрисовке) — общий способ,
+           к которому может подключиться любой сюжет. */
+        const declared = el.getAttribute('data-expr');
+        if (declared && hasStroke) {
+          const pgf = mathToPgf(declared, el.getAttribute('data-expr-var') || 'Q');
+          if (pgf) {
+            const opts = pgfStroke(el, cs, colorName);
+            body.push('\\addplot[' + opts.join(', ') + ', domain=' + num(Math.max(0, xLo)) + ':' + num(xHi) +
+                      ', samples=120, restrict y to domain=' + num(Math.max(0, yLo)) + ':' + num(yHi) +
+                      ', forget plot] {' + pgf + '};');
+            continue;
+          }
+        }
+        // Оцифровка идёт по пикселям, поэтому сначала переводим в координаты
+        // данных, а прореживаем уже ТАМ (texResample): иначе один и тот же
+        // график из окна пошире и поуже давал слегка разные наборы точек и,
+        // значит, разные файлы (А45).
+        const runs = texSamplePath(el)
+          .map(r => texResample(r.map(p => toData(p[0], p[1])), 60));
         if (hasFill) {
           runs.forEach(r => {
             if (r.length < 3) return;
@@ -1278,12 +1383,17 @@ function buildTex(title, label) {
         if (!inView(c[0], c[1])) continue;
         const col = colorName(hasFill ? cs.fill : cs.stroke);
         body.push('\\addplot[' + col + ', only marks, mark size=' +
-          Math.max(0.6, (+el.getAttribute('r') || 4) * ptPerPx).toFixed(1) + 'pt, forget plot] coordinates {' + pt(c[0], c[1]) + '};');
+          markPt(+el.getAttribute('r')).toFixed(1) + 'pt, forget plot] coordinates {' + pt(c[0], c[1]) + '};');
       } else if (tag === 'text') {
         const raw = Array.prototype.filter.call(el.childNodes, n => n.nodeType === 3)
           .map(n => n.nodeValue).join('');
-        const txt = texText(raw);
+        // А46. Величина набирается формулой: Pb=60 уходит как $P_b = 60$, а не
+        // обычным текстом. Логика перевода ОДНА на экран, бумагу и панель
+        // (quantityTex), поэтому одна и та же величина не может быть написана
+        // на экране одним способом, а в файле другим.
+        const txt = quantityTex(raw);
         if (!txt.trim()) continue;
+        if (!onScreen(el)) continue;                  // А47: только то, что видно
         const c = toData(+el.getAttribute('x') || 0, +el.getAttribute('y') || 0);
         if (!inView(c[0], c[1])) continue;
         const ha = { start: 'west', middle: '', end: 'east' }[cs.textAnchor] ?? '';
@@ -1291,9 +1401,9 @@ function buildTex(title, label) {
         const va = (bl === 'hanging' || bl === 'text-before-edge') ? 'north'
                  : (bl === 'middle' || bl === 'central') ? '' : 'base';
         const anchor = (va + (va && ha ? ' ' : '') + ha).trim() || 'base';
-        const fs = Math.max(4, (parseFloat(cs.fontSize) || 11) * ptPerPx);
+        const fs = texPt(el, cs);
         const opt = ['anchor=' + anchor, 'text=' + colorName(cs.fill),
-                     'font=\\fontsize{' + fs.toFixed(1) + '}{' + (fs * 1.15).toFixed(1) + '}\\selectfont',
+                     'font=\\fontsize{' + fs + '}{' + (fs * 1.15).toFixed(1) + '}\\selectfont',
                      'inner sep=1pt'];
         body.push('\\node[' + opt.join(', ') + '] at (axis cs:' + num(c[0]) + ',' + num(c[1]) + ') {' + txt + '};');
       }
@@ -1379,6 +1489,59 @@ function exportPDF() {
     .finally(() => { if (btn) { btn.disabled = false; btn.textContent = 'Скачать PDF'; } });
 }
 
+/* Поля окна экспорта правятся НА МЕСТЕ, как и всё остальное в калькуляторе
+   (А50): щелчок по значению открывает правку прямо там, без окошка внутри
+   окошка. Скрытые input сохранены как хранилище значения, чтобы весь
+   остальной код (exportTex, exportPDF) читал их прежним способом. */
+function buildExportFields() {
+  [['exp-title', 'exp-title-slot', 'Например: Рынок хлеба'],
+   ['exp-label', 'exp-label-slot', 'Например: fig:bread']].forEach(([id, slotId, hint]) => {
+    const slot = document.getElementById(slotId), inp = document.getElementById(id);
+    if (!slot || !inp || slot.dataset.ready) return;
+    slot.dataset.ready = '1';
+    slot.appendChild(makeEditableValue({
+      kind: 'text',
+      get: () => inp.value || '',
+      set: (v) => { inp.value = String(v == null ? '' : v).trim(); refreshExportPreview(); },
+      fmt: (v) => (String(v || '').trim() || hint),
+      title: 'Щёлкните, чтобы изменить',
+    }));
+  });
+}
+
+/* Предпросмотр: что именно уйдёт в файл. Раньше человек жал «Скачать» вслепую. */
+function refreshExportPreview() {
+  const box = document.getElementById('exp-preview');
+  if (!box) return;
+  let tex = '';
+  try { tex = buildTex(expValue('exp-title'), expValue('exp-label')); } catch (e) { tex = ''; }
+  if (!tex) { box.textContent = 'Пока нечего выгружать: на графике ничего не построено.'; return; }
+  const size = /width=([\d.]+)cm, height=([\d.]+)cm/.exec(tex);
+  const formulas = (tex.match(/\\addplot\[[^\]]*\] *\{/g) || []).length;
+  const tables = (tex.match(/\\addplot\[[^\]]*\] *coordinates/g) || []).length;
+  const fills = (tex.match(/\\fill\[/g) || []).length;
+  const labels = (tex.match(/\\node\[/g) || []).length;
+  const cap = expValue('exp-title');
+  const rows = [
+    ['Картинка', size ? size[1] + ' на ' + size[2] + ' см' : 'по умолчанию'],
+    ['Кривых формулой', String(formulas)],
+    ['Кривых точками', String(tables)],
+    ['Закрашенных областей', String(fills)],
+    ['Подписей', String(labels)],
+    ['Подпись под картинкой', cap || 'без подписи'],
+  ];
+  box.innerHTML = '';
+  rows.forEach(([k, v]) => {
+    const r = document.createElement('div');
+    r.className = 'exp-prow';
+    const a = document.createElement('span'); a.className = 'exp-pk'; a.textContent = k;
+    const b = document.createElement('span'); b.className = 'exp-pv'; b.textContent = v;
+    r.appendChild(a); r.appendChild(b); box.appendChild(r);
+  });
+}
+
+function expValue(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+
 function openExport() {
   const m = document.getElementById('export-modal');
   if (!m) return;
@@ -1386,7 +1549,15 @@ function openExport() {
   if (t && !t.value) t.value = STATE.graphTitle || SCENE_NAMES[STATE.sceneKey] || '';
   m.classList.add('open');
   m.removeAttribute('inert');
-  if (t) t.focus();
+  buildExportFields();
+  const slot = document.getElementById('exp-title-slot');
+  const ed = slot && slot.querySelector('.edval');
+  if (ed && ed._repaint) ed._repaint();
+  const slot2 = document.getElementById('exp-label-slot');
+  const ed2 = slot2 && slot2.querySelector('.edval');
+  if (ed2 && ed2._repaint) ed2._repaint();
+  refreshExportPreview();
+  if (ed) ed.focus();
 }
 function closeExport() {
   const m = document.getElementById('export-modal');

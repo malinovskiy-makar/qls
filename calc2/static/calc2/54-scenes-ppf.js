@@ -305,7 +305,7 @@ function drawPpfCurve() {
       const lx = xm * 0.28, ly = evalPpf(lx) * 0.4;
       if (isFinite(ly) && ly > 0) {
         g.append('text').attr('x', sx(lx)).attr('y', sy(ly))
-          .attr('font-size', 11).attr('fill', c1).attr('opacity', 0.75).text('Достижимо');
+          .attr('font-size', FS.base).attr('fill', c1).attr('opacity', 0.75).text('Достижимо');
       }
     }
   }
@@ -1101,7 +1101,7 @@ function ppfSumSchemaData() {
 function schemaNote(text) {
   const m = CONFIG.margin;
   svg.append('text').attr('x', W - m.right - 4).attr('y', m.top + 2).attr('text-anchor', 'end').attr('dominant-baseline', 'hanging')
-    .attr('font-size', 11).attr('fill', COL.inkSoft).attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(text);
+    .attr('font-size', FS.base).attr('fill', COL.inkSoft).attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(text);
 }
 
 // Отрисовка схемы (НЕ в масштабе): причёсанные высоты, без числовых осей, настоящие подписи.
@@ -1126,8 +1126,8 @@ function drawPpfSumSchema() {
     .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
   ga.append('line').attr('x1', originX).attr('y1', baseY).attr('x2', originX).attr('y2', m.top)
     .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
-  ga.append('text').attr('x', W - m.right + 6).attr('y', baseY + 4).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('X');
-  ga.append('text').attr('x', originX - 4).attr('y', m.top - 8).attr('text-anchor', 'end').attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text('Y');
+  ga.append('text').attr('x', W - m.right + 6).attr('y', baseY + 4).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('X');
+  ga.append('text').attr('x', originX - 4).attr('y', m.top - 8).attr('text-anchor', 'end').attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('Y');
 
   // Путь кривой по участкам: «прямая» — отрезок, «дуга» — квадратичная Безье (выгиб наружу).
   let dPath = `M ${PX[0][0]} ${PX[0][1]}`;
@@ -1150,7 +1150,7 @@ function drawPpfSumSchema() {
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     if (pt.kind === 'start') haloText(g, px - 8, py, fmtRu(pt.y), 'end', 'middle');          // Y-перехват у оси Y
     else if (pt.kind === 'end') haloText(g, px, baseY + 8, fmtRu(pt.x), 'middle', 'hanging'); // Xmax у оси X
-    else g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', 12).attr('font-weight', 600).attr('fill', COL.ink)
+    else g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(`(${fmtRu(pt.x)}; ${fmtRu(pt.y)})`);
   });
   schemaNote('Схема · не в масштабе');
@@ -1257,7 +1257,7 @@ function drawPpfTrade(d) {
 function drawPpfTradeMarks(d) {
   const ox = sx(0), oy = sy(0), g = svg.append('g');
   if (d.line) {
-    g.append('text').attr('x', sx(d.xint * 0.5)).attr('y', sy(d.line.intercept * 0.5) - 6).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.S)
+    g.append('text').attr('x', sx(d.xint * 0.5)).attr('y', sy(d.line.intercept * 0.5) - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.S)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('КТВ');
   }
   if (d.xp != null) {
@@ -1558,7 +1558,7 @@ function drawTradeB(d) {
     // Заголовок панели рисуем ВНЕ обрезки: она начинается у верхней границы
     // поля, и текст над ней срезался бы вместе с воздухом.
     svg.append('text').attr('x', (p.x0 + p.x1) / 2).attr('y', p.yTop - 6)
-      .attr('text-anchor', 'middle').attr('font-size', 12.5).attr('font-weight', 700)
+      .attr('text-anchor', 'middle').attr('font-size', FS.base).attr('font-weight', 700)
       .attr('fill', co.color).text(tbName(co.idx));
 
     // КПВ и КТВ обе сплошные (Фаза 15.4): пунктир читался как «ненастоящая».

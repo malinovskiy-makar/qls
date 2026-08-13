@@ -208,7 +208,7 @@ function drawMacroCurve(c, color, dash, label) {
     g.append('line').attr('x1', sx(c.atQ)).attr('y1', sy(0)).attr('x2', sx(c.atQ)).attr('y2', sy(CONFIG.Pmax))
       .attr('stroke', color).attr('stroke-width', 2.8);
     if (label) g.append('text').attr('x', sx(c.atQ) + 6).attr('y', sy(CONFIG.Pmax * 0.94))
-      .attr('font-size', 11.5).attr('font-weight', 600).attr('fill', color)
+      .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
     return;
   }
@@ -220,7 +220,7 @@ function drawMacroCurve(c, color, dash, label) {
     for (const t of [0.86, 0.7, 0.5, 0.3, 0.14]) {
       const q = CONFIG.Qmax * t, v = evalCurve(c, q);
       if (!isNaN(v) && v > CONFIG.Pmax * 0.04 && v < CONFIG.Pmax * 0.95) {
-        g.append('text').attr('x', sx(q)).attr('y', sy(v) - 6).attr('font-size', 11.5).attr('font-weight', 600).attr('fill', color)
+        g.append('text').attr('x', sx(q)).attr('y', sy(v) - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
           .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
         break;
       }
@@ -255,7 +255,7 @@ function redrawMacro() {
     og.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 2);
     haloText(og, px, oy + 8, 't=' + fmt(r.best.t), 'middle', 'hanging');
     haloText(og, ox - 8, py, fmt(r.best.rev), 'end', 'middle');
-    og.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', 12).attr('font-weight', 700).attr('fill', COL.ink)
+    og.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', FS.base).attr('font-weight', 700).attr('fill', COL.ink)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Максимум');
     updateMacroPanel();
     return;
@@ -291,7 +291,7 @@ function redrawMacro() {
   if (r.base && STATE.showGhost && Math.abs(r.base.Q - r.eq.Q) > 1e-6) {
     const g = svg.append('g'), [bx, by] = toPx(r.base.Q, r.base.P);
     g.append('circle').attr('cx', bx).attr('cy', by).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
-    g.append('text').attr('x', bx + 7).attr('y', by + 14).attr('font-size', 11).attr('font-weight', 600).attr('fill', COL.inkSoft)
+    g.append('text').attr('x', bx + 7).attr('y', by + 14).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Было');
   }
   if (r.eq) drawEquilibriumAt(r.eq.Q, r.eq.P, (r.kind === 'phillips') ? 'u*' : 'E');
@@ -307,7 +307,7 @@ function drawEquilibriumAt(Q, P, label) {
   haloText(g, px, oy + 8, fmt(Q), 'middle', 'hanging');
   haloText(g, ox - 8, py, fmt(P), 'end', 'middle');
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  if (label) g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', 13).attr('font-weight', 600).attr('fill', COL.ink).text(label);
+  if (label) g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text(label);
 }
 
 function updateMacroPanel() {

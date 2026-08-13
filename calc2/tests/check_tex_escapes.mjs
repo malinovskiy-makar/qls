@@ -19,6 +19,7 @@ const DIR = join(HERE, '..', 'static', 'calc2');
 
 const bad = [];
 let scanned = 0;
+let scannedLiterals = 0;
 
 for (const file of readdirSync(DIR).filter(f => f.endsWith('.js')).sort()) {
   const lines = readFileSync(join(DIR, file), 'utf8').split('\n');
@@ -32,21 +33,40 @@ for (const file of readdirSync(DIR).filter(f => f.endsWith('.js')).sort()) {
     if (opens > closes) inBlock = true;
     else if (closes > opens) inBlock = false;
     if (wasBlock || opens > 0) return;
-    const code = line.replace(/\/\/.*$/, '');
-    if (!code.includes('$')) return;
-    scanned++;
+    /* Возврат каретки убираем ПЕРЕД срезом комментария. В регулярном
+       выражении точка не совпадает с \r, поэтому на файле с CRLF «.*$» не
+       доходило до конца строки и строчные комментарии не срезались вовсе:
+       проверка молча читала человеческий текст как код. */
+    const code = line.replace(/\r/g, '').replace(/\/\/.*$/, '');
     /* В ИСХОДНИКЕ правильная запись выглядит как «\\pi»: два символа слэша
        подряд. Одиночный слэш перед буквой внутри долларов означает, что при
        разборе строки он будет съеден. */
-    const spans = code.match(/\$[^$]{0,200}\$/g) || [];
-    for (const span of spans) {
-      const m = span.match(/(^|[^\\])\\[a-zA-Z]/);
-      if (m) bad.push(`${file}:${i + 1}  ${span.trim().slice(0, 70)}`);
+    if (code.includes('$')) {
+      scanned++;
+      const spans = code.match(/\$[^$]{0,200}\$/g) || [];
+      for (const span of spans) {
+        const m = span.match(/(^|[^\\])\\[a-zA-Z]/);
+        if (m) bad.push(`${file}:${i + 1}  ${span.trim().slice(0, 70)}`);
+      }
+    }
+    /* Команда LaTeX встречается и БЕЗ долларов вокруг: словари подстановок,
+       куски преамбулы, тонкие пробелы. Именно так класс и вернулся: словарь
+       греческих букв приехал в файл как «'\alpha'», то есть просто «alpha»,
+       а «'\,'» — как запятая. Ловим одиночный слэш в любом строковом литерале
+       перед буквой или перед запятой (тонкий пробел). */
+    const literals = code.match(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g) || [];
+    for (const lit of literals) {
+      scannedLiterals++;
+      // Внутри литерала правильный слэш записан парой. Ищем нечётную серию.
+      const m = lit.match(/(^|[^\\])\\(?:[a-zA-Z]{2,}|,)/);
+      if (!m) continue;
+      // Известные однобуквенные escape-последовательности JS — не ошибка.
+      bad.push(`${file}:${i + 1}  ${lit.trim().slice(0, 70)}`);
     }
   });
 }
 
-console.log('Проверено строк с долларами: ' + scanned);
+console.log('Проверено строк с долларами: ' + scanned + ', строковых литералов: ' + scannedLiterals);
 if (bad.length) {
   console.log('\nОдиночный слэш LaTeX внутри строки JS (будет съеден): ' + bad.length);
   bad.forEach(b => console.log('  ' + b));
