@@ -494,6 +494,22 @@ function upgradeFormulaField(inp) {
   if (!inp || inp._mfDone) return;
   inp._mfDone = true;
   _mfWaiting.push(inp);
+  /* Запасной путь: как только к полю прикоснулись, собираем его немедленно и
+     не полагаясь на учёт видимости. Ленивая сборка экономит четыре десятка
+     тяжёлых компонентов, но она не должна оставлять человека с обычным
+     текстовым окошком, если геометрию секции мы посчитали неверно. */
+  const wake = () => {
+    inp.removeEventListener('pointerdown', wake);
+    inp.removeEventListener('focus', wake);
+    const i = _mfWaiting.indexOf(inp);
+    if (i >= 0) _mfWaiting.splice(i, 1);
+    if (!inp._mf && MATHLIVE_READY) {
+      try { buildMathfield(inp); if (inp._mf) inp._mf.focus(); }
+      catch (e) { console.warn('Поле формулы:', e); }
+    }
+  };
+  inp.addEventListener('pointerdown', wake);
+  inp.addEventListener('focus', wake);
   flushMathfields();
 }
 
@@ -510,6 +526,16 @@ function fieldOnScreen(inp) {
   if (!slot.offsetParent && getComputedStyle(slot).position !== 'fixed') return false;
   const r = slot.getBoundingClientRect();
   return r.width > 0 && r.height > 0;
+}
+
+/* Разобрать очередь на СЛЕДУЮЩЕМ кадре. Панель или секцию только что
+   раскрыли, но раскладка ещё не пересчитана: поле в этот момент числится
+   невидимым и остаётся в очереди до следующей перерисовки. */
+let _flushQueued = false;
+function flushMathfieldsSoon() {
+  if (_flushQueued) return;
+  _flushQueued = true;
+  requestAnimationFrame(() => { _flushQueued = false; flushMathfields(); });
 }
 
 function flushMathfields() {
@@ -1286,4 +1312,158 @@ function segToToggle(segId, leftId, rightId, leftText, rightText) {
   const sync = () => tgl._set(r.classList.contains('active'));
   new MutationObserver(sync).observe(l, { attributes: true, attributeFilter: ['class'] });
   new MutationObserver(sync).observe(r, { attributes: true, attributeFilter: ['class'] });
+}
+
+/* ── Свой раскрывающийся список вместо нативного select (А64 · А32) ────────
+
+   Нативный select не переносит текст: он просто РЕЖЕТ его. Замерено шрифтом,
+   которым он рисуется: «Что добавляем» имел 179 px при нужных 208, выбор
+   кривой в площадях — 128 при нужных 134. Отсюда и «Выберите криву» без
+   последней буквы.
+
+   Кроме того, серая системная коробочка выглядела чужеродно рядом с полями,
+   где значение правится прямо в тексте.
+
+   Переделываем ПОВЕРХ существующего select: он остаётся в разметке и остаётся
+   источником правды, поэтому все прежние обработчики (change) продолжают
+   работать, а сцены ничего не знают о подмене. Меню уезжает в body с
+   position:fixed — панель прокручивается и обрезала бы его. */
+const OPEN_SELECTS = new Set();
+
+function closeAllSelectMenus(except) {
+  OPEN_SELECTS.forEach(m => { if (m !== except) m._close(); });
+}
+
+function upgradeSelect(id, title) {
+  const sel = document.getElementById(id);
+  if (!sel || sel._upgraded) return;
+  sel._upgraded = true;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'sel-btn';
+  btn.setAttribute('aria-haspopup', 'listbox');
+  btn.setAttribute('aria-expanded', 'false');
+  if (title) btn.title = title;
+
+  const text = document.createElement('span');
+  text.className = 'sel-text';
+  const caret = document.createElement('span');
+  caret.className = 'sel-caret';
+  caret.textContent = '⌄';
+  btn.append(text, caret);
+
+  const paint = () => {
+    const o = sel.options[sel.selectedIndex];
+    text.textContent = o ? o.textContent.trim() : '';
+    btn.classList.toggle('sel-empty', !!(o && o.value === ''));
+  };
+  paint();
+  sel.classList.add('sel-native-hidden');
+  sel.parentNode.insertBefore(btn, sel);
+  sel._paint = paint;
+  // Сцена может переставить значение сама — держим кнопку в согласии со списком.
+  sel.addEventListener('change', paint);
+
+  let menu = null;
+  const close = () => {
+    if (!menu) return;
+    menu.remove(); menu = null;
+    OPEN_SELECTS.delete(api);
+    btn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', onOutside, true);
+    window.removeEventListener('resize', close);
+    window.removeEventListener('scroll', close, true);
+  };
+  const api = { _close: close };
+
+  function onOutside(e) { if (!menu || (!menu.contains(e.target) && e.target !== btn)) close(); }
+
+  const open = () => {
+    if (menu) { close(); return; }
+    closeAllSelectMenus(api);
+    menu = document.createElement('div');
+    menu.className = 'sel-menu';
+    menu.setAttribute('role', 'listbox');
+    Array.prototype.forEach.call(sel.options, (o, i) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'sel-item' + (i === sel.selectedIndex ? ' active' : '');
+      item.setAttribute('role', 'option');
+      item.textContent = o.textContent.trim();
+      item.addEventListener('click', () => {
+        sel.value = o.value;
+        paint();
+        close();
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      menu.appendChild(item);
+    });
+    document.body.appendChild(menu);
+    const r = btn.getBoundingClientRect();
+    // Ширина не меньше кнопки: вариант должен помещаться целиком.
+    menu.style.minWidth = Math.max(r.width, 180) + 'px';
+    menu.style.left = Math.max(6, Math.min(window.innerWidth - menu.offsetWidth - 6, r.left)) + 'px';
+    const below = window.innerHeight - r.bottom;
+    if (below > menu.offsetHeight + 8 || below > r.top) menu.style.top = (r.bottom + 4) + 'px';
+    else menu.style.top = Math.max(6, r.top - menu.offsetHeight - 4) + 'px';
+    OPEN_SELECTS.add(api);
+    btn.setAttribute('aria-expanded', 'true');
+    document.addEventListener('pointerdown', onOutside, true);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+  };
+
+  btn.addEventListener('click', open);
+  btn.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { close(); return; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const n = sel.options.length;
+      if (!n) return;
+      sel.selectedIndex = (sel.selectedIndex + (e.key === 'ArrowDown' ? 1 : n - 1)) % n;
+      paint();
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+}
+
+/* Обычное текстовое поле → правка на месте (А6 · А66).
+
+   Формулы уже набираются своим полем, а имена (кривой, страны, функции) до сих
+   пор жили в серых прямоугольных окошках — в одном блоке оказывалось два
+   разных способа ввода. Переделываем ПОВЕРХ поля: сам input остаётся в
+   разметке и остаётся источником правды, поэтому все прежние обработчики
+   («input», «change») продолжают работать. */
+function upgradeTextField(inp, placeholder) {
+  if (!inp || inp._textUp) return;
+  inp._textUp = true;
+  const hint = placeholder || inp.placeholder || 'без имени';
+  const val = makeEditableValue({
+    kind: 'text',
+    get: () => inp.value || '',
+    set: (v) => {
+      inp.value = String(v == null ? '' : v);
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
+    },
+    fmt: (v) => (String(v || '').trim() || hint),
+    title: inp.title || 'Щёлкните, чтобы изменить',
+  });
+  val.classList.add('edval-text');
+  inp.classList.add('text-up-hidden');
+  inp.parentNode.insertBefore(val, inp);
+  inp._editable = val;
+  return val;
+}
+
+// Оснастить все обычные текстовые поля внутри контейнера (кроме полей формул).
+function upgradeTextFieldsIn(root) {
+  const box = (typeof root === 'string') ? document.getElementById(root) : root;
+  if (!box) return;
+  box.querySelectorAll('input[type="text"]').forEach(inp => {
+    if (inp._equipped || inp._mfDone) return;      // это поле формулы, у него свой вид
+    if (inp.classList.contains('curve-expr-inp')) return;
+    upgradeTextField(inp);
+  });
 }

@@ -19,9 +19,15 @@ function redrawAll() {
   // а не только в рыночном пересчёте: иначе в сцене, куда пришли из монополии,
   // до первого пересчёта висел бы чужой заголовок.
   if (typeof updateEqSectionTitle === 'function') updateEqSectionTitle();
-  // Поля формул собираются лениво (А56): те, что стали видны после смены
-  // сцены или раскрытия секции, разбираются здесь.
-  if (typeof flushMathfields === 'function') flushMathfields();
+  /* Поля формул собираются лениво (А56): те, что стали видны после смены
+     сцены или раскрытия секции, разбираются здесь — на СЛЕДУЮЩЕМ кадре, когда
+     раскладка уже пересчитана. Синхронный вызов видел нулевые размеры у
+     только что показанной секции и оставлял поле в очереди. */
+  if (typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
+  // А6: обычных текстовых окошек в панели не остаётся — имена правятся на
+  // месте тем же способом, что и числа. Строки сцен собираются на лету,
+  // поэтому проходим по панели после каждой перерисовки.
+  if (typeof upgradeTextFieldsIn === 'function') upgradeTextFieldsIn('tools-panel');
   // Последним: карточка блока прячет переключатели соседних моделей. Идёт после
   // обычной логики видимости, иначе та вернула бы их на место.
   applyCardScope();
@@ -213,6 +219,10 @@ function renderGraphRows() {
   box.innerHTML = '';
   STATE.curves.forEach(c => box.appendChild(buildGraphRow(c)));
   box.appendChild(buildGraphRow(null));
+  /* Поля формул собираются лениво и только когда видны (А56), а строки мы
+     вставили в разметку только что: разбираем очередь здесь, иначе поле
+     остаётся обычным текстовым окошком до следующей перерисовки. */
+  if (typeof flushMathfields === 'function') flushMathfields();
 }
 
 function graphError(msg) {
@@ -1318,7 +1328,12 @@ function syncAreaRangeLabel() {
   const r = areaCurveRange();
   el.innerHTML = '';
   if (!r) {
-    el.textContent = areaTargets().length ? 'Выберите кривую' : 'Сначала постройте кривую';
+    /* А65. Пока кривая не выбрана, здесь не показывается ничего. Раньше стоял
+       тот же текст, что и в самом списке слева («Выберите кривую»), причём в
+       поле шириной 43 пикселя — он переносился в две строки и выглядел как
+       вторая, сбившаяся подсказка. По замыслу здесь стоит отрезок, на котором
+       считается площадь, и он появляется вместе с выбором. */
+    el.textContent = areaTargets().length ? '' : 'Сначала постройте кривую';
     return;
   }
   const bound = (key, get) => makeEditableValue({
@@ -1655,6 +1670,8 @@ function syncAreaCalcUI() {
         sel.appendChild(o);
       });
       sel.value = (names.indexOf(prev) >= 0) ? prev : '';
+      // Список пересобран: своя кнопка выбора должна показать новое значение.
+      if (typeof sel._paint === 'function') sel._paint();
     }
   }
   renderVertList();
@@ -1705,7 +1722,7 @@ function wireFolds() {
       /* Поля формул собираются лениво (А56): пока секция была свёрнута, поле
          оставалось в очереди. Раскрыли — собираем то, что стало видно.
          Перерисовку тут не зовём: раскрытие карточки график не меняет. */
-      if (open && typeof flushMathfields === 'function') flushMathfields();
+      if (open && typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
     });
   });
 }

@@ -62,6 +62,11 @@ function init() {
     [null,             'ineq-rd-tax', 'ineq-rd-transfer', 'Проп. налог',    'Трансферт'],
     [null,             'mc-max',      'mc-min',         'Максимум',         'Минимум'],
   ].forEach(args => segToToggle.apply(null, args));
+  /* А64 · А32. Оба раскрывающихся списка переведены на свой вид: нативный
+     select не переносит текст, а режет его, и варианты не помещались («Что
+     добавляем» имел 179px при нужных 208, выбор кривой — 128 при 134). */
+  upgradeSelect('new-role', 'Что добавляем на график');
+  upgradeSelect('ac-pick', 'Кривая, под которой считается площадь');
   initSceneColorPickers();
   renderCurveList();
   redrawAll();

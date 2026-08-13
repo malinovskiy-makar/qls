@@ -82,8 +82,32 @@ const reveal = async (sel) => {
   await page.waitForTimeout(140);
 };
 const clickUI = async (sel, opts) => { await reveal(sel); return page.click(sel, opts); };
-const selectUI = async (sel, val) => { await reveal(sel); return page.selectOption(sel, val); };
-const fillUI = async (sel, val) => { await reveal(sel); return page.fill(sel, val); };
+/* Выбор варианта в списке. Нативный select спрятан за своим раскрывающимся
+   списком (А64): он не переносил текст, а резал его. Сам select остался в
+   разметке источником правды, поэтому ставим значение ему и будим слушателей
+   ровно тем же событием, что и щелчок по пункту меню. */
+const selectUI = async (sel, val) => {
+  await reveal(sel);
+  return page.evaluate(([s, v]) => {
+    const el = document.querySelector(s);
+    if (!el) throw new Error('нет списка ' + s);
+    el.value = v;
+    if (typeof el._paint === 'function') el._paint();
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, [sel, val]);
+};
+/* Ввод в поле формулы. Поле набирается компонентом MathLive (А66), а обычный
+   input под ним хранит текст для движка и остаётся источником правды. */
+const fillUI = async (sel, val) => {
+  await reveal(sel);
+  return page.evaluate(([s, v]) => {
+    const el = document.querySelector(s);
+    if (!el) throw new Error('нет поля ' + s);
+    el.value = v;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, [sel, val]);
+};
 
 await t('окно сценариев открыто', () => page.locator('#scene-picker').isVisible());
 await t('#sec-mode удалён', async () => (await page.locator('#sec-mode').count()) === 0 || 'ещё есть');
@@ -1287,7 +1311,7 @@ await t('у каждой кривой есть поле формулы', async (
 
 await t('правка формулы пересчитывает равновесие', async () => {
   await reveal('.curve-expr-inp');
-  await page.locator('.curve-expr-inp').first().fill('200 - 2*Q');
+  await fillUI('.curve-expr-inp', '200 - 2*Q');
   await page.waitForTimeout(300);
   return await page.evaluate(() => {
     const e = STATE.eq;
@@ -1300,7 +1324,7 @@ await t('правка сохраняет роль, цвет и id кривой',
 
 await t('битая формула не сносит кривую', async () => {
   await reveal('.curve-expr-inp');
-  await page.locator('.curve-expr-inp').first().fill('200 - 2*');
+  await fillUI('.curve-expr-inp', '200 - 2*');
   await page.waitForTimeout(250);
   const bad = await page.evaluate(() => document.querySelector('.curve-expr-inp').classList.contains('bad'));
   const kept = await page.evaluate(() => STATE.curves[0].expr);

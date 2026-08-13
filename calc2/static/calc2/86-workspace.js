@@ -94,6 +94,10 @@ function setSideOpen(panelId, btnId, open) {
     // Подпись идёт за состоянием: свёрнутая панель предлагает открыть, открытая — закрыть.
     b.setAttribute('data-tip', open ? 'Закрыть меню' : 'Открыть меню');
   }
+  /* Панель раскрыли — поля формул внутри стали видны и собираются (А56).
+     Без этого поле, добавленное при свёрнутой панели, оставалось обычным
+     текстовым окошком до следующей перерисовки. */
+  if (open && typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
 }
 function setToolsOpen(open) { setSideOpen('tools-panel', 'tools-toggle', open); }
 function setParamsOpen(open) { setSideOpen('params-panel', 'params-toggle', open); }
