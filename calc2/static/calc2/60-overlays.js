@@ -13,6 +13,7 @@ function redrawAll() {
   redrawScene();
   drawOverlays();
   applyLabelSize();      // общий размер подписей — одним проходом по холсту (П50)
+  spreadLabels();        // и разведение наложившихся — тем же приёмом (А60)
   refreshRegulators();   // строки «имя = значение» идут за значениями ползунков
   // Заголовок раздела равновесия — свойство сцены (А52). Синхронизируем здесь,
   // а не только в рыночном пересчёте: иначе в сцене, куда пришли из монополии,
@@ -604,10 +605,18 @@ function legendCorner(boxW, boxH) {
     { x: m.left + EDGE,               y: (H - m.bottom) - boxH - 26 },  // левый нижний
   ];
   // Точки нарисованных кривых в пикселях холста, разреженно: для выбора угла
-  // этого хватает, обходить каждый узел каждой кривой незачем.
+  // этого хватает, обходить каждый узел каждой кривой незачем. Подписи тоже
+  // учитываем: иначе легенда садилась ровно на ярлык кривой (замер А60 ловил
+  // пару «D» и «DWL»).
   const pts = [];
   const node = svg.node();
   if (node) {
+    const box = node.getBoundingClientRect();
+    node.querySelectorAll('text').forEach(t => {
+      const r = t.getBoundingClientRect();
+      if (r.width < 0.5) return;
+      pts.push([r.left - box.left + r.width / 2, r.top - box.top + r.height / 2]);
+    });
     node.querySelectorAll('path').forEach(p => {
       const cs = getComputedStyle(p);
       if (!cs.stroke || cs.stroke === 'none' || parseFloat(cs.strokeWidth) < 1) return;

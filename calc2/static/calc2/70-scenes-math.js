@@ -255,7 +255,7 @@ function editInlineLabel(current, px, py, apply) {
   if (old) old.remove();
   const inp = document.createElement('input');
   inp.id = 'pt-rename'; inp.type = 'text'; inp.value = current;
-  inp.style.cssText = 'position:absolute;z-index:40;font-size:11px;font-weight:600;padding:2px 5px;'
+  inp.style.cssText = 'position:absolute;z-index:40;font-size:' + FS.base + 'px;font-weight:600;padding:2px 5px;'
     + 'border:1px solid var(--accent);border-radius:var(--r-sm);background:var(--surface);'
     + 'color:var(--text);min-width:110px;'
     + 'left:' + Math.round(px) + 'px;top:' + Math.round(py - 16) + 'px;';

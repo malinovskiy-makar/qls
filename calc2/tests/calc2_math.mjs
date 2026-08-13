@@ -1697,6 +1697,44 @@ const CASES = [
              ['поле графика, а не картинка', 'only', 1, 0]],
   },
   {
+    /* А60. Подписи не налезают друг на друга.
+
+       Было замерено попарно: в сцене налога $Q_1 = 40$ налезала на деления оси
+       30, 40 и 50 и читалась как «3Q₁=400 60», подпись $S$ налезала на $S + t$.
+       По десяти сценам пятнадцать наложений.
+
+       Разводит их один проход после отрисовки (spreadLabels): кто нарисован
+       раньше, тот и остаётся на месте, поэтому деления осей не двигаются.
+       Полного нуля не обещаем: у подписи, зажатой между кривой сверху и
+       делением снизу, свободного места может не быть вовсе, а увести её от
+       своего объекта хуже, чем оставить наложение. */
+    name: 'Подписи · не налезают друг на друга',
+    run: `var scenes = ['tax', 'sd', 'mono', 'ceil', 'elast', 'costs', 'labor', 'adas', 'ppf', 'smallopen'];
+          var total = 0, labels = 0;
+          scenes.forEach(function (k) {
+            pickScene(k); redrawAll();
+            var items = [];
+            document.querySelectorAll('#chart text').forEach(function (t) {
+              var r = t.getBoundingClientRect();
+              if (r.width < 0.5 || r.height < 0.5) return;
+              items.push(r);
+            });
+            labels += items.length;
+            for (var i = 0; i < items.length; i++) {
+              for (var j = i + 1; j < items.length; j++) {
+                var a = items[i], b = items[j];
+                var ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+                var oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+                if (ox > 2 && oy > 2) total++;
+              }
+            }
+          });
+          pickScene('sd');
+          return { total: total, labels: labels };`,
+    checks: [['наложений на десяти сценах', 'total', 0, 3],
+             ['подписей всего', 'labels', 240, 80]],
+  },
+  {
     /* А3 · А54. Название модели переносится на две строки и не обрезается.
 
        Было: место под заголовок 163 px при узком окне и 199 при широком, а

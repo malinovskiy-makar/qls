@@ -1032,13 +1032,30 @@ await t('легенда выключается галочкой', async () => {
   return (off === 0 && on === 1) || `выкл ${off}, вкл ${on}`;
 });
 
-await t('легенда стоит выше поля графика, не поверх кривых', () => page.evaluate(() => {
-  const t0 = document.querySelector('#chart .legend text');
-  if (!t0) return 'легенды нет';
+/* А59. РАНЬШЕ здесь требовался ровно правый нижний угол. Требование снято:
+   легенда занимала девять процентов площади графика и садилась поверх линии
+   S + t и поверх подписи координат. Теперь угол выбирается СВОБОДНЫЙ — тот,
+   где меньше всего кривых и подписей, — поэтому проверять надо не место, а то,
+   ради чего место выбиралось: легенда внутри поля и никого не накрывает. */
+await t('легенда стоит в свободном углу и никого не накрывает', () => page.evaluate(() => {
+  const box = document.querySelector('#chart .legend rect');
+  if (!box) return 'легенды нет';
   const gw = document.getElementById('graph-wrap').getBoundingClientRect();
-  const b0 = t0.getBoundingClientRect();
-  return (b0.x > gw.x + gw.width / 2 && b0.y > gw.y + gw.height / 2)
-    || 'легенда не в правом нижнем углу';
+  const b = box.getBoundingClientRect();
+  const inside = b.x >= gw.x - 1 && b.y >= gw.y - 1
+              && b.right <= gw.right + 1 && b.bottom <= gw.bottom + 1;
+  if (!inside) return 'легенда вылезла за поле графика';
+  // Подписи кривых и значений не должны оказаться под коробкой легенды.
+  let over = 0;
+  document.querySelectorAll('#chart text').forEach(t => {
+    if (t.closest('.legend')) return;
+    const r = t.getBoundingClientRect();
+    if (r.width < 0.5) return;
+    const ox = Math.min(r.right, b.right) - Math.max(r.left, b.left);
+    const oy = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
+    if (ox > 2 && oy > 2) over++;
+  });
+  return over === 0 || `легенда накрыла подписей: ${over}`;
 }));
 
 /* --- Клавиатура и конструктор кусочной функции ------------------------- */

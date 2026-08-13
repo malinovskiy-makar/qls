@@ -94,6 +94,67 @@ function labelScale() {
   return (isFinite(v) && v >= 8 && v <= 40) ? v / LABEL_BASE : 1;
 }
 
+/* Разведение подписей (А60).
+
+   Замер попарно: в сцене налога подпись $Q_1 = 40$ налезала на деления оси 30,
+   40 и 50 и читалась как «3Q₁=400 60», подпись кривой $S$ налезала на $S + t$.
+   Всего по десяти сценам пятнадцать наложений.
+
+   Подписи рисуют полсотни разных мест, поэтому разводим их одним проходом
+   после отрисовки — тем же приёмом, что и общий размер. Кто нарисован раньше,
+   тот и остаётся на месте: деления осей рисуются первыми и потому не двигаются
+   никогда. Сдвиг только по вертикали и небольшой: подпись должна остаться у
+   своего объекта, иначе разведение вредит больше, чем наложение. */
+function spreadLabels() {
+  const node = svg.node();
+  if (!node) return;
+  const items = [];
+  node.querySelectorAll('text').forEach(t => {
+    if (t.getAttribute('data-no-spread')) return;
+    const r = t.getBoundingClientRect();
+    if (r.width < 0.5 || r.height < 0.5) return;
+    items.push({ el: t, x: r.left, y: r.top, w: r.width, h: r.height });
+  });
+  if (items.length < 2) return;
+
+  const hit = (a, b) => (Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) > 2
+                     && (Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)) > 2;
+  const m = CONFIG.margin;
+  const placed = [];
+  const STEP = 13;               // чуть больше строки: подпись уходит целиком
+  items.forEach(it => {
+    if (!placed.length) { placed.push(it); return; }
+    let dy = 0, dx = 0;
+    /* Сначала вверх и вниз с нарастающим шагом, и только потом вбок: подпись
+       обязана остаться у своего объекта, а сдвиг по вертикали связь с ним
+       рвёт меньше. Вбок уходим последней попыткой — для подписей у самой оси,
+       где сверху кривая, а снизу деление. */
+    const tries = [
+      [0, -STEP], [0, STEP], [0, -2 * STEP], [0, 2 * STEP], [0, -3 * STEP], [0, 3 * STEP],
+      [22, 0], [-22, 0], [26, -STEP], [-26, -STEP],
+    ];
+    const box = node.getBoundingClientRect();
+    for (let k = 0; k < tries.length; k++) {
+      if (!placed.some(p => hit(it, p))) break;
+      const [wx, wy] = tries[k];
+      const top = it.y + wy, bottom = top + it.h;
+      // За поле графика не выпускаем: там подпись всё равно не читается.
+      if (top < box.top + m.top - 6 || bottom > box.top + (H - m.bottom) + 16) continue;
+      const probe = { x: it.x + wx, y: top, w: it.w, h: it.h };
+      if (!placed.some(p => hit(probe, p))) { dy = wy; dx = wx; it.y = top; it.x = probe.x; break; }
+    }
+    if (dy) {
+      const cur = parseFloat(it.el.getAttribute('y'));
+      if (isFinite(cur)) it.el.setAttribute('y', cur + dy);
+    }
+    if (dx) {
+      const cur = parseFloat(it.el.getAttribute('x'));
+      if (isFinite(cur)) it.el.setAttribute('x', cur + dx);
+    }
+    placed.push(it);
+  });
+}
+
 function applyLabelSize() {
   const k = labelScale();
   if (Math.abs(k - 1) < 1e-6) return;

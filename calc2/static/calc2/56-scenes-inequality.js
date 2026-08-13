@@ -507,7 +507,7 @@ function renderIneqGroupsTable() {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:4px;';
     const lab = document.createElement('span');
-    lab.style.cssText = 'font-size:12px;color:var(--text2);width:78px;';
+    lab.style.cssText = 'font-size:' + FS.base + 'px;color:var(--text2);width:78px;';
     lab.textContent = 'Группа ' + (i + 1);
     const inp = document.createElement('input');
     inp.type = 'number'; inp.step = '0.1'; inp.value = v;
