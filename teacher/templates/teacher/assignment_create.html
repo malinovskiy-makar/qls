@@ -26,73 +26,29 @@
       <input type="hidden" name="manual_order" id="manual-order-input">
 
       {% comment %}
-      ⚠️ ПРАВАЯ КОЛОНКА — КАК В КОНСТРУКТОРЕ ПОДБОРКИ (сессия 8, п. 13):
-      это один и тот же по смыслу блок, и выглядеть он обязан одинаково.
-      Ни одного поля не убрано и не добавлено — только вид.
+      ⚠️ КОРЗИНА ВЫШЕ НАСТРОЕК (сессия 10, фаза 2.1). Порядок читается как
+      сам ход работы: что набрал → как выдаём → кому выдаём и кнопка. Раньше
+      кнопка «Создать» стояла под корзиной, а настройки над ней — то есть
+      главное действие было оторвано от последнего поля, которое заполняют.
       {% endcomment %}
-      <div class="sidebar-card">
-        <div class="sidebar-title">Настройки домашки</div>
-
-        <div class="form-group">
-          <label class="form-label" for="id_name">Название *</label>
-          <input class="k-input" type="text" id="id_name" name="name"
-                 placeholder="Например: Домашка 5 — КПВ" required>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="id_deadline">Дедлайн</label>
-          <input class="k-input" type="datetime-local" id="id_deadline"
-                 name="deadline">
-        </div>
-
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label">Группы *</label>
-          {% if groups %}
-          <div class="groups-list">
-            {% for group in groups %}
-            <label class="k-check k-check--box">
-              <input type="checkbox" name="groups" value="{{ group.pk }}">
-              <span>{{ group.name }}
-                <span class="k-chip-kind">{{ group.kind_label }}</span>
-                {% if not group.is_individual %}<span class="k-quiet">· {{ group.students.count|count_ru:"ученик,ученика,учеников" }}</span>{% endif %}
-              </span>
-            </label>
-            {% endfor %}
-          </div>
-          {% else %}
-          <p class="k-hint">
-            Нет групп. <a href="{% url 'teacher:group_create' %}">Создать группу</a>
-          </p>
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="sidebar-card">
-        {% comment %}
-        Мелкие кнопки «Написать свою задачу» и «Подобрать по описанию» убраны
-        отсюда: способы набора переехали наверх в ряд равных плиток. Правая
-        колонка держит ТОЛЬКО настройки и корзину — больше ничего.
-        {% endcomment %}
+      <div class="k-card ws-card">
         <div class="cart-header">
-          <div class="sidebar-title" style="margin-bottom:0;">Выбранные задачи</div>
+          <div class="ws-title" style="margin-bottom:0;">Выбранные задачи</div>
           <span class="cart-count">Выбрано: <strong id="cart-count">0</strong></span>
         </div>
 
         <div class="cart-list" id="cart-list">
           <p class="cart-empty">Пока ничего не добавлено</p>
         </div>
-
-        {% comment %}
-        Неактивная кнопка ОБЪЯСНЯЕТ, чего не хватает. Раньше она была просто
-        серой, и понять — нет названия? группы? задач? — было нельзя.
-        Список пересчитывается на лету в `_picker_js.html`.
-        {% endcomment %}
-        <div class="k-hint" id="submit-why" style="margin-bottom:8px"></div>
-        <button type="submit" class="k-btn k-btn--main k-btn--wide"
-                id="submit-btn" disabled>
-          Создать домашку
-        </button>
       </div>
+
+      {% comment %}
+      ⚠️ ПАНЕЛЬ НАСТРОЕК — ОБЩИЙ ПАРТИАЛ, ОДИН НА ЧЕТЫРЕ ЭКРАНА СОЗДАНИЯ
+      (сессия 10, фаза 2.1). Здесь собирают ДОМАШКУ: у контрольной свой
+      конструктор внутри группы, куда ведёт переключатель вида в шапке.
+      Ни одного поля не убрано и не добавлено — только вид и общий источник.
+      {% endcomment %}
+      {% include "teacher/_work_settings.html" with is_exam=False groups=groups group_id=group_id submit_label="Создать домашку" %}
     </form>
   </aside>
 </div>
@@ -103,4 +59,5 @@
 {% block extra_js %}
 {% include "teacher/_picker_js.html" with cart_key="hw_cart" picker_form_id="picker-form" %}
 {% include "teacher/_build_keep.html" %}
+{% include "teacher/_date_field_js.html" %}
 {% endblock %}

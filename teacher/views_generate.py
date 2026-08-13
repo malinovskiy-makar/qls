@@ -28,7 +28,7 @@ from django.urls import reverse
 
 from problems import hw_generator
 
-from .access import tutor_required
+from .access import group_id_param, tutor_required
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +123,7 @@ def assignment_generate(request):
         # Группа, из которой пришли (кнопки «Создать домашку/контрольную»
         # ведут сюда с ?group=). Контрольной она обязательна: её конструктор
         # живёт внутри группы.
-        'group_id': (request.POST.get('group') or request.GET.get('group')
-                     or ''),
+        'group_id': group_id_param(request),
         'group': _group_or_none(request.user,
                                 request.POST.get('group')
                                 or request.GET.get('group')),

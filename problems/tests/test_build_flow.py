@@ -146,8 +146,12 @@ class BuildScreenTests(TestCase):
                                                  teacher=self.tutor)
 
     def test_screen_opens_for_homework_and_exam(self):
+        # ⚠️ «Как идёт время», а не «Как ограничим время»: в сессии 10 панель
+        # настроек сведена в один партиал, и два разных заголовка одного и
+        # того же блока пришлось свести к одному. Оставлена формулировка
+        # конструктора контрольной — экрана, где этот блок главный.
         for kind, marker in (('homework', 'Срок сдачи'),
-                             ('exam', 'Как ограничим время')):
+                             ('exam', 'Как идёт время')):
             body = self.client.get(reverse('teacher:assignment_build'),
                                    {'kind': kind}).content.decode()
             self.assertIn(marker, body, kind)

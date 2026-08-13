@@ -31,14 +31,23 @@
     <h1 class="page-title">Новая работа</h1>
   </div>
 
+  {% comment %}
+  ⚠️ НОМЕР ЗАНЯТИЯ ПРИЦЕПЛЕН К КАЖДОЙ ССЫЛКЕ (сессия 10, фаза 2.1). Он терялся
+  в ТРЁХ ссылках из шести: «Домашка» на «Искать самому» вела на голый
+  `assignment_create`, обе ссылки на «Написать свою» — на голый `problem_new`.
+  Потеря видна не сразу: экран открывается, переключатель на месте, а вот
+  вернуться к контрольной уже нельзя — её конструктор живёт ВНУТРИ занятия, и
+  без номера адрес не собирается. Ровно эту потерю чинили в сессии 9 у одних
+  ссылок и не заметили у других. Поймано сценарием, не тестами.
+  {% endcomment %}
   <div class="k-tiles bh-kind" style="margin-left:auto">
     <a class="k-tile {% if not is_exam %}k-tile--on{% endif %}"
-       href="{% if mode == 'describe' %}{% url 'teacher:assignment_generate' %}?kind=homework{% if group_id %}&amp;group={{ group_id }}{% endif %}{% elif mode == 'own' %}{% url 'teacher:problem_new' %}?to_cart=1{% else %}{% url 'teacher:assignment_create' %}{% endif %}">
+       href="{% if mode == 'describe' %}{% url 'teacher:assignment_generate' %}?kind=homework{% if group_id %}&amp;group={{ group_id }}{% endif %}{% elif mode == 'own' %}{% url 'teacher:problem_new' %}?to_cart=1{% if group_id %}&amp;group={{ group_id }}{% endif %}{% else %}{% url 'teacher:assignment_create' %}{% if group_id %}?group={{ group_id }}{% endif %}{% endif %}">
       <span class="k-tile__name">Домашка</span>
       <span class="k-tile__note">решают дома, срок сдачи</span>
     </a>
     <a class="k-tile {% if is_exam %}k-tile--on{% endif %}"
-       href="{% if mode == 'describe' %}{% url 'teacher:assignment_generate' %}?kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}{% elif mode == 'search' and group_id %}{% url 'teacher:exam_create' group_id %}{% elif mode == 'own' %}{% url 'teacher:problem_new' %}?to_cart=1&amp;kind=exam{% else %}{% url 'teacher:assignment_generate' %}?kind=exam{% endif %}">
+       href="{% if mode == 'describe' %}{% url 'teacher:assignment_generate' %}?kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}{% elif mode == 'search' and group_id %}{% url 'teacher:exam_create' group_id %}{% elif mode == 'own' %}{% url 'teacher:problem_new' %}?to_cart=1&amp;kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}{% else %}{% url 'teacher:assignment_generate' %}?kind=exam{% endif %}">
       <span class="k-tile__name">Контрольная</span>
       <span class="k-tile__note">ограниченное время, окно</span>
     </a>

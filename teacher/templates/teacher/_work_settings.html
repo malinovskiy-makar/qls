@@ -1,0 +1,224 @@
+{% load ru %}{% comment %}
+ПАНЕЛЬ «НАСТРОЙКИ РАБОТЫ» — ОДИН ПАРТИАЛ НА ВСЕ ЭКРАНЫ СОЗДАНИЯ
+(сессия 10, фаза 2.1; остаток фазы 10 сессии 9).
+
+⚠️ ЗАЧЕМ. Панель жила в трёх экземплярах — у «Искать самому», у конструктора
+контрольной и у конструктора подборки. Они были похожи, но не одинаковы: у
+контрольной поля другого класса (другая высота и рамка), у «Искать самому»
+не было ни одного поля времени, «Вид работы» на одном экране рисовался в
+шапке, на другом внутри панели. Требование владельца: однотипные блоки
+обязаны выглядеть и работать одинаково, иначе пользователь перестаёт понимать
+логику сайта.
+
+⚠️ ПАРТИАЛ ПОКРЫВАЕТ ОБЪЕДИНЕНИЕ ПОЛЕЙ, А НЕ ПЕРЕСЕЧЕНИЕ. Поле, которое есть
+у одного экрана и нет у других, остаётся — оно включается параметром. Иначе
+сведение стало бы обрезкой возможностей.
+
+⚠️ ИМЕНА ПОЛЕЙ НА СЕРВЕРЕ НЕ МЕНЯЛИСЬ НИ ОДНО. Вьюхи `assignment_create` и
+`exam_create` читают ровно те же `name`, `deadline`, `groups`, `kind`,
+`starts_at`, `ends_at`, `duration`, `show_results`. Панель — только вид.
+
+Ждёт в контексте:
+  is_exam       — собирается контрольная (иначе домашка);
+  groups        — из чего выбирать «кому выдать»; пусто — блок не рисуется;
+  group         — группа, заданная АДРЕСОМ (конструктор контрольной);
+                  тогда выбирать не из чего, показываем строкой;
+  group_id      — номер группы, если известен;
+  form          — прежние значения (конструктор контрольной возвращает их
+                  при ошибке валидации);
+  errors        — список ошибок формы;
+  min_window / min_duration / max_duration — границы из настроек;
+  show_kind     — рисовать ли переключатель вида ВНУТРИ панели;
+  submit_label  — надпись кнопки;
+  group_choice  — 'radio' | 'checkbox' (по умолчанию: у контрольной
+                  переключатели, у домашки галочки).
+
+⚠️ ПЕРЕКЛЮЧАТЕЛЬ ВИДА — ПАРАМЕТР, А НЕ ПОСТОЯННЫЙ БЛОК. На трёх экранах
+создания он уже стоит в общей шапке `_build_head.html` (сессия 9, фаза 10.0 —
+там его специально чинили, он пропадал на двух экранах из трёх). Рисовать его
+ещё и в панели значило бы поставить на страницу ДВА переключателя одного и
+того же. У конструктора подборки общей шапки нет — там панель показывает его
+сама (`show_kind`).
+{% endcomment %}
+
+{% if errors %}
+<div class="ws-errors">
+  <ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+{% if show_kind %}
+<div class="k-card ws-card">
+  <div class="k-label ws-cap">Вид работы</div>
+  {% comment %}
+  ⚠️ НОМЕР ГРУППЫ ЕДЕТ ЧЕРЕЗ ПЕРЕКЛЮЧАТЕЛЬ. Голая ссылка `?kind=…` теряла
+  группу, и контрольная молча собиралась в конструкторе домашки — без окна
+  и лимита времени.
+  {% endcomment %}
+  <div class="k-tiles ws-kind">
+    <a class="k-tile {% if not is_exam %}k-tile--on{% endif %}"
+       href="?kind=homework{% if group_id %}&amp;group={{ group_id }}{% endif %}">
+      <span class="k-tile__name">Домашка</span>
+      <span class="k-tile__note">срок сдачи</span>
+    </a>
+    <a class="k-tile {% if is_exam %}k-tile--on{% endif %}"
+       href="?kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}">
+      <span class="k-tile__name">Контрольная</span>
+      <span class="k-tile__note">окно и время</span>
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<div class="k-card ws-card">
+  <div class="ws-title">Настройки работы</div>
+
+  <div class="ws-field">
+    <label class="k-label" for="id_name">Название</label>
+    <input class="k-input" type="text" id="id_name" name="name" required
+           value="{{ form.name|default:'' }}"
+           placeholder="{% if is_exam %}Например: Контрольная — эластичность{% else %}Например: Домашка 5 — КПВ{% endif %}">
+  </div>
+
+  {% if is_exam %}
+  {% comment %}
+  Контрольная: окно (с — по) ЛИБО лимит времени. Лишний набор полей спрятан:
+  показывать оба сразу — верный способ получить контрольную с окном И
+  лимитом одновременно.
+  {% endcomment %}
+  <div class="ws-field">
+    <div class="k-label">Как идёт время</div>
+    <div class="ws-when" id="ws-when">
+      <label class="k-check k-check--box {% if form.kind != 'limit' %}is-on{% endif %}">
+        <input type="radio" name="kind" value="window"
+               {% if form.kind != 'limit' %}checked{% endif %}>
+        <span>
+          <span class="ws-when__t">Окно</span>
+          <span class="ws-when__d">Все пишут одновременно: задано начало и
+            конец. Подходит для урока.</span>
+        </span>
+      </label>
+      <label class="k-check k-check--box {% if form.kind == 'limit' %}is-on{% endif %}">
+        <input type="radio" name="kind" value="limit"
+               {% if form.kind == 'limit' %}checked{% endif %}>
+        <span>
+          <span class="ws-when__t">Срок с лимитом</span>
+          <span class="ws-when__d">Сдать до срока, на решение — заданное
+            число минут с момента старта.</span>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <div class="ws-part" data-when="window" {% if form.kind == 'limit' %}hidden{% endif %}>
+    <div class="ws-field">
+      <label class="k-label" for="id_starts_at">Начало окна</label>
+      {% include "teacher/_date_field.html" with field_name='starts_at' field_id='id_starts_at' field_value=form.starts_at default_time='09:00' %}
+    </div>
+    <div class="ws-field">
+      <label class="k-label" for="id_ends_at">Конец окна</label>
+      {% include "teacher/_date_field.html" with field_name='ends_at' field_id='id_ends_at' field_value=form.ends_at default_time='23:59' %}
+      <div class="k-hint">Окно не короче {{ min_window }} минут и
+        заканчивается в будущем.</div>
+    </div>
+  </div>
+
+  <div class="ws-part" data-when="limit" {% if form.kind != 'limit' %}hidden{% endif %}>
+    <div class="ws-field">
+      <label class="k-label" for="id_deadline">Сдать до</label>
+      {% include "teacher/_date_field.html" with field_name='deadline' field_id='id_deadline' field_value=form.deadline default_time='23:59' %}
+    </div>
+    <div class="ws-field">
+      <label class="k-label" for="id_duration">Лимит времени, минут</label>
+      <input class="k-input k-input--num" type="text" inputmode="numeric"
+             id="id_duration" name="duration"
+             value="{{ form.duration|default:'60' }}">
+      <div class="k-hint">От {{ min_duration }} до {{ max_duration }} минут.
+        Если до крайнего срока останется меньше — время урежется, и ученика
+        предупредят ДО старта.</div>
+    </div>
+  </div>
+
+  <div class="ws-field ws-field--last">
+    <label class="k-check k-check--box">
+      <input type="checkbox" name="show_results"
+             {% if form.show_results or not form %}checked{% endif %}>
+      <span>Показывать ученику результат сразу</span>
+    </label>
+    <div class="k-hint">Тесты проверяются автоматически. Снимите галочку,
+      если балл лучше придержать до проверки открытых задач. Комментарий,
+      который вы напишете руками, ученик увидит в любом случае.</div>
+  </div>
+
+  {% else %}
+  <div class="ws-field ws-field--last">
+    <label class="k-label" for="id_deadline">Срок сдачи</label>
+    {% include "teacher/_date_field.html" with field_name='deadline' field_id='id_deadline' field_value=form.deadline default_time='23:59' %}
+    <div class="k-hint">Можно не задавать — тогда срока нет.</div>
+  </div>
+  {% endif %}
+</div>
+
+{% comment %}
+«Кому выдать». Три случая: группа задана адресом (выбирать не из чего),
+список групп есть, групп нет вовсе.
+{% endcomment %}
+<div class="k-card ws-card">
+  <div class="ws-title">Кому выдать</div>
+
+  {% if group and not groups %}
+  {% comment %}
+  ⚠️ ГРУППА ИЗ АДРЕСА — СТРОКОЙ, БЕЗ ПОЛЯ `groups`. Конструктор контрольной
+  живёт ВНУТРИ группы и поле `groups` не читает вовсе. Нарисовать здесь
+  отмеченную галочку значило бы обещать выбор, которого нет; а живое поле
+  `groups` ещё и попало бы под проверку «выберите группу» в `_picker_js`.
+  {% endcomment %}
+  <div class="ws-fixed">
+    <span class="ws-fixed__name">{{ group.name }}</span>
+    <span class="k-chip-kind">{{ group.kind_label }}</span>
+    {% if not group.is_individual %}<span class="k-quiet">· {{ group.students.count|count_ru:"ученик,ученика,учеников" }}</span>{% endif %}
+  </div>
+  <div class="k-hint">Контрольная выдаётся тому занятию, внутри которого её
+    собирают.</div>
+
+  {% elif groups %}
+  <div class="ws-groups">
+    {% for g in groups %}
+    <label class="k-check k-check--box">
+      {% comment %}
+      ⚠️ У домашки группы — ГАЛОЧКИ (её можно выдать нескольким), у
+      контрольной — переключатели: контрольная живёт внутри одной группы,
+      её конструктор так и устроен. Обещать выбор, которого система не
+      держит, нельзя.
+
+      ⚠️ В списке И ГРУППЫ, И ИНДИВИДУАЛЬНЫЕ ЗАНЯТИЯ, вперемешку и с чипом
+      типа (сессия 9, фаза 9). Второй список заставил бы репетитора помнить,
+      где кто лежит.
+      {% endcomment %}
+      <input type="{% if group_choice %}{{ group_choice }}{% elif is_exam %}radio{% else %}checkbox{% endif %}"
+             name="groups" value="{{ g.pk }}"
+             {% if group_id and g.pk|stringformat:"s" == group_id|stringformat:"s" %}checked{% endif %}>
+      <span>{{ g.name }}
+        <span class="k-chip-kind">{{ g.kind_label }}</span>
+        {% if not g.is_individual %}<span class="k-quiet">· {{ g.students.count|count_ru:"ученик,ученика,учеников" }}</span>{% endif %}
+      </span>
+    </label>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="k-hint">Занятий пока нет.
+    <a href="{% url 'teacher:group_create' %}">Создать занятие</a>
+  </div>
+  {% endif %}
+
+  {% comment %}
+  Неактивная кнопка ОБЪЯСНЯЕТ, чего не хватает: нет названия? группы? задач?
+  Список пересчитывается на лету в `_picker_js.html`.
+  {% endcomment %}
+  <div class="k-hint ws-why" id="submit-why"></div>
+  <button type="submit" class="k-btn k-btn--main k-btn--wide"
+          id="submit-btn" disabled>
+    {% if submit_label %}{{ submit_label }}{% elif is_exam %}Создать контрольную{% else %}Создать работу{% endif %}
+  </button>
+</div>

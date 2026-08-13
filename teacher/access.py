@@ -72,3 +72,23 @@ def group_assignment_or_404(group, assignment_id):
     from problems.models import Assignment
 
     return get_object_or_404(Assignment, pk=assignment_id, group=group)
+
+
+def group_id_param(request):
+    """Номер занятия из адреса — ТОЛЬКО если это число, иначе пусто.
+
+    ⚠️ ЗАЧЕМ. Экраны создания работы таскают номер занятия через `?group=`,
+    и он уходит прямо в `{% url 'teacher:group_detail' group_id %}` в общей
+    шапке. Django на нечисловом значении бросает `NoReverseMatch`, и все три
+    экрана создания отвечали ПЯТИСОТКОЙ на `?group=abc`.
+
+    Найдено в сессии 10 своей же проверкой (сценарий подставил `group=null`).
+    Дефект был и до сведения панели — шапка `_build_head.html` разбирала
+    значение так с самого её появления.
+
+    Проверять существование занятия здесь НЕ надо: номер тут нужен только
+    чтобы собрать ссылку и не потеряться между экранами, а всё, что меняет
+    данные, идёт через `own_group_or_404`.
+    """
+    raw = (request.POST.get('group') or request.GET.get('group') or '').strip()
+    return raw if raw.isdigit() else ''

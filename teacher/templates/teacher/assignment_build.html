@@ -48,11 +48,10 @@
             padding: 26px 20px; text-align: center; color: var(--text2);
             font-size: 13px; line-height: 1.6; }
 .bd-side { position: sticky; top: 68px; }
-.bd-side .k-card { margin-bottom: 12px; }
-.bd-groups { display: flex; flex-direction: column; gap: 8px;
-             max-height: 200px; overflow-y: auto; }
-.bd-when { display: none; }
-.bd-when.is-on { display: block; }
+{% comment %}
+Правила `.bd-groups` и `.bd-when` убраны: обе разметки переехали в общий
+партиал настроек, стили — в набор деталей (`.ws-groups`, `.ws-part`).
+{% endcomment %}
 @media (max-width: 900px) {
   .bd-layout { grid-template-columns: minmax(0,1fr); }
   .bd-side { position: static; }
@@ -86,12 +85,20 @@
       Вернитесь в подбор и отметьте задачи — или добавьте их из каталога.
     </div>
 
+    {% comment %}
+    ⚠️ «НАПИСАТЬ СВОЮ» ВЕЛА В НИКУДА (найдено сценарием, сессия 10, фаза 2.1):
+    адрес был голый `problem_new`, БЕЗ `to_cart=1`. Задача создавалась и
+    оставалась в «Моих задачах», а в собираемую работу не попадала — кнопка
+    обещала пополнить эту работу и не пополняла. Заодно терялись занятие и
+    вид работы, как в соседних плитках.
+    {% endcomment %}
     <div class="k-row" style="gap:10px;margin-top:14px;flex-wrap:wrap">
       <a class="k-btn k-btn--plain"
-         href="{% if is_exam and group_id %}{% url 'teacher:exam_create' group_id %}{% else %}{% url 'teacher:assignment_create' %}{% endif %}">
+         href="{% if is_exam and group_id %}{% url 'teacher:exam_create' group_id %}{% else %}{% url 'teacher:assignment_create' %}{% if group_id %}?group={{ group_id }}{% endif %}{% endif %}">
         Добавить из каталога
       </a>
-      <a class="k-btn k-btn--plain" href="{% url 'teacher:problem_new' %}">
+      <a class="k-btn k-btn--plain"
+         href="{% url 'teacher:problem_new' %}?to_cart=1{% if is_exam %}&amp;kind=exam{% endif %}{% if group_id %}&amp;group={{ group_id }}{% endif %}">
         Написать свою
       </a>
     </div>
@@ -114,116 +121,14 @@
       <input type="hidden" name="problem_points" id="problem-points-input">
       <input type="hidden" name="manual_order" id="manual-order-input">
 
-      <div class="k-card">
-        <div class="k-label" style="margin-bottom:8px">Вид работы</div>
-        <div class="k-tiles" style="grid-template-columns:repeat(2,minmax(0,1fr))">
-          {% comment %}
-          ⚠️ НОМЕР ГРУППЫ ЕДЕТ ЧЕРЕЗ ПЕРЕКЛЮЧАТЕЛЬ. Голая ссылка `?kind=…`
-          теряла группу, и контрольная молча собиралась в конструкторе
-          домашки — без окна и лимита времени.
-          {% endcomment %}
-          <a class="k-tile {% if not is_exam %}k-tile--on{% endif %}"
-             href="?kind=homework{% if group_id %}&amp;group={{ group_id }}{% endif %}">
-            <span class="k-tile__name">Домашка</span>
-            <span class="k-tile__note">срок сдачи</span>
-          </a>
-          <a class="k-tile {% if is_exam %}k-tile--on{% endif %}"
-             href="?kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}">
-            <span class="k-tile__name">Контрольная</span>
-            <span class="k-tile__note">окно и время</span>
-          </a>
-        </div>
-      </div>
-
-      <div class="k-card">
-        <div class="k-label">Название</div>
-        <input class="k-input" type="text" name="name" id="id_name"
-               placeholder="{% if is_exam %}Например: Контрольная — эластичность{% else %}Например: Домашка 5 — КПВ{% endif %}"
-               required>
-
-        {% if is_exam %}
-        {% comment %}
-        Контрольная: окно (с — по) или лимит времени. Поля и правила — те
-        же, что в обычном конструкторе контрольной, и проверяет их тот же
-        обработчик.
-        {% endcomment %}
-        <div class="k-label" style="margin-top:14px">Как ограничим время</div>
-        <div class="k-row" style="gap:14px;flex-wrap:wrap">
-          <label class="k-check k-check--box">
-            <input type="radio" name="kind" value="window" checked
-                   class="bd-mode"> окно
-          </label>
-          <label class="k-check k-check--box">
-            <input type="radio" name="kind" value="limit" class="bd-mode">
-            лимит времени
-          </label>
-        </div>
-
-        <div class="bd-when is-on" data-mode="window">
-          <div class="k-label" style="margin-top:12px">Начало окна</div>
-          <input class="k-input" type="datetime-local" name="starts_at">
-          <div class="k-label" style="margin-top:10px">Конец окна</div>
-          <input class="k-input" type="datetime-local" name="ends_at">
-          <div class="k-hint">Окно не короче {{ min_window }} минут.</div>
-        </div>
-
-        <div class="bd-when" data-mode="limit">
-          <div class="k-label" style="margin-top:12px">Крайний срок</div>
-          <input class="k-input" type="datetime-local" name="deadline">
-          <div class="k-label" style="margin-top:10px">Сколько минут на работу</div>
-          <input class="k-input k-input--num" type="number" name="duration"
-                 min="{{ min_duration }}" max="{{ max_duration }}" value="45">
-        </div>
-
-        <label class="k-check k-check--box" style="margin-top:12px">
-          <input type="checkbox" name="show_results" checked>
-          показать результат сразу после сдачи
-        </label>
-        {% else %}
-        <div class="k-label" style="margin-top:14px">Срок сдачи</div>
-        <input class="k-input" type="datetime-local" name="deadline">
-        <div class="k-hint">Можно не задавать — тогда срока нет.</div>
-        {% endif %}
-      </div>
-
-      <div class="k-card">
-        <div class="k-label">Кому выдать</div>
-        {% if groups %}
-        <div class="bd-groups">
-          {% for g in groups %}
-          <label class="k-check k-check--box">
-            {% comment %}
-            ⚠️ У домашки группы — ГАЛОЧКИ (её можно выдать нескольким), у
-            контрольной — переключатели: контрольная живёт внутри одной
-            группы, её конструктор так и устроен. Обещать выбор, которого
-            система не держит, нельзя.
-            {% endcomment %}
-            <input type="{% if is_exam %}radio{% else %}checkbox{% endif %}"
-                   name="groups" value="{{ g.pk }}"
-                   {% if group_id and g.pk == group.pk %}checked{% endif %}>
-            {% comment %}
-            ⚠️ В списке И ГРУППЫ, И ИНДИВИДУАЛЬНЫЕ ЗАНЯТИЯ, вперемешку и с
-            чипом типа (сессия 9, фаза 9). Заводить второй список значило бы
-            заставить репетитора помнить, где кто лежит.
-            {% endcomment %}
-            <span>{{ g.name }}
-              <span class="k-chip-kind">{{ g.kind_label }}</span>
-              {% if not g.is_individual %}<span class="k-quiet">· {{ g.students.count|count_ru:"ученик,ученика,учеников" }}</span>{% endif %}</span>
-          </label>
-          {% endfor %}
-        </div>
-        {% else %}
-        <div class="k-hint">Нет групп.
-          <a href="{% url 'teacher:group_create' %}">Создать группу</a>
-        </div>
-        {% endif %}
-
-        <div class="k-hint" id="submit-why" style="margin:10px 0 8px"></div>
-        <button type="submit" class="k-btn k-btn--main k-btn--wide"
-                id="submit-btn" disabled>
-          Создать {% if is_exam %}контрольную{% else %}работу{% endif %}
-        </button>
-      </div>
+      {% comment %}
+      ⚠️ ПАНЕЛЬ НАСТРОЕК — ОБЩИЙ ПАРТИАЛ (сессия 10, фаза 2.1). Здесь она
+      выводит и переключатель вида (`show_kind`): у конструктора подборки нет
+      общей шапки `_build_head.html` — способы набора остались на шаге раньше,
+      и рисовать их плитки тут значило бы звать назад, а не вперёд. Вид работы
+      выбрать надо, поэтому его переключатель показывает сама панель.
+      {% endcomment %}
+      {% include "teacher/_work_settings.html" with is_exam=is_exam groups=groups group=group group_id=group_id min_window=min_window min_duration=min_duration max_duration=max_duration show_kind=True %}
     </form>
   </aside>
 </div>
@@ -338,7 +243,7 @@
     if (name && !name.value.trim()) { missing.push('впишите название'); }
     var boxes = form.querySelectorAll('[name=groups]');
     if (boxes.length && ![].some.call(boxes, function (b) { return b.checked; })) {
-      missing.push(IS_EXAM ? 'выберите группу' : 'выберите группу');
+      missing.push('выберите группу');
     }
     var button = document.getElementById('submit-btn');
     button.disabled = missing.length > 0;
@@ -370,13 +275,9 @@
     refreshSubmit();
   });
   document.addEventListener('change', function (event) {
-    // Окно или лимит — показываем только нужные поля.
-    if (event.target.closest('.bd-mode')) {
-      var mode = event.target.value;
-      document.querySelectorAll('.bd-when').forEach(function (block) {
-        block.classList.toggle('is-on', block.dataset.mode === mode);
-      });
-    }
+    // Переключение «окно / лимит» переехало в общий `_work_settings_js.html`:
+    // разметка теперь общая с конструктором контрольной, и скрипт к ней один.
+
     // ⚠️ У контрольной адрес формы зависит от группы: её конструктор живёт
     // внутри группы. Без этого работа ушла бы в конструктор домашки.
     if (event.target.name === 'groups' && IS_EXAM) {
@@ -407,4 +308,6 @@
 })();
 </script>
 {% include "teacher/_build_keep.html" %}
+{% include "teacher/_work_settings_js.html" %}
+{% include "teacher/_date_field_js.html" %}
 {% endblock %}

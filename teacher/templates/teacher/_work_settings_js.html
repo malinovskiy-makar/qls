@@ -1,0 +1,37 @@
+{% comment %}
+Скрипт панели «Настройки работы» (сессия 10, фаза 2.1).
+
+Делает ровно одно: показывает набор полей, отвечающий выбранному способу
+ограничить время, и прячет второй. Показывать оба сразу — верный способ
+получить контрольную с окном И лимитом одновременно.
+
+⚠️ ЗАЧЕМ ОДИН ФАЙЛ. Копий этого переключения было две: `exam_create.html`
+искал `#fields-window`/`#fields-limit`, конструктор подборки — `.bd-when`.
+Разметка у них уже разошлась, а логика была одна. Теперь и та, и другая
+пришли из общего партиала, и скрипт к ним тоже один.
+
+Подключается ТОЛЬКО там, где панель показывает поля контрольной.
+{% endcomment %}
+<script>
+(function () {
+  'use strict';
+  var box = document.getElementById('ws-when');
+  if (!box) { return; }
+  var parts = document.querySelectorAll('.ws-part[data-when]');
+
+  function paint() {
+    var chosen = box.querySelector('input[name="kind"]:checked');
+    var mode = chosen ? chosen.value : 'window';
+    parts.forEach(function (part) {
+      part.hidden = part.dataset.when !== mode;
+    });
+    box.querySelectorAll('label').forEach(function (label) {
+      var input = label.querySelector('input');
+      label.classList.toggle('is-on', !!input && input.checked);
+    });
+  }
+
+  box.addEventListener('change', paint);
+  paint();
+})();
+</script>

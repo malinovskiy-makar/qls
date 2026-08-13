@@ -1,0 +1,121 @@
+{% comment %}
+Скрипт поля даты (сессия 10, фаза 2.3). Подключается ОДИН раз на страницу,
+само поле может стоять на ней трижды (начало окна, конец окна, срок).
+Разметка и обоснование — в `teacher/_date_field.html`.
+{% endcomment %}
+<script>
+(function () {
+  'use strict';
+
+  // Разбор того, что напечатал человек. Принимаем и точку, и слэш, и дефис
+  // как разделитель даты; время — через двоеточие или точку; запятая между
+  // датой и временем необязательна. Возвращаем ГГГГ-ММ-ДДTЧЧ:ММ либо ''.
+  var RE = /^\s*(\d{1,2})\s*[.\/-]\s*(\d{1,2})\s*[.\/-]\s*(\d{2,4})\s*(?:[,\s]+(\d{1,2})\s*[:.]\s*(\d{2}))?\s*$/;
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+  function toIso(text, defaultTime) {
+    var m = RE.exec(text || '');
+    if (!m) { return null; }
+    var day = +m[1], month = +m[2], year = +m[3];
+    // Двузначный год: 26 — это 2026, а не 1926. Век задач по экономике один.
+    if (year < 100) { year += 2000; }
+    var time = defaultTime || '00:00';
+    if (m[4] !== undefined) {
+      var hh = +m[4], mm = +m[5];
+      if (hh > 23 || mm > 59) { return null; }
+      time = pad(hh) + ':' + pad(mm);
+    }
+    if (month < 1 || month > 12 || day < 1 || day > 31) { return null; }
+    // Проверяем календарём, а не таблицей длин месяцев: 31.02 обязано быть
+    // ошибкой, а не молча превратиться в 3 марта.
+    var probe = new Date(year, month - 1, day);
+    if (probe.getFullYear() !== year || probe.getMonth() !== month - 1
+        || probe.getDate() !== day) {
+      return null;
+    }
+    return year + '-' + pad(month) + '-' + pad(day) + 'T' + time;
+  }
+
+  function toRu(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || '');
+    if (!m) { return ''; }
+    return m[3] + '.' + m[2] + '.' + m[1] + ', ' + m[4] + ':' + m[5];
+  }
+
+  document.querySelectorAll('[data-k-date]').forEach(function (box) {
+    var text = box.querySelector('.k-date__text');
+    var native = box.querySelector('.k-date__native');
+    var pick = box.querySelector('.k-date__pick');
+    var err = box.querySelector('.k-date__err');
+    if (!text || !native) { return; }
+
+    var defaultTime = box.dataset.defaultTime || '23:59';
+
+    function showError(on) {
+      if (err) { err.hidden = !on; }
+      text.classList.toggle('is-bad', !!on);
+    }
+
+    // Родное поле — истина. Текстовое всегда показывает то же значение.
+    function fromNative() {
+      text.value = toRu(native.value);
+      showError(false);
+    }
+
+    // Разбираем напечатанное. Пусто — это законный ответ «срока нет»,
+    // ошибкой не считаем.
+    function fromText() {
+      var raw = (text.value || '').trim();
+      if (!raw) {
+        native.value = '';
+        showError(false);
+        return;
+      }
+      var iso = toIso(raw, defaultTime);
+      if (iso === null) {
+        // ⚠️ РОДНОЕ ПОЛЕ НЕ ЧИСТИМ. Если человек опечатался, прежнее
+        // значение обязано уцелеть: иначе правка «20:00» → «20:0» стирала бы
+        // уже выбранный срок, и работа уходила бы вообще без него.
+        showError(true);
+        return;
+      }
+      native.value = iso;
+      // Показываем ровно то, что поняли: дополненное время (23:59 у срока)
+      // видно сразу, а не всплывает потом на странице работы.
+      text.value = toRu(iso);
+      showError(false);
+    }
+
+    fromNative();
+    text.addEventListener('blur', fromText);
+    text.addEventListener('change', fromText);
+    text.addEventListener('keydown', function (event) {
+      // ⚠️ Enter в поле формы — встроенная «неявная отправка» HTML. Здесь она
+      // особенно некстати: строка ещё не разобрана, и работа ушла бы без
+      // срока. Разбираем и гасим (правило из сессии 3, work_form.js).
+      if (event.key === 'Enter') { event.preventDefault(); fromText(); }
+    });
+    native.addEventListener('change', fromNative);
+    native.addEventListener('input', fromNative);
+
+    if (pick) {
+      pick.addEventListener('click', function () {
+        // showPicker есть не везде; где нет — отдаём фокус родному полю,
+        // и календарь открывается его же средствами.
+        try {
+          if (typeof native.showPicker === 'function') {
+            native.showPicker();
+            return;
+          }
+        } catch (e) { /* жест не от пользователя либо поле не отрисовано */ }
+        native.focus();
+      });
+    }
+
+    // Класс ставится ПОСЛЕДНИМ: пока его нет, виден обычный родной
+    // datetime-local, и поле работает как до этой фазы.
+    box.classList.add('is-ready');
+  });
+})();
+</script>

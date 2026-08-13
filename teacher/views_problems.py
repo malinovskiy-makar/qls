@@ -20,7 +20,7 @@ from problems.models_platform import (
     SolutionVisibility,
 )
 
-from .access import tutor_required
+from .access import group_id_param, tutor_required
 
 
 def _canonical_topics():
@@ -322,7 +322,7 @@ def problem_form(request, pk=None):
         # подбору уже без контрольной — ровно та потеря, которую и чинили.
         'is_exam': (request.GET.get('kind') or request.POST.get('kind_work')
                     ) == 'exam',
-        'group_id': request.GET.get('group') or request.POST.get('group'),
+        'group_id': group_id_param(request),
         'return_to': _safe_return(request.GET.get('return_to')
                                   or request.POST.get('return_to')),
         'solution_visibility': SolutionVisibility.choices,

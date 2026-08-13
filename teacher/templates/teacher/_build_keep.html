@@ -14,8 +14,16 @@
   var KEY = 'hw_settings';
   // Поля, которые надо помнить. Имена — как в форме: второго списка,
   // способного разъехаться с разметкой, не заводим.
-  var FIELDS = ['name', 'deadline', 'starts_at', 'ends_at',
-                'duration_minutes', 'exam_mode'];
+  //
+  // ⚠️ ДВА ИМЕНИ ИЗ ШЕСТИ БЫЛИ ВЫДУМАННЫМИ (найдено в сессии 10, фаза 2.1):
+  // в списке стояли `duration_minutes` и `exam_mode`, а формы отдают
+  // `duration` и `kind`. `querySelector` не находил их никогда, память
+  // молча не работала — ровно тот случай, когда «второй список разъехался
+  // с разметкой», от которого предостерегает комментарий выше.
+  // `kind` в общий список НЕ возвращаем: это переключатели, а не текстовое
+  // поле, и `field.value = …` переписал бы value самой кнопки. Он ниже,
+  // своим куском.
+  var FIELDS = ['name', 'deadline', 'starts_at', 'ends_at', 'duration'];
 
   function read() {
     try { return JSON.parse(sessionStorage.getItem(KEY) || '{}'); }
@@ -33,13 +41,45 @@
     if (!field) { return; }
     // Подставляем сохранённое ТОЛЬКО в пустое поле: значение, пришедшее с
     // сервера (правка существующей работы), главнее нашей памяти.
-    if (!field.value && saved[name]) { field.value = saved[name]; }
+    if (!field.value && saved[name]) {
+      field.value = saved[name];
+      // ⚠️ Поле даты — надстройка над родным `datetime-local` (фаза 2.3):
+      // подставив значение молча, мы обновили бы родное поле, а человек
+      // видел бы пустую строку. Событие заставляет надстройку показать то,
+      // что мы положили.
+      field.dispatchEvent(new Event('change', {bubbles: true}));
+    }
     field.addEventListener('input', function () {
       var data = read();
       data[name] = field.value;
       write(data);
     });
+    // Родное поле даты меняется не только набором с клавиатуры, но и
+    // календарём — тогда `input` у него не всегда есть, а `change` есть.
+    field.addEventListener('change', function () {
+      var data = read();
+      data[name] = field.value;
+      write(data);
+    });
   });
+
+  // Способ ограничить время — переключатели, поэтому не значение поля, а
+  // какой из них отмечен.
+  var modes = document.querySelectorAll('input[name="kind"][type="radio"]');
+  if (modes.length) {
+    modes.forEach(function (radio) {
+      if (saved.kind && radio.value === saved.kind && !radio.checked) {
+        radio.checked = true;
+        radio.dispatchEvent(new Event('change', {bubbles: true}));
+      }
+      radio.addEventListener('change', function () {
+        if (!radio.checked) { return; }
+        var data = read();
+        data.kind = radio.value;
+        write(data);
+      });
+    });
+  }
 
   // Группы — набор галочек, поэтому список значений.
   var boxes = document.querySelectorAll('input[name="groups"]');

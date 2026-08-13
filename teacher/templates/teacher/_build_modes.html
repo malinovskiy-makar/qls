@@ -31,12 +31,18 @@
   ничего не теряется.
   {% endcomment %}
   <a class="k-tile {% if mode == 'search' %}k-tile--on{% endif %}"
-     href="{% if exam and group_id %}{% url 'teacher:exam_create' group_id %}{% else %}{% url 'teacher:assignment_create' %}{% endif %}">
+     href="{% if exam and group_id %}{% url 'teacher:exam_create' group_id %}{% else %}{% url 'teacher:assignment_create' %}{% if group_id %}?group={{ group_id }}{% endif %}{% endif %}">
     <span class="k-tile__name">Искать самому</span>
     <span class="k-tile__note">Ручной поиск по каталогу</span>
   </a>
+  {% comment %}
+  ⚠️ «НАПИСАТЬ СВОЮ» ТЕРЯЛА И ЗАНЯТИЕ, И ВИД РАБОТЫ (сессия 10, фаза 2.1):
+  ссылка была голая `?to_cart=1`. Репетитор, собиравший контрольную для
+  занятия, уходил дописать свою задачу и возвращался к домашке без занятия —
+  та самая потеря, которую чинили в сессии 9 у соседних ссылок.
+  {% endcomment %}
   <a class="k-tile {% if mode == 'own' %}k-tile--on{% endif %}"
-     href="{% url 'teacher:problem_new' %}?to_cart=1">
+     href="{% url 'teacher:problem_new' %}?to_cart=1{% if exam %}&amp;kind=exam{% endif %}{% if group_id %}&amp;group={{ group_id }}{% endif %}">
     <span class="k-tile__name">Написать свою</span>
     <span class="k-tile__note">Создание задачи с нуля</span>
   </a>
