@@ -75,6 +75,12 @@ class Calc2MathRegressionTest(StaticLiveServerTestCase):
                 cwd=str(settings.BASE_DIR),
                 capture_output=True,
                 text=True,
+                # Раннер печатает по-русски в UTF-8, а консоль Windows живёт в
+                # cp1251: без явной кодировки поток чтения падает на
+                # UnicodeDecodeError, вывод теряется целиком и контрольные числа
+                # не видно (тест при этом зелёный — худший вид молчания).
+                encoding="utf-8",
+                errors="replace",
                 timeout=180,
             )
         except FileNotFoundError as exc:
