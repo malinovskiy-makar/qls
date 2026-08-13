@@ -221,7 +221,7 @@ function mathDot(g, mx, my, x, y, color, label, dy, key) {
   const t = g.append('text').attr('x', tx).attr('y', ty)
     .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6);
-  if (hasMathMarkup(shown)) mathTspans(t, shown); else t.text(shown);
+  renderLabelText(t, shown);
   if (!key) return;
   makeRenamable(t, shown, tx, ty, (v) => {
     if (v) STATE.pointNames[key] = v; else delete STATE.pointNames[key];
@@ -503,9 +503,12 @@ function labelCurveMath(g, f, mx, my, txt, color, key) {
     const v = f(x);
     if (!isNaN(v) && v >= ylo && v <= yhi) {
       const sm = smoothLabel('math:' + (key || txt), mx(x), my(v), true);
-      g.append('text').attr('x', sm.px - 4).attr('y', sm.py - 7).attr('text-anchor', 'end')
-        .attr('font-size', curveLabelSize()).attr('font-weight', 600).attr('fill', color)
-        .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6).text(txt);
+      // А28: имя кривой набирается с индексом (f с единицей), а не слипшимся текстом.
+      renderLabelText(
+        g.append('text').attr('x', sm.px - 4).attr('y', sm.py - 7).attr('text-anchor', 'end')
+          .attr('font-size', curveLabelSize()).attr('font-weight', 600).attr('fill', color)
+          .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6),
+        txt);
       return;
     }
   }
@@ -1119,6 +1122,29 @@ function texText(s) {
   return out;
 }
 
+/* Читаемый текст подписи с холста.
+
+   Собирать только собственные текстовые узлы больше нельзя: с А28 величина
+   разложена на tspan'ы (символ, индекс, остаток), и такой сбор давал огрызок
+   или пустую строку — подписи пропали бы из файла целиком. Полный textContent
+   тоже не годится: у подписи бывает дочерний <title> с подсказкой («Двойной
+   щелчок, чтобы переименовать»), и он приехал бы в .tex как часть названия. */
+function labelPlainText(el) {
+  let out = '';
+  const walk = (n) => {
+    n.childNodes.forEach(c => {
+      if (c.nodeType === 3) { out += c.nodeValue; return; }
+      if (c.nodeType !== 1) return;
+      const tag = c.tagName.toLowerCase();
+      if (tag === 'title' || tag === 'desc') return;    // подсказка, не текст
+      walk(c);
+    });
+  };
+  walk(el);
+  // Нулевой ширины пробел ставится, чтобы вернуть базовую линию после индекса.
+  return out.replace(/​/g, '');
+}
+
 /* Подпись с холста → запись для .tex (А46).
 
    Величина уходит математикой ($P_b = 60$), проза — обычным текстом. Решает
@@ -1438,8 +1464,7 @@ function buildTex(title, label) {
         body.push('\\addplot[' + col + ', only marks, mark size=' +
           markPt(+el.getAttribute('r')).toFixed(1) + 'pt, forget plot] coordinates {' + pt(c[0], c[1]) + '};');
       } else if (tag === 'text') {
-        const raw = Array.prototype.filter.call(el.childNodes, n => n.nodeType === 3)
-          .map(n => n.nodeValue).join('');
+        const raw = labelPlainText(el);
         // А46. Величина набирается формулой: Pb=60 уходит как $P_b = 60$, а не
         // обычным текстом. Логика перевода ОДНА на экран, бумагу и панель
         // (quantityTex), поэтому одна и та же величина не может быть написана

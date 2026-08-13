@@ -523,8 +523,12 @@ function redrawPlants() {
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const label = (x, y, txt, color) => {
     if (isNaN(y) || y > CONFIG.Pmax || y < 0) return;
-    g.append('text').attr('x', sx(x)).attr('y', sy(y) - 5).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(txt);
+    // А28: величина набирается с индексом, а не слипшимся текстом.
+    renderLabelText(
+      g.append('text').attr('x', sx(x)).attr('y', sy(y) - 5).attr('font-size', FS.base)
+        .attr('font-weight', 600).attr('fill', color)
+        .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5),
+      txt);
   };
   if (STATE.plView === 'mc') {
     // MC каждого завода по СВОЕМУ объёму + совокупная MC (горизонтальная сумма).

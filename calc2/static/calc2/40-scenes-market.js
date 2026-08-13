@@ -580,6 +580,63 @@ function mathTspans(sel, txt) {
 // Есть ли в подписи что-то математическое: иначе не стоит и разбирать.
 function hasMathMarkup(txt) { return /[*^_]/.test(String(txt == null ? '' : txt)); }
 
+/* Подпись-величина на холсте (А28 · А29).
+
+   Было: в правой панели «$P_b$» набиралось формулой, а на холсте та же
+   величина стояла обычным текстом «Pb=60». Даже внутри холста согласия не
+   было: «Q₁» пользовалось юникодной цифрой, а «Pb» и «Ps» — обычными буквами.
+   Всего таких «текстовых формул» на холсте было больше восьмидесяти.
+
+   Разбор ведёт ТА ЖЕ функция, что и для панели и для файла (qtyParts), так что
+   решение «величина это или проза» принимается один раз и в одном месте.
+   На холсте формула набирается средствами самого SVG (tspan со смещением
+   базовой линии): KaTeX сюда не встанет, а вставка через foreignObject
+   выпала бы из снимка холста, то есть из выгрузки в PNG. */
+function qtyTspans(sel, raw) {
+  const parts = qtyParts(raw);
+  let shift = 0;
+  const put = (v, kind) => {
+    if (!v) return;
+    if (kind === 'txt') {
+      const ts = sel.append('tspan').text(v);
+      if (shift) { ts.attr('dy', (-shift).toFixed(2) + 'em'); shift = 0; }
+      return;
+    }
+    const d = (kind === 'sup') ? -0.42 : 0.26;
+    sel.append('tspan').attr('dy', (d - shift).toFixed(2) + 'em')
+      .attr('font-size', '76%').text(v);
+    shift = d;
+  };
+  parts.forEach(p => {
+    if (p.kind === 'sym') {
+      put(p.greek ? qtyGreekChar(p.greek) : p.s, 'txt');
+      if (p.sub) put(p.sub, 'sub');
+      if (p.sup) put(p.sup, 'sup');
+    } else put(p.s, 'txt');
+  });
+  // dy у tspan накапливается: возвращаем базовую линию, иначе следующая
+  // подпись в той же строке поедет вслед за индексом.
+  if (shift) sel.append('tspan').attr('dy', (-shift).toFixed(2) + 'em').text('​');
+  return sel;
+}
+
+// Греческая буква остаётся собой: в LaTeX она пишется командой, на экране
+// печатается как есть.
+function qtyGreekChar(cmd) {
+  const back = Object.keys(QTY_GREEK).find(ch => QTY_GREEK[ch] === cmd);
+  return back || cmd;
+}
+
+/* Единая точка печати подписи. Явная разметка (P_b, Q^2) разбирается как
+   раньше; величина без разметки (Pb, Q₁) — через общий разбор; проза
+   печатается как есть. */
+function renderLabelText(sel, txt) {
+  const s = String(txt == null ? '' : txt);
+  if (hasMathMarkup(s)) return mathTspans(sel, s);
+  if (typeof qtyIsQuantity === 'function' && qtyIsQuantity(s)) return qtyTspans(sel, s);
+  return sel.text(s);
+}
+
 function haloText(g, x, y, txt, anchor, baseline) {
   const w = String(txt).length * 5.9 + 6;      // ширина строки при кегле 10
   let ax = anchor, px = x;
@@ -591,7 +648,7 @@ function haloText(g, x, y, txt, anchor, baseline) {
     .attr('text-anchor', ax).attr('dominant-baseline', baseline)
     .attr('font-size', FS.small).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3);
-  if (hasMathMarkup(txt)) mathTspans(t, txt); else t.text(txt);
+  renderLabelText(t, txt);
   return t;
 }
 

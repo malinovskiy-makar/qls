@@ -235,8 +235,10 @@ function labelCurve(g, f, txt, color, opts) {
     .attr('x', tx).attr('y', y)
     .attr('text-anchor', toLeft ? 'end' : 'start')
     .attr('font-size', o.size || curveLabelSize()).attr('font-weight', 600).attr('fill', color)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6)
-    .text(txt);
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6);
+  // А28: название кривой набирается как величина (MC, S + t, Q_d), а не
+  // обычным текстом. Решает общий разбор, тот же, что у панели и у файла.
+  renderLabelText(t, txt);
   // Название кривой правится двойным щелчком прямо на графике.
   if (o.curve) {
     makeRenamable(t, txt, tx, y, (v) => {

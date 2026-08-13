@@ -1254,7 +1254,11 @@ const CASES = [
             var curve = null, axis = null, other = null;
             t.forEach(function (n) {
               if (n.classList.contains('axis-num')) { if (axis === null) axis = +n.getAttribute('font-size'); return; }
-              var s = n.firstChild && n.firstChild.nodeValue;
+              /* Текст подписи читаем целиком, а не первым узлом: с А28 величина
+                 разложена на tspan'ы, и firstChild у неё элемент, а не текст.
+                 Ожидаемые размеры прежние — меняется только способ найти
+                 подпись. Подсказку в <title> отбрасываем. */
+              var s = labelPlainText(n).trim();
               if (s === 'S' && curve === null) curve = +n.getAttribute('font-size');
               else if (other === null) other = +n.getAttribute('font-size');
             });
@@ -1695,6 +1699,41 @@ const CASES = [
              ['нижняя граница', 'ymin', 'WANTYMIN', 0.02],
              ['верхняя граница', 'ymax', 'WANTYMAX', 0.02],
              ['поле графика, а не картинка', 'only', 1, 0]],
+  },
+  {
+    /* А28 · А29. Величины на холсте набраны с индексами.
+
+       Было: в правой панели «$P_b$» набиралось формулой, а на холсте та же
+       величина стояла обычным текстом «Pb=60». Даже внутри холста согласия не
+       было: «Q₁» пользовалось юникодной цифрой, а «Pb» и «Ps» — обычными
+       буквами. Таких «текстовых формул» по всем сценам было больше восьмидесяти.
+
+       Решает общий разбор (qtyParts) — тот же, что у панели и у файла; на
+       холсте он печатается средствами SVG, поэтому подписи остаются в снимке
+       холста и попадают в выгрузку в PNG. */
+    name: 'Подписи · величины на холсте с индексами, а не слипшимся текстом',
+    run: `var scenes = Object.keys(SCENE_ROUTE);
+          var glued = 0, withSub = 0;
+          scenes.forEach(function (k) {
+            pickScene(k);
+            document.querySelectorAll('#chart text').forEach(function (t) {
+              if (t.classList.contains('axis-num')) return;
+              if (t.getBoundingClientRect().width < 0.5) return;
+              var own = [].filter.call(t.childNodes, function (n) { return n.nodeType === 3; })
+                          .map(function (n) { return n.nodeValue; }).join('');
+              if (/[A-Za-z][0-9\\u2080-\\u2089]|[0-9\\u2080-\\u2089][A-Za-z]/.test(own)) glued++;
+              if (t.querySelector('tspan[dy]')) withSub++;
+            });
+          });
+          pickScene('tax');
+          var tex = buildTex('', '');
+          return { glued: glued, withSub: withSub,
+                   texPb: tex.indexOf('$P_b = 60$') >= 0 ? 1 : 0,
+                   texNodes: (tex.match(/\\\\node\\[/g) || []).length };`,
+    checks: [['слипшихся величин', 'glued', 0, 0],
+             ['подписей с индексом', 'withSub', 30, 28],
+             ['в файле цена покупателя с индексом', 'texPb', 1, 0],
+             ['подписи из файла не пропали', 'texNodes', 11, 4]],
   },
   {
     /* А60. Подписи не налезают друг на друга.
