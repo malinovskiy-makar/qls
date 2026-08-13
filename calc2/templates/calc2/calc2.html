@@ -2000,7 +2000,11 @@
 
   <!-- ── ГРАФИК ────────────────────────────────────────────────────── -->
   <div class="graph-wrap" id="graph-wrap">
+    <!-- А58. Печатная шапка и подвал: на экране их нет, на листе они несут
+         название модели и ключевые значения. Заполняются перед печатью. -->
+    <div class="print-only" id="print-title"></div>
     <svg id="chart"></svg>
+    <div class="print-only" id="print-stats"></div>
 
     <!-- Быстрый расчёт площади: появляется, когда вершин набрано достаточно. -->
     <button class="quick-area" id="quick-area" type="button" hidden>Площадь по точкам</button>

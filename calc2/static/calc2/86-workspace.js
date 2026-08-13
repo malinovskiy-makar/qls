@@ -87,7 +87,13 @@ function dockActive(id, on) {
    анимации ширины его надо перерисовать (этим занимается ResizeObserver). */
 function setSideOpen(panelId, btnId, open) {
   const p = document.getElementById(panelId);
-  if (p) p.classList.toggle('collapsed', !open);
+  if (p) {
+    p.classList.toggle('collapsed', !open);
+    /* На узком экране правая панель сворачивается сама (А57). Пометка
+       «открыл человек» отменяет это правило: раз развернул руками, панель
+       остаётся развёрнутой. */
+    p.classList.toggle('user-open', !!open);
+  }
   const b = document.getElementById(btnId);
   if (b) {
     b.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -730,3 +736,48 @@ function wireWrench() {
   }
 }
 
+
+/* ── Печать (А58) ─────────────────────────────────────────────────────────
+   Правил печати не было ни одного: Ctrl+P выводил страницу как есть, вместе
+   с рейкой значков, обеими панелями и тёмным фоном. Стили печати оставляют на
+   листе только график; здесь наполняем его шапку и подвал — название модели и
+   ключевые значения, иначе лист выходит безымянным.
+
+   Тёмная тема на бумаге не нужна: на время печати переключаемся на светлую и
+   возвращаем как было. */
+function fillPrintBlocks() {
+  const title = document.getElementById('print-title');
+  if (title) {
+    title.textContent = STATE.graphTitle
+      || SCENE_NAMES[STATE.sceneKey] || 'График';
+  }
+  const stats = document.getElementById('print-stats');
+  if (!stats) return;
+  stats.innerHTML = '';
+  const src = document.getElementById('sb-body');
+  if (!src) return;
+  // Берём только строки со значениями: разбор на бумаге ни к чему.
+  src.querySelectorAll('.stat').forEach(row => {
+    const clone = row.cloneNode(true);
+    stats.appendChild(clone);
+  });
+}
+
+let _printTheme = null;
+window.addEventListener('beforeprint', () => {
+  fillPrintBlocks();
+  const root = document.documentElement;
+  _printTheme = root.getAttribute('data-theme');
+  if (_printTheme === 'dark') {
+    root.setAttribute('data-theme', 'light');
+    if (typeof redrawAll === 'function') redrawAll();
+  }
+});
+window.addEventListener('afterprint', () => {
+  const root = document.documentElement;
+  if (_printTheme === 'dark') {
+    root.setAttribute('data-theme', 'dark');
+    if (typeof redrawAll === 'function') redrawAll();
+  }
+  _printTheme = null;
+});
