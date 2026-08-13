@@ -41,6 +41,8 @@ def _pending_count(assignments):
 
 def assignment_stats(assignment):
     """Сводка по заданию: сдано / из скольких / ждёт проверки."""
+    from django.db.models import Max
+
     from problems.models import Submission
     from problems.timefmt import deadline_pair
 
@@ -80,10 +82,22 @@ def assignment_stats(assignment):
     # ничем. Тот же довод, по которому в истории работ баллы заменены
     # процентами.
     percent = _assignment_percent(assignment)
+    # ⚠️ У ЗАНЯТИЯ ОДИН НА ОДИН «сдали 1 из 1» — ГРУППОВАЯ ФОРМУЛИРОВКА
+    # (обзор 13.08, п. 36). У одного человека это не доля, а факт: сдана или
+    # нет. Момент сдачи спрашиваем ЗДЕСЬ, рядом с остальными числами
+    # карточки, — иначе шаблону пришлось бы ходить в базу самому.
+    solo = assignment.group.single_student if assignment.group_id else None
+    solo_submitted_at = None
+    if solo is not None:
+        solo_submitted_at = (Submission.objects
+                             .filter(assignment=assignment, student=solo,
+                                     submitted_at__isnull=False)
+                             .aggregate(last=Max('submitted_at'))['last'])
     return {
         'assignment': assignment,
         'students': students,
         'submitted': submitted_students,
+        'solo_submitted_at': solo_submitted_at,
         'pending': pending,
         'deadline': deadline,
         'deadline_human': human,
@@ -309,8 +323,14 @@ def group_detail(request, pk):
         key=lambda a: (a.deadline_at is None, a.deadline_at or a.created_at))
 
     rows = [assignment_stats(a) for a in assignments]
+    # ⚠️ `solo` НУЖЕН НА ВСЕХ ВКЛАДКАХ (обзор 13.08, п. 36–38). Раньше он
+    # считался только для обзора, и вкладки «Задания» и «Материалы» говорили
+    # групповыми словами про занятие один на один: «сдали 1 из 1», «средняя
+    # оценка», «доступные группе».
+    solo = group.single_student
     context = {
         'group': group,
+        'solo': solo,
         'tab': tab,
         'assignment_rows': rows,
         'assignment_groups': group_assignments_by_state(
@@ -336,10 +356,8 @@ def group_detail(request, pk):
         # «ученики × темы», таблица учеников и строка «по группе» теряют
         # смысл. Вместо них — тот же блок «Прогресс по темам», что на
         # карточке ученика, и четыре карточки-показателя.
-        solo = group.single_student
         if group.is_individual and solo is not None:
             context.update({
-                'solo': solo,
                 'solo_profile': getattr(solo, 'profile', None),
                 'progress': stats_module.topic_progress_pairs(solo,
                                                               period=period),

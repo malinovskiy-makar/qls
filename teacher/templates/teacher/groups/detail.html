@@ -222,8 +222,12 @@
              href="{% if row.is_exam %}{% url 'teacher:group_exam_results' group.pk row.assignment.pk %}{% else %}{% url 'teacher:group_assignment' group.pk row.assignment.pk %}{% endif %}"
              class="ass-link">{{ row.assignment.name }}</a>
         </div>
+        {% comment %}
+        ⚠️ У ЗАНЯТИЯ ОДИН НА ОДИН «сдали 1 из 1» — ГРУППОВАЯ ФОРМУЛИРОВКА
+        (обзор 13.08, п. 36). У одного человека это не доля, а факт.
+        {% endcomment %}
         <div class="ass-meta">
-          сдали {{ row.submitted }} из {{ row.students }} ·
+          {% if solo %}{% if row.solo_submitted_at %}сдана {{ row.solo_submitted_at|date:"d.m" }}{% else %}не сдана{% endif %}{% else %}сдали {{ row.submitted }} из {{ row.students }}{% endif %} ·
           {% if row.deadline %}<span data-hint="{{ row.deadline_exact }}">{{ row.deadline_human }}</span>{% else %}без срока{% endif %}
         </div>
       </div>
@@ -243,7 +247,12 @@
       сложность, которую ученики поставили сами.
       {% endcomment %}
       <div class="ass-figures">
-        {% if row.percent is not None %}<b>{{ row.percent }}%</b>средняя оценка{% else %}<b>—</b>никто не сдал{% endif %}
+        {% comment %}
+        ⚠️ «СРЕДНЯЯ» ТОЛЬКО ТАМ, ГДЕ ЕСТЬ ПО ЧЕМУ УСРЕДНЯТЬ (обзор 13.08,
+        п. 37). Средняя по одному ученику — просто оценка; «никто не сдал»
+        про одного человека — тоже групповая формулировка.
+        {% endcomment %}
+        {% if row.percent is not None %}<b>{{ row.percent }}%</b>{% if solo %}оценка{% else %}средняя оценка{% endif %}{% else %}<b>—</b>{% if solo %}работа не сдана{% else %}никто не сдал{% endif %}{% endif %}
         <div>{{ row.difficulty_label }}</div>
       </div>
       {% endif %}
@@ -270,7 +279,7 @@
 
   {% else %}
   <div class="empty-state">
-    <p>В группе пока нет заданий.</p>
+    <p>{% if solo %}У этого ученика пока нет заданий.{% else %}В группе пока нет заданий.{% endif %}</p>
     <p>Создайте домашку или контрольную — они появятся здесь.</p>
   </div>
   {% endif %}
@@ -278,7 +287,12 @@
 {% else %}
   <div class="empty-state">
     <p><strong>Материалы</strong></p>
-    <p>Появится позже. Сюда лягут сохранённые графики, доступные группе.</p>
+    {% comment %}
+    ⚠️ У индивидуального занятия группы нет — «доступные группе» обещает то,
+    чего не существует (обзор 13.08, п. 38).
+    {% endcomment %}
+    <p>Появится позже. Сюда лягут сохранённые графики, доступные
+      {% if solo %}ученику{% else %}группе{% endif %}.</p>
   </div>
 {% endif %}
 {% endblock %}
