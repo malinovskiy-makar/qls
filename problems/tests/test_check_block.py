@@ -47,13 +47,19 @@ class CheckBlockMarkupTests(TestCase):
             args=[self.group.pk, self.assignment.pk])).content.decode()
 
     def _markup(self):
-        """Разметка БЕЗ скриптов.
+        """Разметка БЕЗ скриптов И БЕЗ СТИЛЕЙ.
 
         ⚠️ В скрипте страницы лежат ОБЕ надписи кнопки (он их и переключает).
         Искать надпись по всему исходнику значит всегда находить обе и не
         проверить ничего.
+
+        ⚠️ Стили вырезаются по той же причине: набор деталей вклеивается в
+        `<style>` целиком, вместе с комментариями. Слово из объяснения в
+        CSS — не надпись на экране, а проверка на нём краснела (обзор 13.08:
+        в наборе появился комментарий со словом «готово»).
         """
-        return re.sub(r'<script.*?</script>', '', self._page(), flags=re.S)
+        html = re.sub(r'<script.*?</script>', '', self._page(), flags=re.S)
+        return re.sub(r'<style.*?</style>', '', html, flags=re.S)
 
     def _buttons(self):
         html = self._markup()

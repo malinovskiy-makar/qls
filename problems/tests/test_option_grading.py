@@ -427,14 +427,20 @@ class TutorStudentViewTests(TestCase):
         self.assertIn('глазами ученика', response.content.decode())
 
     def test_review_page_always_offers_the_link(self):
-        """Кнопка на месте. Надпись сокращена в фазе 7.2 до «Глазами
-        ученика»: длинная строка вылезала за границы кнопки."""
+        """Переход на месте.
+
+        Надпись сокращена в фазе 7.2 до «Глазами ученика» (длинная строка
+        вылезала за границы кнопки), а в обзоре 13.08 (п. 47) это перестало
+        быть кнопкой: третья кнопка в ряду читалась как НЕАКТИВНАЯ. Теперь
+        тихая ссылка со строчной буквы — как в сводке решений.
+        """
         work = self._work(group=None)
         sub = Submission.objects.get(assignment=work)
         body = self.client.get(
             reverse('teacher:review_submission',
                     args=[sub.pk])).content.decode()
-        self.assertIn('Глазами ученика', body)
+        self.assertIn('глазами ученика', body)
+        self.assertIn('rv-eyes', body)
         # Класс .btn-back тут стоять не должен: у него white-space:nowrap.
         self.assertNotIn('class="btn-back"\n             style', body)
 
