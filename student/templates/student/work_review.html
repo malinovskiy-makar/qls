@@ -150,11 +150,17 @@
   <div class="wr-cap">итоговый балл за работу</div>
   {% elif show_scores and summary.graded_max %}
   <div class="wr-score">{{ summary.scored }}<span class="k-score__of">из</span><span class="k-score__max">{{ summary.graded_max }}</span></div>
-  <div class="wr-cap">по проверенным задачам · всего в работе {{ summary.max_score }} б.</div>
+  {% comment %}
+  ⚠️ ОДНО ОБЪЯСНЕНИЕ, А НЕ ДВА (обзор 13.08, п. 51). Здесь стояло «по
+  проверенным задачам · всего в работе 18 б.», а строкой ниже плашка
+  говорила ровно то же словами. Оставлена плашка — она понятнее и уже
+  объясняет, почему балл предварительный; подпись сокращена до сути.
+  {% endcomment %}
+  <div class="wr-cap">по проверенным задачам</div>
   {% elif show_scores %}
   {# Проверено пока НИЧЕГО. «0 из 0» — не результат, а недоразумение. #}
   <div class="wr-score">—</div>
-  <div class="wr-cap">ещё ничего не проверено · всего в работе {{ summary.max_score }} б.</div>
+  <div class="wr-cap">ещё ничего не проверено</div>
   {% else %}
   <div class="wr-score">—</div>
   <div class="wr-cap">преподаватель откроет результат после проверки</div>

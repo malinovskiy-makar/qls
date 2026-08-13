@@ -784,4 +784,40 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
 })();
 </script>
 
+<script>
+// ⚠️ ПРИХОД ПО «НАПИСАТЬ УЧЕНИКУ» (обзор 13.08, п. 43). Кнопка в сводке
+// решений приводит сюда с `?write=<ученик>`. Раньше она приводила просто на
+// страницу, и репетитор искал переписку сам: находил блок, выбирал
+// видимость, выбирал получателя. Теперь всё это делает страница.
+//
+// Открываем переписку ПЕРВОЙ задачи: отдельной переписки «репетитор ↔
+// ученик» в продукте нет, комментарий всегда привязан к задаче.
+(function () {
+  var who = new URLSearchParams(window.location.search).get('write');
+  if (!who) { return; }
+  var form = document.querySelector('.comment-form');
+  if (!form) { return; }
+  var select = form.querySelector('.vis-select');
+  var picker = form.querySelector('[name=recipient_id]');
+  // Ставим «видно только этому ученику»: письмо адресное, и показывать его
+  // всей группе — не то, о чём просили нажатием.
+  if (select && [].some.call(select.options, function (o) {
+        return o.value === 'private'; })) {
+    select.value = 'private';
+    // Список получателей показывает свой обработчик — будим его событием,
+    // а не повторяем логику показа второй раз.
+    select.dispatchEvent(new Event('change'));
+  }
+  if (picker && [].some.call(picker.options, function (o) {
+        return o.value === who; })) {
+    picker.value = who;
+  }
+  var area = form.querySelector('textarea');
+  if (area) {
+    form.scrollIntoView({ block: 'center' });
+    area.focus();
+  }
+})();
+</script>
+
 {% endblock %}

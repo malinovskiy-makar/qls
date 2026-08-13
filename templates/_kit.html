@@ -255,6 +255,12 @@
   box-shadow: 0 0 0 3px var(--focus-ring); background: var(--surface);
 }
 .k-score__cap { font-size: 11px; color: var(--text3); }
+/* ⚠️ «Балл не поставлен» — СЛОВАМИ, а не прочерком (обзор 13.08, п. 46).
+   Прочерк на месте крупного числа, да ещё над подписью «из 2», читался как
+   «ноль из двух». Кегль меньше числа намеренно: это отсутствие значения, и
+   оно не должно весить столько же, сколько значение. */
+.k-score__none { font-size: 14px; font-weight: 600; color: var(--text2);
+                 line-height: 1.35; white-space: nowrap; padding: 6px 0; }
 /* Стрелки у крупного балла прячет общее правило числовых полей выше
    (сессия 7, фаза 2) — здесь второй копии больше нет. */
 
@@ -291,7 +297,12 @@
 .k-mark.k-mark--correct { border-left-color: var(--green); }
 .k-mark.k-mark--partial { border-left-color: var(--amber); }
 .k-mark.k-mark--wrong   { border-left-color: var(--error); }
-.k-mark.k-mark--pending { border-left-color: var(--amber); }
+/* ⚠️ «ЖДЁТ ПРОВЕРКИ» — НЕЙТРАЛЬНЫЙ СЕРО-СИНИЙ (обзор 13.08, п. 45). Янтарь
+   занят смыслом «частично верно», и на двух соседних экранах — проверка
+   задачи и итоги проверки — одна и та же жёлтая полоса означала разное:
+   между ними ровно один клик. Цвет заведён токеном `--pending`, чтобы обе
+   темы менялись в одной точке. */
+.k-mark.k-mark--pending { border-left-color: var(--pending); }
 .k-mark.k-mark--empty   { border-left-color: var(--border); }
 .k-mark.k-mark--blank   { border-left-color: var(--border); }
 
@@ -301,7 +312,8 @@
 .k-flag.k-flag--correct { background: var(--green-tint); color: var(--green); }
 .k-flag.k-flag--partial { background: var(--amber-tint); color: var(--amber); }
 .k-flag.k-flag--wrong   { background: var(--error-tint); color: var(--error); }
-.k-flag.k-flag--pending { background: var(--amber-tint); color: var(--amber); }
+.k-flag.k-flag--pending { background: var(--pending-tint);
+                          color: var(--pending); }
 .k-flag.k-flag--empty   { background: var(--chip-bg); color: var(--chip-text); }
 .k-flag.k-flag--blank   { background: var(--chip-bg); color: var(--chip-text); }
 
@@ -346,8 +358,11 @@
    Сколько сданных работ ждёт проверки. Как в мессенджерах: маленький
    кружок с числом у самого слова.
    ⚠️ НЕ ЯРКО-КРАСНЫЙ. Красный кружок читается как авария, а это обычная
-   работа репетитора. Янтарь здесь в своём законном смысле — «ждёт вас»,
-   тот же, что у полосы состояния `.k-mark--pending` на карточке работы.
+   работа репетитора. Янтарь здесь в своём законном смысле — «ждёт вас».
+   ⚠️ Это НЕ тот же цвет, что у полосы `.k-mark--pending`: с обзора 13.08
+   полоса «ждёт проверки» нейтральная (`--pending`), потому что стояла в
+   одном ряду с янтарным «частично верно». Кружок у вкладки ни с чем таким
+   не соседствует, и «ждёт вас» янтарём тут читается верно.
    ⚠️ Ноль не показывается вовсе — пустой кружок это не «ноль дел»,
    а мусор на экране; шаблон не рисует его при нулевом числе. */
 .k-count {

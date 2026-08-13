@@ -614,9 +614,12 @@ class SubmissionsByStudentTests(TestCase):
         self.assertEqual(len(cards), 3)
 
     def test_not_started_card(self):
+        # ⚠️ Подпись уточнена в обзоре 13.08 (п. 43): кнопка теперь несёт
+        # номер ученика и открывает переписку с ним, а не просто страницу
+        # задания. Проверка адреса — в `test_obzor_review.WriteButtonTests`.
         card = self._cards()['sbs_c']
         self.assertEqual(card['state'], 'not_started')
-        self.assertEqual(card['button']['label'], 'Написать')
+        self.assertEqual(card['button']['label'], 'Написать ученику')
         self.assertEqual(card['button']['kind'], 'quiet')
 
     def test_pending_card_offers_checking(self):

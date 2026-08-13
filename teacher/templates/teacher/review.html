@@ -98,6 +98,11 @@
 
 .rv-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
               margin-top: 18px; }
+/* Переход на другой экран, а не действие с работой: тихая ссылка, отодвинутая
+   от пары кнопок. Тот же вид, что у «глазами ученика» в сводке решений. */
+.rv-eyes { margin-left: auto; font-size: 13px; color: var(--text2);
+           text-decoration: none; white-space: nowrap; }
+.rv-eyes:hover { color: var(--text); text-decoration: underline; }
 
 @media (max-width: 720px) {
   .rv-pair { grid-template-columns: 1fr; }
@@ -272,12 +277,24 @@
         {% elif answer_state == 'blank' %}не отвечал
         {% else %}ждёт проверки{% endif %}
       </span>
+      {% comment %}
+      ⚠️ ПРОЧЕРК НАД «ИЗ 2» ЧИТАЛСЯ КАК «НОЛЬ ИЗ ДВУХ» (обзор 13.08, п. 46).
+      Пока балл не поставлен, числа нет вовсе — и притворяться числом ему
+      нельзя. Максимум при этом не прячем: он нужен, чтобы выбрать балл.
+      {% endcomment %}
+      {% if existing_feedback and existing_feedback.score is not None %}
       <span class="k-score">
-        <span class="k-score__value">{% if existing_feedback and existing_feedback.score is not None %}{{ existing_feedback.score|floatformat:"-2" }}{% else %}—{% endif %}<span
+        <span class="k-score__value">{{ existing_feedback.score|floatformat:"-2" }}<span
           class="k-score__of">из</span><span
           class="k-score__max">{{ max_score|floatformat:"-2" }}</span></span>
         <span class="k-score__cap">балл за задачу</span>
       </span>
+      {% else %}
+      <span class="k-score">
+        <span class="k-score__none">балл не поставлен</span>
+        <span class="k-score__cap">максимум {{ max_score|floatformat:"-2" }}</span>
+      </span>
+      {% endif %}
     </div>
     <label class="k-label">Балл за задачу</label>
     <div class="rv-score">
@@ -318,7 +335,14 @@
       <button type="submit" name="go" value="list" class="k-btn k-btn--plain">
         Сохранить и выйти
       </button>
-      <a href="{{ work_review_url }}" class="k-btn k-btn--quiet">Глазами ученика</a>
+      {% comment %}
+      ⚠️ «ГЛАЗАМИ УЧЕНИКА» ОТДЕЛЕНО ОТ ПАРЫ КНОПОК (обзор 13.08, п. 47). Оно
+      стояло третьим в ряду тихой кнопкой и читалось как НЕАКТИВНАЯ кнопка:
+      две кнопки сохраняют, третья почему-то бледная. Это не действие с
+      работой, а переход на другой экран — поэтому тихая ссылка, отодвинутая
+      вправо. Ровно так же он подписан в сводке решений (`.stu-eyes`).
+      {% endcomment %}
+      <a href="{{ work_review_url }}" class="rv-eyes">глазами ученика →</a>
     </div>
   </div>
 </form>

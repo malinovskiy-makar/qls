@@ -101,12 +101,18 @@
     </span>
     {% endif %}
 
+    {% comment %}
+    ⚠️ У ДВУХ КРУПНЫХ ЧИСЕЛ РАЗНЫЕ ЗНАМЕНАТЕЛИ, И ЭТО НЕ ОШИБКА (обзор
+    13.08, п. 41). «3 из 18» и «3 из 13» стоят рядом, числители совпали —
+    выглядит как сбой. Объясняем словами прямо здесь: машина берётся не за
+    всю работу.
+    {% endcomment %}
     {% if card.has_machine %}
     <span class="k-score k-score--pair">
       <span class="k-score__value">{{ card.machine_got }}<span
         class="k-score__of">из</span><span
         class="k-score__max">{{ card.machine_could }}</span></span>
-      <span class="k-score__cap">Результат автопроверки</span>
+      <span class="k-score__cap">Результат автопроверки{% include '_hint.html' with hint='Знаменатель меньше итогового: машина считает только тесты и задачи с утверждённым числовым эталоном. Открытые задачи оценивает преподаватель, и их баллы в это число не входят.' %}</span>
     </span>
     {% endif %}
   </div>
