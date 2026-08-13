@@ -1690,6 +1690,48 @@ const CASES = [
              ['поле графика, а не картинка', 'only', 1, 0]],
   },
   {
+    /* А51 · А52. У монополиста кривой предложения не существует, оптимум там
+       MR = MC. Раздел «Равновесие D = S» показывался в шести монопольных
+       сценах, а в трёх из них ещё и навсегда застревал в состоянии «Отметьте
+       одну кривую как D»: второй кривой в модели нет.
+
+       Заголовок стал свойством сцены. Список монопольных сюжетов берётся по
+       КЛЮЧУ КАРТОЧКИ: STATE.market для этого не годится — после монополии
+       флаг остаётся поднятым в сценах рынка труда. */
+    name: 'Монополия · раздел равновесия не обещает D = S',
+    run: `var out = { badTitle: 0, stuck: 0, monoOk: 0, compOk: 0, autarky: 0 };
+          var mono = ['mono', 'mono-nat', 'mono-d1', 'mono-d3', 'mono-kink', 'monoexport'];
+          var comp = ['sd', 'tax', 'ceil', 'elast', 'ext'];
+          var title = function () {
+            var s = document.getElementById('sec-eq');
+            var t = s && s.querySelector('.section-title');
+            return t ? t.textContent.trim() : '';
+          };
+          var body = function () {
+            var b = document.getElementById('info-eq');
+            return b ? b.textContent.trim() : '';
+          };
+          mono.forEach(function (k) {
+            pickScene(k); redrawAll();
+            if (/D\\s*=\\s*S/.test(title())) out.badTitle++;
+            if (/Отметьте|Появятся/.test(body())) out.stuck++;
+            if (/MR\\s*=\\s*MC/.test(title())) out.monoOk++;
+          });
+          comp.forEach(function (k) {
+            pickScene(k); redrawAll();
+            if (/D\\s*=\\s*S/.test(title())) out.compOk++;
+          });
+          pickScene('smallopen'); redrawAll();
+          if (/автарки/i.test(title())) out.autarky = 1;
+          pickScene('sd');
+          return out;`,
+    checks: [['монопольных с «D = S»', 'badTitle', 0, 0],
+             ['монопольных с застрявшей подсказкой', 'stuck', 0, 0],
+             ['монопольных с «MR = MC»', 'monoOk', 6, 0],
+             ['конкурентных с «D = S»', 'compOk', 5, 0],
+             ['малая открытая: автаркия', 'autarky', 1, 0]],
+  },
+  {
     /* А46 · А47. Подписи величин на бумаге набраны математикой и совпадают с
        тем, что видно на экране. До этого в .tex не было ни одного
        математического режима вовсе, а набор подписей расходился с экраном в

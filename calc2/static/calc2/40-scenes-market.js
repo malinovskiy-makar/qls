@@ -601,10 +601,53 @@ function yWageLabel(g, ox, py, txt) {
   haloText(g, ox - 8, py, txt, 'end', 'middle');
 }
 
+/* Заголовок раздела равновесия — СВОЙСТВО СЦЕНЫ, а не константа (А51 · А52).
+
+   Раньше «Равновесие D = S» стояло в разметке жёстко и показывалось в
+   тринадцати сценах, шесть из которых монопольные. У монополиста кривой
+   предложения не существует вовсе, оптимум там MR = MC, и в трёх сценах
+   раздел вдобавок навсегда застревал в состоянии «Отметьте одну кривую как D»:
+   второй кривой в модели нет, значит и появиться ему было не из чего. Ниже,
+   отдельным блоком, та же сцена честно показывала Qm = 40.
+
+   Малая открытая экономика оставлена, но переименована. Точка D = S там
+   существует и нужна: это равновесие БЕЗ торговли, то самое, с которым
+   сравнивают мировую цену. Убирать её нельзя, а называть «равновесием» без
+   оговорки — сбивать с толку: при мировой цене рынок приходит в другую точку,
+   а разрыв закрывает импорт. */
+/* Список монопольных сюжетов — по КЛЮЧУ КАРТОЧКИ, а не по STATE.market.
+   Проверка через STATE.market казалась естественной и оказалась неверной:
+   после монополии этот флаг остаётся поднятым в сценах рынка труда
+   (монопсония и двусторонняя монополия ставят его сами), и заголовок
+   «Оптимум монополии» уезжал туда, где его быть не должно. Ключ карточки
+   такой двусмысленности не имеет. */
+const MONOPOLY_SCENES = ['mono', 'mono-nat', 'mono-d1', 'mono-d3', 'mono-kink', 'monoexport'];
+function isMonopolyScene() {
+  const key = (typeof baseScene === 'function') ? baseScene(STATE.sceneKey) : STATE.sceneKey;
+  return MONOPOLY_SCENES.indexOf(STATE.sceneKey) >= 0 || MONOPOLY_SCENES.indexOf(key) >= 0;
+}
+
+function eqSectionTitle() {
+  if (isMonopolyScene()) return 'Оптимум монополии: MR = MC';
+  if (STATE.scenario === 'openecon') return 'Равновесие без торговли (автаркия)';
+  return 'Равновесие D = S';
+}
+
+function updateEqSectionTitle() {
+  const sec = document.getElementById('sec-eq');
+  const t = sec && sec.querySelector('.section-title');
+  if (t && t.textContent !== eqSectionTitle()) t.textContent = eqSectionTitle();
+}
+
 // Табло слева: показываем Q* и P* (или подсказку / «не найдено»).
 function updateInfoPanel() {
+  updateEqSectionTitle();
   const box = document.getElementById('info-eq');
   if (!box) return;
+  /* В монополии числа даёт блок «Монополия» под тем же заголовком: Qm, Pm и
+     сравнение с конкурентным выпуском. Своего содержимого у раздела здесь
+     нет, и подсказка про «отметьте кривую S» тут была бы неправдой. */
+  if (isMonopolyScene()) { box.innerHTML = ''; return; }
   if (!STATE.D || !STATE.S) {
     box.innerHTML = '<div class="muted">Отметьте одну кривую как D&nbsp;(спрос), другую как S&nbsp;(предложение) в списке кривых.</div>';
     return;
