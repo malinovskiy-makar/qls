@@ -29,6 +29,20 @@ from django.test import tag
 RUNNER = os.path.join(os.path.dirname(__file__), "calc2_math.mjs")
 
 
+def _safe_print(text):
+    """Печать, которая не падает на символах, неизвестных консоли.
+
+    Раннер печатает «галочки» и «крестики», а консоль Windows живёт в cp1251 и
+    таких символов не знает: печать роняла сам тест, хотя проверка проходила.
+    """
+    import sys
+    enc = (getattr(sys.stdout, "encoding", None) or "utf-8")
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        print(text.encode(enc, "replace").decode(enc, "replace"))
+
+
 @tag("calc2", "browser")
 class Calc2MathRegressionTest(StaticLiveServerTestCase):
     """Все контрольные числа математики calc2 (равновесие, налог, монополия,
@@ -93,7 +107,10 @@ class Calc2MathRegressionTest(StaticLiveServerTestCase):
         if result.returncode == 3:
             self._loud_skip("calc2 не загрузился (Playwright или CDN недоступны):\n" + out[-500:])
         # Печатаем вывод раннера, чтобы при провале было видно конкретные числа.
-        print("\n" + out)
+        # Консоль Windows живёт в cp1251 и не умеет печатать «галочку» (U+2713):
+        # без замены падал бы сам вывод, а не тест. Заменяем то, чего консоль
+        # не знает, на её же вопросительные знаки.
+        _safe_print("\n" + out)
         self.assertEqual(
             result.returncode,
             0,
