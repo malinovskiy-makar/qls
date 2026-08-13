@@ -41,10 +41,15 @@
 .ass-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
 .ass-link { color: var(--text); text-decoration: none; }
 .ass-link:hover { text-decoration: underline; }
-/* Тип работы — маленький чип тонкой рамкой, а не заливка: это уточнение. */
+/* Тип работы — маленький чип тонкой рамкой, а не заливка: это уточнение.
+   ⚠️ Стоит ПЕРЕД названием и имеет фиксированную ширину: после названия он
+   уезжал к правому краю у длинных заголовков, а теперь названия всех
+   карточек начинаются на одной вертикали. */
 .ass-kind { font-size: 11px; font-weight: 500; color: var(--text2);
             border: 1px solid var(--border); border-radius: 999px;
-            padding: 1px 8px; margin-left: 8px; white-space: nowrap; }
+            padding: 1px 8px; margin-right: 9px; white-space: nowrap;
+            display: inline-block; min-width: 88px; text-align: center;
+            vertical-align: 1px; }
 .ass-meta { font-size: 12px; color: var(--text2); }
 .ass-waiting { font-size: 12px; }
 /* Правая часть проверенной работы — два значения в две строки. */
@@ -176,8 +181,10 @@
     {% comment %}
     Полоса состояния: жёлтая — ждёт проверки, серая — идёт, зелёная —
     проверена. Классы из набора деталей, своих цветов здесь нет.
+    ⚠️ Цвет берётся у СТРОКИ, а не у группы (обзор 13.08, п. 25): работа,
+    которую никто не открыл, стоит в «Проверены», но зелёной быть не может.
     {% endcomment %}
-    <div class="k-card ass-card k-mark k-mark--{{ group_row.mark }}{% if group_row.key != 'needs_you' %} ass-card--quiet{% endif %}"
+    <div class="k-card ass-card k-mark k-mark--{{ row.mark }}{% if group_row.key != 'needs_you' %} ass-card--quiet{% endif %}"
          {% if forloop.counter0 >= group_row.shown|length %}hidden data-extra="1"{% endif %}>
       <div class="ass-main">
         {% comment %}
@@ -186,15 +193,20 @@
         проверять: у идущей работы способа посмотреть её состав не было
         вовсе. Найдено сквозным сценарием.
         {% endcomment %}
+        {% comment %}
+        ⚠️ ЧИП ТИПА СТОИТ ПЕРЕД НАЗВАНИЕМ (обзор 13.08, п. 27). После
+        названия он уезжал к правому краю у длинных заголовков и терял с
+        ними связь. Ширина у чипа фиксированная, поэтому названия всех
+        карточек начинаются на одной вертикали.
+        {% endcomment %}
         <div class="ass-name">
-          <a href="{% if row.is_exam %}{% url 'teacher:group_exam_results' group.pk row.assignment.pk %}{% else %}{% url 'teacher:group_assignment' group.pk row.assignment.pk %}{% endif %}"
+          {% if row.is_exam %}<span class="ass-kind">контрольная</span>{% else %}<span class="ass-kind">домашка</span>{% endif %}<a
+             href="{% if row.is_exam %}{% url 'teacher:group_exam_results' group.pk row.assignment.pk %}{% else %}{% url 'teacher:group_assignment' group.pk row.assignment.pk %}{% endif %}"
              class="ass-link">{{ row.assignment.name }}</a>
-          {% if row.is_exam %}<span class="ass-kind">контрольная</span>{% else %}<span class="ass-kind">домашка</span>{% endif %}
         </div>
         <div class="ass-meta">
           сдали {{ row.submitted }} из {{ row.students }} ·
-          {% if group_row.key == 'done' %}{% if row.deadline %}<span title="{{ row.deadline_exact }}">{{ row.deadline_human }}</span>{% else %}без срока{% endif %}
-          {% else %}{% if row.deadline %}<span title="{{ row.deadline_exact }}">{{ row.deadline_human }}</span>{% else %}без срока{% endif %}{% endif %}
+          {% if row.deadline %}<span data-hint="{{ row.deadline_exact }}">{{ row.deadline_human }}</span>{% else %}без срока{% endif %}
         </div>
       </div>
 
@@ -225,9 +237,14 @@
     «Проверены» показываются последние пять (фаза 11.3). Полный список — по
     кнопке, а не бесконечной лентой: закрытые работы внимания не требуют.
     {% endcomment %}
+    {% comment %}
+    ⚠️ КНОПКА НАЗЫВАЕТ ЧИСЛО (обзор 13.08, п. 26). Оно то же, что в подписи
+    «последние 5 из 6» над списком, — берётся из того же счёта, второго
+    источника не заводим.
+    {% endcomment %}
     <div class="ass-more">
       <button type="button" class="k-btn k-btn--plain k-btn--sm js-show-all"
-              data-more="{{ group_row.hidden_count }}">Посмотреть все</button>
+              data-more="{{ group_row.hidden_count }}">Посмотреть все {{ group_row.items|length }}</button>
     </div>
     {% endif %}
   </div>

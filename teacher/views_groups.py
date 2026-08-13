@@ -423,7 +423,18 @@ def group_assignments_by_state(rows, now=None, show_all_done=False):
     now = now or timezone.now()
     buckets = {key: [] for key, _ in ASSIGNMENT_STATES}
     for row in rows:
-        buckets[assignment_state(row, now)].append(row)
+        key = assignment_state(row, now)
+        # ⚠️ ПОЛОСА У КАЖДОЙ КАРТОЧКИ СВОЯ (обзор 13.08, п. 25). Раньше цвет
+        # брался у ГРУППЫ, и работа, которую никто не открыл, стояла в
+        # «Проверены» с зелёной полосой: зелёный читается как «всё хорошо»,
+        # а проверять там было нечего. Такой работе даём серую полосу — ту
+        # же, что у «Идут сейчас»: состояние честное, «ничего не
+        # происходило».
+        mark = STATE_MARKS[key]
+        if key == 'done' and row.get('nobody_submitted'):
+            mark = STATE_MARKS['running']
+        row['mark'] = mark
+        buckets[key].append(row)
 
     result = []
     for key, title in ASSIGNMENT_STATES:
