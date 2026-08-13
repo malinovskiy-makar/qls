@@ -1697,6 +1697,32 @@ const CASES = [
              ['поле графика, а не картинка', 'only', 1, 0]],
   },
   {
+    /* А3 · А54. Название модели переносится на две строки и не обрезается.
+
+       Было: место под заголовок 163 px при узком окне и 199 при широком, а
+       «Рынок труда: совершенная конкуренция» требует 321 px в одну строку —
+       многоточием обрезались 23 названия из 41. Решение штаба от 13.08:
+       переносить, не сокращая названий и не уменьшая кегль.
+
+       Высота шапки постоянна: иначе содержимое ниже прыгало бы при переходе
+       между сценами с коротким и длинным названием. */
+    name: 'Заголовок · переносится на две строки, не обрезается, шапка не прыгает',
+    run: `var cut = 0, heads = {};
+          Object.keys(SCENE_ROUTE).forEach(function (k) {
+            pickScene(k);
+            var el = document.getElementById('scene-name');
+            var cs = getComputedStyle(el);
+            if (el.scrollWidth > el.clientWidth + 1) cut++;
+            if (el.scrollHeight > el.clientHeight + 1) cut++;
+            if (cs.textOverflow === 'ellipsis') cut++;
+            heads[Math.round(document.querySelector('.side-head').getBoundingClientRect().height)] = 1;
+          });
+          pickScene('sd');
+          return { cut: cut, headSizes: Object.keys(heads).length };`,
+    checks: [['обрезанных заголовков', 'cut', 0, 0],
+             ['высот шапки', 'headSizes', 1, 0]],
+  },
+  {
     /* А1 · А2 · А55. Порог скорости (решение штаба от 13.08): открытие сцены
        не дольше 300 мс, перерисовка не дольше 100 мс.
 

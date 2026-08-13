@@ -970,7 +970,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   display: flex; align-items: center; gap: 8px; flex-shrink: 0;
   /* Отступы симметричные: стрелка лежит поверх шапки только с одной стороны, но
      при 34px и 14px заголовок вставал на десяток пикселей мимо центра (Н4). */
-  height: 46px; padding: 0 34px;
+  /* А3 · А54. Место под заголовок было 163px при узком окне и 199 при широком,
+     а «Рынок труда: совершенная конкуренция» требует 321px: многоточием
+     обрезались 23 названия из 41. Решение штаба от 13.08 — переносить на две
+     строки, не сокращая названий и не уменьшая кегль.
+
+     Высота шапки ПОСТОЯННА и задана под три строки: двух хватает сорока
+     сценам из сорока одной, но «Рынок труда: совершенная конкуренция» требует
+     трёх, и при плавающей высоте содержимое ниже прыгало бы при переходе
+     между сценами. Отступы по бокам уменьшены с 34px до 24px — стрелке
+     хватает, а заголовку достаётся двадцать лишних пикселей на строку. */
+  height: 74px; padding: 6px 24px;
   border-bottom: 1px solid var(--border-soft);
 }
 /* Н4. Название модели слева и «Аналитика» справа — одним кеглем и по центру
@@ -980,7 +990,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .side-head h2, .side-scene {
   flex: 1; min-width: 0; text-align: center;
   font-size: 16px; font-weight: 750; letter-spacing: -.015em; color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* Переносим по словам; многоточия быть не должно. Три строки разрешены для
+     самых длинных названий, дальше слово переносится по буквам, лишь бы текст
+     не пропал. */
+  white-space: normal; overflow-wrap: break-word; word-break: break-word;
+  line-height: 1.22; max-height: calc(1.22em * 3);
 }
 .side-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
