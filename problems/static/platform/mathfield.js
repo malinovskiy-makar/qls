@@ -149,9 +149,23 @@
 
     var panel = el('div', 'mf-panel');
 
+    // ⚠️ КНОПКА ФОРМУЛЫ МОЖЕТ ЖИТЬ В ЧУЖОМ РЯДУ (обзор 13.08, п. 69).
+    // У редактора своей задачи под полем условия уже стоят «Добавить
+    // график» и «Создать новый график», и «∑ Формула» отдельной строкой
+    // ниже выглядела четвёртым разным объектом. Поле само указывает, куда
+    // её положить: `data-mathfield-tools="#statement-tools"`. Тело панели
+    // остаётся на своём месте — раскрывается под полем, как и раньше.
     var toggle = el('button', 'mf-toggle', '∑ Формула');
     toggle.type = 'button';
-    panel.appendChild(toggle);
+    var toolsSelector = textarea.getAttribute('data-mathfield-tools');
+    var tools = toolsSelector ? document.querySelector(toolsSelector) : null;
+    if (tools) {
+      // В чужом ряду кнопка обязана выглядеть как соседи: класс набора.
+      toggle.className += ' k-btn k-btn--plain k-btn--sm';
+      tools.appendChild(toggle);
+    } else {
+      panel.appendChild(toggle);
+    }
 
     var body = el('div', 'mf-body');
     body.hidden = true;

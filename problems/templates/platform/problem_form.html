@@ -43,9 +43,14 @@
 .ed-card__name { font-size: 13px; font-weight: 700; }
 .ed-card__note { font-size: 12px; color: var(--text3); }
 
-/* Кнопки формул и графиков — ОДНА тихая строка под полем условия. */
-.ed-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+/* Кнопки формул и графиков — ОДНА строка под полем условия.
+   ⚠️ Отступы поджаты: три кнопки в 404-пиксельной колонке не помещались
+   ровно на пять пикселей и переносили «∑ Формула» на вторую строку
+   (замерено: 128 + 174 + 91 плюс зазоры против 404). Это не косметика —
+   ради одной строки пункт 69 и заводился. */
+.ed-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
             margin-top: 8px; }
+.ed-tools .k-btn, .ed-tools .mf-toggle { padding: 5px 9px; }
 
 /* ⚠️ ЛИПКОЕ ПРЕВЬЮ. `position: sticky` держится только пока элемент —
    прямой потомок колонки сетки и колонка не растянута (`align-items:
@@ -174,16 +179,29 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
           <label for="id_statement">Текст задачи</label>
           <textarea id="id_statement" name="statement" data-mathfield
                     data-mathfield-preview="0"
+                    data-mathfield-tools="#statement-tools"
                     required>{{ form.statement }}</textarea>
           {% comment %}
           Кнопки формул и графиков — ОДНА тихая строка под полем, а не три
           разных блока с пояснениями между ними.
           {% endcomment %}
+          {% comment %}
+          ⚠️ ТРИ КНОПКИ ОДНОГО ВЕСА В ОДНОЙ СТРОКЕ (обзор 13.08, п. 69).
+          «Добавить график» выглядела кнопкой, «Создать новый график» —
+          ссылкой, хотя это две соседние операции одного назначения; а
+          «∑ Формула» стояла отдельной строкой ниже, потому что её рисует
+          `mathfield.js`. Теперь поле само говорит, КУДА положить кнопку
+          формулы (`data-mathfield-tools`), и все три стоят рядом.
+
+          Вес — `k-btn--plain` (тонкая рамка), а не `--quiet`: тремя
+          «тихими» они снова стали бы похожи на ссылки, из-за чего пункт и
+          возник. Стрелка «↗» у второй оставлена: она уводит на другой экран.
+          {% endcomment %}
           <div class="ed-tools" id="statement-tools">
             <button type="button" class="k-btn k-btn--plain k-btn--sm"
                     id="add-graph-btn">Добавить график</button>
             <a href="/calc2/" target="_blank" rel="noopener"
-               class="k-btn k-btn--quiet k-btn--sm">Создать новый график ↗</a>
+               class="k-btn k-btn--plain k-btn--sm">Создать новый график ↗</a>
           </div>
         </div>
       </div>
@@ -265,10 +283,17 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
             {% endfor %}
           </div>
 
+          {% comment %}
+          ⚠️ ПОДПИСЬ ПРО ВЕС — ТОЛЬКО ПРИ ПУНКТАХ (обзор 13.08, п. 66). Она
+          висела под «+ Пункт» ещё до того, как появился хоть один пункт, и
+          объясняла поле, которого на экране нет. Прячет/показывает её
+          `syncParts` — та же функция, что уже знает, сколько пунктов.
+          {% endcomment %}
           <div class="ed-tools">
             <button type="button" class="k-btn k-btn--plain k-btn--sm"
                     id="add-part-btn">+ Пункт</button>
-            <span class="k-hint" style="margin:0">Вес — доля балла задачи.
+            <span class="k-hint" id="parts-weight-hint" style="margin:0"
+                  {% if not parts %}hidden{% endif %}>Вес — доля балла задачи.
               Пусто у всех — баллы делятся поровну.</span>
           </div>
         </div>
@@ -469,6 +494,10 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
     });
     var has = rows.length > 0;
     wholeAnswer.hidden = has;
+    // Подпись про вес объясняет поле «Вес», которое живёт в строке пункта:
+    // без пунктов ей нечего объяснять.
+    var weightHint = document.getElementById('parts-weight-hint');
+    if (weightHint) { weightHint.hidden = !has; }
     if (answerNote) {
       answerNote.textContent = kind.value !== 'open' ? ''
         : (has ? 'ученик отвечает на каждый пункт отдельно'
