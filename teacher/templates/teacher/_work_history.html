@@ -57,14 +57,22 @@
       <tr{% if row.not_submitted %} class="is-idle"{% endif %}>
         <td class="wk-name">{{ row.work.name }}</td>
         <td><span class="wk-kind">{% if row.is_exam %}контрольная{% else %}домашка{% endif %}</span></td>
+        {% comment %}
+        ⚠️ «НЕТ ТЕСТОВ» И ПРОЧЕРК — РАЗНЫЕ ОТВЕТЫ (обзор 13.08, п. 34).
+        Голый прочерк рядом с «80 %» читается как «плохо», хотя тестов в
+        работе просто не задавали. Прочерк остаётся там, где задачи ЕСТЬ, а
+        данных ещё нет: это честное «пока не знаем».
+        {% endcomment %}
         <td class="wk-num" data-sort="{{ row.open_percent|default:-1 }}">
           {% if row.open_percent is not None %}
           <span class="k-level k-level--{{ row.open_level }}">{{ row.open_percent }} %</span>
+          {% elif not row.has_open %}<span class="wk-nothing">нет задач</span>
           {% else %}—{% endif %}
         </td>
         <td class="wk-num" data-sort="{{ row.test_percent|default:-1 }}">
           {% if row.test_percent is not None %}
           <span class="k-level k-level--{{ row.test_level }}">{{ row.test_percent }} %</span>
+          {% elif not row.has_test %}<span class="wk-nothing">нет тестов</span>
           {% else %}—{% endif %}
         </td>
         <td class="wk-num" data-sort="{{ row.mark|default:-1 }}">

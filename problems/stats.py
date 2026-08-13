@@ -1354,6 +1354,26 @@ def _work_scores(work, students):
     return got, could, when
 
 
+def work_kinds(work):
+    """Что вообще есть В СОСТАВЕ работы: открытые задачи и/или тесты.
+
+    ⚠️ ЗАЧЕМ ОТДЕЛЬНО ОТ БАЛЛОВ (обзор 13.08, п. 34). В истории работ
+    столбцы «% верных задач» и «% верных тестов» показывали голый прочерк
+    и когда данных ещё нет, и когда таких задач в работе НЕ БЫЛО ВОВСЕ.
+    Рядом с «80 %» соседний прочерк читается как «плохо», хотя тестов
+    в работе просто не задавали. Это разные ответы, и различить их можно
+    только по составу.
+    """
+    kinds = {'has_open': False, 'has_test': False}
+    for item in work.items.select_related('catalog_problem',
+                                          'custom_problem'):
+        if item.is_test:
+            kinds['has_test'] = True
+        else:
+            kinds['has_open'] = True
+    return kinds
+
+
 def _work_percents(got, could):
     """Три процента строки: по задачам, по тестам и итог. Нет базы → None.
 
@@ -1404,6 +1424,7 @@ def work_history(student, tutor):
                'submitted_at': submitted_at,
                'deadline': work.deadline_at,
                'not_submitted': submitted_at is None}
+        row.update(work_kinds(work))
         row.update(_work_percents(got, could))
         rows.append(row)
     return rows
@@ -1446,6 +1467,7 @@ def group_work_history(group):
                'submitted_at': solo,
                'is_late': bool(solo and deadline and solo > deadline),
                'not_submitted': missing == len(watched)}
+        row.update(work_kinds(work))
         row.update(_work_percents(got, could))
         rows.append(row)
     return rows

@@ -16,6 +16,13 @@
 
    Заголовки групп — ТИХИЕ подписи: вес должен быть у карточек, а не у
    надписей над ними. */
+/* Правая часть шапки занятия: кнопка карточки ученика и чип типа.
+   ⚠️ Своя обёртка, потому что у чипа в общих стилях стоит `margin-left:auto`
+   — внутри этого ряда он растащил бы кнопку и чип по краям. */
+.gd-side { margin-left: auto; display: flex; align-items: center; gap: 10px;
+           flex-wrap: wrap; }
+.gd-side .k-chip-kind { margin-left: 0; }
+
 .ass-group { margin-bottom: 26px; }
 .ass-group-head { display: flex; align-items: baseline; gap: 8px;
                   margin-bottom: 10px; }
@@ -97,15 +104,26 @@
         {% if solo_profile.goal %}<span><span class="cap">цель на год</span>{{ solo_profile.goal }}</span>{% endif %}
       </div>
       {% endif %}
-      <div class="page-sub">
-        <a href="{% url 'teacher:student_progress' solo.pk %}">карточка ученика</a>
-        {% if group.description %} · {{ group.description }}{% endif %}
-      </div>
+      {% if group.description %}<div class="page-sub">{{ group.description }}</div>{% endif %}
     {% elif group.description %}
       <div class="page-sub">{{ group.description }}</div>
     {% endif %}
   </div>
-  <span class="k-chip-kind">{{ group.kind_label }}</span>
+  {% comment %}
+  ⚠️ «КАРТОЧКА УЧЕНИКА» ПОЛУЧИЛА СВОЁ МЕСТО (обзор 13.08, п. 32). Она стояла
+  голой браузерной ссылкой ВНУТРИ подписи, вплотную под строкой «класс ·
+  город · цель на год», и буквы налезали друг на друга. Теперь это тихая
+  кнопка набора в правой части шапки, рядом с чипом типа.
+  ⚠️ Ссылку НЕ УДАЛЯЛИ: она ведёт на ДРУГОЙ экран (`student_progress`), а не
+  на текущий — проверено.
+  {% endcomment %}
+  <div class="gd-side">
+    {% if solo %}
+    <a href="{% url 'teacher:student_progress' solo.pk %}"
+       class="k-btn k-btn--plain k-btn--sm">Карточка ученика</a>
+    {% endif %}
+    <span class="k-chip-kind">{{ group.kind_label }}</span>
+  </div>
 </div>
 
 {% comment %}
