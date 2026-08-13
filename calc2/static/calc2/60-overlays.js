@@ -155,6 +155,7 @@ function redrawGraphMode() {
   drawGrid();
   drawAxes('x', 'y');
   drawCurves();
+  updateGraphPanel();   // А53: нули, вершины и пересечения построенных кривых
 }
 
 /* Строки функций сюжета min/max. Первая строка это общее поле f(x) раздела,

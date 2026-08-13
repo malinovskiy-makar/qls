@@ -40,7 +40,7 @@ const SCENE_NAMES = {
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
 // info-areacalc сюда НЕ входит: посчитанная площадь остаётся в своей секции
 // «Площади», рядом с кнопкой, которая её посчитала.
-const RESULT_IDS = ['info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
+const RESULT_IDS = ['info-graph', 'info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
   'info-prod', 'info-iso', 'info-plants', 'info-labor',
   'info-inequality', 'info-consumer', 'info-macro', 'info-math', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
@@ -98,11 +98,15 @@ function setSideOpen(panelId, btnId, open) {
 function setToolsOpen(open) { setSideOpen('tools-panel', 'tools-toggle', open); }
 function setParamsOpen(open) { setSideOpen('params-panel', 'params-toggle', open); }
 
-/* Где считать нечего, «Аналитики» нет вовсе. Это построение графиков и
-   деформации — там нет ни равновесия, ни площадей, ни разбора, только сама
-   кривая. */
-const NO_ANALYTICS = { 'm-graph': true, 'm-transform': true };
-function hasAnalytics() { return !NO_ANALYTICS[STATE.sceneKey]; }
+/* А53. Раньше в двух сюжетах «Аналитики» не было вовсе: считалось, что в
+   построении графиков и в деформациях считать нечего. На деле блоки всё равно
+   открывались и оказывались ПУСТЫМИ, а «Построение графиков» это первая сцена,
+   которую открывает новый человек: он раскрывал объяснение и видел пустоту.
+
+   Считать там есть что: нули функции, её экстремумы, пересечения кривых между
+   собой, вид деформации и то, как она двигает график. Пустой список остаётся
+   пустым только пока не введена ни одна формула. */
+function hasAnalytics() { return true; }
 
 /* Разбор «как это получилось» сцены пишут внутрь своего блока расчётов. Здесь
    он одним проходом уезжает в «Объяснение модели»: так новому блоку аналитики

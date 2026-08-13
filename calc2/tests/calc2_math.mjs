@@ -1153,17 +1153,24 @@ const CASES = [
           document.getElementById('btn-ppf-apply').click();
           var f = parsePpfEquation(STATE.ppfFormula).f;
           var ex = document.getElementById('ex-body');
-          var qs = [].map.call(ex.querySelectorAll('p > b'), function (b) { return b.textContent; });
-          var withQ = qs.filter(function (s) { return /\\?$/.test(s.trim()); }).length;
+          var qs = [].map.call(ex.querySelectorAll('p > b'), function (b) { return b.textContent.trim(); });
+          /* Форма разбора: каждый абзац с заголовком начинается ВОПРОСОМ,
+             кроме последнего — он начинается со слова «Вывод». Раньше здесь
+             стояло точное число абзацев (3), и любое дополнение разбора роняло
+             проверку формы, хотя форма как раз соблюдена. Считаем нарушения. */
+          var bad = qs.filter(function (s) { return !/\\?$/.test(s) && !/^Вывод/.test(s); }).length;
           var junk = /NaN|undefined|Infinity/.test(ex.textContent) ? 1 : 0;
           return { f60: f(60), xmax: ppfXmaxOf(f),
                    type: /выпуклая/.test(ppfTypeLabel()) ? 1 : 0,
-                   qs: qs.length, withQ: withQ, junk: junk };`,
+                   qs: qs.length, bad: bad,
+                   hasConcl: qs.some(function (s) { return /^Вывод/.test(s); }) ? 1 : 0,
+                   junk: junk };`,
     checks: [['кусочная считается верно', 'f60', 45, 0.01],
              ['и кончается там, где надо', 'xmax', 150, 0.5],
              ['тип КПВ выпуклая, а не вогнутая', 'type', 1, 0],
-             ['абзацев с заголовком', 'qs', 3, 0],
-             ['и все начинаются вопросом', 'withQ', 3, 0],
+             ['абзацев с заголовком не меньше трёх', 'qs', 5, 2],
+             ['есть абзац «Вывод»', 'hasConcl', 1, 0],
+             ['нарушений формы', 'bad', 0, 0],
              ['мусора в разборе нет', 'junk', 0, 0]],
   },
   {
@@ -1688,6 +1695,45 @@ const CASES = [
              ['нижняя граница', 'ymin', 'WANTYMIN', 0.02],
              ['верхняя граница', 'ymax', 'WANTYMAX', 0.02],
              ['поле графика, а не картинка', 'only', 1, 0]],
+  },
+  {
+    /* А53. Два сюжета открывались с ПУСТЫМИ блоками «Ключевые значения» и
+       «Объяснение модели»: считалось, что в построении графиков и в
+       деформациях считать нечего. «Построение графиков» — первая сцена, которую
+       открывает новый человек, и первое, что он про калькулятор узнавал, что
+       тут ничего нет. Считать есть что: нули, вершины, пересечения. */
+    name: 'Панель · в построении графиков и деформациях есть что показать',
+    run: `var vis = function (el) {
+            if (!el) return 0;
+            var out = '';
+            var walk = function (n) {
+              if (n.nodeType === 3) { out += n.nodeValue; return; }
+              if (n.nodeType !== 1) return;
+              var cs = getComputedStyle(n);
+              if (cs.display === 'none' || cs.visibility === 'hidden') return;
+              if (n.classList && n.classList.contains('katex-mathml')) return;
+              if (n.tagName === 'ANNOTATION') return;
+              [].forEach.call(n.childNodes, walk);
+            };
+            walk(el);
+            return out.replace(/\\s+/g, ' ').trim().length;
+          };
+          var take = function (key) {
+            pickScene(key);
+            ['sb-btn', 'ex-btn'].forEach(function (id) {
+              var b = document.getElementById(id);
+              if (b && b.getAttribute('aria-expanded') !== 'true') b.click();
+            });
+            return { s: vis(document.getElementById('sb-body')),
+                     e: vis(document.getElementById('ex-body')) };
+          };
+          var g = take('m-graph'), t = take('m-transform');
+          pickScene('sd');
+          return { gs: g.s, ge: g.e, ts: t.s, te: t.e };`,
+    checks: [['построение: ключевые значения', 'gs', 400, 400],
+             ['построение: объяснение', 'ge', 1500, 700],
+             ['деформации: ключевые значения', 'ts', 400, 400],
+             ['деформации: объяснение', 'te', 1500, 700]],
   },
   {
     /* А51 · А52. У монополиста кривой предложения не существует, оптимум там
