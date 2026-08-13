@@ -678,7 +678,10 @@
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M22 76 Q84 6 146 76" stroke="var(--curve-tax)" stroke-width="2.6"/>
-            <circle cx="84" cy="24" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
+            <!-- А71: точка стоит НА вершине кривой (максимум поступлений), а не
+                 висит над ней ни к чему не привязанной. Вершина квадратичной
+                 кривой Безье при t=0.5 это (84; 41), а не (84; 24). -->
+            <circle cx="84" cy="41" r="3.6" fill="var(--curve-tax)" stroke="none"/></g></svg></span>
           <span class="scard-name">Кривая Лаффера</span>
           <span class="scard-desc">Поступления бюджета как функция ставки; строится прогоном самой модели налога.</span>
         </button>

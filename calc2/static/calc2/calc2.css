@@ -778,6 +778,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .picker.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 .picker-inner { max-width: 1100px; margin: 0 auto; padding: 44px 28px 64px; }
 .picker-head { margin-bottom: 28px; }
+/* А41 · А68. На экране ОТКРЫТОГО блока шапки первого экрана нет. Кикер,
+   заголовок «С чего начнём?» и инструкция «Откройте раздел и выберите модель»
+   вместе с кнопкой возврата занимали 332 пикселя над первой карточкой: при
+   высоте окна 392 карточка была видна на пятую часть, а инструкция про выбор
+   раздела показывалась уже ПОСЛЕ того, как раздел открыт. */
+#scene-picker.block-open .picker-head { display: none; }
+#scene-picker.block-open .picker-inner { padding-top: 20px; }
 .picker-eyebrow {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
@@ -799,13 +806,24 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   gap: 18px; padding-bottom: 24px;
 }
 .picker-blocks.hidden { display: none; }
+/* А42. Карточка блока была во всю ширину, а занята была только левая
+   половина: картинка, название и счётчик жались друг к другу, а справа
+   оставалось 555 пустых пикселей. Карточки стали уже и идут по две в ряд —
+   на экране их видно вдвое больше, и пустоты не остаётся.
+   Третья строка сетки отдана перечню моделей блока: он и заполняет карточку
+   содержанием, а не воздухом. */
 .bcard {
-  display: grid; grid-template-columns: 176px minmax(0, 1fr);
-  grid-template-rows: auto auto; align-items: center;
-  gap: 2px 18px; text-align: left; cursor: pointer; color: inherit;
+  display: grid; grid-template-columns: 132px minmax(0, 1fr);
+  grid-template-rows: auto auto auto; align-content: start;
+  gap: 2px 16px; text-align: left; cursor: pointer; color: inherit;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-lg); padding: 16px;
   transition: transform .16s var(--ease), border-color .16s var(--ease), box-shadow .16s var(--ease);
+}
+.bcard-list {
+  grid-column: 2; font-size: 11px; line-height: 1.45; color: var(--text3);
+  margin-top: 4px; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
 }
 .bcard-spec {
   grid-row: 1 / 3; align-self: stretch;
@@ -883,8 +901,22 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    style.display, а этот класс просто перекрывает её сверху. */
 .scoped-off { display: none !important; }
 
-.scard.soon { cursor: default; opacity: .5; border-style: dashed; background: transparent; }
+/* А38. Карточка «Скоро» должна читаться как нерабочая С ПЕРВОГО ВЗГЛЯДА.
+   Раньше она была лишь слегка приглушена, но имела полноценную картинку и
+   описание, и человек тыкал в неё, не понимая, почему ничего не происходит.
+   Это тем важнее, что счётчик блока по решению штаба считает и запланированные
+   модели: «9 моделей» при двух рабочих обязано быть видно на самих карточках.
+
+   Картинка сведена к силуэту, текст приглушён, курсор обычный, наведение и
+   нажатие ничего не делают. Плашка «Скоро», наоборот, контрастная. */
+.scard.soon { cursor: default; opacity: .62; border-style: dashed; background: transparent; }
 .scard.soon:hover, .scard.soon:active { transform: none; border-color: var(--border); box-shadow: none; }
+.scard.soon .scard-spec { filter: grayscale(1); opacity: .32; }
+.scard.soon .scard-name, .scard.soon .scard-desc { color: var(--text3); }
+.scard.soon .scard-soon {
+  color: var(--on-accent, #fff); background: var(--text3);
+  border-color: var(--text3); opacity: 1;
+}
 .scard-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .scard-soon {
   flex-shrink: 0; font-size: 10px; font-weight: 600; letter-spacing: .04em;

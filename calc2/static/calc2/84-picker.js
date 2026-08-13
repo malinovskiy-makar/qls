@@ -116,6 +116,19 @@ function closePicker() {
   flushMathfields();   // сцена открыта — можно собирать поля формул
   redrawAll();   // график стал видимым — пересчитать размеры под холст
 }
+
+/* А41 · А68. Открыв блок, человек всё ещё видел шапку первого экрана: кикер
+   «ГРАФИКИ В ЭКОНОМИКЕ», заголовок «С чего начнём?» и инструкцию «Откройте
+   раздел и выберите модель» — уже ПОСЛЕ того, как раздел открыт. Вместе с
+   кнопкой возврата это занимало 332 пикселя над первой карточкой, и при
+   высоте окна 392 карточка была видна на пятую часть.
+
+   Метка на самом окне; шапку прячет стиль. Одно место на все переходы. */
+function setPickerBlockOpen(on) {
+  const p = document.getElementById('scene-picker');
+  if (p) p.classList.toggle('block-open', !!on);
+}
+
 function openPicker() {
   const p = document.getElementById('scene-picker');
   if (!p) return;
@@ -138,9 +151,11 @@ function openPicker() {
     group.classList.add('open');
     if (blocks) blocks.classList.add('hidden');
     if (back) back.classList.add('shown');
+    setPickerBlockOpen(true);
   } else {
     if (blocks) blocks.classList.remove('hidden');
     if (back) back.classList.remove('shown');
+    setPickerBlockOpen(false);
   }
   const first = group
     ? (group.querySelector('.scard:not([disabled])') || p.querySelector('.bcard'))
@@ -361,6 +376,7 @@ function foldPickerGroups() {
     document.querySelectorAll('#scene-picker .picker-group').forEach(x => x.classList.remove('open'));
     blocks.classList.remove('hidden');
     back.classList.remove('shown');
+    setPickerBlockOpen(false);
     inner.scrollIntoView({ block: 'start' });
   };
   back.addEventListener('click', showBlocks);
@@ -384,14 +400,28 @@ function foldPickerGroups() {
     card.className = 'bcard';
     card.setAttribute('aria-controls', grid.id);
     card.innerHTML = blockSpec(name)
-      + '<span class="bcard-name"></span><span class="bcard-count"></span>';
+      + '<span class="bcard-name"></span><span class="bcard-count"></span>'
+      + '<span class="bcard-list"></span>';
     card.querySelector('.bcard-name').textContent = name;
     card.querySelector('.bcard-count').textContent = n + ' ' + plural(n, ['модель', 'модели', 'моделей']);
+    /* А42. Правая половина карточки пустовала: 555 пикселей ни подо что.
+       Перечисляем модели блока — так видно, что внутри, ещё до открытия.
+       Сначала рабочие, потом запланированные: обещание блока честное, но
+       понятно, что уже можно открыть прямо сейчас. */
+    const ready = [], soon = [];
+    grid.querySelectorAll('.scard').forEach(sc => {
+      const nm = (sc.querySelector('.scard-name') || {}).textContent;
+      if (!nm) return;
+      (sc.classList.contains('soon') ? soon : ready).push(nm.trim());
+    });
+    card.querySelector('.bcard-list').textContent =
+      ready.concat(soon.map(s => s + ' (скоро)')).join(' · ');
     card.addEventListener('click', () => {
       blocks.classList.add('hidden');
       groups.forEach(x => x.classList.remove('open'));
       g.classList.add('open');
       back.classList.add('shown');
+      setPickerBlockOpen(true);
       inner.scrollIntoView({ block: 'start' });
     });
     blocks.appendChild(card);
