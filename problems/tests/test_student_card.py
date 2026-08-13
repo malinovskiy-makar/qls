@@ -28,7 +28,20 @@ def read(path):
 
 
 class MinutesOnSiteTests(TestCase):
-    """7.2 — считаем время присутствия, а не пустое поле счётчика."""
+    """7.2 — считаем время присутствия, а не пустое поле счётчика.
+
+    ⚠️ Числа пересчитаны в сессии 10: каждой сессии добавляется
+    `SESSION_TAIL_MINUTES` за последнее событие, длительность которого
+    измерить нечем. Раньше оно весило ноль, и ученик, решающий по задаче за
+    заход, месяцами видел нулевое время на сайте. Подробности и замер —
+    `problems/tests/test_minutes_on_site.py`.
+
+    Числа ниже записаны как «промежутки плюс хвост», а не готовой суммой:
+    иначе при следующей правке константы пришлось бы гадать, откуда взялось
+    магическое число.
+    """
+
+    TAIL = stats.SESSION_TAIL_MINUTES
 
     def setUp(self):
         self.student = make_user('mos_student', role='student')
@@ -45,17 +58,30 @@ class MinutesOnSiteTests(TestCase):
 
     def test_one_sitting_counts_from_first_to_last(self):
         self._events(0, 10, 25)
-        self.assertEqual(stats.minutes_on_site(self.student, 'all'), 25)
+        self.assertEqual(stats.minutes_on_site(self.student, 'all'),
+                         25 + self.TAIL)
 
     def test_long_pause_breaks_the_sitting(self):
-        """Перерыв дольше получаса — это уход, а не работа."""
-        self._events(0, 10, 200, 210)
-        self.assertEqual(stats.minutes_on_site(self.student, 'all'), 20)
+        """Перерыв дольше получаса — это уход, а не работа.
 
-    def test_single_event_gives_zero(self):
-        """Момент известен, длительность — нет. Ноль честнее выдумки."""
+        Два захода по 10 минут промежутков, между ними трёхчасовая дыра:
+        она в зачёт не идёт, а хвост получает КАЖДЫЙ заход.
+        """
+        self._events(0, 10, 200, 210)
+        self.assertEqual(stats.minutes_on_site(self.student, 'all'),
+                         20 + 2 * self.TAIL)
+
+    def test_single_event_gets_the_session_tail(self):
+        """⚠️ РАНЬШЕ ЗДЕСЬ БЫЛ НОЛЬ, и он объяснялся как «честнее выдумки».
+
+        Замер сессии 10 показал, что это не честность, а дефект: у ученика,
+        решающего по одной задаче за заход, счётчик вечно показывал ноль, а
+        три отдельных захода, добавленные к плотной сессии, не добавляли к
+        нему НИЧЕГО. Одиночное событие — это сессия из одного события, и
+        хвост ей полагается такой же, как всякой другой.
+        """
         self._events(0)
-        self.assertEqual(stats.minutes_on_site(self.student, 'all'), 0)
+        self.assertEqual(stats.minutes_on_site(self.student, 'all'), self.TAIL)
 
     def test_nothing_is_zero(self):
         self.assertEqual(stats.minutes_on_site(self.student, 'all'), 0)
@@ -72,7 +98,9 @@ class MinutesOnSiteTests(TestCase):
         LearningEvent.objects.create(user=self.student, source='exam',
                                      event_type='solved',
                                      time_spent_seconds=6000)
-        self.assertEqual(stats.minutes_on_site(self.student, 'all'), 0)
+        # Ровно хвост одной сессии, а не сто минут из счётчика: поле
+        # `time_spent_seconds` по-прежнему не читается.
+        self.assertEqual(stats.minutes_on_site(self.student, 'all'), self.TAIL)
 
     def test_game_counts_as_time_on_site(self):
         from problems.models import LearningEvent
@@ -83,11 +111,13 @@ class MinutesOnSiteTests(TestCase):
                 user=self.student, source='game', event_type='solved')
             LearningEvent.objects.filter(pk=event.pk).update(
                 created_at=base + timedelta(minutes=offset))
-        self.assertEqual(stats.minutes_on_site(self.student, 'all'), 12)
+        self.assertEqual(stats.minutes_on_site(self.student, 'all'),
+                         12 + self.TAIL)
 
     def test_overview_takes_minutes_from_here(self):
         self._events(0, 10, 25)
-        self.assertEqual(stats.overview(self.student, 'all')['minutes'], 25)
+        self.assertEqual(stats.overview(self.student, 'all')['minutes'],
+                         25 + self.TAIL)
 
 
 class RankingHalvesTests(TestCase):
