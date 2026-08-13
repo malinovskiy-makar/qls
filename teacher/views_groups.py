@@ -138,8 +138,10 @@ def _assignment_percent(assignment):
 # Фаза 9 — список групп
 # ---------------------------------------------------------------------------
 
-# Сколько предупреждений показываем на карточке. Больше трёх — это уже не
-# сигнал, а список, и карточка перестаёт читаться с одного взгляда.
+# Сколько УЧЕНИКОВ с предупреждениями показываем на карточке. Больше трёх —
+# это уже не сигнал, а список, и карточка перестаёт читаться с одного
+# взгляда. ⚠️ Считаем людей, а не причины: у одного человека их бывает
+# несколько, и три строки про Петра выглядели как три разных ученика.
 CARD_WARNINGS = 3
 
 
@@ -173,13 +175,19 @@ def groups_list(request):
                      if a.deadline_at and a.deadline_at >= now]
         solo = group.single_student
 
+        # ⚠️ ОДНА СТРОКА НА УЧЕНИКА, А НЕ НА ПРИЧИНУ (обзор 13.08, п. 10).
+        # Раньше причины разворачивались в отдельные строки, и две подряд
+        # про одного человека («не сдал…» и «работа ждёт проверки 5 дней»)
+        # читались как два разных ученика. Ограничение `CARD_WARNINGS`
+        # теперь считает ЛЮДЕЙ: карточка должна читаться с одного взгляда,
+        # а «сколько всего бед» — вопрос уже не к ней.
         warnings = []
         for row in needs_attention(group, now):
-            for reason in row['reasons']:
-                # У индивидуального имя не повторяем: оно и есть заголовок.
-                warnings.append(reason if solo is not None else '%s — %s' % (
-                    row['student'].get_full_name()
-                    or row['student'].username, reason))
+            joined = ', '.join(row['reasons'])
+            # У индивидуального имя не повторяем: оно и есть заголовок.
+            warnings.append(joined if solo is not None else '%s — %s' % (
+                row['student'].get_full_name()
+                or row['student'].username, joined))
         next_deadline = min(deadlines) if deadlines else None
         human, exact = timefmt.deadline_pair(next_deadline)
         cards.append({
@@ -198,6 +206,14 @@ def groups_list(request):
             'hidden_warnings': max(0, len(warnings) - CARD_WARNINGS),
         })
 
+    # ⚠️ СНАЧАЛА ТО, ГДЕ ОТ РЕПЕТИТОРА ЧТО-ТО ЖДУТ (обзор 13.08, п. 9).
+    # Порядок был «как заведено» — по названию, — и занятие с четырьмя
+    # предупреждениями оказывалось под спокойными. Внутри каждой половины
+    # порядок прежний, по названию: иначе карточки прыгали бы местами при
+    # каждой сдаче, и найти нужную глазами стало бы нельзя.
+    cards.sort(key=lambda card: (
+        0 if (card['warnings'] or card['pending']) else 1,
+        card['group'].name.lower()))
     return render(request, 'teacher/groups/list.html', {'cards': cards})
 
 

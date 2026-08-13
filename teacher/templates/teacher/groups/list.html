@@ -38,7 +38,9 @@
 .gc-warn { display: flex; flex-direction: column; gap: 5px; }
 .gc-warn div { font-size: 12px; color: var(--text); line-height: 1.4;
                border-left: 2px solid var(--amber); padding-left: 8px; }
-.gc-more { border-left-color: var(--border) !important; color: var(--text3); }
+.gc-more { border-left-color: var(--border) !important; color: var(--text3);
+           text-decoration: none; display: block; }
+.gc-more:hover { color: var(--accent); border-left-color: var(--accent) !important; }
 .gc-calm { font-size: 12px; color: var(--text3); }
 .gc-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
            margin-top: auto; padding-top: 4px; }
@@ -47,6 +49,7 @@
            color: var(--amber); white-space: nowrap; }
 .gc-when { font-size: 12px; color: var(--text2); margin-left: auto;
            white-space: nowrap; }
+.gc-when--none { color: var(--text3); }
 .gc-open { align-self: flex-start; }
 {% endblock %}
 
@@ -90,8 +93,14 @@
     {% if card.warnings %}
     <div class="gc-warn">
       {% for warning in card.warnings %}<div>{{ warning }}</div>{% endfor %}
+      {% comment %}
+      ⚠️ «И ЕЩЁ N» — ССЫЛКА, А НЕ ТУПИК (обзор 13.08, п. 11). Строка сообщала
+      о скрытом и не давала способа его увидеть. Ведёт на обзор занятия: там
+      блок «Требуют внимания» показан целиком.
+      {% endcomment %}
       {% if card.hidden_warnings %}
-      <div class="gc-more">и ещё {{ card.hidden_warnings }}</div>
+      <a class="gc-more" href="{% url 'teacher:group_detail' card.group.pk %}">и
+        ещё {{ card.hidden_warnings|count_ru:"ученик,ученика,учеников" }} →</a>
       {% endif %}
     </div>
     {% else %}
@@ -102,8 +111,16 @@
       {% if card.pending %}
       <span class="gc-wait">{{ card.pending|count_ru:"работа,работы,работ" }} {{ card.pending|plural_ru:"ждёт,ждут,ждут" }} проверки</span>
       {% endif %}
+      {% comment %}
+      ⚠️ СТРОКА СРОКА СТОИТ ВСЕГДА (обзор 13.08, п. 12). У индивидуальных
+      ближайшего срока обычно нет, у групповой есть — и карточки в одном ряду
+      разъезжались по высоте. «Сроков нет» тихим серым: это не предупреждение,
+      а честный ответ на тот же вопрос.
+      {% endcomment %}
       {% if card.next_deadline %}
       <span class="gc-when" title="{{ card.deadline_exact }}">срок: {{ card.next_deadline|date:"d.m, H:i" }}</span>
+      {% else %}
+      <span class="gc-when gc-when--none">сроков нет</span>
       {% endif %}
     </div>
 
