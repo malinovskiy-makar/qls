@@ -347,9 +347,18 @@ def _safe_return(value):
 @tutor_required
 def problem_list(request):
     """Свои задачи репетитора — чтобы их можно было найти и поправить."""
-    problems = (CustomProblem.objects
-                .filter(owner=request.user, is_deleted=False)
-                .select_related('topic')
-                .prefetch_related('options'))
+    from problems.text_clean import preview_title
+
+    problems = list(CustomProblem.objects
+                    .filter(owner=request.user, is_deleted=False)
+                    .select_related('topic')
+                    .prefetch_related('options'))
+    # ⚠️ НАЗВАНИЕ НЕОБЯЗАТЕЛЬНОЕ, и половина списка звалась «Без названия» —
+    # понять по строке, что откроешь, было нельзя (обзор 13.08, п. 70).
+    # Подставляем начало условия ТОЙ ЖЕ функцией, что подписывает задачи в
+    # подборе и в сводке решений: обрезка по границе слова, второй такой не
+    # заводим.
+    for problem in problems:
+        problem.display_title = preview_title(problem, limit=80)
     return render(request, 'platform/problem_list.html',
                   {'problems': problems})

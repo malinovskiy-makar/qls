@@ -79,17 +79,13 @@ table.data tr:last-child td { border-bottom: none; }
 .section { margin-bottom: 28px; }
 .section-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
 .rows { display: flex; flex-direction: column; gap: 8px; }
-.row-link {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap;
-  background: var(--surface); border: 0.5px solid var(--border);
-  border-radius: 10px; padding: 12px 16px;
-  text-decoration: none; color: var(--text); font-size: 13px;
-  transition: background .12s;
-}
-.row-link:hover { background: var(--panel); }
-.row-main { font-weight: 500; }
-.row-meta { font-size: 12px; color: var(--text2); }
+{% comment %}
+⚠️ Правила `.row-link` / `.row-main` / `.row-meta` ПЕРЕЕХАЛИ В НАБОР
+(`templates/_kit.html`, обзор 13.08, п. 71). Разметка стоит и в «Моих
+задачах», а тот экран этот файл не подключает: строка выходила голой
+браузерной ссылкой — без карточки, без наведения, без признака, что по ней
+можно нажать. Уже знакомый класс дефекта (баг 7.6, история работ в сессии 8).
+{% endcomment %}
 
 .empty-state {
   text-align: center; padding: 48px 20px; color: var(--text2);
@@ -197,5 +193,4 @@ details.fold .fold-body {
   .page-title { font-size: 19px; }
   .cards-grid { grid-template-columns: 1fr; }
   .card, .problem-block { padding: 16px; }
-  .row-link { flex-direction: column; align-items: flex-start; gap: 6px; }
 }

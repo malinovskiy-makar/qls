@@ -585,3 +585,34 @@
 .k-prelim { margin-top: 14px; background: var(--amber-tint);
             border: 1px solid var(--amber-border); border-radius: var(--r);
             padding: 10px 14px; font-size: 13px; line-height: 1.6; }
+
+/* ── Строка-ссылка списка ───────────────────────────────────────────────
+   Карточка-строка, по которой нажимают целиком: «Мои задачи», списки
+   занятий на старых экранах.
+   ⚠️ ПРАВИЛА ЖИВУТ ЗДЕСЬ, А НЕ В СТИЛЯХ ЭКРАНА ГРУППЫ (обзор 13.08, п. 71).
+   Разметка стоит в «Моих задачах», а тот экран `teacher/groups/_style.html`
+   не подключает — строка выходила голой браузерной ссылкой, и признака
+   «сюда можно нажать» не было вовсе. Тот же класс дефекта, что баг 7.6.
+
+   ⚠️ Признак кликабельности — НЕ только наведение: указатель мыши есть не
+   у всех, а на сенсорном экране наведения нет вовсе. Поэтому справа стоит
+   тихая подпись действия (`.row-go`), которая на наведении оживает. */
+.row-link {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  background: var(--surface); border: 0.5px solid var(--border);
+  border-radius: 10px; padding: 12px 16px;
+  text-decoration: none; color: var(--text); font-size: 13px;
+  transition: background .12s ease, border-color .12s ease;
+}
+.row-link:hover { background: var(--surface-2); border-color: var(--text3); }
+.row-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.row-main { font-weight: 500; }
+.row-meta { font-size: 12px; color: var(--text2); }
+.row-side { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.row-go { font-size: 12px; font-weight: 600; color: var(--text3);
+          white-space: nowrap; }
+.row-link:hover .row-go { color: var(--accent); }
+@media (max-width: 560px) {
+  .row-link { flex-direction: column; align-items: flex-start; gap: 6px; }
+}

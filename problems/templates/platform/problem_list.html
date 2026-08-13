@@ -14,9 +14,20 @@
 {% if problems %}
 <div class="rows">
   {% for problem in problems %}
+  {% comment %}
+  ⚠️ НАЗВАНИЕ — ПЕРВЫЕ СЛОВА УСЛОВИЯ, А НЕ «Без названия» (обзор 13.08,
+  п. 70). Название у своей задачи необязательное, и половина списка звалась
+  одинаково — по такой строке нельзя понять, что откроешь. Обрезку по
+  границе слова делает `text_clean.preview_title` — та же, что подписывает
+  задачи в подборе и в сводке решений; второй такой не заводим.
+
+  ⚠️ Справа — подпись действия (`.row-go`), а не только дата. Признаком
+  кликабельности было одно наведение, а его нет ни на сенсорном экране, ни
+  у клавиатуры.
+  {% endcomment %}
   <a class="row-link" href="{% url 'teacher:problem_edit' problem.pk %}">
     <span>
-      <span class="row-main">{{ problem.title|default:"Без названия" }}</span><br>
+      <span class="row-main">{{ problem.display_title }}</span><br>
       <span class="row-meta">
         {{ problem.get_kind_display }}
         {% if problem.topic %} · {{ problem.topic.name }}{% endif %}
@@ -24,7 +35,10 @@
         {% if problem.solution %} · есть решение{% endif %}
       </span>
     </span>
-    <span class="row-meta">{{ problem.created_at|date:"d.m.Y" }}</span>
+    <span class="row-side">
+      <span class="row-meta">{{ problem.created_at|date:"d.m.Y" }}</span>
+      <span class="row-go">правка →</span>
+    </span>
   </a>
   {% endfor %}
 </div>
