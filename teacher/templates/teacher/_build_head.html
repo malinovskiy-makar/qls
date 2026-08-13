@@ -11,9 +11,12 @@
 тут же, ниже; заголовок, называющий тип до выбора, спорит с переключателем.
 
 Ждёт в контексте:
-  mode      — describe | search | own: какая плитка активна;
-  is_exam   — собирается контрольная;
-  group_id  — номер группы, если известен.
+  mode        — describe | search | own: какая плитка активна;
+  is_exam     — собирается контрольная;
+  group_id    — номер группы, если известен;
+  group_label — её НАЗВАНИЕ (у индивидуального — имя ученика). Пустое имя
+                убирает среднюю крошку целиком: подчёркнутое слово
+                «занятие» вместо названия — то, что чинилось.
 
 Куда ведёт переключатель, зависит от экрана: у «Описать словами» это свой
 адрес с `?kind=`, у «Искать самому» — конструктор контрольной ВНУТРИ группы
@@ -22,7 +25,7 @@
 {% endcomment %}
 <div class="crumbs">
   <a href="{% url 'teacher:groups' %}">Ученики</a> →
-  {% if group_id %}<a href="{% url 'teacher:group_detail' group_id %}?tab=assignments">занятие</a> → {% endif %}
+  {% if group_id and group_label %}<a href="{% url 'teacher:group_detail' group_id %}?tab=assignments">{{ group_label }}</a> → {% endif %}
   новая работа
 </div>
 

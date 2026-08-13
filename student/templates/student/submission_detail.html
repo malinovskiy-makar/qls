@@ -107,7 +107,7 @@
   {% if submission.solution_file %}
   <div style="margin-top:10px; font-size:13px;">
     <a href="{{ submission.solution_file.url }}" target="_blank"
-       style="color:var(--accent);">📎 Прикреплённый файл</a>
+       style="color:var(--accent);"><span class="k-ico">{% include '_icon.html' with name='clip' %}</span> Прикреплённый файл</a>
   </div>
   {% endif %}
   {% if not submission.submitted_answer and not submission.solution_text and not submission.solution_file %}

@@ -47,7 +47,7 @@
     {% endif %}
 
     {% if row.graph %}
-    <div class="pf-graph">📈 График: {{ row.graph.name }}</div>
+    <div class="pf-graph"><span class="k-ico">{% include '_icon.html' with name='chart' %}</span> График: {{ row.graph.name }}</div>
     {% endif %}
 
     {% if row.is_done or readonly %}
@@ -65,7 +65,7 @@
         {% endif %}
         {% if row.sub.solution_file %}
         <div style="margin-top:8px;font-size:13px;">
-          <a href="{{ row.sub.solution_file.url }}" target="_blank" style="color:var(--accent);">📎 Прикреплённый файл</a>
+          <a href="{{ row.sub.solution_file.url }}" target="_blank" style="color:var(--accent);"><span class="k-ico">{% include '_icon.html' with name='clip' %}</span> Прикреплённый файл</a>
         </div>
         {% endif %}
       </div>
@@ -187,7 +187,7 @@
       {% for hint in row.hints %}
       <template class="hint-tpl">{{ hint.text }}</template>
       {% endfor %}
-      <button type="button" class="hint-btn" onclick="showHint({{ row.item.pk }})">💡 Подсказка</button>
+      <button type="button" class="hint-btn" onclick="showHint({{ row.item.pk }})"><span class="k-ico">{% include '_icon.html' with name='bulb' %}</span> Подсказка</button>
       <div id="hint-shown-{{ row.item.pk }}"></div>
     </div>
     {% endif %}

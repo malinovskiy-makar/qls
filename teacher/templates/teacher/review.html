@@ -107,7 +107,7 @@
 {% block content %}
 <div class="crumbs">
   {% if group %}
-  <a href="{% url 'teacher:groups' %}">Группы</a> →
+  <a href="{% url 'teacher:groups' %}">Ученики</a> →
   <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a> →
   <a href="{% url 'teacher:group_submissions' group.pk submission.assignment.pk %}">{{ submission.assignment.name }}</a> →
   проверка

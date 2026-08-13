@@ -1,4 +1,5 @@
 {% extends 'teacher/base.html' %}
+{% load ru %}
 
 {% block title %}{{ assignment.name }} — ЭкЗадачи{% endblock %}
 
@@ -122,7 +123,7 @@
 
 {% block content %}
 <div class="crumbs">
-  <a href="{% url 'teacher:groups' %}">Группы</a> →
+  <a href="{% url 'teacher:groups' %}">Ученики</a> →
   <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a> →
   {{ assignment.name }}
 </div>
@@ -134,8 +135,17 @@
       Так задание выглядит целиком — ещё до того, как кто-то начал решать.
     </div>
   </div>
+  {% comment %}
+  ⚠️ ЕДИНИЦА — СДАННАЯ РАБОТА УЧЕНИКА, и число в скобках её не называло.
+  Кнопка писала «Проверять решения (1)», а следующий экран — «Проверить
+  2 задачи»: две разные единицы в двух кликах друг от друга. Считает
+  по-прежнему `stats.works_waiting` (одна точка счёта), изменилась только
+  подпись — теперь она вслух говорит, чего именно одна штука.
+  Разбивка по задачам осталась на своём месте: в сводке решений она про
+  задачи ВНУТРИ одной работы и там уместна.
+  {% endcomment %}
   <a href="{% url 'teacher:group_submissions' group.pk assignment.pk %}" class="btn-primary">
-    Проверять решения{% if stats.pending %} ({{ stats.pending }}){% endif %}
+    {% if stats.pending %}Проверить {{ stats.pending|count_ru:"работу,работы,работ" }}{% else %}Проверять решения{% endif %}
   </a>
 </div>
 

@@ -28,7 +28,7 @@ from django.urls import reverse
 
 from problems import hw_generator
 
-from .access import group_id_param, tutor_required
+from .access import group_id_param, group_label_param, tutor_required
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +124,8 @@ def assignment_generate(request):
         # ведут сюда с ?group=). Контрольной она обязательна: её конструктор
         # живёт внутри группы.
         'group_id': group_id_param(request),
+        # Название занятия для крошки: раньше там стояло слово «занятие».
+        'group_label': group_label_param(request),
         'group': _group_or_none(request.user,
                                 request.POST.get('group')
                                 or request.GET.get('group')),

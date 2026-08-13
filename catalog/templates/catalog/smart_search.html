@@ -217,7 +217,10 @@
   padding: 60px 20px;
   color: var(--text2);
 }
-.ss-empty-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: .35; }
+/* ⚠️ Иконка КОНТУРНАЯ из общего набора, а не эмодзи: эмодзи рисует
+   операционная система — цветной, мимо палитры и мимо тёмной темы. */
+.ss-empty-icon { margin-bottom: 12px; opacity: .35; line-height: 0; }
+.ss-empty-icon svg { width: 40px; height: 40px; }
 .ss-empty h3 { font-size: 1rem; color: var(--text); margin-bottom: 6px; }
 .ss-empty p { font-size: .875rem; }
 
@@ -362,7 +365,7 @@
   {% else %}
     <!-- Нет результатов -->
     <div class="ss-empty">
-      <div class="ss-empty-icon">🔍</div>
+      <div class="ss-empty-icon">{% include '_icon.html' with name='search' %}</div>
       <h3>Ничего не найдено</h3>
       <p>Попробуйте переформулировать запрос или убрать фильтры.</p>
     </div>
@@ -371,7 +374,7 @@
 {% elif not error %}
   <!-- Нулевое состояние — ещё не искали -->
   <div class="ss-empty">
-    <div class="ss-empty-icon">💡</div>
+    <div class="ss-empty-icon">{% include '_icon.html' with name='bulb' %}</div>
     <h3>Попробуйте описать задачу</h3>
     <p>«Монополист максимизирует прибыль при линейном спросе и постоянных издержках»</p>
   </div>

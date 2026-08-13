@@ -102,7 +102,10 @@
   padding: 60px 24px;
   color: var(--text2);
 }
-.empty-state .emoji { font-size: 40px; margin-bottom: 12px; }
+/* ⚠️ Контурная иконка набора вместо эмодзи: эмодзи рисует операционная
+   система — цветной, мимо палитры и мимо тёмной темы. */
+.empty-state .empty-icon { margin-bottom: 12px; opacity: .45; line-height: 0; }
+.empty-state .empty-icon svg { width: 40px; height: 40px; }
 .empty-state p { font-size: 15px; }
 
 /* ── Контрольные ─────────────────────────────────────────
@@ -128,7 +131,7 @@
 
 {% if not active and not submitted and not completed and not has_exams %}
 <div class="empty-state">
-  <div class="emoji">📚</div>
+  <div class="empty-icon">{% include '_icon.html' with name='book' %}</div>
   <p>Пока заданий нет. Загляни позже!</p>
 </div>
 {% else %}
@@ -255,10 +258,10 @@
   </div>
   <div class="assignment-metrics">
     {% if item.stats.open_count > 0 and item.stats.open_avg is not None %}
-      <span class="metric-open">📝 {{ item.stats.open_avg }} б.</span>
+      <span class="metric-open">{{ item.stats.open_avg }} б. за задачи</span>
     {% endif %}
     {% if item.stats.test_count > 0 and item.stats.test_pct is not None %}
-      <span class="metric-test">✅ {{ item.stats.test_pct }}% тестов</span>
+      <span class="metric-test">{{ item.stats.test_pct }}% тестов</span>
     {% endif %}
     {% if item.stats.open_count > 0 and item.stats.open_avg is None and item.stats.test_count > 0 and item.stats.test_pct is None %}
       <span class="metric-pending">Ожидает проверки</span>

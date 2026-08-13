@@ -15,7 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .access import group_id_param, tutor_required
+from .access import group_id_param, group_label_param, tutor_required
 
 
 # ---------------------------------------------------------------------------
@@ -827,6 +827,7 @@ def assignment_create(request):
     # Номер группы нужен общей шапке: без него переключатель «контрольная»
     # не соберёт адрес её конструктора (он живёт ВНУТРИ группы).
     context.setdefault('group_id', group_id_param(request))
+    context.setdefault('group_label', group_label_param(request))
     return render(request, 'teacher/assignment_create.html', context)
 
 

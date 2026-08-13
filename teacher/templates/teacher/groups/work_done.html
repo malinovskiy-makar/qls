@@ -41,7 +41,7 @@
 
 {% block content %}
 <div class="crumbs">
-  <a href="{% url 'teacher:groups' %}">Группы</a> →
+  <a href="{% url 'teacher:groups' %}">Ученики</a> →
   <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a> →
   <a href="{% url 'teacher:group_submissions' group.pk assignment.pk %}">{{ assignment.name }}</a> →
   готово

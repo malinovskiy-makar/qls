@@ -136,7 +136,7 @@
 
 {% if group %}
 <div style="font-size:13px;color:var(--text2);margin:-12px 0 18px;">
-  <a href="{% url 'teacher:groups' %}" style="color:var(--accent);text-decoration:none;">Группы</a> →
+  <a href="{% url 'teacher:groups' %}" style="color:var(--accent);text-decoration:none;">Ученики</a> →
   <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments" style="color:var(--accent);text-decoration:none;">{{ group.name }}</a> →
   проверка решений
 </div>

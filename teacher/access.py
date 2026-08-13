@@ -92,3 +92,26 @@ def group_id_param(request):
     """
     raw = (request.POST.get('group') or request.GET.get('group') or '').strip()
     return raw if raw.isdigit() else ''
+
+
+def group_label_param(request):
+    """Название занятия из `?group=` — для крошки экранов создания.
+
+    ⚠️ ЗАЧЕМ. Крошка писала подчёркнутое слово «занятие» вместо настоящего
+    названия: `Ученики → занятие → новая работа`. Номер в адресе был, имени
+    в шаблоне не было, и ссылка выглядела заглушкой.
+
+    Пусто, если номера нет, занятие не найдено или принадлежит другому
+    репетитору. Пустое имя убирает саму крошку — подставлять в неё название
+    чужой группы нельзя, а показывать ссылку без слов бессмысленно.
+    """
+    from problems.models import StudentGroup
+
+    raw = group_id_param(request)
+    if not raw:
+        return ''
+    groups = StudentGroup.objects.filter(pk=raw)
+    if not request.user.is_staff:
+        groups = groups.filter(teacher=request.user)
+    group = groups.first()
+    return group.display_name if group is not None else ''

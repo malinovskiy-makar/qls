@@ -25,7 +25,7 @@
 же переключателем, и заголовок, называющий вид до выбора, спорит с ним — то
 самое рассуждение, по которому заголовок меняли в сессии 9.
 {% endcomment %}
-{% include "teacher/_build_head.html" with mode='search' is_exam=True group_id=group.pk %}
+{% include "teacher/_build_head.html" with mode='search' is_exam=True group_id=group.pk group_label=group.display_name %}
 
 <div class="hw-layout">
   <div class="hw-main">

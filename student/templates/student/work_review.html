@@ -303,7 +303,7 @@
     {% if row.sub.solution_file %}
     <div class="wr-block">
       <a href="{{ row.sub.solution_file.url }}" target="_blank"
-         style="color:var(--accent);font-size:13px;">📎 Прикреплённый файл</a>
+         style="color:var(--accent);font-size:13px;"><span class="k-ico">{% include '_icon.html' with name='clip' %}</span> Прикреплённый файл</a>
     </div>
     {% endif %}
 
