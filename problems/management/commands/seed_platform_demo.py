@@ -153,7 +153,15 @@ class Command(BaseCommand):
         self._history([g.students.first() for g in solo_groups], now,
                       seed_offset=50)
         self._finished_exam(tutor, group, students, now)
-        self._work_difficulty(tutor, students)
+        # ⚠️ ОЦЕНКИ СЛОЖНОСТИ — И ИНДИВИДУАЛЬНЫМ УЧЕНИКАМ ТОЖЕ (обзор 13.08,
+        # п. 29). Раньше сюда уходили только ученики группы, и на экране
+        # занятия один на один карточка «Средняя сложность работ» стояла
+        # пустой при сданной и проверенной работе: вопрос ученику задаётся,
+        # но в демо-данных на него никто не отвечал.
+        self._work_difficulty(
+            tutor,
+            students + [g.students.first() for g in solo_groups
+                        if g.students.exists()])
 
         self.stdout.write(self.style.SUCCESS('\nДемо-данные готовы.'))
         self.stdout.write('Вход (пароль у всех одинаковый):')
@@ -915,12 +923,12 @@ class Command(BaseCommand):
         pattern = [4, 7, 3, 8, 5, 6, None, 5, 4, None, 7, 3]
         created = 0
         index = 0
+        rated = set()
+        submitted = {}
         for work in works:
             for student in students:
                 value = pattern[index % len(pattern)]
                 index += 1
-                if value is None:
-                    continue
                 # ⚠️ Оценку ставит только тот, кто РАБОТУ СДАВАЛ. Иначе на
                 # экране выходит «никто не сдал · сложность 4,7 из 10» —
                 # оценка работы, которую никто не открывал.
@@ -928,10 +936,27 @@ class Command(BaseCommand):
                         assignment=work, student=student,
                         status__in=('submitted', 'reviewed')).exists():
                     continue
+                submitted.setdefault(student.pk, (work, student))
+                if value is None:
+                    continue
                 _, made = WorkDifficulty.objects.get_or_create(
                     assignment=work, student=student,
                     defaults={'value': value})
                 created += int(made)
+                rated.add(student.pk)
+
+        # ⚠️ У СДАВШЕГО ХОТЬ ЧТО-ТО ОЦЕНКА ЕСТЬ ВСЕГДА. Раньше это решал
+        # шаблон `pattern`: у ученика с одной работой он мог выпасть на
+        # `None`, и карточка «Средняя сложность работ» оставалась пустой —
+        # ровно так и вышло у индивидуального занятия. Состояние «нет
+        # оценок» на экране всё равно видно: работ у каждого несколько, и
+        # часть их остаётся без оценки.
+        for pk, (work, student) in submitted.items():
+            if pk in rated:
+                continue
+            _, made = WorkDifficulty.objects.get_or_create(
+                assignment=work, student=student, defaults={'value': 6})
+            created += int(made)
         if created:
             self.stdout.write('  проставлены оценки сложности работ (%d)'
                               % created)

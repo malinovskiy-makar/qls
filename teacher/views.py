@@ -698,10 +698,10 @@ def student_progress(request, pk):
 
 
 def _difficulty_label(value):
-    """«4,3 из 10» или None. Нет оценок — None, а не ноль."""
-    if value is None:
-        return None
-    return ('%.1f' % value).replace('.', ',') + ' из 10'
+    """«4,3 из 10» или None. Делегирует ЕДИНСТВЕННОЙ точке форматирования."""
+    from problems.models_platform import difficulty_label
+
+    return difficulty_label(value)
 
 
 def _work_history(student, tutor):

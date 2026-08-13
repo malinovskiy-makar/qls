@@ -83,7 +83,7 @@
   <div class="card3">
     <div class="card3-cap">Средняя сложность работ{% include '_hint.html' with hint='Ученик сам оценивает каждую сданную работу по шкале от 1 до 10.' %}</div>
     <div class="card3-value">
-      {% if solo_difficulty %}{{ solo_difficulty|stringformat:"s"|cut:"." }}{% else %}нет оценок{% endif %}
+      {% if solo_difficulty %}{{ solo_difficulty }}{% else %}нет оценок{% endif %}
     </div>
   </div>
   <div class="card3">

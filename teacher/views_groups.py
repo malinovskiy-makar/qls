@@ -110,7 +110,11 @@ def assignment_stats(assignment):
         # (`WorkDifficulty`), вычислить её из баллов нельзя. Нет ответов —
         # пишем словами, а не нулём: ноль по шкале 1–10 означал бы оценку.
         'difficulty': difficulty,
-        'difficulty_label': ('сложность %s из 10' % str(difficulty).replace('.', ',')
+        # ⚠️ Подпись собирает ЕДИНСТВЕННАЯ точка форматирования
+        # (`models_platform.difficulty_label`): третья своя запись числа
+        # разъехалась бы с двумя другими — так «7.0» уже превращалось в «70».
+        'difficulty_label': ('сложность %s'
+                             % models_platform.difficulty_label(difficulty)
                              if difficulty is not None else 'нет оценок'),
         'percent': percent,
         'nobody_submitted': submitted_students == 0,
@@ -366,7 +370,10 @@ def group_detail(request, pk):
                 'solo_test': stats_module.accuracy_pair(
                     solo, tutor=request.user, kind='test', period=period),
                 'solo_minutes': stats_module.minutes_on_site(solo, period),
-                'solo_difficulty': models_platform.difficulty_for_student(solo),
+                # ⚠️ Готовая ПОДПИСЬ, а не сырое число: в шаблоне стояло
+                # `stringformat:"s"|cut:"."`, и «7.0» превращалось в «70».
+                'solo_difficulty': models_platform.difficulty_label(
+                    models_platform.difficulty_for_student(solo)),
             })
 
         context.update({
