@@ -1204,10 +1204,12 @@ function buildTex(title, label) {
       if (!pgf) return;
       drawnByFormula.add(c.id);
       const lo = Math.max(0, xLo), hi = xHi;
+      // forget plot — чтобы pgfplots не заводил СВОЮ легенду. Имена кривых уже
+      // подписаны узлами на самих кривых (как на экране), а вторая легенда
+      // рядом с нашей легендой закрашенных областей подписывала бы всё дважды.
       body.push('\\addplot[' + colorName(c.color) + ', very thick, domain=' + num(lo) + ':' + num(hi) +
-                ', samples=120, restrict y to domain=' + num(Math.max(0, yLo)) + ':' + num(yHi) + '] {' + pgf + '};');
-      const nm = texText(curveShortName(c));
-      if (nm) body.push('\\addlegendentry{' + nm + '}');
+                ', samples=120, restrict y to domain=' + num(Math.max(0, yLo)) + ':' + num(yHi) +
+                ', forget plot] {' + pgf + '};');
     });
   }
 
@@ -1324,20 +1326,24 @@ function buildTex(title, label) {
     '\\begin{figure}[h]',
     '\\centering',
     '\\begin{tikzpicture}',
-    '\\begin{axis}[',
-    '  width=' + texPlotSize().w + 'cm, height=' + texPlotSize().h + 'cm,',
-    // Размер относится к самому полю графика, а не ко всей картинке вместе
-    // с подписями: только так сантиметр на единицу совпадает с экраном.
-    '  scale only axis,',
-    '  xmin=' + num(xLo) + ', xmax=' + num(xHi) + ', ymin=' + num(yLo) + ', ymax=' + num(yHi) + ',',
-    '  xlabel={' + xName + '}, ylabel={' + yName + '},',
-    '  axis lines=left, axis line style={-{Stealth[length=6pt]}},',
-    '  xlabel style={at={(axis description cs:1,0)}, anchor=west},',
-    '  ylabel style={at={(axis description cs:0,1)}, anchor=south, rotate=-90},',
-    STATE.showGrid ? '  grid=major, grid style={very thin, gray!25},' : '',
-    '  legend pos=north east, legend cell align=left,',
-    '  legend style={font=\\small, draw=gray!40},',
-    ']',
+    // Список настроек осей идёт ОДНОЙ строкой намеренно. Пустая строка внутри
+    // \begin{axis}[...] обрывает абзац, и pgfplots падает с «Paragraph ended
+    // before \pgfplots@@environment@axis was complete». Пустая строка тут
+    // берётся не из нашего кода, а из удвоенных переводов строк по дороге на
+    // сервер (см. normalize_newlines в calc2/views.py). Сервер это чинит, а
+    // одна строка не даёт пустой строке появиться в принципе.
+    '\\begin{axis}[' + [
+      'width=' + texPlotSize().w + 'cm, height=' + texPlotSize().h + 'cm',
+      // Размер относится к самому полю графика, а не ко всей картинке вместе
+      // с подписями: только так сантиметр на единицу совпадает с экраном.
+      'scale only axis',
+      'xmin=' + num(xLo) + ', xmax=' + num(xHi) + ', ymin=' + num(yLo) + ', ymax=' + num(yHi),
+      'xlabel={' + xName + '}, ylabel={' + yName + '}',
+      'axis lines=left, axis line style={-{Stealth[length=6pt]}}',
+      'xlabel style={at={(axis description cs:1,0)}, anchor=west}',
+      'ylabel style={at={(axis description cs:0,1)}, anchor=south, rotate=-90}',
+      STATE.showGrid ? 'grid=major, grid style={very thin, gray!25}' : '',
+    ].filter(Boolean).join(', ') + ']',
     ...uniq,
     ...body,
     '\\end{axis}',

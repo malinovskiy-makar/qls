@@ -53,6 +53,22 @@ def pdflatex_available():
     return bool(binary) and os.path.isfile(binary) and os.access(binary, os.X_OK)
 
 
+def normalize_newlines(text):
+    """Приводит переводы строк к одному виду (LF).
+
+    Файл .tex приходит с клиента обычным текстовым полем формы, а браузер по
+    стандарту multipart/form-data нормализует переводы строк в текстовых полях
+    к CRLF. pdflatex считает CR и LF за ДВА перевода строки, поэтому после
+    каждой строки появляется пустая. Пустая строка внутри списка настроек
+    \\begin{axis}[...] обрывает абзац, и pgfplots падает с
+    «Paragraph ended before \\pgfplots@@environment@axis was complete».
+
+    Замерено: ошибка, поставленная в строку 6, 12 и 20, приезжала как строка
+    11, 23 и 39 — ровно 2n−1 во всех трёх случаях.
+    """
+    return text.replace('\r\n', '\n').replace('\r', '\n')
+
+
 def compile_pdf_pdflatex(tex_content):
     """Собирает .tex в PDF. Возвращает (bytes, None) или (None, лог ошибки)."""
     binary = _pdflatex_bin()
@@ -62,7 +78,11 @@ def compile_pdf_pdflatex(tex_content):
         tex_path = Path(tmpdir) / 'graph.tex'
         pdf_path = Path(tmpdir) / 'graph.pdf'
         log_path = Path(tmpdir) / 'graph.log'
-        tex_path.write_text(tex_content, encoding='utf-8')
+        # newline='' — записываем строку как есть, без второй трансляции
+        # переводов строк средствами Python (на Windows она превратила бы
+        # уже нормализованный \n обратно в \r\n).
+        with open(tex_path, 'w', encoding='utf-8', newline='') as fh:
+            fh.write(normalize_newlines(tex_content))
         try:
             proc = subprocess.run(
                 [binary, '-interaction=nonstopmode', '-halt-on-error',
