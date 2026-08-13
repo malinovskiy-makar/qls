@@ -1701,6 +1701,45 @@ const CASES = [
              ['поле графика, а не картинка', 'only', 1, 0]],
   },
   {
+    /* А30 · А61 · А63. Точки на графике.
+
+       А30: черновик открывался с «x = 0, y = 0», потому что незаполненная
+       координата уходила в общий формат чисел, а тот на пустой строке считал
+       ноль. Человек нажимал галочку не глядя и получал точку в начале
+       координат. Теперь пусто показывается пустым.
+
+       А61: при правке значение ВЫДЕЛЯЕТСЯ целиком, и первый набранный символ
+       его заменяет. Раньше курсор ставился в конец, и набор «45» поверх нуля
+       давал «045». Это отмена прежнего решения, принятая по замеру владельца.
+
+       А63: у всех точек был один цвет (COL.ink), и на графике с тремя точками
+       их было не различить. Новая точка берёт следующий свободный цвет из той
+       же палитры, что предлагает пикер. */
+    name: 'Точки · пустой черновик, свой цвет, замена значения при правке',
+    run: `pickScene('sd');
+          STATE.marks = []; markCounter = 0; renderMarkList();
+          startMarkDraft();
+          var row = document.querySelector('.mark-draft');
+          var vals = [].map.call(row.querySelectorAll('.edval'), function (e) { return e.textContent; });
+          var zeros = vals.filter(function (s) { return /=\\s*0\\b/.test(s); }).length;
+
+          STATE.marks = []; markCounter = 0;
+          for (var i = 1; i <= 5; i++) addMarkAt(i * 10, i * 10, null);
+          redrawAll();
+          var cols = STATE.marks.map(function (m) { return String(m.color || ''); });
+          var uniq = {};
+          cols.forEach(function (c) { uniq[c] = 1; });
+
+          STATE.marks = []; markCounter = 0; addMarkAt(50, 50, null); renderMarkList();
+          pickScene('sd');
+          return { zeros: zeros, drafts: vals.length,
+                   colors: Object.keys(uniq).length, empty: cols.filter(Boolean).length };`,
+    checks: [['нулей в черновике', 'zeros', 0, 0],
+             ['полей в черновике', 'drafts', 2, 1],
+             ['разных цветов у пяти точек', 'colors', 5, 0],
+             ['точек с заданным цветом', 'empty', 5, 0]],
+  },
+  {
     /* А28 · А29. Величины на холсте набраны с индексами.
 
        Было: в правой панели «$P_b$» набиралось формулой, а на холсте та же

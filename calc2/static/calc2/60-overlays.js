@@ -2793,11 +2793,25 @@ function addMarkAt(x, y, snapTo) {
 /* Заготовка точки: строка списка уже есть, а на плоскости точки ещё нет.
    Так работает пайплайн П28 — тумблер и поля координат живут в той же строке,
    которая потом станет обычной строкой точки, и фокус при наборе не теряется. */
+/* Цвет новой точки — следующий свободный из общей палитры (А63).
+
+   Было: у всех точек цвет null, то есть COL.ink, и на графике с тремя точками
+   их было не различить ни на холсте, ни в списке. Палитра та же, что предлагает
+   пикер (--pal-1…--pal-6), поэтому светлая и тёмная тема дают свои значения;
+   когда цвета кончаются, начинаем заново. */
+function nextMarkColor() {
+  const pal = paletteSix().filter(Boolean);
+  if (!pal.length) return null;
+  const used = (STATE.marks || []).map(m => String(m.color || '').toLowerCase());
+  const free = pal.find(c => used.indexOf(String(c).toLowerCase()) < 0);
+  return free || pal[(STATE.marks || []).length % pal.length];
+}
+
 function newMark(x, y, snapTo, mode) {
   markCounter++;
   return {
     id: markCounter, x, y, text: 'Точка ' + markCounter,
-    showCoords: true, showDash: true, color: null,
+    showCoords: true, showDash: true, color: nextMarkColor(),
     mode: mode || 'coords',      // как её создавали: тумблер после этого заперт
     pending: false,
     // Имя кривой, на которой сидит точка. Пока оно задано, точка при

@@ -1151,8 +1151,13 @@ function makeEditableValue(opts) {
 
   const shown = () => {
     const v = opts.get();
-    return (typeof opts.fmt === 'function') ? opts.fmt(v)
-         : (isNum ? fmt(v) : String(v == null ? '' : v));
+    if (typeof opts.fmt === 'function') return opts.fmt(v);
+    /* А30. Пустое числовое значение показываем пустым, а не нулём. Раньше
+       незаполненная координата уходила в fmt, а тот на пустой строке считал
+       ноль: черновик точки открывался с «x = 0, y = 0», и человек нажимал
+       галочку не глядя, получая точку в начале координат. */
+    if (isNum && (v === '' || v == null || !isFinite(v))) return '';
+    return isNum ? fmt(v) : String(v == null ? '' : v);
   };
   const paint = () => {
     if (el.classList.contains('editing')) return;
@@ -1181,8 +1186,12 @@ function makeEditableValue(opts) {
     el.contentEditable = 'plaintext-only';
     if (el.contentEditable !== 'plaintext-only') el.contentEditable = 'true';   // Firefox
     el.focus();
-    // Курсор в конец, а не выделение всей строки.
-    const r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
+    /* А61. Содержимое ВЫДЕЛЯЕТСЯ целиком: первый же набранный символ заменяет
+       прежнее значение. Раньше курсор ставился в конец, и набор «45» поверх
+       нуля давал «045». Это отмена прежнего решения: дописывать к значению
+       по-прежнему можно, для этого достаточно нажать стрелку или щёлкнуть
+       второй раз, а вот случайное «045» ловилось глазами не всегда. */
+    const r = document.createRange(); r.selectNodeContents(el);
     const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
 
     const live = () => {
