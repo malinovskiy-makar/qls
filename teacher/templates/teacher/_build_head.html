@@ -43,17 +43,22 @@
   без номера адрес не собирается. Ровно эту потерю чинили в сессии 9 у одних
   ссылок и не заметили у других. Поймано сценарием, не тестами.
   {% endcomment %}
-  <div class="k-tiles bh-kind" style="margin-left:auto">
-    <a class="k-tile {% if not is_exam %}k-tile--on{% endif %}"
-       href="{% if mode == 'describe' %}{% url 'teacher:assignment_generate' %}?kind=homework{% if group_id %}&amp;group={{ group_id }}{% endif %}{% elif mode == 'own' %}{% url 'teacher:problem_new' %}?to_cart=1{% if group_id %}&amp;group={{ group_id }}{% endif %}{% else %}{% url 'teacher:assignment_create' %}{% if group_id %}?group={{ group_id }}{% endif %}{% endif %}">
-      <span class="k-tile__name">Домашка</span>
-      <span class="k-tile__note">решают дома, срок сдачи</span>
-    </a>
-    <a class="k-tile {% if is_exam %}k-tile--on{% endif %}"
-       href="{% if mode == 'describe' %}{% url 'teacher:assignment_generate' %}?kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}{% elif mode == 'search' and group_id %}{% url 'teacher:exam_create' group_id %}{% elif mode == 'own' %}{% url 'teacher:problem_new' %}?to_cart=1&amp;kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}{% else %}{% url 'teacher:assignment_generate' %}?kind=exam{% endif %}">
-      <span class="k-tile__name">Контрольная</span>
-      <span class="k-tile__note">ограниченное время, окно</span>
-    </a>
+  {% comment %}
+  ⚠️ ВИД РАБОТЫ — СЕГМЕНТИРОВАННЫЙ ПЕРЕКЛЮЧАТЕЛЬ, А НЕ ПЛИТКИ (обзор 13.08,
+  п. 57). Плиток на экране получалось ПЯТЬ одного размера — три способа
+  набора и два вида работы, — и понять, какие из них главные, было нельзя.
+  Вид это уточнение к заголовку, а не способ; способ выбирают ниже.
+  Подписи-пояснения не потеряны: они показываются для ВЫБРАННОГО вида одной
+  строкой под переключателем.
+  {% endcomment %}
+  <div class="bh-kindwrap">
+    <div class="bh-kind" role="group" aria-label="Вид работы">
+      <a class="bh-kind__opt {% if not is_exam %}is-on{% endif %}"
+         href="{% if mode == 'describe' %}{% url 'teacher:assignment_generate' %}?kind=homework{% if group_id %}&amp;group={{ group_id }}{% endif %}{% elif mode == 'own' %}{% url 'teacher:problem_new' %}?to_cart=1{% if group_id %}&amp;group={{ group_id }}{% endif %}{% else %}{% url 'teacher:assignment_create' %}{% if group_id %}?group={{ group_id }}{% endif %}{% endif %}">Домашка</a>
+      <a class="bh-kind__opt {% if is_exam %}is-on{% endif %}"
+         href="{% if mode == 'describe' %}{% url 'teacher:assignment_generate' %}?kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}{% elif mode == 'search' and group_id %}{% url 'teacher:exam_create' group_id %}{% elif mode == 'own' %}{% url 'teacher:problem_new' %}?to_cart=1&amp;kind=exam{% if group_id %}&amp;group={{ group_id }}{% endif %}{% else %}{% url 'teacher:assignment_generate' %}?kind=exam{% endif %}">Контрольная</a>
+    </div>
+    <div class="bh-kind__note">{% if is_exam %}ограниченное время, окно{% else %}решают дома, срок сдачи{% endif %}</div>
   </div>
 </div>
 

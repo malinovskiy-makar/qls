@@ -37,14 +37,32 @@
    здесь остались только размеры, чтобы ряд не разъезжался на две строки. */
 /* ⚠️ Ряд компактнее и ОДНОЙ высоты: поля набора и кнопки стоят на общей
    базовой линии, а не разной высоты друг рядом с другом. */
+/* ── Ряд отбора ─────────────────────────────────────────────────────────
+   ⚠️ РАСКЛАДКА ВЫРОВНЕНА (обзор 13.08, п. 62). Ряд ложился в две строки
+   неровно: первая занята наполовину, на второй оставались «Любой тип»,
+   флажок, «Найти» и «Сброс».
+
+   Причина: у обёрток списков стояло `flex: 0 1 auto`, то есть ширина по
+   СОДЕРЖИМОМУ, — и список тем растягивался под самую длинную тему
+   («Введение в экономическую теорию», 339 пикселей). Он один съедал
+   полстроки, а остальным места не хватало.
+
+   Теперь у всех гибких полей заданная основа и общий рост: поиск весит
+   вдвое, три списка поровну; кнопки и флажок не тянутся вовсе. Переносится
+   ряд по-прежнему — но ровно, а не с полупустой первой строкой. */
 .filters-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
                align-items: center; }
 .filters-row .k-input, .filters-row .k-select,
 .filters-row .k-btn { height: 34px; }
-.filters-row .k-check { height: 34px; }
-.filters-row .filter-input { flex: 1 1 190px; min-width: 150px; width: auto; }
-.filters-row .k-select-wrap { flex: 0 1 155px; width: auto; min-width: 120px; }
-.filters-row .k-select { min-width: 0; }
+.filters-row .k-check { height: 34px; flex: 0 0 auto; }
+.filters-row .k-btn { flex: 0 0 auto; }
+.filters-row .filter-input { flex: 2 1 170px; min-width: 140px; width: auto; }
+.filters-row .k-select-wrap { flex: 1 1 128px; width: auto;
+                              min-width: 112px; max-width: 230px; }
+/* ⚠️ `min-width: 0` обязателен: без него `select` не даёт себя сжать ниже
+   ширины самой длинной строки, и вся раскладка снова разъезжается. */
+.filters-row .k-select { min-width: 0; width: 100%;
+                         text-overflow: ellipsis; }
 .checkbox-label {
   display: flex; align-items: center; gap: 6px; font-size: 13px;
   color: var(--text); cursor: pointer; white-space: nowrap; height: 34px;
@@ -222,6 +240,9 @@
 
 /* Одна тихая строка вместо ряда цветных тегов и звёздочек (фаза 16). */
 .card-meta { font-size: 12px; color: var(--text3); margin-top: 6px; }
-/* Обёртка своего списка растягивается в ряду фильтров как прежний select. */
-.filters-row .k-select-wrap { flex: 0 1 auto; width: auto; min-width: 150px; }
-.filters-row .k-select { min-width: 150px; }
+{% comment %}
+⚠️ ЗДЕСЬ СТОЯЛ ВТОРОЙ НАБОР ПРАВИЛ ДЛЯ ТЕХ ЖЕ КЛАССОВ и, стоя ниже, побеждал
+первый: `flex: 0 1 auto` и `min-width: 150px` — из-за них список тем и
+растягивался по самой длинной теме. Правила сведены в одно место наверху
+файла; двух наборов на один класс в файле больше нет.
+{% endcomment %}

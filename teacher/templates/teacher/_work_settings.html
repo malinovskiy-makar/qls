@@ -215,10 +215,17 @@
   {% comment %}
   Неактивная кнопка ОБЪЯСНЯЕТ, чего не хватает: нет названия? группы? задач?
   Список пересчитывается на лету в `_picker_js.html`.
+
+  ⚠️ `submit_apart` — кнопка рисуется НЕ ЗДЕСЬ, а отдельным блоком
+  (`teacher/_work_submit.html`) под корзиной. Так у конструкторов, где
+  порядок колонки перевёрнут: настройки сверху, корзина снизу, и кнопка
+  обязана остаться последней (обзор 13.08, п. 59).
   {% endcomment %}
+  {% if not submit_apart %}
   <div class="k-hint ws-why" id="submit-why"></div>
   <button type="submit" class="k-btn k-btn--main k-btn--wide"
           id="submit-btn" disabled>
     {% if submit_label %}{{ submit_label }}{% elif is_exam %}Создать контрольную{% else %}Создать работу{% endif %}
   </button>
+  {% endif %}
 </div>

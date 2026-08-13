@@ -142,9 +142,10 @@ async function panelShape(page) {
   ]) {
     await open(page, `${url}${url.includes('?') ? '&' : '?'}group=${groupId}`, name);
     const seen = await page.evaluate(() => {
-      const tiles = [...document.querySelectorAll('.bh-kind .k-tile')]
-        .map(t => t.querySelector('.k-tile__name').textContent.trim());
-      const links = [...document.querySelectorAll('.bh-kind .k-tile')]
+      // Вид работы — сегментированный переключатель с обзора 13.08.
+      const tiles = [...document.querySelectorAll('.bh-kind__opt')]
+        .map(t => t.textContent.trim());
+      const links = [...document.querySelectorAll('.bh-kind__opt')]
         .map(t => t.getAttribute('href'));
       return { tiles, links };
     });
@@ -164,7 +165,6 @@ async function panelShape(page) {
   ]) {
     await open(page, `${url}${url.includes('?') ? '&' : '?'}group=${groupId}`, name);
     const modes = await page.evaluate(() => [...document.querySelectorAll('.k-tiles .k-tile')]
-      .filter(t => !t.closest('.bh-kind'))
       .map(t => ({ name: t.querySelector('.k-tile__name').textContent.trim(),
                    href: t.getAttribute('href') })));
     const own = modes.find(m => m.name === 'Написать свою');

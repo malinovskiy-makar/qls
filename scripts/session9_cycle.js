@@ -80,7 +80,10 @@ async function shot(page, url, name) {
   await shot(page, '/teacher/assignment/generate/?group=2', '04-создание-описанием');
   const title = await page.$eval('.page-title', (e) => e.textContent.trim());
   check('заголовок общий — «Новая работа»', title === 'Новая работа', title);
-  const switcher = await page.$$eval('.bh-kind .k-tile__name',
+  // ⚠️ С обзора 13.08 вид работы — сегментированный переключатель
+  // (`.bh-kind__opt`), а не плитки: пять одинаковых плиток на экране не
+  // давали понять, какие из них главные.
+  const switcher = await page.$$eval('.bh-kind__opt',
     (n) => n.map((e) => e.textContent.trim()));
   check('переключатель вида на месте',
     switcher.join(',') === 'Домашка,Контрольная', JSON.stringify(switcher));

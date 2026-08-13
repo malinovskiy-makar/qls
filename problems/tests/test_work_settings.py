@@ -158,7 +158,13 @@ class GroupAndKindSurviveTheSwitchers(TestCase):
                     f"{reverse('teacher:problem_new')}?to_cart=1&group={pk}",
                     reverse('teacher:exam_create', args=[pk])):
             body = self.client.get(url).content.decode()
-            tiles = re.findall(r'<a class="k-tile[^"]*"\s+href="([^"]+)"', body)
+            # ⚠️ Ссылок теперь ДВА вида: плитки способа набора и
+            # сегментированный переключатель вида работы (обзор 13.08,
+            # п. 57). Проверять надо оба — иначе половина покрытия
+            # исчезла бы молча вместе с классом.
+            tiles = (re.findall(r'<a class="k-tile[^"]*"\s+href="([^"]+)"', body)
+                     + re.findall(r'<a class="bh-kind__opt[^"]*"\s+href="([^"]+)"',
+                                  body))
             self.assertTrue(tiles, url)
             for href in tiles:
                 self.assertTrue(

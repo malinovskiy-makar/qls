@@ -38,8 +38,21 @@
       <input type="hidden" name="problem_ids" id="problem-ids-input">
 
       {% comment %}
-      ⚠️ КОРЗИНА ВЫШЕ НАСТРОЕК — тот же порядок, что у конструктора домашки
-      (сессия 10, фаза 2.1): что набрал → как идёт время → кому и кнопка.
+      ⚠️ ПАНЕЛЬ НАСТРОЕК — ОБЩИЙ ПАРТИАЛ (сессия 10, фаза 2.1). До сведения
+      здесь стояла своя копия с полями класса `.form-control` — другой
+      высоты и с другой рамкой, чем `.k-input` на соседних экранах создания.
+
+      ⚠️ ГРУППА ЗАДАНА АДРЕСОМ: конструктор контрольной живёт ВНУТРИ группы,
+      вьюха поле `groups` не читает вовсе. Партиалу передаём `group` без
+      `groups`, и он рисует занятие строкой, а не выбором.
+      {% endcomment %}
+      {% include "teacher/_work_settings.html" with is_exam=True group=group groups=None form=form errors=errors min_window=min_window min_duration=min_duration max_duration=max_duration submit_label="Создать контрольную" submit_apart=1 %}
+
+      {% comment %}
+      ⚠️ ПОРЯДОК ТОТ ЖЕ, ЧТО У ДОМАШКИ (обзор 13.08, п. 59): настройки и
+      «кому» сверху, корзина снизу, кнопка последней. Разводить порядок на
+      двух конструкторах нельзя — однотипные блоки обязаны работать
+      одинаково, ровно ради этого их и сводили в сессии 10.
       {% endcomment %}
       <div class="k-card ws-card">
         <div class="cart-header">
@@ -52,16 +65,7 @@
         </div>
       </div>
 
-      {% comment %}
-      ⚠️ ПАНЕЛЬ НАСТРОЕК — ОБЩИЙ ПАРТИАЛ (сессия 10, фаза 2.1). До сведения
-      здесь стояла своя копия с полями класса `.form-control` — другой
-      высоты и с другой рамкой, чем `.k-input` на соседних экранах создания.
-
-      ⚠️ ГРУППА ЗАДАНА АДРЕСОМ: конструктор контрольной живёт ВНУТРИ группы,
-      вьюха поле `groups` не читает вовсе. Партиалу передаём `group` без
-      `groups`, и он рисует занятие строкой, а не выбором.
-      {% endcomment %}
-      {% include "teacher/_work_settings.html" with is_exam=True group=group groups=None form=form errors=errors min_window=min_window min_duration=min_duration max_duration=max_duration submit_label="Создать контрольную" %}
+      {% include "teacher/_work_submit.html" with submit_label="Создать контрольную" is_exam=True %}
     </form>
   </aside>
 </div>

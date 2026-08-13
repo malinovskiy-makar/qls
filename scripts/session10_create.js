@@ -123,7 +123,7 @@ async function typeDate(page, label, value) {
   await page.goto(`${BASE}/teacher/groups/${groupId}/exams/new/`,
                   { waitUntil: 'networkidle' });
   check('переключатель вида на конструкторе контрольной есть',
-        await page.evaluate(() => document.querySelectorAll('.bh-kind .k-tile').length) === 2);
+        await page.evaluate(() => document.querySelectorAll('.bh-kind__opt').length) === 2);
   const adders = await page.$$('.problem-card [data-add]');
   await adders[0].click();
   if (adders[1]) { await adders[1].click(); }
@@ -155,7 +155,7 @@ async function typeDate(page, label, value) {
   await page.goto(`${BASE}/teacher/problems/new/?to_cart=1&group=${groupId}`,
                   { waitUntil: 'networkidle' });
   check('на «Написать свою» видна общая шапка с переключателем',
-        await page.evaluate(() => document.querySelectorAll('.bh-kind .k-tile').length) === 2);
+        await page.evaluate(() => document.querySelectorAll('.bh-kind__opt').length) === 2);
   await page.fill('input[name=title]', ownTitle);
   await page.fill('textarea[name=statement]',
                   'Спрос Qd = 100 - 2P, предложение Qs = 3P. Найдите равновесную цену.');
