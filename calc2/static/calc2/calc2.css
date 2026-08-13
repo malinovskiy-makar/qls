@@ -1217,12 +1217,19 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 /* Ползунок параметра: границы написаны по краям дорожки и открывают редактор. */
 .param-track { display: flex; align-items: center; gap: 6px; }
 .param-track input[type="range"] { flex: 1; min-width: 0; }
+/* А35. Границы ползунка задуманы как правка на месте, но выглядели как
+   служебная мелочь: кегль 10.5 и цвет --text3 почти сливались с фоном, и
+   человек просто не замечал, что по ним можно щёлкнуть. Оформляем их так же,
+   как и любое редактируемое значение (.edval): читаемый цвет, заметный
+   пунктир снизу, текстовый курсор. */
 .param-bound {
   flex: 0 0 auto; padding: 1px 3px; border: none; background: transparent;
-  font-size: 10.5px; color: var(--text3); font-variant-numeric: tabular-nums;
-  border-bottom: 1px dashed var(--border); border-radius: 0; cursor: pointer;
+  font-size: 10px; color: var(--text2); font-variant-numeric: tabular-nums;
+  border-bottom: 1px dashed var(--text3); border-radius: 0; cursor: text;
+  transition: color .12s var(--ease), border-bottom-color .12s var(--ease);
 }
-.param-bound:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.param-bound:hover,
+.param-bound:focus-visible { color: var(--accent); border-bottom-color: var(--accent); }
 .param-editor { display: none; }
 .param-editor.open { display: block; margin-top: 6px; }
 .param-ed-line { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; font-size: 11px; color: var(--text2); }
@@ -1303,8 +1310,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    поэтому поднять слой безопасно. */
 .graph-tools {
   position: absolute; top: 12px; right: 12px; z-index: calc(var(--z-pop) + 1);
-  display: flex; align-items: center; gap: 6px;
+  /* А33. Кнопки стоят ВЕРТИКАЛЬНОЙ СТОПКОЙ: ключ, под ним «плюс», под ним
+     «минус» — как у Desmos и как в первом калькуляторе. В коде это уже было
+     задумано (см. комментарий в разметке), но раскладка оставалась строкой,
+     и все четыре кнопки шли в ряд. */
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
+/* Приблизить и отдалить читаются как одна пара, поэтому стоят вплотную. */
+#btn-zoomin { margin-top: 2px; }
+#btn-zoomout { margin-top: -3px; }
 .gt-btn {
   width: 34px; height: 34px; display: grid; place-items: center; position: relative;
   border: 1px solid var(--border); border-radius: var(--r-sm);

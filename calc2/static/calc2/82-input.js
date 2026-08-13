@@ -1269,9 +1269,12 @@ function makeToggle(leftText, rightText, startRight, onChange) {
    сцены читают и ставят у них класс .active, а тумблер лишь щёлкает по ним и
    показывает их состояние. Так переключатель стал другим на вид, а логика
    сцен осталась ровно та же. */
+/* Первый аргумент — id самой полосы ИЛИ null: тогда полоса ищется по кнопке.
+   Так подключаются переключатели, у которых своего id у полосы нет, и не
+   приходится трогать разметку ради одной обвязки (А34, А67). */
 function segToToggle(segId, leftId, rightId, leftText, rightText) {
-  const seg = document.getElementById(segId);
   const l = document.getElementById(leftId), r = document.getElementById(rightId);
+  const seg = segId ? document.getElementById(segId) : (l && l.closest('.seg'));
   if (!seg || !l || !r || seg._tgl) return;
   const tgl = makeToggle(leftText, rightText, r.classList.contains('active'), (v) => {
     (v === 'right' ? r : l).click();

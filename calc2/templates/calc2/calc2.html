@@ -784,6 +784,17 @@
          следующая, а эта стала полноценной строкой списка. -->
     <div class="section" id="sec-graph" style="display:none;">
       <div class="section-title">Функции</div>
+      <div class="hint-row">
+        <span class="hint-lead">Как строить график</span>
+        <button class="hint-btn" type="button" data-pop="hp-graph" aria-label="Как этим пользоваться">?</button>
+      </div>
+      <div class="hint-pop" id="hp-graph">
+        <p>Формула пишется от x: «x^2 - 4», «sin(x)», «1/x». Каждая строка это отдельная кривая
+          со своим цветом; строк можно завести сколько угодно.</p>
+        <p>Незнакомая буква в формуле («a*x + b») превращается в ползунок: двигая его, видно,
+          как буква меняет график. Нули функции, её вершины и точки пересечения кривых
+          считаются сами и показаны в «Ключевых значениях» справа.</p>
+      </div>
       <div id="graph-rows"></div>
       <div class="error" id="graph-error"></div>
     </div>
@@ -799,6 +810,15 @@
     <!-- Излишки CS / PS (шаг 6) -->
     <div class="section" id="sec-areas">
       <div class="section-title">Излишки</div>
+        <div class="hint-row">
+          <span class="hint-lead">Что такое излишки</span>
+          <button class="hint-btn" type="button" data-pop="hp-areas" aria-label="Как этим пользоваться">?</button>
+        </div>
+        <div class="hint-pop" id="hp-areas">
+          <p>Излишек покупателя это разница между тем, сколько человек готов был заплатить, и тем, сколько он заплатил на самом деле. На графике это область между кривой спроса и линией цены.</p>
+          <p>Излишек продавца считается зеркально: между ценой и кривой предложения, то есть между выручкой и издержками. Сумма двух излишков это общий выигрыш рынка, и именно её уменьшает любое вмешательство.</p>
+        </div>
+
       <label class="chk"><input type="checkbox" id="chk-cs" checked>
         <span class="swatch" style="background:var(--curve-d)"></span> Показывать CS</label>
       <label class="chk"><input type="checkbox" id="chk-ps" checked>
@@ -1255,6 +1275,17 @@
     <!-- Рынок труда (Чекпоинт 1) — отдельный режим. Оси: труд L и зарплата W.
          Структура: совершенная конкуренция / монопсония + минимальная зарплата (МРОТ). -->
     <div class="section" id="sec-labor" style="display:none;">
+      <div class="hint-row">
+        <span class="hint-lead">Как читать рынок труда</span>
+        <button class="hint-btn" type="button" data-pop="hp-labor" aria-label="Как этим пользоваться">?</button>
+      </div>
+      <div class="hint-pop" id="hp-labor">
+        <p>Стороны здесь поменялись местами: труд покупают фирмы, продают работники.
+          По горизонтали идёт занятость, по вертикали ставка зарплаты.</p>
+        <p>Переключатель сверху задаёт устройство рынка: конкуренция, единственный наниматель,
+          профсоюз или двусторонняя монополия. От него зависит, какие кривые появятся на поле
+          и по какому правилу считается занятость.</p>
+      </div>
       <div id="labor-seg">
         <div class="seg">
           <button class="seg-btn active" id="lab-comp">Конкуренция</button>
@@ -1890,6 +1921,17 @@
       <!-- П28: список точек и кнопка «Добавить точку» собираются целиком в
            renderMarkList — кнопка обязана стоять ПОД уже созданными точками. -->
       <div class="fold-body open" id="marks-body">
+        <div class="hint-row">
+          <span class="hint-lead">Зачем ставить точки</span>
+          <button class="hint-btn" type="button" data-pop="hp-marks" aria-label="Как этим пользоваться">?</button>
+        </div>
+        <div class="hint-pop" id="hp-marks">
+          <p>Точка отмечает на графике конкретный набор чисел: равновесие, оптимум, заданный объём.
+            Её можно ввести координатами или указать щелчком по плоскости, а рядом с кривой она к этой
+            кривой прилипает и дальше скользит по ней.</p>
+          <p>Галочки у точки решают, что показывать: сами координаты, пунктир до осей и подпись.
+            Цвет у каждой новой точки свой, чтобы на одном графике их можно было различить.</p>
+        </div>
         <div id="mark-list"></div>
       </div>
     </div>
@@ -1904,6 +1946,16 @@
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div class="fold-body" id="areascalc-body">
+        <div class="hint-row">
+          <span class="hint-lead">Что здесь считается</span>
+          <button class="hint-btn" type="button" data-pop="hp-areascalc" aria-label="Как этим пользоваться">?</button>
+        </div>
+        <div class="hint-pop" id="hp-areascalc">
+          <p>Площадь под кривой на отрезке это интеграл, и в экономике она почти всегда что-то значит: площадь под спросом до равновесия даёт общую готовность платить, а под предельными издержками переменные издержки.</p>
+          <p>Второй способ считает площадь многоугольника по отмеченным вершинам. Так берут излишки, сбор бюджета и потери общества, когда фигура составлена из отрезков, а не ограничена одной кривой.</p>
+          <p>Счёт численный: под кривой методом трапеций, по вершинам по формуле площади многоугольника. Поэтому подходит любая кривая, а не только та, у которой есть простая первообразная.</p>
+        </div>
+
         <div class="seg" id="ac-mode">
           <button class="seg-btn active" id="ac-curve">Под кривой</button>
           <button class="seg-btn" id="ac-poly">Между точками</button>

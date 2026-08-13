@@ -456,8 +456,16 @@ function upgradeRegulator(field) {
        перед дорожкой: она не всегда прямой потомок, и insertBefore на чужом
        родителе падает. */
     const top = field.querySelector('.pchip-top');
-    if (top) { const old = top.querySelector('.pchip-label'); if (old) old.remove(); top.insertBefore(eq, top.firstChild); }
-    else field.insertBefore(eq, field.firstChild);
+    if (top) {
+      const old = top.querySelector('.pchip-label');
+      if (old) old.remove();
+      /* А36. Цветная точка стоит ПЕРЕД именем, как в списке кривых. Раньше
+         строка «имя = значение» вставлялась в самое начало, точка оказывалась
+         между именем и числом («D = 100 ●») и читалась как часть числа. */
+      const dot = top.querySelector('.pchip-dot');
+      if (dot) top.insertBefore(eq, dot.nextSibling);
+      else top.insertBefore(eq, top.firstChild);
+    } else field.insertBefore(eq, field.firstChild);
     if (labEl) labEl.classList.add('reg-label-hidden');
     const oldVal = field.querySelector('.pchip-val');
     if (oldVal) oldVal.style.display = 'none';
