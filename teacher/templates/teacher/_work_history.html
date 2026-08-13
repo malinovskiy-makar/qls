@@ -87,7 +87,7 @@
         <td class="wk-num" data-sort="{{ row.submitted_at|date:'U'|default:0 }}">
           {% if row.submitted_at %}
           {% if row.is_late %}<span class="wk-flag wk-flag--late">после срока</span> {% endif %}{{ row.submitted_at|date:"d.m.Y, H:i" }}
-          {% else %}<span class="wk-flag wk-flag--none">не сдал</span>{% endif %}
+          {% else %}<span class="wk-flag wk-flag--none">не сдана</span>{% endif %}
         </td>
         {% else %}
         <td class="wk-num" data-sort="{{ row.submitted_at|date:'U'|default:0 }}">{% if row.submitted_at %}{{ row.submitted_at|date:"d.m.Y" }}{% else %}—{% endif %}</td>

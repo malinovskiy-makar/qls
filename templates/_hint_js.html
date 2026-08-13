@@ -1,6 +1,14 @@
 {% comment %}
-Своя всплывашка для знаков вопроса (`.k-hintmark`, партиал `_hint.html`).
-Подключается ОДИН раз в базовом шаблоне, рядом с закрывающим </body>.
+Своя всплывашка для всего, что несёт `data-hint`: знаки вопроса
+(`.k-hintmark`, партиал `_hint.html`), заголовки колонок теплокарты, клетки
+матрицы. Подключается ОДИН раз в базовом шаблоне, рядом с закрывающим </body>.
+
+⚠️ ПРИЦЕПЛЯЕМСЯ К `[data-hint]`, А НЕ К КЛАССУ (обзор 13.08, п. 17). Класс
+`.k-hintmark` — это ВИД (серый кружок с вопросом), а не механизм. Пока
+слушатели искали его, всё остальное было вынуждено пользоваться браузерным
+`title` — тем самым, который признан нерабочим в сессии 9: всплывает через
+секунду-две неподвижного курсора, мелким системным шрифтом, у курсора, а не
+у знака, и на сенсорном экране не всплывает вовсе.
 
 Почему не CSS-псевдоэлемент. Знаки вопроса стоят в шапках таблиц, а таблицы
 живут внутри `overflow-x: auto` (теплокарта «ученики × темы», история работ).
@@ -65,21 +73,21 @@
   // и в кусках разметки, подгруженных без перезагрузки страницы (карточки
   // кандидатов, строки проверки), и вешать слушателей заново было бы негде.
   document.addEventListener('mouseover', function (e) {
-    var mark = e.target.closest && e.target.closest('.k-hintmark');
+    var mark = e.target.closest && e.target.closest('[data-hint]');
     if (mark) show(mark);
   });
   document.addEventListener('mouseout', function (e) {
-    var mark = e.target.closest && e.target.closest('.k-hintmark');
+    var mark = e.target.closest && e.target.closest('[data-hint]');
     if (mark && mark === current) hide();
   });
 
   // Клавиатура: подсказка обязана появляться и без мыши.
   document.addEventListener('focusin', function (e) {
-    var mark = e.target.closest && e.target.closest('.k-hintmark');
+    var mark = e.target.closest && e.target.closest('[data-hint]');
     if (mark) show(mark);
   });
   document.addEventListener('focusout', function (e) {
-    var mark = e.target.closest && e.target.closest('.k-hintmark');
+    var mark = e.target.closest && e.target.closest('[data-hint]');
     if (mark && mark === current) hide();
   });
 
@@ -90,7 +98,7 @@
   // Поймано сценарием: клик на знак давал пустой экран.
   // Убирается нажатием мимо, уходом курсора или клавишей Esc.
   document.addEventListener('click', function (e) {
-    var mark = e.target.closest && e.target.closest('.k-hintmark');
+    var mark = e.target.closest && e.target.closest('[data-hint]');
     if (mark) { show(mark); return; }
     hide();
   });

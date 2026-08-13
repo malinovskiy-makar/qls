@@ -834,11 +834,19 @@ def group_topic_matrix(group, period='all', now=None, limit_topics=None):
 
     totals = {}
     cells = {}
+    # ⚠️ ПО СКОЛЬКИМ УЧЕНИКАМ ПОСЧИТАНА КОЛОНКА (обзор 13.08, п. 16). Строка
+    # «по группе» средневзвешенная, и 100% там появляется даже когда у двоих
+    # из троих прочерк — формально верно, а читается как «вся группа освоила
+    # тему». Число попыток этого не объясняет: важно, сколько ЧЕЛОВЕК вообще
+    # трогали тему. Одна строка запроса = одна пара (ученик, тема), поэтому
+    # людей достаточно сосчитать здесь же.
+    covered = {}
     for row in rows:
         topic = (row['topic_id'], row['topic__name'])
         bucket = totals.setdefault(topic, {'attempted': 0, 'solved': 0})
         bucket['attempted'] += row['attempted']
         bucket['solved'] += row['solved']
+        covered[row['topic_id']] = covered.get(row['topic_id'], 0) + 1
         cells[(row['user_id'], row['topic_id'])] = {
             'attempted': row['attempted'],
             'solved': row['solved'],
@@ -864,6 +872,8 @@ def group_topic_matrix(group, period='all', now=None, limit_topics=None):
             'topic_id': topic.pk,
             'name': topic.name,
             'attempted': data['attempted'],
+            'covered': covered.get(topic.pk, 0),
+            'students': len(students),
             'accuracy': (round(data['solved'] * 100.0 / data['attempted'])
                          if data['attempted'] else None),
         })
@@ -875,6 +885,8 @@ def group_topic_matrix(group, period='all', now=None, limit_topics=None):
             'topic_id': topic_id,
             'name': name,
             'attempted': data['attempted'],
+            'covered': covered.get(topic_id, 0),
+            'students': len(students),
             'accuracy': (round(data['solved'] * 100.0 / data['attempted'])
                          if data['attempted'] else None),
         })
@@ -933,7 +945,7 @@ def works_waiting(assignments):
 
 
 def needs_attention(group, now=None):
-    """Кому нужно внимание: пропал, просел, не сдал, ЖДЁТ ВАШЕЙ ПРОВЕРКИ.
+    """Кому нужно внимание: нет активности, просел, не сдана, ЖДЁТ ПРОВЕРКИ.
 
     ⚠️ Четвёртое условие — про САМОГО РЕПЕТИТОРА, а не про ученика.
     Остальные три говорят «ученик не сделал», а это — «вы не сделали»:
@@ -981,19 +993,30 @@ def needs_attention(group, now=None):
             .values_list('student_id', flat=True))
         missed = {s.pk for s in students if s.pk not in done}
 
+    # ⚠️ ФОРМУЛИРОВКИ БЕЗЛИЧНЫЕ (обзор 13.08, п. 15). Было «Анна Соколова —
+    # не сдал»: женское имя и мужской род в одной строке. Род ученика
+    # платформе не известен и известен не будет — ни имя, ни фамилия его не
+    # определяют однозначно, а спрашивать ради строки предупреждения нельзя.
+    # Поэтому фраза строится так, чтобы род вообще не требовался: не
+    # «не сдал работу», а «работа не сдана».
     flagged = []
     for student in students:
         reasons = []
         seen = last_seen.get(student.pk)
-        if seen is None or seen < quiet_threshold:
-            reasons.append('не заходил больше двух недель')
+        if seen is None:
+            # Дней считать не от чего: событий нет вовсе.
+            reasons.append('ни одного захода на сайт')
+        elif seen < quiet_threshold:
+            quiet_days = max(1, (now - seen).days)
+            reasons.append('нет активности %d %s'
+                           % (quiet_days, _days_word(quiet_days)))
         current = month_now.get(student.pk, {}).get('accuracy')
         before = previous.get(student.pk, {}).get('accuracy')
         if current is not None and before is not None and current + 10 <= before:
             reasons.append('доля верных упала с %d%% до %d%%'
                            % (before, current))
         if student.pk in missed and last_work is not None:
-            reasons.append('не сдал «%s»' % last_work.name)
+            reasons.append('работа «%s» не сдана' % last_work.name)
         waiting = stale.get(student.pk)
         if waiting is not None:
             days = max(1, (now - waiting).days)

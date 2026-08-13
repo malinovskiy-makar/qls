@@ -288,10 +288,19 @@
    Обёртка нужна, потому что сам блок прокручивается: градиент внутри него
    уезжал бы вместе с содержимым. */
 .fade-box { position: relative; }
+/* ⚠️ РАСТВОРЕНИЕ УСИЛЕНО (обзор 13.08, п. 18). Оно было включено и раньше,
+   но читалось как ровный обрыв: клетки теплокарты бледные, и белое по
+   белому не видно. Теперь два слоя в одном градиенте — сначала содержимое
+   уходит под цвет карточки (нижний слой), потом у самого края ложится
+   мягкая тень (верхний). Тень и есть признак «лист продолжается»; одного
+   растворения на бледном содержимом не хватает.
+   Оба слоя гаснут вместе, когда доскроллили до конца. */
 .fade-box::after {
-  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 44px;
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 56px;
   pointer-events: none; opacity: 1; transition: opacity .18s ease;
-  background: linear-gradient(to right, transparent, var(--surface));
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0) 55%, var(--fade-edge) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0) 0%, var(--surface) 80%);
 }
 .fade-box.is-end::after { opacity: 0; }
 table.stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -308,6 +317,8 @@ table.stats-table tbody tr:hover { background: var(--surface-2); }
 .matrix-cell { font-size: 11px; text-align: center; border-radius: 4px;
                padding: 5px 4px; min-width: 46px; display: block; color: var(--text); }
 .matrix-none { background: var(--surface-2); color: var(--text3); }
+/* Всё, что несёт подсказку, — поверхность «справка», а не действие. */
+.stats-table [data-hint] { cursor: help; }
 .matrix-bad  { background: var(--error-tint); color: var(--error); font-weight: 700; }
 .matrix-mid  { background: var(--amber-tint); color: var(--amber); font-weight: 600; }
 .matrix-good { background: var(--green-tint); color: var(--green); font-weight: 600; }
