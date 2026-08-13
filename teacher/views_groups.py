@@ -1213,6 +1213,24 @@ def work_done(request, group_id, assignment_id, student_id):
 
     summary = work_summary(assignment, student, viewer=request.user)
 
+    # ⚠️ «РАБОТА ПРОВЕРЕНА» — НЕ ВСЕГДА ПРАВДА (обзор 13.08, п. 54). Экран
+    # называется так с фазы 13 и подписан «пройдена целиком», а внутри могли
+    # стоять задачи со статусом «на проверке»: сюда попадают и по ссылке, и
+    # пройдя очередь до конца, но пропуская задачи. Прямое противоречие
+    # заголовка содержимому — берём состояние у той же сводки.
+    unchecked = summary['pending']
+    first_unchecked = None
+    if unchecked:
+        from problems.models import Submission
+
+        waiting = (Submission.objects
+                   .filter(assignment=assignment, student=student,
+                           status='submitted')
+                   .order_by('problem_item__order', 'pk').first())
+        if waiting is not None:
+            first_unchecked = reverse('teacher:group_review_submission',
+                                      args=[group.pk, waiting.pk])
+
     return render(request, 'teacher/groups/work_done.html', {
         'group': group,
         'assignment': assignment,
@@ -1220,6 +1238,8 @@ def work_done(request, group_id, assignment_id, student_id):
         'rows': summary['rows'],
         'total': summary['scored'],
         'maximum': summary['max_score'],
+        'unchecked': unchecked,
+        'first_unchecked': first_unchecked,
         'work_feedback': WorkFeedback.objects.filter(
             assignment=assignment, student=student).first(),
         'next_student': _next_student_to_check(assignment, student),

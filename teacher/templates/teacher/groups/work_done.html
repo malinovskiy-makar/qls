@@ -1,4 +1,5 @@
 {% extends 'teacher/base.html' %}
+{% load ru %}
 {% comment %}
 Экран завершения работы (фаза 13.1).
 
@@ -10,7 +11,7 @@
 Главное на экране — итоговый балл.
 {% endcomment %}
 
-{% block title %}Работа проверена — {{ student.get_full_name|default:student.username }}{% endblock %}
+{% block title %}{% if unchecked %}Проверено частично{% else %}Работа проверена{% endif %} — {{ student.get_full_name|default:student.username }}{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .done-total { text-align: center; padding: 26px 20px 22px; }
@@ -44,20 +45,42 @@
   <a href="{% url 'teacher:groups' %}">Ученики</a> →
   <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a> →
   <a href="{% url 'teacher:group_submissions' group.pk assignment.pk %}">{{ assignment.name }}</a> →
-  готово
+  {% if unchecked %}итог{% else %}готово{% endif %}
 </div>
 
+{% comment %}
+⚠️ ЗАГОЛОВОК ЗАВИСИТ ОТ СОСТОЯНИЯ (обзор 13.08, п. 54). Экран назывался
+«Работа проверена» и подписывался «пройдена целиком», а внутри стояли задачи
+с пометкой «НА ПРОВЕРКЕ» — прямое противоречие. Число непроверенных берём у
+той же сводки `work_summary`, что рисует строки ниже: второго счёта нет.
+{% endcomment %}
 <div class="page-header">
   <div>
     <h1 class="page-title">{{ student.get_full_name|default:student.username }}</h1>
-    <div class="page-sub">Работа «{{ assignment.name }}» пройдена целиком.</div>
+    <div class="page-sub">
+      {% if unchecked %}
+      Работа «{{ assignment.name }}» проверена частично. Осталось проверить:
+      {% if first_unchecked %}<a href="{{ first_unchecked }}">{{ unchecked|count_ru:"задача,задачи,задач" }}</a>{% else %}{{ unchecked|count_ru:"задача,задачи,задач" }}{% endif %}.
+      {% else %}
+      Работа «{{ assignment.name }}» пройдена целиком.
+      {% endif %}
+    </div>
   </div>
+  <span class="k-flag k-flag--{% if unchecked %}pending{% else %}correct{% endif %}"
+        style="margin-left:auto">{% if unchecked %}проверено частично{% else %}работа проверена{% endif %}</span>
 </div>
 
 <div class="k-card done-total">
   <div class="done-score">{{ total }}<span class="k-score__of">из</span><span
     class="k-score__max">{{ maximum }}</span></div>
   <div class="done-cap">итоговый балл за работу</div>
+  {% comment %}
+  ⚠️ ТА ЖЕ ПЛАШКА, ЧТО У УЧЕНИКА (п. 55). Крупный балл не учитывает
+  непроверенные задачи и раньше об этом молчал — а на соседнем экране,
+  глазами ученика, предупреждение стояло. Партиал ОДИН: вторую такую же
+  писать нельзя.
+  {% endcomment %}
+  {% include '_prelim.html' with pending=unchecked %}
 </div>
 
 {% comment %}

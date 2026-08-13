@@ -558,3 +558,13 @@
    правило CSS сильнее атрибута разметки. */
 .k-ico { display: inline-flex; vertical-align: -0.2em; }
 .k-ico svg { width: 1.2em; height: 1.2em; }
+
+/* ── Плашка «результат предварительный» ─────────────────────────────────
+   Партиал `templates/_prelim.html`. Стоит на разборе работы глазами ученика
+   и на экране итогов проверки — поэтому правило живёт здесь, а не в стилях
+   одного экрана (знакомый класс дефекта: стили `.wk-table` уже приходилось
+   переносить сюда по той же причине).
+   Янтарь здесь в своём законном смысле — «ещё не готово». */
+.k-prelim { margin-top: 14px; background: var(--amber-tint);
+            border: 1px solid var(--amber-border); border-radius: var(--r);
+            padding: 10px 14px; font-size: 13px; line-height: 1.6; }
