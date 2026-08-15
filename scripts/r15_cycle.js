@@ -593,6 +593,92 @@ async function cursorsOnPage(page) {
     }
   }
 
+  // ══ ФАЗЫ 7–15 (вторая сессия) ══════════════════════════════════════════
+  // Частные проверки живут в своих сценариях (`r15_date_probe.js`,
+  // `r15_builder_probe.js`, `r15_collect_probe.js`); здесь — сквозные,
+  // те, что обязаны быть верны на живом пути репетитора.
+  console.log('\n── Фазы 7–15 ──────────────────────────────────────────────');
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.evaluate(() => localStorage.setItem('theme', 'light'));
+
+  await open(page, '/teacher/groups/2/assignments/6/', 'ф7: страница задания');
+  {
+    const heads = await page.locator('.k-sep--head .k-sep__cap')
+      .evaluateAll((list) => list.map((n) => n.textContent.trim()));
+    check('ф7: части подписаны', heads.length === 2, heads);
+    const detail = await page.locator('.k-sep--head .k-sep__of')
+      .evaluateAll((list) => list.map((n) => n.textContent.trim()));
+    check('ф7: у части виден состав',
+      detail.every((text) => /\d+ (вопрос|задач)/.test(text)), detail);
+    const chips = await page.locator('.item-kind .k-kind').count();
+    const cards = await page.locator('.problem-block').count();
+    check('ф7: чип типа у каждой карточки', chips === cards,
+      { чипов: chips, карточек: cards });
+    const stripes = await page.locator('.problem-block.k-type').count();
+    check('ф7: полоса типа у каждой карточки', stripes === cards);
+  }
+
+  await open(page, '/teacher/groups/2/assignments/6/students/9/',
+    'ф7: разбор работы');
+  {
+    const heads = await page.locator('.k-sep--head').count();
+    check('ф7: части подписаны и в разборе', heads === 2, heads);
+    const both = await page.locator('.wr-item.k-type').count();
+    check('ф7: полосы типа тут нет (край занят состоянием)', both === 0, both);
+  }
+
+  await open(page, '/teacher/student/11/progress/?period=month',
+    'ф8: карточка ученика, месяц');
+  {
+    const body = await page.locator('body').textContent();
+    check('ф8: блок сильных и слабых на месте',
+      body.includes('Сильные и слабые темы'));
+    const facts = await page.locator('.student-facts .fact').count();
+    check('ф8: значения фактов — отдельные объекты', facts > 0, facts);
+  }
+
+  await open(page, '/teacher/groups/', 'ф11: экран «Ученики»');
+  check('ф11: ссылка «Мои задачи» есть',
+    (await page.locator('a[href="/teacher/problems/"]').count()) > 0);
+
+  await open(page, '/teacher/assignment/create/?group=2', 'ф10: создание работы');
+  {
+    const box = page.locator('[data-k-date]').first();
+    check('ф10: поле даты готово',
+      await box.evaluate((n) => n.classList.contains('is-ready')));
+    const text = box.locator('.k-date__text');
+    await text.click();
+    await text.type('20082026 1830', { delay: 8 });
+    await text.blur();
+    check('ф10: цифры без разделителей стали значением',
+      (await box.locator('.k-date__native').inputValue()) === '2026-08-20T18:30',
+      await box.locator('.k-date__native').inputValue());
+    const tabs = await page.locator('.picker-tab')
+      .evaluateAll((list) => list.map((n) => n.textContent.trim()));
+    check('ф11: вкладок три, третья — «Мои задачи»',
+      tabs.length === 3 && tabs[2].startsWith('Мои задачи'), tabs);
+  }
+
+  {
+    const response = await page.goto(`${BASE}/teacher/assignment/create/?group=999999`,
+      { waitUntil: 'domcontentloaded' });
+    check('ф15: чужое занятие уводит на «Ученики»',
+      page.url().includes('/teacher/groups/') && response.status() === 200,
+      page.url());
+    check('ф15: отказ объяснён',
+      (await page.locator('body').textContent()).includes('Такого занятия нет'));
+  }
+
+  await open(page, '/teacher/groups/2/assignments/6/print/?for=teacher',
+    'ф14: лист преподавателю');
+  {
+    const body = await page.locator('body').textContent();
+    check('ф14: ответ и решение подписаны отдельно',
+      body.includes('Ответ:') && body.includes('Решение:'));
+    check('ф14: пустого места в этом варианте нет',
+      (await page.locator('.space').count()) === 0);
+  }
+
   // ══ ИТОГ ═══════════════════════════════════════════════════════════════
   console.log(`\n${'='.repeat(60)}`);
   console.log(`Проверок: ${ok + bad}, зелёных: ${ok}, красных: ${bad}`);
