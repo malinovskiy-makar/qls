@@ -2454,11 +2454,17 @@ const CASES = [
           window.minOf = function () { scans++; return realMin.apply(this, arguments); };
           window.redrawCosts = function () { during++; return realDraw.apply(this, arguments); };
           var sc = mainScales(), y0 = sc.my(20);
+          ['sb-btn'].forEach(function (id) { var b = document.getElementById(id);
+            if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); });
           beginLrDrag();
-          var midSlider = null;
+          var midSlider = null, midTypeset = 0;
           for (var i = 1; i <= 40; i++) {
             dragLrPrice(sc.my.invert(y0 - 200 * i / 40));
-            if (i === 20) midSlider = parseFloat(document.getElementById('lr-price-slider').value);
+            if (i === 20) {
+              midSlider = parseFloat(document.getElementById('lr-price-slider').value);
+              // Панель в ПУТИ обязана быть набрана так же, как в покое.
+              midTypeset = document.querySelectorAll('#sb-body .stat .katex').length > 0 ? 1 : 0;
+            }
           }
           var moved = (STATE.lr || {}).Q != null ? 1 : 0;
           // Пересборка на ОТПУСКАНИИ обязана быть ровно одна: считаем отдельно.
@@ -2475,7 +2481,8 @@ const CASES = [
                    slid: midSlider === 20 ? 1 : 0,
                    sameSlider: Math.abs(endSlider - endPrice) <= step / 2 + 1e-9 ? 1 : 0,
                    rounded: Math.abs(endPrice * 100 - Math.round(endPrice * 100)) < 1e-9 ? 1 : 0,
-                   sameQ: Math.abs((STATE.lr || {}).Q - endQ) < 1e-6 ? 1 : 0 };`,
+                   sameQ: Math.abs((STATE.lr || {}).Q - endQ) < 1e-6 ? 1 : 0,
+                   typeset: midTypeset };`,
     /* Ползунок цены сделан с шагом 0,5 и точнее показать не может, поэтому
        после отпускания он совпадает с числом с точностью до половины шага;
        подпись и числовое поле показывают цену как есть. */
@@ -2486,7 +2493,8 @@ const CASES = [
              ['ползунок в пути не дёргается', 'slid', 1, 0],
              ['на отпускании ползунок догоняет', 'sameSlider', 1, 0],
              ['и цена округлена', 'rounded', 1, 0],
-             ['ответ тот же, что обычным путём', 'sameQ', 1, 0]],
+             ['ответ тот же, что обычным путём', 'sameQ', 1, 0],
+             ['в пути панель набрана формулами', 'typeset', 1, 0]],
   },
 
   /* --- Фаза 5: панели (Б12–Б15, Б39–Б41) ------------------------------ */

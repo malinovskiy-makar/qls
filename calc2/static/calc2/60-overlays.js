@@ -349,10 +349,19 @@ function drawOverlays() {
   syncAreaCalcUI();          // выпадашка кривых и список точек для расчёта площади
   hintsToDots();             // подсказки, добавленные сценой, тоже уходят под вопросик
   syncFirstCard();                                     // ярче та карточка, что сверху
-  syncAnalyticsPanel();                                // разбор уезжает в свой блок
-  renderMathIn(document.getElementById('sb-body'));    // формулы в аналитике
+  refreshAnalyticsPanel();
   renderMathIn(document.getElementById('ex-body'));    // и в объяснении модели
   renderMathIn(document.getElementById('tools-panel'));// и в подсказках панели
+}
+
+/* Довести правую панель до готового вида: разбор в свой блок, формулы, числа
+   с колонкой знаков равенства. Вынесено отдельно, потому что зовётся не только
+   из общей перерисовки: перетаскивание линии цены обновляет ТОЛЬКО панель и
+   слои цены (Б32), и без этого прохода числа в пути показывались сырым текстом,
+   а на отпускании скачком превращались в формулы. */
+function refreshAnalyticsPanel() {
+  syncAnalyticsPanel();                                // разбор уезжает в свой блок
+  renderMathIn(document.getElementById('sb-body'));    // формулы в аналитике
   typesetStats(document.getElementById('sb-body'));    // Н6: числа тоже формулой
 }
 
@@ -466,7 +475,8 @@ function restatWide(row, lab, val, raw, own) {
   /* Значение, набранное сценой, переносим КАК ЕСТЬ: разбирать готовый KaTeX
      обратно в текст значит потерять формулы внутри. Меняется только раскладка
      строки — подпись сверху, значение снизу. */
-  if (own) { if (isPhrase && !isList) row.classList.add('stat-phrase'); return true; }
+  if (own) { row.classList.add('stat-own');
+    if (isPhrase && !isList) row.classList.add('stat-phrase'); return true; }
   val.innerHTML = '';
   if (isList) {
     pieces.forEach(p => {

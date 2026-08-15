@@ -623,6 +623,9 @@ function dragLrPrice(p) {
   area.selectAll('*').remove(); fillLongRunArea(area);
   marks.selectAll('*').remove(); if (STATE.lrOn) fillLongRunMarks(marks);
   updateCostsPanel();
+  // Панель обязана выглядеть так же, как после обычной перерисовки: иначе в
+  // пути числа показывались сырым текстом и скачком менялись на отпускании.
+  refreshAnalyticsPanel();
 }
 
 function endLrDrag() {
