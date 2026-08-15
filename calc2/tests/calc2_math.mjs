@@ -2639,6 +2639,46 @@ const CASES = [
              ['и кривые тянутся', 'sdGrab', 2, 0],
              ['в потолке тоже', 'cGrab', 3, 0], ['и на рынке труда', 'lGrab', 3, 0]],
   },
+
+  /* --- Фаза 10: экспорт от модели сцены (Б4, Б5, Б35) ----------------- */
+  {
+    /* Б35, Б4. Кривая, у которой есть выражение, обязана уйти в файл ФОРМУЛОЙ.
+       Раньше формулами уходили только кривые из списка (STATE.curves), а
+       сценовые (издержки, производство, заводы) — таблицами по шестьдесят
+       точек, хотя их выражения выводятся из введённой человеком функции по
+       определению: ATC = TC/Q, VC = TC − FC, MC = dTC/dQ (символьно).
+       Б5. Кусок кривой уходит со своим отрезком построения. */
+    name: 'Б4 · Кривые сцены уходят формулами, а не таблицами точек',
+    run: `var f = function (k) {
+            resetSceneMemory(); pickScene(k); redrawAll();
+            var tex = buildTex('', '');
+            var formulas = (tex.match(/\\\\addplot\\[[^\\]]*\\] *\\{/g) || []).length;
+            var tables = (tex.match(/\\\\addplot\\[[^\\]]*\\] *coordinates \\{[^}]*\\}/g) || [])
+              .filter(function (t) { return (t.match(/\\(/g) || []).length > 5; }).length;
+            /* Считаем ОТРЕЗОК ПОСТРОЕНИЯ, а не ограничение по y: у каждого
+               \\addplot есть и «domain=», и «restrict y to domain=», и без
+               запятой перед словом в счёт попадали оба. */
+            var domains = (tex.match(/, domain=[\\d.]+:[\\d.]+/g) || []).length;
+            var notes = (tex.match(/выгружена точками/g) || []).length;
+            return { formulas: formulas, tables: tables, domains: domains, notes: notes };
+          };
+          var c = f('costs'), pr = f('prod'), pl = f('plants');
+          // Символьная производная должна получаться у обычной записи.
+          var d = derivativeExpr('Q^3 - 6*Q^2 + 15*Q + 18', 'Q');
+          var dv = d ? math.parse(d).compile().evaluate({ Q: 4 }) : NaN;
+          return { cF: c.formulas, cT: c.tables, pF: pr.formulas, pT: pr.tables,
+                   plF: pl.formulas, plDom: pl.domains, plNotes: pl.notes,
+                   deriv: dv };`,
+    // MC(4) = 3·16 − 48 + 15 = 15.
+    checks: [['издержки: четыре кривые формулой', 'cF', 4, 0],
+             ['и ни одной таблицей', 'cT', 0, 0],
+             ['производство: TP, MP, AP формулой', 'pF', 3, 0],
+             ['и ни одной таблицей', 'pT', 0, 0],
+             ['заводы: TC₁ и TC₂ формулой', 'plF', 2, 0],
+             ['со своими отрезками', 'plDom', 2, 0],
+             ['а совокупная — с пояснением', 'plNotes', 1, 0],
+             ['символьная производная верна', 'deriv', 15, 0.001]],
+  },
 ];
 
 function approx(got, want, tol) {

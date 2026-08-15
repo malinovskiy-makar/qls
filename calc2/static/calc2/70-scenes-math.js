@@ -1335,6 +1335,7 @@ function buildTex(title, label) {
   const { mx, my } = mainScales();
   const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
   const notes = [];                       // пояснения, почему что-то ушло точками
+  let needPatterns = false;               // в файле есть заливка штриховкой
 
   const defs = [];
   const colorName = (css) => {
@@ -1439,6 +1440,12 @@ function buildTex(title, label) {
       // означает «пустая метка» и разбирается отдельно; у остальных фигур на
       // бумаге ей делать нечего.
       const bgFill = hasFill && tag !== 'circle' && sameColor(cs.fill, '#' + canvasColor());
+      /* Заливка штриховкой (Б41) — это не цвет, а ссылка на образец, и texHex
+         прочёл бы её как чёрный. В TikZ ей отвечает pattern, а цвет берём из
+         имени образца. */
+      const hatch = /hatch-(profit|loss)/.exec(String(cs.fill || ''));
+      const hatchOpt = hatch ? ('pattern=north east lines, pattern color=' +
+        colorName(hatch[1] === 'profit' ? COL.profit : COL.bad)) : null;
       const hasStroke = cs.stroke && cs.stroke !== 'none' && (parseFloat(cs.strokeWidth) || 0) > 0 && solid(cs.stroke);
 
       if (tag === 'path') {
@@ -1454,7 +1461,13 @@ function buildTex(title, label) {
           const pgf = mathToPgf(declared, el.getAttribute('data-expr-var') || 'Q');
           if (pgf) {
             const opts = pgfStroke(el, cs, colorName);
-            body.push('\\addplot[' + opts.join(', ') + ', domain=' + num(Math.max(0, xLo)) + ':' + num(xHi) +
+            // Свой отрезок построения, если кривая его объявила (Б5): кусок
+            // кусочной кривой обязан оставаться на своём промежутке.
+            const dFrom = parseFloat(el.getAttribute('data-expr-from'));
+            const dTo = parseFloat(el.getAttribute('data-expr-to'));
+            const lo = isFinite(dFrom) ? Math.max(dFrom, xLo) : Math.max(0, xLo);
+            const hi2 = isFinite(dTo) ? Math.min(dTo, xHi) : xHi;
+            body.push('\\addplot[' + opts.join(', ') + ', domain=' + num(lo) + ':' + num(hi2) +
                       ', samples=120, restrict y to domain=' + num(Math.max(0, yLo)) + ':' + num(yHi) +
                       ', forget plot] {' + pgf + '};');
             continue;
@@ -1477,7 +1490,9 @@ function buildTex(title, label) {
         if (hasStroke) {
           runs.forEach(r => {
             if (r.length < 2) return;
-            if (cid) notes.push('% кривая выгружена точками: её формулу pgfplots не понимает');
+            const why = el.getAttribute('data-numeric');
+            if (why) notes.push('% ' + why + ': выгружена точками');
+            else if (cid) notes.push('% кривая выгружена точками: её формулу pgfplots не понимает');
             body.push('\\addplot[' + pgfStroke(el, cs, colorName).join(', ') + ', forget plot] coordinates {' +
               r.map(p => pt(p[0], p[1])).join(' ') + '};');
           });
@@ -1494,8 +1509,10 @@ function buildTex(title, label) {
         if (!(w > 0 && h > 0) || !hasFill || bgFill) continue;
         const a = toData(x, y + h), b = toData(x + w, y);
         if (!inView(a[0], a[1]) && !inView(b[0], b[1])) continue;
-        body.push('\\fill[' + colorName(cs.fill) + ', opacity=' +
-          (parseFloat(cs.fillOpacity) * parseFloat(cs.opacity || 1) || 0.2).toFixed(2) + '] ' +
+        const rectOpt = hatchOpt || (colorName(cs.fill) + ', opacity=' +
+          (parseFloat(cs.fillOpacity) * parseFloat(cs.opacity || 1) || 0.2).toFixed(2));
+        if (hatchOpt) needPatterns = true;
+        body.push('\\fill[' + rectOpt + '] ' +
           '(axis cs:' + num(a[0]) + ',' + num(a[1]) + ') rectangle (axis cs:' + num(b[0]) + ',' + num(b[1]) + ');');
       } else if (tag === 'circle') {
         const c = toData(+el.getAttribute('cx'), +el.getAttribute('cy'));
@@ -1563,6 +1580,7 @@ function buildTex(title, label) {
     '\\usepackage{pgfplots}',
     '\\pgfplotsset{compat=1.18}',
     '\\usetikzlibrary{arrows.meta}',
+    needPatterns ? '\\usetikzlibrary{patterns}' : '',
     '\\usepackage{geometry}',
     '\\geometry{margin=2cm}',
     ...defs,

@@ -258,27 +258,68 @@ function costPoints(f) {
   return out;
 }
 
+/* Выражения кривых издержек — то самое «описание сцены», из которого строится
+   выгрузка (Б35). Всё выводится из одной введённой функции по определению:
+   FC = TC(0), VC = TC − FC, ATC = TC/Q, AVC = VC/Q, AFC = FC/Q, MC = dTC/dQ.
+   Пустое значение означает «формулы нет» — тогда кривая уходит точками, и в
+   файл идёт пояснение почему. */
+function costExprs() {
+  const out = { TC: '', VC: '', ATC: '', AVC: '', AFC: '', MC: '', FC: '' };
+  if (!STATE.costsReady) return out;
+  if (STATE.costsMode === 'curves') {
+    out.MC = (STATE.costsMCx || '').trim();
+    out.ATC = (STATE.costsATCx || '').trim();
+    out.AVC = (STATE.costsAVCx || '').trim();
+    if (out.ATC) out.TC = '(' + out.ATC + ')*Q';
+    if (out.AVC) out.VC = '(' + out.AVC + ')*Q';
+    if (out.ATC && out.AVC) out.AFC = '(' + out.ATC + ') - (' + out.AVC + ')';
+    const fc = costsFC();
+    if (isFinite(fc)) out.FC = String(fc);
+    return out;
+  }
+  const tc = (STATE.costsTC || '').trim();
+  if (!tc) return out;
+  const fc = costsFC();
+  out.TC = tc;
+  out.ATC = '(' + tc + ')/Q';
+  out.MC = derivativeExpr(tc, 'Q') || '';
+  if (isFinite(fc)) {
+    out.FC = String(fc);
+    out.VC = '(' + tc + ') - (' + fc + ')';
+    out.AVC = '((' + tc + ') - (' + fc + '))/Q';
+    out.AFC = '(' + fc + ')/Q';
+  }
+  return out;
+}
+
 // Отрисовка кривых издержек + точки закрытия (min AVC) и безубыточности (min ATC).
 function drawCostCurves() {
   if (!STATE.costsReady) return;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
-  const curve = (f, color, on, dash) => {
+  /* Б4, Б35. Кривая, у которой есть выражение, объявляет его сцене — и уходит
+     в файл ФОРМУЛОЙ, а не таблицей из шестидесяти точек. Выражения здесь есть
+     почти у всех: TC вводит человек, остальное из неё выводится по правилу
+     (ATC = TC/Q, VC = TC − FC и так далее). Предельные затраты берём символьной
+     производной; не вышло — кривая честно уходит точками. */
+  const curve = (f, color, on, dash, expr) => {
     if (!on) return;
     const p = g.append('path').datum(costPoints(f)).attr('fill', 'none')
       .attr('stroke', color).attr('stroke-width', 2.2).attr('d', line);
     if (dash) p.attr('stroke-dasharray', dash);
+    if (expr) markExpr(p, expr, 'Q');
   };
+  const E = costExprs();
   // Кривой, которой у сцены нет (нет постоянных затрат либо поле пустое),
   // не существует: галочка её не воскрешает.
   // Полные затраты (Б21): TC, VC и FC — тройка, живут вместе.
-  curve(costTC,  COL.costTC, STATE.showTC && costHas('TC'), '5 4');
-  curve(() => costsFC(), COL.costFC, STATE.showFC && costHas('FC'), '2 4');
-  curve(costVC,  COL.costVC, STATE.showVC && costHas('VC'), '5 4');   // VC — полные переменные (по желанию)
-  curve(costAFC, COL.costAFC, STATE.showAFC && costHas('AFC'));
-  curve(costAVC, COL.costAVC, STATE.showAVC && costHas('AVC'));
-  curve(costATC, COL.costATC, STATE.showATC && costHas('ATC'));
-  curve(costMC,  COL.costMC, STATE.showMC && costHas('MC'));
+  curve(costTC,  COL.costTC, STATE.showTC && costHas('TC'), '5 4', E.TC);
+  curve(() => costsFC(), COL.costFC, STATE.showFC && costHas('FC'), '2 4', E.FC);
+  curve(costVC,  COL.costVC, STATE.showVC && costHas('VC'), '5 4', E.VC);   // VC — полные переменные (по желанию)
+  curve(costAFC, COL.costAFC, STATE.showAFC && costHas('AFC'), null, E.AFC);
+  curve(costAVC, COL.costAVC, STATE.showAVC && costHas('AVC'), null, E.AVC);
+  curve(costATC, COL.costATC, STATE.showATC && costHas('ATC'), null, E.ATC);
+  curve(costMC,  COL.costMC, STATE.showMC && costHas('MC'), null, E.MC);
 
   // Подписи кривых (Фаза 3): у правого края, а если кривая там вне окна —
   // у ближайшего места, где она видна. Раньше подпись просто пропадала.
@@ -730,7 +771,10 @@ function redrawProduction() {
         .attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(t)); });
     return g;
   };
-  const curve = (g, f, scale, color, on, width) => {
+  // Б4: TP вводит человек, MP берём символьной производной, AP = TP/L.
+  const pe = (STATE.prodExpr || '').trim();
+  const EXPR = { TP: pe, MP: derivativeExpr(pe, 'L') || '', AP: pe ? '(' + pe + ')/L' : '' };
+  const curve = (g, f, scale, color, on, width, key) => {
     if (!on) return;
     const line = d3.line().defined(d => d !== null).x(d => lx(d[0])).y(d => scale(d[1]));
     const pts = [];
@@ -738,16 +782,17 @@ function redrawProduction() {
       const l = Lmax * i / 300, v = f(l);
       pts.push((isNaN(v) || v < 0 || v > scale.domain()[1] * 1.5) ? null : [l, v]);
     }
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', width || 2.4).attr('d', line);
+    const path = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', width || 2.4).attr('d', line);
+    if (key && EXPR[key]) markExpr(path, EXPR[key], 'L', [0, Lmax]);
   };
   // Сцена рисует две панели своими руками и общий drawAxes не зовёт, поэтому
   // названия осей для выгрузки проставляем здесь (Б37).
   STATE.axisXDefault = 'L'; STATE.axisYDefault = 'TP, MP, AP';
   const gTop = panel(t1, yTop0, 'TP, общий продукт');
-  curve(gTop, prodEval, t1, COL.prodTP, STATE.showTP, 2.6);
+  curve(gTop, prodEval, t1, COL.prodTP, STATE.showTP, 2.6, 'TP');
   const gBot = panel(t2, yBot0, 'MP и AP');
-  curve(gBot, prodMP, t2, COL.prodMP, STATE.showMP);
-  curve(gBot, prodAP, t2, COL.prodAP, STATE.showAP);
+  curve(gBot, prodMP, t2, COL.prodMP, STATE.showMP, null, 'MP');
+  curve(gBot, prodAP, t2, COL.prodAP, STATE.showAP, null, 'AP');
   // Ключевые вертикали: перегиб TP (максимум MP) и максимум AP (там AP = MP).
   const vline = (L, color, label, row) => {
     if (L == null) return;
@@ -988,18 +1033,28 @@ function redrawPlants() {
   if (STATE.plView === 'mc') {
     // MC каждого завода по СВОЕМУ объёму + совокупная MC (горизонтальная сумма).
     const mkMC = (c) => { const o = []; for (let i = 0; i <= 300; i++) { const q = p.qMax * i / 300; const v = plantMC(c, q); o.push(isNaN(v) ? null : [q, v]); } return o; };
-    g.append('path').datum(mkMC(p.c1)).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
-    g.append('path').datum(mkMC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
-    g.append('path').datum(p.table.map(r => [r.Q, r.m])).attr('fill', 'none').attr('stroke', COL.MC).attr('stroke-width', 2.8).attr('d', line);
+    // Б4: у заводов формулы затрат ввёл человек, предельные берём символьно.
+    markExpr(g.append('path').datum(mkMC(p.c1)).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line),
+             derivativeExpr(STATE.pl1, 'Q'), 'Q', [0, p.qMax]);
+    markExpr(g.append('path').datum(mkMC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line),
+             derivativeExpr(STATE.pl2, 'Q'), 'Q', [0, p.qMax]);
+    /* Совокупная кривая строится ЧИСЛЕННО (горизонтальное сложение по уровню
+       предельных затрат), замкнутой формулы у неё в общем случае нет. Говорим
+       об этом в самом файле, а не выдаём таблицу точек за формулу (Б5). */
+    g.append('path').datum(p.table.map(r => [r.Q, r.m])).attr('fill', 'none').attr('stroke', COL.MC).attr('stroke-width', 2.8).attr('d', line)
+      .attr('data-numeric', 'совокупная MC получена горизонтальным сложением, замкнутой формулы у неё нет');
     label(p.qMax * 0.5, plantMC(p.c1, p.qMax * 0.5), 'MC₁', COL.tax);
     label(p.qMax * 0.34, plantMC(p.c2, p.qMax * 0.34), 'MC₂', COL.reg);
     const mid = plantsAt(p.Qtot * 0.6); if (mid) label(mid.Q, mid.m, 'MC совокупная', COL.MC);
   } else {
     // TC каждого завода по своему объёму + совокупная TC(Q) (минимум суммы).
     const mkTC = (c) => { const o = []; for (let i = 0; i <= 300; i++) { const q = p.qMax * i / 300; const v = plantTC(c, q); o.push(isNaN(v) ? null : [q, v]); } return o; };
-    g.append('path').datum(mkTC(p.c1)).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
-    g.append('path').datum(mkTC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
-    g.append('path').datum(p.table.map(r => [r.Q, r.tcDirect])).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.8).attr('d', line);
+    markExpr(g.append('path').datum(mkTC(p.c1)).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line),
+             STATE.pl1, 'Q', [0, p.qMax]);
+    markExpr(g.append('path').datum(mkTC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line),
+             STATE.pl2, 'Q', [0, p.qMax]);
+    g.append('path').datum(p.table.map(r => [r.Q, r.tcDirect])).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.8).attr('d', line)
+      .attr('data-numeric', 'совокупная TC — минимум суммы затрат по всем способам разделить выпуск, замкнутой формулы у неё нет');
     label(p.qMax * 0.7, plantTC(p.c1, p.qMax * 0.7), 'TC₁', COL.tax);
     label(p.qMax * 0.45, plantTC(p.c2, p.qMax * 0.45), 'TC₂', COL.reg);
     const mid = plantsAt(p.Qtot * 0.7); if (mid) label(mid.Q, mid.tcDirect, 'TC совокупная', COL.D);

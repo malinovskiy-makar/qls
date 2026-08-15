@@ -49,15 +49,40 @@ function curvePoints(curve) {
    зная про экспорт. Кривые, у которых аналитического выражения нет вовсе
    (изокванта, сумма КПВ по Минковскому, горизонтальная сумма заводов),
    по-прежнему честно уходят точками. */
-function markExpr(sel, curveOrExpr, varName) {
+function markExpr(sel, curveOrExpr, varName, domain) {
   const expr = (curveOrExpr && typeof curveOrExpr === 'object')
     ? (curveOrExpr.texExpr || curveOrExpr.expr)
     : curveOrExpr;
   if (expr) {
     sel.attr('data-expr', String(expr));
     if (varName) sel.attr('data-expr-var', varName);
+    /* Свой отрезок построения (Б5). Нужен кусочным кривым: у совокупных
+       издержек двух заводов каждый гладкий кусок живёт на своём промежутке,
+       и без этого pgfplots рисовал бы обе формулы во всю ширину. */
+    if (domain && isFinite(domain[0]) && isFinite(domain[1])) {
+      sel.attr('data-expr-from', domain[0]).attr('data-expr-to', domain[1]);
+    }
   }
   return sel;
+}
+
+/* Производная формулы В ВИДЕ ФОРМУЛЫ (Б4). Предельные величины движок считает
+   численно — это правильно, потому что работает для любой функции. Но в файл
+   такая кривая уходила таблицей из шестидесяти точек, хотя для обычной записи
+   производная берётся символьно и получается настоящая формула. Пробуем взять
+   её; не вышло (корни, модули, кусочные) — возвращаем null, и кривая честно
+   уходит точками с пояснением. */
+function derivativeExpr(expr, varName) {
+  if (!expr || typeof math === 'undefined' || typeof math.derivative !== 'function') return null;
+  const v = varName || 'Q';
+  try {
+    const src = String(expr).replace(/\bx\b/g, v).replace(/\bQ\b/g, v).replace(/\bL\b/g, v);
+    const d = math.derivative(src, v).toString();
+    // Пробное вычисление: символьная производная бывает верной, но незаписываемой.
+    const c = math.parse(d).compile();
+    const probe = c.evaluate(paramScope({ [v]: 1, x: 1, Q: 1, L: 1 }));
+    return (typeof probe === 'number' && isFinite(probe)) ? d : null;
+  } catch (e) { return null; }
 }
 
 function curveAnchor(f, fromFrac, toFrac) {
