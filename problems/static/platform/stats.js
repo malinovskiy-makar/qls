@@ -155,17 +155,43 @@
       }),
     });
 
+    // ⚠️ ОБА ГРАФИКА «КОГДА ЗАНИМАЕШЬСЯ» — В МИНУТАХ, А НЕ В ПОПЫТКАХ
+    // (ревью 15.08, п. 21). Числа приходят из `stats.minutes_by_*`, то
+    // есть посчитаны тем же правилом, что карточка «Минут на сайте».
+    // Подпись обязана называть единицу: столбик «14» без слова читается
+    // как «14 задач».
+    var minuteAxis = Object.assign({}, options.scales.y, {
+      ticks: Object.assign({}, options.scales.y.ticks,
+        { callback: function (value) { return value + ' мин'; } }),
+    });
+    // Подпись во всплывашке приходит ГОТОВОЙ строкой с сервера («15 минут»):
+    // правило трёх русских форм живёт в питоне и второй копии на клиенте
+    // не имеет. Берём её по номеру столбика.
+    // ⚠️ Оформление всплывашки берём из общих настроек и ДОПОЛНЯЕМ, а не
+    // заменяем: голый `{callbacks}` стёр бы цвета фона и текста, и в
+    // тёмной теме подпись стала бы чёрной по чёрному.
+    function minuteTipFor(rows) {
+      return Object.assign({}, options.plugins.tooltip, {
+        callbacks: { label: function (ctx) {
+          var row = rows[ctx.dataIndex];
+          return row ? row.text : ctx.formattedValue;
+        } },
+      });
+    }
+
     make('chart-weekday', {
       type: 'bar',
       data: {
         labels: state.byWeekday.map(function (r) { return r.label; }),
-        datasets: [{ label: 'Попыток',
+        datasets: [{ label: 'Минуты на сайте',
                      data: state.byWeekday.map(function (r) { return r.value; }),
                      backgroundColor: colors.accent }],
       },
       options: Object.assign({}, options, {
         plugins: Object.assign({}, options.plugins,
-          { legend: { display: false } }),
+          { legend: { display: false },
+            tooltip: minuteTipFor(state.byWeekday) }),
+        scales: Object.assign({}, options.scales, { y: minuteAxis }),
       }),
     });
 
@@ -173,14 +199,16 @@
       type: 'bar',
       data: {
         labels: state.byHour.map(function (r) { return r.hour + ':00'; }),
-        datasets: [{ label: 'Попыток',
+        datasets: [{ label: 'Минуты на сайте',
                      data: state.byHour.map(function (r) { return r.value; }),
                      backgroundColor: colors.accent }],
       },
       options: Object.assign({}, options, {
         plugins: Object.assign({}, options.plugins,
-          { legend: { display: false } }),
+          { legend: { display: false },
+            tooltip: minuteTipFor(state.byHour) }),
         scales: Object.assign({}, options.scales, {
+          y: minuteAxis,
           x: Object.assign({}, options.scales.x,
             { ticks: { color: colors.text, font: { size: 9 },
                        maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } }),

@@ -208,31 +208,133 @@ def minutes_on_site(user, period='month', now=None):
     Сессии нельзя собрать одним `aggregate`, а тянем мы только один
     проиндексированный столбец.
     """
-    from .models import LearningEvent
-
-    start, end = period_bounds(period, now)
-    queryset = LearningEvent.objects.filter(user=user)
-    if start is not None:
-        queryset = queryset.filter(created_at__gte=start, created_at__lt=end)
-    stamps = list(queryset.order_by('created_at')
-                  .values_list('created_at', flat=True))
+    stamps = _site_stamps(user, period, now)
 
     if not stamps:
         # Ни одного события — честный ноль. Хвост начисляется сессии, а
         # сессии тут нет ни одной; иначе «не заходил» весило бы две минуты.
         return 0
 
-    gap = timedelta(minutes=SESSION_GAP_MINUTES)
-    total = timedelta()
-    sessions = 1
-    for previous, current in zip(stamps, stamps[1:]):
-        step = current - previous
-        if step <= gap:
-            total += step
-        else:
-            sessions += 1
-    total += sessions * timedelta(minutes=SESSION_TAIL_MINUTES)
+    total = sum((piece for _moment, piece in _minute_slices(stamps)),
+                timedelta())
     return int(round(total.total_seconds() / 60))
+
+
+def _minute_slices(stamps):
+    """Минуты на сайте, разложенные по МОМЕНТАМ, когда они прошли.
+
+    Возвращает `[(местное время начала куска, длительность)]`.
+
+    ⚠️ ЗАЧЕМ РАЗЛОЖЕНИЕ. «Минут на сайте» и графики «Когда занимаешься»
+    обязаны считаться ОДНИМ правилом (ревью 15.08, п. 21). До этого они
+    жили по разным: карточка — по расстоянию между событиями, левый график
+    — по счётчику `DailySummary.problems_attempted`, правый — по событиям
+    вида «решено / неверно». Отсюда наблюдение владельца «левый показывает
+    10, правый пуст»: у репетитора десять событий каталога вида «открыл»,
+    в сводке они посчитаны попытками, а в правый график не попадают вовсе.
+    Два числа об одном и том же, посчитанные тремя способами, — это не
+    графики, это три разных вопроса под одним заголовком.
+
+    Правило то же, что у `minutes_on_site`: промежуток короче
+    `SESSION_GAP_MINUTES` идёт в зачёт, длиннее — уход; каждой сессии
+    добавляется `SESSION_TAIL_MINUTES` за последнее событие.
+
+    ⚠️ КУСОК НЕ ПЕРЕСЕКАЕТ ГРАНИЦУ ЧАСА. Двадцать пять минут, начатые в
+    20:50, — это десять минут восьмого часа вечера и пятнадцать девятого;
+    записать их целиком в 20 часов значило бы нарисовать на графике час,
+    в котором человека уже не было. Заодно это чинит и полночь: кусок
+    сам разложится по двум дням недели.
+    """
+    if not stamps:
+        return []
+    gap = timedelta(minutes=SESSION_GAP_MINUTES)
+    tail = timedelta(minutes=SESSION_TAIL_MINUTES)
+    rough = []
+    for index, moment in enumerate(stamps):
+        following = stamps[index + 1] if index + 1 < len(stamps) else None
+        if following is not None and following - moment <= gap:
+            rough.append((moment, following - moment))
+        else:
+            # Событие последнее в своей сессии: дальше либо разрыв, либо
+            # конец списка. Хвост даётся именно ему.
+            rough.append((moment, tail))
+    pieces = []
+    for moment, length in rough:
+        pieces.extend(_cut_by_hour(moment, length))
+    return pieces
+
+
+def _cut_by_hour(moment, length):
+    """Кусок времени → куски, не пересекающие границу часа (в местном поясе)."""
+    local = timezone.localtime(moment)
+    out = []
+    while length > timedelta():
+        edge = (local + timedelta(hours=1)).replace(minute=0, second=0,
+                                                    microsecond=0)
+        step = min(length, edge - local)
+        out.append((local, step))
+        local, length = edge, length - step
+    return out
+
+
+MINUTE_FORMS = ('минута', 'минуты', 'минут')
+
+
+def minutes_text(value):
+    """«1 минута», «3 минуты», «15 минут» — для подписи на графике.
+
+    ⚠️ СКЛОНЕНИЕ СЧИТАЕТ ПИТОН, А НЕ БРАУЗЕР. Готовая строка уезжает во
+    всплывашку графика: правило трёх форм существует в проекте ровно один
+    раз (`templatetags.ru.pick`), и заводить его вторую копию на
+    JavaScript ради одной подписи значит гарантированно их развести.
+    """
+    from problems.templatetags.ru import pick
+
+    return '%d %s' % (value, pick(value, *MINUTE_FORMS))
+
+
+def minutes_by_weekday(user, period='month', now=None):
+    """Минуты на сайте по дням недели (0 — понедельник)."""
+    names = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+    buckets = [timedelta()] * 7
+    for local, step in _minute_slices(_site_stamps(user, period, now)):
+        buckets[local.weekday()] += step
+    out = []
+    for i in range(7):
+        value = int(round(buckets[i].total_seconds() / 60))
+        out.append({'label': names[i], 'value': value,
+                    'text': minutes_text(value)})
+    return out
+
+
+def minutes_by_hour(user, period='month', now=None):
+    """Минуты на сайте по часам суток."""
+    buckets = [timedelta()] * 24
+    out = []
+    for local, step in _minute_slices(_site_stamps(user, period, now)):
+        buckets[local.hour] += step
+    for hour in range(24):
+        value = int(round(buckets[hour].total_seconds() / 60))
+        out.append({'hour': hour, 'value': value,
+                    'text': minutes_text(value)})
+    return out
+
+
+def _site_stamps(user, period, now=None):
+    """Отметки времени всех событий человека за период, по возрастанию.
+
+    ⚠️ ВСЕ события, а не только «решено / неверно», и ВКЛЮЧАЯ игру — это
+    время НА САЙТЕ. Тот же набор, что у `minutes_on_site`; расходиться им
+    нельзя, иначе сумма по графику не сойдётся с карточкой.
+    """
+    from .models import LearningEvent
+
+    start, end = period_bounds(period, now)
+    queryset = LearningEvent.objects.filter(user=user)
+    if start is not None:
+        queryset = queryset.filter(created_at__gte=start, created_at__lt=end)
+    return list(queryset.order_by('created_at')
+                .values_list('created_at', flat=True))
 
 
 def _delta(current, previous):
@@ -680,8 +782,18 @@ def full_stats(user, period='month', now=None, use_cache=True):
         'radar': section_radar(user, 'all', now, rows=all_topics),
         'ring': answer_ring(user, period, now),
         'hardest': hardest_problems(user, 'all', now),
-        'by_weekday': activity_by_weekday(user, period, now),
-        'by_hour': by_hour,
+        # ⚠️ ГРАФИКИ «КОГДА ЗАНИМАЕШЬСЯ» ПОКАЗЫВАЮТ МИНУТЫ, А НЕ ПОПЫТКИ
+        # (ревью 15.08, п. 21). Попытка — величина эфемерная: открытая
+        # задача каталога и решённая контрольная считались одинаково, а
+        # два графика рядом брали её из РАЗНЫХ мест и расходились. Минуты
+        # считает то же правило, что карточку «Минут на сайте», поэтому
+        # сумма по любому из графиков сходится с ней.
+        'by_weekday': minutes_by_weekday(user, period, now),
+        'by_hour': minutes_by_hour(user, period, now),
+        # ⚠️ Подсказка под графиками отвечает на ДРУГОЙ вопрос — «когда у
+        # тебя лучше получается», а не «когда ты занимаешься». Ей нужны
+        # попытки и верные ответы, поэтому она по-прежнему считает по
+        # `activity_by_hour`. Две функции — два вопроса.
         'time_hint': best_time_hint(by_hour),
         'sources': source_split(user, period, now),
         'game': game_stats(user, 'all', now),

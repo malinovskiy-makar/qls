@@ -80,6 +80,9 @@
    ровно один блок из десяти, и это читалось не как «сюда смотреть», а как
    «здесь что-то не так» — либо все, либо никакие. Убрано у всех: акцент
    в проекте не для рамок блоков. */
+/* Два графика рядом, на узком экране — друг под другом. */
+.chart-pair { display: grid; gap: 18px;
+              grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .chart-box { position: relative; height: 240px; }
 .chart-box.tall { height: 300px; }
 .empty-note { font-size: 13px; color: var(--text2); text-align: center;

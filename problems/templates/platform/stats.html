@@ -185,8 +185,19 @@
 </div>
 
 <div class="panel">
-  <div class="panel-head"><div class="panel-title">Когда занимаешься</div></div>
-  <div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));">
+  <div class="panel-head">
+    <div class="panel-title">Когда занимаешься</div>
+    {% comment %}
+    ⚠️ ЗАГОЛОВОК НАЗЫВАЕТ ЕДИНИЦУ (ревью 15.08, п. 21). Оба графика
+    показывают МИНУТЫ НА САЙТЕ — те же, что в карточке наверху, и
+    посчитанные тем же правилом. До этого один считал попытки по сводке
+    дня, второй — события «решено / неверно», и рядом стояли два числа,
+    которые не могли сойтись ни при каком раскладе.
+    {% endcomment %}
+    <div class="panel-hint">минуты на сайте, по тому же счёту, что в
+      карточке «Минут на сайте»</div>
+  </div>
+  <div class="chart-pair">
     <div class="chart-box"><canvas id="chart-weekday"></canvas></div>
     <div class="chart-box"><canvas id="chart-hour"></canvas></div>
   </div>
