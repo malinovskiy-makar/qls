@@ -49,6 +49,10 @@ class MinutesLabelTests(TestCase):
         self.client.force_login(self.tutor)
 
     def _card_value(self, html):
+        # ⚠️ Вырезаем `<style>`: стили вклеены в страницу, и подпись,
+        # упомянутая в комментарии к правилу, находилась бы ПЕРВОЙ — дальше
+        # проверка мерила бы совсем другую карточку. Наступали трижды.
+        html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.S)
         part = html.split('Минут на сайте')[1]
         value = re.search(r'class="card3-value">(.*?)</div>', part, re.S)
         return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>|\{.*?\}', '',

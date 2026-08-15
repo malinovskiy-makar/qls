@@ -161,7 +161,7 @@
           `data-hint` + `templates/_hint_js.html`.
           {% endcomment %}
           {% for column in matrix.columns %}
-          <th class="no-sort" style="text-align:center;"
+          <th class="no-sort" data-type="num"
               data-hint="{{ column.name }}">
             <span class="matrix-head">{{ column.name|truncatechars:26 }}</span>
           </th>
@@ -173,7 +173,7 @@
         <tr>
           <td>{{ row.student.get_full_name|default:row.student.username }}</td>
           {% for cell in row.cells %}
-          <td>
+          <td data-type="num">
             {% if cell %}
             <span class="matrix-cell {% if cell.accuracy < 50 %}matrix-bad{% elif cell.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}"
                   data-hint="{{ cell.solved }} из {{ cell.attempted }}">{{ cell.accuracy }}%</span>
@@ -200,7 +200,7 @@
           ЛЮДЕЙ, которые тему вообще трогали.
           {% endcomment %}
           {% for column in matrix.columns %}
-          <td>
+          <td data-type="num">
             {% if column.accuracy is not None %}
             <span class="matrix-cell {% if column.accuracy < 50 %}matrix-bad{% elif column.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}"
                   data-hint="{{ column.accuracy }}% · посчитано по {{ column.covered }} из {{ column.students|count_ru:'ученика,учеников,учеников' }}">
@@ -261,8 +261,8 @@
               {{ row.student.get_full_name|default:row.student.username }}
             </span>
           </td>
-          <td data-sort="{{ row.solved }}">{{ row.solved }}</td>
-          <td data-sort="{{ row.accuracy_all|default:-1 }}">
+          <td data-type="num" data-sort="{{ row.solved }}">{{ row.solved }}</td>
+          <td data-type="num" data-sort="{{ row.accuracy_all|default:-1 }}">
             <span class="k-pair">
               {% if row.accuracy_all is not None %}
               <span class="k-level k-level--{{ row.level_all }}">{{ row.accuracy_all }}%</span>
@@ -271,7 +271,7 @@
               <span class="k-pair__mine">{% if row.accuracy_mine is not None %}{{ row.accuracy_mine }}%{% else %}—{% endif %}</span>
             </span>
           </td>
-          <td data-sort="{{ row.submitted }}">
+          <td data-type="num" data-sort="{{ row.submitted }}">
             {{ row.submitted }}{% if row.pending %} <span class="muted">({{ row.pending }} ждёт)</span>{% endif %}
           </td>
           {% comment %}
@@ -280,7 +280,7 @@
           в СВОЮ, а не в браузерный `title`: на одном экране два механизма
           подсказок означали бы, что половина из них «не работает».
           {% endcomment %}
-          <td data-sort="{{ row.last_active|date:'U'|default:0 }}"
+          <td data-type="date" data-sort="{{ row.last_active|date:'U'|default:0 }}"
               {% if row.last_active %}data-hint="{{ row.last_active|date:'d.m.Y, H:i' }}"{% endif %}>
             {% if row.last_active %}{{ row.last_active_human }}{% else %}нет активности{% endif %}
           </td>

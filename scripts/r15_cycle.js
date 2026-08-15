@@ -278,6 +278,78 @@ async function cursorsOnPage(page) {
   await shot(page, 'ф2-крошки-380');
   await page.setViewportSize({ width: 1440, height: 1000 });
 
+  // ══ ФАЗА 3: выравнивание ═══════════════════════════════════════════════
+  console.log('\n— Фаза 3.1: числовые столбцы стоят на одной оси');
+  /** Центр «чернил» ячейки — середина прямоугольника её текста. */
+  async function columnSpread(page, selector) {
+    return page.evaluate((sel) => {
+      const table = document.querySelector(sel);
+      if (!table) return null;
+      const ink = (cell) => {
+        const range = document.createRange();
+        range.selectNodeContents(cell);
+        const box = range.getBoundingClientRect();
+        return box.width ? box.left + box.width / 2 : null;
+      };
+      return [...table.querySelectorAll('thead th')].map((th, i) => {
+        const values = [...table.querySelectorAll('tbody tr')]
+          .map((tr) => tr.children[i]).filter(Boolean)
+          .map(ink).filter((v) => v !== null);
+        const head = ink(th);
+        return {
+          тип: th.dataset.type || '—',
+          имя: th.textContent.replace(/\s+/g, ' ').trim().slice(0, 20),
+          сдвиг: values.length && head !== null
+            ? Math.round(Math.max(...values.map((v) => Math.abs(v - head))))
+            : null,
+        };
+      });
+    }, selector);
+  }
+  const TABLES = [
+    ['/teacher/groups/2/', '#students-table', 'таблица «Ученики»'],
+    ['/teacher/groups/2/', '#group-works-table', 'история работ занятия'],
+    ['/teacher/student/11/progress/', '#student-works-table',
+     'история работ ученика'],
+  ];
+  for (const [url, selector, name] of TABLES) {
+    if (!await open(page, url, name)) continue;
+    const columns = await columnSpread(page, selector);
+    if (!columns) { check(`${name}: таблица найдена`, false); continue; }
+    const off = columns.filter((c) => c.тип === 'num' && c.сдвиг > 1);
+    check(`${name}: числовые столбцы на одной оси`, off.length === 0, off);
+    const nums = columns.filter((c) => c.тип === 'num');
+    check(`${name}: числовые столбцы вообще размечены`, nums.length > 0);
+  }
+
+  console.log('\n— Фаза 3.2: значения четырёх карточек на одной линии');
+  for (const [url, name] of [['/teacher/student/11/progress/', 'карточка ученика'],
+                             ['/teacher/groups/3/', 'занятие один на один']]) {
+    if (!await open(page, url, name)) continue;
+    const tops = await page.$$eval('.card3-value',
+      (nodes) => nodes.map((n) => Math.round(n.getBoundingClientRect().top)));
+    check(`${name}: значения на одной линии`,
+      tops.length > 1 && Math.max(...tops) - Math.min(...tops) <= 1, tops);
+  }
+  await shot(page, 'ф3-карточка-ученика');
+
+  console.log('\n— Фаза 3: узкий экран не сломан');
+  await page.setViewportSize({ width: 380, height: 900 });
+  if (await open(page, '/teacher/student/11/progress/', 'карточка (380)')) {
+    const stacked = await page.$$eval('.card3',
+      (nodes) => nodes.map((n) => Math.round(n.getBoundingClientRect().left)));
+    check('на 380 карточки идут столбцом',
+      new Set(stacked).size === 1, stacked);
+    const wide = await page.evaluate(() => {
+      const wrap = document.querySelector('.page-wrap') || document.body;
+      return { scroll: wrap.scrollWidth, client: wrap.clientWidth };
+    });
+    check('на 380 содержимое вбок не тянет',
+      wide.scroll <= wide.client + 1, wide);
+    await shot(page, 'ф3-карточка-380');
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
   // ══ ИТОГ ═══════════════════════════════════════════════════════════════
   console.log(`\n${'='.repeat(60)}`);
   console.log(`Проверок: ${ok + bad}, зелёных: ${ok}, красных: ${bad}`);

@@ -446,7 +446,11 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .ptable tr:last-child td { border-bottom: none; }
-.ptable .col-diff  { width: 80px; color: var(--amber); white-space: nowrap; }
+/* ⚠️ Столбец сложности — по центру, как все числовые столбцы платформы
+   (ревью 15.08, фаза 3). Звёзды это запись ЧИСЛА, и их количество
+   меняется от строки к строке: общей оси у левого края нет. */
+.ptable .col-diff  { width: 80px; color: var(--amber); white-space: nowrap;
+                     text-align: center; }
 .ptable .col-topic { width: 150px; }
 .ptable .col-type  { width: 120px; }
 .ptable .col-src   { width: 130px; }

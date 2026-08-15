@@ -43,9 +43,9 @@ tr.footer-row td { border-top: 1px solid var(--border); font-weight: 700; }
         <tr>
           <th class="no-sort">Ученик</th>
           {% for item in items %}
-          <th class="no-sort" style="text-align:center;">{{ forloop.counter }}</th>
+          <th class="no-sort" data-type="num">{{ forloop.counter }}</th>
           {% endfor %}
-          <th class="no-sort">Балл</th>
+          <th class="no-sort" data-type="num">Балл</th>
           <th class="no-sort">Отметки</th>
         </tr>
       </thead>
@@ -57,7 +57,7 @@ tr.footer-row td { border-top: 1px solid var(--border); font-weight: 700; }
           </td>
           {% if row.started %}
             {% for cell in row.cells %}
-            <td class="cell">
+            <td class="cell" data-type="num">
               <span class="cell-{{ cell.state }}"
                     title="{{ cell.answer|default:'нет ответа' }}">
                 {% if cell.state == 'correct' %}✓{% elif cell.state == 'wrong' %}✗
@@ -65,7 +65,7 @@ tr.footer-row td { border-top: 1px solid var(--border); font-weight: 700; }
               </span>
             </td>
             {% endfor %}
-            <td><b>{{ row.scored }}</b> / {{ row.max_score }}</td>
+            <td data-type="num"><b>{{ row.scored }}</b> / {{ row.max_score }}</td>
             <td class="muted">
               {% if row.pending %}ждёт проверки: {{ row.pending }}{% endif %}
               {% if row.attempt.is_auto_submitted %} · сдана автоматически{% endif %}

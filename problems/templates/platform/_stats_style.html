@@ -182,12 +182,25 @@
    знакомая нам поломка (баг 7.6, история работ в сессии 8). */
 .cards3 { display: grid; gap: 12px; margin-bottom: 24px;
           grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+/* ⚠️ ЗНАЧЕНИЕ ПРИЖАТО К НИЗУ КАРТОЧКИ (ревью 15.08, п. 3.2). Заголовки
+   разной длины: у двух карточек подпись переносится на две строки, у двух
+   помещается в одну, и число под ними стояло на разной высоте (замерено:
+   261 px против 248 px). Карточки в сетке и так одной высоты, поэтому
+   `margin-top: auto` сажает все четыре числа на одну линию.
+
+   ⚠️ Подписи карточек в этом комментарии НЕ ПОВТОРЯЕМ дословно: стили
+   вклеены в `<style>` страницы, и проверка, которая ищет подпись по тексту
+   страницы, нашла бы сначала комментарий. Наступали трижды.
+
+   Сетку `.cards3` при этом не трогаем: на узком экране карточки идут
+   столбцом, каждая по своему содержимому, и прижимать там нечего. */
 .card3 { background: var(--surface); border: 1px solid var(--border);
-         border-radius: 10px; padding: 16px 18px; }
+         border-radius: 10px; padding: 16px 18px;
+         display: flex; flex-direction: column; }
 .card3-cap { font-size: 12px; color: var(--text2); margin-bottom: 8px;
              display: flex; align-items: center; }
 .card3-value { font-size: 26px; font-weight: 700;
-               font-variant-numeric: tabular-nums; }
+               font-variant-numeric: tabular-nums; margin-top: auto; }
 .card3-value .k-pair { font-size: 26px; }
 .card3-value .k-pair__mine { font-size: 20px; }
 
@@ -304,7 +317,11 @@
 }
 .fade-box.is-end::after { opacity: 0; }
 table.stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.stats-table th, table.stats-table td {
+/* ⚠️ СЕЛЕКТОР НАМЕРЕННО БЕЗ `table` ВПЕРЕДИ. С ним правило весило столько
+   же, сколько общее `table td[data-type="num"]` из набора, и, стоя ниже,
+   побеждало его: числовой столбец оставался прижат влево, а набор выглядел
+   сломанным. Выравнивание типизированных столбцов принадлежит набору. */
+.stats-table th, .stats-table td {
   padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border-soft);
   white-space: nowrap; }
 table.stats-table th { font-size: 11px;

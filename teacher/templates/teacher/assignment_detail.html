@@ -162,7 +162,7 @@
       <th>Ученик</th>
       <th>Задача</th>
       <th>Статус</th>
-      <th>Отправлено</th>
+      <th data-type="date">Отправлено</th>
       <th></th>
     </tr>
   </thead>
@@ -180,7 +180,7 @@
           {% else %}{{ sub.status }}{% endif %}
         </span>
       </td>
-      <td>
+      <td data-type="date">
         {% if sub.submitted_at %}
           {{ sub.submitted_at|date:"d.m.Y H:i" }}
         {% else %}

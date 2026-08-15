@@ -57,7 +57,7 @@
         <tr>
           <th class="no-sort">Ученик</th>
           {% for column in matrix.columns %}
-          <th class="no-sort" style="text-align:center;">
+          <th class="no-sort" data-type="num">
             <span class="matrix-head">{{ column.name|truncatechars:26 }}</span>
           </th>
           {% endfor %}

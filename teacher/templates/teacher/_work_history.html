@@ -63,19 +63,19 @@
         работе просто не задавали. Прочерк остаётся там, где задачи ЕСТЬ, а
         данных ещё нет: это честное «пока не знаем».
         {% endcomment %}
-        <td class="wk-num" data-sort="{{ row.open_percent|default:-1 }}">
+        <td class="wk-num" data-type="num" data-sort="{{ row.open_percent|default:-1 }}">
           {% if row.open_percent is not None %}
           <span class="k-level k-level--{{ row.open_level }}">{{ row.open_percent }} %</span>
           {% elif not row.has_open %}<span class="wk-nothing">нет задач</span>
           {% else %}—{% endif %}
         </td>
-        <td class="wk-num" data-sort="{{ row.test_percent|default:-1 }}">
+        <td class="wk-num" data-type="num" data-sort="{{ row.test_percent|default:-1 }}">
           {% if row.test_percent is not None %}
           <span class="k-level k-level--{{ row.test_level }}">{{ row.test_percent }} %</span>
           {% elif not row.has_test %}<span class="wk-nothing">нет тестов</span>
           {% else %}—{% endif %}
         </td>
-        <td class="wk-num" data-sort="{{ row.mark|default:-1 }}">
+        <td class="wk-num" data-type="num" data-sort="{{ row.mark|default:-1 }}">
           {% if row.mark is not None %}
           <span class="k-level k-level--{{ row.mark_level }}">{{ row.mark }} %</span>
           {% else %}—{% endif %}
@@ -85,22 +85,22 @@
         ⚠️ Работа без срока в столбец «невовремя» не попадает вообще —
         прочерк, а не ноль: без срока опоздать нельзя.
         {% endcomment %}
-        <td class="wk-num" data-sort="{{ row.missing }}">{% if row.late is not None %}{{ row.late }}{% else %}—{% endif %} / {{ row.missing }}</td>
+        <td class="wk-num" data-type="num" data-sort="{{ row.missing }}">{% if row.late is not None %}{{ row.late }}{% else %}—{% endif %} / {{ row.missing }}</td>
         {% elif solo %}
         {% comment %}
         ⚠️ У ОДНОГО УЧЕНИКА два числа «невовремя / не сдано» вырождаются в
         «0/1» — читать это труднее, чем сам факт. Поэтому здесь момент
         сдачи, а опоздание и несдача — чипы перед датой (сессия 9, фаза 9).
         {% endcomment %}
-        <td class="wk-num" data-sort="{{ row.submitted_at|date:'U'|default:0 }}">
+        <td class="wk-num" data-type="date" data-sort="{{ row.submitted_at|date:'U'|default:0 }}">
           {% if row.submitted_at %}
           {% if row.is_late %}<span class="wk-flag wk-flag--late">после срока</span> {% endif %}{{ row.submitted_at|date:"d.m.Y, H:i" }}
           {% else %}<span class="wk-flag wk-flag--none">не сдана</span>{% endif %}
         </td>
         {% else %}
-        <td class="wk-num" data-sort="{{ row.submitted_at|date:'U'|default:0 }}">{% if row.submitted_at %}{{ row.submitted_at|date:"d.m.Y" }}{% else %}—{% endif %}</td>
+        <td class="wk-num" data-type="date" data-sort="{{ row.submitted_at|date:'U'|default:0 }}">{% if row.submitted_at %}{{ row.submitted_at|date:"d.m.Y" }}{% else %}—{% endif %}</td>
         {% endif %}
-        <td class="wk-num" data-sort="{{ row.deadline|date:'U'|default:0 }}">{% if row.deadline %}{{ row.deadline|date:"d.m.Y" }}{% else %}без срока{% endif %}</td>
+        <td class="wk-num" data-type="date" data-sort="{{ row.deadline|date:'U'|default:0 }}">{% if row.deadline %}{{ row.deadline|date:"d.m.Y" }}{% else %}без срока{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
