@@ -2315,6 +2315,44 @@ const CASES = [
              ['согласованные — молчим', 'warn', 0, 0],
              ['несогласованные — говорим', 'warnBad', 1, 0]],
   },
+
+  /* --- Фаза 2: эластичность предложения (Б28, Б29) -------------------- */
+  {
+    /* Б28. Правило было записано наоборот. Вывод: Q = (P − b)/a, поэтому
+       Es = (dQ/dP)·(P/Q) = P/(P − b). У S: P = 10 + Q в точке Q = 10, P = 20
+       выходит Es = 20/10 = 2 > 1, то есть ЭЛАСТИЧНО при ПОЛОЖИТЕЛЬНОМ
+       перехвате цены. Проверяем и число, и то, что в тексте стоит нужное
+       слово рядом с нужным перехватом.
+       Б29. Для кривого предложения про перехват не говорим вовсе. */
+    name: 'Б28 · Эластичность предложения: перехват вверх это эластично',
+    run: `resetSceneMemory(); pickScene('elast');
+          var setS = function (expr) {
+            var s = curveByRole('supply');
+            if (s) updateCurveExpr(s, expr);
+            redrawAll();
+          };
+          STATE.showElastS = true;
+          setS('10 + Q');
+          STATE.elastQS = 10; redrawAll();
+          var lin = STATE.elastS || {};
+          var t1 = (document.getElementById('info-elast') || {}).innerText || '';
+          setS('Q^2');
+          STATE.elastQS = 10; redrawAll();
+          var t2 = (document.getElementById('info-elast') || {}).innerText || '';
+          return {
+            Es: lin.absEs,
+            // «эластично» стоит РЯДОМ с «положительный перехват», а не «неэластично».
+            good: /положительный перехват цены., предложение эластично/.test(t1.replace(/\\s+/g, ' ')) ? 1 : 0,
+            bad: /положительным перехватом цены неэластично/.test(t1) ? 1 : 0,
+            noIntercept: /перехват/.test(t2) ? 1 : 0,
+            varies: /от точки к точке/.test(t2) ? 1 : 0,
+          };`,
+    checks: [['|Es| в точке Q = 10', 'Es', 2, 0.02],
+             ['сказано «эластично»', 'good', 1, 0],
+             ['старой формулировки нет', 'bad', 0, 0],
+             ['у кривой про перехват молчим', 'noIntercept', 0, 0],
+             ['и говорим про точку', 'varies', 1, 0]],
+  },
 ];
 
 function approx(got, want, tol) {
