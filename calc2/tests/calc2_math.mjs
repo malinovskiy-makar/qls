@@ -2432,6 +2432,57 @@ const CASES = [
              ['30 000 набрано математикой', 'num', 1, 0],
              ['и просто число тоже', 'plain', 1, 0]],
   },
+
+  /* --- Фаза 4: перетаскивание цены (Б32, Б33) ------------------------- */
+  {
+    /* Б32. Разбор издержек от цены не зависит, поэтому за целое перетаскивание
+       он не должен считаться ни разу: раньше на каждый пиксель уходило три
+       скана по 2400 вычислений формулы плюс полная пересборка холста.
+       Б33. Округление и синхронизация трёх показов цены — на отпускании.
+       Проверяем и то, что ОТВЕТ от этого не изменился. */
+    name: 'Б32 · Перетаскивание цены не пересобирает сцену',
+    run: `resetSceneMemory(); pickScene('costs');
+          STATE.costsTC = 'Q^3 - 6*Q^2 + 15*Q + 18'; STATE.lrOn = true;
+          setLrPrice(20);
+          var scans = 0, during = 0, onRelease = 0;
+          var realMin = window.minOf, realDraw = window.redrawCosts;
+          window.minOf = function () { scans++; return realMin.apply(this, arguments); };
+          window.redrawCosts = function () { during++; return realDraw.apply(this, arguments); };
+          var sc = mainScales(), y0 = sc.my(20);
+          beginLrDrag();
+          var midSlider = null;
+          for (var i = 1; i <= 40; i++) {
+            dragLrPrice(sc.my.invert(y0 - 200 * i / 40));
+            if (i === 20) midSlider = parseFloat(document.getElementById('lr-price-slider').value);
+          }
+          var moved = (STATE.lr || {}).Q != null ? 1 : 0;
+          // Пересборка на ОТПУСКАНИИ обязана быть ровно одна: считаем отдельно.
+          var mark = during;
+          endLrDrag();
+          onRelease = during - mark;
+          window.minOf = realMin; window.redrawCosts = realDraw;
+          var endPrice = STATE.lrPrice, endQ = (STATE.lr || {}).Q;
+          var slider = document.getElementById('lr-price-slider');
+          var endSlider = parseFloat(slider.value), step = parseFloat(slider.step) || 1;
+          // Тот же ответ, полученный обычным путём.
+          setLrPrice(0); setLrPrice(endPrice);
+          return { scans: scans, during: mark, onRelease: onRelease, moved: moved,
+                   slid: midSlider === 20 ? 1 : 0,
+                   sameSlider: Math.abs(endSlider - endPrice) <= step / 2 + 1e-9 ? 1 : 0,
+                   rounded: Math.abs(endPrice * 100 - Math.round(endPrice * 100)) < 1e-9 ? 1 : 0,
+                   sameQ: Math.abs((STATE.lr || {}).Q - endQ) < 1e-6 ? 1 : 0 };`,
+    /* Ползунок цены сделан с шагом 0,5 и точнее показать не может, поэтому
+       после отпускания он совпадает с числом с точностью до половины шага;
+       подпись и числовое поле показывают цену как есть. */
+    checks: [['сканов за перетаскивание', 'scans', 0, 0],
+             ['пересборок в пути', 'during', 0, 0],
+             ['и ровно одна на отпускании', 'onRelease', 1, 0],
+             ['выпуск при этом считается', 'moved', 1, 0],
+             ['ползунок в пути не дёргается', 'slid', 1, 0],
+             ['на отпускании ползунок догоняет', 'sameSlider', 1, 0],
+             ['и цена округлена', 'rounded', 1, 0],
+             ['ответ тот же, что обычным путём', 'sameQ', 1, 0]],
+  },
 ];
 
 function approx(got, want, tol) {

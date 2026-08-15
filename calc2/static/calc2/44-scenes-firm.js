@@ -157,8 +157,27 @@ function computeFCfromTC() {
   return { val, kind: val < -1e-9 ? 'negative' : 'limit' };
 }
 
+/* Отпечаток входных данных разбора издержек. Минимумы AVC и ATC, постоянные
+   затраты и вид кривой MC от ЦЕНЫ не зависят вовсе — они свойство функции
+   затрат. Раньше их считали заново на каждую перерисовку, то есть на каждый
+   пиксель перетаскивания линии цены: три скана по 2400 вычислений формулы
+   каждый плюс повторная компиляция (Б32). */
+function costsSignature() {
+  return [STATE.costsMode, STATE.costsTC, STATE.costsMCx, STATE.costsATCx, STATE.costsAVCx,
+          costScanTop(), paramsSignature()].join(' ');
+}
+// Значения буквенных параметров: от них разбор тоже зависит.
+function paramsSignature() {
+  const p = STATE.params || {};
+  return Object.keys(p).sort().map(k => k + '=' + (p[k] && p[k].value)).join(',');
+}
+
 // Пересчёт издержек: компиляция формул, постоянные затраты, ключевые точки.
 function recomputeCosts() {
+  const sig = costsSignature();
+  if (STATE.costsSig === sig && STATE.costsReady) return;   // входные данные те же
+  STATE.costsSig = sig;
+  STATE.mcFlat = null;
   STATE.costsReady = false;
   STATE.minAVC = STATE.minATC = null;
   STATE.costsFCInfo = null;
@@ -387,7 +406,9 @@ function recomputeLongRun() {
      выпуска и прибыли исчезал с экрана без единого слова, и это выглядело как
      поломка калькулятора. Разбираем случай явно. */
   const hi = costScanTop();
-  const mcMin = minOf(costMC, COST_SCAN_LO, hi);
+  // Вид кривой MC от цены не зависит, поэтому считается один раз на функцию.
+  if (STATE.mcFlat === null || STATE.mcFlat === undefined) STATE.mcFlat = minOf(costMC, COST_SCAN_LO, hi) || false;
+  const mcMin = STATE.mcFlat || null;
   if (mcMin && mcMin.kind === 'flat') {
     const mc = mcMin.val;
     const note = (P > mc + 1e-9)
@@ -429,8 +450,15 @@ function recomputeLongRun() {
    ширина. Убыток при этом равен постоянным затратам, и он показывается
    отрезком на оси — подписанным, чтобы его не прочли как цену. */
 function drawLongRunArea() {
+  /* Своя группа с постоянным местом в порядке отрисовки. Во время
+     перетаскивания цены её содержимое меняется на месте, а холст целиком не
+     пересобирается (Б32) — поэтому заливка так и остаётся ПОД кривыми. */
+  const g = svg.append('g').attr('class', 'lr-area').attr('clip-path', 'url(#plot-clip)');
+  fillLongRunArea(g);
+}
+
+function fillLongRunArea(g) {
   const lr = STATE.lr; if (!lr || !STATE.lrArea || lr.profit == null) return;
-  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   if (lr.shutdown) {
     const fc = lr.fc;
     if (isNaN(fc) || !(fc > 0) || fc > CONFIG.Pmax) return;
@@ -453,8 +481,13 @@ function drawLongRunArea() {
 
 // Линия цены, точка P = MC и подписи.
 function drawLongRunMarks() {
+  const g = svg.append('g').attr('class', 'lr-marks');
+  fillLongRunMarks(g);
+}
+
+function fillLongRunMarks(g) {
   const lr = STATE.lr; if (!lr) return;
-  const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax), g = svg.append('g');
+  const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax);
   const yP = sy(lr.P);
   g.append('line').attr('x1', ox).attr('y1', yP).attr('x2', xMax).attr('y2', yP)
     .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
@@ -498,15 +531,49 @@ function drawLongRunHandle(g, lr, ox, xMax, yP) {
 function setLrPrice(p) {
   p = Math.max(0, Math.min(p, CONFIG.Pmax));
   STATE.lrPrice = Math.round(p * 100) / 100;
+  syncLrPriceFields();
+  redrawAll();
+}
+
+// Ползунок, подпись и числовое поле цены — три разных показа одного числа.
+function syncLrPriceFields() {
   const s = document.getElementById('lr-price-slider'); if (s) s.value = STATE.lrPrice;
   const l = document.getElementById('lr-price-val');    if (l) l.textContent = fmt(STATE.lrPrice);
   const i = document.getElementById('lr-price-input');  if (i) i.value = STATE.lrPrice;
+}
+
+/* Перетаскивание линии цены (Б32, Б33).
+
+   Раньше каждый пиксель движения мыши звал redrawAll: тот пересчитывал
+   минимумы AVC и ATC (три скана по 2400 вычислений формулы), заново
+   компилировал TC, сносил весь холст и собирал его с нуля — вместе с тем
+   самым прямоугольником-захватом, за который человек держится мышью.
+   Отсюда и ощущение, что график живёт своей жизнью.
+
+   От цены зависит РОВНО ЧЕТЫРЕ вещи: положение линии, точка P = MC,
+   прямоугольник прибыли и числа в табло. Их и трогаем; кривые, оси, сетка и
+   ключевые точки на месте. Округление до сотых и синхронизация трёх
+   показов числа — на отпускании кнопки, а не на каждом движении (Б33). */
+function beginLrDrag() { STATE.lrDragging = true; }
+
+function dragLrPrice(p) {
+  if (!STATE.lrDragging) { setLrPrice(p); return; }
+  STATE.lrPrice = Math.max(0, Math.min(p, CONFIG.Pmax));
+  recomputeLongRun();
+  const area = svg.select('g.lr-area'), marks = svg.select('g.lr-marks');
+  // Слоёв нет (сцена ещё ни разу не рисовалась) — идём обычным путём.
+  if (area.empty() && marks.empty()) { redrawAll(); return; }
+  area.selectAll('*').remove(); fillLongRunArea(area);
+  marks.selectAll('*').remove(); if (STATE.lrOn) fillLongRunMarks(marks);
+  updateCostsPanel();
+}
+
+function endLrDrag() {
+  STATE.lrDragging = false;
+  STATE.lrPrice = Math.round(STATE.lrPrice * 100) / 100;
+  syncLrPriceFields();
   redrawAll();
 }
-// Перетаскивание линии цены (Фаза 4 наполнит их лёгким путём без пересборки).
-function beginLrDrag() { STATE.lrDragging = true; }
-function dragLrPrice(p) { setLrPrice(p); }
-function endLrDrag()   { STATE.lrDragging = false; }
 
 function updateLongRunPanel(html) {
   const lr = STATE.lr;
