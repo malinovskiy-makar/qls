@@ -91,8 +91,16 @@ class SectionMarkTests(TestCase):
         make_item(self.homework, catalog_problem=a_test('Т2'), order=1)
         make_item(self.homework, catalog_problem=a_task('З1'), order=2)
         items = ordered_items(self.homework)
-        self.assertEqual(section_marks(items),
-                         {0: 'Тестовая часть', 2: 'Задачи'})
+        marks = section_marks(items)
+        self.assertEqual(sorted(marks), [0, 2])
+        # ⚠️ Заголовок части НЕСЁТ СОСТАВ (ревью 15.08, фаза 7): без него
+        # разделение читалось как случайная черта посреди списка.
+        self.assertEqual(marks[0]['title'], 'Тестовая часть')
+        self.assertEqual(marks[0]['count'], 2)
+        self.assertEqual(marks[2]['title'], 'Задачи')
+        self.assertEqual(marks[2]['count'], 1)
+        self.assertIn('2 вопроса', marks[0]['detail'])
+        self.assertIn('1 задача', marks[2]['detail'])
 
     def test_only_tests_no_marks(self):
         make_item(self.homework, catalog_problem=a_test('Т1'), order=0)
@@ -108,7 +116,8 @@ class SectionMarkTests(TestCase):
         make_item(self.homework, catalog_problem=a_test('Т1'), order=1)
         rows = build_rows(self.homework, self.student)
         self.assertEqual([r['title'] for r in rows], ['Т1', 'З1'])
-        self.assertEqual([r['section_title'] for r in rows],
+        self.assertEqual([r['section_head']['title'] if r['section_head']
+                          else '' for r in rows],
                          ['Тестовая часть', 'Задачи'])
 
     def test_print_sheet_matches_the_screen(self):
@@ -120,8 +129,8 @@ class SectionMarkTests(TestCase):
         sheet, _ = print_rows(self.homework)
         self.assertEqual([r['title'] for r in screen],
                          [r['title'] for r in sheet])
-        self.assertEqual([r['section_title'] for r in screen],
-                         [r['section_title'] for r in sheet])
+        self.assertEqual([r['section_head'] for r in screen],
+                         [r['section_head'] for r in sheet])
 
     def test_manual_order_kills_the_marks_too(self):
         """Ручной порядок — значит и делить на части мы не вправе."""
@@ -134,7 +143,8 @@ class SectionMarkTests(TestCase):
         self.assertEqual([r['title'] for r in rows], ['З1', 'Т1', 'З2'])
         # Части чередуются: подпись «Тестовая часть» встала бы посреди
         # списка перед одним тестом и обещала бы часть, которой нет.
-        self.assertEqual([r['section_title'] for r in rows], ['', '', ''])
+        self.assertEqual([r['section_head'] for r in rows],
+                         [None, None, None])
 
     def test_manual_order_that_happens_to_be_grouped_keeps_marks(self):
         """Ручной порядок, но фактически сгруппировано — подписи правдивы."""
@@ -145,5 +155,6 @@ class SectionMarkTests(TestCase):
         self.homework.save(update_fields=['manual_order'])
         rows = build_rows(self.homework, self.student)
         self.assertEqual([r['title'] for r in rows], ['Т1', 'З1', 'З2'])
-        self.assertEqual([r['section_title'] for r in rows],
+        self.assertEqual([(r['section_head'] or {}).get('title', '')
+                          for r in rows],
                          ['Тестовая часть', 'Задачи', ''])

@@ -505,12 +505,15 @@ def _item_title(item):
 
 
 def _source_label(item):
-    """Откуда задача: «своя» / «тест» / «каталог». Одно слово, мелким."""
-    if item.is_custom:
-        return 'своя'
-    if item.is_test:
-        return 'тест'
-    return 'каталог'
+    """ОТКУДА задача: «своя» / «каталог». Одно слово, мелким.
+
+    ⚠️ СЛОВО «ТЕСТ» ОТСЮДА УБРАНО (ревью 15.08, фаза 7). Метка отвечала
+    сразу на два вопроса: у своей задачи печаталось происхождение, у
+    каталожного теста — тип, и один и тот же тест подписывался то «тест»,
+    то «своя» в зависимости от того, кто его написал. Тип теперь несёт
+    отдельный чип у каждой карточки, и обе метки говорят каждая о своём.
+    """
+    return 'своя' if item.is_custom else 'каталог'
 
 
 def _answer_rows(item):
@@ -565,7 +568,9 @@ def group_assignment_detail(request, group_id, assignment_id):
     group = own_group_or_404(request.user, group_id)
     assignment = group_assignment_or_404(group, assignment_id)
 
-    from problems.assignment_rows import ordered_items, section_marks
+    from problems.assignment_rows import (
+        item_section, ordered_items, section_marks,
+    )
 
     # Порядок и деление на части — та же функция, что у ученика и у листка.
     items = ordered_items(assignment, list(
@@ -594,7 +599,9 @@ def group_assignment_detail(request, group_id, assignment_id):
         rows.append({
             'item': item,
             'number': index + 1,
-            'section_title': marks.get(index, ''),
+            'section_head': marks.get(index),
+            # Тип задачи одним словом — им же красится полоса слева.
+            'kind': item_section(item),
             # ⚠️ Заголовок задачи на экране РАНЬШЕ НЕ ПОКАЗЫВАЛСЯ, хотя в
             # печатном листке был. Из-за этого страница из семи позиций
             # читалась сплошной простынёй: зацепиться глазом не за что.

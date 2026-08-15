@@ -174,7 +174,7 @@ def parse_cart(raw):
     return keys, catalog, custom
 
 
-def cart_rows(keys, owner, manual_order=False):
+def cart_rows(keys, owner, manual_order=False, points=None):
     """Корзина → позиции будущей работы В ТОМ ЖЕ ПОРЯДКЕ, что увидит ученик.
 
     ⚠️ СБОРКА ОДНА НА ВСЕХ. Порядок и подписи частей считает
@@ -185,7 +185,15 @@ def cart_rows(keys, owner, manual_order=False):
 
     Позиции создаются В ПАМЯТИ (никаких записей в базу): работы ещё нет,
     а порядок показать надо.
+
+    ⚠️ БАЛЛ ПРОСТАВЛЯЕТСЯ ПОЗИЦИИ ЗДЕСЬ ЖЕ. Заголовок части считает состав
+    («3 вопроса · 6 баллов») через `item_max_score`, то есть смотрит в
+    `item.points`; у позиции в памяти это поле пусто, и без подстановки
+    заголовок обещал бы по одному баллу за задачу, пока рядом в строке
+    стоит десять. `points` — то, что репетитор уже наменял на экране;
+    чего там нет, стоит по умолчанию (10 задаче, 3 тесту).
     """
+    from decimal import Decimal
     from types import SimpleNamespace
 
     from problems import assignment_rows
@@ -213,6 +221,9 @@ def cart_rows(keys, owner, manual_order=False):
                                   custom_problem=custom[int(key[1:])])
         if item is None:
             continue
+        chosen = (points or {}).get(key)
+        item.points = (Decimal(str(chosen)) if chosen is not None
+                       else default_points(item.is_test))
         items.append(item)
         by_item[id(item)] = key
 
@@ -237,8 +248,8 @@ def cart_rows(keys, owner, manual_order=False):
             'title': preview_title(problem, limit=90),
             'meta': card_meta(topics, kind, problem.difficulty or 0),
             'is_test': item.is_test,
-            'points': float(default_points(item.is_test)),
-            'section': marks.get(index, ''),
+            'points': float(item.points),
+            'section': marks.get(index),
         })
     return rows
 

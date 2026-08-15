@@ -155,8 +155,15 @@ def assignment_detail(request, pk, group=None):
     # строке нельзя понять, что проверяешь. Берём заголовок, а если его
     # нет — первые слова условия, обрезкой по границе слова.
     submissions = list(submissions)
+    from problems.assignment_rows import item_section
+
     for sub in submissions:
         sub.display_title = _submission_title(sub)
+        # Тип задачи чипом в столбце «Задача»: в таблице, отсортированной
+        # по ученикам, тесты и открытые задачи иначе не различить вовсе.
+        # Позиции может не быть у старых записей — тогда чипа просто нет.
+        sub.kind = (item_section(sub.problem_item)
+                    if sub.problem_item_id else '')
 
     return render(request, 'teacher/assignment_detail.html', {
         'assignment': assignment,

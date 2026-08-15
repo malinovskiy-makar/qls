@@ -48,7 +48,11 @@
 .wr-item > summary::before { content: '▸'; color: var(--text2);
                              font-size: 12px; }
 .wr-item[open] > summary::before { content: '▾'; }
-.wr-num { font-size: 13px; font-weight: 700; color: var(--text2); }
+/* ⚠️ У НОМЕРА ФИКСИРОВАННАЯ ШИРИНА — иначе чип типа, стоящий следом,
+   съезжает вправо на двузначных номерах, и «на одной вертикали» перестаёт
+   быть правдой ровно с десятой задачи. */
+.wr-num { font-size: 13px; font-weight: 700; color: var(--text2);
+          min-width: 22px; }
 .wr-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wr-points { font-size: 16px; font-weight: 800; white-space: nowrap; }
@@ -256,12 +260,24 @@
 которой не видно ни списка, ни порядка. У ученика прежнее поведение:
 задачи с ошибкой раскрыты, с них и начинается разбор.
 {% endcomment %}
+{% comment %}
+⚠️ ЗАГОЛОВОК ЧАСТИ ПОЯВИЛСЯ И ЗДЕСЬ (ревью 15.08, фаза 7): разбор работы —
+такой же список задач работы, как страница задания, и делиться на части он
+обязан так же. Строки состава приходят готовыми из `section_marks`.
+{% endcomment %}
+{% include "_section_sep.html" with sec=row.section_head %}
+{% comment %}
+⚠️ ЛЕВЫЙ КРАЙ ЗДЕСЬ ЗАНЯТ СОСТОЯНИЕМ (`k-mark--*`: верно / частично /
+неверно), поэтому полосы типа у карточки НЕТ — тип говорит чип в шапке.
+Две полосы разного смысла на одном крае читаются как одна двухцветная.
+{% endcomment %}
 <details class="wr-item k-mark k-mark--{{ row.state }}" data-state="{{ row.state }}"
          id="task-{{ row.item.pk }}"
          data-attention="{% if row.needs_attention %}1{% else %}0{% endif %}"
          {% if row.item.pk == open_item %}open data-open-target="1"{% elif row.needs_attention and not for_tutor %}open{% endif %}>
   <summary>
     <span class="wr-num">{{ row.number }}.</span>
+    {% include "_kind_chip.html" with kind=row.section %}
     <span class="wr-title">{{ row.title|default:row.statement|striptags|truncatechars:70 }}</span>
     {% comment %}
     ⚠️ СЛОВО ВЕРДИКТА БЕРЁТСЯ ИЗ ОДНОЙ ТОЧКИ (`work_review.state_word`).

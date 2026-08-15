@@ -173,8 +173,10 @@ class BuildScreenTests(TestCase):
         self.assertEqual([row['key'] for row in rows],
                          [str(test.pk), str(task.pk)],
                          'тесты обязаны идти первыми')
-        self.assertEqual(rows[0]['section'], 'Тестовая часть')
-        self.assertEqual(rows[1]['section'], 'Задачи')
+        # Заголовок части с составом (ревью 15.08, фаза 7).
+        self.assertEqual(rows[0]['section']['title'], 'Тестовая часть')
+        self.assertEqual(rows[0]['section']['count'], 1)
+        self.assertEqual(rows[1]['section']['title'], 'Задачи')
 
     def test_cart_rows_respect_manual_order(self):
         """Ручной порядок не трогаем — репетитор расставил по смыслу урока."""
@@ -197,7 +199,8 @@ class BuildScreenTests(TestCase):
         last = make_problem('Тест B', ptype='тест: один верный')
         rows = cart_rows([str(first.pk), str(middle.pk), str(last.pk)],
                          self.tutor, manual_order=True)
-        self.assertEqual([row['section'] for row in rows], ['', '', ''])
+        self.assertEqual([row['section'] for row in rows],
+                         [None, None, None])
 
     def test_default_points_come_from_one_place(self):
         test = make_problem('Тест 3', ptype='тест: верно/неверно')

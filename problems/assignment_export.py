@@ -150,12 +150,14 @@ def build_tex(assignment, for_teacher=False, solution_space=True):
         if looks_broken(statement):
             skipped.append({'item': item, 'why': 'битая разметка в условии'})
             continue
-        # Подпись части плюс пунктирная линия. Подпись обязательна: в печати
-        # одна линия без слов теряется и читается как случайная черта.
-        title = marks.get(index)
-        if title:
-            out.append(r'\smallskip{\small\bfseries ' + escape_latex(title)
-                       + r'}\nobreak')
+        # Заголовок части плюс пунктирная линия. Подпись обязательна: в
+        # печати одна линия без слов теряется и читается как случайная
+        # черта. Состав («3 вопроса · 6 баллов») приходит готовой строкой
+        # из `section_caption` — той же, что на экране.
+        head = marks.get(index)
+        if head:
+            out.append(r'\smallskip{\small\bfseries '
+                       + escape_latex(head['caption']) + r'}\nobreak')
             out.append(r'\nobreak\vspace{-4pt}'
                        r'\hrule height 0pt \dotfill \vspace{2pt}')
             out.append('')
@@ -396,7 +398,7 @@ def print_rows(assignment, for_teacher=False):
             # Нумерация подписей идёт по ИСХОДНОМУ индексу позиции, а не по
             # номеру в листке: задача с битой разметкой пропускается, и
             # номера разъезжаются с индексами.
-            'section_title': marks.get(index, ''),
+            'section_head': marks.get(index),
             'title': item.problem_title if item.problem_title != item.statement
                      else '',
             'statement': text,

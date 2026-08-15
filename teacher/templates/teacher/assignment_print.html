@@ -177,13 +177,13 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
   {% endif %}
 
   {% for row in rows %}
-  {% if row.section_title %}
+  {% if row.section_head %}
   {% comment %}
   Подпись части плюс пунктир. Подпись обязательна: на бумаге одна линия без
   слов теряется и читается как случайная черта. Служебная — поэтому мелкая
   и не жирнее задачи.
   {% endcomment %}
-  <div class="part-sep"><span>{{ row.section_title }}</span><i></i></div>
+  <div class="part-sep"><span>{{ row.section_head.caption }}</span><i></i></div>
   {% endif %}
   <div class="task">
     <div class="task-head">

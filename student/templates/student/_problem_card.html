@@ -10,9 +10,16 @@
 Ждёт в контексте `row` из `problems.assignment_rows.build_rows` и флаг
 `readonly` (на контрольной после сдачи и в проверенной работе).
 {% endcomment %}
-<div class="problem-card" id="item-{{ row.item.pk }}" data-item="{{ row.item.pk }}">
+<div class="problem-card k-type k-type--{{ row.section }}"
+     id="item-{{ row.item.pk }}" data-item="{{ row.item.pk }}">
   <div class="problem-card-head">
-    <span class="problem-num">Задача {{ row.number }}</span>
+    {% comment %}
+    ⚠️ НОМЕР БЕЗ СЛОВА «Задача»: тестовый вопрос задачей не называется, и
+    подпись спорила бы с чипом типа, который стоит рядом. Вид работы теперь
+    говорит чип, а не номер.
+    {% endcomment %}
+    <span class="problem-num">{{ row.number }}.</span>
+    {% include "_kind_chip.html" with kind=row.section %}
     {% if row.title %}<span class="problem-title-text">{{ row.title }}</span>{% endif %}
     {% comment %}
     ⚠️ Состояние берётся из `row.status`, а НЕ из `row.sub.status`: во время

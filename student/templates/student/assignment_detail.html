@@ -37,7 +37,7 @@
   {% csrf_token %}
 
   {% for row in rows %}
-    {% include "_section_sep.html" with title=row.section_title %}
+    {% include "_section_sep.html" with sec=row.section_head %}
     {% include "student/_problem_card.html" with row=row show_comments=1 %}
   {% empty %}
     <div class="pf-locked">В этой работе пока нет задач.</div>

@@ -171,7 +171,7 @@
     {% for sub in submissions %}
     <tr>
       <td>{{ sub.student.get_full_name|default:sub.student.username }}</td>
-      <td>{{ sub.display_title }}</td>
+      <td>{% if sub.kind %}{% include "_kind_chip.html" with kind=sub.kind %} {% endif %}{{ sub.display_title }}</td>
       <td>
         <span class="badge badge-{{ sub.status }}">
           {% if sub.status == 'not_started' %}Не начато

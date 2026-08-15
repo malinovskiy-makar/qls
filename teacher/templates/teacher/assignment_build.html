@@ -32,17 +32,17 @@
           min-width: 18px; }
 .bd-main { flex: 1; min-width: 0; }
 .bd-name { font-size: 14px; font-weight: 600; line-height: 1.4; }
-.bd-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.bd-meta { font-size: 12px; color: var(--text3); margin-top: 4px;
+           display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .bd-right { display: flex; align-items: center; gap: 8px; }
 .bd-drop { background: none; border: 0; color: var(--text3); cursor: pointer;
            font-size: 17px; line-height: 1; padding: 2px 4px; }
 .bd-drop:hover { color: var(--error); }
 
-/* Подпись части — тем же пунктиром, что на экране ученика и в листке. */
-.bd-sep { display: flex; align-items: center; gap: 10px; margin: 16px 0 8px;
-          font-size: 12px; font-weight: 600; color: var(--text2); }
-.bd-sep::after { content: ''; flex: 1; height: 0;
-                 border-top: 1px dashed var(--border); }
+/* ⚠️ ЗАГОЛОВОК ЧАСТИ — ИЗ НАБОРА (`.k-sep--head`), СВОИХ ПРАВИЛ НЕТ.
+   Здесь лежала своя копия пунктира; после ревью 15.08 заголовок части
+   несёт состав («3 вопроса · 6 баллов») и выглядит одинаково на шести
+   экранах — держать седьмую копию правил значит гарантированно отстать. */
 
 .bd-empty { border: 1px dashed var(--border); border-radius: 10px;
             padding: 26px 20px; text-align: center; color: var(--text2);
@@ -149,7 +149,11 @@
     <span class="bd-num"></span>
     <div class="bd-main">
       <div class="bd-name"></div>
-      <div class="bd-meta"></div>
+      {% comment %}
+      Чип типа стоит ПЕРВЫМ в строке меты — так у всех позиций списка чипы
+      выходят на одну вертикаль сами, без заданной ширины строки.
+      {% endcomment %}
+      <div class="bd-meta"><span class="k-kind"></span><span class="bd-meta-text"></span></div>
     </div>
     <div class="bd-right">
       <input class="k-input k-input--num bd-points" type="number" min="0"
@@ -195,6 +199,10 @@
     data.append('csrfmiddlewaretoken', CSRF ? CSRF.value : '');
     data.append('keys', list.join(','));
     data.append('manual_order', manualOrder === '1' ? '1' : '');
+    // Баллы уезжают на сервер вместе с корзиной: состав части считает он.
+    data.append('points', list.map(function (key) {
+      return points[key] !== undefined ? key + ':' + points[key] : '';
+    }).filter(Boolean).join(','));
     fetch(ROWS_URL, { method: 'POST', body: data })
       .then(function (r) { return r.json(); })
       .then(function (payload) { rows = payload.rows || []; render(); })
@@ -209,16 +217,31 @@
 
     rows.forEach(function (row, index) {
       if (row.section) {
+        // Заголовок части — та же разметка, что в `_section_sep.html`:
+        // название, состав, линия. Строки приходят с сервера готовыми.
         var sep = document.createElement('div');
-        sep.className = 'bd-sep';
-        sep.textContent = row.section;
+        sep.className = 'k-sep k-sep--head';
+        sep.setAttribute('data-section', row.section.kind);
+        var cap = document.createElement('span');
+        cap.className = 'k-sep__cap';
+        cap.textContent = row.section.title;
+        var of = document.createElement('span');
+        of.className = 'k-sep__of';
+        of.textContent = row.section.detail;
+        var line = document.createElement('span');
+        line.className = 'k-sep__line';
+        sep.appendChild(cap); sep.appendChild(of); sep.appendChild(line);
         host.appendChild(sep);
       }
       var node = tpl.content.firstElementChild.cloneNode(true);
       node.dataset.key = row.key;
+      // Полоса слева по типу — те же два цвета, что на странице задания.
+      node.classList.add('k-type', row.is_test ? 'k-type--test' : 'k-type--task');
       node.querySelector('.bd-num').textContent = (index + 1) + '.';
       node.querySelector('.bd-name').textContent = row.title;
-      node.querySelector('.bd-meta').textContent = row.meta;
+      var chip = node.querySelector('.k-kind');
+      chip.textContent = row.is_test ? 'Тест' : 'Задача';
+      node.querySelector('.bd-meta-text').textContent = row.meta;
       var field = node.querySelector('.bd-points');
       field.value = (points[row.key] !== undefined)
         ? points[row.key] : row.points;
@@ -271,7 +294,19 @@
     saveCart();
     rows = rows.filter(function (r) { return r.key !== item.dataset.key; });
     render();
+    // ⚠️ ПОСЛЕ УДАЛЕНИЯ СПИСОК ПЕРЕСПРАШИВАЕТСЯ У СЕРВЕРА. Состав части
+    // («3 вопроса · 6 баллов») считает питон; убрав задачу локально, мы
+    // оставили бы заголовок обещать вопрос, которого уже нет.
+    load();
   });
+
+  // Правка балла тоже меняет состав части. Ждём паузу в наборе, чтобы не
+  // слать запрос на каждую цифру.
+  var pointsTimer = null;
+  function reloadSoon() {
+    if (pointsTimer) { clearTimeout(pointsTimer); }
+    pointsTimer = setTimeout(load, 500);
+  }
 
   document.addEventListener('input', function (event) {
     var field = event.target.closest('.bd-points');
@@ -279,6 +314,7 @@
       var item = field.closest('.bd-item');
       points[item.dataset.key] = parseFloat(field.value) || 0;
       recount();
+      reloadSoon();
       return;
     }
     refreshSubmit();

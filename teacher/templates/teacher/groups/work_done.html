@@ -27,6 +27,9 @@
             margin-bottom: 6px; border-radius: 0 var(--r) var(--r) 0;
             background: var(--surface-2); }
 .done-row:last-child { margin-bottom: 0; }
+/* Номер фиксированной ширины: чип типа стоит следом и обязан быть на
+   одной вертикали у всех строк, включая двузначные номера. */
+.done-row-num { color: var(--text2); font-weight: 700; min-width: 22px; }
 .done-row-name { color: var(--text); min-width: 0; flex: 1;
                  overflow-wrap: anywhere; }
 .done-row-right { display: flex; align-items: center; gap: 10px;
@@ -91,8 +94,18 @@
 {% endcomment %}
 <div class="k-card done-list" style="margin-top:14px">
   {% for row in rows %}
+  {% comment %}
+  Заголовок части — тот же, что на странице задания и в разборе работы:
+  список задач работы везде делится одинаково.
+  {% endcomment %}
+  {% include "_section_sep.html" with sec=row.section_head %}
+  {% comment %}
+  Левый край строки занят СОСТОЯНИЕМ проверки, поэтому тип говорит чип.
+  {% endcomment %}
   <div class="done-row k-mark k-mark--{{ row.state }}">
-    <span class="done-row-name">{{ forloop.counter }}. {{ row.title|default:row.statement|striptags|truncatechars:70 }}</span>
+    <span class="done-row-num">{{ forloop.counter }}.</span>
+    {% include "_kind_chip.html" with kind=row.section %}
+    <span class="done-row-name">{{ row.title|default:row.statement|striptags|truncatechars:70 }}</span>
     <span class="done-row-right">
       <span class="k-flag k-flag--{{ row.state }}">
         {% if row.state == 'correct' %}верно

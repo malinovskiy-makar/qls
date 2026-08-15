@@ -87,13 +87,25 @@ class RailTests(TestCase):
                          'номер снова в рейке над баллом')
 
     def test_source_label_is_a_separate_object(self):
-        """«баллов» и «тест» читались одной фразой «2 баллов тест»."""
+        """«баллов» и «тест» читались одной фразой «2 баллов тест».
+
+        ⚠️ ПЕРЕСЧИТАН, А НЕ ОТКЛЮЧЁН (ревью 15.08, фаза 7). Метка уехала
+        из рейки в тело карточки и встала рядом с чипом типа: в рейке она
+        стояла прямо под словом «баллов» и склеивалась с ним в фразу — то
+        самое, из-за чего эта проверка и заводилась. Требование прежнее:
+        метка остаётся ОТДЕЛЬНЫМ объектом со своим фоном, а не третьей
+        строкой того же текста.
+        """
         style = read(CARD)
-        match = re.search(r'\.item-src \{(.*?)\}', style, re.S)
-        self.assertIsNotNone(match)
-        rule = match.group(1)
-        self.assertIn('margin-top', rule, 'подписи снова стоят встык')
-        self.assertIn('var(--chip-bg)', rule)
+        match = re.search(r'\.item-from \{(.*?)\}', style, re.S)
+        self.assertIsNotNone(match, 'метка источника перестала быть объектом')
+        self.assertIn('var(--chip-bg)', match.group(1))
+        markup = self._markup()
+        rail = re.search(r'class="item-rail">(.*?)</div>\s*<div class="item-body"',
+                         markup, re.S)
+        self.assertIsNotNone(rail)
+        self.assertNotIn('item-from', rail.group(1),
+                         'метка источника снова стоит под словом «баллов»')
 
 
 class FocusRingTests(TestCase):

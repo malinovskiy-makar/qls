@@ -378,14 +378,20 @@ def api_cart_rows(request):
     """
     from django.http import JsonResponse
 
-    from .picker import cart_rows
+    from .picker import cart_rows, parse_points
 
     if request.method != 'POST':
         return JsonResponse({'error': 'only POST'}, status=405)
     keys = [key.strip() for key in
             (request.POST.get('keys') or '').split(',') if key.strip()]
+    # ⚠️ БАЛЛЫ ЕДУТ НА СЕРВЕР ВМЕСТЕ С КОРЗИНОЙ. Состав части («3 вопроса ·
+    # 6 баллов») считает питон, а балл репетитор правит прямо на экране;
+    # без этого заголовок показывал бы баллы по умолчанию, пока в строках
+    # стоят исправленные. Складывать их на клиенте нельзя: склонение
+    # «балл / балла / баллов» тогда существовало бы в двух местах.
     rows = cart_rows(keys, request.user,
-                     manual_order=request.POST.get('manual_order') == '1')
+                     manual_order=request.POST.get('manual_order') == '1',
+                     points=parse_points(request.POST.get('points')))
     return JsonResponse({'rows': rows})
 
 

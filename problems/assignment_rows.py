@@ -22,6 +22,8 @@
 предлагать «краткий ответ строкой» рядом с готовыми вариантами — значит
 спрашивать одно и то же дважды.
 """
+from decimal import Decimal
+
 from django.db import IntegrityError, transaction
 
 
@@ -126,10 +128,70 @@ SECTION_TEST = 'test'
 SECTION_TASK = 'task'
 SECTION_TITLES = {SECTION_TEST: 'Тестовая часть', SECTION_TASK: 'Задачи'}
 
+# Как считать содержимое части. У теста единица счёта — ВОПРОС, у открытой
+# части — ЗАДАЧА: «Тестовая часть · 3 задачи» звучит так, будто в тесте
+# лежат задачи, а в соседней части что-то другое.
+SECTION_UNITS = {
+    SECTION_TEST: ('вопрос', 'вопроса', 'вопросов'),
+    SECTION_TASK: ('задача', 'задачи', 'задач'),
+}
+# Слово «балл» склоняется по тем же трём формам.
+POINT_FORMS = ('балл', 'балла', 'баллов')
+
+
+def section_detail(kind, count, points):
+    """Состав части без названия: «3 вопроса · 6 баллов».
+
+    ⚠️ СТРОКА СОБИРАЕТСЯ В ПИТОНЕ, А НЕ В ШАБЛОНЕ. Её показывают четыре
+    экрана (задание, разбор работы, конструктор подборки, сводка решений)
+    плюс печатный листок и `.tex`; собранная в шаблоне, она существовала бы
+    в шести чуть разных видах, а в `.tex` шаблонных фильтров нет вовсе.
+
+    Склонение — общая `templatetags.ru.pick`: в русском три формы, и
+    «3 вопросов» на экране разрушает доверие к остальным числам.
+    """
+    from problems.scorefmt import ball
+    from problems.templatetags.ru import pick
+
+    unit = pick(count, *SECTION_UNITS.get(kind, SECTION_UNITS[SECTION_TASK]))
+    parts = ['%s %s' % (count, unit)]
+    if points is not None:
+        # Балл печатает единственная точка (`scorefmt.ball`): «6», а не
+        # «6,00». Ноль баллов — законное состояние, прочерк был бы враньём.
+        #
+        # ⚠️ У ДРОБНОГО ЧИСЛА ФОРМА ВСЕГДА РОДИТЕЛЬНАЯ: «1,5 балла», а не
+        # «1,5 балл». Отбросить дробную часть и склонять по целому нельзя —
+        # именно так и вышло бы «1,5 балл».
+        number = Decimal(str(points))
+        word = (POINT_FORMS[1] if number != number.to_integral_value()
+                else pick(int(number), *POINT_FORMS))
+        parts.append('%s %s' % (ball(number, '0'), word))
+    return ' · '.join(parts)
+
+
+def section_caption(kind, count, points):
+    """То же с названием: «Тестовая часть · 3 вопроса · 6 баллов».
+
+    Нужна там, где заголовок печатается ОДНОЙ строкой и разложить его на
+    подпись и состав нечем: `.tex` и печатный листок.
+    """
+    return '%s · %s' % (SECTION_TITLES[kind],
+                        section_detail(kind, count, points))
+
 
 def item_section(item):
     """К какой части работы относится позиция."""
     return SECTION_TEST if item.is_test else SECTION_TASK
+
+
+# Слово типа для чипа на карточке. В единственном числе: чип подписывает
+# ОДНУ задачу, а заголовок части — сколько их («3 вопроса»).
+KIND_LABELS = {SECTION_TEST: 'Тест', SECTION_TASK: 'Задача'}
+
+
+def kind_label(item):
+    """«Тест» или «Задача» — подпись типа у одной позиции."""
+    return KIND_LABELS[item_section(item)]
 
 
 def ordered_items(assignment, items=None):
@@ -152,9 +214,19 @@ def ordered_items(assignment, items=None):
 
 
 def section_marks(items):
-    """Подписи частей: {индекс позиции: «Тестовая часть» | «Задачи»}.
+    """Заголовки частей: {индекс первой позиции части: словарь состава}.
 
-    Подпись выдаётся ТОЛЬКО первой позиции каждой части и ТОЛЬКО когда
+    Словарь: `kind` («test» / «task»), `title` («Тестовая часть»), `count`,
+    `points`, `caption` («Тестовая часть · 3 вопроса · 6 баллов»).
+
+    ⚠️ ВОЗВРАЩАЕТ СЛОВАРЬ, А НЕ СТРОКУ (ревью 15.08, фаза 7). Раньше здесь
+    была одна подпись, и разделение частей читалось как мелкая серая черта
+    посреди списка: владелец на приёмке сказал, что «изначально не видно,
+    что у нас вообще существует такое разделение». Состав части — то, что
+    делает подпись заголовком: сколько там вопросов и сколько это стоит.
+    Считается ЗДЕСЬ, потому что здесь уже известны обе части целиком.
+
+    Заголовок выдаётся ТОЛЬКО первой позиции каждой части и ТОЛЬКО когда
     список ДЕЙСТВИТЕЛЬНО поделён на две сплошные части.
 
     ⚠️ Проверяем сам список, а не флаг `manual_order`. Причина конкретная:
@@ -172,12 +244,28 @@ def section_marks(items):
     switches = sum(1 for a, b in zip(sections, sections[1:]) if a != b)
     if switches != 1:
         return {}
+    totals = {}
+    for item, section in zip(items, sections):
+        count, points = totals.get(section, (0, Decimal('0')))
+        totals[section] = (count + 1, points + item_max_score(item))
+
     marks = {}
     seen = set()
     for index, section in enumerate(sections):
         if section not in seen:
             seen.add(section)
-            marks[index] = SECTION_TITLES[section]
+            count, points = totals[section]
+            marks[index] = {
+                'kind': section,
+                'title': SECTION_TITLES[section],
+                'count': count,
+                'points': points,
+                # «3 вопроса · 6 баллов» — для экрана, где название стоит
+                # отдельным словом и набрано крупнее.
+                'detail': section_detail(section, count, points),
+                # Вся строка целиком — для печати и `.tex`.
+                'caption': section_caption(section, count, points),
+            }
     return marks
 
 
@@ -627,7 +715,7 @@ def build_rows(assignment, student, user=None, with_comments=True):
             # позиции части и только когда частей две. Пусто — рисовать
             # нечего.
             'section': item_section(item),
-            'section_title': marks.get(number - 1, ''),
+            'section_head': marks.get(number - 1),
             'problem': problem,
             'title': item.problem_title,
             'statement': item.statement,

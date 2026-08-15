@@ -38,7 +38,10 @@
   gap: 8px; padding: 14px 20px; background: var(--panel);
   border-bottom: 1px solid var(--border);
 }
-.problem-num { font-size: 13px; font-weight: 700; color: var(--text2); }
+/* Ширина номера фиксирована, чтобы чип типа у всех карточек стоял на
+   одной вертикали и на двузначных номерах. */
+.problem-num { font-size: 13px; font-weight: 700; color: var(--text2);
+               min-width: 22px; }
 .problem-title-text { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; }
 .status-badge {
   font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
@@ -309,11 +312,8 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
   .problem-title-text { flex-basis: 100%; margin: 0; }
 }
 
-/* Разделитель частей работы («Тестовая часть» / «Задачи»).
-   Дубль правила `.k-sep` из templates/_kit.html: базовый шаблон ученика
-   набор деталей не подключает, а разметка партиала _section_sep.html
-   одна на обе стороны — расходиться им нельзя. */
-.k-sep { display: flex; align-items: center; gap: 10px; margin: 22px 0 12px; }
-.k-sep__cap { font-size: 12px; font-weight: 600; color: var(--text2);
-              white-space: nowrap; }
-.k-sep__line { flex: 1; border-top: 1px dashed var(--border); min-width: 20px; }
+/* ⚠️ ДУБЛЬ ПРАВИЛ `.k-sep` УДАЛЁН (ревью 15.08, фаза 7). Он был заведён,
+   когда базовый шаблон ученика не подключал набор деталей; с сессии 7
+   подключает (`student/base.html`), и копия стала обычной миной: стоя
+   НИЖЕ набора, она молча перебивала бы отступы заголовка части. Правила
+   разделителя живут в одном месте — templates/_kit.html. */

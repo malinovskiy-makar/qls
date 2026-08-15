@@ -38,9 +38,14 @@
    «2 баллов тест». «баллов» — единица измерения числа, «тест» — вид
    задачи; разводим отступом и делаем метку источника отдельным объектом,
    а не третьей строкой того же текста. */
-.item-src { font-size: 11px; color: var(--chip-text); margin-top: 9px;
-            background: var(--chip-bg); border-radius: 999px;
-            padding: 2px 9px; }
+/* ⚠️ ОТКУДА ЗАДАЧА — ТЕПЕРЬ В ТЕЛЕ КАРТОЧКИ, РЯДОМ С ЧИПОМ ТИПА, а не в
+   рейке под баллом. В рейке метка стояла под словом «баллов» и читалась
+   как продолжение числа; кроме того, она отвечала сразу на два вопроса —
+   «своя или каталог» и «тест или задача». Теперь два ответа, две метки. */
+.item-kind { display: flex; align-items: center; gap: 8px; margin: 6px 0 10px; }
+.item-from { font-size: 11px; color: var(--chip-text);
+             background: var(--chip-bg); border-radius: 999px;
+             padding: 2px 9px; }
 /* Тихая подпись у запертого балла: цифра осталась крупной, а править её
    нельзя — без объяснения это читается как поломка. */
 .pts-lock { font-size: 11px;
@@ -230,8 +235,9 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
 {% endif %}
 
 {% for row in rows %}
-{% include "_section_sep.html" with title=row.section_title %}
-<div class="problem-block item-card" id="item-{{ row.item.pk }}">
+{% include "_section_sep.html" with sec=row.section_head %}
+<div class="problem-block item-card k-type k-type--{{ row.kind }}"
+     id="item-{{ row.item.pk }}">
 
   {% comment %}
   ЛЕВАЯ РЕЙКА: номер, максимальный балл, откуда задача.
@@ -255,7 +261,6 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
       <span class="k-score__value">{{ row.item.points|ball }}</span>
       <span class="k-score__cap">баллов</span>
     </div>
-    <div class="item-src">{{ row.source_label }}</div>
     <div class="pts-lock k-quiet"
          title="Работу уже сдавали. Оценки выставлены по этой шкале, и менять максимум задним числом значило бы переписать их всем.">заперто</div>
     {% else %}
@@ -272,13 +277,17 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
              value="{{ row.item.points|ball }}" aria-label="балл за задачу">
       <span class="k-score__cap">баллов</span>
     </label>
-    <div class="item-src">{{ row.source_label }}</div>
     <div class="pts-status k-quiet" data-pts-status="{{ row.item.pk }}"></div>
     {% endif %}
   </div>
 
   <div class="item-body">
     <h2 class="item-title"><span class="item-num">{{ row.number }}.</span>{{ row.title }}</h2>
+    {% comment %}
+    Строка типа: чип первым, дальше — откуда задача. Раньше вид задачи был
+    виден только по метке «тест» в рейке, которая у своей задачи молчала.
+    {% endcomment %}
+    <div class="item-kind">{% include "_kind_chip.html" with kind=row.kind %}<span class="item-from">{{ row.source_label }}</span></div>
 
     <div class="problem-statement">{{ row.item.statement }}</div>
 

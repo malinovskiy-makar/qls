@@ -19,11 +19,13 @@ id это молчаливо сломанный `getElementById` (браузер
 кнопки, те же данные.
 {% endcomment %}
 {% comment %}
-⚠️ `data-kind` красит полосу слева: зелёная — открытая задача, серая — тест
-(сессия 9, фаза 10.3). Тип берём из уже посчитанного признака, второй
-проверки «это тест?» не заводим.
+⚠️ Полосу слева красит `.k-type` из набора: зелёная — открытая задача,
+серая — тест (сессия 9, фаза 10.3; общие правила — с ревью 15.08). Тип
+берём из уже посчитанного признака, второй проверки «это тест?» не заводим.
+`data-kind` оставлен: по нему ищут карточки сквозные сценарии.
 {% endcomment %}
-<div class="problem-card" data-pid="{{ problem.pk }}"
+<div class="problem-card k-type k-type--{% if is_test %}test{% else %}task{% endif %}"
+     data-pid="{{ problem.pk }}"
      data-kind="{% if is_test %}test{% else %}open{% endif %}"
      data-title="{{ card_title }}">
   <div class="card-main">
