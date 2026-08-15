@@ -130,7 +130,7 @@
     {% endif %}
 
     {% if row.is_done or readonly %}
-    {% include "student/_feedback_block.html" with fb=row.feedback points=row.item.points pending_text="Ждёт проверки преподавателем." %}
+    {% include "student/_feedback_block.html" with fb=row.feedback points=row.item.points state=row.fb_state verdict=row.fb_verdict comment=row.feedback.comment pending_text="Ждёт проверки преподавателем." %}
     {% endif %}
 
     {% if row.has_solution %}

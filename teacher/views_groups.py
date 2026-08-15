@@ -1341,6 +1341,39 @@ def api_grade_submission(request):
     # ⚠️ `label` уезжает ОБРАТНО В ПОЛЕ, а поле показывает число по-русски —
     # значит и здесь запятая. С точкой сервер возвращал бы «1.5» туда, где
     # репетитор только что набрал «1,5», и число дёргалось бы после каждого
-    # сохранения.
-    label = ('%.2f' % score).rstrip('0').rstrip('.').replace('.', ',')
-    return JsonResponse({'score': score, 'max': top, 'label': label})
+    # сохранения. Запись собирает `problems/scorefmt.py` — одна на платформу.
+    from problems import scorefmt
+    from problems.work_review import state_word, work_summary
+
+    label = scorefmt.ball(score, default='0')
+
+    # ⚠️ ЭКРАН ПЕРЕСЧИТЫВАЕТ СЕБЯ ПО ОТВЕТУ СЕРВЕРА (ревью 15.08, фаза 6).
+    # Раньше скрипт трогал только поля блока оценивания, а балл в шапке
+    # задачи, вердикт, плашка под ответом и итог за работу обновлялись
+    # ТОЛЬКО перезагрузкой: репетитор ставил другую оценку и видел прежнюю.
+    # Считает всё та же `work_summary` — второй формулы итога не заводим,
+    # иначе экран и база начали бы расходиться так же, как в «Штрихе».
+    summary = work_summary(assignment, submission.student, viewer=request.user)
+    row = next((item for item in summary['rows']
+                if item['sub'].pk == submission.pk), None)
+    state = row['state'] if row else ''
+    return JsonResponse({
+        'score': score, 'max': top, 'label': label,
+        # Строка задачи.
+        'state': state,
+        'verdict': state_word(state),
+        'points_text': '%s / %s б.' % (scorefmt.ball(score, default='0'),
+                                       scorefmt.ball(row['max_points'])
+                                       if row else ''),
+        'score_text': scorefmt.ball(score, default='0'),
+        'max_text': scorefmt.ball(row['max_points']) if row else '',
+        'comment': comment,
+        # Шапка работы.
+        'total': summary['scored'],
+        'total_max': summary['max_score'],
+        'graded_max': summary['graded_max'],
+        'is_final': summary['is_final'],
+        'pending': summary['pending'],
+        'wrong': summary['wrong'],
+        'tasks': len(summary['rows']),
+    })

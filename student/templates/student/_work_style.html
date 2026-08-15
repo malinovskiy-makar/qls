@@ -143,12 +143,29 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
   margin-top: 16px; padding: 14px 16px; border-radius: var(--r);
   border: 1px solid var(--border); background: var(--surface-2);
 }
-.fb-block.fb-teacher { background: var(--green-tint);
-                       border-color: var(--green-border); }
+/* ⚠️ ЦВЕТ ПЛАШКИ — ПО ВЕРДИКТУ, а не по тому, кто проверил (ревью 15.08,
+   фаза 6). Прежнее правило красило зелёным ЛЮБУЮ человеческую проверку, и
+   «0,5 из 1» выглядело как «верно». Цвета те же, что у чипа и у полосы
+   состояния: своих здесь нет. */
+.fb-block.fb-state--correct { background: var(--green-tint);
+                              border-color: var(--green-border); }
+.fb-block.fb-state--partial { background: var(--amber-tint);
+                              border-color: var(--amber-border); }
+.fb-block.fb-state--wrong   { background: var(--error-tint);
+                              border-color: var(--error-border); }
 .fb-head { display: flex; align-items: baseline; gap: 10px;
            flex-wrap: wrap; margin-bottom: 6px; }
 .fb-score { font-size: 20px; font-weight: 800; color: var(--text); }
-.fb-teacher .fb-score { color: var(--green); }
+.fb-state--correct .fb-score { color: var(--green); }
+.fb-state--partial .fb-score { color: var(--amber-ink); }
+.fb-state--wrong   .fb-score { color: var(--error); }
+/* Вердикт словом — тот же, что в чипе шапки задачи. */
+.fb-verdict { font-size: 11px; font-weight: 700; text-transform: uppercase;
+              letter-spacing: .05em; }
+.fb-state--correct .fb-verdict { color: var(--green); }
+.fb-state--partial .fb-verdict { color: var(--amber-ink); }
+.fb-state--wrong   .fb-verdict { color: var(--error); }
+.fb-comment[hidden] { display: none; }
 .fb-source { font-size: 11px; font-weight: 700; text-transform: uppercase;
              letter-spacing: .05em; color: var(--text2); }
 .fb-comment { font-size: 14px; line-height: 1.65; margin-top: 4px;

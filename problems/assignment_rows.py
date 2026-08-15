@@ -676,6 +676,27 @@ def build_rows(assignment, student, user=None, with_comments=True):
             'solution_text': item.solution_text,
             'graph': item.graph,
         })
+    # ⚠️ ВЕРДИКТ СЧИТАЕТ ОДНА ФУНКЦИЯ (ревью 15.08, фаза 6). Плашка результата
+    # красится по состоянию задачи, а не по признаку «проверил человек», и
+    # состояние ей нужно на КАЖДОМ экране, где она стоит: и в разборе работы,
+    # и на карточке домашки у ученика. Разбор считает состояние точнее (он
+    # знает баллы по пунктам) и своё значение перебивает — но формула у обоих
+    # одна, `work_review.state_of`.
+    from decimal import Decimal
+
+    from .work_review import state_of, state_word
+
+    for row in rows:
+        feedback = row['feedback']
+        score = (Decimal(str(feedback.score))
+                 if feedback is not None and feedback.score is not None
+                 else None)
+        if row['sub'].status not in ('submitted', 'reviewed') or score is None:
+            row['fb_state'] = ''
+            row['fb_verdict'] = ''
+            continue
+        row['fb_state'] = state_of(score, item_max_score(row['item']))
+        row['fb_verdict'] = state_word(row['fb_state'])
     return rows
 
 

@@ -157,18 +157,23 @@
   </div>
   <h1 class="wr-name">{{ assignment.name }}</h1>
 
+  {% comment %}
+  ⚠️ ТОЧКИ ОБНОВЛЕНИЯ (`data-wr-*`). После сохранения оценки шапка
+  пересчитывается на месте — числа приходят из `api_grade_submission`, то
+  есть из той же `work_summary`, что нарисовала страницу.
+  {% endcomment %}
   {% if show_scores and summary.is_final %}
-  <div class="wr-score">{{ summary.scored }}<span class="k-score__of">из</span><span class="k-score__max">{{ summary.max_score }}</span></div>
-  <div class="wr-cap">итоговый балл за работу</div>
+  <div class="wr-score" data-wr-score><span data-wr-total>{{ summary.scored }}</span><span class="k-score__of">из</span><span class="k-score__max" data-wr-max>{{ summary.max_score }}</span></div>
+  <div class="wr-cap" data-wr-cap>итоговый балл за работу</div>
   {% elif show_scores and summary.graded_max %}
-  <div class="wr-score">{{ summary.scored }}<span class="k-score__of">из</span><span class="k-score__max">{{ summary.graded_max }}</span></div>
+  <div class="wr-score" data-wr-score><span data-wr-total>{{ summary.scored }}</span><span class="k-score__of">из</span><span class="k-score__max" data-wr-max>{{ summary.graded_max }}</span></div>
   {% comment %}
   ⚠️ ОДНО ОБЪЯСНЕНИЕ, А НЕ ДВА (обзор 13.08, п. 51). Здесь стояло «по
   проверенным задачам · всего в работе 18 б.», а строкой ниже плашка
   говорила ровно то же словами. Оставлена плашка — она понятнее и уже
   объясняет, почему балл предварительный; подпись сокращена до сути.
   {% endcomment %}
-  <div class="wr-cap">по проверенным задачам</div>
+  <div class="wr-cap" data-wr-cap>по проверенным задачам</div>
   {% elif show_scores %}
   {# Проверено пока НИЧЕГО. «0 из 0» — не результат, а недоразумение. #}
   <div class="wr-score">—</div>
@@ -182,7 +187,7 @@
     {% if submitted_at %}<span>сдано {{ submitted_at|date:"d.m.Y, H:i" }}</span>{% endif %}
     {% if spent_minutes is not None %}<span>затрачено {{ spent_minutes }} мин</span>{% endif %}
     <span>задач: {{ summary.rows|length }}</span>
-    {% if summary.wrong %}<span>с ошибками: {{ summary.wrong }}</span>{% endif %}
+    <span data-wr-wrong {% if not summary.wrong %}hidden{% endif %}>с ошибками: <span data-wr-wrong-n>{{ summary.wrong }}</span></span>
   </div>
 
   {% comment %}
@@ -258,18 +263,18 @@
   <summary>
     <span class="wr-num">{{ row.number }}.</span>
     <span class="wr-title">{{ row.title|default:row.statement|striptags|truncatechars:70 }}</span>
-    <span class="wr-flag k-flag k-flag--{% if not show_scores and not row.by_teacher %}empty{% else %}{{ row.state }}{% endif %}">
-      {% if not show_scores and not row.by_teacher %}сдано
-      {% elif row.state == 'correct' %}верно
-      {% elif row.state == 'partial' %}частично
-      {% elif row.state == 'wrong' %}неверно
-      {% elif row.state == 'pending' %}на проверке
-      {% else %}без ответа{% endif %}
-    </span>
+    {% comment %}
+    ⚠️ СЛОВО ВЕРДИКТА БЕРЁТСЯ ИЗ ОДНОЙ ТОЧКИ (`work_review.state_word`).
+    Здесь стояла лесенка `{% if %}` со своими словами, а плашка под ответом
+    вообще не знала про вердикт — отсюда «ЧАСТИЧНО» в шапке задачи и зелёное
+    «Верно ✓» пятью строками ниже.
+    {% endcomment %}
+    <span class="wr-flag k-flag k-flag--{% if not show_scores and not row.by_teacher %}empty{% else %}{{ row.state }}{% endif %}"
+          data-wr-flag>{% if not show_scores and not row.by_teacher %}сдано{% else %}{{ row.verdict }}{% endif %}</span>
     <span class="wr-points">
       {# Прочерк остался ровно там, где балла ещё НЕТ: задача не сдана или #}
       {# ждёт преподавателя. Пустая задача сданной работы получает честный 0. #}
-      {% if row.score is not None and show_scores or row.by_teacher %}{{ row.score|ball }}{% else %}—{% endif %}<small> / {{ row.max_points|ball }} б.</small>
+      <span data-wr-got>{% if row.score is not None and show_scores or row.by_teacher %}{{ row.score|ball }}{% else %}—{% endif %}</span><small> / {{ row.max_points|ball }} б.</small>
     </span>
   </summary>
 
@@ -326,7 +331,7 @@
     {% endif %}
 
     {% if show_scores or row.by_teacher %}
-      {% include "student/_feedback_block.html" with fb=row.feedback points=row.max_points pending_text="Эту задачу ещё проверяет преподаватель." %}
+      {% include "student/_feedback_block.html" with fb=row.feedback points=row.max_points state=row.state verdict=row.verdict comment=row.comment pending_text="Эту задачу ещё проверяет преподаватель." %}
     {% endif %}
 
     {% if for_tutor %}
@@ -374,6 +379,79 @@
     });
   }
 
+  // ⚠️ ПЕРЕСЧЁТ НА МЕСТЕ (ревью 15.08, фаза 6). Раньше скрипт трогал ТОЛЬКО
+  // поля блока оценивания: балл в шапке задачи, вердикт, полоса состояния,
+  // плашка под ответом и итог за работу менялись лишь после перезагрузки —
+  // репетитор ставил другую оценку и продолжал видеть прежнюю.
+  //
+  // ⚠️ НИЧЕГО НЕ СЧИТАЕМ САМИ. Все числа и слова приходят с сервера, из той
+  // же `work_summary`, что нарисовала страницу. Второй расчёт на клиенте
+  // разошёлся бы с базой — урок «Штриха» v1.
+  var STATES = ['correct', 'partial', 'wrong', 'blank', 'pending', 'empty'];
+
+  function swapState(node, prefix, state) {
+    if (!node) { return; }
+    STATES.forEach(function (name) { node.classList.remove(prefix + name); });
+    if (state) { node.classList.add(prefix + state); }
+  }
+
+  function repaintTask(block, data) {
+    var task = block.closest('.wr-item');
+    if (!task) { return; }
+    task.dataset.state = data.state || '';
+    swapState(task, 'k-mark--', data.state);
+
+    var flag = task.querySelector('[data-wr-flag]');
+    if (flag) {
+      flag.textContent = data.verdict || '';
+      swapState(flag, 'k-flag--', data.state);
+    }
+    var got = task.querySelector('[data-wr-got]');
+    if (got) { got.textContent = data.score_text; }
+
+    // Плашка результата — тот же вердикт и тот же цвет, что у чипа.
+    var plate = task.querySelector('[data-fb-block]');
+    if (plate) {
+      swapState(plate, 'fb-state--', data.state);
+      var value = plate.querySelector('[data-fb-score]');
+      if (value) { value.textContent = data.points_text; }
+      var verdict = plate.querySelector('[data-fb-verdict]');
+      if (verdict) { verdict.textContent = data.verdict || ''; }
+      var source = plate.querySelector('[data-fb-source]');
+      if (source) { source.textContent = 'проверил преподаватель'; }
+      var note = plate.querySelector('[data-fb-comment]');
+      if (note) {
+        note.textContent = data.comment || '';
+        note.hidden = !data.comment;
+      }
+    }
+  }
+
+  function repaintWork(data) {
+    var total = document.querySelector('[data-wr-total]');
+    if (total) { total.textContent = data.total; }
+    var max = document.querySelector('[data-wr-max]');
+    if (max) {
+      max.textContent = data.is_final ? data.total_max : data.graded_max;
+    }
+    var cap = document.querySelector('[data-wr-cap]');
+    if (cap) {
+      cap.textContent = data.is_final
+        ? 'итоговый балл за работу' : 'по проверенным задачам';
+    }
+    var wrong = document.querySelector('[data-wr-wrong]');
+    if (wrong) {
+      wrong.hidden = !data.wrong;
+      var number = wrong.querySelector('[data-wr-wrong-n]');
+      if (number) { number.textContent = data.wrong; }
+    }
+    // Плашка о неполном итоге уходит, когда проверено всё.
+    // ⚠️ Её текст здесь НЕ ПОВТОРЯЕМ: скрипт уезжает на страницу, и
+    // проверка «надписи нет» ловила бы комментарий.
+    var prelim = document.querySelector('[data-prelim]');
+    if (prelim) { prelim.hidden = data.is_final; }
+  }
+
   document.addEventListener('click', function (event) {
     var preset = event.target.closest('.gi-preset');
     if (preset) {
@@ -402,6 +480,8 @@
         // записал, а не то, что было введено.
         block.querySelector('.gi-input').value = payload.label;
         paint(block);
+        repaintTask(block, payload);
+        repaintWork(payload);
         said.textContent = 'сохранено';
         said.hidden = false;
         setTimeout(function () { said.hidden = true; }, 2500);

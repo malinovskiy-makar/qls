@@ -8,24 +8,33 @@
 Два места — две разные правды. Теперь блок один, и всё, что сделал
 преподаватель, доезжает до ученика везде одинаково.
 
+⚠️ ЦВЕТ И ВЕРДИКТ — ПО СОСТОЯНИЮ ЗАДАЧИ, А НЕ ПО ТОМУ, КТО ПРОВЕРИЛ
+(ревью 15.08, фаза 6). Плашка красилась зелёным на одном признаке
+«проверил человек», поэтому оценка 0,5 из 1 давала ЗЕЛЁНУЮ плашку рядом
+с янтарным чипом «частично». Кто проверил — остаётся подписью справа,
+там ему и место.
+
 Ждёт в контексте:
   fb      — TeacherFeedback или None
   points  — максимум баллов за задачу (может отсутствовать)
+  state   — состояние задачи (`correct` / `partial` / `wrong` / …)
+  verdict — то же состояние словом; собирает `work_review.state_word`
+  comment — слова ЧЕЛОВЕКА (машинный вердикт сюда не попадает)
   pending_text — что написать, когда проверки ещё нет (необязательно)
 {% endcomment %}
 {% if fb %}
-<div class="fb-block {% if fb.reviewed_by_id %}fb-teacher{% else %}fb-auto{% endif %}">
+<div class="fb-block fb-state--{{ state|default:'pending' }}"
+     data-fb-block>
   <div class="fb-head">
     {% if fb.score is not None %}
-    <span class="fb-score">{{ fb.score|ball }}{% if points %} / {{ points|ball }}{% endif %} б.</span>
+    <span class="fb-score" data-fb-score>{{ fb.score|ball }}{% if points %} / {{ points|ball }}{% endif %} б.</span>
     {% endif %}
-    <span class="fb-source">
+    {% if verdict %}<span class="fb-verdict" data-fb-verdict>{{ verdict }}</span>{% endif %}
+    <span class="fb-source" data-fb-source>
       {% if fb.reviewed_by_id %}проверил преподаватель{% else %}проверено автоматически{% endif %}
     </span>
   </div>
-  {% if fb.comment %}
-  <div class="fb-comment">{{ fb.comment|linebreaksbr }}</div>
-  {% endif %}
+  <div class="fb-comment" data-fb-comment {% if not comment %}hidden{% endif %}>{{ comment|linebreaksbr }}</div>
   {% if fb.mistakes.all %}
   <div class="fb-mistakes-cap">Типовые ошибки, отмеченные преподавателем:</div>
   <div class="mistake-tags">

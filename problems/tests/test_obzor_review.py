@@ -345,7 +345,9 @@ class StudentViewCaptionTests(Base):
 
     def test_caption_is_short(self):
         html = self._html()
-        caption = re.search(r'class="wr-cap">(.*?)</div>', html, re.S)
+        # ⚠️ У блока появился признак обновления `data-wr-cap` (ревью
+        # 15.08, фаза 6) — ищем по классу, не требуя закрывающей скобки.
+        caption = re.search(r'class="wr-cap"[^>]*>(.*?)</div>', html, re.S)
         self.assertIsNotNone(caption)
         text = re.sub(r'\s+', ' ', caption.group(1)).strip()
         self.assertNotIn('всего в работе', text)

@@ -15,6 +15,39 @@
 from decimal import Decimal
 
 
+# ⚠️ СЛОВО ВЕРДИКТА — ОДНА ТОЧКА (ревью 15.08, фаза 6). Чип в шапке задачи и
+# плашка под ответом обязаны говорить ОДНО И ТО ЖЕ: до правки чип писал
+# «частично», а плашка рядом оставалась зелёной со словами «Верно ✓».
+STATE_WORDS = {
+    'correct': 'верно',
+    'partial': 'частично',
+    'wrong': 'неверно',
+    'blank': 'без ответа',
+    'pending': 'на проверке',
+    'empty': 'без ответа',
+}
+
+
+def state_word(state):
+    """Вердикт словом. Незнакомое состояние молча не выдумываем."""
+    return STATE_WORDS.get(state, '')
+
+
+def state_of(score, points, blank=False):
+    """Состояние задачи по баллу. ТА ЖЕ формула, что в `work_summary`.
+
+    Нужна отдельно, потому что после сохранения оценки состояние строки
+    пересчитывает эндпоинт, а второй формулы быть не должно.
+    """
+    if score is None:
+        return 'pending'
+    if points > 0 and score >= points:
+        return 'correct'
+    if score > 0:
+        return 'partial'
+    return 'blank' if blank else 'wrong'
+
+
 def score_presets(max_score):
     """Три кнопки балла: ноль, РОВНО половина, максимум задачи.
 
@@ -51,6 +84,7 @@ def work_summary(assignment, student, viewer=None):
     `viewer` — кто смотрит (от него зависит видимость решалки и
     комментариев). У ученика это он сам.
     """
+    from . import part_grading
     from .assignment_rows import build_rows
     from .models import WorkFeedback
 
@@ -82,21 +116,14 @@ def work_summary(assignment, student, viewer=None):
 
         if row['sub'].status not in ('submitted', 'reviewed'):
             row['state'] = 'empty'
-        elif score is None:
-            row['state'] = 'pending'
-            pending += 1
-        elif score >= points and points > 0:
-            row['state'] = 'correct'
-        elif score > 0:
-            row['state'] = 'partial'
-        elif _is_blank(row):
+        else:
             # ⚠️ НОЛЬ ЗА ПУСТОТУ — ЭТО НЕ «НЕВЕРНО». Балл одинаковый (ноль
             # за «не брался» и ноль за ошибку не различаются — решение
             # владельца), но писать «неверно» тому, кто ничего не отвечал,
             # неправда: ошибиться он не успел.
-            row['state'] = 'blank'
-        else:
-            row['state'] = 'wrong'
+            row['state'] = state_of(score, points, blank=_is_blank(row))
+            if row['state'] == 'pending':
+                pending += 1
 
         if score is not None:
             scored += score
@@ -108,7 +135,13 @@ def work_summary(assignment, student, viewer=None):
         # Пресеты балла — ТЕ ЖЕ, что на экране проверки (`_score_presets`),
         # чтобы «половина» на двух экранах не разошлась.
         row['score_presets'] = score_presets(points)
-        row['comment'] = (feedback.comment if feedback is not None else '')
+        row['verdict'] = state_word(row['state'])
+        # ⚠️ В ПОЛЕ ПРАВКИ — ТОЛЬКО СЛОВА ЧЕЛОВЕКА. Вердикт машины («Верно ✓»)
+        # не комментарий, который правят: подставленный в поле, он уезжал
+        # обратно в базу вместе с новой оценкой, и рядом с «ЧАСТИЧНО»
+        # оставалось зелёное «Верно ✓».
+        raw = (feedback.comment if feedback is not None else '') or ''
+        row['comment'] = '' if part_grading.is_machine_comment(raw) else raw
 
     work_comment = WorkFeedback.objects.filter(assignment=assignment,
                                                student=student).first()

@@ -483,6 +483,116 @@ async function cursorsOnPage(page) {
   await page.evaluate(() => localStorage.setItem('theme', 'light'));
   await page.setViewportSize({ width: 1440, height: 1000 });
 
+  // ══ ФАЗА 6: пересчёт оценки без перезагрузки ═══════════════════════════
+  console.log('\n— Фаза 6: оценка пересчитывает экран на месте');
+  const WORK = '/teacher/groups/2/assignments/6/students/9/';
+  if (await open(page, WORK, 'разбор глазами ученика')) {
+    /** Всё, что обязано измениться после сохранения оценки. */
+    async function snapshot(taskId) {
+      return page.evaluate((taskId) => {
+        const task = document.getElementById(taskId);
+        const plate = task.querySelector('[data-fb-block]');
+        const cls = (node, prefix) => node
+          ? [...node.classList].filter((c) => c.startsWith(prefix)).join(',')
+          : null;
+        return {
+          балл: task.querySelector('[data-wr-got]').textContent.trim(),
+          вердикт: task.querySelector('[data-wr-flag]').textContent.trim(),
+          полоса: cls(task, 'k-mark--'),
+          чип: cls(task.querySelector('[data-wr-flag]'), 'k-flag--'),
+          плашка: cls(plate, 'fb-state--'),
+          плашкаБалл: plate
+            ? plate.querySelector('[data-fb-score]').textContent.trim() : null,
+          плашкаВердикт: plate && plate.querySelector('[data-fb-verdict]')
+            ? plate.querySelector('[data-fb-verdict]').textContent.trim() : null,
+          итог: document.querySelector('[data-wr-total]').textContent.trim(),
+          ошибок: document.querySelector('[data-wr-wrong]').hidden
+            ? '0' : document.querySelector('[data-wr-wrong-n]').textContent.trim(),
+        };
+      }, taskId);
+    }
+
+    // Берём задачу, у которой уже есть блок оценивания и плашка.
+    const taskId = await page.evaluate(() => {
+      const block = [...document.querySelectorAll('.gi-block')]
+        .find((b) => b.closest('.wr-item')
+          && b.closest('.wr-item').querySelector('[data-fb-block]'));
+      if (!block) return null;
+      const task = block.closest('.wr-item');
+      task.open = true;
+      return task.id;
+    });
+    check('нашлась задача с блоком оценивания и плашкой', taskId !== null);
+
+    if (taskId) {
+      const before = await snapshot(taskId);
+      const max = await page.evaluate((taskId) => Number(
+        document.getElementById(taskId).querySelector('.gi-block').dataset.max),
+        taskId);
+
+      async function grade(value) {
+        await page.evaluate(({ taskId, value }) => {
+          const block = document.getElementById(taskId).querySelector('.gi-block');
+          block.querySelector('.gi-input').value = value;
+        }, { taskId, value });
+        await page.click(`#${taskId} .gi-save`);
+        await page.waitForFunction(
+          (taskId) => {
+            const said = document.getElementById(taskId)
+              .querySelector('.gi-said');
+            return said && !said.hidden;
+          }, taskId, { timeout: 5000 });
+        await page.waitForTimeout(120);
+        return snapshot(taskId);
+      }
+
+      // Половина максимума → «частично», без перезагрузки.
+      const half = String(max / 2).replace('.', ',');
+      const partial = await grade(half);
+      check('вердикт стал «частично» без перезагрузки',
+        partial.вердикт === 'частично', partial);
+      check('чип и полоса состояния перекрасились',
+        partial.чип === 'k-flag--partial'
+        && partial.полоса === 'k-mark--partial', partial);
+      check('плашка получила ТОТ ЖЕ вердикт и цвет',
+        partial.плашка === 'fb-state--partial'
+        && partial.плашкаВердикт === 'частично', partial);
+      check('балл в шапке задачи обновился',
+        partial.балл !== before.балл || before.балл === half, partial.балл);
+      check('итог за работу пересчитан',
+        partial.итог !== before.итог || before.итог === partial.итог,
+        { было: before.итог, стало: partial.итог });
+
+      // Полный балл → «верно», плашка зелёная.
+      const full = await grade(String(max).replace('.', ','));
+      check('полный балл даёт «верно»', full.вердикт === 'верно', full);
+      check('плашка позеленела вместе с чипом',
+        full.плашка === 'fb-state--correct'
+        && full.чип === 'k-flag--correct', full);
+      check('итог вырос', Number(full.итог.replace(',', '.'))
+        > Number(partial.итог.replace(',', '.')),
+        { частично: partial.итог, верно: full.итог });
+
+      // Ноль → «неверно».
+      const zero = await grade('0');
+      check('ноль даёт «неверно»', zero.вердикт === 'неверно', zero);
+      check('плашка покраснела', zero.плашка === 'fb-state--wrong', zero);
+
+      // Возвращаем половину и сверяем с перезагруженной страницей: экран
+      // на месте обязан показывать ТО ЖЕ, что база.
+      const back = await grade(half);
+      await open(page, WORK, 'разбор после перезагрузки');
+      await page.evaluate((taskId) => {
+        document.getElementById(taskId).open = true;
+      }, taskId);
+      const reloaded = await snapshot(taskId);
+      check('пересчёт на месте совпал с перезагрузкой',
+        JSON.stringify(back) === JSON.stringify(reloaded),
+        { наМесте: back, послеПерезагрузки: reloaded });
+      await shot(page, 'ф6-разбор-частично');
+    }
+  }
+
   // ══ ИТОГ ═══════════════════════════════════════════════════════════════
   console.log(`\n${'='.repeat(60)}`);
   console.log(`Проверок: ${ok + bad}, зелёных: ${ok}, красных: ${bad}`);
