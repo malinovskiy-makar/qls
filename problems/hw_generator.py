@@ -528,8 +528,10 @@ def _materialise(hits, has_answer, sources):
         return []
     # `source_references__source` — карточке нужно НАЗВАНИЕ источника
     # («тема · сложность · источник»), а не только его номер.
+    # `parts` — карточка раскрывается ЦЕЛИКОМ (ревью 15.08, фаза 13), и
+    # без предзагрузки каждый пункт стоил бы отдельного запроса.
     queryset = Problem.objects.filter(pk__in=ids).prefetch_related(
-        'topics', 'source_references__source')
+        'topics', 'parts', 'source_references__source')
     if has_answer:
         queryset = queryset.exclude(answer='').filter(answer__isnull=False)
     by_id = {p.pk: p for p in queryset}
@@ -621,14 +623,26 @@ def problem_card(problem, confidence='', how=''):
         'сложность %s' % problem.difficulty if problem.difficulty else '',
         source,
     ) if part)
+    # ⚠️ ЗАДАЧА РАСКРЫВАЕТСЯ ЦЕЛИКОМ (ревью 15.08, фаза 13). Обрезка по 900
+    # символам решала не ту задачу: «отсмотреть» — это увидеть ВСЁ условие,
+    # ВСЕ пункты и ответы, потому что именно по ним репетитор решает,
+    # годится ли задача. Обрезанное условие выглядит как целое, и ошибка
+    # обнаруживается уже у ученика.
+    parts = [{'label': part.label or '',
+              'text': clean(part.statement or ''),
+              'answer': part.answer or ''}
+             for part in problem.parts.all()
+             if (part.statement or '').strip()]
     return {
         'problem': problem,
         'id': problem.pk,
         'title': preview_title(problem, limit=90),
         'preview': clean((problem.statement or ''))[:220],
-        # Начало условия целиком — репетитор ОТСМАТРИВАЕТ задачу, а по
-        # 220 символам понять, годится ли она, нельзя.
-        'body': clean((problem.statement or ''))[:900],
+        # Условие ЦЕЛИКОМ, без обрезки.
+        'body': clean(problem.statement or ''),
+        'parts': parts,
+        'answer': problem.answer or '',
+        'has_solution': bool(problem.solution),
         'topics': topics,
         'source': source,
         # Одна тихая строка «тема · сложность N · источник» — как в карточке

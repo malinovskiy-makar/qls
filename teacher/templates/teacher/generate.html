@@ -126,6 +126,15 @@ textarea.gen-text:focus { border-color: var(--focus); }
 .q-arrow { color: var(--text3); font-size: 11px; width: 10px;
   flex-shrink: 0; }
 .q-text { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; }
+.q-query { display: block; font-weight: 400; font-size: 12px;
+           color: var(--text3); margin-top: 3px; overflow-wrap: anywhere; }
+.cand-st { white-space: pre-line; }
+.cand-part { margin-top: 6px; }
+.cand-part b { color: var(--accent); }
+.cand-ans { display: block; margin-top: 4px; font-size: 12px;
+            color: var(--text3); }
+.cand-flags { margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap;
+              font-size: 11px; color: var(--text3); }
 .q-tally { font-size: 12px; color: var(--text3); white-space: nowrap;
   padding: 3px 8px; border-radius: 999px; }
 /* Недобрали — тихая жёлтая плашка. Не тревога, а «здесь ещё не готово». */
@@ -440,7 +449,15 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
          data-label="{{ preview.row.label }}">
       <button type="button" class="q-head" aria-expanded="false">
         <span class="q-arrow" aria-hidden="true">▶</span>
-        <span class="q-text">{{ preview.row.label }}</span>
+        {% comment %}
+        ⚠️ ЗАПРОС ВИДЕН БЕЗ РАСКРЫТИЯ (ревью 15.08, фаза 13). В заголовке
+        стояло только НАЗВАНИЕ строки, а по какой формулировке искали —
+        было видно лишь развернув карточку. «Видно, какая строка запроса
+        дала эту группу задач» — прямое требование владельца.
+        {% endcomment %}
+        <span class="q-text">{{ preview.row.label }}
+          <span class="q-query">искали: «{{ preview.row.query }}»</span>
+        </span>
         <span class="q-tally">сложность {{ preview.row.difficulty }} ·
           нужно {{ preview.row.count }} ·
           выбрано <b class="q-picked">{{ preview.picked }}</b></span>
@@ -845,7 +862,33 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     box.disabled = false;
     node.querySelector('.cand-name').textContent = card.title;
     node.querySelector('.cand-meta').textContent = card.meta;
-    node.querySelector('.cand-body').textContent = card.body;
+    // ⚠️ Догруженная карточка заполняется ТЕМИ ЖЕ полями, что серверная:
+    // условие целиком, пункты, ответ, пометка про решение. Иначе задачи
+    // из «Показать ещё 5» раскрывались бы беднее соседних.
+    node.querySelector('.cand-st').textContent = card.body;
+    var parts = node.querySelector('.cand-parts');
+    parts.innerHTML = '';
+    (card.parts || []).forEach(function (part) {
+      var line = document.createElement('div');
+      line.className = 'cand-part';
+      line.innerHTML = '<b></b> <span></span>';
+      line.querySelector('b').textContent = (part.label || '') + ')';
+      line.querySelector('span').textContent = part.text || '';
+      if (part.answer) {
+        var answer = document.createElement('span');
+        answer.className = 'cand-ans';
+        answer.textContent = 'ответ: ' + part.answer;
+        line.appendChild(answer);
+      }
+      parts.appendChild(line);
+    });
+    var whole = node.querySelector('.cand-answer');
+    whole.hidden = !card.answer;
+    whole.textContent = card.answer ? 'Ответ: ' + card.answer : '';
+    node.querySelector('.cand-kind').textContent =
+      card.is_test ? 'Тест' : 'Задача';
+    node.querySelector('.cand-sol').textContent = card.has_solution
+      ? 'эталонное решение есть' : 'эталонного решения нет';
     var conf = node.querySelector('.conf');
     conf.className = 'conf conf-' + card.confidence;
     conf.textContent = card.confidence_label;

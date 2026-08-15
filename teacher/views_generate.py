@@ -437,11 +437,19 @@ def api_more_candidates(request):
         offset=offset)
     return JsonResponse({
         'has_more': has_more,
+        # ⚠️ ДОГРУЖЕННАЯ КАРТОЧКА НЕСЁТ ТО ЖЕ, ЧТО СЕРВЕРНАЯ (ревью 15.08,
+        # фаза 13): условие целиком, пункты, ответ, есть ли решение. Иначе
+        # задачи из «Показать ещё 5» раскрывались бы беднее соседних, и
+        # выбирать пришлось бы по разному объёму сведений.
         'cards': [{
             'id': card['id'],
             'title': card['title'],
             'meta': card['meta'],
             'body': card['body'],
+            'parts': card['parts'],
+            'answer': card['answer'],
+            'has_solution': card['has_solution'],
+            'is_test': card['is_test'],
             'confidence': card['confidence'],
             'confidence_label': card['confidence_label'],
         } for card in cards],

@@ -24,7 +24,27 @@
     <div class="cand-name" role="button" tabindex="0">{{ card.title }}</div>
     <div class="cand-meta">{{ card.meta }}</div>
     <div class="cand-taken">уже выбрана в строке «<span class="cand-taken-row">{{ card.taken_by }}</span>»</div>
-    <div class="cand-body">{{ card.body }}</div>
+    {% comment %}
+    ⚠️ ЗАДАЧА РАСКРЫВАЕТСЯ ЦЕЛИКОМ (ревью 15.08, фаза 13): условие без
+    обрезки, ВСЕ пункты, ответы и пометка про эталонное решение. Раньше
+    здесь было начало условия на 900 символов — обрезанное условие
+    выглядит как целое, и ошибка обнаруживается уже у ученика.
+    {% endcomment %}
+    <div class="cand-body">
+      <div class="cand-st">{{ card.body }}</div>
+      <div class="cand-parts">
+        {% for part in card.parts %}
+        <div class="cand-part"><b>{{ part.label }})</b> <span>{{ part.text }}</span>
+          {% if part.answer %}<span class="cand-ans">ответ: {{ part.answer }}</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="cand-ans cand-answer" {% if not card.answer %}hidden{% endif %}>Ответ: {{ card.answer }}</div>
+      <div class="cand-flags">
+        <span class="cand-kind">{% if card.is_test %}Тест{% else %}Задача{% endif %}</span>
+        <span class="cand-sol">{% if card.has_solution %}эталонное решение есть{% else %}эталонного решения нет{% endif %}</span>
+      </div>
+    </div>
   </div>
   <span class="conf conf-{{ card.confidence }}">{{ card.confidence_label }}</span>
 </li>
