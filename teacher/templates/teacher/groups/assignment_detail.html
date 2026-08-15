@@ -1,5 +1,5 @@
 {% extends 'teacher/base.html' %}
-{% load ru %}
+{% load score %}{% load ru %}
 
 {% block title %}{{ assignment.name }} — ЭкЗадачи{% endblock %}
 
@@ -43,7 +43,7 @@
             padding: 2px 9px; }
 /* Тихая подпись у запертого балла: цифра осталась крупной, а править её
    нельзя — без объяснения это читается как поломка. */
-.pts-lock { font-size: 11px; cursor: help;
+.pts-lock { font-size: 11px;
             border-bottom: 1px dotted var(--text3); }
 .item-body { min-width: 0; }
 .item-title { font-size: 15px; font-weight: 600; line-height: 1.35;
@@ -98,7 +98,7 @@
 .check-body { padding: 12px 14px 13px; }
 .check-why { font-size: 12px; color: var(--text2); line-height: 1.6;
              margin: 0 0 12px; }
-.check-hint { border-bottom: 1px dotted var(--text3); cursor: help; }
+.check-hint { border-bottom: 1px dotted var(--text3); }
 
 .ans-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
            margin-bottom: 8px; }
@@ -252,16 +252,24 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
     обязательна — без неё нередактируемое поле читается как поломка.
     {% endcomment %}
     <div class="k-score" title="Максимальный балл за задачу">
-      <span class="k-score__value">{{ row.item.points|floatformat:"-2" }}</span>
+      <span class="k-score__value">{{ row.item.points|ball }}</span>
       <span class="k-score__cap">баллов</span>
     </div>
     <div class="item-src">{{ row.source_label }}</div>
     <div class="pts-lock k-quiet"
          title="Работу уже сдавали. Оценки выставлены по этой шкале, и менять максимум задним числом значило бы переписать их всем.">заперто</div>
     {% else %}
+    {% comment %}
+    ⚠️ ПОЛЕ ТЕКСТОВОЕ, А НЕ `type="number"` — как все поля балла с сессии 9.
+    Балл печатается по-русски, с запятой; `type="number"` запятую не считает
+    допустимой и стирает СОБСТВЕННОЕ начальное значение, то есть «2,5» за
+    задачу превращалось бы в пустое поле при каждой загрузке страницы.
+    Запятую приводит к точке сервер (`api_item_points`).
+    {% endcomment %}
     <label class="k-score" title="Максимальный балл за задачу">
-      <input type="number" class="pts-input" data-item="{{ row.item.pk }}"
-             value="{{ row.item.points|floatformat:"-2" }}" min="0" max="1000" step="0.5">
+      <input type="text" inputmode="decimal" class="pts-input"
+             data-item="{{ row.item.pk }}" autocomplete="off"
+             value="{{ row.item.points|ball }}" aria-label="балл за задачу">
       <span class="k-score__cap">баллов</span>
     </label>
     <div class="item-src">{{ row.source_label }}</div>

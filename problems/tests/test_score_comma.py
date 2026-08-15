@@ -98,12 +98,21 @@ class ScoreFieldMarkupTests(TestCase):
         self.assertEqual(float(feedback.score), 1.5)
 
     def test_saved_fraction_comes_back_to_the_form(self):
-        """Раньше сохранённые 1,5 в поле НЕ ПОКАЗЫВАЛИСЬ вовсе."""
+        """Раньше сохранённые 1,5 в поле НЕ ПОКАЗЫВАЛИСЬ вовсе.
+
+        ⚠️ ОЖИДАНИЕ ПЕРЕСЧИТАНО (ревью 15.08, п. 1.4): было «1,50». Хвостовой
+        нуль давал `floatformat:"-2"` — он по устройству печатает ДВА знака,
+        как только у числа есть дробная часть. Теперь балл везде пишет одна
+        функция `problems/scorefmt.py`, и незначащих нулей не осталось ни на
+        одном экране. Смысл проверки прежний: сохранённая дробь возвращается
+        в поле по-русски, с запятой.
+        """
         url = reverse('teacher:group_review_submission',
                       args=[self.group.pk, self.sub.pk])
         self.client.post(url, {'score': '1,5', 'comment': '', 'go': 'list'})
         html = self._review_html()
-        self.assertIn('value="1,50"', html)
+        self.assertIn('value="1,5"', html)
+        self.assertNotIn('value="1,50"', html)
 
     def test_server_still_clips_by_maximum(self):
         """Обрезка по максимуму — не тронута."""

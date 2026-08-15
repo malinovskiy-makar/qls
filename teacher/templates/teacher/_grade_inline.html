@@ -1,3 +1,4 @@
+{% load score %}
 {% comment %}
 Оценивание ПРЯМО В РАЗБОРЕ РАБОТЫ глазами ученика (сессия 8, п. 14.4).
 
@@ -16,7 +17,7 @@ _max_score_for`), а не атрибутом `max=`: запрос можно о�
 браузера, и в базе однажды нашлась оценка «9 из 5».
 {% endcomment %}
 <div class="gi-block" data-submission="{{ row.sub.pk }}"
-     data-max="{{ row.max_points|floatformat:'-2' }}">
+     data-max="{{ row.max_points|ball_dot }}">
   <div class="gi-head">
     <span class="wr-block-cap">Оценивание</span>
     <span class="gi-said" hidden>сохранено</span>
@@ -36,9 +37,9 @@ _max_score_for`), а не атрибутом `max=`: запрос можно о�
     {% endcomment %}
     <input type="text" inputmode="decimal" class="k-input k-input--num gi-input"
            data-decimal autocomplete="off"
-           value="{% if row.score is not None %}{{ row.score|floatformat:'-2' }}{% endif %}"
+           value="{% if row.score is not None %}{{ row.score|ball }}{% endif %}"
            aria-label="балл за задачу">
-    <span class="k-quiet">максимум {{ row.max_points|floatformat:"-2" }}</span>
+    <span class="k-quiet">максимум {{ row.max_points|ball }}</span>
   </div>
 
   <textarea class="k-area gi-comment" rows="2"

@@ -1,4 +1,5 @@
 {% extends 'teacher/base.html' %}
+{% load score %}
 {% comment %}
 Экран проверки работы (переделан в фазе 13).
 
@@ -284,15 +285,15 @@
       {% endcomment %}
       {% if existing_feedback and existing_feedback.score is not None %}
       <span class="k-score">
-        <span class="k-score__value">{{ existing_feedback.score|floatformat:"-2" }}<span
+        <span class="k-score__value">{{ existing_feedback.score|ball }}<span
           class="k-score__of">из</span><span
-          class="k-score__max">{{ max_score|floatformat:"-2" }}</span></span>
+          class="k-score__max">{{ max_score|ball }}</span></span>
         <span class="k-score__cap">балл за задачу</span>
       </span>
       {% else %}
       <span class="k-score">
         <span class="k-score__none">балл не поставлен</span>
-        <span class="k-score__cap">максимум {{ max_score|floatformat:"-2" }}</span>
+        <span class="k-score__cap">максимум {{ max_score|ball }}</span>
       </span>
       {% endif %}
     </div>
@@ -319,9 +320,9 @@
         {% endcomment %}
         <input type="text" inputmode="decimal" name="score" id="score-input"
                class="k-input" data-decimal autocomplete="off"
-               value="{% if existing_feedback %}{{ existing_feedback.score|floatformat:'-2' }}{% elif auto_score is not None %}{{ auto_score|floatformat:'-2' }}{% endif %}">
+               value="{% if existing_feedback %}{{ existing_feedback.score|ball }}{% elif auto_score is not None %}{{ auto_score|ball }}{% endif %}">
       </span>
-      <span class="rv-max">максимум {{ max_score|floatformat:"-2" }}</span>
+      <span class="rv-max">максимум {{ max_score|ball }}</span>
     </div>
 
     <label class="k-label" style="margin-top:16px">Комментарий к задаче</label>

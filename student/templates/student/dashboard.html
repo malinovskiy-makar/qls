@@ -1,4 +1,5 @@
 {% extends "student/base.html" %}
+{% load score %}
 
 {% block title %}Мои работы{% endblock %}
 
@@ -249,7 +250,7 @@
     <div class="hw-name">{{ item.assignment.name }}</div>
     <div class="hw-meta">
       <span class="metric-progress">
-        {% if item.score is not None %}<b>{{ item.score|floatformat:"-2" }} из {{ item.max_score|floatformat:"-2" }} б.</b>{% else %}{{ item.stats.total }} задач проверено{% endif %}
+        {% if item.score is not None %}<b>{{ item.score }} из {{ item.max_score }} б.</b>{% else %}{{ item.stats.total }} задач проверено{% endif %}
       </span>
       {% if item.deadline %}
         <span class="deadline-badge deadline-grey">{{ item.deadline|date:"d.m.Y" }}</span>

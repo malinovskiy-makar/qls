@@ -88,19 +88,35 @@ class AssignmentsTabTests(TestCase):
         self.assertIn('Никем не тронутая', done)
         self.assertIn('Проверенная целиком', done)
 
-    # ---- 4.2 «Посмотреть все N» --------------------------------------
-    def test_show_all_button_carries_the_total(self):
+    # ---- 4.2 «Посмотреть ещё N» --------------------------------------
+    def _fill_checked(self, extra):
+        """Доводит группу «Проверены» до нужного размера."""
         from problems.models import Assignment
 
-        # Доводим «Проверены» до шести работ, чтобы кнопка появилась.
-        for index in range(4):
+        for index in range(extra):
             work = Assignment.objects.create(
                 name='Старая %d' % index, author=self.tutor, group=self.group,
                 deadline=self.now - timedelta(days=10 + index))
             work.students.set([self.student])
+
+    def test_show_all_button_counts_what_is_hidden(self):
+        """⚠️ ОЖИДАНИЕ ПЕРЕСЧИТАНО (ревью 15.08, п. 1.3).
+
+        Было «Посмотреть все 6» — число ВСЕХ работ, стоящее под подписью
+        «последние 5 из 6». Ни одно из двух чисел не отвечало на вопрос
+        «сколько я ещё не вижу». Теперь кнопка называет СКРЫТЫЕ, подпись
+        над списком не тронута.
+        """
+        self._fill_checked(4)
         html = self._html()
-        self.assertIn('Посмотреть все 6', html)
+        self.assertIn('Посмотреть ещё 1 работу', html)
+        self.assertNotIn('Посмотреть все', html)
         self.assertIn('последние 5 из 6', html)
+
+    def test_hidden_count_is_declined(self):
+        """Три скрытых — «3 работы», а не «3 работу»."""
+        self._fill_checked(6)
+        self.assertIn('Посмотреть ещё 3 работы', self._html())
 
     def test_no_button_when_nothing_is_hidden(self):
         # ⚠️ Ищем САМУ КНОПКУ по её атрибуту: и класс, и надпись встречаются

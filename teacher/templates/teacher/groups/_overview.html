@@ -306,8 +306,7 @@
 <div class="panel">
   <div class="panel-head">
     <div class="panel-title">История работ</div>
-    <div class="panel-hint">{% if not solo %}Проценты — средние по группе.
-      {% endif %}Нажмите на заголовок столбца, чтобы отсортировать</div>
+    <div class="panel-hint">Нажмите на заголовок столбца, чтобы отсортировать</div>
   </div>
   {% include "teacher/_work_history.html" with works=group_works for_group=True solo=solo %}
 </div>

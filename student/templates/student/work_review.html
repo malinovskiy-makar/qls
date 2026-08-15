@@ -1,5 +1,5 @@
 {% extends "student/base.html" %}
-{% load catalog_filters %}
+{% load score %}{% load catalog_filters %}
 
 {% block title %}{{ assignment.name }} — разбор{% endblock %}
 
@@ -254,7 +254,7 @@
     <span class="wr-points">
       {# Прочерк остался ровно там, где балла ещё НЕТ: задача не сдана или #}
       {# ждёт преподавателя. Пустая задача сданной работы получает честный 0. #}
-      {% if row.score is not None and show_scores or row.by_teacher %}{{ row.score|floatformat:"-2" }}{% else %}—{% endif %}<small> / {{ row.max_points|floatformat:"-2" }} б.</small>
+      {% if row.score is not None and show_scores or row.by_teacher %}{{ row.score|ball }}{% else %}—{% endif %}<small> / {{ row.max_points|ball }} б.</small>
     </span>
   </summary>
 

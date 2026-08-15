@@ -1127,11 +1127,15 @@ def api_item_points(request):
 
 
 def _clean_points(value):
-    """«3.00» → «3», «2.50» → «2.5». Хвостовые нули на экране — шум."""
-    if value is None:
-        return ''
-    text = ('%s' % value)
-    return text.rstrip('0').rstrip('.') if '.' in text else text
+    """«3.00» → «3», «2.50» → «2,5». Запись балла — одна на всю платформу.
+
+    ⚠️ Раньше эта функция отдавала число С ТОЧКОЙ, а разбор той же работы —
+    С ЗАПЯТОЙ: сводка решений писала «4.25 из 18», разбор рядом «4,25 из 18».
+    Правила записи теперь в `problems/scorefmt.py`, второго набора нет.
+    """
+    from problems import scorefmt
+
+    return scorefmt.ball(value)
 
 
 @require_POST

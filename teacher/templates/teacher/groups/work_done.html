@@ -1,5 +1,5 @@
 {% extends 'teacher/base.html' %}
-{% load ru %}
+{% load score %}{% load ru %}
 {% comment %}
 Экран завершения работы (фаза 13.1).
 
@@ -103,8 +103,8 @@
         {% else %}не сдана{% endif %}
       </span>
       <span class="done-row-score">
-        {% if row.score is not None %}{{ row.score|floatformat:"-2" }}<small>
-          / {{ row.max_points|floatformat:"-2" }} б.</small>
+        {% if row.score is not None %}{{ row.score|ball }}<small>
+          / {{ row.max_points|ball }} б.</small>
         {% else %}—{% endif %}
       </span>
     </span>

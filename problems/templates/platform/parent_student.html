@@ -1,4 +1,5 @@
 {% extends "platform/base.html" %}
+{% load score %}
 
 {% block title %}{{ student.get_full_name|default:student.username }}{% endblock %}
 
@@ -94,7 +95,7 @@
       </span>
       <span>
         {% if row.has_score %}
-          <b>{{ row.score|floatformat:1 }} б.</b>
+          <b>{{ row.score|ball }} б.</b>
         {% else %}
           <span class="muted">на проверке</span>
         {% endif %}

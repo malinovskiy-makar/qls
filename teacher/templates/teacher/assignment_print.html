@@ -1,4 +1,4 @@
-{% load catalog_filters %}<!doctype html>
+{% load score %}{% load catalog_filters %}<!doctype html>
 {% comment %}
 ⚠️ `<!doctype html>` ОБЯЗАТЕЛЕН И СТОИТ ПЕРВЫМ. Без него браузер уходит в
 quirks mode, а KaTeX в quirks mode ОТКАЗЫВАЕТСЯ рисовать вообще
@@ -158,7 +158,7 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
     {% if assignment.is_exam %}Контрольная работа{% else %}Домашнее задание{% endif %}
     {% if group %} · {{ group.name }}{% endif %}
     {% if deadline %} · срок: {{ deadline|date:"d.m.Y, H:i" }}{% endif %}
-    · задач: {{ rows|length }}{% if total_points %} · всего баллов: {{ total_points|floatformat:"-2" }}{% endif %}
+    · задач: {{ rows|length }}{% if total_points %} · всего баллов: {{ total_points|ball }}{% endif %}
   </div>
   {% if for_teacher %}
   <div class="meta"><b>Вариант преподавателя:</b> с ответами и решениями.</div>
@@ -189,7 +189,7 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
     <div class="task-head">
       {{ row.number }}.
       {% if row.title %}{{ row.title }}{% endif %}
-      {% if row.points %}<span class="task-points">({{ row.points|floatformat:"-2" }} б.)</span>{% endif %}
+      {% if row.points %}<span class="task-points">({{ row.points|ball }} б.)</span>{% endif %}
     </div>
     <div class="statement">{{ row.statement }}</div>
 

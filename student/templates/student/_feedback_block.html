@@ -1,3 +1,4 @@
+{% load score %}
 {% comment %}
 Проверка одной задачи глазами ученика. ОДИН блок на домашку и контрольную.
 
@@ -16,7 +17,7 @@
 <div class="fb-block {% if fb.reviewed_by_id %}fb-teacher{% else %}fb-auto{% endif %}">
   <div class="fb-head">
     {% if fb.score is not None %}
-    <span class="fb-score">{{ fb.score|floatformat:"-2" }}{% if points %} / {{ points|floatformat:"-2" }}{% endif %} б.</span>
+    <span class="fb-score">{{ fb.score|ball }}{% if points %} / {{ points|ball }}{% endif %} б.</span>
     {% endif %}
     <span class="fb-source">
       {% if fb.reviewed_by_id %}проверил преподаватель{% else %}проверено автоматически{% endif %}

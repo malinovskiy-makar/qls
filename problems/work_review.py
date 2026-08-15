@@ -149,9 +149,15 @@ def _item_max(item, row):
 
 
 def _clean(value):
-    """Дробь без хвостовых нулей: «8», а не «8.00»."""
-    value = Decimal(value).quantize(Decimal('0.01'))
-    return value.normalize() if value == value.to_integral() else value
+    """Дробь без хвостовых нулей: «8», а не «8,00». Одна запись на платформу.
+
+    ⚠️ Раньше возвращался Decimal, и хвостовой нуль срезался ТОЛЬКО у целых:
+    «0.50» уходило в шаблон как есть и печаталось «0,50». Правила записи —
+    в `problems/scorefmt.py`.
+    """
+    from . import scorefmt
+
+    return scorefmt.ball(value)
 
 
 def spent_minutes(assignment, student):

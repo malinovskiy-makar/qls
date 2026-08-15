@@ -2921,3 +2921,63 @@ problems/tests/test_obzor_minutes.py (новый, 15)
 **`seed_platform_demo`** прогнана последним действием — сценарий сохраняющий,
 но ходит по `db_check.sqlite3`; боевую базу трогала только простановка оценок
 сложности из фазы 12.
+
+# ОБЪЕДИНЁННОЕ РЕВЬЮ 15.08.2026 (сессия 12)
+
+15 фаз. Правило прежнее: одна фаза — один коммит, отметка «ГОТОВО» значит
+переделывать не надо.
+
+## Фаза 1 — курсор, лишние надписи, единый формат чисел — ГОТОВО — 2026-08-15
+
+Сделано:
+- **1.1.** `cursor: help` убран отовсюду (было четыре места: `.k-hintmark` в
+  наборе, `.stats-table [data-hint]`, `.pts-lock` и `.check-hint` на странице
+  задания). Всплывашка не тронута — она живёт на `data-hint`, а не на курсоре.
+  Держится тестом, который обходит ВСЮ разметку кабинета и ученической части.
+- **1.2.** Надпись «Проценты — средние по группе» убрана из «Истории работ»;
+  осталась только подсказка про сортировку.
+- **1.3.** Кнопка под свёрнутым списком проверенных называет СКРЫТЫЕ работы:
+  «Посмотреть ещё 4 работы» вместо «Посмотреть все 9». Склонение — `count_ru`.
+  Механику раскрытия не трогали. Скрытых нет — кнопки нет.
+- **1.4.** Заведена ЕДИНСТВЕННАЯ точка записи балла — `problems/scorefmt.py`
+  (`ball` / `ball_dot` / `pair`) и фильтр `{% load score %}` → `|ball`.
+  Правила: запятая, незначащие нули отброшены («0,5», «2», «4,25»).
+
+Причина расхождения найдена, а не подогнана: одно и то же число печаталось
+двумя помощниками — `views_groups._clean_points` отдавал СТРОКУ «4.25» (строку
+Django не локализует → точка), а `work_review._clean` отдавал Decimal (→
+запятая). Лишний нуль давали `floatformat:"-2"` (печатает два знака, как
+только есть дробная часть) и `_clean`, который срезал хвост только у целых.
+
+Попутно найдено и починено: `assignment_export._clean_number` срезал нули с
+конца строки без оглядки на точку — `Decimal('10')` превращалось в «1», а
+`Decimal('100')` тоже в «1». Вживую не стреляло только потому, что в базе балл
+лежит с двумя знаками (`decimal_places=2`).
+
+Поле максимального балла на странице задания переведено с `type="number"` на
+текстовое с `inputmode="decimal"` — как все поля балла с сессии 9. С запятой
+числовое поле стирало собственное начальное значение: «2,5 балла» за задачу
+пропадали при каждой загрузке страницы.
+
+Файлы: `problems/scorefmt.py` (новый), `problems/templatetags/score.py`
+(новый), `problems/work_review.py`, `problems/assignment_export.py`,
+`teacher/views_groups.py`, `templates/_kit.html`,
+`problems/templates/platform/_stats_style.html`,
+`teacher/templates/teacher/groups/{_overview,detail,assignment_detail,work_done,submissions_by_student}.html`,
+`teacher/templates/teacher/{review,assignment_print,_grade_inline}.html`,
+`student/templates/student/{_part_results,_feedback_block,dashboard,work_review,submission_detail}.html`,
+`problems/templates/platform/parent_student.html`
+
+Тесты: новый `problems/tests/test_r15_format.py` (20). Полный прогон —
+**1623/1623**.
+⚠️ Два существующих теста ПЕРЕСЧИТАНЫ, а не отключены:
+`test_score_comma.test_saved_fraction_comes_back_to_the_form` ждал «1,50»
+(хвостовой нуль от `floatformat`), `test_obzor_assignments` ждал «Посмотреть
+все 6» — по п. 1.3 кнопка теперь называет скрытые.
+
+Сценарий: `node scripts/r15_cycle.js 8199` — 32 проверки, все зелёные.
+
+Смотреть глазами: /teacher/groups/2/ (нет надписи про средние, курсор обычный),
+/teacher/groups/2/?tab=assignments (кнопка «Посмотреть ещё 4 работы»),
+/teacher/groups/2/assignments/6/submissions/ против
+/teacher/groups/2/assignments/6/students/9/ — «4,25 из 18» одинаково на обоих.

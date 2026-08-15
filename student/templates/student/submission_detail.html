@@ -1,6 +1,6 @@
 {% extends "student/base.html" %}
 {% load student_filters %}
-{% load catalog_filters %}
+{% load score %}{% load catalog_filters %}
 
 {% block title %}Результат: {{ problem.title|default:"Задача" }}{% endblock %}
 
@@ -121,7 +121,7 @@
   <div class="block-label" style="color:var(--green);">Результат проверки</div>
   {% if feedback.score is not None %}
   <div class="feedback-score-big">
-    {{ feedback.score }}<span>баллов</span>
+    {{ feedback.score|ball }}<span>баллов</span>
   </div>
   {% endif %}
   {% if feedback.comment %}

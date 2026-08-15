@@ -190,8 +190,16 @@ def build_tex(assignment, for_teacher=False, solution_space=True):
 
 
 def _clean_number(value):
-    text = ('%s' % value).rstrip('0').rstrip('.')
-    return text or '0'
+    """Балл в листке пишется ТАК ЖЕ, как на экране (`problems/scorefmt.py`).
+
+    ⚠️ Прежняя запись срезала нули с КОНЦА СТРОКИ без оглядки на точку:
+    `Decimal('10')` превращалось в «1», а `Decimal('100')` — тоже в «1». В
+    базе балл лежит с двумя знаками (`decimal_places=2`), и вживую это не
+    стреляло, но сумма и балл, посчитанные в памяти, приходят без хвоста.
+    """
+    from . import scorefmt
+
+    return scorefmt.ball(value, default='0')
 
 
 def _parts_lines(item, for_teacher):
