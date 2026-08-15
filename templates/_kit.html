@@ -310,7 +310,7 @@
           letter-spacing: .05em; padding: 3px 9px; border-radius: 999px;
           white-space: nowrap; }
 .k-flag.k-flag--correct { background: var(--green-tint); color: var(--green); }
-.k-flag.k-flag--partial { background: var(--amber-tint); color: var(--amber); }
+.k-flag.k-flag--partial { background: var(--amber-tint); color: var(--amber-ink); }
 .k-flag.k-flag--wrong   { background: var(--error-tint); color: var(--error); }
 .k-flag.k-flag--pending { background: var(--pending-tint);
                           color: var(--pending); }
@@ -382,11 +382,17 @@
    не соседствует, и «ждёт вас» янтарём тут читается верно.
    ⚠️ Ноль не показывается вовсе — пустой кружок это не «ноль дел»,
    а мусор на экране; шаблон не рисует его при нулевом числе. */
+/* ⚠️ ПЛОТНЕЕ, ЧЕМ ОСТАЛЬНОЙ ЯНТАРЬ (ревью 15.08, п. 4). Владелец: «в светлой
+   теме сделать кружок ярче и виднее». Заливка — `--amber-border` вместо
+   бледного `--amber-tint`, рамка — сам сигнальный `--amber`, чернила —
+   `--amber-ink`. Замер на плотной заливке: светлая 5,00:1, тёмная 5,05:1
+   (на бледной подложке `--amber` давал 3,98:1 в тёмной теме — то есть
+   плотный фон без своих чернил был бы хуже, чем было). */
 .k-count {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px; padding: 0 5px;
-  border-radius: 999px; background: var(--amber-tint); color: var(--amber);
-  border: 1px solid var(--amber-border);
+  border-radius: 999px; background: var(--amber-border);
+  color: var(--amber-ink); border: 1px solid var(--amber);
   font-size: 11px; font-weight: 700; line-height: 1;
   font-variant-numeric: tabular-nums; vertical-align: middle;
   margin-left: 6px;
@@ -425,7 +431,7 @@
 .k-level { display: inline-block; padding: 2px 8px; border-radius: 999px;
            font-weight: 700; font-variant-numeric: tabular-nums; }
 .k-level--good { background: var(--green-tint); color: var(--green); }
-.k-level--mid  { background: var(--amber-tint); color: var(--amber); }
+.k-level--mid  { background: var(--amber-tint); color: var(--amber-ink); }
 .k-level--bad  { background: var(--error-tint); color: var(--error); }
 .k-level--none { background: var(--chip-bg); color: var(--chip-text); }
 

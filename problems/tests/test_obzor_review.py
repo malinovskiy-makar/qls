@@ -24,6 +24,45 @@ def read(*parts):
         return handle.read()
 
 
+# ── Счёт контраста. Держим ЗДЕСЬ, а не «на глаз»: цифра либо есть, либо нет.
+def _lum(value):
+    value = value.lstrip('#')
+    channels = [int(value[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    channels = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+                for c in channels]
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+
+
+def ratio(one, two):
+    first, second = _lum(one), _lum(two)
+    top, bottom = max(first, second), min(first, second)
+    return (top + 0.05) / (bottom + 0.05)
+
+
+def over(colour, alpha, below):
+    """Полупрозрачный цвет поверх фона → сплошной.
+
+    ⚠️ В тёмной теме подложки заданы через `rgba`, и считать контраст по
+    самому `rgba` нельзя: пока он не лёг на поверхность, у него нет яркости.
+    """
+    top = [int(colour.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4)]
+    base = [int(below.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4)]
+    return '#%02x%02x%02x' % tuple(
+        round(top[i] * alpha + base[i] * (1 - alpha)) for i in range(3))
+
+
+def _markup_files():
+    for folder in ('templates', 'teacher', 'student', 'problems/templates'):
+        for base, _dirs, files in os.walk(os.path.join(ROOT, folder)):
+            if 'node_modules' in base:
+                continue
+            for name in files:
+                if name.endswith('.html'):
+                    path = os.path.join(base, name)
+                    with open(path, encoding='utf-8') as handle:
+                        yield os.path.relpath(path, ROOT), handle.read()
+
+
 class Base(TestCase):
     def setUp(self):
         from problems.models import Assignment, AssignmentItem, Submission
@@ -153,19 +192,6 @@ class PendingColourTests(TestCase):
 
     def test_contrast_passes_aa(self):
         """Считаем прямо здесь: «проверено на глаз» не проверка."""
-        def lum(value):
-            value = value.lstrip('#')
-            channels = [int(value[i:i + 2], 16) / 255 for i in (0, 2, 4)]
-            channels = [c / 12.92 if c <= 0.03928
-                        else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
-            return (0.2126 * channels[0] + 0.7152 * channels[1]
-                    + 0.0722 * channels[2])
-
-        def ratio(one, two):
-            first, second = lum(one), lum(two)
-            top, bottom = max(first, second), min(first, second)
-            return (top + 0.05) / (bottom + 0.05)
-
         tokens = read('templates', '_tokens.html')
         light = tokens.split('[data-theme="dark"]')[0]
         colour = re.search(r'--pending:\s*(#[0-9a-fA-F]{6})', light).group(1)
@@ -173,6 +199,66 @@ class PendingColourTests(TestCase):
                          light).group(1)
         self.assertGreaterEqual(round(ratio(colour, tint), 2), 4.5)
         self.assertGreaterEqual(round(ratio(colour, '#ffffff'), 2), 4.5)
+
+    # ── Янтарь: текст на янтарной подложке (ревью 15.08, фаза 4) ─────────
+    # ⚠️ Раньше здесь стояла только пометка «ждёт проверки». Пара
+    # `--amber` на `--amber-tint` давала 3,95:1 и жила отдельной карточкой в
+    # Notion; теперь у текста свой токен, и он проверяется тем же счётом.
+
+    def test_amber_ink_exists_in_both_themes(self):
+        tokens = read('templates', '_tokens.html')
+        light, dark = tokens.split('[data-theme="dark"]')
+        for part in (light, dark):
+            self.assertIn('--amber-ink:', part)
+
+    def test_amber_ink_passes_aa_in_light(self):
+        tokens = read('templates', '_tokens.html')
+        light = tokens.split('[data-theme="dark"]')[0]
+        ink = re.search(r'--amber-ink:\s*(#[0-9a-fA-F]{6})', light).group(1)
+        tint = re.search(r'--amber-tint:\s*(#[0-9a-fA-F]{6})', light).group(1)
+        dense = re.search(r'--amber-border:\s*(#[0-9a-fA-F]{6})',
+                          light).group(1)
+        surface = re.search(r'--surface:\s*(#[0-9a-fA-F]{6})', light).group(1)
+        self.assertGreaterEqual(round(ratio(ink, tint), 2), 4.5)
+        self.assertGreaterEqual(round(ratio(ink, dense), 2), 4.5)
+        self.assertGreaterEqual(round(ratio(ink, surface), 2), 4.5)
+
+    def test_amber_ink_passes_aa_in_dark(self):
+        """⚠️ В тёмной теме подложка ПРОЗРАЧНАЯ — считаем поверх поверхности."""
+        tokens = read('templates', '_tokens.html')
+        dark = tokens.split('[data-theme="dark"]')[1]
+        ink = re.search(r'--amber-ink:\s*(#[0-9a-fA-F]{6})', dark).group(1)
+        base = re.search(r'--amber:\s*(#[0-9a-fA-F]{6})', dark).group(1)
+        surface = re.search(r'--surface:\s*(#[0-9a-fA-F]{6})', dark).group(1)
+        page = re.search(r'--bg:\s*(#[0-9a-fA-F]{6})', dark).group(1)
+        for below in (surface, page):
+            self.assertGreaterEqual(round(ratio(ink, over(base, .15, below)),
+                                          2), 4.5, below)
+            self.assertGreaterEqual(round(ratio(ink, over(base, .35, below)),
+                                          2), 4.5, below)
+
+    def test_old_pair_really_was_below_aa(self):
+        """Проверка «зубастая»: прежняя пара порог НЕ проходит."""
+        self.assertLess(round(ratio('#b26b00', '#fff7e8'), 2), 4.5)
+
+    def test_text_on_amber_never_uses_the_signal_colour(self):
+        """Сигнал остаётся сигналом, чернила — чернилами."""
+        # ⚠️ `(?<![-\w])` обязательна: без неё под правило попадают
+        # `border-left-color: var(--amber)` — а это ПОЛОСА, законный сигнал.
+        text_colour = re.compile(r'(?<![-\w])color:\s*var\(--amber\)')
+        bad = []
+        for path, text in _markup_files():
+            for line in text.split('\n'):
+                if 'amber-tint' in line and text_colour.search(line):
+                    bad.append('%s: %s' % (path, line.strip()[:70]))
+        self.assertEqual(bad, [], bad)
+
+    def test_stars_keep_the_signal_colour(self):
+        """⚠️ Звёзды сложности — САМ СИГНАЛ, их цвет не трогали."""
+        page = read('catalog', 'templates', 'catalog', 'problem_list.html')
+        stars = [l for l in page.split('\n') if '.card-stars' in l][0]
+        self.assertIn('var(--amber)', stars)
+        self.assertNotIn('amber-ink', stars)
 
     def test_pending_is_not_confusable_with_the_grey_empty(self):
         tokens = read('templates', '_tokens.html')

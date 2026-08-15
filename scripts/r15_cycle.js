@@ -350,6 +350,63 @@ async function cursorsOnPage(page) {
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
 
+  // ══ ФАЗА 4: янтарь и контраст ══════════════════════════════════════════
+  console.log('\n— Фаза 4: текст на янтарном фоне проходит AA');
+  /** Контраст текста элемента против НАСТОЯЩЕГО фона под ним. */
+  async function contrastOf(page, selector) {
+    return page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      const parse = (value) => {
+        const m = value.match(
+          /rgba?\(([\d.]+), ([\d.]+), ([\d.]+)(?:, ([\d.]+))?\)/);
+        return m ? [+m[1], +m[2], +m[3],
+                    m[4] === undefined ? 1 : Number(m[4])] : null;
+      };
+      const solid = (node) => {
+        while (node) {
+          const c = parse(getComputedStyle(node).backgroundColor);
+          if (c && c[3] === 1) return c.slice(0, 3);
+          node = node.parentElement;
+        }
+        return [255, 255, 255];
+      };
+      const mix = (fg, a, bg) => fg.map((c, i) => c * a + bg[i] * (1 - a));
+      const own = parse(getComputedStyle(el).backgroundColor);
+      const under = solid(el.parentElement);
+      const bg = own ? mix(own.slice(0, 3), own[3], under) : under;
+      const fg = parse(getComputedStyle(el).color).slice(0, 3);
+      const lum = (c) => {
+        const f = c.map((v) => { v /= 255;
+          return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+        return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2];
+      };
+      const [x, y] = [lum(fg), lum(bg)];
+      return Math.round(((Math.max(x, y) + 0.05)
+        / (Math.min(x, y) + 0.05)) * 100) / 100;
+    }, selector);
+  }
+  const AMBER = [
+    ['/teacher/groups/2/assignments/6/students/9/', '.k-flag--partial',
+     'чип «частично»'],
+    ['/teacher/groups/2/?tab=assignments', '.k-count', 'кружок счётчика'],
+    ['/teacher/groups/', '.gc-wait', 'чип «ждут проверки»'],
+    ['/teacher/groups/2/', '.k-level--mid', 'процент в таблице'],
+    ['/teacher/groups/2/', '.matrix-mid', 'клетка теплокарты'],
+  ];
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((t) => localStorage.setItem('theme', t), theme);
+    for (const [url, selector, name] of AMBER) {
+      await page.goto(BASE + url, { waitUntil: 'networkidle' });
+      const value = await contrastOf(page, selector);
+      check(`${theme}: ${name} — контраст ${value}`,
+        value !== null && value >= 4.5, value);
+    }
+  }
+  await page.evaluate(() => localStorage.setItem('theme', 'light'));
+  await open(page, '/teacher/groups/2/?tab=assignments', 'вкладки со счётчиком');
+  await shot(page, 'ф4-счётчик');
+
   // ══ ИТОГ ═══════════════════════════════════════════════════════════════
   console.log(`\n${'='.repeat(60)}`);
   console.log(`Проверок: ${ok + bad}, зелёных: ${ok}, красных: ${bad}`);

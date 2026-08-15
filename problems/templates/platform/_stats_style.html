@@ -103,7 +103,7 @@
            letter-spacing: .05em; padding: 2px 7px; border-radius: 999px; }
 .mastery-none      { background: var(--chip-bg); color: var(--chip-text); }
 .mastery-familiar  { background: var(--accent-tint); color: var(--accent); }
-.mastery-confident { background: var(--amber-tint); color: var(--amber); }
+.mastery-confident { background: var(--amber-tint); color: var(--amber-ink); }
 .mastery-mastered  { background: var(--green-tint); color: var(--green); }
 .topic-bar { height: 4px; background: var(--surface); border-radius: 999px;
              overflow: hidden; margin-top: 8px; border: 1px solid var(--border-soft); }
@@ -335,7 +335,7 @@ table.stats-table tbody tr:hover { background: var(--surface-2); }
                padding: 5px 4px; min-width: 46px; display: block; color: var(--text); }
 .matrix-none { background: var(--surface-2); color: var(--text3); }
 .matrix-bad  { background: var(--error-tint); color: var(--error); font-weight: 700; }
-.matrix-mid  { background: var(--amber-tint); color: var(--amber); font-weight: 600; }
+.matrix-mid  { background: var(--amber-tint); color: var(--amber-ink); font-weight: 600; }
 .matrix-good { background: var(--green-tint); color: var(--green); font-weight: 600; }
 /* Заголовки тем идут вертикально — это оставлено: горизонтально они не
    помещаются. Капслок убран: он кричал, а тепловая карта и так читается
@@ -418,7 +418,7 @@ tr.row-click { cursor: pointer; }
    читались бы как одно предложение. */
 .wk-flag { font-size: 11px; font-weight: 600; border-radius: 999px;
            padding: 1px 8px; white-space: nowrap; }
-.wk-flag--late { background: var(--amber-tint); color: var(--amber); }
+.wk-flag--late { background: var(--amber-tint); color: var(--amber-ink); }
 .wk-flag--none { background: var(--error-tint); color: var(--error); }
 /* «Нет тестов» / «нет задач»: ТИХИЙ СЕРЫЙ, без плашки и без цвета. Это не
    результат и не сигнал — это ответ «такого в работе не было». Плашка

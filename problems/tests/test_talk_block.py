@@ -121,7 +121,13 @@ class TalkStyleTests(TestCase):
         self.assertIsNotNone(match)
         rule = match.group(1)
         self.assertNotIn('italic', rule)
-        self.assertIn('var(--amber)', rule)
+        # ⚠️ ОЖИДАНИЕ ПЕРЕСЧИТАНО (ревью 15.08, фаза 4): янтарь разведён на
+        # два токена. Сигнальный `--amber` остался за полосами и звёздами,
+        # а ТЕКСТ на янтарной подложке пишется `--amber-ink` — прежняя пара
+        # давала 3,95:1 при норме AA 4,5. Смысл проверки прежний: пометка
+        # видимости янтарная и заметная, а не серый курсив.
+        self.assertIn('var(--amber-ink)', rule)
+        self.assertIn('var(--amber-tint)', rule)
 
     def test_both_screens_use_the_same_device(self):
         """Подложка — и у репетитора, и у ученика; приём ОДИН."""
