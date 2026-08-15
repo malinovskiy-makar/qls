@@ -2544,6 +2544,72 @@ const CASES = [
     checks: [['наложений', 'over', 0, 0], ['строки нашлись', 'rows', 1, 0],
              ['стопкой разложено', 'stacked', 1, 0]],
   },
+
+  /* --- Фаза 6: робастность (Б30, Б31) --------------------------------- */
+  {
+    /* Б30. Линейность определялась по трём точкам в СЕРЕДИНЕ диапазона, и
+       кусочная «max(0, 80 - Q)» на них выглядела прямой P = 80 − Q: наклон
+       в 20, 50 и 80 всюду единичный. Дальше evalCurve шёл быстрым путём по
+       этим коэффициентам, и при Q > 80 цена уходила в минус вместо нуля. */
+    name: 'Б30 · Кусочная не выдаётся за прямую',
+    run: `resetSceneMemory(); pickScene('sd');
+          var d = curveByRole('demand');
+          updateCurveExpr(d, 'max(0, 80 - Q)'); redrawAll();
+          var kink = { lin: d.linear ? 1 : 0, at90: evalCurve(d, 90), at40: evalCurve(d, 40) };
+          updateCurveExpr(d, '100 - Q'); redrawAll();
+          var line = { lin: d.linear ? 1 : 0, a: d.linear ? d.linear.a : null, b: d.linear ? d.linear.b : null };
+          return { kinkLin: kink.lin, at90: kink.at90, at40: kink.at40,
+                   lineLin: line.lin, a: line.a, b: line.b };`,
+    checks: [['кусочная не прямая', 'kinkLin', 0, 0],
+             ['за изломом ноль, а не минус', 'at90', 0, 0.001],
+             ['до излома как надо', 'at40', 40, 0.001],
+             ['настоящая прямая распознана', 'lineLin', 1, 0],
+             ['наклон', 'a', -1, 0.001], ['свободный член', 'b', 100, 0.001]],
+  },
+  {
+    /* Б31. Площадь между кривыми при НЕСКОЛЬКИХ пересечениях: модуль
+       интеграла даёт разность площадей, куски с разными знаками гасят друг
+       друга. Контрольный случай: g(x) = sin-подобная смена знака на [0, 2],
+       где ∫ = 0, а площадь равна 2. Берём g(x) = 1 − x на [0, 2]: интеграл
+       0, площадь двух треугольников по 1/2 равна 1. */
+    name: 'Б31 · Площадь считается кусками, а не модулем интеграла',
+    run: `var g = function (x) { return 1 - x; };
+          var naive = Math.abs(integrate(g, 0, 2));
+          var honest = areaBetween(g, 0, 2);
+          var one = areaBetween(g, 0, 1);
+          var n2 = crossingCount(function (x) { return (x - 1) * (x - 3); }, 0, 4);
+          var n1 = crossingCount(g, 0, 2);
+          return { naive: naive, honest: honest, one: one, n2: n2, n1: n1 };`,
+    checks: [['модуль интеграла обнуляется', 'naive', 0, 0.01],
+             ['площадь считается верно', 'honest', 1, 0.01],
+             ['на одном знаке ответ прежний', 'one', 0.5, 0.01],
+             ['два пересечения найдены', 'n2', 2, 0], ['одно — тоже', 'n1', 1, 0]],
+  },
+  {
+    /* Б26 в производственной функции: край сетки — не экстремум.
+       У TP = 10L предельный продукт постоянен (перегиба нет), у TP = L²
+       он растёт всюду (максимум на краю), у TP = 100√L максимума выпуска
+       нет вовсе. Числа классической 30L² − L³ при этом не двигаются. */
+    name: 'Б26 · Производство: нет экстремума — нет и числа',
+    run: `resetSceneMemory(); pickScene('prod');
+          var kinds = function (e) { STATE.prodExpr = e; redrawAll(); var p = STATE.prod || {};
+            return [(p.maxMP||{}).kind, (p.maxAP||{}).kind, (p.maxTP||{}).kind].join('/'); };
+          var flat = kinds('10*L');
+          var grow = kinds('L^2');
+          var root = kinds('100*sqrt(L)');
+          var ok = kinds('30*L^2 - L^3');
+          var p = STATE.prod || {};
+          return { flat: flat === 'flat/flat/boundary' ? 1 : 0,
+                   grow: /boundary/.test(grow) ? 1 : 0,
+                   root: /boundary/.test(root) ? 1 : 0,
+                   ok: ok === 'interior/interior/interior' ? 1 : 0,
+                   mp: (p.maxMP||{}).val, ap: (p.maxAP||{}).val };`,
+    checks: [['MP постоянна — так и сказано', 'flat', 1, 0],
+             ['MP растёт всюду — край', 'grow', 1, 0],
+             ['у корня максимума нет', 'root', 1, 0],
+             ['у классической всё внутри', 'ok', 1, 0],
+             ['max MP не поехал', 'mp', 300, 1], ['max AP не поехал', 'ap', 225, 1]],
+  },
 ];
 
 function approx(got, want, tol) {

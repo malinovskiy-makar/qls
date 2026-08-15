@@ -55,7 +55,7 @@ function laborMinMonopsony(Wmin) {
   // Безработица = желающие работать при W_min (L̂) минус нанятые (Lstar).
   const unemployment = Math.max(0, Lhat - Lstar);
   let dwl = null;
-  if (Lk != null) { const lo = Math.min(Lstar, Lk), hi = Math.max(Lstar, Lk); dwl = Math.abs(integrate(l => evalCurve(D, l) - evalCurve(S, l), lo, hi)); }
+  if (Lk != null) { const lo = Math.min(Lstar, Lk), hi = Math.max(Lstar, Lk); dwl = areaBetween(l => evalCurve(D, l) - evalCurve(S, l), lo, hi); }
   return { binding: true, Lstar, wage, Lhat, unemployment, dwl, Wmin };
 }
 
@@ -83,7 +83,7 @@ function laborUnionMonopoly() {
   if (Lu == null || Lu <= 1e-6) return null;
   const Wu = evalCurve(D, Lu);                       // зарплата = D(Lп), НЕ MRL и НЕ S
   let dwl = null;
-  if (eq) { const lo = Math.min(Lu, eq.Q), hi = Math.max(Lu, eq.Q); dwl = Math.abs(integrate(l => evalCurve(D, l) - evalCurve(S, l), lo, hi)); }
+  if (eq) { const lo = Math.min(Lu, eq.Q), hi = Math.max(Lu, eq.Q); dwl = areaBetween(l => evalCurve(D, l) - evalCurve(S, l), lo, hi); }
   return { Lu, Wu, Lk: eq ? eq.Q : null, Wk: eq ? eq.P : null, dwl };
 }
 
@@ -124,7 +124,7 @@ function recomputeLabor() {
     if (Lm != null && Lm > 0) {
       const Wm = evalCurve(S, Lm);               // зарплата = W_s(Lm) (НЕ с точки MCL=D и НЕ с D)
       let dwl = null;
-      if (eq) { const lo = Math.min(Lm, eq.Q), hi = Math.max(Lm, eq.Q); dwl = Math.abs(integrate(l => evalCurve(D, l) - evalCurve(S, l), lo, hi)); }
+      if (eq) { const lo = Math.min(Lm, eq.Q), hi = Math.max(Lm, eq.Q); dwl = areaBetween(l => evalCurve(D, l) - evalCurve(S, l), lo, hi); }
       STATE.laborMono = { Lm, Wm, Lk: eq ? eq.Q : null, Wk: eq ? eq.P : null, dwl };
     }
   }
@@ -167,7 +167,7 @@ function recomputeLabor() {
       const workerCS = integrate(l => Wfact - evalCurve(S, l), 0, Lstar);   // над S, под W_факт, до L*
       const firmCS = integrate(l => evalCurve(D, l) - Wfact, 0, Lstar);     // под D, над W_факт, до L*
       const Lk = eq.Q, lo = Math.min(Lstar, Lk), hi = Math.max(Lstar, Lk);
-      const dwl = Math.abs(integrate(l => evalCurve(D, l) - evalCurve(S, l), lo, hi));  // между D и S от L* до Lk
+      const dwl = areaBetween(l => evalCurve(D, l) - evalCurve(S, l), lo, hi);  // между D и S от L* до Lk
       STATE.laborMinWelfare = { Lstar, Wfact, workerCS, firmCS, dwl };
     }
   }

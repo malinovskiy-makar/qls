@@ -49,12 +49,29 @@ function detectLinear(compiled) {
     try { const v = compiled.evaluate(paramScope({ x: q, Q: q, L: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
     catch (e) { return NaN; }
   };
-  const q1 = CONFIG.Qmax * 0.2, q2 = CONFIG.Qmax * 0.5, q3 = CONFIG.Qmax * 0.8;
-  const f1 = at(q1), f2 = at(q2), f3 = at(q3);
-  if (isNaN(f1) || isNaN(f2) || isNaN(f3)) return null;
-  const a12 = (f2 - f1) / (q2 - q1), a23 = (f3 - f2) / (q3 - q2);
-  if (Math.abs(a12 - a23) > 1e-6 * (1 + Math.abs(a12))) return null;  // наклон «гуляет» -> нелинейная
-  const a = a12, b = f1 - a * q1;
+  /* Б30. Проверять три точки В СЕРЕДИНЕ диапазона нельзя: кусочная функция
+     на этом участке бывает прямой, а на другом нет. «max(0, Q - 10)» при
+     Qmax = 100 давала в точках 20, 50 и 80 значения 10, 40 и 70 — наклон
+     всюду единичный, и кривая запоминалась как прямая P = Q. Дальше evalCurve
+     шёл быстрым путём по этим коэффициентам, и на участке Q < 10 и график, и
+     все расчёты уходили по неверной прямой.
+     Смотрим сетку из 13 точек и обязательно окрестность нуля (там живут
+     перехваты и постоянные затраты) и правый край. */
+  const hi = CONFIG.Qmax;
+  const qs = [0, hi * 0.01, hi * 0.05];
+  for (let i = 1; i <= 9; i++) qs.push(hi * i / 10);
+  qs.push(hi);
+  const vs = qs.map(at);
+  if (vs.some(isNaN)) return null;
+  const a = (vs[vs.length - 1] - vs[0]) / (qs[qs.length - 1] - qs[0]);
+  if (!isFinite(a)) return null;
+  const b = vs[0] - a * qs[0];
+  // Расхождение хоть в одной точке — не прямая. Порог берём от масштаба самих
+  // значений, иначе крупные числа не пройдут проверку из-за ошибок округления.
+  const scale = Math.max(1, ...vs.map(Math.abs));
+  for (let i = 0; i < qs.length; i++) {
+    if (Math.abs(vs[i] - (a * qs[i] + b)) > 1e-7 * scale) return null;
+  }
   return { a, b };
 }
 
@@ -278,6 +295,49 @@ function integrate(f, a, b, n = 1000) {
   for (let i = 1; i < n; i++) sum += f(a + i * h);
   return sum * h;
 }
+
+/* Площадь между двумя кривыми на отрезке (Б31).
+
+   Считать её как МОДУЛЬ ИНТЕГРАЛА разности верно ровно до тех пор, пока
+   разность не меняет знак. При двух и более пересечениях куски с разными
+   знаками гасят друг друга, и площадь выходит заниженной: у потерь общества
+   это прямо неверное число. Поэтому режем отрезок по нулям разности и
+   складываем МОДУЛИ кусков. */
+/* Места, где разность меняет знак на отрезке.
+
+   Проверять «произведение соседних значений отрицательно» недостаточно: если
+   ноль приходится РОВНО НА УЗЕЛ сетки, оба произведения равны нулю, и смена
+   знака теряется целиком. Случай не выдуманный: у прямых D и S равновесие
+   часто попадает ровно на круглое число. Поэтому следим за последним НЕнулевым
+   знаком, а сам ноль в узле принимаем за место пересечения. */
+function signChanges(g, lo, hi, n = 400) {
+  const out = [];
+  if (!(hi > lo)) return out;
+  const step = (hi - lo) / n;
+  let lastSign = 0, lastX = lo, zeroX = null;
+  for (let i = 0; i <= n; i++) {
+    const x = lo + step * i, v = g(x);
+    if (isNaN(v)) continue;
+    const s = v > 0 ? 1 : (v < 0 ? -1 : 0);
+    if (s === 0) { zeroX = x; continue; }
+    if (lastSign !== 0 && s !== lastSign) out.push(zeroX != null ? zeroX : bisect(g, lastX, x));
+    lastSign = s; lastX = x; zeroX = null;
+  }
+  return out;
+}
+
+function areaBetween(g, lo, hi, n = 400) {
+  if (!(hi > lo)) return 0;
+  let total = 0, from = lo;
+  signChanges(g, lo, hi, n).forEach(root => {
+    total += Math.abs(integrate(g, from, root));
+    from = root;
+  });
+  return total + Math.abs(integrate(g, from, hi));
+}
+
+// Сколько раз разность меняет знак на отрезке: столько же и пересечений.
+function crossingCount(g, lo, hi, n = 400) { return signChanges(g, lo, hi, n).length; }
 
 // Универсальный поиск корня g(Q)=0 в первой четверти [0, Qmax].
 // Сканируем мелкую сетку, на смене знака уточняем бисекцией; null — если корня нет.

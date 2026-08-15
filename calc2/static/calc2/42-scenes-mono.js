@@ -235,7 +235,7 @@ function monopolyCeiling(Pc) {
   let dwl = null;
   if (Qc != null) {                              // потери — площадь между D и MC от Qstar до Qc
     const lo = Math.min(Qstar, Qc), hi = Math.max(Qstar, Qc);
-    dwl = Math.abs(integrate(q => evalCurve(D, q) - mcAt(q), lo, hi));
+    dwl = areaBetween(q => evalCurve(D, q) - mcAt(q), lo, hi);
   }
   // Области CS/VC/PS до нового выпуска при новой цене (для табло и заливок).
   const csM = integrate(q => evalCurve(D, q) - price, 0, Qstar);
@@ -349,7 +349,7 @@ function monopolyTax(shift) {
   const csM = integrate(q => evalCurve(D, q) - Pt, 0, Qt);       // CS при новой цене
   // DWL — против эффективного выпуска (D = СОЦИАЛЬНАЯ MC, без ставки): вмешательство его увеличивает.
   let dwl = null;
-  if (m.Qc != null) { const lo = Math.min(Qt, m.Qc), hi = Math.max(Qt, m.Qc); dwl = Math.abs(integrate(q => evalCurve(D, q) - mcAt(q), lo, hi)); }
+  if (m.Qc != null) { const lo = Math.min(Qt, m.Qc), hi = Math.max(Qt, m.Qc); dwl = areaBetween(q => evalCurve(D, q) - mcAt(q), lo, hi); }
   return { isTax, shift, rate, Qt, Pt, budget, csM, dwl, mcAtQt: mcAt(Qt) };
 }
 
@@ -366,7 +366,7 @@ function monopolyFloor(Pf) {
   const vcM = integrate(q => mcAt(q), 0, Q);
   const psM = integrate(q => price - mcAt(q), 0, Q);
   let dwl = null;
-  if (m.Qc != null) { const lo = Math.min(Q, m.Qc), hi = Math.max(Q, m.Qc); dwl = Math.abs(integrate(q => evalCurve(D, q) - mcAt(q), lo, hi)); }
+  if (m.Qc != null) { const lo = Math.min(Q, m.Qc), hi = Math.max(Q, m.Qc); dwl = areaBetween(q => evalCurve(D, q) - mcAt(q), lo, hi); }
   return { binding: true, Pf, Q, price, csM, vcM, psM, dwl };
 }
 

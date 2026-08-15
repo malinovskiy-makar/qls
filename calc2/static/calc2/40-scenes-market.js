@@ -78,7 +78,7 @@ function recompute() {
       STATE.csTax = integrate(q => evalCurve(STATE.D, q) - Pb, 0, Q1);
       STATE.psTax = integrate(q => Ps - evalCurve(STATE.S, q), 0, Q1);
       // DWL — площадь между D и S на интервале между старым и новым Q (всегда > 0).
-      STATE.dwl = Math.abs(integrate(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi));
+      STATE.dwl = areaBetween(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi);
       if (STATE.intervType === 'subsidy') {
         STATE.incBuyer = STATE.eq.P - Pb;         // выигрыш покупателя (цена упала)
         STATE.incSeller = Ps - STATE.eq.P;        // выигрыш продавца (цена выросла)
@@ -112,7 +112,7 @@ function recompute() {
       STATE.pc.sw = STATE.pc.cs + STATE.pc.ps;
       // DWL — площадь между D и S от Q_trade до Q* (недо-/перепроизводство).
       const lo = Math.min(Qtrade, STATE.eq.Q), hi = Math.max(Qtrade, STATE.eq.Q);
-      STATE.pc.dwl = Math.abs(integrate(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi));
+      STATE.pc.dwl = areaBetween(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi);
       STATE.pcActive = true;
     }
   }
@@ -129,7 +129,7 @@ function recompute() {
       let dwl = null;
       if (Qc != null) {                            // потери — площадь между D и MC от Qm до Qc
         const lo = Math.min(Qm, Qc), hi = Math.max(Qm, Qc);
-        dwl = Math.abs(integrate(q => evalCurve(STATE.D, q) - mcAt(q), lo, hi));
+        dwl = areaBetween(q => evalCurve(STATE.D, q) - mcAt(q), lo, hi);
       }
       let profit = null;                           // прибыль (TR − TC) — только если задана ATC
       const ATC = curveByRole('atc');
@@ -252,7 +252,7 @@ function recompute() {
       Popt = other(Qopt);                                  // высота точки пересечения
       const lo = Math.min(Qopt, Qmkt), hi = Math.max(Qopt, Qmkt);
       // Клин потерь — площадь между общественной и противоположной частной кривой.
-      dwl = Math.abs(integrate(q => social(q) - other(q), lo, hi));
+      dwl = areaBetween(q => social(q) - other(q), lo, hi);
       corrective = evalExt(Qopt);                          // величина эффекта в оптимуме
       // Корректирующий инструмент приводит рынок ровно в Qопт, двигая предложение:
       // отрицательный эффект → налог (S + t); положительный → субсидия (S − s).
@@ -329,8 +329,8 @@ function recomputeOpenEconomy() {
         // ДВА треугольника потерь, по отдельности:
         //  производство — площадь между S и Pw на [Qs, Qs′] (дороже произвели дома);
         //  потребление  — площадь между D и Pw на [Qd′, Qd] (недопотребили).
-        const dwlProd = Math.abs(integrate(q => evalCurve(S, q) - Pw, Qs, Qs1));
-        const dwlCons = Math.abs(integrate(q => Pw - evalCurve(D, q), Qd1, Qd));
+        const dwlProd = areaBetween(q => evalCurve(S, q) - Pw, Qs, Qs1);
+        const dwlCons = areaBetween(q => Pw - evalCurve(D, q), Qd1, Qd);
         const cs1 = integrate(q => evalCurve(D, q) - P1, 0, Qd1);
         const ps1 = integrate(q => P1 - evalCurve(S, q), 0, Qs1);
         res.tool = STATE.openTool;
@@ -713,9 +713,16 @@ function updateInfoPanel() {
     box.innerHTML = '<div class="warn">Равновесие не найдено в первой четверти.</div>';
     return;
   }
-  box.innerHTML =
+  let html =
     `<div class="stat"><span>$Q^*$ (количество)</span><b>${fmt(STATE.eq.Q)}</b></div>` +
     `<div class="stat"><span>$P^*$ (цена)</span><b>${fmt(STATE.eq.P)}</b></div>`;
+  /* Б31. Кривые могут пересечься не один раз, и тогда равновесие не одно.
+     Молчать об этом нельзя: все дальнейшие числа считаются вокруг ОДНОГО
+     из них, и человек вправе знать, вокруг какого. */
+  const n = crossingCount(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), 0, CONFIG.Qmax);
+  if (n > 1) html += `<div class="hint">Кривые пересекаются ${n} раза, то есть равновесий несколько. ` +
+    `Взято ближайшее к началу координат: ${'$Q^* = ' + fmt(STATE.eq.Q) + '$'}. Излишки и потери посчитаны вокруг него.</div>`;
+  box.innerHTML = html;
 }
 
 /* ---------------------------------------------------------------------

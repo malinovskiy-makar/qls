@@ -633,14 +633,33 @@ function prodMP(L) {
 }
 function prodAP(L) { const q = prodEval(L); return (isNaN(q) || L <= 0) ? NaN : q / L; }
 
-// Максимум произвольной функции на отрезке (зеркало minOf).
+/* Максимум произвольной функции на отрезке — зеркало minOf, включая ЧЕСТНЫЙ
+   ответ о том, что найдено (Б26 в производственной функции). У TP = 10·L
+   предельный продукт постоянен: перегиба нет вовсе, а панель писала «перегиб
+   TP при L = 6,57». У TP = L² предельный продукт растёт всюду: максимум MP
+   оказывался на правом краю сетки. И то, и другое — край цикла, выданный за
+   экономическую величину. */
 function maxOf(f, lo, hi) {
-  let bestQ = null, bestV = -Infinity;
-  const scan = (a, b, n) => { for (let i = 0; i <= n; i++) { const q = a + (b - a) * i / n, v = f(q); if (!isNaN(v) && v > bestV) { bestV = v; bestQ = q; } } };
+  let bestQ = null, bestV = -Infinity, lowV = Infinity;
+  const scan = (a, b, n) => {
+    for (let i = 0; i <= n; i++) {
+      const q = a + (b - a) * i / n, v = f(q);
+      if (isNaN(v)) continue;
+      if (v > bestV) { bestV = v; bestQ = q; }
+      if (v < lowV) lowV = v;
+    }
+  };
   scan(lo, hi, 2000);
-  if (bestQ != null) { const st = (hi - lo) / 2000; scan(Math.max(lo, bestQ - st), Math.min(hi, bestQ + st), 400); }
-  return bestQ == null ? null : { L: bestQ, val: bestV };
+  if (bestQ == null) return null;
+  const scale = Math.max(1e-9, Math.abs(bestV), Math.abs(lowV));
+  if (bestV - lowV <= 1e-6 * scale) return { L: bestQ, val: bestV, kind: 'flat' };
+  const st = (hi - lo) / 2000;
+  const interior = (bestQ > lo + 2 * st) && (bestQ < hi - 2 * st);
+  scan(Math.max(lo, bestQ - st), Math.min(hi, bestQ + st), 400);
+  return { L: bestQ, val: bestV, kind: interior ? 'interior' : 'boundary' };
 }
+// Показывать числом можно только настоящий внутренний максимум.
+function realMax(m) { return (m && m.kind === 'interior') ? m : null; }
 
 function recomputeProduction() {
   STATE.prod = null;
@@ -723,19 +742,32 @@ function redrawProduction() {
     g.append('text').attr('x', x + 5).attr('y', top + 10).attr('font-size', FS.small).attr('font-weight', 600).attr('fill', color)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
   };
-  if (p.maxMP) vline(p.maxMP.L, COL.prodMP, 'перегиб TP · max MP · L=' + fmt(p.maxMP.L));
-  if (p.maxAP) vline(p.maxAP.L, COL.prodAP, 'max AP = MP · L=' + fmt(p.maxAP.L));
-  if (p.maxTP) vline(p.maxTP.L, COL.ghost, 'max TP · MP=0');
+  /* Вертикали ставим только там, где максимум НАСТОЯЩИЙ: край сетки — это не
+     точка перегиба и не максимум среднего продукта (Б26). */
+  const vMP = realMax(p.maxMP), vAP = realMax(p.maxAP), vTP = realMax(p.maxTP);
+  if (vMP) vline(vMP.L, COL.prodMP, 'перегиб TP · max MP · L=' + fmt(vMP.L));
+  if (vAP) vline(vAP.L, COL.prodAP, 'max AP = MP · L=' + fmt(vAP.L));
+  if (vTP) vline(vTP.L, COL.ghost, 'max TP · MP=0');
   // Точки на нижней панели.
-  if (p.maxAP && STATE.showAP) {
-    svg.append('circle').attr('cx', lx(p.maxAP.L)).attr('cy', t2(p.maxAP.val)).attr('r', 4.5)
+  if (vAP && STATE.showAP) {
+    svg.append('circle').attr('cx', lx(vAP.L)).attr('cy', t2(vAP.val)).attr('r', 4.5)
       .attr('fill', COL.prodAP).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   }
-  if (p.maxMP && STATE.showMP) {
-    svg.append('circle').attr('cx', lx(p.maxMP.L)).attr('cy', t2(p.maxMP.val)).attr('r', 4.5)
+  if (vMP && STATE.showMP) {
+    svg.append('circle').attr('cx', lx(vMP.L)).attr('cy', t2(vMP.val)).attr('r', 4.5)
       .attr('fill', COL.prodMP).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   }
   updateProdPanel();
+}
+
+// Объяснение на месте несуществующего максимума (Б26 в производстве).
+function noMaxNote(m, what, name, why) {
+  if (!m) return '';
+  if (m.kind === 'flat')
+    return `<div class="hint">Кривая ${name} постоянна на всём диапазоне, поэтому ${what} не существует: ${why}</div>`;
+  if (m.kind === 'boundary')
+    return `<div class="hint">У кривой ${name} нет внутреннего максимума: она монотонна на всём диапазоне, поэтому ${what} не существует: ${why}</div>`;
+  return '';
 }
 
 function updateProdPanel() {
@@ -743,10 +775,17 @@ function updateProdPanel() {
   const p = STATE.prod;
   if (!p) { box.innerHTML = '<div class="warn">Не понял формулу Q = f(L).</div>'; return; }
   let html = '';
-  if (p.maxMP) html += `<div class="stat"><span>Перегиб TP (max MP)</span><b>L = ${fmt(p.maxMP.L)}, MP = ${fmt(p.maxMP.val)}</b></div>`;
-  if (p.maxAP) html += `<div class="stat"><span>Максимум AP</span><b>L = ${fmt(p.maxAP.L)}, AP = ${fmt(p.maxAP.val)}</b></div>`;
-  if (p.maxAP && !isNaN(p.mpAtMaxAP)) html += `<div class="stat"><span>$MP$ в этой точке</span><b>${fmt(p.mpAtMaxAP)}</b></div>`;
-  if (p.maxTP) html += `<div class="stat"><span>Максимум TP</span><b>L = ${fmt(p.maxTP.L)}, Q = ${fmt(p.maxTP.val)}</b></div>`;
+  const mMP = realMax(p.maxMP), mAP = realMax(p.maxAP), mTP = realMax(p.maxTP);
+  if (mMP) html += `<div class="stat"><span>Перегиб TP (max MP)</span><b>L = ${fmt(mMP.L)}, MP = ${fmt(mMP.val)}</b></div>`;
+  else html += noMaxNote(p.maxMP, 'точки перегиба TP', 'MP',
+    'убывающая предельная отдача на этом диапазоне не начинается.');
+  if (mAP) html += `<div class="stat"><span>Максимум AP</span><b>L = ${fmt(mAP.L)}, AP = ${fmt(mAP.val)}</b></div>`;
+  else html += noMaxNote(p.maxAP, 'максимума среднего продукта', 'AP',
+    'средний продукт нигде не разворачивается.');
+  if (mAP && !isNaN(p.mpAtMaxAP)) html += `<div class="stat"><span>$MP$ в этой точке</span><b>${fmt(p.mpAtMaxAP)}</b></div>`;
+  if (mTP) html += `<div class="stat"><span>Максимум TP</span><b>L = ${fmt(mTP.L)}, Q = ${fmt(mTP.val)}</b></div>`;
+  else html += noMaxNote(p.maxTP, 'максимума выпуска', 'TP',
+    'предельный продукт нигде не обращается в ноль, и выпуск растёт с каждым работником.');
   html += '<div class="hint" style="margin-top:4px;">С точки перегиба TP начинается <b>убывающая предельная отдача</b>: ' +
     'каждый следующий работник добавляет меньше предыдущего. В максимуме AP выполняется <b>AP = MP</b>, ' +
     'пока MP выше среднего, средний растёт; как только MP опускается ниже, средний начинает падать. ' +
