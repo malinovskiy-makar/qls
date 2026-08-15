@@ -139,8 +139,11 @@ def build_tex(assignment, for_teacher=False, solution_space=True):
         out.append(r'{\small\itshape Вариант преподавателя: с ответами '
                    r'и решениями.}')
     else:
+        # ⚠️ ЛИНИЯ ИДЁТ ДО ПРАВОГО ПОЛЯ. Жёсткие 7 см обрывались на
+        # середине строки и читались как обрез страницы; `\dotfill`
+        # растягивается ровно по ширине набора при любом формате.
         out.append(r'\vspace{4pt}{\small Фамилия, имя: '
-                   r'\underline{\hspace{7cm}}}')
+                   r'\hrulefill}')
     out += [r'\medskip\hrule\medskip', '']
 
     skipped = []
@@ -156,18 +159,38 @@ def build_tex(assignment, for_teacher=False, solution_space=True):
         # из `section_caption` — той же, что на экране.
         head = marks.get(index)
         if head:
-            out.append(r'\smallskip{\small\bfseries '
+            # ⚠️ ЗАГОЛОВОК НЕ ОТРЫВАЕТСЯ ОТ ПЕРВОЙ ЗАДАЧИ (ревью 15.08,
+            # п. 14.2). В собранном pdf «Задачи» повисли внизу первой
+            # страницы, а первая задача уехала на вторую. `\nobreak`
+            # после заголовка не удерживает: разрыв случается на пустой
+            # строке ПОСЛЕ линейки. Держит `\needspace`-подобный приём —
+            # заголовок, линейка и начало задачи в одной неразрывной
+            # группе `\samepage` внутри `minipage`-абзаца.
+            out.append(r'\smallskip\begingroup\samepage')
+            out.append(r'{\small\bfseries '
                        + escape_latex(head['caption']) + r'}\nobreak')
             out.append(r'\nobreak\vspace{-4pt}'
                        r'\hrule height 0pt \dotfill \vspace{2pt}')
-            out.append('')
+            out.append(r'\nobreak')
+            # ⚠️ СЧЁТ ВНУТРИ ЧАСТИ НАЧИНАЕТСЯ ЗАНОВО. Вопросы тестовой
+            # части подписывались «Задача 1, 2, 3», хотя стоят в разделе
+            # «Тестовая часть», и нумерация шла сквозной с задачами: на
+            # занятии «задача 4» означала бы разное у разных людей.
+            number = 0
         number += 1
         points = ''
         if item.points is not None:
-            points = (r'\hfill\textit{%s б.}'
+            # ⚠️ БАЛЛ НЕ ОТРЫВАЕТСЯ ОТ ЧИСЛА. У двух задач цифра осталась
+            # справа, а «б.» уехало на следующую строку одиноким курсивом:
+            # между ними стоял обычный пробел, по которому TeX и рвёт.
+            points = (r'\hfill\textit{%s~б.}'
                       % escape_latex(_clean_number(item.points)))
-        out.append(r'\textbf{Задача ' + str(number) + r'.}\quad '
+        # Своё слово у теста: «Вопрос», а не «Задача».
+        word = 'Вопрос' if item.is_test else 'Задача'
+        out.append(r'\textbf{' + word + ' ' + str(number) + r'.}\quad '
                    + _plate(escape_latex(statement)) + points)
+        if head:
+            out.append(r'\endgroup')
         out.append('')
 
         for line in _parts_lines(item, for_teacher):
@@ -176,7 +199,20 @@ def build_tex(assignment, for_teacher=False, solution_space=True):
         if for_teacher:
             out += _teacher_lines(item)
         elif solution_space:
-            out.append(r'\vspace{3.2cm}')
+            # ⚠️ МЕСТО ЗАВИСИТ ОТ ТИПА И ВЕСА ЗАДАЧИ (ревью 15.08, п. 14.2).
+            # Раньше всем подряд отводилось ровно 3,2 см: после теста с
+            # готовыми вариантами пустоты было столько же, сколько после
+            # расчётной задачи на полстраницы. Считает та же
+            # `solution_lines`, что и страница печати, — лист из браузера
+            # и лист из `.tex` обязаны совпадать.
+            if item.is_test:
+                # У теста место нужно не под решение, а под ОТМЕТКУ
+                # ответа: её вообще не было, и отвечать было некуда.
+                out.append(r'\smallskip\textit{Ответ:} '
+                           r'\underline{\hspace{3cm}}')
+            else:
+                out.append(r'\vspace{%.1fcm}'
+                           % (solution_lines(item) * 0.62))
 
         out.append(r'\bigskip')
         out.append('')
@@ -229,14 +265,22 @@ def _parts_lines(item, for_teacher):
 
 
 def _teacher_lines(item):
+    """Ответ и решение в варианте преподавателя — ДВЕ разные части.
+
+    ⚠️ Обе подписи набраны ОДИНАКОВО и жирным (ревью 15.08, п. 14.1):
+    курсив «Ответ:» и курсив «Решение:» посреди курсивного же разбора
+    сливались, и лист читался сплошняком. Владелец просил «лист с
+    условиями и сразу же решениями» — значит границы этих частей обязаны
+    быть видны с одного взгляда, у всех задач одинаково.
+    """
     lines = []
     answer = (item.correct_answer or '').strip()
     if answer and not looks_broken(answer):
-        lines.append(r'\smallskip\textit{Ответ:} ' + escape_latex(answer))
+        lines.append(r'\smallskip\textbf{Ответ:} ' + escape_latex(answer))
         lines.append('')
     solution = (item.solution_text or '').strip()
     if solution and not looks_broken(solution):
-        lines.append(r'\smallskip\textit{Решение:} '
+        lines.append(r'\smallskip\textbf{Решение:} '
                      + _plate(escape_latex(solution)))
         lines.append('')
     return lines

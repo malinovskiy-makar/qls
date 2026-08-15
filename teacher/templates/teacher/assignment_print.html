@@ -87,6 +87,9 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
   .solution { margin-top: 8px; font-size: 10.5pt; color: #222;
               border-left: 2px solid #999; padding-left: 10px;
               white-space: pre-wrap; }
+  /* Подпись «Решение:» — такая же, как «Ответ:»: две части листка
+     обязаны отличаться одинаково у ВСЕХ задач. */
+  .sol-cap { font-weight: bold; }
   .plate { border: 1px dashed #666; padding: 10px; margin-top: 8px;
            font-size: 10.5pt; color: #333; }
   /* Учительский вариант: просто напоминание, какой график к задаче. Рамки
@@ -235,11 +238,20 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
     {% endif %}
 
     {% if for_teacher %}
+      {% comment %}
+      ⚠️ ОТВЕТ И РЕШЕНИЕ — ЯВНО РАЗНЫЕ ЧАСТИ (ревью 15.08, п. 14.1).
+      Владелец дословно: «лист с условиями и сразу же решениями, ничего
+      более» — чтобы отправить файлом. Вариант с ответами печатал и то и
+      другое, но разбор шёл сплошняком сразу после «Ответ:», и где
+      кончается ответ, а где начинается решение, было не видно.
+      Пустого места под решение в этом варианте нет и быть не должно:
+      это компактный лист для отправки, а не бланк для письма.
+      {% endcomment %}
       {% if row.answer %}
       <div class="answer-line"><b>Ответ:</b> {{ row.answer }}</div>
       {% endif %}
       {% if row.solution %}
-      <div class="solution">{{ row.solution }}</div>
+      <div class="solution"><b class="sol-cap">Решение:</b> {{ row.solution }}</div>
       {% endif %}
     {% else %}
       {% for _ in row.space_lines %}<div class="space"></div>{% endfor %}

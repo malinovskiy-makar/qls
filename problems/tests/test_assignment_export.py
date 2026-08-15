@@ -44,8 +44,12 @@ class BuildTexTests(TestCase):
         self.assertNotIn('P = 30', tex)
         self.assertNotIn('Приравниваем спрос', tex)
         self.assertEqual(skipped, [])
-        # Место для решения.
-        self.assertIn(r'\vspace{3.2cm}', tex)
+        # ⚠️ ПЕРЕСЧИТАН (ревью 15.08, п. 14.2). Место под решение было
+        # ОДИНАКОВЫМ у всех задач — 3,2 см и после теста с готовыми
+        # вариантами, и после расчётной задачи на полстраницы. Теперь его
+        # считает та же `solution_lines`, что и страница печати. Требование
+        # проверки прежнее: место под решение в ученическом варианте есть.
+        self.assertRegex(tex, r'\\vspace\{\d+\.\d+cm\}')
 
     def test_teacher_sheet_has_answers_and_solutions(self):
         tex, _ = export.build_tex(self.homework, for_teacher=True)
@@ -61,7 +65,8 @@ class BuildTexTests(TestCase):
 
     def test_points_are_printed(self):
         tex, _ = export.build_tex(self.homework)
-        self.assertIn('4 б.', tex)
+        # ⚠️ Неразрывный пробел: «4» и «б.» разъезжались по строкам.
+        self.assertIn('4~б.', tex)
 
     def test_file_compiles_with_any_engine(self):
         """⚠️ ИЗМЕНЕНИЕ КОНТРАКТА (Фаза C.4). Раньше здесь стояло «fontspec
