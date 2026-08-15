@@ -2610,6 +2610,35 @@ const CASES = [
              ['у классической всё внутри', 'ok', 1, 0],
              ['max MP не поехал', 'mp', 300, 1], ['max AP не поехал', 'ap', 225, 1]],
   },
+
+  /* --- Фаза 7: разгрузка перегруженных сюжетов (Б34) ------------------ */
+  {
+    /* Б34. Перетаскивание кривых мышью — главный интерактив калькулятора, и
+       оно остаётся. Убираем его вместе с ползунками «Сдвиг кривых» ТОЧЕЧНО:
+       в эластичности по кривым уже ездят две точки, в налогах — своя линия
+       ставки. Считаем подвижные объекты на самом графике. */
+    name: 'Б34 · Сдвиг кривых выключен точечно, а не везде',
+    run: `var count = function (k) { resetSceneMemory(); pickScene(k); redrawAll();
+            var n = 0;
+            document.querySelectorAll('svg#chart *').forEach(function (el) {
+              var cs = getComputedStyle(el);
+              if (!/grab|move|ew-resize|ns-resize/.test(cs.cursor)) return;
+              if (!el.getClientRects().length) return;
+              n++;
+            });
+            return { grab: n, shift: pultCurveList().length }; };
+          var e = count('elast'), t = count('tax'), ta = count('tax-adv');
+          var sd = count('sd'), c = count('ceil'), l = count('labor');
+          return { eGrab: e.grab, eShift: e.shift, tShift: t.shift, taShift: ta.shift,
+                   sdShift: sd.shift, sdGrab: sd.grab, cGrab: c.grab, lGrab: l.grab };`,
+    checks: [['эластичность: только две точки', 'eGrab', 2, 0],
+             ['и ни одного ползунка сдвига', 'eShift', 0, 0],
+             ['налог: ползунков сдвига нет', 'tShift', 0, 0],
+             ['адвалорный: тоже нет', 'taShift', 0, 0],
+             ['на обычном рынке сдвиг остался', 'sdShift', 2, 0],
+             ['и кривые тянутся', 'sdGrab', 2, 0],
+             ['в потолке тоже', 'cGrab', 3, 0], ['и на рынке труда', 'lGrab', 3, 0]],
+  },
 ];
 
 function approx(got, want, tol) {
