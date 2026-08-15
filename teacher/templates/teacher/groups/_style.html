@@ -27,9 +27,12 @@
 .btn-outline:hover { background: var(--panel); }
 .btn-small { padding: 4px 10px; font-size: 12px; }
 
-.crumbs { font-size: 13px; color: var(--text2); margin-bottom: 14px; }
-.crumbs a { color: var(--accent); text-decoration: none; }
-.crumbs a:hover { text-decoration: underline; }
+{% comment %}
+⚠️ Правила `.crumbs` ПЕРЕЕХАЛИ В НАБОР (`templates/_kit.html`, ревью 15.08,
+фаза 2). Крошки стоят и на экранах, которые этот файл не подключают, — там
+они выходили голой браузерной ссылкой. Класс дефекта тот же, что у
+`.row-link` ниже и у `.wk-table` в сессии 8.
+{% endcomment %}
 
 .card {
   background: var(--surface); border: 0.5px solid var(--border);

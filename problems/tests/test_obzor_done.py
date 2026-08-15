@@ -121,11 +121,12 @@ class DoneScreenTests(TestCase):
         self.assertIn('k-flag--correct', self._header())
 
     def test_crumb_follows_the_state(self):
-        crumb = re.search(r'<div class="crumbs">(.*?)</div>',
+        # ⚠️ Крошка стала `<nav>` (ревью 15.08, фаза 2) — ищем по новому тегу.
+        crumb = re.search(r'<nav class="crumbs"[^>]*>(.*?)</nav>',
                           self._html(), re.S).group(1)
         self.assertIn('итог', crumb)
         self._check_all()
-        crumb = re.search(r'<div class="crumbs">(.*?)</div>',
+        crumb = re.search(r'<nav class="crumbs"[^>]*>(.*?)</nav>',
                           self._html(), re.S).group(1)
         self.assertIn('готово', crumb)
 

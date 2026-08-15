@@ -112,7 +112,22 @@
 {% endblock %}
 
 {% block content %}
+{% comment %}
+⚠️ Экран ОДИН на ученика и репетитора, а навигация у них разная. У ученика
+это его работа — «← Все работы» и есть весь путь назад. У репетитора это
+экран кабинета, и он обязан выглядеть как остальные: крошки, а не одинокая
+стрелка (ревью 15.08, фаза 2).
+{% endcomment %}
+{% if for_tutor %}
+<nav class="crumbs" aria-label="Где я">
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  {% if crumbs_group %}<a href="{% url 'teacher:group_detail' crumbs_group.pk %}?tab=assignments">{{ crumbs_group.display_name }}</a>{% endif %}
+  <a href="{{ back_url }}">{{ assignment.name }}</a>
+  <span class="crumbs__here">глазами ученика</span>
+</nav>
+{% else %}
 <a class="back-link" href="{{ back_url }}">← {{ back_label }}</a>
+{% endif %}
 
 {% if for_tutor %}
 {% comment %}

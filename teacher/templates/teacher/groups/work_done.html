@@ -41,12 +41,12 @@
 {% endblock %}
 
 {% block content %}
-<div class="crumbs">
-  <a href="{% url 'teacher:groups' %}">Ученики</a> →
-  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a> →
-  <a href="{% url 'teacher:group_submissions' group.pk assignment.pk %}">{{ assignment.name }}</a> →
-  {% if unchecked %}итог{% else %}готово{% endif %}
-</div>
+<nav class="crumbs" aria-label="Где я">
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a>
+  <a href="{% url 'teacher:group_submissions' group.pk assignment.pk %}">{{ assignment.name }}</a>
+  <span class="crumbs__here">{% if unchecked %}итог{% else %}готово{% endif %}</span>
+</nav>
 
 {% comment %}
 ⚠️ ЗАГОЛОВОК ЗАВИСИТ ОТ СОСТОЯНИЯ (обзор 13.08, п. 54). Экран назывался

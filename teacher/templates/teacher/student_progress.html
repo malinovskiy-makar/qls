@@ -50,8 +50,20 @@
 {% endblock %}
 
 {% block content %}
+{% comment %}
+⚠️ КРОШКА ВМЕСТО «НАЗАД» (ревью 15.08, п. 2.5). Здесь стояла ссылка «назад
+по истории браузера»: она уводит туда, откуда пришли, то есть куда угодно —
+из поиска, с соседней вкладки, с обновлённой страницы — никуда. Крошка ведёт
+в обзор занятия; какое именно занятие взять, решает
+`access.lesson_for_student`.
+{% endcomment %}
+<nav class="crumbs" aria-label="Где я">
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  {% if lesson %}<a href="{% url 'teacher:group_detail' lesson.pk %}">{{ lesson.display_name }}</a>{% endif %}
+  <span class="crumbs__here">{{ student.get_full_name|default:student.username }}</span>
+</nav>
+
 <div class="page-header">
-  <a href="javascript:history.back()" class="back-link">← Назад</a>
   <div class="avatar">
     {{ student.first_name|first|default:student.username|first|upper }}
   </div>

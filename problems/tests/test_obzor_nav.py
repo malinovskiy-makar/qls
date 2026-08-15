@@ -27,11 +27,21 @@ def read(*parts):
 
 
 def crumbs(html):
-    """Текст первой хлебной крошки страницы, без разметки."""
-    found = re.search(r'<div class="crumbs">(.*?)</div>', html, re.S)
+    """Текст первой хлебной крошки страницы: звенья через стрелку.
+
+    ⚠️ ПЕРЕСЧИТАНО (ревью 15.08, фаза 2). Крошка стала `<nav>`, а стрелку
+    рисует CSS (`::before` у каждого звена, кроме первого) — в разметке её
+    больше нет. Собираем ТУ ЖЕ строку, что видит глаз, из текстов звеньев;
+    смысл всех проверок ниже не изменился.
+    """
+    found = re.search(r'<nav class="crumbs"[^>]*>(.*?)</nav>', html, re.S)
     if not found:
         return ''
-    return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', found.group(1))).strip()
+    parts = re.findall(r'<(?:a|span)\b[^>]*>(.*?)</(?:a|span)>',
+                       found.group(1), re.S)
+    clean = [re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', part)).strip()
+             for part in parts]
+    return ' → '.join(part for part in clean if part)
 
 
 class CrumbWordTests(TestCase):
@@ -89,7 +99,7 @@ class CrumbWordTests(TestCase):
             reverse('teacher:group_submissions',
                     args=[self.group.pk, self.work.pk])
             + '?view=problems').content.decode()
-        self.assertIn('Ученики</a> →', html)
+        self.assertTrue(crumbs(html).startswith('Ученики'), crumbs(html))
 
     def test_no_template_says_gruppy_in_a_crumb(self):
         """Слово «Группы» не осталось ни в одной живой крошке кабинета."""

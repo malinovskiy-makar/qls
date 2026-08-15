@@ -111,17 +111,18 @@
 {% endblock %}
 
 {% block content %}
-<div class="crumbs">
+<nav class="crumbs" aria-label="Где я">
   {% if group %}
-  <a href="{% url 'teacher:groups' %}">Ученики</a> →
-  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a> →
-  <a href="{% url 'teacher:group_submissions' group.pk submission.assignment.pk %}">{{ submission.assignment.name }}</a> →
-  проверка
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a>
+  <a href="{% url 'teacher:group_submissions' group.pk submission.assignment.pk %}">{{ submission.assignment.name }}</a>
+  <span class="crumbs__here">проверка</span>
   {% else %}
   {# Занятия без группы: вести назад некуда, кроме списка учеников. #}
-  <a href="{% url 'teacher:groups' %}">Ученики</a> → {{ submission.assignment.name }}
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  <span class="crumbs__here">{{ submission.assignment.name }}</span>
   {% endif %}
-</div>
+</nav>
 
 <div class="rv-head">
   <div>

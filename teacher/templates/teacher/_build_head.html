@@ -23,11 +23,11 @@
 (без номера группы такого адреса нет вовсе, поэтому остаётся конструктор
 домашки — то же правило, что в `_build_modes.html`).
 {% endcomment %}
-<div class="crumbs">
-  <a href="{% url 'teacher:groups' %}">Ученики</a> →
-  {% if group_id and group_label %}<a href="{% url 'teacher:group_detail' group_id %}?tab=assignments">{{ group_label }}</a> → {% endif %}
-  новая работа
-</div>
+<nav class="crumbs" aria-label="Где я">
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  {% if group_id and group_label %}<a href="{% url 'teacher:group_detail' group_id %}?tab=assignments">{{ group_label }}</a>{% endif %}
+  <span class="crumbs__here">новая работа</span>
+</nav>
 
 <div class="page-header">
   <div>

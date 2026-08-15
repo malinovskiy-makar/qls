@@ -122,11 +122,11 @@
 {% endblock %}
 
 {% block content %}
-<div class="crumbs">
-  <a href="{% url 'teacher:groups' %}">Ученики</a> →
-  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a> →
-  {{ assignment.name }}
-</div>
+<nav class="crumbs" aria-label="Где я">
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a>
+  <span class="crumbs__here">{{ assignment.name }}</span>
+</nav>
 
 <div class="page-header">
   <div>

@@ -22,16 +22,9 @@
 .sub-switch a:hover { color: var(--text); }
 .sub-switch a.is-on { background: var(--surface); color: var(--text);
                       font-weight: 600; }
-.btn-back {
-  color: var(--text2);
-  text-decoration: none;
-  font-size: 13px;
-  padding: 5px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  transition: color .12s, border-color .12s;
-}
-.btn-back:hover { color: var(--text); border-color: var(--border); }
+{% comment %}
+Правила `.btn-back` удалены вместе с кнопкой: путь назад стал звеном крошки.
+{% endcomment %}
 .page-title {
   font-size: 20px;
   font-weight: 700;
@@ -114,12 +107,23 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
+{% comment %}
+⚠️ КРОШКА СОБИРАЛАСЬ РУКАМИ, ИНЛАЙН-СТИЛЯМИ (ревью 15.08, фаза 2). Ниже по
+странице стоял свой `<div>` с `style="color:var(--accent)"` на каждой ссылке
+— то есть четвёртая по счёту запись одного и того же вида, живущая мимо
+набора. Теперь это обычная крошка, как на всех остальных экранах; кнопка
+«← К заданию» уехала в неё звеном, чтобы путь назад не потерялся.
+{% endcomment %}
+<nav class="crumbs" aria-label="Где я">
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
   {% if group %}
-    <a href="{% url 'teacher:group_assignment' group.pk assignment.pk %}" class="btn-back">← К заданию</a>
-  {% else %}
-    <a href="{% url 'teacher:groups' %}" class="btn-back">← Ученики</a>
+  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.name }}</a>
+  <a href="{% url 'teacher:group_assignment' group.pk assignment.pk %}">{{ assignment.name }}</a>
   {% endif %}
+  <span class="crumbs__here">проверка решений</span>
+</nav>
+
+<div class="page-header">
   <h1 class="page-title">{{ assignment.name }}</h1>
   {% if group %}
   {% comment %}
@@ -133,14 +137,6 @@
   </div>
   {% endif %}
 </div>
-
-{% if group %}
-<div style="font-size:13px;color:var(--text2);margin:-12px 0 18px;">
-  <a href="{% url 'teacher:groups' %}" style="color:var(--accent);text-decoration:none;">Ученики</a> →
-  <a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments" style="color:var(--accent);text-decoration:none;">{{ group.name }}</a> →
-  проверка решений
-</div>
-{% endif %}
 
 <div class="k-hint" style="margin-bottom:18px">
   Тесты и утверждённые задачи оценены автоматически — вам остаются

@@ -79,7 +79,7 @@
 {% include 'platform/_stats_style.html' %}{% endblock %}
 
 {% block content %}
-<div class="crumbs"><a href="{% url 'teacher:groups' %}">Ученики</a> → {{ group.name }}</div>
+<nav class="crumbs" aria-label="Где я"><a href="{% url 'teacher:groups' %}">Ученики</a><span class="crumbs__here">{{ group.name }}</span></nav>
 
 {% comment %}
 ⚠️ ШАПКА ВЕТВИТСЯ ПО ТИПУ ЗАНЯТИЯ (сессия 9, фаза 9). У группы это её

@@ -122,10 +122,11 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
 единственно верная.
 {% endcomment %}
 {% if not to_cart %}
-<div class="crumbs">
-  <a href="{% url 'teacher:problem_list' %}">Мои задачи</a> →
-  {% if problem %}правка{% else %}новая задача{% endif %}
-</div>
+<nav class="crumbs" aria-label="Где я">
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  <a href="{% url 'teacher:problem_list' %}">Мои задачи</a>
+  <span class="crumbs__here">{% if problem %}правка{% else %}новая задача{% endif %}</span>
+</nav>
 {% endif %}
 
 {% comment %}

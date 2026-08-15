@@ -15,7 +15,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .access import group_id_param, group_label_param, tutor_required
+from .access import (group_id_param, group_label_param,
+                     lesson_for_student, tutor_required)
 
 
 # ---------------------------------------------------------------------------
@@ -673,6 +674,9 @@ def student_progress(request, pk):
     return render(request, 'teacher/student_progress.html', {
         'student': student,
         'profile': profile,
+        # Занятие для крошки: «Ученики → занятие → имя». Правило выбора — в
+        # `access.lesson_for_student`, там же объяснено, почему не «Назад».
+        'lesson': lesson_for_student(request.user, student, request),
         'note': note,
         'period': period,
         'periods': stats_module.PERIODS,

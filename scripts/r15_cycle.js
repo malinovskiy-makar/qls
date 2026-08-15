@@ -191,6 +191,93 @@ async function cursorsOnPage(page) {
   await shot(page, 'ф1-разбор-380');
   await page.setViewportSize({ width: 1440, height: 1000 });
 
+  // ══ ФАЗА 2: крошки ═════════════════════════════════════════════════════
+  console.log('\n— Фаза 2: крошки одинаковы на всех экранах');
+  const CRUMB_PAGES = [
+    ['/teacher/groups/2/', 'обзор занятия'],
+    ['/teacher/groups/2/assignments/6/', 'задание целиком'],
+    ['/teacher/groups/2/assignments/6/submissions/', 'сводка решений'],
+    ['/teacher/groups/2/assignments/6/students/9/', 'глазами ученика'],
+    ['/teacher/assignment/create/?group=3', 'искать самому'],
+    ['/teacher/assignment/generate/?group=2', 'описать словами'],
+    ['/teacher/assignment/build/?group=2', 'конструктор подборки'],
+    ['/teacher/groups/2/exams/new/', 'конструктор контрольной'],
+    ['/teacher/problems/new/', 'своя задача'],
+    ['/teacher/problems/', 'мои задачи'],
+    ['/teacher/student/11/progress/', 'карточка ученика'],
+  ];
+  const looks = [];
+  for (const [url, name] of CRUMB_PAGES) {
+    if (!await open(page, url, name)) continue;
+    const info = await page.evaluate(() => {
+      const box = document.querySelector('.crumbs');
+      if (!box) return null;
+      const cs = getComputedStyle(box);
+      const kids = [...box.children];
+      return {
+        кегль: cs.fontSize,
+        последнее: getComputedStyle(kids[kids.length - 1]).color,
+        ссылка: kids[0] ? getComputedStyle(kids[0]).color : null,
+        подчёркивание: kids[0]
+          ? getComputedStyle(kids[0]).textDecorationLine : null,
+        стрелка: kids.length > 1
+          ? getComputedStyle(kids[1], '::before').content : null,
+        стрелкаЦвет: kids.length > 1
+          ? getComputedStyle(kids[1], '::before').color : null,
+        первойСтрелкиНет:
+          getComputedStyle(kids[0], '::before').content === 'none',
+      };
+    });
+    check(`${name}: крошка есть`, info !== null);
+    if (!info) continue;
+    looks.push([name, info]);
+    check(`${name}: не браузерная синь`,
+      info.ссылка !== 'rgb(0, 0, 238)', info.ссылка);
+    check(`${name}: без подчёркивания`,
+      info.подчёркивание === 'none', info.подчёркивание);
+    check(`${name}: перед первым звеном стрелки нет`, info.первойСтрелкиНет);
+  }
+  // Одинаковость: все экраны обязаны совпасть по кеглю и трём цветам.
+  if (looks.length) {
+    const first = JSON.stringify({
+      кегль: looks[0][1].кегль, последнее: looks[0][1].последнее,
+      ссылка: looks[0][1].ссылка,
+    });
+    const разные = looks.filter(([, i]) => JSON.stringify({
+      кегль: i.кегль, последнее: i.последнее, ссылка: i.ссылка,
+    }) !== first).map(([n]) => n);
+    check('вид крошек совпадает на всех экранах', разные.length === 0, разные);
+    check('последнее звено — обычный текст, не приглушённый',
+      looks[0][1].последнее !== 'rgb(91, 100, 114)', looks[0][1].последнее);
+    check('стрелку рисует CSS и она акцентная',
+      looks.every(([, i]) => i.стрелка === null
+        || (i.стрелка.includes('→') && i.стрелкаЦвет === 'rgb(190, 24, 93)')));
+  }
+
+  console.log('\n— Фаза 2: ссылок «назад по истории» не осталось');
+  for (const [url, name] of CRUMB_PAGES) {
+    await page.goto(BASE + url, { waitUntil: 'domcontentloaded' });
+    const jsLinks = await page.$$eval('a[href^="javascript:"]',
+      (nodes) => nodes.length);
+    check(`${name}: нет ссылок javascript:`, jsLinks === 0, jsLinks);
+  }
+
+  console.log('\n— Фаза 2: крошки в тёмной теме и на 380');
+  await page.evaluate(() => localStorage.setItem('theme', 'dark'));
+  await open(page, '/teacher/assignment/create/?group=3', 'конструктор (тёмная)');
+  await shot(page, 'ф2-крошки-конструктор-тёмная');
+  await page.setViewportSize({ width: 380, height: 900 });
+  await page.evaluate(() => localStorage.setItem('theme', 'light'));
+  await open(page, '/teacher/groups/2/assignments/6/submissions/', 'сводка (380)');
+  const crumbWide = await page.evaluate(() => {
+    const box = document.querySelector('.crumbs');
+    return { scroll: box.scrollWidth, client: box.clientWidth };
+  });
+  check('на 380 крошка переносится, а не тянет вбок',
+    crumbWide.scroll <= crumbWide.client + 1, crumbWide);
+  await shot(page, 'ф2-крошки-380');
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
   // ══ ИТОГ ═══════════════════════════════════════════════════════════════
   console.log(`\n${'='.repeat(60)}`);
   console.log(`Проверок: ${ok + bad}, зелёных: ${ok}, красных: ${bad}`);

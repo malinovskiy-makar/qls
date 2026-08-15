@@ -1002,6 +1002,8 @@ def student_work_review(request, assignment_id, student_id, group_id=None):
     context = work_review_context(
         assignment, student, viewer=request.user, for_tutor=True,
         back_url=back_url, back_label='К решениям', open_item=open_item)
+    # Занятие для крошки. Работа без группы — крошка обходится без звена.
+    context['crumbs_group'] = group if group_id is not None else assignment.group
     return render(request, 'student/work_review.html', context)
 
 

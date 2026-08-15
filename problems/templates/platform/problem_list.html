@@ -3,6 +3,11 @@
 {% block title %}Мои задачи{% endblock %}
 
 {% block content %}
+<nav class="crumbs" aria-label="Где я">
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  <span class="crumbs__here">Мои задачи</span>
+</nav>
+
 <div class="page-header">
   <div>
     <h1 class="page-title">Мои задачи</h1>

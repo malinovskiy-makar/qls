@@ -16,10 +16,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="crumbs">
-  <a href="{% url 'teacher:groups' %}">Ученики</a> →
-  {% if individual %}Новый ученик{% else %}Новая группа{% endif %}
-</div>
+<nav class="crumbs" aria-label="Где я">
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  <span class="crumbs__here">{% if individual %}Новый ученик{% else %}Новая группа{% endif %}</span>
+</nav>
 
 <h1 class="page-title" style="margin-bottom: 20px;">
   {% if individual %}Добавить ученика{% else %}Создать группу{% endif %}

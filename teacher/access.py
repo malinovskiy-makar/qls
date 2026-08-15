@@ -94,6 +94,43 @@ def group_id_param(request):
     return raw if raw.isdigit() else ''
 
 
+def lesson_for_student(user, student, request=None):
+    """Занятие, в контексте которого смотрят на ученика. Нужно КРОШКЕ.
+
+    ⚠️ ЗАЧЕМ. На карточке ученика вместо крошки стояла ссылка
+    `javascript:history.back()` — «Назад» уводило туда, откуда пришли, то
+    есть куда угодно: из поиска, из соседней вкладки, с обновлённой
+    страницы — никуда. Крошка обязана вести в ОБЗОР ЗАНЯТИЯ, а для этого
+    занятие надо назвать.
+
+    Правило выбора:
+    1. Пришли из занятия (`?group=`) — берём его, но только если оно этого
+       репетитора И в нём есть этот ученик. Чужой номер в адресе не должен
+       подписывать крошку чужим названием.
+    2. Иначе — занятие этого репетитора с этим учеником, первое по
+       алфавиту. У ученика их обычно одно; когда их два, порядок обязан
+       быть устойчивым, иначе крошка меняется от загрузки к загрузке.
+    3. Ни одного — None, и крошка обходится двумя звеньями.
+    """
+    from problems.models import StudentGroup
+
+    lessons = StudentGroup.objects.filter(students=student)
+    if not user.is_staff:
+        lessons = lessons.filter(teacher=user)
+
+    if request is not None:
+        raw = group_id_param(request)
+        if raw:
+            asked = lessons.filter(pk=raw).first()
+            if asked is not None:
+                return asked
+
+    # ⚠️ Сортируем УЖЕ ВЫБРАННЫЕ, а не в базе: у индивидуального занятия на
+    # экране стоит имя ученика (`display_name`), а в базе — название группы,
+    # и «первое по алфавиту» по названию выбрало бы не то, что видно глазам.
+    return min(lessons, key=lambda g: g.display_name.lower(), default=None)
+
+
 def group_label_param(request):
     """Название занятия из `?group=` — для крошки экранов создания.
 

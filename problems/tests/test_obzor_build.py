@@ -20,6 +20,22 @@ def read(*parts):
         return handle.read()
 
 
+def _crumb_text(html):
+    """Крошка строкой, как её видит глаз.
+
+    ⚠️ Стрелку рисует CSS (ревью 15.08, фаза 2), в разметке её нет —
+    собираем из текстов звеньев. Та же сборка, что в `test_obzor_nav`.
+    """
+    found = re.search(r'<nav class="crumbs"[^>]*>(.*?)</nav>', html, re.S)
+    if not found:
+        return ''
+    parts = re.findall(r'<(?:a|span)\b[^>]*>(.*?)</(?:a|span)>',
+                       found.group(1), re.S)
+    clean = [re.sub(r'\s+', ' ', re.sub('<[^>]+>', '', part)).strip()
+             for part in parts]
+    return ' → '.join(part for part in clean if part)
+
+
 class Base(TestCase):
     def setUp(self):
         self.tutor = make_user('ob_tutor', role='teacher')
@@ -39,13 +55,13 @@ class OwnProblemHeaderTests(Base):
 
     def test_only_one_crumb_in_build_context(self):
         html = self._in_build()
-        self.assertEqual(html.count('<div class="crumbs">'), 1)
+        self.assertEqual(html.count('<nav class="crumbs"'), 1)
 
     def test_that_crumb_is_the_common_one(self):
-        html = self._in_build()
-        crumb = re.search(r'<div class="crumbs">(.*?)</div>', html, re.S).group(1)
-        text = re.sub(r'\s+', ' ', re.sub('<[^>]+>', '', crumb)).strip()
-        self.assertEqual(text, 'Ученики → Группа А → новая работа')
+        # ⚠️ Стрелку рисует CSS (ревью 15.08, фаза 2) — собираем строку из
+        # звеньев так же, как её видит глаз.
+        self.assertEqual(_crumb_text(self._in_build()),
+                         'Ученики → Группа А → новая работа')
 
     def test_common_header_parts_are_there(self):
         html = self._in_build()
@@ -55,8 +71,7 @@ class OwnProblemHeaderTests(Base):
 
     def test_from_my_problems_the_old_crumb_stays(self):
         html = self.client.get(reverse('teacher:problem_new')).content.decode()
-        crumb = re.search(r'<div class="crumbs">(.*?)</div>', html, re.S).group(1)
-        self.assertIn('Мои задачи', crumb)
+        self.assertIn('Мои задачи', _crumb_text(html))
         # Общей шапки нет: ни переключателя вида, ни плиток способа.
         self.assertNotIn('<a class="bh-kind__opt', html)
         self.assertNotIn('<span class="k-tile__name">', html)

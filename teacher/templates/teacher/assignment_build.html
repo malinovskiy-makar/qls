@@ -60,9 +60,18 @@
 
 {% block content %}
 <div class="bd-wrap">
+{% comment %}
+⚠️ КРОШКА ВМЕСТО «← Подбор» (ревью 15.08, п. 2.5). Путь назад не потерян —
+он стал звеном крошки; заодно видно, в каком занятии собирается работа.
+{% endcomment %}
+<nav class="crumbs" aria-label="Где я">
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  {% if group %}<a href="{% url 'teacher:group_detail' group.pk %}?tab=assignments">{{ group.display_name }}</a>{% endif %}
+  <a href="{% url 'teacher:assignment_generate' %}?kind={{ kind }}{% if group_id %}&amp;group={{ group_id }}{% endif %}">описать словами</a>
+  <span class="crumbs__here">конструктор подборки</span>
+</nav>
+
 <div class="page-header">
-  <a href="{% url 'teacher:assignment_generate' %}?kind={{ kind }}{% if group_id %}&amp;group={{ group_id }}{% endif %}"
-     class="back-link">← Подбор</a>
   <h1 class="page-title">Конструктор подборки</h1>
 </div>
 
