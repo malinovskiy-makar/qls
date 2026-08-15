@@ -30,7 +30,9 @@ from django.views.decorators.http import require_POST
 from problems import hw_generator
 
 from . import picker
-from .access import group_id_param, group_label_param, tutor_required
+from .access import (
+    group_id_param, group_label_param, group_param_refusal, tutor_required,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +109,12 @@ def _catalog_size():
 @tutor_required
 def assignment_generate(request):
     """Экран подбора. Шаг определяется тем, что пришло в POST."""
+    # Чужое или несуществующее занятие в адресе — отказ СРАЗУ, а не
+    # через три шага страницей Django (ревью 15.08, фаза 15).
+    refusal = group_param_refusal(request)
+    if refusal is not None:
+        return refusal
+
     # Домашка или контрольная. Движок подбора один и тот же (фаза 19);
     # отличается только то, какие настройки спрашиваем на последнем шаге.
     kind = request.POST.get('kind') or request.GET.get('kind') or 'homework'
@@ -348,6 +356,9 @@ def assignment_build(request):
     точки создания работы нет, иначе правила разъедутся — сегодня в одной
     появится проверка срока, завтра в другой нет.
     """
+    refusal = group_param_refusal(request)
+    if refusal is not None:
+        return refusal
     from problems import exam_engine
     from problems.models import StudentGroup
 

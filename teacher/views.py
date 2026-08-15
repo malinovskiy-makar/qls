@@ -16,6 +16,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from .access import (group_id_param, group_label_param,
+                     group_param_refusal,
                      lesson_for_student, tutor_required)
 
 
@@ -747,6 +748,11 @@ def _strip_latex(text):
 @teacher_required
 def assignment_create(request):
     """Конструктор домашки. Отбор задач — общий модуль `teacher/picker.py`."""
+    # Чужое занятие в адресе — отказ сразу, с возвратом на «Ученики».
+    refusal = group_param_refusal(request)
+    if refusal is not None:
+        return refusal
+
     from problems.models import Assignment, StudentGroup
 
     from .picker import (

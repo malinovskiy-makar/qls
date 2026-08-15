@@ -20,7 +20,9 @@ from problems.models_platform import (
     SolutionVisibility,
 )
 
-from .access import group_id_param, group_label_param, tutor_required
+from .access import (
+    group_id_param, group_label_param, group_param_refusal, tutor_required,
+)
 
 
 def _canonical_topics():
@@ -171,6 +173,13 @@ def _parse_steps(raw):
 
 @tutor_required
 def problem_form(request, pk=None):
+    # ⚠️ Экран «Написать свою» тоже таскает занятие через `?group=`, и
+    # чужой номер уезжал дальше по цепочке экранов создания. Отказ здесь
+    # же, с возвратом на «Ученики» (ревью 15.08, фаза 15).
+    refusal = group_param_refusal(request)
+    if refusal is not None:
+        return refusal
+
     problem = None
     if pk is not None:
         problem = get_object_or_404(CustomProblem, pk=pk,

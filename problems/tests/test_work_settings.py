@@ -191,8 +191,14 @@ class GroupAndKindSurviveTheSwitchers(TestCase):
                     reverse('teacher:problem_new')):
             for bad in ('abc', 'null', '1; drop', ''):
                 response = self.client.get(url, {'group': bad, 'to_cart': '1'})
-                self.assertEqual(response.status_code, 200,
-                                 f'{url}?group={bad}')
+                # ⚠️ ПЕРЕСЧИТАН (ревью 15.08, фаза 15). Требование прежнее —
+                # пятисотки быть не должно; но с этой сессии непонятное
+                # занятие не «просто игнорируется», а получает внятный
+                # отказ с возвратом на «Ученики». Пустое значение законно и
+                # по-прежнему открывает экран.
+                expected = (200,) if bad == '' else (200, 302)
+                self.assertIn(response.status_code, expected,
+                              f'{url}?group={bad}')
 
 
 class ManualSearchFiltersStayComplete(TestCase):

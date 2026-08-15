@@ -1,0 +1,36 @@
+{% extends "teacher/base.html" %}
+{% comment %}
+Страница «не найдено» с возвратом туда, откуда можно продолжить.
+
+⚠️ ЗАЧЕМ (ревью 15.08, фаза 15). Прямой адрес несуществующего занятия
+(`/teacher/groups/13/exams/new/`) отдавал служебную страницу Django
+«No StudentGroup matches the given query» — текст для разработчика, а не
+для репетитора, и без единой ссылки. Отказ остался отказом (код 404,
+ничего не выдумываем), но теперь он объясняет и уводит на «Ученики».
+
+⚠️ При включённом DEBUG Django показывает СВОЮ жёлтую страницу и сюда не
+заходит — это его отладочный режим, а не наша разметка. На проде
+DEBUG выключен, и виден этот шаблон.
+{% endcomment %}
+{% block title %}Страница не найдена — ЭкЗадачи{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Такой страницы нет</h1>
+    <div class="page-sub">
+      Возможно, занятие или работа удалены — или в адресе опечатка.
+    </div>
+  </div>
+</div>
+
+<div class="k-card">
+  <p class="k-hint" style="margin:0 0 14px">
+    Ничего не потеряно: всё, что вы создавали, лежит на своих местах.
+  </p>
+  <div class="k-row" style="gap:10px;flex-wrap:wrap">
+    <a class="k-btn k-btn--main" href="{% url 'teacher:groups' %}">К ученикам</a>
+    <a class="k-btn k-btn--plain" href="{% url 'teacher:dashboard' %}">На дашборд</a>
+  </div>
+</div>
+{% endblock %}

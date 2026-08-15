@@ -88,10 +88,44 @@ def group_id_param(request):
 
     Проверять существование занятия здесь НЕ надо: номер тут нужен только
     чтобы собрать ссылку и не потеряться между экранами, а всё, что меняет
-    данные, идёт через `own_group_or_404`.
+    данные, идёт через `own_group_or_404`. Отказ по чужому и
+    несуществующему занятию даёт `group_param_refusal` — см. ниже.
     """
     raw = (request.POST.get('group') or request.GET.get('group') or '').strip()
     return raw if raw.isdigit() else ''
+
+
+def group_param_refusal(request):
+    """ Отказ, если `?group=` называет ЧУЖОЕ или несуществующее занятие.
+
+    Возвращает готовый ответ-перенаправление или None, если всё в порядке.
+
+    ВНИМАНИЕ: ЗАЧЕМ ОТДЕЛЬНАЯ ПРОВЕРКА (ревью 15.08, фаза 15). Подстановка
+    `?group=13` открывала экран создания как ни в чём не бывало: крошка
+    молча теряла имя занятия (`group_label_param` отдаёт пустую строку и
+    ТЕМ САМЫМ МАСКИРУЕТ ошибку), работа собиралась, а переключатель
+    «Контрольная» уводил на `/teacher/groups/13/exams/new/` и выдавал
+    страницу Django «No StudentGroup matches the given query». То есть
+    отказ был, но приходил через три шага и на чужом языке.
+
+    Отказ обязан быть СРАЗУ и с возвратом туда, откуда можно продолжить, —
+    на «Ученики». Пустой параметр законен: работу создают и без занятия.
+    """
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.urls import reverse
+
+    from problems.models import StudentGroup
+
+    raw = (request.POST.get('group') or request.GET.get('group') or '').strip()
+    if not raw:
+        return None
+    if (raw.isdigit()
+            and StudentGroup.objects.filter(pk=int(raw),
+                                            teacher=request.user).exists()):
+        return None
+    messages.error(request, 'Такого занятия нет — выберите его из списка.')
+    return redirect(reverse('teacher:groups'))
 
 
 def lesson_for_student(user, student, request=None):
