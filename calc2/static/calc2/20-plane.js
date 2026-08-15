@@ -158,6 +158,19 @@ function addDefs(mx, my) {
     .attr('x', x0).attr('y', y1)
     .attr('width', Math.max(0, x1 - x0))
     .attr('height', Math.max(0, y0 - y1));
+
+  /* Б43. Прямоугольник прибыли и убытка рисуется ШТРИХОВКОЙ, а не сплошным
+     цветом. Сплошная зелёная заливка спорила с кривой MC: цвета не совпадали,
+     но читались как один. Штриховка отличает область от линии по САМОМУ ВИДУ,
+     а не по оттенку, поэтому спорить им больше нечем. */
+  [['hatch-profit', COL.profit], ['hatch-loss', COL.bad]].forEach(([id, color]) => {
+    const p = defs.append('pattern').attr('id', id)
+      .attr('width', 7).attr('height', 7).attr('patternUnits', 'userSpaceOnUse')
+      .attr('patternTransform', 'rotate(45)');
+    p.append('rect').attr('width', 7).attr('height', 7).attr('fill', color).attr('opacity', 0.10);
+    p.append('line').attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', 7)
+      .attr('stroke', color).attr('stroke-width', 2).attr('opacity', 0.55);
+  });
 }
 
 // Лёгкая сетка по делениям шкал. Рисуется под осями, поэтому первой.

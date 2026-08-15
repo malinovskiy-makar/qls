@@ -1186,22 +1186,32 @@
           кривые не запрещаются, но об этом будет сказано.</div>
       </div>
       <div class="error" id="costs-error"></div>
-      <div style="margin-top:10px;">
+      <!-- Б21, Б22. Названия кривых полные: «MC (предельные)» обрывалось на
+           полуслове, а слово «затраты» и есть то, чего в них не хватало.
+           Полные суммарные величины (TC, VC, FC) стоят вместе, отдельной
+           группой: раньше в списке был один VC без своей пары. -->
+      <div class="curve-group" style="margin-top:10px;">
+        <div class="curve-group-title">Средние и предельные затраты</div>
         <label class="chk"><input type="checkbox" id="chk-mc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costMC" title="Цвет MC"> MC (предельные)</label>
+          <input type="color" class="swatch swatch-pick" data-col="costMC" title="Цвет MC"> MC, предельные затраты</label>
         <label class="chk"><input type="checkbox" id="chk-atc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costATC" title="Цвет ATC"> ATC (средние общие)</label>
+          <input type="color" class="swatch swatch-pick" data-col="costATC" title="Цвет ATC"> ATC, средние общие затраты</label>
         <label class="chk"><input type="checkbox" id="chk-avc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costAVC" title="Цвет AVC"> AVC (средние переменные)</label>
+          <input type="color" class="swatch swatch-pick" data-col="costAVC" title="Цвет AVC"> AVC, средние переменные затраты</label>
         <label class="chk"><input type="checkbox" id="chk-afc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costAFC" title="Цвет AFC"> AFC (средние постоянные)</label>
+          <input type="color" class="swatch swatch-pick" data-col="costAFC" title="Цвет AFC"> AFC, средние постоянные затраты</label>
+        <div class="curve-group-title" style="margin-top:8px;">Полные затраты</div>
+        <label class="chk"><input type="checkbox" id="chk-tc">
+          <input type="color" class="swatch swatch-pick" data-col="costTC" title="Цвет TC"> TC, общие затраты</label>
         <label class="chk"><input type="checkbox" id="chk-vc">
-          <input type="color" class="swatch swatch-pick" data-col="costVC" title="Цвет VC"> VC (переменные, полные)</label>
+          <input type="color" class="swatch swatch-pick" data-col="costVC" title="Цвет VC"> VC, переменные затраты</label>
+        <label class="chk"><input type="checkbox" id="chk-fc">
+          <input type="color" class="swatch swatch-pick" data-col="costFC" title="Цвет FC"> FC, постоянные затраты</label>
       </div>
       <!-- 9в: долгосрочное равновесие конкурентной фирмы. -->
       <div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border);">
         <label class="chk"><input type="checkbox" id="chk-lr" checked>
-          <span class="swatch" style="background:var(--curve-reg)"></span> Рыночная цена P и прибыль</label>
+          <span class="swatch" style="background:var(--c-price)"></span> Рыночная цена P и прибыль</label>
         <div class="field" id="lr-price-field">
           <label>Цена P = <b id="lr-price-val">15</b></label>
           <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
@@ -1987,17 +1997,21 @@
         <!-- П41: выбор кривой узкий, справа от него — отрезок в скобках.
              Границы первой четверти подставляются сами, поля «от/до» больше
              не нужны: их прежний смысл целиком в этой подписи. -->
+        <!-- Б16. Подпись отрезка стоит ОТДЕЛЬНОЙ СТРОКОЙ под списком. В одной
+             строке со списком места ей не оставалось, и «на отрезке [0; 100]»
+             переносилось по одному знаку в полосу шириной в два десятка
+             пикселей, а хвост обрезался краем панели. -->
         <div id="ac-pane-curve">
           <div class="ac-pick-row">
             <select id="ac-pick"></select>
-            <span class="ac-range" id="ac-range">Выберите кривую</span>
           </div>
+          <div class="ac-range" id="ac-range"></div>
         </div>
 
         <div id="ac-pane-poly" style="display:none;">
           <div class="ac-empty" id="ac-verts-empty">Выберите точки на графике</div>
           <div class="vert-btns" id="ac-vert-btns" style="display:none;">
-            <button class="btn-sm" id="ac-vert-clear" type="button">Убрать все вершины</button>
+            <button class="btn btn-quiet" id="ac-vert-clear" type="button" style="width:100%;">Убрать все вершины</button>
           </div>
           <div id="ac-verts"></div>
         </div>
@@ -2005,9 +2019,11 @@
         <button class="btn" id="ac-calc" type="button" style="margin-top:8px;width:100%;" disabled>Посчитать площадь</button>
         <div class="error" id="ac-error"></div>
         <div id="info-areacalc" style="margin-top:8px;"></div>
-        <!-- Н57: «Убрать все» стоит ПОД таблицей, к которой относится. Над ней
-             она читалась как продолжение кнопки расчёта. -->
-        <button class="btn-sm" id="ac-clear" type="button" style="margin-top:6px;">Убрать все</button>
+        <!-- Н57: «Убрать всё» стоит ПОД таблицей, к которой относится. Над ней
+             она читалась как продолжение кнопки расчёта.
+             Б17: главная и второстепенная кнопки одного семейства — один
+             размер и одна геометрия, разная только заливка. Б18: «всё». -->
+        <button class="btn btn-quiet" id="ac-clear" type="button" style="margin-top:6px;width:100%;">Убрать всё</button>
       </div>
     </div>
 

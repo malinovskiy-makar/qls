@@ -156,9 +156,9 @@ function ppfTypeLabel() {
   if (isNaN(s1) || isNaN(s2) || isNaN(s3)) return 'нелинейная';
   const c1 = Math.abs(s1), c3 = Math.abs(s3);
   const flat = Math.abs(s1 - s2) < 1e-4 && Math.abs(s2 - s3) < 1e-4;
-  if (flat) return 'линейная (пост. альт. изд.)';
-  if (c3 > c1 * (1 + 1e-4)) return 'вогнутая (растущие альт. изд.)';
-  if (c3 < c1 * (1 - 1e-4)) return 'выпуклая (падающие альт. изд.)';
+  if (flat) return 'линейная: постоянные альтернативные издержки';
+  if (c3 > c1 * (1 + 1e-4)) return 'вогнутая: растущие альтернативные издержки';
+  if (c3 < c1 * (1 - 1e-4)) return 'выпуклая: падающие альтернативные издержки';
   return 'нелинейная';
 }
 
@@ -438,7 +438,7 @@ function updatePpfPanel() {
     html += `<div class="stat"><span>${STATE.ppfName2 || 'КПВ 2'}: $X_{max}$ / $Y_{max}$</span>`
           + `<b>${fmt(m2x)} / ${fmt(m2y)}</b></div>`;
     const k2 = Math.abs(ppfSlopeOf(evalPpf2, m2x * 0.5));
-    html += `<div class="stat"><span>${STATE.ppfName2 || 'КПВ 2'}: альт. издержки X</span><b>${fmt(k2)} Y за ед. X</b></div>`;
+    html += `<div class="stat"><span>${STATE.ppfName2 || 'КПВ 2'}: альтернативные издержки X</span><b>${fmt(k2)} Y за ед. X</b></div>`;
   }
   if (STATE.bundleOn) {
     const b = bundleRay(f);
@@ -767,7 +767,7 @@ function combinedPpfFormula(c1, c2) {
     const lo = (c1.b <= c2.b) ? c1 : c2, hi = (c1.b <= c2.b) ? c2 : c1;  // меньшая альт. цена X специализируется первой
     const Atot = lo.a + hi.a, xk = lo.Xmax, Xtot = lo.Xmax + hi.Xmax, Ykink = hi.a;
     if (Math.abs(lo.b - hi.b) < 1e-6) {
-      const text = `Y = ${fmt(Atot)} − ${fmt(lo.b)}·X,  X ∈ [0; ${fmt(Xtot)}]  (равные альт. издержки дают одну прямую).`;
+      const text = `Y = ${fmt(Atot)} − ${fmt(lo.b)}·X,  X ∈ [0; ${fmt(Xtot)}]  (равные альтернативные издержки дают одну прямую).`;
       return { type: 'линейная (1 кусок)', text, evalY: (x) => (x >= 0 && x <= Xtot) ? Atot - lo.b * x : NaN, kinks: [] };
     }
     const C = hi.a + hi.b * xk;                       // второй кусок: Y = C − hi.b·X

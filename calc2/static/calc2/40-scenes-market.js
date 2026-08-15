@@ -1228,7 +1228,7 @@ function updateShiftPanel() {
   let html = '';
   html += `<div class="stat"><span>$E_0$ (исходное)</span><b>${fmt(r.E0.Q)}, ${fmt(r.E0.P)}</b></div>`;
   html += `<div class="stat"><span>$E_d$ (только спрос)</span><b>${fmt(r.Ed.Q)}, ${fmt(r.Ed.P)}</b></div>`;
-  html += `<div class="stat"><span>$E_s$ (только предлож.)</span><b>${fmt(r.Es.Q)}, ${fmt(r.Es.P)}</b></div>`;
+  html += `<div class="stat"><span>$E_s$ (только предложение)</span><b>${fmt(r.Es.Q)}, ${fmt(r.Es.P)}</b></div>`;
   html += `<div class="stat"><span>$E_1$ (оба сдвига)</span><b>${fmt(r.E1.Q)}, ${fmt(r.E1.P)}</b></div>`;
   html += '<table class="tx-table" style="margin-top:6px;"><tr><th></th><th>спрос</th><th>предл.</th><th>итог</th></tr>';
   html += `<tr><td>ΔQ*</td><td>${sg(r.dQ.demand)}</td><td>${sg(r.dQ.supply)}</td><td>${sg(r.dQ.total)}</td></tr>`;

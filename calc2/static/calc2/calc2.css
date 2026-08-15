@@ -20,9 +20,19 @@
   --c-warn:      #C2680F;   /* предупреждение                */
   --c-bad:       #D23B3B;   /* дефицит / ошибка              */
   --c-profit:    #2E9E44;   /* прямоугольник прибыли фирмы   */
+  /* Б42. Рыночная цена в сцене издержек. Раньше она рисовалась цветом
+     регулируемой цены (--curve-reg), а он совпадает с цветом AVC до последнего
+     разряда — при том что весь смысл сцены в том, где линия цены пересекает
+     AVC. Свой тон, не совпадающий ни с одной кривой издержек: от MC (172°),
+     ATC (220°), AVC (36°), AFC (268°) и VC (217°) он отстоит не меньше чем на
+     50°. В других сценах цена по-прежнему янтарная: там AVC нет. */
+  --c-price:     #B0338C;   /* линия рыночной цены на графике затрат */
   /* Кривые издержек — пять различимых вторичных цветов. */
   --cost-mc:  #119C8A;  --cost-atc: #2F6FED;  --cost-avc: #B5791F;
   --cost-afc: #8B3FE0;  --cost-vc:  #5B6472;
+  /* Полные затраты: TC и FC ходят парой с VC, поэтому и цвета из одной
+     семьи, но заметно разной светлоты (Б21). */
+  --cost-tc:  #2A3140;  --cost-fc:  #96A0AF;
 
   /* ── Шесть предложенных цветов (П34). Светлая палитра — значения Desmos,
      снятые с их страницы. Тёмная подобрана вручную под наш холст #10141c:
@@ -171,13 +181,28 @@ input:focus-visible, select:focus-visible {
 .row { display: flex; gap: 8px; }
 .row .field { flex: 1; }
 .chk { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; margin-bottom: 6px; }
-.chk input { cursor: pointer; accent-color: var(--accent); }
+/* Б23. Галочка в списке кривых — служебный переключатель, а маркер цвета рядом
+   и есть главное: по нему кривую узнают на графике. Малиновая галочка была
+   крупнее и заметнее маркера и перетягивала взгляд на себя. Делаем её
+   спокойнее (мельче и цветом текста), а маркер — заметнее. */
+.chk input[type=checkbox] { cursor: pointer; accent-color: var(--text3); width: 13px; height: 13px; flex: none; }
+.chk input[type=checkbox]:checked { accent-color: var(--text2); }
+.chk input[type=checkbox]:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 1px; }
+/* Заголовок группы кривых: разделяет средние и полные затраты (Б21). */
+.curve-group-title { font-size: 11px; font-weight: 600; color: var(--text3);
+  text-transform: uppercase; letter-spacing: .03em; margin: 0 0 5px; }
 .btn {
   width: 100%; padding: 8px 10px; border: none; border-radius: var(--r-sm);
   background: var(--btn-bg); color: var(--on-btn); font-weight: 600; font-size: 13px;
   transition: background .12s var(--ease), transform .08s var(--ease);
 }
 .btn:hover { background: var(--btn-bg-hover); }
+/* Б17. Второстепенное действие того же семейства: тот же размер и та же
+   геометрия, что у главной кнопки, разная только заливка. Прежде рядом
+   стояли крупная тёмная во всю ширину и мелкая светлая другой формы. */
+.btn.btn-quiet { background: transparent; color: var(--text2);
+  box-shadow: inset 0 0 0 1px var(--border); font-weight: 500; }
+.btn.btn-quiet:hover { background: var(--surface-2); color: var(--text); }
 .btn:active { transform: scale(.98); }
 .btn-sm {
   padding: 4px 9px; border: 1px solid var(--border); border-radius: var(--r-sm);
@@ -553,12 +578,13 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
   width: 100%; padding: 4px 6px; border: 1px solid var(--border);
   border-radius: var(--r-sm); background: var(--input-bg); font-size: 12px; color: var(--text2);
 }
-.swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+/* Б23: маркер цвета крупнее галочки — по нему кривую узнают на графике. */
+.swatch { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; }
 /* Кликабельный образец = нативный input[type=color] (Фаза 2). */
 .swatch-pick {
   -webkit-appearance: none; appearance: none;
-  width: 14px; height: 14px; padding: 0; cursor: pointer;
-  border: 1px solid var(--border-soft); border-radius: 3px; background: none;
+  width: 17px; height: 17px; padding: 0; cursor: pointer;
+  border: 1px solid var(--border-soft); border-radius: 4px; background: none;
   transition: border-color .12s var(--ease), transform .12s var(--ease);
 }
 .swatch-pick::-webkit-color-swatch-wrapper { padding: 0; }
@@ -1263,11 +1289,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 /* Выбор кривой узкий, справа от него отрезок в скобках (П41). */
 .ac-pick-row { display: flex; align-items: center; gap: 8px; }
 .ac-pick-row select {
-  flex: 0 1 128px; min-width: 0; padding: 5px 6px; font-size: 12.5px;
+  flex: 1 1 auto; min-width: 0; padding: 5px 6px; font-size: 12.5px;
   border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--input-bg); color: var(--text);
 }
-.ac-range { flex: 1; min-width: 0; font-size: 12px; color: var(--text2); font-variant-numeric: tabular-nums; }
+/* Б16: отрезок — своя строка во всю ширину, а не остаток места справа от
+   списка. Пока кривая не выбрана, строки нет вовсе (А65). */
+.ac-range { display: block; margin-top: 6px; font-size: 12px; color: var(--text2);
+  font-variant-numeric: tabular-nums; line-height: 1.5; }
+.ac-range:empty { display: none; }
 /* Кнопка расчёта не горит, пока считать нечего. */
 #ac-calc:disabled { opacity: .45; cursor: not-allowed; }
 

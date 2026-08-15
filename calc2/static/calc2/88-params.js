@@ -1037,7 +1037,7 @@ function wireControls() {
   const cmTc = document.getElementById('cm-tc'), cmCur = document.getElementById('cm-curves');
   if (cmTc) cmTc.addEventListener('click', () => setCostsInputMode('tc'));
   if (cmCur) cmCur.addEventListener('click', () => setCostsInputMode('curves'));
-  [['chk-mc', 'showMC'], ['chk-atc', 'showATC'], ['chk-avc', 'showAVC'], ['chk-afc', 'showAFC'], ['chk-vc', 'showVC'],
+  [['chk-mc', 'showMC'], ['chk-atc', 'showATC'], ['chk-avc', 'showAVC'], ['chk-afc', 'showAFC'], ['chk-vc', 'showVC'], ['chk-tc', 'showTC'], ['chk-fc', 'showFC'],
    ['chk-tp', 'showTP'], ['chk-mp', 'showMP'], ['chk-ap', 'showAP'], ['chk-iso-fan', 'isoFan'], ['chk-lr-area', 'lrArea']]
     .forEach(([id, key]) => { const el = document.getElementById(id); if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); }); });
 

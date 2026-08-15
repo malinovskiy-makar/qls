@@ -295,7 +295,8 @@ const STATE = {
   costsWarn: null,                 // несогласованность заданных кривых
   costsCompiled: null,
   costsReady: false,
-  showMC: true, showATC: true, showAVC: true, showAFC: true, showVC: false,
+  showMC: true, showATC: true, showAVC: true, showAFC: true,
+  showTC: false, showVC: false, showFC: false,   // полные затраты — по желанию
   // Фаза 9: три сюжета режима «Фирма».
   costsSub: 'costs',           // 'costs' | 'production' | 'isoquant'
   // 9в — долгосрочное равновесие: рыночная цена, оптимум P = MC, прибыль/убыток.
@@ -395,12 +396,15 @@ function refreshColors() {
        прибыли лежит рядом с кривой MC, и брать для неё оттенок из той же
        зелёно-бирюзовой части круга — значит спорить с MC (Б43). */
     profit: cssVar('--c-profit'),
+    price:  cssVar('--c-price'),      // рыночная цена на графике затрат (Б42)
     // Кривые издержек (отдельный режим — свои различимые цвета).
     costMC:  cssVar('--cost-mc'),
     costATC: cssVar('--cost-atc'),
     costAVC: cssVar('--cost-avc'),
     costAFC: cssVar('--cost-afc'),
     costVC:  cssVar('--cost-vc'),
+    costTC:  cssVar('--cost-tc'),
+    costFC:  cssVar('--cost-fc'),
     // Отдельные ключи для кривых, у которых свой пикер (Фаза 2). Значения по
     // умолчанию те же токены — картинка не меняется, но смена цвета MP больше
     // не перекрашивает MC, а веер изоквант — все кривые спроса на сайте.

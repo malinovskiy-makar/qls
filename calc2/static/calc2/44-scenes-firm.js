@@ -83,11 +83,12 @@ function costMC(q) {
 function costHas(name) {
   if (STATE.costsMode !== 'curves') {
     // Без постоянных затрат нет ни VC, ни AVC, ни AFC.
-    if (name === 'VC' || name === 'AVC' || name === 'AFC') return !isNaN(costsFC());
+    if (name === 'VC' || name === 'AVC' || name === 'AFC' || name === 'FC') return !isNaN(costsFC());
     return true;
   }
   if (name === 'MC' || name === 'ATC' || name === 'AVC') return hasPart(name);
-  if (name === 'AFC' || name === 'VC') return hasPart('ATC') && hasPart('AVC');
+  if (name === 'AFC' || name === 'VC' || name === 'FC') return hasPart('ATC') && hasPart('AVC');
+  if (name === 'TC') return hasPart('ATC');
   return false;
 }
 
@@ -237,11 +238,20 @@ function checkCostsConsistency() {
        ': по определению MC пересекает среднюю кривую ровно в её минимуме. Кривые построены, но между собой они не согласованы.');
 }
 
-// Точки кривой издержек от малого Q (>0) до Qmax. Выбросы за пределы экрана обрываем.
+/* Точки кривой издержек. Выбросы за пределы экрана обрываем.
+
+   Б46. Начинать ВСЕ кривые с Q = 0,5 было нельзя: у AFC в нуле асимптота, и
+   для неё порог оправдан, а у MC, TC и VC в нуле конечные значения — им левый
+   край графика просто отрезали. Поэтому идём от самого нуля и обрываем ровно
+   там, где кривая не определена: у средних это выходит само (деление на ноль
+   даёт бесконечность и точка отбрасывается), у остальных ничего не теряется. */
 function costPoints(f) {
-  const N = 400, q0 = 0.5, out = [];
+  const N = 400, out = [];
+  const q0 = Math.max(0, CONFIG.Qmin);
+  const step = (CONFIG.Qmax - q0) / N;
   for (let i = 0; i <= N; i++) {
-    const q = q0 + (CONFIG.Qmax - q0) * i / N;
+    // Ровно ноль пропускаем: там у средних кривых деление на ноль.
+    const q = (i === 0 && q0 === 0) ? step * 1e-3 : q0 + step * i;
     const v = f(q);
     out.push((isNaN(v) || v < 0 || v > CONFIG.Pmax * 4) ? null : [q, v]);
   }
@@ -261,6 +271,9 @@ function drawCostCurves() {
   };
   // Кривой, которой у сцены нет (нет постоянных затрат либо поле пустое),
   // не существует: галочка её не воскрешает.
+  // Полные затраты (Б21): TC, VC и FC — тройка, живут вместе.
+  curve(costTC,  COL.costTC, STATE.showTC && costHas('TC'), '5 4');
+  curve(() => costsFC(), COL.costFC, STATE.showFC && costHas('FC'), '2 4');
   curve(costVC,  COL.costVC, STATE.showVC && costHas('VC'), '5 4');   // VC — полные переменные (по желанию)
   curve(costAFC, COL.costAFC, STATE.showAFC && costHas('AFC'));
   curve(costAVC, COL.costAVC, STATE.showAVC && costHas('AVC'));
@@ -274,6 +287,8 @@ function drawCostCurves() {
   if (STATE.showAVC && costHas('AVC')) labelCurve(g, costAVC, 'AVC', COL.costAVC, { below: true });
   if (STATE.showAFC && costHas('AFC')) labelCurve(g, costAFC, 'AFC', COL.costAFC);
   if (STATE.showVC  && costHas('VC'))  labelCurve(g, costVC,  'VC',  COL.costVC, { below: true });
+  if (STATE.showTC  && costHas('TC'))  labelCurve(g, costTC,  'TC',  COL.costTC);
+  if (STATE.showFC  && costHas('FC'))  labelCurve(g, () => costsFC(), 'FC', COL.costFC, { below: true });
 
   // Ключевые точки: безубыточность (min ATC) и закрытие (min AVC) — MC проходит
   // через них. Показываем только НАСТОЯЩИЙ внутренний минимум: край отрезка
@@ -476,7 +491,8 @@ function fillLongRunArea(g) {
   const yHi = Math.max(lr.P, lr.atc), yLo = Math.min(lr.P, lr.atc);
   g.append('rect').attr('x', sx(0)).attr('y', sy(yHi))
     .attr('width', sx(lr.Q) - sx(0)).attr('height', Math.abs(sy(yLo) - sy(yHi)))
-    .attr('fill', lr.profit > 0 ? COL.profit : COL.bad).attr('opacity', lr.profit > 0 ? 0.20 : 0.18);
+    .attr('fill', lr.profit > 0 ? 'url(#hatch-profit)' : 'url(#hatch-loss)')
+    .attr('data-legend', lr.profit > 0 ? 'Прибыль фирмы' : 'Убыток фирмы');
 }
 
 // Линия цены, точка P = MC и подписи.
@@ -490,7 +506,7 @@ function fillLongRunMarks(g) {
   const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax);
   const yP = sy(lr.P);
   g.append('line').attr('x1', ox).attr('y1', yP).attr('x2', xMax).attr('y2', yP)
-    .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
+    .attr('stroke', COL.price).attr('stroke-width', 2.5).style('pointer-events', 'none');
   haloText(g, ox - 8, yP, 'P=' + fmt(lr.P), 'end', 'middle');
   // Корня P = MC может не быть вовсе — тогда на графике только линия цены.
   if (lr.Qmc == null || lr.Qmc > CONFIG.Qmax) { drawLongRunHandle(g, lr, ox, xMax, yP); return; }
@@ -525,7 +541,7 @@ function drawLongRunHandle(g, lr, ox, xMax, yP) {
     .on('drag', (e) => dragLrPrice(sy.invert(e.y)))
     .on('end', () => { document.body.style.cursor = ''; endLrDrag(); }));
   g.append('circle').attr('cx', ox + (xMax - ox) * 0.9).attr('cy', yP).attr('r', 7)
-    .attr('fill', COL.reg).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
+    .attr('fill', COL.price).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
 }
 
 function setLrPrice(p) {
@@ -733,21 +749,29 @@ function redrawProduction() {
   curve(gBot, prodMP, t2, COL.prodMP, STATE.showMP);
   curve(gBot, prodAP, t2, COL.prodAP, STATE.showAP);
   // Ключевые вертикали: перегиб TP (максимум MP) и максимум AP (там AP = MP).
-  const vline = (L, color, label) => {
+  const vline = (L, color, label, row) => {
     if (L == null) return;
     const x = lx(L);
     svg.append('line').attr('x1', x).attr('y1', top).attr('x2', x).attr('y2', bottom)
       .attr('stroke', color).attr('stroke-width', 1.2).attr('stroke-dasharray', '5 4').attr('opacity', 0.8);
     const g = svg.append('g');
-    g.append('text').attr('x', x + 5).attr('y', top + 10).attr('font-size', FS.small).attr('font-weight', 600).attr('fill', color)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
+    // Каждая подпись на своей строке: этажи разводят их даже при близких L.
+    renderLabelText(
+      g.append('text').attr('x', x + 5).attr('y', top + 10 + (row || 0) * (FS.small + 4))
+        .attr('font-size', FS.small).attr('font-weight', 600).attr('fill', color)
+        .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5),
+      label);
   };
   /* Вертикали ставим только там, где максимум НАСТОЯЩИЙ: край сетки — это не
      точка перегиба и не максимум среднего продукта (Б26). */
   const vMP = realMax(p.maxMP), vAP = realMax(p.maxAP), vTP = realMax(p.maxTP);
-  if (vMP) vline(vMP.L, COL.prodMP, 'перегиб TP · max MP · L=' + fmt(vMP.L));
-  if (vAP) vline(vAP.L, COL.prodAP, 'max AP = MP · L=' + fmt(vAP.L));
-  if (vTP) vline(vTP.L, COL.ghost, 'max TP · MP=0');
+  /* Б45. Подписи набираются формулами, а не строками с точкой посередине
+     («перегиб TP · max MP · L=10» мешало латиницу с кириллицей и читалось
+     как машинный вывод). И разводятся по вертикали: при близких L три
+     подписи в один ряд налезали друг на друга. */
+  if (vMP) vline(vMP.L, COL.prodMP, 'перегиб TP: $\\max MP$ при $L = ' + fmt(vMP.L) + '$', 0);
+  if (vAP) vline(vAP.L, COL.prodAP, '$\\max AP = MP$ при $L = ' + fmt(vAP.L) + '$', 1);
+  if (vTP) vline(vTP.L, COL.ghost, '$\\max TP$: $MP = 0$', 2);
   // Точки на нижней панели.
   if (vAP && STATE.showAP) {
     svg.append('circle').attr('cx', lx(vAP.L)).attr('cy', t2(vAP.val)).attr('r', 4.5)
