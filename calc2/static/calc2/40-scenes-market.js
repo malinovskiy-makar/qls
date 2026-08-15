@@ -446,7 +446,7 @@ function setOpenPw(p) {
   STATE.openPw = p;
   const s = document.getElementById('open-pw-slider'); if (s) s.value = p;
   const l = document.getElementById('open-pw-val');    if (l) l.textContent = fmt(p);
-  const i = document.getElementById('open-pw-input');  if (i) i.value = fmt(p);
+  const i = document.getElementById('open-pw-input');  if (i) i.value = fmtInput(p);
   redrawAll();
 }
 
@@ -905,7 +905,7 @@ function setTax(t) {
   const lbl = document.getElementById('tax-val');
   if (lbl) lbl.textContent = fmt(t);
   const inp = document.getElementById('tax-input');
-  if (inp) inp.value = fmt(t);                         // числовое поле (точное)
+  if (inp) inp.value = fmtInput(t);                         // числовое поле (точное)
   redrawAll();
 }
 
@@ -1122,10 +1122,10 @@ function updateElasticityPanel() {
   if (!STATE.D) { box.innerHTML = '<div class="muted">Отметьте кривую спроса (роль D).</div>'; return; }
   const e = STATE.elast;
   if (!e || isNaN(e.Ed)) { box.innerHTML = '<div class="warn">Эластичность не определена в этой точке.</div>'; return; }
-  const zone = e.absEd > 1.0001 ? 'эластичный (|Ed|&gt;1)' : (e.absEd < 0.9999 ? 'неэластичный (|Ed|&lt;1)' : 'единичная (|Ed|=1)');
+  const zone = e.absEd > 1.0001 ? 'эластичный, $|E_d| > 1$' : (e.absEd < 0.9999 ? 'неэластичный, $|E_d| < 1$' : 'единичная, $|E_d| = 1$');
   let html = '';
   html += `<div class="stat"><span>Точка спроса (Q, P)</span><b>${fmt(e.q)}, ${fmt(e.p)}</b></div>`;
-  html += `<div class="stat"><span>|Ed|</span><b>${fmt(e.absEd)}</b></div>`;
+  html += `<div class="stat"><span>$|E_d|$</span><b>${fmt(e.absEd)}</b></div>`;
   html += `<div class="stat"><span>Зона спроса</span><b>${zone}</b></div>`;
   html += `<div class="stat"><span>Выручка TR = P·Q</span><b>${fmt(e.TR)}</b></div>`;
   // Связь эластичности с выручкой — главный вывод темы, поэтому словами (Фаза 2а).
@@ -1136,16 +1136,16 @@ function updateElasticityPanel() {
       : 'Единичная эластичность: выручка в максимуме, малое изменение цены её почти не меняет.');
   html += `<div class="hint" style="margin-top:4px;">${trNote}</div>`;
   if (e.unit) {
-    html += `<div class="stat" style="margin-top:4px;"><span>Единичная точка</span><b>Q=${fmt(e.unit.Q)}, P=${fmt(e.unit.P)}</b></div>`;
+    html += `<div class="stat" style="margin-top:4px;"><span>Единичная точка</span><b>Q = ${fmt(e.unit.Q)}, P = ${fmt(e.unit.P)}</b></div>`;
     html += `<div class="stat"><span>Макс выручка TR</span><b>${fmt(e.unit.TR)}</b></div>`;
   }
   // Эластичность предложения (Фаза 2а) — вторая точка, своя строка в табло.
   const s = STATE.elastS;
   if (s && !isNaN(s.Es)) {
-    const zs = s.absEs > 1.0001 ? 'эластичное (|Es|&gt;1)' : (s.absEs < 0.9999 ? 'неэластичное (|Es|&lt;1)' : 'единичная (|Es|=1)');
+    const zs = s.absEs > 1.0001 ? 'эластичное, $|E_s| > 1$' : (s.absEs < 0.9999 ? 'неэластичное, $|E_s| < 1$' : 'единичная, $|E_s| = 1$');
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
     html += `<div class="stat"><span>Точка предложения (Q, P)</span><b>${fmt(s.q)}, ${fmt(s.p)}</b></div>`;
-    html += `<div class="stat"><span>|Es|</span><b>${fmt(s.absEs)}</b></div>`;
+    html += `<div class="stat"><span>$|E_s|$</span><b>${fmt(s.absEs)}</b></div>`;
     html += `<div class="stat"><span>Зона предложения</span><b>${zs}</b></div>`;
     /* Б28 · Б29. Правило про перехват верно только для ПРЯМОЙ, и раньше оно
        было записано наоборот. Вывод: у предложения P = b + aQ обратная запись
@@ -1327,9 +1327,9 @@ function updateExtPanel() {
   const mktEq = e.pos ? 'MPB = S' : 'D = MPC', optEq = e.pos ? 'MSB = S' : 'D = MSC';
   const tool = e.pos ? 'Корректирующая субсидия' : 'Корректирующий налог (Пигу)';
   let html = '';
-  html += `<div class="stat"><span>Qрын (${mktEq})</span><b>Q=${fmt(e.Qmkt)}, P=${fmt(e.Pmkt)}</b></div>`;
+  html += `<div class="stat"><span>Qрын (${mktEq})</span><b>Q = ${fmt(e.Qmkt)}, P = ${fmt(e.Pmkt)}</b></div>`;
   if (e.Qopt != null) {
-    html += `<div class="stat"><span>Qопт (${optEq})</span><b>Q=${fmt(e.Qopt)}, P=${fmt(e.Popt)}</b></div>`;
+    html += `<div class="stat"><span>Qопт (${optEq})</span><b>Q = ${fmt(e.Qopt)}, P = ${fmt(e.Popt)}</b></div>`;
     html += `<div class="stat"><span>$DWL$ (потери)</span><b>${fmt(e.dwl)}</b></div>`;
     html += `<div class="stat"><span>${tool}</span><b>${fmt(e.corrective)}</b></div>`;
     const gap = e.Qopt - e.Qmkt;
@@ -1339,7 +1339,7 @@ function updateExtPanel() {
         ? 'Рынок выпускает <b>меньше</b> общественного оптимума на ' + fmt(gap) + ': <b>недопроизводство</b>, частная выгода ниже общественной.'
         : 'Рынок уже в общественном оптимуме: внешний эффект нулевой.')}</div>`;
     if (e.applyPigou && e.pigouEq) {
-      html += `<div class="stat" style="margin-top:4px;"><span>Новое равновесие</span><b>Q=${fmt(e.pigouEq.Q)}, P=${fmt(e.pigouEq.P)}</b></div>`;
+      html += `<div class="stat" style="margin-top:4px;"><span>Новое равновесие</span><b>Q = ${fmt(e.pigouEq.Q)}, P = ${fmt(e.pigouEq.P)}</b></div>`;
       html += `<div class="hint">${e.pos ? 'Субсидия опустила издержки' : 'Налог Пигу поднял издержки'}, рынок пришёл в Qопт, DWL устранён.</div>`;
     }
   } else {
@@ -1385,7 +1385,7 @@ function setPRegFields(p) {
   STATE.pReg = p;
   const slider = document.getElementById('pc-slider'); if (slider) slider.value = p;
   const lbl = document.getElementById('pc-val');       if (lbl) lbl.textContent = fmt(p);
-  const inp = document.getElementById('pc-input');     if (inp) inp.value = fmt(p);
+  const inp = document.getElementById('pc-input');     if (inp) inp.value = fmtInput(p);
 }
 
 // Единый путь смены цены (ползунок, числовое поле, перетаскивание линии).

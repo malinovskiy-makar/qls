@@ -240,8 +240,8 @@ function bundleDragTo(x, y) {
   [['inp-bundle-x', 'inp-bundle-y'], ['inp-bundle-x2', 'inp-bundle-y2'],
    ['inp-bundle-xt', 'inp-bundle-yt']].forEach(([ix, iy]) => {
     const ex = document.getElementById(ix), ey = document.getElementById(iy);
-    if (ex && ex.value !== '') ex.value = fmt(STATE.bundleX);
-    if (ey && ey.value !== '') ey.value = fmt(STATE.bundleY);
+    if (ex && ex.value !== '') ex.value = fmtInput(STATE.bundleX);
+    if (ey && ey.value !== '') ey.value = fmtInput(STATE.bundleY);
   });
   redrawAll();
 }

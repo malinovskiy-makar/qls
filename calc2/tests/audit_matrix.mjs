@@ -160,6 +160,15 @@ for (const [key, name] of scenes) {
     if (typeof fmt === 'function' && (/[kK]/.test(fmt(5000)) || /[kK]/.test(fmt(12345)))) noK = false;
     if (texts.some(t => kRe.test(t))) noK = false;
 
+    /* Б15: дробная часть в русском интерфейсе отделяется ЗАПЯТОЙ. Проверяем и
+       сам форматчик (он общий на весь калькулятор), и напечатанное на экране:
+       точка между цифрами в подписи графика или в табло — нарушение. */
+    const dotRe = /(^|[\s(;=])\d+\.\d/;
+    let commaOk = true;
+    if (typeof fmt === 'function' && (/\d\.\d/.test(fmt(3.67)) || !/3,67/.test(fmt(3.67)))) commaOk = false;
+    const dotHits = texts.filter(t => dotRe.test(t)).slice(0, 3);
+    if (dotHits.length) commaOk = false;
+
     // П35, П48: полос прокрутки не видно ни в панелях, ни в гаечном ключе.
     // Смотрим фактическую ширину полосы, а не наличие overflow.
     const bars = [...document.querySelectorAll('.app *')].filter(el => {
@@ -275,7 +284,7 @@ for (const [key, name] of scenes) {
       resetZoom(); await wait(120);
     } catch (e) {}
 
-    return { noK, bars: bars.length, picks: picks.length, rawColor,
+    return { noK, commaOk, dotHits, bars: bars.length, picks: picks.length, rawColor,
              wheelOk, keyOk, nums: nums.length, snapAxes, zoomOk, panOk,
              boxed, fieldsSeen, axisNames: axisNames.length, axisClash };
   });
@@ -298,12 +307,13 @@ console.log('\nСцен со сломанной сеткой: ' + badGrid.length
 console.log('\n## Сквозные правила по сценам\n');
 console.log('| Сцена | П45 нет «k» | П35/П48 полос прокрутки | П34 выборов цвета (голых) | П16 колесо/стрелки | П31 оси как цель | П53/П54 зум и панорама |');
 console.log('|---|---|---|---|---|---|---|');
-const broken = { noK: [], bars: [], color: [], num: [], snap: [], zoom: [], par: [], boxed: [] };
+const broken = { noK: [], comma: [], bars: [], color: [], num: [], snap: [], zoom: [], par: [], boxed: [] };
 for (const [key, name, r] of rows) {
   if (r.par && r.par.dead.length) broken.par.push(key + ' (' + r.par.dead.join(', ') + ')');
   if (r.rules && r.rules.boxed && r.rules.boxed.length) broken.boxed.push(key + ' (' + r.rules.boxed.join(', ') + ')');
   const u = r.rules;
   if (!u.noK) broken.noK.push(key);
+  if (!u.commaOk) broken.comma.push(key + (u.dotHits && u.dotHits.length ? ' (' + u.dotHits.join(' | ').slice(0, 40) + ')' : ''));
   if (u.bars > 0) broken.bars.push(key);
   if (u.rawColor > 0) broken.color.push(key);
   if (!u.wheelOk || !u.keyOk) broken.num.push(key);
@@ -314,6 +324,7 @@ for (const [key, name, r] of rows) {
 const say = (t, arr) => console.log(`${t}: ${arr.length ? arr.length + ' (' + arr.slice(0, 8).join(', ') + ')' : 'нарушений нет'}`);
 console.log('');
 say('П45 «k» в числах', broken.noK);
+say('Б15 точка вместо десятичной запятой', broken.comma);
 say('П35/П48 видимая полоса прокрутки', broken.bars);
 say('П34 голый выбор цвета', broken.color);
 say('П16 числовое поле листается', broken.num);

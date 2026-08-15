@@ -1052,7 +1052,7 @@ function updateKinkPanel() {
   html += `<div class="stat"><span>$Q^*$ (выпуск)</span><b>${fmt(k.Qstar)}</b></div>`;
   html += `<div class="stat"><span>$P^*$ (цена)</span><b>${fmt(k.Pstar)}</b></div>`;
   html += `<div class="stat"><span>Прибыль π</span><b>${fmt(k.profit)}</b></div>`;
-  html += `<div class="stat"><span>Победил кандидат</span><b>${k.winKind} @ Q=${fmt(k.Qstar)}</b></div>`;
+  html += `<div class="stat"><span>Победил кандидат</span><b>${k.winKind} @ Q = ${fmt(k.Qstar)}</b></div>`;
   // Таблица всех кандидатов с прибылью (видно сравнение).
   html += '<table class="tx-table" style="margin-top:6px;"><tr><th>Кандидат</th><th>Q</th><th>π</th></tr>';
   k.cands.forEach(c => {

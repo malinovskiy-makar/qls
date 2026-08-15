@@ -384,9 +384,16 @@ function typesetStats(root) {
        «MathML + исходная запись + видимый текст», и мы напечатали бы её целиком.
        И знак равенства не ставим: в таком значении он обычно уже есть, вышло бы
        «Наибольшее = y* = 5». */
-    if (val.querySelector('.katex')) { row.classList.add('stat-eq', 'stat-own'); return; }
-    const raw = (val.textContent || '').trim();
-    if (!raw) return;
+    /* Значение уже набрано формулой самой сценой? Тогда textContent у него —
+       тройка «MathML + исходная запись + видимый текст», и читать надо только
+       видимую часть. Проверку на «не помещается» делаем ДО остального: длинная
+       фраза с формулой внутри («эластичный, |E_d| > 1») это тоже KaTeX. */
+    const own = !!val.querySelector('.katex');
+    const raw = (own ? katexVisibleText(val) : (val.textContent || '')).trim();
+    if (!raw) { if (own) row.classList.add('stat-eq', 'stat-own', 'stat-nosign'); return; }
+    // Составное значение и фраза не помещаются в ячейку для числа (Б39, Б40).
+    if (restatWide(row, lab, val, raw, own)) return;
+    if (own) { row.classList.add('stat-eq', 'stat-own', 'stat-nosign'); return; }
     // Числовое ли значение: число, пара, проценты, знак — да; фраза — нет.
     const numeric = /^[(\[]?\s*[-−+]?[\d.,]/.test(raw) || /^[-−+]?\d/.test(raw);
     if (numeric && typeof katex !== 'undefined') {
@@ -397,7 +404,7 @@ function typesetStats(root) {
     }
     row.classList.add('stat-eq');
     // Своё равенство внутри значения («SW = CS + PS») тоже не удваиваем.
-    if (raw.indexOf('=') >= 0) return;
+    if (raw.indexOf('=') >= 0) { row.classList.add('stat-nosign'); return; }
     const eq = document.createElement('i');
     eq.className = 'stat-sign';
     eq.setAttribute('aria-hidden', 'true');
@@ -412,9 +419,114 @@ function statToTex(s) {
   return String(s)
     .replace(/−/g, '-')
     .replace(/ /g, '\\,')
+    // Запятая между цифрами — десятичный разделитель, а не перечисление: без
+    // скобок KaTeX ставит после неё пробел, и «3,67» читается как «3, 67».
+    .replace(/(\d),(\d)/g, '$1{,}$2')
     .replace(/%/g, '\\%')
     .replace(/°/g, '^{\\circ}')
     .replace(/([A-Za-zА-Яа-я ]{2,})/g, (w) => '\\text{' + w + '}');
+}
+
+/* Строка табло, в которую значение не помещается (Б39, Б40).
+
+   Строка «подпись слева, число справа» рассчитана ровно на ОДНО число.
+   Значение, набранное KaTeX, — это inline-block с готовой шириной: сжиматься
+   ему нечем, поэтому длинное значение выдавливало подпись и печаталось прямо
+   поверх неё. Разница кеглей (12 против 16) делала кашу заметной, но причина
+   была не в кегле.
+
+   Два вида таких значений и два ответа:
+     · СПИСОК величин («Q=3.67, ATC=11.35») — подпись сверху, каждая величина
+       своей строкой снизу;
+     · ФРАЗА («эластичный (|Ed|>1)») — своей строкой под подписью, обычным
+       начертанием: это качественная характеристика, а не отсчёт прибора. */
+/* Видимый текст значения, набранного KaTeX.
+
+   Читать одни .katex-html нельзя: значение бывает СМЕШАННЫМ («единичная,
+   $|E_d| = 1$», «$y^* = -18$ при $x^* = -3$»), и обычные слова между формулами
+   так теряются — а именно по ним и видно, что перед нами фраза. Поэтому берём
+   копию узла и выбрасываем из неё MathML: он и есть тот невидимый двойник,
+   из-за которого textContent приходит утроенным. */
+function katexVisibleText(val) {
+  const clone = val.cloneNode(true);
+  clone.querySelectorAll('.katex-mathml').forEach(e => e.remove());
+  return clone.textContent || '';
+}
+
+function restatWide(row, lab, val, raw, own) {
+  const pieces = statPieces(raw);
+  const isList = pieces.length >= 2 && pieces.every(p => p.indexOf('=') >= 0);
+  const isPhrase = /[А-Яа-яЁё]{3,}/.test(raw);
+  /* Последняя проверка — по МЕСТУ, а не по виду значения. Бывает значение,
+     которое не список и не фраза, а просто длинное («MR=MC @ Q = 60»):
+     смотреть на его вид бесполезно, надо мерить. Больше двух третей строки —
+     значит подписи не осталось места, и строку раскладываем стопкой. */
+  if (!isList && !isPhrase && !statTooWide(row, lab, val)) return false;
+  row.classList.add('stat-stack');
+  /* Значение, набранное сценой, переносим КАК ЕСТЬ: разбирать готовый KaTeX
+     обратно в текст значит потерять формулы внутри. Меняется только раскладка
+     строки — подпись сверху, значение снизу. */
+  if (own) { if (isPhrase && !isList) row.classList.add('stat-phrase'); return true; }
+  val.innerHTML = '';
+  if (isList) {
+    pieces.forEach(p => {
+      const line = document.createElement('span');
+      line.className = 'stat-line';
+      if (typeof katex !== 'undefined') {
+        try { katex.render(statToTex(p), line, { throwOnError: false, displayMode: false }); }
+        catch (e) { line.textContent = p; }
+      } else line.textContent = p;
+      val.appendChild(line);
+    });
+    val.classList.add('stat-tex');
+  } else {
+    row.classList.add('stat-phrase');
+    val.textContent = raw;
+  }
+  return true;
+}
+
+/* Помещаются ли подпись и значение в одну строку.
+
+   Мерим НАПЕЧАТАННЫЙ текст (Range по содержимому), а не коробки: колонке
+   подписи разрешено сжиматься до нуля, поэтому по коробкам наложения не видно
+   вовсе — оно видно только по чернилам. И сравнивать надо СУММУ двух чернил с
+   шириной строки: значение бывает и не самым длинным, а места всё равно нет,
+   потому что длинная подпись. */
+function statInkWidth(el) {
+  try {
+    const r = document.createRange(); r.selectNodeContents(el);
+    const w = r.getBoundingClientRect().width;
+    if (w > 0) return w;
+  } catch (e) { /* ниже возьмём коробку */ }
+  return el.getBoundingClientRect().width;
+}
+function statTooWide(row, lab, val) {
+  const rw = row.getBoundingClientRect().width;
+  if (!(rw > 0)) return false;
+  // 20 px — зазор между колонками и место под знак равенства.
+  return statInkWidth(lab) + statInkWidth(val) + 20 > rw;
+}
+
+/* Разбор значения на части по запятым и точкам с запятой ВЕРХНЕГО уровня.
+   Внутри скобок не режем: «(|Ed|>1)» и «(P − ATC)·Q» это один кусок. */
+function statPieces(raw) {
+  const s = String(raw);
+  const out = [];
+  let depth = 0, cur = '';
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '(' || ch === '[') depth++;
+    else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1);
+    /* Запятая между цифрами — ДЕСЯТИЧНЫЙ разделитель (Б15), а не граница
+       списка: без этой оговорки «Q = 3,67, ATC = 11,35» разваливалось на
+       четыре куска, и составное значение переставало опознаваться. */
+    const decimal = (ch === ',') && /\d/.test(s[i - 1] || '') && /\d/.test(s[i + 1] || '');
+    if ((ch === ',' || ch === ';') && depth === 0 && !decimal) { out.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  out.push(cur);
+  return out.map(t => t.trim()).filter(Boolean);
 }
 
 /* ── Общий рендер математики в тексте интерфейса (Фаза 4) ─────────────

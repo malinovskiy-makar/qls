@@ -164,7 +164,7 @@ function computeFCfromTC() {
    каждый плюс повторная компиляция (Б32). */
 function costsSignature() {
   return [STATE.costsMode, STATE.costsTC, STATE.costsMCx, STATE.costsATCx, STATE.costsAVCx,
-          costScanTop(), paramsSignature()].join(' ');
+          costScanTop(), paramsSignature()].join(' ');
 }
 // Значения буквенных параметров: от них разбор тоже зависит.
 function paramsSignature() {
@@ -328,9 +328,9 @@ function updateCostsPanel() {
   }
 
   const mATC = realMin(STATE.minATC), mAVC = realMin(STATE.minAVC);
-  if (mATC) html += `<div class="stat"><span>Безубыточность (min ATC)</span><b>Q=${fmt(mATC.Q)}, ATC=${fmt(mATC.val)}</b></div>`;
+  if (mATC) html += `<div class="stat"><span>Безубыточность (min ATC)</span><b>Q = ${fmt(mATC.Q)}, ATC = ${fmt(mATC.val)}</b></div>`;
   else html += noMinNote(STATE.minATC, 'точки безубыточности', 'ATC');
-  if (mAVC) html += `<div class="stat"><span>Закрытие (min AVC)</span><b>Q=${fmt(mAVC.Q)}, AVC=${fmt(mAVC.val)}</b></div>`;
+  if (mAVC) html += `<div class="stat"><span>Закрытие (min AVC)</span><b>Q = ${fmt(mAVC.Q)}, AVC = ${fmt(mAVC.val)}</b></div>`;
   else html += noMinNote(STATE.minAVC, 'точки закрытия', 'AVC');
 
   if (STATE.costsWarn) html += `<div class="warn">${STATE.costsWarn}</div>`;
@@ -743,10 +743,10 @@ function updateProdPanel() {
   const p = STATE.prod;
   if (!p) { box.innerHTML = '<div class="warn">Не понял формулу Q = f(L).</div>'; return; }
   let html = '';
-  if (p.maxMP) html += `<div class="stat"><span>Перегиб TP (max MP)</span><b>L=${fmt(p.maxMP.L)}, MP=${fmt(p.maxMP.val)}</b></div>`;
-  if (p.maxAP) html += `<div class="stat"><span>Максимум AP</span><b>L=${fmt(p.maxAP.L)}, AP=${fmt(p.maxAP.val)}</b></div>`;
+  if (p.maxMP) html += `<div class="stat"><span>Перегиб TP (max MP)</span><b>L = ${fmt(p.maxMP.L)}, MP = ${fmt(p.maxMP.val)}</b></div>`;
+  if (p.maxAP) html += `<div class="stat"><span>Максимум AP</span><b>L = ${fmt(p.maxAP.L)}, AP = ${fmt(p.maxAP.val)}</b></div>`;
   if (p.maxAP && !isNaN(p.mpAtMaxAP)) html += `<div class="stat"><span>$MP$ в этой точке</span><b>${fmt(p.mpAtMaxAP)}</b></div>`;
-  if (p.maxTP) html += `<div class="stat"><span>Максимум TP</span><b>L=${fmt(p.maxTP.L)}, Q=${fmt(p.maxTP.val)}</b></div>`;
+  if (p.maxTP) html += `<div class="stat"><span>Максимум TP</span><b>L = ${fmt(p.maxTP.L)}, Q = ${fmt(p.maxTP.val)}</b></div>`;
   html += '<div class="hint" style="margin-top:4px;">С точки перегиба TP начинается <b>убывающая предельная отдача</b>: ' +
     'каждый следующий работник добавляет меньше предыдущего. В максимуме AP выполняется <b>AP = MP</b>, ' +
     'пока MP выше среднего, средний растёт; как только MP опускается ниже, средний начинает падать. ' +

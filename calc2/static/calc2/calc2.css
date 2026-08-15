@@ -1698,6 +1698,27 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .sb-body .stat.stat-eq > span { text-align: right; }
 .stat-sign { font-style: normal; color: var(--text3); font-size: 12px; }
 .sb-body .stat.stat-eq > b { text-align: left; font-weight: 700; }
+/* Б39. Страховка от наложения. Колонка подписи может сжаться до нуля
+   (minmax(0, 1fr)), но САМ ТЕКСТ подписи сжиматься не умеет и при длинном
+   значении вылезал за свою колонку прямо на число. Разрешаем ему переноситься
+   и не даём числу занять всю строку. */
+.sb-body .stat.stat-eq > span { overflow-wrap: anywhere; hyphens: auto; }
+.sb-body .stat.stat-eq > b { max-width: 100%; overflow-wrap: anywhere; }
+/* Колонок в сетке три (подпись · знак равенства · число), но знак ставится не
+   всегда: у значения со своим равенством внутри его не удваивают. Пустая
+   третья колонка при этом продолжала держать свои 78 px и додавливала подпись
+   до ширины одной буквы — та переносилась по букве в строку. Строке без знака
+   отдаём две колонки. */
+.sb-body .stat.stat-eq.stat-nosign { grid-template-columns: minmax(0, 1fr) minmax(78px, max-content); }
+
+/* Б40. Составное значение — это список, а не число, и в ячейку для числа оно
+   не помещается: подпись сверху, величины снизу, каждая своей строкой. */
+.sb-body .stat.stat-stack { display: block; padding: 6px 0; }
+.sb-body .stat.stat-stack > span { display: block; text-align: left; margin-bottom: 2px; }
+.sb-body .stat.stat-stack > b { display: block; text-align: left; }
+.sb-body .stat.stat-stack .stat-line { display: block; line-height: 1.45; }
+/* Качественная характеристика набирается обычным начертанием: это не отсчёт. */
+.sb-body .stat.stat-phrase > b { font-size: 13px; font-weight: 500; color: var(--text); }
 /* Число, набранное KaTeX: кегль табло, но без жирности самого шрифта формул. */
 .sb-body .stat b.stat-tex .katex { font-size: 1em; }
 

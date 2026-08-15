@@ -1229,7 +1229,12 @@ const CASES = [
           var texts = [].map.call(document.querySelectorAll('#chart text'), function (t) { return t.textContent; });
           var ppf = texts.filter(function (s) { return s.indexOf('КПВ (') === 0; })[0] || '';
           var ktv = texts.filter(function (s) { return s.indexOf('КТВ (') === 0; })[0] || '';
-          var nums = function (s) { var m = s.match(/([-\\d.]+); ([-\\d.]+)/); return m ? [+m[1], +m[2]] : [-1, -1]; };
+          /* Дробная часть на экране отделяется ЗАПЯТОЙ (Б15), поэтому разбор
+             числа с холста обязан её понимать: со старым классом [-\\d.] из
+             «66,67» вычитывалось «67». */
+          var nums = function (s) { var m = s.match(/([-\\d.,]+); ([-\\d.,]+)/);
+            var n = function (t) { return parseFloat(String(t).replace(',', '.')); };
+            return m ? [n(m[1]), n(m[2])] : [-1, -1]; };
           return { chk: chk, off: off, on: STATE.bundleOn ? 1 : 0,
                    px: nums(ppf)[0], py: nums(ppf)[1],
                    tx: nums(ktv)[0], ty: nums(ktv)[1],
@@ -2482,6 +2487,62 @@ const CASES = [
              ['на отпускании ползунок догоняет', 'sameSlider', 1, 0],
              ['и цена округлена', 'rounded', 1, 0],
              ['ответ тот же, что обычным путём', 'sameQ', 1, 0]],
+  },
+
+  /* --- Фаза 5: панели (Б12–Б15, Б39–Б41) ------------------------------ */
+  {
+    /* Б15. Дробная часть отделяется запятой, а числовое поле продолжает
+       получать машинную запись: type=number с запятой молча очищается.
+       Б14. Между именем величины и числом стоит отбивка.
+       Б40. Составное значение разбирается на части, но десятичная запятая
+       границей списка НЕ считается. */
+    name: 'Б15 · Запятая на экране, точка в числовом поле',
+    run: `resetSceneMemory(); pickScene('costs');
+          var pieces = statPieces('Q = 3,67, ATC = 11,35');
+          var one = statPieces('(1,73; -3,46)');
+          return { show: fmt(3.67) === '3,67' ? 1 : 0,
+                   input: fmtInput(3.67) === '3.67' ? 1 : 0,
+                   thousand: fmt(30000).indexOf(',') < 0 ? 1 : 0,
+                   n: pieces.length, first: pieces[0] === 'Q = 3,67' ? 1 : 0,
+                   inBrackets: one.length };`,
+    checks: [['на экране запятая', 'show', 1, 0], ['в поле точка', 'input', 1, 0],
+             ['разряды не путаются с дробью', 'thousand', 1, 0],
+             ['составное делится надвое', 'n', 2, 0], ['и по нужному месту', 'first', 1, 0],
+             ['внутри скобок не режем', 'inBrackets', 1, 0]],
+  },
+  {
+    /* Б39, Б12. Причина наложения: у значения, набранного KaTeX, нет чем
+       сжиматься, а колонке подписи разрешено ужаться до нуля. Плюс сетка
+       строки держала 78 px под знак равенства даже там, где знака нет.
+       Проверяем ИТОГ: ни в одной строке табло подпись и значение не
+       перекрываются напечатанным текстом. */
+    name: 'Б39 · Подпись и значение в табло не налезают друг на друга',
+    run: `var keys = ['elast', 'costs', 'prod', 'mono-kink', 'm-optimum', 'ext', 'trade'];
+          var ink = function (el) { var r = document.createRange(); r.selectNodeContents(el);
+            var b = r.getBoundingClientRect();
+            return (b.width > 0 && b.height > 0) ? b : el.getBoundingClientRect(); };
+          var over = 0, rows = 0, stacked = 0;
+          keys.forEach(function (k) {
+            resetSceneMemory(); pickScene(k);
+            ['sb-btn', 'ex-btn'].forEach(function (id) {
+              var b = document.getElementById(id);
+              if (b && b.getAttribute('aria-expanded') !== 'true') b.click();
+            });
+            document.querySelectorAll('.sb-body .stat').forEach(function (row) {
+              var lab = row.querySelector(':scope > span'), val = row.querySelector(':scope > b');
+              if (!lab || !val) return;
+              var lr = ink(lab), vr = ink(val);
+              if (!(lr.width > 0 && vr.width > 0)) return;
+              rows++;
+              if (row.classList.contains('stat-stack')) { stacked++; return; }
+              var ox = Math.min(lr.right, vr.right) - Math.max(lr.left, vr.left);
+              var oy = Math.min(lr.bottom, vr.bottom) - Math.max(lr.top, vr.top);
+              if (ox > 1 && oy > 1) over++;
+            });
+          });
+          return { over: over, rows: rows > 30 ? 1 : 0, stacked: stacked > 0 ? 1 : 0 };`,
+    checks: [['наложений', 'over', 0, 0], ['строки нашлись', 'rows', 1, 0],
+             ['стопкой разложено', 'stacked', 1, 0]],
   },
 ];
 

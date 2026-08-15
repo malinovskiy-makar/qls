@@ -942,7 +942,7 @@ function wireControls() {
     const apply = (v) => {
       if (isNaN(v) || v < 0) return;
       STATE[key] = v;
-      if (sl) sl.value = v; if (inp) inp.value = fmt(v); if (lab) lab.textContent = fmt(v);
+      if (sl) sl.value = v; if (inp) inp.value = fmtInput(v); if (lab) lab.textContent = fmt(v);
       redrawAll();
     };
     if (sl) sl.addEventListener('input', () => apply(parseFloat(sl.value)));

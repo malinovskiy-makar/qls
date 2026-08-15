@@ -391,7 +391,7 @@ function setLaborMinFields(p) {
   STATE.laborMinW = p;
   const s = document.getElementById('labmin-slider'); if (s) s.value = p;
   const l = document.getElementById('labmin-val'); if (l) l.textContent = fmt(p);
-  const i = document.getElementById('labmin-input'); if (i) i.value = fmt(p);
+  const i = document.getElementById('labmin-input'); if (i) i.value = fmtInput(p);
 }
 // Единый путь смены МРОТ (ползунок, поле, перетаскивание).
 function setLaborMin(p) {
@@ -488,7 +488,7 @@ function setUnionWageFields(p) {
   STATE.unionWage = p;
   const s = document.getElementById('union-wage-slider'); if (s) s.value = p;
   const l = document.getElementById('union-wage-val'); if (l) l.textContent = fmt(p);
-  const i = document.getElementById('union-wage-input'); if (i) i.value = fmt(p);
+  const i = document.getElementById('union-wage-input'); if (i) i.value = fmtInput(p);
 }
 // Единый путь смены зарплаты профсоюза (ползунок, поле, перетаскивание).
 function setUnionWage(p) {
