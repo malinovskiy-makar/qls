@@ -93,6 +93,9 @@ urlpatterns = [
     # Конструктор подборки: превью работы + её настройки (сессия 8, 12.2).
     path('assignment/build/', views_generate.assignment_build,
          name='assignment_build'),
+    # Печатный лист по корзине — ДО создания работы (ревью 15.08, ф. 12).
+    path('assignment/cart/print/', views_generate.cart_print,
+         name='cart_print'),
     path('api/generate/more/', views_generate.api_more_candidates,
          name='api_more_candidates'),
     path('api/cart/rows/', views_generate.api_cart_rows,

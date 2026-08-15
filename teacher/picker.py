@@ -215,8 +215,13 @@ def parse_cart(raw):
     return keys, catalog, custom
 
 
-def cart_rows(keys, owner, manual_order=False, points=None):
-    """Корзина → позиции будущей работы В ТОМ ЖЕ ПОРЯДКЕ, что увидит ученик.
+def cart_items(keys, owner, manual_order=False, points=None):
+    """Корзина → ПОЗИЦИИ будущей работы в памяти, в порядке показа.
+
+    Отдаёт `(позиции, {id(позиции): ключ корзины})`. Нужна и правой колонке
+    конструктора, и предпросмотру печатного листка: листок собирается той
+    же `assignment_export.print_rows`, что и у созданной работы, — второй
+    сборки печати не заводим.
 
     ⚠️ СБОРКА ОДНА НА ВСЕХ. Порядок и подписи частей считает
     `assignment_rows.ordered_items` + `section_marks` — те же функции, что
@@ -270,6 +275,21 @@ def cart_rows(keys, owner, manual_order=False, points=None):
 
     shell = SimpleNamespace(manual_order=bool(manual_order))
     ordered = assignment_rows.ordered_items(shell, items)
+    return ordered, by_item
+
+
+def cart_rows(keys, owner, manual_order=False, points=None):
+    """Строки для правой колонки конструктора: всё, что показывает экран.
+
+    ⚠️ ПОЗИЦИЯ ОТДАЁТ ЗАДАЧУ ЦЕЛИКОМ (ревью 15.08, фаза 12). Блок назывался
+    «Работа глазами ученика», а показывал название, тему и балл — то есть
+    ровно то, чего ученик как раз не видит. Условие, ВСЕ пункты, ответы,
+    наличие эталонного решения, тип и сложность приходят сюда сразу: без
+    них проверить собранную работу можно только создав её.
+    """
+    from problems import assignment_rows
+
+    ordered, by_item = cart_items(keys, owner, manual_order, points)
     marks = assignment_rows.section_marks(ordered)
 
     rows = []
@@ -291,8 +311,53 @@ def cart_rows(keys, owner, manual_order=False, points=None):
             'is_test': item.is_test,
             'points': float(item.points),
             'section': marks.get(index),
+            # ⚠️ Полное содержимое задачи — ниже. Санитайзер `text_clean`
+            # здесь НЕ зовём: он живёт на показе и экспорте готовой работы,
+            # а тут задача ещё выбирается; менять текст «по дороге» в
+            # конструкторе значило бы показать не то, что уедет в работу.
+            'statement': item.statement or '',
+            'parts': _cart_parts(item),
+            'options': _cart_options(item),
+            'answer': _cart_answer(item),
+            'has_solution': bool(getattr(problem, 'solution', '')),
+            'difficulty': problem.difficulty or 0,
+            'kind_label': assignment_rows.kind_label(item),
         })
     return rows
+
+
+def _cart_parts(item):
+    """Пункты задачи для превью: буква, вопрос, эталонный ответ."""
+    from problems import assignment_rows
+
+    out = []
+    for part in assignment_rows.answer_parts(item):
+        if part is None:
+            continue
+        out.append({'label': part.label or '',
+                    'text': part.statement or '',
+                    'answer': (part.answer or '')})
+    return out
+
+
+def _cart_options(item):
+    """Варианты ответа у теста — с пометкой верного."""
+    if item.is_custom and item.custom_problem is not None:
+        return [{'label': o.label, 'text': o.text, 'right': o.is_correct}
+                for o in item.custom_problem.options.all()]
+    if item.catalog_problem_id is None:
+        return []
+    # У каталожного теста варианты — это подпункты, а верный записан
+    # буквой в поле «ответ». Разбирать её здесь не будем: в превью
+    # достаточно показать варианты и сам ответ отдельной строкой.
+    return [{'label': p.label or '', 'text': p.statement or '', 'right': False}
+            for p in item.catalog_problem.parts.all()] if item.is_test else []
+
+
+def _cart_answer(item):
+    """Ответ на задачу целиком (если он один на всю задачу)."""
+    problem = item.problem
+    return (getattr(problem, 'answer', '') or '')
 
 
 def parse_points(raw):

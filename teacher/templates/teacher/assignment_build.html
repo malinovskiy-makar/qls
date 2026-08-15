@@ -39,6 +39,60 @@
            font-size: 17px; line-height: 1; padding: 2px 4px; }
 .bd-drop:hover { color: var(--error); }
 
+/* ── Порядок задач (ревью 15.08, фаза 12) ──────────────────────────────
+   Ручка перетаскивания и две кнопки. ⚠️ КНОПКИ ОБЯЗАТЕЛЬНЫ: перетаскивание
+   с клавиатуры недоступно, и порядок, задаваемый только мышью, для части
+   людей не задаётся вовсе. */
+.bd-grip { color: var(--text3); cursor: grab; font-size: 14px;
+           line-height: 1.4; user-select: none; }
+.bd-item.is-drag { opacity: .45; }
+.bd-item.is-over { border-color: var(--accent); }
+.bd-move { display: inline-flex; flex-direction: column; gap: 2px; }
+.bd-move button { background: none; border: 0.5px solid var(--border);
+                  border-radius: 5px; color: var(--text2); cursor: pointer;
+                  font-size: 11px; line-height: 1; padding: 3px 5px; }
+.bd-move button:hover:not(:disabled) { color: var(--text);
+                                       border-color: var(--text3); }
+.bd-move button:disabled { opacity: .35; cursor: default; }
+
+/* ── Позиция целиком ───────────────────────────────────────────────────
+   Владелец: блок «показывает только название, тему и балл; ни условия, ни
+   пунктов, ни ответов». Раскрытие показывает ровно то, что уедет в работу. */
+.bd-more { background: none; border: 0; padding: 4px 0 0; cursor: pointer;
+           font-size: 12px; color: var(--accent); }
+.bd-more:hover { text-decoration: underline; }
+.bd-full { margin-top: 10px; padding: 12px 14px; border-radius: var(--r);
+           background: var(--surface-2); border: 0.5px solid var(--border);
+           font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.bd-full[hidden] { display: none; }
+.bd-full .bd-st { white-space: pre-line; }
+.bd-full .bd-part { margin-top: 8px; }
+.bd-full .bd-part b { color: var(--accent); }
+.bd-full .bd-ans { margin-top: 8px; font-size: 12px; color: var(--text2); }
+.bd-full .bd-ans b { color: var(--text); }
+.bd-full ul.bd-opts { margin: 8px 0 0; padding-left: 18px; }
+.bd-full .bd-flags { margin-top: 10px; display: flex; gap: 8px;
+                     flex-wrap: wrap; font-size: 11px; color: var(--text3); }
+
+/* Окно «как увидит ученик»: тот же список, но без ответов и решений. */
+.bd-eyes { position: fixed; inset: 0; z-index: 300; display: none;
+           background: rgba(15,23,42,.55); padding: 24px; overflow: auto; }
+.bd-eyes.is-open { display: block; }
+.bd-eyes__sheet { max-width: 760px; margin: 0 auto; background: var(--surface);
+                  border-radius: 12px; padding: 22px 26px 26px; }
+.bd-eyes__head { display: flex; align-items: baseline; gap: 12px;
+                 margin-bottom: 6px; }
+.bd-eyes__head h2 { font-size: 17px; font-weight: 700; flex: 1; }
+.bd-eyes__note { font-size: 12px; color: var(--text3); margin-bottom: 14px; }
+.bd-eyes__task { margin-top: 16px; padding-top: 14px;
+                 border-top: 1px solid var(--border-soft); }
+.bd-eyes__num { font-size: 13px; font-weight: 700; color: var(--text2); }
+.bd-eyes__st { white-space: pre-line; line-height: 1.7; margin-top: 4px; }
+.bd-eyes__part { margin-top: 8px; }
+.bd-eyes__part b { color: var(--accent); }
+.bd-eyes__field { margin-top: 8px; height: 34px; border-radius: var(--r);
+                  border: 1px dashed var(--border); background: var(--surface-2); }
+
 /* ⚠️ ЗАГОЛОВОК ЧАСТИ — ИЗ НАБОРА (`.k-sep--head`), СВОИХ ПРАВИЛ НЕТ.
    Здесь лежала своя копия пунктира; после ревью 15.08 заголовок части
    несёт состав («3 вопроса · 6 баллов») и выглядит одинаково на шести
@@ -77,8 +131,15 @@
 
 <div class="bd-layout">
   <div>
+    {% comment %}
+    ⚠️ НАЗВАНИЕ ПРИВЕДЕНО К ТОМУ, ЧТО БЛОК ПОКАЗЫВАЕТ (ревью 15.08, ф. 12).
+    Он назывался «Работа глазами ученика», а показывал название, тему и
+    балл — то есть ровно то, чего ученик и не видит. Теперь позиция
+    раскрывается целиком, а «как увидит ученик» — отдельная кнопка, и
+    название честное.
+    {% endcomment %}
     <div class="bd-head">
-      <h2>Работа глазами ученика</h2>
+      <h2>Состав работы</h2>
       {% comment %}
       Формы «1 позиция / 2 позиции / 5 позиций» в шаблоне не различить,
       поэтому число ставим ПОСЛЕ слова: так верно при любом числе.
@@ -93,6 +154,35 @@
       Пока ничего не выбрано.<br>
       Вернитесь в подбор и отметьте задачи — или добавьте их из каталога.
     </div>
+
+    {% comment %}
+    ⚠️ ДВА ПРЕДПРОСМОТРА ДО СОЗДАНИЯ РАБОТЫ (ревью 15.08, ф. 12). Раньше
+    увидеть собранное можно было единственным способом — создать работу.
+    «Как увидит ученик» рисуется тут же, из тех же строк, что и список;
+    печатный лист собирает СЕРВЕР той же `assignment_export.print_rows`,
+    что печатает уже созданную работу, — второй сборки печати нет.
+    {% endcomment %}
+    <div class="k-row" id="bd-preview-row" style="gap:10px;margin-top:14px;flex-wrap:wrap" hidden>
+      <button type="button" class="k-btn k-btn--plain" id="bd-eyes">
+        Посмотреть, как увидит ученик</button>
+      <button type="submit" form="bd-print-form" class="k-btn k-btn--plain">
+        Предпросмотр печатного листа</button>
+    </div>
+
+    <form id="bd-print-form" method="post" target="_blank"
+          action="{% url 'teacher:cart_print' %}">
+      {% csrf_token %}
+      <input type="hidden" name="keys" id="bd-print-keys">
+      <input type="hidden" name="points" id="bd-print-points">
+      <input type="hidden" name="manual_order" id="bd-print-order">
+      {% comment %}
+      ⚠️ ПОЛЕ НАЗЫВАЕТСЯ `work_name`, А НЕ `name`. Настоящее поле названия
+      живёт в форме создания на этой же странице, и второй элемент с тем
+      же именем делает `[name=name]` двусмысленным — сценарий уже нашёл
+      первым скрытый. Родня той же ловушки, что с полем `action`.
+      {% endcomment %}
+      <input type="hidden" name="work_name" id="bd-print-name">
+    </form>
 
     {% comment %}
     ⚠️ «НАПИСАТЬ СВОЮ» ВЕЛА В НИКУДА (найдено сценарием, сессия 10, фаза 2.1):
@@ -110,6 +200,24 @@
          href="{% url 'teacher:problem_new' %}?to_cart=1{% if is_exam %}&amp;kind=exam{% endif %}{% if group_id %}&amp;group={{ group_id }}{% endif %}">
         Написать свою
       </a>
+    </div>
+  </div>
+
+  {% comment %}
+  Окно «как увидит ученик» рисуется из ТЕХ ЖЕ строк, что и список слева:
+  условие, пункты, места для ответа. Ответы и решения в него не попадают —
+  это и есть разница между «глазами ученика» и составом работы.
+  {% endcomment %}
+  <div class="bd-eyes" id="bd-eyes-box" role="dialog" aria-modal="true"
+       aria-label="Работа глазами ученика">
+    <div class="bd-eyes__sheet">
+      <div class="bd-eyes__head">
+        <h2>Работа глазами ученика</h2>
+        <button type="button" class="k-btn k-btn--plain k-btn--sm"
+                id="bd-eyes-close">Закрыть</button>
+      </div>
+      <div class="bd-eyes__note">Ответов и решений ученик здесь не видит.</div>
+      <div id="bd-eyes-list"></div>
     </div>
   </div>
 
@@ -145,7 +253,17 @@
 
 {% comment %}Разметка позиции — одна, скрипт клонирует её же.{% endcomment %}
 <template id="bd-item-tpl">
-  <div class="bd-item">
+  {% comment %}
+  Позиция работы. Кроме названия и балла у неё есть:
+  • ручки порядка — «вверх / вниз» КНОПКАМИ и перетаскивание мышью.
+    ⚠️ Кнопки обязательны: перетаскивание недоступно с клавиатуры, и
+    экран, где порядок задаётся только мышью, для части людей просто не
+    работает. Перетаскивание — удобство сверху, а не единственный способ.
+  • раскрытие: условие, ВСЕ пункты, ответы, решение — то, что раньше
+    можно было увидеть, только создав работу.
+  {% endcomment %}
+  <div class="bd-item" draggable="true">
+    <span class="bd-grip" title="Перетащить" aria-hidden="true">⠿</span>
     <span class="bd-num"></span>
     <div class="bd-main">
       <div class="bd-name"></div>
@@ -154,8 +272,16 @@
       выходят на одну вертикаль сами, без заданной ширины строки.
       {% endcomment %}
       <div class="bd-meta"><span class="k-kind"></span><span class="bd-meta-text"></span></div>
+      <button type="button" class="bd-more">Показать целиком</button>
+      <div class="bd-full" hidden></div>
     </div>
     <div class="bd-right">
+      <span class="bd-move">
+        <button type="button" class="bd-up" title="Выше"
+                aria-label="Переместить выше">↑</button>
+        <button type="button" class="bd-down" title="Ниже"
+                aria-label="Переместить ниже">↓</button>
+      </span>
       <input class="k-input k-input--num bd-points" type="number" min="0"
              max="1000" step="any" aria-label="балл за задачу">
       <button type="button" class="bd-drop" title="Убрать">×</button>
@@ -190,7 +316,36 @@
     catch (e) {}
   }
 
-  function keys() { return Object.keys(cart); }
+  // ⚠️ ПОРЯДОК КОРЗИНЫ ХРАНИТСЯ ОТДЕЛЬНЫМ СПИСКОМ (ревью 15.08, ф. 12).
+  // Корзина — объект, а JavaScript выдаёт ЧИСЛОВЫЕ ключи объекта по
+  // возрастанию НЕЗАВИСИМО от порядка добавления. Ключ каталожной задачи —
+  // её номер, то есть порядок задач молча совпадал с порядком номеров в
+  // банке, и переставить их было нельзя ничем. Найдено сценарием: кнопка
+  // «выше» срабатывала, корзина переписывалась, а список возвращался.
+  var ORDER_KEY = CART_KEY + '_order';
+
+  function readOrder() {
+    try { return JSON.parse(sessionStorage.getItem(ORDER_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+
+  function writeOrder(list) {
+    try { sessionStorage.setItem(ORDER_KEY, JSON.stringify(list)); }
+    catch (e) {}
+  }
+
+  function keys() {
+    var known = Object.keys(cart);
+    var order = readOrder().filter(function (key) {
+      return known.indexOf(key) !== -1;
+    });
+    // Всё, что положили мимо списка порядка (например, в отборе), идёт
+    // следом — потерять задачу из-за отставшего списка нельзя.
+    known.forEach(function (key) {
+      if (order.indexOf(key) === -1) { order.push(key); }
+    });
+    return order;
+  }
 
   function load() {
     var list = keys();
@@ -246,9 +401,214 @@
       field.value = (points[row.key] !== undefined)
         ? points[row.key] : row.points;
       points[row.key] = parseFloat(field.value) || 0;
+      // Кнопки порядка гаснут на краях: нажатие, которое ничего не делает,
+      // читается как поломка.
+      node.querySelector('.bd-up').disabled = index === 0;
+      node.querySelector('.bd-down').disabled = index === rows.length - 1;
+      // Раскрытие переживает перерисовку: список пересобирается на каждую
+      // правку балла, и свёрнутая обратно задача читалась бы как сбой.
+      if (opened[row.key]) {
+        node.querySelector('.bd-full').hidden = false;
+        node.querySelector('.bd-more').textContent = 'Свернуть';
+        fillFull(node.querySelector('.bd-full'), row);
+      }
       host.appendChild(node);
     });
+    document.getElementById('bd-preview-row').hidden = rows.length === 0;
     recount();
+  }
+
+  // ---- Позиция целиком ------------------------------------------------
+  var opened = {};
+
+  function esc(text) {
+    var box = document.createElement('div');
+    box.textContent = text == null ? '' : String(text);
+    return box.innerHTML;
+  }
+
+  // Формулы рисует KaTeX — тем же вызовом, что на остальных экранах.
+  function typeset(node) {
+    if (!window.renderMathInElement) { return; }
+    renderMathInElement(node, {
+      delimiters: [{ left: '$$', right: '$$', display: true },
+                   { left: '$', right: '$', display: false }],
+      throwOnError: false
+    });
+  }
+
+  function fillFull(box, row) {
+    var html = '<div class="bd-st">' + esc(row.statement) + '</div>';
+    (row.parts || []).forEach(function (part) {
+      html += '<div class="bd-part"><b>' + esc(part.label) + ')</b> '
+        + esc(part.text)
+        + (part.answer ? '<div class="bd-ans"><b>Ответ:</b> '
+                         + esc(part.answer) + '</div>' : '')
+        + '</div>';
+    });
+    if ((row.options || []).length) {
+      html += '<ul class="bd-opts">';
+      (row.options || []).forEach(function (option) {
+        html += '<li>' + esc(option.text)
+          + (option.right ? ' ✓' : '') + '</li>';
+      });
+      html += '</ul>';
+    }
+    if (row.answer) {
+      html += '<div class="bd-ans"><b>Ответ:</b> ' + esc(row.answer) + '</div>';
+    }
+    html += '<div class="bd-flags"><span>' + esc(row.kind_label) + '</span>'
+      + '<span>сложность ' + (row.difficulty || 0) + ' из 5</span>'
+      + '<span>' + (row.has_solution ? 'эталонное решение есть'
+                                     : 'эталонного решения нет') + '</span>'
+      + '</div>';
+    box.innerHTML = html;
+    typeset(box);
+  }
+
+  document.addEventListener('click', function (event) {
+    var more = event.target.closest('.bd-more');
+    if (!more) { return; }
+    var item = more.closest('.bd-item');
+    var row = rows.filter(function (r) { return r.key === item.dataset.key; })[0];
+    var box = item.querySelector('.bd-full');
+    var show = box.hidden;
+    box.hidden = !show;
+    more.textContent = show ? 'Свернуть' : 'Показать целиком';
+    opened[item.dataset.key] = show;
+    if (show && row) { fillFull(box, row); }
+  });
+
+  // ---- Порядок: кнопки и перетаскивание --------------------------------
+  // ⚠️ ПОРЯДОК ЖИВЁТ В КОРЗИНЕ, а не в разметке: список пересобирается с
+  // сервера, и перестановка только в DOM пропала бы на первой же правке
+  // балла. Плюс ручной порядок отменяет автоматическую перестановку
+  // «сначала тесты» — иначе задача возвращалась бы на прежнее место.
+  function moveKey(key, shift) {
+    var order = rows.map(function (r) { return r.key; });
+    var at = order.indexOf(key);
+    var to = at + shift;
+    if (at < 0 || to < 0 || to >= order.length) { return; }
+    order.splice(to, 0, order.splice(at, 1)[0]);
+    applyOrder(order);
+  }
+
+  function applyOrder(order) {
+    writeOrder(order);
+    manualOrder = '1';
+    try { sessionStorage.setItem('hw_manual_order', '1'); } catch (e) {}
+    document.getElementById('manual-order-input').value = '1';
+    load();
+  }
+
+  document.addEventListener('click', function (event) {
+    var up = event.target.closest('.bd-up');
+    var down = event.target.closest('.bd-down');
+    if (!up && !down) { return; }
+    var item = (up || down).closest('.bd-item');
+    moveKey(item.dataset.key, up ? -1 : 1);
+  });
+
+  var dragKey = null;
+  document.addEventListener('dragstart', function (event) {
+    var item = event.target.closest && event.target.closest('.bd-item');
+    if (!item) { return; }
+    dragKey = item.dataset.key;
+    item.classList.add('is-drag');
+    event.dataTransfer.effectAllowed = 'move';
+    // Safari без данных перетаскивание не начинает.
+    try { event.dataTransfer.setData('text/plain', dragKey); } catch (e) {}
+  });
+  document.addEventListener('dragover', function (event) {
+    var item = event.target.closest && event.target.closest('.bd-item');
+    if (!item || !dragKey) { return; }
+    event.preventDefault();
+    item.classList.add('is-over');
+  });
+  document.addEventListener('dragleave', function (event) {
+    var item = event.target.closest && event.target.closest('.bd-item');
+    if (item) { item.classList.remove('is-over'); }
+  });
+  document.addEventListener('drop', function (event) {
+    var item = event.target.closest && event.target.closest('.bd-item');
+    if (!item || !dragKey) { return; }
+    event.preventDefault();
+    item.classList.remove('is-over');
+    var order = rows.map(function (r) { return r.key; });
+    var from = order.indexOf(dragKey);
+    var to = order.indexOf(item.dataset.key);
+    dragKey = null;
+    if (from < 0 || to < 0 || from === to) { return; }
+    order.splice(to, 0, order.splice(from, 1)[0]);
+    applyOrder(order);
+  });
+  document.addEventListener('dragend', function () {
+    dragKey = null;
+    document.querySelectorAll('.bd-item').forEach(function (item) {
+      item.classList.remove('is-drag', 'is-over');
+    });
+  });
+
+  // ---- «Посмотреть, как увидит ученик» ---------------------------------
+  var eyesBox = document.getElementById('bd-eyes-box');
+  document.getElementById('bd-eyes').addEventListener('click', function () {
+    var host = document.getElementById('bd-eyes-list');
+    host.innerHTML = '';
+    rows.forEach(function (row, index) {
+      if (row.section) {
+        var sep = document.createElement('div');
+        sep.className = 'k-sep k-sep--head';
+        sep.innerHTML = '<span class="k-sep__cap"></span>'
+          + '<span class="k-sep__of"></span><span class="k-sep__line"></span>';
+        sep.querySelector('.k-sep__cap').textContent = row.section.title;
+        sep.querySelector('.k-sep__of').textContent = row.section.detail;
+        host.appendChild(sep);
+      }
+      var task = document.createElement('div');
+      task.className = 'bd-eyes__task';
+      var html = '<div class="bd-eyes__num">' + (index + 1) + '.</div>'
+        + '<div class="bd-eyes__st">' + esc(row.statement) + '</div>';
+      (row.parts || []).forEach(function (part) {
+        html += '<div class="bd-eyes__part"><b>' + esc(part.label) + ')</b> '
+          + esc(part.text) + '<div class="bd-eyes__field"></div></div>';
+      });
+      if ((row.options || []).length) {
+        html += '<ul class="bd-opts">';
+        (row.options || []).forEach(function (option) {
+          html += '<li>' + esc(option.text) + '</li>';
+        });
+        html += '</ul>';
+      }
+      if (!(row.parts || []).length) {
+        html += '<div class="bd-eyes__field"></div>';
+      }
+      task.innerHTML = html;
+      host.appendChild(task);
+    });
+    typeset(host);
+    eyesBox.classList.add('is-open');
+  });
+  function closeEyes() { eyesBox.classList.remove('is-open'); }
+  document.getElementById('bd-eyes-close').addEventListener('click', closeEyes);
+  eyesBox.addEventListener('click', function (event) {
+    if (event.target === eyesBox) { closeEyes(); }
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') { closeEyes(); }
+  });
+
+  // Печатный предпросмотр собирает СЕРВЕР по тем же ключам и баллам,
+  // что уедут в работу.
+  function syncPrint() {
+    document.getElementById('bd-print-keys').value =
+      rows.map(function (r) { return r.key; }).join(',');
+    document.getElementById('bd-print-points').value =
+      rows.map(function (r) { return r.key + ':' + (points[r.key] || 0); })
+        .join(',');
+    document.getElementById('bd-print-order').value = manualOrder;
+    var nameField = form.querySelector('[name=name]');
+    document.getElementById('bd-print-name').value =
+      nameField ? nameField.value : '';
   }
 
   function recount() {
@@ -263,6 +623,9 @@
     document.getElementById('problem-points-input').value =
       rows.map(function (r) { return r.key + ':' + (points[r.key] || 0); })
         .join(',');
+    // Печатный предпросмотр собирает СЕРВЕР по тем же ключам и баллам,
+    // что уедут в работу: поля формы держим в согласии со списком.
+    syncPrint();
     refreshSubmit();
   }
 
@@ -302,6 +665,11 @@
 
   // Правка балла тоже меняет состав части. Ждём паузу в наборе, чтобы не
   // слать запрос на каждую цифру.
+  // Поля печатного предпросмотра заполняем ПЕРЕД отправкой: название
+  // репетитор правит в панели справа, и ждать пересчёта списка незачем.
+  document.getElementById('bd-print-form')
+    .addEventListener('submit', function () { syncPrint(); });
+
   var pointsTimer = null;
   function reloadSoon() {
     if (pointsTimer) { clearTimeout(pointsTimer); }

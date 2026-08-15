@@ -297,8 +297,14 @@ def compile_pdf(tex):
 # Версия для печати — те же данные, что в `.tex`, но рисует их браузер
 # ---------------------------------------------------------------------------
 
-def print_rows(assignment, for_teacher=False):
+def print_rows(assignment, for_teacher=False, items=None):
     """Строки задания для страницы печати. Возвращает (строки, пропущенные).
+
+    ⚠️ `items` ПОЗВОЛЯЕТ СОБРАТЬ ЛИСТОК ДО СОЗДАНИЯ РАБОТЫ (ревью 15.08,
+    фаза 12): конструктор подборки показывает печатный лист по корзине, а
+    работы ещё нет. Позиции приходят готовыми (`picker.cart_items`), всё
+    остальное считается ровно так же — второй сборки печати не заводим,
+    иначе предпросмотр начал бы расходиться с тем, что печатается потом.
 
     ⚠️ ОДНА СБОРКА С `.tex`. Порядок задач, номера, баллы, пункты и то,
     какая задача пропущена из-за битой разметки, обязаны совпадать: лист,
@@ -317,12 +323,14 @@ def print_rows(assignment, for_teacher=False):
 
     # Порядок и подписи частей — ТА ЖЕ функция, что у экрана. Иначе на
     # странице задача №4, а в листке под этим номером другая.
-    items = ordered_items(assignment, list(
-        assignment.items
-        .select_related('catalog_problem', 'custom_problem', 'graph')
-        .prefetch_related('catalog_problem__parts',
-                          'custom_problem__options')
-        .order_by('order', 'id')))
+    if items is None:
+        items = list(assignment.items
+                     .select_related('catalog_problem', 'custom_problem',
+                                     'graph')
+                     .prefetch_related('catalog_problem__parts',
+                                       'custom_problem__options')
+                     .order_by('order', 'id'))
+    items = ordered_items(assignment, items)
     marks = section_marks(items)
 
     rows = []

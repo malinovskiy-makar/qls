@@ -25,6 +25,7 @@ import logging
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from problems import hw_generator
 
@@ -517,6 +518,60 @@ def assignment_export(request, group_id, assignment_id):
 
 
 @tutor_required
+@tutor_required
+@require_POST
+def cart_print(request):
+    """Печатный лист ДО создания работы — по корзине конструктора.
+
+    ⚠️ ТА ЖЕ СБОРКА, ЧТО У СОЗДАННОЙ РАБОТЫ (`assignment_export.print_rows`)
+    и тот же шаблон. Предпросмотр, собранный своим кодом, показывал бы не
+    то, что напечатается потом, — а это ровно та ошибка, ради которой
+    предпросмотр и заводится.
+
+    Работы ещё нет, поэтому вместо неё — оболочка с теми полями, которые
+    читает шаблон. В базу не пишем НИЧЕГО.
+    """
+    from types import SimpleNamespace
+
+    from problems import assignment_export as export
+
+    from .picker import cart_items, parse_points
+
+    keys = [key.strip() for key in
+            (request.POST.get('keys') or '').split(',') if key.strip()]
+    items, _ = cart_items(keys, request.user,
+                          manual_order=request.POST.get('manual_order') == '1',
+                          points=parse_points(request.POST.get('points')))
+    is_exam = request.POST.get('kind') == 'exam'
+    shell = SimpleNamespace(
+        pk=None,
+        name=(request.POST.get('work_name') or '').strip()
+             or 'Новая работа',
+        is_exam=is_exam, manual_order=request.POST.get('manual_order') == '1',
+        group=None, group_id=None, deadline_at=None)
+    for_teacher = request.POST.get('for') == 'teacher'
+    rows, skipped = export.print_rows(shell, for_teacher=for_teacher,
+                                      items=items)
+    return render(request, 'teacher/assignment_print.html', {
+        'assignment': shell,
+        'group': None,
+        'rows': rows,
+        'skipped': skipped,
+        'for_teacher': for_teacher,
+        'deadline': None,
+        'total_points': export.total_points(rows),
+        'site_home': request.build_absolute_uri('/'),
+        # Возврата и переключателя вариантов у предпросмотра нет: он
+        # открывается отдельной вкладкой и закрывается ею же.
+        'back_url': '',
+        'other_url': '',
+        'other_label': '',
+        'pdf_enabled': False,
+        'pdf_url': '',
+        'is_preview': True,
+    })
+
+
 def assignment_print(request, group_id, assignment_id):
     """Версия для печати: браузер печатает то, что уже умеет рисовать.
 
