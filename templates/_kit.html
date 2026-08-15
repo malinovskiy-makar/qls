@@ -694,13 +694,12 @@ td[data-type="num"] > .k-pair { display: inline-flex; }
 .k-date.is-ready .k-date__text { display: block; }
 .k-date__text.is-bad { border-color: var(--error); }
 
-/* ⚠️ РОДНОЕ ПОЛЕ ПРЯЧЕМ ПРОЗРАЧНОСТЬЮ, А НЕ `display:none`: у неотрисованного
-   поля `showPicker()` бросает ошибку, и кнопка календаря перестала бы
-   работать. Оно лежит ПОД кнопкой и не ловит нажатий — нажатия у кнопки. */
-.k-date.is-ready .k-date__native {
-  position: absolute; right: 0; top: 0; width: 40px; height: 100%;
-  opacity: 0; pointer-events: none; border: 0; padding: 0; background: none;
-}
+/* ⚠️ РОДНОЕ ПОЛЕ СПРЯТАНО ЦЕЛИКОМ (ревью 15.08, фаза 10). Раньше оно
+   пряталось прозрачностью — ради `showPicker()`, которому нужно
+   отрисованное поле. Календарь теперь свой, и два календаря на одном поле
+   — ровно то, что просили убрать. Значение по-прежнему лежит ЗДЕСЬ: это
+   поле с именем, его и отправляет форма. */
+.k-date.is-ready .k-date__native { display: none; }
 .k-date__pick { display: none; }
 .k-date.is-ready .k-date__pick {
   display: flex; align-items: center; justify-content: center;
@@ -714,6 +713,71 @@ td[data-type="num"] > .k-pair { display: inline-flex; }
 /* ⚠️ `display` из правила выше сильнее браузерного `[hidden]` — третий раз
    за проект. Без этой строки подсказка об ошибке висела бы всегда. */
 .k-date__err[hidden] { display: none; }
+
+/* ── Свой календарь ────────────────────────────────────────────────────
+   Окно под полем: сетка месяца, затем панель времени. Родного пикера
+   больше нет вовсе — см. `teacher/_date_field.html`. */
+.k-cal { display: none; position: absolute; z-index: 40; top: calc(100% + 6px);
+         left: 0; width: 288px; padding: 12px;
+         background: var(--surface); border: 1px solid var(--border);
+         border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.16); }
+.k-date.is-open .k-cal { display: block; }
+.k-cal__head { display: flex; align-items: center; gap: 6px;
+               margin-bottom: 10px; }
+.k-cal__month { flex: 1; text-align: center; font-size: 13px;
+                font-weight: 700; color: var(--text); }
+.k-cal__nav { width: 28px; height: 28px; flex: none; padding: 0;
+              background: none; border: 1px solid transparent;
+              border-radius: 8px; color: var(--text2); cursor: pointer;
+              font-size: 16px; line-height: 1; }
+.k-cal__nav:hover { background: var(--surface-2); color: var(--text); }
+.k-cal__week, .k-cal__grid { display: grid; grid-template-columns: repeat(7, 1fr);
+                             gap: 2px; }
+.k-cal__week span { text-align: center; font-size: 11px; color: var(--text3);
+                    padding-bottom: 4px; }
+.k-cal__day { height: 32px; padding: 0; border: 1px solid transparent;
+              border-radius: 8px; background: none; color: var(--text);
+              font-size: 13px; cursor: pointer; }
+.k-cal__day:hover { background: var(--surface-2); }
+/* День не своего месяца остаётся нажимаемым: попасть на 1 сентября из
+   августовской сетки — обычный способ выбрать дату. Он просто тише. */
+.k-cal__day.is-out { color: var(--text3); }
+.k-cal__day.is-today { border-color: var(--border); font-weight: 700; }
+.k-cal__day.is-picked { background: var(--accent); color: #fff;
+                        border-color: var(--accent); font-weight: 700; }
+.k-cal__foot { display: flex; align-items: center; justify-content: space-between;
+               gap: 8px; margin-top: 10px; padding-top: 10px;
+               border-top: 1px solid var(--border-soft); }
+.k-cal__time { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.k-cal__col-cap { font-size: 11px; color: var(--text3); text-align: center;
+                  margin-bottom: 4px; }
+/* Список часов и минут прокручивается внутри себя: 24 строки не должны
+   растягивать окно на весь экран. */
+.k-cal__list { max-height: 168px; overflow-y: auto; display: grid;
+               grid-template-columns: repeat(2, 1fr); gap: 2px;
+               scrollbar-width: none; }
+.k-cal__list::-webkit-scrollbar { width: 0; height: 0; }
+.k-cal__pick { padding: 6px 0; border: 1px solid transparent;
+               border-radius: 8px; background: none; color: var(--text);
+               font-size: 13px; cursor: pointer; }
+.k-cal__pick:hover { background: var(--surface-2); }
+.k-cal__pick.is-picked { background: var(--accent); color: #fff;
+                         border-color: var(--accent); font-weight: 700; }
+.k-cal__picked { font-size: 15px; font-weight: 700;
+                 font-variant-numeric: tabular-nums; }
+.k-cal__step[hidden] { display: none; }
+
+@media (max-width: 520px) {
+  /* ⚠️ НА УЗКОМ ЭКРАНЕ ОКНО — ЛИСТ СНИЗУ. Окно шириной 288px, привязанное
+     к полю, на 380 пикселях вылезает за правый край и обрезается: поле
+     стоит в панели с отступами. Лист снизу — обычный приём телефона и
+     ничего не обрезает. */
+  .k-date.is-open .k-cal { position: fixed; top: auto; bottom: 0; left: 0;
+                           right: 0; width: auto; border-radius: 14px 14px 0 0;
+                           padding: 16px 16px 20px;
+                           box-shadow: 0 -8px 30px rgba(0,0,0,.28); }
+  .k-cal__day { height: 38px; }
+}
 
 /* ── Панель «Настройки работы» ──────────────────────────────────────────
    Один партиал на четыре экрана создания (`teacher/_work_settings.html`).

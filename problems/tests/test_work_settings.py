@@ -252,17 +252,20 @@ class DateParsingRunsInNode(TestCase):
     """
 
     def run_js(self, body):
-        source = open(DATE_JS, encoding='utf-8').read()
-        source = source[source.index('<script>') + len('<script>'):]
-        source = source[:source.index('</script>')]
-        # Берём только чистые функции разбора: DOM здесь не нужен. Начало —
-        # с первой переменной, чтобы не утащить открывающую скобку своей
-        # обёртки-IIFE (иначе скобки не сойдутся и node падает разбором).
-        head = source[source.index('var RE'):
-                      source.index('document.querySelectorAll')]
+        """Чистые функции разбора из боевого скрипта + переданный кусок.
+
+        ⚠️ ПЕРЕСЧИТАН ПОД НОВОЕ ПОЛЕ (ревью 15.08, фаза 10), а не отключён.
+        Разбор был одной регуляркой `toIso`, требовавшей всех разделителей;
+        теперь значащими считаются только цифры (`digitsOf` → `maskOf` →
+        `parse`), и отказ возвращается СО СЛОВАМИ, а не как `null`.
+        Способ проверки прежний: исполнением в node.
+        """
+        from problems.tests.test_r15_date import _functions
+
         with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False,
                                          encoding='utf-8') as handle:
-            handle.write('(function () {\n' + head + '\n' + body + '\n})();')
+            handle.write('(function () {\n' + _functions() + '\n'
+                         + body + '\n})();')
             path = handle.name
         try:
             done = subprocess.run(['node', path], capture_output=True,
@@ -271,6 +274,11 @@ class DateParsingRunsInNode(TestCase):
             return done.stdout.strip()
         finally:
             os.unlink(path)
+
+    def iso(self, text, default='23:59'):
+        return self.run_js(
+            "var r = parse(digitsOf(%r), %r);"
+            "console.log(r.why ? 'null' : r.iso);" % (text, default))
 
     def test_script_parses(self):
         source = open(DATE_JS, encoding='utf-8').read()
@@ -288,25 +296,45 @@ class DateParsingRunsInNode(TestCase):
             os.unlink(path)
 
     def test_russian_input_becomes_iso(self):
-        out = self.run_js("console.log(toIso('14.08.2026, 20:00', '23:59'));")
-        self.assertEqual(out, '2026-08-14T20:00')
+        self.assertEqual(self.iso('14.08.2026, 20:00'), '2026-08-14T20:00')
 
     def test_date_without_time_takes_the_default(self):
-        out = self.run_js("console.log(toIso('01.09.2026', '23:59'));")
-        self.assertEqual(out, '2026-09-01T23:59')
+        self.assertEqual(self.iso('01.09.2026'), '2026-09-01T23:59')
 
-    def test_separators_and_short_year(self):
-        for text in ('14/08/2026 20:00', '14-08-2026, 20:00', '14.08.26 20.00'):
-            out = self.run_js("console.log(toIso(%r, '23:59'));" % text)
-            self.assertEqual(out, '2026-08-14T20:00', text)
+    def test_separators_do_not_matter_at_all(self):
+        """⚠️ ГЛАВНОЕ ИЗМЕНЕНИЕ: разделители расставляет поле, а не человек.
+
+        Двузначный год при этом больше не понимается — и не может: в маске
+        из одних цифр «14.08.26 20:00» неотличимо от «14.08.2620, ...».
+        Цена размена названа вслух: набор без разделителей работает, а
+        сокращённый год — нет.
+        """
+        for text in ('14/08/2026 20:00', '14-08-2026, 20:00',
+                     '14082026 2000', '140820262000'):
+            self.assertEqual(self.iso(text), '2026-08-14T20:00', text)
 
     def test_impossible_dates_are_refused(self):
         """31 февраля обязано быть ошибкой, а не 3 марта."""
         for text in ('31.02.2026', '32.01.2026', '14.13.2026',
-                     '14.08.2026, 25:00', 'вчера', '14.08'):
-            out = self.run_js("console.log(toIso(%r, '23:59'));" % text)
-            self.assertEqual(out, 'null', text)
+                     '14.08.2026, 25:00', '14.08'):
+            self.assertEqual(self.iso(text), 'null', text)
 
-    def test_iso_shows_back_in_russian(self):
-        out = self.run_js("console.log(toRu('2026-08-14T20:00'));")
+    def test_letters_never_reach_the_field(self):
+        """⚠️ «вчера» — это не «невозможная дата», это НЕ ДАТА ВОВСЕ.
+
+        Маска пропускает только цифры, поэтому буквы в поле не появляются
+        даже вставкой: поле остаётся пустым, и это видно. Пустое поле —
+        законный ответ «срока нет», а не молчаливое обнуление набранного.
+        """
+        self.assertEqual(self.run_js("console.log('[' + digitsOf('вчера') + ']');"),
+                         '[]')
+        self.assertEqual(self.iso('вчера'), '')
+
+    def test_refusal_speaks_words(self):
+        """Молчаливый ноль — то, из-за чего затевалась фаза."""
+        why = self.run_js("console.log(parse(digitsOf('14.08'), '23:59').why);")
+        self.assertTrue(len(why) > 15, why)
+
+    def test_mask_writes_the_separators(self):
+        out = self.run_js("console.log(maskOf(digitsOf('140820262000')));")
         self.assertEqual(out, '14.08.2026, 20:00')

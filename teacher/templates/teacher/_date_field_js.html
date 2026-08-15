@@ -1,47 +1,152 @@
 {% comment %}
-Скрипт поля даты (сессия 10, фаза 2.3). Подключается ОДИН раз на страницу,
-само поле может стоять на ней трижды (начало окна, конец окна, срок).
-Разметка и обоснование — в `teacher/_date_field.html`.
+Скрипт поля даты со своим календарём (ревью 15.08, фаза 10).
+Подключается ОДИН раз на страницу, само поле может стоять на ней трижды
+(начало окна, конец окна, срок). Обоснование — в `teacher/_date_field.html`.
+
+Здесь же лежит разметка окна выбора: поле включается по три раза на
+страницу, а `<template>` с одним id может быть только один.
 {% endcomment %}
+<template id="k-date-pop-tpl">
+  {% comment %}
+  Окно выбора. Два шага в ОДНОМ окне: сетка месяца, затем панель времени.
+  Порядок именно такой — сначала отвечаем «какой день», потом «во сколько»;
+  обратный порядок заставляет держать время в голове, пока ищешь дату.
+  {% endcomment %}
+  <div class="k-cal" role="dialog" aria-label="Выбор даты и времени">
+    <div class="k-cal__step k-cal__step--date">
+      <div class="k-cal__head">
+        <button type="button" class="k-cal__nav" data-cal-prev
+                aria-label="Предыдущий месяц">‹</button>
+        <div class="k-cal__month" data-cal-title aria-live="polite"></div>
+        <button type="button" class="k-cal__nav" data-cal-next
+                aria-label="Следующий месяц">›</button>
+      </div>
+      <div class="k-cal__week" aria-hidden="true">
+        <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span>
+        <span>Пт</span><span>Сб</span><span>Вс</span>
+      </div>
+      <div class="k-cal__grid" data-cal-grid></div>
+      <div class="k-cal__foot">
+        <button type="button" class="k-btn k-btn--quiet k-btn--sm"
+                data-cal-today>Сегодня</button>
+        <button type="button" class="k-btn k-btn--quiet k-btn--sm"
+                data-cal-clear>Очистить</button>
+      </div>
+    </div>
+
+    <div class="k-cal__step k-cal__step--time" hidden>
+      <div class="k-cal__head">
+        <button type="button" class="k-cal__nav" data-cal-back
+                aria-label="Назад к календарю">‹</button>
+        <div class="k-cal__month" data-cal-day></div>
+        <span class="k-cal__nav" aria-hidden="true"></span>
+      </div>
+      <div class="k-cal__time">
+        <div class="k-cal__col">
+          <div class="k-cal__col-cap">часы</div>
+          <div class="k-cal__list" data-cal-hours></div>
+        </div>
+        <div class="k-cal__col">
+          <div class="k-cal__col-cap">минуты</div>
+          <div class="k-cal__list" data-cal-minutes></div>
+        </div>
+      </div>
+      <div class="k-cal__foot">
+        <div class="k-cal__picked" data-cal-picked></div>
+        <button type="button" class="k-btn k-btn--main k-btn--sm"
+                data-cal-done>Готово</button>
+      </div>
+    </div>
+  </div>
+</template>
 <script>
 (function () {
   'use strict';
 
-  // Разбор того, что напечатал человек. Принимаем и точку, и слэш, и дефис
-  // как разделитель даты; время — через двоеточие или точку; запятая между
-  // датой и временем необязательна. Возвращаем ГГГГ-ММ-ДДTЧЧ:ММ либо ''.
-  var RE = /^\s*(\d{1,2})\s*[.\/-]\s*(\d{1,2})\s*[.\/-]\s*(\d{2,4})\s*(?:[,\s]+(\d{1,2})\s*[:.]\s*(\d{2}))?\s*$/;
+  var MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+                'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  var MONTHS_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь',
+                    'Декабрь'];
+  // Шаг минут в списке. Пять — потому что сроком «18:37» никто не
+  // пользуется, а список из шестидесяти строк не пролистывается глазами.
+  var MINUTE_STEP = 5;
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
-  function toIso(text, defaultTime) {
-    var m = RE.exec(text || '');
-    if (!m) { return null; }
-    var day = +m[1], month = +m[2], year = +m[3];
-    // Двузначный год: 26 — это 2026, а не 1926. Век задач по экономике один.
-    if (year < 100) { year += 2000; }
-    var time = defaultTime || '00:00';
-    if (m[4] !== undefined) {
-      var hh = +m[4], mm = +m[5];
-      if (hh > 23 || mm > 59) { return null; }
-      time = pad(hh) + ':' + pad(mm);
-    }
-    if (month < 1 || month > 12 || day < 1 || day > 31) { return null; }
-    // Проверяем календарём, а не таблицей длин месяцев: 31.02 обязано быть
-    // ошибкой, а не молча превратиться в 3 марта.
-    var probe = new Date(year, month - 1, day);
-    if (probe.getFullYear() !== year || probe.getMonth() !== month - 1
-        || probe.getDate() !== day) {
-      return null;
-    }
-    return year + '-' + pad(month) + '-' + pad(day) + 'T' + time;
+  // ── Маска ввода ──────────────────────────────────────────────────────
+  // ⚠️ ЗНАКИ РАССТАВЛЯЕТ ПОЛЕ, А НЕ ЧЕЛОВЕК. Набор «20082026 1830»
+  // показывался в поле, но значением не становился: разбор требовал всех
+  // разделителей. Теперь значащими считаются ТОЛЬКО цифры, а точки,
+  // запятая и двоеточие подставляются сами и обратно в цифры не попадают.
+  function digitsOf(text) {
+    return (text || '').replace(/\D+/g, '').slice(0, 12);
   }
 
-  function toRu(iso) {
-    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || '');
-    if (!m) { return ''; }
-    return m[3] + '.' + m[2] + '.' + m[1] + ', ' + m[4] + ':' + m[5];
+  function maskOf(digits) {
+    var out = digits.slice(0, 2);
+    if (digits.length > 2) { out += '.' + digits.slice(2, 4); }
+    if (digits.length > 4) { out += '.' + digits.slice(4, 8); }
+    if (digits.length > 8) { out += ', ' + digits.slice(8, 10); }
+    if (digits.length > 10) { out += ':' + digits.slice(10, 12); }
+    return out;
   }
+
+  // Разбор ПОЛНОСТЬЮ набранного значения. Возвращает ISO либо объект с
+  // причиной отказа: молчаливый ноль — то, из-за чего затевалась фаза.
+  function parse(digits, defaultTime) {
+    if (!digits.length) { return { iso: '' }; }
+    if (digits.length < 8) {
+      return { why: 'Дата набрана не до конца. Нужно 8 цифр: 20.08.2026.' };
+    }
+    var day = +digits.slice(0, 2);
+    var month = +digits.slice(2, 4);
+    var year = +digits.slice(4, 8);
+    var time = defaultTime || '00:00';
+    if (digits.length > 8 && digits.length < 12) {
+      return { why: 'Время набрано не до конца. Нужны часы и минуты: 18:30.' };
+    }
+    if (digits.length === 12) {
+      var hh = +digits.slice(8, 10), mm = +digits.slice(10, 12);
+      if (hh > 23 || mm > 59) {
+        return { why: 'Такого времени не бывает. Часы до 23, минуты до 59.' };
+      }
+      time = pad(hh) + ':' + pad(mm);
+    }
+    // Проверяем КАЛЕНДАРЁМ, а не таблицей длин месяцев: 31.02 обязано быть
+    // ошибкой, а не молча превратиться в 3 марта.
+    var probe = new Date(year, month - 1, day);
+    if (month < 1 || month > 12 || day < 1
+        || probe.getFullYear() !== year || probe.getMonth() !== month - 1
+        || probe.getDate() !== day) {
+      return { why: 'Такой даты нет в календаре. Пример: 20.08.2026.' };
+    }
+    return { iso: year + '-' + pad(month) + '-' + pad(day) + 'T' + time };
+  }
+
+  function isoToDigits(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || '');
+    return m ? m[3] + m[2] + m[1] + m[4] + m[5] : '';
+  }
+
+  function isoParts(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || '');
+    if (!m) { return null; }
+    return { year: +m[1], month: +m[2] - 1, day: +m[3],
+             hour: +m[4], minute: +m[5] };
+  }
+
+  function isoOf(year, month, day, hour, minute) {
+    return year + '-' + pad(month + 1) + '-' + pad(day)
+           + 'T' + pad(hour) + ':' + pad(minute);
+  }
+
+  function sameDay(a, b) {
+    return a && b && a.getFullYear() === b.getFullYear()
+           && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+
+  var tpl = document.getElementById('k-date-pop-tpl');
 
   document.querySelectorAll('[data-k-date]').forEach(function (box) {
     var text = box.querySelector('.k-date__text');
@@ -51,68 +156,281 @@
     if (!text || !native) { return; }
 
     var defaultTime = box.dataset.defaultTime || '23:59';
+    var pop = null;              // окно выбора, создаётся при первом открытии
+    var view = null;             // месяц, который сейчас показан
+    var draft = null;            // выбранное в окне, до «Готово»
 
-    function showError(on) {
-      if (err) { err.hidden = !on; }
-      text.classList.toggle('is-bad', !!on);
+    function showError(why) {
+      if (err) {
+        err.textContent = why || '';
+        err.hidden = !why;
+      }
+      text.classList.toggle('is-bad', !!why);
     }
 
     // Родное поле — истина. Текстовое всегда показывает то же значение.
     function fromNative() {
-      text.value = toRu(native.value);
-      showError(false);
+      text.value = maskOf(isoToDigits(native.value));
+      showError('');
     }
 
-    // Разбираем напечатанное. Пусто — это законный ответ «срока нет»,
-    // ошибкой не считаем.
-    function fromText() {
-      var raw = (text.value || '').trim();
-      if (!raw) {
-        native.value = '';
-        showError(false);
-        return;
-      }
-      var iso = toIso(raw, defaultTime);
-      if (iso === null) {
-        // ⚠️ РОДНОЕ ПОЛЕ НЕ ЧИСТИМ. Если человек опечатался, прежнее
-        // значение обязано уцелеть: иначе правка «20:00» → «20:0» стирала бы
-        // уже выбранный срок, и работа уходила бы вообще без него.
-        showError(true);
-        return;
-      }
+    function commit(iso) {
       native.value = iso;
-      // Показываем ровно то, что поняли: дополненное время (23:59 у срока)
-      // видно сразу, а не всплывает потом на странице работы.
-      text.value = toRu(iso);
-      showError(false);
+      text.value = maskOf(isoToDigits(iso));
+      showError('');
+      // Соседние поля («окно не короче пяти минут») слушают change.
+      native.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    fromNative();
+    // ── Разбор напечатанного ───────────────────────────────────────────
+    function fromText() {
+      var result = parse(digitsOf(text.value), defaultTime);
+      if (result.why) {
+        // ⚠️ РОДНОЕ ПОЛЕ НЕ ЧИСТИМ. Опечатка не имеет права стирать уже
+        // выбранный срок: иначе правка «20:00» → «20:0» отправляла бы
+        // работу вообще без срока.
+        showError(result.why);
+        return;
+      }
+      commit(result.iso);
+    }
+
+    // ── Окно выбора ────────────────────────────────────────────────────
+    function build() {
+      if (pop || !tpl) { return pop; }
+      pop = tpl.content.firstElementChild.cloneNode(true);
+      box.appendChild(pop);
+
+      pop.querySelector('[data-cal-prev]').addEventListener('click',
+        function () { view.setMonth(view.getMonth() - 1); drawMonth(); });
+      pop.querySelector('[data-cal-next]').addEventListener('click',
+        function () { view.setMonth(view.getMonth() + 1); drawMonth(); });
+      pop.querySelector('[data-cal-today]').addEventListener('click',
+        function () { chooseDay(new Date()); });
+      pop.querySelector('[data-cal-clear]').addEventListener('click',
+        function () { commit(''); close(true); });
+      pop.querySelector('[data-cal-back]').addEventListener('click',
+        function () { step('date'); });
+      pop.querySelector('[data-cal-done]').addEventListener('click',
+        function () { close(true); });
+
+      pop.addEventListener('keydown', onKeys);
+      return pop;
+    }
+
+    function step(which) {
+      pop.querySelector('.k-cal__step--date').hidden = which !== 'date';
+      pop.querySelector('.k-cal__step--time').hidden = which !== 'time';
+    }
+
+    function drawMonth() {
+      pop.querySelector('[data-cal-title]').textContent =
+        MONTHS_NOM[view.getMonth()] + ' ' + view.getFullYear();
+      var grid = pop.querySelector('[data-cal-grid]');
+      grid.innerHTML = '';
+      var first = new Date(view.getFullYear(), view.getMonth(), 1);
+      // Неделя начинается с понедельника: воскресенье у JS это 0.
+      var lead = (first.getDay() + 6) % 7;
+      var start = new Date(first);
+      start.setDate(1 - lead);
+      var today = new Date();
+      var chosen = draft ? new Date(draft.year, draft.month, draft.day) : null;
+      for (var i = 0; i < 42; i++) {
+        var day = new Date(start);
+        day.setDate(start.getDate() + i);
+        var cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'k-cal__day';
+        cell.textContent = day.getDate();
+        cell.dataset.iso = isoOf(day.getFullYear(), day.getMonth(),
+                                 day.getDate(), 0, 0);
+        if (day.getMonth() !== view.getMonth()) {
+          cell.classList.add('is-out');
+        }
+        if (sameDay(day, today)) { cell.classList.add('is-today'); }
+        if (sameDay(day, chosen)) {
+          cell.classList.add('is-picked');
+          cell.setAttribute('aria-current', 'date');
+        }
+        cell.addEventListener('click', function (event) {
+          var parts = isoParts(event.currentTarget.dataset.iso);
+          chooseDay(new Date(parts.year, parts.month, parts.day));
+        });
+        grid.appendChild(cell);
+      }
+    }
+
+    function chooseDay(date) {
+      var time = draft
+        ? { hour: draft.hour, minute: draft.minute }
+        : { hour: +defaultTime.slice(0, 2), minute: +defaultTime.slice(3, 5) };
+      draft = { year: date.getFullYear(), month: date.getMonth(),
+                day: date.getDate(), hour: time.hour, minute: time.minute };
+      view = new Date(date.getFullYear(), date.getMonth(), 1);
+      apply();
+      step('time');
+      drawTime();
+    }
+
+    // ⚠️ СПИСКИ ЧАСОВ И МИНУТ СТРОЯТСЯ ОДИН РАЗ, а отметка выбранного
+    // переставляется отдельно. Перестроение на каждый клик УБИВАЛО нажатую
+    // кнопку прямо в её обработчике: событие всплывало до документа уже с
+    // оторванным от страницы target, проверка «клик был вне окна?» отвечала
+    // «да», и окно закрывалось после выбора часа. Поймано браузером —
+    // разметка при этом валидна, ошибок в консоли нет.
+    function drawTime() {
+      pop.querySelector('[data-cal-day]').textContent =
+        draft.day + ' ' + MONTHS[draft.month] + ' ' + draft.year;
+      fillList(pop.querySelector('[data-cal-hours]'), 24, 1, 'hour');
+      fillList(pop.querySelector('[data-cal-minutes]'), 60, MINUTE_STEP,
+               'minute');
+      markTime(true);
+    }
+
+    function fillList(host, limit, step_, key) {
+      host.innerHTML = '';
+      host.dataset.key = key;
+      host.dataset.step = step_;
+      for (var value = 0; value < limit; value += step_) {
+        var item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'k-cal__pick';
+        item.textContent = pad(value);
+        item.dataset.value = value;
+        item.addEventListener('click', function (event) {
+          var list = event.currentTarget.parentNode;
+          draft[list.dataset.key] = +event.currentTarget.dataset.value;
+          apply();
+          markTime(false);
+        });
+        host.appendChild(item);
+      }
+    }
+
+    function markTime(scroll) {
+      ['[data-cal-hours]', '[data-cal-minutes]'].forEach(function (which) {
+        var host = pop.querySelector(which);
+        var step_ = +host.dataset.step;
+        var value = draft[host.dataset.key];
+        host.querySelectorAll('.k-cal__pick').forEach(function (item) {
+          var own = +item.dataset.value;
+          // У минут шаг пять: 18:37 подсвечивает «35» — ближайшую снизу.
+          item.classList.toggle('is-picked',
+                                value >= own && value < own + step_);
+        });
+        // Прокручиваем ТОЛЬКО при открытии панели: прыжок списка под
+        // курсором на каждый клик читается как сбой.
+        var current = scroll ? host.querySelector('.is-picked') : null;
+        if (current) {
+          host.scrollTop = current.offsetTop - host.clientHeight / 3;
+        }
+      });
+      pop.querySelector('[data-cal-picked]').textContent =
+        pad(draft.hour) + ':' + pad(draft.minute);
+    }
+
+    // Выбранное уезжает в поле СРАЗУ, не по «Готово»: закрыв окно крестиком
+    // или Escape, репетитор обязан увидеть то, что выбрал, а не пустоту.
+    function apply() {
+      commit(isoOf(draft.year, draft.month, draft.day,
+                   draft.hour, draft.minute));
+    }
+
+    function onKeys(event) {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        close(true);
+        return;
+      }
+      var cell = event.target.closest ? event.target.closest('.k-cal__day') : null;
+      if (!cell) { return; }
+      var shift = { ArrowLeft: -1, ArrowRight: 1,
+                    ArrowUp: -7, ArrowDown: 7 }[event.key];
+      if (shift === undefined) { return; }
+      event.preventDefault();
+      var parts = isoParts(cell.dataset.iso);
+      var moved = new Date(parts.year, parts.month, parts.day + shift);
+      if (moved.getMonth() !== view.getMonth()
+          || moved.getFullYear() !== view.getFullYear()) {
+        view = new Date(moved.getFullYear(), moved.getMonth(), 1);
+      }
+      draft = draft || { hour: +defaultTime.slice(0, 2),
+                         minute: +defaultTime.slice(3, 5) };
+      draft = { year: moved.getFullYear(), month: moved.getMonth(),
+                day: moved.getDate(), hour: draft.hour, minute: draft.minute };
+      drawMonth();
+      var next = pop.querySelector('.k-cal__day.is-picked');
+      if (next) { next.focus(); }
+    }
+
+    function open() {
+      build();
+      var parts = isoParts(native.value);
+      draft = parts;
+      view = parts ? new Date(parts.year, parts.month, 1)
+                   : new Date(new Date().getFullYear(),
+                              new Date().getMonth(), 1);
+      step('date');
+      drawMonth();
+      box.classList.add('is-open');
+      pick.setAttribute('aria-expanded', 'true');
+      var focusable = pop.querySelector('.k-cal__day.is-picked')
+                      || pop.querySelector('.k-cal__day.is-today')
+                      || pop.querySelector('.k-cal__day');
+      if (focusable) { focusable.focus(); }
+    }
+
+    function close(back) {
+      if (!box.classList.contains('is-open')) { return; }
+      box.classList.remove('is-open');
+      pick.setAttribute('aria-expanded', 'false');
+      if (back) { pick.focus(); }
+    }
+
+    pick.addEventListener('click', function () {
+      if (box.classList.contains('is-open')) { close(true); } else { open(); }
+    });
+
+    // Клик вне окна закрывает его. Слушаем документ, а не окно: нажатие
+    // по соседнему полю обязано закрыть календарь, а не оставить два.
+    // ⚠️ СЛУШАЕМ `mousedown`, А НЕ `click`. К моменту `click` обработчик
+    // кнопки внутри окна успевает перерисовать её содержимое, нажатый
+    // элемент оказывается оторван от страницы, и `box.contains(target)`
+    // честно отвечает «нет» — окно закрывалось от собственного нажатия.
+    document.addEventListener('mousedown', function (event) {
+      if (!box.classList.contains('is-open')) { return; }
+      if (box.contains(event.target)) { return; }
+      close(false);
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') { close(false); }
+    });
+
+    // ── Ввод с клавиатуры ──────────────────────────────────────────────
+    text.addEventListener('input', function () {
+      var atEnd = text.selectionStart === text.value.length;
+      var digits = digitsOf(text.value);
+      text.value = maskOf(digits);
+      // Каретку возвращаем в конец только если человек там и печатал:
+      // при правке середины прыжок в конец хуже отсутствия маски.
+      if (atEnd) {
+        text.setSelectionRange(text.value.length, text.value.length);
+      }
+      showError('');
+    });
     text.addEventListener('blur', fromText);
     text.addEventListener('change', fromText);
     text.addEventListener('keydown', function (event) {
-      // ⚠️ Enter в поле формы — встроенная «неявная отправка» HTML. Здесь она
-      // особенно некстати: строка ещё не разобрана, и работа ушла бы без
-      // срока. Разбираем и гасим (правило из сессии 3, work_form.js).
+      // ⚠️ Enter в поле формы — встроенная «неявная отправка» HTML. Здесь
+      // она особенно некстати: строка ещё не разобрана, и работа ушла бы
+      // без срока. Разбираем и гасим (правило из сессии 3, work_form.js).
       if (event.key === 'Enter') { event.preventDefault(); fromText(); }
     });
-    native.addEventListener('change', fromNative);
-    native.addEventListener('input', fromNative);
+    native.addEventListener('change', function () {
+      if (!box.classList.contains('is-open')) { fromNative(); }
+    });
 
-    if (pick) {
-      pick.addEventListener('click', function () {
-        // showPicker есть не везде; где нет — отдаём фокус родному полю,
-        // и календарь открывается его же средствами.
-        try {
-          if (typeof native.showPicker === 'function') {
-            native.showPicker();
-            return;
-          }
-        } catch (e) { /* жест не от пользователя либо поле не отрисовано */ }
-        native.focus();
-      });
-    }
-
+    fromNative();
     // Класс ставится ПОСЛЕДНИМ: пока его нет, виден обычный родной
     // datetime-local, и поле работает как до этой фазы.
     box.classList.add('is-ready');
