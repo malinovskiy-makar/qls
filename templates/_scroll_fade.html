@@ -1,0 +1,76 @@
+{% comment %}
+Растворение у краёв прокручиваемых блоков — ОДИН механизм на весь кабинет.
+
+Подключается один раз в базовом шаблоне, рядом с закрывающим </body>.
+Правила вида — в `templates/_kit.html` (`.fade-box`).
+
+⚠️ ЗАЧЕМ СКРИПТ, ЕСЛИ ЕСТЬ CSS-ТРЮК С `background-attachment: local`. Тот
+трюк рисует тени ФОНОМ, то есть ПОД содержимым. У теплокарты каждая клетка
+имеет свою заливку, у таблиц — заливка строки при наведении и зебра: тень
+оказалась бы закрыта ровно там, где содержимое есть. Наложение поверх
+(`::before` / `::after` у обёртки) видно всегда, но «доскроллили или нет»
+CSS сам не знает — отсюда классы `is-start` / `is-end`.
+
+⚠️ ПРОКРУТКА С КЛАВИАТУРЫ. Полосы спрятаны, и у того, кто ходит табом, не
+осталось бы способа добраться до правых колонок. Переполненный блок получает
+`tabindex="0"` и подпись; НЕ переполненный не получает ничего — лишняя
+остановка табуляции на блоке, который виден целиком, только мешает.
+Прокрутка колесом, трекпадом и Shift+колесом работает у любого блока с
+`overflow: auto` сама, её выключить нечем.
+{% endcomment %}
+<script>
+(function () {
+  'use strict';
+
+  /** Сам прокручиваемый блок внутри обёртки. */
+  function scrollerOf(box) {
+    return box.querySelector('[data-scroller]')
+      || box.firstElementChild;
+  }
+
+  function setup(box) {
+    var scroller = scrollerOf(box);
+    if (!scroller) { return; }
+    var vertical = box.classList.contains('fade-box--y');
+
+    function paint() {
+      var overflow = vertical
+        ? scroller.scrollHeight - scroller.clientHeight
+        : scroller.scrollWidth - scroller.clientWidth;
+      var at = vertical ? scroller.scrollTop : scroller.scrollLeft;
+
+      // Переполнения нет — оба края гасим и остановку табуляции убираем.
+      if (overflow <= 1) {
+        box.classList.add('is-start', 'is-end');
+        if (scroller.dataset.fadeTab === '1') {
+          scroller.removeAttribute('tabindex');
+          scroller.removeAttribute('role');
+          scroller.removeAttribute('aria-label');
+          delete scroller.dataset.fadeTab;
+        }
+        return;
+      }
+      box.classList.toggle('is-start', at <= 1);
+      box.classList.toggle('is-end', at >= overflow - 1);
+      if (scroller.dataset.fadeTab !== '1') {
+        scroller.tabIndex = 0;
+        scroller.setAttribute('role', 'group');
+        scroller.setAttribute('aria-label', vertical
+          ? 'Прокручиваемая область: стрелки вверх и вниз'
+          : 'Прокручиваемая область: стрелки влево и вправо');
+        scroller.dataset.fadeTab = '1';
+      }
+    }
+
+    scroller.addEventListener('scroll', paint, { passive: true });
+    window.addEventListener('resize', paint);
+    // Содержимое меняется без перезагрузки (сортировка, раскрытие карточек).
+    if (window.ResizeObserver) {
+      new ResizeObserver(paint).observe(scroller);
+    }
+    paint();
+  }
+
+  document.querySelectorAll('[data-fade]').forEach(setup);
+})();
+</script>

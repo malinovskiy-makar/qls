@@ -26,6 +26,11 @@
 неправильно, а «нет данных» уходит в −1, чтобы не оказаться между 0 и 1 %.
 {% endcomment %}
 {% if works %}
+{% comment %}
+Обёртка растворения краёв — общая деталь набора; на узком экране таблица
+прокручивается внутри себя, и полосы у неё нет.
+{% endcomment %}
+<div class="fade-box" data-fade>
 <div class="stats-table-wrap">
   <table class="wk-table" data-sortable id="{% if for_group %}group-works-table{% else %}student-works-table{% endif %}">
     <thead>
@@ -105,6 +110,7 @@
       {% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 {% else %}
 <div class="empty-note">Работ ещё не было.</div>

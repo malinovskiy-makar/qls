@@ -497,6 +497,75 @@
 .back-link { font-size: 13px; color: var(--text2); text-decoration: none; }
 .back-link:hover { color: var(--text); }
 
+/* ── Прокручиваемый блок: без полосы, с растворением у краёв ────────────
+   ⚠️ ПРАВИЛА ЖИВУТ ЗДЕСЬ (ревью 15.08, фаза 5). Раньше они лежали в
+   `platform/_stats_style.html` и работали только у теплокарты; при этом
+   прокручиваемых блоков в кабинете шесть. Тот же класс дефекта, что у
+   `.crumbs`: правило в файле, который подключают не все экраны.
+
+   Устройство: ОБЁРТКА `.fade-box` не прокручивается и держит два наложения
+   (`::before` слева, `::after` справа), внутри неё — сам прокручиваемый
+   блок. Наложение внутри прокручиваемого блока уезжало бы вместе с
+   содержимым, поэтому обёртка обязательна.
+
+   Каждое наложение — ДВА слоя в одном градиенте: нижний уводит содержимое
+   под цвет карточки, верхний кладёт у самого края мягкую тень. Тень и есть
+   признак «лист продолжается»; на бледном содержимом одного растворения не
+   хватает (проверено на теплокарте — белое по белому не видно).
+
+   Классы `is-start` / `is-end` вешает `templates/_scroll_fade.html`:
+   доскроллили до края — соответствующее наложение гаснет. Висящая всё
+   время тень читалась бы как украшение и перестала бы что-либо сообщать. */
+.fade-box { position: relative; --fade-under: var(--surface); }
+.fade-box > * { scrollbar-width: none; -ms-overflow-style: none; }
+.fade-box > *::-webkit-scrollbar { display: none; }
+.fade-box::before, .fade-box::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 56px;
+  pointer-events: none; opacity: 1; transition: opacity .18s ease;
+}
+.fade-box::before {
+  left: 0;
+  background:
+    linear-gradient(to left, rgba(0, 0, 0, 0) 55%, var(--fade-edge) 100%),
+    linear-gradient(to left, rgba(0, 0, 0, 0) 0%, var(--fade-under) 80%);
+}
+.fade-box::after {
+  right: 0;
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0) 55%, var(--fade-edge) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0) 0%, var(--fade-under) 80%);
+}
+.fade-box.is-start::before { opacity: 0; }
+.fade-box.is-end::after { opacity: 0; }
+
+/* Вертикальный вариант — правая панель конструктора. Края сверху и снизу. */
+.fade-box--y::before, .fade-box--y::after {
+  left: 0; right: 0; width: auto; height: 40px; top: auto; bottom: auto;
+}
+.fade-box--y::before {
+  top: 0;
+  background:
+    linear-gradient(to top, rgba(0, 0, 0, 0) 55%, var(--fade-edge) 100%),
+    linear-gradient(to top, rgba(0, 0, 0, 0) 0%, var(--fade-under) 80%);
+}
+.fade-box--y::after {
+  bottom: 0;
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0) 55%, var(--fade-edge) 100%),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, var(--fade-under) 80%);
+}
+
+/* ⚠️ ПРОКРУТКА С КЛАВИАТУРЫ. Полоса спрятана — значит утащить блок мышью
+   больше нельзя, и у того, кто ходит по странице табом, не осталось бы
+   вообще никакого способа увидеть правые колонки. Скрипт ставит
+   `tabindex="0"` ТОЛЬКО переполненным блокам (пустая остановка табуляции
+   на блоке, который и так виден целиком, — мусор), а кольцо фокуса тут
+   обязано быть видно. */
+.fade-box > [tabindex]:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: -2px;
+  border-radius: var(--r);
+}
+
 /* ── Столбцы таблиц ─────────────────────────────────────────────────────
    ⚠️ ПРАВИЛО ОБЩЕЕ, А НЕ ПОДКРУТКА ОТДЕЛЬНЫХ ТАБЛИЦ (ревью 15.08, фаза 3).
    Владелец: «каждый столбец и все значения в нём должны быть отцентрованы

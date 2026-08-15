@@ -407,6 +407,82 @@ async function cursorsOnPage(page) {
   await open(page, '/teacher/groups/2/?tab=assignments', 'вкладки со счётчиком');
   await shot(page, 'ф4-счётчик');
 
+  // ══ ФАЗА 5: края прокрутки ═════════════════════════════════════════════
+  console.log('\n— Фаза 5: полосы спрятаны, края растворяются с обеих сторон');
+  await page.setViewportSize({ width: 1100, height: 760 });
+  await page.evaluate(() => localStorage.setItem('theme', 'light'));
+  const SCROLLERS = [
+    ['/teacher/groups/2/', '.fade-box', 'теплокарта', 'x'],
+    ['/teacher/assignment/create/?group=2', '.hw-sidebar',
+     'панель конструктора', 'y'],
+  ];
+  for (const [url, selector, name, axis] of SCROLLERS) {
+    if (!await open(page, url, name)) continue;
+    const state = await page.evaluate(({ selector, axis }) => {
+      const box = document.querySelector(selector);
+      if (!box) return null;
+      const sc = box.querySelector('[data-scroller]') || box.firstElementChild;
+      const over = axis === 'y' ? sc.scrollHeight - sc.clientHeight
+        : sc.scrollWidth - sc.clientWidth;
+      return {
+        переполнение: over,
+        полоса: getComputedStyle(sc).scrollbarWidth,
+        вначале: box.classList.contains('is-start'),
+        левое: getComputedStyle(box, '::before').opacity,
+        правое: getComputedStyle(box, '::after').opacity,
+        таб: sc.getAttribute('tabindex'),
+      };
+    }, { selector, axis });
+    if (!state) { check(`${name}: обёртка есть`, false); continue; }
+    check(`${name}: содержимое действительно не влезает`,
+      state.переполнение > 1, state.переполнение);
+    check(`${name}: полоса прокрутки спрятана`,
+      state.полоса === 'none', state.полоса);
+    check(`${name}: в начале левого растворения нет`,
+      state.вначале && state.левое === '0', state);
+    check(`${name}: правое растворение видно`, state.правое !== '0');
+    check(`${name}: блок доступен с клавиатуры`, state.таб === '0', state.таб);
+
+    // Прокручиваем СТРЕЛКОЙ, а не скриптом: проверяем то, чем пользуются.
+    await page.evaluate(({ selector }) => {
+      const box = document.querySelector(selector);
+      (box.querySelector('[data-scroller]') || box.firstElementChild).focus();
+    }, { selector });
+    for (let i = 0; i < 4; i += 1) {
+      await page.keyboard.press(axis === 'y' ? 'ArrowDown' : 'ArrowRight');
+    }
+    await page.waitForTimeout(200);
+    const after = await page.evaluate(({ selector, axis }) => {
+      const box = document.querySelector(selector);
+      const sc = box.querySelector('[data-scroller]') || box.firstElementChild;
+      return {
+        сдвиг: axis === 'y' ? sc.scrollTop : sc.scrollLeft,
+        левое: getComputedStyle(box, '::before').opacity,
+      };
+    }, { selector, axis });
+    check(`${name}: стрелки прокручивают`, after.сдвиг > 0, after.сдвиг);
+    check(`${name}: после прокрутки левое растворение появилось`,
+      after.левое !== '0', after.левое);
+  }
+
+  console.log('\n— Фаза 5: тёмная тема не слабее светлой');
+  const steps = {};
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((t) => localStorage.setItem('theme', t), theme);
+    await open(page, '/teacher/groups/2/', `теплокарта (${theme})`);
+    // Уводим прокрутку в середину: видны оба края.
+    await page.evaluate(() => {
+      const sc = document.querySelector('.fade-box').firstElementChild;
+      sc.scrollLeft = Math.round((sc.scrollWidth - sc.clientWidth) / 2);
+    });
+    await page.waitForTimeout(300);
+    steps[theme] = true;
+    await shot(page, `ф5-края-${theme}`);
+  }
+  check('края сняты в обеих темах', steps.light && steps.dark);
+  await page.evaluate(() => localStorage.setItem('theme', 'light'));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
   // ══ ИТОГ ═══════════════════════════════════════════════════════════════
   console.log(`\n${'='.repeat(60)}`);
   console.log(`Проверок: ${ok + bad}, зелёных: ${ok}, красных: ${bad}`);

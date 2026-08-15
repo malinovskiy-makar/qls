@@ -341,24 +341,8 @@
   });
 })();
 
-// Растворение правого края теплокарты (фаза 6.2). Полоса прокрутки спрятана,
-// и растворение — единственный признак, что справа есть ещё колонки.
-// ⚠️ Гаснет, когда доскроллили: висящая всё время тень читалась бы как
-// украшение и перестала бы что-либо сообщать. При отсутствии переполнения
-// условие выполняется сразу — тени нет вовсе.
-(function () {
-  document.querySelectorAll('[data-fade]').forEach(function (box) {
-    var scroller = box.querySelector('.stats-table-wrap');
-    if (!scroller) { return; }
-    function paint() {
-      var atEnd = scroller.scrollLeft + scroller.clientWidth
-        >= scroller.scrollWidth - 1;
-      box.classList.toggle('is-end', atEnd);
-    }
-    scroller.addEventListener('scroll', paint);
-    window.addEventListener('resize', paint);
-    paint();
-  });
-})();
+// ⚠️ Растворение краёв переехало в ОБЩИЙ `templates/_scroll_fade.html`
+// (ревью 15.08, фаза 5): прокручиваемых блоков в кабинете шесть, а здешний
+// скрипт знал только про теплокарту и только про правый край.
 </script>
 {% endblock %}

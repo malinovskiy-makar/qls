@@ -180,14 +180,19 @@ class FadeTests(TestCase):
     """3.3 — признак «справа есть ещё колонки»."""
 
     def test_fade_is_wide_and_two_layered(self):
-        css = read('problems', 'templates', 'platform', '_stats_style.html')
-        block = css.split('.fade-box::after')[1].split('}')[0]
+        # ⚠️ ПРАВИЛА ПЕРЕЕХАЛИ В НАБОР (ревью 15.08, фаза 5): прокручиваемых
+        # блоков в кабинете шесть, а файл статистики подключают не все.
+        css = read('templates', '_kit.html')
+        block = css.split('.fade-box::before, .fade-box::after')[1].split('}')[0]
         self.assertIn('width: 56px', block)
-        self.assertIn('var(--fade-edge)', block)
-        self.assertIn('var(--surface)', block)
+        # ⚠️ Режем по переводу строки: подстрока `.fade-box::after {` есть и
+        # в общем правиле `.fade-box::before, .fade-box::after {`.
+        tail = css.split('\n.fade-box::after {')[1].split('}')[0]
+        self.assertIn('var(--fade-edge)', tail)
+        self.assertIn('var(--fade-under)', tail)
 
     def test_fade_goes_out_at_the_end_of_the_scroll(self):
-        css = read('problems', 'templates', 'platform', '_stats_style.html')
+        css = read('templates', '_kit.html')
         self.assertIn('.fade-box.is-end::after { opacity: 0; }', css)
 
     def test_edge_colour_is_defined_in_both_themes(self):

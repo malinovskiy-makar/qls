@@ -138,12 +138,14 @@ class ScrollFadeTests(TestCase):
     """6.2 — полосу прячем, прокрутку оставляем, край растворяем."""
 
     def test_style_hides_only_the_bar(self):
+        # ⚠️ Полосу прячет ТЕПЕРЬ САМ `.fade-box` из набора (ревью 15.08,
+        # фаза 5) — отдельный класс `no-bar` больше не нужен. Прокрутка
+        # осталась там же, где была.
+        kit = read('templates/_kit.html')
+        self.assertIn('scrollbar-width: none', kit)
+        self.assertIn('::-webkit-scrollbar { display: none', kit)
         css = read('problems/templates/platform/_stats_style.html')
-        self.assertIn('scrollbar-width: none', css)
-        self.assertIn('::-webkit-scrollbar { display: none', css)
-        # Прокрутка обязана остаться.
         self.assertIn('.stats-table-wrap { overflow-x: auto; }', css)
 
     def test_fade_turns_off_at_the_end(self):
-        css = read('problems/templates/platform/_stats_style.html')
-        self.assertIn('.fade-box.is-end::after', css)
+        self.assertIn('.fade-box.is-end::after', read('templates/_kit.html'))

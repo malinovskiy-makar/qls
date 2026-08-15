@@ -155,6 +155,7 @@
 </div>
 
 {% if submissions %}
+<div class="fade-box" data-fade>
 <div class="sub-table-wrap">
 <table class="sub-table">
   <thead>
@@ -200,6 +201,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 </div>
 {% else %}
 <div class="empty">Решений нет{% if status_filter %} с таким статусом{% endif %}.</div>

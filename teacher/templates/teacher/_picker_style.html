@@ -12,13 +12,23 @@
 /* ── Двухколоночный макет ────────────────────────── */
 .hw-layout { display: flex; gap: 20px; align-items: flex-start; }
 .hw-main   { flex: 1; min-width: 0; }
+/* ⚠️ ПАНЕЛЬ САМА НЕ ПРОКРУЧИВАЕТСЯ (ревью 15.08, фаза 5). Прокручивается
+   её нутро, а панель служит обёрткой растворения (`.fade-box fade-box--y`):
+   наложение внутри прокручиваемого блока уезжало бы вместе с содержимым.
+   Полосу прокрутки прячет сам набор; вместо неё сверху и снизу появляется
+   растворение, и оно гаснет у достигнутого края.
+   ⚠️ Панель стоит НА ФОНЕ СТРАНИЦЫ, а не на карточке, поэтому цвет, под
+   который уводится содержимое, переопределён на `--bg`: белая дымка на
+   сером фоне была бы заметнее самого края. */
 .hw-sidebar {
   width: 310px; flex-shrink: 0; position: sticky; top: 68px;
-  max-height: calc(100vh - 90px); overflow-y: auto; scrollbar-width: thin;
+  max-height: calc(100vh - 90px); --fade-under: var(--bg);
 }
+.hw-sidebar__scroll { max-height: calc(100vh - 90px); overflow-y: auto; }
 @media (max-width: 900px) {
   .hw-layout { flex-direction: column; }
   .hw-sidebar { width: 100%; position: static; max-height: none; }
+  .hw-sidebar__scroll { max-height: none; overflow: visible; }
 }
 
 /* ── Фильтры ─────────────────────────────────────── */

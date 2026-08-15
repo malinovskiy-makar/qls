@@ -138,10 +138,18 @@ class SummaryCardTests(Base):
 class ColumnOrderTests(Base):
     """9.4 — сверху что за работа, снизу чем наполняем."""
 
+    def _aside(self, html):
+        """Правая колонка целиком.
+
+        ⚠️ Режем по `<aside class="hw-sidebar` БЕЗ закрывающей кавычки:
+        с ревью 15.08 панель ещё и обёртка растворения краёв, и в атрибуте
+        рядом стоят `fade-box fade-box--y`.
+        """
+        return html.split('<aside class="hw-sidebar')[1]
+
     def _order(self, html):
         """Порядок блоков правой колонки по их заголовкам."""
-        aside = html.split('<aside class="hw-sidebar">')[1]
-        return re.findall(r'class="ws-title"[^>]*>(.*?)<', aside)
+        return re.findall(r'class="ws-title"[^>]*>(.*?)<', self._aside(html))
 
     def test_homework_settings_stand_above_the_cart(self):
         html = self.client.get(
@@ -165,7 +173,7 @@ class ColumnOrderTests(Base):
         html = self.client.get(
             reverse('teacher:assignment_create')
             + '?group=%d' % self.group.pk).content.decode()
-        aside = html.split('<aside class="hw-sidebar">')[1]
+        aside = self._aside(html)
         self.assertLess(aside.index('cart-list'), aside.index('id="submit-btn"'))
 
     def test_button_ids_did_not_change(self):

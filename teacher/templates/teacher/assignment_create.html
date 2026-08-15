@@ -15,7 +15,8 @@
     {% include "teacher/_picker_list.html" %}
   </div>
 
-  <aside class="hw-sidebar">
+  <aside class="hw-sidebar fade-box fade-box--y" data-fade>
+  <div class="hw-sidebar__scroll">
     <form method="post" id="picker-form" action="">
       {% csrf_token %}
       <input type="hidden" name="problem_ids" id="problem-ids-input">
@@ -53,6 +54,7 @@
 
       {% include "teacher/_work_submit.html" with submit_label="Создать домашку" is_exam=False %}
     </form>
+  </div>
   </aside>
 </div>
 

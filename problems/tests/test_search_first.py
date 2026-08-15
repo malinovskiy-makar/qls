@@ -90,6 +90,16 @@ class TopicIsNotAFilterTests(TestCase):
     """Тема подсказывает порядок и НИЧЕГО не отсекает."""
 
     def setUp(self):
+        # ⚠️ ПОЧЕМУ ЗДЕСЬ ЧИСТКА (найдено 15.08). Класс краснел ТОЛЬКО в
+        # полном прогоне и проходил в одиночку: индекс смыслового поиска
+        # живёт модульной переменной (`catalog.semantic._index`) и строится
+        # один раз на процесс. Соседний класс чистит его перед собой, этот —
+        # нет, и порядок выдачи считался по задачам ЧУЖОГО теста.
+        # Своей правки поведения тут нет, только гигиена прогона.
+        from catalog import semantic
+
+        cache.clear()
+        semantic.invalidate_index()
         self.ppf, self.trade, _ = bank()
 
     def test_wrong_topic_does_not_empty_the_result(self):
