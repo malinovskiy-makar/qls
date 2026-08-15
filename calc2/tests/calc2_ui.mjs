@@ -243,9 +243,12 @@ await t('монополия 40/60 не сломана', () => page.evaluate(() =
 await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('costs'); closePicker(); });
 await page.waitForTimeout(400);
 
-await t('у пяти кривых издержек есть пикеры', async () => {
+/* Кривых издержек стало СЕМЬ: к пяти средним и предельным добавились полные
+   TC и FC (Б21) — в списке был один VC без своей пары. Ожидание изменено
+   вместе с продуктом, а не подогнано: проверяем, что пикер есть у каждой. */
+await t('у семи кривых издержек есть пикеры', async () => {
   const n = await page.locator('#sec-costs .cpick[data-col^="cost"]').count();
-  return n === 5 || `пикеров ${n}`;
+  return n === 7 || `пикеров ${n}`;
 });
 
 await t('ключи цвета уникальны (MP ≠ MC и т.п.)', () => page.evaluate(() => {
