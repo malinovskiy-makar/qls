@@ -100,7 +100,7 @@ urlpatterns = [
     # Экспорт задания в .tex / PDF (Часть D).
     path('groups/<int:group_id>/assignments/<int:assignment_id>/export/',
          views_generate.assignment_export, name='assignment_export'),
-    path('api/problem/<int:pk>/', views.api_problem_detail,
+    path('api/problem/<str:key>/', views.api_problem_detail,
          name='api_problem_detail'),
     path('api/assignment/<int:pk>/add_problem/',
          views.api_assignment_add_problem, name='api_assignment_add_problem'),

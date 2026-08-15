@@ -31,6 +31,51 @@
 .form-field textarea { min-height: 130px; resize: vertical;
                        line-height: 1.6; }
 .form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+
+/* ── Поле на весь экран (п. 11.4) ─────────────────────────────────────
+   Владелец о редакторе своей задачи: «УЖАСНЫЙ экран создания каждого
+   пункта по отдельности; у каждого поля ввода должна быть функция
+   открытия его на полный экран». Разворачивается ОБЁРТКА, а не поле:
+   внутри неё остаются и кнопки формул, и панель графика. */
+.zoom-box { position: relative; }
+.zoom-btn { position: absolute; top: 6px; right: 6px; z-index: 2;
+            width: 26px; height: 26px; padding: 0; line-height: 1;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--surface); border: 0.5px solid var(--border);
+            border-radius: var(--r); color: var(--text3); cursor: pointer; }
+.zoom-btn:hover { color: var(--text); border-color: var(--text3); }
+/* ⚠️ ВЫШЕ ВЕРХНЕГО МЕНЮ. Шапка сайта — `position: sticky; z-index: 200`,
+   и развёрнутое поле с меньшим слоем уезжало ПОД неё: кнопка «Свернуть»
+   оказывалась накрыта ссылкой «Выйти» и не нажималась вовсе. Поймано
+   браузером; на глаз это выглядит просто как «кнопка не работает». */
+.zoom-box.is-zoomed { position: fixed; inset: 0; z-index: 300;
+                      background: var(--surface); padding: 56px 20px 20px;
+                      display: flex; flex-direction: column; gap: 12px;
+                      overflow: auto; }
+.zoom-box.is-zoomed > textarea { flex: 1; min-height: 40vh; }
+.zoom-head { display: none; }
+.zoom-box.is-zoomed .zoom-head { display: flex; align-items: center;
+                                 gap: 12px; position: absolute; top: 12px;
+                                 left: 20px; right: 20px; }
+.zoom-head__name { font-size: 13px; font-weight: 700; flex: 1; }
+.zoom-preview { display: none; }
+/* Живой предпросмотр рядом с полем: в развёрнутом виде правая колонка
+   «Так увидит ученик» не видна, а формулы проверяют глазами. */
+.zoom-box.is-zoomed .zoom-preview { display: block; flex: 1; min-height: 25vh;
+  overflow: auto; font-size: 14px; line-height: 1.7; padding: 12px 14px;
+  background: var(--surface-2); border: 0.5px solid var(--border);
+  border-radius: var(--r); overflow-wrap: anywhere; }
+.zoom-preview__cap { font-size: 11px; text-transform: uppercase;
+                     letter-spacing: .04em; color: var(--text3);
+                     margin-bottom: 6px; }
+@media (min-width: 900px) {
+  /* На широком экране поле и предпросмотр стоят рядом, а не друг под другом. */
+  .zoom-box.is-zoomed { display: grid; gap: 14px;
+                        grid-template-columns: 1fr 1fr;
+                        grid-template-rows: 1fr auto; align-content: stretch; }
+  .zoom-box.is-zoomed > textarea { grid-row: 1; }
+  .zoom-box.is-zoomed .zoom-preview { grid-row: 1; }
+}
 .errors { background: var(--error-tint); border: 1px solid var(--error-border);
           color: var(--error); border-radius: var(--r); padding: 12px 14px;
           font-size: 13px; line-height: 1.7; margin-bottom: 18px; }
@@ -178,6 +223,16 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
 
         <div class="form-field">
           <label for="id_statement">Текст задачи</label>
+          {% comment %}
+          ⚠️ ОБЁРТКА `.zoom-box` — ЭТО И ЕСТЬ ПОЛНОЭКРАННЫЙ РЕЖИМ (ревью
+          15.08, п. 11.4). Владелец: «у каждого поля ввода должна быть
+          функция открытия его на полный экран». Разворачиваем НЕ переносом
+          узлов в новое окно, а классом на обёртке: панель формул
+          `mathfield.js` вставляет СЛЕДУЮЩИМ СОСЕДОМ за полем, и перенос
+          поля в другое место оставил бы кнопку формул позади. Внутри
+          обёртки соседство сохраняется само.
+          {% endcomment %}
+          <div class="zoom-box" data-zoom="Текст задачи">
           <textarea id="id_statement" name="statement" data-mathfield
                     data-mathfield-preview="0"
                     data-mathfield-tools="#statement-tools"
@@ -203,6 +258,7 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
                     id="add-graph-btn">Добавить график</button>
             <a href="/calc2/" target="_blank" rel="noopener"
                class="k-btn k-btn--plain k-btn--sm">Создать новый график ↗</a>
+          </div>
           </div>
         </div>
       </div>
@@ -262,8 +318,10 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
                        value="{{ part.label }}" aria-label="метка пункта">
                 <button type="button" class="part-drop" title="Убрать пункт">×</button>
               </div>
+              <div class="zoom-box" data-zoom="Вопрос пункта">
               <textarea name="part_statement"
                         placeholder="Вопрос пункта">{{ part.statement }}</textarea>
+              </div>
               <div class="part-grid">
                 <div class="form-field" style="margin:0">
                   <label>Правильный ответ</label>
@@ -367,8 +425,10 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
           колонке «Так увидит ученик». Второй блок «Как это будет выглядеть»
           прямо под полем показывал бы то же самое дважды.
           {% endcomment %}
+          <div class="zoom-box" data-zoom="Эталонное решение">
           <textarea id="id_solution" name="solution" data-mathfield
                     data-mathfield-preview="0">{{ form.solution }}</textarea>
+          </div>
           {% comment %}
           Разбиение решения на шаги убрано из интерфейса по ревью владельца
           (сессия 7, фаза 1). Модель шагов НЕ удалена: поле едет скрытым и
@@ -515,7 +575,9 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
       '<input class="part-label-input" type="text" name="part_label" aria-label="метка пункта">' +
       '<button type="button" class="part-drop" title="Убрать пункт">×</button>' +
       '</div>' +
+      '<div class="zoom-box" data-zoom="Вопрос пункта">' +
       '<textarea name="part_statement" placeholder="Вопрос пункта"></textarea>' +
+      '</div>' +
       '<div class="part-grid">' +
       '<div class="form-field" style="margin:0"><label>Правильный ответ</label>' +
       '<input type="text" name="part_answer"></div>' +
@@ -666,6 +728,103 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
   }
   statement.addEventListener('input', schedule);
   if (solution) { solution.addEventListener('input', schedule); }
+
+  // ---- Поле на весь экран (п. 11.4) ----------------------------------
+  // ⚠️ РАЗВОРАЧИВАЕМ ОБЁРТКУ, А НЕ ПЕРЕНОСИМ ПОЛЕ. Панель формул
+  // `mathfield.js` вставляет себя СЛЕДУЮЩИМ СОСЕДОМ за полем; перенеся
+  // поле в отдельное окно, мы оставили бы кнопку «∑ Формула» позади — то
+  // есть отобрали бы у полноэкранного режима ровно то, ради чего он и
+  // нужен. Класс на обёртке ничего не двигает, поэтому не теряются ни
+  // обработчики, ни введённый текст.
+  function zoomBox(box) {
+    if (box.querySelector('.zoom-head')) { return; }
+    var head = document.createElement('div');
+    head.className = 'zoom-head';
+    head.innerHTML = '<span class="zoom-head__name"></span>';
+    head.querySelector('.zoom-head__name').textContent =
+      box.dataset.zoom || 'Поле';
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'k-btn k-btn--plain k-btn--sm';
+    close.textContent = 'Свернуть';
+    close.addEventListener('click', function () { unzoom(box); });
+    head.appendChild(close);
+    box.insertBefore(head, box.firstChild);
+
+    var preview = document.createElement('div');
+    preview.className = 'zoom-preview';
+    preview.innerHTML = '<div class="zoom-preview__cap">Так увидит ученик</div>'
+      + '<div class="zoom-preview__body"></div>';
+    box.appendChild(preview);
+  }
+
+  function zoomPreview(box) {
+    var body = box.querySelector('.zoom-preview__body');
+    var area = box.querySelector('textarea');
+    if (!body || !area) { return; }
+    body.innerHTML = asHtml(area.value)
+      || '<span class="row-meta">Пока пусто.</span>';
+    if (window.renderMathInElement) {
+      renderMathInElement(body, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false }
+        ],
+        throwOnError: false
+      });
+    }
+  }
+
+  function unzoom(box) {
+    box.classList.remove('is-zoomed');
+    document.body.style.overflow = '';
+    var area = box.querySelector('textarea');
+    if (area) { area.focus(); }
+  }
+
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('.zoom-btn');
+    if (!button) { return; }
+    var box = button.closest('.zoom-box');
+    zoomBox(box);
+    box.classList.add('is-zoomed');
+    // Страница под развёрнутым полем прокручиваться не должна: иначе
+    // закрытие возвращает в другое место экрана.
+    document.body.style.overflow = 'hidden';
+    zoomPreview(box);
+    var area = box.querySelector('textarea');
+    if (area) { area.focus(); }
+  });
+
+  document.addEventListener('input', function (event) {
+    var box = event.target.closest
+      && event.target.closest('.zoom-box.is-zoomed');
+    if (box) { zoomPreview(box); }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') { return; }
+    var open = document.querySelector('.zoom-box.is-zoomed');
+    if (open) { unzoom(open); }
+  });
+
+  // Кнопка «развернуть» появляется у КАЖДОЙ обёртки, включая пункты,
+  // добавленные уже после загрузки страницы.
+  function markZoomable(root) {
+    (root || document).querySelectorAll('.zoom-box').forEach(function (box) {
+      if (box.querySelector(':scope > .zoom-btn')) { return; }
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'zoom-btn';
+      button.title = 'Развернуть на весь экран';
+      button.setAttribute('aria-label', 'Развернуть на весь экран');
+      button.textContent = '⤢';
+      box.appendChild(button);
+    });
+  }
+  markZoomable();
+  new MutationObserver(function () { markZoomable(); })
+    .observe(document.body, { childList: true, subtree: true });
 
   // ---- Кнопки под полем условия — ОДНОЙ строкой ----------------------
   // ⚠️ Панель формул вставляет себя сразу после textarea, поэтому строка

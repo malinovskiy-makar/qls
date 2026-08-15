@@ -24,7 +24,10 @@ def exam_create(request, pk):
     """
     from problems.models import Assignment
 
-    from .picker import create_items, parse_cart, parse_points, picker_context
+    from .picker import (
+        create_items, own_problem_rows, parse_cart, parse_points,
+        picker_context,
+    )
 
     group = own_group_or_404(request.user, pk)
     form = {'kind': 'window', 'show_results': True}
@@ -85,6 +88,14 @@ def exam_create(request, pk):
         'errors': errors,
         'show_saved': True,
         'saved_problems': saved,
+        'own_problems': own_problem_rows(request.user),
+        # ⚠️ ПРИЗНАК «СОБИРАЕМ КОНТРОЛЬНУЮ» НУЖЕН И СПИСКУ ЗАДАЧ. Шаблоны
+        # передавали его в шапку и в настройки вручную, а вкладка «Мои
+        # задачи» ссылается на редактор своей задачи и обязана дописать
+        # `kind=exam` — иначе «Написать свою» возвращает в домашку, ровно
+        # та потеря, которую чинили в сессии 9.
+        'is_exam': True,
+        'group_id': group.pk,
         'picker_reset_url': reverse('teacher:exam_create', args=[group.pk]),
         'min_window': exam_engine.MIN_WINDOW_MINUTES,
         'min_duration': exam_engine.MIN_DURATION_MINUTES,

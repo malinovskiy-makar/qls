@@ -28,6 +28,7 @@ from django.urls import reverse
 
 from problems import hw_generator
 
+from . import picker
 from .access import group_id_param, group_label_param, tutor_required
 
 logger = logging.getLogger(__name__)
@@ -359,7 +360,7 @@ def assignment_build(request):
         'group': group,
         'group_id': group.pk if group else '',
         'groups': groups,
-        'cart_key': 'exam_cart' if is_exam else 'hw_cart',
+        'cart_key': picker.CART_KEY,
         'min_window': exam_engine.MIN_WINDOW_MINUTES,
         'min_duration': exam_engine.MIN_DURATION_MINUTES,
         'max_duration': exam_engine.MAX_DURATION_MINUTES,

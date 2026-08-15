@@ -749,7 +749,10 @@ def assignment_create(request):
     """Конструктор домашки. Отбор задач — общий модуль `teacher/picker.py`."""
     from problems.models import Assignment, StudentGroup
 
-    from .picker import create_items, parse_cart, parse_points, picker_context
+    from .picker import (
+        create_items, own_problem_rows, parse_cart, parse_points,
+        picker_context,
+    )
 
     if request.method == 'POST':
         title = request.POST.get('name', '').strip()
@@ -833,6 +836,9 @@ def assignment_create(request):
             teacher=request.user).prefetch_related('students'),
         'show_saved': True,
         'saved_problems': saved,
+        # Третья вкладка: свои задачи репетитора. «Сохранённые» — это
+        # закладки КАТАЛОГА, и мешать их со своими нельзя (п. 11.2).
+        'own_problems': own_problem_rows(request.user),
         'picker_reset_url': reverse('teacher:assignment_create'),
     })
     # Номер группы нужен общей шапке: без него переключатель «контрольная»
@@ -843,11 +849,24 @@ def assignment_create(request):
 
 
 @teacher_required
-def api_problem_detail(request, pk):
-    from problems.models import Problem
+def api_problem_detail(request, key):
+    """Условие задачи для окна предпросмотра в отборе.
+
+    ⚠️ КЛЮЧ ТОТ ЖЕ, ЧТО У КОРЗИНЫ (ревью 15.08, п. 11.2): число — задача
+    каталога, «c12» — своя задача репетитора. Второй эндпоинт для своих
+    задач не заводим: окно предпросмотра одно, и разъехаться им было бы
+    негде, кроме как в мелочах вроде «показывает ли решение».
+    """
+    from problems.models import CustomProblem, Problem
+
+    key = str(key)
+    if key.startswith('c') and key[1:].isdigit():
+        return _own_problem_json(request, int(key[1:]))
+    if not key.isdigit():
+        return JsonResponse({'error': 'Not found'}, status=404)
 
     try:
-        problem = Problem.objects.prefetch_related('topics', 'parts', 'source_references__source').get(pk=pk)
+        problem = Problem.objects.prefetch_related('topics', 'parts', 'source_references__source').get(pk=int(key))
     except Problem.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
 
@@ -874,6 +893,42 @@ def api_problem_detail(request, pk):
         'problem_type':   problem.problem_type,
         'has_solution':   bool(problem.solution),
         'sources':        sources,
+    })
+
+
+def _own_problem_json(request, pk):
+    """Своя задача репетитора в том же виде, что каталожная.
+
+    ⚠️ ЧУЖУЮ НЕ ОТДАЁМ. Своя задача видна только автору: она не в каталоге
+    и через шлюз качества не проходила.
+    """
+    from problems.models import CustomProblem
+
+    problem = (CustomProblem.objects
+               .filter(pk=pk, owner=request.user, is_deleted=False)
+               .prefetch_related('parts', 'options').first())
+    if problem is None:
+        return JsonResponse({'error': 'Not found'}, status=404)
+
+    level = problem.difficulty or 0
+    parts = [{'label': part.label, 'text': part.statement, 'points': None}
+             for part in problem.parts.all()]
+    # У теста подпункты — это варианты ответа; показываем их так же, как
+    # каталожные варианты, чтобы окно не выглядело пустым.
+    options = [{'label': option.label, 'text': option.text}
+               for option in problem.options.all()]
+    return JsonResponse({
+        'id': 'c%d' % problem.pk,
+        'title': problem.title or 'Своя задача',
+        'statement': problem.statement,
+        'parts': parts,
+        'options': options,
+        'difficulty': level,
+        'difficulty_str': '★' * level + '☆' * (5 - level),
+        'topics': [problem.topic.name] if problem.topic_id else [],
+        'problem_type': problem.get_kind_display(),
+        'has_solution': bool(problem.solution),
+        'sources': ['своя задача'],
     })
 
 

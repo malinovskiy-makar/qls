@@ -1,6 +1,11 @@
 {% comment %}
 Карточка задачи в отборе (переделана в фазе 16).
 
+⚠️ КЛЮЧ КАРТОЧКИ — `card_key` (ревью 15.08, п. 11.2). У каталожной задачи
+это её номер, у своей задачи репетитора — «c12»: ровно тот же словарь
+ключей, что у корзины и у эндпоинта предпросмотра. Без него своя задача
+уехала бы в корзину под номером ЧУЖОЙ каталожной.
+
 ⚠️ У кнопки «Добавить» НЕТ уникального id. Одна и та же задача может стоять
 и во вкладке «Каталог», и во вкладке «Сохранённые» — два элемента с одним
 id это молчаливо сломанный `getElementById` (браузер вернёт первый). Ищем
@@ -25,7 +30,7 @@ id это молчаливо сломанный `getElementById` (браузер
 `data-kind` оставлен: по нему ищут карточки сквозные сценарии.
 {% endcomment %}
 <div class="problem-card k-type k-type--{% if is_test %}test{% else %}task{% endif %}"
-     data-pid="{{ problem.pk }}"
+     data-pid="{{ card_key|default:problem.pk }}"
      data-kind="{% if is_test %}test{% else %}open{% endif %}"
      data-title="{{ card_title }}">
   <div class="card-main">
@@ -45,8 +50,9 @@ id это молчаливо сломанный `getElementById` (браузер
   значение в строке разбора работы.
   {% endcomment %}
   <div class="card-actions">
-    <button class="btn-preview" type="button" data-preview="{{ problem.pk }}">Условие</button>
+    <button class="btn-preview" type="button"
+            data-preview="{{ card_key|default:problem.pk }}">Условие</button>
     <button class="k-btn k-btn--main k-btn--sm btn-add" type="button"
-            data-add="{{ problem.pk }}">+ Добавить</button>
+            data-add="{{ card_key|default:problem.pk }}">+ Добавить</button>
   </div>
 </div>

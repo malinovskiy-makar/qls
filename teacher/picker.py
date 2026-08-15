@@ -19,6 +19,14 @@ from django.db.models import Q
 from problems.hw_generator import is_test_problem
 from problems.text_clean import preview_title
 
+# ⚠️ КОРЗИНА ОДНА НА СОБИРАЕМУЮ РАБОТУ (ревью 15.08, п. 11.1). Их было две
+# — `hw_cart` и `exam_cart`, — и переключатель «Домашка / Контрольная» это
+# ПЕРЕХОД ПО ССЫЛКЕ: уходя на соседний экран, репетитор терял всё, что уже
+# отобрал. Разделение заводилось ради «недособранная домашка не утечёт в
+# контрольную», но одновременно две работы не собирают, а вид работы — это
+# уточнение к той же работе, а не другая работа.
+CART_KEY = 'work_cart'
+
 
 
 def card_meta(topics, problem_type, difficulty):
@@ -143,6 +151,9 @@ def picker_context(request, per_page=20):
     return {
         'page_obj': page_obj,
         'cards': cards,
+        # Ключ корзины — из одной точки: разъехавшись, экраны собирали бы
+        # две разные работы, каждый свою.
+        'cart_key': CART_KEY,
         'total': paginator.count,
         # ⚠️ Был ли ЗАПРОС. Число «найдено» показываем только после него:
         # при пустом поиске это просто размер каталога, и на экране сборки
@@ -159,6 +170,36 @@ def picker_context(request, per_page=20):
         'preselect_id': request.GET.get('preselect', '').strip(),
         'add_custom': add_custom,
     }
+
+
+def own_problem_rows(owner):
+    """Свои задачи репетитора карточками отбора — третья вкладка.
+
+    ⚠️ КЛЮЧ «c<номер>», А НЕ НОМЕР (ревью 15.08, п. 11.2). Тот же словарь
+    ключей, что у корзины и у эндпоинта предпросмотра: свою задачу №3 и
+    каталожную №3 голый номер не различает, и в работу уехала бы чужая.
+
+    Строка «тема · тип · сложность» собирается ТОЙ ЖЕ `card_meta`, что у
+    каталожной карточки: вкладки обязаны выглядеть одинаково — это одно
+    место, где выбирают задачи, а не два.
+    """
+    from problems.models import CustomProblem
+
+    rows = []
+    for problem in (CustomProblem.objects
+                    .filter(owner=owner, is_deleted=False)
+                    .select_related('topic').order_by('-updated_at', '-pk')):
+        topics = [problem.topic] if problem.topic_id else []
+        rows.append({
+            'problem': problem,
+            'key': 'c%d' % problem.pk,
+            'title': preview_title(problem, limit=60),
+            'meta': card_meta(topics, problem.get_kind_display(),
+                              problem.difficulty or 0),
+            'preview': word_cut(strip_latex(problem.statement), 100),
+            'is_test': problem.is_test,
+        })
+    return rows
 
 
 def parse_cart(raw):

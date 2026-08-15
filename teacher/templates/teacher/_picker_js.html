@@ -3,7 +3,9 @@
 конструктор контрольной.
 
 Ждёт в контексте:
-  cart_key         — ключ sessionStorage («hw_cart» / «exam_cart»);
+  cart_key         — ключ sessionStorage (`picker.CART_KEY`, один на
+                     домашку и контрольную: вид работы — это уточнение
+                     к той же работе, а не другая работа);
                      у домашки и контрольной он РАЗНЫЙ, иначе недособранная
                      домашка утекала бы в контрольную;
   picker_form_id   — id формы, куда кладётся строка выбранных задач.
@@ -12,7 +14,7 @@
 <script>
 (function () {
   'use strict';
-  var STORAGE_KEY = '{{ cart_key|default:"hw_cart" }}';
+  var STORAGE_KEY = '{{ cart_key|default:"work_cart" }}';
   var FORM_ID = '{{ picker_form_id|default:"picker-form" }}';
 
   var cart = {};
