@@ -157,19 +157,32 @@ class CrumbGroupNameTests(TestCase):
         self.assertIn('Мария Ким', crumbs(html))
 
     def test_stranger_group_gives_no_crumb(self):
-        """Чужое занятие названия не подтверждает — крошки просто нет."""
+        """Чужое занятие названия не подтверждает.
+
+        ⚠️ ПЕРЕСЧИТАН (ревью 15.08, фаза 15). Раньше экран открывался как ни
+        в чём не бывало, просто без имени в крошке, — и это МАСКИРОВАЛО
+        ошибку: работа собиралась, а переключатель «Контрольная» через три
+        шага выдавал служебную страницу Django. Теперь отказ приходит сразу
+        и с возвратом на «Ученики». Требование проверки прежнее: название
+        чужого занятия на экран не попадает.
+        """
         alien = StudentGroup.objects.create(name='Секретная', teacher=self.other)
-        html = self.client.get(
+        response = self.client.get(
             reverse('teacher:assignment_create')
-            + '?group=%d' % alien.pk).content.decode()
+            + '?group=%d' % alien.pk, follow=True)
+        html = response.content.decode()
         self.assertNotIn('Секретная', html)
-        self.assertEqual(crumbs(html), 'Ученики → новая работа')
+        self.assertContains(response, 'Такого занятия нет')
 
     def test_garbage_group_param_still_opens(self):
-        """`?group=abc` по-прежнему не роняет экран (находка сессии 10)."""
+        """`?group=abc` по-прежнему не роняет экран (находка сессии 10).
+
+        ⚠️ ПЕРЕСЧИТАН: пятисотки нет и быть не должно, но непонятное
+        занятие теперь получает внятный отказ, а не игнорируется молча.
+        """
         response = self.client.get(
             reverse('teacher:assignment_create') + '?group=abc')
-        self.assertEqual(response.status_code, 200)
+        self.assertIn(response.status_code, (200, 302))
 
 
 class CheckButtonTests(TestCase):

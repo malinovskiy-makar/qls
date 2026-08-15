@@ -199,12 +199,14 @@ class OneFormatOnScreenTests(TestCase):
         AssignmentItem.objects.filter(pk=self.item.pk).update(
             points=Decimal('10'))
         text = build_tex(self.work, for_teacher=False)[0]
-        self.assertIn('10 б.', text)
+        # ⚠️ Пробел НЕРАЗРЫВНЫЙ (ревью 15.08, п. 14.2): «10» и «б.»
+        # разъезжались по строкам в собранном pdf.
+        self.assertIn('10~б.', text)
 
         AssignmentItem.objects.filter(pk=self.item.pk).update(
             points=Decimal('2.5'))
         text = build_tex(self.work, for_teacher=False)[0]
-        self.assertIn('2,5 б.', text)
+        self.assertIn('2,5~б.', text)
 
 
 class NoStaleFloatformatTests(TestCase):
