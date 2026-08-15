@@ -6,49 +6,216 @@
    MC — численная производная (центральная разность), работает для любой TC.
    --------------------------------------------------------------------- */
 
+/* До какого выпуска ищутся минимумы средних и корень P = MC. Число ПОСТОЯННОЕ
+   и от окна не зависит: минимум AVC — свойство функции затрат, а не текущего
+   масштаба, и не должен меняться от прокрутки колеса. Если человек отодвинул
+   окно дальше этого предела, ищем до края окна (зависимость односторонняя,
+   поэтому обратной связи «скан двигает окно, окно двигает скан» здесь нет —
+   в отличие от заводов, где именно она когда-то раздувала ось). */
+const COST_SCAN_Q = 200;
+function costScanTop() { return Math.max(COST_SCAN_Q, CONFIG.Qmax); }
+// Малый Q > 0: у средних кривых при Q → 0 значения уходят в бесконечность.
+const COST_SCAN_LO = 1e-3;
+
 // Значение TC(Q) по компилированной формуле (Q и x — обе переменные).
 function evalTC(q) {
   if (!STATE.costsCompiled) return NaN;
   try { const v = STATE.costsCompiled.evaluate(paramScope({ x: q, Q: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
   catch (e) { return NaN; }
 }
-function costVC(q)  { const tc = evalTC(q); return isNaN(tc) ? NaN : tc - STATE.costsFC; }   // переменные = TC − FC
-function costATC(q) { const tc = evalTC(q); return isNaN(tc) ? NaN : tc / q; }                // средние общие
-function costAVC(q) { const vc = costVC(q); return isNaN(vc) ? NaN : vc / q; }                // средние переменные
-function costAFC(q) { return STATE.costsFC / q; }                                            // средние постоянные
+
+/* Значение отдельно заданной кривой режима «по отдельности».
+   STATE.costsParts хранит скомпилированные формулы; пустое поле = кривая
+   не задана, и наружу уходит NaN, а не выдуманное число. */
+function evalPart(key, q) {
+  const c = STATE.costsParts && STATE.costsParts[key];
+  if (!c) return NaN;
+  try { const v = c.evaluate(paramScope({ x: q, Q: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  catch (e) { return NaN; }
+}
+function hasPart(key) { return !!(STATE.costsParts && STATE.costsParts[key]); }
+
+/* Постоянные затраты. В режиме «задаю TC» это TC(0) — определение, а не
+   соглашение. В режиме «задаю кривые» постоянные берутся из разности средних:
+   AFC = ATC − AVC, значит FC = (ATC − AVC)·Q. */
+function costsFC() {
+  const info = STATE.costsFCInfo;
+  return (info && info.kind !== 'none') ? info.val : NaN;
+}
+
+function costTC(q)  {
+  if (STATE.costsMode === 'curves') {
+    const atc = evalPart('ATC', q);
+    if (!isNaN(atc)) return atc * q;
+    const avc = evalPart('AVC', q), fc = costsFC();
+    return (isNaN(avc) || isNaN(fc)) ? NaN : avc * q + fc;
+  }
+  return evalTC(q);
+}
+function costVC(q)  {
+  if (STATE.costsMode === 'curves') { const a = evalPart('AVC', q); return isNaN(a) ? NaN : a * q; }
+  const tc = evalTC(q), fc = costsFC();
+  return (isNaN(tc) || isNaN(fc)) ? NaN : tc - fc;               // переменные = TC − FC
+}
+function costATC(q) {
+  if (STATE.costsMode === 'curves') return evalPart('ATC', q);
+  const tc = evalTC(q); return isNaN(tc) ? NaN : tc / q;          // средние общие
+}
+function costAVC(q) {
+  if (STATE.costsMode === 'curves') return evalPart('AVC', q);
+  const vc = costVC(q); return isNaN(vc) ? NaN : vc / q;          // средние переменные
+}
+function costAFC(q) {
+  if (STATE.costsMode === 'curves') {
+    const atc = evalPart('ATC', q), avc = evalPart('AVC', q);
+    return (isNaN(atc) || isNaN(avc)) ? NaN : atc - avc;
+  }
+  const fc = costsFC(); return isNaN(fc) ? NaN : fc / q;          // средние постоянные
+}
 // MC = d(TC)/dQ численно (центральная разность) — как mcAt для TC.
 function costMC(q) {
+  if (STATE.costsMode === 'curves') return evalPart('MC', q);
   const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
   const a = evalTC(q + h), b = evalTC(q - h);
   return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / (2 * h);
 }
+// Есть ли у сцены эта кривая вообще (в режиме «по отдельности» — только заданные).
+function costHas(name) {
+  if (STATE.costsMode !== 'curves') {
+    // Без постоянных затрат нет ни VC, ни AVC, ни AFC.
+    if (name === 'VC' || name === 'AVC' || name === 'AFC') return !isNaN(costsFC());
+    return true;
+  }
+  if (name === 'MC' || name === 'ATC' || name === 'AVC') return hasPart(name);
+  if (name === 'AFC' || name === 'VC') return hasPart('ATC') && hasPart('AVC');
+  return false;
+}
 
-// Минимум функции f на [qLo, qHi]: грубый скан + локальное уточнение.
-// Через него находим точки закрытия (min AVC) и безубыточности (min ATC).
+/* Минимум функции f на [qLo, qHi] с ЧЕСТНЫМ ответом о том, что найдено (Б26).
+
+   Прежняя версия возвращала «наименьшее из просканированного». Если
+   внутреннего минимума нет, наружу уходила ГРАНИЦА ОТРЕЗКА — то есть край
+   цикла for, выданный за экономическую величину: у TC = Q² + 18 средние
+   переменные AVC = Q растут всюду, а панель писала «Закрытие (min AVC):
+   Q = 0,5, AVC = 0,5».
+
+   kind: 'interior' — настоящий внутренний минимум (только его и можно
+                      показывать числом);
+         'boundary' — функция монотонна, наименьшее значение на краю отрезка;
+         'flat'     — функция постоянна, минимума нет. */
 function minOf(f, qLo, qHi) {
-  let bestQ = null, bestV = Infinity;
+  let bestQ = null, bestV = Infinity, topV = -Infinity;
   const scan = (lo, hi, n) => {
     for (let i = 0; i <= n; i++) {
       const q = lo + (hi - lo) * i / n, v = f(q);
-      if (!isNaN(v) && v < bestV) { bestV = v; bestQ = q; }
+      if (isNaN(v)) continue;
+      if (v < bestV) { bestV = v; bestQ = q; }
+      if (v > topV) topV = v;
     }
   };
   scan(qLo, qHi, 2000);
-  if (bestQ != null) { const step = (qHi - qLo) / 2000; scan(Math.max(qLo, bestQ - step), Math.min(qHi, bestQ + step), 400); }
-  return bestQ == null ? null : { Q: bestQ, val: bestV };
+  if (bestQ == null) return null;
+  const scale = Math.max(1e-9, Math.abs(bestV), Math.abs(topV));
+  if (topV - bestV <= 1e-6 * scale) return { Q: bestQ, val: bestV, kind: 'flat' };
+  const step = (qHi - qLo) / 2000;
+  // Внутренний минимум — тот, что не прижат к краю отрезка. Запас в два шага
+  // сетки: ровно на краю сетка не отличает «минимум здесь» от «дальше ниже».
+  const interior = (bestQ > qLo + 2 * step) && (bestQ < qHi - 2 * step);
+  scan(Math.max(qLo, bestQ - step), Math.min(qHi, bestQ + step), 400);
+  return { Q: bestQ, val: bestV, kind: interior ? 'interior' : 'boundary' };
+}
+// Показывать точкой на графике можно только настоящий внутренний минимум.
+function realMin(m) { return (m && m.kind === 'interior') ? m : null; }
+
+/* Цена закрытия — НИЖНЯЯ ГРАНЬ средних переменных затрат, и это не то же
+   самое, что «точка закрытия». У AVC = 0,5Q + 10 внутреннего минимума нет:
+   кривая растёт всюду, точки закрытия на графике не существует. Но ниже 10
+   средние переменные не опускаются, и при цене ниже 10 производить нельзя.
+   Поэтому точку показываем только для внутреннего минимума (Б26), а правило
+   остановки считаем по УРОВНЮ, каким бы он ни был достигнут (Б25). */
+function shutdownPrice() {
+  const m = STATE.minAVC;
+  return (m && isFinite(m.val)) ? m.val : NaN;
 }
 
-// Пересчёт издержек: компиляция TC, ключевые точки (минимумы AVC и ATC).
+/* Постоянные затраты из функции TC (Б24). Обычно это просто TC(0). Если в нуле
+   функция не определена (например TC = Q·ln Q), считаем предел справа: берём
+   всё меньшие Q и смотрим, сходится ли ряд значений. Расходится (TC = 1/Q) —
+   говорим об этом честно и не рисуем AFC. */
+function computeFCfromTC() {
+  const direct = evalTC(0);
+  if (isFinite(direct)) return { val: direct, kind: direct < -1e-9 ? 'negative' : 'exact' };
+  const qs = [1e-2, 1e-3, 1e-4, 1e-6, 1e-8];
+  const vs = qs.map(evalTC);
+  if (vs.some(v => isNaN(v))) return { val: NaN, kind: 'none' };
+  const last = vs[vs.length - 1], prev = vs[vs.length - 2];
+  if (Math.abs(last) > 1e9) return { val: NaN, kind: 'none' };
+  const scale = Math.max(1, Math.abs(evalTC(1)) || 1);
+  if (Math.abs(last - prev) > 1e-3 * scale) return { val: NaN, kind: 'none' };
+  // Хвост вроде −1,8·10⁻⁷ у Q·ln Q — это ноль, а не «отрицательные постоянные».
+  const val = (Math.abs(last) < 1e-4 * scale) ? 0 : last;
+  return { val, kind: val < -1e-9 ? 'negative' : 'limit' };
+}
+
+// Пересчёт издержек: компиляция формул, постоянные затраты, ключевые точки.
 function recomputeCosts() {
   STATE.costsReady = false;
   STATE.minAVC = STATE.minATC = null;
-  const { compiled } = compileFormula(STATE.costsTC);
-  if (!compiled) { STATE.costsCompiled = null; return; }
-  STATE.costsCompiled = compiled;
-  STATE.costsReady = true;
-  // Сканируем от малого Q>0 (у средних кривых при Q→0 значения уходят в бесконечность).
-  STATE.minAVC = minOf(costAVC, 0.5, CONFIG.Qmax);   // точка закрытия
-  STATE.minATC = minOf(costATC, 0.5, CONFIG.Qmax);   // точка безубыточности
+  STATE.costsFCInfo = null;
+  STATE.costsWarn = null;
+  STATE.costsParts = null;
+
+  if (STATE.costsMode === 'curves') {
+    const parts = {};
+    [['MC', STATE.costsMCx], ['ATC', STATE.costsATCx], ['AVC', STATE.costsAVCx]].forEach(([k, src]) => {
+      if (!(src || '').trim()) return;
+      const { compiled } = compileFormula(src);
+      if (compiled) parts[k] = compiled;
+    });
+    STATE.costsParts = parts;
+    if (!Object.keys(parts).length) return;
+    STATE.costsReady = true;
+    // Постоянные затраты выводимы только из пары средних: FC = (ATC − AVC)·Q.
+    if (parts.ATC && parts.AVC) {
+      const probe = Math.max(1, costScanTop() * 0.05);
+      const fc = (evalPart('ATC', probe) - evalPart('AVC', probe)) * probe;
+      STATE.costsFCInfo = isFinite(fc) ? { val: fc, kind: 'parts' } : null;
+    }
+  } else {
+    const { compiled } = compileFormula(STATE.costsTC);
+    if (!compiled) { STATE.costsCompiled = null; return; }
+    STATE.costsCompiled = compiled;
+    STATE.costsReady = true;
+    STATE.costsFCInfo = computeFCfromTC();
+  }
+
+  const hi = costScanTop();
+  if (costHas('AVC')) STATE.minAVC = minOf(costAVC, COST_SCAN_LO, hi);   // точка закрытия
+  if (costHas('ATC')) STATE.minATC = minOf(costATC, COST_SCAN_LO, hi);   // точка безубыточности
+  checkCostsConsistency();
+}
+
+/* Согласованность заданных по отдельности кривых (Б24, режим 'curves').
+   Запрещать ничего не надо: олимпиадное условие бывает и «неаккуратным».
+   Но молчать тоже нельзя — MC обязана проходить через минимумы средних. */
+function checkCostsConsistency() {
+  if (STATE.costsMode !== 'curves' || !STATE.costsReady) return;
+  const bad = [];
+  const near = (a, b) => Math.abs(a - b) <= 0.02 * Math.max(1, Math.abs(a), Math.abs(b));
+  [['ATC', realMin(STATE.minATC)], ['AVC', realMin(STATE.minAVC)]].forEach(([name, m]) => {
+    if (!m || !hasPart('MC')) return;
+    const mc = costMC(m.Q);
+    if (!isNaN(mc) && !near(mc, m.val)) bad.push(name);
+  });
+  if (hasPart('ATC') && hasPart('AVC')) {
+    const probe = Math.max(1, costScanTop() * 0.05);
+    if (evalPart('ATC', probe) < evalPart('AVC', probe) - 1e-9) bad.push('порядок');
+  }
+  if (!bad.length) return;
+  STATE.costsWarn = (bad.indexOf('порядок') >= 0)
+    ? 'Средние общие затраты оказались ниже средних переменных, а такого быть не может: разность ATC − AVC это постоянные затраты, делённые на выпуск.'
+    : ('Предельные затраты не проходят через минимум ' + bad.join(' и ') +
+       ': по определению MC пересекает среднюю кривую ровно в её минимуме. Кривые построены, но между собой они не согласованы.');
 }
 
 // Точки кривой издержек от малого Q (>0) до Qmax. Выбросы за пределы экрана обрываем.
@@ -73,21 +240,25 @@ function drawCostCurves() {
       .attr('stroke', color).attr('stroke-width', 2.2).attr('d', line);
     if (dash) p.attr('stroke-dasharray', dash);
   };
-  curve(costVC,  COL.costVC, STATE.showVC, '5 4');   // VC — полные переменные (по желанию)
-  curve(costAFC, COL.costAFC, STATE.showAFC);
-  curve(costAVC, COL.costAVC, STATE.showAVC);
-  curve(costATC, COL.costATC, STATE.showATC);
-  curve(costMC,  COL.costMC, STATE.showMC);
+  // Кривой, которой у сцены нет (нет постоянных затрат либо поле пустое),
+  // не существует: галочка её не воскрешает.
+  curve(costVC,  COL.costVC, STATE.showVC && costHas('VC'), '5 4');   // VC — полные переменные (по желанию)
+  curve(costAFC, COL.costAFC, STATE.showAFC && costHas('AFC'));
+  curve(costAVC, COL.costAVC, STATE.showAVC && costHas('AVC'));
+  curve(costATC, COL.costATC, STATE.showATC && costHas('ATC'));
+  curve(costMC,  COL.costMC, STATE.showMC && costHas('MC'));
 
   // Подписи кривых (Фаза 3): у правого края, а если кривая там вне окна —
   // у ближайшего места, где она видна. Раньше подпись просто пропадала.
-  if (STATE.showMC)  labelCurve(g, costMC,  'MC',  COL.costMC);
-  if (STATE.showATC) labelCurve(g, costATC, 'ATC', COL.costATC);
-  if (STATE.showAVC) labelCurve(g, costAVC, 'AVC', COL.costAVC, { below: true });
-  if (STATE.showAFC) labelCurve(g, costAFC, 'AFC', COL.costAFC);
-  if (STATE.showVC)  labelCurve(g, costVC,  'VC',  COL.costVC, { below: true });
+  if (STATE.showMC  && costHas('MC'))  labelCurve(g, costMC,  'MC',  COL.costMC);
+  if (STATE.showATC && costHas('ATC')) labelCurve(g, costATC, 'ATC', COL.costATC);
+  if (STATE.showAVC && costHas('AVC')) labelCurve(g, costAVC, 'AVC', COL.costAVC, { below: true });
+  if (STATE.showAFC && costHas('AFC')) labelCurve(g, costAFC, 'AFC', COL.costAFC);
+  if (STATE.showVC  && costHas('VC'))  labelCurve(g, costVC,  'VC',  COL.costVC, { below: true });
 
-  // Ключевые точки: безубыточность (min ATC) и закрытие (min AVC) — MC проходит через них.
+  // Ключевые точки: безубыточность (min ATC) и закрытие (min AVC) — MC проходит
+  // через них. Показываем только НАСТОЯЩИЙ внутренний минимум: край отрезка
+  // сканирования экономической точкой не является (Б26).
   const mark = (pt, color, label) => {
     if (!pt || pt.val > CONFIG.Pmax || pt.Q > CONFIG.Qmax) return;
     const [px, py] = toPx(pt.Q, pt.val);
@@ -97,19 +268,60 @@ function drawCostCurves() {
       .attr('text-anchor', 'middle').attr('font-size', FS.small).attr('font-weight', 600).attr('fill', color)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
   };
-  if (STATE.showATC) mark(STATE.minATC, COL.costATC, 'безубыт.');
-  if (STATE.showAVC) mark(STATE.minAVC, COL.costAVC, 'закрытие');
+  if (STATE.showATC && costHas('ATC')) mark(realMin(STATE.minATC), COL.costATC, 'безубыточность');
+  if (STATE.showAVC && costHas('AVC')) mark(realMin(STATE.minAVC), COL.costAVC, 'закрытие');
+}
+
+/* Объяснение на месте несуществующего минимума (Б26). Числа с края отрезка
+   сканирования сюда не попадают: если внутреннего минимума нет, говорим об
+   этом словами и объясняем, почему его нет. */
+function noMinNote(m, what, avgName) {
+  if (!m) return '';
+  if (m.kind === 'flat')
+    return `<div class="hint">Кривая ${avgName} постоянна, поэтому минимума у неё нет, и ${what} в обычном смысле не существует.</div>`;
+  if (m.kind === 'boundary')
+    return `<div class="hint">Внутреннего минимума ${avgName} нет: кривая монотонна на всём диапазоне, поэтому ${what} в обычном смысле не существует.</div>`;
+  return '';
 }
 
 // Табло издержек: ключевые точки закрытия и безубыточности.
 function updateCostsPanel() {
   const box = document.getElementById('info-costs');
   if (!box) return;
-  if (!STATE.costsReady) { box.innerHTML = '<div class="warn">Не понял формулу TC.</div>'; return; }
+  if (!STATE.costsReady) {
+    box.innerHTML = '<div class="warn">' + (STATE.costsMode === 'curves'
+      ? 'Задайте хотя бы одну кривую: MC, ATC или AVC.'
+      : 'Не понял формулу TC.') + '</div>';
+    return;
+  }
   let html = '';
-  if (STATE.minATC) html += `<div class="stat"><span>Безубыточность (min ATC)</span><b>Q=${fmt(STATE.minATC.Q)}, ATC=${fmt(STATE.minATC.val)}</b></div>`;
-  if (STATE.minAVC) html += `<div class="stat"><span>Закрытие (min AVC)</span><b>Q=${fmt(STATE.minAVC.Q)}, AVC=${fmt(STATE.minAVC.val)}</b></div>`;
-  html += '<div class="hint">В точках закрытия и безубыточности MC пересекает соответственно AVC и ATC (в их минимумах).</div>';
+  // Постоянные затраты: отдельного поля нет, число выведено из самой функции.
+  const fi = STATE.costsFCInfo;
+  if (STATE.costsMode === 'tc') {
+    if (fi && (fi.kind === 'exact' || fi.kind === 'limit'))
+      html += `<div class="stat"><span>Постоянные затраты $FC = TC(0)$</span><b>${fmt(fi.val)}</b></div>`;
+    else if (fi && fi.kind === 'negative')
+      html += '<div class="warn">Постоянные затраты вышли отрицательными: $TC(0) < 0$. Так быть не может, проверьте формулу.</div>';
+    else
+      html += '<div class="hint">Постоянные затраты по этой функции не определены: $TC(0)$ не существует. Поэтому AFC, AVC и VC не строятся, а точки закрытия нет.</div>';
+  } else if (fi) {
+    html += `<div class="stat"><span>Постоянные затраты $FC = (ATC - AVC) \\cdot Q$</span><b>${fmt(fi.val)}</b></div>`;
+  }
+
+  const mATC = realMin(STATE.minATC), mAVC = realMin(STATE.minAVC);
+  if (mATC) html += `<div class="stat"><span>Безубыточность (min ATC)</span><b>Q=${fmt(mATC.Q)}, ATC=${fmt(mATC.val)}</b></div>`;
+  else html += noMinNote(STATE.minATC, 'точки безубыточности', 'ATC');
+  if (mAVC) html += `<div class="stat"><span>Закрытие (min AVC)</span><b>Q=${fmt(mAVC.Q)}, AVC=${fmt(mAVC.val)}</b></div>`;
+  else html += noMinNote(STATE.minAVC, 'точки закрытия', 'AVC');
+
+  if (STATE.costsWarn) html += `<div class="warn">${STATE.costsWarn}</div>`;
+  // Про пересечение говорим ровно о тех точках, которые на графике есть.
+  if (mATC && mAVC)
+    html += '<div class="hint">В точках закрытия и безубыточности MC пересекает соответственно AVC и ATC (в их минимумах).</div>';
+  else if (mATC)
+    html += '<div class="hint">В точке безубыточности MC пересекает ATC — ровно в её минимуме.</div>';
+  else if (mAVC)
+    html += '<div class="hint">В точке закрытия MC пересекает AVC — ровно в её минимуме.</div>';
   html = updateLongRunPanel(html);   // 9в — цена, оптимум P = MC, прибыль/убыток
   box.innerHTML = html;
 }
@@ -149,30 +361,92 @@ function redrawCosts() {
 // Поэтому ищем корень справа налево, как findRootLast.
 function recomputeLongRun() {
   STATE.lr = null;
-  if (!STATE.costsReady || !STATE.lrOn) return;
+  if (!STATE.costsReady || !STATE.lrOn || !costHas('MC')) return;
   const P = STATE.lrPrice;
   if (!(P > 0)) return;
-  const g = (q) => { const m = costMC(q); return isNaN(m) ? NaN : P - m; };   // P − MC: слева +, справа −
-  const Q = findRootLast(g, 0.5, CONFIG.Qmax);
-  if (Q == null || !(Q > 0)) return;
-  const atc = costATC(Q), avc = costAVC(Q);
-  const profit = isNaN(atc) ? null : (P - atc) * Q;
-  // Краткосрочное правило остановки: цена ниже минимума AVC — выгоднее закрыться.
-  const shutdown = (STATE.minAVC && P < STATE.minAVC.val - 1e-9);
+  const fc = costsFC();
   // Долгосрочная точка входа/выхода: P = min ATC (нулевая экономическая прибыль).
-  const breakeven = STATE.minATC ? STATE.minATC.val : null;
-  STATE.lr = { P, Q, atc, avc, profit, shutdown, breakeven };
+  const breakeven = realMin(STATE.minATC) ? STATE.minATC.val : null;
+  const sp = shutdownPrice();
+  /* Правило остановки решается ПЕРВЫМ, до поиска корня P = MC. Иначе случай
+     «цена ниже предельных затрат на всём диапазоне» уходил в ветку «корня нет»
+     и убыток, равный постоянным затратам, не назывался вовсе, хотя фирма его
+     несёт: закрыться не значит ничего не потерять. */
+  const shutdown = isFinite(sp) && P < sp - 1e-9;
+  const base = {
+    P, breakeven, fc, shutdown,
+    shutPrice: sp, shutIsPoint: !!realMin(STATE.minAVC),
+    Q: shutdown ? 0 : null,
+    profit: shutdown ? (isNaN(fc) ? null : -fc) : null,
+  };
+
+  /* Оптимума может не быть вовсе, и молчать об этом нельзя (Б27): раньше при
+     постоянных предельных затратах findRootLast возвращал null, весь блок цены,
+     выпуска и прибыли исчезал с экрана без единого слова, и это выглядело как
+     поломка калькулятора. Разбираем случай явно. */
+  const hi = costScanTop();
+  const mcMin = minOf(costMC, COST_SCAN_LO, hi);
+  if (mcMin && mcMin.kind === 'flat') {
+    const mc = mcMin.val;
+    const note = (P > mc + 1e-9)
+      ? 'Предельные затраты постоянны и цена выше них, поэтому каждая следующая единица приносит одну и ту же прибавку к прибыли: конечного оптимума нет, выпуск выгодно наращивать без предела.'
+      : (P < mc - 1e-9
+        ? 'Предельные затраты постоянны и цена ниже них, поэтому любая выпущенная единица приносит убыток: выгодно не производить вовсе.'
+        : 'Цена в точности равна постоянным предельным затратам, поэтому любой выпуск даёт одну и ту же прибыль (нулевую сверх постоянных затрат): единственного оптимума нет.');
+    STATE.lr = Object.assign({}, base, { Qmc: null, atc: NaN, avc: NaN, note });
+    return;
+  }
+
+  const g = (q) => { const m = costMC(q); return isNaN(m) ? NaN : P - m; };   // P − MC: слева +, справа −
+  const Qmc = findRootLast(g, COST_SCAN_LO, hi);
+  if (Qmc == null || !(Qmc > 0)) {
+    // Корня нет: либо цена ниже всей кривой MC, либо выше её на всём диапазоне.
+    const mcLo = costMC(COST_SCAN_LO), mcHi = costMC(hi);
+    const note = (!isNaN(mcHi) && P > mcHi)
+      ? `Цена выше предельных затрат на всём просмотренном диапазоне (до Q = ${fmt(hi)}), поэтому выпуск выгодно наращивать дальше: оптимум лежит за этими пределами.`
+      : ((!isNaN(mcLo) && P < mcLo)
+        ? 'Цена ниже предельных затрат уже на первой единице, поэтому производить невыгодно ни при каком выпуске.'
+        : 'Уравнение P = MC решений не имеет: проверьте функцию затрат.');
+    // При закрытии выпуск и убыток уже стоят в base — их и показываем, а
+    // объяснение просто добавляем: закрыться не значит ничего не потерять.
+    STATE.lr = Object.assign({}, base, { Qmc: null, atc: NaN, avc: NaN, note: shutdown ? null : note, extra: note });
+    return;
+  }
+
+  const atc = costATC(Qmc), avc = costAVC(Qmc);
+  /* Краткосрочное правило остановки (Б25). Раньше этот флаг только считался:
+     панель показывала положительный выпуск, рисовала на нём прямоугольник
+     убытка и тут же писала «выгоднее закрыться». Теперь он МЕНЯЕТ ответ. */
+  const Q = shutdown ? 0 : Qmc;
+  const profit = shutdown ? base.profit : (isNaN(atc) ? null : (P - atc) * Qmc);
+  STATE.lr = Object.assign({}, base, { Q, Qmc, atc, avc, profit, note: null });
 }
 
-// Прямоугольник прибыли (зелёный) или убытка (красный) между P и ATC на [0, Q].
+/* Прямоугольник прибыли (зелёный) или убытка (красный) между P и ATC на [0, Q].
+   При закрытии (Б25) прямоугольника нет: выпуск нулевой, значит нулевая и
+   ширина. Убыток при этом равен постоянным затратам, и он показывается
+   отрезком на оси — подписанным, чтобы его не прочли как цену. */
 function drawLongRunArea() {
   const lr = STATE.lr; if (!lr || !STATE.lrArea || lr.profit == null) return;
-  if (Math.abs(lr.profit) < 1e-9 || !(lr.Q > 0)) return;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  if (lr.shutdown) {
+    const fc = lr.fc;
+    if (isNaN(fc) || !(fc > 0) || fc > CONFIG.Pmax) return;
+    const ox = sx(0);
+    g.append('line').attr('x1', ox).attr('y1', sy(0)).attr('x2', ox).attr('y2', sy(fc))
+      .attr('stroke', COL.bad).attr('stroke-width', 7).attr('opacity', 0.55).attr('stroke-linecap', 'butt');
+    renderLabelText(
+      g.append('text').attr('x', ox + 10).attr('y', sy(fc / 2)).attr('dominant-baseline', 'middle')
+        .attr('font-size', FS.small).attr('font-weight', 600).attr('fill', COL.bad)
+        .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5),
+      'убыток = FC = ' + fmt(fc));
+    return;
+  }
+  if (Math.abs(lr.profit) < 1e-9 || !(lr.Q > 0)) return;
   const yHi = Math.max(lr.P, lr.atc), yLo = Math.min(lr.P, lr.atc);
   g.append('rect').attr('x', sx(0)).attr('y', sy(yHi))
     .attr('width', sx(lr.Q) - sx(0)).attr('height', Math.abs(sy(yLo) - sy(yHi)))
-    .attr('fill', lr.profit > 0 ? COL.tax : COL.bad).attr('opacity', lr.profit > 0 ? 0.20 : 0.18);
+    .attr('fill', lr.profit > 0 ? COL.profit : COL.bad).attr('opacity', lr.profit > 0 ? 0.20 : 0.18);
 }
 
 // Линия цены, точка P = MC и подписи.
@@ -183,19 +457,38 @@ function drawLongRunMarks() {
   g.append('line').attr('x1', ox).attr('y1', yP).attr('x2', xMax).attr('y2', yP)
     .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
   haloText(g, ox - 8, yP, 'P=' + fmt(lr.P), 'end', 'middle');
-  const px = sx(lr.Q);
+  // Корня P = MC может не быть вовсе — тогда на графике только линия цены.
+  if (lr.Qmc == null || lr.Qmc > CONFIG.Qmax) { drawLongRunHandle(g, lr, ox, xMax, yP); return; }
+  const px = sx(lr.Qmc);
+  /* При закрытии точка P = MC остаётся, но бледной и с оговоркой: это корень
+     уравнения, а не выбор фирмы. Иначе экран утверждал бы одновременно и
+     «выпускай столько», и «закройся». */
+  const dim = lr.shutdown ? 0.35 : 1;
   g.append('line').attr('x1', px).attr('y1', yP).attr('x2', px).attr('y2', oy)
-    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3').attr('opacity', dim);
   g.append('circle').attr('cx', px).attr('cy', yP).attr('r', 4.5)
-    .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  haloText(g, px, oy + 8, 'Q=' + fmt(lr.Q), 'middle', 'hanging');
-  // Зона захвата линии цены — тянется мышью.
+    .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5).attr('opacity', dim);
+  if (lr.shutdown) {
+    renderLabelText(
+      g.append('text').attr('x', px + 8).attr('y', yP - 8).attr('font-size', FS.small).attr('fill', COL.inkSoft)
+        .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5),
+      'математический корень, но производить невыгодно');
+  }
+  haloText(g, px, oy + 8, 'Q=' + fmt(lr.Qmc), 'middle', 'hanging');
+  drawLongRunHandle(g, lr, ox, xMax, yP);
+}
+
+/* Зона захвата линии цены (тянется мышью) и её кружок-рукоятка. Вынесено
+   отдельной функцией: линия цены нужна и там, где корня P = MC нет вовсе,
+   иначе за цену стало бы не ухватиться ровно в тех случаях, где её и хочется
+   подвинуть. */
+function drawLongRunHandle(g, lr, ox, xMax, yP) {
   const hit = g.append('rect').attr('x', ox).attr('y', yP - 12).attr('width', xMax - ox).attr('height', 24)
-    .attr('fill', 'transparent').style('cursor', 'grab');
+    .attr('fill', 'transparent').style('cursor', 'grab').attr('data-skip-export', '1');
   hit.call(d3.drag().container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
-    .on('drag', (e) => setLrPrice(sy.invert(e.y)))
-    .on('end', () => { document.body.style.cursor = ''; }));
+    .on('start', () => { document.body.style.cursor = 'grabbing'; beginLrDrag(); })
+    .on('drag', (e) => dragLrPrice(sy.invert(e.y)))
+    .on('end', () => { document.body.style.cursor = ''; endLrDrag(); }));
   g.append('circle').attr('cx', ox + (xMax - ox) * 0.9).attr('cy', yP).attr('r', 7)
     .attr('fill', COL.reg).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
 }
@@ -208,23 +501,50 @@ function setLrPrice(p) {
   const i = document.getElementById('lr-price-input');  if (i) i.value = STATE.lrPrice;
   redrawAll();
 }
+// Перетаскивание линии цены (Фаза 4 наполнит их лёгким путём без пересборки).
+function beginLrDrag() { STATE.lrDragging = true; }
+function dragLrPrice(p) { setLrPrice(p); }
+function endLrDrag()   { STATE.lrDragging = false; }
 
 function updateLongRunPanel(html) {
   const lr = STATE.lr;
   if (!lr) return html;
   html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
   html += `<div class="stat"><span>Цена P</span><b>${fmt(lr.P)}</b></div>`;
+  /* Правило остановки применено, а не только посчитано (Б25): при цене ниже
+     минимума AVC выпуск равен нулю, а убыток равен постоянным затратам.
+     Разбирается ПЕРВЫМ: у закрытия числа есть, и они важнее объяснения. */
+  if (lr.shutdown) {
+    html += '<div class="stat"><span>Выпуск Q</span><b>0</b></div>';
+    html += `<div class="stat"><span>Убыток = FC</span><b>${lr.profit == null ? '—' : fmt(-lr.profit)}</b></div>`;
+    if (lr.Qmc != null) html += `<div class="stat"><span>Корень P = MC (не выбор фирмы)</span><b>${fmt(lr.Qmc)}</b></div>`;
+    if (lr.breakeven != null) html += `<div class="stat"><span>Вход/выход: P = min ATC</span><b>${fmt(lr.breakeven)}</b></div>`;
+    if (lr.note || lr.extra) html += `<div class="hint" style="margin-top:4px;">${lr.note || lr.extra}</div>`;
+    html += '<div class="hint" style="margin-top:4px;">' +
+      (lr.shutIsPoint
+        ? 'Цена ниже минимума AVC: '
+        : `Средние переменные затраты нигде не опускаются ниже ${fmt(lr.shutPrice)}, а цена ниже этого уровня: `) +
+      'выручка не покрывает даже переменные затраты, поэтому каждая выпущенная единица увеличивает убыток. ' +
+      'Выгоднее <b>закрыться</b>. Закрывшись, фирма всё равно платит постоянные затраты, значит ровно их и теряет: ' +
+      'это её убыток при нулевом выпуске. Корень уравнения P = MC на графике остался, но он показывает не выбор ' +
+      'фирмы, а точку, где выпуск был бы оптимален, если бы производить вообще стоило.</div>';
+    return html;
+  }
+  // Оптимума может не быть вовсе — тогда вместо чисел стоит объяснение (Б27).
+  if (lr.note) {
+    html += `<div class="hint" style="margin-top:4px;">${lr.note}</div>`;
+    if (lr.breakeven != null) html += `<div class="stat"><span>Вход/выход: P = min ATC</span><b>${fmt(lr.breakeven)}</b></div>`;
+    return html;
+  }
   html += `<div class="stat"><span>Выпуск Q (P = MC)</span><b>${fmt(lr.Q)}</b></div>`;
   html += `<div class="stat"><span>$ATC(Q)$</span><b>${fmt(lr.atc)}</b></div>`;
   html += `<div class="stat"><span>${lr.profit >= 0 ? 'Прибыль' : 'Убыток'} (P − ATC)·Q</span><b>${fmt(lr.profit)}</b></div>`;
   if (lr.breakeven != null) html += `<div class="stat"><span>Вход/выход: P = min ATC</span><b>${fmt(lr.breakeven)}</b></div>`;
-  html += `<div class="hint" style="margin-top:4px;">${lr.shutdown
-    ? 'Цена ниже минимума AVC, поэтому в коротком периоде выгоднее <b>закрыться</b>: выручка не покрывает даже переменные издержки.'
-    : (lr.profit > 1e-9
-      ? 'Прибыль положительна, поэтому в долгом периоде в отрасль входят новые фирмы и цена падает к min ATC.'
-      : (lr.profit < -1e-9
-        ? 'Убыток при P выше min AVC: в коротком периоде производить стоит, в долгом фирмы уходят и цена растёт к min ATC.'
-        : 'Нулевая экономическая прибыль и есть долгосрочное равновесие.'))}</div>`;
+  html += `<div class="hint" style="margin-top:4px;">${lr.profit > 1e-9
+    ? 'Прибыль положительна, поэтому в долгом периоде в отрасль входят новые фирмы и цена падает к min ATC.'
+    : (lr.profit < -1e-9
+      ? 'Убыток при P выше min AVC: в коротком периоде производить стоит, в долгом фирмы уходят и цена растёт к min ATC.'
+      : 'Нулевая экономическая прибыль и есть долгосрочное равновесие.')}</div>`;
   return html;
 }
 
@@ -621,6 +941,29 @@ function setPlantsQ(q) {
   const l = document.getElementById('pl-q-val');    if (l) l.textContent = fmt(q);
   const i = document.getElementById('pl-q-input');  if (i) i.value = q;
   redrawAll();
+}
+
+/* Переключатель способа ввода издержек (Б24). Спрашиваем сразу, при входе в
+   сцену: «задам TC, остальное посчитайте» или «задам кривые по отдельности». */
+function setCostsInputMode(mode) {
+  STATE.costsMode = (mode === 'curves') ? 'curves' : 'tc';
+  syncCostsInputMode();
+  redrawAll();
+}
+
+// Привести переключатель и поля в согласие с STATE (нужно и при возврате в
+// модель из памяти сцен, где состояние восстанавливается мимо переключателя).
+function syncCostsInputMode() {
+  const curves = STATE.costsMode === 'curves';
+  const a = document.getElementById('cm-tc'), b = document.getElementById('cm-curves');
+  if (a) a.classList.toggle('active', !curves);
+  if (b) b.classList.toggle('active', curves);
+  const pt = document.getElementById('costs-input-tc'), pc = document.getElementById('costs-input-curves');
+  if (pt) pt.style.display = curves ? 'none' : '';
+  if (pc) pc.style.display = curves ? '' : 'none';
+  const put = (id, v) => { const e = document.getElementById(id); if (e && v != null) e.value = v; };
+  put('inp-tc', STATE.costsTC);
+  put('inp-cmc', STATE.costsMCx); put('inp-catc', STATE.costsATCx); put('inp-cavc', STATE.costsAVCx);
 }
 
 // Переключатель сюжета режима «Фирма».

@@ -61,6 +61,7 @@ function init() {
     [null,             'un-monopoly', 'un-wagefloor',   'Монопсония',       'Пол зарплаты'],
     [null,             'ineq-rd-tax', 'ineq-rd-transfer', 'Проп. налог',    'Трансферт'],
     [null,             'mc-max',      'mc-min',         'Максимум',         'Минимум'],
+    ['costs-mode-seg',  'cm-tc',      'cm-curves',      'Задам TC',         'Задам кривые'],
   ].forEach(args => segToToggle.apply(null, args));
   /* А64 · А32. Оба раскрывающихся списка переведены на свой вид: нативный
      select не переносит текст, а режет его, и варианты не помещались («Что

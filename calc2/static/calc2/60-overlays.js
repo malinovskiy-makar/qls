@@ -2757,7 +2757,8 @@ function resetDecor() {
    этой модели действительно менял. */
 const SNAPSHOT_KEYS = Object.keys(SCENE_DEFAULTS).concat([
   'curves', 'ppfFormula', 'ppfFormula2', 'ppftFormula', 'ppftPrice',
-  'costsTC', 'costsFC', 'ineqIncomes', 'ineqFormula', 'mathFormula',
+  'costsTC', 'costsMode', 'costsMCx', 'costsATCx', 'costsAVCx',
+  'ineqIncomes', 'ineqFormula', 'mathFormula',
   'tax', 'pReg', 'taxKind', 'intervType',
 ]);
 const _sceneSnaps = {};
@@ -2785,6 +2786,9 @@ function restoreSceneSnapshot(key) {
   }
   if (snap._counters) { markCounter = snap._counters.mark; areaCalcCounter = snap._counters.area; }
   if (typeof syncLabelSizeSeg === 'function') syncLabelSizeSeg();
+  // Способ ввода издержек — часть обстановки модели, поэтому его переключатель
+  // и поля надо вернуть в согласие с восстановленным состоянием (Б24).
+  if (typeof syncCostsInputMode === 'function') syncCostsInputMode();
   renderMarkList();
   renderVertList();
   renderCurveList();

@@ -985,18 +985,17 @@ function wireControls() {
   if (tkU) tkU.addEventListener('click', () => setTaxKind('unit'));
   if (tkA) tkA.addEventListener('click', () => setTaxKind('advalorem'));
 
-  // Режим издержек (Задача 2): ввод TC/FC, кнопки «Построить» / «Стандартные», галочки кривых.
+  /* Режим издержек (Задача 2). Постоянные затраты отдельным полем больше не
+     вводятся (Б24): в режиме «задаю TC» они равны TC(0). Поэтому здесь только
+     формула TC — либо, во втором режиме, три формулы кривых. */
   const tcInp = document.getElementById('inp-tc');
-  const fcInp = document.getElementById('inp-fc');
   function applyCosts() {
     const tc = ((tcInp && tcInp.value) || '').trim();
-    const fc = parseFloat(fcInp && fcInp.value);
     const { error } = compileFormula(tc);
     const errBox = document.getElementById('costs-error');
     if (error) { if (errBox) { errBox.textContent = 'Не понял формулу TC: ' + error; errBox.style.display = 'block'; } return; }
     if (errBox) errBox.style.display = 'none';
     STATE.costsTC = tc;
-    STATE.costsFC = isNaN(fc) ? 0 : fc;
     redrawAll();
   }
   const cApply = document.getElementById('btn-costs-apply');
@@ -1004,11 +1003,35 @@ function wireControls() {
   const cPreset = document.getElementById('btn-costs-preset');
   if (cPreset) cPreset.addEventListener('click', () => {
     if (tcInp) tcInp.value = 'Q^3 - 6*Q^2 + 15*Q + 18';
-    if (fcInp) fcInp.value = 18;
     applyCosts();
   });
   if (tcInp) tcInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyCosts(); });
-  if (fcInp) fcInp.addEventListener('change', applyCosts);
+  // Второй способ ввода: кривые по отдельности.
+  const cmcInp = document.getElementById('inp-cmc'), catcInp = document.getElementById('inp-catc'),
+        cavcInp = document.getElementById('inp-cavc');
+  function applyCostParts() {
+    const errBox = document.getElementById('costs-error');
+    const bad = [];
+    [[cmcInp, 'MC', 'costsMCx'], [catcInp, 'ATC', 'costsATCx'], [cavcInp, 'AVC', 'costsAVCx']]
+      .forEach(([el, name, key]) => {
+        const src = ((el && el.value) || '').trim();
+        if (src && compileFormula(src).error) { bad.push(name); return; }
+        STATE[key] = src;
+      });
+    if (errBox) {
+      errBox.style.display = bad.length ? 'block' : 'none';
+      errBox.textContent = bad.length ? ('Не понял формулу ' + bad.join(' и ')) : '';
+    }
+    redrawAll();
+  }
+  const cpApply = document.getElementById('btn-cparts-apply');
+  if (cpApply) cpApply.addEventListener('click', applyCostParts);
+  [cmcInp, catcInp, cavcInp].forEach(e => {
+    if (e) e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') applyCostParts(); });
+  });
+  const cmTc = document.getElementById('cm-tc'), cmCur = document.getElementById('cm-curves');
+  if (cmTc) cmTc.addEventListener('click', () => setCostsInputMode('tc'));
+  if (cmCur) cmCur.addEventListener('click', () => setCostsInputMode('curves'));
   [['chk-mc', 'showMC'], ['chk-atc', 'showATC'], ['chk-avc', 'showAVC'], ['chk-afc', 'showAFC'], ['chk-vc', 'showVC'],
    ['chk-tp', 'showTP'], ['chk-mp', 'showMP'], ['chk-ap', 'showAP'], ['chk-iso-fan', 'isoFan'], ['chk-lr-area', 'lrArea']]
     .forEach(([id, key]) => { const el = document.getElementById(id); if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); }); });

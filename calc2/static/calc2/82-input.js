@@ -872,6 +872,7 @@ const FORMULA_FIELD_KINDS = {
   'inp-ki-1': 'DEMAND', 'inp-ki-2': 'DEMAND', 'inp-ki-3': 'DEMAND',
   'inp-kp-1': 'DEMAND', 'inp-kp-2': 'DEMAND', 'inp-kink-mc': 'MC',
   'inp-pl1': 'TC', 'inp-pl2': 'TC',
+  'inp-cmc': 'MC', 'inp-catc': 'ATC', 'inp-cavc': 'ATC',
   'ineq-formula': 'MATHF',
   'inp-ppft': 'PPF',   // строки стран собираются на лету и оснащаются там же
   'inp-tb1': 'PPF', 'inp-tb2': 'PPF',

@@ -74,10 +74,11 @@ function loadScene(name) {
     applyD3WorldLabels();
     setMonoMode('discr3');
   } else if (name === 'costs') {
-    const tcInp = document.getElementById('inp-tc'), fcInp = document.getElementById('inp-fc');
-    STATE.costsTC = 'Q^3 - 6*Q^2 + 15*Q + 18'; STATE.costsFC = 18;
+    // Постоянные затраты отдельным полем не задаются: FC = TC(0) (Б24).
+    const tcInp = document.getElementById('inp-tc');
+    STATE.costsTC = 'Q^3 - 6*Q^2 + 15*Q + 18';
     if (tcInp) tcInp.value = STATE.costsTC;
-    if (fcInp) fcInp.value = STATE.costsFC;
+    if (typeof setCostsInputMode === 'function') setCostsInputMode('tc');
     setMode('costs');                  // setMode сам ставит setRanges(10, 50)
   } else if (name === 'ppf') {
     const ppfInp = document.getElementById('inp-ppf');

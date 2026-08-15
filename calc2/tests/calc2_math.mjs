@@ -2187,6 +2187,134 @@ const CASES = [
              ['Q₁ при Q=60', 'q1at60', 40, 0.3], ['Q₂ при Q=60', 'q2at60', 20, 0.3],
              ['MC при Q=60', 'mAt60', 80, 0.6]],
   },
+
+  /* --- Фаза 1: экономика издержек (Б24–Б27) --------------------------- */
+  {
+    /* Б24. Постоянные затраты выводятся из самой функции, а не из отдельного
+       поля. Проверка ровно того случая, на котором ломался прежний код:
+       свободный член меняем, поля FC не существует, и всё пересчитывается.
+       TC = Q³ − 6Q² + 15Q + 40 ⇒ FC = 40, AVC = Q² − 6Q + 15 (та же, min = 6
+       при Q = 3), ATC = AVC + 40/Q ⇒ минимум смещается вправо от 3,67. */
+    name: 'Б24 · Постоянные затраты идут из TC(0), отдельного поля нет',
+    run: `resetSceneMemory(); pickScene('costs');
+          STATE.costsTC = 'Q^3 - 6*Q^2 + 15*Q + 40'; redrawAll();
+          var fi = STATE.costsFCInfo || {};
+          var vcAt5 = costVC(5), afcAt5 = costAFC(5);
+          var atcQ = (STATE.minATC || {}).Q;
+          return { fc: fi.val, exact: fi.kind === 'exact' ? 1 : 0,
+                   vc5: vcAt5, afc5: afcAt5, avcMin: (STATE.minAVC || {}).val, atcQ: atcQ,
+                   noField: document.getElementById('inp-fc') ? 1 : 0 };`,
+    // VC(5) = 125 − 150 + 75 = 50; AFC(5) = 40/5 = 8; min AVC = 6 (не зависит от FC).
+    checks: [['FC', 'fc', 40, 0.001], ['взято точно', 'exact', 1, 0],
+             ['VC(5)', 'vc5', 50, 0.01], ['AFC(5)', 'afc5', 8, 0.01],
+             ['min AVC', 'avcMin', 6, 0.02], ['Q при min ATC', 'atcQ', 4.5, 0.35],
+             ['поля FC нет', 'noField', 0, 0]],
+  },
+  {
+    /* Б25. Правило остановки МЕНЯЕТ ответ, а не только приписку. При цене 4
+       (ниже min AVC = 6) выпуск ноль, а убыток равен постоянным затратам 18.
+       Корень P = MC при этом остаётся отдельным числом. */
+    name: 'Б25 · Ниже min AVC: выпуск 0, убыток равен FC',
+    run: `resetSceneMemory(); pickScene('costs');
+          STATE.costsTC = 'Q^3 - 6*Q^2 + 15*Q + 18'; STATE.lrOn = true;
+          STATE.lrPrice = 4; redrawAll();
+          var a = STATE.lr || {};
+          STATE.lrPrice = 15.54; redrawAll();
+          var b = STATE.lr || {};
+          return { shut: a.shutdown ? 1 : 0, Q: a.Q, loss: a.profit, root: a.Qmc,
+                   okShut: b.shutdown ? 1 : 0, okQ: b.Q };`,
+    /* Корень при P = 4: 3Q² − 12Q + 15 = 4 ⇒ 3Q² − 12Q + 11 = 0 ⇒
+       Q = (12 ± √12)/6, больший корень 2,577. Первым заходом здесь стояло 3,03
+       (моя арифметическая описка при составлении случая), код давал 2,577 —
+       правильно он и давал. */
+    checks: [['закрытие', 'shut', 1, 0], ['выпуск', 'Q', 0, 0.001],
+             ['убыток = −FC', 'loss', -18, 0.01], ['корень P = MC есть', 'root', 2.577, 0.02],
+             ['при 15,54 не закрытие', 'okShut', 0, 0], ['выпуск при 15,54', 'okQ', 4.04, 0.03]],
+  },
+  {
+    /* Б26. Край цикла сканирования больше не выдаётся за экономическую точку.
+       AVC = Q растёт всюду ⇒ внутреннего минимума нет; ATC = Q + 18/Q ⇒ есть,
+       в Q = √18. Постоянная кривая ⇒ минимума нет вовсе. */
+    name: 'Б26 · Нет внутреннего минимума — нет и числа',
+    run: `resetSceneMemory(); pickScene('costs');
+          STATE.costsTC = 'Q^2 + 18'; redrawAll();
+          var a = { avc: (STATE.minAVC||{}).kind, atc: (STATE.minATC||{}).kind,
+                    atcQ: (STATE.minATC||{}).Q, shown: !!realMin(STATE.minAVC) };
+          STATE.costsTC = '20*Q'; redrawAll();
+          var b = { avc: (STATE.minAVC||{}).kind, atc: (STATE.minATC||{}).kind };
+          var txt = (document.getElementById('info-costs')||{}).innerText || '';
+          return { a1: a.avc === 'boundary' ? 1 : 0, a2: a.atc === 'interior' ? 1 : 0,
+                   atcQ: a.atcQ, shown: a.shown ? 1 : 0,
+                   b1: b.avc === 'flat' ? 1 : 0, b2: b.atc === 'flat' ? 1 : 0,
+                   said: /постоянна/.test(txt) ? 1 : 0 };`,
+    checks: [['AVC = Q — край', 'a1', 1, 0], ['ATC — внутренний', 'a2', 1, 0],
+             ['Q при min ATC = √18', 'atcQ', 4.243, 0.02],
+             ['точки закрытия не рисуем', 'shown', 0, 0],
+             ['ATC постоянна', 'b1', 1, 0], ['AVC постоянна', 'b2', 1, 0],
+             ['и сказано словами', 'said', 1, 0]],
+  },
+  {
+    /* Б27. При постоянных предельных затратах блок долгого периода больше не
+       исчезает молча: числа нет, зато есть объяснение — и разное для трёх
+       положений цены относительно MC = 20. */
+    name: 'Б27 · Постоянная MC: вместо пустоты объяснение',
+    run: `resetSceneMemory(); pickScene('costs');
+          STATE.costsTC = '20*Q'; STATE.lrOn = true;
+          var probe = function (p) { STATE.lrPrice = p; redrawAll(); var l = STATE.lr || {};
+            return { has: l.note ? 1 : 0, q: l.Q, t: l.note || '' }; };
+          var hi = probe(30), lo = probe(10), eq = probe(20);
+          return { hiHas: hi.has, loHas: lo.has, eqHas: eq.has,
+                   hiQ: hi.q === null ? 1 : 0,
+                   hiT: /наращивать без предела/.test(hi.t) ? 1 : 0,
+                   loT: /не производить вовсе/.test(lo.t) ? 1 : 0,
+                   eqT: /единственного оптимума нет/.test(eq.t) ? 1 : 0 };`,
+    checks: [['цена выше MC — пояснение', 'hiHas', 1, 0], ['цена ниже MC', 'loHas', 1, 0],
+             ['цена равна MC', 'eqHas', 1, 0], ['выпуска нет', 'hiQ', 1, 0],
+             ['текст «без предела»', 'hiT', 1, 0], ['текст «не производить»', 'loT', 1, 0],
+             ['текст «оптимума нет»', 'eqT', 1, 0]],
+  },
+  {
+    /* Цена закрытия — нижняя грань AVC, а не обязательно точка на кривой.
+       У TC = 0,5Q² + 10Q + 50 средние переменные 0,5Q + 10 растут всюду:
+       точки закрытия на графике нет, но ниже 10 они не опускаются, поэтому
+       при цене 8 производить нельзя, а при 12 можно. */
+    name: 'Б25 · Цена закрытия как нижняя грань AVC без точки на кривой',
+    run: `resetSceneMemory(); pickScene('costs');
+          STATE.costsTC = '0.5*Q^2 + 10*Q + 50'; STATE.lrOn = true;
+          STATE.lrPrice = 8; redrawAll(); var a = STATE.lr || {};
+          STATE.lrPrice = 12; redrawAll(); var b = STATE.lr || {};
+          return { kind: (STATE.minAVC||{}).kind === 'boundary' ? 1 : 0,
+                   sp: a.shutPrice, isPt: a.shutIsPoint ? 1 : 0,
+                   shut8: a.shutdown ? 1 : 0, loss8: a.profit,
+                   shut12: b.shutdown ? 1 : 0, Q12: b.Q };`,
+    // MC = Q + 10 = 12 ⇒ Q = 2.
+    checks: [['у AVC нет внутр. минимума', 'kind', 1, 0], ['цена закрытия', 'sp', 10, 0.02],
+             ['точкой не показываем', 'isPt', 0, 0],
+             ['при 8 закрытие', 'shut8', 1, 0], ['убыток = −FC', 'loss8', -50, 0.01],
+             ['при 12 работаем', 'shut12', 0, 0], ['выпуск при 12', 'Q12', 2, 0.03]],
+  },
+  {
+    /* Б24, второй способ ввода: кривые задаются по отдельности и ничего не
+       выводится одно из другого. MC = 3Q² − 12Q + 15, ATC = Q² − 6Q + 15 + 18/Q,
+       AVC = Q² − 6Q + 15 — те же кривые, что даёт TC = Q³ − 6Q² + 15Q + 18,
+       поэтому числа обязаны совпасть с Б1, а несогласованности быть не должно. */
+    name: 'Б24 · Режим «задам кривые»: числа те же, несогласованности нет',
+    run: `resetSceneMemory(); pickScene('costs'); setCostsInputMode('curves');
+          STATE.costsMCx = '3*Q^2 - 12*Q + 15';
+          STATE.costsATCx = 'Q^2 - 6*Q + 15 + 18/Q';
+          STATE.costsAVCx = 'Q^2 - 6*Q + 15';
+          STATE.lrOn = true; STATE.lrPrice = 15.54; redrawAll();
+          var ok = { avc: (STATE.minAVC||{}).val, atc: (STATE.minATC||{}).val,
+                     Q: (STATE.lr||{}).Q, fc: (STATE.costsFCInfo||{}).val, warn: STATE.costsWarn ? 1 : 0 };
+          STATE.costsATCx = 'Q^2 - 2*Q + 40'; redrawAll();
+          ok.warnBad = STATE.costsWarn ? 1 : 0;
+          setCostsInputMode('tc');
+          return ok;`,
+    checks: [['min AVC', 'avc', 6, 0.02], ['min ATC', 'atc', 11.35, 0.02],
+             ['выпуск', 'Q', 4.04, 0.03], ['FC из ATC − AVC', 'fc', 18, 0.2],
+             ['согласованные — молчим', 'warn', 0, 0],
+             ['несогласованные — говорим', 'warnBad', 1, 0]],
+  },
 ];
 
 function approx(got, want, tol) {

@@ -1148,23 +1148,43 @@
         <button class="seg-btn" id="cs-plants">Два завода</button>
       </div>
       <div id="costs-pane-costs">
-      <div class="field f-wrap">
-        <label>Суммарные затраты TC(Q)</label>
-        <div class="f-row">
-          <input type="text" id="inp-tc" value="Q^3 - 6*Q^2 + 15*Q + 18" autocomplete="off">
-          <button class="f-help" id="fh-tc" type="button" aria-expanded="false"
-                  aria-controls="fp-tc" title="Как писать формулы">?</button>
+      <!-- Б24. Способ ввода спрашиваем сразу, при входе в сцену. Отдельного
+           поля «постоянные издержки FC» больше нет: в режиме «задаю TC» они
+           равны TC(0) по определению, а второй хозяин у того же числа молча
+           ломал VC, AVC, AFC, точку закрытия и прямоугольник прибыли. -->
+      <div class="seg" id="costs-mode-seg" style="margin-bottom:8px;">
+        <button class="seg-btn active" id="cm-tc">Задам TC</button>
+        <button class="seg-btn" id="cm-curves">Задам кривые</button>
+      </div>
+      <div id="costs-input-tc">
+        <div class="field f-wrap">
+          <label>Суммарные затраты TC(Q)</label>
+          <div class="f-row">
+            <input type="text" id="inp-tc" value="Q^3 - 6*Q^2 + 15*Q + 18" autocomplete="off">
+            <button class="f-help" id="fh-tc" type="button" aria-expanded="false"
+                    aria-controls="fp-tc" title="Как писать формулы">?</button>
+          </div>
+          <div class="f-pop" id="fp-tc" role="region" aria-label="Примеры формул TC"></div>
         </div>
-        <div class="f-pop" id="fp-tc" role="region" aria-label="Примеры формул TC"></div>
+        <button class="btn" id="btn-costs-apply">Построить</button>
+        <button class="btn-sm" id="btn-costs-preset" style="margin-top:6px;width:100%;">Стандартные издержки</button>
+        <div class="hint">Постоянные затраты не вводятся отдельно: FC&nbsp;=&nbsp;TC(0). Дальше
+          VC&nbsp;=&nbsp;TC&nbsp;−&nbsp;FC, ATC&nbsp;=&nbsp;TC/Q, AVC&nbsp;=&nbsp;VC/Q,
+          AFC&nbsp;=&nbsp;FC/Q, MC&nbsp;=&nbsp;dTC/dQ. MC проходит через минимумы ATC и AVC.</div>
       </div>
-      <div class="field">
-        <label>Постоянные издержки FC</label>
-        <input type="number" id="inp-fc" step="0.1" value="18">
+      <div id="costs-input-curves" style="display:none;">
+        <div class="field"><label>Предельные затраты MC(Q)</label>
+          <input type="text" id="inp-cmc" value="3*Q^2 - 12*Q + 15" autocomplete="off"></div>
+        <div class="field"><label>Средние общие ATC(Q)</label>
+          <input type="text" id="inp-catc" value="Q^2 - 6*Q + 15 + 18/Q" autocomplete="off"></div>
+        <div class="field"><label>Средние переменные AVC(Q)</label>
+          <input type="text" id="inp-cavc" value="Q^2 - 6*Q + 15" autocomplete="off"></div>
+        <button class="btn" id="btn-cparts-apply">Построить</button>
+        <div class="hint">Для олимпиадных условий, где сразу даны MC и ATC, а функция TC не дана.
+          Пустое поле — кривой нет: здесь ничего не выводится одно из другого. Если заданы
+          и ATC, и AVC, постоянные затраты берутся как (ATC&nbsp;−&nbsp;AVC)·Q. Несогласованные
+          кривые не запрещаются, но об этом будет сказано.</div>
       </div>
-      <button class="btn" id="btn-costs-apply">Построить</button>
-      <button class="btn-sm" id="btn-costs-preset" style="margin-top:6px;width:100%;">Стандартные издержки</button>
-      <div class="hint">VC&nbsp;=&nbsp;TC&nbsp;−&nbsp;FC, ATC&nbsp;=&nbsp;TC/Q, AVC&nbsp;=&nbsp;VC/Q,
-        AFC&nbsp;=&nbsp;FC/Q, MC&nbsp;=&nbsp;dTC/dQ. MC проходит через минимумы ATC и AVC.</div>
       <div class="error" id="costs-error"></div>
       <div style="margin-top:10px;">
         <label class="chk"><input type="checkbox" id="chk-mc" checked>
