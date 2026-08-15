@@ -146,33 +146,7 @@
   {% endif %}
 </div>
 
-{% if data.ranking.enough_data %}
-<div class="panel">
-  <div class="panel-head">
-    <div class="panel-title">Сильные и слабые темы</div>
-    <div class="panel-hint">Только темы, где не меньше {{ data.ranking.min_attempts }} попыток —
-      на трёх задачах доля верных ничего не значит</div>
-  </div>
-  <div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
-    <div>
-      <div class="muted" style="margin-bottom:6px;">Получается лучше всего</div>
-      <ul class="list-rows">
-        {% for topic in data.ranking.strong %}
-        <li><span>{{ topic.name }}</span><b style="color:var(--green)">{{ topic.accuracy }}%</b></li>
-        {% empty %}<li class="muted">данных пока мало</li>{% endfor %}
-      </ul>
-    </div>
-    <div>
-      <div class="muted" style="margin-bottom:6px;">Стоит подтянуть</div>
-      <ul class="list-rows">
-        {% for topic in data.ranking.weak %}
-        <li><span>{{ topic.name }}</span><b style="color:var(--error)">{{ topic.accuracy }}%</b></li>
-        {% empty %}<li class="muted">данных пока мало</li>{% endfor %}
-      </ul>
-    </div>
-  </div>
-</div>
-{% endif %}
+{% include "_ranking.html" with ranking=data.ranking strong_cap="Получается лучше всего" weak_cap="Стоит подтянуть" %}
 
 {# ── Теплокарта ────────────────────────────────────────────────────── #}
 <div class="panel">

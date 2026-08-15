@@ -74,32 +74,7 @@
   {% endif %}
 </div>
 
-{% if ranking.enough_data %}
-<div class="panel">
-  <div class="panel-head">
-    <div class="panel-title">Сильные и слабые стороны</div>
-    <div class="panel-hint">Только темы с {{ ranking.min_attempts }}+ попытками</div>
-  </div>
-  <div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
-    <div>
-      <div class="muted" style="margin-bottom:6px;">Сильные</div>
-      <ul class="list-rows">
-        {% for topic in ranking.strong %}
-        <li><span>{{ topic.name }}</span><b style="color:var(--green)">{{ topic.accuracy }}%</b></li>
-        {% empty %}<li class="muted">данных мало</li>{% endfor %}
-      </ul>
-    </div>
-    <div>
-      <div class="muted" style="margin-bottom:6px;">Слабые</div>
-      <ul class="list-rows">
-        {% for topic in ranking.weak %}
-        <li><span>{{ topic.name }}</span><b style="color:var(--error)">{{ topic.accuracy }}%</b></li>
-        {% empty %}<li class="muted">данных мало</li>{% endfor %}
-      </ul>
-    </div>
-  </div>
-</div>
-{% endif %}
+{% include "_ranking.html" with ranking=ranking %}
 
 <div class="panel">
   <div class="panel-head">

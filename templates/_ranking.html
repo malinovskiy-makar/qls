@@ -1,0 +1,45 @@
+{% comment %}
+Блок «Сильные и слабые темы» — ОДНА разметка на три экрана: карточка
+ученика у репетитора, второй экран статистики ученика и личная статистика
+самого ученика.
+
+Ждёт:
+  `ranking`   — словарь из `problems.stats.strongest_weakest`;
+  `strong_cap`/`weak_cap` — подписи половин. Они РАЗНЫЕ по адресату:
+  репетитору «Сильные / Слабые», ученику «Получается лучше всего / Стоит
+  подтянуть». Один и тот же список, обращённый к разным людям.
+
+⚠️ БЛОК ЕСТЬ ВСЕГДА (ревью 15.08, п. 11). Раньше он показывался только
+при `enough_data`: на «Месяце» его не было вовсе, на «Всё время» он
+появлялся — и владелец решил, что блок исчез из продукта. Пустое место
+ничего не объясняет; строка «данных мало, попробуйте период шире» —
+объясняет. Слова собирает `strongest_weakest`, а не шаблон: экранов три.
+{% endcomment %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Сильные и слабые темы</div>
+    <div class="panel-hint">только темы с {{ ranking.min_attempts }}+ попытками</div>
+  </div>
+  {% if ranking.enough_data %}
+  <div class="rank-halves">
+    <div>
+      <div class="muted rank-cap">{{ strong_cap|default:"Сильные" }}</div>
+      <ul class="list-rows">
+        {% for topic in ranking.strong %}
+        <li><span>{{ topic.name }}</span><b style="color:var(--green)">{{ topic.accuracy }}%</b></li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div>
+      <div class="muted rank-cap">{{ weak_cap|default:"Слабые" }}</div>
+      <ul class="list-rows">
+        {% for topic in ranking.weak %}
+        <li><span>{{ topic.name }}</span><b style="color:var(--error)">{{ topic.accuracy }}%</b></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-note">{{ ranking.note }}{% if ranking.hint %} {{ ranking.hint }}{% endif %}</div>
+  {% endif %}
+</div>

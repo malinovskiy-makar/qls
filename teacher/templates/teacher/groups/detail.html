@@ -97,13 +97,7 @@
       {% if solo %}{{ solo.get_full_name|default:solo.username }}{% else %}{{ group.name }}{% endif %}
     </h1>
     {% if solo %}
-      {% if solo_profile %}
-      <div class="student-facts">
-        {% if solo_profile.grade %}<span><span class="cap">класс</span>{{ solo_profile.grade }}</span>{% endif %}
-        {% if solo_profile.city %}<span><span class="cap">город</span>{{ solo_profile.city }}</span>{% endif %}
-        {% if solo_profile.goal %}<span><span class="cap">цель на год</span>{{ solo_profile.goal }}</span>{% endif %}
-      </div>
-      {% endif %}
+      {% include "_student_facts.html" with profile=solo_profile %}
       {% if group.description %}<div class="page-sub">{{ group.description }}</div>{% endif %}
     {% elif group.description %}
       <div class="page-sub">{{ group.description }}</div>

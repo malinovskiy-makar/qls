@@ -71,13 +71,7 @@
     <h1 class="student-name">
       {{ student.get_full_name|default:student.username }}
     </h1>
-    {% if profile %}
-    <div class="student-facts">
-      {% if profile.grade %}<span><span class="cap">класс</span>{{ profile.grade }}</span>{% endif %}
-      {% if profile.city %}<span><span class="cap">город</span>{{ profile.city }}</span>{% endif %}
-      {% if profile.goal %}<span><span class="cap">цель на год</span>{{ profile.goal }}</span>{% endif %}
-    </div>
-    {% endif %}
+    {% include "_student_facts.html" with profile=profile %}
   </div>
 </div>
 
@@ -192,36 +186,11 @@
 </div>
 
 {% comment %}
-«Сильные и слабые темы» — перенесено со второго экрана статистики
-(решение стоп-гейта 10.1). Показывается только когда данных достаточно:
-на трёх задачах «100 % верных» не значит ничего.
+«Сильные и слабые темы» — общий партиал `templates/_ranking.html`, тот же,
+что на личной статистике ученика. Блок стоит ВСЕГДА: раньше он исчезал
+целиком, когда данных не хватало, и владелец решил, что фичи больше нет.
 {% endcomment %}
-{% if ranking.enough_data %}
-<div class="panel">
-  <div class="panel-head">
-    <div class="panel-title">Сильные и слабые темы</div>
-    <div class="panel-hint">только темы с {{ ranking.min_attempts }}+ попытками</div>
-  </div>
-  <div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
-    <div>
-      <div class="muted" style="margin-bottom:6px;">Сильные</div>
-      <ul class="list-rows">
-        {% for topic in ranking.strong %}
-        <li><span>{{ topic.name }}</span><b style="color:var(--green)">{{ topic.accuracy }}%</b></li>
-        {% empty %}<li class="muted">данных мало</li>{% endfor %}
-      </ul>
-    </div>
-    <div>
-      <div class="muted" style="margin-bottom:6px;">Слабые</div>
-      <ul class="list-rows">
-        {% for topic in ranking.weak %}
-        <li><span>{{ topic.name }}</span><b style="color:var(--error)">{{ topic.accuracy }}%</b></li>
-        {% empty %}<li class="muted">данных мало</li>{% endfor %}
-      </ul>
-    </div>
-  </div>
-</div>
-{% endif %}
+{% include "_ranking.html" with ranking=ranking %}
 
 <div class="panel">
   <div class="panel-head">

@@ -1,0 +1,20 @@
+{% comment %}
+Строка личных фактов ученика: класс, город, цель на год.
+Ждёт `profile` (`problems.models_platform.UserProfile`).
+
+Стоит на карточке ученика у репетитора и в шапке индивидуального занятия —
+поэтому разметка ОДНА. Пустые поля не рисуются вовсе: «не указано» — это
+строка ни о чём, а три таких строки съедают шапку.
+
+⚠️ ЗНАЧЕНИЕ ЗАМЕТНЕЕ МЕТКИ (ревью 15.08, п. 11). Раньше метка и значение
+шли одним кеглем и почти одним цветом, и вся строка читалась как подпись
+под именем — то есть как то, что можно не читать. Репетитор смотрит сюда
+ПЕРЕД занятием: класс и цель — рабочие сведения, а не оформление.
+Крупнее и ярче делаем ровно значение; метка остаётся мелкой и тихой.
+{% endcomment %}{% if profile %}{% if profile.grade or profile.city or profile.goal %}
+<div class="student-facts">
+  {% if profile.grade %}<span><span class="cap">класс</span><b class="fact">{{ profile.grade }}</b></span>{% endif %}
+  {% if profile.city %}<span><span class="cap">город</span><b class="fact">{{ profile.city }}</b></span>{% endif %}
+  {% if profile.goal %}<span><span class="cap">цель на год</span><b class="fact">{{ profile.goal }}</b></span>{% endif %}
+</div>
+{% endif %}{% endif %}

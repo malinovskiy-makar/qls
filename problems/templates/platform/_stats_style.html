@@ -144,6 +144,13 @@
           background: var(--surface-2); text-align: center; }
 .record .big { font-size: 24px; font-weight: 800; }
 .record .cap { font-size: 11px; color: var(--text2); margin-top: 4px; }
+/* ── Сильные и слабые темы ──────────────────────────
+   Две половины одной сетки. Правила стоят здесь, потому что блок собран
+   ОДНИМ партиалом `templates/_ranking.html` и рисуется на трёх экранах;
+   инлайновый `style` в каждом из них уже давал три чуть разных сетки. */
+.rank-halves { display: grid; gap: 18px;
+               grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.rank-cap { margin-bottom: 6px; }
 .list-rows { list-style: none; margin: 0; padding: 0; }
 .list-rows li { display: flex; align-items: center; justify-content: space-between;
                 gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border-soft);
@@ -166,10 +173,23 @@
           background: var(--chip-bg); color: var(--text2);
           display: flex; align-items: center; justify-content: center;
           font-size: 17px; font-weight: 700; flex-shrink: 0; }
-.student-facts { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px;
-                 font-size: 13px; color: var(--text); }
-.student-facts span { display: inline-flex; align-items: baseline; gap: 5px; }
-.student-facts .cap { font-size: 11px; color: var(--text3); }
+/* ⚠️ ЗНАЧЕНИЕ ЗАМЕТНЕЕ МЕТКИ (ревью 15.08, п. 11). Метка и значение шли
+   одним кеглем 13px и почти одним цветом — строка читалась как подпись,
+   которую можно пропустить. Теперь значение крупнее и плотнее, метка
+   осталась мелкой и тихой, а между тремя фактами стоит точка-разделитель:
+   без неё «класс 9 город Москва» слипалось в одну фразу.
+   Заметнее — не значит ярко: цвет прежний текстовый, акцента нет. */
+.student-facts { display: flex; gap: 4px 16px; flex-wrap: wrap;
+                 margin-top: 7px; font-size: 14px; color: var(--text); }
+.student-facts span { display: inline-flex; align-items: baseline; gap: 6px;
+                      min-width: 0; }
+.student-facts .cap { font-size: 11px; color: var(--text3);
+                      white-space: nowrap; }
+.student-facts .fact { font-weight: 600; overflow-wrap: anywhere; }
+/* Разделитель между фактами рисует CSS: литеральной точки в разметке нет,
+   иначе она осталась бы висеть у последнего факта или у единственного. */
+.student-facts > span + span::before { content: '·'; color: var(--text3);
+                                       margin-right: 10px; }
 /* Чип типа занятия `.k-chip-kind` живёт в НАБОРЕ ДЕТАЛЕЙ (`_kit.html`):
    он стоит и на конструкторе подборки, и в ручном конструкторе, а те
    стили статистики не подключают. Здесь только то, что нужно шапке. */

@@ -124,12 +124,21 @@ class RankingHalvesTests(TestCase):
     """Сильные и слабые половины не пересекаются."""
 
     def test_halves_do_not_overlap(self):
+        """⚠️ ПЕРЕСЧИТАН, А НЕ ОТКЛЮЧЁН (ревью 15.08, п. 11).
+
+        Раньше сильным доставались первые ПЯТЬ, а слабым — остаток: на
+        восьми темах выходило 5 и 3, а на двух обе уезжали в «сильные»,
+        и тема с долей верных 25% стояла под заголовком «Сильные». Теперь
+        половины берутся поровну с двух концов. Главное требование
+        проверки не изменилось — они по-прежнему не пересекаются.
+        """
         rows = [{'name': 'Тема %d' % i, 'attempted': 10,
                  'accuracy': 100 - i * 5} for i in range(8)]
         result = stats.strongest_weakest(None, rows=rows)
         strong = {r['name'] for r in result['strong']}
         weak = {r['name'] for r in result['weak']}
-        self.assertEqual(len(strong), 5)
+        self.assertEqual(len(strong), 4)
+        self.assertEqual(len(weak), 4)
         self.assertEqual(strong & weak, set(),
                          'тема не может быть и сильной, и слабой сразу')
 
