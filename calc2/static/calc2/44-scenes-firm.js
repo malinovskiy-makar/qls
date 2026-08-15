@@ -336,7 +336,9 @@ function redrawCosts() {
   svg.selectAll('*').remove();
   addDefs();
   drawGrid();
-  drawAxes('Q', '');
+  // Подпись по вертикали рисуем сами, но НАЗВАНИЕ оси сообщаем: иначе в
+  // выгрузке на графике затрат стояло ylabel={P} от прошлой сцены (Б37).
+  drawAxes('Q', '', { yName: 'Издержки, цена' });
   svg.append('text').attr('x', sx(0) + 6).attr('y', sy(CONFIG.Pmax) - 5)
     .attr('text-anchor', 'start').attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Издержки, цена');
   drawLongRunArea();      // прямоугольник прибыли/убытка — под кривыми
@@ -636,6 +638,9 @@ function redrawProduction() {
     }
     g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', width || 2.4).attr('d', line);
   };
+  // Сцена рисует две панели своими руками и общий drawAxes не зовёт, поэтому
+  // названия осей для выгрузки проставляем здесь (Б37).
+  STATE.axisXDefault = 'L'; STATE.axisYDefault = 'TP, MP, AP';
   const gTop = panel(t1, yTop0, 'TP, общий продукт');
   curve(gTop, prodEval, t1, COL.prodTP, STATE.showTP, 2.6);
   const gBot = panel(t2, yBot0, 'MP и AP');
@@ -835,7 +840,7 @@ function redrawPlants() {
   }
   makeScales();
   svg.selectAll('*').remove();
-  addDefs(); drawGrid(); drawAxes('Q', '');
+  addDefs(); drawGrid(); drawAxes('Q', '', { yName: 'Издержки' });
   const errBox = document.getElementById('pl-error');
   if (errBox) { errBox.style.display = STATE.plErr ? 'block' : 'none'; errBox.textContent = STATE.plErr ? ('Не понял формулу: ' + STATE.plErr) : ''; }
   if (!p) { updatePlantsPanel(); return; }

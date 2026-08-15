@@ -2005,8 +2005,15 @@ const CASES = [
           var tables = [].slice.call(tex.match(/\\\\addplot\\[[^\\]]*\\] *coordinates \\{[^}]*\\}/g) || []);
           var big = tables.filter(function (t) { return (t.match(/\\(/g) || []).length > 5; }).length;
           return { formulas: formulas, big: big };`,
+    /* Ожидание «4 таблицы по 60 точек» ОТМЕНЕНО пунктом Б6 и заменено на ноль.
+       Те четыре таблицы были не кривыми: это обведённые по контуру значки
+       «закрепки» у ключевых точек. Значок живёт в группе с display:none и
+       появляется только под курсором, но проверка видимости стояла лишь у
+       подписей, поэтому его фигуры уезжали в файл — одна из них с
+       координатами (102; −0,88), то есть за пределами осей. Теперь в сцене
+       налога длинных таблиц точек нет вовсе: все кривые ушли формулами. */
     checks: [['кривых формулой', 'formulas', 3, 1],
-             ['кривых таблицей точек', 'big', 4, 2]],
+             ['длинных таблиц точек нет', 'big', 0, 0]],
   },
   {
     // Фаза 2: ключевые точки считаются и в «Математике».
@@ -2352,6 +2359,78 @@ const CASES = [
              ['старой формулировки нет', 'bad', 0, 0],
              ['у кривой про перехват молчим', 'noIntercept', 0, 0],
              ['и говорим про точку', 'varies', 1, 0]],
+  },
+
+  /* --- Фаза 3: быстрые починки экспорта (Б6–Б10, Б37) ----------------- */
+  {
+    /* Б37. Название оси — свойство сцены, а не побочный эффект того, кто
+       рисует подпись. Сцены издержек, производства и заводов рисуют вертикаль
+       сами и присылали пустую строку, из-за чего в выгрузке на графике ЗАТРАТ
+       стояло ylabel={P} от прошлой сцены. */
+    name: 'Б37 · Подпись оси в .tex совпадает со сценой',
+    run: `resetSceneMemory();
+          var yl = function (k) { pickScene(k); redrawAll();
+            var m = /ylabel=\\{([^}]*)\\}/.exec(buildTex('', '')); return m ? m[1] : ''; };
+          var xl = function (k) { pickScene(k); redrawAll();
+            var m = /xlabel=\\{([^}]*)\\}/.exec(buildTex('', '')); return m ? m[1] : ''; };
+          var costs = yl('costs'), plants = yl('plants'), prodY = yl('prod'), prodX = xl('prod');
+          var sd = yl('sd');
+          return { costsOk: /Издержки/.test(costs) ? 1 : 0,
+                   plantsOk: /Издержки/.test(plants) ? 1 : 0,
+                   prodOk: /TP/.test(prodY) ? 1 : 0, prodX: prodX === 'L' ? 1 : 0,
+                   noP: (costs === 'P' || plants === 'P' || prodY === 'P') ? 1 : 0,
+                   sdOk: sd === 'P' ? 1 : 0 };`,
+    checks: [['издержки', 'costsOk', 1, 0], ['два завода', 'plantsOk', 1, 0],
+             ['производство по вертикали', 'prodOk', 1, 0], ['производство по горизонтали', 'prodX', 1, 0],
+             ['нигде не осталось «P»', 'noP', 0, 0], ['на рынке по-прежнему P', 'sdOk', 1, 0]],
+  },
+  {
+    /* Б6. В файл не уходит ничего, чего человек не видит. Проверяем на сцене
+       налога: у ключевых точек есть значок «закрепки» в спрятанной группе, и
+       раньше его подложка и контур уезжали в .tex.
+       Б9. Точка «излом MC» на графике совокупных ЗАТРАТ — из другой кривой.
+       Б10. Ось не должна уходить далеко за данные. */
+    name: 'Б6 · В .tex нет спрятанного, чужого и фона',
+    run: `resetSceneMemory(); pickScene('tax'); redrawAll();
+          var tex = buildTex('', '');
+          var canvas = getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim();
+          var hex = canvas.replace('#', '').toUpperCase();
+          var outside = 0;
+          var re = /\\(axis cs:(-?[\\d.]+),(-?[\\d.]+)\\)/g, m;
+          while ((m = re.exec(tex))) { if (+m[1] < -1e-6 || +m[2] < -1e-6) outside++; }
+          // Точка «излом MC» на графике затрат: в сцене заводов её быть не должно.
+          resetSceneMemory(); pickScene('plants'); setPlantsView('tc'); redrawAll();
+          var names = keyTargets().map(function (k) { return k.name; }).join('|');
+          var mcOnTc = /MC/.test(names) ? 1 : 0;
+          setPlantsView('mc'); redrawAll();
+          var mcOnMc = /MC/.test(keyTargets().map(function (k) { return k.name; }).join('|')) ? 1 : 0;
+          // Б10: верх оси не дальше трети над данными.
+          var top = CONFIG.Pmax, data = STATE.plants ? STATE.plants.mMax : 0;
+          return { bg: tex.indexOf('c' + hex) >= 0 ? 1 : 0, outside: outside,
+                   mcOnTc: mcOnTc, mcOnMc: mcOnMc, over: data > 0 ? top / data : 1 };`,
+    checks: [['цвета холста в файле нет', 'bg', 0, 0],
+             ['ничего за осями', 'outside', 0, 0],
+             ['на графике TC изломов MC нет', 'mcOnTc', 0, 0],
+             ['на графике MC они есть', 'mcOnMc', 1, 0],
+             ['запас оси не больше трети', 'over', 1.15, 0.18]],
+  },
+  {
+    /* Б8. Голое число — математика, а не проза: узкого неразрывного пробела
+       (разделителя разрядов) в шрифтах T2A нет вовсе. Плюс подпись, севшая на
+       саму ось, отодвигается внутрь поля. */
+    name: 'Б8 · Числа в .tex математикой и не на самой оси',
+    run: `resetSceneMemory(); pickScene('tax'); redrawAll();
+          var tex = buildTex('', '');
+          var thin = /\\u202F/.test(tex) ? 1 : 0;
+          var shifted = /at \\(axis cs:0,60\\)/.test(tex) && /xshift=3pt[^;]*at \\(axis cs:0,60\\)/.test(tex) ? 1 : 0;
+          var num = quantityTex('30\\u202F000');
+          var plain = quantityTex('12');
+          return { thin: thin, shifted: shifted,
+                   num: num === '$30\\\\,000$' ? 1 : 0, plain: plain === '$12$' ? 1 : 0 };`,
+    checks: [['узкого пробела в файле нет', 'thin', 0, 0],
+             ['подпись на оси отодвинута', 'shifted', 1, 0],
+             ['30 000 набрано математикой', 'num', 1, 0],
+             ['и просто число тоже', 'plain', 1, 0]],
   },
 ];
 

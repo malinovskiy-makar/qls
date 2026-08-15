@@ -7,7 +7,13 @@ import { chromium } from 'playwright';
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
 const PASS = process.env.CALC2_PASS || 'admin12345';
-const SCENES = (process.env.PDF_SCENES || 'sd,tax,mono,adas,isoquant,m-graph').split(',');
+/* Каждая сцена гоняется ДВАЖДЫ: с сеткой и без неё (Б36). Выключенная сетка
+   когда-то роняла сборку, потому что список настроек осей собирался в столбик
+   и на её месте оставалась пустая строка, а пустая строка в TeX — конец
+   абзаца. Теперь список идёт одной строкой, и проба это стережёт. */
+const SCENES = (process.env.PDF_SCENES ||
+  'sd,tax,mono,adas,isoquant,m-graph,costs,production,plants,elast').split(',');
+const GRIDS = [true, false];
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
@@ -23,8 +29,12 @@ if (!ready) { console.error('SKIP: calc2 не загрузился'); await brow
 
 let bad = 0;
 for (const key of SCENES) {
-  const r = await page.evaluate(async (k) => {
+ for (const grid of GRIDS) {
+  const r = await page.evaluate(async ({ k, grid }) => {
+    resetSceneMemory();
     pickScene(k);
+    STATE.showGrid = grid;
+    redrawAll();
     await new Promise(res => setTimeout(res, 400));
     const tex = buildTex('Проба ' + k, '');
     const fd = new FormData();
@@ -38,11 +48,12 @@ for (const key of SCENES) {
     if (resp.ok && ct.includes('pdf')) size = (await resp.blob()).size;
     else msg = (await resp.text()).slice(-260);
     return { status: resp.status, ct, size, msg, lines: tex.split('\n').length, chars: tex.length };
-  }, key);
+  }, { k: key, grid });
   const ok = r.status === 200 && r.ct.includes('pdf');
   if (!ok) bad++;
-  console.log(`${ok ? 'OK  ' : 'FAIL'} ${key.padEnd(10)} код ${r.status}  ${r.ct.slice(0, 24).padEnd(26)} pdf ${String(r.size).padStart(7)} б  .tex ${String(r.lines).padStart(4)} строк / ${r.chars} знаков`);
+  console.log(`${ok ? 'OK  ' : 'FAIL'} ${key.padEnd(11)} сетка ${grid ? 'вкл ' : 'выкл'}  код ${r.status}  ${r.ct.slice(0, 20).padEnd(22)} pdf ${String(r.size).padStart(7)} б  .tex ${String(r.lines).padStart(4)} строк`);
   if (!ok) console.log('     ' + r.msg.replace(/\n/g, '\n     '));
+ }
 }
 await browser.close();
 console.log(bad ? `\nПровалов: ${bad}` : '\nВсе сцены собрались в PDF.');

@@ -1115,6 +1115,9 @@ const TEX_UNICODE = [
   ['π', '$\\pi$'], ['τ', '$\\tau$'], ['σ', '$\\sigma$'], ['λ', '$\\lambda$'],
   ['μ', '$\\mu$'], ['ε', '$\\varepsilon$'], ['θ', '$\\theta$'], ['Σ', '$\\Sigma$'],
   ['∈', '$\\in$'], ['∂', '$\\partial$'], [' ', '~'],
+  // Узкий неразрывный пробел (U+202F) — это наш разделитель разрядов. В
+  // шрифтах T2A такого знака нет вовсе, и «30 000» приезжало склеенным (Б8).
+  [' ', '\\,'],
 ];
 function texText(s) {
   let out = texEscape(s);
@@ -1151,9 +1154,23 @@ function labelPlainText(el) {
    ОДНА функция на весь калькулятор (qtyIsQuantity), та же, что решает это на
    экране, поэтому одна и та же величина не может быть написана на экране
    одним способом, а в файле другим. */
+// Голое число и разделители разрядов в нём. Вынесены отдельными константами,
+// чтобы в одной строке кода не встречались доллары и регулярное выражение:
+// проверка check_tex_escapes читает такую строку как один кусок LaTeX.
+const QTY_PLAIN_NUMBER = /^[-−+]?\d[\d    ]*([.,]\d+)?$/;
+const QTY_THIN_SPACE = /[    ]/g;
+
 function quantityTex(raw) {
   const s = String(raw == null ? '' : raw).trim();
   if (!s) return '';
+  /* Голое число — тоже математика, а не проза (Б8). Иначе «30 000» уходило
+     обычным текстом вместе с узким неразрывным пробелом, которого в шрифтах
+     T2A нет: на бумаге получалось «30000». В математике разряды разделяет
+     штатное \, — и цифры набираются тем же начертанием, что и в формулах. */
+  if (QTY_PLAIN_NUMBER.test(s)) {
+    const body = s.replace(QTY_THIN_SPACE, '\\,').replace(/−/g, '-');
+    return '$' + body + '$';
+  }
   if (!qtyIsQuantity(s)) return texText(s);
   return '$' + qtyLatex(s) + '$';
 }
@@ -1335,6 +1352,11 @@ function buildTex(title, label) {
 
   const body = [];
   const inView = (x, y) => x >= xLo - 1e-9 && x <= xHi + 1e-9 && y >= yLo - 1e-9 && y <= yHi + 1e-9;
+  /* Цвет холста. Заливка им означает «здесь ничего нет»: так рисуются
+     подложки и пустые метки. На бумаге фон белый, поэтому переносить такую
+     заливку нельзя — вышло бы тёмное пятно на пустом месте (Б6). */
+  const canvasColor = () => texHex(getComputedStyle(document.documentElement).getPropertyValue('--canvas'));
+  const sameColor = (a, b) => texHex(a) === texHex(b);
 
   /* Кегли на бумаге берутся из ОБЩЕЙ шкалы (FS → FS_PT), а не из пропорций
      окна браузера: экранный размер сводится к своей ступени, ступень даёт
@@ -1357,10 +1379,14 @@ function buildTex(title, label) {
      попадала вовсе. Спрашиваем у браузера: есть ли у элемента размер на
      экране. Скрытый родитель, display:none и нулевая прозрачность отсекаются
      сами. */
+  /* Размер по ОДНОЙ из сторон, а не по обеим: отвесная проекция имеет нулевую
+     ширину, горизонтальная — нулевую высоту, и требование «и то, и другое»
+     выбросило бы из файла все пунктиры к осям. У спрятанного родителем
+     элемента обе стороны нулевые, поэтому спрятанное по-прежнему отсекается. */
   const onScreen = (el) => {
     if (typeof el.getBoundingClientRect !== 'function') return true;
     const r = el.getBoundingClientRect();
-    return r.width > 0.5 && r.height > 0.5;
+    return r.width > 0.5 || r.height > 0.5;
   };
 
   // 1) Кривые, у которых есть формула, — одной строкой каждая.
@@ -1393,12 +1419,26 @@ function buildTex(title, label) {
       if (tag === 'g') { walk(el); continue; }
 
       if (el.getAttribute('data-skip-export')) continue;
+      /* Б6. Видно человеку — единственное условие попадания на бумагу, и оно
+         относится ко ВСЕМУ, а не только к подписям. Раньше проверка стояла
+         лишь у текста, поэтому спрятанная группа отдавала свои фигуры: у
+         «закрепки» ключевой точки (display:none до наведения) в файл уходили
+         подложка цветом фона и обведённый по контуру значок из шестидесяти
+         точек. Свой computed-стиль у ребёнка при этом обычный: прячется
+         РОДИТЕЛЬ, и увидеть это можно только по размеру на экране.
+         Заодно отсекаются <title> (у них геометрии нет вовсе) и всё, что
+         вынесено за пределы холста. */
+      if (!onScreen(el)) continue;
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) continue;
       // Полностью прозрачный цвет — это служебная фигура (дорожка для мыши,
       // подложка под подсказку). На бумаге её быть не должно.
       const solid = (c) => { const m = /rgba?\([^)]*?,\s*([\d.]+)\s*\)$/.exec(String(c || '')); return !m || parseFloat(m[1]) > 0.01; };
       const hasFill = cs.fill && cs.fill !== 'none' && parseFloat(cs.fillOpacity) > 0 && solid(cs.fill);
+      // Заливка цветом холста — это подложка, а не данные (Б6). У кружков она
+      // означает «пустая метка» и разбирается отдельно; у остальных фигур на
+      // бумаге ей делать нечего.
+      const bgFill = hasFill && tag !== 'circle' && sameColor(cs.fill, '#' + canvasColor());
       const hasStroke = cs.stroke && cs.stroke !== 'none' && (parseFloat(cs.strokeWidth) || 0) > 0 && solid(cs.stroke);
 
       if (tag === 'path') {
@@ -1426,7 +1466,7 @@ function buildTex(title, label) {
         // значит, разные файлы (А45).
         const runs = texSamplePath(el)
           .map(r => texResample(r.map(p => toData(p[0], p[1])), 60));
-        if (hasFill) {
+        if (hasFill && !bgFill) {
           runs.forEach(r => {
             if (r.length < 3) return;
             body.push('\\fill[' + colorName(cs.fill) + ', opacity=' +
@@ -1451,7 +1491,7 @@ function buildTex(title, label) {
       } else if (tag === 'rect') {
         const x = +el.getAttribute('x'), y = +el.getAttribute('y');
         const w = +el.getAttribute('width'), h = +el.getAttribute('height');
-        if (!(w > 0 && h > 0) || !hasFill) continue;
+        if (!(w > 0 && h > 0) || !hasFill || bgFill) continue;
         const a = toData(x, y + h), b = toData(x + w, y);
         if (!inView(a[0], a[1]) && !inView(b[0], b[1])) continue;
         body.push('\\fill[' + colorName(cs.fill) + ', opacity=' +
@@ -1460,8 +1500,14 @@ function buildTex(title, label) {
       } else if (tag === 'circle') {
         const c = toData(+el.getAttribute('cx'), +el.getAttribute('cy'));
         if (!inView(c[0], c[1])) continue;
-        const col = colorName(hasFill ? cs.fill : cs.stroke);
-        body.push('\\addplot[' + col + ', only marks, mark size=' +
+        /* Кружок цветом холста — это ПУСТАЯ метка: на экране сквозь неё видно
+           фон, и человек читает её как незакрашенное кольцо. Сплошной точкой
+           того же цвета на бумаге получалось бы тёмное пятно там, где на
+           экране пусто, поэтому такую метку рисуем открытой. */
+        const hollow = hasFill && sameColor(cs.fill, '#' + canvasColor());
+        const col = colorName((hasFill && !hollow) ? cs.fill : cs.stroke);
+        const mark = hollow ? ', mark=o' : '';
+        body.push('\\addplot[' + col + ', only marks' + mark + ', mark size=' +
           markPt(+el.getAttribute('r')).toFixed(1) + 'pt, forget plot] coordinates {' + pt(c[0], c[1]) + '};');
       } else if (tag === 'text') {
         const raw = labelPlainText(el);
@@ -1483,6 +1529,18 @@ function buildTex(title, label) {
         const opt = ['anchor=' + anchor, 'text=' + colorName(cs.fill),
                      'font=\\fontsize{' + fs + '}{' + (fs * 1.15).toFixed(1) + '}\\selectfont',
                      'inner sep=1pt'];
+        /* Подпись, севшая ровно на ось, отодвигается ВНУТРЬ поля (Б8). На
+           экране между числом и осью есть зазор в несколько пикселей, но он
+           живёт в координатах вне окна и при переводе в данные схлопывается
+           на границу: на бумаге число упиралось в саму ось и вылезало за
+           рамку рисунка. Сдвиг задаём в пунктах — он не зависит от масштаба. */
+        const spanX = Math.abs(xHi - xLo), spanY = Math.abs(yHi - yLo);
+        const onLeft = Math.abs(c[0] - xLo) < spanX * 3e-3;
+        const onBottom = Math.abs(c[1] - yLo) < spanY * 3e-3;
+        if (onLeft && /east/.test(anchor)) opt.push('xshift=-3pt');
+        if (onLeft && /west/.test(anchor)) opt.push('xshift=3pt');
+        if (onBottom && /north/.test(anchor)) opt.push('yshift=-3pt');
+        if (onBottom && anchor === 'base') opt.push('yshift=3pt');
         body.push('\\node[' + opt.join(', ') + '] at (axis cs:' + num(c[0]) + ',' + num(c[1]) + ') {' + txt + '};');
       }
     }

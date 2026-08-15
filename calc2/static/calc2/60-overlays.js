@@ -2480,11 +2480,18 @@ function snapTargets() {
     if (pts && pts.length) out.push({ name: 'изокванта', f: (l) => interpY(pts, l) });
     return out;
   }
-  // Два завода: совокупные предельные издержки — это горизонтальная сумма,
-  // и она уже посчитана таблицей. Катаемся по ней, а не по TC₁ и TC₂.
+  /* Два завода: катаемся по ТОЙ кривой, что сейчас нарисована (Б9). Раньше
+     здесь всегда стояла совокупная MC, даже когда на экране совокупная TC.
+     Ключевые точки строятся по этому же списку, поэтому на графике затрат
+     появлялась точка «излом MC» в (150; 200) — координаты правильные для MC,
+     но на оси до 40 000 она ложилась на самую ось и в выгрузку уходила
+     точкой ниоткуда. Обе кривые посчитаны одной таблицей, выбрать нужную
+     дёшево. */
   if (STATE.mode === 'costs' && STATE.costsSub === 'plants' && STATE.plants) {
     const p = STATE.plants;
-    out.push({ name: 'MC', f: (q) => interpY(p.table.map(r => [r.Q, r.m]), q) });
+    const mc = (STATE.plView === 'mc');
+    const pts = p.table.map(r => [r.Q, mc ? r.m : r.tcDirect]);
+    out.push({ name: mc ? 'MC' : 'TC', f: (q) => interpY(pts, q) });
     return out;
   }
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'single' && STATE.ppfReady) {

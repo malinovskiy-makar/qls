@@ -415,7 +415,9 @@ function redrawInequality() {
   svg.selectAll('*').remove();
   addDefs();
   drawGrid();
-  drawAxes('', '');
+  // Подписи осей рисует drawInequalityCaptions, но названия сообщаем — их
+  // забирает выгрузка в .tex (Б37).
+  drawAxes('', '', { xName: 'Доля населения, %', yName: 'Доля дохода, %' });
   drawInequalityCaptions();
   if (STATE.ineqStats && STATE.ineqLorenz) {
     if (STATE.ineqRedist) {
