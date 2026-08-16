@@ -162,7 +162,7 @@
     <tr>
       <th>Ученик</th>
       <th>Задача</th>
-      <th>Статус</th>
+      <th data-type="num">Статус</th>
       <th data-type="date">Отправлено</th>
       <th></th>
     </tr>
@@ -172,7 +172,7 @@
     <tr>
       <td>{{ sub.student.get_full_name|default:sub.student.username }}</td>
       <td>{% if sub.kind %}{% include "_kind_chip.html" with kind=sub.kind %} {% endif %}{{ sub.display_title }}</td>
-      <td>
+      <td data-type="num">
         <span class="badge badge-{{ sub.status }}">
           {% if sub.status == 'not_started' %}Не начато
           {% elif sub.status == 'in_progress' %}В процессе

@@ -51,16 +51,18 @@
   {% if topics %}
   <div class="stats-table-wrap">
     <table class="stats-table">
-      <thead><tr><th class="no-sort">Тема</th><th class="no-sort">Попыток</th>
-        <th class="no-sort">Верных</th><th class="no-sort">Доля</th>
+      <thead><tr><th class="no-sort">Тема</th>
+        <th class="no-sort" data-type="num">Попыток</th>
+        <th class="no-sort" data-type="num">Верных</th>
+        <th class="no-sort" data-type="num">Доля</th>
         <th class="no-sort">Владение</th></tr></thead>
       <tbody>
         {% for topic in topics %}
         <tr>
           <td>{{ topic.name }}</td>
-          <td>{{ topic.attempted }}</td>
-          <td>{{ topic.solved }}</td>
-          <td>
+          <td data-type="num">{{ topic.attempted }}</td>
+          <td data-type="num">{{ topic.solved }}</td>
+          <td data-type="num">
             <span class="matrix-cell {% if topic.accuracy < 50 %}matrix-bad{% elif topic.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}">{{ topic.accuracy }}%</span>
           </td>
           <td><span class="mastery mastery-{{ topic.mastery }}">{% if topic.mastery == 'mastered' %}разобрался{% elif topic.mastery == 'confident' %}уверенно{% elif topic.mastery == 'familiar' %}знаком{% else %}не начата{% endif %}</span></td>

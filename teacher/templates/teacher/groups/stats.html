@@ -121,17 +121,17 @@
         {% for row in rows %}
         <tr>
           <td>{{ row.student.get_full_name|default:row.student.username }}</td>
-          <td data-sort="{{ row.solved }}">{{ row.solved }}</td>
-          <td data-sort="{{ row.accuracy|default:-1 }}">
+          <td data-type="num" data-sort="{{ row.solved }}">{{ row.solved }}</td>
+          <td data-type="num" data-sort="{{ row.accuracy|default:-1 }}">
             {% if row.accuracy is not None %}{{ row.accuracy }}%{% else %}—{% endif %}
           </td>
-          <td data-sort="{{ row.submitted }}">
+          <td data-type="num" data-sort="{{ row.submitted }}">
             {{ row.submitted }}{% if row.pending %} <span class="muted">({{ row.pending }} ждёт)</span>{% endif %}
           </td>
-          <td data-sort="{{ row.avg_score|default:-1 }}">
+          <td data-type="num" data-sort="{{ row.avg_score|default:-1 }}">
             {% if row.avg_score is not None %}{{ row.avg_score }}{% else %}—{% endif %}
           </td>
-          <td data-sort="{{ row.last_active|date:'U'|default:0 }}">
+          <td data-type="date" data-sort="{{ row.last_active|date:'U'|default:0 }}">
             {% if row.last_active %}{{ row.last_active|date:"d.m.Y" }}{% else %}не заходил{% endif %}
           </td>
           <td><a href="{% url 'teacher:student_stats' row.student.pk %}"

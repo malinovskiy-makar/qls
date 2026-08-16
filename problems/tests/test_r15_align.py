@@ -38,20 +38,39 @@ def markup_files():
 class RuleIsCommonTests(TestCase):
     """Правило одно, в наборе, а не подкрутка каждой таблицы."""
 
+    # ⚠️ ПЕРЕСЧИТАНЫ 16.08: правило переехало из набора в общий партиал
+    # `templates/_table_align.html` — набор подключают только экраны
+    # кабинета, а владелец просил подравнять и таблицы каталога, который
+    # видит ученик. Смысл проверок прежний, читаем РЕНДЕР набора: он
+    # включает партиал, и правило по-прежнему приезжает на экраны кабинета
+    # ровно оттуда, откуда приезжало.
+    def kit_css(self):
+        from django.template.loader import render_to_string
+
+        return render_to_string('_kit.html')
+
     def test_kit_owns_column_alignment(self):
-        kit = read('templates', '_kit.html')
+        kit = self.kit_css()
         self.assertIn('table th[data-type="num"], table td[data-type="num"]',
                       kit)
         self.assertIn('text-align: center', kit.split(
             'table th[data-type="num"], table td[data-type="num"]')[1][:80])
 
     def test_numbers_are_tabular(self):
-        kit = read('templates', '_kit.html')
-        block = kit.split('table th[data-type="num"], table td[data-type="num"],')[1]
-        self.assertIn('tabular-nums', block[:200])
+        """⚠️ Ищем ПРАВИЛО, а не первое вхождение селектора.
+
+        Прежняя проверка резала файл по строке селектора и смотрела на
+        первые 200 символов после неё. С 16.08 такой селектор встречается
+        дважды (центрирование и табличные цифры), и разрез попадал в
+        соседнее правило — тест краснел на верной таблице стилей.
+        """
+        kit = self.kit_css()
+        rules = [piece for piece in kit.split('}')
+                 if 'tabular-nums' in piece and 'data-type="num"' in piece]
+        self.assertTrue(rules, 'правила табличных цифр нет вовсе')
 
     def test_header_sits_on_one_line(self):
-        kit = read('templates', '_kit.html')
+        kit = self.kit_css()
         self.assertIn('table thead th[data-type] { vertical-align: bottom; }',
                       kit)
 

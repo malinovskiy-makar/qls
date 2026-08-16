@@ -88,10 +88,10 @@ tr:last-child td { border-bottom: none; }
     <thead>
       <tr>
         <th>Ученик</th>
-        <th>Открытых задач</th>
-        <th>Средний балл</th>
-        <th>Тестов</th>
-        <th>Верных</th>
+        <th data-type="num">Открытых задач</th>
+        <th data-type="num">Средний балл</th>
+        <th data-type="num">Тестов</th>
+        <th data-type="num">Верных</th>
         <th></th>
       </tr>
     </thead>
@@ -107,10 +107,10 @@ tr:last-child td { border-bottom: none; }
             {% endif %}
           </span>
         </td>
-        <td class="stat-val">{{ row.open_count }}</td>
-        <td class="stat-val">{% if row.open_avg %}{{ row.open_avg }}{% else %}—{% endif %}</td>
-        <td class="stat-val">{{ row.test_count }}</td>
-        <td class="stat-val">{% if row.test_pct %}{{ row.test_pct }}%{% else %}—{% endif %}</td>
+        <td class="stat-val" data-type="num">{{ row.open_count }}</td>
+        <td class="stat-val" data-type="num">{% if row.open_avg %}{{ row.open_avg }}{% else %}—{% endif %}</td>
+        <td class="stat-val" data-type="num">{{ row.test_count }}</td>
+        <td class="stat-val" data-type="num">{% if row.test_pct %}{{ row.test_pct }}%{% else %}—{% endif %}</td>
         <td>
           <a href="{% url 'teacher:student_progress' row.student.pk %}" class="btn-sm">Прогресс</a>
         </td>

@@ -128,100 +128,12 @@
 </div>
 
 {% else %}
-{# ── Тепловая матрица «ученики × темы» ─────────────────────────────── #}
-<div class="panel">
-  <div class="panel-head">
-    {% comment %}
-    ⚠️ Пометки «за всё время» здесь БОЛЬШЕ НЕТ (сессия 9, фаза 6.1):
-    теплокарта теперь слушается переключателя периода над ней, и пометка
-    стала бы враньём. До этого период был прибит в коде вьюхи, владелец
-    выбирал «Месяц», числа не менялись — и это выглядело поломкой.
-    {% endcomment %}
-    <div class="panel-title">Ученики × темы</div>
-  </div>
-  {% if matrix.columns %}
-  {% comment %}
-  ⚠️ ПОЛОСА ПРОКРУТКИ СПРЯТАНА, ПРОКРУТКА ОСТАЛАСЬ (фаза 6.2). Вместе с
-  полосой исчезал единственный признак, что справа есть ещё колонки, — а их
-  теперь 23. Поэтому у правого края блока стоит мягкое растворение, и оно
-  само гаснет, когда доскроллили до конца (класс `is-end` вешает скрипт
-  внизу шаблона группы).
-  {% endcomment %}
-  <div class="fade-box" data-fade>
-  <div class="stats-table-wrap">
-    <table class="stats-table">
-      <thead>
-        <tr>
-          <th class="no-sort">Ученик</th>
-          {% comment %}
-          ⚠️ ПОЛНОЕ ИМЯ ТЕМЫ — СВОЕЙ ВСПЛЫВАШКОЙ, А НЕ `title` (обзор 13.08,
-          п. 17). Заголовки обрезаны наклонно, часть нечитаема («Теория
-          фирмы: прои»), а браузерный `title` в этом проекте признан
-          нерабочим ещё в сессии 9. Механизм тот же, что у знаков вопроса:
-          `data-hint` + `templates/_hint_js.html`.
-          {% endcomment %}
-          {% for column in matrix.columns %}
-          <th class="no-sort" data-type="num"
-              data-hint="{{ column.name }}">
-            <span class="matrix-head">{{ column.name|truncatechars:26 }}</span>
-          </th>
-          {% endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in matrix.matrix %}
-        <tr>
-          <td>{{ row.student.get_full_name|default:row.student.username }}</td>
-          {% for cell in row.cells %}
-          <td data-type="num">
-            {% if cell %}
-            <span class="matrix-cell {% if cell.accuracy < 50 %}matrix-bad{% elif cell.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}"
-                  data-hint="{{ cell.solved }} из {{ cell.attempted }}">{{ cell.accuracy }}%</span>
-            {% else %}
-            <span class="matrix-cell matrix-none" data-hint="нет попыток">—</span>
-            {% endif %}
-          </td>
-          {% endfor %}
-        </tr>
-        {% endfor %}
-        <tr>
-          <td class="muted">по группе</td>
-          {% comment %}
-          ⚠️ Строка «по группе» считается СРЕДНЕВЗВЕШЕННО по числу попыток
-          (фаза 8.3): она собирается из сумм по колонке, а не как среднее из
-          процентов учеников. Среднее из процентов дало бы решившему три
-          задачи тот же вес, что решившему триста.
-          {% endcomment %}
-          {% comment %}
-          ⚠️ В ПОДСКАЗКЕ — ПО СКОЛЬКИМ УЧЕНИКАМ ПОСЧИТАНО (обзор 13.08, п. 16).
-          Строка средневзвешенная, и 100% появляется даже когда у двоих из
-          троих прочерк: формально верно, а читается как «вся группа освоила
-          тему». Число попыток на этот вопрос не отвечает — отвечает число
-          ЛЮДЕЙ, которые тему вообще трогали.
-          {% endcomment %}
-          {% for column in matrix.columns %}
-          <td data-type="num">
-            {% if column.accuracy is not None %}
-            <span class="matrix-cell {% if column.accuracy < 50 %}matrix-bad{% elif column.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}"
-                  data-hint="{{ column.accuracy }}% · посчитано по {{ column.covered }} из {{ column.students|count_ru:'ученика,учеников,учеников' }}">
-              {{ column.accuracy }}%
-            </span>
-            {% else %}
-            <span class="matrix-cell matrix-none" data-hint="нет попыток">—</span>
-            {% endif %}
-          </td>
-          {% endfor %}
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  </div>
-  {% else %}
-  <div class="empty-note">Ученики ещё не решали задач с темами — матрице
-    нечего показать.</div>
-  {% endif %}
-</div>
-
+{% comment %}
+⚠️ ПОРЯДОК БЛОКОВ: ТАБЛИЦА УЧЕНИКОВ ВЫШЕ МАТРИЦЫ (ревью 16.08, п. 6.2).
+Список людей — то, ради чего открывают занятие; матрица «ученики × темы»
+отвечает на следующий вопрос и требует прокрутки вбок. Раньше она стояла
+первой и отодвигала таблицу за сгиб.
+{% endcomment %}
 {# ── Таблица учеников ──────────────────────────────────────────────── #}
 <div class="panel">
   <div class="panel-head">
@@ -297,6 +209,113 @@
   </div>
 </div>
 
+
+{# ── Тепловая матрица «ученики × темы» ─────────────────────────────── #}
+<div class="panel">
+  <div class="panel-head">
+    {% comment %}
+    ⚠️ Пометки «за всё время» здесь БОЛЬШЕ НЕТ (сессия 9, фаза 6.1):
+    теплокарта теперь слушается переключателя периода над ней, и пометка
+    стала бы враньём. До этого период был прибит в коде вьюхи, владелец
+    выбирал «Месяц», числа не менялись — и это выглядело поломкой.
+    {% endcomment %}
+    <div class="panel-title">Ученики × темы</div>
+  </div>
+  {% if matrix.columns %}
+  {% comment %}
+  ⚠️ ПОЛОСА ПРОКРУТКИ СПРЯТАНА, ПРОКРУТКА ОСТАЛАСЬ (фаза 6.2). Вместе с
+  полосой исчезал единственный признак, что справа есть ещё колонки, — а их
+  теперь 23. Поэтому у правого края блока стоит мягкое растворение, и оно
+  само гаснет, когда доскроллили до конца (класс `is-end` вешает скрипт
+  внизу шаблона группы).
+  {% endcomment %}
+  <div class="fade-box" data-fade>
+  <div class="stats-table-wrap">
+    <table class="stats-table">
+      <thead>
+        <tr>
+          {% comment %}
+          ⚠️ ПЕРВЫЙ СТОЛБЕЦ ЗАКРЕПЛЁН (ревью 16.08, п. 6.3): при прокрутке
+          вправо имена остаются на месте. Тем 23, и без имён строка
+          матрицы превращается в ряд процентов неизвестно про кого.
+          {% endcomment %}
+          <th class="no-sort matrix-name">Ученик</th>
+          {% comment %}
+          ⚠️ ПОЛНОЕ ИМЯ ТЕМЫ — СВОЕЙ ВСПЛЫВАШКОЙ, А НЕ `title` (обзор 13.08,
+          п. 17). Заголовки обрезаны наклонно, часть нечитаема («Теория
+          фирмы: прои»), а браузерный `title` в этом проекте признан
+          нерабочим ещё в сессии 9. Механизм тот же, что у знаков вопроса:
+          `data-hint` + `templates/_hint_js.html`.
+          {% endcomment %}
+          {% for column in matrix.columns %}
+          <th class="no-sort" data-type="num"
+              data-hint="{{ column.name }}">
+            <span class="matrix-head">{{ column.name|truncatechars:26 }}</span>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in matrix.matrix %}
+        <tr>
+          <td class="matrix-name">{{ row.student.get_full_name|default:row.student.username }}</td>
+          {% for cell in row.cells %}
+          <td data-type="num">
+            {% if cell %}
+            <span class="matrix-cell {% if cell.accuracy < 50 %}matrix-bad{% elif cell.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}"
+                  data-hint="{{ cell.solved }} из {{ cell.attempted }}">{{ cell.accuracy }}%</span>
+            {% else %}
+            <span class="matrix-cell matrix-none" data-hint="нет попыток">—</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+        <tr>
+          <td class="muted matrix-name">по группе</td>
+          {% comment %}
+          ⚠️ Строка «по группе» считается СРЕДНЕВЗВЕШЕННО по числу попыток
+          (фаза 8.3): она собирается из сумм по колонке, а не как среднее из
+          процентов учеников. Среднее из процентов дало бы решившему три
+          задачи тот же вес, что решившему триста.
+          {% endcomment %}
+          {% comment %}
+          ⚠️ В ПОДСКАЗКЕ — ПО СКОЛЬКИМ УЧЕНИКАМ ПОСЧИТАНО (обзор 13.08, п. 16).
+          Строка средневзвешенная, и 100% появляется даже когда у двоих из
+          троих прочерк: формально верно, а читается как «вся группа освоила
+          тему». Число попыток на этот вопрос не отвечает — отвечает число
+          ЛЮДЕЙ, которые тему вообще трогали.
+          {% endcomment %}
+          {% for column in matrix.columns %}
+          <td data-type="num">
+            {% if column.accuracy is not None %}
+            <span class="matrix-cell {% if column.accuracy < 50 %}matrix-bad{% elif column.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}"
+                  data-hint="{{ column.accuracy }}% · посчитано по {{ column.covered }} из {{ column.students|count_ru:'ученика,учеников,учеников' }}">
+              {{ column.accuracy }}%
+            </span>
+            {% else %}
+            <span class="matrix-cell matrix-none" data-hint="нет попыток">—</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  </div>
+  {% else %}
+  <div class="empty-note">Ученики ещё не решали задач с темами — матрице
+    нечего показать.</div>
+  {% endif %}
+</div>
+
+{% comment %}
+⚠️ ЗАКРЫВАЮЩИЙ `endif` СТОИТ ЗДЕСЬ, А НЕ ПЕРЕД МАТРИЦЕЙ. Оба блока —
+и таблица учеников, и матрица — принадлежат ветке ГРУППЫ: у
+индивидуального занятия ни того, ни другого быть не должно. Перестановка
+блоков местами (п. 6.2) один раз уже вынесла матрицу за эту скобку, и
+она появилась на экране занятия с одним учеником — поймано тестом.
+{% endcomment %}
 {% endif %}
 
 {% comment %}

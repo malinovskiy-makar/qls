@@ -403,6 +403,24 @@ table.stats-table tbody tr:hover { background: var(--surface-2); }
 /* Заголовки тем идут вертикально — это оставлено: горизонтально они не
    помещаются. Капслок убран: он кричал, а тепловая карта и так читается
    цветом. */
+/* ── Закреплённый первый столбец теплокарты (ревью 16.08, п. 6.3) ──────
+   ⚠️ ЗАЧЕМ. Тем 23, матрица прокручивается вбок, и вместе с ней уезжали
+   имена: строка превращалась в ряд процентов неизвестно про кого.
+   ⚠️ У ЗАКРЕПЛЁННОЙ ЯЧЕЙКИ ОБЯЗАТЕЛЬНА СВОЯ ЗАЛИВКА. `position: sticky`
+   не делает фон: без него уезжающие клетки просвечивают сквозь имя.
+   Подсветка строки при наведении задаётся тем же цветом, иначе имя
+   осталось бы белым посреди подсвеченной строки. */
+.stats-table td.matrix-name, .stats-table th.matrix-name {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  /* Мягкая тень справа — признак того, что столбец стоит НАД содержимым.
+     Одна граница читается как обычная линия таблицы. */
+  box-shadow: 4px 0 8px -6px rgba(0,0,0,.35);
+  white-space: nowrap;
+}
+.stats-table tbody tr:hover td.matrix-name { background: var(--surface-2); }
+
 .matrix-head { font-size: 11px; color: var(--text2); writing-mode: vertical-rl;
                transform: rotate(180deg); max-height: 120px;
                text-transform: none; }

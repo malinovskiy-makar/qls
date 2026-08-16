@@ -730,25 +730,25 @@
       <table class="ptable">
         <thead>
           <tr>
-            <th class="col-diff">Сложн.</th>
+            <th class="col-diff" data-type="num">Сложн.</th>
             <th class="col-title">Название</th>
             <th class="col-topic">Тема</th>
             <th class="col-type">Тип</th>
             <th class="col-src">Источник</th>
-            <th class="col-sol">Реш.</th>
-            <th class="col-act">Действие</th>
+            <th class="col-sol" data-type="num">Реш.</th>
+            <th class="col-act" data-type="num">Действие</th>
           </tr>
         </thead>
         <tbody>
           {% for card in cards %}
           <tr>
-            <td class="col-diff">{% if card.problem.difficulty %}{% for i in card.difficulty_stars %}★{% endfor %}{% else %}—{% endif %}</td>
+            <td class="col-diff" data-type="num">{% if card.problem.difficulty %}{% for i in card.difficulty_stars %}★{% endfor %}{% else %}—{% endif %}</td>
             <td class="col-title"><a class="t-title" href="/catalog/problem/{{ card.problem.pk }}/">{% if card.problem.title %}{{ card.problem.title }}{% else %}Задача #{{ card.problem.pk }}{% endif %}</a></td>
             <td class="col-topic">{% if card.topics %}{{ card.topics.0.name }}{% else %}—{% endif %}</td>
             <td class="col-type">{{ card.problem.problem_type|default:'—' }}</td>
             <td class="col-src">{{ card.source|default:'—' }}</td>
-            <td class="col-sol">{% if card.has_solution %}<span class="yes">✓</span>{% else %}—{% endif %}</td>
-            <td class="col-act"><button class="ca-btn ca-preview" onclick="openCatalogModal({{ card.problem.pk }}, event)">👁 Условие</button></td>
+            <td class="col-sol" data-type="num">{% if card.has_solution %}<span class="yes">✓</span>{% else %}—{% endif %}</td>
+            <td class="col-act" data-type="num"><button class="ca-btn ca-preview" onclick="openCatalogModal({{ card.problem.pk }}, event)">👁 Условие</button></td>
           </tr>
           {% endfor %}
         </tbody>
