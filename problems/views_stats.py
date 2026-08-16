@@ -142,8 +142,18 @@ MASTERY_LABELS = {
 
 
 def _chart_payload(data):
-    """Только то, что рисуют графики. Отдаётся и в шаблон, и в JSON."""
+    """Только то, что рисуют графики. Отдаётся и в шаблон, и в JSON.
+
+    ⚠️ СЕТКУ АКТИВНОСТИ РИСУЕТ СЕРВЕР И ОТДАЁТ ГОТОВОЙ РАЗМЕТКОЙ. Она
+    подчиняется переключателю периода, а собрать её второй раз на клиенте
+    значило бы завести вторую раскладку тех же дней — ровно то, от чего
+    отказались, когда координаты клеток начал считать питон.
+    """
+    from django.template.loader import render_to_string
+
     return {
+        'activityHtml': render_to_string('platform/_activity.html',
+                                         {'activity': data['activity']}),
         'period': data['period'],
         'overview': data['overview'],
         'weekly': data['weekly'],

@@ -148,13 +148,33 @@
 
 {% include "_ranking.html" with ranking=data.ranking strong_cap="Получается лучше всего" weak_cap="Стоит подтянуть" %}
 
-{# ── Теплокарта ────────────────────────────────────────────────────── #}
+{# ── Активность на сайте ───────────────────────────────────────────── #}
+{% comment %}
+⚠️ ОДИН БЛОК ВМЕСТО ТРЁХ (ревью 16.08, фаза 4). Были «Календарь занятий»,
+«По дням недели» и «По часам» — три карточки об одном и том же, стоявшие
+в разных концах страницы и мерившие разное. Теперь сверху сетка дней,
+справа четыре факта, под ними два разреза той же величины, и всё это
+подчиняется переключателю периода наверху.
+{% endcomment %}
 <div class="panel">
   <div class="panel-head">
-    <div class="panel-title">Календарь занятий</div>
-    <div class="panel-hint">Год по неделям</div>
+    <div class="panel-title">Активность на сайте</div>
+    <div class="panel-hint">цвет ячейки — сколько минут в этот день</div>
   </div>
-  {% include "platform/_heatmap.html" with calendar=data.calendar %}
+  <div id="activity-block">
+    {% include "platform/_activity.html" with activity=data.activity %}
+  </div>
+  <div class="chart-pair" style="margin-top:18px;">
+    <div class="chart-box">
+      <div class="panel-hint" style="margin-bottom:6px;">По дням недели</div>
+      <canvas id="chart-weekday"></canvas>
+    </div>
+    <div class="chart-box">
+      <div class="panel-hint" style="margin-bottom:6px;">По часам</div>
+      <canvas id="chart-hour"></canvas>
+    </div>
+  </div>
+  <div class="panel-hint" id="time-hint" style="margin-top:10px;">{{ data.time_hint }}</div>
 </div>
 
 {# ── Графики ───────────────────────────────────────────────────────── #}
@@ -182,26 +202,6 @@
     <div class="panel-head"><div class="panel-title">Откуда задачи</div></div>
     <div class="chart-box"><canvas id="chart-sources"></canvas></div>
   </div>
-</div>
-
-<div class="panel">
-  <div class="panel-head">
-    <div class="panel-title">Когда занимаешься</div>
-    {% comment %}
-    ⚠️ ЗАГОЛОВОК НАЗЫВАЕТ ЕДИНИЦУ (ревью 15.08, п. 21). Оба графика
-    показывают МИНУТЫ НА САЙТЕ — те же, что в карточке наверху, и
-    посчитанные тем же правилом. До этого один считал попытки по сводке
-    дня, второй — события «решено / неверно», и рядом стояли два числа,
-    которые не могли сойтись ни при каком раскладе.
-    {% endcomment %}
-    <div class="panel-hint">минуты на сайте, по тому же счёту, что в
-      карточке «Минут на сайте»</div>
-  </div>
-  <div class="chart-pair">
-    <div class="chart-box"><canvas id="chart-weekday"></canvas></div>
-    <div class="chart-box"><canvas id="chart-hour"></canvas></div>
-  </div>
-  <div class="panel-hint" id="time-hint" style="margin-top:10px;">{{ data.time_hint }}</div>
 </div>
 
 {# ── Достижения ────────────────────────────────────────────────────── #}

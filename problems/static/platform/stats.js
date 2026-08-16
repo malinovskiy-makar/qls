@@ -229,6 +229,13 @@
         updateMetrics(payload.overview);
         var hint = document.getElementById('time-hint');
         if (hint) { hint.textContent = payload.timeHint || ''; }
+        // Сетку активности перерисовывает СЕРВЕР — подставляем готовую
+        // разметку. Края растворения после подмены настраиваем заново.
+        var block = document.getElementById('activity-block');
+        if (block && payload.activityHtml) {
+          block.innerHTML = payload.activityHtml;
+          if (window.QLS_FADE) { window.QLS_FADE(); }
+        }
         drawAll();
         document.querySelectorAll('#period-bar button').forEach(function (b) {
           b.classList.toggle('is-active', b === button);

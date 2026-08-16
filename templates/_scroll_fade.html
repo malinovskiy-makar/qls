@@ -71,6 +71,17 @@ CSS сам не знает — отсюда классы `is-start` / `is-end`.
     paint();
   }
 
-  document.querySelectorAll('[data-fade]').forEach(setup);
+  // ⚠️ ПОВТОРНЫЙ ЗАПУСК ПОСЛЕ ПОДМЕНЫ РАЗМЕТКИ. Блок активности
+  // перерисовывается сервером при смене периода, и новая обёртка пришла бы
+  // без краёв растворения. Уже настроенную пропускаем по признаку.
+  function setupAll() {
+    document.querySelectorAll('[data-fade]').forEach(function (box) {
+      if (box.dataset.fadeReady === '1') { return; }
+      box.dataset.fadeReady = '1';
+      setup(box);
+    });
+  }
+  window.QLS_FADE = setupAll;
+  setupAll();
 })();
 </script>

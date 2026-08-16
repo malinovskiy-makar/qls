@@ -124,6 +124,56 @@
                color: var(--text2); margin-top: 8px; }
 .heat-legend i { width: 11px; height: 11px; border-radius: 2px; display: block; }
 
+/* ── Активность на сайте: сетка дней ────────────────────────────────────
+   ⚠️ Один блок вместо трёх (ревью 16.08, ф. 4). Ячейка — это ДЕНЬ: в ней
+   стоит число месяца, поэтому сетка на CSS, а не на SVG. Цвет считается
+   МИНУТАМИ с общими для всех границами (`stats.MINUTE_STEPS`), и легенда
+   называет их вслух: прежнее «меньше — больше» не мерило ничего. */
+.act { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 20px;
+       align-items: start; }
+.act-main { min-width: 0; }
+.act-scroll { overflow-x: auto; padding-bottom: 6px; }
+.act-dow { display: grid; grid-template-columns: repeat(7, 34px); gap: 4px;
+           margin-bottom: 4px; }
+.act-dow span { font-size: 10px; color: var(--text3); text-align: center; }
+.act-grid--days { display: grid; grid-template-columns: repeat(7, 34px);
+                  gap: 4px; }
+/* Годовой вид: клетки идут столбцами-неделями, чисел в них нет — 365 цифр
+   по 11 пикселей не прочитать. */
+.act-grid--year { display: grid; grid-template-rows: repeat(7, 11px);
+                  grid-auto-flow: column; grid-auto-columns: 11px; gap: 3px; }
+.act-day { border-radius: 5px; background: var(--surface-2);
+           color: var(--text2); font-size: 11px; line-height: 1;
+           display: flex; align-items: center; justify-content: center;
+           font-variant-numeric: tabular-nums; }
+.act-grid--days .act-day { height: 34px; }
+.act-grid--year .act-day { border-radius: 2px; }
+.act-day.is-out { opacity: .3; }
+/* Сегодня обведён, а не залит: заливка — это минуты, и второй смысл у
+   того же приёма читался бы как «сегодня был очень длинный день». */
+.act-day.is-today { outline: 2px solid var(--text2); outline-offset: -2px;
+                    font-weight: 700; }
+.act-l0 { background: var(--surface-2); }
+.act-l1 { background: var(--accent); opacity: .22; }
+.act-l2 { background: var(--accent); opacity: .45; }
+.act-l3 { background: var(--accent); opacity: .70; }
+.act-l4 { background: var(--accent); }
+/* Число на залитой клетке — белым: на плотном малиновом серый текст
+   пропадает. Прозрачность заливки трогать нельзя, она и есть шкала. */
+.act-l2, .act-l3, .act-l4 { color: #fff; }
+.act-legend { display: flex; align-items: center; gap: 6px; font-size: 11px;
+              color: var(--text2); margin-top: 10px; flex-wrap: wrap; }
+.act-sw { width: 12px; height: 12px; border-radius: 3px; display: block; }
+.act-facts { display: grid; gap: 12px; }
+.act-fact { border-left: 2px solid var(--border); padding-left: 10px; }
+.act-fact__v { font-size: 19px; font-weight: 700; color: var(--text);
+               font-variant-numeric: tabular-nums; }
+.act-fact__k { font-size: 11px; color: var(--text2); margin-top: 1px; }
+@media (max-width: 720px) {
+  .act { grid-template-columns: 1fr; }
+  .act-facts { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* ── Достижения ─────────────────────────────────────── */
 .achv-grid { display: grid; gap: 10px;
              grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }

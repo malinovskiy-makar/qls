@@ -512,6 +512,183 @@ def hardest_problems(user, period='all', now=None, limit=5):
 # Активность
 # ===========================================================================
 
+# ⚠️ ЛЕГЕНДА МЕРЯЕТ МИНУТЫ, А НЕ «МЕНЬШЕ — БОЛЬШЕ» (ревью 16.08, ф. 4).
+# Прежние пять оттенков считались ДОЛЕЙ ОТ ЛИЧНОГО ПИКА: у человека с
+# одним решённым днём этот день был «самым тёмным», у человека с сорока —
+# тем же цветом красился день на сорок задач. Одинаковый цвет означал
+# разное, а легенда честно не могла сказать, сколько это.
+MINUTE_STEPS = (15, 40, 90)
+MINUTE_LEGEND = ('0', 'до 15', 'до 40', 'до 90', 'больше')
+
+# Слово «день» для строки «12 из 31».
+DAY_FORMS = ('день', 'дня', 'дней')
+
+
+def minutes_level(minutes):
+    """Оттенок клетки по минутам. Границы одни на всех, они же в легенде."""
+    if not minutes:
+        return 0
+    for index, edge in enumerate(MINUTE_STEPS):
+        if minutes <= edge:
+            return index + 1
+    return len(MINUTE_STEPS) + 1
+
+
+def minutes_by_day(user, period='month', now=None):
+    """Минуты на сайте по календарным дням.
+
+    ⚠️ ТЕМ ЖЕ ПРАВИЛОМ, ЧТО КАРТОЧКА «МИНУТ НА САЙТЕ» (`_minute_slices`).
+    Сетка активности и число в карточке обязаны складываться в одно и то
+    же: рядом на одном экране два числа об одном, посчитанные по-разному,
+    — это ровно тот дефект, который чинили в графиках «Когда занимаешься».
+    """
+    buckets = {}
+    for local, step in _minute_slices(_site_stamps(user, period, now)):
+        key = local.date()
+        buckets[key] = buckets.get(key, timedelta()) + step
+    return {day: int(round(value.total_seconds() / 60))
+            for day, value in buckets.items()}
+
+
+def _site_events(user, period, now=None):
+    """События периода одним заходом: (когда, что, откуда).
+
+    ⚠️ ОДИН ЗАПРОС НА ВЕСЬ БЛОК. Сетке нужны и минуты (по отметкам
+    времени), и число решённых задач в каждый день. Двумя запросами это
+    выходило на единицу больше потолка страницы — а потолок и заведён,
+    чтобы новый блок не проносил с собой лишние походы в базу.
+    """
+    from .models import LearningEvent
+
+    start, end = period_bounds(period, now)
+    queryset = LearningEvent.objects.filter(user=user)
+    if start is not None:
+        queryset = queryset.filter(created_at__gte=start, created_at__lt=end)
+    return list(queryset.order_by('created_at')
+                .values_list('created_at', 'event_type', 'source'))
+
+
+def activity_grid(user, period='month', now=None):
+    """Сетка дней «Активность на сайте» — ОДИН блок вместо трёх.
+
+    ⚠️ СЕТКА ПОКРЫВАЕТ РОВНО ПЕРИОД, ВЫБРАННЫЙ НАВЕРХУ СТРАНИЦЫ. Раньше
+    календарь всегда показывал год, а переключатель периода стоял рядом и
+    ни на что не влиял: человек выбирал «неделю», а видел двенадцать
+    месяцев. Заодно это условие делает сумму по сетке равной карточке
+    «Минут на сайте» — иначе на одном экране стояли бы два разных итога.
+
+    Возвращает `mode`:
+      * `days` — сетка по дням с числом месяца в клетке (день/неделя/месяц);
+      * `year` — сжатая сетка по неделям без чисел («всё время»): в год
+        365 клеток, и число месяца в каждой прочесть невозможно.
+    """
+    now = now or timezone.now()
+    today = timezone.localtime(now).date()
+    rows = _site_events(user, period, now)
+
+    minutes = {}
+    for local, step in _minute_slices([row[0] for row in rows]):
+        key = local.date()
+        minutes[key] = minutes.get(key, timedelta()) + step
+    minutes = {day: int(round(value.total_seconds() / 60))
+               for day, value in minutes.items()}
+
+    # «Решено» здесь считается ТЕМ ЖЕ набором, что карточка «Решено»:
+    # игра в него не входит (у неё своя шкала), в минуты — входит.
+    solved = {}
+    for created, kind, source in rows:
+        if kind == 'solved' and source != 'game':
+            day = timezone.localtime(created).date()
+            solved[day] = solved.get(day, 0) + 1
+
+    # ⚠️ ГРАНИЦА ПЕРИОДА — ТА ЖЕ, ЧТО У ВСЕХ ОСТАЛЬНЫХ ЧИСЕЛ СТРАНИЦЫ
+    # (`period_bounds`). Считать её здесь своим способом («последние 30
+    # дней от сегодняшней даты») уже пробовали: сетка показала 381 минуту
+    # там, где подпись под ней и карточка «Минут на сайте» показывали 419.
+    # Разошлись на кусок первого дня — событий за 30×24 часа назад, но
+    # календарно на день раньше.
+    mode = 'days' if PERIOD_DAYS.get(period) else 'year'
+    since, _ = period_bounds(period, now)
+    start = (timezone.localtime(since).date() if since is not None
+             else today - timedelta(days=364))
+
+    # Сетка всегда начинается с понедельника: иначе столбец «Пн» держал бы
+    # разные дни недели в разных строках.
+    first = start - timedelta(days=start.weekday())
+    last = today + timedelta(days=6 - today.weekday())
+
+    cells = []
+    day = first
+    while day <= last:
+        inside = start <= day <= today
+        count = minutes.get(day, 0) if inside else 0
+        cells.append({
+            'date': day,
+            'number': day.day,
+            'minutes': count,
+            'solved': solved.get(day, 0) if inside else 0,
+            'level': minutes_level(count),
+            'inside': inside,
+            'is_today': day == today,
+        })
+        day += timedelta(days=1)
+
+    inside_cells = [c for c in cells if c['inside']]
+    worked = [c for c in inside_cells if c['minutes']]
+    # ⚠️ ИТОГ БЕРЁМ У КАРТОЧКИ «МИНУТ НА САЙТЕ», А НЕ СКЛАДЫВАЕМ КЛЕТКИ.
+    # Клетка округляется до минуты сама по себе, час на графике — сам по
+    # себе, и суммы трёх разложений одного и того же времени расходятся на
+    # единицы. Число на экране должно быть ОДНО и то же везде, где оно
+    # напечатано; клетки и столбики остаются разрезами, а не источниками
+    # итога.
+    total = minutes_on_site(user, period, now)
+    return {
+        'mode': mode,
+        'cells': cells,
+        # Для годового вида клетки идут по столбцам-неделям: сетка та же,
+        # меняется только направление раскладки.
+        'weeks': (len(cells) + 6) // 7,
+        'start': start,
+        'end': today,
+        'legend': list(MINUTE_LEGEND),
+        'facts': _activity_facts(inside_cells, worked, total, period),
+    }
+
+
+def _activity_facts(cells, worked, total, period='month'):
+    """Четыре факта справа от сетки. Считаются по тем же клеткам."""
+    from problems.templatetags.ru import pick
+
+    days_total = len(cells)
+    # ⚠️ «В средний РАБОЧИЙ день», а не «в средний день»: делить на все дни
+    # периода значит мешать отдых с занятиями и называть результат
+    # усердием. Ноль рабочих дней — прочерк, а не ноль: делить не на что.
+    average = int(round(total / len(worked))) if worked else None
+    return [
+        {'value': '%d из %d' % (len(worked), days_total),
+         'label': 'дней с занятиями'},
+        # Подпись НЕ повторяет единицу, которая уже стоит в значении:
+        # «418 мин · минут за период» — это дважды одно слово.
+        {'value': '%d мин' % total,
+         'label': 'всего %s' % PERIOD_WORDS.get(period, 'за период'),
+         'minutes': total},
+        {'value': ('%d мин' % average) if average is not None else '—',
+         'label': 'в средний рабочий день'},
+        {'value': '%d %s' % (_best_streak(cells),
+                             pick(_best_streak(cells), *DAY_FORMS)),
+         'label': 'лучшая серия подряд'},
+    ]
+
+
+def _best_streak(cells):
+    """Самая длинная череда дней подряд с занятиями внутри периода."""
+    best = run = 0
+    for cell in cells:
+        run = run + 1 if cell['minutes'] else 0
+        best = max(best, run)
+    return best
+
+
 def activity_calendar(user, days=365, now=None):
     """Данные теплокарты — из ДНЕВНЫХ СВОДОК, а не из событий.
 
@@ -661,6 +838,60 @@ def best_time_hint(by_hour):
             % (best, round(best_accuracy), best_total))
 
 
+# Как назвать время суток. Границы обычные разговорные, а не астрономические.
+DAY_PARTS = ((5, 'ночью'), (12, 'утром'), (17, 'днём'), (23, 'вечером'))
+PERIOD_WORDS = {'day': 'за день', 'week': 'за неделю', 'month': 'за месяц',
+                'all': 'за всё время'}
+# Ширина окна, которое ищем: три часа — то, что человек называет «вечером»,
+# а не одна точка на графике.
+BUSY_WINDOW = 3
+
+
+def _day_part(hour):
+    for edge, name in DAY_PARTS:
+        if hour < edge:
+            return name
+    return 'вечером'
+
+
+def busy_time_hint(by_hour, period='month', total=None):
+    """Подпись под сеткой активности — ПРО МИНУТЫ.
+
+    ⚠️ Здесь стояла подпись про долю верных ответов («91% верных из 22
+    попыток»). Она отвечала на другой вопрос, чем весь блок вокруг неё:
+    блок называется «Активность на сайте» и меряет время, а подпись под
+    ним — точность. Тот же вопрос, что у блока, и та же единица.
+    """
+    # Итог — тот же, что в карточке и в фактах у сетки (см. `activity_grid`).
+    if total is None:
+        total = sum(row['value'] for row in by_hour)
+    if not total:
+        return ('Пока не из чего считать: позанимайся немного, и здесь '
+                'появится твоё любимое время.')
+    best_start, best_sum = 0, -1
+    for start in range(len(by_hour) - BUSY_WINDOW + 1):
+        window = sum(by_hour[h]['value']
+                     for h in range(start, start + BUSY_WINDOW))
+        # ⚠️ ПРИ РАВЕНСТВЕ ОКНО НАЧИНАЕТСЯ С НЕПУСТОГО ЧАСА. Занятия в 19 и
+        # 20 дают одинаковую сумму окнам 18–21 и 19–22, и первое победило
+        # бы просто потому, что перебор идёт слева: на экране выходило
+        # «занимаешься с 18:00», хотя в 18 не было ни минуты.
+        better = window > best_sum
+        if not better and window == best_sum and window:
+            better = (not by_hour[best_start]['value']
+                      and by_hour[start]['value'])
+        if better:
+            best_sum, best_start = window, start
+    if not best_sum:
+        return ('Пока не из чего считать: позанимайся немного, и здесь '
+                'появится твоё любимое время.')
+    return ('Чаще всего занимаешься %s, %02d:00–%02d:00 — на это время '
+            'пришлось %s из %d %s.'
+            % (_day_part(best_start + BUSY_WINDOW // 2), best_start,
+               best_start + BUSY_WINDOW, minutes_text(best_sum), total,
+               PERIOD_WORDS.get(period, 'за период')))
+
+
 def source_split(user, period='all', now=None):
     """Откуда задачи: домашки / каталог / контрольные / игра."""
     from .models import LearningEvent
@@ -757,9 +988,13 @@ def full_stats(user, period='month', now=None, use_cache=True):
 
     profile, _ = StudentProgressProfile.objects.get_or_create(user=user)
     remaining, next_threshold = xp_to_next_level(profile.xp_total)
-    by_hour = activity_by_hour(user, period, now)
     # Разбивка по темам за всё время — считаем ОДИН раз на три блока.
     all_topics = topic_breakdown(user, 'all', now)
+    # Минуты по часам нужны и графику, и подписи под сеткой — считаем раз.
+    hour_minutes = minutes_by_hour(user, period, now)
+    # ⚠️ СЕТКА АКТИВНОСТИ ПОДЧИНЯЕТСЯ ПЕРИОДУ (ревью 16.08, ф. 4): прежний
+    # календарь всегда показывал год, а переключатель стоял рядом зря.
+    activity = activity_grid(user, period, now)
 
     data = {
         'period': period,
@@ -789,17 +1024,17 @@ def full_stats(user, period='month', now=None, use_cache=True):
         # считает то же правило, что карточку «Минут на сайте», поэтому
         # сумма по любому из графиков сходится с ней.
         'by_weekday': minutes_by_weekday(user, period, now),
-        'by_hour': minutes_by_hour(user, period, now),
-        # ⚠️ Подсказка под графиками отвечает на ДРУГОЙ вопрос — «когда у
-        # тебя лучше получается», а не «когда ты занимаешься». Ей нужны
-        # попытки и верные ответы, поэтому она по-прежнему считает по
-        # `activity_by_hour`. Две функции — два вопроса.
-        'time_hint': best_time_hint(by_hour),
+        'by_hour': hour_minutes,
+        # ⚠️ ПОДПИСЬ ПОД БЛОКОМ ГОВОРИТ О ТОМ ЖЕ, О ЧЁМ БЛОК (ревью 16.08,
+        # ф. 4). Здесь стояла подпись про долю верных ответов: блок мерит
+        # время, а строка под ним — точность, и читались они как одно.
+        'time_hint': busy_time_hint(hour_minutes, period,
+                                    total=activity['facts'][1]['minutes']),
         'sources': source_split(user, period, now),
         'game': game_stats(user, 'all', now),
-        # Теплокарта и линия уровня всегда за ВСЮ историю, а не за период:
-        # календарь за один день и «рост уровня» из одной точки бессмысленны.
-        'calendar': activity_calendar(user, 365, now),
+        'activity': activity,
+        # Линия уровня — по-прежнему за всю историю: «рост» из одной точки
+        # бессмыслен.
         'level_history': level_history(user, now),
     }
     if use_cache:

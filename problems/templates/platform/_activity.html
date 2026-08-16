@@ -1,0 +1,57 @@
+{% comment %}
+СЕТКА «АКТИВНОСТЬ НА САЙТЕ» — ячейка это ДЕНЬ, а не безымянный квадрат
+(ревью 16.08, фаза 4).
+
+⚠️ ЧТО БЫЛО. Три блока об одном: «Календарь занятий» (всегда год, цвет —
+доля от личного пика), «По дням недели» и «По часам». Календарь не
+подчинялся переключателю периода: человек выбирал неделю, а видел
+двенадцать месяцев. Легенда мерила «меньше — больше», то есть не мерила
+ничего: одинаковый цвет означал разное у разных людей.
+
+⚠️ ТЕПЕРЬ ЦВЕТ — ЭТО МИНУТЫ, и границы у всех одни (`stats.MINUTE_STEPS`).
+Легенда называет их вслух. Число месяца стоит прямо в клетке, дни недели
+подписаны, сегодняшний день обведён, дни вне периода приглушены.
+
+⚠️ РАЗМЕТКА — CSS-СЕТКА, А НЕ SVG. У прежней теплокарты координаты клеток
+считал питон и рисовал `<rect>`: в клетку с текстом это не превращается —
+пришлось бы считать ещё и положение цифры. Годовой вид (365 клеток без
+чисел) остаётся сжатым: там читать цифры всё равно нельзя.
+
+Ждёт `activity` из `problems.stats.activity_grid`.
+{% endcomment %}
+<div class="act">
+  <div class="act-main">
+    <div class="fade-box" data-fade>
+      <div class="act-scroll">
+        {% if activity.mode == 'days' %}
+        <div class="act-dow" aria-hidden="true">
+          <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span>
+          <span>Пт</span><span>Сб</span><span>Вс</span>
+        </div>
+        {% endif %}
+        <div class="act-grid act-grid--{{ activity.mode }}"
+             role="img" aria-label="Активность по дням">
+          {% for cell in activity.cells %}
+          <div class="act-day act-l{{ cell.level }}{% if not cell.inside %} is-out{% endif %}{% if cell.is_today %} is-today{% endif %}"
+               data-hint="{{ cell.date|date:'j E' }} · {{ cell.minutes }} мин · решено {{ cell.solved }}">{% if activity.mode == 'days' %}{{ cell.number }}{% endif %}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="act-legend">
+      <span>минут в день:</span>
+      {% for name in activity.legend %}
+      <i class="act-sw act-l{{ forloop.counter0 }}"></i><span>{{ name }}</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="act-facts">
+    {% for fact in activity.facts %}
+    <div class="act-fact">
+      <div class="act-fact__v">{{ fact.value }}</div>
+      <div class="act-fact__k">{{ fact.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
