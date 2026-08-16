@@ -392,3 +392,70 @@ class StartClearsTheCartTests(WorkFlowBase):
         for name in ('teacher:work_pick', 'teacher:work_compose'):
             html = self.client.get(reverse(name)).content.decode()
             self.assertNotIn('removeItem(window.QLS_CART.cart)', html)
+
+
+class EntryPointsTests(WorkFlowBase):
+    """12.6 — входные точки переключены на новый поток."""
+
+    def lesson_html(self):
+        return self.client.get('%s?tab=assignments'
+                               % reverse('teacher:group_detail',
+                                         args=[self.group.pk])).content.decode()
+
+    def test_lesson_screen_starts_the_flow(self):
+        self.assertIn('%s?group=%d' % (reverse('teacher:work_start'),
+                                       self.group.pk), self.lesson_html())
+
+    def test_start_is_used_and_not_the_first_step_directly(self):
+        """⚠️ Вход обязан идти через чистку корзины. Ссылка прямо на первый
+        шаг оживила бы брошенную неделю назад корзину того же занятия."""
+        block = self.lesson_html().split('Создание работы')[0][-400:]
+        self.assertIn(reverse('teacher:work_start'), block)
+
+    def test_no_screen_still_sends_people_to_the_old_constructors(self):
+        """⚠️ Старые конструкторы остаются доступными по прямому адресу —
+        их удаление идёт отдельным шагом, — но ни одна кнопка кабинета в
+        них больше не ведёт."""
+        old = (reverse('teacher:assignment_create'),
+               reverse('teacher:assignment_build'))
+        pages = ('%s?tab=assignments' % reverse('teacher:group_detail',
+                                                args=[self.group.pk]),
+                 reverse('teacher:groups'),
+                 reverse('teacher:problem_list'))
+        for page in pages:
+            html = self.client.get(page).content.decode()
+            for url in old:
+                self.assertNotIn('href="%s"' % url, html, '%s → %s'
+                                 % (page, url))
+
+    def test_found_step_leads_to_the_new_compose(self):
+        """Кнопка перехода живёт на шаге с результатами, до которого без
+        модели не дойти, — поэтому смотрим саму разметку экрана."""
+        from django.template.loader import get_template
+
+        source = get_template('teacher/generate.html').template.source
+        self.assertIn("teacher:work_compose", source)
+        self.assertNotIn("teacher:assignment_build", source)
+
+    def test_found_step_wears_the_flow_rail(self):
+        html = self.client.get(reverse('teacher:assignment_generate'),
+                               ).content.decode()
+        self.assertIn('wk-rail', html)
+        self.assertIn('Что нашлось', html)
+
+    def test_found_step_marks_where_the_task_came_from(self):
+        """Подзаголовок позиции в составе говорит, откуда задача; в корзине
+        лежит только ключ, и восстановить это потом неоткуда."""
+        html = self.client.get(reverse('teacher:assignment_generate'),
+                               ).content.decode()
+        self.assertIn("from: 'describe'", html)
+
+    def test_own_problem_returns_into_the_flow_by_default(self):
+        """Без явного `return_to` редактор возвращал на прежний
+        конструктор домашки — мимо собираемой работы."""
+        from teacher.views_problems import _safe_return
+
+        self.assertEqual(_safe_return(''), '/teacher/work/')
+        self.assertEqual(_safe_return('http://evil/'), '/teacher/work/')
+        self.assertEqual(_safe_return('/teacher/work/?group=2'),
+                         '/teacher/work/?group=2')

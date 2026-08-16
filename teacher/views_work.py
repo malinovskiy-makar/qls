@@ -99,7 +99,9 @@ def kind_urls(state, step):
     работы, начинал сборку заново.
     """
     route = {'pick': 'teacher:work_pick', 'compose': 'teacher:work_compose',
-             'give': 'teacher:work_give'}.get(step, 'teacher:work_pick')
+             'give': 'teacher:work_give',
+             'found': 'teacher:assignment_generate'}.get(step,
+                                                         'teacher:work_pick')
     base = reverse(route)
     return {
         'homework': base + flow_query(dict(state, kind='homework')),

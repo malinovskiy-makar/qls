@@ -29,7 +29,7 @@ from django.views.decorators.http import require_POST
 
 from problems import hw_generator
 
-from . import picker
+from . import picker, views_work
 from .access import (
     group_id_param, group_label_param, group_param_refusal, tutor_required,
 )
@@ -135,6 +135,13 @@ def assignment_generate(request):
         'left_today': max(0, hw_generator.daily_limit()
                           - hw_generator.used_today(request.user)),
         'step': 'ask',
+        # Лента шагов: этот экран — второй шаг потока, и он единственный,
+        # у кого он есть (два других пути идут из отбора прямо в состав).
+        'steps': views_work.step_urls({'group_id': group_id_param(request),
+                                       'kind': kind}),
+        'kind_urls': views_work.kind_urls(
+            {'group_id': group_id_param(request), 'kind': kind}, 'found'),
+        'flow_step': 'found',
         'is_exam': is_exam,
         'kind': kind,
         'groups': _tutor_groups(request.user),

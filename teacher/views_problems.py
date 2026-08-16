@@ -346,7 +346,7 @@ def _safe_return(value):
     путь внутри `/teacher/`. Иначе это открытый редирект — ссылку с чужим
     адресом можно подсунуть репетитору.
     """
-    default = '/teacher/assignment/create/'
+    default = '/teacher/work/'
     value = (value or '').strip()
     if not value.startswith('/teacher/') or value.startswith('//'):
         return default

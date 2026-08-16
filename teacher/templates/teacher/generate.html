@@ -197,7 +197,12 @@ textarea.gen-text:focus { border-color: var(--focus); }
 
 {% block content %}
 <div class="gen-wrap">
-{% include "teacher/_build_head.html" with mode='describe' is_exam=is_exam group_id=group_id %}
+{% comment %}
+⚠️ ЭТОТ ЭКРАН — ВТОРОЙ ШАГ ПОТОКА, и лента шагов на нём та же, что на
+остальных трёх. Своя шапка со своими плитками способов набора звала бы
+назад, к трём отдельным экранам, из которых поток и собирали.
+{% endcomment %}
+{% include "teacher/work/_head.html" with step=flow_step found=1 %}
 
 <div class="gen-step">
   <span class="{% if step == 'ask' %}is-on{% else %}is-done{% endif %}">1. Запрос</span>
@@ -581,8 +586,8 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
               data-manual-order="{% if manual_order %}1{% else %}0{% endif %}"
               data-exam="{% if is_exam %}1{% else %}0{% endif %}"
               data-group="{{ group_id }}"
-              data-build-url="{% url 'teacher:assignment_build' %}">
-        Отправить в конструктор подборки
+              data-build-url="{% url 'teacher:work_compose' %}">
+        Дальше — состав →
       </button>
       <button type="submit" class="k-btn k-btn--plain" name="step_action" value="research">
         Переискать по моим формулировкам
@@ -681,8 +686,8 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
             data-manual-order="{% if manual_order %}1{% else %}0{% endif %}"
             data-exam="{% if is_exam %}1{% else %}0{% endif %}"
             data-group="{{ group_id }}"
-            data-build-url="{% url 'teacher:assignment_build' %}">
-      Отправить в конструктор подборки
+            data-build-url="{% url 'teacher:work_compose' %}">
+      Дальше — состав →
     </button>
     <button type="button" class="k-btn k-btn--plain" id="again">Подобрать другие</button>
     <a href="{% url 'teacher:assignment_generate' %}" class="k-btn k-btn--quiet">Начать заново</a>
@@ -751,7 +756,11 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     var added = 0;
     document.querySelectorAll('.gen-pick, .cand-pick').forEach(function (box) {
       if (!box.checked || box.disabled) { return; }
-      cart[box.value] = { title: box.dataset.title };
+      // ⚠️ ОТКУДА ЗАДАЧА, ПОМЕЧАЕТСЯ ПРИ ДОБАВЛЕНИИ. Шаг состава пишет в
+      // подзаголовке позиции «подобрано по описанию» / «из каталога» /
+      // «своя задача», и восстановить это потом неоткуда: в корзине лежит
+      // ключ, а он у каталожной задачи одинаков на всех путях.
+      cart[box.value] = { title: box.dataset.title, from: 'describe' };
       if (order.indexOf(box.value) === -1) { order.push(box.value); }
       added += 1;
     });
