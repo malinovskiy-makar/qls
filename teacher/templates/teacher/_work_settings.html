@@ -113,11 +113,11 @@
   <div class="ws-part" data-when="window" {% if form.kind == 'limit' %}hidden{% endif %}>
     <div class="ws-field">
       <label class="k-label" for="id_starts_at">Начало окна</label>
-      {% include "teacher/_date_field.html" with field_name='starts_at' field_id='id_starts_at' field_value=form.starts_at default_time='09:00' %}
+      {% include "teacher/_date_field.html" with field_name='starts_at' field_id='id_starts_at' field_value=form.starts_at default_time='09:00' field_what='начало окна' %}
     </div>
     <div class="ws-field">
       <label class="k-label" for="id_ends_at">Конец окна</label>
-      {% include "teacher/_date_field.html" with field_name='ends_at' field_id='id_ends_at' field_value=form.ends_at default_time='23:59' %}
+      {% include "teacher/_date_field.html" with field_name='ends_at' field_id='id_ends_at' field_value=form.ends_at default_time='23:59' field_what='конец окна' %}
       <div class="k-hint">Окно не короче {{ min_window }} минут и
         заканчивается в будущем.</div>
     </div>
@@ -126,7 +126,7 @@
   <div class="ws-part" data-when="limit" {% if form.kind != 'limit' %}hidden{% endif %}>
     <div class="ws-field">
       <label class="k-label" for="id_deadline">Сдать до</label>
-      {% include "teacher/_date_field.html" with field_name='deadline' field_id='id_deadline' field_value=form.deadline default_time='23:59' %}
+      {% include "teacher/_date_field.html" with field_name='deadline' field_id='id_deadline' field_value=form.deadline default_time='23:59' field_what='срок сдачи' %}
     </div>
     <div class="ws-field">
       <label class="k-label" for="id_duration">Лимит времени, минут</label>
@@ -153,7 +153,7 @@
   {% else %}
   <div class="ws-field ws-field--last">
     <label class="k-label" for="id_deadline">Срок сдачи</label>
-    {% include "teacher/_date_field.html" with field_name='deadline' field_id='id_deadline' field_value=form.deadline default_time='23:59' %}
+    {% include "teacher/_date_field.html" with field_name='deadline' field_id='id_deadline' field_value=form.deadline default_time='23:59' field_what='срок сдачи' %}
     <div class="k-hint">Можно не задавать — тогда срока нет.</div>
   </div>
   {% endif %}

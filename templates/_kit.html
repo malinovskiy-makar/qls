@@ -690,6 +690,11 @@ td[data-type="num"] > .k-pair { display: inline-flex; }
    `datetime-local`. Так поле не может «пропасть» из-за ошибки в скрипте:
    имя (`name`) всё это время на родном поле, значение уходит на сервер. */
 .k-date { position: relative; }
+/* ⚠️ КНОПКА КАЛЕНДАРЯ СЧИТАЕТСЯ ОТ РЯДА, А НЕ ОТ ВСЕЙ ОБЁРТКИ. Пока она
+   тянулась `top:1px; bottom:1px` по всей `.k-date`, появление сообщения об
+   ошибке растягивало обёртку вниз — и значок уезжал вниз и вправо ровно
+   тогда, когда на него смотрят. Сообщение теперь СНАРУЖИ ряда. */
+.k-date__row { position: relative; }
 .k-date__text { display: none; padding-right: 40px; }
 .k-date.is-ready .k-date__text { display: block; }
 .k-date__text.is-bad { border-color: var(--error); }
@@ -742,29 +747,37 @@ td[data-type="num"] > .k-pair { display: inline-flex; }
 /* День не своего месяца остаётся нажимаемым: попасть на 1 сентября из
    августовской сетки — обычный способ выбрать дату. Он просто тише. */
 .k-cal__day.is-out { color: var(--text3); }
+/* День за границей срока не нажимается: календарь не предлагает того, что
+   поле ввода тут же назовёт ошибкой. */
+.k-cal__day.is-off { color: var(--text3); opacity: .35; cursor: default;
+                     text-decoration: line-through; }
+.k-cal__day.is-off:hover { background: none; }
 .k-cal__day.is-today { border-color: var(--border); font-weight: 700; }
 .k-cal__day.is-picked { background: var(--accent); color: #fff;
                         border-color: var(--accent); font-weight: 700; }
 .k-cal__foot { display: flex; align-items: center; justify-content: space-between;
                gap: 8px; margin-top: 10px; padding-top: 10px;
                border-top: 1px solid var(--border-soft); }
-.k-cal__time { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.k-cal__col-cap { font-size: 11px; color: var(--text3); text-align: center;
-                  margin-bottom: 4px; }
-/* Список часов и минут прокручивается внутри себя: 24 строки не должны
-   растягивать окно на весь экран. */
-.k-cal__list { max-height: 168px; overflow-y: auto; display: grid;
-               grid-template-columns: repeat(2, 1fr); gap: 2px;
-               scrollbar-width: none; }
-.k-cal__list::-webkit-scrollbar { width: 0; height: 0; }
-.k-cal__pick { padding: 6px 0; border: 1px solid transparent;
-               border-radius: 8px; background: none; color: var(--text);
-               font-size: 13px; cursor: pointer; }
-.k-cal__pick:hover { background: var(--surface-2); }
-.k-cal__pick.is-picked { background: var(--accent); color: #fff;
-                         border-color: var(--accent); font-weight: 700; }
-.k-cal__picked { font-size: 15px; font-weight: 700;
-                 font-variant-numeric: tabular-nums; }
+/* ── Время: крупное число, ни одного поля ввода ────────────────────────
+   ⚠️ Здесь стояли два прокручиваемых списка в рамках, похожих на форму
+   («ужасные окошки» в разборе владельца). Рамок нет ни у числа, ни у
+   панели: активное число подсвечено акцентом, под ним полоса — она и
+   говорит, куда пойдут набранные цифры. */
+.k-time { display: flex; align-items: baseline; justify-content: center;
+          gap: 2px; padding: 14px 0 6px; }
+.k-time__num { padding: 0 4px 4px; border: 0; border-bottom: 2px solid transparent;
+               background: none; color: var(--text); cursor: pointer;
+               font: inherit; font-size: 34px; font-weight: 700;
+               line-height: 1.1; font-variant-numeric: tabular-nums; }
+.k-time__num:hover { color: var(--accent); }
+.k-time__num:focus { outline: none; }
+.k-time__num.is-on { color: var(--accent); border-bottom-color: var(--accent); }
+.k-time__colon { font-size: 30px; font-weight: 700; color: var(--text2);
+                 line-height: 1.1; }
+.k-time__hint { font-size: 11px; color: var(--text3); text-align: center;
+                min-height: 15px; }
+/* У панели времени одна кнопка, и ей место справа. */
+.k-cal__foot--time { justify-content: flex-end; }
 .k-cal__step[hidden] { display: none; }
 
 @media (max-width: 520px) {

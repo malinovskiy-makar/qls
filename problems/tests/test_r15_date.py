@@ -24,7 +24,7 @@ from django.test import TestCase
 
 NODE = shutil.which('node')
 
-# Пробы: набранные цифры → что обязано уехать на сервер.
+# Пробы: набранное → что обязано уехать на сервер.
 # ⚠️ Первая строка — тот самый случай владельца.
 PROBES = [
     ['20082026 1830', '2026-08-20T18:30', 'без единого разделителя'],
@@ -34,6 +34,12 @@ PROBES = [
     ['01012027', '2027-01-01T23:59', 'первое января'],
     ['29022028', '2028-02-29T23:59', 'високосный год'],
     ['', '', 'пусто — законный ответ «срока нет»'],
+    # ⚠️ ДВУЗНАЧНЫЙ ГОД (ревью 16.08, п. 3.1). Понимается ровно потому, что
+    # набранный разделитель ЗАКРЫВАЕТ поле года, а не потому, что мы
+    # угадали: «140826 2000» и «14.08.26, 20:00» разбираются одинаково.
+    ['140826 2000', '2026-08-14T20:00', 'двузначный год через пробел'],
+    ['14.08.26, 20:00', '2026-08-14T20:00', 'двузначный год с точками'],
+    ['14.08.26', '2026-08-14T23:59', 'двузначный год без времени'],
 ]
 
 # Пробы, которые обязаны ОТКАЗАТЬ со словами, а не молча дать пустоту.
@@ -43,21 +49,48 @@ REFUSALS = [
     ['20082026 2560', 'часов и минут таких не бывает'],
     ['31022026', 'такой даты нет в календаре'],
     ['32082026', 'такого дня нет'],
+    ['14.08.202, 20:00', 'год набран не до конца'],
 ]
+
+# ⚠️ ГРАНИЦЫ СРОКА (ревью 16.08, п. 3.2). Проверяем отдельно и с ЯВНЫМИ
+# границами: иначе тест зависел бы от того, какое сегодня число, и однажды
+# покраснел бы сам собой.
+BOUNDS = ['2026-08-16', '2027-12-31']
+BOUND_PROBES = [
+    ['15082026', False, 'вчерашний день не принимается'],
+    ['16082026', True, 'сегодня — можно'],
+    ['31122027', True, 'последний разрешённый день'],
+    ['01012028', False, 'дальше границы — нельзя'],
+]
+
+# ⚠️ Границы разбора и границы формата — РАЗНЫЕ вопросы, поэтому пробы
+# формата идут с заведомо широкими границами. Иначе «високосный 2028» из
+# проверки календаря превратился бы в проверку потолка.
+WIDE = ['2000-01-01', '2099-12-31']
 
 HARNESS = r"""
 %(functions)s
 
-var out = { masked: [], parsed: [], refused: [] };
+function boundsOf(pair) {
+  return { min: dateFromIso(pair[0] + 'T00:00'),
+           max: dateFromIso(pair[1] + 'T23:59') };
+}
+var wide = boundsOf(%(wide)s);
+
+var out = { masked: [], parsed: [], refused: [], bounded: [] };
 %(probes)s.forEach(function (probe) {
-  var digits = digitsOf(probe[0]);
-  out.masked.push(maskOf(digits));
-  var result = parse(digits, '23:59');
+  out.masked.push(maskOf(fieldsOf(probe[0])));
+  var result = parse(probe[0], '23:59', wide);
   out.parsed.push(result.why ? null : result.iso);
 });
 %(refusals)s.forEach(function (probe) {
-  var result = parse(digitsOf(probe[0]), '23:59');
+  var result = parse(probe[0], '23:59', wide);
   out.refused.push(result.why || null);
+});
+var tight = boundsOf(%(bounds)s);
+%(bound_probes)s.forEach(function (probe) {
+  var result = parse(probe[0], '23:59', tight);
+  out.bounded.push(result.why ? result.why : null);
 });
 console.log(JSON.stringify(out));
 """
@@ -71,7 +104,11 @@ def _functions():
     """
     page = render_to_string('teacher/_date_field_js.html')
     script = re.search(r'<script>(.*?)</script>', page, re.S).group(1)
-    wanted = ('pad', 'digitsOf', 'maskOf', 'parse')
+    # ⚠️ ПЕРЕСЧИТАН 16.08: `digitsOf` больше нет — разделители теперь
+    # значат «поле кончилось», и разбор идёт по полям (`fieldsOf`), а не
+    # по сплошной строке цифр. Плюс появились границы срока.
+    wanted = ('pad', 'fieldsOf', 'maskOf', 'dateFromIso', 'human',
+              'outOfBounds', 'parse')
     out = []
     for name in wanted:
         found = re.search(r'\n  function %s\(.*?\n  \}\n' % name, script, re.S)
@@ -87,10 +124,13 @@ class DateMaskTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        dump = lambda value: json.dumps(value, ensure_ascii=False)
         source = HARNESS % {'functions': _functions(),
-                            'probes': json.dumps(PROBES, ensure_ascii=False),
-                            'refusals': json.dumps(REFUSALS,
-                                                   ensure_ascii=False)}
+                            'probes': dump(PROBES),
+                            'refusals': dump(REFUSALS),
+                            'wide': dump(WIDE),
+                            'bounds': dump(BOUNDS),
+                            'bound_probes': dump(BOUND_PROBES)}
         folder = tempfile.mkdtemp()
         path = os.path.join(folder, 'probe.js')
         with open(path, 'w', encoding='utf-8') as fh:
@@ -122,6 +162,51 @@ class DateMaskTests(TestCase):
     def test_impossible_date_is_refused_by_the_calendar(self):
         """31 февраля обязано быть отказом, а не 3 марта."""
         self.assertIn('календаре', self.result['refused'][3])
+
+    def test_two_digit_year_means_twenty_something(self):
+        """⚠️ Ревью 16.08, п. 3.1: «140826 2000» это 2026 год, не 2620.
+
+        Прошлая сессия объявила двузначный год непонимаемым, и это было
+        верно ДЛЯ ТОЙ маски: она выбрасывала разделители, и «14.08.26 20:00»
+        превращалось в сплошное «1408262000», где 2620 и 26 неотличимы.
+        Разделитель теперь закрывает поле — и различать стало чем.
+        """
+        for text, want, why in PROBES:
+            if not text.startswith('1408') and not text.startswith('140826'):
+                continue
+            index = [p[0] for p in PROBES].index(text)
+            self.assertEqual(self.result['parsed'][index], want, why)
+
+    def test_year_without_separator_stays_four_digits(self):
+        """Цена размена названа вслух: слитный набор — только полный год.
+
+        «1408262000» без разделителей — это 14.08.2620, и иначе быть не
+        может: различать нечем. Двузначный год требует разделителя ровно
+        так, как его и набирают руками.
+        """
+        index = [p[0] for p in PROBES].index('20082026 1830')
+        self.assertEqual(self.result['parsed'][index], '2026-08-20T18:30')
+
+    def test_bounds_are_enforced_with_words(self):
+        """⚠️ Ревью 16.08, п. 3.2: раньше сегодня и позже 2027 — отказ."""
+        for index, probe in enumerate(BOUND_PROBES):
+            why = self.result['bounded'][index]
+            if probe[1]:
+                self.assertIsNone(why, probe[2])
+            else:
+                self.assertTrue(why, probe[2])
+                self.assertTrue(len(why) > 15, why)
+
+    def test_refusal_never_shows_a_sample_value(self):
+        """⚠️ Ревью 16.08, п. 3.4: жалоба не подсказывает значение.
+
+        Прежнее «Нужны часы и минуты: 18:30» читалось как «поставьте
+        18:30» — то есть как прежнее значение поля. Формат стоит в
+        placeholder, и повторять его в жалобе незачем.
+        """
+        for why in self.result['refused']:
+            self.assertNotRegex(why or '', r'\d\d:\d\d')
+            self.assertNotRegex(why or '', r'\d\d\.\d\d\.\d\d')
 
 
 class DateFieldMarkupTests(TestCase):
@@ -177,6 +262,84 @@ class DateFieldMarkupTests(TestCase):
         self.assertIn('ArrowLeft', script)
         self.assertIn('ArrowDown', script)
         self.assertIn("event.key === 'Escape'", script)
+
+
+class TimeIsANumberTests(TestCase):
+    """⚠️ Ревью 16.08, п. 3.6: время — крупное число, а не поля ввода."""
+
+    def script(self):
+        return render_to_string('teacher/_date_field_js.html')
+
+    def test_no_input_boxes_left_in_the_time_panel(self):
+        """Владелец назвал прежние прокручиваемые списки «окошками»."""
+        script = self.script()
+        panel = script.split('k-cal__step--time')[1].split('</template>')[0]
+        self.assertNotIn('<input', panel)
+        self.assertNotIn('k-cal__list', panel)
+        self.assertNotIn('k-cal__pick', panel)
+
+    def test_hour_and_minute_are_buttons(self):
+        """Кнопки, а не `<span>`: их берёт Tab и слышит читалка."""
+        script = self.script()
+        self.assertIn('data-time-part="hour"', script)
+        self.assertIn('data-time-part="minute"', script)
+        self.assertIn('aria-label="Часы"', script)
+
+    def test_typing_arrows_and_wheel_all_work(self):
+        script = self.script()
+        for piece in ('function typeDigit', 'ArrowUp', "'wheel'",
+                      'function bump'):
+            self.assertIn(piece, script)
+
+    def test_escape_undoes_and_enter_confirms(self):
+        script = self.script()
+        panel = script[script.index('function onTimeKeys'):]
+        self.assertIn("event.key === 'Escape'", panel)
+        self.assertIn('stopEdit(true)', panel)
+        self.assertIn("event.key === 'Enter'", panel)
+
+    def test_active_number_has_no_frame_only_an_underline(self):
+        kit = render_to_string('_kit.html')
+        rules = kit[kit.index('.k-time {'):kit.index('.k-cal__foot--time')]
+        self.assertIn('border: 0', rules)
+        self.assertIn('border-bottom: 2px solid transparent', rules)
+        self.assertIn('.k-time__num.is-on', rules)
+
+
+class DateFieldLayoutTests(TestCase):
+    """⚠️ Ревью 16.08, п. 3.5: значок календаря не уезжает от сообщения."""
+
+    def test_icon_is_positioned_from_the_row_not_the_whole_box(self):
+        markup = render_to_string('teacher/_date_field.html', {
+            'field_name': 'deadline', 'field_id': 'id_deadline'})
+        # Сообщение — СНАРУЖИ ряда: иначе оно растягивает то, от чего
+        # считается кнопка, и значок уезжает вниз и вправо.
+        row = markup[markup.index('k-date__row'):markup.index('k-date__err')]
+        self.assertIn('k-date__pick', row)
+        self.assertNotIn('k-date__err', row)
+        kit = render_to_string('_kit.html')
+        self.assertIn('.k-date__row { position: relative; }', kit)
+
+
+class SubmitIsLockedByABadDateTests(TestCase):
+    """⚠️ Ревью 16.08, п. 3.3: красное поле запирает выдачу.
+
+    Пока кнопка оставалась активной, уходило ПРЕЖНЕЕ значение из родного
+    поля: на экране одно, на сервер другое — и заметить это нечем.
+    """
+
+    def test_both_gates_count_a_bad_date(self):
+        for name in ('teacher/_picker_js.html',
+                     'teacher/assignment_build.html'):
+            with open('teacher/templates/' + name, encoding='utf-8') as fh:
+                text = fh.read()
+            self.assertIn(".k-date__text.is-bad", text, name)
+            self.assertIn("missing.push('проверьте ", text, name)
+
+    def test_the_reason_names_the_field(self):
+        markup = render_to_string('teacher/_work_settings.html', {
+            'is_exam': False, 'form': {}})
+        self.assertIn('data-what="срок сдачи"', markup)
 
 
 class DateFieldOnScreensTests(TestCase):

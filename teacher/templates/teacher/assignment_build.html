@@ -641,6 +641,14 @@
     if (boxes.length && ![].some.call(boxes, function (b) { return b.checked; })) {
       missing.push('выберите группу');
     }
+    // ⚠️ НЕРАЗОБРАННАЯ ДАТА ЗАПИРАЕТ ВЫДАЧУ (ревью 16.08, п. 3.3). Правило
+    // то же, что в `_picker_js.html`: пока поле красное, в форме лежит
+    // ПРЕЖНЕЕ значение, и уйдёт не то, что видно на экране.
+    document.querySelectorAll('.k-date__text.is-bad').forEach(function (bad) {
+      var box = bad.closest('[data-k-date]');
+      if (box && box.offsetParent === null) { return; }
+      missing.push('проверьте ' + ((box && box.dataset.what) || 'дату'));
+    });
     var button = document.getElementById('submit-btn');
     button.disabled = missing.length > 0;
     var why = document.getElementById('submit-why');

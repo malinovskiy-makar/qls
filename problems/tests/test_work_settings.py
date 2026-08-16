@@ -260,10 +260,11 @@ class DateParsingRunsInNode(TestCase):
     def run_js(self, body):
         """Чистые функции разбора из боевого скрипта + переданный кусок.
 
-        ⚠️ ПЕРЕСЧИТАН ПОД НОВОЕ ПОЛЕ (ревью 15.08, фаза 10), а не отключён.
-        Разбор был одной регуляркой `toIso`, требовавшей всех разделителей;
-        теперь значащими считаются только цифры (`digitsOf` → `maskOf` →
-        `parse`), и отказ возвращается СО СЛОВАМИ, а не как `null`.
+        ⚠️ ПЕРЕСЧИТАН ДВАЖДЫ, ни разу не отключён. Сперва (15.08) разбор
+        перестал быть одной регуляркой `toIso` и стал маской из цифр; затем
+        (16.08) разделитель снова стал значащим — он ЗАКРЫВАЕТ поле, и
+        двузначный год опять понимается. Границы срока передаются явно,
+        чтобы проверка формата не зависела от сегодняшнего числа.
         Способ проверки прежний: исполнением в node.
         """
         from problems.tests.test_r15_date import _functions
@@ -281,10 +282,15 @@ class DateParsingRunsInNode(TestCase):
         finally:
             os.unlink(path)
 
+    # Широкие границы: этот класс проверяет ФОРМАТ, а не потолок срока.
+    WIDE = ("{min: dateFromIso('2000-01-01T00:00'), "
+            "max: dateFromIso('2099-12-31T23:59')}")
+
     def iso(self, text, default='23:59'):
         return self.run_js(
-            "var r = parse(digitsOf(%r), %r);"
-            "console.log(r.why ? 'null' : r.iso);" % (text, default))
+            "var r = parse(%r, %r, %s);"
+            "console.log(r.why ? 'null' : r.iso);"
+            % (text, default, self.WIDE))
 
     def test_script_parses(self):
         source = open(DATE_JS, encoding='utf-8').read()
@@ -316,13 +322,17 @@ class DateParsingRunsInNode(TestCase):
         сокращённый год — нет.
         """
         for text in ('14/08/2026 20:00', '14-08-2026, 20:00',
-                     '14082026 2000', '140820262000'):
+                     '14082026 2000', '140820262000',
+                     # ⚠️ ПЕРЕСЧИТАН 16.08: двузначный год снова понимается.
+                     '140826 2000', '14.08.26, 20:00'):
             self.assertEqual(self.iso(text), '2026-08-14T20:00', text)
 
     def test_impossible_dates_are_refused(self):
         """31 февраля обязано быть ошибкой, а не 3 марта."""
         for text in ('31.02.2026', '32.01.2026', '14.13.2026',
                      '14.08.2026, 25:00', '14.08'):
+            # Замечание: границы здесь широкие, значит отказ приходит
+            # именно от календаря, а не от потолка срока.
             self.assertEqual(self.iso(text), 'null', text)
 
     def test_letters_never_reach_the_field(self):
@@ -332,15 +342,17 @@ class DateParsingRunsInNode(TestCase):
         даже вставкой: поле остаётся пустым, и это видно. Пустое поле —
         законный ответ «срока нет», а не молчаливое обнуление набранного.
         """
-        self.assertEqual(self.run_js("console.log('[' + digitsOf('вчера') + ']');"),
-                         '[]')
+        self.assertEqual(
+            self.run_js("console.log('[' + maskOf(fieldsOf('вчера')) + ']');"),
+            '[]')
         self.assertEqual(self.iso('вчера'), '')
 
     def test_refusal_speaks_words(self):
         """Молчаливый ноль — то, из-за чего затевалась фаза."""
-        why = self.run_js("console.log(parse(digitsOf('14.08'), '23:59').why);")
+        why = self.run_js("console.log(parse('14.08', '23:59', %s).why);"
+                          % self.WIDE)
         self.assertTrue(len(why) > 15, why)
 
     def test_mask_writes_the_separators(self):
-        out = self.run_js("console.log(maskOf(digitsOf('140820262000')));")
+        out = self.run_js("console.log(maskOf(fieldsOf('140820262000')));")
         self.assertEqual(out, '14.08.2026, 20:00')

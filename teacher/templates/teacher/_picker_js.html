@@ -60,6 +60,14 @@
       });
       if (!chosen) { missing.push('выберите группу'); }
     }
+    // ⚠️ НЕРАЗОБРАННАЯ ДАТА ЗАПИРАЕТ ВЫДАЧУ (ревью 16.08, п. 3.3). Раньше
+    // поле краснело, а кнопка оставалась активной — и уходило ПРЕЖНЕЕ
+    // значение, лежащее в родном поле: на экране одно, на сервер другое.
+    document.querySelectorAll('.k-date__text.is-bad').forEach(function (bad) {
+      var box = bad.closest('[data-k-date]');
+      if (box && box.offsetParent === null) { return; }   // поле скрыто
+      missing.push('проверьте ' + ((box && box.dataset.what) || 'дату'));
+    });
     return missing;
   }
 

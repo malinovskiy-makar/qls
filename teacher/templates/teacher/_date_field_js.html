@@ -34,6 +34,17 @@
       </div>
     </div>
 
+    {% comment %}
+    ⚠️ ВРЕМЯ — ЭТО ЧИСЛО, А НЕ ПОЛЕ ВВОДА (ревью 16.08, п. 3.6). Здесь
+    стояли два прокручиваемых списка в рамках, похожих на форму; владелец
+    назвал их «ужасными окошками». Теперь на панели крупное «18:30»:
+    нажатие на час или на минуты подсвечивает число акцентом и зажигает
+    полосу под ним, дальше цифры набираются с клавиатуры поверх, стрелки
+    меняют на единицу, колесо прокручивает. Рамок нет ни одной.
+
+    Числа — кнопки, а не `<span>`: их берёт Tab, им можно дать
+    `aria-label`, и клавиатура работает без единой ловушки фокуса.
+    {% endcomment %}
     <div class="k-cal__step k-cal__step--time" hidden>
       <div class="k-cal__head">
         <button type="button" class="k-cal__nav" data-cal-back
@@ -41,18 +52,15 @@
         <div class="k-cal__month" data-cal-day></div>
         <span class="k-cal__nav" aria-hidden="true"></span>
       </div>
-      <div class="k-cal__time">
-        <div class="k-cal__col">
-          <div class="k-cal__col-cap">часы</div>
-          <div class="k-cal__list" data-cal-hours></div>
-        </div>
-        <div class="k-cal__col">
-          <div class="k-cal__col-cap">минуты</div>
-          <div class="k-cal__list" data-cal-minutes></div>
-        </div>
+      <div class="k-time" role="group" aria-label="Время">
+        <button type="button" class="k-time__num" data-time-part="hour"
+                aria-label="Часы">00</button><span
+              class="k-time__colon" aria-hidden="true">:</span><button
+              type="button" class="k-time__num" data-time-part="minute"
+              aria-label="Минуты">00</button>
       </div>
-      <div class="k-cal__foot">
-        <div class="k-cal__picked" data-cal-picked></div>
+      <div class="k-time__hint" data-cal-hint></div>
+      <div class="k-cal__foot k-cal__foot--time">
         <button type="button" class="k-btn k-btn--main k-btn--sm"
                 data-cal-done>Готово</button>
       </div>
@@ -68,48 +76,117 @@
   var MONTHS_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
                     'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь',
                     'Декабрь'];
-  // Шаг минут в списке. Пять — потому что сроком «18:37» никто не
-  // пользуется, а список из шестидесяти строк не пролистывается глазами.
-  var MINUTE_STEP = 5;
-
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
   // ── Маска ввода ──────────────────────────────────────────────────────
-  // ⚠️ ЗНАКИ РАССТАВЛЯЕТ ПОЛЕ, А НЕ ЧЕЛОВЕК. Набор «20082026 1830»
-  // показывался в поле, но значением не становился: разбор требовал всех
-  // разделителей. Теперь значащими считаются ТОЛЬКО цифры, а точки,
-  // запятая и двоеточие подставляются сами и обратно в цифры не попадают.
-  function digitsOf(text) {
-    return (text || '').replace(/\D+/g, '').slice(0, 12);
+  // ⚠️ ЗНАКИ РАССТАВЛЯЕТ ПОЛЕ, А ЧЕЛОВЕК МОЖЕТ ИХ СТАВИТЬ САМ. Значащие —
+  // цифры, но набранный разделитель тоже что-то значит: он ЗАКРЫВАЕТ поле
+  // досрочно. Из-за того, что прежняя маска разделители выбрасывала,
+  // «140826 2000» превращалось в «14.08.2620, 00»: год съедал две цифры
+  // времени, а сказать «год кончился» было нечем.
+  //
+  // Отсюда правило скана: поле набирается до своей ширины (дд, мм, гггг,
+  // чч, мм) ЛИБО до первого разделителя, что случится раньше. Один проход
+  // слева направо, без единого частного случая — и «140826 2000», и
+  // «14.08.26, 20:00», и слитное «200820261830» разбираются им одинаково.
+  var WIDTHS = [2, 2, 4, 2, 2];
+  var SEPS = ['.', '.', ', ', ':'];
+
+  // ⚠️ МАСКА ОБЯЗАНА СОХРАНИТЬ НАБРАННЫЙ РАЗДЕЛИТЕЛЬ. Поймано браузером,
+  // питон-тесты этого не видели: они звали `fieldsOf` один раз, а поле
+  // перерисовывает себя на КАЖДУЮ цифру. Набранная точка после «26»
+  // исчезала при первой же перерисовке — и следующая цифра дописывалась
+  // в год: «140826 2000» снова превращалось в «14.08.2620, 00».
+  // Поэтому `fieldsOf` помечает, закрыл ли поле разделитель, а `maskOf`
+  // такой разделитель дорисовывает. Ширина поля закрывает его молча:
+  // слитный набор выглядит ровно как раньше.
+  function fieldsOf(raw) {
+    var fields = [];
+    var current = '';
+    var index = 0;
+    fields.closed = false;
+    function flush(bySeparator) {
+      if (!current) { return; }
+      fields.push(current);
+      current = '';
+      index += 1;
+      fields.closed = !!bySeparator;
+    }
+    for (var i = 0; i < (raw || '').length && index < WIDTHS.length; i++) {
+      var ch = raw.charAt(i);
+      if (ch >= '0' && ch <= '9') {
+        current += ch;
+        if (current.length === WIDTHS[index]) { flush(false); }
+      } else {
+        flush(true);
+      }
+    }
+    flush(false);
+    return fields;
   }
 
-  function maskOf(digits) {
-    var out = digits.slice(0, 2);
-    if (digits.length > 2) { out += '.' + digits.slice(2, 4); }
-    if (digits.length > 4) { out += '.' + digits.slice(4, 8); }
-    if (digits.length > 8) { out += ', ' + digits.slice(8, 10); }
-    if (digits.length > 10) { out += ':' + digits.slice(10, 12); }
+  function maskOf(fields) {
+    var out = '';
+    for (var i = 0; i < fields.length; i++) {
+      if (i) { out += SEPS[i - 1]; }
+      out += fields[i];
+    }
+    if (fields.closed && fields.length && fields.length < WIDTHS.length) {
+      out += SEPS[fields.length - 1];
+    }
     return out;
+  }
+
+  // Границы срока. Раньше сегодня работу не выдают, а 2027 год — предел
+  // осмысленного: дальше это опечатка в годе, а не план.
+  function startOfToday() {
+    var now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+
+  function dateFromIso(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || '');
+    return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null;
+  }
+
+  function human(date) {
+    return pad(date.getDate()) + '.' + pad(date.getMonth() + 1) + '.'
+           + date.getFullYear();
   }
 
   // Разбор ПОЛНОСТЬЮ набранного значения. Возвращает ISO либо объект с
   // причиной отказа: молчаливый ноль — то, из-за чего затевалась фаза.
-  function parse(digits, defaultTime) {
-    if (!digits.length) { return { iso: '' }; }
-    if (digits.length < 8) {
-      return { why: 'Дата набрана не до конца. Нужно 8 цифр: 20.08.2026.' };
+  //
+  // ⚠️ ПРИЧИНА НАЗЫВАЕТ ТО, ЧТО ДЕЙСТВИТЕЛЬНО НЕ ТАК, И НЕ ПОКАЗЫВАЕТ
+  // ОБРАЗЦОВОГО ЗНАЧЕНИЯ. Прежнее «Нужны часы и минуты: 18:30» читалось
+  // как подсказка «поставьте 18:30» — то есть как прежнее значение поля.
+  // Формат стоит в placeholder, повторять его в жалобе незачем.
+  function parse(raw, defaultTime, bounds) {
+    var fields = fieldsOf(raw);
+    if (!fields.length) { return { iso: '' }; }
+    if (fields.length < 3) {
+      return { why: 'Дата набрана не до конца: нужны день, месяц и год.' };
     }
-    var day = +digits.slice(0, 2);
-    var month = +digits.slice(2, 4);
-    var year = +digits.slice(4, 8);
+    var day = +fields[0];
+    var month = +fields[1];
+    var yearText = fields[2];
+    if (yearText.length === 3) {
+      return { why: 'Год набран не до конца.' };
+    }
+    // ⚠️ ДВЕ ЦИФРЫ В ГОДЕ — ЭТО 20xx. Правило владельца; работает потому,
+    // что поле года закрыл разделитель, а не потому, что мы угадали.
+    var year = yearText.length <= 2 ? 2000 + +yearText : +yearText;
     var time = defaultTime || '00:00';
-    if (digits.length > 8 && digits.length < 12) {
-      return { why: 'Время набрано не до конца. Нужны часы и минуты: 18:30.' };
+    if (fields.length === 4) {
+      return { why: 'Время набрано не до конца: не хватает минут.' };
     }
-    if (digits.length === 12) {
-      var hh = +digits.slice(8, 10), mm = +digits.slice(10, 12);
+    if (fields.length === 5) {
+      var hh = +fields[3], mm = +fields[4];
+      if (fields[4].length < 2) {
+        return { why: 'Время набрано не до конца: не хватает минут.' };
+      }
       if (hh > 23 || mm > 59) {
-        return { why: 'Такого времени не бывает. Часы до 23, минуты до 59.' };
+        return { why: 'Такого времени не бывает: часы до 23, минуты до 59.' };
       }
       time = pad(hh) + ':' + pad(mm);
     }
@@ -119,14 +196,28 @@
     if (month < 1 || month > 12 || day < 1
         || probe.getFullYear() !== year || probe.getMonth() !== month - 1
         || probe.getDate() !== day) {
-      return { why: 'Такой даты нет в календаре. Пример: 20.08.2026.' };
+      return { why: 'Такой даты нет в календаре.' };
     }
-    return { iso: year + '-' + pad(month) + '-' + pad(day) + 'T' + time };
+    var iso = year + '-' + pad(month) + '-' + pad(day) + 'T' + time;
+    var why = outOfBounds(dateFromIso(iso), bounds);
+    return why ? { why: why } : { iso: iso };
   }
 
-  function isoToDigits(iso) {
+  function outOfBounds(date, bounds) {
+    if (!date || !bounds) { return ''; }
+    if (bounds.min && date < bounds.min) {
+      return 'Эта дата уже прошла. Самое раннее — сегодня, '
+             + human(bounds.min) + '.';
+    }
+    if (bounds.max && date > bounds.max) {
+      return 'Слишком далеко. Самое позднее — ' + human(bounds.max) + '.';
+    }
+    return '';
+  }
+
+  function isoToFields(iso) {
     var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || '');
-    return m ? m[3] + m[2] + m[1] + m[4] + m[5] : '';
+    return m ? [m[3], m[2], m[1], m[4], m[5]] : [];
   }
 
   function isoParts(iso) {
@@ -159,6 +250,15 @@
     var pop = null;              // окно выбора, создаётся при первом открытии
     var view = null;             // месяц, который сейчас показан
     var draft = null;            // выбранное в окне, до «Готово»
+    var editing = null;          // какое число времени сейчас набирают
+    var typed = '';              // цифры, набранные поверх него
+    var undo = null;             // значение до правки — его вернёт Escape
+    var bounds = {
+      min: box.dataset.min ? dateFromIso(box.dataset.min + 'T00:00')
+                           : startOfToday(),
+      max: box.dataset.max ? dateFromIso(box.dataset.max + 'T23:59')
+                           : dateFromIso('2027-12-31T23:59')
+    };
 
     function showError(why) {
       if (err) {
@@ -170,13 +270,13 @@
 
     // Родное поле — истина. Текстовое всегда показывает то же значение.
     function fromNative() {
-      text.value = maskOf(isoToDigits(native.value));
+      text.value = maskOf(isoToFields(native.value));
       showError('');
     }
 
     function commit(iso) {
       native.value = iso;
-      text.value = maskOf(isoToDigits(iso));
+      text.value = maskOf(isoToFields(iso));
       showError('');
       // Соседние поля («окно не короче пяти минут») слушают change.
       native.dispatchEvent(new Event('change', { bubbles: true }));
@@ -184,7 +284,7 @@
 
     // ── Разбор напечатанного ───────────────────────────────────────────
     function fromText() {
-      var result = parse(digitsOf(text.value), defaultTime);
+      var result = parse(text.value, defaultTime, bounds);
       if (result.why) {
         // ⚠️ РОДНОЕ ПОЛЕ НЕ ЧИСТИМ. Опечатка не имеет права стирать уже
         // выбранный срок: иначе правка «20:00» → «20:0» отправляла бы
@@ -212,7 +312,25 @@
       pop.querySelector('[data-cal-back]').addEventListener('click',
         function () { step('date'); });
       pop.querySelector('[data-cal-done]').addEventListener('click',
-        function () { close(true); });
+        function () { stopEdit(false); close(true); });
+
+      pop.querySelectorAll('.k-time__num').forEach(function (num) {
+        var part = num.dataset.timePart;
+        num.addEventListener('click', function () { startEdit(part); });
+        num.addEventListener('focus', function () {
+          if (editing !== part) { startEdit(part); }
+        });
+        num.addEventListener('blur', function () {
+          if (editing === part) { stopEdit(false); }
+        });
+        num.addEventListener('keydown', onTimeKeys);
+        // Колесо прокручивает число под курсором. `passive: false` —
+        // иначе браузер не даёт отменить прокрутку страницы.
+        num.addEventListener('wheel', function (event) {
+          event.preventDefault();
+          bump(part, event.deltaY < 0 ? 1 : -1);
+        }, { passive: false });
+      });
 
       pop.addEventListener('keydown', onKeys);
       return pop;
@@ -248,6 +366,16 @@
           cell.classList.add('is-out');
         }
         if (sameDay(day, today)) { cell.classList.add('is-today'); }
+        // ⚠️ ЗА ГРАНИЦЕЙ ДЕНЬ НЕ НАЖИМАЕТСЯ. Иначе календарь предлагал бы
+        // то, что поле ввода тут же назовёт ошибкой, — два правила об
+        // одном в одном окне.
+        var dayEnd = new Date(day.getFullYear(), day.getMonth(),
+                              day.getDate(), 23, 59);
+        if ((bounds.min && dayEnd < bounds.min)
+            || (bounds.max && day > bounds.max)) {
+          cell.classList.add('is-off');
+          cell.disabled = true;
+        }
         if (sameDay(day, chosen)) {
           cell.classList.add('is-picked');
           cell.setAttribute('aria-current', 'date');
@@ -270,63 +398,122 @@
       apply();
       step('time');
       drawTime();
+      // Фокус сразу на часах: набрать время можно, не трогая мышь.
+      var hour = pop.querySelector('.k-time__num[data-time-part="hour"]');
+      if (hour) { hour.focus(); }
     }
 
-    // ⚠️ СПИСКИ ЧАСОВ И МИНУТ СТРОЯТСЯ ОДИН РАЗ, а отметка выбранного
-    // переставляется отдельно. Перестроение на каждый клик УБИВАЛО нажатую
-    // кнопку прямо в её обработчике: событие всплывало до документа уже с
-    // оторванным от страницы target, проверка «клик был вне окна?» отвечала
-    // «да», и окно закрывалось после выбора часа. Поймано браузером —
-    // разметка при этом валидна, ошибок в консоли нет.
+    // ── Панель времени: крупное число, а не поля ввода ─────────────────
+    // ⚠️ ЧИСЛО ПРАВИТСЯ НА МЕСТЕ. Здесь стояли два прокручиваемых списка в
+    // рамках; владелец назвал их «ужасными окошками». Теперь час и минуты
+    // — это две кнопки с крупными цифрами: нажатие делает число активным
+    // (акцент плюс полоса под ним), дальше цифры набираются поверх,
+    // стрелки меняют на единицу, колесо прокручивает.
+    var LIMITS = { hour: 24, minute: 60 };
+
     function drawTime() {
       pop.querySelector('[data-cal-day]').textContent =
         draft.day + ' ' + MONTHS[draft.month] + ' ' + draft.year;
-      fillList(pop.querySelector('[data-cal-hours]'), 24, 1, 'hour');
-      fillList(pop.querySelector('[data-cal-minutes]'), 60, MINUTE_STEP,
-               'minute');
-      markTime(true);
+      markTime();
     }
 
-    function fillList(host, limit, step_, key) {
-      host.innerHTML = '';
-      host.dataset.key = key;
-      host.dataset.step = step_;
-      for (var value = 0; value < limit; value += step_) {
-        var item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'k-cal__pick';
-        item.textContent = pad(value);
-        item.dataset.value = value;
-        item.addEventListener('click', function (event) {
-          var list = event.currentTarget.parentNode;
-          draft[list.dataset.key] = +event.currentTarget.dataset.value;
-          apply();
-          markTime(false);
-        });
-        host.appendChild(item);
+    function markTime() {
+      pop.querySelectorAll('.k-time__num').forEach(function (num) {
+        var part = num.dataset.timePart;
+        num.textContent = pad(draft[part]);
+        num.classList.toggle('is-on', editing === part);
+        num.setAttribute('aria-live', editing === part ? 'polite' : 'off');
+      });
+      var hint = pop.querySelector('[data-cal-hint]');
+      if (hint) {
+        hint.textContent = editing
+          ? 'Наберите цифры, стрелки меняют на единицу'
+          : 'Нажмите на часы или на минуты, чтобы поправить';
       }
     }
 
-    function markTime(scroll) {
-      ['[data-cal-hours]', '[data-cal-minutes]'].forEach(function (which) {
-        var host = pop.querySelector(which);
-        var step_ = +host.dataset.step;
-        var value = draft[host.dataset.key];
-        host.querySelectorAll('.k-cal__pick').forEach(function (item) {
-          var own = +item.dataset.value;
-          // У минут шаг пять: 18:37 подсвечивает «35» — ближайшую снизу.
-          item.classList.toggle('is-picked',
-                                value >= own && value < own + step_);
-        });
-        // Прокручиваем ТОЛЬКО при открытии панели: прыжок списка под
-        // курсором на каждый клик читается как сбой.
-        var current = scroll ? host.querySelector('.is-picked') : null;
-        if (current) {
-          host.scrollTop = current.offsetTop - host.clientHeight / 3;
+    // Правку начинаем с запоминания прежнего значения: Escape обязан
+    // вернуть его, иначе «передумал» стоит столько же, сколько «ошибся».
+    function startEdit(part) {
+      editing = part;
+      typed = '';
+      undo = draft[part];
+      markTime();
+      // ⚠️ ФОКУС ПЕРЕЕЗЖАЕТ ВМЕСТЕ С ПРАВКОЙ. Без этого после набранных
+      // часов подсвечивались минуты, а цифры продолжали уходить в часы:
+      // клавиатуру слушает КНОПКА, а не панель. Поймано браузером.
+      var num = pop.querySelector('.k-time__num[data-time-part="' + part + '"]');
+      if (num && document.activeElement !== num) { num.focus(); }
+    }
+
+    function stopEdit(restore) {
+      if (editing && restore && undo !== null) {
+        draft[editing] = undo;
+        apply();
+      }
+      editing = null;
+      typed = '';
+      undo = null;
+      markTime();
+    }
+
+    function bump(part, delta) {
+      var limit = LIMITS[part];
+      draft[part] = (draft[part] + delta + limit) % limit;
+      typed = '';
+      apply();
+      markTime();
+    }
+
+    // Набор цифрами. Две цифры подряд, невозможное число начинает счёт
+    // заново с последней цифры — так ведут себя все часы, где время
+    // набирают, и объяснять это не приходится.
+    function typeDigit(part, digit) {
+      var limit = LIMITS[part] - 1;
+      var next = +(typed + digit);
+      if (typed && next > limit) { next = +digit; typed = ''; }
+      if (next > limit) { next = +digit; }
+      typed += digit;
+      draft[part] = next;
+      apply();
+      markTime();
+      // Часы набраны — уходим на минуты сами: иначе после «18» приходится
+      // отдельно целиться мышью в соседнее число.
+      if (part === 'hour' && (typed.length === 2 || next > 2)) {
+        startEdit('minute');
+      } else if (typed.length === 2) {
+        stopEdit(false);
+      }
+    }
+
+    function onTimeKeys(event) {
+      var part = event.currentTarget.dataset.timePart;
+      if (event.key >= '0' && event.key <= '9') {
+        event.preventDefault();
+        if (editing !== part) { startEdit(part); }
+        typeDigit(part, event.key);
+        return;
+      }
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (editing !== part) { startEdit(part); }
+        bump(part, event.key === 'ArrowUp' ? 1 : -1);
+        return;
+      }
+      if (event.key === 'Escape') {
+        // Гасим всплытие: Escape над числом отменяет ПРАВКУ ЧИСЛА, а не
+        // закрывает окно вместе с уже выбранной датой.
+        if (editing === part) {
+          event.preventDefault();
+          event.stopPropagation();
+          stopEdit(true);
         }
-      });
-      pop.querySelector('[data-cal-picked]').textContent =
-        pad(draft.hour) + ':' + pad(draft.minute);
+        return;
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        stopEdit(false);
+      }
     }
 
     // Выбранное уезжает в поле СРАЗУ, не по «Готово»: закрыв окно крестиком
@@ -370,6 +557,9 @@
       view = parts ? new Date(parts.year, parts.month, 1)
                    : new Date(new Date().getFullYear(),
                               new Date().getMonth(), 1);
+      editing = null;
+      typed = '';
+      undo = null;
       step('date');
       drawMonth();
       box.classList.add('is-open');
@@ -382,6 +572,7 @@
 
     function close(back) {
       if (!box.classList.contains('is-open')) { return; }
+      stopEdit(false);
       box.classList.remove('is-open');
       pick.setAttribute('aria-expanded', 'false');
       if (back) { pick.focus(); }
@@ -409,8 +600,7 @@
     // ── Ввод с клавиатуры ──────────────────────────────────────────────
     text.addEventListener('input', function () {
       var atEnd = text.selectionStart === text.value.length;
-      var digits = digitsOf(text.value);
-      text.value = maskOf(digits);
+      text.value = maskOf(fieldsOf(text.value));
       // Каретку возвращаем в конец только если человек там и печатал:
       // при правке середины прыжок в конец хуже отсутствия маски.
       if (atEnd) {

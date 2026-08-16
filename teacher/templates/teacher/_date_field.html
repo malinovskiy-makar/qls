@@ -34,23 +34,33 @@
 ⚠️ РАЗМЕТКА КАЛЕНДАРЯ ЛЕЖИТ ТАМ ЖЕ, а не здесь: это поле стоит на странице
 ТРИЖДЫ (начало окна, конец окна, срок), и `<template>` с одним id
 размножился бы втрое — `getElementById` молча вернул бы первый.
+
+⚠️ ПОЛЕ И КНОПКА ЛЕЖАТ В СВОЁМ РЯДУ (`k-date__row`), а сообщение об ошибке
+— СНАРУЖИ него. Кнопка календаря позиционируется от ряда; когда она
+считалась от всей обёртки, появление сообщения растягивало обёртку вниз, и
+значок уезжал вниз и вправо ровно в тот момент, когда на него смотрят.
 {% endcomment %}
-<div class="k-date" data-k-date data-default-time="{{ default_time|default:'23:59' }}">
-  <input class="k-input k-date__text" type="text" autocomplete="off"
-         inputmode="numeric" placeholder="дд.мм.гггг, чч:мм"
-         aria-label="дата и время, например 14.08.2026, 20:00">
-  <input class="k-input k-date__native" type="datetime-local"
-         id="{{ field_id }}" name="{{ field_name }}"
-         value="{% if field_value %}{{ field_value|date:'Y-m-d\TH:i' }}{% endif %}">
-  <button class="k-date__pick" type="button"
-          aria-label="Выбрать в календаре" aria-expanded="false"
-          title="Выбрать в календаре">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"
-         aria-hidden="true">
-      <rect x="3" y="5" width="18" height="16" rx="2"/>
-      <path d="M8 3v4M16 3v4M3 10h18"/>
-    </svg>
-  </button>
+<div class="k-date" data-k-date data-default-time="{{ default_time|default:'23:59' }}"
+     data-what="{{ field_what|default:'дату' }}"
+     {% if min_date %}data-min="{{ min_date }}"{% endif %}
+     {% if max_date %}data-max="{{ max_date }}"{% endif %}>
+  <div class="k-date__row">
+    <input class="k-input k-date__text" type="text" autocomplete="off"
+           inputmode="numeric" placeholder="дд.мм.гггг, чч:мм"
+           aria-label="дата и время, например 14.08.2026, 20:00">
+    <input class="k-input k-date__native" type="datetime-local"
+           id="{{ field_id }}" name="{{ field_name }}"
+           value="{% if field_value %}{{ field_value|date:'Y-m-d\TH:i' }}{% endif %}">
+    <button class="k-date__pick" type="button"
+            aria-label="Выбрать в календаре" aria-expanded="false"
+            title="Выбрать в календаре">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"
+           aria-hidden="true">
+        <rect x="3" y="5" width="18" height="16" rx="2"/>
+        <path d="M8 3v4M16 3v4M3 10h18"/>
+      </svg>
+    </button>
+  </div>
   <div class="k-date__err" hidden></div>
 </div>
