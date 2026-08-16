@@ -111,7 +111,10 @@ class CartOrderTests(TestCase):
         with open('teacher/templates/teacher/assignment_build.html',
                   encoding='utf-8') as fh:
             page = fh.read()
-        self.assertIn("var ORDER_KEY = CART_KEY + '_order'", page)
+        # ПЕРЕСЧИТАН 16.08: имя ключа теперь приходит из общего
+        # `_cart_keys.html` (одна точка на все экраны), а не собирается
+        # здесь строкой. Смысл проверки прежний — список порядка есть.
+        self.assertIn('var ORDER_KEY = window.QLS_CART.order', page)
         self.assertIn('function readOrder', page)
 
 

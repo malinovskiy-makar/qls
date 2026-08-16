@@ -640,6 +640,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
 {% endblock %}
 
 {% block extra_js %}
+{% include "teacher/_cart_keys.html" %}
 <script>
 (function () {
   // ⚠️ Сообщение об отказе не только СТОИТ рядом с кнопкой, но и уводит
@@ -670,7 +671,10 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     // потому что переключение вида — это переход по ссылке, и разные
     // ключи означали потерю всего отобранного.
     var isExam = toCart.dataset.exam === '1';
-    var cartKey = '{{ cart_key }}';
+    // ⚠️ ИМЯ КЛЮЧА — ИЗ `_cart_keys.html`, А НЕ ИЗ КОНТЕКСТА ЭТОГО ЭКРАНА.
+    // Именно здесь `{{ cart_key }}` рисовалось ПУСТОЙ строкой (вьюха его не
+    // клала), и подобранное уезжало в ключ с пустым именем.
+    var cartKey = window.QLS_CART.cart;
     var cart = {};
     try { cart = JSON.parse(sessionStorage.getItem(cartKey) || '{}'); }
     catch (e) { cart = {}; }
@@ -679,13 +683,21 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     // автоматическая перестановка «сначала тесты» отменяется (правило
     // фазы 4): он расставлял по смыслу урока, а мы — по формальному признаку.
     try {
-      sessionStorage.setItem('hw_manual_order',
+      sessionStorage.setItem(window.QLS_CART.manual,
                              toCart.dataset.manualOrder === '1' ? '1' : '');
     } catch (e) {}
+    // ⚠️ ПОРЯДОК ОТБОРА ЗАПИСЫВАЕТСЯ ОТДЕЛЬНЫМ СПИСКОМ. Корзина — объект, а
+    // числовые ключи объекта JavaScript отдаёт по возрастанию: без списка
+    // подобранное выстроилось бы по номерам задач в банке, а не по тому,
+    // как их подобрали под строки запроса.
+    var order = [];
+    try { order = JSON.parse(sessionStorage.getItem(window.QLS_CART.order) || '[]'); }
+    catch (e) { order = []; }
     var added = 0;
     document.querySelectorAll('.gen-pick, .cand-pick').forEach(function (box) {
       if (!box.checked || box.disabled) { return; }
       cart[box.value] = { title: box.dataset.title };
+      if (order.indexOf(box.value) === -1) { order.push(box.value); }
       added += 1;
     });
     if (!added) {
@@ -693,6 +705,9 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
       return;
     }
     sessionStorage.setItem(cartKey, JSON.stringify(cart));
+    try {
+      sessionStorage.setItem(window.QLS_CART.order, JSON.stringify(order));
+    } catch (e) {}
 
     var url = toCart.dataset.buildUrl + '?kind=' + (isExam ? 'exam' : 'homework');
     var chooser = document.getElementById('exam-group');

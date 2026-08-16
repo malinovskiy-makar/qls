@@ -134,6 +134,11 @@ def assignment_generate(request):
         # ведут сюда с ?group=). Контрольной она обязательна: её конструктор
         # живёт внутри группы.
         'group_id': group_id_param(request),
+        # ⚠️ ИМЕНА ХРАНИЛИЩ РАНЬШЕ В ЭТОТ КОНТЕКСТ НЕ КЛАЛИСЬ ВОВСЕ, и
+        # `{{ cart_key }}` в шаблоне рисовалось ПУСТОЙ строкой: подобранное
+        # уезжало в ключ с пустым именем, а конструктор читал соседний ключ
+        # и показывал прошлую корзину.
+        'storage': picker.storage_keys(group_id_param(request)),
         # Название занятия для крошки: раньше там стояло слово «занятие».
         'group_label': group_label_param(request),
         'group': _group_or_none(request.user,
@@ -372,7 +377,7 @@ def assignment_build(request):
         'group': group,
         'group_id': group.pk if group else '',
         'groups': groups,
-        'cart_key': picker.CART_KEY,
+        'storage': picker.storage_keys(group.pk if group else None),
         'min_window': exam_engine.MIN_WINDOW_MINUTES,
         'min_duration': exam_engine.MIN_DURATION_MINUTES,
         'max_duration': exam_engine.MAX_DURATION_MINUTES,

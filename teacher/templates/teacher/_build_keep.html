@@ -11,7 +11,9 @@
 {% endcomment %}
 <script>
 (function () {
-  var KEY = 'hw_settings';
+  // Имя хранилища приходит из `_cart_keys.html`: настройки привязаны к
+  // занятию так же, как корзина, и чистятся вместе с ней.
+  var KEY = window.QLS_CART.settings;
   // Поля, которые надо помнить. Имена — как в форме: второго списка,
   // способного разъехаться с разметкой, не заводим.
   //
@@ -116,7 +118,7 @@
   // Признак ручного порядка приезжает из подбора по описанию.
   var orderInput = document.getElementById('manual-order-input');
   if (orderInput) {
-    try { orderInput.value = sessionStorage.getItem('hw_manual_order') || ''; }
+    try { orderInput.value = sessionStorage.getItem(window.QLS_CART.manual) || ''; }
     catch (e) {}
   }
 
@@ -128,7 +130,7 @@
       setTimeout(function () {
         try {
           sessionStorage.removeItem(KEY);
-          sessionStorage.removeItem('hw_manual_order');
+          sessionStorage.removeItem(window.QLS_CART.manual);
         } catch (e) {}
       }, 100);
     });

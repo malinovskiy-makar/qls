@@ -291,10 +291,11 @@
 {% endblock %}
 
 {% block extra_js %}
+{% include "teacher/_cart_keys.html" %}
 <script>
 (function () {
   'use strict';
-  var CART_KEY = '{{ cart_key }}';
+  var CART_KEY = window.QLS_CART.cart;
   var ROWS_URL = '{% url "teacher:api_cart_rows" %}';
   var IS_EXAM = {% if is_exam %}true{% else %}false{% endif %};
   var form = document.getElementById('picker-form');
@@ -304,7 +305,7 @@
   try { cart = JSON.parse(sessionStorage.getItem(CART_KEY) || '{}'); }
   catch (e) { cart = {}; }
   var manualOrder = '';
-  try { manualOrder = sessionStorage.getItem('hw_manual_order') || ''; }
+  try { manualOrder = sessionStorage.getItem(window.QLS_CART.manual) || ''; }
   catch (e) {}
   document.getElementById('manual-order-input').value = manualOrder;
 
@@ -322,7 +323,7 @@
   // её номер, то есть порядок задач молча совпадал с порядком номеров в
   // банке, и переставить их было нельзя ничем. Найдено сценарием: кнопка
   // «выше» срабатывала, корзина переписывалась, а список возвращался.
-  var ORDER_KEY = CART_KEY + '_order';
+  var ORDER_KEY = window.QLS_CART.order;
 
   function readOrder() {
     try { return JSON.parse(sessionStorage.getItem(ORDER_KEY) || '[]'); }
@@ -496,7 +497,7 @@
   function applyOrder(order) {
     writeOrder(order);
     manualOrder = '1';
-    try { sessionStorage.setItem('hw_manual_order', '1'); } catch (e) {}
+    try { sessionStorage.setItem(window.QLS_CART.manual, '1'); } catch (e) {}
     document.getElementById('manual-order-input').value = '1';
     load();
   }
@@ -706,8 +707,9 @@
     setTimeout(function () {
       try {
         sessionStorage.removeItem(CART_KEY);
-        sessionStorage.removeItem('hw_settings');
-        sessionStorage.removeItem('hw_manual_order');
+        sessionStorage.removeItem(ORDER_KEY);
+        sessionStorage.removeItem(window.QLS_CART.settings);
+        sessionStorage.removeItem(window.QLS_CART.manual);
       } catch (e) {}
     }, 100);
   });

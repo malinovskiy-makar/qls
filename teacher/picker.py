@@ -27,6 +27,50 @@ from problems.text_clean import preview_title
 # уточнение к той же работе, а не другая работа.
 CART_KEY = 'work_cart'
 
+# ⚠️ КОРЗИНА ПРИВЯЗАНА К ЗАНЯТИЮ. Ключ один на вид работы, но НЕ один на
+# все занятия: собранное для «Экономики 10–11» не имеет права всплыть в
+# индивидуальном занятии Марии — вкладка одна, а работы разные. Занятие
+# неизвестно (общий конструктор домашки без `?group=`) — храним под нулём.
+#
+# ⚠️ ПОЧЕМУ КЛЮЧИ СОБИРАЕТ СЕРВЕР. Прежде их писали руками в четырёх
+# шаблонах, и на экране «Описать словами» переменная `cart_key` в контекст
+# не попадала вовсе: `{{ cart_key }}` рисовалось ПУСТОЙ строкой, а
+# `sessionStorage.setItem('', …)` — законная запись в ключ с пустым именем.
+# Подобранное по описанию уезжало туда, конструктор читал `work_cart` и
+# показывал прошлую корзину. Экран при этом был непустой, и понять, что
+# подбор пропал, было нельзя.
+SETTINGS_KEY = 'hw_settings'
+MANUAL_ORDER_KEY = 'hw_manual_order'
+
+# Хранилища прошлых версий. `hw_cart`/`exam_cart` — две корзины до их
+# слияния; пустое имя — след того самого дефекта. Ни одно из них больше
+# не читается, и держать их в сессии незачем.
+JUNK_KEYS = ('hw_cart', 'exam_cart', '')
+
+
+def storage_keys(group_id=None):
+    """Имена хранилищ этого занятия — ОДНА точка на весь клиент.
+
+    `migrate` — пары «откуда → куда»: общие ключи прошлой версии могли
+    держать корзину прямо сейчас, и она обязана переехать, а не пропасть.
+    `junk` — то, что не читает никто и можно стирать сразу.
+    """
+    suffix = ':%s' % (group_id or 0)
+    keys = {
+        'cart': CART_KEY + suffix,
+        'order': CART_KEY + suffix + '_order',
+        'settings': SETTINGS_KEY + suffix,
+        'manual': MANUAL_ORDER_KEY + suffix,
+    }
+    keys['migrate'] = [
+        [CART_KEY, keys['cart']],
+        [CART_KEY + '_order', keys['order']],
+        [SETTINGS_KEY, keys['settings']],
+        [MANUAL_ORDER_KEY, keys['manual']],
+    ]
+    keys['junk'] = list(JUNK_KEYS)
+    return keys
+
 
 
 def card_meta(topics, problem_type, difficulty):
@@ -148,12 +192,16 @@ def picker_context(request, per_page=20):
             pk=int(add_custom_id), owner=request.user,
             is_deleted=False).first()
 
+    from .access import group_id_param
+
     return {
         'page_obj': page_obj,
         'cards': cards,
-        # Ключ корзины — из одной точки: разъехавшись, экраны собирали бы
-        # две разные работы, каждый свою.
-        'cart_key': CART_KEY,
+        # Имена хранилищ — из ОДНОЙ точки (`storage_keys`). Пока их писал
+        # каждый экран сам, один писал пустую строку, и подобранное уезжало
+        # в ключ с пустым именем. Занятие тут же в ключе: вкладка одна,
+        # занятий много.
+        'storage': storage_keys(group_id_param(request)),
         'total': paginator.count,
         # ⚠️ Был ли ЗАПРОС. Число «найдено» показываем только после него:
         # при пустом поиске это просто размер каталога, и на экране сборки

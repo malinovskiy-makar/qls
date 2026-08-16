@@ -27,6 +27,7 @@ def exam_create(request, pk):
     from .picker import (
         create_items, own_problem_rows, parse_cart, parse_points,
         picker_context,
+        storage_keys as picker_storage,
     )
 
     group = own_group_or_404(request.user, pk)
@@ -96,6 +97,10 @@ def exam_create(request, pk):
         # та потеря, которую чинили в сессии 9.
         'is_exam': True,
         'group_id': group.pk,
+        # Занятие здесь задано АДРЕСОМ, а не `?group=`, поэтому имена
+        # хранилищ пересобираем под него: иначе контрольная собиралась бы
+        # в корзину «занятие не выбрано».
+        'storage': picker_storage(group.pk),
         'picker_reset_url': reverse('teacher:exam_create', args=[group.pk]),
         'min_window': exam_engine.MIN_WINDOW_MINUTES,
         'min_duration': exam_engine.MIN_DURATION_MINUTES,

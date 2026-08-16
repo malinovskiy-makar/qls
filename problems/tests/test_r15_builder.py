@@ -47,15 +47,22 @@ class OneCartTests(TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn(CART_KEY, response.content.decode())
 
-    def test_old_split_keys_are_gone(self):
-        """⚠️ Две корзины — это две работы, а собирают одну."""
+    def test_old_split_keys_are_never_read_or_written(self):
+        """⚠️ Две корзины — это две работы, а собирают одну.
+
+        ПЕРЕСЧИТАН 16.08: старые имена снова появились в разметке, но уже
+        в другом качестве — их СТИРАЮТ (`_cart_keys.html`). Проверка «слова
+        нет на странице» после этого краснела бы на правильном экране,
+        поэтому проверяем смысл: читать и писать в них нельзя.
+        """
         for url in ('/teacher/assignment/create/',
                     '/teacher/groups/%d/exams/new/' % self.group.pk,
                     '/teacher/assignment/build/',
                     '/teacher/assignment/generate/'):
             body = self.client.get(url).content.decode()
-            self.assertNotIn("'hw_cart'", body, url)
-            self.assertNotIn("'exam_cart'", body, url)
+            for dead in ('hw_cart', 'exam_cart'):
+                self.assertNotIn("getItem('%s')" % dead, body, url)
+                self.assertNotIn("setItem('%s'" % dead, body, url)
 
     def test_key_lives_in_python(self):
         self.assertEqual(CART_KEY, 'work_cart')

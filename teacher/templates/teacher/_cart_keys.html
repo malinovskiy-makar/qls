@@ -1,0 +1,55 @@
+{% comment %}
+ОДНО ХРАНИЛИЩЕ СОБИРАЕМОЙ РАБОТЫ. Партиал стоит ПЕРВЫМ среди скриптов на
+каждом экране создания и отдаёт остальным готовые имена — `window.QLS_CART`.
+
+⚠️ ЗАЧЕМ. Хранилищ было четыре сразу: `work_cart` (живой), `hw_cart` и
+`exam_cart` (мёртвые, от версии с двумя корзинами) и ключ с ПУСТЫМ именем —
+туда уезжало подобранное по описанию, потому что на том экране переменная
+`cart_key` в контекст не попадала и `{{ cart_key }}` рисовалось пустотой.
+Путь «Описать словами» заканчивался ничем: конструктор читал `work_cart` и
+показывал ПРОШЛУЮ корзину, экран был непустой, и понять, что подбор пропал,
+было нельзя.
+
+⚠️ КЛЮЧ ВКЛЮЧАЕТ ЗАНЯТИЕ. Вкладка одна, занятий много: собранное для группы
+не имеет права всплыть в индивидуальном.
+
+⚠️ ПЕРЕНОС, А НЕ УДАЛЕНИЕ. Общий `work_cart` прошлой версии мог держать
+корзину прямо сейчас — она переезжает под ключ занятия и только потом
+стирается. Мёртвые ключи удаляются сразу: их не читает никто.
+
+Ждёт в контексте: `storage` — `picker.storage_keys(group_id)`.
+{% endcomment %}
+<script>
+(function () {
+  'use strict';
+  var KEYS = {
+    cart: '{{ storage.cart|escapejs }}',
+    order: '{{ storage.order|escapejs }}',
+    settings: '{{ storage.settings|escapejs }}',
+    manual: '{{ storage.manual|escapejs }}'
+  };
+
+  function move(from, to) {
+    try {
+      var value = sessionStorage.getItem(from);
+      if (value === null) { return; }
+      // Уже собранное под ключом занятия главнее общего остатка: перенос
+      // не имеет права затереть то, что человек набрал только что.
+      if (sessionStorage.getItem(to) === null) {
+        sessionStorage.setItem(to, value);
+      }
+      sessionStorage.removeItem(from);
+    } catch (e) {}
+  }
+
+  {% for pair in storage.migrate %}
+  move('{{ pair.0|escapejs }}', '{{ pair.1|escapejs }}');
+  {% endfor %}
+
+  {% for name in storage.junk %}
+  try { sessionStorage.removeItem('{{ name|escapejs }}'); } catch (e) {}
+  {% endfor %}
+
+  window.QLS_CART = KEYS;
+})();
+</script>

@@ -2,19 +2,18 @@
 Корзина отбора и модалка условия. ОДИН скрипт на конструктор домашки и
 конструктор контрольной.
 
+Ждёт ПОДКЛЮЧЁННЫМ ВЫШЕ `teacher/_cart_keys.html` — он отдаёт имена
+хранилищ (`window.QLS_CART`). Своего имени ключа здесь нет намеренно:
+пока каждый экран писал его сам, один из них писал пустую строку.
+
 Ждёт в контексте:
-  cart_key         — ключ sessionStorage (`picker.CART_KEY`, один на
-                     домашку и контрольную: вид работы — это уточнение
-                     к той же работе, а не другая работа);
-                     у домашки и контрольной он РАЗНЫЙ, иначе недособранная
-                     домашка утекала бы в контрольную;
   picker_form_id   — id формы, куда кладётся строка выбранных задач.
 Ждёт в разметке: #problem-ids-input, #cart-count, #cart-list, #submit-btn.
 {% endcomment %}
 <script>
 (function () {
   'use strict';
-  var STORAGE_KEY = '{{ cart_key|default:"work_cart" }}';
+  var STORAGE_KEY = window.QLS_CART.cart;
   var FORM_ID = '{{ picker_form_id|default:"picker-form" }}';
 
   var cart = {};
