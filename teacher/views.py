@@ -894,7 +894,10 @@ def api_problem_detail(request, key):
         'statement':      problem.statement,
         'parts':          parts,
         'difficulty':     d,
-        'difficulty_str': '★' * d + '☆' * (5 - d),
+        # ⚠️ ПЯТЬ ПУСТЫХ ЗВЁЗД ЧИТАЮТСЯ КАК «СЛОЖНОСТЬ НОЛЬ» (ревью 16.08,
+        # п. 7.2), а означают «в банке она не проставлена». Пустая строка
+        # — сигнал окну показать словами, что сложности нет.
+        'difficulty_str': ('★' * d + '☆' * (5 - d)) if d else '',
         'topics':         topics,
         'problem_type':   problem.problem_type,
         'has_solution':   bool(problem.solution),
@@ -930,7 +933,7 @@ def _own_problem_json(request, pk):
         'parts': parts,
         'options': options,
         'difficulty': level,
-        'difficulty_str': '★' * level + '☆' * (5 - level),
+        'difficulty_str': ('★' * level + '☆' * (5 - level)) if level else '',
         'topics': [problem.topic.name] if problem.topic_id else [],
         'problem_type': problem.get_kind_display(),
         'has_solution': bool(problem.solution),

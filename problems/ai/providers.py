@@ -17,6 +17,7 @@
     AI_FAKE_REPLY = '{"rows": [...]}'   # или функция (profile, text) → str
 """
 import json
+import logging
 import os
 
 
@@ -30,6 +31,23 @@ class Reply(object):
         self.output_tokens = output_tokens
         self.cache_write_tokens = cache_write_tokens
         self.cache_read_tokens = cache_read_tokens
+
+
+logger = logging.getLogger(__name__)
+
+
+def log_cause(error):
+    """Записать в журнал НАСТОЯЩУЮ причину отказа поставщика.
+
+    ⚠️ ЗАЧЕМ (ревью 16.08, п. 7.5). Наружу поставщик отдаёт человеческий
+    текст — репетитору код ошибки не говорит ничего. Но в журнал сервера
+    попадал ТОТ ЖЕ текст, и причину приходилось искать руками: локально
+    подбор падал из-за `urllib3` v2, несовместимой с LibreSSL системного
+    Python 3.9, а в логе стояло «Сервис разбора запроса недоступен».
+    Класс исключения и его сообщение теперь пишутся всегда.
+    """
+    logger.warning('Поставщик модели отказал: %s: %s',
+                   type(error).__name__, error, exc_info=True)
 
 
 class ProviderError(Exception):
@@ -65,6 +83,18 @@ class BaseProvider(object):
     def complete(self, system_blocks, user_text, schema, model, max_tokens):
         raise NotImplementedError
 
+
+    def _fail(self, error, text, kind='other'):
+        """Записать причину в журнал и вернуть человеческий отказ.
+
+        ⚠️ ОДНА ТОЧКА НА ВСЕ ВЕТКИ. Раньше каждая ветка `except` собирала
+        свой `ProviderError`, а настоящее исключение выбрасывалось молча:
+        в журнале оставался тот же текст, что видел репетитор. Локально
+        это стоило часа поисков — падала `urllib3` v2 на LibreSSL, а лог
+        сообщал «Сервис разбора запроса недоступен».
+        """
+        log_cause(error)
+        return ProviderError(text, kind=kind)
 
 class AnthropicProvider(BaseProvider):
     name = 'anthropic'
@@ -119,25 +149,29 @@ class AnthropicProvider(BaseProvider):
                 output_config={'format': {'type': 'json_schema',
                                           'schema': schema}},
             )
-        except anthropic.APIConnectionError:
-            raise ProviderError(
+        except anthropic.APIConnectionError as error:
+            raise self._fail(
+                error,
                 'Не удалось связаться с сервисом разбора запроса. Проверьте '
                 'сеть или соберите домашку вручную.')
-        except anthropic.RateLimitError:
-            raise ProviderError(
+        except anthropic.RateLimitError as error:
+            raise self._fail(
+                error,
                 'Сервис разбора сейчас перегружен. Попробуйте через минуту '
                 'или соберите домашку вручную.')
         except anthropic.APIStatusError as error:
             # 401/403 — ключ не принят: это «не настроен доступ», а не
             # «сервис молчит», и совет репетитору другой.
             kind = 'no_key' if error.status_code in (401, 403) else 'other'
-            raise ProviderError(
+            raise self._fail(
+                error,
                 'Сервис разбора вернул ошибку (%s).' % error.status_code,
                 kind=kind)
-        except Exception:
+        except Exception as error:
             # Библиотека может кинуть что угодно своё. Белого экрана у
             # репетитора быть не должно ни при какой ошибке.
-            raise ProviderError(
+            raise self._fail(
+                error,
                 'Сервис разбора запроса недоступен. Соберите домашку '
                 'вручную.')
 

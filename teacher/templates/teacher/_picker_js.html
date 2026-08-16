@@ -224,6 +224,10 @@
     if (data.difficulty_str) {
       meta += '<span style="font-size:13px;color:var(--amber);">'
         + data.difficulty_str + '</span>';
+    } else {
+      // Сложности в банке нет — говорим это словами. Пять пустых звёзд
+      // читались как «сложность ноль» (ревью 16.08, п. 7.2).
+      meta += '<span class="modal-tag">сложность не указана</span>';
     }
     (data.topics || []).forEach(function (t) {
       meta += '<span class="modal-tag">' + t + '</span>';

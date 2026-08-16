@@ -86,8 +86,11 @@ def card_meta(topics, problem_type, difficulty):
         parts.append(topics[0].name)
     if problem_type:
         parts.append(problem_type)
-    if difficulty:
-        parts.append('сложность %d из 5' % difficulty)
+    # ⚠️ НОЛЬ — ЭТО «НЕ УКАЗАНА», А НЕ «САМАЯ ЛЁГКАЯ» (ревью 16.08, п. 7.2).
+    # Молчать о ней тоже нельзя: строка «тема · тип» без третьего слова
+    # читается как «сложность где-то есть, просто не поместилась».
+    parts.append('сложность %d из 5' % difficulty if difficulty
+                 else 'сложность не указана')
     return ' · '.join(parts)
 
 def word_cut(text, limit):

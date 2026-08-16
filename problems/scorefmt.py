@@ -64,6 +64,31 @@ def ball_dot(value, default=''):
     return ball(value, default).replace(',', '.')
 
 
+def exact(value, default=''):
+    """Число БЕЗ округления, но без хвостовых нулей: «0,001», «1», «2,5».
+
+    ⚠️ ЗАЧЕМ ОТДЕЛЬНО ОТ `ball`. `ball` округляет до сотых — это верно для
+    балла, у которого дальше второго знака чисел не бывает. Но у ДОПУСКА
+    сравнения шесть знаков (`decimal_places=6`), и он лежит в поле формы:
+    показать 0,001 как «0» значит стереть допуск при первом же сохранении.
+    Правило записи то же (запятая, лишние нули прочь), округления нет.
+    """
+    if value is None or value == '':
+        return default
+    if isinstance(value, str):
+        value = value.strip().replace(',', '.')
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return default
+    text = format(number, 'f')
+    if '.' in text:
+        text = text.rstrip('0').rstrip('.')
+    if text in ('-0', ''):
+        text = '0'
+    return text.replace('.', ',')
+
+
 def pair(value, maximum, default='—'):
     """«4,25 из 18». Обе половины — одной записью, чтобы не разъехались."""
     left = ball(value)

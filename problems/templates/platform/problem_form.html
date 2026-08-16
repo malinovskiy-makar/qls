@@ -1,4 +1,5 @@
 {% extends 'platform/base.html' %}
+{% load score %}
 
 {% comment %}
 Экран своей задачи репетитора.
@@ -329,13 +330,20 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
                 </div>
                 <div class="form-field" style="margin:0">
                   <label>Допуск</label>
+                  {% comment %}
+                  ⚠️ ЗАПИСЬ ЧИСЛА — ОБЩАЯ С ОСТАЛЬНОЙ ПЛАТФОРМОЙ (ревью
+                  16.08, п. 7.1). В базе вес и допуск лежат Decimal'ами с
+                  двумя знаками, и поле показывало «1,00» и «2,00» там, где
+                  весь остальной сайт печатает «1» и «2». Незначащие нули
+                  отбрасывает `scorefmt.ball` — та же точка, что у баллов.
+                  {% endcomment %}
                   <input type="text" name="part_tolerance"
-                         value="{{ part.answer_tolerance }}">
+                         value="{{ part.answer_tolerance|exact }}">
                 </div>
                 <div class="form-field" style="margin:0">
                   <label>Вес</label>
                   <input type="text" name="part_points"
-                         value="{% if part.points %}{{ part.points }}{% endif %}">
+                         value="{{ part.points|ball }}">
                 </div>
               </div>
             </div>

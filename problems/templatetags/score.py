@@ -25,3 +25,9 @@ def ball(value):
 @register.filter
 def ball_dot(value):
     return scorefmt.ball_dot(value)
+
+
+@register.filter
+def exact(value):
+    """Число без округления — для допуска сравнения (шесть знаков)."""
+    return scorefmt.exact(value)
