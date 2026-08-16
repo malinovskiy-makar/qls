@@ -401,11 +401,22 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
     </details>
   </div>
   {% else %}
-  <div class="check-state is-ok">
+  {% comment %}
+  ⚠️ ЭТАЛОН СПРАШИВАЕМ У `answer_gist`, А НЕ У ЗАДАЧИ ЦЕЛИКОМ. У задачи с
+  пунктами ответа «целиком» нет по устройству — он живёт на пунктах, — и
+  прежняя подстановка по умолчанию уверяла, что эталон «задан разметкой»,
+  там, где его вовсе не задавали. Пустой эталон означает ручную проверку:
+  машина за него не берётся (`part_grading.grade_part`).
+  {% endcomment %}
+  <div class="check-state {% if row.answer_gist %}is-ok{% else %}is-warn{% endif %}">
     <div class="check-head check-head--static">
-      <span class="check-icon">✓</span>
-      <span class="check-title">Проверяется само</span>
-      <span class="check-gist">эталон: {{ row.item.correct_answer|default:"задан разметкой" }}</span>
+      <span class="check-icon">{% if row.answer_gist %}✓{% else %}!{% endif %}</span>
+      <span class="check-title">
+        {% if row.answer_gist %}Проверяется само{% else %}Проверять придётся вам, вручную{% endif %}
+      </span>
+      <span class="check-gist">
+        {% if row.answer_gist %}эталон: {{ row.answer_gist|truncatechars:60 }}{% else %}эталон не задан{% endif %}
+      </span>
     </div>
   </div>
   {% endif %}

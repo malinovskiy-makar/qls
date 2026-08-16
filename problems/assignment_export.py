@@ -116,7 +116,7 @@ def build_tex(assignment, for_teacher=False, solution_space=True):
         assignment.items
         .select_related('catalog_problem', 'custom_problem', 'graph')
         .prefetch_related('catalog_problem__parts',
-                          'custom_problem__options')
+                          'custom_problem__options', 'custom_problem__parts')
         .order_by('order', 'id')))
     marks = section_marks(items)
 
@@ -241,11 +241,15 @@ def _clean_number(value):
 
 
 def _parts_lines(item, for_teacher):
-    """Пункты «а)», «б)» — отдельными строками, как просили."""
-    if item.is_custom or item.catalog_problem_id is None:
-        return []
-    parts = [p for p in item.catalog_problem.parts.all()
-             if (p.statement or '').strip()]
+    """Пункты «а)», «б)» — отдельными строками, как просили.
+
+    ⚠️ Пункты спрашиваем `display_parts`, а не `catalog_problem.parts`:
+    у своей задачи репетитора они лежат в своей таблице, и лист печатался
+    БЕЗ ВОПРОСОВ — одно условие и пустое место под решение.
+    """
+    from problems.assignment_rows import display_parts
+
+    parts = display_parts(item)
     if not parts:
         return []
     lines = [r'\begin{enumerate}[leftmargin=*]']
@@ -372,7 +376,8 @@ def print_rows(assignment, for_teacher=False, items=None):
                      .select_related('catalog_problem', 'custom_problem',
                                      'graph')
                      .prefetch_related('catalog_problem__parts',
-                                       'custom_problem__options')
+                                       'custom_problem__options',
+                                       'custom_problem__parts')
                      .order_by('order', 'id'))
     items = ordered_items(assignment, items)
     marks = section_marks(items)
@@ -405,7 +410,8 @@ def print_rows(assignment, for_teacher=False, items=None):
         # подпункты играют роль вариантов ответа, и печатать их списком
         # «а) … Ответ: верно» значит выдать ключ прямо в условии.
         from problems.assignment_rows import (
-            ANSWER_TEXT, correct_option_values, item_answer_form,
+            ANSWER_TEXT, correct_option_values, display_parts,
+            item_answer_form,
         )
         from problems.answer_check import normalize_label
 
@@ -424,10 +430,12 @@ def print_rows(assignment, for_teacher=False, items=None):
                               or _letter(position)).rstrip(').'),
                     'text': clean(option['label']),
                     'is_correct': value in correct})
-        elif item.catalog_problem_id:
-            for part in item.catalog_problem.parts.all():
-                if not (part.statement or '').strip():
-                    continue
+        else:
+            # ⚠️ ПУНКТЫ СПРАШИВАЕТ `display_parts`. Прежняя ветка звучала
+            # «elif item.catalog_problem_id», то есть у своей задачи
+            # репетитора пунктов не было НИКОГДА — печатный лист выходил с
+            # условием и пустотой вместо вопросов «а)» и «б)».
+            for part in display_parts(item):
                 if looks_broken(part.statement or ''):
                     continue
                 # ⚠️ БУКВА ПУНКТА БЕРЁТСЯ ИЗ ЗАДАЧИ, а не выдумывается

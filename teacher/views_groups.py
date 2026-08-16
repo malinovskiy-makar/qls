@@ -569,14 +569,14 @@ def group_assignment_detail(request, group_id, assignment_id):
     assignment = group_assignment_or_404(group, assignment_id)
 
     from problems.assignment_rows import (
-        item_section, ordered_items, section_marks,
+        answer_gist, display_parts, item_section, ordered_items, section_marks,
     )
 
     # Порядок и деление на части — та же функция, что у ученика и у листка.
     items = ordered_items(assignment, list(
         assignment.items
         .select_related('catalog_problem', 'custom_problem')
-        .prefetch_related('custom_problem__options',
+        .prefetch_related('custom_problem__options', 'custom_problem__parts',
                           'catalog_problem__parts')
         .order_by('order', 'id')))
     marks = section_marks(items)
@@ -608,8 +608,13 @@ def group_assignment_detail(request, group_id, assignment_id):
             'title': _item_title(item),
             'source_label': _source_label(item),
             'options': options,
-            'parts': list(item.catalog_problem.parts.all())
-            if item.catalog_problem_id else [],
+            # Пункты спрашивает ОДНА функция на весь проект: у своей задачи
+            # они лежат в своей таблице, и экран не имеет права знать, в
+            # какой именно (см. `assignment_rows.display_parts`).
+            'parts': display_parts(item),
+            # Эталон одной строкой. Пусто — значит проверять его нечем, и
+            # плашка обязана сказать это, а не «проверяется само».
+            'answer_gist': answer_gist(item),
             'comments': by_item.get(item.pk, []),
             # Что именно уйдёт в автопроверку — по строке на пункт.
             'answer_rows': _answer_rows(item),

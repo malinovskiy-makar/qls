@@ -83,6 +83,71 @@ def part_link(part):
     return {'part': part, 'custom_part': None}
 
 
+def display_parts(item):
+    """Пункты, которые ПОКАЗЫВАЮТ в составе работы. Пустой список — их нет.
+
+    ⚠️ ЗАЧЕМ ОТДЕЛЬНАЯ ФУНКЦИЯ И ПОЧЕМУ ОНА ПОЯВИЛАСЬ ПОЗДНО. Пункты своей
+    задачи живут в СВОЕЙ таблице (`CustomProblemPart`), потому что
+    `ProblemPart` ссылается на каталог. Когда её заводили, про неё узнала
+    только сторона ВВОДА (`answer_parts` ниже), а сторона ПОКАЗА осталась
+    как была: четыре экрана независимо писали
+    `item.catalog_problem.parts.all()`, то есть спрашивали пункты у той
+    половины позиции, которой у своей задачи нет вовсе. Ученик получал
+    задачу без вопросов — на экране, в печати и в `.tex` одновременно.
+    Отсюда правило: пункты спрашивает ОДНА функция, а не каждый экран сам.
+
+    Отличие от `answer_parts`: та отвечает «на что ученик пишет ответ» и
+    задачу без пунктов считает одним безымянным пунктом (`[None]`); эта
+    отвечает «что нарисовать под условием» и пустоту возвращает пустотой.
+
+    Пункты теста сюда НЕ попадают: там подпункты играют роль вариантов
+    ответа, и списком под условием они нарисовались бы во второй раз.
+    """
+    kind, _ = item_answer_form(item)
+    if kind != ANSWER_TEXT:
+        return []
+    if item.is_custom:
+        if item.custom_problem is None:
+            return []
+        parts = item.custom_problem.parts.all()
+    elif item.catalog_problem_id:
+        parts = item.catalog_problem.parts.all()
+    else:
+        return []
+    # Пункт без собственного условия — не вопрос, а мусор импорта («Ответ:»
+    # без содержания, ~150 таких задач в банке). То же правило, что у
+    # `answer_parts`: спрашивать по нему нечего, и рисовать нечего.
+    return [p for p in parts if (p.statement or '').strip()]
+
+
+def answer_gist(item):
+    """Эталон одной строкой — для плашки «проверяется само» на задании.
+
+    ⚠️ У ЗАДАЧИ С ПУНКТАМИ ЭТАЛОН ТОЖЕ ПО ПУНКТАМ. Плашка спрашивала
+    `item.correct_answer` — ответ задачи ЦЕЛИКОМ, которого у задачи с
+    пунктами нет по устройству (он живёт на пунктах). Пустая строка
+    подставляла слова «задан разметкой», и экран уверял, что эталон есть,
+    у задачи, где его вовсе не задавали.
+
+    Пустая строка на выходе означает «эталона нет» — тогда машина проверять
+    не станет (`part_grading.grade_part` возвращает «решает человек»), и
+    плашка обязана говорить именно это.
+    """
+    pairs = []
+    for part in display_parts(item):
+        answer = (part.answer or '').strip()
+        if answer:
+            pairs.append('%s) %s' % ((part.label or '').rstrip(').'), answer))
+    if pairs:
+        return ' · '.join(pairs)
+    answer = (item.correct_answer or '').strip()
+    if answer:
+        return answer
+    # У теста верный вариант помечен в разметке, отдельной строкой его не
+    # показать — но он ЕСТЬ, и это не то же самое, что пустой эталон.
+    return 'задан разметкой' if item.is_test else ''
+
+
 def answer_parts(item):
     """Пункты, на которые ученик отвечает ОТДЕЛЬНО. Всегда непустой список.
 
@@ -664,7 +729,7 @@ def build_rows(assignment, student, user=None, with_comments=True):
         assignment.items
         .select_related('catalog_problem', 'custom_problem', 'graph')
         .prefetch_related('catalog_problem__parts', 'catalog_problem__hints',
-                          'custom_problem__options')
+                          'custom_problem__options', 'custom_problem__parts')
         .order_by('order', 'id')))
     marks = section_marks(items)
 
@@ -720,10 +785,9 @@ def build_rows(assignment, student, user=None, with_comments=True):
             'title': item.problem_title,
             'statement': item.statement,
             # Подпункты показываем только когда они НЕ варианты ответа:
-            # иначе один и тот же список нарисовался бы дважды.
-            'parts': (list(item.catalog_problem.parts.all())
-                      if item.catalog_problem_id and kind == ANSWER_TEXT
-                      else []),
+            # иначе один и тот же список нарисовался бы дважды. Спрашивает
+            # их ОДНА функция — она знает и про свои задачи репетитора.
+            'parts': display_parts(item),
             'hints': (list(item.catalog_problem.hints.all())
                       if item.catalog_problem_id else []),
             'answer_kind': kind,
