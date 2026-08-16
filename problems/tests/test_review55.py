@@ -377,37 +377,53 @@ class OneCreateButtonTests(TestCase):
         self.assertNotIn('Создать контрольную', body)
 
     def test_the_button_carries_the_group(self):
-        self.assertIn('/teacher/assignment/generate/?group=%d' % self.group.pk,
+        """⚠️ ПЕРЕСЧИТАНО 17.08: вход в поток переехал на `work_start`.
+
+        Проверка та же по смыслу — единственная кнопка входа несёт номер
+        занятия, — но адрес теперь другой: сборка работы идёт по новому
+        потоку, а вход чистит корзину этого занятия.
+        """
+        self.assertIn('/teacher/work/start/?group=%d' % self.group.pk,
                       self._tab())
 
     def test_the_kind_switch_keeps_the_group(self):
         """⚠️ Пока входов было два, группа приходила в адресе каждого.
 
         Со ОДНИМ входом потеря `group` на переключателе означала бы, что
-        контрольная тихо собирается в конструкторе домашки — без окна и
-        лимита времени.
+        контрольная тихо собирается без окна и лимита времени.
+
+        ⚠️ ПЕРЕСЧИТАНО 17.08: порядок параметров задаёт сборщик адреса
+        (`views_work.flow_query`), и проверять его строкой значит ломаться
+        от перестановки, которая ничего не меняет. Проверяем наличие обоих.
         """
         from django.urls import reverse
 
         body = self.client.get(
             reverse('teacher:assignment_generate')
             + '?group=%d' % self.group.pk).content.decode()
-        self.assertIn('?kind=exam&amp;group=%d' % self.group.pk, body)
-        self.assertIn('?kind=homework&amp;group=%d' % self.group.pk, body)
+        switch = body.split('bh-kind"', 1)[1].split('</div>', 1)[0]
+        self.assertIn('kind=exam', switch)
+        self.assertIn('group=%d' % self.group.pk, switch)
+        # Домашка — это отсутствие `kind=exam`, а не отдельное слово.
+        self.assertEqual(switch.count('kind=exam'), 1)
 
     def test_exam_path_reaches_its_own_constructor(self):
-        """«Искать самому» у контрольной ведёт в конструктор ВНУТРИ группы.
+        """Контрольная доходит до своего обработчика ВНУТРИ группы.
 
-        Без номера группы адрес не собирается, и раньше плитка молча
-        уводила в конструктор домашки: настройки времени спросить было негде.
+        Без номера группы такого адреса нет вовсе, и раньше путь молча
+        уводил в обработчик домашки: настройки времени спросить было негде.
+
+        ⚠️ ПЕРЕСЧИТАНО 17.08: адрес собирает шаг «Выдача» — там выбирают
+        занятие, и там же стоят поля окна и лимита. На шаге подбора его
+        больше нет и быть не должно.
         """
         from django.urls import reverse
 
         body = self.client.get(
-            reverse('teacher:assignment_generate')
+            reverse('teacher:work_give')
             + '?kind=exam&group=%d' % self.group.pk).content.decode()
-        self.assertIn(reverse('teacher:exam_create', args=[self.group.pk]),
-                      body)
+        self.assertIn('/teacher/groups/0/exams/new/', body)
+        self.assertIn('name="starts_at"', body)
 
 
 # ===========================================================================
