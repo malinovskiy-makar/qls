@@ -184,7 +184,7 @@
 </div>
 </div>
 
-{% include "teacher/work/_bar.html" with next_url=steps.compose next_label="Дальше — состав →" %}
+{% include "teacher/work/_bar.html" with next_url=steps.compose next_label="Дальше — состав →" quick_url=steps.give %}
 </div>
 {% endblock %}
 
@@ -217,6 +217,15 @@
     var start = last && document.querySelector('[data-pane="' + last + '"]');
     if (start) { start.click(); }
   } catch (e) {}
+
+  {% if add_custom %}
+  // ⚠️ ВОЗВРАТ ИЗ РЕДАКТОРА СВОЕЙ ЗАДАЧИ. Написанная задача обязана
+  // оказаться СРАЗУ в двух местах: в собираемой работе и во вкладке своих
+  // задач. Раньше она попадала только во второе, и кнопка «Написать свою»
+  // обещала пополнить работу, не пополняя её.
+  window.QLS_WORK.add('c{{ add_custom.pk }}');
+  document.querySelector('.wk-tab[data-pane="pane-own"]').click();
+  {% endif %}
 
   // Сортировка — это тот же отбор, поэтому просто отправляем форму фильтров.
   var sort = document.getElementById('wk-sort');

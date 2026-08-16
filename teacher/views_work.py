@@ -154,8 +154,13 @@ def work_pick(request):
         # положить готовую задачу в корзину (`to_cart=1`). Без этого задача
         # создавалась, оставалась в «Моих задачах» и в собираемую работу не
         # попадала — кнопка обещала пополнить работу и не пополняла.
+        # ⚠️ `return_to` ОБЯЗАТЕЛЕН. Без него редактор задачи возвращает на
+        # свой умолчательный адрес — прежний конструктор домашки, — и
+        # написанная задача уезжает мимо собираемой работы.
         'own_new_url': (reverse('teacher:problem_new')
-                        + flow_query(state, to_cart='1')),
+                        + flow_query(state, to_cart='1',
+                                     return_to=(reverse('teacher:work_pick')
+                                                + flow_query(state)))),
         'groups': _tutor_groups(request.user),
     })
     return render(request, 'teacher/work/pick.html', context)

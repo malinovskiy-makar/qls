@@ -7,8 +7,12 @@
 раз на клиенте значило бы завести второй источник тех же чисел, а склонения
 «задача / задачи / задач» существовали бы в двух местах сразу.
 
-Ждёт: next_url, next_label. Необязательно: back_url, back_label,
-extra (готовая разметка дополнительных кнопок).
+Ждёт: next_url, next_label. Необязательно: back_url, back_label, quick_url.
+
+⚠️ «ВЫДАТЬ СРАЗУ» ПЕРЕПРЫГИВАЕТ СОСТАВ (фаза 12.5). Домашку из двух задач
+не за чем вести через четыре экрана: состав у неё виден и так, а порядок и
+баллы можно не трогать. Кнопка появляется только когда есть что выдавать —
+пустая работа «сразу» не выдаётся никуда.
 {% endcomment %}
 <div class="wk-bar" id="wk-bar">
   <span class="wk-bar__sum" id="wk-tally">В работе пока ничего нет</span>
@@ -19,7 +23,10 @@ extra (готовая разметка дополнительных кнопок
     {% endif %}
     <button type="button" class="k-btn k-btn--quiet k-btn--sm" id="wk-clear">
       Очистить</button>
-    {{ extra }}
+    {% if quick_url %}
+    <a class="k-btn k-btn--plain k-btn--sm" id="wk-quick" href="{{ quick_url }}"
+       hidden>Выдать сразу</a>
+    {% endif %}
     <a class="k-btn k-btn--main" id="wk-next" href="{{ next_url }}">{{ next_label }}</a>
   </span>
 </div>

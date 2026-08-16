@@ -212,6 +212,77 @@ async function go(page, path) {
      /ничего нет/.test(await page.locator('#wk-tally').textContent()),
      await page.locator('#wk-tally').textContent());
 
+  // ── Быстрый путь «Выдать сразу» (12.5) ───────────────────────────────
+  await go(page, `/teacher/work/?group=${GROUP}`);
+  ok('пустая корзина не предлагает выдать сразу',
+     await page.locator('#wk-quick').isHidden());
+  await page.locator('#pane-catalog .wk-add').first().click();
+  await page.waitForTimeout(700);
+  ok('«Выдать сразу» появилась', await page.locator('#wk-quick').isVisible());
+  await page.locator('#wk-quick').click();
+  await page.waitForLoadState('networkidle');
+  ok('быстрый путь ведёт в выдачу', page.url().includes('/teacher/work/give/'),
+     page.url());
+  ok('занятие не потерялось', page.url().includes(`group=${GROUP}`));
+
+  // ── Своя задача внутри потока (13.3) ─────────────────────────────────
+  await go(page, `/teacher/work/?group=${GROUP}`);
+  await page.locator('.wk-tab', { hasText: 'Написать свою' }).click();
+  await page.waitForLoadState('networkidle');
+  ok('редактор открылся с занятием', page.url().includes(`group=${GROUP}`),
+     page.url());
+  const mono = await page.evaluate(() => {
+    const a = document.createElement('div');
+    a.innerHTML = '<div class="part-row"><textarea></textarea></div>';
+    document.body.appendChild(a);
+    const font = getComputedStyle(a.querySelector('textarea')).fontFamily;
+    a.remove();
+    return font;
+  });
+  ok('поле пункта не моноширинное', !/mono/i.test(mono), mono);
+
+  await page.fill('[name=title]', 'Задача из потока');
+  await page.fill('[name=statement]', 'Условие своей задачи.');
+  await page.click('#add-part-btn');
+  await page.waitForTimeout(400);
+  const chip = await page.locator('.part-chip input').first().inputValue();
+  ok('буква пункта проставлена сама', chip === 'а', chip);
+  ok('подпись «пункт N» на месте',
+     /пункт 1/.test(await page.locator('.part-of').first().textContent()));
+  await page.fill('[name=part_statement]', 'Найдите TC.');
+  await page.fill('[name=part_answer]', '5000');
+  await page.waitForTimeout(900);
+  ok('превью показывает пункт живьём',
+     /Найдите TC/.test(await page.locator('#preview-parts').textContent()));
+
+  await page.click('button[type=submit]');
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(900);
+  ok('вернулись в поток', page.url().includes('/teacher/work/'), page.url());
+  ok('занятие не потерялось после сохранения',
+     page.url().includes(`group=${GROUP}`), page.url());
+  const ownTally = await page.locator('#wk-tally').textContent();
+  ok('своя задача легла в работу', /задач/.test(ownTally), ownTally);
+  ok('открыта вкладка своих задач',
+     await page.locator('#pane-own').isVisible());
+  const ownCard = await page.locator('#pane-own .wk-card__title').first().textContent();
+  ok('своя задача видна во вкладке', /Задача из потока/.test(ownCard), ownCard);
+  ok('своя задача отмечена как выбранная',
+     await page.locator('#pane-own .wk-card.is-added').count() >= 1);
+
+  // ── Окно контрольной переживает переключение вида (12.2) ─────────────
+  await go(page, `/teacher/work/give/?group=${GROUP}&kind=exam`);
+  await page.locator('.k-date__text').first().fill('20.09.2026, 09:00');
+  await page.locator('.k-date__text').first().blur();
+  await page.waitForTimeout(500);
+  await page.locator('.bh-kind__opt', { hasText: 'Домашка' }).click();
+  await page.waitForLoadState('networkidle');
+  await page.locator('.bh-kind__opt', { hasText: 'Контрольная' }).click();
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(700);
+  const back = await page.locator('.k-date__text').first().inputValue();
+  ok('окно контрольной вернулось', /20\.09\.2026/.test(back), back);
+
   // ── Тёмная тема и узкий экран ────────────────────────────────────────
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.setViewportSize({ width: 380, height: 900 });

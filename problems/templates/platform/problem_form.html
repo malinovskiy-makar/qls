@@ -126,21 +126,44 @@
             font: inherit; font-size: 12px; padding: 4px 7px; }
 .opt-move:hover { background: var(--panel); }
 
-/* Пункт задачи: своя карточка со своим ответом, допуском и весом. */
+/* ── Пункт задачи ──────────────────────────────────────────────────────
+   Владелец дважды назвал эти поля ужасными. Причина оказалась не во вкусе:
+   поле вопроса стояло ВНЕ `.form-field`, то есть не получало ни одного
+   правила формы — браузер рисовал его своим моноширинным шрифтом, узким и
+   не на всю ширину, рядом с обычными полями платформы. */
 .part-row { border: 0.5px solid var(--border); border-radius: 10px;
-            padding: 12px 14px; margin-bottom: 10px;
+            padding: 14px 16px 16px; margin-bottom: 12px;
             background: var(--surface-2); }
-.part-head { display: flex; align-items: center; gap: 8px;
-             margin-bottom: 8px; }
-.part-letter { font-weight: 700; font-size: 14px; min-width: 18px; }
-.part-label-input { width: 54px; }
+.part-head { display: flex; align-items: center; gap: 10px;
+             margin-bottom: 10px; }
+/* Метка — ОДИН редактируемый чип, а не подпись плюс микрополе рядом.
+   Их было двое, и они показывали одно и то же: номер по порядку и букву,
+   которую можно поменять. Читалось это как поломка. */
+.part-chip { display: inline-flex; align-items: baseline;
+             border: 0.5px solid var(--border); border-radius: 999px;
+             background: var(--surface); padding: 4px 12px 4px 14px;
+             font-weight: 700; font-size: 14px; }
+.part-chip input { width: 2.2em; border: 0; padding: 0; background: none;
+                   color: var(--accent); font: inherit; text-align: center; }
+.part-chip input:focus { outline: none; }
+.part-chip__tail { color: var(--accent); }
+.part-of { font-size: 12px; color: var(--text3); }
 .part-drop { margin-left: auto; background: none; border: 0;
              color: var(--text3); cursor: pointer; font-size: 17px;
              line-height: 1; padding: 2px 6px; }
 .part-drop:hover { color: var(--error); }
-.part-row textarea { min-height: 64px; }
-.part-grid { display: grid; grid-template-columns: 1fr 90px 90px; gap: 10px;
-             margin-top: 8px; }
+/* Поле вопроса — ровно те же правила, что у остальных полей платформы. */
+.part-row textarea { width: 100%; font: inherit; font-size: 14px;
+                     padding: 9px 12px; border-radius: var(--r);
+                     border: 0.5px solid var(--border);
+                     background: var(--surface); color: var(--text);
+                     min-height: 74px; resize: vertical; line-height: 1.6; }
+/* Трём полям нужен воздух: они разного смысла, а стояли впритык. */
+.part-grid { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr);
+             gap: 14px; margin-top: 12px; }
+.part-grid input { background: var(--surface); }
+.part-grid label { white-space: nowrap; }
+.part-grid .k-hint { margin-top: 4px; font-size: 11px; }
 
 .graph-plate {
   display: inline-block; border: 1px dashed var(--border);
@@ -314,9 +337,15 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
             {% for part in parts %}
             <div class="part-row">
               <div class="part-head">
-                <span class="part-letter"></span>
-                <input class="part-label-input" type="text" name="part_label"
-                       value="{{ part.label }}" aria-label="метка пункта">
+                {% comment %}
+                Буква проставляется сама и остаётся правимой: авторы пишут
+                и «а», и «1», и «I». Подпись «пункт N» рядом отвечает на
+                другой вопрос — какой он по счёту.
+                {% endcomment %}
+                <span class="part-chip"><input type="text" name="part_label"
+                       value="{{ part.label }}" aria-label="метка пункта"
+                       maxlength="4"><span class="part-chip__tail">)</span></span>
+                <span class="part-of"></span>
                 <button type="button" class="part-drop" title="Убрать пункт">×</button>
               </div>
               <div class="zoom-box" data-zoom="Вопрос пункта">
@@ -329,7 +358,7 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
                   <input type="text" name="part_answer" value="{{ part.answer }}">
                 </div>
                 <div class="form-field" style="margin:0">
-                  <label>Допуск</label>
+                  <label>Допуск сравнения</label>
                   {% comment %}
                   ⚠️ ЗАПИСЬ ЧИСЛА — ОБЩАЯ С ОСТАЛЬНОЙ ПЛАТФОРМОЙ (ревью
                   16.08, п. 7.1). В базе вес и допуск лежат Decimal'ами с
@@ -341,7 +370,7 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
                          value="{{ part.answer_tolerance|exact }}">
                 </div>
                 <div class="form-field" style="margin:0">
-                  <label>Вес</label>
+                  <label>Вес пункта</label>
                   <input type="text" name="part_points"
                          value="{{ part.points|ball }}">
                 </div>
@@ -460,6 +489,11 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
     {# --- Живой предпросмотр --- #}
     <div class="k-card preview">
       <div class="preview-label">Так увидит ученик</div>
+      {% comment %}
+      ⚠️ ПУСТОЕ ПРЕВЬЮ ОБЪЯСНЯЕТ СЕБЯ. Владелец: колонка «занимает правую
+      треть и пустует». Пустая она ровно до первой строки условия — но
+      понять это, глядя на пустое место, нельзя.
+      {% endcomment %}
       <div class="preview-body" id="preview-body"></div>
       <div class="pv-parts" id="preview-parts"></div>
       <div id="preview-options"></div>
@@ -554,12 +588,14 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
   function syncParts() {
     var rows = partsList.children;
     Array.prototype.forEach.call(rows, function (row, index) {
-      var letter = row.querySelector('.part-letter');
-      var input = row.querySelector('.part-label-input');
+      var input = row.querySelector('.part-chip input');
       if (!input.value.trim()) {
         input.value = index < LETTERS.length ? LETTERS[index] : String(index + 1);
       }
-      letter.textContent = (index + 1) + '.';
+      var of = row.querySelector('.part-of');
+      if (of) { of.textContent = 'пункт ' + (index + 1); }
+      var zoom = row.querySelector('.zoom-box');
+      if (zoom) { zoom.dataset.zoom = 'Пункт ' + input.value.trim(); }
     });
     var has = rows.length > 0;
     wholeAnswer.hidden = has;
@@ -579,8 +615,9 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
     row.className = 'part-row';
     row.innerHTML =
       '<div class="part-head">' +
-      '<span class="part-letter"></span>' +
-      '<input class="part-label-input" type="text" name="part_label" aria-label="метка пункта">' +
+      '<span class="part-chip"><input type="text" name="part_label" maxlength="4"' +
+      ' aria-label="метка пункта"><span class="part-chip__tail">)</span></span>' +
+      '<span class="part-of"></span>' +
       '<button type="button" class="part-drop" title="Убрать пункт">×</button>' +
       '</div>' +
       '<div class="zoom-box" data-zoom="Вопрос пункта">' +
@@ -589,9 +626,9 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
       '<div class="part-grid">' +
       '<div class="form-field" style="margin:0"><label>Правильный ответ</label>' +
       '<input type="text" name="part_answer"></div>' +
-      '<div class="form-field" style="margin:0"><label>Допуск</label>' +
+      '<div class="form-field" style="margin:0"><label>Допуск сравнения</label>' +
       '<input type="text" name="part_tolerance" value="0"></div>' +
-      '<div class="form-field" style="margin:0"><label>Вес</label>' +
+      '<div class="form-field" style="margin:0"><label>Вес пункта</label>' +
       '<input type="text" name="part_points"></div>' +
       '</div>';
     partsList.appendChild(row);
@@ -679,7 +716,9 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
 
   function renderPreview() {
     previewBody.innerHTML = asHtml(statement.value)
-      || '<span class="row-meta">Пока пусто.</span>';
+      || '<span class="row-meta">Здесь появится задача — так, как её увидит '
+       + 'ученик. Пишите условие слева: формулы, пункты и варианты ответа '
+       + 'появляются тут сразу.</span>';
 
     // Пункты — ровно так, как их увидит ученик: буквой и отдельным вопросом.
     previewParts.innerHTML = '';
@@ -687,7 +726,7 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
       Array.prototype.forEach.call(partsList.children, function (row, index) {
         var text = row.querySelector('[name=part_statement]').value.trim();
         if (!text) { return; }
-        var label = row.querySelector('.part-label-input').value.trim()
+        var label = row.querySelector('.part-chip input').value.trim()
           || (index < LETTERS.length ? LETTERS[index] : String(index + 1));
         var block = document.createElement('div');
         block.className = 'pv-part';

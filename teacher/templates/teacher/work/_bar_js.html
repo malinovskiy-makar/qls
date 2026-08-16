@@ -141,6 +141,9 @@
       if (gaps.length) { next.setAttribute('tabindex', '-1'); }
       else { next.removeAttribute('tabindex'); }
     }
+    // Быстрый путь предлагается, только когда есть что выдавать.
+    var quick = document.getElementById('wk-quick');
+    if (quick) { quick.hidden = list.length === 0; }
     if (why) {
       why.hidden = gaps.length === 0;
       why.textContent = gaps.join(', ').replace(/^./, function (c) {
