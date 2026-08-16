@@ -21,8 +21,15 @@
     {% if back_url %}
     <a class="k-btn k-btn--plain k-btn--sm" href="{{ back_url }}">{{ back_label }}</a>
     {% endif %}
+    {% comment %}
+    ⚠️ НА ШАГЕ ВЫДАЧИ ЭТОЙ КНОПКИ НЕТ. Там она стёрла бы ровно то, что
+    человек собирается выдать, — и стояла бы в сантиметре от главного
+    действия экрана. Отказаться от сборки можно шагом раньше.
+    {% endcomment %}
+    {% if not no_clear %}
     <button type="button" class="k-btn k-btn--quiet k-btn--sm" id="wk-clear">
       Очистить</button>
+    {% endif %}
     {% if quick_url %}
     <a class="k-btn k-btn--plain k-btn--sm" id="wk-quick" href="{{ quick_url }}"
        hidden>Выдать сразу</a>
