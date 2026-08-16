@@ -1,4 +1,5 @@
 {% extends "teacher/base.html" %}
+{% load ru %}
 
 {% block title %}Подобрать домашку по описанию{% endblock %}
 
@@ -161,6 +162,21 @@ textarea.gen-text:focus { border-color: var(--focus); }
   line-height: 1.55; margin-top: 6px; padding-left: 10px;
   border-left: 2px solid var(--border); overflow-wrap: anywhere; }
 .cand.is-shown .cand-body { display: block; }
+/* ── Сводка «просили — набрали» (ревью 16.08, п. 9.1) ──────────────────
+   Зелёный и янтарный здесь в своём законном смысле: «набрали сколько
+   просили» и «есть расхождение». Строка стоит первой на шаге. */
+.gen-tally { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+             margin-bottom: 14px; font-size: 13px; }
+.tally { display: inline-flex; align-items: baseline; gap: 4px;
+         padding: 5px 10px; border-radius: 999px; border: 1px solid; }
+.tally--ok { color: var(--green); border-color: var(--green-border);
+             background: var(--green-tint); }
+.tally--off, .tally--short { color: var(--amber-ink);
+                             border-color: var(--amber-border);
+                             background: var(--amber-tint); }
+/* Раскрыли условие целиком — две строки превью убираем: одно и то же
+   начало не должно стоять дважды подряд. */
+.cand.is-shown .cand-lead { display: none; }
 .cand-taken { display: none; font-size: 12px; color: var(--text3);
   font-style: italic; margin-top: 2px; }
 .cand.is-taken .cand-taken { display: block; }
@@ -438,6 +454,33 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     </div>
 
     {% comment %}
+    ⚠️ «ПРОСИЛИ — НАБРАЛИ» ПЕРВОЙ СТРОКОЙ (ревью 16.08, п. 9.1). Раньше
+    противоречие «в запросе были тесты, а в настройках стоит „тестов 0"»
+    упоминалось внутри абзаца с объяснением модели — и пропускалось.
+    Теперь оно стоит наверху, называет оба числа и даёт кнопку, которая
+    доищет недостающее БЕЗ обращения к модели.
+    {% endcomment %}
+    {% if plan_summary %}
+    <div class="gen-tally">
+      {% for line in plan_summary %}
+      <span class="tally tally--{{ line.state }}">
+        <b>{{ line.word }}: {{ line.got }}{% if line.show_need %} из {{ line.need }}{% endif %}</b>{% if line.why %} — {{ line.why }}{% endif %}
+      </span>
+      {% if line.missing %}
+      <button type="submit" class="k-btn k-btn--plain k-btn--sm"
+              name="step_action" value="fill"
+              formnovalidate
+              onclick="document.getElementById('fill-kind').value='{{ line.kind }}';document.getElementById('fill-count').value='{{ line.missing }}';">
+        {{ line.fill_label }}
+      </button>
+      {% endif %}
+      {% endfor %}
+      <input type="hidden" name="fill_kind" id="fill-kind" value="">
+      <input type="hidden" name="fill_count" id="fill-count" value="">
+    </div>
+    {% endif %}
+
+    {% comment %}
     ⚠️ КАРТОЧКА ЗАПРОСА РАСКРЫВАЕТСЯ НА МЕСТЕ (сессия 8, фаза 2 / п. 12.1).
     Раньше под строкой висели три названия без выбора и серая строка
     «Ваша строка: «…»», дословно повторявшая поле ввода выше. Владелец:
@@ -495,8 +538,16 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
           {% for card in preview.cards %}
           {% include "teacher/_cand_row.html" with card=card %}
           {% empty %}
-          <li class="pf-none">По этой строке в банке ничего не нашлось —
-            поправьте формулировку.</li>
+          {% comment %}
+          ⚠️ ТЕКСТ НАЗЫВАЕТ ОБА ВЫХОДА (ревью 16.08, п. 9.3). «Поправьте
+          формулировку» не говорит ни того, что переиск бесплатный, ни
+          того, что задачу можно добрать руками на следующем шаге.
+          {% endcomment %}
+          <li class="pf-none">По этой строке в банке ничего не нашлось.
+            Поправьте формулировку своими словами и нажмите
+            «Переискать» — это бесплатно, к модели обращаться не нужно.
+            Или уберите строку и доберите задачу из каталога на следующем
+            шаге.</li>
           {% endfor %}
         </ul>
 
@@ -538,13 +589,17 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
       </button>
       <a href="{% url 'teacher:assignment_generate' %}" class="reset-link">✕ Начать заново</a>
     </div>
-    {% if usage %}
+    {% comment %}
+    ⚠️ СТОИМОСТЬ И НАЗВАНИЕ МОДЕЛИ УШЛИ В ЖУРНАЛ (ревью 16.08, п. 9.4).
+    «$0,003771 (claude-haiku-4-5)» репетитору не говорит ничего: платит
+    не он, а модель ему выбирать не приходится. Полезное число одно —
+    сколько разборов осталось на сегодня, и оно же стоит у кнопки на
+    первом шаге. Расход по-прежнему пишется построчно в `AiUsageLog`.
+    {% endcomment %}
     <div class="gen-cost">
-      {% if cached %}ответ взят из кэша, обращения не было{% else %}
-      разбор запроса: {{ usage.input_tokens }} + {{ usage.output_tokens }} токенов{% if usage.cache_read_tokens %}, из кэша {{ usage.cache_read_tokens }}{% endif %},
-      ${{ usage.cost_usd|floatformat:6 }} ({{ usage.model }}){% endif %}
+      {% if cached %}Ответ взят из кэша — обращения не было.
+      {% endif %}осталось {{ left_today|count_ru:"разбор,разбора,разборов" }} сегодня
     </div>
-    {% endif %}
   </div>
 </form>
 {% endif %}
@@ -788,8 +843,11 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
       head.setAttribute('aria-expanded', open ? 'true' : 'false');
       return;
     }
-    // Название кандидата — раскрыть начало условия прямо здесь.
-    var name = event.target.closest('.cand-name');
+    // Название кандидата или кнопка «Целиком» — раскрыть условие здесь.
+    // ⚠️ ДВЕ ТОЧКИ ВХОДА, ОДНО ДЕЙСТВИЕ (ревью 16.08, п. 9.2): у строки
+    // теперь есть видимые две строки условия, и кнопка называет, что
+    // будет дальше. Название кликабельно по-прежнему — привычка.
+    var name = event.target.closest('.cand-name, .cand-full');
     if (name) {
       var cand = name.closest('.cand');
       cand.classList.toggle('is-shown');
@@ -880,6 +938,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     // ⚠️ Догруженная карточка заполняется ТЕМИ ЖЕ полями, что серверная:
     // условие целиком, пункты, ответ, пометка про решение. Иначе задачи
     // из «Показать ещё 5» раскрывались бы беднее соседних.
+    node.querySelector('.cand-lead').textContent = card.preview || '';
     node.querySelector('.cand-st').textContent = card.body;
     var parts = node.querySelector('.cand-parts');
     parts.innerHTML = '';

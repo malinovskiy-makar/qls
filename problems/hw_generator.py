@@ -681,6 +681,102 @@ def row_candidates(row, has_answer=False, sources=None, offset=0, size=None):
     return cards, len(items) > offset + size
 
 
+KIND_WORDS = {'open': 'задачи', 'test': 'тесты'}
+# Формы для счёта: «доискать 2 теста», а не «2 тесты».
+KIND_FORMS = {'open': ('задачу', 'задачи', 'задач'),
+              'test': ('тест', 'теста', 'тестов')}
+
+# Сколько тестов доискать, если в запросе они названы без числа.
+DEFAULT_FILL = 2
+
+
+def tests_in_text(text):
+    """Просили ли тесты СЛОВАМИ и сколько. `None` — не просили вовсе.
+
+    ⚠️ ЗАЧЕМ ЧИТАТЬ ФРАЗУ (ревью 16.08, п. 9.1). Модель про типы задач не
+    спрашивают вовсе: план делится на «задачи» и «тесты» уже у нас, по
+    полям настроек. Значит расхождение «в запросе тесты были, а в
+    настройках стоит „тестов 0"» видно ТОЛЬКО во фразе — больше нигде.
+
+    Число берём то, что стоит перед словом; нет числа — возвращаем 0, и
+    экран честно не печатает выдуманное «из N».
+    """
+    import re
+
+    lowered = (text or '').lower()
+    if 'тест' not in lowered:
+        return None
+    found = re.search(r'(\d+)\s*(?:[а-яё]+\s+){0,2}тест', lowered)
+    return int(found.group(1)) if found else 0
+
+
+def kind_totals(rows):
+    """Сколько открытых задач и сколько тестов просит план."""
+    totals = {'open': 0, 'test': 0}
+    for row in rows:
+        key = 'test' if row.get('kind') == 'test' else 'open'
+        totals[key] += int(row.get('count') or 0)
+    return totals
+
+
+def plan_summary(previews, wanted, asked, mentioned=None):
+    """«Просили — набрали» по видам работы. Список строк для экрана.
+
+    ⚠️ ЗАЧЕМ (ревью 16.08, п. 9.1). Противоречие «в запросе просили тесты,
+    а в настройках стоит „тестов 0"» упоминалось только внутри абзаца с
+    объяснением модели — и пропускалось. Оно обязано стоять первым и
+    называть оба числа: сколько просили и сколько набрали.
+
+    `wanted` — что стоит в НАСТРОЙКАХ (поля «сколько задач» и «сколько
+    тестов»), `asked` — что просил план модели ДО деления квоты по типу.
+    Расхождение между ними и есть тот самый случай.
+    """
+    got = {'open': 0, 'test': 0}
+    for preview in previews:
+        key = 'test' if preview['row'].get('kind') == 'test' else 'open'
+        got[key] += int(preview.get('picked') or 0)
+
+    from problems.templatetags.ru import pick
+
+    lines = []
+    for key in ('open', 'test'):
+        need = int(wanted.get(key) or 0)
+        plan = int(asked.get(key) or 0)
+        have = got[key]
+        # Тесты названы во фразе, а в настройках ноль — тот самый случай.
+        said = mentioned if key == 'test' else None
+        if not need and said is None and not plan:
+            continue
+        if not need and (plan or said is not None):
+            asked_count = plan or (said or 0)
+            lines.append({
+                'kind': key, 'word': KIND_WORDS[key], 'got': have,
+                # «из N» печатаем ТОЛЬКО когда число действительно названо:
+                # выдуманное число хуже отсутствующего.
+                'need': asked_count, 'show_need': bool(asked_count),
+                'state': 'off', 'missing': asked_count or DEFAULT_FILL,
+                'why': 'в запросе они были, а в настройках стоит «%s 0»'
+                       % KIND_WORDS[key]})
+        elif have < need:
+            lines.append({
+                'kind': key, 'word': KIND_WORDS[key], 'got': have,
+                'need': need, 'show_need': True, 'state': 'short',
+                'missing': need - have,
+                'why': 'нашлось меньше, чем просили'})
+        else:
+            lines.append({'kind': key, 'word': KIND_WORDS[key], 'got': have,
+                          'need': need, 'show_need': True, 'state': 'ok',
+                          'missing': 0, 'why': ''})
+    for line in lines:
+        # ⚠️ Подпись кнопки склоняет ПИТОН: «Доискать 2 тесты» — то самое
+        # место, где шаблонный `pluralize` с тремя формами отдаёт пустоту.
+        line['fill_label'] = ('Доискать %d %s'
+                              % (line['missing'],
+                                 pick(line['missing'], *KIND_FORMS[line['kind']]))
+                              if line['missing'] else '')
+    return lines
+
+
 def preview_rows(rows, has_answer=False, sources=None, per_row=None):
     """Что нашлось по каждой строке — карточки запроса с выбором.
 

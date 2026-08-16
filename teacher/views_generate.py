@@ -129,6 +129,11 @@ def assignment_generate(request):
         'topics': hw_generator.canonical_topics(),
         'used_today': hw_generator.used_today(request.user),
         'daily_limit': hw_generator.daily_limit(),
+        # ⚠️ НА ЭКРАН — ОСТАТОК, А НЕ РАСХОД (ревью 16.08, п. 9.4). «Сколько
+        # уже потрачено» требует вычитания в уме; «сколько осталось» —
+        # готовый ответ на вопрос «можно ещё разок?».
+        'left_today': max(0, hw_generator.daily_limit()
+                          - hw_generator.used_today(request.user)),
         'step': 'ask',
         'is_exam': is_exam,
         'kind': kind,
@@ -201,12 +206,29 @@ def assignment_generate(request):
                        cached=plan.get('cached'))
         context['previews'] = hw_generator.preview_rows(
             rows, has_answer=form['has_answer'])
+        # ⚠️ СВОДКА «ПРОСИЛИ — НАБРАЛИ» (ревью 16.08, п. 9.1). `asked` —
+        # план МОДЕЛИ до деления квоты по типу: если он просил тесты, а в
+        # настройках стоит «тестов 0», строк с тестами после деления нет
+        # вовсе, и сказать об этом больше нечем.
+        context['asked'] = hw_generator.kind_totals(plan['rows'])
+        context['plan_summary'] = hw_generator.plan_summary(
+            context['previews'],
+            {'open': form['count_open'], 'test': form['count_test']},
+            context['asked'],
+            mentioned=hw_generator.tests_in_text(form['text']))
+        _refresh_left(context, request.user)
         context['manual_order'] = hw_generator.describes_order(form['text'])
         return render(request, 'teacher/generate.html', context)
 
-    if action == 'research':
+    if action in ('research', 'fill'):
         # Поправили формулировку строки и переискали. К модели НЕ ходим.
         rows = _read_plan(request)
+        if action == 'fill':
+            # ⚠️ ДОБОР НЕДОСТАЮЩЕГО ВИДА (ревью 16.08, п. 9.1). Кнопка
+            # стоит рядом со строкой «тесты: 0 из 2» и добавляет в план
+            # строку нужного вида по ТОЙ ЖЕ фразе запроса. К модели не
+            # ходим: искать по банку она не нужна.
+            rows = rows + _fill_row(request, form)
         if not rows:
             messages.error(request, 'В плане не осталось ни одной строки.')
             context['step'] = 'ask'
@@ -215,8 +237,16 @@ def assignment_generate(request):
         context['previews'] = hw_generator.preview_rows(
             rows, has_answer=form['has_answer'])
         context['manual_order'] = hw_generator.describes_order(form['text'])
-        messages.success(request, 'Переискал по вашим формулировкам — '
-                                  'обращения к модели не потребовалось.')
+        totals = hw_generator.kind_totals(rows)
+        context['asked'] = totals
+        context['plan_summary'] = hw_generator.plan_summary(
+            context['previews'], totals, totals)
+        _refresh_left(context, request.user)
+        messages.success(request, 'Доискал по вашим формулировкам — '
+                                  'обращения к модели не потребовалось.'
+                         if action == 'fill' else
+                         'Переискал по вашим формулировкам — '
+                         'обращения к модели не потребовалось.')
         return render(request, 'teacher/generate.html', context)
 
     if action in ('search', 'replace'):
@@ -305,6 +335,42 @@ def _read_form(request):
         'has_answer': request.POST.get('has_answer') == 'on',
         'topics': request.POST.getlist('topics'),
     }
+
+
+def _refresh_left(context, user):
+    """Пересчитать «осталось разборов» ПЕРЕД отрисовкой.
+
+    ⚠️ Контекст собирается в начале вьюхи, а обращение к модели случается
+    позже — и на экране плана стояло число, каким оно было ДО этого самого
+    разбора. Человек видел «осталось 27» сразу после того, как потратил
+    двадцать седьмой.
+    """
+    context['used_today'] = hw_generator.used_today(user)
+    context['left_today'] = max(0, hw_generator.daily_limit()
+                                - context['used_today'])
+
+
+def _fill_row(request, form):
+    """Строка плана для добора недостающего вида. Пустой список — нечего."""
+    kind = request.POST.get('fill_kind')
+    if kind not in ('open', 'test'):
+        return []
+    try:
+        missing = int(request.POST.get('fill_count') or 0)
+    except (TypeError, ValueError):
+        return []
+    if missing <= 0:
+        return []
+    return [{
+        'label': 'Тесты' if kind == 'test' else 'Задачи',
+        # Ищем по ФРАЗЕ ЦЕЛИКОМ: своей формулировки у этой строки нет — её
+        # никто не писал, она появилась из расхождения настроек и запроса.
+        'query': (form.get('text') or '').strip()[:300],
+        'topic': '',
+        'difficulty': form.get('min_difficulty') or 3,
+        'count': min(missing, 30),
+        'kind': kind,
+    }]
 
 
 def _read_plan(request):

@@ -23,6 +23,15 @@
     {% endcomment %}
     <div class="cand-name" role="button" tabindex="0">{{ card.title }}</div>
     <div class="cand-meta">{{ card.meta }}</div>
+    {% comment %}
+    ⚠️ ДВЕ СТРОКИ УСЛОВИЯ ВИДНЫ СРАЗУ (ревью 16.08, п. 9.2). Раньше в
+    строке стояли только название, тема, сложность и источник — то есть
+    ничего о самой задаче: чтобы понять, о чём она, приходилось раскрывать
+    каждую по очереди. Обрезка — по CSS (`line-clamp`), а не по символам:
+    резать текст числом символов значит рвать формулу посередине.
+    {% endcomment %}
+    <div class="cand-lead">{{ card.preview }}</div>
+    <button type="button" class="k-btn k-btn--quiet k-btn--sm cand-full">Целиком</button>
     <div class="cand-taken">уже выбрана в строке «<span class="cand-taken-row">{{ card.taken_by }}</span>»</div>
     {% comment %}
     ⚠️ ЗАДАЧА РАСКРЫВАЕТСЯ ЦЕЛИКОМ (ревью 15.08, фаза 13): условие без
