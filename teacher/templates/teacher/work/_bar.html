@@ -1,0 +1,25 @@
+{% comment %}
+Полоса собранного у нижнего края — ОДНА на шаги «Что кладём» и «Состав».
+
+⚠️ ЧИСЛО ЗДЕСЬ ПЕЧАТАЕТСЯ ОДИН РАЗ И ПРИХОДИТ С СЕРВЕРА (правило проекта,
+ревью 16.08). Сколько задач, сколько баллов, сколько из них тестов — это
+тот же счёт, что покажет состав работы и печатный лист; посчитать его ещё
+раз на клиенте значило бы завести второй источник тех же чисел, а склонения
+«задача / задачи / задач» существовали бы в двух местах сразу.
+
+Ждёт: next_url, next_label. Необязательно: back_url, back_label,
+extra (готовая разметка дополнительных кнопок).
+{% endcomment %}
+<div class="wk-bar" id="wk-bar">
+  <span class="wk-bar__sum" id="wk-tally">В работе пока ничего нет</span>
+  <span class="wk-bar__acts">
+    <span class="wk-bar__why" id="wk-why">Добавьте хотя бы одну задачу</span>
+    {% if back_url %}
+    <a class="k-btn k-btn--plain k-btn--sm" href="{{ back_url }}">{{ back_label }}</a>
+    {% endif %}
+    <button type="button" class="k-btn k-btn--quiet k-btn--sm" id="wk-clear">
+      Очистить</button>
+    {{ extra }}
+    <a class="k-btn k-btn--main" id="wk-next" href="{{ next_url }}">{{ next_label }}</a>
+  </span>
+</div>

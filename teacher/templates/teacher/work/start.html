@@ -1,0 +1,42 @@
+{% extends "teacher/base.html" %}
+
+{% comment %}
+ВХОД В ПОТОК С ЧИСТОГО ЛИСТА.
+
+⚠️ ЗАЧЕМ ОТДЕЛЬНЫЙ ЭКРАН-ПЕРЕХОД. Корзина живёт в хранилище вкладки и
+привязана к занятию — то есть переживает и закрытие экрана, и возврат
+через неделю. Для кнопки «Создание работы» это ловушка: человек начинает
+новую работу и получает задачи, выбранные когда-то и забытые. Возврат
+НАЗАД по ленте шагов корзину, наоборот, трогать не имеет права — это
+разные события, и различить их может только вход.
+
+Чистка идёт на клиенте: хранилище вкладки серверу недоступно.
+{% endcomment %}
+
+{% block title %}Новая работа{% endblock %}
+
+{% block content %}
+<div class="wk-empty" style="max-width:520px;margin:60px auto;">
+  <b>Открываем сборку работы</b>
+  Если экран не сменился сам — <a href="{{ next_url }}">продолжить</a>.
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include "teacher/_cart_keys.html" %}
+<script>
+(function () {
+  'use strict';
+  try {
+    sessionStorage.removeItem(window.QLS_CART.cart);
+    sessionStorage.removeItem(window.QLS_CART.order);
+    sessionStorage.removeItem(window.QLS_CART.settings);
+    sessionStorage.removeItem(window.QLS_CART.manual);
+    sessionStorage.removeItem('work_tab');
+  } catch (e) {}
+  // `replace`, а не `assign`: иначе кнопка «назад» браузера возвращала бы
+  // на экран чистки, и он чистил бы корзину ещё раз.
+  window.location.replace('{{ next_url|escapejs }}');
+})();
+</script>
+{% endblock %}

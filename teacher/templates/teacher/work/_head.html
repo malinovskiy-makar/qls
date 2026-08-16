@@ -1,0 +1,67 @@
+{% comment %}
+Шапка потока создания работы: крошка, вид работы, лента шагов.
+ОДИН партиал на все шаги — иначе они разъедутся, как разъехались прежние
+три экрана набора.
+
+⚠️ КРОШКИ НЕ ПЕРЕДЕЛЫВАЮТСЯ (прямое решение владельца: «сейчас крошки
+выглядят хорошо»). Разметка та же, что на прежних экранах создания:
+`.crumbs` из набора деталей, звено-разделитель рисует CSS.
+
+⚠️ ЗАНЯТИЕ И ВИД РАБОТЫ ЕДУТ В КАЖДОЙ ССЫЛКЕ ШАПКИ. Именно здесь они
+терялись в прошлой версии: переключатель вида вёл на голый адрес, и после
+него занятие приходилось выбирать заново, а «кому выдать» слетало.
+
+Ждёт в контексте: step, steps (адреса шагов), group_id, group_label,
+is_exam, kind, found (показывать ли шаг «Что нашлось»).
+{% endcomment %}
+<nav class="crumbs" aria-label="Где я">
+  <a href="{% url 'teacher:groups' %}">Ученики</a>
+  {% if group_id and group_label %}<a href="{% url 'teacher:group_detail' group_id %}?tab=assignments">{{ group_label }}</a>{% endif %}
+  <span class="crumbs__here">новая работа</span>
+</nav>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Новая работа</h1>
+  </div>
+
+  {% comment %}
+  ⚠️ ВИД РАБОТЫ МЕНЯЕТСЯ НА ЛЮБОМ ШАГЕ И НИЧЕГО НЕ ТЕРЯЕТ (фаза 12.2).
+  Ссылка ведёт на ТОТ ЖЕ шаг, на котором стоит человек, — меняется один
+  параметр адреса. Состав, порядок, баллы и настройки живут в корзине
+  занятия, а она у обоих видов одна.
+  {% endcomment %}
+  <div class="bh-kindwrap">
+    <div class="bh-kind" role="group" aria-label="Вид работы">
+      <a class="bh-kind__opt {% if not is_exam %}is-on{% endif %}"
+         href="{{ kind_urls.homework }}">Домашка</a>
+      <a class="bh-kind__opt {% if is_exam %}is-on{% endif %}"
+         href="{{ kind_urls.exam }}">Контрольная</a>
+    </div>
+    <div class="bh-kind__note">{% if is_exam %}ограниченное время, окно{% else %}решают дома, срок сдачи{% endif %}</div>
+  </div>
+</div>
+
+{% comment %}
+Лента шагов. Пройденные — ссылки: вернуться назад можно с любого шага, и
+ничто при этом не теряется (фаза 12.3). Шаг «Что нашлось» стоит в ленте
+только на пути подбора: у двух других путей его нет вовсе, и обещать его
+всем значило бы рисовать экран, который не откроется.
+{% endcomment %}
+<ol class="wk-rail" aria-label="Шаги создания работы">
+  <li class="wk-rail__s {% if step == 'pick' %}is-on{% else %}is-done{% endif %}">
+    <a href="{{ steps.pick }}"><span class="wk-rail__n">1</span>Что кладём</a>
+  </li>
+  {% if found %}
+  <li class="wk-rail__s {% if step == 'found' %}is-on{% endif %}">
+    <span><span class="wk-rail__n">2</span>Что нашлось</span>
+  </li>
+  {% endif %}
+  <li class="wk-rail__s {% if step == 'compose' %}is-on{% elif step == 'give' %}is-done{% endif %}">
+    {% if step == 'give' %}<a href="{{ steps.compose }}"><span class="wk-rail__n">{% if found %}3{% else %}2{% endif %}</span>Состав</a>
+    {% else %}<span><span class="wk-rail__n">{% if found %}3{% else %}2{% endif %}</span>Состав</span>{% endif %}
+  </li>
+  <li class="wk-rail__s {% if step == 'give' %}is-on{% endif %}">
+    <span><span class="wk-rail__n">{% if found %}4{% else %}3{% endif %}</span>Выдача</span>
+  </li>
+</ol>

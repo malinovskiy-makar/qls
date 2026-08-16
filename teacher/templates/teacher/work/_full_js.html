@@ -1,0 +1,93 @@
+{% comment %}
+ОКНО «ЗАДАЧА ЦЕЛИКОМ» — ОДИН РИСОВАТЕЛЬ НА ВЕСЬ ПОТОК.
+
+Шаг «Что кладём» раскрывает им карточку, шаг «Состав» — позицию работы.
+Второй рисователь разошёлся бы с первым на первой же правке: сегодня один
+показывает решение, завтра другой перестаёт.
+
+Наружу торчит `window.QLS_FULL`:
+  fill(box, row)   — нарисовать задачу в готовый узел;
+  load(key)        — попросить у сервера строку по ключу корзины;
+  esc(text)        — экранирование (нужно и соседним скриптам);
+  typeset(node)    — формулы тем же вызовом, что на остальных экранах.
+{% endcomment %}
+<script>
+(function () {
+  'use strict';
+  var URL_TPL = '{% url "teacher:api_work_full" "KEY" %}';
+  var cache = {};
+
+  function esc(text) {
+    var box = document.createElement('div');
+    box.textContent = text == null ? '' : String(text);
+    return box.innerHTML;
+  }
+
+  // ⚠️ ФОРМУЛЫ РИСУЕТ ТОТ ЖЕ КОНВЕЙЕР, ЧТО НА СТРАНИЦЕ ЦЕЛИКОМ. Литеральный
+  // доллар маскирует общий партиал `_katex_dollars.html`; звать его надо ДО
+  // разбора и снимать маску ПОСЛЕ, иначе «\$» уезжает в формулу.
+  function typeset(node) {
+    if (!window.renderMathInElement) { return; }
+    if (window.maskEscapedDollars) { maskEscapedDollars(node); }
+    renderMathInElement(node, {
+      delimiters: [
+        { left: '$$', right: '$$', display: true },
+        { left: '$', right: '$', display: false },
+        { left: '\\[', right: '\\]', display: true },
+        { left: '\\(', right: '\\)', display: false }
+      ],
+      throwOnError: false
+    });
+    if (window.fixCurrencyDollars) { fixCurrencyDollars(node); }
+  }
+
+  function fill(box, row) {
+    var html = '<div class="wk-st">' + esc(row.statement) + '</div>';
+    (row.parts || []).forEach(function (part) {
+      html += '<div class="wk-part"><b>' + esc(part.label) + ')</b> '
+        + esc(part.text)
+        + (part.answer ? '<div class="wk-ans"><b>Ответ:</b> '
+                         + esc(part.answer) + '</div>' : '')
+        + '</div>';
+    });
+    if ((row.options || []).length) {
+      html += '<ul class="wk-opts">';
+      (row.options || []).forEach(function (option) {
+        html += '<li>' + esc(option.text) + (option.right ? ' ✓' : '') + '</li>';
+      });
+      html += '</ul>';
+    }
+    if (row.answer) {
+      html += '<div class="wk-ans"><b>Ответ:</b> ' + esc(row.answer) + '</div>';
+    }
+    if (row.solution) {
+      html += '<div class="wk-sol"><b>Решение:</b> ' + esc(row.solution)
+        + '</div>';
+    }
+    // ⚠️ «СЛОЖНОСТЬ 0 ИЗ 5» — НЕ СЛОЖНОСТЬ, А ЕЁ ОТСУТСТВИЕ (ревью 16.08,
+    // п. 7.2): ноль по пятибалльной шкале читается как «легче лёгкого».
+    html += '<div class="wk-flags"><span>' + esc(row.kind_label) + '</span>'
+      + '<span>' + (row.difficulty ? 'сложность ' + row.difficulty + ' из 5'
+                                   : 'сложность не указана') + '</span>'
+      + '<span>' + (row.has_solution ? 'эталонное решение есть'
+                                     : 'эталонного решения нет') + '</span>'
+      + (row.source ? '<span>' + esc(row.source) + '</span>' : '')
+      + '</div>';
+    box.innerHTML = html;
+    typeset(box);
+  }
+
+  function load(key) {
+    if (cache[key]) { return Promise.resolve(cache[key]); }
+    return fetch(URL_TPL.replace('KEY', encodeURIComponent(key)))
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        if (!data || !data.row) { throw new Error('empty'); }
+        cache[key] = data.row;
+        return data.row;
+      });
+  }
+
+  window.QLS_FULL = { fill: fill, load: load, esc: esc, typeset: typeset };
+})();
+</script>

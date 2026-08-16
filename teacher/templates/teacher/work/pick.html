@@ -1,0 +1,253 @@
+{% extends "teacher/base.html" %}
+{% load ru %}
+
+{% comment %}
+ШАГ 1 «ЧТО КЛАДЁМ» — пять способов набора одной страницей.
+
+⚠️ СПОСОБ НАБОРА — ЭТО ВКЛАДКА, А НЕ ЭКРАН (решение владельца). Часть задач
+берут из каталога, часть подбирают словами, одну пишут сами — и всё это
+одна работа. Пока способы были тремя экранами, переход между ними означал
+потерю набранного, а корзины у них были разные.
+
+⚠️ КОРЗИНА ВНИЗУ, А НЕ В ПРАВОЙ КОЛОНКЕ. Правую треть занимали настройки
+работы, которые нужны на последнем шаге; каталогу оставалась половина
+ширины. Настройки уехали на «Выдачу», ширина досталась списку задач.
+{% endcomment %}
+
+{% block title %}Что кладём — новая работа{% endblock %}
+
+{% block extra_style %}
+.wk-wrap { max-width: 1100px; }
+{% comment %}
+Отступ снизу — чтобы полоса собранного не накрывала последнюю карточку
+списка: она липкая и стоит поверх содержимого.
+{% endcomment %}
+.wk-panes { padding-bottom: 6px; }
+.wk-pane[hidden] { display: none; }
+.wk-pages { display: flex; gap: 6px; justify-content: center;
+            margin: 18px 0 4px; flex-wrap: wrap; }
+.wk-pages a, .wk-pages span { font-size: 13px; padding: 5px 10px;
+            border-radius: 7px; border: 0.5px solid var(--border);
+            color: var(--text2); text-decoration: none; }
+.wk-pages .is-here { background: var(--accent); border-color: var(--accent);
+            color: #fff; font-weight: 600; }
+{% endblock %}
+
+{% block content %}
+<div class="wk-wrap">
+{% include "teacher/work/_head.html" %}
+
+<div class="wk-tabs" id="wk-tabs" role="tablist">
+  <button type="button" class="wk-tab is-on" data-pane="pane-catalog">
+    Каталог<small>ручной поиск</small></button>
+  {% comment %}
+  ⚠️ ДВЕ ВКЛАДКИ ИЗ ПЯТИ — ССЫЛКИ, И ЭТО НАМЕРЕННО. «Описать словами» ведёт
+  на шаг «Что нашлось» (он уже сделан и живёт на своём адресе), «Написать
+  свою» — в редактор задачи. Обе уносят занятие и вид работы с собой, а
+  корзина у занятия одна: вернувшись, человек находит набранное на месте.
+  {% endcomment %}
+  <a class="wk-tab" href="{{ steps.found }}">
+    Описать словами<small>умный подбор</small></a>
+  <a class="wk-tab" href="{{ own_new_url }}">
+    Написать свою<small>задача с нуля</small></a>
+  <button type="button" class="wk-tab" data-pane="pane-own">
+    Мои задачи ({{ own_problems|length }})<small>написанные вами</small></button>
+  <button type="button" class="wk-tab" data-pane="pane-saved">
+    Отложенные ({{ saved_rows|length }})<small>закладки каталога</small></button>
+</div>
+
+<div class="wk-panes">
+<div class="wk-pane" id="pane-catalog">
+  <form method="get" action="{% url 'teacher:work_pick' %}"
+        class="k-card k-filters" id="wk-filter-form">
+    {% comment %}
+    ⚠️ ЗАНЯТИЕ И ВИД РАБОТЫ ЕДУТ СКРЫТЫМИ ПОЛЯМИ. Форма отбора — это GET, и
+    без них поиск по каталогу молча выбрасывал бы человека из занятия
+    (фаза 12.1): крошка теряет имя, «кому выдать» на последнем шаге
+    перестаёт быть отмеченным заранее.
+    {% endcomment %}
+    {% if group_id %}<input type="hidden" name="group" value="{{ group_id }}">{% endif %}
+    {% if is_exam %}<input type="hidden" name="kind" value="exam">{% endif %}
+    <div class="wk-filters">
+      <input class="k-input" type="text" name="q" value="{{ f_q }}"
+             placeholder="Поиск по условию…">
+      <span class="k-select-wrap">
+        <select class="k-select" name="topic">
+          <option value="">Все темы</option>
+          {% for topic in topics %}
+          <option value="{{ topic.id }}"
+            {% if f_topic == topic.id|stringformat:"s" %}selected{% endif %}>{{ topic.name }}</option>
+          {% endfor %}
+        </select>
+      </span>
+      <span class="k-select-wrap">
+        <select class="k-select" name="difficulty">
+          <option value="">Любая сложность</option>
+          {% for level in "12345" %}
+          <option value="{{ level }}" {% if f_diff == level %}selected{% endif %}>
+            сложность {{ level }}</option>
+          {% endfor %}
+        </select>
+      </span>
+      <span class="k-select-wrap">
+        <select class="k-select" name="type">
+          <option value="">Любой тип</option>
+          <option value="тест: один ответ" {% if f_type == "тест: один ответ" %}selected{% endif %}>Тест</option>
+          {% for pt in problem_types %}
+          {% if pt != "тест: один ответ" %}
+          <option value="{{ pt }}" {% if f_type == pt %}selected{% endif %}>{{ pt }}</option>
+          {% endif %}
+          {% endfor %}
+        </select>
+      </span>
+      <label class="k-check">
+        <input type="checkbox" name="has_solution" value="1"
+               {% if f_sol == "1" %}checked{% endif %}> с решением
+      </label>
+      <button class="k-btn k-btn--main k-btn--sm" type="submit">Найти</button>
+      <a href="{{ reset_url }}" class="k-btn k-btn--quiet k-btn--sm">Сброс</a>
+    </div>
+
+    <div class="wk-found">
+      {% comment %}
+      ⚠️ «НАШЛОСЬ N» ГОВОРИМ ТОЛЬКО ПОСЛЕ ЗАПРОСА. Без фильтров это размер
+      каталога, и на экране сборки работы он читается как «в работе 18 865
+      задач» — поэтому число там названо своим именем.
+      {% endcomment %}
+      <span>{% if has_query %}Нашлось <b>{{ total }}</b>
+        {{ total|plural_ru:"задача,задачи,задач" }}{% else %}В каталоге
+        <b>{{ total }}</b> {{ total|plural_ru:"задача,задачи,задач" }} —
+        задайте фильтры или листайте{% endif %}</span>
+      <span class="k-select-wrap">
+        <select class="k-select k-select--sm" name="sort" id="wk-sort">
+          {% for key, label in sorts %}
+          <option value="{{ key }}" {% if f_sort == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </span>
+    </div>
+  </form>
+
+  {% for card in cards %}
+  {% include "teacher/work/_card.html" with key=card.problem.pk title=card.card_title facts=card.facts source=card.source preview=card.preview is_test=card.is_test %}
+  {% empty %}
+  <div class="wk-empty">
+    <b>По этому запросу ничего не нашлось</b>
+    Уберите часть фильтров или поищите другими словами.
+    <div><a href="{{ reset_url }}" class="k-btn k-btn--plain k-btn--sm">Сбросить фильтры</a></div>
+  </div>
+  {% endfor %}
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="wk-pages">
+    {% if page_obj.has_previous %}
+    <a href="?{{ base_query }}&amp;page={{ page_obj.previous_page_number }}">←</a>
+    {% endif %}
+    {% for n in page_obj.paginator.page_range %}
+      {% if n == page_obj.number %}<span class="is-here">{{ n }}</span>
+      {% elif n == 1 or n == page_obj.paginator.num_pages or n >= page_obj.number|add:"-2" and n <= page_obj.number|add:"2" %}
+      <a href="?{{ base_query }}&amp;page={{ n }}">{{ n }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+    <a href="?{{ base_query }}&amp;page={{ page_obj.next_page_number }}">→</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="wk-pane" id="pane-own" hidden>
+  {% for row in own_problems %}
+  {% include "teacher/work/_card.html" with key=row.key title=row.title facts=row.facts source="своя задача" preview=row.preview is_test=row.is_test %}
+  {% empty %}
+  <div class="wk-empty">
+    <b>Вы ещё не написали ни одной своей задачи</b>
+    Своя задача — это условие, пункты и эталонные ответы, написанные вами.
+    Она остаётся здесь и годится для любой следующей работы.
+    <div><a href="{{ own_new_url }}" class="k-btn k-btn--main k-btn--sm">Написать свою</a></div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="wk-pane" id="pane-saved" hidden>
+  {% for row in saved_rows %}
+  {% include "teacher/work/_card.html" with key=row.key title=row.title facts=row.facts source=row.source preview=row.preview is_test=row.is_test %}
+  {% empty %}
+  <div class="wk-empty">
+    <b>Отложенных задач нет</b>
+    Откладывайте их из каталога — кнопка «Сохранить» есть на странице любой
+    задачи. Отложенные это закладки КАТАЛОГА; свои задачи лежат на соседней
+    вкладке.
+    <div><a href="{% url 'catalog:problem_list' %}" class="k-btn k-btn--plain k-btn--sm">Открыть каталог</a></div>
+  </div>
+  {% endfor %}
+</div>
+</div>
+
+{% include "teacher/work/_bar.html" with next_url=steps.compose next_label="Дальше — состав →" %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include "teacher/_cart_keys.html" %}
+{% include "teacher/work/_full_js.html" %}
+{% include "teacher/work/_bar_js.html" %}
+<script>
+(function () {
+  'use strict';
+  // ── Вкладки ────────────────────────────────────────────────────────────
+  // ⚠️ ПЕРЕКЛЮЧЕНИЕ ВКЛАДКИ НЕ ТРОГАЕТ КОРЗИНУ. Вкладка — это только
+  // видимость панели: сама корзина живёт в хранилище занятия и одна на все
+  // способы набора.
+  var tabs = document.getElementById('wk-tabs');
+  tabs.addEventListener('click', function (event) {
+    var tab = event.target.closest('.wk-tab[data-pane]');
+    if (!tab) { return; }
+    tabs.querySelectorAll('.wk-tab').forEach(function (other) {
+      other.classList.toggle('is-on', other === tab);
+    });
+    document.querySelectorAll('.wk-pane').forEach(function (pane) {
+      pane.hidden = pane.id !== tab.dataset.pane;
+    });
+    try { sessionStorage.setItem('work_tab', tab.dataset.pane); } catch (e) {}
+  });
+  // Вкладка переживает возврат из редактора своей задачи и перезагрузку.
+  try {
+    var last = sessionStorage.getItem('work_tab');
+    var start = last && document.querySelector('[data-pane="' + last + '"]');
+    if (start) { start.click(); }
+  } catch (e) {}
+
+  // Сортировка — это тот же отбор, поэтому просто отправляем форму фильтров.
+  var sort = document.getElementById('wk-sort');
+  if (sort) {
+    sort.addEventListener('change', function () {
+      document.getElementById('wk-filter-form').submit();
+    });
+  }
+
+  // ── Задача целиком ─────────────────────────────────────────────────────
+  document.addEventListener('click', function (event) {
+    var more = event.target.closest('.wk-more');
+    if (!more) { return; }
+    var card = more.closest('.wk-card');
+    var box = card.querySelector('.wk-full');
+    if (!box.hidden) {
+      box.hidden = true;
+      more.textContent = 'Целиком';
+      return;
+    }
+    box.hidden = false;
+    more.textContent = 'Свернуть';
+    if (box.dataset.ready) { return; }
+    box.textContent = 'Загрузка…';
+    window.QLS_FULL.load(more.dataset.full).then(function (row) {
+      window.QLS_FULL.fill(box, row);
+      box.dataset.ready = '1';
+    }).catch(function () {
+      box.textContent = 'Не удалось загрузить задачу.';
+    });
+  });
+})();
+</script>
+{% endblock %}

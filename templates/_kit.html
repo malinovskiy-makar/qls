@@ -860,3 +860,118 @@
 @media (max-width: 560px) {
   .row-link { flex-direction: column; align-items: flex-start; gap: 6px; }
 }
+
+/* ── Поток создания работы ──────────────────────────────────────────────
+   Правила стоят ЗДЕСЬ, а не в шаблоне одного шага: разметка одна на все
+   четыре шага, а класс, живущий больше чем на одном экране, обязан лежать
+   в наборе — иначе повторяется история «стили в файле, который экран не
+   подключает» (обзор 13.08: строка выходила голой браузерной ссылкой). */
+
+/* Лента шагов. Пройденный шаг — ссылка, текущий выделен, будущие тихие. */
+.wk-rail { display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+           list-style: none; margin: 0 0 18px; padding: 0; }
+.wk-rail__s { display: flex; align-items: center; font-size: 13px;
+              color: var(--text3); }
+.wk-rail__s + .wk-rail__s::before { content: ""; width: 26px; height: 1px;
+              background: var(--border); margin: 0 10px; }
+.wk-rail__s > a, .wk-rail__s > span { display: flex; align-items: center;
+              gap: 8px; color: inherit; text-decoration: none; }
+.wk-rail__s > a:hover { color: var(--text); }
+.wk-rail__n { display: grid; place-items: center; width: 22px; height: 22px;
+              border-radius: 999px; border: 1px solid var(--border);
+              font-size: 11px; font-weight: 600; }
+.wk-rail__s.is-on { color: var(--text); font-weight: 600; }
+.wk-rail__s.is-on .wk-rail__n { background: var(--accent);
+              border-color: var(--accent); color: #fff; }
+.wk-rail__s.is-done .wk-rail__n { background: var(--accent-tint);
+              border-color: var(--accent-tint); color: var(--accent); }
+
+/* Пять способов набора одной строкой. */
+.wk-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.wk-tab { display: block; font-size: 13px; padding: 8px 14px;
+          border-radius: 10px; border: 0.5px solid var(--border);
+          background: var(--surface-2); color: var(--text2); cursor: pointer;
+          text-align: left; text-decoration: none; }
+.wk-tab:hover { color: var(--text); border-color: var(--text3); }
+.wk-tab small { display: block; font-size: 11px; color: var(--text3);
+                font-weight: 400; }
+.wk-tab.is-on { border-color: var(--accent); background: var(--accent-tint);
+                color: var(--text); font-weight: 600; }
+.wk-tab.is-on small { color: var(--text2); }
+
+/* Ряд фильтров и строка «сколько нашлось + чем сортировать». */
+.wk-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.wk-filters .k-input { flex: 1 1 190px; min-width: 150px; }
+.wk-filters .k-select-wrap { flex: 0 0 auto; }
+.wk-found { display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; flex-wrap: wrap; margin: 12px 2px; font-size: 13px;
+            color: var(--text2); }
+.wk-found b { color: var(--text); }
+
+/* Карточка задачи в отборе. */
+.wk-card { display: flex; gap: 14px; align-items: flex-start;
+           background: var(--surface); border: 0.5px solid var(--border);
+           border-radius: 11px; padding: 12px 14px; margin-bottom: 9px; }
+.wk-card.is-added { opacity: .55; }
+.wk-card__main { flex: 1; min-width: 0; }
+.wk-card__title { font-size: 14px; font-weight: 600; line-height: 1.4; }
+.wk-card__facts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+.wk-chip { font-size: 11px; color: var(--chip-text); background: var(--chip-bg);
+           border-radius: 5px; padding: 1px 7px; white-space: nowrap; }
+.wk-card__src { font-size: 11px; color: var(--text3); margin-top: 5px; }
+.wk-card__lead { font-size: 13px; color: var(--text2); margin-top: 6px;
+                 display: -webkit-box; -webkit-line-clamp: 2;
+                 -webkit-box-orient: vertical; overflow: hidden; }
+.wk-card__acts { display: flex; gap: 8px; align-items: center;
+                 flex-shrink: 0; flex-wrap: wrap; }
+
+/* Задача, раскрытая целиком: то же наполнение на всех шагах потока. */
+.wk-full { margin-top: 10px; padding: 12px 14px; border-radius: var(--r);
+           background: var(--surface-2); border: 0.5px solid var(--border);
+           font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.wk-full[hidden] { display: none; }
+.wk-full .wk-st { white-space: pre-line; }
+.wk-full .wk-part { margin-top: 8px; }
+.wk-full .wk-part b { color: var(--accent); }
+.wk-full .wk-ans { margin-top: 6px; font-size: 12px; color: var(--text2); }
+.wk-full .wk-ans b { color: var(--text); }
+.wk-full .wk-sol { margin-top: 10px; padding-top: 10px;
+                   border-top: 1px solid var(--border-soft);
+                   white-space: pre-line; }
+.wk-full ul.wk-opts { margin: 8px 0 0; padding-left: 18px; }
+.wk-full .wk-flags { margin-top: 10px; display: flex; gap: 8px;
+                     flex-wrap: wrap; font-size: 11px; color: var(--text3); }
+.wk-full :is(table, .katex-display) { overflow-x: auto; }
+
+/* Полоса собранного у нижнего края: она же несёт переход к следующему шагу. */
+.wk-bar { position: sticky; bottom: 0; z-index: 20; display: flex;
+          align-items: center; justify-content: space-between; gap: 16px;
+          flex-wrap: wrap; margin-top: 18px; padding: 12px 16px;
+          background: var(--surface); border: 0.5px solid var(--border);
+          border-radius: 12px; box-shadow: 0 -2px 14px rgba(0,0,0,.06); }
+.wk-bar__sum { font-size: 13px; color: var(--text2); }
+.wk-bar__sum b { color: var(--text); }
+.wk-bar__acts { display: flex; align-items: center; gap: 10px;
+                flex-wrap: wrap; }
+.wk-bar__why { font-size: 12px; color: var(--text3); }
+
+/* Пустое состояние вкладки или шага. */
+.wk-empty { border: 1px dashed var(--border); border-radius: 10px;
+            padding: 30px 20px; text-align: center; color: var(--text2);
+            font-size: 13px; line-height: 1.7; }
+.wk-empty b { display: block; color: var(--text); font-size: 14px;
+              margin-bottom: 6px; }
+.wk-empty .k-btn { margin-top: 12px; }
+
+@media (max-width: 560px) {
+  .wk-card { flex-direction: column; }
+  .wk-card__acts { width: 100%; }
+  .wk-bar { flex-direction: column; align-items: stretch; }
+}
+
+/* Ссылка-кнопка, которой сейчас нельзя пользоваться. Тег `a` не понимает
+   `disabled`, а гасить её одним цветом мало: нажатие, которое ничего не
+   делает, читается как поломка. */
+.k-btn.is-off, .k-btn.is-off:hover { opacity: .45; cursor: default;
+                                     pointer-events: none; }
+.k-select--sm { font-size: 12px; padding-top: 4px; padding-bottom: 4px; }

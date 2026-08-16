@@ -1,0 +1,177 @@
+{% comment %}
+КОРЗИНА ПОТОКА — ОДИН МЕХАНИЗМ НА ВСЕ ШАГИ.
+
+Наружу торчит `window.QLS_WORK`:
+  keys()          — ключи в порядке работы;
+  has(key)        — задача уже в работе;
+  add/remove/toggle(key);
+  drop(key)       — убрать и пересчитать;
+  setOrder(list)  — задать порядок (шаг «Состав»);
+  clear();
+  refresh()       — пересчитать полосу собранного;
+  onchange(fn)    — подписка (шаг «Состав» перерисовывает список).
+
+⚠️ ПОРЯДОК ХРАНИТСЯ ОТДЕЛЬНЫМ СПИСКОМ (ревью 15.08, ф. 12): корзина —
+объект, а JavaScript отдаёт числовые ключи объекта ПО ВОЗРАСТАНИЮ
+независимо от порядка добавления. Ключ каталожной задачи — её номер, и
+порядок молча совпадал с порядком номеров в банке.
+
+Ждёт ПОДКЛЮЧЁННЫМ ВЫШЕ `teacher/_cart_keys.html` (имена хранилищ занятия).
+{% endcomment %}
+<script>
+(function () {
+  'use strict';
+  var CART = window.QLS_CART.cart;
+  var ORDER = window.QLS_CART.order;
+  var TALLY_URL = '{% url "teacher:api_work_tally" %}';
+  var listeners = [];
+
+  function read(name, fallback) {
+    try { return JSON.parse(sessionStorage.getItem(name) || fallback); }
+    catch (e) { return JSON.parse(fallback); }
+  }
+  function write(name, value) {
+    try { sessionStorage.setItem(name, JSON.stringify(value)); } catch (e) {}
+  }
+
+  var cart = read(CART, '{}');
+
+  function keys() {
+    var known = Object.keys(cart);
+    var order = read(ORDER, '[]').filter(function (key) {
+      return known.indexOf(key) !== -1;
+    });
+    // Положенное мимо списка порядка идёт следом: потерять задачу из-за
+    // отставшего списка нельзя.
+    known.forEach(function (key) {
+      if (order.indexOf(key) === -1) { order.push(key); }
+    });
+    return order;
+  }
+
+  function has(key) { return Boolean(cart[key]); }
+
+  function titleOf(key) {
+    var card = document.querySelector('[data-pid="' + key + '"]');
+    return (card && card.dataset.title) || ('Задача ' + key);
+  }
+
+  function add(key) {
+    if (cart[key]) { return; }
+    cart[key] = { title: titleOf(key) };
+    write(CART, cart);
+    var order = keys();
+    if (order.indexOf(key) === -1) { order.push(key); }
+    write(ORDER, order);
+    changed();
+  }
+
+  function remove(key) {
+    if (!cart[key]) { return; }
+    delete cart[key];
+    write(CART, cart);
+    write(ORDER, read(ORDER, '[]').filter(function (k) { return k !== key; }));
+    changed();
+  }
+
+  function clear() {
+    cart = {};
+    write(CART, cart);
+    write(ORDER, []);
+    changed();
+  }
+
+  function setOrder(list) {
+    write(ORDER, list);
+    // Ручной порядок отменяет автоматическую перестановку «сначала тесты»:
+    // иначе переставленная задача возвращалась бы на прежнее место.
+    try { sessionStorage.setItem(window.QLS_CART.manual, '1'); } catch (e) {}
+    changed();
+  }
+
+  function changed() {
+    highlight();
+    refresh();
+    listeners.forEach(function (fn) { fn(); });
+  }
+
+  function highlight() {
+    document.querySelectorAll('[data-add]').forEach(function (button) {
+      var inCart = has(button.dataset.add);
+      // ⚠️ Кнопка ВЫКЛЮЧАЕТСЯ, а карточка гаснет целиком: повторное нажатие
+      // и раньше не плодило дубль, но на экране этому ничто не мешало.
+      button.textContent = inCart ? '✓ В работе' : '+ Добавить';
+      button.disabled = inCart;
+      button.classList.toggle('added', inCart);
+      var card = button.closest('.wk-card');
+      if (card) { card.classList.toggle('is-added', inCart); }
+    });
+  }
+
+  // `students` — сколько человек получит работу. Число знает только экран
+  // выдачи, а фразу собирает сервер: склонение живёт в питоне.
+  var students = 0;
+  function refresh(count) {
+    if (count !== undefined) { students = count; }
+    var tally = document.getElementById('wk-tally');
+    var next = document.getElementById('wk-next');
+    var why = document.getElementById('wk-why');
+    var list = keys();
+    if (next) {
+      // Ссылка-кнопка не умеет `disabled`; гасим её признаком, который
+      // читают и мышь, и клавиатура.
+      next.classList.toggle('is-off', list.length === 0);
+      next.setAttribute('aria-disabled', list.length === 0 ? 'true' : 'false');
+      if (list.length === 0) { next.setAttribute('tabindex', '-1'); }
+      else { next.removeAttribute('tabindex'); }
+    }
+    if (why) { why.hidden = list.length > 0; }
+    if (!tally) { return; }
+    if (!list.length) {
+      tally.textContent = 'В работе пока ничего нет';
+      return;
+    }
+    // ⚠️ СЧЁТ ЗАПРАШИВАЕТСЯ GET-ом. Он ничего не меняет, а POST потребовал
+    // бы ключ защиты формы — на шаге отбора форм нет вовсе, и пришлось бы
+    // держать пустую форму ради одного скрытого поля.
+    fetch(TALLY_URL + '?keys=' + encodeURIComponent(list.join(','))
+          + '&points=' + encodeURIComponent(pointsParam())
+          + (students ? '&students=' + students : ''))
+      .then(function (r) { return r.json(); })
+      .then(function (payload) { tally.textContent = payload.text; })
+      .catch(function () { tally.textContent = ''; });
+  }
+
+  // Баллы, наменянные на шаге состава. На шаге отбора их ещё нет — сервер
+  // подставит подсказку по сложности задачи.
+  var points = {};
+  function pointsParam() {
+    return Object.keys(points).map(function (key) {
+      return key + ':' + points[key];
+    }).join(',');
+  }
+
+  document.addEventListener('click', function (event) {
+    var add_ = event.target.closest('[data-add]');
+    if (add_) {
+      if (has(add_.dataset.add)) { remove(add_.dataset.add); }
+      else { add(add_.dataset.add); }
+      return;
+    }
+    var off = event.target.closest('#wk-next.is-off');
+    if (off) { event.preventDefault(); return; }
+    var clr = event.target.closest('#wk-clear');
+    if (clr) { clear(); }
+  });
+
+  window.QLS_WORK = {
+    keys: keys, has: has, add: add, remove: remove, clear: clear,
+    setOrder: setOrder, refresh: refresh,
+    points: points, pointsParam: pointsParam,
+    onchange: function (fn) { listeners.push(fn); }
+  };
+
+  highlight();
+  refresh();
+})();
+</script>

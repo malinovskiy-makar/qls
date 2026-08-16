@@ -14,10 +14,26 @@
 разметка — в партиалах `teacher/_picker_*.html`.
 """
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Case, Count, IntegerField, Q, Value, When
 
 from problems.hw_generator import is_test_problem
 from problems.text_clean import preview_title
+
+# ⚠️ СОРТИРОВКА ОТБОРА — ТРИ ВАРИАНТА И ОДИН ИСТОЧНИК ПРАВДЫ (ревью 17.08,
+# фаза 8). Ключи едут в адресе (`?sort=`), подписи рисует шаблон отсюда же:
+# список из двух мест разъехался бы на первой правке.
+#
+# ⚠️ «Подходящие по теме» — это НЕ пустая сортировка с красивым названием.
+# Считаются два признака: совпало ли слово запроса в НАЗВАНИИ (а не только
+# где-то в условии) и насколько задача сосредоточена на выбранной теме —
+# задача с одной темой про неё, задача с пятью темами задевает её краем.
+# Ни того ни другого «по номеру задачи» не даёт.
+SORTS = (
+    ('fit', 'сначала подходящие по теме'),
+    ('easy', 'сначала простые'),
+    ('hard', 'сначала сложные'),
+)
+SORT_KEYS = tuple(key for key, _ in SORTS)
 
 # ⚠️ КОРЗИНА ОДНА НА СОБИРАЕМУЮ РАБОТУ (ревью 15.08, п. 11.1). Их было две
 # — `hw_cart` и `exam_cart`, — и переключатель «Домашка / Контрольная» это
@@ -115,11 +131,57 @@ def strip_latex(text):
     return _strip_latex(text)
 
 
-def picker_context(request, per_page=20):
+def source_label(problem):
+    """Откуда задача — одной строкой: «ВсОШ · регион · 2019 · 9–11 класс».
+
+    ⚠️ ПЕЧАТАЕМ ТОЛЬКО ТО, ЧТО ЕСТЬ В ДАННЫХ (ревью 17.08, фаза 8). У части
+    банка заполнен один источник без года и класса, у ВсОШ — всё четыре
+    поля. Подставлять недостающее нечем, а строка «источник · — · — » хуже
+    короткой: она обещает сведения, которых нет.
+    """
+    reference = None
+    for candidate in problem.source_references.all():
+        reference = candidate
+        break
+    if reference is None:
+        return ''
+    parts = [reference.source.name]
+    for value in (reference.stage, reference.year, reference.grade):
+        text = str(value or '').strip()
+        if text and text not in parts:
+            parts.append(text + (' класс' if value is reference.grade else ''))
+    return ' · '.join(parts)
+
+
+def card_facts(problem, is_test, parts_count):
+    """Чипы карточки отбора: тип, пункты, сложность, решение.
+
+    Список готовых строк — шаблон их только рисует. Условие «печатаем
+    только то, что есть» то же, что у `source_label`: чипа «0 пунктов» не
+    бывает, задача без пунктов просто не имеет этого чипа.
+    """
+    facts = ['тест' if is_test else 'задача']
+    if parts_count:
+        from problems.templatetags.ru import count_ru
+
+        facts.append(count_ru(parts_count, 'пункт,пункта,пунктов'))
+    if problem.difficulty:
+        facts.append('сложность %d' % problem.difficulty)
+    if getattr(problem, 'solution', ''):
+        facts.append('есть решение')
+    return facts
+
+
+def picker_context(request, per_page=20, sortable=False):
     """Контекст списка задач каталога: фильтры, карточки, пагинация.
 
     Возвращает готовый словарь — оба конструктора кладут его в свой
     контекст как есть.
+
+    ⚠️ `sortable` ВЫКЛЮЧЕН ПО УМОЛЧАНИЮ НАРОЧНО. Порядок выдачи — это
+    поведение, а не оформление: включив сортировку всем, я поменял бы
+    список на прежних экранах отбора, которых эта сессия не касается.
+    Новый поток просит её явно.
     """
     from problems.management.commands.apply_topic_mapping import CANONICAL
     from problems.models import CustomProblem, Problem, Topic
@@ -144,7 +206,31 @@ def picker_context(request, per_page=20):
     if f_sol == '1':
         qs = qs.exclude(solution='')
 
-    qs = qs.prefetch_related('topics').order_by('-id').distinct()
+    # ⚠️ ПОРЯДОК ПО УМОЛЧАНИЮ — ТОТ ЖЕ, ЧТО БЫЛ (`-id`). «Сначала
+    # подходящие по теме» и есть естественный порядок отфильтрованного
+    # списка: тема и слова запроса уже отобрали, что подходит, а внутри
+    # отобранного сверху идут те, у кого слово нашлось в НАЗВАНИИ, а не
+    # только где-то в условии. Две другие сортировки перекладывают список
+    # по сложности и о фильтрах не знают — это честно написано в подсказке.
+    f_sort = (request.GET.get('sort') or '').strip() if sortable else ''
+    if f_sort not in SORT_KEYS:
+        f_sort = 'fit'
+    order = ['-id']
+    if f_sort == 'easy':
+        order = ['difficulty', '-id']
+    elif f_sort == 'hard':
+        order = ['-difficulty', '-id']
+    elif f_q:
+        qs = qs.annotate(title_hit=Case(
+            When(title__icontains=f_q, then=Value(0)),
+            default=Value(1), output_field=IntegerField()))
+        order = ['title_hit', '-id']
+
+    # ⚠️ ПУНКТЫ СЧИТАЕМ ПРЕДЗАГРУЗКОЙ, А НЕ `annotate(Count(...))`. Число
+    # нужно двадцати карточкам страницы, а `Count` заставил бы базу
+    # сгруппировать все восемнадцать тысяч ДО пагинации — ради чипа.
+    qs = (qs.prefetch_related('topics', 'parts', 'source_references__source')
+          .order_by(*order).distinct())
 
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(request.GET.get('page', 1))
@@ -158,7 +244,12 @@ def picker_context(request, per_page=20):
         preview = word_cut(strip_latex(problem.statement), 100)
         difficulty = problem.difficulty or 0
         topics = list(problem.topics.all())[:3]
+        is_test = is_test_problem(problem)
         cards.append({
+            # Чипы и источник — только для нового потока; прежние шаблоны
+            # этих ключей не читают, и добавление их ничего не меняет.
+            'facts': card_facts(problem, is_test, len(problem.parts.all())),
+            'source': source_label(problem),
             'problem': problem,
             'preview': preview,
             # Название задачи — общей функцией: она умеет и по границе слова
@@ -171,7 +262,7 @@ def picker_context(request, per_page=20):
             'difficulty_empty': range(5 - difficulty),
             # Тип красит полосу слева у карточки (фаза 10.3). Признак тот
             # же, что везде в проекте: «тест: …» в `problem_type`.
-            'is_test': is_test_problem(problem),
+            'is_test': is_test,
         })
 
     problem_types = list(
@@ -218,6 +309,8 @@ def picker_context(request, per_page=20):
         'f_diff': f_diff,
         'f_type': f_type,
         'f_sol': f_sol,
+        'f_sort': f_sort,
+        'sorts': SORTS,
         'preselect_id': request.GET.get('preselect', '').strip(),
         'add_custom': add_custom,
     }
@@ -266,7 +359,7 @@ def parse_cart(raw):
     return keys, catalog, custom
 
 
-def cart_items(keys, owner, manual_order=False, points=None):
+def cart_items(keys, owner, manual_order=False, points=None, suggest=False):
     """Корзина → ПОЗИЦИИ будущей работы в памяти, в порядке показа.
 
     Отдаёт `(позиции, {id(позиции): ключ корзины})`. Нужна и правой колонке
@@ -295,7 +388,7 @@ def cart_items(keys, owner, manual_order=False, points=None):
 
     from problems import assignment_rows
     from problems.models import AssignmentItem, CustomProblem, Problem
-    from problems.models_platform import default_points
+    from problems.models_platform import default_points, suggested_points
 
     keys = [key for key in keys if key]
     catalog_ids = [int(k) for k in keys if k.isdigit()]
@@ -319,8 +412,15 @@ def cart_items(keys, owner, manual_order=False, points=None):
         if item is None:
             continue
         chosen = (points or {}).get(key)
-        item.points = (Decimal(str(chosen)) if chosen is not None
-                       else default_points(item.is_test))
+        if chosen is not None:
+            item.points = Decimal(str(chosen))
+        elif suggest:
+            # Новый поток подставляет балл по сложности задачи; прежние
+            # конструкторы — прежнее значение по умолчанию.
+            item.points = suggested_points(
+                item.is_test, getattr(item.problem, 'difficulty', 0))
+        else:
+            item.points = default_points(item.is_test)
         items.append(item)
         by_item[id(item)] = key
 
@@ -329,7 +429,7 @@ def cart_items(keys, owner, manual_order=False, points=None):
     return ordered, by_item
 
 
-def cart_rows(keys, owner, manual_order=False, points=None):
+def cart_rows(keys, owner, manual_order=False, points=None, suggest=False):
     """Строки для правой колонки конструктора: всё, что показывает экран.
 
     ⚠️ ПОЗИЦИЯ ОТДАЁТ ЗАДАЧУ ЦЕЛИКОМ (ревью 15.08, фаза 12). Блок назывался
@@ -340,12 +440,13 @@ def cart_rows(keys, owner, manual_order=False, points=None):
     """
     from problems import assignment_rows
 
-    ordered, by_item = cart_items(keys, owner, manual_order, points)
+    ordered, by_item = cart_items(keys, owner, manual_order, points, suggest)
     marks = assignment_rows.section_marks(ordered)
 
     rows = []
     for index, item in enumerate(ordered):
         problem = item.problem
+        parts = _cart_parts(item)
         # ⚠️ У своей задачи репетитора тема ОДНА (`topic`), у каталожной —
         # набор (`topics`). Одна строка «тема · тип · сложность» на обе,
         # чтобы превью не разъезжалось по виду задачи.
@@ -367,10 +468,21 @@ def cart_rows(keys, owner, manual_order=False, points=None):
             # а тут задача ещё выбирается; менять текст «по дороге» в
             # конструкторе значило бы показать не то, что уедет в работу.
             'statement': item.statement or '',
-            'parts': _cart_parts(item),
+            'parts': parts,
+            # Подзаголовок позиции в составе: тип · пункты · сложность.
+            # Собирает та же функция, что чипы карточки отбора, — иначе
+            # одна и та же задача описывалась бы на двух шагах по-разному.
+            'facts': card_facts(problem, item.is_test, len(parts)),
             'options': _cart_options(item),
             'answer': _cart_answer(item),
             'has_solution': bool(getattr(problem, 'solution', '')),
+            # ⚠️ РЕШЕНИЕ ЦЕЛИКОМ, А НЕ ТОЛЬКО ПРИЗНАК «ОНО ЕСТЬ» (ревью
+            # 17.08, фазы 8 и 10). Окно «Целиком» обязано показать то же,
+            # что уедет в вариант листка с ответами: пометка «решение
+            # есть» не даёт проверить, что оно про эту задачу.
+            'solution': getattr(problem, 'solution', '') or '',
+            'source': ('своя задача' if item.is_custom
+                       else source_label(problem)),
             'difficulty': problem.difficulty or 0,
             'kind_label': assignment_rows.kind_label(item),
         })
@@ -378,16 +490,26 @@ def cart_rows(keys, owner, manual_order=False, points=None):
 
 
 def _cart_parts(item):
-    """Пункты задачи для превью: буква, вопрос, эталонный ответ."""
+    """Пункты задачи для превью: буква, вопрос, эталонный ответ, вес.
+
+    ⚠️ ПУНКТЫ СПРАШИВАЕТ ОДНА ФУНКЦИЯ (`assignment_rows.answer_parts`) —
+    у своей задачи репетитора они лежат в своей таблице, и обращение к
+    `catalog_problem.parts` отдало бы пустоту (ревью 16.08, фаза 1).
+    """
     from problems import assignment_rows
 
     out = []
     for part in assignment_rows.answer_parts(item):
         if part is None:
             continue
+        points = getattr(part, 'points', None)
         out.append({'label': part.label or '',
                     'text': part.statement or '',
-                    'answer': (part.answer or '')})
+                    'answer': (part.answer or ''),
+                    # Вес пункта, а НЕ балл: балл считает позиция работы
+                    # (`assignment_rows.part_max_score`), и печатать здесь
+                    # каталожное число значило бы обещать не тот балл.
+                    'weight': float(points) if points is not None else None})
     return out
 
 

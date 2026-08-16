@@ -483,9 +483,14 @@ def api_cart_rows(request):
     # без этого заголовок показывал бы баллы по умолчанию, пока в строках
     # стоят исправленные. Складывать их на клиенте нельзя: склонение
     # «балл / балла / баллов» тогда существовало бы в двух местах.
+    # ⚠️ ПОДСКАЗКА БАЛЛА ПРОСИТСЯ ЯВНО. Новый поток предлагает балл по
+    # сложности задачи, прежние конструкторы — прежнее значение по
+    # умолчанию; молча поменять его всем значило бы переоценить работы,
+    # собираемые на старых экранах прямо сейчас.
     rows = cart_rows(keys, request.user,
                      manual_order=request.POST.get('manual_order') == '1',
-                     points=parse_points(request.POST.get('points')))
+                     points=parse_points(request.POST.get('points')),
+                     suggest=request.POST.get('suggest') == '1')
     return JsonResponse({'rows': rows})
 
 

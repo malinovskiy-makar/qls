@@ -227,11 +227,23 @@ def section_detail(kind, count, points):
         # ⚠️ У ДРОБНОГО ЧИСЛА ФОРМА ВСЕГДА РОДИТЕЛЬНАЯ: «1,5 балла», а не
         # «1,5 балл». Отбросить дробную часть и склонять по целому нельзя —
         # именно так и вышло бы «1,5 балл».
-        number = Decimal(str(points))
-        word = (POINT_FORMS[1] if number != number.to_integral_value()
-                else pick(int(number), *POINT_FORMS))
-        parts.append('%s %s' % (ball(number, '0'), word))
+        parts.append(points_text(points))
     return ' · '.join(parts)
+
+
+def points_text(points):
+    """«6 баллов» / «1,5 балла» — ЕДИНСТВЕННАЯ точка на весь проект.
+
+    ⚠️ У ДРОБНОГО ЧИСЛА ФОРМА ВСЕГДА РОДИТЕЛЬНАЯ. Отбросить дробную часть
+    и склонять по целому нельзя: именно так и выходило «1,5 балл».
+    """
+    from problems.scorefmt import ball
+    from problems.templatetags.ru import pick
+
+    number = Decimal(str(points))
+    word = (POINT_FORMS[1] if number != number.to_integral_value()
+            else pick(int(number), *POINT_FORMS))
+    return '%s %s' % (ball(number, '0'), word)
 
 
 def section_caption(kind, count, points):

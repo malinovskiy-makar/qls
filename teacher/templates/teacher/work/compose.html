@@ -1,0 +1,488 @@
+{% extends "teacher/base.html" %}
+
+{% comment %}
+ШАГ 3 «СОСТАВ» — общий для всех способов набора.
+
+⚠️ КОНСТРУКТОР БЫЛ ТОЛЬКО У ОДНОГО ПУТИ. Собранное вручную уходило ученику
+мимо экрана, где видно порядок, баллы и содержимое задач: репетитор узнавал
+состав работы, только создав её. Теперь этот шаг проходят все три пути.
+
+⚠️ СПИСОК СТРОИТ СЕРВЕР (`teacher:api_cart_rows`). Порядок частей, подписи
+«Тестовая часть · 3 вопроса · 6 баллов» и содержимое задач считает тот же
+код, что рисует работу ученику, репетитору, печатному листку и `.tex`.
+Второй сборки нет намеренно: состав, расходящийся с выданной работой, хуже
+отсутствия предпросмотра.
+{% endcomment %}
+
+{% block title %}Состав работы{% endblock %}
+
+{% block extra_style %}
+.wk-wrap { max-width: 1000px; }
+.wk-sum { display: flex; gap: 20px; flex-wrap: wrap; font-size: 13px;
+          color: var(--text2); margin: 0 2px 14px; }
+.wk-sum b { color: var(--text); }
+
+{% comment %}Позиция работы: ручка, номер, название, балл, кнопки.{% endcomment %}
+.wk-item { display: flex; gap: 12px; align-items: flex-start;
+           background: var(--surface); border: 0.5px solid var(--border);
+           border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.wk-item.is-drag { opacity: .45; }
+.wk-item.is-over { border-color: var(--accent); }
+.wk-grip { color: var(--text3); cursor: grab; font-size: 14px;
+           line-height: 1.5; user-select: none; }
+.wk-no { font-size: 13px; font-weight: 700; color: var(--text3);
+         min-width: 20px; line-height: 1.5; }
+.wk-body { flex: 1; min-width: 0; }
+.wk-title { font-size: 14px; font-weight: 600; line-height: 1.4; }
+.wk-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+.wk-open { background: none; border: 0; padding: 4px 0 0; cursor: pointer;
+           font-size: 12px; color: var(--accent); }
+.wk-open:hover { text-decoration: underline; }
+.wk-side { display: flex; align-items: center; gap: 8px; }
+.wk-move { display: inline-flex; flex-direction: column; gap: 2px; }
+.wk-move button { background: none; border: 0.5px solid var(--border);
+                  border-radius: 5px; color: var(--text2); cursor: pointer;
+                  font-size: 11px; line-height: 1; padding: 3px 5px; }
+.wk-move button:hover:not(:disabled) { color: var(--text);
+                                       border-color: var(--text3); }
+.wk-move button:disabled { opacity: .35; cursor: default; }
+.wk-pts { display: flex; align-items: center; gap: 5px; font-size: 12px;
+          color: var(--text3); }
+.wk-pts input { width: 58px; text-align: center; }
+{% comment %}
+Пустое поле балла — это ноль, и оно об этом говорит: молчаливый ноль
+складывается в работу «на 0 баллов» и обнаруживается уже у ученика.
+{% endcomment %}
+.wk-pts input.is-zero { border-color: var(--amber);
+                        background: var(--amber-tint); }
+.wk-x { background: none; border: 0; color: var(--text3); cursor: pointer;
+        font-size: 17px; line-height: 1; padding: 2px 4px; }
+.wk-x:hover { color: var(--error); }
+
+{% comment %}Окно «как увидит ученик»: тот же список, но без ответов.{% endcomment %}
+.wk-eyes { position: fixed; inset: 0; z-index: 300; display: none;
+           background: rgba(15,23,42,.55); padding: 24px; overflow: auto; }
+.wk-eyes.is-open { display: block; }
+.wk-eyes__sheet { max-width: 760px; margin: 0 auto; background: var(--surface);
+                  border-radius: 12px; padding: 22px 26px 26px; }
+.wk-eyes__head { display: flex; align-items: baseline; gap: 12px; }
+.wk-eyes__head h2 { font-size: 17px; font-weight: 700; flex: 1; }
+.wk-eyes__note { font-size: 12px; color: var(--text3); margin: 6px 0 14px; }
+.wk-eyes__task { margin-top: 16px; padding-top: 14px;
+                 border-top: 1px solid var(--border-soft); }
+.wk-eyes__no { font-size: 13px; font-weight: 700; color: var(--text2); }
+.wk-eyes__st { white-space: pre-line; line-height: 1.7; margin-top: 4px; }
+.wk-eyes__part { margin-top: 8px; }
+.wk-eyes__part b { color: var(--accent); }
+.wk-eyes__field { margin-top: 8px; height: 34px; border-radius: var(--r);
+                  border: 1px dashed var(--border); background: var(--surface-2); }
+.wk-big { margin: 0 2px 14px; }
+{% endblock %}
+
+{% block content %}
+<div class="wk-wrap">
+{% include "teacher/work/_head.html" %}
+
+<div class="wk-sum">
+  <span>Позиций: <b id="wk-n">0</b></span>
+  <span>Баллов: <b id="wk-p">0</b></span>
+  <span>Тестов: <b id="wk-t">0</b></span>
+  <span>Задач: <b id="wk-o">0</b></span>
+</div>
+
+{% comment %}
+⚠️ ПРЕДУПРЕЖДАЕМ, НО НЕ ЗАПРЕЩАЕМ. Работа на тридцать с лишним позиций —
+это, скорее всего, промах, но бывают и сборники: запрет здесь отнял бы
+законный сценарий ради подсказки.
+{% endcomment %}
+<div class="k-state k-state--warn wk-big" id="wk-big" hidden>
+  Работа получается очень большой — <b id="wk-big-n">0</b> позиций.
+  Ученику её, скорее всего, не осилить за один раз.
+</div>
+
+<div class="k-state wk-big" id="wk-zero" hidden>
+  Проставьте баллы: сейчас вся работа стоит ноль.
+</div>
+
+<div id="wk-list"></div>
+
+<div class="wk-empty" id="wk-none" hidden>
+  <b>В работе пока ничего нет</b>
+  Вернитесь к выбору и добавьте задачи — из каталога, подбором по описанию
+  или написав свою.
+  <div><a class="k-btn k-btn--main k-btn--sm" href="{{ steps.pick }}">Вернуться к выбору</a></div>
+</div>
+
+<div class="k-row" id="wk-previews" style="gap:10px;margin-top:14px;flex-wrap:wrap" hidden>
+  <button type="button" class="k-btn k-btn--plain" id="wk-eyes-open">
+    Посмотреть, как увидит ученик</button>
+  <button type="submit" form="wk-print" class="k-btn k-btn--plain">
+    Предпросмотр печатного листа</button>
+</div>
+
+{% comment %}
+Печатный лист собирает СЕРВЕР той же `assignment_export.print_rows`, что
+печатает уже созданную работу. В базу не пишется ничего.
+{% endcomment %}
+<form id="wk-print" method="post" target="_blank"
+      action="{% url 'teacher:cart_print' %}">
+  {% csrf_token %}
+  <input type="hidden" name="keys" id="wk-print-keys">
+  <input type="hidden" name="points" id="wk-print-points">
+  <input type="hidden" name="manual_order" id="wk-print-order">
+  {% if is_exam %}<input type="hidden" name="kind" value="exam">{% endif %}
+  {% comment %}
+  ⚠️ ПОЛЕ НАЗЫВАЕТСЯ `work_name`, А НЕ `name`: второй элемент с именем
+  `name` делает поиск по этому имени двусмысленным (родня ловушки с полем
+  `action`, из-за которой форма уходила на «…/[object HTMLInputElement]»).
+  {% endcomment %}
+  <input type="hidden" name="work_name" value="">
+</form>
+
+<div class="wk-eyes" id="wk-eyes" role="dialog" aria-modal="true"
+     aria-label="Работа глазами ученика">
+  <div class="wk-eyes__sheet">
+    <div class="wk-eyes__head">
+      <h2>Работа глазами ученика</h2>
+      <button type="button" class="k-btn k-btn--plain k-btn--sm"
+              id="wk-eyes-close">Закрыть</button>
+    </div>
+    <div class="wk-eyes__note">Ответов и решений ученик здесь не видит.</div>
+    <div id="wk-eyes-list"></div>
+  </div>
+</div>
+
+{% include "teacher/work/_bar.html" with next_url=steps.give next_label="Дальше — выдача →" back_url=steps.pick back_label="← Добавить ещё" %}
+</div>
+
+{% comment %}Разметка позиции одна — скрипт клонирует её же.{% endcomment %}
+<template id="wk-item-tpl">
+  <div class="wk-item" draggable="true">
+    <span class="wk-grip" title="Перетащить" aria-hidden="true">⠿</span>
+    <span class="wk-no"></span>
+    <div class="wk-body">
+      <div class="wk-title"></div>
+      <div class="wk-sub"><span class="k-kind"></span> <span class="wk-sub-t"></span></div>
+      <button type="button" class="wk-open">Показать целиком</button>
+      <div class="wk-full" hidden></div>
+    </div>
+    <div class="wk-side">
+      {% comment %}
+      ⚠️ КНОПКИ ПОРЯДКА ОБЯЗАТЕЛЬНЫ. Перетаскивание с клавиатуры недоступно,
+      и экран, где порядок задаётся только мышью, для части людей просто не
+      работает. Перетаскивание — удобство сверху, а не единственный способ.
+      {% endcomment %}
+      <span class="wk-move">
+        <button type="button" class="wk-up" title="Выше"
+                aria-label="Переместить выше">↑</button>
+        <button type="button" class="wk-down" title="Ниже"
+                aria-label="Переместить ниже">↓</button>
+      </span>
+      <span class="wk-pts">
+        <input class="k-input k-input--num" type="text" inputmode="decimal"
+               aria-label="балл за задачу"><span>б.</span>
+      </span>
+      <button type="button" class="wk-x" title="Убрать из работы">×</button>
+    </div>
+  </div>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+{% include "teacher/_cart_keys.html" %}
+{% include "teacher/work/_full_js.html" %}
+{% include "teacher/work/_bar_js.html" %}
+<script>
+(function () {
+  'use strict';
+  var ROWS_URL = '{% url "teacher:api_cart_rows" %}';
+  var BIG_WORK = 30;
+  var CSRF = document.querySelector('[name=csrfmiddlewaretoken]');
+  var esc = window.QLS_FULL.esc;
+  var rows = [];
+  var opened = {};
+  var points = window.QLS_WORK.points;
+
+  function manualOrder() {
+    try { return sessionStorage.getItem(window.QLS_CART.manual) || ''; }
+    catch (e) { return ''; }
+  }
+
+  function load() {
+    var list = window.QLS_WORK.keys();
+    if (!list.length) { rows = []; render(); return; }
+    var data = new FormData();
+    data.append('csrfmiddlewaretoken', CSRF ? CSRF.value : '');
+    data.append('keys', list.join(','));
+    data.append('manual_order', manualOrder() === '1' ? '1' : '');
+    // ⚠️ БАЛЛ ПО УМОЛЧАНИЮ ПРОСИТСЯ ЯВНО (`suggest`): в этом потоке задача
+    // стоит столько, какова её сложность, а тест — один балл. Прежние
+    // конструкторы просят прежнее значение, и менять его им нельзя.
+    data.append('suggest', '1');
+    data.append('points', window.QLS_WORK.pointsParam());
+    fetch(ROWS_URL, { method: 'POST', body: data })
+      .then(function (r) { return r.json(); })
+      .then(function (payload) { rows = payload.rows || []; render(); })
+      .catch(function () { rows = []; render(); });
+  }
+
+  // Откуда задача пришла в работу. Ключ «c…» — своя задача репетитора;
+  // остальное различает пометка, поставленная при добавлении.
+  function origin(key) {
+    var cart = {};
+    try { cart = JSON.parse(sessionStorage.getItem(window.QLS_CART.cart) || '{}'); }
+    catch (e) {}
+    if (String(key).charAt(0) === 'c') { return 'своя задача'; }
+    var from = cart[key] && cart[key].from;
+    return from === 'describe' ? 'подобрано по описанию' : 'из каталога';
+  }
+
+  function render() {
+    var host = document.getElementById('wk-list');
+    var tpl = document.getElementById('wk-item-tpl');
+    host.innerHTML = '';
+    document.getElementById('wk-none').hidden = rows.length > 0;
+    document.getElementById('wk-previews').hidden = rows.length === 0;
+
+    rows.forEach(function (row, index) {
+      if (row.section) {
+        var sep = document.createElement('div');
+        sep.className = 'k-sep k-sep--head';
+        sep.setAttribute('data-section', row.section.kind);
+        sep.innerHTML = '<span class="k-sep__cap"></span>'
+          + '<span class="k-sep__of"></span><span class="k-sep__line"></span>';
+        sep.querySelector('.k-sep__cap').textContent = row.section.title;
+        sep.querySelector('.k-sep__of').textContent = row.section.detail;
+        host.appendChild(sep);
+      }
+      var node = tpl.content.firstElementChild.cloneNode(true);
+      node.dataset.key = row.key;
+      node.classList.add('k-type', row.is_test ? 'k-type--test' : 'k-type--task');
+      node.querySelector('.wk-no').textContent = (index + 1) + '.';
+      node.querySelector('.wk-title').textContent = row.title;
+      node.querySelector('.k-kind').textContent = row.is_test ? 'Тест' : 'Задача';
+      node.querySelector('.wk-sub-t').textContent =
+        (row.facts || []).slice(1).concat([origin(row.key)]).join(' · ');
+      var field = node.querySelector('.wk-pts input');
+      field.value = (points[row.key] !== undefined)
+        ? String(points[row.key]).replace('.', ',') : String(row.points).replace('.', ',');
+      points[row.key] = num(field.value);
+      field.classList.toggle('is-zero', !points[row.key]);
+      // ⚠️ ОДНА ПОЗИЦИЯ — ПЕРЕСТАВЛЯТЬ НЕЧЕГО: обе кнопки гаснут, и
+      // перетаскивание выключается тоже.
+      node.querySelector('.wk-up').disabled = index === 0;
+      node.querySelector('.wk-down').disabled = index === rows.length - 1;
+      if (rows.length < 2) { node.draggable = false; }
+      // Раскрытие переживает перерисовку: список пересобирается на каждую
+      // правку балла, и свёрнутая обратно задача читалась бы как сбой.
+      if (opened[row.key]) {
+        var box = node.querySelector('.wk-full');
+        box.hidden = false;
+        node.querySelector('.wk-open').textContent = 'Свернуть';
+        window.QLS_FULL.fill(box, row);
+      }
+      host.appendChild(node);
+    });
+    recount();
+  }
+
+  // ⚠️ ЗАПЯТАЯ — ЗАКОННАЯ ДЕСЯТИЧНАЯ ТОЧКА. Поле текстовое именно поэтому:
+  // числовое поле стирает СОБСТВЕННОЕ значение, увидев «1,5».
+  function num(value) {
+    var n = parseFloat(String(value).replace(',', '.'));
+    return (isNaN(n) || n < 0) ? 0 : n;
+  }
+
+  function recount() {
+    var total = 0, tests = 0;
+    rows.forEach(function (row) {
+      total += points[row.key] || 0;
+      if (row.is_test) { tests += 1; }
+    });
+    document.getElementById('wk-n').textContent = rows.length;
+    document.getElementById('wk-p').textContent =
+      (Math.round(total * 100) / 100).toString().replace('.', ',');
+    document.getElementById('wk-t').textContent = tests;
+    document.getElementById('wk-o').textContent = rows.length - tests;
+    document.getElementById('wk-big').hidden = rows.length <= BIG_WORK;
+    document.getElementById('wk-big-n').textContent = rows.length;
+
+    // ⚠️ РАБОТА НА НОЛЬ БАЛЛОВ ДАЛЬШЕ НЕ ИДЁТ. Сумма ноль означает, что
+    // оценивать нечем: ученик получит «0 из 0» и не поймёт, при чём тут он.
+    var zero = rows.length > 0 && total <= 0;
+    document.getElementById('wk-zero').hidden = !zero;
+    var next = document.getElementById('wk-next');
+    var why = document.getElementById('wk-why');
+    if (next && zero) {
+      next.classList.add('is-off');
+      next.setAttribute('aria-disabled', 'true');
+      if (why) { why.hidden = false; why.textContent = 'Проставьте баллы'; }
+    } else if (why && rows.length) {
+      why.hidden = true;
+    }
+    if (why && !rows.length) {
+      why.textContent = 'Добавьте хотя бы одну задачу';
+    }
+
+    document.getElementById('wk-print-keys').value =
+      rows.map(function (r) { return r.key; }).join(',');
+    document.getElementById('wk-print-points').value =
+      window.QLS_WORK.pointsParam();
+    document.getElementById('wk-print-order').value = manualOrder();
+    window.QLS_WORK.refresh();
+  }
+
+  // ── Раскрытие позиции ───────────────────────────────────────────────
+  document.addEventListener('click', function (event) {
+    var open = event.target.closest('.wk-open');
+    if (!open) { return; }
+    var item = open.closest('.wk-item');
+    var row = rows.filter(function (r) { return r.key === item.dataset.key; })[0];
+    var box = item.querySelector('.wk-full');
+    var show = box.hidden;
+    box.hidden = !show;
+    open.textContent = show ? 'Свернуть' : 'Показать целиком';
+    opened[item.dataset.key] = show;
+    if (show && row) { window.QLS_FULL.fill(box, row); }
+  });
+
+  // ── Порядок: кнопки и перетаскивание ─────────────────────────────────
+  function move(key, shift) {
+    var order = rows.map(function (r) { return r.key; });
+    var at = order.indexOf(key);
+    var to = at + shift;
+    if (at < 0 || to < 0 || to >= order.length) { return; }
+    order.splice(to, 0, order.splice(at, 1)[0]);
+    window.QLS_WORK.setOrder(order);
+    load();
+  }
+
+  document.addEventListener('click', function (event) {
+    var up = event.target.closest('.wk-up');
+    var down = event.target.closest('.wk-down');
+    if (up || down) {
+      move((up || down).closest('.wk-item').dataset.key, up ? -1 : 1);
+      return;
+    }
+    var drop = event.target.closest('.wk-x');
+    if (drop) {
+      var key = drop.closest('.wk-item').dataset.key;
+      delete points[key];
+      window.QLS_WORK.remove(key);
+      // ⚠️ ПОСЛЕ УДАЛЕНИЯ СПИСОК ПЕРЕСПРАШИВАЕТСЯ У СЕРВЕРА: состав части
+      // («3 вопроса · 6 баллов») считает питон, и убрав задачу локально, мы
+      // оставили бы заголовок обещать вопрос, которого уже нет.
+      load();
+    }
+  });
+
+  var dragKey = null;
+  document.addEventListener('dragstart', function (event) {
+    var item = event.target.closest && event.target.closest('.wk-item');
+    if (!item || rows.length < 2) { return; }
+    dragKey = item.dataset.key;
+    item.classList.add('is-drag');
+    event.dataTransfer.effectAllowed = 'move';
+    try { event.dataTransfer.setData('text/plain', dragKey); } catch (e) {}
+  });
+  document.addEventListener('dragover', function (event) {
+    var item = event.target.closest && event.target.closest('.wk-item');
+    if (!item || !dragKey) { return; }
+    event.preventDefault();
+    item.classList.add('is-over');
+  });
+  document.addEventListener('dragleave', function (event) {
+    var item = event.target.closest && event.target.closest('.wk-item');
+    if (item) { item.classList.remove('is-over'); }
+  });
+  document.addEventListener('drop', function (event) {
+    var item = event.target.closest && event.target.closest('.wk-item');
+    if (!item || !dragKey) { return; }
+    event.preventDefault();
+    item.classList.remove('is-over');
+    var order = rows.map(function (r) { return r.key; });
+    var from = order.indexOf(dragKey);
+    var to = order.indexOf(item.dataset.key);
+    dragKey = null;
+    if (from < 0 || to < 0 || from === to) { return; }
+    order.splice(to, 0, order.splice(from, 1)[0]);
+    window.QLS_WORK.setOrder(order);
+    load();
+  });
+  document.addEventListener('dragend', function () {
+    dragKey = null;
+    document.querySelectorAll('.wk-item').forEach(function (item) {
+      item.classList.remove('is-drag', 'is-over');
+    });
+  });
+
+  // ── Баллы ────────────────────────────────────────────────────────────
+  var timer = null;
+  document.addEventListener('input', function (event) {
+    var field = event.target.closest('.wk-pts input');
+    if (!field) { return; }
+    var key = field.closest('.wk-item').dataset.key;
+    points[key] = num(field.value);
+    field.classList.toggle('is-zero', !points[key]);
+    recount();
+    // Правка балла меняет и состав части — ждём паузу в наборе, чтобы не
+    // слать запрос на каждую цифру.
+    if (timer) { clearTimeout(timer); }
+    timer = setTimeout(load, 500);
+  });
+
+  // ── «Как увидит ученик» ──────────────────────────────────────────────
+  var eyes = document.getElementById('wk-eyes');
+  document.getElementById('wk-eyes-open').addEventListener('click', function () {
+    var host = document.getElementById('wk-eyes-list');
+    host.innerHTML = '';
+    rows.forEach(function (row, index) {
+      if (row.section) {
+        var sep = document.createElement('div');
+        sep.className = 'k-sep k-sep--head';
+        sep.innerHTML = '<span class="k-sep__cap"></span>'
+          + '<span class="k-sep__of"></span><span class="k-sep__line"></span>';
+        sep.querySelector('.k-sep__cap').textContent = row.section.title;
+        sep.querySelector('.k-sep__of').textContent = row.section.detail;
+        host.appendChild(sep);
+      }
+      var task = document.createElement('div');
+      task.className = 'wk-eyes__task';
+      var html = '<div class="wk-eyes__no">' + (index + 1) + '.</div>'
+        + '<div class="wk-eyes__st">' + esc(row.statement) + '</div>';
+      (row.parts || []).forEach(function (part) {
+        html += '<div class="wk-eyes__part"><b>' + esc(part.label) + ')</b> '
+          + esc(part.text) + '<div class="wk-eyes__field"></div></div>';
+      });
+      if ((row.options || []).length) {
+        html += '<ul class="wk-opts">';
+        (row.options || []).forEach(function (option) {
+          html += '<li>' + esc(option.text) + '</li>';
+        });
+        html += '</ul>';
+      }
+      if (!(row.parts || []).length) { html += '<div class="wk-eyes__field"></div>'; }
+      task.innerHTML = html;
+      host.appendChild(task);
+    });
+    window.QLS_FULL.typeset(host);
+    eyes.classList.add('is-open');
+  });
+  function closeEyes() { eyes.classList.remove('is-open'); }
+  document.getElementById('wk-eyes-close').addEventListener('click', closeEyes);
+  eyes.addEventListener('click', function (event) {
+    if (event.target === eyes) { closeEyes(); }
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') { closeEyes(); }
+  });
+
+  // Удаление из полосы собранного (кнопка «Очистить») тоже перерисовывает.
+  window.QLS_WORK.onchange(function () {
+    if (!window.QLS_WORK.keys().length) { rows = []; render(); }
+  });
+
+  load();
+})();
+</script>
+{% endblock %}

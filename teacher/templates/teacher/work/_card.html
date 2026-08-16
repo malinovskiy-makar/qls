@@ -1,0 +1,40 @@
+{% comment %}
+Карточка задачи на шаге «Что кладём». ОДНА разметка на все пять вкладок:
+каталог, отложенные, свои задачи. Вкладка — это откуда взяли задачу, а не
+другой сорт задачи, и выглядеть карточки обязаны одинаково.
+
+Ждёт: key (ключ корзины: номер или «c12»), title, facts (список чипов),
+source, preview, is_test.
+
+⚠️ КЛЮЧ КОРЗИНЫ, А НЕ НОМЕР ЗАДАЧИ. Своя задача репетитора и каталожная
+могут иметь один и тот же номер; голый номер увёл бы в работу чужую
+(ревью 15.08, п. 11.2).
+
+⚠️ ПОЛОСУ СЛЕВА КРАСИТ НАБОР (`k-type`), цвета не трогаем — прямое
+решение владельца.
+{% endcomment %}
+<div class="wk-card k-type k-type--{% if is_test %}test{% else %}task{% endif %}"
+     data-pid="{{ key }}" data-kind="{% if is_test %}test{% else %}open{% endif %}"
+     data-title="{{ title }}">
+  <div class="wk-card__main">
+    <div class="wk-card__title">{{ title }}</div>
+    <div class="wk-card__facts">
+      {% for fact in facts %}<span class="wk-chip">{{ fact }}</span>{% endfor %}
+    </div>
+    {% if source %}<div class="wk-card__src">{{ source }}</div>{% endif %}
+    {% if preview %}<p class="wk-card__lead">{{ preview }}</p>{% endif %}
+    {% comment %}
+    Задача целиком раскрывается ЗДЕСЬ ЖЕ — тем же окном, что на шаге
+    «Что нашлось»: условие без обрезки, все пункты с ответами, ответ,
+    эталонное решение. Содержимое приезжает по нажатию, а не с каждой из
+    двадцати карточек страницы.
+    {% endcomment %}
+    <div class="wk-full" hidden></div>
+  </div>
+  <div class="wk-card__acts">
+    <button type="button" class="k-btn k-btn--quiet k-btn--sm wk-more"
+            data-full="{{ key }}">Целиком</button>
+    <button type="button" class="k-btn k-btn--main k-btn--sm wk-add"
+            data-add="{{ key }}">+ Добавить</button>
+  </div>
+</div>

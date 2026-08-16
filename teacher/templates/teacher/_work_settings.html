@@ -195,8 +195,12 @@
       типа (сессия 9, фаза 9). Второй список заставил бы репетитора помнить,
       где кто лежит.
       {% endcomment %}
+      {% comment %}
+      `data-students` — сколько человек в занятии. Нужно шагу выдачи, чтобы
+      сказать «выдаётся 3 ученикам»; прежние экраны его не читают.
+      {% endcomment %}
       <input type="{% if group_choice %}{{ group_choice }}{% elif is_exam %}radio{% else %}checkbox{% endif %}"
-             name="groups" value="{{ g.pk }}"
+             name="groups" value="{{ g.pk }}" data-students="{{ g.students.count }}"
              {% if group_id and g.pk|stringformat:"s" == group_id|stringformat:"s" %}checked{% endif %}>
       <span>{{ g.name }}
         <span class="k-chip-kind">{{ g.kind_label }}</span>

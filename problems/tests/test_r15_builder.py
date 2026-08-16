@@ -190,7 +190,12 @@ class GroupFromUrlTests(TestCase):
 
     def checked(self, url):
         html = self.client.get(url).content.decode()
-        return re.findall(r'name="groups" value="(\d+)"\s*\n?\s*checked', html)
+        # ⚠️ Ищем `checked` ГДЕ УГОДНО ВНУТРИ ТЕГА, а не следующим словом:
+        # проверка ломалась от любого нового атрибута между ними, хотя
+        # проверяет она совсем другое. Так и вышло, когда полю добавили
+        # число учеников для сводки выдачи.
+        return re.findall(r'name="groups" value="(\d+)"[^>]*?\bchecked', html,
+                          re.S)
 
     def test_creation_screens_precheck_the_group(self):
         for url in ('/teacher/assignment/create/?group=%d' % self.second.pk,

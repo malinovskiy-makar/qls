@@ -2,7 +2,7 @@ from django.urls import path
 
 from . import (
     views, views_exams, views_generate, views_groups, views_problems,
-    views_stats,
+    views_stats, views_work,
 )
 
 app_name = 'teacher'
@@ -84,6 +84,18 @@ urlpatterns = [
     # Версия для печати — основной способ получить листок (Фаза C.1).
     path('groups/<int:group_id>/assignments/<int:assignment_id>/print/',
          views_generate.assignment_print, name='assignment_print'),
+
+    # ---- Новый поток создания работы: четыре шага ------------------------
+    # Строится РЯДОМ со старыми конструкторами и переключается на них
+    # последним шагом: пока поток не готов целиком, на сайте обязана
+    # работать ровно одна модель навигации — прежняя.
+    path('work/', views_work.work_pick, name='work_pick'),
+    path('work/start/', views_work.work_start, name='work_start'),
+    path('work/compose/', views_work.work_compose, name='work_compose'),
+    path('work/give/', views_work.work_give, name='work_give'),
+    path('work/api/full/<str:key>/', views_work.api_work_full,
+         name='api_work_full'),
+    path('work/api/tally/', views_work.api_work_tally, name='api_work_tally'),
 
     path('assignment/create/', views.assignment_create,
          name='assignment_create'),

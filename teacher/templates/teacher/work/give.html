@@ -1,0 +1,293 @@
+{% extends "teacher/base.html" %}
+{% load ru %}
+
+{% comment %}
+ШАГ 4 «ВЫДАЧА» — настройки в конце, рядом с тем, что получит ученик.
+
+⚠️ НАСТРОЙКИ ПРИЕХАЛИ СЮДА С ПЕРВОГО ШАГА. Название, срок и «кому» нужны
+один раз и в конце; пока они висели справа с самого начала, они занимали
+треть ширины там, где нужен был каталог, а спрашивались за три экрана до
+того, как на них можно ответить.
+
+⚠️ РАБОТУ СОЗДАЁТ ПРЕЖНИЙ ОБРАБОТЧИК. Форма уходит в `assignment_create`
+(домашка) или `exam_create` (контрольная) — те же, что у старых
+конструкторов, с теми же именами полей. Второй точки создания работы в
+проекте нет: разъезжаются не экраны, а правила.
+{% endcomment %}
+
+{% block title %}Выдача работы{% endblock %}
+
+{% block extra_style %}
+.wk-wrap { max-width: 1100px; }
+.wk-give { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,.85fr);
+           gap: 22px; align-items: start; }
+.wk-sheet { position: sticky; top: 68px; background: var(--surface-2);
+            border: 0.5px solid var(--border); border-radius: 12px;
+            padding: 14px 16px; }
+.wk-sheet__cap { font-size: 11px; letter-spacing: .08em;
+                 text-transform: uppercase; color: var(--text3);
+                 margin-bottom: 10px; }
+.wk-paper { background: var(--surface); border-radius: 8px;
+            padding: 16px 18px; font-size: 12px; line-height: 1.6; }
+.wk-paper h3 { font-size: 14px; font-weight: 700; text-align: center; }
+.wk-paper .wk-paper__sub { text-align: center; color: var(--text2);
+                           font-size: 11px; margin: 3px 0 12px; }
+.wk-paper__task { margin-top: 10px; }
+.wk-paper__no { font-weight: 700; }
+.wk-paper__st { white-space: pre-line; }
+.wk-paper__part { margin-left: 12px; }
+.wk-paper__part b { color: var(--accent); }
+.wk-paper :is(table, .katex-display) { overflow-x: auto; }
+.wk-note { font-size: 12px; color: var(--text3); margin-top: 10px; }
+@media (max-width: 900px) {
+  .wk-give { grid-template-columns: minmax(0,1fr); }
+  .wk-sheet { position: static; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="wk-wrap">
+{% include "teacher/work/_head.html" %}
+
+<div class="wk-give">
+  <div>
+    {% comment %}
+    ⚠️ АДРЕС ФОРМЫ ЗАВИСИТ ОТ ВИДА РАБОТЫ, а у контрольной — ещё и от
+    занятия: её обработчик живёт ВНУТРИ занятия. Занятие выбирают прямо
+    здесь, поэтому адрес досоставляет скрипт.
+    {% endcomment %}
+    <form method="post" id="wk-form"
+          action="{% url 'teacher:assignment_create' %}"
+          data-hw-url="{% url 'teacher:assignment_create' %}"
+          data-exam-url-template="/teacher/groups/0/exams/new/"
+          data-exam="{% if is_exam %}1{% else %}0{% endif %}">
+      {% csrf_token %}
+      <input type="hidden" name="problem_ids" id="wk-ids">
+      <input type="hidden" name="problem_points" id="wk-points">
+      <input type="hidden" name="manual_order" id="wk-manual">
+
+      {% comment %}
+      ⚠️ ВЫБОР ЗАНЯТИЯ У КОНТРОЛЬНОЙ ОДИНОЧНЫЙ, и это не оформление:
+      её обработчик живёт ВНУТРИ занятия и получает его адресом. Галочки
+      обещали бы выдать контрольную трём занятиям сразу, а получило бы её
+      одно. Вид выбора partial ставит сам по `is_exam` — второго правила
+      здесь не заводим.
+      {% endcomment %}
+      {% include "teacher/_work_settings.html" with is_exam=is_exam groups=groups group_id=group_id form=form min_window=min_window min_duration=min_duration max_duration=max_duration submit_apart=1 %}
+
+      {% comment %}
+      ⚠️ СРОК МОЖНО НЕ ЗАДАВАТЬ, И ЭТО НАПИСАНО НА ЭКРАНЕ (подсказка внутри
+      панели настроек). Молчаливо пустое поле читается как недоделанная
+      форма, а работа без срока — законное состояние.
+      {% endcomment %}
+    </form>
+  </div>
+
+  <aside class="wk-sheet">
+    <div class="wk-sheet__cap">Так уйдёт ученику</div>
+    <div class="wk-paper" id="wk-paper">
+      <h3 id="wk-paper-name">Новая работа</h3>
+      <div class="wk-paper__sub" id="wk-paper-sub"></div>
+      <div id="wk-paper-body"></div>
+    </div>
+    <div class="wk-note">Тот же состав, что уйдёт в печать и в
+      <span aria-label="файл TeX">.tex</span> — один источник, не три разных.</div>
+  </aside>
+</div>
+
+{% include "teacher/work/_bar.html" with next_url="#" next_label="Выдать работу" back_url=steps.compose back_label="← Назад к составу" %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include "teacher/_cart_keys.html" %}
+{% include "teacher/work/_full_js.html" %}
+{% include "teacher/work/_bar_js.html" %}
+<script>
+(function () {
+  'use strict';
+  var ROWS_URL = '{% url "teacher:api_cart_rows" %}';
+  var IS_EXAM = {% if is_exam %}true{% else %}false{% endif %};
+  var form = document.getElementById('wk-form');
+  var CSRF = document.querySelector('[name=csrfmiddlewaretoken]');
+  var esc = window.QLS_FULL.esc;
+  var rows = [];
+
+  function manualOrder() {
+    try { return sessionStorage.getItem(window.QLS_CART.manual) || ''; }
+    catch (e) { return ''; }
+  }
+
+  function load() {
+    var list = window.QLS_WORK.keys();
+    if (!list.length) { rows = []; paint(); return; }
+    var data = new FormData();
+    data.append('csrfmiddlewaretoken', CSRF ? CSRF.value : '');
+    data.append('keys', list.join(','));
+    data.append('manual_order', manualOrder() === '1' ? '1' : '');
+    data.append('suggest', '1');
+    data.append('points', window.QLS_WORK.pointsParam());
+    fetch(ROWS_URL, { method: 'POST', body: data })
+      .then(function (r) { return r.json(); })
+      .then(function (payload) { rows = payload.rows || []; paint(); })
+      .catch(function () { rows = []; paint(); });
+  }
+
+  // ── Лист, который уйдёт ученику ─────────────────────────────────────
+  // ⚠️ ЭТО ТОТ ЖЕ СОСТАВ, ЧТО НА ШАГЕ «СОСТАВ»: строки приходят с сервера
+  // одной и той же сборкой. Ответов и решений здесь нет — их не видит и
+  // ученик.
+  function paint() {
+    var name = (form.querySelector('[name=name]') || {}).value || '';
+    document.getElementById('wk-paper-name').textContent =
+      name.trim() || 'Новая работа';
+    var bits = [IS_EXAM ? 'Контрольная работа' : 'Домашнее задание'];
+    {% if group_label %}bits.push('{{ group_label|escapejs }}');{% endif %}
+    var when = deadlineText();
+    if (when) { bits.push(when); }
+    document.getElementById('wk-paper-sub').textContent = bits.join(' · ');
+
+    var host = document.getElementById('wk-paper-body');
+    host.innerHTML = '';
+    rows.forEach(function (row, index) {
+      if (row.section) {
+        var sep = document.createElement('div');
+        sep.className = 'k-sep k-sep--head';
+        sep.innerHTML = '<span class="k-sep__cap"></span>'
+          + '<span class="k-sep__of"></span><span class="k-sep__line"></span>';
+        sep.querySelector('.k-sep__cap').textContent = row.section.title;
+        sep.querySelector('.k-sep__of').textContent = row.section.detail;
+        host.appendChild(sep);
+      }
+      var task = document.createElement('div');
+      task.className = 'wk-paper__task';
+      var html = '<span class="wk-paper__no">' + (index + 1) + '.</span> '
+        + '<span class="wk-paper__st">' + esc(row.statement) + '</span>';
+      (row.parts || []).forEach(function (part) {
+        html += '<div class="wk-paper__part"><b>' + esc(part.label) + ')</b> '
+          + esc(part.text) + '</div>';
+      });
+      (row.options || []).forEach(function (option) {
+        html += '<div class="wk-paper__part">' + esc(option.label) + ') '
+          + esc(option.text) + '</div>';
+      });
+      task.innerHTML = html;
+      host.appendChild(task);
+    });
+    window.QLS_FULL.typeset(host);
+    sync();
+  }
+
+  // Срок словами берём из ВИДИМОГО поля даты: там уже стоит разобранная и
+  // дополненная строка, а лезть в машинный формат ради показа незачем.
+  function deadlineText() {
+    var boxes = document.querySelectorAll('[data-k-date]');
+    var out = [];
+    boxes.forEach(function (item) {
+      if (item.offsetParent === null) { return; }
+      var text = item.querySelector('.k-date__text');
+      var native = item.querySelector('.k-date__native');
+      var shown = (text && text.value.trim())
+        || (native && native.value ? native.value.replace('T', ', ') : '');
+      if (shown) { out.push((item.dataset.what || 'срок') + ': ' + shown); }
+    });
+    return out.join(' · ');
+  }
+
+  function chosenStudents() {
+    var total = 0;
+    form.querySelectorAll('[name=groups]').forEach(function (box) {
+      if (box.checked) { total += parseInt(box.dataset.students || '0', 10) || 0; }
+    });
+    return total;
+  }
+
+  // ⚠️ ЧЕГО НЕ ХВАТАЕТ — СПИСКОМ, А НЕ ПРОСТО СЕРОЙ КНОПКОЙ. Правило то же,
+  // что в прежних конструкторах: неактивная кнопка обязана объяснять себя.
+  function missing() {
+    var out = [];
+    if (!window.QLS_WORK.keys().length) { out.push('добавьте хотя бы одну задачу'); }
+    var name = form.querySelector('[name=name]');
+    if (name && !name.value.trim()) { out.push('впишите название'); }
+    var boxes = form.querySelectorAll('[name=groups]');
+    if (boxes.length && ![].some.call(boxes, function (b) { return b.checked; })) {
+      out.push('выберите, кому выдать');
+    }
+    // ⚠️ НЕРАЗОБРАННАЯ ДАТА ЗАПИРАЕТ ВЫДАЧУ (ревью 16.08, п. 3.3): пока
+    // поле красное, в форме лежит ПРЕЖНЕЕ значение, и уйдёт не то, что
+    // видно на экране. Шлюз тот же, второго не заводим.
+    document.querySelectorAll('.k-date__text.is-bad').forEach(function (bad) {
+      var box = bad.closest('[data-k-date]');
+      if (box && box.offsetParent === null) { return; }
+      out.push('проверьте ' + ((box && box.dataset.what) || 'дату'));
+    });
+    return out;
+  }
+
+  function sync() {
+    document.getElementById('wk-ids').value =
+      rows.map(function (r) { return r.key; }).join(',');
+    document.getElementById('wk-points').value = window.QLS_WORK.pointsParam();
+    document.getElementById('wk-manual').value = manualOrder();
+
+    var why = document.getElementById('wk-why');
+    var next = document.getElementById('wk-next');
+    var gaps = missing();
+    if (next) {
+      next.classList.toggle('is-off', gaps.length > 0);
+      next.setAttribute('aria-disabled', gaps.length ? 'true' : 'false');
+    }
+    if (why) {
+      why.hidden = gaps.length === 0;
+      why.textContent = gaps.join(', ').replace(/^./, function (c) {
+        return c.toUpperCase();
+      }) + (gaps.length ? '.' : '');
+    }
+    window.QLS_WORK.refresh(chosenStudents());
+  }
+
+  document.addEventListener('input', function () { paint(); });
+  document.addEventListener('change', function (event) {
+    // У контрольной адрес формы зависит от занятия: её обработчик живёт
+    // внутри него.
+    if (event.target.name === 'groups' && IS_EXAM && event.target.checked) {
+      form.action = form.dataset.examUrlTemplate
+        .replace('/groups/0/', '/groups/' + event.target.value + '/');
+    }
+    paint();
+  });
+
+  document.getElementById('wk-next').addEventListener('click', function (event) {
+    event.preventDefault();
+    if (missing().length) { return; }
+    sync();
+    form.submit();
+  });
+
+  form.addEventListener('submit', function () {
+    // ⚠️ КОРЗИНА ЭТОГО ЗАНЯТИЯ ЧИСТИТСЯ ПОСЛЕ ВЫДАЧИ. Иначе следующая
+    // работа открывается с задачами предыдущей — а перед глазами у
+    // репетитора в этот момент уже созданная работа, и связать одно с
+    // другим он не может.
+    setTimeout(function () {
+      try {
+        sessionStorage.removeItem(window.QLS_CART.cart);
+        sessionStorage.removeItem(window.QLS_CART.order);
+        sessionStorage.removeItem(window.QLS_CART.settings);
+        sessionStorage.removeItem(window.QLS_CART.manual);
+      } catch (e) {}
+    }, 100);
+  });
+
+  {% if is_exam and group_id %}
+  form.action = form.dataset.examUrlTemplate
+    .replace('/groups/0/', '/groups/{{ group_id }}/');
+  {% endif %}
+
+  load();
+})();
+</script>
+{% include "teacher/_work_settings_js.html" %}
+{% include "teacher/_date_field_js.html" %}
+{% include "teacher/_build_keep.html" %}
+{% endblock %}
