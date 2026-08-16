@@ -108,7 +108,9 @@ def build_tex(assignment, for_teacher=False, solution_space=True):
     """Готовый `.tex` для задания. Возвращает (текст, список пропущенных)."""
     from problems.timefmt import DATE, fmt
 
-    from problems.assignment_rows import ordered_items, section_marks
+    from problems.assignment_rows import (
+        ordered_items, section_marks, whole_caption,
+    )
 
     # Порядок и деление на части — ТА ЖЕ функция, что у экрана и у страницы
     # печати. Три разных порядка одной работы — это три разных работы.
@@ -119,6 +121,12 @@ def build_tex(assignment, for_teacher=False, solution_space=True):
                           'custom_problem__options', 'custom_problem__parts')
         .order_by('order', 'id')))
     marks = section_marks(items)
+    # ⚠️ У РАБОТЫ ИЗ ОДНИХ ТЕСТОВ ПОДПИСИ ЧАСТЕЙ НЕТ ВОВСЕ — делить нечего.
+    # Из-за этого лист начинался строкой «Вопрос 1.» сразу после названия,
+    # и состав работы («5 вопросов · 10 баллов») на нём не значился нигде.
+    # Ставим ОДНУ подпись на всю работу той же сборкой, что и подписи
+    # частей: второй формулировки состава в проекте нет.
+    whole = whole_caption(items) if not marks else None
 
     kind = 'Контрольная работа' if assignment.is_exam else 'Домашнее задание'
     group = assignment.group.name if assignment.group_id else ''
@@ -145,6 +153,9 @@ def build_tex(assignment, for_teacher=False, solution_space=True):
         out.append(r'\vspace{4pt}{\small Фамилия, имя: '
                    r'\hrulefill}')
     out += [r'\medskip\hrule\medskip', '']
+    if whole:
+        out += [r'{\small\bfseries ' + escape_latex(whole['caption'])
+                + r'}\vspace{2pt}', r'\hrule height 0pt \dotfill', '']
 
     skipped = []
     number = 0
@@ -287,6 +298,14 @@ def _teacher_lines(item):
         lines.append(r'\smallskip\textbf{Решение:} '
                      + _plate(escape_latex(solution)))
         lines.append('')
+    elif answer:
+        # ⚠️ ОТСУТСТВИЕ РЕШЕНИЯ НАЗЫВАЕТСЯ ВСЛУХ. Лист «с ответами», где у
+        # части задач стоит только «Ответ:», читается как потеря при
+        # выгрузке — а это состояние банка: эталонного разбора у задачи
+        # просто нет. Молчание тут неотличимо от поломки.
+        lines.append(r'\smallskip{\small\itshape Эталонного решения '
+                     r'в банке нет.}')
+        lines.append('')
     return lines
 
 
@@ -366,7 +385,7 @@ def print_rows(assignment, for_teacher=False, items=None):
     from problems.text_clean import clean
 
     from problems.assignment_rows import (
-        item_section, ordered_items, section_marks,
+        item_section, ordered_items, section_marks, whole_caption,
     )
 
     # Порядок и подписи частей — ТА ЖЕ функция, что у экрана. Иначе на
@@ -381,6 +400,7 @@ def print_rows(assignment, for_teacher=False, items=None):
                      .order_by('order', 'id'))
     items = ordered_items(assignment, items)
     marks = section_marks(items)
+    whole = whole_caption(items) if not marks else None
 
     rows = []
     skipped = []
@@ -458,7 +478,11 @@ def print_rows(assignment, for_teacher=False, items=None):
             # Нумерация подписей идёт по ИСХОДНОМУ индексу позиции, а не по
             # номеру в листке: задача с битой разметкой пропускается, и
             # номера разъезжаются с индексами.
-            'section_head': marks.get(index),
+            # ⚠️ У ОДНОРОДНОЙ РАБОТЫ ПОДПИСЬ ОДНА И СТОИТ ПЕРЕД ПЕРВОЙ
+            # ПОЗИЦИЕЙ. `section_marks` у неё молчит — границы частей нет,
+            # — и листок оставался вовсе без строки состава. Рисуется она
+            # тем же местом шаблона: второй разметки заголовка не заводим.
+            'section_head': marks.get(index) or (whole if not rows else None),
             'title': item.problem_title if item.problem_title != item.statement
                      else '',
             'statement': text,

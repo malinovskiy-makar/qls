@@ -346,6 +346,38 @@ def section_marks(items):
     return marks
 
 
+def whole_caption(items):
+    """Состав работы ОДНОЙ строкой, когда делить её не на что.
+
+    ⚠️ ЗАЧЕМ ОТДЕЛЬНАЯ ФУНКЦИЯ, А НЕ ПРАВКА `section_marks` (ревью 17.08,
+    фаза 14). Та отвечает на вопрос «где проходит граница частей», и у
+    работы из одних тестов границы нет — она честно молчит. Но у печатного
+    листка и `.tex` от этого пропадала ВСЯКАЯ подпись состава: контрольная
+    из одних тестов начиналась строкой «Вопрос 1.» сразу после названия, и
+    понять, сколько там вопросов и сколько это стоит, было нельзя, пока не
+    досчитаешь до конца. Здесь другой вопрос — «что это за работа целиком»,
+    и ответ на него есть всегда.
+
+    Возвращает такой же словарь, что и `section_marks`, или None, если
+    работа смешанная (там подписи ставит `section_marks`) либо пуста.
+    """
+    if not items:
+        return None
+    sections = {item_section(i) for i in items}
+    if len(sections) != 1:
+        return None
+    section = sections.pop()
+    points = sum((item_max_score(i) for i in items), Decimal('0'))
+    return {
+        'kind': section,
+        'title': SECTION_TITLES[section],
+        'count': len(items),
+        'points': points,
+        'detail': section_detail(section, len(items), points),
+        'caption': section_caption(section, len(items), points),
+    }
+
+
 def part_max_score(item, part, parts_count):
     """Максимум баллов за пункт.
 
