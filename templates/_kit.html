@@ -388,11 +388,18 @@
    `--amber-ink`. Замер на плотной заливке: светлая 5,00:1, тёмная 5,05:1
    (на бледной подложке `--amber` давал 3,98:1 в тёмной теме — то есть
    плотный фон без своих чернил был бы хуже, чем было). */
+/* ⚠️ КРУЖОК КРАСНЫЙ, КАК УВЕДОМЛЕНИЕ В МЕССЕНДЖЕРЕ (решение владельца,
+   ревью 16.08). Это отменяет прежний янтарный вид: янтарь в проекте
+   означает «частично», а здесь речь о числе непроверенных работ — вещи,
+   которую надо заметить, а не оценить. Заливка сплошная, без рамки:
+   рамка вокруг плотного цвета делает знак «кнопкой».
+   Чернила — `--on-error`, они РАЗНЫЕ в двух темах: в тёмной сам красный
+   светлый, и белым по нему выходит 2,78:1. Замер держится тестом. */
 .k-count {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px; padding: 0 5px;
-  border-radius: 999px; background: var(--amber-border);
-  color: var(--amber-ink); border: 1px solid var(--amber);
+  border-radius: 999px; background: var(--error);
+  color: var(--on-error); border: 0;
   font-size: 11px; font-weight: 700; line-height: 1;
   font-variant-numeric: tabular-nums; vertical-align: middle;
   margin-left: 6px;

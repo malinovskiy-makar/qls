@@ -913,6 +913,55 @@ def source_split(user, period='all', now=None):
             for key, label in labels.items()]
 
 
+def difficulty_split(user, period='month', now=None):
+    """Карта сложности: сколько задач каждого уровня взято и сколько верно.
+
+    ⚠️ ЗАМЕНА КОЛЬЦУ «ОТВЕТЫ ЗА ПЕРИОД» (ревью 16.08, п. 5.3–5.5). Кольцо
+    показывало «верно / неверно / пропущено» — то же самое, что карточка
+    «Доля верных» двумя блоками выше, только круглое. Здесь вопрос другой
+    и на него больше негде ответить: на каком уровне сложности человек
+    работает и где начинает спотыкаться.
+
+    Сложность берётся из СНИМКА в событии (`LearningEvent.difficulty`) по
+    той же причине, что и тема: правка задачи в каталоге не имеет права
+    переписывать прошлое.
+    """
+    rows = (_problem_events(user, period, now)
+            .filter(event_type__in=('solved', 'failed'),
+                    difficulty__gte=1, difficulty__lte=5)
+            .values('difficulty')
+            .annotate(attempted=Count('pk'),
+                      solved=Count('pk', filter=Q(event_type='solved'))))
+    by_level = {r['difficulty']: r for r in rows}
+    out = []
+    total = weighted = 0
+    for level in range(1, 6):
+        row = by_level.get(level, {})
+        attempted = row.get('attempted', 0)
+        solved = row.get('solved', 0)
+        total += attempted
+        weighted += attempted * level
+        out.append({
+            'level': level,
+            'attempted': attempted,
+            'solved': solved,
+            # Доля верных — ноль попыток даёт `None`, а не ноль процентов:
+            # «0% на пятом уровне» у того, кто пятый уровень не открывал,
+            # читается как провал, которого не было.
+            'accuracy': (round(solved * 100 / attempted)
+                         if attempted else None),
+        })
+    average = round(weighted / total, 1) if total else None
+    return {'levels': out, 'total': total, 'average': average,
+            'average_text': ('средняя %s из 5' % _comma(average)
+                             if average is not None else '')}
+
+
+def _comma(value):
+    """Число на экране пишется с запятой — как везде в проекте."""
+    return ('%g' % value).replace('.', ',')
+
+
 def answer_ring(user, period='month', now=None):
     """Кольцо верно / неверно / пропущено."""
     counts = _problem_events(user, period, now).aggregate(
@@ -1015,7 +1064,11 @@ def full_stats(user, period='month', now=None, use_cache=True):
         'topics': topic_breakdown(user, period, now),
         'ranking': strongest_weakest(user, 'all', now, rows=all_topics),
         'radar': section_radar(user, 'all', now, rows=all_topics),
-        'ring': answer_ring(user, period, now),
+        # ⚠️ КОЛЬЦО «ОТВЕТЫ ЗА ПЕРИОД» УБРАНО (ревью 16.08, п. 5.3): оно
+        # повторяло карточку «Доля верных» двумя блоками выше, только
+        # круглым. На его месте — карта сложности, вопрос без другого
+        # места на экране.
+        'difficulty': difficulty_split(user, period, now),
         'hardest': hardest_problems(user, 'all', now),
         # ⚠️ ГРАФИКИ «КОГДА ЗАНИМАЕШЬСЯ» ПОКАЗЫВАЮТ МИНУТЫ, А НЕ ПОПЫТКИ
         # (ревью 15.08, п. 21). Попытка — величина эфемерная: открытая

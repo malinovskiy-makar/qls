@@ -85,8 +85,43 @@
     }
 
     // Паутинка по укрупнённым разделам: по 21 теме радар нечитаем.
+    // ⚠️ ПОДПИСИ ШКАЛЫ РИСУЕМ САМИ. Chart.js умеет только «строго вверх»:
+    // ни угла, ни смещения у радиальных подписей в его настройках нет.
+    // Плагин ставит их на биссектрису между первым и вторым лучом (там
+    // свободно при любом числе разделов) и подкладывает прямоугольник
+    // цвета карточки — иначе сетка просвечивает сквозь цифры.
+    var radarTicks = {
+      id: 'radarTicks',
+      afterDatasetsDraw: function (chart, args, opts) {
+        var scale = chart.scales.r;
+        if (!scale) { return; }
+        var count = (chart.data.labels || []).length || 1;
+        var angle = Math.PI / count;
+        var ctx = chart.ctx;
+        ctx.save();
+        ctx.font = '9px ' + getComputedStyle(document.body).fontFamily;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        (scale.ticks || []).forEach(function (tick, index) {
+          if (!index) { return; }   // ноль сидит в центре, подписывать нечего
+          var radius = scale.getDistanceFromCenterForValue(tick.value);
+          var x = scale.xCenter + radius * Math.sin(angle);
+          var y = scale.yCenter - radius * Math.cos(angle);
+          var text = tick.label === undefined ? String(tick.value)
+                                              : String(tick.label);
+          var width = ctx.measureText(text).width;
+          ctx.fillStyle = opts.backdrop;
+          ctx.fillRect(x - width / 2 - 3, y - 7, width + 6, 14);
+          ctx.fillStyle = opts.color;
+          ctx.fillText(text, x, y);
+        });
+        ctx.restore();
+      },
+    };
+
     make('chart-radar', {
       type: 'radar',
+      plugins: [radarTicks],
       data: {
         labels: state.radar.map(function (r) { return r.name; }),
         datasets: [{
@@ -99,38 +134,66 @@
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: false },
+                   radarTicks: { color: colors.text,
+                                 backdrop: colors.surface } },
         scales: {
           r: {
             beginAtZero: true, max: 100,
             angleLines: { color: colors.grid },
             grid: { color: colors.grid },
             pointLabels: { color: colors.text, font: { size: 10 } },
-            ticks: { color: colors.text, backdropColor: 'transparent',
-                     font: { size: 9 } },
+            // ⚠️ ВСТРОЕННЫЕ ПОДПИСИ ШКАЛЫ ВЫКЛЮЧЕНЫ (ревью 16.08, п. 5.2).
+            // Chart.js рисует 20/40/60/80/100 строго вверх — там же
+            // проходит линия первого раздела и сидит его точка, и цифры
+            // под ними не читались вовсе. Рисуем их сами, на биссектрисе
+            // между первыми двумя лучами (плагин `radarTicks` ниже).
+            ticks: { display: false },
           },
         },
       },
     });
 
-    // Кольцо верно/неверно/пропущено. Зелёный здесь в своём законном
-    // смысле — «решение верно», как звёзды сложности амбером.
-    make('chart-ring', {
-      type: 'doughnut',
+    // ── Розовая пара: насыщенный «верно», приглушённый «мимо» ─────────
+    // ⚠️ РЕШЕНИЕ ВЛАДЕЛЬЦА (ревью 16.08). Зелёный и красный в этих двух
+    // карточках больше не используются: они закреплены за ВЕРДИКТОМ
+    // задачи («решение верно» / «неверно»), а здесь речь о распределении
+    // работы, а не о приговоре ученику. Оба тона — один и тот же акцент
+    // с разной плотностью, поэтому тему они переживают сами.
+    var hit = colors.accent;
+    var miss = colors.accent + '3d';
+
+    // Карта сложности: высота — сколько задач взято, число сверху и
+    // насыщенность — доля верных.
+    make('chart-difficulty', {
+      type: 'bar',
       data: {
-        labels: state.ring.map(function (r) { return r.label; }),
-        datasets: [{
-          data: state.ring.map(function (r) { return r.value; }),
-          backgroundColor: [colors.green, colors.error, colors.grid],
-          borderWidth: 0,
-        }],
+        labels: state.difficulty.levels.map(function (r) {
+          return String(r.level); }),
+        datasets: [
+          { label: 'Верно',
+            data: state.difficulty.levels.map(function (r) {
+              return r.solved; }),
+            backgroundColor: hit, stack: 'd' },
+          { label: 'Мимо',
+            data: state.difficulty.levels.map(function (r) {
+              return r.attempted - r.solved; }),
+            backgroundColor: miss, stack: 'd' },
+        ],
       },
-      options: {
-        responsive: true, maintainAspectRatio: false, cutout: '62%',
-        plugins: { legend: { position: 'bottom',
-                             labels: { color: colors.text, boxWidth: 12,
-                                       font: { size: 11 } } } },
-      },
+      options: Object.assign({}, options, {
+        plugins: Object.assign({}, options.plugins, {
+          tooltip: Object.assign({}, options.plugins.tooltip, {
+            callbacks: { title: function (ctx) {
+              return 'Сложность ' + ctx[0].label + ' из 5';
+            } },
+          }),
+        }),
+        scales: {
+          x: Object.assign({ stacked: true }, options.scales.x),
+          y: Object.assign({ stacked: true }, options.scales.y),
+        },
+      }),
     });
 
     make('chart-sources', {
@@ -140,11 +203,11 @@
         datasets: [
           { label: 'Верно',
             data: state.sources.map(function (r) { return r.solved; }),
-            backgroundColor: colors.green, stack: 's' },
+            backgroundColor: hit, stack: 's' },
           { label: 'Мимо',
             data: state.sources.map(function (r) {
               return r.attempted - r.solved; }),
-            backgroundColor: colors.error, stack: 's' },
+            backgroundColor: miss, stack: 's' },
         ],
       },
       options: Object.assign({}, options, {

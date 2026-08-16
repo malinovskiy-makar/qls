@@ -164,6 +164,17 @@
 .act-legend { display: flex; align-items: center; gap: 6px; font-size: 11px;
               color: var(--text2); margin-top: 10px; flex-wrap: wrap; }
 .act-sw { width: 12px; height: 12px; border-radius: 3px; display: block; }
+/* ── Логотип Econ Rush в строке заголовка ──────────────────────────────
+   Разметка знака общая со страницей игры (`templates/_rush_logo.html`),
+   там он во весь экран, здесь — строка. Наклон и цвет «RUSH» те же. */
+.rush-logo { display: inline-block; font-weight: 800; letter-spacing: -.5px;
+             user-select: none; }
+.rush-logo--sm { font-size: 18px; line-height: 1; }
+.rush-logo .bolt { margin: 0 .08em; }
+.rush-logo .bolt .qi { width: .9em; height: .9em; vertical-align: -.1em; }
+.rush-logo .rush { color: var(--accent); display: inline-block;
+                   transform: rotate(-2deg) skewX(-6deg); }
+
 .act-facts { display: grid; gap: 12px; }
 .act-fact { border-left: 2px solid var(--border); padding-left: 10px; }
 .act-fact__v { font-size: 19px; font-weight: 700; color: var(--text);

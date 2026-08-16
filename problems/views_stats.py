@@ -158,7 +158,7 @@ def _chart_payload(data):
         'overview': data['overview'],
         'weekly': data['weekly'],
         'radar': data['radar'],
-        'ring': data['ring'],
+        'difficulty': data['difficulty'],
         'byWeekday': data['by_weekday'],
         'byHour': data['by_hour'],
         'sources': data['sources'],

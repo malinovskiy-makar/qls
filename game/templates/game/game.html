@@ -81,6 +81,7 @@ a:focus-visible, button:focus-visible {
   padding-top: 4vh;
 }
 .rush-logo {
+  display: inline-block;
   font-size: clamp(40px, 6vw, 56px);
   font-weight: 800;
   letter-spacing: -1.5px;
@@ -988,7 +989,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   <!-- ЭКРАН 1: СТАРТ -->
   <section id="screen-start" class="screen active">
     <div class="col">
-      <h1 class="rush-logo">ECON<span class="bolt"></span><span class="rush">RUSH</span></h1>
+      {# ⚠️ Разметка знака — ОБЩАЯ с блоком «Econ Rush» в личной
+         статистике (`templates/_rush_logo.html`). Копия разошлась бы с
+         оригиналом при первой же правке. Размер задаёт `.rush-logo`
+         этой страницы, молния приезжает из общего набора иконок. #}
+      <h1>{% include "_rush_logo.html" %}</h1>
       <p class="rush-sub">Вопросы по экономике на время. Четыре режима — как в шахматах.</p>
       <div class="topic-chips" id="topic-chips">
         <button class="topic-chip active" data-topic="">Все темы</button>

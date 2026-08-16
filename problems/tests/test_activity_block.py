@@ -13,6 +13,7 @@
 """
 from datetime import timedelta
 
+from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
 
@@ -178,6 +179,11 @@ class ActivityPageTests(TestCase):
     """Разметка: три блока свелись в один, и его рисует сервер."""
 
     def setUp(self):
+        # ⚠️ СВОДКА КЭШИРУЕТСЯ ПО (пользователь, период) НА ПЯТЬ МИНУТ, а в
+        # прогоне номера пользователей переиспользуются между классами:
+        # без чистки этот класс читал бы сводку чужого теста и краснел
+        # ТОЛЬКО в полном прогоне. Та же ловушка, что с индексом поиска.
+        cache.clear()
         self.user = make_student('act_page')
         self.client.force_login(self.user)
 

@@ -180,7 +180,7 @@
 {# ── Графики ───────────────────────────────────────────────────────── #}
 <div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));">
   <div class="panel">
-    <div class="panel-head"><div class="panel-title">Рост уровня</div></div>
+    <div class="panel-head"><div class="panel-title">Динамика уровня</div></div>
     {% if data.level_history %}
       <div class="chart-box"><canvas id="chart-level"></canvas></div>
     {% else %}
@@ -193,13 +193,31 @@
     <div class="chart-box"><canvas id="chart-radar"></canvas></div>
   </div>
 
+  {% comment %}
+  ⚠️ КОЛЬЦО «ОТВЕТЫ ЗА ПЕРИОД» УБРАНО (ревью 16.08, п. 5.3): оно повторяло
+  карточку «Доля верных» двумя блоками выше, только круглым. На его месте
+  карта сложности — вопрос, на который ответить больше негде.
+  {% endcomment %}
   <div class="panel">
-    <div class="panel-head"><div class="panel-title">Ответы за период</div></div>
-    <div class="chart-box"><canvas id="chart-ring"></canvas></div>
+    <div class="panel-head">
+      <div class="panel-title">По сложности</div>
+      {% if data.difficulty.average_text %}
+      <div class="panel-hint">{{ data.difficulty.average_text }}</div>
+      {% endif %}
+    </div>
+    {% if data.difficulty.total %}
+      <div class="chart-box"><canvas id="chart-difficulty"></canvas></div>
+    {% else %}
+      <div class="empty-note">Решённых задач пока мало — карта сложности
+        заполнится сама.</div>
+    {% endif %}
   </div>
 
   <div class="panel">
-    <div class="panel-head"><div class="panel-title">Откуда задачи</div></div>
+    <div class="panel-head">
+      <div class="panel-title">Где решаешь</div>
+      <div class="panel-hint">насыщенный — верно, приглушённый — мимо</div>
+    </div>
     <div class="chart-box"><canvas id="chart-sources"></canvas></div>
   </div>
 </div>
@@ -307,7 +325,12 @@
 {# ── Игра — ОТДЕЛЬНО и явно подписано ──────────────────────────────── #}
 <div class="panel game-panel">
   <div class="panel-head">
-    <div class="panel-title">Econ Rush <span class="game-badge">игра</span></div>
+    {% comment %}
+    ⚠️ ЗНАК — ТОТ ЖЕ, ЧТО НА СТРАНИЦЕ ИГРЫ (ревью 16.08, п. 5.6): общая
+    разметка `templates/_rush_logo.html`, тот же шрифт и те же цвета.
+    Здесь он меньше — это строка заголовка карточки, а не заглавие экрана.
+    {% endcomment %}
+    <div class="panel-title">{% include "_rush_logo.html" with extra="rush-logo--sm" %}<span class="game-badge">игра</span></div>
     <div class="panel-hint">Считается отдельно от учёбы: скорость узнавания и
       решение задачи — разные вещи</div>
   </div>
