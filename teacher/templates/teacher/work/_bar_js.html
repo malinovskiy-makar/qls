@@ -108,6 +108,21 @@
     });
   }
 
+  // ⚠️ ЧТО МЕШАЕТ ПЕРЕЙТИ ДАЛЬШЕ, РЕШАЕТ ОДНО МЕСТО — ЭТО. Сначала правило
+  // «корзина не пуста» жило здесь, а «проставьте баллы» и «впишите
+  // название» — в скриптах шагов; полоса пересчитывалась ПОСЛЕДНЕЙ и
+  // молча снимала их запрет. На экране это выглядело так: кнопка выдачи
+  // активна при пустом названии, и работа уходила с пустым полем. Поймано
+  // браузером, питон-тесты такого не видят.
+  var blockers = [];
+  function reasons() {
+    var out = keys().length ? [] : ['добавьте хотя бы одну задачу'];
+    blockers.forEach(function (fn) {
+      try { out = out.concat(fn() || []); } catch (e) {}
+    });
+    return out;
+  }
+
   // `students` — сколько человек получит работу. Число знает только экран
   // выдачи, а фразу собирает сервер: склонение живёт в питоне.
   var students = 0;
@@ -117,15 +132,21 @@
     var next = document.getElementById('wk-next');
     var why = document.getElementById('wk-why');
     var list = keys();
+    var gaps = reasons();
     if (next) {
       // Ссылка-кнопка не умеет `disabled`; гасим её признаком, который
       // читают и мышь, и клавиатура.
-      next.classList.toggle('is-off', list.length === 0);
-      next.setAttribute('aria-disabled', list.length === 0 ? 'true' : 'false');
-      if (list.length === 0) { next.setAttribute('tabindex', '-1'); }
+      next.classList.toggle('is-off', gaps.length > 0);
+      next.setAttribute('aria-disabled', gaps.length ? 'true' : 'false');
+      if (gaps.length) { next.setAttribute('tabindex', '-1'); }
       else { next.removeAttribute('tabindex'); }
     }
-    if (why) { why.hidden = list.length > 0; }
+    if (why) {
+      why.hidden = gaps.length === 0;
+      why.textContent = gaps.join(', ').replace(/^./, function (c) {
+        return c.toUpperCase();
+      }) + (gaps.length ? '.' : '');
+    }
     if (!tally) { return; }
     if (!list.length) {
       tally.textContent = 'В работе пока ничего нет';
@@ -166,8 +187,9 @@
 
   window.QLS_WORK = {
     keys: keys, has: has, add: add, remove: remove, clear: clear,
-    setOrder: setOrder, refresh: refresh,
+    setOrder: setOrder, refresh: refresh, reasons: reasons,
     points: points, pointsParam: pointsParam,
+    block: function (fn) { blockers.push(fn); },
     onchange: function (fn) { listeners.push(fn); }
   };
 

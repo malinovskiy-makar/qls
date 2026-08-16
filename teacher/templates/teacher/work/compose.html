@@ -309,20 +309,10 @@
 
     // ⚠️ РАБОТА НА НОЛЬ БАЛЛОВ ДАЛЬШЕ НЕ ИДЁТ. Сумма ноль означает, что
     // оценивать нечем: ученик получит «0 из 0» и не поймёт, при чём тут он.
-    var zero = rows.length > 0 && total <= 0;
-    document.getElementById('wk-zero').hidden = !zero;
-    var next = document.getElementById('wk-next');
-    var why = document.getElementById('wk-why');
-    if (next && zero) {
-      next.classList.add('is-off');
-      next.setAttribute('aria-disabled', 'true');
-      if (why) { why.hidden = false; why.textContent = 'Проставьте баллы'; }
-    } else if (why && rows.length) {
-      why.hidden = true;
-    }
-    if (why && !rows.length) {
-      why.textContent = 'Добавьте хотя бы одну задачу';
-    }
+    // Сам запрет ставит полоса собранного (`QLS_WORK.block`) — она решает
+    // это одна на все шаги; писать сюда `is-off` бесполезно, полоса
+    // пересчитывается после и вернула бы кнопку в строй.
+    document.getElementById('wk-zero').hidden = !(rows.length > 0 && total <= 0);
 
     document.getElementById('wk-print-keys').value =
       rows.map(function (r) { return r.key; }).join(',');
@@ -417,6 +407,13 @@
   });
 
   // ── Баллы ────────────────────────────────────────────────────────────
+  window.QLS_WORK.block(function () {
+    if (!rows.length) { return []; }
+    var total = 0;
+    rows.forEach(function (row) { total += points[row.key] || 0; });
+    return total > 0 ? [] : ['проставьте баллы'];
+  });
+
   var timer = null;
   document.addEventListener('input', function (event) {
     var field = event.target.closest('.wk-pts input');

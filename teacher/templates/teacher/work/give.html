@@ -204,9 +204,10 @@
 
   // ⚠️ ЧЕГО НЕ ХВАТАЕТ — СПИСКОМ, А НЕ ПРОСТО СЕРОЙ КНОПКОЙ. Правило то же,
   // что в прежних конструкторах: неактивная кнопка обязана объяснять себя.
+  // Причины отдаются полосе собранного: запрет ставит она одна, иначе
+  // пересчёт полосы снимал бы его молча.
   function missing() {
     var out = [];
-    if (!window.QLS_WORK.keys().length) { out.push('добавьте хотя бы одну задачу'); }
     var name = form.querySelector('[name=name]');
     if (name && !name.value.trim()) { out.push('впишите название'); }
     var boxes = form.querySelectorAll('[name=groups]');
@@ -224,25 +225,13 @@
     return out;
   }
 
+  window.QLS_WORK.block(missing);
+
   function sync() {
     document.getElementById('wk-ids').value =
       rows.map(function (r) { return r.key; }).join(',');
     document.getElementById('wk-points').value = window.QLS_WORK.pointsParam();
     document.getElementById('wk-manual').value = manualOrder();
-
-    var why = document.getElementById('wk-why');
-    var next = document.getElementById('wk-next');
-    var gaps = missing();
-    if (next) {
-      next.classList.toggle('is-off', gaps.length > 0);
-      next.setAttribute('aria-disabled', gaps.length ? 'true' : 'false');
-    }
-    if (why) {
-      why.hidden = gaps.length === 0;
-      why.textContent = gaps.join(', ').replace(/^./, function (c) {
-        return c.toUpperCase();
-      }) + (gaps.length ? '.' : '');
-    }
     window.QLS_WORK.refresh(chosenStudents());
   }
 
@@ -257,26 +246,22 @@
     paint();
   });
 
+  // ⚠️ КОРЗИНА ЭТОГО ЗАНЯТИЯ ЧИСТИТСЯ ПЕРЕД ОТПРАВКОЙ, И ЧИСТИТ ЕЁ САМ
+  // ОБРАБОТЧИК НАЖАТИЯ. Вешать это на событие `submit` нельзя: вызов
+  // `form.submit()` из скрипта событие `submit` НЕ ПОРОЖДАЕТ — форма
+  // уходит, чистка не случается, и следующая работа открывается с
+  // задачами предыдущей. Поймано браузером: питон-тесты этого не видят.
   document.getElementById('wk-next').addEventListener('click', function (event) {
     event.preventDefault();
-    if (missing().length) { return; }
+    if (window.QLS_WORK.reasons().length) { return; }
     sync();
+    try {
+      sessionStorage.removeItem(window.QLS_CART.cart);
+      sessionStorage.removeItem(window.QLS_CART.order);
+      sessionStorage.removeItem(window.QLS_CART.settings);
+      sessionStorage.removeItem(window.QLS_CART.manual);
+    } catch (e) {}
     form.submit();
-  });
-
-  form.addEventListener('submit', function () {
-    // ⚠️ КОРЗИНА ЭТОГО ЗАНЯТИЯ ЧИСТИТСЯ ПОСЛЕ ВЫДАЧИ. Иначе следующая
-    // работа открывается с задачами предыдущей — а перед глазами у
-    // репетитора в этот момент уже созданная работа, и связать одно с
-    // другим он не может.
-    setTimeout(function () {
-      try {
-        sessionStorage.removeItem(window.QLS_CART.cart);
-        sessionStorage.removeItem(window.QLS_CART.order);
-        sessionStorage.removeItem(window.QLS_CART.settings);
-        sessionStorage.removeItem(window.QLS_CART.manual);
-      } catch (e) {}
-    }, 100);
   });
 
   {% if is_exam and group_id %}
