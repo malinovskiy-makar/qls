@@ -862,7 +862,7 @@ EXTERNAL_DB_URL — Render → qls-db → Connections → External Database URL.
 | С решением | 6 448 (из них 1 097 — вынесены ИИ, `solution_ai_extracted`) + решения жюри ВсОШ |
 | С ответом | 5 445 + 218 ВсОШ |
 | Эмбеддинги | все 31 690 на BGE-M3, формула с ai_blurb+тегами (218 ВсОШ пересчитаны 2026-07-13) |
-| Тесты | **1602/1602** ✅ (снимок 2026-08-13; в таблице выше — цифры на 2026-07-13) |
+| Тесты | **2032/2032** ✅ (снимок 2026-08-17; в таблице выше — цифры на 2026-07-13) |
 | Игровой пул (`GameQuestion`) | **8 017** = базовые **2 917** (boolean 380, single 2 225, multi 248, numeric 64; из них ВсОШ — 165) + **5 100** сгенерированных (17 архетипов, ветка `feat/game-generators`) |
 | Автотем (kNN, порог 0.70) | ~3 425 |
 
@@ -2458,7 +2458,8 @@ generate/` (что нашлось, только у подбора) → `/teacher
 пустыми), `./venv/bin/python scripts/r17_index.py` →
 `reports/review/index_r17.html`.
 **Тесты:** `problems/tests/test_work_flow.py` (46),
-`problems/tests/test_whole_caption.py` (14).
+`problems/tests/test_whole_caption.py` (14),
+`problems/tests/test_css_comments.py` (3). Полный прогон — **2032/2032**.
 
 ## Прочие команды-замеры (только чтение)
 
