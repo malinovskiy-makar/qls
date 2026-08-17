@@ -19,14 +19,16 @@
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 /* ── Карточка занятия ──────────────────────────────────────────────────
-   Жёлтая полоса слева — ТОЛЬКО когда есть предупреждения. Тот же приём,
-   что у карточек работ (`.k-mark--*`): состояние несёт полоса, а не
-   заливка карточки целиком. */
+   ⚠️ ПОЛОСА СЛЕВА ЕСТЬ У ВСЕХ КАРТОЧЕК (ревью 17.08, п. 5.1). Раньше она
+   появлялась только там, где что-то не так, и приём читался как случайное
+   украшение: половина сетки с полосой, половина без. Полоса — это шкала:
+   янтарь «ждёт вас», нейтральная «спокойно». Тот же словарь, что у
+   карточек работ (`.k-mark--*`). */
 .gc-grid { display: grid; gap: 14px;
            grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
 .gc-card { display: flex; flex-direction: column; gap: 10px;
-           padding: 16px 18px; }
-.gc-card.is-calls { border-left: 3px solid var(--amber); }
+           padding: 16px 18px; border-left: 3px solid var(--border); }
+.gc-card.is-calls { border-left-color: var(--amber); }
 .gc-head { display: flex; align-items: flex-start; gap: 10px; }
 .gc-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
 .gc-meta { font-size: 12px; color: var(--text2); margin-top: 3px; }
@@ -34,22 +36,35 @@
           background: var(--chip-bg); color: var(--text2);
           display: flex; align-items: center; justify-content: center;
           font-size: 13px; font-weight: 700; }
-/* Предупреждение — короткая строка с жёлтой чертой слева. */
+/* ⚠️ ЦВЕТ ЧЁРТОЧКИ ПРЕДУПРЕЖДЕНИЯ — ЭТО СРОЧНОСТЬ (ревью 17.08, п. 5.1).
+   Красная — просрочено или ждёт вас дольше недели, янтарная — стоит
+   посмотреть, нейтральная — просто факт об ученике. Ступень считает
+   `stats.needs_attention`, шаблон её только красит. */
 .gc-warn { display: flex; flex-direction: column; gap: 5px; }
 .gc-warn div { font-size: 12px; color: var(--text); line-height: 1.4;
-               border-left: 2px solid var(--amber); padding-left: 8px; }
+               border-left: 2px solid var(--border); padding-left: 8px; }
+.gc-warn div.is-high { border-left-color: var(--error); }
+.gc-warn div.is-warn { border-left-color: var(--amber); }
 .gc-more { border-left-color: var(--border) !important; color: var(--text3);
            text-decoration: none; display: block; }
 .gc-more:hover { color: var(--accent); border-left-color: var(--accent) !important; }
 .gc-calm { font-size: 12px; color: var(--text3); }
+/* ⚠️ НИЗ ПРИЖАТ КО ДНУ И ОТДЕЛЁН ЛИНИЕЙ (ревью 17.08, п. 5.1). Высоты
+   карточек разные намеренно, и без линии строка состояния у спокойной
+   карточки болталась посреди пустоты. Линия делает из разновысоких
+   карточек сетку: взгляд читает низы по одной горизонтали внутри ряда. */
 .gc-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-           margin-top: auto; padding-top: 4px; }
+           margin-top: auto; padding-top: 11px;
+           border-top: 1px solid var(--border-soft); }
 .gc-wait { font-size: 12px; font-weight: 600; border-radius: 999px;
            padding: 2px 10px; background: var(--amber-tint);
+           border: 1px solid var(--amber-border);
            color: var(--amber-ink); white-space: nowrap; }
+/* Спокойное состояние — обычный текст без плашки: плашка любого цвета
+   встала бы в один ряд с янтарной и читалась бы как второй сигнал. */
+.gc-quiet { font-size: 12px; color: var(--text2); }
 .gc-when { font-size: 12px; color: var(--text2); margin-left: auto;
            white-space: nowrap; }
-.gc-when--none { color: var(--text3); }
 .gc-open { align-self: flex-start; }
 {% endblock %}
 
@@ -78,7 +93,7 @@
 {% if cards %}
 <div class="gc-grid">
   {% for card in cards %}
-  <div class="k-card gc-card{% if card.warnings %} is-calls{% endif %}">
+  <div class="k-card gc-card{% if card.warnings or card.pending %} is-calls{% endif %}">
     <div class="gc-head">
       {% if card.solo %}
       <span class="gc-ava" aria-hidden="true">{{ card.solo.first_name|first|default:card.solo.username|first|upper }}</span>
@@ -99,7 +114,7 @@
 
     {% if card.warnings %}
     <div class="gc-warn">
-      {% for warning in card.warnings %}<div>{{ warning }}</div>{% endfor %}
+      {% for warning in card.warnings %}<div class="is-{{ warning.level }}">{{ warning.text }}</div>{% endfor %}
       {% comment %}
       ⚠️ «И ЕЩЁ N» — ССЫЛКА, А НЕ ТУПИК (обзор 13.08, п. 11). Строка сообщала
       о скрытом и не давала способа его увидеть. Ведёт на обзор занятия: там
@@ -114,20 +129,22 @@
     <div class="gc-calm">Всё вовремя, ничего не ждёт проверки.</div>
     {% endif %}
 
+    {% comment %}
+    ⚠️ НИЖНЯЯ СТРОКА ОТВЕЧАЕТ НА ДВА РАЗНЫХ ВОПРОСА (ревью 17.08, п. 5.1).
+    Слева — что ждёт ВАС: янтарная пилюля с числом либо тихое «ничего».
+    Справа — ближайший срок, и только когда он близко; дальний срок пустого
+    места не занимает, потому что на вопрос «чем заняться сегодня» он не
+    отвечает. Прежняя строка «сроков нет» стояла всегда и была ответом на
+    вопрос, которого никто не задавал.
+    {% endcomment %}
     <div class="gc-foot">
       {% if card.pending %}
       <span class="gc-wait">{{ card.pending|count_ru:"работа,работы,работ" }} {{ card.pending|plural_ru:"ждёт,ждут,ждут" }} проверки</span>
-      {% endif %}
-      {% comment %}
-      ⚠️ СТРОКА СРОКА СТОИТ ВСЕГДА (обзор 13.08, п. 12). У индивидуальных
-      ближайшего срока обычно нет, у групповой есть — и карточки в одном ряду
-      разъезжались по высоте. «Сроков нет» тихим серым: это не предупреждение,
-      а честный ответ на тот же вопрос.
-      {% endcomment %}
-      {% if card.next_deadline %}
-      <span class="gc-when" title="{{ card.deadline_exact }}">срок: {{ card.next_deadline|date:"d.m, H:i" }}</span>
       {% else %}
-      <span class="gc-when gc-when--none">сроков нет</span>
+      <span class="gc-quiet">Работ на проверке нет</span>
+      {% endif %}
+      {% if card.deadline_soon %}
+      <span class="gc-when" data-hint="{{ card.deadline_exact }}">срок: {{ card.deadline_human }}</span>
       {% endif %}
     </div>
 

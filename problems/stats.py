@@ -1563,33 +1563,54 @@ def needs_attention(group, now=None):
     flagged = []
     for student in students:
         reasons = []
+        levels = []
+
+        def note(text, level):
+            reasons.append(text)
+            levels.append(level)
+
         seen = last_seen.get(student.pk)
         if seen is None:
             # Дней считать не от чего: событий нет вовсе.
-            reasons.append('ни одного захода на сайт')
+            note('ни одного захода на сайт', 'info')
         elif seen < quiet_threshold:
             quiet_days = max(1, (now - seen).days)
-            reasons.append('нет активности %d %s'
-                           % (quiet_days, _days_word(quiet_days)))
+            note('нет активности %d %s'
+                 % (quiet_days, _days_word(quiet_days)), 'info')
         current = month_now.get(student.pk, {}).get('accuracy')
         before = previous.get(student.pk, {}).get('accuracy')
         if current is not None and before is not None and current + 10 <= before:
-            reasons.append('доля верных упала с %d%% до %d%%'
-                           % (before, current))
+            note('доля верных упала с %d%% до %d%%' % (before, current), 'warn')
         if student.pk in missed and last_work is not None:
-            reasons.append('работа «%s» не сдана' % last_work.name)
+            # Срок этой работы УЖЕ ПРОШЁЛ по условию отбора — это просрочка.
+            note('работа «%s» не сдана' % last_work.name, 'high')
         waiting = stale.get(student.pk)
         if waiting is not None:
             days = max(1, (now - waiting).days)
             # Имя в причину не вставляем: список и так сгруппирован по
             # ученику, а склонять фамилию в родительный падеж программно
             # нельзя — «работа Пётр Иванов» читается как ошибка.
-            reasons.append('работа ждёт вашей проверки %d %s'
-                           % (days, _days_word(days)))
+            note('работа ждёт вашей проверки %d %s' % (days, _days_word(days)),
+                 'high' if days > 7 else 'warn')
         if reasons:
             flagged.append({'student': student, 'reasons': reasons,
+                            'level': worst_level(levels),
                             'last_active': seen})
     return flagged
+
+
+# Три ступени срочности предупреждения — от них зависит только ЦВЕТ чёрточки
+# слева (ревью 17.08, п. 5.1). Смысл: `high` — просрочено или ждёт вас дольше
+# недели, `warn` — стоит посмотреть, `info` — просто факт об ученике.
+# Порядок в кортеже и есть порядок возрастания срочности.
+ATTENTION_LEVELS = ('info', 'warn', 'high')
+
+
+def worst_level(levels):
+    """Самая срочная из ступеней. У строки ученика причин может быть много."""
+    found = [ATTENTION_LEVELS.index(level) for level in levels
+             if level in ATTENTION_LEVELS]
+    return ATTENTION_LEVELS[max(found)] if found else 'info'
 
 
 # ===========================================================================

@@ -199,13 +199,21 @@ def groups_list(request):
         # читались как два разных ученика. Ограничение `CARD_WARNINGS`
         # теперь считает ЛЮДЕЙ: карточка должна читаться с одного взгляда,
         # а «сколько всего бед» — вопрос уже не к ней.
+        # ⚠️ У СТРОКИ ЕСТЬ СТУПЕНЬ СРОЧНОСТИ (ревью 17.08, п. 5.1). Цвет
+        # чёрточки слева считает `stats.needs_attention` — там же, где
+        # собираются сами причины. Реши это шаблон, «просрочено» и «стоит
+        # посмотреть» разъехались бы с блоком «Требуют внимания» внутри
+        # занятия, который читает ту же функцию.
         warnings = []
         for row in needs_attention(group, now):
             joined = ', '.join(row['reasons'])
             # У индивидуального имя не повторяем: оно и есть заголовок.
-            warnings.append(joined if solo is not None else '%s — %s' % (
-                row['student'].get_full_name()
-                or row['student'].username, joined))
+            warnings.append({
+                'text': joined if solo is not None else '%s — %s' % (
+                    row['student'].get_full_name()
+                    or row['student'].username, joined),
+                'level': row['level'],
+            })
         next_deadline = min(deadlines) if deadlines else None
         human, exact = timefmt.deadline_pair(next_deadline)
         cards.append({
@@ -217,6 +225,12 @@ def groups_list(request):
             'next_deadline': next_deadline,
             'deadline_human': human,
             'deadline_exact': exact,
+            # ⚠️ СРОК ПОКАЗЫВАЕМ, ТОЛЬКО КОГДА ОН БЛИЗКО (ревью 17.08,
+            # п. 5.1). Дата через месяц не помогает решить, чем заняться
+            # сегодня, а место в нижней строке занимает наравне с тем, что
+            # помогает. Дальний срок виден внутри занятия, где ему и место.
+            'deadline_soon': (next_deadline is not None
+                              and next_deadline <= now + timedelta(days=7)),
             'assignments': len(assignments),
             'warnings': warnings[:CARD_WARNINGS],
             # Считаем скрытое ЗДЕСЬ: шаблонная арифметика через `add`

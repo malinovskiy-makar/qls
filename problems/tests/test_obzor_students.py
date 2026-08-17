@@ -126,10 +126,15 @@ class ScreenTests(TestCase):
         self.assertEqual(shown[-1], 'Апрель — спокойные')
 
     # ---- 2.2 схлопывание ----------------------------------------------
+    # ⚠️ Строка предупреждения теперь несёт КЛАСС СРОЧНОСТИ (ревью 17.08,
+    # п. 5.1) — голого `<div>` в списке больше нет. Проверка про одну
+    # строку на ученика от этого не изменилась, изменился разбор разметки.
+    LINE = r'<div class="is-\w+">(.*?)</div>'
+
     def test_one_line_per_student(self):
         card = [c for c in cards_html(self._html())
                 if 'Ясень' in c][0]
-        lines = re.findall(r'<div>(.*?)</div>',
+        lines = re.findall(self.LINE,
                            re.search(r'<div class="gc-warn">(.*?)</div>\s*</div>',
                                      card, re.S).group(0), re.S)
         peter_lines = [line for line in lines if 'Пётр' in line]
@@ -137,7 +142,7 @@ class ScreenTests(TestCase):
 
     def test_both_reasons_are_in_that_one_line(self):
         card = [c for c in cards_html(self._html()) if 'Ясень' in c][0]
-        line = [l for l in re.findall(r'<div>(.*?)</div>', card, re.S)
+        line = [l for l in re.findall(self.LINE, card, re.S)
                 if 'Пётр' in l][0]
         self.assertIn('Домашка рынок труда', line)
         self.assertIn('ждёт вашей проверки', line)
@@ -172,13 +177,17 @@ class ScreenTests(TestCase):
                       % reverse('teacher:group_detail', args=[self.hot.pk]),
                       card)
 
-    # ---- 2.4 одинаковая высота ----------------------------------------
-    def test_card_without_a_deadline_still_has_the_line(self):
+    # ---- 2.4 нижняя строка --------------------------------------------
+    # ⚠️ ПЕРЕСЧИТАНО (ревью 17.08, п. 5.1). Прежде строка срока стояла у
+    # каждой карточки — ради одинаковой высоты ряда; высоту теперь держит
+    # линия над прижатым ко дну низом, а срок показывается, только когда он
+    # близко. «Сроков нет» было ответом на вопрос, которого не задавали.
+    def test_card_without_a_deadline_says_nothing_about_deadlines(self):
         card = [c for c in cards_html(self._html())
                 if 'Апрель' in c][0]
-        self.assertIn('сроков нет', card)
+        self.assertNotIn('class="gc-when', card)
 
-    def test_card_with_a_deadline_shows_it(self):
+    def test_card_with_a_near_deadline_shows_it(self):
         from problems.models import Assignment
 
         work = Assignment.objects.create(
@@ -187,9 +196,18 @@ class ScreenTests(TestCase):
         work.students.set(list(self.calm.students.all()))
         card = [c for c in cards_html(self._html()) if 'Апрель' in c][0]
         self.assertIn('срок:', card)
-        self.assertNotIn('сроков нет', card)
 
-    def test_every_card_has_exactly_one_deadline_line(self):
-        """Одна строка на карточку — из-за этого ряд и разъезжался."""
+    def test_far_deadline_is_not_shown(self):
+        """Дальше недели — молчим: чем заняться сегодня, это не отвечает."""
+        from problems.models import Assignment
+
+        work = Assignment.objects.create(
+            name='Далёкая', author=self.tutor, group=self.calm,
+            deadline=self.now + timedelta(days=20))
+        work.students.set(list(self.calm.students.all()))
+        card = [c for c in cards_html(self._html()) if 'Апрель' in c][0]
+        self.assertNotIn('class="gc-when', card)
+
+    def test_every_card_has_at_most_one_deadline_line(self):
         for card in cards_html(self._html()):
-            self.assertEqual(card.count('class="gc-when'), 1, card[:200])
+            self.assertLessEqual(card.count('class="gc-when'), 1, card[:200])
