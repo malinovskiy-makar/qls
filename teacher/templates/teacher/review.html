@@ -25,7 +25,11 @@
            gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
 .rv-who { font-size: 20px; font-weight: 600; }
 .rv-sub { font-size: 13px; color: var(--text2); margin-top: 3px; }
-.rv-nav { display: flex; align-items: center; gap: 8px; }
+/* ⚠️ ПЕРЕХОДЫ ЖИВУТ ВМЕСТЕ (п. 3.2): стрелки, «задача N из M» и «глазами
+   ученика» — один узел. Ссылка переехала сюда из ряда кнопок сохранения,
+   поэтому узел стал двухэтажным на узком экране. */
+.rv-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+          justify-content: flex-end; }
 .rv-pos { font-size: 13px; color: var(--text2); white-space: nowrap; }
 .rv-arrow { display: inline-flex; align-items: center; justify-content: center;
             width: 32px; height: 32px; border-radius: var(--r);
@@ -46,20 +50,25 @@
    экран проверки за край окна (замер: содержимое 457px при окне 380px).
    Та же строка уже стоит у `.problem-statement` на странице задания. */
 .rv-statement :is(table, .katex-display) { max-width: 100%; overflow-x: auto; }
-.rv-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-           margin: 14px 0; }
-.rv-box { background: var(--surface); border: 0.5px solid var(--border);
-          border-radius: 10px; padding: 14px 16px; min-width: 0; }
-.rv-box-cap { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+/* ── Что сдал ученик: ТРИ РАВНЫЕ СЕКЦИИ ОДНОГО БЛОКА ───────────────────
+   ⚠️ БЫЛО ЧЕТЫРЕ УРОВНЯ ВЛОЖЕННОСТИ (визуальная сессия 17.08, п. 3.2):
+   белая карточка → карточка с полосой → ДВЕ СЕРЫЕ КАРТОЧКИ внутри неё
+   («ответил ученик» и «верный ответ») → и решение, которое карточки не
+   имело вовсе, единственное исключение из правила.
+   Теперь ответ, эталон и решение — три секции одного блока, разделённые
+   тонкой линией. Исключений нет, уровня стало три. */
+.rv-sect { padding: 12px 0; border-top: 1px solid var(--border-soft);
+           min-width: 0; }
+.rv-sect:first-child { border-top: 0; padding-top: 0; }
+.rv-box-cap { font-size: 11px; font-weight: 600; letter-spacing: .5px;
+              text-transform: uppercase; color: var(--text3);
+              margin-bottom: 5px; }
 /* Крупно — потому что именно это и сравнивают. */
 .rv-value { font-size: 19px; line-height: 1.5; overflow-wrap: anywhere; }
 .rv-value.is-empty { color: var(--text3); font-size: 15px; font-style: italic; }
 .rv-value.is-missing { color: var(--error); font-style: normal; }
-.rv-solution { margin-top: 12px; padding-top: 12px;
-               border-top: 0.5px dashed var(--border); font-size: 14px;
-               line-height: 1.7; overflow-wrap: anywhere; }
+.rv-solution { font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
 .rv-solution-text { white-space: pre-wrap; }
-.rv-solution-cap { font-size: 11px; color: var(--text3); margin-bottom: 4px; }
 
 .rv-part { border-top: 0.5px solid var(--border); padding-top: 14px;
            margin-top: 14px; }
@@ -67,19 +76,26 @@
 .rv-part-q { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
 
 /* Балл ставится НАЖАТИЕМ: 21 оценка за работу — это 21 набранное число. */
-.rv-score { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.rv-preset { font: inherit; font-size: 15px; font-weight: 600;
-             min-width: 52px; padding: 9px 14px; cursor: pointer;
-             border: 0.5px solid var(--border); border-radius: var(--r);
+.rv-score { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+/* ⚠️ ТРИ КНОПКИ — ОДИН ПЕРЕКЛЮЧАТЕЛЬ (п. 3.2). Общая рамка, общие
+   внутренние границы, скруглены только края группы. Порознь они читались
+   как три отключённые кнопки. */
+.rv-seg { display: inline-flex; border: 1px solid var(--border);
+          border-radius: var(--r); overflow: hidden; }
+.rv-preset { font: inherit; font-size: 15px; font-weight: 700;
+             min-width: 56px; padding: 9px 18px; cursor: pointer;
+             border: 0; border-right: 1px solid var(--border);
              background: var(--surface); color: var(--text);
-             font-variant-numeric: tabular-nums; }
-.rv-preset:hover { border-color: var(--text3); }
-.rv-preset.is-on { background: var(--btn-bg); color: var(--on-btn);
-                   border-color: var(--btn-bg); }
-.rv-own { display: flex; align-items: center; gap: 6px; font-size: 12px;
+             font-variant-numeric: tabular-nums; transition: .12s; }
+.rv-preset:last-child { border-right: 0; }
+.rv-preset:hover { background: var(--accent-tint); color: var(--accent-deep); }
+/* ⚠️ ВЫБРАННЫЙ — АКЦЕНТ, А НЕ ГРАФИТ. Графитовая заливка на платформе
+   означает «крупное действие» (кнопка «Сохранить»), а здесь это ВЫБОР
+   одного из трёх; рядом стоят две настоящие графитовые кнопки, и три
+   графитовых пятна в одном блоке читались как три равные кнопки. */
+.rv-preset.is-on { background: var(--accent); color: var(--on-btn); }
+.rv-own { display: flex; align-items: baseline; gap: 6px; font-size: 12px;
           color: var(--text2); }
-.rv-own input { width: 74px; }
-.rv-max { font-size: 12px; color: var(--text3); }
 
 /* Картинка-решение показывается ЦЕЛИКОМ (фаза 14.2): решение под ссылкой
    пришлось бы открывать в новой вкладке на каждой задаче. */
@@ -99,15 +115,17 @@
 
 .rv-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
               margin-top: 18px; }
-/* Переход на другой экран, а не действие с работой: тихая ссылка, отодвинутая
-   от пары кнопок. Тот же вид, что у «глазами ученика» в сводке решений. */
-.rv-eyes { margin-left: auto; font-size: 13px; color: var(--text2);
-           text-decoration: none; white-space: nowrap; }
+/* Переход на другой экран, а не действие с работой. Тот же вид, что у
+   «глазами ученика» в сводке решений; `margin-left: auto` убран — теперь
+   ссылка стоит в узле переходов, а не отодвигается от кнопок. */
+.rv-eyes { flex-basis: 100%; text-align: right; font-size: 13px;
+           color: var(--text2); text-decoration: none; white-space: nowrap; }
 .rv-eyes:hover { color: var(--text); text-decoration: underline; }
 
-@media (max-width: 720px) {
-  .rv-pair { grid-template-columns: 1fr; }
-}
+{% comment %}
+Правило узкого экрана больше не нужно: ответ, эталон и решение стоят
+секциями одна под другой в любой ширине (п. 3.2).
+{% endcomment %}
 {% endblock %}
 
 {% block content %}
@@ -151,6 +169,11 @@
     <a class="rv-arrow {% if not next_sub %}is-off{% endif %}"
        {% if next_sub and group %}href="{% url 'teacher:group_review_submission' group.pk next_sub.pk %}"{% endif %}
        title="следующая задача">→</a>
+    {% comment %}
+    Переход «глазами ученика» стоит здесь же — среди переходов, а не среди
+    кнопок сохранения (п. 3.2).
+    {% endcomment %}
+    <a href="{{ work_review_url }}" class="rv-eyes">открыть глазами ученика ↗</a>
   </div>
 </div>
 
@@ -171,36 +194,32 @@
       {% for row in part_rows %}
       <div class="rv-part">
         {% if row.label %}<div class="rv-part-q">{{ row.label }}) {{ row.statement }}</div>{% endif %}
-        <div class="rv-pair">
-          <div class="rv-box">
-            <div class="rv-box-cap">ответил ученик</div>
-            {% if row.given %}
-            <div class="rv-value">{{ row.given }}</div>
-            {% else %}
-            <div class="rv-value is-empty {% if wrote_solution_without_answer %}is-missing{% endif %}">ответа нет</div>
-            {% endif %}
-          </div>
-          <div class="rv-box">
-            <div class="rv-box-cap">верный ответ</div>
-            <div class="rv-value">{{ row.correct|default:"эталон не задан" }}</div>
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    {% else %}
-      <div class="rv-pair">
-        <div class="rv-box">
-          <div class="rv-box-cap">ответил ученик</div>
-          {% if submission.submitted_answer %}
-          <div class="rv-value">{{ submission.submitted_answer }}</div>
+        <div class="rv-sect">
+          <div class="rv-box-cap">Ответ</div>
+          {% if row.given %}
+          <div class="rv-value">{{ row.given }}</div>
           {% else %}
           <div class="rv-value is-empty {% if wrote_solution_without_answer %}is-missing{% endif %}">ответа нет</div>
           {% endif %}
         </div>
-        <div class="rv-box">
-          <div class="rv-box-cap">верный ответ</div>
-          <div class="rv-value">{% if submission.problem_item %}{{ submission.problem_item.correct_answer|default:"эталон не задан" }}{% else %}эталон не задан{% endif %}</div>
+        <div class="rv-sect">
+          <div class="rv-box-cap">Верный ответ</div>
+          <div class="rv-value">{{ row.correct|default:"эталон не задан" }}</div>
         </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="rv-sect">
+        <div class="rv-box-cap">Ответ</div>
+        {% if submission.submitted_answer %}
+        <div class="rv-value">{{ submission.submitted_answer }}</div>
+        {% else %}
+        <div class="rv-value is-empty {% if wrote_solution_without_answer %}is-missing{% endif %}">ответа нет</div>
+        {% endif %}
+      </div>
+      <div class="rv-sect">
+        <div class="rv-box-cap">Верный ответ</div>
+        <div class="rv-value">{% if submission.problem_item %}{{ submission.problem_item.correct_answer|default:"эталон не задан" }}{% else %}эталон не задан{% endif %}</div>
       </div>
     {% endif %}
 
@@ -213,8 +232,8 @@
     зависимости от того, что написал ученик, — то есть меняла скелет.
     То же самое теперь говорит пометка состояния в шапке блока оценивания.
     {% endcomment %}
-    <div class="rv-solution">
-      <div class="rv-solution-cap">Решение ученика</div>
+    <div class="rv-sect rv-solution">
+      <div class="rv-box-cap">Решение</div>
       {% if submission.solution_text %}
       {% comment %}
       ⚠️ Текст ВПЛОТНУЮ к тегу: у блока `white-space: pre-wrap`, и отступы
@@ -232,8 +251,8 @@
     задаче, а проверять надо здесь.
     {% endcomment %}
     {% if submission.solution_file %}
-    <div class="rv-solution">
-      <div class="rv-solution-cap">Прикреплённый файл</div>
+    <div class="rv-sect rv-solution">
+      <div class="rv-box-cap">Прикреплённый файл</div>
       {% with name=submission.solution_file.name|lower %}
       {% if name|slice:"-4:" == ".png" or name|slice:"-4:" == ".jpg" or name|slice:"-5:" == ".jpeg" or name|slice:"-5:" == ".webp" or name|slice:"-4:" == ".gif" %}
       <a href="{{ submission.solution_file.url }}">
@@ -284,6 +303,14 @@
       Пока балл не поставлен, числа нет вовсе — и притворяться числом ему
       нельзя. Максимум при этом не прячем: он нужен, чтобы выбрать балл.
       {% endcomment %}
+      {% comment %}
+      ⚠️ ШАПКА СОКРАЩЕНА ДО ДВУХ СУЩНОСТЕЙ (визуальная сессия 17.08, п. 3.2):
+      заголовок слева, состояние чипом справа. Третьим здесь стоял ещё и
+      крупный балл — «балл не поставлен / максимум 2», — то есть то же
+      самое, что уже говорит состояние, плюс максимум, который нужен НЕ
+      здесь, а у самого поля балла: он туда и переехал («из 2»).
+      Поставленный балл остаётся: он ответ на вопрос «что уже стоит».
+      {% endcomment %}
       {% if existing_feedback and existing_feedback.score is not None %}
       <span class="k-score">
         <span class="k-score__value">{{ existing_feedback.score|ball }}<span
@@ -291,18 +318,23 @@
           class="k-score__max">{{ max_score|ball }}</span></span>
         <span class="k-score__cap">балл за задачу</span>
       </span>
-      {% else %}
-      <span class="k-score">
-        <span class="k-score__none">балл не поставлен</span>
-        <span class="k-score__cap">максимум {{ max_score|ball }}</span>
-      </span>
       {% endif %}
     </div>
     <label class="k-label">Балл за задачу</label>
     <div class="rv-score">
+      {% comment %}
+      ⚠️ ПРЕСЕТЫ — ОДИН ПЕРЕКЛЮЧАТЕЛЬ, А НЕ ТРИ КНОПКИ (п. 3.2). Три белых
+      прямоугольника подряд читались как ОТКЛЮЧЁННЫЕ — при том что это
+      главный жест экрана. Общая рамка и общие внутренние границы говорят
+      «выберите одно из»; выбранное заливается акцентом.
+      Правило трёх значений (минимум / половина / максимум) НЕ трогаем —
+      его считает `work_review.score_presets`.
+      {% endcomment %}
+      <span class="rv-seg">
       {% for preset in score_presets %}
       <button type="button" class="rv-preset" data-score="{{ preset.value }}">{{ preset.label }}</button>
       {% endfor %}
+      </span>
       <span class="rv-own">
         своё
         {% comment %}
@@ -320,13 +352,28 @@
         Границы держит сервер (`_max_score_for`), а не разметка.
         {% endcomment %}
         <input type="text" inputmode="decimal" name="score" id="score-input"
-               class="k-input" data-decimal autocomplete="off"
+               class="k-num k-num--wide" data-decimal autocomplete="off"
+               min="0" max="{{ max_score|ball_dot }}"
                value="{% if existing_feedback %}{{ existing_feedback.score|ball }}{% elif auto_score is not None %}{{ auto_score|ball }}{% endif %}">
+        {% comment %}
+        ⚠️ МАКСИМУМ СКАЗАН ОДИН РАЗ И РЯДОМ С ЧИСЛОМ (п. 3.2). Он стоял
+        в шапке блока («максимум 2») и ещё раз строкой правее — дважды об
+        одном, и оба раза далеко от поля, где его применяют.
+        Границы по-прежнему держит СЕРВЕР (`_max_score_for`): форму можно
+        отправить и в обход браузера.
+        {% endcomment %}
+        <span class="k-unit">из {{ max_score|ball }}</span>
       </span>
-      <span class="rv-max">максимум {{ max_score|ball }}</span>
     </div>
 
-    <label class="k-label" style="margin-top:16px">Комментарий к задаче</label>
+    {% comment %}
+    ⚠️ СКАЗАНО, КТО ПРОЧТЁТ (п. 3.2). Комментарий к задаче виден одному
+    ученику, но экран об этом молчал — и это ровно тот вопрос, из-за
+    которого его пишут осторожнее, чем надо.
+    {% endcomment %}
+    <label class="k-label" style="margin-top:16px">Комментарий к задаче
+      <span class="k-quiet" style="text-transform:none;letter-spacing:0;font-weight:400">— увидит только {{ submission.student.first_name|default:submission.student.get_full_name|default:submission.student.username }}</span>
+    </label>
     <textarea name="comment" class="k-area" rows="3"
               placeholder="Что не так и как надо">{% if existing_feedback %}{{ existing_feedback.comment }}{% endif %}</textarea>
 
@@ -338,13 +385,13 @@
         Сохранить и выйти
       </button>
       {% comment %}
-      ⚠️ «ГЛАЗАМИ УЧЕНИКА» ОТДЕЛЕНО ОТ ПАРЫ КНОПОК (обзор 13.08, п. 47). Оно
-      стояло третьим в ряду тихой кнопкой и читалось как НЕАКТИВНАЯ кнопка:
-      две кнопки сохраняют, третья почему-то бледная. Это не действие с
-      работой, а переход на другой экран — поэтому тихая ссылка, отодвинутая
-      вправо. Ровно так же он подписан в сводке решений (`.stu-eyes`).
+      ⚠️ «ГЛАЗАМИ УЧЕНИКА» УЕХАЛО НАВЕРХ (визуальная сессия 17.08, п. 3.2).
+      Оно и раньше было отодвинуто от пары кнопок (обзор 13.08, п. 47), но
+      оставалось в ОДНОМ ряду с ними — а это не действие с работой, а
+      переход между экранами. Место ему рядом с «задача N из M», где живут
+      остальные переходы. Внизу остались ровно два действия, и понятно,
+      какое главное.
       {% endcomment %}
-      <a href="{{ work_review_url }}" class="rv-eyes">глазами ученика →</a>
     </div>
   </div>
 </form>

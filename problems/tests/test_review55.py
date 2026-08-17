@@ -1062,15 +1062,21 @@ class ReviewSkeletonTests(TestCase):
                     args=[self.group.pk, self.sub.pk])).content.decode()
 
     def test_skeleton_is_the_same_with_and_without_a_solution(self):
-        """⚠️ Раньше блок решения появлялся по условию, и экран ПЛАВАЛ."""
+        """⚠️ Раньше блок решения появлялся по условию, и экран ПЛАВАЛ.
+
+        ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 3.2): «Ответ», «Верный
+        ответ» и «Решение» стали ТРЕМЯ РАВНЫМИ секциями одного блока, и
+        заголовок третьей называется так же коротко, как две первые —
+        «Решение». Требование прежнее: секция есть всегда.
+        """
         empty = self._body()
-        self.assertIn('Решение ученика', empty)
+        self.assertIn('>Решение<', empty)
         self.assertIn('решение не написано', empty)
 
         self.sub.solution_text = 'Считаем по формуле'
         self.sub.save(update_fields=['solution_text'])
         filled = self._body()
-        self.assertIn('Решение ученика', filled)
+        self.assertIn('>Решение<', filled)
         self.assertNotIn('решение не написано', filled)
 
     def test_the_caption_no_longer_changes_shape(self):

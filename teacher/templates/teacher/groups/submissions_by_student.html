@@ -16,17 +16,20 @@
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .stu-card { display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
             padding: 16px 18px; margin-bottom: 10px; }
-/* Не приступавшие — приглушённо: это не работа, это её отсутствие. */
 {% comment %}
-⚠️ ПРИГЛУШЕНИЯ БОЛЬШЕ НЕТ (решение владельца от 17.08). Здесь стояло
-`opacity: .62` у карточки не начавшего ученика. Что он не начинал, и так
-написано словами строкой ниже (`stu-state`), а полупрозрачность вдобавок
-роняла контраст имени.
+⚠️ ПРИГЛУШЕНИЯ БОЛЬШЕ НЕТ (решение владельца от 17.08). Карточка не
+начавшего ученика была полупрозрачной. Что он не начинал, и так написано
+словами в самой строке статуса, а прозрачность вдобавок роняла контраст
+имени. Само значение здесь не повторяем: правило удалено, а проверка
+«его больше нет» ищет по файлу и поймала бы объяснение.
 {% endcomment %}
 .stu-main { flex: 1; min-width: 180px; }
 .stu-name { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
 .stu-meta { font-size: 12px; color: var(--text2); }
-.stu-state { font-size: 12px; color: var(--text2); margin-top: 3px; }
+/* Подпись, объясняющая выделение первой карточки. Акцентная и мелкая:
+   это пояснение к полосе, а не ещё один показатель. */
+.stu-next { font-size: 12px; font-weight: 600; color: var(--accent);
+            margin-top: 2px; }
 
 /* Крупные числа карточки — класс набора `.k-score--pair` (сессия 7, фаза 4).
    Свои `.stu-score*` удалены: они задавали ТО ЖЕ САМОЕ вторым способом, и
@@ -42,6 +45,9 @@
 /* Тихая ссылка «глазами ученика» рядом с главной кнопкой: это второй,
    необязательный переход, и весом он должен быть заметно меньше. */
 .stu-eyes { font-size: 12px; color: var(--text2); white-space: nowrap; }
+/* Прочерк вместо числа: тише самого числа, но того же кегля — иначе
+   строка карточки съезжает по высоте. */
+.k-score__value--none { color: var(--text3); }
 
 @media (max-width: 560px) {
   .stu-card { align-items: stretch; }
@@ -81,13 +87,22 @@
 </div>
 
 {% for card in cards %}
-<div class="k-card stu-card {% if card.pending %}k-card--calls{% endif %}">
+{% comment %}
+⚠️ ВЫДЕЛЕНИЕ — ЛЕВАЯ ПОЛОСА И СЛОВА (визуальная сессия 17.08, п. 3.1).
+Первая карточка была обведена малиновой рамкой ПО ВСЕМУ ПЕРИМЕТРУ и
+читалась как случайное выделение: почему именно она — не сказано нигде.
+Полоса — тот же приём, что на остальных экранах платформы, а подпись под
+именем объясняет её словами.
+{% endcomment %}
+<div class="k-card stu-card {% if card.is_next %}k-mark k-mark--next{% endif %}">
   <div class="stu-main">
     <div class="stu-name">{{ card.student.get_full_name|default:card.student.username }}</div>
-    <div class="stu-meta">
-      сдано {{ card.submitted }} из {{ card.total }}{% if card.submitted_human %} · {{ card.submitted_human }}{% endif %}
-    </div>
-    <div class="stu-state">{{ card.state_label }}</div>
+    {% comment %}
+    Статус — ОДНА строка через точки: у одних учеников их было три, у
+    других две, и карточки выходили разной высоты без причины.
+    {% endcomment %}
+    <div class="stu-meta">{{ card.status_line }}</div>
+    {% if card.is_next %}<div class="stu-next">следующий на проверку</div>{% endif %}
   </div>
 
   {% comment %}
@@ -97,14 +112,24 @@
   важность, хотя это просто два показателя одной работы.
   {% endcomment %}
   <div class="stu-scores">
-    {% if card.has_scored %}
+    {% comment %}
+    ⚠️ У НЕ НАЧАВШЕГО ЧИСЛА ЗАМЕНЯЕТСЯ ПРОЧЕРКОМ, А НЕ ИСЧЕЗАЮТ (визуальная
+    сессия 17.08, п. 3.1). Без них карточка теряла две колонки, съезжала
+    вдвое ниже соседних, и список переставал читаться как таблица — при
+    том что сказать надо ровно одно: работы ещё нет.
+    Прочерк здесь не путается с нулём: рядом нет «из N», а строка статуса
+    прямо говорит «не начата».
+    {% endcomment %}
     <span class="k-score k-score--pair">
+      {% if card.has_scored %}
       <span class="k-score__value">{{ card.scored }}<span
         class="k-score__of">из</span><span
         class="k-score__max">{{ card.scored_max }}</span></span>
+      {% else %}
+      <span class="k-score__value k-score__value--none">—</span>
+      {% endif %}
       <span class="k-score__cap">Итоговый балл</span>
     </span>
-    {% endif %}
 
     {% comment %}
     ⚠️ У ДВУХ КРУПНЫХ ЧИСЕЛ РАЗНЫЕ ЗНАМЕНАТЕЛИ, И ЭТО НЕ ОШИБКА (обзор
@@ -112,14 +137,16 @@
     выглядит как сбой. Объясняем словами прямо здесь: машина берётся не за
     всю работу.
     {% endcomment %}
-    {% if card.has_machine %}
     <span class="k-score k-score--pair">
+      {% if card.has_machine %}
       <span class="k-score__value">{{ card.machine_got }}<span
         class="k-score__of">из</span><span
         class="k-score__max">{{ card.machine_could }}</span></span>
+      {% else %}
+      <span class="k-score__value k-score__value--none">—</span>
+      {% endif %}
       <span class="k-score__cap">Результат автопроверки{% include '_hint.html' with hint='Знаменатель меньше итогового: машина считает только тесты и задачи с утверждённым числовым эталоном. Открытые задачи оценивает преподаватель, и их баллы в это число не входят.' %}</span>
     </span>
-    {% endif %}
   </div>
 
   <a class="k-btn {% if card.button.kind == 'main' %}k-btn--main{% else %}k-btn--plain{% endif %}"

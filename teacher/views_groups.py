@@ -912,7 +912,22 @@ def student_cards(assignment, group):
 
         submitted_at = max([s.submitted_at for s in done if s.submitted_at]
                            or [None])
+        # ⚠️ СТАТУС — ОДНА СТРОКА ЧЕРЕЗ ТОЧКИ (визуальная сессия 17.08,
+        # п. 3.1). У одних учеников он занимал три строки, у других две, и
+        # карточки списка выходили разной высоты без всякой причины: список
+        # читается как таблица, а строки в нём прыгали.
+        # Собирает строку ПИТОН: в шаблоне это была бы вторая сборка того
+        # же самого, а «сдано N из M» уже печатается ещё и в подписи кнопки.
+        parts = []
+        if not done:
+            parts.append('не начата')
+        parts.append('сдано %d из %d' % (len(done), total))
+        if submitted_at:
+            parts.append(timefmt.fmt(submitted_at, timefmt.SHORT))
+        if done:
+            parts.append(state_label)
         cards.append({
+            'status_line': ' · '.join(parts),
             'student': student,
             'submitted': len(done),
             'total': total,
@@ -936,6 +951,16 @@ def student_cards(assignment, group):
     order = {'partial': 0, 'checked': 1, 'not_started': 2}
     cards.sort(key=lambda c: (0 if c['pending'] else 1, order[c['state']],
                               (c['student'].last_name or '').lower()))
+    # ⚠️ «СЛЕДУЮЩИЙ НА ПРОВЕРКУ» — РОВНО ОДИН (п. 3.1). Очередь работы уже
+    # задана порядком карточек; выделение объясняет её словами, а не
+    # заставляет догадываться по цвету. Ждущих проверки нет — не выделяем
+    # ничего: указание «начните отсюда» там, где начинать нечего, врёт.
+    for card in cards:
+        card['is_next'] = False
+    for card in cards:
+        if card['pending']:
+            card['is_next'] = True
+            break
     return cards
 
 

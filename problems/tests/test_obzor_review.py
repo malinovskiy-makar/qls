@@ -276,9 +276,17 @@ class ScoreBlockTests(Base):
                     args=[self.group.pk, self.sub.pk])).content.decode()
 
     def test_says_the_score_is_not_set(self):
+        """⚠️ ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 3.2). Шапка блока
+        сокращена до двух сущностей: заголовок и состояние. «Балл не
+        поставлен» удалено — это и говорит состояние («ждёт проверки»), а
+        «максимум N» переехало к самому полю балла, где его применяют.
+        Требование по существу прежнее: экран обязан сказать, что балла
+        ещё нет и каков потолок."""
         html = self._html()
-        self.assertIn('балл не поставлен', html)
-        self.assertIn('максимум 3', html)
+        self.assertIn('ждёт проверки', html)
+        self.assertIn('из 3', html)
+        # Дважды об одном на одном экране больше не говорим.
+        self.assertNotIn('максимум 3', html)
 
     def test_no_dash_over_the_maximum(self):
         html = self._html()
