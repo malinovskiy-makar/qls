@@ -408,6 +408,11 @@ ASSIGNMENT_STATES = (
     ('needs_you', 'Требуют проверки'),
     ('running', 'Идут сейчас'),
     ('done', 'Проверены'),
+    # ⚠️ ЧЕТВЁРТЫЙ БЛОК (ревью 17.08, п. 5.1). Работа с прошедшим сроком,
+    # по которой НЕТ НИ ОДНОЙ СДАЧИ, лежала в «Проверены» — со строкой
+    # «сдали 0 из 3, никто не сдал, нет оценок». Проверить то, чего никто
+    # не сдавал, нельзя: это не результат работы, а её отсутствие.
+    ('closed', 'Завершены'),
 )
 
 
@@ -417,6 +422,11 @@ def assignment_state(row, now=None):
     Порядок проверок важен: «требуют вас» ГЛАВНЕЕ срока. Работа с прошедшим
     сроком, где лежит непроверенное, — это всё ещё работа для репетитора, а
     не архив.
+
+    ⚠️ «ЗАВЕРШЕНЫ» — НЕ «ПРОВЕРЕНЫ» (ревью 17.08, п. 5.1). Работа, которой
+    никто не сдал, попадала в «Проверены»: слово обещало результат там, где
+    результата не было вовсе. Признак тот же, по которому карточка уже
+    получала серую полосу вместо зелёной.
     """
     if row['pending']:
         return 'needs_you'
@@ -424,7 +434,7 @@ def assignment_state(row, now=None):
     now = now or timezone.now()
     if deadline is None or deadline >= now:
         return 'running'
-    return 'done'
+    return 'closed' if row.get('nobody_submitted') else 'done'
 
 
 # Сколько проверенных работ показываем сразу. Остальные — по кнопке
@@ -435,7 +445,10 @@ DONE_SHOWN = 5
 # Цвет полосы состояния. Берутся классы набора деталей (`.k-mark--*`), те же
 # пять состояний, что на разборе работы: два набора цветов для одного и того
 # же разъехались бы на первой же правке.
-STATE_MARKS = {'needs_you': 'pending', 'running': 'empty', 'done': 'correct'}
+STATE_MARKS = {'needs_you': 'pending', 'running': 'empty', 'done': 'correct',
+               # Завершённая без сдач — серая: зелёный читался бы как
+               # «всё хорошо», а хорошего здесь ничего не случилось.
+               'closed': 'empty'}
 
 
 def group_assignments_by_state(rows, now=None, show_all_done=False):
@@ -455,10 +468,7 @@ def group_assignments_by_state(rows, now=None, show_all_done=False):
         # а проверять там было нечего. Такой работе даём серую полосу — ту
         # же, что у «Идут сейчас»: состояние честное, «ничего не
         # происходило».
-        mark = STATE_MARKS[key]
-        if key == 'done' and row.get('nobody_submitted'):
-            mark = STATE_MARKS['running']
-        row['mark'] = mark
+        row['mark'] = STATE_MARKS[key]
         buckets[key].append(row)
 
     result = []
@@ -468,7 +478,10 @@ def group_assignments_by_state(rows, now=None, show_all_done=False):
             continue
         shown = items
         hidden = 0
-        if key == 'done' and not show_all_done and len(items) > DONE_SHOWN:
+        # ⚠️ У «Завершены» своя кнопка «Посмотреть ещё», как у «Проверены»:
+        # длинный хвост закрытых работ прячет за собой то, что горит.
+        if key in ('done', 'closed') and not show_all_done \
+                and len(items) > DONE_SHOWN:
             shown = items[:DONE_SHOWN]
             hidden = len(items) - DONE_SHOWN
         caption = ('последние %d из %d' % (len(shown), len(items))

@@ -204,7 +204,16 @@
 партиал `teacher/_work_history.html` + `problems.stats.work_history`.
 {% endcomment %}
 <div class="panel">
-  <div class="panel-head"><div class="panel-title">История работ</div></div>
+  {% comment %}
+  ⚠️ ШАПКА БЛОКА ТА ЖЕ, ЧТО НА ЭКРАНЕ ЗАНЯТИЯ (ревью 17.08, п. 5.5).
+  Таблица здесь и там одна (`_work_history.html`), сортировка тоже, а
+  подпись «нажмите на заголовок» стояла только на экране группы: на
+  карточке ученика про сортировку нельзя было догадаться.
+  {% endcomment %}
+  <div class="panel-head">
+    <div class="panel-title">История работ</div>
+    <div class="panel-hint">Нажмите на заголовок столбца, чтобы отсортировать</div>
+  </div>
   {% include "teacher/_work_history.html" with works=works for_group=False %}
 </div>
 

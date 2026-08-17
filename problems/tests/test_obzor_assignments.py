@@ -81,23 +81,52 @@ class AssignmentsTabTests(TestCase):
     def test_checked_work_keeps_the_green_stripe(self):
         self.assertIn('k-mark--correct', self._card('Проверенная целиком'))
 
-    def test_both_are_in_the_same_group(self):
-        """Полоса разная, а группа одна — «Проверены»: состояние честное."""
+    def test_they_are_in_different_groups_now(self):
+        """⚠️ ПЕРЕСЧИТАН (ревью 17.08, п. 5.1). Здесь проверялось, что обе
+        работы лежат в «Проверены» и различаются только полосой. Владелец
+        назвал это дефектом: работу, которой никто не сдал, проверить
+        нельзя — слово «проверены» обещало результат. Для неё заведён блок
+        «Завершены», полоса у обеих по-прежнему честная.
+        """
         html = self._html()
-        done = html.split('Проверены')[1]
-        self.assertIn('Никем не тронутая', done)
+        done = html.split('Проверены')[1].split('Завершены')[0]
+        closed = html.split('Завершены')[1]
         self.assertIn('Проверенная целиком', done)
+        self.assertNotIn('Никем не тронутая', done)
+        self.assertIn('Никем не тронутая', closed)
 
     # ---- 4.2 «Посмотреть ещё N» --------------------------------------
     def _fill_checked(self, extra):
-        """Доводит группу «Проверены» до нужного размера."""
-        from problems.models import Assignment
+        """Доводит группу «Проверены» до нужного размера.
 
+        ⚠️ РАБОТЫ ОБЯЗАНЫ БЫТЬ СДАННЫМИ И ПРОВЕРЕННЫМИ (ревью 17.08, п. 5.1).
+        Раньше помощник заводил их пустыми, и они всё равно попадали в
+        «Проверены» — ровно тот дефект, ради которого завели блок
+        «Завершены». Теперь пустая работа туда не попадает, и помощник
+        обязан делать то, что написано в его названии.
+        """
+        from decimal import Decimal
+
+        from problems.models import (
+            Assignment, AssignmentItem, Problem, Submission, TeacherFeedback,
+        )
+
+        problem = Problem.objects.create(
+            title='Задача для истории', statement='Условие',
+            status=Problem.Status.PUBLISHED, problem_type='задача')
         for index in range(extra):
             work = Assignment.objects.create(
                 name='Старая %d' % index, author=self.tutor, group=self.group,
                 deadline=self.now - timedelta(days=10 + index))
             work.students.set([self.student])
+            item = AssignmentItem.objects.create(
+                assignment=work, order=0, catalog_problem=problem,
+                points=Decimal('1'))
+            sub = Submission.objects.create(
+                assignment=work, student=self.student, problem=problem,
+                problem_item=item, status='reviewed')
+            TeacherFeedback.objects.create(submission=sub, score=Decimal('1'),
+                                           reviewed_by=self.tutor)
 
     def test_show_all_button_counts_what_is_hidden(self):
         """⚠️ ОЖИДАНИЕ ПЕРЕСЧИТАНО (ревью 15.08, п. 1.3).
@@ -107,7 +136,7 @@ class AssignmentsTabTests(TestCase):
         «сколько я ещё не вижу». Теперь кнопка называет СКРЫТЫЕ, подпись
         над списком не тронута.
         """
-        self._fill_checked(4)
+        self._fill_checked(5)
         html = self._html()
         self.assertIn('Посмотреть ещё 1 работу', html)
         self.assertNotIn('Посмотреть все', html)
@@ -115,7 +144,7 @@ class AssignmentsTabTests(TestCase):
 
     def test_hidden_count_is_declined(self):
         """Три скрытых — «3 работы», а не «3 работу»."""
-        self._fill_checked(6)
+        self._fill_checked(7)
         self.assertIn('Посмотреть ещё 3 работы', self._html())
 
     def test_no_button_when_nothing_is_hidden(self):

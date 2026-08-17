@@ -218,8 +218,16 @@
     var out = [];
     var name = form.querySelector('[name=name]');
     if (name && !name.value.trim()) { out.push('впишите название'); }
+    // ⚠️ ЗАНЯТИЕ БЕЗ УЧЕНИКОВ АДРЕСАТОМ НЕ СЧИТАЕТСЯ (ревью 17.08, п. 5.7).
+    // Такую галочку сервер рисует недоступной; если ВСЕ занятия пусты,
+    // причина другая — выдавать некому вообще, и об этом надо сказать
+    // прямо, а не предлагать «выбрать» из недоступного списка.
     var boxes = form.querySelectorAll('[name=groups]');
-    if (boxes.length && ![].some.call(boxes, function (b) { return b.checked; })) {
+    var open_ = [].filter.call(boxes, function (b) { return !b.disabled; });
+    if (boxes.length && !open_.length) {
+      out.push('ни в одном занятии нет учеников');
+    } else if (open_.length
+               && ![].some.call(open_, function (b) { return b.checked; })) {
       out.push('выберите, кому выдать');
     }
     // ⚠️ НЕРАЗОБРАННАЯ ДАТА ЗАПИРАЕТ ВЫДАЧУ (ревью 16.08, п. 3.3): пока

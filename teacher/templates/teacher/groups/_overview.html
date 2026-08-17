@@ -248,9 +248,18 @@
           `data-hint` + `templates/_hint_js.html`.
           {% endcomment %}
           {% for column in matrix.columns %}
-          <th class="no-sort" data-type="num"
-              data-hint="{{ column.name }}">
-            <span class="matrix-head">{{ column.name|truncatechars:26 }}</span>
+          {% comment %}
+          ⚠️ ПОДСКАЗКА ВИСИТ НА САМОЙ НАДПИСИ, А НЕ НА ЯЧЕЙКЕ (ревью 17.08,
+          п. 5.6). Заголовок повёрнут `writing-mode` + `transform`, и
+          видимый текст выходит ЗА пределы ячейки: курсор над словом
+          оказывался вне `th`, `closest('[data-hint]')` ничего не находил, и
+          подсказка не появлялась вовсе — при том что на клетках матрицы тот
+          же механизм работал. Проверено наведением.
+          {% endcomment %}
+          <th class="no-sort" data-type="num">
+            <span class="matrix-head"
+                  data-hint="{{ column.name }}"
+                  tabindex="0">{{ column.name|truncatechars:26 }}</span>
           </th>
           {% endfor %}
         </tr>

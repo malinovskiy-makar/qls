@@ -186,6 +186,13 @@ class GroupFromUrlTests(TestCase):
                                                 teacher=cls.tutor)
         cls.second = StudentGroup.objects.create(name='Второе',
                                                  teacher=cls.tutor)
+        # ⚠️ У ЗАНЯТИЙ ДОЛЖНЫ БЫТЬ УЧЕНИКИ (ревью 17.08, п. 5.7): пустое
+        # занятие выбрать нельзя, и отмечать его адресом тоже нельзя —
+        # работа ушла бы в пустоту.
+        cls.first.students.add(User.objects.create_user('t11g-a', password='x',
+                                                        role='student'))
+        cls.second.students.add(User.objects.create_user('t11g-b', password='x',
+                                                         role='student'))
 
     def setUp(self):
         self.client = Client()

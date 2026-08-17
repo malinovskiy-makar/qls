@@ -170,7 +170,8 @@ def _chart_payload(data):
         ],
         'topics': [
             {'name': t['name'], 'accuracy': t['accuracy'],
-             'attempted': t['attempted'], 'mastery': t['mastery']}
+             'attempted': t['attempted'], 'mastery': t['mastery'],
+             'label': t['label'], 'label_kind': t['label_kind']}
             for t in data['topics']
         ],
     }

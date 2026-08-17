@@ -353,6 +353,34 @@ def _delta(current, previous):
 # Темы
 # ===========================================================================
 
+# ⚠️ МЕТКА ТЕМЫ СЧИТАЕТСЯ ОДНОЙ ФУНКЦИЕЙ ПО ЯВНОМУ ПРАВИЛУ (ревью 17.08,
+# п. 5.2). До этой правки она бралась из `StudentTopicProgress.mastery_level`
+# — счётчика, который живёт по своим правилам и обновляется своим путём.
+# Рядом на той же карточке стояла доля верных, посчитанная за выбранный
+# период, и они противоречили друг другу: «Международная торговля —
+# уверенно — 40%» соседствовала с «Инфляция — разобрался — 95%», а две темы
+# с ОДИНАКОВЫМИ данными (100%, 2 из 2) получали разные метки.
+#
+# Порог попыток — тот же, что у блока «Сильные и слабые темы»
+# (`MIN_ATTEMPTS_FOR_RANKING`): два разных порога «когда данным можно
+# верить» на одном экране разъехались бы неизбежно.
+TOPIC_LABELS = (
+    (85, 'master', 'мастер'),
+    (60, 'good', 'разобрался'),
+    (0, 'weak', 'стоит подтянуть'),
+)
+
+
+def topic_label(attempted, accuracy):
+    """(ключ, слово) для метки темы. Мало попыток — так и говорим."""
+    if attempted < MIN_ATTEMPTS_FOR_RANKING:
+        return 'thin', 'мало данных'
+    for edge, key, word in TOPIC_LABELS:
+        if accuracy >= edge:
+            return key, word
+    return 'weak', 'стоит подтянуть'
+
+
 def topic_breakdown(user, period='month', now=None):
     """По каждой теме: попыток, верных, доля, владение. Одним запросом."""
     from .models import StudentTopicProgress
@@ -380,6 +408,9 @@ def topic_breakdown(user, period='month', now=None):
             'accuracy': round(solved * 100.0 / attempted) if attempted else 0,
             'mastery': mastery.get(row['topic_id'], 'none'),
         })
+        # Метка считается ПО ТЕМ ЖЕ ЧИСЛАМ, что стоят рядом на карточке.
+        result[-1]['label_kind'], result[-1]['label'] = topic_label(
+            attempted, result[-1]['accuracy'])
     return result
 
 
@@ -413,9 +444,16 @@ def strongest_weakest(user, period='all', now=None, limit=RANKING_LIMIT,
     # с долей верных 25% стояла под заголовком «Сильные». Это не «мало
     # данных», это неправда. Берём поровну с двух концов; середина не
     # показывается нигде — она и не сильная, и не слабая.
-    half = min(limit, len(by_accuracy) // 2)
-    strong = by_accuracy[:half]
-    weak = list(reversed(by_accuracy[len(by_accuracy) - half:]))
+    # ⚠️ КОЛОНКИ ЗАПОЛНЯЮТСЯ ДО ПЯТИ, КОГДА ТЕМ ХВАТАЕТ (ревью 17.08,
+    # п. 5.3). Прежнее `len // 2` при девяти темах давало 4 и 4, а десятую
+    # строку не показывало нигде: на экране стояло по четыре темы вместо
+    # пяти. Делим с округлением вверх в пользу сильных; пересечения нет по
+    # построению — слабые берутся из остатка.
+    total = len(by_accuracy)
+    strong_count = min(limit, (total + 1) // 2)
+    weak_count = min(limit, total - strong_count)
+    strong = by_accuracy[:strong_count]
+    weak = list(reversed(by_accuracy[total - weak_count:])) if weak_count else []
     # ⚠️ БЛОК НЕ ИСЧЕЗАЕТ, КОГДА ДАННЫХ МАЛО (ревью 15.08, п. 11). Раньше
     # он показывался только при `enough_data`, и на «Месяце» его не было
     # вовсе, а на «Всё время» он появлялся: владелец решил, что блок

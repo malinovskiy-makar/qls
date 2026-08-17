@@ -494,9 +494,17 @@ class AssignmentGroupingTests(TestCase):
         self._work('Закрыта', days=-5, submitted=1)
         self.assertEqual(self._groups()['done'], ['Закрыта'])
 
-    def test_past_deadline_nobody_submitted_is_done(self):
+    def test_past_deadline_nobody_submitted_is_closed(self):
+        """⚠️ ПЕРЕСЧИТАН (ревью 17.08, п. 5.1): такая работа не «проверена».
+
+        Прежде она попадала в «Проверены» со строкой «сдали 0 из 3, никто
+        не сдал, нет оценок» — слово обещало результат там, где результата
+        не было вовсе. Для неё заведён отдельный блок «Завершены».
+        """
         self._work('Никто не сдал', days=-5)
-        self.assertEqual(self._groups()['done'], ['Никто не сдал'])
+        groups = self._groups()
+        self.assertEqual(groups['closed'], ['Никто не сдал'])
+        self.assertNotIn('done', groups)
 
     def test_needs_you_beats_a_passed_deadline(self):
         """Срок прошёл, но непроверенное лежит — это всё ещё ваша работа."""

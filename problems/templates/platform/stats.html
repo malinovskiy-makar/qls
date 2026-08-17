@@ -124,7 +124,7 @@
 {# ── Карта тем: САМЫЙ ПОЛЕЗНЫЙ БЛОК ───────────────────────────────── #}
 <div class="panel">
   <div class="panel-head">
-    <div class="panel-title">Карта тем — что делать дальше</div>
+    <div class="panel-title">Карта тем — что делать дальше{% include '_hint.html' with hint='Метка ставится по числам этой же карточки: меньше 5 попыток — «мало данных»; дальше по доле верных: 85–100% — «мастер», 60–84% — «разобрался», ниже 60% — «стоит подтянуть».' %}</div>
     <div class="panel-hint">Нажмите на тему, чтобы открыть её задачи в каталоге</div>
   </div>
   {% if data.topics %}
@@ -133,7 +133,14 @@
     <a class="topic-card" href="{% url 'catalog:problem_list' %}?topic={{ topic.topic_id }}">
       <div class="name">{{ topic.name }}</div>
       <div class="row">
-        <span class="mastery mastery-{{ topic.mastery }}">{% if topic.mastery == 'mastered' %}разобрался{% elif topic.mastery == 'confident' %}уверенно{% elif topic.mastery == 'familiar' %}знаком{% else %}не начата{% endif %}</span>
+        {% comment %}
+        ⚠️ МЕТКУ СЧИТАЕТ СЕРВЕР (`stats.topic_label`) ПО ТЕМ ЖЕ ЧИСЛАМ, что
+        стоят справа (ревью 17.08, п. 5.2). Здесь она собиралась цепочкой
+        `{% if %}` из счётчика владения темой, который живёт по своим
+        правилам: рядом стояли «уверенно — 40%» и «разобрался — 95%», а две
+        темы с одинаковыми данными получали разные слова.
+        {% endcomment %}
+        <span class="mastery mastery-{{ topic.label_kind }}">{{ topic.label }}</span>
         <span>{{ topic.accuracy }}% · {{ topic.solved }}/{{ topic.attempted }}</span>
       </div>
       <div class="topic-bar"><i style="width:{{ topic.accuracy }}%"></i></div>

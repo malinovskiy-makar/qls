@@ -104,10 +104,13 @@
                    font-size: 12px; color: var(--text2); }
 .mastery { font-size: 10px; font-weight: 700; text-transform: uppercase;
            letter-spacing: .05em; padding: 2px 7px; border-radius: 999px; }
-.mastery-none      { background: var(--chip-bg); color: var(--chip-text); }
-.mastery-familiar  { background: var(--accent-tint); color: var(--accent); }
-.mastery-confident { background: var(--amber-tint); color: var(--amber-ink); }
-.mastery-mastered  { background: var(--green-tint); color: var(--green); }
+/* Четыре метки темы — по одному правилу (`stats.topic_label`). Янтарь у
+   «стоит подтянуть» остаётся в своём законном смысле: это сигнал, а не
+   украшение. «Мало данных» — нейтральный чип: это не оценка. */
+.mastery-thin   { background: var(--chip-bg); color: var(--chip-text); }
+.mastery-weak   { background: var(--amber-tint); color: var(--amber-ink); }
+.mastery-good   { background: var(--accent-tint); color: var(--accent); }
+.mastery-master { background: var(--green-tint); color: var(--green); }
 .topic-bar { height: 4px; background: var(--surface); border-radius: 999px;
              overflow: hidden; margin-top: 8px; border: 1px solid var(--border-soft); }
 .topic-bar i { display: block; height: 100%; background: var(--accent); }
