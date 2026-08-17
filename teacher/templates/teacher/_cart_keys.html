@@ -26,7 +26,12 @@
     cart: '{{ storage.cart|escapejs }}',
     order: '{{ storage.order|escapejs }}',
     settings: '{{ storage.settings|escapejs }}',
-    manual: '{{ storage.manual|escapejs }}'
+    manual: '{{ storage.manual|escapejs }}',
+    // ⚠️ Ручные баллы и правило начисления живут в хранилище, а не в
+    // памяти страницы: между «Составом» и «Выдачей» страница
+    // перезагружается, и наменянное пропадало молча.
+    points: '{{ storage.points|escapejs }}',
+    rule: '{{ storage.rule|escapejs }}'
   };
 
   function move(from, to) {

@@ -151,10 +151,42 @@
   </div>
 
   {% else %}
-  <div class="ws-field ws-field--last">
+  <div class="ws-field{% if not show_points_rule %} ws-field--last{% endif %}">
     <label class="k-label" for="id_deadline">Срок сдачи</label>
     {% include "teacher/_date_field.html" with field_name='deadline' field_id='id_deadline' field_value=form.deadline default_time='23:59' field_what='срок сдачи' %}
     <div class="k-hint">Можно не задавать — тогда срока нет.</div>
+  </div>
+  {% endif %}
+
+  {% if show_points_rule %}
+  {% comment %}
+  ⚠️ ПРАВИЛО НАЧИСЛЕНИЯ СТОИТ ЗДЕСЬ, А НЕ В КОНСТРУКТОРЕ (решение владельца
+  от 17.08). Вопрос «сколько стоит позиция» решается ОДИН раз и в одном
+  месте; пока ответ на него был зашит константой в записи работы, шаг
+  «Состав» показывал одни числа, а ученик получал другие.
+
+  ⚠️ ПРАВИЛО НЕ ТРОГАЕТ ПОЗИЦИИ, ПРАВЛЕНЫЕ РУКАМИ. Об этом написано прямо
+  на экране: иначе переключение выглядит сломанным — часть строк изменилась,
+  часть нет.
+  {% endcomment %}
+  <div class="ws-field ws-field--last">
+    <div class="k-label">Баллы за позиции</div>
+    <div class="ws-rule" id="ws-rule">
+      <label class="k-check">
+        <input type="radio" name="points_rule_mode" value="difficulty" checked>
+        <span>по сложности задачи</span>
+      </label>
+      <label class="k-check ws-rule__flat">
+        <input type="radio" name="points_rule_mode" value="flat">
+        <span>одинаково по</span>
+        <input class="k-input k-input--num ws-rule__num" type="text"
+               inputmode="decimal" value="3" aria-label="балл за каждую позицию">
+        <span>б.</span>
+      </label>
+    </div>
+    <div class="k-hint">По сложности: задача стоит столько баллов, какова её
+      сложность (1–5), тест — один. Баллы, которые вы правили руками в
+      составе, правило не меняет.</div>
   </div>
   {% endif %}
 </div>

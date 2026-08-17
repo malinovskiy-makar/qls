@@ -756,7 +756,7 @@ def assignment_create(request):
     from problems.models import Assignment, StudentGroup
 
     from .picker import (
-        create_items, own_problem_rows, parse_cart, parse_points,
+        create_items, own_problem_rows, parse_cart, parse_points, parse_rule,
         picker_context,
     )
 
@@ -807,8 +807,16 @@ def assignment_create(request):
             # (правило фазы 4). Признак приезжает из подбора по описанию.
             manual_order=request.POST.get('manual_order') == '1',
         )
+        # ⚠️ ПРАВИЛО НАЧИСЛЕНИЯ ПРИХОДИТ С ШАГА «ВЫДАЧА» (ревью 17.08, ф. 1).
+        # `problem_points` несёт ТОЛЬКО ручные правки; всё остальное считает
+        # правило — то же самое, что показывал шаг «Состав». Пока правила
+        # здесь не было, конструктор показывал одни числа, а работа
+        # записывалась с другими.
         create_items(assignment, request.user, keys, catalog_ids, custom_ids,
-                     points=parse_points(request.POST.get('problem_points')))
+                     points=parse_points(request.POST.get('problem_points')),
+                     rule=(parse_rule(request.POST.get('points_rule'))
+                           if request.POST.get('points_rule') is not None
+                           else None))
 
         for group in groups:
             assignment.students.add(*group.students.all())

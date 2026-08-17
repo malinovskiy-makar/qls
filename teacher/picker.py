@@ -58,6 +58,19 @@ CART_KEY = 'work_cart'
 SETTINGS_KEY = 'hw_settings'
 MANUAL_ORDER_KEY = 'hw_manual_order'
 
+# ⚠️ БАЛЛЫ ХРАНЯТСЯ РЯДОМ С КОРЗИНОЙ, И ЭТО НЕ УДОБСТВО (ревью 17.08, ф. 1).
+# До этой правки наменянные баллы жили ТОЛЬКО в памяти страницы: шаг
+# «Состав» показывал их правильно, а шаг «Выдача» открывался с пустым
+# списком правок и отправлял в создание работы пустое поле `problem_points`
+# — балл позиции ставился заново значением по умолчанию. Репетитор видел
+# «2 балла», ученик получал работу на 6.
+#
+# В хранилище едут ТОЛЬКО РУЧНЫЕ ПРАВКИ: наличие ключа здесь и есть признак
+# «этого числа правило больше не касается». Остальные позиции считает
+# правило начисления, и второй памяти о них не заводим — разошлась бы.
+POINTS_KEY = 'work_points'
+RULE_KEY = 'work_rule'
+
 # Хранилища прошлых версий. `hw_cart`/`exam_cart` — две корзины до их
 # слияния; пустое имя — след того самого дефекта. Ни одно из них больше
 # не читается, и держать их в сессии незачем.
@@ -77,6 +90,11 @@ def storage_keys(group_id=None):
         'order': CART_KEY + suffix + '_order',
         'settings': SETTINGS_KEY + suffix,
         'manual': MANUAL_ORDER_KEY + suffix,
+        # Ручные баллы позиций и правило начисления — той же привязкой к
+        # занятию, что корзина: две собираемые работы не имеют права делить
+        # ни состав, ни цены позиций.
+        'points': POINTS_KEY + suffix,
+        'rule': RULE_KEY + suffix,
     }
     keys['migrate'] = [
         [CART_KEY, keys['cart']],
@@ -86,6 +104,49 @@ def storage_keys(group_id=None):
     ]
     keys['junk'] = list(JUNK_KEYS)
     return keys
+
+
+# ── Правило начисления баллов ────────────────────────────────────────────
+# ⚠️ ОДНО МЕСТО, ГДЕ РЕШАЕТСЯ «СКОЛЬКО СТОИТ ПОЗИЦИЯ» (решение владельца от
+# 17.08). Правило задаётся на шаге «Выдача» и применяется СЕРВЕРОМ — и при
+# показе состава, и при записи работы. Клиент правило только выбирает: пока
+# он считал баллы сам, экран и запись расходились молча.
+RULE_DIFFICULTY = 'difficulty'
+RULE_FLAT = 'flat'
+DEFAULT_FLAT_POINTS = 3
+
+
+def parse_rule(raw):
+    """Разбор правила начисления: «difficulty» или «flat:2» → словарь.
+
+    Мусор и пустая строка дают правило по сложности задачи — то же, что
+    видит репетитор, открывший поток и не трогавший настройку.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    mode, _, value = (raw or '').strip().partition(':')
+    value = value.strip().replace(',', '.')
+    # ⚠️ ПУСТОЕ ЧИСЛО — ЭТО НЕ НОЛЬ. «flat:» без числа означает, что правило
+    # не задано; прочти его как «одинаково по 0 б.» — и вся работа молча
+    # стала бы работой на ноль баллов.
+    if mode != RULE_FLAT or not value:
+        return {'mode': RULE_DIFFICULTY}
+    try:
+        number = Decimal(value)
+    except (InvalidOperation, ValueError):
+        return {'mode': RULE_DIFFICULTY}
+    if number < 0 or number > 1000:
+        return {'mode': RULE_DIFFICULTY}
+    return {'mode': RULE_FLAT, 'value': number}
+
+
+def rule_points(rule, is_test, difficulty):
+    """Балл позиции по действующему правилу. Возвращает Decimal."""
+    from problems.models_platform import suggested_points
+
+    if rule and rule.get('mode') == RULE_FLAT:
+        return rule['value']
+    return suggested_points(is_test, difficulty)
 
 
 
@@ -359,7 +420,8 @@ def parse_cart(raw):
     return keys, catalog, custom
 
 
-def cart_items(keys, owner, manual_order=False, points=None, suggest=False):
+def cart_items(keys, owner, manual_order=False, points=None, suggest=False,
+               rule=None):
     """Корзина → ПОЗИЦИИ будущей работы в памяти, в порядке показа.
 
     Отдаёт `(позиции, {id(позиции): ключ корзины})`. Нужна и правой колонке
@@ -380,15 +442,19 @@ def cart_items(keys, owner, manual_order=False, points=None, suggest=False):
     («3 вопроса · 6 баллов») через `item_max_score`, то есть смотрит в
     `item.points`; у позиции в памяти это поле пусто, и без подстановки
     заголовок обещал бы по одному баллу за задачу, пока рядом в строке
-    стоит десять. `points` — то, что репетитор уже наменял на экране;
-    чего там нет, стоит по умолчанию (10 задаче, 3 тесту).
+    стоит десять.
+
+    ⚠️ ПОРЯДОК СТАРШИНСТВА ОДИН НА ВЕСЬ ПОТОК: ручная правка репетитора
+    (`points`) → правило начисления шага «Выдача» (`rule`) → прежнее
+    значение по умолчанию. Ручная правка выигрывает всегда: правило меняет
+    цену тех позиций, к которым человек не притрагивался.
     """
     from decimal import Decimal
     from types import SimpleNamespace
 
     from problems import assignment_rows
     from problems.models import AssignmentItem, CustomProblem, Problem
-    from problems.models_platform import default_points, suggested_points
+    from problems.models_platform import default_points
 
     keys = [key for key in keys if key]
     catalog_ids = [int(k) for k in keys if k.isdigit()]
@@ -414,11 +480,12 @@ def cart_items(keys, owner, manual_order=False, points=None, suggest=False):
         chosen = (points or {}).get(key)
         if chosen is not None:
             item.points = Decimal(str(chosen))
-        elif suggest:
-            # Новый поток подставляет балл по сложности задачи; прежние
-            # конструкторы — прежнее значение по умолчанию.
-            item.points = suggested_points(
-                item.is_test, getattr(item.problem, 'difficulty', 0))
+        elif rule or suggest:
+            # Новый поток считает балл правилом начисления (по умолчанию —
+            # по сложности задачи); прежние конструкторы просят прежнее
+            # значение по умолчанию.
+            item.points = rule_points(
+                rule, item.is_test, getattr(item.problem, 'difficulty', 0))
         else:
             item.points = default_points(item.is_test)
         items.append(item)
@@ -429,7 +496,8 @@ def cart_items(keys, owner, manual_order=False, points=None, suggest=False):
     return ordered, by_item
 
 
-def cart_rows(keys, owner, manual_order=False, points=None, suggest=False):
+def cart_rows(keys, owner, manual_order=False, points=None, suggest=False,
+              rule=None):
     """Строки для правой колонки конструктора: всё, что показывает экран.
 
     ⚠️ ПОЗИЦИЯ ОТДАЁТ ЗАДАЧУ ЦЕЛИКОМ (ревью 15.08, фаза 12). Блок назывался
@@ -440,7 +508,8 @@ def cart_rows(keys, owner, manual_order=False, points=None, suggest=False):
     """
     from problems import assignment_rows
 
-    ordered, by_item = cart_items(keys, owner, manual_order, points, suggest)
+    ordered, by_item = cart_items(keys, owner, manual_order, points, suggest,
+                                  rule)
     marks = assignment_rows.section_marks(ordered)
 
     rows = []
@@ -462,6 +531,11 @@ def cart_rows(keys, owner, manual_order=False, points=None, suggest=False):
             'meta': card_meta(topics, kind, problem.difficulty or 0),
             'is_test': item.is_test,
             'points': float(item.points),
+            # ⚠️ ПРИЗНАК РУЧНОЙ ПРАВКИ СЧИТАЕТ СЕРВЕР, а не экран. Правило
+            # начисления и ручные баллы применяет одна функция; спроси
+            # клиент об этом сам — «вручную» появлялось бы там, где балл
+            # просто совпал с подсказкой.
+            'manual': by_item[id(item)] in (points or {}),
             'section': marks.get(index),
             # ⚠️ Полное содержимое задачи — ниже. Санитайзер `text_clean`
             # здесь НЕ зовём: он живёт на показе и экспорте готовой работы,
@@ -558,14 +632,21 @@ def parse_points(raw):
 
 
 def create_items(assignment, owner, keys, catalog_ids, custom_ids,
-                 points=None):
+                 points=None, rule=None):
     """Создаёт позиции работы в порядке корзины. Возвращает их число.
 
     Одна точка на домашку и контрольную: раньше контрольная умела класть
     только каталожные задачи, и своя задача репетитора в неё не попадала.
 
-    `points` — {ключ корзины: балл} из конструктора подборки. Не задан —
-    балл проставит `AssignmentItem.save()` по умолчанию.
+    `points` — {ключ корзины: балл}, ручные правки репетитора. `rule` —
+    правило начисления с шага «Выдача»; по нему считаются позиции, которых
+    человек не касался.
+
+    ⚠️ ТО ЖЕ СТАРШИНСТВО, ЧТО В `cart_items` (ревью 17.08, ф. 1): ручная
+    правка → правило → значение по умолчанию. Пока правило знал только
+    экран, конструктор показывал балл по сложности задачи, а запись работы
+    ставила прежнюю константу: работа из двух тестов уходила ученику на
+    шесть баллов вместо двух.
     """
     from decimal import Decimal
 
@@ -576,23 +657,38 @@ def create_items(assignment, owner, keys, catalog_ids, custom_ids,
         pk__in=custom_ids, owner=owner, is_deleted=False)}
     points = points or {}
 
-    def score(key):
+    def score(key, item):
+        """Балл позиции. ⚠️ «Тест ли это» спрашиваем У САМОЙ ПОЗИЦИИ.
+
+        У `AssignmentItem.is_test` своё определение (тип задачи начинается
+        со слова «тест»), и второй предикат рядом с ним разъехался бы с
+        конструктором на первой же задаче с необычным типом.
+        """
         value = points.get(key)
-        return None if value is None else Decimal(str(value))
+        if value is not None:
+            return Decimal(str(value))
+        if rule is None:
+            # Прежние экраны правила не присылают — там балл по-прежнему
+            # ставит `AssignmentItem.save()` значением по умолчанию.
+            return None
+        return rule_points(rule, item.is_test,
+                           getattr(item.problem, 'difficulty', 0))
 
     order = 0
     for key in keys:
+        item = None
         if key.isdigit() and int(key) in catalog:
-            AssignmentItem.objects.create(assignment=assignment, order=order,
-                                          catalog_problem=catalog[int(key)],
-                                          points=score(key))
-            order += 1
+            item = AssignmentItem(assignment=assignment, order=order,
+                                  catalog_problem=catalog[int(key)])
         elif key.startswith('c') and key[1:].isdigit() \
                 and int(key[1:]) in custom:
-            AssignmentItem.objects.create(assignment=assignment, order=order,
-                                          custom_problem=custom[int(key[1:])],
-                                          points=score(key))
-            order += 1
+            item = AssignmentItem(assignment=assignment, order=order,
+                                  custom_problem=custom[int(key[1:])])
+        if item is None:
+            continue
+        item.points = score(key, item)
+        item.save()
+        order += 1
 
     # Старый M2M заполняем тоже — на нём держатся прежние экраны.
     if catalog:

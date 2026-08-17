@@ -63,7 +63,15 @@
           data-exam="{% if is_exam %}1{% else %}0{% endif %}">
       {% csrf_token %}
       <input type="hidden" name="problem_ids" id="wk-ids">
+      {% comment %}
+      ⚠️ `problem_points` НЕСЁТ ТОЛЬКО РУЧНЫЕ ПРАВКИ, а `points_rule` —
+      правило для всех остальных позиций. Балл считает сервер обеими
+      половинами сразу: пока он приходил сюда готовым числом от экрана (а
+      точнее — не приходил вовсе), запись работы ставила своё значение по
+      умолчанию, и работа из двух тестов уходила на шесть баллов.
+      {% endcomment %}
       <input type="hidden" name="problem_points" id="wk-points">
+      <input type="hidden" name="points_rule" id="wk-rule">
       <input type="hidden" name="manual_order" id="wk-manual">
 
       {% comment %}
@@ -73,7 +81,7 @@
       одно. Вид выбора partial ставит сам по `is_exam` — второго правила
       здесь не заводим.
       {% endcomment %}
-      {% include "teacher/_work_settings.html" with is_exam=is_exam groups=groups group_id=group_id form=form min_window=min_window min_duration=min_duration max_duration=max_duration submit_apart=1 %}
+      {% include "teacher/_work_settings.html" with is_exam=is_exam groups=groups group_id=group_id form=form min_window=min_window min_duration=min_duration max_duration=max_duration submit_apart=1 show_points_rule=1 %}
 
       {% comment %}
       ⚠️ СРОК МОЖНО НЕ ЗАДАВАТЬ, И ЭТО НАПИСАНО НА ЭКРАНЕ (подсказка внутри
@@ -127,6 +135,7 @@
     data.append('manual_order', manualOrder() === '1' ? '1' : '');
     data.append('suggest', '1');
     data.append('points', window.QLS_WORK.pointsParam());
+    data.append('rule', window.QLS_WORK.ruleParam());
     fetch(ROWS_URL, { method: 'POST', body: data })
       .then(function (r) { return r.json(); })
       .then(function (payload) { rows = payload.rows || []; paint(); })
@@ -231,8 +240,41 @@
     document.getElementById('wk-ids').value =
       rows.map(function (r) { return r.key; }).join(',');
     document.getElementById('wk-points').value = window.QLS_WORK.pointsParam();
+    document.getElementById('wk-rule').value = window.QLS_WORK.ruleParam();
     document.getElementById('wk-manual').value = manualOrder();
     window.QLS_WORK.refresh(chosenStudents());
+  }
+
+  // ── Правило начисления баллов ────────────────────────────────────────
+  // ⚠️ ЭКРАН ТОЛЬКО ЗАПОМИНАЕТ ВЫБОР. Пересчёт делает сервер и присылает
+  // готовые числа — и в лист справа, и в полосу собранного, и в запись
+  // работы. Считай их клиент, у нас снова было бы два ответа на вопрос
+  // «сколько стоит позиция».
+  var ruleBox = document.getElementById('ws-rule');
+  if (ruleBox) {
+    var flatField = ruleBox.querySelector('.ws-rule__num');
+    var saved = window.QLS_WORK.rule();
+    if (saved.mode === 'flat') {
+      ruleBox.querySelector('[value=flat]').checked = true;
+      flatField.value = String(saved.value).replace('.', ',');
+    }
+    var pushRule = function () {
+      var flat = ruleBox.querySelector('[value=flat]').checked;
+      var raw = parseFloat(flatField.value.replace(',', '.'));
+      if (isNaN(raw) || raw < 0) { raw = 0; }
+      window.QLS_WORK.setRule(flat ? { mode: 'flat', value: raw }
+                                   : { mode: 'difficulty' });
+      load();
+    };
+    ruleBox.addEventListener('change', pushRule);
+    ruleBox.addEventListener('input', function (event) {
+      // Набор числа сам переключает на «одинаково по»: иначе человек
+      // печатает в поле, а работает по-прежнему сложность задачи.
+      if (event.target === flatField) {
+        ruleBox.querySelector('[value=flat]').checked = true;
+        pushRule();
+      }
+    });
   }
 
   document.addEventListener('input', function () { paint(); });
@@ -260,6 +302,8 @@
       sessionStorage.removeItem(window.QLS_CART.order);
       sessionStorage.removeItem(window.QLS_CART.settings);
       sessionStorage.removeItem(window.QLS_CART.manual);
+      sessionStorage.removeItem(window.QLS_CART.points);
+      sessionStorage.removeItem(window.QLS_CART.rule);
     } catch (e) {}
     form.submit();
   });

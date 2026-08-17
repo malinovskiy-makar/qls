@@ -71,6 +71,9 @@
     delete cart[key];
     write(CART, cart);
     write(ORDER, read(ORDER, '[]').filter(function (k) { return k !== key; }));
+    // Ручной балл убранной позиции уходит вместе с ней: вернув ту же
+    // задачу, репетитор ждёт свежую цену по правилу, а не забытую свою.
+    dropManual(key);
     changed();
   }
 
@@ -78,6 +81,8 @@
     cart = {};
     write(CART, cart);
     write(ORDER, []);
+    Object.keys(points).forEach(function (key) { delete points[key]; });
+    savePoints();
     changed();
   }
 
@@ -160,19 +165,45 @@
     // держать пустую форму ради одного скрытого поля.
     fetch(TALLY_URL + '?keys=' + encodeURIComponent(list.join(','))
           + '&points=' + encodeURIComponent(pointsParam())
+          + '&rule=' + encodeURIComponent(ruleParam())
           + (students ? '&students=' + students : ''))
       .then(function (r) { return r.json(); })
       .then(function (payload) { tally.textContent = payload.text; })
       .catch(function () { tally.textContent = ''; });
   }
 
-  // Баллы, наменянные на шаге состава. На шаге отбора их ещё нет — сервер
-  // подставит подсказку по сложности задачи.
-  var points = {};
+  // ⚠️ БАЛЛЫ ЖИВУТ В ХРАНИЛИЩЕ, А НЕ В ПАМЯТИ СТРАНИЦЫ (ревью 17.08, ф. 1).
+  // Раньше этот объект заводился пустым на каждом шаге: «Состав» набивал
+  // его сам и показывал верно, а «Выдача» открывалась чистой и отправляла
+  // в создание работы пустое поле — балл позиции ставился заново значением
+  // по умолчанию. Репетитор видел «2 балла», ученик получал работу на 6.
+  //
+  // ⚠️ ЗДЕСЬ ТОЛЬКО РУЧНЫЕ ПРАВКИ. Наличие ключа = «правило этого числа
+  // больше не касается». Клади сюда каждую строку — и первое же
+  // переключение правила ничего бы не изменило: всё выглядело бы ручным.
+  var points = read(window.QLS_CART.points, '{}');
+  function savePoints() { write(window.QLS_CART.points, points); }
   function pointsParam() {
     return Object.keys(points).map(function (key) {
       return key + ':' + points[key];
     }).join(',');
+  }
+  function setManual(key, value) { points[key] = value; savePoints(); }
+  function dropManual(key) { delete points[key]; savePoints(); }
+  function isManual(key) { return points[key] !== undefined; }
+
+  // Правило начисления баллов — выбирается на шаге «Выдача», действует на
+  // все шаги. Считает по нему СЕРВЕР; здесь хранится только выбор.
+  function rule() {
+    var saved = read(window.QLS_CART.rule, 'null');
+    if (!saved || !saved.mode) { return { mode: 'difficulty' }; }
+    return saved;
+  }
+  function setRule(value) { write(window.QLS_CART.rule, value); changed(); }
+  function ruleParam() {
+    var current = rule();
+    return current.mode === 'flat'
+      ? 'flat:' + current.value : 'difficulty';
   }
 
   document.addEventListener('click', function (event) {
@@ -192,6 +223,8 @@
     keys: keys, has: has, add: add, remove: remove, clear: clear,
     setOrder: setOrder, refresh: refresh, reasons: reasons,
     points: points, pointsParam: pointsParam,
+    setManual: setManual, dropManual: dropManual, isManual: isManual,
+    rule: rule, setRule: setRule, ruleParam: ruleParam,
     block: function (fn) { blockers.push(fn); },
     onchange: function (fn) { listeners.push(fn); }
   };

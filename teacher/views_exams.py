@@ -25,7 +25,7 @@ def exam_create(request, pk):
     from problems.models import Assignment
 
     from .picker import (
-        create_items, own_problem_rows, parse_cart, parse_points,
+        create_items, own_problem_rows, parse_cart, parse_points, parse_rule,
         picker_context,
         storage_keys as picker_storage,
     )
@@ -55,9 +55,15 @@ def exam_create(request, pk):
                 # перестановку «сначала тесты» отменяем (правило фазы 4).
                 manual_order=request.POST.get('manual_order') == '1')
             exam.students.set(group.students.all())
+            # Правило начисления — то же, что у домашки: одна точка на обе
+            # работы, иначе тест в контрольной стоил бы не столько, сколько
+            # тот же тест в домашке.
             create_items(exam, request.user, keys, catalog_ids, custom_ids,
                          points=parse_points(
-                             request.POST.get('problem_points')))
+                             request.POST.get('problem_points')),
+                         rule=(parse_rule(request.POST.get('points_rule'))
+                               if request.POST.get('points_rule') is not None
+                               else None))
             # ⚠️ ПОСЛЕ СОЗДАНИЯ — НА СТРАНИЦУ САМОЙ РАБОТЫ (сессия 8, п. 12.3),
             # как и у домашки. Экран результатов сразу после создания пуст по
             # построению: работу ещё никто не писал.

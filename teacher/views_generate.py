@@ -479,7 +479,7 @@ def api_cart_rows(request):
     """
     from django.http import JsonResponse
 
-    from .picker import cart_rows, parse_points
+    from .picker import cart_rows, parse_points, parse_rule
 
     if request.method != 'POST':
         return JsonResponse({'error': 'only POST'}, status=405)
@@ -494,10 +494,16 @@ def api_cart_rows(request):
     # сложности задачи, прежние конструкторы — прежнее значение по
     # умолчанию; молча поменять его всем значило бы переоценить работы,
     # собираемые на старых экранах прямо сейчас.
+    # ⚠️ ПРАВИЛО НАЧИСЛЕНИЯ ПРИЕЗЖАЕТ ВМЕСТЕ С НИМИ (ревью 17.08, ф. 1).
+    # `points` — только РУЧНЫЕ правки; остальным позициям цену считает
+    # правило, и считает её сервер: пока это делал экран, шаг «Состав» и
+    # запись работы расходились молча.
     rows = cart_rows(keys, request.user,
                      manual_order=request.POST.get('manual_order') == '1',
                      points=parse_points(request.POST.get('points')),
-                     suggest=request.POST.get('suggest') == '1')
+                     suggest=request.POST.get('suggest') == '1',
+                     rule=(parse_rule(request.POST.get('rule'))
+                           if request.POST.get('rule') is not None else None))
     return JsonResponse({'rows': rows})
 
 
@@ -647,13 +653,16 @@ def cart_print(request):
 
     from problems import assignment_export as export
 
-    from .picker import cart_items, parse_points
+    from .picker import cart_items, parse_points, parse_rule
 
     keys = [key.strip() for key in
             (request.POST.get('keys') or '').split(',') if key.strip()]
     items, _ = cart_items(keys, request.user,
                           manual_order=request.POST.get('manual_order') == '1',
-                          points=parse_points(request.POST.get('points')))
+                          points=parse_points(request.POST.get('points')),
+                          rule=(parse_rule(request.POST.get('rule'))
+                                if request.POST.get('rule') is not None
+                                else None))
     is_exam = request.POST.get('kind') == 'exam'
     shell = SimpleNamespace(
         pk=None,

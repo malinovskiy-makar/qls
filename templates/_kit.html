@@ -794,6 +794,14 @@
 .ws-field .k-label { display: block; margin-bottom: 6px; }
 .ws-part[hidden] { display: none; }
 
+/* Правило начисления баллов — два варианта в столбик, у второго число
+   прямо в строке: «одинаково по [3] б.». Поле текстовое, потому что
+   запятая законна, а числовое поле стирает от неё собственное значение. */
+.ws-rule { display: flex; flex-direction: column; gap: 8px; }
+.ws-rule .k-check { align-items: center; gap: 8px; }
+.ws-rule__flat { flex-wrap: wrap; }
+.ws-rule__num { width: 62px; text-align: center; }
+
 /* Как идёт время: две плашки с пояснением — что такое «окно» и что такое
    «срок с лимитом», словами, а не догадкой по названию. */
 .ws-when { display: flex; flex-direction: column; gap: 8px; }

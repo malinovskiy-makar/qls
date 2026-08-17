@@ -278,7 +278,8 @@ def api_work_tally(request):
     rows = picker.cart_rows(keys, request.user,
                             points=picker.parse_points(
                                 request.GET.get('points')),
-                            suggest=True)
+                            suggest=True,
+                            rule=picker.parse_rule(request.GET.get('rule')))
     return JsonResponse(tally(rows, students))
 
 

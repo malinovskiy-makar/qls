@@ -55,6 +55,14 @@
 {% endcomment %}
 .wk-pts input.is-zero { border-color: var(--amber);
                         background: var(--amber-tint); }
+{% comment %}
+Пометка правленного руками балла: тихая, в одну строку под полем.
+{% endcomment %}
+.wk-manual { font-size: 11px; color: var(--text3); white-space: nowrap; }
+.wk-rerule { background: none; border: 0; padding: 0; cursor: pointer;
+             font-size: 11px; color: var(--accent); }
+.wk-rerule:hover { text-decoration: underline; }
+.wk-pts { flex-wrap: wrap; justify-content: flex-end; max-width: 150px; }
 .wk-x { background: none; border: 0; color: var(--text3); cursor: pointer;
         font-size: 17px; line-height: 1; padding: 2px 4px; }
 .wk-x:hover { color: var(--error); }
@@ -129,6 +137,7 @@
   {% csrf_token %}
   <input type="hidden" name="keys" id="wk-print-keys">
   <input type="hidden" name="points" id="wk-print-points">
+  <input type="hidden" name="rule" id="wk-print-rule">
   <input type="hidden" name="manual_order" id="wk-print-order">
   {% if is_exam %}<input type="hidden" name="kind" value="exam">{% endif %}
   {% comment %}
@@ -181,6 +190,15 @@
       <span class="wk-pts">
         <input class="k-input k-input--num" type="text" inputmode="decimal"
                aria-label="балл за задачу"><span>б.</span>
+        {% comment %}
+        ⚠️ ПОМЕТКА ТИХАЯ И СТОИТ ТОЛЬКО У ПРАВЛЕННОГО РУКАМИ. Правило
+        начисления с шага «Выдача» такие позиции не трогает, и без пометки
+        переключение правила выглядело бы как сбой: часть строк поменялась,
+        часть нет, и почему — не сказано.
+        {% endcomment %}
+        <span class="wk-manual" hidden>вручную ·
+          <button type="button" class="wk-rerule">вернуть по правилу</button>
+        </span>
       </span>
       <button type="button" class="wk-x" title="Убрать из работы">×</button>
     </div>
@@ -220,10 +238,19 @@
     // конструкторы просят прежнее значение, и менять его им нельзя.
     data.append('suggest', '1');
     data.append('points', window.QLS_WORK.pointsParam());
+    // ⚠️ БАЛЛ СЧИТАЕТ СЕРВЕР ПО ПРАВИЛУ. Экран его только показывает: пока
+    // цену позиции решал клиент, «Состав» и записанная работа расходились.
+    data.append('rule', window.QLS_WORK.ruleParam());
     fetch(ROWS_URL, { method: 'POST', body: data })
       .then(function (r) { return r.json(); })
       .then(function (payload) { rows = payload.rows || []; render(); })
       .catch(function () { rows = []; render(); });
+  }
+
+  // Балл строки: пока сервер не ответил, показываем свежее ручное число;
+  // в остальном — то, что посчитал сервер.
+  function effective(row) {
+    return points[row.key] !== undefined ? points[row.key] : row.points;
   }
 
   // Откуда задача пришла в работу. Ключ «c…» — своя задача репетитора;
@@ -264,10 +291,13 @@
       node.querySelector('.wk-sub-t').textContent =
         (row.facts || []).slice(1).concat([origin(row.key)]).join(' · ');
       var field = node.querySelector('.wk-pts input');
-      field.value = (points[row.key] !== undefined)
-        ? String(points[row.key]).replace('.', ',') : String(row.points).replace('.', ',');
-      points[row.key] = num(field.value);
-      field.classList.toggle('is-zero', !points[row.key]);
+      // ⚠️ ЗДЕСЬ НЕЛЬЗЯ ПИСАТЬ В `points`. Раньше строка отрисовки клала
+      // туда КАЖДУЮ позицию — и все они становились «правлеными руками»,
+      // то есть правило начисления не действовало ни на одну.
+      field.value = String(effective(row)).replace('.', ',');
+      field.classList.toggle('is-zero', !effective(row));
+      var manual = window.QLS_WORK.isManual(row.key) || row.manual;
+      node.querySelector('.wk-manual').hidden = !manual;
       // ⚠️ ОДНА ПОЗИЦИЯ — ПЕРЕСТАВЛЯТЬ НЕЧЕГО: обе кнопки гаснут, и
       // перетаскивание выключается тоже.
       node.querySelector('.wk-up').disabled = index === 0;
@@ -296,7 +326,7 @@
   function recount() {
     var total = 0, tests = 0;
     rows.forEach(function (row) {
-      total += points[row.key] || 0;
+      total += effective(row) || 0;
       if (row.is_test) { tests += 1; }
     });
     document.getElementById('wk-n').textContent = rows.length;
@@ -318,6 +348,8 @@
       rows.map(function (r) { return r.key; }).join(',');
     document.getElementById('wk-print-points').value =
       window.QLS_WORK.pointsParam();
+    document.getElementById('wk-print-rule').value =
+      window.QLS_WORK.ruleParam();
     document.getElementById('wk-print-order').value = manualOrder();
     window.QLS_WORK.refresh();
   }
@@ -357,7 +389,6 @@
     var drop = event.target.closest('.wk-x');
     if (drop) {
       var key = drop.closest('.wk-item').dataset.key;
-      delete points[key];
       window.QLS_WORK.remove(key);
       // ⚠️ ПОСЛЕ УДАЛЕНИЯ СПИСОК ПЕРЕСПРАШИВАЕТСЯ У СЕРВЕРА: состав части
       // («3 вопроса · 6 баллов») считает питон, и убрав задачу локально, мы
@@ -410,8 +441,18 @@
   window.QLS_WORK.block(function () {
     if (!rows.length) { return []; }
     var total = 0;
-    rows.forEach(function (row) { total += points[row.key] || 0; });
+    rows.forEach(function (row) { total += effective(row) || 0; });
     return total > 0 ? [] : ['проставьте баллы'];
+  });
+
+  // ⚠️ ВОЗВРАТ ПО ПРАВИЛУ СНИМАЕТ ПРИЗНАК РУЧНОЙ ПРАВКИ, а число потом
+  // приносит сервер. Считать его здесь значило бы завести второе правило
+  // начисления — ровно то, ради чего эта сессия и затевалась.
+  document.addEventListener('click', function (event) {
+    var back = event.target.closest('.wk-rerule');
+    if (!back) { return; }
+    window.QLS_WORK.dropManual(back.closest('.wk-item').dataset.key);
+    load();
   });
 
   var timer = null;
@@ -419,8 +460,12 @@
     var field = event.target.closest('.wk-pts input');
     if (!field) { return; }
     var key = field.closest('.wk-item').dataset.key;
-    points[key] = num(field.value);
+    // Человек тронул число — с этого момента оно правлено руками, и
+    // правило начисления его больше не касается.
+    window.QLS_WORK.setManual(key, num(field.value));
     field.classList.toggle('is-zero', !points[key]);
+    var mark = field.closest('.wk-item').querySelector('.wk-manual');
+    if (mark) { mark.hidden = false; }
     recount();
     // Правка балла меняет и состав части — ждём паузу в наборе, чтобы не
     // слать запрос на каждую цифру.

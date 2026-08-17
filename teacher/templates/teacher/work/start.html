@@ -32,6 +32,10 @@
     sessionStorage.removeItem(window.QLS_CART.order);
     sessionStorage.removeItem(window.QLS_CART.settings);
     sessionStorage.removeItem(window.QLS_CART.manual);
+    // Ручные баллы и правило начисления — часть той же собираемой работы:
+    // оставь их, и новая работа открылась бы с ценами прошлой.
+    sessionStorage.removeItem(window.QLS_CART.points);
+    sessionStorage.removeItem(window.QLS_CART.rule);
     sessionStorage.removeItem('work_tab');
   } catch (e) {}
   // `replace`, а не `assign`: иначе кнопка «назад» браузера возвращала бы
