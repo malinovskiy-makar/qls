@@ -263,7 +263,7 @@
     {% for record in records %}
     <div class="record">
       <div class="big">{{ record.value|floatformat:0 }}</div>
-      <div class="cap">{{ record.get_kind_display }}{% if record.kind == 'most_productive_day' %}{% include '_hint.html' with hint='Лучшим считается день, когда решено больше всего задач. Игра сюда не входит.' %}{% endif %}</div>
+      <div class="cap">{{ record.get_kind_display }}{% if record.kind == 'most_productive_day' %}{% include '_hint.html' with hint='Лучшим считается день, когда решено больше всего задач и тестов — по всему сайту: домашки, контрольные, каталог и игра.' %}{% endif %}</div>
       {% if record.when %}
       <div class="when">{{ record.when|date:"j E Y" }}</div>
       {% endif %}

@@ -17,6 +17,13 @@
 .wr-score { font-size: 56px; font-weight: 800; line-height: 1;
             letter-spacing: -.02em; }
 .wr-cap { font-size: 13px; color: var(--text2); margin-top: 8px; }
+{% comment %}
+Сколько баллов ещё на проверке — тихой строкой рядом с крупным баллом, а не
+вместо знаменателя: знаменатель у одной величины обязан быть один.
+{% endcomment %}
+.wr-rest { display: block; font-size: 14px; font-weight: 500;
+           letter-spacing: 0; color: var(--text2); margin-top: 6px; }
+.wr-rest[hidden] { display: none; }
 .wr-meta { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px;
            font-size: 13px; color: var(--text2); }
 .wr-note { margin-top: 18px; background: var(--green-tint);
@@ -166,17 +173,21 @@
   пересчитывается на месте — числа приходят из `api_grade_submission`, то
   есть из той же `work_summary`, что нарисовала страницу.
   {% endcomment %}
+  {% comment %}
+  ⚠️ ЗНАМЕНАТЕЛЬ ОДИН НА ВСЕ ЭКРАНЫ — ПОЛНЫЙ МАКСИМУМ РАБОТЫ (ревью 17.08,
+  п. 2.2). Здесь стоял максимум ТОЛЬКО проверенных задач, и сводка решений
+  писала «2,5 из 18» там, где разбор той же работы писал «2,5 из 13». Два
+  знаменателя у одной величины на соседних экранах читаются как ошибка —
+  и это она и была.
+
+  ⚠️ ОДНО ОБЪЯСНЕНИЕ, А НЕ ДВА (обзор 13.08, п. 51). Подпись сокращена до
+  сути: почему балл предварительный, объясняет плашка ниже.
+  {% endcomment %}
   {% if show_scores and summary.is_final %}
   <div class="wr-score" data-wr-score><span data-wr-total>{{ summary.scored }}</span><span class="k-score__of">из</span><span class="k-score__max" data-wr-max>{{ summary.max_score }}</span></div>
   <div class="wr-cap" data-wr-cap>итоговый балл за работу</div>
   {% elif show_scores and summary.graded_max %}
-  <div class="wr-score" data-wr-score><span data-wr-total>{{ summary.scored }}</span><span class="k-score__of">из</span><span class="k-score__max" data-wr-max>{{ summary.graded_max }}</span></div>
-  {% comment %}
-  ⚠️ ОДНО ОБЪЯСНЕНИЕ, А НЕ ДВА (обзор 13.08, п. 51). Здесь стояло «по
-  проверенным задачам · всего в работе 18 б.», а строкой ниже плашка
-  говорила ровно то же словами. Оставлена плашка — она понятнее и уже
-  объясняет, почему балл предварительный; подпись сокращена до сути.
-  {% endcomment %}
+  <div class="wr-score" data-wr-score><span data-wr-total>{{ summary.scored }}</span><span class="k-score__of">из</span><span class="k-score__max" data-wr-max>{{ summary.max_score }}</span><span class="wr-rest" data-wr-rest>(ещё {{ summary.pending_points }} б. на проверке)</span></div>
   <div class="wr-cap" data-wr-cap>по проверенным задачам</div>
   {% elif show_scores %}
   {# Проверено пока НИЧЕГО. «0 из 0» — не результат, а недоразумение. #}
@@ -447,8 +458,14 @@
     var total = document.querySelector('[data-wr-total]');
     if (total) { total.textContent = data.total; }
     var max = document.querySelector('[data-wr-max]');
-    if (max) {
-      max.textContent = data.is_final ? data.total_max : data.graded_max;
+    // Знаменатель ВСЕГДА полный максимум работы; сколько ещё на проверке —
+    // отдельным числом рядом. Оба приходят с сервера, из той же
+    // `work_summary`, что нарисовала страницу.
+    if (max) { max.textContent = data.total_max; }
+    var rest = document.querySelector('[data-wr-rest]');
+    if (rest) {
+      rest.hidden = data.is_final;
+      rest.textContent = '(ещё ' + data.pending_points + ' б. на проверке)';
     }
     var cap = document.querySelector('[data-wr-cap]');
     if (cap) {

@@ -468,12 +468,55 @@ def update_records(user):
     _bump(user, PersonalRecord.Kind.BEST_CORRECT_STREAK, best_row)
     _bump(user, PersonalRecord.Kind.HARDEST_SOLVED, hardest)
 
-    from .models import DailySummary
-    best_day = DailySummary.objects.filter(user=user).order_by(
-        '-problems_solved').first()
-    if best_day is not None:
-        _bump(user, PersonalRecord.Kind.MOST_PRODUCTIVE_DAY,
-              best_day.problems_solved, {'date': str(best_day.date)})
+    _update_best_day(user)
+
+
+def best_day_of(user):
+    """Лучший день: (дата, сколько решено) — или None, если решать нечего.
+
+    ⚠️ СЧИТАЕТСЯ ПО ЖУРНАЛУ СОБЫТИЙ, А НЕ ПО `DailySummary` (ревью 17.08,
+    п. 2.3). Дневная сводка — производная запись, её пишут и пересчитывают
+    разные пути, и рекорд по ней показывал 275 задач у ученика, решившего
+    за месяц 55: рекорд ТОЛЬКО РАСТЁТ (`_bump` берёт максимум за всю
+    историю), поэтому одно завышенное число оставалось на экране навсегда.
+    Журнал перепроверяется целиком и врать не может.
+
+    ⚠️ ИГРА ВХОДИТ. Решённое в Econ Rush — тоже решённое за день; это
+    записано в подсказке на экране. «Решено» и «Доля верных» игру
+    по-прежнему не считают: там речь про учебную работу, а здесь про день.
+    """
+    from django.db.models import Count
+    from django.db.models.functions import TruncDate
+
+    from .models import LearningEvent
+
+    row = (LearningEvent.objects
+           .filter(user=user, event_type='solved')
+           .annotate(day=TruncDate('created_at'))
+           .values('day')
+           .annotate(solved=Count('pk'))
+           .order_by('-solved', '-day')
+           .first())
+    if not row or not row['solved']:
+        return None
+    return row['day'], row['solved']
+
+
+def _update_best_day(user):
+    """Рекорд «лучший день» — ПЕРЕЗАПИСЬЮ, а не только вверх.
+
+    ⚠️ `_bump` здесь не годится по устройству: он никогда не уменьшает
+    значение, и однажды завышенное число исправить было нечем.
+    """
+    from .models import PersonalRecord
+
+    best = best_day_of(user)
+    if best is None:
+        return
+    day, solved = best
+    PersonalRecord.objects.update_or_create(
+        user=user, kind=PersonalRecord.Kind.MOST_PRODUCTIVE_DAY,
+        defaults={'value': solved, 'payload': {'date': str(day)}})
 
 
 def _bump(user, kind, value, payload=None):

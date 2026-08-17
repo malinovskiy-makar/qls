@@ -231,19 +231,32 @@ def section_detail(kind, count, points):
     return ' · '.join(parts)
 
 
-def points_text(points):
-    """«6 баллов» / «1,5 балла» — ЕДИНСТВЕННАЯ точка на весь проект.
+def point_word(points):
+    """«балл» / «балла» / «баллов» под это число — ОДНО правило на проект.
 
     ⚠️ У ДРОБНОГО ЧИСЛА ФОРМА ВСЕГДА РОДИТЕЛЬНАЯ. Отбросить дробную часть
     и склонять по целому нельзя: именно так и выходило «1,5 балл».
+
+    ⚠️ ВЫНЕСЕНО ИЗ `points_text` (ревью 17.08, п. 2.4). Там, где число и
+    слово стоят РАЗНЫМИ элементами разметки (крупная цифра балла и подпись
+    под ней), готовая строка не годится, и слово писали руками: на странице
+    задания у позиции в три балла стояло «3 баллов». Правило склонения
+    осталось одно, у него просто появился второй вход.
     """
-    from problems.scorefmt import ball
     from problems.templatetags.ru import pick
 
+    number = Decimal(str(points or 0))
+    if number != number.to_integral_value():
+        return POINT_FORMS[1]
+    return pick(int(number), *POINT_FORMS)
+
+
+def points_text(points):
+    """«6 баллов» / «1,5 балла» — ЕДИНСТВЕННАЯ точка на весь проект."""
+    from problems.scorefmt import ball
+
     number = Decimal(str(points))
-    word = (POINT_FORMS[1] if number != number.to_integral_value()
-            else pick(int(number), *POINT_FORMS))
-    return '%s %s' % (ball(number, '0'), word)
+    return '%s %s' % (ball(number, '0'), point_word(number))
 
 
 def section_caption(kind, count, points):

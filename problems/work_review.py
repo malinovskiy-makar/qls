@@ -151,6 +151,12 @@ def work_summary(assignment, student, viewer=None):
         'scored': _clean(scored),
         'max_score': _clean(maximum),
         'graded_max': _clean(graded_max),
+        # ⚠️ ЗНАМЕНАТЕЛЬ ВЕЗДЕ ОДИН — ПОЛНЫЙ МАКСИМУМ РАБОТЫ (ревью 17.08,
+        # п. 2.2). Сводка решений писала «2,5 из 18», а разбор той же работы
+        # того же ученика — «2,5 из 13»: второй экран делил на максимум
+        # ТОЛЬКО проверенных задач. Незавершённость теперь называется
+        # отдельным числом рядом, а не подменяет знаменатель.
+        'pending_points': _clean(maximum - graded_max),
         'pending': pending,
         'wrong': wrong,
         'is_final': pending == 0,

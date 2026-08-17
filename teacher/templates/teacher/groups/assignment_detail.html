@@ -259,7 +259,7 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
     {% endcomment %}
     <div class="k-score" title="Максимальный балл за задачу">
       <span class="k-score__value">{{ row.item.points|ball }}</span>
-      <span class="k-score__cap">баллов</span>
+      <span class="k-score__cap">{{ row.item.points|point_word }}</span>
     </div>
     <div class="pts-lock k-quiet"
          title="Работу уже сдавали. Оценки выставлены по этой шкале, и менять максимум задним числом значило бы переписать их всем.">заперто</div>
@@ -275,7 +275,13 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
       <input type="text" inputmode="decimal" class="pts-input"
              data-item="{{ row.item.pk }}" autocomplete="off"
              value="{{ row.item.points|ball }}" aria-label="балл за задачу">
-      <span class="k-score__cap">баллов</span>
+      {% comment %}
+      ⚠️ СЛОВО СКЛОНЯЕТСЯ ПО ЧИСЛУ И ПЕРЕСЧИТЫВАЕТСЯ ПРИ ПРАВКЕ. Здесь стояло
+      «баллов» намертво, и позиция в три балла подписывалась «3 баллов».
+      Правило склонения одно на проект (`assignment_rows.point_word`), сюда
+      оно приходит фильтром, а после сохранения — ответом сервера.
+      {% endcomment %}
+      <span class="k-score__cap" data-pts-word="{{ row.item.pk }}">{{ row.item.points|point_word }}</span>
     </label>
     <div class="pts-status k-quiet" data-pts-status="{{ row.item.pk }}"></div>
     {% endif %}
@@ -790,6 +796,8 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
         .then(function (d) {
           saved = d.points;
           input.value = d.points;
+          var word = document.querySelector('[data-pts-word="' + itemId + '"]');
+          if (word && d.word) { word.textContent = d.word; }
           status.textContent = 'сохранено';
           setTimeout(function () { status.textContent = ''; }, 1500);
         })

@@ -1133,10 +1133,15 @@ def api_item_points(request):
     item.save(update_fields=['points'])
 
     from problems.assignment_export import total_points, print_rows
+    from problems.assignment_rows import point_word
 
     rows, _ = print_rows(item.assignment)
     return JsonResponse({'ok': True,
                          'points': _clean_points(item.points),
+                         # Слово под новым числом считает то же правило,
+                         # что и при отрисовке страницы: склонять его на
+                         # клиенте значило бы завести второй набор форм.
+                         'word': point_word(item.points),
                          'total': _clean_points(total_points(rows))})
 
 
@@ -1384,6 +1389,9 @@ def api_grade_submission(request):
         'total': summary['scored'],
         'total_max': summary['max_score'],
         'graded_max': summary['graded_max'],
+        # Сколько баллов ещё не проверено. Знаменатель шапки при этом не
+        # меняется — он всегда полный максимум работы (ревью 17.08, п. 2.2).
+        'pending_points': summary['pending_points'],
         'is_final': summary['is_final'],
         'pending': summary['pending'],
         'wrong': summary['wrong'],

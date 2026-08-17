@@ -1145,14 +1145,15 @@ def group_table(group, period='month', now=None):
         last=Count('pk'))
     by_user = {r['user_id']: r for r in events}
 
-    submissions = (Submission.objects
-                   .filter(assignment__group=group, student__in=students)
-                   .values('student_id')
-                   .annotate(
-                       submitted=Count('pk', filter=Q(
-                           status__in=('submitted', 'reviewed'))),
-                       pending=Count('pk', filter=Q(status='submitted'))))
-    subs_by_user = {r['student_id']: r for r in submissions}
+    # ⚠️ СЧИТАЕМ РАБОТЫ, А НЕ СТРОКИ `Submission` (ревью 17.08, п. 2.1).
+    # `Submission` заводится на КАЖДУЮ ЗАДАЧУ, и прежний `Count('pk')` давал
+    # «Сдано работ 25» там, где заданий в группе одиннадцать. Единица счёта
+    # одна на весь экран — `student_work_counts`.
+    from .models import Assignment
+
+    works = Assignment.objects.filter(group=group)
+    submitted_by = student_work_counts(works, SUBMITTED_STATUSES)
+    pending_by = student_work_counts(works, WAITING_STATUSES)
 
     scores = (TeacherFeedback.objects
               .filter(submission__assignment__group=group,
@@ -1169,7 +1170,6 @@ def group_table(group, period='month', now=None):
         stats = by_user.get(student.pk, {})
         attempted = stats.get('attempted', 0)
         solved = stats.get('solved', 0)
-        subs = subs_by_user.get(student.pk, {})
         # ⚠️ ДВА ЧИСЛА ДОЛИ ВЕРНЫХ (фаза 8.8): по всему сайту и по работам
         # этого репетитора. Одно число отвечало на вопрос, которого никто не
         # задавал: репетитору нужно знать, как ученик решает У НЕГО, и
@@ -1183,8 +1183,8 @@ def group_table(group, period='month', now=None):
             'accuracy_mine': pair['mine'],
             'level_all': level_of(pair['all']),
             'accuracy': round(solved * 100.0 / attempted) if attempted else None,
-            'submitted': subs.get('submitted', 0),
-            'pending': subs.get('pending', 0),
+            'submitted': submitted_by.get(student.pk, 0),
+            'pending': pending_by.get(student.pk, 0),
             'avg_score': (round(float(score_by_user[student.pk]), 2)
                           if student.pk in score_by_user else None),
             'last_active': last_seen.get(student.pk),
@@ -1348,6 +1348,35 @@ def _days_word(number):
     return 'дней'
 
 
+SUBMITTED_STATUSES = ('submitted', 'reviewed')
+WAITING_STATUSES = ('submitted',)
+
+
+def student_work_counts(assignments, statuses=WAITING_STATUSES):
+    """{номер ученика: сколько его РАБОТ в этих состояниях}.
+
+    ⚠️ ЕДИНИЦА СЧЁТА — ПАРА (УЧЕНИК, РАБОТА), и это ЕДИНСТВЕННОЕ место, где
+    она определена (ревью 17.08, п. 2.1). Таблица «Ученики» считала строки
+    `Submission`, а `Submission` заводится на КАЖДУЮ ЗАДАЧУ: на одном экране
+    стояло «Сдано работ 25 (7 ждёт)» у вкладки «Обзор» и «3 работы ждут
+    проверки» у вкладки «Задания» — при одиннадцати заданиях в группе.
+    Считались разные вещи одним словом «работа».
+
+    `works_waiting` — сумма по этому же счёту, поэтому вкладка, кружок и
+    колонка сходятся ПО ПОСТРОЕНИЮ, а не по совпадению. Держится тестом.
+    """
+    from .models import Submission
+
+    pairs = (Submission.objects
+             .filter(assignment__in=assignments, status__in=statuses)
+             .values('assignment_id', 'student_id')
+             .distinct())
+    counts = {}
+    for pair in pairs:
+        counts[pair['student_id']] = counts.get(pair['student_id'], 0) + 1
+    return counts
+
+
 def works_waiting(assignments):
     """Сколько СДАННЫХ РАБОТ ждёт проверки. ЕДИНСТВЕННАЯ точка счёта.
 
@@ -1365,13 +1394,7 @@ def works_waiting(assignments):
     одного задания, `works_waiting(assignments)` для всей группы. Сумма по
     заданиям сходится с общим числом по построению — держится тестом.
     """
-    from .models import Submission
-
-    return (Submission.objects
-            .filter(assignment__in=assignments, status='submitted')
-            .values('assignment_id', 'student_id')
-            .distinct()
-            .count())
+    return sum(student_work_counts(assignments, WAITING_STATUSES).values())
 
 
 def needs_attention(group, now=None):
