@@ -10,6 +10,8 @@ the focal point; UI is quiet graphite chrome so the curve colors are the only sa
 thing on the canvas. Dual theme: **light is default** (classroom / projector / print
 parity), **dark** for evening work. Persisted in `localStorage['calc2-theme']`; system
 preference is the first-run default; applied pre-paint in a `<head>` bootstrap.
+(The key is now plain `localStorage['theme']`, shared with the rest of the site — it was
+unified so the theme carries across /calc2/ and the catalog.)
 
 ## Color
 - **Curve palette is FIXED** (colorblind-distinct, identical in both themes), in CSS vars:
@@ -43,15 +45,52 @@ One hue, lightness-only shifts across surfaces. Dark mode leans on borders, not 
 ## Hierarchy
 - **Picker (Screen 1):** one hero — `picker-title` 30px/800. Category labels 11px/600 muted.
   Cards carry a mini-graph specimen drawn in the engine's own curve colors (the signature).
-- **Scoreboard:** "decided metric" readout — `--stat b` 19px/700 tabular-nums (Q*, P*…),
-  label 12px muted. Big numbers are the instrument readout.
+- **Scoreboard:** "decided metric" readout — `.sb-body .stat b` **16px/700** tabular-nums,
+  label 12px/500 muted. (Recorded as 19px originally; lowered to 16 once real scenes turned
+  out to show up to ~11 rows at once — 19px made the panel a wall and broke the "one focal
+  point" it was meant to create. 16 vs 12 still reads as an instrument readout.)
+  The same `.stat` inside **Tools** stays 13px: there it is reference text, not a readout.
 
-## Layout (Scene)
-Full-bleed `.graph-wrap` (absolute inset:0). Left **dock** 56px (tool/score toggles, grid,
-save+export stubs, theme). **Header** top-left: "← Сценарии" + scene name. **Tools** panel
-bottom-left (relocated control sections; "Все настройки" reveals secondary mode/scenes/axes).
-**Scoreboard** top-right (relocated `#info-*` blocks). Panels collapse via dock / × ; slide
-horizontally (translateX). Narrow screens (≤760px): panels shrink, scene name hides.
+## Card specimens — icon geometry (fixed tiers)
+Every mini-graph in the picker uses exactly three stroke weights, one marker size, one dash:
+**axes/helper 1.5 · secondary or dashed curve 2.2 · primary curve 2.6 · marker r 3.6 ·
+dash `5 4`**. Fills that hint at an area use `opacity .16` (matching the canvas area-fill
+rule); a deliberately faded line uses `.4`. Bands (deficit strip, integral strips) are
+`<rect>` fills, never thick strokes. Before this was fixed there were 11 stroke widths,
+5 marker radii and 4 dash patterns across 30 cards.
+
+## Layout (Scene) — docked columns, 2026-07-29
+Four columns in a flex row, **no panel ever overlaps the plot**:
+`dock 56 · tools 316 · graph (flex:1) · params 268`. Collapsed panel shrinks to a
+**26px rail** carrying only its arrow — never a fully hidden panel the user must hunt for.
+Width transition 220ms; the canvas redraws from a **ResizeObserver** on `.graph-wrap`
+(catches both window resize and panel collapse — there is no `window.resize` listener).
+
+- **Dock (56px)** — exactly four scene actions (back / analytics / save / download),
+  each with a right-side tooltip; theme sits alone at the bottom behind the spacer.
+- **Tools panel (316px)** — two sticky-titled parts in one scroll: «Ввод функций»
+  then «Аналитика» (the former scoreboard). Scene name is the panel head.
+  316 vs 268 is deliberate: formulas need width, knobs don't.
+- **Params panel (268px)** — live regulators. Each is a two-row `.pchip`:
+  name + tabular value on top, full-width range below. One shape for every
+  regulator kind; a single-line layout is unreadable in a 268px column.
+- **Wrench menu** (`.wrench`, 268px, top-right over the plot) owns everything about
+  the *plane*: both axis bounds, tick step, axis names, grid tri-state, legend,
+  graph title + its color. Nothing about the *model* lives there.
+- **Reset-view button** appears only when `STATE.viewDirty` — an affordance that
+  shows up exactly when it has something to do.
+
+## Area legend
+Lower-right corner **inside** the plot, vertical stack, short codes only
+(CS · PS · Tx · GS · DWL · VC) at 11px/600 with an 11px swatch; full name lives in
+`<title>`. It was a horizontal strip across the top margin and fought the graph title.
+Note for tests: a legend `<text>` node's `textContent` includes the `<title>` child.
+
+## Math input
+`math-field` inherits the input token set (`--input-bg`, `--border`, `--r-sm`) plus
+`--caret-color: var(--accent)`; built-in MathLive toggles hidden via `::part()`.
+Keyboard `.mkbd` opens **below** the field: 3 tab sections, one open at a time,
+keys `min 30×32px` (touch-safe), footer links to examples and the piecewise builder.
 
 ## Motion
 ease-out `cubic-bezier(.23,1,.32,1)` (`--ease`), all <300ms. Picker content fade+rise once

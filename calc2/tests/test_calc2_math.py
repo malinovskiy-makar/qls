@@ -2,12 +2,20 @@
 
 Математика calc2 написана на JS (Math.js в браузере), поэтому самый надёжный
 способ её проверить — прогнать РЕАЛЬНЫЕ функции в настоящем браузере. Этот тест
-поднимает живой сервер (LiveServerTestCase), создаёт суперпользователя и запускает
-node-раннер calc2_math.mjs (Playwright) против /calc2/, проверяя контрольные числа.
+поднимает живой сервер, создаёт суперпользователя и запускает node-раннер
+calc2_math.mjs (Playwright) против /calc2/, проверяя контрольные числа.
 
 Граничные случаи (Playwright/Node/CDN недоступны) → тест ПРОПУСКАЕТСЯ (skip),
 а не падает: это не ломает остальные тесты в офлайн-CI. Сам node-раннер можно
 запускать и отдельно: `node calc2/tests/calc2_math.mjs` (нужен живой dev-сервер).
+
+ВАЖНО про базовый класс. Обычный LiveServerTestCase отдаёт статику только из
+STATIC_ROOT, а в разработке он не задан: обработчик падал на document_root=None,
+страница приходила без скриптов, раннер честно возвращал 3, и тест МОЛЧА
+пропускался. То есть «тесты зелёные» значило «браузерная регрессия не
+запускалась». StaticLiveServerTestCase отдаёт статику через finders, и STATIC_ROOT
+ему не нужен. Причину любого пропуска печатаем ГРОМКО (_loud_skip): молчаливый
+skip выглядит как «всё хорошо» и потому хуже красного теста.
 """
 import os
 import shutil
@@ -15,13 +23,28 @@ import subprocess
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import LiveServerTestCase, tag
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.test import tag
 
 RUNNER = os.path.join(os.path.dirname(__file__), "calc2_math.mjs")
 
 
+def _safe_print(text):
+    """Печать, которая не падает на символах, неизвестных консоли.
+
+    Раннер печатает «галочки» и «крестики», а консоль Windows живёт в cp1251 и
+    таких символов не знает: печать роняла сам тест, хотя проверка проходила.
+    """
+    import sys
+    enc = (getattr(sys.stdout, "encoding", None) or "utf-8")
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        print(text.encode(enc, "replace").decode(enc, "replace"))
+
+
 @tag("calc2", "browser")
-class Calc2MathRegressionTest(LiveServerTestCase):
+class Calc2MathRegressionTest(StaticLiveServerTestCase):
     """Все контрольные числа математики calc2 (равновесие, налог, монополия,
     дискриминация 1/3, ломаный, эластичность, Пигу, КПВ-сумма, труд, неравенство,
     торговля Б) — через реальные функции в браузере."""
@@ -36,12 +59,22 @@ class Calc2MathRegressionTest(LiveServerTestCase):
             self.user.role = "teacher"
             self.user.save(update_fields=["role"])
 
+    def _loud_skip(self, reason):
+        """Пропуск с громкой причиной прямо в выводе прогона.
+
+        Молчаливый skip хуже красного теста: он выглядит как «всё хорошо».
+        Печатаем рамку, чтобы пропуск нельзя было проглядеть в общей ленте.
+        """
+        line = "=" * 72
+        print(f"\n{line}\nПРОПУЩЕНА браузерная регрессия calc2\nПричина: {reason}\n{line}")
+        self.skipTest(reason)
+
     def test_calc2_control_numbers(self):
         node = shutil.which("node")
         if not node:
-            self.skipTest("node не найден — пропускаю JS-регрессию calc2")
+            self._loud_skip("node не найден, JS-регрессия calc2 не запускалась")
         if not os.path.exists(RUNNER):
-            self.skipTest(f"раннер не найден: {RUNNER}")
+            self._loud_skip(f"раннер не найден: {RUNNER}")
 
         env = dict(
             os.environ,
@@ -56,19 +89,28 @@ class Calc2MathRegressionTest(LiveServerTestCase):
                 cwd=str(settings.BASE_DIR),
                 capture_output=True,
                 text=True,
+                # Раннер печатает по-русски в UTF-8, а консоль Windows живёт в
+                # cp1251: без явной кодировки поток чтения падает на
+                # UnicodeDecodeError, вывод теряется целиком и контрольные числа
+                # не видно (тест при этом зелёный — худший вид молчания).
+                encoding="utf-8",
+                errors="replace",
                 timeout=180,
             )
         except FileNotFoundError as exc:
-            self.skipTest(f"не удалось запустить node-раннер: {exc}")
+            self._loud_skip(f"не удалось запустить node-раннер: {exc}")
         except subprocess.TimeoutExpired:
-            self.skipTest("node-раннер calc2 не уложился в 180с (браузер/CDN?)")
+            self._loud_skip("node-раннер calc2 не уложился в 180с (браузер или CDN)")
 
         out = (result.stdout or "") + (result.stderr or "")
         # Код 3 — calc2 не загрузился (нет Playwright/Chromium или CDN Math.js/D3).
         if result.returncode == 3:
-            self.skipTest("calc2 не загрузился (Playwright/CDN недоступны):\n" + out[-500:])
+            self._loud_skip("calc2 не загрузился (Playwright или CDN недоступны):\n" + out[-500:])
         # Печатаем вывод раннера, чтобы при провале было видно конкретные числа.
-        print("\n" + out)
+        # Консоль Windows живёт в cp1251 и не умеет печатать «галочку» (U+2713):
+        # без замены падал бы сам вывод, а не тест. Заменяем то, чего консоль
+        # не знает, на её же вопросительные знаки.
+        _safe_print("\n" + out)
         self.assertEqual(
             result.returncode,
             0,
