@@ -270,9 +270,17 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
         <span class="q-text">{{ preview.row.label }}
           <span class="q-query">искали: «{{ preview.row.query }}»</span>
         </span>
-        <span class="q-tally">сложность {{ preview.row.difficulty }} ·
-          нужно {{ preview.row.count }} ·
-          выбрано <b class="q-picked">{{ preview.picked }}</b></span>
+        {% comment %}
+        ⚠️ ЧИСЛА ПРАВЯТСЯ В ОДНОМ МЕСТЕ (ревью 17.08, п. 6.8). Заголовок
+        печатал «сложность 3 · нужно 2», и ровно те же две величины стояли
+        полями ниже: сколько их на самом деле и какое из них настоящее —
+        по экрану не понять. Заголовок теперь только СЧИТАЕТ («выбрано 2 из
+        2»), а правят их поля под ним. Число «нужно» здесь знаменатель, а
+        не второй ввод: без него «выбрано 2» ни о чём не говорит.
+        {% endcomment %}
+        <span class="q-tally">выбрано
+          <b class="q-picked">{{ preview.picked }}</b>
+          из <span class="q-need">{{ preview.row.count }}</span></span>
       </button>
 
       <div class="q-body">
@@ -602,6 +610,10 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
         (block.querySelector('[name=row_count]') || {}).value || '0', 10) || 0;
       var counter = block.querySelector('.q-picked');
       if (counter) { counter.textContent = picked; }
+      // Знаменатель идёт за полем «нужно задач»: править его можно только
+      // там, а показывать надо и в свёрнутом заголовке.
+      var need_shown = block.querySelector('.q-need');
+      if (need_shown) { need_shown.textContent = need; }
       var tally = block.querySelector('.q-tally');
       if (tally) { tally.classList.toggle('is-short', picked < need); }
     });

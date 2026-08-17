@@ -1404,6 +1404,7 @@ def group_topic_matrix(group, period='all', now=None, limit_topics=None):
             'students': len(students),
             'accuracy': (round(data['solved'] * 100.0 / data['attempted'])
                          if data['attempted'] else None),
+            'short': _matrix_label(topic.name),
         })
     extra = [((topic_id, name), data)
              for (topic_id, name), data in totals.items()
@@ -1417,6 +1418,7 @@ def group_topic_matrix(group, period='all', now=None, limit_topics=None):
             'students': len(students),
             'accuracy': (round(data['solved'] * 100.0 / data['attempted'])
                          if data['attempted'] else None),
+            'short': _matrix_label(name),
         })
     if limit_topics:
         columns = columns[:limit_topics]
@@ -1429,6 +1431,28 @@ def group_topic_matrix(group, period='all', now=None, limit_topics=None):
                       for column in columns],
         })
     return {'students': students, 'columns': columns, 'matrix': matrix}
+
+
+# ⚠️ ДЛИНА ПОВЁРНУТОЙ ПОДПИСИ ЗАДАЁТ ВЫСОТУ ВСЕГО БЛОКА (ревью 17.08,
+# п. 6.4). Заголовки матрицы стоят вертикально, и самая длинная из двадцати
+# трёх решает, насколько высокой будет шапка. Полное название лежит в
+# подсказке — она и есть ответ на «какая именно тема».
+#
+# ⚠️ ЧИСЛО ПОДОБРАНО ЗАМЕРОМ ПО КАНОНУ ТЕМ, а не на глаз. Четырнадцать —
+# ровно столько, сколько нужно примерам владельца («Вмешательство…»,
+# «Международная…»), и при нём двадцать два названия из двадцати трёх
+# ложатся на границу слова. Больше — шапка растёт (самая длинная подпись
+# просит около 7,6 px на символ), меньше — названия перестают различаться:
+# на одиннадцати «Теория потребителя» и «Теория фирмы» обе становятся
+# «Теория…».
+MATRIX_LABEL_LIMIT = 14
+
+
+def _matrix_label(name):
+    """Короткая подпись колонки: по границе слова, всегда с многоточием."""
+    from .text_clean import shorten
+
+    return shorten(name, MATRIX_LABEL_LIMIT)
 
 
 # Сколько дней сданная работа может ждать проверки, прежде чем это станет

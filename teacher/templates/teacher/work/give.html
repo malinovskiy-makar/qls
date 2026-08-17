@@ -31,11 +31,11 @@
 .wk-paper h3 { font-size: 14px; font-weight: 700; text-align: center; }
 .wk-paper .wk-paper__sub { text-align: center; color: var(--text2);
                            font-size: 11px; margin: 3px 0 12px; }
-.wk-paper__task { margin-top: 10px; }
-.wk-paper__no { font-weight: 700; }
-.wk-paper__st { white-space: pre-line; }
-.wk-paper__part { margin-left: 12px; }
-.wk-paper__part b { color: var(--accent); }
+{% comment %}
+⚠️ Правила листа — в НАБОРЕ (`templates/_kit.html`, ревью 17.08, п. 6.1):
+разметку рисует общий `work/_sheet_js.html`, и её видят два экрана.
+Здесь остаётся только бумага, на которой лист лежит.
+{% endcomment %}
 .wk-paper :is(table, .katex-display) { overflow-x: auto; }
 .wk-note { font-size: 12px; color: var(--text3); margin-top: 10px; }
 @media (max-width: 900px) {
@@ -109,6 +109,7 @@
 {% block extra_js %}
 {% include "teacher/_cart_keys.html" %}
 {% include "teacher/work/_full_js.html" %}
+{% include "teacher/work/_sheet_js.html" %}
 {% include "teacher/work/_bar_js.html" %}
 <script>
 (function () {
@@ -155,34 +156,11 @@
     if (when) { bits.push(when); }
     document.getElementById('wk-paper-sub').textContent = bits.join(' · ');
 
-    var host = document.getElementById('wk-paper-body');
-    host.innerHTML = '';
-    rows.forEach(function (row, index) {
-      if (row.section) {
-        var sep = document.createElement('div');
-        sep.className = 'k-sep k-sep--head';
-        sep.innerHTML = '<span class="k-sep__cap"></span>'
-          + '<span class="k-sep__of"></span><span class="k-sep__line"></span>';
-        sep.querySelector('.k-sep__cap').textContent = row.section.title;
-        sep.querySelector('.k-sep__of').textContent = row.section.detail;
-        host.appendChild(sep);
-      }
-      var task = document.createElement('div');
-      task.className = 'wk-paper__task';
-      var html = '<span class="wk-paper__no">' + (index + 1) + '.</span> '
-        + '<span class="wk-paper__st">' + esc(row.statement) + '</span>';
-      (row.parts || []).forEach(function (part) {
-        html += '<div class="wk-paper__part"><b>' + esc(part.label) + ')</b> '
-          + esc(part.text) + '</div>';
-      });
-      (row.options || []).forEach(function (option) {
-        html += '<div class="wk-paper__part">' + esc(option.label) + ') '
-          + esc(option.text) + '</div>';
-      });
-      task.innerHTML = html;
-      host.appendChild(task);
-    });
-    window.QLS_FULL.typeset(host);
+    // ⚠️ РИСУЕТ ОБЩИЙ ЛИСТ (`work/_sheet_js.html`, ревью 17.08, п. 6.1).
+    // Разметка одна с окном на шаге состава и с печатным листком; надпись
+    // под листом про единственный источник наконец правда.
+    window.QLS_SHEET.paint(document.getElementById('wk-paper-body'), rows,
+                           { fields: true });
     sync();
   }
 

@@ -554,6 +554,11 @@ def cart_rows(keys, owner, manual_order=False, points=None, suggest=False,
             'meta': card_meta(topics, kind, problem.difficulty or 0),
             'is_test': item.is_test,
             'points': float(item.points),
+            # ⚠️ СКЛОНЕНИЕ СЧИТАЕТ ПИТОН, КЛИЕНТ ПЕЧАТАЕТ ГОТОВУЮ СТРОКУ
+            # (ревью 17.08, п. 6.1). Правило трёх русских форм живёт в
+            # `assignment_rows.point_word`; вторая его копия на клиенте
+            # разошлась бы с печатным листком на первом же дробном балле.
+            'points_text': assignment_rows.points_text(item.points),
             # ⚠️ ПРИЗНАК РУЧНОЙ ПРАВКИ СЧИТАЕТ СЕРВЕР, а не экран. Правило
             # начисления и ручные баллы применяет одна функция; спроси
             # клиент об этом сам — «вручную» появлялось бы там, где балл

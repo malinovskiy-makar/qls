@@ -484,8 +484,14 @@ table.stats-table tbody tr:hover { background: var(--surface-2); }
 }
 .stats-table tbody tr:hover td.matrix-name { background: var(--surface-2); }
 
+/* ⚠️ ПОТОЛОК ВЫСОТЫ ОБЯЗАН ВМЕЩАТЬ САМУЮ ДЛИННУЮ ПОДПИСЬ (ревью 17.08,
+   п. 6.4). Прежние 120 px её НЕ вмещали: подпись в 26 символов просит
+   около двухсот, и `max-height` срезал ей хвост вместе с многоточием —
+   отсюда и «обрубок с запятой», который владелец принял за опечатку.
+   Теперь длину сводит сервер (`stats.MATRIX_LABEL_LIMIT`), а здесь стоит
+   ровно та высота, которую эта длина просит: замерено, а не на глаз. */
 .matrix-head { font-size: 11px; color: var(--text2); writing-mode: vertical-rl;
-               transform: rotate(180deg); max-height: 120px;
+               transform: rotate(180deg); max-height: 118px;
                text-transform: none; }
 
 /* ⚠️ ТОНКАЯ ПОЛОСА СЛЕВА, А НЕ ЗАЛИВКА ПАНЕЛИ. Панель, залитая янтарём

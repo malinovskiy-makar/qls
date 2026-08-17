@@ -1,0 +1,49 @@
+{% comment %}
+ПОЛЕ ТЕКСТА РАСТЁТ ПО СОДЕРЖИМОМУ — ОДИН СКРИПТ НА ПЛАТФОРМУ
+(ревью 17.08, п. 6.3).
+
+⚠️ ЗАЧЕМ. Нативную ручку изменения размера в правом нижнем углу рисует сам
+браузер, и именно она выдаёт «стандартную textarea» посреди набора деталей:
+это единственный элемент платформы с чужим управляющим значком. Ручка убрана
+правилом `resize: none` в наборе, а высоту вместо человека подбирает поле
+само — иначе запрет превратился бы в наказание для тех, кто пишет длинно.
+
+⚠️ ВЫСОТА СБРАСЫВАЕТСЯ ПЕРЕД ЗАМЕРОМ. `scrollHeight` не уменьшается сам:
+без сброса поле, однажды выросшее, никогда не сжимается обратно — текст
+стирают, а пустое поле остаётся на десять строк.
+
+Начальная высота (`rows`) остаётся нижней границей: поле не должно
+схлопываться в одну строку, пока в нём пусто.
+{% endcomment %}
+<script>
+(function () {
+  'use strict';
+  var MAX = 420;   // выше поле уже прокручивается внутри себя
+
+  function fit(area) {
+    var least = area.dataset.leastHeight;
+    if (!least) {
+      least = String(area.clientHeight || 0);
+      area.dataset.leastHeight = least;
+    }
+    area.style.height = 'auto';
+    var wanted = Math.max(area.scrollHeight, Number(least));
+    area.style.overflowY = wanted > MAX ? 'auto' : 'hidden';
+    area.style.height = Math.min(wanted, MAX) + 'px';
+  }
+
+  function watch(area) {
+    if (area.dataset.grows) { return; }
+    area.dataset.grows = '1';
+    fit(area);
+    area.addEventListener('input', function () { fit(area); });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('textarea.k-area').forEach(watch);
+  });
+  // Поля, появившиеся позже (пункты своей задачи, окна проверки), просят
+  // подгонку сами: следить за всем документом ради этого незачем.
+  window.QLS_AREA = { fit: fit, watch: watch };
+})();
+</script>

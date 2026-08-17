@@ -85,14 +85,11 @@
 .wk-eyes__head { display: flex; align-items: baseline; gap: 12px; }
 .wk-eyes__head h2 { font-size: 17px; font-weight: 700; flex: 1; }
 .wk-eyes__note { font-size: 12px; color: var(--text3); margin: 6px 0 14px; }
-.wk-eyes__task { margin-top: 16px; padding-top: 14px;
-                 border-top: 1px solid var(--border-soft); }
-.wk-eyes__no { font-size: 13px; font-weight: 700; color: var(--text2); }
-.wk-eyes__st { white-space: pre-line; line-height: 1.7; margin-top: 4px; }
-.wk-eyes__part { margin-top: 8px; }
-.wk-eyes__part b { color: var(--accent); }
-.wk-eyes__field { margin-top: 8px; height: 34px; border-radius: var(--r);
-                  border: 1px dashed var(--border); background: var(--surface-2); }
+{% comment %}
+⚠️ Правила самого листа переехали в НАБОР (`templates/_kit.html`, ревью
+17.08, п. 6.1): та же разметка рисуется и на шаге выдачи. Класс, чей стиль
+лежит в файле одного экрана, — знакомая поломка (шестой случай по проекту).
+{% endcomment %}
 .wk-big { margin: 0 2px 14px; }
 {% endblock %}
 
@@ -228,6 +225,7 @@
 {% block extra_js %}
 {% include "teacher/_cart_keys.html" %}
 {% include "teacher/work/_full_js.html" %}
+{% include "teacher/work/_sheet_js.html" %}
 {% include "teacher/work/_bar_js.html" %}
 <script>
 (function () {
@@ -506,38 +504,12 @@
   // ── «Как увидит ученик» ──────────────────────────────────────────────
   var eyes = document.getElementById('wk-eyes');
   document.getElementById('wk-eyes-open').addEventListener('click', function () {
-    var host = document.getElementById('wk-eyes-list');
-    host.innerHTML = '';
-    rows.forEach(function (row, index) {
-      if (row.section) {
-        var sep = document.createElement('div');
-        sep.className = 'k-sep k-sep--head';
-        sep.innerHTML = '<span class="k-sep__cap"></span>'
-          + '<span class="k-sep__of"></span><span class="k-sep__line"></span>';
-        sep.querySelector('.k-sep__cap').textContent = row.section.title;
-        sep.querySelector('.k-sep__of').textContent = row.section.detail;
-        host.appendChild(sep);
-      }
-      var task = document.createElement('div');
-      task.className = 'wk-eyes__task';
-      var html = '<div class="wk-eyes__no">' + (index + 1) + '.</div>'
-        + '<div class="wk-eyes__st">' + esc(row.statement) + '</div>';
-      (row.parts || []).forEach(function (part) {
-        html += '<div class="wk-eyes__part"><b>' + esc(part.label) + ')</b> '
-          + esc(part.text) + '<div class="wk-eyes__field"></div></div>';
-      });
-      if ((row.options || []).length) {
-        html += '<ul class="wk-opts">';
-        (row.options || []).forEach(function (option) {
-          html += '<li>' + esc(option.text) + '</li>';
-        });
-        html += '</ul>';
-      }
-      if (!(row.parts || []).length) { html += '<div class="wk-eyes__field"></div>'; }
-      task.innerHTML = html;
-      host.appendChild(task);
-    });
-    window.QLS_FULL.typeset(host);
+    // ⚠️ РИСУЕТ ОБЩИЙ ЛИСТ (`work/_sheet_js.html`, ревью 17.08, п. 6.1).
+    // Своя разметка окна показывала варианты маркерами и подставляла поле
+    // ввода даже тесту с готовыми вариантами — то есть обещала способ
+    // ответить, которого у ученика нет.
+    window.QLS_SHEET.paint(document.getElementById('wk-eyes-list'), rows,
+                           { fields: true });
     eyes.classList.add('is-open');
   });
   function closeEyes() { eyes.classList.remove('is-open'); }

@@ -234,8 +234,14 @@
     {% csrf_token %}
     <textarea class="k-area" name="note" id="note-text" rows="4"
               placeholder="Полезная информация {% with name=student.get_full_name|default:student.username %}{{ name|prep_o }} {{ name|prepositional }}{% endwith %}">{% if note %}{{ note.text }}{% endif %}</textarea>
+    {% comment %}
+    ⚠️ КНОПКА СОРАЗМЕРНА ПОЛЮ (ревью 17.08, п. 6.3). Под полем в четыре
+    строки стояла самая мелкая кнопка набора самого тихого веса: единственное
+    действие блока выглядело необязательным. Вес «главная», размер обычный —
+    сохранение заметки это то, ради чего блок существует.
+    {% endcomment %}
     <div class="k-row" style="margin-top:10px;align-items:center">
-      <button type="submit" class="k-btn k-btn--plain k-btn--sm">Сохранить</button>
+      <button type="submit" class="k-btn k-btn--main">Сохранить</button>
       <span class="note-said" id="note-said" hidden>сохранено</span>
     </div>
   </form>

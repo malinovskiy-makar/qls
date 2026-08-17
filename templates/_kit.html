@@ -94,7 +94,12 @@
   box-shadow: 0 0 0 3px var(--focus-ring); background: var(--surface);
 }
 .k-input::placeholder, .k-area::placeholder { color: var(--text3); }
-.k-area { min-height: 84px; resize: vertical; line-height: 1.6; }
+/* ⚠️ НАТИВНОЙ РУЧКИ РАЗМЕРА НЕТ (ревью 17.08, п. 6.3). Её рисует браузер
+   своим значком в углу — единственный чужой управляющий элемент на
+   платформе, и именно он выдавал «обычную textarea» посреди набора.
+   Высоту подбирает само поле по содержимому (`templates/_area_js.html`),
+   поэтому запрет никого не наказывает: длинная заметка помещается. */
+.k-area { min-height: 84px; resize: none; line-height: 1.6; }
 .k-input--num { width: 88px; text-align: center;
                 font-variant-numeric: tabular-nums; }
 
@@ -1198,6 +1203,32 @@ details.fold > summary:hover,
 .wk-full .wk-flags { margin-top: 10px; display: flex; gap: 8px;
                      flex-wrap: wrap; font-size: 11px; color: var(--text3); }
 .wk-full :is(table, .katex-display) { overflow-x: auto; }
+
+/* ── Лист работы: одна разметка на все предпросмотры ───────────────────
+   Рисует `teacher/work/_sheet_js.html`, показывают окно «глазами ученика»
+   на шаге состава и лист «так уйдёт ученику» на шаге выдачи. Правила стоят
+   здесь, а не в файле одного экрана: класс на двух экранах — правила в
+   наборе (обзор 13.08, три дефекта одной болезнью).
+   Строение повторяет печатный листок: номер и цена в одной строке, условие,
+   пункты буквами, варианты буквами. */
+.sheet-task { margin-top: 14px; padding-top: 12px;
+              border-top: 1px solid var(--border-soft); }
+.sheet-task:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.sheet-task__head { display: flex; align-items: baseline; gap: 10px; }
+.sheet-task__no { font-weight: 700; }
+/* Цена позиции — тихая и справа: она про устройство работы, а не про
+   задачу. У печатного листка она стоит там же. */
+.sheet-task__pts { margin-left: auto; font-size: 12px; color: var(--text2);
+                   white-space: nowrap; }
+.sheet-task__st { white-space: pre-line; line-height: 1.6; margin-top: 4px; }
+.sheet-task__part { margin-top: 8px; margin-left: 12px; }
+.sheet-task__part b { color: var(--accent); }
+.sheet-task__opt { margin-top: 4px; margin-left: 12px; }
+/* Место под ответ — пунктирная строка: это не поле ввода, а лист. */
+.sheet-task__field { margin-top: 8px; height: 34px; border-radius: var(--r);
+                     border: 1px dashed var(--border);
+                     background: var(--surface-2); }
+.sheet-task :is(table, .katex-display) { overflow-x: auto; }
 
 /* Полоса собранного у нижнего края: она же несёт переход к следующему шагу. */
 .wk-bar { position: sticky; bottom: 0; z-index: 20; display: flex;

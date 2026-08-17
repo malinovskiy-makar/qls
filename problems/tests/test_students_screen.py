@@ -185,8 +185,11 @@ class WarningsWordingTests(TestCase):
         card = next(c for c in resp.context['cards']
                     if c['group'].pk == self.lesson.pk)
         self.assertTrue(card['warnings'])
+        # ⚠️ Строка предупреждения стала СЛОВАРЁМ (ревью 17.08, п. 5.1): к
+        # тексту добавилась ступень срочности, от которой зависит цвет
+        # чёрточки слева. Проверяем по-прежнему текст.
         for warning in card['warnings']:
-            self.assertNotIn('Тимур Ахметов —', warning)
+            self.assertNotIn('Тимур Ахметов —', warning['text'])
 
     def test_group_keeps_the_name(self):
         from datetime import timedelta
@@ -202,4 +205,5 @@ class WarningsWordingTests(TestCase):
         resp = self.client.get(reverse('teacher:groups'))
         card = next(c for c in resp.context['cards']
                     if c['group'].pk == group.pk)
-        self.assertTrue(any('Тимур Ахметов —' in w for w in card['warnings']))
+        self.assertTrue(any('Тимур Ахметов —' in w['text']
+                            for w in card['warnings']))

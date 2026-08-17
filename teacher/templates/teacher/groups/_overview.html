@@ -257,9 +257,16 @@
           же механизм работал. Проверено наведением.
           {% endcomment %}
           <th class="no-sort" data-type="num">
+            {% comment %}
+            ⚠️ ПОДПИСЬ ОБРЕЗАЕТ СЕРВЕР ПО ГРАНИЦЕ СЛОВА (ревью 17.08,
+            п. 6.4). Шаблонный `truncatechars` резал посреди слова и ставил
+            многоточие, которое у повёрнутого текста читается запятой:
+            «Вмешательство госу,» выглядело опечаткой, а не сокращением.
+            Полное название — в подсказке.
+            {% endcomment %}
             <span class="matrix-head"
                   data-hint="{{ column.name }}"
-                  tabindex="0">{{ column.name|truncatechars:26 }}</span>
+                  tabindex="0">{{ column.short|default:column.name }}</span>
           </th>
           {% endfor %}
         </tr>

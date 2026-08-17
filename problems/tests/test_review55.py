@@ -950,7 +950,11 @@ class StudentCardTests(TestCase):
         template = io.open(
             'problems/templates/platform/_stats_style.html',
             encoding='utf-8').read()
-        self.assertIn('grid-template-columns: 200px 1fr 1px 1fr', template)
+        # ⚠️ Ширина 200 → 300 (ревью 17.08, п. 5.2): на 200 обрывалось
+        # восемь названий тем из двадцати трёх. Требование, ради которого
+        # тест писался, — «колонка ФИКСИРОВАННАЯ» — не изменилось, изменилось
+        # само число.
+        self.assertIn('grid-template-columns: 300px 1fr 1px 1fr', template)
         self.assertIn('.tp-half .tp-value { width: 58px', template)
 
     def test_hover_swap_is_pure_css(self):

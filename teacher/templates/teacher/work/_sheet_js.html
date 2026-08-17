@@ -1,0 +1,79 @@
+{% comment %}
+ЛИСТ РАБОТЫ — ОДНА РАЗМЕТКА НА ВСЕ ПРЕДПРОСМОТРЫ (ревью 17.08, п. 6.1).
+
+⚠️ ЗАЧЕМ. Одна и та же работа показывалась тремя разными способами: окно
+«глазами ученика» на шаге состава (голый список), лист «так уйдёт ученику»
+на шаге выдачи (другой голый список) и печатный листок (заголовки частей,
+баллы у позиций, варианты буквами). Под листом выдачи при этом стояла
+надпись про единственный источник — и она врала: состав действительно был
+один, а разметки три.
+
+За основу взят печатный листок как самый полный: заголовок части, номер
+позиции, её цена, условие, пункты буквами и варианты ответа буквами.
+Подписи частей приходят готовыми с сервера (`assignment_rows.section_marks`),
+цена — готовой строкой (`points_text`): правило склонения живёт в питоне и
+второй копии на клиенте не имеет.
+
+Наружу торчит одна функция — `window.QLS_SHEET.paint(host, rows, opts)`.
+`opts.fields` — рисовать ли место под ответ (там, где лист показывают как
+экран ученика). Второго рисователя не заводим: разошлись бы ровно так же,
+как разошлись эти три.
+{% endcomment %}
+<script>
+(function () {
+  'use strict';
+  var esc = window.QLS_FULL.esc;
+
+  function sectionRow(mark) {
+    var sep = document.createElement('div');
+    sep.className = 'k-sep k-sep--head';
+    sep.innerHTML = '<span class="k-sep__cap"></span>'
+      + '<span class="k-sep__of"></span><span class="k-sep__line"></span>';
+    sep.querySelector('.k-sep__cap').textContent = mark.title;
+    sep.querySelector('.k-sep__of').textContent = mark.detail;
+    return sep;
+  }
+
+  function paint(host, rows, opts) {
+    var options = opts || {};
+    host.innerHTML = '';
+    (rows || []).forEach(function (row, index) {
+      if (row.section) { host.appendChild(sectionRow(row.section)); }
+
+      var task = document.createElement('div');
+      task.className = 'sheet-task';
+      var html = '<div class="sheet-task__head">'
+        + '<span class="sheet-task__no">' + (index + 1) + '.</span>'
+        + '<span class="sheet-task__pts">' + esc(row.points_text || '')
+        + '</span></div>'
+        + '<div class="sheet-task__st">' + esc(row.statement) + '</div>';
+
+      var parts = row.parts || [];
+      var choices = row.options || [];
+      parts.forEach(function (part) {
+        html += '<div class="sheet-task__part"><b>' + esc(part.label) + ')</b> '
+          + esc(part.text)
+          + (options.fields ? '<div class="sheet-task__field"></div>' : '')
+          + '</div>';
+      });
+      // ⚠️ ВАРИАНТЫ — БУКВАМИ, А НЕ МАРКЕРАМИ СПИСКА (п. 6.2). Маркер не
+      // называет вариант, а ответ ученик даёт именно буквой.
+      choices.forEach(function (choice) {
+        html += '<div class="sheet-task__opt">' + esc(choice.label) + ') '
+          + esc(choice.text) + '</div>';
+      });
+      // ⚠️ У ТЕСТА С ГОТОВЫМИ ВАРИАНТАМИ ПОЛЯ ВВОДА НЕТ (п. 6.2). Ученик
+      // там выбирает, а не пишет: пустая строка под вариантами обещала
+      // второй способ ответить, которого нет.
+      if (options.fields && !parts.length && !choices.length) {
+        html += '<div class="sheet-task__field"></div>';
+      }
+      task.innerHTML = html;
+      host.appendChild(task);
+    });
+    window.QLS_FULL.typeset(host);
+  }
+
+  window.QLS_SHEET = { paint: paint };
+})();
+</script>
