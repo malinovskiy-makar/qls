@@ -104,7 +104,9 @@ class OneWayOutTests(TestCase):
             self.assertNotIn('вручную', text, kind)
 
     def test_the_link_below_still_offers_it(self):
-        page = read('teacher', 'templates', 'teacher', 'generate.html')
+        # ⚠️ ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 2.1): плашка ошибки
+        # стоит в самой панели, а она переехала в свой партиал.
+        page = read('teacher', 'templates', 'teacher', '_ask_panel.html')
         self.assertIn('Соберите работу вручную:', page)
 
 
@@ -118,10 +120,19 @@ class OneNameTests(TestCase):
         словами / умный поиск по каталогу» (ревью 17.08, п. 4.3), и
         проверяется именно это: второго набора слов нигде нет.
         """
-        pick = read('teacher', 'templates', 'teacher', 'work', 'pick.html')
-        self.assertIn('умный поиск по каталогу', pick)
-        self.assertIn('ручной поиск по каталогу', pick)
-        self.assertIn('создание задачи с нуля', pick)
+        # ⚠️ ПЕРЕСЧИТАН ВТОРОЙ РАЗ (визуальная сессия 17.08, п. 2.1): ряд
+        # способов набора стал ОДНИМ партиалом на три места — именно
+        # поэтому второго набора слов теперь не может завестись в принципе.
+        ways = read('teacher', 'templates', 'teacher', 'work', '_ways.html')
+        self.assertIn('умный поиск по каталогу', ways)
+        self.assertIn('ручной поиск по каталогу', ways)
+        self.assertIn('создание задачи с нуля', ways)
+        for screen in (('teacher', 'templates', 'teacher', 'work',
+                        'pick.html'),
+                       ('teacher', 'templates', 'teacher', 'generate.html'),
+                       ('problems', 'templates', 'platform',
+                        'problem_form.html')):
+            self.assertIn('teacher/work/_ways.html', read(*screen), screen[-1])
 
 
 class LoggingTests(TestCase):

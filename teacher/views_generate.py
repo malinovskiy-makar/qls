@@ -97,6 +97,27 @@ def _tutor_groups(user):
                 .prefetch_related('students').order_by('name'))
 
 
+def _saved_count(user):
+    """Сколько отложенных задач каталога — для подписи вкладки."""
+    from problems.models import SavedProblem
+
+    return SavedProblem.objects.filter(owner=user, is_deleted=False,
+                                       catalog_problem__isnull=False).count()
+
+
+def _own_new_url(request, kind):
+    """Адрес «Написать свою» — с занятием, видом работы и возвратом в поток.
+
+    ⚠️ `to_cart` и `return_to` ОБЯЗАТЕЛЬНЫ. Без первого написанная задача
+    остаётся в «Моих задачах» и в собираемую работу не попадает, без
+    второго редактор возвращает на свой умолчательный адрес.
+    """
+    state = {'group_id': group_id_param(request), 'kind': kind}
+    back = reverse('teacher:work_pick') + views_work.flow_query(state)
+    return (reverse('teacher:problem_new')
+            + views_work.flow_query(state, to_cart='1', return_to=back))
+
+
 def _catalog_size():
     """Сколько задач в каталоге СЕЙЧАС. Число не зашиваем в текст.
 
@@ -160,6 +181,15 @@ def assignment_generate(request):
                                 request.POST.get('group')
                                 or request.GET.get('group')),
         'problem_count': _catalog_size(),
+        # Ряд способов набора на этом экране — тот же партиал, что на шаге
+        # «Что кладём» (п. 2.1). Здесь вкладки — ссылки: панелей у этого
+        # состояния нет, оно само одна из них.
+        'pick_url': (reverse('teacher:work_pick')
+                     + views_work.flow_query({'group_id': group_id_param(request),
+                                              'kind': kind})),
+        'own_count': len(picker.own_problem_rows(request.user)),
+        'saved_count': _saved_count(request.user),
+        'own_new_url': _own_new_url(request, kind),
         'form': {'count': 4, 'count_open': 4, 'count_test': 0,
                  'min_difficulty': 1, 'max_difficulty': 5,
                  'text': '', 'has_answer': False, 'topics': []},
@@ -169,7 +199,14 @@ def assignment_generate(request):
     }
 
     if request.method != 'POST':
-        return render(request, 'teacher/generate.html', context)
+        # ⚠️ ПРОСТО ОТКРЫТЬ ЭТОТ АДРЕС БОЛЬШЕ НЕЛЬЗЯ (визуальная сессия
+        # 17.08, п. 2.1). Форма запроса — это ПАНЕЛЬ шага «Что кладём», а
+        # не отдельный экран: пока у неё был свой адрес, с него уезжала
+        # лента шагов и менялась ширина колонки. За этим адресом осталось
+        # только второе состояние панели — разбор запроса, то есть POST.
+        state = {'group_id': group_id_param(request), 'kind': kind}
+        return redirect(reverse('teacher:work_pick')
+                        + views_work.flow_query(state, tab='ai'))
 
     form = _read_form(request)
     context['form'] = form

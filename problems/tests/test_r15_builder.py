@@ -96,14 +96,19 @@ class OwnProblemsTabTests(TestCase):
         return response.content.decode()
 
     def test_three_tabs(self):
-        """⚠️ Вкладок стало пять, а названия — общие для платформы."""
+        """⚠️ Вкладок стало пять, а названия — общие для платформы.
+
+        ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 2.3): число уехало из
+        скобок в подпись вкладки — «Мои задачи» и ниже «1 написанная
+        вами». Скобки разрывали одно предложение надвое.
+        """
         html = self.page()
         self.assertIn('Искать самому', html)
-        self.assertIn('Отложенные (', html)
-        self.assertIn('Мои задачи (', html)
+        self.assertIn('Отложенные', html)
+        self.assertIn('Мои задачи', html)
 
     def test_own_tab_counts_only_mine(self):
-        self.assertIn('Мои задачи (1)', self.page())
+        self.assertIn('1 написанная вами', self.page())
 
     def test_alien_problem_never_shows(self):
         self.assertNotIn('Не показывать', self.page())
@@ -149,7 +154,7 @@ class OwnProblemsTabTests(TestCase):
     def test_exam_builder_has_the_tab_too(self):
         html = self.client.get('/teacher/work/?group=%d&kind=exam'
                                % self.group.pk).content.decode()
-        self.assertIn('Мои задачи (1)', html)
+        self.assertIn('1 написанная вами', html)
 
 
 class OwnProblemsEntryTests(TestCase):

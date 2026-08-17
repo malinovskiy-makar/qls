@@ -1,0 +1,70 @@
+{% comment %}
+Правила панели «Описать словами» (умный поиск по каталогу).
+
+⚠️ ОТДЕЛЬНЫМ ФАЙЛОМ, ПОТОМУ ЧТО ПАНЕЛЬ СТОИТ НА ДВУХ ЭКРАНАХ (визуальная
+сессия 17.08, п. 2.1): она — вкладка шага «Что кладём», и она же
+перерисовывается со своей ошибкой на экране разбора запроса. Правила,
+лежащие в файле, который второй экран не подключает, — знакомый по проекту
+класс дефекта (пятый раз): поле выходит браузерным, ссылка синей.
+
+В набор деталей (`_kit.html`) не переехали намеренно: классы `.gen-*`
+принадлежат ОДНОЙ панели, а набор — то, что стоит на десятке экранов.
+{% endcomment %}
+/* Две колонки первого шага: слева рабочая область, справа «Что получится». */
+.gen-two { display: grid; grid-template-columns: minmax(0,1fr) 300px;
+           gap: 20px; align-items: start; }
+.gen-left { min-width: 0; }
+.gen-side { position: sticky; top: 68px; }
+.gen-sum__line { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.gen-sum__line.k-quiet { font-weight: 400; }
+@media (max-width: 900px) { .gen-two { grid-template-columns: 1fr; }
+                            .gen-side { position: static; } }
+.gen-card { background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 22px 24px; margin-bottom: 18px; }
+.gen-card h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+/* Заголовок карточки первого шага — тихая подпись, а не крупный заголовок:
+   вес должен быть у поля ввода, а не у надписи над ним. */
+.gen-cap { font-size: 12px; font-weight: 600; color: var(--text2);
+           margin-bottom: 6px; }
+/* Примеры — тихая раскрывашка: это подсказка, а не второй раздел формы. */
+.gen-examples { margin-top: 14px; }
+/* ⚠️ Вид раскрывашки задаёт НАБОР (`_kit.html`, п. 1.3): знак, цвет и
+   поворот одни на платформу. Здесь свои правила были подменой глифа
+   «▸»→«▾», от которой надпись рядом дёргалась вбок. */
+/* ⚠️ Счётчик обращений — ОТДЕЛЬНОЙ СТРОКОЙ под кнопкой (п. 2.8): рядом с
+   ней он читался как её подпись, то есть как предупреждение. */
+.gen-used { font-size: 12px; color: var(--text3); margin-top: 10px; }
+/* ⚠️ ПРИМЕР ПЕРЕНОСИТСЯ ПО СЛОВАМ. У кнопок набора `white-space: nowrap` —
+   правильное умолчание для «Сохранить», но пример это целая фраза, и на
+   узком экране она выносила страницу вбок. Поймано замером на 380px. */
+.gen-example { white-space: normal; line-height: 1.45; }
+.gen-card .sub { font-size: 13px; color: var(--text2); margin-bottom: 16px;
+                 line-height: 1.6; }
+textarea.gen-text { width: 100%; box-sizing: border-box; min-height: 110px;
+  resize: vertical; font: inherit; font-size: 15px; line-height: 1.6;
+  padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); outline: none; }
+textarea.gen-text:focus { border-color: var(--focus); }
+.gen-params { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px;
+              align-items: flex-end; }
+.gen-params .form-group { margin-bottom: 0; min-width: 120px; }
+/* Флажок без заголовка сверху — выравниваем по низу соседних полей, иначе
+   он всплывает к их подписям и читается как подпись к «Сложности». */
+.gen-params .form-group--check { min-width: 0; padding-bottom: 7px; }
+/* ⚠️ ЧИСЛОВЫЕ ПОЛЯ ОДНОЙ ШИРИНЫ И ОДНОЙ ВЫСОТЫ (поправка 5): раньше они
+   были разного размера и «болтались». Ширину задаём здесь, а не в наборе:
+   она подобрана под эту строку и на других экранах не нужна.
+   ⚠️ Рамок у чисел больше нет (`.k-num`), и выравнивание по нижнему краю
+   стало точнее: линия у всех на одной высоте, а не низ трёх разных рамок. */
+.gen-params .k-num { width: 68px; min-width: 68px; }
+.gen-params .form-label { display: block; margin-bottom: 5px; }
+.gen-actions { display: flex; gap: 12px; align-items: center;
+               flex-wrap: wrap; margin-top: 18px; }
+.gen-error { margin-top: 18px; }
+.gen-error a { color: var(--accent); }
+/* ⚠️ ДВА ПРАВИЛА ПРИВЕДЕНЫ СЮДА ИЗ `_picker_style.html`. Тот файл — целая
+   таблица стилей экрана отбора, и тянуть её на шаг «Что кладём» ради двух
+   строк незачем; без них подпись поля выходит браузерной. */
+.form-group { margin-bottom: 14px; }
+.form-label { display: block; font-size: 12px; font-weight: 600;
+              color: var(--text2); margin-bottom: 6px; }

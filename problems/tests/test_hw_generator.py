@@ -284,12 +284,15 @@ class GenerateScreenTests(TestCase):
         self.client.force_login(self.tutor)
 
     def test_screen_opens_and_says_when_switched_off(self):
+        """⚠️ ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 2.1): подбор стал
+        панелью шага «Что кладём». Требование прежнее — выключенный слой
+        модели назван словами, и рядом сказано, что делать вместо него."""
         with mock.patch.dict('os.environ', {'ANTHROPIC_API_KEY': ''}):
             body = self.client.get(
-                reverse('teacher:assignment_generate')).content.decode()
-        self.assertIn('Подобрать домашку по описанию', body)
+                reverse('teacher:work_pick') + '?tab=ai').content.decode()
+        self.assertIn('Умный поиск сейчас недоступен', body)
         self.assertIn('ANTHROPIC_API_KEY', body)
-        self.assertIn('вручную', body)
+        self.assertIn('Искать самому', body)
 
     def test_stop_gate_shows_the_plan_before_searching(self):
         calls = []

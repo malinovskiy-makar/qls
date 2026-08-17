@@ -12,7 +12,7 @@
 него занятие приходилось выбирать заново, а «кому выдать» слетало.
 
 Ждёт в контексте: step, steps (адреса шагов), group_id, group_label,
-is_exam, kind, found (показывать ли шаг «Что нашлось»).
+is_exam, kind.
 {% endcomment %}
 <nav class="crumbs" aria-label="Где я">
   <a href="{% url 'teacher:groups' %}">Ученики</a>
@@ -44,24 +44,23 @@ is_exam, kind, found (показывать ли шаг «Что нашлось»
 
 {% comment %}
 Лента шагов. Пройденные — ссылки: вернуться назад можно с любого шага, и
-ничто при этом не теряется (фаза 12.3). Шаг «Что нашлось» стоит в ленте
-только на пути подбора: у двух других путей его нет вовсе, и обещать его
-всем значило бы рисовать экран, который не откроется.
+ничто при этом не теряется (фаза 12.3).
+
+⚠️ ШАГОВ ВСЕГДА ТРИ (визуальная сессия 17.08, п. 2.2). Четвёртым здесь
+стоял «Что нашлось» — но только на пути подбора: у двух других путей его
+не было, и лента меняла длину в зависимости от того, как человек набирает
+задачи. «Что нашлось» — это ВТОРОЕ СОСТОЯНИЕ панели «Описать словами»,
+а не отдельный шаг: набор задач в обоих случаях один и тот же шаг.
 {% endcomment %}
 <ol class="wk-rail" aria-label="Шаги создания работы">
-  <li class="wk-rail__s {% if step == 'pick' %}is-on{% else %}is-done{% endif %}">
+  <li class="wk-rail__s {% if step == 'pick' or step == 'found' %}is-on{% else %}is-done{% endif %}">
     <a href="{{ steps.pick }}"><span class="wk-rail__n">1</span>Что кладём</a>
   </li>
-  {% if found %}
-  <li class="wk-rail__s {% if step == 'found' %}is-on{% endif %}">
-    <span><span class="wk-rail__n">2</span>Что нашлось</span>
-  </li>
-  {% endif %}
   <li class="wk-rail__s {% if step == 'compose' %}is-on{% elif step == 'give' %}is-done{% endif %}">
-    {% if step == 'give' %}<a href="{{ steps.compose }}"><span class="wk-rail__n">{% if found %}3{% else %}2{% endif %}</span>Состав</a>
-    {% else %}<span><span class="wk-rail__n">{% if found %}3{% else %}2{% endif %}</span>Состав</span>{% endif %}
+    {% if step == 'give' %}<a href="{{ steps.compose }}"><span class="wk-rail__n">2</span>Состав</a>
+    {% else %}<span><span class="wk-rail__n">2</span>Состав</span>{% endif %}
   </li>
   <li class="wk-rail__s {% if step == 'give' %}is-on{% endif %}">
-    <span><span class="wk-rail__n">{% if found %}4{% else %}3{% endif %}</span>Выдача</span>
+    <span><span class="wk-rail__n">3</span>Выдача</span>
   </li>
 </ol>

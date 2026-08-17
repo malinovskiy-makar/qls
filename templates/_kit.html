@@ -34,6 +34,14 @@
 .k-btn:disabled, .k-btn[aria-disabled="true"] {
   opacity: .45; cursor: not-allowed;
 }
+/* ⚠️ «УЖЕ В РАБОТЕ» — НЕ ВЫКЛЮЧЕННАЯ КНОПКА, А ОТВЕТ (п. 2.6). Она
+   отключена (нажимать нечего), но `opacity: .45` читалось как «сюда
+   нельзя», хотя сообщение ровно обратное — «получилось». Зелень здесь в
+   своём законном смысле: сделано. */
+.k-btn.added, .k-btn.added:disabled {
+  opacity: 1; background: var(--green-tint); color: var(--green);
+  border-color: var(--green-border); cursor: default;
+}
 /* ⚠️ `display` из правила выше СИЛЬНЕЕ браузерного `[hidden]{display:none}`,
    поэтому спрятанная кнопка продолжала рисоваться. Поймано глазами на
    карточке позиции: у неутверждённой задачи висела кнопка «Проверять
@@ -266,8 +274,14 @@
   border-radius: 10px; padding: 18px 20px;
 }
 .k-card--flat { background: var(--surface-2); }
-/* Карточка, которая просит внимания: тонкая рамка акцентом, БЕЗ заливки */
-.k-card--calls { border-color: var(--accent); border-width: 1px; }
+/* ⚠️ РАМКИ ПО ПЕРИМЕТРУ БОЛЬШЕ НЕТ (визуальная сессия 17.08, п. 3.3).
+   «Это выделено» говорилось на платформе тремя способами сразу: полная
+   рамка акцентом, левая полоса и заливка. Словарь оставлен один:
+   ЛЕВАЯ ПОЛОСА — состояние (`.k-mark--*`), ЗАЛИВКА — выбор (задача
+   положена в работу), рамка по периметру не значит ничего.
+   Класс оставлен, чтобы экраны, которые его ставят, не потеряли отступ и
+   не пришлось править их все разом; выделение он больше не рисует. */
+.k-card--calls { border-color: var(--border); }
 
 /* ── Пометка состояния ──────────────────────────────────────────────────
    Тонкая цветная полоса слева + значок. Фон нейтральный: панель, залитая
@@ -325,8 +339,12 @@
    разметке — не разделитель, за разделитель отвечают отступы.
    Классы живут ЗДЕСЬ, чтобы «из» выглядело одинаково на разборе работы,
    в сводке решений и на итогах проверки. */
+/* ⚠️ ЗАЗОР ПОЛНОЦЕННЫЙ, ПО .3em С КАЖДОЙ СТОРОНЫ (визуальная сессия
+   17.08, п. 3.1; владелец просил ещё в п. 48 прошлого ревью). На крупном
+   кегле с отрицательным letter-spacing прежние .22em/.26em съедались, и
+   «2,5 из 18» читалось почти слитно. */
 .k-score__of { font-size: .46em; font-weight: 700; color: var(--text2);
-               letter-spacing: 0; margin: 0 .22em 0 .26em; }
+               letter-spacing: 0; margin: 0 .3em; }
 .k-score__max { font-size: .52em; font-weight: 700; color: var(--text2);
                 letter-spacing: 0; }
 /* Пара «итог» и «автопроверка» в сводке — одно начертание на оба числа. */
@@ -359,6 +377,11 @@
 .k-mark.k-mark--pending { border-left-color: var(--pending); }
 .k-mark.k-mark--empty   { border-left-color: var(--border); }
 .k-mark.k-mark--blank   { border-left-color: var(--border); }
+/* ⚠️ «СЮДА ВАМ» — АКЦЕНТ (визуальная сессия 17.08, п. 3.1 и 3.3). Это не
+   состояние работы, а указание, с чего начать: единственная карточка
+   списка, к которой ведёт очередь проверки. Рядом стоит подпись словами —
+   цветом такое не сообщают. */
+.k-mark.k-mark--next    { border-left-color: var(--accent); }
 
 .k-flag { font-size: 11px; font-weight: 700; text-transform: uppercase;
           letter-spacing: .05em; padding: 3px 9px; border-radius: 999px;
@@ -1095,23 +1118,31 @@ details.fold > summary:hover,
                 color: var(--text); font-weight: 600; }
 .wk-tab.is-on small { color: var(--text2); }
 
-/* Ряд фильтров и строка «сколько нашлось + чем сортировать». */
-.wk-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.wk-filters .k-input { flex: 1 1 190px; min-width: 150px; }
-/* ⚠️ ОБЁРТКА СПИСКА В НАБОРЕ ЗАДАНА `width: 100%` — она рассчитана на
-   колонку формы. Во флекс-ряду это значит «занять всю строку», и семь
-   полей отбора вставали друг под другом столбиком. `flex` тут не спасает:
-   базис берётся из ширины. Ширину переопределяем явно. */
-.wk-filters .k-select-wrap { flex: 0 1 auto; width: auto; min-width: 148px; }
+/* ── Отбор: поиск шире всего остального (п. 2.5) ───────────────────────
+   ⚠️ РЯД СТАЛ СЕТКОЙ, А НЕ ФЛЕКСОМ. Во флексе ширина поля поиска зависела
+   от того, сколько места осталось от трёх списков, и главное поле экрана
+   выходило самым узким. Сетка `2fr 1fr 1fr 1fr` задаёт то, что просил
+   владелец: поиск вдвое шире каждого списка, всегда. */
+.wk-filters { display: grid; gap: 8px; align-items: center;
+              grid-template-columns: 2fr 1fr 1fr 1fr; }
+.wk-filters .k-input { width: 100%; min-width: 0; }
+.wk-filters .k-select-wrap { width: 100%; min-width: 0; }
 .wk-filters .k-select { width: 100%; }
-.wk-found { display: flex; align-items: center; justify-content: space-between;
-            gap: 12px; flex-wrap: wrap; margin: 12px 2px; font-size: 13px;
-            color: var(--text2); }
-.wk-found b { color: var(--text); }
+/* Флажок, кнопки и счётчик — ОДНА строка под фильтрами. */
+.wk-frow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+           margin-top: 12px; }
+.wk-count { font-size: 13px; color: var(--text2); }
+.wk-count b { color: var(--text); }
+@media (max-width: 760px) {
+  .wk-filters { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+  .wk-filters { grid-template-columns: 1fr; }
+}
 
 /* ⚠️ КОЛОНКА ПОТОКА ЗАДАНА ОДИН РАЗ (ревью 17.08, п. 4.4). Каждый шаг
    объявлял ширину сам: 1100 у отбора, 1000 у состава, 1100 у выдачи, а
-   шаг «Что нашлось» жил в своей обёртке на 1060. Переходя между шагами,
+   разбор запроса жил в своей обёртке на 1060. Переходя между шагами,
    человек видел, как содержимое дёргается вбок. Ширина одна на все четыре
    шага; переопределять её на странице нельзя. */
 .wk-wrap { max-width: 1100px; }
@@ -1121,7 +1152,15 @@ details.fold > summary:hover,
            flex-wrap: wrap;
            background: var(--surface); border: 0.5px solid var(--border);
            border-radius: 11px; padding: 12px 14px; margin-bottom: 9px; }
-.wk-card.is-added { opacity: .55; }
+/* ⚠️ ПОЛОЖЕННАЯ В РАБОТУ КАРТОЧКА НЕ ПРИГЛУШАЕТСЯ (п. 2.6, решение
+   владельца от 17.08). `opacity: .55` гасило её ЦЕЛИКОМ — вместе с
+   названием и условием, — то есть сообщало «эта задача неважная», а
+   означало ровно обратное: «эта уже выбрана». Выбор говорит ЗАЛИВКА, и
+   она же единственная на платформе значит «выбрано». */
+.wk-card.is-added { background: var(--green-tint);
+                    border-color: var(--green-border); }
+.wk-card.is-added.k-type--test { border-left-color: var(--green); }
+.wk-card.is-added.k-type--task { border-left-color: var(--green); }
 .wk-card__main { flex: 1; min-width: 0; }
 .wk-card__title { font-size: 14px; font-weight: 600; line-height: 1.4; }
 /* ⚠️ ЧИПЫ КАРТОЧКИ — ОБЩИЕ (`.k-chip`, п. 1.2). Здесь жил свой `.wk-chip`:

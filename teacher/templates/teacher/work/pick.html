@@ -17,6 +17,7 @@
 {% block title %}Что кладём — новая работа{% endblock %}
 
 {% block extra_style %}
+{% include "teacher/_ask_style.html" %}
 {% comment %}
 Отступ снизу — чтобы полоса собранного не накрывала последнюю карточку
 списка: она липкая и стоит поверх содержимого.
@@ -43,27 +44,10 @@
 действия. Формулировки владельца, менять их нельзя; вкладки «Мои задачи»
 и «Отложенные» свои подписи сохраняют — это не способы набора.
 {% endcomment %}
-<div class="wk-tabs" id="wk-tabs" role="tablist">
-  <button type="button" class="wk-tab is-on" data-pane="pane-catalog">
-    Искать самому<small>ручной поиск по каталогу</small></button>
-  {% comment %}
-  ⚠️ ДВЕ ВКЛАДКИ ИЗ ПЯТИ — ССЫЛКИ, И ЭТО НАМЕРЕННО. «Описать словами» ведёт
-  на шаг «Что нашлось» (он уже сделан и живёт на своём адресе), «Написать
-  свою» — в редактор задачи. Обе уносят занятие и вид работы с собой, а
-  корзина у занятия одна: вернувшись, человек находит набранное на месте.
-  {% endcomment %}
-  <a class="wk-tab" href="{{ steps.found }}">
-    Описать словами<small>умный поиск по каталогу</small></a>
-  <a class="wk-tab" href="{{ own_new_url }}">
-    Написать свою<small>создание задачи с нуля</small></a>
-  <button type="button" class="wk-tab" data-pane="pane-own">
-    Мои задачи ({{ own_problems|length }})<small>написанные вами</small></button>
-  <button type="button" class="wk-tab" data-pane="pane-saved">
-    Отложенные ({{ saved_rows|length }})<small>закладки каталога</small></button>
-</div>
+{% include "teacher/work/_ways.html" with inline=1 %}
 
 <div class="wk-panes">
-<div class="wk-pane" id="pane-catalog">
+<div class="wk-pane" id="pane-catalog" {% if way != 'catalog' %}hidden{% endif %}>
   <form method="get" action="{% url 'teacher:work_pick' %}"
         class="k-card k-filters" id="wk-filter-form">
     {% comment %}
@@ -106,31 +90,30 @@
           {% endfor %}
         </select>
       </span>
+    </div>
+
+    {% comment %}
+    ⚠️ СЧЁТЧИК СТОИТ В ОДНОМ РЯДУ С КНОПКАМИ (п. 2.5). Он жил отдельной
+    строкой под фильтрами вместе с выбором сортировки — и получалось три
+    ряда органов управления подряд над списком.
+    ⚠️ «НАШЛОСЬ N» ГОВОРИМ ТОЛЬКО ПОСЛЕ ЗАПРОСА. Без фильтров это размер
+    каталога, и на экране сборки работы он читается как «в работе 18 865
+    задач» — поэтому число там названо своим именем.
+    ⚠️ ВЫБОРА СОРТИРОВКИ ЗДЕСЬ БОЛЬШЕ НЕТ (решение владельца). Порядок
+    «сначала подходящие по теме» остался поведением по умолчанию, просто
+    молча: он и есть естественный порядок отфильтрованного списка.
+    {% endcomment %}
+    <div class="wk-frow">
       <label class="k-check">
         <input type="checkbox" name="has_solution" value="1"
                {% if f_sol == "1" %}checked{% endif %}> с решением
       </label>
       <button class="k-btn k-btn--main k-btn--sm" type="submit">Найти</button>
       <a href="{{ reset_url }}" class="k-btn k-btn--quiet k-btn--sm">Сброс</a>
-    </div>
-
-    <div class="wk-found">
-      {% comment %}
-      ⚠️ «НАШЛОСЬ N» ГОВОРИМ ТОЛЬКО ПОСЛЕ ЗАПРОСА. Без фильтров это размер
-      каталога, и на экране сборки работы он читается как «в работе 18 865
-      задач» — поэтому число там названо своим именем.
-      {% endcomment %}
-      <span>{% if has_query %}Нашлось <b>{{ total }}</b>
+      <span class="wk-count">{% if has_query %}Нашлось <b>{{ total }}</b>
         {{ total|plural_ru:"задача,задачи,задач" }}{% else %}В каталоге
         <b>{{ total }}</b> {{ total|plural_ru:"задача,задачи,задач" }} —
         задайте фильтры или листайте{% endif %}</span>
-      <span class="k-select-wrap">
-        <select class="k-select k-select--sm" name="sort" id="wk-sort">
-          {% for key, label in sorts %}
-          <option value="{{ key }}" {% if f_sort == key %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </span>
     </div>
   </form>
 
@@ -162,7 +145,24 @@
   {% endif %}
 </div>
 
-<div class="wk-pane" id="pane-own" hidden>
+{% comment %}
+Панель «Описать словами» — первое состояние: форма запроса. Второе, «Что
+нашлось», рисует `teacher/generate.html` после разбора; лента шагов в обоих
+случаях одна и та же, из трёх шагов.
+{% endcomment %}
+<div class="wk-pane" id="pane-ai" {% if way != 'ai' %}hidden{% endif %}>
+  {% if available %}
+  {% include "teacher/_ask_panel.html" %}
+  {% else %}
+  <div class="wk-empty">
+    <b>Умный поиск сейчас недоступен</b>
+    {{ reason }}
+    Задачи можно набрать руками — соседняя вкладка «Искать самому».
+  </div>
+  {% endif %}
+</div>
+
+<div class="wk-pane" id="pane-own" {% if way != 'mine' %}hidden{% endif %}>
   {% for row in own_problems %}
   {% include "teacher/work/_card.html" with key=row.key title=row.title facts=row.facts source="своя задача" preview=row.preview is_test=row.is_test %}
   {% empty %}
@@ -175,7 +175,7 @@
   {% endfor %}
 </div>
 
-<div class="wk-pane" id="pane-saved" hidden>
+<div class="wk-pane" id="pane-saved" {% if way != 'saved' %}hidden{% endif %}>
   {% for row in saved_rows %}
   {% include "teacher/work/_card.html" with key=row.key title=row.title facts=row.facts source=row.source preview=row.preview is_test=row.is_test %}
   {% empty %}
@@ -218,11 +218,18 @@
     try { sessionStorage.setItem('work_tab', tab.dataset.pane); } catch (e) {}
   });
   // Вкладка переживает возврат из редактора своей задачи и перезагрузку.
+  // ⚠️ АДРЕС СИЛЬНЕЕ ПАМЯТИ: если экран открыт с `?tab=`, память вкладки не
+  // спрашиваем вовсе — иначе возврат «к формулировке» с результата разбора
+  // приводил бы на ту вкладку, что была открыта в прошлый раз.
+  // ⚠️ Подписи с экрана в комментариях скрипта не повторяем: он вклеен в
+  // страницу, и проверка «такой надписи на экране нет» ловит комментарий.
+  {% if not asked_tab %}
   try {
     var last = sessionStorage.getItem('work_tab');
     var start = last && document.querySelector('[data-pane="' + last + '"]');
     if (start) { start.click(); }
   } catch (e) {}
+  {% endif %}
 
   {% if add_custom %}
   // ⚠️ ВОЗВРАТ ИЗ РЕДАКТОРА СВОЕЙ ЗАДАЧИ. Написанная задача обязана
@@ -232,14 +239,6 @@
   window.QLS_WORK.add('c{{ add_custom.pk }}');
   document.querySelector('.wk-tab[data-pane="pane-own"]').click();
   {% endif %}
-
-  // Сортировка — это тот же отбор, поэтому просто отправляем форму фильтров.
-  var sort = document.getElementById('wk-sort');
-  if (sort) {
-    sort.addEventListener('change', function () {
-      document.getElementById('wk-filter-form').submit();
-    });
-  }
 
   // ── Задача целиком ─────────────────────────────────────────────────────
   document.addEventListener('click', function (event) {

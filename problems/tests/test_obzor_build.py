@@ -154,12 +154,14 @@ class SummaryCardTests(Base):
     """9.3 — «0 тестов» называется вслух."""
 
     def test_zero_is_spelled_out(self):
-        page = read('teacher', 'templates', 'teacher', 'generate.html')
+        # ⚠️ ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 2.1): разметка панели
+        # переехала в свой партиал — она стоит на двух экранах.
+        page = read('teacher', 'templates', 'teacher', '_ask_panel.html')
         block = page.split('function paint()')[1].split('}')[0]
         self.assertIn('if (o || t)', block)
 
     def test_empty_state_still_says_nothing_chosen(self):
-        page = read('teacher', 'templates', 'teacher', 'generate.html')
+        page = read('teacher', 'templates', 'teacher', '_ask_panel.html')
         self.assertIn("'ничего не выбрано'", page)
 
 

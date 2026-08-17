@@ -142,7 +142,9 @@ class EveryScreenIsCoveredTests(TestCase):
             # удалены, набор задач живёт в потоке. Крошка обязана быть на
             # каждом его шаге — это и проверяется.
             (reverse('teacher:work_pick') + '?group=%d' % g, 'что кладём'),
-            (reverse('teacher:assignment_generate') + '?group=%d' % g,
+            # ⚠️ Панель «Описать словами» живёт на шаге «Что кладём»
+            # (визуальная сессия 17.08, п. 2.1) — и он в списке уже есть.
+            (reverse('teacher:work_pick') + '?group=%d&tab=ai' % g,
              'описать словами'),
             (reverse('teacher:work_compose') + '?group=%d' % g, 'состав'),
             (reverse('teacher:work_give') + '?group=%d' % g, 'выдача'),

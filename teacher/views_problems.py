@@ -374,10 +374,24 @@ def _flow_head(request):
             query['kind'] = 'exam'
         return here + ('?' + urlencode(query) if query else '')
 
+    # Ряд способов набора — тот же партиал, что на шаге «Что кладём»
+    # (визуальная сессия 17.08, п. 2.1). Вкладки здесь ссылки: панелей у
+    # этого экрана нет, он сам одна из них.
+    from problems.models import SavedProblem
+
+    from . import picker
+
     return {
         'steps': views_work.step_urls(state),
         'kind_urls': {'homework': same_screen('homework'),
                       'exam': same_screen('exam')},
+        'pick_url': reverse('teacher:work_pick')
+        + views_work.flow_query(state),
+        'own_new_url': here + ('?' + urlencode(keep) if keep else ''),
+        'own_count': len(picker.own_problem_rows(request.user)),
+        'saved_count': SavedProblem.objects.filter(
+            owner=request.user, is_deleted=False,
+            catalog_problem__isnull=False).count(),
     }
 
 

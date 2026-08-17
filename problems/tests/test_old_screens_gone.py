@@ -51,8 +51,13 @@ class OneStepRailTests(Base):
     """4.1 — лента шагов на экране одна."""
 
     def test_found_step_has_a_single_rail(self):
-        html = self.client.get(reverse('teacher:assignment_generate')
-                               ).content.decode()
+        # ⚠️ ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 2.1): адрес разбора
+        # запроса открывается только POST-ом, GET уводит в панель шага
+        # «Что кладём». Требование прежнее — лента на экране одна.
+        html = self.client.post(reverse('teacher:assignment_generate'), {
+            'step_action': 'parse', 'text': 'спрос',
+            'count_open': 1, 'count_test': 0,
+            'min_difficulty': 1, 'max_difficulty': 5}).content.decode()
         self.assertEqual(html.count('class="wk-rail"'), 1)
         # Прежний ряд «1. Запрос — 2. Что нашлось — 3. Конструктор» удалён
         # вместе с разметкой и стилями.
@@ -234,7 +239,10 @@ class TabTitleTests(Base):
             reverse('teacher:work_pick'),
             reverse('teacher:work_compose'),
             reverse('teacher:work_give'),
-            reverse('teacher:assignment_generate'),
+            # ⚠️ Адрес разбора запроса из списка убран: он больше не
+            # рисует страницу по GET, а уводит в панель шага «Что кладём»
+            # (визуальная сессия 17.08, п. 2.1). Его заголовок — заголовок
+            # того самого шага, и он в списке уже есть.
             reverse('teacher:student_progress', args=[student.pk]),
         ]
 

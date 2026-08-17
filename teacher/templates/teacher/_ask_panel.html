@@ -1,0 +1,217 @@
+{% comment %}
+ПАНЕЛЬ «ОПИСАТЬ СЛОВАМИ» — умный поиск по каталогу.
+
+⚠️ ОДНА РАЗМЕТКА НА ДВА МЕСТА (визуальная сессия 17.08, п. 2.1): вкладка
+шага «Что кладём» и тот же экран после отказа модели или ошибки в форме.
+Второй копии нет намеренно: разойдясь, они обещали бы разное на соседних
+нажатиях.
+
+⚠️ ЭТО ПЕРВОЕ СОСТОЯНИЕ ПАНЕЛИ. Второе — «Что нашлось» — рисует
+`teacher/generate.html` после нажатия «Разобрать запрос»: отдельным шагом
+ленты оно быть перестало (п. 2.2), это по-прежнему шаг «Что кладём».
+
+Ждёт в контексте: form, examples, problem_count, used_today, daily_limit,
+ai_error, steps, kind, group_id.
+{% endcomment %}
+<form method="post" action="{% url 'teacher:assignment_generate' %}">
+  {% csrf_token %}
+  <input type="hidden" name="step_action" value="parse">
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="group" value="{{ group_id }}">
+  {% comment %}
+  ⚠️ ПЕРВЫЙ ШАГ СОБРАН В КАРТОЧКИ (сессия 7, фаза 12.0 — поправка 5).
+  Раньше это была сплошная лента: заголовок, поле, четыре разнокалиберных
+  числа, флажок, две подписи и стопка примеров той же высоты, что само поле
+  ввода. Полей НЕ убрано и НЕ добавлено ни одного — переделан только вид.
+  Ориентир — экран разбора работы глазами ученика: белые карточки, тихие
+  подписи, крупное только там, где действие.
+  {% endcomment %}
+
+  {% comment %}
+  ⚠️ ДВЕ КОЛОНКИ (сессия 9, фаза 10.1). Правая половина экрана пустовала, а
+  на соседних способах там панель. Слева — рабочая область, справа карточка
+  «Что получится»: она отвечает на вопрос «что я сейчас соберу» ДО того, как
+  запрос уйдёт в разбор. Полей не убрано и не добавлено ни одного.
+  {% endcomment %}
+  <div class="gen-two">
+  <div class="gen-left">
+  <div class="gen-card">
+    <div class="gen-cap">Опишите словами</div>
+    <div class="sub">
+      Новые задачи не сочиняются. Сайт разбирает вашу фразу и ищет среди
+      {{ problem_count }} задач каталога.
+    </div>
+    <textarea class="gen-text" name="text" id="gen-text" required
+              placeholder="Например: домашка на монополию и эластичность, четыре задачи и три теста, одна посложнее в конце">{{ form.text }}</textarea>
+
+    {% comment %}
+    Примеры — под ТИХОЙ раскрывашкой. Это подсказка, а она занимала столько
+    же места, сколько само поле ввода.
+    {% endcomment %}
+    <details class="gen-examples">
+      <summary>Так тоже можно</summary>
+      <div class="k-stack" style="gap:6px;margin-top:10px">
+        {% for example in examples %}
+        <button type="button" class="k-btn k-btn--plain gen-example"
+                style="text-align:left;justify-content:flex-start"
+                data-example="{{ example }}">{{ example }}</button>
+        {% endfor %}
+      </div>
+    </details>
+  </div>
+
+  <div class="gen-card">
+    <div class="gen-cap">Сколько и какой сложности</div>
+
+    <div class="gen-params">
+      {% comment %}
+      ⚠️ ДВА ОТДЕЛЬНЫХ ПОЛЯ. Раньше поле было одно — «сколько задач», — и
+      разделить нельзя было никак: репетитор, которому нужны четыре задачи
+      и три теста, получал семь чего попало.
+      {% endcomment %}
+      <div class="form-group">
+        <label class="form-label" for="id_open">Открытых задач</label>
+        <input class="k-num" type="number" id="id_open"
+               name="count_open" min="0" max="30" value="{{ form.count_open }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="id_test">Тестов</label>
+        <input class="k-num" type="number" id="id_test"
+               name="count_test" min="0" max="30" value="{{ form.count_test }}">
+      </div>
+      <div class="form-group">
+        {% comment %}
+        Сложность — ОДНА пара в одну строку. Раньше это были два поля с
+        подписями «СЛОЖНОСТЬ ОТ» и «ДО» капслоком над каждым, и они
+        читались как два независимых числа.
+        {% endcomment %}
+        <label class="form-label">Сложность</label>
+        <div class="k-row" style="gap:6px;flex-wrap:nowrap">
+          <input class="k-num" type="number" name="min_difficulty"
+                 min="1" max="5" value="{{ form.min_difficulty }}"
+                 aria-label="сложность от">
+          <span class="k-quiet">—</span>
+          <input class="k-num" type="number" name="max_difficulty"
+                 min="1" max="5" value="{{ form.max_difficulty }}"
+                 aria-label="сложность до">
+        </div>
+      </div>
+      {% comment %}
+      ⚠️ ФЛАЖОК ОТБИРАЕТ ПО ОТВЕТУ, А НЕ ПО РЕШЕНИЮ (сессия 7, фаза 1).
+      Заголовка над ним нет намеренно: у флажка подпись справа от квадратика
+      и есть, а «Решения» сверху обещали раздел настроек, которого не было.
+      {% endcomment %}
+      <div class="form-group form-group--check">
+        <label class="k-check">
+          <input type="checkbox" name="has_answer"
+                 {% if form.has_answer %}checked{% endif %}>
+          Искать только задачи с ответом
+        </label>
+      </div>
+    </div>
+
+    {% comment %}
+    ⚠️ ЧЕСТНАЯ ПОДПИСЬ. Сложность работает как ПРЕДПОЧТЕНИЕ, а не отбор:
+    задача вне диапазона встанет ниже, но может попасть. Именно так оно и
+    написано в коде — а интерфейс раньше обещал фильтр, которого нет.
+    {% endcomment %}
+    <div class="k-hint">
+      Сложность — это предпочтение, а не жёсткий отбор: задачи вне диапазона
+      встанут ниже, но могут попасть.
+    </div>
+
+    {% comment %}
+    ⚠️ ОШИБКА СТОИТ РЯДОМ С КНОПКОЙ, А НЕ ВВЕРХУ СТРАНИЦЫ (сессия 7, фаза 7.2).
+    Плашка `messages` прилипает к верху; репетитор в этот момент смотрит на
+    кнопку внизу, и для него на экране не происходило РОВНО НИЧЕГО.
+    Текст человеческий, код ошибки остался в журнале сервера (фаза 7.4), а
+    выход из положения — ссылкой прямо здесь.
+    {% endcomment %}
+    {% if ai_error %}
+    <div class="k-state k-state--warn gen-error" id="gen-error"
+         role="alert" tabindex="-1">
+      <span class="k-state__icon" aria-hidden="true">!</span>
+      <span class="k-state__body">
+        <span class="k-state__title">{{ ai_error.text }}</span>
+        <span class="k-state__note">Соберите работу вручную:
+          <a href="{{ steps.pick }}">Искать самому</a> — ручной поиск по каталогу.
+        </span>
+      </span>
+    </div>
+    {% endif %}
+
+    {% comment %}
+    Счётчик обращений — РЯДОМ С КНОПКОЙ и тише её (поправка 5): это
+    техническая деталь, а отдельной строкой под кнопкой она читалась как
+    предупреждение.
+    {% endcomment %}
+    {% comment %}
+    ⚠️ СЧЁТЧИК СТОИТ ОТДЕЛЬНОЙ СТРОКОЙ (п. 2.8). Прижатый к тёмной кнопке,
+    он читался как её подпись — то есть как предупреждение о том, что
+    сейчас произойдёт. Это техническая справка, и место ей под кнопкой.
+    {% endcomment %}
+    <div class="gen-actions">
+      <button type="submit" class="k-btn k-btn--main">Разобрать запрос</button>
+    </div>
+    <div class="gen-used">сегодня использовано {{ used_today }} из {{ daily_limit }}</div>
+  </div>
+  </div>
+
+  <aside class="gen-side">
+    <div class="gen-card gen-sum">
+      <div class="gen-cap">Что получится</div>
+      <div class="gen-sum__line" id="sum-count">—</div>
+      <div class="gen-sum__line k-quiet" id="sum-hard">—</div>
+      <div class="k-hint">Задачи выберете на следующем шаге.</div>
+    </div>
+  </aside>
+  </div>
+</form>
+
+{% comment %}
+Карточка «Что получится» пересчитывается ПРЯМО В БРАУЗЕРЕ по тем же полям,
+что уйдут на сервер. Своих чисел у неё нет — она их только складывает.
+{% endcomment %}
+<script>
+(function () {
+  var open = document.getElementById('id_open');
+  var test = document.getElementById('id_test');
+  var lo = document.querySelector('[name=min_difficulty]');
+  var hi = document.querySelector('[name=max_difficulty]');
+  var count = document.getElementById('sum-count');
+  var hard = document.getElementById('sum-hard');
+  if (!open || !count) { return; }
+
+  // Склонение — то же правило, что у шаблонного фильтра `count_ru`.
+  function word(n, one, few, many) {
+    n = Math.abs(n | 0);
+    if (n % 100 >= 11 && n % 100 <= 14) { return many; }
+    if (n % 10 === 1) { return one; }
+    if (n % 10 >= 2 && n % 10 <= 4) { return few; }
+    return many;
+  }
+  function paint() {
+    var o = parseInt(open.value, 10) || 0;
+    var t = parseInt(test.value, 10) || 0;
+    // ⚠️ НОЛЬ НАЗЫВАЕТСЯ ВСЛУХ (обзор 13.08, п. 58). Раньше строка молчала
+    // о том, чего ноль, — «4 открытые задачи» без слова «тест» читалось как
+    // «поле тестов не учтено». Пропускаем обе строки только когда пусто
+    // ВСЁ: «0 задач, 0 тестов» — это не сводка, а недоразумение.
+    var parts = [];
+    if (o || t) {
+      parts.push(o + ' ' + word(o, 'открытая задача', 'открытые задачи',
+                                'открытых задач'));
+      parts.push(t + ' ' + word(t, 'тест', 'теста', 'тестов'));
+    }
+    count.textContent = parts.length ? parts.join(', ') : 'ничего не выбрано';
+    var a = parseInt(lo && lo.value, 10) || 1;
+    var b = parseInt(hi && hi.value, 10) || 5;
+    hard.textContent = a === b ? ('сложность ' + a)
+                               : ('сложность ' + a + '–' + b);
+  }
+  [open, test, lo, hi].forEach(function (field) {
+    if (field) { field.addEventListener('input', paint); }
+  });
+  paint();
+})();
+</script>

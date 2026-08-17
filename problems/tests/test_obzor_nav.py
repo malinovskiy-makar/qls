@@ -142,9 +142,11 @@ class CrumbGroupNameTests(TestCase):
         self.assertNotIn('занятие', crumbs(html))
 
     def test_individual_shows_student_name(self):
+        # ⚠️ ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 2.1): панель подбора
+        # живёт на шаге «Что кладём».
         html = self.client.get(
-            reverse('teacher:assignment_generate')
-            + '?group=%d' % self.solo.pk).content.decode()
+            reverse('teacher:work_pick')
+            + '?group=%d&tab=ai' % self.solo.pk).content.decode()
         self.assertIn('Мария Ким', crumbs(html))
 
     def test_individual_name_wins_over_renamed_lesson(self):

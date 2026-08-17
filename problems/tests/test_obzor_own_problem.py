@@ -133,9 +133,14 @@ class ToolsRowTests(Base):
         self.assertNotIn('k-btn--quiet', row)
 
     def test_the_arrow_is_kept_on_the_outgoing_link(self):
+        """⚠️ ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 2.7): три кнопки
+        названы в одной грамматике — «Вставить график», «Вставить формулу»,
+        «Создать график ↗». Требование прежнее: стрелка остаётся у той, что
+        уводит на другой экран."""
         html = self.html()
         row = html.split('id="statement-tools"')[1].split('</div>')[0]
-        self.assertIn('Создать новый график ↗', row)
+        self.assertIn('Создать график ↗', row)
+        self.assertIn('Вставить график', row)
 
     def test_the_field_says_where_the_formula_button_goes(self):
         html = self.html()

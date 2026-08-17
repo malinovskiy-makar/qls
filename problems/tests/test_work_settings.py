@@ -165,7 +165,7 @@ class GroupAndKindSurviveTheSwitchers(TestCase):
     def test_kind_switcher_keeps_the_group_everywhere(self):
         """Терялся в трёх ссылках из шести — поймано сценарием сессии 10."""
         pk = self.group.pk
-        for url in (f"{reverse('teacher:assignment_generate')}?group={pk}",
+        for url in (f"{reverse('teacher:work_pick')}?group={pk}&tab=ai",
                     f"{reverse('teacher:work_pick')}?group={pk}",
                     f"{reverse('teacher:work_compose')}?group={pk}",
                     f"{reverse('teacher:work_give')}?group={pk}",
@@ -200,8 +200,7 @@ class GroupAndKindSurviveTheSwitchers(TestCase):
         """⚠️ `?group=abc` отвечал ПЯТИСОТКОЙ: значение уходило прямо в
         `{% url %}`, и Django бросал NoReverseMatch. Дефект был и до
         сведения панели."""
-        for url in (reverse('teacher:assignment_generate'),
-                    reverse('teacher:work_pick'),
+        for url in (reverse('teacher:work_pick'),
                     reverse('teacher:problem_new')):
             for bad in ('abc', 'null', '1; drop', ''):
                 response = self.client.get(url, {'group': bad, 'to_cart': '1'})

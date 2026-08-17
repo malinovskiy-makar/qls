@@ -398,9 +398,12 @@ class OneCreateButtonTests(TestCase):
         """
         from django.urls import reverse
 
+        # ⚠️ ПЕРЕСЧИТАНО (визуальная сессия 17.08, п. 2.1): форма запроса
+        # стала панелью шага «Что кладём», и её прежний адрес по GET только
+        # уводит туда.
         body = self.client.get(
-            reverse('teacher:assignment_generate')
-            + '?group=%d' % self.group.pk).content.decode()
+            reverse('teacher:work_pick')
+            + '?group=%d&tab=ai' % self.group.pk).content.decode()
         switch = body.split('bh-kind"', 1)[1].split('</div>', 1)[0]
         self.assertIn('kind=exam', switch)
         self.assertIn('group=%d' % self.group.pk, switch)
@@ -1144,10 +1147,12 @@ class PickerFirstStepTests(TestCase):
         from django.test import override_settings
         from django.urls import reverse
 
+        # ⚠️ ПЕРЕСЧИТАНО (визуальная сессия 17.08, п. 2.1): панель живёт на
+        # шаге «Что кладём», её прежний адрес по GET только уводит туда.
         with override_settings(AI_PROVIDER='fake'):
             return self.client.get(
-                reverse('teacher:assignment_generate')
-                + '?group=%d' % self.group.pk).content.decode()
+                reverse('teacher:work_pick')
+                + '?group=%d&tab=ai' % self.group.pk).content.decode()
 
     def test_every_field_survived(self):
         body = self._body()
@@ -1155,9 +1160,15 @@ class PickerFirstStepTests(TestCase):
             self.assertIn('name="%s"' % name, body, name)
 
     def test_no_extra_fields_appeared(self):
+        """⚠️ ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 2.1): панель стоит на
+        экране отбора, и рядом с ней живут поля соседней панели — поиск по
+        каталогу и его фильтры. Смотрим ТОЛЬКО свою панель: требование
+        было и остаётся «полей у подбора не убавилось и не прибавилось».
+        """
         import re
+        panel = self._body().split('id="pane-ai"')[1].split('id="pane-own"')[0]
         names = set(re.findall(r'<(?:input|textarea|select)[^>]*name="([^"]+)"',
-                               self._body()))
+                               panel))
         names.discard('csrfmiddlewaretoken')
         self.assertEqual(names, set(self.FIELDS))
 
@@ -1172,12 +1183,19 @@ class PickerFirstStepTests(TestCase):
         self.assertIn('gen-examples', body)
         self.assertIn('<summary>Так тоже можно</summary>', body)
 
-    def test_usage_counter_sits_next_to_the_button(self):
+    def test_usage_counter_sits_below_the_button(self):
+        """⚠️ ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 2.8). Прижатый к
+        тёмной кнопке счётчик читался как её подпись, то есть как
+        предупреждение о том, что сейчас произойдёт. Он остаётся рядом с
+        кнопкой, но отдельной строкой — требование «тише кнопки и при ней»
+        не изменилось.
+        """
         import re
         body = self._body()
         actions = re.search(r'<div class="gen-actions">(.*?)</div>', body,
                             re.S).group(1)
-        self.assertIn('сегодня использовано', actions)
+        self.assertNotIn('сегодня использовано', actions)
+        self.assertIn('<div class="gen-used">сегодня использовано', body)
 
     def test_active_step_is_not_magenta(self):
         """⚠️ Шаги формы — не навигация сайта, акцент им не полагается.
@@ -1194,10 +1212,11 @@ class PickerFirstStepTests(TestCase):
 
     def test_number_fields_share_one_width(self):
         import io
-        template = io.open('teacher/templates/teacher/generate.html',
+        # ⚠️ ПЕРЕСЧИТАНО дважды (визуальная сессия 17.08). Числа правятся без
+        # рамки (п. 1.1), и класс поля сменился; правила панели переехали в
+        # свой файл (п. 2.1) — она стоит на двух экранах. Смысл прежний:
+        # ширина у всех трёх одна и задана в одном месте.
+        template = io.open('teacher/templates/teacher/_ask_style.html',
                            encoding='utf-8').read()
-        # ⚠️ ПЕРЕСЧИТАНО (визуальная сессия 17.08, п. 1.1). Числа на этом
-        # экране правятся без рамки (`.k-num`), и класс поля сменился;
-        # смысл проверки прежний — ширина у всех трёх одна и задана здесь.
         self.assertIn('.gen-params .k-num { width: 68px; min-width: 68px; }',
                       template)

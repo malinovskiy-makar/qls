@@ -147,9 +147,18 @@ class TabsKeepTheCartTests(WorkFlowBase):
         for pane in ('pane-catalog', 'pane-own', 'pane-saved'):
             self.assertIn('id="%s"' % pane, html, pane)
 
-    def test_describe_tab_leads_to_the_found_step(self):
+    def test_describe_tab_is_a_panel_not_a_link(self):
+        """⚠️ ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 2.1): «Описать
+        словами» стала панелью ЭТОГО экрана, а не ссылкой на другой адрес.
+        Проверяем то же самое требование по существу — способ набора
+        доступен с шага «Что кладём» и не уводит с него.
+        """
         html = self.html()
-        self.assertIn(reverse('teacher:assignment_generate'), html)
+        self.assertIn('data-pane="pane-ai"', html)
+        self.assertIn('id="pane-ai"', html)
+        # Ссылки на отдельный адрес разбора у вкладки больше нет.
+        self.assertNotIn('href="%s"' % reverse('teacher:assignment_generate'),
+                         html)
 
     def test_own_tab_asks_to_put_the_task_into_the_cart(self):
         """Без `to_cart` задача создавалась и в собираемую работу не
@@ -190,10 +199,30 @@ class SortingTests(WorkFlowBase):
         return re.findall(r'data-pid="(\d+)"', html)
 
     def test_easy_first_and_hard_first_are_opposite(self):
-        easy = self.order('%s?sort=easy' % reverse('teacher:work_pick'))
-        hard = self.order('%s?sort=hard' % reverse('teacher:work_pick'))
+        """⚠️ ПЕРЕСЧИТАН (визуальная сессия 17.08, п. 2.5). Выбор порядка
+        с экрана убран решением владельца, и параметр адреса шаг больше не
+        читает. Само умение осталось у функции и проверяется прямо —
+        проверять его через экран, где такой кнопки нет, значило бы
+        держать скрытую настройку.
+        """
+        from teacher import picker
+
+        request = self.client.get('/teacher/work/?sort=easy').wsgi_request
+        easy = [str(card['problem'].pk) for card in
+                picker.picker_context(request, sortable=True)['cards']]
+        request = self.client.get('/teacher/work/?sort=hard').wsgi_request
+        hard = [str(card['problem'].pk) for card in
+                picker.picker_context(request, sortable=True)['cards']]
         self.assertEqual(str(self.test.pk), easy[0])
         self.assertEqual(str(self.task.pk), hard[0])
+
+    def test_the_screen_no_longer_offers_a_choice(self):
+        html = self.client.get(reverse('teacher:work_pick')).content.decode()
+        self.assertNotIn('name="sort"', html)
+        # Порядок при этом прежний: параметр адреса ничего не меняет.
+        plain = self.order(reverse('teacher:work_pick'))
+        asked = self.order('%s?sort=easy' % reverse('teacher:work_pick'))
+        self.assertEqual(plain, asked)
 
     def test_sorting_is_asked_for_explicitly(self):
         """⚠️ ПЕРЕСЧИТАН (ревью 17.08, п. 4.5): старых экранов отбора нет.
@@ -452,16 +481,28 @@ class EntryPointsTests(WorkFlowBase):
         self.assertNotIn("teacher:assignment_build", source)
 
     def test_found_step_wears_the_flow_rail(self):
-        html = self.client.get(reverse('teacher:assignment_generate'),
-                               ).content.decode()
+        """⚠️ ПЕРЕСЧИТАН (п. 2.1–2.2). Адрес разбора запроса открывается
+        только POST-ом: GET уводит в панель шага «Что кладём». Лента шагов
+        при этом та же и теперь ВСЕГДА из трёх — «Что нашлось» перестало
+        притворяться четвёртым шагом.
+        """
+        moved = self.client.get(reverse('teacher:assignment_generate'))
+        self.assertEqual(moved.status_code, 302)
+        self.assertIn('tab=ai', moved['Location'])
+        html = self.client.get(moved['Location']).content.decode()
         self.assertIn('class="wk-rail"', html)
-        self.assertIn('Что нашлось', html)
+        self.assertNotIn('Что нашлось', html)
 
     def test_found_step_marks_where_the_task_came_from(self):
         """Подзаголовок позиции в составе говорит, откуда задача; в корзине
-        лежит только ключ, и восстановить это потом неоткуда."""
-        html = self.client.get(reverse('teacher:assignment_generate'),
-                               ).content.decode()
+        лежит только ключ, и восстановить это потом неоткуда.
+
+        ⚠️ ПЕРЕСЧИТАН (п. 2.1): состояние «Что нашлось» приходит POST-ом.
+        """
+        html = self.client.post(reverse('teacher:assignment_generate'), {
+            'step_action': 'parse', 'text': 'эластичность',
+            'count_open': 1, 'count_test': 0,
+            'min_difficulty': 1, 'max_difficulty': 5}).content.decode()
         self.assertIn("from: 'describe'", html)
 
     def test_own_problem_returns_into_the_flow_by_default(self):

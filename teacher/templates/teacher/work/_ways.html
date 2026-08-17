@@ -1,0 +1,58 @@
+{% load ru %}{% comment %}
+ПЯТЬ СПОСОБОВ НАБОРА — ОДИН РЯД НА ВСЕ СОСТОЯНИЯ ШАГА «ЧТО КЛАДЁМ».
+
+⚠️ ОДИН ПАРТИАЛ, ПОТОМУ ЧТО РЯД СТОИТ НА ДВУХ ЭКРАНАХ (визуальная сессия
+17.08, п. 2.1): сам шаг и его второе состояние — разбор запроса. Пока ряда
+на втором не было, человек, нажавший «Разобрать запрос», оказывался на
+экране без единого способа вернуться к остальным четырём.
+
+⚠️ НАЗВАНИЯ — ОДНИ НА ВСЮ ПЛАТФОРМУ, формулировки владельца:
+«Искать самому / ручной поиск по каталогу», «Описать словами / умный поиск
+по каталогу», «Написать свою / создание задачи с нуля». Менять их нельзя.
+
+⚠️ ЧИСЛО ЖИВЁТ В ПОДПИСИ, А НЕ В СКОБКАХ (п. 2.3): «Мои задачи (14)» и
+ниже «написанные вами» — это одно предложение, разорванное скобками.
+
+Ждёт: way (какая панель открыта), inline (вкладки на этом экране —
+панели, а не ссылки), own_count, saved_count, own_new_url, pick_url.
+{% endcomment %}
+<div class="wk-tabs" id="wk-tabs" role="tablist">
+  {% if inline %}
+  <button type="button" class="wk-tab {% if way == 'catalog' %}is-on{% endif %}"
+          data-pane="pane-catalog">
+    Искать самому<small>ручной поиск по каталогу</small></button>
+  <button type="button" class="wk-tab {% if way == 'ai' %}is-on{% endif %}"
+          data-pane="pane-ai">
+    Описать словами<small>умный поиск по каталогу</small></button>
+  {% else %}
+  <a class="wk-tab" href="{{ pick_url }}">
+    Искать самому<small>ручной поиск по каталогу</small></a>
+  <a class="wk-tab {% if way == 'ai' %}is-on{% endif %}"
+     href="{{ pick_url }}{% if '?' in pick_url %}&amp;{% else %}?{% endif %}tab=ai">
+    Описать словами<small>умный поиск по каталогу</small></a>
+  {% endif %}
+
+  {% comment %}
+  ⚠️ «НАПИСАТЬ СВОЮ» — ЕДИНСТВЕННАЯ ССЫЛКА ИЗ ПЯТИ. Редактор своей задачи
+  это девятьсот строк со своим предпросмотром и своим скриптом на ДРУГОМ
+  базовом шаблоне; переносить его сюда — переписывание, а не оформление, а
+  эта сессия функцию не трогает. Шапка, лента шагов, ширина колонки и
+  корзина у него те же, поэтому из потока он не выбрасывает.
+  {% endcomment %}
+  <a class="wk-tab {% if way == 'own' %}is-on{% endif %}" href="{{ own_new_url }}">
+    Написать свою<small>создание задачи с нуля</small></a>
+
+  {% if inline %}
+  <button type="button" class="wk-tab {% if way == 'mine' %}is-on{% endif %}"
+          data-pane="pane-own">
+    Мои задачи<small>{{ own_count }} {{ own_count|plural_ru:"написанная,написанные,написанных" }} вами</small></button>
+  <button type="button" class="wk-tab {% if way == 'saved' %}is-on{% endif %}"
+          data-pane="pane-saved">
+    Отложенные<small>{{ saved_count }} {{ saved_count|plural_ru:"закладка,закладки,закладок" }} каталога</small></button>
+  {% else %}
+  <a class="wk-tab" href="{{ pick_url }}{% if '?' in pick_url %}&amp;{% else %}?{% endif %}tab=mine">
+    Мои задачи<small>{{ own_count }} {{ own_count|plural_ru:"написанная,написанные,написанных" }} вами</small></a>
+  <a class="wk-tab" href="{{ pick_url }}{% if '?' in pick_url %}&amp;{% else %}?{% endif %}tab=saved">
+    Отложенные<small>{{ saved_count }} {{ saved_count|plural_ru:"закладка,закладки,закладок" }} каталога</small></a>
+  {% endif %}
+</div>

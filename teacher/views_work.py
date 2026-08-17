@@ -1,13 +1,20 @@
 """
-Поток создания работы — четыре шага на четырёх адресах.
+Поток создания работы — ТРИ шага.
 
-    1. «Что кладём»   /teacher/work/           — вкладки: каталог, описать
-                                                 словами, написать свою,
-                                                 мои задачи, отложенные;
-    2. «Что нашлось»  /teacher/assignment/generate/ — ТОЛЬКО у подбора
-                                                 (сделан ревью 16.08, фаза 9);
-    3. «Состав»       /teacher/work/compose/   — порядок, баллы, предпросмотры;
-    4. «Выдача»       /teacher/work/give/      — название, срок, кому.
+    1. «Что кладём»   /teacher/work/           — пять панелей одного экрана:
+                                                 искать самому, описать
+                                                 словами, написать свою, мои
+                                                 задачи, отложенные;
+                      /teacher/assignment/generate/ — ВТОРОЕ СОСТОЯНИЕ панели
+                                                 «Описать словами» («Что
+                                                 нашлось»), а не отдельный шаг;
+    2. «Состав»       /teacher/work/compose/   — порядок, баллы, предпросмотры;
+    3. «Выдача»       /teacher/work/give/      — название, срок, кому.
+
+⚠️ ШАГОВ ВСЕГДА ТРИ (визуальная сессия 17.08, п. 2.2). «Что нашлось» стоял
+в ленте четвёртым — но только у одного из трёх способов набора, и лента
+меняла длину в зависимости от того, как человек набирает задачи. Набор
+задач это ОДИН шаг, каким бы способом он ни шёл.
 
 ⚠️ ЗАЧЕМ НОВЫЕ АДРЕСА, А НЕ ПРАВКА СТАРЫХ. Прежние три способа набора —
 `assignment_create`, `assignment_generate`, `problem_new` — жили по разным
@@ -37,9 +44,9 @@ from .access import (
     group_id_param, group_label_param, group_param_refusal, tutor_required,
 )
 
-# Порядок шагов на ленте. «Что нашлось» показывается только на пути подбора:
-# рисовать его всем значило бы обещать экран, которого у двух путей нет.
-STEPS = ('pick', 'found', 'compose', 'give')
+# Порядок шагов на ленте. «found» — не шаг, а состояние первого: он остаётся
+# в списке адресов, потому что у него свой URL, но в ленте его нет.
+STEPS = ('pick', 'compose', 'give')
 
 
 def flow_state(request):
@@ -136,7 +143,13 @@ def work_pick(request):
     from problems.models import SavedProblem
 
     state = flow_state(request)
-    context = picker.picker_context(request, sortable=True)
+    # ⚠️ СОРТИРОВКИ НА ЭКРАНЕ БОЛЬШЕ НЕТ (п. 2.5, решение владельца):
+    # выбор из трёх порядков стоял третьим рядом органов управления над
+    # списком. Порядок остался прежним — «сначала подходящие по теме», он
+    # же естественный порядок отфильтрованного списка. Просить его явно
+    # больше некому, поэтому `sortable` не передаём: параметр адреса
+    # `?sort=` теперь не читается вовсе, и скрытой настройки не остаётся.
+    context = picker.picker_context(request)
     saved = [item.catalog_problem for item in
              SavedProblem.objects.filter(owner=request.user, is_deleted=False,
                                          catalog_problem__isnull=False)
@@ -144,13 +157,44 @@ def work_pick(request):
              .prefetch_related('catalog_problem__topics',
                                'catalog_problem__parts',
                                'catalog_problem__source_references__source')]
+    from problems import hw_generator
+
+    from . import views_generate
+
+    own_rows = picker.own_problem_rows(request.user)
+    asked = (request.GET.get('tab') or '').strip()
+    way = asked if asked in ('catalog', 'ai', 'own', 'mine', 'saved') \
+        else 'catalog'
+
     context.update(state)
     context.update({
         'steps': step_urls(state),
         'kind_urls': kind_urls(state, 'pick'),
         'step': 'pick',
+        # ⚠️ «ОПИСАТЬ СЛОВАМИ» — ПАНЕЛЬ ЭТОГО ЭКРАНА (п. 2.1), поэтому её
+        # контекст собирается здесь же. Разбор запроса по-прежнему делает
+        # `assignment_generate`: второй точки обращения к модели нет.
+        # `way` говорит шаблону, какая панель открыта: адрес сильнее
+        # памяти вкладки, иначе возврат «к формулировке» уводил бы на ту
+        # вкладку, что была открыта в прошлый раз.
+        # Какая панель открыта. Адрес сильнее памяти вкладки: возврат
+        # «к формулировке» обязан открыть именно её.
+        'way': way,
+        'asked_tab': asked,
+        'own_count': len(own_rows),
+        'saved_count': len(saved),
+        'pick_url': reverse('teacher:work_pick') + flow_query(state),
+        'available': hw_generator.is_available(),
+        'reason': hw_generator.unavailable_reason(),
+        'used_today': hw_generator.used_today(request.user),
+        'daily_limit': hw_generator.daily_limit(),
+        'problem_count': views_generate._catalog_size(),
+        'examples': views_generate.EXAMPLE_QUERIES,
+        'form': {'count': 4, 'count_open': 4, 'count_test': 0,
+                 'min_difficulty': 1, 'max_difficulty': 5,
+                 'text': '', 'has_answer': False, 'topics': []},
         'saved_rows': [_saved_row(problem) for problem in saved],
-        'own_problems': picker.own_problem_rows(request.user),
+        'own_problems': own_rows,
         'reset_url': reverse('teacher:work_pick') + flow_query(state),
         # ⚠️ «Написать свою» уносит занятие и вид работы с собой и просит
         # положить готовую задачу в корзину (`to_cart=1`). Без этого задача

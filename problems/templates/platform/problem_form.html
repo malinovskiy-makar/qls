@@ -151,8 +151,15 @@
              border: 0.5px solid var(--border); border-radius: 999px;
              background: var(--surface); padding: 4px 12px 4px 14px;
              font-weight: 700; font-size: 14px; }
-.part-chip input { width: 2.2em; border: 0; padding: 0; background: none;
-                   color: var(--accent); font: inherit; text-align: center; }
+{% comment %}
+⚠️ БУКВА ПРИЖАТА К СКОБКЕ (визуальная сессия 17.08, п. 2.7). Поле метки
+шириной 2,2em с текстом по центру оставляло между «а» и «)» пустоту в
+полсимвола — чип читался как «а  )». Ширины хватает под четыре знака
+(метки бывают «I», «10»), а прижимает букву выравнивание вправо.
+{% endcomment %}
+.part-chip input { width: 1.6em; min-width: 1.6em; border: 0; padding: 0;
+                   background: none; color: var(--accent); font: inherit;
+                   text-align: right; }
 .part-chip input:focus { outline: none; }
 .part-chip__tail { color: var(--accent); }
 .part-of { font-size: 12px; color: var(--text3); }
@@ -233,6 +240,14 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
 {% endcomment %}
 {% if to_cart %}
 {% include "teacher/work/_head.html" with step='pick' %}
+{% comment %}
+⚠️ РЯД СПОСОБОВ НАБОРА СТОИТ И ЗДЕСЬ (визуальная сессия 17.08, п. 2.1).
+«Написать свою» — один из пяти способов набрать задачи в работу, и без ряда
+с этого экрана нельзя было вернуться к остальным четырём иначе как назад
+браузером. Вкладки здесь ссылки: панелей у этого экрана нет, он сам одна
+из них.
+{% endcomment %}
+{% include "teacher/work/_ways.html" with way='own' %}
 {% else %}
 <div class="page-header">
   <div>
@@ -305,11 +320,19 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
           «тихими» они снова стали бы похожи на ссылки, из-за чего пункт и
           возник. Стрелка «↗» у второй оставлена: она уводит на другой экран.
           {% endcomment %}
+          {% comment %}
+          ⚠️ ТРИ КНОПКИ НАЗВАНЫ В ОДНОЙ ГРАММАТИКЕ (визуальная сессия 17.08,
+          п. 2.7): «Вставить график», «Вставить формулу», «Создать график ↗».
+          Было «Добавить график», «∑ Формула» и «Создать новый график» —
+          три разных способа назвать соседние действия. Слово «Вставить»
+          говорит, что попадёт В ТЕКСТ; «Создать» со стрелкой — что уводит
+          на другой экран.
+          {% endcomment %}
           <div class="ed-tools" id="statement-tools">
             <button type="button" class="k-btn k-btn--plain k-btn--sm"
-                    id="add-graph-btn">Добавить график</button>
+                    id="add-graph-btn">Вставить график</button>
             <a href="/calc2/" target="_blank" rel="noopener"
-               class="k-btn k-btn--plain k-btn--sm">Создать новый график ↗</a>
+               class="k-btn k-btn--plain k-btn--sm">Создать график ↗</a>
           </div>
           </div>
         </div>
@@ -324,12 +347,21 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
 
         <div class="form-field">
           <label for="id_kind">Тип задачи</label>
-          <select id="id_kind" name="kind">
+          {% comment %}
+          ⚠️ СПИСКИ ЗДЕСЬ — ТЕ ЖЕ, ЧТО В ПОТОКЕ (п. 2.7). Браузерный
+          `select` рисуется системным виджетом, а в тёмной теме ещё и
+          светлым: рядом с полями платформы он читался как чужой элемент.
+          Обёртка обязательна — стрелку рисует она (`.k-select-wrap::after`),
+          а `.k-select` родную как раз убирает.
+          {% endcomment %}
+          <span class="k-select-wrap">
+          <select class="k-select" id="id_kind" name="kind">
             {% for value, label in kinds %}
             <option value="{{ value }}"
               {% if form.kind == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
+          </span>
         </div>
 
         {# --- Открытая задача --- #}
@@ -459,23 +491,27 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
         <div class="form-row2">
           <div class="form-field">
             <label for="id_topic">Тема</label>
-            <select id="id_topic" name="topic">
+            <span class="k-select-wrap">
+            <select class="k-select" id="id_topic" name="topic">
               <option value="">не указана</option>
               {% for topic in topics %}
               <option value="{{ topic.pk }}"
                 {% if form.topic_id == topic.pk %}selected{% endif %}>{{ topic.name }}</option>
               {% endfor %}
             </select>
+            </span>
           </div>
           <div class="form-field">
             <label for="id_difficulty">Сложность</label>
-            <select id="id_difficulty" name="difficulty">
+            <span class="k-select-wrap">
+            <select class="k-select" id="id_difficulty" name="difficulty">
               <option value="">не указана</option>
               {% for d in difficulties %}
               <option value="{{ d }}"
                 {% if form.difficulty == d %}selected{% endif %}>{{ d }}</option>
               {% endfor %}
             </select>
+            </span>
           </div>
         </div>
       </div>
@@ -536,7 +572,7 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
 </form>
 
 <dialog class="modal" id="graph-modal">
-  <div class="card-name">Добавить график</div>
+  <div class="card-name">Вставить график</div>
   {% for group in graph_groups %}
     {% if group.graphs %}
     <div style="margin-top:12px;">
