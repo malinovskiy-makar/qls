@@ -571,12 +571,22 @@ def user_facts(user):
             difficulty__gte=HARD_DIFFICULTY).count(),
         'correct_in_row': records.get('best_correct_streak', 0),
         'hardest_solved': records.get('hardest_solved', 0),
+        # ⚠️ `.order_by()` ЗДЕСЬ ОБЯЗАТЕЛЕН (ревью 17.08, п. 6.7). У
+        # `Submission` в `Meta.ordering` стоит `-submitted_at`, и Django
+        # добавляет поле сортировки прямо в `SELECT DISTINCT`: строки
+        # начинают различаться ещё и моментом сдачи, и одна сданная работа
+        # из четырёх задач считалась за четыре домашки. Тот же дефект был
+        # вылечен в `stats.py` (фаза 0) — здесь он дожил до достижений.
+        # Уже выданные значки не отбираем: достижение — это случившееся
+        # событие, а ошибка счёта наша.
         'homeworks_submitted': Submission.objects.filter(
             student=user, status__in=('submitted', 'reviewed'),
-            assignment__kind='homework').values('assignment').distinct().count(),
+            assignment__kind='homework').order_by()
+            .values('assignment').distinct().count(),
         'exams_taken': Submission.objects.filter(
             student=user, status__in=('submitted', 'reviewed'),
-            assignment__kind='exam').values('assignment').distinct().count(),
+            assignment__kind='exam').order_by()
+            .values('assignment').distinct().count(),
         'active_days': DailySummary.objects.filter(
             user=user, counted_for_streak=True).count(),
         'weekly_goal_streak': weekly_goal_streak(user, profile),
@@ -586,8 +596,18 @@ def user_facts(user):
 
 
 def weekly_goal_streak(user, profile=None):
-    """Сколько недель ПОДРЯД (считая от прошлой) выполнена недельная цель."""
-    from .models import DailySummary, StudentProgressProfile
+    """Сколько недель ПОДРЯД (считая от прошлой) выполнена недельная цель.
+
+    ⚠️ ПРАВИЛО СЧЁТА ОДНО С ЭКРАНОМ — `stats.solved_by_day` (решение
+    владельца от 17.08: игра в недельную цель не входит). Раньше здесь
+    складывался дневной счётчик `DailySummary`, куда игровые ответы попадают
+    наравне с задачами: цель на экране и цель в достижении означали бы
+    разное, и значок выдавался бы за то, чего экран не засчитал.
+    Уже выданные достижения от этого не снимаются — `check_achievements`
+    только добавляет.
+    """
+    from .models import StudentProgressProfile
+    from .stats import solved_by_day
 
     profile = profile or StudentProgressProfile.objects.filter(
         user=user).first()
@@ -597,9 +617,7 @@ def weekly_goal_streak(user, profile=None):
 
     today = timezone.localdate()
     week_start = today - timedelta(days=today.weekday())
-    rows = {r['date']: r['problems_solved'] for r in
-            DailySummary.objects.filter(user=user)
-            .values('date', 'problems_solved')}
+    rows = solved_by_day(user)
     streak = 0
     for back in range(1, 53):
         start = week_start - timedelta(days=7 * back)

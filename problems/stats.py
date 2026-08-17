@@ -1051,7 +1051,32 @@ def game_stats(user, period='all', now=None):
         'accuracy': round(solved * 100.0 / attempted) if attempted else None,
         'by_mode': by_mode,
         'has_data': attempted > 0,
+        'miss_topics': game_miss_topics(rows),
     }
+
+
+# Сколько тем промахов показывать под блоком игры.
+GAME_MISS_TOPICS = 3
+
+
+def game_miss_topics(rows, limit=GAME_MISS_TOPICS):
+    """Темы, в которых чаще всего промахиваешься в игре.
+
+    Воронка «поиграл → пошёл разбираться»: у каждой строки ссылка в
+    «Разобрать ошибки» и в каталог по этой теме. Без тем строка бесполезна —
+    целиться в «Без темы» нечем, поэтому такие события не показываем
+    (то же правило, что у `mistake_topics` в сводке забега).
+    """
+    top = (rows.filter(event_type__in=('solved', 'failed'),
+                       topic__isnull=False)
+           .values('topic_id', 'topic__name')
+           .annotate(attempted=Count('pk'),
+                     failed=Count('pk', filter=Q(event_type='failed')))
+           .filter(failed__gt=0)
+           .order_by('-failed', 'topic__name')[:limit])
+    return [{'topic_id': row['topic_id'], 'name': row['topic__name'],
+             'failed': row['failed'], 'attempted': row['attempted']}
+            for row in top]
 
 
 # ===========================================================================
@@ -1133,18 +1158,53 @@ def full_stats(user, period='month', now=None, use_cache=True):
     return data
 
 
+def solved_between(user, start, end):
+    """Сколько ЗАДАЧ И ТЕСТОВ верно решено за отрезок дней [start, end).
+
+    ⚠️ ИГРА В ЭТОТ СЧЁТ НЕ ВХОДИТ (решение владельца от 17.08). Недельная
+    цель — это стимул, а стимул, который закрывается тремя партиями «Пули»
+    по минуте, толкает не туда. Правило то же, что у карточки «Решено»:
+    событие «решено» по задаче каталога или своей задаче репетитора, без
+    источника «игра». В «Лучшем дне» игра, наоборот, ВХОДИТ — это рекорд,
+    факт о прошлом, а не приглашение; там правило другое намеренно.
+
+    ⚠️ Считаем ПО ЖУРНАЛУ, а не по `DailySummary.problems_solved`: тот
+    счётчик наращивается на каждое событие, включая игровые, и отделить их
+    в нём уже нечем.
+    """
+    return _goal_events(user).filter(
+        created_at__date__gte=start, created_at__date__lt=end).count()
+
+
+def _goal_events(user):
+    """Базовая выборка правила недельной цели. ОДНА на все её применения."""
+    from .models import LearningEvent
+
+    return (LearningEvent.objects
+            .filter(user=user, event_type='solved')
+            .exclude(source='game')
+            .filter(Q(catalog_problem__isnull=False)
+                    | Q(custom_problem__isnull=False)))
+
+
+def solved_by_day(user):
+    """{день: сколько верных} по тому же правилу — одним запросом."""
+    rows = (_goal_events(user)
+            .values('created_at__date')
+            .annotate(total=Count('pk')))
+    return {row['created_at__date']: row['total'] for row in rows}
+
+
 def weekly_progress(user, profile=None, now=None):
-    """Кольцо недельной цели: сколько решено на этой неделе из цели."""
-    from .models import DailySummary, StudentProgressProfile
+    """Недельная цель: сколько верных задач и тестов на этой неделе из цели."""
+    from .models import StudentProgressProfile
 
     profile = profile or StudentProgressProfile.objects.filter(
         user=user).first()
     goal = profile.weekly_goal if profile else 20
     today = timezone.localtime(now or timezone.now()).date()
     monday = today - timedelta(days=today.weekday())
-    solved = DailySummary.objects.filter(
-        user=user, date__gte=monday, date__lte=today).aggregate(
-        total=Sum('problems_solved'))['total'] or 0
+    solved = solved_between(user, monday, today + timedelta(days=1))
     return {
         'goal': goal,
         'done': solved,

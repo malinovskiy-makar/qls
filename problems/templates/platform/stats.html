@@ -1,5 +1,5 @@
 {% extends "platform/base.html" %}
-{% load static %}
+{% load static ru %}
 
 {% block title %}Моя статистика{% endblock %}
 
@@ -20,6 +20,21 @@
     {% endfor %}
   </div>
 </div>
+
+{% comment %}
+⚠️ БЛОКИ РАЗБИТЫ НА ПЯТЬ ГРУПП (ревью 17.08, п. 4.6): где я сейчас, что я
+знаю, как я занимаюсь, чего добился, игра. Группу задаёт ОДИН класс
+`.st-group` и один промежуток — ни заголовков, ни линий на экране нет.
+Порядок блоков внутри групп собран по смыслу: два графика про знания
+переехали к карте тем, два графика про занятия — к календарю активности.
+Раньше все четыре лежали в одной сетке и отвечали на два разных вопроса
+вперемешку.
+
+⚠️ Заголовки блоков в этом комментарии НЕ ПОВТОРЯЮТСЯ дословно: проверка,
+которая ищет подпись по тексту шаблона, нашла бы сначала объяснение. По
+проекту это уже седьмой случай.
+{% endcomment %}
+<div class="st-group">
 
 {# ── Шапка героя: уровень, серия, опыт, недельная цель ─────────────── #}
 <div class="hero">
@@ -44,7 +59,14 @@
     {% endcomment %}
     <div class="big"><span class="qi-inline">{% include '_icon.html' with name='flame' %}</span> {{ data.profile.streak }}</div>
     <div class="cap">{% if data.profile.streak == 1 %}день подряд{% else %}дней подряд{% endif %}</div>
-    <div class="tiny">заморозок: {{ data.profile.freezes }} · лучшая серия {{ data.profile.longest_streak }}</div>
+    {% comment %}
+    ⚠️ Счётчик пропущенных дней серии убран с экрана (ревью 17.08, п. 4.2).
+    Это игровая механика, и на учебном экране она объясняет себя хуже, чем
+    занимает места: слово ничего не значит тому, кто не читал правил серии.
+    Сама механика жива — `StudentProgressProfile.freezes_available`
+    работает как работал, здесь только перестал показываться.
+    {% endcomment %}
+    <div class="tiny">лучшая серия {{ data.profile.longest_streak }}</div>
   </div>
 
   <div class="hero-cell">
@@ -54,23 +76,15 @@
 
   <div class="hero-cell">
     {% with w=data.weekly %}
-    <svg class="goal-ring" width="72" height="72" viewBox="0 0 72 72" role="img"
-         aria-label="Недельная цель: {{ w.done }} из {{ w.goal }}">
-      <circle class="goal-ring-bg" cx="36" cy="36" r="30"></circle>
-      {% comment %}
-      Длина окружности r=30 равна 188.5; заполнение — долей от неё.
-      Считаем через calc() в CSS: в шаблоне умножать нечем, а второе
-      место, где живёт число 188.5, разъехалось бы с первым.
-      {% endcomment %}
-      <circle class="goal-ring-fg" cx="36" cy="36" r="30"
-              stroke-dasharray="188.5"
-              style="stroke-dashoffset: calc(188.5px - 1.885px * {{ w.percent }})"></circle>
-      <text x="36" y="34" text-anchor="middle" font-size="15" font-weight="800"
-            fill="currentColor">{{ w.done }}</text>
-      <text x="36" y="48" text-anchor="middle" font-size="10"
-            fill="currentColor" opacity=".6">из {{ w.goal }}</text>
-    </svg>
-    <div class="cap">цель на неделю</div>
+    {% comment %}
+    ⚠️ КОЛЬЦО ЗАМЕНЕНО ТОЙ ЖЕ ТОНКОЙ ШКАЛОЙ, ЧТО У УРОВНЯ (ревью 17.08,
+    п. 4.2). Кольцо было самой тяжёлой фигурой блока — и показывало ноль:
+    уровень, ради которого блок существует, терялся рядом с ним. Теперь в
+    блоке одна крупная величина, три остальные равновесны между собой.
+    {% endcomment %}
+    <div class="big">{{ w.done }}<span class="of">/ {{ w.goal }}</span></div>
+    <div class="cap">верных за неделю{% include '_hint.html' with hint='Сколько задач и тестов вы решили верно с понедельника. Ответы в Econ Rush сюда не идут: цель — про разбор задач, а не про скорость узнавания. В «Лучшем дне» игра, наоборот, считается — это рекорд, а не цель.' %}</div>
+    <div class="hero-bar hero-bar--thin"><i style="width:{{ w.percent }}%"></i></div>
     <button type="button" class="goal-edit" id="goal-edit">изменить</button>
     <form method="post" action="{% url 'set_weekly_goal' %}" id="goal-form" hidden
           style="margin-top:6px;">
@@ -94,11 +108,18 @@
         {{ o.change.solved.abs_diff }} к прошлому периоду{% else %}&nbsp;{% endif %}
     </div>
   </div>
+  {% comment %}
+  ⚠️ ПУСТОТА НАЗЫВАЕТСЯ СЛОВАМИ (ревью 17.08, п. 4.4). Голый прочерк на
+  месте крупного числа читается как поломка экрана, а не как «ответов пока
+  не было»: остальные три карточки в тот же момент показывают числа.
+  Пустое состояние — приглашение действовать, поэтому оно тише соседей
+  (мельче и цветом `--text3`), а строка под ним называет период.
+  {% endcomment %}
   <div class="metric">
     <div class="cap">доля верных</div>
-    <div class="big" data-metric="accuracy">{% if o.accuracy is not None %}{{ o.accuracy }}%{% else %}—{% endif %}</div>
+    <div class="big{% if o.accuracy is None %} is-empty{% endif %}" data-metric="accuracy">{% if o.accuracy is not None %}{{ o.accuracy }}%{% else %}нет ответов{% endif %}</div>
     <div class="chg {{ o.change.accuracy.direction }}" data-change="accuracy">
-      {% if o.change.accuracy %}{% if o.change.accuracy.direction == 'up' %}↑{% elif o.change.accuracy.direction == 'down' %}↓{% endif %}
+      {% if o.accuracy is None %}за выбранный период{% elif o.change.accuracy %}{% if o.change.accuracy.direction == 'up' %}↑{% elif o.change.accuracy.direction == 'down' %}↓{% endif %}
         {{ o.change.accuracy.abs_diff }} п.п.{% else %}&nbsp;{% endif %}
     </div>
   </div>
@@ -120,7 +141,9 @@
   </div>
   {% endwith %}
 </div>
+</div>{# конец группы «где я сейчас» #}
 
+<div class="st-group">
 {# ── Карта тем: САМЫЙ ПОЛЕЗНЫЙ БЛОК ───────────────────────────────── #}
 <div class="panel">
   <div class="panel-head">
@@ -143,7 +166,13 @@
         <span class="mastery mastery-{{ topic.label_kind }}">{{ topic.label }}</span>
         <span>{{ topic.accuracy }}% · {{ topic.solved }}/{{ topic.attempted }}</span>
       </div>
-      <div class="topic-bar"><i style="width:{{ topic.accuracy }}%"></i></div>
+      {% comment %}
+      ⚠️ ПОДЧЁРКИВАНИЕ КРАСИТСЯ ПО МЕТКЕ (ревью 17.08, п. 4.5). Малиновым
+      одного тона красились и тема на 95%, и тема на 40%: полоса занимала
+      место, но не отвечала ни на один вопрос. Цвет берётся у того же
+      `label_kind`, что и слово рядом, — второго правила не заводим.
+      {% endcomment %}
+      <div class="topic-bar topic-bar--{{ topic.label_kind }}"><i style="width:{{ topic.accuracy }}%"></i></div>
     </a>
     {% endfor %}
   </div>
@@ -155,29 +184,16 @@
 
 {% include "_ranking.html" with ranking=data.ranking strong_cap="Получается лучше всего" weak_cap="Стоит подтянуть" %}
 
-{# ── Активность на сайте ───────────────────────────────────────────── #}
-{% comment %}
-⚠️ БЛОК ОБЩИЙ С КАРТОЧКОЙ УЧЕНИКА У РЕПЕТИТОРА (ревью 17.08, фаза 6).
-Разметка — `platform/_activity_panel.html`, расчёт — `stats.activity_grid`.
-Два разреза под сеткой рисует Chart.js, поэтому они просятся параметром.
-{% endcomment %}
-{% include "platform/_activity_panel.html" with activity=data.activity with_charts=1 time_hint=data.time_hint %}
-
-
-{# ── Графики ───────────────────────────────────────────────────────── #}
-<div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));">
-  <div class="panel">
-    <div class="panel-head"><div class="panel-title">Динамика уровня</div></div>
-    {% if data.level_history %}
-      <div class="chart-box"><canvas id="chart-level"></canvas></div>
-    {% else %}
-      <div class="empty-note">Реши первую задачу — линия начнёт расти.</div>
-    {% endif %}
-  </div>
-
+<div class="panel-pair">
   <div class="panel">
     <div class="panel-head"><div class="panel-title">Разделы экономики</div></div>
-    <div class="chart-box"><canvas id="chart-radar"></canvas></div>
+    {% comment %}
+    ⚠️ РАДАРУ НУЖНА ВЫСОТА (ревью 17.08, п. 4.1). На 240 px его радиус был
+    88, и пять подписей шкалы вставали в девяти пикселях друг от друга —
+    различалась только последняя. Высота `.chart-box.tall` даёт радиус
+    около 110, шаг сетки 20 вместо 10 убирает половину подписей.
+    {% endcomment %}
+    <div class="chart-box tall"><canvas id="chart-radar"></canvas></div>
   </div>
 
   {% comment %}
@@ -199,6 +215,27 @@
         заполнится сама.</div>
     {% endif %}
   </div>
+</div>
+</div>{# конец группы «что я знаю» #}
+
+<div class="st-group">
+{# ── Активность на сайте ───────────────────────────────────────────── #}
+{% comment %}
+⚠️ БЛОК ОБЩИЙ С КАРТОЧКОЙ УЧЕНИКА У РЕПЕТИТОРА (ревью 17.08, фаза 6).
+Разметка — `platform/_activity_panel.html`, расчёт — `stats.activity_grid`.
+Два разреза под сеткой рисует Chart.js, поэтому они просятся параметром.
+{% endcomment %}
+{% include "platform/_activity_panel.html" with activity=data.activity with_charts=1 time_hint=data.time_hint %}
+
+<div class="panel-pair">
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">Динамика уровня</div></div>
+    {% if data.level_history %}
+      <div class="chart-box"><canvas id="chart-level"></canvas></div>
+    {% else %}
+      <div class="empty-note">Реши первую задачу — линия начнёт расти.</div>
+    {% endif %}
+  </div>
 
   <div class="panel">
     <div class="panel-head">
@@ -208,7 +245,9 @@
     <div class="chart-box"><canvas id="chart-sources"></canvas></div>
   </div>
 </div>
+</div>{# конец группы «как я занимаюсь» #}
 
+<div class="st-group">
 {# ── Достижения ────────────────────────────────────────────────────── #}
 <div class="panel">
   <div class="panel-head">
@@ -308,7 +347,9 @@
   </div>
 </div>
 {% endif %}
+</div>{# конец группы «чего добился» #}
 
+<div class="st-group">
 {# ── Игра — ОТДЕЛЬНО и явно подписано ──────────────────────────────── #}
 <div class="panel game-panel">
   <div class="panel-head">
@@ -338,10 +379,42 @@
     </div>
     {% endfor %}
   </div>
+  {% comment %}
+  ⚠️ ВОРОНКА «ПОИГРАЛ → ПОШЁЛ РАЗБИРАТЬСЯ» (ревью 17.08, п. 4.7). Брендинг
+  блока не тронут: игра отгорожена от учебных экранов намеренно. Добавлены
+  только данные, которые ведут ОБРАТНО в учёбу — темы промахов со ссылкой в
+  «Разобрать ошибки» и в каталог по этой теме. Больше цифр ради цифр здесь
+  не появляется.
+  {% endcomment %}
+  {% if data.game.miss_topics %}
+  <div class="miss">
+    <div class="miss-cap">Чаще всего промахиваешься в игре</div>
+    <div class="miss-grid">
+      {% for row in data.game.miss_topics %}
+      <div class="miss-row">
+        <div class="miss-name">{{ row.name }}</div>
+        <div class="miss-num">{{ row.failed }} {{ row.failed|plural_ru:"промах,промаха,промахов" }} из {{ row.attempted }}</div>
+        {% comment %}
+        ⚠️ ТЕМА В АДРЕС ИГРЫ НЕ ПЕРЕДАЁТСЯ. `game.game_page` параметров GET
+        не читает вовсе, а её вкладки тем — состояние клиента; ссылка вида
+        `/game/?topic=…` открывала бы игру ровно так же, как без него, то
+        есть обещала бы отбор, которого нет. Ведём на саму игру, где живёт
+        «Разобрать ошибки», а по теме — в каталог, который её понимает.
+        {% endcomment %}
+        <div class="miss-go">
+          <a href="{% url 'game:page' %}">разобрать ошибки</a>
+          <a href="{% url 'catalog:problem_list' %}?topic={{ row.topic_id }}">задачи темы</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
   {% else %}
   <div class="empty-note">Ты ещё не играл. <a href="/game/" style="color:var(--accent)">Попробовать Econ Rush</a></div>
   {% endif %}
 </div>
+</div>{# конец группы «игра» #}
 {% endblock %}
 
 {% block extra_js %}

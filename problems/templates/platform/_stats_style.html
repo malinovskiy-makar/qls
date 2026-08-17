@@ -28,19 +28,23 @@
 .hero-level { display: flex; align-items: baseline; gap: 10px; }
 .hero-level b { font-size: 40px; line-height: 1; font-weight: 800; }
 .hero-level span { font-size: 13px; color: var(--text2); }
-.hero-bar { height: 8px; background: var(--surface-2); border-radius: 999px;
+/* ⚠️ ШКАЛА ТОНКАЯ — 5 px (ревью 17.08, п. 4.2). Их на экране две, у уровня
+   и у недельной цели, и обе обязаны выглядеть одной величиной: разная
+   толщина читается как разная важность. */
+.hero-bar { height: 5px; background: var(--surface-2); border-radius: 999px;
             overflow: hidden; margin-top: 10px; border: 1px solid var(--border-soft); }
 .hero-bar i { display: block; height: 100%; background: var(--accent); }
+.hero-bar--thin { margin-top: 8px; }
 .hero-note { font-size: 12px; color: var(--text2); margin-top: 6px; }
 .hero-cell { text-align: center; }
-.hero-cell .big { font-size: 26px; font-weight: 800; line-height: 1.1; }
+.hero-cell .big { font-size: 26px; font-weight: 800; line-height: 1.1;
+                  font-variant-numeric: tabular-nums; }
+/* Знаменатель цели тише числителя: сделано столько-то ИЗ цели, а не
+   «двадцать» рядом с «двенадцать». */
+.hero-cell .big .of { font-size: 14px; font-weight: 600; color: var(--text2);
+                      margin-left: 4px; }
 .hero-cell .cap { font-size: 12px; color: var(--text2); margin-top: 4px; }
 .hero-cell .tiny { font-size: 11px; color: var(--text3); margin-top: 2px; }
-.goal-ring { display: block; margin: 0 auto; }
-.goal-ring-bg { fill: none; stroke: var(--surface-2); stroke-width: 8; }
-.goal-ring-fg { fill: none; stroke: var(--accent); stroke-width: 8;
-                stroke-linecap: round; transform: rotate(-90deg);
-                transform-origin: 50% 50%; }
 .goal-edit { border: 1px solid var(--border); background: transparent;
              color: var(--text2); font: inherit; font-size: 11px;
              border-radius: var(--r); padding: 3px 8px; cursor: pointer;
@@ -57,6 +61,9 @@
 .metric .cap { font-size: 11px; color: var(--text2); text-transform: uppercase;
                letter-spacing: .06em; }
 .metric .big { font-size: 26px; font-weight: 800; margin-top: 6px; }
+/* Пустое состояние карточки: мельче и тише соседних чисел — это ответ
+   «пока нечего показать», а не показатель (ревью 17.08, п. 4.4). */
+.metric .big.is-empty { font-size: 18px; font-weight: 600; color: var(--text3); }
 .metric .chg { font-size: 12px; margin-top: 4px; color: var(--text2); }
 .chg.up { color: var(--green); }
 .chg.down { color: var(--error); }
@@ -80,6 +87,21 @@
    ровно один блок из десяти, и это читалось не как «сюда смотреть», а как
    «здесь что-то не так» — либо все, либо никакие. Убрано у всех: акцент
    в проекте не для рамок блоков. */
+/* ── Иерархия расстоянием (ревью 17.08, п. 4.6) ────────────────────────
+   ⚠️ НИ ЗАГОЛОВКОВ, НИ ЛИНИЙ — ТОЛЬКО ДВА РАЗМЕРА ПРОМЕЖУТКА. Десять
+   блоков подряд с одинаковым отступом читаются как один поток: глаз не
+   находит, где кончается «что я знаю» и начинается «как я занимаюсь».
+   24 внутри смысловой группы, 56 между группами. Подписей групп на экране
+   нет намеренно: они назвали бы вслух то, что и так видно расстоянием, и
+   добавили бы пять заголовков туда, где их просили убрать. */
+.st-group + .st-group { margin-top: 56px; }
+.st-group > * { margin-bottom: 24px; }
+.st-group > *:last-child { margin-bottom: 0; }
+/* Два блока рядом — промежуток держит сетка, а не поля блоков. */
+.panel-pair { display: grid; gap: 24px;
+              grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.panel-pair > .panel { margin-bottom: 0; }
+@media (max-width: 720px) { .st-group + .st-group { margin-top: 40px; } }
 /* Два графика рядом, на узком экране — друг под другом. */
 .chart-pair { display: grid; gap: 18px;
               grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
@@ -101,19 +123,31 @@
 .topic-card .name { font-size: 13px; font-weight: 600; line-height: 1.35;
                     margin-bottom: 8px; }
 .topic-card .row { display: flex; align-items: center; justify-content: space-between;
+                   gap: 2px 8px; flex-wrap: wrap;
                    font-size: 12px; color: var(--text2); }
+/* Числа справа не разрываются: длинная метка («стоит подтянуть») переносится
+   сама, а «40% · 2/5» разъезжалось на две строки посреди дроби. */
+.topic-card .row > span + span { white-space: nowrap; }
 .mastery { font-size: 10px; font-weight: 700; text-transform: uppercase;
            letter-spacing: .05em; padding: 2px 7px; border-radius: 999px; }
-/* Четыре метки темы — по одному правилу (`stats.topic_label`). Янтарь у
-   «стоит подтянуть» остаётся в своём законном смысле: это сигнал, а не
-   украшение. «Мало данных» — нейтральный чип: это не оценка. */
+/* ⚠️ ЧЕТЫРЕ МЕТКИ — ЧЕТЫРЕ ЦВЕТА, И ПОЛОСА ПОД КАРТОЧКОЙ БЕРЁТ ТОТ ЖЕ
+   (ревью 17.08, п. 4.5). Шкала идёт от лучшего к худшему: зелёный —
+   «мастер», янтарь — «разобрался», красный — «стоит подтянуть»,
+   нейтральный — «мало данных» (это не оценка, а признание, что судить
+   рано). Раньше метка и полоса говорили РАЗНОЕ на одной карточке: полоса
+   у всех тем была одинаково малиновой.
+   Чернила на подложке — только `--*-ink` там, где пара иначе не держит AA
+   (замерено тестом, не на глаз). */
 .mastery-thin   { background: var(--chip-bg); color: var(--chip-text); }
-.mastery-weak   { background: var(--amber-tint); color: var(--amber-ink); }
-.mastery-good   { background: var(--accent-tint); color: var(--accent); }
+.mastery-weak   { background: var(--error-tint); color: var(--error); }
+.mastery-good   { background: var(--amber-tint); color: var(--amber-ink); }
 .mastery-master { background: var(--green-tint); color: var(--green); }
 .topic-bar { height: 4px; background: var(--surface); border-radius: 999px;
              overflow: hidden; margin-top: 8px; border: 1px solid var(--border-soft); }
-.topic-bar i { display: block; height: 100%; background: var(--accent); }
+.topic-bar i { display: block; height: 100%; background: var(--border); }
+.topic-bar--weak   i { background: var(--error); }
+.topic-bar--good   i { background: var(--amber); }
+.topic-bar--master i { background: var(--green); }
 
 /* ── Теплокарта (SVG руками) ────────────────────────── */
 .heat-scroll { overflow-x: auto; padding-bottom: 6px; }
@@ -234,6 +268,22 @@
 
 /* ── Блок игры — визуально отделён ──────────────────── */
 .game-panel { border-style: dashed; }
+/* Темы промахов: единственное место блока, которое ведёт обратно в учёбу.
+   Числа тихие, ссылки обычные — это не ещё один показатель, а переход. */
+.miss { margin-top: 16px; padding-top: 14px;
+        border-top: 1px solid var(--border-soft); }
+.miss-cap { font-size: 12px; font-weight: 600; color: var(--text2);
+            margin-bottom: 10px; }
+.miss-grid { display: grid; gap: 10px;
+             grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.miss-row { border-left: 3px solid var(--error); padding-left: 10px; }
+.miss-name { font-size: 13px; font-weight: 600; line-height: 1.35; }
+.miss-num { font-size: 12px; color: var(--text2); margin-top: 2px;
+            font-variant-numeric: tabular-nums; }
+.miss-go { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 5px; }
+.miss-go a { font-size: 12px; color: var(--accent); text-decoration: none;
+             border-bottom: 1px solid var(--accent-ring); }
+.miss-go a:hover { color: var(--accent-deep); }
 .game-badge { font-size: 10px; font-weight: 700; letter-spacing: .06em;
               text-transform: uppercase; color: var(--text2);
               background: var(--chip-bg); border-radius: 999px; padding: 2px 8px; }

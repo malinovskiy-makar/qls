@@ -99,7 +99,7 @@
         var angle = Math.PI / count;
         var ctx = chart.ctx;
         ctx.save();
-        ctx.font = '9px ' + getComputedStyle(document.body).fontFamily;
+        ctx.font = '10px ' + getComputedStyle(document.body).fontFamily;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         (scale.ticks || []).forEach(function (tick, index) {
@@ -130,6 +130,11 @@
           borderColor: colors.accent,
           backgroundColor: colors.accent + '33',
           pointBackgroundColor: colors.accent,
+          // ⚠️ ТОЧКИ НА ВЕРШИНАХ (ревью 17.08, п. 4.1). Там, где заливка
+          // почти сходится к центру, у многоугольника нет площади, и
+          // значение раздела читать не по чему: видна только линия.
+          pointRadius: 3.5,
+          pointHoverRadius: 5,
         }],
       },
       options: {
@@ -148,7 +153,13 @@
             // проходит линия первого раздела и сидит его точка, и цифры
             // под ними не читались вовсе. Рисуем их сами, на биссектрисе
             // между первыми двумя лучами (плагин `radarTicks` ниже).
-            ticks: { display: false },
+            //
+            // ⚠️ ШАГ СЕТКИ 20, А НЕ 10 (ревью 17.08, п. 4.1). По умолчанию
+            // Chart.js дробит шкалу 0..100 на десять делений; на биссектрисе
+            // они вставали в девяти пикселях друг от друга и слипались в
+            // кашу — различалась только последняя. Пять колец читаются, и
+            // сама сетка перестала быть частой рябью.
+            ticks: { display: false, stepSize: 20 },
           },
         },
       },
@@ -311,19 +322,32 @@
   }
 
   function updateMetrics(overview) {
+    // ⚠️ ПУСТОЕ СОСТОЯНИЕ НАЗЫВАЕТСЯ СЛОВАМИ И ЗДЕСЬ ТОЖЕ (ревью 17.08,
+    // п. 4.4). Разметку рисует шаблон, а переключатель периода —
+    // этот код; разойдись они, «нет ответов» появлялось бы только при
+    // загрузке страницы и пропадало при первом же переключении периода.
+    var empty = overview.accuracy === null;
     var texts = {
       solved: String(overview.solved),
-      accuracy: overview.accuracy === null ? '—' : overview.accuracy + '%',
+      accuracy: empty ? 'нет ответов' : overview.accuracy + '%',
       minutes: overview.minutes + ' мин',
       xp: String(overview.xp),
     };
     Object.keys(texts).forEach(function (key) {
       var node = document.querySelector('[data-metric="' + key + '"]');
-      if (node) { node.textContent = texts[key]; }
+      if (node) {
+        node.textContent = texts[key];
+        node.classList.toggle('is-empty', key === 'accuracy' && empty);
+      }
       var chg = document.querySelector('[data-change="' + key + '"]');
       if (!chg) { return; }
       var change = (overview.change || {})[key];
-      chg.className = 'chg' + (change ? ' ' + change.direction : '');
+      chg.className = 'chg' + (change && !(key === 'accuracy' && empty)
+                               ? ' ' + change.direction : '');
+      if (key === 'accuracy' && empty) {
+        chg.textContent = 'за выбранный период';
+        return;
+      }
       if (!change) { chg.innerHTML = '&nbsp;'; return; }
       var arrow = change.direction === 'up' ? '↑'
         : (change.direction === 'down' ? '↓' : '');

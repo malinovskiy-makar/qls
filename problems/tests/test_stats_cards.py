@@ -186,8 +186,27 @@ class RadarTicksTests(TestCase):
         source = read(JS)
         radar = source[source.index("make('chart-radar'"):]
         radar = radar[:radar.index("make('chart-difficulty'")]
-        self.assertIn('ticks: { display: false }', radar)
+        # ⚠️ Пересчитано (ревью 17.08, п. 4.1): рядом с `display: false`
+        # теперь стоит шаг сетки. Проверка про то, что ВСТРОЕННЫЕ подписи
+        # выключены, а рисуем мы сами, — она и осталась.
+        self.assertIn('display: false', radar)
+        self.assertIn('stepSize: 20', radar)
         self.assertIn('plugins: [radarTicks]', radar)
+
+    def test_five_rings_and_dots_on_vertices(self):
+        """Пять делений вместо десяти и точка на каждой вершине."""
+        source = read(JS)
+        radar = source[source.index("make('chart-radar'"):]
+        radar = radar[:radar.index("make('chart-difficulty'")]
+        self.assertIn('stepSize: 20', radar)
+        self.assertIn('pointRadius: 3.5', radar)
+
+    def test_radar_box_is_tall(self):
+        """Радиус 110 берётся из высоты контейнера, а не из настроек."""
+        page = read('problems', 'templates', 'platform', 'stats.html')
+        block = page[page.index('Разделы экономики'):]
+        block = block[:block.index('</div>', block.index('chart-radar'))]
+        self.assertIn('chart-box tall', block)
 
     def test_labels_sit_on_a_backdrop_of_the_card(self):
         source = read(JS)

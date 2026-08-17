@@ -1057,14 +1057,34 @@ class Command(BaseCommand):
                 f'{len(events)} событий')
 
         # Партии игры — чтобы блок Econ Rush не был пустым.
+        # ⚠️ У ИГРОВОГО СОБЫТИЯ ЕСТЬ ТЕМА (ревью 17.08, п. 4.7). Без неё
+        # список «Чаще всего промахиваешься в игре» пуст на любой демо-базе:
+        # целиться в «Без темы» нечем, и блок молчит. Боевая игра тему
+        # пишет — денормализованную из `GameQuestion`; демо обязано вести
+        # себя так же, иначе экран показывает не то, что увидит человек.
+        from problems.management.commands.apply_topic_mapping import CANONICAL
+
+        game_topics = list(Topic.objects.filter(
+            name__in=CANONICAL)[:6]) or list(Topic.objects.all()[:6])
         for index, student in enumerate(students[:2]):
-            if LearningEvent.objects.filter(user=student,
-                                            source='game').exists():
+            played = LearningEvent.objects.filter(user=student, source='game')
+            if played.exists():
+                # Досев темы уже созданным партиям: команда идемпотентна, и
+                # база, засеянная до этой правки, иначе навсегда осталась бы
+                # с пустым списком промахов.
+                blank = list(played.filter(topic__isnull=True))
+                filler = random.Random(3000 + index)
+                for event in blank:
+                    if game_topics:
+                        event.topic = filler.choice(game_topics)
+                if blank and game_topics:
+                    LearningEvent.objects.bulk_update(blank, ['topic'])
                 continue
             rng = random.Random(2000 + index)
             for _ in range(rng.randint(20, 40)):
                 LearningEvent.objects.create(
                     user=student, source='game',
                     event_type='solved' if rng.random() < 0.7 else 'failed',
+                    topic=rng.choice(game_topics) if game_topics else None,
                     payload={'mode': rng.choice(['bullet', 'blitz', 'rapid',
                                                  'classic'])})
