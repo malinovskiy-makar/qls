@@ -247,12 +247,18 @@
     if (!more) { return; }
     var card = more.closest('.wk-card');
     var box = card.querySelector('.wk-full');
+    // ⚠️ УСЕЧЁННАЯ СТРОКА УБИРАЕТСЯ ПРИ РАСКРЫТИИ (ревью 17.08, п. 7.3).
+    // Она оставалась над полным текстом, и условие печаталось дважды:
+    // сначала обрезанное многоточием, следом целиком.
+    var lead = card.querySelector('.wk-card__lead');
     if (!box.hidden) {
       box.hidden = true;
+      if (lead) { lead.hidden = false; }
       more.textContent = 'Целиком';
       return;
     }
     box.hidden = false;
+    if (lead) { lead.hidden = true; }
     more.textContent = 'Свернуть';
     if (box.dataset.ready) { return; }
     box.textContent = 'Загрузка…';

@@ -157,41 +157,12 @@
 
 {# ── Активность на сайте ───────────────────────────────────────────── #}
 {% comment %}
-⚠️ ОДИН БЛОК ВМЕСТО ТРЁХ (ревью 16.08, фаза 4). Были «Календарь занятий»,
-«По дням недели» и «По часам» — три карточки об одном и том же, стоявшие
-в разных концах страницы и мерившие разное. Теперь сверху сетка дней,
-справа четыре факта, под ними два разреза той же величины, и всё это
-подчиняется переключателю периода наверху.
+⚠️ БЛОК ОБЩИЙ С КАРТОЧКОЙ УЧЕНИКА У РЕПЕТИТОРА (ревью 17.08, фаза 6).
+Разметка — `platform/_activity_panel.html`, расчёт — `stats.activity_grid`.
+Два разреза под сеткой рисует Chart.js, поэтому они просятся параметром.
 {% endcomment %}
-<div class="panel">
-  <div class="panel-head">
-    <div class="panel-title">Активность на сайте</div>
-    <div class="panel-hint">цвет ячейки — сколько минут в этот день</div>
-  </div>
-  <div id="activity-block">
-    {% include "platform/_activity.html" with activity=data.activity %}
-  </div>
-  {% comment %}
-  ⚠️ ПОДПИСЬ ГРАФИКА — НАД `.chart-box`, А НЕ ВНУТРИ НЕЁ (ревью 17.08,
-  п. 3.2). `.chart-box` это КОНТЕЙНЕР ЗАДАННОЙ ВЫСОТЫ: Chart.js меряет
-  родителя холста и растягивает холст на все 240 px. Строка «По дням
-  недели» внутри съедала свои двадцать, холст вылезал за нижний край
-  ровно на столько же — и подпись «Чаще всего занимаешься вечером…»,
-  стоящая следом, ложилась ПОВЕРХ подписей оси («Пн Вт Ср…», «0 мин»).
-  Высоту холста при этом трогать нельзя: она и есть размер графика.
-  {% endcomment %}
-  <div class="chart-pair" style="margin-top:18px;">
-    <div>
-      <div class="panel-hint" style="margin-bottom:6px;">По дням недели</div>
-      <div class="chart-box"><canvas id="chart-weekday"></canvas></div>
-    </div>
-    <div>
-      <div class="panel-hint" style="margin-bottom:6px;">По часам</div>
-      <div class="chart-box"><canvas id="chart-hour"></canvas></div>
-    </div>
-  </div>
-  <div class="panel-hint" id="time-hint" style="margin-top:10px;">{{ data.time_hint }}</div>
-</div>
+{% include "platform/_activity_panel.html" with activity=data.activity with_charts=1 time_hint=data.time_hint %}
+
 
 {# ── Графики ───────────────────────────────────────────────────────── #}
 <div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));">

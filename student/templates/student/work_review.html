@@ -320,7 +320,13 @@
     {% endif %}
 
     <div class="wr-block">
-      <div class="wr-block-cap">Мой ответ</div>
+      {% comment %}
+      ⚠️ ЗАГОЛОВОК ЗАВИСИТ ОТ ТОГО, КТО СМОТРИТ (ревью 17.08, п. 7.1). Экран
+      разбора один на ученика и на репетитора, и «Мой ответ» на стороне
+      репетитора читалось так, будто отвечал он сам — а он рядом ставит за
+      этот ответ балл.
+      {% endcomment %}
+      <div class="wr-block-cap">{% if for_tutor %}Ответ ученика{% else %}Мой ответ{% endif %}</div>
       {% if row.has_real_parts %}
         {% include "student/_part_results.html" with part_rows=row.answer_parts show_correct=1 %}
       {% elif row.option_review %}

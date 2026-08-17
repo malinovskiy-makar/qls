@@ -120,8 +120,13 @@ class ChartCaptionTests(TestCase):
     """3.2 — подпись стоит ПОД графиками, а не поверх подписей оси."""
 
     def test_label_is_outside_the_sized_box(self):
-        """`.chart-box` — контейнер заданной высоты; текст внутри её ломает."""
-        html = read('problems/templates/platform/stats.html')
+        """`.chart-box` — контейнер заданной высоты; текст внутри её ломает.
+
+        ⚠️ Разметка переехала в общий партиал `platform/_activity_panel.html`
+        (ревью 17.08, фаза 6): блок активности стал один на два экрана.
+        Проверка та же, только файл другой.
+        """
+        html = read('problems/templates/platform/_activity_panel.html')
         block = html[html.index('chart-weekday') - 400:
                      html.index('chart-hour') + 200]
         # Подпись графика обязана стоять ДО открытия `.chart-box`.

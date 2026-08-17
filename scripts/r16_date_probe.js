@@ -39,9 +39,11 @@ async function login(page) {
 
   await login(page);
 
-  const url = `${BASE}/teacher/assignment/create/?group=2`;
+  // ⚠️ Экран переехал: прежний конструктор удалён (ревью 17.08, п. 4.5),
+  // поле срока живёт на шаге «Выдача».
+  const url = `${BASE}/teacher/work/give/?group=2`;
   const res = await page.goto(url);
-  check('экран отбора отвечает 200', res.status() === 200, String(res.status()));
+  check('шаг «Выдача» отвечает 200', res.status() === 200, String(res.status()));
 
   const box = page.locator('[data-k-date]').first();
   const text = box.locator('.k-date__text');
@@ -54,8 +56,12 @@ async function login(page) {
   await text.fill('');
   await page.keyboard.type('141226 2000');
   const typing = await text.inputValue();
-  check('маска не съедает набранный разделитель',
-        typing === '14.12.26, 20:00', typing);
+  // ⚠️ ОЖИДАНИЕ ПЕРЕСЧИТАНО (ревью 17.08, п. 7.2). Проверка ловила, что
+  // маска не выбрасывает набранный разделитель, — это по-прежнему так.
+  // Изменилось другое: двузначный год разворачивается СРАЗУ, а не при
+  // открытии календаря, и на экране уже стоит канонический вид.
+  check('маска не съедает набранный разделитель и разворачивает год',
+        typing === '14.12.2026, 20:00', typing);
   await text.blur();
   const iso = await native.inputValue();
   check('двузначный год даёт 20xx', iso === '2026-12-14T20:00', iso);
@@ -88,8 +94,8 @@ async function login(page) {
   check('в сообщении нет образцового времени', !/\d\d:\d\d/.test(far), far);
 
   // ── 3.3 Кнопка заперта ──────────────────────────────────────────────
-  const submit = page.locator('#submit-btn');
-  const why = (await page.locator('#submit-why').textContent()).trim();
+  const submit = page.locator('#wk-next');
+  const why = (await page.locator('#wk-why').textContent()).trim();
   check('кнопка выдачи заперта', await submit.isDisabled());
   check('причина названа', /срок сдачи/i.test(why), why);
 

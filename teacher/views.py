@@ -705,7 +705,11 @@ def student_progress(request, pk):
         'works': _work_history(student, request.user),
         # Перенесено со второго экрана (см. решение стоп-гейта выше).
         'ranking': stats_module.strongest_weakest(student, period),
-        'calendar': stats_module.activity_calendar(student),
+        # ⚠️ БЛОК АКТИВНОСТИ ОБЩИЙ С ЭКРАНОМ УЧЕНИКА (ревью 17.08, ф. 6) и
+        # СЛУШАЕТСЯ ПЕРЕКЛЮЧАТЕЛЯ ПЕРИОДА. Прежняя `activity_calendar`
+        # всегда отдавала полгода, поэтому при выбранном «Месяце» на
+        # экране стояли числа за месяц и картинка за полгода.
+        'activity': stats_module.activity_grid(student, period),
     })
 
 

@@ -209,8 +209,15 @@ def source_label(problem):
     parts = [reference.source.name]
     for value in (reference.stage, reference.year, reference.grade):
         text = str(value or '').strip()
-        if text and text not in parts:
-            parts.append(text + (' класс' if value is reference.grade else ''))
+        if not text:
+            continue
+        # ⚠️ ЭТАП НЕ ПОВТОРЯЕМ, ЕСЛИ ОН УЖЕ В НАЗВАНИИ ИСТОЧНИКА (ревью
+        # 17.08, п. 7.4). Выходило «ВсОШ — региональный этап · региональный
+        # · 2016 · 9, 10, 11 класс»: сравнение шло на ПОЛНОЕ совпадение
+        # строки, а «региональный» и «ВсОШ — региональный этап» не равны.
+        if any(text.lower() in known.lower() for known in parts):
+            continue
+        parts.append(text + (' класс' if value is reference.grade else ''))
     return ' · '.join(parts)
 
 

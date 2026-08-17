@@ -192,12 +192,14 @@
 {% endcomment %}
 {% include "_ranking.html" with ranking=ranking %}
 
-<div class="panel">
-  <div class="panel-head">
-    <div class="panel-title">Активность за полгода</div>
-  </div>
-  {% include "platform/_heatmap.html" with calendar=calendar %}
-</div>
+{% comment %}
+⚠️ ТОТ ЖЕ БЛОК, ЧТО У УЧЕНИКА (ревью 17.08, фаза 6). Здесь стояла ПРЕЖНЯЯ
+теплокарта: легенда «меньше — больше», без чисел месяца и подписей дней, и
+она не подчинялась переключателю периода — при выбранном «Месяце»
+показывала полгода. Разметка и расчёт общие; складывать разрезы разной
+глубины округления нельзя, поэтому итог берётся у `minutes_on_site`.
+{% endcomment %}
+{% include "platform/_activity_panel.html" with activity=activity %}
 
 {% comment %}
 История работ (фаза 10.5). Разметка и сборка ОБЩИЕ с обзором группы:
