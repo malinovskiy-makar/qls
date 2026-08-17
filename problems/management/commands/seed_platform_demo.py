@@ -1000,6 +1000,11 @@ class Command(BaseCommand):
 
         from problems.models import LearningEvent
 
+        # ⚠️ ПАРТИИ ИГРЫ — ДО РАННЕГО ВЫХОДА. Им задачи из банка не нужны, а
+        # выход ниже срабатывает на тощей базе и раньше уносил с собой досев
+        # темы игровым событиям (ревью 17.08, п. 2.6).
+        self._game_history(students)
+
         problems = list(Problem.objects.filter(
             status=Problem.Status.PUBLISHED, needs_quality_review=False,
             topics__isnull=False).distinct()[:60])
@@ -1056,13 +1061,25 @@ class Command(BaseCommand):
                 f'  история «{profile["name"]}» для {student.username}: '
                 f'{len(events)} событий')
 
-        # Партии игры — чтобы блок Econ Rush не был пустым.
-        # ⚠️ У ИГРОВОГО СОБЫТИЯ ЕСТЬ ТЕМА (ревью 17.08, п. 4.7). Без неё
-        # список «Чаще всего промахиваешься в игре» пуст на любой демо-базе:
-        # целиться в «Без темы» нечем, и блок молчит. Боевая игра тему
-        # пишет — денормализованную из `GameQuestion`; демо обязано вести
-        # себя так же, иначе экран показывает не то, что увидит человек.
+    def _game_history(self, students):
+        """Партии игры — чтобы блок Econ Rush не был пустым.
+
+        ⚠️ У ИГРОВОГО СОБЫТИЯ ЕСТЬ ТЕМА (ревью 17.08, п. 4.7). Без неё
+        список «Чаще всего промахиваешься в игре» пуст на любой демо-базе:
+        целиться в «Без темы» нечем, и блок молчит. Боевая игра тему
+        пишет — денормализованную из `GameQuestion`; демо обязано вести
+        себя так же, иначе экран показывает не то, что увидит человек.
+
+        ⚠️ ОТДЕЛЬНЫЙ МЕТОД, А НЕ ХВОСТ ИСТОРИИ (ревью 17.08, п. 2.6). Этот
+        блок стоял ПОСЛЕ раннего выхода `_history` («в банке мало задач с
+        темами»), то есть на тощей базе досев не случался вовсе — а именно
+        досев чинит уже засеянную базу владельца. Игровым событиям задачи
+        из банка не нужны, и зависеть от него они не должны.
+        """
+        import random
+
         from problems.management.commands.apply_topic_mapping import CANONICAL
+        from problems.models import LearningEvent
 
         game_topics = list(Topic.objects.filter(
             name__in=CANONICAL)[:6]) or list(Topic.objects.all()[:6])

@@ -126,10 +126,17 @@ class CardsTests(TestCase):
         self.assertLessEqual(len(card['warnings']), 3)
 
     def test_calm_line_when_nothing_is_wrong(self):
+        """⚠️ ПЕРЕСЧИТАНО 17.08 (п. 2.2): об одном говорят ОДИН раз.
+
+        В теле спокойной карточки стояло «Всё вовремя, ничего не ждёт
+        проверки», а строкой ниже — «Работ на проверке нет». Оставлена
+        нижняя: она в одном ряду со сроком и держит сетку карточки.
+        """
         cards, resp = self._cards()
+        page = resp.content.decode()
         self.assertEqual(cards[self.lesson.pk]['warnings'], [])
-        self.assertIn('Всё вовремя, ничего не ждёт проверки',
-                      resp.content.decode())
+        self.assertIn('Работ на проверке нет', page)
+        self.assertNotIn('Всё вовремя', page)
 
     def test_waiting_counter_matches_the_group_screen(self):
         """Число то же, что внутри занятия, — счёт один (фаза 4)."""

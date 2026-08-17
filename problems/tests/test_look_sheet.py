@@ -122,8 +122,12 @@ class TopicLabelCutTests(TestCase):
 
         self.assertEqual(_matrix_label('Вмешательство государства'),
                          'Вмешательство…')
+        # ⚠️ ПЕРЕСЧИТАНО 17.08: потолок длины поднят с 14 до 22 (решение
+        # владельца — читаемость подписей важнее высоты блока), и это
+        # название теперь помещается целиком. Многоточие ставится ТОЛЬКО
+        # когда что-то отрезано, поэтому здесь его быть не должно.
         self.assertEqual(_matrix_label('Международная торговля'),
-                         'Международная…')
+                         'Международная торговля')
         # Короткое название не получает обещания продолжения.
         self.assertEqual(_matrix_label('Рынок труда'), 'Рынок труда')
         self.assertLessEqual(len('Вмешательство'), MATRIX_LABEL_LIMIT)
@@ -157,7 +161,9 @@ class TopicLabelCutTests(TestCase):
         rule = re.search(r'\.matrix-head \{([^}]*)\}', style)
         found = re.search(r'max-height:\s*(\d+)px', rule.group(1))
         self.assertIsNotNone(found)
-        self.assertGreaterEqual(int(found.group(1)), 114)
+        # ⚠️ ПЕРЕСЧИТАНО 17.08 вслед за длиной подписи: 22 символа × 7,6 px
+        # просят около 167 px. Прежние 114 срезали бы хвост с многоточием.
+        self.assertGreaterEqual(int(found.group(1)), 167)
 
 
 class ScrollEdgeTests(TestCase):

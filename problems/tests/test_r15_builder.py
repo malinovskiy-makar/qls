@@ -169,10 +169,21 @@ class OwnProblemsEntryTests(TestCase):
         self.client = Client()
         self.client.force_login(self.tutor)
 
-    def test_link_on_the_students_screen(self):
+    def test_entry_lives_in_the_work_flow(self):
+        """⚠️ ПЕРЕСЧИТАНО 17.08 (п. 2.1): вход переехал, но не пропал.
+
+        Кнопка стояла на экране «Ученики» — среди двух способов завести
+        занятие, третьим смыслом: экран отвечает на вопрос «с кем я
+        занимаюсь», а свои задачи про содержание. Убрана ровно кнопка;
+        вкладка «Мои задачи» внутри потока создания работы осталась входом
+        из интерфейса, а не только адресом в строке браузера.
+        """
         html = self.client.get('/teacher/groups/').content.decode()
-        self.assertIn('href="/teacher/problems/"', html)
-        self.assertIn('Мои задачи', html)
+        self.assertNotIn('href="/teacher/problems/"', html)
+        flow = self.client.get('/teacher/work/').content.decode()
+        self.assertIn('Мои задачи', flow)
+        self.assertEqual(self.client.get('/teacher/problems/').status_code,
+                         200)
 
     def test_top_menu_is_not_touched(self):
         """⚠️ У верхнего меню известная поломка на узком экране — не трогаем."""

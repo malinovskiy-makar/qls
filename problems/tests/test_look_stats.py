@@ -192,11 +192,18 @@ class GameMissTopicsTests(TestCase):
     """4.7 — воронка «поиграл → пошёл разбираться»."""
 
     def test_block_lives_inside_the_game_panel(self):
+        """⚠️ ПЕРЕСЧИТАНО 17.08 (п. 2.5): ссылка ОДНА — в каталог по теме.
+
+        Ссылки «в игру целиком» здесь больше нет: она вела в игру вообще, а
+        не в слабую тему промаха, потому что `game.game_page` параметров GET
+        не читает. Каталог тему читает — воронка «промахнулся в игре →
+        открыл задачи по теме» работает по-настоящему.
+        """
         page = read(STATS)
         panel = page[page.index('game-panel'):]
         self.assertIn('Чаще всего промахиваешься в игре', panel)
         self.assertIn("{% url 'catalog:problem_list' %}?topic=", panel)
-        self.assertIn("{% url 'game:page' %}", panel)
+        self.assertNotIn("{% url 'game:page' %}", panel)
 
     def test_branding_of_the_game_block_is_untouched(self):
         """Знак и пометка «игра» остаются — блок отгорожен намеренно."""
