@@ -17,7 +17,12 @@
 .stu-card { display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
             padding: 16px 18px; margin-bottom: 10px; }
 /* Не приступавшие — приглушённо: это не работа, это её отсутствие. */
-.stu-card.is-idle { opacity: .62; }
+{% comment %}
+⚠️ ПРИГЛУШЕНИЯ БОЛЬШЕ НЕТ (решение владельца от 17.08). Здесь стояло
+`opacity: .62` у карточки не начавшего ученика. Что он не начинал, и так
+написано словами строкой ниже (`stu-state`), а полупрозрачность вдобавок
+роняла контраст имени.
+{% endcomment %}
 .stu-main { flex: 1; min-width: 180px; }
 .stu-name { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
 .stu-meta { font-size: 12px; color: var(--text2); }
@@ -76,7 +81,7 @@
 </div>
 
 {% for card in cards %}
-<div class="k-card stu-card {% if card.pending %}k-card--calls{% endif %}{% if card.state == 'not_started' %} is-idle{% endif %}">
+<div class="k-card stu-card {% if card.pending %}k-card--calls{% endif %}">
   <div class="stu-main">
     <div class="stu-name">{{ card.student.get_full_name|default:card.student.username }}</div>
     <div class="stu-meta">

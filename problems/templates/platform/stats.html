@@ -164,14 +164,23 @@
   <div id="activity-block">
     {% include "platform/_activity.html" with activity=data.activity %}
   </div>
+  {% comment %}
+  ⚠️ ПОДПИСЬ ГРАФИКА — НАД `.chart-box`, А НЕ ВНУТРИ НЕЁ (ревью 17.08,
+  п. 3.2). `.chart-box` это КОНТЕЙНЕР ЗАДАННОЙ ВЫСОТЫ: Chart.js меряет
+  родителя холста и растягивает холст на все 240 px. Строка «По дням
+  недели» внутри съедала свои двадцать, холст вылезал за нижний край
+  ровно на столько же — и подпись «Чаще всего занимаешься вечером…»,
+  стоящая следом, ложилась ПОВЕРХ подписей оси («Пн Вт Ср…», «0 мин»).
+  Высоту холста при этом трогать нельзя: она и есть размер графика.
+  {% endcomment %}
   <div class="chart-pair" style="margin-top:18px;">
-    <div class="chart-box">
+    <div>
       <div class="panel-hint" style="margin-bottom:6px;">По дням недели</div>
-      <canvas id="chart-weekday"></canvas>
+      <div class="chart-box"><canvas id="chart-weekday"></canvas></div>
     </div>
-    <div class="chart-box">
+    <div>
       <div class="panel-hint" style="margin-bottom:6px;">По часам</div>
-      <canvas id="chart-hour"></canvas>
+      <div class="chart-box"><canvas id="chart-hour"></canvas></div>
     </div>
   </div>
   <div class="panel-hint" id="time-hint" style="margin-top:10px;">{{ data.time_hint }}</div>

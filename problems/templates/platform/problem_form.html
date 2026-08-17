@@ -158,11 +158,20 @@
                      border: 0.5px solid var(--border);
                      background: var(--surface); color: var(--text);
                      min-height: 74px; resize: vertical; line-height: 1.6; }
-/* Трём полям нужен воздух: они разного смысла, а стояли впритык. */
-.part-grid { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr);
-             gap: 14px; margin-top: 12px; }
+/* Трём полям нужен воздух: они разного смысла, а стояли впритык.
+   ⚠️ ПОДПИСЬ ИМЕЕТ ПРАВО ПЕРЕНЕСТИСЬ (ревью 17.08, п. 3.3). Здесь стояло
+   `white-space: nowrap` при колонках `minmax(0, …)`: колонка сжимается
+   ниже своего содержимого, а неразрывная подпись из неё вылезает. При
+   ширине ячейки 96 px «Допуск сравнения» требовал 114 и налезал на
+   соседнюю — на экране читалось «Допуск сравнениВес пункта». Доли колонок
+   заодно розданы по длине подписей, чтобы перенос был редкостью, а не
+   нормой; `align-items: end` держит поля на одной линии, даже когда
+   подпись всё-таки перенеслась. */
+.part-grid { display: grid;
+             grid-template-columns: minmax(0,1.5fr) minmax(0,1.25fr) minmax(0,1fr);
+             gap: 14px; margin-top: 12px; align-items: end; }
 .part-grid input { background: var(--surface); }
-.part-grid label { white-space: nowrap; }
+.part-grid label { white-space: normal; line-height: 1.25; }
 .part-grid .k-hint { margin-top: 4px; font-size: 11px; }
 
 .graph-plate {

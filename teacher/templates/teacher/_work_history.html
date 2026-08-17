@@ -59,7 +59,7 @@
     </thead>
     <tbody>
       {% for row in works %}
-      <tr{% if row.not_submitted %} class="is-idle"{% endif %}>
+      <tr>
         <td class="wk-name">{{ row.work.name }}</td>
         <td><span class="wk-kind">{% if row.is_exam %}контрольная{% else %}домашка{% endif %}</span></td>
         {% comment %}
@@ -90,7 +90,15 @@
         ⚠️ Работа без срока в столбец «невовремя» не попадает вообще —
         прочерк, а не ноль: без срока опоздать нельзя.
         {% endcomment %}
-        <td class="wk-num" data-type="num" data-sort="{{ row.missing }}">{% if row.late is not None %}{{ row.late }}{% else %}—{% endif %} / {{ row.missing }}</td>
+        {% comment %}
+        ⚠️ «НИКТО НЕ СДАЛ» НАПИСАНО СЛОВАМИ (решение владельца от 17.08).
+        Раньше такую строку гасило правило `opacity: .55` — половина
+        «Истории работ» уходила в светло-серый, и приглушение читалось как
+        «строка неважная», хотя смысл другой.
+        {% endcomment %}
+        <td class="wk-num" data-type="num" data-sort="{{ row.missing }}">
+          {% if row.not_submitted %}<span class="wk-none">никто не сдал</span>
+          {% else %}{% if row.late is not None %}{{ row.late }}{% else %}—{% endif %} / {{ row.missing }}{% endif %}</td>
         {% elif solo %}
         {% comment %}
         ⚠️ У ОДНОГО УЧЕНИКА два числа «невовремя / не сдано» вырождаются в

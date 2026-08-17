@@ -55,15 +55,41 @@
     var pad = 8;                       // отступ от края окна
     var gap = 8;                       // зазор между знаком и подсказкой
 
+    // ⚠️ ПОДСКАЗКА ВСТАЁТ ПОД БЛОКОМ, КОТОРЫЙ ОБЪЯСНЯЕТ (ревью 17.08,
+    // п. 3.5). Раньше она вставала НАД знаком, а знак стоит в подписи ПОД
+    // числом: всплывашка у «Результата автопроверки» закрывала сами числа,
+    // а сбоку от неё стоит кнопка «Проверить N задач» — свободного места
+    // РЯДОМ СО ЗНАКОМ в такой карточке нет вовсе. Единственное место, где
+    // подсказка гарантированно ничего не прячет, — за нижним краем самого
+    // блока. Правило общее: карточка, строка таблицы, плитка.
+    //
+    // ⚠️ ТОЛЬКО У КОМПАКТНОГО БЛОКА. У знака внутри целой панели (клетка
+    // теплокарты, шапка большого раздела) «под блоком» означало бы «через
+    // пол-экрана вниз» — там подсказка отрывается от того, к чему
+    // относится. Высокие блоки не в счёт, у них работает прежняя привязка
+    // к самому знаку.
+    var BLOCK_LIMIT = 260;
+    var block = mark.closest
+      ? mark.closest('.k-card, .stu-card, .k-tile, .card3, tr') : null;
+    var frame = anchor;
+    if (block) {
+      var blockBox = block.getBoundingClientRect();
+      if (blockBox.height <= BLOCK_LIMIT) { frame = blockBox; }
+    }
+
     // По горизонтали — по центру знака, но не вылезая за края окна.
     var left = anchor.left + anchor.width / 2 - size.width / 2;
     var maxLeft = window.innerWidth - size.width - pad;
     if (left > maxLeft) left = maxLeft;
     if (left < pad) left = pad;
 
-    // По вертикали — сверху; не помещается сверху — снизу.
-    var top = anchor.top - size.height - gap;
-    if (top < pad) top = anchor.bottom + gap;
+    // Снизу от блока; не помещается снизу — сверху. Порядок обратный
+    // прежнему: под блоком обычно пусто, над ним — то, что он показывает.
+    var top = frame.bottom + gap;
+    if (top + size.height + pad > window.innerHeight) {
+      top = frame.top - size.height - gap;
+    }
+    if (top < pad) top = pad;
 
     el.style.left = Math.round(left) + 'px';
     el.style.top = Math.round(top) + 'px';

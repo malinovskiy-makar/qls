@@ -153,14 +153,19 @@
    того же приёма читался бы как «сегодня был очень длинный день». */
 .act-day.is-today { outline: 2px solid var(--text2); outline-offset: -2px;
                     font-weight: 700; }
-.act-l0 { background: var(--surface-2); }
-.act-l1 { background: var(--accent); opacity: .22; }
-.act-l2 { background: var(--accent); opacity: .45; }
-.act-l3 { background: var(--accent); opacity: .70; }
-.act-l4 { background: var(--accent); }
-/* Число на залитой клетке — белым: на плотном малиновом серый текст
-   пропадает. Прозрачность заливки трогать нельзя, она и есть шкала. */
-.act-l2, .act-l3, .act-l4 { color: #fff; }
+/* ⚠️ ПЛОТНОСТЬ ЗАЛИВКИ — В ЦВЕТЕ ФОНА, А НЕ В `opacity` КЛЕТКИ (ревью
+   17.08, п. 3.1). Свойство `opacity` гасит ВСЁ содержимое разом: на первом
+   уровне цифра дня оставалась при 22% прозрачности и не читалась вовсе
+   (контраст 1,01 — шесть залитых клеток из восемнадцати). Заливка теперь
+   `rgba(var(--accent-rgb), …)`, цифра сохраняет свой цвет целиком.
+   Чернила — двумя токенами, и в тёмной теме они меняются местами: сам
+   акцент там светлый. Обе пары замерены тестом, не на глаз. */
+.act-l0 { background: var(--surface-2); color: var(--text2); }
+.act-l1 { background: rgba(var(--accent-rgb), .22); color: var(--act-ink); }
+.act-l2 { background: rgba(var(--accent-rgb), .45); color: var(--act-ink); }
+.act-l3 { background: rgba(var(--accent-rgb), .70); color: var(--act-ink); }
+.act-l4 { background: rgb(var(--accent-rgb));
+          color: var(--act-ink-solid); }
 .act-legend { display: flex; align-items: center; gap: 6px; font-size: 11px;
               color: var(--text2); margin-top: 10px; flex-wrap: wrap; }
 .act-sw { width: 12px; height: 12px; border-radius: 3px; display: block; }
@@ -473,8 +478,18 @@ tr.row-click { cursor: pointer; }
 .wk-table td { padding: 10px; border-bottom: 1px solid var(--border-soft);
                vertical-align: middle; }
 .wk-table tr:last-child td { border-bottom: none; }
-/* Не сданная работа приглушена: это отсутствие работы, а не её результат. */
-.wk-table tr.is-idle td { opacity: .55; }
+/* ⚠️ СМЫСЛ НАЗЫВАЕТСЯ СЛОВАМИ, А НЕ ПРОЗРАЧНОСТЬЮ (решение владельца от
+   17.08). Здесь стояло правило, гасившее строку несданной работы до 55%
+   непрозрачности: в «Истории работ» группы пять строк из одиннадцати
+   уходили в светло-серый вместе с названиями. Полупрозрачность сообщает
+   «эта строка неважная», а на деле смысл другой: «никто не сдал». Пометка
+   стоит в той же ячейке, где считаются сдачи; строка читается целиком.
+   ⚠️ Имя убранного класса здесь НЕ ПОВТОРЯЕТСЯ намеренно: проверка ищет
+   его по файлу и поймала бы собственное объяснение. По проекту это уже
+   шестой раз. */
+.wk-none { display: inline-block; font-size: 11px; color: var(--text2);
+           background: var(--pending-tint); border: 1px solid var(--pending-border);
+           border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 .wk-name { font-weight: 700; }
 .wk-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* ── Вид истории работ (сессия 9, фаза 6.4) ────────────────────────────
