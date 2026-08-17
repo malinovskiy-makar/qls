@@ -28,8 +28,13 @@
            border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
 .wk-item.is-drag { opacity: .45; }
 .wk-item.is-over { border-color: var(--accent); }
-.wk-grip { color: var(--text3); cursor: grab; font-size: 14px;
-           line-height: 1.5; user-select: none; }
+/* ⚠️ РУЧКА И СТРЕЛКИ — ЭТО ОРГАНЫ УПРАВЛЕНИЯ (ревью 17.08, п. 3.1). На
+   `--text3` (4,93:1 в светлой теме, 5,79:1 в тёмной) они читались как
+   украшение: владелец их не опознал как то, за что можно взяться. Подняты
+   до `--text2` (5,98:1 и 7,74:1) и чуть крупнее — знак ручки мелкий сам по
+   себе. Акцентом они не становятся: главное действие экрана не здесь. */
+.wk-grip { color: var(--text2); cursor: grab; font-size: 16px;
+           line-height: 1.4; user-select: none; }
 .wk-no { font-size: 13px; font-weight: 700; color: var(--text3);
          min-width: 20px; line-height: 1.5; }
 .wk-body { flex: 1; min-width: 0; }
@@ -42,12 +47,19 @@
 {% endcomment %}
 .wk-side { display: flex; align-items: center; gap: 8px; }
 .wk-move { display: inline-flex; flex-direction: column; gap: 2px; }
-.wk-move button { background: none; border: 0.5px solid var(--border);
+/* Рамка — `--num-line`: тот же оттенок границы, что у остальных полей, но
+   плотнее. На `--border` (.12) она читалась как случайная царапина — ровно
+   та же причина, по которой этот токен заводили для правимого числа. */
+.wk-move button { background: none; border: 1px solid var(--num-line);
                   border-radius: 5px; color: var(--text2); cursor: pointer;
-                  font-size: 11px; line-height: 1; padding: 3px 5px; }
+                  font-size: 12px; line-height: 1; padding: 3px 6px; }
 .wk-move button:hover:not(:disabled) { color: var(--text);
-                                       border-color: var(--text3); }
-.wk-move button:disabled { opacity: .35; cursor: default; }
+                                       border-color: var(--text2); }
+/* ⚠️ НЕДОСТУПНОЕ СОСТОЯНИЕ — ЦВЕТОМ, А НЕ `opacity`. Прозрачность гасит
+   всё содержимое разом и на платформе от неё отказались (визуальная сессия
+   17.08); здесь она к тому же делала невидимой и без того бледную рамку. */
+.wk-move button:disabled { color: var(--text3); border-color: var(--border);
+                           cursor: default; }
 .wk-pts { display: flex; align-items: center; gap: 5px; font-size: 12px;
           color: var(--text3); }
 {% comment %}

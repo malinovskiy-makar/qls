@@ -146,43 +146,11 @@
 теме делает `topic_progress_pairs`. Второй сборки нет: иначе половины начали
 бы расходиться правилами.
 
-⚠️ Шкала двухцветная и НЕ акцентная: слева доля верных (цвет по уровню),
-справа доля неверных — всегда серая. Малиновый здесь запрещён.
-⚠️ Тема без попыток в этой половине — пустая шкала пунктиром и прочерк
-вместо числа. Без попыток в ОБЕИХ — строка приглушается целиком.
+⚠️ РАЗМЕТКА БЛОКА ОБЩАЯ с обзором индивидуального занятия
+(`teacher/_topic_progress.html`): до ревью 17.08 она была скопирована в два
+шаблона слово в слово.
 {% endcomment %}
-<div class="panel">
-  <div class="panel-head">
-    <div class="panel-title">Прогресс по темам</div>
-    <div class="panel-hint">Попробуйте навестись на шкалу</div>
-  </div>
-
-  <div class="tp-row tp-head">
-    <span></span>
-    <span class="tp-half">Задачи</span>
-    <span></span>
-    <span class="tp-half">Тесты</span>
-  </div>
-
-  {% for row in progress.rows %}
-  <div class="tp-row{% if row.empty %} tp-empty{% endif %}">
-    <span class="tp-name">{{ row.name }}</span>
-    {% include 'teacher/_tp_half.html' with cell=row.open cap='Задачи' %}
-    <span class="tp-split"></span>
-    {% include 'teacher/_tp_half.html' with cell=row.test cap='Тесты' %}
-  </div>
-  {% endfor %}
-
-  {% comment %}
-  Строка «Всего» — та же вёрстка, шкалы чуть выше, значения полужирным.
-  {% endcomment %}
-  <div class="tp-row tp-total">
-    <span class="tp-name">Всего</span>
-    {% include 'teacher/_tp_half.html' with cell=progress.total_open cap='Задачи' %}
-    <span class="tp-split"></span>
-    {% include 'teacher/_tp_half.html' with cell=progress.total_test cap='Тесты' %}
-  </div>
-</div>
+{% include 'teacher/_topic_progress.html' with progress=progress %}
 
 {% comment %}
 «Сильные и слабые темы» — общий партиал `templates/_ranking.html`, тот же,

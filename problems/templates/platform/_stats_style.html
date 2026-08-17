@@ -262,6 +262,12 @@
 .rank-halves { display: grid; gap: 18px;
                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .rank-cap { margin-bottom: 6px; }
+/* ⚠️ ПУСТОЕ СОСТОЯНИЕ БЛОКА — ОБЫЧНАЯ СТРОКА (ревью 17.08, п. 3.2). Здесь
+   стояла общая плашка пустоты: серый прямоугольник во всю ширину панели с
+   отступами по 28 px. На карточке ученика он весил больше, чем блок с
+   данными, и читался как сообщение об ошибке. Общую плашку не трогаем —
+   на других экранах она к месту (там пустой блок и правда занимает экран). */
+.rank-none { font-size: 13px; color: var(--text2); line-height: 1.6; }
 .list-rows { list-style: none; margin: 0; padding: 0; }
 .list-rows li { display: flex; align-items: center; justify-content: space-between;
                 gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border-soft);
@@ -411,6 +417,14 @@
 .tp-half:hover .tp-value .frac { display: inline; }
 .tp-row:hover .tp-name { color: var(--text); }
 .tp-none { font-size: 12px; color: var(--text3); }
+/* ⚠️ ПУСТЫЕ ТЕМЫ — ПОД РАСКРЫВАШКОЙ (ревью 17.08, п. 3.2). Из 23 строк
+   двадцать бывают пустыми, и двадцать пунктирных шкал подряд дают полторы
+   прокрутки шума. Раскрытие — общий `.k-details` из набора; своих правил
+   вида у него здесь нет, только отступы, чтобы строки внутри стояли на той
+   же вертикали, что и снаружи. */
+.tp-rest-fold { margin-top: 4px; }
+.tp-rest-fold > summary { font-size: 12px; }
+.tp-none-all { font-size: 13px; color: var(--text2); padding: 10px 0; }
 /* Строка «Всего» — отделена чертой, шкала выше, значение полужирным. */
 .tp-total { border-top: 1px solid var(--border); margin-top: 10px;
             padding-top: 12px; }

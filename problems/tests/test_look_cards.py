@@ -186,9 +186,19 @@ class TopicColumnWidthTests(TestCase):
         self.assertIn('300px', rule.group(1))
 
     def test_header_row_shares_the_same_grid(self):
-        """Шапка колонок — тот же класс: две ширины разъехались бы."""
+        """Шапка колонок — тот же класс: две ширины разъехались бы.
+
+        ⚠️ ПЕРЕСЧИТАНО 17.08 (п. 3.2): разметка блока переехала в общий
+        партиал `teacher/_topic_progress.html` — до этого она была
+        скопирована в два шаблона слово в слово. Проверяем там же и заодно
+        то, что копии не осталось.
+        """
         css = read(STYLE)
         self.assertNotIn('.tp-head { display: grid', css)
+        self.assertIn('tp-row tp-head',
+                      read('teacher/templates/teacher/_topic_progress.html'))
         for path in ('teacher/templates/teacher/student_progress.html',
                      'teacher/templates/teacher/groups/_overview.html'):
-            self.assertIn('tp-row tp-head', read(path))
+            page = read(path)
+            self.assertIn('teacher/_topic_progress.html', page)
+            self.assertNotIn('tp-row tp-head', page)

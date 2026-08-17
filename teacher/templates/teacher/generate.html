@@ -56,10 +56,15 @@
 /* ── Карточка запроса: свёрнута/раскрыта ПРЯМО ЗДЕСЬ ──────────────────
    Раскрытие без перезагрузки: репетитор сравнивает строки между собой,
    и уход на другую страницу за каждой из них ломает сравнение. */
+/* Шапка блока: крупная галочка «оставить строку» и кнопка раскрытия рядом.
+   ⚠️ Галочка — СОСЕД кнопки: внутри `<button>` она была бы невалидна, и
+   нажатие на неё сворачивало бы карточку вместо переключения. */
+.q-top { display: flex; align-items: center; gap: 0; }
+.q-top:hover { background: var(--surface-2); }
+.q-keep { padding: 12px 0 12px 14px; }
 .q-head { display: flex; gap: 10px; align-items: center; width: 100%;
   padding: 12px 14px; background: none; border: 0; cursor: pointer;
   font: inherit; color: var(--text); text-align: left; }
-.q-head:hover { background: var(--surface-2); }
 .q-arrow { color: var(--text3); font-size: 11px; width: 10px;
   flex-shrink: 0; }
 .q-text { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; }
@@ -259,6 +264,20 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     {% for preview in previews %}
     <div class="plan-block" data-row="{{ preview.index }}"
          data-label="{{ preview.row.label }}">
+      {% comment %}
+      ⚠️ ДВЕ ГАЛОЧКИ ЗНАЧАТ РАЗНОЕ И ВЫГЛЯДЯТ РАЗНО (ревью 17.08, п. 3.4).
+      Эта выкидывает ВЕСЬ блок строки запроса, галочка в списке ниже — одну
+      задачу; выглядели они одинаково, и цена ошибки была разной. Теперь
+      она крупная (`.k-check--box`) и стоит В ШАПКЕ строки, а галочки задач
+      — обычного размера внутри списка.
+      ⚠️ ОНА СОСЕД КНОПКИ, А НЕ ЕЁ СОДЕРЖИМОЕ: галочка внутри `<button>` —
+      невалидная разметка, и нажатие на неё сворачивало бы карточку.
+      {% endcomment %}
+      <div class="q-top">
+      <label class="k-check k-check--box q-keep">
+        <input type="checkbox" name="row_keep" value="{{ forloop.counter0 }}"
+               aria-label="оставить эту строку запроса" checked>
+      </label>
       <button type="button" class="q-head" aria-expanded="false">
         <span class="q-arrow" aria-hidden="true">▶</span>
         {% comment %}
@@ -282,17 +301,18 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
           <b class="q-picked">{{ preview.picked }}</b>
           из <span class="q-need">{{ preview.row.count }}</span></span>
       </button>
+      </div>
 
       <div class="q-body">
         {% comment %}
         ⚠️ ОБА ПОЛЯ ПОДПИСАНЫ И ОБА УЗКИЕ. Раньше под строкой стояли два
         голых числа, и что они значат, понять было нельзя — подпись жила
         только в подсказке при наведении, которой на телефоне нет вовсе.
+        ⚠️ Галочка «оставить строку» переехала отсюда в шапку блока (п. 3.4):
+        здесь она стояла в одном ряду с полями правки и читалась как
+        настройка строки, а не как «выкинуть её целиком».
         {% endcomment %}
         <div class="plan-row">
-          <label class="k-check" style="height:auto;">
-            <input type="checkbox" name="row_keep" value="{{ forloop.counter0 }}" checked>
-          </label>
           <input class="q k-input" type="text" name="row_query"
                  value="{{ preview.row.query }}"
                  placeholder="о чём должны быть задачи">

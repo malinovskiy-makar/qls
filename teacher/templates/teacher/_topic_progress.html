@@ -1,0 +1,83 @@
+{% load ru %}
+{% comment %}
+Блок «Прогресс по темам» — ОДНА разметка на карточку ученика и на обзор
+индивидуального занятия. До этой правки она была скопирована в два шаблона:
+знакомый класс дефекта, из-за которого экраны расходятся с первой же правки.
+
+Ждёт `progress` — словарь из `stats.topic_progress_pairs`.
+
+⚠️ Шкала двухцветная и НЕ акцентная: слева доля верных (цвет по уровню),
+справа доля неверных — всегда серая. Малиновый здесь запрещён.
+⚠️ Тема без попыток в этой половине — пустая шкала пунктиром и прочерк
+вместо числа. Без попыток в ОБЕИХ — строка уезжает под раскрывашку.
+
+⚠️ ПУСТЫЕ ТЕМЫ СВЁРНУТЫ (ревью 17.08, п. 3.2). Из 23 строк двадцать бывают
+пустыми, и двадцать пунктирных плейсхолдеров подряд дают полторы прокрутки
+шума ровно там, где репетитор ищет, чем заняться. Темы не спрятаны: они под
+раскрывашкой, и число их названо. Делит строки СЕРВЕР (`topic_progress_pairs`
+отдаёт `filled` и `blank`) — второго правила «что считать пустым» не заводим.
+{% endcomment %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Прогресс по темам</div>
+    {% comment %}
+    ⚠️ ДРОБНАЯ ДОЛЯ ОБЪЯСНЯЕТСЯ ЗДЕСЬ (ревью 17.08, п. 3.5). При наведении
+    шкала показывает «0,4 / 3» — формально верно (неполный балл идёт весом,
+    правило в `stats._graded_ratios`), но читается как «решено 0,4 задачи» и
+    ставит репетитора в тупик. Фраза стоит на виду, а не под вторым знаком
+    вопроса: непонятное число объясняют там, где на него смотрят.
+    {% endcomment %}
+    <div class="panel-hint">Наведитесь на шкалу — вместо процента покажет
+      «верных / решено». Неполный балл идёт с весом, поэтому доли бывают
+      дробными: 8 баллов из 10 — это 0,8.</div>
+  </div>
+
+  <div class="tp-row tp-head">
+    <span></span>
+    <span class="tp-half">Задачи</span>
+    <span></span>
+    <span class="tp-half">Тесты</span>
+  </div>
+
+  {% for row in progress.filled %}
+  <div class="tp-row">
+    <span class="tp-name">{{ row.name }}</span>
+    {% include 'teacher/_tp_half.html' with cell=row.open cap='Задачи' %}
+    <span class="tp-split"></span>
+    {% include 'teacher/_tp_half.html' with cell=row.test cap='Тесты' %}
+  </div>
+  {% endfor %}
+
+  {% if not progress.filled %}
+  <div class="tp-none-all">За этот период ответов по темам нет.</div>
+  {% endif %}
+
+  {% if progress.blank %}
+  {% comment %}
+  Раскрытие тем же элементом, что и везде (`.k-details` из набора): свой
+  вид у этой раскрывашки означал бы, что она про что-то другое.
+  {% endcomment %}
+  <details class="k-details tp-rest-fold">
+    <summary>ещё {{ progress.blank|length|count_ru:"тема,темы,тем" }} без ответов за период</summary>
+    {% for row in progress.blank %}
+    <div class="tp-row tp-empty">
+      <span class="tp-name">{{ row.name }}</span>
+      {% include 'teacher/_tp_half.html' with cell=row.open cap='Задачи' %}
+      <span class="tp-split"></span>
+      {% include 'teacher/_tp_half.html' with cell=row.test cap='Тесты' %}
+    </div>
+    {% endfor %}
+  </details>
+  {% endif %}
+
+  {% comment %}
+  Строка «Всего» — та же вёрстка, шкалы чуть выше, значения полужирным.
+  Стоит ПОСЛЕ раскрывашки и никогда внутрь неё не уезжает: это итог блока.
+  {% endcomment %}
+  <div class="tp-row tp-total">
+    <span class="tp-name">Всего</span>
+    {% include 'teacher/_tp_half.html' with cell=progress.total_open cap='Задачи' %}
+    <span class="tp-split"></span>
+    {% include 'teacher/_tp_half.html' with cell=progress.total_test cap='Тесты' %}
+  </div>
+</div>

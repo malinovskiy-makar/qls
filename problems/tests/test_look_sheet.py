@@ -187,10 +187,18 @@ class DifficultyHintTests(TestCase):
     """6.6 — величина объясняет себя."""
 
     def test_hint_sits_next_to_the_number(self):
+        """⚠️ ПЕРЕСЧИТАНО 17.08 (п. 3.6): сложность ПЕРЕЕХАЛА В подсказку.
+
+        Отдельной строки под процентом у неё больше нет — третьей строкой
+        мелким серым она была сноской, которую не читают, и ломала общую
+        вертикаль правого края списка. Знак вопроса остался на месте, у
+        самого числа; текст подсказки собирает вьюха вместе со значением.
+        """
         page = read('teacher/templates/teacher/groups/detail.html')
-        block = page[page.index('row.difficulty_label'):]
+        block = page[page.index('row.difficulty_hint'):]
         block = block[:block.index('</div>')]
         self.assertIn('_hint.html', block)
+        self.assertNotIn('<div>{{ row.difficulty_label }}', page)
 
 
 class WorkCountTests(TestCase):

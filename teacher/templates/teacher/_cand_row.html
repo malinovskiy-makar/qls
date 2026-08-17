@@ -10,7 +10,13 @@
 {% endcomment %}
 <li class="cand{% if card.checked %} is-picked{% endif %}{% if card.taken_by %} is-taken{% endif %}"
     data-pid="{{ card.id }}">
-  <label class="k-check k-check--box">
+  {% comment %}
+  ⚠️ ГАЛОЧКА ЗАДАЧИ — ОБЫЧНОГО РАЗМЕРА (ревью 17.08, п. 3.4). Крупная
+  осталась одна на блок — в шапке строки запроса, и выкидывает она весь
+  блок. Здесь цена нажатия — одна задача, и вес должен отличаться:
+  одинаковые галочки для разных по цене действий сбивают с толку.
+  {% endcomment %}
+  <label class="k-check">
     <input type="checkbox" class="cand-pick" value="{{ card.id }}"
            data-title="{{ card.title }}"
            {% if card.checked %}checked{% endif %}

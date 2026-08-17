@@ -116,6 +116,17 @@ def assignment_stats(assignment):
         'difficulty_label': ('сложность %s'
                              % models_platform.difficulty_label(difficulty)
                              if difficulty is not None else 'нет оценок'),
+        # ⚠️ СЛОЖНОСТЬ ПЕРЕЕХАЛА В ПОДСКАЗКУ (ревью 17.08, п. 3.6). На
+        # карточке она была третьей строкой мелким серым — сноской, которую
+        # не читают, и ломала общую вертикаль правого края списка. Строку
+        # собираем ЗДЕСЬ: число и объяснение обязаны ехать вместе, а
+        # шаблон уже дважды разъезжался на записи этого же числа.
+        'difficulty_hint': (
+            'Средняя %s. Ученики сами оценивают сданную работу по шкале от '
+            '1 до 10; здесь среднее по тем, кто оценил — на балл это не '
+            'влияет.' % ('сложность %s'
+                         % models_platform.difficulty_label(difficulty))
+            if difficulty is not None else ''),
         'percent': percent,
         'nobody_submitted': submitted_students == 0,
         'all_checked': submitted_students > 0 and pending == 0,

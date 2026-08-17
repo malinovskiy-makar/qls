@@ -565,13 +565,31 @@ class AssignmentGroupingTests(TestCase):
         self.assertIn('50%', body)                    # 4 из 8
         self.assertIn('сложность 6,0 из 10', body)
 
-    def test_finished_card_without_votes_says_so(self):
-        """Нет оценок — пишем словами, а не нулём: ноль означал бы оценку."""
+    def test_finished_card_without_votes_says_nothing_not_zero(self):
+        """Нет оценок — нуля на карточке не появляется.
+
+        ⚠️ ПЕРЕСЧИТАНО 17.08 (п. 3.6). Раньше строка «нет оценок» стояла
+        третьей под процентом; теперь сложность живёт в подсказке у процента,
+        и подсказки просто НЕТ, когда оценивать нечего. Исходное требование
+        («ноль по шкале 1–10 означал бы оценку») от этого не пострадало —
+        оно про то, чтобы не печатать ноль, а не про саму строку. Строка
+        «нет оценок» осталась там, где отвечает на заданный вопрос, — на
+        карточке «Средняя сложность работ».
+        """
+        from teacher.views_groups import assignment_stats
+
         work = self._work('Без оценок', days=-3, submitted=1)
+        row = assignment_stats(work)
+        self.assertEqual(row['difficulty'], None)
+        self.assertEqual(row['difficulty_hint'], '')
+        self.assertEqual(row['difficulty_label'], 'нет оценок')
         body = self.client.get(
             reverse('teacher:group_detail', args=[self.group.pk])
             + '?tab=assignments').content.decode()
-        self.assertIn('нет оценок', body)
+        figures = body[body.index('class="ass-figures"'):]
+        figures = figures[:figures.index('</div>')]
+        self.assertNotIn('сложность', figures)
+        self.assertNotIn('0 из 10', figures)
 
 
 class SubmissionsByStudentTests(TestCase):

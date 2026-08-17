@@ -188,10 +188,19 @@ class TopicPairsTests(TestCase):
             self.assertEqual(row['empty'], expected, row['name'])
 
     def test_one_partial_draws_both_halves(self):
-        """Три копии разметки шкалы — три разных вида после первой правки."""
-        text = read('teacher/templates/teacher/student_progress.html')
-        self.assertEqual(text.count('_tp_half.html'), 4,
-                         'две половины строки плюс две половины «Всего»')
+        """Три копии разметки шкалы — три разных вида после первой правки.
+
+        ⚠️ ПЕРЕСЧИТАНО 17.08 (п. 3.2): блок целиком переехал в общий
+        партиал. Половин теперь шесть — две у строки с данными, две у
+        свёрнутой пустой строки и две у «Всего», — и все шесть рисует та же
+        одна разметка.
+        """
+        text = read('teacher/templates/teacher/_topic_progress.html')
+        self.assertEqual(text.count('_tp_half.html'), 6,
+                         'по две половины на строку с данными, пустую и «Всего»')
+        self.assertNotIn(
+            '_tp_half.html',
+            read('teacher/templates/teacher/student_progress.html'))
 
 
 class StudentCardScreenTests(TestCase):

@@ -1894,7 +1894,12 @@ def topic_progress_pairs(user, tutor=None, period='all', now=None):
         if name not in seen and not right['empty']:
             rows.append({'name': name, 'topic': right['topic'],
                          'open': None, 'test': right, 'empty': False})
+    # ⚠️ ДЕЛИТ СТРОКИ СЕРВЕР (ревью 17.08, п. 3.2). Пустые темы уезжают на
+    # экране под раскрывашку, и правило «что считать пустым» обязано быть
+    # ОДНО: `empty` уже посчитан выше, шаблону остаётся только нарисовать.
     return {'rows': rows,
+            'filled': [row for row in rows if not row['empty']],
+            'blank': [row for row in rows if row['empty']],
             'total_open': open_data['total'],
             'total_test': test_data['total']}
 

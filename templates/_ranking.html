@@ -40,6 +40,12 @@
     </div>
   </div>
   {% else %}
-  <div class="empty-note">{{ ranking.note }}{% if ranking.hint %} {{ ranking.hint }}{% endif %}</div>
+  {% comment %}
+  ⚠️ ПУСТОЕ СОСТОЯНИЕ — СТРОКА, А НЕ ПЛАШКА ВО ВСЮ ШИРИНУ (ревью 17.08,
+  п. 3.2). Серый прямоугольник на всю ширину панели весил больше, чем сам
+  блок с данными, и на карточке ученика читался как ошибка. Текст той же
+  величины, что остальные подписи блока, без заливки: слова те же.
+  {% endcomment %}
+  <div class="rank-none">{{ ranking.note }}{% if ranking.hint %} {{ ranking.hint }}{% endif %}</div>
   {% endif %}
 </div>
