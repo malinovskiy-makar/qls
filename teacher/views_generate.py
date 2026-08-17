@@ -431,45 +431,6 @@ def _read_ids(request, name):
 
 
 @tutor_required
-def assignment_build(request):
-    """Конструктор подборки: слева превью работы, справа её настройки.
-
-    ⚠️ ЗАЧЕМ ОТДЕЛЬНЫЙ ЭКРАН. Раньше после «описать словами» репетитора
-    перекидывало в «Искать самому» — то есть в другой способ набора, с
-    поиском по каталогу во весь экран. Владелец: «странно, что мы прошли
-    весь путь описания словами, а нас перекидывает в «Искать самому»».
-
-    ⚠️ РАБОТУ СОЗДАЁТ НЕ ЭТОТ ЭКРАН. Форма уходит в те же обработчики, что
-    и у прежних конструкторов (`assignment_create` / `exam_create`): второй
-    точки создания работы нет, иначе правила разъедутся — сегодня в одной
-    появится проверка срока, завтра в другой нет.
-    """
-    refusal = group_param_refusal(request)
-    if refusal is not None:
-        return refusal
-    from problems import exam_engine
-    from problems.models import StudentGroup
-
-    kind = request.GET.get('kind') or 'homework'
-    is_exam = kind == 'exam'
-    group = _group_or_none(request.user, request.GET.get('group'))
-    groups = _tutor_groups(request.user)
-    return render(request, 'teacher/assignment_build.html', {
-        'is_exam': is_exam,
-        'kind': kind,
-        'group': group,
-        'group_id': group.pk if group else '',
-        'groups': groups,
-        'storage': picker.storage_keys(group.pk if group else None),
-        'min_window': exam_engine.MIN_WINDOW_MINUTES,
-        'min_duration': exam_engine.MIN_DURATION_MINUTES,
-        'max_duration': exam_engine.MAX_DURATION_MINUTES,
-        'has_groups': bool(groups),
-        'group_model': StudentGroup,
-    })
-
-
-@tutor_required
 def api_cart_rows(request):
     """Корзина → позиции работы в порядке, который увидит ученик.
 

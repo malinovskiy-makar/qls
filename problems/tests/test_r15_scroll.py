@@ -140,8 +140,9 @@ class EverywhereTests(TestCase):
         'teacher/templates/teacher/_work_history.html',         # история
         'teacher/templates/teacher/assignment_detail.html',     # по задачам
         'problems/templates/platform/_heatmap.html',            # активность
-        'teacher/templates/teacher/assignment_create.html',     # панель
-        'teacher/templates/teacher/groups/exam_create.html',    # панель
+        # ⚠️ ПЕРЕСЧИТАН (ревью 17.08, п. 4.5): прежние конструкторы с их
+        # прокручиваемой правой панелью удалены. Прокручиваемых блоков на
+        # шагах потока нет — колонка одна и растёт вниз страницей.
     ]
 
     def test_every_scroller_has_a_wrapper(self):
@@ -222,9 +223,14 @@ class LivePageTests(TestCase):
                     args=[self.student.pk])).content.decode()
         self.assertIn("querySelectorAll('[data-fade]')", html)
 
-    def test_constructor_sidebar_is_wrapped(self):
+    def test_constructor_has_no_scrolling_sidebar_anymore(self):
+        """⚠️ ПЕРЕСЧИТАН: правой прокручиваемой колонки больше нет.
+
+        Растворение краёв заводилось для неё; в потоке состав работы —
+        обычный список страницы, и прятать край не от чего (ревью 17.08,
+        п. 4.5). Проверка держит именно это: панель не вернулась молча.
+        """
         html = self.client.get(
-            reverse('teacher:assignment_create')
+            reverse('teacher:work_compose')
             + '?group=%d' % self.group.pk).content.decode()
-        self.assertIn('hw-sidebar fade-box fade-box--y', html)
-        self.assertIn('hw-sidebar__scroll', html)
+        self.assertNotIn('hw-sidebar', html)

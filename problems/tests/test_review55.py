@@ -1180,13 +1180,17 @@ class PickerFirstStepTests(TestCase):
         self.assertIn('сегодня использовано', actions)
 
     def test_active_step_is_not_magenta(self):
-        """⚠️ Шаги формы — не навигация сайта, акцент им не полагается."""
+        """⚠️ Шаги формы — не навигация сайта, акцент им не полагается.
+
+        ПЕРЕСЧИТАН (ревью 17.08, п. 4.1): свой ряд шагов у подбора удалён,
+        на экране осталась ОДНА лента — общая для потока. Требование то же
+        и проверяется на ней.
+        """
         import io, re
-        template = io.open('teacher/templates/teacher/generate.html',
-                           encoding='utf-8').read()
-        rule = re.search(r'\.gen-step span\.is-on\s*\{([^}]*)\}', template)
-        self.assertIsNotNone(rule)
-        self.assertNotIn('--accent', rule.group(1))
+        kit = io.open('templates/_kit.html', encoding='utf-8').read()
+        rule = re.search(r'\.wk-rail__s\.is-on[^{]*\{([^}]*)\}', kit)
+        self.assertIsNotNone(rule, 'правила активного шага ленты нет')
+        self.assertNotIn('background: var(--accent)', rule.group(1))
 
     def test_number_fields_share_one_width(self):
         import io

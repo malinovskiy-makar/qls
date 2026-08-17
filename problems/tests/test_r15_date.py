@@ -329,12 +329,18 @@ class SubmitIsLockedByABadDateTests(TestCase):
     """
 
     def test_both_gates_count_a_bad_date(self):
-        for name in ('teacher/_picker_js.html',
-                     'teacher/assignment_build.html'):
-            with open('teacher/templates/' + name, encoding='utf-8') as fh:
-                text = fh.read()
-            self.assertIn(".k-date__text.is-bad", text, name)
-            self.assertIn("missing.push('проверьте ", text, name)
+        """⚠️ ПЕРЕСЧИТАН (ревью 17.08, п. 4.5): шлюз остался ОДИН.
+
+        Их было два — у прежнего конструктора и у шага «Выдача», — и
+        проверялось, что оба считают красное поле причиной запрета.
+        Конструктор удалён; требование стало сильнее: запрет ставит одно
+        место, полоса собранного, и второго шлюза нигде нет.
+        """
+        with open('teacher/templates/teacher/work/give.html',
+                  encoding='utf-8') as fh:
+            text = fh.read()
+        self.assertIn(".k-date__text.is-bad", text)
+        self.assertIn("out.push('проверьте ", text)
 
     def test_the_reason_names_the_field(self):
         markup = render_to_string('teacher/_work_settings.html', {

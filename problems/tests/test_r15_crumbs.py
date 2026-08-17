@@ -138,13 +138,16 @@ class EveryScreenIsCoveredTests(TestCase):
             (reverse('teacher:work_done', args=[g, a, s]), 'итоги'),
             (reverse('teacher:group_review_submission', args=[g, self.sub.pk]),
              'проверка задачи'),
-            (reverse('teacher:assignment_create') + '?group=%d' % g,
-             'искать самому'),
+            # ⚠️ ПЕРЕСЧИТАН (ревью 17.08, п. 4.5): прежние конструкторы
+            # удалены, набор задач живёт в потоке. Крошка обязана быть на
+            # каждом его шаге — это и проверяется.
+            (reverse('teacher:work_pick') + '?group=%d' % g, 'что кладём'),
             (reverse('teacher:assignment_generate') + '?group=%d' % g,
              'описать словами'),
-            (reverse('teacher:assignment_build') + '?group=%d' % g,
-             'конструктор подборки'),
-            (reverse('teacher:exam_create', args=[g]), 'контрольная'),
+            (reverse('teacher:work_compose') + '?group=%d' % g, 'состав'),
+            (reverse('teacher:work_give') + '?group=%d' % g, 'выдача'),
+            (reverse('teacher:work_give') + '?group=%d&kind=exam' % g,
+             'контрольная'),
             (reverse('teacher:problem_new'), 'своя задача'),
             (reverse('teacher:problem_list'), 'мои задачи'),
             (reverse('teacher:student_progress', args=[s]), 'карточка ученика'),

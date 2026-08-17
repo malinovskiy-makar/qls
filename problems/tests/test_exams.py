@@ -620,7 +620,11 @@ class ExamCreationTests(TestCase):
         SavedProblem.objects.create(owner=self.tutor,
                                     catalog_problem=self.problem)
         self.client.force_login(self.tutor)
+        # ⚠️ Адрес прежний и по-прежнему СОЗДАЁТ контрольную: удалён только
+        # экран конструктора (ревью 17.08, п. 4.5), обработчик формы цел.
         self.url = reverse('teacher:exam_create', args=[self.group.pk])
+        self.pick_url = '%s?group=%d&kind=exam' % (
+            reverse('teacher:work_pick'), self.group.pk)
 
     def _post(self, **overrides):
         # ⚠️ МЕСТНОЕ время, а не UTC: поле `datetime-local` в браузере даёт
@@ -658,8 +662,11 @@ class ExamCreationTests(TestCase):
         было нельзя. Теперь на странице есть поиск, фильтры по теме и
         сложности и карточки задач каталога.
         """
+        # ⚠️ ОТБОР ЗАДАЧ ПЕРЕЕХАЛ НА ПЕРВЫЙ ШАГ ПОТОКА (ревью 17.08, п. 4.5):
+        # конструктор контрольной удалён, вид работы стал параметром.
+        # Требование прежнее: берём из ВСЕГО каталога, а не из отложенного.
         fresh = make_problem('Не сохранённая задача каталога', difficulty=4)
-        body = self.client.get(self.url).content.decode()
+        body = self.client.get(self.pick_url).content.decode()
         self.assertIn('Не сохранённая задача каталога', body)
         self.assertIn('name="q"', body)          # поиск
         self.assertIn('name="topic"', body)      # фильтр темы
@@ -674,14 +681,19 @@ class ExamCreationTests(TestCase):
     def test_search_filters_the_list(self):
         make_problem('Монополия и её издержки')
         make_problem('Совсем про другое')
-        body = self.client.get(self.url, {'q': 'Монополия'}).content.decode()
+        body = self.client.get(self.pick_url,
+                               {'q': 'Монополия'}).content.decode()
         self.assertIn('Монополия и её издержки', body)
         self.assertNotIn('Совсем про другое', body)
 
     def test_saved_problems_stay_as_a_quick_tab(self):
-        """Сохранённые не исчезли — они стали вкладкой быстрого доступа."""
-        body = self.client.get(self.url).content.decode()
-        self.assertIn('Сохранённые', body)
+        """Отложенные не исчезли — они вкладка быстрого доступа.
+
+        ⚠️ Вкладка называется «Отложенные» с ревью 15.08: «Сохранённые» это
+        закладки каталога, и путать их со своими задачами нельзя.
+        """
+        body = self.client.get(self.pick_url).content.decode()
+        self.assertIn('Отложенные', body)
         self.assertIn('pane-saved', body)
 
     def test_cart_order_becomes_problem_order(self):
@@ -736,10 +748,19 @@ class ExamCreationTests(TestCase):
         self.assertFalse(Assignment.objects.filter(kind='exam').exists())
 
     def test_validation_never_returns_500(self):
+        """⚠️ ПЕРЕСЧИТАН: ошибка формы возвращает на шаг «Выдача».
+
+        Экрана конструктора больше нет, и рисовать форму заново неоткуда;
+        требование то же — пятисотки быть не должно, а человек обязан
+        увидеть, что именно поправить.
+        """
         response = self.client.post(self.url, {'name': '', 'kind': 'window',
                                                'starts_at': 'мусор',
                                                'ends_at': ''})
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/teacher/work/give/', response['Location'])
+        page = self.client.get(response['Location']).content.decode()
+        self.assertIn('Название не может быть пустым', page)
 
 
 class ExamResultsForTutorTests(TestCase):

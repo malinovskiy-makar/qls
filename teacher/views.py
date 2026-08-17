@@ -747,7 +747,13 @@ def _strip_latex(text):
 
 @teacher_required
 def assignment_create(request):
-    """Конструктор домашки. Отбор задач — общий модуль `teacher/picker.py`."""
+    """СОЗДАНИЕ домашки. Экрана здесь нет — только приём формы.
+
+    ⚠️ ЭТО ЕДИНСТВЕННАЯ ТОЧКА СОЗДАНИЯ ДОМАШКИ. Шаг «Выдача» нового потока
+    отправляет форму сюда, с теми же именами полей, что были у прежнего
+    конструктора. Прежний конструктор (GET) удалён в ревью 17.08, п. 4.5;
+    открытый по старой закладке адрес уводит на первый шаг потока.
+    """
     # Чужое занятие в адресе — отказ сразу, с возвратом на «Ученики».
     refusal = group_param_refusal(request)
     if refusal is not None:
@@ -755,10 +761,7 @@ def assignment_create(request):
 
     from problems.models import Assignment, StudentGroup
 
-    from .picker import (
-        create_items, own_problem_rows, parse_cart, parse_points, parse_rule,
-        picker_context,
-    )
+    from .picker import create_items, parse_cart, parse_points, parse_rule
 
     if request.method == 'POST':
         title = request.POST.get('name', '').strip()
@@ -767,15 +770,19 @@ def assignment_create(request):
         keys, catalog_ids, custom_ids = parse_cart(
             request.POST.get('problem_ids'))
 
+        # Ошибка формы возвращает на шаг «Выдача»: там стоят те самые поля,
+        # которые нужно поправить. Прежний конструктор их больше не рисует.
+        back = reverse('teacher:work_give') + (
+            '?group=%s' % group_ids[0] if group_ids else '')
         if not title:
             messages.error(request, 'Укажите название домашки.')
-            return redirect('teacher:assignment_create')
+            return redirect(back)
         if not (catalog_ids or custom_ids):
             messages.error(request, 'Добавьте хотя бы одну задачу.')
-            return redirect('teacher:assignment_create')
+            return redirect(back)
         if not group_ids:
             messages.error(request, 'Выберите хотя бы одну группу.')
-            return redirect('teacher:assignment_create')
+            return redirect(back)
 
         import datetime
 
@@ -837,29 +844,15 @@ def assignment_create(request):
         messages.success(request, f'Домашка «{title}» создана.')
         return redirect('teacher:groups')
 
-    from problems.models import SavedProblem
-
-    saved = [item.catalog_problem for item in
-             SavedProblem.objects.filter(owner=request.user, is_deleted=False,
-                                         catalog_problem__isnull=False)
-             .select_related('catalog_problem')]
-
-    context = picker_context(request)
-    context.update({
-        'groups': StudentGroup.objects.filter(
-            teacher=request.user).prefetch_related('students'),
-        'show_saved': True,
-        'saved_problems': saved,
-        # Третья вкладка: свои задачи репетитора. «Сохранённые» — это
-        # закладки КАТАЛОГА, и мешать их со своими нельзя (п. 11.2).
-        'own_problems': own_problem_rows(request.user),
-        'picker_reset_url': reverse('teacher:assignment_create'),
-    })
-    # Номер группы нужен общей шапке: без него переключатель «контрольная»
-    # не соберёт адрес её конструктора (он живёт ВНУТРИ группы).
-    context.setdefault('group_id', group_id_param(request))
-    context.setdefault('group_label', group_label_param(request))
-    return render(request, 'teacher/assignment_create.html', context)
+    # ⚠️ ЭКРАНА ЗДЕСЬ БОЛЬШЕ НЕТ, А ОБРАБОТЧИК ОСТАЁТСЯ (ревью 17.08, п. 4.5).
+    # Работу создаёт именно этот адрес: шаг «Выдача» отправляет форму сюда,
+    # и второй точки создания работы в проекте нет. Удалён только прежний
+    # конструктор — набор задач переехал в поток `/teacher/work/`. Открытый
+    # по старой закладке адрес уводит на первый шаг, а не показывает
+    # мёртвый экран.
+    tail = '?group=%s' % group_id_param(request) if group_id_param(request) \
+        else ''
+    return redirect(reverse('teacher:work_pick') + tail)
 
 
 @teacher_required

@@ -40,9 +40,11 @@ class OneCartTests(TestCase):
         self.client.force_login(self.tutor)
 
     def test_key_is_the_same_for_homework_and_exam(self):
-        homework = self.client.get('/teacher/assignment/create/')
-        exam = self.client.get('/teacher/groups/%d/exams/new/' % self.group.pk)
-        build = self.client.get('/teacher/assignment/build/')
+        # ⚠️ Экраны переехали в поток (ревью 17.08, п. 4.5): корзина одна на
+        # все шаги и на оба вида работы — это и проверяется.
+        homework = self.client.get('/teacher/work/')
+        exam = self.client.get('/teacher/work/?kind=exam')
+        build = self.client.get('/teacher/work/compose/')
         for response in (homework, exam, build):
             self.assertEqual(response.status_code, 200)
             self.assertIn(CART_KEY, response.content.decode())
@@ -89,14 +91,15 @@ class OwnProblemsTabTests(TestCase):
         self.client.force_login(self.tutor)
 
     def page(self):
-        response = self.client.get('/teacher/assignment/create/')
+        response = self.client.get('/teacher/work/')
         self.assertEqual(response.status_code, 200)
         return response.content.decode()
 
     def test_three_tabs(self):
+        """⚠️ Вкладок стало пять, а названия — общие для платформы."""
         html = self.page()
-        self.assertIn('>Каталог<', html)
-        self.assertIn('Сохранённые (', html)
+        self.assertIn('Искать самому', html)
+        self.assertIn('Отложенные (', html)
         self.assertIn('Мои задачи (', html)
 
     def test_own_tab_counts_only_mine(self):
@@ -114,8 +117,8 @@ class OwnProblemsTabTests(TestCase):
     def test_card_looks_like_a_catalog_card(self):
         html = self.page()
         piece = html.split('id="pane-own"')[1].split('id="pane-saved"')[0]
-        self.assertIn('btn-preview', piece)
-        self.assertIn('btn-add', piece)
+        self.assertIn('data-full', piece)
+        self.assertIn('data-add', piece)
         self.assertIn('k-type k-type--task', piece)
 
     def test_saved_tab_is_not_mixed_with_own(self):
@@ -144,7 +147,7 @@ class OwnProblemsTabTests(TestCase):
             self.client.get('/teacher/api/problem/abc/').status_code, 404)
 
     def test_exam_builder_has_the_tab_too(self):
-        html = self.client.get('/teacher/groups/%d/exams/new/'
+        html = self.client.get('/teacher/work/?group=%d&kind=exam'
                                % self.group.pk).content.decode()
         self.assertIn('Мои задачи (1)', html)
 
@@ -198,12 +201,12 @@ class GroupFromUrlTests(TestCase):
                           re.S)
 
     def test_creation_screens_precheck_the_group(self):
-        for url in ('/teacher/assignment/create/?group=%d' % self.second.pk,
-                    '/teacher/assignment/build/?group=%d' % self.second.pk):
+        for url in ('/teacher/work/give/?group=%d' % self.second.pk,
+                    '/teacher/work/give/?group=%d&kind=exam' % self.second.pk):
             self.assertEqual(self.checked(url), [str(self.second.pk)], url)
 
     def test_without_a_group_nothing_is_prechecked(self):
-        self.assertEqual(self.checked('/teacher/assignment/create/'), [])
+        self.assertEqual(self.checked('/teacher/work/give/'), [])
 
     def test_memory_yields_to_the_address(self):
         """⚠️ Память ДОБАВЛЯЛА к отмеченному занятию прошлое, и работа тихо

@@ -13,7 +13,7 @@
 одним начертанием.
 {% endcomment %}
 
-{% block title %}{{ student.get_full_name|default:student.username }} — ЭкЗадачи{% endblock %}
+{% block title %}{{ student.get_full_name|default:student.username }}{% endblock %}
 
 {% block extra_style %}
 {% include 'platform/_stats_style.html' %}

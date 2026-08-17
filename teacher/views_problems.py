@@ -336,7 +336,49 @@ def problem_form(request, pk=None):
         'return_to': _safe_return(request.GET.get('return_to')
                                   or request.POST.get('return_to')),
         'solution_visibility': SolutionVisibility.choices,
+        # ⚠️ ЭКРАН СВОЕЙ ЗАДАЧИ — ЭТО ПЕРВЫЙ ШАГ ПОТОКА (ревью 17.08, п. 4.2).
+        # Ленты шагов на нём не было вовсе: вместо неё стоял прежний ряд из
+        # трёх плиток способов, и человек, зайдя сюда, переставал понимать,
+        # где он и как вернуться к собираемой работе. Адреса шагов считает
+        # тот же модуль, что рисует их на остальных экранах.
+        'step': 'pick',
+        **_flow_head(request),
     })
+
+
+def _flow_head(request):
+    """Лента шагов и переключатель вида — для экрана «Написать свою».
+
+    ⚠️ АДРЕСА СЧИТАЕТ `views_work`, а не этот модуль: вторая сборка ленты
+    разъехалась бы с потоком на первой же правке (шаг «Что нашлось»
+    показывается не всем путям, и это правило живёт там).
+
+    ⚠️ ПЕРЕКЛЮЧАТЕЛЬ ВИДА ОСТАЁТСЯ НА ЭТОМ ЖЕ ЭКРАНЕ. Увести его на шаг
+    отбора значило бы выбросить недописанную задачу ради уточнения «это
+    контрольная».
+    """
+    from urllib.parse import urlencode
+
+    from django.urls import reverse
+
+    from . import views_work
+
+    state = views_work.flow_state(request)
+    here = reverse('teacher:problem_new')
+    keep = {key: value for key, value in request.GET.items()
+            if key in ('group', 'to_cart', 'return_to')}
+
+    def same_screen(kind):
+        query = dict(keep)
+        if kind == 'exam':
+            query['kind'] = 'exam'
+        return here + ('?' + urlencode(query) if query else '')
+
+    return {
+        'steps': views_work.step_urls(state),
+        'kind_urls': {'homework': same_screen('homework'),
+                      'exam': same_screen('exam')},
+    }
 
 
 def _safe_return(value):

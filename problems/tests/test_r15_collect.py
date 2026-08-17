@@ -108,14 +108,14 @@ class CartOrderTests(TestCase):
         Значит порядок каталожных задач нельзя было задать вообще ничем.
         Экран хранит порядок отдельным списком — проверяем, что он есть.
         """
-        with open('teacher/templates/teacher/assignment_build.html',
+        # ПЕРЕСЧИТАН 17.08: конструктор подборки удалён, порядок хранит
+        # корзина потока. Смысл проверки прежний — отдельный список порядка
+        # есть, и он не полагается на ключи объекта.
+        with open('teacher/templates/teacher/work/_bar_js.html',
                   encoding='utf-8') as fh:
             page = fh.read()
-        # ПЕРЕСЧИТАН 16.08: имя ключа теперь приходит из общего
-        # `_cart_keys.html` (одна точка на все экраны), а не собирается
-        # здесь строкой. Смысл проверки прежний — список порядка есть.
-        self.assertIn('var ORDER_KEY = window.QLS_CART.order', page)
-        self.assertIn('function readOrder', page)
+        self.assertIn('var ORDER = window.QLS_CART.order', page)
+        self.assertIn('read(ORDER', page)
 
 
 class CartPrintPreviewTests(TestCase):
@@ -199,18 +199,20 @@ class BuildScreenMarkupTests(TestCase):
         self.client.force_login(self.tutor)
 
     def page(self):
-        response = self.client.get('/teacher/assignment/build/')
+        # ⚠️ Конструктор подборки удалён (ревью 17.08, п. 4.5) — состав
+        # работы собирает шаг «Состав», общий для всех способов набора.
+        response = self.client.get('/teacher/work/compose/')
         self.assertEqual(response.status_code, 200)
         return response.content.decode()
 
     def test_block_name_matches_what_it_shows(self):
         html = self.page()
-        self.assertIn('<h2>Состав работы</h2>', html)
+        self.assertIn('Состав работы', html)
 
     def test_student_view_is_a_separate_button(self):
         html = self.page()
         self.assertIn('Посмотреть, как увидит ученик', html)
-        self.assertIn('id="bd-eyes-box"', html)
+        self.assertIn('id="wk-eyes"', html)
 
     def test_print_preview_button(self):
         html = self.page()
@@ -220,13 +222,20 @@ class BuildScreenMarkupTests(TestCase):
     def test_order_has_buttons_not_only_dragging(self):
         """⚠️ Перетаскивание недоступно с клавиатуры — кнопки обязательны."""
         html = self.page()
-        self.assertIn('class="bd-up"', html)
-        self.assertIn('class="bd-down"', html)
+        self.assertIn('class="wk-up"', html)
+        self.assertIn('class="wk-down"', html)
         self.assertIn('draggable="true"', html)
 
     def test_hidden_name_field_does_not_clash(self):
         """⚠️ Второй элемент с именем `name` делал `[name=name]`
-        двусмысленным — сценарий находил первым скрытый."""
+        двусмысленным — сценарий находил первым скрытый.
+
+        Проверка разнесена по двум шагам: на «Составе» живёт скрытое
+        `work_name` печатной формы и поля `name` нет вовсе, на «Выдаче»
+        поле названия работы ровно одно.
+        """
         html = self.page()
         self.assertIn('name="work_name"', html)
-        self.assertEqual(html.count('name="name"'), 1)
+        self.assertEqual(html.count('name="name"'), 0)
+        give = self.client.get('/teacher/work/give/').content.decode()
+        self.assertEqual(give.count('name="name"'), 1)

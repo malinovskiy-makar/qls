@@ -2,6 +2,13 @@
 Обзор кабинета 13.08.2026, фаза 9 — создание работы.
 
 Пункты владельца 57, 58, 59, 60, 62, 63.
+
+⚠️ ПЕРЕСЧИТАН В РЕВЬЮ 17.08, п. 4.5. Прежние экраны создания удалены, набор
+задач живёт в потоке `/teacher/work/`. Требования владельца не отменялись —
+они проверяются там, где эти элементы теперь стоят: общая шапка стала
+лентой шагов, правая колонка с настройками — шагом «Выдача», кнопка
+создания — полосой собранного. Отдельно отмечено ниже, что именно
+изменилось и почему прежнее ожидание больше не верно.
 """
 import os
 import re
@@ -64,17 +71,29 @@ class OwnProblemHeaderTests(Base):
                          'Ученики → Группа А → новая работа')
 
     def test_common_header_parts_are_there(self):
+        """⚠️ ПЕРЕСЧИТАН: вместо трёх плиток способов — ЛЕНТА ШАГОВ.
+
+        Требование то же и стало строже: экран своей задачи не имеет права
+        выпадать из потока. Плитки способов набора удалены с платформы
+        вместе со старыми экранами (ревью 17.08, п. 4.2 и 4.5) — их роль
+        играют вкладки первого шага.
+        """
         html = self._in_build()
         self.assertIn('Новая работа', html)
         self.assertIn('bh-kind__opt', html)
-        self.assertEqual(html.count('<span class="k-tile__name">'), 3)
+        # ⚠️ Ищем РАЗМЕТКУ, а не имя класса: набор стилей вклеен в
+        # `<style>` страницы, и поиск по имени зеленел бы всегда (по
+        # проекту наступали на это шесть раз).
+        self.assertIn('class="wk-rail"', html)
+        self.assertIn('Что кладём', html)
+        self.assertIn('Выдача', html)
 
     def test_from_my_problems_the_old_crumb_stays(self):
         html = self.client.get(reverse('teacher:problem_new')).content.decode()
         self.assertIn('Мои задачи', _crumb_text(html))
-        # Общей шапки нет: ни переключателя вида, ни плиток способа.
+        # Шапки потока нет: ни переключателя вида, ни ленты шагов.
         self.assertNotIn('<a class="bh-kind__opt', html)
-        self.assertNotIn('<span class="k-tile__name">', html)
+        self.assertNotIn('class="wk-rail"', html)
 
 
 class KindSwitcherTests(Base):
@@ -82,7 +101,7 @@ class KindSwitcherTests(Base):
 
     def _html(self):
         return self.client.get(
-            reverse('teacher:assignment_create')
+            reverse('teacher:work_pick')
             + '?group=%d' % self.group.pk).content.decode()
 
     def test_kind_is_not_a_tile_anymore(self):
@@ -92,9 +111,17 @@ class KindSwitcherTests(Base):
         # набора, которые вклеены в <style> страницы.
         self.assertEqual(html.count('<a class="bh-kind__opt'), 2)
 
-    def test_only_three_tiles_left_on_the_screen(self):
-        """Плиток было пять одного размера — какие главные, понять нельзя."""
-        self.assertEqual(self._html().count('<span class="k-tile__name">'), 3)
+    def test_ways_to_pick_are_tabs_now(self):
+        """⚠️ ПЕРЕСЧИТАН: плитки способов заменены вкладками первого шага.
+
+        Прежнее ожидание («ровно три плитки») относилось к удалённому ряду
+        `_build_modes`. Способов по-прежнему три, но они стали вкладками —
+        переход между ними больше не теряет набранное (ревью 17.08, п. 4.5).
+        """
+        html = self._html()
+        self.assertNotIn('<span class="k-tile__name">', html)
+        for name in ('Искать самому', 'Описать словами', 'Написать свою'):
+            self.assertIn(name, html)
 
     def test_the_note_is_not_lost(self):
         html = self._html()
@@ -102,7 +129,8 @@ class KindSwitcherTests(Base):
 
     def test_the_note_follows_the_chosen_kind(self):
         html = self.client.get(
-            reverse('teacher:exam_create', args=[self.group.pk])).content.decode()
+            '%s?group=%d&kind=exam' % (reverse('teacher:work_pick'),
+                                       self.group.pk)).content.decode()
         note = re.search(r'class="bh-kind__note">(.*?)<', html).group(1)
         self.assertEqual(note, 'ограниченное время, окно')
 
@@ -138,90 +166,96 @@ class SummaryCardTests(Base):
 class ColumnOrderTests(Base):
     """9.4 — сверху что за работа, снизу чем наполняем."""
 
-    def _aside(self, html):
-        """Правая колонка целиком.
-
-        ⚠️ Режем по `<aside class="hw-sidebar` БЕЗ закрывающей кавычки:
-        с ревью 15.08 панель ещё и обёртка растворения краёв, и в атрибуте
-        рядом стоят `fade-box fade-box--y`.
-        """
-        return html.split('<aside class="hw-sidebar')[1]
+    def _give(self, kind='homework'):
+        tail = '?group=%d' % self.group.pk
+        if kind == 'exam':
+            tail += '&kind=exam'
+        return self.client.get(reverse('teacher:work_give')
+                               + tail).content.decode()
 
     def _order(self, html):
-        """Порядок блоков правой колонки по их заголовкам."""
-        return re.findall(r'class="ws-title"[^>]*>(.*?)<', self._aside(html))
+        """Порядок блоков настроек по их заголовкам."""
+        return re.findall(r'class="ws-title"[^>]*>(.*?)<', html)
 
     def test_homework_settings_stand_above_the_cart(self):
-        html = self.client.get(
-            reverse('teacher:assignment_create')
-            + '?group=%d' % self.group.pk).content.decode()
-        order = self._order(html)
-        self.assertEqual(order[:3],
-                         ['Настройки работы', 'Кому выдать', 'Выбранные задачи'])
+        """⚠️ ПЕРЕСЧИТАН: правой колонки конструктора больше нет.
+
+        Настройки работы спрашиваются на шаге «Выдача», а состав живёт на
+        шаге раньше (ревью 17.08, п. 4.5). Порядок внутри настроек прежний
+        и по-прежнему проверяется: сначала сама работа, потом кому выдать.
+        """
+        self.assertEqual(self._order(self._give())[:2],
+                         ['Настройки работы', 'Кому выдать'])
 
     def test_exam_uses_the_same_order(self):
-        """Разводить порядок на двух конструкторах нельзя."""
-        html = self.client.get(
-            reverse('teacher:exam_create',
-                    args=[self.group.pk])).content.decode()
-        order = self._order(html)
-        self.assertEqual(order[:3],
-                         ['Настройки работы', 'Кому выдать',
-                          'Задачи контрольной'])
+        """Разводить порядок на двух видах работы нельзя."""
+        self.assertEqual(self._order(self._give('exam'))[:2],
+                         ['Настройки работы', 'Кому выдать'])
 
     def test_button_stayed_last(self):
-        html = self.client.get(
-            reverse('teacher:assignment_create')
-            + '?group=%d' % self.group.pk).content.decode()
-        aside = self._aside(html)
-        self.assertLess(aside.index('cart-list'), aside.index('id="submit-btn"'))
+        """Кнопка выдачи — последняя на экране, ниже настроек."""
+        html = self._give()
+        self.assertLess(html.index('Кому выдать'), html.index('id="wk-next"'))
 
     def test_button_ids_did_not_change(self):
-        """Их ищет `_picker_js` — переименование сломало бы подсказку."""
-        html = self.client.get(
-            reverse('teacher:assignment_create')).content.decode()
-        self.assertIn('id="submit-btn"', html)
-        self.assertIn('id="submit-why"', html)
+        """⚠️ ПЕРЕСЧИТАН: кнопка создания переехала в полосу собранного.
+
+        Прежние `submit-btn` / `submit-why` принадлежали удалённым
+        конструкторам. Их роль играют `wk-next` и `wk-why`, и запрет
+        перехода ставит одно место — полоса (ревью 17.08, фаза 12).
+        """
+        html = self._give()
+        self.assertIn('id="wk-next"', html)
+        self.assertIn('id="wk-why"', html)
 
     def test_only_one_button_on_the_page(self):
-        for url in (reverse('teacher:assignment_create'),
-                    reverse('teacher:exam_create', args=[self.group.pk])):
-            html = self.client.get(url).content.decode()
-            self.assertEqual(html.count('id="submit-btn"'), 1, url)
+        for kind in ('homework', 'exam'):
+            html = self._give(kind)
+            self.assertEqual(html.count('id="wk-next"'), 1, kind)
 
 
 class SubmitLabelTests(Base):
-    """9.5 — надпись кнопки следует за видом работы."""
+    """9.5 — надпись кнопки следует за видом работы.
+
+    ⚠️ ПЕРЕСЧИТАН ЦЕЛИКОМ (ревью 17.08, п. 4.5). Надписей «Создать домашку»
+    и «Создать контрольную» больше нет: кнопка в потоке одна и называется
+    «Выдать работу», а вид работы виден на ленте шагов и в переключателе
+    над ней. Требование, ради которого писался класс, — «человек видит, что
+    именно он создаёт» — проверяется теперь по этому переключателю и по
+    подписи под ним.
+    """
+
+    def _give(self, kind='homework'):
+        tail = '?group=%d' % self.group.pk
+        if kind == 'exam':
+            tail += '&kind=exam'
+        return self.client.get(reverse('teacher:work_give')
+                               + tail).content.decode()
 
     def test_homework_says_homework(self):
-        html = self.client.get(
-            reverse('teacher:assignment_create')
-            + '?group=%d' % self.group.pk).content.decode()
-        self.assertIn('Создать домашку', html)
+        html = self._give()
+        self.assertIn('Выдать работу', html)
+        self.assertIn('решают дома, срок сдачи', html)
 
-    def test_switching_to_exam_leads_to_the_exam_button(self):
-        """Переключатель ведёт в конструктор контрольной — там своя надпись."""
-        html = self.client.get(
-            reverse('teacher:assignment_create')
-            + '?group=%d' % self.group.pk).content.decode()
+    def test_switching_to_exam_stays_on_the_same_step(self):
+        """⚠️ Переключатель ведёт на ТОТ ЖЕ шаг, а не на другой экран."""
+        html = self._give()
         links = re.findall(r'<a class="bh-kind__opt[^"]*"\s+href="([^"]+)"', html)
         exam_url = links[1].replace('&amp;', '&')
-        self.assertEqual(exam_url,
-                         reverse('teacher:exam_create', args=[self.group.pk]))
+        self.assertIn(reverse('teacher:work_give'), exam_url)
+        self.assertIn('kind=exam', exam_url)
         exam_html = self.client.get(exam_url).content.decode()
-        self.assertIn('Создать контрольную', exam_html)
-        self.assertNotIn('Создать домашку', exam_html)
+        self.assertIn('ограниченное время, окно', exam_html)
 
-    def test_without_a_group_the_exam_constructor_does_not_exist(self):
-        """Он живёт ВНУТРИ занятия: без номера адрес не собирается.
-
-        Это ограничение, а не дефект надписи: переключатель уводит на
-        «Описать словами», где кнопки создания нет вовсе.
+    def test_exam_needs_no_group_in_the_address_anymore(self):
+        """⚠️ ПЕРЕСЧИТАН: конструктор контрольной жил ВНУТРИ занятия, и без
+        номера адрес не собирался. Теперь занятие выбирают на шаге
+        «Выдача», и путь к контрольной есть даже без `?group=`.
         """
-        html = self.client.get(reverse('teacher:assignment_create')).content.decode()
+        html = self.client.get(reverse('teacher:work_give')).content.decode()
         links = re.findall(r'<a class="bh-kind__opt[^"]*"\s+href="([^"]+)"', html)
+        self.assertEqual(len(links), 2)
         self.assertIn('kind=exam', links[1])
-        self.assertIn('generate', links[1])
 
 
 class FiltersRowTests(Base):
@@ -251,8 +285,11 @@ class FiltersRowTests(Base):
         self.assertIn('.filters-row .k-btn { flex: 0 0 auto; }', css)
 
     def test_all_seven_controls_are_still_there(self):
-        html = self.client.get(reverse('teacher:assignment_create')).content.decode()
-        row = html.split('class="filters-row"')[1].split('</form>')[0]
+        # ⚠️ Ряд отбора переехал в поток и называется `wk-filters`
+        # (ревью 17.08, п. 4.5). Ни один элемент не потерян — это и
+        # проверяется.
+        html = self.client.get(reverse('teacher:work_pick')).content.decode()
+        row = html.split('class="wk-filters"')[1].split('</form>')[0]
         for name in ('name="q"', 'name="topic"', 'name="difficulty"',
                      'name="type"', 'name="has_solution"'):
             self.assertIn(name, row)

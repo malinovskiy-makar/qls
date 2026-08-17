@@ -6,7 +6,7 @@
 индивидуального занятия — ученика, а название подставляется само.
 {% endcomment %}
 
-{% block title %}{% if individual %}Новый ученик{% else %}Создать группу{% endif %} — ЭкЗадачи{% endblock %}
+{% block title %}{% if individual %}Новый ученик{% else %}Создать группу{% endif %}{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .form-field { margin-bottom: 16px; }

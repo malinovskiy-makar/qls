@@ -136,7 +136,7 @@ class CrumbGroupNameTests(TestCase):
 
     def test_group_name_instead_of_the_word(self):
         html = self.client.get(
-            reverse('teacher:assignment_create')
+            reverse('teacher:work_pick')
             + '?group=%d' % self.group.pk).content.decode()
         self.assertIn('Экономика, вторник', crumbs(html))
         self.assertNotIn('занятие', crumbs(html))
@@ -152,7 +152,7 @@ class CrumbGroupNameTests(TestCase):
         self.solo.name = 'Вторник, 18:00'
         self.solo.save()
         html = self.client.get(
-            reverse('teacher:assignment_create')
+            reverse('teacher:work_pick')
             + '?group=%d' % self.solo.pk).content.decode()
         self.assertIn('Мария Ким', crumbs(html))
 
@@ -168,7 +168,7 @@ class CrumbGroupNameTests(TestCase):
         """
         alien = StudentGroup.objects.create(name='Секретная', teacher=self.other)
         response = self.client.get(
-            reverse('teacher:assignment_create')
+            reverse('teacher:work_pick')
             + '?group=%d' % alien.pk, follow=True)
         html = response.content.decode()
         self.assertNotIn('Секретная', html)
@@ -181,7 +181,7 @@ class CrumbGroupNameTests(TestCase):
         занятие теперь получает внятный отказ, а не игнорируется молча.
         """
         response = self.client.get(
-            reverse('teacher:assignment_create') + '?group=abc')
+            reverse('teacher:work_pick') + '?group=abc')
         self.assertIn(response.status_code, (200, 302))
 
 

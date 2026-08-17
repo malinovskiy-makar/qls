@@ -83,13 +83,15 @@ class DifficultyWordsTests(TestCase):
         self.assertIn('сложность 3 из 5', card_meta([], 'Задача', 3))
 
     def test_builder_row_says_it_too(self):
-        text = read('teacher', 'templates', 'teacher', 'assignment_build.html')
-        self.assertIn("'сложность не указана'", text)
-        self.assertNotIn("(row.difficulty || 0) + ' из 5'", text)
+        """⚠️ Строку собирает СЕРВЕР (`picker.card_meta`), и на всех экранах
+        одна. Конструктор подборки со своей сборкой удалён вместе с
+        экраном (ревью 17.08, п. 4.5) — второй такой строки не осталось."""
+        from teacher.picker import card_meta
 
-    def test_preview_window_does_not_show_five_empty_stars(self):
-        script = read('teacher', 'templates', 'teacher', '_picker_js.html')
-        self.assertIn('сложность не указана', script)
+        self.assertIn('сложность не указана', card_meta([], 'Задача', 0))
+        for path in ('work/compose.html', 'work/pick.html'):
+            text = read('teacher', 'templates', 'teacher', *path.split('/'))
+            self.assertNotIn("(row.difficulty || 0) + ' из 5'", text)
 
 
 class OneWayOutTests(TestCase):
@@ -110,12 +112,16 @@ class OneNameTests(TestCase):
     """7.4 — «конструктор подборки» во всех местах одинаково."""
 
     def test_button_and_screen_agree(self):
-        page = read('teacher', 'templates', 'teacher', 'generate.html')
-        build = read('teacher', 'templates', 'teacher',
-                     'assignment_build.html')
-        self.assertIn('конструктор подборки', page)
-        self.assertNotIn('конструктор подборок', page)
-        self.assertIn('Конструктор подборки', build)
+        """⚠️ ПЕРЕСЧИТАН: «конструктор подборки» как экран удалён.
+
+        Название способа набора теперь одно на платформу — «Описать
+        словами / умный поиск по каталогу» (ревью 17.08, п. 4.3), и
+        проверяется именно это: второго набора слов нигде нет.
+        """
+        pick = read('teacher', 'templates', 'teacher', 'work', 'pick.html')
+        self.assertIn('умный поиск по каталогу', pick)
+        self.assertIn('ручной поиск по каталогу', pick)
+        self.assertIn('создание задачи с нуля', pick)
 
 
 class LoggingTests(TestCase):

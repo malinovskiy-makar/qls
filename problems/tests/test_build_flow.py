@@ -152,18 +152,24 @@ class BuildScreenTests(TestCase):
         # конструктора контрольной — экрана, где этот блок главный.
         for kind, marker in (('homework', 'Срок сдачи'),
                              ('exam', 'Как идёт время')):
-            body = self.client.get(reverse('teacher:assignment_build'),
+            # ⚠️ Конструктор подборки удалён (ревью 17.08, п. 4.5):
+            # настройки работы спрашивает шаг «Выдача».
+            body = self.client.get(reverse('teacher:work_give'),
                                    {'kind': kind}).content.decode()
             self.assertIn(marker, body, kind)
 
     def test_exam_keeps_the_group_in_links(self):
-        """⚠️ Переключатель вида НЕ теряет группу: у контрольной конструктор
-        живёт внутри группы, и без номера адрес не собрать."""
-        body = self.client.get(reverse('teacher:assignment_build'),
+        """⚠️ Переключатель вида НЕ теряет занятие.
+
+        ПЕРЕСЧИТАН (ревью 17.08, п. 4.5): конструктор контрольной жил
+        внутри занятия, теперь вид работы — параметр того же шага, и
+        переключатель ведёт на него же, не теряя занятия.
+        """
+        body = self.client.get(reverse('teacher:work_give'),
                                {'kind': 'exam',
                                 'group': self.group.pk}).content.decode()
-        self.assertIn('?kind=homework&amp;group=%d' % self.group.pk, body)
-        self.assertIn('/groups/%d/exams/new/' % self.group.pk, body)
+        self.assertIn('group=%d' % self.group.pk, body)
+        self.assertIn('kind=exam', body)
 
     def test_cart_rows_use_the_shared_order(self):
         """Порядок и подписи частей — та же сборка, что у ученика."""

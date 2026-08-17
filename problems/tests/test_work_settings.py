@@ -1,9 +1,14 @@
 """
-Панель «Настройки работы» — один партиал на четыре экрана создания
-(сессия 10, фаза 2).
+Панель «Настройки работы» — один партиал (сессия 10, фаза 2).
+
+⚠️ ПЕРЕСЧИТАНО В РЕВЬЮ 17.08, п. 4.5. Экранов создания было четыре, и файл
+проверял, что панель одинакова на всех. Старые конструкторы удалены — набор
+задач живёт в потоке `/teacher/work/`, а настройки работы спрашиваются один
+раз, на шаге «Выдача». Требование не ослабло, оно стало сильнее: панель
+теперь ровно одна, и проверяется, что второй нигде не завелось.
 
 Здесь держится главное, что легко сломать незаметно:
-  * панель есть на ВСЕХ четырёх экранах и всюду одна и та же;
+  * панель есть на шаге «Выдача» и нигде больше;
   * ИМЕНА ПОЛЕЙ НА СЕРВЕРЕ не изменились ни одно — иначе создание работ
     молча перестанет работать, а страница будет отдавать честные 200;
   * переключатель вида и номер занятия не теряются в ссылках;
@@ -45,7 +50,7 @@ def make_tutor(name='ws_tutor'):
 
 
 class PanelIsOneOnEveryScreen(TestCase):
-    """Панель настроек — один партиал, и он виден на всех экранах создания."""
+    """Панель настроек — один партиал, и он виден на шаге «Выдача»."""
 
     def setUp(self):
         self.tutor = make_tutor()
@@ -54,14 +59,12 @@ class PanelIsOneOnEveryScreen(TestCase):
                                                  teacher=self.tutor)
 
     def screens(self):
+        """Шаг «Выдача» в обоих видах работы — единственное место панели."""
+        give = reverse('teacher:work_give')
         return {
-            'искать самому': reverse('teacher:assignment_create'),
-            'конструктор контрольной': reverse('teacher:exam_create',
-                                               args=[self.group.pk]),
-            'конструктор подборки (домашка)':
-                reverse('teacher:assignment_build') + '?kind=homework',
-            'конструктор подборки (контрольная)':
-                reverse('teacher:assignment_build') + '?kind=exam',
+            'выдача домашки': '%s?group=%s' % (give, self.group.pk),
+            'выдача контрольной':
+                '%s?group=%s&kind=exam' % (give, self.group.pk),
         }
 
     def test_panel_on_every_screen(self):
@@ -69,8 +72,12 @@ class PanelIsOneOnEveryScreen(TestCase):
             body = self.client.get(url).content.decode()
             self.assertIn('Настройки работы', body, name)
             self.assertIn('Кому выдать', body, name)
-            self.assertIn('id="submit-btn"', body, name)
-            self.assertIn('id="submit-why"', body, name)
+            # ⚠️ КНОПКА ВЫДАЧИ ПЕРЕЕХАЛА В ПОЛОСУ СОБРАННОГО (ревью 17.08).
+            # Она называется `wk-next`, а причины запрета пишет `wk-why` —
+            # одно место на все шаги потока, иначе полоса пересчитывалась
+            # бы последней и молча снимала запрет шага.
+            self.assertIn('id="wk-next"', body, name)
+            self.assertIn('id="wk-why"', body, name)
 
     def test_no_screen_keeps_its_own_copy_of_the_panel(self):
         """Старые заголовки-близнецы обязаны исчезнуть.
@@ -84,6 +91,15 @@ class PanelIsOneOnEveryScreen(TestCase):
             self.assertNotIn('Настройки домашки', body, name)
             self.assertNotIn('Настройки контрольной', body, name)
             self.assertNotIn('class="sidebar-card"', body, name)
+
+    def test_settings_are_not_asked_before_they_are_needed(self):
+        """⚠️ Панель уехала с первого шага (ревью 17.08): её спрашивали за
+        три экрана до того, как на неё можно ответить, и она занимала треть
+        ширины там, где нужен каталог."""
+        body = self.client.get(
+            '%s?group=%s' % (reverse('teacher:work_pick'),
+                             self.group.pk)).content.decode()
+        self.assertNotIn('Кому выдать', body)
 
 
 class ServerFieldNamesUnchanged(TestCase):
@@ -100,32 +116,28 @@ class ServerFieldNamesUnchanged(TestCase):
         return set(re.findall(r'name="([a-z_]+)"', body))
 
     def test_homework_asks_name_deadline_groups(self):
-        for url in (reverse('teacher:assignment_create'),
-                    reverse('teacher:assignment_build') + '?kind=homework'):
-            names = self.names_on(url)
-            self.assertLessEqual({'name', 'deadline', 'groups'}, names, url)
+        names = self.names_on(reverse('teacher:work_give'))
+        self.assertLessEqual({'name', 'deadline', 'groups'}, names)
 
     def test_exam_asks_the_whole_time_block(self):
         expected = {'name', 'kind', 'starts_at', 'ends_at', 'deadline',
                     'duration', 'show_results'}
-        for url in (reverse('teacher:exam_create', args=[self.group.pk]),
-                    reverse('teacher:assignment_build') + '?kind=exam'):
-            self.assertLessEqual(expected, self.names_on(url), url)
+        self.assertLessEqual(
+            expected, self.names_on(reverse('teacher:work_give') + '?kind=exam'))
 
-    def test_exam_inside_a_group_has_no_groups_field(self):
-        """Группа задана адресом; вьюха `groups` не читает вовсе.
-
-        Живое поле `groups` здесь не только лишнее — оно попало бы под
-        проверку «выберите группу» в `_picker_js` и заперло бы кнопку.
+    def test_exam_picks_one_lesson_not_several(self):
+        """⚠️ ПЕРЕСЧИТАН (ревью 17.08, п. 4.5). Прежде занятие контрольной
+        задавалось АДРЕСОМ её конструктора, и поля `groups` на экране не
+        было вовсе. Конструктор удалён; занятие выбирают на шаге «Выдача»,
+        и требование стало другим: выбор ОДИНОЧНЫЙ. Обещать галочками
+        выдачу трём занятиям нельзя — обработчик живёт внутри одного.
         """
         body = self.client.get(
-            reverse('teacher:exam_create', args=[self.group.pk])).content.decode()
-        # ⚠️ Ищем ЭЛЕМЕНТ, а не строку `name="groups"`: та же строка стоит
-        # селектором внутри `_build_keep.html`, и наивная проверка краснела
-        # бы всегда — родня ловушке «класс набора вклеен в <style>».
-        self.assertFalse(re.search(r'<input[^>]*name="groups"', body),
-                         'поля выбора занятия здесь быть не должно')
-        self.assertIn(self.group.name, body)
+            reverse('teacher:work_give') + '?kind=exam').content.decode()
+        boxes = re.findall(r'<input[^>]*name="groups"[^>]*>', body)
+        self.assertTrue(boxes, 'выбора занятия нет вовсе')
+        for box in boxes:
+            self.assertIn('type="radio"', box, box)
 
     def test_deadline_still_travels_as_a_datetime_local(self):
         """Надстройка — лицо, имя остаётся на родном поле.
@@ -133,7 +145,7 @@ class ServerFieldNamesUnchanged(TestCase):
         Если имя переедет на текстовое поле, сервер получит «14.08.2026»,
         а `datetime.fromisoformat` его не разберёт и срок пропадёт молча.
         """
-        body = self.client.get(reverse('teacher:assignment_create')).content.decode()
+        body = self.client.get(reverse('teacher:work_give')).content.decode()
         self.assertIn('type="datetime-local"', body)
         self.assertRegex(
             body,
@@ -154,9 +166,10 @@ class GroupAndKindSurviveTheSwitchers(TestCase):
         """Терялся в трёх ссылках из шести — поймано сценарием сессии 10."""
         pk = self.group.pk
         for url in (f"{reverse('teacher:assignment_generate')}?group={pk}",
-                    f"{reverse('teacher:assignment_create')}?group={pk}",
-                    f"{reverse('teacher:problem_new')}?to_cart=1&group={pk}",
-                    reverse('teacher:exam_create', args=[pk])):
+                    f"{reverse('teacher:work_pick')}?group={pk}",
+                    f"{reverse('teacher:work_compose')}?group={pk}",
+                    f"{reverse('teacher:work_give')}?group={pk}",
+                    f"{reverse('teacher:problem_new')}?to_cart=1&group={pk}"):
             body = self.client.get(url).content.decode()
             # ⚠️ Ссылок теперь ДВА вида: плитки способа набора и
             # сегментированный переключатель вида работы (обзор 13.08,
@@ -175,7 +188,8 @@ class GroupAndKindSurviveTheSwitchers(TestCase):
         """«Написать свою» вела на голый problem_new: задача не попадала
         в собираемую работу, а вид работы сбрасывался на домашку."""
         body = self.client.get(
-            reverse('teacher:exam_create', args=[self.group.pk])).content.decode()
+            '%s?group=%s&kind=exam' % (reverse('teacher:work_pick'),
+                                       self.group.pk)).content.decode()
         own = [h for h in re.findall(r'href="([^"]*problems/new/[^"]*)"', body)]
         self.assertTrue(own, 'ссылки «Написать свою» нет вовсе')
         for href in own:
@@ -187,7 +201,7 @@ class GroupAndKindSurviveTheSwitchers(TestCase):
         `{% url %}`, и Django бросал NoReverseMatch. Дефект был и до
         сведения панели."""
         for url in (reverse('teacher:assignment_generate'),
-                    reverse('teacher:assignment_create'),
+                    reverse('teacher:work_pick'),
                     reverse('teacher:problem_new')):
             for bad in ('abc', 'null', '1; drop', ''):
                 response = self.client.get(url, {'group': bad, 'to_cart': '1'})
@@ -209,8 +223,11 @@ class ManualSearchFiltersStayComplete(TestCase):
         self.client.force_login(self.tutor)
 
     def test_all_seven_controls_are_there(self):
-        body = self.client.get(reverse('teacher:assignment_create')).content.decode()
-        form = body[body.index('id="filter-form"'):]
+        body = self.client.get(reverse('teacher:work_pick')).content.decode()
+        # ⚠️ Форма отбора переехала в поток и называется `wk-filter-form`
+        # (ревью 17.08, п. 4.5). Проверка та же: ни один элемент ряда
+        # фильтров не потерян.
+        form = body[body.index('id="wk-filter-form"'):]
         form = form[:form.index('</form>')]
         for field in ('name="q"', 'name="topic"', 'name="difficulty"',
                       'name="type"', 'name="has_solution"'):
@@ -219,9 +236,11 @@ class ManualSearchFiltersStayComplete(TestCase):
         self.assertIn('Сброс', form)
 
     def test_the_row_lives_in_a_kit_card(self):
-        body = self.client.get(reverse('teacher:assignment_create')).content.decode()
-        self.assertRegex(body, r'id="filter-form"[^>]*class="k-card k-filters"'
-                               r'|class="k-card k-filters"[^>]*id="filter-form"')
+        body = self.client.get(reverse('teacher:work_pick')).content.decode()
+        self.assertRegex(
+            body,
+            r'id="wk-filter-form"[^>]*class="k-card k-filters"'
+            r'|class="k-card k-filters"[^>]*id="wk-filter-form"')
 
 
 class DateFieldMarkup(TestCase):

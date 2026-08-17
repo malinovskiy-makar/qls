@@ -11,7 +11,6 @@
    тянуть ради одной строки весь набор стилей статистики незачем. */
 .empty-note { font-size: 13px; color: var(--text2); text-align: center;
               padding: 18px; }
-.gen-wrap { max-width: 1060px; }
 /* Две колонки первого шага: слева рабочая область, справа «Что получится». */
 .gen-two { display: grid; grid-template-columns: minmax(0,1fr) 300px;
            gap: 20px; align-items: start; }
@@ -21,18 +20,6 @@
 .gen-sum__line.k-quiet { font-weight: 400; }
 @media (max-width: 900px) { .gen-two { grid-template-columns: 1fr; }
                             .gen-side { position: static; } }
-.gen-step { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap;
-            font-size: 12px; }
-.gen-step span { padding: 5px 12px; border-radius: 999px;
-                 border: 1px solid var(--border); color: var(--text2); }
-/* ⚠️ АКТИВНЫЙ ШАГ НЕ МАЛИНОВЫЙ (поправка 5 владельца): это не навигация
-   сайта, а положение внутри одной формы. Активный — графитовая заливка
-   (как крупные кнопки), пройденный — тихая галочка, будущий — приглушён. */
-.gen-step span.is-on { border-color: var(--btn-bg); color: var(--on-btn);
-                       background: var(--btn-bg); font-weight: 600; }
-.gen-step span.is-done { border-color: var(--border); color: var(--text2); }
-.gen-step span.is-done::before { content: '✓ '; color: var(--green); }
-.gen-step span.is-next { opacity: .55; }
 .gen-card { background: var(--surface); border: 1px solid var(--border);
             border-radius: 12px; padding: 22px 24px; margin-bottom: 18px; }
 .gen-card h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
@@ -196,27 +183,33 @@ textarea.gen-text:focus { border-color: var(--focus); }
 {% endblock %}
 
 {% block content %}
-<div class="gen-wrap">
+<div class="wk-wrap">
 {% comment %}
 ⚠️ ЭТОТ ЭКРАН — ВТОРОЙ ШАГ ПОТОКА, и лента шагов на нём та же, что на
 остальных трёх. Своя шапка со своими плитками способов набора звала бы
 назад, к трём отдельным экранам, из которых поток и собирали.
 {% endcomment %}
+{% comment %}
+⚠️ ЛЕНТА ШАГОВ НА ЭКРАНЕ ОДНА (ревью 17.08, п. 4.1). Здесь стоял ВТОРОЙ
+ряд — «1. Запрос — 2. Что нашлось — 3. Конструктор» — от прежнего потока,
+где подбор был отдельным трёхшаговым экраном. Рядом с лентой нового потока
+он читался как вторая, противоречащая ей навигация: два «шага 2» на одной
+странице, и оба про разное.
+{% endcomment %}
 {% include "teacher/work/_head.html" with step=flow_step found=1 %}
-
-<div class="gen-step">
-  <span class="{% if step == 'ask' %}is-on{% else %}is-done{% endif %}">1. Запрос</span>
-  <span class="{% if step == 'plan' %}is-on{% elif step == 'result' %}is-done{% else %}is-next{% endif %}">2. Что нашлось</span>
-  <span class="{% if step == 'result' %}is-on{% else %}is-next{% endif %}">3. Конструктор</span>
-</div>
 
 {% if not available %}
 <div class="gen-card">
   <h2>Функция выключена</h2>
   <div class="sub">{{ reason }}</div>
-  <a href="{% url 'teacher:assignment_create' %}" class="filter-btn"
+  {% comment %}
+  ⚠️ ВЕДЁТ В ПОТОК, А НЕ НА ПРЕЖНИЙ КОНСТРУКТОР (ревью 17.08, п. 4.5).
+  Старые экраны удалены; собирать работу руками — это вкладка «Искать
+  самому» на первом шаге.
+  {% endcomment %}
+  <a href="{{ steps.pick }}" class="filter-btn"
      style="display:inline-block;text-decoration:none;line-height:34px;">
-    Собрать домашку вручную
+    Собрать работу вручную
   </a>
 </div>
 {% else %}
@@ -351,7 +344,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
       <span class="k-state__body">
         <span class="k-state__title">{{ ai_error.text }}</span>
         <span class="k-state__note">Соберите работу вручную:
-          <a href="{% if is_exam and group_id %}{% url 'teacher:exam_create' group_id %}{% else %}{% url 'teacher:assignment_create' %}{% endif %}">Ручной поиск по каталогу</a>.
+          <a href="{{ steps.pick }}">Искать самому</a> — ручной поиск по каталогу.
         </span>
       </span>
     </div>

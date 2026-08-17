@@ -195,16 +195,23 @@ class SortingTests(WorkFlowBase):
         self.assertEqual(str(self.test.pk), easy[0])
         self.assertEqual(str(self.task.pk), hard[0])
 
-    def test_old_screens_keep_their_order(self):
-        """⚠️ Сортировка просится ЯВНО. Молча включив её всем, я поменял бы
-        список на прежних экранах отбора, которых эта сессия не касается."""
-        html = self.client.get('%s?sort=easy'
-                               % reverse('teacher:assignment_create')).content.decode()
-        pids = re.findall(r'data-pid="(\d+)"', html)
-        self.assertEqual(pids[0], str(self.own.pk) if False else pids[0])
-        # На старом экране свежая задача остаётся первой независимо от
-        # параметра: он там не читается вовсе.
-        self.assertEqual(pids[0], str(self.test.pk))
+    def test_sorting_is_asked_for_explicitly(self):
+        """⚠️ ПЕРЕСЧИТАН (ревью 17.08, п. 4.5): старых экранов отбора нет.
+
+        Проверка была про то, что сортировка не включается молча всем.
+        Прежние экраны удалены, и держать это на них больше нельзя —
+        требование осталось у самой функции: без явного `sortable` порядок
+        прежний, каким бы ни был параметр адреса.
+        """
+        from teacher import picker
+
+        request = self.client.get('/teacher/work/?sort=easy').wsgi_request
+        # Без явной просьбы параметр адреса не читается вовсе: порядок
+        # остаётся прежним («подходящие по теме»).
+        self.assertEqual(picker.picker_context(request)['f_sort'], 'fit',
+                         'сортировка включилась без явной просьбы')
+        self.assertEqual(
+            picker.picker_context(request, sortable=True)['f_sort'], 'easy')
 
 
 class CardFactsTests(WorkFlowBase):
@@ -413,11 +420,12 @@ class EntryPointsTests(WorkFlowBase):
         self.assertIn(reverse('teacher:work_start'), block)
 
     def test_no_screen_still_sends_people_to_the_old_constructors(self):
-        """⚠️ Старые конструкторы остаются доступными по прямому адресу —
-        их удаление идёт отдельным шагом, — но ни одна кнопка кабинета в
-        них больше не ведёт."""
-        old = (reverse('teacher:assignment_create'),
-               reverse('teacher:assignment_build'))
+        """⚠️ ПЕРЕСЧИТАН: старые конструкторы УДАЛЕНЫ (ревью 17.08, п. 4.5).
+
+        Адрес `assignment_create` остался — он создаёт работу по форме шага
+        «Выдача», — но экрана за ним нет, и ссылок на него быть не должно.
+        """
+        old = (reverse('teacher:assignment_create'),)
         pages = ('%s?tab=assignments' % reverse('teacher:group_detail',
                                                 args=[self.group.pk]),
                  reverse('teacher:groups'),
@@ -440,7 +448,7 @@ class EntryPointsTests(WorkFlowBase):
     def test_found_step_wears_the_flow_rail(self):
         html = self.client.get(reverse('teacher:assignment_generate'),
                                ).content.decode()
-        self.assertIn('wk-rail', html)
+        self.assertIn('class="wk-rail"', html)
         self.assertIn('Что нашлось', html)
 
     def test_found_step_marks_where_the_task_came_from(self):

@@ -56,8 +56,12 @@ class StorageKeysTests(TestCase):
 class CreateScreensTests(TestCase):
     """Все экраны создания говорят об одном и том же хранилище."""
 
-    URLS = ('/teacher/assignment/create/',
-            '/teacher/assignment/build/',
+    # ⚠️ ПЕРЕСЧИТАН (ревью 17.08, п. 4.5): прежние конструкторы удалены,
+    # экраны создания — это четыре шага потока. Требование прежнее: имя
+    # хранилища приходит с сервера, руками его не пишет никто.
+    URLS = ('/teacher/work/',
+            '/teacher/work/compose/',
+            '/teacher/work/give/',
             '/teacher/assignment/generate/')
 
     @classmethod
@@ -72,7 +76,7 @@ class CreateScreensTests(TestCase):
 
     def urls_with_group(self):
         return [u + '?group=%d' % self.group.pk for u in self.URLS] + [
-            '/teacher/groups/%d/exams/new/' % self.group.pk]
+            '/teacher/work/?group=%d&kind=exam' % self.group.pk]
 
     def test_every_screen_knows_the_lesson_cart(self):
         want = picker.storage_keys(self.group.pk)['cart']
@@ -104,14 +108,15 @@ class CreateScreensTests(TestCase):
         """Срок и название живут рядом с корзиной и чистятся вместе с ней."""
         want = picker.storage_keys(self.group.pk)['settings']
         body = self.client.get(
-            '/teacher/assignment/create/?group=%d' % self.group.pk
+            '/teacher/work/give/?group=%d' % self.group.pk
         ).content.decode()
         self.assertIn(want, body)
 
     def test_key_name_is_never_hardcoded_in_screens(self):
         """Имя ключа не пишется в шаблонах руками — иначе они разъедутся."""
-        for path in ('teacher/templates/teacher/_picker_js.html',
-                     'teacher/templates/teacher/assignment_build.html',
+        for path in ('teacher/templates/teacher/work/_bar_js.html',
+                     'teacher/templates/teacher/work/compose.html',
+                     'teacher/templates/teacher/work/give.html',
                      'teacher/templates/teacher/generate.html',
                      'teacher/templates/teacher/_build_keep.html'):
             with open(path, encoding='utf-8') as fh:

@@ -17,17 +17,19 @@ from .access import own_group_or_404, tutor_required
 
 @tutor_required
 def exam_create(request, pk):
-    """Конструктор контрольной: как у домашки плюс блок времени.
+    """СОЗДАНИЕ контрольной. Экрана здесь нет — только приём формы.
+
+    ⚠️ ЕДИНСТВЕННАЯ ТОЧКА СОЗДАНИЯ КОНТРОЛЬНОЙ: шаг «Выдача» отправляет
+    форму сюда. Прежний конструктор (GET) удалён в ревью 17.08, п. 4.5.
 
     Валидация — НА ФОРМЕ, а не 500-я: репетитор, поставивший конец окна
-    раньше начала, должен увидеть подсказку, а не страницу ошибки.
+    раньше начала, должен увидеть подсказку, а не страницу ошибки. Ошибки
+    показываются на шаге «Выдача», куда и возвращает редирект.
     """
     from problems.models import Assignment
 
     from .picker import (
-        create_items, own_problem_rows, parse_cart, parse_points, parse_rule,
-        picker_context,
-        storage_keys as picker_storage,
+        create_items, parse_cart, parse_points, parse_rule,
     )
 
     group = own_group_or_404(request.user, pk)
@@ -74,45 +76,20 @@ def exam_create(request, pk):
             return redirect('teacher:group_assignment', group_id=group.pk,
                             assignment_id=exam.pk)
 
+        # Ошибка формы возвращает на шаг «Выдача»: там стоят поля, которые
+        # надо поправить, и там же лежит собранный состав.
         for error in errors:
             messages.error(request, error)
+        return redirect('%s?group=%s&kind=exam'
+                        % (reverse('teacher:work_give'), group.pk))
 
-    # ⚠️ Задачи берутся ИЗ КАТАЛОГА — тем же отбором, что у домашки
-    # (поиск, фильтры по теме и сложности, корзина, порядок). Прошлая
-    # версия предлагала только сохранённые, и работать с этим было нельзя.
-    # Сохранённые остались — отдельной вкладкой быстрого доступа.
-    from problems.models import SavedProblem
-
-    saved = [item.catalog_problem for item in
-             SavedProblem.objects.filter(owner=request.user, is_deleted=False,
-                                         catalog_problem__isnull=False)
-             .select_related('catalog_problem')]
-
-    context = picker_context(request)
-    context.update({
-        'group': group,
-        'form': form,
-        'errors': errors,
-        'show_saved': True,
-        'saved_problems': saved,
-        'own_problems': own_problem_rows(request.user),
-        # ⚠️ ПРИЗНАК «СОБИРАЕМ КОНТРОЛЬНУЮ» НУЖЕН И СПИСКУ ЗАДАЧ. Шаблоны
-        # передавали его в шапку и в настройки вручную, а вкладка «Мои
-        # задачи» ссылается на редактор своей задачи и обязана дописать
-        # `kind=exam` — иначе «Написать свою» возвращает в домашку, ровно
-        # та потеря, которую чинили в сессии 9.
-        'is_exam': True,
-        'group_id': group.pk,
-        # Занятие здесь задано АДРЕСОМ, а не `?group=`, поэтому имена
-        # хранилищ пересобираем под него: иначе контрольная собиралась бы
-        # в корзину «занятие не выбрано».
-        'storage': picker_storage(group.pk),
-        'picker_reset_url': reverse('teacher:exam_create', args=[group.pk]),
-        'min_window': exam_engine.MIN_WINDOW_MINUTES,
-        'min_duration': exam_engine.MIN_DURATION_MINUTES,
-        'max_duration': exam_engine.MAX_DURATION_MINUTES,
-    })
-    return render(request, 'teacher/groups/exam_create.html', context)
+    # ⚠️ ЭКРАНА ЗДЕСЬ БОЛЬШЕ НЕТ, А ОБРАБОТЧИК ОСТАЁТСЯ (ревью 17.08,
+    # п. 4.5). Контрольную создаёт именно этот адрес — шаг «Выдача»
+    # отправляет форму сюда. Прежний конструктор удалён: набор задач
+    # переехал в поток `/teacher/work/`, и открытый по старой закладке
+    # адрес уводит на его первый шаг, а не показывает мёртвый экран.
+    return redirect('%s?group=%s&kind=exam'
+                    % (reverse('teacher:work_pick'), group.pk))
 
 
 def _read_exam_form(request):

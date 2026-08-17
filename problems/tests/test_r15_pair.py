@@ -22,9 +22,13 @@ from problems.models import Assignment, StudentGroup
 User = get_user_model()
 
 # Экраны, принимающие занятие параметром `?group=`.
+# ⚠️ СПИСОК ПЕРЕСЧИТАН (ревью 17.08, п. 4.5): прежние конструкторы удалены,
+# занятие в адресе несут шаги потока. Требование прежнее — чужое и
+# несуществующее занятие получает отказ, а не тихий экран.
 GROUP_PARAM_SCREENS = [
-    '/teacher/assignment/create/',
-    '/teacher/assignment/build/',
+    '/teacher/work/',
+    '/teacher/work/compose/',
+    '/teacher/work/give/',
     '/teacher/assignment/generate/',
     '/teacher/problems/new/',
 ]
@@ -59,7 +63,7 @@ class ForeignGroupParamTests(TestCase):
             self.assertEqual(response.status_code, 302, url)
 
     def test_refusal_explains_itself(self):
-        response = self.client.get('/teacher/assignment/create/',
+        response = self.client.get('/teacher/work/',
                                    {'group': 999999}, follow=True)
         self.assertContains(response, 'Такого занятия нет')
 
@@ -76,7 +80,7 @@ class ForeignGroupParamTests(TestCase):
     def test_non_numeric_group_still_does_not_crash(self):
         """⚠️ `?group=abc` когда-то отвечал пятисоткой — правило остаётся."""
         for bad in ('abc', 'null', '1; drop', '-3'):
-            response = self.client.get('/teacher/assignment/create/',
+            response = self.client.get('/teacher/work/',
                                        {'group': bad})
             self.assertIn(response.status_code, (200, 302), bad)
 
@@ -150,9 +154,11 @@ class GroupAndSoloPairTests(TestCase):
                     200, '%s %s' % (lesson.name, url))
 
     def test_exam_constructor_exists_for_both(self):
+        """⚠️ Конструктор контрольной жил внутри занятия и удалён: вид
+        работы стал параметром потока (ревью 17.08, п. 4.5)."""
         for lesson in (self.group, self.solo):
             self.assertEqual(
-                self.client.get('/teacher/groups/%d/exams/new/'
+                self.client.get('/teacher/work/?group=%d&kind=exam'
                                 % lesson.pk).status_code, 200, lesson.name)
 
     def test_solo_screen_drops_the_group_only_blocks(self):

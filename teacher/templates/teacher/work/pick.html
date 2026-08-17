@@ -17,7 +17,6 @@
 {% block title %}Что кладём — новая работа{% endblock %}
 
 {% block extra_style %}
-.wk-wrap { max-width: 1100px; }
 {% comment %}
 Отступ снизу — чтобы полоса собранного не накрывала последнюю карточку
 списка: она липкая и стоит поверх содержимого.
@@ -37,9 +36,16 @@
 <div class="wk-wrap">
 {% include "teacher/work/_head.html" %}
 
+{% comment %}
+⚠️ НАЗВАНИЯ СПОСОБОВ НАБОРА — ОДНИ НА ВСЮ ПЛАТФОРМУ (ревью 17.08, п. 4.3).
+Здесь стояло «Каталог / ручной поиск», а на экране своей задачи — «Искать
+самому / Ручной поиск по каталогу»: два набора слов про три одинаковых
+действия. Формулировки владельца, менять их нельзя; вкладки «Мои задачи»
+и «Отложенные» свои подписи сохраняют — это не способы набора.
+{% endcomment %}
 <div class="wk-tabs" id="wk-tabs" role="tablist">
   <button type="button" class="wk-tab is-on" data-pane="pane-catalog">
-    Каталог<small>ручной поиск</small></button>
+    Искать самому<small>ручной поиск по каталогу</small></button>
   {% comment %}
   ⚠️ ДВЕ ВКЛАДКИ ИЗ ПЯТИ — ССЫЛКИ, И ЭТО НАМЕРЕННО. «Описать словами» ведёт
   на шаг «Что нашлось» (он уже сделан и живёт на своём адресе), «Написать
@@ -47,9 +53,9 @@
   корзина у занятия одна: вернувшись, человек находит набранное на месте.
   {% endcomment %}
   <a class="wk-tab" href="{{ steps.found }}">
-    Описать словами<small>умный подбор</small></a>
+    Описать словами<small>умный поиск по каталогу</small></a>
   <a class="wk-tab" href="{{ own_new_url }}">
-    Написать свою<small>задача с нуля</small></a>
+    Написать свою<small>создание задачи с нуля</small></a>
   <button type="button" class="wk-tab" data-pane="pane-own">
     Мои задачи ({{ own_problems|length }})<small>написанные вами</small></button>
   <button type="button" class="wk-tab" data-pane="pane-saved">
