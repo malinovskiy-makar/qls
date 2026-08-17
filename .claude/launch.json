@@ -30,6 +30,17 @@
         "8131"
       ],
       "port": 8131
+    },
+    {
+      "name": "qls-look",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8401",
+        "--settings=config.settings_check"
+      ],
+      "port": 8401
     }
   ]
 }

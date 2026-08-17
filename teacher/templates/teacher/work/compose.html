@@ -23,6 +23,7 @@
 
 {% comment %}Позиция работы: ручка, номер, название, балл, кнопки.{% endcomment %}
 .wk-item { display: flex; gap: 12px; align-items: flex-start;
+           flex-wrap: wrap;
            background: var(--surface); border: 0.5px solid var(--border);
            border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
 .wk-item.is-drag { opacity: .45; }
@@ -34,9 +35,11 @@
 .wk-body { flex: 1; min-width: 0; }
 .wk-title { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .wk-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
-.wk-open { background: none; border: 0; padding: 4px 0 0; cursor: pointer;
-           font-size: 12px; color: var(--accent); }
-.wk-open:hover { text-decoration: underline; }
+{% comment %}
+Вид раскрывашки задаёт НАБОР (`.k-disc`): своё правило здесь перебивало бы
+общее — оно ниже и той же силы, — и «Целиком» на этом шаге выглядело бы
+иначе, чем на соседнем.
+{% endcomment %}
 .wk-side { display: flex; align-items: center; gap: 8px; }
 .wk-move { display: inline-flex; flex-direction: column; gap: 2px; }
 .wk-move button { background: none; border: 0.5px solid var(--border);
@@ -47,13 +50,20 @@
 .wk-move button:disabled { opacity: .35; cursor: default; }
 .wk-pts { display: flex; align-items: center; gap: 5px; font-size: 12px;
           color: var(--text3); }
-.wk-pts input { width: 58px; text-align: center; }
+{% comment %}
+Балл позиции — число без рамки (`.k-num` из набора). Ширину переопределяем
+здесь: в строке состава рядом стоят кнопки порядка и крестик, и колонка
+узкая.
+{% endcomment %}
+.wk-pts .k-num { width: 52px; min-width: 52px; }
 {% comment %}
 Пустое поле балла — это ноль, и оно об этом говорит: молчаливый ноль
 складывается в работу «на 0 баллов» и обнаруживается уже у ученика.
+⚠️ У безрамочного числа сигналом служит ЛИНИЯ, а не рамка: `border-color`
+на `.k-num` не виден вовсе — рамки у него нет.
 {% endcomment %}
-.wk-pts input.is-zero { border-color: var(--amber);
-                        background: var(--amber-tint); }
+.wk-pts .k-num.is-zero { border-bottom-color: var(--amber);
+                         background: var(--amber-tint); }
 {% comment %}
 Пометка правленного руками балла: тихая, в одну строку под полем.
 {% endcomment %}
@@ -171,8 +181,13 @@
     <div class="wk-body">
       <div class="wk-title"></div>
       <div class="wk-sub"><span class="k-kind"></span> <span class="wk-sub-t"></span></div>
-      <button type="button" class="wk-open">Показать целиком</button>
-      <div class="wk-full" hidden></div>
+      {% comment %}
+      ⚠️ СЛОВО И ЗНАК ОДНИ НА ПЛАТФОРМУ (п. 1.3). Здесь было «Показать
+      целиком», на соседнем шаге — «Целиком»: одно действие, два названия.
+      {% endcomment %}
+      <button type="button" class="k-disc wk-open" aria-expanded="false"><span
+        class="k-disc__tri" aria-hidden="true">▸</span><span
+        class="k-disc__lbl">Целиком</span></button>
     </div>
     <div class="wk-side">
       {% comment %}
@@ -187,8 +202,8 @@
                 aria-label="Переместить ниже">↓</button>
       </span>
       <span class="wk-pts">
-        <input class="k-input k-input--num" type="text" inputmode="decimal"
-               aria-label="балл за задачу"><span>б.</span>
+        <input class="k-num" type="text" inputmode="decimal" min="0"
+               aria-label="балл за задачу"><span class="k-unit">б.</span>
         {% comment %}
         ⚠️ ПОМЕТКА ТИХАЯ И СТОИТ ТОЛЬКО У ПРАВЛЕННОГО РУКАМИ. Правило
         начисления с шага «Выдача» такие позиции не трогает, и без пометки
@@ -201,6 +216,11 @@
       </span>
       <button type="button" class="wk-x" title="Убрать из работы">×</button>
     </div>
+    {% comment %}
+    ⚠️ РАСКРЫТОЕ — ПРЯМОЙ РЕБЁНОК СТРОКИ (п. 1.3): внутри левой колонки
+    условие обрывалось на двух третях, а справа под баллом было пусто.
+    {% endcomment %}
+    <div class="wk-full" hidden></div>
   </div>
 </template>
 {% endblock %}
@@ -287,8 +307,14 @@
       node.querySelector('.wk-no').textContent = (index + 1) + '.';
       node.querySelector('.wk-title').textContent = row.title;
       node.querySelector('.k-kind').textContent = row.is_test ? 'Тест' : 'Задача';
+      // ⚠️ ТИП В ПОДСТРОКЕ НЕ ПОВТОРЯЕМ: он уже стоит чипом слева. Записи
+      // приходят словарями `{kind, text}` (`picker.card_facts`) — сервер
+      // решает, что сигнал, а что справка; здесь строка тихая, и все
+      // записи в ней текстовые.
       node.querySelector('.wk-sub-t').textContent =
-        (row.facts || []).slice(1).concat([origin(row.key)]).join(' · ');
+        (row.facts || []).filter(function (fact) { return fact.kind !== 'type'; })
+          .map(function (fact) { return fact.hint || fact.text; })
+          .concat([origin(row.key)]).join(' · ');
       var field = node.querySelector('.wk-pts input');
       // ⚠️ ЗДЕСЬ НЕЛЬЗЯ ПИСАТЬ В `points`. Раньше строка отрисовки клала
       // туда КАЖДУЮ позицию — и все они становились «правлеными руками»,
@@ -307,7 +333,9 @@
       if (opened[row.key]) {
         var box = node.querySelector('.wk-full');
         box.hidden = false;
-        node.querySelector('.wk-open').textContent = 'Свернуть';
+        var open = node.querySelector('.wk-open');
+        open.querySelector('.k-disc__lbl').textContent = 'Свернуть';
+        open.setAttribute('aria-expanded', 'true');
         window.QLS_FULL.fill(box, row);
       }
       host.appendChild(node);
@@ -362,7 +390,10 @@
     var box = item.querySelector('.wk-full');
     var show = box.hidden;
     box.hidden = !show;
-    open.textContent = show ? 'Свернуть' : 'Показать целиком';
+    // Меняем ЯРЛЫК, а не всю кнопку: внутри неё стоит ещё треугольник.
+    open.querySelector('.k-disc__lbl').textContent = show ? 'Свернуть'
+                                                          : 'Целиком';
+    open.setAttribute('aria-expanded', show ? 'true' : 'false');
     opened[item.dataset.key] = show;
     if (show && row) { window.QLS_FULL.fill(box, row); }
   });

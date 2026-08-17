@@ -1,0 +1,128 @@
+{% comment %}
+Число, которое правится без поля ввода (`.k-num`). ОДИН скрипт на кабинет:
+подключён в трёх базовых шаблонах рядом с подсказками и краями прокрутки.
+
+⚠️ РАБОТАЕТ ЧЕРЕЗ ДЕЛЕГИРОВАНИЕ. Числа приезжают и разметкой сервера, и
+скриптами шагов (состав, «Что нашлось», пункты своей задачи): навешивать
+слушатели на найденные при загрузке поля значило бы, что половина чисел
+на странице ведёт себя иначе, чем вторая.
+
+⚠️ СТРЕЛКИ ↑/↓ СЧИТАЕТ СКРИПТ, А НЕ БРАУЗЕР. Часть чисел кабинета —
+текстовые поля с `inputmode="decimal"`: при русской локали Django печатает
+«1,5», а `input[type=number]` считает запятую недопустимой и стирает
+собственное начальное значение (сессия 9). Родные стрелки есть только у
+`type=number`, то есть у половины полей, — поэтому шаг везде наш.
+
+⚠️ ENTER НЕ ПЕРЕХВАТЫВАЕТСЯ. «Применить» для настоящего поля означает
+только «отменить больше нельзя»: значение и так уже в поле. Гасить Enter
+значило бы поменять поведение форм проверки, где им сохраняют оценку, —
+а эта сессия функцию не трогает. Escape возвращает значение, каким оно
+было в момент прихода фокуса.
+{% endcomment %}
+<script>
+(function () {
+  'use strict';
+
+  // Значение, каким оно было при получении фокуса. Escape возвращает его.
+  var before = new WeakMap();
+
+  function unit(field) {
+    // Шаг задаётся полем (`step`), иначе единица: у балла и у сложности
+    // дробного шага нет, а у допуска сравнения он свой.
+    var step = parseFloat(field.getAttribute('step'));
+    return (isFinite(step) && step > 0) ? step : 1;
+  }
+
+  function read(field) {
+    // Запятая — законная запись числа на этих полях (см. `normalize_decimal`).
+    var value = parseFloat(String(field.value).replace(',', '.'));
+    return isFinite(value) ? value : null;
+  }
+
+  function write(field, value) {
+    // Хвост из нулей после сложения 0.1 + 0.2 — не наша арифметика, а
+    // двоичная дробь: округляем до шести знаков и убираем незначащие нули.
+    var text = String(parseFloat(value.toFixed(6)));
+    field.value = (String(field.value).indexOf(',') >= 0)
+      ? text.replace('.', ',') : text;
+    field.dispatchEvent(new Event('input', {bubbles: true}));
+    field.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+
+  function limits(field) {
+    var low = parseFloat(String(field.getAttribute('min')).replace(',', '.'));
+    var high = parseFloat(String(field.getAttribute('max')).replace(',', '.'));
+    return {low: isFinite(low) ? low : null,
+            high: isFinite(high) ? high : null};
+  }
+
+  function why(field) {
+    var box = field.parentNode
+      && field.parentNode.querySelector('.k-num__why');
+    if (box) { return box; }
+    box = document.createElement('span');
+    box.className = 'k-num__why';
+    box.hidden = true;
+    if (field.parentNode) { field.parentNode.appendChild(box); }
+    return box;
+  }
+
+  // Границы называются словами ПОД числом: цветом сообщать «почему нельзя»
+  // нечем, а поле, которое молча краснеет, читается как поломка сайта.
+  function check(field) {
+    var edge = limits(field);
+    var value = read(field);
+    var text = '';
+    if (value !== null && edge.high !== null && value > edge.high) {
+      text = 'не больше ' + String(edge.high).replace('.', ',');
+    } else if (value !== null && edge.low !== null && value < edge.low) {
+      text = 'не меньше ' + String(edge.low).replace('.', ',');
+    }
+    var box = why(field);
+    field.classList.toggle('k-num--bad', Boolean(text));
+    box.textContent = text;
+    box.hidden = !text;
+  }
+
+  document.addEventListener('focusin', function (event) {
+    var field = event.target.closest && event.target.closest('.k-num');
+    if (field) { before.set(field, field.value); }
+  });
+
+  document.addEventListener('focusout', function (event) {
+    var field = event.target.closest && event.target.closest('.k-num');
+    // Уход фокуса применяет: отменять уже нечего.
+    if (field) { before.delete(field); check(field); }
+  });
+
+  document.addEventListener('input', function (event) {
+    var field = event.target.closest && event.target.closest('.k-num');
+    if (field) { check(field); }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    var field = event.target.closest && event.target.closest('.k-num');
+    if (!field) { return; }
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      var edge = limits(field);
+      var step = unit(field) * (event.key === 'ArrowUp' ? 1 : -1);
+      var next = (read(field) === null ? 0 : read(field)) + step;
+      if (edge.low !== null && next < edge.low) { next = edge.low; }
+      if (edge.high !== null && next > edge.high) { next = edge.high; }
+      write(field, next);
+      check(field);
+      return;
+    }
+    if (event.key === 'Escape' && before.has(field)) {
+      event.preventDefault();
+      field.value = before.get(field);
+      field.dispatchEvent(new Event('input', {bubbles: true}));
+      field.dispatchEvent(new Event('change', {bubbles: true}));
+      check(field);
+      field.blur();
+    }
+    // Enter не трогаем намеренно: см. пояснение в начале файла.
+  });
+})();
+</script>

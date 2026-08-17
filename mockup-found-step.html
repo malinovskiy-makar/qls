@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Шаг «Что нашлось» — новый вид</title>
+<style>
+  :root{
+    --bg:#0b0f16; --card:#141a24; --sunk:#0f141d; --line:#212936;
+    --ink:#e8ebef; --muted:#8a94a6; --dim:#5d6779;
+    --accent:#e8477f; --accent-deep:#be185d; --accent-soft:#4a2036;
+    --good:#5fbe86; --amber:#d69a3c; --test:#3d6ea8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:15px;line-height:1.5;padding:32px 24px 72px}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:22px;font-weight:700;margin-bottom:6px}
+  .lead{color:var(--muted);max-width:76ch;margin-bottom:10px}
+  .step{margin:44px 0 16px;padding-top:22px;border-top:1px solid var(--line)}
+  .step-n{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .step h2{font-size:18px;font-weight:650;margin:6px 0 4px}
+  .step p{color:var(--muted);max-width:78ch;font-size:14px}
+  .screen{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .bar{padding:14px 20px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+  .bar b{color:var(--accent);font-weight:500}
+  .rail{display:flex;align-items:center;padding:16px 20px 6px}
+  .rail .s{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--dim)}
+  .rail .s .n{width:22px;height:22px;border-radius:999px;border:1px solid var(--line);display:grid;place-items:center;font-size:11px}
+  .rail .s.on{color:var(--ink);font-weight:600}
+  .rail .s.on .n{background:var(--accent);border-color:var(--accent);color:#fff}
+  .rail .s.done .n{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent)}
+  .rail .gap{flex:1;height:1px;background:var(--line);margin:0 12px}
+  .body{padding:18px 20px 22px}
+  .said{background:var(--sunk);border:1px solid var(--line);border-left:3px solid var(--accent-soft);
+    border-radius:0 10px 10px 0;padding:13px 15px;font-size:13.5px;color:var(--muted);margin-bottom:14px}
+  .said b{color:var(--ink);font-weight:600}
+  .tally{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--sunk);
+    border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin-bottom:16px;font-size:13px}
+  .tally .ok{color:var(--good)}
+  .tally .warn{color:var(--amber)}
+  .tally .fix{margin-left:auto;font-size:12px;color:var(--accent);border:1px solid var(--accent-soft);
+    padding:5px 11px;border-radius:8px}
+  .grp{border:1px solid var(--line);border-radius:12px;margin-bottom:11px;overflow:hidden}
+  .grp-h{display:flex;align-items:center;gap:12px;padding:13px 15px;background:var(--sunk)}
+  .grp-h .caret{color:var(--dim);font-size:11px}
+  .grp-h .t{flex:1;min-width:0}
+  .grp-h h4{font-size:14.5px;font-weight:650}
+  .grp-h .q{font-size:12px;color:var(--dim);margin-top:1px}
+  .grp-h .cnt{font-size:12px;color:var(--muted);white-space:nowrap}
+  .grp-h .cnt b{color:var(--ink)}
+  .grp-b{padding:6px 15px 14px}
+  .task{display:flex;gap:12px;align-items:flex-start;padding:11px 12px;border-radius:10px;margin-top:7px;
+    border:1px solid transparent}
+  .task.pick{background:rgba(232,71,127,.08);border-color:var(--accent-soft)}
+  .task .box{width:17px;height:17px;border-radius:5px;border:1px solid #39435a;flex:none;margin-top:2px}
+  .task.pick .box{background:var(--accent);border-color:var(--accent)}
+  .task .t{flex:1;min-width:0}
+  .task h5{font-size:14px;font-weight:600}
+  .task .meta{font-size:12px;color:var(--dim);margin:2px 0 5px}
+  .task .txt{font-size:12.5px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .task .side{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex:none}
+  .conf{font-size:11px;font-weight:600}
+  .conf.exact{color:var(--good)}.conf.close{color:var(--amber)}
+  .btn{font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line);background:var(--sunk);color:var(--ink)}
+  .btn.pri{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;font-size:13px;padding:8px 15px}
+  .btn.ghost{background:transparent;color:var(--muted)}
+  .task.dupe{opacity:.45}
+  .task.dupe .why{font-size:11.5px;color:var(--dim);font-style:italic}
+  .more{margin-top:10px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:10px}
+  .empty{padding:16px;border:1px dashed var(--line);border-radius:10px;margin-top:8px;font-size:13px;color:var(--muted)}
+  .empty b{display:block;color:var(--ink);font-size:14px;margin-bottom:4px;font-weight:600}
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;
+    border-top:1px solid var(--line);background:var(--sunk);font-size:13px;color:var(--muted)}
+  .foot .left{display:flex;gap:10px;align-items:center}
+  .note{font-size:12px;color:var(--dim);margin-top:10px}
+  /* состав */
+  .row{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--line);
+    border-radius:10px;background:var(--sunk);margin-bottom:8px;border-left:3px solid var(--accent-deep)}
+  .row.test{border-left-color:var(--test)}
+  .row .num{font-size:13px;color:var(--dim);width:16px}
+  .row .t{flex:1}.row .t h5{font-size:14px;font-weight:600}
+  .row .t .sub{font-size:12px;color:var(--dim)}
+  .pts input{width:44px;background:#0c1119;border:1px solid var(--line);border-radius:7px;color:var(--ink);
+    padding:4px 7px;font-size:13px;text-align:center}
+  /* таблица с центром */
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th{font-size:12px;color:var(--muted);font-weight:500;padding:9px 10px;border-bottom:1px solid var(--line)}
+  td{padding:10px;border-bottom:1px solid #1a212c}
+  th.l,td.l{text-align:left}
+  th.c,td.c{text-align:center}
+  .pill{display:inline-block;font-size:11px;background:#1a2130;color:var(--muted);padding:3px 10px;border-radius:999px}
+  .guide{position:relative}
+  .guide::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(232,71,127,.5)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Шаг «Что нашлось» и связка с составом</h1>
+  <p class="lead">Экран сохраняет всё хорошее, что там уже есть: объяснение модели словами, правку формулировок
+  без повторного обращения к ней, честные метки уверенности, пометку дублей. Меняется четыре вещи.</p>
+
+  <div class="screen">
+    <div class="bar"><b>Ученики</b> → <b>Экономика 10–11, вторник</b> → новая работа</div>
+    <div class="rail">
+      <span class="s done"><i class="n">✓</i>Что кладём</span><span class="gap"></span>
+      <span class="s on"><i class="n">2</i>Что нашлось</span><span class="gap"></span>
+      <span class="s"><i class="n">3</i>Состав</span><span class="gap"></span>
+      <span class="s"><i class="n">4</i>Выдача</span>
+    </div>
+    <div class="body">
+
+      <div class="said">
+        Вы просили <b>четыре задачи и два теста</b>. Разложил на содержательные блоки: две задачи
+        на эластичность спроса, одна на издержки фирмы, одна сложнее — на сочетание тем.
+      </div>
+
+      <div class="tally">
+        <span class="ok">✓ задачи: <b>4 из 4</b></span>
+        <span class="warn">тесты: 0 из 2 — в запросе они были, а в настройках стоит «тестов 0»</span>
+        <span class="fix">Найти два теста</span>
+      </div>
+
+      <div class="grp">
+        <div class="grp-h">
+          <span class="caret">▾</span>
+          <div class="t"><h4>эластичность спроса</h4><div class="q">искали: «эластичность спроса» · сложность 2</div></div>
+          <span class="cnt">выбрано <b>2</b> из 2</span>
+        </div>
+        <div class="grp-b">
+          <div class="task pick">
+            <span class="box"></span>
+            <div class="t">
+              <h5>Эластичность спроса</h5>
+              <div class="meta">Эластичность · сложность 2 · ILE / iloveeconomics.ru</div>
+              <div class="txt">Цена товара выросла с 100 до 120 рублей, а объём спроса упал с 50 до 40 единиц.
+                Найдите коэффициент ценовой эластичности спроса по средней точке и определите, эластичен спрос или нет.</div>
+            </div>
+            <div class="side"><span class="conf exact">точное совпадение</span><span class="btn">Целиком</span></div>
+          </div>
+
+          <div class="task pick">
+            <span class="box"></span>
+            <div class="t">
+              <h5>Эластичность спроса по цене</h5>
+              <div class="meta">Эластичность · сложность 5 · ILE / iloveeconomics.ru</div>
+              <div class="txt">Городской перевозчик поднял цену проездного с 800 до 1000 рублей. Число проданных
+                проездных упало с 50 000 до 44 000 в месяц. Посчитайте дуговую эластичность и скажите, вырастет ли выручка.</div>
+            </div>
+            <div class="side"><span class="conf exact">точное совпадение</span><span class="btn">Целиком</span></div>
+          </div>
+
+          <div class="task">
+            <span class="box"></span>
+            <div class="t">
+              <h5>Рост спроса и эластичность предложения</h5>
+              <div class="meta">Эластичность · сложность 5 · ILE / iloveeconomics.ru</div>
+              <div class="txt">На рынке товара X спрос вырос на 20 процентов. Известно, что предложение
+                описывается функцией с постоянной эластичностью…</div>
+            </div>
+            <div class="side"><span class="conf close">близко</span><span class="btn">Целиком</span></div>
+          </div>
+
+          <div class="task dupe">
+            <span class="box"></span>
+            <div class="t">
+              <h5>Эластичность спроса.</h5>
+              <div class="why">уже выбрана в строке «эластичность спроса и издержки (посложнее)»</div>
+            </div>
+            <div class="side"><span class="conf close">близко</span></div>
+          </div>
+
+          <div class="more"><span class="btn">Показать ещё 5</span><span>поиск по банку — модель не потревожим</span></div>
+        </div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-h">
+          <span class="caret">▸</span>
+          <div class="t"><h4>издержки фирмы</h4><div class="q">искали: «издержки фирмы» · сложность 3</div></div>
+          <span class="cnt">выбрано <b>1</b> из 1</span>
+        </div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-h">
+          <span class="caret">▾</span>
+          <div class="t"><h4>монополия и ценовая дискриминация</h4><div class="q">искали: «ценовая дискриминация третьей степени»</div></div>
+          <span class="cnt">выбрано <b>0</b> из 1</span>
+        </div>
+        <div class="grp-b">
+          <div class="empty">
+            <b>По этой строке в банке ничего не нашлось</b>
+            Поправьте формулировку своими словами и нажмите «Переискать» — это бесплатно, к модели
+            обращаться не нужно. Или уберите строку и доберите задачу из каталога на следующем шаге.
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="foot">
+      <span class="left">
+        <span class="btn ghost">Переискать по моим формулировкам</span>
+        <span class="btn ghost">Начать заново</span>
+      </span>
+      <span class="left">
+        <span>осталось 29 разборов сегодня</span>
+        <span class="btn pri">Дальше — состав →</span>
+      </span>
+    </div>
+  </div>
+
+  <p class="note">Четыре изменения: сверху сводка «сколько просили — сколько набрали» с кнопкой добрать
+  недостающее; у каждой задачи видно условие и есть «Целиком»; пустая строка объясняет, что делать;
+  внизу вместо стоимости в долларах — остаток разборов.</p>
+
+  <!-- связка -->
+  <div class="step">
+    <div class="step-n">Куда это едет</div>
+    <h2>Подобранное попадает в состав — то самое, что сейчас теряется</h2>
+    <p>Сейчас выбранное на этом шаге складывается в ячейку памяти без имени, а конструктор читает другую
+    и показывает прошлую корзину. В новом потоке шаг «Что нашлось» кладёт задачи в ту же корзину работы,
+    что и каталог со своими задачами, — она одна на все способы.</p>
+  </div>
+
+  <div class="screen">
+    <div class="rail">
+      <span class="s done"><i class="n">✓</i>Что кладём</span><span class="gap"></span>
+      <span class="s done"><i class="n">✓</i>Что нашлось</span><span class="gap"></span>
+      <span class="s on"><i class="n">3</i>Состав</span><span class="gap"></span>
+      <span class="s"><i class="n">4</i>Выдача</span>
+    </div>
+    <div class="body">
+      <div style="display:flex;gap:22px;font-size:13px;color:var(--muted);margin-bottom:14px">
+        <span>Позиций: <b style="color:var(--ink)">4</b></span>
+        <span>Баллов: <b style="color:var(--ink)">14</b></span>
+        <span>из умного подбора: <b style="color:var(--ink)">4</b></span>
+      </div>
+      <div class="row"><span class="num">1.</span><div class="t"><h5>Эластичность спроса</h5>
+        <div class="sub">задача · сложность 2 · подобрано по описанию</div></div>
+        <span class="pts"><input value="3"></span></div>
+      <div class="row"><span class="num">2.</span><div class="t"><h5>Эластичность спроса по цене</h5>
+        <div class="sub">задача · сложность 5 · подобрано по описанию</div></div>
+        <span class="pts"><input value="4"></span></div>
+      <div class="row"><span class="num">3.</span><div class="t"><h5>Издержки фирмы</h5>
+        <div class="sub">задача · 2 пункта · сложность 3 · подобрано по описанию</div></div>
+        <span class="pts"><input value="3"></span></div>
+      <div class="row"><span class="num">4.</span><div class="t"><h5>Эластичность спроса и издержки</h5>
+        <div class="sub">задача · сложность 5 · подобрано по описанию</div></div>
+        <span class="pts"><input value="4"></span></div>
+    </div>
+  </div>
+
+  <!-- тип по центру -->
+  <div class="step">
+    <div class="step-n">Правка из ревью</div>
+    <h2>Столбец «Тип»: заголовок и чипы по одной оси</h2>
+    <p>В прошлый раз я поставил их по левому краю — ты поправил: нужен центр. Здесь заголовок и все чипы
+    столбца стоят на одной вертикали, розовая линия показывает эту ось. Числовые столбцы — так же.</p>
+  </div>
+
+  <div class="screen"><div class="body">
+    <table>
+      <tr>
+        <th class="l">Работа</th>
+        <th class="c guide">Тип</th>
+        <th class="c">% верных задач</th>
+        <th class="c">% верных тестов</th>
+        <th class="c">Оценка</th>
+        <th class="c">Сдано</th>
+      </tr>
+      <tr>
+        <td class="l">Домашка №3: спрос, предложение, эластичность</td>
+        <td class="c guide"><span class="pill">домашка</span></td>
+        <td class="c">70 %</td><td class="c">38 %</td><td class="c">4,25</td><td class="c">13.08</td>
+      </tr>
+      <tr>
+        <td class="l">Контрольная №1 (окно, все одновременно)</td>
+        <td class="c guide"><span class="pill">контрольная</span></td>
+        <td class="c">20 %</td><td class="c">50 %</td><td class="c">31 %</td><td class="c">06.08</td>
+      </tr>
+      <tr>
+        <td class="l">Сквозная домашка</td>
+        <td class="c guide"><span class="pill">домашка</span></td>
+        <td class="c">—</td><td class="c">0 %</td><td class="c">0 %</td><td class="c">без срока</td>
+      </tr>
+    </table>
+    <div class="note">Чип центрируется вместе со своим фоном: длина слова «контрольная» против «домашка»
+    больше не сдвигает столбец.</div>
+  </div></div>
+
+</div>
+</body>
+</html>

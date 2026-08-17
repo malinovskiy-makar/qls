@@ -29,12 +29,9 @@
            margin-bottom: 6px; }
 /* Примеры — тихая раскрывашка: это подсказка, а не второй раздел формы. */
 .gen-examples { margin-top: 14px; }
-.gen-examples > summary { cursor: pointer; font-size: 13px;
-                          color: var(--text2); list-style: none; }
-.gen-examples > summary::-webkit-details-marker { display: none; }
-.gen-examples > summary::before { content: '▸ '; }
-.gen-examples[open] > summary::before { content: '▾ '; }
-.gen-examples > summary:hover { color: var(--text); }
+/* ⚠️ Вид раскрывашки задаёт НАБОР (`_kit.html`, п. 1.3): знак, цвет и
+   поворот одни на платформу. Здесь свои правила были подменой глифа
+   «▸»→«▾», от которой надпись рядом дёргалась вбок. */
 /* Счётчик обращений — рядом с кнопкой и заметно тише её. */
 .gen-used { font-size: 12px; color: var(--text3); }
 /* ⚠️ ПРИМЕР ПЕРЕНОСИТСЯ ПО СЛОВАМ. У кнопок набора `white-space: nowrap` —
@@ -56,8 +53,10 @@ textarea.gen-text:focus { border-color: var(--focus); }
 .gen-params .form-group--check { min-width: 0; padding-bottom: 7px; }
 /* ⚠️ ЧИСЛОВЫЕ ПОЛЯ ОДНОЙ ШИРИНЫ И ОДНОЙ ВЫСОТЫ (поправка 5): раньше они
    были разного размера и «болтались». Ширину задаём здесь, а не в наборе:
-   у набора `.k-input--num` шире, и он нужен таким на других экранах. */
-.gen-params .k-input--num { width: 68px; }
+   она подобрана под эту строку и на других экранах не нужна.
+   ⚠️ Рамок у чисел больше нет (`.k-num`), и выравнивание по нижнему краю
+   стало точнее: линия у всех на одной высоте, а не низ трёх разных рамок. */
+.gen-params .k-num { width: 68px; min-width: 68px; }
 .gen-params .form-label { display: block; margin-bottom: 5px; }
 /* Подписи полей строки плана: два голых числа читались загадкой. */
 .plan-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
@@ -76,7 +75,7 @@ textarea.gen-text:focus { border-color: var(--focus); }
   font-size: 13px; padding: 7px 10px; border-radius: var(--r);
   border: 1px solid var(--border); background: var(--surface);
   color: var(--text); }
-.plan-row .k-input--num { width: 68px; }
+.plan-row .k-num { width: 62px; min-width: 62px; }
 .gen-note { background: var(--surface-2); border: 1px solid var(--border);
             border-radius: var(--r); padding: 10px 14px; font-size: 13px;
             line-height: 1.6; margin-bottom: 14px; }
@@ -281,12 +280,12 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
       {% endcomment %}
       <div class="form-group">
         <label class="form-label" for="id_open">Открытых задач</label>
-        <input class="k-input k-input--num" type="number" id="id_open"
+        <input class="k-num" type="number" id="id_open"
                name="count_open" min="0" max="30" value="{{ form.count_open }}">
       </div>
       <div class="form-group">
         <label class="form-label" for="id_test">Тестов</label>
-        <input class="k-input k-input--num" type="number" id="id_test"
+        <input class="k-num" type="number" id="id_test"
                name="count_test" min="0" max="30" value="{{ form.count_test }}">
       </div>
       <div class="form-group">
@@ -297,11 +296,11 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
         {% endcomment %}
         <label class="form-label">Сложность</label>
         <div class="k-row" style="gap:6px;flex-wrap:nowrap">
-          <input class="k-input k-input--num" type="number" name="min_difficulty"
+          <input class="k-num" type="number" name="min_difficulty"
                  min="1" max="5" value="{{ form.min_difficulty }}"
                  aria-label="сложность от">
           <span class="k-quiet">—</span>
-          <input class="k-input k-input--num" type="number" name="max_difficulty"
+          <input class="k-num" type="number" name="max_difficulty"
                  min="1" max="5" value="{{ form.max_difficulty }}"
                  aria-label="сложность до">
         </div>
@@ -519,12 +518,12 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
                  placeholder="о чём должны быть задачи">
           <label class="plan-field">
             <span class="plan-cap">сложность</span>
-            <input class="k-input k-input--num" type="number" name="row_difficulty"
+            <input class="k-num" type="number" name="row_difficulty"
                    min="1" max="5" value="{{ preview.row.difficulty }}">
           </label>
           <label class="plan-field">
             <span class="plan-cap">нужно задач</span>
-            <input class="k-input k-input--num" type="number" name="row_count"
+            <input class="k-num" type="number" name="row_count"
                    min="1" max="30" value="{{ preview.row.count }}">
           </label>
           <input type="hidden" name="row_label" value="{{ preview.row.label }}">
@@ -853,6 +852,14 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     if (name) {
       var cand = name.closest('.cand');
       cand.classList.toggle('is-shown');
+      // Подпись и знак — общие (`.k-disc`); меняем ЯРЛЫК, а не всю кнопку.
+      var disc = cand.querySelector('.cand-full');
+      if (disc) {
+        var shown = cand.classList.contains('is-shown');
+        disc.setAttribute('aria-expanded', shown ? 'true' : 'false');
+        disc.querySelector('.k-disc__lbl').textContent =
+          shown ? 'Свернуть' : 'Целиком';
+      }
       if (cand.classList.contains('is-shown')
           && typeof renderMathInElement !== 'undefined') {
         var body = cand.querySelector('.cand-body');

@@ -1196,4 +1196,8 @@ class PickerFirstStepTests(TestCase):
         import io
         template = io.open('teacher/templates/teacher/generate.html',
                            encoding='utf-8').read()
-        self.assertIn('.gen-params .k-input--num { width: 68px; }', template)
+        # ⚠️ ПЕРЕСЧИТАНО (визуальная сессия 17.08, п. 1.1). Числа на этом
+        # экране правятся без рамки (`.k-num`), и класс поля сменился;
+        # смысл проверки прежний — ширина у всех трёх одна и задана здесь.
+        self.assertIn('.gen-params .k-num { width: 68px; min-width: 68px; }',
+                      template)

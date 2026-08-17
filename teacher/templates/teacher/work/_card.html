@@ -18,8 +18,17 @@ source, preview, is_test.
      data-title="{{ title }}">
   <div class="wk-card__main">
     <div class="wk-card__title">{{ title }}</div>
+    {% comment %}
+    ⚠️ ЧИП ИЛИ ТЕКСТ — РЕШАЕТ СЕРВЕР (`picker.card_facts`). Шаблон рисует
+    то, что ему сказали: сложность и наличие решения это сигналы и носят
+    цвет, тип отличается контуром, число пунктов чипом быть перестало —
+    это справка.
+    {% endcomment %}
     <div class="wk-card__facts">
-      {% for fact in facts %}<span class="wk-chip">{{ fact }}</span>{% endfor %}
+      {% for fact in facts %}{% if fact.kind == 'note' %}<span
+        class="k-chip-note">{{ fact.text }}</span>{% else %}<span
+        class="k-chip k-chip--{{ fact.kind }}"
+        {% if fact.hint %}data-hint="{{ fact.hint }}"{% endif %}>{{ fact.text }}</span>{% endif %}{% endfor %}
     </div>
     {% if source %}<div class="wk-card__src">{{ source }}</div>{% endif %}
     {% if preview %}<p class="wk-card__lead">{{ preview }}</p>{% endif %}
@@ -29,12 +38,26 @@ source, preview, is_test.
     эталонное решение. Содержимое приезжает по нажатию, а не с каждой из
     двадцати карточек страницы.
     {% endcomment %}
-    <div class="wk-full" hidden></div>
+    {% comment %}
+    ⚠️ «ЦЕЛИКОМ» СТОИТ ПОД УСЛОВИЕМ, А НЕ В КОЛОНКЕ ДЕЙСТВИЙ (п. 1.3).
+    Раскрытие относится к тексту задачи, а раскрытое занимает всю ширину
+    карточки; пока кнопка жила справа рядом с «Добавить», раскрытый текст
+    обрывался на двух третях — под колонкой кнопок оставалось пусто.
+    {% endcomment %}
+    <button type="button" class="k-disc wk-more" data-full="{{ key }}"
+            aria-expanded="false" aria-controls="full-{{ key }}"><span
+      class="k-disc__tri" aria-hidden="true">▸</span><span
+      class="k-disc__lbl">Целиком</span></button>
   </div>
   <div class="wk-card__acts">
-    <button type="button" class="k-btn k-btn--quiet k-btn--sm wk-more"
-            data-full="{{ key }}">Целиком</button>
     <button type="button" class="k-btn k-btn--main k-btn--sm wk-add"
             data-add="{{ key }}">+ Добавить</button>
   </div>
+  {% comment %}
+  ⚠️ РАСКРЫТОЕ — ПРЯМОЙ РЕБЁНОК КАРТОЧКИ, А НЕ ЕЁ ЛЕВОЙ КОЛОНКИ (п. 1.3).
+  Внутри колонки текст обрывался на двух третях ширины, а справа под
+  кнопкой оставалась пустота: условие и так длинное, и лишний столбец
+  воздуха делал его ещё длиннее.
+  {% endcomment %}
+  <div class="wk-full" id="full-{{ key }}" hidden></div>
 </div>

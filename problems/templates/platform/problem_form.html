@@ -23,7 +23,15 @@
 .form-field:last-child { margin-bottom: 0; }
 .form-field label { display: block; font-size: 12px; font-weight: 600;
                     color: var(--text2); margin-bottom: 5px; }
-.form-field input[type=text], .form-field input[type=number],
+{% comment %}
+⚠️ `:not(.k-num)` — ЧИСЛА ЗДЕСЬ БЕЗ РАМОК (визуальная сессия 17.08, п. 1.1).
+Правило страницы (`.form-field input[type=text]`) СПЕЦИФИЧНЕЕ правила набора
+(`.k-num`) и стоит ниже него: без явного исключения рамка вернулась бы
+поверх безрамочного числа, и на экране оказалось бы поле с рамкой И с
+пунктиром под ней.
+{% endcomment %}
+.form-field input[type=text]:not(.k-num),
+.form-field input[type=number]:not(.k-num),
 .form-field select, .form-field textarea {
   width: 100%; font: inherit; font-size: 14px; padding: 9px 12px;
   border-radius: var(--r); border: 0.5px solid var(--border);
@@ -170,7 +178,13 @@
 .part-grid { display: grid;
              grid-template-columns: minmax(0,1.5fr) minmax(0,1.25fr) minmax(0,1fr);
              gap: 14px; margin-top: 12px; align-items: end; }
-.part-grid input { background: var(--surface); }
+.part-grid input:not(.k-num) { background: var(--surface); }
+{% comment %}
+Вес и допуск — числа, и правятся они без рамки. Ширина своя: у допуска
+шесть знаков после запятой, у веса один-два.
+{% endcomment %}
+.part-grid .k-num, #whole-answer .k-num { width: 100%; min-width: 0;
+                                          text-align: left; padding-left: 2px; }
 .part-grid label { white-space: normal; line-height: 1.25; }
 .part-grid .k-hint { margin-top: 4px; font-size: 11px; }
 
@@ -336,8 +350,8 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
               </div>
               <div class="form-field">
                 <label for="id_answer_tolerance">Допуск сравнения</label>
-                <input type="text" id="id_answer_tolerance"
-                       name="answer_tolerance"
+                <input type="text" inputmode="decimal" class="k-num"
+                       id="id_answer_tolerance" name="answer_tolerance" min="0"
                        value="{{ form.answer_tolerance }}">
               </div>
             </div>
@@ -380,12 +394,14 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
                   весь остальной сайт печатает «1» и «2». Незначащие нули
                   отбрасывает `scorefmt.ball` — та же точка, что у баллов.
                   {% endcomment %}
-                  <input type="text" name="part_tolerance"
+                  <input type="text" inputmode="decimal" class="k-num" min="0"
+                         name="part_tolerance"
                          value="{{ part.answer_tolerance|exact }}">
                 </div>
                 <div class="form-field" style="margin:0">
                   <label>Вес пункта</label>
-                  <input type="text" name="part_points"
+                  <input type="text" inputmode="decimal" class="k-num" min="0"
+                         name="part_points"
                          value="{{ part.points|ball }}">
                 </div>
               </div>
@@ -641,9 +657,11 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
       '<div class="form-field" style="margin:0"><label>Правильный ответ</label>' +
       '<input type="text" name="part_answer"></div>' +
       '<div class="form-field" style="margin:0"><label>Допуск сравнения</label>' +
-      '<input type="text" name="part_tolerance" value="0"></div>' +
+      '<input type="text" inputmode="decimal" class="k-num" min="0"' +
+      ' name="part_tolerance" value="0"></div>' +
       '<div class="form-field" style="margin:0"><label>Вес пункта</label>' +
-      '<input type="text" name="part_points"></div>' +
+      '<input type="text" inputmode="decimal" class="k-num" min="0"' +
+      ' name="part_points"></div>' +
       '</div>';
     partsList.appendChild(row);
     syncParts();

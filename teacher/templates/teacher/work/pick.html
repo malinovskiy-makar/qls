@@ -251,15 +251,20 @@
     // Она оставалась над полным текстом, и условие печаталось дважды:
     // сначала обрезанное многоточием, следом целиком.
     var lead = card.querySelector('.wk-card__lead');
+    // ⚠️ ПОДПИСЬ МЕНЯЕТСЯ У ЯРЛЫКА, А НЕ У ВСЕЙ КНОПКИ: внутри неё стоит
+    // ещё и треугольник, и `more.textContent = …` стёр бы его.
+    var label = more.querySelector('.k-disc__lbl') || more;
     if (!box.hidden) {
       box.hidden = true;
       if (lead) { lead.hidden = false; }
-      more.textContent = 'Целиком';
+      label.textContent = 'Целиком';
+      more.setAttribute('aria-expanded', 'false');
       return;
     }
     box.hidden = false;
     if (lead) { lead.hidden = true; }
-    more.textContent = 'Свернуть';
+    label.textContent = 'Свернуть';
+    more.setAttribute('aria-expanded', 'true');
     if (box.dataset.ready) { return; }
     box.textContent = 'Загрузка…';
     window.QLS_FULL.load(more.dataset.full).then(function (row) {

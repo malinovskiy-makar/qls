@@ -31,7 +31,15 @@
     резать текст числом символов значит рвать формулу посередине.
     {% endcomment %}
     <div class="cand-lead">{{ card.preview }}</div>
-    <button type="button" class="k-btn k-btn--quiet k-btn--sm cand-full">Целиком</button>
+    {% comment %}
+    ⚠️ СЛОВО И ЗНАК ОДНИ НА ПЛАТФОРМУ (визуальная сессия 17.08, п. 1.3).
+    Здесь стояла тихая серая кнопка набора, на соседнем шаге — та же
+    надпись малиновой ссылкой.
+    {% endcomment %}
+    <button type="button" class="k-disc cand-full" aria-expanded="false"
+            aria-controls="cand-body-{{ card.problem.pk }}"><span
+      class="k-disc__tri" aria-hidden="true">▸</span><span
+      class="k-disc__lbl">Целиком</span></button>
     <div class="cand-taken">уже выбрана в строке «<span class="cand-taken-row">{{ card.taken_by }}</span>»</div>
     {% comment %}
     ⚠️ ЗАДАЧА РАСКРЫВАЕТСЯ ЦЕЛИКОМ (ревью 15.08, фаза 13): условие без
@@ -39,7 +47,7 @@
     здесь было начало условия на 900 символов — обрезанное условие
     выглядит как целое, и ошибка обнаруживается уже у ученика.
     {% endcomment %}
-    <div class="cand-body">
+    <div class="cand-body" id="cand-body-{{ card.problem.pk }}">
       <div class="cand-st">{{ card.body }}</div>
       <div class="cand-parts">
         {% for part in card.parts %}

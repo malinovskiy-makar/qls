@@ -122,6 +122,60 @@
   margin: 0;
 }
 
+/* ── Число правится без поля ввода (визуальная сессия 17.08, п. 1.1) ────
+   Решение владельца: там, где вводится ЧИСЛО, рамки не будет. Образец уже
+   работает на платформе — время в календаре срока (`.k-time`): крупное
+   число, полоса под ним, набор с клавиатуры.
+
+   ⚠️ ПОД КАПОТОМ ОСТАЁТСЯ НАСТОЯЩИЙ `input`. Нарисовать число `span`-ом и
+   ловить клавиши руками означало бы потерять мобильную клавиатуру, выбор
+   текста, автозаполнение и озвучивание — то есть чинить вид, ломая ввод.
+   Меняется ТОЛЬКО оформление: имя поля, значение и отправка формы прежние.
+
+   ⚠️ ПРИЁМ ТОЛЬКО ДЛЯ ЧИСЕЛ. Название работы, поиск, условие задачи,
+   решение, комментарий и заметки об ученике остаются в рамках: у длинного
+   текста без рамки не видно, где кончается поле, и выделение мышью
+   перестаёт читаться.
+
+   ⚠️ `type` НЕ НАВЯЗЫВАЕТСЯ. Часть чисел кабинета — текстовые поля с
+   `inputmode="decimal"`: при русской локали Django печатает «1,5», а
+   `input[type=number]` считает запятую недопустимой и стирает СОБСТВЕННОЕ
+   начальное значение (сессия 9). Поэтому стрелки ↑/↓ считает наш скрипт,
+   а не браузер, — иначе на половине полей их бы не было.
+
+   Высота — не меньше 44 px: в полосу толщиной в пиксель пальцем не
+   попасть. Отступ сверху больше нижнего нарочно — линия обязана держаться
+   у самого числа, иначе она перестаёт быть его подчёркиванием. */
+.k-numwrap { display: inline-flex; align-items: baseline; gap: 5px;
+             flex-wrap: wrap; }
+.k-num {
+  font: inherit; font-variant-numeric: tabular-nums; font-weight: 600;
+  color: var(--text); background: transparent; text-align: center;
+  border: 0; border-bottom: 1px dashed var(--num-line); border-radius: 0;
+  padding: 14px 5px 6px; min-height: 44px; width: 46px; min-width: 46px;
+  -moz-appearance: textfield; appearance: textfield;
+  transition: border-color .12s, background-color .12s, color .12s;
+}
+.k-num::-webkit-outer-spin-button,
+.k-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.k-num:hover { border-bottom-color: var(--accent);
+               background: var(--accent-tint); }
+.k-num:focus { outline: 0; border-bottom: 2px solid var(--accent);
+               padding-bottom: 5px; background: transparent;
+               color: var(--accent-deep); }
+/* ⚠️ Ошибка ДВУМЯ КЛАССАМИ и с перебивкой наведения: иначе линия под
+   неверным числом синеет от одного движения мыши и перестаёт быть
+   ошибкой. Само объяснение — строкой ниже, цветом не сообщаем ничего. */
+.k-num.k-num--bad, .k-num.k-num--bad:hover, .k-num.k-num--bad:focus {
+  border-bottom-color: var(--error); color: var(--error);
+}
+.k-num--wide { width: 64px; min-width: 64px; }
+.k-num--long { width: 92px; min-width: 92px; }
+.k-unit { font-size: 13px; color: var(--text2); white-space: nowrap; }
+.k-num__why { display: block; width: 100%; font-size: 12px;
+              color: var(--error); margin-top: 2px; }
+.k-num__why[hidden] { display: none; }
+
 /* Выпадающий список: браузерная стрелка убрана, своя рисуется обёрткой.
    Без appearance:none в тёмной теме просвечивает системный светлый виджет. */
 .k-select { appearance: none; -webkit-appearance: none; -moz-appearance: none;
@@ -525,9 +579,13 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
    Две параллельные полосы разного смысла у одной карточки не читаются:
    глаз видит одну толстую двухцветную черту.
 
-   Цвета — те же, что уже стоят в отборе задач с сессии 9: открытая
-   задача зелёная («её решают»), тест — тихий серый. Новых сигналов не
-   заводим: янтарь занят сложностью, малиновый — акцент.
+   ⚠️ ЦВЕТА ПОМЕНЯЛИСЬ (визуальная сессия 17.08, п. 1.2): тест — акцент,
+   открытая задача — нейтральная граница. Раньше задача была ЗЕЛЁНОЙ, а
+   зелёный на платформе занят смыслом «решение ✓» — и на той же карточке
+   отбора рядом появился зелёный чип «✓ решение». Две зелени в одном
+   сантиметре означали бы разное. Янтарь занят сложностью, поэтому тип
+   отличает акцент: он ничего не «сигналит», он просто метка.
+   Новых цветов не заводим.
 
    ⚠️ МОДИФИКАТОР ЗАДАЁТ ПОЛОСУ ЦЕЛИКОМ И ЗАПИСАН ДВУМЯ КЛАССАМИ — та же
    ловушка, что у `.k-mark`, только злее. Карточка задачи объявляет рамку
@@ -535,8 +593,8 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
    равной силе селекторов побеждает та, что стоит ниже, — а набор
    подключается ВЫШЕ страничных стилей. Полоса молча пропала бы. */
 .k-type { border-left: 3px solid var(--border); }
-.k-type.k-type--task { border-left: 3px solid var(--green); }
-.k-type.k-type--test { border-left: 3px solid var(--text3); }
+.k-type.k-type--task { border-left: 3px solid var(--border); }
+.k-type.k-type--test { border-left: 3px solid var(--accent); }
 
 /* ── Чип типа задачи ───────────────────────────────────────────────────
    Стоит первым в строке меты, поэтому у всех карточек списка чипы
@@ -557,10 +615,110 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
    видят — страница отдаёт 200 с любой ошибкой в стилях. Парность держит
    `problems/tests/test_css_comments.py`; знак закрытия внутри текста
    комментария писать нельзя даже в кавычках — он и есть закрытие. */
+/* ⚠️ ЧИП ТИПА — КОНТУРНЫЙ, БЕЗ ЗАЛИВКИ (визуальная сессия 17.08, п. 1.2).
+   Серая заливка означала на платформе восемь разных вещей сразу: тип,
+   число пунктов, сложность, наличие решения, вид работы, происхождение.
+   Цвет остался только у сложности и решения — там он сигнал; тип
+   отличается формой, а не краской. */
 .k-kind { display: inline-block; min-width: 62px; text-align: center;
           font-size: 11px; font-weight: 600; line-height: 18px;
           padding: 0 8px; border-radius: 999px; white-space: nowrap;
-          background: var(--chip-bg); color: var(--chip-text); }
+          background: transparent; color: var(--text2);
+          border: 1px solid var(--border); }
+
+/* ── Чипы карточки задачи: сигнал, а не подпись (п. 1.2) ───────────────
+   Три вида и ни одного больше:
+     `--type` — тип («задача», «тест», «домашка», «своя»): контур;
+     `--diff` — сложность: янтарь И ЗВЕЗДА. Цвет всегда в паре со знаком —
+                правило «никакой информации только цветом»;
+     `--sol`  — есть разбор: зелень и галка, в том же законном смысле
+                («зелёный = решение ✓»), что и везде на сайте.
+   Число пунктов чипом БЫТЬ ПЕРЕСТАЛО: это справка, а не сигнал, и место
+   ей в обычном тексте (`.k-chip-note`). */
+.k-chip { display: inline-flex; align-items: center; gap: 4px;
+          font-size: 12px; font-weight: 500; line-height: 1.7;
+          padding: 1px 9px; border-radius: 999px; white-space: nowrap;
+          border: 1px solid transparent; }
+.k-chip.k-chip--type { background: transparent; border-color: var(--border);
+                       color: var(--text2); }
+.k-chip.k-chip--diff { background: var(--amber-tint);
+                       border-color: var(--amber-border);
+                       color: var(--amber-ink); }
+.k-chip.k-chip--sol { background: var(--green-tint);
+                      border-color: var(--green-border);
+                      color: var(--green); }
+.k-chip-note { font-size: 12px; color: var(--text2); white-space: nowrap; }
+
+/* ── Раскрытие: одно слово и один знак на платформу (п. 1.3) ───────────
+   Одно и то же действие называлось «Целиком» на шаге «Что кладём»,
+   «Показать целиком» в составе, а в разборе пряталось в нажатие по
+   строке; выглядело то серой кнопкой, то малиновой ссылкой, то
+   треугольником в углу. Свожу к одному: слово «Целиком» / «Свернуть»,
+   знак — треугольник, который ПОВОРАЧИВАЕТСЯ.
+
+   ⚠️ ЗНАК ПОВОРАЧИВАЕТСЯ, А НЕ ПОДМЕНЯЕТСЯ. Прежние раскрывашки меняли
+   `content` с «▸» на «▾»: это два разных глифа, они разной ширины и
+   по-разному стоят на строке, отчего надпись рядом дёргалась вбок.
+
+   ⚠️ ЦВЕТ АКЦЕНТНЫЙ — И ЭТО ОТМЕНА ПРЕЖНЕГО ПРАВИЛА (мокап владельца
+   17.08). До этой сессии `details.fold` намеренно красилась в `--text2`:
+   «малиновый оставлен навигации». Владелец решил иначе: раскрытие —
+   действие, и на экране их по одному-два, а не россыпь. Правило теперь
+   одно на все раскрывашки, и живёт оно ЗДЕСЬ.
+
+   Слова у «Эталонного решения», «Так тоже можно» и «Переписки по задаче»
+   свои — они правда про разное. Общий только знак и цвет. */
+.k-disc { display: inline-flex; align-items: center; gap: 5px;
+          font: inherit; font-size: 13px; font-weight: 500;
+          color: var(--accent); background: none; border: 0;
+          padding: 6px 0; cursor: pointer; }
+.k-disc:hover { color: var(--accent-deep); }
+.k-disc__tri { display: inline-block; font-size: 10px; line-height: 1;
+               transition: transform .14s; }
+.k-disc[aria-expanded="true"] .k-disc__tri { transform: rotate(90deg); }
+
+/* Раскрывашки на `details`: тот же знак и тот же цвет, без своего скрипта.
+   Классы перечислены здесь, а не проставлены заново в шаблонах: правило
+   на четыре экрана обязано лежать в наборе (иначе — «стили в файле,
+   который экран не подключает», уже трижды по проекту). */
+.k-details > summary,
+.gen-examples > summary,
+details.fold > summary,
+.pf-fold > summary {
+  display: flex; align-items: center; gap: 5px; list-style: none;
+  cursor: pointer; font-size: 13px; font-weight: 500;
+  color: var(--accent); padding: 6px 0;
+}
+.k-details > summary::-webkit-details-marker,
+.gen-examples > summary::-webkit-details-marker,
+details.fold > summary::-webkit-details-marker,
+.pf-fold > summary::-webkit-details-marker { display: none; }
+.k-details > summary::before,
+.gen-examples > summary::before,
+details.fold > summary::before,
+.pf-fold > summary::before {
+  content: '▸'; font-size: 10px; line-height: 1; display: inline-block;
+  transition: transform .14s;
+}
+.k-details[open] > summary::before,
+.gen-examples[open] > summary::before,
+details.fold[open] > summary::before,
+.pf-fold[open] > summary::before { transform: rotate(90deg); }
+.k-details > summary:hover,
+.gen-examples > summary:hover,
+details.fold > summary:hover,
+.pf-fold > summary:hover { color: var(--accent-deep); }
+
+/* ⚠️ ДВИЖЕНИЕ ВЫКЛЮЧАЕТСЯ ПО ПРОСЬБЕ СИСТЕМЫ. Поворот и переливы чипов —
+   украшение; для человека с вестибулярными нарушениями это не мелочь. */
+@media (prefers-reduced-motion: reduce) {
+  .k-disc__tri,
+  .k-details > summary::before,
+  .gen-examples > summary::before,
+  details.fold > summary::before,
+  .pf-fold > summary::before,
+  .k-chip, .k-num { transition: none; }
+}
 
 /* ── Мелочи, нужные во многих экранах ───────────────────────────────── */
 .k-quiet { font-size: 12px; color: var(--text3); }
@@ -960,14 +1118,19 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
 
 /* Карточка задачи в отборе. */
 .wk-card { display: flex; gap: 14px; align-items: flex-start;
+           flex-wrap: wrap;
            background: var(--surface); border: 0.5px solid var(--border);
            border-radius: 11px; padding: 12px 14px; margin-bottom: 9px; }
 .wk-card.is-added { opacity: .55; }
 .wk-card__main { flex: 1; min-width: 0; }
 .wk-card__title { font-size: 14px; font-weight: 600; line-height: 1.4; }
-.wk-card__facts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
-.wk-chip { font-size: 11px; color: var(--chip-text); background: var(--chip-bg);
-           border-radius: 5px; padding: 1px 7px; white-space: nowrap; }
+/* ⚠️ ЧИПЫ КАРТОЧКИ — ОБЩИЕ (`.k-chip`, п. 1.2). Здесь жил свой `.wk-chip`:
+   одна серая заливка на тип, число пунктов, сложность и наличие решения.
+   Четыре разных смысла одним пятном — взгляду не за что зацепиться, и
+   экраны отбора выглядели «скудно». `align-items: baseline` держит чипы и
+   справку о пунктах на одной строке текста. */
+.wk-card__facts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px;
+                  align-items: baseline; }
 .wk-card__src { font-size: 11px; color: var(--text3); margin-top: 5px; }
 .wk-card__lead { font-size: 13px; color: var(--text2); margin-top: 6px;
                  display: -webkit-box; -webkit-line-clamp: 2;
@@ -976,7 +1139,11 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
                  flex-shrink: 0; flex-wrap: wrap; }
 
 /* Задача, раскрытая целиком: то же наполнение на всех шагах потока. */
-.wk-full { margin-top: 10px; padding: 12px 14px; border-radius: var(--r);
+/* ⚠️ РАСКРЫТОЕ ЗАНИМАЕТ ВСЮ ШИРИНУ (п. 1.3). `flex: 1 0 100%` в карточке
+   отбора и в строке состава: оба контейнера — флекс-ряды с колонкой
+   кнопок справа, и без этого текст обрывался на двух третях. */
+.wk-full { flex: 1 0 100%; margin-top: 10px; padding: 12px 14px;
+           border-radius: var(--r);
            background: var(--surface-2); border: 0.5px solid var(--border);
            font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .wk-full[hidden] { display: none; }

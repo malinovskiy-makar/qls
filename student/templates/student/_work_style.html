@@ -213,11 +213,7 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
 
 /* ── Решалка и вопросы по задаче ─────────────────── */
 .pf-fold { margin-top: 12px; }
-.pf-fold > summary { cursor: pointer; font-size: 13px; color: var(--accent);
-                     list-style: none; padding: 4px 0; }
-.pf-fold > summary::-webkit-details-marker { display: none; }
-.pf-fold > summary::before { content: '▸ '; }
-.pf-fold[open] > summary::before { content: '▾ '; }
+/* ⚠️ Вид раскрывашки задаёт НАБОР (`_kit.html`, п. 1.3). */
 .pf-fold-body { margin-top: 8px; padding: 12px 14px; background: var(--surface-2);
                 border-radius: var(--r); font-size: 13px; line-height: 1.7;
                 overflow-wrap: anywhere; }
