@@ -1405,8 +1405,18 @@ def student_work_counts(assignments, statuses=WAITING_STATUSES):
     """
     from .models import Submission
 
+    # ⚠️ `order_by()` ОБЯЗАТЕЛЕН, ИНАЧЕ `distinct()` НЕ РАБОТАЕТ. У
+    # `Submission` в `Meta.ordering` стоит `-submitted_at`, и Django
+    # ДОБАВЛЯЕТ поле сортировки в сам SELECT: получается
+    # `SELECT DISTINCT assignment_id, student_id, submitted_at`, то есть
+    # строки различаются ещё и МОМЕНТОМ СДАЧИ. Один ученик, сдавший работу
+    # из четырёх задач, давал четыре «работы»: кнопка писала «Проверить
+    # 4 работы» рядом со «сдали 1 из 3», а колонка «Сдано работ» — 21 при
+    # двенадцати заданиях группы. Ошибка тихая: числа сходятся между собой
+    # (источник-то один), но все три врут одинаково.
     pairs = (Submission.objects
              .filter(assignment__in=assignments, status__in=statuses)
+             .order_by()
              .values('assignment_id', 'student_id')
              .distinct())
     counts = {}

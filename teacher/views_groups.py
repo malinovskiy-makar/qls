@@ -486,6 +486,14 @@ def group_assignments_by_state(rows, now=None, show_all_done=False):
             hidden = len(items) - DONE_SHOWN
         caption = ('последние %d из %d' % (len(shown), len(items))
                    if hidden else str(len(items)))
+        # ⚠️ У «Требуют проверки» ЧИСЛА В ЗАГОЛОВКЕ НЕТ (ревью 17.08, п. 0.1).
+        # В тридцати пикселях над списком стояла пилюля «6 работ ждут
+        # проверки» и заголовок «Требуют проверки 3»: два числа про одно и
+        # то же, и считают они РАЗНОЕ — пилюля работы (пары ученик×работа),
+        # заголовок задания. Единица счёта на экране одна, и называет её
+        # пилюля; здесь число просто лишнее.
+        if key == 'needs_you':
+            caption = ''
         result.append({
             'key': key,
             'title': title,
