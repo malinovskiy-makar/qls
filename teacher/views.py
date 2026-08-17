@@ -17,7 +17,7 @@ from django.views.decorators.http import require_POST
 
 from .access import (group_id_param, group_label_param,
                      group_param_refusal,
-                     lesson_for_student, tutor_required)
+                     lesson_for_student, solo_lesson_for, tutor_required)
 
 
 # ---------------------------------------------------------------------------
@@ -639,6 +639,18 @@ def student_progress(request, pk):
     Со второго перенесено то, чего здесь не было, — «сильные и слабые
     стороны» и теплокарта активности за полгода; сам он стал редиректом.
     Третьего экрана нет и не будет.
+
+    ⚠️ У ИНДИВИДУАЛЬНОГО УЧЕНИКА ЭКРАНА ДВА НЕ БЫВАЕТ (решение владельца
+    17.08). Если у ученика с этим репетитором ровно одно занятие и оно
+    индивидуальное — карточка УВОДИТ на занятие: там те же блоки плюс
+    задания и материалы. Условие считает `access.solo_lesson_for`, и оно
+    намеренно узкое: ученик может ходить и в группу, и на индивидуальное,
+    и тогда занятие рассказывает лишь половину его учёбы.
+
+    ⚠️ ОБРАБОТЧИК ЗАМЕТОК ОСТАЁТСЯ ЗДЕСЬ и обслуживает ОБА экрана: форма с
+    занятия шлёт сюда и возвращает обратно по полю `back`. Поэтому проверка
+    на слияние стоит ПОСЛЕ приёма POST — иначе перенаправление съело бы
+    отправленную заметку.
     """
     from problems import stats as stats_module
     from problems.models import StudentGroup, User as PlatformUser
@@ -659,7 +671,11 @@ def student_progress(request, pk):
             tutor=request.user, student=student, defaults={'text': text})
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'ok': True})
-        return redirect('teacher:student_progress', pk=student.pk)
+        return redirect(_note_return(request, student))
+
+    solo_lesson = solo_lesson_for(request.user, student)
+    if solo_lesson is not None:
+        return redirect('teacher:group_detail', pk=solo_lesson.pk)
 
     profile = getattr(student, 'profile', None)
     note = TutorNote.objects.filter(tutor=request.user,
@@ -686,6 +702,9 @@ def student_progress(request, pk):
         # `access.lesson_for_student`, там же объяснено, почему не «Назад».
         'lesson': lesson_for_student(request.user, student, request),
         'note': note,
+        # Общий блок заметок: обработчик один (этот экран), возврат — сюда же.
+        'note_action': reverse('teacher:student_progress', args=[student.pk]),
+        'note_back': reverse('teacher:student_progress', args=[student.pk]),
         'period': period,
         'periods': stats_module.PERIODS,
         'open_pair': open_pair,
@@ -711,6 +730,26 @@ def student_progress(request, pk):
         # экране стояли числа за месяц и картинка за полгода.
         'activity': stats_module.activity_grid(student, period),
     })
+
+
+def _note_return(request, student):
+    """Куда вернуть того, кто сохранил заметку без JavaScript.
+
+    ⚠️ Обработчик заметок ОДИН, а экранов, где стоит блок, два: карточка
+    ученика и обзор индивидуального занятия. Отправивший заметку с занятия
+    обязан остаться на занятии — иначе экран меняется под руками.
+
+    Адрес берётся из скрытого поля `back` и обязан быть СВОИМ: чужой
+    адрес в редиректе — это открытый перенаправитель.
+    """
+    from django.utils.http import url_has_allowed_host_and_scheme
+
+    back = (request.POST.get('back') or '').strip()
+    if back and url_has_allowed_host_and_scheme(
+            back, allowed_hosts={request.get_host()},
+            require_https=request.is_secure()):
+        return back
+    return reverse('teacher:student_progress', args=[student.pk])
 
 
 def _difficulty_label(value):

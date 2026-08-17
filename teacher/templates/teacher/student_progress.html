@@ -44,9 +44,8 @@
    Класс, чей стиль лежит в неподключённом файле, — уже знакомый нам
    класс дефекта (баг 7.6). */
 
-/* ── Заметки об ученике ──────────────────────────────────────────────── */
-.note-said { font-size: 12px; color: var(--text2); margin-left: 10px; }
-.note-said[hidden] { display: none; }
+/* Заметки об ученике — общий партиал, правила пометки «сохранено» переехали
+   в набор деталей: блок стоит и на обзоре индивидуального занятия. */
 {% endblock %}
 
 {% block content %}
@@ -221,58 +220,12 @@
 
 {% comment %}
 Заметки об ученике — последний блок экрана (фаза 10.6).
-Поле из набора деталей (`.k-area`), а не голая браузерная textarea.
-Сохранение без перезагрузки; форма настоящая, поэтому без JavaScript экран
-всё равно работает.
+⚠️ РАЗМЕТКА ОБЩАЯ с обзором индивидуального занятия (решение владельца
+17.08): второй копии этого блока в проекте нет.
 {% endcomment %}
-<div class="panel">
-  <div class="panel-head">
-    <div class="panel-title">Заметки об ученике</div>
-    <div class="panel-hint">Видно только вам</div>
-  </div>
-  <form method="post" id="note-form">
-    {% csrf_token %}
-    <textarea class="k-area" name="note" id="note-text" rows="4"
-              placeholder="Полезная информация {% with name=student.get_full_name|default:student.username %}{{ name|prep_o }} {{ name|prepositional }}{% endwith %}">{% if note %}{{ note.text }}{% endif %}</textarea>
-    {% comment %}
-    ⚠️ КНОПКА СОРАЗМЕРНА ПОЛЮ (ревью 17.08, п. 6.3). Под полем в четыре
-    строки стояла самая мелкая кнопка набора самого тихого веса: единственное
-    действие блока выглядело необязательным. Вес «главная», размер обычный —
-    сохранение заметки это то, ради чего блок существует.
-    {% endcomment %}
-    <div class="k-row" style="margin-top:10px;align-items:center">
-      <button type="submit" class="k-btn k-btn--main">Сохранить</button>
-      <span class="note-said" id="note-said" hidden>сохранено</span>
-    </div>
-  </form>
-</div>
+{% include "teacher/_tutor_note.html" with student=student note=note action=note_action back=note_back %}
 {% endblock %}
 
 {% block extra_js %}
 {% include '_table_sort.html' %}
-<script>
-// Заметка сохраняется без ухода со страницы. Форма остаётся настоящей:
-// если скрипт не выполнится, обычная отправка сработает как раньше.
-(function () {
-  var form = document.getElementById('note-form');
-  var said = document.getElementById('note-said');
-  if (!form) { return; }
-  form.addEventListener('submit', function (event) {
-    event.preventDefault();
-    said.hidden = false;
-    said.textContent = 'сохраняем…';
-    fetch(window.location.pathname, {
-      method: 'POST',
-      body: new FormData(form),
-      credentials: 'same-origin',
-      headers: {'X-Requested-With': 'XMLHttpRequest'}
-    }).then(function (response) {
-      if (!response.ok) { throw new Error('нет'); }
-      said.textContent = 'сохранено';
-    }).catch(function () {
-      said.textContent = 'не удалось сохранить';
-    });
-  });
-})();
-</script>
 {% endblock %}

@@ -165,6 +165,38 @@ def lesson_for_student(user, student, request=None):
     return min(lessons, key=lambda g: g.display_name.lower(), default=None)
 
 
+def solo_lesson_for(user, student):
+    """Индивидуальное занятие, которое ЗАМЕНЯЕТ карточку ученика. Или None.
+
+    ⚠️ ЗАЧЕМ (решение владельца 17.08). У индивидуального ученика «занятие»
+    и «ученик» — одно лицо, и два экрана про него показывали почти одно и
+    то же. Экран занятия забрал себе заметки, а старый адрес карточки ведёт
+    на него — но ТОЛЬКО когда карточке нечего показать отдельно.
+
+    Условий два, и оба обязательны:
+    1. у этого ученика с этим репетитором РОВНО ОДНО занятие;
+    2. и это занятие индивидуальное.
+
+    Иначе карточка работает как раньше: ученик может одновременно ходить в
+    группу и заниматься индивидуально, и тогда экран занятия рассказывает
+    только про одну половину его учёбы.
+
+    ⚠️ Предикат «индивидуальное» ОДИН на проект — `single_student` (он же
+    даёт шаблонам переменную `solo`). Второго рядом не заводим: на этой
+    ловушке проект уже стоял с двумя предикатами «это тест».
+    """
+    from problems.models import StudentGroup
+
+    lessons = StudentGroup.objects.filter(students=student)
+    if not user.is_staff:
+        lessons = lessons.filter(teacher=user)
+    lessons = list(lessons[:2])
+    if len(lessons) != 1:
+        return None
+    lesson = lessons[0]
+    return lesson if lesson.single_student is not None else None
+
+
 def group_label_param(request):
     """Название занятия из `?group=` — для крошки экранов создания.
 

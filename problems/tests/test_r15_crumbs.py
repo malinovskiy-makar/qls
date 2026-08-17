@@ -259,6 +259,14 @@ class SoloLessonNameTests(TestCase):
         lesson = StudentGroup.objects.create(name='Занятие 17', teacher=tutor,
                                              kind='individual')
         lesson.students.set([student])
+        # ⚠️ ПЕРЕСЧИТАНО 17.08: у ученика, чьё ЕДИНСТВЕННОЕ занятие
+        # индивидуальное, карточка уводит на экран занятия (решение
+        # владельца). Крошка живёт там, где карточка осталась экраном, —
+        # у ученика, который ходит ещё и в группу. Второе занятие названо
+        # так, чтобы выбор `lesson_for_student` («первое по алфавиту среди
+        # видимых названий») оставался устойчивым: «Тимур» < «Ярославль».
+        other = StudentGroup.objects.create(name='Ярославль', teacher=tutor)
+        other.students.set([student])
         self.client.force_login(tutor)
         html = self.client.get(
             reverse('teacher:student_progress', args=[student.pk])

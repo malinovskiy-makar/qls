@@ -375,8 +375,18 @@ def group_detail(request, pk):
         # смысл. Вместо них — тот же блок «Прогресс по темам», что на
         # карточке ученика, и четыре карточки-показателя.
         if group.is_individual and solo is not None:
+            # ⚠️ ЗАМЕТКИ ОБ УЧЕНИКЕ ПЕРЕЕХАЛИ СЮДА (решение владельца 17.08):
+            # у индивидуального «занятие» и «ученик» — одно лицо, и карточка
+            # больше не открывается отдельным экраном. Разметка общая
+            # (`teacher/_tutor_note.html`), обработчик остался ОДИН — на
+            # карточке, поэтому форма шлёт туда и возвращает сюда.
             context.update({
                 'solo_profile': getattr(solo, 'profile', None),
+                'note': models_platform.TutorNote.objects.filter(
+                    tutor=request.user, student=solo).first(),
+                'note_action': reverse('teacher:student_progress',
+                                       args=[solo.pk]),
+                'note_back': request.get_full_path(),
                 'progress': stats_module.topic_progress_pairs(solo,
                                                               period=period),
                 'solo_open': stats_module.accuracy_pair(

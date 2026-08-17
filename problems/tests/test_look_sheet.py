@@ -104,8 +104,11 @@ class TextAreaTests(TestCase):
         self.assertIn("area.style.height = 'auto'", source)
 
     def test_save_button_carries_weight(self):
-        page = read('teacher/templates/teacher/student_progress.html')
-        block = page[page.index('id="note-form"'):]
+        # ⚠️ ПЕРЕСЧИТАНО 17.08: блок заметок переехал в общий партиал —
+        # он стоит и на карточке ученика, и на обзоре индивидуального
+        # занятия. Проверка та же, файл другой.
+        page = read('teacher/templates/teacher/_tutor_note.html')
+        block = page[page.index('class="note-form"'):]
         block = block[:block.index('</form>')]
         self.assertIn('k-btn--main', block)
         self.assertNotIn('k-btn--quiet', block)

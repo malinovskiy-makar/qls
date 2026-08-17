@@ -40,6 +40,14 @@ class MinutesLabelTests(TestCase):
             name='Мария Ким', teacher=self.tutor,
             kind=StudentGroup.Kind.INDIVIDUAL)
         self.lesson.students.set([self.student])
+        # ⚠️ ВТОРОЕ ЗАНЯТИЕ — ЧТОБЫ КАРТОЧКА ВООБЩЕ ОТКРЫВАЛАСЬ (решение
+        # владельца 17.08). У ученика, у которого одно занятие и оно
+        # индивидуальное, карточка теперь УВОДИТ на экран занятия: там те же
+        # блоки. Проверять карточку имеет смысл там, где она осталась
+        # самостоятельным экраном, — у ученика, который ходит ещё и в группу.
+        self.group = StudentGroup.objects.create(name='Группа',
+                                                 teacher=self.tutor)
+        self.group.students.set([self.student])
         now = timezone.now()
         for shift in (0, 4, 9):
             LearningEvent.objects.create(user=self.student, source='catalog',
@@ -81,7 +89,13 @@ class MinutesLabelTests(TestCase):
 
 
 class HeaderLinkTests(TestCase):
-    """5.2 — ссылка «Карточка ученика» стоит на своём месте."""
+    """5.2 — что стоит в шапке индивидуального занятия.
+
+    ⚠️ ПЕРЕСЧИТАНО 17.08. Кнопки «Карточка ученика» здесь больше нет: у
+    индивидуального занятие и карточка слились в один экран (решение
+    владельца). Проверки не отключены — они спрашивают новое: кнопки нет,
+    адрес карточки не умер, а ведёт сюда, заметки на месте.
+    """
 
     def setUp(self):
         self.tutor = make_user('hl_tutor', role='teacher')
@@ -102,10 +116,12 @@ class HeaderLinkTests(TestCase):
             reverse('teacher:group_detail',
                     args=[self.lesson.pk])).content.decode()
 
-    def test_link_is_not_deleted(self):
-        """⚠️ Ссылка ведёт на ДРУГОЙ экран — удалять её было нельзя."""
-        self.assertIn(reverse('teacher:student_progress',
-                              args=[self.student.pk]), self._html())
+    def test_card_address_is_not_dead(self):
+        """⚠️ Адрес карточки жив — он УВОДИТ на занятие, а не отвечает 404."""
+        response = self.client.get(
+            reverse('teacher:student_progress', args=[self.student.pk]))
+        self.assertRedirects(
+            response, reverse('teacher:group_detail', args=[self.lesson.pk]))
 
     def test_link_left_the_subtitle(self):
         """Она стояла ВНУТРИ подписи, вплотную под строкой с данными."""
@@ -117,11 +133,18 @@ class HeaderLinkTests(TestCase):
         for chunk in subtitle[1:]:
             self.assertNotIn('student_progress', chunk[:200])
 
-    def test_link_is_a_kit_button_now(self):
+    def test_header_has_no_card_button(self):
+        """Второй двери в ту же комнату не осталось."""
         html = self._html()
         block = html.split('<div class="gd-side">')[1][:400]
-        self.assertIn('k-btn k-btn--plain k-btn--sm', block)
-        self.assertIn('Карточка ученика', block)
+        self.assertNotIn('Карточка ученика', block)
+        self.assertNotIn('Карточка ученика', html)
+
+    def test_notes_moved_into_the_overview(self):
+        """Заметки об ученике — последний блок обзора занятия."""
+        html = self._html()
+        self.assertIn('Заметки об ученике', html)
+        self.assertIn('name="note"', html)
 
     def test_kind_chip_is_still_there(self):
         block = self._html().split('<div class="gd-side">')[1][:500]

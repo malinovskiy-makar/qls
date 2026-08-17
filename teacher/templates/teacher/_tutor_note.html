@@ -1,0 +1,76 @@
+{% load ru %}
+{% comment %}
+Заметки об ученике — ОДИН блок на два экрана: карточка ученика и обзор
+индивидуального занятия (решение владельца 17.08 о слиянии двух дверей в
+одну комнату).
+
+⚠️ РАЗМЕТКА ЗДЕСЬ ОДНА. Копия на втором экране разошлась бы с первой — это
+самый частый класс дефекта проекта («одно и то же в двух местах»).
+
+⚠️ `{% templatetag openblock %} load {% templatetag closeblock %}` НЕ
+наследуется из включающего шаблона: без строки выше падало бы «Invalid
+filter» на `prep_o`.
+
+Параметры:
+  student — чьи заметки;
+  note    — запись `TutorNote` или None;
+  action  — куда отправлять форму (единственный обработчик — карточка);
+  back    — куда вернуться после отправки без JavaScript.
+{% endcomment %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Заметки об ученике</div>
+    <div class="panel-hint">Видно только вам</div>
+  </div>
+  <form method="post" class="note-form" action="{{ action }}">
+    {% csrf_token %}
+    {% comment %}
+    Куда вернуться. Обработчик один (карточка ученика), а экранов два, и
+    отправивший заметку с занятия обязан остаться на занятии.
+    ⚠️ Поле называется `back`, а не `action`: имя `action` затеняет
+    `form.action` и уводит отправку на «…/[object HTMLInputElement]».
+    {% endcomment %}
+    <input type="hidden" name="back" value="{{ back }}">
+    <textarea class="k-area" name="note" rows="4"
+              placeholder="Полезная информация {% with name=student.get_full_name|default:student.username %}{{ name|prep_o }} {{ name|prepositional }}{% endwith %}">{% if note %}{{ note.text }}{% endif %}</textarea>
+    {% comment %}
+    ⚠️ КНОПКА СОРАЗМЕРНА ПОЛЮ (ревью 17.08, п. 6.3). Под полем в четыре
+    строки стояла самая мелкая кнопка набора самого тихого веса: единственное
+    действие блока выглядело необязательным.
+    {% endcomment %}
+    <div class="k-row" style="margin-top:10px;align-items:center">
+      <button type="submit" class="k-btn k-btn--main">Сохранить</button>
+      <span class="note-said" hidden>сохранено</span>
+    </div>
+  </form>
+</div>
+
+<script>
+// Заметка сохраняется без ухода со страницы. Форма остаётся настоящей:
+// если скрипт не выполнится, обычная отправка сработает как раньше и
+// вернёт туда, откуда отправляли (скрытое поле возврата).
+(function () {
+  var form = document.currentScript.previousElementSibling
+             .querySelector('.note-form');
+  if (!form) { return; }
+  var said = form.querySelector('.note-said');
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    said.hidden = false;
+    said.textContent = 'сохраняем…';
+    // ⚠️ Адрес берём У ФОРМЫ, а не из адресной строки: обработчик один,
+    // а экранов, где стоит этот блок, два.
+    fetch(form.getAttribute('action') || window.location.pathname, {
+      method: 'POST',
+      body: new FormData(form),
+      credentials: 'same-origin',
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    }).then(function (response) {
+      if (!response.ok) { throw new Error('нет'); }
+      said.textContent = 'сохранено';
+    }).catch(function () {
+      said.textContent = 'не удалось сохранить';
+    });
+  });
+})();
+</script>
