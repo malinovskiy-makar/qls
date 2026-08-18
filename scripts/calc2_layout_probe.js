@@ -87,7 +87,7 @@ const snap = () => {
     if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) < .05) return;
     const r = t.getBoundingClientRect();
     if (r.width < 0.5 || r.height < 0.5) return;
-    texts.push({ s: ownText(t).slice(0, 28), r: rel(r),
+    texts.push({ s: ownText(t).slice(0, 28), r: rel(r), node: t,
                  cls: t.getAttribute('class') || '', clip: clipOf(t) });
   });
 
@@ -99,18 +99,23 @@ const snap = () => {
     }
 
   /* ── Плавающее НАД холстом: HTML-блоки внутри обёртки ─────────── */
+  /* ⚠️ У ПЛАВАЮЩЕГО БЛОКА ЕСТЬ СВОИ ПОДПИСИ, И ЭТО НЕ НАЛОЖЕНИЕ.
+     Легенда — блок с текстом внутри, и первая версия замера считала её
+     собственные строки («CS», «PS», «DWL») чужими подписями под ней: 96
+     наложений из 127 были выдумкой самого прибора. Помним узел блока и
+     пропускаем всё, что лежит ВНУТРИ него. */
   const floats = [];
   wrap.querySelectorAll('.graph-tools, .quick-area, .wrench, .graph-float').forEach(el => {
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || el.hasAttribute('hidden')) return;
     const r = el.getBoundingClientRect();
     if (r.width < 1) return;
-    floats.push({ s: el.id || el.className, r: rel(r) });
+    floats.push({ s: el.id || el.className, r: rel(r), node: el });
   });
   /* Легенду рисует сам SVG — она такой же плавающий блок по смыслу. */
   const legend = svgEl.querySelector('.legend, [data-legend-box]');
   if (legend) { const r = legend.getBoundingClientRect();
-                if (r.width > 1) floats.push({ s: 'легенда', r: rel(r) }); }
+                if (r.width > 1) floats.push({ s: 'легенда', r: rel(r), node: legend }); }
 
   const floatPairs = [];
   for (let i = 0; i < floats.length; i++)
@@ -120,6 +125,7 @@ const snap = () => {
     }
   const floatOverText = [];
   floats.forEach(f => texts.forEach(t => {
+    if (f.node && t.node && f.node.contains(t.node)) return;   // своя подпись — не наложение
     const a = overlap(f.r, t.r);
     if (a) floatOverText.push({ float: f.s, text: t.s, area: a });
   }));

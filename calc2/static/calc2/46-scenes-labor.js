@@ -312,7 +312,19 @@ function drawLaborMonopsonyPoints() {
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('M₀');
     }
     // Новый оптимум при МРОТ.
-    if (min.Lstar > 1e-6) laborPoint(g, min.Lstar, min.wage, COL.ink, 'M', { lText: 'L=' + fmt(min.Lstar), wText: 'W=' + fmt(min.wage) });
+    /* ⚠️ ДВЕ ПОДПИСИ ОДНОГО ЧИСЛА У ОДНОЙ ТОЧКИ — ЭТО НЕ НАЛОЖЕНИЕ, А ПОВТОР
+       (п. 34, последний случай). Когда МРОТ поставлен ровно на зарплату
+       монопсониста, у оси печаталось «W=65» поверх «Wmin=65»: развести их
+       нельзя, потому что они об одном и том же. Говорит тот, кто объясняет
+       БОЛЬШЕ: линия МРОТ названа человеком, а зарплата в этой точке ей и
+       равна. Само число не пропадает ни в каком случае. */
+    if (min.Lstar > 1e-6) {
+      const sameAsMin = STATE.laborMinOn && STATE.laborMinW > 0
+                        && fmt(min.wage) === fmt(STATE.laborMinW);
+      laborPoint(g, min.Lstar, min.wage, COL.ink, 'M',
+                 { lText: 'L=' + fmt(min.Lstar),
+                   wText: sameAsMin ? null : 'W=' + fmt(min.wage) });
+    }
     // Безработица на оси L между Lstar и L̂ (желающие при W_min).
     if (min.unemployment > 1e-6) {
       const xLo = sx(Math.min(min.Lstar, min.Lhat)), xHi = sx(Math.max(min.Lstar, min.Lhat));

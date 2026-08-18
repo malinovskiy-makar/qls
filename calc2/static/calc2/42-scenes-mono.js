@@ -831,7 +831,11 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
   // Оси.
   g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', right).attr('y2', bottom).attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
   g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', left).attr('y2', top).attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
-  g.append('text').attr('x', (left + right) / 2).attr('y', top - 12).attr('text-anchor', 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink).text(title);
+  /* Заголовок панели зажимается внутрь холста: «Экспорт по мировой цене»
+     шире своей половины, и на узком окне уезжал за правый край. */
+  const tw = measureText(title, FS.base, 600);
+  const tx = Math.max(tw / 2 + 2, Math.min(W - tw / 2 - 2, (left + right) / 2));
+  g.append('text').attr('x', tx).attr('y', top - 12).attr('text-anchor', 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink).text(title);
   g.append('text').attr('x', right + 4).attr('y', bottom + 4).attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Q');
   g.append('text').attr('x', left - 4).attr('y', top - 2).attr('text-anchor', 'end').attr('font-size', FS.base).attr('fill', COL.inkSoft).text('P');
   [0.25, 0.5, 0.75, 1].forEach(t => { const xq = Xmax * t; g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(xq)); });

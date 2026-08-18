@@ -550,6 +550,20 @@ function statPieces(raw) {
    Правится только текст, разметка не трогается: обходим текстовые узлы и
    заменяем найденный кусок на span с формулой. Узлы, уже прошедшие обработку,
    помечаются, чтобы статичные подсказки не разбирались заново на каждом кадре. */
+/* ⚠️ п. 48. `$MC$` KaTeX набирает как ПРОИЗВЕДЕНИЕ переменных M·C: курсив
+   с зазором, и на экране это читается как «M с индексом C». Аббревиатура
+   величины (MC, ATC, AVC, CS, PS, DWL, TP, MP, AP) — ОДНО имя, и набирается
+   прямым шрифтом. Тот же разбор уже стоит на холсте: qtyParts не режет на
+   буквы то, что целиком заглавное.
+   Правим в единственной точке печати формул панели, а не в 244 строках сцен,
+   где эти доллары написаны. Имена команд LaTeX не трогаем, содержимое
+   \text{…} и \mathrm{…} тоже: там прямой шрифт уже задан. */
+function texAbbrev(src) {
+  return String(src).replace(
+    /(\\(?:text|mathrm|mathbf|operatorname)\s*\{[^{}]*\})|(\\[a-zA-Z]+)|([A-Z]{2,})/g,
+    (all, keep, cmd, abbr) => keep || cmd || ('\\mathrm{' + abbr + '}'));
+}
+
 function renderMathIn(root) {
   if (!root || typeof katex === 'undefined') return;
   const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -571,7 +585,7 @@ function renderMathIn(root) {
       if (i % 2 === 0) { if (piece) frag.appendChild(document.createTextNode(piece)); return; }
       const span = document.createElement('span');
       span.className = 'tex';
-      try { katex.render(piece, span, { throwOnError: false, displayMode: false }); }
+      try { katex.render(texAbbrev(piece), span, { throwOnError: false, displayMode: false }); }
       catch (e) { span.textContent = piece; }
       frag.appendChild(span);
     });
@@ -661,8 +675,16 @@ const AREA_SHORT = {
   'Излишек покупателя (CS)': 'CS',
   'Излишек продавца (PS)': 'PS',
   'Излишек производителя (TR - VC)': 'PS',
-  'Излишек работников': 'CS',
-  'Излишек фирм': 'PS',
+  /* ⚠️ п. 41. НА РЫНКЕ ТРУДА ПРОДАЮТ РАБОТНИКИ, А ПОКУПАЮТ ФИРМЫ.
+     Обозначения стояли наоборот, и получалось противоречие между сценами:
+     заливка честно берёт цвет ОГРАНИЧИВАЮЩЕЙ кривой (излишек под D — синий,
+     над S — оранжевый), а легенда называла синее пятно «PS», оранжевое «CS».
+     На рынке благ «CS синий, PS оранжевый», в монопсонии выходило наоборот.
+     Правило одно: CS живёт под кривой спроса и потому синий, PS над кривой
+     предложения и потому оранжевый; кто в модели покупатель, а кто продавец,
+     на цвет не влияет. */
+  'Излишек работников': 'PS',
+  'Излишек фирм': 'CS',
   'Излишек фирмы: весь излишек рынка': 'PS',
   'Переменные издержки (VC)': 'VC',
   'Потери общества (DWL)': 'DWL',
@@ -672,15 +694,22 @@ const AREA_SHORT = {
   'Доход бюджета': 'Tx',
   'Расход бюджета': 'GS',
   'Рента квоты': 'R',
-  'Достижимые наборы': 'Дост.',
+  /* «Достижимые наборы» короткого обозначения не имеет: «Дост.» это не
+     сокращение величины, а обрубок слова (п. 45). Пишем целиком. */
   'Диапазон возможных зарплат': 'W',
   'Площадь': 'S',
 };
+/* ⚠️ ОБРУБОК ПО ЧИСЛУ ЗНАКОВ ОТМЕНЁН (п. 45).
+   Осмысленное сокращение — это CS, PS, DWL, Tx: их школьник читает быстрее
+   фразы, и они входят в реестр обозначений. А «Прибыль ф…» и «Дост.» это не
+   сокращения, а обрезанные слова: подпись перестаёт читаться, а места экономит
+   меньше, чем стоит потеря смысла. Незнакомое название печатается целиком,
+   коробка легенды просто становится шире — её ширина считается по фактически
+   измеренному тексту, а не по числу знаков. */
 function areaShort(name) {
   if (AREA_SHORT[name]) return AREA_SHORT[name];
   const m = /\(([^)]{1,5})\)\s*$/.exec(name);      // «… (CS)» → CS
-  if (m) return m[1];
-  return name.length > 10 ? name.slice(0, 9) + '…' : name;
+  return m ? m[1] : name;
 }
 
 /* Легенда: столбик у правого нижнего угла поля графика. Раньше она лежала
@@ -705,7 +734,9 @@ function drawLegend() {
   const SW = 12, GAP = 6, LH = 18, PAD = 8;
   const fsz = FS.base;
   const labels = seen.map(e => areaShort(e.key));
-  const wide = Math.max.apply(null, labels.map(s => s.length)) * fsz * 0.62;
+  // Ширину меряет браузер: оценка «знаков × 0,62 кегля» врала, и подпись
+  // выходила за подложку (та же беда, что была у полей холста).
+  const wide = Math.max.apply(null, labels.map(t => measureText(t, fsz, 600)));
   const boxW = SW + GAP + wide + 2 * PAD;
   const boxH = seen.length * LH + 2 * PAD;
   const { x, y } = legendCorner(boxW, boxH);
@@ -731,6 +762,34 @@ function drawLegend() {
    считаем, сколько их точек попадает в коробку в каждом из четырёх углов, и
    садимся в самый пустой. При равенстве побеждает правый нижний — привычное
    место, к которому глаз уже приучен. */
+/* ⚠️ ЕДИНАЯ РАСКЛАДКА ПЛАВАЮЩЕГО (механизм 3.3; п. 38, 39, 40, 45).
+
+   Над холстом висят HTML-блоки: стопка кнопок масштаба с гаечным ключом
+   (`.graph-tools`, правый верхний угол) и кнопка площади по точкам. Они лежат
+   в обёртке `#graph-wrap`, а не внутри SVG, поэтому холст про них не знал
+   ВООБЩЕ. Отсюда 124 наложения из замера: легенда садилась ровно под кнопки
+   («DWL» читалось как «DW»), туда же уезжали подписи кривых.
+
+   Прямоугольники собираются ОДИН раз и отдаются всем, кому нужно свободное
+   место: выбору места легенды и разведению подписей. Второго списка «кто над
+   холстом висит» не заводим — он разъехался бы с разметкой. */
+function floatRects() {
+  const node = svg.node();
+  const wrap = document.getElementById('graph-wrap');
+  if (!node || !wrap) return [];
+  const box = node.getBoundingClientRect();
+  const out = [];
+  wrap.querySelectorAll('.graph-tools, .quick-area, .wrench, .graph-float').forEach(el => {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || el.hasAttribute('hidden')) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return;
+    out.push({ x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height,
+               left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+  });
+  return out;
+}
+
 function legendCorner(boxW, boxH) {
   const m = CONFIG.margin, EDGE = 8;
   /* Б47. Место только СПРАВА. Слева у графика ось значений с цифрами делений и
@@ -744,6 +803,11 @@ function legendCorner(boxW, boxH) {
      равных выбирался угол. */
   const xRight = (W - m.right) - boxW - EDGE;
   const yTop = m.top + EDGE, yBot = (H - m.bottom) - boxH - 26;
+  /* ⚠️ ПЕРВЫМ ИДЁТ НИЖНИЙ УГОЛ, А НЕ ВЕРХНИЙ. Верхний правый занят стопкой
+     кнопок масштаба — постоянно, во всех сценах. Порядок кандидатов закреплён,
+     и место выбирается ПЕРВОЕ подходящее, а не «лучшее» из всех: канон просит
+     устойчивое место (п. 40), а «лучшее» пересчитывалось на каждое движение
+     кривой, и легенда прыгала снизу вверх сама собой. */
   const corners = [{ x: xRight, y: yBot }, { x: xRight, y: yTop }];
   for (let i = 1; i < 8; i++) corners.push({ x: xRight, y: yTop + (yBot - yTop) * i / 8 });
   // Точки нарисованных кривых в пикселях холста, разреженно: для выбора угла
@@ -770,15 +834,26 @@ function legendCorner(boxW, boxH) {
       }
     });
   }
-  let best = corners[0], bestHits = Infinity;
-  corners.forEach(c => {
+  /* Плавающие блоки — ЗАПРЕТ, а не штраф: под кнопками легенду не прочитать
+     никак, сколько бы свободного места вокруг ни было. */
+  const blocked = floatRects();
+  const clash = (c) => blocked.some(b =>
+    c.x < b.x + b.w && b.x < c.x + boxW && c.y < b.y + b.h && b.y < c.y + boxH);
+  const cost = corners.map(c => {
+    if (clash(c)) return Infinity;
     let hits = 0;
     pts.forEach(([px, py]) => {
       if (px >= c.x && px <= c.x + boxW && py >= c.y && py <= c.y + boxH) hits++;
     });
-    if (hits < bestHits) { bestHits = hits; best = c; }
+    return hits;
   });
-  return best;
+  // Прежнее место остаётся за легендой, пока оно свободно (п. 40).
+  const prev = STATE.legendSpot;
+  if (prev != null && corners[prev] && cost[prev] === 0) return corners[prev];
+  let best = 0;
+  for (let i = 1; i < corners.length; i++) if (cost[i] < cost[best]) best = i;
+  STATE.legendSpot = best;
+  return corners[best];
 }
 
 
@@ -2862,6 +2937,7 @@ const SCENE_DEFAULTS = {
   // Плоскость и подписи.
   labelSize: LABEL_SIZE_DEFAULT, firstQuad: true, xStep: null, yStep: null,
   showLegend: true, zoomLock: false, viewDirty: false,
+  legendSpot: null,           // выбранное место легенды: держится, пока свободно
   // Буквы-параметры и кэши расчётов.
   params: {}, ppfSumData: null, ppfTradeData: null, mathRes: null,
   bundleOn: false, bundleX: null, bundleY: null,

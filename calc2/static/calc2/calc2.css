@@ -1624,6 +1624,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
 /* Кнопки над графиком мягко въезжают один раз при открытии сцены. */
 @keyframes floatIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+/* п. 31. Кнопка возврата масштаба то есть, то нет, а стопка не должна
+   разъезжаться: место за ней остаётся, меняется только видимость. */
+.gt-btn.is-off { visibility: hidden; pointer-events: none; }
+
 .graph-tools { animation: floatIn .34s var(--ease) .04s; }
 @media (prefers-reduced-motion: reduce) {
   .side, .side-arrow svg { transition: none; }
