@@ -80,7 +80,7 @@ function derivativeExpr(expr, varName) {
     const d = math.derivative(src, v).toString();
     // Пробное вычисление: символьная производная бывает верной, но незаписываемой.
     const c = math.parse(d).compile();
-    const probe = c.evaluate(paramScope({ [v]: 1, x: 1, Q: 1, L: 1 }));
+    const probe = c.evaluate(paramScope(axisScope(1, { [v]: 1 })));
     return (typeof probe === 'number' && isFinite(probe)) ? d : null;
   } catch (e) { return null; }
 }

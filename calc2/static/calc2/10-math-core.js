@@ -8,13 +8,24 @@
 // Компиляция формулы P = f(Q). Возвращает { compiled, error }.
 // Пользователь пишет от Q; внутри даём Math.js обе переменные (Q и x),
 // чтобы принимались оба варианта записи.
+/* П14. Область подстановки переменной графика: одно место на весь движок.
+   Строчная буква — тот же аргумент, что заглавная; `L` синоним для рынка
+   труда, `X` — для блока КПВ, где горизонталь называется товаром X.
+   ⚠️ Вертикальные обозначения (`P`, `y`, `Y`) сюда НЕ входят: они значение,
+   а не аргумент, и подставлять их нельзя. */
+function axisScope(q, extra) {
+  const c = extra || {};
+  c.x = q; c.Q = q; c.q = q; c.L = q; c.l = q; c.X = q;
+  return c;
+}
+
 function compileFormula(expr) {
   try {
     const compiled = math.parse(prepExpr(expr)).compile();
     // Пробный расчёт ловит опечатки сразу (L — синоним для рынка труда).
     // Там, где буквы становятся параметрами, незнакомая буква — не опечатка,
     // а будущий ползунок, поэтому на пробу подставляем ей единицу.
-    const ctx = paramScope({ x: 1, Q: 1, L: 1 });
+    const ctx = paramScope(axisScope(1));
     if (paramsAllowed()) freeSymbols(expr).forEach(n => { if (ctx[n] === undefined) ctx[n] = 1; });
     compiled.evaluate(ctx);
     return { compiled, error: null };
@@ -32,7 +43,7 @@ function evalCurve(curve, q) {
   // Быстрый путь для прямых (нужен и для плавного перетаскивания).
   if (curve.linear) return curve.linear.a * q + curve.linear.b;
   try {
-    const v = evalWithParams(curve.compiled, { x: q, Q: q, L: q }, curve.expr);   // L — синоним переменной (рынок труда)
+    const v = evalWithParams(curve.compiled, axisScope(q), curve.expr);
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) {
     return NaN;
@@ -46,7 +57,7 @@ function detectLinear(compiled) {
   const at = (q) => {
     // Значения ползунков подмешиваем: иначе «a*x» без них падает на неизвестной
     // букве и прямая считалась бы кривой (а её нельзя ни таскать, ни двигать).
-    try { const v = compiled.evaluate(paramScope({ x: q, Q: q, L: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+    try { const v = compiled.evaluate(paramScope(axisScope(q))); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
     catch (e) { return NaN; }
   };
   /* Б30. Проверять три точки В СЕРЕДИНЕ диапазона нельзя: кусочная функция
@@ -372,13 +383,13 @@ function curveDeriv(curve, q) {
 
 // Внешние предельные издержки (Задача 4): константа или функция от Q (как спрос — переменная Q).
 function compileExt(expr) {
-  try { const c = math.parse(expr).compile(); c.evaluate(scopeFor(expr, { x: 1, Q: 1 })); return { compiled: c, error: null }; }
+  try { const c = math.parse(expr).compile(); c.evaluate(scopeFor(expr, axisScope(1))); return { compiled: c, error: null }; }
   catch (e) { return { compiled: null, error: e.message }; }
 }
 function evalExt(q) {
   if (!STATE.extCompiled) return NaN;
   try {
-    const v = STATE.extCompiled.evaluate(scopeFor(STATE.extExpr, { x: q, Q: q }));
+    const v = STATE.extCompiled.evaluate(scopeFor(STATE.extExpr, axisScope(q)));
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) { return NaN; }
 }

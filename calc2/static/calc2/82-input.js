@@ -338,6 +338,62 @@ const TEX_GREEK = { alpha: 'alpha', beta: 'beta', gamma: 'gamma', delta: 'delta'
   rho: 'rho', sigma: 'sigma', tau: 'tau', phi: 'phi', omega: 'omega',
   Delta: 'Delta', Sigma: 'Sigma', Omega: 'Omega' };
 
+/* П16. ОШИБКА СТОИТ У ТОГО ПОЛЯ, ГДЕ ВОЗНИКЛА, И НЕ СДВИГАЕТ МАКЕТ.
+
+   Канон 2.4: три носителя сразу — линия, цвет и фраза; фраза называет
+   ТРЕБОВАНИЕ, а не диагноз, и встаёт В ТУ ЖЕ СТРОКУ. Прежде красный текст про
+   пустое поле печатался в общий блок ошибок наверху панели: он относился к
+   одному полю, а стоял у другого, и появление фразы двигало вниз всё, что под
+   ней. Место под фразу занято ВСЕГДА (пустая строка той же высоты) — тот же
+   приём, что у кнопки возврата масштаба в подфазе 3b. */
+function fieldProblem(inp, msg) {
+  if (!inp) return;
+  const host = inp.closest('.f-wrap, .f-slot, .field, .grow') || inp.parentElement;
+  if (!host) return;
+  let box = host._problem;
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'f-why';
+    box.setAttribute('role', 'status');
+    host.appendChild(box);
+    host._problem = box;
+  }
+  box.textContent = msg || '';
+  box.classList.toggle('is-bad', !!msg);
+  const slot = inp.closest('.f-slot') || inp;
+  slot.classList.toggle('is-bad', !!msg);
+  if (msg) inp.setAttribute('aria-invalid', 'true'); else inp.removeAttribute('aria-invalid');
+}
+
+/* П17 · П18. КОМАНДА, КОТОРУЮ РАЗБОР НЕ ЗНАЕТ, БОЛЬШЕ НЕ ПРЕВРАЩАЕТСЯ
+   В ПРОИЗВЕДЕНИЕ БУКВ.
+
+   Неизвестная команда прежде теряла обратный слэш, а текст оставался: `\pm`
+   становился `pm`, дальше раскрытие неявного умножения делало из него `p*m`,
+   и на экране молча появлялись два ползунка — `p` и `m`. Буква `p` в
+   экономике это цена, и такой ползунок дезориентирует полностью. То же
+   случалось с `\int` и с `\frac{d}{dx}`: последняя превращалась в
+   `d/(d*x)` и «считалась».
+
+   Обе клавиши с клавиатуры убраны (движок интегралов и производных по формуле
+   не считает — правило «либо считается, либо не предлагается»), но набрать
+   команду можно и руками, поэтому есть проверка. */
+const TEX_KNOWN = new Set([
+  'frac', 'dfrac', 'tfrac', 'sqrt', 'left', 'right', 'bigl', 'bigr',
+  'cdot', 'times', 'ast', 'div', 'le', 'leq', 'ge', 'geq', 'ne', 'neq',
+  'lt', 'gt', 'infty', 'placeholder', 'begin', 'end', 'text', 'mathrm',
+  'mathit', 'operatorname', 'exponentialE', 'imaginaryI', 'log',
+  'lbrace', 'rbrace', 'cases', 'nthRoot',
+].concat(TEX_FUNCS).concat(Object.keys(TEX_GREEK)));
+
+function unknownTexCommand(tex) {
+  const s = String(tex == null ? '' : tex);
+  const re = /\\([A-Za-z]+)/g;
+  let m;
+  while ((m = re.exec(s))) if (!TEX_KNOWN.has(m[1])) return '\\' + m[1];
+  return null;
+}
+
 // Содержимое группы, начинающейся на позиции i (символ '{'), с учётом вложенности.
 function texGroup(s, i) {
   if (s[i] !== '{') return null;
@@ -593,6 +649,18 @@ function buildMathfield(inp) {
     if (syncing) return;
     syncing = true;
     try {
+      /* П17 · П18. Команда, которой разбор не знает, дальше не идёт. Прежде она
+         теряла слэш и уходила в движок буквами: `\pm` становился `p*m` и
+         заводил два ползунка, один из которых назывался ценой. */
+      const bad = unknownTexCommand(mf.value);
+      if (bad) {
+        inp.dataset.texUnknown = bad;
+        if (typeof fieldProblem === 'function')
+          fieldProblem(inp, 'Не понимаю команду ' + bad + ' — калькулятор её не считает');
+        return;
+      }
+      delete inp.dataset.texUnknown;
+      if (typeof fieldProblem === 'function') fieldProblem(inp, '');
       const text = latexToMath(mf.value);
       if (inp.value !== text) {
         inp.value = text;
@@ -672,8 +740,12 @@ const MKBD_BASE = [
   [['4', '4'], ['5', '5'], ['6', '6'], ['×', '\\cdot ', '*'], ['÷', '\\frac{#@}{#?}', '/']],
   [['1', '1'], ['2', '2'], ['3', '3'], ['−', '-', '-'], ['+', '+', '+']],
   [['0', '0'], [',', '.', '.'], ['=', '=', '='], ['x²', '#@^2', '^2'], ['xⁿ', '#@^{#?}', '^(', 1]],
-  [['xₙ', '#@_{#?}', '_'], ['√', '\\sqrt{#?}', 'sqrt()', 1], ['дробь', '\\frac{#@}{#?}', '/'],
-   ['⌫', 'DEL'], ['стереть', 'CLEAR']],
+  /* П21. Один язык оформления в ряду. Было вперемешку: «×» и «÷» знаками,
+     «дробь» и «стереть» словами, «⌫» иконкой. Знак действия рисуется знаком,
+     а команда над полем называется словом — «дробь» это то же самое, что «÷»,
+     и второй кнопки для неё не нужно. */
+  [['xₙ', '#@_{#?}', '_'], ['√', '\\sqrt{#?}', 'sqrt()', 1], ['|x|', '\\left|#?\\right|', 'abs()', 1],
+   ['⌫', 'DEL'], ['✕', 'CLEAR']],
 ];
 const MKBD_FUNCS = [
   ['Корни и модуль', [
@@ -691,10 +763,6 @@ const MKBD_FUNCS = [
     ['sin', '\\sin\\left(#?\\right)', 'sin()', 1],
     ['cos', '\\cos\\left(#?\\right)', 'cos()', 1],
     ['tan', '\\tan\\left(#?\\right)', 'tan()', 1],
-  ]],
-  ['Анализ', [
-    ['d/dx', '\\frac{d}{dx}', 'd/dx'],
-    ['∫', '\\int_{#?}^{#?}', 'integral'],
   ]],
   ['Сравнения', [
     ['<', '<', '<'], ['>', '>', '>'],
@@ -719,7 +787,7 @@ const MKBD_LETTERS = [
   ]],
   ['Знаки', [
     ['∞', '\\infty ', 'Infinity'], ['%', '\\%', '%'],
-    ['±', '\\pm ', '+-'], ['≈', '\\approx ', '=='],
+    ['≈', '\\approx ', '=='],
   ]],
 ];
 
@@ -727,6 +795,10 @@ function mkbdKey(k, inp) {
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'mk';
   b.textContent = k[0];
+  /* Знак без слова обязан называть себя доступному чтению: нативной подсказки
+     на сайте нет (правило 18 части 4), а «⌫» и «✕» на слух не читаются. */
+  if (k[1] === 'DEL') b.setAttribute('aria-label', 'Стереть символ');
+  if (k[1] === 'CLEAR') b.setAttribute('aria-label', 'Очистить поле');
   if (k[0].length > 2) b.classList.add('fn');
   b.addEventListener('mousedown', (e) => e.preventDefault());   // не терять фокус поля
   b.addEventListener('click', () => {

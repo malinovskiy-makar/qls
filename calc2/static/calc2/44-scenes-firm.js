@@ -20,7 +20,7 @@ const COST_SCAN_LO = 1e-3;
 // Значение TC(Q) по компилированной формуле (Q и x — обе переменные).
 function evalTC(q) {
   if (!STATE.costsCompiled) return NaN;
-  try { const v = STATE.costsCompiled.evaluate(paramScope({ x: q, Q: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  try { const v = STATE.costsCompiled.evaluate(paramScope(axisScope(q))); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
   catch (e) { return NaN; }
 }
 
@@ -30,7 +30,7 @@ function evalTC(q) {
 function evalPart(key, q) {
   const c = STATE.costsParts && STATE.costsParts[key];
   if (!c) return NaN;
-  try { const v = c.evaluate(paramScope({ x: q, Q: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  try { const v = c.evaluate(paramScope(axisScope(q))); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
   catch (e) { return NaN; }
 }
 function hasPart(key) { return !!(STATE.costsParts && STATE.costsParts[key]); }
@@ -944,7 +944,7 @@ function plantMC(compiled, q) {
   return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / ((q + h) - lo);
 }
 function plantTC(compiled, q) {
-  try { const v = compiled.evaluate(paramScope({ Q: q, x: q, L: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  try { const v = compiled.evaluate(paramScope(axisScope(q))); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
   catch (e) { return NaN; }
 }
 // Объём завода при уровне предельных издержек m: MC(q) = m. MC растёт по q,

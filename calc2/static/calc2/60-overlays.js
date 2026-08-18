@@ -215,6 +215,7 @@ function renderMmRows() {
    Начали печатать — она превращается в обычную строку списка (цвет, имя,
    удаление, правка формулы), а под ней появляется новая пустая. */
 function graphRowsBox() { return document.getElementById('graph-rows'); }
+let graphFieldSeq = 0;   // порядковый номер поля строки: набор навешивается по id
 
 function renderGraphRows() {
   const box = graphRowsBox();
@@ -234,6 +235,12 @@ function renderGraphRows() {
   }
   STATE.curves.forEach(c => box.appendChild(buildGraphRow(c)));
   box.appendChild(buildGraphRow(null));
+  /* П19 · П21. Строки «Построения графиков» получают ТОТ ЖЕ набор, что поля
+     формул остальных сцен: клавиатуру и вопросик. Прежде здесь звалась только
+     `upgradeFormulaField`, и это была единственная сцена, где формулу нечем
+     было набрать, кроме системной клавиатуры. */
+  if (typeof equipFormulaField === 'function')
+    box.querySelectorAll('.f-slot > input[id]').forEach(el => equipFormulaField(el.id, 'MATH'));
   /* Поля формул собираются лениво и только когда видны (А56), а строки мы
      вставили в разметку только что: разбираем очередь здесь, иначе поле
      остаётся обычным текстовым окошком до следующей перерисовки. */
@@ -296,7 +303,17 @@ function buildGraphRow(curve) {
 
   row._curve = curve || null;
   inp.addEventListener('input', () => graphRowInput(row, inp, del, name));
-  upgradeFormulaField(inp);
+  /* П19 · П21. Строка «Построения графиков» получает ТОТ ЖЕ набор, что поля
+     формул во всех остальных сценах: клавиатуру и вопросик. Прежде здесь
+     звалась только `upgradeFormulaField` — поле становилось математическим,
+     но без клавиатуры и без подсказки, и это была единственная сцена, где
+     формулу набирать было нечем, кроме системной клавиатуры.
+     Идентификатор строке нужен: набор навешивается по id. */
+  /* ⚠️ НАБОР НАВЕШИВАЕТСЯ ПОСЛЕ ВСТАВКИ В СТРАНИЦУ, А НЕ ЗДЕСЬ.
+     `equipFormulaField` ищет поле через `getElementById`, а строка в этот
+     момент ещё не в документе: вызов отсюда молча ничего не делал, и поле
+     оставалось без клавиатуры и вопросика. Отдаём id, разбирает renderGraphRows. */
+  if (!inp.id) inp.id = 'graph-f-' + (++graphFieldSeq);
   return row;
 }
 
@@ -307,8 +324,11 @@ function graphRowInput(row, inp, del, name) {
   if (!row._curve) {
     if (!txt) return;
     const { compiled, error } = compileFormula(txt);
-    if (error) { graphError('Пока не понимаю: ' + error); return; }
-    graphError('');
+    /* П16. Фраза стоит У ЭТОГО поля, а не в общем блоке ошибок наверху панели:
+       строк формул в сцене несколько, и общий блок не говорит, в какой из них
+       беда. Общий блок оставлен пустым, чтобы не сообщать одно и то же дважды. */
+    if (error) { fieldProblem(inp, 'Пока не понимаю запись: ' + error); return; }
+    fieldProblem(inp, ''); graphError('');
     curveCounter++;
     const c = { id: curveCounter, expr: txt, compiled, color: nextColor(),
                 name: txt, role: null, visible: true,
@@ -324,7 +344,7 @@ function graphRowInput(row, inp, del, name) {
   }
   if (!txt) return;                       // пустое поле не роняет кривую
   const err = updateCurveExpr(row._curve, txt);
-  graphError(err ? ('Пока не понимаю: ' + err) : '');
+  fieldProblem(inp, err ? ('Пока не понимаю запись: ' + err) : '');
   if (!err) redrawAll();
 }
 
@@ -1979,7 +1999,13 @@ function paramsAllowed() { return true; }
 
 /* Переменные графика: буквы, которыми подписаны оси. Параметром такая буква
    стать не может — её значение задаёт сама точка на графике. */
-const AXIS_VARS = new Set(['x', 'y', 'Q', 'P', 'L', 'K', 'X', 'Y']);
+/* П14. Строчная и заглавная — ОДНА величина. «100 - q» давало прямую P = 99
+   и ползунок q = 1: буква не значилась осью, становилась параметром со
+   значением 1, и формула честно считала «100 − 1». При этом «100 - x»
+   работало, и разницы человек объяснить не мог. Синонимы объявлены здесь и
+   ПОДСТАВЛЯЮТСЯ в расчёт (см. axisScope в 10-math-core.js) — одного списка
+   мало: буква перестала бы быть параметром, но осталась бы неизвестной. */
+const AXIS_VARS = new Set(['x', 'y', 'Q', 'q', 'P', 'p', 'L', 'l', 'K', 'X', 'Y']);
 
 /* Настоящие математические константы. Только они из всего словаря Math.js
    закрывают одиночную букву. Раньше проверка была «есть ли math[имя]», и под
