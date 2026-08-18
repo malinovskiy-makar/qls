@@ -3,17 +3,17 @@ name: ЭкЗадачи
 description: Olympiad-economics task bank, homework builder, and graphing calculator — a quiet, precise workbench for teacher and student.
 colors:
   graphite: "#1a1f2e"
-  ink-blue: "#4f7cff"
-  ink-blue-deep: "#3d66e0"
+  accent: "#BE185D"
+  accent-deep: "#9D1450"
   warm-paper: "#f7f7f5"
   paper-cool: "#f5f5f3"
   pencil-line: "#e8e8e4"
   graphite-text: "#1a1a1a"
   muted-text: "#666666"
-  amber: "#f5a623"
-  solution-green: "#2a9d5c"
+  amber: "#b26b00"
+  solution-green: "#1d7e45"
   green-tint: "#e9faf0"
-  tag-tint: "#eef2ff"
+  tag-tint: "var(--accent-tint)"
   error-red: "#c0392b"
   error-tint: "#fff0f0"
 typography:
@@ -61,12 +61,12 @@ spacing:
   xl: "40px"
 components:
   button-primary:
-    backgroundColor: "{colors.ink-blue}"
+    backgroundColor: "{colors.accent}"
     textColor: "#ffffff"
     rounded: "{rounded.sm}"
     padding: "7px 12px"
   button-primary-hover:
-    backgroundColor: "{colors.ink-blue-deep}"
+    backgroundColor: "{colors.accent-deep}"
     textColor: "#ffffff"
   button-dark:
     backgroundColor: "{colors.graphite}"
@@ -80,7 +80,7 @@ components:
     padding: "16px 20px"
   chip:
     backgroundColor: "{colors.tag-tint}"
-    textColor: "{colors.ink-blue}"
+    textColor: "{colors.accent}"
     rounded: "{rounded.pill}"
     padding: "2px 9px"
   input:
@@ -94,20 +94,30 @@ components:
     height: "48px"
 ---
 
+> **Владелец:** Claude Code
+> **Обновлён:** 2026-08-18
+> **Статус:** актуален
+
+> ⚠️ **Единственный источник истины по цветам — `templates/_tokens.html`.**
+> Этот файл описывает намерение и правила применения; конкретные значения
+> берите из токенов. Акцент сайта — малиновый `#BE185D` (светлая тема) /
+> `#FF4D94` (тёмная). Прежний синий `#4f7cff` не используется с 2026-06-23.
+> У `/calc2/` свой изолированный мир токенов — общими его не трогать.
+
 # Design System: ЭкЗадачи
 
 ## 1. Overview
 
 **Creative North Star: "The Graphite Notebook"**
 
-ЭкЗадачи looks like a well-kept graphite notebook owned by a serious economics coach: warm off-white pages, a graphite-dark spine, one disciplined ink-blue pen reserved for the things that matter, and a soft amber pencil that marks difficulty. The interface is calm and dense with information but never loud. It earns trust the way a good notebook does — the math is always legible, the structure is always obvious, and nothing decorative competes with the content. Warmth comes from the paper tone (`#f7f7f5`, never stark `#ffffff` for surfaces that recede) and from generous line-height on problem text, not from mascots, gradients, or gamification.
+ЭкЗадачи looks like a well-kept graphite notebook owned by a serious economics coach: warm off-white pages, a graphite-dark spine, one disciplined accent pen reserved for the things that matter, and a soft amber pencil that marks difficulty. The interface is calm and dense with information but never loud. It earns trust the way a good notebook does — the math is always legible, the structure is always obvious, and nothing decorative competes with the content. Warmth comes from the paper tone (`#f7f7f5`, never stark `#ffffff` for surfaces that recede) and from generous line-height on problem text, not from mascots, gradients, or gamification.
 
-The system is built for two roles on one platform. Teachers see a denser surface (filter rails, homework builders, review tables); students see a lighter one (assignments, progress). Both share the same graphite header, the same ink-blue accent language, and the same flat-paper card vocabulary, so the platform always feels like one tool. This is infrastructure, not a course: every screen should feel like a precise instrument a professional reaches for, not a marketing page that wants something from them.
+The system is built for two roles on one platform. Teachers see a denser surface (filter rails, homework builders, review tables); students see a lighter one (assignments, progress). Both share the same graphite header, the same accent accent language, and the same flat-paper card vocabulary, so the platform always feels like one tool. This is infrastructure, not a course: every screen should feel like a precise instrument a professional reaches for, not a marketing page that wants something from them.
 
 It explicitly rejects three things. It is **not Corporate SaaS** — no gradient hero metrics, no "01 / 02 / 03" section scaffolding, no upsell surfaces inside the app. It is **not a Soviet textbook or Word document** — no Times New Roman, no black-on-stark-white walls of text, no dot-matrix table forms. And the public product is **not a reskinned Django admin** — the catalog, student cabinet, and teacher panel must carry visibly different weight and affordances than `/admin/`.
 
 **Key Characteristics:**
-- Warm-paper surfaces, graphite structure, a single ink-blue accent used sparingly.
+- Warm-paper surfaces, graphite structure, a single accent accent used sparingly.
 - Flat by default; depth appears only on interaction (hover lift, focus ring, modal).
 - Math is first-class: KaTeX-rendered formulas, never images, never broken `$`.
 - Information-dense but quiet — the accent earns attention because it is rare.
@@ -115,18 +125,18 @@ It explicitly rejects three things. It is **not Corporate SaaS** — no gradient
 
 ## 2. Colors
 
-A warm-neutral paper palette anchored by a graphite dark and lit by exactly one saturated ink-blue, with two functional signal colors (amber for difficulty, green for "has solution").
+A warm-neutral paper palette anchored by a graphite dark and lit by exactly one saturated accent, with two functional signal colors (amber for difficulty, green for "has solution").
 
 ### Primary
-- **Ink Blue** (`#4f7cff`): The single brand accent. Used for the logo tile, active nav state, primary buttons, focused inputs, links, chips, and the difficulty/solution affordances that need to read as "interactive." This is the one voice — it should never cover large areas.
-- **Ink Blue Deep** (`#3d66e0`): The pressed/hover state of every ink-blue surface. Slightly desaturated and darkened so hover feels like weight, not color change.
+- **Accent (Crimson)** (`#BE185D`): The single brand accent. Used for the logo tile, active nav state, primary buttons, focused inputs, links, chips, and the difficulty/solution affordances that need to read as "interactive." This is the one voice — it should never cover large areas.
+- **Accent Deep** (`#9D1450`): The pressed/hover state of every accent surface. Slightly desaturated and darkened so hover feels like weight, not color change.
 
 ### Secondary
 - **Graphite** (`#1a1f2e`): The structural dark. Header bar, nav, dark "Войти" submit button, and any surface that frames rather than holds content. It is a blue-leaning near-black, not pure black — it belongs to the same cool family as the accent.
 
 ### Tertiary (functional signals)
-- **Difficulty Amber** (`#f5a623`): Reserved exclusively for difficulty stars (★) and their tints (`#fff8ed`, `#fff3d9`). Pairs color with the star shape so difficulty is never color-only.
-- **Solution Green** (`#2a9d5c`): Reserved for the "решение ✓" badge and confirmation states, on a green tint (`#e9faf0`). Always paired with the ✓ glyph or explicit text.
+- **Difficulty Amber** (`#b26b00` светлая / `#f5a623` тёмная): Reserved exclusively for difficulty stars (★) and their tints (`#fff8ed`, `#fff3d9`). Pairs color with the star shape so difficulty is never color-only.
+- **Solution Green** (`#1d7e45` светлая): Reserved for the "решение ✓" badge and confirmation states, on a green tint (`#e9faf0`). Always paired with the ✓ glyph or explicit text.
 
 ### Neutral
 - **Graphite Text** (`#1a1a1a`): Primary body and heading text on paper. Carries the WCAG-AA contrast load.
@@ -134,13 +144,13 @@ A warm-neutral paper palette anchored by a graphite dark and lit by exactly one 
 - **Warm Paper** (`#f7f7f5`): The recessive surface — filter cards, panels, the contextual rail. Surfaces that hold content sit on white; surfaces that frame it sit on warm paper.
 - **Paper Cool** (`#f5f5f3`): The full-bleed page background behind the login card.
 - **Pencil Line** (`#e8e8e4`): Borders and dividers, almost always at `0.5px`–`1.5px`. The hairline that defines a card without shouting.
-- **Tag Tint** (`#eef2ff`): The pale ink-blue wash behind chips/tags.
+- **Accent Tint** (`var(--accent-tint)`): The pale accent wash behind chips/tags.
 
 ### Error
 - **Error Red** (`#c0392b`) on **Error Tint** (`#fff0f0`) with a `#ffd5d5` border: login failures and validation only. Never used decoratively.
 
 ### Named Rules
-**The One Voice Rule.** Ink Blue (`#4f7cff`) appears on ≤10% of any screen. Its rarity is what makes "active," "primary," and "interactive" instantly legible. If two ink-blue elements compete on one screen, one of them is wrong.
+**The One Voice Rule.** Accent Crimson (`#BE185D`) appears on ≤10% of any screen. Its rarity is what makes "active," "primary," and "interactive" instantly legible. If two accent elements compete on one screen, one of them is wrong.
 
 **The No-Stark-White Rule.** Pure `#ffffff` is for content cards only. Page chrome and recessive panels use warm paper (`#f7f7f5`) or cool paper (`#f5f5f3`). A screen that is all `#ffffff` reads as a Django admin grid, not as ЭкЗадачи.
 
@@ -163,7 +173,7 @@ A warm-neutral paper palette anchored by a graphite dark and lit by exactly one 
 ### Named Rules
 **The Readable-Math Rule.** Problem body line-height never drops below 1.55. Inline KaTeX needs vertical air; tight leading turns a fraction into a smudge.
 
-**The Weight-Not-Color Hierarchy.** Heading vs. body is expressed by weight and size, not by tinting text with the accent. Ink-blue text is reserved for links and active state — never for "making a heading pop."
+**The Weight-Not-Color Hierarchy.** Heading vs. body is expressed by weight and size, not by tinting text with the accent. Accent text is reserved for links and active state — never for "making a heading pop."
 
 ## 4. Elevation
 
@@ -171,8 +181,8 @@ Flat by default. Surfaces rest on the page defined only by a `0.5px`–`1.5px` P
 
 ### Shadow Vocabulary
 - **Card hover** (`box-shadow: 0 2px 14px rgba(0,0,0,0.07)`): The gentle lift a problem card takes when hovered, paired with a slightly darker border. The page feels like paper you can pick up.
-- **Accent hover** (`box-shadow: 0 4px 16px rgba(79,124,255,0.12)` + `translateY(-2px)`): Home navigation cards — a tinted lift that previews the ink-blue destination.
-- **Focus ring** (`box-shadow: 0 0 0 3px rgba(79,124,255,0.15)`): The soft ink-blue halo on a focused search field. Replaces, never adds to, a hard outline.
+- **Accent hover** (`box-shadow: 0 4px 16px rgba(190,24,93,0.12)` + `translateY(-2px)`): Home navigation cards — a tinted lift that previews the accent destination.
+- **Focus ring** (`box-shadow: 0 0 0 3px rgba(190,24,93,0.15)`): The soft accent halo on a focused search field. Replaces, never adds to, a hard outline.
 - **Dropdown** (`box-shadow: 0 4px 20px rgba(0,0,0,0.12)`): The "+ В домашку" menu — enough lift to read as floating above the card.
 - **Modal** (`box-shadow: 0 8px 40px rgba(0,0,0,0.18)`): The problem-preview overlay — the deepest shadow in the system, used once at a time over a `rgba(0,0,0,0.45)` scrim.
 
@@ -183,14 +193,14 @@ Flat by default. Surfaces rest on the page defined only by a `0.5px`–`1.5px` P
 
 ### Buttons
 - **Shape:** Gently rounded — `6px` (sm) for compact actions, up to `20px`/`26px` full-pill for the home search submit and chips.
-- **Primary:** Ink-blue fill, white text, `6px` radius, ~`7px 12px` padding. The home hero submit grows to a `20px` pill inside a `26px` search field.
+- **Primary:** Accent fill, white text, `6px` radius, ~`7px 12px` padding. The home hero submit grows to a `20px` pill inside a `26px` search field.
 - **Dark:** Graphite fill (`#1a1f2e`), white text, used for the login "Войти" submit — full-width, `11px` vertical padding. Hover deepens to `#252c40`.
-- **Hover / Focus:** Primary deepens to Ink Blue Deep (`#3d66e0`); transitions are `~0.12s–0.15s` on `background`, `border-color`, and (cards) `transform`. No bounce, no scale-up beyond a `2px` lift.
-- **Ghost / Outline:** White fill, Pencil-Line border, muted text; on hover the border and text shift to ink-blue (e.g. "👁 Условие", "+ В домашку").
+- **Hover / Focus:** Primary deepens to Accent Deep (`#9D1450`); transitions are `~0.12s–0.15s` on `background`, `border-color`, and (cards) `transform`. No bounce, no scale-up beyond a `2px` lift.
+- **Ghost / Outline:** White fill, Pencil-Line border, muted text; on hover the border and text shift to accent (e.g. "👁 Условие", "+ В домашку").
 
 ### Chips
-- **Style:** Pill (`20px` radius), Tag-Tint (`#eef2ff`) background, ink-blue text, `2px 9px` padding, weight 500. The solution variant swaps to green tint + Solution Green text + a ✓.
-- **State:** Topic tags are static labels (not interactive); difficulty/type *filter* chips in the rail invert to ink-blue fill when active.
+- **Style:** Pill (`20px` radius), Tag-Tint (`var(--accent-tint)`) background, accent text, `2px 9px` padding, weight 500. The solution variant swaps to green tint + Solution Green text + a ✓.
+- **State:** Topic tags are static labels (not interactive); difficulty/type *filter* chips in the rail invert to accent fill when active.
 
 ### Cards / Containers
 - **Corner Style:** `10px` (problem & filter cards), `12px` (home nav cards, modal, login card).
@@ -200,12 +210,12 @@ Flat by default. Surfaces rest on the page defined only by a `0.5px`–`1.5px` P
 
 ### Inputs / Fields
 - **Style:** White fill, `0.5px–1.5px` Pencil-Line border, `6px` radius, `7px–12px` padding, system font at 13–15px.
-- **Focus:** Border shifts to ink-blue; the home search additionally gains the `3px` ink-blue focus halo. No hard browser outline.
+- **Focus:** Border shifts to accent; the home search additionally gains the `3px` accent focus halo. No hard browser outline.
 - **Error:** Wrapped in the Error-Tint panel with Error-Red text; field itself keeps its border.
 
 ### Navigation
-- **Style:** A sticky graphite bar (`#1a1f2e`), `48–52px` tall, with the `28px` rounded ink-blue "Эк" logo tile at the left.
-- **Typography:** 13px links at weight 500. Inactive links are `rgba(255,255,255,0.6)`; hover goes to full white; the **active** link is full white with a `2px` ink-blue bottom border.
+- **Style:** A sticky graphite bar (`#1a1f2e`), `48–52px` tall, with the `28px` rounded accent "Эк" logo tile at the left.
+- **Typography:** 13px links at weight 500. Inactive links are `rgba(255,255,255,0.6)`; hover goes to full white; the **active** link is full white with a `2px` accent bottom border.
 - **Role-aware:** Teacher, student, and guest see different link sets but identical styling — the nav is the clearest expression of "one platform, many roles."
 
 ### Filter Rail (signature component)
@@ -214,7 +224,7 @@ The left rail in the catalog is the platform's signature dense surface: a Warm-P
 ## 6. Do's and Don'ts
 
 ### Do:
-- **Do** keep Ink Blue (`#4f7cff`) under ~10% of any screen — logo, one primary action, active state, links. Let its rarity do the work (The One Voice Rule).
+- **Do** keep Accent Crimson (`#BE185D`) under ~10% of any screen — logo, one primary action, active state, links. Let its rarity do the work (The One Voice Rule).
 - **Do** sit recessive chrome on Warm Paper (`#f7f7f5`) and content on white. Mixing them is how the platform reads as "designed," not "admin."
 - **Do** define resting surfaces with a `0.5px` Pencil-Line border and reserve shadow for hover/focus/overlay (The Flat-By-Default Rule).
 - **Do** keep problem-body line-height ≥ 1.55 so inline KaTeX stays legible (The Readable-Math Rule).
@@ -225,13 +235,13 @@ The left rail in the catalog is the platform's signature dense surface: a Warm-P
 - **Don't** build Corporate SaaS surfaces: no gradient hero metrics, no "01 / 02 / 03" section scaffolding, no upsell banners inside the app.
 - **Don't** fall back to a Soviet-textbook / Word look: no Times New Roman, no black-on-stark-white walls of text, no dot-matrix table forms.
 - **Don't** let the public product look like a reskinned Django admin grid — it must carry different visual weight and affordances than `/admin/`.
-- **Don't** tint heading text with the accent to "make it pop" — ink-blue text means link or active state, nothing else (The Weight-Not-Color Hierarchy).
+- **Don't** tint heading text with the accent to "make it pop" — accent text means link or active state, nothing else (The Weight-Not-Color Hierarchy).
 - **Don't** borrow amber or green for decoration — they mean difficulty and solution-present, respectively (The Signal-Color Lockbox).
 - **Don't** put a drop-shadow on a resting card, and don't use a `border-left` color stripe thicker than the hairline as a substitute for real hierarchy.
 
 ## 7. Scoped surface — Graphing instrument (/calc2/)
 
-The new graphing calculator (`/calc2/`) is the one place that **departs from the ink-blue
+The new graphing calculator (`/calc2/`) is the one place that **departs from the accent
 system on purpose**. It is a tool where the full-bleed plot is the hero and controls/results
 float over it like instrument readouts, so it has its own scoped tokens (full detail in
 `.interface-design/system.md`). The rest of the site is unchanged.
@@ -241,7 +251,7 @@ float over it like instrument readouts, so it has its own scoped tokens (full de
   `--curve-tax #2E9E44` (налог/субсидия/бюджет — единый зелёный), `--curve-dwl #8C8C84` (DWL),
   `--curve-reg #B5791F` (потолок/пол/МРОТ), `--curve-ghost #9AA0A6` (исходное состояние).
   Area fills reuse these at 12–22 % opacity. Cost curves: `--cost-mc/atc/avc/afc/vc`.
-- **UI accent — raspberry**, deliberately NOT ink-blue: `#BE185D` (light) / `#FF4D94` (dark).
+- **UI accent — raspberry**, deliberately NOT accent: `#BE185D` (light) / `#FF4D94` (dark).
   Reserved for **small** affordances only: checkbox `accent-color`, focus rings, "← Сценарии"
   border. Chosen because it collides with no curve hue. White-on-accent = 6:1 (AA).
 - **Large action buttons (`.btn`)** — graphite, NOT raspberry: `--btn-bg #1e293b` (light) /
