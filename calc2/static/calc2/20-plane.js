@@ -23,10 +23,58 @@ function computeSize() {
    ставим левое поле и пересобираем шкалы. Проход дешёвый (две линейные
    шкалы), зато рамка вокруг плоскости исчезает: «100» и «12 500» получают
    разное место, а не одинаковые 76 px на всякий случай. */
+/* ⚠️ ШИРИНУ ПОДПИСИ МЕРЯЕТ БРАУЗЕР, А НЕ «СТОЛЬКО-ТО ПИКСЕЛЕЙ НА ЗНАК».
+
+   Прежняя оценка `знаков × 6.2` занижала ширину, и поле слева выходило меньше
+   подписи. Замер (`scripts/calc2_layout_probe.js`): в «Производственной
+   функции» деления «1 000 … 4 000» начинались с координаты −5…−7 px, то есть
+   ЗА холстом, и на экране читалось «000». Причин занижения две, и обе
+   неустранимы константой: разряды разделены узким неразрывным пробелом,
+   а ширина цифры зависит от шрифта, которым страницу в итоге нарисовали.
+
+   Меряем в ОТДЕЛЬНОМ невидимом svg, а не в самом холсте: по `#chart` ходят
+   проходы `applyLabelInk`, `applyLabelSize`, `spreadLabels` и сборка `.tex`,
+   и служебный узел подмешался бы во все четыре. При этом узел лежит ВНУТРИ
+   `#graph-wrap`, чтобы наследовать тот же шрифт, что и подписи холста.
+
+   Проверка канона 5.1: подставить значения в 10 000 раз крупнее — ни одна
+   подпись не обрезана. */
+let _measSvg = null, _measText = null;
+function measureText(str, size, weight) {
+  const txt = String(str == null ? '' : str);
+  if (!txt) return 0;
+  try {
+    if (!_measText || !_measText.isConnected) {
+      const host = document.getElementById('graph-wrap') || document.body;
+      _measSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      _measSvg.setAttribute('aria-hidden', 'true');
+      _measSvg.setAttribute('data-skip-export', '1');
+      _measSvg.style.cssText = 'position:absolute;left:-9999px;top:-9999px;'
+                             + 'width:10px;height:10px;overflow:hidden;pointer-events:none;';
+      _measText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      _measSvg.appendChild(_measText);
+      host.appendChild(_measSvg);
+    }
+    _measText.setAttribute('font-size', size || FS.small);
+    _measText.setAttribute('font-weight', weight || 400);
+    _measText.textContent = txt;
+    const w = _measText.getComputedTextLength();
+    if (w > 0) return w;
+  } catch (e) { /* до сборки страницы мерить нечем — уходим в оценку */ }
+  return txt.length * 6.2;             // запасная оценка, пока холста нет
+}
+
+/* Полоса под осью X: строка чисел делений (от oy+8) плюс строка подписи,
+   которую сцены печатают на oy+24 («Дефицит = 40», «Безработица = 30»).
+   Замер: при поле 30 такая подпись уходила на 5 px ЗА нижний край холста
+   в четырёх сценах. Полоса одна на все сцены намеренно: список «кто пишет
+   под осью» разъехался бы со сценами, а стоит она 14 px из ~790 по высоте. */
+const BOTTOM_BAND = 44;
+
 function fitMargins() {
   const m = CONFIG.margin;
   makeScales();
-  let wide = 1;
+  let wide = 0;
   try {
     // Деления зависят только от диапазона, поэтому в «Математике» берём её
     // окно: там по вертикали свои границы, а не первая четверть.
@@ -35,16 +83,27 @@ function fitMargins() {
       : [CONFIG.Pmin, CONFIG.Pmax];
     const probe = d3.scaleLinear().domain(dom).range([0, 1]);
     axisTicks(probe, 8, STATE.yStep).forEach(t => {
-      const s = fmt(t);
-      if (s.length > wide) wide = s.length;
+      const w = measureText(fmt(t), FS.small);
+      if (w > wide) wide = w;
     });
   } catch (e) { /* сцена ещё не готова — останемся со стартовыми полями */ }
-  // 6.2 px на знак при кегле 10 + 8 px отступа от оси + 6 px запаса у края.
-  m.left = Math.max(30, Math.min(88, Math.round(wide * 6.2) + 14));
-  m.right = 32;                        // буква оси X справа от стрелки
-  m.bottom = 30;                       // строка чисел под осью X
-  // Своё название графика печатается над плоскостью — ему нужна полоса.
-  m.top = (STATE.graphTitle || '').trim() ? 44 : 26;
+  // 8 px отступа подписи от оси (её ставит drawAxes) + 6 px запаса у края.
+  m.left = Math.max(30, Math.min(120, Math.ceil(wide) + 14));
+
+  /* Справа за стрелкой стоит НАЗВАНИЕ оси X, и оно бывает длинным:
+     «t (ставка)» — 76 px, «Поступления» — 106. При поле 32 такое название
+     уезжало за холст на полсотни пикселей. Имя берём то же, что нарисует
+     drawAxes: своё, если человек его задал, иначе сценовое. */
+  const xName = STATE.axisXName || STATE.axisXDefault || 'Q';
+  m.right = Math.max(32, Math.min(140,
+              Math.ceil(AXIS_LABEL_GAP + measureText(xName, FS.large, 600)) + 6));
+
+  m.bottom = BOTTOM_BAND;
+  /* Сверху: полоса под своё название графика плюс место под НАЗВАНИЕ оси Y,
+     которое drawAxes печатает над стрелкой. */
+  const yName = STATE.axisYName || STATE.axisYDefault || 'P';
+  const yNeed = yName ? AXIS_LABEL_GAP + Math.ceil(FS.large * 1.2) : 0;
+  m.top = Math.max((STATE.graphTitle || '').trim() ? 44 : 26, yNeed + 8);
   makeScales();
 }
 
@@ -372,15 +431,34 @@ function drawAxes(xLabel, yLabel, opts) {
   /* Н24: подпись оси помечена классом. Во-первых, по нему проверка ловит
      наложения; во-вторых, общий проход размера подписей (applyLabelSize) и
      выгрузка отличают её от прочих надписей. */
-  if (xLabel && atZeroY) g.append('text').attr('class', 'axis-name')
-    .attr('x', xRight + AXIS_LABEL_GAP).attr('y', oy)
-    .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
-    .attr('font-size', FS.large).attr('font-weight', 600)
-    .attr('fill', COL.ink).text(xLabel);
-  if (yLabel && atZeroX) g.append('text').attr('class', 'axis-name')
-    .attr('x', ox).attr('y', yTop - AXIS_LABEL_GAP)
-    .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
-    .attr('font-size', FS.large).attr('font-weight', 600)
-    .attr('fill', COL.ink).text(yLabel);
+  /* ⚠️ НАЗВАНИЕ ОСИ ПЕРЕЕЗЖАЕТ, А НЕ УЕЗЖАЕТ ЗА КРАЙ.
+     Поля холста считает fitMargins по измеренной ширине названия, но на самой
+     первой отрисовке сцены STATE.axisXDefault ещё не заполнен, а человек может
+     вписать своё название прямо сейчас — поле догонит его только следующим
+     кадром. Поэтому место зажимается ещё и здесь: два предохранителя на одну
+     беду, зато подпись не пропадает ни в одном порядке событий.
+     Тот же приём уже принят для подписей кривых (curveAnchor): подпись
+     переносится, а не скрывается. */
+  const EDGE = 2;
+  if (xLabel && atZeroY) {
+    const w = measureText(xLabel, FS.large, 600);
+    const x = Math.min(xRight + AXIS_LABEL_GAP, W - EDGE - w);
+    g.append('text').attr('class', 'axis-name')
+      .attr('x', Math.max(EDGE, x)).attr('y', oy)
+      .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
+      .attr('font-size', FS.large).attr('font-weight', 600)
+      .attr('fill', COL.ink).text(xLabel);
+  }
+  if (yLabel && atZeroX) {
+    const w = measureText(yLabel, FS.large, 600);
+    // Якорь по центру, поэтому за край выходит половина ширины.
+    const x = Math.min(Math.max(ox, EDGE + w / 2), W - EDGE - w / 2);
+    const y = Math.max(yTop - AXIS_LABEL_GAP, FS.large + EDGE);
+    g.append('text').attr('class', 'axis-name')
+      .attr('x', x).attr('y', y)
+      .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
+      .attr('font-size', FS.large).attr('font-weight', 600)
+      .attr('fill', COL.ink).text(yLabel);
+  }
 }
 

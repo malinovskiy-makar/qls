@@ -375,8 +375,13 @@ function drawMathTangent(f) {
   // функция, а где производная.
   gUi.append('text').attr('x', m.left + 4).attr('y', L.top + 14)
     .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanF).text('f(x), сама функция');
-  gUi.append('text').attr('x', m.left + 4).attr('y', L.botTop + 14)
-    .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanD).text("$f'(x)$, производная");
+  /* ⚠️ Подпись панели идёт через ОБЩИЙ разбор, а не через .text().
+     Прямой .text() печатал «$f'(x)$, производная» вместе с долларами: KaTeX
+     на холсте нет, и снимать разделители умеет только renderLabelText. */
+  renderLabelText(
+    gUi.append('text').attr('x', m.left + 4).attr('y', L.botTop + 14)
+      .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanD),
+    "$f'(x)$, производная");
 
   mathLine(gTop, f, s1.mx, s1.my, COL.tanF, 2.6);
   mathLine(gBot, dfun, s2.mx, s2.my, COL.tanD, 2.4);

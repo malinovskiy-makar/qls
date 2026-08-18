@@ -217,7 +217,11 @@ function drawInequalityDiagonal() {
 // Подписи осей (длинные, рисуем сами; drawAxes вызываем без меток).
 function drawInequalityCaptions() {
   const g = svg.append('g'), ox = sx(0), oy = sy(0), xMid = (sx(0) + sx(100)) / 2, yTop = sy(100);
-  g.append('text').attr('x', xMid).attr('y', oy + 30).attr('text-anchor', 'middle')
+  /* Подпись под осью стоит НИЖЕ строки чисел делений: числа висят от oy + 8
+     и занимают около 13 px, поэтому прежние oy + 30 садились ровно на них
+     (замер: «40» × «Доля населения, %» в трёх ширинах окна). Место под эту
+     строку резервирует BOTTOM_BAND в 20-plane.js — они меняются вместе. */
+  g.append('text').attr('x', xMid).attr('y', oy + 38).attr('text-anchor', 'middle')
     .attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Доля населения, %');
   g.append('text').attr('x', ox + 6).attr('y', yTop - 5).attr('text-anchor', 'start')
     .attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Доля дохода, %');
