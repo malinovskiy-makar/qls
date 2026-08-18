@@ -29,8 +29,10 @@
 - **Установка чужих skills пачкой.** Только собственный проверенный список.
 - **Синтаксис `int | None`.** Проект на Python 3.9, union через `|` роняет импорт.
   Пишем `Optional[int]` — [ADR 0001](docs/adr/0001-python39-django42.md).
-- **`makemigrations game`** на ветке без файлов 0007–0012 — сочинит свою 0007 под
-  занятым номером. [ADR 0004](docs/adr/0004-game-migrations-split.md).
+- **`makemigrations game` на `main`** — файлы миграций `game` **0007–0012** лежат
+  в ветке `feat/econ-rush-figure`, на `main` их нет. Автодетектор сочинит свою 0007
+  под тем же номером, и при слиянии ветки получится неразрешимый конфликт номеров.
+  [game/CLAUDE.md](game/CLAUDE.md) · [ADR 0004](docs/adr/0004-game-migrations-split.md).
 
 ---
 
@@ -92,7 +94,8 @@ lockdown_dev_accounts [--apply]   # погасить дев-аккаунты
 Локальные правила слоёв (читаются вместе с кодом, который правите):
 [`problems/ai/`](problems/ai/CLAUDE.md) ·
 [`problems/management/commands/`](problems/management/commands/CLAUDE.md) ·
-[`catalog/`](catalog/CLAUDE.md) · [`calc2/`](calc2/CLAUDE.md)
+[`catalog/`](catalog/CLAUDE.md) · [`calc2/`](calc2/CLAUDE.md) ·
+[`game/`](game/CLAUDE.md)
 
 ---
 
