@@ -180,6 +180,154 @@ function spreadLabels() {
   });
 }
 
+/* ───────────────────────────────────────────────────────────────────────
+   П75. ЧЕРНИЛА ПОДПИСИ — НЕ ЦВЕТ КРИВОЙ.
+
+   Подпись на холсте это ТЕКСТ, и к ней применяется правило 5 части 4 канона:
+   контраст не ниже 4,5 в ОБЕИХ темах. Цвета самих кривых при этом не трогаются
+   — они предметная семантика (канон 5.1): спрос всегда одного цвета,
+   предложение другого, и ученик запоминает пару.
+
+   Замер до правки (`scripts/calc2_canon_probe.js`, все 41 сцена × 2 темы):
+   106 подписей из 1796 ниже нормы. Аудит назвал пять примеров, на деле их
+   в двадцать раз больше: `S` (#E0563B на белом) — 3,77; `MC` (#119C8A) — 3,42;
+   `AVC`/`ATC`/«закрытие» (#B5791F) — 3,67; «безубыточность» (#2F6FED
+   на тёмном) — 4,05; «Исходная» (#9AA0A6) — 2,64.
+
+   Почему ОДИН ПРОХОД по холсту, а не правка в местах отрисовки. Подписи ставят
+   больше сорока функций в девяти файлах, и каждая берёт цвет у своей кривой.
+   Проход по готовому SVG чинит их все разом, работает для сцен, которых ещё
+   нет, и повторяет уже принятый в проекте приём applyLabelSize (общий размер
+   подписей). Он идемпотентен: исправленный цвет норму проходит, и следующий
+   проход его не трогает.
+
+   Оттенок сохраняется: двигаем только СВЕТЛОТУ в HSL и только в сторону от
+   фона. Поэтому «S» остаётся тем же красным, только различимым. */
+const _inkCache = new Map();
+
+function parseColor(c) {
+  if (!c) return null;
+  c = String(c).trim();
+  const m = /rgba?\(([^)]+)\)/.exec(c);
+  if (m) {
+    const p = m[1].split(/[ ,\/]+/).filter(Boolean).map(Number);
+    return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
+  }
+  const h = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(c);
+  if (!h) return null;
+  let v = h[1];
+  if (v.length === 3) v = v.split('').map(x => x + x).join('');
+  return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16), 1];
+}
+
+function relLum(rgb) {
+  const f = rgb.slice(0, 3).map(v => {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2];
+}
+
+function contrastOf(a, b) {
+  const l1 = relLum(a), l2 = relLum(b);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn;
+  const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  let h;
+  if (mx === r) h = ((g - b) / d + (g < b ? 6 : 0));
+  else if (mx === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return [h / 6, s, l];
+}
+
+function hslToRgb(h, s, l) {
+  if (s === 0) { const v = Math.round(l * 255); return [v, v, v, 1]; }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+  const ch = (t) => {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  return [Math.round(ch(h + 1 / 3) * 255), Math.round(ch(h) * 255), Math.round(ch(h - 1 / 3) * 255), 1];
+}
+
+/* Цвет подписи, читаемый на фоне холста. Возвращает исходный цвет, если он
+   и так проходит норму: большинство подписей менять не нужно. */
+function labelInk(color, bgStr, large) {
+  const bg = parseColor(bgStr) || [255, 255, 255, 1];
+  const key = color + '|' + bgStr + '|' + (large ? 'L' : 'S');
+  if (_inkCache.has(key)) return _inkCache.get(key);
+  const need = large ? 3 : 4.5;
+  const fg = parseColor(color);
+  let out = color;
+  if (fg) {
+    // Полупрозрачную подпись сначала кладём на фон: контраст меряется у того,
+    // что видно, а не у объявленного цвета.
+    const flat = fg[3] >= 1 ? fg
+      : [0, 1, 2].map(i => Math.round(fg[i] * fg[3] + bg[i] * (1 - fg[3]))).concat([1]);
+    if (contrastOf(flat, bg) < need) {
+      const hsl = rgbToHsl(flat[0], flat[1], flat[2]);
+      const darken = relLum(bg) > 0.5;     // светлый фон — темним, тёмный — светлим
+      let best = null;
+      for (let i = 1; i <= 100; i++) {
+        const l = darken ? hsl[2] - i * 0.01 : hsl[2] + i * 0.01;
+        if (l < 0 || l > 1) break;
+        const cand = hslToRgb(hsl[0], hsl[1], l);
+        if (contrastOf(cand, bg) >= need) { best = cand; break; }
+      }
+      if (!best) best = darken ? [0, 0, 0, 1] : [255, 255, 255, 1];
+      out = 'rgb(' + best[0] + ', ' + best[1] + ', ' + best[2] + ')';
+    }
+  }
+  _inkCache.set(key, out);
+  return out;
+}
+
+/* Общий проход: после каждой перерисовки поправить чернила всех подписей.
+   Смена темы меняет --canvas, поэтому кэш держит фон в ключе. */
+function applyLabelInk() {
+  const node = svg.node();
+  if (!node) return;
+  const bg = cssVar('--canvas') || '#ffffff';
+  node.querySelectorAll('text').forEach(t => {
+    const cs = getComputedStyle(t);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return;
+    const fill = (cs.fill && cs.fill !== 'none') ? cs.fill : cs.color;
+    const size = parseFloat(cs.fontSize) || 12;
+    const bold = parseInt(cs.fontWeight, 10) >= 700;
+    const op = parseFloat(cs.opacity);
+    if (isFinite(op) && op < 0.05) return;   // спрятано прозрачностью — это не подпись
+    /* ⚠️ ПРИГЛУШЕНИЕ ТЕКСТА ЧЕРЕЗ opacity ОТМЕНЯЕТСЯ, А НЕ ПОДКРАШИВАЕТСЯ.
+       Канон 2.6: «Гашение через opacity не применять: оно делает текст
+       нечитаемым, а не второстепенным». Пять подписей («Достижимо» 0,75,
+       «эластичный»/«неэластичный» 0,8, «A»/«B» 0,85) остались бы ниже нормы
+       даже с исправленным цветом — прозрачность разбавила бы его обратно.
+       Поэтому прозрачность сворачивается В ЦВЕТ: считаем, как подпись
+       выглядит на фоне, правим уже этот цвет и ставим полную непрозрачность.
+       Второстепенность после этого несёт сам оттенок, а не мутность. */
+    const eff = (isFinite(op) && op < 1) ? mixToBg(fill, bg, op) : fill;
+    const ink = labelInk(eff, bg, size >= 24 || (size >= 18.66 && bold));
+    if (ink && ink !== fill) t.setAttribute('fill', ink);
+    if (isFinite(op) && op < 1) t.style.opacity = '1';
+  });
+}
+
+function mixToBg(color, bgStr, op) {
+  const fg = parseColor(color), bg = parseColor(bgStr);
+  if (!fg || !bg) return color;
+  const a = fg[3] * op;
+  const m = [0, 1, 2].map(i => Math.round(fg[i] * a + bg[i] * (1 - a)));
+  return 'rgb(' + m[0] + ', ' + m[1] + ', ' + m[2] + ')';
+}
+
 function applyLabelSize() {
   const k = labelScale();
   if (Math.abs(k - 1) < 1e-6) return;
