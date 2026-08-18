@@ -519,8 +519,7 @@ function drawEquilibrium() {
   // Сама точка и подпись E*.
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
     .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  mathTspans(g.append('text').attr('x', px + 8).attr('y', py - 8)
-    .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink), 'E*');
+  pointName(g, px, py, 'E*', COL.ink);
 }
 
 // Текст с белой обводкой (halo) — чтобы подписи равновесия читались над сеткой.
@@ -688,6 +687,28 @@ function haloText(g, x, y, txt, anchor, baseline) {
     .attr('font-size', FS.small).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3);
   renderLabelText(t, txt);
+  return t;
+}
+
+/* ПРАВИЛО 47. НА ХОЛСТЕ У ТОЧКИ СТОИТ ТОЛЬКО ОБОЗНАЧЕНИЕ.
+   Одна заглавная латинская буква; звёздочка — тогда и только тогда, когда со
+   звёздочкой подписаны координаты («Q*» и «P*» → точка «E*»).
+   ЧТО это за точка, говорит легенда или панель, а не холст: холст и так самый
+   плотный объект на экране. До этой функции на нём жили пять грамматик сразу —
+   «E*», «E», «M», «M · монополия», «AC · P=ATC».
+   Класс `point-name` нужен реестру обозначений (Добавка В) и проверке канона:
+   собирать обозначения «по коротким текстам» нельзя, деление оси «60» тоже
+   короткое. */
+function pointName(g, px, py, sym, color, opts) {
+  if (!sym) return null;
+  const o = opts || {};
+  const t = g.append('text').attr('class', 'point-name')
+    .attr('x', px + (o.dx == null ? 8 : o.dx))
+    .attr('y', py + (o.dy == null ? -8 : o.dy))
+    .attr('font-size', o.size || FS.large).attr('font-weight', o.weight || 600)
+    .attr('fill', color || COL.ink)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5);
+  renderLabelText(t, sym);
   return t;
 }
 

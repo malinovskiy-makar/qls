@@ -107,6 +107,24 @@ function fitMargins() {
   makeScales();
 }
 
+/* ⚠️ ПОЛЕ СЛЕВА ПОД ЧУЖИЕ ДЕЛЕНИЯ (п. 35).
+   fitMargins меряет деления ГЛАВНОЙ вертикали сцены — [CONFIG.Pmin, Pmax].
+   Сцены с двумя панелями считают вертикаль сами: у производственной функции
+   верхняя панель доходит до 5 000, и её «5 000» начиналось с координаты −7,
+   то есть за левым краем холста, а на экране читалось «000».
+   Сцена зовёт эту функцию СВОИМИ значениями делений ДО того, как построит
+   шкалы: поле только расширяется, сузить его чужая панель не может. */
+function fitLeftForLabels(values) {
+  let wide = 0;
+  (values || []).forEach(v => {
+    const w = measureText(typeof v === 'number' ? fmt(v) : String(v), FS.small);
+    if (w > wide) wide = w;
+  });
+  const need = Math.max(30, Math.min(120, Math.ceil(wide) + 14));
+  if (need > CONFIG.margin.left) { CONFIG.margin.left = need; makeScales(); }
+  return CONFIG.margin.left;
+}
+
 // Линейные шкалы по двум осям. Границы берём из CONFIG целиком: нижние
 // (Qmin/Pmin) двигает панорамирование и поля «от» в меню плоскости.
 function makeScales() {

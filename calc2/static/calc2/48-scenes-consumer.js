@@ -111,9 +111,7 @@ function drawChoicePoint(x, y, color, label) {
   haloText(g, px, oy + 8, fmt(x), 'middle', 'hanging');
   haloText(g, ox - 8, py, fmt(y), 'end', 'middle');
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 2);
-  if (label) g.append('text').attr('x', px + 9).attr('y', py - 9)
-    .attr('font-size', FS.base).attr('font-weight', 700).attr('fill', color)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
+  pointName(g, px, py, label, color, { dx: 9, dy: -9, size: FS.base, weight: 700 });
 }
 
 // Перетаскиваемые концы бюджетной линии: тянем за перехват — меняется соответствующая цена.

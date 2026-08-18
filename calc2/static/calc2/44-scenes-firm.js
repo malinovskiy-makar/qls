@@ -411,11 +411,12 @@ function redrawCosts() {
   svg.selectAll('*').remove();
   addDefs();
   drawGrid();
-  // Подпись по вертикали рисуем сами, но НАЗВАНИЕ оси сообщаем: иначе в
-  // выгрузке на графике затрат стояло ylabel={P} от прошлой сцены (Б37).
-  drawAxes('Q', '', { yName: 'Издержки, цена' });
-  svg.append('text').attr('x', sx(0) + 6).attr('y', sy(CONFIG.Pmax) - 5)
-    .attr('text-anchor', 'start').attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Издержки, цена');
+  /* Правило 46: подпись оси — символ величины. Здесь на вертикали стоят и
+     цена, и издержки в тех же деньгах, и это одна величина — `P`. Фраза
+     «Издержки, цена» тем же кеглем, что и деления, была подписью-объяснением,
+     а не обозначением; что именно нарисовано, говорят имена самих кривых
+     (MC, ATC, AVC, AFC). */
+  drawAxes('Q', 'P');
   drawLongRunArea();      // прямоугольник прибыли/убытка — под кривыми
   drawCostCurves();
   if (STATE.lrOn) drawLongRunMarks();
@@ -747,13 +748,20 @@ function redrawProduction() {
   const p = STATE.prod;
   if (!p) { updateProdPanel(); return; }
   const m = CONFIG.margin;
+  const Lmax = p.Lmax || CONFIG.Qmax;
+  const tpMax = padMax(p.maxTP ? p.maxTP.val : 1);
+  const mpMax = padMax(Math.max(p.maxMP ? p.maxMP.val : 1, p.maxAP ? p.maxAP.val : 1));
+  /* Поле слева считаем ПО СВОИМ делениям: у верхней панели своя вертикаль
+     (до 5 000), и общий fitMargins её не видит. `ticks` зависит только от
+     области значений, поэтому шкалу для замера можно построить до того, как
+     станет известно само поле. */
+  fitLeftForLabels([].concat(
+    d3.scaleLinear().domain([0, tpMax]).ticks(5),
+    d3.scaleLinear().domain([0, mpMax]).ticks(5)));
   const left = m.left, right = W - m.right;
   const top = m.top, bottom = H - m.bottom;
   const gap = 34, hTop = (bottom - top - gap) * 0.55, hBot = (bottom - top - gap) - hTop;
   const yTop0 = top + hTop, yBot0 = bottom;
-  const Lmax = p.Lmax || CONFIG.Qmax;
-  const tpMax = padMax(p.maxTP ? p.maxTP.val : 1);
-  const mpMax = padMax(Math.max(p.maxMP ? p.maxMP.val : 1, p.maxAP ? p.maxAP.val : 1));
   const lx = d3.scaleLinear().domain([0, Lmax]).range([left, right]);
   const t1 = d3.scaleLinear().domain([0, tpMax]).range([yTop0, top]);
   const t2 = d3.scaleLinear().domain([0, mpMax]).range([yBot0, yTop0 + gap]);
@@ -1018,7 +1026,7 @@ function redrawPlants() {
   }
   makeScales();
   svg.selectAll('*').remove();
-  addDefs(); drawGrid(); drawAxes('Q', '', { yName: 'Издержки' });
+  addDefs(); drawGrid(); drawAxes('Q', 'P');    // правило 46: символ, а не «Издержки»
   const errBox = document.getElementById('pl-error');
   if (errBox) { errBox.style.display = STATE.plErr ? 'block' : 'none'; errBox.textContent = STATE.plErr ? ('Не понял формулу: ' + STATE.plErr) : ''; }
   if (!p) { updatePlantsPanel(); return; }

@@ -129,7 +129,13 @@ function mathScales(yTop, yBot, yLo, yHi) {
           .range([yBot == null ? H - m.bottom : yBot, yTop == null ? m.top : yTop]),
   };
 }
-function drawPlaneAxes(g, mx, my, xlab, ylab) {
+/* Оси полного плана. `opts.ticks === false` — сцена печатает деления сама.
+   Так сделано в «Как определяется мировая цена»: у неё два поля со своими
+   масштабами, деления она рисует ВНЕ обрезки (иначе их срезало бы), а эта
+   функция печатала ВТОРОЙ комплект внутри обрезки — то есть невидимый.
+   Замер Добавки А нашёл ровно эти 24 подписи-невидимки. */
+function drawPlaneAxes(g, mx, my, xlab, ylab, opts) {
+  const o = opts || {};
   const [px0, px1] = mx.range(), [py0, py1] = my.range();
   const ox = mx(0), oy = my(0);       // ось стоит в нуле и уезжает вместе с ним
   const seeY = ox >= px0 - 1 && ox <= px1 + 1;
@@ -139,11 +145,15 @@ function drawPlaneAxes(g, mx, my, xlab, ylab) {
     .attr('stroke', COL.ink).attr('stroke-width', 1.4).attr('marker-end', 'url(#arrow)');
   if (seeY) g.append('line').attr('x1', ox).attr('y1', py0).attr('x2', ox).attr('y2', py1)
     .attr('stroke', COL.ink).attr('stroke-width', 1.4).attr('marker-end', 'url(#arrow)');
-  if (seeX) planeTicksX(g, mx, oy);
-  if (seeY) planeTicksY(g, my, ox);
-  if (xlab && seeX) g.append('text').attr('x', px1 - 2).attr('y', oy - 7).attr('text-anchor', 'end')
+  if (seeX && o.ticks !== false) planeTicksX(g, mx, oy);
+  if (seeY && o.ticks !== false) planeTicksY(g, my, ox);
+  // Класс `axis-name` один на все режимы: по нему живут реестр обозначений,
+  // общий проход размера подписей и проверка канона.
+  if (xlab && seeX) g.append('text').attr('class', 'axis-name')
+    .attr('x', px1 - 2).attr('y', oy - 7).attr('text-anchor', 'end')
     .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text(xlab || 'x');
-  if (ylab && seeY) g.append('text').attr('x', ox + 7).attr('y', py1 + 11)
+  if (ylab && seeY) g.append('text').attr('class', 'axis-name')
+    .attr('x', ox + 7).attr('y', py1 + 11)
     .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text(ylab || 'y');
 }
 function planeTicksX(g, mx, oy) {

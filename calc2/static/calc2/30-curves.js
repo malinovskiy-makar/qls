@@ -130,6 +130,112 @@ function labelScale() {
    тот и остаётся на месте: деления осей рисуются первыми и потому не двигаются
    никогда. Сдвиг только по вертикали и небольшой: подпись должна остаться у
    своего объекта, иначе разведение вредит больше, чем наложение. */
+/* ⚠️ ПОДПИСЬ, КОТОРУЮ РЕЖЕТ СОБСТВЕННАЯ ОБРЕЗКА, ПЕРЕЕЗЖАЕТ НАРУЖУ (Добавка А).
+
+   Обрезка нужна КРИВЫМ: без неё круто растущая линия вылезала бы за окно, а в
+   сценах с двумя панелями — из своей панели в соседнюю. Подпись же не кривая:
+   она стоит У края по устройству (деление оси, название кривой), и тот же
+   прямоугольник срезал ей по половине знака. Замер этого не видел вовсе, пока
+   Добавка А не научила его сравнивать подпись ещё и с клипом: подпись лежит
+   ВНУТРИ холста, но СНАРУЖИ клипа. Найдено 39 подписей в 6 сценах: «−6» без
+   минуса в «Функции и её производной», деления обеих панелей в «Мировой цене»,
+   срезанные «AVC» и «MC» у правого края в издержках и монополии.
+
+   Два предохранителя, чтобы проход не сделал хуже:
+   · переезжает только та подпись, которую РЕЖЕТ. Спрятанная целиком остаётся
+     спрятанной: её скрыли намеренно (деление панели, ось которой ушла за кадр),
+     и вытащить её значит нарисовать лишнее;
+   · переезд отменяется, если у любого предка есть `transform`: узел сменил бы
+     систему координат и уехал. В calc2 таких групп нет, но правило дешевле
+     проверки «а не завели ли новую».
+   Слой один на холст и стоит последним, поэтому подписи оказываются поверх
+   всего — им там и место. */
+function unclipLabels() {
+  const node = svg.node();
+  if (!node) return;
+  const box = node.getBoundingClientRect();
+  let layer = null;
+  const clipBox = new Map();
+  const boxOf = (holder) => {
+    if (clipBox.has(holder)) return clipBox.get(holder);
+    let r = null;
+    const m = (holder.getAttribute('clip-path') || '').match(/url\(#([^)]+)\)/);
+    const def = m && (node.querySelector('#' + m[1]) || document.getElementById(m[1]));
+    const rc = def && def.querySelector('rect');
+    const ctm = holder.getScreenCTM && holder.getScreenCTM();
+    if (rc && ctm) {
+      const num = (a) => parseFloat(rc.getAttribute(a)) || 0;
+      const at = (px, py) => {
+        const p = node.ownerSVGElement ? node.ownerSVGElement.createSVGPoint() : node.createSVGPoint();
+        p.x = px; p.y = py; return p.matrixTransform(ctm);
+      };
+      const a = at(num('x'), num('y')), b = at(num('x') + num('width'), num('y') + num('height'));
+      r = { left: Math.min(a.x, b.x), top: Math.min(a.y, b.y),
+            right: Math.max(a.x, b.x), bottom: Math.max(a.y, b.y) };
+    }
+    clipBox.set(holder, r);
+    return r;
+  };
+  Array.prototype.forEach.call(node.querySelectorAll('text'), (t) => {
+    let el = t.parentNode, holder = null, moved = false;
+    while (el && el !== node) {
+      if (el.getAttribute) {
+        if (el.getAttribute('transform')) moved = true;
+        if (!holder && /url\(#/.test(el.getAttribute('clip-path') || '')) holder = el;
+      }
+      el = el.parentNode;
+    }
+    if (!holder || moved) return;
+    const cl = boxOf(holder);
+    if (!cl) return;
+    const r = t.getBoundingClientRect();
+    if (r.width < 0.5 || r.height < 0.5) return;
+    const whole = r.left >= cl.left - 0.5 && r.right <= cl.right + 0.5
+               && r.top >= cl.top - 0.5 && r.bottom <= cl.bottom + 0.5;
+    if (whole) return;                                    // целиком внутри — не режет
+    const touches = r.left < cl.right && cl.left < r.right
+                 && r.top < cl.bottom && cl.top < r.bottom;
+    if (!touches) return;                                 // спрятана целиком и намеренно
+    void box;
+    if (!layer) {
+      layer = node.querySelector('g.free-labels');
+      if (!layer) {
+        layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        layer.setAttribute('class', 'free-labels');
+      }
+      node.appendChild(layer);                            // последним: подписи поверх всего
+    }
+    layer.appendChild(t);
+  });
+}
+
+/* ⚠️ НАЗВАНИЕ ОСИ ЗАЖИМАЕТСЯ ПОСЛЕ ТОГО, КАК ПРИМЕНЁН РАЗМЕР ПОДПИСЕЙ.
+
+   `drawAxes` уже зажимает название внутрь холста, но меряет его ПРЕЖНИМ
+   кеглем: общий проход `applyLabelSize` идёт позже и множит размер всех
+   подписей на выбранный человеком коэффициент. У якоря по центру подпись
+   растёт в обе стороны, и «e (курс)» уезжала за левый край на 1,8 px,
+   «Поступления» — на 4,6, «t (ставка)» и «Валюта» — за правый.
+   Зажимаем ещё раз, уже по фактическому размеру: два предохранителя на одну
+   беду, как и с самим `drawAxes`. Трогаем только названия осей — обычную
+   подпись сдвиг оторвал бы от её объекта. */
+function keepAxisNamesInside() {
+  const node = svg.node();
+  if (!node) return;
+  const box = node.getBoundingClientRect();
+  const EDGE = 2;
+  Array.prototype.forEach.call(node.querySelectorAll('text.axis-name'), (t) => {
+    const r = t.getBoundingClientRect();
+    if (r.width < 0.5) return;
+    let dx = 0;
+    if (r.left - box.left < EDGE) dx = EDGE - (r.left - box.left);
+    else if (r.right - box.left > box.width - EDGE) dx = box.width - EDGE - (r.right - box.left);
+    if (!dx) return;
+    const cur = parseFloat(t.getAttribute('x'));
+    if (isFinite(cur)) t.setAttribute('x', cur + dx);
+  });
+}
+
 function spreadLabels() {
   const node = svg.node();
   if (!node) return;
@@ -417,6 +523,7 @@ function labelCurve(g, f, txt, color, opts) {
   const tx = toLeft ? px - 6 : px + 6;
   void rawPy;                                     // сырое место нужно было только для сглаживания
   const t = g.append('text')
+    .attr('class', 'curve-name')     // реестр обозначений и проверка канона ищут по нему
     .attr('x', tx).attr('y', y)
     .attr('text-anchor', toLeft ? 'end' : 'start')
     .attr('font-size', o.size || curveLabelSize()).attr('font-weight', 600).attr('fill', color)

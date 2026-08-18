@@ -192,7 +192,7 @@ function laborPoint(g, L, W, color, label, opts) {
   if (opts.lText !== null) haloText(g, px, oy + 8, opts.lText || ('L=' + fmt(L)), 'middle', 'hanging');
   if (opts.wText !== null) yWageLabel(g, ox, py, opts.wText || ('W=' + fmt(W)));
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  if (label) g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', color).text(label);
+  pointName(g, px, py, label, color);
 }
 
 // Бледный конкурентный ориентир (Lk, Wk) — точка «К» (по галочке «было → стало»).
@@ -332,7 +332,7 @@ function drawLaborMonopsonyPoints() {
     // Зарплата опускается вертикально на кривую предложения: точка M(Lm, Wm).
     dash(ox, pyW, pxm, pyW);
     g.append('circle').attr('cx', pxm).attr('cy', pyW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pyW - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+    pointName(g, pxm, pyW, 'M', COL.ink);
     haloText(g, pxm, oy + 8, 'Lм=' + fmt(mono.Lm), 'middle', 'hanging');
     yWageLabel(g, ox, pyW, 'Wм=' + fmt(mono.Wm));
   }
@@ -444,7 +444,7 @@ function drawLaborUnionPoints() {
     // Зарплата профсоюза Wп на кривой спроса (выше конкурентной).
     dash(ox, pyW, px, pyW);
     g.append('circle').attr('cx', px).attr('cy', pyW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', px + 8).attr('y', pyW - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('П');
+    pointName(g, px, pyW, 'П', COL.ink);
     haloText(g, px, oy + 8, 'Lп=' + fmt(u.Lu), 'middle', 'hanging');
     yWageLabel(g, ox, pyW, 'Wп=' + fmt(u.Wu));
   } else if (u.binding) {
@@ -457,7 +457,7 @@ function drawLaborUnionPoints() {
     g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
     if (u.unemployment > 1e-6) haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(u.unemployment), 'middle', 'hanging');
     g.append('circle').attr('cx', xL).attr('cy', yW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', xL + 8).attr('y', yW - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('П');
+    pointName(g, xL, yW, 'П', COL.ink);
   }
 }
 

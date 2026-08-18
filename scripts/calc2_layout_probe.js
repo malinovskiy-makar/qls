@@ -43,6 +43,43 @@ const snap = () => {
       .filter(c => c.nodeType === 3).map(c => c.nodeValue).join('').trim()
       || Array.from(n.querySelectorAll('tspan')).map(t => t.textContent).join('').trim();
 
+  /* ⚠️ ПОДПИСЬ БЫВАЕТ ВНУТРИ ХОЛСТА, НО СНАРУЖИ СВОЕГО КЛИПА (Добавка А).
+     Сравнения с границами `#chart` мало: в сценах с двумя панелями группа
+     несёт свой `clip-path`, и обрезает именно он. Замеренный случай —
+     `m-tangent`: подпись «−6» лежит с x = 23 до 36, а `#tan-clip-top`
+     начинается с 29, поэтому на экране читается «6». Метрика «за краем»
+     такую потерю не видела вовсе.
+     Прямоугольник берётся у ближайшего предка с `clip-path` и переводится
+     в координаты холста через его же `getScreenCTM` — так учитывается
+     любое преобразование группы, а не только сдвиг. */
+  const clipOf = (node) => {
+    let el = node;
+    while (el && el !== svgEl) {
+      const cp = el.getAttribute && el.getAttribute('clip-path');
+      const m = cp && cp.match(/url\(#([^)]+)\)/);
+      if (m) {
+        const def = svgEl.querySelector('#' + m[1]) || document.getElementById(m[1]);
+        const rc = def && def.querySelector('rect');
+        const ctm = el.getScreenCTM && el.getScreenCTM();
+        if (rc && ctm) {
+          const num = (a) => parseFloat(rc.getAttribute(a)) || 0;
+          const at = (px, py) => {
+            const p = svgEl.createSVGPoint(); p.x = px; p.y = py;
+            const q = p.matrixTransform(ctm);
+            return { x: q.x - box.left, y: q.y - box.top };
+          };
+          const a = at(num('x'), num('y'));
+          const b = at(num('x') + num('width'), num('y') + num('height'));
+          return { id: m[1],
+                   x: Math.min(a.x, b.x), y: Math.min(a.y, b.y),
+                   w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+        }
+      }
+      el = el.parentNode;
+    }
+    return null;
+  };
+
   /* ── Тексты холста ───────────────────────────────────────────── */
   const texts = [];
   svgEl.querySelectorAll('text').forEach(t => {
@@ -51,7 +88,7 @@ const snap = () => {
     const r = t.getBoundingClientRect();
     if (r.width < 0.5 || r.height < 0.5) return;
     texts.push({ s: ownText(t).slice(0, 28), r: rel(r),
-                 cls: t.getAttribute('class') || '' });
+                 cls: t.getAttribute('class') || '', clip: clipOf(t) });
   });
 
   const textPairs = [];
@@ -87,12 +124,23 @@ const snap = () => {
     if (a) floatOverText.push({ float: f.s, text: t.s, area: a });
   }));
 
-  /* ── Выход за границы холста ─────────────────────────────────── */
-  const outside = texts.filter(t =>
-      t.r.x < -0.5 || t.r.y < -0.5 ||
-      t.r.x + t.r.w > box.width + 0.5 || t.r.y + t.r.h > box.height + 0.5)
-    .map(t => ({ s: t.s, x: +t.r.x.toFixed(1), y: +t.r.y.toFixed(1),
-                 right: +(t.r.x + t.r.w).toFixed(1), bottom: +(t.r.y + t.r.h).toFixed(1) }));
+  /* ── Обрезка подписи: холстом ИЛИ своим клипом ───────────────── */
+  const cut = (t) => {
+    const wide = { x: 0, y: 0, w: box.width, h: box.height };
+    const boxes = [['холст', wide]];
+    if (t.clip) boxes.push(['клип #' + t.clip.id, t.clip]);
+    for (const [why, b] of boxes)
+      if (t.r.x < b.x - 0.5 || t.r.y < b.y - 0.5 ||
+          t.r.x + t.r.w > b.x + b.w + 0.5 || t.r.y + t.r.h > b.y + b.h + 0.5)
+        return why;
+    return '';
+  };
+  const outside = texts.filter(t => cut(t))
+    .map(t => ({ s: t.s, why: cut(t), x: +t.r.x.toFixed(1), y: +t.r.y.toFixed(1),
+                 right: +(t.r.x + t.r.w).toFixed(1), bottom: +(t.r.y + t.r.h).toFixed(1),
+                 clip: t.clip ? { x: +t.clip.x.toFixed(1), y: +t.clip.y.toFixed(1),
+                                  right: +(t.clip.x + t.clip.w).toFixed(1),
+                                  bottom: +(t.clip.y + t.clip.h).toFixed(1) } : null }));
 
   /* ── Сырой LaTeX на холсте (п. 42) ───────────────────────────── */
   const rawTex = texts.filter(t => /\$|\\[a-zA-Z]{2,}|\\max|\\min/.test(t.s)).map(t => t.s);

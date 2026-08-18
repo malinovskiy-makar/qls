@@ -222,9 +222,11 @@ function drawInequalityCaptions() {
      (замер: «40» × «Доля населения, %» в трёх ширинах окна). Место под эту
      строку резервирует BOTTOM_BAND в 20-plane.js — они меняются вместе. */
   g.append('text').attr('x', xMid).attr('y', oy + 38).attr('text-anchor', 'middle')
-    .attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Доля населения, %');
+    .attr('class', 'axis-name')
+    .attr('font-size', FS.base).attr('fill', COL.inkSoft).text('N, %');
   g.append('text').attr('x', ox + 6).attr('y', yTop - 5).attr('text-anchor', 'start')
-    .attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Доля дохода, %');
+    .attr('class', 'axis-name')
+    .attr('font-size', FS.base).attr('fill', COL.inkSoft).text('I, %');
 }
 
 // Заливки A (между диагональю и кривой) и B (под кривой) — смысл Джини.
@@ -421,7 +423,10 @@ function redrawInequality() {
   drawGrid();
   // Подписи осей рисует drawInequalityCaptions, но названия сообщаем — их
   // забирает выгрузка в .tex (Б37).
-  drawAxes('', '', { xName: 'Доля населения, %', yName: 'Доля дохода, %' });
+  /* Правило 46: `N` — доля населения, `I` — доля дохода; обе оси несут
+     процент, поэтому единица стоит через запятую. Расшифровка — в подписи
+     под графиком и в панели расчётов. */
+  drawAxes('', '', { xName: 'N, %', yName: 'I, %' });
   drawInequalityCaptions();
   if (STATE.ineqStats && STATE.ineqLorenz) {
     if (STATE.ineqRedist) {

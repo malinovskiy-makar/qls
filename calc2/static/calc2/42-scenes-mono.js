@@ -124,8 +124,7 @@ function drawMonopolyPoints() {
   // Точка монополии (Qm, Pm) на кривой спроса.
   g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5)
     .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  g.append('text').attr('x', pxm + 8).attr('y', pym - 8)
-    .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+  pointName(g, pxm, pym, 'M', COL.ink);
   haloText(g, pxm, oy + 8, 'Qm=' + fmt(m.Qm), 'middle', 'hanging');
   haloText(g, ox - 8, pym, 'Pm=' + fmt(m.Pm), 'end', 'middle');
 }
@@ -299,7 +298,7 @@ function drawMonoCeilingPoints() {
     const [pxm, pym] = toPx(mc.Qstar, mc.price);
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+    pointName(g, pxm, pym, 'M', COL.ink);
     haloText(g, pxm, oy + 8, 'Q=' + fmt(mc.Qstar), 'middle', 'hanging');
   }
   // Дефицит на оси Q между Qstar и Q̂ (объём спроса при цене Pc).
@@ -476,7 +475,8 @@ function drawNaturalCurves() {
   labelCurve(g, naturalATC, 'ATC', COL.reg, { from: 0.93 });
 }
 
-// Три вертикальных ориентира с подписями: M (монополия), MC (P=MC), AC (P=ATC).
+// Три вертикальных ориентира: M (монополия), MC (цена по предельным
+// издержкам), AC (цена по средним). Расшифровка — в панели расчётов.
 function drawNaturalPoints() {
   const n = STATE.natural; if (!n) return;
   const oy = sy(0), ox = sx(0), g = svg.append('g');
@@ -489,15 +489,16 @@ function drawNaturalPoints() {
       .attr('stroke', color).attr('stroke-width', 1).attr('stroke-dasharray', '4 3').attr('opacity', 0.55);
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
       .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', px + (side < 0 ? -9 : 9)).attr('y', py - 9)
-      .attr('text-anchor', side < 0 ? 'end' : 'start')
-      .attr('font-size', FS.base).attr('font-weight', 700).attr('fill', color)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
+    /* Правило 47: на холсте только обозначение. Что это за ориентир —
+       говорит панель «Естественная монополия», а не подпись у точки. */
+    pointName(g, px, py, label, color,
+              { dx: side < 0 ? -9 : 9, dy: -9, size: FS.base, weight: 700 })
+      .attr('text-anchor', side < 0 ? 'end' : 'start');
     haloText(g, px, oy + 8, fmt(Q), 'middle', 'hanging');
   };
-  mark(n.Qm, n.Pm, 'M · монополия', COL.ink, -1);
-  if (n.acReg) mark(n.acReg.Q, n.acReg.P, 'AC · P=ATC', COL.reg, 1);
-  if (n.mcReg) mark(n.mcReg.Q, n.mcReg.P, 'MC · P=MC', COL.MC, -1);
+  mark(n.Qm, n.Pm, 'M', COL.ink, -1);
+  if (n.acReg) mark(n.acReg.Q, n.acReg.P, 'AC', COL.reg, 1);
+  if (n.mcReg) mark(n.mcReg.Q, n.mcReg.P, 'MC', COL.MC, -1);
 }
 
 // Полная отрисовка под-режима «Естественная монополия».
@@ -518,15 +519,15 @@ function updateNaturalPanel() {
   const n = STATE.natural;
   if (!n) { box.innerHTML = '<div class="warn">Оптимум монополии не найден. Проверьте кривые.</div>'; return; }
   let html = `<div class="stat"><span>Постоянные издержки FC</span><b>${fmt(n.FC)}</b></div>`;
-  html += `<div class="stat"><span>1 · Монополия: ($Q$; $P$)</span><b>(${fmt(n.Qm)}; ${fmt(n.Pm)})</b></div>`;
+  html += `<div class="stat"><span>M · монополия: ($Q$; $P$)</span><b>(${fmt(n.Qm)}; ${fmt(n.Pm)})</b></div>`;
   if (!isNaN(n.atcAtQm)) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;(ATC(Qm); прибыль)</span><b>(${fmt(n.atcAtQm)}; ${fmt(n.profit)})</b></div>`;
   if (n.mcReg) {
-    html += `<div class="stat" style="margin-top:4px;"><span>2 · $P = MC$: $Q$ / $P$</span><b>${fmt(n.mcReg.Q)} / ${fmt(n.mcReg.P)}</b></div>`;
+    html += `<div class="stat" style="margin-top:4px;"><span>MC · цена $P = MC$: $Q$ / $P$</span><b>${fmt(n.mcReg.Q)} / ${fmt(n.mcReg.P)}</b></div>`;
     html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;ATC на этом Q</span><b>${fmt(n.mcReg.atc)}</b></div>`;
     if (n.mcReg.subsidy != null) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;Нужна субсидия</span><b>${fmt(n.mcReg.subsidy)}</b></div>`;
   }
   if (n.acReg) {
-    html += `<div class="stat" style="margin-top:4px;"><span>3 · $P = ATC$: $Q$ / $P$</span><b>${fmt(n.acReg.Q)} / ${fmt(n.acReg.P)}</b></div>`;
+    html += `<div class="stat" style="margin-top:4px;"><span>AC · цена $P = ATC$: $Q$ / $P$</span><b>${fmt(n.acReg.Q)} / ${fmt(n.acReg.P)}</b></div>`;
     html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;Прибыль</span><b>0</b></div>`;
   } else if (n.acNote) {
     html += `<div class="warn" style="margin-top:4px;">${n.acNote}</div>`;
@@ -590,7 +591,7 @@ function drawMonoTaxPoints() {
     const [pxm, pym] = toPx(t.Qt, t.Pt);
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+    pointName(g, pxm, pym, 'M', COL.ink);
     haloText(g, pxm, oy + 8, 'Q=' + fmt(t.Qt), 'middle', 'hanging');
     haloText(g, ox - 8, pym, 'P=' + fmt(t.Pt), 'end', 'middle');
   }
@@ -626,7 +627,7 @@ function drawMonoFloorPoints() {
     const [pxm, pym] = toPx(fl.Q, fl.price);
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+    pointName(g, pxm, pym, 'M', COL.ink);
     haloText(g, pxm, oy + 8, 'Q=' + fmt(fl.Q), 'middle', 'hanging');
   }
 }
@@ -1045,7 +1046,7 @@ function drawKinkedFull() {
     const dash = (x1, y1, x2, y2) => og.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     dash(px, py, px, oy); dash(px, py, ox, py);
     og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    og.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
+    pointName(og, px, py, 'M', COL.ink);
     haloText(og, px, oy + 8, 'Q*=' + fmt(k.Qstar), 'middle', 'hanging');
     haloText(og, ox - 8, py, 'P*=' + fmt(k.Pstar), 'end', 'middle');
   }

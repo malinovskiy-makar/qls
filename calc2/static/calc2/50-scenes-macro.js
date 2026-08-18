@@ -75,9 +75,14 @@ const MACRO = {
   adas:     { title: 'AD–AS', xl: 'Y', yl: 'P', vars: ['Y'] },
   phillips: { title: 'Кривая Филлипса', xl: 'u, %', yl: 'π, %', vars: ['u'] },
   money:    { title: 'Денежный рынок', xl: 'M', yl: 'i, %', vars: ['i'] },
-  loanable: { title: 'Рынок заёмных средств', xl: 'Объём', yl: 'r, %', vars: ['r'] },
-  fx:       { title: 'Валютный рынок', xl: 'Валюта', yl: 'e (курс)', vars: ['e'] },
-  laffer:   { title: 'Кривая Лаффера', xl: 't (ставка)', yl: 'Поступления', vars: ['Q'] },
+  /* Правило 46: подпись оси — СИМВОЛ величины из реестра (DESIGN.md 5.1),
+     единица добавляется только у доли и процента. Было «Объём», «Валюта»,
+     «e (курс)», «t (ставка)», «Поступления» — пять фраз там, где у величины
+     есть общепринятая буква. `Tx` уже стоит в легенде под поступлениями
+     бюджета, `t` — ставка потоварного налога в деньгах (не процент). */
+  loanable: { title: 'Рынок заёмных средств', xl: 'Q', yl: 'r, %', vars: ['r'] },
+  fx:       { title: 'Валютный рынок', xl: 'Q', yl: 'e', vars: ['e'] },
+  laffer:   { title: 'Кривая Лаффера', xl: 't', yl: 'Tx', vars: ['Q'] },
   islm:     { title: 'IS–LM', xl: 'Y', yl: 'r, %', vars: ['Y'] },
 };
 
@@ -307,7 +312,7 @@ function drawEquilibriumAt(Q, P, label) {
   haloText(g, px, oy + 8, fmt(Q), 'middle', 'hanging');
   haloText(g, ox - 8, py, fmt(P), 'end', 'middle');
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  if (label) g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text(label);
+  pointName(g, px, py, label, COL.ink);
 }
 
 function updateMacroPanel() {
