@@ -497,8 +497,8 @@ function drawNaturalPoints() {
     haloText(g, px, oy + 8, fmt(Q), 'middle', 'hanging');
   };
   mark(n.Qm, n.Pm, 'M', COL.ink, -1);
-  if (n.acReg) mark(n.acReg.Q, n.acReg.P, 'AC', COL.reg, 1);
-  if (n.mcReg) mark(n.mcReg.Q, n.mcReg.P, 'MC', COL.MC, -1);
+  if (n.acReg) mark(n.acReg.Q, n.acReg.P, 'E_{ATC}', COL.reg, 1);
+  if (n.mcReg) mark(n.mcReg.Q, n.mcReg.P, 'E_{MC}', COL.MC, -1);
 }
 
 // Полная отрисовка под-режима «Естественная монополия».
@@ -522,12 +522,12 @@ function updateNaturalPanel() {
   html += `<div class="stat"><span>M · монополия: ($Q$; $P$)</span><b>(${fmt(n.Qm)}; ${fmt(n.Pm)})</b></div>`;
   if (!isNaN(n.atcAtQm)) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;(ATC(Qm); прибыль)</span><b>(${fmt(n.atcAtQm)}; ${fmt(n.profit)})</b></div>`;
   if (n.mcReg) {
-    html += `<div class="stat" style="margin-top:4px;"><span>MC · цена $P = MC$: $Q$ / $P$</span><b>${fmt(n.mcReg.Q)} / ${fmt(n.mcReg.P)}</b></div>`;
+    html += `<div class="stat" style="margin-top:4px;"><span>$E_{MC}$ · цена $P = MC$: $Q$ / $P$</span><b>${fmt(n.mcReg.Q)} / ${fmt(n.mcReg.P)}</b></div>`;
     html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;ATC на этом Q</span><b>${fmt(n.mcReg.atc)}</b></div>`;
     if (n.mcReg.subsidy != null) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;Нужна субсидия</span><b>${fmt(n.mcReg.subsidy)}</b></div>`;
   }
   if (n.acReg) {
-    html += `<div class="stat" style="margin-top:4px;"><span>AC · цена $P = ATC$: $Q$ / $P$</span><b>${fmt(n.acReg.Q)} / ${fmt(n.acReg.P)}</b></div>`;
+    html += `<div class="stat" style="margin-top:4px;"><span>$E_{ATC}$ · цена $P = ATC$: $Q$ / $P$</span><b>${fmt(n.acReg.Q)} / ${fmt(n.acReg.P)}</b></div>`;
     html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;Прибыль</span><b>0</b></div>`;
   } else if (n.acNote) {
     html += `<div class="warn" style="margin-top:4px;">${n.acNote}</div>`;

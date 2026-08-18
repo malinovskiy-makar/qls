@@ -456,7 +456,7 @@ function drawLaborUnionPoints() {
     // Зарплата профсоюза Wп на кривой спроса (выше конкурентной).
     dash(ox, pyW, px, pyW);
     g.append('circle').attr('cx', px).attr('cy', pyW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    pointName(g, px, pyW, 'П', COL.ink);
+    pointName(g, px, pyW, 'E′', COL.ink);
     haloText(g, px, oy + 8, 'Lп=' + fmt(u.Lu), 'middle', 'hanging');
     yWageLabel(g, ox, pyW, 'Wп=' + fmt(u.Wu));
   } else if (u.binding) {
@@ -469,7 +469,7 @@ function drawLaborUnionPoints() {
     g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
     if (u.unemployment > 1e-6) haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(u.unemployment), 'middle', 'hanging');
     g.append('circle').attr('cx', xL).attr('cy', yW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    pointName(g, xL, yW, 'П', COL.ink);
+    pointName(g, xL, yW, 'E′', COL.ink);
   }
 }
 
@@ -553,8 +553,8 @@ function drawLaborBilateral() {
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
     .text('Конкретная точка зависит от переговорной силы, а её модель не определяет');
   // Две граничные точки: решение монопсониста и решение профсоюза.
-  laborPoint(gg, b.Lm, b.Wm, COL.S, 'М', { lText: 'Lм=' + fmt(b.Lm), wText: null });
-  laborPoint(gg, b.Lu, b.Wu, COL.MR, 'П', { lText: 'Lп=' + fmt(b.Lu), wText: null });
+  laborPoint(gg, b.Lm, b.Wm, COL.S, 'M', { lText: 'Lм=' + fmt(b.Lm), wText: null });
+  laborPoint(gg, b.Lu, b.Wu, COL.MR, 'E′', { lText: 'Lп=' + fmt(b.Lu), wText: null });
 }
 
 // Табло двусторонней монополии.
