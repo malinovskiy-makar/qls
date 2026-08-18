@@ -1,11 +1,11 @@
 {% extends "admin/base.html" %}
 {% load i18n %}
 
-{# Переопределяем блок верхней панели, чтобы добавить ссылку на Desmos-калькулятор. #}
+{# Переопределяем блок верхней панели, чтобы добавить ссылку на калькулятор. #}
 {% block nav-global %}
   <style>
     /* Кнопка «Графики» в шапке Admin */
-    .desmos-nav-link {
+    .admin-nav-link {
       display: inline-block;
       margin-right: 12px;
       padding: 6px 12px;
@@ -17,10 +17,10 @@
       text-decoration: none !important;
       transition: background .15s;
     }
-    .desmos-nav-link:hover {
+    .admin-nav-link:hover {
       background: rgba(255,255,255,0.28);
     }
   </style>
-  <a href="/desmos/" class="desmos-nav-link">Графики</a>
-  <a href="/teacher/" class="desmos-nav-link">Кабинет</a>
+  <a href="/calc2/" class="admin-nav-link">Графики</a>
+  <a href="/teacher/" class="admin-nav-link">Кабинет</a>
 {% endblock %}

@@ -1168,38 +1168,6 @@ class DuplicateCandidate(models.Model):
 
 
 # ===========================================================================
-# Этап 6а — Графический калькулятор Desmos
-# ===========================================================================
-
-class DesmosGraph(models.Model):
-    """Сохранённый пользователем график Desmos.
-
-    Поле `state` — полное состояние калькулятора в формате JSON
-    (получается через calculator.getState() в браузере).
-    Восстанавливается через calculator.setState(state).
-    """
-
-    title = models.CharField('Название', max_length=200)
-    author = models.ForeignKey(
-        'User', on_delete=models.CASCADE,
-        related_name='desmos_graphs',
-        verbose_name='Автор',
-    )
-    state = models.JSONField('Состояние графика (JSON)')
-
-    created_at = models.DateTimeField('Создан', auto_now_add=True)
-    updated_at = models.DateTimeField('Изменён', auto_now=True)
-
-    class Meta:
-        ordering = ['-updated_at']
-        verbose_name = 'График Desmos'
-        verbose_name_plural = 'Графики Desmos'
-
-    def __str__(self):
-        return f'{self.title} ({self.author})'
-
-
-# ===========================================================================
 # Этап Е — Группы учеников
 # ===========================================================================
 

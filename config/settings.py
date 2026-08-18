@@ -39,8 +39,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Наше приложение с задачами:
     'problems',
-    # Этап 6а — Графический калькулятор Desmos:
-    'graphs',
     # Этап А — Публичный каталог задач:
     'catalog',
     # Этап В1 — Кабинет ученика:
@@ -74,7 +72,7 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         # Ищем глобальные шаблоны в папке templates/ в корне проекта.
-        # Это нужно чтобы переопределить admin/base_site.html (добавить ссылку на Desmos).
+        # Это нужно чтобы переопределить admin/base_site.html (ссылка на калькулятор).
         'DIRS': [BASE_DIR / 'templates'],
         # Django 4.1+ кэширует шаблоны в памяти процесса ДАЖЕ при DEBUG=True.
         # Долго работающий runserver (особенно с --noreload) продолжает отдавать
