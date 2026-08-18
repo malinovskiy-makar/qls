@@ -1042,7 +1042,7 @@ function updateTaxPanel() {
   rows.forEach(([k, a, b]) => {
     // Δ считается из ОКРУГЛЁННЫХ соседей: иначе столбец не сходится с теми
     // двумя числами, которые человек видит слева от него (п. 1).
-    const d = shownDiff(b, a), ds = (d > 0 ? '+' : '') + fmt(d);
+    const ds = fmtDiff(b, a);
     html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
   });
   html += '</table>';
@@ -1545,7 +1545,7 @@ function updatePcPanel() {
   rows.forEach(([k, a, b]) => {
     // Δ считается из ОКРУГЛЁННЫХ соседей: иначе столбец не сходится с теми
     // двумя числами, которые человек видит слева от него (п. 1).
-    const d = shownDiff(b, a), ds = (d > 0 ? '+' : '') + fmt(d);
+    const ds = fmtDiff(b, a);
     html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
   });
   html += '</table>';

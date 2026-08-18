@@ -95,23 +95,49 @@ function roundShown(v) { return Math.round(v * SHOWN_POW) / SHOWN_POW; }
    собирается только ПОКАЗ. */
 function fmtSum(...parts) {
   const s = parts.reduce((acc, v) => acc + (isFinite(v) ? roundShown(v) : NaN), 0);
-  return fmt(s);
+  return fmt(s, sumDecimals(parts));
 }
 /* Та же оговорка для разности: столбец «Δ» в таблице «До / После / Δ» обязан
    сходиться с двумя соседними столбцами, а не считаться по сырым значениям. */
 function shownDiff(after, before) { return roundShown(after) - roundShown(before); }
+function fmtDiff(after, before) {
+  const d = shownDiff(after, before);
+  return (d > 0 ? '+' : '') + fmt(d, sumDecimals([after, before]));
+}
 
-function fmt(v) {
+/* ⚠️ У СУММЫ ТА ЖЕ ГЛУБИНА, ЧТО У СЛАГАЕМЫХ (канон 2.2).
+   «290,65 + 290,65 = 581,3» арифметически верно и всё равно читается как
+   ошибка: в столбце два знака у слагаемых и один у итога, глаз ищет
+   пропавшую копейку. Незначащий ноль печатается только там, где рядом
+   стоят числа с этим разрядом; одиночное «50» так и остаётся «50».
+   shownDecimals отвечает на вопрос «сколько знаков fmt напечатает САМ»,
+   поэтому padding никогда не срезает значащую цифру. */
+function shownDecimals(v) {
+  const r = roundShown(v);
+  if (!isFinite(r)) return 0;
+  let frac = Math.round(Math.abs(r) * SHOWN_POW) % SHOWN_POW;
+  let d = SHOWN_DECIMALS;
+  while (d > 0 && frac % 10 === 0) { frac /= 10; d--; }
+  return d;
+}
+function sumDecimals(parts) {
+  return parts.reduce((d, v) => isFinite(v) ? Math.max(d, shownDecimals(v)) : d, 0);
+}
+
+function fmt(v, minDecimals) {
   const r = roundShown(v);
   if (!isFinite(r)) return String(v);
   const sign = r < 0 ? '-' : '';
   const a = Math.abs(r);
   const whole = Math.floor(a);
   let s = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, NBTHIN);
-  const frac = Math.round((a - whole) * 100) / 100;
-  // Дробная часть отделяется ЗАПЯТОЙ: интерфейс русский (Б15). Ведущий ноль
-  // не печатаем — «,5» короче и читается так же.
-  if (frac > 0) s += ',' + String(frac).slice(2);
+  const want = Math.max(shownDecimals(r), minDecimals || 0);
+  // Дробная часть отделяется ЗАПЯТОЙ: интерфейс русский (Б15).
+  if (want > 0) {
+    const frac = String(Math.round((a - whole) * SHOWN_POW))
+                   .padStart(SHOWN_DECIMALS, '0');
+    s += ',' + frac.slice(0, want);
+  }
   return sign + s;
 }
 

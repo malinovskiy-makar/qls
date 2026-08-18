@@ -96,7 +96,7 @@ const snapContrast = () => {
     const size = parseFloat(c.fontSize), bold = parseInt(c.fontWeight, 10) >= 700;
     const large = size >= 24 || (size >= 18.66 && bold);
     rows.push({ text: own.slice(0, 34), fill: c.fill, size,
-                r: +ratio(over(fg, canvasBg), canvasBg).toFixed(2), need: large ? 3 : 4.5 });
+                r: +ratio(over(fg, canvasBg), canvasBg).toFixed(2), need: large ? 3 : 4.6 });
   });
   return { canvasBg: canvasBg.join(','), rows };
 };
