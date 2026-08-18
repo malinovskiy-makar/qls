@@ -1,0 +1,19 @@
+# Зависимости боевого сервиса. Без ML: модель эмбеддингов на прод не едет
+# (ADR 0002) — иначе torch тянет ~2 ГБ в образ и копию в каждый воркер.
+#
+# Это ИСХОДНИК. Точные версии — в requirements/base.txt, он компилируется:
+#     pip-compile requirements/base.in -o requirements/base.txt
+Django>=5.2,<5.3          # LTS до апреля 2028 — ADR 0007
+asgiref
+sqlparse
+gunicorn
+whitenoise
+dj-database-url
+psycopg[binary]           # заменяет psycopg2-binary: живая ветка драйвера
+Pillow
+numpy
+PyMuPDF
+pdfminer.six
+pypandoc
+redis
+django-redis

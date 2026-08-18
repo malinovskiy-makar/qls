@@ -1,0 +1,19 @@
+# Локальная разработка: всё боевое плюс ML-стек для эмбеддингов.
+# Ставится ТОЛЬКО на машину разработчика — на прод не едет (ADR 0002).
+-r base.in
+
+sentence-transformers
+torch
+transformers
+tokenizers
+safetensors
+huggingface_hub
+scikit-learn
+scipy
+
+# Подбор домашки по описанию. Без ключа ANTHROPIC_API_KEY функция сама
+# выключается — на проде не нужен.
+anthropic
+
+PyYAML
+cryptography
