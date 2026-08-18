@@ -108,6 +108,16 @@
   --pal-5: #a78bfa;
   --pal-6: #ffffff;
 }
+/* Оговорка под числом: «эти числа — до вмешательства» (канон 2.13, п. 5).
+   Стоит ТАМ ЖЕ, где число, а не сноской внизу: число без оговорки становится
+   фактом через секунду после того, как его увидели. */
+.scope-note { margin-top: 4px; font-size: 11px; line-height: 1.35; color: var(--text3); }
+
+/* Строка «вернуть исходный вид» (канон 2.8, п. 9). */
+.side-reset { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; }
+.side-reset__why { font-size: 12px; line-height: 1.45; color: var(--text2); }
+.side-reset .btn { align-self: flex-start; }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
   height: 100%; overflow: hidden;

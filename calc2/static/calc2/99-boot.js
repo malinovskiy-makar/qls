@@ -20,6 +20,23 @@ function lockNumberFields() {
   app.addEventListener('keydown', (e) => {
     if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && isNum(e.target)) e.preventDefault();
   }, true);
+  /* П4 (частично). Русская клавиатура набирает дробь ЗАПЯТОЙ, а поле
+     type=number принимает только точку и молча глотает нажатие: человек жмёт
+     «0», «,», «5» и видит «05». Подменяем символ на лету — тем же приёмом, что
+     платформа применила к полям балла.
+     Полный канон 2.1 (число во фразе — подчёркнутая полосочка `.k-num`, где и
+     показ идёт с запятой) здесь не делается: полей 49 и читателей значения 43,
+     это предмет фазы 6, где поля и есть тема. */
+  app.addEventListener('beforeinput', (e) => {
+    if (!isNum(e.target) || e.data == null || e.data.indexOf(',') < 0) return;
+    e.preventDefault();
+    const el = e.target, dot = e.data.replace(/,/g, '.');
+    const a = el.selectionStart, b = el.selectionEnd;
+    if (typeof el.setRangeText === 'function' && a != null && b != null) {
+      el.setRangeText(dot, a, b, 'end');
+    } else { el.value += dot; }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, true);
 }
 
 function init() {

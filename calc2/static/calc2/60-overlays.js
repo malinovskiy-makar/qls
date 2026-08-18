@@ -2902,6 +2902,10 @@ const _sceneSnaps = {};
 
 // Забыть, что помнилось по моделям. Нужно, когда состояние надо начать с нуля
 // (например, в контрольных прогонах, где каждый случай ставит свою обстановку).
+/* Забыть снимок ОДНОЙ модели: на этом стоит «вернуть модель к исходному виду».
+   Без этого pickScene тут же восстановил бы то, что мы только что отменили. */
+function forgetSceneSnapshot(key) { delete _sceneSnaps[key]; }
+
 function resetSceneMemory() { Object.keys(_sceneSnaps).forEach(k => { delete _sceneSnaps[k]; }); }
 
 function saveSceneSnapshot(key) {

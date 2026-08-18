@@ -78,8 +78,31 @@ function toData(px, py) { return [sx.invert(px), sy.invert(py)]; }
    Ширину подписи меряет fitMargins по длине этой строки, поэтому поле слева
    само раздвинется под новые, более длинные числа. */
 const NBTHIN = ' ';        // узкий неразрывный пробел — разделитель разрядов
+
+/* ⚠️ ЧИСЛО НА ЭКРАНЕ ОКРУГЛЯЕТСЯ РОВНО В ОДНОМ МЕСТЕ (канон 2.2).
+   Глубина округления — здесь и больше нигде: любое «Math.round(v*100)/100»,
+   написанное рядом с выводом, рано или поздно разъедется с этим. */
+const SHOWN_DECIMALS = 2;
+const SHOWN_POW = Math.pow(10, SHOWN_DECIMALS);
+function roundShown(v) { return Math.round(v * SHOWN_POW) / SHOWN_POW; }
+
+/* ⚠️ СУММА СЧИТАЕТСЯ ИЗ ОКРУГЛЁННЫХ СЛАГАЕМЫХ, А НЕ ОКРУГЛЯЕТСЯ САМА (п. 1).
+   На экране стояло «SW = CS + PS», а под ним CS 907,91 + PS 907,91 = 1 815,81:
+   сумма считалась по сырым float и округлялась отдельно от слагаемых, поэтому
+   в последнем разряде расходилась с тем, что человек видит и складывает сам.
+   Первое, что заметит ученик, — именно это.
+   Математика не меняется: STATE.sw по-прежнему точная сумма, из округлённого
+   собирается только ПОКАЗ. */
+function fmtSum(...parts) {
+  const s = parts.reduce((acc, v) => acc + (isFinite(v) ? roundShown(v) : NaN), 0);
+  return fmt(s);
+}
+/* Та же оговорка для разности: столбец «Δ» в таблице «До / После / Δ» обязан
+   сходиться с двумя соседними столбцами, а не считаться по сырым значениям. */
+function shownDiff(after, before) { return roundShown(after) - roundShown(before); }
+
 function fmt(v) {
-  const r = Math.round(v * 100) / 100;
+  const r = roundShown(v);
   if (!isFinite(r)) return String(v);
   const sign = r < 0 ? '-' : '';
   const a = Math.abs(r);

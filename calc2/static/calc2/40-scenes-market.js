@@ -490,7 +490,7 @@ function updateOpenPanel() {
     // Разбивка потерь — по отдельности, без «одного числа».
     html += `<div class="stat" style="margin-top:4px;"><span>Потери: искажение производства</span><b>${fmt(o.dwlProd)}</b></div>`;
     html += `<div class="stat"><span>Потери: искажение потребления</span><b>${fmt(o.dwlCons)}</b></div>`;
-    html += `<div class="stat"><span>Итого потери</span><b>${fmt(o.dwlTotal)}</b></div>`;
+    html += `<div class="stat"><span>Итого потери</span><b>${fmtSum(o.dwlProd, o.dwlCons)}</b></div>`;
     html += '<div class="hint">Левый треугольник это производственное искажение: часть импорта заместили ' +
       'более дорогим отечественным выпуском. Правый это потребительское искажение: часть покупателей ушла с рынка ' +
       'из-за выросшей цены.</div>';
@@ -710,12 +710,19 @@ function updateInfoPanel() {
     return;
   }
   if (!STATE.eq) {
-    box.innerHTML = '<div class="warn">Равновесие не найдено в первой четверти.</div>';
+    /* П7. Раньше об отсутствии равновесия говорили ТРИ блока подряд: этот,
+       «Излишки» («появятся после нахождения равновесия») и «Вмешательство»
+       («двигайте ползунок»). Два последних теперь молчат — говорит один, и
+       он называет не только факт, но и что сделать (канон 2.3). */
+    box.innerHTML = '<div class="warn">Кривые не пересекаются в первой четверти, ' +
+      'поэтому равновесия нет. Измените формулу спроса или предложения ' +
+      'либо отодвиньте границы плоскости.</div>';
     return;
   }
   let html =
     `<div class="stat"><span>$Q^*$ (количество)</span><b>${fmt(STATE.eq.Q)}</b></div>` +
-    `<div class="stat"><span>$P^*$ (цена)</span><b>${fmt(STATE.eq.P)}</b></div>`;
+    `<div class="stat"><span>$P^*$ (цена)</span><b>${fmt(STATE.eq.P)}</b></div>` +
+    beforeInterventionNote();
   /* Б31. Кривые могут пересечься не один раз, и тогда равновесие не одно.
      Молчать об этом нельзя: все дальнейшие числа считаются вокруг ОДНОГО
      из них, и человек вправе знать, вокруг какого. */
@@ -751,17 +758,30 @@ function drawAreas() {
 }
 
 // Табло излишков: CS, PS и общественное благосостояние SW.
+/* Оговорка «эти числа — до вмешательства» (п. 5, канон 2.13).
+   В сцене налога сверху стояло «Q* 50, CS 1 250», а в таблице ниже «После:
+   Q 40, CS 800» — два разных значения одной величины на одном экране, и ничто
+   не говорило, что верхнее относится к рынку ДО вмешательства. Оговорка стоит
+   ПОД числами, а не в сноске, и называет область действия. */
+function beforeInterventionNote() {
+  const pcOn = !!(STATE.pc && STATE.pc.binding && STATE.pReg > 0);
+  if (!STATE.taxActive && !pcOn) return '';
+  return '<div class="scope-note">до вмешательства государства</div>';
+}
+
 function updateAreasPanel() {
   const box = document.getElementById('info-areas');
   if (!box) return;
-  if (!STATE.eq || STATE.cs == null) {
-    box.innerHTML = '<div class="muted">Появятся после нахождения равновесия.</div>';
-    return;
-  }
+  /* П6. В монополии излишки считает и показывает блок «Монополия»: там свои
+     Qm, Pm, CS и потери. Заглушка «появятся после нахождения равновесия»
+     обещала числа, которые уже стоят рядом на том же экране. */
+  if (isMonopolyScene()) { box.innerHTML = ''; return; }
+  if (!STATE.eq || STATE.cs == null) { box.innerHTML = ''; return; }   // говорит блок равновесия, см. П7
   box.innerHTML =
     `<div class="stat"><span>$CS$ (потребитель)</span><b>${fmt(STATE.cs)}</b></div>` +
     `<div class="stat"><span>$PS$ (производитель)</span><b>${fmt(STATE.ps)}</b></div>` +
-    `<div class="stat"><span>$SW = CS + PS$</span><b>${fmt(STATE.sw)}</b></div>`;
+    `<div class="stat"><span>$SW = CS + PS$</span><b>${fmtSum(STATE.cs, STATE.ps)}</b></div>` +
+    beforeInterventionNote();
 }
 
 /* ---------------------------------------------------------------------
@@ -987,9 +1007,19 @@ function setTaxKind(kind) {
 function updateTaxPanel() {
   const box = document.getElementById('info-tax');
   if (!box) return;
+  /* ⚠️ П12. БЛОК ГОВОРИТ ТОЛЬКО ТАМ, ГДЕ ЕГО ИНСТРУМЕНТ ЕСТЬ.
+     Сюжет объявляет недоступные ему органы управления сам (SCENE_ROUTE.lock →
+     класс .scoped-off). «Спрос и предложение» и «Стандартная монополия»
+     запирают весь блок вмешательства — и всё равно показывали подсказку
+     «двигайте ползунок, чтобы ввести налог» про ползунок, которого на экране
+     нет. Спрашиваем ту же разметку, что и прячет: второго списка сцен
+     с налогом не заводим, он бы разъехался с маршрутами. */
+  const sec = document.getElementById(L_INTERV);
+  if (sec && sec.classList.contains('scoped-off')) { box.innerHTML = ''; return; }
   if (!STATE.D || !STATE.S) {
     box.innerHTML = '<div class="muted">Сначала отметьте кривые D и S.</div>'; return;
   }
+  if (!STATE.eq) { box.innerHTML = ''; return; }   // об отсутствии равновесия говорит один блок, см. П7
   const isSub = (STATE.intervType === 'subsidy');
   if (!STATE.taxActive) {
     box.innerHTML = `<div class="muted">Двигайте ползунок или тяните клин на графике, чтобы ввести ${isSub ? 'субсидию' : 'налог'}.</div>`;
@@ -1010,7 +1040,9 @@ function updateTaxPanel() {
              `<b>${fmt(STATE.tax)}${adv ? ' %' : ''}</b></div>`;
   html += '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
   rows.forEach(([k, a, b]) => {
-    const d = b - a, ds = (d > 0 ? '+' : '') + fmt(d);
+    // Δ считается из ОКРУГЛЁННЫХ соседей: иначе столбец не сходится с теми
+    // двумя числами, которые человек видит слева от него (п. 1).
+    const d = shownDiff(b, a), ds = (d > 0 ? '+' : '') + fmt(d);
     html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
   });
   html += '</table>';
@@ -1511,7 +1543,9 @@ function updatePcPanel() {
   let html = `<div class="stat"><span>${isCeiling ? 'Потолок Pc' : 'Пол Pf'}</span><b>${fmt(pc.Preg)}</b></div>`;
   html += '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
   rows.forEach(([k, a, b]) => {
-    const d = b - a, ds = (d > 0 ? '+' : '') + fmt(d);
+    // Δ считается из ОКРУГЛЁННЫХ соседей: иначе столбец не сходится с теми
+    // двумя числами, которые человек видит слева от него (п. 1).
+    const d = shownDiff(b, a), ds = (d > 0 ? '+' : '') + fmt(d);
     html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
   });
   html += '</table>';

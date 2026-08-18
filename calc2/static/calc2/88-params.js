@@ -318,8 +318,17 @@ function buildPultCurveChips(list) {
     chip.title = 'Сдвиг кривой: ' + (c.name || c.expr || '');
 
     const sl = document.createElement('input');
-    sl.type = 'range'; sl.min = 0; sl.max = CONFIG.Pmax; sl.step = 1;
-    sl.value = Math.round(c.linear.b);
+    /* ⚠️ ОДНО ЗНАЧЕНИЕ — ОДИН ИСТОЧНИК (п. 3, канон 2.1).
+       Было: шаг 1 и `Math.round(c.linear.b)`, то есть у свободного члена
+       появлялось ВТОРОЕ значение. После перетаскивания кривой формула
+       становилась «85.22 - Q», а строка над ползунком показывала «D = 85»
+       (её собирает upgradeRegulator из значения ползунка) — и первое же
+       касание ползунка молча теряло 0,22.
+       `step = 'any'` разрешает ползунку нести точное значение; клавиши-стрелки
+       при этом по-прежнему ходят целыми (браузер берёт сотую долю размаха,
+       а размах здесь 0…100). */
+    sl.type = 'range'; sl.min = 0; sl.max = CONFIG.Pmax; sl.step = 'any';
+    sl.value = c.linear.b;
     sl.style.accentColor = c.color;   // акцент ползунка в цвет кривой
     sl.title = 'Сдвиг кривой по вертикали (свободный член b)';
 
@@ -353,7 +362,7 @@ function syncPultCurveValues(list) {
     if (!chip) return;
     const sl = chip.querySelector('input[type="range"]');
     const val = chip.querySelector('.pchip-val');
-    if (sl && document.activeElement !== sl) sl.value = Math.round(c.linear.b);
+    if (sl && document.activeElement !== sl) sl.value = c.linear.b;   // точное, см. п. 3
     if (val) val.textContent = fmt(c.linear.b);
   });
 }

@@ -648,6 +648,15 @@ function drawMonoFloorLine() {
 
 // Табло вмешательства в монополии (info-tax): налог / субсидия / потолок / пол.
 function updateMonoInterventionPanel() {
+  /* П12, та же оговорка, что у конкурентного рынка: блок говорит только там,
+     где его инструмент есть. Естественная монополия и обе дискриминации
+     запирают блок вмешательства (SCENE_ROUTE.lock), и подсказка «двигайте
+     ставку» обещала бы ползунок, которого на экране нет. */
+  {
+    const _sec = document.getElementById(L_INTERV);
+    const _box = document.getElementById('info-tax');
+    if (_sec && _box && _sec.classList.contains('scoped-off')) { _box.innerHTML = ''; return; }
+  }
   const box = document.getElementById('info-tax');
   if (!box) return;
   if (STATE.monoMode !== 'simple') { box.innerHTML = '<div class="muted">Вмешательство государства доступно в режиме «Обычная» монополия.</div>'; return; }

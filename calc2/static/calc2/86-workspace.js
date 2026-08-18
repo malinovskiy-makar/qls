@@ -341,6 +341,9 @@ function syncFirstCard() {
 }
 
 function wireScene() {
+  const rst = document.getElementById('btn-scene-reset');
+  if (rst) rst.addEventListener('click', resetCurrentScene);
+
   const tools = document.getElementById('tools-panel');
   const params = document.getElementById('params-panel');
 
@@ -467,6 +470,18 @@ function wireScene() {
    Сюда переехали бывшие секции «Все настройки» и «Сетка»: границы осей,
    шаг делений, названия осей, вид сетки, легенда и заголовок графика.
    --------------------------------------------------------------------- */
+/* П9. Вернуть текущую модель к исходному виду: забыть её снимок и заново
+   выполнить маршрут карточки. Снимок удаляем ПЕРЕД pickScene — иначе он тут
+   же восстановит ровно то, что мы отменяем. Другие модели не трогаем: у
+   каждой снимок свой. */
+function resetCurrentScene() {
+  const key = STATE.sceneKey;
+  if (!key) return;
+  if (typeof forgetSceneSnapshot === 'function') forgetSceneSnapshot(key);
+  pickScene(key);
+  if (typeof toast === 'function') toast('Модель вернулась к исходному виду');
+}
+
 function setWrenchOpen(open) {
   const pop = document.getElementById('wrench-pop');
   const btn = document.getElementById('btn-wrench');
