@@ -184,8 +184,13 @@ const L_TAXSIDE = 'taxside-row';         // Налог платит: прода�
 
 const SCENE_ROUTE = {
   /* --- Блок 1 · Математика ------------------------------------------ */
+  /* П60. Сцена открывается ПУСТЫМ холстом, поэтому её единственная карточка
+     раскрыта заранее: свёрнутая панель над пустым графиком не сообщает даже
+     того, что здесь вообще что-то делают. Во всех остальных сценах карточки
+     закрыты по-прежнему — там на холсте уже есть модель, и первый шаг очевиден. */
   'm-graph':      { run: () => { STATE.curves = []; curveCounter = 0; STATE.params = {};
-                                 setMode('graph'); renderGraphRows(); } },
+                                 setMode('graph'); renderGraphRows();
+                                 if (typeof openSection === 'function') openSection('sec-graph'); } },
   'm-tangent':    { run: () => { setMode('math'); setMathSub('tangent'); },    lock: ['math-seg'] },
   'm-optimum':    { run: () => { setMode('math'); setMathSub('optimum'); },    lock: ['math-seg'] },
   'm-transform':  { run: () => { setMode('math'); setMathSub('transform'); },  lock: ['math-seg'] },

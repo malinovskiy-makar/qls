@@ -220,6 +220,18 @@ function renderGraphRows() {
   const box = graphRowsBox();
   if (!box) return;
   box.innerHTML = '';
+  /* П60. Пустое состояние по канону 3.13: говорит, чего здесь нет и что здесь
+     появится. Пустой холст и одна безымянная строка ввода не объясняли ни
+     того, ни другого; кнопки «Добавить кривую» в этой сцене нет по устройству
+     (строка заводит кривую сама), и без слов это тоже не угадывается. */
+  if (!STATE.curves.length) {
+    const empty = document.createElement('div');
+    empty.className = 'k-empty';
+    empty.innerHTML = '<b>Пока ни одной функции</b>' +
+      '<p>Впишите формулу в строку ниже, и кривая появится на графике. ' +
+      'Следующая пустая строка добавится сама.</p>';
+    box.appendChild(empty);
+  }
   STATE.curves.forEach(c => box.appendChild(buildGraphRow(c)));
   box.appendChild(buildGraphRow(null));
   /* Поля формул собираются лениво и только когда видны (А56), а строки мы

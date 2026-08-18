@@ -521,15 +521,26 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 /* Строка списка функций в режиме построения графиков: цвет, формула, крестик
    и своё имя под ними. Пустая строка внизу выглядит так же, только без имени
    и крестика — начал печатать, и она стала обычной. */
+/* П61. ⚠️ СТРОКА ПЕРЕЖИЛА СВОЮ СЕТКУ, И ЭТО ЛОМАЛО ПОЛЕ ФОРМУЛЫ.
+   Колонок объявлено три (образец цвета · формула · крестик), а детей в строке
+   стало ПЯТЬ: имя кривой из текстового поля превратилось в редактируемое
+   значение (.edval), и лишние элементы перенесло на второй ряд. Ширину
+   колонки «auto» задаёт САМЫЙ ШИРОКИЙ элемент колонки по всем рядам, а им
+   оказалось имя: образец цвета раздувался до 110 px, и полю формулы из 215 px
+   доступных оставалось 75 — плейсхолдер обрезался до «Наприме».
+   Лечим не подгонкой ширин, а раскладкой: имя занимает СВОЙ ряд целиком
+   (`1 / -1`), и первая колонка снова меряется по образцу цвета. */
 .grow {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
   gap: 6px; margin-bottom: 8px;
 }
 .grow .f-slot { min-width: 0; }
+.grow > .cpick { justify-self: start; }
 .grow math-field { font-size: 14px; padding: 4px 7px; }
+.grow > .edval, .grow > .grow-name { grid-column: 1 / -1; }
 .grow-name {
-  grid-column: 2 / 3; width: 100%; min-width: 0; padding: 3px 7px; font-size: 12px;
-  border: 1px solid var(--border); border-radius: var(--r);
+  width: 100%; min-width: 0; padding: 3px 7px; font-size: 12px;
+  border: var(--line) solid var(--border); border-radius: var(--r);
   background: var(--input-bg); color: var(--text2);
 }
 .pw-count-field { display: flex; align-items: center; gap: 8px; }
@@ -1192,6 +1203,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .sb-body .stat span { font-size: 12px; }
 .sb-body .stat b { font-size: 13px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 .sb-empty { font-size: 13px; color: var(--text2); line-height: 1.5; padding: 6px 0; }
+/* Пустое состояние по канону 3.13: заголовок 13/600, текст 13/400, по центру.
+   Говорит две вещи — чего здесь нет и что здесь появится. */
+.k-empty { text-align: center; padding: 18px 12px 14px; color: var(--text2); }
+.k-empty > b { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.k-empty > p { margin: 0; font-size: 13px; font-weight: 400; line-height: 1.5; }
 .sb-body > div:not(:empty) { margin-bottom: 12px; }
 .sb-body > div:empty { margin: 0; }
 
