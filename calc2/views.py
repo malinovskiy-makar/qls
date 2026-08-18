@@ -147,13 +147,6 @@ def export_pdf(request):
     собирает клиент (buildTex в calc2.html): он переводит нарисованный холст
     в TikZ. Здесь только компиляция.
     """
-    if not pdflatex_available():
-        return HttpResponse(
-            'На этом сервере не установлен pdflatex. Скачайте .tex и '
-            'скомпилируйте его в Overleaf.',
-            status=503, content_type='text/plain; charset=utf-8',
-        )
-
     tex = request.POST.get('tex', '')
     if not tex.strip():
         return HttpResponseBadRequest('Пустой файл .tex')
@@ -161,6 +154,18 @@ def export_pdf(request):
         return HttpResponseBadRequest('Файл .tex слишком большой')
     if _TEX_FORBIDDEN.search(tex):
         return HttpResponseBadRequest('В .tex есть команды, которые сервер не компилирует')
+
+    # ⚠️ РАЗБОР ВХОДА ИДЁТ ДО ПРОВЕРКИ КОМПИЛЯТОРА.
+    # Раньше «нет pdflatex» отвечало 503 на ЛЮБОЙ запрос, и запрещённая
+    # команда получала тот же ответ, что и правильный файл: на машине без TeX
+    # проверка защитного фильтра молча мерила не то. Отказ по существу входа
+    # не зависит от того, чем мы собираемся его собирать.
+    if not pdflatex_available():
+        return HttpResponse(
+            'На этом сервере не установлен pdflatex. Скачайте .tex и '
+            'скомпилируйте его в Overleaf.',
+            status=503, content_type='text/plain; charset=utf-8',
+        )
 
     pdf, err = compile_pdf_pdflatex(tex)
     if pdf is None:
