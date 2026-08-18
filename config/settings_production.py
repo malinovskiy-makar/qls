@@ -10,6 +10,18 @@ import dj_database_url
 
 DEBUG = False
 
+# Предохранитель: прод не имеет права подняться в отладочном режиме.
+# При DEBUG=True Django показывает трассировки с кусками кода и значениями
+# переменных прямо в браузере, а ALLOWED_HOSTS перестаёт работать.
+# Падение при старте лучше, чем утечка внутренностей наружу.
+if os.environ.get('DJANGO_DEBUG', '').lower() in ('1', 'true', 'yes', 'on'):
+    raise RuntimeError(
+        'DJANGO_DEBUG выставлен, а на проде отладочный режим запрещён. '
+        'Уберите переменную окружения DJANGO_DEBUG.'
+    )
+
+# Именно [ ], а не .get(): без ключа сервис обязан упасть при старте,
+# а не подняться с тихим значением по умолчанию.
 SECRET_KEY = os.environ['SECRET_KEY']
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '.onrender.com').split(',')

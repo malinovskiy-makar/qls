@@ -305,7 +305,8 @@ class ExportBundleTests(TestCase):
             self._export(out_dir, source_id=self.source.id)
 
             # манифест: только видимая задача, категории на месте
-            manifest = json.loads((out_dir / 'manifest.json').read_text())
+            manifest = json.loads(
+                (out_dir / 'manifest.json').read_text(encoding='utf-8'))
             self.assertEqual(manifest['format'], BUNDLE_FORMAT)
             self.assertEqual(manifest['count'], 1)
             self.assertEqual([p['id'] for p in manifest['problems']],
@@ -317,10 +318,11 @@ class ExportBundleTests(TestCase):
             # оболочка и js-зеркало манифеста
             self.assertTrue((out_dir / 'reviewer.html').exists())
             self.assertIn('window.REVIEW_MANIFEST',
-                          (out_dir / 'manifest.js').read_text())
+                          (out_dir / 'manifest.js').read_text(encoding='utf-8'))
 
             # снимок: боевой HTML, но офлайн и всё раскрыто
-            snap = (out_dir / 'snapshots' / f'{self.visible.id}.html').read_text()
+            snap = (out_dir / 'snapshots'
+                    / f'{self.visible.id}.html').read_text(encoding='utf-8')
             self.assertIn('review-snapshot-overrides', snap)
             self.assertNotIn('cdn.jsdelivr.net', snap)
             self.assertIn('../assets/vendor/katex/katex.min.css', snap)
@@ -344,7 +346,8 @@ class ExportBundleTests(TestCase):
                 f'{second.id}\n{self.flagged.id}\n{self.visible.id}\n')
             out_dir = Path(tmp) / 'bundle_ids'
             out = self._export(out_dir, ids_file=str(ids_file))
-            manifest = json.loads((out_dir / 'manifest.json').read_text())
+            manifest = json.loads(
+                (out_dir / 'manifest.json').read_text(encoding='utf-8'))
         # порядок файла сохранён, зафлагованная выброшена с предупреждением
         self.assertEqual([p['id'] for p in manifest['problems']],
                          [second.id, self.visible.id])

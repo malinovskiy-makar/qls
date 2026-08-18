@@ -135,7 +135,8 @@ class DateMaskTests(TestCase):
         path = os.path.join(folder, 'probe.js')
         with open(path, 'w', encoding='utf-8') as fh:
             fh.write(source)
-        run = subprocess.run([NODE, path], capture_output=True, text=True)
+        run = subprocess.run([NODE, path], capture_output=True, text=True,
+                             encoding='utf-8')
         assert run.returncode == 0, run.stderr
         cls.result = json.loads(run.stdout)
         shutil.rmtree(folder, ignore_errors=True)
