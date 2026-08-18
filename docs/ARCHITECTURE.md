@@ -79,7 +79,7 @@
   `TeacherFeedback`, `StudentGroup`.
 - **Инфраструктура:** `Collection`, `Job`, `Template`, `ExportRecord`,
   `ImportSession`, `DuplicateCandidate` (инвариант `a.id < b.id`),
-  `AutoTopicAssignment`, `DesmosGraph`.
+  `AutoTopicAssignment`.
 
 **Решение по M2M «задача ↔ навык/ошибка»:** объявлены ОДИН раз на стороне
 `Problem` (`related_name='problems'`), доступны с обеих сторон. Иначе Django
