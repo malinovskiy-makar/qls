@@ -95,7 +95,7 @@ class RankingAlwaysThereTests(TestCase):
         for path in ('teacher/student_progress.html',
                      'teacher/groups/student_stats.html',
                      'platform/stats.html'):
-            with open('/'.join(['.', _find(path)]), encoding='utf-8') as fh:
+            with open(_find(path), encoding='utf-8') as fh:
                 body = fh.read()
             self.assertIn('_ranking.html', body, path)
 
@@ -104,7 +104,10 @@ def _find(template):
     """Путь к шаблону на диске — по тем же каталогам, что у Django."""
     from django.template.loader import get_template
 
-    return get_template(template).origin.name.split('qls_platform/')[-1]
+    # Абсолютный путь как есть. Прежний вариант резал по 'qls_platform/' —
+    # префиксу каталога на машине автора; на другой машине его нет, и
+    # путь оставался абсолютным, а вызывающий код клеил к нему './'.
+    return get_template(template).origin.name
 
 
 class StudentFactsTests(TestCase):

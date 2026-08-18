@@ -55,7 +55,8 @@ def run_node(script):
         f.write(body)
         path = f.name
     try:
-        proc = subprocess.run(['node', path], capture_output=True, text=True)
+        proc = subprocess.run(['node', path], capture_output=True, text=True,
+                              encoding='utf-8')
         if proc.returncode != 0:
             raise AssertionError(proc.stderr)
         return json.loads(proc.stdout)

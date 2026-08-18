@@ -63,8 +63,10 @@ class MaskOutsideMathTests(unittest.TestCase):
             fh.write(script)
             path = fh.name
         try:
+            # encoding обязателен: node печатает UTF-8, а локаль на
+            # Windows — cp1251, и кириллица приезжает кашей.
             out = subprocess.run([self.node, path], capture_output=True,
-                                 text=True, timeout=30)
+                                 text=True, encoding='utf-8', timeout=30)
             self.assertEqual(out.returncode, 0, out.stderr)
             import json
             return json.loads(out.stdout)
