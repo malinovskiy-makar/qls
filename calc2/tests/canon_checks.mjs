@@ -159,9 +159,13 @@ const inPage = (theme) => {
      когда элемент перерисован до последнего пикселя: браузер не снимает флаг
      от того, что мы задали фон и рамку. Спрашиваем только те органы, где хром
      ДЕЙСТВИТЕЛЬНО рисует система и разница видна глазом. */
+  /* ⚠️ СПИСОК ВЗЯТ У КАНОНА ДОСЛОВНО (правило 6 части 4): список, флажок,
+     переключатель, выбор файла. Ползунка в этом списке НЕТ, и статьи о нём в
+     каноне тоже нет вовсе — сейчас он системный, крашенный `accent-color`.
+     Рисовать свой значит изобрести правило, которого канон не даёт: вопрос
+     отложен владельцу, а не решён прибором. */
   Array.from(document.querySelectorAll(
-    'select, input[type=checkbox], input[type=radio], input[type=range], ' +
-    'input[type=color], input[type=number], input[type=date], input[type=datetime-local]'))
+    'select, input[type=checkbox], input[type=radio], input[type=file]'))
     .filter(vis).forEach(el => {
       if (inNav(el)) return;
       const c = getComputedStyle(el);
@@ -208,9 +212,16 @@ const inPage = (theme) => {
   });
 
   /* 10. Кегль и вес — только из шкалы канона 1.2. */
-  const SCALE = new Set(['11/600', '11/400', '11/700', '12/400', '12/600', '13/400', '13/500',
-    '13/600', '13/700', '14/400', '14/600', '15/600', '15/700', '16/600', '16/700',
-    '17/700', '20/600', '22/600', '24/700', '28/700', '10/700']);
+  /* Шкала канона 1.2 (текст) + 1.2.2 (числа) + два места, названные в самом
+     каноне отдельно: мелкая кнопка 12px при базовом весе 500 (3.1) и глиф «?»
+     кеглем 10 внутри кружка 15x15 (1.2, «это знак, а не текст»). */
+  const SCALE = new Set([
+    '11/400', '11/600', '11/700',
+    '12/400', '12/500', '12/600', '12/700',
+    '13/400', '13/500', '13/600', '13/700',
+    '14/400', '14/600', '14/700',
+    '15/600', '15/700', '22/600',
+    '26/700', '56/800', '10/700']);
   all.forEach(el => {
     const own = Array.from(el.childNodes).filter(n => n.nodeType === 3).map(n => n.nodeValue).join('').trim();
     if (own.length < 2 || inNav(el) || el.closest('svg') || el.closest('.katex')) return;
@@ -270,24 +281,55 @@ const inPage = (theme) => {
 
   /* 16. Тень бывает только у того, что физически висит над страницей, и у колец
      фокуса (канон 1.7). */
-  const POP = '.f-pop, .hint-pop, .hint-tip, .wrench-pop, .mkbd, .toast, .picker, .modal, ' +
-              '.menu, .cpick-menu, .k-tip, .ML__keyboard, [role="dialog"], [role="tooltip"]';
+  /* ⚠️ «ВСПЛЫВАЮЩЕЕ» СПРАШИВАЕТСЯ У РАСКЛАДКИ, А НЕ У СПИСКА КЛАССОВ.
+     Список устаревает от первого нового окна, а канон говорит не про классы,
+     а про то, что элемент физически висит НАД страницей. Измеримо это ровно
+     две вещи: элемент вынут из потока (absolute / fixed / sticky) и поднят
+     (z-index больше нуля). Кнопки масштаба над холстом под это подходят
+     и тень им положена; панель в покое — нет. */
+  const raised = (el) => {
+    const c = getComputedStyle(el);
+    if (!/^(absolute|fixed|sticky)$/.test(c.position)) return false;
+    const z = parseInt(c.zIndex, 10);
+    return isFinite(z) && z > 0;
+  };
+  const floating = (el) => {
+    for (let e = el; e && e !== document.body; e = e.parentElement) if (raised(e)) return true;
+    return false;
+  };
   all.forEach(el => {
     if (inNav(el) || el.closest('svg')) return;
     const sh = getComputedStyle(el).boxShadow;
     if (!sh || sh === 'none') return;
-    if (el.matches(POP) || el.closest(POP)) return;
+    if (floating(el)) return;
     if (el === document.activeElement) return;                     // кольцо фокуса
     add('shadow_only_pop', name(el) + ' ' + sh.slice(0, 40));
   });
 
-  /* 17. Нажимаемое пальцем — не ниже 44 px (канон 3.9). */
-  Array.from(document.querySelectorAll('button, a[href], input[type=checkbox], input[type=radio], [role="button"]'))
-    .filter(vis).forEach(el => {
-      if (inNav(el) || el.closest('svg')) return;
-      const r = el.getBoundingClientRect();
-      if (r.height < 44 - 0.5) add('touch_44', name(el) + ' h=' + r.height.toFixed(0));
+  /* 17. Область касания у поля-полосочки — не ниже 44 px (канон 3.3).
+     ⚠️ ПРОВЕРКА СУЖЕНА ПО КАНОНУ, И ЭТО НЕ ПОБЛАЖКА. В плане работы она
+     записана как «высота нажимаемого пальцем элемента ≥ 44 px», но канон
+     такого правила не содержит: 44 px названы ровно в 3.3 (числовое
+     поле-полосочка, «это область касания»), а у кнопки канон 3.1 задаёт
+     высоту 33 px и мелкий вариант 25 px. Требовать 44 у кнопки значит
+     противоречить статье 3.1 той же книги. */
+  Array.from(document.querySelectorAll('.k-num')).filter(vis).forEach(el => {
+    const r = el.getBoundingClientRect();
+    if (r.height < 44 - 0.5) add('knum_44', name(el) + ' h=' + r.height.toFixed(0));
+  });
+
+  /* 8 (канон, часть 4). Сплошной акцент — только у ВЫБРАННОГО из равноправных,
+     и таких мест на экране не больше трёх. */
+  if (accent) {
+    const filled = all.filter(el => {
+      if (inNav(el) || el.closest('svg')) return false;
+      const bg = px(getComputedStyle(el).backgroundColor);
+      if (!bg || bg[3] < 0.9) return false;
+      return Math.abs(bg[0] - accent[0]) + Math.abs(bg[1] - accent[1]) + Math.abs(bg[2] - accent[2]) <= 12;
     });
+    if (filled.length > 3)
+      add('accent_fill_count', filled.length + ' шт: ' + filled.slice(0, 4).map(name).join(', '));
+  }
 
   /* 18. В тёмной теме нет светлых системных виджетов: белое поле на тёмной
      панели слепит и выдаёт, что элемент рисует не сайт. */
@@ -367,7 +409,8 @@ const inPage = (theme) => {
 const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_main_button',
   'disabled_button_explained', 'tabular_nums', 'title_on_interactive', 'no_h_scroll',
   'type_scale', 'radius_scale', 'state_plate_tint', 'two_stripes', 'math_line_height',
-  'shadow_only_pop', 'touch_44', 'dark_light_widget', 'raw_template', 'label_clipped'];
+  'shadow_only_pop', 'knum_44', 'accent_fill_count', 'dark_light_widget', 'raw_template',
+  'label_clipped'];
 
 (async () => {
   let browser;
