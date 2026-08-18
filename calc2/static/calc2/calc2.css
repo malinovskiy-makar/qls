@@ -1597,6 +1597,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 @media print {
   :root { color-scheme: light; }
   html, body { background: #fff !important; color: #000 !important; height: auto !important; }
+  /* П71. Шапка сайта в список не входила, и на бумаге печаталась тёмная
+     полоса с меню и кнопкой «Выйти». Прячем по тем же признакам, по каким её
+     находят проверки: свой тег и общие имена шапки платформы. */
+  nav, header, .site-header, #site-nav,
   .dock, .side, .graph-tools, .wrench, .picker, .modal, .toast,
   #pult, .quick-area, .side-arrow, .kbd, .mkbd { display: none !important; }
   .app { display: block !important; height: auto !important; }
@@ -1611,6 +1615,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
     font-size: 16pt; font-weight: 700; margin: 0 0 8px; color: #000;
   }
   #print-stats { margin-top: 10px; font-size: 10pt; color: #000; }
+  /* П73. Таблица чисел не растягивается на всю ширину листа: строка «подпись
+     ... значение» через весь лист читается по диагонали, а глаз теряет пару.
+     Ширина — по содержанию, потолок — половина полосы. */
+  #print-stats { max-width: 9cm; }
   #print-stats .stat { display: flex; justify-content: space-between; gap: 12px;
     padding: 2px 0; border-bottom: 1px solid #ddd; }
   @page { margin: 1.5cm; }

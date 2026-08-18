@@ -779,8 +779,38 @@ function fillPrintBlocks() {
 }
 
 let _printTheme = null;
+let _printViewBox = null;
+/* П72. ⚠️ БЕЗ `viewBox` ПЕЧАТНЫЙ РАЗМЕР ХОЛСТА НЕ МАСШТАБИРУЕТ РИСУНОК.
+   Печатный стиль задаёт `#chart` ширину 100 % и высоту 15 cm, но рисунок
+   внутри SVG нарисован в пикселях экрана: без системы координат браузеру
+   нечего пересчитывать, и он просто обрезает лишнее — картинка прижималась
+   к левому верхнему углу, а ось количества уходила за нижний край листа.
+   `viewBox` ставим перед печатью по фактическому размеру холста и снимаем
+   после (П74): на экране он не нужен, а `preserveAspectRatio` при живом
+   перетаскивании кривых сместил бы координаты указателя. */
+function setPrintViewBox(on) {
+  const svg = document.getElementById('chart');
+  if (!svg) return;
+  if (on) {
+    if (_printViewBox === null) _printViewBox = svg.getAttribute('viewBox') || '';
+    const w = svg.clientWidth || parseFloat(svg.getAttribute('width')) || 0;
+    const h = svg.clientHeight || parseFloat(svg.getAttribute('height')) || 0;
+    if (w > 0 && h > 0) {
+      svg.setAttribute('viewBox', '0 0 ' + Math.round(w) + ' ' + Math.round(h));
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    }
+    return;
+  }
+  if (_printViewBox === null) return;
+  if (_printViewBox) svg.setAttribute('viewBox', _printViewBox);
+  else svg.removeAttribute('viewBox');
+  svg.removeAttribute('preserveAspectRatio');
+  _printViewBox = null;
+}
+
 window.addEventListener('beforeprint', () => {
   fillPrintBlocks();
+  setPrintViewBox(true);
   const root = document.documentElement;
   _printTheme = root.getAttribute('data-theme');
   if (_printTheme === 'dark') {
@@ -792,7 +822,17 @@ window.addEventListener('afterprint', () => {
   const root = document.documentElement;
   if (_printTheme === 'dark') {
     root.setAttribute('data-theme', 'dark');
-    if (typeof redrawAll === 'function') redrawAll();
   }
   _printTheme = null;
+  setPrintViewBox(false);
+  /* П74. Холст возвращается к прежнему размеру ВСЕГДА, а не только после
+     тёмной темы: печатный стиль растянул его на всю ширину листа, и без
+     перерисовки на экране оставалась растянутая картинка.
+     ⚠️ Перерисовка идёт СЛЕДУЮЩИМ КАДРОМ. В момент `afterprint` печатные
+     правила уже сняты, но раскладка ещё не пересчитана: замер даёт ширину
+     печатного листа, и холст перерисовывается по ней — то есть остаётся
+     растянутым, только теперь по своей же вине. */
+  if (typeof redrawAll === 'function') {
+    requestAnimationFrame(() => requestAnimationFrame(() => redrawAll()));
+  }
 });
