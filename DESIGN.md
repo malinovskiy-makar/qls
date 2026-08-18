@@ -1,289 +1,1868 @@
----
-name: ЭкЗадачи
-description: Olympiad-economics task bank, homework builder, and graphing calculator — a quiet, precise workbench for teacher and student.
-colors:
-  graphite: "#1a1f2e"
-  ink-blue: "#4f7cff"
-  ink-blue-deep: "#3d66e0"
-  warm-paper: "#f7f7f5"
-  paper-cool: "#f5f5f3"
-  pencil-line: "#e8e8e4"
-  graphite-text: "#1a1a1a"
-  muted-text: "#666666"
-  amber: "#f5a623"
-  solution-green: "#2a9d5c"
-  green-tint: "#e9faf0"
-  tag-tint: "#eef2ff"
-  error-red: "#c0392b"
-  error-tint: "#fff0f0"
-typography:
-  display:
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-    fontSize: "44px"
-    fontWeight: 800
-    lineHeight: 1.05
-    letterSpacing: "-1px"
-  headline:
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-    fontSize: "20px"
-    fontWeight: 700
-    lineHeight: 1.3
-    letterSpacing: "normal"
-  title:
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-    fontSize: "14px"
-    fontWeight: 600
-    lineHeight: 1.4
-    letterSpacing: "normal"
-  body:
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-    fontSize: "15px"
-    fontWeight: 400
-    lineHeight: 1.6
-    letterSpacing: "normal"
-  label:
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-    fontSize: "11px"
-    fontWeight: 600
-    lineHeight: 1.2
-    letterSpacing: "0.5px"
-rounded:
-  sm: "6px"
-  md: "10px"
-  lg: "12px"
-  pill: "20px"
-  logo: "7px"
-spacing:
-  xs: "4px"
-  sm: "8px"
-  md: "16px"
-  lg: "24px"
-  xl: "40px"
-components:
-  button-primary:
-    backgroundColor: "{colors.ink-blue}"
-    textColor: "#ffffff"
-    rounded: "{rounded.sm}"
-    padding: "7px 12px"
-  button-primary-hover:
-    backgroundColor: "{colors.ink-blue-deep}"
-    textColor: "#ffffff"
-  button-dark:
-    backgroundColor: "{colors.graphite}"
-    textColor: "#ffffff"
-    rounded: "{rounded.sm}"
-    padding: "11px 16px"
-  card:
-    backgroundColor: "#ffffff"
-    textColor: "{colors.graphite-text}"
-    rounded: "{rounded.md}"
-    padding: "16px 20px"
-  chip:
-    backgroundColor: "{colors.tag-tint}"
-    textColor: "{colors.ink-blue}"
-    rounded: "{rounded.pill}"
-    padding: "2px 9px"
-  input:
-    backgroundColor: "#ffffff"
-    textColor: "{colors.graphite-text}"
-    rounded: "{rounded.sm}"
-    padding: "7px 10px"
-  nav:
-    backgroundColor: "{colors.graphite}"
-    textColor: "#ffffff"
-    height: "48px"
+# Язык дизайна платформы ЭкЗадачи
+
+Версия 1.0 · 18 августа 2026 · заменяет `DESIGN.md`
+
 ---
 
-# Design System: ЭкЗадачи
+## Оглавление
 
-## 1. Overview
+**Часть 0. Как читать этот документ** — кому адресован, три пометки, правило разрешения
+споров, форма статьи.
 
-**Creative North Star: "The Graphite Notebook"**
+**Часть 1. Основание** — цвет · кегль и вес · межстрочный интервал · отступы ·
+скругления · линии и полосы · тени · движение · ширина полосы и точки перелома ·
+сводка новых переменных · что здесь достроено.
 
-ЭкЗадачи looks like a well-kept graphite notebook owned by a serious economics coach: warm off-white pages, a graphite-dark spine, one disciplined ink-blue pen reserved for the things that matter, and a soft amber pencil that marks difficulty. The interface is calm and dense with information but never loud. It earns trust the way a good notebook does — the math is always legible, the structure is always obvious, and nothing decorative competes with the content. Warmth comes from the paper tone (`#f7f7f5`, never stark `#ffffff` for surfaces that recede) and from generous line-height on problem text, not from mascots, gradients, or gamification.
+**Часть 2. Механизмы** — семнадцать статей в шести группах:
+*числа* (запись, показ, отсутствие) ·
+*обратная связь* (ошибка ввода, состояние, требует действия, выключенная кнопка) ·
+*необратимость и сохранность* (подтверждение, сохранение) ·
+*объяснение* (раскрытие, смысл, чужой взгляд, предварительный результат) ·
+*состояния интерфейса* (активное, фокус) ·
+*объём* (длинный список, многошаговый процесс).
 
-The system is built for two roles on one platform. Teachers see a denser surface (filter rails, homework builders, review tables); students see a lighter one (assignments, progress). Both share the same graphite header, the same ink-blue accent language, and the same flat-paper card vocabulary, so the platform always feels like one tool. This is infrastructure, not a course: every screen should feel like a precise instrument a professional reaches for, not a marketing page that wants something from them.
+**Часть 3. Детали** — восемнадцать элементов с полной геометрией и всеми состояниями.
 
-It explicitly rejects three things. It is **not Corporate SaaS** — no gradient hero metrics, no "01 / 02 / 03" section scaffolding, no upsell surfaces inside the app. It is **not a Soviet textbook or Word document** — no Times New Roman, no black-on-stark-white walls of text, no dot-matrix table forms. And the public product is **not a reskinned Django admin** — the catalog, student cabinet, and teacher panel must carry visibly different weight and affordances than `/admin/`.
+**Часть 4. Свод неотменяемого** — двадцать правил, восемнадцать из них проверяются тестом.
 
-**Key Characteristics:**
-- Warm-paper surfaces, graphite structure, a single ink-blue accent used sparingly.
-- Flat by default; depth appears only on interaction (hover lift, focus ring, modal).
-- Math is first-class: KaTeX-rendered formulas, never images, never broken `$`.
-- Information-dense but quiet — the accent earns attention because it is rare.
-- One platform, two densities: teacher-dense, student-light, shared language.
+**Часть 5. Отдельные поверхности** — `/calc2/`, `/game/`, судьба прежнего `DESIGN.md`,
+порядок применения.
 
-## 2. Colors
+---
 
-A warm-neutral paper palette anchored by a graphite dark and lit by exactly one saturated ink-blue, with two functional signal colors (amber for difficulty, green for "has solution").
+# Часть 0. Как читать этот документ
 
-### Primary
-- **Ink Blue** (`#4f7cff`): The single brand accent. Used for the logo tile, active nav state, primary buttons, focused inputs, links, chips, and the difficulty/solution affordances that need to read as "interactive." This is the one voice — it should never cover large areas.
-- **Ink Blue Deep** (`#3d66e0`): The pressed/hover state of every ink-blue surface. Slightly desaturated and darkened so hover feels like weight, not color change.
+## 0.1 Кому адресован
 
-### Secondary
-- **Graphite** (`#1a1f2e`): The structural dark. Header bar, nav, dark "Войти" submit button, and any surface that frames rather than holds content. It is a blue-leaning near-black, not pure black — it belongs to the same cool family as the accent.
+Читатель — **Claude Code**. Документ написан как спецификация, а не как эссе: правило,
+точное значение, способ проверки, одна строка «почему». «Почему» нужно не для красоты —
+оно не даёт применить правило там, где оно не работает.
 
-### Tertiary (functional signals)
-- **Difficulty Amber** (`#f5a623`): Reserved exclusively for difficulty stars (★) and their tints (`#fff8ed`, `#fff3d9`). Pairs color with the star shape so difficulty is never color-only.
-- **Solution Green** (`#2a9d5c`): Reserved for the "решение ✓" badge and confirmation states, on a green tint (`#e9faf0`). Always paired with the ✓ glyph or explicit text.
+## 0.2 Откуда взяты значения
 
-### Neutral
-- **Graphite Text** (`#1a1a1a`): Primary body and heading text on paper. Carries the WCAG-AA contrast load.
-- **Muted Text** (`#666666`): Secondary text — meta, captions, slogans, inactive labels.
-- **Warm Paper** (`#f7f7f5`): The recessive surface — filter cards, panels, the contextual rail. Surfaces that hold content sit on white; surfaces that frame it sit on warm paper.
-- **Paper Cool** (`#f5f5f3`): The full-bleed page background behind the login card.
-- **Pencil Line** (`#e8e8e4`): Borders and dividers, almost always at `0.5px`–`1.5px`. The hairline that defines a card without shouting.
-- **Tag Tint** (`#eef2ff`): The pale ink-blue wash behind chips/tags.
+Всё измерено на живом сайте 18.08.2026 через DOM: реальные вычисленные стили,
+а не исходники и не скриншоты. Проверены обе темы. Охвачено 16 экранов: кабинет ученика
+(список работ, домашка, контрольная целиком, разбор работы, статистика, профиль),
+кабинет преподавателя (ученики, группа, задания, задание целиком, решения, проверка,
+конструктор в три шага, прогресс ученика, результаты контрольной) и живой стайлгайд
+`/teacher/styleguide/`.
 
-### Error
-- **Error Red** (`#c0392b`) on **Error Tint** (`#fff0f0`) with a `#ffd5d5` border: login failures and validation only. Never used decoratively.
+## 0.3 Три пометки
 
-### Named Rules
-**The One Voice Rule.** Ink Blue (`#4f7cff`) appears on ≤10% of any screen. Its rarity is what makes "active," "primary," and "interactive" instantly legible. If two ink-blue elements compete on one screen, one of them is wrong.
+У каждого правила стоит одна из трёх:
 
-**The No-Stark-White Rule.** Pure `#ffffff` is for content cards only. Page chrome and recessive panels use warm paper (`#f7f7f5`) or cool paper (`#f5f5f3`). A screen that is all `#ffffff` reads as a Django admin grid, not as ЭкЗадачи.
+**СНЯТО** — так уже работает на платформе. Менять нельзя без причины.
 
-**The Signal-Color Lockbox.** Amber means difficulty, green means solution-present. Neither is ever borrowed for decoration, hover, or emphasis. A color that means something cannot also mean nothing.
+**ДОСТРОЕНО** — так не было, но следует из платформы. Обычно это значит, что платформа
+делала правильно в одном месте и никак — в остальных.
 
-## 3. Typography
+**СПОР** — платформа делает по-разному. Выбран один вариант, рядом сказано, какие были
+и почему выбран этот.
 
-**Display / Body / Label Font:** The native system stack — `-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`. One family across the whole UI; weight and size carry the hierarchy.
-**Math Font:** KaTeX (Computer Modern) for all formulas — rendered, never rasterized.
+## 0.4 Правило разрешения споров
 
-**Character:** Neutral, legible, fast-loading, and invisible by design — the system font gets out of the way so economics content and math render are the only things the eye resolves. The personality lives in weight contrast (800 display against 400 body) and in tight tracking on the wordmark, not in a bespoke typeface.
+**Канон никогда не изобретает третий вариант.** Когда платформа делает одно и то же
+по-разному, канон выбирает из уже существующих, а не придумывает новый. Порядок
+предпочтения:
 
-### Hierarchy
-- **Display** (800, 44px, line-height 1.05, letter-spacing −1px): The "ЭкЗадачи" wordmark and home hero only. The one place the type is allowed to be loud.
-- **Headline** (700, 18–20px, 1.3): Page-level and card-group headings ("Войти", section titles).
-- **Title** (600–700, 14–15px, 1.4): Problem-card titles, modal titles, list item headings.
-- **Body** (400, 13–15px, 1.55–1.65): Problem statements and prose. Generous line-height because problem text is dense and often carries inline math; readability is the feature.
-- **Label** (600, 11px, uppercase, letter-spacing 0.5px): Filter-rail section labels, badge captions, table column heads. The quiet structural scaffolding of dense screens.
+1. То, что записано в `/teacher/styleguide/` — команда уже сформулировала это словами.
+2. То, что живёт в наборе `templates/_kit.html`.
+3. То, что применено в кабинете преподавателя — это самая новая и самая аккуратная
+   часть платформы.
+4. То, что чаще встречается.
 
-### Named Rules
-**The Readable-Math Rule.** Problem body line-height never drops below 1.55. Inline KaTeX needs vertical air; tight leading turns a fraction into a smudge.
+Кабинет ученика в этом порядке последний: он написан до набора и использует собственный
+словарь (`.hw-card`, `.btn-open`, `.kind-badge`, `.answer-short`), который нигде больше
+не встречается.
 
-**The Weight-Not-Color Hierarchy.** Heading vs. body is expressed by weight and size, not by tinting text with the accent. Ink-blue text is reserved for links and active state — never for "making a heading pop."
+## 0.5 Форма статьи
 
-## 4. Elevation
+```
+### Название механизма
+Пометка: СНЯТО / ДОСТРОЕНО / СПОР
+Применимо к calc2: да / нет / частично
+Правило.    Что делать. Одно предложение.
+Значения.   Точные числа и токены.
+Границы.    Где правило не действует и что вместо него.
+Почему.     Одна строка. Не украшение — защита от буквального применения.
+Проверить.  Наблюдаемое условие: запрос к DOM, тест или сценарий глазами.
+```
 
-Flat by default. Surfaces rest on the page defined only by a `0.5px`–`1.5px` Pencil Line border. Depth is a *response to state*, not an ambient property — it appears on hover, focus, and overlay, then disappears. There is no global drop-shadow on resting cards; a card you are not touching is a flat sheet of paper.
+## 0.6 Чего в этом документе нет
 
-### Shadow Vocabulary
-- **Card hover** (`box-shadow: 0 2px 14px rgba(0,0,0,0.07)`): The gentle lift a problem card takes when hovered, paired with a slightly darker border. The page feels like paper you can pick up.
-- **Accent hover** (`box-shadow: 0 4px 16px rgba(79,124,255,0.12)` + `translateY(-2px)`): Home navigation cards — a tinted lift that previews the ink-blue destination.
-- **Focus ring** (`box-shadow: 0 0 0 3px rgba(79,124,255,0.15)`): The soft ink-blue halo on a focused search field. Replaces, never adds to, a hard outline.
-- **Dropdown** (`box-shadow: 0 4px 20px rgba(0,0,0,0.12)`): The "+ В домашку" menu — enough lift to read as floating above the card.
-- **Modal** (`box-shadow: 0 8px 40px rgba(0,0,0,0.18)`): The problem-preview overlay — the deepest shadow in the system, used once at a time over a `rgba(0,0,0,0.45)` scrim.
+- **Списка расхождений платформы.** Их 29, они в Notion как задачи. Здесь — канон,
+  а не разбор.
+- **Списка багов.** Их 20, они в Notion.
+- **Плана работ.** «Что делаем и почему» живёт в штабе, справочник — в репозитории.
 
-### Named Rules
-**The Flat-By-Default Rule.** Resting surfaces have a border, never a shadow. If a card has a drop-shadow while no one is touching it, the shadow is wrong. Motion and depth are feedback, not decoration.
+## 0.7 Оговорка про сегодняшнюю платформу
 
-## 5. Components
+Работы по приведению платформы к канону отложены — сейчас чинится калькулятор.
+Значит какое-то время калькулятор будет совпадать не со всей платформой, а с её
+самой новой частью. Это следствие правила 0.4 и оно временное: расхождение всегда
+в одну сторону, своего ни на что не похожего у калькулятора не появляется нигде.
 
-### Buttons
-- **Shape:** Gently rounded — `6px` (sm) for compact actions, up to `20px`/`26px` full-pill for the home search submit and chips.
-- **Primary:** Ink-blue fill, white text, `6px` radius, ~`7px 12px` padding. The home hero submit grows to a `20px` pill inside a `26px` search field.
-- **Dark:** Graphite fill (`#1a1f2e`), white text, used for the login "Войти" submit — full-width, `11px` vertical padding. Hover deepens to `#252c40`.
-- **Hover / Focus:** Primary deepens to Ink Blue Deep (`#3d66e0`); transitions are `~0.12s–0.15s` on `background`, `border-color`, and (cards) `transform`. No bounce, no scale-up beyond a `2px` lift.
-- **Ghost / Outline:** White fill, Pencil-Line border, muted text; on hover the border and text shift to ink-blue (e.g. "👁 Условие", "+ В домашку").
+Единственное исключение — **цвета кривых в `/calc2/`**. Они остаются собственными,
+потому что это предметная семантика (спрос, предложение, MR, MC, налог, DWL),
+а не оформление. Подробности — часть 5.
 
-### Chips
-- **Style:** Pill (`20px` radius), Tag-Tint (`#eef2ff`) background, ink-blue text, `2px 9px` padding, weight 500. The solution variant swaps to green tint + Solution Green text + a ✓.
-- **State:** Topic tags are static labels (not interactive); difficulty/type *filter* chips in the rail invert to ink-blue fill when active.
+---
 
-### Cards / Containers
-- **Corner Style:** `10px` (problem & filter cards), `12px` (home nav cards, modal, login card).
-- **Background:** White for content cards; Warm Paper (`#f7f7f5`) for the recessive filter rail.
-- **Shadow Strategy:** None at rest (see Elevation) — `0.5px` Pencil-Line border only. Hover adds Card-hover shadow + border darkening.
-- **Internal Padding:** `16px–20px` for list cards, `18px` for the filter card, `24px` for home nav cards, `40px` for the login card.
+# Часть 1. Основание
 
-### Inputs / Fields
-- **Style:** White fill, `0.5px–1.5px` Pencil-Line border, `6px` radius, `7px–12px` padding, system font at 13–15px.
-- **Focus:** Border shifts to ink-blue; the home search additionally gains the `3px` ink-blue focus halo. No hard browser outline.
-- **Error:** Wrapped in the Error-Tint panel with Error-Red text; field itself keeps its border.
+Шкалы, на которые опирается всё остальное.
 
-### Navigation
-- **Style:** A sticky graphite bar (`#1a1f2e`), `48–52px` tall, with the `28px` rounded ink-blue "Эк" logo tile at the left.
-- **Typography:** 13px links at weight 500. Inactive links are `rgba(255,255,255,0.6)`; hover goes to full white; the **active** link is full white with a `2px` ink-blue bottom border.
-- **Role-aware:** Teacher, student, and guest see different link sets but identical styling — the nav is the clearest expression of "one platform, many roles."
+## 1.1 Цвет
 
-### Filter Rail (signature component)
-The left rail in the catalog is the platform's signature dense surface: a Warm-Paper card holding uppercase 11px section labels, a search row, native `select`s for theme/source, amber star-buttons for difficulty, stacked type buttons, and a reset link. It is the teacher's instrument panel — quiet, compact, every control one click deep.
+**Пометка: СНЯТО целиком.** Цветовой слой платформы — единственная часть системы,
+которая построена полностью и на обе темы. Новых цветов не заводить.
 
-## 6. Do's and Don'ts
+Файл: `templates/_tokens.html`, подключается **первым** в `<head>` каждой публичной базы.
+`:root` — светлая, `[data-theme="dark"]` — тёмная. Ключ темы — `localStorage['theme']`,
+общий для всего сайта, включая `/calc2/`.
 
-### Do:
-- **Do** keep Ink Blue (`#4f7cff`) under ~10% of any screen — logo, one primary action, active state, links. Let its rarity do the work (The One Voice Rule).
-- **Do** sit recessive chrome on Warm Paper (`#f7f7f5`) and content on white. Mixing them is how the platform reads as "designed," not "admin."
-- **Do** define resting surfaces with a `0.5px` Pencil-Line border and reserve shadow for hover/focus/overlay (The Flat-By-Default Rule).
-- **Do** keep problem-body line-height ≥ 1.55 so inline KaTeX stays legible (The Readable-Math Rule).
-- **Do** pair every signal color with a shape or word — amber with ★, green with ✓ — so nothing is color-only (WCAG 2.1 AA, no color-only encoding).
-- **Do** express hierarchy with weight and size; keep transitions ≤ 0.15s and degrade them to instant under `prefers-reduced-motion`.
+### Поверхности и текст
 
-### Don't:
-- **Don't** build Corporate SaaS surfaces: no gradient hero metrics, no "01 / 02 / 03" section scaffolding, no upsell banners inside the app.
-- **Don't** fall back to a Soviet-textbook / Word look: no Times New Roman, no black-on-stark-white walls of text, no dot-matrix table forms.
-- **Don't** let the public product look like a reskinned Django admin grid — it must carry different visual weight and affordances than `/admin/`.
-- **Don't** tint heading text with the accent to "make it pop" — ink-blue text means link or active state, nothing else (The Weight-Not-Color Hierarchy).
-- **Don't** borrow amber or green for decoration — they mean difficulty and solution-present, respectively (The Signal-Color Lockbox).
-- **Don't** put a drop-shadow on a resting card, and don't use a `border-left` color stripe thicker than the hairline as a substitute for real hierarchy.
+| Токен | Светлая | Тёмная | Роль |
+|---|---|---|---|
+| `--bg` | `#f5f5f3` | `#10141c` | фон страницы |
+| `--surface` | `#ffffff` | `#161b25` | карточка, панель — держит содержание |
+| `--surface-2` | `#f5f5f3` | `#1d2330` | рецессивное: поля, рельсы, вложенные блоки |
+| `--border` | `rgba(22,26,38,.12)` | `rgba(255,255,255,.13)` | граница поверхности |
+| `--border-soft` | `rgba(22,26,38,.07)` | `rgba(255,255,255,.07)` | разделитель внутри блока |
+| `--text` | `#1a1a1a` | `#e7e9ef` | основной |
+| `--text2` | `#5b6472` | `#a7aebc` | второстепенный |
+| `--text3` | `#687180` | `#8e96a4` | третьестепенный |
+| `--nav-bg` / `--sb` | `#1a1f2e` | `#1a1f2e` | шапка — **не меняется по темам** |
 
-## 7. Scoped surface — Graphing instrument (/calc2/)
+### Акцент
 
-The new graphing calculator (`/calc2/`) is the one place that **departs from the ink-blue
-system on purpose**. It is a tool where the full-bleed plot is the hero and controls/results
-float over it like instrument readouts, so it has its own scoped tokens (full detail in
-`.interface-design/system.md`). The rest of the site is unchanged.
+| Токен | Светлая | Тёмная | Роль |
+|---|---|---|---|
+| `--accent` | `#BE185D` | `#FF4D94` | акцент |
+| `--accent-deep` | `#9D1450` | `#FF6BA6` | нажатие/наведение |
+| `--accent-tint` | `rgba(190,24,93,.10)` | `rgba(255,77,148,.16)` | заливка акцентом |
+| `--accent-ring` | `rgba(190,24,93,.34)` | `rgba(255,77,148,.42)` | кольцо акцента |
+| `--accent-rgb` | `190, 24, 93` | `255, 77, 148` | для `rgba()` |
+| `--act-ink-solid` | `#ffffff` | `#161b25` | **текст на сплошной акцентной заливке** |
 
-- **Curve palette (fixed, colorblind-distinct, both themes):** `--curve-d #2F6FED` (спрос),
-  `--curve-s #E0563B` (предложение), `--curve-mr #8B3FE0` (MR), `--curve-mc #119C8A` (MC),
-  `--curve-tax #2E9E44` (налог/субсидия/бюджет — единый зелёный), `--curve-dwl #8C8C84` (DWL),
-  `--curve-reg #B5791F` (потолок/пол/МРОТ), `--curve-ghost #9AA0A6` (исходное состояние).
-  Area fills reuse these at 12–22 % opacity. Cost curves: `--cost-mc/atc/avc/afc/vc`.
-- **UI accent — raspberry**, deliberately NOT ink-blue: `#BE185D` (light) / `#FF4D94` (dark).
-  Reserved for **small** affordances only: checkbox `accent-color`, focus rings, "← Сценарии"
-  border. Chosen because it collides with no curve hue. White-on-accent = 6:1 (AA).
-- **Large action buttons (`.btn`)** — graphite, NOT raspberry: `--btn-bg #1e293b` (light) /
-  `#334155` (dark), hover `--btn-bg-hover #293548` / `#3e4f69`, text `--on-btn #ffffff`.
-  Linear/Stripe-style calm fill so crimson remains a rare accent, not a background wash.
-- **Dual theme** (light default, dark for evening/projector), `data-theme` on `<html>`,
-  persisted; structural canvas colors (`--ink/--ink-soft/--grid/--halo/--canvas`) flip with theme.
-- **Surfaces:** floating panels on `--surface` with 1px `--border` + soft `--shadow-panel`;
-  dock/inputs on `--surface-2`. Radii `--r-sm 6 / --r 8 / --r-lg 14`. Motion `--ease`
-  `cubic-bezier(.23,1,.32,1)`, all < 300 ms, full `prefers-reduced-motion` off-switch.
-- **Signature:** the scenario-picker cards carry a mini-graph drawn in the engine's own
-  curve colors; the scoreboard shows big tabular "instrument" numbers (Q*, P*, …).
+### Кнопки и фокус
 
-## 8. Scoped surface — Game (/game/)
+| Токен | Светлая | Тёмная | Роль |
+|---|---|---|---|
+| `--btn-bg` | `#1e293b` | `#46566d` | главная кнопка — графит, не акцент |
+| `--btn-bg-hover` | `#293548` | `#556883` | |
+| `--on-btn` | `#ffffff` | `#ffffff` | текст главной кнопки |
+| `--focus` | `#64748b` | `#94a3b8` | кольцо фокуса — **нейтральное** |
+| `--focus-ring` | `rgba(30,41,59,.16)` | `rgba(148,163,184,.26)` | |
 
-Econ Rush is a public acquisition surface (no login) that stays inside the site's
-raspberry «Scene» system but adds a scoped `--rush-*` token layer, every value of
-which **maps onto the global tokens** from `templates/_tokens.html` — no raw hex:
-`--rush-accent → var(--accent)`, `--rush-surface → var(--surface)`,
-`--rush-ok/-tint → var(--green)/(--green-tint)`, `--rush-bad/-tint → var(--error)/
-(--error-tint)`, motion ease `cubic-bezier(.23,1,.32,1)`. Both themes come for free
-via the shared `localStorage['theme']` key and the shared anti-flash bootstrap.
+### Сигналы
 
-- **Documented exception to the Signal-Color Lockbox — the time bar.** The 8px
-  time track re-colors by remaining time: raspberry (normal) → amber `var(--amber)`
-  (<15 s) → red `var(--error)` with a slow pulse (<7 s). This borrows the amber
-  signal hue for something other than difficulty stars — allowed HERE ONLY because
-  the bar encodes timer semantics (urgency), is unique on screen, never appears on
-  learning surfaces, and is always paired with the numeric timer (no color-only
-  encoding). Do not copy this pattern elsewhere.
-- **Key badges (kbd style):** each answer button carries a 26px square badge
-  `1`–`5` — `--surface-2` fill, `--border` outline with a 2px bottom edge
-  (keycap look), `--text3` label. Hidden on touch (`hover: none`) and under 720px.
-  Hover of the whole option = raspberry border + `--accent-tint` wash; correct =
-  green tint + green border; wrong = red tint + shake, correct option outlined
-  green. Green/red here are true semantic verdicts — not decoration.
-- **Layout:** game scene max 760px, question card on `--surface`, radius 16,
-  card-hover shadow from the vocabulary; options grid 2×2 (odd last option spans
-  full width), one column on mobile. Final screen: two columns ~880px
-  (score + 2×2 stats | «Разобрать ошибки» list), stacked on mobile.
-- **Motion:** all under ~500 ms with the calc2 ease; «+6 с» chip flies to the
-  time bar (~450 ms), wrong answer shakes 300 ms + brief red vignette, next
-  question slides up ~500 ms, combo badge pulses on ×2/×3/×4 thresholds; canvas
-  confetti ~1.5 s only on a new personal record. Everything collapses to instant
-  swaps under `prefers-reduced-motion`.
+Четыре семейства, каждое по схеме «основной + `-tint` + `-border`».
+У амбера дополнительно `-ink` — затемнённый вариант для текста.
+
+| Семейство | Токены | Значение |
+|---|---|---|
+| зелёный | `--green #1d7e45` / `#3fc77f`, `--green-tint`, `--green-border` | верно, решение есть, освоено |
+| амбер | `--amber #b26b00` / `#f5a623`, `--amber-ink #8a5200` / `#ffc25e`, `--amber-tint`, `--amber-border` | сложность, частично, требует внимания |
+| ошибка | `--error #c0392b` / `#ff6b6b`, `--error-tint`, `--error-border`, `--on-error #ffffff` / `#14181f` | неверно, просрочено, ошибка ввода |
+| ожидание | `--pending #43566f` / `#a8bcd6`, `--pending-tint`, `--pending-border` | ждёт проверки, никто не сдал |
+
+Плюс нейтральная пилюля: `--chip-bg`, `--chip-text`. Плюс `--num-line` — подчёркивание
+числового поля. Плюс `--fade-edge` — край затухания у прокручиваемого блока.
+
+### Правило 1.1.1 — текст на сплошной акцентной заливке
+
+**Пометка: ДОСТРОЕНО.**
+**Правило.** Текст на сплошном `--accent` окрашивается только в `var(--act-ink-solid)`.
+Жёсткий `#fff` запрещён.
+**Почему.** В светлой теме белый на `#BE185D` даёт 6 : 1 — норма. В тёмной теме тот же
+белый на `#FF4D94` даёт **3,12 : 1** — ниже порога AA 4,5. Токен под эту задачу уже
+заведён и в тёмной теме содержит тёмный цвет.
+**Границы.** На тинте (`--accent-tint`) текст остаётся `--accent` — там контраст в норме.
+**Проверить.** В тёмной теме ни один элемент с `background-color: var(--accent)` не имеет
+`color: #fff` / `rgb(255,255,255)`. Сейчас нарушают шесть: плитка логотипа, активная
+кнопка периода, номер шага конструктора, активная страница пагинации, выбранная оценка
+сложности, выбранный пресет балла.
+**Доказательство, что механизм рабочий:** красный бейдж `.k-count` в тёмной теме
+использует `--on-error` и норму проходит. У акцента — ровно такой же токен.
+
+### Правило 1.1.2 — три значения сигнальных цветов
+
+**Пометка: ДОСТРОЕНО** (правило записано впервые, поведение снято).
+**Правило.** Зелёный, амбер и красный имеют ровно три разрешённых значения и никаких
+других:
+
+| Поверхность | Что означают |
+|---|---|
+| учебная (задача, разбор, ярлык) | зелёный — верно / есть решение; амбер — сложность / частично; красный — неверно |
+| статистическая (шкала, матрица, пилюля показателя) | **уровень освоения**: зелёный — хорошо, амбер — средне, красный — плохо |
+| ввод | красный — ошибка ввода |
+
+**Почему.** Третье значение уже используется (`.tp-fill--*`, `.k-level--*`,
+`.matrix-cell`, `.mastery`) и читается. Но пока оно не записано, следующий экран возьмёт
+те же цвета для чего-то четвёртого.
+**Границы.** Для украшения, наведения и выделения эти три цвета не берутся никогда.
+**Проверить.** Любое употребление зелёного/амбера/красного должно попадать в одну из трёх
+строк таблицы.
+
+### Правило 1.1.3 — цвет никогда не единственный носитель
+
+**Пометка: СНЯТО.**
+**Правило.** Каждый цветной признак сопровождается вторым носителем — глифом или словом.
+**Примеры с платформы.** `★ 2` — амбер и звезда. `✓ решение` — зелёный и галочка.
+`↑ 3,7 п.п.` — зелёный и стрелка. `ВЕРНО` — зелёный тинт и слово.
+`— / никто не сдал` — прочерк и фраза.
+**Проверить.** Убрать цвет — смысл должен остаться читаемым.
+
+---
+
+## 1.2 Кегль и вес
+
+**Пометка: СПОР** (платформа использует 10 сочетаний на одном экране и не имеет шкалы).
+
+Семейство одно на весь интерфейс:
+`-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`. Математика — KaTeX.
+
+### Шкала текста
+
+| Кегль/вес | Роль | Снято с |
+|---|---|---|
+| **11 / 600**, uppercase, `ls .05em`, `--text2` | служебная метка: заголовок столбца, подпись блока внутри карточки | `.no-sort`, `.rv-box-cap`, `.k-kind` |
+| **11 / 400**, `--text3` | подпись под числом, единица, мелкая сноска | `.k-score__cap`, `.summary-label`, `.cap` |
+| **12 / 400**, `--text2` | второстепенный текст: метаданные, объяснение под полем, подсказка панели | `.field-hint`, `.k-hint`, `.panel-hint`, `.k-quiet` |
+| **12 / 600**, `--text2` | метка поля, заголовок группы в списке | `.k-label`, `.ass-group-title` |
+| **13 / 400** | основной интерфейсный текст: строка таблицы, крошки, подпись | `.crumbs`, `.stats-table`, `.tp-name` |
+| **13 / 500** | текст элемента управления: кнопка, вкладка, ссылка-раскрытие | `.k-btn`, `.tabs a`, `.k-disc` |
+| **13 / 600** | активный элемент управления | `.wk-rail__s.is-on`, `.wk-tab.is-on` |
+| **14 / 400**, lh 1.7 | содержательный текст: условие задачи, ответ ученика, вариант теста | `.rv-statement`, `.opt-body`, `.wr-mine` |
+| **14 / 600** | название позиции в списке задач | `.problem-title-text`, `.wr-title`, `.ass-name` |
+| **15 / 600** | название объекта в списке (работа, ученик) | `.stu-name`, `.hw-name` |
+| **15 / 700** | заголовок блока или панели | `.panel-title`, `.rv-grade-title` |
+| **22 / 600** | заголовок страницы | `.page-title` в кабинете преподавателя |
+
+**Что исключено из шкалы:**
+
+| Значение | Где встречается | Куда сводится |
+|---|---|---|
+| 10 / 700 | `.kind-badge`, `.mastery` | **11 / 600** — 10px ниже комфортного минимума |
+| 16 | `.summary-value`, `.wr-points` | это числа → числовая шкала, 1.2.2 |
+| 17 / 700 | `.avatar` | **13 / 700** для 32px, **17 / 700** оставлено только для аватара 44px |
+| 20 / 700, 22 / 700, 24 / 700 | заголовки страниц у ученика и в статистике | **22 / 600** |
+| 12 / 500, 11 / 500, 11 / 700 | три вида пилюли | **11 / 600**, кроме `.k-flag` — см. ниже |
+
+**Исключение для `.k-flag`.** Ярлык-вердикт («ВЕРНО», «ЖДЁТ ПРОВЕРКИ», «БЕЗ ОТВЕТА») —
+**11 / 700** uppercase. Он единственный набирается семисотым: это приговор, а не
+структурная подпись.
+
+**Кегль 10px разрешён ровно в одном месте** — глиф «?» внутри кружка подсказки
+`.k-hintmark` 15×15. Это знак, а не текст.
+
+### 1.2.2 Числовая шкала
+
+**Пометка: СПОР** (платформа использует 13/700, 16/800, 19/700, 20/800, 26/700, 26/800,
+28/600, 56/800).
+
+Число — самостоятельный объект, у него своя шкала из трёх ступеней:
+
+| Кегль/вес | Роль | Пример |
+|---|---|---|
+| **как у строки, вес 700**, `tabular-nums` | число внутри строки таблицы или ряда | «38%», «0 / 3 б.» |
+| **26 / 700**, `tabular-nums` | число в карточке-показателе, редактируемый балл | «47%», «828», балл за позицию |
+| **56 / 800**, `ls -.02em`, `tabular-nums` | итог экрана, **одно число на экран** | «5 из 5» |
+
+**Обязательно во всех трёх:** `font-variant-numeric: tabular-nums`.
+**Почему.** Столбец чисел читают вертикально; пропорциональные цифры ломают колонку.
+
+### 1.2.3 Спутники числа
+
+**Пометка: СНЯТО** — лучший приём в системе, переносится дословно.
+
+Предлог и предел набираются **относительным кеглем от числа**, а не в пикселях:
+
+```
+«из»       0.46em, вес 700, цвет --text2
+максимум   0.52em, вес 700, цвет --text2
+подпись    11px / 400, цвет --text3, строкой ниже
+```
+
+**Почему em, а не px.** Один и тот же приём работает на 26px и на 56px — пропорция
+сохраняется без второго набора правил. Предлог мельче числа, потому что он служебный.
+**Проверить.** «5 из 5» при кегле 56 даёт «из» ≈ 25,8px и «5» ≈ 29,1px.
+
+### 1.2.4 KaTeX
+
+**Пометка: СНЯТО.**
+Формула набирается **на 21 % крупнее** окружающего текста: при базовых 15px KaTeX
+рендерится в 18,15px.
+**Почему.** Формула с индексами и дробями при равном кегле читается мельче текста.
+**Проверить.** `getComputedStyle(.katex).fontSize / getComputedStyle(родитель).fontSize ≈ 1.21`
+
+---
+
+## 1.3 Межстрочный интервал
+
+**Пометка: СПОР** (платформа задаёт 13 разных значений, а чаще всего — вообще не задаёт).
+
+| Значение | Где |
+|---|---|
+| **1.7** | текст, в котором бывают формулы: условие задачи, разбор, ответ ученика |
+| **1.6** | обычный многострочный текст: плашки, объяснения, комментарии, поле-многострочник |
+| **1.35** | заголовок, который может занять две строки |
+| **1.2** | однострочный элемент управления: кнопка, чип, вкладка |
+| **1.1** | крупное число |
+
+**Жёсткий низ.** Для текста с формулами интервал **не опускается ниже 1.55** ни при
+каких условиях. Правило снято с платформы (`.problem-statement` 1.65, `.rv-statement`
+1.75) и там же названо: тесная выключка превращает дробь в грязь.
+
+**Что исправлено:** `.k-chip` сейчас имеет 1.7 при одной строке — это шум, канон 1.2.
+
+**Проверить.** Ни один текстовый блок не имеет `line-height: normal`, если в нём больше
+одной строки.
+
+---
+
+## 1.4 Отступы
+
+**Пометка: СПОР** (платформа использует 22 разных значения).
+
+Единой шкалы у платформы нет и не будет: у мелкого элемента и у панели разная логика.
+Поэтому три коротких списка по роли. **Новое значение не изобретать — брать ближайшее
+из списка.**
+
+### Внутри мелкого элемента (кнопка, поле, чип, ячейка)
+```
+2 · 4 · 5 · 6 · 8 · 10 · 11 · 12 · 14 · 16
+```
+Примеры: чип `2px 9px`; кнопка `8px 16px`; мелкая кнопка `5px 11px`; поле `8px 10px`;
+ячейка матрицы `5px 4px`.
+
+### Внутри карточки или панели
+```
+12 · 14 · 16 · 18 · 20 · 22 · 24
+```
+Примеры: карточка-элемент `18px 20px`; крупная панель `20px 22px`;
+плитка `13px 15px` → **`12px 16px`**; плашка состояния `12px 14px`.
+
+### Между блоками
+```
+8 · 10 · 12 · 14 · 20 · 22 · 24 · 28 · 32
+```
+Примеры: между карточками списка `10`; сетка карточек `12`–`14`;
+над разделителем `20`–`28`; перед строкой отправки `32`.
+
+**Исключено:** 7, 9, 13, 15, 26, 36. Это одиночные значения, встречающиеся по одному разу.
+
+**Поля страницы.** `36px 24px 80px` — верх, бока, низ. Снято, менять не нужно:
+нижние 80px оставляют воздух под последним блоком и под липкой панелью.
+
+---
+
+## 1.5 Скругления
+
+**Пометка: СПОР** (платформа использует 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 20, 999).
+
+**Новые переменные** — здесь они окупаются: значений мало, употребление массовое,
+калькулятор будет брать те же.
+
+```css
+--r-sm:    4px;    /* ячейка матрицы, день тепловой карты, образец легенды */
+--r:       6px;    /* поле, кнопка, мелкий блок — УЖЕ ЕСТЬ в _tokens.html */
+--r-card: 10px;    /* карточка-элемент */
+--r-panel:12px;    /* крупная панель, липкая нижняя полоса */
+--r-pill: 999px;   /* пилюля, кружок, сегмент */
+```
+
+**Сведение:** 2, 3, 5 → `--r-sm`; 7, 8 → `--r`; 11 → `--r-card`; 20 → `--r-pill`.
+
+**Правило вложенности.** Внутри `--r-panel` лежит `--r-card`, внутри него `--r` или
+`--r-sm`. Скругление уменьшается вглубь, никогда не растёт.
+
+**Проверить.** Ни одного `border-radius` вне пяти значений.
+
+---
+
+## 1.6 Линии и полосы
+
+**Пометка: СПОР.**
+
+### Граница поверхности
+
+```css
+--line: 1px;
+```
+
+Платформа использует и `0.5px` (набор), и `1px` (страничные карточки), и `1.5px`
+(чекбокс). Канон — **1px**.
+**Почему.** `0.5px` на экране без удвоенной плотности не рисуется как половина пикселя:
+браузер сглаживает его в бледную и непредсказуемую линию. На маке разработчика видно
+одно, на ноутбуке ученика — другое.
+**Границы.** Чекбокс и радиокнопка сохраняют `1.5px` — это единственная граница,
+которая несёт состояние и должна быть заметнее.
+
+### Полоса слева
+
+Три толщины с разным смыслом. Это настоящая система, сохраняется как есть:
+
+```css
+--stripe-thin:   2px;   /* строка в ленте «требуют внимания» */
+--stripe:        3px;   /* принадлежность и тип: контрольная, тип задачи, вид плашки */
+--stripe-strong: 4px;   /* состояние проверки: верно / частично / неверно / ждёт / следующий */
+```
+
+**Правило одной полосы.** На одном крае элемента — одна полоса. Если край занят
+состоянием (`--stripe-strong`), тип говорит чипом, а не второй полосой.
+**Проверить.** Ни один элемент не имеет одновременно `border-left` и вложенный элемент
+с `border-left` на том же крае.
+
+**Отдельно:** плашка «Оценивание» на проверке решения несёт полосу **сверху**, а не слева.
+Это единственный такой случай; он оправдан — блок стоит последним и полоса сверху
+отделяет его от содержания. Не тиражировать.
+
+---
+
+## 1.7 Тени
+
+**Пометка: СНЯТО + СПОР.**
+
+```css
+--shadow-pop: 0 6px 20px rgba(0,0,0,.14);   /* всплывающее: подсказка, меню */
+```
+
+**Правило.** У поверхности в покое тени нет. У поверхности под курсором тени тоже нет —
+меняются рамка и фон. Тень появляется только у того, что физически висит над страницей.
+
+**Что исправлено:** `.hw-card:hover` в кабинете ученика добавляет
+`0 2px 8px rgba(0,0,0,.08)`. Это единственная тень при наведении на сайте — убрать,
+привести к смене рамки и фона, как в `.k-tile` и `.row-link`.
+
+**Проверить.** `box-shadow` встречается только у всплывающих элементов и у колец фокуса.
+
+---
+
+## 1.8 Движение
+
+**Пометка: СПОР** (платформа использует .12s, .14s, .18s, .2s).
+
+```css
+--t:      .12s;   /* смена цвета, рамки, фона у элемента управления */
+--t-slow: .2s;    /* переключение темы, появление и исчезание крупного блока */
+```
+
+Функция сглаживания интерфейсных переходов — `ease`. Платформа не использует
+собственную кривую, и заводить её не нужно.
+
+**Единственный физический жест** — `translateY(1px)` при нажатии кнопки. Других
+смещений, увеличений и подпрыгиваний нет.
+
+### Правило 1.8.1 — отключение движения
+
+**Пометка: ДОСТРОЕНО.**
+**Правило.** Блок `@media (prefers-reduced-motion: reduce)` покрывает **все** переходы,
+а не выборочные.
+**Почему.** Сейчас он покрывает четыре класса, а кнопки, поля, карточки и переключение
+темы в него не попали — то есть настройка операционной системы игнорируется.
+**Проверить.** Внутри медиазапроса стоит правило на `*` либо перечислены все классы
+с `transition`.
+
+**Граница для calc2.** Собственное движение графики (появление кривых, перестроение сцены)
+сохраняет свою кривую `cubic-bezier(.23,1,.32,1)` и свои длительности до 300 мс. Правило
+`--t` относится только к элементам управления.
+
+---
+
+## 1.9 Ширина полосы контента и точки перелома
+
+**Пометка: СПОР.**
+
+```css
+--w-page: 960px;   /* обычная страница */
+--w-read: 860px;   /* страница, где основное содержание — длинный текст с формулами */
+```
+
+Платформа использует 960 в кабинете преподавателя и статистике, 860 — в кабинете ученика.
+Оба значения осмысленны: 860 короче строка, легче читать условие задачи.
+
+**Одиночная карточка на пустой странице** — 520–620px, задаётся компоненту, не странице.
+
+### Точки перелома
+
+```
+560px   → одноколоночная раскладка, сетки схлопываются
+760px   → двухколоночные экраны становятся одноколоночными
+```
+
+Платформа использует четыре: 480, 520, 560, 760. Значения 480 и 520 сводятся к 560.
+
+### Правило 1.9.1 — горизонтальная прокрутка
+
+**Пометка: ДОСТРОЕНО** (приём снят с платформы, правило записано впервые).
+**Правило.** Страница не прокручивается вбок никогда. Блок, который шире окна,
+прокручивается **внутри своей рамки**.
+**Как.** Обёртка `.fade-box`: скрывает полосу прокрутки, рисует градиент затухания 56px
+у горизонтального края (40px у вертикального), гасит его классами `is-start` / `is-end`,
+`transition .18s`. Фокус внутри — `outline 2px var(--focus)` со смещением **внутрь**
+(`outline-offset: -2px`), чтобы кольцо не обрезалось краем.
+**Почему.** Когда вбок едет вся страница, липкая шапка обрывается на ширине окна и
+последние пункты навигации оказываются серым по светло-серому.
+**Проверить.** `document.documentElement.scrollWidth <= clientWidth` на любой ширине
+от 360px. Сейчас нарушается на всех страницах из-за навигации: при окне 606px содержимое
+шапки занимает 878px.
+
+---
+
+## 1.10 Новые переменные — сводка
+
+Всего добавляется **одиннадцать**. Все — размерные, ни одна не меняется по темам,
+поэтому объявляются один раз в `:root` и в блок `[data-theme="dark"]` не попадают.
+
+```css
+/* скругления */
+--r-sm:    4px;
+--r:       6px;    /* уже есть */
+--r-card: 10px;
+--r-panel:12px;
+--r-pill: 999px;
+
+/* линии */
+--line:          1px;
+--stripe-thin:   2px;
+--stripe:        3px;
+--stripe-strong: 4px;
+
+/* движение */
+--t:      .12s;
+--t-slow: .2s;
+
+/* ширина полосы */
+--w-page: 960px;
+--w-read: 860px;
+
+/* тень */
+--shadow-pop: 0 6px 20px rgba(0,0,0,.14);
+```
+
+Кегли, отступы и межстрочные переменными **не оформляются**. Причина: переменная нужна,
+когда значение меняется на лету — как цвет между темами. Размеры не меняются ни от чего,
+а замена двух тысяч чисел на имена делает код менее читаемым и ничего не даёт взамен.
+Вместо этого — списки разрешённых значений и тест.
+
+---
+
+## 1.11 Что здесь достроено — список для проверки
+
+Всё остальное снято с платформы. Проверять стоит именно эти семнадцать решений:
+
+**Новые правила (не было вообще):**
+1. Текст на сплошном акценте — только `--act-ink-solid` (1.1.1).
+2. Три значения сигнальных цветов записаны явно (1.1.2).
+3. `prefers-reduced-motion` покрывает все переходы (1.8.1).
+4. Страница не прокручивается вбок; широкий блок едет внутри рамки (1.9.1).
+5. Скругление уменьшается вглубь вложенности (1.5).
+6. На одном крае элемента — одна полоса (1.6).
+
+**Выбор из существующего (было по-разному):**
+7. Заголовок страницы — 22/600, а не 24/700, 22/700 или 20/700.
+8. Минимальный кегль текста — 11px; 10px только для глифа «?».
+9. Ярлык-пилюля — 11/600, кроме вердикта `.k-flag` (11/700 uppercase).
+10. Трекинг капслока — 0.05em, а не 0.08em.
+11. Числовая шкала — три ступени: кегль строки / 26 / 56, вес 700–800.
+12. Крупный редактируемый балл — 26/700, а не 28/600.
+13. Межстрочные — пять значений вместо тринадцати.
+14. Скругления — пять значений вместо двенадцати.
+15. Граница поверхности — 1px, а не 0.5px.
+16. Точки перелома — две вместо четырёх.
+17. Тени при наведении нет; отличие даёт рамка и фон.
+
+**Ни одно из семнадцати не вводит на сайт того, чего там нет.** Каждое либо выбирает
+из уже существующих вариантов, либо распространяет приём, который платформа уже
+применяет в одном месте, на все остальные.
+
+---
+
+---
+
+## Часть 2. Механизмы
+
+Главная часть документа. Здесь не «как это выглядит», а **как это работает**: как вводится
+число, как сообщается ошибка, как выключается кнопка, как объясняется смысл. Значения
+прилагаются к механизмам, а не наоборот.
+
+Семнадцать статей в шести группах:
+
+| Группа | Статьи |
+|---|---|
+| A. Числа | 2.1 запись · 2.2 показ · 2.3 отсутствие |
+| B. Обратная связь | 2.4 ошибка ввода · 2.5 состояние · 2.6 требует действия · 2.7 выключенная кнопка |
+| C. Необратимость и сохранность | 2.8 подтверждение · 2.9 сохранение |
+| D. Объяснение | 2.10 раскрытие · 2.11 смысл · 2.12 чужой взгляд · 2.13 предварительный результат |
+| E. Состояния интерфейса | 2.14 активное · 2.15 фокус |
+| F. Объём | 2.16 длинный список · 2.17 многошаговый процесс |
+
+Ссылки вида «корень N» — на десять первопричин из аудита вкладки «Графики».
+
+---
+
+# A. Числа
+
+## 2.1 Как записывается число
+
+**Пометка: СНЯТО** (проверка решения, `/teacher/groups/*/submissions/*/`).
+**Применимо к calc2: да** — корень 4, все поля параметров сцен.
+
+**Правило.** Частые значения предлагаются кнопками; редкое вписывается в подчёркнутую
+строку рядом; предел показан тихим текстом ещё до ошибки. Кнопки и поле — **одно
+значение**, а не два независимых элемента управления.
+
+```
+[ 0 ][ 0,5 ][ 1 ]   своё  ‾2‾  из 1
+ └── пресеты ──┘          └поле┘ └предел┘
+```
+
+**Значения.**
+
+Сегмент пресетов:
+```
+рамка var(--line), радиус var(--r), кнопка 15/700, tabular-nums, padding 9px 18px
+активная — сплошной var(--accent), текст var(--act-ink-solid)
+```
+
+Поле-полосочка `.k-num`:
+```
+рамки нет, кроме border-bottom: var(--line) dashed var(--num-line)
+border-radius: 0
+padding: 14px 5px 6px      min-height: 44px
+width: 46 / 64 / 92px      по ожидаемой длине значения
+font-weight: 600           font-variant-numeric: tabular-nums
+background: transparent
+type="text" с атрибутами min и max
+appearance: textfield + ::-webkit-*-spin-button { appearance: none }
+```
+
+Состояния поля:
+```
+:hover  → border-bottom-color: var(--accent); background: var(--accent-tint)
+:focus  → border-bottom: 2px solid var(--accent); padding-bottom: 5px; 
+          background: transparent; color: var(--accent-deep)
+```
+`padding-bottom` уменьшается на 1px ровно настолько, насколько утолщается линия —
+поэтому текст не прыгает.
+
+Единица и предел — отдельным элементом: 13/400, `var(--text2)`.
+
+**Границы.** Пресеты имеют смысл, когда типовых значений 2–4. Больше — только поле.
+Поле-коробка (`.k-input`) остаётся для текста и для чисел внутри анкеты; полосочка —
+для числа, которое живёт внутри фразы.
+
+**Почему.** Число в тексте — не поле формы. Прямоугольная рамка вокруг него превращает
+фразу в анкету. `type="text"` вместо `number` — потому что `number` в русской раскладке
+теряет «0,5» с запятой и рисует браузерные стрелки, которые всё равно приходится гасить.
+
+**Проверить.** Ввести значение вне диапазона → у поля появляется класс `k-num--bad`,
+высота строки не изменилась. Ввести «0,5» → значение принято. Стрелок нет.
+
+---
+
+## 2.2 Как показывается число
+
+**Пометка: СНЯТО.**
+**Применимо к calc2: да** — корень 4.
+
+**Правило.** У числа три ступени кегля (1.2.2). Спутники задаются в `em`, а не в пикселях.
+`tabular-nums` — всегда. Сравнительное число мельче и тише основного, после косой черты.
+Единица — отдельный элемент, не часть числа.
+
+**Значения.**
+
+Число с пределом:
+```
+число        56/800, ls -.02em, tabular-nums
+«из»         0.46em, вес 700, var(--text2)
+максимум     0.52em, вес 700, var(--text2)
+подпись      11/400, var(--text3), строкой ниже
+```
+
+Пара «своё / чужое» (`.k-pair`):
+```
+своё         26/700, var(--text),  tabular-nums
+косая        26/700, var(--text3)
+чужое        20/700, var(--text2), tabular-nums
+gap 7px, выравнивание по базовой линии
+```
+
+**Границы.** Единица не крупнее `0.55em` от числа. Запись вида «358 мин», где единица
+равна числу по кеглю и весу, — так не делать.
+
+**Почему.** Колонку чисел читают вертикально: пропорциональные цифры её ломают.
+Спутник одного кегля с числом отбирает у него внимание. `em` вместо пикселей — чтобы
+один приём работал и на 26px, и на 56px без второго набора правил.
+
+**Проверить.** У каждого числа крупнее строки — `font-variant-numeric: tabular-nums`.
+При кегле 56 «из» ≈ 25,8px, максимум ≈ 29,1px.
+
+---
+
+## 2.3 Как показывается отсутствие
+
+**Пометка: СНЯТО** (история работ, разбор, результаты контрольной).
+**Применимо к calc2: да.**
+
+**Правило.** Пустота называется словами, и слова различают **разные** пустоты.
+
+**Значения.** Пять случаев, снятых с платформы:
+
+| Случай | Как показано | Стиль |
+|---|---|---|
+| величина неприменима | «нет задач», «нет тестов» | 12/400 `--text3` |
+| величина неизвестна | «—» **в той же геометрии, что число** | цвет `--text3`, ширина сохраняется |
+| действие не совершено | «никто не сдал», «ответа нет», «ничего не отмечено», «эталон не задан», «балл не поставлен» | 11/400–12/400 или пилюля `--pending-tint` |
+| срок не задан | «без срока» | 13/400 `--text2` |
+| пуста вся строка | одна фраза во всю ширину строки вместо ряда пустых ячеек: «не приступал» | 12/400 `--text2` |
+
+**Границы.** Ноль — это значение, а не пустота: «0 из 3» пишется числом. Прочерк ставится
+только там, где величины нет.
+
+**Почему.** Прочерк не отличает «нечего мерить» от «не сделано». Человек достраивает
+худшее из двух.
+
+**Проверить.** На экране нет ячейки, где пусто без слова. Элемент «—» сохраняет ширину
+и высоту числа, которое он заменяет (`.k-score__value--none` — 62px), поэтому колонка
+не разъезжается.
+
+---
+
+# B. Обратная связь
+
+## 2.4 Как сообщается ошибка ввода
+
+**Пометка: СНЯТО** (проверено вводом: значение 7 при максимуме 1).
+**Применимо к calc2: да** — корень 6.
+
+**Правило.** Три носителя одновременно: линия, цвет текста, фраза. Фраза называет
+**границу**, а не факт ошибки, и встаёт **в ту же строку**, а не под полем.
+
+**Значения.**
+```
+.k-num--bad → border-bottom: 2px solid var(--error)
+              color: var(--error)
+              держится и при :hover, и при :focus
+.k-num__why → 12px, var(--error), скрывается атрибутом hidden
+              при размещении блоком — margin-top: 2px
+```
+Пресеты при ручном вводе теряют выделение: значение одно.
+
+**Границы.** Фраза говорит требование («не больше 1»), а не диагноз («неверное
+значение»). Ошибка не блокирует ввод — поле принимает символы, значение помечено.
+
+**Почему.** Фраза под полем сдвигает всё, что ниже, и человек теряет место, где смотрел.
+В той же строке — не сдвигает. Требование можно выполнить, диагноз — нет.
+
+**Проверить.** Класс, цвет и фраза появляются вместе. Высота контейнера до и после
+ошибки одинаковая.
+
+---
+
+## 2.5 Как показывается состояние
+
+**Пометка: СНЯТО** — сформулировано в `/teacher/styleguide/`.
+**Применимо к calc2: да** — корень 8.
+
+**Правило.** Тонкая цветная полоса слева и значок. **Панель целиком не заливается.**
+
+**Значения.**
+```
+.k-state    background: var(--surface-2)
+            border-left: var(--stripe) solid <цвет семейства>
+            border-radius: 0 var(--r) var(--r) 0
+            padding: 12px 14px;  font: 13px/1.6;  gap: 10px
+  __icon    колонка 16px, вес 700, цвет семейства, выравнивание по центру
+  __title   вес 600, margin-bottom 2px
+  __note    12/400, var(--text2)
+--warn / --ok / --bad меняют ТОЛЬКО цвет полосы и значка
+```
+
+**Границы.** Цветная заливка панели допустима у сообщения об операции (`.messages`) —
+оно живёт секунду и исчезает. У постоянного состояния — нет.
+
+**Почему** (цитата из стайлгайда): «залитая цветом панель читается как ошибка, даже когда
+это обычное рабочее состояние».
+
+**Проверить.** Ни одна плашка постоянного состояния не имеет `background` из семейства
+`*-tint`.
+
+---
+
+## 2.6 Как показывается «требует действия»
+
+**Пометка: СНЯТО** (вкладка «Задания»).
+**Применимо к calc2: да** — корень 8.
+
+**Правило.** Громкость блока равна тому, требуется ли от человека действие.
+
+**Значения.** Три ступени:
+
+| Состояние | Поверхность | Полоса | Справа |
+|---|---|---|---|
+| требует действия | `--surface` (белая) | `--stripe-strong`, цвет состояния | **кнопка** `.k-btn--main` |
+| в процессе | `--surface-2` (серая) | нейтральная | тихий текст, кнопки нет |
+| завершено | `--surface-2` | цвет итога | число, кнопки нет |
+
+Плюс правило стайлгайда: **главная кнопка — одна на экран.** Если требующих действия
+несколько, главная кнопка стоит у следующего по очереди, остальные получают `--plain`.
+Следующий помечен полосой `.k-mark--next` акцентом **и подписью словом**
+(«следующий на проверку», 12/600 акцентом).
+
+**Границы.** «Тише» — это поверхность и отсутствие кнопки, а не прозрачность.
+Гашение через `opacity` не применять: оно делает текст нечитаемым, а не второстепенным.
+
+**Почему.** Экран, где десять блоков кричат одинаково, не даёт точки входа — человек
+начинает с верхнего, а не с нужного.
+
+**Проверить.** На экране ровно одна `.k-btn--main`. Ни один блок не гасится `opacity`.
+
+---
+
+## 2.7 Как выключается кнопка
+
+**Пометка: СНЯТО** (конструктор, все три шага).
+**Применимо к calc2: да.**
+
+**Правило.** Рядом с выключенной кнопкой стоит фраза, называющая недостающее условие.
+
+**Значения.**
+```
+.is-off  opacity: .45; cursor: default; pointer-events: none
+причина  12/400, var(--text3), слева от кнопки, в той же строке
+```
+Примеры с платформы: «Добавьте хотя бы одну задачу.», «Впишите название.»
+
+**Границы.** Фраза говорит, **что сделать**, а не что не так. Не «поле не заполнено»,
+а «впишите название».
+
+**Почему.** Выключенная кнопка без объяснения — тупик: человек видит, что дальше нельзя,
+и не знает, чего ему не хватает.
+
+**Проверить.** У каждой `.is-off` и `:disabled` есть видимый сосед с текстом.
+
+---
+
+# C. Необратимость и сохранность
+
+## 2.8 Как подтверждается необратимое
+
+**Пометка: СНЯТО** (старт и завершение контрольной).
+**Применимо к calc2: частично** — сброс сцены, очистка, экспорт поверх файла.
+
+**Правило.** Три слоя: объяснение последствий **до** действия, обычная кнопка, тихое
+примечание рядом с ней.
+
+**Значения.**
+```
+плашка     background: var(--amber-tint); border: var(--line) solid var(--amber-border)
+           border-radius: var(--r); padding: 12px 14px; font: 13px/1.6
+           начинается со знака «⏱» или «!»
+кнопка     обычная главная (графит) — НЕ красная и НЕ акцентная
+примечание 12/400 или 15/400, var(--text2), справа от кнопки
+```
+
+Образец текста с платформы:
+> ⏱ После старта таймер остановить нельзя — он идёт на сервере и не зависит от вашего
+> устройства. Ответы сохраняются сами, но время идёт, даже если закрыть вкладку.
+>
+> **[ Начать ]**  на решение — 60 мин
+
+**Границы.** Диалог подтверждения — отдельный слой поверх этих трёх. Платформа сейчас
+использует нативный `window.confirm()`. **Для calc2 нативный диалог не применять:**
+он замораживает вкладку целиком и выглядит чужим на странице.
+
+**Почему.** Предупреждение до действия человек читает. Предупреждение в момент действия
+он проматывает, потому что уже решил.
+
+**Проверить.** Перед каждым необратимым действием на экране есть текст, называющий
+последствие, а не только слово «внимание».
+
+---
+
+## 2.9 Как сохраняется работа
+
+**Пометка: СНЯТО** (контрольная в процессе).
+**Применимо к calc2: да** — корень 5.
+
+**Правило.** Одно изменение отражается на всех уровнях сразу: в самом элементе,
+в его контейнере, в навигации и в общем счётчике. Плюс отдельный индикатор надёжности.
+
+**Значения.** Снято с контрольной — ввод одного символа меняет пять вещей:
+
+| Уровень | Что происходит |
+|---|---|
+| поле | значение |
+| задача | ярлык «Не начата» → «В работе» |
+| навигация | плитка задачи получает `.is-answered` |
+| работа целиком | счётчик «отвечено 0 из 4» → «1 из 4» |
+| надёжность | `.save-state`: «сохраняем…» → «сохранено» |
+
+```
+дебаунс сохранения        2000 мс после остановки ввода
+сверка с сервером         отдельный лёгкий запрос раз в 15 000 мс
+.save-state               12/400, var(--text2)
+                          три состояния: сохраняем… / сохранено / пробуем отправить
+счётчик                   число полужирным внутри фразы
+```
+
+**Границы.** Если автосохранения нет — предупреждение при уходе со страницы обязательно.
+Третьего варианта («ни того, ни другого») быть не должно. Сейчас так ведёт себя домашка:
+теряет набранный текст молча.
+
+**Почему.** Без отклика человек не знает, услышала ли его система, и переспрашивает
+действием — повторяет ввод, обновляет страницу, нажимает второй раз.
+
+**Проверить.** Ввод символа меняет минимум два индикатора помимо самого поля. Индикатор
+сохранения хотя бы на мгновение показывает промежуточное состояние, а не сразу «сохранено».
+
+---
+
+# D. Объяснение
+
+## 2.10 Как раскрывается подробность
+
+**Пометка: СПОР** — на платформе два визуально одинаковых механизма
+(`.k-disc` и `.k-details > summary` с четырьмя классами-синонимами).
+**Применимо к calc2: да** — корень 8.
+
+**Правило.** Один механизм: треугольник плюс подпись, цвет `--accent`, поворот
+треугольника на 90° при раскрытии.
+
+**Значения.**
+```
+13/500, var(--accent), padding: 6px 0, gap: 5px
+треугольник 10px, transition: transform .14s
+состояние — в aria-expanded
+:hover → var(--accent-deep)
+```
+
+**Границы.** Нативный `<details>` оставить там, где содержимое должно жить в DOM
+и находиться поиском браузера по странице.
+
+**Почему.** Два визуально одинаковых механизма на одном сайте — гарантия, что третий
+экран заведёт третий.
+
+**Проверить.** В CSS не более одного набора правил на раскрытие.
+
+---
+
+## 2.11 Как объясняется смысл
+
+**Пометка: СНЯТО.**
+**Применимо к calc2: да** — корень 10.
+
+**Правило.** Три уровня объяснения, каждый на своём месте и своей громкости.
+
+| Уровень | Где стоит | Что объясняет | Стиль |
+|---|---|---|---|
+| подзаголовок экрана | под заголовком | зачем этот экран | 13/400 `--text2` |
+| подпись у элемента | **после** элемента | как этим пользоваться | 12/400 `--text2`, `margin-top: 6px` |
+| знак «?» | рядом с числом | методику самого числа | 15×15 |
+
+**Значения знака.**
+```
+.k-hintmark  15×15, border-radius: var(--r-pill), 10/700, var(--text3)
+             background: var(--surface-2); border: var(--line) solid var(--border)
+             tabindex="0"  role="note"  data-hint="…"  aria-label="…"
+.k-tip       position: fixed; max-width: 260px; padding: 8px 11px; 12px/1.45
+             background: var(--surface-2); border: var(--line) solid var(--border)
+             border-radius: var(--r); box-shadow: var(--shadow-pop)
+             pointer-events: none
+```
+Показывается **сразу** — при наведении, при фокусе с клавиатуры и по нажатию
+на сенсорном экране.
+
+Образцы текста с платформы:
+> Первое число — по всем задачам, решённым на сайте. Второе — только по домашкам
+> и контрольным этой группы. Игра не входит ни в одно из них.
+
+> Наведитесь на шкалу — вместо процента покажет «верных / решено». Неполный балл идёт
+> с весом, поэтому доли бывают дробными: 8 баллов из 10 — это 0,8.
+
+**Границы.** «?» ставится там, где рядом стоят два числа и без пояснения непонятно, чем
+они отличаются (правило стайлгайда). На кнопки не ставится: назначение кнопки должно быть
+в её подписи. Нативный `title` браузера не используется нигде — он появляется с задержкой,
+не работает с клавиатуры и оформлен операционной системой.
+
+**Почему.** Объяснение, стоящее после элемента, не мешает тому, кто уже знает.
+Объяснение перед элементом читают все — включая тех, кому оно не нужно.
+
+**Проверить.** Ни одного атрибута `title` на интерактивных элементах. Каждая пара чисел
+рядом имеет «?».
+
+---
+
+## 2.12 Как показывается чужой взгляд
+
+**Пометка: СНЯТО** («глазами ученика»).
+**Применимо к calc2: частично** — режим «исходное состояние», предпросмотр печати.
+
+**Правило.** Экран, показывающий чужой или иной вид, начинается с плашки, называющей
+**четыре** вещи: чей это вид, что совпадает, что отличается, где обычный маршрут.
+
+**Образец с платформы:**
+> **Вы смотрите работу глазами ученика.** Пётр Иванов видит эту страницу ровно так же.
+> Задачи свёрнуты — раскройте нужную, чтобы поставить балл прямо здесь; сплошной поток
+> проверки живёт на **к решениям**.
+
+**Значения.** Геометрия `.k-state`, полоса `--stripe`, первая фраза полужирная,
+маршрут — ссылкой.
+
+**Почему.** Без такой плашки человек не понимает, правит он настоящее или смотрит копию,
+и боится трогать.
+
+**Проверить.** У каждого режима «как это выглядит для…» есть вводная плашка с четырьмя
+элементами.
+
+---
+
+## 2.13 Как показывается предварительный результат
+
+**Пометка: СНЯТО.**
+**Применимо к calc2: да** — корни 1 и 4: величины, зависящие от неточного ввода
+или недосчитанные.
+
+**Правило.** Неполное число никогда не показывается как готовое. Оговорка стоит
+**под числом**, а не в сноске, и дублируется плашкой.
+
+**Значения.**
+```
+крупное число                            56/800 со спутниками
+строка «чего не хватает»                 13/600            «(ещё 1 б. на проверке)»
+строка «на чём посчитано»                13/400 --text2    «по проверенным задачам»
+.k-prelim                                --amber-tint, рамка --amber-border,
+                                         var(--r), padding 10px 14px, 13px/1.6
+                                         начинается словами «Это предварительный результат»
+в строке списка                          прочерк вместо нуля + ярлык состояния
+```
+
+**Границы.** Оговорка — не мелкий шрифт под экраном. Она стоит там же, где число,
+и её нельзя пропустить, глядя на число.
+
+**Почему.** Число без оговорки становится фактом через секунду после того, как его
+увидели. Убрать этот факт из головы потом уже нельзя.
+
+**Проверить.** Каждое число, зависящее от незавершённого или приближённого, имеет
+соседнюю строку с оговоркой.
+
+---
+
+# E. Состояния интерфейса
+
+## 2.14 Как выглядит активное
+
+**Пометка: СПОР** — на платформе четыре языка.
+**Применимо к calc2: да.**
+
+**Правило.** Два языка выбора, разделённые по смыслу, плюс отдельный вид «где я сейчас».
+
+| Что | Как |
+|---|---|
+| **выбор из равноправных** — плитка, сегмент, шаг, страница пагинации, пресет | сплошная заливка `var(--accent)` + текст `var(--act-ink-solid)` |
+| **включённый фильтр или режим просмотра** | `var(--accent-tint)` + текст `var(--accent)` + рамка `var(--accent)` |
+| **где я сейчас** — вкладка, пункт навигации | подчёркивание 2px `var(--accent)` + текст `var(--accent)`; у неактивных подчёркивание прозрачное той же толщины |
+
+**Границы.** Четвёртого вида нет. Зелёный тинт у «отвеченной» плитки навигации в
+контрольной — это не «выбрано», а состояние выполнения, оно живёт по 2.5.
+
+**Почему.** Стайлгайд уже говорит, что заливка акцентом — редкость. Разделение по смыслу
+удерживает эту редкость: заливается только выбор из равных, а фильтров на экране обычно
+несколько.
+
+**Проверить.** Каждый элемент с `is-on` / `is-active` / `.active` попадает ровно в одну
+из трёх строк. У неактивной вкладки подчёркивание прозрачное, а не отсутствующее —
+иначе при переключении макет прыгает.
+
+---
+
+## 2.15 Как ведёт себя фокус
+
+**Пометка: СПОР** — на платформе три механизма плюс места, где кольцо погашено
+и ничем не заменено.
+**Применимо к calc2: да.**
+
+**Правило.** Один механизм на весь сайт — нейтральное кольцо.
+
+**Значения.**
+```
+:focus-visible → outline: 2px solid var(--focus)
+                 outline-offset: 2px
+                 border-radius: 3px
+внутри прокручиваемой рамки → outline-offset: -2px
+```
+
+**Границы.** Единственное исключение — `.k-num`: кольца нет, состояние несёт
+подчёркивание акцентом (2.1). Оправдано тем, что у поля нет рамки, и кольцо обвело бы
+пустоту вокруг цифры.
+
+**Почему.** Кольцо нейтральное, а не акцентное, потому что акцентная обводка при каждом
+клике даёт крупное акцентное пятно. Это решение команда уже приняла и записала в токенах
+(`--focus` — серо-синий, не малиновый).
+
+**Проверить.** Ни одно правило не гасит `outline` без замены. Сейчас гасят — в нескольких
+местах фокус виден только по смене цвета рамки, а в паре мест не виден вообще.
+
+---
+
+# F. Объём
+
+## 2.16 Как ведёт себя длинный список
+
+**Пометка: СНЯТО** (прогресс ученика).
+**Применимо к calc2: да.**
+
+**Правило.** Хвост списка сворачивается, а остаток называется **числом**.
+
+**Значения.** Подпись вида «ещё 15 тем без ответов», механизм раскрытия из 2.10.
+Порог — когда видимая часть перестаёт помещаться без прокрутки внутри блока.
+
+**Границы.** Свёрнутый хвост не прячет ничего, что требует действия. Если в хвосте есть
+элементы из первой ступени 2.6 — хвост не сворачивается.
+
+**Почему.** «Показать ещё» без числа не даёт понять, стоит ли нажимать: там может быть
+две строки, а может двести.
+
+**Проверить.** У каждого свёрнутого хвоста в подписи есть число.
+
+---
+
+## 2.17 Как устроен многошаговый процесс
+
+**Пометка: СНЯТО** (конструктор работы, три шага).
+**Применимо к calc2: частично** — выбор сцены → настройка → экспорт.
+
+**Правило.** Шаги видны всегда. Липкая нижняя полоса всегда показывает три вещи:
+что уже собрано, чего не хватает, что дальше.
+
+**Значения.**
+
+Полоса шагов:
+```
+номер          22×22, border-radius: var(--r-pill), 11/600
+активный       сплошной var(--accent) + var(--act-ink-solid); подпись 13/600 var(--text)
+пройденный     var(--accent-tint) + цифра var(--accent); подпись 13/400 var(--text3)
+будущий        нейтральный фон; подпись 13/400 var(--text3)
+```
+
+Липкая полоса:
+```
+background: var(--surface); border-radius: var(--r-panel); padding: 12px 16px
+слева   сводка         13/400 var(--text2)   «В работе: 1 задача · 2 балла»
+справа  причина        12/400 var(--text3)   «Впишите название.»
+        кнопка назад   --plain --sm
+        кнопка вперёд  --main (или .is-off, см. 2.7)
+```
+
+Плюс: **предпросмотр результата стоит рядом с настройками, а не после нажатия.**
+На платформе это лист «ТАК УЙДЁТ УЧЕНИКУ» с уменьшенной типографикой (12/400, lh 1.6)
+на `--surface-2` с белым листом внутри, и подпись под ним, объясняющая гарантию:
+«Тот же состав, что уйдёт в печать и в .tex — один источник, не три разных.»
+
+**Границы.** Шаги нумеруются, только если порядок обязателен. Если между разделами можно
+ходить свободно — это вкладки, а не шаги.
+
+**Почему.** Человек должен видеть, что он уже сделал, не возвращаясь назад. И должен
+видеть результат до того, как согласится.
+
+**Проверить.** На каждом шаге видна сводка собранного и видна причина, если дальше нельзя.
+Предпросмотр обновляется вместе с настройками, а не по кнопке.
+
+---
+
+## Сводка применимости к calc2
+
+| Механизм | Применимо | Корень аудита |
+|---|---|---|
+| 2.1 запись числа | да | 4 |
+| 2.2 показ числа | да | 4 |
+| 2.3 отсутствие | да | — |
+| 2.4 ошибка ввода | да | 6 |
+| 2.5 состояние | да | 8 |
+| 2.6 требует действия | да | 8 |
+| 2.7 выключенная кнопка | да | — |
+| 2.8 подтверждение | частично | 5 |
+| 2.9 сохранение состояния | да | 5 |
+| 2.10 раскрытие | да | 8 |
+| 2.11 объяснение смысла | да | 10 |
+| 2.12 чужой взгляд | частично | 9 |
+| 2.13 предварительный результат | да | 1, 4 |
+| 2.14 активное | да | — |
+| 2.15 фокус | да | — |
+| 2.16 длинный список | да | — |
+| 2.17 многошаговый процесс | частично | — |
+
+Корни 2 (поля холста), 3 (плавающие элементы), 7 (режимы взаимодействия с холстом)
+каноном платформы не покрываются — это собственные задачи рисующей поверхности.
+Они разбираются в части 5.
+
+---
+
+*Части 3–5 — детали элементов, свод неотменяемых правил и отдельные поверхности —
+следуют отдельно.*
+
+---
+
+## Часть 3. Детали
+
+Спецификация элементов. Механизмы описаны в части 2 — здесь только геометрия, цвета
+и полный набор состояний. Ссылки вида «см. 2.N» ведут в часть 2.
+
+Обязательный набор состояний для всего интерактивного:
+**покой · наведение · фокус · нажатие · выключено · ошибка** (где применимо).
+Если состояние не описано — значит оно совпадает с покоем.
+
+---
+
+## 3.1 Кнопка
+
+**Правило стайлгайда:** три веса. Главная — сплошная заливка, **одна на экран**.
+Обычная — тонкая рамка. Тихая — только текст, для необязательных действий.
+
+### База
+```
+font: 13px/1.2, вес 500        padding: 8px 16px        gap: 6px
+border: var(--line) solid transparent
+border-radius: var(--r)        white-space: nowrap
+display: inline-flex; align-items: center; justify-content: center
+transition: background var(--t), border-color var(--t), color var(--t)
+высота 33px
+```
+
+### Три веса
+
+| Вес | Класс | Фон | Текст | Рамка |
+|---|---|---|---|---|
+| главная | `--main` | `var(--btn-bg)` | `var(--on-btn)` | нет |
+| обычная | `--plain` | `var(--surface)` | `var(--text)` | `var(--border)` |
+| тихая | `--quiet` | нет | `var(--text2)` | нет; padding `6px 10px` |
+
+**Главная кнопка графитовая, а не акцентная.** Сплошной акцент на крупной кнопке
+на платформе не встречается нигде.
+
+### Размеры
+```
+--sm    12px, padding 5px 11px, высота 25px
+--wide  width: 100%
+```
+
+### Состояния
+```
+--main:hover    → var(--btn-bg-hover)
+--plain:hover   → border-color темнее
+--quiet:hover   → color: var(--text)
+:active         → transform: translateY(1px)   (у всех трёх)
+:disabled       → opacity: .45; cursor: not-allowed        + причина рядом, см. 2.7
+.is-off         → то же + pointer-events: none
+.added          → color: var(--green); cursor: default
+```
+
+⚠️ Отдельное правило `.k-btn[hidden] { display: none }` обязательно: `display: inline-flex`
+из набора сильнее браузерного `[hidden]`, и без этого правила скрытая кнопка остаётся
+видимой. То же нужно для любого нового класса с явным `display`.
+
+---
+
+## 3.2 Поле ввода
+
+**Правило стайлгайда:** ни одного браузерного элемента по умолчанию — список и галочка
+рисуются своими, иначе в тёмной теме просвечивает светлый системный виджет.
+
+### Однострочное и многострочное
+```
+font-size: 13px                padding: 8px 10px         width: 100%
+background: var(--surface-2)   ← карточка на --surface, поле внутри неё на --surface-2
+border: var(--line) solid var(--border)
+border-radius: var(--r)
+transition: border-color var(--t), background var(--t)
+плейсхолдер — var(--text3)
+
+многострочное: line-height 1.6; min-height 84px; resize: none
+```
+
+Фактическое правило поверхностей: **карточка светлая, поле внутри неё — на ступень
+глубже.** Набор объявляет `--surface`, но все живые экраны переопределяют на `--surface-2`;
+канон закрепляет факт.
+
+### Фокус
+```
+outline: none
+border-color: var(--focus)
+box-shadow: 0 0 0 3px var(--focus-ring)
+```
+
+### Список (`select`)
+```
+appearance: none               padding-right: 28px
+стрелка — ::after у обёртки: символ «▾», 11px, var(--text2), справа 10px,
+          pointer-events: none
+--sm: 12px, padding 4px
+```
+Нативный `select` без обёртки запрещён.
+
+### Числовое поле в анкете
+```
+font-variant-numeric: tabular-nums;  text-align: center;  width: 88px
+appearance: textfield + гашение ::-webkit-*-spin-button
+```
+
+### Метка и подпись
+```
+метка       12/600, var(--text2), margin-bottom 6–8px
+            капслок только в заголовке карточки-настроек (12/600, ls .05em)
+подпись     12/400, var(--text2), margin-top 6px, ПОСЛЕ поля (см. 2.11)
+```
+
+### Файл
+Нативный `<input type="file">` запрещён: он рисуется операционной системой и подписан
+по-английски. Оформляется как обычная кнопка `--plain` с подписью-объяснением рядом.
+
+---
+
+## 3.3 Числовое поле-полосочка
+
+Геометрия и состояния — в 2.1, ошибка — в 2.4. Здесь только варианты ширины:
+
+| Класс | Ширина | Для чего |
+|---|---|---|
+| `.k-num` | 46px | одна-две цифры |
+| `--wide` | 64px | до четырёх знаков |
+| `--long` | 92px | дробь или число с единицей |
+
+Минимальная высота — 44px во всех вариантах: это область касания.
+
+---
+
+## 3.4 Переключатель
+
+```
+чекбокс   appearance: none;  17×17 (вариант --box 19×19)
+          border: 1.5px solid var(--border);  border-radius: 4px
+          background: var(--surface);  transition: background var(--t), border-color var(--t)
+:hover    border-color: var(--accent)
+:checked  background: var(--accent); border-color: var(--accent)
+          галочка — ::after: 4×9px, border 0 2px 2px 0 белым, rotate(45deg)
+:disabled border-style: dashed; background: var(--surface-2); opacity: .55
+          подпись рядом — var(--text3), cursor: not-allowed
+:focus-visible  outline: 2px solid var(--focus); outline-offset: 2px
+
+радио     то же, border-radius: 50%
+:checked  точка — ::after: inset 3px, background: var(--accent)
+```
+
+Подпись: 13px, `gap: 8px`, `user-select: none`, **вся строка нажимается**, не только
+квадратик.
+
+⚠️ Сейчас ответы теста в контрольной используют нативный чекбокс 13×13 — против правила
+стайлгайда и почти втрое меньше области касания.
+
+---
+
+## 3.5 Чип-пилюля
+
+**Три роли, три вида.** Четвёртого нет.
+
+| Роль | Кегль/вес | Отступы | Фон | Текст | Рамка |
+|---|---|---|---|---|---|
+| **тип** — что это за объект | 11/600 | `0 8px`, line-height 18px | нет | `--text2` | `var(--border)` |
+| **сигнал** — сложность, решение, уровень | 11/600 | `2px 8px` | `*-tint` | `*` или `*-ink` | `*-border` |
+| **вердикт** — итог проверки | 11/700, uppercase, `ls .05em` | `3px 9px` | `*-tint` | `*` | нет |
+
+Все три: `border-radius: var(--r-pill)`, `gap: 4px` при наличии глифа,
+`white-space: nowrap`.
+
+**Сигнальный чип всегда с глифом:** `★ 2`, `✓ решение`. Вердикт — словом.
+
+⚠️ Амберный текст на амберном тинте берётся из `--amber-ink`, а не из `--amber`:
+`--amber` на `--amber-tint` даёт 3,95 : 1 при норме 4,5.
+
+Сейчас на платформе девять видов пилюли — сводятся к этим трём.
+
+---
+
+## 3.6 Карточка
+
+**Правило стайлгайда:** обычная и «просит внимания» — вторая отличается только тонкой
+рамкой, без заливки.
+
+```
+background: var(--surface)
+border: var(--line) solid var(--border)
+border-radius: var(--r-card)
+padding: 18px 20px          (≤560px → 15px 16px)
+тени в покое нет; при наведении тоже нет — меняются рамка и фон
+```
+
+| Вариант | Отличие |
+|---|---|
+| просит внимания | `border-color: var(--accent)`, заливки нет |
+| рецессивная | `background: var(--surface-2)` — для того, что не требует действия (см. 2.6) |
+| с состоянием | `+ border-left: var(--stripe-strong) solid <цвет>` |
+| с типом | `+ border-left: var(--stripe) solid <цвет>` |
+
+Крупная панель: `border-radius: var(--r-panel)`, `padding: 20px 22px`.
+
+Нажимаемая строка-карточка: `padding: 12px 16px`; `:hover` → `background: var(--surface-2)`
++ `border-color: var(--text3)`; `:focus-visible` — кольцо по 2.15.
+
+---
+
+## 3.7 Разделитель раздела
+
+Три уровня. Подпись плюс линия во всю оставшуюся ширину.
+
+| Уровень | Подпись | Линия | Отступы |
+|---|---|---|---|
+| служебный | 12/600 `--text2` | 1px **пунктир** `--border` | `20px 0 12px` |
+| громкий | 13/700 `--text` | 1px сплошная | `26px 0 14px` |
+| заголовок раздела | 14/700 `--text`, `ls .01em` | 1px сплошная | `26px 0 12px` |
+
+У третьего справа — счётчик 12/400 `--text3`: «3 задачи · 9 баллов».
+`gap: 10px`. На ≤520px счётчик переносится на отдельную строку.
+
+**Правило стайлгайда:** служебный разделитель намеренно не жирный — это линия,
+а не заголовок.
+
+---
+
+## 3.8 Вкладки
+
+```
+13/500, padding: 8px 14px, gap: 4px
+неактивная  color: var(--text2); border-bottom: 2px solid transparent
+активная    color: var(--accent);  border-bottom: 2px solid var(--accent)
+```
+
+**Прозрачная рамка у неактивной обязательна** — иначе при переключении содержимое
+прыгает на 2px.
+
+Счётчик на вкладке: 18×18, `border-radius: var(--r-pill)`, 11/700, фон `var(--error)`,
+текст `var(--on-error)`, `margin-left: 6px`, `tabular-nums`.
+
+Вложенные вкладки второго уровня оформляются так же — различие даёт только положение.
+
+---
+
+## 3.9 Сегмент
+
+Для выбора одного из 2–4 равноправных.
+
+```
+обёртка     background: var(--surface-2); padding: 3px; gap: 2px
+            border-radius: var(--r-pill); border: var(--line) solid var(--border)
+кнопка      12–13/600, padding: 6px 14px, border-radius: var(--r-pill)
+неактивная  color: var(--text2)
+активная    background: var(--accent); color: var(--act-ink-solid)
+```
+
+**Вариант с пояснением.** Если выбор меняет смысл дальнейшей работы, под сегментом
+стоит строка 11/400 `--text3`, объясняющая **выбранное**: «решают дома, срок сдачи».
+Строка меняется вместе с выбором.
+
+---
+
+## 3.10 Плитка выбора
+
+**Правило стайлгайда:** равноправные способы что-то сделать; выбранная плитка —
+единственное место, где акцент заливает поверхность.
+
+```
+background: var(--surface); border: var(--line) solid var(--border)
+border-radius: var(--r-card); padding: 12px 16px
+transition: border-color var(--t), background var(--t)
+  название  14/600, margin-bottom 3px
+  пояснение 12/400, var(--text2), line-height 1.45
+:hover      border-color: var(--text3); background: var(--surface-2)
+выбранная   border-color: var(--accent); background: var(--accent-tint)
+            название — var(--accent)
+```
+
+Настоящий `input` спрятан (`position: absolute; opacity: 0`), нажимается вся плитка.
+Сетка: `repeat(auto-fit, minmax(190px, 1fr))`, `gap: 10px`; ≤560px — одна колонка.
+
+**Пояснение обязательно** и по возможности содержит число: «Мои задачи / 15 написанных
+вами», «Отложенные / 2 закладки каталога».
+
+---
+
+## 3.11 Аватар
+
+```
+32×32, border-radius: var(--r-pill), 13/700
+background: var(--chip-bg); color: var(--text2)
+одна буква имени, по центру
+```
+Крупный вариант на странице объекта — 44×44, 17/700.
+
+---
+
+## 3.12 Полоса прогресса
+
+```
+высота 4px (в шапке страницы 5px)
+border-radius: var(--r-pill)
+дорожка   background: var(--surface-2)
+заливка   background: var(--accent)
+```
+Ширина — по контейнеру, не фиксированная. Рядом всегда текст «N из M» (см. 2.2):
+полоса без числа не показывается.
+
+Пустая шкала: дорожка с пунктирной рамкой без заливки + «—» вместо процента.
+
+Сейчас на платформе пять разных геометрий полосы — сводятся к этой.
+
+---
+
+## 3.13 Пустое состояние
+
+```
+text-align: center; padding: 60px 24px; color: var(--text2)
+иконка    40×40, opacity .45, margin-bottom 12px      (необязательна)
+заголовок 13/600, var(--text)
+текст     13/400, var(--text2)
+```
+
+**Текст говорит две вещи: чего здесь нет и что здесь появится.**
+Образец с платформы: «Появится позже. Сюда лягут сохранённые графики, доступные группе.»
+
+Пустой экран без объяснения запрещён.
+
+---
+
+## 3.14 Таблица
+
+```
+шрифт строк      13/400
+заголовок столбца 11/600, ls .05em, var(--text2), padding 9px 10px
+ячейка           padding 9px 10px
+чередование строк background: var(--surface-2) у чётных
+число в ячейке   tabular-nums, вес 700
+```
+
+**Сортируемый заголовок** — нажимается, состояние видно значком. Рядом с таблицей —
+подпись 12/400 `--text2`: «Нажмите на заголовок столбца, чтобы отсортировать».
+
+**Ячейка-показатель** — пилюля 11/600–700, `border-radius: var(--r-sm)`, `padding: 5px 4px`,
+цвет по уровню (см. 1.1.2). Вес растёт при ухудшении: хорошо 600 → плохо 700.
+
+**Широкая таблица** — только внутри `.fade-box` (см. 1.9.1). Горизонтально едет таблица,
+не страница.
+
+---
+
+## 3.15 Крошки
+
+```
+13px, line-height 1.7, margin-bottom 14px
+ссылка       var(--accent), без подчёркивания; :hover — подчёркивание
+разделитель  «→» цветом var(--accent), margin 0 7px
+текущая      var(--text)
+```
+
+---
+
+## 3.16 Шапка сайта
+
+```
+height: 48px            position: sticky; top: 0; z-index: 200
+background: var(--nav-bg)  ← не меняется по темам
+padding: 0 24px         gap: 16px
+логотип   28×28, border-radius: var(--r), background: var(--accent)
+          11/700, цвет var(--act-ink-solid), ls -.5px
+ссылка    13/500, rgba(255,255,255,.55), padding 6px 10px, border-radius: var(--r)
+:hover    белый + rgba(255,255,255,.08)
+активная  белый + подчёркивание 2px var(--accent)
+имя       12px, rgba(255,255,255,.85), вес 600
+выход     12px, рамка rgba(255,255,255,.15), padding 5px 10px
+```
+
+⚠️ **Шапка обязана сворачиваться до того, как страница поедет вбок** (см. 1.9.1).
+Сейчас не сворачивается: при окне 606px содержимое занимает 878px, вбок едет вся
+страница, графитовая подложка обрывается на ширине окна и последние пункты становятся
+серым по светло-серому.
+
+Правило `.site-header { height: 52px }` в наборе к живому элементу не применяется —
+фактическая высота 48px. Привести объявление к факту.
+
+---
+
+## 3.17 Липкая нижняя панель
+
+```
+background: var(--surface); border: var(--line) solid var(--border)
+border-radius: var(--r-panel); padding: 12px 16px; gap: 16px
+слева   сводка собранного   13/400, var(--text2)
+справа  причина             12/400, var(--text3)   (см. 2.7)
+        кнопки              назад --plain --sm, вперёд --main
+```
+Всегда показывает три вещи: что собрано, чего не хватает, что дальше (см. 2.17).
+
+---
+
+## 3.18 Сводка: что чем заменяется
+
+| Было на платформе | Стало |
+|---|---|
+| 9 видов чипа-пилюли | 3 роли (3.5) |
+| 4 главные кнопки (`.k-btn--main`, `.btn-open`, `.btn-primary`, `.btn-submit`) | 3 веса + 2 размера (3.1) |
+| 3 модели текстового поля | 1 (3.2) |
+| 5 геометрий полосы прогресса | 1 (3.12) |
+| 8 заголовков раздела | 3 уровня разделителя (3.7) + заголовок панели 15/700 |
+| 6 моделей блока состояния | 1 (2.5) |
+| 4 языка активного состояния | 3, разделённые по смыслу (2.14) |
+| 3 механизма фокуса | 1 + одно исключение (2.15) |
+| 2 механизма раскрытия | 1 (2.10) |
+| 6 моделей «число + подпись» | 3 ступени + правило спутника (2.2) |
+
+---
+
+## Часть 4. Свод неотменяемого
+
+Двадцать правил, нарушение которых считается дефектом. Восемнадцать из них проверяются
+машиной — их стоит закрепить тестом `problems/tests/test_design_canon.py`, который
+обходит живые страницы обеих тем.
+
+### Цвет
+
+**1.** Каждый цвет — через `var(--…)`. Хардкод hex ломает тёмную тему.
+*Исключения:* цвета типов событий календаря, `rgba(0,0,0,…)` в тенях, цвета кривых `/calc2/`.
+*Проверка:* в CSS нет `#` вне `_tokens.html` и вне перечисленных исключений.
+
+**2.** Текст на сплошном `var(--accent)` — только `var(--act-ink-solid)`.
+*Проверка:* в тёмной теме ни один элемент с `background-color: var(--accent)` не имеет белого текста.
+
+**3.** Сигнальные цвета имеют ровно три значения (1.1.2) и никогда не берутся для украшения.
+*Проверка:* глазами по таблице 1.1.2.
+
+**4.** Цвет никогда не единственный носитель смысла: рядом глиф или слово.
+*Проверка:* обесцветить страницу — смысл читается.
+
+**5.** Контраст текста не ниже 4,5 (крупного — 3,0) **в обеих темах**.
+*Проверка:* обход всех текстовых узлов с расчётом фона по цепочке предков.
+*Важно:* тест на одну тему пропускает половину проблем — сегодня в светлой теме
+нарушений ноль, в тёмной шесть.
+
+### Элементы
+
+**6.** Ни одного браузерного элемента по умолчанию: `select`, `checkbox`, `radio`,
+`input[type=file]` оформляются своими.
+*Проверка:* ни у одного видимого элемента управления нет `appearance: auto`.
+
+**7.** Главная кнопка — одна на экран.
+*Проверка:* `document.querySelectorAll('.k-btn--main').length <= 1`.
+
+**8.** Главная кнопка графитовая. Сплошной акцент — только у выбранного из равноправных.
+*Проверка:* элементов с фоном `var(--accent)` на экране не больше трёх, и все они —
+выбранное состояние.
+
+**9.** Постоянное состояние показывается полосой и значком, панель не заливается.
+*Проверка:* ни у одной плашки состояния нет фона из семейства `*-tint`.
+
+**10.** На одном крае элемента — одна полоса.
+
+**11.** Выключенная кнопка имеет видимого соседа с причиной.
+*Проверка:* у каждой `:disabled` / `.is-off` есть текстовый сосед.
+
+### Числа
+
+**12.** Каждое число крупнее строки — `tabular-nums`.
+*Проверка:* обход элементов с числовым содержимым.
+
+**13.** Пустота называется словами и различает свои виды (2.3).
+*Проверка:* нет видимой ячейки без текста там, где ожидается значение.
+
+**14.** Ошибка ввода показывается тремя носителями, фраза называет границу и не сдвигает макет.
+*Проверка:* высота контейнера до и после ошибки одинакова.
+
+**15.** Неполное число сопровождается оговоркой под ним (2.13).
+
+### Текст и типографика
+
+**16.** Кегль, вес, межстрочный, отступ, скругление — только из шкал части 1.
+*Проверка:* обход вычисленных стилей, любое значение вне списка — дефект.
+
+**17.** Межстрочный интервал текста с формулами не ниже 1.55.
+
+**18.** Нативный `title` не используется. Подсказка — только `.k-hintmark` + `.k-tip`.
+*Проверка:* `document.querySelectorAll('[title]').length === 0`.
+
+### Поведение
+
+**19.** Страница не едет вбок ни на какой ширине от 360px; широкий блок прокручивается
+внутри своей рамки.
+*Проверка:* `documentElement.scrollWidth <= clientWidth` на ширинах 360 / 560 / 760 / 1024.
+
+**20.** `@media (prefers-reduced-motion: reduce)` покрывает все переходы, а не выборочные.
+
+---
+
+### Что тест не проверит
+
+Эти правила проверяются только глазами и попадают в сценарий приёмки:
+
+- **Громкость равна требованию действия** (2.6): требующий действия блок белый и с кнопкой,
+  остальные серые и без кнопки.
+- **Объяснение стоит после элемента**, а не перед ним (2.11).
+- **Оговорка стоит там же, где число**, а не в сноске (2.13).
+- **Предупреждение о необратимом стоит до действия**, а не в момент (2.8).
+- **Плашка чужого взгляда называет четыре вещи** (2.12).
+
+---
+
+## Часть 5. Отдельные поверхности
+
+Два места на сайте живут по собственным правилам. Оба — сознательно, оба — с чётко
+очерченной границей.
+
+---
+
+## 5.1 `/calc2/` — графический калькулятор
+
+### Что остаётся своим и почему
+
+**Цвета кривых.** Это предметная семантика, а не оформление: спрос всегда одного цвета,
+предложение — другого, и ученик запоминает эту пару. Унифицировать их с палитрой сайта
+нельзя.
+
+```
+--curve-d      #2F6FED   спрос
+--curve-s      #E0563B   предложение
+--curve-mr     #8B3FE0   MR
+--curve-mc     #119C8A   MC
+--curve-tax    #2E9E44   налог, субсидия, бюджет — единый зелёный
+--curve-dwl    #8C8C84   DWL
+--curve-reg    #B5791F   потолок, пол, МРОТ
+--curve-ghost  #9AA0A6   исходное состояние
+Заливки площадей — те же цвета при 12–22 % прозрачности.
+Кривые издержек — --cost-mc / atc / avc / afc / vc.
+```
+
+Набор подобран колориконтрастно и работает в обеих темах. **Не трогать.**
+
+**Структурные цвета холста** — `--ink`, `--ink-soft`, `--grid`, `--halo`, `--canvas` —
+тоже остаются своими: они относятся к рисующей поверхности, а не к интерфейсу.
+
+**Собственное движение графики.** Появление кривых, перестроение сцены, панорамирование —
+своя кривая `cubic-bezier(.23,1,.32,1)`, длительности до 300 мс. Правило `--t` (0,12 с)
+относится только к элементам управления.
+
+### Что приводится к канону
+
+**Всё остальное.** Панели, кнопки, поля, числа, чипы, подсказки, пустые состояния,
+раскрытия, фокус, темы, ширина окна — по частям 1–3 без изъятий.
+
+Отдельно снимается прежнее расхождение: у calc2 сейчас **свой малиновый акцент**
+`#BE185D / #FF4D94`. Это ровно те же значения, что у сайта. То есть акцент уже общий —
+достаточно перевести его на общие токены и не держать вторую копию.
+
+Крупные кнопки calc2 уже графитовые (`--btn-bg #1e293b`) — совпадает с каноном (3.1).
+Радиусы calc2 (`--r-sm 6 / --r 8 / --r-lg 14`) приводятся к общим
+(`--r-sm 4 / --r 6 / --r-card 10 / --r-panel 12`).
+
+Единый ключ темы `localStorage['theme']` — уже общий, менять не нужно.
+
+### Три задачи, которых канон не покрывает
+
+Это собственные задачи рисующей поверхности. Канон даёт им только принцип, решение —
+за отдельной сессией.
+
+**Корень 2 — поля холста.**
+*Принцип.* Отступы холста вычисляются от фактической ширины подписей делений, а не
+задаются числом. Четырёхзначное число обязано помещаться.
+*Проверка.* Подставить в сцену значения в 10 000 раз крупнее — ни одна подпись не обрезана.
+
+**Корень 3 — плавающие элементы над холстом.**
+*Принцип.* Легенда, блок зума и чипы-переключатели принадлежат одной раскладке, которая
+знает обо всех и не даёт им занять один угол. Ни один плавающий элемент не перекрывает
+подписи осей.
+*Проверка.* На каждой сцене при трёх ширинах окна нет пересечения прямоугольников
+плавающих элементов между собой и с областью подписей.
+
+**Корень 7 — режимы взаимодействия с холстом.**
+*Принцип.* Клик по холсту имеет ровно один смысл в каждый момент. Режимы
+(смотрю / двигаю / ставлю вершины) явные, текущий виден по курсору и по состоянию
+кнопки. У перетаскивания есть порог смещения, ниже которого это клик, а не перенос.
+*Проверка.* В режиме «смотрю» ни один клик не меняет модель.
+
+### Контраст в calc2
+
+Аудит показал пять подписей ниже нормы в тёмной теме: `D` — 4,05; `AFC` — 3,41;
+`MRL` — 3,40; подписи точек и координат — 3,80; «безубыточность» — 4,05.
+
+Это тот же класс дефекта, что шесть мест на платформе, и лечится так же: цвет подписи
+берётся не из цвета кривой, а из пары «цвет кривой на светлой / затемнённый или
+осветлённый вариант на тёмной». **Подпись на холсте — текст, к ней применяется правило 5
+части 4.**
+
+---
+
+## 5.2 `/game/` — Econ Rush
+
+Публичная поверхность без входа. Живёт в общей системе, но добавляет слой `--rush-*`,
+**каждое значение которого отображается на общий токен** — сырого hex нет:
+
+```
+--rush-accent      → var(--accent)
+--rush-surface     → var(--surface)
+--rush-ok / -tint  → var(--green) / var(--green-tint)
+--rush-bad / -tint → var(--error) / var(--error-tint)
+```
+
+### Записанное исключение из правила сигнальных цветов
+
+**Полоса времени.** Дорожка 8px перекрашивается по остатку: акцент (норма) → `var(--amber)`
+(< 15 с) → `var(--error)` с медленной пульсацией (< 7 с).
+
+Это заимствование амбера под смысл, отличный от сложности. Разрешено **только здесь**
+и только потому, что выполняются четыре условия сразу:
+
+1. полоса кодирует срочность таймера, а не свойство задачи;
+2. она единственная на экране;
+3. она никогда не появляется на учебных поверхностях;
+4. она всегда сопровождается числовым таймером — цвет не единственный носитель.
+
+**Не копировать.** Любое другое заимствование сигнального цвета — дефект.
+
+### Клавиши-бейджи
+
+Каждая кнопка ответа несёт квадратный бейдж 26px с цифрой `1`–`5`: фон `--surface-2`,
+рамка `--border` с утолщением 2px снизу (вид клавиши), подпись `--text3`.
+Скрывается при `hover: none` и на ширинах до 720px.
+
+Зелёный и красный на экране игры — настоящие вердикты («верно» / «мимо»), а не украшение,
+поэтому правило 1.1.2 не нарушается.
+
+---
+
+## 5.3 Что делать с `DESIGN.md`
+
+Файл заменяется целиком на этот документ (части 0–5).
+
+Разделы 1–6 прежнего `DESIGN.md` описывают систему вокруг чернильно-синего `#4f7cff`.
+На живом сайте этого цвета нет ни в одном месте — сайт переехал на малиновую систему
+«Сцены», а документ за ним не пошёл. Переносить оттуда нечего.
+
+Разделы 7 и 8 (calc2 и игра) переехали в части 5.1 и 5.2 с уточнениями.
+
+---
+
+## Порядок применения
+
+Документ не требует единовременной переделки. Порядок такой:
+
+1. **Одиннадцать новых переменных** заводятся в `_tokens.html` (1.10). Это единственная
+   правка, которая трогает платформу, и она безопасна: переменные добавляются, ничего
+   не переопределяя.
+2. **Калькулятор приводится к канону** — по частям 1–3, сессиями из аудита.
+3. **Тест `test_design_canon.py`** закрепляет восемнадцать проверяемых правил части 4.
+   Пишется после калькулятора, чтобы сразу проходить на нём.
+4. **Платформа приводится к канону** — позже, отдельными сессиями, по реестру расхождений
+   в Notion.
+
+До шага 4 калькулятор совпадает с самой новой частью платформы — кабинетом преподавателя
+и набором `_kit.html`. Расхождение с кабинетом ученика временное и в одну сторону:
+своего, ни на что не похожего, у калькулятора не появляется нигде.
