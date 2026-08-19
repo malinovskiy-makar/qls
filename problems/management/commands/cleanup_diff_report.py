@@ -154,8 +154,26 @@ def sort_key(card):
     return (pri, card['id'])
 
 
+def _fetch(url, dest):
+    """Скачать файл, разрешая только https.
+
+    Проверка схемы — то, на что указывает bandit (B310): urlretrieve умеет
+    не только http(s), но и file:// и ftp://, и если адрес когда-нибудь
+    начнут собирать не из констант, тихо прочитает локальный файл.
+    Здесь адреса собираются из CDN-константы, но проверка стоит на пути,
+    а не в комментарии."""
+    if not url.startswith('https://'):
+        raise ValueError('разрешён только https, получено: ' + url)
+    urllib.request.urlretrieve(url, dest)  # nosec B310 — схема проверена строкой выше
+
+
 def ensure_assets(asset_dir, stdout):
-    """Скачивает KaTeX локально один раз. Возвращает True, если ядро (css/js/auto-render) на месте."""
+    """Скачивает KaTeX локально один раз. Возвращает True, если ядро (css/js/auto-render) на месте.
+
+    ⚠️ Ассеты тянутся с внешнего CDN (jsdelivr). Это и зависимость от чужой
+    инфраструктуры, и обращение на зарубежный домен. Самостоятельное
+    размещение статики — отдельная работа, карточка в Notion «Задачи».
+    """
     asset_dir.mkdir(parents=True, exist_ok=True)
     (asset_dir / 'fonts').mkdir(exist_ok=True)
     core_ok = True
@@ -164,7 +182,7 @@ def ensure_assets(asset_dir, stdout):
         if f.exists() and f.stat().st_size > 0:
             continue
         try:
-            urllib.request.urlretrieve(url, f)
+            _fetch(url, f)
             stdout('  скачан ' + name)
         except Exception as e:
             core_ok = False
@@ -174,7 +192,7 @@ def ensure_assets(asset_dir, stdout):
         if f.exists() and f.stat().st_size > 0:
             continue
         try:
-            urllib.request.urlretrieve(CDN + 'fonts/' + fam + '.woff2', f)
+            _fetch(CDN + 'fonts/' + fam + '.woff2', f)
         except Exception:
             pass  # шрифты не критичны: KaTeX отрендерит с запасным шрифтом
     return core_ok

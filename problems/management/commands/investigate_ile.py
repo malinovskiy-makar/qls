@@ -63,7 +63,9 @@ class Command(BaseCommand):
             'SELECT p.id, p.statement, p.solution, p.answer '
             'FROM problems_problem p '
             'JOIN problems_sourcereference sr ON sr.problem_id = p.id '
-            f'WHERE sr.source_id = {sid}')}
+            # int() явно, а не «argparse же обещал type=int»: гарантия
+            # должна быть видна на месте подстановки, как в fix_ile_formulas.
+            f'WHERE sr.source_id = {int(sid)}')}  # nosec B608
         con.close()
 
         problems = (Problem.objects

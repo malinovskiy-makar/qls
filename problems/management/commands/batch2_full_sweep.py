@@ -98,15 +98,19 @@ def _load_old_state(backup_path: str, ids: List[int]):
     old_parts: Dict[int, List[Tuple[int, str, str]]] = defaultdict(list)
     for i in range(0, len(ids), SQL_CHUNK):
         chunk = ids[i:i + SQL_CHUNK]
+        # В строку запроса подставляется ТОЛЬКО строка вида "?,?,?" — по числу
+        # элементов куска. Сами значения уходят вторым аргументом execute() и
+        # экранируются драйвером. Это стандартный приём для IN с переменным
+        # числом элементов, подстановки данных здесь нет.
         qmarks = ",".join("?" * len(chunk))
         cur.execute(
-            "SELECT id, statement FROM problems_problem WHERE id IN ({})".format(qmarks),
+            "SELECT id, statement FROM problems_problem WHERE id IN ({})".format(qmarks),  # nosec B608
             chunk)
         for pid, stmt in cur.fetchall():
             old_stmt[pid] = stmt or ""
         cur.execute(
             "SELECT id, problem_id, label, statement FROM problems_problempart "
-            "WHERE problem_id IN ({})".format(qmarks), chunk)
+            "WHERE problem_id IN ({})".format(qmarks), chunk)  # nosec B608
         for pk, pid, label, stmt in cur.fetchall():
             old_parts[pid].append((pk, label, stmt or ""))
     con.close()

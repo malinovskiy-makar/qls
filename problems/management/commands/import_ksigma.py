@@ -134,7 +134,10 @@ def run_ocr(pdf_bytes: bytes, base: str, stderr_write, timeout=480) -> str:
     if not SWIFT_SCRIPT.exists():
         stderr_write(f'  Нет swift-скрипта: {SWIFT_SCRIPT}')
         return ''
-    tmp = Path('/tmp/ksigma_ocr_tmp.pdf')   # без пробелов — нужно для file:// URL
+    # Путь без пробелов обязателен: его получает swift-скрипт как file:// URL.
+    # Предсказуемость пути здесь по той же причине, что и в остальных
+    # импортёрах: разовая команда на машине владельца, на сервере не бывает.
+    tmp = Path('/tmp/ksigma_ocr_tmp.pdf')  # nosec B108
     tmp.write_bytes(pdf_bytes)
     try:
         res = subprocess.run(
