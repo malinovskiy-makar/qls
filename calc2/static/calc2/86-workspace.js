@@ -100,6 +100,7 @@ function setSideOpen(panelId, btnId, open) {
     b.setAttribute('aria-expanded', open ? 'true' : 'false');
     // Подпись идёт за состоянием: свёрнутая панель предлагает открыть, открытая — закрыть.
     b.setAttribute('data-tip', open ? 'Закрыть меню' : 'Открыть меню');
+    if (typeof syncTipLabels === 'function') syncTipLabels();   // и подпись для чтеца тоже
   }
   /* Панель раскрыли — поля формул внутри стали видны и собираются (А56).
      Без этого поле, добавленное при свёрнутой панели, оставалось обычным
@@ -414,6 +415,7 @@ function wireScene() {
 
   wireWrench();
   wireHintButtons();
+  wireTips();               // п. 78–81: одна плашка на все подсказки
 
   // График перерисовываем, когда меняется его РАЗМЕР, а не только окно:
   // сворачивание панели меняет ширину холста, и без этого кривые остались бы
@@ -587,6 +589,82 @@ function showHintTip(dot, html) {
 function hideHintTip() {
   const t = document.getElementById('hint-tip');
   if (t) t.style.display = 'none';
+}
+
+/* ═══ п. 78–81. ОДНА СИСТЕМА ПОДСКАЗОК ════════════════════════════════
+
+   Было две. Знаки «?» показывали свою плашку рядом с собой; кнопки полосы,
+   стрелки панелей и кнопки над графиком — собственные тёмные подписи через
+   `::after`, нарисованные правилами CSS. Отсюда три беды сразу:
+
+   · п. 79. Подпись `::after` держится, пока держится `:focus-visible`, а он
+     остаётся ПОСЛЕ нажатия. Плашка «назад» висела поверх заголовка модели,
+     пока человек работал в другом конце экрана. Две сразу тоже ловились:
+     одна по наведению, другая по фокусу.
+   · п. 78. Две системы — два вида, две геометрии, два набора правил.
+   · п. 81. Текст подписи и текст для чтеца расходились, потому что жили в
+     разных атрибутах и правились по отдельности.
+
+   Теперь плашка ОДНА на весь калькулятор — тот же узел, что у знаков «?».
+   Их физически не может быть две. Показывается по наведению, по фокусу с
+   клавиатуры и по касанию; гаснет по уходу, по нажатию, по Escape и при
+   смене модели. Текст один: `data-tip` копируется в `aria-label`, поэтому
+   разойтись им негде.                                                     */
+let _tipByKeyboard = false;   // последнее действие человека было с клавиатуры
+function tipText(el) { return (el.getAttribute('data-tip') || '').trim(); }
+
+function showTipFor(el) {
+  const t = tipText(el);
+  if (!t) return;
+  showHintTip(el, t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+}
+
+function wireTips() {
+  const near = (e) => (e.target && e.target.closest) ? e.target.closest('[data-tip]') : null;
+  // Наведение и уход. pointerover/out всплывают, поэтому хватает двух
+  // слушателей на весь документ, и новые кнопки подключаются сами.
+  document.addEventListener('pointerover', (e) => { const el = near(e); if (el) showTipFor(el); });
+  document.addEventListener('pointerout', (e) => { if (near(e)) hideHintTip(); });
+  /* Клавиатура: фокус показывает, уход прячет. ⚠️ ТОЛЬКО фокус С КЛАВИАТУРЫ.
+
+     Обычный `focus` приходит и от мыши, и ПРОГРАММНО: закрытие окна выбора
+     само переводит фокус на кнопку возврата, и плашка всплывала при каждом
+     входе в модель, а гасла только по следующему действию. Это та же п. 79,
+     пришедшая с другой стороны.
+
+     Псевдокласс `:focus-visible` тут не помощник: браузер считает
+     программный фокус «видимым», пока страница не видела ни одного действия
+     человека, — проверено, плашка всплывала и с ним. Поэтому клавиатуру
+     отслеживаем сами: Tab и стрелки поднимают флаг, любое нажатие
+     указателем его снимает. */
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab' || e.key.indexOf('Arrow') === 0) _tipByKeyboard = true;
+  }, true);
+  document.addEventListener('pointerdown', () => { _tipByKeyboard = false; }, true);
+  document.addEventListener('focusin', (e) => {
+    const el = near(e);
+    if (el && _tipByKeyboard) showTipFor(el);
+  });
+  document.addEventListener('focusout', (e) => { if (near(e)) hideHintTip(); });
+  /* ⚠️ НАЖАТИЕ ГАСИТ ПОДСКАЗКУ. Ровно здесь была п. 79: после щелчка фокус
+     остаётся на кнопке, и подпись, привязанная к фокусу, не уходила никогда.
+     Человек уже нажал — объяснять ему нечего. */
+  document.addEventListener('click', (e) => { if (near(e)) hideHintTip(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideHintTip(); });
+  syncTipLabels();
+}
+
+/* п. 81. Один текст на подпись и на чтеца. Своего `aria-label` у кнопки с
+   подсказкой нет: он собирается из того же `data-tip`, и разойтись им негде.
+   Зовётся и после смены подписи (стрелки панелей меняют её на «Открыть» и
+   «Закрыть»). */
+function syncTipLabels() {
+  document.querySelectorAll('[data-tip]').forEach(el => {
+    const t = tipText(el);
+    if (!t) return;
+    const own = (el.textContent || '').trim();
+    if (!own) el.setAttribute('aria-label', t);   // у кнопки-иконки своего текста нет
+  });
 }
 
 /* Куда повесить вопросик. Порядок от самого крупного заголовка к самому

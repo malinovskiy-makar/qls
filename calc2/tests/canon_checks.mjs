@@ -207,6 +207,10 @@ const inPage = (theme) => {
      поддаётся оформлению. */
   Array.from(document.querySelectorAll('[title]')).filter(vis).forEach(el => {
     if (el.closest('svg')) return;                  // <title> внутри SVG — это имя фигуры, не подсказка
+    /* Шапка сайта — общий файл платформы, и правится она не отсюда: у неё
+       мимо канона ещё радиусы, границы и контраст логотипа, и все эти
+       проверки исключают её так же явно. Карточка владельцу заведена. */
+    if (inNav(el)) return;
     if (!el.matches('a, button, input, select, textarea, [role="button"], [tabindex], label')) return;
     add('title_on_interactive', name(el) + ' title=«' + el.getAttribute('title').slice(0, 24) + '»');
   });

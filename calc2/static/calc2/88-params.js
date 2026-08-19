@@ -330,7 +330,9 @@ function buildPultCurveChips(list) {
     sl.type = 'range'; sl.min = 0; sl.max = CONFIG.Pmax; sl.step = 'any';
     sl.value = c.linear.b;
     sl.style.accentColor = c.color;   // акцент ползунка в цвет кривой
-    sl.title = 'Сдвиг кривой по вертикали (свободный член b)';
+    // п. 78. Подсказка идёт через общую плашку, а не через нативный title:
+    // тот не появляется ни с клавиатуры, ни на сенсорном экране.
+    sl.setAttribute('data-tip', 'Сдвиг кривой по вертикали (свободный член b)');
 
     // Слайдер → задаём b ТЕМ ЖЕ путём, что перетаскивание (по id, кривая могла пересоздаться).
     sl.addEventListener('input', () => {
@@ -437,9 +439,9 @@ function upgradeRegulator(field) {
   }
   field.classList.remove('param-track');   // поле дорожкой больше не притворяется
   const lo = document.createElement('button');
-  lo.type = 'button'; lo.className = 'param-bound'; lo.title = 'Границы и шаг';
+  lo.type = 'button'; lo.className = 'param-bound'; lo.setAttribute('data-tip', 'Границы и шаг');
   const hi = document.createElement('button');
-  hi.type = 'button'; hi.className = 'param-bound'; hi.title = 'Границы и шаг';
+  hi.type = 'button'; hi.className = 'param-bound'; hi.setAttribute('data-tip', 'Границы и шаг');
   track.insertBefore(lo, sl);
   track.insertBefore(hi, sl.nextSibling);
 

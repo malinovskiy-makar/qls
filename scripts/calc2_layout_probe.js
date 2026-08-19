@@ -105,7 +105,7 @@ const snap = () => {
      наложений из 127 были выдумкой самого прибора. Помним узел блока и
      пропускаем всё, что лежит ВНУТРИ него. */
   const floats = [];
-  wrap.querySelectorAll('.graph-tools, .quick-area, .wrench, .graph-float').forEach(el => {
+  wrap.querySelectorAll('.graph-tools, .cv-mode, .wrench, .graph-float').forEach(el => {
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || el.hasAttribute('hidden')) return;
     const r = el.getBoundingClientRect();

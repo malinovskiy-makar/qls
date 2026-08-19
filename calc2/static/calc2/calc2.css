@@ -299,12 +299,16 @@ input:focus-visible, select:focus-visible {
 .ppfsum-name:hover { border-color: var(--border); }
 .ppfsum-name:focus { border-color: var(--accent); background: var(--input-bg); color: var(--text); outline: none; }
 #ppfsum-rows .field > label { display: flex; align-items: center; }
+/* Единственная плашка подсказки на весь калькулятор (канон 2.11, `.k-tip`).
+   ⚠️ `pointer-events: none` — часть правила, а не украшение: плашка всплывает
+   там, где рука ведёт указатель, и без этого она перехватывала бы нажатие по
+   тому самому элементу, который объясняет. */
 #hint-tip {
-  position: fixed; z-index: 200; display: none; max-width: 300px;
-  padding: 9px 11px; border-radius: var(--r);
-  background: var(--surface); border: var(--line) solid var(--border);
-  box-shadow: 0 6px 22px rgba(0,0,0,.16);
-  font-size: 12px; line-height: 1.5; color: var(--text2);
+  position: fixed; z-index: var(--z-pop); display: none; max-width: 260px;
+  padding: 8px 11px; border-radius: var(--r);
+  background: var(--surface-2); border: var(--line) solid var(--border);
+  box-shadow: var(--shadow-pop); pointer-events: none;
+  font-size: 12px; line-height: 1.45; color: var(--text2);
 }
 #hint-tip hr { border: none; border-top: var(--line) solid var(--border); margin: 7px 0; }
 .hint code { background: var(--surface-2); border: 1px solid var(--border-soft);
@@ -1067,16 +1071,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .dock-btn:hover { background: var(--surface); color: var(--text); }
 .dock-btn.active { background: var(--accent-tint); color: var(--accent); }
 .dock-btn:disabled { opacity: .4; cursor: not-allowed; }
-/* Подпись-тултип справа от кнопки */
-.dock-btn[data-tip]::after {
-  content: attr(data-tip); position: absolute; left: calc(100% + 8px); top: 50%;
-  transform: translateY(-50%) scale(.96); transform-origin: left center;
-  background: var(--text); color: var(--surface); font-size: 11px; font-weight: 600;
-  padding: 4px 8px; border-radius: var(--r); white-space: nowrap; pointer-events: none;
-  opacity: 0; transition: opacity .12s var(--ease), transform .12s var(--ease); z-index: var(--z-pop);
-}
-.dock-btn:hover[data-tip]::after,
-.dock-btn:focus-visible[data-tip]::after { opacity: 1; transform: translateY(-50%) scale(1); }
+/* п. 78. Своей подписи у кнопки полосы больше нет: подсказку показывает одна
+   общая плашка (#hint-tip), та же, что у знаков «?». Правило `::after`,
+   привязанное к :focus-visible, держало подпись и ПОСЛЕ нажатия. */
 
 /* ── Боковые панели ──────────────────────────────────────────────────
    Обе устроены одинаково и различаются только стороной. Свёрнутая панель
@@ -1098,6 +1095,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .side-right { width: 268px; border-left:  1px solid var(--border); }
 .side-left, .side-right { flex: 0 1 auto; min-width: 200px; }
 .side.collapsed { width: 26px; min-width: 26px; flex: 0 0 auto; }
+/* п. 77. Имя свёрнутой панели читается вдоль её корешка. Видно только в
+   свёрнутом виде: у раскрытой панели имя и так стоит в шапке. */
+.side-spine {
+  display: none; position: absolute; top: 52px; left: 0; width: 26px;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--text3);
+  white-space: nowrap; pointer-events: none;
+  text-align: left;
+}
+.side.collapsed .side-spine { display: block; }
+.side-right .side-spine { transform: rotate(180deg); transform-origin: center; top: auto; bottom: 52px; }
 .side-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .side.collapsed .side-inner { display: none; }
 
@@ -1113,23 +1121,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .side-left  .side-arrow { right: 2px; }
 .side-right .side-arrow { left: 2px; }
 .side-arrow:hover { background: var(--surface-2); color: var(--text); }
-/* Подпись всплывает не сразу: она нужна тому, кто задумался над иконкой,
-   и мешала бы при обычном движении мыши через панель. */
-.side-arrow[data-tip]::after {
-  content: attr(data-tip); position: absolute; top: 50%;
-  transform: translateY(-50%) scale(.96);
-  background: var(--text); color: var(--surface); font-size: 11px; font-weight: 600;
-  padding: 4px 8px; border-radius: var(--r); white-space: nowrap; pointer-events: none;
-  opacity: 0; transition: opacity .12s var(--ease) 0s, transform .12s var(--ease) 0s;
-  z-index: var(--z-pop);
-}
-.side-left  .side-arrow[data-tip]::after { left: calc(100% + 8px); transform-origin: left center; }
-.side-right .side-arrow[data-tip]::after { right: calc(100% + 8px); transform-origin: right center; }
-.side-arrow:hover[data-tip]::after,
-.side-arrow:focus-visible[data-tip]::after {
-  opacity: 1; transform: translateY(-50%) scale(1);
-  transition-delay: .9s;
-}
+/* п. 78. Подпись стрелки показывает та же общая плашка, что и у всех
+   остальных подсказок калькулятора. */
+
 .side-arrow svg { width: 15px; height: 15px; transition: transform .22s var(--ease); }
 .side.collapsed .side-arrow svg { transform: rotate(180deg); }
 
@@ -1405,15 +1399,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 }
 .cv-mode__stop:hover { background: var(--btn-bg-hover); }
 
-/* Быстрая кнопка расчёта площади поверх графика. */
-.quick-area {
-  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
-  z-index: var(--z-float); padding: 7px 14px; font-size: 12px; font-weight: 600;
-  color: var(--on-btn); background: var(--btn-bg); border: none; border-radius: var(--r-pill);
-  box-shadow: var(--shadow-float);
-}
-.quick-area:hover { background: var(--btn-bg-hover); }
-.quick-area[hidden] { display: none; }
 
 /* Поля координат своей точки. */
 .mark-xy { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
@@ -1547,15 +1532,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .gt-btn:active { transform: scale(.94); }
 .gt-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-tint); }
 .gt-btn[hidden] { display: none; }
-.gt-btn[data-tip]::after {
-  content: attr(data-tip); position: absolute; top: calc(100% + 7px); right: 0;
-  background: var(--text); color: var(--surface); font-size: 11px; font-weight: 600;
-  padding: 4px 8px; border-radius: var(--r); white-space: nowrap; pointer-events: none;
-  opacity: 0; transform: translateY(-3px); transition: opacity .12s var(--ease), transform .12s var(--ease);
-  z-index: var(--z-pop);
-}
-.gt-btn:hover[data-tip]::after,
-.gt-btn:focus-visible[data-tip]::after { opacity: 1; transform: none; }
+/* п. 78. Кнопки над графиком тоже показывают общую плашку. */
 @media (prefers-reduced-motion: no-preference) {
   .gt-btn.appear { animation: gtIn .18s var(--ease); }
   @keyframes gtIn { from { opacity: 0; transform: scale(.9); } }
@@ -1625,6 +1602,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 @media (max-width: 820px) {
   .side-right:not(.user-open) { width: 26px; min-width: 26px; flex: 0 0 auto; }
   .side-right:not(.user-open) .side-inner { display: none; }
+  /* п. 77. Панель, свёрнутая самой раскладкой, называет себя так же, как
+     свёрнутая рукой: класса `collapsed` на ней нет, поэтому правило своё. */
+  .side-right:not(.user-open) .side-spine { display: block; }
 }
 
 /* ── ПЕЧАТЬ (А58) ─────────────────────────────────────────────────────────
@@ -1640,7 +1620,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
      находят проверки: свой тег и общие имена шапки платформы. */
   nav, header, .site-header, #site-nav,
   .dock, .side, .graph-tools, .wrench, .picker, .modal, .toast,
-  #pult, .quick-area, .side-arrow, .kbd, .mkbd { display: none !important; }
+  #pult, .cv-mode, .side-arrow, .kbd, .mkbd { display: none !important; }
   .app { display: block !important; height: auto !important; }
   .stage, .graph-wrap {
     display: block !important; width: 100% !important; height: auto !important;

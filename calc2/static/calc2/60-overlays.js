@@ -825,7 +825,7 @@ function floatRects() {
   if (!node || !wrap) return [];
   const box = node.getBoundingClientRect();
   const out = [];
-  wrap.querySelectorAll('.graph-tools, .quick-area, .wrench, .graph-float').forEach(el => {
+  wrap.querySelectorAll('.graph-tools, .cv-mode, .wrench, .graph-float').forEach(el => {
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || el.hasAttribute('hidden')) return;
     const r = el.getBoundingClientRect();
@@ -1507,8 +1507,17 @@ function armVerts(on) {
    на самом деле произойдёт. Состояние спрашиваем у `canvasMode()` —
    второго списка флагов не заводим. */
 const CANVAS_MODE_TEXT = {
-  mark: { what: '<b>Ставите точку</b> <span>· нажмите на график</span>', stop: 'Отмена' },
-  vert: { what: '<b>Отмечаете вершины</b> <span>· каждый щелчок ставит вершину</span>', stop: 'Готово' },
+  mark: () => ({ what: '<b>Ставите точку</b> <span>· нажмите на график</span>', stop: 'Отмена' }),
+  /* Счёт набранного стоит здесь, а не отдельной плавающей кнопкой (п. 80):
+     человек работает на холсте, и видеть, сколько уже отмечено, ему нужно
+     здесь же. Считает площадь по-прежнему одна кнопка — та, под которой
+     появляется результат. */
+  vert: () => {
+    const n = (STATE.areaVerts || []).length;
+    const tail = n ? ('· отмечено ' + n + (n < 3 ? ', нужно хотя бы три' : ''))
+                   : '· каждый щелчок ставит вершину';
+    return { what: '<b>Отмечаете вершины</b> <span>' + tail + '</span>', stop: 'Готово' };
+  },
 };
 
 function syncCanvasMode() {
@@ -1519,9 +1528,10 @@ function syncCanvasMode() {
   if (arm) arm.hidden = !!STATE.vertArm;
   const bar = document.getElementById('cv-mode');
   if (!bar) return;
-  const t = CANVAS_MODE_TEXT[canvasMode()];
-  bar.hidden = !t;
-  if (!t) return;
+  const make = CANVAS_MODE_TEXT[canvasMode()];
+  bar.hidden = !make;
+  if (!make) return;
+  const t = make();
   const what = document.getElementById('cv-mode-what');
   const stop = document.getElementById('cv-mode-stop');
   if (what) what.innerHTML = t.what;
@@ -2062,15 +2072,8 @@ function syncAreaCalcUI() {
   updateQuickArea();
 }
 
-// Быстрая кнопка у графика, когда вершин набрано достаточно.
-function updateQuickArea() {
-  const b = document.getElementById('quick-area');
-  if (!b) return;
-  const n = (STATE.areaVerts || []).length;
-  const show = (STATE.areaCalcMode === 'poly') && n >= 3;
-  b.hidden = !show;
-  if (show) b.textContent = 'Площадь по ' + n + ' точкам';
-}
+// Сколько вершин набрано — говорит полоса режима над холстом (п. 80).
+function updateQuickArea() { syncCanvasMode(); }
 
 function setAreaCalcMode(mode) {
   STATE.areaCalcMode = (mode === 'poly') ? 'poly' : 'curve';
@@ -2117,8 +2120,6 @@ function wireAreaCalc() {
   if (calc) calc.addEventListener('click', () => runAreaCalc());
   const clr = document.getElementById('ac-clear');
   if (clr) clr.addEventListener('click', () => clearAreaCalc());
-  const q = document.getElementById('quick-area');
-  if (q) q.addEventListener('click', () => { setAreaCalcMode('poly'); runAreaCalc(); });
   // Выбрали кривую — сразу видно, на каком отрезке считаем, и кнопка загорается.
   const pick = document.getElementById('ac-pick');
   if (pick) pick.addEventListener('change', () => { syncAreaRangeLabel(); syncAreaCalcButton(); });
@@ -2388,10 +2389,10 @@ function buildParamChip(box, name) {
   track.className = 'param-track';
   const loLab = document.createElement('button');
   loLab.type = 'button'; loLab.className = 'param-bound';
-  loLab.title = 'Границы и шаг';
+  loLab.setAttribute('data-tip', 'Границы и шаг');
   const hiLab = document.createElement('button');
   hiLab.type = 'button'; hiLab.className = 'param-bound';
-  hiLab.title = 'Границы и шаг';
+  hiLab.setAttribute('data-tip', 'Границы и шаг');
 
   const sl = document.createElement('input');
   sl.type = 'range'; sl.style.accentColor = cssVar('--accent');

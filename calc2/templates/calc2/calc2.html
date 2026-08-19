@@ -754,6 +754,11 @@
             aria-label="Свернуть или развернуть панель ввода" aria-expanded="true">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg>
     </button>
+    <!-- п. 77. Свёрнутая панель называет себя. Полоса в 26 пикселей со
+         стрелкой и больше ничем — это загадка: на узком экране правая панель
+         сворачивается САМА, и человек видит непонятный корешок у края. Имя
+         читается вдоль полосы и исчезает, как только панель раскрыта. -->
+    <span class="side-spine" aria-hidden="true">Ввод функций</span>
     <div class="side-inner">
       <!-- П5: крошки глобального блока над названием модели больше нет.
            П8: серой подписи «Ввод функций» тоже — название модели и есть
@@ -844,7 +849,9 @@
 
     <!-- Равновесие (шаг 5) -->
     <div class="section" id="sec-eq">
-      <div class="section-title">Равновесие D = S</div>
+      <!-- Строку заполняет updateEqSectionTitle: у монополии и у автаркии она
+           своя, а условие равновесия набирается формулой (п. 82). -->
+      <div class="section-title">Равновесие $D = S$</div>
       <div id="info-eq"></div>
     </div>
 
@@ -2113,8 +2120,12 @@
       <button class="cv-mode__stop" id="cv-mode-stop" type="button">Готово</button>
     </div>
 
-    <!-- Быстрый расчёт площади: появляется, когда вершин набрано достаточно. -->
-    <button class="quick-area" id="quick-area" type="button" hidden>Площадь по точкам</button>
+    <!-- п. 80. Плавающей кнопки «Площадь по N точкам» здесь больше нет.
+         Она появлялась внизу по центру холста, в шестистах пикселях от
+         кнопки расчёта в панели, и читалась как подсказка к ней, а не как
+         второе такое же действие. Сколько вершин набрано, говорит полоса
+         режима над холстом; считает площадь одна кнопка — та, под которой
+         появляется результат. -->
 
     <!-- Кнопки над графиком: настройки плоскости и возврат масштаба. -->
     <div class="graph-tools">
@@ -2241,6 +2252,7 @@
             aria-label="Свернуть или развернуть панель аналитики" aria-expanded="true">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6l6 6-6 6"/></svg>
     </button>
+    <span class="side-spine" aria-hidden="true">Аналитика</span>
     <div class="side-inner">
       <div class="side-head"><h2>Аналитика</h2></div>
       <div class="side-scroll">

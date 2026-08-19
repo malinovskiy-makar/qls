@@ -744,16 +744,27 @@ function isMonopolyScene() {
   return MONOPOLY_SCENES.indexOf(STATE.sceneKey) >= 0 || MONOPOLY_SCENES.indexOf(key) >= 0;
 }
 
+/* п. 82. Условие равновесия — МАТЕМАТИКА, и набирается как математика.
+   Обычным текстом среди набранных формул «D = S» читалось как опечатка:
+   на соседних строках те же буквы стоят курсивом. */
 function eqSectionTitle() {
-  if (isMonopolyScene()) return 'Оптимум монополии: MR = MC';
+  if (isMonopolyScene()) return 'Оптимум монополии: $MR = MC$';
   if (STATE.scenario === 'openecon') return 'Равновесие без торговли (автаркия)';
-  return 'Равновесие D = S';
+  return 'Равновесие $D = S$';
 }
 
+/* ⚠️ Сверяем ИСХОДНУЮ строку, а не то, что на экране: после KaTeX внутри
+   заголовка лежат его узлы, `textContent` уже не равен исходнику, и сравнение
+   с ним переписывало бы заголовок на каждой перерисовке, стирая набор. */
 function updateEqSectionTitle() {
   const sec = document.getElementById('sec-eq');
   const t = sec && sec.querySelector('.section-title');
-  if (t && t.textContent !== eqSectionTitle()) t.textContent = eqSectionTitle();
+  if (!t) return;
+  const raw = eqSectionTitle();
+  if (t.dataset.raw === raw) return;
+  t.dataset.raw = raw;
+  t.textContent = raw;
+  if (typeof renderMathIn === 'function') renderMathIn(t);
 }
 
 // Табло слева: показываем Q* и P* (или подсказку / «не найдено»).

@@ -325,7 +325,13 @@ function updateMacroPanel() {
     html += `<div class="stat"><span>Краткосрочно: (Y; P)</span><b>(${fmt(r.eq.Q)}; ${fmt(r.eq.P)})</b></div>`;
     html += `<div class="stat"><span>Потенциальный выпуск $Y^*$</span><b>${fmt(r.Ystar)}</b></div>`;
     const g = r.gap;
-    html += `<div class="stat"><span>Разрыв выпуска</span><b>${(g >= 0 ? '+' : '') + fmt(g)}</b></div>`;
+    /* п. 82. У нуля знака нет. «+0» обещает превышение, которого нет: разрыв
+       ровно нулевой значит, что выпуск и есть потенциальный. Сравниваем с
+       ПОКАЗАННЫМ числом, а не с сырым: −0,004 печатается как «0», и знак
+       у него был бы взят от невидимой сотой. */
+    const shown = fmt(g);
+    const zero = /^-?0([.,]0+)?$/.test(shown);
+    html += `<div class="stat"><span>Разрыв выпуска</span><b>${(zero || g < 0) ? shown : '+' + shown}</b></div>`;
     html += `<div class="hint" style="margin-top:4px;">${Math.abs(g) < 1e-6
       ? 'Экономика ровно на потенциале: краткосрочное равновесие совпало с долгосрочным, разрыва нет.'
       : (g < 0
