@@ -830,6 +830,9 @@ def build_rows(assignment, student, user=None, with_comments=True):
         problem = item.problem
         status = work_status(submission, submission.submitted_answer,
                              submission.solution_text)
+        # Считаем ОДИН раз: значение нужно и флагу для шаблона, и решению
+        # о том, класть ли сам текст решения в контекст.
+        solution_visible = item.is_solution_visible_for(user)
         rows.append({
             'item': item,
             'number': number,
@@ -879,10 +882,21 @@ def build_rows(assignment, student, user=None, with_comments=True):
                              or (submission.solution_text or '').strip()),
             'selected': selected_values(submission.submitted_answer),
             'comments': comments_by_item.get(item.pk, []),
-            'solution_visible': item.is_solution_visible_for(user),
+            'solution_visible': solution_visible,
             'solution_hint': item.solution_unlock_hint(),
             'has_solution': item.has_solution,
-            'solution_text': item.solution_text,
+            # ⚠️ ТЕКСТ РЕШЕНИЯ КЛАДЁТСЯ, ТОЛЬКО ЕСЛИ ЕГО МОЖНО ПОКАЗАТЬ.
+            # Раньше здесь стояло безусловное `item.solution_text`, а прятал
+            # решение шаблон — по соседнему флагу `solution_visible`. Проверено
+            # опытом: достаточно убрать один `{% if %}` в `_problem_card.html`,
+            # и эталонное решение уезжает ученику прямо посреди контрольной.
+            # Шаблонов, рисующих эту строку, четыре, и забыть условие можно в
+            # любом из них.
+            #
+            # Теперь правило серверное: не видно — не отдаём. `has_solution` и
+            # `solution_hint` рядом остаются намеренно: ученику надо сказать,
+            # что решение существует и когда откроется, не показывая его.
+            'solution_text': item.solution_text if solution_visible else '',
             'graph': item.graph,
         })
     # ⚠️ ВЕРДИКТ СЧИТАЕТ ОДНА ФУНКЦИЯ (ревью 15.08, фаза 6). Плашка результата

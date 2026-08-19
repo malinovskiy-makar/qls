@@ -109,7 +109,16 @@ def api_save_problem(request):
 
     lookup = {'owner': request.user}
     if catalog_id:
-        lookup['catalog_problem'] = get_object_or_404(Problem, pk=catalog_id)
+        # ⚠️ ФИЛЬТР ПО ОПУБЛИКОВАННОСТИ ЗДЕСЬ ОБЯЗАТЕЛЕН. Раньше стояло просто
+        # `get_object_or_404(Problem, pk=catalog_id)`, и это была утечка
+        # чернового контента: любой вошедший подставлял в этот эндпоинт номер
+        # черновика, скрытой или зафлагованной шлюзом задачи, она ложилась ему
+        # в «Сохранённое» и оттуда показывалась на `/profile/?tab=saved`
+        # вместе с условием. Каталог такие задачи не отдаёт — а этот путь
+        # отдавал, в обход шлюза качества.
+        lookup['catalog_problem'] = get_object_or_404(
+            Problem, pk=catalog_id, status=Problem.Status.PUBLISHED,
+            needs_quality_review=False)
     else:
         lookup['custom_problem'] = get_object_or_404(
             CustomProblem, pk=custom_id, owner=request.user)

@@ -3,10 +3,8 @@
 """
 import json
 import re
-from functools import wraps
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -21,17 +19,33 @@ from .access import (group_id_param, group_label_param,
 
 
 # ---------------------------------------------------------------------------
-# Декоратор: только учитель (или суперпользователь)
+# Декоратор: только репетитор
 # ---------------------------------------------------------------------------
-
-def teacher_required(view_func):
-    @login_required(login_url='/login/')
-    @wraps(view_func)
-    def wrapper(request, *args, **kwargs):
-        if not (request.user.role == 'teacher' or request.user.is_staff):
-            raise PermissionDenied
-        return view_func(request, *args, **kwargs)
-    return wrapper
+#
+# ⚠️ ЗДЕСЬ БЫЛА ВТОРАЯ, СВОЯ ПРОВЕРКА РОЛИ — И ЭТО БЫЛА ДЫРА.
+#
+# Она смотрела ТОЛЬКО старое поле `User.role`:
+#
+#     if not (request.user.role == 'teacher' or request.user.is_staff):
+#
+# А `tutor_required` из `access.py` смотрит обе системы ролей. Репетитор,
+# заведённый через `UserProfile` и без старого поля, проходил на 95 маршрутов
+# кабинета и получал 403 на шести — тех, что висели на этой проверке.
+#
+# ПОЧЕМУ ОБЪЕДИНЯЕМ, А НЕ ВЫБИРАЕМ ОДНУ СИСТЕМУ. Обе живы намеренно и ни одна
+# не покрывает всех:
+#   • `UserProfile.role` — источник правды новой платформы, но у пользователей,
+#     заведённых до профилей, профиля просто нет;
+#   • `User.role` — легаси, но на нём висит `limit_choices_to` у StudentGroup,
+#     и синхронизация профиль → юзер ОДНОСТОРОННЯЯ (`sync_user_role`), то есть
+#     правка `User.role` руками через админку профиль не подтянет.
+# Значит верный ответ — «репетитор хоть по одной системе», и он уже записан
+# один раз в `access.is_tutor`.
+#
+# Имя оставлено алиасом, а не удалено: оно стоит в двенадцати местах этого
+# файла, и переименование ради переименования — это диff, в котором смысловая
+# правка потонет. Второй РЕАЛИЗАЦИИ больше нет, а именно она и была проблемой.
+teacher_required = tutor_required
 
 
 # ---------------------------------------------------------------------------
@@ -915,8 +929,18 @@ def api_problem_detail(request, key):
     if not key.isdigit():
         return JsonResponse({'error': 'Not found'}, status=404)
 
+    # ⚠️ ТОЛЬКО ОПУБЛИКОВАННЫЕ И НЕ ЗАФЛАГОВАННЫЕ. Раньше фильтра не было
+    # вовсе: `.get(pk=int(key))` отдавал черновик, скрытую и забракованную
+    # шлюзом задачу. Окно предпросмотра показывает то, что кладут в работу, а
+    # подбор берёт только опубликованные — значит и окно обязано. Иначе
+    # репетитор видит в предпросмотре задачу, которую положить не сможет.
     try:
-        problem = Problem.objects.prefetch_related('topics', 'parts', 'source_references__source').get(pk=int(key))
+        problem = (
+            Problem.objects
+            .prefetch_related('topics', 'parts', 'source_references__source')
+            .get(pk=int(key), status=Problem.Status.PUBLISHED,
+                 needs_quality_review=False)
+        )
     except Problem.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
 
