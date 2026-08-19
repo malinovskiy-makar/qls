@@ -37,9 +37,12 @@
 ## Как запустить
 
 ```bash
-./venv/bin/python manage.py runserver          # macOS
-venv/Scripts/python.exe manage.py runserver    # Windows
+venv313/Scripts/python.exe manage.py runserver   # Windows
+./venv313/bin/python manage.py runserver         # macOS
 ```
+
+Стек — **Python 3.13 + Django 5.2 LTS**. Окружение `venv313/`; `venv/` (3.9) и
+`venv312/` оставлены как страховка перехода.
 
 Сайт: http://127.0.0.1:8000/ · Админка: `/admin/` · Демо-данные: `manage.py seed_demo`
 
@@ -51,7 +54,7 @@ venv/Scripts/python.exe manage.py runserver    # Windows
 ```bash
 manage.py check                              # 0 ошибок
 manage.py makemigrations --check --dry-run   # ничего не предлагает создать
-manage.py test                               # ~2 387 тестов, ~13 минут
+manage.py test                               # 2 391 тест, ~18 минут
 ```
 
 Плюс визуальная проверка человеком того, что менялось на экране. «Тесты зелёные»

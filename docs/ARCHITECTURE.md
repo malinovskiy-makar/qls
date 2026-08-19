@@ -12,19 +12,25 @@
 
 ## Стек
 
-- **Python 3.9** + Django 4.2 (LTS) + SQLite локально / **PostgreSQL на проде**.
+- **Python 3.13** + **Django 5.2 LTS** + SQLite локально / **PostgreSQL на проде**.
+  Переход сделан 2026-08-19 — [ADR 0007](adr/0007-target-stack-python313-django52.md).
 - Проект: `config/`. Основное приложение: `problems/`. Локальная база — `db.sqlite3`.
 - Кастомный пользователь `problems.User` с полем `role`; роли платформы —
   в отдельной модели `UserProfile` (`problems/models_platform.py`).
-- Виртуальное окружение в `./venv/`.
+- Зависимости: исходники `requirements/*.in`, локи `requirements/*.txt`
+  (собраны `pip-compile` на 3.13). Корневые `requirements.txt` и
+  `requirements-local.txt` — указатели на них.
+- Виртуальное окружение — `venv313/`. Рядом сохранены `venv/` (3.9) и
+  `venv312/` (мост) до подтверждения владельцем.
 
 Синтаксис `int | None` разрешён с 2026-08-19 (union через `|` требует Python
 3.10+). Массово переписывать существующие `Optional[int]` не надо — это шум в
 диффе; снят только запрет на новое.
 
-⚠️ **Путь к интерпретатору зависит от машины.** На macOS — `./venv/bin/python`,
-на Windows — `venv/Scripts/python.exe`. В документации проекта встречаются оба;
-это не опечатка, а две рабочие машины.
+⚠️ **Путь к интерпретатору зависит от машины.** На macOS — `./venv313/bin/python`,
+на Windows — `venv313/Scripts/python.exe`. В старых записях проекта встречается
+`venv/` без цифр — это окружение на Python 3.9, оно оставлено как страховка
+перехода и боевым больше не является.
 
 ---
 
@@ -106,12 +112,12 @@
 
 - Хостинг **Render.com** (free, Frankfurt). БД — **PostgreSQL** `qls-db`.
 - Репозиторий приватный `github.com/malinovskiy-makar/qls`, ветка `main`.
-- Python 3.11 на проде. Docker не используется → **нет TeX** → PDF-экспорт
+- Python **3.13** на проде (`render.yaml`). Docker не используется → **нет TeX** → PDF-экспорт
   подборок отключён, доступен только `.tex` + Overleaf.
 - `sentence-transformers` на проде **не грузится**: эмбеддинги считаются локально
   и лежат в базе, «похожие» работают по кэшу M2M.
-- Файлы деплоя: `requirements.txt` (без ML), `requirements-local.txt` (с ML),
-  `config/settings_production.py`, `Procfile`, `render.yaml`.
+- Файлы деплоя: `requirements.txt` (указатель на `requirements/base.txt` — лок
+  без ML), `config/settings_production.py`, `Procfile`, `render.yaml`.
 
 **Деплой = пуш в `main`** (Auto-Deploy On Commit, 2–4 минуты; Start Command
 прогоняет `migrate` и `collectstatic`).
@@ -146,9 +152,14 @@
 в России. Пока не реализованы — это то, куда идём.
 
 **Целевой стек: Python 3.13 + Django 5.2 LTS + PostgreSQL 17**
-([ADR 0007](adr/0007-target-stack-python313-django52.md)). Сегодняшний прод живёт
-**без патчей безопасности**: Python 3.9 не обновляется с 31.10.2025, Django 4.2
-LTS — с 07.04.2026.
+([ADR 0007](adr/0007-target-stack-python313-django52.md)).
+
+✅ **Python 3.13 и Django 5.2 достигнуты 2026-08-19** (сессия 2Б). Осталось
+**PostgreSQL 17** — это следующая сессия, вместе с Redis и CI.
+
+⚠️ Пока выкатки не было, на сервере всё ещё крутится прежний рантайм.
+`render.yaml` уже требует Python 3.13.12 — **до пуша в `main` проверить, что
+хостинг эту версию даёт**, иначе сборка упадёт.
 
 Не 6.x, потому что 6.0 и 6.1 не LTS (следующий LTS — 6.2 в апреле 2027), Channels
 не поддерживает 6.1, а 6.1 отказался от PostgreSQL 14. Django 5.2 LTS живёт до
