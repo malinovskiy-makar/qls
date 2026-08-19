@@ -33,7 +33,13 @@ class ActivityGridTests(TestCase):
 
     def setUp(self):
         self.user = make_student()
-        self.now = timezone.now()
+        # ⚠️ Полдень по МЕСТНОМУ времени, а не «сейчас». `busy_day` растягивает
+        # события на десятки минут, и если прогон случился в последние минуты
+        # суток, хвост дня переваливал за полночь и попадал на СЛЕДУЮЩИЙ
+        # календарный день — серия занятий вырастала на день, а «средний
+        # рабочий день» делился на лишний день. Тест падал только ночью.
+        self.now = timezone.localtime().replace(hour=12, minute=0, second=0,
+                                                microsecond=0)
 
     def event(self, when, kind='solved', source='homework'):
         row = LearningEvent.objects.create(user=self.user, event_type=kind,

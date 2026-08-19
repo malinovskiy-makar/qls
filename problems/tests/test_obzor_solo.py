@@ -69,8 +69,13 @@ class SoloWordingTests(TestCase):
 
     # ---- 6.1 ----------------------------------------------------------
     def test_submitted_date_instead_of_a_ratio(self):
+        # ⚠️ Дату сверяем в ПОЯСЕ ПРОЕКТА, а не в UTC. Шаблон печатает момент
+        # через `date`, который переводит его в местное время сам, а
+        # `strftime` у aware-даты печатает UTC. Между 21:00 и полуночью по
+        # местному это РАЗНЫЕ календарные дни, и тест падал только вечером.
+        local = timezone.localtime(self.submitted_at)
         line = meta(self._tab('assignments'))[0]
-        self.assertIn('сдана %s' % self.submitted_at.strftime('%d.%m'), line)
+        self.assertIn('сдана %s' % local.strftime('%d.%m'), line)
         self.assertNotIn('из 1', line)
 
     def test_not_submitted_says_so(self):
