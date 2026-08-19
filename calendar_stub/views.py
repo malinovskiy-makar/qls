@@ -15,6 +15,10 @@ from django.views.decorators.http import require_http_methods
 from problems.models import (
     Assignment, CalendarEvent, StudentGroup, Submission,
 )
+# Проверка роли — ОДНА на проект. `teacher/access.py` для того и заведён
+# («переиспользуемый — его ждут все новые экраны»); свою копию здесь
+# заводить нельзя, иначе систем ролей снова станет две.
+from teacher.access import is_student, is_tutor
 
 # ---------------------------------------------------------------------------
 # Константы
@@ -34,7 +38,15 @@ OVERDUE_COLOR = '#ef4444'
 # ---------------------------------------------------------------------------
 
 def _visible_qs(user):
-    """QuerySet событий, видимых пользователю."""
+    """QuerySet событий, видимых пользователю.
+
+    ⚠️ РОЛЬ СПРАШИВАЕТСЯ У `teacher.access`, А НЕ У ПОЛЯ `user.role`.
+    Здесь стояло `getattr(user, 'role', '') == 'teacher'` — то есть третье
+    в проекте место, знающее только СТАРУЮ систему ролей. Репетитор,
+    заведённый через `UserProfile`, попадал в последнюю ветку и не видел
+    в календаре даже собственных событий. `is_tutor` и `is_student` смотрят
+    обе системы; вторых реализаций проверки роли в проекте больше нет.
+    """
     base = CalendarEvent.objects.select_related(
         'author', 'assignment',
     ).prefetch_related('groups')
@@ -42,15 +54,13 @@ def _visible_qs(user):
     if user.is_superuser:
         return base.all()
 
-    role = getattr(user, 'role', '')
-
-    if role == 'student':
+    if is_student(user):
         my_groups = user.enrolled_groups.all()
         return base.filter(
             Q(is_global=True) | Q(groups__in=my_groups)
         ).distinct()
 
-    if role == 'teacher':
+    if is_tutor(user):
         my_groups = user.teaching_groups.all()
         return base.filter(
             Q(is_global=True) | Q(author=user) | Q(groups__in=my_groups)
@@ -80,18 +90,18 @@ def _format_event(event, user, now=None):
     time_str = local_start.strftime('%H:%M')
     short_title = f'{time_str} {event.title[:10]}'
 
-    role = getattr(user, 'role', '')
+    tutor = user.is_superuser or is_tutor(user)
     can_edit = user.is_superuser or event.author_id == user.pk
 
     assignment_url = None
     if event.assignment_id:
-        if user.is_superuser or role == 'teacher':
+        if tutor:
             assignment_url = f'/teacher/assignment/{event.assignment_id}/'
-        elif role == 'student':
+        elif is_student(user):
             assignment_url = f'/student/assignment/{event.assignment_id}/'
 
     submissions_info = None
-    if event.assignment_id and (user.is_superuser or role == 'teacher'):
+    if event.assignment_id and tutor:
         total = event.assignment.students.count()
         submitted = Submission.objects.filter(
             assignment_id=event.assignment_id,
@@ -135,6 +145,28 @@ def _parse_aware_dt(date_str, time_str):
         return timezone.make_aware(raw)
     except (ValueError, OverflowError):
         return None
+
+
+def _own_assignment(user, assignment_id):
+    """Работа, которую этот пользователь вправе привязать к событию. Или None.
+
+    ⚠️ ЗАЧЕМ ЭТО ПОЯВИЛОСЬ. Раньше и в создании, и в правке события стояло
+    просто `Assignment.objects.get(pk=assignment_id)` — БЕЗ проверки владения.
+    Репетитор мог подставить номер ЧУЖОЙ работы, и календарь начинал
+    показывать про неё `submissions_info`: сколько всего учеников и сколько
+    уже сдали. То есть номер чужой работы обменивался на сведения о её ходе.
+
+    Сужаем queryset, а не проверяем после загрузки: забытая проверка — дыра,
+    забытое сужение — пустая выдача.
+    """
+    if not assignment_id:
+        return None
+    assignments = Assignment.objects.all()
+    if not user.is_superuser:
+        assignments = assignments.filter(
+            Q(author=user) | Q(group__teacher=user)
+        ).distinct()
+    return assignments.filter(pk=assignment_id).first()
 
 
 def _set_groups(event, group_ids, user, is_global):
@@ -225,9 +257,10 @@ def events_api(request):
 def event_create(request):
     """POST /calendar/api/events/create/"""
     user = request.user
-    role = getattr(user, 'role', '')
 
-    if not (user.is_superuser or role == 'teacher'):
+    # Роль — через общую проверку, а не через старое поле `user.role`:
+    # репетитор из `UserProfile` иначе не может создать событие вовсе.
+    if not (user.is_superuser or is_tutor(user)):
         return JsonResponse({'error': 'Нет прав'}, status=403)
 
     try:
@@ -264,10 +297,8 @@ def event_create(request):
 
     assignment = None
     if assignment_id and event_type == 'homework':
-        try:
-            assignment = Assignment.objects.get(pk=assignment_id)
-        except Assignment.DoesNotExist:
-            pass
+        # Чужая работа сюда не привяжется — см. `_own_assignment`.
+        assignment = _own_assignment(user, assignment_id)
 
     event = CalendarEvent.objects.create(
         title=title,
@@ -363,10 +394,8 @@ def event_update(request, pk):
     event.is_global   = is_global
 
     if assignment_id and event_type == 'homework':
-        try:
-            event.assignment = Assignment.objects.get(pk=assignment_id)
-        except Assignment.DoesNotExist:
-            event.assignment = None
+        # Чужая работа сюда не привяжется — см. `_own_assignment`.
+        event.assignment = _own_assignment(user, assignment_id)
     elif not assignment_id:
         event.assignment = None
 
@@ -391,11 +420,32 @@ def event_delete(request, pk):
         data = {}
 
     if data.get('delete_all', False):
+        # ⚠️ ПРАВО ПРОВЕРЕНО НА ОДНОМ ЗВЕНЕ, А УДАЛЯЕТСЯ ВСЯ ЦЕПОЧКА.
+        # Так было раньше: выше проверяется авторство `event`, а `.delete()`
+        # шёл по `parent` и всем его потомкам без единой проверки. Достаточно
+        # быть автором ОДНОГО звена, чтобы снести серию целиком — а звенья
+        # серии не обязаны быть одного автора: `parent_event` — обычный
+        # внешний ключ, и админка позволяет его переставить.
+        #
+        # Сужаем сам queryset, а не добавляем ещё одну проверку рядом:
+        # забытая проверка — это дыра, забытое сужение — пустая выдача.
         parent = event.parent_event or event
-        CalendarEvent.objects.filter(
+        chain = CalendarEvent.objects.filter(
             Q(pk=parent.pk) | Q(parent_event=parent)
-        ).delete()
+        )
+        if not user.is_superuser:
+            chain = chain.filter(author=user)
+        # ⚠️ ВЫБРАНО «УДАЛИТЬ ТОЛЬКО СВОЁ», А НЕ «ОТКАЗАТЬ ЦЕЛИКОМ».
+        # Отказ целиком означал бы, что репетитор не может убрать свою серию
+        # из-за чужого звена, которое он не видит и исправить не может, —
+        # тупик без выхода. «Только своё» предсказуемо: чужое не трогается
+        # никогда, а своё уходит полностью.
+        #
+        # Осиротевшие чужие звенья не ломаются: `parent_event` объявлен
+        # с `on_delete=SET_NULL`, они просто перестают быть частью серии.
+        deleted = chain.delete()[0]
     else:
         event.delete()
+        deleted = 1
 
-    return JsonResponse({'status': 'ok'})
+    return JsonResponse({'status': 'ok', 'deleted': deleted})
