@@ -10,12 +10,17 @@ from django.urls import include, path
 
 from catalog import views as catalog_views
 from problems import views_parent, views_platform, views_stats
+from config.csp_report import csp_report
 from problems.views_auth import RoleBasedLoginView
 
 urlpatterns = [
     # Главная страница сайта: статистика, поиск, навигация.
     path('', catalog_views.home, name='home'),
     path('admin/', admin.site.urls),
+    # Куда браузер шлёт нарушения Content-Security-Policy. Политика идёт в
+    # режиме отчёта: она ничего не блокирует, но рассказывает, что заблокировал
+    # бы боевой режим. См. config/security_headers.py.
+    path('csp-report/', csp_report, name='csp_report'),
     # Логин / логаут.
     path('login/', RoleBasedLoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(next_page='/login/'), name='logout'),

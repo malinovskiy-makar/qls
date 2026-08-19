@@ -296,11 +296,22 @@ class CalendarSeriesDeleteTests(TestCase):
             'чужое звено серии удалено — дыра вернулась')
 
     def test_outsider_cannot_delete_at_all(self):
-        """Посторонний не удаляет ничего и получает отказ."""
+        """Посторонний не удаляет ничего и получает отказ.
+
+        ⚠️ ОЖИДАНИЕ СМЕНИЛОСЬ С 403 НА 404 (сессия 3Б), и это не ослабление.
+        Отказ здесь идёт ПО ВЛАДЕНИЮ, а не по роли: посторонний — обычный
+        вошедший пользователь, просто чужой этому событию. Правило проекта
+        для такого случая одно (docs/SECURITY.md): чужой объект не
+        «запрещён», его для этого человека не существует, иначе 403 на
+        чужом номере подтверждает, что событие есть.
+
+        Зубы теста — во второй проверке: в базе после запроса по-прежнему
+        три события. Она не тронута.
+        """
         outsider = User.objects.create_user('cal_outsider', password=PASSWORD)
         client = _login(outsider.username)
         response = self._delete_all(client, self.parent)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
         self.assertEqual(
             CalendarEvent.objects.filter(
                 pk__in=[self.parent.pk, self.mine_child.pk,

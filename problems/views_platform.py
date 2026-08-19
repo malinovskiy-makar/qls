@@ -11,6 +11,9 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+# Problem нужен и в профиле (пометка «снята с публикации»), и при
+# сохранении — поднимаем импорт на уровень модуля.
+from .models import Problem
 from .models_platform import (
     CustomProblem,
     SavedFolder,
@@ -68,6 +71,23 @@ def profile(request):
                                                      is_deleted=False)
                          .select_related('folder', 'catalog_problem',
                                          'custom_problem'))
+            # ⚠️ РЕШЕНИЕ ВЛАДЕЛЬЦА (сессия 3Б): задачу, которую шлюз качества
+            # забраковал ПОСЛЕ сохранения, показываем — но с пометкой.
+            #
+            # Молча спрятать нельзя: подборка ученика «похудеет» без всякого
+            # объяснения, и он решит, что что-то потерял. Молча показать со
+            # ссылкой тоже нельзя: тогда шлюз не работает — ссылка ведёт на
+            # страницу, которой для него нет.
+            #
+            # Признак считается ЗДЕСЬ, а не в шаблоне: шаблон не должен
+            # ходить в базу и не должен знать правила шлюза.
+            for item in saved:
+                problem = item.catalog_problem
+                item.is_public = bool(
+                    problem is not None
+                    and problem.status == Problem.Status.PUBLISHED
+                    and not problem.needs_quality_review
+                )
         # Группируем по папкам; «Без папки» всегда последняя — это не папка,
         # а её отсутствие.
         groups = [{'folder': f,
@@ -99,7 +119,6 @@ def api_save_problem(request):
     Удаление мягкое — запись остаётся с `is_deleted=True`. Тогда «сохранил →
     убрал → сохранил снова» не спотыкается об ограничение уникальности.
     """
-    from .models import Problem
 
     data = _body(request)
     catalog_id = data.get('catalog_problem_id')

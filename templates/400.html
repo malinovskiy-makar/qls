@@ -1,0 +1,8 @@
+{% extends "_error_base.html" %}
+{% comment %}
+Страница 400. Основа самостоятельная — почему, написано в _error_base.html.
+{% endcomment %}
+{% block title %}Неверный запрос{% endblock %}
+{% block code %}Ошибка 400{% endblock %}
+{% block heading %}Запрос не принят{% endblock %}
+{% block text %}Браузер прислал запрос, который сервер не смог разобрать. Обычно это лечится обновлением страницы: попробуйте открыть её заново.{% endblock %}

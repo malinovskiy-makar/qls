@@ -88,9 +88,23 @@ class ForeignGroupParamTests(TestCase):
 
     @override_settings(DEBUG=False)
     def test_direct_address_gives_our_own_page(self):
+        """Наша страница, а не служебная страница Django.
+
+        ⚠️ МАРКЕР СМЕНИЛСЯ С «К ученикам» НА «Такой страницы нет»
+        (сессия 3Б). Причина: страницу 404 видит кто угодно — гость,
+        ученик, родитель, — а «К ученикам» вела в панель репетитора, то
+        есть в никуда для троих из четверых. Заодно прежняя основа
+        (`teacher/base.html`) собирала адреса через `{% url %}` в
+        пространствах имён приложений и на наборе адресов без `catalog`
+        роняла саму страницу 404 пятисоткой.
+
+        Проверяется ровно то же самое, что и раньше: пришла НАША разметка,
+        а не служебный текст Django. Маркер теперь тот же, что у соседнего
+        теста ниже.
+        """
         response = self.client.get('/teacher/groups/999999/')
         self.assertEqual(response.status_code, 404)
-        self.assertContains(response, 'К ученикам', status_code=404)
+        self.assertContains(response, 'Такой страницы нет', status_code=404)
 
     @override_settings(DEBUG=False)
     def test_exam_constructor_of_a_missing_group(self):
