@@ -414,7 +414,7 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
   'disabled_button_explained', 'tabular_nums', 'title_on_interactive', 'no_h_scroll',
   'type_scale', 'radius_scale', 'state_plate_tint', 'two_stripes', 'math_line_height',
   'shadow_only_pop', 'knum_44', 'accent_fill_count', 'dark_light_widget', 'raw_template',
-  'label_clipped'];
+  'label_clipped', 'label_shake'];
 
 (async () => {
   let browser;
@@ -441,6 +441,48 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
         found.forEach(([k, what]) => put(k, theme + '/' + key, what));
       }
     }
+
+    /* 20. Подпись кривой не дёргается, пока ведут ползунок параметра.
+
+       Это тот самый прогон, которым дефект был найден: «a» ведётся от 1,00 до
+       2,00 шагами по 0,05, и на каждом шаге меряется место подписи. Заодно
+       меряется деление «2» на оси: если плоскость сама поехала, движение
+       подписи было бы честным следствием, а не дефектом.
+
+       Порог 2 px за шаг: подпись имеет право ЕХАТЬ вслед за кривой, но не
+       имеет права прыгать туда-сюда. До правки замер давал до 16 px при
+       неподвижной плоскости. */
+    await openScene(page, 'm-graph', 'light');
+    await page.evaluate(() => {
+      const box = document.getElementById('graph-rows');
+      if (box) openSection(box.closest('.section').id);
+      const inp = document.querySelector('#graph-rows .f-slot > input');
+      if (inp) { inp.value = 'a*x^2 - 3*x'; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+    });
+    await page.waitForTimeout(900);
+    let prevY = null, prevTick = null, worst = 0, tickMoved = 0;
+    for (let i = 0; i <= 20; i++) {
+      await page.evaluate((v) => {
+        if (STATE.params && STATE.params.a) STATE.params.a.value = v;
+        redrawAll();
+      }, 1 + i * 0.05);
+      await page.waitForTimeout(200);
+      const st = await page.evaluate(() => {
+        const lab = document.querySelector('#chart text.curve-name');
+        const box = document.querySelector('#chart').getBoundingClientRect();
+        const tick = Array.from(document.querySelectorAll('#chart text.axis-num'))
+          .filter(t => t.textContent.trim() === '2')[0];
+        return { y: lab ? lab.getBoundingClientRect().top - box.top : null,
+                 tick: tick ? tick.getBoundingClientRect().left - box.left : null };
+      });
+      if (st.y == null) continue;
+      if (prevY != null) worst = Math.max(worst, Math.abs(st.y - prevY));
+      if (prevTick != null && st.tick != null) tickMoved = Math.max(tickMoved, Math.abs(st.tick - prevTick));
+      prevY = st.y; if (prevTick == null) prevTick = st.tick;
+    }
+    if (worst > 2) put('label_shake', 'm-graph',
+                       'скачок ' + worst.toFixed(1) + ' px за шаг при сдвиге плоскости ' +
+                       tickMoved.toFixed(1) + ' px');
 
     /* 9. Страница не едет вбок ни на одной из четырёх ширин (канон 1.9.1). */
     await openScene(page, SCENES[0], 'light');
