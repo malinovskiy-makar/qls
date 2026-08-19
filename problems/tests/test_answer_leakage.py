@@ -78,16 +78,28 @@ class AnswerLeakageTestCase(TestCase):
 
     # -- помощники --------------------------------------------------------
     def assert_no_secrets(self, response, where):
-        """Ни одного маркера в СЫРОМ теле ответа."""
+        """Ни одного маркера в СЫРОМ теле ответа.
+
+        ⚠️ ИЩЕМ ДВЕ ФОРМЫ ЗАПИСИ, И ЭТО НЕ ПРИДИРКА. `JsonResponse` по
+        умолчанию экранирует кириллицу в `\\uXXXX`, поэтому строка
+        «ОТВЕТМАРКЕР» в JSON выглядит как `\\u041e\\u0422...`. Проверка
+        только по сырому виду была бы ЗЕЛЁНОЙ на утёкшем JSON — то есть
+        беззубой ровно там, где утечку заметить труднее всего.
+        """
+        import json as _json
+
         body = response.content.decode('utf-8', errors='replace')
         for name, marker in (('ответ', SECRET_ANSWER),
                              ('решение', SECRET_SOLUTION),
                              ('заметка репетитора', SECRET_NOTE),
                              ('утверждённый эталон', SECRET_OVERRIDE)):
-            self.assertNotIn(
-                marker, body,
-                '%s: в теле ответа найден %s — он уехал в браузер ученика'
-                % (where, name))
+            escaped = _json.dumps(marker)[1:-1]
+            for form, needle in (('как есть', marker),
+                                 ('экранированный в JSON', escaped)):
+                self.assertNotIn(
+                    needle, body,
+                    '%s: в теле ответа найден %s (%s) — он уехал в браузер '
+                    'ученика' % (where, name, form))
 
     def start_attempt(self):
         """Начать попытку — как это делает ученик кнопкой «Начать»."""
