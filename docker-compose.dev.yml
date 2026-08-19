@@ -1,0 +1,62 @@
+# Локальные службы для разработки и прогона тестов.
+#
+# ⚠️ ЭТО НЕ ПРОД. Файл поднимает ту же СУБД, что на боевом сервере, чтобы
+# перестать доказывать корректность на SQLite. Инфраструктура переезда
+# (docker-compose.prod.yml, nginx, certbot) — отдельная работа, её здесь нет.
+#
+# Поднять:      docker compose -f docker-compose.dev.yml up -d
+# Посмотреть:   docker compose -f docker-compose.dev.yml ps
+# Погасить:     docker compose -f docker-compose.dev.yml down
+# Снести с данными: docker compose -f docker-compose.dev.yml down -v
+#
+# ⚠️ ПОРТЫ НАРУЖУ НЕСТАНДАРТНЫЕ — 55432 и 56379. Причина: у разработчика на
+# машине уже может стоять своя PostgreSQL на 5432, и контейнер либо не
+# поднимется, либо (хуже) команды пойдут не в ту базу. Промах по номеру порта
+# заметен сразу, промах по базе — через час.
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: qls_postgres_dev
+    environment:
+      POSTGRES_USER: qls
+      POSTGRES_PASSWORD: qls_dev_password
+      POSTGRES_DB: qls_dev
+      # Сравнение и сортировка строк. C.UTF-8 даёт устойчивый порядок,
+      # не зависящий от локали хоста: иначе один и тот же order_by по
+      # русским строкам даёт разный порядок на разных машинах, и тест,
+      # зелёный у одного, краснеет у другого.
+      LANG: C.UTF-8
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C.UTF-8'
+    ports:
+      - '55432:5432'
+    volumes:
+      - qls_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Тесты стартуют раньше, чем база готова принимать соединения, и
+      # падают с «connection refused». Проверка здоровья закрывает эту щель.
+      test: ['CMD-SHELL', 'pg_isready -U qls -d qls_dev']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: qls_redis_dev
+    # ⚠️ К DJANGO НЕ ПОДКЛЮЧЁН. Стоит здесь заранее, чтобы состав служб
+    # совпадал с целевым сервером. Подключение кэша и сессий — отдельная
+    # сессия, она идёт ПОСЛЕ аудита безопасности: кэш, розданный до того,
+    # как разобраны границы доступа, раздаёт и чужие страницы тоже.
+    ports:
+      - '56379:6379'
+    volumes:
+      - qls_redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  qls_pgdata:
+  qls_redisdata:
