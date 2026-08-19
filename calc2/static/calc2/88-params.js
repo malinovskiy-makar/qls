@@ -212,6 +212,28 @@ function editEqValue(lab, name, current, apply) {
    введённый символ, поэтому «−12» проезжает через «−» (неполное значение,
    пропускаем), «−1» и «−12». Закрывается тремя способами: тронули этот ползунок,
    ввели точное значение, щёлкнули мимо полей интервала. */
+/* ⚠️ ПРАВИЛО ВЫХОДА ЗНАЧЕНИЯ ЗА ПОЛОСУ — ОДНО НА ВЕСЬ КАЛЬКУЛЯТОР, И СЛУЧАЕВ
+   В НЁМ ДВА РАЗНЫХ (решение владельца 19.08).
+
+   Случай первый: человек вписывает ЗНАЧЕНИЕ за пределами действующих границ.
+   Границы переезжают так, чтобы новое значение встало ровно посередине; ширина
+   полосы сохраняется. Проверка: границы −5…3 (ширина 8), вписали 50 → 46…54.
+   Прежде граница просто раздвигалась до значения, и полоса становилась
+   неуправляемо длинной: вписал 1000 при −10…10 — и шаг ползунка обесценился.
+
+   Случай второй: человек задаёт ГРАНИЦЫ, не содержащие текущего значения.
+   Здесь границы остаются как заданы, а подтягивается значение — к ближайшей
+   границе. Проверка: значение 6, задали −1…1 → границы −1…1, значение 1.
+
+   Разница не произвольная: человек всегда получает то, что назвал последним. */
+function centerBandOn(band, value) {
+  const width = Math.abs(band.max - band.min) || 2;
+  return { min: value - width / 2, max: value + width / 2 };
+}
+function pullIntoBand(band, value) {
+  return Math.max(band.min, Math.min(band.max, value));
+}
+
 function attachBoundsEditor(chip, editor, name, get, set) {
   const tex = (t) => {
     const s = document.createElement('span'); s.className = 'param-ed-tex';
@@ -223,6 +245,8 @@ function attachBoundsEditor(chip, editor, name, get, set) {
   const close = () => {
     if (!editor.classList.contains('open')) return;
     editor.classList.remove('open'); editor.innerHTML = '';
+    const track = chip.querySelector('.param-track');
+    if (track && track.dataset.hidden) { delete track.dataset.hidden; track.style.display = ''; }
     document.removeEventListener('pointerdown', onOutside, true);
   };
   /* Слушатель снимается и когда чип уехал из разметки: правая панель
@@ -235,16 +259,25 @@ function attachBoundsEditor(chip, editor, name, get, set) {
     if (!editor.contains(e.target) && !(track && track.contains(e.target))) close();
   }
   editor._close = close;
-  const open = () => {
+  const open = (side) => {
     if (editor.classList.contains('open')) { close(); return; }
     editor.classList.add('open');
     editor.innerHTML = '';
+    /* Полоса ползунка и обе подписи границ на время правки убираются: их место
+       и занимает меню. Копия Десмоса, и она же честнее — иначе на экране разом
+       два способа задать одно и то же. */
+    const track = chip.querySelector('.param-track');
+    if (track) { track.dataset.hidden = '1'; track.style.display = 'none'; }
     /* Три значения интервала — тем же компонентом, что и всюду: пунктир снизу,
        правка на месте, ни одной прямоугольной рамки (Н75). Живое обновление на
        каждый символ; неполный ввод («−», «1e») компонент не применяет и красит
        подчёркивание. */
+    /* ⚠️ ПОЛЯ ПУСТЫЕ, ДЕЙСТВУЮЩИЕ ЗНАЧЕНИЯ НЕ ПОДСТАВЛЯЮТСЯ. Это сознательная
+       копия Десмоса: владелец выбрал именно так. Незаполненное поле сохраняет
+       прежнее значение — см. `set` ниже, он зовётся только на осмысленный
+       ввод. */
     const mk = (key) => makeEditableValue({
-      get: () => get(key),
+      get: () => '',
       set: (v) => {
         /* Пока идёт правка, меню закрывать нельзя: set() может зажать значение
            ползунка и разбудить «input», а тот закрыл бы меню и снёс поле, в
@@ -262,6 +295,17 @@ function attachBoundsEditor(chip, editor, name, get, set) {
                 tex('\\text{с шагом}'), mk('step'));
     editor.append(line);
     document.addEventListener('pointerdown', onOutside, true);
+    /* Курсор встаёт в поле ТОЙ границы, по которой щёлкнули: слева — в левое,
+       справа — в правое. Правку открывает сама эта граница, значит и продолжить
+       человек хочет с неё. */
+    const fields = line.querySelectorAll('.edval');
+    const want = (side === 'max') ? fields[1] : fields[0];
+    if (want && want.click) { want.click(); }
+    /* Enter закрывает и применяет. Щелчок мимо — тоже применяет, а не
+       отменяет: проверено на Десмосе, введённое без Enter сохраняется. */
+    line.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); close(); }
+    });
   };
   return { open, close };
 }
@@ -514,8 +558,11 @@ function upgradeRegulator(field) {
   eq.addEventListener('click', () => {
     if (editor._close) editor._close();          // Н10: точное значение закрывает интервал
     editEqValue(eq, name, +sl.value, (v) => {
-      if (v < +sl.min) sl.min = v;
-      if (v > +sl.max) sl.max = v;
+      // Случай первый: значение за полосой — полоса переезжает, значение в центре.
+      if (v < +sl.min || v > +sl.max) {
+        const b = centerBandOn({ min: +sl.min, max: +sl.max }, v);
+        sl.min = b.min; sl.max = b.max;
+      }
       sl.value = v;
       sl.dispatchEvent(new Event('input', { bubbles: true }));
       sync();
@@ -532,8 +579,8 @@ function upgradeRegulator(field) {
       if (+sl.value !== cur) { sl.value = cur; sl.dispatchEvent(new Event('input', { bubbles: true })); }
       sync();
     });
-  lo.addEventListener('click', open);
-  hi.addEventListener('click', open);
+  lo.addEventListener('click', () => open('min'));
+  hi.addEventListener('click', () => open('max'));
 }
 
 /* Короткие обозначения длинных регуляторов (Н8). Полное название остаётся в

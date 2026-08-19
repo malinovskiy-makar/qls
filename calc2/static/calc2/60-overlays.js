@@ -2588,9 +2588,15 @@ function buildParamChip(box, name) {
     if (p.folded) { p.folded = false; applyFold(); return; }   // свёрнутый — сначала разворачиваем
     if (bounds && bounds.close) bounds.close();
     editEqValue(lab, name, p.value, (v) => {
+      /* Случай первый (см. разбор у centerBandOn): вписали значение за полосой —
+         полоса переезжает так, чтобы значение встало ровно посередине, ширина
+         сохраняется. Раньше граница просто раздвигалась до значения, и полоса
+         становилась неуправляемо длинной. */
+      if (v < p.min || v > p.max) {
+        const b = centerBandOn({ min: p.min, max: p.max }, v);
+        p.min = b.min; p.max = b.max;
+      }
       p.value = v;
-      if (v < p.min) p.min = v;      // вышли за границу — она раздвигается сама
-      if (v > p.max) p.max = v;
       syncSlider();
       redrawAll();
     });
@@ -2604,12 +2610,14 @@ function buildParamChip(box, name) {
     (key, v) => {
       p[key] = v;
       if (p.max <= p.min) p.max = p.min + 1;
-      p.value = Math.max(p.min, Math.min(p.max, p.value));
+      // Случай второй: границы заданы человеком и остаются как заданы,
+      // подтягивается ЗНАЧЕНИЕ — к ближайшей границе.
+      p.value = pullIntoBand({ min: p.min, max: p.max }, p.value);
       syncSlider();
       redrawAll();
     });
-  loLab.addEventListener('click', bounds.open);
-  hiLab.addEventListener('click', bounds.open);
+  loLab.addEventListener('click', () => bounds.open('min'));
+  hiLab.addEventListener('click', () => bounds.open('max'));
 
   box.appendChild(chip);
 }
