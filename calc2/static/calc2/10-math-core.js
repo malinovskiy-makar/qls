@@ -144,9 +144,15 @@ function refreshLinearForParams() {
 
 // Красивая запись прямой по a и b (для подписи в списке при перетаскивании).
 // varName — имя переменной ('Q' по умолчанию; 'P' для записи Q(P), Фаза 1б).
-function fmtLinear(a, b, varName) {
+/* dec — глубина округления. По умолчанию два знака, как было у всех прежних
+   вызовов. Перетаскивание просит три (решение владельца 19.08) и передаёт их
+   ЯВНО: печатать глубже, чем хранится в curve.linear, нельзя — запись и
+   расчёт разошлись бы в последнем разряде, а это ровно та беда, из-за которой
+   округление в движке вообще появилось. */
+function fmtLinear(a, b, varName, dec) {
   const V = varName || 'Q';
-  const r = (v) => Math.round(v * 100) / 100; a = r(a); b = r(b);
+  const pow = Math.pow(10, (dec === undefined ? 2 : dec));
+  const r = (v) => Math.round(v * pow) / pow; a = r(a); b = r(b);
   if (a === 0) return `${b}`;
   if (a < 0) {
     const aa = Math.abs(a), aPart = aa === 1 ? V : `${aa}*${V}`;

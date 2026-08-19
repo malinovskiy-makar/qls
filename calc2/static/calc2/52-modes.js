@@ -581,6 +581,16 @@ function initZoom() {
     if (t && t.isContentEditable) return;
     if (document.getElementById('scene-picker') &&
         !document.getElementById('scene-picker').classList.contains('hidden')) return;
+    /* Отмена последнего действия. Cmd+Z на маке, Ctrl+Z на остальных.
+       Стоит ДО остальных разборов клавиш: иначе «z» ушло бы дальше по цепочке.
+       Поля ввода отсеяны выше по этой же функции — в них работает своя отмена
+       браузера, и перехватывать её нельзя. */
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === 'z' || e.key === 'Z' ||
+        e.code === 'KeyZ')) {
+      if (e.shiftKey) return;          // Shift+Z это «вернуть», а его мы не делаем
+      if (typeof undoLast === 'function' && undoLast()) e.preventDefault();
+      return;
+    }
     if (e.code === 'Space') { _spaceDown = true; gw.style.cursor = 'grab'; return; }
     const step = e.shiftKey ? 120 : 40;   // с Shift шаг крупнее
     if (e.key === 'ArrowLeft')  { panByPixels(step, 0); e.preventDefault(); }

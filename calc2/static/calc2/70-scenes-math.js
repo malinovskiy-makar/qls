@@ -276,7 +276,7 @@ function editInlineLabel(current, px, py, apply) {
   const finish = (save) => {
     if (done) return;
     done = true;
-    if (save) apply(inp.value.trim());
+    if (save) { pushUndo(); apply(inp.value.trim()); }
     inp.remove();
     redrawAll();
   };

@@ -197,6 +197,7 @@ function editEqValue(lab, name, current, apply) {
   const done = () => {
     if (closed) return; closed = true;
     const v = parseFloat(inp.value);
+    if (isFinite(v) && v !== current) pushUndo();
     apply(isFinite(v) ? v : current);
   };
   inp.addEventListener('blur', done);
@@ -249,6 +250,7 @@ function attachBoundsEditor(chip, editor, name, get, set) {
            ползунка и разбудить «input», а тот закрыл бы меню и снёс поле, в
            котором прямо сейчас печатают. */
         editor._busy = true;
+        pushUndo();
         try { set(key, v); } finally { editor._busy = false; }
       },
       tex: (v, text) => text,
@@ -1554,6 +1556,11 @@ function wireControls() {
   const submit = () => {
     const before = STATE.curves.length;
     addCurve(formula.value, STATE.curveForm);
+    // Эту формулу вписал человек — значит мышью она не тянется (фаза 4).
+    // Сцены зовут addCurve тем же путём, поэтому признак ставится ЗДЕСЬ,
+    // у поля ввода, а не внутри общей функции.
+    const added = STATE.curves[STATE.curves.length - 1];
+    if (added) added.handTyped = true;
     if (STATE.curves.length > before) {
       const sel = document.getElementById('new-role');
       const role = sel ? sel.value : '';

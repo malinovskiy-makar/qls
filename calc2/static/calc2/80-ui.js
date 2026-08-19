@@ -72,6 +72,12 @@ function updateCurveExpr(curve, expr) {
     curve.fn = null;   // синтетическая функция (S + t и т.п.) больше не действует
   }
   if (!curve.label) curve.name = expr;   // родовое имя идёт за формулой
+  /* Формулу правил человек, а не сцена. Это и есть признак, по которому
+     кривая перестаёт тянуться мышью (см. curveDraggable): обычная функция
+     вида «x» не подразумевает изменения себя на графике — двигать там нечего,
+     кривая целиком задана записью. Обоих вызывающих у этой функции ровно
+     двое, и оба — поля формул в панели. */
+  curve.handTyped = true;
   return null;
 }
 
@@ -144,6 +150,7 @@ function renderCurveList() {
     const del = document.createElement('button');
     del.className = 'btn-icon'; del.textContent = '✕'; del.title = 'Удалить кривую';
     del.addEventListener('click', () => {
+      pushUndo();
       STATE.curves = STATE.curves.filter(c => c.id !== curve.id);
       renderCurveList();
       redrawAll();
@@ -173,6 +180,7 @@ function renderCurveList() {
       fInp.placeholder = curve.srcForm === 'QP' ? 'Q = f(P)' : 'P = f(Q)';
       fInp.title = 'Формула кривой: правится на месте';
       fInp.addEventListener('input', () => {
+        pushUndo();
         const err = updateCurveExpr(curve, fInp.value);
         fInp.classList.toggle('bad', !!err);
         fInp.title = err ? ('Пока не применено: ' + err) : 'Формула кривой: правится на месте';

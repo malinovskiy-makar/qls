@@ -283,6 +283,7 @@ function buildGraphRow(curve) {
   del.style.visibility = curve ? '' : 'hidden';
   del.addEventListener('click', () => {
     if (!row._curve) return;
+    pushUndo();
     STATE.curves = STATE.curves.filter(c => c !== row._curve);
     renderGraphRows();
     redrawAll();
@@ -331,7 +332,7 @@ function graphRowInput(row, inp, del, name) {
     fieldProblem(inp, ''); graphError('');
     curveCounter++;
     const c = { id: curveCounter, expr: txt, compiled, color: nextColor(),
-                name: txt, role: null, visible: true,
+                name: txt, role: null, visible: true, handTyped: true,
                 linear: detectLinear(compiled), srcForm: 'PQ' };
     STATE.curves.push(c);
     row._curve = c;
@@ -343,6 +344,7 @@ function graphRowInput(row, inp, del, name) {
     return;
   }
   if (!txt) return;                       // пустое поле не роняет кривую
+  pushUndo();
   const err = updateCurveExpr(row._curve, txt);
   fieldProblem(inp, err ? ('Пока не понимаю запись: ' + err) : '');
   if (!err) redrawAll();
@@ -1415,6 +1417,7 @@ function drawCurveHits() {
    списке. Блок «Точки на графике» при этом раскрывается сразу же, иначе точка
    уходит в закрытую карточку и выглядит как «ничего не произошло». */
 function pinKeyPoint(p) {
+  pushUndo();
   /* Единственный способ вынести точку насовсем. Наведение этого не делает
      намеренно: владелец оговорил отдельно и настойчиво, что увёл курсор — и
      не осталось ничего. */
@@ -3286,6 +3289,7 @@ const SCENE_DEFAULTS = {
 };
 
 function resetDecor() {
+  clearUndo();          // шаги прежней модели к новой отношения не имеют
   Object.keys(SCENE_DEFAULTS).forEach(k => {
     const v = SCENE_DEFAULTS[k];
     STATE[k] = Array.isArray(v) ? [] : (v && typeof v === 'object' ? {} : v);
@@ -3318,6 +3322,92 @@ const SNAPSHOT_KEYS = Object.keys(SCENE_DEFAULTS).concat([
   'tax', 'pReg', 'taxKind', 'intervType',
 ]);
 const _sceneSnaps = {};
+
+/* ── ОТМЕНА ПОСЛЕДНЕГО ДЕЙСТВИЯ (фаза 4) ──────────────────────────────────
+
+   Строится на УЖЕ СУЩЕСТВУЮЩЕМ списке полей SNAPSHOT_KEYS — на том самом, по
+   которому работает память моделей и кнопка «Вернуть исходный вид». Второй
+   механизм состояния рядом с первым разъехался бы с ним на первой же новой
+   настройке: список полей один, и он один.
+
+   ⚠️ СНИМОК ДЛЯ ОТМЕНЫ ОБЯЗАН БЫТЬ КОПИЕЙ, А НЕ ССЫЛКОЙ. saveSceneSnapshot
+   кладёт `snap[k] = STATE[k]`, и ему этого хватает: он снимает состояние
+   ровно в тот момент, когда сцена уходит с экрана и меняться уже не будет.
+   Отмене нужно другое — состояние ДО действия, которое случится через
+   мгновение и переписывает те же массивы на месте. Со ссылкой снимок менялся
+   бы вместе с оригиналом, и «отмена» возвращала бы то же самое.
+
+   Копируем два уровня: сам массив или объект и его прямых детей (кривую,
+   точку, запись параметра, разбор прямой `linear`, который перетаскивание
+   правит на месте). Глубже не идём намеренно — там скомпилированная формула и
+   функции сцены, их надо оставить ссылкой. */
+const UNDO_DEPTH = 20;
+const _undoStack = [];
+
+/* ⚠️ КОПИЯ ОБЯЗАНА ДОСТАТЬ ДО ТОГО, ЧТО ПРАВЯТ НА МЕСТЕ.
+   Первая версия копировала ровно один уровень: массив кривых → сама кривая.
+   Разбор прямой `curve.linear` при этом оставался ОБЩИМ объектом, а
+   перетаскивание пишет именно в него (`curve.linear.b = …`). Снимок менялся
+   вместе с оригиналом, и отмена возвращала формулу «100 - Q» при свободном
+   члене 90,661 — запись и расчёт расходились ровно так же, как в дефекте,
+   ради которого фаза и затевалась. Нашёл прибор: формулы сошлись, числа нет.
+   Поэтому у ребёнка копируются и его собственные простые дети. */
+function _undoCopyChild(v) {
+  if (Array.isArray(v)) return v.slice();
+  if (v && typeof v === 'object' && v.constructor === Object) {
+    const o = {};
+    Object.keys(v).forEach(k => {
+      const x = v[k];
+      if (Array.isArray(x)) o[k] = x.slice();
+      else if (x && typeof x === 'object' && x.constructor === Object) o[k] = Object.assign({}, x);
+      else o[k] = x;
+    });
+    return o;
+  }
+  return v;
+}
+function _undoCopy(v) {
+  if (Array.isArray(v)) return v.map(_undoCopyChild);
+  if (v && typeof v === 'object' && v.constructor === Object) {
+    const o = {};
+    Object.keys(v).forEach(k => { o[k] = _undoCopyChild(v[k]); });
+    return o;
+  }
+  return v;
+}
+
+/* Положить состояние на полку ПЕРЕД изменяющим действием. Зовётся из мест,
+   которые действительно меняют модель: сдвиг кривой, вынос и удаление точки,
+   удаление кривой, переименование, правка формулы, значение и границы
+   параметра. Тихо ничего не делает, пока сцена не открыта. */
+function pushUndo() {
+  if (!STATE.sceneKey) return;
+  const snap = { scene: STATE.sceneKey, data: {} };
+  SNAPSHOT_KEYS.forEach(k => { snap.data[k] = _undoCopy(STATE[k]); });
+  _undoStack.push(snap);
+  if (_undoStack.length > UNDO_DEPTH) _undoStack.shift();
+}
+
+/* Шаг назад. Снимок чужой модели не применяем: человек ушёл в другую сцену,
+   и вернуть туда состояние отсюда значило бы менять то, чего он не видит. */
+function undoLast() {
+  while (_undoStack.length) {
+    const snap = _undoStack.pop();
+    if (snap.scene !== STATE.sceneKey) continue;
+    SNAPSHOT_KEYS.forEach(k => { STATE[k] = snap.data[k]; });
+    if (typeof renderCurveList === 'function') renderCurveList();
+    if (typeof renderGraphRows === 'function' && document.getElementById('graph-rows')) renderGraphRows();
+    if (typeof renderMarkList === 'function') renderMarkList();
+    if (typeof renderVertList === 'function') renderVertList();
+    redrawAll();
+    return true;
+  }
+  return false;
+}
+
+// Уходя из модели, забываем её шаги: отмена — про «здесь и сейчас».
+function clearUndo() { _undoStack.length = 0; }
+
 
 // Забыть, что помнилось по моделям. Нужно, когда состояние надо начать с нуля
 // (например, в контрольных прогонах, где каждый случай ставит свою обстановку).
