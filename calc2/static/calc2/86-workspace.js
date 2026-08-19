@@ -579,10 +579,46 @@ function showHintTip(dot, html) {
   t.style.display = 'block';
   const b = dot.getBoundingClientRect();
   const w = t.offsetWidth, h = t.offsetHeight;
-  let left = b.left + b.width / 2 - w / 2;
-  left = Math.max(8, Math.min(window.innerWidth - w - 8, left));
-  let top = b.bottom + 8;
-  if (top + h > window.innerHeight - 8) top = Math.max(8, b.top - h - 8);
+
+  /* ⚠️ ПЛАШКА НЕ САДИТСЯ НА СОСЕДНИЙ УПРАВЛЯЮЩИЙ ЭЛЕМЕНТ.
+
+     Правило то же, что уже записано про холст: всплывающее появляется ровно
+     там, где рука ведёт указатель, и закрывает собой то, к чему рука шла.
+     Здесь оно ловилось на кнопке возврата: подсказка «Ко всем моделям»
+     всплывала вниз и накрывала текст кнопки «Вернуть исходный вид».
+
+     Место выбирается перебором: снизу, сверху, справа, слева. Берём первое,
+     которое помещается в окно и не накрывает ни одной кнопки, поля или
+     ссылки, кроме той, к которой подсказка относится. Не нашлось ни одного —
+     остаётся прежнее нижнее, лишь бы плашка была видна. */
+  const clampX = (x) => Math.max(8, Math.min(window.innerWidth - w - 8, x));
+  const clampY = (y) => Math.max(8, Math.min(window.innerHeight - h - 8, y));
+  const midX = clampX(b.left + b.width / 2 - w / 2);
+  const midY = clampY(b.top + b.height / 2 - h / 2);
+  const spots = [
+    { x: midX, y: b.bottom + 8 },
+    { x: midX, y: b.top - h - 8 },
+    { x: b.right + 8, y: midY },
+    { x: b.left - w - 8, y: midY },
+  ];
+  const controls = Array.from(document.querySelectorAll(
+    'button, input, select, textarea, a[href], [data-tip]'));
+  const covers = (x, y) => controls.some(el => {
+    if (el === dot || el.contains(dot) || dot.contains(el)) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return false;
+    return x < r.right - 1 && x + w > r.left + 1 && y < r.bottom - 1 && y + h > r.top + 1;
+  });
+  let spot = null;
+  for (const s of spots) {
+    if (s.x < 8 || s.x + w > window.innerWidth - 8) continue;
+    if (s.y < 8 || s.y + h > window.innerHeight - 8) continue;
+    if (covers(s.x, s.y)) continue;
+    spot = s; break;
+  }
+  const left = spot ? spot.x : midX;
+  let top = spot ? spot.y : b.bottom + 8;
+  if (!spot && top + h > window.innerHeight - 8) top = Math.max(8, b.top - h - 8);
   t.style.left = Math.round(left) + 'px';
   t.style.top = Math.round(top) + 'px';
 }

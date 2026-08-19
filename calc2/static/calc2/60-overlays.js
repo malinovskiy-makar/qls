@@ -221,26 +221,14 @@ function renderGraphRows() {
   const box = graphRowsBox();
   if (!box) return;
   box.innerHTML = '';
-  /* П60. Пустое состояние по канону 3.13: говорит, чего здесь нет и что здесь
-     появится. Пустой холст и одна безымянная строка ввода не объясняли ни
-     того, ни другого; кнопки «Добавить кривую» в этой сцене нет по устройству
-     (строка заводит кривую сама), и без слов это тоже не угадывается. */
-  if (!STATE.curves.length) {
-    const empty = document.createElement('div');
-    empty.className = 'k-empty';
-    empty.innerHTML = '<b>Пока ни одной функции</b>' +
-      '<p>Впишите формулу в строку ниже, и кривая появится на графике. ' +
-      'Следующая пустая строка добавится сама.</p>';
-    box.appendChild(empty);
-  }
+  /* Блока пустого состояния здесь нет: исключение из канона 3.13 записано в
+     DESIGN.md 5.1. Пустая строка ввода сама является приглашением к действию —
+     она подписана и несёт образец формулы, — а плашка занимала место на самом
+     плотном экране продукта и вдобавок оставалась на виду ПОСЛЕ того, как
+     функция введена и кривая построена. */
   STATE.curves.forEach(c => box.appendChild(buildGraphRow(c)));
   box.appendChild(buildGraphRow(null));
-  /* П19 · П21. Строки «Построения графиков» получают ТОТ ЖЕ набор, что поля
-     формул остальных сцен: клавиатуру и вопросик. Прежде здесь звалась только
-     `upgradeFormulaField`, и это была единственная сцена, где формулу нечем
-     было набрать, кроме системной клавиатуры. */
-  if (typeof equipFormulaField === 'function')
-    box.querySelectorAll('.f-slot > input[id]').forEach(el => equipFormulaField(el.id, 'MATH'));
+  equipGraphRows(box);
   /* Поля формул собираются лениво и только когда видны (А56), а строки мы
      вставили в разметку только что: разбираем очередь здесь, иначе поле
      остаётся обычным текстовым окошком до следующей перерисовки. */
@@ -272,7 +260,10 @@ function buildGraphRow(curve) {
   const inp = document.createElement('input');
   inp.type = 'text'; inp.autocomplete = 'off';
   inp.value = curve ? curve.expr : '';
-  inp.placeholder = curve ? '' : 'Например: x^2 - 4';
+  /* Образец без пробелов вокруг минуса: замер показал, что «x^2 - 4» шире
+     содержимого поля на пять пикселей и обрезается. Текст образца владелец
+     оставил, требование было одно — он обязан помещаться целиком. */
+  inp.placeholder = curve ? '' : 'Например: x^2-4';
   inp.setAttribute('aria-label', 'Формула функции');
   slot.appendChild(inp);
   row.appendChild(slot);
@@ -318,6 +309,27 @@ function buildGraphRow(curve) {
   return row;
 }
 
+/* ⚠️ СТРОКА СПИСКА РОЖДАЕТСЯ ОДИНАКОВО, КАКИМ БЫ ПУТЁМ ЕЁ НИ ЗАВЕЛИ.
+
+   Путей два: полная пересборка списка и «рождение» следующей пустой строки
+   сразу после ввода. Набор полей вешала только пересборка, поэтому строка,
+   добавившаяся сама, оставалась обычным текстовым полем — и общий проход по
+   текстовым полям превращал её в правку-на-месте с пунктиром. На экране
+   выходило два разных способа ввода одного и того же: у первой строки
+   настоящее поле формул с клавиатурой, у второй — пунктирная строчка, дающая
+   по щелчку голый курсор с обрубком линии.
+
+   Разница была не в оформлении, а в том, что набор навешивался в одном месте
+   из двух. Теперь он один на оба пути.
+
+   П19 · П21: строки «Построения графиков» получают ТОТ ЖЕ набор, что поля
+   формул остальных сцен, — клавиатуру и вопросик. */
+function equipGraphRows(box) {
+  if (!box || typeof equipFormulaField !== 'function') return;
+  box.querySelectorAll('.f-slot > input[id]').forEach(el => equipFormulaField(el.id, 'MATH'));
+  if (typeof flushMathfields === 'function') flushMathfields();
+}
+
 /* Правка строки. Пустая строка при первом же осмысленном вводе заводит кривую
    и «рожает» следующую пустую; заполненная просто обновляет свою формулу. */
 function graphRowInput(row, inp, del, name) {
@@ -339,7 +351,7 @@ function graphRowInput(row, inp, del, name) {
     row.dataset.cid = c.id;
     del.style.visibility = '';
     const box = graphRowsBox();
-    if (box) box.appendChild(buildGraphRow(null));
+    if (box) { box.appendChild(buildGraphRow(null)); equipGraphRows(box); }
     redrawAll();
     return;
   }

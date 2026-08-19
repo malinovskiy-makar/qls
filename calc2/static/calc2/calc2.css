@@ -543,7 +543,10 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 }
 .grow .f-slot { min-width: 0; }
 .grow > .cpick { justify-self: start; }
-.grow math-field { font-size: 14px; padding: 4px 7px; }
+/* Отступ по горизонтали ужат с 7 до 4: образец «Например: x^2-4» просит 113 px,
+   а поле давало 108, и запись обрезалась. Текст образца владелец оставил, и
+   правильнее найти пять пикселей в раскладке, чем урезать то, что он выбрал. */
+.grow math-field { font-size: 14px; padding: 4px 4px; }
 .grow > .edval, .grow > .grow-name { grid-column: 1 / -1; }
 .grow-name {
   width: 100%; min-width: 0; padding: 3px 7px; font-size: 12px;
@@ -1741,6 +1744,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 /* Неполный ввод («−», «1e») подсвечивается самим подчёркиванием, без всплывашек. */
 .edval.bad { border-bottom-color: var(--error, #d14343); }
 .edval-row { display: flex; align-items: baseline; gap: 4px; flex-wrap: nowrap; }
+
+/* Имя кривой на графике: в покое пунктира нет, он появляется под курсором и
+   при правке. Причина узкая: строка ввода в этом блоке и так подписана, а
+   пунктир под каждым именем превращал панель в решётку из подчёркиваний.
+   Правило намеренно узкое — только имя в строке списка. Пунктир под
+   КООРДИНАТАМИ точек не трогаем: там он показывает, что число правится, и
+   другого признака у него нет. */
+.grow > .edval-text { border-bottom-color: transparent; }
+.grow > .edval-text:hover, .grow > .edval-text:focus,
+.grow > .edval-text.editing { border-bottom-color: var(--accent); }
 
 /* Н60, Н72, Н75. Общее правило на всю панель: короткое значение правится прямо
    в строке, без прямоугольной рамки и фона — намёк несёт пунктир снизу, как у

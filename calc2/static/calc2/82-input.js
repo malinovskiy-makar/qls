@@ -348,7 +348,17 @@ const TEX_GREEK = { alpha: 'alpha', beta: 'beta', gamma: 'gamma', delta: 'delta'
    приём, что у кнопки возврата масштаба в подфазе 3b. */
 function fieldProblem(inp, msg) {
   if (!inp) return;
-  const host = inp.closest('.f-wrap, .f-slot, .field, .grow') || inp.parentElement;
+  /* ⚠️ МЕСТО ПОД СООБЩЕНИЕ ЛЕЖИТ ПОД ВСЕЙ СТРОКОЙ, А НЕ ВНУТРИ ПОЛЯ.
+
+     Замер: кнопка клавиатуры была 58,8 px при поле 40,8. Разница ровно в это
+     место — 16 px плюс 2 отступа. Причина: резерв клался в тот же блок, что и
+     поле, а строка выравнивает детей по высоте (`align-items: stretch`), и
+     кнопка честно повторяла высоту соседа вместе с невидимым резервом.
+
+     Сам резерв убирать нельзя: он держит вёрстку от прыжка, когда сообщение
+     появится. Поэтому он переезжает НАРУЖУ строки — под неё. На экране
+     сообщение остаётся там же, где было, а высоту строки больше не задаёт. */
+  const host = inp.closest('.f-wrap') || inp.closest('.f-slot, .field, .grow') || inp.parentElement;
   if (!host) return;
   let box = host._problem;
   if (!box) {
