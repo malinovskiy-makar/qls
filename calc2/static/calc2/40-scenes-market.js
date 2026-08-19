@@ -1245,7 +1245,10 @@ function updateElasticityPanel() {
   if (!e || isNaN(e.Ed)) { box.innerHTML = '<div class="warn">Эластичность не определена в этой точке.</div>'; return; }
   const zone = e.absEd > 1.0001 ? 'эластичный, $|E_d| > 1$' : (e.absEd < 0.9999 ? 'неэластичный, $|E_d| < 1$' : 'единичная, $|E_d| = 1$');
   let html = '';
-  html += `<div class="stat"><span>Точка спроса (Q, P)</span><b>${fmt(e.q)}, ${fmt(e.p)}</b></div>`;
+  /* Пара чисел — тоже список, и запятая в нём спорит с десятичным знаком:
+     «50,50» читается как одно число с копейками. Разделитель тот же, что у
+     остальных списков, — точка с запятой. */
+  html += `<div class="stat"><span>Точка спроса (Q, P)</span><b>${fmt(e.q)}; ${fmt(e.p)}</b></div>`;
   html += `<div class="stat"><span>$|E_d|$</span><b>${fmt(e.absEd)}</b></div>`;
   html += `<div class="stat"><span>Зона спроса</span><b>${zone}</b></div>`;
   html += `<div class="stat"><span>Выручка TR = P·Q</span><b>${fmt(e.TR)}</b></div>`;
@@ -1265,7 +1268,7 @@ function updateElasticityPanel() {
   if (s && !isNaN(s.Es)) {
     const zs = s.absEs > 1.0001 ? 'эластичное, $|E_s| > 1$' : (s.absEs < 0.9999 ? 'неэластичное, $|E_s| < 1$' : 'единичная, $|E_s| = 1$');
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
-    html += `<div class="stat"><span>Точка предложения (Q, P)</span><b>${fmt(s.q)}, ${fmt(s.p)}</b></div>`;
+    html += `<div class="stat"><span>Точка предложения (Q, P)</span><b>${fmt(s.q)}; ${fmt(s.p)}</b></div>`;
     html += `<div class="stat"><span>$|E_s|$</span><b>${fmt(s.absEs)}</b></div>`;
     html += `<div class="stat"><span>Зона предложения</span><b>${zs}</b></div>`;
     /* Б28 · Б29. Правило про перехват верно только для ПРЯМОЙ, и раньше оно

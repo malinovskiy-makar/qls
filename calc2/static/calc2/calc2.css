@@ -1833,13 +1833,36 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
      длинному значению всю ширину, подпись оставалась шириной в букву и
      рассыпалась по вертикали. `fit-content(46%)` держит прежнее поведение у
      обычных чисел и не пускает колонку дальше середины строки. */
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(78px, fit-content(46%));
-  align-items: baseline; column-gap: 6px;
+  /* ⚠️ ЗДЕСЬ БЫЛА НЕДЕЙСТВУЮЩАЯ ЗАПИСЬ, И ИМЕННО ОНА ДАВАЛА ТРИ СТРОКИ.
+
+     Стояло `grid-template-columns: minmax(0, 1fr) auto minmax(78px,
+     fit-content(46%))`. По правилам CSS `fit-content()` НЕ РАЗРЕШЕН внутри
+     `minmax()`, поэтому браузер выбрасывал объявление целиком — и сетка
+     оставалась с одной колонкой. Подпись, знак и число вставали тремя
+     отдельными строками: пять значений занимали пятнадцать строк. Замер:
+     `grid-template-columns` считался как одно значение вроде «108px», высота
+     строки 76–78 px вместо одной строки.
+
+     Комментарий рядом при этом подробно объяснял поведение трёх колонок,
+     которого никогда не было. Это второй урок: описание в комментарии не
+     доказывает, что правило работает.
+
+     Раскладка переложена на flex с переносом — так же, как в согласованном
+     макете. Значение стоит СРАЗУ ЗА ЗНАКОМ РАВЕНСТВА и к правому краю не
+     прижимается (решение владельца). Длинная подпись переносится сама внутри
+     себя, знак и число остаются при ней. Панель НЕ расширяется. */
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: flex-start; column-gap: 5px;
+  /* ⚠️ ПЕРЕНЕСЁННАЯ СТРОКА ПРОСИТ ЗАЗОР, ХОТЯ ТЕКСТ ЕГО НЕ ПРОСИЛ.
+     С нулевым зазором значение, набранное формулой, налезало на подпись
+     сверху на 2,4 px: у формулы с индексами и скобками чернила выходят ВЫШЕ
+     базовой линии, а выравнивание идёт по ней. Обычный текст такого не даёт,
+     поэтому в макете зазора и нет. Замер поймал два случая в «Оптимизации». */
+  row-gap: 3px;
 }
-.sb-body .stat.stat-eq > span { text-align: right; }
-.stat-sign { font-style: normal; color: var(--text3); font-size: 12px; }
-.sb-body .stat.stat-eq > b { text-align: left; font-weight: 700; }
+.sb-body .stat.stat-eq > span { text-align: left; flex: 0 1 auto; min-width: 0; }
+.stat-sign { font-style: normal; color: var(--text3); font-size: 12px; flex: 0 0 auto; }
+.sb-body .stat.stat-eq > b { text-align: left; font-weight: 700; flex: 0 1 auto; }
 /* Б39. Страховка от наложения. Колонка подписи может сжаться до нуля
    (minmax(0, 1fr)), но САМ ТЕКСТ подписи сжиматься не умеет и при длинном
    значении вылезал за свою колонку прямо на число. Разрешаем ему переноситься
@@ -1858,13 +1881,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    третья колонка при этом продолжала держать свои 78 px и додавливала подпись
    до ширины одной буквы — та переносилась по букве в строку. Строке без знака
    отдаём две колонки. */
-.sb-body .stat.stat-eq.stat-nosign { grid-template-columns: minmax(0, 1fr) minmax(78px, fit-content(46%)); }
+/* Строке без знака отдельной раскладки больше не нужно: при переносе по
+   строке пустой колонки не остаётся вовсе. */
 
 /* Б40. Составное значение — это список, а не число, и в ячейку для числа оно
    не помещается: подпись сверху, величины снизу, каждая своей строкой. */
-.sb-body .stat.stat-stack { display: block; padding: 6px 0; }
-.sb-body .stat.stat-stack > span { display: block; text-align: left; margin-bottom: 2px; }
-.sb-body .stat.stat-stack > b { display: block; text-align: left; }
+/* Прежде широкое значение уходило на свою строку блоком, и в одном списке
+   уживались два разных формата. Формат теперь один: тот же перенос по строке,
+   просто значение переезжает целиком, когда не помещается рядом. */
+.sb-body .stat.stat-stack { display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: flex-start; column-gap: 5px; row-gap: 3px; padding: 6px 0; }
+.sb-body .stat.stat-stack > span { text-align: left; flex: 0 1 auto; min-width: 0; }
+.sb-body .stat.stat-stack > b { text-align: left; flex: 0 1 auto; }
 .sb-body .stat.stat-stack .stat-line { display: block; line-height: 1.45; }
 /* Качественная характеристика набирается обычным начертанием: это не отсчёт. */
 .sb-body .stat.stat-phrase > b { font-size: 13px; font-weight: 500; color: var(--text); }

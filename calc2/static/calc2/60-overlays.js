@@ -463,8 +463,8 @@ function typesetStats(root) {
     const raw = (own ? katexVisibleText(val) : (val.textContent || '')).trim();
     if (!raw) { if (own) row.classList.add('stat-eq', 'stat-own', 'stat-nosign'); return; }
     // Составное значение и фраза не помещаются в ячейку для числа (Б39, Б40).
-    if (restatWide(row, lab, val, raw, own)) return;
-    if (own) { row.classList.add('stat-eq', 'stat-own', 'stat-nosign'); return; }
+    if (restatWide(row, lab, val, raw, own)) { addStatSign(row, val, raw); return; }
+    if (own) { row.classList.add('stat-eq', 'stat-own'); addStatSign(row, val, raw); return; }
     // Числовое ли значение: число, пара, проценты, знак — да; фраза — нет.
     const numeric = /^[(\[]?\s*[-−+]?[\d.,]/.test(raw) || /^[-−+]?\d/.test(raw);
     if (numeric && typeof katex !== 'undefined') {
@@ -475,13 +475,29 @@ function typesetStats(root) {
     }
     row.classList.add('stat-eq');
     // Своё равенство внутри значения («SW = CS + PS») тоже не удваиваем.
-    if (raw.indexOf('=') >= 0) { row.classList.add('stat-nosign'); return; }
-    const eq = document.createElement('i');
-    eq.className = 'stat-sign';
-    eq.setAttribute('aria-hidden', 'true');
-    eq.textContent = '=';
-    row.insertBefore(eq, val);
+    addStatSign(row, val, raw);
   });
+}
+
+/* ⚠️ ФОРМАТ СТРОКИ ОДИН НА ВЕСЬ СПИСОК — СО ЗНАКОМ РАВЕНСТВА.
+
+   Форматов было три сразу: без знака (подпись, а значение под ней), со знаком,
+   и один выровненный по правому краю. В одном списке это читается как три
+   разных вида данных, хотя данные одни. Знак теперь ставит одна функция, и
+   зовут её ВСЕ ветки разбора, включая те, что раньше возвращались раньше
+   времени.
+
+   Единственное исключение — значение со СВОИМ равенством внутри («SW = CS +
+   PS»): второй знак дал бы «SW = = CS + PS». */
+function addStatSign(row, val, raw) {
+  if (!row || !val) return;
+  if (row.querySelector(':scope > .stat-sign')) return;
+  if (String(raw || '').indexOf('=') >= 0) { row.classList.add('stat-nosign'); return; }
+  const eq = document.createElement('i');
+  eq.className = 'stat-sign';
+  eq.setAttribute('aria-hidden', 'true');
+  eq.textContent = '=';
+  row.insertBefore(eq, val);
 }
 
 /* Значение табло в запись для KaTeX. Числа и разделители оставляем как есть,

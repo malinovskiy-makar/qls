@@ -1,0 +1,3213 @@
+{
+ "scenes": {
+  "m-graph": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 147.8,
+     "text": "Кривая=f"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 70,
+     "text": "Пересекает ось xxx=0;10; 10;1"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 82.9,
+     "text": "Пересекает ось yyy=000"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 71,
+     "text": "Вершины=(0,5;−0,25)(0{,}5; -0{,}25)(0,5;−0,25)"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 1
+  },
+  "m-tangent": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 136.4,
+     "text": "Точка x0x_0x0​=111"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 156.4,
+     "text": "f(x0)f(x_0)f(x0​)=111"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 22.1,
+     "text": "Наклон касательной f′(x0)f'(x_0)f′(x0​)=222"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 37.1,
+     "text": "Угол наклона=63,43textcirc63{,}43^{\\\\text{circ}}63"
+    },
+    {
+     "sameLine": true,
+     "h": 26,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 34.8,
+     "text": "Касательнаяy = 1 + 2·(x - 1)"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 1
+  },
+  "m-optimum": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": false,
+     "h": 54.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 100,
+     "text": "Наибольшее на отрезкеy∗=18y^* = 18y∗=18 при x∗=3x^"
+    },
+    {
+     "sameLine": false,
+     "h": 54.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 78.8,
+     "text": "Наименьшее на отрезкеy∗=−18y^* = -18y∗=−18 при x∗="
+    },
+    {
+     "sameLine": false,
+     "h": 42.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 111.3,
+     "text": "Локальный максимум(x∗;y∗)=(−1;2)(x^*; y^*) = (-1; "
+    },
+    {
+     "sameLine": false,
+     "h": 42.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 111.3,
+     "text": "Локальный минимум(x∗;y∗)=(1;−2)(x^*; y^*) = (1; -2"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 64.6,
+     "text": "Перегиб(x∗;y∗)=(0;0)(x^*; y^*) = (0; 0)(x∗;y∗)=(0;"
+    }
+   ],
+   "tallRows": 2,
+   "crossRow": 0,
+   "curves": 1
+  },
+  "m-transform": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 47.6,
+     "text": "Преобразование=f(x) + a"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 118.4,
+     "text": "Параметр aaa=111"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "m-minmax": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 79.8,
+     "text": "СтроимZ = min(f₁, f₂)"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 71.3,
+     "text": "Функций участвует=222"
+    },
+    {
+     "sameLine": false,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -180.9,
+     "rightGap": 150.6,
+     "text": "Кривые меняются местами=−2,56;1,56-2{,}56; 1{,}56−"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 3
+  },
+  "m-constraint": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 175.2,
+     "text": "x∗x^*x∗=555"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 175.6,
+     "text": "y∗y^*y∗=555"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 131.7,
+     "text": "f(x∗,,y∗)f(x^*,, y^*)f(x∗,,y∗)=555"
+    },
+    {
+     "sameLine": true,
+     "h": 28,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 94.7,
+     "text": "Ищем=максимум"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 1
+  },
+  "ppf": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": false,
+     "h": 69,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -64.1,
+     "rightGap": 0,
+     "text": "Тип КПВ=линейная: постоянные альтернативные издерж"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 19.9,
+     "text": "XmaxX_{max}Xmax​ (весь ресурс на X)=100100100"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 23.5,
+     "text": "YmaxY_{max}Ymax​ (весь ресурс на Y)=100100100"
+    },
+    {
+     "sameLine": false,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -193.2,
+     "rightGap": 150.9,
+     "text": "Альт. издержки X в середине=1 Y за ед. X1\\text{ Y "
+    },
+    {
+     "sameLine": false,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -192.9,
+     "rightGap": 150.9,
+     "text": "Альт. издержки Y в середине=1 X за ед. Y1\\text{ X "
+    }
+   ],
+   "tallRows": 1,
+   "crossRow": 0,
+   "curves": 1
+  },
+  "ppfsum": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 63.4,
+     "text": "Складываем кривых=222"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 63.8,
+     "text": "XmaxX_{max}Xmax​ суммарной=120120120"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 67.1,
+     "text": "YmaxY_{max}Ymax​ суммарной=160160160"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 64.4,
+     "text": "Точка излома 1=100;60100; 60100;60"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 3
+  },
+  "trade": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 28,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 27,
+     "text": "Режим=специализация на X"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 59.3,
+     "text": "Мировая цена Px/PyP_x/P_yPx​/Py​=222"
+    },
+    {
+     "sameLine": false,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 195.7,
+     "text": "Внутренняя цена X (наклон КПВ)=111"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 11.6,
+     "text": "Производство (Xп;Yп)(X_п; Y_п)(Xп​;Yп​)=(100;0)(10"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 6.7,
+     "text": "Предел потребления XмаксX_{макс}Xмакс​=100100100"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 10,
+     "text": "Предел потребления YмаксY_{макс}Yмакс​=200200200"
+    },
+    {
+     "sameLine": false,
+     "h": 53,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -171.8,
+     "rightGap": 17.6,
+     "text": "Прирост против автаркии=Постройте кривую комплекто"
+    }
+   ],
+   "tallRows": 1,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "tradeprice": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 65.8,
+     "text": "Автарк. цена X стр.1=111"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 63.8,
+     "text": "Автарк. цена X стр.2=222"
+    },
+    {
+     "sameLine": true,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 65.1,
+     "text": "Мировая цена Pw=1,411{,}411,41 (равновесная)"
+    },
+    {
+     "sameLine": false,
+     "h": 53,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -102.1,
+     "rightGap": 76.5,
+     "text": "Экспортируют=КПВ 1 → X, КПВ 2 → Y"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 66.3,
+     "text": "Обмен X (макс.)=70,7170{,}7170,71"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 77.1,
+     "text": "Обмен Y (макс.)=100100100"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 24.3,
+     "text": "Излом КТВ у КПВ 1=29,29;10029{,}29; 10029,29;100"
+    }
+   ],
+   "tallRows": 1,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "sd": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 82,
+     "text": "Q∗Q^*Q∗ (количество)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 123.4,
+     "text": "P∗P^*P∗ (цена)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 59.6,
+     "text": "CS\\mathrm{CS}CS (потребитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 44.4,
+     "text": "PS\\mathrm{PS}PS (производитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 78,
+     "text": "SW=CS+PS\\mathrm{SW} = \\mathrm{CS} + \\mathrm{PS}SW="
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "tax": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 82,
+     "text": "Q∗Q^*Q∗ (количество)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 123.4,
+     "text": "P∗P^*P∗ (цена)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 59.6,
+     "text": "CS\\mathrm{CS}CS (потребитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 44.4,
+     "text": "PS\\mathrm{PS}PS (производитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 78,
+     "text": "SW=CS+PS\\mathrm{SW} = \\mathrm{CS} + \\mathrm{PS}SW="
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 139,
+     "text": "Налог t=202020"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 70.9,
+     "text": "Бремя покупателя=101010"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 82.2,
+     "text": "Бремя продавца=101010"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "tax-adv": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 82,
+     "text": "Q∗Q^*Q∗ (количество)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 123.4,
+     "text": "P∗P^*P∗ (цена)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 59.6,
+     "text": "CS\\mathrm{CS}CS (потребитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 44.4,
+     "text": "PS\\mathrm{PS}PS (производитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 78,
+     "text": "SW=CS+PS\\mathrm{SW} = \\mathrm{CS} + \\mathrm{PS}SW="
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 34.3,
+     "text": "Ставка τ (адвалорная)=20%20 \\%20%"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 60.5,
+     "text": "Бремя покупателя=4,554{,}554,55"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 71.7,
+     "text": "Бремя продавца=4,554{,}554,55"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "ceil": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 82,
+     "text": "Q∗Q^*Q∗ (количество)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 123.4,
+     "text": "P∗P^*P∗ (цена)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 59.6,
+     "text": "CS\\mathrm{CS}CS (потребитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 44.4,
+     "text": "PS\\mathrm{PS}PS (производитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 78,
+     "text": "SW=CS+PS\\mathrm{SW} = \\mathrm{CS} + \\mathrm{PS}SW="
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 114.5,
+     "text": "Потолок Pc=303030"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 128.6,
+     "text": "Дефицит=404040"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "elast": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 82,
+     "text": "Q∗Q^*Q∗ (количество)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 123.4,
+     "text": "P∗P^*P∗ (цена)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 59.6,
+     "text": "CS\\mathrm{CS}CS (потребитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 44.4,
+     "text": "PS\\mathrm{PS}PS (производитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 78,
+     "text": "SW=CS+PS\\mathrm{SW} = \\mathrm{CS} + \\mathrm{PS}SW="
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 45,
+     "text": "Точка спроса (Q, P)=50;5050; 5050;50"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 165.3,
+     "text": "∣Ed∣|E_d|∣Ed​∣=111"
+    },
+    {
+     "sameLine": true,
+     "h": 30.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 8.9,
+     "text": "Зона спросаединичная, ∣Ed∣=1|E_d| = 1∣Ed​∣=1"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 60.3,
+     "text": "Выручка TR = P·Q=2 5002 5002 500"
+    },
+    {
+     "sameLine": true,
+     "h": 46.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 61.8,
+     "text": "Единичная точкаQ =50\\text{Q }= 50Q =50P =50\\text{P"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 62.2,
+     "text": "Макс выручка TR=2 5002 5002 500"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 5.2,
+     "text": "Точка предложения (Q, P)=65;6565; 6565;65"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 166.3,
+     "text": "∣Es∣|E_s|∣Es​∣=111"
+    },
+    {
+     "sameLine": false,
+     "h": 55.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 91.6,
+     "text": "Зона предложенияединичная, ∣Es∣=1|E_s| = 1∣Es​∣=1"
+    }
+   ],
+   "tallRows": 2,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "ext": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 82,
+     "text": "Q∗Q^*Q∗ (количество)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 123.4,
+     "text": "P∗P^*P∗ (цена)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 59.6,
+     "text": "CS\\mathrm{CS}CS (потребитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 44.4,
+     "text": "PS\\mathrm{PS}PS (производитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 78,
+     "text": "SW=CS+PS\\mathrm{SW} = \\mathrm{CS} + \\mathrm{PS}SW="
+    },
+    {
+     "sameLine": true,
+     "h": 46.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 68.1,
+     "text": "Qрын (D = MPC)Q =50\\text{Q }= 50Q =50P =50\\text{P "
+    },
+    {
+     "sameLine": true,
+     "h": 46.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 71.8,
+     "text": "Qопт (D = MSC)Q =40\\text{Q }= 40Q =40P =60\\text{P "
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 87.7,
+     "text": "DWL\\mathrm{DWL}DWL (потери)=100100100"
+    },
+    {
+     "sameLine": false,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -202.9,
+     "rightGap": 201.5,
+     "text": "Корректирующий налог (Пигу)=202020"
+    }
+   ],
+   "tallRows": 2,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "costs": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": false,
+     "h": 42,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 188.9,
+     "text": "Постоянные затраты FC=TC(0)\\mathrm{FC} = \\mathrm{T"
+    },
+    {
+     "sameLine": false,
+     "h": 71.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 134.5,
+     "text": "Безубыточность (min ATC)Q =3,67\\text{Q }= 3{,}67Q "
+    },
+    {
+     "sameLine": true,
+     "h": 46.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 29.7,
+     "text": "Закрытие (min AVC)Q =3\\text{Q }= 3Q =3AVC =6\\text{"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 141.3,
+     "text": "Цена P=151515"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 77,
+     "text": "Выпуск Q (P = MC)=444"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 122.2,
+     "text": "ATC(Q)\\mathrm{ATC}(Q)ATC(Q)=11,511{,}511,5"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 55.6,
+     "text": "Прибыль (P − ATC)·Q=141414"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 16,
+     "text": "Вход/выход: P = min ATC=11,3511{,}3511,35"
+    }
+   ],
+   "tallRows": 2,
+   "crossRow": 0,
+   "curves": 4
+  },
+  "prod": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 46.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 16.4,
+     "text": "Перегиб TP (max MP)L =10\\text{L }= 10L =10MP =300\\"
+    },
+    {
+     "sameLine": true,
+     "h": 46.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 65,
+     "text": "Максимум APL =15\\text{L }= 15L =15AP =225\\text{AP "
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 75.6,
+     "text": "MP\\mathrm{MP}MP в этой точке=225225225"
+    },
+    {
+     "sameLine": true,
+     "h": 46.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 66.3,
+     "text": "Максимум TPL =20\\text{L }= 20L =20Q =4 000\\text{Q "
+    }
+   ],
+   "tallRows": 3,
+   "crossRow": 0,
+   "curves": 1
+  },
+  "plants": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 46.4,
+     "text": "Совокупный выпуск Q=303030"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 118,
+     "text": "Завод 1: Q₁=202020"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 115.4,
+     "text": "Завод 2: Q₂=101010"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 43.7,
+     "text": "MC1=MC2=MC(Q)\\mathrm{MC}_1 = \\mathrm{MC}_2 = \\math"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 48.8,
+     "text": "TC(Q)=TC1+TC2\\mathrm{TC}(Q) = \\mathrm{TC}_1 + \\mat"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 58.9,
+     "text": "∫ MC(q)dq (сверка)=600600600"
+    },
+    {
+     "sameLine": false,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -195.9,
+     "rightGap": 185.9,
+     "text": "«Сумма в лоб» TC₁(Q)+TC₂(Q)=2 7002 7002 700"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 1
+  },
+  "isoquant": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 41,
+     "text": "Оптимум (L∗;K∗)(L^*; K^*)(L∗;K∗)=(50;25)(50; 25)(5"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 107.8,
+     "text": "Выпуск Q=35,3635{,}3635,36"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 64,
+     "text": "MRTS\\mathrm{MRTS}MRTS в оптимуме=0,50{,}50,5"
+    },
+    {
+     "sameLine": true,
+     "h": 28.5,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 167,
+     "text": "wr\\frac{w}{r}rw​=0,50{,}50,5"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 110.3,
+     "text": "Потрачено=100100100"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 1
+  },
+  "mono": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 82,
+     "text": "Qm (монополия)=404040"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 122.3,
+     "text": "Pm (цена)=606060"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 73.4,
+     "text": "QcQ_cQc​ (конкуренция)=808080"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 75.1,
+     "text": "PcP_cPc​ (конкуренция)=202020"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 87.7,
+     "text": "DWL\\mathrm{DWL}DWL (потери)=800800800"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 68.4,
+     "text": "CS\\mathrm{CS}CS (потребитель)=800800800"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 36,
+     "text": "VC\\mathrm{VC}VC (перем. издержки)=800800800"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 1.6,
+     "text": "Излишек произв. (TR − VC)=1 6001 6001 600"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "mono-nat": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 82,
+     "text": "Qm (монополия)=404040"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 122.3,
+     "text": "Pm (цена)=606060"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 73.4,
+     "text": "QcQ_cQc​ (конкуренция)=808080"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 75.1,
+     "text": "PcP_cPc​ (конкуренция)=202020"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 87.7,
+     "text": "DWL\\mathrm{DWL}DWL (потери)=800800800"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 68.4,
+     "text": "CS\\mathrm{CS}CS (потребитель)=800800800"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 36,
+     "text": "VC\\mathrm{VC}VC (перем. издержки)=800800800"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 1.6,
+     "text": "Излишек произв. (TR − VC)=1 6001 6001 600"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 17.8,
+     "text": "Постоянные издержки FC=800800800"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 19.6,
+     "text": "M · монополия: (QQQ; PPP)=(40;60)(40; 60)(40;60)"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 12.7,
+     "text": "(ATC(Qm); прибыль)=(40;800)(40; 800)(40;800)"
+    },
+    {
+     "sameLine": false,
+     "h": 45.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -178.1,
+     "rightGap": 181.1,
+     "text": "EMCE_{\\mathrm{MC}}EMC​ · цена P=MCP = \\mathrm{MC}P"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 87.2,
+     "text": "ATC на этом Q=303030"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 65.3,
+     "text": "Нужна субсидия=800800800"
+    },
+    {
+     "sameLine": false,
+     "h": 45.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -192,
+     "rightGap": 146.6,
+     "text": "EATCE_{\\mathrm{ATC}}EATC​ · цена P=ATCP = \\mathrm{"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 125.4,
+     "text": "Прибыль=000"
+    }
+   ],
+   "tallRows": 2,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "mono-d1": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 17.7,
+     "text": "Выпуск (= конкурентному)=808080"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 14.7,
+     "text": "Прибыль (весь излишек)=3 2003 2003 200"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 81.9,
+     "text": "CS\\mathrm{CS}CS (потребитель)=000"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 101.2,
+     "text": "DWL\\mathrm{DWL}DWL (потери)=000"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 33.4,
+     "text": "Простая монополия: Qm=404040"
+    },
+    {
+     "sameLine": false,
+     "h": 56.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 173.3,
+     "text": "Простая монополия: излишек (TR−VC)=1 6001 6001 600"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 19.4,
+     "text": "Простая монополия: DWL=800800800"
+    }
+   ],
+   "tallRows": 1,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "mono-d3": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 59.5,
+     "text": "Рынок 1: (q₁; P₁)=(40;60)(40; 60)(40;60)"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 56,
+     "text": "Рынок 2: (q₂; P₂)=(15;50)(15; 50)(15;50)"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 127.8,
+     "text": "Σ выпуск=555555"
+    },
+    {
+     "sameLine": true,
+     "h": 28,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 64.1,
+     "text": "MR1=MR2=MC\\mathrm{MR}_1 = \\mathrm{MR}_2 = \\mathrm{"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "mono-kink": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 107.9,
+     "text": "Q∗Q^*Q∗ (выпуск)=606060"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 123.4,
+     "text": "P∗P^*P∗ (цена)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 100.8,
+     "text": "Прибыль π=1 8001 8001 800"
+    },
+    {
+     "sameLine": false,
+     "h": 41,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": false,
+     "nosign": true,
+     "gap": null,
+     "rightGap": 105,
+     "text": "Победил кандидатMR=MC @ Q = 60"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "labor": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 92.1,
+     "text": "LkL_kLk​ (занятость)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 93,
+     "text": "WkW_kWk​ (зарплата)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 58.3,
+     "text": "Излишек рабочих=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 75.4,
+     "text": "Излишек фирм=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 104.9,
+     "text": "МРОТ W_min=656565"
+    },
+    {
+     "sameLine": true,
+     "h": 28,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 52.9,
+     "text": "Занятость=35 (было 50)"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 104,
+     "text": "Безработица=303030"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 47.6,
+     "text": "Излишек рабочих=1 662,51 662{,}51 662,5"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 73.7,
+     "text": "Излишек фирм=612,5612{,}5612,5"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 87.7,
+     "text": "DWL\\mathrm{DWL}DWL (потери)=225225225"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "labor-mono": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 74.3,
+     "text": "LмL_мLм​ (занятость)=33,3333{,}3333,33"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 75.2,
+     "text": "WмW_мWм​ (зарплата)=33,3333{,}3333,33"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 73.3,
+     "text": "LkL_kLk​ (конкуренция)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 69.2,
+     "text": "WkW_kWk​ (конкуренция)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 22.4,
+     "text": "DWL\\mathrm{DWL}DWL (недозанятость)=277,78277{,}782"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 104.9,
+     "text": "МРОТ W_min=656565"
+    },
+    {
+     "sameLine": false,
+     "h": 53,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -124.5,
+     "rightGap": 112.8,
+     "text": "Занятость с МРОТ=35 (было 33,33)"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 126.3,
+     "text": "Зарплата=656565"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 104,
+     "text": "Безработица=303030"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 47.6,
+     "text": "Излишек рабочих=1 662,51 662{,}51 662,5"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 73.7,
+     "text": "Излишек фирм=612,5612{,}5612,5"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 87.7,
+     "text": "DWL\\mathrm{DWL}DWL (потери)=225225225"
+    }
+   ],
+   "tallRows": 1,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "labor-union": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 75.6,
+     "text": "LпL_пLп​ (занятость)=33,3333{,}3333,33"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 76.5,
+     "text": "WпW_пWп​ (зарплата)=66,6766{,}6766,67"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 73.3,
+     "text": "LkL_kLk​ (конкуренция)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 69.2,
+     "text": "WkW_kWk​ (конкуренция)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 22.4,
+     "text": "DWL\\mathrm{DWL}DWL (недозанятость)=277,78277{,}782"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "labor-bilat": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": false,
+     "h": 56.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 171.6,
+     "text": "Нижняя граница Wм (монопсония)=33,3333{,}3333,33"
+    },
+    {
+     "sameLine": false,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 171.6,
+     "text": "Верхняя граница Wп (профсоюз)=66,6766{,}6766,67"
+    },
+    {
+     "sameLine": false,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -134.9,
+     "rightGap": 134,
+     "text": "Диапазон зарплаты=33,33…66,6733{,}33 … 66{,}6733,3"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 9.3,
+     "text": "Конкурентный ориентир Wk=505050"
+    },
+    {
+     "sameLine": false,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -153.4,
+     "rightGap": 140.9,
+     "text": "Занятость на границах=33,33 и 33,3333{,}33\\text{ и"
+    }
+   ],
+   "tallRows": 1,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "smallopen": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 82,
+     "text": "Q∗Q^*Q∗ (количество)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 123.4,
+     "text": "P∗P^*P∗ (цена)=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 59.6,
+     "text": "CS\\mathrm{CS}CS (потребитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 44.4,
+     "text": "PS\\mathrm{PS}PS (производитель)=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 78,
+     "text": "SW=CS+PS\\mathrm{SW} = \\mathrm{CS} + \\mathrm{PS}SW="
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 75.6,
+     "text": "Мировая цена Pw=303030"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 36.9,
+     "text": "Автаркия: (Q∗;P∗)(Q^*; P^*)(Q∗;P∗)=(50;50)(50; 50)"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 51.3,
+     "text": "При Pw: (Qd; Qs)=(70;30)(70; 30)(70;30)"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 136.5,
+     "text": "Импорт=404040"
+    },
+    {
+     "sameLine": false,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -183,
+     "rightGap": 148.6,
+     "text": "(CS; PS) при своб. торговле=(2 450;450)(2 450; 450"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 31.7,
+     "text": "Выигрыш от торговли=+400+400+400"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "monoexport": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 63.9,
+     "text": "Внутри: (q₁; P₁)=(25;75)(25; 75)(25;75)"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 48,
+     "text": "Экспорт q₂ (по Pw)=25/5025 / 5025/50"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 127.8,
+     "text": "Σ выпуск=505050"
+    },
+    {
+     "sameLine": true,
+     "h": 28.8,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 75.5,
+     "text": "MR1=Pw=MC\\mathrm{MR}_1 = P_w = \\mathrm{MC}MR1​=Pw​"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 2
+  },
+  "consumer": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 47.1,
+     "text": "Оптимум (x∗;y∗)(x^*; y^*)(x∗;y∗)=(50;25)(50; 25)(5"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 81.8,
+     "text": "Полезность U=35,3635{,}3635,36"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 73.6,
+     "text": "MRS\\mathrm{MRS}MRS в оптимуме=0,50{,}50,5"
+    },
+    {
+     "sameLine": true,
+     "h": 30.9,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 159.8,
+     "text": "PxPy\\frac{P_x}{P_y}Py​Px​​=0,50{,}50,5"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 34.8,
+     "text": "Перехваты I/Px, I/Py=100;50100; 50100;50"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 0
+  },
+  "cons-slutsky": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 47.1,
+     "text": "Оптимум (x∗;y∗)(x^*; y^*)(x∗;y∗)=(50;25)(50; 25)(5"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 81.8,
+     "text": "Полезность U=35,3635{,}3635,36"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 73.6,
+     "text": "MRS\\mathrm{MRS}MRS в оптимуме=0,50{,}50,5"
+    },
+    {
+     "sameLine": true,
+     "h": 30.9,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 159.8,
+     "text": "PxPy\\frac{P_x}{P_y}Py​Px​​=0,50{,}50,5"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 34.8,
+     "text": "Перехваты I/Px, I/Py=100;50100; 50100;50"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 19.2,
+     "text": "A: старый выбор (Px=1)=50/2550 / 2550/25"
+    },
+    {
+     "sameLine": false,
+     "h": 43,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -206,
+     "rightGap": 153.4,
+     "text": "B: компенсированный (I′I'I′=250)=31,25/62,531{,}25"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 12.1,
+     "text": "C: новый выбор (Px=4)=12,5/2512{,}5 / 2512,5/25"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 0
+  },
+  "adas": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 19.8,
+     "text": "Краткосрочно: (Y; P)=(100;60)(100; 60)(100;60)"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 9.2,
+     "text": "Потенциальный выпуск Y∗Y^*Y∗=100100100"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 89.7,
+     "text": "Разрыв выпуска=000"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 0
+  },
+  "islm": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 17.4,
+     "text": "Равновесный выпуск Y=166,67166{,}67166,67"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 41.6,
+     "text": "Равновесная ставка r=3,333{,}333,33"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 0
+  },
+  "phillips": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 35.1,
+     "text": "Ожидаемая инфляция πe=555"
+    },
+    {
+     "sameLine": true,
+     "h": 27.4,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 31,
+     "text": "Естественный уровень u∗u^*u∗=555"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 123.9,
+     "text": "Наклон β=0,50{,}50,5"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 0
+  },
+  "money": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 32,
+     "text": "Предложение денег Ms=120120120"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 53.8,
+     "text": "Равновесная ставка i=202020"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 0
+  },
+  "loanable": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 57.2,
+     "text": "База: (r; объём)=(20;90)(20; 90)(20;90)"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 0
+  },
+  "fx": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 68.1,
+     "text": "Плавающий курс e=161616"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 40.2,
+     "text": "Объём при плавающем=686868"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 0
+  },
+  "ineq": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 49.5,
+     "text": "Коэффициент Джини=0,30{,}30,3"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 48.6,
+     "text": "Робин Гуда (Гувера)=0,240{,}240,24"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 23,
+     "text": "Коэф. фондов (децильный)=555"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 20.3,
+     "text": "Квинтильный коэф. фондов=555"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 0
+  },
+  "laffer": {
+   "panelW": 215,
+   "rows": [
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 59,
+     "text": "Ставка максимума t=505050"
+    },
+    {
+     "sameLine": false,
+     "h": 41.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": -188.8,
+     "rightGap": 185.9,
+     "text": "Максимальные поступления=1 2501 2501 250"
+    },
+    {
+     "sameLine": true,
+     "h": 26.6,
+     "display": "flex",
+     "justify": "flex-start",
+     "labAlign": "left",
+     "hasSign": true,
+     "nosign": false,
+     "gap": 5,
+     "rightGap": 49.4,
+     "text": "Объём рынка при ней=252525"
+    }
+   ],
+   "tallRows": 0,
+   "crossRow": 0,
+   "curves": 0
+  }
+ },
+ "pageErrors": []
+}

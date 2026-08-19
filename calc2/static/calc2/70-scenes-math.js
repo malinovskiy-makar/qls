@@ -952,7 +952,7 @@ function updateMathPanel() {
       for (let i = 0; i < mmSlots(); i++) if (mmGet(i).trim()) names.push(mmLabel(i));
       html += `<div class="stat"><span>Строим</span><b>${nm} = ${r.isMin ? 'min' : 'max'}(${names.join(', ')})</b></div>`;
       html += `<div class="stat"><span>Функций участвует</span><b>${r.count}</b></div>`;
-      html += `<div class="stat"><span>Кривые меняются местами</span><b>${(r.switches || []).length ? r.switches.map(fmt).join(', ') : 'нигде'}</b></div>`;
+      html += `<div class="stat"><span>Кривые меняются местами</span><b>${(r.switches || []).length ? r.switches.map(v => fmt(v)).join('; ') : 'нигде'}</b></div>`;
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + `<p><b>Как строится итоговая кривая?</b> В каждой точке x берётся ${r.isMin ? 'наименьшее' : 'наибольшее'} из значений всех функций. `
         + `Получается ломаная из кусков исходных кривых: ${r.isMin ? 'нижняя' : 'верхняя'} огибающая. `
@@ -1883,21 +1883,33 @@ function updateGraphPanel() {
     const d1 = (x) => (f(x + h) - f(x - h)) / (2 * h);
     const ext = rootsOf(d1, lo, hi, 500).filter(x => isFinite(f(x)));
     html += `<div class="stat"><span>Кривая</span><b>${name}</b></div>`;
+    /* ⚠️ РАЗДЕЛИТЕЛЬ СПИСКА — ТОЧКА С ЗАПЯТОЙ, ПОТОМУ ЧТО ЗАПЯТАЯ ЗАНЯТА.
+       Корни 0 и 1 печатались как «0, 1,0»: запятая разделяла список и она же
+       была десятичным знаком, прочитать это невозможно. Десятичная запятая —
+       требование канона 2.1, значит менять надо разделитель. Стало «0; 1». */
+    /* ⚠️ `.map(fmt)` ПЕРЕДАЁТ В fmt НОМЕР ЭЛЕМЕНТА ВТОРЫМ ДОВОДОМ, а второй
+       довод у fmt — «сколько знаков после запятой печатать не меньше». Поэтому
+       первый корень печатался как «0», а второй тем же числом знаков, что его
+       номер: «1,0». Именно это и увидел владелец в записи «0, 1,0» — половина
+       беды была не в разделителе списка, а здесь. */
     html += `<div class="stat"><span>Пересекает ось $x$</span><b>${
-      zeros.length ? zeros.map(fmt).join(', ') : 'в окне не пересекает'}</b></div>`;
+      zeros.length ? zeros.map(v => fmt(v)).join('; ') : 'в окне не пересекает'}</b></div>`;
     html += `<div class="stat"><span>Пересекает ось $y$</span><b>${
       (lo <= 0 && hi >= 0 && isFinite(y0)) ? fmt(y0) : 'ось вне окна'}</b></div>`;
     if (ext.length) {
       html += `<div class="stat"><span>Вершины</span><b>${
-        ext.map(x => '(' + fmt(x) + '; ' + fmt(f(x)) + ')').join(', ')}</b></div>`;
+        ext.map(x => '(' + fmt(x) + '; ' + fmt(f(x)) + ')').join('; ')}</b></div>`;
     }
   });
   // Пересечения кривых между собой — их уже считает общий движок ключевых точек.
   const crosses = (typeof keyTargets === 'function' ? keyTargets() : [])
     .filter(p => p.kind === 'cross');
-  if (crosses.length) {
+  /* ⚠️ ПРИ ОДНОЙ КРИВОЙ ПЕРЕСЕКАТЬСЯ НЕЧЕМУ. Строка выводилась всегда и
+     повторяла точки пересечения с осями под другим заголовком: те же числа
+     дважды, причём второй раз под названием, которое их не описывает. */
+  if (crosses.length && shown.length > 1) {
     html += `<div class="stat"><span>Кривые пересекаются</span><b>${
-      crosses.map(p => '(' + fmt(p.x) + '; ' + fmt(p.y) + ')').join(', ')}</b></div>`;
+      crosses.map(p => '(' + fmt(p.x) + '; ' + fmt(p.y) + ')').join('; ')}</b></div>`;
   }
   box.innerHTML = html + graphExplainNote(shown.length);
 }

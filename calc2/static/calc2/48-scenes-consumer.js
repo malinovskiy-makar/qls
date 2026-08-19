@@ -193,7 +193,7 @@ function updateConsumerPanel() {
   html += `<div class="stat"><span>Полезность U</span><b>${fmt(b.U)}</b></div>`;
   html += `<div class="stat"><span>$MRS$ в оптимуме</span><b>${fmt(b.mrs)}</b></div>`;
   html += `<div class="stat"><span>$\\frac{P_x}{P_y}$</span><b>${fmt(b.px / b.py)}</b></div>`;
-  html += `<div class="stat"><span>Перехваты I/Px, I/Py</span><b>${fmt(b.xInt)}, ${fmt(b.yInt)}</b></div>`;
+  html += `<div class="stat"><span>Перехваты I/Px, I/Py</span><b>${fmt(b.xInt)}; ${fmt(b.yInt)}</b></div>`;
   // Свойство, характерное для выбранного типа предпочтений.
   const t = STATE.consType;
   if (t === 'subs') {
