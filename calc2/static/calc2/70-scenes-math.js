@@ -248,7 +248,9 @@ function makeRenamable(t, current, px, py, apply) {
   t.style('cursor', 'text');
   t.on('dblclick', (ev) => {
     ev.stopPropagation(); ev.preventDefault();
-    editInlineLabel(current, px, py, apply);
+    // Узел подписи нужен правке: у неё нет своего вида, она берёт кегль, вес и
+    // цвет у самой подписи и встаёт ровно на её место.
+    editInlineLabel(current, px, py, apply, t.node());
   });
 }
 
@@ -259,33 +261,91 @@ function editPointName(key, current, px, py) {
   });
 }
 
-/* Поле ввода поверх графика на месте подписи. Enter и уход фокуса сохраняют,
-   Esc отменяет, пустая строка возвращает машинное имя. */
-function editInlineLabel(current, px, py, apply) {
+/* ⚠️ ПОЛЯ ВВОДА ПРИ ПЕРЕИМЕНОВАНИИ ЧЕЛОВЕК НЕ ВИДИТ (фаза 8 ревью 19.08).
+
+   Было: белое окошко 152×20 с рамкой, всегда одной ширины и всегда вправо от
+   подписи. У правого края холста оно вылезало за пределы картинки, а на месте
+   аккуратной подписи вдруг появлялся чужой прямоугольник.
+
+   Стало: само название остаётся на месте и получает пунктирное подчёркивание
+   ровно по длине слова, акцентным цветом. Содержимое выделено целиком — набор
+   сразу заменяет старое имя. Подчёркивание тянется за словом при вводе.
+
+   Поле по-прежнему настоящее (`input`): подменить его на `contenteditable`
+   значило бы потерять мобильную клавиатуру, выделение и озвучивание. Просто у
+   него нет своего вида — ни фона, ни рамки, — а кегль, вес и цвет оно берёт у
+   самой подписи. Подпись на время правки прячется, иначе текст двоился бы.
+
+   Enter и щелчок мимо сохраняют, Escape отменяет, пустое имя откатывается к
+   прежнему. Не помещается у края — переезжает ЦЕЛИКОМ левее или правее; на
+   вторую строку название не разрывается никогда. */
+function editInlineLabel(current, px, py, apply, node) {
   const wrap = document.getElementById('graph-wrap');
   if (!wrap) return;
   const old = document.getElementById('pt-rename');
   if (old) old.remove();
+
+  // Вид берём у самой подписи: своего у поля быть не должно.
+  const cs = node ? getComputedStyle(node) : null;
+  const size = cs ? cs.fontSize : (FS.base + 'px');
+  const weight = cs ? cs.fontWeight : '600';
+  const color = (cs && cs.fill && cs.fill !== 'none') ? cs.fill : 'var(--text)';
+  const family = cs ? cs.fontFamily : 'inherit';
+  // Подпись прячем, но место её не трогаем: она вернётся ровно туда же.
+  if (node) node.style.visibility = 'hidden';
+
   const inp = document.createElement('input');
   inp.id = 'pt-rename'; inp.type = 'text'; inp.value = current;
-  inp.style.cssText = 'position:absolute;z-index:40;font-size:' + FS.base + 'px;font-weight:600;padding:2px 5px;'
-    + 'border:1px solid var(--accent);border-radius:var(--r-sm);background:var(--surface);'
-    + 'color:var(--text);min-width:110px;'
-    + 'left:' + Math.round(px) + 'px;top:' + Math.round(py - 16) + 'px;';
+  inp.setAttribute('aria-label', 'Название на графике');
+  inp.style.cssText = 'position:absolute;z-index:40;padding:0;margin:0;'
+    + 'border:0;border-bottom:1px dashed var(--accent);border-radius:0;background:none;'
+    + 'outline:none;box-sizing:content-box;line-height:1.1;'
+    + 'font-size:' + size + ';font-weight:' + weight + ';font-family:' + family + ';'
+    + 'color:' + color + ';';
+
+  /* Ширина — по содержимому и пересчитывается на каждый ввод: подчёркивание
+     обязано тянуться за словом, а не стоять на месте. Меряем настоящим
+     размером текста, а не прикидкой по числу символов. */
+  const ruler = document.createElement('span');
+  ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;padding:0;'
+    + 'font-size:' + size + ';font-weight:' + weight + ';font-family:' + family + ';';
+  wrap.appendChild(ruler);
+
+  const box = wrap.getBoundingClientRect();
+  const fit = () => {
+    ruler.textContent = inp.value || ' ';
+    const w = Math.max(12, ruler.offsetWidth + 2);
+    inp.style.width = w + 'px';
+    /* Подпись целиком внутри холста. Не влезла справа — переезжает влево ВСЯ,
+       а не переносится по словам: имя на графике разрывать нельзя. */
+    let left = px;
+    if (left + w > box.width - 4) left = Math.max(4, box.width - 4 - w);
+    if (left < 4) left = 4;
+    inp.style.left = Math.round(left) + 'px';
+  };
+
+  const fs = parseFloat(size) || 13;
+  inp.style.top = Math.round(py - fs) + 'px';
+  wrap.appendChild(inp);
+  fit();
+
   let done = false;
   const finish = (save) => {
     if (done) return;
     done = true;
-    if (save) { pushUndo(); apply(inp.value.trim()); }
+    // Пустое имя не сохраняем: откат к прежнему (решение владельца).
+    if (save && inp.value.trim()) { pushUndo(); apply(inp.value.trim()); }
+    ruler.remove();
     inp.remove();
+    if (node) node.style.visibility = '';
     redrawAll();
   };
+  inp.addEventListener('input', fit);
   inp.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); finish(true); }
     else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
   });
   inp.addEventListener('blur', () => finish(true));
-  wrap.appendChild(inp);
   inp.focus(); inp.select();
 }
 
