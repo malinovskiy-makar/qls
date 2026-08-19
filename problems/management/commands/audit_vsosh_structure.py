@@ -161,7 +161,7 @@ class Command(BaseCommand):
             seen = set()
             for pdf in sorted(glob.glob(
                     f'materials/vsosh_region/{year}/test_answers_*.pdf')):
-                h = hashlib.md5(open(pdf, 'rb').read()).hexdigest()
+                h = hashlib.md5(open(pdf, 'rb').read(), usedforsecurity=False).hexdigest()
                 if h in seen:
                     continue
                 seen.add(h)

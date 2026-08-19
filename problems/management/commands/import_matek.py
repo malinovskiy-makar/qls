@@ -571,7 +571,7 @@ class Command(BaseCommand):
 
                     title = rec['title'] or extract_title(stmt)
                     solution = clean_latex(rec['solution']) if rec['solution'] else ''
-                    stmt_hash = hashlib.md5(stmt.encode()).hexdigest()
+                    stmt_hash = hashlib.md5(stmt.encode(), usedforsecurity=False).hexdigest()
                     parts = [
                         clean_latex(s) for s in rec['subitems']
                         if clean_latex(s)

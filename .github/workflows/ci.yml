@@ -1,0 +1,299 @@
+# Проверки, которые обязаны пройти до слияния.
+#
+# ⚠️ ЗДЕСЬ НЕТ НИ ОДНОГО continue-on-error, И ЭТО ГЛАВНОЕ ПРАВИЛО ФАЙЛА.
+# Джоб, который «падает, но не считается», — это не проверка, а зелёная
+# галочка напротив непроверенного кода. Если джоб мешает — его чинят или
+# осознанно убирают целиком, а не помечают необязательным.
+#
+# Пять джобов:
+#   lint          — стиль и очевидные ошибки (ruff)
+#   security      — статический разбор и уязвимости зависимостей
+#   migrations    — схема поднимается С НУЛЯ и совпадает с моделями
+#   tests         — весь набор против PostgreSQL 17, матрицей по приложениям
+#   deploy-check  — продакшен-настройки глазами самого Django
+#
+# Версии берутся ТОЛЬКО из локов (`requirements/*.txt`). Установка по `.in`
+# означала бы, что CI проверяет не то, что поедет на сервер.
+
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# Новый пуш в ту же ветку отменяет предыдущий прогон: полный набор идёт
+# долго, и держать очередь из устаревших прогонов незачем.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.13'
+  # ⚠️ Вывод команд проекта по-русски. Без явной кодировки раннер отдаёт его
+  # в системной, и текст превращается в «РѕР±С‹С‡РЅС‹Р№» — а разбирать по такому
+  # логу упавший тест невозможно.
+  PYTHONIOENCODING: utf-8
+  PYTHONUTF8: '1'
+
+jobs:
+  # ---------------------------------------------------------------------
+  lint:
+    name: Стиль (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements/dev.txt
+
+      - name: Поставить инструменты
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/dev.txt
+
+      # Набор правил — в ruff.toml, там же написано, почему он такой узкий
+      # и как его расширять по шагам. Сегодня код проходит его начисто.
+      - name: ruff check
+        run: ruff check .
+
+      # ⚠️ ШАГА `ruff format --check .` ЗДЕСЬ НЕТ, И ЭТО НЕ ЗАБЫТО.
+      # Замерено 2026-08-19: форматтер переписал бы 448 файлов из 574 —
+      # 95 639 строк. Поставить такой шаг сейчас значит получить джоб,
+      # красный с первого дня и до дня, когда кто-то решится на этот коммит.
+      # Красная проверка, которую нельзя починить сегодня, за неделю
+      # превращается в проверку, на которую перестают смотреть, — и тогда
+      # она не поймает и настоящую поломку.
+      #
+      # Включать форматтер — отдельной работой: сначала слить открытые ветки
+      # (их четыре), потом один коммит «форматирование, только пробелы»,
+      # потом этот шаг. Настройки форматтера в ruff.toml уже готовы.
+      # Карточка заведена в Notion «Задачи».
+
+  # ---------------------------------------------------------------------
+  security:
+    name: Безопасность (bandit, pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements/dev.txt
+
+      - name: Поставить инструменты
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/dev.txt
+
+      # -ll — только средняя и высокая важность. Низкая на проекте с
+      # 155 командами даёт стену шума, в которой настоящая находка теряется.
+      #
+      # ⚠️ -b .bandit-baseline.json — ЭТО НЕ ГЛУШИЛКА. В базовой линии лежат
+      # 18 находок, доставшихся по наследству (интерполяция имён таблиц в SQL,
+      # разбор XML из .docx, скачивание ассетов KaTeX). Каждая НОВАЯ находка
+      # роняет джоб; старые ждут своей сессии — аудита границ доступа. Файл
+      # лежит в репозитории и читается глазами, в отличие от `skips` в
+      # настройках, который выключил бы правило целиком и навсегда.
+      #
+      # Проверено, что линия устойчива: сдвиг находки на пять строк её не
+      # ломает — сопоставление идёт по коду, а не по номеру строки.
+      #
+      # 29 находок высокой важности (B324, md5) НЕ в базовой линии — они
+      # починены по-настоящему: проставлен usedforsecurity=False. Дайджест
+      # при этом не меняется (проверено), а правило остаётся включённым и
+      # поймает настоящее злоупотребление MD5.
+      - name: bandit
+        run: >-
+          bandit -r problems catalog teacher student game calc2 config
+          -ll -b .bandit-baseline.json
+
+      # ⚠️ Проверяем БОЕВОЙ лок, а не dev: уязвимость в линтере на сервер
+      # не поедет, а уязвимость в Django поедет.
+      - name: pip-audit
+        run: pip-audit -r requirements/base.txt
+
+  # ---------------------------------------------------------------------
+  migrations:
+    name: Миграции с нуля
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: qls
+          POSTGRES_PASSWORD: qls_ci_password
+          POSTGRES_DB: qls_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qls -d qls_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgres://qls:qls_ci_password@127.0.0.1:5432/qls_ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements/dev.txt
+
+      - name: Поставить зависимости
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/dev.txt
+
+      # Главное здесь — «с нуля». Схема, которая поднимается только
+      # доливкой поверх старой базы, на новом сервере не поднимется вовсе.
+      - name: migrate с чистой базы
+        run: python manage.py migrate --noinput --settings=config.settings_test_pg
+
+      # ⚠️ БЕЗ ИМЕНИ ПРИЛОЖЕНИЯ ЗДЕСЬ МОЖНО, И ТОЛЬКО ЗДЕСЬ.
+      # Запрет проекта касается СОЗДАНИЯ файлов миграций: автодетектор
+      # сочинит своей номер 0007 для `game`, а файлы 0007–0012 лежат в ветке
+      # feat/econ-rush-figure, и при слиянии номера столкнутся неразрешимо
+      # (ADR 0004). Связка --check --dry-run не пишет на диск ничего: она
+      # только отвечает, разошлись ли модели с миграциями, и падает, если да.
+      - name: Модели и миграции не разошлись
+        run: python manage.py makemigrations --check --dry-run --settings=config.settings_test_pg
+
+  # ---------------------------------------------------------------------
+  tests:
+    name: Тесты на PostgreSQL 17
+    runs-on: ubuntu-latest
+
+    # Полному набору хватает часа с запасом; ставим 45 минут, чтобы зависший
+    # браузерный тест не жёг раннер шесть часов по умолчанию.
+    timeout-minutes: 45
+
+    # ⚠️ ПОЧЕМУ ЗДЕСЬ НЕТ МАТРИЦЫ ПО ПРИЛОЖЕНИЯМ. Разложить набор по
+    # приложениям напрашивается, но на этом проекте это не работает:
+    # из 120 файлов тестов 111 лежат в `problems`. Матрица дала бы одну
+    # ячейку с 90 % работы и три почти мгновенные — выигрыша во времени нет,
+    # а установка зависимостей и браузера playwright (самая дорогая часть
+    # подготовки) повторилась бы в каждой ячейке. Итог был бы медленнее
+    # одного джоба.
+    #
+    # Если прогон однажды перестанет укладываться — делить надо НЕ по
+    # приложениям, а внутри `problems.tests`, и делать это по замеру, а не
+    # на глаз. Сокращать набор нельзя ни в каком виде.
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: qls
+          POSTGRES_PASSWORD: qls_ci_password
+          POSTGRES_DB: qls_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qls -d qls_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgres://qls:qls_ci_password@127.0.0.1:5432/qls_ci
+      # Имя тестовой базы задано явно. Ячейки матрицы столкнуться не могут —
+      # у каждой свой раннер и свой контейнер PostgreSQL, — но явное имя
+      # избавляет от догадок при разборе упавшего прогона по логу.
+      TEST_DATABASE_NAME: test_qls
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements/dev.txt
+
+      # Node нужен двум проверкам: регрессии математики calc2 и разбору
+      # повреждений KaTeX. Без него они «громко пропускаются» — то есть
+      # молчаливо не проверяют ничего.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Поставить зависимости Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/dev.txt
+
+      - name: Поставить зависимости Node
+        run: npm ci
+
+      - name: Браузер для playwright
+        run: npx playwright install --with-deps chromium
+
+      # Приложения перечислены поимённо, а не отдано на автопоиск: так
+      # видно, что проверяется всё семь, и пропажа приложения из списка
+      # заметна глазом при чтении файла.
+      - name: Прогон
+        run: |
+          python manage.py test \
+            problems catalog teacher student calc2 game calendar_stub \
+            --settings=config.settings_test_pg --verbosity 2
+
+  # ---------------------------------------------------------------------
+  deploy-check:
+    name: Продакшен-настройки
+    runs-on: ubuntu-latest
+
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings_production
+      # ⚠️ ОКРУЖЕНИЕ ПОДСТАВНОЕ, НО ПРАВДОПОДОБНОЕ. Ключ длинный и
+      # разнобуквенный намеренно: на коротком поднимется security.W009, и
+      # джоб покраснеет по вине заглушки, а не настроек. Настоящий ключ
+      # выдаёт хостинг (generateValue в render.yaml).
+      SECRET_KEY: x7Kq2mZv9Lp4Rt6Wy8Bn3Cf5Hj1Dg0Sa-QwErTyUiOpAsDfGhJkLzXcVbNm
+      ALLOWED_HOSTS: example.org,www.example.org
+      DATABASE_URL: postgres://u:p@127.0.0.1:5432/db
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements/base.txt
+
+      # Здесь ставим БОЕВОЙ лок: джоб проверяет, что поднимается именно то,
+      # что поедет на сервер, а не оно же плюс инструменты разработчика.
+      - name: Поставить боевые зависимости
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/base.txt
+
+      # ⚠️ --fail-level WARNING ОБЯЗАТЕЛЕН. Без него `check --deploy`
+      # возвращает НОЛЬ даже когда выводит предупреждения: ошибками он
+      # считает только ошибки. Джоб был бы вечнозелёным и не заметил бы ни
+      # выключенной куки, ни звёздочки в ALLOWED_HOSTS.
+      - name: check --deploy
+        run: python manage.py check --deploy --fail-level WARNING

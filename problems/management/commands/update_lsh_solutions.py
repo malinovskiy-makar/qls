@@ -280,7 +280,7 @@ def extract_solutions_from_tex(content: str):
         if not sol_clean:
             continue
 
-        stmt_hash = hashlib.md5(stmt_clean.encode()).hexdigest()
+        stmt_hash = hashlib.md5(stmt_clean.encode(), usedforsecurity=False).hexdigest()
         results.append((stmt_hash, sol_clean))
 
     return results

@@ -80,7 +80,7 @@ SUBLOW_RE = re.compile(r'(?m)^\s*\(([a-h])\)\s')
 
 
 def md5(text: str) -> str:
-    return hashlib.md5(text.encode()).hexdigest()
+    return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
 
 
 def pdf_text(path: Path) -> str:

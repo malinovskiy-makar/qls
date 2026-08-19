@@ -94,7 +94,7 @@ _TRANSLIT = {
 
 
 def md5(text: str) -> str:
-    return hashlib.md5(text.encode()).hexdigest()
+    return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
 
 
 def extract_pdf_text(pdf_path: Path) -> str:

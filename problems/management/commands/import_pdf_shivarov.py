@@ -448,7 +448,7 @@ class Command(BaseCommand):
                         skipped += 1
                         continue
 
-                    stmt_hash = hashlib.md5(stmt.encode()).hexdigest()
+                    stmt_hash = hashlib.md5(stmt.encode(), usedforsecurity=False).hexdigest()
                     if stmt_hash in existing_hashes:
                         skipped += 1
                         continue

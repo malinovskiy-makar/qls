@@ -273,7 +273,7 @@ class Command(BaseCommand):
             with transaction.atomic():
                 for rec in batch:
                     stmt = rec['statement']
-                    stmt_hash = hashlib.md5(stmt.encode()).hexdigest()
+                    stmt_hash = hashlib.md5(stmt.encode(), usedforsecurity=False).hexdigest()
 
                     if stmt_hash in existing_hashes:
                         skipped += 1
