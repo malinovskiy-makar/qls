@@ -1,4 +1,4 @@
-"""
+r"""
 Management command: update_lsh_solutions
 
 Ищет решения (\solution{}{}) к задачам ЛШ Олмат 2025, которые были
@@ -192,7 +192,7 @@ def _is_letter_answer(text: str) -> bool:
 # ── Парсинг задач с решением ──────────────────────────────────────────────────
 
 def extract_solutions_from_tex(content: str):
-    """
+    r"""
     Возвращает список пар (stmt_hash, solution_text) для задач,
     у которых есть \solution{}{} или \solution{} с непустым содержимым.
     Хэш считается от очищенного условия.

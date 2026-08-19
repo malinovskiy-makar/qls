@@ -18,9 +18,9 @@
   в отдельной модели `UserProfile` (`problems/models_platform.py`).
 - Виртуальное окружение в `./venv/`.
 
-⚠️ **Совместимость с Python 3.9.** Синтаксис `int | None` (union через `|`)
-появился только в 3.10 и роняет импорт с `TypeError`. Пишем
-`from typing import Optional` → `Optional[int]`. Никогда `int | None`.
+Синтаксис `int | None` разрешён с 2026-08-19 (union через `|` требует Python
+3.10+). Массово переписывать существующие `Optional[int]` не надо — это шум в
+диффе; снят только запрет на новое.
 
 ⚠️ **Путь к интерпретатору зависит от машины.** На macOS — `./venv/bin/python`,
 на Windows — `venv/Scripts/python.exe`. В документации проекта встречаются оба;
