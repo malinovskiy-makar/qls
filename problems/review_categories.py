@@ -43,6 +43,14 @@ REVIEW_CATEGORIES = [
     # должен превращать идеальную задачу в выброшенную и наоборот.
     {'key': 'trash',            'hotkey': '0', 'kind': 'trash',
      'label': 'Гагно', 'hint': 'в мусор целиком'},
+    # Разбор УЖЕ ПОЧИНЕННЫХ задач (пакеты reports/defect_review): человек
+    # показал один дефект, а правка тронула другое место. Отдельная категория
+    # нужна потому, что «other» отвечает на вопрос «что не так с задачей», а
+    # эта — «что не так с ПРАВКОЙ»; смешав их, мы потеряли бы счёт промахов
+    # починки. Клавиша «-» — не цифра (все заняты) и не буква: буква зависит
+    # от раскладки, а «-» в русской и английской раскладках одна и та же.
+    {'key': 'fixed_wrong',      'hotkey': '-', 'kind': 'defect',
+     'label': 'Починил не то', 'hint': 'правка тронула не тот дефект'},
 ]
 
 CATEGORY_KEYS = [c['key'] for c in REVIEW_CATEGORIES]
@@ -56,4 +64,8 @@ BUNDLE_FORMAT = 'qls-review-bundle-v1'
 # Импорт понимает ОБА — 2 401 вердикт по ILE лежат в v1 и переводу не подлежат.
 VERDICTS_FORMAT_V1 = 'qls-review-verdicts-v1'
 VERDICTS_FORMAT = 'qls-review-verdicts-v2'
-VERDICTS_FORMATS = (VERDICTS_FORMAT_V1, VERDICTS_FORMAT)
+# v3: то же, что v2, плюс `quotes` — куски текста, выделенные ревьюером прямо
+# на экране, с комментарием к каждому. Отдельная версия нужна, чтобы импорт
+# файла БЕЗ цитат нельзя было спутать с файлом, где ревьюер цитаты снял.
+VERDICTS_FORMAT_V3 = 'qls-review-verdicts-v3'
+VERDICTS_FORMATS = (VERDICTS_FORMAT_V1, VERDICTS_FORMAT, VERDICTS_FORMAT_V3)

@@ -95,16 +95,22 @@ class RankingAlwaysThereTests(TestCase):
         for path in ('teacher/student_progress.html',
                      'teacher/groups/student_stats.html',
                      'platform/stats.html'):
-            with open('/'.join(['.', _find(path)]), encoding='utf-8') as fh:
+            with open(_find(path), encoding='utf-8') as fh:
                 body = fh.read()
             self.assertIn('_ranking.html', body, path)
 
 
 def _find(template):
-    """Путь к шаблону на диске — по тем же каталогам, что у Django."""
+    """Путь к шаблону на диске — по тем же каталогам, что у Django.
+
+    ⚠️ Отдаём АБСОЛЮТНЫЙ путь как есть. Раньше от него отрезали кусок
+    'qls_platform/' и приклеивали './' — это работало только на машине, где
+    проект лежит в папке с таким именем. На Windows (C:\\qls) отрезать было
+    нечего, и open() получал './C:\\qls\\...' — недопустимый путь.
+    """
     from django.template.loader import get_template
 
-    return get_template(template).origin.name.split('qls_platform/')[-1]
+    return get_template(template).origin.name
 
 
 class StudentFactsTests(TestCase):

@@ -139,6 +139,7 @@ class Command(BaseCommand):
 
         by_key = {(rv.problem_id, rv.category): rv for rv in existing}
         created = updated = unchanged = removed = 0
+        quoted_problems, quote_rows = set(), 0
         skipped_ids = []
         summary = Counter()
 
@@ -149,17 +150,28 @@ class Command(BaseCommand):
                     skipped_ids.append(pid)
                     continue
                 comment = v.get('comment') or ''
+                # Цитаты есть только в v3; у v1/v2 их нет — это пустой список,
+                # а не отсутствие поля, иначе повторный импорт старого файла
+                # выглядел бы как «ревьюер снял все цитаты».
+                quotes = v.get('quotes')
+                if not isinstance(quotes, list):
+                    quotes = []
+                if quotes:
+                    quoted_problems.add(pid)
+                    quote_rows += len(quotes)
                 at = parse_at(v.get('at')) or timezone.now()
                 for category in verdict_categories(v, fmt):
                     summary[category] += 1
                     prev = by_key.get((pid, category))
-                    if prev is not None and (prev.comment, prev.reviewer) == (comment, reviewer):
+                    if prev is not None and (prev.comment, prev.reviewer,
+                                             prev.quotes) == (comment, reviewer,
+                                                              quotes):
                         unchanged += 1
                         continue
                     _, was_created = ReviewVerdict.objects.update_or_create(
                         bundle=bundle, problem_id=pid, category=category,
                         defaults={'comment': comment, 'reviewer': reviewer,
-                                  'created_at': at})
+                                  'quotes': quotes, 'created_at': at})
                     if was_created:
                         created += 1
                     else:
@@ -183,6 +195,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(
                 f'Пропущенные id: {skipped_ids[:20]}'
                 f'{"…" if len(skipped_ids) > 20 else ""}'))
+        if quote_rows:
+            self.stdout.write('Цитат: {} в {} задачах.'.format(
+                quote_rows, len(quoted_problems)))
         self.stdout.write('Сводка по категориям:')
         for key in CATEGORY_KEYS:
             if summary[key]:

@@ -43,7 +43,12 @@ def markup_files():
                 if name.endswith('.html'):
                     path = os.path.join(base, name)
                     with open(path, encoding='utf-8') as handle:
-                        yield os.path.relpath(path, ROOT), handle.read()
+                        # ⚠️ Путь наружу — всегда через «/». На Windows
+                        # relpath отдаёт разделителем обратный слэш, и сверка
+                        # с ожидаемым 'templates/_kit.html' краснела бы на
+                        # ровном месте, ничего не говоря о самих правилах.
+                        rel = os.path.relpath(path, ROOT).replace(os.sep, '/')
+                        yield rel, handle.read()
 
 
 class RulesLiveInTheKitTests(TestCase):
