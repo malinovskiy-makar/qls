@@ -306,6 +306,83 @@ class CalendarSeriesDeleteTests(TestCase):
                 pk__in=[self.parent.pk, self.mine_child.pk,
                         self.alien_child.pk]).count(), 3)
 
+    def test_foreign_assignment_cannot_be_attached(self):
+        """Чужую работу нельзя привязать к своему событию календаря.
+
+        ⚠️ ЗАЧЕМ ЭТО ВАЖНО. `_format_event` отдаёт по привязанной работе
+        `submissions_info` — сколько всего учеников и сколько уже сдали.
+        Раньше и создание, и правка события брали работу простым
+        `Assignment.objects.get(pk=...)`, без проверки владения: номер чужой
+        работы обменивался на сведения о её ходе.
+        """
+        from problems.models import Assignment, StudentGroup as SG
+
+        alien_group = SG.objects.create(name='Чужое занятие',
+                                        teacher=self.other)
+        alien_work = Assignment.objects.create(
+            name='Чужая работа', author=self.other, group=alien_group)
+
+        client = _login(self.mine.username)
+        response = client.post(
+            reverse('calendar_stub:event_create'),
+            data=('{"title": "Моё событие", "event_type": "homework",'
+                  ' "date": "2026-09-01", "time_start": "10:00",'
+                  ' "assignment_id": %d}' % alien_work.pk),
+            content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+
+        created = CalendarEvent.objects.filter(title='Моё событие').first()
+        self.assertIsNotNone(created, 'событие не создалось — проверять нечего')
+        self.assertIsNone(
+            created.assignment_id,
+            'чужая работа привязана к событию — дыра вернулась')
+
+    def test_foreign_assignment_cannot_be_attached_on_update(self):
+        """То же при ПРАВКЕ события, а не только при создании."""
+        from problems.models import Assignment, StudentGroup as SG
+
+        alien_group = SG.objects.create(name='Чужое занятие 2',
+                                        teacher=self.other)
+        alien_work = Assignment.objects.create(
+            name='Чужая работа 2', author=self.other, group=alien_group)
+
+        client = _login(self.mine.username)
+        response = client.post(
+            reverse('calendar_stub:event_update', args=[self.parent.pk]),
+            data=('{"title": "Родитель серии", "event_type": "homework",'
+                  ' "assignment_id": %d}' % alien_work.pk),
+            content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+
+        self.parent.refresh_from_db()
+        self.assertIsNone(
+            self.parent.assignment_id,
+            'чужая работа привязана правкой события — дыра вернулась')
+
+    def test_own_assignment_still_attaches(self):
+        """Контроль: свою работу привязать по-прежнему можно."""
+        from problems.models import Assignment, StudentGroup as SG
+
+        my_group = SG.objects.create(name='Моё занятие', teacher=self.mine)
+        my_work = Assignment.objects.create(
+            name='Моя работа', author=self.mine, group=my_group)
+
+        client = _login(self.mine.username)
+        client.post(
+            reverse('calendar_stub:event_create'),
+            data=('{"title": "Событие со своей работой",'
+                  ' "event_type": "homework", "date": "2026-09-01",'
+                  ' "time_start": "10:00", "assignment_id": %d}'
+                  % my_work.pk),
+            content_type='application/json')
+
+        created = CalendarEvent.objects.filter(
+            title='Событие со своей работой').first()
+        self.assertIsNotNone(created)
+        self.assertEqual(created.assignment_id, my_work.pk,
+                         'своя работа перестала привязываться — правка '
+                         'зашла слишком далеко')
+
     def test_single_delete_still_works(self):
         """Контроль: обычное удаление одного события не сломано."""
         client = _login(self.mine.username)
