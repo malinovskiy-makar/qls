@@ -57,8 +57,6 @@ urlpatterns = [
     path('student/', include('student.urls')),
     # Этап В2–В4 — Панель учителя.
     path('teacher/', include('teacher.urls')),
-    # Этап 6а — Графический калькулятор Desmos.
-    path('desmos/', include('graphs.urls')),
     # Этап Е — Собственный графический движок (D3 + Math.js), новый калькулятор.
     path('calc2/', include('calc2.urls')),
     # Этап А — Публичный каталог задач.

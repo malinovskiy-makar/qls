@@ -642,7 +642,7 @@ class AssignmentItem(models.Model):
         ordering = ['order', 'id']
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(catalog_problem__isnull=False,
                              custom_problem__isnull=True)
                     | models.Q(catalog_problem__isnull=True,
@@ -905,7 +905,7 @@ class SavedProblem(models.Model):
         ordering = ['-created_at']
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(catalog_problem__isnull=False,
                              custom_problem__isnull=True)
                     | models.Q(catalog_problem__isnull=True,

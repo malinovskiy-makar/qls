@@ -39,7 +39,7 @@ from problems.models import Problem
 TIER1 = [
     'problems.User', 'problems.Topic', 'problems.Subtopic', 'problems.Tag',
     'problems.Source', 'problems.FileAsset', 'problems.Skill',
-    'problems.MistakeTag', 'problems.Template', 'problems.DesmosGraph',
+    'problems.MistakeTag', 'problems.Template',
     'problems.StudentGroup', 'problems.Job', 'problems.TheoryPage',
 ]
 

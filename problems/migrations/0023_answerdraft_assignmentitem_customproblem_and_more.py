@@ -381,7 +381,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='savedproblem',
-            constraint=models.CheckConstraint(check=models.Q(models.Q(('catalog_problem__isnull', False), ('custom_problem__isnull', True)), models.Q(('catalog_problem__isnull', True), ('custom_problem__isnull', False)), _connector='OR'), name='saved_problem_exactly_one_problem'),
+            constraint=models.CheckConstraint(condition=models.Q(models.Q(('catalog_problem__isnull', False), ('custom_problem__isnull', True)), models.Q(('catalog_problem__isnull', True), ('custom_problem__isnull', False)), _connector='OR'), name='saved_problem_exactly_one_problem'),
         ),
         migrations.AddConstraint(
             model_name='savedproblem',
@@ -429,7 +429,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='assignmentitem',
-            constraint=models.CheckConstraint(check=models.Q(models.Q(('catalog_problem__isnull', False), ('custom_problem__isnull', True)), models.Q(('catalog_problem__isnull', True), ('custom_problem__isnull', False)), _connector='OR'), name='assignment_item_exactly_one_problem'),
+            constraint=models.CheckConstraint(condition=models.Q(models.Q(('catalog_problem__isnull', False), ('custom_problem__isnull', True)), models.Q(('catalog_problem__isnull', True), ('custom_problem__isnull', False)), _connector='OR'), name='assignment_item_exactly_one_problem'),
         ),
         migrations.AddConstraint(
             model_name='answerdraft',

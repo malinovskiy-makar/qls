@@ -48,7 +48,19 @@ DATABASES = {
 MIDDLEWARE = ['whitenoise.middleware.WhiteNoiseMiddleware'] + MIDDLEWARE
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Настройка хранилищ одним словарём. Отдельные STATICFILES_STORAGE и
+# DEFAULT_FILE_STORAGE объявлены устаревшими в Django 4.2 и удалены в 5.1:
+# два ключа вместо одного места давали разное поведение у файлов и статики.
+# Ключ 'default' задаём явно — иначе он потеряется вместе со словарём.
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 # ─── Шаблоны: кэшированный загрузчик на продакшене ───────────────────────────
 

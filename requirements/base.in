@@ -1,0 +1,25 @@
+# Зависимости боевого сервиса. Без ML: модель эмбеддингов на прод не едет
+# (ADR 0002) — иначе torch тянет ~2 ГБ в образ и копию в каждый воркер.
+#
+# Это ИСХОДНИК. Точные версии — в requirements/base.txt, он компилируется:
+#     pip-compile requirements/base.in -o requirements/base.txt
+Django>=5.2,<5.3          # LTS до апреля 2028 — ADR 0007
+asgiref
+sqlparse
+gunicorn
+whitenoise
+dj-database-url
+psycopg2-binary           # драйвер прода СЕГОДНЯ. Переход на psycopg3 —
+                          # отдельная работа: сменить драйвер, не проверив
+                          # его против настоящей PostgreSQL, нельзя, а её
+                          # локально нет (сессия про PostgreSQL — следующая).
+Pillow
+numpy
+PyMuPDF>=1.26.7,<1.27     # потолок намеренный: 1.28 объявляет устаревшим
+                          # API `fitz`, а он стоит в 19 файлах проекта.
+                          # Уязвимость PYSEC-2026-3001 закрыта уже в 1.26.7,
+                          # переезд на новый API — отдельная работа.
+pdfminer.six
+pypandoc
+redis
+django-redis
