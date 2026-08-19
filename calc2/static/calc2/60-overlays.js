@@ -383,7 +383,11 @@ function drawOverlays() {
   applyAreaColors();         // свои цвета заливок — одним проходом по data-legend
   drawAreaCalc();            // посчитанная площадь (Фаза 10)
   drawAreaVerts();           // набранные вершины будущей площади
-  drawCrossPoints();         // пересечения кривых тусклыми точками
+  /* Полосы попадания — СТРОГО перед кружками: кружку ключевой точки нужен свой
+     запас попадания, и он обязан лежать ВЫШЕ полосы кривой, иначе промах по
+     точке на пять пикселей уносит руку в кривую. */
+  drawCurveHits();           // полосы попадания у кривых, нарисованных сценой
+  drawCrossPoints();         // ключевые точки взведённой кривой
   drawRoller();              // точка, катящаяся по кривой
   drawGraphTitle();
   drawLegend();
@@ -1087,22 +1091,36 @@ function keyTargets() {
   /* Вид точки нужен отрисовке (П36–П38): излом рисуется по-особому, у
      остальных вид одинаковый. Перегибы сюда не попадают и не попадут:
      договорились их ключевыми точками не считать. */
-  const push = (x, y, name, kind) => {
+  /* ⚠️ У КАЖДОЙ ТОЧКИ ЕСТЬ ХОЗЯЕВА — КРИВЫЕ, КОТОРЫМ ОНА ПРИНАДЛЕЖИТ.
+
+     Без этого списка нельзя ответить на вопрос фазы 3: «какие точки зажечь,
+     когда щёлкнули по этой кривой». Хозяев может быть двое — точка пересечения
+     принадлежит обеим кривым и обязана загораться при щелчке по любой из них
+     (решение владельца). У экстремума и излома хозяин один. У начала координат
+     хозяев нет вовсе: это пересечение ОСЕЙ, а не кривой, и загораться вместе с
+     кривой ему не за что.
+
+     Хозяин записывается ИМЕНЕМ, тем же, что печатает snapTargets: по имени же
+     сверяет взведение, и второго способа отождествить кривую заводить нельзя. */
+  const push = (x, y, name, kind, owners) => {
     if (!isFinite(x) || !isFinite(y)) return;
     if (x < w.x0 - 1e-9 || x > w.x1 + 1e-9 || y < w.y0 - 1e-9 || y > w.y1 + 1e-9) return;
     if (out.some(o => Math.abs(o.x - x) < dx && Math.abs(o.y - y) < dy)) return;
-    out.push({ x, y, name, kind: kind || 'cross' });
+    out.push({ x, y, name, kind: kind || 'cross', owners: owners || [] });
   };
+  const curveNames = new Set(snapTargets().map(t => t.name));
   (STATE.crosses && STATE.crosses.length ? STATE.crosses : crossPoints()).forEach(p => {
+    // Второй участник бывает осью, а не кривой: ось в хозяева не идёт.
+    const own = [p.a, p.b].filter(nm => curveNames.has(nm));
     push(p.x, p.y, /^ось /.test(p.b)
       ? ('пересечение с ' + p.b.replace('ось ', 'осью '))
-      : ('пересечение ' + p.a + ' и ' + p.b), 'cross');
+      : ('пересечение ' + p.a + ' и ' + p.b), 'cross', own);
   });
   /* Н40: начало координат тоже ключевая точка. Добавляем ПОСЛЕ пересечений:
      если кривая и так пересекает ось в нуле, это одна и та же точка, и имя у
      неё должно остаться содержательным, а не превратиться в «начало координат».
      Сам push отсеет повтор по координатам. */
-  push(0, 0, 'начало координат', 'cross');
+  push(0, 0, 'начало координат', 'cross', []);
   if (!(w.x1 > w.x0)) { _keyPtsCache = out; return out; }
   const lo = w.x0 + (w.x1 - w.x0) * 1e-4, hi = w.x1;
   const h = (w.x1 - w.x0) * 1e-4;
@@ -1132,7 +1150,7 @@ function keyTargets() {
       if (!isFinite(y)) return;
       const s = d2Num(t.f, x, h2);
       const kind = (s > 0) ? 'минимум ' : (s < 0 ? 'максимум ' : 'плато ');
-      push(x, y, kind + t.name, 'extremum');
+      push(x, y, kind + t.name, 'extremum', [t.name]);
     });
     // Излом, совпавший с уже найденным пересечением, не добавляем: у Z = min(f, g)
     // ветвь переключается ровно там, где кривые пересекаются, а пересечение и
@@ -1140,7 +1158,7 @@ function keyTargets() {
     const near = (w.x1 - w.x0) * 0.02;
     kinksOf(t.f, lo, hi).forEach(x => {
       if (out.some(o => Math.abs(o.x - x) < near)) return;
-      push(x, t.f(x), 'излом ' + t.name, 'kink');
+      push(x, t.f(x), 'излом ' + t.name, 'kink', [t.name]);
     });
   });
   _keyPtsCache = out;
@@ -1152,6 +1170,9 @@ function keyTargets() {
    больше, чтобы попадать в неё было легче, чем промахнуться мимо. */
 // В ключевую точку попасть должно быть заметно легче, чем просто в кривую (П42).
 const KEY_SNAP_PX = 22;
+/* Запас попадания по кружку ключевой точки. Больше половины ширины полосы
+   кривой (16 px): иначе зазора между «взял точку» и «взял кривую» нет вовсе. */
+const KEY_HIT_PX = 11;
 /* п. 33. ВОЗМОЖНОСТЬ, О КОТОРОЙ ЗНАЕТ ТОЛЬКО НАВЕДЕНИЕ МЫШИ, НЕ СУЩЕСТВУЕТ.
 
    «Двойной щелчок, чтобы переименовать», «Добавить в список точек» и
@@ -1195,10 +1216,18 @@ function snapVertexAt(px, py) {
    обеим осям и подписываются координаты НА ОСЯХ. У остальных точек так не
    делается: они серые, а координаты и «закрепка» появляются по щелчку. */
 function drawCrossPoints() {
-  const pts = keyTargets();
+  /* По умолчанию автоматических ключевых точек нет вовсе (решение владельца).
+     Пока ни одна кривая не взведена, рисовать нечего — холст чистый.
+     Своих точек и вершин площадей это не касается: их рисуют drawMarks и
+     drawAreaVerts, и они видны всегда. */
+  if (!STATE.armedCurve) return;
+  const pts = keyTargets().filter(keyPointLit);
   if (!pts.length) return;
   const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'crosses');
+  // Цвет взведённой кривой: загоревшаяся точка красится им, а не общим сланцем.
+  const armed = snapTargets().filter(t => t.name === STATE.armedCurve)[0];
+  const litColor = (armed && armed.color) || COL.ink;
   // Пока набирают вершины или ставят свою точку, кружки ключевых точек не ловят
   // щелчок: иначе щелчок рядом с пересечением уходил в кружок и вершина не
   // ставилась вовсе. Прилипание к этим же точкам работает и без их кликабельности.
@@ -1211,7 +1240,10 @@ function drawCrossPoints() {
     const px = mx(p.x), py = my(p.y);
 
     if (p.kind === 'kink') {
-      // Пунктир к обеим осям и числа прямо на осях — без щелчка.
+      /* Излом рисуется подробнее прочих: пунктир к обеим осям и числа прямо на
+         осях. Правило «показывать сразу, без щелчка» отменено общим решением
+         владельца — на холсте по умолчанию нет ни одной автоматической точки.
+         Подробная разметка осталась, но включается вместе со своей кривой. */
       g.append('line').attr('x1', zx).attr('y1', py).attr('x2', px).attr('y2', py)
         .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
         .attr('stroke-dasharray', '3 3').attr('opacity', .6);
@@ -1239,10 +1271,19 @@ function drawCrossPoints() {
       return;
     }
 
-    const dot = g.append('circle').attr('cx', px).attr('cy', py)
+    const item = g.append('g').attr('class', 'cross-item');
+    /* ⚠️ ЗАПАС ПОПАДАНИЯ ПО ТОЧКЕ. Замер до правки: сама точка ловила щелчок
+       кругом радиусом 4 px, а с пяти пикселей в любую сторону под курсором
+       была уже полоса кривой шириной 16. Зазора не было вовсе — промах на пять
+       пикселей уносил руку в кривую вместо точки. Прозрачный круг радиусом 11
+       лежит выше полос (см. порядок в drawOverlays), и пока курсор внутри
+       него, кривая на указатель не отзывается. */
+    item.append('circle').attr('cx', px).attr('cy', py).attr('r', KEY_HIT_PX)
+      .attr('fill', 'transparent').attr('data-skip-export', '1').style('cursor', 'pointer');
+    const dot = item.append('circle').attr('cx', px).attr('cy', py)
       .style('cursor', 'pointer');
     // Подпись живёт в своей группе: её показываем и прячем, не трогая остальное.
-    const lab = g.append('g').attr('class', 'cross-label').style('display', 'none');
+    const lab = item.append('g').attr('class', 'cross-label').style('display', 'none');
     haloText(lab, px + 9, py - 9, '(' + fmt(p.x) + '; ' + fmt(p.y) + ')', 'start', 'auto');
     // «Закрепка» рядом с координатами: кладёт точку в список своих точек.
     const pin = lab.append('g').attr('class', 'cross-pin').style('cursor', 'pointer');
@@ -1252,34 +1293,121 @@ function drawCrossPoints() {
       .attr('d', `M${px + 12.5},${py + 7} l0,-3 l6,-6 l3,3 l-6,6 z`)
       .attr('fill', 'none').attr('stroke', COL.inkSoft).attr('stroke-width', 1.2)
       .attr('stroke-linejoin', 'round');
-    /* Плашки у значка нет намеренно: он ловит нажатие, и всплывающее под
-       указателем мешало бы по нему попасть. Что он делает, сказано в
-       подсказке блока «Точки на графике». */
+    /* Значок без подписи и без пояснения — просто точка (решение владельца).
+       Он единственный выносит точку в список насовсем. */
     pin.on('click', (ev) => { ev.stopPropagation(); pinKeyPoint(p); });
 
-    /* Поведение как у Desmos (Н42–Н44): по умолчанию кружок серый и пустой
-       внутри; при наведении показываются координаты; щелчок их закрепляет, и
-       тогда точка заливается и становится чуть крупнее. Щелчок в стороне
-       гасит закрепку. Закрепка-значок появляется только у закреплённой точки:
-       на пролёте курсора её некуда нажимать. */
+    /* Точка взведённой кривой горит цветом этой кривой и жирнее обычного, но
+       БЕЗ координат: координаты показывает наведение и только оно. */
     const paint = () => {
-      const pinned = (STATE.hotCross === i);
       const hover = (STATE.hoverCross === i);
-      // Координаты видны — значит точка залита и чуть крупнее (Н44). Верно и
-      // для наведения, и для закреплённой щелчком: состояние одно и то же.
-      const hot = pinned || hover;
-      dot.attr('r', hot ? 5 : 4)
-         .attr('fill', hot ? COL.ink : COL.halo)
-         .attr('stroke', hot ? COL.ink : COL.inkSoft)
-         .attr('stroke-width', hot ? 2 : 1.4)
-         .attr('opacity', hot ? 1 : 0.55);
-      lab.style('display', hot ? null : 'none');
-      pin.style('display', pinned ? null : 'none');
+      dot.attr('r', hover ? 5.5 : 4.5)
+         .attr('fill', hover ? litColor : COL.halo)
+         .attr('stroke', litColor)
+         .attr('stroke-width', hover ? 2.6 : 2.2)
+         .attr('opacity', 1);
+      lab.style('display', hover ? null : 'none');
+      pin.style('display', hover ? null : 'none');
     };
     paint();
-    dot.on('click', (ev) => { ev.stopPropagation(); STATE.hotCross = (STATE.hotCross === i) ? null : i; redrawAll(); })
-       .on('pointerenter', () => { STATE.hoverCross = i; paint(); })
-       .on('pointerleave', () => { if (STATE.hoverCross === i) STATE.hoverCross = null; paint(); });
+    /* ⚠️ ПЛАШКА ОБЯЗАНА ПЕРЕЖИТЬ ПЕРЕХОД С ТОЧКИ НА ЗНАЧОК.
+       Значок лежит внутри плашки, то есть в стороне от кружка. Скрой плашку
+       сразу по уходу курсора с кружка — и до значка не дотянуться никогда:
+       он исчезает ровно в тот момент, когда рука к нему движется. Поэтому
+       уход даёт короткую отсрочку, а вход в саму плашку её отменяет.
+       Второй раз в проекте: тем же способом лечится любая плашка с кнопкой. */
+    let leaveTimer = null;
+    const show = () => {
+      if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+      STATE.hoverCross = i; paint();
+    };
+    const hide = () => {
+      if (leaveTimer) clearTimeout(leaveTimer);
+      leaveTimer = setTimeout(() => {
+        leaveTimer = null;
+        if (STATE.hoverCross === i) { STATE.hoverCross = null; paint(); }
+      }, 160);
+    };
+    item.on('pointerenter', show).on('pointerleave', hide);
+    /* Щелчок по самой точке НЕ закрепляет её: закрепки больше нет, выносит
+       только значок. Всплытие останавливаем, иначе щелчок дошёл бы до холста
+       и погасил взведённую кривую прямо из-под руки. */
+    item.on('click', (ev) => ev.stopPropagation());
+  });
+}
+
+/* ── ВЗВЕДЕНИЕ КРИВОЙ (фаза 3) ────────────────────────────────────────────
+
+   Правило владельца: по умолчанию автоматических ключевых точек на холсте нет
+   вовсе. Щелчок по кривой ЗАЖИГАЕТ её ключевые точки — цветом и жирностью, без
+   координат. Наведение на загоревшуюся точку ПОКАЗЫВАЕТ координаты и значок;
+   наведение ничего не выносит и ничего не сохраняет. Выносит точку в список
+   только щелчок по значку.
+
+   ⚠️ Это НЕ копия Десмоса, и это осознанно. В Десмосе шага «щёлкнуть по
+   кривой» нет: точка появляется только под курсором, по одной, и найти их все
+   можно лишь обшарив кривую мышью. Для учебного инструмента это хуже — ученик
+   должен видеть, ГДЕ у функции особые точки. Отсюда гибрид: щелчок показывает
+   все точки разом, дальше наведение работает по-десмосовски.
+
+   Взведена всегда ОДНА кривая: щелчок по другой гасит первую. Гасится ровно
+   двумя способами — повторным щелчком по той же кривой и щелчком по пустому
+   месту холста. Escape не гасит: так решил владелец. */
+function armCurve(name) {
+  const nm = name || null;
+  STATE.armedCurve = (STATE.armedCurve === nm) ? null : nm;
+  redrawAll();
+}
+
+function disarmCurve() {
+  if (STATE.armedCurve === null) return false;
+  STATE.armedCurve = null;
+  redrawAll();
+  return true;
+}
+
+// Горит ли точка сейчас: у неё есть хозяин, и он взведён.
+function keyPointLit(p) {
+  return !!STATE.armedCurve && !!p.owners && p.owners.indexOf(STATE.armedCurve) >= 0;
+}
+
+/* Полосы попадания для кривых, которые сцена рисует САМА, мимо общего
+   рисовальщика. Их одиннадцать сцен из сорока одной (издержки, макро, КПВ,
+   «ломаный спрос» и прочие): у них нет записи в STATE.curves, которую видит
+   drawCurves, а значит нет и полосы — то есть взвести их было бы нечем.
+
+   Полоса строится по той же функции, по которой считаются ключевые точки
+   (snapTargets), поэтому кривая и её точки не могут разъехаться по построению.
+   Имена, у которых полоса уже есть, пропускаем: две полосы на одну кривую
+   означали бы, что верхняя молча съедает щелчок по нижней. */
+function drawCurveHits() {
+  if (STATE.markArm || STATE.vertArm) return;   // сейчас на холсте ставят точку
+  const targets = snapTargets();
+  if (!targets.length) return;
+  const done = new Set();
+  svg.selectAll('g.curves path[data-hit]').each(function () {
+    const nm = this.getAttribute('data-hit-name');
+    if (nm) done.add(nm);
+  });
+  const { mx, my } = mainScales();
+  const [xLo, xHi] = mx.domain();
+  const g = svg.append('g').attr('class', 'curve-hits').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
+  targets.forEach(t => {
+    if (done.has(t.name)) return;
+    const pts = [];
+    for (let i = 0; i <= 240; i++) {
+      const x = xLo + (xHi - xLo) * i / 240;
+      let v;
+      try { v = t.f(x); } catch (e) { v = NaN; }
+      pts.push(isFinite(v) ? [x, v] : null);
+    }
+    if (!pts.some(p => p)) return;
+    g.append('path').datum(pts)
+      .attr('fill', 'none').attr('stroke', 'transparent').attr('stroke-width', CURVE_HIT_PX)
+      .attr('data-skip-export', '1').attr('data-hit-name', t.name)
+      .attr('d', line).style('cursor', 'pointer')
+      .on('click', (ev) => { ev.stopPropagation(); armCurve(t.name); });
   });
 }
 
@@ -1287,7 +1415,9 @@ function drawCrossPoints() {
    списке. Блок «Точки на графике» при этом раскрывается сразу же, иначе точка
    уходит в закрытую карточку и выглядит как «ничего не произошло». */
 function pinKeyPoint(p) {
-  STATE.hotCross = null;
+  /* Единственный способ вынести точку насовсем. Наведение этого не делает
+     намеренно: владелец оговорил отдельно и настойчиво, что увёл курсор — и
+     не осталось ничего. */
   addMarkAt(p.x, p.y, null);              // последней в списке, как обычная точка
   openSection('sec-view');
 }
@@ -2921,7 +3051,10 @@ function snapTargets() {
   }
   if (STATE.mode === 'math') { mathSnapTargets(out); return out; }
   STATE.curves.filter(c => c.visible && !isVertical(c)).forEach(c => {
-    out.push({ name: curveShortName(c), f: (q) => evalCurve(c, q) });
+    /* Цвет и сама кривая нужны взведению (фаза 3): загоревшаяся точка красится
+       цветом своей кривой, а полоса попадания должна знать, какую кривую
+       взводит. Раньше сюда попадало только имя и функция. */
+    out.push({ name: curveShortName(c), f: (q) => evalCurve(c, q), color: c.color, curve: c });
   });
   return out;
 }
@@ -3135,7 +3268,7 @@ const SCENE_DEFAULTS = {
   graphTitle: '', axisXName: '', axisYName: '', titleColor: null,
   // Точки, вершины и посчитанные площади.
   marks: [], areaVerts: [], areaCalcList: [], areaCalcMode: 'curve',
-  roller: null, hotCross: null, hoverCross: null, pointNames: {},
+  roller: null, armedCurve: null, hoverCross: null, pointNames: {},
   markArm: false, vertArm: false,
   acFrom: null, acTo: null,   // свой отрезок «Под кривой» (Н52); null = вся первая четверть
   // Заливки и цвета.

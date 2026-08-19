@@ -617,8 +617,14 @@ function drawCurves() {
         .attr('fill', 'none').attr('stroke', 'transparent').attr('stroke-width', CURVE_HIT_PX)
         .attr('data-skip-export', '1')    // это полоса для мыши, а не линия графика
         .attr('data-hit', curve.id)
+        .attr('data-hit-name', curveShortName(curve))
         .attr('d', line).style('cursor', drag ? 'ns-resize' : 'pointer');
       if (drag) attachDrag(hit, curve);
+      /* Щелчок по полосе взводит кривую: загораются её ключевые точки.
+         Порога смещения не вводим — люди щёлкают статично, в один пиксель
+         (решение владельца). Перетаскиванию это не мешает: у d3.drag свой
+         порог, и после настоящего протягивания щелчок браузером не выдаётся. */
+      hit.on('click', (ev) => { ev.stopPropagation(); armCurve(curveShortName(curve)); });
     }
   });
   // Подписи поверх линий (Фаза 1 и 3): имя кривой видно прямо на графике.
@@ -646,6 +652,10 @@ function drawCurves() {
      · эластичность — по кривым уже ездят две точки эластичности;
      · потоварные и адвалорные налоги — там своя подвижная линия ставки.
    В остальных сценах сдвиг кривых мышью работает как раньше. */
+/* На сколько надо сдвинуть указатель, чтобы нажатие по кривой стало
+   прокатыванием точки, а не щелчком по кривой. */
+const ROLL_START_PX = 4;
+
 const NO_CURVE_DRAG = ['elast', 'tax', 'tax-adv'];
 function curveDragAllowed() {
   return NO_CURVE_DRAG.indexOf(STATE.sceneKey) < 0;

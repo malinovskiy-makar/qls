@@ -490,15 +490,30 @@ function initZoom() {
     // п. 25. Взведённый режим — единственный хозяин щелчка: ни прокатывание
     // точки, ни сдвиг поля не имеют права его перехватить.
     if (e.button !== 0 || canvasArmed()) return;
-    // Нажали ПО кривой — катим по ней точку, а не двигаем поле. Радиус захвата
-    // маленький: рядом лежат ключевые точки, и попадать по ним ничто не мешает.
+    /* ⚠️ ОДНО НАЖАТИЕ — ОДИН СМЫСЛ, И РЕШАЕТСЯ ОН НЕ В МОМЕНТ НАЖАТИЯ.
+
+       Прокатывание начиналось прямо на pointerdown: оно тут же забирало
+       указатель себе (setPointerCapture) и звало перерисовку. Полосу кривой
+       при этом пересобирало заново, поэтому ни mouseup, ни click до неё уже
+       не доходили — щелчок по кривой не существовал как событие вовсе.
+       Замер: из всех событий нажатия до полосы доходило одно, mousedown.
+
+       Теперь пресс по кривой только ЗАПОМИНАЕТСЯ. Сдвинули указатель — это
+       прокатывание, оно и начинается. Отпустили не сдвинув — это щелчок, и он
+       спокойно доходит до полосы и взводит кривую. Порога взведения это не
+       вводит: взводит настоящее событие click, а не расстояние.
+
+       Если под нажатием лежит ПОДВИЖНАЯ кривая, прокатывания нет вовсе:
+       у такого нажатия уже есть хозяин — перетаскивание самой кривой. Раньше
+       оба жеста шли одновременно, и это и есть та «одновременно двигается и
+       кривая, и точка», о которой писал владелец. */
     const r0 = gw.getBoundingClientRect();
-    const hit = rollerTargetAt(e.clientX - r0.left, e.clientY - r0.top);
+    const onDragBand = !!(e.target && e.target.getAttribute &&
+                          e.target.getAttribute('data-hit-name') !== null &&
+                          (e.target.style.cursor === 'ns-resize' || e.target.style.cursor === 'ew-resize'));
+    const hit = onDragBand ? null : rollerTargetAt(e.clientX - r0.left, e.clientY - r0.top);
     if (hit) {
-      STATE.roller = { f: hit.f, name: hit.name, color: hit.color || null, x: 0, y: 0, pinned: true };
-      roll = { id: e.pointerId };
-      gw.setPointerCapture(e.pointerId);
-      rollerMove(e.clientX - r0.left, e.clientX, e.clientY);
+      roll = { id: e.pointerId, hit, live: false, x0: e.clientX, y0: e.clientY };
       return;
     }
     const t = e.target;
@@ -516,6 +531,14 @@ function initZoom() {
   });
   gw.addEventListener('pointermove', (e) => {
     if (roll && e.pointerId === roll.id) {
+      if (!roll.live) {
+        // Пока указатель стоит на месте, это ещё щелчок, а не прокатывание.
+        if (Math.hypot(e.clientX - roll.x0, e.clientY - roll.y0) < ROLL_START_PX) return;
+        roll.live = true;
+        STATE.roller = { f: roll.hit.f, name: roll.hit.name,
+                         color: roll.hit.color || null, x: 0, y: 0, pinned: true };
+        try { gw.setPointerCapture(roll.id); } catch (err) {}
+      }
       rollerMove(e.clientX - gw.getBoundingClientRect().left, e.clientX, e.clientY);
       return;
     }
@@ -534,8 +557,12 @@ function initZoom() {
   });
   const endPan = (e) => {
     if (roll && e.pointerId === roll.id) {
+      const wasLive = roll.live;
       try { gw.releasePointerCapture(roll.id); } catch (err) {}
-      roll = null; rollerOff();
+      roll = null;
+      // Не катили — и убирать нечего: перерисовка здесь снесла бы полосу
+      // раньше, чем до неё дойдёт щелчок, и мы вернулись бы к прежней беде.
+      if (wasLive) rollerOff();
       return;
     }
     if (!pan) return;
