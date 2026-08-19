@@ -1819,8 +1819,13 @@ const CASES = [
           pickScene('tax');
           var tex = buildTex('', '');
           return { glued: glued, withSub: withSub,
-                   texPb: tex.indexOf('$P_b = 60$') >= 0 ? 1 : 0,
+                   texPb: tex.indexOf('$60_b$') >= 0 ? 1 : 0,
                    texNodes: (tex.match(/\\\\node\\[/g) || []).length };`,
+    /* ⚠️ ОЖИДАНИЕ ПЕРЕСЧИТАНО 19.08. Значения координат уехали за оси и потеряли
+       имя оси: вместо «P_b = 60» на оси стоит «60» с индексом «b». Требование
+       осталось тем же по сути — индекс обязан доехать до бумаги, — но искать
+       его надо в новой записи. Заодно эта строка держит находку фазы: индекс
+       при ЧИСЛЕ разбор для бумаги раньше не понимал вовсе и терял молча. */
     checks: [['слипшихся величин', 'glued', 0, 0],
              ['подписей с индексом', 'withSub', 30, 28],
              ['в файле цена покупателя с индексом', 'texPb', 1, 0],
@@ -2016,8 +2021,9 @@ const CASES = [
           return {
             nodes: nodes.length,
             mathAll: (nodes.length && math === nodes.length) ? 1 : 0,
-            hasPb: tex.indexOf('$P_b = 60$') >= 0 ? 1 : 0,
-            hasPs: tex.indexOf('$P_s = 40$') >= 0 ? 1 : 0,
+            // Координата уехала за ось и стоит одним числом с индексом (19.08).
+            hasPb: tex.indexOf('$60_b$') >= 0 ? 1 : 0,
+            hasPs: tex.indexOf('$40_s$') >= 0 ? 1 : 0,
             // Своя легенда одна: вторую, от pgfplots, убрали.
             legend: (tex.match(/addlegendentry/g) || []).length,
           };`,

@@ -258,8 +258,8 @@ function redrawMacro() {
     og.append('line').attr('x1', ox).attr('y1', py).attr('x2', px).attr('y2', py)
       .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     og.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 2);
-    haloText(og, px, oy + 8, 't=' + fmt(r.best.t), 'middle', 'hanging');
-    haloText(og, ox - 8, py, fmt(r.best.rev), 'end', 'middle');
+    axisValueX(og, px, oy, fmt(r.best.t), '');
+    axisValueY(og, ox, py, fmt(r.best.rev), '');
     og.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', FS.base).attr('font-weight', 700).attr('fill', COL.ink)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Максимум');
     updateMacroPanel();
@@ -280,7 +280,7 @@ function redrawMacro() {
     const ye = sy(r.fixed.e);
     g.append('line').attr('x1', ox).attr('y1', ye).attr('x2', xMax).attr('y2', ye)
       .attr('stroke', COL.reg).attr('stroke-width', 2.5);
-    haloText(g, ox - 8, ye, 'e фикс=' + fmt(r.fixed.e), 'end', 'middle');
+    axisValueY(g, ox, ye, fmt(r.fixed.e), 'фикс');
     const xa = sx(Math.min(r.fixed.Qd, r.fixed.Qs)), xb = sx(Math.max(r.fixed.Qd, r.fixed.Qs));
     if (xb > xa + 1) {
       g.append('line').attr('x1', xa).attr('y1', oy).attr('x2', xb).attr('y2', oy)
@@ -309,8 +309,8 @@ function drawEquilibriumAt(Q, P, label) {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
-  haloText(g, px, oy + 8, fmt(Q), 'middle', 'hanging');
-  haloText(g, ox - 8, py, fmt(P), 'end', 'middle');
+  axisValueX(g, px, oy, fmt(Q), '');
+  axisValueY(g, ox, py, fmt(P), '');
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   pointName(g, px, py, label, COL.ink);
 }

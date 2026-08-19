@@ -549,7 +549,7 @@ function fillLongRunMarks(g) {
   const yP = sy(lr.P);
   g.append('line').attr('x1', ox).attr('y1', yP).attr('x2', xMax).attr('y2', yP)
     .attr('stroke', COL.price).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yP, 'P=' + fmt(lr.P), 'end', 'middle');
+  axisValueY(g, ox, yP, fmt(lr.P), '');
   // Корня P = MC может не быть вовсе — тогда на графике только линия цены.
   if (lr.Qmc == null || lr.Qmc > CONFIG.Qmax) { drawLongRunHandle(g, lr, ox, xMax, yP); return; }
   const px = sx(lr.Qmc);
@@ -567,7 +567,7 @@ function fillLongRunMarks(g) {
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5),
       'математический корень, но производить невыгодно');
   }
-  haloText(g, px, oy + 8, 'Q=' + fmt(lr.Qmc), 'middle', 'hanging');
+  axisValueX(g, px, oy, fmt(lr.Qmc), '');
   drawLongRunHandle(g, lr, ox, xMax, yP);
 }
 
@@ -1081,8 +1081,8 @@ function redrawPlants() {
     og.append('line').attr('x1', ox).attr('y1', py).attr('x2', px).attr('y2', py)
       .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    haloText(og, px, oy + 8, 'Q=' + fmt(cur.Q), 'middle', 'hanging');
-    haloText(og, ox - 8, py, fmt(yv), 'end', 'middle');
+    axisValueX(og, px, oy, fmt(cur.Q), '');
+    axisValueY(og, ox, py, fmt(yv), '');
     if (STATE.plView === 'mc') {
       // Показываем ГОРИЗОНТАЛЬНОЕ сложение: на уровне m объёмы заводов складываются.
       og.append('line').attr('x1', ox).attr('y1', py).attr('x2', sx(cur.Q)).attr('y2', py)

@@ -377,6 +377,79 @@ function extraTickY(g, v, color) {
   haloText(g, ox - 8, sy(v), fmt(v), 'end', 'middle');
 }
 
+/* ── ЧИСЛО ТОЧКИ НА ОСИ (фаза 5 ревью 19.08) ──────────────────────────────
+
+   Решение владельца: значения координат уходят ЗА оси. Цена — левее оси цены,
+   количество — ниже оси количества, внутри поля построения подписей координат
+   не остаётся вовсе. Имя оси при этом не повторяется: вместо «P*=50» на оси
+   стоит просто «50» — какая это ось, написано у её стрелки.
+
+   ⚠️ ПОЧЕМУ ЭТО ЗАОДНО ЧИНИТ РАСПОЛОЖЕНИЕ, А НЕ ТОЛЬКО ТЕКСТ. Замер до правки:
+   поле построения по горизонтали 32…816, а подпись «P∗=50» лежала на 32…69,
+   то есть внутри поля, поверх сетки и заливок. Причина не в том, что её туда
+   поставили: haloText разворачивает подпись внутрь графика, когда она не
+   влезает в поле слева, а «P∗=50» шириной 37 px в поля шириной 32 px не
+   влезала никогда. Оставшись одним числом, подпись становится не шире деления
+   шкалы — и спокойно встаёт туда же, где стоят деления.
+
+   Различитель сохраняется. Там, где на одной оси стоят две РАЗНЫЕ величины
+   (цена покупателя и цена продавца в потоварном налоге), имя оси снимается, а
+   индекс остаётся и переезжает за ось вместе с числом: иначе на оси окажутся
+   голые «60» и «40», и различить их станет нечем.
+
+   Совпало с делением шкалы — ДЕЛЕНИЕ УСТУПАЕТ МЕСТО: серое число шкалы
+   убирается, на его месте печатается число точки акцентным цветом и жирным.
+   Двух чисел друг на друге не остаётся. */
+
+/* Убрать деление шкалы, стоящее ровно там, где сейчас встанет число точки.
+   Деления рисует drawAxes ДО сцены, поэтому к этому моменту они уже в
+   разметке и их можно просто снять. Ищем среди своих же подписей делений
+   (класс axis-num), а не среди всех текстов холста. */
+function dropTickAt(coord, horizontal) {
+  if (!svg || !svg.node()) return false;
+  let hit = false;
+  svg.selectAll('text.axis-num').each(function () {
+    const v = parseFloat(this.getAttribute(horizontal ? 'x' : 'y'));
+    if (!isFinite(v) || Math.abs(v - coord) > 7) return;
+    this.remove();
+    hit = true;
+  });
+  return hit;
+}
+
+/* Число точки под осью количества. `oy` — пиксель самой оси, `idx` — индекс
+   различителя ('b', 's', '1', 'спрос'…) или пустая строка. */
+function axisValueX(g, px, oy, value, idx) {
+  if (!isFinite(px) || !isFinite(value)) return null;
+  const span = Math.abs(sx.domain()[1] - sx.domain()[0]);
+  const onTick = xTicks().some(t => Math.abs(sx(t) - px) < 7) ||
+                 xTicks().some(t => Math.abs(t - value) < span * 0.02);
+  if (onTick) dropTickAt(px, true);
+  const t = haloText(g, px, oy + 8, axisValueText(value, idx), 'middle', 'hanging');
+  if (onTick) t.attr('fill', cssVar('--accent')).attr('font-weight', 700);
+  return t;
+}
+
+/* Число точки левее оси цены. `ox` — пиксель самой оси. */
+function axisValueY(g, ox, py, value, idx) {
+  if (!isFinite(py) || !isFinite(value)) return null;
+  const span = Math.abs(sy.domain()[1] - sy.domain()[0]);
+  const onTick = yTicks().some(t => Math.abs(sy(t) - py) < 7) ||
+                 yTicks().some(t => Math.abs(t - value) < span * 0.02);
+  if (onTick) dropTickAt(py, false);
+  const t = haloText(g, ox - 8, py, axisValueText(value, idx), 'end', 'middle');
+  if (onTick) t.attr('fill', cssVar('--accent')).attr('font-weight', 700);
+  return t;
+}
+
+/* Само число и, если он есть, индекс различителя нижним индексом. Разбор
+   разметки подписей уже умеет «_», и в выгрузку он уходит тем же путём. */
+function axisValueText(value, idx) {
+  const n = fmt(value);
+  if (!idx) return n;
+  return String(idx).length > 1 ? (n + '_{' + idx + '}') : (n + '_' + idx);
+}
+
 // Оси со стрелками, делениями, числами и подписями.
 // Подписи параметризованы: по умолчанию Q/P (рынок, издержки), для КПВ — X/Y.
 // Ось нарисована ровно там, где ноль. Уехал ноль за край при панорамировании —

@@ -108,8 +108,8 @@ function drawChoicePoint(x, y, color, label) {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
-  haloText(g, px, oy + 8, fmt(x), 'middle', 'hanging');
-  haloText(g, ox - 8, py, fmt(y), 'end', 'middle');
+  axisValueX(g, px, oy, fmt(x), '');
+  axisValueY(g, ox, py, fmt(y), '');
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 2);
   pointName(g, px, py, label, color, { dx: 9, dy: -9, size: FS.base, weight: 700 });
 }

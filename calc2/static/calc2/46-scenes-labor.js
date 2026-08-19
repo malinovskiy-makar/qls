@@ -189,8 +189,13 @@ function laborPoint(g, L, W, color, label, opts) {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
-  if (opts.lText !== null) haloText(g, px, oy + 8, opts.lText || ('L=' + fmt(L)), 'middle', 'hanging');
-  if (opts.wText !== null) yWageLabel(g, ox, py, opts.wText || ('W=' + fmt(W)));
+  /* Своя подпись сцены (opts.lText) идёт как есть: она называет не координату,
+     а величину сюжета. Без неё печатается число на оси общим помощником. */
+  if (opts.lText) haloText(g, px, oy + 8, opts.lText, 'middle', 'hanging');
+  else if (opts.lText !== null) axisValueX(g, px, oy, L, opts.lIdx || '');
+  /* Своя подпись сцены идёт как есть; без неё — число на оси общим помощником. */
+  if (opts.wText) yWageLabel(g, ox, py, opts.wText);
+  else if (opts.wText !== null) yWageValue(g, ox, py, W, opts.wIdx || '');
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   pointName(g, px, py, label, color);
 }
@@ -202,7 +207,7 @@ function drawLaborGhost(L, W, label) {
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
   g.append('text').attr('x', px + 7).attr('y', py + 13).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label || 'К');
-  haloText(g, px, oy + 8, 'Lk=' + fmt(L), 'middle', 'hanging');
+  axisValueX(g, px, oy, fmt(L), 'k');
 }
 
 // Заливки излишков в конкуренции: излишек рабочих (над S, под W) и фирм (под D, над W).
@@ -322,8 +327,7 @@ function drawLaborMonopsonyPoints() {
       const sameAsMin = STATE.laborMinOn && STATE.laborMinW > 0
                         && fmt(min.wage) === fmt(STATE.laborMinW);
       laborPoint(g, min.Lstar, min.wage, COL.ink, 'M',
-                 { lText: 'L=' + fmt(min.Lstar),
-                   wText: sameAsMin ? null : 'W=' + fmt(min.wage) });
+                 { wText: sameAsMin ? null : undefined });
     }
     // Безработица на оси L между Lstar и L̂ (желающие при W_min).
     if (min.unemployment > 1e-6) {
@@ -345,8 +349,8 @@ function drawLaborMonopsonyPoints() {
     dash(ox, pyW, pxm, pyW);
     g.append('circle').attr('cx', pxm).attr('cy', pyW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     pointName(g, pxm, pyW, 'M', COL.ink);
-    haloText(g, pxm, oy + 8, 'Lм=' + fmt(mono.Lm), 'middle', 'hanging');
-    yWageLabel(g, ox, pyW, 'Wм=' + fmt(mono.Wm));
+    axisValueX(g, pxm, oy, fmt(mono.Lm), 'м');
+    yWageValue(g, ox, pyW, mono.Wm, 'м');
   }
 }
 
@@ -363,8 +367,8 @@ function drawLaborCompPoints() {
     const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
       .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     dash(xQd, yW, xQd, oy); dash(xQs, yW, xQs, oy);
-    haloText(g, xQd, oy + 8, 'Lспрос=' + fmt(min.Qd), 'middle', 'hanging');
-    haloText(g, xQs, oy + 8, 'Lпредл=' + fmt(min.Qs), 'middle', 'hanging');
+    axisValueX(g, xQd, oy, fmt(min.Qd), 'спрос');
+    axisValueX(g, xQs, oy, fmt(min.Qs), 'предл');
     // Безработица — полоса между Qd и Qs на оси L.
     const xLo = Math.min(xQd, xQs), xHi = Math.max(xQd, xQs);
     g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
@@ -372,7 +376,7 @@ function drawLaborCompPoints() {
     // Точка занятости (короткая сторона) на линии W_min.
     g.append('circle').attr('cx', xQd).attr('cy', yW).attr('r', 4).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   } else {
-    laborPoint(g, eq.Q, eq.P, COL.ink, 'E*', { lText: 'Lk=' + fmt(eq.Q), wText: 'Wk=' + fmt(eq.P) });
+    laborPoint(g, eq.Q, eq.P, COL.ink, 'E*', { lIdx: 'k', wIdx: 'k' });
   }
 }
 
@@ -383,7 +387,7 @@ function drawLaborMinLine() {
   const g = svg.append('g');
   g.append('line').attr('x1', ox).attr('y1', yW).attr('x2', xMax).attr('y2', yW)
     .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yW, 'Wmin=' + fmt(STATE.laborMinW), 'end', 'middle');
+  axisValueY(g, ox, yW, fmt(STATE.laborMinW), 'min');
   const hit = g.append('rect').attr('x', ox).attr('y', yW - 12).attr('width', xMax - ox).attr('height', 24)
     .attr('fill', 'transparent').style('cursor', 'grab');
   attachLaborMinDrag(hit);
@@ -457,14 +461,14 @@ function drawLaborUnionPoints() {
     dash(ox, pyW, px, pyW);
     g.append('circle').attr('cx', px).attr('cy', pyW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     pointName(g, px, pyW, 'E′', COL.ink);
-    haloText(g, px, oy + 8, 'Lп=' + fmt(u.Lu), 'middle', 'hanging');
-    yWageLabel(g, ox, pyW, 'Wп=' + fmt(u.Wu));
+    axisValueX(g, px, oy, fmt(u.Lu), 'п');
+    yWageValue(g, ox, pyW, u.Wu, 'п');
   } else if (u.binding) {
     // Диктат зарплаты (ценовой пол): занятость по спросу, безработица до предложения.
     const yW = sy(u.W), xL = sx(u.Lu), xQs = sx(u.Qs);
     dash(xL, yW, xL, oy); dash(xQs, yW, xQs, oy);
-    haloText(g, xL, oy + 8, 'Lп=' + fmt(u.Lu), 'middle', 'hanging');
-    haloText(g, xQs, oy + 8, 'Lпредл=' + fmt(u.Qs), 'middle', 'hanging');
+    axisValueX(g, xL, oy, fmt(u.Lu), 'п');
+    axisValueX(g, xQs, oy, fmt(u.Qs), 'предл');
     const xLo = Math.min(xL, xQs), xHi = Math.max(xL, xQs);
     g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
     if (u.unemployment > 1e-6) haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(u.unemployment), 'middle', 'hanging');
@@ -480,7 +484,7 @@ function drawLaborUnionWageLine() {
   const g = svg.append('g');
   g.append('line').attr('x1', ox).attr('y1', yW).attr('x2', xMax).attr('y2', yW)
     .attr('stroke', COL.MC).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yW, 'Wп=' + fmt(STATE.unionWage), 'end', 'middle');
+  axisValueY(g, ox, yW, fmt(STATE.unionWage), 'п');
   const hit = g.append('rect').attr('x', ox).attr('y', yW - 12).attr('width', xMax - ox).attr('height', 24)
     .attr('fill', 'transparent').style('cursor', 'grab');
   attachUnionWageDrag(hit);
@@ -542,8 +546,8 @@ function drawLaborBilateral() {
   g.append('line').attr('x1', ox).attr('y1', yHi).attr('x2', xMax).attr('y2', yHi)
     .attr('stroke', COL.reg).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
   const gg = svg.append('g');
-  haloText(gg, ox - 8, yLo, 'Wм=' + fmt(b.Wm), 'end', 'middle');
-  haloText(gg, ox - 8, yHi, 'Wп=' + fmt(b.Wu), 'end', 'middle');
+  axisValueY(gg, ox, yLo, fmt(b.Wm), 'м');
+  axisValueY(gg, ox, yHi, fmt(b.Wu), 'п');
   gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2)
     .attr('text-anchor', 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.warn)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
@@ -553,8 +557,8 @@ function drawLaborBilateral() {
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
     .text('Конкретная точка зависит от переговорной силы, а её модель не определяет');
   // Две граничные точки: решение монопсониста и решение профсоюза.
-  laborPoint(gg, b.Lm, b.Wm, COL.S, 'M', { lText: 'Lм=' + fmt(b.Lm), wText: null });
-  laborPoint(gg, b.Lu, b.Wu, COL.MR, 'E′', { lText: 'Lп=' + fmt(b.Lu), wText: null });
+  laborPoint(gg, b.Lm, b.Wm, COL.S, 'M', { lIdx: 'м', wText: null });
+  laborPoint(gg, b.Lu, b.Wu, COL.MR, 'E′', { lIdx: 'п', wText: null });
 }
 
 // Табло двусторонней монополии.

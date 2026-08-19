@@ -112,7 +112,7 @@ function drawMonopolyPoints() {
     g.append('text').attr('x', pxc + 7).attr('y', pyc + 13)
       .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('К');
-    haloText(g, pxc, oy + 8, 'Qc=' + fmt(m.Qc), 'middle', 'hanging');
+    axisValueX(g, pxc, oy, fmt(m.Qc), 'c');
   }
 
   // Вертикаль Qm (через точку MR=MC до спроса) + горизонталь к оси P.
@@ -125,8 +125,8 @@ function drawMonopolyPoints() {
   g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5)
     .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   pointName(g, pxm, pym, 'M', COL.ink);
-  haloText(g, pxm, oy + 8, 'Qm=' + fmt(m.Qm), 'middle', 'hanging');
-  haloText(g, ox - 8, pym, 'Pm=' + fmt(m.Pm), 'end', 'middle');
+  axisValueX(g, pxm, oy, fmt(m.Qm), 'm');
+  axisValueY(g, ox, pym, fmt(m.Pm), 'm');
 }
 
 // Табло монополии: Qm, Pm, конкурентные Qc/Pc, DWL, прибыль (если задана ATC).
@@ -299,13 +299,13 @@ function drawMonoCeilingPoints() {
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     pointName(g, pxm, pym, 'M', COL.ink);
-    haloText(g, pxm, oy + 8, 'Q=' + fmt(mc.Qstar), 'middle', 'hanging');
+    axisValueX(g, pxm, oy, fmt(mc.Qstar), '');
   }
   // Дефицит на оси Q между Qstar и Q̂ (объём спроса при цене Pc).
   if (mc.shortage > 1e-6) {
     const xLo = sx(Math.min(mc.Qstar, mc.Qhat)), xHi = sx(Math.max(mc.Qstar, mc.Qhat));
     g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
-    haloText(g, sx(mc.Qhat), oy + 8, 'Qd=' + fmt(mc.Qhat), 'middle', 'hanging');
+    axisValueX(g, sx(mc.Qhat), oy, fmt(mc.Qhat), 'd');
     haloText(g, (xLo + xHi) / 2, oy + 24, 'Дефицит = ' + fmt(mc.shortage), 'middle', 'hanging');
   }
 }
@@ -318,7 +318,7 @@ function drawMonoCeilingLine() {
   const g = svg.append('g');
   g.append('line').attr('x1', ox).attr('y1', yPc).attr('x2', xMax).attr('y2', yPc)
     .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yPc, 'Pc=' + fmt(STATE.pReg), 'end', 'middle');
+  axisValueY(g, ox, yPc, fmt(STATE.pReg), 'c');
   const hit = g.append('rect').attr('x', ox).attr('y', yPc - 12).attr('width', xMax - ox).attr('height', 24)
     .attr('fill', 'transparent').style('cursor', 'grab');
   attachPcDrag(hit);
@@ -494,7 +494,7 @@ function drawNaturalPoints() {
     pointName(g, px, py, label, color,
               { dx: side < 0 ? -9 : 9, dy: -9, size: FS.base, weight: 700 })
       .attr('text-anchor', side < 0 ? 'end' : 'start');
-    haloText(g, px, oy + 8, fmt(Q), 'middle', 'hanging');
+    axisValueX(g, px, oy, fmt(Q), '');
   };
   mark(n.Qm, n.Pm, 'M', COL.ink, -1);
   if (n.acReg) mark(n.acReg.Q, n.acReg.P, 'E_{ATC}', COL.reg, 1);
@@ -592,8 +592,8 @@ function drawMonoTaxPoints() {
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     pointName(g, pxm, pym, 'M', COL.ink);
-    haloText(g, pxm, oy + 8, 'Q=' + fmt(t.Qt), 'middle', 'hanging');
-    haloText(g, ox - 8, pym, 'P=' + fmt(t.Pt), 'end', 'middle');
+    axisValueX(g, pxm, oy, fmt(t.Qt), '');
+    axisValueY(g, ox, pym, fmt(t.Pt), '');
   }
 }
 
@@ -628,7 +628,7 @@ function drawMonoFloorPoints() {
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     pointName(g, pxm, pym, 'M', COL.ink);
-    haloText(g, pxm, oy + 8, 'Q=' + fmt(fl.Q), 'middle', 'hanging');
+    axisValueX(g, pxm, oy, fmt(fl.Q), '');
   }
 }
 
@@ -639,7 +639,7 @@ function drawMonoFloorLine() {
   const g = svg.append('g');
   g.append('line').attr('x1', ox).attr('y1', yPf).attr('x2', xMax).attr('y2', yPf)
     .attr('stroke', COL.MR).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yPf, 'Pf=' + fmt(STATE.pReg), 'end', 'middle');
+  axisValueY(g, ox, yPf, fmt(STATE.pReg), 'f');
   const hit = g.append('rect').attr('x', ox).attr('y', yPf - 12).attr('width', xMax - ox).attr('height', 24)
     .attr('fill', 'transparent').style('cursor', 'grab');
   attachPcDrag(hit);
@@ -752,7 +752,7 @@ function drawDiscr1() {
   const og = svg.append('g'), [px, py] = toPx(d1.Qcomp, Pq);
   og.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.tax).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  haloText(og, px, oy + 8, 'Qcomp=' + fmt(d1.Qcomp), 'middle', 'hanging');
+  axisValueX(og, px, oy, fmt(d1.Qcomp), 'comp');
   haloText(og, sx(d1.Qcomp * 0.45), sy(Math.max(0, (Pq + mcAt(d1.Qcomp * 0.45)) / 2)), 'Прибыль', 'middle', 'middle');
 }
 
@@ -851,8 +851,11 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
     g.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', bottom).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     g.append('line').attr('x1', px).attr('y1', py).attr('x2', left).attr('y2', py).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    haloText(g, px, bottom + 12, 'q=' + fmt(qi), 'middle', 'hanging');
-    haloText(g, left - 5, py, 'P=' + fmt(Pi), 'end', 'middle');
+    /* Мини-панель дискриминации живёт на СВОИХ осях (lx/ly), поэтому общий
+       помощник ей не подходит: он считает по шкалам главного графика. Правило
+       то же — имя оси не повторяется, остаётся одно число. */
+    haloText(g, px, bottom + 12, fmt(qi), 'middle', 'hanging');
+    haloText(g, left - 5, py, fmt(Pi), 'end', 'middle');
   }
 }
 
@@ -1051,8 +1054,8 @@ function drawKinkedFull() {
     dash(px, py, px, oy); dash(px, py, ox, py);
     og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     pointName(og, px, py, 'M', COL.ink);
-    haloText(og, px, oy + 8, 'Q*=' + fmt(k.Qstar), 'middle', 'hanging');
-    haloText(og, ox - 8, py, 'P*=' + fmt(k.Pstar), 'end', 'middle');
+    axisValueX(og, px, oy, fmt(k.Qstar), '');
+    axisValueY(og, ox, py, fmt(k.Pstar), '');
   }
   updateKinkPanel();
 }

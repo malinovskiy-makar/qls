@@ -1040,12 +1040,12 @@ function drawPpfSumMarks(d) {
       .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3').attr('opacity', .7);
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.ink)
       .attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    haloText(g, px, oy + 8, fmt(k[0]), 'middle', 'hanging');
-    haloText(g, ox - 8, py, fmt(k[1]), 'end', 'middle');
+    axisValueX(g, px, oy, fmt(k[0]), '');
+    axisValueY(g, ox, py, fmt(k[1]), '');
   });
   // концы суммарной кривой
-  haloText(g, ox - 8, sy(d.Ytot), fmt(d.Ytot), 'end', 'middle');
-  haloText(g, sx(d.Xtot), oy + 8, fmt(d.Xtot), 'middle', 'hanging');
+  axisValueY(g, ox, sy(d.Ytot), fmt(d.Ytot), '');
+  axisValueX(g, sx(d.Xtot), oy, fmt(d.Xtot), '');
   const midX = d.Xtot * 0.5, midY = interpY(d.points, midX);
   const nm = (STATE.ppfSumName || '').trim() || 'Сумма';
   if (!isNaN(midY)) g.append('text').attr('x', sx(midX)).attr('y', sy(midY) - 8)

@@ -611,6 +611,8 @@ function qtyHasCyrillic(s) { return /[А-Яа-яЁё]/.test(String(s || '')); }
 function qtyIsQuantity(raw) {
   const s = String(raw == null ? '' : raw).trim();
   if (!s || qtyHasCyrillic(s)) return false;
+  // Число с индексом («60_b») — величина: индекс и есть её имя.
+  if (/^[−-]?[\d.,]+_/.test(s)) return true;
   if (!/[A-Za-zα-ωΑ-Ω]/.test(s)) return false;      // одни цифры — не величина
   if (/[A-Za-z]{5,}/.test(s)) return false;          // длинное слово — это слово
   return true;
@@ -656,7 +658,21 @@ function qtyParts(raw) {
     } else if (/[0-9]/.test(ch)) {
       let run = '';
       while (i < s.length && /[0-9.,]/.test(s[i])) { run += s[i]; i++; }
-      out.push({ kind: 'num', s: run });
+      const num = { kind: 'num', s: run, sub: '' };
+      /* ⚠️ ИНДЕКС БЫВАЕТ И ПРИ ЧИСЛЕ, А НЕ ТОЛЬКО ПРИ БУКВЕ (фаза 5, 19.08).
+         Значения координат уехали за оси одними числами, и различитель двух
+         величин на одной оси («цена покупателя» и «цена продавца») переехал
+         туда же нижним индексом: «60_b» и «40_s». Холст такую запись понимал
+         сразу — её разбирает mathTspans, — а этот разбор, по которому строится
+         бумага, не понимал вовсе: подпись уходила в файл как «60b», то есть
+         теряла индекс молча. Два разбора одной разметки обязаны понимать её
+         одинаково. */
+      if (s[i] === '_') {
+        i++;
+        if (s[i] === '{') { i++; while (i < s.length && s[i] !== '}') { num.sub += s[i]; i++; } i++; }
+        else if (i < s.length) { num.sub += s[i]; i++; }
+      }
+      out.push(num);
     } else { out.push({ kind: 'op', s: ch }); i++; }
   }
   return out;
@@ -672,7 +688,10 @@ function qtyLatex(raw) {
       out += (p.greek || p.s);
       if (p.sub) out += (p.sub.length > 1 ? '_{' + p.sub + '}' : '_' + p.sub);
       if (p.sup) out += (p.sup.length > 1 ? '^{' + p.sup + '}' : '^' + p.sup);
-    } else if (p.kind === 'num') out += p.s;
+    } else if (p.kind === 'num') {
+      out += p.s;
+      if (p.sub) out += (p.sub.length > 1 ? '_{' + p.sub + '}' : '_' + p.sub);
+    }
     else {
       const ch = p.s;
       // Пробел внутри математики LaTeX игнорирует, поэтому «S + t» без явной

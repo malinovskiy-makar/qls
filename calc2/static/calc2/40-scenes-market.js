@@ -392,14 +392,14 @@ function drawOpenLines() {
   const yPw = sy(o.Pw);
   g.append('line').attr('x1', ox).attr('y1', yPw).attr('x2', xMax).attr('y2', yPw)
     .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yPw, 'Pw=' + fmt(o.Pw), 'end', 'middle');
+  axisValueY(g, ox, yPw, fmt(o.Pw), 'w');
   if (o.error) { attachOpenPwDrag(g.append('rect').attr('x', ox).attr('y', yPw - 12).attr('width', xMax - ox).attr('height', 24).attr('fill', 'transparent').style('cursor', 'grab')); return; }
   // Внутренняя цена при тарифе/квоте — вторая линия.
   if (o.P1 != null) {
     const y1 = sy(o.P1);
     g.append('line').attr('x1', ox).attr('y1', y1).attr('x2', xMax).attr('y2', y1)
       .attr('stroke', COL.MR).attr('stroke-width', 2.5).attr('stroke-dasharray', '7 4').style('pointer-events', 'none');
-    haloText(g, ox - 8, y1, 'P₁=' + fmt(o.P1), 'end', 'middle');
+    axisValueY(g, ox, y1, fmt(o.P1), '1');
   }
   // Проекции и полоса объёма торговли на уровне действующей цены.
   const Pdom = (o.P1 != null) ? o.P1 : o.Pw;
@@ -408,8 +408,8 @@ function drawOpenLines() {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(sx(qS), yD, sx(qS), oy); dash(sx(qD), yD, sx(qD), oy);
-  haloText(g, sx(qS), oy + 8, 'Qs=' + fmt(qS), 'middle', 'hanging');
-  haloText(g, sx(qD), oy + 8, 'Qd=' + fmt(qD), 'middle', 'hanging');
+  axisValueX(g, sx(qS), oy, fmt(qS), 's');
+  axisValueX(g, sx(qD), oy, fmt(qD), 'd');
   const lo = Math.min(sx(qS), sx(qD)), hi = Math.max(sx(qS), sx(qD));
   if (hi > lo + 1) {
     g.append('line').attr('x1', lo).attr('y1', yD).attr('x2', hi).attr('y2', yD)
@@ -513,12 +513,12 @@ function drawEquilibrium() {
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
 
   // Числа Q* и P* у осей (с белой обводкой, чтобы читались поверх делений).
-  haloText(g, px, oy + 8, 'Q*=' + fmt(Q), 'middle', 'hanging');
-  haloText(g, ox - 8, py, 'P*=' + fmt(P), 'end', 'middle');
+  axisValueX(g, px, oy, fmt(Q), '');
+  axisValueY(g, ox, py, fmt(P), '');
 
-  // Сама точка и подпись E*.
-  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
-    .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+  /* Кружок у точки пересечения снят решением владельца: пунктиры к осям уже
+     показывают, где точка, а числа на осях — какая она. Подпись «E*» остаётся:
+     это ИМЯ точки, а не повтор переменной. */
   pointName(g, px, py, 'E*', COL.ink);
 }
 
@@ -670,6 +670,14 @@ function texToCanvasText(raw) {
 
 function renderLabelText(sel, txt) {
   const s = texToCanvasText(txt);
+  /* ⚠️ ИСХОДНАЯ РАЗМЕТКА ПОДПИСИ ОСТАЁТСЯ ПРИ УЗЛЕ.
+     Нарисованная подпись разложена на tspan'ы, и собрать из них разметку
+     обратно нельзя: «60» с подстрочным «b» читается как «60b», то есть
+     индекс теряется молча. На холсте это незаметно (там он нарисован), а в
+     выгрузке на бумагу подпись уезжала уже без него. Вместо угадывания по
+     готовой картинке держим исходную запись рядом с узлом — её и читает
+     сборка файла. */
+  if (sel && sel.attr) sel.attr('data-raw', s);
   if (hasMathMarkup(s)) return mathTspans(sel, s);
   if (typeof qtyIsQuantity === 'function' && qtyIsQuantity(s)) return qtyTspans(sel, s);
   return sel.text(s);
@@ -717,6 +725,9 @@ function pointName(g, px, py, sym, color, opts) {
 function yWageLabel(g, ox, py, txt) {
   haloText(g, ox - 8, py, txt, 'end', 'middle');
 }
+
+/* Значение зарплаты у оси — тем же помощником, что и все прочие координаты. */
+function yWageValue(g, ox, py, value, idx) { return axisValueY(g, ox, py, value, idx || ''); }
 
 /* Заголовок раздела равновесия — СВОЙСТВО СЦЕНЫ, а не константа (А51 · А52).
 
@@ -942,9 +953,9 @@ function drawTaxPoints() {
   dash(xQ1, yPb, ox, yPb);
   dash(xQ1, yPs, ox, yPs);
 
-  haloText(g, ox - 8, yPb, 'Pb=' + fmt(Pb), 'end', 'middle');
-  haloText(g, ox - 8, yPs, 'Ps=' + fmt(Ps), 'end', 'middle');
-  haloText(g, xQ1, oy + 8, 'Q₁=' + fmt(Q), 'middle', 'hanging');
+  axisValueY(g, ox, yPb, fmt(Pb), 'b');
+  axisValueY(g, ox, yPs, fmt(Ps), 's');
+  axisValueX(g, xQ1, oy, fmt(Q), '1');
 
   // Точки покупателя (синяя) и продавца (красная).
   g.append('circle').attr('cx', xQ1).attr('cy', yPb).attr('r', 4)
@@ -1185,8 +1196,8 @@ function drawElasticityPoint() {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
-  haloText(g, px, oy + 8, 'Q=' + fmt(e.q), 'middle', 'hanging');
-  haloText(g, ox - 8, py, 'P=' + fmt(e.p), 'end', 'middle');
+  axisValueX(g, px, oy, fmt(e.q), '');
+  axisValueY(g, ox, py, fmt(e.p), '');
   g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Ed|=' + fmt(e.absEd));
   const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
@@ -1401,7 +1412,7 @@ function drawExtPoints(e) {
   g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Qрын');
-  haloText(g, pxm, oy + 8, fmt(e.Qmkt), 'middle', 'hanging');
+  axisValueX(g, pxm, oy, fmt(e.Qmkt), '');
   // Общественный оптимум (Qопт, Pопт) — на пересечении D и MSC.
   if (e.Qopt != null) {
     const [pxo, pyo] = toPx(e.Qopt, e.Popt);
@@ -1409,7 +1420,7 @@ function drawExtPoints(e) {
     g.append('circle').attr('cx', pxo).attr('cy', pyo).attr('r', 4.5).attr('fill', COL.tax).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     g.append('text').attr('x', pxo + 8).attr('y', pyo - 8).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.tax)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Qопт');
-    haloText(g, pxo, oy + 8, fmt(e.Qopt), 'middle', 'hanging');
+    axisValueX(g, pxo, oy, fmt(e.Qopt), '');
     // С налогом Пигу новое равновесие совпадает с Qопт — отмечаем кольцом.
     if (e.applyPigou && e.pigouEq) {
       const [pxp, pyp] = toPx(e.pigouEq.Q, e.pigouEq.P);
@@ -1545,7 +1556,8 @@ function drawPriceControl() {
   // Горизонтальная линия фиксированной цены через весь график.
   g.append('line').attr('x1', ox).attr('y1', yReg).attr('x2', xMax).attr('y2', yReg)
     .attr('stroke', lineColor).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yReg, (pc.isCeiling ? 'Pc=' : 'Pf=') + fmt(Preg), 'end', 'middle');
+  // Потолок и пол — разные величины на одной оси: имя снимается, индекс остаётся.
+  axisValueY(g, ox, yReg, Preg, pc.isCeiling ? 'c' : 'f');
 
   if (STATE.pcActive) {
     const { Qs, Qd, Qtrade, gap, isCeiling } = pc;
@@ -1555,8 +1567,8 @@ function drawPriceControl() {
       .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     dash(xQs, yReg, xQs, oy);   // проекция объёма предложения на ось Q
     dash(xQd, yReg, xQd, oy);   // проекция объёма спроса на ось Q
-    haloText(g, xQs, oy + 8, 'Qs=' + fmt(Qs), 'middle', 'hanging');
-    haloText(g, xQd, oy + 8, 'Qd=' + fmt(Qd), 'middle', 'hanging');
+    axisValueX(g, xQs, oy, fmt(Qs), 's');
+    axisValueX(g, xQd, oy, fmt(Qd), 'd');
     // Зона дефицита/избытка — цветная полоса на оси Q между Qs и Qd.
     const xLo = Math.min(xQs, xQd), xHi = Math.max(xQs, xQd);
     g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy)

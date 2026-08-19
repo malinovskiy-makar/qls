@@ -1151,6 +1151,10 @@ function texText(s) {
    тоже не годится: у подписи бывает дочерний <title> с подсказкой («Двойной
    щелчок, чтобы переименовать»), и он приехал бы в .tex как часть названия. */
 function labelPlainText(el) {
+  // Исходная разметка, если её сохранил рисователь подписей: только в ней
+  // остались индексы и степени (см. renderLabelText).
+  const raw = el.getAttribute && el.getAttribute('data-raw');
+  if (raw) return raw;
   let out = '';
   const walk = (n) => {
     n.childNodes.forEach(c => {
