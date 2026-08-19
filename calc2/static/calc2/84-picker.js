@@ -410,27 +410,22 @@ function foldPickerGroups() {
     card.type = 'button';
     card.className = 'bcard';
     card.setAttribute('aria-controls', grid.id);
+    /* ⚠️ ПЕРЕЧНЯ МОДЕЛЕЙ НА КАРТОЧКЕ БОЛЬШЕ НЕТ, И ЭТО ОДНА ПРАВКА, А НЕ ДВЕ.
+       Замер высот десяти карточек: 162, 162, 194, 194, 178, 178, 210, 210,
+       178, 178 — пять разных значений. Причина одна: перечень занимал от 32
+       до 96 px, а карточки в ряду тянутся по самой высокой. Снятие перечня
+       само выравнивает карточки.
+       Порядок карточек внутри блока (готовые вперёд, запланированные следом)
+       остаётся: он про сетку блока, а не про перечень. */
     card.innerHTML = blockSpec(name)
-      + '<span class="bcard-name"></span><span class="bcard-count"></span>'
-      + '<span class="bcard-list"></span>';
+      + '<span class="bcard-name"></span><span class="bcard-count"></span>';
     card.querySelector('.bcard-name').textContent = name;
     card.querySelector('.bcard-count').textContent = (n === all)
       ? all + ' ' + plural(all, ['модель', 'модели', 'моделей'])
       : n + ' ' + plural(n, ['модель', 'модели', 'моделей']) + ' из ' + all;
-    /* А42. Правая половина карточки пустовала: 555 пикселей ни подо что.
-       Перечисляем модели блока — так видно, что внутри, ещё до открытия.
-       Сначала рабочие, потом запланированные: обещание блока честное, но
-       понятно, что уже можно открыть прямо сейчас. */
-    /* п. 64. ОДИН ПОРЯДОК НА ОБОИХ ЭКРАНАХ. Перечень на карточке ставил
-       готовые вперёд, а сетка внутри блока шла как в разметке, вперемешку с
-       запланированными. Двигаем САМИ КАРТОЧКИ: так порядок совпадает, и на
-       экране блока не нужно выбирать нужное среди недоступного. */
+    /* п. 64. Запланированные модели уходят в конец сетки блока: на экране
+       блока не приходится выбирать нужное среди недоступного. */
     grid.querySelectorAll('.scard.soon').forEach(sc => grid.appendChild(sc));
-    const names = [...grid.querySelectorAll('.scard')].map(sc => {
-      const nm = ((sc.querySelector('.scard-name') || {}).textContent || '').trim();
-      return nm && (sc.classList.contains('soon') ? nm + ' (скоро)' : nm);
-    }).filter(Boolean);
-    card.querySelector('.bcard-list').textContent = names.join(' · ');
     card.addEventListener('click', () => {
       blocks.classList.add('hidden');
       groups.forEach(x => x.classList.remove('open'));
