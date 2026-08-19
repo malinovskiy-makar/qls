@@ -152,9 +152,15 @@
           <a href="{% url 'catalog:problem_detail' item.catalog_problem_id %}"
              class="saved-link">{{ item.problem_title|truncatechars:70 }}</a>
         {% else %}
-          {# ⚠️ Ссылки НЕТ намеренно: страница задачи для ученика закрыта
-             шлюзом качества. Пометка объясняет, почему по этой строке
-             некуда нажать, — иначе исчезнувшая ссылка выглядит поломкой. #}
+          {% comment %}
+          ⚠️ Ссылки НЕТ намеренно: страница задачи для ученика закрыта шлюзом
+          качества. Пометка объясняет, почему по этой строке некуда нажать, —
+          иначе исчезнувшая ссылка выглядит поломкой.
+
+          ⚠️ Через {% templatetag openblock %} comment {% templatetag closeblock %},
+          а не многострочным {# #}: второй печатается на экран как текст —
+          правило проекта, держится тестом test_template_hygiene.
+          {% endcomment %}
           {{ item.problem_title|truncatechars:70 }}
           <span class="saved-off">снята с публикации</span>
         {% endif %}
