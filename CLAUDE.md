@@ -54,8 +54,14 @@ venv313/Scripts/python.exe manage.py runserver   # Windows
 ```bash
 manage.py check                              # 0 ошибок
 manage.py makemigrations --check --dry-run   # ничего не предлагает создать
-manage.py test                               # 2 391 тест, ~18 минут
+manage.py test                               # 2 416 тестов на SQLite, ~21 мин
+
+docker compose -f docker-compose.dev.yml up -d        # PostgreSQL 17 + Redis 7
+manage.py test --settings=config.settings_test_pg     # то же на PostgreSQL, ~23 мин
 ```
+
+**Зелёный прогон на SQLite больше не считается доказательством** — прод живёт
+на PostgreSQL. Подробности и найденные расхождения — [docs/TESTING.md](docs/TESTING.md).
 
 Плюс визуальная проверка человеком того, что менялось на экране. «Тесты зелёные»
 доказывает математику и разметку, а не то, что красиво.
