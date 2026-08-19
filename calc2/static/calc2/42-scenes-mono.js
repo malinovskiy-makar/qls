@@ -838,8 +838,25 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
   g.append('text').attr('x', tx).attr('y', top - 12).attr('text-anchor', 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink).text(title);
   g.append('text').attr('x', right + 4).attr('y', bottom + 4).attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Q');
   g.append('text').attr('x', left - 4).attr('y', top - 2).attr('text-anchor', 'end').attr('font-size', FS.base).attr('fill', COL.inkSoft).text('P');
-  [0.25, 0.5, 0.75, 1].forEach(t => { const xq = Xmax * t; g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(xq)); });
-  [0.25, 0.5, 0.75, 1].forEach(t => { const yp = Ymax * t; g.append('text').attr('x', left - 5).attr('y', ly(yp)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(yp)); });
+  /* ⚠️ ДЕЛЕНИЕ УСТУПАЕТ МЕСТО ЧИСЛУ ТОЧКИ, И РЕШАЕТСЯ ЭТО В ДАННЫХ.
+
+     Пока у координаты стоял префикс («q=15»), она была шире деления и вставала
+     рядом. Оставшись голым числом (фаза 5), она села к делениям вплотную, и
+     «12,5» с «15» наложились — единственное наложение подписей во всём
+     калькуляторе по замеру.
+
+     Две попытки решить это на экране не годились: по расстоянию между точками
+     привязки порог не выражается (числа разной длины: «12,5» шире «15» вдвое),
+     а сравнение готовых прямоугольников зависит от порядка отрисовки. В
+     ДАННЫХ вопрос простой: деление, стоящее ближе десятой доли окна к
+     координате точки, не печатаем вовсе. */
+  const near = (a, b, span) => isFinite(a) && isFinite(b) && Math.abs(a - b) < span * 0.1;
+  [0.25, 0.5, 0.75, 1].forEach(t => { const xq = Xmax * t;
+    if (qi != null && near(xq, qi, Xmax)) return;
+    g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(xq)); });
+  [0.25, 0.5, 0.75, 1].forEach(t => { const yp = Ymax * t;
+    if (Pi != null && near(yp, Pi, Ymax)) return;
+    g.append('text').attr('x', left - 5).attr('y', ly(yp)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(yp)); });
   const gc = svg.append('g').attr('clip-path', 'url(#' + cid + ')');
   const line = d3.line().defined(d => d !== null).x(d => lx(d[0])).y(d => ly(d[1]));
   const sample = (f) => { const o = []; for (let i = 0; i <= 300; i++) { const q = Xmax * i / 300; const v = f(q); o.push((isNaN(v) || v < 0) ? null : [q, v]); } return o; };
@@ -853,9 +870,24 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     /* Мини-панель дискриминации живёт на СВОИХ осях (lx/ly), поэтому общий
        помощник ей не подходит: он считает по шкалам главного графика. Правило
-       то же — имя оси не повторяется, остаётся одно число. */
-    haloText(g, px, bottom + 12, fmt(qi), 'middle', 'hanging');
-    haloText(g, left - 5, py, fmt(Pi), 'end', 'middle');
+       то же — имя оси не повторяется, остаётся одно число.
+
+       ⚠️ И то же правило про деление. Пока у координаты стоял префикс («q=15»),
+       она была шире деления и вставала рядом; оставшись голым числом, она села
+       ровно туда же, где уже стоит деление шкалы, и два числа наложились
+       (замер поймал наложение на 7,2 px² в этой сцене — единственное во всём
+       калькуляторе). Деление на этом месте убираем, число точки печатаем
+       акцентным и жирным — как на главных осях. */
+    /* ⚠️ УСТУПАЕТ НЕ ТО ДЕЛЕНИЕ, ЧТО СТОИТ РОВНО ТАМ ЖЕ, А ТО, ЧТО НАЛЕЗАЕТ.
+       Первая правка снимала деление по расстоянию между их точками привязки
+       (порог 7 px). Замер показал, что этого мало: «12,5» шириной 22,7 px и
+       «15» стоят в 16 px друг от друга — привязки далеко, а коробки
+       пересекаются. Сравниваем настоящие прямоугольники после отрисовки:
+       порогу тут верить нельзя, длина числа заранее неизвестна. */
+    haloText(g, px, bottom + 12, fmt(qi), 'middle', 'hanging')
+      .attr('fill', cssVar('--accent')).attr('font-weight', 700);
+    haloText(g, left - 5, py, fmt(Pi), 'end', 'middle')
+      .attr('fill', cssVar('--accent')).attr('font-weight', 700);
   }
 }
 
