@@ -92,14 +92,20 @@ class StdlibEntityBehaviourTests(SimpleTestCase):
     перечитать заново.
     """
 
+    # ⚠️ Здесь ET.fromstring зовётся НАПРЯМУЮ, мимо `_xml_from_docx`, и это
+    # единственное место в проекте, где так можно. Смысл этих двух проверок
+    # ровно в том, чтобы посмотреть на поведение стандартной библиотеки без
+    # нашей защиты: иначе обоснование в `_xml_from_docx` держалось бы на
+    # памяти, а не на замере. Данные — две строки-константы из этого же
+    # файла, ничего внешнего сюда не попадает.
     def test_stdlib_does_not_resolve_external_entities(self):
         """Внешние сущности стандартный ElementTree не тянет — XXE не бывает."""
         with self.assertRaises(ET.ParseError):
-            ET.fromstring(XXE)
+            ET.fromstring(XXE)  # nosec B314 — замер поведения, вход-константа
 
     def test_stdlib_does_expand_internal_entities(self):
         """А внутренние раскрывает — вот почему одного стандарта мало."""
-        grown = ET.fromstring(_bomb())
+        grown = ET.fromstring(_bomb())  # nosec B314 — то же, вход-константа
         self.assertGreater(len(grown.text or ''), 10_000)
 
 
