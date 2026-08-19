@@ -15,6 +15,7 @@
 """
 import importlib
 import os
+import sys
 import unittest
 from contextlib import contextmanager
 
@@ -30,29 +31,49 @@ FAKE_ENV = {
 }
 
 
+MODULE = 'config.settings_production'
+
+
 @contextmanager
-def _production_module(**extra):
+def _production_module(drop=(), **extra):
     """Загружает продакшен-настройки с подставным окружением.
+
+    ⚠️ ВСЕГДА СВЕЖИЙ ИМПОРТ, А НЕ `importlib.reload`. На reload полагаться
+    нельзя: когда модуль падает при исполнении — а он обязан падать, на нём
+    три предохранителя, — Python убирает его из `sys.modules`. Следующий
+    `import` тогда исполняет файл ЗАНОВО, в чужом окружении, и роняет
+    посторонний тест. Ровно это и случилось: проверка «нет SECRET_KEY»
+    сломала соседнюю.
 
     Окружение возвращается как было: тест, оставивший после себя SECRET_KEY,
     сделал бы зелёными чужие проверки, которые обязаны краснеть.
     """
     env = dict(FAKE_ENV)
     env.update(extra)
-    saved = {k: os.environ.get(k) for k in env}
+    saved = {k: os.environ.get(k) for k in list(env) + list(drop)}
     # DJANGO_DEBUG обязан отсутствовать — на нём стоит предохранитель.
     saved['DJANGO_DEBUG'] = os.environ.get('DJANGO_DEBUG')
+    previous = sys.modules.pop(MODULE, None)
     try:
-        os.environ.update(env)
+        # Порядок важен: сначала убираем DJANGO_DEBUG (по умолчанию его быть
+        # не должно), и только потом раскладываем окружение — иначе тест,
+        # который НАРОЧНО выставляет DJANGO_DEBUG, тут же его и потеряет.
         os.environ.pop('DJANGO_DEBUG', None)
-        module = importlib.import_module('config.settings_production')
-        yield importlib.reload(module)
+        os.environ.update(env)
+        for key in drop:
+            os.environ.pop(key, None)
+        yield importlib.import_module(MODULE)
     finally:
         for key, value in saved.items():
             if value is None:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+        # Возвращаем то, что лежало до нас: следующий тест обязан начинать
+        # с того же состояния, что и мы.
+        sys.modules.pop(MODULE, None)
+        if previous is not None:
+            sys.modules[MODULE] = previous
 
 
 class ProductionSecurityValuesTests(unittest.TestCase):
@@ -156,39 +177,20 @@ class ProductionFusesTests(unittest.TestCase):
     def test_debug_env_raises(self):
         """DJANGO_DEBUG на проде запрещён — предохранитель с сессии 1."""
         with self.assertRaises(RuntimeError) as ctx:
-            env = dict(FAKE_ENV)
-            saved = {k: os.environ.get(k) for k in env}
-            saved['DJANGO_DEBUG'] = os.environ.get('DJANGO_DEBUG')
-            try:
-                os.environ.update(env)
-                os.environ['DJANGO_DEBUG'] = '1'
-                import config.settings_production as mod
-                importlib.reload(mod)
-            finally:
-                for key, value in saved.items():
-                    if value is None:
-                        os.environ.pop(key, None)
-                    else:
-                        os.environ[key] = value
+            with _production_module(DJANGO_DEBUG='1'):
+                pass
         self.assertIn('DJANGO_DEBUG', str(ctx.exception))
 
     def test_missing_secret_key_raises(self):
-        """Без SECRET_KEY сервис не имеет права подняться."""
-        saved = {k: os.environ.get(k) for k in FAKE_ENV}
-        saved['DJANGO_DEBUG'] = os.environ.get('DJANGO_DEBUG')
-        try:
-            os.environ.update(FAKE_ENV)
-            os.environ.pop('DJANGO_DEBUG', None)
-            os.environ.pop('SECRET_KEY', None)
-            import config.settings_production as mod
-            with self.assertRaises(KeyError):
-                importlib.reload(mod)
-        finally:
-            for key, value in saved.items():
-                if value is None:
-                    os.environ.pop(key, None)
-                else:
-                    os.environ[key] = value
+        """Без SECRET_KEY сервис не имеет права подняться.
+
+        Именно KeyError, а не RuntimeError: ключ читается через
+        `os.environ['SECRET_KEY']` намеренно — квадратные скобки роняют
+        сервис сами, без нашей проверки.
+        """
+        with self.assertRaises(KeyError):
+            with _production_module(drop=('SECRET_KEY',)):
+                pass
 
 
 class DeployCheckTests(unittest.TestCase):

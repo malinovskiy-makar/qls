@@ -31,6 +31,33 @@ from problems.models import Topic
 EXPLICIT_ID = 900001
 
 
+def _sequence_name(table, column='id'):
+    with connection.cursor() as cur:
+        cur.execute('SELECT pg_get_serial_sequence(%s, %s)', [table, column])
+        return cur.fetchone()[0]
+
+
+def _reset_sequence(table, value, column='id'):
+    """Ставит счётчик в заведомо известное состояние.
+
+    ⚠️ ЗАЧЕМ ЭТО ВООБЩЕ НУЖНО — САМОЕ ВАЖНОЕ В ФАЙЛЕ. Счётчики в PostgreSQL
+    НЕ ОТКАТЫВАЮТСЯ вместе с транзакцией, и это не оплошность, а устройство:
+    иначе два одновременных клиента, получив номера, ждали бы друг друга.
+    А `TestCase` откатывает каждый тест транзакцией — то есть строки
+    исчезают, а сдвинутый счётчик остаётся.
+
+    Итог: тесты этого класса влияют друг на друга, и порядок у них
+    алфавитный. Первая версия файла на этом и попалась — проверка
+    «без выравнивания вставка падает» получала счётчик, уже сдвинутый
+    соседним тестом, и не падала. На SQLite такого не бывает.
+    """
+    with connection.cursor() as cur:
+        # false третьим аргументом — «это значение ещё не выдавали»,
+        # то есть следующим придёт ровно `value`.
+        cur.execute('SELECT setval(%s, %s, false)',
+                    [_sequence_name(table, column), value])
+
+
 def _next_value(table, column='id'):
     """Какое число счётчик выдаст следующим.
 
@@ -54,13 +81,27 @@ def _next_value(table, column='id'):
 class FixSequencesTests(TestCase):
     """Заливка с явными id → выравнивание → обычная вставка."""
 
+    # Низкое значение, с которого начинает каждый тест. Любое, лишь бы
+    # заведомо меньше EXPLICIT_ID: смысл в дыре между «что выдаст счётчик»
+    # и «что уже занято».
+    START = 1000
+
+    def setUp(self):
+        # Счётчик транзакцией не откатывается — см. _reset_sequence.
+        # Без этой строки тесты класса зависят от порядка запуска.
+        _reset_sequence(Topic._meta.db_table, self.START)
+
     def _load_fixture_like_row(self):
         """Имитирует заливку фикстуры: запись с явно заданным номером.
 
         Именно так работает `bulk_load_fixtures` — номера берутся из файла,
         а не у счётчика.
         """
-        Topic.objects.create(pk=EXPLICIT_ID, name='Тема из фикстуры')
+        # ⚠️ slug задаётся явно: поле уникальное, и две темы с пустым
+        # slug роняют вставку раньше, чем дело дойдёт до проверяемого
+        # счётчика — падение было бы не по той причине.
+        Topic.objects.create(pk=EXPLICIT_ID, name='Тема из фикстуры',
+                             slug='tema-iz-fikstury')
 
     # -- 1. мина на месте ------------------------------------------------
     def test_without_fix_insert_fails(self):
@@ -76,19 +117,18 @@ class FixSequencesTests(TestCase):
         # номера, хотя большой уже занят.
         self.assertLess(_next_value(Topic._meta.db_table), EXPLICIT_ID)
 
-        # Догоняем счётчик до занятого номера обычными вставками —
-        # так же, как это сделала бы работа сайта после заливки.
-        with connection.cursor() as cur:
-            cur.execute(
-                "SELECT setval(pg_get_serial_sequence('%s', 'id'), %%s, true)"
-                % Topic._meta.db_table, [EXPLICIT_ID - 1])
+        # Догоняем счётчик до занятого номера — так же, как это сделала бы
+        # обычная работа сайта после заливки: сотни новых тем, и однажды
+        # счётчик доходит до номера, взятого из фикстуры.
+        _reset_sequence(Topic._meta.db_table, EXPLICIT_ID)
 
         with self.assertRaises(IntegrityError):
             # ⚠️ Отдельный atomic обязателен: упавший запрос отравляет
             # транзакцию, и без своего блока развалился бы весь тест,
             # а не одна вставка.
             with transaction.atomic():
-                Topic.objects.create(name='Обычная тема')
+                Topic.objects.create(name='Обычная тема',
+                                     slug='obychnaya-tema')
 
     # -- 2. команда мину снимает -----------------------------------------
     def test_apply_moves_sequence_and_insert_works(self):
@@ -102,7 +142,8 @@ class FixSequencesTests(TestCase):
         # аргументом true означает «этот номер уже выдан».
         self.assertEqual(_next_value(Topic._meta.db_table), EXPLICIT_ID + 1)
 
-        topic = Topic.objects.create(name='Обычная тема')
+        topic = Topic.objects.create(name='Обычная тема',
+                                     slug='obychnaya-tema')
         self.assertEqual(topic.pk, EXPLICIT_ID + 1)
 
         self.assertIn('problems_topic', out.getvalue())
@@ -144,16 +185,41 @@ class FixSequencesTests(TestCase):
 
         У них свой `id` со своим счётчиком, отстать он может так же, а
         заметить это труднее: модели с таким именем в коде нет.
+
+        ⚠️ Ожидаемое число СЧИТАЕТСЯ ЗДЕСЬ ЖЕ, а не записано числом.
+        Записанное число устаревает при первой новой модели, и тест
+        начинает краснеть на пустом месте — а чинят такой тест правкой
+        числа, не читая, что он проверял.
         """
+        from django.apps import apps
+        from django.db import models as dj_models
+
+        def count_autofields(include_auto_created):
+            total = 0
+            for model in apps.get_models(
+                    include_auto_created=include_auto_created):
+                if model._meta.proxy or not model._meta.managed:
+                    continue
+                for field in model._meta.local_fields:
+                    if isinstance(field, dj_models.AutoField):
+                        total += 1
+            return total
+
+        plain = count_autofields(False)
+        with_m2m = count_autofields(True)
+
+        # Если этого не выполняется, у проекта не осталось ни одной связи
+        # «многие ко многим», и проверять здесь стало нечего.
+        self.assertGreater(with_m2m, plain,
+                           'нет ни одной автосозданной таблицы связей')
+
         out = StringIO()
         call_command('fix_sequences', stdout=out)
         text = out.getvalue()
 
-        # Считаем то, что команда сама сообщает о числе проверенных таблиц,
-        # и сверяем с числом моделей — включая автосозданные.
         self.assertIn('Проверено таблиц со счётчиком:', text)
         checked = int(text.split('Проверено таблиц со счётчиком:')[1]
                       .split('\n')[0].strip())
-        # Моделей в проекте заведомо больше сотни; если бы автосозданные
-        # таблицы связей отбрасывались, число было бы заметно меньше.
-        self.assertGreater(checked, 100)
+        # Команда обязана дойти до ВСЕХ таблиц, а не только до обычных
+        # моделей: равенство с plain означало бы, что связи отброшены.
+        self.assertEqual(checked, with_m2m)
