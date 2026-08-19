@@ -370,6 +370,15 @@ function mainScales() {
 function drawOverlays() {
   if (!svg || !svg.node()) return;
   invalidateKeyTargets();    // особые точки считаются заново под новую картинку
+  /* ⚠️ ПЕРЕСЕЧЕНИЯ СЧИТАЮТСЯ ЗДЕСЬ, А НЕ ТАМ, ГДЕ ИХ РИСУЮТ.
+
+     Раньше `STATE.crosses` обновлял `drawCrossPoints`, а он идёт ниже расчёта
+     площадей и набранных вершин. Всё, что спрашивало ключевые точки раньше
+     него, получало картину ПРОШЛОГО кадра — и, что хуже, клало её в кэш на
+     весь текущий. Сдвинули кривую: пересечение уже в другом месте, а вершина,
+     стоящая в старом, всё ещё считает себя стоящей в пересечении. Общее
+     состояние не может обновляться побочным действием отрисовки. */
+  STATE.crosses = crossPoints();
   if (typeof resetLabelBoxes === 'function') resetLabelBoxes();   // подписи расставляются заново
   applyAreaColors();         // свои цвета заливок — одним проходом по data-legend
   drawAreaCalc();            // посчитанная площадь (Фаза 10)
@@ -786,6 +795,11 @@ function drawLegend() {
       .attr('x', x + PAD + SW + GAP).attr('y', cy + SW * 0.95)
       .attr('font-size', fsz).attr('font-weight', 600).attr('fill', COL.ink)
       .text(labels[i]);
+    /* Полное название аббревиатуры остаётся узлом `title` внутри SVG, и это
+       не та подсказка, о которой говорит правило 18: строка легенды ничего не
+       делает по нажатию, а `title` у фигуры это её ИМЯ — им же её называет
+       чтец с экрана. Заменять его всплывающей плашкой значило бы отобрать
+       имя и ничего не дать взамен. */
     t.append('title').text(e.key);
   });
 }
@@ -1138,6 +1152,25 @@ function keyTargets() {
    больше, чтобы попадать в неё было легче, чем промахнуться мимо. */
 // В ключевую точку попасть должно быть заметно легче, чем просто в кривую (П42).
 const KEY_SNAP_PX = 22;
+/* п. 33. ВОЗМОЖНОСТЬ, О КОТОРОЙ ЗНАЕТ ТОЛЬКО НАВЕДЕНИЕ МЫШИ, НЕ СУЩЕСТВУЕТ.
+
+   «Двойной щелчок, чтобы переименовать», «Добавить в список точек» и
+   «Потяните, чтобы перенести» жили внутри SVG узлами `title`, то есть в
+   подсказке браузера. На сенсорном экране её нет вовсе, с клавиатуры не
+   открыть, оформлению не поддаётся — узнать о возможности можно было только
+   случайно, мышью.
+
+   ⚠️ ЗАМЕНИТЬ ИХ ВСПЛЫВАЮЩЕЙ ПЛАШКОЙ НЕ ВЫШЛО, И ЭТО ПРАВИЛЬНО. Плашка
+   всплывает ровно там, где рука ведёт указатель, перехватывает его и мешает
+   тому самому действию, ради которого показана: подпись максимума с плашкой
+   перестала открываться двойным щелчком совсем. Нашёл браузер; ни один
+   разбор исходников такого не видит.
+
+   Поэтому возможности названы ТАМ, ГДЕ ИМИ УПРАВЛЯЮТ: переименование и
+   значок закрепки — в подсказке блока «Точки на графике», перенос названия
+   графика — рядом с полем этого названия в меню плоскости. Узел `title` у
+   аббревиатуры легенды оставлен: это не подсказка, а ИМЯ фигуры.            */
+
 function snapVertexAt(px, py) {
   const { mx, my } = mainScales();
   let best = null;
@@ -1162,7 +1195,6 @@ function snapVertexAt(px, py) {
    обеим осям и подписываются координаты НА ОСЯХ. У остальных точек так не
    делается: они серые, а координаты и «закрепка» появляются по щелчку. */
 function drawCrossPoints() {
-  STATE.crosses = crossPoints();
   const pts = keyTargets();
   if (!pts.length) return;
   const { mx, my } = mainScales();
@@ -1220,7 +1252,9 @@ function drawCrossPoints() {
       .attr('d', `M${px + 12.5},${py + 7} l0,-3 l6,-6 l3,3 l-6,6 z`)
       .attr('fill', 'none').attr('stroke', COL.inkSoft).attr('stroke-width', 1.2)
       .attr('stroke-linejoin', 'round');
-    pin.append('title').text('Добавить в список точек');
+    /* Плашки у значка нет намеренно: он ловит нажатие, и всплывающее под
+       указателем мешало бы по нему попасть. Что он делает, сказано в
+       подсказке блока «Точки на графике». */
     pin.on('click', (ev) => { ev.stopPropagation(); pinKeyPoint(p); });
 
     /* Поведение как у Desmos (Н42–Н44): по умолчанию кружок серый и пустой
@@ -1275,7 +1309,8 @@ function hoverLabel(g, dot, x, y, text, anchor, baseline) {
   dot.style('cursor', 'pointer')
      .on('pointerenter', () => lab.style('display', null))
      .on('pointerleave', () => lab.style('display', 'none'));
-  dot.append('title').text(text);
+  /* Своей плашки здесь не нужно: та же фраза уже показывается подписью на
+     холсте, а `pointerenter` приходит и от касания. */
   return lab;
 }
 
@@ -1428,8 +1463,23 @@ function curveRightEdge(f) {
 
 // Как называется переменная горизонтальной оси в текущей сцене: границы отрезка
 // подписываются ею, а не безликими «от» и «до».
-function axisXLetter() {
-  return (STATE.axisXName || STATE.axisXDefault || 'x').trim() || 'x';
+function axisXLetter() { return axisLetter('x'); }
+
+/* п. 32. КООРДИНАТА НАЗЫВАЕТСЯ ТАК ЖЕ, КАК ОСЬ.
+
+   Оси подписаны Q и P, а форма ввода точки просила x и y — две системы
+   обозначений на одном экране. Берём обозначение самой оси, но ТОЛЬКО когда
+   это обозначение, а не фраза: «Издержки = 50» в колонке шириной в сотню
+   пикселей нечитаемо, а «TP, MP, AP» ещё и не одна величина. Длинное
+   название оси оставляем осям, координате даём привычные x и y. */
+const AXIS_LETTER_MAX = 3;
+function axisLetter(which) {
+  const src = (which === 'y')
+    ? (STATE.axisYName || STATE.axisYDefault)
+    : (STATE.axisXName || STATE.axisXDefault);
+  const t = String(src || '').trim();
+  if (t && t.length <= AXIS_LETTER_MAX && !/[\s,;]/.test(t)) return t;
+  return which === 'y' ? 'y' : 'x';
 }
 
 /* ── Вершины площади щелчками (Фаза 7) ────────────────────────────────
@@ -1437,11 +1487,52 @@ function axisXLetter() {
    ставит вершину, рядом с особой точкой она прыгает точно в неё. Галочки
    в списке для этого больше не нужны. */
 function armVerts(on) {
+  const was = STATE.vertArm;
   STATE.vertArm = !!on;
   const wrap = document.getElementById('graph-wrap');
   if (wrap) wrap.style.cursor = STATE.vertArm ? 'crosshair' : '';
   if (!STATE.vertArm) showSnapHint(null);
   renderVertList();
+  syncCanvasMode();
+  // Дорожка захвата кривой во взведённом режиме не рисуется, поэтому холст
+  // надо переложить. Только НА СМЕНЕ состояния: снятие уже снятого режима
+  // случается при каждой загрузке сцены, и лишняя перерисовка там ни к чему.
+  if (was !== STATE.vertArm && typeof redrawAll === 'function') redrawAll();
+}
+
+/* п. 25. Полоса режима холста: что делает щелчок и чем это кончить.
+
+   Слова берём здесь, в одном месте, а не в каждом, кто взводит режим:
+   иначе «ставите точку» и «набираете вершины» разъехались бы с тем, что
+   на самом деле произойдёт. Состояние спрашиваем у `canvasMode()` —
+   второго списка флагов не заводим. */
+const CANVAS_MODE_TEXT = {
+  mark: { what: '<b>Ставите точку</b> <span>· нажмите на график</span>', stop: 'Отмена' },
+  vert: { what: '<b>Отмечаете вершины</b> <span>· каждый щелчок ставит вершину</span>', stop: 'Готово' },
+};
+
+function syncCanvasMode() {
+  // Пока вершины отмечаются, закончить набор предлагает полоса режима над
+  // холстом; кнопка в панели на это время уходит, чтобы одно и то же действие
+  // не стояло на экране дважды. Состояние у обеих одно — `canvasMode()`.
+  const arm = document.getElementById('ac-vert-arm');
+  if (arm) arm.hidden = !!STATE.vertArm;
+  const bar = document.getElementById('cv-mode');
+  if (!bar) return;
+  const t = CANVAS_MODE_TEXT[canvasMode()];
+  bar.hidden = !t;
+  if (!t) return;
+  const what = document.getElementById('cv-mode-what');
+  const stop = document.getElementById('cv-mode-stop');
+  if (what) what.innerHTML = t.what;
+  if (stop) stop.textContent = t.stop;
+}
+
+// Выйти из любого взведённого режима холста. Одна дверь на кнопку «Готово»,
+// на Escape и на всё, что режим прерывает.
+function leaveCanvasMode() {
+  if (STATE.markArm) { cancelMarkDraft(); return; }
+  if (STATE.vertArm) armVerts(false);
 }
 
 function addAreaVert(x, y, name) {
@@ -1465,6 +1556,7 @@ function renderVertList() {
   const btns = document.getElementById('ac-vert-btns');
   if (empty) empty.style.display = list.length ? 'none' : '';
   if (btns) btns.style.display = list.length ? '' : 'none';
+  syncCanvasMode();   // подпись кнопки «Отмечать вершины» идёт за состоянием
   box.innerHTML = '';
   list.forEach((p, i) => {
     const row = document.createElement('div');
@@ -1589,10 +1681,36 @@ function syncAreaRangeLabel() {
   el.append(word, open, bound('acFrom', () => r.a), semi, bound('acTo', () => r.b), close);
 }
 
+/* п. 29. ИМЯ ВЕРШИНЫ УСТАРЕВАЕТ ВМЕСТЕ С КАРТИНКОЙ.
+
+   Вершина, поставленная в пересечение D и S, запоминает это имя. Потом
+   кривые сдвигают, пересечение уезжает, а в списке по-прежнему написано
+   «1. пересечение D и S (50; 50)»: координаты верны, объяснение — нет.
+   Координаты человек ставил сам, их не трогаем; имя это НАША подпись, и
+   держать её можно, только пока она правда. Сверяем с текущими ключевыми
+   точками: нет такой на этом месте — имя снимаем, остаются числа. */
+function freshenVertNames() {
+  const list = (STATE.areaVerts || []).filter(p => p.name);
+  if (!list.length) return false;
+  const w = viewWindow();
+  const dx = (w.x1 - w.x0) * 2e-3, dy = (w.y1 - w.y0) * 2e-3;
+  const keys = keyTargets();
+  let changed = false;
+  list.forEach(p => {
+    const ok = keys.some(k => k.name === p.name &&
+      Math.abs(k.x - p.x) <= dx && Math.abs(k.y - p.y) <= dy);
+    if (!ok) { p.name = ''; changed = true; }
+  });
+  return changed;
+}
+
 // Набранные вершины на графике: номер у каждой и бледный контур будущей фигуры.
 function drawAreaVerts() {
   const list = STATE.areaVerts || [];
   if (!list.length) return;
+  // Список перекладываем ПОСЛЕ проверки имён и только если что-то изменилось:
+  // renderVertList не перерисовывает холст, поэтому петли здесь нет.
+  if (freshenVertNames()) renderVertList();
   const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'area-verts').style('pointer-events', 'none');
   if (list.length >= 3) {
@@ -1617,6 +1735,8 @@ function drawAreaVerts() {
     const dot = g.append('circle').attr('cx', mx(p.x)).attr('cy', my(p.y)).attr('r', 4.5)
       .attr('fill', COL.halo).attr('stroke', COL.reg).attr('stroke-width', 2)
       .style('pointer-events', 'all').style('cursor', 'grab');
+    // Номер вершины стоит вплотную к своей точке: на 8 px вправо и вверх,
+    // то есть в углу её же кружка радиусом 4,5.
     haloText(g, mx(p.x) + 8, my(p.y) - 8, String(i + 1), 'start', 'auto');
 
     dot.on('pointerenter', () => dot.attr('r', 6.5).attr('stroke-width', 3))
@@ -1729,11 +1849,20 @@ function bestAreaRing(pts) {
   return best ? { ring: best.ring, exact: true } : { ring: angleRing(pts), exact: false };
 }
 
+/* п. 26. САМОПЕРЕСЕЧЕНИЕ НАЗЫВАЕТСЯ ВСЛУХ.
+
+   До восьми вершин перебор сам отбрасывает «бабочки», и обход всегда простой.
+   От девяти он невозможен по времени, остаётся обход по кругу — а он у
+   некоторых наборов точек пересекает сам себя, и площадь по формуле шнурков
+   тогда не значит ничего: части фигуры вычитаются друг из друга. Молчать об
+   этом нельзя (канон 2.13), поэтому оговорка едет вместе с числом и видна на
+   экране, а не в подсказке браузера. */
 function calcAreaPolygon() {
   const pts = (STATE.areaVerts || []).slice();
   if (pts.length < 3) return { error: 'Нужно хотя бы три вершины: щёлкните по графику ещё раз.' };
   const r = bestAreaRing(pts);
   return { kind: 'poly', value: ringArea(r.ring), exact: r.exact,
+           crosses: !r.exact && ringSelfCrosses(r.ring),
            ring: r.ring.map(p => [p.x, p.y]) };
 }
 
@@ -1810,7 +1939,14 @@ function updateAreaCalcPanel() {
      бюджета, потери общества). Раньше сценовые области жили только в отдельном
      разделе «Цвета областей», и там у них не было ни числа, ни соседства с
      посчитанными площадями. Раздел удалён, ничего не потеряно. */
-  const scene = currentAreas();
+  /* Области, которые нарисовала САМА МОДЕЛЬ. Посчитанные человеком площади
+     тоже помечены `data-legend` — иначе они не попали бы в легенду на холсте,
+     а там они нужны. Но в ТАБЛИЦЕ им не место: они уже идут своими строками
+     ниже, со своим именем, цветом и крестиком. Без этой отсечки одна и та же
+     площадь стояла дважды: S₁ без крестика и S₁ с крестиком, с одним числом. */
+  const mine = {};
+  (list || []).forEach(r => { mine[areaKey(r.label)] = 1; });
+  const scene = currentAreas().filter(e => !mine[e.key]);
   box.innerHTML = '';
   if (!list.length && !scene.length) return;
 
@@ -1864,11 +2000,7 @@ function updateAreaCalcPanel() {
 
     const c3 = document.createElement('b');
     c3.textContent = fmt(r.value);
-    if (r.kind === 'poly' && r.exact === false) {
-      c3.classList.add('area-approx');
-      c3.title = 'Вершин больше восьми: полный перебор обходов слишком долгий, '
-               + 'поэтому берётся приближение — обход вершин по кругу.';
-    }
+    if (r.kind === 'poly' && r.exact === false) c3.classList.add('area-approx');
 
     const del = document.createElement('button');
     del.type = 'button'; del.className = 'btn-icon'; del.textContent = '×';
@@ -1879,6 +2011,17 @@ function updateAreaCalcPanel() {
     });
 
     row.append(c1, c3, del);
+    /* Оговорка идёт СТРОКОЙ ПОД числом, а не подсказкой браузера: подсказку
+       на планшете не открыть вовсе, а знать про приближение надо до того, как
+       число выпишут в тетрадь. */
+    if (r.kind === 'poly' && r.exact === false) {
+      const note = document.createElement('span');
+      note.className = 'area-note' + (r.crosses ? ' area-note--bad' : '');
+      note.textContent = r.crosses
+        ? 'Обход пересекает сам себя: это число не площадь фигуры. Уберите лишние вершины.'
+        : 'Вершин больше восьми: обход взят по кругу, площадь приближённая.';
+      row.appendChild(note);
+    }
     table.appendChild(row);
   });
   box.appendChild(table);
@@ -1981,6 +2124,8 @@ function wireAreaCalc() {
   if (pick) pick.addEventListener('change', () => { syncAreaRangeLabel(); syncAreaCalcButton(); });
   const vClear = document.getElementById('ac-vert-clear');
   if (vClear) vClear.addEventListener('click', () => clearAreaVerts());
+  const vArm = document.getElementById('ac-vert-arm');
+  if (vArm) vArm.addEventListener('click', () => armVerts(!STATE.vertArm));
   setAreaCalcMode('curve');
 }
 
@@ -2385,7 +2530,8 @@ function drawGraphTitle() {
     .style('cursor', 'move')
     .text(t);
 
-  el.append('title').text('Потяните, чтобы перенести. Двойной щелчок правит название');
+  // Название графика тянут и правят двойным щелчком; про это сказано в меню
+  // координатной плоскости, где это название и вводят.
 
   // Перетаскивание: запоминаем долю поля, а не пиксели.
   el.call(d3.drag().container(() => svg.node())
@@ -2954,10 +3100,23 @@ let markCounter = 0;
 
 // Взвести/снять режим «следующий щелчок по графику ставит точку».
 function armMark(on) {
-  STATE.markArm = on;
+  const was = STATE.markArm;
+  STATE.markArm = !!on;
   const wrap = document.getElementById('graph-wrap');
   if (wrap) wrap.style.cursor = on ? 'crosshair' : '';
   if (!on) showSnapHint(null);   // снятый режим не оставляет кружок-подсказку
+  syncCanvasMode();
+  if (was !== STATE.markArm && typeof redrawAll === 'function') redrawAll();
+}
+
+/* Отмена начатой точки: убираем заготовку и снимаем режим. Раньше Escape
+   только снимал режим, и в списке оставалась строка-заготовка без координат —
+   состояние, из которого не было выхода, кроме как ввести числа руками. */
+function cancelMarkDraft() {
+  armMark(false);
+  const draft = pendingMark();
+  if (draft) STATE.marks = STATE.marks.filter(m => m !== draft);
+  renderMarkList();
 }
 
 /* П20. Сброс при переходе между моделями. Раньше сбрасывалось только
@@ -3087,12 +3246,55 @@ function addMarkAt(x, y, snapTo) {
    их было не различить ни на холсте, ни в списке. Палитра та же, что предлагает
    пикер (--pal-1…--pal-6), поэтому светлая и тёмная тема дают свои значения;
    когда цвета кончаются, начинаем заново. */
+/* п. 32. НОВАЯ ТОЧКА НЕ ПОВТОРЯЕТ ЦВЕТ ТОГО, ЧТО УЖЕ НАРИСОВАНО.
+
+   Совпадения по коду цвета тут не было и быть не могло: у палитры точек свои
+   значения (--pal-*), у кривых свои (--curve-*). А глазом красная точка на
+   красной кривой предложения читалась как её часть. Поэтому сравниваем не
+   строки, а РАССТОЯНИЕ между цветами, и берём тот образец палитры, который
+   дальше всего от уже нарисованного.
+
+   Цвета берём с самого холста: спрашивать сцену, чем она рисует, значит
+   держать второй список ролей и разойтись с ним на первой же новой сцене. */
+function colorDist(a, b) {
+  const px = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const [r1, g1, b1] = px(a), [r2, g2, b2] = px(b);
+  // «Redmean» — дешёвое приближение к воспринимаемой разнице, точнее простой
+  // евклидовой метрики по RGB: у тёмных и светлых пар веса каналов разные.
+  const rm = (r1 + r2) / 2, dr = r1 - r2, dg = g1 - g2, db = b1 - b2;
+  return Math.sqrt((2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db);
+}
+
+function drawnStrokeColors() {
+  const out = [];
+  const node = (typeof svg !== 'undefined' && svg && svg.node) ? svg.node() : null;
+  if (!node) return out;
+  node.querySelectorAll('path[stroke], line[stroke]').forEach(el => {
+    const c = el.getAttribute('stroke');
+    if (!c || c === 'none' || c === 'transparent') return;
+    const h = normHex(c);
+    if (h && out.indexOf(h) < 0) out.push(h);
+  });
+  return out;
+}
+
+// Ниже этого расстояния два цвета на графике читаются как один.
+const COLOR_NEAR = 90;
+
 function nextMarkColor() {
   const pal = paletteSix().filter(Boolean);
   if (!pal.length) return null;
-  const used = (STATE.marks || []).map(m => String(m.color || '').toLowerCase());
-  const free = pal.find(c => used.indexOf(String(c).toLowerCase()) < 0);
-  return free || pal[(STATE.marks || []).length % pal.length];
+  const used = (STATE.marks || []).map(m => normHex(m.color || '')).filter(Boolean);
+  const busy = used.concat(drawnStrokeColors());
+  const far = (c) => busy.reduce((m, b) => Math.min(m, colorDist(normHex(c), b)), Infinity);
+  // Свободный по коду и достаточно далёкий от нарисованного — лучший выбор.
+  const free = pal.filter(c => used.indexOf(normHex(c)) < 0);
+  const good = free.filter(c => far(c) >= COLOR_NEAR);
+  if (good.length) return good[0];
+  // Ни один не проходит порог (на графике уже много цветов) — берём самый
+  // дальний из ещё не занятых, а если заняты все, идём по кругу, как раньше.
+  if (free.length) return free.slice().sort((a, b) => far(b) - far(a))[0];
+  return pal[(STATE.marks || []).length % pal.length];
 }
 
 function newMark(x, y, snapTo, mode) {
@@ -3191,10 +3393,12 @@ function buildMarkRow(mk) {
      поле рядом. Правится тем же компонентом, что и всюду: пунктир снизу, правка
      на месте, применение на каждый символ. */
   const mkNum = (key) => {
+    // п. 32. Координата подписана буквой ТОЙ ЖЕ оси, что нарисована на графике.
+    const letter = axisLetter(key);
     const n = makeEditableValue({
       get: () => (isFinite(mk[key]) ? Math.round(mk[key] * 1000) / 1000 : ''),
-      tex: (v, text) => key + ' = ' + (text === '' ? '{?}' : text),
-      title: 'Координата ' + key,
+      tex: (v, text) => letter + ' = ' + (text === '' ? '{?}' : text),
+      title: 'Координата ' + letter,
       set: (v) => {
         mk[key] = isFinite(v) ? v : NaN;
         // Точка на кривой держится за неё: меняем x, высоту берём с кривой.

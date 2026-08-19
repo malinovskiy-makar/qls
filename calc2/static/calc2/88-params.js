@@ -1419,8 +1419,12 @@ function wireControls() {
     showSnapHint(snapVertexAt(px, py));
   });
   if (chartEl) chartEl.addEventListener('mouseleave', () => showSnapHint(null));
-  // Esc снимает взведённый режим — иначе курсор-перекрестие остаётся «залипшим».
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && STATE.markArm) armMark(false); });
+  /* Esc снимает ЛЮБОЙ взведённый режим — иначе курсор-перекрестие остаётся
+     «залипшим». Раньше Escape знал только про свою точку, и из набора вершин
+     выйти с клавиатуры было нечем. То же делает кнопка в полосе режима. */
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && canvasArmed()) leaveCanvasMode(); });
+  const cvStop = document.getElementById('cv-mode-stop');
+  if (cvStop) cvStop.addEventListener('click', () => leaveCanvasMode());
   renderMarkList();
   initSceneColorPickers();   // Фаза 2: пикеры у кривых издержек, производства, вееров
   wireFolds();               // сворачивание любых секций со складным заголовком

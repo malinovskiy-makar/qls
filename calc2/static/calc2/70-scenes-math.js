@@ -242,7 +242,10 @@ function mathDot(g, mx, my, x, y, color, label, dy, key) {
    Одиночный щелчок оставлен свободным: им ставят точки и включают области, и
    переименование по нему срабатывало бы против воли. */
 function makeRenamable(t, current, px, py, apply) {
-  t.style('cursor', 'text').append('title').text('Двойной щелчок, чтобы переименовать');
+  // Плашки у подписи нет: она открывается двойным щелчком, и всплывающее
+  // под указателем мешало бы попасть. Про переименование сказано в
+  // подсказке блока «Точки на графике».
+  t.style('cursor', 'text');
   t.on('dblclick', (ev) => {
     ev.stopPropagation(); ev.preventDefault();
     editInlineLabel(current, px, py, apply);
@@ -445,7 +448,7 @@ function drawMathTangent(f) {
     const dot2 = gBot.append('circle').attr('cx', s2.mx(x0)).attr('cy', s2.my(k)).attr('r', 6)
       .attr('fill', 'transparent').attr('stroke', COL.tanD).attr('stroke-width', 2.2)
       .style('cursor', 'ew-resize');
-    dot2.append('title').text('Ведите её, и касательная сверху перестроится');
+    // Точку ведут мышью — плашка перехватывала бы указатель.
     dot2.call(d3.drag().container(() => svg.node()).on('drag', grabX(s2.mx, wBot)));
   }
   updateMathPanel();

@@ -266,7 +266,10 @@ input:focus-visible, select:focus-visible {
   border-bottom: var(--line) solid var(--border);
 }
 /* Площадь, посчитанная приближением (вершин больше восьми). */
-.area-approx { border-bottom: 1px dotted var(--text3); cursor: help; }
+.area-approx { border-bottom: var(--line) dotted var(--text3); }
+/* Оговорка к числу: своя строка во всю ширину карточки, под ним. */
+.area-note { grid-column: 1 / -1; font-size: 12px; line-height: 1.45; color: var(--text2); }
+.area-note--bad { color: var(--error); }
 .area-row:last-child { border-bottom: none; }
 .area-head { font-size: 11px; font-weight: 600; letter-spacing: .03em;
   color: var(--text3); text-transform: uppercase; padding-bottom: 4px; }
@@ -1366,6 +1369,31 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 #ac-calc:disabled { opacity: .45; cursor: not-allowed; }
 
 .chk.dim { opacity: .72; }
+
+/* Пояснение под полем в меню плоскости: что ещё можно сделать с этим же
+   на самом графике. Обычный текст, не сигнал. */
+.wrench-note { margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--text2); }
+
+/* п. 25. Полоса режима холста. Поверхность и рамка, без сигнальной заливки:
+   это не предупреждение, а название текущего состояния. Стоит вверху слева,
+   где холст всегда пуст, и не перекрывает кнопок масштаба справа. */
+.cv-mode {
+  position: absolute; left: 12px; top: 10px; z-index: var(--z-float);
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 8px 6px 12px; border-radius: var(--r-pill);
+  background: var(--surface); border: var(--line) solid var(--border);
+  box-shadow: var(--shadow-float);
+  font-size: 12px; line-height: 1.4; color: var(--text);
+}
+.cv-mode[hidden] { display: none; }
+.cv-mode__what b { font-weight: 600; }
+.cv-mode__what span { color: var(--text2); }
+.cv-mode__stop {
+  padding: 5px 11px; min-height: 28px; font-size: 12px; font-weight: 600;
+  color: var(--on-btn); background: var(--btn-bg);
+  border: none; border-radius: var(--r-pill); cursor: pointer;
+}
+.cv-mode__stop:hover { background: var(--btn-bg-hover); }
 
 /* Быстрая кнопка расчёта площади поверх графика. */
 .quick-area {

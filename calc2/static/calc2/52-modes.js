@@ -479,7 +479,7 @@ function initZoom() {
        Shift — и тогда прокатывание не перехватывает нажатие. */
     const forcePan = (e.button === 2) || _spaceDown || e.shiftKey;
     if (forcePan) {
-      if (STATE.markArm || STATE.vertArm) return;
+      if (canvasArmed()) return;
       const rp = gw.getBoundingClientRect();
       const panel = (STATE.mode === 'math' && STATE.mathSub === 'tangent')
         ? tangentPanelAt(e.clientY - rp.top) : null;
@@ -487,7 +487,9 @@ function initZoom() {
       e.preventDefault();
       return;
     }
-    if (e.button !== 0 || STATE.markArm) return;
+    // п. 25. Взведённый режим — единственный хозяин щелчка: ни прокатывание
+    // точки, ни сдвиг поля не имеют права его перехватить.
+    if (e.button !== 0 || canvasArmed()) return;
     // Нажали ПО кривой — катим по ней точку, а не двигаем поле. Радиус захвата
     // маленький: рядом лежат ключевые точки, и попадать по ним ничто не мешает.
     const r0 = gw.getBoundingClientRect();

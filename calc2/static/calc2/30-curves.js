@@ -570,7 +570,7 @@ function drawCurves() {
       .attr('d', line);
     // Прямые можно перетаскивать: кладём поверх широкую невидимую «дорожку»
     // для удобного захвата мышью и вешаем на неё перетаскивание.
-    if (curve.linear && curveDragAllowed()) {
+    if (curve.linear && curveDragAllowed() && !canvasArmed()) {
       const hit = g.append('path').datum(pts)
         .attr('fill', 'none').attr('stroke', 'transparent').attr('stroke-width', 16)
         .attr('data-skip-export', '1')    // это дорожка для мыши, а не линия графика
@@ -634,14 +634,32 @@ function setCurveFreeTerm(curve, b) {
   renderCurveList();  // обновим формулу в списке кривых (и слайдеры пульта — в конце renderCurveList)
 }
 
+/* п. 24. ПОРОГ СМЕЩЕНИЯ. Щелчок это не перетаскивание.
+
+   Дорожка захвата шириной 16 px лежит поверх кривой, и любое нажатие внутри
+   неё d3 считает началом перетаскивания. Мышь во время обычного щелчка
+   съезжает на пиксель-другой, событие всё равно приходит, и модель меняется:
+   два щелчка мимо превращали «100 - Q» в «99.5 - Q», а «Q» в «Q + 0.17». Числа при
+   этом становятся нечитаемыми, а человек уверен, что ничего не трогал. Поэтому
+   кривая стоит, пока указатель не ушёл от места нажатия дальше порога;
+   после этого перетаскивание идёт как раньше, до отпускания. */
+const CURVE_DRAG_MIN_PX = 5;
+
 function attachDrag(sel, curve) {
+  let live = false, x0 = 0, y0 = 0;
   sel.call(d3.drag()
     .container(() => svg.node())   // координаты события — в пикселях SVG
+    .on('start', (event) => { live = false; x0 = event.x; y0 = event.y; })
     .on('drag', (event) => {
+      if (!live) {
+        if (Math.hypot(event.x - x0, event.y - y0) < CURVE_DRAG_MIN_PX) return;
+        live = true;
+      }
       const [q, p] = toData(event.x, event.y);
       // Прямая проходит через курсор с прежним наклоном -> пересчитываем b тем же путём.
       setCurveFreeTerm(curve, p - curve.linear.a * q);
-    }));
+    })
+    .on('end', () => { live = false; }));
 }
 // TODO (будущие шаги): перетаскивание нелинейных кривых (парабол и т.п.).
 
