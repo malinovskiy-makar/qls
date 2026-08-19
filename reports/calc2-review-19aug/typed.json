@@ -1,0 +1,55 @@
+{
+ "typed": "ок",
+ "shot": {
+  "rows": [
+   {
+    "kbd": 58.8,
+    "field": 40.8,
+    "slot": 58.8,
+    "hasWhy": true,
+    "hasMathField": true,
+    "hasFRow": true,
+    "edval": null,
+    "filled": true,
+    "html": "<span class=\"cpick\"><button type=\"button\" class=\"swatch cpick-btn\" title=\"Цвет кривой\" aria-label=\"Цвет кривой\" style=\"background: rgb(47, 111, 237);\"></button><input type=\"color\" style=\"display: none",
+    "placeholder": "Например: x^2 - 4",
+    "clipped": false
+   },
+   {
+    "kbd": null,
+    "field": 0,
+    "slot": 18,
+    "hasWhy": false,
+    "hasMathField": false,
+    "hasFRow": false,
+    "edval": "edval edval-text",
+    "filled": false,
+    "html": "<span class=\"cpick\"><button type=\"button\" class=\"swatch cpick-btn\" title=\"Цвет кривой\" aria-label=\"Цвет кривой\" style=\"background: rgb(224, 86, 59);\"></button><input type=\"color\" style=\"display: none;",
+    "placeholder": "Например: x^2 - 4",
+    "clipped": false
+   }
+  ],
+  "bands": [
+   {
+    "cursor": "auto",
+    "width": 2.5,
+    "skip": false,
+    "curveId": "1"
+   },
+   {
+    "cursor": "ns-resize",
+    "width": 16,
+    "skip": true,
+    "curveId": null
+   }
+  ],
+  "kEmpty": 1,
+  "curves": [
+   {
+    "expr": "x",
+    "linear": true
+   }
+  ]
+ },
+ "pageErrors": []
+}
