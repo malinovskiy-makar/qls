@@ -257,7 +257,7 @@ def extract_inline_answers(content: str):
         if '#1' in stmt_clean or '#2' in stmt_clean:
             continue
 
-        stmt_hash = hashlib.md5(stmt_clean.encode()).hexdigest()
+        stmt_hash = hashlib.md5(stmt_clean.encode(), usedforsecurity=False).hexdigest()
         results.append((stmt_hash, answer_raw))
 
     return results

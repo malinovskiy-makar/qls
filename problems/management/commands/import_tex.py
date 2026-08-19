@@ -315,7 +315,7 @@ class Command(BaseCommand):
                         continue
 
                     title = extract_title(stmt)
-                    stmt_hash = hashlib.md5(stmt.encode()).hexdigest()
+                    stmt_hash = hashlib.md5(stmt.encode(), usedforsecurity=False).hexdigest()
                     parts = [
                         clean_latex(s) for s in subitems_raw
                         if clean_latex(s)

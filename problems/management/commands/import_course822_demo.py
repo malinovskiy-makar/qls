@@ -85,7 +85,7 @@ _TRANSLIT = {
 # ── Вспомогательные функции ───────────────────────────────────────────────
 
 def md5(text: str) -> str:
-    return hashlib.md5(text.encode()).hexdigest()
+    return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
 
 
 def make_topic_slug(name: str) -> str:

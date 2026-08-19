@@ -51,7 +51,7 @@ EXAM_RE = re.compile(r'(Mock Exam \d+|Practice Exam(?:\s+\d+)?)')
 
 
 def md5(text: str) -> str:
-    return hashlib.md5(text.encode()).hexdigest()
+    return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
 
 
 def exam_key(name: str):

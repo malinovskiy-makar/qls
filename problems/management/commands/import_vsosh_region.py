@@ -51,7 +51,7 @@ WS_RE = re.compile(r'\s+')
 
 def norm_hash(text):
     """Хэш нормализованного условия: пробелы схлопнуты, регистр убран."""
-    return hashlib.md5(WS_RE.sub(' ', text).strip().lower().encode()).hexdigest()
+    return hashlib.md5(WS_RE.sub(' ', text).strip().lower().encode(), usedforsecurity=False).hexdigest()
 
 
 def norm_option(text):
@@ -80,7 +80,7 @@ def is_duplicate_of_existing(q, cand_ids, parts_of):
 
 def raw_hash(text):
     """content_hash в поле Problem — md5 сырого условия (как в import_ieo)."""
-    return hashlib.md5(text.encode()).hexdigest()
+    return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
 
 
 def plan_question(q):

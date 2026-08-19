@@ -85,7 +85,7 @@ SUB_RE = re.compile(r'(?m)^\s*([абвгдеёжзaА-Яa-z])\)\s')
 
 
 def md5(text: str) -> str:
-    return hashlib.md5(text.encode()).hexdigest()
+    return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
 
 
 def make_slug(name: str) -> str:
