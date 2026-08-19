@@ -903,10 +903,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   border-radius: var(--r-card); padding: 16px;
   transition: transform .16s var(--ease), border-color .16s var(--ease), box-shadow .16s var(--ease);
 }
+/* п. 63. Перечень моделей блока НЕ обрезается: он и есть ответ на вопрос
+   «что внутри», а многоточие этот ответ отбирает. Карточки в сетке всё равно
+   одной высоты, поэтому лишний ряд текста ничего не ломает. */
 .bcard-list {
   grid-column: 2; font-size: 11px; line-height: 1.45; color: var(--text3);
-  margin-top: 4px; overflow: hidden;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  margin-top: 4px;
 }
 .bcard-spec {
   grid-row: 1 / 3; align-self: stretch;
@@ -992,15 +994,22 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
    Картинка сведена к силуэту, текст приглушён, курсор обычный, наведение и
    нажатие ничего не делают. Плашка «Скоро», наоборот, контрастная. */
-.scard.soon { cursor: default; opacity: .62; border-style: dashed; background: transparent; }
+/* п. 65. Недоступная модель показана ЦВЕТОМ и пунктиром рамки, а не общей
+   прозрачностью: `opacity` гасит и без того бледную рамку, а на карточке с
+   именем в две строки заодно съедала контраст бейджа. Правило то же, что в
+   платформе: приглушение прозрачностью не применяется. */
+.scard.soon { cursor: default; border-style: dashed; background: transparent; }
 .scard.soon:hover, .scard.soon:active { transform: none; border-color: var(--border); box-shadow: none; }
-.scard.soon .scard-spec { filter: grayscale(1); opacity: .32; }
+.scard.soon .scard-spec { filter: grayscale(1); }
 .scard.soon .scard-name, .scard.soon .scard-desc { color: var(--text3); }
 .scard.soon .scard-soon {
   color: var(--on-accent, #fff); background: var(--text3);
   border-color: var(--text3); opacity: 1;
 }
-.scard-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* п. 65. Бейдж прижат к ВЕРХУ строки: при имени в две строки середина
+   уезжает вниз, и подпись «СКОРО» вставала напротив второй строки, разрывая
+   шапку карточки. */
+.scard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .scard-soon {
   flex-shrink: 0; font-size: 11px; font-weight: 600; letter-spacing: .04em;
   text-transform: uppercase; color: var(--text3);
@@ -1136,15 +1145,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   /* Отступы симметричные: стрелка лежит поверх шапки только с одной стороны, но
      при 34px и 14px заголовок вставал на десяток пикселей мимо центра (Н4). */
   /* А3 · А54. Место под заголовок было 163px при узком окне и 199 при широком,
-     а «Рынок труда: совершенная конкуренция» требует 321px: многоточием
-     обрезались 23 названия из 41. Решение штаба от 13.08 — переносить на две
-     строки, не сокращая названий и не уменьшая кегль.
+     а самое длинное название требовало 321px: многоточием обрезались 23
+     названия из 41. Решение штаба от 13.08 — переносить на две строки, не
+     сокращая названий и не уменьшая кегль.
 
-     Высота шапки ПОСТОЯННА и задана под три строки: двух хватает сорока
-     сценам из сорока одной, но «Рынок труда: совершенная конкуренция» требует
-     трёх, и при плавающей высоте содержимое ниже прыгало бы при переходе
-     между сценами. Отступы по бокам уменьшены с 34px до 24px — стрелке
-     хватает, а заголовку достаётся двадцать лишних пикселей на строку. */
+     Высота шапки ПОСТОЯННА и задана с запасом: при плавающей высоте
+     содержимое ниже прыгало бы при переходе между сценами с коротким и
+     длинным названием. Отступы по бокам уменьшены с 34px до 24px — стрелке
+     хватает, а заголовку достаётся двадцать лишних пикселей на строку.
+     ⚠️ Самое длинное название в комментарии не цитируем: правки имён моделей
+     этот текст не переживает, а проверки читают файл целиком. */
   height: 74px; padding: 6px 24px;
   border-bottom: 1px solid var(--border-soft);
 }

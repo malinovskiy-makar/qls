@@ -397,10 +397,15 @@ function foldPickerGroups() {
     grid.classList.add('open');          // внутри открытого блока сетка видна всегда
     lab.remove();
 
-    // Н1: считаем ВСЕ модели блока, вместе с запланированными. Карточка обещает
-    // содержимое блока, а не только то, что уже готово: «2 модели» при трёх
-    // видимых читалось как ошибка.
-    const n = grid.querySelectorAll('.scard').length;
+    /* п. 62. СЧЁТЧИК НАЗЫВАЕТ ОБА ЧИСЛА.
+
+       Сначала считали только готовые — «2 модели» при трёх видимых карточках
+       читалось как ошибка (решение Н1). Потом стали считать все — и «Выбор
+       потребителя: 9 моделей» обещал девять там, где работают две. Оба раза
+       одно число отвечало на два разных вопроса: «что здесь будет» и «во что
+       можно зайти сейчас». Печатаем оба, и только когда они расходятся. */
+    const all = grid.querySelectorAll('.scard').length;
+    const n = grid.querySelectorAll('.scard:not(.soon)').length;
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'bcard';
@@ -409,19 +414,23 @@ function foldPickerGroups() {
       + '<span class="bcard-name"></span><span class="bcard-count"></span>'
       + '<span class="bcard-list"></span>';
     card.querySelector('.bcard-name').textContent = name;
-    card.querySelector('.bcard-count').textContent = n + ' ' + plural(n, ['модель', 'модели', 'моделей']);
+    card.querySelector('.bcard-count').textContent = (n === all)
+      ? all + ' ' + plural(all, ['модель', 'модели', 'моделей'])
+      : n + ' ' + plural(n, ['модель', 'модели', 'моделей']) + ' из ' + all;
     /* А42. Правая половина карточки пустовала: 555 пикселей ни подо что.
        Перечисляем модели блока — так видно, что внутри, ещё до открытия.
        Сначала рабочие, потом запланированные: обещание блока честное, но
        понятно, что уже можно открыть прямо сейчас. */
-    const ready = [], soon = [];
-    grid.querySelectorAll('.scard').forEach(sc => {
-      const nm = (sc.querySelector('.scard-name') || {}).textContent;
-      if (!nm) return;
-      (sc.classList.contains('soon') ? soon : ready).push(nm.trim());
-    });
-    card.querySelector('.bcard-list').textContent =
-      ready.concat(soon.map(s => s + ' (скоро)')).join(' · ');
+    /* п. 64. ОДИН ПОРЯДОК НА ОБОИХ ЭКРАНАХ. Перечень на карточке ставил
+       готовые вперёд, а сетка внутри блока шла как в разметке, вперемешку с
+       запланированными. Двигаем САМИ КАРТОЧКИ: так порядок совпадает, и на
+       экране блока не нужно выбирать нужное среди недоступного. */
+    grid.querySelectorAll('.scard.soon').forEach(sc => grid.appendChild(sc));
+    const names = [...grid.querySelectorAll('.scard')].map(sc => {
+      const nm = ((sc.querySelector('.scard-name') || {}).textContent || '').trim();
+      return nm && (sc.classList.contains('soon') ? nm + ' (скоро)' : nm);
+    }).filter(Boolean);
+    card.querySelector('.bcard-list').textContent = names.join(' · ');
     card.addEventListener('click', () => {
       blocks.classList.add('hidden');
       groups.forEach(x => x.classList.remove('open'));

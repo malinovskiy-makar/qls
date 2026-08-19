@@ -9,7 +9,8 @@ const SCENE_NAMES = {
   sd: 'Спрос и предложение', tax: 'Потоварные налоги и субсидии', ceil: 'Пол и потолок цены',
   mono: 'Стандартная монополия', elast: 'Эластичность', ext: 'Внешние эффекты',
   costs: 'Издержки фирмы', ppf: 'Построение КПВ',
-  labor: 'Рынок труда: совершенная конкуренция', ineq: 'Неравенство доходов',
+  // п. 67. Ровно то же, что написано на карточке блока «Рынок труда».
+  labor: 'Конкурентный рынок труда', ineq: 'Неравенство доходов',
   consumer: 'Кривые безразличия',
   adas: 'AD–AS', phillips: 'Кривая Филлипса', money: 'Денежный рынок',
   loanable: 'Рынок заёмных средств', fx: 'Валютный рынок', laffer: 'Кривая Лаффера', islm: 'IS–LM',
@@ -357,9 +358,9 @@ function wireScene() {
   const dTheme = document.getElementById('dock-theme');
   if (dTheme) dTheme.addEventListener('click', () => toggleCalcTheme());
 
-  // Сохранение графиков в базу — задача следующей сессии, кнопка пока заглушка.
-  const dSave = document.getElementById('dock-save');
-  if (dSave) dSave.addEventListener('click', () => toast('Сохранение графиков в профиль появится в следующей версии'));
+  /* Сохранения графиков в базу нет, и кнопки-заглушки в полосе тоже больше
+     нет (п. 68): она занимала второе место и умела только сказать «появится
+     в следующей версии». Появится сохранение — вернётся и кнопка. */
 
   // Экспорт: окно с заголовком и подписью, затем PNG / .tex / PDF.
   const dExport = document.getElementById('dock-export');
@@ -407,7 +408,7 @@ function wireScene() {
   const expPdf = document.getElementById('exp-pdf');
   if (expPdf) expPdf.addEventListener('click', () => exportPDF());
 
-  // «Назад к сценариям».
+  // «Ко всем моделям».
   const back = document.getElementById('scene-back');
   if (back) back.addEventListener('click', () => openPicker());
 

@@ -1370,6 +1370,34 @@ function buildTex(title, label) {
   const toData = (px, py) => [mx.invert(px), my.invert(py)];
 
   const body = [];
+  /* п. 70. ОПИСЬ СЧИТАЕТ ТО, ЧТО ВИДИТ ЧЕЛОВЕК.
+
+     Раньше опись считала строки самого файла: одна кривая с разрывом даёт
+     несколько `\addplot`, одна область — два пути, и на экране с двумя
+     кривыми и двумя заливками стояло «Кривых точками 10, Закрашенных
+     областей 4». Числа были верны для файла и неверны для картинки.
+     Считаем ИСТОЧНИКИ: одна кривая холста — одна кривая описи, чем бы она ни
+     обернулась внутри. Счётчик заполняется здесь же, при обходе, поэтому
+     разойтись с выгрузкой ему не на чем. */
+  const tally = { curves: 0, areas: 0, dots: 0, lines: 0, labels: 0 };
+  /* Одна закрашенная область человека — это одно ПЯТНО, у которого есть имя
+     в легенде, даже если сцена рисует его двумя путями (излишек до и после
+     вмешательства, половинки клина). Пятна с именем считаем по именам,
+     безымянные — поштучно. */
+  const areaSeen = new Set();
+  /* Сама легенда в опись не входит ни одной строкой: её образцы это тоже
+     закрашенные прямоугольники, а подписи — тоже текст, и без этой отсечки
+     на графике с четырьмя пятнами опись показывала восемь. Легенда — один
+     предмет, и о ней отдельная строка «есть». */
+  const inLegend = (el) => !!(el.closest && el.closest('.legend'));
+  const countArea = (el) => {
+    if (inLegend(el)) { tally.legend = true; return; }
+    const k = el.getAttribute('data-legend');
+    if (!k) { tally.areas++; return; }
+    if (areaSeen.has(k)) return;
+    areaSeen.add(k); tally.areas++;
+  };
+  buildTex._tally = tally;
   const inView = (x, y) => x >= xLo - 1e-9 && x <= xHi + 1e-9 && y >= yLo - 1e-9 && y <= yHi + 1e-9;
   /* Цвет холста. Заливка им означает «здесь ничего нет»: так рисуются
      подложки и пустые метки. На бумаге фон белый, поэтому переносить такую
@@ -1416,6 +1444,7 @@ function buildTex(title, label) {
       const pgf = mathToPgf(c.expr, 'Q');
       if (!pgf) return;
       drawnByFormula.add(c.id);
+      tally.curves++;
       const lo = Math.max(0, xLo), hi = xHi;
       // forget plot — чтобы pgfplots не заводил СВОЮ легенду. Имена кривых уже
       // подписаны узлами на самих кривых (как на экране), а вторая легенда
@@ -1488,6 +1517,7 @@ function buildTex(title, label) {
             body.push('\\addplot[' + opts.join(', ') + ', domain=' + num(lo) + ':' + num(hi2) +
                       ', samples=120, restrict y to domain=' + num(Math.max(0, yLo)) + ':' + num(yHi) +
                       ', forget plot] {' + pgf + '};');
+            tally.curves++;
             continue;
           }
         }
@@ -1498,6 +1528,7 @@ function buildTex(title, label) {
         const runs = texSamplePath(el)
           .map(r => texResample(r.map(p => toData(p[0], p[1])), 60));
         if (hasFill && !bgFill) {
+          if (runs.some(r => r.length >= 3)) countArea(el);
           runs.forEach(r => {
             if (r.length < 3) return;
             body.push('\\fill[' + colorName(cs.fill) + ', opacity=' +
@@ -1506,6 +1537,12 @@ function buildTex(title, label) {
           });
         }
         if (hasStroke) {
+          // Кривая это путь, объявивший себя кривой; остальные штрихи (пунктиры
+          // к осям, засечки, рамки) — линии, и в описи они названы линиями.
+          if (runs.some(r => r.length >= 2)) {
+            if (cid || declared) tally.curves++;
+            else if (!inLegend(el)) tally.lines++;
+          }
           runs.forEach(r => {
             if (r.length < 2) return;
             const why = el.getAttribute('data-numeric');
@@ -1517,6 +1554,7 @@ function buildTex(title, label) {
         }
       } else if (tag === 'line') {
         if (!hasStroke) continue;
+        if (!inLegend(el)) tally.lines++;
         const a = toData(+el.getAttribute('x1'), +el.getAttribute('y1'));
         const b = toData(+el.getAttribute('x2'), +el.getAttribute('y2'));
         body.push('\\addplot[' + pgfStroke(el, cs, colorName).join(', ') + ', forget plot] coordinates {' +
@@ -1530,6 +1568,7 @@ function buildTex(title, label) {
         const rectOpt = hatchOpt || (colorName(cs.fill) + ', opacity=' +
           (parseFloat(cs.fillOpacity) * parseFloat(cs.opacity || 1) || 0.2).toFixed(2));
         if (hatchOpt) needPatterns = true;
+        countArea(el);
         body.push('\\fill[' + rectOpt + '] ' +
           '(axis cs:' + num(a[0]) + ',' + num(a[1]) + ') rectangle (axis cs:' + num(b[0]) + ',' + num(b[1]) + ');');
       } else if (tag === 'circle') {
@@ -1542,6 +1581,7 @@ function buildTex(title, label) {
         const hollow = hasFill && sameColor(cs.fill, '#' + canvasColor());
         const col = colorName((hasFill && !hollow) ? cs.fill : cs.stroke);
         const mark = hollow ? ', mark=o' : '';
+        tally.dots++;
         body.push('\\addplot[' + col + ', only marks' + mark + ', mark size=' +
           markPt(+el.getAttribute('r')).toFixed(1) + 'pt, forget plot] coordinates {' + pt(c[0], c[1]) + '};');
       } else if (tag === 'text') {
@@ -1560,6 +1600,7 @@ function buildTex(title, label) {
         const va = (bl === 'hanging' || bl === 'text-before-edge') ? 'north'
                  : (bl === 'middle' || bl === 'central') ? '' : 'base';
         const anchor = (va + (va && ha ? ' ' : '') + ha).trim() || 'base';
+        if (inLegend(el)) tally.legend = true; else tally.labels++;
         const fs = texPt(el, cs);
         const opt = ['anchor=' + anchor, 'text=' + colorName(cs.fill),
                      'font=\\fontsize{' + fs + '}{' + (fs * 1.15).toFixed(1) + '}\\selectfont',
@@ -1689,17 +1730,21 @@ function refreshExportPreview() {
   try { tex = buildTex(expValue('exp-title'), expValue('exp-label')); } catch (e) { tex = ''; }
   if (!tex) { box.textContent = 'Пока нечего выгружать: на графике ничего не построено.'; return; }
   const size = /width=([\d.]+)cm, height=([\d.]+)cm/.exec(tex);
-  const formulas = (tex.match(/\\addplot\[[^\]]*\] *\{/g) || []).length;
-  const tables = (tex.match(/\\addplot\[[^\]]*\] *coordinates/g) || []).length;
-  const fills = (tex.match(/\\fill\[/g) || []).length;
-  const labels = (tex.match(/\\node\[/g) || []).length;
+  /* п. 70. Опись перечисляет то, что человек видит на графике, и его словами.
+     «Кривых формулой» и «Кривых точками» — это про устройство файла: у одной
+     и той же кривой разрыв даёт несколько записей, и на экране с двумя
+     кривыми стояло «Кривых точками 10». Как именно кривая записана в файле,
+     человека не касается: он выбирает, скачивать или нет. */
+  const t = buildTex._tally || {};
   const cap = expValue('exp-title');
   const rows = [
-    ['Картинка', size ? size[1] + ' на ' + size[2] + ' см' : 'по умолчанию'],
-    ['Кривых формулой', String(formulas)],
-    ['Кривых точками', String(tables)],
-    ['Закрашенных областей', String(fills)],
-    ['Подписей', String(labels)],
+    ['Размер картинки', size ? size[1] + ' на ' + size[2] + ' см' : 'по умолчанию'],
+    ['Кривых', String(t.curves || 0)],
+    ['Закрашенных областей', String(t.areas || 0)],
+    ['Точек', String(t.dots || 0)],
+    ['Линий и пунктиров', String(t.lines || 0)],
+    ['Подписей', String(t.labels || 0)],
+    ['Легенда областей', t.legend ? 'есть' : 'нет'],
     ['Подпись под картинкой', cap || 'без подписи'],
   ];
   box.innerHTML = '';
