@@ -216,7 +216,12 @@ input:focus-visible, select:focus-visible {
 .chk input[type=checkbox]:checked { background: var(--accent); border-color: var(--accent); }
 .chk input[type=checkbox]:checked::after {
   content: ''; position: absolute; left: 5px; top: 1px; width: 4px; height: 9px;
-  border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
+  /* Чернила на акцентной заливке идут ТОКЕНОМ, а не белым числом: в тёмной
+     теме сам акцент светлый, и белая галочка на нём была бы нечитаема — это
+     то самое правило части 4, по которому белого на акценте в тёмной теме не
+     бывает. Канон 3.4 пишет «белым», имея в виду светлую тему; общий токен
+     говорит то же самое и вдобавок верен во второй. */
+  border: solid var(--on-accent); border-width: 0 2px 2px 0; transform: rotate(45deg);
 }
 .chk input[type=checkbox]:disabled {
   border-style: dashed; background: var(--surface-2); opacity: .55; cursor: not-allowed;

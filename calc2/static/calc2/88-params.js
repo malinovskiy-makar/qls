@@ -745,13 +745,25 @@ function showPult(on) {
     syncPultRegulators([]);   // все узлы — домой
     const cc = document.getElementById('params-curves'); if (cc) cc.innerHTML = '';
     const ce = document.getElementById('params-extra'); if (ce) ce.innerHTML = '';
-    panel._curveSig = ''; panel._extraSig = '';
+    panel._curveSig = PULT_REBUILD; panel._extraSig = PULT_REBUILD;
   }
   if (empty) empty.style.display = on ? 'none' : '';
 }
 
 // Единая точка пересмотра содержимого «Основных параметров» — дёргается из
 // renderCurveList (кривые) и из set-функций режима/сцены/типа.
+/* ⚠️ ПРИЗНАК «ПЕРЕСОБРАТЬ» НЕ ИМЕЕТ ПРАВА СОВПАДАТЬ С НАСТОЯЩЕЙ ПОДПИСЬЮ.
+
+   Правая панель пересобирается, когда подпись её содержимого изменилась.
+   «Заставить пересобраться» записывали пустой строкой — но пустая строка это
+   ЗАКОННАЯ подпись сцены, у которой своих ползунков нет. У такой
+   сцены приказ пересобраться читался как «ничего не изменилось», и чип
+   прежней модели оставался на экране: ровно та утечка параметра между
+   моделями, которую нашёл владелец.
+
+   Сентинел не равен ни одной настоящей подписи, потому что все они строки. */
+const PULT_REBUILD = null;
+
 function updatePult() {
   const panel = document.getElementById('params-panel');
   if (!panel) return;
@@ -807,7 +819,7 @@ function wireControls() {
     ['tax-slider', 'tax-input', 'pc-slider', 'pc-input'].forEach(id => {
       const e = document.getElementById(id); if (e) e.max = v;
     });
-    const pl = document.getElementById('params-panel'); if (pl) pl._curveSig = '';   // форсируем пересборку
+    const pl = document.getElementById('params-panel'); if (pl) pl._curveSig = PULT_REBUILD;   // форсируем пересборку
     if (typeof updatePult === 'function') updatePult();   // слайдеры кривых: новый предел = Pmax
   });
 
@@ -1161,7 +1173,7 @@ function wireControls() {
     STATE.ppfFormula2 = ((ppfInp2 && ppfInp2.value) || '').trim();
     STATE.ppfX = null;
     redrawAll();
-    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = '';   // пере-инициализировать
+    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = PULT_REBUILD;   // пере-инициализировать
     if (typeof updatePult === 'function') updatePult();
   }
   const pApply = document.getElementById('btn-ppf-apply');
@@ -1239,7 +1251,7 @@ function wireControls() {
   function applyPpfSum() {
     STATE.ppfSumData = null;   // принудительный пересчёт
     redrawAll();
-    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = '';
+    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = PULT_REBUILD;
     if (typeof updatePult === 'function') updatePult();
   }
   const sumApply = document.getElementById('btn-ppfsum-apply');

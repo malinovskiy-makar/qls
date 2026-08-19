@@ -2659,6 +2659,39 @@ const CASES = [
              ['max MP не поехал', 'mp', 300, 1], ['max AP не поехал', 'ap', 225, 1]],
   },
 
+  {
+    /* Утечка параметра между моделями (ревью 19.08). Контрольный опыт
+       владельца: одна и та же модель, два пути, разный результат.
+
+       Прямой путь в «Потоварные налоги» — ползунков-параметров ноль. Через
+       «Построение графиков» с буквой в формуле — ползунок «a» оставался на
+       экране рядом с настоящей ставкой t, хотя в состоянии его уже не было.
+
+       Течёт не состояние, а РАЗМЕТКА: правая панель пересобирается по смене
+       подписи своего содержимого, а «заставить пересобраться» записывали
+       пустой строкой — то есть тем же значением, что и законная подпись сцены
+       без ползунков. Проверяем оба пути и требуем одинакового числа. */
+    name: 'Утечка · параметр не переезжает из модели в модель',
+    run: `resetSceneMemory();
+          pickScene('tax'); redrawAll();
+          var direct = document.querySelectorAll('.pchip-param').length;
+          pickScene('m-graph');
+          STATE.curves = []; curveCounter = 0;
+          addCurve('x^2-a*x'); syncParams(); redrawAll();
+          var inGraph = document.querySelectorAll('.pchip-param').length;
+          var letter = STATE.params && STATE.params.a ? 1 : 0;
+          pickScene('tax'); redrawAll();
+          var after = document.querySelectorAll('.pchip-param').length;
+          var stateAfter = Object.keys(STATE.params || {}).length;
+          return { direct: direct, inGraph: inGraph, letter: letter,
+                   after: after, stateAfter: stateAfter };`,
+    checks: [['прямым путём ползунков нет', 'direct', 0, 0],
+             ['в «Построении графиков» буква завелась', 'letter', 1, 0],
+             ['и ползунок показан', 'inGraph', 1, 0],
+             ['после перехода ползунков столько же, сколько прямым путём', 'after', 0, 0],
+             ['и в состоянии букв не осталось', 'stateAfter', 0, 0]],
+  },
+
   /* --- Фаза 7: разгрузка перегруженных сюжетов (Б34) ------------------ */
   {
     /* Б34. Перетаскивание кривых мышью — главный интерактив калькулятора, и
