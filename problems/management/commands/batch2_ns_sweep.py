@@ -65,16 +65,18 @@ def _load_fund_rows(backup_path, pids):
     ctx = {}
     for i in range(0, len(pids), SQL_CHUNK):
         chunk = pids[i:i + SQL_CHUNK]
+        # Подставляется только "?,?,?" по числу элементов; значения идут
+        # отдельным аргументом execute() — см. batch2_full_sweep.py.
         qmarks = ",".join("?" * len(chunk))
         cur.execute(
             "SELECT id, statement, answer, solution FROM problems_problem "
-            "WHERE id IN ({})".format(qmarks), chunk)
+            "WHERE id IN ({})".format(qmarks), chunk)  # nosec B608
         for pid, stmt, ans, sol in cur.fetchall():
             ctx[pid] = {"statement": stmt or "", "answer": ans or "",
                         "solution": sol or "", "parts": []}
         cur.execute(
             "SELECT problem_id, label, statement, answer FROM problems_problempart "
-            "WHERE problem_id IN ({}) ORDER BY \"order\", label".format(qmarks),
+            "WHERE problem_id IN ({}) ORDER BY \"order\", label".format(qmarks),  # nosec B608
             chunk)
         for pid, label, stmt, ans in cur.fetchall():
             if pid in ctx:

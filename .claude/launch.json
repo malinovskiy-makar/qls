@@ -2,45 +2,11 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "qls",
-      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
-      "runtimeArgs": [
-        "manage.py",
-        "runserver",
-        "8123"
-      ],
+      "name": "errorcheck",
+      "runtimeExecutable": "venv313/Scripts/python.exe",
+      "runtimeArgs": ["manage.py", "runserver", "8123", "--insecure",
+                      "--noreload", "--settings=config.settings_errorcheck"],
       "port": 8123
-    },
-    {
-      "name": "qls-stats",
-      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
-      "runtimeArgs": [
-        "manage.py",
-        "runserver",
-        "8127"
-      ],
-      "port": 8127
-    },
-    {
-      "name": "qls-s3",
-      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
-      "runtimeArgs": [
-        "manage.py",
-        "runserver",
-        "8131"
-      ],
-      "port": 8131
-    },
-    {
-      "name": "qls-look",
-      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
-      "runtimeArgs": [
-        "manage.py",
-        "runserver",
-        "8401",
-        "--settings=config.settings_check"
-      ],
-      "port": 8401
     }
   ]
 }

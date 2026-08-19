@@ -246,7 +246,11 @@ class Command(BaseCommand):
         self.stdout.write(f'Записываем {len(rows)} связей...')
         with transaction.atomic():
             with connection.cursor() as cur:
-                cur.execute(f'DELETE FROM {through._meta.db_table}')
+                # Имя таблицы берётся из метаданных модели Django
+                # (through._meta.db_table), а не из ввода: это константа,
+                # заданная в models.py. Параметром имя таблицы передать
+                # нельзя — драйвер подставляет только значения.
+                cur.execute(f'DELETE FROM {through._meta.db_table}')  # nosec B608
             through.objects.bulk_create(rows, batch_size=10000)
 
         self.stdout.write(self.style.SUCCESS(

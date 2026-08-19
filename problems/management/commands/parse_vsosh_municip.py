@@ -1103,10 +1103,33 @@ W = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
 M_NS = '{http://schemas.openxmlformats.org/officeDocument/2006/math}'
 
 
+def _xml_from_docx(data: bytes):
+    """Разобрать XML из .docx, не раскрывая сущности.
+
+    Что проверено на Python 3.13 (тест `problems/tests/test_xml_entities.py`):
+
+    * ВНЕШНЮЮ сущность (`file:///...`) стандартный ElementTree не тянет
+      вовсе — падает с «undefined entity». Чтения чужих файлов и обращений
+      в сеть через .docx не бывает;
+    * а вот ВНУТРЕННИЕ сущности он раскрывает, и «бомба» из девяти
+      вложенных объявлений раздувается без ограничений. Это отказ в
+      обслуживании: разбор одного файла съедает память машины.
+
+    Лечится дёшево и без новой зависимости: в OOXML объявления DTD не
+    бывают вовсе — Word их не пишет. Значит, файл с `<!DOCTYPE` либо
+    подделан, либо повреждён, и разбирать его не надо.
+    """
+    if b'<!DOCTYPE' in data:
+        raise ValueError(
+            'в XML из .docx объявлен DOCTYPE — так Word не пишет; '
+            'файл не разбираем')
+    return ET.fromstring(data)  # nosec B314 — сущности отсечены проверкой выше
+
+
 def _docx_numfmt_map(z):
     """numId → numFmt нулевого уровня (из numbering.xml)."""
     try:
-        root = ET.fromstring(z.read('word/numbering.xml'))
+        root = _xml_from_docx(z.read('word/numbering.xml'))
     except KeyError:
         return {}
     abstract = {}
@@ -1164,7 +1187,7 @@ def parse_docx_2019(path, grades, group, fname):
     """DOCX «критерии» 2019 → (questions, unparsed)."""
     z = zipfile.ZipFile(str(path))
     numfmt = _docx_numfmt_map(z)
-    root = ET.fromstring(z.read('word/document.xml'))
+    root = _xml_from_docx(z.read('word/document.xml'))
     body = root.find(W + 'body')
 
     # элементы тела по порядку: абзацы и таблицы

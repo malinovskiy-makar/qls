@@ -513,7 +513,7 @@ def file_input_name(item):
 def item_answer_form(item):
     """(вид ввода, варианты) для позиции.
 
-    Варианты — список словарей `{'value', 'label', 'is_html'}`. `value` это
+    Варианты — список словарей `{'value', 'label'}`. `value` это
     то, что уедет в `Submission.submitted_answer`: у каталожного теста —
     метка подпункта («а»), у своей задачи — id варианта. Так автопроверка
     в обоих случаях сравнивает ровно то, что хранит.
@@ -524,7 +524,7 @@ def item_answer_form(item):
             return ANSWER_TEXT, []
         kind = (ANSWER_CHECKBOX
                 if problem.kind == problem.Kind.MULTIPLE else ANSWER_RADIO)
-        options = [{'value': str(o.pk), 'label': o.text, 'is_html': False}
+        options = [{'value': str(o.pk), 'label': o.text}
                    for o in problem.options.all()]
         return kind, options
 
@@ -536,7 +536,12 @@ def item_answer_form(item):
     if not ptype.startswith('тест') or not parts:
         return ANSWER_TEXT, []
 
-    options = [{'value': p.label, 'label': p.statement, 'is_html': True,
+    # ⚠️ Флага `is_html` здесь БОЛЬШЕ НЕТ (сессия 3Б, фаза 2). Он стоял в
+    # True у текста подпункта каталожной задачи, и шаблоны из-за него
+    # выводили корпусный текст через `|safe`. Тот же текст на публичной
+    # странице каталога всегда рисовался экранированным — значит, сырой
+    # HTML корпусу не нужен, а флаг лишь открывал дорогу нагрузке.
+    options = [{'value': p.label, 'label': p.statement,
                 'part_label': p.label}
                for p in parts]
     # ⚠️ ГАЛОЧКИ ТОЛЬКО У «ВСЕХ ВЕРНЫХ». «Верно/неверно» раньше тоже рисовался
@@ -621,7 +626,6 @@ def option_review(item, submission):
         rows.append({
             'label': option.get('part_label') or '',
             'text': option['label'],
-            'is_html': option.get('is_html', False),
             'chosen': is_chosen,
             'correct': is_correct,
             'state': state,

@@ -33,7 +33,7 @@
 
   <div class="problem-card-body">
     {% if row.statement %}
-    <div class="problem-statement">{{ row.statement|safe }}</div>
+    <div class="problem-statement">{{ row.statement }}</div>
     {% endif %}
 
     {% comment %}
@@ -47,7 +47,7 @@
       {% for part in row.parts %}
       <div class="part-item">
         <span class="part-label">{{ part.label|partlabel }}</span>
-        <span>{{ part.statement|safe }}</span>
+        <span>{{ part.statement }}</span>
       </div>
       {% endfor %}
     </div>
@@ -89,7 +89,7 @@
                 <input type="{{ row.answer_kind }}" name="{{ row.answer_name }}"
                        value="{{ option.value }}"
                        {% if option.value in row.selected %}checked{% endif %}>
-                <span>{% if option.part_label %}<b>{{ option.part_label|partlabel }}</b> {% endif %}{% if option.is_html %}{{ option.label|safe }}{% else %}{{ option.label }}{% endif %}</span>
+                <span>{% if option.part_label %}<b>{{ option.part_label|partlabel }}</b> {% endif %}{{ option.label }}</span>
               </label>
             </li>
             {% endfor %}
@@ -109,7 +109,7 @@
             {% if part.part %}
             <div class="part-answer-q">
               <span class="part-label">{{ part.label|partlabel }}</span>
-              <span>{{ part.statement|safe }}</span>
+              <span>{{ part.statement }}</span>
             </div>
             {% endif %}
             <input type="text" class="answer-short" id="{{ part.name }}"

@@ -306,14 +306,14 @@
   </summary>
 
   <div class="wr-body">
-    <div class="problem-statement">{{ row.statement|safe }}</div>
+    <div class="problem-statement">{{ row.statement }}</div>
 
     {% if row.parts and not row.answer_parts %}
     <div class="problem-parts">
       {% for part in row.parts %}
       <div class="part-item">
         <span class="part-label">{{ part.label|partlabel }}</span>
-        <span>{{ part.statement|safe }}</span>
+        <span>{{ part.statement }}</span>
       </div>
       {% endfor %}
     </div>

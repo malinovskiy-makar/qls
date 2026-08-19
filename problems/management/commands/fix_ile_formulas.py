@@ -719,14 +719,17 @@ def _load_backup(sid):
                  'SELECT p.id, p.statement, p.solution, p.answer '
                  'FROM problems_problem p '
                  'JOIN problems_sourcereference sr ON sr.problem_id = p.id '
-                 f'WHERE sr.source_id = {int(sid)}')}
+                 # int() гарантирует, что в строку попадёт только число:
+                 # ничего, кроме цифр и минуса, из него не выйдет.
+                 f'WHERE sr.source_id = {int(sid)}')}  # nosec B608
     parts = {r[0]: {'statement': r[1] or '', 'answer': r[2] or '',
                     'solution': r[3] or ''}
              for r in con.execute(
                  'SELECT pp.id, pp.statement, pp.answer, pp.solution '
                  'FROM problems_problempart pp '
                  'JOIN problems_sourcereference sr ON sr.problem_id = pp.problem_id '
-                 f'WHERE sr.source_id = {int(sid)}')}
+                 # то же: int() не пропустит ничего, кроме числа.
+                 f'WHERE sr.source_id = {int(sid)}')}  # nosec B608
     con.close()
     return probs, parts
 

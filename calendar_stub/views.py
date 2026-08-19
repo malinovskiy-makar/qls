@@ -8,10 +8,11 @@ import json
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
+from problems.jsonsafe import dumps_for_script
 from problems.models import (
     Assignment, CalendarEvent, StudentGroup, Submission,
 )
@@ -169,6 +170,39 @@ def _own_assignment(user, assignment_id):
     return assignments.filter(pk=assignment_id).first()
 
 
+def _own_event(user, pk):
+    """Событие, которое этот пользователь вправе ПРАВИТЬ. Или None.
+
+    ⚠️ ЗАЧЕМ ЭТО ПОЯВИЛОСЬ (сессия 3Б, хвост сессии 3А). Правка и удаление
+    брали объект `get_object_or_404(CalendarEvent, pk=pk)` и только потом
+    смотрели на автора. Дыры не было — проверка по существу верная, — но
+    коды ответа рассказывали лишнее:
+
+        чужой существующий pk  -> 403 «Нет прав»
+        несуществующий pk      -> 404
+
+    То есть перебором номеров можно было составить список существующих
+    событий, не имея к ним доступа. Сужение делает оба случая
+    неотличимыми: для этого человека такого события просто нет.
+
+    Сужаем queryset, а не проверяем после загрузки: забытая проверка —
+    дыра, забытое сужение — пустая выдача.
+    """
+    events = CalendarEvent.objects.all()
+    if not user.is_superuser:
+        events = events.filter(author=user)
+    return events.filter(pk=pk).first()
+
+
+def _not_found():
+    """Один и тот же отказ на «нет такого» и «не ваше».
+
+    Ответ остаётся JSON: экран календаря разбирает тело (`d.status`), а не
+    код ответа, и страница Django «не найдено» сломала бы ему разбор.
+    """
+    return JsonResponse({'error': 'Событие не найдено'}, status=404)
+
+
 def _set_groups(event, group_ids, user, is_global):
     """Устанавливает группы события с проверкой прав."""
     if is_global:
@@ -213,8 +247,13 @@ def calendar_view(request):
 
     return render(request, 'calendar_stub/calendar.html', {
         'user_role': 'admin' if user.is_superuser else role,
-        'groups_json': json.dumps(groups, ensure_ascii=False),
-        'assignments_json': json.dumps(assignments, ensure_ascii=False),
+        # ⚠️ НЕ `json.dumps`. Названия занятий и работ печатает репетитор, а
+        # уезжают они прямо внутрь тега <script>. `json.dumps` оставляет `<`
+        # как есть, поэтому занятие с названием `</script><img ...>` закрывало
+        # наш скрипт и открывало свой. `dumps_for_script` экранирует `<`, `>`
+        # и `&` — как штатный `json_script` Django.
+        'groups_json': dumps_for_script(groups),
+        'assignments_json': dumps_for_script(assignments),
     })
 
 
@@ -340,9 +379,12 @@ def event_create(request):
 @login_required(login_url='/login/')
 def event_detail(request, pk):
     """GET /calendar/api/events/<pk>/"""
-    event = get_object_or_404(CalendarEvent, pk=pk)
-    if not _visible_qs(request.user).filter(pk=pk).exists():
-        return JsonResponse({'error': 'Нет доступа'}, status=403)
+    # Сначала сузить до видимого, потом взять. Порядок важен: обратный
+    # отвечал 403 на чужое существующее событие и 404 на несуществующее,
+    # и разница между ответами сама была ответом.
+    event = _visible_qs(request.user).filter(pk=pk).first()
+    if event is None:
+        return _not_found()
     return JsonResponse(_format_event(event, request.user))
 
 
@@ -351,10 +393,9 @@ def event_detail(request, pk):
 def event_update(request, pk):
     """POST /calendar/api/events/<pk>/update/"""
     user  = request.user
-    event = get_object_or_404(CalendarEvent, pk=pk)
-
-    if not (user.is_superuser or event.author_id == user.pk):
-        return JsonResponse({'error': 'Нет прав'}, status=403)
+    event = _own_event(user, pk)
+    if event is None:
+        return _not_found()
 
     try:
         data = json.loads(request.body)
@@ -409,10 +450,9 @@ def event_update(request, pk):
 def event_delete(request, pk):
     """POST /calendar/api/events/<pk>/delete/"""
     user  = request.user
-    event = get_object_or_404(CalendarEvent, pk=pk)
-
-    if not (user.is_superuser or event.author_id == user.pk):
-        return JsonResponse({'error': 'Нет прав'}, status=403)
+    event = _own_event(user, pk)
+    if event is None:
+        return _not_found()
 
     try:
         data = json.loads(request.body)

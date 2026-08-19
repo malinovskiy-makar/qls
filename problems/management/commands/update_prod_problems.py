@@ -173,11 +173,11 @@ class Command(BaseCommand):
             max_id = cur.fetchone()[0]
             # seqname получен от самой БД (например public.problems_problempart_id_seq),
             # не пользовательский ввод — интерполяция в FROM безопасна.
-            cur.execute('SELECT last_value, is_called FROM %s' % seqname)
+            cur.execute('SELECT last_value, is_called FROM %s' % seqname)  # nosec B608
             before = cur.fetchone()
             # setval(seq, max_id, true) → следующий nextval() вернёт max_id + 1
             cur.execute('SELECT setval(%s, %s, true)', [seqname, max_id])
-            cur.execute('SELECT last_value, is_called FROM %s' % seqname)
+            cur.execute('SELECT last_value, is_called FROM %s' % seqname)  # nosec B608
             after = cur.fetchone()
         self.stdout.write(
             f'  sequence {seqname}: было {before}, max(id)={max_id}, '

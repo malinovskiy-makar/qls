@@ -23,6 +23,13 @@
   padding: 10px 0; border-bottom: 0.5px solid var(--border); font-size: 13px;
 }
 .saved-item:last-child { border-bottom: none; }
+.saved-link { color: var(--accent); text-decoration: none; }
+.saved-link:hover { text-decoration: underline; }
+/* Пометка снятой с витрины задачи: приглушённая, это не ошибка ученика. */
+.saved-off {
+  font-size: 11px; padding: 2px 7px; border-radius: 999px;
+  background: var(--line); color: var(--text2); white-space: nowrap;
+}
 .saved-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .saved-actions select { font: inherit; font-size: 12px; padding: 4px 8px;
   border-radius: var(--r); border: 0.5px solid var(--border);
@@ -138,8 +145,25 @@
     <div class="saved-item" data-id="{{ item.pk }}"
          data-kind="{% if subtab == 'graphs' %}graph{% else %}problem{% endif %}">
       <span>
-        {% if subtab == 'graphs' %}{{ item.name }}
-        {% else %}{{ item.problem_title|truncatechars:70 }}{% endif %}
+        {% if subtab == 'graphs' %}
+          {{ item.name }}
+        {% elif item.is_public %}
+          {# Задача открыта — ведём на её страницу. #}
+          <a href="{% url 'catalog:problem_detail' item.catalog_problem_id %}"
+             class="saved-link">{{ item.problem_title|truncatechars:70 }}</a>
+        {% else %}
+          {% comment %}
+          ⚠️ Ссылки НЕТ намеренно: страница задачи для ученика закрыта шлюзом
+          качества. Пометка объясняет, почему по этой строке некуда нажать, —
+          иначе исчезнувшая ссылка выглядит поломкой.
+
+          ⚠️ Через {% templatetag openblock %} comment {% templatetag closeblock %},
+          а не многострочным {# #}: второй печатается на экран как текст —
+          правило проекта, держится тестом test_template_hygiene.
+          {% endcomment %}
+          {{ item.problem_title|truncatechars:70 }}
+          <span class="saved-off">снята с публикации</span>
+        {% endif %}
         {% if item.note %}<span class="row-meta"> — {{ item.note }}</span>{% endif %}
       </span>
       <span class="saved-actions">

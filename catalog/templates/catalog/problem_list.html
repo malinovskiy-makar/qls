@@ -929,42 +929,81 @@ function openCatalogModal(pid, e) {
     });
 }
 
+// ⚠️ ОКНО СОБИРАЕТСЯ УЗЛАМИ, А НЕ СТРОКОЙ HTML, И ЭТО НЕ СТИЛЬ.
+//
+// Раньше условие подставлялось в шаблонную строку разметки, и готовая
+// строка уезжала в innerHTML. Условие приходит из JSON каталога, то есть
+// прямо из банка: 31 690 задач приехали из внешних источников. Задача с
+// текстом-нагрузкой (битая картинка с обработчиком onerror) выполняла бы
+// чужой код в браузере
+// КАЖДОГО посетителя каталога — вход для этого не нужен, страница публичная.
+//
+// `textContent` кладёт строку как текст: браузер не разбирает её как
+// разметку. KaTeX это не мешает — он и так ходит по текстовым узлам, ровно
+// как на серверной странице задачи, где условие всегда выводилось
+// экранированным.
+//
+// Единственные строки, которые здесь по-прежнему становятся разметкой, —
+// наши собственные («решение ✓», скобка после метки пункта). Всё, что
+// пришло из данных, идёт через textContent.
+function chip(text, extraClass) {
+  const el = document.createElement('span');
+  el.className = 'c-modal-tag' + (extraClass ? ' ' + extraClass : '');
+  el.textContent = text;
+  return el;
+}
+
 function renderCatalogModal(data) {
   document.getElementById('c-modal-title').textContent = data.title;
   document.getElementById('c-modal-link').href = '/catalog/problem/' + data.id + '/';
 
-  let metaHtml = '';
+  const meta = document.getElementById('c-modal-meta');
+  meta.textContent = '';
   if (data.difficulty_str) {
-    metaHtml += `<span style="font-size:13px;color:var(--amber);">${data.difficulty_str}</span>`;
+    const d = document.createElement('span');
+    d.style.cssText = 'font-size:13px;color:var(--amber);';
+    d.textContent = data.difficulty_str;
+    meta.appendChild(d);
   }
-  data.topics.forEach(t => {
-    metaHtml += `<span class="c-modal-tag">${t}</span>`;
-  });
-  if (data.problem_type) {
-    metaHtml += `<span class="c-modal-tag">${data.problem_type}</span>`;
-  }
-  if (data.has_solution) {
-    metaHtml += `<span class="c-modal-tag sol">решение ✓</span>`;
-  }
-  document.getElementById('c-modal-meta').innerHTML = metaHtml;
+  (data.topics || []).forEach(t => meta.appendChild(chip(t)));
+  if (data.problem_type) { meta.appendChild(chip(data.problem_type)); }
+  if (data.has_solution) { meta.appendChild(chip('решение ✓', 'sol')); }
 
   if (data.sources && data.sources.length) {
     document.getElementById('c-modal-source').textContent = data.sources.join(', ');
   }
 
-  let bodyHtml = `<div>${data.statement}</div>`;
+  const body = document.getElementById('c-modal-body');
+  body.textContent = '';
+  const stmt = document.createElement('div');
+  stmt.textContent = data.statement || '';
+  body.appendChild(stmt);
+
   if (data.parts && data.parts.length) {
     data.parts.forEach(part => {
-      const pts = part.points
-        ? ` <span style="color:var(--text2);font-size:12px;">(${part.points} б.)</span>`
-        : '';
-      bodyHtml += `<div class="c-modal-part">
-        <div class="c-modal-part-label">${part.label ? part.label.replace(/[).．。\s]+$/,'')+')' : ''}${pts}</div>
-        <div>${part.text || ''}</div>
-      </div>`;
+      const wrap = document.createElement('div');
+      wrap.className = 'c-modal-part';
+
+      const label = document.createElement('div');
+      label.className = 'c-modal-part-label';
+      if (part.label) {
+        label.textContent = String(part.label).replace(/[).．。\s]+$/, '') + ')';
+      }
+      if (part.points) {
+        const pts = document.createElement('span');
+        pts.style.cssText = 'color:var(--text2);font-size:12px;';
+        pts.textContent = ' (' + part.points + ' б.)';
+        label.appendChild(pts);
+      }
+      wrap.appendChild(label);
+
+      const text = document.createElement('div');
+      text.textContent = part.text || '';
+      wrap.appendChild(text);
+
+      body.appendChild(wrap);
     });
   }
-  document.getElementById('c-modal-body').innerHTML = bodyHtml;
 
   maskEscapedDollars(document.getElementById('c-modal-body'));
   if (typeof renderMathInElement !== 'undefined') {
@@ -975,7 +1014,8 @@ function renderCatalogModal(data) {
         { left: '\\[', right: '\\]', display: true  },
         { left: '\\(', right: '\\)', display: false }
       ],
-      throwOnError: false
+      throwOnError: false,
+      trust: false
     });
   }
   // Чистка эскейпов — всегда, даже если CDN KaTeX не загрузился
@@ -1018,24 +1058,31 @@ function toggleHwDropdown(pid, e) {
   const dd = document.getElementById('hw-dd-' + pid);
   if (!dd) return;
 
-  // Наполняем dropdown
-  if (TEACHER_ASSIGNMENTS.length === 0) {
-    dd.innerHTML = `
-      <div class="ca-dd-head">Добавить в:</div>
-      <a class="ca-dd-item new-hw" href="/teacher/assignment/create/?preselect=${pid}"
-         onclick="event.stopPropagation()">+ Новая домашка</a>`;
-  } else {
-    const items = TEACHER_ASSIGNMENTS.map(a =>
-      `<button class="ca-dd-item" onclick="addToAssignment(${a.id}, ${pid}, this); event.stopPropagation();">
-        ${a.name}
-      </button>`
-    ).join('');
-    dd.innerHTML = `
-      <div class="ca-dd-head">Добавить в:</div>
-      ${items}
-      <a class="ca-dd-item new-hw" href="/teacher/assignment/create/?preselect=${pid}"
-         onclick="event.stopPropagation()">+ Новая домашка</a>`;
-  }
+  // ⚠️ Собираем узлами: название работы печатает человек, и через
+  // innerHTML оно становилось разметкой.
+  dd.textContent = '';
+  const head = document.createElement('div');
+  head.className = 'ca-dd-head';
+  head.textContent = 'Добавить в:';
+  dd.appendChild(head);
+
+  TEACHER_ASSIGNMENTS.forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'ca-dd-item';
+    btn.textContent = a.name;
+    btn.addEventListener('click', ev => {
+      addToAssignment(a.id, pid, btn);
+      ev.stopPropagation();
+    });
+    dd.appendChild(btn);
+  });
+
+  const link = document.createElement('a');
+  link.className = 'ca-dd-item new-hw';
+  link.href = '/teacher/assignment/create/?preselect=' + pid;
+  link.textContent = '+ Новая домашка';
+  link.addEventListener('click', ev => ev.stopPropagation());
+  dd.appendChild(link);
 
   dd.classList.add('open');
   openDropdownPid = pid;

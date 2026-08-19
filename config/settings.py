@@ -64,6 +64,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Permissions-Policy и CSP в режиме отчёта — своими настройками Django
+    # их не задаёт. Подробности и обоснование — в config/security_headers.py.
+    'config.security_headers.SecurityHeadersMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -128,7 +131,13 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
     },
     {
+        # ⚠️ 10, а не восемь по умолчанию. Восьмизначный пароль современная
+        # видеокарта перебирает быстрее, чем человек его придумывает; десять
+        # — уже заметная разница, а неудобство для человека почти то же.
+        # Проверяется формами Django (смена пароля); `create_user` в коде и
+        # в тестах валидаторы не вызывает, поэтому фикстуры не ломаются.
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {'min_length': 10},
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -180,3 +189,74 @@ LOGOUT_REDIRECT_URL = '/login/'
 # На проде выключено в settings_production.py, пока преподаватель не проверил
 # превью и не принял решение о выкатке.
 GAME_GENERATED_ENABLED = True
+
+
+# ─── Кэш: счётчики ограничения частоты ───────────────────────────────────
+#
+# ⚠️ СЕГОДНЯ ЭТО ПАМЯТЬ ПРОЦЕССА, И ЭТО НАДО ЗНАТЬ ЧЕСТНО. `LocMemCache`
+# живёт внутри одного процесса: счётчик неудачных входов не переживает
+# перезапуск, а при нескольких воркерах у каждого он свой. На бесплатном
+# хостинге процесс один, поэтому ограничение работает; после переезда
+# Redis подключается сменой ЭТОГО словаря — код в `problems/ratelimit.py`
+# знает только `django.core.cache.cache` и правки не потребует.
+#
+# Имя `LOCATION` задано явно: без него два разных места кода могут получить
+# разные экземпляры кэша и не увидеть счётчиков друг друга.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'qls-default',
+    },
+}
+
+
+# ─── Журналы ─────────────────────────────────────────────────────────────
+#
+# ⚠️ ЗАЧЕМ ЭТО ВООБЩЕ ПОЯВИЛОСЬ. Своей настройки `LOGGING` в проекте не было,
+# и работала настройка Django по умолчанию. В ней у консольного обработчика
+# стоит фильтр `require_debug_true` — то есть на проде (`DEBUG=False`) записи
+# приложения в консоль НЕ шли вовсе. Записи вроде «поставщик модели отказал»
+# доезжали до stderr только запасным обработчиком Python и только начиная с
+# уровня WARNING, а всё, что ниже, пропадало молча.
+#
+# ⚠️ ЧЕГО ЗДЕСЬ НЕТ И НЕ БУДЕТ. В журнал запрещено писать пароли, куки,
+# CSRF-токены, токены приглашений и публичные токены подборок, полные
+# запросы к модели и решения учеников, адрес почты в составе URL, содержимое
+# загруженных файлов. Список и причины — в docs/SECURITY.md, раздел
+# «Что попадает в журналы».
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'plain': {
+            'format': '{levelname} {asctime} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'plain',
+        },
+    },
+    'loggers': {
+        # Свой код проекта. INFO — чтобы «что произошло» было видно, но
+        # без потока отладки.
+        'problems': {'handlers': ['console'], 'level': 'INFO'},
+        'catalog': {'handlers': ['console'], 'level': 'INFO'},
+        'teacher': {'handlers': ['console'], 'level': 'INFO'},
+        'student': {'handlers': ['console'], 'level': 'INFO'},
+        'game': {'handlers': ['console'], 'level': 'INFO'},
+        'calendar_stub': {'handlers': ['console'], 'level': 'INFO'},
+        'security': {'handlers': ['console'], 'level': 'INFO'},
+        # ⚠️ `django.request` пишет трассировку пятисоток. Она нужна, и она
+        # обязана быть ЗДЕСЬ, а не на экране: наружу уходит страница 500 без
+        # единого технического слова (templates/500.html).
+        'django.request': {'handlers': ['console'], 'level': 'ERROR',
+                           'propagate': False},
+        # А вот сам django.security шумит на каждую подделку хоста — оставляем
+        # предупреждениями, иначе сканеры забьют журнал.
+        'django.security': {'handlers': ['console'], 'level': 'WARNING',
+                            'propagate': False},
+    },
+}

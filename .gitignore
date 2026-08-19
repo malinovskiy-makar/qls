@@ -35,9 +35,12 @@ local_settings.py
 reports/
 
 # Node.js (Playwright)
+# ⚠️ node_modules/ игнорируется, а package.json и package-lock.json — НЕТ,
+# и это принципиально. CI ставит зависимости через `npm ci`, а он без лока
+# не работает вовсе. Лок ещё и фиксирует точную версию playwright: библиотека
+# и скачанный браузер обязаны совпадать, иначе браузерные проверки ломаются
+# по причине, которой нет в диффе.
 node_modules/
-package-lock.json
-package.json
 
 # macOS
 .DS_Store
