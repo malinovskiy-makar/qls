@@ -33,6 +33,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST, require_safe
 
+from problems.jsonsafe import dumps_for_script
 from problems.management.commands.apply_topic_mapping import CANONICAL
 from .models import GameQuestion, GameResult, make_result_code
 from . import config
@@ -116,7 +117,9 @@ def game_page(request):
     return render(request, 'game/game.html', {
         'topics': topics,
         # JSON для JS-клиента: механика читается только из config.py
-        'config_json': json.dumps({
+        # Здесь лежат только константы из game/config.py, но правило
+        # одно на проект: JSON внутри <script> собирается помощником.
+        'config_json': dumps_for_script({
             'modes': {key: _mode_payload(key) for key in config.MODES},
             'default_mode': config.DEFAULT_MODE,
             'pool_counts': pool_counts,

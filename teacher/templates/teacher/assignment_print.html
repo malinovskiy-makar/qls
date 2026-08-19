@@ -294,7 +294,8 @@ function initKaTeX() {
       { left: '\\[', right: '\\]', display: true },
       { left: '\\(', right: '\\)', display: false }
     ],
-    throwOnError: false
+    throwOnError: false,
+    trust: false
   });
   fixCurrencyDollars(document.body);
 }

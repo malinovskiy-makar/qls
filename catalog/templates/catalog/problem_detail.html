@@ -349,7 +349,8 @@ function toggleReveal(id, btn) {
           { left: '\\[',  right: '\\]',  display: true  },
           { left: '\\(',  right: '\\)',  display: false }
         ],
-        throwOnError: false
+        throwOnError: false,
+        trust: false
       });
     }
     // Чистка эскейпов — всегда, даже если CDN KaTeX не загрузился

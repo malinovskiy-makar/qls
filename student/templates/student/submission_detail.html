@@ -81,14 +81,14 @@
 <div class="block-card">
   <div class="block-label">Условие</div>
   {% if problem.statement %}
-  <div class="problem-statement">{{ problem.statement|safe }}</div>
+  <div class="problem-statement">{{ problem.statement }}</div>
   {% endif %}
   {% if problem.parts.all %}
   <div style="margin-top:12px;">
     {% for part in problem.parts.all %}
     <div class="part-item">
       <span class="part-label">{{ part.label|partlabel }}</span>
-      <span>{{ part.statement|safe }}</span>
+      <span>{{ part.statement }}</span>
     </div>
     {% endfor %}
   </div>

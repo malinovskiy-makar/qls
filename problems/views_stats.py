@@ -19,6 +19,8 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from problems.jsonsafe import dumps_for_script
+
 from . import stats as stats_module
 
 
@@ -128,7 +130,7 @@ def _student_payload(user, period):
         'records': _records(PersonalRecord.objects.filter(user=user)),
         'mistakes': mistakes,
         'skills': skills,
-        'chart_json': json.dumps(_chart_payload(data), ensure_ascii=False),
+        'chart_json': dumps_for_script(_chart_payload(data)),
         'mastery_labels': MASTERY_LABELS,
     }
 

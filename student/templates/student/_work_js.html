@@ -27,7 +27,8 @@ function showHint(itemPk) {
         { left: '$', right: '$', display: false },
         { left: '\\[', right: '\\]', display: true },
         { left: '\\(', right: '\\)', display: false }
-      ], throwOnError: false
+      ], throwOnError: false,
+      trust: false
     });
   }
   if (typeof fixCurrencyDollars === 'function') { fixCurrencyDollars(box); }

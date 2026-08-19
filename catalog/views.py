@@ -8,6 +8,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from problems.jsonsafe import dumps_for_script
 from problems.models import Collection, Problem, Source, Topic
 from problems.management.commands.apply_topic_mapping import CANONICAL
 
@@ -180,7 +181,9 @@ def problem_list(request):
         ).filter(
             Q(deadline__isnull=True) | Q(deadline__gte=timezone.now())
         ).order_by('-id')[:50]
-        teacher_assignments_json = json.dumps([
+        # Названия работ печатает репетитор, а уезжают они в <script>:
+        # экранируем `<`, `>`, `&` (см. problems/jsonsafe.py).
+        teacher_assignments_json = dumps_for_script([
             {'id': a.pk, 'name': a.name}
             for a in active_qs
         ])

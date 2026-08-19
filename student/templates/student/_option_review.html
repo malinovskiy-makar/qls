@@ -19,7 +19,7 @@
     </span>
     <span class="opt-body">
       {% if opt.label %}<b class="opt-label">{{ opt.label }})</b> {% endif %}
-      {% if opt.is_html %}{{ opt.text|safe }}{% else %}{{ opt.text }}{% endif %}
+      {{ opt.text }}
     </span>
     <span class="opt-note">
       {% if opt.state == 'hit' %}вы выбрали · верно
