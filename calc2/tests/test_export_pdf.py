@@ -16,6 +16,8 @@ pdflatex считает CR и LF за два перевода строки — �
 Второй тест пропускается там, где pdflatex не установлен (Render free), и
 пропуск печатается ГРОМКО: молчаливый skip выглядит как «всё хорошо».
 """
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase, tag
 from django.urls import reverse
@@ -117,12 +119,40 @@ class ExportPdfEndpointTests(TestCase):
         self.client.logout()
         self.assertNotEqual(self.client.post(self.url, {"tex": MINIMAL_TEX}).status_code, 200)
 
-    def test_empty_tex_rejected(self):
-        self.assertEqual(self.client.post(self.url, {"tex": "   "}).status_code, 400)
+    # Валидация присланного .tex обязана отвечать по существу (400) независимо
+    # от того, есть ли на сервере pdflatex — раньше проверка доступности
+    # компилятора шла ПЕРВОЙ, и на раннере CI (без pdflatex) любой запрос,
+    # даже с мусором вместо .tex, получал 503 вместо 400. Здесь доступность
+    # компилятора подменяется явно (patch), а не спрашивается у системы, чтобы
+    # тест проверял одно и то же на любой машине.
 
-    def test_forbidden_command_rejected(self):
+    def test_empty_tex_rejected_with_pdflatex(self):
+        with patch("calc2.views.pdflatex_available", return_value=True):
+            resp = self.client.post(self.url, {"tex": "   "})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_empty_tex_rejected_without_pdflatex(self):
+        with patch("calc2.views.pdflatex_available", return_value=False):
+            resp = self.client.post(self.url, {"tex": "   "})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_forbidden_command_rejected_with_pdflatex(self):
         bad = MINIMAL_TEX.replace(r"\begin{document}", "\\input{/etc/passwd}\n\\begin{document}")
-        self.assertEqual(self.client.post(self.url, {"tex": bad}).status_code, 400)
+        with patch("calc2.views.pdflatex_available", return_value=True):
+            resp = self.client.post(self.url, {"tex": bad})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_forbidden_command_rejected_without_pdflatex(self):
+        bad = MINIMAL_TEX.replace(r"\begin{document}", "\\input{/etc/passwd}\n\\begin{document}")
+        with patch("calc2.views.pdflatex_available", return_value=False):
+            resp = self.client.post(self.url, {"tex": bad})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_valid_tex_returns_503_without_pdflatex(self):
+        """Валидный .tex без pdflatex — честная деградация (503), не падение."""
+        with patch("calc2.views.pdflatex_available", return_value=False):
+            resp = self.client.post(self.url, {"tex": MINIMAL_TEX})
+        self.assertEqual(resp.status_code, 503)
 
     def test_pdf_is_built(self):
         """Главный тест: документ формы buildTex собирается в PDF."""
