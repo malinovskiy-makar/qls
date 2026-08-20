@@ -28,7 +28,7 @@ function addCurve(expr, form) {
     curveCounter++;
     STATE.curves.push({
       id: curveCounter, expr, compiled: null,
-      color: nextColor(), name: expr, role: null, visible: true,
+      color: nextColor(), role: null, visible: true,
       linear: built.linear, fn: built.fn,
       srcForm: 'QP', srcExpr: expr, srcCompiled: built.srcCompiled, srcLinear: built.srcLinear,
     });
@@ -42,7 +42,7 @@ function addCurve(expr, form) {
   curveCounter++;
   STATE.curves.push({
     id: curveCounter, expr, compiled,
-    color: nextColor(), name: expr, role: null, visible: true,
+    color: nextColor(), role: null, visible: true,
     linear: detectLinear(compiled),   // {a, b} для прямых, иначе null
     srcForm: 'PQ',
   });
@@ -71,13 +71,6 @@ function updateCurveExpr(curve, expr) {
     curve.linear = detectLinear(compiled);
     curve.fn = null;   // синтетическая функция (S + t и т.п.) больше не действует
   }
-  if (!curve.label) curve.name = expr;   // родовое имя идёт за формулой
-  /* Формулу правил человек, а не сцена. Это и есть признак, по которому
-     кривая перестаёт тянуться мышью (см. curveDraggable): обычная функция
-     вида «x» не подразумевает изменения себя на графике — двигать там нечего,
-     кривая целиком задана записью. Обоих вызывающих у этой функции ровно
-     двое, и оба — поля формул в панели. */
-  curve.handTyped = true;
   return null;
 }
 
@@ -134,7 +127,7 @@ function renderCurveList() {
 
     const nm = document.createElement('span');
     nm.className = 'curve-name'; nm.textContent = curveShortName(curve);
-    nm.title = curve.name || curve.expr || '';
+    nm.title = curve.expr || '';        // под именем — сама формула
     if (!curve.visible) nm.style.opacity = '.4';
 
     // Бейдж формы записи (Фаза 1б): видно, что кривая введена как «объём от цены».

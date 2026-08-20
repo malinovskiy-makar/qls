@@ -100,6 +100,7 @@ const SHOT = () => {
       if (!aim) { rec.moved.push({ name: b.name, skip: 'полоса ничем не ловится' }); continue; }
 
       const before = await page.evaluate(SHOT);
+      const armedBefore = await page.evaluate(() => STATE.armedCurve || null);
       await page.mouse.move(aim.x, aim.y);
       await page.mouse.down();
       await page.mouse.move(aim.x, aim.y + 40, { steps: 6 });
@@ -107,8 +108,15 @@ const SHOT = () => {
       await page.mouse.up();
       await page.waitForTimeout(400);
       const after = await page.evaluate(SHOT);
+      const armedAfter = await page.evaluate(() => STATE.armedCurve || null);
+      /* ⚠️ «КАРТИНКА ИЗМЕНИЛАСЬ» И «КРИВУЮ УТАЩИЛИ» — РАЗНОЕ. Протягивание по
+         полосе кончается щелчком, а щелчок по полосе ВЗВОДИТ кривую (п. 21):
+         загораются её ключевые точки, и отпечаток холста честно меняется, хотя
+         сама кривая стоит там же. Пока это было одним признаком, каждая новая
+         полоса захвата выглядела как вернувшееся перетаскивание. */
       rec.moved.push({ name: b.name, cursor: b.cursor,
                        curveMoved: before.curves !== after.curves,
+                       armedNow: armedAfter !== armedBefore ? (armedAfter || 'снято') : null,
                        formulaChanged: before.texts !== after.texts });
       if (before.curves !== after.curves) await openScene(page, key);   // вернуть сцену
     }

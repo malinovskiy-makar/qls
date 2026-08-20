@@ -365,7 +365,7 @@ function buildPultCurveChips(list) {
     chip.dataset.cid = c.id;
     // Подсказку вешаем на сам чип: подпись .pchip-label заменяет
     // upgradeRegulator строкой «имя = значение», и title на ней пропал бы.
-    chip.title = 'Сдвиг кривой: ' + (c.name || c.expr || '');
+    chip.title = 'Сдвиг кривой ' + curveShortName(c) + ': ' + (c.expr || '');
 
     const sl = document.createElement('input');
     /* ⚠️ ОДНО ЗНАЧЕНИЕ — ОДИН ИСТОЧНИК (п. 3, канон 2.1).
@@ -1619,11 +1619,6 @@ function wireControls() {
   const submit = () => {
     const before = STATE.curves.length;
     addCurve(formula.value, STATE.curveForm);
-    // Эту формулу вписал человек — значит мышью она не тянется (фаза 4).
-    // Сцены зовут addCurve тем же путём, поэтому признак ставится ЗДЕСЬ,
-    // у поля ввода, а не внутри общей функции.
-    const added = STATE.curves[STATE.curves.length - 1];
-    if (added) added.handTyped = true;
     if (STATE.curves.length > before) {
       const sel = document.getElementById('new-role');
       const role = sel ? sel.value : '';
