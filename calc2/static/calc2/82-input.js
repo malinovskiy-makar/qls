@@ -29,8 +29,7 @@ function renderTex(el, expr) {
   if (!tex) { el.textContent = ''; el.classList.remove('has'); return; }
   el.classList.add('has');
   if (typeof katex === 'undefined') { el.textContent = expr; return; }
-  try { katex.render(tex, el, { throwOnError: false, displayMode: false }); }
-  catch (e) { el.textContent = expr; }
+  if (!katexInto(el, tex)) el.textContent = expr;
 }
 // То же, но на вход уже готовый LaTeX (кусочная функция собирается сразу в него).
 function renderTexRaw(el, tex) {
@@ -38,8 +37,7 @@ function renderTexRaw(el, tex) {
   if (!tex) { el.textContent = ''; el.classList.remove('has'); return; }
   el.classList.add('has');
   if (typeof katex === 'undefined') { el.textContent = tex; return; }
-  try { katex.render(tex, el, { throwOnError: false, displayMode: false }); }
-  catch (e) { el.textContent = tex; }
+  if (!katexInto(el, tex)) el.textContent = tex;
 }
 // KaTeX подгружается отложенно — когда доедет, перерисовываем то, что уже на экране.
 const _texPending = [];
@@ -338,6 +336,72 @@ const TEX_GREEK = { alpha: 'alpha', beta: 'beta', gamma: 'gamma', delta: 'delta'
   rho: 'rho', sigma: 'sigma', tau: 'tau', phi: 'phi', omega: 'omega',
   Delta: 'Delta', Sigma: 'Sigma', Omega: 'Omega' };
 
+/* П16. ОШИБКА СТОИТ У ТОГО ПОЛЯ, ГДЕ ВОЗНИКЛА, И НЕ СДВИГАЕТ МАКЕТ.
+
+   Канон 2.4: три носителя сразу — линия, цвет и фраза; фраза называет
+   ТРЕБОВАНИЕ, а не диагноз, и встаёт В ТУ ЖЕ СТРОКУ. Прежде красный текст про
+   пустое поле печатался в общий блок ошибок наверху панели: он относился к
+   одному полю, а стоял у другого, и появление фразы двигало вниз всё, что под
+   ней. Место под фразу занято ВСЕГДА (пустая строка той же высоты) — тот же
+   приём, что у кнопки возврата масштаба в подфазе 3b. */
+function fieldProblem(inp, msg) {
+  if (!inp) return;
+  /* ⚠️ МЕСТО ПОД СООБЩЕНИЕ ЛЕЖИТ ПОД ВСЕЙ СТРОКОЙ, А НЕ ВНУТРИ ПОЛЯ.
+
+     Замер: кнопка клавиатуры была 58,8 px при поле 40,8. Разница ровно в это
+     место — 16 px плюс 2 отступа. Причина: резерв клался в тот же блок, что и
+     поле, а строка выравнивает детей по высоте (`align-items: stretch`), и
+     кнопка честно повторяла высоту соседа вместе с невидимым резервом.
+
+     Сам резерв убирать нельзя: он держит вёрстку от прыжка, когда сообщение
+     появится. Поэтому он переезжает НАРУЖУ строки — под неё. На экране
+     сообщение остаётся там же, где было, а высоту строки больше не задаёт. */
+  const host = inp.closest('.f-wrap') || inp.closest('.f-slot, .field, .grow') || inp.parentElement;
+  if (!host) return;
+  let box = host._problem;
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'f-why';
+    box.setAttribute('role', 'status');
+    host.appendChild(box);
+    host._problem = box;
+  }
+  box.textContent = msg || '';
+  box.classList.toggle('is-bad', !!msg);
+  const slot = inp.closest('.f-slot') || inp;
+  slot.classList.toggle('is-bad', !!msg);
+  if (msg) inp.setAttribute('aria-invalid', 'true'); else inp.removeAttribute('aria-invalid');
+}
+
+/* П17 · П18. КОМАНДА, КОТОРУЮ РАЗБОР НЕ ЗНАЕТ, БОЛЬШЕ НЕ ПРЕВРАЩАЕТСЯ
+   В ПРОИЗВЕДЕНИЕ БУКВ.
+
+   Неизвестная команда прежде теряла обратный слэш, а текст оставался: `\pm`
+   становился `pm`, дальше раскрытие неявного умножения делало из него `p*m`,
+   и на экране молча появлялись два ползунка — `p` и `m`. Буква `p` в
+   экономике это цена, и такой ползунок дезориентирует полностью. То же
+   случалось с `\int` и с `\frac{d}{dx}`: последняя превращалась в
+   `d/(d*x)` и «считалась».
+
+   Обе клавиши с клавиатуры убраны (движок интегралов и производных по формуле
+   не считает — правило «либо считается, либо не предлагается»), но набрать
+   команду можно и руками, поэтому есть проверка. */
+const TEX_KNOWN = new Set([
+  'frac', 'dfrac', 'tfrac', 'sqrt', 'left', 'right', 'bigl', 'bigr',
+  'cdot', 'times', 'ast', 'div', 'le', 'leq', 'ge', 'geq', 'ne', 'neq',
+  'lt', 'gt', 'infty', 'placeholder', 'begin', 'end', 'text', 'mathrm',
+  'mathit', 'operatorname', 'exponentialE', 'imaginaryI', 'log',
+  'lbrace', 'rbrace', 'cases', 'nthRoot',
+].concat(TEX_FUNCS).concat(Object.keys(TEX_GREEK)));
+
+function unknownTexCommand(tex) {
+  const s = String(tex == null ? '' : tex);
+  const re = /\\([A-Za-z]+)/g;
+  let m;
+  while ((m = re.exec(s))) if (!TEX_KNOWN.has(m[1])) return '\\' + m[1];
+  return null;
+}
+
 // Содержимое группы, начинающейся на позиции i (символ '{'), с учётом вложенности.
 function texGroup(s, i) {
   if (s[i] !== '{') return null;
@@ -552,6 +616,90 @@ function flushMathfields() {
   keep.forEach(inp => _mfWaiting.push(inp));
 }
 
+/* ⚠️ ОДНА ДВЕРЬ К KaTeX НА ВЕСЬ КАЛЬКУЛЯТОР.
+
+   Печатать формулу звали из девяти мест, и каждое отдавало KaTeX сырую строку.
+   Он честно писал в консоль про всё, что не по правилам: за один обход сорока
+   одной сцены набиралось 467 предупреждений двух родов.
+
+   Первый род — узкий неразрывный пробел U+202F. Это НАШ разделитель разрядов
+   («1 250»), и в шрифтах KaTeX такого символа нет вовсе: он ругался дважды на
+   каждое число («Unrecognized Unicode» и «No character metrics»). Заменяем его
+   на математический тонкий пробел `\,` — на экране он выглядит так же.
+
+   Второй род — кириллица в математическом режиме («Безработица», индекс
+   «предл»). Это не только шум в консоли: в математическом режиме буквы
+   набираются курсивным математическим шрифтом, то есть читаются как
+   произведение переменных. Слова обязаны идти текстом. Оборачиваем в
+   `\text{...}` РОВНО ТО, что стоит вне уже существующих текстовых групп:
+   считаем глубину фигурных скобок после `\text{`, `\mathrm{`, `\operatorname{`,
+   и внутри них ничего не трогаем — там кириллица уже на своём месте. */
+const TEX_TEXT_CMD = /\\(?:text|textrm|textbf|textit|mathrm|operatorname)\s*\{/g;
+
+function katexSafe(src) {
+  let s = String(src == null ? '' : src).replace(/[  ]/g, '\\,');
+  if (!/[А-Яа-яЁё]/.test(s)) return s;
+  // Где начинаются текстовые группы: внутрь них не заглядываем.
+  const spans = [];
+  let m;
+  TEX_TEXT_CMD.lastIndex = 0;
+  while ((m = TEX_TEXT_CMD.exec(s)) !== null) {
+    let depth = 1, i = m.index + m[0].length;
+    while (i < s.length && depth > 0) {
+      if (s[i] === '{') depth++;
+      else if (s[i] === '}') depth--;
+      i++;
+    }
+    spans.push([m.index, i]);
+  }
+  const inText = (i) => spans.some(([a, b]) => i >= a && i < b);
+  let out = '', run = '';
+  // Хвостовой пробел в текстовую группу не берём: он принадлежит формуле рядом.
+  const flush = () => {
+    const t = run.replace(/\s+$/, '');
+    if (t) out += '\\text{' + t + '}';
+    if (run.length > t.length) out += '\\,';
+    run = '';
+  };
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (/[А-Яа-яЁё ]/.test(ch) && !inText(i) && (ch !== ' ' || run)) { run += ch; continue; }
+    flush(); out += ch;
+  }
+  flush();
+  return out;
+}
+
+/* Печать формулы: одна точка входа, один разбор ошибок. Не собралось — на
+   экране остаётся исходный текст, как и было. */
+function katexInto(el, tex, opts) {
+  if (!el) return false;
+  const raw = String(tex == null ? '' : tex);
+  if (typeof katex === 'undefined') { el.textContent = raw; return false; }
+  try {
+    katex.render(katexSafe(raw), el, Object.assign({ throwOnError: false, displayMode: false }, opts || {}));
+    return true;
+  } catch (e) { el.textContent = raw; return false; }
+}
+
+/* ⚠️ ОБРАЗЕЦ В СТРОКЕ ВВОДА — ЭТО ПРОЗА ПЛЮС ФОРМУЛА, А НЕ ОДНА ФОРМУЛА.
+   MathLive печатает свой placeholder математикой целиком, и двоеточие в
+   «Например: 100 − Q» верстается как знак отношения, с отбивкой по обе
+   стороны: на экране выходило «Например : 100 − Q». Слово и двоеточие
+   отдаём текстом, математикой остаётся только сама формула. */
+function placeholderTex(raw) {
+  const s = String(raw || '');
+  const i = s.indexOf(':');
+  if (i < 0) return '\\text{' + texSafeText(s) + '}';
+  const head = s.slice(0, i + 1), tail = s.slice(i + 1).trim();
+  const math = (typeof mathToLatexField === 'function' && tail) ? mathToLatexField(tail) : tail;
+  return '\\text{' + texSafeText(head) + '}\\;' + math;
+}
+// Экранируем то, что в \text{} значит не себя.
+function texSafeText(t) {
+  return String(t || '').replace(/([\\{}$&#^_~%])/g, '\\$1');
+}
+
 function buildMathfield(inp) {
   const slot = inp.parentNode;
   /* Запасную накладку с набранной формулой убираем СРАЗУ. Она лежит абсолютом
@@ -563,12 +711,19 @@ function buildMathfield(inp) {
   if (ts) ts.classList.remove('show');
   const mf = new window.MathfieldElement({
     mathVirtualKeyboardPolicy: 'manual',   // всплывающую клавиатуру ведём сами
-    smartMode: false,                      // «e» и «x» — переменные, а не слова
-    smartFence: true,
-    removeExtraneousParentheses: false,
   });
+  /* ⚠️ ЭТИ ТРИ НАСТРОЙКИ ЧИТАЮТСЯ ТОЛЬКО У ГОТОВОГО ПОЛЯ, НЕ У КОНСТРУКТОРА.
+     Переданные в `new MathfieldElement({...})`, они молча не применялись, а
+     MathLive писал в консоль предупреждение на каждое поле: за один обход
+     сорока одной сцены набиралось под девятьсот строк, и отлаживать в консоли
+     было нечем. Значения те же, что задумывал автор кода: «e» и «x» остаются
+     переменными, а не превращаются в слова; закрывающая скобка ставится сама;
+     лишние скобки при вводе не убираются. */
+  mf.smartMode = false;
+  mf.smartFence = true;
+  mf.removeExtraneousParentheses = false;
   mf.setAttribute('aria-label', inp.getAttribute('aria-label') || 'Формула');
-  if (inp.placeholder) mf.setAttribute('placeholder', inp.placeholder);
+  if (inp.placeholder) mf.setAttribute('placeholder', placeholderTex(inp.placeholder));
   slot.appendChild(mf);
   inp.classList.add('mf-hidden');
   inp._mf = mf;
@@ -584,8 +739,41 @@ function buildMathfield(inp) {
     else if (!s) mf.focus();
   };
   mf.focusField = () => { mf.focus(); grabKeys(); setTimeout(grabKeys, 0); };
+
+  /* ⚠️ НАБОР В ПОЛЕ ФОРМУЛЫ ЗАМЕНЯЕТ ПРЕЖНЮЮ ЗАПИСЬ, А НЕ ДОПИСЫВАЕТСЯ К НЕЙ.
+
+     Причина не во вкусе, а в устройстве: клавиши MathLive принимает не сам
+     элемент, а невидимый приёмник внутри него, и перевод фокуса туда (grabKeys
+     выше) сбрасывает курсор в КОНЕЦ записи. Куда бы человек ни щёлкнул — в
+     начало строки, в середину, по самой формуле, — набранное приезжает в хвост.
+
+     Отсюда дефект, который владелец видел живьём и принял за пропажу параметра:
+     щёлкнул по полю КПВ, набрал «y=100-a*x», нажал «Построить» — а в поле лежит
+     «y=100-xy=100-a*x», разбор его не понимает, и модель молча остаётся с
+     прежней формулой «y = 100 − x». Ползунок буквы при этом заводится (его
+     список читает ТЕКСТ ПОЛЯ, а не состояние модели), выглядит рабочим и не
+     двигает ничего.
+
+     Раз курсор поставить всё равно нельзя, набор обязан заменять: выделяем
+     запись целиком, как это давно делают значение параметра и имя точки. Чтобы
+     поправить один символ, щёлкают второй раз — поле уже в фокусе, выделение
+     снимается, дальше правка обычная.
+
+     Тот же дефект и той же природы уже чинили 20.08 у редактора границ
+     ползунка («значение дописывается вместо замены», п. 18). У полей формул
+     он остался. */
+  let hadFocus = false;
+  const selectAllOnEntry = () => {
+    if (hadFocus) return;
+    hadFocus = true;
+    try { mf.select(); } catch (e) {}
+  };
+  mf.addEventListener('blur', () => { hadFocus = false; });
   ['pointerdown', 'pointerup', 'focus'].forEach(ev => {
-    mf.addEventListener(ev, () => { grabKeys(); setTimeout(grabKeys, 0); });
+    mf.addEventListener(ev, () => {
+      grabKeys();
+      setTimeout(() => { grabKeys(); selectAllOnEntry(); }, 0);
+    });
   });
 
   let syncing = false;
@@ -593,6 +781,18 @@ function buildMathfield(inp) {
     if (syncing) return;
     syncing = true;
     try {
+      /* П17 · П18. Команда, которой разбор не знает, дальше не идёт. Прежде она
+         теряла слэш и уходила в движок буквами: `\pm` становился `p*m` и
+         заводил два ползунка, один из которых назывался ценой. */
+      const bad = unknownTexCommand(mf.value);
+      if (bad) {
+        inp.dataset.texUnknown = bad;
+        if (typeof fieldProblem === 'function')
+          fieldProblem(inp, 'Не понимаю команду ' + bad + ' — калькулятор её не считает');
+        return;
+      }
+      delete inp.dataset.texUnknown;
+      if (typeof fieldProblem === 'function') fieldProblem(inp, '');
       const text = latexToMath(mf.value);
       if (inp.value !== text) {
         inp.value = text;
@@ -672,8 +872,12 @@ const MKBD_BASE = [
   [['4', '4'], ['5', '5'], ['6', '6'], ['×', '\\cdot ', '*'], ['÷', '\\frac{#@}{#?}', '/']],
   [['1', '1'], ['2', '2'], ['3', '3'], ['−', '-', '-'], ['+', '+', '+']],
   [['0', '0'], [',', '.', '.'], ['=', '=', '='], ['x²', '#@^2', '^2'], ['xⁿ', '#@^{#?}', '^(', 1]],
-  [['xₙ', '#@_{#?}', '_'], ['√', '\\sqrt{#?}', 'sqrt()', 1], ['дробь', '\\frac{#@}{#?}', '/'],
-   ['⌫', 'DEL'], ['стереть', 'CLEAR']],
+  /* П21. Один язык оформления в ряду. Было вперемешку: «×» и «÷» знаками,
+     «дробь» и «стереть» словами, «⌫» иконкой. Знак действия рисуется знаком,
+     а команда над полем называется словом — «дробь» это то же самое, что «÷»,
+     и второй кнопки для неё не нужно. */
+  [['xₙ', '#@_{#?}', '_'], ['√', '\\sqrt{#?}', 'sqrt()', 1], ['|x|', '\\left|#?\\right|', 'abs()', 1],
+   ['⌫', 'DEL'], ['✕', 'CLEAR']],
 ];
 const MKBD_FUNCS = [
   ['Корни и модуль', [
@@ -691,10 +895,6 @@ const MKBD_FUNCS = [
     ['sin', '\\sin\\left(#?\\right)', 'sin()', 1],
     ['cos', '\\cos\\left(#?\\right)', 'cos()', 1],
     ['tan', '\\tan\\left(#?\\right)', 'tan()', 1],
-  ]],
-  ['Анализ', [
-    ['d/dx', '\\frac{d}{dx}', 'd/dx'],
-    ['∫', '\\int_{#?}^{#?}', 'integral'],
   ]],
   ['Сравнения', [
     ['<', '<', '<'], ['>', '>', '>'],
@@ -719,7 +919,7 @@ const MKBD_LETTERS = [
   ]],
   ['Знаки', [
     ['∞', '\\infty ', 'Infinity'], ['%', '\\%', '%'],
-    ['±', '\\pm ', '+-'], ['≈', '\\approx ', '=='],
+    ['≈', '\\approx ', '=='],
   ]],
 ];
 
@@ -727,6 +927,10 @@ function mkbdKey(k, inp) {
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'mk';
   b.textContent = k[0];
+  /* Знак без слова обязан называть себя доступному чтению: нативной подсказки
+     на сайте нет (правило 18 части 4), а «⌫» и «✕» на слух не читаются. */
+  if (k[1] === 'DEL') b.setAttribute('aria-label', 'Стереть символ');
+  if (k[1] === 'CLEAR') b.setAttribute('aria-label', 'Очистить поле');
   if (k[0].length > 2) b.classList.add('fn');
   b.addEventListener('mousedown', (e) => e.preventDefault());   // не терять фокус поля
   b.addEventListener('click', () => {
@@ -1190,8 +1394,7 @@ function makeEditableValue(opts) {
     if (el.classList.contains('editing')) return;
     const text = shown();
     if (typeof katex === 'undefined' || typeof opts.tex !== 'function') { el.textContent = text; return; }
-    try { katex.render(opts.tex(opts.get(), text), el, { throwOnError: false, displayMode: false }); }
-    catch (e) { el.textContent = text; }
+    if (!katexInto(el, opts.tex(opts.get(), text))) el.textContent = text;
   };
   el._repaint = paint;
   paint();
@@ -1232,8 +1435,20 @@ function makeEditableValue(opts) {
       el.removeEventListener('blur', onBlur);
       el.classList.remove('editing', 'bad');
       el.contentEditable = 'false';
-      if (cancel) opts.set(before);
-      else { const v = parse(el.textContent.trim()); if (v !== null) opts.set(v); else opts.set(before); }
+      /* ⚠️ НЕЗАПОЛНЕННОЕ ПОЛЕ ВОЗВРАЩАЕТ ПРЕЖНЕЕ ЗНАЧЕНИЕ, А НЕ ПУСТОТУ.
+         У редактора границ ползунка поля показываются ПУСТЫМИ намеренно (копия
+         Десмоса), то есть `before` там — пустая строка. А выход из правки
+         честно звал `set(before)`, и пустая строка уезжала прямо в границу
+         ползунка: `sl.max = ''` — полоса ломается, значение обнуляется,
+         ползунок перестаёт двигаться. Пустое «прежнее» означает «прежнего
+         числа не было», и правильный ответ на него — не трогать ничего. */
+      const restorable = !isNum || (before !== '' && before != null && isFinite(before));
+      if (cancel) { if (restorable) opts.set(before); }
+      else {
+        const v = parse(el.textContent.trim());
+        if (v !== null) opts.set(v);
+        else if (restorable) opts.set(before);
+      }
       paint();
     };
     function onKey(e) {
@@ -1247,6 +1462,11 @@ function makeEditableValue(opts) {
   };
 
   el.addEventListener('click', begin);
+  /* Tab ведёт по полям редактора по порядку, и пришедшее фокусом поле сразу
+     готово к набору. Без этого Tab переводил фокус, но правку не открывал, и
+     второе число приходилось начинать щелчком. Повторного входа не будет:
+     `begin` первым делом ставит класс «editing» и только потом зовёт focus. */
+  el.addEventListener('focus', () => { if (!el.classList.contains('editing')) begin(); });
   el.addEventListener('keydown', (e) => {
     if (!el.classList.contains('editing') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); begin(); }
   });

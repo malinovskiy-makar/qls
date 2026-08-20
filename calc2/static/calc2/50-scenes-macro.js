@@ -75,9 +75,14 @@ const MACRO = {
   adas:     { title: 'AD–AS', xl: 'Y', yl: 'P', vars: ['Y'] },
   phillips: { title: 'Кривая Филлипса', xl: 'u, %', yl: 'π, %', vars: ['u'] },
   money:    { title: 'Денежный рынок', xl: 'M', yl: 'i, %', vars: ['i'] },
-  loanable: { title: 'Рынок заёмных средств', xl: 'Объём', yl: 'r, %', vars: ['r'] },
-  fx:       { title: 'Валютный рынок', xl: 'Валюта', yl: 'e (курс)', vars: ['e'] },
-  laffer:   { title: 'Кривая Лаффера', xl: 't (ставка)', yl: 'Поступления', vars: ['Q'] },
+  /* Правило 46: подпись оси — СИМВОЛ величины из реестра (DESIGN.md 5.1),
+     единица добавляется только у доли и процента. Было «Объём», «Валюта»,
+     «e (курс)», «t (ставка)», «Поступления» — пять фраз там, где у величины
+     есть общепринятая буква. `Tx` уже стоит в легенде под поступлениями
+     бюджета, `t` — ставка потоварного налога в деньгах (не процент). */
+  loanable: { title: 'Рынок заёмных средств', xl: 'Q', yl: 'r, %', vars: ['r'] },
+  fx:       { title: 'Валютный рынок', xl: 'Q', yl: 'e', vars: ['e'] },
+  laffer:   { title: 'Кривая Лаффера', xl: 't', yl: 'Tx', vars: ['Q'] },
   islm:     { title: 'IS–LM', xl: 'Y', yl: 'r, %', vars: ['Y'] },
 };
 
@@ -253,8 +258,8 @@ function redrawMacro() {
     og.append('line').attr('x1', ox).attr('y1', py).attr('x2', px).attr('y2', py)
       .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     og.append('circle').attr('cx', px).attr('cy', py).attr('r', 5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 2);
-    haloText(og, px, oy + 8, 't=' + fmt(r.best.t), 'middle', 'hanging');
-    haloText(og, ox - 8, py, fmt(r.best.rev), 'end', 'middle');
+    axisValueX(og, px, oy, fmt(r.best.t), '');
+    axisValueY(og, ox, py, fmt(r.best.rev), '');
     og.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', FS.base).attr('font-weight', 700).attr('fill', COL.ink)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Максимум');
     updateMacroPanel();
@@ -275,7 +280,7 @@ function redrawMacro() {
     const ye = sy(r.fixed.e);
     g.append('line').attr('x1', ox).attr('y1', ye).attr('x2', xMax).attr('y2', ye)
       .attr('stroke', COL.reg).attr('stroke-width', 2.5);
-    haloText(g, ox - 8, ye, 'e фикс=' + fmt(r.fixed.e), 'end', 'middle');
+    axisValueY(g, ox, ye, fmt(r.fixed.e), 'фикс');
     const xa = sx(Math.min(r.fixed.Qd, r.fixed.Qs)), xb = sx(Math.max(r.fixed.Qd, r.fixed.Qs));
     if (xb > xa + 1) {
       g.append('line').attr('x1', xa).attr('y1', oy).attr('x2', xb).attr('y2', oy)
@@ -304,10 +309,10 @@ function drawEquilibriumAt(Q, P, label) {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
-  haloText(g, px, oy + 8, fmt(Q), 'middle', 'hanging');
-  haloText(g, ox - 8, py, fmt(P), 'end', 'middle');
+  axisValueX(g, px, oy, fmt(Q), '');
+  axisValueY(g, ox, py, fmt(P), '');
   g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  if (label) g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text(label);
+  pointName(g, px, py, label, COL.ink);
 }
 
 function updateMacroPanel() {
@@ -320,7 +325,13 @@ function updateMacroPanel() {
     html += `<div class="stat"><span>Краткосрочно: (Y; P)</span><b>(${fmt(r.eq.Q)}; ${fmt(r.eq.P)})</b></div>`;
     html += `<div class="stat"><span>Потенциальный выпуск $Y^*$</span><b>${fmt(r.Ystar)}</b></div>`;
     const g = r.gap;
-    html += `<div class="stat"><span>Разрыв выпуска</span><b>${(g >= 0 ? '+' : '') + fmt(g)}</b></div>`;
+    /* п. 82. У нуля знака нет. «+0» обещает превышение, которого нет: разрыв
+       ровно нулевой значит, что выпуск и есть потенциальный. Сравниваем с
+       ПОКАЗАННЫМ числом, а не с сырым: −0,004 печатается как «0», и знак
+       у него был бы взят от невидимой сотой. */
+    const shown = fmt(g);
+    const zero = /^-?0([.,]0+)?$/.test(shown);
+    html += `<div class="stat"><span>Разрыв выпуска</span><b>${(zero || g < 0) ? shown : '+' + shown}</b></div>`;
     html += `<div class="hint" style="margin-top:4px;">${Math.abs(g) < 1e-6
       ? 'Экономика ровно на потенциале: краткосрочное равновесие совпало с долгосрочным, разрыва нет.'
       : (g < 0

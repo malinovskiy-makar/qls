@@ -129,7 +129,13 @@ function mathScales(yTop, yBot, yLo, yHi) {
           .range([yBot == null ? H - m.bottom : yBot, yTop == null ? m.top : yTop]),
   };
 }
-function drawPlaneAxes(g, mx, my, xlab, ylab) {
+/* Оси полного плана. `opts.ticks === false` — сцена печатает деления сама.
+   Так сделано в «Как определяется мировая цена»: у неё два поля со своими
+   масштабами, деления она рисует ВНЕ обрезки (иначе их срезало бы), а эта
+   функция печатала ВТОРОЙ комплект внутри обрезки — то есть невидимый.
+   Замер Добавки А нашёл ровно эти 24 подписи-невидимки. */
+function drawPlaneAxes(g, mx, my, xlab, ylab, opts) {
+  const o = opts || {};
   const [px0, px1] = mx.range(), [py0, py1] = my.range();
   const ox = mx(0), oy = my(0);       // ось стоит в нуле и уезжает вместе с ним
   const seeY = ox >= px0 - 1 && ox <= px1 + 1;
@@ -139,11 +145,15 @@ function drawPlaneAxes(g, mx, my, xlab, ylab) {
     .attr('stroke', COL.ink).attr('stroke-width', 1.4).attr('marker-end', 'url(#arrow)');
   if (seeY) g.append('line').attr('x1', ox).attr('y1', py0).attr('x2', ox).attr('y2', py1)
     .attr('stroke', COL.ink).attr('stroke-width', 1.4).attr('marker-end', 'url(#arrow)');
-  if (seeX) planeTicksX(g, mx, oy);
-  if (seeY) planeTicksY(g, my, ox);
-  if (xlab && seeX) g.append('text').attr('x', px1 - 2).attr('y', oy - 7).attr('text-anchor', 'end')
+  if (seeX && o.ticks !== false) planeTicksX(g, mx, oy);
+  if (seeY && o.ticks !== false) planeTicksY(g, my, ox);
+  // Класс `axis-name` один на все режимы: по нему живут реестр обозначений,
+  // общий проход размера подписей и проверка канона.
+  if (xlab && seeX) g.append('text').attr('class', 'axis-name')
+    .attr('x', px1 - 2).attr('y', oy - 7).attr('text-anchor', 'end')
     .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text(xlab || 'x');
-  if (ylab && seeY) g.append('text').attr('x', ox + 7).attr('y', py1 + 11)
+  if (ylab && seeY) g.append('text').attr('class', 'axis-name')
+    .attr('x', ox + 7).attr('y', py1 + 11)
     .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text(ylab || 'y');
 }
 function planeTicksX(g, mx, oy) {
@@ -151,7 +161,13 @@ function planeTicksX(g, mx, oy) {
     if (Math.abs(t) < 1e-9) return;
     g.append('line').attr('x1', mx(t)).attr('y1', oy - 3).attr('x2', mx(t)).attr('y2', oy + 3)
       .attr('stroke', COL.ink).attr('stroke-width', 1);
-    g.append('text').attr('x', mx(t)).attr('y', oy + 7)
+    /* ⚠️ КЛАСС `axis-num` — ЭТО НЕ УКРАШЕНИЕ, А ПРИЗНАК «ЭТО ДЕЛЕНИЕ ШКАЛЫ».
+       По нему работают три разные вещи: `dropTickAt` снимает деление, на место
+       которого встаёт подпись координаты; `applyLabelSize` НЕ увеличивает
+       деления вместе с прочими подписями; выгрузка отличает шкалу от подписи.
+       У полного плана свой рисователь осей, и он этот класс не ставил вовсе —
+       в «Деформациях графика» деления выглядели так же, а вели себя иначе. */
+    g.append('text').attr('x', mx(t)).attr('y', oy + 7).attr('class', 'axis-num')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
       .attr('font-size', FS.small).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
@@ -162,7 +178,7 @@ function planeTicksY(g, my, ox) {
     if (Math.abs(t) < 1e-9) return;
     g.append('line').attr('x1', ox - 3).attr('y1', my(t)).attr('x2', ox + 3).attr('y2', my(t))
       .attr('stroke', COL.ink).attr('stroke-width', 1);
-    g.append('text').attr('x', ox - 6).attr('y', my(t))
+    g.append('text').attr('x', ox - 6).attr('y', my(t)).attr('class', 'axis-num')
       .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
       .attr('font-size', FS.small).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
@@ -231,12 +247,65 @@ function mathDot(g, mx, my, x, y, color, label, dy, key) {
 /* Любую подпись на графике переименовывают двойным щелчком прямо по ней.
    Одиночный щелчок оставлен свободным: им ставят точки и включают области, и
    переименование по нему срабатывало бы против воли. */
-function makeRenamable(t, current, px, py, apply) {
-  t.style('cursor', 'text').append('title').text('Двойной щелчок, чтобы переименовать');
-  t.on('dblclick', (ev) => {
+/* ⚠️ ЦЕЛЬ ДЛЯ ДВОЙНОГО ЩЕЛЧКА НЕ БЫВАЕТ МЕНЬШЕ 24×24 (решение владельца 20.08).
+
+   Сама подпись «D» занимает 7×14 пикселей, и попасть в неё двойным щелчком
+   почти невозможно: на приёмке промахнулись трижды подряд, каждый раз мимо на
+   один-два пикселя. У кривых эта беда решена давно полосой захвата в 16 px;
+   подписи достаётся невидимый прямоугольник вокруг слова.
+
+   Вид подписи не меняется ни на пиксель: прямоугольник прозрачный и в выгрузку
+   не идёт (`data-skip-export`).
+
+   ЧУЖИЕ ЩЕЛЧКИ ОН НЕ СЪЕДАЕТ, и вот почему:
+     · всё, что рисуется ПОЗЖЕ (ключевые точки, добор полос захвата,
+       манипуляторы сцены), лежит выше него и получает свой щелчок первым;
+     · одиночный щелчок ВСПЛЫВАЕТ до холста, поэтому панорама, постановка
+       точки и набор вершин работают как работали;
+     · единственное, что оказалось бы ниже, — полоса захвата своей же кривой,
+       и одиночный щелчок по имени кривой делает ровно то же, что щелчок по
+       ней самой: взводит её ключевые точки. */
+const RENAME_HIT_PX = 24;
+function makeRenamable(t, current, px, py, apply, armName) {
+  // Плашки у подписи нет: она открывается двойным щелчком, и всплывающее
+  // под указателем мешало бы попасть. Про переименование сказано в
+  // подсказке блока «Точки на графике».
+  t.style('cursor', 'text');
+  const open = (ev) => {
     ev.stopPropagation(); ev.preventDefault();
-    editInlineLabel(current, px, py, apply);
-  });
+    // Узел подписи нужен правке: у неё нет своего вида, она берёт кегль, вес и
+    // цвет у самой подписи и встаёт ровно на её место.
+    editInlineLabel(current, px, py, apply, t.node());
+  };
+  t.on('dblclick', open);
+
+  const node = t.node();
+  const parent = node && node.parentNode;
+  let bb = null;
+  try { bb = node.getBBox(); } catch (e) { bb = null; }
+  if (!bb || !parent || !(bb.width > 0)) return;
+  const w = Math.max(RENAME_HIT_PX, bb.width + 10);
+  const h = Math.max(RENAME_HIT_PX, bb.height + 8);
+  /* ⚠️ ПРЯМОУГОЛЬНИК ВСТАЁТ ПОД САМУ ПОДПИСЬ, А НЕ НАД НЕЙ. Он прозрачный, и
+     на вид разницы нет никакой, но щелчок по самим буквам обязан доставаться
+     тексту: иначе всякая проверка, целящаяся в подпись, упирается в чужую
+     фигуру («intercepts pointer events»), а человек теряет ровно ту цель, по
+     которой он и метит. Прямоугольник добирает ПОЛЯ вокруг слова, и только. */
+  const hit = d3.select(parent).insert('rect', () => node)
+    .attr('x', bb.x + bb.width / 2 - w / 2)
+    .attr('y', bb.y + bb.height / 2 - h / 2)
+    .attr('width', w).attr('height', h)
+    .attr('fill', 'transparent')
+    .attr('data-skip-export', '1')
+    .attr('data-rename-hit', '1')
+    .style('cursor', 'text');
+  hit.on('dblclick', open);
+  if (armName) {
+    hit.on('click', (ev) => {
+      ev.stopPropagation();
+      if (typeof armCurve === 'function') armCurve(armName);
+    });
+  }
 }
 
 // Совместимость: прежнее имя оставлено, вызовы через него по-прежнему работают.
@@ -246,33 +315,91 @@ function editPointName(key, current, px, py) {
   });
 }
 
-/* Поле ввода поверх графика на месте подписи. Enter и уход фокуса сохраняют,
-   Esc отменяет, пустая строка возвращает машинное имя. */
-function editInlineLabel(current, px, py, apply) {
+/* ⚠️ ПОЛЯ ВВОДА ПРИ ПЕРЕИМЕНОВАНИИ ЧЕЛОВЕК НЕ ВИДИТ (фаза 8 ревью 19.08).
+
+   Было: белое окошко 152×20 с рамкой, всегда одной ширины и всегда вправо от
+   подписи. У правого края холста оно вылезало за пределы картинки, а на месте
+   аккуратной подписи вдруг появлялся чужой прямоугольник.
+
+   Стало: само название остаётся на месте и получает пунктирное подчёркивание
+   ровно по длине слова, акцентным цветом. Содержимое выделено целиком — набор
+   сразу заменяет старое имя. Подчёркивание тянется за словом при вводе.
+
+   Поле по-прежнему настоящее (`input`): подменить его на `contenteditable`
+   значило бы потерять мобильную клавиатуру, выделение и озвучивание. Просто у
+   него нет своего вида — ни фона, ни рамки, — а кегль, вес и цвет оно берёт у
+   самой подписи. Подпись на время правки прячется, иначе текст двоился бы.
+
+   Enter и щелчок мимо сохраняют, Escape отменяет, пустое имя откатывается к
+   прежнему. Не помещается у края — переезжает ЦЕЛИКОМ левее или правее; на
+   вторую строку название не разрывается никогда. */
+function editInlineLabel(current, px, py, apply, node) {
   const wrap = document.getElementById('graph-wrap');
   if (!wrap) return;
   const old = document.getElementById('pt-rename');
   if (old) old.remove();
+
+  // Вид берём у самой подписи: своего у поля быть не должно.
+  const cs = node ? getComputedStyle(node) : null;
+  const size = cs ? cs.fontSize : (FS.base + 'px');
+  const weight = cs ? cs.fontWeight : '600';
+  const color = (cs && cs.fill && cs.fill !== 'none') ? cs.fill : 'var(--text)';
+  const family = cs ? cs.fontFamily : 'inherit';
+  // Подпись прячем, но место её не трогаем: она вернётся ровно туда же.
+  if (node) node.style.visibility = 'hidden';
+
   const inp = document.createElement('input');
   inp.id = 'pt-rename'; inp.type = 'text'; inp.value = current;
-  inp.style.cssText = 'position:absolute;z-index:40;font-size:' + FS.base + 'px;font-weight:600;padding:2px 5px;'
-    + 'border:1px solid var(--accent);border-radius:var(--r-sm);background:var(--surface);'
-    + 'color:var(--text);min-width:110px;'
-    + 'left:' + Math.round(px) + 'px;top:' + Math.round(py - 16) + 'px;';
+  inp.setAttribute('aria-label', 'Название на графике');
+  inp.style.cssText = 'position:absolute;z-index:40;padding:0;margin:0;'
+    + 'border:0;border-bottom:1px dashed var(--accent);border-radius:0;background:none;'
+    + 'outline:none;box-sizing:content-box;line-height:1.1;'
+    + 'font-size:' + size + ';font-weight:' + weight + ';font-family:' + family + ';'
+    + 'color:' + color + ';';
+
+  /* Ширина — по содержимому и пересчитывается на каждый ввод: подчёркивание
+     обязано тянуться за словом, а не стоять на месте. Меряем настоящим
+     размером текста, а не прикидкой по числу символов. */
+  const ruler = document.createElement('span');
+  ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;padding:0;'
+    + 'font-size:' + size + ';font-weight:' + weight + ';font-family:' + family + ';';
+  wrap.appendChild(ruler);
+
+  const box = wrap.getBoundingClientRect();
+  const fit = () => {
+    ruler.textContent = inp.value || ' ';
+    const w = Math.max(12, ruler.offsetWidth + 2);
+    inp.style.width = w + 'px';
+    /* Подпись целиком внутри холста. Не влезла справа — переезжает влево ВСЯ,
+       а не переносится по словам: имя на графике разрывать нельзя. */
+    let left = px;
+    if (left + w > box.width - 4) left = Math.max(4, box.width - 4 - w);
+    if (left < 4) left = 4;
+    inp.style.left = Math.round(left) + 'px';
+  };
+
+  const fs = parseFloat(size) || 13;
+  inp.style.top = Math.round(py - fs) + 'px';
+  wrap.appendChild(inp);
+  fit();
+
   let done = false;
   const finish = (save) => {
     if (done) return;
     done = true;
-    if (save) apply(inp.value.trim());
+    // Пустое имя не сохраняем: откат к прежнему (решение владельца).
+    if (save && inp.value.trim()) { pushUndo(); apply(inp.value.trim()); }
+    ruler.remove();
     inp.remove();
+    if (node) node.style.visibility = '';
     redrawAll();
   };
+  inp.addEventListener('input', fit);
   inp.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); finish(true); }
     else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
   });
   inp.addEventListener('blur', () => finish(true));
-  wrap.appendChild(inp);
   inp.focus(); inp.select();
 }
 
@@ -375,8 +502,13 @@ function drawMathTangent(f) {
   // функция, а где производная.
   gUi.append('text').attr('x', m.left + 4).attr('y', L.top + 14)
     .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanF).text('f(x), сама функция');
-  gUi.append('text').attr('x', m.left + 4).attr('y', L.botTop + 14)
-    .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanD).text("$f'(x)$, производная");
+  /* ⚠️ Подпись панели идёт через ОБЩИЙ разбор, а не через .text().
+     Прямой .text() печатал «$f'(x)$, производная» вместе с долларами: KaTeX
+     на холсте нет, и снимать разделители умеет только renderLabelText. */
+  renderLabelText(
+    gUi.append('text').attr('x', m.left + 4).attr('y', L.botTop + 14)
+      .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanD),
+    "$f'(x)$, производная");
 
   mathLine(gTop, f, s1.mx, s1.my, COL.tanF, 2.6);
   mathLine(gBot, dfun, s2.mx, s2.my, COL.tanD, 2.4);
@@ -430,7 +562,7 @@ function drawMathTangent(f) {
     const dot2 = gBot.append('circle').attr('cx', s2.mx(x0)).attr('cy', s2.my(k)).attr('r', 6)
       .attr('fill', 'transparent').attr('stroke', COL.tanD).attr('stroke-width', 2.2)
       .style('cursor', 'ew-resize');
-    dot2.append('title').text('Ведите её, и касательная сверху перестроится');
+    // Точку ведут мышью — плашка перехватывала бы указатель.
     dot2.call(d3.drag().container(() => svg.node()).on('drag', grabX(s2.mx, wBot)));
   }
   updateMathPanel();
@@ -874,7 +1006,7 @@ function updateMathPanel() {
       for (let i = 0; i < mmSlots(); i++) if (mmGet(i).trim()) names.push(mmLabel(i));
       html += `<div class="stat"><span>Строим</span><b>${nm} = ${r.isMin ? 'min' : 'max'}(${names.join(', ')})</b></div>`;
       html += `<div class="stat"><span>Функций участвует</span><b>${r.count}</b></div>`;
-      html += `<div class="stat"><span>Кривые меняются местами</span><b>${(r.switches || []).length ? r.switches.map(fmt).join(', ') : 'нигде'}</b></div>`;
+      html += `<div class="stat"><span>Кривые меняются местами</span><b>${(r.switches || []).length ? r.switches.map(v => fmt(v)).join('; ') : 'нигде'}</b></div>`;
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + `<p><b>Как строится итоговая кривая?</b> В каждой точке x берётся ${r.isMin ? 'наименьшее' : 'наибольшее'} из значений всех функций. `
         + `Получается ломаная из кусков исходных кривых: ${r.isMin ? 'нижняя' : 'верхняя'} огибающая. `
@@ -1133,6 +1265,10 @@ function texText(s) {
    тоже не годится: у подписи бывает дочерний <title> с подсказкой («Двойной
    щелчок, чтобы переименовать»), и он приехал бы в .tex как часть названия. */
 function labelPlainText(el) {
+  // Исходная разметка, если её сохранил рисователь подписей: только в ней
+  // остались индексы и степени (см. renderLabelText).
+  const raw = el.getAttribute && el.getAttribute('data-raw');
+  if (raw) return raw;
   let out = '';
   const walk = (n) => {
     n.childNodes.forEach(c => {
@@ -1352,6 +1488,34 @@ function buildTex(title, label) {
   const toData = (px, py) => [mx.invert(px), my.invert(py)];
 
   const body = [];
+  /* п. 70. ОПИСЬ СЧИТАЕТ ТО, ЧТО ВИДИТ ЧЕЛОВЕК.
+
+     Раньше опись считала строки самого файла: одна кривая с разрывом даёт
+     несколько `\addplot`, одна область — два пути, и на экране с двумя
+     кривыми и двумя заливками стояло «Кривых точками 10, Закрашенных
+     областей 4». Числа были верны для файла и неверны для картинки.
+     Считаем ИСТОЧНИКИ: одна кривая холста — одна кривая описи, чем бы она ни
+     обернулась внутри. Счётчик заполняется здесь же, при обходе, поэтому
+     разойтись с выгрузкой ему не на чем. */
+  const tally = { curves: 0, areas: 0, dots: 0, lines: 0, labels: 0 };
+  /* Одна закрашенная область человека — это одно ПЯТНО, у которого есть имя
+     в легенде, даже если сцена рисует его двумя путями (излишек до и после
+     вмешательства, половинки клина). Пятна с именем считаем по именам,
+     безымянные — поштучно. */
+  const areaSeen = new Set();
+  /* Сама легенда в опись не входит ни одной строкой: её образцы это тоже
+     закрашенные прямоугольники, а подписи — тоже текст, и без этой отсечки
+     на графике с четырьмя пятнами опись показывала восемь. Легенда — один
+     предмет, и о ней отдельная строка «есть». */
+  const inLegend = (el) => !!(el.closest && el.closest('.legend'));
+  const countArea = (el) => {
+    if (inLegend(el)) { tally.legend = true; return; }
+    const k = el.getAttribute('data-legend');
+    if (!k) { tally.areas++; return; }
+    if (areaSeen.has(k)) return;
+    areaSeen.add(k); tally.areas++;
+  };
+  buildTex._tally = tally;
   const inView = (x, y) => x >= xLo - 1e-9 && x <= xHi + 1e-9 && y >= yLo - 1e-9 && y <= yHi + 1e-9;
   /* Цвет холста. Заливка им означает «здесь ничего нет»: так рисуются
      подложки и пустые метки. На бумаге фон белый, поэтому переносить такую
@@ -1398,6 +1562,7 @@ function buildTex(title, label) {
       const pgf = mathToPgf(c.expr, 'Q');
       if (!pgf) return;
       drawnByFormula.add(c.id);
+      tally.curves++;
       const lo = Math.max(0, xLo), hi = xHi;
       // forget plot — чтобы pgfplots не заводил СВОЮ легенду. Имена кривых уже
       // подписаны узлами на самих кривых (как на экране), а вторая легенда
@@ -1470,6 +1635,7 @@ function buildTex(title, label) {
             body.push('\\addplot[' + opts.join(', ') + ', domain=' + num(lo) + ':' + num(hi2) +
                       ', samples=120, restrict y to domain=' + num(Math.max(0, yLo)) + ':' + num(yHi) +
                       ', forget plot] {' + pgf + '};');
+            tally.curves++;
             continue;
           }
         }
@@ -1480,6 +1646,7 @@ function buildTex(title, label) {
         const runs = texSamplePath(el)
           .map(r => texResample(r.map(p => toData(p[0], p[1])), 60));
         if (hasFill && !bgFill) {
+          if (runs.some(r => r.length >= 3)) countArea(el);
           runs.forEach(r => {
             if (r.length < 3) return;
             body.push('\\fill[' + colorName(cs.fill) + ', opacity=' +
@@ -1488,6 +1655,12 @@ function buildTex(title, label) {
           });
         }
         if (hasStroke) {
+          // Кривая это путь, объявивший себя кривой; остальные штрихи (пунктиры
+          // к осям, засечки, рамки) — линии, и в описи они названы линиями.
+          if (runs.some(r => r.length >= 2)) {
+            if (cid || declared) tally.curves++;
+            else if (!inLegend(el)) tally.lines++;
+          }
           runs.forEach(r => {
             if (r.length < 2) return;
             const why = el.getAttribute('data-numeric');
@@ -1499,6 +1672,7 @@ function buildTex(title, label) {
         }
       } else if (tag === 'line') {
         if (!hasStroke) continue;
+        if (!inLegend(el)) tally.lines++;
         const a = toData(+el.getAttribute('x1'), +el.getAttribute('y1'));
         const b = toData(+el.getAttribute('x2'), +el.getAttribute('y2'));
         body.push('\\addplot[' + pgfStroke(el, cs, colorName).join(', ') + ', forget plot] coordinates {' +
@@ -1512,6 +1686,7 @@ function buildTex(title, label) {
         const rectOpt = hatchOpt || (colorName(cs.fill) + ', opacity=' +
           (parseFloat(cs.fillOpacity) * parseFloat(cs.opacity || 1) || 0.2).toFixed(2));
         if (hatchOpt) needPatterns = true;
+        countArea(el);
         body.push('\\fill[' + rectOpt + '] ' +
           '(axis cs:' + num(a[0]) + ',' + num(a[1]) + ') rectangle (axis cs:' + num(b[0]) + ',' + num(b[1]) + ');');
       } else if (tag === 'circle') {
@@ -1524,6 +1699,7 @@ function buildTex(title, label) {
         const hollow = hasFill && sameColor(cs.fill, '#' + canvasColor());
         const col = colorName((hasFill && !hollow) ? cs.fill : cs.stroke);
         const mark = hollow ? ', mark=o' : '';
+        tally.dots++;
         body.push('\\addplot[' + col + ', only marks' + mark + ', mark size=' +
           markPt(+el.getAttribute('r')).toFixed(1) + 'pt, forget plot] coordinates {' + pt(c[0], c[1]) + '};');
       } else if (tag === 'text') {
@@ -1536,12 +1712,25 @@ function buildTex(title, label) {
         if (!txt.trim()) continue;
         if (!onScreen(el)) continue;                  // А47: только то, что видно
         const c = toData(+el.getAttribute('x') || 0, +el.getAttribute('y') || 0);
-        if (!inView(c[0], c[1])) continue;
+        /* ⚠️ ПОДПИСЬ КООРДИНАТЫ ЖИВЁТ ЗА ОСЬЮ, И ВЫБРАСЫВАТЬ ЕЁ ЗА ЭТО НЕЛЬЗЯ.
+           Решение владельца 19.08 увело числа за оси: цена левее оси цены,
+           количество ниже оси количества. В координатах данных это «снаружи
+           окна», и общая отсечка inView уносила из файла ВСЕ подписи координат
+           разом — на бумаге пунктиры вели к осям и упирались в пустоту, ровно
+           как это было на экране. Поэтому такую подпись не выбрасываем, а
+           прижимаем к оси; наружу её отодвинет тот же сдвиг в пунктах, что
+           применяется к подписи, севшей на саму ось (ниже). */
+        const isCoord = el.classList && el.classList.contains('coord-num');
+        if (isCoord) {
+          c[0] = Math.min(xHi, Math.max(xLo, c[0]));
+          c[1] = Math.min(yHi, Math.max(yLo, c[1]));
+        } else if (!inView(c[0], c[1])) continue;
         const ha = { start: 'west', middle: '', end: 'east' }[cs.textAnchor] ?? '';
         const bl = el.getAttribute('dominant-baseline') || cs.dominantBaseline || '';
         const va = (bl === 'hanging' || bl === 'text-before-edge') ? 'north'
                  : (bl === 'middle' || bl === 'central') ? '' : 'base';
         const anchor = (va + (va && ha ? ' ' : '') + ha).trim() || 'base';
+        if (inLegend(el)) tally.legend = true; else tally.labels++;
         const fs = texPt(el, cs);
         const opt = ['anchor=' + anchor, 'text=' + colorName(cs.fill),
                      'font=\\fontsize{' + fs + '}{' + (fs * 1.15).toFixed(1) + '}\\selectfont',
@@ -1671,17 +1860,21 @@ function refreshExportPreview() {
   try { tex = buildTex(expValue('exp-title'), expValue('exp-label')); } catch (e) { tex = ''; }
   if (!tex) { box.textContent = 'Пока нечего выгружать: на графике ничего не построено.'; return; }
   const size = /width=([\d.]+)cm, height=([\d.]+)cm/.exec(tex);
-  const formulas = (tex.match(/\\addplot\[[^\]]*\] *\{/g) || []).length;
-  const tables = (tex.match(/\\addplot\[[^\]]*\] *coordinates/g) || []).length;
-  const fills = (tex.match(/\\fill\[/g) || []).length;
-  const labels = (tex.match(/\\node\[/g) || []).length;
+  /* п. 70. Опись перечисляет то, что человек видит на графике, и его словами.
+     «Кривых формулой» и «Кривых точками» — это про устройство файла: у одной
+     и той же кривой разрыв даёт несколько записей, и на экране с двумя
+     кривыми стояло «Кривых точками 10». Как именно кривая записана в файле,
+     человека не касается: он выбирает, скачивать или нет. */
+  const t = buildTex._tally || {};
   const cap = expValue('exp-title');
   const rows = [
-    ['Картинка', size ? size[1] + ' на ' + size[2] + ' см' : 'по умолчанию'],
-    ['Кривых формулой', String(formulas)],
-    ['Кривых точками', String(tables)],
-    ['Закрашенных областей', String(fills)],
-    ['Подписей', String(labels)],
+    ['Размер картинки', size ? size[1] + ' на ' + size[2] + ' см' : 'по умолчанию'],
+    ['Кривых', String(t.curves || 0)],
+    ['Закрашенных областей', String(t.areas || 0)],
+    ['Точек', String(t.dots || 0)],
+    ['Линий и пунктиров', String(t.lines || 0)],
+    ['Подписей', String(t.labels || 0)],
+    ['Легенда областей', t.legend ? 'есть' : 'нет'],
     ['Подпись под картинкой', cap || 'без подписи'],
   ];
   box.innerHTML = '';
@@ -1756,21 +1949,33 @@ function updateGraphPanel() {
     const d1 = (x) => (f(x + h) - f(x - h)) / (2 * h);
     const ext = rootsOf(d1, lo, hi, 500).filter(x => isFinite(f(x)));
     html += `<div class="stat"><span>Кривая</span><b>${name}</b></div>`;
+    /* ⚠️ РАЗДЕЛИТЕЛЬ СПИСКА — ТОЧКА С ЗАПЯТОЙ, ПОТОМУ ЧТО ЗАПЯТАЯ ЗАНЯТА.
+       Корни 0 и 1 печатались как «0, 1,0»: запятая разделяла список и она же
+       была десятичным знаком, прочитать это невозможно. Десятичная запятая —
+       требование канона 2.1, значит менять надо разделитель. Стало «0; 1». */
+    /* ⚠️ `.map(fmt)` ПЕРЕДАЁТ В fmt НОМЕР ЭЛЕМЕНТА ВТОРЫМ ДОВОДОМ, а второй
+       довод у fmt — «сколько знаков после запятой печатать не меньше». Поэтому
+       первый корень печатался как «0», а второй тем же числом знаков, что его
+       номер: «1,0». Именно это и увидел владелец в записи «0, 1,0» — половина
+       беды была не в разделителе списка, а здесь. */
     html += `<div class="stat"><span>Пересекает ось $x$</span><b>${
-      zeros.length ? zeros.map(fmt).join(', ') : 'в окне не пересекает'}</b></div>`;
+      zeros.length ? zeros.map(v => fmt(v)).join('; ') : 'в окне не пересекает'}</b></div>`;
     html += `<div class="stat"><span>Пересекает ось $y$</span><b>${
       (lo <= 0 && hi >= 0 && isFinite(y0)) ? fmt(y0) : 'ось вне окна'}</b></div>`;
     if (ext.length) {
       html += `<div class="stat"><span>Вершины</span><b>${
-        ext.map(x => '(' + fmt(x) + '; ' + fmt(f(x)) + ')').join(', ')}</b></div>`;
+        ext.map(x => '(' + fmt(x) + '; ' + fmt(f(x)) + ')').join('; ')}</b></div>`;
     }
   });
   // Пересечения кривых между собой — их уже считает общий движок ключевых точек.
   const crosses = (typeof keyTargets === 'function' ? keyTargets() : [])
     .filter(p => p.kind === 'cross');
-  if (crosses.length) {
+  /* ⚠️ ПРИ ОДНОЙ КРИВОЙ ПЕРЕСЕКАТЬСЯ НЕЧЕМУ. Строка выводилась всегда и
+     повторяла точки пересечения с осями под другим заголовком: те же числа
+     дважды, причём второй раз под названием, которое их не описывает. */
+  if (crosses.length && shown.length > 1) {
     html += `<div class="stat"><span>Кривые пересекаются</span><b>${
-      crosses.map(p => '(' + fmt(p.x) + '; ' + fmt(p.y) + ')').join(', ')}</b></div>`;
+      crosses.map(p => '(' + fmt(p.x) + '; ' + fmt(p.y) + ')').join('; ')}</b></div>`;
   }
   box.innerHTML = html + graphExplainNote(shown.length);
 }

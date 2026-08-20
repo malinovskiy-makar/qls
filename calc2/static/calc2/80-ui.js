@@ -28,7 +28,7 @@ function addCurve(expr, form) {
     curveCounter++;
     STATE.curves.push({
       id: curveCounter, expr, compiled: null,
-      color: nextColor(), name: expr, role: null, visible: true,
+      color: nextColor(), role: null, visible: true,
       linear: built.linear, fn: built.fn,
       srcForm: 'QP', srcExpr: expr, srcCompiled: built.srcCompiled, srcLinear: built.srcLinear,
     });
@@ -42,7 +42,7 @@ function addCurve(expr, form) {
   curveCounter++;
   STATE.curves.push({
     id: curveCounter, expr, compiled,
-    color: nextColor(), name: expr, role: null, visible: true,
+    color: nextColor(), role: null, visible: true,
     linear: detectLinear(compiled),   // {a, b} для прямых, иначе null
     srcForm: 'PQ',
   });
@@ -71,7 +71,6 @@ function updateCurveExpr(curve, expr) {
     curve.linear = detectLinear(compiled);
     curve.fn = null;   // синтетическая функция (S + t и т.п.) больше не действует
   }
-  if (!curve.label) curve.name = expr;   // родовое имя идёт за формулой
   return null;
 }
 
@@ -128,7 +127,7 @@ function renderCurveList() {
 
     const nm = document.createElement('span');
     nm.className = 'curve-name'; nm.textContent = curveShortName(curve);
-    nm.title = curve.name || curve.expr || '';
+    nm.title = curve.expr || '';        // под именем — сама формула
     if (!curve.visible) nm.style.opacity = '.4';
 
     // Бейдж формы записи (Фаза 1б): видно, что кривая введена как «объём от цены».
@@ -144,6 +143,7 @@ function renderCurveList() {
     const del = document.createElement('button');
     del.className = 'btn-icon'; del.textContent = '✕'; del.title = 'Удалить кривую';
     del.addEventListener('click', () => {
+      pushUndo();
       STATE.curves = STATE.curves.filter(c => c.id !== curve.id);
       renderCurveList();
       redrawAll();
@@ -173,6 +173,7 @@ function renderCurveList() {
       fInp.placeholder = curve.srcForm === 'QP' ? 'Q = f(P)' : 'P = f(Q)';
       fInp.title = 'Формула кривой: правится на месте';
       fInp.addEventListener('input', () => {
+        pushUndo();
         const err = updateCurveExpr(curve, fInp.value);
         fInp.classList.toggle('bad', !!err);
         fInp.title = err ? ('Пока не применено: ' + err) : 'Формула кривой: правится на месте';

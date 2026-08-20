@@ -23,10 +23,61 @@ function computeSize() {
    ставим левое поле и пересобираем шкалы. Проход дешёвый (две линейные
    шкалы), зато рамка вокруг плоскости исчезает: «100» и «12 500» получают
    разное место, а не одинаковые 76 px на всякий случай. */
+/* ⚠️ ШИРИНУ ПОДПИСИ МЕРЯЕТ БРАУЗЕР, А НЕ «СТОЛЬКО-ТО ПИКСЕЛЕЙ НА ЗНАК».
+
+   Прежняя оценка `знаков × 6.2` занижала ширину, и поле слева выходило меньше
+   подписи. Замер (`scripts/calc2_layout_probe.js`): в «Производственной
+   функции» деления «1 000 … 4 000» начинались с координаты −5…−7 px, то есть
+   ЗА холстом, и на экране читалось «000». Причин занижения две, и обе
+   неустранимы константой: разряды разделены узким неразрывным пробелом,
+   а ширина цифры зависит от шрифта, которым страницу в итоге нарисовали.
+
+   Меряем в ОТДЕЛЬНОМ невидимом svg, а не в самом холсте: по `#chart` ходят
+   проходы `applyLabelInk`, `applyLabelSize`, `spreadLabels` и сборка `.tex`,
+   и служебный узел подмешался бы во все четыре. При этом узел лежит ВНУТРИ
+   `#graph-wrap`, чтобы наследовать тот же шрифт, что и подписи холста.
+
+   Проверка канона 5.1: подставить значения в 10 000 раз крупнее — ни одна
+   подпись не обрезана. */
+let _measSvg = null, _measText = null;
+function measureText(str, size, weight) {
+  const txt = String(str == null ? '' : str);
+  if (!txt) return 0;
+  try {
+    if (!_measText || !_measText.isConnected) {
+      const host = document.getElementById('graph-wrap') || document.body;
+      _measSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      _measSvg.setAttribute('aria-hidden', 'true');
+      _measSvg.setAttribute('data-skip-export', '1');
+      _measSvg.style.cssText = 'position:absolute;left:-9999px;top:-9999px;'
+                             + 'width:10px;height:10px;overflow:hidden;pointer-events:none;';
+      _measText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      _measSvg.appendChild(_measText);
+      host.appendChild(_measSvg);
+    }
+    _measText.setAttribute('font-size', size || FS.small);
+    _measText.setAttribute('font-weight', weight || 400);
+    _measText.textContent = txt;
+    const w = _measText.getComputedTextLength();
+    if (w > 0) return w;
+  } catch (e) { /* до сборки страницы мерить нечем — уходим в оценку */ }
+  return txt.length * 6.2;             // запасная оценка, пока холста нет
+}
+
+/* Полоса под осью X: строка чисел делений (от oy+8) плюс строка подписи,
+   которую сцены печатают на oy+24 («Дефицит = 40», «Безработица = 30»).
+   Замер: при поле 30 такая подпись уходила на 5 px ЗА нижний край холста
+   в четырёх сценах. Полоса одна на все сцены намеренно: список «кто пишет
+   под осью» разъехался бы со сценами, а стоит она 14 px из ~790 по высоте. */
+const BOTTOM_BAND = 44;
+
+/* Запас левого поля под подпись координаты (см. разбор в fitMargins). */
+const COORD_LABEL_PAD = 24;
+
 function fitMargins() {
   const m = CONFIG.margin;
   makeScales();
-  let wide = 1;
+  let wide = 0;
   try {
     // Деления зависят только от диапазона, поэтому в «Математике» берём её
     // окно: там по вертикали свои границы, а не первая четверть.
@@ -35,17 +86,54 @@ function fitMargins() {
       : [CONFIG.Pmin, CONFIG.Pmax];
     const probe = d3.scaleLinear().domain(dom).range([0, 1]);
     axisTicks(probe, 8, STATE.yStep).forEach(t => {
-      const s = fmt(t);
-      if (s.length > wide) wide = s.length;
+      const w = measureText(fmt(t), FS.small);
+      if (w > wide) wide = w;
     });
   } catch (e) { /* сцена ещё не готова — останемся со стартовыми полями */ }
-  // 6.2 px на знак при кегле 10 + 8 px отступа от оси + 6 px запаса у края.
-  m.left = Math.max(30, Math.min(88, Math.round(wide * 6.2) + 14));
-  m.right = 32;                        // буква оси X справа от стрелки
-  m.bottom = 30;                       // строка чисел под осью X
-  // Своё название графика печатается над плоскостью — ему нужна полоса.
-  m.top = (STATE.graphTitle || '').trim() ? 44 : 26;
+  /* 8 px отступа подписи от оси (её ставит drawAxes) + 6 px запаса у края,
+     плюс запас под ПОДПИСЬ КООРДИНАТЫ. У неё, в отличие от деления шкалы,
+     бывают дробная часть и индекс различителя: деление «80» занимает 16 px, а
+     подпись «54,55_b» — 40. Без этого запаса подпись не помещалась в поле, и
+     общий haloText разворачивал её ВНУТРЬ первой четверти, поверх поля
+     построения, — ровно то, на что жаловался владелец («65_min» на линии МРОТ).
+     Число подобрано замером живых подписей по всем сценам, а не на глаз:
+     scripts/calc2_coordlabel_probe.js считает, сколько подписей залезло правее
+     оси, и при этом запасе их ноль. */
+  m.left = Math.max(30, Math.min(120, Math.ceil(wide) + 14 + COORD_LABEL_PAD));
+
+  /* Справа за стрелкой стоит НАЗВАНИЕ оси X, и оно бывает длинным:
+     «t (ставка)» — 76 px, «Поступления» — 106. При поле 32 такое название
+     уезжало за холст на полсотни пикселей. Имя берём то же, что нарисует
+     drawAxes: своё, если человек его задал, иначе сценовое. */
+  const xName = STATE.axisXName || STATE.axisXDefault || 'Q';
+  m.right = Math.max(32, Math.min(140,
+              Math.ceil(AXIS_LABEL_GAP + measureText(xName, FS.large, 600)) + 6));
+
+  m.bottom = BOTTOM_BAND;
+  /* Сверху: полоса под своё название графика плюс место под НАЗВАНИЕ оси Y,
+     которое drawAxes печатает над стрелкой. */
+  const yName = STATE.axisYName || STATE.axisYDefault || 'P';
+  const yNeed = yName ? AXIS_LABEL_GAP + Math.ceil(FS.large * 1.2) : 0;
+  m.top = Math.max((STATE.graphTitle || '').trim() ? 44 : 26, yNeed + 8);
   makeScales();
+}
+
+/* ⚠️ ПОЛЕ СЛЕВА ПОД ЧУЖИЕ ДЕЛЕНИЯ (п. 35).
+   fitMargins меряет деления ГЛАВНОЙ вертикали сцены — [CONFIG.Pmin, Pmax].
+   Сцены с двумя панелями считают вертикаль сами: у производственной функции
+   верхняя панель доходит до 5 000, и её «5 000» начиналось с координаты −7,
+   то есть за левым краем холста, а на экране читалось «000».
+   Сцена зовёт эту функцию СВОИМИ значениями делений ДО того, как построит
+   шкалы: поле только расширяется, сузить его чужая панель не может. */
+function fitLeftForLabels(values) {
+  let wide = 0;
+  (values || []).forEach(v => {
+    const w = measureText(typeof v === 'number' ? fmt(v) : String(v), FS.small);
+    if (w > wide) wide = w;
+  });
+  const need = Math.max(30, Math.min(120, Math.ceil(wide) + 14));
+  if (need > CONFIG.margin.left) { CONFIG.margin.left = need; makeScales(); }
+  return CONFIG.margin.left;
 }
 
 // Линейные шкалы по двум осям. Границы берём из CONFIG целиком: нижние
@@ -78,17 +166,66 @@ function toData(px, py) { return [sx.invert(px), sy.invert(py)]; }
    Ширину подписи меряет fitMargins по длине этой строки, поэтому поле слева
    само раздвинется под новые, более длинные числа. */
 const NBTHIN = ' ';        // узкий неразрывный пробел — разделитель разрядов
-function fmt(v) {
-  const r = Math.round(v * 100) / 100;
+
+/* ⚠️ ЧИСЛО НА ЭКРАНЕ ОКРУГЛЯЕТСЯ РОВНО В ОДНОМ МЕСТЕ (канон 2.2).
+   Глубина округления — здесь и больше нигде: любое «Math.round(v*100)/100»,
+   написанное рядом с выводом, рано или поздно разъедется с этим. */
+const SHOWN_DECIMALS = 2;
+const SHOWN_POW = Math.pow(10, SHOWN_DECIMALS);
+function roundShown(v) { return Math.round(v * SHOWN_POW) / SHOWN_POW; }
+
+/* ⚠️ СУММА СЧИТАЕТСЯ ИЗ ОКРУГЛЁННЫХ СЛАГАЕМЫХ, А НЕ ОКРУГЛЯЕТСЯ САМА (п. 1).
+   На экране стояло «SW = CS + PS», а под ним CS 907,91 + PS 907,91 = 1 815,81:
+   сумма считалась по сырым float и округлялась отдельно от слагаемых, поэтому
+   в последнем разряде расходилась с тем, что человек видит и складывает сам.
+   Первое, что заметит ученик, — именно это.
+   Математика не меняется: STATE.sw по-прежнему точная сумма, из округлённого
+   собирается только ПОКАЗ. */
+function fmtSum(...parts) {
+  const s = parts.reduce((acc, v) => acc + (isFinite(v) ? roundShown(v) : NaN), 0);
+  return fmt(s, sumDecimals(parts));
+}
+/* Та же оговорка для разности: столбец «Δ» в таблице «До / После / Δ» обязан
+   сходиться с двумя соседними столбцами, а не считаться по сырым значениям. */
+function shownDiff(after, before) { return roundShown(after) - roundShown(before); }
+function fmtDiff(after, before) {
+  const d = shownDiff(after, before);
+  return (d > 0 ? '+' : '') + fmt(d, sumDecimals([after, before]));
+}
+
+/* ⚠️ У СУММЫ ТА ЖЕ ГЛУБИНА, ЧТО У СЛАГАЕМЫХ (канон 2.2).
+   «290,65 + 290,65 = 581,3» арифметически верно и всё равно читается как
+   ошибка: в столбце два знака у слагаемых и один у итога, глаз ищет
+   пропавшую копейку. Незначащий ноль печатается только там, где рядом
+   стоят числа с этим разрядом; одиночное «50» так и остаётся «50».
+   shownDecimals отвечает на вопрос «сколько знаков fmt напечатает САМ»,
+   поэтому padding никогда не срезает значащую цифру. */
+function shownDecimals(v) {
+  const r = roundShown(v);
+  if (!isFinite(r)) return 0;
+  let frac = Math.round(Math.abs(r) * SHOWN_POW) % SHOWN_POW;
+  let d = SHOWN_DECIMALS;
+  while (d > 0 && frac % 10 === 0) { frac /= 10; d--; }
+  return d;
+}
+function sumDecimals(parts) {
+  return parts.reduce((d, v) => isFinite(v) ? Math.max(d, shownDecimals(v)) : d, 0);
+}
+
+function fmt(v, minDecimals) {
+  const r = roundShown(v);
   if (!isFinite(r)) return String(v);
   const sign = r < 0 ? '-' : '';
   const a = Math.abs(r);
   const whole = Math.floor(a);
   let s = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, NBTHIN);
-  const frac = Math.round((a - whole) * 100) / 100;
-  // Дробная часть отделяется ЗАПЯТОЙ: интерфейс русский (Б15). Ведущий ноль
-  // не печатаем — «,5» короче и читается так же.
-  if (frac > 0) s += ',' + String(frac).slice(2);
+  const want = Math.max(shownDecimals(r), minDecimals || 0);
+  // Дробная часть отделяется ЗАПЯТОЙ: интерфейс русский (Б15).
+  if (want > 0) {
+    const frac = String(Math.round((a - whole) * SHOWN_POW))
+                   .padStart(SHOWN_DECIMALS, '0');
+    s += ',' + frac.slice(0, want);
+  }
   return sign + s;
 }
 
@@ -251,6 +388,150 @@ function extraTickY(g, v, color) {
   haloText(g, ox - 8, sy(v), fmt(v), 'end', 'middle');
 }
 
+/* ── ЧИСЛО ТОЧКИ НА ОСИ (фаза 5 ревью 19.08) ──────────────────────────────
+
+   Решение владельца: значения координат уходят ЗА оси. Цена — левее оси цены,
+   количество — ниже оси количества, внутри поля построения подписей координат
+   не остаётся вовсе. Имя оси при этом не повторяется: вместо «P*=50» на оси
+   стоит просто «50» — какая это ось, написано у её стрелки.
+
+   ⚠️ ПОЧЕМУ ЭТО ЗАОДНО ЧИНИТ РАСПОЛОЖЕНИЕ, А НЕ ТОЛЬКО ТЕКСТ. Замер до правки:
+   поле построения по горизонтали 32…816, а подпись «P∗=50» лежала на 32…69,
+   то есть внутри поля, поверх сетки и заливок. Причина не в том, что её туда
+   поставили: haloText разворачивает подпись внутрь графика, когда она не
+   влезает в поле слева, а «P∗=50» шириной 37 px в поля шириной 32 px не
+   влезала никогда. Оставшись одним числом, подпись становится не шире деления
+   шкалы — и спокойно встаёт туда же, где стоят деления.
+
+   Различитель сохраняется. Там, где на одной оси стоят две РАЗНЫЕ величины
+   (цена покупателя и цена продавца в потоварном налоге), имя оси снимается, а
+   индекс остаётся и переезжает за ось вместе с числом: иначе на оси окажутся
+   голые «60» и «40», и различить их станет нечем.
+
+   Совпало с делением шкалы — ДЕЛЕНИЕ УСТУПАЕТ МЕСТО: серое число шкалы
+   убирается, на его месте печатается число точки акцентным цветом и жирным.
+   Двух чисел друг на друге не остаётся. */
+
+/* Убрать деление шкалы, стоящее ровно там, где сейчас встанет число точки.
+   Деления рисует drawAxes ДО сцены, поэтому к этому моменту они уже в
+   разметке и их можно просто снять. Ищем среди своих же подписей делений
+   (класс axis-num), а не среди всех текстов холста. */
+function dropTickAt(coord, horizontal) {
+  if (!svg || !svg.node()) return false;
+  let hit = false;
+  svg.selectAll('text.axis-num').each(function () {
+    const v = parseFloat(this.getAttribute(horizontal ? 'x' : 'y'));
+    if (!isFinite(v) || Math.abs(v - coord) > 7) return;
+    this.remove();
+    hit = true;
+  });
+  return hit;
+}
+
+/* ⚠️ ЗНАЧЕНИЕ ПРИХОДИТ СЮДА И ЧИСЛОМ, И УЖЕ НАБРАННОЙ СТРОКОЙ.
+
+   Из пятидесяти с лишним мест вызова почти все пишут `axisValueY(g, ox, py,
+   fmt(P), 'b')` — то есть отдают готовую строку, а не число. Пока на входе
+   стояла проверка `!isFinite(value)`, это работало ТОЛЬКО для целых: `fmt(40)`
+   даёт «40», и `isFinite('40')` — правда, а `fmt(54.5454)` даёт «54,55», и
+   `isFinite('54,55')` — ложь, потому что десятичный разделитель у нас запятая.
+   Функция молча возвращала null, и подписи координат пропадали ЦЕЛИКОМ у любой
+   дробной величины: в «Процентных налогах» пунктиры вели к осям и упирались в
+   пустоту при значениях по умолчанию.
+
+   Правило показа теперь одно: подпись выводится ВСЕГДА. «Деление уступает
+   место» — это разрешение столкновения, а не условие показа. Число нужно
+   отдельно, только чтобы проверить совпадение с делением; не разобралось —
+   столкновения просто не ищем, но подпись рисуем. */
+function coordValue(value) {
+  if (typeof value === 'number') return isFinite(value) ? { text: fmt(value), num: value } : null;
+  const s = String(value == null ? '' : value).trim();
+  if (!s) return null;
+  // Разбираем обратно нашу же запись: узкий неразрывный пробел разрядов и запятая.
+  const num = parseFloat(s.replace(/[\s\u202f\u00a0]/g, '').replace(',', '.'));
+  return { text: s, num: num };
+}
+
+/* Число точки под осью количества. `oy` — пиксель самой оси, `idx` — индекс
+   различителя ('b', 's', '1', 'спрос'…) или пустая строка. */
+/* ⚠️ ОДНО МЕСТО — ОДНО ЧИСЛО. Две точки, сошедшиеся в одну, печатают свою
+   координату каждая, и на оси встаёт «50» поверх «50»: в «Эластичности»
+   равновесие и точка единичной эластичности сходятся при исходных формулах, в
+   разложении Слуцкого — старый и компенсированный наборы. Читается это как
+   опечатка, а разводить такие подписи нельзя: они и должны стоять там, где
+   стоят, потому что это одно и то же число.
+
+   Проверка живёт ЗДЕСЬ, в общей точке печати координат, а не в сценах: сцены
+   не знают друг о друге, а второй такой же проверки рядом быть не должно. */
+function coordAlreadyAt(px, horiz, text) {
+  let found = false;
+  svg.selectAll('text.coord-num').each(function () {
+    if (found) return;
+    if ((this.getAttribute('data-raw') || this.textContent || '').trim() !== String(text).trim()) return;
+    const at = horiz ? +this.getAttribute('x') : +this.getAttribute('y');
+    if (isFinite(at) && Math.abs(at - px) < 6) found = true;
+  });
+  return found;
+}
+
+function axisValueX(g, px, oy, value, idx) {
+  if (!isFinite(px)) return null;
+  const v = coordValue(value);
+  if (!v) return null;
+  const span = Math.abs(sx.domain()[1] - sx.domain()[0]);
+  const onTick = xTicks().some(t => Math.abs(sx(t) - px) < 7) ||
+                 (isFinite(v.num) && xTicks().some(t => Math.abs(t - v.num) < span * 0.02));
+  if (coordAlreadyAt(px, true, axisValueText(v.text, idx))) return null;
+  if (onTick) dropTickAt(px, true);
+  const t = haloText(g, px, oy + 8, axisValueText(v.text, idx), 'middle', 'hanging');
+  t.attr('class', 'coord-num');       // по этому классу их и считает проверка
+  if (onTick) t.attr('fill', cssVar('--accent')).attr('font-weight', 700);
+  return t;
+}
+
+/* Число точки левее оси цены. `ox` — пиксель самой оси.
+
+   ⚠️ ПОДПИСЬ КООРДИНАТЫ НЕ ИМЕЕТ ПРАВА УЙТИ В ПЕРВУЮ ЧЕТВЕРТЬ. Общий haloText
+   разворачивает не влезшую подпись ВНУТРЬ графика, и с узким левым полем (32 px)
+   так уезжали все подписи с индексом: «60_b» и «40_s» в потоварном налоге вставали
+   ПРАВЕЕ оси, поверх поля построения, а «65_min» на рынке труда ложилась прямо на
+   линию МРОТ. Решение владельца 19.08 требует обратного: цена стоит левее оси цены.
+
+   Поэтому здесь свой разворот, и он считается по НАСТОЯЩЕЙ ширине уже
+   нарисованной подписи, а не по оценке «символов × 5,9». Оценка haloText
+   считает индекс полноразмерным и завышает ширину «65_min» почти в полтора
+   раза — по ней подпись «не влезала» там, где на самом деле влезает. */
+function axisValueY(g, ox, py, value, idx) {
+  if (!isFinite(py)) return null;
+  const v = coordValue(value);
+  if (!v) return null;
+  const span = Math.abs(sy.domain()[1] - sy.domain()[0]);
+  const onTick = yTicks().some(t => Math.abs(sy(t) - py) < 7) ||
+                 (isFinite(v.num) && yTicks().some(t => Math.abs(t - v.num) < span * 0.02));
+  if (coordAlreadyAt(py, false, axisValueText(v.text, idx))) return null;
+  if (onTick) dropTickAt(py, false);
+  const t = haloText(g, ox - 8, py, axisValueText(v.text, idx), 'end', 'middle', { noFlip: true });
+  t.attr('class', 'coord-num');
+  /* Не поместившуюся подпись прижимает к краю холста ОТДЕЛЬНЫЙ ПРОХОД
+     (`pinCoordLabels`), а не эта строка. Причина: здесь текст только что создан,
+     размеры его ещё не посчитаны, и `getBBox` отвечает про пустой узел — пока
+     проверка стояла тут, «31,72_ATC» в естественной монополии спокойно уезжала
+     за левый край холста. Проход идёт вместе с разведением подписей, когда
+     раскладка уже готова. */
+  if (onTick) t.attr('fill', cssVar('--accent')).attr('font-weight', 700);
+  return t;
+}
+
+/* Само число и, если он есть, индекс различителя нижним индексом. Разбор
+   разметки подписей уже умеет «_», и в выгрузку он уходит тем же путём.
+   На вход приходит УЖЕ НАБРАННОЕ число (см. coordValue): второй проход fmt
+   по строке с запятой её бы испортил. */
+function axisValueText(text, idx) {
+  const n = String(text);
+  if (!idx) return n;
+  return String(idx).length > 1 ? (n + '_{' + idx + '}') : (n + '_' + idx);
+}
+
 // Оси со стрелками, делениями, числами и подписями.
 // Подписи параметризованы: по умолчанию Q/P (рынок, издержки), для КПВ — X/Y.
 // Ось нарисована ровно там, где ноль. Уехал ноль за край при панорамировании —
@@ -323,15 +604,34 @@ function drawAxes(xLabel, yLabel, opts) {
   /* Н24: подпись оси помечена классом. Во-первых, по нему проверка ловит
      наложения; во-вторых, общий проход размера подписей (applyLabelSize) и
      выгрузка отличают её от прочих надписей. */
-  if (xLabel && atZeroY) g.append('text').attr('class', 'axis-name')
-    .attr('x', xRight + AXIS_LABEL_GAP).attr('y', oy)
-    .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
-    .attr('font-size', FS.large).attr('font-weight', 600)
-    .attr('fill', COL.ink).text(xLabel);
-  if (yLabel && atZeroX) g.append('text').attr('class', 'axis-name')
-    .attr('x', ox).attr('y', yTop - AXIS_LABEL_GAP)
-    .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
-    .attr('font-size', FS.large).attr('font-weight', 600)
-    .attr('fill', COL.ink).text(yLabel);
+  /* ⚠️ НАЗВАНИЕ ОСИ ПЕРЕЕЗЖАЕТ, А НЕ УЕЗЖАЕТ ЗА КРАЙ.
+     Поля холста считает fitMargins по измеренной ширине названия, но на самой
+     первой отрисовке сцены STATE.axisXDefault ещё не заполнен, а человек может
+     вписать своё название прямо сейчас — поле догонит его только следующим
+     кадром. Поэтому место зажимается ещё и здесь: два предохранителя на одну
+     беду, зато подпись не пропадает ни в одном порядке событий.
+     Тот же приём уже принят для подписей кривых (curveAnchor): подпись
+     переносится, а не скрывается. */
+  const EDGE = 2;
+  if (xLabel && atZeroY) {
+    const w = measureText(xLabel, FS.large, 600);
+    const x = Math.min(xRight + AXIS_LABEL_GAP, W - EDGE - w);
+    g.append('text').attr('class', 'axis-name')
+      .attr('x', Math.max(EDGE, x)).attr('y', oy)
+      .attr('text-anchor', 'start').attr('dominant-baseline', 'middle')
+      .attr('font-size', FS.large).attr('font-weight', 600)
+      .attr('fill', COL.ink).text(xLabel);
+  }
+  if (yLabel && atZeroX) {
+    const w = measureText(yLabel, FS.large, 600);
+    // Якорь по центру, поэтому за край выходит половина ширины.
+    const x = Math.min(Math.max(ox, EDGE + w / 2), W - EDGE - w / 2);
+    const y = Math.max(yTop - AXIS_LABEL_GAP, FS.large + EDGE);
+    g.append('text').attr('class', 'axis-name')
+      .attr('x', x).attr('y', y)
+      .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
+      .attr('font-size', FS.large).attr('font-weight', 600)
+      .attr('fill', COL.ink).text(yLabel);
+  }
 }
 

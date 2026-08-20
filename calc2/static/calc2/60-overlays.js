@@ -13,7 +13,10 @@ function redrawAll() {
   redrawScene();
   drawOverlays();
   applyLabelSize();      // общий размер подписей — одним проходом по холсту (П50)
+  unclipLabels();        // подпись, которую режет её же обрезка, переезжает наружу
+  keepAxisNamesInside(); // и название оси зажимается по ФАКТИЧЕСКОМУ кеглю
   spreadLabels();        // и разведение наложившихся — тем же приёмом (А60)
+  applyLabelInk();       // и читаемые чернила подписей — тем же приёмом (П75)
   refreshRegulators();   // строки «имя = значение» идут за значениями ползунков
   // Заголовок раздела равновесия — свойство сцены (А52). Синхронизируем здесь,
   // а не только в рыночном пересчёте: иначе в сцене, куда пришли из монополии,
@@ -212,13 +215,20 @@ function renderMmRows() {
    Начали печатать — она превращается в обычную строку списка (цвет, имя,
    удаление, правка формулы), а под ней появляется новая пустая. */
 function graphRowsBox() { return document.getElementById('graph-rows'); }
+let graphFieldSeq = 0;   // порядковый номер поля строки: набор навешивается по id
 
 function renderGraphRows() {
   const box = graphRowsBox();
   if (!box) return;
   box.innerHTML = '';
+  /* Блока пустого состояния здесь нет: исключение из канона 3.13 записано в
+     DESIGN.md 5.1. Пустая строка ввода сама является приглашением к действию —
+     она подписана и несёт образец формулы, — а плашка занимала место на самом
+     плотном экране продукта и вдобавок оставалась на виду ПОСЛЕ того, как
+     функция введена и кривая построена. */
   STATE.curves.forEach(c => box.appendChild(buildGraphRow(c)));
   box.appendChild(buildGraphRow(null));
+  equipGraphRows(box);
   /* Поля формул собираются лениво и только когда видны (А56), а строки мы
      вставили в разметку только что: разбираем очередь здесь, иначе поле
      остаётся обычным текстовым окошком до следующей перерисовки. */
@@ -250,7 +260,10 @@ function buildGraphRow(curve) {
   const inp = document.createElement('input');
   inp.type = 'text'; inp.autocomplete = 'off';
   inp.value = curve ? curve.expr : '';
-  inp.placeholder = curve ? '' : 'Например: x^2 - 4';
+  /* Образец без пробелов вокруг минуса: замер показал, что «x^2 - 4» шире
+     содержимого поля на пять пикселей и обрезается. Текст образца владелец
+     оставил, требование было одно — он обязан помещаться целиком. */
+  inp.placeholder = curve ? '' : 'Например: x^2-4';
   inp.setAttribute('aria-label', 'Формула функции');
   slot.appendChild(inp);
   row.appendChild(slot);
@@ -261,6 +274,7 @@ function buildGraphRow(curve) {
   del.style.visibility = curve ? '' : 'hidden';
   del.addEventListener('click', () => {
     if (!row._curve) return;
+    pushUndo();
     STATE.curves = STATE.curves.filter(c => c !== row._curve);
     renderGraphRows();
     redrawAll();
@@ -281,8 +295,39 @@ function buildGraphRow(curve) {
 
   row._curve = curve || null;
   inp.addEventListener('input', () => graphRowInput(row, inp, del, name));
-  upgradeFormulaField(inp);
+  /* П19 · П21. Строка «Построения графиков» получает ТОТ ЖЕ набор, что поля
+     формул во всех остальных сценах: клавиатуру и вопросик. Прежде здесь
+     звалась только `upgradeFormulaField` — поле становилось математическим,
+     но без клавиатуры и без подсказки, и это была единственная сцена, где
+     формулу набирать было нечем, кроме системной клавиатуры.
+     Идентификатор строке нужен: набор навешивается по id. */
+  /* ⚠️ НАБОР НАВЕШИВАЕТСЯ ПОСЛЕ ВСТАВКИ В СТРАНИЦУ, А НЕ ЗДЕСЬ.
+     `equipFormulaField` ищет поле через `getElementById`, а строка в этот
+     момент ещё не в документе: вызов отсюда молча ничего не делал, и поле
+     оставалось без клавиатуры и вопросика. Отдаём id, разбирает renderGraphRows. */
+  if (!inp.id) inp.id = 'graph-f-' + (++graphFieldSeq);
   return row;
+}
+
+/* ⚠️ СТРОКА СПИСКА РОЖДАЕТСЯ ОДИНАКОВО, КАКИМ БЫ ПУТЁМ ЕЁ НИ ЗАВЕЛИ.
+
+   Путей два: полная пересборка списка и «рождение» следующей пустой строки
+   сразу после ввода. Набор полей вешала только пересборка, поэтому строка,
+   добавившаяся сама, оставалась обычным текстовым полем — и общий проход по
+   текстовым полям превращал её в правку-на-месте с пунктиром. На экране
+   выходило два разных способа ввода одного и того же: у первой строки
+   настоящее поле формул с клавиатурой, у второй — пунктирная строчка, дающая
+   по щелчку голый курсор с обрубком линии.
+
+   Разница была не в оформлении, а в том, что набор навешивался в одном месте
+   из двух. Теперь он один на оба пути.
+
+   П19 · П21: строки «Построения графиков» получают ТОТ ЖЕ набор, что поля
+   формул остальных сцен, — клавиатуру и вопросик. */
+function equipGraphRows(box) {
+  if (!box || typeof equipFormulaField !== 'function') return;
+  box.querySelectorAll('.f-slot > input[id]').forEach(el => equipFormulaField(el.id, 'MATH'));
+  if (typeof flushMathfields === 'function') flushMathfields();
 }
 
 /* Правка строки. Пустая строка при первом же осмысленном вводе заводит кривую
@@ -292,24 +337,28 @@ function graphRowInput(row, inp, del, name) {
   if (!row._curve) {
     if (!txt) return;
     const { compiled, error } = compileFormula(txt);
-    if (error) { graphError('Пока не понимаю: ' + error); return; }
-    graphError('');
+    /* П16. Фраза стоит У ЭТОГО поля, а не в общем блоке ошибок наверху панели:
+       строк формул в сцене несколько, и общий блок не говорит, в какой из них
+       беда. Общий блок оставлен пустым, чтобы не сообщать одно и то же дважды. */
+    if (error) { fieldProblem(inp, 'Пока не понимаю запись: ' + error); return; }
+    fieldProblem(inp, ''); graphError('');
     curveCounter++;
     const c = { id: curveCounter, expr: txt, compiled, color: nextColor(),
-                name: txt, role: null, visible: true,
+                role: null, visible: true,
                 linear: detectLinear(compiled), srcForm: 'PQ' };
     STATE.curves.push(c);
     row._curve = c;
     row.dataset.cid = c.id;
     del.style.visibility = '';
     const box = graphRowsBox();
-    if (box) box.appendChild(buildGraphRow(null));
+    if (box) { box.appendChild(buildGraphRow(null)); equipGraphRows(box); }
     redrawAll();
     return;
   }
   if (!txt) return;                       // пустое поле не роняет кривую
+  pushUndo();
   const err = updateCurveExpr(row._curve, txt);
-  graphError(err ? ('Пока не понимаю: ' + err) : '');
+  fieldProblem(inp, err ? ('Пока не понимаю запись: ' + err) : '');
   if (!err) redrawAll();
 }
 
@@ -335,11 +384,24 @@ function mainScales() {
 function drawOverlays() {
   if (!svg || !svg.node()) return;
   invalidateKeyTargets();    // особые точки считаются заново под новую картинку
+  /* ⚠️ ПЕРЕСЕЧЕНИЯ СЧИТАЮТСЯ ЗДЕСЬ, А НЕ ТАМ, ГДЕ ИХ РИСУЮТ.
+
+     Раньше `STATE.crosses` обновлял `drawCrossPoints`, а он идёт ниже расчёта
+     площадей и набранных вершин. Всё, что спрашивало ключевые точки раньше
+     него, получало картину ПРОШЛОГО кадра — и, что хуже, клало её в кэш на
+     весь текущий. Сдвинули кривую: пересечение уже в другом месте, а вершина,
+     стоящая в старом, всё ещё считает себя стоящей в пересечении. Общее
+     состояние не может обновляться побочным действием отрисовки. */
+  STATE.crosses = crossPoints();
   if (typeof resetLabelBoxes === 'function') resetLabelBoxes();   // подписи расставляются заново
   applyAreaColors();         // свои цвета заливок — одним проходом по data-legend
   drawAreaCalc();            // посчитанная площадь (Фаза 10)
   drawAreaVerts();           // набранные вершины будущей площади
-  drawCrossPoints();         // пересечения кривых тусклыми точками
+  /* Полосы попадания — СТРОГО перед кружками: кружку ключевой точки нужен свой
+     запас попадания, и он обязан лежать ВЫШЕ полосы кривой, иначе промах по
+     точке на пять пикселей уносит руку в кривую. */
+  drawCurveHits();           // полосы попадания у кривых, нарисованных сценой
+  drawCrossPoints();         // ключевые точки взведённой кривой
   drawRoller();              // точка, катящаяся по кривой
   drawGraphTitle();
   drawLegend();
@@ -348,7 +410,7 @@ function drawOverlays() {
   syncSceneColorPickers();   // образцы в панели идут за темой и за своими цветами
   syncAreaCalcUI();          // выпадашка кривых и список точек для расчёта площади
   hintsToDots();             // подсказки, добавленные сценой, тоже уходят под вопросик
-  syncFirstCard();                                     // ярче та карточка, что сверху
+  syncFirstCard();                                     // ярче та карточка, где вводят формулы
   refreshAnalyticsPanel();
   renderMathIn(document.getElementById('ex-body'));    // и в объяснении модели
   renderMathIn(document.getElementById('tools-panel'));// и в подсказках панели
@@ -401,25 +463,41 @@ function typesetStats(root) {
     const raw = (own ? katexVisibleText(val) : (val.textContent || '')).trim();
     if (!raw) { if (own) row.classList.add('stat-eq', 'stat-own', 'stat-nosign'); return; }
     // Составное значение и фраза не помещаются в ячейку для числа (Б39, Б40).
-    if (restatWide(row, lab, val, raw, own)) return;
-    if (own) { row.classList.add('stat-eq', 'stat-own', 'stat-nosign'); return; }
+    if (restatWide(row, lab, val, raw, own)) { addStatSign(row, val, raw); return; }
+    if (own) { row.classList.add('stat-eq', 'stat-own'); addStatSign(row, val, raw); return; }
     // Числовое ли значение: число, пара, проценты, знак — да; фраза — нет.
     const numeric = /^[(\[]?\s*[-−+]?[\d.,]/.test(raw) || /^[-−+]?\d/.test(raw);
     if (numeric && typeof katex !== 'undefined') {
       try {
-        katex.render(statToTex(raw), val, { throwOnError: false, displayMode: false });
+        if (!katexInto(val, statToTex(raw))) throw new Error('katex');
         val.classList.add('stat-tex');
       } catch (e) { /* остаётся прежним текстом */ }
     }
     row.classList.add('stat-eq');
     // Своё равенство внутри значения («SW = CS + PS») тоже не удваиваем.
-    if (raw.indexOf('=') >= 0) { row.classList.add('stat-nosign'); return; }
-    const eq = document.createElement('i');
-    eq.className = 'stat-sign';
-    eq.setAttribute('aria-hidden', 'true');
-    eq.textContent = '=';
-    row.insertBefore(eq, val);
+    addStatSign(row, val, raw);
   });
+}
+
+/* ⚠️ ФОРМАТ СТРОКИ ОДИН НА ВЕСЬ СПИСОК — СО ЗНАКОМ РАВЕНСТВА.
+
+   Форматов было три сразу: без знака (подпись, а значение под ней), со знаком,
+   и один выровненный по правому краю. В одном списке это читается как три
+   разных вида данных, хотя данные одни. Знак теперь ставит одна функция, и
+   зовут её ВСЕ ветки разбора, включая те, что раньше возвращались раньше
+   времени.
+
+   Единственное исключение — значение со СВОИМ равенством внутри («SW = CS +
+   PS»): второй знак дал бы «SW = = CS + PS». */
+function addStatSign(row, val, raw) {
+  if (!row || !val) return;
+  if (row.querySelector(':scope > .stat-sign')) return;
+  if (String(raw || '').indexOf('=') >= 0) { row.classList.add('stat-nosign'); return; }
+  const eq = document.createElement('i');
+  eq.className = 'stat-sign';
+  eq.setAttribute('aria-hidden', 'true');
+  eq.textContent = '=';
+  row.insertBefore(eq, val);
 }
 
 /* Значение табло в запись для KaTeX. Числа и разделители оставляем как есть,
@@ -483,8 +561,7 @@ function restatWide(row, lab, val, raw, own) {
       const line = document.createElement('span');
       line.className = 'stat-line';
       if (typeof katex !== 'undefined') {
-        try { katex.render(statToTex(p), line, { throwOnError: false, displayMode: false }); }
-        catch (e) { line.textContent = p; }
+        if (!katexInto(line, statToTex(p))) line.textContent = p;
       } else line.textContent = p;
       val.appendChild(line);
     });
@@ -547,6 +624,20 @@ function statPieces(raw) {
    Правится только текст, разметка не трогается: обходим текстовые узлы и
    заменяем найденный кусок на span с формулой. Узлы, уже прошедшие обработку,
    помечаются, чтобы статичные подсказки не разбирались заново на каждом кадре. */
+/* ⚠️ п. 48. `$MC$` KaTeX набирает как ПРОИЗВЕДЕНИЕ переменных M·C: курсив
+   с зазором, и на экране это читается как «M с индексом C». Аббревиатура
+   величины (MC, ATC, AVC, CS, PS, DWL, TP, MP, AP) — ОДНО имя, и набирается
+   прямым шрифтом. Тот же разбор уже стоит на холсте: qtyParts не режет на
+   буквы то, что целиком заглавное.
+   Правим в единственной точке печати формул панели, а не в 244 строках сцен,
+   где эти доллары написаны. Имена команд LaTeX не трогаем, содержимое
+   \text{…} и \mathrm{…} тоже: там прямой шрифт уже задан. */
+function texAbbrev(src) {
+  return String(src).replace(
+    /(\\(?:text|mathrm|mathbf|operatorname)\s*\{[^{}]*\})|(\\[a-zA-Z]+)|([A-Z]{2,})/g,
+    (all, keep, cmd, abbr) => keep || cmd || ('\\mathrm{' + abbr + '}'));
+}
+
 function renderMathIn(root) {
   if (!root || typeof katex === 'undefined') return;
   const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -568,8 +659,7 @@ function renderMathIn(root) {
       if (i % 2 === 0) { if (piece) frag.appendChild(document.createTextNode(piece)); return; }
       const span = document.createElement('span');
       span.className = 'tex';
-      try { katex.render(piece, span, { throwOnError: false, displayMode: false }); }
-      catch (e) { span.textContent = piece; }
+      if (!katexInto(span, texAbbrev(piece))) span.textContent = piece;
       frag.appendChild(span);
     });
     node.parentNode.replaceChild(frag, node);
@@ -658,8 +748,16 @@ const AREA_SHORT = {
   'Излишек покупателя (CS)': 'CS',
   'Излишек продавца (PS)': 'PS',
   'Излишек производителя (TR - VC)': 'PS',
-  'Излишек работников': 'CS',
-  'Излишек фирм': 'PS',
+  /* ⚠️ п. 41. НА РЫНКЕ ТРУДА ПРОДАЮТ РАБОТНИКИ, А ПОКУПАЮТ ФИРМЫ.
+     Обозначения стояли наоборот, и получалось противоречие между сценами:
+     заливка честно берёт цвет ОГРАНИЧИВАЮЩЕЙ кривой (излишек под D — синий,
+     над S — оранжевый), а легенда называла синее пятно «PS», оранжевое «CS».
+     На рынке благ «CS синий, PS оранжевый», в монопсонии выходило наоборот.
+     Правило одно: CS живёт под кривой спроса и потому синий, PS над кривой
+     предложения и потому оранжевый; кто в модели покупатель, а кто продавец,
+     на цвет не влияет. */
+  'Излишек работников': 'PS',
+  'Излишек фирм': 'CS',
   'Излишек фирмы: весь излишек рынка': 'PS',
   'Переменные издержки (VC)': 'VC',
   'Потери общества (DWL)': 'DWL',
@@ -669,15 +767,22 @@ const AREA_SHORT = {
   'Доход бюджета': 'Tx',
   'Расход бюджета': 'GS',
   'Рента квоты': 'R',
-  'Достижимые наборы': 'Дост.',
+  /* «Достижимые наборы» короткого обозначения не имеет: «Дост.» это не
+     сокращение величины, а обрубок слова (п. 45). Пишем целиком. */
   'Диапазон возможных зарплат': 'W',
   'Площадь': 'S',
 };
+/* ⚠️ ОБРУБОК ПО ЧИСЛУ ЗНАКОВ ОТМЕНЁН (п. 45).
+   Осмысленное сокращение — это CS, PS, DWL, Tx: их школьник читает быстрее
+   фразы, и они входят в реестр обозначений. А «Прибыль ф…» и «Дост.» это не
+   сокращения, а обрезанные слова: подпись перестаёт читаться, а места экономит
+   меньше, чем стоит потеря смысла. Незнакомое название печатается целиком,
+   коробка легенды просто становится шире — её ширина считается по фактически
+   измеренному тексту, а не по числу знаков. */
 function areaShort(name) {
   if (AREA_SHORT[name]) return AREA_SHORT[name];
   const m = /\(([^)]{1,5})\)\s*$/.exec(name);      // «… (CS)» → CS
-  if (m) return m[1];
-  return name.length > 10 ? name.slice(0, 9) + '…' : name;
+  return m ? m[1] : name;
 }
 
 /* Легенда: столбик у правого нижнего угла поля графика. Раньше она лежала
@@ -702,7 +807,9 @@ function drawLegend() {
   const SW = 12, GAP = 6, LH = 18, PAD = 8;
   const fsz = FS.base;
   const labels = seen.map(e => areaShort(e.key));
-  const wide = Math.max.apply(null, labels.map(s => s.length)) * fsz * 0.62;
+  // Ширину меряет браузер: оценка «знаков × 0,62 кегля» врала, и подпись
+  // выходила за подложку (та же беда, что была у полей холста).
+  const wide = Math.max.apply(null, labels.map(t => measureText(t, fsz, 600)));
   const boxW = SW + GAP + wide + 2 * PAD;
   const boxH = seen.length * LH + 2 * PAD;
   const { x, y } = legendCorner(boxW, boxH);
@@ -720,6 +827,11 @@ function drawLegend() {
       .attr('x', x + PAD + SW + GAP).attr('y', cy + SW * 0.95)
       .attr('font-size', fsz).attr('font-weight', 600).attr('fill', COL.ink)
       .text(labels[i]);
+    /* Полное название аббревиатуры остаётся узлом `title` внутри SVG, и это
+       не та подсказка, о которой говорит правило 18: строка легенды ничего не
+       делает по нажатию, а `title` у фигуры это её ИМЯ — им же её называет
+       чтец с экрана. Заменять его всплывающей плашкой значило бы отобрать
+       имя и ничего не дать взамен. */
     t.append('title').text(e.key);
   });
 }
@@ -728,6 +840,34 @@ function drawLegend() {
    считаем, сколько их точек попадает в коробку в каждом из четырёх углов, и
    садимся в самый пустой. При равенстве побеждает правый нижний — привычное
    место, к которому глаз уже приучен. */
+/* ⚠️ ЕДИНАЯ РАСКЛАДКА ПЛАВАЮЩЕГО (механизм 3.3; п. 38, 39, 40, 45).
+
+   Над холстом висят HTML-блоки: стопка кнопок масштаба с гаечным ключом
+   (`.graph-tools`, правый верхний угол) и кнопка площади по точкам. Они лежат
+   в обёртке `#graph-wrap`, а не внутри SVG, поэтому холст про них не знал
+   ВООБЩЕ. Отсюда 124 наложения из замера: легенда садилась ровно под кнопки
+   («DWL» читалось как «DW»), туда же уезжали подписи кривых.
+
+   Прямоугольники собираются ОДИН раз и отдаются всем, кому нужно свободное
+   место: выбору места легенды и разведению подписей. Второго списка «кто над
+   холстом висит» не заводим — он разъехался бы с разметкой. */
+function floatRects() {
+  const node = svg.node();
+  const wrap = document.getElementById('graph-wrap');
+  if (!node || !wrap) return [];
+  const box = node.getBoundingClientRect();
+  const out = [];
+  wrap.querySelectorAll('.graph-tools, .cv-mode, .wrench, .graph-float').forEach(el => {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || el.hasAttribute('hidden')) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return;
+    out.push({ x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height,
+               left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+  });
+  return out;
+}
+
 function legendCorner(boxW, boxH) {
   const m = CONFIG.margin, EDGE = 8;
   /* Б47. Место только СПРАВА. Слева у графика ось значений с цифрами делений и
@@ -741,6 +881,11 @@ function legendCorner(boxW, boxH) {
      равных выбирался угол. */
   const xRight = (W - m.right) - boxW - EDGE;
   const yTop = m.top + EDGE, yBot = (H - m.bottom) - boxH - 26;
+  /* ⚠️ ПЕРВЫМ ИДЁТ НИЖНИЙ УГОЛ, А НЕ ВЕРХНИЙ. Верхний правый занят стопкой
+     кнопок масштаба — постоянно, во всех сценах. Порядок кандидатов закреплён,
+     и место выбирается ПЕРВОЕ подходящее, а не «лучшее» из всех: канон просит
+     устойчивое место (п. 40), а «лучшее» пересчитывалось на каждое движение
+     кривой, и легенда прыгала снизу вверх сама собой. */
   const corners = [{ x: xRight, y: yBot }, { x: xRight, y: yTop }];
   for (let i = 1; i < 8; i++) corners.push({ x: xRight, y: yTop + (yBot - yTop) * i / 8 });
   // Точки нарисованных кривых в пикселях холста, разреженно: для выбора угла
@@ -767,15 +912,26 @@ function legendCorner(boxW, boxH) {
       }
     });
   }
-  let best = corners[0], bestHits = Infinity;
-  corners.forEach(c => {
+  /* Плавающие блоки — ЗАПРЕТ, а не штраф: под кнопками легенду не прочитать
+     никак, сколько бы свободного места вокруг ни было. */
+  const blocked = floatRects();
+  const clash = (c) => blocked.some(b =>
+    c.x < b.x + b.w && b.x < c.x + boxW && c.y < b.y + b.h && b.y < c.y + boxH);
+  const cost = corners.map(c => {
+    if (clash(c)) return Infinity;
     let hits = 0;
     pts.forEach(([px, py]) => {
       if (px >= c.x && px <= c.x + boxW && py >= c.y && py <= c.y + boxH) hits++;
     });
-    if (hits < bestHits) { bestHits = hits; best = c; }
+    return hits;
   });
-  return best;
+  // Прежнее место остаётся за легендой, пока оно свободно (п. 40).
+  const prev = STATE.legendSpot;
+  if (prev != null && corners[prev] && cost[prev] === 0) return corners[prev];
+  let best = 0;
+  for (let i = 1; i < corners.length; i++) if (cost[i] < cost[best]) best = i;
+  STATE.legendSpot = best;
+  return corners[best];
 }
 
 
@@ -963,22 +1119,36 @@ function keyTargets() {
   /* Вид точки нужен отрисовке (П36–П38): излом рисуется по-особому, у
      остальных вид одинаковый. Перегибы сюда не попадают и не попадут:
      договорились их ключевыми точками не считать. */
-  const push = (x, y, name, kind) => {
+  /* ⚠️ У КАЖДОЙ ТОЧКИ ЕСТЬ ХОЗЯЕВА — КРИВЫЕ, КОТОРЫМ ОНА ПРИНАДЛЕЖИТ.
+
+     Без этого списка нельзя ответить на вопрос фазы 3: «какие точки зажечь,
+     когда щёлкнули по этой кривой». Хозяев может быть двое — точка пересечения
+     принадлежит обеим кривым и обязана загораться при щелчке по любой из них
+     (решение владельца). У экстремума и излома хозяин один. У начала координат
+     хозяев нет вовсе: это пересечение ОСЕЙ, а не кривой, и загораться вместе с
+     кривой ему не за что.
+
+     Хозяин записывается ИМЕНЕМ, тем же, что печатает snapTargets: по имени же
+     сверяет взведение, и второго способа отождествить кривую заводить нельзя. */
+  const push = (x, y, name, kind, owners) => {
     if (!isFinite(x) || !isFinite(y)) return;
     if (x < w.x0 - 1e-9 || x > w.x1 + 1e-9 || y < w.y0 - 1e-9 || y > w.y1 + 1e-9) return;
     if (out.some(o => Math.abs(o.x - x) < dx && Math.abs(o.y - y) < dy)) return;
-    out.push({ x, y, name, kind: kind || 'cross' });
+    out.push({ x, y, name, kind: kind || 'cross', owners: owners || [] });
   };
+  const curveNames = new Set(snapTargets().map(t => t.name));
   (STATE.crosses && STATE.crosses.length ? STATE.crosses : crossPoints()).forEach(p => {
+    // Второй участник бывает осью, а не кривой: ось в хозяева не идёт.
+    const own = [p.a, p.b].filter(nm => curveNames.has(nm));
     push(p.x, p.y, /^ось /.test(p.b)
       ? ('пересечение с ' + p.b.replace('ось ', 'осью '))
-      : ('пересечение ' + p.a + ' и ' + p.b), 'cross');
+      : ('пересечение ' + p.a + ' и ' + p.b), 'cross', own);
   });
   /* Н40: начало координат тоже ключевая точка. Добавляем ПОСЛЕ пересечений:
      если кривая и так пересекает ось в нуле, это одна и та же точка, и имя у
      неё должно остаться содержательным, а не превратиться в «начало координат».
      Сам push отсеет повтор по координатам. */
-  push(0, 0, 'начало координат', 'cross');
+  push(0, 0, 'начало координат', 'cross', []);
   if (!(w.x1 > w.x0)) { _keyPtsCache = out; return out; }
   const lo = w.x0 + (w.x1 - w.x0) * 1e-4, hi = w.x1;
   const h = (w.x1 - w.x0) * 1e-4;
@@ -1008,7 +1178,7 @@ function keyTargets() {
       if (!isFinite(y)) return;
       const s = d2Num(t.f, x, h2);
       const kind = (s > 0) ? 'минимум ' : (s < 0 ? 'максимум ' : 'плато ');
-      push(x, y, kind + t.name, 'extremum');
+      push(x, y, kind + t.name, 'extremum', [t.name]);
     });
     // Излом, совпавший с уже найденным пересечением, не добавляем: у Z = min(f, g)
     // ветвь переключается ровно там, где кривые пересекаются, а пересечение и
@@ -1016,7 +1186,7 @@ function keyTargets() {
     const near = (w.x1 - w.x0) * 0.02;
     kinksOf(t.f, lo, hi).forEach(x => {
       if (out.some(o => Math.abs(o.x - x) < near)) return;
-      push(x, t.f(x), 'излом ' + t.name, 'kink');
+      push(x, t.f(x), 'излом ' + t.name, 'kink', [t.name]);
     });
   });
   _keyPtsCache = out;
@@ -1028,6 +1198,28 @@ function keyTargets() {
    больше, чтобы попадать в неё было легче, чем промахнуться мимо. */
 // В ключевую точку попасть должно быть заметно легче, чем просто в кривую (П42).
 const KEY_SNAP_PX = 22;
+/* Запас попадания по кружку ключевой точки. Больше половины ширины полосы
+   кривой (16 px): иначе зазора между «взял точку» и «взял кривую» нет вовсе. */
+const KEY_HIT_PX = 11;
+/* п. 33. ВОЗМОЖНОСТЬ, О КОТОРОЙ ЗНАЕТ ТОЛЬКО НАВЕДЕНИЕ МЫШИ, НЕ СУЩЕСТВУЕТ.
+
+   «Двойной щелчок, чтобы переименовать», «Добавить в список точек» и
+   «Потяните, чтобы перенести» жили внутри SVG узлами `title`, то есть в
+   подсказке браузера. На сенсорном экране её нет вовсе, с клавиатуры не
+   открыть, оформлению не поддаётся — узнать о возможности можно было только
+   случайно, мышью.
+
+   ⚠️ ЗАМЕНИТЬ ИХ ВСПЛЫВАЮЩЕЙ ПЛАШКОЙ НЕ ВЫШЛО, И ЭТО ПРАВИЛЬНО. Плашка
+   всплывает ровно там, где рука ведёт указатель, перехватывает его и мешает
+   тому самому действию, ради которого показана: подпись максимума с плашкой
+   перестала открываться двойным щелчком совсем. Нашёл браузер; ни один
+   разбор исходников такого не видит.
+
+   Поэтому возможности названы ТАМ, ГДЕ ИМИ УПРАВЛЯЮТ: переименование и
+   значок закрепки — в подсказке блока «Точки на графике», перенос названия
+   графика — рядом с полем этого названия в меню плоскости. Узел `title` у
+   аббревиатуры легенды оставлен: это не подсказка, а ИМЯ фигуры.            */
+
 function snapVertexAt(px, py) {
   const { mx, my } = mainScales();
   let best = null;
@@ -1052,11 +1244,18 @@ function snapVertexAt(px, py) {
    обеим осям и подписываются координаты НА ОСЯХ. У остальных точек так не
    делается: они серые, а координаты и «закрепка» появляются по щелчку. */
 function drawCrossPoints() {
-  STATE.crosses = crossPoints();
-  const pts = keyTargets();
+  /* По умолчанию автоматических ключевых точек нет вовсе (решение владельца).
+     Пока ни одна кривая не взведена, рисовать нечего — холст чистый.
+     Своих точек и вершин площадей это не касается: их рисуют drawMarks и
+     drawAreaVerts, и они видны всегда. */
+  if (!STATE.armedCurve) return;
+  const pts = keyTargets().filter(keyPointLit);
   if (!pts.length) return;
   const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'crosses');
+  // Цвет взведённой кривой: загоревшаяся точка красится им, а не общим сланцем.
+  const armed = snapTargets().filter(t => t.name === STATE.armedCurve)[0];
+  const litColor = (armed && armed.color) || COL.ink;
   // Пока набирают вершины или ставят свою точку, кружки ключевых точек не ловят
   // щелчок: иначе щелчок рядом с пересечением уходил в кружок и вершина не
   // ставилась вовсе. Прилипание к этим же точкам работает и без их кликабельности.
@@ -1069,7 +1268,10 @@ function drawCrossPoints() {
     const px = mx(p.x), py = my(p.y);
 
     if (p.kind === 'kink') {
-      // Пунктир к обеим осям и числа прямо на осях — без щелчка.
+      /* Излом рисуется подробнее прочих: пунктир к обеим осям и числа прямо на
+         осях. Правило «показывать сразу, без щелчка» отменено общим решением
+         владельца — на холсте по умолчанию нет ни одной автоматической точки.
+         Подробная разметка осталась, но включается вместе со своей кривой. */
       g.append('line').attr('x1', zx).attr('y1', py).attr('x2', px).attr('y2', py)
         .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
         .attr('stroke-dasharray', '3 3').attr('opacity', .6);
@@ -1097,10 +1299,19 @@ function drawCrossPoints() {
       return;
     }
 
-    const dot = g.append('circle').attr('cx', px).attr('cy', py)
+    const item = g.append('g').attr('class', 'cross-item');
+    /* ⚠️ ЗАПАС ПОПАДАНИЯ ПО ТОЧКЕ. Замер до правки: сама точка ловила щелчок
+       кругом радиусом 4 px, а с пяти пикселей в любую сторону под курсором
+       была уже полоса кривой шириной 16. Зазора не было вовсе — промах на пять
+       пикселей уносил руку в кривую вместо точки. Прозрачный круг радиусом 11
+       лежит выше полос (см. порядок в drawOverlays), и пока курсор внутри
+       него, кривая на указатель не отзывается. */
+    item.append('circle').attr('cx', px).attr('cy', py).attr('r', KEY_HIT_PX)
+      .attr('fill', 'transparent').attr('data-skip-export', '1').style('cursor', 'pointer');
+    const dot = item.append('circle').attr('cx', px).attr('cy', py)
       .style('cursor', 'pointer');
     // Подпись живёт в своей группе: её показываем и прячем, не трогая остальное.
-    const lab = g.append('g').attr('class', 'cross-label').style('display', 'none');
+    const lab = item.append('g').attr('class', 'cross-label').style('display', 'none');
     haloText(lab, px + 9, py - 9, '(' + fmt(p.x) + '; ' + fmt(p.y) + ')', 'start', 'auto');
     // «Закрепка» рядом с координатами: кладёт точку в список своих точек.
     const pin = lab.append('g').attr('class', 'cross-pin').style('cursor', 'pointer');
@@ -1110,32 +1321,121 @@ function drawCrossPoints() {
       .attr('d', `M${px + 12.5},${py + 7} l0,-3 l6,-6 l3,3 l-6,6 z`)
       .attr('fill', 'none').attr('stroke', COL.inkSoft).attr('stroke-width', 1.2)
       .attr('stroke-linejoin', 'round');
-    pin.append('title').text('Добавить в список точек');
+    /* Значок без подписи и без пояснения — просто точка (решение владельца).
+       Он единственный выносит точку в список насовсем. */
     pin.on('click', (ev) => { ev.stopPropagation(); pinKeyPoint(p); });
 
-    /* Поведение как у Desmos (Н42–Н44): по умолчанию кружок серый и пустой
-       внутри; при наведении показываются координаты; щелчок их закрепляет, и
-       тогда точка заливается и становится чуть крупнее. Щелчок в стороне
-       гасит закрепку. Закрепка-значок появляется только у закреплённой точки:
-       на пролёте курсора её некуда нажимать. */
+    /* Точка взведённой кривой горит цветом этой кривой и жирнее обычного, но
+       БЕЗ координат: координаты показывает наведение и только оно. */
     const paint = () => {
-      const pinned = (STATE.hotCross === i);
       const hover = (STATE.hoverCross === i);
-      // Координаты видны — значит точка залита и чуть крупнее (Н44). Верно и
-      // для наведения, и для закреплённой щелчком: состояние одно и то же.
-      const hot = pinned || hover;
-      dot.attr('r', hot ? 5 : 4)
-         .attr('fill', hot ? COL.ink : COL.halo)
-         .attr('stroke', hot ? COL.ink : COL.inkSoft)
-         .attr('stroke-width', hot ? 2 : 1.4)
-         .attr('opacity', hot ? 1 : 0.55);
-      lab.style('display', hot ? null : 'none');
-      pin.style('display', pinned ? null : 'none');
+      dot.attr('r', hover ? 5.5 : 4.5)
+         .attr('fill', hover ? litColor : COL.halo)
+         .attr('stroke', litColor)
+         .attr('stroke-width', hover ? 2.6 : 2.2)
+         .attr('opacity', 1);
+      lab.style('display', hover ? null : 'none');
+      pin.style('display', hover ? null : 'none');
     };
     paint();
-    dot.on('click', (ev) => { ev.stopPropagation(); STATE.hotCross = (STATE.hotCross === i) ? null : i; redrawAll(); })
-       .on('pointerenter', () => { STATE.hoverCross = i; paint(); })
-       .on('pointerleave', () => { if (STATE.hoverCross === i) STATE.hoverCross = null; paint(); });
+    /* ⚠️ ПЛАШКА ОБЯЗАНА ПЕРЕЖИТЬ ПЕРЕХОД С ТОЧКИ НА ЗНАЧОК.
+       Значок лежит внутри плашки, то есть в стороне от кружка. Скрой плашку
+       сразу по уходу курсора с кружка — и до значка не дотянуться никогда:
+       он исчезает ровно в тот момент, когда рука к нему движется. Поэтому
+       уход даёт короткую отсрочку, а вход в саму плашку её отменяет.
+       Второй раз в проекте: тем же способом лечится любая плашка с кнопкой. */
+    let leaveTimer = null;
+    const show = () => {
+      if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+      STATE.hoverCross = i; paint();
+    };
+    const hide = () => {
+      if (leaveTimer) clearTimeout(leaveTimer);
+      leaveTimer = setTimeout(() => {
+        leaveTimer = null;
+        if (STATE.hoverCross === i) { STATE.hoverCross = null; paint(); }
+      }, 160);
+    };
+    item.on('pointerenter', show).on('pointerleave', hide);
+    /* Щелчок по самой точке НЕ закрепляет её: закрепки больше нет, выносит
+       только значок. Всплытие останавливаем, иначе щелчок дошёл бы до холста
+       и погасил взведённую кривую прямо из-под руки. */
+    item.on('click', (ev) => ev.stopPropagation());
+  });
+}
+
+/* ── ВЗВЕДЕНИЕ КРИВОЙ (фаза 3) ────────────────────────────────────────────
+
+   Правило владельца: по умолчанию автоматических ключевых точек на холсте нет
+   вовсе. Щелчок по кривой ЗАЖИГАЕТ её ключевые точки — цветом и жирностью, без
+   координат. Наведение на загоревшуюся точку ПОКАЗЫВАЕТ координаты и значок;
+   наведение ничего не выносит и ничего не сохраняет. Выносит точку в список
+   только щелчок по значку.
+
+   ⚠️ Это НЕ копия Десмоса, и это осознанно. В Десмосе шага «щёлкнуть по
+   кривой» нет: точка появляется только под курсором, по одной, и найти их все
+   можно лишь обшарив кривую мышью. Для учебного инструмента это хуже — ученик
+   должен видеть, ГДЕ у функции особые точки. Отсюда гибрид: щелчок показывает
+   все точки разом, дальше наведение работает по-десмосовски.
+
+   Взведена всегда ОДНА кривая: щелчок по другой гасит первую. Гасится ровно
+   двумя способами — повторным щелчком по той же кривой и щелчком по пустому
+   месту холста. Escape не гасит: так решил владелец. */
+function armCurve(name) {
+  const nm = name || null;
+  STATE.armedCurve = (STATE.armedCurve === nm) ? null : nm;
+  redrawAll();
+}
+
+function disarmCurve() {
+  if (STATE.armedCurve === null) return false;
+  STATE.armedCurve = null;
+  redrawAll();
+  return true;
+}
+
+// Горит ли точка сейчас: у неё есть хозяин, и он взведён.
+function keyPointLit(p) {
+  return !!STATE.armedCurve && !!p.owners && p.owners.indexOf(STATE.armedCurve) >= 0;
+}
+
+/* Полосы попадания для кривых, которые сцена рисует САМА, мимо общего
+   рисовальщика. Их одиннадцать сцен из сорока одной (издержки, макро, КПВ,
+   «ломаный спрос» и прочие): у них нет записи в STATE.curves, которую видит
+   drawCurves, а значит нет и полосы — то есть взвести их было бы нечем.
+
+   Полоса строится по той же функции, по которой считаются ключевые точки
+   (snapTargets), поэтому кривая и её точки не могут разъехаться по построению.
+   Имена, у которых полоса уже есть, пропускаем: две полосы на одну кривую
+   означали бы, что верхняя молча съедает щелчок по нижней. */
+function drawCurveHits() {
+  if (STATE.markArm || STATE.vertArm) return;   // сейчас на холсте ставят точку
+  const targets = snapTargets();
+  if (!targets.length) return;
+  const done = new Set();
+  svg.selectAll('g.curves path[data-hit]').each(function () {
+    const nm = this.getAttribute('data-hit-name');
+    if (nm) done.add(nm);
+  });
+  const { mx, my } = mainScales();
+  const [xLo, xHi] = mx.domain();
+  const g = svg.append('g').attr('class', 'curve-hits').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
+  targets.forEach(t => {
+    if (done.has(t.name)) return;
+    const pts = [];
+    for (let i = 0; i <= 240; i++) {
+      const x = xLo + (xHi - xLo) * i / 240;
+      let v;
+      try { v = t.f(x); } catch (e) { v = NaN; }
+      pts.push(isFinite(v) ? [x, v] : null);
+    }
+    if (!pts.some(p => p)) return;
+    g.append('path').datum(pts)
+      .attr('fill', 'none').attr('stroke', 'transparent').attr('stroke-width', CURVE_HIT_PX)
+      .attr('data-skip-export', '1').attr('data-hit-name', t.name)
+      .attr('d', line).style('cursor', 'pointer')
+      .on('click', (ev) => { ev.stopPropagation(); armCurve(t.name); });
   });
 }
 
@@ -1143,7 +1443,10 @@ function drawCrossPoints() {
    списке. Блок «Точки на графике» при этом раскрывается сразу же, иначе точка
    уходит в закрытую карточку и выглядит как «ничего не произошло». */
 function pinKeyPoint(p) {
-  STATE.hotCross = null;
+  pushUndo();
+  /* Единственный способ вынести точку насовсем. Наведение этого не делает
+     намеренно: владелец оговорил отдельно и настойчиво, что увёл курсор — и
+     не осталось ничего. */
   addMarkAt(p.x, p.y, null);              // последней в списке, как обычная точка
   openSection('sec-view');
 }
@@ -1165,7 +1468,8 @@ function hoverLabel(g, dot, x, y, text, anchor, baseline) {
   dot.style('cursor', 'pointer')
      .on('pointerenter', () => lab.style('display', null))
      .on('pointerleave', () => lab.style('display', 'none'));
-  dot.append('title').text(text);
+  /* Своей плашки здесь не нужно: та же фраза уже показывается подписью на
+     холсте, а `pointerenter` приходит и от касания. */
   return lab;
 }
 
@@ -1318,8 +1622,23 @@ function curveRightEdge(f) {
 
 // Как называется переменная горизонтальной оси в текущей сцене: границы отрезка
 // подписываются ею, а не безликими «от» и «до».
-function axisXLetter() {
-  return (STATE.axisXName || STATE.axisXDefault || 'x').trim() || 'x';
+function axisXLetter() { return axisLetter('x'); }
+
+/* п. 32. КООРДИНАТА НАЗЫВАЕТСЯ ТАК ЖЕ, КАК ОСЬ.
+
+   Оси подписаны Q и P, а форма ввода точки просила x и y — две системы
+   обозначений на одном экране. Берём обозначение самой оси, но ТОЛЬКО когда
+   это обозначение, а не фраза: «Издержки = 50» в колонке шириной в сотню
+   пикселей нечитаемо, а «TP, MP, AP» ещё и не одна величина. Длинное
+   название оси оставляем осям, координате даём привычные x и y. */
+const AXIS_LETTER_MAX = 3;
+function axisLetter(which) {
+  const src = (which === 'y')
+    ? (STATE.axisYName || STATE.axisYDefault)
+    : (STATE.axisXName || STATE.axisXDefault);
+  const t = String(src || '').trim();
+  if (t && t.length <= AXIS_LETTER_MAX && !/[\s,;]/.test(t)) return t;
+  return which === 'y' ? 'y' : 'x';
 }
 
 /* ── Вершины площади щелчками (Фаза 7) ────────────────────────────────
@@ -1327,11 +1646,62 @@ function axisXLetter() {
    ставит вершину, рядом с особой точкой она прыгает точно в неё. Галочки
    в списке для этого больше не нужны. */
 function armVerts(on) {
+  const was = STATE.vertArm;
   STATE.vertArm = !!on;
   const wrap = document.getElementById('graph-wrap');
   if (wrap) wrap.style.cursor = STATE.vertArm ? 'crosshair' : '';
   if (!STATE.vertArm) showSnapHint(null);
   renderVertList();
+  syncCanvasMode();
+  // Дорожка захвата кривой во взведённом режиме не рисуется, поэтому холст
+  // надо переложить. Только НА СМЕНЕ состояния: снятие уже снятого режима
+  // случается при каждой загрузке сцены, и лишняя перерисовка там ни к чему.
+  if (was !== STATE.vertArm && typeof redrawAll === 'function') redrawAll();
+}
+
+/* п. 25. Полоса режима холста: что делает щелчок и чем это кончить.
+
+   Слова берём здесь, в одном месте, а не в каждом, кто взводит режим:
+   иначе «ставите точку» и «набираете вершины» разъехались бы с тем, что
+   на самом деле произойдёт. Состояние спрашиваем у `canvasMode()` —
+   второго списка флагов не заводим. */
+const CANVAS_MODE_TEXT = {
+  mark: () => ({ what: '<b>Ставите точку</b> <span>· нажмите на график</span>', stop: 'Отмена' }),
+  /* Счёт набранного стоит здесь, а не отдельной плавающей кнопкой (п. 80):
+     человек работает на холсте, и видеть, сколько уже отмечено, ему нужно
+     здесь же. Считает площадь по-прежнему одна кнопка — та, под которой
+     появляется результат. */
+  vert: () => {
+    const n = (STATE.areaVerts || []).length;
+    const tail = n ? ('· отмечено ' + n + (n < 3 ? ', нужно хотя бы три' : ''))
+                   : '· каждый щелчок ставит вершину';
+    return { what: '<b>Отмечаете вершины</b> <span>' + tail + '</span>', stop: 'Готово' };
+  },
+};
+
+function syncCanvasMode() {
+  // Пока вершины отмечаются, закончить набор предлагает полоса режима над
+  // холстом; кнопка в панели на это время уходит, чтобы одно и то же действие
+  // не стояло на экране дважды. Состояние у обеих одно — `canvasMode()`.
+  const arm = document.getElementById('ac-vert-arm');
+  if (arm) arm.hidden = !!STATE.vertArm;
+  const bar = document.getElementById('cv-mode');
+  if (!bar) return;
+  const make = CANVAS_MODE_TEXT[canvasMode()];
+  bar.hidden = !make;
+  if (!make) return;
+  const t = make();
+  const what = document.getElementById('cv-mode-what');
+  const stop = document.getElementById('cv-mode-stop');
+  if (what) what.innerHTML = t.what;
+  if (stop) stop.textContent = t.stop;
+}
+
+// Выйти из любого взведённого режима холста. Одна дверь на кнопку «Готово»,
+// на Escape и на всё, что режим прерывает.
+function leaveCanvasMode() {
+  if (STATE.markArm) { cancelMarkDraft(); return; }
+  if (STATE.vertArm) armVerts(false);
 }
 
 function addAreaVert(x, y, name) {
@@ -1355,6 +1725,7 @@ function renderVertList() {
   const btns = document.getElementById('ac-vert-btns');
   if (empty) empty.style.display = list.length ? 'none' : '';
   if (btns) btns.style.display = list.length ? '' : 'none';
+  syncCanvasMode();   // подпись кнопки «Отмечать вершины» идёт за состоянием
   box.innerHTML = '';
   list.forEach((p, i) => {
     const row = document.createElement('div');
@@ -1479,10 +1850,36 @@ function syncAreaRangeLabel() {
   el.append(word, open, bound('acFrom', () => r.a), semi, bound('acTo', () => r.b), close);
 }
 
+/* п. 29. ИМЯ ВЕРШИНЫ УСТАРЕВАЕТ ВМЕСТЕ С КАРТИНКОЙ.
+
+   Вершина, поставленная в пересечение D и S, запоминает это имя. Потом
+   кривые сдвигают, пересечение уезжает, а в списке по-прежнему написано
+   «1. пересечение D и S (50; 50)»: координаты верны, объяснение — нет.
+   Координаты человек ставил сам, их не трогаем; имя это НАША подпись, и
+   держать её можно, только пока она правда. Сверяем с текущими ключевыми
+   точками: нет такой на этом месте — имя снимаем, остаются числа. */
+function freshenVertNames() {
+  const list = (STATE.areaVerts || []).filter(p => p.name);
+  if (!list.length) return false;
+  const w = viewWindow();
+  const dx = (w.x1 - w.x0) * 2e-3, dy = (w.y1 - w.y0) * 2e-3;
+  const keys = keyTargets();
+  let changed = false;
+  list.forEach(p => {
+    const ok = keys.some(k => k.name === p.name &&
+      Math.abs(k.x - p.x) <= dx && Math.abs(k.y - p.y) <= dy);
+    if (!ok) { p.name = ''; changed = true; }
+  });
+  return changed;
+}
+
 // Набранные вершины на графике: номер у каждой и бледный контур будущей фигуры.
 function drawAreaVerts() {
   const list = STATE.areaVerts || [];
   if (!list.length) return;
+  // Список перекладываем ПОСЛЕ проверки имён и только если что-то изменилось:
+  // renderVertList не перерисовывает холст, поэтому петли здесь нет.
+  if (freshenVertNames()) renderVertList();
   const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'area-verts').style('pointer-events', 'none');
   if (list.length >= 3) {
@@ -1507,6 +1904,8 @@ function drawAreaVerts() {
     const dot = g.append('circle').attr('cx', mx(p.x)).attr('cy', my(p.y)).attr('r', 4.5)
       .attr('fill', COL.halo).attr('stroke', COL.reg).attr('stroke-width', 2)
       .style('pointer-events', 'all').style('cursor', 'grab');
+    // Номер вершины стоит вплотную к своей точке: на 8 px вправо и вверх,
+    // то есть в углу её же кружка радиусом 4,5.
     haloText(g, mx(p.x) + 8, my(p.y) - 8, String(i + 1), 'start', 'auto');
 
     dot.on('pointerenter', () => dot.attr('r', 6.5).attr('stroke-width', 3))
@@ -1619,11 +2018,20 @@ function bestAreaRing(pts) {
   return best ? { ring: best.ring, exact: true } : { ring: angleRing(pts), exact: false };
 }
 
+/* п. 26. САМОПЕРЕСЕЧЕНИЕ НАЗЫВАЕТСЯ ВСЛУХ.
+
+   До восьми вершин перебор сам отбрасывает «бабочки», и обход всегда простой.
+   От девяти он невозможен по времени, остаётся обход по кругу — а он у
+   некоторых наборов точек пересекает сам себя, и площадь по формуле шнурков
+   тогда не значит ничего: части фигуры вычитаются друг из друга. Молчать об
+   этом нельзя (канон 2.13), поэтому оговорка едет вместе с числом и видна на
+   экране, а не в подсказке браузера. */
 function calcAreaPolygon() {
   const pts = (STATE.areaVerts || []).slice();
   if (pts.length < 3) return { error: 'Нужно хотя бы три вершины: щёлкните по графику ещё раз.' };
   const r = bestAreaRing(pts);
   return { kind: 'poly', value: ringArea(r.ring), exact: r.exact,
+           crosses: !r.exact && ringSelfCrosses(r.ring),
            ring: r.ring.map(p => [p.x, p.y]) };
 }
 
@@ -1700,7 +2108,14 @@ function updateAreaCalcPanel() {
      бюджета, потери общества). Раньше сценовые области жили только в отдельном
      разделе «Цвета областей», и там у них не было ни числа, ни соседства с
      посчитанными площадями. Раздел удалён, ничего не потеряно. */
-  const scene = currentAreas();
+  /* Области, которые нарисовала САМА МОДЕЛЬ. Посчитанные человеком площади
+     тоже помечены `data-legend` — иначе они не попали бы в легенду на холсте,
+     а там они нужны. Но в ТАБЛИЦЕ им не место: они уже идут своими строками
+     ниже, со своим именем, цветом и крестиком. Без этой отсечки одна и та же
+     площадь стояла дважды: S₁ без крестика и S₁ с крестиком, с одним числом. */
+  const mine = {};
+  (list || []).forEach(r => { mine[areaKey(r.label)] = 1; });
+  const scene = currentAreas().filter(e => !mine[e.key]);
   box.innerHTML = '';
   if (!list.length && !scene.length) return;
 
@@ -1754,11 +2169,7 @@ function updateAreaCalcPanel() {
 
     const c3 = document.createElement('b');
     c3.textContent = fmt(r.value);
-    if (r.kind === 'poly' && r.exact === false) {
-      c3.classList.add('area-approx');
-      c3.title = 'Вершин больше восьми: полный перебор обходов слишком долгий, '
-               + 'поэтому берётся приближение — обход вершин по кругу.';
-    }
+    if (r.kind === 'poly' && r.exact === false) c3.classList.add('area-approx');
 
     const del = document.createElement('button');
     del.type = 'button'; del.className = 'btn-icon'; del.textContent = '×';
@@ -1769,6 +2180,17 @@ function updateAreaCalcPanel() {
     });
 
     row.append(c1, c3, del);
+    /* Оговорка идёт СТРОКОЙ ПОД числом, а не подсказкой браузера: подсказку
+       на планшете не открыть вовсе, а знать про приближение надо до того, как
+       число выпишут в тетрадь. */
+    if (r.kind === 'poly' && r.exact === false) {
+      const note = document.createElement('span');
+      note.className = 'area-note' + (r.crosses ? ' area-note--bad' : '');
+      note.textContent = r.crosses
+        ? 'Обход пересекает сам себя: это число не площадь фигуры. Уберите лишние вершины.'
+        : 'Вершин больше восьми: обход взят по кругу, площадь приближённая.';
+      row.appendChild(note);
+    }
     table.appendChild(row);
   });
   box.appendChild(table);
@@ -1809,15 +2231,8 @@ function syncAreaCalcUI() {
   updateQuickArea();
 }
 
-// Быстрая кнопка у графика, когда вершин набрано достаточно.
-function updateQuickArea() {
-  const b = document.getElementById('quick-area');
-  if (!b) return;
-  const n = (STATE.areaVerts || []).length;
-  const show = (STATE.areaCalcMode === 'poly') && n >= 3;
-  b.hidden = !show;
-  if (show) b.textContent = 'Площадь по ' + n + ' точкам';
-}
+// Сколько вершин набрано — говорит полоса режима над холстом (п. 80).
+function updateQuickArea() { syncCanvasMode(); }
 
 function setAreaCalcMode(mode) {
   STATE.areaCalcMode = (mode === 'poly') ? 'poly' : 'curve';
@@ -1864,13 +2279,13 @@ function wireAreaCalc() {
   if (calc) calc.addEventListener('click', () => runAreaCalc());
   const clr = document.getElementById('ac-clear');
   if (clr) clr.addEventListener('click', () => clearAreaCalc());
-  const q = document.getElementById('quick-area');
-  if (q) q.addEventListener('click', () => { setAreaCalcMode('poly'); runAreaCalc(); });
   // Выбрали кривую — сразу видно, на каком отрезке считаем, и кнопка загорается.
   const pick = document.getElementById('ac-pick');
   if (pick) pick.addEventListener('change', () => { syncAreaRangeLabel(); syncAreaCalcButton(); });
   const vClear = document.getElementById('ac-vert-clear');
   if (vClear) vClear.addEventListener('click', () => clearAreaVerts());
+  const vArm = document.getElementById('ac-vert-arm');
+  if (vArm) vArm.addEventListener('click', () => armVerts(!STATE.vertArm));
   setAreaCalcMode('curve');
 }
 
@@ -1889,7 +2304,13 @@ function paramsAllowed() { return true; }
 
 /* Переменные графика: буквы, которыми подписаны оси. Параметром такая буква
    стать не может — её значение задаёт сама точка на графике. */
-const AXIS_VARS = new Set(['x', 'y', 'Q', 'P', 'L', 'K', 'X', 'Y']);
+/* П14. Строчная и заглавная — ОДНА величина. «100 - q» давало прямую P = 99
+   и ползунок q = 1: буква не значилась осью, становилась параметром со
+   значением 1, и формула честно считала «100 − 1». При этом «100 - x»
+   работало, и разницы человек объяснить не мог. Синонимы объявлены здесь и
+   ПОДСТАВЛЯЮТСЯ в расчёт (см. axisScope в 10-math-core.js) — одного списка
+   мало: буква перестала бы быть параметром, но осталась бы неизвестной. */
+const AXIS_VARS = new Set(['x', 'y', 'Q', 'q', 'P', 'p', 'L', 'l', 'K', 'X', 'Y']);
 
 /* Настоящие математические константы. Только они из всего словаря Math.js
    закрывают одиночную букву. Раньше проверка была «есть ли math[имя]», и под
@@ -2066,7 +2487,13 @@ function syncParams() {
   }
   const names = [];
   const take = (expr) => { if (expr) freeSymbols(expr).forEach(n => { if (names.indexOf(n) < 0) names.push(n); }); };
-  STATE.curves.forEach(c => take(c.expr));
+  /* ⚠️ Вторая половина договора о параметрах. Карточку списка сцена уже не
+     показывает (syncCurveListVisibility), но сами кривые в STATE.curves у неё
+     остаются — их кладёт пресет монополии. Пока буквы из них заводили ползунки,
+     рычаг оставался молчащим, просто без своей карточки. */
+  if (typeof sceneDrawsCurveList !== 'function' || sceneDrawsCurveList()) {
+    STATE.curves.forEach(c => take(c.expr));
+  }
   if (STATE.mode === 'math') [STATE.mathFormula, STATE.mathG2, STATE.mathG3, STATE.mathG4].forEach(take);
   // Формулы сцен (КПВ, издержки, макро, полезность и прочие) живут не в
   // STATE.curves, а в своих полях ввода. Берём их из общего реестра — только
@@ -2084,7 +2511,7 @@ function syncParams() {
   });
   if (changed) {
     const panel = document.getElementById('params-panel');
-    if (panel) panel._extraSig = '';     // пересобрать правую панель
+    if (panel) panel._extraSig = PULT_REBUILD;     // пересобрать правую панель
     updatePult();
   }
 }
@@ -2127,10 +2554,10 @@ function buildParamChip(box, name) {
   track.className = 'param-track';
   const loLab = document.createElement('button');
   loLab.type = 'button'; loLab.className = 'param-bound';
-  loLab.title = 'Границы и шаг';
+  loLab.setAttribute('data-tip', 'Границы и шаг');
   const hiLab = document.createElement('button');
   hiLab.type = 'button'; hiLab.className = 'param-bound';
-  hiLab.title = 'Границы и шаг';
+  hiLab.setAttribute('data-tip', 'Границы и шаг');
 
   const sl = document.createElement('input');
   sl.type = 'range'; sl.style.accentColor = cssVar('--accent');
@@ -2171,7 +2598,7 @@ function buildParamChip(box, name) {
     val.textContent = fmt(p.value);
     paintEq();
     if (bounds && bounds.close) bounds.close();   // Н10: тронули ползунок — меню закрылось
-    redrawAll();
+    redrawKeepingWindow();     // окно подбирается под формулу, а не под значение буквы
   });
 
   /* Н12: щёлкнули по значению — «a =» остаётся на месте, правится только число
@@ -2181,11 +2608,17 @@ function buildParamChip(box, name) {
     if (p.folded) { p.folded = false; applyFold(); return; }   // свёрнутый — сначала разворачиваем
     if (bounds && bounds.close) bounds.close();
     editEqValue(lab, name, p.value, (v) => {
+      /* Случай первый (см. разбор у centerBandOn): вписали значение за полосой —
+         полоса переезжает так, чтобы значение встало ровно посередине, ширина
+         сохраняется. Раньше граница просто раздвигалась до значения, и полоса
+         становилась неуправляемо длинной. */
+      if (v < p.min || v > p.max) {
+        const b = centerBandOn({ min: p.min, max: p.max }, v);
+        p.min = b.min; p.max = b.max;
+      }
       p.value = v;
-      if (v < p.min) p.min = v;      // вышли за границу — она раздвигается сама
-      if (v > p.max) p.max = v;
       syncSlider();
-      redrawAll();
+      redrawKeepingWindow();
     });
   });
 
@@ -2197,12 +2630,14 @@ function buildParamChip(box, name) {
     (key, v) => {
       p[key] = v;
       if (p.max <= p.min) p.max = p.min + 1;
-      p.value = Math.max(p.min, Math.min(p.max, p.value));
+      // Случай второй: границы заданы человеком и остаются как заданы,
+      // подтягивается ЗНАЧЕНИЕ — к ближайшей границе.
+      p.value = pullIntoBand({ min: p.min, max: p.max }, p.value);
       syncSlider();
-      redrawAll();
+      redrawKeepingWindow();
     });
-  loLab.addEventListener('click', bounds.open);
-  hiLab.addEventListener('click', bounds.open);
+  loLab.addEventListener('click', () => bounds.open('min'));
+  hiLab.addEventListener('click', () => bounds.open('max'));
 
   box.appendChild(chip);
 }
@@ -2269,7 +2704,8 @@ function drawGraphTitle() {
     .style('cursor', 'move')
     .text(t);
 
-  el.append('title').text('Потяните, чтобы перенести. Двойной щелчок правит название');
+  // Название графика тянут и правят двойным щелчком; про это сказано в меню
+  // координатной плоскости, где это название и вводят.
 
   // Перетаскивание: запоминаем долю поля, а не пиксели.
   el.call(d3.drag().container(() => svg.node())
@@ -2344,7 +2780,17 @@ function normHex(c) {
   if (/^#[0-9a-f]{3}$/i.test(s)) return '#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3];
   const m = s.match(/rgba?\(\s*(\d+)\D+(\d+)\D+(\d+)/i);
   if (m) return '#' + [1, 2, 3].map(i => (+m[i]).toString(16).padStart(2, '0')).join('');
-  return '#888888';
+  /* Разобрать не удалось. Нейтральный цвет берём ИЗ ТОКЕНА, а не числом.
+     ⚠️ Рекурсией сюда возвращаться нельзя: если у токена пустое значение,
+     `normHex(cssVar(...))` позвал бы сам себя без конца. Поэтому значение
+     токена разбирается тем же кодом ОДИН раз, через флаг. */
+  if (!normHex._deep) {
+    normHex._deep = true;
+    const t = cssVar('--text3');
+    normHex._deep = false;
+    if (t) { const v = normHex(t); if (v) return v; }
+  }
+  return '#888888';                       // запасное значение, если токена нет
 }
 /* Шесть предложенных цветов (П34). Значения живут в токенах --pal-1…--pal-6,
    поэтому светлая и тёмная тема дают РАЗНЫЕ образцы, а перекрашивание темы
@@ -2647,10 +3093,87 @@ function snapTargets() {
     return out;
   }
   if (STATE.mode === 'math') { mathSnapTargets(out); return out; }
+  if (STATE.mode === 'macro')      { macroSnapTargets(out); return out; }
+  if (STATE.mode === 'consumer')   { consumerSnapTargets(out); return out; }
+  if (STATE.mode === 'inequality') { ineqSnapTargets(out); return out; }
   STATE.curves.filter(c => c.visible && !isVertical(c)).forEach(c => {
-    out.push({ name: curveShortName(c), f: (q) => evalCurve(c, q) });
+    /* Цвет и сама кривая нужны взведению (фаза 3): загоревшаяся точка красится
+       цветом своей кривой, а полоса попадания должна знать, какую кривую
+       взводит. Раньше сюда попадало только имя и функция. */
+    out.push({ name: curveShortName(c), f: (q) => evalCurve(c, q), color: c.color, curve: c });
   });
   return out;
+}
+
+/* П21. Кривые макромоделей, потребителя и неравенства.
+
+   Полоса захвата и ключевые точки строятся по одному списку (snapTargets),
+   поэтому кривая, которой здесь нет, не только не взводится щелчком, но и не
+   отдаёт своих пересечений. Замер 21.08: полосы не было ни в одной из десяти
+   сцен этих трёх режимов, хотя кривые в них есть и они главные.
+
+   Вертикальные кривые (LRAS, Ms, долгосрочная Филлипса) не берём — по ним
+   не катаются, ровно как в общей ветке ниже.
+
+   Одиннадцатая сцена без полосы — «Построение графиков»: она открывается
+   пустым холстом, и полоса появляется вместе с первой же кривой. Это не
+   пробел, а её устройство. */
+function macroSnapTargets(out) {
+  const r = STATE.macroRes;
+  if (!r) return;
+  if (r.kind === 'laffer') {
+    if (r.pts && r.pts.length) {
+      out.push({ name: 'Поступления', f: (t) => interpY(r.pts, t), color: COL.tax });
+    }
+    return;
+  }
+  [].concat(r.extra || [], r.curves || []).forEach(([lab, c, col]) => {
+    if (!c || typeof c.fn !== 'function' || isVertical(c)) return;
+    out.push({ name: lab, f: (x) => { const v = c.fn(x); return isFinite(v) ? v : NaN; }, color: col });
+  });
+}
+
+/* Потребитель. Бюджетная линия задана перехватами, кривая безразличия — уровнем
+   полезности: её точки считает тот же движок касания уровня, что рисует её на
+   холсте, второй математики здесь нет. В разложении Слуцкого линий три, и
+   каждая своя: спрашивают именно «эта или та». */
+function consumerSnapTargets(out) {
+  const c = STATE.cons;
+  if (!c) return;
+  const budget = (o) => (x) => {
+    if (!(o.xInt > 0)) return NaN;
+    const y = o.yInt - (o.yInt / o.xInt) * x;
+    return (x >= 0 && x <= o.xInt) ? y : NaN;
+  };
+  const level = (U) => {
+    const pts = traceLevelCurve(c.f, U, CONFIG.Qmax, CONFIG.Pmax * 6, 220);
+    return (pts && pts.length) ? ((x) => interpY(pts, x)) : null;
+  };
+  const push = (name, f, color) => { if (f) out.push({ name, f, color }); };
+  const s = c.slutsky, b = c.base;
+  if (s) {
+    push('бюджет: старый', budget(b), COL.ghost);
+    push('бюджет: компенсир.', budget(s.comp), COL.MR);
+    push('бюджет: новый', budget(s.fin), COL.reg);
+    push('U исходная', level(b.U), COL.indiff);
+    if (s.fin.U > 0) push('U новая', level(s.fin.U), COL.reg);
+  } else {
+    push('бюджетная линия', budget(b), COL.reg);
+    push('кривая безразличия', level(b.U), COL.indiff);
+  }
+}
+
+/* Неравенство. Кривая Лоренца хранится долями 0…1, а холст размечен в
+   процентах: переводим на входе и на выходе, чтобы полоса легла ровно на
+   нарисованную линию. */
+function ineqSnapTargets(out) {
+  const pts = STATE.ineqLorenz;
+  if (!pts || !pts.length) return;
+  out.push({ name: 'Лоренц', f: (x) => lorenzAt(pts, Math.max(0, Math.min(1, x / 100))) * 100, color: COL.D });
+  const rd = STATE.ineqRedist;
+  if (rd && rd.lorenz && rd.lorenz.length) {
+    out.push({ name: 'Лоренц после', f: (x) => lorenzAt(rd.lorenz, Math.max(0, Math.min(1, x / 100))) * 100, color: COL.S });
+  }
 }
 
 /* Кривые раздела «Математика» для прокатывания и пересечений. Берём то же,
@@ -2828,10 +3351,23 @@ let markCounter = 0;
 
 // Взвести/снять режим «следующий щелчок по графику ставит точку».
 function armMark(on) {
-  STATE.markArm = on;
+  const was = STATE.markArm;
+  STATE.markArm = !!on;
   const wrap = document.getElementById('graph-wrap');
   if (wrap) wrap.style.cursor = on ? 'crosshair' : '';
   if (!on) showSnapHint(null);   // снятый режим не оставляет кружок-подсказку
+  syncCanvasMode();
+  if (was !== STATE.markArm && typeof redrawAll === 'function') redrawAll();
+}
+
+/* Отмена начатой точки: убираем заготовку и снимаем режим. Раньше Escape
+   только снимал режим, и в списке оставалась строка-заготовка без координат —
+   состояние, из которого не было выхода, кроме как ввести числа руками. */
+function cancelMarkDraft() {
+  armMark(false);
+  const draft = pendingMark();
+  if (draft) STATE.marks = STATE.marks.filter(m => m !== draft);
+  renderMarkList();
 }
 
 /* П20. Сброс при переходе между моделями. Раньше сбрасывалось только
@@ -2849,7 +3385,7 @@ const SCENE_DEFAULTS = {
   graphTitle: '', axisXName: '', axisYName: '', titleColor: null,
   // Точки, вершины и посчитанные площади.
   marks: [], areaVerts: [], areaCalcList: [], areaCalcMode: 'curve',
-  roller: null, hotCross: null, hoverCross: null, pointNames: {},
+  roller: null, armedCurve: null, hoverCross: null, pointNames: {},
   markArm: false, vertArm: false,
   acFrom: null, acTo: null,   // свой отрезок «Под кривой» (Н52); null = вся первая четверть
   // Заливки и цвета.
@@ -2858,7 +3394,9 @@ const SCENE_DEFAULTS = {
   colorOverride: {}, areaColor: {}, titlePos: null,   // своё место названия (доли поля, Н22)
   // Плоскость и подписи.
   labelSize: LABEL_SIZE_DEFAULT, firstQuad: true, xStep: null, yStep: null,
+  quadSaved: null,            // окно до включения первой четверти (обратный ход тумблера)
   showLegend: true, zoomLock: false, viewDirty: false,
+  legendSpot: null,           // выбранное место легенды: держится, пока свободно
   // Буквы-параметры и кэши расчётов.
   params: {}, ppfSumData: null, ppfTradeData: null, mathRes: null,
   bundleOn: false, bundleX: null, bundleY: null,
@@ -2866,6 +3404,34 @@ const SCENE_DEFAULTS = {
 };
 
 function resetDecor() {
+  clearUndo();          // шаги прежней модели к новой отношения не имеют
+  /* ⚠️ СБРОСИТЬ СОСТОЯНИЕ МАЛО — НАДО ЕЩЁ СКАЗАТЬ ПАНЕЛИ ПЕРЕСОБРАТЬСЯ.
+
+     Контрольный опыт владельца: зайти в «Построение графиков», вписать
+     «x^2-a*x» (появляется ползунок a), вернуться ко всем блокам и открыть
+     «Потоварные налоги» — ползунок «a» на месте, рядом с настоящей ставкой t.
+     Прямым путём в ту же модель ползунков ноль.
+
+     Замер показал, ГДЕ именно течёт: `STATE.params` к этому моменту уже пуст
+     (буквы в состоянии нет вовсе), а чип по-прежнему в разметке. Правая панель
+     пересобирается только при СМЕНЕ ПОДПИСИ своего содержимого, и подпись эта
+     считается по состоянию — которое как раз стало прежним, пустым. Значит
+     течёт не состояние, а разметка, пережившая его.
+
+     Чистка состояния и приказ панели пересобраться обязаны стоять рядом:
+     именно потому, что это одно событие — «началась новая модель». */
+  /* ⚠️ ОБНУЛИТЬ ПОДПИСЬ НЕДОСТАТОЧНО, И ЭТО ВТОРОЙ СЛОЙ ТОЙ ЖЕ БЕДЫ.
+     Панель пересобирается, когда подпись её содержимого ИЗМЕНИЛАСЬ. У сцены
+     без своих ползунков подпись — пустая строка, и после «обнуления» она
+     совпадала с новой: «не изменилось, пересобирать нечего», а чип прежней
+     модели оставался на экране. Поэтому чистим САМИ КОНТЕЙНЕРЫ: новая модель
+     начинается с пустой панели, а наполнит её updatePult. */
+  const panel = document.getElementById('params-panel');
+  if (panel) { panel._extraSig = PULT_REBUILD; panel._curveSig = PULT_REBUILD; }
+  ['params-extra', 'params-curves'].forEach(id => {
+    const box = document.getElementById(id);
+    if (box) box.innerHTML = '';
+  });
   Object.keys(SCENE_DEFAULTS).forEach(k => {
     const v = SCENE_DEFAULTS[k];
     STATE[k] = Array.isArray(v) ? [] : (v && typeof v === 'object' ? {} : v);
@@ -2899,8 +3465,98 @@ const SNAPSHOT_KEYS = Object.keys(SCENE_DEFAULTS).concat([
 ]);
 const _sceneSnaps = {};
 
+/* ── ОТМЕНА ПОСЛЕДНЕГО ДЕЙСТВИЯ (фаза 4) ──────────────────────────────────
+
+   Строится на УЖЕ СУЩЕСТВУЮЩЕМ списке полей SNAPSHOT_KEYS — на том самом, по
+   которому работает память моделей и кнопка «Вернуть исходный вид». Второй
+   механизм состояния рядом с первым разъехался бы с ним на первой же новой
+   настройке: список полей один, и он один.
+
+   ⚠️ СНИМОК ДЛЯ ОТМЕНЫ ОБЯЗАН БЫТЬ КОПИЕЙ, А НЕ ССЫЛКОЙ. saveSceneSnapshot
+   кладёт `snap[k] = STATE[k]`, и ему этого хватает: он снимает состояние
+   ровно в тот момент, когда сцена уходит с экрана и меняться уже не будет.
+   Отмене нужно другое — состояние ДО действия, которое случится через
+   мгновение и переписывает те же массивы на месте. Со ссылкой снимок менялся
+   бы вместе с оригиналом, и «отмена» возвращала бы то же самое.
+
+   Копируем два уровня: сам массив или объект и его прямых детей (кривую,
+   точку, запись параметра, разбор прямой `linear`, который перетаскивание
+   правит на месте). Глубже не идём намеренно — там скомпилированная формула и
+   функции сцены, их надо оставить ссылкой. */
+const UNDO_DEPTH = 20;
+const _undoStack = [];
+
+/* ⚠️ КОПИЯ ОБЯЗАНА ДОСТАТЬ ДО ТОГО, ЧТО ПРАВЯТ НА МЕСТЕ.
+   Первая версия копировала ровно один уровень: массив кривых → сама кривая.
+   Разбор прямой `curve.linear` при этом оставался ОБЩИМ объектом, а
+   перетаскивание пишет именно в него (`curve.linear.b = …`). Снимок менялся
+   вместе с оригиналом, и отмена возвращала формулу «100 - Q» при свободном
+   члене 90,661 — запись и расчёт расходились ровно так же, как в дефекте,
+   ради которого фаза и затевалась. Нашёл прибор: формулы сошлись, числа нет.
+   Поэтому у ребёнка копируются и его собственные простые дети. */
+function _undoCopyChild(v) {
+  if (Array.isArray(v)) return v.slice();
+  if (v && typeof v === 'object' && v.constructor === Object) {
+    const o = {};
+    Object.keys(v).forEach(k => {
+      const x = v[k];
+      if (Array.isArray(x)) o[k] = x.slice();
+      else if (x && typeof x === 'object' && x.constructor === Object) o[k] = Object.assign({}, x);
+      else o[k] = x;
+    });
+    return o;
+  }
+  return v;
+}
+function _undoCopy(v) {
+  if (Array.isArray(v)) return v.map(_undoCopyChild);
+  if (v && typeof v === 'object' && v.constructor === Object) {
+    const o = {};
+    Object.keys(v).forEach(k => { o[k] = _undoCopyChild(v[k]); });
+    return o;
+  }
+  return v;
+}
+
+/* Положить состояние на полку ПЕРЕД изменяющим действием. Зовётся из мест,
+   которые действительно меняют модель: сдвиг кривой, вынос и удаление точки,
+   удаление кривой, переименование, правка формулы, значение и границы
+   параметра. Тихо ничего не делает, пока сцена не открыта. */
+function pushUndo() {
+  if (!STATE.sceneKey) return;
+  const snap = { scene: STATE.sceneKey, data: {} };
+  SNAPSHOT_KEYS.forEach(k => { snap.data[k] = _undoCopy(STATE[k]); });
+  _undoStack.push(snap);
+  if (_undoStack.length > UNDO_DEPTH) _undoStack.shift();
+}
+
+/* Шаг назад. Снимок чужой модели не применяем: человек ушёл в другую сцену,
+   и вернуть туда состояние отсюда значило бы менять то, чего он не видит. */
+function undoLast() {
+  while (_undoStack.length) {
+    const snap = _undoStack.pop();
+    if (snap.scene !== STATE.sceneKey) continue;
+    SNAPSHOT_KEYS.forEach(k => { STATE[k] = snap.data[k]; });
+    if (typeof renderCurveList === 'function') renderCurveList();
+    if (typeof renderGraphRows === 'function' && document.getElementById('graph-rows')) renderGraphRows();
+    if (typeof renderMarkList === 'function') renderMarkList();
+    if (typeof renderVertList === 'function') renderVertList();
+    redrawAll();
+    return true;
+  }
+  return false;
+}
+
+// Уходя из модели, забываем её шаги: отмена — про «здесь и сейчас».
+function clearUndo() { _undoStack.length = 0; }
+
+
 // Забыть, что помнилось по моделям. Нужно, когда состояние надо начать с нуля
 // (например, в контрольных прогонах, где каждый случай ставит свою обстановку).
+/* Забыть снимок ОДНОЙ модели: на этом стоит «вернуть модель к исходному виду».
+   Без этого pickScene тут же восстановил бы то, что мы только что отменили. */
+function forgetSceneSnapshot(key) { delete _sceneSnaps[key]; }
+
 function resetSceneMemory() { Object.keys(_sceneSnaps).forEach(k => { delete _sceneSnaps[k]; }); }
 
 function saveSceneSnapshot(key) {
@@ -2956,12 +3612,55 @@ function addMarkAt(x, y, snapTo) {
    их было не различить ни на холсте, ни в списке. Палитра та же, что предлагает
    пикер (--pal-1…--pal-6), поэтому светлая и тёмная тема дают свои значения;
    когда цвета кончаются, начинаем заново. */
+/* п. 32. НОВАЯ ТОЧКА НЕ ПОВТОРЯЕТ ЦВЕТ ТОГО, ЧТО УЖЕ НАРИСОВАНО.
+
+   Совпадения по коду цвета тут не было и быть не могло: у палитры точек свои
+   значения (--pal-*), у кривых свои (--curve-*). А глазом красная точка на
+   красной кривой предложения читалась как её часть. Поэтому сравниваем не
+   строки, а РАССТОЯНИЕ между цветами, и берём тот образец палитры, который
+   дальше всего от уже нарисованного.
+
+   Цвета берём с самого холста: спрашивать сцену, чем она рисует, значит
+   держать второй список ролей и разойтись с ним на первой же новой сцене. */
+function colorDist(a, b) {
+  const px = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const [r1, g1, b1] = px(a), [r2, g2, b2] = px(b);
+  // «Redmean» — дешёвое приближение к воспринимаемой разнице, точнее простой
+  // евклидовой метрики по RGB: у тёмных и светлых пар веса каналов разные.
+  const rm = (r1 + r2) / 2, dr = r1 - r2, dg = g1 - g2, db = b1 - b2;
+  return Math.sqrt((2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db);
+}
+
+function drawnStrokeColors() {
+  const out = [];
+  const node = (typeof svg !== 'undefined' && svg && svg.node) ? svg.node() : null;
+  if (!node) return out;
+  node.querySelectorAll('path[stroke], line[stroke]').forEach(el => {
+    const c = el.getAttribute('stroke');
+    if (!c || c === 'none' || c === 'transparent') return;
+    const h = normHex(c);
+    if (h && out.indexOf(h) < 0) out.push(h);
+  });
+  return out;
+}
+
+// Ниже этого расстояния два цвета на графике читаются как один.
+const COLOR_NEAR = 90;
+
 function nextMarkColor() {
   const pal = paletteSix().filter(Boolean);
   if (!pal.length) return null;
-  const used = (STATE.marks || []).map(m => String(m.color || '').toLowerCase());
-  const free = pal.find(c => used.indexOf(String(c).toLowerCase()) < 0);
-  return free || pal[(STATE.marks || []).length % pal.length];
+  const used = (STATE.marks || []).map(m => normHex(m.color || '')).filter(Boolean);
+  const busy = used.concat(drawnStrokeColors());
+  const far = (c) => busy.reduce((m, b) => Math.min(m, colorDist(normHex(c), b)), Infinity);
+  // Свободный по коду и достаточно далёкий от нарисованного — лучший выбор.
+  const free = pal.filter(c => used.indexOf(normHex(c)) < 0);
+  const good = free.filter(c => far(c) >= COLOR_NEAR);
+  if (good.length) return good[0];
+  // Ни один не проходит порог (на графике уже много цветов) — берём самый
+  // дальний из ещё не занятых, а если заняты все, идём по кругу, как раньше.
+  if (free.length) return free.slice().sort((a, b) => far(b) - far(a))[0];
+  return pal[(STATE.marks || []).length % pal.length];
 }
 
 function newMark(x, y, snapTo, mode) {
@@ -3060,10 +3759,12 @@ function buildMarkRow(mk) {
      поле рядом. Правится тем же компонентом, что и всюду: пунктир снизу, правка
      на месте, применение на каждый символ. */
   const mkNum = (key) => {
+    // п. 32. Координата подписана буквой ТОЙ ЖЕ оси, что нарисована на графике.
+    const letter = axisLetter(key);
     const n = makeEditableValue({
       get: () => (isFinite(mk[key]) ? Math.round(mk[key] * 1000) / 1000 : ''),
-      tex: (v, text) => key + ' = ' + (text === '' ? '{?}' : text),
-      title: 'Координата ' + key,
+      tex: (v, text) => letter + ' = ' + (text === '' ? '{?}' : text),
+      title: 'Координата ' + letter,
       set: (v) => {
         mk[key] = isFinite(v) ? v : NaN;
         // Точка на кривой держится за неё: меняем x, высоту берём с кривой.

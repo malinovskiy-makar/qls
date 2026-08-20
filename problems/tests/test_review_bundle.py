@@ -64,11 +64,16 @@ class CategoriesTests(TestCase):
         trash = next(c for c in REVIEW_CATEGORIES if c['key'] == 'trash')['hotkey']
         self.assertGreater(abs(keys.index(perfect) - keys.index(trash)), 1)
 
-    def test_exactly_two_exclusive_kinds_and_seven_defects(self):
+    def test_exactly_two_exclusive_kinds_and_eight_defects(self):
+        # Дефектных категорий стало восемь: 2026-08-19 к семи прежним добавлена
+        # `fixed_wrong` («Починил не то») для пакетов разбора уже починенных
+        # задач. Она отвечает на вопрос «что не так с ПРАВКОЙ», а не «что не
+        # так с задачей», поэтому заведена отдельно от `other`.
         exclusive = [c for c in REVIEW_CATEGORIES if c['kind'] in EXCLUSIVE_KINDS]
         defects = [c for c in REVIEW_CATEGORIES if c['kind'] == 'defect']
         self.assertEqual(sorted(c['key'] for c in exclusive), ['perfect', 'trash'])
-        self.assertEqual(len(defects), 7)
+        self.assertEqual(len(defects), 8)
+        self.assertIn('fixed_wrong', [c['key'] for c in defects])
 
     def test_hotkeys_are_unique(self):
         hot = [c['hotkey'] for c in REVIEW_CATEGORIES]
@@ -305,8 +310,7 @@ class ExportBundleTests(TestCase):
             self._export(out_dir, source_id=self.source.id)
 
             # манифест: только видимая задача, категории на месте
-            manifest = json.loads(
-                (out_dir / 'manifest.json').read_text(encoding='utf-8'))
+            manifest = json.loads((out_dir / 'manifest.json').read_text(encoding='utf-8'))
             self.assertEqual(manifest['format'], BUNDLE_FORMAT)
             self.assertEqual(manifest['count'], 1)
             self.assertEqual([p['id'] for p in manifest['problems']],
@@ -321,8 +325,7 @@ class ExportBundleTests(TestCase):
                           (out_dir / 'manifest.js').read_text(encoding='utf-8'))
 
             # снимок: боевой HTML, но офлайн и всё раскрыто
-            snap = (out_dir / 'snapshots'
-                    / f'{self.visible.id}.html').read_text(encoding='utf-8')
+            snap = (out_dir / 'snapshots' / f'{self.visible.id}.html').read_text(encoding='utf-8')
             self.assertIn('review-snapshot-overrides', snap)
             self.assertNotIn('cdn.jsdelivr.net', snap)
             self.assertIn('../assets/vendor/katex/katex.min.css', snap)
@@ -346,8 +349,7 @@ class ExportBundleTests(TestCase):
                 f'{second.id}\n{self.flagged.id}\n{self.visible.id}\n')
             out_dir = Path(tmp) / 'bundle_ids'
             out = self._export(out_dir, ids_file=str(ids_file))
-            manifest = json.loads(
-                (out_dir / 'manifest.json').read_text(encoding='utf-8'))
+            manifest = json.loads((out_dir / 'manifest.json').read_text(encoding='utf-8'))
         # порядок файла сохранён, зафлагованная выброшена с предупреждением
         self.assertEqual([p['id'] for p in manifest['problems']],
                          [second.id, self.visible.id])

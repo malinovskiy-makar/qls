@@ -1,0 +1,625 @@
+{
+ "m-graph": {
+  "title": "",
+  "axisNames": [
+   "x",
+   "y"
+  ],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "x",
+   "y": "y"
+  }
+ },
+ "m-tangent": {
+  "title": "",
+  "axisNames": [
+   "x",
+   "x",
+   "y",
+   "f′"
+  ],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "m-optimum": {
+  "title": "",
+  "axisNames": [
+   "x",
+   "y"
+  ],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "m-transform": {
+  "title": "",
+  "axisNames": [
+   "x",
+   "y"
+  ],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "m-minmax": {
+  "title": "",
+  "axisNames": [
+   "x",
+   "y"
+  ],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "m-constraint": {
+  "title": "",
+  "axisNames": [
+   "x",
+   "y"
+  ],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "ppf": {
+  "title": "",
+  "axisNames": [
+   "X",
+   "Y"
+  ],
+  "curveNames": [
+   "КПВ"
+  ],
+  "pointNames": [],
+  "declared": {
+   "x": "X",
+   "y": "Y"
+  }
+ },
+ "ppfsum": {
+  "title": "",
+  "axisNames": [
+   "X",
+   "Y"
+  ],
+  "curveNames": [
+   "КПВ 1",
+   "КПВ 2"
+  ],
+  "pointNames": [],
+  "declared": {
+   "x": "X",
+   "y": "Y"
+  }
+ },
+ "trade": {
+  "title": "",
+  "axisNames": [
+   "X",
+   "Y"
+  ],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "X",
+   "y": "Y"
+  }
+ },
+ "tradeprice": {
+  "title": "",
+  "axisNames": [
+   "X",
+   "Y",
+   "X",
+   "Y"
+  ],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "X",
+   "y": "Y"
+  }
+ },
+ "sd": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [
+   "D",
+   "S"
+  ],
+  "pointNames": [
+   "E∗​"
+  ],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "tax": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [
+   "D",
+   "S",
+   "S + t"
+  ],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "tax-adv": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [
+   "D",
+   "S",
+   "S·(1+τ)"
+  ],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "ceil": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [
+   "D",
+   "S"
+  ],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "elast": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [
+   "D",
+   "S"
+  ],
+  "pointNames": [
+   "E∗​"
+  ],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "ext": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [
+   "D",
+   "S",
+   "MSC"
+  ],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "costs": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [
+   "MC",
+   "ATC",
+   "AVC",
+   "AFC"
+  ],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "prod": {
+  "title": "",
+  "axisNames": [],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "L",
+   "y": "TP, MP, AP"
+  }
+ },
+ "plants": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "isoquant": {
+  "title": "",
+  "axisNames": [
+   "L",
+   "K"
+  ],
+  "curveNames": [],
+  "pointNames": [
+   "E"
+  ],
+  "declared": {
+   "x": "L",
+   "y": "K"
+  }
+ },
+ "mono": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [
+   "D",
+   "MC"
+  ],
+  "pointNames": [
+   "M"
+  ],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "mono-nat": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [
+   "D",
+   "MC",
+   "ATC"
+  ],
+  "pointNames": [
+   "M",
+   "AC",
+   "MC"
+  ],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "mono-d1": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [
+   "D",
+   "MC"
+  ],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "mono-d3": {
+  "title": "",
+  "axisNames": [],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "mono-kink": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [],
+  "pointNames": [
+   "M"
+  ],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "labor": {
+  "title": "",
+  "axisNames": [
+   "L",
+   "W"
+  ],
+  "curveNames": [
+   "D",
+   "S"
+  ],
+  "pointNames": [],
+  "declared": {
+   "x": "L",
+   "y": "W"
+  }
+ },
+ "labor-mono": {
+  "title": "",
+  "axisNames": [
+   "L",
+   "W"
+  ],
+  "curveNames": [
+   "D",
+   "S"
+  ],
+  "pointNames": [
+   "M"
+  ],
+  "declared": {
+   "x": "L",
+   "y": "W"
+  }
+ },
+ "labor-union": {
+  "title": "",
+  "axisNames": [
+   "L",
+   "W"
+  ],
+  "curveNames": [
+   "D",
+   "S"
+  ],
+  "pointNames": [
+   "П"
+  ],
+  "declared": {
+   "x": "L",
+   "y": "W"
+  }
+ },
+ "labor-bilat": {
+  "title": "",
+  "axisNames": [
+   "L",
+   "W"
+  ],
+  "curveNames": [
+   "D",
+   "S"
+  ],
+  "pointNames": [
+   "М",
+   "П"
+  ],
+  "declared": {
+   "x": "L",
+   "y": "W"
+  }
+ },
+ "smallopen": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "P"
+  ],
+  "curveNames": [
+   "D",
+   "S"
+  ],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "monoexport": {
+  "title": "",
+  "axisNames": [],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "Q",
+   "y": "P"
+  }
+ },
+ "consumer": {
+  "title": "",
+  "axisNames": [
+   "x",
+   "y"
+  ],
+  "curveNames": [],
+  "pointNames": [
+   "E"
+  ],
+  "declared": {
+   "x": "x",
+   "y": "y"
+  }
+ },
+ "cons-slutsky": {
+  "title": "",
+  "axisNames": [
+   "x",
+   "y"
+  ],
+  "curveNames": [],
+  "pointNames": [
+   "A",
+   "B",
+   "C"
+  ],
+  "declared": {
+   "x": "x",
+   "y": "y"
+  }
+ },
+ "adas": {
+  "title": "",
+  "axisNames": [
+   "Y",
+   "P"
+  ],
+  "curveNames": [],
+  "pointNames": [
+   "E"
+  ],
+  "declared": {
+   "x": "Y",
+   "y": "P"
+  }
+ },
+ "islm": {
+  "title": "",
+  "axisNames": [
+   "Y",
+   "r, %"
+  ],
+  "curveNames": [],
+  "pointNames": [
+   "E"
+  ],
+  "declared": {
+   "x": "Y",
+   "y": "r, %"
+  }
+ },
+ "phillips": {
+  "title": "",
+  "axisNames": [
+   "u, %",
+   "π, %"
+  ],
+  "curveNames": [],
+  "pointNames": [
+   "u∗​"
+  ],
+  "declared": {
+   "x": "u, %",
+   "y": "π, %"
+  }
+ },
+ "money": {
+  "title": "",
+  "axisNames": [
+   "M",
+   "i, %"
+  ],
+  "curveNames": [],
+  "pointNames": [
+   "E"
+  ],
+  "declared": {
+   "x": "M",
+   "y": "i, %"
+  }
+ },
+ "loanable": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "r, %"
+  ],
+  "curveNames": [],
+  "pointNames": [
+   "E"
+  ],
+  "declared": {
+   "x": "Q",
+   "y": "r, %"
+  }
+ },
+ "fx": {
+  "title": "",
+  "axisNames": [
+   "Q",
+   "e"
+  ],
+  "curveNames": [],
+  "pointNames": [
+   "E"
+  ],
+  "declared": {
+   "x": "Q",
+   "y": "e"
+  }
+ },
+ "ineq": {
+  "title": "",
+  "axisNames": [
+   "N, %",
+   "I, %"
+  ],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "N, %",
+   "y": "I, %"
+  }
+ },
+ "laffer": {
+  "title": "",
+  "axisNames": [
+   "t",
+   "Tx"
+  ],
+  "curveNames": [],
+  "pointNames": [],
+  "declared": {
+   "x": "t",
+   "y": "Tx"
+  }
+ }
+}

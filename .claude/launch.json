@@ -7,6 +7,61 @@
       "runtimeArgs": ["manage.py", "runserver", "8123", "--insecure",
                       "--noreload", "--settings=config.settings_errorcheck"],
       "port": 8123
+    },
+    {
+      "name": "qls-stats",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8127"
+      ],
+      "port": 8127
+    },
+    {
+      "name": "qls-s3",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8131"
+      ],
+      "port": 8131
+    },
+    {
+      "name": "qls-look",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv/bin/python",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8401",
+        "--settings=config.settings_check"
+      ],
+      "port": 8401
+    },
+    {
+      "name": "review-shell",
+      "runtimeExecutable": "venv\\Scripts\\python.exe",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8555",
+        "--directory",
+        "reports/defect_review"
+      ],
+      "port": 8555
+    },
+    {
+      "name": "wave1-bundle",
+      "runtimeExecutable": "venv\\Scripts\\python.exe",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8402",
+        "--directory",
+        "."
+      ],
+      "port": 8402
     }
   ]
 }

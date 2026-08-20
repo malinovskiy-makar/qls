@@ -7,12 +7,17 @@
 
 // Установить границы осей Qmax/Pmax (и поля ввода / пределы ползунков) разом.
 // Нижние границы сцена всегда хочет нулевые: она рисует первую четверть.
-function setRanges(qmax, pmax) {
+/* opts.symmetric — окно раскрывается на все четыре четверти поровну
+   (−max…max), а не первая четверть с тонкой каймой. Просится ЯВНО и ровно
+   одной моделью: у остальных границы выбраны осознанно, и общая правка
+   переставила бы оси там, где их никто не просил трогать. */
+function setRanges(qmax, pmax, opts) {
   CONFIG.Qmax = qmax; CONFIG.Pmax = pmax;
   // В режиме «только первая четверть» окно начинается ровно в нуле. Режим сняли —
   // оставляем немного места слева и снизу, чтобы ось не липла к самому краю.
-  CONFIG.Qmin = STATE.firstQuad ? 0 : -qmax * 0.08;
-  CONFIG.Pmin = STATE.firstQuad ? 0 : -pmax * 0.08;
+  const sym = !!(opts && opts.symmetric);
+  CONFIG.Qmin = STATE.firstQuad ? 0 : (sym ? -qmax : -qmax * 0.08);
+  CONFIG.Pmin = STATE.firstQuad ? 0 : (sym ? -pmax : -pmax * 0.08);
   syncViewFields();
   // Адвалорная ставка меряется в ПРОЦЕНТАХ — её пределы к масштабу цены не привязаны
   // (ими управляет applyTaxRateBounds), поэтому поля ставки в этом случае пропускаем.
@@ -42,12 +47,21 @@ function syncViewFields() {
 }
 
 // Кнопка возврата масштаба появляется, только когда есть куда возвращаться.
+/* ⚠️ МЕСТО ПОД КНОПКУ ЗАНЯТО ВСЕГДА (п. 31).
+   Кнопка появляется, только когда есть куда возвращаться, — это верно. Но
+   пряталась она через `hidden`, то есть с выпадением из раскладки, и стопка
+   разъезжалась: гаечный ключ уезжал с отметки 79 px на 117 px прямо под рукой,
+   и человек промахивался по кнопке, которой только что пользовался.
+   Теперь слот держит своё место, а меняется только видимость. */
 function updateResetViewBtn() {
   const b = document.getElementById('btn-resetview');
   if (!b) return;
   const show = !!STATE.viewDirty;
-  if (show === !b.hidden) return;
-  b.hidden = !show;
+  if (show === !b.classList.contains('is-off')) return;
+  b.classList.toggle('is-off', !show);
+  b.disabled = !show;
+  b.setAttribute('aria-hidden', show ? 'false' : 'true');
+  b.tabIndex = show ? 0 : -1;
   if (show) { b.classList.remove('appear'); void b.offsetWidth; b.classList.add('appear'); }
 }
 
@@ -69,6 +83,8 @@ function markViewDirty() {
 let _rangeAnimReq = null;     // id текущего кадра анимации (для отмены)
 let _rangeAnimating = false;  // идёт ли анимация прямо сейчас (мы внутри кадра)
 let _wantRangeAnim = false;   // одноразовый запрос анимации от ползунка/поля Pw
+let _paramOnlyRedraw = false; // перерисовка вызвана ТОЛЬКО сменой значения буквы
+                              // (разбор правила — у redrawKeepingWindow ниже)
 
 function prefersReducedMotion() {
   return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -108,6 +124,7 @@ function animateRanges(targetQmax, targetPmax) {
 // либо выставить мгновенно. Вызывается ВМЕСТО прямого setRanges в recompute КТВ.
 function applyTradeRanges(targetQmax, targetPmax) {
   if (_rangeAnimating) return;                 // внутри кадра анимации границами управляет цикл
+  if (_paramOnlyRedraw) { _wantRangeAnim = false; return; }   // окно идёт за формулой, не за буквой
   /* П54. Масштаб, выбранный человеком, главнее авто-подгонки — ровно как в
      applyAutoRanges. Без этой проверки сцены торговли возвращали свой вид на
      первой же перерисовке, и колесо на них не работало совсем. */
@@ -210,8 +227,35 @@ function boundsOfDrawn(baseQ, baseP) {
            pmax: my > baseP ? padMax(my) : baseP };
 }
 
+/* ⚠️ АВТО-ПОДГОНКА ОСЕЙ ИДЁТ ЗА ФОРМУЛОЙ, А НЕ ЗА ЗНАЧЕНИЕМ БУКВЫ.
+
+   Ради этого правила существует флаг ниже. Сцены, которые вписывают свою кривую
+   в окно на каждой перерисовке (КПВ, КТВ, сумма КПВ, труд, фирма, потребитель,
+   вся макроэкономика), при линейной формуле давали БАЙТ В БАЙТ ту же картинку,
+   сколько бы ни двигали ползунок буквы: прямая идёт от перехвата до перехвата,
+   а оси едут вместе с перехватами. У «y = 100 − a·x» при a = 1 и при a = 10
+   линия занимала одни и те же пиксели, менялись только числа на осях. Владелец
+   на приёмке 20.08 прочитал это ровно так, как оно выглядит: рычаг не двигает
+   ничего. И был прав — рычаг обязан двигать КРИВУЮ.
+
+   Поэтому окно подбирается тогда, когда меняется САМА ФУНКЦИЯ: сцена
+   загрузилась, формулу вписали заново, тронули регулятор модели (ставка,
+   мировая цена, границы КПВ). Значение буквы окна не трогает: линия ходит
+   внутри того окна, которое уже выбрано, и её видно.
+
+   Вернуть вид, если кривая ушла за край, по-прежнему можно кнопкой возврата
+   масштаба — она считает границы по нарисованному (boundsOfDrawn).
+
+   Сам признак объявлен рядом с прочими флагами масштаба, выше по файлу: его
+   читает и applyTradeRanges, которая стоит раньше этого места. */
+function redrawKeepingWindow() {
+  _paramOnlyRedraw = true;
+  try { redrawAll(); } finally { _paramOnlyRedraw = false; }
+}
+
 function applyAutoRanges(qmax, pmax) {
   if (_rangeAnimating) return;
+  if (_paramOnlyRedraw) { _wantRangeAnim = false; return; }
   // Пользователь покрутил колесо — его масштаб главнее авто-подгонки, иначе
   // сцена возвращала бы свой вид на первой же перерисовке. Снимается сменой
   // сцены или двойным щелчком по графику (resetZoom).
@@ -350,9 +394,23 @@ function panByPixels(dxPx, dyPx, panel) {
        происходило. Проверка этого не ловила, потому что тянула только в ту
        сторону, которая и так работала.
 
-       Тяга это осознанное действие: куда потянули, то и показываем. Галочка
-       «Только первая четверть» по-прежнему задаёт, что выбирает сцена сама и
-       что делает подгонка осей, но чужой рукой окно больше не двигает. */
+       Тяга это осознанное действие: куда потянули, то и показываем.
+
+       ⚠️ НО ГАЛОЧКА «ТОЛЬКО ПЕРВАЯ ЧЕТВЕРТЬ» — ЭТО ОБЕЩАНИЕ (п. 30).
+       При снятом ограничении окно едет свободно, как и задумано выше. При
+       ВКЛЮЧЁННОМ уезжать ниже нуля нельзя: замер поймал Pmin = −41,8, сетку
+       в отрицательной области и пропавшие подписи оси цен. Стена мягкая —
+       окно доезжает до нуля и там останавливается, СОХРАНЯЯ свой размер,
+       поэтому тяга не «залипает»: движение видно до самого края, как у любой
+       прокручиваемой области. Две стороны из четырёх у прижатого к нулю окна
+       и должны стоять: показывать за ними нечего.
+
+       Здесь была история наоборот (П10): возврат в четверть стоял БЕЗУСЛОВНО,
+       и мешал даже при снятой галочке. Условие — вся разница. */
+    if (STATE.firstQuad) {
+      if (CONFIG.Qmin < 0) { CONFIG.Qmax -= CONFIG.Qmin; CONFIG.Qmin = 0; }
+      if (CONFIG.Pmin < 0) { CONFIG.Pmax -= CONFIG.Pmin; CONFIG.Pmin = 0; }
+    }
     cancelRangeAnim();
   }
   markViewDirty();
@@ -456,7 +514,7 @@ function initZoom() {
        Shift — и тогда прокатывание не перехватывает нажатие. */
     const forcePan = (e.button === 2) || _spaceDown || e.shiftKey;
     if (forcePan) {
-      if (STATE.markArm || STATE.vertArm) return;
+      if (canvasArmed()) return;
       const rp = gw.getBoundingClientRect();
       const panel = (STATE.mode === 'math' && STATE.mathSub === 'tangent')
         ? tangentPanelAt(e.clientY - rp.top) : null;
@@ -464,16 +522,33 @@ function initZoom() {
       e.preventDefault();
       return;
     }
-    if (e.button !== 0 || STATE.markArm) return;
-    // Нажали ПО кривой — катим по ней точку, а не двигаем поле. Радиус захвата
-    // маленький: рядом лежат ключевые точки, и попадать по ним ничто не мешает.
+    // п. 25. Взведённый режим — единственный хозяин щелчка: ни прокатывание
+    // точки, ни сдвиг поля не имеют права его перехватить.
+    if (e.button !== 0 || canvasArmed()) return;
+    /* ⚠️ ОДНО НАЖАТИЕ — ОДИН СМЫСЛ, И РЕШАЕТСЯ ОН НЕ В МОМЕНТ НАЖАТИЯ.
+
+       Прокатывание начиналось прямо на pointerdown: оно тут же забирало
+       указатель себе (setPointerCapture) и звало перерисовку. Полосу кривой
+       при этом пересобирало заново, поэтому ни mouseup, ни click до неё уже
+       не доходили — щелчок по кривой не существовал как событие вовсе.
+       Замер: из всех событий нажатия до полосы доходило одно, mousedown.
+
+       Теперь пресс по кривой только ЗАПОМИНАЕТСЯ. Сдвинули указатель — это
+       прокатывание, оно и начинается. Отпустили не сдвинув — это щелчок, и он
+       спокойно доходит до полосы и взводит кривую. Порога взведения это не
+       вводит: взводит настоящее событие click, а не расстояние.
+
+       Если под нажатием лежит ПОДВИЖНАЯ кривая, прокатывания нет вовсе:
+       у такого нажатия уже есть хозяин — перетаскивание самой кривой. Раньше
+       оба жеста шли одновременно, и это и есть та «одновременно двигается и
+       кривая, и точка», о которой писал владелец. */
     const r0 = gw.getBoundingClientRect();
-    const hit = rollerTargetAt(e.clientX - r0.left, e.clientY - r0.top);
+    const onDragBand = !!(e.target && e.target.getAttribute &&
+                          e.target.getAttribute('data-hit-name') !== null &&
+                          (e.target.style.cursor === 'ns-resize' || e.target.style.cursor === 'ew-resize'));
+    const hit = onDragBand ? null : rollerTargetAt(e.clientX - r0.left, e.clientY - r0.top);
     if (hit) {
-      STATE.roller = { f: hit.f, name: hit.name, color: hit.color || null, x: 0, y: 0, pinned: true };
-      roll = { id: e.pointerId };
-      gw.setPointerCapture(e.pointerId);
-      rollerMove(e.clientX - r0.left, e.clientX, e.clientY);
+      roll = { id: e.pointerId, hit, live: false, x0: e.clientX, y0: e.clientY };
       return;
     }
     const t = e.target;
@@ -491,6 +566,14 @@ function initZoom() {
   });
   gw.addEventListener('pointermove', (e) => {
     if (roll && e.pointerId === roll.id) {
+      if (!roll.live) {
+        // Пока указатель стоит на месте, это ещё щелчок, а не прокатывание.
+        if (Math.hypot(e.clientX - roll.x0, e.clientY - roll.y0) < ROLL_START_PX) return;
+        roll.live = true;
+        STATE.roller = { f: roll.hit.f, name: roll.hit.name,
+                         color: roll.hit.color || null, x: 0, y: 0, pinned: true };
+        try { gw.setPointerCapture(roll.id); } catch (err) {}
+      }
       rollerMove(e.clientX - gw.getBoundingClientRect().left, e.clientX, e.clientY);
       return;
     }
@@ -509,8 +592,12 @@ function initZoom() {
   });
   const endPan = (e) => {
     if (roll && e.pointerId === roll.id) {
+      const wasLive = roll.live;
       try { gw.releasePointerCapture(roll.id); } catch (err) {}
-      roll = null; rollerOff();
+      roll = null;
+      // Не катили — и убирать нечего: перерисовка здесь снесла бы полосу
+      // раньше, чем до неё дойдёт щелчок, и мы вернулись бы к прежней беде.
+      if (wasLive) rollerOff();
       return;
     }
     if (!pan) return;
@@ -529,6 +616,16 @@ function initZoom() {
     if (t && t.isContentEditable) return;
     if (document.getElementById('scene-picker') &&
         !document.getElementById('scene-picker').classList.contains('hidden')) return;
+    /* Отмена последнего действия. Cmd+Z на маке, Ctrl+Z на остальных.
+       Стоит ДО остальных разборов клавиш: иначе «z» ушло бы дальше по цепочке.
+       Поля ввода отсеяны выше по этой же функции — в них работает своя отмена
+       браузера, и перехватывать её нельзя. */
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === 'z' || e.key === 'Z' ||
+        e.code === 'KeyZ')) {
+      if (e.shiftKey) return;          // Shift+Z это «вернуть», а его мы не делаем
+      if (typeof undoLast === 'function' && undoLast()) e.preventDefault();
+      return;
+    }
     if (e.code === 'Space') { _spaceDown = true; gw.style.cursor = 'grab'; return; }
     const step = e.shiftKey ? 120 : 40;   // с Shift шаг крупнее
     if (e.key === 'ArrowLeft')  { panByPixels(step, 0); e.preventDefault(); }
@@ -638,7 +735,11 @@ function setMode(mode) {
   // При каждом переключении режима — выставлять характерный масштаб осей.
   // Ручные правки в полях «Оси» при смене режима намеренно сбрасываются.
   if (mode === 'math') { /* окно задаёт сам раздел (setMathWindow) */ }
-  else if (mode === 'graph') setRanges(10, 10);   // чистый лист: привычные −10…10
+  /* Чистый лист открывается на −10…10 по ОБЕИМ осям: все четыре четверти
+     равноправно, как в Десмосе (решение владельца 19.08). Прежде здесь была
+     первая четверть с тонкой каймой: x от −0,8 до 10. Тумблер первого
+     квадранта в меню плоскости остаётся и работает как прежде. */
+  else if (mode === 'graph') setRanges(10, 10, { symmetric: true });
   else if (mode === 'costs') setRanges(10, 50);
   else setRanges(100, 100);   // market / labor / ppf / inequality — стандартный масштаб 0..100
   // Секция «Оси» с полями «Q макс»/«P макс» уехала в меню гаечного ключа, где
@@ -665,6 +766,8 @@ function applyScenarioVisibility() {
   [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'],
    ['scn-ext', 'externality'], ['scn-open', 'openecon']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', s === v); });
+  // Карточка общего списка кривых живёт только там, где сцена его рисует.
+  if (typeof syncCurveListVisibility === 'function') syncCurveListVisibility();
 }
 
 // Переключение сценария анализа рынка. Сценарии — конкурентный контекст: если был

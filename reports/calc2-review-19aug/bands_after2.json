@@ -1,0 +1,753 @@
+{
+ "scenes": {
+  "m-graph": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "m-graph"
+  },
+  "m-tangent": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "m-tangent"
+  },
+  "m-optimum": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "m-optimum"
+  },
+  "m-transform": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "m-transform"
+  },
+  "m-minmax": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "m-minmax"
+  },
+  "m-constraint": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "m-constraint"
+  },
+  "ppf": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "ppf"
+  },
+  "ppfsum": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "ppfsum"
+  },
+  "trade": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "trade"
+  },
+  "tradeprice": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "tradeprice"
+  },
+  "sd": {
+   "bands": [
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "sd"
+  },
+  "tax": {
+   "bands": [
+    {
+     "cursor": "pointer",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "pointer",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "tax"
+  },
+  "tax-adv": {
+   "bands": [
+    {
+     "cursor": "pointer",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "pointer",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "tax-adv"
+  },
+  "ceil": {
+   "bands": [
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "ceil"
+  },
+  "elast": {
+   "bands": [
+    {
+     "cursor": "pointer",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "pointer",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "elast"
+  },
+  "ext": {
+   "bands": [
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "ext"
+  },
+  "costs": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "costs"
+  },
+  "prod": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "prod"
+  },
+  "plants": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "plants"
+  },
+  "isoquant": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "isoquant"
+  },
+  "mono": {
+   "bands": [
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "mono"
+  },
+  "mono-nat": {
+   "bands": [
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "mono-nat"
+  },
+  "mono-d1": {
+   "bands": [
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "mono-d1"
+  },
+  "mono-d3": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 2,
+   "linear": 2,
+   "scene": "mono-d3"
+  },
+  "mono-kink": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 2,
+   "linear": 2,
+   "scene": "mono-kink"
+  },
+  "labor": {
+   "bands": [
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "labor"
+  },
+  "labor-mono": {
+   "bands": [
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "labor-mono"
+  },
+  "labor-union": {
+   "bands": [
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "labor-union"
+  },
+  "labor-bilat": {
+   "bands": [
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "labor-bilat"
+  },
+  "smallopen": {
+   "bands": [
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "1",
+     "curveId": null
+    },
+    {
+     "cursor": "ns-resize",
+     "width": 16,
+     "skip": true,
+     "hit": "2",
+     "curveId": null
+    }
+   ],
+   "lines": [
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "1"
+    },
+    {
+     "cursor": "auto",
+     "width": 2.5,
+     "skip": false,
+     "hit": null,
+     "curveId": "2"
+    }
+   ],
+   "drawn": 2,
+   "curves": 2,
+   "linear": 2,
+   "scene": "smallopen"
+  },
+  "monoexport": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 2,
+   "linear": 2,
+   "scene": "monoexport"
+  },
+  "consumer": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "consumer"
+  },
+  "cons-slutsky": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "cons-slutsky"
+  },
+  "adas": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "adas"
+  },
+  "islm": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "islm"
+  },
+  "phillips": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "phillips"
+  },
+  "money": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "money"
+  },
+  "loanable": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "loanable"
+  },
+  "fx": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "fx"
+  },
+  "ineq": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "ineq"
+  },
+  "laffer": {
+   "bands": [],
+   "lines": [],
+   "drawn": 0,
+   "curves": 0,
+   "linear": 0,
+   "scene": "laffer"
+  }
+ },
+ "pageErrors": []
+}

@@ -156,8 +156,7 @@ function paintEqLabel(lab, name, value) {
   const plain = name + ' = ' + fmt(value);
   if (typeof katex === 'undefined') { lab.textContent = plain; return; }
   try {
-    katex.render(texifyName(name) + ' = ' + String(fmt(value)).replace(/ /g, '\\,'), lab,
-                 { throwOnError: false, displayMode: false });
+    katexInto(lab, texifyName(name) + ' = ' + fmt(value));
   } catch (e) { lab.textContent = plain; }
 }
 
@@ -182,21 +181,25 @@ function editEqValue(lab, name, current, apply) {
   const head = document.createElement('span');
   head.className = 'param-eq-head';
   if (typeof katex !== 'undefined') {
-    try { katex.render(texifyName(name) + ' =', head, { throwOnError: false, displayMode: false }); }
-    catch (e) { head.textContent = name + ' ='; }
+    if (!katexInto(head, texifyName(name) + ' =')) head.textContent = name + ' =';
   } else head.textContent = name + ' =';
   const inp = document.createElement('input');
   inp.type = 'number'; inp.step = 'any'; inp.value = current;
   inp.className = 'param-eq-input';
   lab.append(head, inp);
-  /* Курсор в конец, а не выделение всей строки: синяя заливка поверх значения
-     читается как «сейчас всё сотрётся» и выглядит как обычное поле ввода (Н75). */
+  /* ⚠️ СОДЕРЖИМОЕ ВЫДЕЛЯЕТСЯ ЦЕЛИКОМ: первый набранный символ заменяет старое
+     значение. Это отмена прежнего решения «курсор в конец» (Н75): при a = 1
+     набор «50» давал 150, а вместе с ним и границы 146…154 — то есть один
+     промах уводил и значение, и полосу. Правило теперь общее для всех правок
+     на месте, ровно как у makeEditableValue (А61): дописать к значению
+     по-прежнему можно стрелкой или вторым щелчком. */
   inp.focus();
-  try { const n = inp.value.length; inp.setSelectionRange(n, n); } catch (e) {}
+  try { inp.select(); } catch (e) {}
   let closed = false;
   const done = () => {
     if (closed) return; closed = true;
     const v = parseFloat(inp.value);
+    if (isFinite(v) && v !== current) pushUndo();
     apply(isFinite(v) ? v : current);
   };
   inp.addEventListener('blur', done);
@@ -211,17 +214,40 @@ function editEqValue(lab, name, current, apply) {
    введённый символ, поэтому «−12» проезжает через «−» (неполное значение,
    пропускаем), «−1» и «−12». Закрывается тремя способами: тронули этот ползунок,
    ввели точное значение, щёлкнули мимо полей интервала. */
+/* ⚠️ ПРАВИЛО ВЫХОДА ЗНАЧЕНИЯ ЗА ПОЛОСУ — ОДНО НА ВЕСЬ КАЛЬКУЛЯТОР, И СЛУЧАЕВ
+   В НЁМ ДВА РАЗНЫХ (решение владельца 19.08).
+
+   Случай первый: человек вписывает ЗНАЧЕНИЕ за пределами действующих границ.
+   Границы переезжают так, чтобы новое значение встало ровно посередине; ширина
+   полосы сохраняется. Проверка: границы −5…3 (ширина 8), вписали 50 → 46…54.
+   Прежде граница просто раздвигалась до значения, и полоса становилась
+   неуправляемо длинной: вписал 1000 при −10…10 — и шаг ползунка обесценился.
+
+   Случай второй: человек задаёт ГРАНИЦЫ, не содержащие текущего значения.
+   Здесь границы остаются как заданы, а подтягивается значение — к ближайшей
+   границе. Проверка: значение 6, задали −1…1 → границы −1…1, значение 1.
+
+   Разница не произвольная: человек всегда получает то, что назвал последним. */
+function centerBandOn(band, value) {
+  const width = Math.abs(band.max - band.min) || 2;
+  return { min: value - width / 2, max: value + width / 2 };
+}
+function pullIntoBand(band, value) {
+  return Math.max(band.min, Math.min(band.max, value));
+}
+
 function attachBoundsEditor(chip, editor, name, get, set) {
   const tex = (t) => {
     const s = document.createElement('span'); s.className = 'param-ed-tex';
     if (typeof katex === 'undefined') { s.textContent = t.replace(/\\le/g, '≤'); return s; }
-    try { katex.render(t, s, { throwOnError: false, displayMode: false }); }
-    catch (e) { s.textContent = t.replace(/\\le/g, '≤'); }
+    if (!katexInto(s, t)) s.textContent = t.replace(/\\le/g, '≤');
     return s;
   };
   const close = () => {
     if (!editor.classList.contains('open')) return;
     editor.classList.remove('open'); editor.innerHTML = '';
+    const track = chip.querySelector('.param-track');
+    if (track && track.dataset.hidden) { delete track.dataset.hidden; track.style.display = ''; }
     document.removeEventListener('pointerdown', onOutside, true);
   };
   /* Слушатель снимается и когда чип уехал из разметки: правая панель
@@ -234,22 +260,35 @@ function attachBoundsEditor(chip, editor, name, get, set) {
     if (!editor.contains(e.target) && !(track && track.contains(e.target))) close();
   }
   editor._close = close;
-  const open = () => {
+  const open = (side) => {
     if (editor.classList.contains('open')) { close(); return; }
     editor.classList.add('open');
     editor.innerHTML = '';
+    /* Полоса ползунка и обе подписи границ на время правки убираются: их место
+       и занимает меню. Копия Десмоса, и она же честнее — иначе на экране разом
+       два способа задать одно и то же. */
+    const track = chip.querySelector('.param-track');
+    if (track) { track.dataset.hidden = '1'; track.style.display = 'none'; }
     /* Три значения интервала — тем же компонентом, что и всюду: пунктир снизу,
        правка на месте, ни одной прямоугольной рамки (Н75). Живое обновление на
        каждый символ; неполный ввод («−», «1e») компонент не применяет и красит
        подчёркивание. */
+    /* ⚠️ ПОЛЯ ПУСТЫЕ, ДЕЙСТВУЮЩИЕ ЗНАЧЕНИЯ НЕ ПОДСТАВЛЯЮТСЯ. Это сознательная
+       копия Десмоса: владелец выбрал именно так. Незаполненное поле сохраняет
+       прежнее значение — см. `set` ниже, он зовётся только на осмысленный
+       ввод. */
     const mk = (key) => makeEditableValue({
-      get: () => get(key),
+      get: () => '',
       set: (v) => {
         /* Пока идёт правка, меню закрывать нельзя: set() может зажать значение
            ползунка и разбудить «input», а тот закрыл бы меню и снёс поле, в
            котором прямо сейчас печатают. */
+        // Вторая застава к правилу «пустое поле не трогает границу»: сюда
+        // не должно доехать ничего, кроме числа.
+        if (!isFinite(parseFloat(v))) return;
         editor._busy = true;
-        try { set(key, v); } finally { editor._busy = false; }
+        pushUndo();
+        try { set(key, +v); } finally { editor._busy = false; }
       },
       tex: (v, text) => text,
       title: key === 'step' ? 'Шаг' : (key === 'min' ? 'Нижняя граница' : 'Верхняя граница'),
@@ -260,6 +299,17 @@ function attachBoundsEditor(chip, editor, name, get, set) {
                 tex('\\text{с шагом}'), mk('step'));
     editor.append(line);
     document.addEventListener('pointerdown', onOutside, true);
+    /* Курсор встаёт в поле ТОЙ границы, по которой щёлкнули: слева — в левое,
+       справа — в правое. Правку открывает сама эта граница, значит и продолжить
+       человек хочет с неё. */
+    const fields = line.querySelectorAll('.edval');
+    const want = (side === 'max') ? fields[1] : fields[0];
+    if (want && want.click) { want.click(); }
+    /* Enter закрывает и применяет. Щелчок мимо — тоже применяет, а не
+       отменяет: проверено на Десмосе, введённое без Enter сохраняется. */
+    line.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); close(); }
+    });
   };
   return { open, close };
 }
@@ -315,13 +365,24 @@ function buildPultCurveChips(list) {
     chip.dataset.cid = c.id;
     // Подсказку вешаем на сам чип: подпись .pchip-label заменяет
     // upgradeRegulator строкой «имя = значение», и title на ней пропал бы.
-    chip.title = 'Сдвиг кривой: ' + (c.name || c.expr || '');
+    chip.title = 'Сдвиг кривой ' + curveShortName(c) + ': ' + (c.expr || '');
 
     const sl = document.createElement('input');
-    sl.type = 'range'; sl.min = 0; sl.max = CONFIG.Pmax; sl.step = 1;
-    sl.value = Math.round(c.linear.b);
+    /* ⚠️ ОДНО ЗНАЧЕНИЕ — ОДИН ИСТОЧНИК (п. 3, канон 2.1).
+       Было: шаг 1 и `Math.round(c.linear.b)`, то есть у свободного члена
+       появлялось ВТОРОЕ значение. После перетаскивания кривой формула
+       становилась «85.22 - Q», а строка над ползунком показывала «D = 85»
+       (её собирает upgradeRegulator из значения ползунка) — и первое же
+       касание ползунка молча теряло 0,22.
+       `step = 'any'` разрешает ползунку нести точное значение; клавиши-стрелки
+       при этом по-прежнему ходят целыми (браузер берёт сотую долю размаха,
+       а размах здесь 0…100). */
+    sl.type = 'range'; sl.min = 0; sl.max = CONFIG.Pmax; sl.step = 'any';
+    sl.value = c.linear.b;
     sl.style.accentColor = c.color;   // акцент ползунка в цвет кривой
-    sl.title = 'Сдвиг кривой по вертикали (свободный член b)';
+    // п. 78. Подсказка идёт через общую плашку, а не через нативный title:
+    // тот не появляется ни с клавиатуры, ни на сенсорном экране.
+    sl.setAttribute('data-tip', 'Сдвиг кривой по вертикали (свободный член b)');
 
     // Слайдер → задаём b ТЕМ ЖЕ путём, что перетаскивание (по id, кривая могла пересоздаться).
     sl.addEventListener('input', () => {
@@ -353,7 +414,7 @@ function syncPultCurveValues(list) {
     if (!chip) return;
     const sl = chip.querySelector('input[type="range"]');
     const val = chip.querySelector('.pchip-val');
-    if (sl && document.activeElement !== sl) sl.value = Math.round(c.linear.b);
+    if (sl && document.activeElement !== sl) sl.value = c.linear.b;   // точное, см. п. 3
     if (val) val.textContent = fmt(c.linear.b);
   });
 }
@@ -428,9 +489,9 @@ function upgradeRegulator(field) {
   }
   field.classList.remove('param-track');   // поле дорожкой больше не притворяется
   const lo = document.createElement('button');
-  lo.type = 'button'; lo.className = 'param-bound'; lo.title = 'Границы и шаг';
+  lo.type = 'button'; lo.className = 'param-bound'; lo.setAttribute('data-tip', 'Границы и шаг');
   const hi = document.createElement('button');
-  hi.type = 'button'; hi.className = 'param-bound'; hi.title = 'Границы и шаг';
+  hi.type = 'button'; hi.className = 'param-bound'; hi.setAttribute('data-tip', 'Границы и шаг');
   track.insertBefore(lo, sl);
   track.insertBefore(hi, sl.nextSibling);
 
@@ -501,8 +562,11 @@ function upgradeRegulator(field) {
   eq.addEventListener('click', () => {
     if (editor._close) editor._close();          // Н10: точное значение закрывает интервал
     editEqValue(eq, name, +sl.value, (v) => {
-      if (v < +sl.min) sl.min = v;
-      if (v > +sl.max) sl.max = v;
+      // Случай первый: значение за полосой — полоса переезжает, значение в центре.
+      if (v < +sl.min || v > +sl.max) {
+        const b = centerBandOn({ min: +sl.min, max: +sl.max }, v);
+        sl.min = b.min; sl.max = b.max;
+      }
       sl.value = v;
       sl.dispatchEvent(new Event('input', { bubbles: true }));
       sync();
@@ -519,8 +583,8 @@ function upgradeRegulator(field) {
       if (+sl.value !== cur) { sl.value = cur; sl.dispatchEvent(new Event('input', { bubbles: true })); }
       sync();
     });
-  lo.addEventListener('click', open);
-  hi.addEventListener('click', open);
+  lo.addEventListener('click', () => open('min'));
+  hi.addEventListener('click', () => open('max'));
 }
 
 /* Короткие обозначения длинных регуляторов (Н8). Полное название остаётся в
@@ -685,13 +749,25 @@ function showPult(on) {
     syncPultRegulators([]);   // все узлы — домой
     const cc = document.getElementById('params-curves'); if (cc) cc.innerHTML = '';
     const ce = document.getElementById('params-extra'); if (ce) ce.innerHTML = '';
-    panel._curveSig = ''; panel._extraSig = '';
+    panel._curveSig = PULT_REBUILD; panel._extraSig = PULT_REBUILD;
   }
   if (empty) empty.style.display = on ? 'none' : '';
 }
 
 // Единая точка пересмотра содержимого «Основных параметров» — дёргается из
 // renderCurveList (кривые) и из set-функций режима/сцены/типа.
+/* ⚠️ ПРИЗНАК «ПЕРЕСОБРАТЬ» НЕ ИМЕЕТ ПРАВА СОВПАДАТЬ С НАСТОЯЩЕЙ ПОДПИСЬЮ.
+
+   Правая панель пересобирается, когда подпись её содержимого изменилась.
+   «Заставить пересобраться» записывали пустой строкой — но пустая строка это
+   ЗАКОННАЯ подпись сцены, у которой своих ползунков нет. У такой
+   сцены приказ пересобраться читался как «ничего не изменилось», и чип
+   прежней модели оставался на экране: ровно та утечка параметра между
+   моделями, которую нашёл владелец.
+
+   Сентинел не равен ни одной настоящей подписи, потому что все они строки. */
+const PULT_REBUILD = null;
+
 function updatePult() {
   const panel = document.getElementById('params-panel');
   if (!panel) return;
@@ -747,7 +823,7 @@ function wireControls() {
     ['tax-slider', 'tax-input', 'pc-slider', 'pc-input'].forEach(id => {
       const e = document.getElementById(id); if (e) e.max = v;
     });
-    const pl = document.getElementById('params-panel'); if (pl) pl._curveSig = '';   // форсируем пересборку
+    const pl = document.getElementById('params-panel'); if (pl) pl._curveSig = PULT_REBUILD;   // форсируем пересборку
     if (typeof updatePult === 'function') updatePult();   // слайдеры кривых: новый предел = Pmax
   });
 
@@ -1101,7 +1177,7 @@ function wireControls() {
     STATE.ppfFormula2 = ((ppfInp2 && ppfInp2.value) || '').trim();
     STATE.ppfX = null;
     redrawAll();
-    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = '';   // пере-инициализировать
+    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = PULT_REBUILD;   // пере-инициализировать
     if (typeof updatePult === 'function') updatePult();
   }
   const pApply = document.getElementById('btn-ppf-apply');
@@ -1179,7 +1255,7 @@ function wireControls() {
   function applyPpfSum() {
     STATE.ppfSumData = null;   // принудительный пересчёт
     redrawAll();
-    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = '';
+    const pl = document.getElementById('params-panel'); if (pl) pl._extraSig = PULT_REBUILD;
     if (typeof updatePult === 'function') updatePult();
   }
   const sumApply = document.getElementById('btn-ppfsum-apply');
@@ -1390,15 +1466,13 @@ function wireControls() {
   // «Убрать последнюю» убрана по П42: у каждой вершины в списке свой крестик.
   // «Убрать все вершины» подключается в wireAreaCalc вместе с остальной секцией.
 
-  /* П38: щелчок по пустому месту снимает выделение ключевой точки — она снова
-     серая и без координат. Раньше выделение гасил только повторный щелчок по
-     самой точке, и координаты оставались висеть, пока в неё не попадёшь снова.
-     Сами кружки останавливают всплытие, поэтому сюда доходит только «мимо». */
+  /* Щелчок по пустому месту холста гасит взведённую кривую — один из ровно
+     двух способов (второй — повторный щелчок по той же кривой). Escape не
+     гасит: так решил владелец. Полосы кривых и кружки точек останавливают
+     всплытие, поэтому сюда доходит только настоящее «мимо». */
   if (chartEl) chartEl.addEventListener('click', () => {
     if (STATE.markArm || STATE.vertArm) return;      // взведённые режимы заняты своим
-    if (STATE.hotCross === null) return;
-    STATE.hotCross = null;
-    redrawAll();
+    disarmCurve();
   });
 
   // Подсказка: пока режим взведён, показываем кружком, куда сядет точка.
@@ -1410,8 +1484,12 @@ function wireControls() {
     showSnapHint(snapVertexAt(px, py));
   });
   if (chartEl) chartEl.addEventListener('mouseleave', () => showSnapHint(null));
-  // Esc снимает взведённый режим — иначе курсор-перекрестие остаётся «залипшим».
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && STATE.markArm) armMark(false); });
+  /* Esc снимает ЛЮБОЙ взведённый режим — иначе курсор-перекрестие остаётся
+     «залипшим». Раньше Escape знал только про свою точку, и из набора вершин
+     выйти с клавиатуры было нечем. То же делает кнопка в полосе режима. */
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && canvasArmed()) leaveCanvasMode(); });
+  const cvStop = document.getElementById('cv-mode-stop');
+  if (cvStop) cvStop.addEventListener('click', () => leaveCanvasMode());
   renderMarkList();
   initSceneColorPickers();   // Фаза 2: пикеры у кривых издержек, производства, вееров
   wireFolds();               // сворачивание любых секций со складным заголовком

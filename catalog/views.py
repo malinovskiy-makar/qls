@@ -73,7 +73,8 @@ def home(request):
 def random_problem(request):
     problem = (
         Problem.objects
-        .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False)
+        .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
+                hidden_pending_review=False)
         .order_by('?')
         .first()
     )
@@ -84,9 +85,12 @@ def random_problem(request):
 
 # ── Список задач ────────────────────────────────────────────────────────────
 def problem_list(request):
-    # Качественный шлюз: задачи с битым рендером скрыты (quality_gate --revert снимает)
+    # Два шлюза сразу и по разным поводам: качественный прячет битый
+    # рендер (quality_gate), второй — то, чего человек ещё не смотрел
+    # (pending_review_gate). Оба снимаются своим --revert.
     qs = Problem.objects.filter(status=Problem.Status.PUBLISHED,
-                                needs_quality_review=False)
+                                needs_quality_review=False,
+                                hidden_pending_review=False)
 
     f_q      = request.GET.get('q',           '').strip()
     f_topic  = request.GET.get('topic',        '').strip()
@@ -205,6 +209,7 @@ def problem_list(request):
             .annotate(n=Count('problems', filter=Q(
                 problems__status=Problem.Status.PUBLISHED,
                 problems__needs_quality_review=False,
+                problems__hidden_pending_review=False,
             )))
         )
         by_name = {t.name: t for t in counted}
@@ -251,7 +256,8 @@ def problem_list(request):
 # ── Страница задачи ─────────────────────────────────────────────────────────
 def problem_detail(request, pk):
     problem = get_object_or_404(Problem, pk=pk, status=Problem.Status.PUBLISHED,
-                                needs_quality_review=False)
+                                needs_quality_review=False,
+                                hidden_pending_review=False)
 
     # Учебное событие: задачу открыли. Запись неблокирующая — см.
     # problems/event_log.py (её падение не должно ронять страницу).
@@ -264,7 +270,8 @@ def problem_detail(request, pk):
     # Похожие задачи из кеша (топ-5), без задач за качественным шлюзом
     similar_qs = (
         problem.similar_problems
-        .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False)
+        .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
+                hidden_pending_review=False)
         .prefetch_related('topics')[:5]
     )
     similar = []
@@ -314,9 +321,10 @@ def collection_new(request):
 def collection_detail(request, token):
     collection = get_object_or_404(Collection, token=token)
 
-    # Каталог с теми же фильтрами что в problem_list (+ качественный шлюз)
+    # Каталог с теми же фильтрами что в problem_list (+ оба шлюза)
     qs = Problem.objects.filter(status=Problem.Status.PUBLISHED,
-                                needs_quality_review=False)
+                                needs_quality_review=False,
+                                hidden_pending_review=False)
     f_q      = request.GET.get('q', '').strip()
     f_topic  = request.GET.get('topic', '').strip()
     f_diff   = request.GET.get('difficulty', '').strip()
@@ -340,7 +348,8 @@ def collection_detail(request, token):
     added_ids = set(collection.problems.values_list('id', flat=True))
     order_map = {pid: i for i, pid in enumerate(collection.problem_order)}
     coll_problems = sorted(
-        collection.problems.filter(needs_quality_review=False)
+        collection.problems.filter(needs_quality_review=False,
+                                   hidden_pending_review=False)
         .prefetch_related('topics'),
         key=lambda p: order_map.get(p.pk, 9999),
     )
@@ -447,7 +456,8 @@ def collection_export(request, token):
 
     order_map = {pid: i for i, pid in enumerate(collection.problem_order)}
     problems  = sorted(
-        collection.problems.filter(needs_quality_review=False)
+        collection.problems.filter(needs_quality_review=False,
+                                   hidden_pending_review=False)
         .prefetch_related('topics'),
         key=lambda p: order_map.get(p.pk, 9999),
     )
@@ -503,7 +513,8 @@ def catalog_api_problem(request, pk):
             Problem.objects
             .prefetch_related('topics', 'parts', 'source_references__source')
             .get(pk=pk, status=Problem.Status.PUBLISHED,
-                 needs_quality_review=False)
+                 needs_quality_review=False,
+                 hidden_pending_review=False)
         )
     except Problem.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)

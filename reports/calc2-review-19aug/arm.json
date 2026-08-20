@@ -1,0 +1,233 @@
+{
+ "ok": [
+  "холст при открытии чист во всех сценах",
+  "ключевые точки по-прежнему считаются (сцен с точками: 41)",
+  "в «Спросе и предложении» две кривые: D, S",
+  "нашлось место, где под курсором именно полоса кривой «D»",
+  "щелчок по кривой взвёл её: D",
+  "у взведённой кривой загорелись ключевые точки: 6",
+  "координаты без наведения не показываются (видимых подписей 0)",
+  "щелчок по второй кривой погасил первую и взвёл вторую",
+  "повторный щелчок по той же кривой погасил её",
+  "щелчок по пустому месту холста погасил кривую",
+  "Escape не гасит взведённую кривую",
+  "на холсте есть загоревшаяся точка для наведения",
+  "наведение показало координаты ровно одной точки (1)",
+  "рядом с координатами появился значок (1)",
+  "наведение НИЧЕГО не вынесло в список точек",
+  "увели курсор — не осталось ни плашки, ни точки",
+  "значок доступен курсору (плашка пережила переход с точки на значок)",
+  "щелчок по значку вынес точку в список",
+  "промах по точке на 7 px во все четыре стороны берёт точку: [\"точка\",\"точка\",\"точка\",\"точка\"]",
+  "точка пересечения записана за обеими кривыми: D и S"
+ ],
+ "bad": [],
+ "empty": {
+  "m-graph": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "m-tangent": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "m-optimum": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 5
+  },
+  "m-transform": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 2
+  },
+  "m-minmax": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 5
+  },
+  "m-constraint": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 3
+  },
+  "ppf": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 3
+  },
+  "ppfsum": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 5
+  },
+  "trade": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "tradeprice": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 3
+  },
+  "sd": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "tax": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "tax-adv": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "ceil": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "elast": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "ext": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "costs": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 5
+  },
+  "prod": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "plants": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "isoquant": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "mono": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 5
+  },
+  "mono-nat": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 5
+  },
+  "mono-d1": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 5
+  },
+  "mono-d3": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 5
+  },
+  "mono-kink": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 5
+  },
+  "labor": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "labor-mono": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "labor-union": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "labor-bilat": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "smallopen": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "monoexport": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 4
+  },
+  "consumer": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "cons-slutsky": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "adas": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "islm": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "phillips": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "money": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "loanable": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "fx": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "ineq": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  },
+  "laffer": {
+   "crossGroups": 0,
+   "armed": null,
+   "keyPts": 1
+  }
+ },
+ "pageErrors": []
+}

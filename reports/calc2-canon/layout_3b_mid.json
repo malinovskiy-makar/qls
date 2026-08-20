@@ -1,0 +1,2648 @@
+{
+ "1440/m-graph": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 11,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/m-tangent": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 31,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/m-optimum": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/m-transform": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 15,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/m-minmax": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/m-constraint": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/ppf": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 16,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "Дост.",
+    "area": 644.4
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/ppfsum": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 22,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "Дост.",
+    "area": 644.4
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/trade": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 13,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/tradeprice": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/sd": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 23,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 52
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/tax": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 27,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 52
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "Tx",
+    "area": 274.4
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/tax-adv": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 27,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 52
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "Tx",
+    "area": 274.4
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/ceil": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 25,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 52
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/elast": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 28,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 52
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/ext": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 52
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/costs": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 25,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "AVC",
+    "area": 111.4
+   },
+   {
+    "float": "легенда",
+    "text": "Прибыль ф…",
+    "area": 1542
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/prod": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 29,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/plants": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 18,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/isoquant": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/mono": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [
+   {
+    "a": "graph-tools",
+    "b": "легенда",
+    "area": 516.8
+   }
+  ],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "DWL",
+    "area": 125.5
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.2
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/mono-nat": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 25,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/mono-d1": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 21,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [
+   {
+    "a": "graph-tools",
+    "b": "легенда",
+    "area": 204
+   }
+  ],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/mono-d3": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 26,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/mono-kink": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/labor": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 22,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 52
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/labor-mono": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [
+   {
+    "a": "W=65",
+    "b": "Wmin=65",
+    "area": 53.3
+   }
+  ],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 52
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/labor-union": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 20,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 52
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/labor-bilat": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 26,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 52
+   },
+   {
+    "float": "легенда",
+    "text": "W",
+    "area": 234.5
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/smallopen": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 52
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/monoexport": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 26,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/consumer": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 16,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/cons-slutsky": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 27,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/adas": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 21,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/islm": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/phillips": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/money": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 16,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/loanable": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 22,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/fx": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 20,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/ineq": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 20,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1440/laffer": {
+  "size": {
+   "w": 848,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [
+   {
+    "a": "graph-tools",
+    "b": "легенда",
+    "area": 204
+   }
+  ],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "Tx",
+    "area": 274.4
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/m-graph": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 11,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/m-tangent": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 31,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/m-optimum": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/m-transform": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 15,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/m-minmax": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/m-constraint": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/ppf": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 16,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "Дост.",
+    "area": 644.4
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/ppfsum": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 22,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "Дост.",
+    "area": 644.4
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/trade": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 13,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/tradeprice": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/sd": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 23,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 101.3
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/tax": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 27,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 101.3
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "Tx",
+    "area": 274.4
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/tax-adv": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 27,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 101.3
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "Tx",
+    "area": 274.4
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/ceil": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 25,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 101.3
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/elast": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 28,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 101.3
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/ext": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 101.3
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/costs": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 25,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "ATC",
+    "area": 103.7
+   },
+   {
+    "float": "легенда",
+    "text": "Прибыль ф…",
+    "area": 1542
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/prod": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 29,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/plants": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 18,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/isoquant": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/mono": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [
+   {
+    "a": "graph-tools",
+    "b": "легенда",
+    "area": 516.8
+   }
+  ],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "DWL",
+    "area": 125.5
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.2
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/mono-nat": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 25,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/mono-d1": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 21,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [
+   {
+    "a": "graph-tools",
+    "b": "легенда",
+    "area": 204
+   }
+  ],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/mono-d3": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 26,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/mono-kink": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/labor": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 22,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 101.3
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/labor-mono": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [
+   {
+    "a": "W=65",
+    "b": "Wmin=65",
+    "area": 53.3
+   }
+  ],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 101.3
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/labor-union": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 20,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 101.3
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/labor-bilat": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 26,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 101.3
+   },
+   {
+    "float": "легенда",
+    "text": "W",
+    "area": 234.5
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/smallopen": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "S",
+    "area": 101.3
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/monoexport": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 26,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/consumer": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 16,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/cons-slutsky": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 27,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/adas": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 21,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/islm": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/phillips": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/money": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 16,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/loanable": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 22,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/fx": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 20,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/ineq": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 20,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "1180/laffer": {
+  "size": {
+   "w": 676,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [
+   {
+    "a": "graph-tools",
+    "b": "легенда",
+    "area": 204
+   }
+  ],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "Tx",
+    "area": 274.4
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/m-graph": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 11,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/m-tangent": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 31,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/m-optimum": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/m-transform": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 15,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/m-minmax": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/m-constraint": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/ppf": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 16,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "Дост.",
+    "area": 644.4
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/ppfsum": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 22,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "Дост.",
+    "area": 644.4
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/trade": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 13,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/tradeprice": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/sd": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 23,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/tax": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 27,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "Tx",
+    "area": 274.4
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/tax-adv": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 27,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "Tx",
+    "area": 274.4
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/ceil": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 25,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/elast": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 28,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/ext": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/costs": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 25,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "Прибыль ф…",
+    "area": 1542
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/prod": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 29,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/plants": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 18,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/isoquant": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/mono": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [
+   {
+    "a": "graph-tools",
+    "b": "легенда",
+    "area": 516.8
+   }
+  ],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "DWL",
+    "area": 125.5
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.2
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/mono-nat": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 25,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/mono-d1": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 21,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [
+   {
+    "a": "graph-tools",
+    "b": "легенда",
+    "area": 204
+   }
+  ],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/mono-d3": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 26,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/mono-kink": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/labor": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 22,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/labor-mono": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [
+   {
+    "a": "W=65",
+    "b": "Wmin=65",
+    "area": 53.3
+   }
+  ],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   },
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/labor-union": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 20,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "DWL",
+    "area": 539
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/labor-bilat": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 26,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "W",
+    "area": 234.5
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/smallopen": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 24,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "CS",
+    "area": 327.3
+   },
+   {
+    "float": "легенда",
+    "text": "PS",
+    "area": 310
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/monoexport": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 26,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [
+   {
+    "float": "graph-tools",
+    "text": "Экспорт по мировой цене",
+    "area": 578
+   }
+  ],
+  "outside": [
+   {
+    "s": "Экспорт по мировой цене",
+    "why": "холст",
+    "x": 280.5,
+    "y": 38,
+    "right": 463.5,
+    "bottom": 55,
+    "clip": null
+   }
+  ],
+  "rawTex": []
+ },
+ "960/consumer": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 16,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/cons-slutsky": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 27,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/adas": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 21,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/islm": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/phillips": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 17,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/money": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 16,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/loanable": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 22,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/fx": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 20,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/ineq": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 20,
+  "textPairs": [],
+  "floats": [
+   "graph-tools"
+  ],
+  "floatPairs": [],
+  "floatOverText": [],
+  "outside": [],
+  "rawTex": []
+ },
+ "960/laffer": {
+  "size": {
+   "w": 456,
+   "h": 852
+  },
+  "texts": 19,
+  "textPairs": [],
+  "floats": [
+   "graph-tools",
+   "легенда"
+  ],
+  "floatPairs": [
+   {
+    "a": "graph-tools",
+    "b": "легенда",
+    "area": 204
+   }
+  ],
+  "floatOverText": [
+   {
+    "float": "легенда",
+    "text": "Tx",
+    "area": 274.4
+   }
+  ],
+  "outside": [],
+  "rawTex": []
+ }
+}

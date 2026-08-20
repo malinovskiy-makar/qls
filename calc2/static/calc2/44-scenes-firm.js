@@ -20,7 +20,7 @@ const COST_SCAN_LO = 1e-3;
 // Значение TC(Q) по компилированной формуле (Q и x — обе переменные).
 function evalTC(q) {
   if (!STATE.costsCompiled) return NaN;
-  try { const v = STATE.costsCompiled.evaluate(paramScope({ x: q, Q: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  try { const v = STATE.costsCompiled.evaluate(paramScope(axisScope(q))); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
   catch (e) { return NaN; }
 }
 
@@ -30,7 +30,7 @@ function evalTC(q) {
 function evalPart(key, q) {
   const c = STATE.costsParts && STATE.costsParts[key];
   if (!c) return NaN;
-  try { const v = c.evaluate(paramScope({ x: q, Q: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  try { const v = c.evaluate(paramScope(axisScope(q))); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
   catch (e) { return NaN; }
 }
 function hasPart(key) { return !!(STATE.costsParts && STATE.costsParts[key]); }
@@ -411,11 +411,12 @@ function redrawCosts() {
   svg.selectAll('*').remove();
   addDefs();
   drawGrid();
-  // Подпись по вертикали рисуем сами, но НАЗВАНИЕ оси сообщаем: иначе в
-  // выгрузке на графике затрат стояло ylabel={P} от прошлой сцены (Б37).
-  drawAxes('Q', '', { yName: 'Издержки, цена' });
-  svg.append('text').attr('x', sx(0) + 6).attr('y', sy(CONFIG.Pmax) - 5)
-    .attr('text-anchor', 'start').attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Издержки, цена');
+  /* Правило 46: подпись оси — символ величины. Здесь на вертикали стоят и
+     цена, и издержки в тех же деньгах, и это одна величина — `P`. Фраза
+     «Издержки, цена» тем же кеглем, что и деления, была подписью-объяснением,
+     а не обозначением; что именно нарисовано, говорят имена самих кривых
+     (MC, ATC, AVC, AFC). */
+  drawAxes('Q', 'P');
   drawLongRunArea();      // прямоугольник прибыли/убытка — под кривыми
   drawCostCurves();
   if (STATE.lrOn) drawLongRunMarks();
@@ -548,7 +549,7 @@ function fillLongRunMarks(g) {
   const yP = sy(lr.P);
   g.append('line').attr('x1', ox).attr('y1', yP).attr('x2', xMax).attr('y2', yP)
     .attr('stroke', COL.price).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yP, 'P=' + fmt(lr.P), 'end', 'middle');
+  axisValueY(g, ox, yP, fmt(lr.P), '');
   // Корня P = MC может не быть вовсе — тогда на графике только линия цены.
   if (lr.Qmc == null || lr.Qmc > CONFIG.Qmax) { drawLongRunHandle(g, lr, ox, xMax, yP); return; }
   const px = sx(lr.Qmc);
@@ -566,7 +567,7 @@ function fillLongRunMarks(g) {
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5),
       'математический корень, но производить невыгодно');
   }
-  haloText(g, px, oy + 8, 'Q=' + fmt(lr.Qmc), 'middle', 'hanging');
+  axisValueX(g, px, oy, fmt(lr.Qmc), '');
   drawLongRunHandle(g, lr, ox, xMax, yP);
 }
 
@@ -747,13 +748,20 @@ function redrawProduction() {
   const p = STATE.prod;
   if (!p) { updateProdPanel(); return; }
   const m = CONFIG.margin;
+  const Lmax = p.Lmax || CONFIG.Qmax;
+  const tpMax = padMax(p.maxTP ? p.maxTP.val : 1);
+  const mpMax = padMax(Math.max(p.maxMP ? p.maxMP.val : 1, p.maxAP ? p.maxAP.val : 1));
+  /* Поле слева считаем ПО СВОИМ делениям: у верхней панели своя вертикаль
+     (до 5 000), и общий fitMargins её не видит. `ticks` зависит только от
+     области значений, поэтому шкалу для замера можно построить до того, как
+     станет известно само поле. */
+  fitLeftForLabels([].concat(
+    d3.scaleLinear().domain([0, tpMax]).ticks(5),
+    d3.scaleLinear().domain([0, mpMax]).ticks(5)));
   const left = m.left, right = W - m.right;
   const top = m.top, bottom = H - m.bottom;
   const gap = 34, hTop = (bottom - top - gap) * 0.55, hBot = (bottom - top - gap) - hTop;
   const yTop0 = top + hTop, yBot0 = bottom;
-  const Lmax = p.Lmax || CONFIG.Qmax;
-  const tpMax = padMax(p.maxTP ? p.maxTP.val : 1);
-  const mpMax = padMax(Math.max(p.maxMP ? p.maxMP.val : 1, p.maxAP ? p.maxAP.val : 1));
   const lx = d3.scaleLinear().domain([0, Lmax]).range([left, right]);
   const t1 = d3.scaleLinear().domain([0, tpMax]).range([yTop0, top]);
   const t2 = d3.scaleLinear().domain([0, mpMax]).range([yBot0, yTop0 + gap]);
@@ -766,12 +774,16 @@ function redrawProduction() {
       .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
     g.append('text').attr('x', left + 4).attr('y', scale.range()[1] - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink).text(title);
     g.append('text').attr('x', right + 6).attr('y', y0 + 4).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('L');
+    /* Класс `axis-num` — признак «это деление шкалы», а не украшение: по нему
+       снимается деление под подписью координаты, по нему же `applyLabelSize`
+       НЕ увеличивает шкалу вместе с прочими подписями. У панельных сюжетов свои
+       рисователи осей, и класс там не ставился вовсе. */
     scale.ticks(5).forEach(t => { if (t <= 0) return;
       g.append('text').attr('x', left - 6).attr('y', scale(t)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
-        .attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(t)); });
+        .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(t)); });
     lx.ticks(8).forEach(t => { if (t <= 0) return;
       g.append('text').attr('x', lx(t)).attr('y', y0 + 8).attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
-        .attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(t)); });
+        .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(t)); });
     return g;
   };
   // Б4: TP вводит человек, MP берём символьной производной, AP = TP/L.
@@ -936,7 +948,7 @@ function plantMC(compiled, q) {
   return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / ((q + h) - lo);
 }
 function plantTC(compiled, q) {
-  try { const v = compiled.evaluate(paramScope({ Q: q, x: q, L: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+  try { const v = compiled.evaluate(paramScope(axisScope(q))); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
   catch (e) { return NaN; }
 }
 // Объём завода при уровне предельных издержек m: MC(q) = m. MC растёт по q,
@@ -1018,7 +1030,7 @@ function redrawPlants() {
   }
   makeScales();
   svg.selectAll('*').remove();
-  addDefs(); drawGrid(); drawAxes('Q', '', { yName: 'Издержки' });
+  addDefs(); drawGrid(); drawAxes('Q', 'P');    // правило 46: символ, а не «Издержки»
   const errBox = document.getElementById('pl-error');
   if (errBox) { errBox.style.display = STATE.plErr ? 'block' : 'none'; errBox.textContent = STATE.plErr ? ('Не понял формулу: ' + STATE.plErr) : ''; }
   if (!p) { updatePlantsPanel(); return; }
@@ -1073,8 +1085,8 @@ function redrawPlants() {
     og.append('line').attr('x1', ox).attr('y1', py).attr('x2', px).attr('y2', py)
       .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    haloText(og, px, oy + 8, 'Q=' + fmt(cur.Q), 'middle', 'hanging');
-    haloText(og, ox - 8, py, fmt(yv), 'end', 'middle');
+    axisValueX(og, px, oy, fmt(cur.Q), '');
+    axisValueY(og, ox, py, fmt(yv), '');
     if (STATE.plView === 'mc') {
       // Показываем ГОРИЗОНТАЛЬНОЕ сложение: на уровне m объёмы заводов складываются.
       og.append('line').attr('x1', ox).attr('y1', py).attr('x2', sx(cur.Q)).attr('y2', py)

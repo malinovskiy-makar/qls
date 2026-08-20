@@ -392,14 +392,14 @@ function drawOpenLines() {
   const yPw = sy(o.Pw);
   g.append('line').attr('x1', ox).attr('y1', yPw).attr('x2', xMax).attr('y2', yPw)
     .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yPw, 'Pw=' + fmt(o.Pw), 'end', 'middle');
+  axisValueY(g, ox, yPw, fmt(o.Pw), 'w');
   if (o.error) { attachOpenPwDrag(g.append('rect').attr('x', ox).attr('y', yPw - 12).attr('width', xMax - ox).attr('height', 24).attr('fill', 'transparent').style('cursor', 'grab')); return; }
   // Внутренняя цена при тарифе/квоте — вторая линия.
   if (o.P1 != null) {
     const y1 = sy(o.P1);
     g.append('line').attr('x1', ox).attr('y1', y1).attr('x2', xMax).attr('y2', y1)
       .attr('stroke', COL.MR).attr('stroke-width', 2.5).attr('stroke-dasharray', '7 4').style('pointer-events', 'none');
-    haloText(g, ox - 8, y1, 'P₁=' + fmt(o.P1), 'end', 'middle');
+    axisValueY(g, ox, y1, fmt(o.P1), '1');
   }
   // Проекции и полоса объёма торговли на уровне действующей цены.
   const Pdom = (o.P1 != null) ? o.P1 : o.Pw;
@@ -408,8 +408,8 @@ function drawOpenLines() {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(sx(qS), yD, sx(qS), oy); dash(sx(qD), yD, sx(qD), oy);
-  haloText(g, sx(qS), oy + 8, 'Qs=' + fmt(qS), 'middle', 'hanging');
-  haloText(g, sx(qD), oy + 8, 'Qd=' + fmt(qD), 'middle', 'hanging');
+  axisValueX(g, sx(qS), oy, fmt(qS), 's');
+  axisValueX(g, sx(qD), oy, fmt(qD), 'd');
   const lo = Math.min(sx(qS), sx(qD)), hi = Math.max(sx(qS), sx(qD));
   if (hi > lo + 1) {
     g.append('line').attr('x1', lo).attr('y1', yD).attr('x2', hi).attr('y2', yD)
@@ -490,7 +490,7 @@ function updateOpenPanel() {
     // Разбивка потерь — по отдельности, без «одного числа».
     html += `<div class="stat" style="margin-top:4px;"><span>Потери: искажение производства</span><b>${fmt(o.dwlProd)}</b></div>`;
     html += `<div class="stat"><span>Потери: искажение потребления</span><b>${fmt(o.dwlCons)}</b></div>`;
-    html += `<div class="stat"><span>Итого потери</span><b>${fmt(o.dwlTotal)}</b></div>`;
+    html += `<div class="stat"><span>Итого потери</span><b>${fmtSum(o.dwlProd, o.dwlCons)}</b></div>`;
     html += '<div class="hint">Левый треугольник это производственное искажение: часть импорта заместили ' +
       'более дорогим отечественным выпуском. Правый это потребительское искажение: часть покупателей ушла с рынка ' +
       'из-за выросшей цены.</div>';
@@ -513,14 +513,13 @@ function drawEquilibrium() {
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
 
   // Числа Q* и P* у осей (с белой обводкой, чтобы читались поверх делений).
-  haloText(g, px, oy + 8, 'Q*=' + fmt(Q), 'middle', 'hanging');
-  haloText(g, ox - 8, py, 'P*=' + fmt(P), 'end', 'middle');
+  axisValueX(g, px, oy, fmt(Q), '');
+  axisValueY(g, ox, py, fmt(P), '');
 
-  // Сама точка и подпись E*.
-  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
-    .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  mathTspans(g.append('text').attr('x', px + 8).attr('y', py - 8)
-    .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink), 'E*');
+  /* Кружок у точки пересечения снят решением владельца: пунктиры к осям уже
+     показывают, где точка, а числа на осях — какая она. Подпись «E*» остаётся:
+     это ИМЯ точки, а не повтор переменной. */
+  pointName(g, px, py, 'E*', COL.ink);
 }
 
 // Текст с белой обводкой (halo) — чтобы подписи равновесия читались над сеткой.
@@ -630,17 +629,70 @@ function qtyGreekChar(cmd) {
 /* Единая точка печати подписи. Явная разметка (P_b, Q^2) разбирается как
    раньше; величина без разметки (Pb, Q₁) — через общий разбор; проза
    печатается как есть. */
+/* ⚠️ НА ХОЛСТЕ НЕТ KaTeX, ПОЭТОМУ `$…$` РАЗБИРАЕТ ЭТА ФУНКЦИЯ (п. 42).
+
+   Подписи холста набираются средствами самого SVG (tspan со сдвигом базовой
+   линии): KaTeX сюда не встанет, а вставка через foreignObject выпала бы из
+   снимка холста, то есть из выгрузки в PNG. Но авторы сцен пишут подписи ТАК,
+   КАК ПРИВЫКЛИ в остальном проекте — долларами и командами. Разбор их не
+   понимал (`hasMathMarkup` проверял только `[*^_]`), и на график уезжал
+   сырой код: «перегиб TP: $\max MP$ при $L = 10$», «$f'(x)$, производная».
+   Замер: 12 подписей в двух сценах.
+
+   Лечим в ОДНОМ месте, а не в четырёх строках сцен: иначе следующая подпись,
+   написанная долларами, снова окажется сырой на экране. Доллар-разделитель
+   снимается, известные команды переводятся в юникод, `\$` остаётся настоящим
+   знаком доллара (в проекте литеральный доллар так и пишется). Всё остальное
+   отдаётся прежнему разбору `^` / `_` / `*`. */
+const TEX_ON_CANVAS = [
+  [/\\max\b/g, 'max'], [/\\min\b/g, 'min'], [/\\log\b/g, 'log'],
+  [/\\ln\b/g, 'ln'], [/\\lim\b/g, 'lim'], [/\\text\{([^}]*)\}/g, '$1'],
+  [/\\mathrm\{([^}]*)\}/g, '$1'], [/\\operatorname\{([^}]*)\}/g, '$1'],
+  [/\\ne(?![a-zA-Z])/g, '\u2260'], [/\\le(?![a-zA-Z])/g, '\u2264'],
+  [/\\ge(?![a-zA-Z])/g, '\u2265'], [/\\approx\b/g, '\u2248'],
+  [/\\cdot\b/g, '\u00b7'], [/\\times\b/g, '\u00d7'],
+  [/\\to\b/g, '\u2192'], [/\\infty\b/g, '\u221e'],
+  [/\\prime\b/g, '\u2032'], [/\\Delta\b/g, '\u0394'],
+  [/\\alpha\b/g, '\u03b1'], [/\\beta\b/g, '\u03b2'],
+  [/\\pi\b/g, '\u03c0'], [/\\lambda\b/g, '\u03bb'],
+  [/\\left|\\right/g, ''], [/\\,|\\;|\\!/g, ''],
+];
+const DOLLAR_HOLD = '\uE001';          // место настоящего доллара на время разбора
+
+function texToCanvasText(raw) {
+  let s = String(raw == null ? '' : raw);
+  if (!/[$\\]/.test(s)) return s;
+  s = s.replace(/\\\$/g, DOLLAR_HOLD);   // «\$» — это знак доллара, не разделитель
+  s = s.replace(/\$/g, '');                // разделители формул снимаем
+  TEX_ON_CANVAS.forEach(([re, to]) => { s = s.replace(re, to); });
+  return s.replace(new RegExp(DOLLAR_HOLD, 'g'), '$');
+}
+
 function renderLabelText(sel, txt) {
-  const s = String(txt == null ? '' : txt);
+  const s = texToCanvasText(txt);
+  /* ⚠️ ИСХОДНАЯ РАЗМЕТКА ПОДПИСИ ОСТАЁТСЯ ПРИ УЗЛЕ.
+     Нарисованная подпись разложена на tspan'ы, и собрать из них разметку
+     обратно нельзя: «60» с подстрочным «b» читается как «60b», то есть
+     индекс теряется молча. На холсте это незаметно (там он нарисован), а в
+     выгрузке на бумагу подпись уезжала уже без него. Вместо угадывания по
+     готовой картинке держим исходную запись рядом с узлом — её и читает
+     сборка файла. */
+  if (sel && sel.attr) sel.attr('data-raw', s);
   if (hasMathMarkup(s)) return mathTspans(sel, s);
   if (typeof qtyIsQuantity === 'function' && qtyIsQuantity(s)) return qtyTspans(sel, s);
   return sel.text(s);
 }
 
-function haloText(g, x, y, txt, anchor, baseline) {
+/* Седьмой аргумент — `{ noFlip: true }`: подпись НЕ разворачивать, даже если
+   она не влезает. Нужен подписям координат у оси цены: развернувшись, они
+   уезжают в первую четверть, а там их быть не должно (см. axisValueY). Такие
+   подписи считают своё место сами, по настоящей ширине нарисованного текста. */
+function haloText(g, x, y, txt, anchor, baseline, opts) {
   const w = String(txt).length * 5.9 + 6;      // ширина строки при кегле 10
+  const noFlip = !!(opts && opts.noFlip);
   let ax = anchor, px = x;
-  if (ax === 'end' && x - w < 2) { ax = 'start'; px = x + 8; }
+  if (noFlip) { /* место выбирает вызывающий */ }
+  else if (ax === 'end' && x - w < 2) { ax = 'start'; px = x + 8; }
   else if (ax === 'start' && x + w > W - 2) { ax = 'end'; px = x - 8; }
   else if (ax === 'middle') px = Math.max(w / 2 + 2, Math.min(W - w / 2 - 2, x));
   const py = Math.max(9, Math.min(H - 4, y));
@@ -652,11 +704,36 @@ function haloText(g, x, y, txt, anchor, baseline) {
   return t;
 }
 
+/* ПРАВИЛО 47. НА ХОЛСТЕ У ТОЧКИ СТОИТ ТОЛЬКО ОБОЗНАЧЕНИЕ.
+   Одна заглавная латинская буква; звёздочка — тогда и только тогда, когда со
+   звёздочкой подписаны координаты («Q*» и «P*» → точка «E*»).
+   ЧТО это за точка, говорит легенда или панель, а не холст: холст и так самый
+   плотный объект на экране. До этой функции на нём жили пять грамматик сразу —
+   «E*», «E», «M», «M · монополия», «AC · P=ATC».
+   Класс `point-name` нужен реестру обозначений (Добавка В) и проверке канона:
+   собирать обозначения «по коротким текстам» нельзя, деление оси «60» тоже
+   короткое. */
+function pointName(g, px, py, sym, color, opts) {
+  if (!sym) return null;
+  const o = opts || {};
+  const t = g.append('text').attr('class', 'point-name')
+    .attr('x', px + (o.dx == null ? 8 : o.dx))
+    .attr('y', py + (o.dy == null ? -8 : o.dy))
+    .attr('font-size', o.size || FS.large).attr('font-weight', o.weight || 600)
+    .attr('fill', color || COL.ink)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5);
+  renderLabelText(t, sym);
+  return t;
+}
+
 // Подпись значения у оси Y (зарплата/цена). Разворот внутрь графика теперь
 // умеет сам haloText, поэтому здесь остался только вызов.
 function yWageLabel(g, ox, py, txt) {
   haloText(g, ox - 8, py, txt, 'end', 'middle');
 }
+
+/* Значение зарплаты у оси — тем же помощником, что и все прочие координаты. */
+function yWageValue(g, ox, py, value, idx) { return axisValueY(g, ox, py, value, idx || ''); }
 
 /* Заголовок раздела равновесия — СВОЙСТВО СЦЕНЫ, а не константа (А51 · А52).
 
@@ -684,16 +761,27 @@ function isMonopolyScene() {
   return MONOPOLY_SCENES.indexOf(STATE.sceneKey) >= 0 || MONOPOLY_SCENES.indexOf(key) >= 0;
 }
 
+/* п. 82. Условие равновесия — МАТЕМАТИКА, и набирается как математика.
+   Обычным текстом среди набранных формул «D = S» читалось как опечатка:
+   на соседних строках те же буквы стоят курсивом. */
 function eqSectionTitle() {
-  if (isMonopolyScene()) return 'Оптимум монополии: MR = MC';
+  if (isMonopolyScene()) return 'Оптимум монополии: $MR = MC$';
   if (STATE.scenario === 'openecon') return 'Равновесие без торговли (автаркия)';
-  return 'Равновесие D = S';
+  return 'Равновесие $D = S$';
 }
 
+/* ⚠️ Сверяем ИСХОДНУЮ строку, а не то, что на экране: после KaTeX внутри
+   заголовка лежат его узлы, `textContent` уже не равен исходнику, и сравнение
+   с ним переписывало бы заголовок на каждой перерисовке, стирая набор. */
 function updateEqSectionTitle() {
   const sec = document.getElementById('sec-eq');
   const t = sec && sec.querySelector('.section-title');
-  if (t && t.textContent !== eqSectionTitle()) t.textContent = eqSectionTitle();
+  if (!t) return;
+  const raw = eqSectionTitle();
+  if (t.dataset.raw === raw) return;
+  t.dataset.raw = raw;
+  t.textContent = raw;
+  if (typeof renderMathIn === 'function') renderMathIn(t);
 }
 
 // Табло слева: показываем Q* и P* (или подсказку / «не найдено»).
@@ -710,12 +798,19 @@ function updateInfoPanel() {
     return;
   }
   if (!STATE.eq) {
-    box.innerHTML = '<div class="warn">Равновесие не найдено в первой четверти.</div>';
+    /* П7. Раньше об отсутствии равновесия говорили ТРИ блока подряд: этот,
+       «Излишки» («появятся после нахождения равновесия») и «Вмешательство»
+       («двигайте ползунок»). Два последних теперь молчат — говорит один, и
+       он называет не только факт, но и что сделать (канон 2.3). */
+    box.innerHTML = '<div class="warn">Кривые не пересекаются в первой четверти, ' +
+      'поэтому равновесия нет. Измените формулу спроса или предложения ' +
+      'либо отодвиньте границы плоскости.</div>';
     return;
   }
   let html =
     `<div class="stat"><span>$Q^*$ (количество)</span><b>${fmt(STATE.eq.Q)}</b></div>` +
-    `<div class="stat"><span>$P^*$ (цена)</span><b>${fmt(STATE.eq.P)}</b></div>`;
+    `<div class="stat"><span>$P^*$ (цена)</span><b>${fmt(STATE.eq.P)}</b></div>` +
+    beforeInterventionNote();
   /* Б31. Кривые могут пересечься не один раз, и тогда равновесие не одно.
      Молчать об этом нельзя: все дальнейшие числа считаются вокруг ОДНОГО
      из них, и человек вправе знать, вокруг какого. */
@@ -751,17 +846,30 @@ function drawAreas() {
 }
 
 // Табло излишков: CS, PS и общественное благосостояние SW.
+/* Оговорка «эти числа — до вмешательства» (п. 5, канон 2.13).
+   В сцене налога сверху стояло «Q* 50, CS 1 250», а в таблице ниже «После:
+   Q 40, CS 800» — два разных значения одной величины на одном экране, и ничто
+   не говорило, что верхнее относится к рынку ДО вмешательства. Оговорка стоит
+   ПОД числами, а не в сноске, и называет область действия. */
+function beforeInterventionNote() {
+  const pcOn = !!(STATE.pc && STATE.pc.binding && STATE.pReg > 0);
+  if (!STATE.taxActive && !pcOn) return '';
+  return '<div class="scope-note">до вмешательства государства</div>';
+}
+
 function updateAreasPanel() {
   const box = document.getElementById('info-areas');
   if (!box) return;
-  if (!STATE.eq || STATE.cs == null) {
-    box.innerHTML = '<div class="muted">Появятся после нахождения равновесия.</div>';
-    return;
-  }
+  /* П6. В монополии излишки считает и показывает блок «Монополия»: там свои
+     Qm, Pm, CS и потери. Заглушка «появятся после нахождения равновесия»
+     обещала числа, которые уже стоят рядом на том же экране. */
+  if (isMonopolyScene()) { box.innerHTML = ''; return; }
+  if (!STATE.eq || STATE.cs == null) { box.innerHTML = ''; return; }   // говорит блок равновесия, см. П7
   box.innerHTML =
     `<div class="stat"><span>$CS$ (потребитель)</span><b>${fmt(STATE.cs)}</b></div>` +
     `<div class="stat"><span>$PS$ (производитель)</span><b>${fmt(STATE.ps)}</b></div>` +
-    `<div class="stat"><span>$SW = CS + PS$</span><b>${fmt(STATE.sw)}</b></div>`;
+    `<div class="stat"><span>$SW = CS + PS$</span><b>${fmtSum(STATE.cs, STATE.ps)}</b></div>` +
+    beforeInterventionNote();
 }
 
 /* ---------------------------------------------------------------------
@@ -851,9 +959,9 @@ function drawTaxPoints() {
   dash(xQ1, yPb, ox, yPb);
   dash(xQ1, yPs, ox, yPs);
 
-  haloText(g, ox - 8, yPb, 'Pb=' + fmt(Pb), 'end', 'middle');
-  haloText(g, ox - 8, yPs, 'Ps=' + fmt(Ps), 'end', 'middle');
-  haloText(g, xQ1, oy + 8, 'Q₁=' + fmt(Q), 'middle', 'hanging');
+  axisValueY(g, ox, yPb, fmt(Pb), 'b');
+  axisValueY(g, ox, yPs, fmt(Ps), 's');
+  axisValueX(g, xQ1, oy, fmt(Q), '1');
 
   // Точки покупателя (синяя) и продавца (красная).
   g.append('circle').attr('cx', xQ1).attr('cy', yPb).attr('r', 4)
@@ -987,9 +1095,19 @@ function setTaxKind(kind) {
 function updateTaxPanel() {
   const box = document.getElementById('info-tax');
   if (!box) return;
+  /* ⚠️ П12. БЛОК ГОВОРИТ ТОЛЬКО ТАМ, ГДЕ ЕГО ИНСТРУМЕНТ ЕСТЬ.
+     Сюжет объявляет недоступные ему органы управления сам (SCENE_ROUTE.lock →
+     класс .scoped-off). «Спрос и предложение» и «Стандартная монополия»
+     запирают весь блок вмешательства — и всё равно показывали подсказку
+     «двигайте ползунок, чтобы ввести налог» про ползунок, которого на экране
+     нет. Спрашиваем ту же разметку, что и прячет: второго списка сцен
+     с налогом не заводим, он бы разъехался с маршрутами. */
+  const sec = document.getElementById(L_INTERV);
+  if (sec && sec.classList.contains('scoped-off')) { box.innerHTML = ''; return; }
   if (!STATE.D || !STATE.S) {
     box.innerHTML = '<div class="muted">Сначала отметьте кривые D и S.</div>'; return;
   }
+  if (!STATE.eq) { box.innerHTML = ''; return; }   // об отсутствии равновесия говорит один блок, см. П7
   const isSub = (STATE.intervType === 'subsidy');
   if (!STATE.taxActive) {
     box.innerHTML = `<div class="muted">Двигайте ползунок или тяните клин на графике, чтобы ввести ${isSub ? 'субсидию' : 'налог'}.</div>`;
@@ -1010,7 +1128,9 @@ function updateTaxPanel() {
              `<b>${fmt(STATE.tax)}${adv ? ' %' : ''}</b></div>`;
   html += '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
   rows.forEach(([k, a, b]) => {
-    const d = b - a, ds = (d > 0 ? '+' : '') + fmt(d);
+    // Δ считается из ОКРУГЛЁННЫХ соседей: иначе столбец не сходится с теми
+    // двумя числами, которые человек видит слева от него (п. 1).
+    const ds = fmtDiff(b, a);
     html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
   });
   html += '</table>';
@@ -1082,8 +1202,8 @@ function drawElasticityPoint() {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
-  haloText(g, px, oy + 8, 'Q=' + fmt(e.q), 'middle', 'hanging');
-  haloText(g, ox - 8, py, 'P=' + fmt(e.p), 'end', 'middle');
+  axisValueX(g, px, oy, fmt(e.q), '');
+  axisValueY(g, ox, py, fmt(e.p), '');
   g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Ed|=' + fmt(e.absEd));
   const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
@@ -1108,6 +1228,11 @@ function drawElasticityPointS() {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
+  /* Пунктир к оси без числа на самой оси. Точка эластичности на ПРЕДЛОЖЕНИИ
+     тянула обе проекции и не подписывала ни одной, хотя её зеркало на спросе
+     подписывает обе: две линии в никуда, и прочесть по ним значение нечем. */
+  axisValueX(g, px, oy, fmt(e.q), '');
+  axisValueY(g, ox, py, fmt(e.p), '');
   g.append('text').attr('x', px + 9).attr('y', py + 15).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.S)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Es|=' + fmt(e.absEs));
   const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
@@ -1131,7 +1256,10 @@ function updateElasticityPanel() {
   if (!e || isNaN(e.Ed)) { box.innerHTML = '<div class="warn">Эластичность не определена в этой точке.</div>'; return; }
   const zone = e.absEd > 1.0001 ? 'эластичный, $|E_d| > 1$' : (e.absEd < 0.9999 ? 'неэластичный, $|E_d| < 1$' : 'единичная, $|E_d| = 1$');
   let html = '';
-  html += `<div class="stat"><span>Точка спроса (Q, P)</span><b>${fmt(e.q)}, ${fmt(e.p)}</b></div>`;
+  /* Пара чисел — тоже список, и запятая в нём спорит с десятичным знаком:
+     «50,50» читается как одно число с копейками. Разделитель тот же, что у
+     остальных списков, — точка с запятой. */
+  html += `<div class="stat"><span>Точка спроса (Q, P)</span><b>${fmt(e.q)}; ${fmt(e.p)}</b></div>`;
   html += `<div class="stat"><span>$|E_d|$</span><b>${fmt(e.absEd)}</b></div>`;
   html += `<div class="stat"><span>Зона спроса</span><b>${zone}</b></div>`;
   html += `<div class="stat"><span>Выручка TR = P·Q</span><b>${fmt(e.TR)}</b></div>`;
@@ -1151,7 +1279,7 @@ function updateElasticityPanel() {
   if (s && !isNaN(s.Es)) {
     const zs = s.absEs > 1.0001 ? 'эластичное, $|E_s| > 1$' : (s.absEs < 0.9999 ? 'неэластичное, $|E_s| < 1$' : 'единичная, $|E_s| = 1$');
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
-    html += `<div class="stat"><span>Точка предложения (Q, P)</span><b>${fmt(s.q)}, ${fmt(s.p)}</b></div>`;
+    html += `<div class="stat"><span>Точка предложения (Q, P)</span><b>${fmt(s.q)}; ${fmt(s.p)}</b></div>`;
     html += `<div class="stat"><span>$|E_s|$</span><b>${fmt(s.absEs)}</b></div>`;
     html += `<div class="stat"><span>Зона предложения</span><b>${zs}</b></div>`;
     /* Б28 · Б29. Правило про перехват верно только для ПРЯМОЙ, и раньше оно
@@ -1298,7 +1426,11 @@ function drawExtPoints(e) {
   g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Qрын');
-  haloText(g, pxm, oy + 8, fmt(e.Qmkt), 'middle', 'hanging');
+  axisValueX(g, pxm, oy, fmt(e.Qmkt), 'рын');
+  /* Пунктир шёл и к оси цены, а числа там не было: линия упиралась в пустоту.
+     Различитель обязателен — на оси цены встают ДВЕ разные величины,
+     рыночная цена и цена общественного оптимума. */
+  axisValueY(g, ox, pym, fmt(e.Pmkt), 'рын');
   // Общественный оптимум (Qопт, Pопт) — на пересечении D и MSC.
   if (e.Qopt != null) {
     const [pxo, pyo] = toPx(e.Qopt, e.Popt);
@@ -1306,7 +1438,8 @@ function drawExtPoints(e) {
     g.append('circle').attr('cx', pxo).attr('cy', pyo).attr('r', 4.5).attr('fill', COL.tax).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     g.append('text').attr('x', pxo + 8).attr('y', pyo - 8).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.tax)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Qопт');
-    haloText(g, pxo, oy + 8, fmt(e.Qopt), 'middle', 'hanging');
+    axisValueX(g, pxo, oy, fmt(e.Qopt), 'опт');
+    axisValueY(g, ox, pyo, fmt(e.Popt), 'опт');
     // С налогом Пигу новое равновесие совпадает с Qопт — отмечаем кольцом.
     if (e.applyPigou && e.pigouEq) {
       const [pxp, pyp] = toPx(e.pigouEq.Q, e.pigouEq.P);
@@ -1442,7 +1575,8 @@ function drawPriceControl() {
   // Горизонтальная линия фиксированной цены через весь график.
   g.append('line').attr('x1', ox).attr('y1', yReg).attr('x2', xMax).attr('y2', yReg)
     .attr('stroke', lineColor).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yReg, (pc.isCeiling ? 'Pc=' : 'Pf=') + fmt(Preg), 'end', 'middle');
+  // Потолок и пол — разные величины на одной оси: имя снимается, индекс остаётся.
+  axisValueY(g, ox, yReg, Preg, pc.isCeiling ? 'c' : 'f');
 
   if (STATE.pcActive) {
     const { Qs, Qd, Qtrade, gap, isCeiling } = pc;
@@ -1452,8 +1586,8 @@ function drawPriceControl() {
       .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     dash(xQs, yReg, xQs, oy);   // проекция объёма предложения на ось Q
     dash(xQd, yReg, xQd, oy);   // проекция объёма спроса на ось Q
-    haloText(g, xQs, oy + 8, 'Qs=' + fmt(Qs), 'middle', 'hanging');
-    haloText(g, xQd, oy + 8, 'Qd=' + fmt(Qd), 'middle', 'hanging');
+    axisValueX(g, xQs, oy, fmt(Qs), 's');
+    axisValueX(g, xQd, oy, fmt(Qd), 'd');
     // Зона дефицита/избытка — цветная полоса на оси Q между Qs и Qd.
     const xLo = Math.min(xQs, xQd), xHi = Math.max(xQs, xQd);
     g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy)
@@ -1511,7 +1645,9 @@ function updatePcPanel() {
   let html = `<div class="stat"><span>${isCeiling ? 'Потолок Pc' : 'Пол Pf'}</span><b>${fmt(pc.Preg)}</b></div>`;
   html += '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
   rows.forEach(([k, a, b]) => {
-    const d = b - a, ds = (d > 0 ? '+' : '') + fmt(d);
+    // Δ считается из ОКРУГЛЁННЫХ соседей: иначе столбец не сходится с теми
+    // двумя числами, которые человек видит слева от него (п. 1).
+    const ds = fmtDiff(b, a);
     html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
   });
   html += '</table>';

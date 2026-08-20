@@ -8,13 +8,24 @@
 // Компиляция формулы P = f(Q). Возвращает { compiled, error }.
 // Пользователь пишет от Q; внутри даём Math.js обе переменные (Q и x),
 // чтобы принимались оба варианта записи.
+/* П14. Область подстановки переменной графика: одно место на весь движок.
+   Строчная буква — тот же аргумент, что заглавная; `L` синоним для рынка
+   труда, `X` — для блока КПВ, где горизонталь называется товаром X.
+   ⚠️ Вертикальные обозначения (`P`, `y`, `Y`) сюда НЕ входят: они значение,
+   а не аргумент, и подставлять их нельзя. */
+function axisScope(q, extra) {
+  const c = extra || {};
+  c.x = q; c.Q = q; c.q = q; c.L = q; c.l = q; c.X = q;
+  return c;
+}
+
 function compileFormula(expr) {
   try {
     const compiled = math.parse(prepExpr(expr)).compile();
     // Пробный расчёт ловит опечатки сразу (L — синоним для рынка труда).
     // Там, где буквы становятся параметрами, незнакомая буква — не опечатка,
     // а будущий ползунок, поэтому на пробу подставляем ей единицу.
-    const ctx = paramScope({ x: 1, Q: 1, L: 1 });
+    const ctx = paramScope(axisScope(1));
     if (paramsAllowed()) freeSymbols(expr).forEach(n => { if (ctx[n] === undefined) ctx[n] = 1; });
     compiled.evaluate(ctx);
     return { compiled, error: null };
@@ -32,7 +43,7 @@ function evalCurve(curve, q) {
   // Быстрый путь для прямых (нужен и для плавного перетаскивания).
   if (curve.linear) return curve.linear.a * q + curve.linear.b;
   try {
-    const v = evalWithParams(curve.compiled, { x: q, Q: q, L: q }, curve.expr);   // L — синоним переменной (рынок труда)
+    const v = evalWithParams(curve.compiled, axisScope(q), curve.expr);
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) {
     return NaN;
@@ -46,7 +57,7 @@ function detectLinear(compiled) {
   const at = (q) => {
     // Значения ползунков подмешиваем: иначе «a*x» без них падает на неизвестной
     // букве и прямая считалась бы кривой (а её нельзя ни таскать, ни двигать).
-    try { const v = compiled.evaluate(paramScope({ x: q, Q: q, L: q })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
+    try { const v = compiled.evaluate(paramScope(axisScope(q))); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
     catch (e) { return NaN; }
   };
   /* Б30. Проверять три точки В СЕРЕДИНЕ диапазона нельзя: кусочная функция
@@ -133,9 +144,15 @@ function refreshLinearForParams() {
 
 // Красивая запись прямой по a и b (для подписи в списке при перетаскивании).
 // varName — имя переменной ('Q' по умолчанию; 'P' для записи Q(P), Фаза 1б).
-function fmtLinear(a, b, varName) {
+/* dec — глубина округления. По умолчанию два знака, как было у всех прежних
+   вызовов. Перетаскивание просит три (решение владельца 19.08) и передаёт их
+   ЯВНО: печатать глубже, чем хранится в curve.linear, нельзя — запись и
+   расчёт разошлись бы в последнем разряде, а это ровно та беда, из-за которой
+   округление в движке вообще появилось. */
+function fmtLinear(a, b, varName, dec) {
   const V = varName || 'Q';
-  const r = (v) => Math.round(v * 100) / 100; a = r(a); b = r(b);
+  const pow = Math.pow(10, (dec === undefined ? 2 : dec));
+  const r = (v) => Math.round(v * pow) / pow; a = r(a); b = r(b);
   if (a === 0) return `${b}`;
   if (a < 0) {
     const aa = Math.abs(a), aPart = aa === 1 ? V : `${aa}*${V}`;
@@ -372,13 +389,13 @@ function curveDeriv(curve, q) {
 
 // Внешние предельные издержки (Задача 4): константа или функция от Q (как спрос — переменная Q).
 function compileExt(expr) {
-  try { const c = math.parse(expr).compile(); c.evaluate(scopeFor(expr, { x: 1, Q: 1 })); return { compiled: c, error: null }; }
+  try { const c = math.parse(expr).compile(); c.evaluate(scopeFor(expr, axisScope(1))); return { compiled: c, error: null }; }
   catch (e) { return { compiled: null, error: e.message }; }
 }
 function evalExt(q) {
   if (!STATE.extCompiled) return NaN;
   try {
-    const v = STATE.extCompiled.evaluate(scopeFor(STATE.extExpr, { x: q, Q: q }));
+    const v = STATE.extCompiled.evaluate(scopeFor(STATE.extExpr, axisScope(q)));
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) { return NaN; }
 }
@@ -577,6 +594,15 @@ const QTY_OPS = {
 // Хвосты, которые в экономике всегда означают индекс, а не продолжение слова.
 const QTY_INDEX_WORDS = ['min', 'max', 'avg', 'opt', 'eq', 'tot', 'reg', 'imp', 'exp'];
 
+/* ⚠️ ИМЯ ФУНКЦИИ — ОПЕРАТОР, А НЕ СИМВОЛ С ИНДЕКСОМ (Добавка Б).
+   Пока подпись «$\max TP$: $MP = 0$» уезжала на холст сырой, вместе с
+   долларами, разбирать было нечего. После чистки долларов (п. 42) её увидел
+   общий разбор: правило «заглавная плюс одна-две строчные — это индекс»
+   поймало «max» и напечатало «m» с подстрочным «ax». Опечатки в тексте нет,
+   ошибка в разборе: имя функции целиком, и резать его нельзя.
+   Тот же класс — min, log, ln, lim, exp, sin, cos, tan. */
+const QTY_FUNC_WORDS = ['max', 'min', 'log', 'ln', 'lim', 'exp', 'sin', 'cos', 'tan', 'abs'];
+
 function qtyHasCyrillic(s) { return /[А-Яа-яЁё]/.test(String(s || '')); }
 
 /* Подпись — это величина? Величиной считаем запись, где есть латинская буква
@@ -585,6 +611,8 @@ function qtyHasCyrillic(s) { return /[А-Яа-яЁё]/.test(String(s || '')); }
 function qtyIsQuantity(raw) {
   const s = String(raw == null ? '' : raw).trim();
   if (!s || qtyHasCyrillic(s)) return false;
+  // Число с индексом («60_b») — величина: индекс и есть её имя.
+  if (/^[−-]?[\d.,]+_/.test(s)) return true;
   if (!/[A-Za-zα-ωΑ-Ω]/.test(s)) return false;      // одни цифры — не величина
   if (/[A-Za-z]{5,}/.test(s)) return false;          // длинное слово — это слово
   return true;
@@ -610,7 +638,8 @@ function qtyParts(raw) {
          похож на индекс: одна-две буквы (Pb, Qd, Qm) или известное слово
          (Wmin, Pmax). Иначе своё имя кривой вроде «Test» превратилось бы в
          «T» с индексом «est» — на экране это выглядит опечаткой. */
-      if (run.length > 1 && !/^[A-Z]+$/.test(run)) {
+      if (run.length > 1 && !/^[A-Z]+$/.test(run)
+          && QTY_FUNC_WORDS.indexOf(run.toLowerCase()) < 0) {
         const tail = run.slice(1);
         if (/^[a-z]{1,2}$/.test(tail) || QTY_INDEX_WORDS.indexOf(tail) >= 0) {
           name = run[0]; sub = tail;
@@ -629,7 +658,21 @@ function qtyParts(raw) {
     } else if (/[0-9]/.test(ch)) {
       let run = '';
       while (i < s.length && /[0-9.,]/.test(s[i])) { run += s[i]; i++; }
-      out.push({ kind: 'num', s: run });
+      const num = { kind: 'num', s: run, sub: '' };
+      /* ⚠️ ИНДЕКС БЫВАЕТ И ПРИ ЧИСЛЕ, А НЕ ТОЛЬКО ПРИ БУКВЕ (фаза 5, 19.08).
+         Значения координат уехали за оси одними числами, и различитель двух
+         величин на одной оси («цена покупателя» и «цена продавца») переехал
+         туда же нижним индексом: «60_b» и «40_s». Холст такую запись понимал
+         сразу — её разбирает mathTspans, — а этот разбор, по которому строится
+         бумага, не понимал вовсе: подпись уходила в файл как «60b», то есть
+         теряла индекс молча. Два разбора одной разметки обязаны понимать её
+         одинаково. */
+      if (s[i] === '_') {
+        i++;
+        if (s[i] === '{') { i++; while (i < s.length && s[i] !== '}') { num.sub += s[i]; i++; } i++; }
+        else if (i < s.length) { num.sub += s[i]; i++; }
+      }
+      out.push(num);
     } else { out.push({ kind: 'op', s: ch }); i++; }
   }
   return out;
@@ -645,7 +688,10 @@ function qtyLatex(raw) {
       out += (p.greek || p.s);
       if (p.sub) out += (p.sub.length > 1 ? '_{' + p.sub + '}' : '_' + p.sub);
       if (p.sup) out += (p.sup.length > 1 ? '^{' + p.sup + '}' : '^' + p.sup);
-    } else if (p.kind === 'num') out += p.s;
+    } else if (p.kind === 'num') {
+      out += p.s;
+      if (p.sub) out += (p.sub.length > 1 ? '_{' + p.sub + '}' : '_' + p.sub);
+    }
     else {
       const ch = p.s;
       // Пробел внутри математики LaTeX игнорирует, поэтому «S + t» без явной

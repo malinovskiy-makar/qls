@@ -32,6 +32,7 @@ def markup_files():
                 if name.endswith('.html'):
                     path = os.path.join(base, name)
                     with open(path, encoding='utf-8') as handle:
+                        # ⚠️ Путь наружу — всегда через «/» (см. test_r15_crumbs).
                         rel = os.path.relpath(path, ROOT).replace(os.sep, '/')
                         yield rel, handle.read()
 

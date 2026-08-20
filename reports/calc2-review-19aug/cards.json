@@ -1,0 +1,231 @@
+{
+ "ok": [
+  "карточек блоков десять: 10",
+  "высота у всех одна: [112]",
+  "высота около 110 px: 112",
+  "серого перечня моделей нет ни на одной карточке",
+  "картинка 132×82: [\"[132,82]\"]",
+  "компоновка горизонтальная: картинка слева от названия",
+  "название 18 px, вес 600: 18px/600",
+  "счётчик 13/400: 13px/400",
+  "надпись «N моделей» сохранена: [\"6 моделей\",\"4 модели\",\"6 моделей из 9\"]",
+  "форма «N моделей из M» тоже сохранена: 6 моделей из 9",
+  "пустого места под названием не остаётся: не больше 22.5 px",
+  "второй экран открылся: моделей 6",
+  "описания моделей на втором экране на месте: 6 из 6",
+  "флажок не рисуется системой: [\"none\",\"none\"]",
+  "размер 17×17: [\"17px/17px\",\"17px/17px\"]",
+  "рамка 1,5 px сплошная объявлена в исходнике (браузер округляет её до 1px solid)",
+  "скругление 4 px: [\"4px\",\"4px\"]",
+  "отмеченный — акцентный, а не серый: [\"rgb(190, 24, 93)\",\"rgb(255, 77, 148)\"]",
+  "галочка нарисована: [\"4px×9px\",\"4px×9px\"]"
+ ],
+ "bad": [],
+ "cards": [
+  {
+   "h": 112,
+   "name": "Математика",
+   "count": "6 моделей",
+   "nameSize": "18px",
+   "nameWeight": "600",
+   "countSize": "13px",
+   "countWeight": "400",
+   "countColor": "rgb(91, 100, 114)",
+   "thumb": [
+    132,
+    82
+   ],
+   "thumbLeft": true,
+   "empty": 22.5,
+   "hasList": false
+  },
+  {
+   "h": 112,
+   "name": "КПВ и КТВ",
+   "count": "4 модели",
+   "nameSize": "18px",
+   "nameWeight": "600",
+   "countSize": "13px",
+   "countWeight": "400",
+   "countColor": "rgb(91, 100, 114)",
+   "thumb": [
+    132,
+    82
+   ],
+   "thumbLeft": true,
+   "empty": 22.5,
+   "hasList": false
+  },
+  {
+   "h": 112,
+   "name": "Совершенная конкуренция",
+   "count": "6 моделей из 9",
+   "nameSize": "18px",
+   "nameWeight": "600",
+   "countSize": "13px",
+   "countWeight": "400",
+   "countColor": "rgb(91, 100, 114)",
+   "thumb": [
+    132,
+    82
+   ],
+   "thumbLeft": true,
+   "empty": 22.5,
+   "hasList": false
+  },
+  {
+   "h": 112,
+   "name": "Теория фирмы",
+   "count": "4 модели",
+   "nameSize": "18px",
+   "nameWeight": "600",
+   "countSize": "13px",
+   "countWeight": "400",
+   "countColor": "rgb(91, 100, 114)",
+   "thumb": [
+    132,
+    82
+   ],
+   "thumbLeft": true,
+   "empty": 22.5,
+   "hasList": false
+  },
+  {
+   "h": 112,
+   "name": "Несовершенная конкуренция",
+   "count": "5 моделей из 6",
+   "nameSize": "18px",
+   "nameWeight": "600",
+   "countSize": "13px",
+   "countWeight": "400",
+   "countColor": "rgb(91, 100, 114)",
+   "thumb": [
+    132,
+    82
+   ],
+   "thumbLeft": true,
+   "empty": 22.5,
+   "hasList": false
+  },
+  {
+   "h": 112,
+   "name": "Рынок труда",
+   "count": "4 модели",
+   "nameSize": "18px",
+   "nameWeight": "600",
+   "countSize": "13px",
+   "countWeight": "400",
+   "countColor": "rgb(91, 100, 114)",
+   "thumb": [
+    132,
+    82
+   ],
+   "thumbLeft": true,
+   "empty": 22.5,
+   "hasList": false
+  },
+  {
+   "h": 112,
+   "name": "Международная торговля",
+   "count": "2 модели из 4",
+   "nameSize": "18px",
+   "nameWeight": "600",
+   "countSize": "13px",
+   "countWeight": "400",
+   "countColor": "rgb(91, 100, 114)",
+   "thumb": [
+    132,
+    82
+   ],
+   "thumbLeft": true,
+   "empty": 22.5,
+   "hasList": false
+  },
+  {
+   "h": 112,
+   "name": "Выбор потребителя",
+   "count": "2 модели из 9",
+   "nameSize": "18px",
+   "nameWeight": "600",
+   "countSize": "13px",
+   "countWeight": "400",
+   "countColor": "rgb(91, 100, 114)",
+   "thumb": [
+    132,
+    82
+   ],
+   "thumbLeft": true,
+   "empty": 22.5,
+   "hasList": false
+  },
+  {
+   "h": 112,
+   "name": "Макроэкономика",
+   "count": "6 моделей из 9",
+   "nameSize": "18px",
+   "nameWeight": "600",
+   "countSize": "13px",
+   "countWeight": "400",
+   "countColor": "rgb(91, 100, 114)",
+   "thumb": [
+    132,
+    82
+   ],
+   "thumbLeft": true,
+   "empty": 22.5,
+   "hasList": false
+  },
+  {
+   "h": 112,
+   "name": "Избранные сюжеты",
+   "count": "2 модели из 3",
+   "nameSize": "18px",
+   "nameWeight": "600",
+   "countSize": "13px",
+   "countWeight": "400",
+   "countColor": "rgb(91, 100, 114)",
+   "thumb": [
+    132,
+    82
+   ],
+   "thumbLeft": true,
+   "empty": 22.5,
+   "hasList": false
+  }
+ ],
+ "chks": [
+  {
+   "theme": "light",
+   "count": 2,
+   "w": "17px",
+   "h": "17px",
+   "appearance": "none",
+   "border": "1px solid",
+   "radius": "4px",
+   "bg": "rgb(190, 24, 93)",
+   "onBg": "rgb(190, 24, 93)",
+   "tick": "4px×9px"
+  },
+  {
+   "theme": "dark",
+   "count": 2,
+   "w": "17px",
+   "h": "17px",
+   "appearance": "none",
+   "border": "1px solid",
+   "radius": "4px",
+   "bg": "rgb(255, 77, 148)",
+   "onBg": "rgb(255, 77, 148)",
+   "tick": "4px×9px"
+  }
+ ],
+ "second": {
+  "count": 6,
+  "withDesc": 6,
+  "sample": [
+   "Любое число кривых, свои точки, подписи и масштаб. Без экономики.",
+   "Сдвиги, растяжения, отражения и модули; один ползунок и обе кривые сразу."
+  ]
+ },
+ "pageErrors": []
+}

@@ -112,7 +112,7 @@ function drawMonopolyPoints() {
     g.append('text').attr('x', pxc + 7).attr('y', pyc + 13)
       .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('К');
-    haloText(g, pxc, oy + 8, 'Qc=' + fmt(m.Qc), 'middle', 'hanging');
+    axisValueX(g, pxc, oy, fmt(m.Qc), 'c');
   }
 
   // Вертикаль Qm (через точку MR=MC до спроса) + горизонталь к оси P.
@@ -124,10 +124,9 @@ function drawMonopolyPoints() {
   // Точка монополии (Qm, Pm) на кривой спроса.
   g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5)
     .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  g.append('text').attr('x', pxm + 8).attr('y', pym - 8)
-    .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
-  haloText(g, pxm, oy + 8, 'Qm=' + fmt(m.Qm), 'middle', 'hanging');
-  haloText(g, ox - 8, pym, 'Pm=' + fmt(m.Pm), 'end', 'middle');
+  pointName(g, pxm, pym, 'M', COL.ink);
+  axisValueX(g, pxm, oy, fmt(m.Qm), 'm');
+  axisValueY(g, ox, pym, fmt(m.Pm), 'm');
 }
 
 // Табло монополии: Qm, Pm, конкурентные Qc/Pc, DWL, прибыль (если задана ATC).
@@ -299,14 +298,14 @@ function drawMonoCeilingPoints() {
     const [pxm, pym] = toPx(mc.Qstar, mc.price);
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
-    haloText(g, pxm, oy + 8, 'Q=' + fmt(mc.Qstar), 'middle', 'hanging');
+    pointName(g, pxm, pym, 'M', COL.ink);
+    axisValueX(g, pxm, oy, fmt(mc.Qstar), '');
   }
   // Дефицит на оси Q между Qstar и Q̂ (объём спроса при цене Pc).
   if (mc.shortage > 1e-6) {
     const xLo = sx(Math.min(mc.Qstar, mc.Qhat)), xHi = sx(Math.max(mc.Qstar, mc.Qhat));
     g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
-    haloText(g, sx(mc.Qhat), oy + 8, 'Qd=' + fmt(mc.Qhat), 'middle', 'hanging');
+    axisValueX(g, sx(mc.Qhat), oy, fmt(mc.Qhat), 'd');
     haloText(g, (xLo + xHi) / 2, oy + 24, 'Дефицит = ' + fmt(mc.shortage), 'middle', 'hanging');
   }
 }
@@ -319,7 +318,7 @@ function drawMonoCeilingLine() {
   const g = svg.append('g');
   g.append('line').attr('x1', ox).attr('y1', yPc).attr('x2', xMax).attr('y2', yPc)
     .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yPc, 'Pc=' + fmt(STATE.pReg), 'end', 'middle');
+  axisValueY(g, ox, yPc, fmt(STATE.pReg), 'c');
   const hit = g.append('rect').attr('x', ox).attr('y', yPc - 12).attr('width', xMax - ox).attr('height', 24)
     .attr('fill', 'transparent').style('cursor', 'grab');
   attachPcDrag(hit);
@@ -476,11 +475,12 @@ function drawNaturalCurves() {
   labelCurve(g, naturalATC, 'ATC', COL.reg, { from: 0.93 });
 }
 
-// Три вертикальных ориентира с подписями: M (монополия), MC (P=MC), AC (P=ATC).
+// Три вертикальных ориентира: M (монополия), MC (цена по предельным
+// издержкам), AC (цена по средним). Расшифровка — в панели расчётов.
 function drawNaturalPoints() {
   const n = STATE.natural; if (!n) return;
   const oy = sy(0), ox = sx(0), g = svg.append('g');
-  const mark = (Q, P, label, color, side) => {
+  const mark = (Q, P, label, color, side, idx) => {
     if (Q == null || !(Q > 0) || isNaN(P)) return;
     const px = sx(Q), py = sy(P);
     g.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', py)
@@ -489,15 +489,20 @@ function drawNaturalPoints() {
       .attr('stroke', color).attr('stroke-width', 1).attr('stroke-dasharray', '4 3').attr('opacity', 0.55);
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
       .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', px + (side < 0 ? -9 : 9)).attr('y', py - 9)
-      .attr('text-anchor', side < 0 ? 'end' : 'start')
-      .attr('font-size', FS.base).attr('font-weight', 700).attr('fill', color)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
-    haloText(g, px, oy + 8, fmt(Q), 'middle', 'hanging');
+    /* Правило 47: на холсте только обозначение. Что это за ориентир —
+       говорит панель «Естественная монополия», а не подпись у точки. */
+    pointName(g, px, py, label, color,
+              { dx: side < 0 ? -9 : 9, dy: -9, size: FS.base, weight: 700 })
+      .attr('text-anchor', side < 0 ? 'end' : 'start');
+    axisValueX(g, px, oy, fmt(Q), idx || '');
+    /* Пунктир шёл и к оси цены, а числа там не было: линия упиралась в пустоту.
+       Различитель обязателен — на оси цены встают ТРИ разные цены: монопольная
+       и два ориентира регулирования. */
+    axisValueY(g, ox, py, fmt(P), idx || '');
   };
-  mark(n.Qm, n.Pm, 'M · монополия', COL.ink, -1);
-  if (n.acReg) mark(n.acReg.Q, n.acReg.P, 'AC · P=ATC', COL.reg, 1);
-  if (n.mcReg) mark(n.mcReg.Q, n.mcReg.P, 'MC · P=MC', COL.MC, -1);
+  mark(n.Qm, n.Pm, 'M', COL.ink, -1, 'm');
+  if (n.acReg) mark(n.acReg.Q, n.acReg.P, 'E_{ATC}', COL.reg, 1, 'ATC');
+  if (n.mcReg) mark(n.mcReg.Q, n.mcReg.P, 'E_{MC}', COL.MC, -1, 'MC');
 }
 
 // Полная отрисовка под-режима «Естественная монополия».
@@ -518,15 +523,15 @@ function updateNaturalPanel() {
   const n = STATE.natural;
   if (!n) { box.innerHTML = '<div class="warn">Оптимум монополии не найден. Проверьте кривые.</div>'; return; }
   let html = `<div class="stat"><span>Постоянные издержки FC</span><b>${fmt(n.FC)}</b></div>`;
-  html += `<div class="stat"><span>1 · Монополия: ($Q$; $P$)</span><b>(${fmt(n.Qm)}; ${fmt(n.Pm)})</b></div>`;
+  html += `<div class="stat"><span>M · монополия: ($Q$; $P$)</span><b>(${fmt(n.Qm)}; ${fmt(n.Pm)})</b></div>`;
   if (!isNaN(n.atcAtQm)) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;(ATC(Qm); прибыль)</span><b>(${fmt(n.atcAtQm)}; ${fmt(n.profit)})</b></div>`;
   if (n.mcReg) {
-    html += `<div class="stat" style="margin-top:4px;"><span>2 · $P = MC$: $Q$ / $P$</span><b>${fmt(n.mcReg.Q)} / ${fmt(n.mcReg.P)}</b></div>`;
+    html += `<div class="stat" style="margin-top:4px;"><span>$E_{MC}$ · цена $P = MC$: $Q$ / $P$</span><b>${fmt(n.mcReg.Q)} / ${fmt(n.mcReg.P)}</b></div>`;
     html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;ATC на этом Q</span><b>${fmt(n.mcReg.atc)}</b></div>`;
     if (n.mcReg.subsidy != null) html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;Нужна субсидия</span><b>${fmt(n.mcReg.subsidy)}</b></div>`;
   }
   if (n.acReg) {
-    html += `<div class="stat" style="margin-top:4px;"><span>3 · $P = ATC$: $Q$ / $P$</span><b>${fmt(n.acReg.Q)} / ${fmt(n.acReg.P)}</b></div>`;
+    html += `<div class="stat" style="margin-top:4px;"><span>$E_{ATC}$ · цена $P = ATC$: $Q$ / $P$</span><b>${fmt(n.acReg.Q)} / ${fmt(n.acReg.P)}</b></div>`;
     html += `<div class="stat"><span>&nbsp;&nbsp;&nbsp;Прибыль</span><b>0</b></div>`;
   } else if (n.acNote) {
     html += `<div class="warn" style="margin-top:4px;">${n.acNote}</div>`;
@@ -590,9 +595,9 @@ function drawMonoTaxPoints() {
     const [pxm, pym] = toPx(t.Qt, t.Pt);
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
-    haloText(g, pxm, oy + 8, 'Q=' + fmt(t.Qt), 'middle', 'hanging');
-    haloText(g, ox - 8, pym, 'P=' + fmt(t.Pt), 'end', 'middle');
+    pointName(g, pxm, pym, 'M', COL.ink);
+    axisValueX(g, pxm, oy, fmt(t.Qt), '');
+    axisValueY(g, ox, pym, fmt(t.Pt), '');
   }
 }
 
@@ -626,8 +631,8 @@ function drawMonoFloorPoints() {
     const [pxm, pym] = toPx(fl.Q, fl.price);
     dash(pxm, oy, pxm, pym); dash(ox, pym, pxm, pym);
     g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
-    haloText(g, pxm, oy + 8, 'Q=' + fmt(fl.Q), 'middle', 'hanging');
+    pointName(g, pxm, pym, 'M', COL.ink);
+    axisValueX(g, pxm, oy, fmt(fl.Q), '');
   }
 }
 
@@ -638,7 +643,7 @@ function drawMonoFloorLine() {
   const g = svg.append('g');
   g.append('line').attr('x1', ox).attr('y1', yPf).attr('x2', xMax).attr('y2', yPf)
     .attr('stroke', COL.MR).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  haloText(g, ox - 8, yPf, 'Pf=' + fmt(STATE.pReg), 'end', 'middle');
+  axisValueY(g, ox, yPf, fmt(STATE.pReg), 'f');
   const hit = g.append('rect').attr('x', ox).attr('y', yPf - 12).attr('width', xMax - ox).attr('height', 24)
     .attr('fill', 'transparent').style('cursor', 'grab');
   attachPcDrag(hit);
@@ -648,6 +653,15 @@ function drawMonoFloorLine() {
 
 // Табло вмешательства в монополии (info-tax): налог / субсидия / потолок / пол.
 function updateMonoInterventionPanel() {
+  /* П12, та же оговорка, что у конкурентного рынка: блок говорит только там,
+     где его инструмент есть. Естественная монополия и обе дискриминации
+     запирают блок вмешательства (SCENE_ROUTE.lock), и подсказка «двигайте
+     ставку» обещала бы ползунок, которого на экране нет. */
+  {
+    const _sec = document.getElementById(L_INTERV);
+    const _box = document.getElementById('info-tax');
+    if (_sec && _box && _sec.classList.contains('scoped-off')) { _box.innerHTML = ''; return; }
+  }
   const box = document.getElementById('info-tax');
   if (!box) return;
   if (STATE.monoMode !== 'simple') { box.innerHTML = '<div class="muted">Вмешательство государства доступно в режиме «Обычная» монополия.</div>'; return; }
@@ -742,7 +756,7 @@ function drawDiscr1() {
   const og = svg.append('g'), [px, py] = toPx(d1.Qcomp, Pq);
   og.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.tax).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  haloText(og, px, oy + 8, 'Qcomp=' + fmt(d1.Qcomp), 'middle', 'hanging');
+  axisValueX(og, px, oy, fmt(d1.Qcomp), 'comp');
   haloText(og, sx(d1.Qcomp * 0.45), sy(Math.max(0, (Pq + mcAt(d1.Qcomp * 0.45)) / 2)), 'Прибыль', 'middle', 'middle');
 }
 
@@ -821,11 +835,32 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
   // Оси.
   g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', right).attr('y2', bottom).attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
   g.append('line').attr('x1', left).attr('y1', bottom).attr('x2', left).attr('y2', top).attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
-  g.append('text').attr('x', (left + right) / 2).attr('y', top - 12).attr('text-anchor', 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink).text(title);
+  /* Заголовок панели зажимается внутрь холста: «Экспорт по мировой цене»
+     шире своей половины, и на узком окне уезжал за правый край. */
+  const tw = measureText(title, FS.base, 600);
+  const tx = Math.max(tw / 2 + 2, Math.min(W - tw / 2 - 2, (left + right) / 2));
+  g.append('text').attr('x', tx).attr('y', top - 12).attr('text-anchor', 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink).text(title);
   g.append('text').attr('x', right + 4).attr('y', bottom + 4).attr('font-size', FS.base).attr('fill', COL.inkSoft).text('Q');
   g.append('text').attr('x', left - 4).attr('y', top - 2).attr('text-anchor', 'end').attr('font-size', FS.base).attr('fill', COL.inkSoft).text('P');
-  [0.25, 0.5, 0.75, 1].forEach(t => { const xq = Xmax * t; g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(xq)); });
-  [0.25, 0.5, 0.75, 1].forEach(t => { const yp = Ymax * t; g.append('text').attr('x', left - 5).attr('y', ly(yp)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(yp)); });
+  /* ⚠️ ДЕЛЕНИЕ УСТУПАЕТ МЕСТО ЧИСЛУ ТОЧКИ, И РЕШАЕТСЯ ЭТО В ДАННЫХ.
+
+     Пока у координаты стоял префикс («q=15»), она была шире деления и вставала
+     рядом. Оставшись голым числом (фаза 5), она села к делениям вплотную, и
+     «12,5» с «15» наложились — единственное наложение подписей во всём
+     калькуляторе по замеру.
+
+     Две попытки решить это на экране не годились: по расстоянию между точками
+     привязки порог не выражается (числа разной длины: «12,5» шире «15» вдвое),
+     а сравнение готовых прямоугольников зависит от порядка отрисовки. В
+     ДАННЫХ вопрос простой: деление, стоящее ближе десятой доли окна к
+     координате точки, не печатаем вовсе. */
+  const near = (a, b, span) => isFinite(a) && isFinite(b) && Math.abs(a - b) < span * 0.1;
+  [0.25, 0.5, 0.75, 1].forEach(t => { const xq = Xmax * t;
+    if (qi != null && near(xq, qi, Xmax)) return;
+    g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(xq)); });
+  [0.25, 0.5, 0.75, 1].forEach(t => { const yp = Ymax * t;
+    if (Pi != null && near(yp, Pi, Ymax)) return;
+    g.append('text').attr('x', left - 5).attr('y', ly(yp)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(yp)); });
   const gc = svg.append('g').attr('clip-path', 'url(#' + cid + ')');
   const line = d3.line().defined(d => d !== null).x(d => lx(d[0])).y(d => ly(d[1]));
   const sample = (f) => { const o = []; for (let i = 0; i <= 300; i++) { const q = Xmax * i / 300; const v = f(q); o.push((isNaN(v) || v < 0) ? null : [q, v]); } return o; };
@@ -837,8 +872,35 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
     g.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', bottom).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     g.append('line').attr('x1', px).attr('y1', py).attr('x2', left).attr('y2', py).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    haloText(g, px, bottom + 12, 'q=' + fmt(qi), 'middle', 'hanging');
-    haloText(g, left - 5, py, 'P=' + fmt(Pi), 'end', 'middle');
+    /* Мини-панель дискриминации живёт на СВОИХ осях (lx/ly), поэтому общий
+       помощник ей не подходит: он считает по шкалам главного графика. Правило
+       то же — имя оси не повторяется, остаётся одно число.
+
+       ⚠️ И то же правило про деление. Пока у координаты стоял префикс («q=15»),
+       она была шире деления и вставала рядом; оставшись голым числом, она села
+       ровно туда же, где уже стоит деление шкалы, и два числа наложились
+       (замер поймал наложение на 7,2 px² в этой сцене — единственное во всём
+       калькуляторе). Деление на этом месте убираем, число точки печатаем
+       акцентным и жирным — как на главных осях. */
+    /* ⚠️ УСТУПАЕТ НЕ ТО ДЕЛЕНИЕ, ЧТО СТОИТ РОВНО ТАМ ЖЕ, А ТО, ЧТО НАЛЕЗАЕТ.
+       Первая правка снимала деление по расстоянию между их точками привязки
+       (порог 7 px). Замер показал, что этого мало: «12,5» шириной 22,7 px и
+       «15» стоят в 16 px друг от друга — привязки далеко, а коробки
+       пересекаются. Сравниваем настоящие прямоугольники после отрисовки:
+       порогу тут верить нельзя, длина числа заранее неизвестна. */
+    /* ⚠️ КЛАСС `coord-num` — ПРИЗНАК «ЭТО ЧИСЛО ТОЧКИ НА ОСИ», А НЕ УКРАШЕНИЕ.
+       По нему разводятся налезающие подписи (общий проход в 30-curves), по нему
+       же выгрузка отличает координату от обычного текста, и по нему её ищут
+       проверки. Мини-панель рисовала свои числа мимо axisValueX/Y и класса не
+       ставила: на экране числа стояли, а всякий, кто спрашивал «есть ли на оси
+       число под этим пунктиром», получал «нет». Та же болезнь, что была у
+       делений шкалы (`axis-num`) в пяти рисователях осей. */
+    haloText(g, px, bottom + 12, fmt(qi), 'middle', 'hanging')
+      .attr('class', 'coord-num')
+      .attr('fill', cssVar('--accent')).attr('font-weight', 700);
+    haloText(g, left - 5, py, fmt(Pi), 'end', 'middle')
+      .attr('class', 'coord-num')
+      .attr('fill', cssVar('--accent')).attr('font-weight', 700);
   }
 }
 
@@ -1036,9 +1098,9 @@ function drawKinkedFull() {
     const dash = (x1, y1, x2, y2) => og.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
     dash(px, py, px, oy); dash(px, py, ox, py);
     og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    og.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('M');
-    haloText(og, px, oy + 8, 'Q*=' + fmt(k.Qstar), 'middle', 'hanging');
-    haloText(og, ox - 8, py, 'P*=' + fmt(k.Pstar), 'end', 'middle');
+    pointName(og, px, py, 'M', COL.ink);
+    axisValueX(og, px, oy, fmt(k.Qstar), '');
+    axisValueY(og, ox, py, fmt(k.Pstar), '');
   }
   updateKinkPanel();
 }
@@ -1077,6 +1139,10 @@ function applyMonoVisibility() {
   show('mono-d3-pane', inMono && mm === 'discr3');
   show('mono-kink-pane', inMono && mm === 'kinked');
   show('mono-nat-pane', inMono && mm === 'natural');
+  /* «Дискр.3» и «Ломаный» рисуют кривые по своим полям формул, общий список
+     они не читают. Карточку списка в них не показываем: см. разбор договора
+     о параметрах у sceneDrawsCurveList. */
+  if (typeof syncCurveListVisibility === 'function') syncCurveListVisibility();
 }
 
 // Стандартный пресет при входе в монополию (Задача 1): ставится ТОЛЬКО если нужного нет.

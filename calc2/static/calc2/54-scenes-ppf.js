@@ -1040,12 +1040,12 @@ function drawPpfSumMarks(d) {
       .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3').attr('opacity', .7);
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.ink)
       .attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    haloText(g, px, oy + 8, fmt(k[0]), 'middle', 'hanging');
-    haloText(g, ox - 8, py, fmt(k[1]), 'end', 'middle');
+    axisValueX(g, px, oy, fmt(k[0]), '');
+    axisValueY(g, ox, py, fmt(k[1]), '');
   });
   // концы суммарной кривой
-  haloText(g, ox - 8, sy(d.Ytot), fmt(d.Ytot), 'end', 'middle');
-  haloText(g, sx(d.Xtot), oy + 8, fmt(d.Xtot), 'middle', 'hanging');
+  axisValueY(g, ox, sy(d.Ytot), fmt(d.Ytot), '');
+  axisValueX(g, sx(d.Xtot), oy, fmt(d.Xtot), '');
   const midX = d.Xtot * 0.5, midY = interpY(d.points, midX);
   const nm = (STATE.ppfSumName || '').trim() || 'Сумма';
   if (!isNaN(midY)) g.append('text').attr('x', sx(midX)).attr('y', sy(midY) - 8)
@@ -1601,7 +1601,9 @@ function drawTradeB(d) {
     const line = d3.line().defined(q => q && isFinite(q[1])).x(q => p.mx(q[0])).y(q => p.my(q[1]));
 
     drawGrid(p.mx, p.my, g);
-    drawPlaneAxes(g, p.mx, p.my, 'X', 'Y');
+    /* Деления печатает сама сцена (ниже, вне обрезки). Без этой оговорки
+       drawPlaneAxes рисовала ВТОРОЙ комплект внутри обрезки, и он был не виден. */
+    drawPlaneAxes(g, p.mx, p.my, 'X', 'Y', { ticks: false });
     // Числа делений: у каждой панели свой масштаб, поэтому и подписи свои.
     // Подписи делений рисуем ВНЕ обрезки: они стоят за краем поля, и обрезка
     // срезала бы их вместе с воздухом.
@@ -1610,8 +1612,9 @@ function drawTradeB(d) {
       const [lo, hi] = scale.domain();
       const step = niceTickStep(hi - lo, 5);
       for (let v = step; v <= hi + 1e-9; v += step) {
-        if (horiz) haloText(gl, scale(v), p.yBot + 8, fmt(v), 'middle', 'hanging');
-        else       haloText(gl, p.x0 - 6, scale(v), fmt(v), 'end', 'middle');
+        // Класс `axis-num` — признак деления шкалы, см. разбор в planeTicksX.
+        if (horiz) haloText(gl, scale(v), p.yBot + 8, fmt(v), 'middle', 'hanging').attr('class', 'axis-num');
+        else       haloText(gl, p.x0 - 6, scale(v), fmt(v), 'end', 'middle').attr('class', 'axis-num');
       }
     };
     tk(p.mx, true); tk(p.my, false);

@@ -767,11 +767,22 @@ await t('регуляторы сцены живут в правой панели
   return n > 0 || 'в панели параметров пусто';
 }));
 
-await t('в аналитике число крупнее подписи', () => page.evaluate(() => {
+/* ⚠️ ПРОВЕРКА ПЕРЕСЧИТАНА ПОД КАНОН, А НЕ ОТКЛЮЧЕНА (фаза 6, п. 50).
+   Прежде она требовала разрыва в три пункта: число 16px против подписи 12px.
+   Канон 1.2.2 говорит другое — «число внутри строки таблицы или ряда: как у
+   строки, ВЕС 700». То есть число выделяется прежде всего НАЧЕРТАНИЕМ, и
+   кегль 16 в строке панели был четвёртым видом записи числа на экране
+   (аудит, п. 50). Теперь число 13/700 против подписи 12/600: крупнее и
+   тяжелее, но в шкале. Требование «плюс три пункта» противоречило бы канону,
+   поэтому проверяем то, что канон и обещает. */
+await t('в аналитике число крупнее и тяжелее подписи', () => page.evaluate(() => {
   const b = document.querySelector('#sb-body .stat b'), s = document.querySelector('#sb-body .stat span');
   if (!b || !s) return 'нет строк в табло';
-  const bs = parseFloat(getComputedStyle(b).fontSize), ss = parseFloat(getComputedStyle(s).fontSize);
-  return bs >= ss + 3 || `число ${bs}px, подпись ${ss}px`;
+  const cb = getComputedStyle(b), cs = getComputedStyle(s);
+  const bs = parseFloat(cb.fontSize), ss = parseFloat(cs.fontSize);
+  const bw = parseInt(cb.fontWeight, 10), sw = parseInt(cs.fontWeight, 10);
+  if (bw !== 700) return `вес числа ${bw}, канон 1.2.2 требует 700`;
+  return (bs >= ss && bw > sw) || `число ${bs}px/${bw}, подпись ${ss}px/${sw}`;
 }));
 
 await t('панель параметров наполняется и в сцене «Труд»', async () => {

@@ -9,7 +9,8 @@ const SCENE_NAMES = {
   sd: 'Спрос и предложение', tax: 'Потоварные налоги и субсидии', ceil: 'Пол и потолок цены',
   mono: 'Стандартная монополия', elast: 'Эластичность', ext: 'Внешние эффекты',
   costs: 'Издержки фирмы', ppf: 'Построение КПВ',
-  labor: 'Рынок труда: совершенная конкуренция', ineq: 'Неравенство доходов',
+  // п. 67. Ровно то же, что написано на карточке блока «Рынок труда».
+  labor: 'Конкурентный рынок труда', ineq: 'Неравенство доходов',
   consumer: 'Кривые безразличия',
   adas: 'AD–AS', phillips: 'Кривая Филлипса', money: 'Денежный рынок',
   loanable: 'Рынок заёмных средств', fx: 'Валютный рынок', laffer: 'Кривая Лаффера', islm: 'IS–LM',
@@ -99,6 +100,7 @@ function setSideOpen(panelId, btnId, open) {
     b.setAttribute('aria-expanded', open ? 'true' : 'false');
     // Подпись идёт за состоянием: свёрнутая панель предлагает открыть, открытая — закрыть.
     b.setAttribute('data-tip', open ? 'Закрыть меню' : 'Открыть меню');
+    if (typeof syncTipLabels === 'function') syncTipLabels();   // и подпись для чтеца тоже
   }
   /* Панель раскрыли — поля формул внутри стали видны и собираются (А56).
      Без этого поле, добавленное при свёрнутой панели, оставалось обычным
@@ -317,21 +319,49 @@ function openSection(secId) {
   if (box && box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
 }
 
-/* Первая видимая карточка ярче остальных: сцена открывается со всеми
-   закрытыми блоками, и глаз должен сразу видеть, куда нажимать. */
+/* ⚠️ ПОДПИСЬ «ВВОД ФУНКЦИЙ» ПРИНАДЛЕЖИТ КАРТОЧКЕ, В КОТОРОЙ ЕСТЬ ЧТО ВВОДИТЬ.
+
+   Правило Н34 («первая карточка везде называется одинаково») стояло на голом
+   «первая видимая», и договор о параметрах его подсёк: в «Составном спросе»,
+   «Дискриминации 3-й степени» и «Монополисте на внешнем рынке» карточка общего
+   списка кривых теперь спрятана, первой видимой становится «Излишки» — и она
+   получала чужое имя. Владелец на приёмке увидел ровно это: заголовок обещает
+   ввод функций, под ним галочки излишков.
+
+   Реестр ниже отвечает на вопрос «эта карточка существует ради ввода функций».
+   Имя достаётся первой ВИДИМОЙ карточке из реестра; не видно ни одной — не
+   переименовываем никого, каждая карточка остаётся под своим именем. Врать
+   заголовком хуже, чем потерять единообразие в трёх сюжетах из сорока одного. */
+const INPUT_CARDS = ['sec-curves', 'sec-graph', 'sec-costs', 'sec-labor',
+                     'sec-inequality', 'sec-consumer', 'sec-ppf', 'sec-macro', 'sec-math'];
+
+/* Карточка, внутри которой лежит живое поле формулы. У трёх монопольных
+   сюжетов свои поля стоят во вложенном блоке «Структура рынка», то есть внутри
+   «Что изучаем»: реестром такое не выразить, спрашиваем сами поля. */
+function cardWithFormula(all) {
+  const live = (typeof FORMULA_FIELDS !== 'undefined' ? FORMULA_FIELDS : [])
+    .filter(i => typeof fieldActive === 'function' && fieldActive(i));
+  for (const s of all) {
+    if (s.style.display === 'none') continue;
+    if (live.some(i => s.contains(i))) return s;
+  }
+  return null;
+}
+
+/* Ярче остальных — карточка, с которой начинают: сцена открывается со всеми
+   закрытыми блоками, и глаз должен сразу видеть, куда нажимать. Это та, где
+   вводят формулы; нет такой вовсе — первая видимая, как было. */
 function syncFirstCard() {
-  const all = document.querySelectorAll('#tools-panel .tools-body > .section');
-  let first = null;
-  all.forEach(s => { if (!first && s.style.display !== 'none') first = s; });
+  const all = [...document.querySelectorAll('#tools-panel .tools-body > .section')];
+  const visible = all.filter(s => s.style.display !== 'none');
+  const named = visible.find(s => INPUT_CARDS.indexOf(s.id) >= 0) || null;
+  const first = cardWithFormula(all) || visible[0] || null;
   all.forEach(s => s.classList.toggle('first-card', s === first));
-  /* Н34. Первая карточка везде называется одинаково. У сцен она была подписана
-     по-своему («Макроэкономика» у Лаффера, «КПВ и торговля» у КТВ), и человек
-     каждый раз заново искал, где вводить формулу, хотя место одно и то же.
-     Своё имя карточки помним: если она перестанет быть первой, оно вернётся. */
+  /* Н34. Своё имя карточки помним: перестанет быть первой — вернётся. */
   all.forEach(s => {
     const b = s.querySelector(':scope > .fold-btn span > b');
     if (!b) return;
-    if (s === first) {
+    if (s === named) {
       if (b.dataset.ownName === undefined) b.dataset.ownName = b.textContent;
       b.textContent = 'Ввод функций';
     } else if (b.dataset.ownName !== undefined) {
@@ -341,6 +371,9 @@ function syncFirstCard() {
 }
 
 function wireScene() {
+  const rst = document.getElementById('btn-scene-reset');
+  if (rst) rst.addEventListener('click', resetCurrentScene);
+
   const tools = document.getElementById('tools-panel');
   const params = document.getElementById('params-panel');
 
@@ -354,9 +387,9 @@ function wireScene() {
   const dTheme = document.getElementById('dock-theme');
   if (dTheme) dTheme.addEventListener('click', () => toggleCalcTheme());
 
-  // Сохранение графиков в базу — задача следующей сессии, кнопка пока заглушка.
-  const dSave = document.getElementById('dock-save');
-  if (dSave) dSave.addEventListener('click', () => toast('Сохранение графиков в профиль появится в следующей версии'));
+  /* Сохранения графиков в базу нет, и кнопки-заглушки в полосе тоже больше
+     нет (п. 68): она занимала второе место и умела только сказать «появится
+     в следующей версии». Появится сохранение — вернётся и кнопка. */
 
   // Экспорт: окно с заголовком и подписью, затем PNG / .tex / PDF.
   const dExport = document.getElementById('dock-export');
@@ -404,12 +437,13 @@ function wireScene() {
   const expPdf = document.getElementById('exp-pdf');
   if (expPdf) expPdf.addEventListener('click', () => exportPDF());
 
-  // «Назад к сценариям».
+  // «Ко всем моделям».
   const back = document.getElementById('scene-back');
   if (back) back.addEventListener('click', () => openPicker());
 
   wireWrench();
   wireHintButtons();
+  wireTips();               // п. 78–81: одна плашка на все подсказки
 
   // График перерисовываем, когда меняется его РАЗМЕР, а не только окно:
   // сворачивание панели меняет ширину холста, и без этого кривые остались бы
@@ -467,6 +501,18 @@ function wireScene() {
    Сюда переехали бывшие секции «Все настройки» и «Сетка»: границы осей,
    шаг делений, названия осей, вид сетки, легенда и заголовок графика.
    --------------------------------------------------------------------- */
+/* П9. Вернуть текущую модель к исходному виду: забыть её снимок и заново
+   выполнить маршрут карточки. Снимок удаляем ПЕРЕД pickScene — иначе он тут
+   же восстановит ровно то, что мы отменяем. Другие модели не трогаем: у
+   каждой снимок свой. */
+function resetCurrentScene() {
+  const key = STATE.sceneKey;
+  if (!key) return;
+  if (typeof forgetSceneSnapshot === 'function') forgetSceneSnapshot(key);
+  pickScene(key);
+  if (typeof toast === 'function') toast('Модель вернулась к исходному виду');
+}
+
 function setWrenchOpen(open) {
   const pop = document.getElementById('wrench-pop');
   const btn = document.getElementById('btn-wrench');
@@ -503,7 +549,21 @@ function applyViewBounds() {
 /* Переключатель «только первая четверть». Включили — окно подтягивается к нулю;
    выключили — открывается отрицательная часть плоскости. Работает и в
    экономических сценах, и в «Математике». */
+/* Снимок границ плоскости: `null` означает «взять текущие». */
+function quadWindow(src) {
+  if (src) return src;
+  return { qa: CONFIG.Qmin, qb: CONFIG.Qmax, pa: CONFIG.Pmin, pb: CONFIG.Pmax };
+}
+// Два окна считаются тем же самым с точностью до тысячной доли размаха.
+function quadSameWindow(a, b) {
+  if (!a || !b) return false;
+  const e = Math.max(1e-6, Math.abs(b.qb - b.qa) * 1e-3, Math.abs(b.pb - b.pa) * 1e-3);
+  return Math.abs(a.qa - b.qa) < e && Math.abs(a.qb - b.qb) < e
+      && Math.abs(a.pa - b.pa) < e && Math.abs(a.pb - b.pb) < e;
+}
+
 function setFirstQuad(on) {
+  const before = quadWindow(null);       // окно ДО переключения — для обратного хода
   STATE.firstQuad = !!on;
   const c = document.getElementById('chk-quad');
   if (c && c.checked !== STATE.firstQuad) c.checked = STATE.firstQuad;
@@ -515,11 +575,27 @@ function setFirstQuad(on) {
       setMathWindow(-w * 0.5, STATE.mathXmax, -h * 0.5, STATE.mathYmax);
     }
   } else if (STATE.firstQuad) {
+    /* ⚠️ ВЫКЛЮЧЕНИЕ ОБЯЗАНО ВЕРНУТЬ РОВНО ТО ОКНО, ЧТО БЫЛО ДО ВКЛЮЧЕНИЯ.
+       Раньше обратного хода не было вовсе: включение считало новые границы по
+       одной формуле, выключение — по другой, и «−10…10» после двух щелчков
+       превращалось в «−5…20». Ноль уезжал в левый нижний угол, и вернуть
+       прежний вид было нечем, кроме сброса всей сцены.
+       Память самоочищается: она годится, только пока окно ровно то, которое
+       мы сами и сделали. Тронул границы руками, колесом или панорамой — от
+       памяти отказываемся и считаем по прежней формуле. */
     if (CONFIG.Qmin < 0) { CONFIG.Qmax -= CONFIG.Qmin; CONFIG.Qmin = 0; }
     if (CONFIG.Pmin < 0) { CONFIG.Pmax -= CONFIG.Pmin; CONFIG.Pmin = 0; }
+    STATE.quadSaved = { was: quadWindow(before), made: quadWindow(null) };
   } else {
-    if (CONFIG.Qmin >= 0) CONFIG.Qmin = -(CONFIG.Qmax - CONFIG.Qmin) * 0.25;
-    if (CONFIG.Pmin >= 0) CONFIG.Pmin = -(CONFIG.Pmax - CONFIG.Pmin) * 0.25;
+    const saved = STATE.quadSaved;
+    if (saved && quadSameWindow(saved.made, quadWindow(null))) {
+      CONFIG.Qmin = saved.was.qa; CONFIG.Qmax = saved.was.qb;
+      CONFIG.Pmin = saved.was.pa; CONFIG.Pmax = saved.was.pb;
+    } else {
+      if (CONFIG.Qmin >= 0) CONFIG.Qmin = -(CONFIG.Qmax - CONFIG.Qmin) * 0.25;
+      if (CONFIG.Pmin >= 0) CONFIG.Pmin = -(CONFIG.Pmax - CONFIG.Pmin) * 0.25;
+    }
+    STATE.quadSaved = null;
   }
   syncViewFields();
   redrawAll();
@@ -561,16 +637,128 @@ function showHintTip(dot, html) {
   t.style.display = 'block';
   const b = dot.getBoundingClientRect();
   const w = t.offsetWidth, h = t.offsetHeight;
-  let left = b.left + b.width / 2 - w / 2;
-  left = Math.max(8, Math.min(window.innerWidth - w - 8, left));
-  let top = b.bottom + 8;
-  if (top + h > window.innerHeight - 8) top = Math.max(8, b.top - h - 8);
+
+  /* ⚠️ ПЛАШКА НЕ САДИТСЯ НА СОСЕДНИЙ УПРАВЛЯЮЩИЙ ЭЛЕМЕНТ.
+
+     Правило то же, что уже записано про холст: всплывающее появляется ровно
+     там, где рука ведёт указатель, и закрывает собой то, к чему рука шла.
+     Здесь оно ловилось на кнопке возврата: подсказка «Ко всем моделям»
+     всплывала вниз и накрывала текст кнопки «Вернуть исходный вид».
+
+     Место выбирается перебором: снизу, сверху, справа, слева. Берём первое,
+     которое помещается в окно и не накрывает ни одной кнопки, поля или
+     ссылки, кроме той, к которой подсказка относится. Не нашлось ни одного —
+     остаётся прежнее нижнее, лишь бы плашка была видна. */
+  const clampX = (x) => Math.max(8, Math.min(window.innerWidth - w - 8, x));
+  const clampY = (y) => Math.max(8, Math.min(window.innerHeight - h - 8, y));
+  const midX = clampX(b.left + b.width / 2 - w / 2);
+  const midY = clampY(b.top + b.height / 2 - h / 2);
+  const spots = [
+    { x: midX, y: b.bottom + 8 },
+    { x: midX, y: b.top - h - 8 },
+    { x: b.right + 8, y: midY },
+    { x: b.left - w - 8, y: midY },
+  ];
+  const controls = Array.from(document.querySelectorAll(
+    'button, input, select, textarea, a[href], [data-tip]'));
+  const covers = (x, y) => controls.some(el => {
+    if (el === dot || el.contains(dot) || dot.contains(el)) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return false;
+    return x < r.right - 1 && x + w > r.left + 1 && y < r.bottom - 1 && y + h > r.top + 1;
+  });
+  let spot = null;
+  for (const s of spots) {
+    if (s.x < 8 || s.x + w > window.innerWidth - 8) continue;
+    if (s.y < 8 || s.y + h > window.innerHeight - 8) continue;
+    if (covers(s.x, s.y)) continue;
+    spot = s; break;
+  }
+  const left = spot ? spot.x : midX;
+  let top = spot ? spot.y : b.bottom + 8;
+  if (!spot && top + h > window.innerHeight - 8) top = Math.max(8, b.top - h - 8);
   t.style.left = Math.round(left) + 'px';
   t.style.top = Math.round(top) + 'px';
 }
 function hideHintTip() {
   const t = document.getElementById('hint-tip');
   if (t) t.style.display = 'none';
+}
+
+/* ═══ п. 78–81. ОДНА СИСТЕМА ПОДСКАЗОК ════════════════════════════════
+
+   Было две. Знаки «?» показывали свою плашку рядом с собой; кнопки полосы,
+   стрелки панелей и кнопки над графиком — собственные тёмные подписи через
+   `::after`, нарисованные правилами CSS. Отсюда три беды сразу:
+
+   · п. 79. Подпись `::after` держится, пока держится `:focus-visible`, а он
+     остаётся ПОСЛЕ нажатия. Плашка «назад» висела поверх заголовка модели,
+     пока человек работал в другом конце экрана. Две сразу тоже ловились:
+     одна по наведению, другая по фокусу.
+   · п. 78. Две системы — два вида, две геометрии, два набора правил.
+   · п. 81. Текст подписи и текст для чтеца расходились, потому что жили в
+     разных атрибутах и правились по отдельности.
+
+   Теперь плашка ОДНА на весь калькулятор — тот же узел, что у знаков «?».
+   Их физически не может быть две. Показывается по наведению, по фокусу с
+   клавиатуры и по касанию; гаснет по уходу, по нажатию, по Escape и при
+   смене модели. Текст один: `data-tip` копируется в `aria-label`, поэтому
+   разойтись им негде.                                                     */
+let _tipByKeyboard = false;   // последнее действие человека было с клавиатуры
+function tipText(el) { return (el.getAttribute('data-tip') || '').trim(); }
+
+function showTipFor(el) {
+  const t = tipText(el);
+  if (!t) return;
+  showHintTip(el, t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+}
+
+function wireTips() {
+  const near = (e) => (e.target && e.target.closest) ? e.target.closest('[data-tip]') : null;
+  // Наведение и уход. pointerover/out всплывают, поэтому хватает двух
+  // слушателей на весь документ, и новые кнопки подключаются сами.
+  document.addEventListener('pointerover', (e) => { const el = near(e); if (el) showTipFor(el); });
+  document.addEventListener('pointerout', (e) => { if (near(e)) hideHintTip(); });
+  /* Клавиатура: фокус показывает, уход прячет. ⚠️ ТОЛЬКО фокус С КЛАВИАТУРЫ.
+
+     Обычный `focus` приходит и от мыши, и ПРОГРАММНО: закрытие окна выбора
+     само переводит фокус на кнопку возврата, и плашка всплывала при каждом
+     входе в модель, а гасла только по следующему действию. Это та же п. 79,
+     пришедшая с другой стороны.
+
+     Псевдокласс `:focus-visible` тут не помощник: браузер считает
+     программный фокус «видимым», пока страница не видела ни одного действия
+     человека, — проверено, плашка всплывала и с ним. Поэтому клавиатуру
+     отслеживаем сами: Tab и стрелки поднимают флаг, любое нажатие
+     указателем его снимает. */
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab' || e.key.indexOf('Arrow') === 0) _tipByKeyboard = true;
+  }, true);
+  document.addEventListener('pointerdown', () => { _tipByKeyboard = false; }, true);
+  document.addEventListener('focusin', (e) => {
+    const el = near(e);
+    if (el && _tipByKeyboard) showTipFor(el);
+  });
+  document.addEventListener('focusout', (e) => { if (near(e)) hideHintTip(); });
+  /* ⚠️ НАЖАТИЕ ГАСИТ ПОДСКАЗКУ. Ровно здесь была п. 79: после щелчка фокус
+     остаётся на кнопке, и подпись, привязанная к фокусу, не уходила никогда.
+     Человек уже нажал — объяснять ему нечего. */
+  document.addEventListener('click', (e) => { if (near(e)) hideHintTip(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideHintTip(); });
+  syncTipLabels();
+}
+
+/* п. 81. Один текст на подпись и на чтеца. Своего `aria-label` у кнопки с
+   подсказкой нет: он собирается из того же `data-tip`, и разойтись им негде.
+   Зовётся и после смены подписи (стрелки панелей меняют её на «Открыть» и
+   «Закрыть»). */
+function syncTipLabels() {
+  document.querySelectorAll('[data-tip]').forEach(el => {
+    const t = tipText(el);
+    if (!t) return;
+    const own = (el.textContent || '').trim();
+    if (!own) el.setAttribute('aria-label', t);   // у кнопки-иконки своего текста нет
+  });
 }
 
 /* Куда повесить вопросик. Порядок от самого крупного заголовка к самому
@@ -764,8 +952,38 @@ function fillPrintBlocks() {
 }
 
 let _printTheme = null;
+let _printViewBox = null;
+/* П72. ⚠️ БЕЗ `viewBox` ПЕЧАТНЫЙ РАЗМЕР ХОЛСТА НЕ МАСШТАБИРУЕТ РИСУНОК.
+   Печатный стиль задаёт `#chart` ширину 100 % и высоту 15 cm, но рисунок
+   внутри SVG нарисован в пикселях экрана: без системы координат браузеру
+   нечего пересчитывать, и он просто обрезает лишнее — картинка прижималась
+   к левому верхнему углу, а ось количества уходила за нижний край листа.
+   `viewBox` ставим перед печатью по фактическому размеру холста и снимаем
+   после (П74): на экране он не нужен, а `preserveAspectRatio` при живом
+   перетаскивании кривых сместил бы координаты указателя. */
+function setPrintViewBox(on) {
+  const svg = document.getElementById('chart');
+  if (!svg) return;
+  if (on) {
+    if (_printViewBox === null) _printViewBox = svg.getAttribute('viewBox') || '';
+    const w = svg.clientWidth || parseFloat(svg.getAttribute('width')) || 0;
+    const h = svg.clientHeight || parseFloat(svg.getAttribute('height')) || 0;
+    if (w > 0 && h > 0) {
+      svg.setAttribute('viewBox', '0 0 ' + Math.round(w) + ' ' + Math.round(h));
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    }
+    return;
+  }
+  if (_printViewBox === null) return;
+  if (_printViewBox) svg.setAttribute('viewBox', _printViewBox);
+  else svg.removeAttribute('viewBox');
+  svg.removeAttribute('preserveAspectRatio');
+  _printViewBox = null;
+}
+
 window.addEventListener('beforeprint', () => {
   fillPrintBlocks();
+  setPrintViewBox(true);
   const root = document.documentElement;
   _printTheme = root.getAttribute('data-theme');
   if (_printTheme === 'dark') {
@@ -777,7 +995,17 @@ window.addEventListener('afterprint', () => {
   const root = document.documentElement;
   if (_printTheme === 'dark') {
     root.setAttribute('data-theme', 'dark');
-    if (typeof redrawAll === 'function') redrawAll();
   }
   _printTheme = null;
+  setPrintViewBox(false);
+  /* П74. Холст возвращается к прежнему размеру ВСЕГДА, а не только после
+     тёмной темы: печатный стиль растянул его на всю ширину листа, и без
+     перерисовки на экране оставалась растянутая картинка.
+     ⚠️ Перерисовка идёт СЛЕДУЮЩИМ КАДРОМ. В момент `afterprint` печатные
+     правила уже сняты, но раскладка ещё не пересчитана: замер даёт ширину
+     печатного листа, и холст перерисовывается по ней — то есть остаётся
+     растянутым, только теперь по своей же вине. */
+  if (typeof redrawAll === 'function') {
+    requestAnimationFrame(() => requestAnimationFrame(() => redrawAll()));
+  }
 });

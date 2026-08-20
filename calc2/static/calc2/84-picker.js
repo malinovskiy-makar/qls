@@ -184,8 +184,13 @@ const L_TAXSIDE = 'taxside-row';         // Налог платит: прода�
 
 const SCENE_ROUTE = {
   /* --- Блок 1 · Математика ------------------------------------------ */
+  /* П60. Сцена открывается ПУСТЫМ холстом, поэтому её единственная карточка
+     раскрыта заранее: свёрнутая панель над пустым графиком не сообщает даже
+     того, что здесь вообще что-то делают. Во всех остальных сценах карточки
+     закрыты по-прежнему — там на холсте уже есть модель, и первый шаг очевиден. */
   'm-graph':      { run: () => { STATE.curves = []; curveCounter = 0; STATE.params = {};
-                                 setMode('graph'); renderGraphRows(); } },
+                                 setMode('graph'); renderGraphRows();
+                                 if (typeof openSection === 'function') openSection('sec-graph'); } },
   'm-tangent':    { run: () => { setMode('math'); setMathSub('tangent'); },    lock: ['math-seg'] },
   'm-optimum':    { run: () => { setMode('math'); setMathSub('optimum'); },    lock: ['math-seg'] },
   'm-transform':  { run: () => { setMode('math'); setMathSub('transform'); },  lock: ['math-seg'] },
@@ -392,31 +397,35 @@ function foldPickerGroups() {
     grid.classList.add('open');          // внутри открытого блока сетка видна всегда
     lab.remove();
 
-    // Н1: считаем ВСЕ модели блока, вместе с запланированными. Карточка обещает
-    // содержимое блока, а не только то, что уже готово: «2 модели» при трёх
-    // видимых читалось как ошибка.
-    const n = grid.querySelectorAll('.scard').length;
+    /* п. 62. СЧЁТЧИК НАЗЫВАЕТ ОБА ЧИСЛА.
+
+       Сначала считали только готовые — «2 модели» при трёх видимых карточках
+       читалось как ошибка (решение Н1). Потом стали считать все — и «Выбор
+       потребителя: 9 моделей» обещал девять там, где работают две. Оба раза
+       одно число отвечало на два разных вопроса: «что здесь будет» и «во что
+       можно зайти сейчас». Печатаем оба, и только когда они расходятся. */
+    const all = grid.querySelectorAll('.scard').length;
+    const n = grid.querySelectorAll('.scard:not(.soon)').length;
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'bcard';
     card.setAttribute('aria-controls', grid.id);
+    /* ⚠️ ПЕРЕЧНЯ МОДЕЛЕЙ НА КАРТОЧКЕ БОЛЬШЕ НЕТ, И ЭТО ОДНА ПРАВКА, А НЕ ДВЕ.
+       Замер высот десяти карточек: 162, 162, 194, 194, 178, 178, 210, 210,
+       178, 178 — пять разных значений. Причина одна: перечень занимал от 32
+       до 96 px, а карточки в ряду тянутся по самой высокой. Снятие перечня
+       само выравнивает карточки.
+       Порядок карточек внутри блока (готовые вперёд, запланированные следом)
+       остаётся: он про сетку блока, а не про перечень. */
     card.innerHTML = blockSpec(name)
-      + '<span class="bcard-name"></span><span class="bcard-count"></span>'
-      + '<span class="bcard-list"></span>';
+      + '<span class="bcard-name"></span><span class="bcard-count"></span>';
     card.querySelector('.bcard-name').textContent = name;
-    card.querySelector('.bcard-count').textContent = n + ' ' + plural(n, ['модель', 'модели', 'моделей']);
-    /* А42. Правая половина карточки пустовала: 555 пикселей ни подо что.
-       Перечисляем модели блока — так видно, что внутри, ещё до открытия.
-       Сначала рабочие, потом запланированные: обещание блока честное, но
-       понятно, что уже можно открыть прямо сейчас. */
-    const ready = [], soon = [];
-    grid.querySelectorAll('.scard').forEach(sc => {
-      const nm = (sc.querySelector('.scard-name') || {}).textContent;
-      if (!nm) return;
-      (sc.classList.contains('soon') ? soon : ready).push(nm.trim());
-    });
-    card.querySelector('.bcard-list').textContent =
-      ready.concat(soon.map(s => s + ' (скоро)')).join(' · ');
+    card.querySelector('.bcard-count').textContent = (n === all)
+      ? all + ' ' + plural(all, ['модель', 'модели', 'моделей'])
+      : n + ' ' + plural(n, ['модель', 'модели', 'моделей']) + ' из ' + all;
+    /* п. 64. Запланированные модели уходят в конец сетки блока: на экране
+       блока не приходится выбирать нужное среди недоступного. */
+    grid.querySelectorAll('.scard.soon').forEach(sc => grid.appendChild(sc));
     card.addEventListener('click', () => {
       blocks.classList.add('hidden');
       groups.forEach(x => x.classList.remove('open'));
@@ -454,6 +463,17 @@ function pickScene(key) {
   if (STATE.sceneKey && STATE.sceneKey !== key) saveSceneSnapshot(STATE.sceneKey);
   resetDecor();           // П20: новая модель начинается с чистого состояния
   STATE.zoomLock = false; // и своего масштаба, а не унаследованного от колеса
+  /* ⚠️ ВХОД В ЛЮБУЮ МОДЕЛЬ ОБНУЛЯЕТ КРИВЫЕ (п. 11).
+     Девятнадцать маршрутов из сорока одного зовут loadScene, и он чистит
+     STATE.curves сам. Остальные двадцать два (вся «Математика», КПВ, торговля,
+     труд, потребитель, макро, неравенство) только переключали режим — и
+     получали кривые предыдущей модели. Замер до правки: 22 сцены из 41
+     приходили с чужим содержимым; в AD–AS от этого висел в пустоте маркер
+     равновесия из монопсонии, а сцена труда открывалась с рыночными D и S
+     вместо своих спроса и предложения труда.
+     Чинить надо не конкретный переход, а жизненный цикл: маршрут, которому
+     кривые нужны, строит их сам сразу после этой строки. */
+  STATE.curves = []; curveCounter = 0;
   const r = SCENE_ROUTE[key] || SCENE_ROUTE.sd;
   r.run();
   // Возврат в модель, где уже работали: восстанавливаем именно её изменения.

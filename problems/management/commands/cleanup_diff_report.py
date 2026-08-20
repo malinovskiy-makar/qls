@@ -42,6 +42,38 @@ ARRAY_RE = re.compile(
     r'(?:\${1,2})\s*\\begin\{array\}\{[^}]*\}(.*?)\\end\{array\}\s*(?:\${1,2})', re.S)
 
 
+def inline_assets(asset_dir):
+    """Прочитать KaTeX с диска для вшивания в страницу.
+
+    Шрифты в CSS подключены относительными путями (url(fonts/…)), поэтому их
+    тоже переводим в data:. Без этого вшитый CSS остался бы без шрифтов, и
+    формулы отрисовались бы бракованными глифами.
+    """
+    import base64
+    try:
+        css = (asset_dir / 'katex.min.css').read_text(encoding='utf-8')
+        js = (asset_dir / 'katex.min.js').read_text(encoding='utf-8')
+        ar = (asset_dir / 'auto-render.min.js').read_text(encoding='utf-8')
+    except OSError:
+        return '', '', ''
+
+    fonts_dir = asset_dir / 'fonts'
+
+    def sub_font(m):
+        name = m.group(1)
+        path = fonts_dir / name
+        if not path.exists():
+            return m.group(0)
+        b64 = base64.b64encode(path.read_bytes()).decode('ascii')
+        return 'url(data:font/woff2;base64,' + b64 + ')'
+
+    css = re.sub(r'url\(fonts/([A-Za-z0-9_\-]+\.woff2)\)', sub_font, css)
+    # Форматы, которых мы не вшивали, убираем: браузер иначе полезет за ними
+    # по несуществующему относительному пути.
+    css = re.sub(r",\s*url\(fonts/[^)]+\)\s*format\(['\"](?:woff|truetype)['\"]\)", '', css)
+    return css, js, ar
+
+
 def esc(s):
     return html_lib.escape(s or '', quote=False)
 
@@ -90,27 +122,46 @@ def render_field(text):
     return ''.join(parts)
 
 
+def field_block(text):
+    """Поле в двух видах: как увидит ученик и как лежит в базе.
+
+    Отрендеренный вид идёт первым и виден всегда — по нему судят о качестве
+    правки. Сырой текст лежит рядом и открывается переключателем: он нужен
+    для разбора, но без рендера правильная разметка формул читается как
+    порча, и превью вводит в заблуждение.
+
+    ⚠️ Свои классы только с префиксом qls-. KaTeX внутри .katex-html сам
+    раздаёт узлам классы text/mord/base/strut/mfrac/sqrt, а CSS матчит по
+    ТОКЕНУ класса — одноимённое правило протащило бы рамку внутрь формулы.
+    """
+    text = text or ''
+    return ('<div class="qls-pair">'
+            '<div class="qls-rendered">' + render_field(text) + '</div>'
+            '<div class="qls-raw">' + esc(text) + '</div>'
+            '</div>')
+
+
 def task_to_html(task, hidden=False):
     blocks = []
     stmt = (task.get('statement') or '').strip()
     if stmt:
-        blocks.append('<div class="lbl">Условие</div><div class="fld">' + render_field(stmt) + '</div>')
+        blocks.append('<div class="lbl">Условие</div><div class="fld">' + field_block(stmt) + '</div>')
     parts = task.get('parts') or []
     if parts:
         items = []
         for p in parts:
             lab = esc((p.get('label') or '').strip())
-            st = render_field((p.get('statement') or '').strip())
+            st = field_block((p.get('statement') or '').strip())
             an = (p.get('answer') or '').strip()
-            an_html = ('<span class="ans">→ ' + render_field(an) + '</span>') if an else ''
+            an_html = ('<span class="ans">→ ' + field_block(an) + '</span>') if an else ''
             items.append('<div class="part"><span class="plab">' + lab + '</span> ' + st + ' ' + an_html + '</div>')
         blocks.append('<div class="lbl">Подпункты</div>' + ''.join(items))
     sol = (task.get('solution') or '').strip()
     if sol:
-        blocks.append('<div class="lbl">Решение</div><div class="fld">' + render_field(sol) + '</div>')
+        blocks.append('<div class="lbl">Решение</div><div class="fld">' + field_block(sol) + '</div>')
     ans = (task.get('answer') or '').strip()
     if ans:
-        blocks.append('<div class="lbl">Ответ</div><div class="fld">' + render_field(ans) + '</div>')
+        blocks.append('<div class="lbl">Ответ</div><div class="fld">' + field_block(ans) + '</div>')
     if not blocks:
         blocks.append('<div class="empty">— пусто —</div>')
     body = ''.join(blocks)
@@ -239,6 +290,11 @@ table.rebuilt tr:first-child td{background:#f3f2ec;font-weight:500}
 .empty{color:#bbb;font-style:italic}
 .hidden-note{color:#791F1F;font-size:13px;margin-bottom:6px}
 .katex .text{font-family:KaTeX_Main,-apple-system,"Segoe UI",sans-serif}
+.qls-raw{display:none;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;line-height:1.45;background:#f6f7f9;border:0.5px solid #dfe3e9;border-radius:6px;padding:6px 9px;margin:5px 0 2px;color:#3a4152;overflow-x:auto}
+body.qls-show-raw .qls-raw{display:block}
+.qls-rawbtn{border:0.5px solid #c9c9c2;background:#fff;border-radius:8px;padding:5px 12px;font-size:13px;cursor:pointer;margin-left:auto}
+body.qls-show-raw .qls-rawbtn{background:#3a4152;color:#fff;border-color:#3a4152}
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 </style></head><body>
 <h1>__TITLE__</h1>
 <div class="sub">__META__ · сгенерировано __TS__</div>
@@ -250,7 +306,22 @@ __CARDS__
 <script src="__AUTORENDER__"></script>
 <script>
 (function(){
-  if(typeof renderMathInElement==='undefined'){document.getElementById('diag').style.display='block';return;}
+  var rb=document.getElementById('qls-rawbtn');
+  if(rb){rb.addEventListener('click',function(){
+    var on=document.body.classList.toggle('qls-show-raw');
+    rb.textContent=on?'Сырой текст: показан':'Сырой текст: скрыт';
+  });}
+})();
+(function(){
+  if(typeof renderMathInElement==='undefined'){
+    document.getElementById('diag').style.display='block';
+    // Формулы не отрисовались — сырой текст показываем сразу, иначе на
+    // экране останется вид, по которому о качестве правки судить нельзя.
+    document.body.classList.add('qls-show-raw');
+    var rb2=document.getElementById('qls-rawbtn');
+    if(rb2){rb2.textContent='Сырой текст: показан';}
+    return;
+  }
   document.querySelectorAll('.tex').forEach(function(el){
     try{renderMathInElement(el,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false,errorColor:'#cc0000'});}catch(e){}
   });
@@ -274,6 +345,12 @@ class Command(BaseCommand):
         parser.add_argument('--raw', required=True)
         parser.add_argument('--patch', required=True)
         parser.add_argument('--out', required=True)
+        parser.add_argument('--ids', default='',
+                            help='Только эти id через запятую (точечная сверка).')
+        parser.add_argument('--limit', type=int, default=0,
+                            help='Взять первые N задач (0 — все).')
+        parser.add_argument('--no-inline', action='store_true',
+                            help='Не вшивать KaTeX в страницу (ссылки на _assets).')
 
     def handle(self, *args, **opts):
         raw_path, patch_path, out_path = Path(opts['raw']), Path(opts['patch']), Path(opts['out'])
@@ -303,6 +380,15 @@ class Command(BaseCommand):
         ptasks = patch.get('tasks', {})
 
         ids = sorted(set(list(ptasks.keys()) + list(hide)), key=lambda x: int(x))
+        if opts.get('ids'):
+            want = {i.strip() for i in opts['ids'].split(',') if i.strip()}
+            missing = want - set(ids)
+            if missing:
+                self.stdout.write(self.style.WARNING(
+                    'В этом патче нет id: ' + ', '.join(sorted(missing))))
+            ids = [i for i in ids if i in want]
+        if opts.get('limit'):
+            ids = ids[:opts['limit']]
         cards, counts = [], {}
         for tid in ids:
             rawt = raw_by.get(tid, {})
@@ -333,6 +419,10 @@ class Command(BaseCommand):
             if counts.get(k):
                 filters.append('<button class="fbtn" data-filter="' + k + '">'
                                + esc(BADGE_LABELS[k]) + ' · ' + str(counts[k]) + '</button>')
+        # Переключатель сырого текста — справа, отдельно от фильтров: он
+        # меняет не выборку карточек, а вид полей.
+        filters.append('<button class="qls-rawbtn" id="qls-rawbtn" '
+                       'type="button">Сырой текст: скрыт</button>')
         filters_html = ''.join(filters)
 
         banner_html = ''
@@ -346,7 +436,28 @@ class Command(BaseCommand):
                      + ' · ' + str(len(cards)) + ' карточек · скрыто ' + str(len(hide)))
         ts = dt.datetime.now().strftime('%Y-%m-%d %H:%M')
 
-        doc = (PAGE.replace('__CSS__', css)
+        # Вшиваем KaTeX внутрь страницы. Иначе отчёт живёт только рядом со
+        # своей папкой _assets: стоит переслать или перенести один файл — и
+        # формулы не отрисуются, а правильная разметка снова читается как
+        # порча. Ровно эта хрупкость и породила жалобу на «сырое превью».
+        if core_ok and not opts.get('no_inline'):
+            doc_css, doc_js, doc_ar = inline_assets(asset_dir)
+            if doc_css:
+                PAGE_LOCAL = (PAGE
+                              .replace('<link rel="stylesheet" href="__CSS__">',
+                                       '<style>' + doc_css + '</style>')
+                              .replace('<script src="__JS__"></script>',
+                                       '<script>' + doc_js + '</script>')
+                              .replace('<script src="__AUTORENDER__"></script>',
+                                       '<script>' + doc_ar + '</script>'))
+                self.stdout.write(self.style.SUCCESS(
+                    'KaTeX вшит в страницу: файл самодостаточен.'))
+            else:
+                PAGE_LOCAL = PAGE
+        else:
+            PAGE_LOCAL = PAGE
+
+        doc = (PAGE_LOCAL.replace('__CSS__', css)
                    .replace('__JS__', js)
                    .replace('__AUTORENDER__', autorender)
                    .replace('__TITLE__', esc(title))

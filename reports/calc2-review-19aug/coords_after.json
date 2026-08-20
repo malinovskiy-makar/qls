@@ -1,0 +1,1043 @@
+{
+ "scenes": {
+  "m-graph": {
+   "domain": {
+    "x": [
+     -10,
+     10
+    ],
+    "y": [
+     -10,
+     10
+    ]
+   },
+   "plot": {
+    "x0": 31,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "m-tangent": {
+   "domain": {
+    "x": [
+     -6,
+     6
+    ],
+    "y": [
+     -4,
+     20
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [
+    "-4",
+    "-2",
+    "2",
+    "4",
+    "-6",
+    "6"
+   ],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "m-optimum": {
+   "domain": {
+    "x": [
+     -3,
+     3
+    ],
+    "y": [
+     -6,
+     6
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "m-transform": {
+   "domain": {
+    "x": [
+     -8,
+     8
+    ],
+    "y": [
+     -6,
+     14
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "m-minmax": {
+   "domain": {
+    "x": [
+     -5,
+     6
+    ],
+    "y": [
+     -3,
+     12
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "m-constraint": {
+   "domain": {
+    "x": [
+     0,
+     10
+    ],
+    "y": [
+     0,
+     12
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "ppf": {
+   "domain": {
+    "x": [
+     0,
+     120
+    ],
+    "y": [
+     0,
+     120
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "ppfsum": {
+   "domain": {
+    "x": [
+     0,
+     150
+    ],
+    "y": [
+     0,
+     180
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "trade": {
+   "domain": {
+    "x": [
+     0,
+     120
+    ],
+    "y": [
+     0,
+     250
+    ]
+   },
+   "plot": {
+    "x0": 33,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "tradeprice": {
+   "domain": {
+    "x": [
+     0,
+     120
+    ],
+    "y": [
+     0,
+     180
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [
+    "50",
+    "100"
+   ],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "sd": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [
+    "E∗​"
+   ],
+   "eqDashes": 2
+  },
+  "tax": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [
+    "t=20"
+   ],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "tax-adv": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [
+    "t=20"
+   ],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "ceil": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [
+    "Дефицит = 40"
+   ],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "elast": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [
+    "E∗​"
+   ],
+   "eqDashes": 2
+  },
+  "ext": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "costs": {
+   "domain": {
+    "x": [
+     0,
+     10
+    ],
+    "y": [
+     0,
+     50
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "prod": {
+   "domain": {
+    "x": [
+     0,
+     10
+    ],
+    "y": [
+     0,
+     50
+    ]
+   },
+   "plot": {
+    "x0": 42,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [
+    "5",
+    "10",
+    "15",
+    "20",
+    "25"
+   ],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "plants": {
+   "domain": {
+    "x": [
+     0,
+     250
+    ],
+    "y": [
+     0,
+     35000
+    ]
+   },
+   "plot": {
+    "x0": 48,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "isoquant": {
+   "domain": {
+    "x": [
+     0,
+     120
+    ],
+    "y": [
+     0,
+     60
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "mono": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "mono-nat": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "mono-d1": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "mono-d3": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [
+    "30",
+    "60",
+    "90",
+    "120",
+    "60",
+    "25",
+    "50",
+    "75",
+    "100",
+    "50"
+   ],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "mono-kink": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "labor": {
+   "domain": {
+    "x": [
+     0,
+     120
+    ],
+    "y": [
+     0,
+     120
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [
+    "Безработица = 30"
+   ],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "labor-mono": {
+   "domain": {
+    "x": [
+     0,
+     120
+    ],
+    "y": [
+     0,
+     120
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [
+    "Безработица = 30"
+   ],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "labor-union": {
+   "domain": {
+    "x": [
+     0,
+     120
+    ],
+    "y": [
+     0,
+     120
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "labor-bilat": {
+   "domain": {
+    "x": [
+     0,
+     120
+    ],
+    "y": [
+     0,
+     120
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "smallopen": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [
+    "Импорт = 40"
+   ],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "monoexport": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [
+    "30",
+    "60",
+    "90",
+    "120",
+    "75",
+    "15",
+    "30",
+    "45",
+    "60",
+    "50"
+   ],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "consumer": {
+   "domain": {
+    "x": [
+     0,
+     120
+    ],
+    "y": [
+     0,
+     60
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "cons-slutsky": {
+   "domain": {
+    "x": [
+     0,
+     120
+    ],
+    "y": [
+     0,
+     150
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "adas": {
+   "domain": {
+    "x": [
+     0,
+     150
+    ],
+    "y": [
+     0,
+     120
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "islm": {
+   "domain": {
+    "x": [
+     0,
+     300
+    ],
+    "y": [
+     0,
+     10
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "phillips": {
+   "domain": {
+    "x": [
+     0,
+     12
+    ],
+    "y": [
+     0,
+     10
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 801,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "money": {
+   "domain": {
+    "x": [
+     0,
+     250
+    ],
+    "y": [
+     0,
+     50
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "loanable": {
+   "domain": {
+    "x": [
+     0,
+     150
+    ],
+    "y": [
+     0,
+     40
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "fx": {
+   "domain": {
+    "x": [
+     0,
+     120
+    ],
+    "y": [
+     0,
+     40
+    ]
+   },
+   "plot": {
+    "x0": 30,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "ineq": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     100
+    ]
+   },
+   "plot": {
+    "x0": 32,
+    "x1": 799,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  },
+  "laffer": {
+   "domain": {
+    "x": [
+     0,
+     100
+    ],
+    "y": [
+     0,
+     1800
+    ]
+   },
+   "plot": {
+    "x0": 40,
+    "x1": 816,
+    "y0": 35,
+    "y1": 808
+   },
+   "namedCoords": [],
+   "numbersInsidePlot": [],
+   "overlapping": [],
+   "eqCircles": 0,
+   "eqName": [],
+   "eqDashes": 0
+  }
+ },
+ "pageErrors": []
+}
