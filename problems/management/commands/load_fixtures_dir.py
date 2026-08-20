@@ -1,8 +1,9 @@
 """
 Команда load_fixtures_dir — загружает все JSON-фикстуры из папки по порядку имён.
 
-Предназначена для ЗАПУСКА НА СЕРВЕРЕ (Render Shell), где соединение с PostgreSQL
-внутреннее — быстрое и стабильное (внешний URL Render обрывает длинные транзакции).
+Предназначена для ЗАПУСКА НА СЕРВЕРЕ (в shell хостинга, если доступен), где
+соединение с PostgreSQL внутреннее — быстрое и стабильное (внешний URL
+обрывает длинные транзакции на некоторых хостингах).
 
 Каждый файл грузится ОТДЕЛЬНЫМ вызовом loaddata (своя транзакция) — память
 освобождается между файлами (безопасно для 512 МБ free-tier), а повтор уже
@@ -12,7 +13,7 @@
 → 31_part_* → 40_misc → 50_dupcand_* → 51_autotopic_* → 90_similar_* (последними,
 когда все Problem уже в базе — иначе FK через границы транзакций ломается).
 
-Запуск (в Render Shell):
+Запуск (в shell хостинга):
     python manage.py load_fixtures_dir
     python manage.py load_fixtures_dir --dir deploy_fixtures
 """
@@ -26,7 +27,7 @@ from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
-    help = 'Загружает все JSON-фикстуры из папки по порядку (для Render Shell)'
+    help = 'Загружает все JSON-фикстуры из папки по порядку (для запуска в shell хостинга)'
 
     def add_arguments(self, parser):
         parser.add_argument('--dir', type=str, default='deploy_fixtures',

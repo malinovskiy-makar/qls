@@ -285,8 +285,8 @@ jobs:
       DJANGO_SETTINGS_MODULE: config.settings_production
       # ⚠️ ОКРУЖЕНИЕ ПОДСТАВНОЕ, НО ПРАВДОПОДОБНОЕ. Ключ длинный и
       # разнобуквенный намеренно: на коротком поднимется security.W009, и
-      # джоб покраснеет по вине заглушки, а не настроек. Настоящий ключ
-      # выдаёт хостинг (generateValue в render.yaml).
+      # джоб покраснеет по вине заглушки, а не настроек. Настоящий ключ на
+      # проде задаётся отдельно (см. docs/MIGRATION-CHECKLIST.md — SECRET_KEY).
       SECRET_KEY: x7Kq2mZv9Lp4Rt6Wy8Bn3Cf5Hj1Dg0Sa-QwErTyUiOpAsDfGhJkLzXcVbNm
       ALLOWED_HOSTS: example.org,www.example.org
       DATABASE_URL: postgres://u:p@127.0.0.1:5432/db

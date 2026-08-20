@@ -3,7 +3,7 @@
 
 В отличие от loaddata (1 INSERT на объект — сотни round-trip'ов, медленно
 через внешний канал), здесь объекты вставляются пачками (batch_size=1000):
-в ~1000 раз меньше обращений к БД → быстро даже через внешний URL Render.
+в ~1000 раз меньше обращений к БД → быстро даже через внешний URL хостинга.
 
 - Читает .json и .json.gz из папки по порядку имён.
 - Группирует по модели, bulk_create(..., ignore_conflicts=True) — идемпотентно,
@@ -11,7 +11,7 @@
 - M2M-связи (topics/tags/skills/mistakes/similar и др.) кладёт напрямую в
   through-таблицы пачками, тоже с ignore_conflicts.
 
-Запуск (локально, против внешней базы Render):
+Запуск (локально, против внешней базы прода):
     DATABASE_URL="postgresql://...?sslmode=require" \
     DJANGO_SETTINGS_MODULE=config.settings_production \
     SECRET_KEY="..." \

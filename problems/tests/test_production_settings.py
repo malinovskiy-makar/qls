@@ -22,8 +22,8 @@ from contextlib import contextmanager
 # ⚠️ КЛЮЧ ДЛИННЫЙ И РАЗНОБУКВЕННЫЙ НАМЕРЕННО. Короткая заглушка поднимает
 # предупреждение security.W009 («ключ короче 50 символов»), и `check --deploy`
 # перестаёт быть чистым — но по вине теста, а не настроек. Разбираться в таком
-# выводе пришлось бы каждому следующему. На проде ключ выдаёт хостинг
-# (`generateValue: true` в render.yaml).
+# выводе пришлось бы каждому следующему. На проде ключ задаётся вручную через
+# переменную окружения (см. docs/MIGRATION-CHECKLIST.md — SECRET_KEY).
 FAKE_ENV = {
     'SECRET_KEY': 'x7Kq2mZv9Lp4Rt6Wy8Bn3Cf5Hj1Dg0Sa-QwErTyUiOpAsDfGhJkLzXcVbNm',
     'ALLOWED_HOSTS': 'example.org,www.example.org',

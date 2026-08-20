@@ -110,6 +110,7 @@ lockdown_dev_accounts [--apply]   # погасить дев-аккаунты
 | Вопрос | Где ответ |
 |---|---|
 | Стек, приложения, деплой, ограничения хостинга | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Что проверить/настроить при выборе нового хостинга | [docs/MIGRATION-CHECKLIST.md](docs/MIGRATION-CHECKLIST.md) |
 | Кто что видит, секреты, известные дыры | [docs/SECURITY.md](docs/SECURITY.md) |
 | Как выкатить, залить данные, восстановиться | [docs/RUNBOOK.md](docs/RUNBOOK.md) |
 | Поиск, эмбеддинги, почему промахивается | [docs/EMBEDDINGS.md](docs/EMBEDDINGS.md) |

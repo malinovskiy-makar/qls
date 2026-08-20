@@ -2,8 +2,12 @@
 # pip-compile на Python 3.13 и содержит точные версии всех зависимостей,
 # включая транзитивные.
 #
-# Файл оставлен здесь, потому что на него ссылается render.yaml
-# (buildCommand: pip install -r requirements.txt). Менять состав — в
-# requirements/base.in, потом пересобирать лок:
+# ⚠️ После отказа от Render (2026-08) ничего в репозитории больше не ставит
+# зависимости из ЭТОГО файла — CI использует requirements/base.txt напрямую,
+# а команда сборки, которая раньше ставила именно requirements.txt
+# (buildCommand: pip install -r requirements.txt), жила только в удалённом
+# render.yaml. Возможно, файл осиротел; удалять его — отдельное решение
+# владельца (см. requirements/README.md про переходный период с Python 3.9
+# на 3.13). Менять состав — в requirements/base.in, потом пересобирать лок:
 #     pip-compile requirements/base.in -o requirements/base.txt
 -r requirements/base.txt

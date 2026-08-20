@@ -146,9 +146,9 @@ class Calc2View(TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         # Честно говорим интерфейсу, умеет ли ЭТОТ сервер собирать PDF.
-        # На бесплатном тарифе Render компилятора нет, поэтому кнопка
-        # «Скачать PDF» там не показывается вовсе — как это уже сделано на
-        # странице экспорта подборок (catalog/collection_export.html).
+        # Если компилятора нет, кнопка «Скачать PDF» не показывается вовсе —
+        # как это уже сделано на странице экспорта подборок
+        # (catalog/collection_export.html).
         ctx['has_pdflatex'] = pdflatex_available()
         return ctx
 
