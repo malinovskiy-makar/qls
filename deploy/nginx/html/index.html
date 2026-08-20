@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Weconomics</title>
+<style>
+  :root {
+    --bg:   #f7f7f5;
+    --ink:  #1c1c1a;
+    --mute: #6b6b66;
+    --line: #e2e2dd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#17171a; --ink:#f0f0ee; --mute:#9a9a94; --line:#2e2e33; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { text-align: center; max-width: 34rem; }
+  h1 {
+    margin: 0 0 .6rem;
+    font-size: clamp(2rem, 7vw, 3.25rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  p { margin: 0; color: var(--mute); font-size: clamp(1rem, 2.6vw, 1.15rem); }
+  hr {
+    width: 3rem; height: 2px;
+    margin: 1.5rem auto;
+    border: 0; background: var(--line);
+  }
+</style>
+</head>
+<body>
+  <main>
+    <h1>Weconomics</h1>
+    <hr>
+    <p>Сайт скоро откроется</p>
+  </main>
+</body>
+</html>
