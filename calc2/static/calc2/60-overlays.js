@@ -344,7 +344,7 @@ function graphRowInput(row, inp, del, name) {
     fieldProblem(inp, ''); graphError('');
     curveCounter++;
     const c = { id: curveCounter, expr: txt, compiled, color: nextColor(),
-                name: txt, role: null, visible: true, handTyped: true,
+                role: null, visible: true,
                 linear: detectLinear(compiled), srcForm: 'PQ' };
     STATE.curves.push(c);
     row._curve = c;
@@ -410,7 +410,7 @@ function drawOverlays() {
   syncSceneColorPickers();   // образцы в панели идут за темой и за своими цветами
   syncAreaCalcUI();          // выпадашка кривых и список точек для расчёта площади
   hintsToDots();             // подсказки, добавленные сценой, тоже уходят под вопросик
-  syncFirstCard();                                     // ярче та карточка, что сверху
+  syncFirstCard();                                     // ярче та карточка, где вводят формулы
   refreshAnalyticsPanel();
   renderMathIn(document.getElementById('ex-body'));    // и в объяснении модели
   renderMathIn(document.getElementById('tools-panel'));// и в подсказках панели
@@ -2598,7 +2598,7 @@ function buildParamChip(box, name) {
     val.textContent = fmt(p.value);
     paintEq();
     if (bounds && bounds.close) bounds.close();   // Н10: тронули ползунок — меню закрылось
-    redrawAll();
+    redrawKeepingWindow();     // окно подбирается под формулу, а не под значение буквы
   });
 
   /* Н12: щёлкнули по значению — «a =» остаётся на месте, правится только число
@@ -2618,7 +2618,7 @@ function buildParamChip(box, name) {
       }
       p.value = v;
       syncSlider();
-      redrawAll();
+      redrawKeepingWindow();
     });
   });
 
@@ -2634,7 +2634,7 @@ function buildParamChip(box, name) {
       // подтягивается ЗНАЧЕНИЕ — к ближайшей границе.
       p.value = pullIntoBand({ min: p.min, max: p.max }, p.value);
       syncSlider();
-      redrawAll();
+      redrawKeepingWindow();
     });
   loLab.addEventListener('click', () => bounds.open('min'));
   hiLab.addEventListener('click', () => bounds.open('max'));
@@ -3093,6 +3093,9 @@ function snapTargets() {
     return out;
   }
   if (STATE.mode === 'math') { mathSnapTargets(out); return out; }
+  if (STATE.mode === 'macro')      { macroSnapTargets(out); return out; }
+  if (STATE.mode === 'consumer')   { consumerSnapTargets(out); return out; }
+  if (STATE.mode === 'inequality') { ineqSnapTargets(out); return out; }
   STATE.curves.filter(c => c.visible && !isVertical(c)).forEach(c => {
     /* Цвет и сама кривая нужны взведению (фаза 3): загоревшаяся точка красится
        цветом своей кривой, а полоса попадания должна знать, какую кривую
@@ -3100,6 +3103,77 @@ function snapTargets() {
     out.push({ name: curveShortName(c), f: (q) => evalCurve(c, q), color: c.color, curve: c });
   });
   return out;
+}
+
+/* П21. Кривые макромоделей, потребителя и неравенства.
+
+   Полоса захвата и ключевые точки строятся по одному списку (snapTargets),
+   поэтому кривая, которой здесь нет, не только не взводится щелчком, но и не
+   отдаёт своих пересечений. Замер 21.08: полосы не было ни в одной из десяти
+   сцен этих трёх режимов, хотя кривые в них есть и они главные.
+
+   Вертикальные кривые (LRAS, Ms, долгосрочная Филлипса) не берём — по ним
+   не катаются, ровно как в общей ветке ниже.
+
+   Одиннадцатая сцена без полосы — «Построение графиков»: она открывается
+   пустым холстом, и полоса появляется вместе с первой же кривой. Это не
+   пробел, а её устройство. */
+function macroSnapTargets(out) {
+  const r = STATE.macroRes;
+  if (!r) return;
+  if (r.kind === 'laffer') {
+    if (r.pts && r.pts.length) {
+      out.push({ name: 'Поступления', f: (t) => interpY(r.pts, t), color: COL.tax });
+    }
+    return;
+  }
+  [].concat(r.extra || [], r.curves || []).forEach(([lab, c, col]) => {
+    if (!c || typeof c.fn !== 'function' || isVertical(c)) return;
+    out.push({ name: lab, f: (x) => { const v = c.fn(x); return isFinite(v) ? v : NaN; }, color: col });
+  });
+}
+
+/* Потребитель. Бюджетная линия задана перехватами, кривая безразличия — уровнем
+   полезности: её точки считает тот же движок касания уровня, что рисует её на
+   холсте, второй математики здесь нет. В разложении Слуцкого линий три, и
+   каждая своя: спрашивают именно «эта или та». */
+function consumerSnapTargets(out) {
+  const c = STATE.cons;
+  if (!c) return;
+  const budget = (o) => (x) => {
+    if (!(o.xInt > 0)) return NaN;
+    const y = o.yInt - (o.yInt / o.xInt) * x;
+    return (x >= 0 && x <= o.xInt) ? y : NaN;
+  };
+  const level = (U) => {
+    const pts = traceLevelCurve(c.f, U, CONFIG.Qmax, CONFIG.Pmax * 6, 220);
+    return (pts && pts.length) ? ((x) => interpY(pts, x)) : null;
+  };
+  const push = (name, f, color) => { if (f) out.push({ name, f, color }); };
+  const s = c.slutsky, b = c.base;
+  if (s) {
+    push('бюджет: старый', budget(b), COL.ghost);
+    push('бюджет: компенсир.', budget(s.comp), COL.MR);
+    push('бюджет: новый', budget(s.fin), COL.reg);
+    push('U исходная', level(b.U), COL.indiff);
+    if (s.fin.U > 0) push('U новая', level(s.fin.U), COL.reg);
+  } else {
+    push('бюджетная линия', budget(b), COL.reg);
+    push('кривая безразличия', level(b.U), COL.indiff);
+  }
+}
+
+/* Неравенство. Кривая Лоренца хранится долями 0…1, а холст размечен в
+   процентах: переводим на входе и на выходе, чтобы полоса легла ровно на
+   нарисованную линию. */
+function ineqSnapTargets(out) {
+  const pts = STATE.ineqLorenz;
+  if (!pts || !pts.length) return;
+  out.push({ name: 'Лоренц', f: (x) => lorenzAt(pts, Math.max(0, Math.min(1, x / 100))) * 100, color: COL.D });
+  const rd = STATE.ineqRedist;
+  if (rd && rd.lorenz && rd.lorenz.length) {
+    out.push({ name: 'Лоренц после', f: (x) => lorenzAt(rd.lorenz, Math.max(0, Math.min(1, x / 100))) * 100, color: COL.S });
+  }
 }
 
 /* Кривые раздела «Математика» для прокатывания и пересечений. Берём то же,
