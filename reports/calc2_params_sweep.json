@@ -1065,8 +1065,8 @@
   },
   "mono-d3": {
    "letter": "a",
-   "fieldsTotal": 5,
-   "capped": true,
+   "fieldsTotal": 3,
+   "capped": false,
    "fields": [
     {
      "id": "inp-d3-1",
@@ -1139,37 +1139,13 @@
      "valueAfter": 6.1,
      "moves": true,
      "curvesInShot": 6
-    },
-    {
-     "id": "curve-expr-1",
-     "was": "100 - Q",
-     "want": "100 - a*Q",
-     "base": 1,
-     "typedInto": "100-a*Q",
-     "typeOk": true,
-     "applyBy": "Enter",
-     "slider": true,
-     "fieldNow": "100-a*Q",
-     "stateHolds": [
-      "curves[0].expr"
-     ],
-     "stateAnyWithLetter": [
-      "curves[0].expr"
-     ],
-     "err": [],
-     "sliderSeen": true,
-     "dragChangedValue": true,
-     "valueBefore": 1,
-     "valueAfter": 6.1,
-     "moves": false,
-     "curvesInShot": 6
     }
    ]
   },
   "mono-kink": {
    "letter": "a",
-   "fieldsTotal": 5,
-   "capped": true,
+   "fieldsTotal": 3,
+   "capped": false,
    "fields": [
     {
      "id": "inp-ki-1",
@@ -1241,30 +1217,6 @@
      "valueBefore": 1,
      "valueAfter": 6.1,
      "moves": true,
-     "curvesInShot": 4
-    },
-    {
-     "id": "curve-expr-1",
-     "was": "100 - Q",
-     "want": "100 - a*Q",
-     "base": 1,
-     "typedInto": "100-a*Q",
-     "typeOk": true,
-     "applyBy": "Enter",
-     "slider": true,
-     "fieldNow": "100-a*Q",
-     "stateHolds": [
-      "curves[0].expr"
-     ],
-     "stateAnyWithLetter": [
-      "curves[0].expr"
-     ],
-     "err": [],
-     "sliderSeen": true,
-     "dragChangedValue": true,
-     "valueBefore": 1,
-     "valueAfter": 6.1,
-     "moves": false,
      "curvesInShot": 4
     }
    ]
@@ -1546,8 +1498,8 @@
   },
   "monoexport": {
    "letter": "a",
-   "fieldsTotal": 5,
-   "capped": true,
+   "fieldsTotal": 3,
+   "capped": false,
    "fields": [
     {
      "id": "inp-d3-1",
@@ -1619,30 +1571,6 @@
      "valueBefore": 1,
      "valueAfter": 6.1,
      "moves": true,
-     "curvesInShot": 6
-    },
-    {
-     "id": "curve-expr-1",
-     "was": "100 - Q",
-     "want": "100 - a*Q",
-     "base": 1,
-     "typedInto": "100-a*Q",
-     "typeOk": true,
-     "applyBy": "Enter",
-     "slider": true,
-     "fieldNow": "100-a*Q",
-     "stateHolds": [
-      "curves[0].expr"
-     ],
-     "stateAnyWithLetter": [
-      "curves[0].expr"
-     ],
-     "err": [],
-     "sliderSeen": true,
-     "dragChangedValue": true,
-     "valueBefore": 1,
-     "valueAfter": 6.1,
-     "moves": false,
      "curvesInShot": 6
     }
    ]
