@@ -480,7 +480,7 @@ function drawNaturalCurves() {
 function drawNaturalPoints() {
   const n = STATE.natural; if (!n) return;
   const oy = sy(0), ox = sx(0), g = svg.append('g');
-  const mark = (Q, P, label, color, side) => {
+  const mark = (Q, P, label, color, side, idx) => {
     if (Q == null || !(Q > 0) || isNaN(P)) return;
     const px = sx(Q), py = sy(P);
     g.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', py)
@@ -494,11 +494,15 @@ function drawNaturalPoints() {
     pointName(g, px, py, label, color,
               { dx: side < 0 ? -9 : 9, dy: -9, size: FS.base, weight: 700 })
       .attr('text-anchor', side < 0 ? 'end' : 'start');
-    axisValueX(g, px, oy, fmt(Q), '');
+    axisValueX(g, px, oy, fmt(Q), idx || '');
+    /* Пунктир шёл и к оси цены, а числа там не было: линия упиралась в пустоту.
+       Различитель обязателен — на оси цены встают ТРИ разные цены: монопольная
+       и два ориентира регулирования. */
+    axisValueY(g, ox, py, fmt(P), idx || '');
   };
-  mark(n.Qm, n.Pm, 'M', COL.ink, -1);
-  if (n.acReg) mark(n.acReg.Q, n.acReg.P, 'E_{ATC}', COL.reg, 1);
-  if (n.mcReg) mark(n.mcReg.Q, n.mcReg.P, 'E_{MC}', COL.MC, -1);
+  mark(n.Qm, n.Pm, 'M', COL.ink, -1, 'm');
+  if (n.acReg) mark(n.acReg.Q, n.acReg.P, 'E_{ATC}', COL.reg, 1, 'ATC');
+  if (n.mcReg) mark(n.mcReg.Q, n.mcReg.P, 'E_{MC}', COL.MC, -1, 'MC');
 }
 
 // Полная отрисовка под-режима «Естественная монополия».

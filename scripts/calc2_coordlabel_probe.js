@@ -52,7 +52,23 @@ const SNAP = () => {
   // Подпись цены обязана целиком лежать левее оси; подпись количества — ниже оси.
   const inside = list.filter(l => (l.x + l.w > ox + 1) && (l.y + l.h < oy - 1));
   const rightOfAxis = list.filter(l => l.anchor !== 'middle' && l.x + l.w > ox + 1);
-  return { ox: +ox.toFixed(1), oy: +oy.toFixed(1), n: list.length, list, inside, rightOfAxis };
+  /* Пунктиры к осям. Прямой отрезок, доходящий до самой оси, — это проекция
+     ключевой точки, и на оси у неё обязано стоять число. Считаем их, чтобы
+     ответить на вопрос владельца дословно: «ни одного пунктира к оси, у
+     которого на оси нет подписи». */
+  const near = (a, b) => Math.abs(a - b) < 3;
+  let projX = 0, projY = 0;
+  document.querySelectorAll('#chart line').forEach(l => {
+    if (!getComputedStyle(l).strokeDasharray || getComputedStyle(l).strokeDasharray === 'none') return;
+    const x1 = +l.getAttribute('x1'), x2 = +l.getAttribute('x2');
+    const y1 = +l.getAttribute('y1'), y2 = +l.getAttribute('y2');
+    if (near(y1, y2) && (near(x1, ox) || near(x2, ox))) projY++;      // горизонталь к оси цены
+    if (near(x1, x2) && (near(y1, oy) || near(y2, oy))) projX++;      // вертикаль к оси количества
+  });
+  return { ox: +ox.toFixed(1), oy: +oy.toFixed(1), n: list.length, list, inside, rightOfAxis,
+           projX, projY,
+           labX: list.filter(l => l.anchor === 'middle').length,
+           labY: list.filter(l => l.anchor !== 'middle').length };
 };
 
 (async () => {

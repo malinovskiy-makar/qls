@@ -1421,7 +1421,11 @@ function drawExtPoints(e) {
   g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   g.append('text').attr('x', pxm + 8).attr('y', pym - 8).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Qрын');
-  axisValueX(g, pxm, oy, fmt(e.Qmkt), '');
+  axisValueX(g, pxm, oy, fmt(e.Qmkt), 'рын');
+  /* Пунктир шёл и к оси цены, а числа там не было: линия упиралась в пустоту.
+     Различитель обязателен — на оси цены встают ДВЕ разные величины,
+     рыночная цена и цена общественного оптимума. */
+  axisValueY(g, ox, pym, fmt(e.Pmkt), 'рын');
   // Общественный оптимум (Qопт, Pопт) — на пересечении D и MSC.
   if (e.Qopt != null) {
     const [pxo, pyo] = toPx(e.Qopt, e.Popt);
@@ -1429,7 +1433,8 @@ function drawExtPoints(e) {
     g.append('circle').attr('cx', pxo).attr('cy', pyo).attr('r', 4.5).attr('fill', COL.tax).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     g.append('text').attr('x', pxo + 8).attr('y', pyo - 8).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.tax)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Qопт');
-    axisValueX(g, pxo, oy, fmt(e.Qopt), '');
+    axisValueX(g, pxo, oy, fmt(e.Qopt), 'опт');
+    axisValueY(g, ox, pyo, fmt(e.Popt), 'опт');
     // С налогом Пигу новое равновесие совпадает с Qопт — отмечаем кольцом.
     if (e.applyPigou && e.pigouEq) {
       const [pxp, pyp] = toPx(e.pigouEq.Q, e.pigouEq.P);
