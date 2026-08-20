@@ -24,6 +24,12 @@ CLAIMS = [
     ('Ф1 · ползунок буквы перерисовывает, не трогая окно',
      'calc2/static/calc2/60-overlays.js', r'redrawKeepingWindow\(\);\s+// окно подбирается под формулу', None),
 
+    # ── Набор в поле формулы заменяет запись ──────────────────────────
+    ('Ф0 · запись выделяется целиком при входе в поле формулы',
+     'calc2/static/calc2/82-input.js', r'const selectAllOnEntry = \(\)', None),
+    ('Ф0 · выделение снимается уходом фокуса',
+     'calc2/static/calc2/82-input.js', r"mf\.addEventListener\('blur', \(\) => \{ hadFocus = false; \}\)", None),
+
     # ── Фаза 2 · заголовок карточки не врёт ───────────────────────────
     ('Ф2 · реестр карточек ввода заведён',
      'calc2/static/calc2/86-workspace.js', r'const INPUT_CARDS = \[', None),
