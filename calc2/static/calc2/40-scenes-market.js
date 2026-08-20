@@ -1228,6 +1228,11 @@ function drawElasticityPointS() {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   dash(px, py, px, oy); dash(px, py, ox, py);
+  /* Пунктир к оси без числа на самой оси. Точка эластичности на ПРЕДЛОЖЕНИИ
+     тянула обе проекции и не подписывала ни одной, хотя её зеркало на спросе
+     подписывает обе: две линии в никуда, и прочесть по ним значение нечем. */
+  axisValueX(g, px, oy, fmt(e.q), '');
+  axisValueY(g, ox, py, fmt(e.p), '');
   g.append('text').attr('x', px + 9).attr('y', py + 15).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.S)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Es|=' + fmt(e.absEs));
   const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');

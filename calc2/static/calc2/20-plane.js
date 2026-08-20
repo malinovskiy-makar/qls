@@ -454,6 +454,26 @@ function coordValue(value) {
 
 /* Число точки под осью количества. `oy` — пиксель самой оси, `idx` — индекс
    различителя ('b', 's', '1', 'спрос'…) или пустая строка. */
+/* ⚠️ ОДНО МЕСТО — ОДНО ЧИСЛО. Две точки, сошедшиеся в одну, печатают свою
+   координату каждая, и на оси встаёт «50» поверх «50»: в «Эластичности»
+   равновесие и точка единичной эластичности сходятся при исходных формулах, в
+   разложении Слуцкого — старый и компенсированный наборы. Читается это как
+   опечатка, а разводить такие подписи нельзя: они и должны стоять там, где
+   стоят, потому что это одно и то же число.
+
+   Проверка живёт ЗДЕСЬ, в общей точке печати координат, а не в сценах: сцены
+   не знают друг о друге, а второй такой же проверки рядом быть не должно. */
+function coordAlreadyAt(px, horiz, text) {
+  let found = false;
+  svg.selectAll('text.coord-num').each(function () {
+    if (found) return;
+    if ((this.getAttribute('data-raw') || this.textContent || '').trim() !== String(text).trim()) return;
+    const at = horiz ? +this.getAttribute('x') : +this.getAttribute('y');
+    if (isFinite(at) && Math.abs(at - px) < 6) found = true;
+  });
+  return found;
+}
+
 function axisValueX(g, px, oy, value, idx) {
   if (!isFinite(px)) return null;
   const v = coordValue(value);
@@ -461,6 +481,7 @@ function axisValueX(g, px, oy, value, idx) {
   const span = Math.abs(sx.domain()[1] - sx.domain()[0]);
   const onTick = xTicks().some(t => Math.abs(sx(t) - px) < 7) ||
                  (isFinite(v.num) && xTicks().some(t => Math.abs(t - v.num) < span * 0.02));
+  if (coordAlreadyAt(px, true, axisValueText(v.text, idx))) return null;
   if (onTick) dropTickAt(px, true);
   const t = haloText(g, px, oy + 8, axisValueText(v.text, idx), 'middle', 'hanging');
   t.attr('class', 'coord-num');       // по этому классу их и считает проверка
@@ -487,6 +508,7 @@ function axisValueY(g, ox, py, value, idx) {
   const span = Math.abs(sy.domain()[1] - sy.domain()[0]);
   const onTick = yTicks().some(t => Math.abs(sy(t) - py) < 7) ||
                  (isFinite(v.num) && yTicks().some(t => Math.abs(t - v.num) < span * 0.02));
+  if (coordAlreadyAt(py, false, axisValueText(v.text, idx))) return null;
   if (onTick) dropTickAt(py, false);
   const t = haloText(g, ox - 8, py, axisValueText(v.text, idx), 'end', 'middle', { noFlip: true });
   t.attr('class', 'coord-num');
