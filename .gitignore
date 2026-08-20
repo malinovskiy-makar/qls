@@ -31,7 +31,41 @@ local_settings.py
 .env.*
 
 # Отчёты (большие, не нужны на сервере)
-reports/
+# ⚠️ Записано как «reports/*», а не «reports/»: git НЕ ДАЁТ вернуть файл
+# исключением, если исключён его родительский каталог. Чтобы пустить в
+# репозиторий вердикты ревью, путь к ним приходится раскрывать по шагам.
+reports/*
+
+# ИСКЛЮЧЕНИЕ: файлы вердиктов ручного ревью. Это НЕ отчёт, который можно
+# пересобрать командой, а единственная копия многодневной ручной работы
+# ревьюера (три пакета, 6 626 задач). Один раз их уже почти потеряли: разбор
+# в Notion был, а самого файла не было ни на одной машине. Вес — 200 и 360 КБ
+# текста, месту в репозитории это не мешает.
+!reports/review_bundles/
+reports/review_bundles/*
+!reports/review_bundles/verdicts_*.json
+
+# ИСКЛЮЧЕНИЕ: результат волн починки. Тоже НЕ отчёт: `aa_repairs.json` и
+# партии в `parts/` — это ответ модели, который повторным запуском не
+# воспроизводится (модель недетерминирована, а прогон стоит времени и денег).
+# `sample.json` и `gate.json` держим рядом, потому что без них ответ не
+# читается. Саму оболочку `reviewer.html` (1,4 МБ) НЕ берём — она собирается
+# командой repair_wave1_export из этих же файлов за секунду.
+!reports/repair_wave1/
+reports/repair_wave1/*
+!reports/repair_wave1/FORMAT.md
+!reports/repair_wave1/aa_repairs.json
+!reports/repair_wave1/sample.json
+!reports/repair_wave1/gate.json
+!reports/repair_wave1/gate_report.md
+!reports/repair_wave1/katex_results.json
+!reports/repair_wave1/manifest.json
+!reports/repair_wave1/parts/
+reports/repair_wave1/parts/*
+!reports/repair_wave1/parts/*.json
+!reports/repair_wave1/batches/
+reports/repair_wave1/batches/*
+!reports/repair_wave1/batches/*.json
 
 # Node.js (Playwright)
 node_modules/
@@ -113,3 +147,8 @@ db_check.sqlite3
 *.doc
 # Временные файлы Word (Word кладёт их рядом с открытым документом)
 ~$*
+
+# Архив передачи: собирается scripts/build_handover_zip.py за секунду,
+# в истории git двоичный файл на 6,5 МБ остался бы навсегда. Тот же довод,
+# что у reviewer.html выше.
+qls_handover_*.zip

@@ -89,6 +89,7 @@ def _build_index():
         .filter(
             status=Problem.Status.PUBLISHED,
             needs_quality_review=False,
+            hidden_pending_review=False,
             embedding__isnull=False,
         )
         .only('id', 'embedding', 'problem_type')

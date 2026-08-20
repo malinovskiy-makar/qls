@@ -41,6 +41,30 @@
         "--settings=config.settings_check"
       ],
       "port": 8401
+    },
+    {
+      "name": "review-shell",
+      "runtimeExecutable": "venv\\Scripts\\python.exe",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8555",
+        "--directory",
+        "reports/defect_review"
+      ],
+      "port": 8555
+    },
+    {
+      "name": "wave1-bundle",
+      "runtimeExecutable": "venv\\Scripts\\python.exe",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8402",
+        "--directory",
+        "."
+      ],
+      "port": 8402
     }
   ]
 }
