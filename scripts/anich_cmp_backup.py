@@ -1,9 +1,22 @@
 # -*- coding: utf-8 -*-
-"""Сверка живой базы с бэкапом до 18.08. Канарейка — 132 задачи со сменой тем (merge_topics 13.08)."""
+"""Сверка живой базы с бэкапом.
+
+⚠️ ПРО ЗУБАСТОСТЬ. Канарейка «сколько задач сменили темы» работает ТОЛЬКО против
+базы, в которой такое изменение заведомо есть (бэкап 13.08 — там 133 задачи от
+merge_topics). Против свежего бэкапа тем никто не менял, и ноль там — ПРАВИЛЬНЫЙ
+ответ, а не слепота прибора. Поэтому ожидание канарейки задаётся аргументом
+--canary N, а сама зубастость доказывается встроенной самопроверкой: сверке
+подсовывается порча, и она обязана её увидеть. Самопроверка не зависит от того,
+какой бэкап взят.
+"""
 import sqlite3, sys, collections, json
 LIVE='db.sqlite3'
 BASE=sys.argv[1]
 ONLY_REST = '--rest' in sys.argv
+CANARY_EXPECT = None
+for i, a in enumerate(sys.argv):
+    if a == '--canary' and i + 1 < len(sys.argv):
+        CANARY_EXPECT = int(sys.argv[i + 1])
 
 live=sqlite3.connect(LIVE); live.row_factory=sqlite3.Row
 old =sqlite3.connect(BASE); old.row_factory=sqlite3.Row
@@ -63,9 +76,26 @@ def topics(con):
 LT=topics(live); OT=topics(old)
 changed_topics=[pid for pid in (set(LT)|set(OT)) if LT.get(pid,set())!=OT.get(pid,set())]
 
-print("\n=== КАНАРЕЙКА (проверка на зубастость) ===")
-print(f"задач со сменой набора тем: {len(changed_topics)}   (ожидается 132 от merge_topics 13.08)")
-print("вердикт канарейки:", "СВЕРКА ВИДИТ ИЗМЕНЕНИЯ" if changed_topics else "!!! СВЕРКА СЛЕПА !!!")
+print("\n=== САМОПРОВЕРКА: сверка обязана видеть порчу ===")
+# Берём первую задачу, портим значение на стороне бэкапа и смотрим, поймано ли.
+probe_id = min(set(L) & set(O) & scope)
+seen = 0
+for idx, fname in ((1, 'statement'), (7, 'status')):
+    spoiled = list(O[probe_id]); spoiled[idx] = (str(spoiled[idx]) or '') + 'ПОРЧА'
+    if tuple(spoiled) != L[probe_id]:
+        seen += 1
+    print(f"  порча поля {fname:<12}: {'видит' if tuple(spoiled) != L[probe_id] else 'СЛЕПА'}")
+print("вердикт самопроверки:", "сверка зубастая" if seen == 2 else "!!! СВЕРКА СЛЕПА — чинить !!!")
+
+print("\n=== КАНАРЕЙКА: задачи со сменой набора тем ===")
+print(f"найдено: {len(changed_topics)}")
+if CANARY_EXPECT is None:
+    print("  ожидание не задано (--canary N). Против свежего бэкапа ноль — это")
+    print("  ПРАВИЛЬНЫЙ ответ: тем никто не менял. Канарейка осмысленна только")
+    print("  против базы, где известное изменение заведомо есть.")
+else:
+    print(f"  ожидалось около {CANARY_EXPECT}")
+    print("  вердикт:", "канарейка сработала" if changed_topics else "!!! КАНАРЕЙКА МОЛЧИТ — сверка под подозрением !!!")
 
 print("\n=== РАСХОЖДЕНИЯ В ЗАДАЧАХ ===")
 print(f"есть только в живой базе: {len(only_live)}   {only_live[:10]}")
