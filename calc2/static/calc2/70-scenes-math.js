@@ -1658,7 +1658,19 @@ function buildTex(title, label) {
         if (!txt.trim()) continue;
         if (!onScreen(el)) continue;                  // А47: только то, что видно
         const c = toData(+el.getAttribute('x') || 0, +el.getAttribute('y') || 0);
-        if (!inView(c[0], c[1])) continue;
+        /* ⚠️ ПОДПИСЬ КООРДИНАТЫ ЖИВЁТ ЗА ОСЬЮ, И ВЫБРАСЫВАТЬ ЕЁ ЗА ЭТО НЕЛЬЗЯ.
+           Решение владельца 19.08 увело числа за оси: цена левее оси цены,
+           количество ниже оси количества. В координатах данных это «снаружи
+           окна», и общая отсечка inView уносила из файла ВСЕ подписи координат
+           разом — на бумаге пунктиры вели к осям и упирались в пустоту, ровно
+           как это было на экране. Поэтому такую подпись не выбрасываем, а
+           прижимаем к оси; наружу её отодвинет тот же сдвиг в пунктах, что
+           применяется к подписи, севшей на саму ось (ниже). */
+        const isCoord = el.classList && el.classList.contains('coord-num');
+        if (isCoord) {
+          c[0] = Math.min(xHi, Math.max(xLo, c[0]));
+          c[1] = Math.min(yHi, Math.max(yLo, c[1]));
+        } else if (!inView(c[0], c[1])) continue;
         const ha = { start: 'west', middle: '', end: 'east' }[cs.textAnchor] ?? '';
         const bl = el.getAttribute('dominant-baseline') || cs.dominantBaseline || '';
         const va = (bl === 'hanging' || bl === 'text-before-edge') ? 'north'

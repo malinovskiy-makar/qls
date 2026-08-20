@@ -683,10 +683,16 @@ function renderLabelText(sel, txt) {
   return sel.text(s);
 }
 
-function haloText(g, x, y, txt, anchor, baseline) {
+/* Седьмой аргумент — `{ noFlip: true }`: подпись НЕ разворачивать, даже если
+   она не влезает. Нужен подписям координат у оси цены: развернувшись, они
+   уезжают в первую четверть, а там их быть не должно (см. axisValueY). Такие
+   подписи считают своё место сами, по настоящей ширине нарисованного текста. */
+function haloText(g, x, y, txt, anchor, baseline, opts) {
   const w = String(txt).length * 5.9 + 6;      // ширина строки при кегле 10
+  const noFlip = !!(opts && opts.noFlip);
   let ax = anchor, px = x;
-  if (ax === 'end' && x - w < 2) { ax = 'start'; px = x + 8; }
+  if (noFlip) { /* место выбирает вызывающий */ }
+  else if (ax === 'end' && x - w < 2) { ax = 'start'; px = x + 8; }
   else if (ax === 'start' && x + w > W - 2) { ax = 'end'; px = x - 8; }
   else if (ax === 'middle') px = Math.max(w / 2 + 2, Math.min(W - w / 2 - 2, x));
   const py = Math.max(9, Math.min(H - 4, y));

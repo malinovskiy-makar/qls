@@ -71,6 +71,9 @@ function measureText(str, size, weight) {
    под осью» разъехался бы со сценами, а стоит она 14 px из ~790 по высоте. */
 const BOTTOM_BAND = 44;
 
+/* Запас левого поля под подпись координаты (см. разбор в fitMargins). */
+const COORD_LABEL_PAD = 24;
+
 function fitMargins() {
   const m = CONFIG.margin;
   makeScales();
@@ -87,8 +90,16 @@ function fitMargins() {
       if (w > wide) wide = w;
     });
   } catch (e) { /* сцена ещё не готова — останемся со стартовыми полями */ }
-  // 8 px отступа подписи от оси (её ставит drawAxes) + 6 px запаса у края.
-  m.left = Math.max(30, Math.min(120, Math.ceil(wide) + 14));
+  /* 8 px отступа подписи от оси (её ставит drawAxes) + 6 px запаса у края,
+     плюс запас под ПОДПИСЬ КООРДИНАТЫ. У неё, в отличие от деления шкалы,
+     бывают дробная часть и индекс различителя: деление «80» занимает 16 px, а
+     подпись «54,55_b» — 40. Без этого запаса подпись не помещалась в поле, и
+     общий haloText разворачивал её ВНУТРЬ первой четверти, поверх поля
+     построения, — ровно то, на что жаловался владелец («65_min» на линии МРОТ).
+     Число подобрано замером живых подписей по всем сценам, а не на глаз:
+     scripts/calc2_coordlabel_probe.js считает, сколько подписей залезло правее
+     оси, и при этом запасе их ноль. */
+  m.left = Math.max(30, Math.min(120, Math.ceil(wide) + 14 + COORD_LABEL_PAD));
 
   /* Справа за стрелкой стоит НАЗВАНИЕ оси X, и оно бывает длинным:
      «t (ставка)» — 76 px, «Поступления» — 106. При поле 32 такое название
@@ -417,35 +428,83 @@ function dropTickAt(coord, horizontal) {
   return hit;
 }
 
+/* ⚠️ ЗНАЧЕНИЕ ПРИХОДИТ СЮДА И ЧИСЛОМ, И УЖЕ НАБРАННОЙ СТРОКОЙ.
+
+   Из пятидесяти с лишним мест вызова почти все пишут `axisValueY(g, ox, py,
+   fmt(P), 'b')` — то есть отдают готовую строку, а не число. Пока на входе
+   стояла проверка `!isFinite(value)`, это работало ТОЛЬКО для целых: `fmt(40)`
+   даёт «40», и `isFinite('40')` — правда, а `fmt(54.5454)` даёт «54,55», и
+   `isFinite('54,55')` — ложь, потому что десятичный разделитель у нас запятая.
+   Функция молча возвращала null, и подписи координат пропадали ЦЕЛИКОМ у любой
+   дробной величины: в «Процентных налогах» пунктиры вели к осям и упирались в
+   пустоту при значениях по умолчанию.
+
+   Правило показа теперь одно: подпись выводится ВСЕГДА. «Деление уступает
+   место» — это разрешение столкновения, а не условие показа. Число нужно
+   отдельно, только чтобы проверить совпадение с делением; не разобралось —
+   столкновения просто не ищем, но подпись рисуем. */
+function coordValue(value) {
+  if (typeof value === 'number') return isFinite(value) ? { text: fmt(value), num: value } : null;
+  const s = String(value == null ? '' : value).trim();
+  if (!s) return null;
+  // Разбираем обратно нашу же запись: узкий неразрывный пробел разрядов и запятая.
+  const num = parseFloat(s.replace(/[\s\u202f\u00a0]/g, '').replace(',', '.'));
+  return { text: s, num: num };
+}
+
 /* Число точки под осью количества. `oy` — пиксель самой оси, `idx` — индекс
    различителя ('b', 's', '1', 'спрос'…) или пустая строка. */
 function axisValueX(g, px, oy, value, idx) {
-  if (!isFinite(px) || !isFinite(value)) return null;
+  if (!isFinite(px)) return null;
+  const v = coordValue(value);
+  if (!v) return null;
   const span = Math.abs(sx.domain()[1] - sx.domain()[0]);
   const onTick = xTicks().some(t => Math.abs(sx(t) - px) < 7) ||
-                 xTicks().some(t => Math.abs(t - value) < span * 0.02);
+                 (isFinite(v.num) && xTicks().some(t => Math.abs(t - v.num) < span * 0.02));
   if (onTick) dropTickAt(px, true);
-  const t = haloText(g, px, oy + 8, axisValueText(value, idx), 'middle', 'hanging');
+  const t = haloText(g, px, oy + 8, axisValueText(v.text, idx), 'middle', 'hanging');
+  t.attr('class', 'coord-num');       // по этому классу их и считает проверка
   if (onTick) t.attr('fill', cssVar('--accent')).attr('font-weight', 700);
   return t;
 }
 
-/* Число точки левее оси цены. `ox` — пиксель самой оси. */
+/* Число точки левее оси цены. `ox` — пиксель самой оси.
+
+   ⚠️ ПОДПИСЬ КООРДИНАТЫ НЕ ИМЕЕТ ПРАВА УЙТИ В ПЕРВУЮ ЧЕТВЕРТЬ. Общий haloText
+   разворачивает не влезшую подпись ВНУТРЬ графика, и с узким левым полем (32 px)
+   так уезжали все подписи с индексом: «60_b» и «40_s» в потоварном налоге вставали
+   ПРАВЕЕ оси, поверх поля построения, а «65_min» на рынке труда ложилась прямо на
+   линию МРОТ. Решение владельца 19.08 требует обратного: цена стоит левее оси цены.
+
+   Поэтому здесь свой разворот, и он считается по НАСТОЯЩЕЙ ширине уже
+   нарисованной подписи, а не по оценке «символов × 5,9». Оценка haloText
+   считает индекс полноразмерным и завышает ширину «65_min» почти в полтора
+   раза — по ней подпись «не влезала» там, где на самом деле влезает. */
 function axisValueY(g, ox, py, value, idx) {
-  if (!isFinite(py) || !isFinite(value)) return null;
+  if (!isFinite(py)) return null;
+  const v = coordValue(value);
+  if (!v) return null;
   const span = Math.abs(sy.domain()[1] - sy.domain()[0]);
   const onTick = yTicks().some(t => Math.abs(sy(t) - py) < 7) ||
-                 yTicks().some(t => Math.abs(t - value) < span * 0.02);
+                 (isFinite(v.num) && yTicks().some(t => Math.abs(t - v.num) < span * 0.02));
   if (onTick) dropTickAt(py, false);
-  const t = haloText(g, ox - 8, py, axisValueText(value, idx), 'end', 'middle');
+  const t = haloText(g, ox - 8, py, axisValueText(v.text, idx), 'end', 'middle', { noFlip: true });
+  try {
+    const b = t.node().getBBox();
+    // Не поместилась в поле слева — прижимаем к краю холста, но ВСЁ РАВНО левее оси.
+    if (b.x < 2) t.attr('x', 2).attr('text-anchor', 'start');
+  } catch (e) { /* узел ещё не в разметке — оставляем как есть */ }
+  t.attr('class', 'coord-num');
   if (onTick) t.attr('fill', cssVar('--accent')).attr('font-weight', 700);
   return t;
 }
 
 /* Само число и, если он есть, индекс различителя нижним индексом. Разбор
-   разметки подписей уже умеет «_», и в выгрузку он уходит тем же путём. */
-function axisValueText(value, idx) {
-  const n = fmt(value);
+   разметки подписей уже умеет «_», и в выгрузку он уходит тем же путём.
+   На вход приходит УЖЕ НАБРАННОЕ число (см. coordValue): второй проход fmt
+   по строке с запятой её бы испортил. */
+function axisValueText(text, idx) {
+  const n = String(text);
   if (!idx) return n;
   return String(idx).length > 1 ? (n + '_{' + idx + '}') : (n + '_' + idx);
 }
