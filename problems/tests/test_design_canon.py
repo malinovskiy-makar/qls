@@ -244,7 +244,14 @@ class CanonBrowserChecks(StaticLiveServerTestCase):
 
         out = (res.stdout or "") + (res.stderr or "")
         if res.returncode == 3:
-            self._loud_skip("calc2 не загрузился:\n" + out[-600:])
+            # ⚠️ У ошибки JavaScript главное — ПЕРВАЯ строка, само сообщение;
+            # хвост это стек. Показывали только последние 600 символов, и в
+            # полном прогоне 21.08 пропуск оказалось нечем объяснить: от
+            # «... is not defined» осталась одна середина стека. Печатаем и
+            # голову, и хвост.
+            head, tail = out[:700], out[-900:]
+            self._loud_skip("calc2 не загрузился.\nНАЧАЛО ВЫВОДА:\n%s\n…\nХВОСТ:\n%s"
+                            % (head, tail))
         if "###CANON-JSON###" not in out:
             self.fail("раннер не отдал результат:\n" + out[-2000:])
 
