@@ -1,0 +1,1940 @@
+{
+ "scenes": {
+  "m-graph": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "capped": false,
+   "fields": [
+    {
+     "id": "graph-f-1",
+     "was": "",
+     "want": "10 - a*x",
+     "base": 1,
+     "seeded": true,
+     "typedInto": "10-a*x",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "10-a*x",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 1
+    }
+   ]
+  },
+  "m-tangent": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-mathf",
+     "was": "x^2",
+     "want": "a*x^2",
+     "base": 1,
+     "typedInto": "a*x^(2)",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a* x^(2)",
+     "stateHolds": [],
+     "stateAnyWithLetter": [
+      "mathFormula"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    }
+   ]
+  },
+  "m-optimum": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-mathf",
+     "was": "x^3 - 3*x",
+     "want": "x^3 - a*x",
+     "base": 3,
+     "typedInto": "x^(3)-a*x",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "x^(3)- a*x",
+     "stateHolds": [],
+     "stateAnyWithLetter": [
+      "mathFormula"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 3,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 1
+    }
+   ]
+  },
+  "m-transform": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-mathf",
+     "was": "x^2",
+     "want": "a*x^2",
+     "base": 1,
+     "typedInto": "a*x^(2)",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a* x^(2)",
+     "stateHolds": [],
+     "stateAnyWithLetter": [
+      "mathFormula"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "m-minmax": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "mm-f0",
+     "was": "x^2",
+     "want": "a*x^2",
+     "base": 1,
+     "typedInto": "a*x^(2)",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a* x^(2)",
+     "stateHolds": [],
+     "stateAnyWithLetter": [
+      "mathFormula"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    },
+    {
+     "id": "mm-f1",
+     "was": "4 - x",
+     "want": "4 - a*x",
+     "base": 1,
+     "typedInto": "4-a*x",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "4-a*x",
+     "stateHolds": [
+      "mathG2"
+     ],
+     "stateAnyWithLetter": [
+      "mathG2"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    }
+   ]
+  },
+  "m-constraint": {
+   "letter": "k",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-mathfc",
+     "was": "x^0.5 * y^0.5",
+     "want": "x^k* y^0.5",
+     "base": 0.5,
+     "typedInto": "x^(k*)y^(0).5",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "x^(k)* y^(0.5)",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 0.5,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 5
+    },
+    {
+     "id": "inp-mathgc",
+     "was": "x + y = 10",
+     "want": "x + y = k*10",
+     "base": 1,
+     "typedInto": "x+y=k*10",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "x+y=k*10",
+     "stateHolds": [
+      "mathGC"
+     ],
+     "stateAnyWithLetter": [
+      "mathGC"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 5
+    }
+   ]
+  },
+  "ppf": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-ppf",
+     "was": "y = 100 - x",
+     "want": "y = 100 - a*x",
+     "base": 1,
+     "typedInto": "y=100-a*x",
+     "typeOk": true,
+     "applyBy": "кнопка btn-ppf-apply",
+     "slider": true,
+     "fieldNow": "y=100-a*x",
+     "stateHolds": [
+      "ppfFormula"
+     ],
+     "stateAnyWithLetter": [
+      "ppfFormula"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 1
+    }
+   ]
+  },
+  "ppfsum": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-ppfsum-0",
+     "was": "100 - X",
+     "want": "100 - a*X",
+     "base": 1,
+     "typedInto": "100-a*X",
+     "typeOk": true,
+     "applyBy": "кнопка btn-ppfsum-apply",
+     "slider": true,
+     "fieldNow": "100-a*X",
+     "stateHolds": [
+      "ppf1"
+     ],
+     "stateAnyWithLetter": [
+      "ppf1"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    },
+    {
+     "id": "inp-ppfsum-1",
+     "was": "60 - 3*X",
+     "want": "60 - a*X",
+     "base": 3,
+     "typedInto": "60-a*X",
+     "typeOk": true,
+     "applyBy": "кнопка btn-ppfsum-apply",
+     "slider": true,
+     "fieldNow": "60-a*X",
+     "stateHolds": [
+      "ppf2"
+     ],
+     "stateAnyWithLetter": [
+      "ppf2"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 3,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    }
+   ]
+  },
+  "trade": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-ppft",
+     "was": "100 - X",
+     "want": "100 - a*X",
+     "base": 1,
+     "typedInto": "100-a*X",
+     "typeOk": true,
+     "applyBy": "кнопка btn-ppft-apply",
+     "slider": true,
+     "fieldNow": "100-a*X",
+     "stateHolds": [
+      "ppftFormula"
+     ],
+     "stateAnyWithLetter": [
+      "ppftFormula"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "tradeprice": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-tb1",
+     "was": "100 - X",
+     "want": "100 - a*X",
+     "base": 1,
+     "typedInto": "100-a*X",
+     "typeOk": true,
+     "applyBy": "кнопка btn-tb-apply",
+     "slider": true,
+     "fieldNow": "100-a*X",
+     "stateHolds": [
+      "tbF1"
+     ],
+     "stateAnyWithLetter": [
+      "tbF1"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    },
+    {
+     "id": "inp-tb2",
+     "was": "100 - 2*X",
+     "want": "100 - a*X",
+     "base": 2,
+     "typedInto": "100-a*X",
+     "typeOk": true,
+     "applyBy": "кнопка btn-tb-apply",
+     "slider": true,
+     "fieldNow": "100-a*X",
+     "stateHolds": [
+      "tbF2"
+     ],
+     "stateAnyWithLetter": [
+      "tbF2"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 2,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    }
+   ]
+  },
+  "sd": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "base": 1,
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "tax": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "base": 1,
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    }
+   ]
+  },
+  "tax-adv": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "base": 1,
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    }
+   ]
+  },
+  "ceil": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "base": 1,
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "elast": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "base": 1,
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "ext": {
+   "letter": "a",
+   "fieldsTotal": 3,
+   "capped": false,
+   "fields": [
+    {
+     "id": "ext-input",
+     "was": "20",
+     "want": "a*20",
+     "base": 1,
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*20",
+     "stateHolds": [
+      "extExpr"
+     ],
+     "stateAnyWithLetter": [
+      "extExpr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    },
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "base": 1,
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    }
+   ]
+  },
+  "costs": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-tc",
+     "was": "Q^3 - 6*Q^2 + 15*Q + 18",
+     "want": "Q^3 - a*Q^2 + 15*Q + 18",
+     "base": 6,
+     "typedInto": "Q^(3)-a*Q^(2)+15*Q+18",
+     "typeOk": false,
+     "applyBy": "кнопка btn-costs-apply",
+     "slider": true,
+     "fieldNow": "Q^3 - a*Q^2 + 15*Q + 18",
+     "stateHolds": [
+      "costsTC"
+     ],
+     "stateAnyWithLetter": [
+      "costsTC",
+      "costsSig"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 6,
+     "valueAfter": 8.8,
+     "moves": true,
+     "curvesInShot": 4
+    }
+   ]
+  },
+  "prod": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-prod",
+     "was": "30*L^2 - L^3",
+     "want": "a*L^2 - L^3",
+     "base": 30,
+     "typedInto": "a*L^(2)-L^(3)",
+     "typeOk": false,
+     "applyBy": "кнопка btn-prod-apply",
+     "slider": true,
+     "fieldNow": "a*L^2 - L^3",
+     "stateHolds": [
+      "prodExpr"
+     ],
+     "stateAnyWithLetter": [
+      "prodExpr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 30,
+     "valueAfter": 51.3,
+     "moves": true,
+     "curvesInShot": 3
+    }
+   ]
+  },
+  "plants": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-pl1",
+     "was": "Q^2",
+     "want": "a*Q^2",
+     "base": 1,
+     "typedInto": "a*Q^(2)",
+     "typeOk": false,
+     "applyBy": "кнопка btn-pl-apply",
+     "slider": true,
+     "fieldNow": "a*Q^2",
+     "stateHolds": [
+      "pl1"
+     ],
+     "stateAnyWithLetter": [
+      "pl1"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    },
+    {
+     "id": "inp-pl2",
+     "was": "2*Q^2",
+     "want": "a*Q^2",
+     "base": 2,
+     "typedInto": "a*Q^(2)",
+     "typeOk": false,
+     "applyBy": "кнопка btn-pl-apply",
+     "slider": true,
+     "fieldNow": "a*Q^2",
+     "stateHolds": [
+      "pl2"
+     ],
+     "stateAnyWithLetter": [
+      "pl2"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 2,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    }
+   ]
+  },
+  "isoquant": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "capped": false,
+   "fields": [
+    {
+     "id": "inp-iso",
+     "was": "L^0.5 * K^0.5",
+     "want": "L^a* K^0.5",
+     "base": 0.5,
+     "typedInto": "L^(a*)K^(0).5",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "L^(a)*K^(0.5)",
+     "stateHolds": [
+      "isoExpr"
+     ],
+     "stateAnyWithLetter": [
+      "isoExpr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 0.5,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    }
+   ]
+  },
+  "mono": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "20",
+     "want": "a*20",
+     "base": 1,
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*20",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    }
+   ]
+  },
+  "mono-nat": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "20",
+     "want": "a*20",
+     "base": 1,
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*20",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    }
+   ]
+  },
+  "mono-d1": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "20",
+     "want": "a*20",
+     "base": 1,
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*20",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "mono-d3": {
+   "letter": "a",
+   "fieldsTotal": 5,
+   "capped": true,
+   "fields": [
+    {
+     "id": "inp-d3-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка btn-d3-apply",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "d3D1"
+     ],
+     "stateAnyWithLetter": [
+      "d3D1"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 6
+    },
+    {
+     "id": "inp-d3-2",
+     "was": "80 - 2*Q",
+     "want": "80 - a*Q",
+     "base": 2,
+     "typedInto": "80-a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка btn-d3-apply",
+     "slider": true,
+     "fieldNow": "80-a*Q",
+     "stateHolds": [
+      "d3D2"
+     ],
+     "stateAnyWithLetter": [
+      "d3D2"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 2,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 6
+    },
+    {
+     "id": "inp-d3-mc",
+     "was": "20",
+     "want": "a*20",
+     "base": 1,
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "кнопка btn-d3-apply",
+     "slider": true,
+     "fieldNow": "a*20",
+     "stateHolds": [
+      "d3MC"
+     ],
+     "stateAnyWithLetter": [
+      "d3MC"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 6
+    },
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": false,
+     "curvesInShot": 6
+    }
+   ]
+  },
+  "mono-kink": {
+   "letter": "a",
+   "fieldsTotal": 5,
+   "capped": true,
+   "fields": [
+    {
+     "id": "inp-ki-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка btn-kink-apply",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "kiD1"
+     ],
+     "stateAnyWithLetter": [
+      "kiD1"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    },
+    {
+     "id": "inp-ki-2",
+     "was": "60 - Q",
+     "want": "60 - a*Q",
+     "base": 1,
+     "typedInto": "60-a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка btn-kink-apply",
+     "slider": true,
+     "fieldNow": "60-a*Q",
+     "stateHolds": [
+      "kiD2"
+     ],
+     "stateAnyWithLetter": [
+      "kiD2"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    },
+    {
+     "id": "inp-kink-mc",
+     "was": "20",
+     "want": "a*20",
+     "base": 1,
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "кнопка btn-kink-apply",
+     "slider": true,
+     "fieldNow": "a*20",
+     "stateHolds": [
+      "kinkMC"
+     ],
+     "stateAnyWithLetter": [
+      "kinkMC"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    },
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": false,
+     "curvesInShot": 4
+    }
+   ]
+  },
+  "labor": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - L",
+     "want": "100 - a*L",
+     "base": 1,
+     "typedInto": "100-a*L",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*L",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "L",
+     "want": "a*L",
+     "base": 1,
+     "typedInto": "a\\cdot L",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*L",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "labor-mono": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - L",
+     "want": "100 - a*L",
+     "base": 1,
+     "typedInto": "100-a*L",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*L",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "L",
+     "want": "a*L",
+     "base": 1,
+     "typedInto": "a\\cdot L",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*L",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    }
+   ]
+  },
+  "labor-union": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - L",
+     "want": "100 - a*L",
+     "base": 1,
+     "typedInto": "100-a*L",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*L",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "L",
+     "want": "a*L",
+     "base": 1,
+     "typedInto": "a\\cdot L",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*L",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 3
+    }
+   ]
+  },
+  "labor-bilat": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - L",
+     "want": "100 - a*L",
+     "base": 1,
+     "typedInto": "100-a*L",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*L",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "L",
+     "want": "a*L",
+     "base": 1,
+     "typedInto": "a\\cdot L",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*L",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 4
+    }
+   ]
+  },
+  "smallopen": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "base": 1,
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "stateHolds": [
+      "curves[1].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[1].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "monoexport": {
+   "letter": "a",
+   "fieldsTotal": 5,
+   "capped": true,
+   "fields": [
+    {
+     "id": "inp-d3-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка btn-d3-apply",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "d3D1"
+     ],
+     "stateAnyWithLetter": [
+      "d3D1"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 6
+    },
+    {
+     "id": "inp-d3-2",
+     "was": "50",
+     "want": "a*50",
+     "base": 1,
+     "typedInto": "a*50",
+     "typeOk": true,
+     "applyBy": "кнопка btn-d3-apply",
+     "slider": true,
+     "fieldNow": "a*50",
+     "stateHolds": [
+      "d3D2"
+     ],
+     "stateAnyWithLetter": [
+      "d3D2"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 6
+    },
+    {
+     "id": "inp-d3-mc",
+     "was": "Q",
+     "want": "a*Q",
+     "base": 1,
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка btn-d3-apply",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "stateHolds": [
+      "d3MC"
+     ],
+     "stateAnyWithLetter": [
+      "d3MC"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 6
+    },
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [
+      "curves[0].expr"
+     ],
+     "stateAnyWithLetter": [
+      "curves[0].expr"
+     ],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": false,
+     "curvesInShot": 6
+    }
+   ]
+  },
+  "consumer": {
+   "letter": "a",
+   "fieldsTotal": 0,
+   "capped": false,
+   "fields": []
+  },
+  "cons-slutsky": {
+   "letter": "a",
+   "fieldsTotal": 0,
+   "capped": false,
+   "fields": []
+  },
+  "adas": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "ma-sras",
+     "was": "10 + 0.5*Y",
+     "want": "10 + a*Y",
+     "base": 0.5,
+     "typedInto": "10+a*Y",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "10+a*Y",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 0.5,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    },
+    {
+     "id": "ma-ad",
+     "was": "120 - 0.6*Y",
+     "want": "120 - a*Y",
+     "base": 0.6,
+     "typedInto": "120-a*Y",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "120-a*Y",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 0.6,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "islm": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "ma-is",
+     "was": "20 - 0.1*Y",
+     "want": "20 - a*Y",
+     "base": 0.1,
+     "typedInto": "20-a*Y",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "20-a*Y",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [
+      "Пересечение IS и LM не найдено в первой четверти."
+     ],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 0.1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    },
+    {
+     "id": "ma-lm",
+     "was": "0.05*Y - 5",
+     "want": "a*Y - 5",
+     "base": 0.05,
+     "typedInto": "a*Y-5",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Y-5",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 0.05,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "phillips": {
+   "letter": "a",
+   "fieldsTotal": 0,
+   "capped": false,
+   "fields": []
+  },
+  "money": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "capped": false,
+   "fields": [
+    {
+     "id": "ma-md",
+     "was": "200 - 4*i",
+     "want": "200 - a*i",
+     "base": 4,
+     "typedInto": "200-a*i",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "200-a*i",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 4,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 1
+    }
+   ]
+  },
+  "loanable": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "ma-ls",
+     "was": "50 + 2*r",
+     "want": "50 + a*r",
+     "base": 2,
+     "typedInto": "50+a*r",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "50+a*r",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 2,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    },
+    {
+     "id": "ma-ld",
+     "was": "150 - 3*r",
+     "want": "150 - a*r",
+     "base": 3,
+     "typedInto": "150-a*r",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "150-a*r",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 3,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "fx": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "ma-fxd",
+     "was": "100 - 2*e",
+     "want": "100 - a*e",
+     "base": 2,
+     "typedInto": "100-a*e",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*e",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 2,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    },
+    {
+     "id": "ma-fxs",
+     "was": "20 + 3*e",
+     "want": "20 + a*e",
+     "base": 3,
+     "typedInto": "20+a*e",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "20+a*e",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 3,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 2
+    }
+   ]
+  },
+  "ineq": {
+   "letter": "a",
+   "fieldsTotal": 0,
+   "capped": false,
+   "fields": []
+  },
+  "laffer": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "capped": false,
+   "fields": [
+    {
+     "id": "ma-lafd",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "base": 1,
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 1
+    },
+    {
+     "id": "ma-lafs",
+     "was": "Q",
+     "want": "a*Q",
+     "base": 1,
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "stateHolds": [],
+     "stateAnyWithLetter": [],
+     "err": [],
+     "sliderSeen": true,
+     "dragChangedValue": true,
+     "valueBefore": 1,
+     "valueAfter": 6.1,
+     "moves": true,
+     "curvesInShot": 1
+    }
+   ]
+  }
+ },
+ "pageErrors": []
+}

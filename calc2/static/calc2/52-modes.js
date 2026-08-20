@@ -736,6 +736,8 @@ function applyScenarioVisibility() {
   [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'],
    ['scn-ext', 'externality'], ['scn-open', 'openecon']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', s === v); });
+  // Карточка общего списка кривых живёт только там, где сцена его рисует.
+  if (typeof syncCurveListVisibility === 'function') syncCurveListVisibility();
 }
 
 // Переключение сценария анализа рынка. Сценарии — конкурентный контекст: если был

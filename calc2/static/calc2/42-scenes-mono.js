@@ -1126,6 +1126,10 @@ function applyMonoVisibility() {
   show('mono-d3-pane', inMono && mm === 'discr3');
   show('mono-kink-pane', inMono && mm === 'kinked');
   show('mono-nat-pane', inMono && mm === 'natural');
+  /* «Дискр.3» и «Ломаный» рисуют кривые по своим полям формул, общий список
+     они не читают. Карточку списка в них не показываем: см. разбор договора
+     о параметрах у sceneDrawsCurveList. */
+  if (typeof syncCurveListVisibility === 'function') syncCurveListVisibility();
 }
 
 // Стандартный пресет при входе в монополию (Задача 1): ставится ТОЛЬКО если нужного нет.

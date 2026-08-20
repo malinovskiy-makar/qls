@@ -2489,7 +2489,13 @@ function syncParams() {
   }
   const names = [];
   const take = (expr) => { if (expr) freeSymbols(expr).forEach(n => { if (names.indexOf(n) < 0) names.push(n); }); };
-  STATE.curves.forEach(c => take(c.expr));
+  /* ⚠️ Вторая половина договора о параметрах. Карточку списка сцена уже не
+     показывает (syncCurveListVisibility), но сами кривые в STATE.curves у неё
+     остаются — их кладёт пресет монополии. Пока буквы из них заводили ползунки,
+     рычаг оставался молчащим, просто без своей карточки. */
+  if (typeof sceneDrawsCurveList !== 'function' || sceneDrawsCurveList()) {
+    STATE.curves.forEach(c => take(c.expr));
+  }
   if (STATE.mode === 'math') [STATE.mathFormula, STATE.mathG2, STATE.mathG3, STATE.mathG4].forEach(take);
   // Формулы сцен (КПВ, издержки, макро, полезность и прочие) живут не в
   // STATE.curves, а в своих полях ввода. Берём их из общего реестра — только
