@@ -489,12 +489,13 @@ function axisValueY(g, ox, py, value, idx) {
                  (isFinite(v.num) && yTicks().some(t => Math.abs(t - v.num) < span * 0.02));
   if (onTick) dropTickAt(py, false);
   const t = haloText(g, ox - 8, py, axisValueText(v.text, idx), 'end', 'middle', { noFlip: true });
-  try {
-    const b = t.node().getBBox();
-    // Не поместилась в поле слева — прижимаем к краю холста, но ВСЁ РАВНО левее оси.
-    if (b.x < 2) t.attr('x', 2).attr('text-anchor', 'start');
-  } catch (e) { /* узел ещё не в разметке — оставляем как есть */ }
   t.attr('class', 'coord-num');
+  /* Не поместившуюся подпись прижимает к краю холста ОТДЕЛЬНЫЙ ПРОХОД
+     (`pinCoordLabels`), а не эта строка. Причина: здесь текст только что создан,
+     размеры его ещё не посчитаны, и `getBBox` отвечает про пустой узел — пока
+     проверка стояла тут, «31,72_ATC» в естественной монополии спокойно уезжала
+     за левый край холста. Проход идёт вместе с разведением подписей, когда
+     раскладка уже готова. */
   if (onTick) t.attr('fill', cssVar('--accent')).attr('font-weight', 700);
   return t;
 }

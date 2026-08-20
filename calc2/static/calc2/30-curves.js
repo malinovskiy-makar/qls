@@ -354,6 +354,23 @@ function keepAxisNamesInside() {
 function spreadLabels() {
   const node = svg.node();
   if (!node) return;
+  /* ⚠️ ПОДПИСЬ КООРДИНАТЫ НЕ ВЫХОДИТ ЗА КРАЙ ХОЛСТА.
+     Она живёт СНАРУЖИ, за осью, и на узком поле не помещается: «31,72_ATC» в
+     естественной монополии занимает полсотни пикселей при поле в пятьдесят
+     четыре. Такую прижимаем к краю — левее оси она при этом остаётся.
+     Считается здесь, а не в самой axisValueY: там текст только что создан и
+     размеров ещё не имеет, а к этому проходу раскладка уже готова. Запас 2 px
+     берётся от НАСТОЯЩЕЙ рамки, в которую входит белое гало подписи. */
+  node.querySelectorAll('text.coord-num').forEach(t => {
+    if (t.getAttribute('text-anchor') === 'middle') return;      // это подпись под осью
+    const r = t.getBoundingClientRect();
+    const box0 = node.getBoundingClientRect();
+    if (r.width < 0.5 || r.left >= box0.left + 2) return;
+    const cur = parseFloat(t.getAttribute('x'));
+    if (!isFinite(cur)) return;
+    t.setAttribute('x', cur + (box0.left + 2 - r.left));
+  });
+
   /* ⚠️ ДЕЛЕНИЕ УСТУПАЕТ МЕСТО ПОДПИСИ КООРДИНАТЫ — ПО НАСТОЯЩИМ РАМКАМ.
      Правило владельца уже было, но срабатывало по порогу «ближе 7 px или 2 %
      размаха», то есть по РАССТОЯНИЮ МЕЖДУ ЯКОРЯМИ. Числа бывают разной длины
