@@ -128,6 +128,7 @@ pending_review_gate [--apply/--revert]   # скрыть непроверенно
 | Вопрос | Где ответ |
 |---|---|
 | Стек, приложения, деплой, ограничения хостинга | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| **Боевой сервер: что где лежит, как перезапустить, что если лёг** | [docs/SERVER.md](docs/SERVER.md) |
 | Что проверить/настроить при выборе нового хостинга | [docs/MIGRATION-CHECKLIST.md](docs/MIGRATION-CHECKLIST.md) |
 | Кто что видит, секреты, известные дыры | [docs/SECURITY.md](docs/SECURITY.md) |
 | Как выкатить, залить данные, восстановиться | [docs/RUNBOOK.md](docs/RUNBOOK.md) |
