@@ -319,21 +319,49 @@ function openSection(secId) {
   if (box && box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
 }
 
-/* Первая видимая карточка ярче остальных: сцена открывается со всеми
-   закрытыми блоками, и глаз должен сразу видеть, куда нажимать. */
+/* ⚠️ ПОДПИСЬ «ВВОД ФУНКЦИЙ» ПРИНАДЛЕЖИТ КАРТОЧКЕ, В КОТОРОЙ ЕСТЬ ЧТО ВВОДИТЬ.
+
+   Правило Н34 («первая карточка везде называется одинаково») стояло на голом
+   «первая видимая», и договор о параметрах его подсёк: в «Составном спросе»,
+   «Дискриминации 3-й степени» и «Монополисте на внешнем рынке» карточка общего
+   списка кривых теперь спрятана, первой видимой становится «Излишки» — и она
+   получала чужое имя. Владелец на приёмке увидел ровно это: заголовок обещает
+   ввод функций, под ним галочки излишков.
+
+   Реестр ниже отвечает на вопрос «эта карточка существует ради ввода функций».
+   Имя достаётся первой ВИДИМОЙ карточке из реестра; не видно ни одной — не
+   переименовываем никого, каждая карточка остаётся под своим именем. Врать
+   заголовком хуже, чем потерять единообразие в трёх сюжетах из сорока одного. */
+const INPUT_CARDS = ['sec-curves', 'sec-graph', 'sec-costs', 'sec-labor',
+                     'sec-inequality', 'sec-consumer', 'sec-ppf', 'sec-macro', 'sec-math'];
+
+/* Карточка, внутри которой лежит живое поле формулы. У трёх монопольных
+   сюжетов свои поля стоят во вложенном блоке «Структура рынка», то есть внутри
+   «Что изучаем»: реестром такое не выразить, спрашиваем сами поля. */
+function cardWithFormula(all) {
+  const live = (typeof FORMULA_FIELDS !== 'undefined' ? FORMULA_FIELDS : [])
+    .filter(i => typeof fieldActive === 'function' && fieldActive(i));
+  for (const s of all) {
+    if (s.style.display === 'none') continue;
+    if (live.some(i => s.contains(i))) return s;
+  }
+  return null;
+}
+
+/* Ярче остальных — карточка, с которой начинают: сцена открывается со всеми
+   закрытыми блоками, и глаз должен сразу видеть, куда нажимать. Это та, где
+   вводят формулы; нет такой вовсе — первая видимая, как было. */
 function syncFirstCard() {
-  const all = document.querySelectorAll('#tools-panel .tools-body > .section');
-  let first = null;
-  all.forEach(s => { if (!first && s.style.display !== 'none') first = s; });
+  const all = [...document.querySelectorAll('#tools-panel .tools-body > .section')];
+  const visible = all.filter(s => s.style.display !== 'none');
+  const named = visible.find(s => INPUT_CARDS.indexOf(s.id) >= 0) || null;
+  const first = cardWithFormula(all) || visible[0] || null;
   all.forEach(s => s.classList.toggle('first-card', s === first));
-  /* Н34. Первая карточка везде называется одинаково. У сцен она была подписана
-     по-своему («Макроэкономика» у Лаффера, «КПВ и торговля» у КТВ), и человек
-     каждый раз заново искал, где вводить формулу, хотя место одно и то же.
-     Своё имя карточки помним: если она перестанет быть первой, оно вернётся. */
+  /* Н34. Своё имя карточки помним: перестанет быть первой — вернётся. */
   all.forEach(s => {
     const b = s.querySelector(':scope > .fold-btn span > b');
     if (!b) return;
-    if (s === first) {
+    if (s === named) {
       if (b.dataset.ownName === undefined) b.dataset.ownName = b.textContent;
       b.textContent = 'Ввод функций';
     } else if (b.dataset.ownName !== undefined) {
