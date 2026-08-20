@@ -2732,6 +2732,86 @@ const CASES = [
              ['сцен всего', 'scenes', 41, 0]],
   },
 
+  {
+    /* 20.08, п. 4.5. ДЛИННОЕ ИМЯ КРИВОЙ ПОКАЗЫВАЕТСЯ ЦЕЛИКОМ.
+       Обрез стоял на четырнадцати символах, и «Спрос жителей города»
+       превращался в «Спрос жителей…» даже когда справа оставалось шестьдесят
+       с лишним пикселей свободного холста: резал жёсткий лимит, а не край поля.
+       Решение владельца: имя переезжает целиком, на вторую строку не рвётся. */
+    name: 'Имя кривой не обрезается многоточием',
+    run: `resetSceneMemory(); pickScene('sd'); redrawAll();
+          STATE.curves[0].label = 'Спрос жителей города'; redrawAll();
+          var own = function (n) { return [].filter.call(n.childNodes, function (c) { return c.nodeType === 3; })
+                                            .map(function (c) { return c.nodeValue; }).join(''); };
+          var found = null, wide = 0, box = document.getElementById('chart').getBoundingClientRect();
+          document.querySelectorAll('#chart text.curve-name').forEach(function (t) {
+            var s = own(t);
+            if (s.indexOf('Спрос') < 0) return;
+            found = s;
+            var r = t.getBoundingClientRect();
+            wide = (r.left >= box.left - 1 && r.right <= box.right + 1) ? 1 : 0;
+          });
+          return { whole: found === 'Спрос жителей города' ? 1 : 0,
+                   dots: (found || '').indexOf(String.fromCharCode(8230)) >= 0 ? 1 : 0,
+                   inside: wide, lines: found ? found.split(String.fromCharCode(10)).length : 0 };`,
+    checks: [['имя целиком', 'whole', 1, 0], ['многоточия нет', 'dots', 0, 0],
+             ['подпись внутри холста', 'inside', 1, 0], ['в одну строку', 'lines', 1, 0]],
+  },
+  {
+    /* 20.08, пп. 4.6 и 4.7. СТРОКА ВВОДА: ОБРАЗЕЦ И НАСТРОЙКИ ПОЛЯ.
+       Образец «Например: 100 − Q» уходил в MathLive целиком как формула, и
+       двоеточие верстало́сь знаком отношения с отбивкой по обе стороны: на
+       экране стояло «Например : 100 − Q». Проза обязана идти текстом.
+       Там же — три настройки поля, переданные в конструктор, где MathLive их
+       не читает: они молча не применялись и давали по предупреждению на поле. */
+    name: 'Строка ввода: проза текстом, настройки поля применились',
+    run: `var sample = placeholderTex('Например: 100 - Q');
+          var mfs = [].slice.call(document.querySelectorAll('math-field'));
+          return { fields: 1,
+                   prose: sample.indexOf(String.fromCharCode(92) + 'text{Например:}') === 0 ? 1 : 0,
+                   bare: /Например\s*:/.test(sample.split('}')[1] || '') ? 1 : 0,
+                   smart: mfs.every(function (m) { return m.smartMode === false; }) ? 1 : 0,
+                   fence: mfs.every(function (m) { return m.smartFence === true; }) ? 1 : 0,
+                   paren: mfs.every(function (m) { return m.removeExtraneousParentheses === false; }) ? 1 : 0 };`,
+    checks: [['образец разобран', 'fields', 1, 0],
+             ['проза образца обёрнута текстом', 'prose', 1, 0],
+             ['двоеточия вне текста не осталось', 'bare', 0, 0],
+             ['smartMode применился', 'smart', 1, 0],
+             ['smartFence применился', 'fence', 1, 0],
+             ['removeExtraneousParentheses применился', 'paren', 1, 0]],
+  },
+  {
+    /* 20.08, п. 4.8. KaTeX БОЛЬШЕ НЕ РУГАЕТСЯ.
+       Два рода жалоб на каждый обход сцен: узкий неразрывный пробел U+202F
+       (наш разделитель разрядов, которого в шрифтах KaTeX нет вовсе) и
+       кириллица в математическом режиме. Второе не только шум: в математике
+       слово набирается курсивным шрифтом переменных, то есть читается как
+       произведение букв. Обе беды закрывает один общий вход katexInto. */
+    name: 'KaTeX: узкий пробел и кириллица приведены к правилам',
+    run: `var B = String.fromCharCode(92), NB = String.fromCharCode(8239);
+          var thin = katexSafe('1' + NB + '250');
+          var word = katexSafe('Безработица = 30');
+          var keep = katexSafe(B + 'text{уже текст: Безработица}');
+          var mix  = katexSafe('L_{' + B + 'text{спрос}} = 35');
+          var errs = 0;
+          Object.keys(SCENE_ROUTE).forEach(function (k) {
+            resetSceneMemory(); pickScene(k); redrawAll();
+            errs += document.querySelectorAll('.katex-error').length;
+          });
+          return { thin: thin.indexOf(NB) < 0 ? 1 : 0,
+                   thinTex: thin === '1' + B + ',250' ? 1 : 0,
+                   word: word.indexOf(B + 'text{Безработица}') === 0 ? 1 : 0,
+                   keepOnce: keep.split(B + 'text{').length - 1,
+                   mixOnce: mix.split(B + 'text{').length - 1,
+                   errs: errs };`,
+    checks: [['узкого пробела не осталось', 'thin', 1, 0],
+             ['он стал тонким пробелом формулы', 'thinTex', 1, 0],
+             ['слово обёрнуто текстом', 'word', 1, 0],
+             ['готовый текст не оборачивается второй раз', 'keepOnce', 1, 0],
+             ['индекс словом тоже не трогаем', 'mixOnce', 1, 0],
+             ['красных формул на всех сценах', 'errs', 0, 0]],
+  },
+
   /* --- Фаза 7: разгрузка перегруженных сюжетов (Б34) ------------------ */
   {
     /* Б34. Перетаскивание кривых мышью — главный интерактив калькулятора, и

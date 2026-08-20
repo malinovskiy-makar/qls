@@ -29,8 +29,7 @@ function renderTex(el, expr) {
   if (!tex) { el.textContent = ''; el.classList.remove('has'); return; }
   el.classList.add('has');
   if (typeof katex === 'undefined') { el.textContent = expr; return; }
-  try { katex.render(tex, el, { throwOnError: false, displayMode: false }); }
-  catch (e) { el.textContent = expr; }
+  if (!katexInto(el, tex)) el.textContent = expr;
 }
 // То же, но на вход уже готовый LaTeX (кусочная функция собирается сразу в него).
 function renderTexRaw(el, tex) {
@@ -38,8 +37,7 @@ function renderTexRaw(el, tex) {
   if (!tex) { el.textContent = ''; el.classList.remove('has'); return; }
   el.classList.add('has');
   if (typeof katex === 'undefined') { el.textContent = tex; return; }
-  try { katex.render(tex, el, { throwOnError: false, displayMode: false }); }
-  catch (e) { el.textContent = tex; }
+  if (!katexInto(el, tex)) el.textContent = tex;
 }
 // KaTeX подгружается отложенно — когда доедет, перерисовываем то, что уже на экране.
 const _texPending = [];
@@ -618,6 +616,90 @@ function flushMathfields() {
   keep.forEach(inp => _mfWaiting.push(inp));
 }
 
+/* ⚠️ ОДНА ДВЕРЬ К KaTeX НА ВЕСЬ КАЛЬКУЛЯТОР.
+
+   Печатать формулу звали из девяти мест, и каждое отдавало KaTeX сырую строку.
+   Он честно писал в консоль про всё, что не по правилам: за один обход сорока
+   одной сцены набиралось 467 предупреждений двух родов.
+
+   Первый род — узкий неразрывный пробел U+202F. Это НАШ разделитель разрядов
+   («1 250»), и в шрифтах KaTeX такого символа нет вовсе: он ругался дважды на
+   каждое число («Unrecognized Unicode» и «No character metrics»). Заменяем его
+   на математический тонкий пробел `\,` — на экране он выглядит так же.
+
+   Второй род — кириллица в математическом режиме («Безработица», индекс
+   «предл»). Это не только шум в консоли: в математическом режиме буквы
+   набираются курсивным математическим шрифтом, то есть читаются как
+   произведение переменных. Слова обязаны идти текстом. Оборачиваем в
+   `\text{...}` РОВНО ТО, что стоит вне уже существующих текстовых групп:
+   считаем глубину фигурных скобок после `\text{`, `\mathrm{`, `\operatorname{`,
+   и внутри них ничего не трогаем — там кириллица уже на своём месте. */
+const TEX_TEXT_CMD = /\\(?:text|textrm|textbf|textit|mathrm|operatorname)\s*\{/g;
+
+function katexSafe(src) {
+  let s = String(src == null ? '' : src).replace(/[  ]/g, '\\,');
+  if (!/[А-Яа-яЁё]/.test(s)) return s;
+  // Где начинаются текстовые группы: внутрь них не заглядываем.
+  const spans = [];
+  let m;
+  TEX_TEXT_CMD.lastIndex = 0;
+  while ((m = TEX_TEXT_CMD.exec(s)) !== null) {
+    let depth = 1, i = m.index + m[0].length;
+    while (i < s.length && depth > 0) {
+      if (s[i] === '{') depth++;
+      else if (s[i] === '}') depth--;
+      i++;
+    }
+    spans.push([m.index, i]);
+  }
+  const inText = (i) => spans.some(([a, b]) => i >= a && i < b);
+  let out = '', run = '';
+  // Хвостовой пробел в текстовую группу не берём: он принадлежит формуле рядом.
+  const flush = () => {
+    const t = run.replace(/\s+$/, '');
+    if (t) out += '\\text{' + t + '}';
+    if (run.length > t.length) out += '\\,';
+    run = '';
+  };
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (/[А-Яа-яЁё ]/.test(ch) && !inText(i) && (ch !== ' ' || run)) { run += ch; continue; }
+    flush(); out += ch;
+  }
+  flush();
+  return out;
+}
+
+/* Печать формулы: одна точка входа, один разбор ошибок. Не собралось — на
+   экране остаётся исходный текст, как и было. */
+function katexInto(el, tex, opts) {
+  if (!el) return false;
+  const raw = String(tex == null ? '' : tex);
+  if (typeof katex === 'undefined') { el.textContent = raw; return false; }
+  try {
+    katex.render(katexSafe(raw), el, Object.assign({ throwOnError: false, displayMode: false }, opts || {}));
+    return true;
+  } catch (e) { el.textContent = raw; return false; }
+}
+
+/* ⚠️ ОБРАЗЕЦ В СТРОКЕ ВВОДА — ЭТО ПРОЗА ПЛЮС ФОРМУЛА, А НЕ ОДНА ФОРМУЛА.
+   MathLive печатает свой placeholder математикой целиком, и двоеточие в
+   «Например: 100 − Q» верстается как знак отношения, с отбивкой по обе
+   стороны: на экране выходило «Например : 100 − Q». Слово и двоеточие
+   отдаём текстом, математикой остаётся только сама формула. */
+function placeholderTex(raw) {
+  const s = String(raw || '');
+  const i = s.indexOf(':');
+  if (i < 0) return '\\text{' + texSafeText(s) + '}';
+  const head = s.slice(0, i + 1), tail = s.slice(i + 1).trim();
+  const math = (typeof mathToLatexField === 'function' && tail) ? mathToLatexField(tail) : tail;
+  return '\\text{' + texSafeText(head) + '}\\;' + math;
+}
+// Экранируем то, что в \text{} значит не себя.
+function texSafeText(t) {
+  return String(t || '').replace(/([\\{}$&#^_~%])/g, '\\$1');
+}
+
 function buildMathfield(inp) {
   const slot = inp.parentNode;
   /* Запасную накладку с набранной формулой убираем СРАЗУ. Она лежит абсолютом
@@ -629,12 +711,19 @@ function buildMathfield(inp) {
   if (ts) ts.classList.remove('show');
   const mf = new window.MathfieldElement({
     mathVirtualKeyboardPolicy: 'manual',   // всплывающую клавиатуру ведём сами
-    smartMode: false,                      // «e» и «x» — переменные, а не слова
-    smartFence: true,
-    removeExtraneousParentheses: false,
   });
+  /* ⚠️ ЭТИ ТРИ НАСТРОЙКИ ЧИТАЮТСЯ ТОЛЬКО У ГОТОВОГО ПОЛЯ, НЕ У КОНСТРУКТОРА.
+     Переданные в `new MathfieldElement({...})`, они молча не применялись, а
+     MathLive писал в консоль предупреждение на каждое поле: за один обход
+     сорока одной сцены набиралось под девятьсот строк, и отлаживать в консоли
+     было нечем. Значения те же, что задумывал автор кода: «e» и «x» остаются
+     переменными, а не превращаются в слова; закрывающая скобка ставится сама;
+     лишние скобки при вводе не убираются. */
+  mf.smartMode = false;
+  mf.smartFence = true;
+  mf.removeExtraneousParentheses = false;
   mf.setAttribute('aria-label', inp.getAttribute('aria-label') || 'Формула');
-  if (inp.placeholder) mf.setAttribute('placeholder', inp.placeholder);
+  if (inp.placeholder) mf.setAttribute('placeholder', placeholderTex(inp.placeholder));
   slot.appendChild(mf);
   inp.classList.add('mf-hidden');
   inp._mf = mf;
@@ -1272,8 +1361,7 @@ function makeEditableValue(opts) {
     if (el.classList.contains('editing')) return;
     const text = shown();
     if (typeof katex === 'undefined' || typeof opts.tex !== 'function') { el.textContent = text; return; }
-    try { katex.render(opts.tex(opts.get(), text), el, { throwOnError: false, displayMode: false }); }
-    catch (e) { el.textContent = text; }
+    if (!katexInto(el, opts.tex(opts.get(), text))) el.textContent = text;
   };
   el._repaint = paint;
   paint();
@@ -1314,8 +1402,20 @@ function makeEditableValue(opts) {
       el.removeEventListener('blur', onBlur);
       el.classList.remove('editing', 'bad');
       el.contentEditable = 'false';
-      if (cancel) opts.set(before);
-      else { const v = parse(el.textContent.trim()); if (v !== null) opts.set(v); else opts.set(before); }
+      /* ⚠️ НЕЗАПОЛНЕННОЕ ПОЛЕ ВОЗВРАЩАЕТ ПРЕЖНЕЕ ЗНАЧЕНИЕ, А НЕ ПУСТОТУ.
+         У редактора границ ползунка поля показываются ПУСТЫМИ намеренно (копия
+         Десмоса), то есть `before` там — пустая строка. А выход из правки
+         честно звал `set(before)`, и пустая строка уезжала прямо в границу
+         ползунка: `sl.max = ''` — полоса ломается, значение обнуляется,
+         ползунок перестаёт двигаться. Пустое «прежнее» означает «прежнего
+         числа не было», и правильный ответ на него — не трогать ничего. */
+      const restorable = !isNum || (before !== '' && before != null && isFinite(before));
+      if (cancel) { if (restorable) opts.set(before); }
+      else {
+        const v = parse(el.textContent.trim());
+        if (v !== null) opts.set(v);
+        else if (restorable) opts.set(before);
+      }
       paint();
     };
     function onKey(e) {
@@ -1329,6 +1429,11 @@ function makeEditableValue(opts) {
   };
 
   el.addEventListener('click', begin);
+  /* Tab ведёт по полям редактора по порядку, и пришедшее фокусом поле сразу
+     готово к набору. Без этого Tab переводил фокус, но правку не открывал, и
+     второе число приходилось начинать щелчком. Повторного входа не будет:
+     `begin` первым делом ставит класс «editing» и только потом зовёт focus. */
+  el.addEventListener('focus', () => { if (!el.classList.contains('editing')) begin(); });
   el.addEventListener('keydown', (e) => {
     if (!el.classList.contains('editing') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); begin(); }
   });

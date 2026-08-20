@@ -156,8 +156,7 @@ function paintEqLabel(lab, name, value) {
   const plain = name + ' = ' + fmt(value);
   if (typeof katex === 'undefined') { lab.textContent = plain; return; }
   try {
-    katex.render(texifyName(name) + ' = ' + String(fmt(value)).replace(/ /g, '\\,'), lab,
-                 { throwOnError: false, displayMode: false });
+    katexInto(lab, texifyName(name) + ' = ' + fmt(value));
   } catch (e) { lab.textContent = plain; }
 }
 
@@ -182,17 +181,20 @@ function editEqValue(lab, name, current, apply) {
   const head = document.createElement('span');
   head.className = 'param-eq-head';
   if (typeof katex !== 'undefined') {
-    try { katex.render(texifyName(name) + ' =', head, { throwOnError: false, displayMode: false }); }
-    catch (e) { head.textContent = name + ' ='; }
+    if (!katexInto(head, texifyName(name) + ' =')) head.textContent = name + ' =';
   } else head.textContent = name + ' =';
   const inp = document.createElement('input');
   inp.type = 'number'; inp.step = 'any'; inp.value = current;
   inp.className = 'param-eq-input';
   lab.append(head, inp);
-  /* Курсор в конец, а не выделение всей строки: синяя заливка поверх значения
-     читается как «сейчас всё сотрётся» и выглядит как обычное поле ввода (Н75). */
+  /* ⚠️ СОДЕРЖИМОЕ ВЫДЕЛЯЕТСЯ ЦЕЛИКОМ: первый набранный символ заменяет старое
+     значение. Это отмена прежнего решения «курсор в конец» (Н75): при a = 1
+     набор «50» давал 150, а вместе с ним и границы 146…154 — то есть один
+     промах уводил и значение, и полосу. Правило теперь общее для всех правок
+     на месте, ровно как у makeEditableValue (А61): дописать к значению
+     по-прежнему можно стрелкой или вторым щелчком. */
   inp.focus();
-  try { const n = inp.value.length; inp.setSelectionRange(n, n); } catch (e) {}
+  try { inp.select(); } catch (e) {}
   let closed = false;
   const done = () => {
     if (closed) return; closed = true;
@@ -238,8 +240,7 @@ function attachBoundsEditor(chip, editor, name, get, set) {
   const tex = (t) => {
     const s = document.createElement('span'); s.className = 'param-ed-tex';
     if (typeof katex === 'undefined') { s.textContent = t.replace(/\\le/g, '≤'); return s; }
-    try { katex.render(t, s, { throwOnError: false, displayMode: false }); }
-    catch (e) { s.textContent = t.replace(/\\le/g, '≤'); }
+    if (!katexInto(s, t)) s.textContent = t.replace(/\\le/g, '≤');
     return s;
   };
   const close = () => {
@@ -282,9 +283,12 @@ function attachBoundsEditor(chip, editor, name, get, set) {
         /* Пока идёт правка, меню закрывать нельзя: set() может зажать значение
            ползунка и разбудить «input», а тот закрыл бы меню и снёс поле, в
            котором прямо сейчас печатают. */
+        // Вторая застава к правилу «пустое поле не трогает границу»: сюда
+        // не должно доехать ничего, кроме числа.
+        if (!isFinite(parseFloat(v))) return;
         editor._busy = true;
         pushUndo();
-        try { set(key, v); } finally { editor._busy = false; }
+        try { set(key, +v); } finally { editor._busy = false; }
       },
       tex: (v, text) => text,
       title: key === 'step' ? 'Шаг' : (key === 'min' ? 'Нижняя граница' : 'Верхняя граница'),

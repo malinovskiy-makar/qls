@@ -469,7 +469,7 @@ function typesetStats(root) {
     const numeric = /^[(\[]?\s*[-−+]?[\d.,]/.test(raw) || /^[-−+]?\d/.test(raw);
     if (numeric && typeof katex !== 'undefined') {
       try {
-        katex.render(statToTex(raw), val, { throwOnError: false, displayMode: false });
+        if (!katexInto(val, statToTex(raw))) throw new Error('katex');
         val.classList.add('stat-tex');
       } catch (e) { /* остаётся прежним текстом */ }
     }
@@ -561,8 +561,7 @@ function restatWide(row, lab, val, raw, own) {
       const line = document.createElement('span');
       line.className = 'stat-line';
       if (typeof katex !== 'undefined') {
-        try { katex.render(statToTex(p), line, { throwOnError: false, displayMode: false }); }
-        catch (e) { line.textContent = p; }
+        if (!katexInto(line, statToTex(p))) line.textContent = p;
       } else line.textContent = p;
       val.appendChild(line);
     });
@@ -660,8 +659,7 @@ function renderMathIn(root) {
       if (i % 2 === 0) { if (piece) frag.appendChild(document.createTextNode(piece)); return; }
       const span = document.createElement('span');
       span.className = 'tex';
-      try { katex.render(texAbbrev(piece), span, { throwOnError: false, displayMode: false }); }
-      catch (e) { span.textContent = piece; }
+      if (!katexInto(span, texAbbrev(piece))) span.textContent = piece;
       frag.appendChild(span);
     });
     node.parentNode.replaceChild(frag, node);
