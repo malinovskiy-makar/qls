@@ -56,6 +56,20 @@ def is_empty_criteria(val):
     return False
 
 
+def has_real_correct_answer(p):
+    return p.get("check_type") != "uncheckable" and bool(p.get("correct_answer"))
+
+
+def parse_json_field(raw):
+    """correct_answer/check_options хранятся как JSON, закодированный ЕЩЁ РАЗ в строку."""
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return raw
+    return raw
+
+
 def main():
     if not PROBLEMS_DIR.exists() or not any(PROBLEMS_DIR.glob("*.json")):
         print(f"В {PROBLEMS_DIR} нет скачанных задач — сначала запусти fetch_problems.py")
@@ -92,16 +106,208 @@ def main():
     out("\n--- ОСНОВНАЯ СТАТИСТИКА ---")
     n_test = sum(1 for p in problems if p.get("is_test") is True)
     n_not_test = sum(1 for p in problems if p.get("is_test") is False)
+    n_answer_md = sum(1 for p in problems if (p.get("answer_md") or "").strip())
+    n_correct_answer_naive = sum(1 for p in problems if p.get("correct_answer"))
     out(f"Всего задач: {total}")
     out(f"  is_test = true (тесты): {n_test}")
     out(f"  is_test = false (открытые задачи): {n_not_test}")
-    out(f"С непустым answer_md (есть решение): {sum(1 for p in problems if (p.get('answer_md') or '').strip())}")
-    out(f"С непустым correct_answer: {sum(1 for p in problems if p.get('correct_answer'))}")
-    out(f"С непустым criteria: {sum(1 for p in problems if not is_empty_criteria(p.get('criteria')))}")
-    out(f"ai_generated = true: {sum(1 for p in problems if p.get('ai_generated') is True)}")
+    out(f"С непустым answer_md (есть решение): {n_answer_md}")
     out(
-        "approved = false ИЛИ hidden = true: "
-        f"{sum(1 for p in problems if p.get('approved') is False or p.get('hidden') is True)}"
+        f"С непустым correct_answer (просто непустая строка, см. ниже почему это "
+        f"вводит в заблуждение): {n_correct_answer_naive}"
+    )
+    out(f"С непустым criteria: {sum(1 for p in problems if not is_empty_criteria(p.get('criteria')))}")
+    out("ai_generated, approved, hidden, visible — см. отдельные секции ниже")
+
+    # --- approved / hidden / visible: полный разбор по значениям ---
+    out("\n--- approved / hidden / visible — ПОЛНЫЙ РАЗБОР (по просьбе Макара, 2026-08-20) ---")
+
+    def field_breakdown(field):
+        c = Counter()
+        for p in problems:
+            if field not in p:
+                c["<ключа нет в файле>"] += 1
+            else:
+                v = p[field]
+                c["null" if v is None else repr(v)] += 1
+        return c
+
+    dead_fields = []
+    for field in ("approved", "hidden", "visible"):
+        c = field_breakdown(field)
+        out(f"{field}: {dict(c)}")
+        if len(c) == 1:
+            only_value = next(iter(c))
+            dead_fields.append((field, only_value))
+
+    n_approved_false = sum(1 for p in problems if p.get("approved") is False)
+    n_approved_true = sum(1 for p in problems if p.get("approved") is True)
+    n_hidden_true = sum(1 for p in problems if p.get("hidden") is True)
+    n_hidden_false = sum(1 for p in problems if p.get("hidden") is False)
+    n_both_flagged = sum(1 for p in problems if p.get("approved") is False and p.get("hidden") is True)
+    out(f"approved = false: {n_approved_false}")
+    out(f"approved = true: {n_approved_true}")
+    out(f"hidden = true: {n_hidden_true}")
+    out(f"hidden = false: {n_hidden_false}")
+    out(f"пересечение (approved=false И hidden=true): {n_both_flagged}")
+    if dead_fields:
+        out("")
+        for field, value in dead_fields:
+            out(
+                f"!!! ПОЛЕ {field} МЁРТВОЕ: одно и то же значение {value} у ВСЕХ {total} задач. "
+                f"Опираться на него на импорте нельзя — оно ничего не различает."
+            )
+        live = [f for f in ("approved", "hidden", "visible") if f not in dict(dead_fields)]
+        if live:
+            out(f"Живое (различается) поле: {', '.join(live)} — но 40 из 6121 approved=true "
+                f"(0,65%) тоже подозрительно мало для «одобрено к публикации», раз все 6121 "
+                f"и так публично доступны на сайте. Смысл поля перед импортом стоит уточнить "
+                f"у авторов сайта, а не считать его готовым фильтром качества.")
+
+    # --- профиль 40 approved=true в сравнении со всем банком ---
+    out("\n--- ПРОФИЛЬ approved=true (40 штук) В СРАВНЕНИИ СО ВСЕМ БАНКОМ (по просьбе Макара) ---")
+    approved_true = [p for p in problems if p.get("approved") is True]
+    n40 = len(approved_true)
+    if n40 == 0:
+        out("  задач с approved=true не найдено — сравнивать нечего")
+    else:
+        def pct(n, d):
+            return f"{n} ({100 * n / d:.0f}%)"
+
+        n_md_40 = sum(1 for p in approved_true if (p.get("answer_md") or "").strip())
+        n_md_all = sum(1 for p in problems if (p.get("answer_md") or "").strip())
+        out(f"С answer_md:               40-ка: {pct(n_md_40, n40)}   весь банк: {pct(n_md_all, total)}")
+
+        n_ca_40 = sum(1 for p in approved_true if has_real_correct_answer(p))
+        n_ca_all = sum(1 for p in problems if has_real_correct_answer(p))
+        out(f"С реальным correct_answer: 40-ка: {pct(n_ca_40, n40)}   весь банк: {pct(n_ca_all, total)}")
+
+        src_40 = Counter(p.get("source") or "<пусто>" for p in approved_true)
+        out(f"source внутри 40-ки: {dict(src_40.most_common())}")
+
+        author_40 = Counter(p.get("author") or "<пусто>" for p in approved_true)
+        out(f"author внутри 40-ки: {dict(author_40.most_common())}")
+
+        diff_40 = Counter(p.get("difficulty") for p in approved_true)
+        out(f"difficulty внутри 40-ки: {dict(diff_40.most_common())}")
+
+        ct_40 = Counter(p.get("check_type") for p in approved_true)
+        out(f"check_type внутри 40-ки: {dict(ct_40.most_common())}")
+
+        tag_40 = Counter()
+        for p in approved_true:
+            for tid in (p.get("tagList") or []):
+                tag_40[tid] += 1
+        top_tags_40 = []
+        for tid, c in tag_40.most_common(5):
+            info = tags_by_id.get(tid)
+            name = info["name"] if info else f"id={tid}"
+            top_tags_40.append(f"{name} {c}/{n40}")
+        out(f"топ-5 тегов внутри 40-ки: {', '.join(top_tags_40)}")
+
+        dominant_source, dominant_source_n = src_40.most_common(1)[0]
+        dominant_author, dominant_author_n = author_40.most_common(1)[0]
+        out("")
+        if dominant_source_n / n40 >= 0.8 and dominant_author_n / n40 >= 0.8:
+            out(
+                f"ВЫВОД: approved=true резко смещено к одному источнику — "
+                f"{dominant_source_n} из {n40} ({100 * dominant_source_n / n40:.0f}%) имеют "
+                f"source={dominant_source!r} и author={dominant_author!r} (это один и тот же "
+                f"партнёр — сайт olymp.education принадлежит «Экономическому олимпу»). При "
+                f"этом доля с решением внутри 40-ки НЕ выше, а НИЖЕ, чем в среднем по банку: "
+                f"answer_md {pct(n_md_40, n40)} против {pct(n_md_all, total)} по всему банку, "
+                f"реальный correct_answer {pct(n_ca_40, n40)} против {pct(n_ca_all, total)}. "
+                f"Это НЕ сигнал качества или полноты решения — похоже на административную "
+                f"метку конкретного партнёра-источника, а не на общий фильтр «одобрено к "
+                f"публикации». Опираться на approved как на признак готовности задачи к "
+                f"использованию на импорте нельзя."
+            )
+        else:
+            out("ВЫВОД: 40-ка не показывает резкого смещения ни по одному признаку — тоже ответ.")
+
+    # --- ai_generated: честное ли поле ---
+    out("\n--- ai_generated — ПРОВЕРКА, ЧТО ПОЛЕ РАБОЧЕЕ, А НЕ ПУСТОЕ (по просьбе Макара) ---")
+    ai_breakdown = field_breakdown("ai_generated")
+    out(f"Все значения ai_generated по {total} файлам: {dict(ai_breakdown)}")
+    out(
+        "В справочнике tags.json и в сыром tRPC-ответе страницы списка (фильтр-панель) "
+        "проверено на упоминания ИИ/генерации (искусственный интеллект, нейросеть, "
+        "generat*, ai) — ноль совпадений, такого фильтра на сайте нет вообще."
+    )
+    if ai_breakdown.keys() == {"False"}:
+        out(
+            "ВЫВОД: поле рабочее, ИИ-задач нет. У всех 6121 задач ai_generated явно "
+            "равно false (не null, не отсутствует — интеграционная проверка Фазы 4 уже "
+            "подтвердила, что поля без ai_generated или с null нет ни одной). Другого "
+            "значения не встречается нигде, а на сайте нет и намёка на функцию "
+            "ИИ-генерации задач — значит false здесь достоверный факт об источнике, "
+            "а не забытое дефолтное значение."
+        )
+    else:
+        out("ВЫВОД: поле неоднородно — см. разбор значений выше, нужен отдельный анализ.")
+
+    # --- correct_answer: осмысленно, а не по факту непустой строки ---
+    out("\n--- correct_answer — ОСМЫСЛЕННЫЙ РАЗБОР (по просьбе Макара) ---")
+    out(
+        f"Наивная проверка «непустая строка» даёт {n_correct_answer_naive} из {total} — "
+        f"ЭТО ВВОДИТ В ЗАБЛУЖДЕНИЕ. correct_answer — это ВСЕГДА JSON-объект вида "
+        f'{{"type": <тип>, "value": ...}}, и у типа "uncheckable" value просто null — '
+        f"формально непустая строка, а по сути ответа нет. Тип совпадает с полем "
+        f"check_type — считаю по нему."
+    )
+    check_type_counter = Counter(p.get("check_type") for p in problems)
+    out(f"Распределение check_type: {dict(check_type_counter.most_common())}")
+
+    n_real_ca = sum(1 for p in problems if has_real_correct_answer(p))
+    out(f"С РЕАЛЬНЫМ correct_answer (check_type != 'uncheckable'): {n_real_ca} из {total}")
+
+    both = sum(1 for p in problems if (p.get("answer_md") or "").strip() and has_real_correct_answer(p))
+    only_answer_md = sum(
+        1 for p in problems if (p.get("answer_md") or "").strip() and not has_real_correct_answer(p)
+    )
+    only_correct_answer = sum(
+        1 for p in problems if not (p.get("answer_md") or "").strip() and has_real_correct_answer(p)
+    )
+    neither = sum(
+        1 for p in problems if not (p.get("answer_md") or "").strip() and not has_real_correct_answer(p)
+    )
+    out("\nКарта ценности банка (answer_md — развёрнутый разбор; correct_answer — реальный, см. выше):")
+    out(f"  и answer_md, и correct_answer: {both}")
+    out(f"  только answer_md: {only_answer_md}")
+    out(f"  только correct_answer: {only_correct_answer}")
+    out(f"  ни того, ни другого (голое условие): {neither}")
+    assert both + only_answer_md + only_correct_answer + neither == total, "корзины не сходятся с total"
+
+    # --- check_type / check_options: готовое сырьё для Econ Rush? ---
+    out("\n--- check_type И check_options — ГОТОВОЕ СЫРЬЁ ДЛЯ ECON RUSH? (по просьбе Макара) ---")
+    out(
+        f"{n_real_ca} задач с реальным correct_answer (см. выше) — потенциальный пул вопросов "
+        f"с автопроверкой вместо генерации моделью. check_type различает форму ответа, "
+        f"check_options — по одному примеру дословно, до 200 символов:"
+    )
+    check_options_example = {}
+    for p in problems:
+        t = p.get("check_type")
+        if t not in check_options_example:
+            check_options_example[t] = json.dumps(parse_json_field(p.get("check_options")), ensure_ascii=False)
+    for t, count in check_type_counter.most_common():
+        example = check_options_example.get(t, "")[:200]
+        out(f"  {t!r}: {count} задач. check_options: {example!r}")
+    out(
+        "\nДля быстрой игры сразу готовы, без доработки: single_choice "
+        f"({check_type_counter.get('single_choice', 0)} задач) — check_options содержит "
+        "готовые текстовые варианты ответа, correct_answer указывает верный индексом. "
+        f"true_false ({check_type_counter.get('true_false', 0)}) — тоже готов: "
+        "check_options пуст не потому, что данных не хватает, а потому что вариантов всего "
+        "два (да/нет) и перечислять их незачем, само утверждение — в тексте задачи. "
+        "multiple_choice "
+        f"({check_type_counter.get('multiple_choice', 0)}) тоже структурирован, но это "
+        "мультивыбор — для игры на скорость сложнее, чем один клик. single_freetext "
+        f"({check_type_counter.get('single_freetext', 0)}) и multiple_questions "
+        f"({check_type_counter.get('multiple_questions', 0)}) требуют сверки текста "
+        "или нескольких значений — риск ложных несовпадений из-за формулировки ответа, "
+        "с ходу на игру не положить без ручной проверки. matching_list — 1 штука, погоды "
+        "не делает."
     )
 
     # --- difficulty (дословно) ---
