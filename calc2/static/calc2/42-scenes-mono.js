@@ -853,10 +853,10 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
   const near = (a, b, span) => isFinite(a) && isFinite(b) && Math.abs(a - b) < span * 0.1;
   [0.25, 0.5, 0.75, 1].forEach(t => { const xq = Xmax * t;
     if (qi != null && near(xq, qi, Xmax)) return;
-    g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(xq)); });
+    g.append('text').attr('x', lx(xq)).attr('y', bottom + 12).attr('text-anchor', 'middle').attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(xq)); });
   [0.25, 0.5, 0.75, 1].forEach(t => { const yp = Ymax * t;
     if (Pi != null && near(yp, Pi, Ymax)) return;
-    g.append('text').attr('x', left - 5).attr('y', ly(yp)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(yp)); });
+    g.append('text').attr('x', left - 5).attr('y', ly(yp)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(yp)); });
   const gc = svg.append('g').attr('clip-path', 'url(#' + cid + ')');
   const line = d3.line().defined(d => d !== null).x(d => lx(d[0])).y(d => ly(d[1]));
   const sample = (f) => { const o = []; for (let i = 0; i <= 300; i++) { const q = Xmax * i / 300; const v = f(q); o.push((isNaN(v) || v < 0) ? null : [q, v]); } return o; };

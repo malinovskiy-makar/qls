@@ -161,7 +161,13 @@ function planeTicksX(g, mx, oy) {
     if (Math.abs(t) < 1e-9) return;
     g.append('line').attr('x1', mx(t)).attr('y1', oy - 3).attr('x2', mx(t)).attr('y2', oy + 3)
       .attr('stroke', COL.ink).attr('stroke-width', 1);
-    g.append('text').attr('x', mx(t)).attr('y', oy + 7)
+    /* ⚠️ КЛАСС `axis-num` — ЭТО НЕ УКРАШЕНИЕ, А ПРИЗНАК «ЭТО ДЕЛЕНИЕ ШКАЛЫ».
+       По нему работают три разные вещи: `dropTickAt` снимает деление, на место
+       которого встаёт подпись координаты; `applyLabelSize` НЕ увеличивает
+       деления вместе с прочими подписями; выгрузка отличает шкалу от подписи.
+       У полного плана свой рисователь осей, и он этот класс не ставил вовсе —
+       в «Деформациях графика» деления выглядели так же, а вели себя иначе. */
+    g.append('text').attr('x', mx(t)).attr('y', oy + 7).attr('class', 'axis-num')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
       .attr('font-size', FS.small).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
@@ -172,7 +178,7 @@ function planeTicksY(g, my, ox) {
     if (Math.abs(t) < 1e-9) return;
     g.append('line').attr('x1', ox - 3).attr('y1', my(t)).attr('x2', ox + 3).attr('y2', my(t))
       .attr('stroke', COL.ink).attr('stroke-width', 1);
-    g.append('text').attr('x', ox - 6).attr('y', my(t))
+    g.append('text').attr('x', ox - 6).attr('y', my(t)).attr('class', 'axis-num')
       .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
       .attr('font-size', FS.small).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));

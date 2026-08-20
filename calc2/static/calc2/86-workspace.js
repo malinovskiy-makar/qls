@@ -521,7 +521,21 @@ function applyViewBounds() {
 /* Переключатель «только первая четверть». Включили — окно подтягивается к нулю;
    выключили — открывается отрицательная часть плоскости. Работает и в
    экономических сценах, и в «Математике». */
+/* Снимок границ плоскости: `null` означает «взять текущие». */
+function quadWindow(src) {
+  if (src) return src;
+  return { qa: CONFIG.Qmin, qb: CONFIG.Qmax, pa: CONFIG.Pmin, pb: CONFIG.Pmax };
+}
+// Два окна считаются тем же самым с точностью до тысячной доли размаха.
+function quadSameWindow(a, b) {
+  if (!a || !b) return false;
+  const e = Math.max(1e-6, Math.abs(b.qb - b.qa) * 1e-3, Math.abs(b.pb - b.pa) * 1e-3);
+  return Math.abs(a.qa - b.qa) < e && Math.abs(a.qb - b.qb) < e
+      && Math.abs(a.pa - b.pa) < e && Math.abs(a.pb - b.pb) < e;
+}
+
 function setFirstQuad(on) {
+  const before = quadWindow(null);       // окно ДО переключения — для обратного хода
   STATE.firstQuad = !!on;
   const c = document.getElementById('chk-quad');
   if (c && c.checked !== STATE.firstQuad) c.checked = STATE.firstQuad;
@@ -533,11 +547,27 @@ function setFirstQuad(on) {
       setMathWindow(-w * 0.5, STATE.mathXmax, -h * 0.5, STATE.mathYmax);
     }
   } else if (STATE.firstQuad) {
+    /* ⚠️ ВЫКЛЮЧЕНИЕ ОБЯЗАНО ВЕРНУТЬ РОВНО ТО ОКНО, ЧТО БЫЛО ДО ВКЛЮЧЕНИЯ.
+       Раньше обратного хода не было вовсе: включение считало новые границы по
+       одной формуле, выключение — по другой, и «−10…10» после двух щелчков
+       превращалось в «−5…20». Ноль уезжал в левый нижний угол, и вернуть
+       прежний вид было нечем, кроме сброса всей сцены.
+       Память самоочищается: она годится, только пока окно ровно то, которое
+       мы сами и сделали. Тронул границы руками, колесом или панорамой — от
+       памяти отказываемся и считаем по прежней формуле. */
     if (CONFIG.Qmin < 0) { CONFIG.Qmax -= CONFIG.Qmin; CONFIG.Qmin = 0; }
     if (CONFIG.Pmin < 0) { CONFIG.Pmax -= CONFIG.Pmin; CONFIG.Pmin = 0; }
+    STATE.quadSaved = { was: quadWindow(before), made: quadWindow(null) };
   } else {
-    if (CONFIG.Qmin >= 0) CONFIG.Qmin = -(CONFIG.Qmax - CONFIG.Qmin) * 0.25;
-    if (CONFIG.Pmin >= 0) CONFIG.Pmin = -(CONFIG.Pmax - CONFIG.Pmin) * 0.25;
+    const saved = STATE.quadSaved;
+    if (saved && quadSameWindow(saved.made, quadWindow(null))) {
+      CONFIG.Qmin = saved.was.qa; CONFIG.Qmax = saved.was.qb;
+      CONFIG.Pmin = saved.was.pa; CONFIG.Pmax = saved.was.pb;
+    } else {
+      if (CONFIG.Qmin >= 0) CONFIG.Qmin = -(CONFIG.Qmax - CONFIG.Qmin) * 0.25;
+      if (CONFIG.Pmin >= 0) CONFIG.Pmin = -(CONFIG.Pmax - CONFIG.Pmin) * 0.25;
+    }
+    STATE.quadSaved = null;
   }
   syncViewFields();
   redrawAll();

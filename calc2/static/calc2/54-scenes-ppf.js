@@ -1612,8 +1612,9 @@ function drawTradeB(d) {
       const [lo, hi] = scale.domain();
       const step = niceTickStep(hi - lo, 5);
       for (let v = step; v <= hi + 1e-9; v += step) {
-        if (horiz) haloText(gl, scale(v), p.yBot + 8, fmt(v), 'middle', 'hanging');
-        else       haloText(gl, p.x0 - 6, scale(v), fmt(v), 'end', 'middle');
+        // Класс `axis-num` — признак деления шкалы, см. разбор в planeTicksX.
+        if (horiz) haloText(gl, scale(v), p.yBot + 8, fmt(v), 'middle', 'hanging').attr('class', 'axis-num');
+        else       haloText(gl, p.x0 - 6, scale(v), fmt(v), 'end', 'middle').attr('class', 'axis-num');
       }
     };
     tk(p.mx, true); tk(p.my, false);

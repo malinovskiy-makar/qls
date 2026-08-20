@@ -3322,6 +3322,7 @@ const SCENE_DEFAULTS = {
   colorOverride: {}, areaColor: {}, titlePos: null,   // своё место названия (доли поля, Н22)
   // Плоскость и подписи.
   labelSize: LABEL_SIZE_DEFAULT, firstQuad: true, xStep: null, yStep: null,
+  quadSaved: null,            // окно до включения первой четверти (обратный ход тумблера)
   showLegend: true, zoomLock: false, viewDirty: false,
   legendSpot: null,           // выбранное место легенды: держится, пока свободно
   // Буквы-параметры и кэши расчётов.

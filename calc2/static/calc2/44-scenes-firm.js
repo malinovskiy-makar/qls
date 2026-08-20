@@ -774,12 +774,16 @@ function redrawProduction() {
       .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
     g.append('text').attr('x', left + 4).attr('y', scale.range()[1] - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink).text(title);
     g.append('text').attr('x', right + 6).attr('y', y0 + 4).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('L');
+    /* Класс `axis-num` — признак «это деление шкалы», а не украшение: по нему
+       снимается деление под подписью координаты, по нему же `applyLabelSize`
+       НЕ увеличивает шкалу вместе с прочими подписями. У панельных сюжетов свои
+       рисователи осей, и класс там не ставился вовсе. */
     scale.ticks(5).forEach(t => { if (t <= 0) return;
       g.append('text').attr('x', left - 6).attr('y', scale(t)).attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
-        .attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(t)); });
+        .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(t)); });
     lx.ticks(8).forEach(t => { if (t <= 0) return;
       g.append('text').attr('x', lx(t)).attr('y', y0 + 8).attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
-        .attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(t)); });
+        .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', COL.inkSoft).text(fmt(t)); });
     return g;
   };
   // Б4: TP вводит человек, MP берём символьной производной, AP = TP/L.

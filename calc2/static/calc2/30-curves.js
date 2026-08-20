@@ -354,12 +354,55 @@ function keepAxisNamesInside() {
 function spreadLabels() {
   const node = svg.node();
   if (!node) return;
-  const items = [];
+  /* ⚠️ ДЕЛЕНИЕ УСТУПАЕТ МЕСТО ПОДПИСИ КООРДИНАТЫ — ПО НАСТОЯЩИМ РАМКАМ.
+     Правило владельца уже было, но срабатывало по порогу «ближе 7 px или 2 %
+     размаха», то есть по РАССТОЯНИЮ МЕЖДУ ЯКОРЯМИ. Числа бывают разной длины
+     («35_спрос» вдвое шире «40»), и пара, разошедшаяся якорями на девять
+     пикселей, всё равно налезала друг на друга. Раньше это скрывало разведение
+     подписей: оно двигало деление в сторону. Теперь деления прибиты, и порог
+     обязан считаться по тому же, что видит глаз, — по рамкам. */
+  const coordBoxes = [];
+  node.querySelectorAll('text.coord-num').forEach(t => {
+    const r = t.getBoundingClientRect();
+    if (r.width > 0.5 && r.height > 0.5) coordBoxes.push(r);
+  });
+  if (coordBoxes.length) {
+    node.querySelectorAll('text.axis-num').forEach(t => {
+      const r = t.getBoundingClientRect();
+      if (r.width < 0.5) return;
+      const over = coordBoxes.some(c =>
+        (Math.min(r.right, c.right) - Math.max(r.left, c.left)) > 1 &&
+        (Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top)) > 1);
+      if (over) t.remove();
+    });
+  }
+
+  const items = [], anchored = [];
   node.querySelectorAll('text').forEach(t => {
     if (t.getAttribute('data-no-spread')) return;
     const r = t.getBoundingClientRect();
     if (r.width < 0.5 || r.height < 0.5) return;
-    items.push({ el: t, x: r.left, y: r.top, w: r.width, h: r.height });
+    const rec = { el: t, x: r.left, y: r.top, w: r.width, h: r.height };
+    /* ⚠️ ЧИСЛО НА ОСИ ПРИБИТО К СВОЕМУ МЕСТУ, И ДВИГАТЬ ЕГО НЕЛЬЗЯ.
+       Деление шкалы и подпись координаты отвечают на вопрос «где именно», и
+       сдвинутое число отвечает на него неправдой. А разведение подписей
+       двигало их наравне с прочими: шаг 13 px, и деление уезжало от оси на
+       13, 26 или 65 пикселей — ровно те «65 px» из ревью владельца. Замер по
+       сорока одной сцене: в дискриминации 3-й степени и на внешнем рынке
+       последнее деление обеих панелей стояло на 26 px выше своего ряда.
+       Такие подписи считаем ЗАНЯТЫМ МЕСТОМ: вокруг них расходятся другие. */
+    if (t.classList.contains('axis-num')) { rec.tick = true; anchored.push(rec); return; }
+    /* ⚠️ ПОДПИСЬ КООРДИНАТЫ ДВИГАЕТСЯ ТОЛЬКО ПРОЧЬ ОТ СВОЕЙ ОСИ.
+       Она отвечает на вопрос «где именно», поэтому вдоль оси её сдвигать
+       нельзя — число станет указывать не туда. А поперёк можно: подпись цены
+       уезжает левее, подпись количества ниже, и обе продолжают говорить
+       правду. Две разные величины в одной точке (33,33 у монопсонии и 33,33 у
+       профсоюза) иначе не развести вовсе. */
+    if (t.classList.contains('coord-num')) {
+      rec.only = (t.getAttribute('text-anchor') === 'middle') ? 'down' : 'left';
+      items.push(rec); return;
+    }
+    items.push(rec);
   });
   if (items.length < 2) return;
 
@@ -371,7 +414,8 @@ function spreadLabels() {
      её не видело: «S» пряталась под кнопками почти во всех рыночных сценах.
      Кладём их в занятое ПЕРВЫМИ — двигать блок нельзя, двигается подпись. */
   const placed = (typeof floatRects === 'function' ? floatRects() : [])
-    .map(r => ({ el: null, x: r.left, y: r.top, w: r.w, h: r.h }));
+    .map(r => ({ el: null, x: r.left, y: r.top, w: r.w, h: r.h }))
+    .concat(anchored);          // числа на осях не двигаются, вокруг них расходятся
   const STEP = 13;               // чуть больше строки: подпись уходит целиком
   items.forEach(it => {
     if (!placed.length) { placed.push(it); return; }
@@ -393,14 +437,38 @@ function spreadLabels() {
       [0, 4 * STEP], [0, 5 * STEP], [-70, 2 * STEP],
     ];
     const box = node.getBoundingClientRect();
-    for (let k = 0; k < tries.length; k++) {
-      if (!placed.some(p => hit(it, p))) break;
-      const [wx, wy] = tries[k];
+    /* ⚠️ ЧИСЛО НА ОСИ — ПРЕПЯТСТВИЕ МЯГКОЕ.
+       Прибив деления к месту, мы добавили в занятое место, из которого чужой
+       подписи иногда уже некуда деться: на узком окне заголовок панели
+       «Экспорт по мировой цене» переставал находить свободный угол и уезжал за
+       край холста, а до этого спокойно вставал рядом. Поэтому проход второй:
+       если места, свободного ОТ ВСЕГО, не нашлось, ищем место, свободное хотя
+       бы от подписей. Наложиться на деление шкалы — меньшее зло, чем уйти с
+       экрана; сдвинуть само деление по-прежнему нельзя. */
+    const hard = placed.filter(p => !p.tick);
+    for (let k = 0; k < tries.length * 2; k++) {
+      const soft = k < tries.length;
+      const against = soft ? placed : hard;
+      if (!against.some(p => hit(it, p))) break;
+      const [wx, wy] = tries[k % tries.length];
+      // Подписи координат ходят только поперёк своей оси и только наружу.
+      if (it.only === 'down' && !(wx === 0 && wy > 0)) continue;
+      if (it.only === 'left' && !(wy === 0 && wx < 0)) continue;
       const top = it.y + wy, bottom = top + it.h;
-      // За поле графика не выпускаем: там подпись всё равно не читается.
-      if (top < box.top + m.top - 6 || bottom > box.top + (H - m.bottom) + 16) continue;
+      /* За поле графика не выпускаем: там подпись всё равно не читается.
+         У подписи координаты поле СВОЁ: она и так живёт снаружи, за осью, и
+         нижняя полоса холста для неё законное место. Границей ей служит сам
+         холст. */
+      const lowEdge = it.only ? box.top + H - 4 : box.top + (H - m.bottom) + 16;
+      if (top < box.top + m.top - 6 || bottom > lowEdge) continue;
+      /* ⚠️ И ЗА БОКОВОЙ КРАЙ ХОЛСТА ТОЖЕ НЕ ВЫПУСКАЕМ. Вертикальная граница
+         стояла с самого начала, боковой не было вовсе: подпись «65_min», уходя
+         влево от оси, уехала за левый край на тридцать пикселей и пропала с
+         экрана совсем. */
+      const left = it.x + wx, right = left + it.w;
+      if (left < box.left + 2 || right > box.left + box.width - 2) continue;
       const probe = { x: it.x + wx, y: top, w: it.w, h: it.h };
-      if (!placed.some(p => hit(probe, p))) { dy = wy; dx = wx; it.y = top; it.x = probe.x; break; }
+      if (!against.some(p => hit(probe, p))) { dy = wy; dx = wx; it.y = top; it.x = probe.x; break; }
     }
     if (dy) {
       const cur = parseFloat(it.el.getAttribute('y'));
