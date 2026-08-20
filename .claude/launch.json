@@ -53,6 +53,18 @@
         "reports/defect_review"
       ],
       "port": 8555
+    },
+    {
+      "name": "wave1-bundle",
+      "runtimeExecutable": "venv\\Scripts\\python.exe",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8402",
+        "--directory",
+        "."
+      ],
+      "port": 8402
     }
   ]
 }

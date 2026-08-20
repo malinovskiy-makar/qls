@@ -1,0 +1,45 @@
+{
+  "format": "qls-repair-review-v1",
+  "bundle_id": "repair_aa_20260728",
+  "source_bundle": "aa_20260728",
+  "title": "Сборник тестов АА — волна 1",
+  "count": 131,
+  "with_edit": 87,
+  "outcomes": [
+    {
+      "key": "fixed_perfect",
+      "hotkey": "1",
+      "verdict": "perfect",
+      "label": "Починил, идеально",
+      "hint": "задача годится, отправляем на сайт"
+    },
+    {
+      "key": "fixed_partial",
+      "hotkey": "2",
+      "verdict": "origin",
+      "label": "Починил, но не до конца",
+      "hint": "стало лучше, дефект остался"
+    },
+    {
+      "key": "not_fixed",
+      "hotkey": "3",
+      "verdict": "origin",
+      "label": "Не починил вообще",
+      "hint": "ничего по сути не изменилось"
+    },
+    {
+      "key": "broke",
+      "hotkey": "4",
+      "verdict": "fixed_wrong",
+      "label": "Сломал что-то",
+      "hint": "стало хуже, чем было"
+    },
+    {
+      "key": "later",
+      "hotkey": "5",
+      "verdict": null,
+      "label": "Скрыть задачу на потом",
+      "hint": "разбираться сейчас не хочу"
+    }
+  ]
+}

@@ -388,8 +388,21 @@ body{margin:0;background:var(--qls-bg);color:var(--qls-ink);
 # Конвейер долларов и рендера — дословно как в templates/_katex_dollars.html
 # и catalog/base.html. Второй копии правил здесь не заводим: расхождение
 # показывало бы не то, что видит ученик.
-JS = r"""
+# ⚠️ Вынесен отдельной константой ровно ради этого запрета: тем же конвейером
+# обязаны мерить и шлюз (repair_wave1_gate), и оболочка разбора починок
+# (repair_wave1_export). Заведи каждый свою копию — и «ошибок KaTeX не
+# прибавилось» перестало бы значить «ученик увидит то же самое».
+PIPELINE_JS = r"""
 var DOLLAR_SENTINEL = '\uE000';
+/* Разделители формул и их ПОРЯДОК ($$ раньше $) — как у боевой страницы.
+   Отдельным списком, а не литералом внутри вызова: тем же порядком обязан
+   мерить шлюз, а две копии списка разъехались бы молча. */
+var QLS_DELIMS = [
+  { left: '$$', right: '$$', display: true },
+  { left: '$', right: '$', display: false },
+  { left: '\\[', right: '\\]', display: true },
+  { left: '\\(', right: '\\)', display: false }
+];
 function findClose(s, from, close) {
   var i = from;
   while (i < s.length) {
@@ -448,6 +461,27 @@ function fixCurrencyDollars(root) {
     }
   });
 }
+/* ⚠️ ТЕКСТ ВЫДЕЛЕНИЯ ЧИТАЕТСЯ С ОЧИЩЕННОГО КЛОНА, а не через String(sel).
+   KaTeX печатает каждую формулу дважды — видимой вёрсткой и скрытой копией
+   MathML, — плюс кладёт в `annotation` исходный TeX. Выделение забирает всё
+   три, и цитата «КПВ региона $Y=20-x$» приезжает как «КПВ региона 𝑌 = 20 −
+   𝑥 Y=20−x». Цитата — вход следующей волны починки, и мусор в ней дороже
+   мусора на экране. */
+function selectionText(sel) {
+  if (!sel || !sel.rangeCount) return '';
+  var box = document.createElement('div');
+  box.style.cssText = 'position:absolute;left:-9999px;top:0';
+  box.appendChild(sel.getRangeAt(0).cloneContents());
+  var junk = box.querySelectorAll('.katex-mathml, annotation');
+  for (var i = 0; i < junk.length; i++) junk[i].remove();
+  document.body.appendChild(box);
+  var text = box.innerText;
+  box.remove();
+  /* Нулевой ширины пробелы — распорки KaTeX, в цитате они невидимый мусор. */
+  return text.replace(/[\u200B\u200C\uFEFF]/g, '')
+             .replace(/[ \t]+\n/g, '\n').trim();
+}
+
 function renderScreen(el) {
   if (el.dataset.rendered === '1') return;
   el.dataset.rendered = '1';
@@ -456,19 +490,17 @@ function renderScreen(el) {
     maskEscapedDollars(zones[i]);
     if (typeof renderMathInElement === 'function') {
       renderMathInElement(zones[i], {
-        delimiters: [
-          { left: '$$', right: '$$', display: true },
-          { left: '$', right: '$', display: false },
-          { left: '\\[', right: '\\]', display: true },
-          { left: '\\(', right: '\\)', display: false }
-        ],
-        throwOnError: false
+        delimiters: QLS_DELIMS, throwOnError: false
       });
     }
     fixCurrencyDollars(zones[i]);
   }
 }
 
+"""
+
+# Оболочка разбора: состояние, кнопки, цитаты, выгрузка.
+SHELL_JS = r"""
 /* ---------- состояние ---------- */
 var KEY = 'qls-defect-' + QLS_DATA.bundle;
 var state = {};
@@ -564,7 +596,7 @@ function toggleCat(key) {
 /* ---------- цитаты ---------- */
 function attachQuote() {
   var sel = window.getSelection();
-  var text = sel ? String(sel).trim() : '';
+  var text = selectionText(sel);
   if (!text) { alert('Сначала выделите кусок текста мышью.'); return; }
   var node = sel.anchorNode;
   var host = node && (node.nodeType === 1 ? node : node.parentNode);
@@ -653,3 +685,5 @@ document.addEventListener('keydown', function (e) {
 });
 paint();
 """
+
+JS = PIPELINE_JS + SHELL_JS

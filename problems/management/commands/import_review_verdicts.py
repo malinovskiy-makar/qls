@@ -5,6 +5,13 @@
 
   v1 (`qls-review-verdicts-v1`) — у вердикта одна `category` (строка).
      Так лежат 2 401 вердикт Анича по ILE; конвертировать их не нужно.
+  v3 (`qls-review-verdicts-v3`) — то же плюс `quotes`.
+  оценки починки (`qls-repair-verdicts-v1`) — у вердикта не категория, а
+     ИСХОД починки (problems/repair_outcomes.py). Категории считаются из
+     него: «починил, идеально» -> `perfect`, и такой вердикт в пакете
+     `repair_*` ОТМЕНЯЕТ прежний брак (human_review_mark.SUPERSEDES).
+     Исход «скрыть на потом» не пишет вердикта вовсе: молчание честнее
+     выдуманной оценки.
   v2 (`qls-review-verdicts-v2`) — у вердикта список `categories`: оболочка
      разрешает отметить несколько дефектов сразу. В базе это несколько строк
      ReviewVerdict с ОДНИМ И ТЕМ ЖЕ комментарием — комментарий относится ко
@@ -32,8 +39,16 @@ from django.db import transaction
 from django.utils import timezone
 
 from problems.models import Problem, ReviewVerdict
+from problems.repair_outcomes import (OUTCOME_KEYS, OUTCOME_LABELS,
+                                      REPAIR_VERDICTS_FORMAT, categories_for)
 from problems.review_categories import (CATEGORY_KEYS, CATEGORY_LABELS,
                                         VERDICTS_FORMAT_V1, VERDICTS_FORMATS)
+
+# Все форматы, которые команда берёт: три версии вердиктов ревью плюс
+# оценки починки. Семейство одно — поля problem_id / comment / quotes / at
+# у них общие, различается только то, ЧЕМ задан вердикт: категорией дефекта
+# или исходом починки.
+ALL_FORMATS = tuple(VERDICTS_FORMATS) + (REPAIR_VERDICTS_FORMAT,)
 
 
 def parse_at(value) -> Optional[datetime]:
@@ -52,6 +67,11 @@ def parse_at(value) -> Optional[datetime]:
 
 def verdict_categories(entry, fmt):
     """Список категорий вердикта независимо от версии формата файла."""
+    if fmt == REPAIR_VERDICTS_FORMAT:
+        # Исход починки -> категории. Правило одно на проект и лежит в
+        # problems/repair_outcomes.py: вторая копия разъехалась бы с оболочкой.
+        return categories_for(entry.get('outcome'),
+                              entry.get('origin_categories') or [])
     if fmt == VERDICTS_FORMAT_V1:
         cat = entry.get('category')
         return [cat] if cat is not None else []
@@ -89,10 +109,10 @@ class Command(BaseCommand):
             raise CommandError(f'Файл не читается как JSON: {exc}')
 
         fmt = data.get('format')
-        if fmt not in VERDICTS_FORMATS:
+        if fmt not in ALL_FORMATS:
             raise CommandError(
                 f'Неожиданный формат {fmt!r} — '
-                f'жду один из {list(VERDICTS_FORMATS)} (файл из reviewer.html).')
+                f'жду один из {list(ALL_FORMATS)} (файл из reviewer.html).')
         verdicts = data.get('verdicts')
         if not isinstance(verdicts, list):
             raise CommandError('В файле нет списка verdicts.')
@@ -101,6 +121,14 @@ class Command(BaseCommand):
                     else data.get('reviewer') or '')
         bundle = (opts['bundle'] if opts['bundle'] is not None
                   else data.get('bundle_id') or '')
+
+        if fmt == REPAIR_VERDICTS_FORMAT:
+            bad_out = sorted({v.get('outcome') for v in verdicts
+                              if v.get('outcome')
+                              and v.get('outcome') not in OUTCOME_KEYS})
+            if bad_out:
+                raise CommandError(f'Неизвестные исходы починки: {bad_out}. '
+                                   f'Допустимые: {OUTCOME_KEYS}')
 
         # Категории проверяем ДО записи: незнакомый ключ — весь файл в отказ
         # (это рассинхрон версий пакета и кода, а не «плохая строчка»).
@@ -198,6 +226,16 @@ class Command(BaseCommand):
         if quote_rows:
             self.stdout.write('Цитат: {} в {} задачах.'.format(
                 quote_rows, len(quoted_problems)))
+        if fmt == REPAIR_VERDICTS_FORMAT:
+            outcomes = Counter(v.get('outcome') or '(не оценено)'
+                               for v in verdicts)
+            self.stdout.write('Сводка по исходам починки:')
+            for key in OUTCOME_KEYS:
+                if outcomes.get(key):
+                    self.stdout.write(f'  {OUTCOME_LABELS[key]}: {outcomes[key]}')
+            if outcomes.get('(не оценено)'):
+                self.stdout.write(f'  без исхода (только цитаты или '
+                                  f'комментарий): {outcomes["(не оценено)"]}')
         self.stdout.write('Сводка по категориям:')
         for key in CATEGORY_KEYS:
             if summary[key]:
