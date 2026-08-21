@@ -1,4 +1,4 @@
-{% load static %}<!DOCTYPE html>
+{% load static calc2_static %}<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
@@ -55,7 +55,7 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="{% static 'calc2/calc2.css' %}">
+  <link rel="stylesheet" href="{% calc2_static 'calc2/calc2.css' %}">
 </head>
 <body>
 {% include '_nav.html' %}
@@ -2395,27 +2395,27 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 </script>
 <!-- Код калькулятора: те же классические скрипты, только вынесенные из шаблона.
      Порядок подключения важен — он повторяет прежний порядок объявлений. -->
-<script src="{% static 'calc2/00-config.js' %}"></script>
-<script src="{% static 'calc2/10-math-core.js' %}"></script>
-<script src="{% static 'calc2/20-plane.js' %}"></script>
-<script src="{% static 'calc2/30-curves.js' %}"></script>
-<script src="{% static 'calc2/40-scenes-market.js' %}"></script>
-<script src="{% static 'calc2/42-scenes-mono.js' %}"></script>
-<script src="{% static 'calc2/44-scenes-firm.js' %}"></script>
-<script src="{% static 'calc2/46-scenes-labor.js' %}"></script>
-<script src="{% static 'calc2/48-scenes-consumer.js' %}"></script>
-<script src="{% static 'calc2/50-scenes-macro.js' %}"></script>
-<script src="{% static 'calc2/52-modes.js' %}"></script>
-<script src="{% static 'calc2/54-scenes-ppf.js' %}"></script>
-<script src="{% static 'calc2/56-scenes-inequality.js' %}"></script>
-<script src="{% static 'calc2/60-overlays.js' %}"></script>
-<script src="{% static 'calc2/70-scenes-math.js' %}"></script>
-<script src="{% static 'calc2/80-ui.js' %}"></script>
-<script src="{% static 'calc2/82-input.js' %}"></script>
-<script src="{% static 'calc2/84-picker.js' %}"></script>
-<script src="{% static 'calc2/86-workspace.js' %}"></script>
-<script src="{% static 'calc2/88-params.js' %}"></script>
-<script src="{% static 'calc2/90-explain.js' %}"></script>
-<script src="{% static 'calc2/99-boot.js' %}"></script>
+<script src="{% calc2_static 'calc2/00-config.js' %}"></script>
+<script src="{% calc2_static 'calc2/10-math-core.js' %}"></script>
+<script src="{% calc2_static 'calc2/20-plane.js' %}"></script>
+<script src="{% calc2_static 'calc2/30-curves.js' %}"></script>
+<script src="{% calc2_static 'calc2/40-scenes-market.js' %}"></script>
+<script src="{% calc2_static 'calc2/42-scenes-mono.js' %}"></script>
+<script src="{% calc2_static 'calc2/44-scenes-firm.js' %}"></script>
+<script src="{% calc2_static 'calc2/46-scenes-labor.js' %}"></script>
+<script src="{% calc2_static 'calc2/48-scenes-consumer.js' %}"></script>
+<script src="{% calc2_static 'calc2/50-scenes-macro.js' %}"></script>
+<script src="{% calc2_static 'calc2/52-modes.js' %}"></script>
+<script src="{% calc2_static 'calc2/54-scenes-ppf.js' %}"></script>
+<script src="{% calc2_static 'calc2/56-scenes-inequality.js' %}"></script>
+<script src="{% calc2_static 'calc2/60-overlays.js' %}"></script>
+<script src="{% calc2_static 'calc2/70-scenes-math.js' %}"></script>
+<script src="{% calc2_static 'calc2/80-ui.js' %}"></script>
+<script src="{% calc2_static 'calc2/82-input.js' %}"></script>
+<script src="{% calc2_static 'calc2/84-picker.js' %}"></script>
+<script src="{% calc2_static 'calc2/86-workspace.js' %}"></script>
+<script src="{% calc2_static 'calc2/88-params.js' %}"></script>
+<script src="{% calc2_static 'calc2/90-explain.js' %}"></script>
+<script src="{% calc2_static 'calc2/99-boot.js' %}"></script>
 </body>
 </html>

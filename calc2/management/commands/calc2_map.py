@@ -38,7 +38,10 @@ END_LINE_RE = re.compile(r'^' + re.escape(END_MARK) + r'\s*$', re.MULTILINE)
 MAP_PATH = Path(settings.BASE_DIR) / 'docs' / 'calc2' / 'CALC2_MAP.md'
 APP_DIR = Path(settings.BASE_DIR) / 'calc2'
 
-STATIC_TAG_RE = re.compile(r"\{%\s*static\s+'(calc2/[^']+)'\s*%\}")
+# Ссылки на статику calc2 в шаблоне. Тег теперь `calc2_static` (он же
+# `static` плюс метка версии `?v=`), но и голый `static` разбираем — на
+# случай ссылки, которую метка не касается.
+STATIC_TAG_RE = re.compile(r"\{%\s*(?:calc2_)?static\s+'(calc2/[^']+)'\s*%\}")
 TEMPLATE_NAME_RE = re.compile(r"template_name\s*=\s*['\"]([^'\"]+)['\"]")
 
 # Четыре формы объявления верхнего уровня, которые нас интересуют. «Верхний
@@ -81,7 +84,7 @@ def discover_core_files():
     # dict.fromkeys вместо set — сохраняет порядок первого появления в шаблоне.
     static_rel_paths = list(dict.fromkeys(STATIC_TAG_RE.findall(template_src)))
     if not static_rel_paths:
-        raise CommandError('В шаблоне не нашлось ни одной ссылки {% static \'calc2/...\' %}')
+        raise CommandError('В шаблоне не нашлось ни одной ссылки {% calc2_static \'calc2/...\' %}')
     static_paths = [APP_DIR / 'static' / rel for rel in static_rel_paths]
     missing = [p for p in static_paths if not p.exists()]
     if missing:
