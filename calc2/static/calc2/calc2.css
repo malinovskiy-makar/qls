@@ -959,6 +959,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .bcard:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: var(--shadow-pop); }
 .bcard:focus-visible { border-color: var(--accent); outline: 2px solid var(--focus); outline-offset: 2px; }
 .bcard:active { transform: translateY(-1px) scale(.995); }
+/* Первую карточку окно фокусирует программно при открытии (доступность —
+   Tab/Enter срабатывают сразу), но браузер не отличает такой фокус от
+   настоящего Tab и рисует кольцо на пустом месте, ещё до первого касания
+   мышью или клавиатурой. Кольцо гасим только на время этого «служебного»
+   фокуса — см. openPicker() в 84-picker.js, класс снимается на первое же
+   действие человека, и дальше :focus-visible снова решает сам браузер. */
+.bcard.no-init-ring:focus-visible { border-color: var(--border); outline: none; }
 
 /* Возврат ко всем блокам. Показывается только внутри открытого блока. */
 .picker-back {

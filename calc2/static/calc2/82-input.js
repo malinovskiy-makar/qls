@@ -90,6 +90,23 @@ function pwRows() {
   return out;
 }
 
+/* Приставка вида «y = », «P = »: конструктор её не придумывает, а читает из
+   ТЕКУЩЕГО значения поля, куда открыт. Раньше «Поставить в поле» стирало всё
+   значение целиком вместе с приставкой (setFieldValue переписывал inp.value
+   голой цепочкой условий), и это ломало и запись, и разбор:
+     · для полей, которые ждут именно «буква = …» (КПВ, «Неравенство доходов»)
+       собранная запись без приставки либо не считается вовсе, либо разбор
+       путает «>=»/«<=» ИЗ УСЛОВИЯ КУСКА с настоящим знаком равенства — свой
+       «=» перед ним отводит эту путаницу, поэтому «y = (x>=0 ...)» разбирается,
+       а голое «(x>=0 ...)» — нет (см. `parsePpfEquation`, ищет первый «=»);
+     · для полей без приставки (голое выражение) регулярка просто не
+       совпадает, и правка ничего не меняет — это тоже правильно.
+   Поэтому конструктор ЧИТАЕТ форму, а не решает её сам. */
+function pwPrefixOf(text) {
+  const m = /^\s*[A-Za-zА-Яа-я][A-Za-zА-Яа-я0-9_]*\s*=(?!=)\s*/.exec(String(text || ''));
+  return m ? m[0] : '';
+}
+
 function pwFormula() {
   const rows = pwRows();
   const v = pwVar();       // условие пишем той же буквой, что и сами куски
@@ -259,6 +276,51 @@ function pwAttachKeyboard(row, inp) {
 function pwPreview() {
   const prev = document.getElementById('pw-preview');
   if (prev) renderTexRaw(prev, pwLatex());
+}
+
+/* Какой буквой сцена ДЕЙСТВИТЕЛЬНО пишет это поле — читаем из его текущей
+   формулы, а не из статичной угадайки FORMULA_VAR («вид поля» → буква).
+   FORMULA_VAR не различает рынок труда (DEMAND/SUPPLY у него всегда «Q», хотя
+   в «Конкурентном рынке труда» и соседних сценах формулы пишут через L) и три
+   разных macro-сюжета под одним ярлыком «MACRO» (денежный рынок — i, рынок
+   заёмных средств — r, кривая Лаффера — Q; угадайка везде отвечает «Y»).
+   Свободная буква самой формулы (freeSymbols, `60-overlays.js`) — то немногое,
+   что действительно знает про КОНКРЕТНОЕ поле; угадайка остаётся только
+   запасным вариантом для пустого поля, где брать букву неоткуда. */
+/* ⚠️ НЕ freeSymbols. У неё обратная задача: найти буквы, которым нужен
+   ползунок, поэтому она НАРОЧНО выбрасывает буквы осей (AXIS_VARS — x, y, Q,
+   L, P… ровно то, что здесь и нужно) и математические константы (MATH_CONSTS,
+   и «i» — мнимая единица — там же, хотя в «Денежном рынке» i это ставка
+   процента, а не корень из −1). Здесь другой вопрос — «по какой букве вообще
+   построена ЭТА формула», — и ответ первая попавшаяся переменная слева
+   направо, будь то ось или что угодно ещё; манипуляторы сцены (ставка t,
+   субсидия s, зарплата w — у них своя роль, не ось) пропускаем, как и имя
+   функции в вызове (sqrt, log…). */
+function pwVarForField(inp, fallback) {
+  if (inp && inp.value) {
+    try {
+      /* Приставка «y = », «P = » — это ИМЯ ФУНКЦИИ (зависимая величина), не
+         буква, по которой сцена строит график. У «y = 100 - x» Math.js читает
+         «y = …» как присваивание, и первым символом при обходе идёт именно
+         «y» — ровно НЕ та буква, что нужна условию куска (условие пишут по x,
+         как и сама функция). Приставку срезаем тем же pwPrefixOf, что уже
+         бережёт её при записи (см. выше) — здесь она, наоборот, мешает. */
+      const pfx = pwPrefixOf(inp.value);
+      const body = pfx ? inp.value.slice(pfx.length) : inp.value;
+      const node = math.parse(prepExpr(body));
+      const reserved = (typeof sceneReserved === 'function') ? sceneReserved() : new Set();
+      let found = null;
+      node.traverse((n, path, parent) => {
+        if (found || n.type !== 'SymbolNode') return;
+        if (parent && parent.type === 'FunctionNode' && parent.fn === n) return;
+        if (reserved.has(n.name)) return;
+        if (n.name.length > 1) { try { if (typeof math[n.name] !== 'undefined') return; } catch (e) {} }
+        found = n.name;
+      });
+      if (found) return found;
+    } catch (e) {}
+  }
+  return fallback;
 }
 
 function openPiecewise(inp, v) {
@@ -1012,7 +1074,7 @@ function buildKeyboard(box, inp) {
   const pw = document.createElement('button'); pw.type = 'button'; pw.textContent = 'Кусочная функция';
   pw.addEventListener('click', () => {
     box.classList.remove('open');
-    openPiecewise(inp, box._var || 'x');
+    openPiecewise(inp, pwVarForField(inp, box._var || 'x'));
   });
   foot.appendChild(pw);
   box.appendChild(foot);
@@ -1270,7 +1332,7 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
     pwBtn.addEventListener('click', () => {
       pop.classList.remove('open');
       btn.setAttribute('aria-expanded', 'false');
-      openPiecewise(inp, FORMULA_VAR[k] || 'x');
+      openPiecewise(inp, pwVarForField(inp, FORMULA_VAR[k] || 'x'));
     });
     pwRow.appendChild(pwBtn);
     pop.appendChild(pwRow);

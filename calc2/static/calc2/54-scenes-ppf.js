@@ -569,11 +569,25 @@ function ppfEvalWith(compiled, x) {
   } catch (e) { return NaN; }
 }
 
-// Наклон произвольной функции f в точке x (центральная разность).
+/* Наклон произвольной функции f в точке x — центральная разность, а на краю
+   домена односторонняя. Угловое решение КТВ (cornerByValue) стоит РОВНО на
+   границе — xp = 0 или xp = Xmax, — и раньше здесь всегда была NaN: f
+   работает через interpY по точкам [0, Xmax], а та честно не экстраполирует
+   за массив (см. её же комментарий), и f(Xmax + h) уходила в NaN. Центральной
+   разности с одной стороны буквально не из чего считать, но с ДРУГОЙ сторона
+   есть — и наклон там определён не хуже, чем в любой другой точке того же
+   отрезка (это не излом, это край графика). Настоящая неопределённость
+   остаётся только там, где недоступна и точка x, и обе соседние — это и
+   означает «здесь функция не задана», а не пограничный артефакт. */
 function ppfSlopeOf(f, x) {
   const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
   const a = f(x + h), b = f(x - h);
-  return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / (2 * h);
+  if (!isNaN(a) && !isNaN(b)) return (a - b) / (2 * h);
+  const c = f(x);
+  if (isNaN(c)) return NaN;
+  if (!isNaN(a)) return (a - c) / h;   // правая сторона доступна — вперёд
+  if (!isNaN(b)) return (c - b) / h;   // левая сторона доступна — назад
+  return NaN;
 }
 
 // Точка пересечения убывающей КПВ с осью X (где Y=0). NaN-зона трактуется как «ниже нуля».
@@ -1406,10 +1420,18 @@ function updatePpfTradePanel() {
     ? d.c.b
     : ((d.xp != null && d.xp > 0) ? Math.abs(ppfSlopeOf((x) => interpY(d.ppfPts, x), d.xp))
                                   : (d.Ymax / d.Xmax));
+  /* ⚠️ НЕ fmt(inner) НАПРЯМУЮ, ЕСЛИ inner НЕ ЧИСЛО. fmt(NaN) печатает буквально
+     «NaN» (isFinite-проверка внутри fmt отдаёт String(v) как есть), а
+     fmt(null) — куда коварнее: roundShown(null) считает null нулём, и «нет
+     значения» на экране неотличимо от настоящего нуля. Оба варианта врут.
+     Есть значение — печатаем; нет — говорим об этом словами. */
+  const innerHtml = (typeof inner === 'number' && isFinite(inner))
+    ? fmt(inner)
+    : '<span class="muted">не определена</span>';
   let html = '';
   html += `<div class="stat"><span>Режим</span><b>${d.regime}</b></div>`;
   html += `<div class="stat"><span>Мировая цена $P_x/P_y$</span><b>${fmt(d.ratio)}</b></div>`;
-  html += `<div class="stat"><span>Внутренняя цена X (наклон КПВ)</span><b>${fmt(inner)}</b></div>`;
+  html += `<div class="stat"><span>Внутренняя цена X (наклон КПВ)</span><b>${innerHtml}</b></div>`;
   if (d.xp != null) {
     html += `<div class="stat"><span>Производство $(X_п; Y_п)$</span><b>(${fmt(d.xp)}; ${fmt(d.yp)})</b></div>`;
   }

@@ -424,9 +424,21 @@ function wireScene() {
     if (PW.inp) {
       // Движку — цепочку условий, полю — одну фигурную скобку. Правится она
       // прямо в строке: разбор скобки обратно в выражение умеет latexToMath.
-      setFieldValue(PW.inp, pwFormula());
-      if (PW.inp._mf) { PW.inp._mf.value = pwLatex(); PW.inp._mf.focusField(); }
+      // Приставка («y = », «P = ») читается из ТЕКУЩЕГО значения поля и
+      // сохраняется — см. pwPrefixOf: без неё КПВ и «Неравенство доходов»
+      // либо путают «>=» условия со знаком равенства, либо просто не
+      // разбирают голую запись.
+      const prefix = pwPrefixOf(PW.inp.value);
+      setFieldValue(PW.inp, prefix + pwFormula());
+      if (PW.inp._mf) { PW.inp._mf.value = prefix + pwLatex(); PW.inp._mf.focusField(); }
       else PW.inp.focus();
+      /* Поле применяется по Enter или по своей кнопке «Построить», не по
+         одному вводу текста (см. applyPpf/applyIneqFm) — setFieldValue выше
+         только пишет текст и будит предпросмотр, но НЕ применяет его. Тот же
+         Enter, каким уже пользуется MathLive-поле при пересылке в inp
+         (см. `mf.addEventListener('keydown', ...)` выше), доводит дело до
+         конца и здесь. */
+      PW.inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     }
     closePiecewise();
   });

@@ -161,7 +161,24 @@ function openPicker() {
   const first = group
     ? (group.querySelector('.scard:not([disabled])') || p.querySelector('.bcard'))
     : (p.querySelector('.bcard') || p.querySelector('.scard:not([disabled])'));
-  if (first) first.focus();
+  /* ⚠️ ПРОГРАММНЫЙ ФОКУС — НЕ ЗНАЧИТ ВИДИМОЕ КОЛЬЦО. focus() здесь нужен ради
+     доступности: открыли окно — Tab и стрелки сразу работают, не нужно
+     проходить всю шапку сайта заново. Но браузер не различает «фокус дала
+     клавиатура человека» и «фокус дал этот вызов» и рисует :focus-visible
+     кольцо в обоих случаях — на первом экране оно появлялось на карточке
+     «Математика» сразу после загрузки, ещё до курсора и до Tab. Класс
+     no-init-ring на время гасит именно кольцо (сам фокус остаётся —
+     скринридер и Enter/стрелки работают как обычно), и снимается на первое
+     же настоящее действие человека — мышью или клавиатурой, — после чего
+     :focus-visible снова решает браузер сам, как везде. */
+  if (first) {
+    first.classList.add('no-init-ring');
+    first.focus({ preventScroll: true });
+    const clearInitRing = () => first.classList.remove('no-init-ring');
+    first.addEventListener('blur', clearInitRing, { once: true });
+    document.addEventListener('pointerdown', clearInitRing, { once: true });
+    document.addEventListener('keydown', clearInitRing, { once: true });
+  }
 }
 /* ---------------------------------------------------------------------
    БЛОКИ 1–10 · МАРШРУТЫ КАРТОЧЕК
