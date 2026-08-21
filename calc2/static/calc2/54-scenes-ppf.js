@@ -116,6 +116,10 @@ function compilePpf(expr) {
   try {
     const compiled = math.parse(prepExpr(expr)).compile();
     compiled.evaluate(scopeFor(expr, { x: 1, X: 1 }));   // пробный расчёт ловит опечатки
+    /* Исходный текст носим на самом узле — как это давно делает compileTwoVar.
+       Он нужен расчёту: по нему ppfEvalWith узнаёт, какие буквы в формуле есть,
+       и подставляет единицу той, у которой ползунка ещё нет. */
+    compiled._src = String(expr || '');
     res = { compiled, error: null };
   } catch (e) { res = { compiled: null, error: e.message }; }
   if (_ppfCompileCache.size > 200) _ppfCompileCache.clear();
@@ -536,9 +540,31 @@ function redrawPpf() {
    «Undefined symbol ax», хотя буква «a» ползунок исправно заводила. Замер
    22.08 и правка — в разделе CLAUDE.md за 22.08. Комментарий не доказывает,
    что код делает написанное: сверяться надо с прогоном, а не с текстом. */
+/* ⚠️ БУКВА БЕЗ ПОЛЗУНКА СЧИТАЕТСЯ ЕДИНИЦЕЙ, А НЕ ОБРУШИВАЕТ РАСЧЁТ.
+
+   Здесь стоял голый paramScope, и это был ТРЕТИЙ, отдельный отказ — не тот же
+   самый, что мёртвый разбор. Проверка владельца 22.08 показала его в чистом
+   виде: `parsePpfEquation('y=100-a*x')` отдаёт `kind: explicit`, то есть
+   формула РАЗОБРАЛАСЬ, а `f(5)` возвращает NaN (в JSON — `null`).
+
+   Асимметрия была ровно между двумя соседними строками: пробный расчёт при
+   разборе идёт через `scopeFor`, который подставляет единицу букве без
+   ползунка, а сам расчёт шёл через `paramScope`, который знает только
+   заведённые ползунки. Разбор проходил, счёт падал.
+
+   Окно, в котором это видно, не выдуманное: ползунок заводится ПОСЛЕ того, как
+   формула принята (об этом прямо сказано в комментарии к `scopeFor`), и между
+   двумя этими моментами кривая считалась в NaN, `ppfXmaxOf` получал null, и
+   сцена показывала «Не удалось определить границы КПВ» на пустом холсте.
+
+   Тот же приём, что у `evalWithParams` и `compileTwoVar`: исходный текст
+   формулы носит сам скомпилированный узел. */
 function ppfEvalWith(compiled, x) {
   try {
-    const v = compiled.evaluate(paramScope({ x: x, X: x }));
+    const ctx = (compiled && compiled._src)
+      ? scopeFor(compiled._src, { x: x, X: x })
+      : paramScope({ x: x, X: x });
+    const v = compiled.evaluate(ctx);
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) { return NaN; }
 }
