@@ -3051,6 +3051,107 @@ const CASES = [
              ['y(10) при a=1', 'y0', 90, 0.001],
              ['y(10) при a=10', 'y1', 0, 0.001]],
   },
+
+  /* ── Сессия 21.08: три дефекта вкладки «Графики» (три карточки Notion,
+     разбор по исходникам + замер в живом браузере) ──────────────────────── */
+  {
+    /* «Безработица = 0» обрезалась левым краем в «Конкурентном рынке труда» при
+       МРОТ выше кривой спроса: invCurve не находит корень, Qd оставался null,
+       fmt(null) врал «0», sx(null) давал x="NaN". Проверяем связывающий случай
+       (D(0)=100, W_min=114 — выше начала кривой спроса) и зеркальный низкий
+       МРОТ — оба раза без NaN-координат и без подписей, обрезанных слева. */
+    name: 'Труд · МРОТ выше кривой спроса ⇒ занятость 0, безработица честная, подписи без NaN и без обрезки',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L');       setRole(STATE.curves[1], 'supply');
+          setLaborStruct('comp');
+          STATE.laborMinOn = true; setLaborMin(114);
+          var m = STATE.laborMin || {};
+          var texts1 = Array.prototype.slice.call(document.querySelectorAll('#chart text'));
+          var nanX1 = texts1.filter(function (t) { return !isFinite(parseFloat(t.getAttribute('x'))); }).length;
+          var offLeft1 = texts1.filter(function (t) { return t.getBBox().x < 0; }).length;
+          STATE.laborMinOn = true; setLaborMin(0.5);
+          var texts2 = Array.prototype.slice.call(document.querySelectorAll('#chart text'));
+          var nanX2 = texts2.filter(function (t) { return !isFinite(parseFloat(t.getAttribute('x'))); }).length;
+          var offLeft2 = texts2.filter(function (t) { return t.getBBox().x < 0; }).length;
+          return { emp: m.employment, unemp: m.unemployment,
+                   nanX1: nanX1, offLeft1: offLeft1, nanX2: nanX2, offLeft2: offLeft2 };`,
+    checks: [['занятость (МРОТ=114)', 'emp', 0, 0.5], ['безработица (МРОТ=114)', 'unemp', 114, 0.5],
+             ['подписей x=NaN (МРОТ=114)', 'nanX1', 0, 0.1], ['подписей левее холста (МРОТ=114)', 'offLeft1', 0, 0.1],
+             ['подписей x=NaN (МРОТ=0.5)', 'nanX2', 0, 0.1], ['подписей левее холста (МРОТ=0.5)', 'offLeft2', 0, 0.1]],
+  },
+  {
+    /* Честный Qd=0/Qs=0 в laborMinCompetition — не единственный слой защиты:
+       если где-то ещё координата дойдёт до haloText нечисловой, подпись не
+       имеет права попасть на холст молча. Проверяем это НАПРЯМУЮ, минуя
+       остальные слои — иначе тест выше не отличит рабочую защиту haloText
+       от случайно неиспорченного пути (сцена с W_min=114 после починки Qd
+       уже не производит NaN сама по себе, и порча только haloText осталась
+       бы незамеченной). */
+    name: 'haloText · нечисловая координата не рисуется и не возвращается',
+    run: `loadScene('sd'); redrawAll();
+          var g = svg.append('g');
+          var before = g.node().childNodes.length;
+          var ret = haloText(g, NaN, 50, 'проба', 'middle', 'hanging');
+          var after = g.node().childNodes.length;
+          var retNull = (ret === null) ? 1 : 0;
+          var noAppend = (after === before) ? 1 : 0;
+          g.remove();
+          return { retNull: retNull, noAppend: noAppend };`,
+    checks: [['возвращает null', 'retNull', 1, 0.1], ['ничего не рисует', 'noAppend', 1, 0.1]],
+  },
+  {
+    /* Правка значения регулятора сцены выглядела как поле ввода на всю ширину
+       панели: .param-eq-input растягивался (width:100%), рамку/фон давало
+       более специфичное «#params-body .field input[type=number]:focus».
+       Эталон — соседний параметр кривой (.param-eq вне .field), с ним не
+       сравниваем напрямую, но проверяем те же числовые инварианты. */
+    name: 'Регулятор сцены · правка значения — поле по содержимому, без рамки, без фона',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L');       setRole(STATE.curves[1], 'supply');
+          setLaborStruct('comp');
+          STATE.laborMinOn = true; setLaborMin(114);
+          var field = document.getElementById('labmin-field');
+          var eq = field.querySelector('.reg-eq');
+          var eqWidth = eq.getBoundingClientRect().width;
+          var panelWidth = document.getElementById('params-body').getBoundingClientRect().width;
+          eq.click();
+          var inp = field.querySelector('input.param-eq-input');
+          var cs = getComputedStyle(inp);
+          var wid = inp.getBoundingClientRect().width;
+          var borderTop = parseFloat(cs.borderTopWidth);
+          var bg = cs.backgroundColor;
+          var bgFlag = (bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') ? 1 : 0;
+          var widFlag = (wid > 0 && wid <= 40) ? 1 : 0;
+          var eqNarrowFlag = (eqWidth < panelWidth * 0.6) ? 1 : 0;
+          inp.blur();
+          return { wid: wid, widFlag: widFlag, borderTop: borderTop, bgFlag: bgFlag,
+                   eqWidth: eqWidth, panelWidth: panelWidth, eqNarrowFlag: eqNarrowFlag };`,
+    checks: [['ширина поля ≤ 40px (флаг)', 'widFlag', 1, 0.1], ['ширина поля, px (сырое)', 'wid', 20, 20],
+             ['border-top = 0', 'borderTop', 0, 0.1], ['фон прозрачный (флаг)', 'bgFlag', 1, 0.1],
+             ['строка .reg-eq заметно уже панели (флаг)', 'eqNarrowFlag', 1, 0.1],
+             ['ширина .reg-eq, px (сырое)', 'eqWidth', 70, 70], ['ширина #params-body, px (сырое)', 'panelWidth', 260, 260]],
+  },
+  {
+    /* «Равновесие𝐷 = 𝑆» без пробела: .section-title — flex-контейнер, и в нём
+       текстовый узел перед span.tex теряет конечный пробел. */
+    name: 'Заголовок раздела · зазор между текстом и формулой («Равновесие D = S»)',
+    run: `loadScene('sd'); redrawAll();
+          var t = document.getElementById('sec-eq').querySelector('.section-title');
+          var textNode = Array.prototype.filter.call(t.childNodes, function (n) { return n.nodeType === 3; })[0];
+          var texSpan = t.querySelector('.tex');
+          var range = document.createRange();
+          range.selectNodeContents(textNode);
+          var tr = range.getBoundingClientRect();
+          var sr = texSpan.getBoundingClientRect();
+          var gap = sr.left - tr.right;
+          var gapFlag = (gap > 2) ? 1 : 0;
+          return { gap: gap, gapFlag: gapFlag };`,
+    checks: [['зазор > 2px (флаг)', 'gapFlag', 1, 0.1], ['зазор, px (сырое)', 'gap', 4, 4]],
+  },
 ];
 
 function approx(got, want, tol) {
