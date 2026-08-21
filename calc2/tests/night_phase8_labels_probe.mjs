@@ -79,7 +79,7 @@ console.log('сцен без подписи ОБЩИМ помощником (к�
 console.log('сцен, где подписи есть, но общего помощника не звали: ' + noClass.length
   + (noClass.length ? ' (' + noClass.map(r => r.key).join(', ') + ')' : ''));
 console.log('сцен, где подписей меньше, чем линий: ' + partial.length
-  + (partial.length ? ' (' + partial.map(r => r.key + ' ' + r.open.looks + '/' + r.open.curves).join(', ') + ')' : ''));
+  + (partial.length ? ' (' + partial.map(r => r.key + ' ' + r.open.labels + '/' + r.open.curves).join(', ') + ')' : ''));
 if (diff.length) fail('раскрытие панели меняет картинку: ' + diff.map(r => r.key).join(', '));
 /* Провал ставим только за то, что проверяет ФАЗА 8 буквально: подписи стоят
    сразу, без раскрытия панели. Сцены, где подписи рисуются мимо общего
