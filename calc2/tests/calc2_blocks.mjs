@@ -231,6 +231,86 @@ await t('baseScene сводит подрежим к базе', () => page.evalua
   (baseScene('mono-nat') === 'mono' && baseScene('labor-bilat') === 'labor'
    && baseScene('tax-adv') === 'tax' && baseScene('sd') === 'sd') || 'baseScene врёт'));
 
+/* --- 6. Ночная сессия «левая панель» (22.08) --------------------------
+   Макет панели утверждён владельцем: во ВСЕХ 41 сцене ровно три карточки в
+   одном порядке, убранные блоки не всплывают нигде, дорожки ползунков стоят
+   вровень. Всё три — сквозные правила, поэтому проверяются перебором сцен, а
+   не на одной удобной. */
+
+const WANT_CARDS = ['sec-input', 'sec-view', 'sec-areascalc'];
+const FORBIDDEN_HEADS = ['Что изучаем', 'Структура рынка', 'Излишки'];
+
+const panelSweep = await page.evaluate(async (FORB) => {
+  const w = ms => new Promise(r => setTimeout(r, ms));
+  const rows = [];
+  for (const k of Object.keys(SCENE_ROUTE)) {
+    resetSceneMemory(); pickScene(k); await w(180);
+    const cards = [...document.querySelectorAll('#tools-panel .tools-body > .section')]
+      .filter(s => s.style.display !== 'none' && s.offsetParent !== null)
+      .map(s => {
+        const btn = s.querySelector(':scope > .fold-btn');
+        const body = s.querySelector(':scope > .fold-body');
+        return { id: s.id,
+                 name: btn ? btn.querySelector('span > b').textContent.trim() : '',
+                 open: btn ? btn.getAttribute('aria-expanded') === 'true' : null,
+                 controls: body ? [...body.querySelectorAll('input,select,button,textarea')]
+                                    .filter(e => e.offsetParent !== null).length : 0 };
+      });
+    const visText = [...document.getElementById('tools-panel').querySelectorAll('*')]
+      .filter(e => e.offsetParent !== null && !e.children.length)
+      .map(e => (e.textContent || '').trim()).join(' | ');
+    rows.push({ key: k, cards, seen: FORB.filter(t => visText.indexOf(t) >= 0) });
+  }
+  return rows;
+}, FORBIDDEN_HEADS);
+
+// (г) Ровно три карточки в заданном порядке, первая раскрыта, две свёрнуты.
+await t('(г) в каждой из 41 сцены три карточки панели в одном порядке', async () => {
+  const bad = panelSweep.filter(r =>
+    r.cards.map(c => c.id).join() !== WANT_CARDS.join()
+    || !(r.cards[0].open === true && r.cards[1].open === false && r.cards[2].open === false)
+    || r.cards[0].name !== 'Ввод функций'
+    || r.cards[0].controls === 0);
+  if (panelSweep.length !== 41) return `сцен ${panelSweep.length}, а не 41`;
+  return bad.length === 0
+    || bad.map(r => r.key + ' [' + r.cards.map(c => c.id + (c.open ? '+' : '-')).join(' ') + ']').join('; ');
+});
+
+// (д) Убранные блоки не показываются НИ В ОДНОЙ сцене.
+await t('(д) «Что изучаем», «Структура рынка» и «Излишки» в панели не встречаются', async () => {
+  const bad = panelSweep.filter(r => r.seen.length);
+  const gone = await page.evaluate(() => ['sec-analysis', 'sec-areas', 'scn-none', 'scn-shift']
+    .filter(id => document.getElementById(id)));
+  if (gone.length) return 'в разметке остались: ' + gone.join(', ');
+  return bad.length === 0 || bad.map(r => r.key + ' ' + JSON.stringify(r.seen)).join('; ');
+});
+
+// (ж) Левый край дорожек всех ползунков панели совпадает до пикселя.
+await t('(ж) левый край дорожек всех ползунков панели совпадает', async () => {
+  const r = await page.evaluate(async () => {
+    const w = ms => new Promise(res => setTimeout(res, ms));
+    /* «Пол и потолок цены» плюс буква из формулы: в панели разом стоят сдвиги
+       кривых (границы «−50»), регулируемая цена («0» и «100») и буква
+       («−10» и «10») — разрядность разная, ради этого случая и правилось. */
+    resetSceneMemory(); pickScene('ceil'); await w(400);
+    const inp = document.querySelector('#curve-list .curve-expr-inp');
+    inp.value = '100 - a*Q'; inp.dispatchEvent(new Event('input', { bubbles: true }));
+    await w(600); redrawAll(); await w(400);
+    const tracks = [...document.querySelectorAll('#params-panel .param-track')]
+      .filter(el => el.offsetParent !== null && el.getBoundingClientRect().width > 0);
+    return tracks.map(el => {
+      const s = el.querySelector('input[type=range]');
+      return { left: Math.round(s.getBoundingClientRect().left * 100) / 100,
+               bound: (el.querySelector('.param-bound') || {}).textContent };
+    });
+  });
+  if (r.length < 3) return 'дорожек всего ' + r.length + ' — проба ничего не проверила';
+  const uniq = [...new Set(r.map(x => x.left))];
+  return uniq.length === 1
+    || `дорожек ${r.length}, разных координат ${uniq.length}: ${uniq.join(', ')}`
+       + ` | границы: ${r.map(x => x.bound).join(', ')}`;
+});
+
 /* --- Итог ------------------------------------------------------------- */
 for (const [st, name, info] of checks) console.log(`${st === 'OK' ? '✓' : '✗'} ${name}${info ? ' — ' + info : ''}`);
 const bad = checks.filter(c => c[0] !== 'OK').length;

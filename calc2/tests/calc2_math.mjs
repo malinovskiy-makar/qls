@@ -3481,6 +3481,106 @@ await gesture('(е) конструктор на пустом поле не па�
   return { ok: !r.crashed && !!r.v, detail: `буква=${r.v} crash=${r.crashed}` };
 });
 
+/* =====================================================================
+   НОЧНАЯ СЕССИЯ «ЛЕВАЯ ПАНЕЛЬ» (22.08). Зубастые проверки к четырём находкам,
+   которые иначе некому стеречь: память параметров между моделями, живая
+   перестройка КТВ и договор «добавленная кривая в расчёты не входит».
+   ===================================================================== */
+
+// (а) Вход в модель, где в этом сеансе не были, начинается с нуля параметров.
+await gesture('(а) вход в новую модель — параметров ноль', async () => {
+  const r = await page.evaluate(async () => {
+    const w = ms => new Promise(res => setTimeout(res, ms));
+    resetSceneMemory(); pickScene('smallopen'); await w(250);
+    const inp = document.querySelector('#curve-list .curve-expr-inp');
+    inp.value = '100 - a*Q'; inp.dispatchEvent(new Event('input', { bubbles: true }));
+    await w(250);
+    const here = Object.keys(STATE.params || {});
+    if (STATE.params.a) STATE.params.a.value = 3;
+    redrawAll(); await w(150);
+    pickScene('adas'); await w(250);
+    const adas = Object.keys(STATE.params || {});
+    pickScene('ceil'); await w(250);
+    const ceil = Object.keys(STATE.params || {});
+    return { here, adas, ceil };
+  });
+  return { ok: r.here.join() === 'a' && r.adas.length === 0 && r.ceil.length === 0,
+           detail: `в «Малой открытой» [${r.here}], в AD–AS [${r.adas}], в «Поле и потолке» [${r.ceil}]` };
+});
+
+// (б) Возврат в модель, где параметр заводили, возвращает его с тем же числом.
+// Эта проверка ВАЖНЕЕ предыдущей: сломав её, мы получим дефект хуже исходного.
+await gesture('(б) возврат в модель — параметр на месте с прежним значением', async () => {
+  const r = await page.evaluate(async () => {
+    const w = ms => new Promise(res => setTimeout(res, ms));
+    resetSceneMemory(); pickScene('smallopen'); await w(250);
+    const inp = document.querySelector('#curve-list .curve-expr-inp');
+    inp.value = '100 - a*Q'; inp.dispatchEvent(new Event('input', { bubbles: true }));
+    await w(250);
+    if (STATE.params.a) STATE.params.a.value = 3.5;
+    redrawAll(); await w(150);
+    pickScene('adas'); await w(250);
+    const away = Object.keys(STATE.params || {});
+    pickScene('smallopen'); await w(300);
+    const back = Object.keys(STATE.params || {});
+    const val = STATE.params.a ? STATE.params.a.value : null;
+    const expr = (STATE.curves[0] || {}).expr;
+    return { away, back, val, expr };
+  });
+  return { ok: r.away.length === 0 && r.back.join() === 'a' && Math.abs(r.val - 3.5) < 1e-9,
+           detail: `уходили [${r.away}], вернулись [${r.back}] a=${r.val}, формула «${r.expr}»` };
+});
+
+// (в) КТВ перестраивается от ползунка, кнопку «Построить КТВ» не трогаем.
+await gesture('(в) ползунок меняет геометрию КТВ без нажатия кнопки', async () => {
+  const r = await page.evaluate(async () => {
+    const w = ms => new Promise(res => setTimeout(res, ms));
+    const geom = () => [...document.querySelectorAll('#chart path')].map(p => p.getAttribute('d') || '');
+    resetSceneMemory(); pickScene('trade'); await w(400);
+    const f = document.getElementById('inp-ppft');
+    f.value = '100 - a*X';
+    document.getElementById('inp-ppft-price').value = '1.5';
+    document.getElementById('btn-ppft-apply').click(); await w(400);
+    const before = geom();
+    const d0 = STATE.ppfTradeData ? { Xmax: STATE.ppfTradeData.Xmax, yint: STATE.ppfTradeData.yint } : null;
+    const sl = [...document.querySelectorAll('#params-panel input[type=range]')]
+      .find(x => (x.id || '').indexOf('ppft') < 0);
+    if (!sl) return { none: true };
+    sl.value = String(Math.min(parseFloat(sl.max), 2));
+    sl.dispatchEvent(new Event('input', { bubbles: true }));
+    await w(500);
+    const after = geom();
+    const d1 = STATE.ppfTradeData ? { Xmax: STATE.ppfTradeData.Xmax, yint: STATE.ppfTradeData.yint } : null;
+    return { changed: JSON.stringify(before) !== JSON.stringify(after), d0, d1 };
+  });
+  if (r.none) return { ok: false, detail: 'ползунка параметра в панели нет' };
+  return { ok: r.changed && r.d0 && r.d1 && Math.abs(r.d0.Xmax - r.d1.Xmax) > 1e-6,
+           detail: `до ${JSON.stringify(r.d0)}, после ${JSON.stringify(r.d1)}, путь изменился: ${r.changed}` };
+});
+
+// (е) Добавленная кривая просто рисуется поверх: контрольные P*=50, Q*=50 держатся.
+await gesture('(е) добавленная кривая не меняет равновесие (P*=50, Q*=50)', async () => {
+  const r = await page.evaluate(async () => {
+    const w = ms => new Promise(res => setTimeout(res, ms));
+    resetSceneMemory(); pickScene('sd'); await w(350);
+    const eq0 = { P: STATE.eq.P, Q: STATE.eq.Q };
+    addEmptyCurve();
+    const el = [...document.querySelectorAll('#curve-list .curve-expr-inp')].pop();
+    el.value = '30 + 0.7*Q'; el.dispatchEvent(new Event('input', { bubbles: true }));
+    await w(350);
+    const c = STATE.curves[STATE.curves.length - 1];
+    const eq1 = { P: STATE.eq.P, Q: STATE.eq.Q };
+    const drawn = document.querySelectorAll('#chart path[data-curve]').length;
+    return { eq0, eq1, role: c.role, drawn, expr: c.expr };
+  });
+  const near = (v, t) => Math.abs(v - t) < 0.3;
+  return { ok: !r.role && near(r.eq1.P, 50) && near(r.eq1.Q, 50)
+               && Math.abs(r.eq1.P - r.eq0.P) < 1e-9 && Math.abs(r.eq1.Q - r.eq0.Q) < 1e-9
+               && r.drawn === 3,
+           detail: `до ${JSON.stringify(r.eq0)}, после ${JSON.stringify(r.eq1)}, роль ${r.role}, `
+                 + `кривых на холсте ${r.drawn}, формула «${r.expr}»` };
+});
+
 await browser.close();
 console.log(`\n=== calc2 регрессия: ${pass} прошло, ${fail} провалено (всего ${CASES.length}) ===`);
 process.exit(fail === 0 ? 0 : 1);
