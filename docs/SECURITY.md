@@ -357,18 +357,37 @@ Python, а всё, что ниже WARNING, пропадало молча. На�
 ## Пользовательские файлы
 
 `/media/<path>` заводится в `config/urls.py` **внутри `if settings.DEBUG`** —
-на проде маршрута нет вовсе, подмена пути не работает не потому, что её
-кто-то отсекает, а потому что отвечать некому. `WHITENOISE_ROOT` не задан,
-поэтому WhiteNoise отдаёт только `STATIC_ROOT`. Представлений с
+на проде маршрута у Django нет вовсе, подмена пути не работает не потому,
+что её кто-то отсекает, а потому что отвечать некому. `WHITENOISE_ROOT` не
+задан, поэтому WhiteNoise отдаёт только `STATIC_ROOT`. Представлений с
 `FileResponse` или `serve()` в проекте нет.
 
-⚠️ **Следствие, которое надо знать:** четыре поля моделей
-(`FileAsset.file`, `Problem.solution_file`, `Job.output_file`,
-`ImportSession.source_file`) принимают загрузку, но на проде **никак не
-отдаются** — ссылка вернёт 404. Это не дыра, а недоделка; карточка в
-Notion.
+⚠️ **22.08: этого было мало — второй слой пропускал.** `deploy/nginx/
+available/django.conf` держал свой `location /media/ { alias
+/var/www/media/; }`, указывающий на тот же общий том, что и `MEDIA_ROOT` у
+Django (`deploy/docker-compose.yml`, том `media`). Реальная загрузка в
+этот том — не гипотеза: `Submission.solution_file` сохраняет скан/фото
+решения ученика при сдаче задания (`problems/assignment_rows.py`),
+рабочая функция уже на момент находки. Итог: прикреплённый файл был
+публично доступен по `/media/submissions/ГГГГ/ММ/имя` в обход Django, без
+единой проверки прав — сессией С2-хвостов закрыто (`location /media/`
+теперь безусловно 404, тем же приёмом, что и `/healthz/`).
 
-Держится тестом `problems/tests/test_media_route.py`.
+Четыре поля моделей принимают загрузку (`FileAsset.file`,
+`Problem.solution_file`, `Job.output_file`, `ImportSession.source_file`),
+но публичной отдачи для них **сознательно нет ни на одном слое** — это не
+недоделка, а осознанная отсрочка до отдельной сессии **SEC-06**: лимиты
+размера, проверка magic-байтов/MIME (не доверять расширению и
+`Content-Type` от клиента), приватное хранилище (не общий с nginx том) и
+подписанные ссылки с ограниченным сроком жизни вместо прямого пути.
+Открывать `/media/` без этого — значит выдавать чужие файлы по
+угадываемому пути, как и обнаружилось 22.08.
+
+Держится тестами `problems/tests/test_media_route.py` — на Django-слое
+(`MediaRouteIsAbsentInProductionTests`, `MediaRouteIsGuardedByDebugFlagTests`,
+`NoOtherFileServingViewTests`) и на nginx-слое
+(`MediaIsNotServedByNginxTests`, читает конфиг текстом — `manage.py test`
+nginx не поднимает).
 
 ---
 
