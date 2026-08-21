@@ -789,6 +789,82 @@ const CASES = [
              ['скобка f(10)', 'ba', 90, 0.01], ['скобка f(50)', 'bb', 60, 0.01], ['скобка f(90)', 'bc', 20, 0.01]],
   },
   {
+    // Сессия 22.08: «Поставить в поле» стирало приставку «y = » целиком, и
+    // разбор КПВ путал «>=» условия куска с настоящим знаком равенства без
+    // своего «=» перед ним — собранная запись оставалась непринятой.
+    name: 'Конструктор кусочной · КПВ принимает собранную запись (приставка «y =» сохранена)',
+    run: `pickScene('ppf');
+          var inp = document.getElementById('inp-ppf');
+          openPiecewise(inp, 'x');
+          PW.n = 2;
+          PW.rows = [{f:'100 - x', a:'0', b:'50'}, {f:'75 - 0.5*x', a:'50', b:''}];
+          document.getElementById('pw-apply').click();
+          var hasPrefix = /^y\\s*=/.test(inp.value) ? 1 : 0;
+          var r = parsePpfEquation(STATE.ppfFormula);
+          var errOk = r.error ? 0 : 1;
+          return { value: inp.value, hasPrefix: hasPrefix, errOk: errOk,
+                   y40: errOk ? r.f(40) : null, y60: errOk ? r.f(60) : null };`,
+    checks: [['приставка «y =» сохранена (флаг)', 'hasPrefix', 1, 0],
+             ['разбор без ошибки (флаг)', 'errOk', 1, 0],
+             ['y(40) = 100−40 (первый кусок)', 'y40', 60, 0.5],
+             ['y(60) = 75−0,5·60 (второй кусок)', 'y60', 45, 0.5]],
+  },
+  {
+    name: 'Конструктор кусочной · «Неравенство доходов» принимает собранную запись (без приставки)',
+    run: `setMode('inequality'); setIneqInput('formula');
+          var inp = document.getElementById('ineq-formula');
+          inp.value = 'p^2';
+          document.getElementById('ineq-formula-apply').click();
+          var before = STATE.ineqFormula;
+          openPiecewise(inp, 'p');
+          PW.n = 2;
+          PW.rows = [{f:'0.5*p', a:'0', b:'0.5'}, {f:'p - 0.25', a:'0.5', b:''}];
+          document.getElementById('pw-apply').click();
+          var changed = (STATE.ineqFormula !== before) ? 1 : 0;
+          return { before: before, after: STATE.ineqFormula, changed: changed,
+                   lorenzLen: (STATE.ineqLorenz || []).length };`,
+    checks: [['формула сменилась (флаг)', 'changed', 1, 0],
+             ['точек кривой посчитано', 'lorenzLen', 101, 5]],
+  },
+  {
+    // pwVarForField читает букву условия из ТЕКУЩЕЙ формулы поля, а не из
+    // статичной FORMULA_VAR[вид поля] — та не различала рынок труда (всегда
+    // «Q», хотя формулы там пишут через L) и три macro-сюжета под одним
+    // ярлыком «MACRO» (i / r / Y). Три поля из карточки «10 полей в 8 сценах».
+    name: 'Конструктор кусочной · условие берёт букву САМОЙ формулы, а не угадайку по виду поля',
+    run: `setMode('labor'); setLaborStruct('competition'); redrawAll();
+          var laborLetter = pwVarForField(document.getElementById('curve-expr-1'), 'FALLBACK');
+          setMode('macro'); setMacroModel('money'); redrawAll();
+          var moneyLetter = pwVarForField(document.getElementById('ma-md'), 'FALLBACK');
+          setMode('inequality'); setIneqInput('formula'); redrawAll();
+          var ineqLetter = pwVarForField(document.getElementById('ineq-formula'), 'FALLBACK');
+          return { laborLetter: laborLetter, moneyLetter: moneyLetter, ineqLetter: ineqLetter,
+                   laborOk: (laborLetter === 'L') ? 1 : 0,
+                   moneyOk: (moneyLetter === 'i') ? 1 : 0,
+                   ineqOk: (ineqLetter === 'p') ? 1 : 0 };`,
+    checks: [['Конкурентный рынок труда: буква L, не Q (флаг)', 'laborOk', 1, 0],
+             ['Денежный рынок: буква i, не Y (флаг)', 'moneyOk', 1, 0],
+             ['Неравенство доходов: буква p, не x (флаг)', 'ineqOk', 1, 0]],
+  },
+  {
+    // ppfSlopeOf брала центральную разность и лезла за границу домена, когда
+    // угловое решение КТВ стоит ровно на Xmax: interpY честно не экстраполирует
+    // за [0, Xmax] и отдавала NaN. Прогон — ровно репродукция бага 22.08.
+    name: 'КТВ. Одна страна · «Внутренняя цена X» — конечное число при кусочной КПВ (не NaN)',
+    run: `pickScene('trade');
+          STATE.ppftFormula = 'x < 50 ? 100 - x : 75 - 0.5*x';
+          recomputePpfTrade();
+          var d = STATE.ppfTradeData;
+          var inner = (d.c.type === 'linear' && d.c.b > 0) ? d.c.b
+            : ((d.xp != null && d.xp > 0)
+                ? Math.abs(ppfSlopeOf(function (x) { return interpY(d.ppfPts, x); }, d.xp))
+                : (d.Ymax / d.Xmax));
+          return { xp: d.xp, isFiniteFlag: (typeof inner === 'number' && isFinite(inner)) ? 1 : 0, inner: inner };`,
+    checks: [['xp = Xmax (угловое решение на границе)', 'xp', 150, 0.5],
+             ['внутренняя цена — конечное число (флаг)', 'isFiniteFlag', 1, 0],
+             ['внутренняя цена = 0,5 (наклон второго отрезка)', 'inner', 0.5, 0.01]],
+  },
+  {
     name: 'Ползунок параметра · k*Q при k = 3 ⇒ 30 в точке 10',
     run: `loadScene('sd');
           STATE.curves = []; STATE.params = {};
