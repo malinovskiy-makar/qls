@@ -861,16 +861,9 @@
       <div class="section-title">Равновесие $D = S$</div>
       <div id="info-eq"></div>
     </div>
-      <!-- Карточка «Излишки» убрана из панели (решение владельца 22.08):
-           тумблер показа переехал в «Настройки графика» у гаечного ключа.
-           Сами галочки живут здесь скрытыми — их состояние читают заливки,
-           а #info-areas переносится в правую панель через RESULT_IDS. -->
-      <div id="areas-holder" hidden>
-        <label class="chk"><input type="checkbox" id="chk-cs" checked>
-          <span class="swatch" style="background:var(--curve-d)"></span> Показывать CS</label>
-        <label class="chk"><input type="checkbox" id="chk-ps" checked>
-          <span class="swatch" style="background:var(--curve-s)"></span> Показывать PS</label>
-      </div>
+      <!-- Карточка «Излишки» убрана из панели (решение владельца 22.08): показ
+           заливок переехал одним тумблером в «Настройки графика» у гаечного
+           ключа. Табло остаётся — RESULT_IDS переносит его в правую панель. -->
       <div id="info-areas" style="margin-top:8px;"></div>
 
       <!-- Обёртка «Что изучаем» убрана (решение владельца 21.08 и 22.08).
@@ -2130,6 +2123,19 @@
         <div class="wrench-title">Область значений</div>
         <label class="chk"><input type="checkbox" id="chk-quad" checked>
           Только первая четверть</label>
+      </div>
+
+      <!-- ИЗЛИШКИ (решение владельца 22.08). Карточка «Излишки» ушла из левой
+           панели, а показ заливок остался нужен — он живёт здесь, рядом с
+           сеткой и первой четвертью: это настройка ВИДА графика, а не ввод
+           модели. Цвета и названия областей не дублируем — они в «Площадях».
+           Прежние две галочки (CS и PS по отдельности) схлопнуты в одну:
+           порознь их никто не включал, а области монополии считаются своими
+           галочками #chk-mono-cs/#chk-mono-ps/#chk-mono-vc и не тронуты. -->
+      <div class="wrench-group">
+        <div class="wrench-title">Излишки</div>
+        <label class="chk"><input type="checkbox" id="chk-areas" checked>
+          Показать излишки</label>
       </div>
 
       <div class="wrench-group">

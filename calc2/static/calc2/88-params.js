@@ -849,11 +849,17 @@ function wireControls() {
   attachFormulaHelp('fh-mathfc', 'fp-mathfc', 'inp-mathfc', 'MATHAB');
   attachFormulaHelp('fh-mathgc', 'fp-mathgc', 'inp-mathgc', 'MATHAB');
 
-  // Галочки показа областей CS и PS.
-  const cs = document.getElementById('chk-cs');
-  const ps = document.getElementById('chk-ps');
-  cs.addEventListener('change', () => { STATE.showCS = cs.checked; redrawAll(); });
-  ps.addEventListener('change', () => { STATE.showPS = ps.checked; redrawAll(); });
+  /* Показ излишков — один тумблер в меню гаечного ключа (решение владельца
+     22.08). Раньше это были две галочки (CS и PS) в карточке «Излишки» левой
+     панели; сама карточка убрана. Оба признака состояния (showCS и showPS)
+     остались — их читают заливки в четырёх местах 40-scenes-market.js, — но
+     переключаются вместе: порознь их не включал никто, а излишки монополии
+     живут на своих галочках #chk-mono-* и сюда не относятся. */
+  const areasChk = document.getElementById('chk-areas');
+  if (areasChk) areasChk.addEventListener('change', () => {
+    STATE.showCS = areasChk.checked; STATE.showPS = areasChk.checked;
+    redrawAll();
+  });
 
   // Галочки областей монополии (Задача 1): CS / VC / PS.
   [['chk-mono-cs', 'showMonoCS'], ['chk-mono-vc', 'showMonoVC'], ['chk-mono-ps', 'showMonoPS']]

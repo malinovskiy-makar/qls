@@ -43,6 +43,11 @@ function syncViewFields() {
     const e = document.getElementById(id);
     if (e && document.activeElement !== e) e.value = Math.round(val * 1000) / 1000;
   });
+  /* Тумблер излишков ставим в согласие с состоянием: новая модель обнуляет
+     showCS/showPS через SCENE_DEFAULTS, и меню, открытое после смены сцены,
+     иначе показывало бы прежнее положение. */
+  const ac = document.getElementById('chk-areas');
+  if (ac) ac.checked = !!(STATE.showCS || STATE.showPS);
   updateResetViewBtn();
 }
 
