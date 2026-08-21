@@ -6,6 +6,13 @@ backups/
 # Исходные материалы для импорта (большие файлы, не нужны на сервере)
 materials/
 
+# Консолидация источников корпуса (сессия 22.08): andrey_handover, aa_fixed,
+# ЛЭШ, shkolkovo, solvehub, baseline/compare/handover — легли в
+# materials/corpus_sources/. Уже покрыто правилом materials/ выше — строка
+# добавлена для явности и на случай, если правило materials/ когда-нибудь
+# сузят до materials/* с точечными исключениями (как у reports/ выше).
+materials/corpus_sources/
+
 # Загружаемые пользователями файлы
 media/
 
