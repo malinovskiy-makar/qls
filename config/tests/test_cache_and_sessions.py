@@ -24,7 +24,7 @@ import numpy as np
 from django.conf import settings
 from django.core.cache import caches
 from django.core.exceptions import ImproperlyConfigured
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, tag
 
 from catalog import semantic
 
@@ -364,6 +364,15 @@ class IndexVersionTests(SimpleTestCase):
 # ─────────────────────────────────────────────────────────────────────────
 # Тест 6. Живой Redis. Пропускается без него — но не в CI.
 # ─────────────────────────────────────────────────────────────────────────
+# ⚠️ ПРИЧИНА МЕТКИ `serial` (без причины метку ставить запрещено, см.
+# docs/TESTING.md): единственный класс, которому нужен НАСТОЯЩИЙ Redis.
+# Параллельный шаг прогона намеренно уводит кэш в память процесса —
+# иначе восемь воркеров писали бы в одну базу Redis и `cache.clear()`
+# одного обнулял бы кэш остальным. Под LocMemCache эти проверки не
+# пропустились бы, а УПАЛИ: `REDIS_URL` задан, значит `skipUnless` не
+# срабатывает, а `settings.CACHES` при этом указывает на память.
+# Поэтому класс идёт вторым шагом, где Redis снова настоящий.
+@tag('serial')
 @unittest.skipUnless(REDIS_URL, 'REDIS_URL не задан — живого Redis нет')
 class RedisLiveTests(SimpleTestCase):
 

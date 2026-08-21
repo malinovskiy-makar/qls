@@ -258,25 +258,53 @@ if REDIS_URL:
         )
     del _parts, _urlsplit
 
+# ⚠️ ПАРАЛЛЕЛЬНЫЙ ШАГ ПРОГОНА УВОДИТ КЭШ В ПАМЯТЬ ПРОЦЕССА, И ЭТО ГЛАВНОЕ
+# МЕСТО ВСЕЙ ЗАТЕИ С `--parallel`.
+#
+# Django при `--parallel` даёт каждому воркеру СВОЮ тестовую базу. А Redis
+# остаётся один на всех: восемь воркеров писали бы в одну базу 15, и первый
+# же `cache.clear()` (их 18 в наборе) обнулял бы кэш остальным семи посреди
+# их работы. Симптом был бы худшим из возможных — тесты падают случайно и
+# не воспроизводятся поодиночке.
+#
+# ⚠️ РАЗДЕЛИТЬ ПРЕФИКСОМ КЛЮЧЕЙ НЕЛЬЗЯ. `cache.clear()` у Redis-бэкенда
+# Django — это `FLUSHDB`: он чистит базу ЦЕЛИКОМ и `KEY_PREFIX` не смотрит.
+# Префикс развёл бы ключи, но не спас бы от сброса.
+#
+# ⚠️ ОТДЕЛЬНОЙ БАЗЫ REDIS НА ВОРКЕРА ТОЖЕ НЕ ХВАТАЕТ. Баз всего 16; 0–1 под
+# боевые, 2–3 зарезервированы. На машине владельца 8 ядер, то есть
+# `--parallel auto` даёт 8 воркеров и потребовал бы 16 баз только под тесты.
+# Схема, которая ломается от покупки нового ноутбука, — не схема.
+#
+# Поэтому: на параллельном шаге кэш у каждого воркера свой, в его памяти.
+# Изоляция получается по устройству процесса, а не по договорённости.
+# Тесты, которым нужен НАСТОЯЩИЙ Redis, помечены `@tag('serial')` и идут
+# вторым шагом, где Redis снова настоящий. Подробности — docs/TESTING.md.
+_LOCAL_TEST_CACHE = os.environ.get('QLS_TEST_LOCAL_CACHE', '') == '1'
+
+# Два РАЗНЫХ `LOCATION` обязательны: одинаковое имя у LocMemCache — это один
+# и тот же склад под двумя вывесками, и тогда `cache.clear()` снова уносил бы
+# сессии, только уже локально.
+_LOCMEM_CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'qls-default',
+    },
+    'sessions': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'qls-sessions',
+    },
+}
+
+if REDIS_URL and not (_TESTING and _LOCAL_TEST_CACHE):
     _CACHE_DB, _SESSION_DB = (15, 14) if _TESTING else (0, 1)
     CACHES = {
         'default': _redis_cache(_CACHE_DB, 'weco'),
         'sessions': _redis_cache(_SESSION_DB, 'weco-sess'),
     }
 else:
-    # Разработка без Redis. Два РАЗНЫХ `LOCATION` обязательны: одинаковое имя
-    # у LocMemCache — это один и тот же склад под двумя вывесками, и тогда
-    # `cache.clear()` снова уносил бы сессии, только уже локально.
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'qls-default',
-        },
-        'sessions': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'qls-sessions',
-        },
-    }
+    # Разработка без Redis — либо параллельный шаг прогона.
+    CACHES = _LOCMEM_CACHES
     if not _TESTING:
         # Не журнал, а stderr: журналирование настраивается ниже по файлу и
         # на момент этой строки ещё не поднято.
