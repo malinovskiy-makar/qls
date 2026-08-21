@@ -21,8 +21,21 @@
 `ImportSession.source_file`) принимают загрузку, но на проде **никак не
 отдаются**: ссылка на `/media/...` вернёт 404. Это не дыра, а недоделка —
 карточка заведена в Notion.
+
+**22.08, сессия С2-хвосты: это была НЕ вся картина.** Django действительно
+не отдаёт `/media/` — но nginx (`deploy/nginx/available/django.conf`)
+отдавал его В ОБХОД Django: `location /media/ { alias /var/www/media/; }`
+указывал на тот же самый общий том, куда `Submission.solution_file`
+реально сохраняет прикреплённые файлы (сдача задания — рабочая функция).
+То есть прикреплённые сканы/фото решений были публично доступны по адресу
+`/media/submissions/ГГГГ/ММ/имя`, без единой проверки прав — ровно то,
+чего первая проверка (тесты ниже) не могла увидеть, потому что смотрела
+только на Django. Закрыто той же сессией — `location /media/` в nginx
+теперь безусловно отвечает 404, как `/healthz/` выше по тому же файлу.
+Тест на это — класс `MediaIsNotServedByNginxTests` ниже.
 """
 import ast
+import re
 from pathlib import Path
 
 from django.conf import settings
@@ -128,3 +141,51 @@ class NoOtherFileServingViewTests(TestCase):
             'Появился код, отдающий файлы. Это не запрещено, но требует '
             'разбора: путь обязан браться не из запроса, а из поля модели, '
             'и доступ — сужением queryset. Найдено: %s' % offenders)
+
+
+class MediaIsNotServedByNginxTests(TestCase):
+    """nginx не должен отдавать `/media/` в обход Django.
+
+    `manage.py test` nginx не поднимает — это тест не поведения, а конфига:
+    читает `deploy/nginx/available/django.conf` текстом и проверяет блок
+    `location /media/`. Django сам по себе `/media/` не отдаёт (тесты выше),
+    но 22.08 выяснилось, что этого мало — nginx у той же папки стоял со
+    своим `alias`, указывающим на тот же общий том, куда реально пишутся
+    прикреплённые файлы учеников (Submission.solution_file). Тест ловит
+    именно возврат `alias`/`try_files` в этот блок, а не общий факт
+    существования файла — если блок пуст или удалён вовсе, тест тоже
+    должен упасть, чтобы никто не решил «уберём блок — и так сойдёт».
+    """
+
+    CONF_PATH = Path(__file__).resolve().parents[2] / 'deploy' / 'nginx' / \
+        'available' / 'django.conf'
+
+    def _media_block(self):
+        text = self.CONF_PATH.read_text(encoding='utf-8')
+        match = re.search(
+            r'location\s+/media/\s*\{(?P<body>.*?)\n    \}',
+            text, re.DOTALL)
+        self.assertIsNotNone(
+            match, 'Блок `location /media/` пропал из django.conf — '
+            'без него запрос уйдёт в location / и что вернёт Django, '
+            'непонятно без отдельной проверки')
+        return match.group('body')
+
+    def test_nginx_conf_exists(self):
+        self.assertTrue(
+            self.CONF_PATH.exists(),
+            'Не нашёл %s — переехал файл или переехал тест' % self.CONF_PATH)
+
+    def test_media_block_has_no_alias(self):
+        body = self._media_block()
+        self.assertNotIn(
+            'alias', body,
+            'В блоке `location /media/` снова появился `alias` — значит, '
+            'nginx опять отдаёт реальные файлы из тома media в обход '
+            'Django. См. docstring вверху файла — это уже приводило к '
+            'публичной раздаче прикреплённых файлов учеников.')
+        self.assertNotIn('try_files', body)
+
+    def test_media_block_returns_404_unconditionally(self):
+        body = self._media_block()
+        self.assertIn('return 404', body)
