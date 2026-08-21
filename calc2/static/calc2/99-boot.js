@@ -68,7 +68,6 @@ function init() {
   [
     ['ac-mode',        'ac-curve',    'ac-poly',        'Под кривой',       'Между точками'],
     ['mm-mode',        'mm-min',      'mm-max',         'Наименьшую',       'Наибольшую'],
-    ['curve-form-seg', 'cf-pq',       'cf-qp',          'P(Q)',             'Q(P)'],
     [null,             'ext-neg',     'ext-pos',        'Отрицательный',    'Положительный'],
     [null,             'seg-comp',    'seg-mono',       'Конкуренция',      'Монополия'],
     [null,             'ki-indiv',    'ki-piece',       'Инд. спросы',      'Кусочный'],
@@ -83,7 +82,6 @@ function init() {
   /* А64 · А32. Оба раскрывающихся списка переведены на свой вид: нативный
      select не переносит текст, а режет его, и варианты не помещались («Что
      добавляем» имел 179px при нужных 208, выбор кривой — 128 при 134). */
-  upgradeSelect('new-role', 'Что добавляем на график');
   upgradeSelect('ac-pick', 'Кривая, под которой считается площадь');
   initSceneColorPickers();
   renderCurveList();

@@ -796,7 +796,9 @@ function drawCurves() {
     .defined(d => d !== null)               // разрыв там, где формула не считается
     .x(d => sx(d[0])).y(d => sy(d[1]));
   STATE.curves.forEach(curve => {
-    if (!curve.visible) return;
+    /* Пустая строка — это заведённое кнопкой ПОЛЕ, а не кривая: пока формулу
+       не набрали, рисовать нечего (решение владельца 22.08). */
+    if (!curve.visible || !curve.expr) return;
     const pts = curvePoints(curve);
     g.append('path').datum(pts)
       .attr('fill', 'none').attr('stroke', curve.color).attr('stroke-width', 2.5)
@@ -838,7 +840,7 @@ function drawCurves() {
   // Подписи поверх линий (Фаза 1 и 3): имя кривой видно прямо на графике.
   // Отдельным проходом, чтобы текст не оказался под соседней кривой.
   STATE.curves.forEach((curve, i) => {
-    if (!curve.visible) return;
+    if (!curve.visible || !curve.expr) return;   // пустая строка подписи не получает
     /* ⚠️ ДЛИННОЕ ИМЯ ПОКАЗЫВАЕТСЯ ЦЕЛИКОМ. Здесь стоял обрез на четырнадцати
        символах, и «Спрос жителей города» превращался в «Спрос жителей…» даже
        тогда, когда справа оставалось шестьдесят с лишним пикселей свободного

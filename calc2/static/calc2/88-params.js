@@ -816,7 +816,6 @@ function wireControls() {
     }
   });
 
-  const formula = document.getElementById('inp-formula');
   const addBtn = document.getElementById('btn-add-curve');
 
   // Границы осей, сетка, легенда и названия осей живут в меню гаечного ключа
@@ -833,13 +832,8 @@ function wireControls() {
     if (typeof updatePult === 'function') updatePult();   // слайдеры кривых: новый предел = Pmax
   });
 
-  // Фаза 1б: форма записи кривой P(Q) / Q(P).
-  const cfPQ = document.getElementById('cf-pq'), cfQP = document.getElementById('cf-qp');
-  if (cfPQ) cfPQ.addEventListener('click', () => setCurveForm('PQ'));
-  if (cfQP) cfQP.addEventListener('click', () => setCurveForm('QP'));
-
-  // Фаза 1а: подсказки формата формулы у полей ввода.
-  attachFormulaHelp('fh-formula', 'fp-formula', 'inp-formula', () => curveHelpKind());
+  // Фаза 1а: подсказки формата формулы у полей ввода. Поля новой кривой здесь
+  // больше нет — справка живёт у полей самих кривых (equipFormulaField).
   attachFormulaHelp('fh-tc', 'fp-tc', 'inp-tc', 'TC');
   attachFormulaHelp('fh-ppf', 'fp-ppf', 'inp-ppf', 'PPF');
   // Остальные формульные поля сцен: обвязку им достраиваем на месте, дальше
@@ -1624,27 +1618,10 @@ function wireControls() {
     redrawAll();
   });
 
-  // Добавление кривой: по кнопке и по Enter в поле формулы.
-  // Форма записи (P(Q) / Q(P)) берётся из переключателя — Фаза 1б.
-  // Роль спрашивается ДО формулы, поэтому назначается сразу после добавления:
-  // кривая появляется уже спросом или предельными издержками, а не «обычной».
-  const submit = () => {
-    const before = STATE.curves.length;
-    addCurve(formula.value, STATE.curveForm);
-    if (STATE.curves.length > before) {
-      const sel = document.getElementById('new-role');
-      const role = sel ? sel.value : '';
-      if (role) setRole(STATE.curves[STATE.curves.length - 1], role);
-      formula.value = '';
-    }
-    formula.focus();
-  };
-  addBtn.addEventListener('click', submit);
-  formula.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
-
-  // Смена роли до ввода перенастраивает справку, подсказку и форму записи.
-  const newRole = document.getElementById('new-role');
-  if (newRole) newRole.addEventListener('change', () => applyNewRoleUI());
-  applyNewRoleUI();
+  /* Кнопка «Добавить кривую» заводит ПУСТУЮ строку под списком (решение
+     владельца 22.08). Ни формулы, ни роли она не спрашивает: формулу человек
+     печатает прямо в новой строке, роль у добавленной кривой всегда пустая,
+     и в расчёты модели такая кривая не входит. */
+  if (addBtn) addBtn.addEventListener('click', () => addEmptyCurve());
 }
 

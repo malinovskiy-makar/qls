@@ -1362,65 +1362,12 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
   });
 }
 
-/* ---------------------------------------------------------------------
-   ФАЗА 1б. Переключатель формы записи кривой: P(Q) ↔ Q(P).
-   Меняет только то, КАК пользователь пишет формулу; в математику всегда
-   уходит канон P = f(Q) (см. buildCurveFromQP). Форма запоминается у каждой
-   кривой отдельно — можно смешивать в одной сцене.
-   --------------------------------------------------------------------- */
-function setCurveForm(form) {
-  STATE.curveForm = (form === 'QP') ? 'QP' : 'PQ';
-  const a = document.getElementById('cf-pq'), b = document.getElementById('cf-qp');
-  if (a) a.classList.toggle('active', STATE.curveForm === 'PQ');
-  if (b) b.classList.toggle('active', STATE.curveForm === 'QP');
-  applyNewRoleUI();
-}
-
-/* Какой набор примеров показать в справке поля кривой. Зависит от того, ЧТО
-   пользователь собрался добавить: рядом с предельными издержками объяснять
-   запись спроса бессмысленно. */
-function newCurveRole() {
-  const sel = document.getElementById('new-role');
-  return sel ? sel.value : '';
-}
-function curveHelpKind() {
-  if (STATE.curveForm === 'QP') return 'QP';          // «объём от цены» — свой набор
-  return { demand: 'DEMAND', supply: 'SUPPLY', mc: 'MC', tc: 'TC', atc: 'ATC' }[newCurveRole()] || 'PQ';
-}
-
-/* Подсказка, плейсхолдер и доступность формы записи под выбранную роль.
-   Запись «объём от цены» осмысленна для спроса и предложения; предельные и
-   средние затраты по определению функции количества, поэтому для них
-   переключатель формы прячется. */
-function applyNewRoleUI() {
-  const role = newCurveRole();
-  const qpOk = (role === '' || role === 'demand' || role === 'supply');
-  const seg = document.getElementById('curve-form-seg');
-  if (seg) seg.style.display = qpOk ? '' : 'none';
-  if (!qpOk && STATE.curveForm === 'QP') { STATE.curveForm = 'PQ'; setCurveForm('PQ'); return; }
-
-  const inp = document.getElementById('inp-formula');
-  const ph = { demand: 'Например: 100 - Q', supply: 'Например: Q',
-               mc: 'Например: 20', tc: 'Например: Q^2 + 10*Q + 50',
-               atc: 'Например: Q - 10 + 100/Q' };
-  if (inp) inp.placeholder = (STATE.curveForm === 'QP') ? 'Например: 100 - 2*P' : (ph[role] || 'Например: 100 - Q');
-
-  const h = document.getElementById('curve-form-hint');
-  const note = {
-    demand: 'Спрос: цена как функция количества, P&nbsp;=&nbsp;f(Q).',
-    supply: 'Предложение: цена как функция количества, P&nbsp;=&nbsp;f(Q).',
-    mc: 'Предельные издержки как функция выпуска, MC(Q). Форма записи тут одна.',
-    tc: 'Суммарные затраты как функция выпуска, TC(Q). Средние и предельные посчитаем сами.',
-    atc: 'Средние затраты как функция выпуска, ATC(Q).',
-  };
-  if (h) h.innerHTML = (STATE.curveForm === 'QP')
-    ? 'Количество как функция цены: Q&nbsp;=&nbsp;f(P). Приведём к P&nbsp;=&nbsp;f(Q) сами: линейную явно, любую другую численно.'
-    : (note[role] || 'Цена как функция количества: P&nbsp;=&nbsp;f(Q).');
-
-  const pop = document.getElementById('fp-formula');
-  if (pop && pop.classList.contains('open') && typeof pop._render === 'function') pop._render();
-}
-
+/* Переключателя формы записи P(Q)/Q(P), списка ролей «Что добавляем» и
+   подсказки под ними больше нет (решение владельца 22.08): форму определяет
+   сам разбор (curveSrcForm в 80-ui.js), а роль у добавленной кривой всегда
+   пустая. Вместе с ними ушли setCurveForm, newCurveRole, curveHelpKind и
+   applyNewRoleUI — им нечем было управлять. Справка с примерами формул
+   осталась у полей самих кривых: их оснащает equipFormulaField. */
 
 /* ── Н75, Н60, Н72. Редактируемое значение ────────────────────────────────
    Один компонент на все места, где человек правит число или короткий текст.

@@ -389,11 +389,27 @@ await page.evaluate(() => {
   if (s) s.scrollIntoView({ block: 'center' });
 });
 await page.waitForTimeout(300);
+
+/* ⚠️ ПОЛЯ НОВОЙ КРИВОЙ СВЕРХУ БОЛЬШЕ НЕТ (решение владельца 22.08).
+   Формула набирается прямо в СТРОКЕ кривой, а пустую строку заводит кнопка
+   «Добавить кривую». Все проверки поля формулы ниже работают с такой строкой:
+   помощник заводит её и запоминает id — и самого поля, и его вопросика
+   (equipFormulaField даёт ему имя fh-auto-<id> поля). Строку приходится
+   заводить заново после каждой смены сцены: смена сцены обнуляет кривые. */
+const newFormulaRow = async () => await page.evaluate(() => {
+  addEmptyCurve();
+  const el = [...document.querySelectorAll('#curve-list .curve-expr-inp')].pop();
+  window.__F  = () => document.getElementById(el.id);
+  window.__FH = () => document.getElementById('fh-auto-' + el.id);
+  return { id: el.id, help: 'fh-auto-' + el.id };
+});
+let F = await newFormulaRow();
+await page.waitForTimeout(200);
 await t('формула показана набранной прямо в строке', async () => {
-  await page.evaluate(() => setFieldValue(document.getElementById('inp-formula'), '100 - 2*Q'));
+  await page.evaluate(() => setFieldValue(__F(), '100 - 2*Q'));
   await page.waitForTimeout(280);
   return await page.evaluate(() => {
-    const inp = document.getElementById('inp-formula');
+    const inp = __F();
     if (inp._mf) {
       // С MathLive формула живёт в самом поле: проверяем, что она туда доехала.
       return /frac|cdot|100/.test(inp._mf.value) || 'поле пустое: ' + inp._mf.value;
@@ -404,9 +420,9 @@ await t('формула показана набранной прямо в стр
 });
 
 await t('поле формулы можно править прямо в строке', async () => {
-  await reveal('#inp-formula');
+  await reveal('#' + F.id);
   return await page.evaluate(() => {
-    const inp = document.getElementById('inp-formula');
+    const inp = __F();
     if (!inp._mf) return true;                 // без MathLive правится обычный input
     inp._mf.focusField();
     return document.activeElement === inp._mf || 'фокус мимо поля';
@@ -414,10 +430,10 @@ await t('поле формулы можно править прямо в стр�
 });
 
 await t('пустое поле остаётся пустым', async () => {
-  await page.evaluate(() => setFieldValue(document.getElementById('inp-formula'), ''));
+  await page.evaluate(() => setFieldValue(__F(), ''));
   await page.waitForTimeout(200);
   return await page.evaluate(() => {
-    const inp = document.getElementById('inp-formula');
+    const inp = __F();
     if (inp._mf) return !inp._mf.value.trim() || 'в поле осталось: ' + inp._mf.value;
     const ts = document.querySelector('#sec-curves .f-typeset');
     return !ts.classList.contains('show') || 'накладка на пустом поле';
@@ -430,42 +446,44 @@ await t('пустое поле остаётся пустым', async () => {
 // геометрию напрямую: строка формулы не меняет высоту при уходе фокуса.
 await t('уход фокуса из формулы не двигает кнопку «Добавить»', async () => {
   await page.evaluate(() => {
-    const inp = document.getElementById('inp-formula');
+    const inp = __F();
     if (inp._mf) inp._mf.focusField(); else inp.focus();
     setFieldValue(inp, '100 - 2*Q');
   });
   await page.waitForTimeout(200);
   const before = await page.evaluate(() =>
     document.getElementById('btn-add-curve').getBoundingClientRect().top);
-  await page.evaluate(() => document.getElementById('inp-formula').blur());
+  await page.evaluate(() => __F().blur());
   await page.waitForTimeout(250);
   const after = await page.evaluate(() =>
     document.getElementById('btn-add-curve').getBoundingClientRect().top);
   return Math.abs(after - before) < 0.5 || `кнопка уехала на ${(after - before).toFixed(1)} px`;
 });
 
+/* Кнопка теперь заводит ПУСТУЮ строку, а формулу человек печатает в ней.
+   Проверяем именно это: настоящий щелчок по кнопке даёт ровно одну новую
+   строку без формулы, и набранная в ней запись становится кривой. */
 await t('кривая добавляется настоящим щелчком по кнопке', async () => {
-  await page.evaluate(() => { STATE.curves = []; renderCurveList(); redrawAll(); });
-  await selectUI('#new-role', '');
-  await page.evaluate(() => setFieldValue(document.getElementById('inp-formula'), '100 - Q'));
-  // Панель прокручиваемая и кнопка может оказаться за её краем, поэтому
-  // воспроизводим последовательность браузера: нажатие, потеря фокуса, щелчок.
+  await page.evaluate(() => { STATE.curves = []; curveCounter = 0; renderCurveList(); redrawAll(); });
+  await page.waitForTimeout(150);
+  await clickUI('#btn-add-curve');
+  await page.waitForTimeout(300);
+  const empty = await page.evaluate(() =>
+    STATE.curves.length === 1 && STATE.curves[0].expr === '' ? true
+      : JSON.stringify(STATE.curves.map(c => c.expr)));
+  if (empty !== true) return 'после кнопки: ' + empty;
+  F = await newFormulaRow();          // строка уже есть — берём её последнее поле
   await page.evaluate(() => {
-    const btn = document.getElementById('btn-add-curve');
-    const opt = { bubbles: true, cancelable: true, view: window };
-    btn.dispatchEvent(new MouseEvent('mousedown', opt));
-    document.getElementById('inp-formula').blur();
-    btn.dispatchEvent(new MouseEvent('mouseup', opt));
-    btn.click();
+    const el = [...document.querySelectorAll('#curve-list .curve-expr-inp')][0];
+    setFieldValue(el, '100 - Q');
   });
   await page.waitForTimeout(300);
   return await page.evaluate(() =>
-    (STATE.curves.length === 1 && STATE.curves[0].expr === '100 - Q')
-    || JSON.stringify(STATE.curves.map(c => c.expr)));
+    STATE.curves[0].expr === '100 - Q' || JSON.stringify(STATE.curves.map(c => c.expr)));
 });
 
 await t('кнопка открывает клавиатуру из трёх разделов', async () => {
-  await page.evaluate(() => document.getElementById('fh-formula').click());
+  await page.evaluate(() => __FH().click());
   await page.waitForTimeout(250);
   return await page.evaluate(() => {
     const kb = document.querySelector('.mkbd.open');
@@ -479,7 +497,7 @@ await t('кнопка открывает клавиатуру из трёх ра
 
 await t('клавиша ставит символ в поле, не стирая набранное', async () => {
   return await page.evaluate(() => {
-    const inp = document.getElementById('inp-formula');
+    const inp = __F();
     if (inp._mf) inp._mf.value = '';
     setFieldValue(inp, '');
     const kb = document.querySelector('.mkbd.open');
@@ -496,7 +514,7 @@ await t('клавиша ставит символ в поле, не стирая
 // Задвоенный рендер при первом входе: запасная накладка оставалась висеть
 // поверх собранного поля MathLive и уходила лишь после правки в строке.
 await t('формула показана один раз, накладки поверх поля нет', () => page.evaluate(() => {
-  const inp = document.getElementById('inp-formula');
+  const inp = __F();
   const ts = inp.closest('.f-slot').querySelector('.f-typeset');
   if (!inp._mf) return true;                      // без MathLive накладка и есть поле
   return !ts.classList.contains('show') || 'накладка видна поверх поля';
@@ -525,13 +543,17 @@ await t('своё имя кривой заменяет родовое D на г�
 await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('sd'); closePicker(); });
 await page.waitForTimeout(350);
 
-await t('структура рынка и вмешательство вложены в «Ввод функций»', () => page.evaluate(() => {
-  // Обёртка «Что изучаем» убрана (решение владельца 22.08): её содержимое
-  // лежит прямо в единой карточке ввода.
-  const an = document.getElementById('sec-input');
-  if (!an) return 'карточки #sec-input нет';
-  return (an.contains(document.getElementById('sec-tax')) &&
-          an.contains(document.getElementById('sec-mono'))) || 'секции всё ещё отдельные';
+await t('монопольные поля в «Вводе функций», вмешательство — в аналитике', () => page.evaluate(() => {
+  /* Обёртка «Что изучаем» убрана (решение владельца 22.08): поля монополии
+     лежат прямо в единой карточке ввода, а блок вмешательства государства
+     переехал в правую панель — он управляется ползунками, а не набирается. */
+  const inp = document.getElementById('sec-input');
+  const right = document.getElementById('params-panel');
+  if (!inp) return 'карточки #sec-input нет';
+  const mono = inp.contains(document.getElementById('sec-mono'));
+  const tax = right.contains(document.getElementById('sec-tax'))
+           && !inp.contains(document.getElementById('sec-tax'));
+  return (mono && tax) || ('монополия в вводе: ' + mono + ', вмешательство справа: ' + tax);
 }));
 
 await t('заголовок верхнего уровня в панели один', () => page.evaluate(() => {
@@ -907,62 +929,54 @@ await t('смена сцены сбрасывает свои имена точе
     Object.keys(STATE.pointNames).length === 0 || JSON.stringify(STATE.pointNames));
 });
 
-/* --- Роль кривой спрашивается до формулы -------------------------------- */
+/* --- Роль при добавлении НЕ спрашивается (решение владельца 22.08) ------
+   Список «Что добавляем» и переключатель формы записи P(Q)/Q(P) убраны:
+   добавленная кривая всегда обычная и в расчёты модели не входит, а форму
+   записи определяет сам разбор по буквам в формуле. */
 await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')));
 await page.evaluate(() => { resetSceneMemory(); openPicker(); });
 await clickUI('.scard[data-scene="sd"]');
-await page.evaluate(() => { STATE.curves = []; curveCounter = 0; STATE.params = {}; renderCurveList(); redrawAll(); });
 await page.waitForTimeout(320);
 
-await t('справка подстраивается под выбранную роль', async () => {
-  const want = { '': 'PQ', demand: 'DEMAND', supply: 'SUPPLY', mc: 'MC', tc: 'TC', atc: 'ATC' };
-  const bad = [];
-  for (const role of Object.keys(want)) {
-    await selectUI('#new-role', role);
-    await page.waitForTimeout(120);
-    const k = await page.evaluate(() => curveHelpKind());
-    if (k !== want[role]) bad.push(`${role || 'обычная'}: ${k}`);
-  }
-  return bad.length === 0 || bad.join(', ');
-});
+await t('списка ролей и переключателя формы записи в панели нет', () => page.evaluate(() => {
+  const left = ['new-role', 'cf-pq', 'cf-qp', 'curve-form-seg', 'curve-form-hint', 'inp-formula']
+    .filter(id => document.getElementById(id));
+  return left.length === 0 || 'осталось: ' + left.join(', ');
+}));
 
-await t('для издержек форма «объём от цены» скрыта', async () => {
-  await selectUI('#new-role', 'mc');
-  await page.waitForTimeout(140);
-  const hidden = await page.evaluate(() =>
-    document.getElementById('curve-form-seg').style.display === 'none' && STATE.curveForm === 'PQ');
-  await selectUI('#new-role', 'demand');
-  await page.waitForTimeout(140);
-  const shown = await page.evaluate(() =>
-    document.getElementById('curve-form-seg').style.display !== 'none');
-  return (hidden && shown) || `скрыт ${hidden}, показан ${shown}`;
-});
-
-await t('кривая добавляется сразу со своей ролью', async () => {
-  await page.evaluate(() => { STATE.curves = []; renderCurveList(); redrawAll(); });
-  await selectUI('#new-role', 'mc');
-  await page.evaluate(() => setFieldValue(document.getElementById('inp-formula'), '20'));
-  await clickUI('#btn-add-curve');
-  await page.waitForTimeout(220);
-  return await page.evaluate(() => {
-    const c = STATE.curves[0];
-    // Поле формулы очищается только при успешном добавлении.
-    const cleared = document.getElementById('inp-formula').value === '';
-    return (c && c.role === 'mc' && cleared) || JSON.stringify({ role: c && c.role, cleared });
+await t('добавленная кривая всегда обычная и равновесие не меняет', async () => {
+  await page.evaluate(() => { resetSceneMemory(); pickScene('sd'); });
+  await page.waitForTimeout(320);
+  return await page.evaluate(async () => {
+    const eq0 = { P: STATE.eq.P, Q: STATE.eq.Q };
+    addEmptyCurve();
+    const el = [...document.querySelectorAll('#curve-list .curve-expr-inp')].pop();
+    setFieldValue(el, '30 + 0.2*Q');
+    await new Promise(r => setTimeout(r, 250));
+    const c = STATE.curves[STATE.curves.length - 1];
+    const eq1 = { P: STATE.eq.P, Q: STATE.eq.Q };
+    const same = Math.abs(eq1.P - 50) < 0.3 && Math.abs(eq1.Q - 50) < 0.3
+              && Math.abs(eq1.P - eq0.P) < 1e-9 && Math.abs(eq1.Q - eq0.Q) < 1e-9;
+    return (!c.role && same) || JSON.stringify({ role: c.role, eq0, eq1 });
   });
 });
 
-// Подсказка формы записи идёт за выбранной ролью: примеров-попапа больше нет,
-// но роль по-прежнему объясняется прямо под полем.
-await t('подсказка под полем называет именно эту роль', async () => {
-  await page.evaluate(() => {
-    const sel = document.getElementById('new-role');
-    sel.value = 'mc'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+await t('форму записи определяет сам разбор', async () => {
+  return await page.evaluate(async () => {
+    const set = async (v) => {
+      const el = [...document.querySelectorAll('#curve-list .curve-expr-inp')][0];
+      setFieldValue(el, v);
+      await new Promise(r => setTimeout(r, 250));
+      return STATE.curves[0].srcForm;
+    };
+    const a = await set('100 - Q');       // цена от количества — канон движка
+    const b = await set('100 - 2*P');     // объём от цены — «Q(P)»
+    const lin = STATE.curves[0].linear;
+    const c = await set('100 - Q');       // и обратно
+    const okLin = lin && Math.abs(lin.a + 0.5) < 1e-6 && Math.abs(lin.b - 50) < 1e-6;
+    return (a === 'PQ' && b === 'QP' && c === 'PQ' && okLin)
+      || JSON.stringify({ a, b, c, lin });
   });
-  await page.waitForTimeout(200);
-  const hint = await page.locator('#curve-form-hint').textContent();
-  const ph = await page.getAttribute('#inp-formula', 'placeholder');
-  return (/Предельные издержки/.test(hint) && /20/.test(ph || '')) || (hint + ' | ' + ph);
 });
 
 /* --- Прилипание своих точек к кривым ----------------------------------- */
@@ -1108,7 +1122,9 @@ await page.evaluate(() => { resetSceneMemory(); openPicker(); });
 await clickUI('.scard[data-scene="sd"]');
 await page.evaluate(() => { STATE.curves = []; curveCounter = 0; STATE.params = {}; renderCurveList(); redrawAll(); });
 await page.waitForTimeout(320);
-await clickUI('#fh-formula');
+F = await newFormulaRow();
+await page.waitForTimeout(200);
+await clickUI('#' + F.help);
 await page.waitForTimeout(220);
 
 await t('в разделе функций есть всё нужное экономике', async () => {
@@ -1141,20 +1157,20 @@ await t('раздел букв даёт латиницу и греческие',
 });
 
 await t('печать слэша даёт дробь, крышки — степень', async () => {
-  const has = await page.evaluate(() => !!document.getElementById('inp-formula')._mf);
+  const has = await page.evaluate(() => !!__F()._mf);
   if (!has) return true;                       // без MathLive поле обычное, проверять нечего
-  await page.evaluate(() => { const m = document.getElementById('inp-formula')._mf; m.value = ''; m.focusField(); });
+  await page.evaluate(() => { const m = __F()._mf; m.value = ''; m.focusField(); });
   await page.waitForTimeout(120);
   await page.keyboard.type('100-Q/2', { delay: 25 });
   await page.waitForTimeout(200);
-  const r1 = await page.evaluate(() => ({ tex: document.getElementById('inp-formula')._mf.value,
-                                          txt: document.getElementById('inp-formula').value }));
+  const r1 = await page.evaluate(() => ({ tex: __F()._mf.value,
+                                          txt: __F().value }));
   if (!/frac/.test(r1.tex)) return 'дроби нет: ' + r1.tex;
-  await page.evaluate(() => { const m = document.getElementById('inp-formula')._mf; m.value = ''; m.focusField(); });
+  await page.evaluate(() => { const m = __F()._mf; m.value = ''; m.focusField(); });
   await page.waitForTimeout(120);
   await page.keyboard.type('Q^2', { delay: 25 });
   await page.waitForTimeout(200);
-  const r2 = await page.evaluate(() => document.getElementById('inp-formula').value);
+  const r2 = await page.evaluate(() => __F().value);
   return r2.replace(/\s/g, '') === 'Q^(2)' || 'степень: ' + r2;
 });
 
@@ -1172,33 +1188,33 @@ const rawKey = async (key, code, vk) => {
                                              windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
 };
 const clearFormula = async () => {
-  await page.evaluate(() => { const m = document.getElementById('inp-formula')._mf; m.value = ''; m.focusField(); });
+  await page.evaluate(() => { const m = __F()._mf; m.value = ''; m.focusField(); });
   await page.waitForTimeout(150);
 };
 
 await t('русская точка остаётся точкой, а не дробью', async () => {
-  const has = await page.evaluate(() => !!document.getElementById('inp-formula')._mf);
+  const has = await page.evaluate(() => !!__F()._mf);
   if (!has) return true;                       // без MathLive поле обычное, проверять нечего
   await clearFormula();
   await rawKey('0', 'Digit0', 48);
   await rawKey('.', 'Slash', 191);             // русская раскладка: точка на клавише слэша
   await rawKey('5', 'Digit5', 53);
   await page.waitForTimeout(220);
-  const r = await page.evaluate(() => ({ tex: document.getElementById('inp-formula')._mf.value,
-                                         txt: document.getElementById('inp-formula').value }));
+  const r = await page.evaluate(() => ({ tex: __F()._mf.value,
+                                         txt: __F().value }));
   if (/frac/.test(r.tex)) return 'вышла дробь: ' + r.tex;
   return r.txt.replace(/\s/g, '') === '0.5' || 'в поле: ' + r.txt;
 });
 
 await t('настоящий слэш по-прежнему даёт дробь', async () => {
-  const has = await page.evaluate(() => !!document.getElementById('inp-formula')._mf);
+  const has = await page.evaluate(() => !!__F()._mf);
   if (!has) return true;
   await clearFormula();
   await rawKey('1', 'Digit1', 49);
   await rawKey('/', 'Slash', 191);
   await rawKey('2', 'Digit2', 50);
   await page.waitForTimeout(220);
-  const tex = await page.evaluate(() => document.getElementById('inp-formula')._mf.value);
+  const tex = await page.evaluate(() => __F()._mf.value);
   return /frac/.test(tex) || 'дроби нет: ' + tex;
 });
 
@@ -1206,7 +1222,7 @@ await t('конструктор кусочной собирает верную �
   await page.evaluate(() => {
     const kb = document.querySelector('.mkbd.open') || document.querySelector('.mkbd');
     const b = [...kb.querySelectorAll('.mkbd-foot button')].find(x => /Кусочн/.test(x.textContent));
-    if (b) b.click(); else openPiecewise(document.getElementById('inp-formula'), 'Q');
+    if (b) b.click(); else openPiecewise(__F(), 'Q');
   });
   await page.waitForTimeout(280);
   // Число кусков задаётся числом, а не выбором из готовых вариантов.
@@ -1237,7 +1253,7 @@ await t('конструктор кусочной собирает верную �
   await clickUI('#pw-apply');
   await page.waitForTimeout(220);
   return await page.evaluate(() => {
-    const expr = document.getElementById('inp-formula').value;
+    const expr = __F().value;
     const r = compileFormula(expr);
     if (r.error) return 'не компилируется: ' + r.error;
     const at = (q) => r.compiled.evaluate({ x: q, Q: q, L: q });
@@ -1246,7 +1262,7 @@ await t('конструктор кусочной собирает верную �
 });
 
 await t('кусочная кривая строится движком', () => page.evaluate(() => {
-  addCurve(document.getElementById('inp-formula').value);
+  addCurve(__F().value);
   const c = STATE.curves[STATE.curves.length - 1];
   return (c.linear === null && evalCurve(c, 10) === 90 && evalCurve(c, 90) === 20)
          || JSON.stringify({ lin: c.linear, v10: evalCurve(c, 10), v90: evalCurve(c, 90) });
