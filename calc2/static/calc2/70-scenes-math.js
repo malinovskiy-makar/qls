@@ -733,7 +733,7 @@ function drawMathMinMax(f) {
 // из прошлых версий должны продолжать считаться.
 function compileAB(expr) {
   try {
-    const compiled = math.parse(expr).compile();
+    const compiled = math.parse(prepExpr(expr)).compile();
     compiled.evaluate(scopeFor(expr, { a: 1, b: 1, x: 1, y: 1, L: 1, K: 1 }));
     return { compiled, error: null };
   } catch (e) { return { compiled: null, error: 'Не понял формулу f(x, y): ' + e.message }; }
@@ -1407,7 +1407,7 @@ function mathToPgf(expr, varName) {
   const src = String(expr || '').trim();
   if (!src) return null;
   let node;
-  try { node = math.parse(src); } catch (e) { return null; }
+  try { node = math.parse(prepExpr(src)); } catch (e) { return null; }
   const vars = new Set([varName, 'x', 'Q', 'L', 'X']);
   let bad = false;
 

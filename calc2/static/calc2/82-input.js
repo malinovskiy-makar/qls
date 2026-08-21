@@ -19,7 +19,16 @@ function mathToTex(expr) {
   const s = String(expr || '').trim();
   if (!s) return '';
   try { return math.parse(s).toTex({ parenthesis: 'auto' }); }
-  catch (e) { return texFallback(s); }
+  catch (e) {
+    /* Предпросмотр показывает то, что считает движок. Запись, которую Math.js
+       не берёт как есть («100-ax», вставленный из буфера LaTeX), он берёт
+       после общей подготовки — той же, что стоит перед разбором. Сначала
+       пробуем исходный текст: подготовка раскрывает неявное умножение, и
+       показывать «a*x» там, где человек набрал «ax», незачем. */
+    try { const t = prepExpr(s); if (t !== s) return math.parse(t).toTex({ parenthesis: 'auto' }); }
+    catch (e2) {}
+    return texFallback(s);
+  }
 }
 // Отрисовать формулу в элемент. Без KaTeX (CDN недоступен) показываем исходный
 // текст — предпросмотр деградирует, но ничего не ломается.

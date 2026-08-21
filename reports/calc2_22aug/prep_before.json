@@ -1,0 +1,76 @@
+[
+  {
+    "src": "100-2x",
+    "prep": "100-2x",
+    "free": [],
+    "ppf": "ok",
+    "eq": "explicit"
+  },
+  {
+    "src": "100-ax",
+    "prep": "100-a*x",
+    "free": [
+      "a"
+    ],
+    "ppf": "Undefined symbol ax",
+    "eq": "Undefined symbol ax"
+  },
+  {
+    "src": "100-a*x",
+    "prep": "100-a*x",
+    "free": [
+      "a"
+    ],
+    "ppf": "ok",
+    "eq": "explicit"
+  },
+  {
+    "src": "100-a\\cdot x",
+    "prep": "100-a\\c*d*o*t x",
+    "free": [],
+    "ppf": "Syntax error in part \"\\cdot x\" (char 6)",
+    "eq": "Syntax error in part \"\\cdot x\" (char 6)"
+  },
+  {
+    "src": "y=100-a\\cdot x",
+    "prep": "y=100-a\\c*d*o*t x",
+    "free": [],
+    "ppf": "Syntax error in part \"\\cdot x\" (char 8)",
+    "eq": "Syntax error in part \"\\cdot x\" (char 6)"
+  },
+  {
+    "src": "\\frac{100}{x}",
+    "prep": "\\f*r*a*c{100}{x}",
+    "free": [],
+    "ppf": "Syntax error in part \"\\frac{100}{x}\" (char 1)",
+    "eq": "Syntax error in part \"\\frac{100}{x}\" (char 1)"
+  },
+  {
+    "src": "100-a\\times x",
+    "prep": "100-a\\t*i*m*e*s x",
+    "free": [],
+    "ppf": "Syntax error in part \"\\times x\" (char 6)",
+    "eq": "Syntax error in part \"\\times x\" (char 6)"
+  },
+  {
+    "src": "\\left(100-x\\right)",
+    "prep": "\\left(100-x\\r*i*g*h*t)",
+    "free": [],
+    "ppf": "Syntax error in part \"\\left(100-x\\right)\" (char 1)",
+    "eq": "Syntax error in part \"\\left(100-x\\right)\" (char 1)"
+  },
+  {
+    "src": "100-a\\cdot x^{2}",
+    "prep": "100-a\\c*d*o*t x^{2}",
+    "free": [],
+    "ppf": "Syntax error in part \"\\cdot x^{2}\" (char 6)",
+    "eq": "Syntax error in part \"\\cdot x^{2}\" (char 6)"
+  },
+  {
+    "src": "\\sqrt{100-x}",
+    "prep": "\\sqrt{100-x}",
+    "free": [],
+    "ppf": "Syntax error in part \"\\sqrt{100-x}\" (char 1)",
+    "eq": "Syntax error in part \"\\sqrt{100-x}\" (char 1)"
+  }
+]

@@ -175,7 +175,7 @@ function fmtLinear(a, b, varName, dec) {
 // Компиляция формулы Q = f(P). Переменные: P (основная), p и x — синонимы.
 function compileFormulaP(expr) {
   try {
-    const compiled = math.parse(expr).compile();
+    const compiled = math.parse(prepExpr(expr)).compile();
     compiled.evaluate(scopeFor(expr, { P: 1, p: 1, x: 1 }));   // пробный расчёт ловит опечатки
     return { compiled, error: null };
   } catch (e) {
@@ -389,7 +389,7 @@ function curveDeriv(curve, q) {
 
 // Внешние предельные издержки (Задача 4): константа или функция от Q (как спрос — переменная Q).
 function compileExt(expr) {
-  try { const c = math.parse(expr).compile(); c.evaluate(scopeFor(expr, axisScope(1))); return { compiled: c, error: null }; }
+  try { const c = math.parse(prepExpr(expr)).compile(); c.evaluate(scopeFor(expr, axisScope(1))); return { compiled: c, error: null }; }
   catch (e) { return { compiled: null, error: e.message }; }
 }
 function evalExt(q) {
@@ -432,7 +432,7 @@ function compileTwoVar(expr) {
 
 function compileTwoVarUncached(expr) {
   try {
-    const compiled = math.parse(expr).compile();
+    const compiled = math.parse(prepExpr(expr)).compile();
     compiled.evaluate(scopeFor(expr, { x: 1, y: 1, L: 1, K: 1 }));   // пробный расчёт ловит опечатки
     // Исходный текст носим на самом скомпилированном узле: evalTwoVar получает
     // только его, а буквы-параметры надо подставлять по тексту формулы.

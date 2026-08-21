@@ -99,7 +99,9 @@ function derivativeExpr(expr, varName) {
   if (!expr || typeof math === 'undefined' || typeof math.derivative !== 'function') return null;
   const v = varName || 'Q';
   try {
-    const src = String(expr).replace(/\bx\b/g, v).replace(/\bQ\b/g, v).replace(/\bL\b/g, v);
+    // Производную берёт Math.js, значит и здесь запись обязана быть на его
+    // языке: символьное дифференцирование разбирает строку само.
+    const src = prepExpr(String(expr)).replace(/\bx\b/g, v).replace(/\bQ\b/g, v).replace(/\bL\b/g, v);
     const d = math.derivative(src, v).toString();
     // Пробное вычисление: символьная производная бывает верной, но незаписываемой.
     const c = math.parse(d).compile();
@@ -706,9 +708,23 @@ function smoothLabel(key, px, py, toLeft) {
   return out;
 }
 let _labelFrame = null;
+/* ⚠️ ДОВОДКА ПОДПИСИ НЕ ИМЕЕТ ПРАВА ПОДБИРАТЬ ОКНО ЗАНОВО.
+
+   Здесь стояла обычная redrawAll, и она в одиночку сводила на нет правило
+   «окно идёт за формулой, а не за значением буквы» (21.08). Замер 22.08 на
+   «Построении КПВ» с формулой «y = 100 - a*x»: ведём ручку от 1 до 10.
+   Каждый шаг двигает кривую, подпись начинает плавно переезжать и просит
+   СЛЕДУЮЩИЙ кадр — а тот перерисовывал без всякой защиты и подгонял оси под
+   новую формулу. Дальше по кругу: окно сжалось, линия снова заняла те же
+   пиксели, подпись снова поехала. Оси проседали со «0…120» до «0…12», а на
+   экране кривая стояла как вкопанная. Со стороны это ровно то, на что
+   жаловался владелец: рычаг двигает плоскость, а не кривую.
+
+   Этот кадр — продолжение той же картинки, а не новая функция: он доводит
+   подпись до места. Окно в нём обязано остаться прежним. */
 function requestLabelFrame() {
   if (_labelFrame != null) return;
-  _labelFrame = requestAnimationFrame(() => { _labelFrame = null; redrawAll(); });
+  _labelFrame = requestAnimationFrame(() => { _labelFrame = null; redrawKeepingWindow(); });
 }
 // Сцена сменилась — прошлые места подписей к ней отношения не имеют.
 function resetLabelPositions() { _labelPos.clear(); _anchorQ.clear(); }
