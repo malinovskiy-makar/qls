@@ -46,9 +46,14 @@ const data = await page.evaluate(async (FORB) => {
       for (const ch of el.children) walk(ch);
     };
     const panel = document.getElementById('tools-panel');
+    /* Свои текстовые узлы, а не «листья»: у подзаголовка «Структура рынка»
+       внутри стоит кнопка-вопросик, и по фильтру «без детей» он в замер не
+       попадал. */
     const visText = [...panel.querySelectorAll('*')]
-      .filter(e => e.offsetParent !== null && !e.children.length)
-      .map(e => (e.textContent || '').trim()).join(' | ');
+      .filter(e => e.offsetParent !== null)
+      .map(e => [...e.childNodes].filter(n => n.nodeType === 3)
+                                 .map(n => n.nodeValue).join('').trim())
+      .filter(Boolean).join(' | ');
     FORB.forEach(t => { if (visText.indexOf(t) >= 0) seen.push(t); });
     rows.push({ key: k, name: SCENE_NAMES[k] || k, cards, forbidden: seen,
                 totalControls: cards.reduce((a, c) => a + c.controls, 0) });

@@ -256,9 +256,17 @@ const panelSweep = await page.evaluate(async (FORB) => {
                  controls: body ? [...body.querySelectorAll('input,select,button,textarea')]
                                     .filter(e => e.offsetParent !== null).length : 0 };
       });
+    /* ⚠️ ВИДИМЫЙ ТЕКСТ СОБИРАЕМ ПО СВОИМ УЗЛАМ, А НЕ ПО «ЛИСТЬЯМ».
+       Прежний фильтр брал только элементы без детей — и пропускал ровно тот
+       случай, ради которого проверка написана: у подзаголовка «Структура
+       рынка» внутри стоит кнопка-вопросик, значит ребёнок у него есть, и
+       заголовок в замер не попадал. Проверено поломкой: снял запреты карточек,
+       «Структура рынка» стала видна на экране, а проверка осталась зелёной. */
     const visText = [...document.getElementById('tools-panel').querySelectorAll('*')]
-      .filter(e => e.offsetParent !== null && !e.children.length)
-      .map(e => (e.textContent || '').trim()).join(' | ');
+      .filter(e => e.offsetParent !== null)
+      .map(e => [...e.childNodes].filter(n => n.nodeType === 3)
+                                 .map(n => n.nodeValue).join('').trim())
+      .filter(Boolean).join(' | ');
     rows.push({ key: k, cards, seen: FORB.filter(t => visText.indexOf(t) >= 0) });
   }
   return rows;
