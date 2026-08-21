@@ -114,7 +114,7 @@ function compilePpf(expr) {
   if (hit) return hit;
   let res;
   try {
-    const compiled = math.parse(expr).compile();
+    const compiled = math.parse(prepExpr(expr)).compile();
     compiled.evaluate(scopeFor(expr, { x: 1, X: 1 }));   // пробный расчёт ловит опечатки
     res = { compiled, error: null };
   } catch (e) { res = { compiled: null, error: e.message }; }
@@ -525,12 +525,17 @@ function redrawPpf() {
    --------------------------------------------------------------------- */
 
 /* Значение скомпилированной КПВ Y=f(X) (переменные X и x — синонимы).
-   П21: значения ползунков подмешиваем обязательно. Раньше здесь стоял голый
-   { x, X }: разбор формулы «100 - a*X» проходил (compilePpf зовёт scopeFor),
-   а КАЖДЫЙ расчёт падал на неизвестной букве и молча отдавал NaN. Дальше
-   ppfXmaxOf получал null, и сцена показывала «Не удалось определить границы
-   КПВ» на пустом холсте. Через эту функцию идут одиночная КПВ, сумма КПВ и
-   обе сцены торговли — чинится всё разом. */
+   П21: значения ползунков подмешиваем обязательно, иначе расчёт падает на
+   букве и молча отдаёт NaN, ppfXmaxOf получает null, и сцена показывает
+   «Не удалось определить границы КПВ» на пустом холсте. Через эту функцию
+   идут одиночная КПВ, сумма КПВ и обе сцены торговли — чинится всё разом.
+
+   ⚠️ ЗДЕСЬ СТОЯЛО, ЧТО «РАЗБОР ФОРМУЛЫ 100 − a*X ПРОХОДИЛ». Это перестало
+   быть правдой и сбило с пути целую сессию: compilePpf звал math.parse БЕЗ
+   общей подготовки, поэтому падал как раз разбор — «100-ax» отвечало
+   «Undefined symbol ax», хотя буква «a» ползунок исправно заводила. Замер
+   22.08 и правка — в разделе CLAUDE.md за 22.08. Комментарий не доказывает,
+   что код делает написанное: сверяться надо с прогоном, а не с текстом. */
 function ppfEvalWith(compiled, x) {
   try {
     const v = compiled.evaluate(paramScope({ x: x, X: x }));
@@ -820,6 +825,26 @@ function detectKinks(points) {
   return ks;
 }
 
+/* ⚠️ ОТКАЗ НАЗЫВАЕТСЯ ТАМ, ГДЕ ЧЕЛОВЕК НАБИРАЛ, А НЕ ТОЛЬКО В АНАЛИТИКЕ.
+
+   Замер 22.08: непонятую формулу все четыре модели блока честно ловили и
+   складывали текст отказа в свой разбор (`info-ppfsum`, `info-ppft`,
+   `info-tb`) — то есть в правую панель, в блок «Ключевые значения», который
+   по умолчанию свёрнут. Рядом с самим полем в разметке лежали три готовых
+   места под сообщение (`ppfsum-error`, `ppft-error`, `tb-error`), и в них не
+   писал никто и никогда. Человек смотрит на поле, в которое печатал: для него
+   формула не принималась молча, а ползунок буквы при этом заводился и
+   выглядел рабочим.
+
+   Пишем в обе стороны и из пути ОТРИСОВКИ, а не из обработчика кнопки: до
+   расчёта можно добраться и правкой поля, и Enter, и сменой числа кривых. */
+function showPaneError(boxId, msg) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  if (msg) { box.textContent = 'Не понял формулу: ' + msg; box.style.display = 'block'; }
+  else { box.textContent = ''; box.style.display = 'none'; }
+}
+
 // Тяжёлый расчёт суммарной КПВ (кэшируется в STATE.ppfSumData; запускается по «Построить»).
 /* Сколько кривых складываем (Фаза 13.1) и их формулы. Первые две живут в
    прежних STATE.ppf1 / STATE.ppf2, чтобы ничего из проверенной пары не
@@ -1059,6 +1084,7 @@ function drawPpfSumMarks(d) {
 function updatePpfSumPanel() {
   const box = document.getElementById('info-ppfsum'); if (!box) return;
   const d = STATE.ppfSumData;
+  showPaneError('ppfsum-error', (d && !d.ok) ? (d.error || 'Не удалось построить.') : '');
   if (!d) { box.innerHTML = '<div class="muted">Введите кривые и нажмите «Построить сумму».</div>'; return; }
   if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось построить.') + '</div>'; return; }
   const ord = d.order || [];
@@ -1345,6 +1371,7 @@ function drawPpfTradeMarks(d) {
 function updatePpfTradePanel() {
   const box = document.getElementById('info-ppft'); if (!box) return;
   const d = STATE.ppfTradeData;
+  showPaneError('ppft-error', (d && !d.ok) ? (d.error || 'Не удалось.') : '');
   if (!d) { box.innerHTML = '<div class="muted">Введите КПВ и мировую цену, нажмите «Построить КТВ».</div>'; return; }
   if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось.') + '</div>'; return; }
   // Внутренняя (автарктическая) цена X: наклон КПВ. У прямой он один, у дуги
@@ -1665,6 +1692,7 @@ function tbName(idx) {
 function updateTradeBPanel() {
   const box = document.getElementById('info-tb'); if (!box) return;
   const d = STATE.tradeBData;
+  showPaneError('tb-error', (d && !d.ok) ? (d.error || 'Не удалось.') : '');
   if (!d) { box.innerHTML = '<div class="muted">Введите две КПВ и нажмите «Построить торговлю».</div>'; return; }
   if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось.') + '</div>'; return; }
   let html = '';

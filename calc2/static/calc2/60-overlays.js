@@ -2343,6 +2343,14 @@ function expandImplicitMul(expr) {
   if (!s) return s;
   return s.replace(/[A-Za-z_][A-Za-z_]*/g, (name, at) => {
     if (name.length < 2) return name;
+    /* ⚠️ ИМЯ ПОСЛЕ ОБРАТНОГО СЛЭША — ЭТО КОМАНДА, А НЕ ПРОИЗВЕДЕНИЕ БУКВ.
+       Замер 22.08 до правки: «100-a\cdot x» превращалось здесь в
+       «100-a\c*d*o*t x». То есть разбор не просто не понимал запись из
+       MathLive — он её ДОЛОМЫВАЛ, и сообщение об ошибке показывало уже свою
+       собственную порчу, а не то, что набрал человек. Перевод LaTeX стоит выше
+       (prepExpr), но и здесь имя за слэшем неприкосновенно: непереведённая
+       команда обязана дойти до Math.js целой и получить честный отказ. */
+    if (at > 0 && s[at - 1] === '\\') return name;
     if (ECON_WORDS.has(name) || MATH_CONSTS.has(name)) return name;
     try { if (typeof math[name] !== 'undefined') return name; } catch (e) {}
     // Имя перед скобкой — вызов функции, разбирать его на буквы нельзя.
@@ -2357,7 +2365,31 @@ function expandImplicitMul(expr) {
    включается только там, где буквы и так становятся ползунками: в готовых
    экономических сценах у обозначений свой смысл, и трогать их нельзя. */
 function prepExpr(expr) {
-  return paramsAllowed() ? expandImplicitMul(expr) : String(expr || '');
+  const plain = texToPlain(expr);
+  return paramsAllowed() ? expandImplicitMul(plain) : plain;
+}
+
+/* ⚠️ ФОРМУЛА ПРИХОДИТ ИЗ ПОЛЯ НА ЯЗЫКЕ LaTeX, А СЧИТАЕТ ЕЁ Math.js.
+   Обычно перевод делает сам ввод (`latexToMath` в связке с MathLive), но
+   надеяться на это нельзя: поле бывает и обычным, запись попадает вставкой из
+   буфера, а математическое поле собирается лениво и до входа в сцену его может
+   не быть вовсе. Поэтому перевод стоит ещё и ЗДЕСЬ, в единственной двери
+   разбора, и раньше раскрытия неявного умножения.
+
+   Дешёвая проверка на слэш — не преждевременная оптимизация: prepExpr зовётся
+   из разбора свободных букв, то есть на каждой новой строке в поле, а подряд
+   идущие символы дают подряд идущие вызовы.
+
+   Перевод, оставивший слэш, означает незнакомую команду. Такую строку отдаём
+   Math.js как есть: пусть откажет он и назовёт место, а не мы молча. */
+function texToPlain(expr) {
+  const s = String(expr == null ? '' : expr);
+  if (s.indexOf('\\') < 0) return s;
+  if (typeof latexToMath !== 'function') return s;
+  try {
+    const t = latexToMath(s);
+    return (typeof t === 'string' && t.trim()) ? t : s;
+  } catch (e) { return s; }
 }
 
 /* Свободные буквы формулы: то, что придётся чем-то заменить при расчёте.
@@ -2392,8 +2424,15 @@ function freeSymbols(expr) {
   return res;
 }
 
+/* ⚠️ ПУСТОЙ СПИСОК БУКВ ЗНАЧИТ «БУКВ НЕТ», А НЕ «НЕ СМОГ РАЗОБРАТЬ».
+   Разные ответы, а форма у них была одна: упавший разбор молча отдавал [], и
+   для всякого, кто спрашивал буквы, непонятая формула была неотличима от
+   «100 - x». Признак разбора носим отдельным полем на самом списке: он не
+   мешает читать список как список (а его читают из десятка мест), но даёт
+   спросить «а разобралось ли вообще». */
 function freeSymbolsUncached(expr) {
   const out = [];
+  let failed = false;
   const scan = (src) => {
     try {
       const node = math.parse(prepExpr(src));
@@ -2405,12 +2444,14 @@ function freeSymbolsUncached(expr) {
         if (sceneReserved().has(n.name)) return;
         if (out.indexOf(n.name) < 0) out.push(n.name);
       });
-    } catch (e) {}
+    } catch (e) { failed = true; }
   };
   const s = String(expr || '');
   // Только одиночное «=»; «==», «<=», «>=», «!=» это сравнения, их не делим.
   const parts = s.split(/(?<![<>=!])=(?!=)/);
   if (parts.length === 2) { scan(parts[0]); scan(parts[1]); } else scan(s);
+  // Пустая строка — это не отказ разбора, а отсутствие формулы.
+  if (s.trim() && failed) Object.defineProperty(out, 'parseFailed', { value: true, enumerable: false });
   return out;
 }
 
@@ -2486,7 +2527,22 @@ function syncParams() {
     return;
   }
   const names = [];
-  const take = (expr) => { if (expr) freeSymbols(expr).forEach(n => { if (names.indexOf(n) < 0) names.push(n); }); };
+  /* ⚠️ БУКВА НЕ ПРОПАДАЕТ ИЗ-ЗА ПОЛУНАБРАННОЙ ФОРМУЛЫ.
+     Замер 22.08: ползунок «a» уводили на 3,5 и продолжали править формулу.
+     Стирание звёздочки даёт промежуточную запись «y = 100 - a*», разбор её не
+     берёт, freeSymbols отдаёт пустой список — и проход удаления сносил живой
+     ползунок. Следующая нажатая клавиша возвращала его со значением 1: набранное
+     человеком число исчезало под рукой, а виноватой выглядела кривая.
+     Пока хоть одна формула на экране не разобралась, только ДОБАВЛЯЕМ буквы;
+     уборка лишних ждёт, пока запись снова станет целой. Ждать недолго — это
+     ровно то время, пока человек дописывает формулу. */
+  let pending = false;
+  const take = (expr) => {
+    if (!expr) return;
+    const got = freeSymbols(expr);
+    if (got.parseFailed) pending = true;
+    got.forEach(n => { if (names.indexOf(n) < 0) names.push(n); });
+  };
   /* ⚠️ Вторая половина договора о параметрах. Карточку списка сцена уже не
      показывает (syncCurveListVisibility), но сами кривые в STATE.curves у неё
      остаются — их кладёт пресет монополии. Пока буквы из них заводили ползунки,
@@ -2506,7 +2562,7 @@ function syncParams() {
   names.forEach(n => {
     if (!STATE.params[n]) { STATE.params[n] = { value: 1, min: -10, max: 10, step: 0.1 }; changed = true; }
   });
-  Object.keys(STATE.params).forEach(n => {
+  if (!pending) Object.keys(STATE.params).forEach(n => {
     if (names.indexOf(n) < 0) { delete STATE.params[n]; changed = true; }
   });
   if (changed) {

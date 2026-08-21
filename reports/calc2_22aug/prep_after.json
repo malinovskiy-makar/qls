@@ -1,0 +1,84 @@
+[
+  {
+    "src": "100-2x",
+    "prep": "100-2x",
+    "free": [],
+    "ppf": "ok",
+    "eq": "explicit"
+  },
+  {
+    "src": "100-ax",
+    "prep": "100-a*x",
+    "free": [
+      "a"
+    ],
+    "ppf": "ok",
+    "eq": "explicit"
+  },
+  {
+    "src": "100-a*x",
+    "prep": "100-a*x",
+    "free": [
+      "a"
+    ],
+    "ppf": "ok",
+    "eq": "explicit"
+  },
+  {
+    "src": "100-a\\cdot x",
+    "prep": "100-a*x",
+    "free": [
+      "a"
+    ],
+    "ppf": "ok",
+    "eq": "explicit"
+  },
+  {
+    "src": "y=100-a\\cdot x",
+    "prep": "y=100-a*x",
+    "free": [
+      "a"
+    ],
+    "ppf": "ok",
+    "eq": "explicit"
+  },
+  {
+    "src": "\\frac{100}{x}",
+    "prep": "((100)/(x))",
+    "free": [],
+    "ppf": "ok",
+    "eq": "explicit"
+  },
+  {
+    "src": "100-a\\times x",
+    "prep": "100-a*x",
+    "free": [
+      "a"
+    ],
+    "ppf": "ok",
+    "eq": "explicit"
+  },
+  {
+    "src": "\\left(100-x\\right)",
+    "prep": "(100-x)",
+    "free": [],
+    "ppf": "ok",
+    "eq": "explicit"
+  },
+  {
+    "src": "100-a\\cdot x^{2}",
+    "prep": "100-a*x^(2)",
+    "free": [
+      "a"
+    ],
+    "ppf": "ok",
+    "eq": "explicit"
+  },
+  {
+    "src": "\\sqrt{100-x}",
+    "prep": "sqrt(100-x)",
+    "free": [],
+    "ppf": "ok",
+    "eq": "explicit"
+  }
+]
