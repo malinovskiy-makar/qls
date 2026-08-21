@@ -135,6 +135,14 @@ function pultShouldShow() {
 }
 
 
+/* Имя регулятора сдвига: «Сдвиг D». Буква кривой уезжает в набор формулой
+   (texifyName делает из одинокой латинской буквы курсивную переменную), а
+   слово «Сдвиг» остаётся прямым текстом. Длинное своё имя кривой сокращаем
+   так же, как раньше: колонка панели узкая. */
+function shiftChipLabel(c) {
+  return 'Сдвиг ' + curveChipLabel(c);
+}
+
 // Короткая метка кривой для чипа: по роли, иначе усечённая формула.
 function curveChipLabel(c) {
   const f = curveShortName(c);   // своё имя → роль → формула (Фаза 1)
@@ -167,6 +175,11 @@ function paintEqLabel(lab, name, value) {
 function texifyName(name) {
   const s = String(name || '').trim();
   if (/^[A-Za-z]$/.test(s)) return s;
+  /* «Сдвиг D» — слово прямым текстом, обозначение кривой набором. Без этой
+     ветки вся строка уходила бы в \text{} целиком, и буква D стояла бы
+     обычным шрифтом рядом с формулой на графике, где она курсивная. */
+  const sh = s.match(/^(Сдвиг)\s+(.+)$/);
+  if (sh) return '\\text{' + sh[1] + '\\,}' + texifyName(sh[2]);
   const m = s.match(/^([A-Za-z])([A-Za-z0-9]{1,4})$/);
   if (m && !/[А-Яа-я]/.test(s)) return m[1] + '_{\\text{' + m[2] + '}}';
   return '\\text{' + s.replace(/([{}\\$&#^_~%])/g, '\\$1') + '}';
@@ -367,7 +380,17 @@ function buildPultCurveChips(list) {
     box.appendChild(t);
   }
   list.forEach(c => {
-    const { chip, lab, val } = makePchip(curveChipLabel(c), fmt(c.linear.b), c.color);
+    /* ⚠️ ПОЛЗУНОК ПОКАЗЫВАЕТ СДВИГ, А НЕ ЗНАЧЕНИЕ КРИВОЙ (решение владельца 22.08).
+       Раньше в строке стояло «D = 100»: имя кривой и её свободный член. Подпись
+       врала дважды — D это функция, а не число, и ползунок двигает не значение
+       спроса, а параллельный сдвиг всей кривой. Теперь имя регулятора прямо
+       называет действие («Сдвиг D», буква набрана формулой), а число рядом —
+       это сам сдвиг: 0 на старте, 12 после протяжки вверх, −12 вниз.
+       Свободный член кривой остаётся ЕДИНСТВЕННЫМ источником правды: сдвиг
+       считается от значения, с которого модель открылась (base), и обратно в
+       кривую кладётся тем же setCurveFreeTerm. */
+    const base = c.linear.b;
+    const { chip, lab, val } = makePchip(shiftChipLabel(c), fmt(0), c.color);
     chip.dataset.cid = c.id;
     // Подсказку вешаем на сам чип: подпись .pchip-label заменяет
     // upgradeRegulator строкой «имя = значение», и title на ней пропал бы.
@@ -383,18 +406,25 @@ function buildPultCurveChips(list) {
        `step = 'any'` разрешает ползунку нести точное значение; клавиши-стрелки
        при этом по-прежнему ходят целыми (браузер берёт сотую долю размаха,
        а размах здесь 0…100). */
-    sl.type = 'range'; sl.min = 0; sl.max = CONFIG.Pmax; sl.step = 'any';
-    sl.value = c.linear.b;
+    /* Старт по центру диапазона — общее правило для всех ползунков аналитики.
+       Диапазон симметричен вокруг нуля, поэтому ручка стоит ровно посередине
+       и сразу видно, что двигать можно в обе стороны. Размах прежний (Pmax),
+       просто он теперь отсчитывается от текущего положения кривой, а не от
+       нуля оси цен. */
+    const half = Math.max(1, CONFIG.Pmax / 2);
+    sl.type = 'range'; sl.min = -half; sl.max = half; sl.step = 'any';
+    sl.value = 0;
     sl.style.accentColor = c.color;   // акцент ползунка в цвет кривой
     // п. 78. Подсказка идёт через общую плашку, а не через нативный title:
     // тот не появляется ни с клавиатуры, ни на сенсорном экране.
-    sl.setAttribute('data-tip', 'Сдвиг кривой по вертикали (свободный член b)');
+    sl.setAttribute('data-tip', 'Параллельный сдвиг кривой по вертикали');
 
     // Слайдер → задаём b ТЕМ ЖЕ путём, что перетаскивание (по id, кривая могла пересоздаться).
     sl.addEventListener('input', () => {
       const cur = STATE.curves.find(x => x.id === c.id);
-      if (cur && cur.linear) setCurveFreeTerm(cur, parseFloat(sl.value));
+      if (cur && cur.linear) setCurveFreeTerm(cur, base + parseFloat(sl.value));
     });
+    chip._shiftBase = base;   // от какого свободного члена считается сдвиг
 
     // Дорожка с кликабельными границами — как у букв-параметров: один и тот же
     // ползунок во всех сценах, а не два похожих вида.
@@ -420,8 +450,17 @@ function syncPultCurveValues(list) {
     if (!chip) return;
     const sl = chip.querySelector('input[type="range"]');
     const val = chip.querySelector('.pchip-val');
-    if (sl && document.activeElement !== sl) sl.value = c.linear.b;   // точное, см. п. 3
-    if (val) val.textContent = fmt(c.linear.b);
+    /* Ползунок несёт СДВИГ, поэтому синхронизируем разницу с базой, а не сам
+       свободный член: иначе протяжка кривой мышью ставила бы в ползунок 85,22
+       при размахе −50…50 и ручка улетала бы за край. */
+    const base = (chip._shiftBase == null) ? c.linear.b : chip._shiftBase;
+    const shift = c.linear.b - base;
+    if (sl && document.activeElement !== sl) sl.value = shift;   // точное, см. п. 3
+    if (val) val.textContent = fmt(shift);
+    /* Видимая строка «Сдвиг D = …» это .reg-eq, её пишет upgradeRegulator;
+       .pchip-val он же прячет. Значит после синхронизации значения надо
+       позвать его же обновление, иначе число в строке останется прежним. */
+    if (chip._regSync) chip._regSync();
   });
 }
 

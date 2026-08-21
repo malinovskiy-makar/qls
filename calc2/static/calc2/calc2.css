@@ -1477,8 +1477,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    человек просто не замечал, что по ним можно щёлкнуть. Оформляем их так же,
    как и любое редактируемое значение (.edval): читаемый цвет, заметный
    пунктир снизу, текстовый курсор. */
+/* ⚠️ ШИРИНА ГРАНИЦЫ НЕ ЗАВИСИТ ОТ РАЗРЯДНОСТИ ЧИСЛА (решение владельца 22.08).
+   Было `flex: 0 0 auto` без минимума, то есть ширина ровно по содержимому:
+   трёхзначная граница «100» шире однозначной «0» на семь пикселей, и дорожки
+   соседних ползунков начинались в разных местах — панель из четырёх ползунков
+   выглядела как лесенка. Минимальная ширина в 3,4em (≈37px при кегле 11)
+   вмещает и «−100», и «1 250», а числа стоят по центру своего места. */
 .param-bound {
-  flex: 0 0 auto; padding: 1px 3px; border: none; background: transparent;
+  flex: 0 0 auto; min-width: 3.4em; text-align: center;
+  padding: 1px 3px; border: none; background: transparent;
   font-size: 11px; color: var(--text2); font-variant-numeric: tabular-nums;
   border-bottom: 1px dashed var(--text3); border-radius: 0; cursor: text;
   transition: color .12s var(--ease), border-bottom-color .12s var(--ease);
