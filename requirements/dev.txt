@@ -130,6 +130,8 @@ sqlparse==0.6.0
     #   django
 stevedore==5.9.0
     # via bandit
+tblib==3.2.2
+    # via -r requirements/dev.in
 tomli==2.4.1
     # via pip-audit
 tomli-w==1.2.0
