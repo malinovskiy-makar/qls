@@ -7,16 +7,35 @@
 # за часы. Службы общаются между собой по внутренней сети backend.
 # Если порт понадобится для отладки — только "127.0.0.1:5432:5432".
 
+# ⚠️ ИМЯ ПРОЕКТА ЗАДАНО ЯВНО, И БЕЗ ЭТОГО ВСЁ ЛОМАЕТСЯ ТИХО.
+# Без ключа name compose берёт имя проекта от каталога, в котором лежит
+# файл. Файл лежит в deploy/, значит проект назывался бы «deploy», а тома —
+# deploy_pgdata вместо weconomics_pgdata. Compose не ругнулся бы: он молча
+# создал бы ПУСТЫЕ тома, и сайт поднялся бы на чистой базе рядом с настоящей.
+name: weconomics
+
 services:
   postgres:
     image: postgres:17-alpine
     container_name: weco-postgres
     restart: unless-stopped
     # ports: НЕ ДОБАВЛЯТЬ. См. комментарий выше.
+    # ⚠️ ЗДЕСЬ НЕТ ПОДСТАНОВКИ ВИДА «доллар-фигурная-скобка», И ЭТО ГЛАВНОЕ
+    # В ФАЙЛЕ. Такая подстановка выполняется НА ХОСТЕ и берёт значение из
+    # файла .env, лежащего РЯДОМ С ЭТИМ ФАЙЛОМ. Этот файл лежит в клоне
+    # репозитория, а пароли — в /srv/weconomics/.env, то есть в другом месте.
+    # Подстановка молча дала бы пустые строки: compose лишь предупредил бы,
+    # база поднялась бы без пароля, а healthcheck поймал бы это уже потом.
+    # Поэтому значения приходят через env_file, который читает КОНТЕЙНЕР.
+    #
+    # Да, контейнер базы видит при этом и остальные ключи файла, включая
+    # SECRET_KEY. Сказано прямо, а не спрятано: настоящей границы тут нет —
+    # контейнеру базы и так доверены все данные проекта. Ради разделения
+    # пришлось бы держать пароль в двух файлах, а это ровно тот способ,
+    # каким пароли расходятся.
+    env_file:
+      - /srv/weconomics/.env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       # C.UTF-8 — чтобы сортировка не поехала на кириллице
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
     volumes:
@@ -24,7 +43,9 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      # Два доллара — экранирование: переменную разворачивает оболочка ВНУТРИ
+      # контейнера, а не compose на хосте.
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -35,12 +56,9 @@ services:
     container_name: weco-redis
     restart: unless-stopped
     # ports: НЕ ДОБАВЛЯТЬ. См. комментарий выше.
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD}
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
-      --appendonly yes
+    # Через sh -c по той же причине, что у postgres: пароль подставляет
+    # оболочка внутри контейнера из env_file, а не compose из чужого .env.
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --maxmemory 512mb --maxmemory-policy allkeys-lru --appendonly yes"]
     volumes:
       - redisdata:/data
     networks:
@@ -51,8 +69,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    env_file:
+      - /srv/weconomics/.env
 
   # ⚠️ КОНТЕЙНЕР web РОВНО ОДИН, И ВТОРОЙ ПОДНИМАТЬ НЕЛЬЗЯ.
   # entrypoint накатывает миграции при старте без всякой блокировки — это
@@ -69,12 +87,15 @@ services:
     restart: unless-stopped
     # ports: НЕ ДОБАВЛЯТЬ. Наружу ходит только nginx, к web он обращается
     # по имени сервиса во внутренней сети backend.
+    # ⚠️ ПУТЬ АБСОЛЮТНЫЙ, И ЭТО НАМЕРЕННО. Файл с паролями лежит вне клона
+    # репозитория: клон можно снести и склонировать заново, .env — нельзя.
     env_file:
-      - .env
-    environment:
-      DJANGO_SETTINGS_MODULE: config.settings_production
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      - /srv/weconomics/.env
+    # DATABASE_URL и REDIS_URL здесь БОЛЬШЕ НЕ СОБИРАЮТСЯ. Раньше они
+    # строились тут из POSTGRES_* и REDIS_PASSWORD, и получалось два места
+    # для одной строки подключения: environment перебивает env_file, поэтому
+    # правка .env не давала бы никакого эффекта, а причину искали бы долго.
+    # Теперь строки живут только в /srv/weconomics/.env.
     volumes:
       # Тома монтируются И СЮДА, И В nginx: web их наполняет, nginx отдаёт.
       - static:/app/staticfiles
@@ -110,13 +131,13 @@ services:
     depends_on:
       - web
     volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/html:/usr/share/nginx/html:ro
+      - /srv/weconomics/nginx/conf.d:/etc/nginx/conf.d:ro
+      - /srv/weconomics/nginx/html:/usr/share/nginx/html:ro
       # Только чтение: отдавать nginx умеет, писать сюда ему незачем.
       - static:/var/www/static:ro
       - media:/var/www/media:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
-      - ./certbot/www:/var/www/certbot:ro
+      - /srv/weconomics/certbot/conf:/etc/letsencrypt:ro
+      - /srv/weconomics/certbot/www:/var/www/certbot:ro
     networks:
       - backend
     healthcheck:
@@ -133,8 +154,8 @@ services:
     container_name: weco-certbot
     profiles: ["tools"]
     volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
+      - /srv/weconomics/certbot/conf:/etc/letsencrypt
+      - /srv/weconomics/certbot/www:/var/www/certbot
 
 volumes:
   # Именованные тома: переживают docker compose down и пересоздание контейнеров.

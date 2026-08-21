@@ -1,0 +1,10 @@
+[Unit]
+Description=Резервная копия базы weconomics
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/weconomics/app/deploy/backup.sh
+# Скрипту нужен docker, поэтому root. Ключей он не печатает.
+User=root
