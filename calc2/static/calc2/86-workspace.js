@@ -201,9 +201,8 @@ const SECTION_ICONS = {
   // Равновесие: пересечение и точка.
   'sec-eq': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 6l13 12M5 18L18 6" stroke-width="2.2"/><circle cx="11.5" cy="12" r="3.6" stroke-width="2.6"/>',
   // Излишки: закрашенная область.
-  'sec-areas': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 6l12 12H5z" fill="currentColor" fill-opacity=".16" stroke-width="2.6"/>',
-  // Что изучаем: кривая и штриховая «до».
-  'sec-analysis': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 17c5 0 9-4 13-11" stroke-width="2.6"/><path d="M5 12c5 0 9-3 13-7" stroke-width="2.2" stroke-dasharray="5 4" opacity=".4"/>',
+  // Ввод функций: кривая на осях — единственная карточка ввода во всех сценах.
+  'sec-input': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 17c5 0 9-4 13-11" stroke-width="2.6"/>',
   // Монополия: спрос и вдвое круче MR.
   'sec-mono': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 6l13 12" stroke-width="2.6"/><path d="M5 6l7 12" stroke-width="2.2" stroke-dasharray="5 4"/>',
   // Вмешательство: клин между кривыми.
@@ -332,8 +331,11 @@ function openSection(secId) {
    Имя достаётся первой ВИДИМОЙ карточке из реестра; не видно ни одной — не
    переименовываем никого, каждая карточка остаётся под своим именем. Врать
    заголовком хуже, чем потерять единообразие в трёх сюжетах из сорока одного. */
-const INPUT_CARDS = ['sec-curves', 'sec-graph', 'sec-costs', 'sec-labor',
-                     'sec-inequality', 'sec-consumer', 'sec-ppf', 'sec-macro', 'sec-math'];
+/* Карточка ввода теперь ровно одна на все модели: поля разных сцен лежат
+   внутри неё вложенными блоками (#sec-curves, #sec-costs и прочие), а имя
+   «Ввод функций» стоит в разметке и никуда не переезжает. Реестр оставлен —
+   на нём держится выделение первой карточки в syncFirstCard. */
+const INPUT_CARDS = ['sec-input'];
 
 /* Карточка, внутри которой лежит живое поле формулы. У трёх монопольных
    сюжетов свои поля стоят во вложенном блоке «Структура рынка», то есть внутри

@@ -525,8 +525,11 @@ await t('своё имя кривой заменяет родовое D на г�
 await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('sd'); closePicker(); });
 await page.waitForTimeout(350);
 
-await t('структура рынка и вмешательство вложены в «Что изучаем»', () => page.evaluate(() => {
-  const an = document.getElementById('sec-analysis');
+await t('структура рынка и вмешательство вложены в «Ввод функций»', () => page.evaluate(() => {
+  // Обёртка «Что изучаем» убрана (решение владельца 22.08): её содержимое
+  // лежит прямо в единой карточке ввода.
+  const an = document.getElementById('sec-input');
+  if (!an) return 'карточки #sec-input нет';
   return (an.contains(document.getElementById('sec-tax')) &&
           an.contains(document.getElementById('sec-mono'))) || 'секции всё ещё отдельные';
 }));
@@ -535,16 +538,16 @@ await t('заголовок верхнего уровня в панели оди
   // Заголовок секции стал складной кнопкой карточки (Фаза 5), а название внутри
   // неё лежит в <b> рядом с иконкой блока (П9). Берём именно его: рядом стоит
   // вопросик-подсказка, и его «?» попал бы в textContent всей кнопки.
-  // Внутри «Что изучаем» заголовков верхнего уровня быть не должно.
+  // Внутри «Ввода функций» заголовков верхнего уровня быть не должно.
   const own = (n) => {
     const b = n.querySelector(':scope > b');
     if (b) return b.textContent.trim();
     return [...n.childNodes].filter(x => x.nodeType === 3).map(x => x.nodeValue).join('').trim();
   };
-  const head = document.querySelector('#sec-analysis > .fold-btn > span');
-  const inner = document.querySelectorAll('#sec-analysis .section-title').length;
+  const head = document.querySelector('#sec-input > .fold-btn > span');
+  const inner = document.querySelectorAll('#sec-input .section-title').length;
   if (!head) return 'у секции нет складного заголовка';
-  if (own(head) !== 'Что изучаем') return 'заголовок: ' + own(head);
+  if (own(head) !== 'Ввод функций') return 'заголовок: ' + own(head);
   return inner === 0 || 'внутри ещё ' + inner + ' заголовков верхнего уровня';
 }));
 
@@ -1535,18 +1538,24 @@ await t('разбор уезжает из расчётов в «Объяснен
 /* ── Фаза 5. Панель ввода — список карточек ───────────────────────────
    Все блоки закрыты, у каждого свой заголовок, раскрытый меняет фон,
    первая видимая карточка выделена. */
-await t('все карточки панели ввода закрыты', async () => {
+await t('«Ввод функций» раскрыт, «Точки» и «Площади» свёрнуты', async () => {
   await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="sd"]');
   await page.waitForTimeout(340);
   await page.evaluate(() => setToolsOpen(true));
   await page.waitForTimeout(200);
   return await page.evaluate(() => {
+    /* Решение владельца 22.08: карточка ввода раскрыта в КАЖДОЙ модели, две
+       остальные свёрнуты. Раньше правило было «все закрыты», и одна модель
+       («Построение графиков») из него выбивалась своим openSection. */
     const bad = [];
     document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
       const btn = sec.querySelector(':scope > .fold-btn');
       if (!btn) { bad.push((sec.id || '?') + ': нет заголовка'); return; }
-      if (btn.getAttribute('aria-expanded') !== 'false') bad.push((sec.id || '?') + ': раскрыт');
+      const want = (sec.id === 'sec-input') ? 'true' : 'false';
+      if (btn.getAttribute('aria-expanded') !== want) {
+        bad.push((sec.id || '?') + (want === 'true' ? ': свёрнут, а должен быть раскрыт' : ': раскрыт'));
+      }
       if (!(btn.querySelector('span') || {}).textContent) bad.push((sec.id || '?') + ': заголовок пуст');
     });
     return !bad.length || bad.join('; ');
@@ -1561,17 +1570,21 @@ await t('первая видимая карточка выделена одна'
     || 'выделено ' + marked.length + ', первая видимая ' + (firstVisible ? firstVisible.id : 'нет');
 }));
 
+/* Карточка теперь одна на весь ввод (#sec-input), и на входе в модель она уже
+   раскрыта. Поэтому сначала закрываем её, потом открываем щелчком — иначе
+   проба меряла бы «раскрытую» и «раскрытую». */
 await t('раскрытая карточка отличается фоном', async () => {
-  await clickUI('#sec-curves > .fold-btn');
+  await clickUI('#sec-input > .fold-btn');           // закрыть
+  await page.waitForTimeout(180);
+  const closed = await page.evaluate(() => getComputedStyle(document.getElementById('sec-input')).backgroundColor);
+  await clickUI('#sec-input > .fold-btn');           // открыть обратно
   await page.waitForTimeout(180);
   const r = await page.evaluate(() => {
-    const sec = document.getElementById('sec-curves');
+    const sec = document.getElementById('sec-input');
     const body = sec.querySelector(':scope > .fold-body');
     return { open: body.classList.contains('open'), card: sec.classList.contains('open-card'),
              bg: getComputedStyle(sec).backgroundColor };
   });
-  await page.evaluate(() => document.querySelector('#sec-curves > .fold-btn').click());
-  const closed = await page.evaluate(() => getComputedStyle(document.getElementById('sec-curves')).backgroundColor);
   return (r.open && r.card && r.bg !== closed) || JSON.stringify(r) + ' закрытая ' + closed;
 });
 

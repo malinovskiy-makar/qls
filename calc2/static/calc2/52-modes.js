@@ -702,9 +702,13 @@ function setMode(mode) {
   STATE.firstQuad = (mode !== 'math' && mode !== 'graph');
   const quadChk = document.getElementById('chk-quad');
   if (quadChk) quadChk.checked = STATE.firstQuad;
-  // Какие секции панели показывать в каждом режиме (отсутствующие id просто игнорируются).
+  /* Какие блоки ВНУТРИ карточки «Ввод функций» показывать в каждом режиме
+     (отсутствующие id просто игнорируются). Сама карточка #sec-input видна
+     всегда: панель во всех 41 сцене состоит из одних и тех же трёх карточек,
+     и меняется только начинка первой. Из списка ушли 'sec-areas' и
+     'sec-analysis' — этих блоков в разметке больше нет. */
   const groups = {
-    market: ['sec-curves', 'sec-eq', 'sec-areas', 'sec-analysis', 'sec-tax', 'sec-mono'],
+    market: ['sec-curves', 'sec-eq', 'sec-tax', 'sec-mono'],
     costs:  ['sec-costs'],
     ppf:    ['sec-ppf'],
     labor:  ['sec-curves', 'sec-labor'],

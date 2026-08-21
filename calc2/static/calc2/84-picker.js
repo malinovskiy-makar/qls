@@ -205,9 +205,10 @@ const SCENE_ROUTE = {
      раскрыта заранее: свёрнутая панель над пустым графиком не сообщает даже
      того, что здесь вообще что-то делают. Во всех остальных сценах карточки
      закрыты по-прежнему — там на холсте уже есть модель, и первый шаг очевиден. */
+  /* Своего openSection у маршрута больше нет: карточка «Ввод функций» раскрыта
+     во ВСЕХ сценах, и открывает её pickScene одинаково для всех. */
   'm-graph':      { run: () => { STATE.curves = []; curveCounter = 0; STATE.params = {};
-                                 setMode('graph'); renderGraphRows();
-                                 if (typeof openSection === 'function') openSection('sec-graph'); } },
+                                 setMode('graph'); renderGraphRows(); } },
   'm-tangent':    { run: () => { setMode('math'); setMathSub('tangent'); },    lock: ['math-seg'] },
   'm-optimum':    { run: () => { setMode('math'); setMathSub('optimum'); },    lock: ['math-seg'] },
   'm-transform':  { run: () => { setMode('math'); setMathSub('transform'); },  lock: ['math-seg'] },
@@ -503,6 +504,10 @@ function pickScene(key) {
   const nm = document.getElementById('scene-name');
   if (nm) nm.textContent = SCENE_NAMES[key] || 'Сцена';
   if (typeof collapseCards === 'function') collapseCards();   // новая сцена — все карточки закрыты
+  /* …кроме «Ввода функций»: он раскрыт всегда и во всех моделях (решение
+     владельца 22.08). «Точки на графике» и «Площади» остаются свёрнутыми —
+     одинаковая структура панели важнее экономии места. */
+  if (typeof openSection === 'function') openSection('sec-input');
   if (typeof updatePult === 'function') updatePult();   // показать/спрятать пульт под выбранную сцену
   // Панель ввода открыта, но все карточки в ней закрыты: список заголовков
   // виден сразу, а разворачивается только нужное.
