@@ -2946,6 +2946,69 @@ const CASES = [
              ['недописанная — отказ виден', 'brokenFlag', 1, 0]],
   },
   {
+    /* ⚠️ ВТОРОЙ ПУТЬ РАЗБОРА: СЫРАЯ СТРОКА ПРЯМО В `parsePpfEquation`.
+
+       Эта проверка появилась потому, что её не было. Соседний случай
+       («Разбор · неявное умножение и LaTeX доходят до Math.js») и живой обход
+       41 сцены оба зеленели, пока `compilePpf` разбирал сырой текст в обход
+       подготовки: через интерфейс сырой LaTeX до разбора не доезжает вовсе —
+       математическое поле кладёт в спрятанный input уже переведённую запись.
+       Дефект нашёл владелец прямым вызовом в консоли, а не прибор.
+
+       Здесь строки подаются КАК ЕСТЬ, и проверяется вся цепочка до числа:
+       разобралось · какой вид · сколько считает. Считаем в точке x = 5:
+       у «y = 100 − a·x» при a = 1 это 95, при a = 10 это 50.
+
+       ⚠️ Отдельная строка про букву БЕЗ ползунка. f(5) отдавал NaN (в JSON это
+       null) при исправно разобранной формуле: пробный расчёт при разборе шёл
+       через scopeFor, подставляющий единицу, а сам счёт — через paramScope,
+       который знает только заведённые ползунки. Ползунок заводится ПОЗЖЕ, чем
+       принимается формула, и в это окно кривая считалась в пустоту. */
+    name: 'Разбор · сырая строка проходит parsePpfEquation до числа',
+    run: `var B = String.fromCharCode(92);
+          resetSceneMemory(); pickScene('ppf'); redrawAll();
+          var was = STATE.params.a;
+          var at5 = function (src, aVal) {
+            if (aVal == null) delete STATE.params.a;
+            else STATE.params.a = { value: aVal, min: -10, max: 10, step: 0.1 };
+            var p = parsePpfEquation(src);
+            if (p.error) return NaN;
+            var v = p.f(5);
+            return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+          };
+          var kindOf = function (src) {
+            var p = parsePpfEquation(src);
+            return p.error ? 0 : (p.kind === 'explicit' ? 1 : 2);
+          };
+          var okc = function (src) { return compilePpf(src).error ? 0 : 1; };
+          var out = {
+            kImplicit: kindOf('y=100-ax'),
+            kCdot:     kindOf('y=100-a' + B + 'cdot x'),
+            kStar:     kindOf('y=100-a*x'),
+            kFrac:     kindOf(B + 'frac{100}{x}'),
+            cImplicit: okc('100-ax'),
+            cCdot:     okc('100-a' + B + 'cdot x'),
+            cFrac:     okc(B + 'frac{100}{x}'),
+            vNoParam:  at5('y=100-ax', null),
+            vA1:       at5('y=100-a' + B + 'cdot x', 1),
+            vA10:      at5('y=100-ax', 10),
+            vFrac:     at5(B + 'frac{100}{x}', null)
+          };
+          if (was) STATE.params.a = was; else delete STATE.params.a;
+          return out;`,
+    checks: [['«y=100-ax» — явная запись', 'kImplicit', 1, 0],
+             ['«y=100-a\\cdot x» — явная запись', 'kCdot', 1, 0],
+             ['«y=100-a*x» — явная запись', 'kStar', 1, 0],
+             ['«\\frac{100}{x}» — явная запись', 'kFrac', 1, 0],
+             ['compilePpf берёт «100-ax»', 'cImplicit', 1, 0],
+             ['compilePpf берёт «100-a\\cdot x»', 'cCdot', 1, 0],
+             ['compilePpf берёт «\\frac{100}{x}»', 'cFrac', 1, 0],
+             ['f(5) без ползунка: буква = 1', 'vNoParam', 95, 0.001],
+             ['f(5) при a=1', 'vA1', 95, 0.001],
+             ['f(5) при a=10', 'vA10', 50, 0.001],
+             ['f(5) у 100/x', 'vFrac', 20, 0.001]]
+  },
+  {
     /* Сессия 22.08. РЫЧАГ ДВИГАЕТ КРИВУЮ, А НЕ ПЛОСКОСТЬ.
        Правило 21.08 («окно идёт за формулой, а не за значением буквы») в
        «Построении КПВ» не работало: доводка подписи кривой просила следующий

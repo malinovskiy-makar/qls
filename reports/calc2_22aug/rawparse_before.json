@@ -1,0 +1,56 @@
+[
+  {
+    "src": "y=100-ax",
+    "prep": "y=100-a*x",
+    "compile": "ok",
+    "kind": "explicit",
+    "f5_noParam": "NaN",
+    "f5_a1": 95,
+    "f5_a10": 50
+  },
+  {
+    "src": "y=100-a\\cdot x",
+    "prep": "y=100-a*x",
+    "compile": "ok",
+    "kind": "explicit",
+    "f5_noParam": "NaN",
+    "f5_a1": 95,
+    "f5_a10": 50
+  },
+  {
+    "src": "y=100-a*x",
+    "prep": "y=100-a*x",
+    "compile": "ok",
+    "kind": "explicit",
+    "f5_noParam": "NaN",
+    "f5_a1": 95,
+    "f5_a10": 50
+  },
+  {
+    "src": "\\frac{100}{x}",
+    "prep": "((100)/(x))",
+    "compile": "ok",
+    "kind": "explicit",
+    "f5_noParam": 20,
+    "f5_a1": 20,
+    "f5_a10": 20
+  },
+  {
+    "src": "100-ax",
+    "prep": "100-a*x",
+    "compile": "ok",
+    "kind": "explicit",
+    "f5_noParam": "NaN",
+    "f5_a1": 95,
+    "f5_a10": 50
+  },
+  {
+    "src": "100-a\\cdot x",
+    "prep": "100-a*x",
+    "compile": "ok",
+    "kind": "explicit",
+    "f5_noParam": "NaN",
+    "f5_a1": 95,
+    "f5_a10": 50
+  }
+]
