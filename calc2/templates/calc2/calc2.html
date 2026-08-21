@@ -1119,61 +1119,6 @@
         <div id="info-mono" style="margin-top:8px;"></div>
       </div>
 
-      <!-- Вмешательство государства: налог / субсидия (шаги 7–8) -->
-      <div class="section" id="sec-tax">
-        <div class="vsub">Вмешательство государства</div>
-        <div class="seg">
-          <button class="seg-btn active" id="seg-tax">Налог</button>
-          <button class="seg-btn" id="seg-sub">Субсидия</button>
-          <button class="seg-btn" id="seg-ceil">Потолок</button>
-          <button class="seg-btn" id="seg-floor">Пол</button>
-        </div>
-        <!-- Кто формально платит налог (Задача 1). Виден только для типа «Налог». -->
-        <div id="taxside-row" style="margin-top:8px;">
-          <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Налог платит:</label>
-          <div class="seg">
-            <button class="seg-btn active" id="tsb-seller">Продавец</button>
-            <button class="seg-btn" id="tsb-buyer">Покупатель</button>
-          </div>
-        </div>
-        <!-- Вид ставки (Фаза 2в): потоварная (руб./ед.) — параллельный сдвиг S;
-             адвалорная (%) — ПОВОРОТ: S_после(Q) = (1+τ)·S(Q). Только в конкуренции. -->
-        <div id="taxkind-row" style="margin-top:8px;">
-          <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Вид ставки:</label>
-          <div class="seg">
-            <button class="seg-btn active" id="tk-unit">Специфический</button>
-            <button class="seg-btn" id="tk-adv">Адвалорный</button>
-          </div>
-        </div>
-        <!-- Поле ставки (налог / субсидия) -->
-        <div class="field" id="tax-field" style="margin-top:8px;">
-          <label>Ставка <span id="rate-letter">t</span> = <b id="tax-val">0</b></label>
-          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
-            <input type="range" id="tax-slider" min="0" max="100" step="1" value="0"
-                   style="flex:1;margin-top:0;">
-            <input type="number" id="tax-input" min="0" max="100" step="0.1" value="0"
-                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
-          </div>
-        </div>
-        <!-- Поле регулируемой цены (потолок / пол) -->
-        <div class="field" id="pc-field" style="margin-top:8px;display:none;">
-          <label>Цена <span id="pc-letter">Pc</span> = <b id="pc-val">0</b></label>
-          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
-            <input type="range" id="pc-slider" min="0" max="100" step="1" value="0"
-                   style="flex:1;margin-top:0;">
-            <input type="number" id="pc-input" min="0" max="100" step="0.1" value="0"
-                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
-          </div>
-        </div>
-        <div class="hint" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
-          на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя
-          и продавца можно тянуть мышью.</div>
-        <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
-          дефицит (продаётся меньше), пол выше равновесия даёт избыток. Линию цены можно тянуть мышью.</div>
-        <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-ghost" checked>
-          <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
-        <div id="info-tax" style="margin-top:8px;"></div>
-      </div>
 
 
     <!-- Издержки фирмы (Задача 2) — отдельный режим -->
@@ -2254,6 +2199,68 @@
           <div id="params-empty" class="k-empty"><b>Ползунков в этой модели нет</b>
             <p>Впишите в формулу букву вместо числа, скажем «100 − a·Q»,
             и она станет ползунком здесь.</p></div>
+        </div>
+
+        <!-- ВМЕШАТЕЛЬСТВО ГОСУДАРСТВА переехало сюда из левой панели
+             (решение владельца 22.08). Разметка, идентификаторы и логика
+             applyScenarioVisibility не тронуты: блок просто живёт в панели
+             аналитики, рядом с ползунками, которыми им и управляют. Правая
+             панель будет перестраиваться отдельной сессией — блок стоит
+             ПЕРЕД «Ключевыми значениями», чтобы та его не потеряла. -->
+        <!-- Вмешательство государства: налог / субсидия (шаги 7–8) -->
+        <div class="section" id="sec-tax">
+          <div class="vsub">Вмешательство государства</div>
+          <div class="seg">
+            <button class="seg-btn active" id="seg-tax">Налог</button>
+            <button class="seg-btn" id="seg-sub">Субсидия</button>
+            <button class="seg-btn" id="seg-ceil">Потолок</button>
+            <button class="seg-btn" id="seg-floor">Пол</button>
+          </div>
+          <!-- Кто формально платит налог (Задача 1). Виден только для типа «Налог». -->
+          <div id="taxside-row" style="margin-top:8px;">
+            <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Налог платит:</label>
+            <div class="seg">
+              <button class="seg-btn active" id="tsb-seller">Продавец</button>
+              <button class="seg-btn" id="tsb-buyer">Покупатель</button>
+            </div>
+          </div>
+          <!-- Вид ставки (Фаза 2в): потоварная (руб./ед.) — параллельный сдвиг S;
+               адвалорная (%) — ПОВОРОТ: S_после(Q) = (1+τ)·S(Q). Только в конкуренции. -->
+          <div id="taxkind-row" style="margin-top:8px;">
+            <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Вид ставки:</label>
+            <div class="seg">
+              <button class="seg-btn active" id="tk-unit">Специфический</button>
+              <button class="seg-btn" id="tk-adv">Адвалорный</button>
+            </div>
+          </div>
+          <!-- Поле ставки (налог / субсидия) -->
+          <div class="field" id="tax-field" style="margin-top:8px;">
+            <label>Ставка <span id="rate-letter">t</span> = <b id="tax-val">0</b></label>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+              <input type="range" id="tax-slider" min="0" max="100" step="1" value="0"
+                     style="flex:1;margin-top:0;">
+              <input type="number" id="tax-input" min="0" max="100" step="0.1" value="0"
+                     style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+            </div>
+          </div>
+          <!-- Поле регулируемой цены (потолок / пол) -->
+          <div class="field" id="pc-field" style="margin-top:8px;display:none;">
+            <label>Цена <span id="pc-letter">Pc</span> = <b id="pc-val">0</b></label>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+              <input type="range" id="pc-slider" min="0" max="100" step="1" value="0"
+                     style="flex:1;margin-top:0;">
+              <input type="number" id="pc-input" min="0" max="100" step="0.1" value="0"
+                     style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+            </div>
+          </div>
+          <div class="hint" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
+            на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя
+            и продавца можно тянуть мышью.</div>
+          <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
+            дефицит (продаётся меньше), пол выше равновесия даёт избыток. Линию цены можно тянуть мышью.</div>
+          <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-ghost" checked>
+            <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
+          <div id="info-tax" style="margin-top:8px;"></div>
         </div>
 
         <!-- Расчёты сцены: сюда JS переносит блок равновесия и все #info-*. -->
