@@ -386,7 +386,7 @@ function drawLaborCompPoints() {
     // Точка занятости (короткая сторона) на линии W_min.
     g.append('circle').attr('cx', xQd).attr('cy', yW).attr('r', 4).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   } else {
-    laborPoint(g, eq.Q, eq.P, COL.ink, 'E*', { lIdx: 'k', wIdx: 'k' });
+    laborPoint(g, eq.Q, eq.P, COL.ink, 'E', { lIdx: 'k', wIdx: 'k' });   // без звёздочки, как на рынке
   }
 }
 

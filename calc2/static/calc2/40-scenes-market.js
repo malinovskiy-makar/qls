@@ -519,7 +519,11 @@ function drawEquilibrium() {
   /* Кружок у точки пересечения снят решением владельца: пунктиры к осям уже
      показывают, где точка, а числа на осях — какая она. Подпись «E*» остаётся:
      это ИМЯ точки, а не повтор переменной. */
-  pointName(g, px, py, 'E*', COL.ink);
+  /* Звёздочка у буквы равновесия убрана (решение владельца 22.08): на холсте
+     остаётся одна буква «E». Координаты по осям звёздочку сохраняют — там она
+     и различает равновесное значение от текущего, а у самой точки различать
+     нечего: другой E на графике нет. */
+  pointName(g, px, py, 'E', COL.ink);
 }
 
 // Текст с белой обводкой (halo) — чтобы подписи равновесия читались над сеткой.
@@ -723,12 +727,20 @@ function haloText(g, x, y, txt, anchor, baseline, opts) {
 function pointName(g, px, py, sym, color, opts) {
   if (!sym) return null;
   const o = opts || {};
+  /* ⚠️ ОРЕОЛ РИСУЕТСЯ ПЕРЕД БУКВОЙ И ШИРЕ ЕЁ (решение владельца 22.08).
+     `paint-order: stroke` кладёт обводку ПОД заливку — иначе она съела бы
+     половину штриха самой буквы. Цвет обводки — фон холста (--halo), поэтому
+     кривая, прошедшая через подпись, обрывается у её края и не идёт сквозь
+     букву. Ширина 5 (по 2,5 px с каждой стороны) при кегле FS.large: прежние
+     2,5 давали 1,25 px, и линия толщиной 2,5 px протыкала букву насквозь —
+     ровно то, что видел владелец у точки равновесия. */
   const t = g.append('text').attr('class', 'point-name')
     .attr('x', px + (o.dx == null ? 8 : o.dx))
     .attr('y', py + (o.dy == null ? -8 : o.dy))
     .attr('font-size', o.size || FS.large).attr('font-weight', o.weight || 600)
     .attr('fill', color || COL.ink)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5);
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo)
+    .attr('stroke-width', o.halo == null ? 5 : o.halo).attr('stroke-linejoin', 'round');
   renderLabelText(t, sym);
   return t;
 }
