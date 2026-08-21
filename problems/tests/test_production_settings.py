@@ -24,10 +24,21 @@ from contextlib import contextmanager
 # перестаёт быть чистым — но по вине теста, а не настроек. Разбираться в таком
 # выводе пришлось бы каждому следующему. На проде ключ задаётся вручную через
 # переменную окружения (см. docs/MIGRATION-CHECKLIST.md — SECRET_KEY).
+#
+# ⚠️ REDIS_URL ЗДЕСЬ ОБЯЗАТЕЛЕН С 2026-08-21, И ЭТО НЕ ФОРМАЛЬНОСТЬ. На нём
+# стоит четвёртый предохранитель боевых настроек (без Redis кэш становится
+# локальным для каждого воркера — мина №2). Пока строки не было, оба класса
+# этого файла падали у того, у кого переменной нет в шелле, и ПРОХОДИЛИ у
+# того, у кого она есть. Тест, зелёный от окружения разработчика, не
+# проверяет ничего — а «зелено у меня» здесь опаснее обычного, потому что
+# файл сторожит именно настройки безопасности.
+# Адрес подставной: настройки только читаются, к Redis никто не подключается
+# (бэкенд Django не открывает соединение, пока у него не попросят ключ).
 FAKE_ENV = {
     'SECRET_KEY': 'x7Kq2mZv9Lp4Rt6Wy8Bn3Cf5Hj1Dg0Sa-QwErTyUiOpAsDfGhJkLzXcVbNm',
     'ALLOWED_HOSTS': 'example.org,www.example.org',
     'DATABASE_URL': 'postgres://u:p@127.0.0.1:5432/db',
+    'REDIS_URL': 'redis://127.0.0.1:6379',
 }
 
 
@@ -190,6 +201,23 @@ class ProductionFusesTests(unittest.TestCase):
         """
         with self.assertRaises(KeyError):
             with _production_module(drop=('SECRET_KEY',)):
+                pass
+
+    def test_redis_url_required(self):
+        """Без REDIS_URL сервис не имеет права подняться.
+
+        Без предохранителя `config/settings.py` молча подставил бы
+        LocMemCache: сайт поднялся бы, страницы открылись бы, и на девяти
+        воркерах вышло бы девять независимых кэшей — попадание примерно один
+        раз из девяти, счётчик неудачных входов у каждого воркера свой,
+        сброс кэша доходит до одного воркера из девяти. Тихая деградация
+        ищется неделями по жалобам, падение при старте — минуты.
+        Обоснование — docs/adr/0011-redis-cache-and-sessions.md.
+        """
+        from django.core.exceptions import ImproperlyConfigured
+
+        with self.assertRaises(ImproperlyConfigured):
+            with _production_module(drop=('REDIS_URL',)):
                 pass
 
 
