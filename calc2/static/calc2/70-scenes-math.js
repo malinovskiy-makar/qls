@@ -636,8 +636,14 @@ function labelCurveMath(g, f, mx, my, txt, color, key) {
     if (!isNaN(v) && v >= ylo && v <= yhi) {
       const sm = smoothLabel('math:' + (key || txt), mx(x), my(v), true);
       // А28: имя кривой набирается с индексом (f с единицей), а не слипшимся текстом.
+      /* Класс тот же, что у общего помощника labelCurve: по нему подпись кривой
+         находят и реестр обозначений, и проверка канона, и ночная проба
+         «сколько кривых подписано». Без него подписи «Математики» — эталона
+         поведения по решению владельца 22.08 — были для всех этих проверок
+         невидимы, хотя на экране стояли. */
       renderLabelText(
-        g.append('text').attr('x', sm.px - 4).attr('y', sm.py - 7).attr('text-anchor', 'end')
+        g.append('text').attr('class', 'curve-name')
+          .attr('x', sm.px - 4).attr('y', sm.py - 7).attr('text-anchor', 'end')
           .attr('font-size', curveLabelSize()).attr('font-weight', 600).attr('fill', color)
           .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6),
         txt);
