@@ -121,7 +121,11 @@ def is_stale(problem: Problem, text: str) -> bool:
     считаются устаревшими — сравнение с текущими константами никогда не
     совпадёт с NULL/''. Это осознанно: для них провенанс неизвестен.
     """
-    return False  # ВРЕМЕННАЯ ЗАГЛУШКА фазы зубастости — TODO(toothy-phase): вернуть проверку.
+    return (
+        problem.embedding_version != EMBEDDING_FORMULA_VERSION
+        or problem.embedding_model_build != EMBEDDING_MODEL_BUILD
+        or problem.embedding_source_hash != embedding_source_hash(text)
+    )
 
 
 class Command(BaseCommand):
