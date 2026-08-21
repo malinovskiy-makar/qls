@@ -257,7 +257,7 @@ venv313/Scripts/python.exe scripts/run_tests.py        # Windows
 
 | Шаг | Команда | Тестов |
 |---|---|---|
-| A — параллельный | `test --parallel auto --exclude-tag=serial` | 2 623 |
+| A — параллельный | `test --parallel auto --exclude-tag=serial` | 2 651 |
 | B — последовательный | `test --tag=serial` | 5 |
 
 **Зачем.** Набор шёл линейно из-за горстки тестов, которые поднимают
@@ -326,7 +326,7 @@ AssertionError: 22256 != 8312 : Кэш ОБЩИЙ между воркерами:
 которым нужен настоящий Redis, помечены `serial` и идут шагом B, где Redis
 снова настоящий.
 
-Цена решения названа честно: на шаге A остальные 2 623 теста Redis не
+Цена решения названа честно: на шаге A остальные 2 651 тест Redis не
 трогают. Семантику Redis (`FLUSHDB`, разные базы, `cached_db`) держит
 шаг B и `config/tests/test_cache_and_sessions.py`.
 
