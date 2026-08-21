@@ -20,7 +20,7 @@
 function parsePpfEquation(src) {
   const t = String(src || '').trim();
   if (!t) return { error: 'Пустая строка.' };
-  const eq = t.indexOf('=');
+  const eq = topLevelEqIndex(t);
 
   // Явная запись: слева одинокая буква вертикальной оси.
   if (eq >= 0) {

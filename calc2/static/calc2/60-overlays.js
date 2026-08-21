@@ -1227,6 +1227,17 @@ function snapVertexAt(px, py) {
     const d = Math.hypot(mx(p.x) - px, my(p.y) - py);
     if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: p.x, y: p.y, name: p.name, key: true, d };
   });
+  /* ⚠️ СВОИ ТОЧКИ — ТОЖЕ КАНДИДАТ НА ЗАХВАТ, НАРАВНЕ С КЛЮЧЕВЫМИ (замер
+     владельца 21.08: промах 5 px давал вершину в 7+ px от своей точки — щелчок
+     соскальзывал на ближайшую кривую вместо неё). Раньше их не было вовсе ни
+     здесь, ни в snapPointAt: своя точка часто стоит НЕ на кривой и НЕ в
+     пересечении, и тогда ловить её было нечем — засечь получалось только
+     координатами до пикселя. Тот же радиус KEY_SNAP_PX, что и у ключевых
+     точек: своя точка для вершины площади не менее важна. */
+  (STATE.marks || []).forEach(mk => {
+    const d = Math.hypot(mx(mk.x) - px, my(mk.y) - py);
+    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: mk.x, y: mk.y, name: mk.name || 'своя точка', key: true, d };
+  });
   if (best) return best;
   const hit = snapPointAt(px, py);
   return hit ? { x: hit.x, y: hit.y, name: hit.name, key: false, cross: hit.cross } : null;
@@ -1261,44 +1272,15 @@ function drawCrossPoints() {
   // ставилась вовсе. Прилипание к этим же точкам работает и без их кликабельности.
   if (STATE.vertArm || STATE.markArm) g.style('pointer-events', 'none');
 
-  const [x0] = mx.domain(), [y0] = my.domain();
-  const zx = mx(Math.max(0, x0)), zy = my(Math.max(0, y0));   // где стоят оси
-
   pts.forEach((p, i) => {
     const px = mx(p.x), py = my(p.y);
 
-    if (p.kind === 'kink') {
-      /* Излом рисуется подробнее прочих: пунктир к обеим осям и числа прямо на
-         осях. Правило «показывать сразу, без щелчка» отменено общим решением
-         владельца — на холсте по умолчанию нет ни одной автоматической точки.
-         Подробная разметка осталась, но включается вместе со своей кривой. */
-      g.append('line').attr('x1', zx).attr('y1', py).attr('x2', px).attr('y2', py)
-        .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
-        .attr('stroke-dasharray', '3 3').attr('opacity', .6);
-      g.append('line').attr('x1', px).attr('y1', zy).attr('x2', px).attr('y2', py)
-        .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
-        .attr('stroke-dasharray', '3 3').attr('opacity', .6);
-      /* Числа на осях. Если ровно там уже стоит деление, второй раз его не
-         печатаем: вышло бы одно число поверх другого. Делаем как extraTickX —
-         засечка и подпись, только по шкалам сцены, а не по глобальным. */
-      const axg = g.append('g').attr('class', 'kink-axis');
-      const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
-      const spanX = Math.abs(xHi - xLo), spanY = Math.abs(yHi - yLo);
-      if (!xTicks().some(t => Math.abs(t - p.x) < spanX * 0.025)) {
-        axg.append('line').attr('x1', px).attr('y1', zy - 4).attr('x2', px).attr('y2', zy + 4)
-          .attr('stroke', COL.ink).attr('stroke-width', 1.4);
-        haloText(axg, px, zy + 8, fmt(p.x), 'middle', 'hanging');
-      }
-      if (!yTicks().some(t => Math.abs(t - p.y) < spanY * 0.025)) {
-        axg.append('line').attr('x1', zx - 4).attr('y1', py).attr('x2', zx + 4).attr('y2', py)
-          .attr('stroke', COL.ink).attr('stroke-width', 1.4);
-        haloText(axg, zx - 8, py, fmt(p.y), 'end', 'middle');
-      }
-      g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
-        .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.6);
-      return;
-    }
-
+    /* Излом раньше рисовался ОСОБО: пунктир к обеим осям и числа прямо на
+       осях, показанные СРАЗУ, без наведения, и вообще без значка закрепки —
+       свой код, в обход всего, что ниже. Приёмка владельца 21.08: излом обязан
+       быть ключевой точкой НАРАВНЕ с пересечением кривой с осью — наведение
+       показывает подпись с координатами, щелчок по значку закрепляет. Особого
+       пути для 'kink' больше нет: точка идёт тем же кодом, что и все прочие. */
     const item = g.append('g').attr('class', 'cross-item');
     /* ⚠️ ЗАПАС ПОПАДАНИЯ ПО ТОЧКЕ. Замер до правки: сама точка ловила щелчок
        кругом радиусом 4 px, а с пяти пикселей в любую сторону под курсором

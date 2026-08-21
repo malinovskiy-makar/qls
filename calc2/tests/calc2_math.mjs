@@ -3298,6 +3298,189 @@ for (const c of CASES) {
   else { fail++; failures.push(`${c.name}\n    ${lines.join('\n    ')}`); console.log(`✗ ${c.name}\n    ${lines.join('\n    ')}`); }
 }
 
+/* =====================================================================
+   ФАЗА 6 (сессия «жесты, кусочная и мелкая интерактивность», 21–22.08).
+   Эти случаи проверяют не математику, а ДВА ЖЕСТА и КОНСТРУКТОР КУСОЧНОЙ —
+   поэтому не укладываются в CASES выше: там run() выполняется целиком ВНУТРИ
+   браузера строкой, а протяжке нужен настоящий page.mouse СНАРУЖИ.
+   ⚠️ Мышиные события в Playwright/Chromium идут через CDP
+   Input.dispatchMouseEvent — тем же путём, что и от настоящего тачпада,
+   поэтому браузер сам порождает pointerdown/pointermove/pointerup ПЕРЕД
+   синтезированными mousedown/mousemove/mouseup. dispatchEvent(new
+   MouseEvent(...)) из page.evaluate этот путь миновал бы и pointer-событий
+   не дал бы вовсе — тремя предыдущими замерами так и не воспроизвели дефект
+   протяжки (см. карточку 3c3b11c9-2bc1-81b5). */
+async function gesture(name, fn) {
+  try {
+    const r = await fn();
+    if (r.ok) { pass++; console.log(`✓ ${name}`); }
+    else { fail++; failures.push(`${name}\n    ${r.detail}`); console.log(`✗ ${name}\n    ${r.detail}`); }
+  } catch (e) {
+    fail++; failures.push(`${name}\n    упал: ${e.message}`);
+    console.log(`✗ ${name}\n    упал: ${e.message}`);
+  }
+}
+
+// Ручка манипулятора на холсте: прозрачный rect с курсором grab (52-modes.js,
+// «ОДНО НАЖАТИЕ — ОДИН СМЫСЛ»). Тот же признак, что и в самом движке.
+async function grabHandle() {
+  return page.evaluate(() => {
+    const r = Array.from(document.querySelectorAll('svg#chart rect'))
+      .find(el => getComputedStyle(el).cursor === 'grab');
+    if (!r) return null;
+    const b = r.getBoundingClientRect();
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  });
+}
+async function pointerDrag(x0, y0, dx, dy, steps) {
+  steps = steps || 30;
+  await page.mouse.move(x0, y0);
+  await page.mouse.down();
+  for (let i = 1; i <= steps; i++) await page.mouse.move(x0 + dx * i / steps, y0 + dy * i / steps);
+  await page.mouse.up();
+}
+
+// (а)/(б) Протяжка ручки манипулятора: значение меняется, ГРАНИЦЫ ОКНА — нет.
+// По одной сцене на клин налога, потолок цены, МРОТ и мировую цену Pw (Н.
+// комментарий 52-modes.js ссылается на замер владельца 21.08, ручка налога).
+async function manipulatorGesture(label, sceneKey, valueExpr) {
+  return gesture(label, async () => {
+    await page.evaluate((sk) => { resetSceneMemory(); pickScene(sk); }, sceneKey);
+    await page.waitForTimeout(250);
+    const before = await page.evaluate((expr) => ({ v: eval(expr), dx0: sx.domain()[0], dx1: sx.domain()[1] }), valueExpr);
+    const h = await grabHandle();
+    if (!h) return { ok: false, detail: 'ручка (rect с cursor:grab) не найдена на холсте' };
+    await pointerDrag(h.x, h.y, -150, -150, 30);
+    await page.waitForTimeout(150);
+    const after = await page.evaluate((expr) => ({ v: eval(expr), dx0: sx.domain()[0], dx1: sx.domain()[1] }), valueExpr);
+    const valueChanged = Math.abs(after.v - before.v) > 1e-6;
+    const domainSame = Math.abs(after.dx0 - before.dx0) < 1e-6 && Math.abs(after.dx1 - before.dx1) < 1e-6;
+    const detail = `значение ${before.v}→${after.v} (изменилось: ${valueChanged}); `
+      + `sx.domain()[0] ${before.dx0.toFixed(2)}→${after.dx0.toFixed(2)} (окно ${domainSame ? 'на месте' : 'СДВИНУЛОСЬ'})`;
+    return { ok: valueChanged && domainSame, detail };
+  });
+}
+await manipulatorGesture('(а) протяжка ручки налога — ставка меняется, поле стоит', 'tax', 'STATE.tax');
+await manipulatorGesture('(б1) протяжка потолка цены — ставка меняется, поле стоит', 'ceil', 'STATE.pReg');
+await manipulatorGesture('(б2) протяжка МРОТ — ставка меняется, поле стоит', 'labor', 'STATE.laborMinW');
+await manipulatorGesture('(б3) протяжка мировой цены Pw — ставка меняется, поле стоит', 'smallopen', 'STATE.openPw');
+
+// (в) Протяжка по ПУСТОМУ месту — сдвиг поля жив: границы окна обязаны
+// сдвинуться. Контроль на то, что фаза 1 не заглушила сдвиг вообще.
+await gesture('(в) протяжка по пустому месту двигает поле', async () => {
+  await page.evaluate(() => { resetSceneMemory(); pickScene('sd'); });
+  await page.waitForTimeout(200);
+  const before = await page.evaluate(() => [sx.domain()[0], sx.domain()[1]]);
+  const rect = await page.evaluate(() => { const r = document.getElementById('chart').getBoundingClientRect(); return { left: r.left, top: r.top }; });
+  // Точка выше кривой D=100−Q и правее её пересечения с осью — заведомо пустое место.
+  const p0 = await page.evaluate(() => ({ x: sx(85), y: sy(97) }));
+  const px0 = rect.left + p0.x, py0 = rect.top + p0.y;
+  await pointerDrag(px0, py0, -80, 0, 20);
+  await page.waitForTimeout(150);
+  const after = await page.evaluate(() => [sx.domain()[0], sx.domain()[1]]);
+  const moved = Math.abs(after[0] - before[0]) > 1e-6;
+  return { ok: moved, detail: `sx.domain() ${before.map(v => v.toFixed(1))} → ${after.map(v => v.toFixed(1))}` };
+});
+
+// (г) Конструктор кусочной в «КТВ. Одна страна»: щёлкаем по НАСТОЯЩИМ кнопкам
+// интерфейса («?» → «Кусочная функция» → «Поставить в поле»), запись обязана
+// применяться без ручной приставки «y = » (карточка 3c3b11c9-2bc1-8182).
+await gesture('(г) КТВ строится конструктором без ручной приставки "y ="', async () => {
+  await page.evaluate(() => { resetSceneMemory(); pickScene('trade'); });
+  await page.waitForTimeout(250);
+  const reveal = async (sel) => {
+    await page.evaluate((s) => {
+      const el = document.querySelector(s);
+      if (!el) return;
+      for (let n = el; n && n !== document.body; n = n.parentElement) {
+        const foldable = n.classList && n.classList.contains('fold-body');
+        if (foldable && !n.classList.contains('open') && n.id) {
+          const btn = document.querySelector('[aria-controls="' + n.id + '"]');
+          if (btn) btn.click();
+        }
+      }
+      el.scrollIntoView({ block: 'center' });
+    }, sel);
+    await page.waitForTimeout(120);
+  };
+  /* ⚠️ PW.rows переживает закрытие окна и чужие поля: openPiecewise досеивает
+     умолчание, только если PW.rows пуст (82-input.js). Прогон этого файла
+     идёт одним долгим сеансом браузера, и более ранний случай уже мог
+     открыть конструктор для ДРУГОГО поля — тогда здесь всплыли бы чужие
+     строки в чужой букве («p» вместо «X») и разбор упал бы на пустом месте,
+     хотя к приставке «y = » это отношения не имеет. Обнаружено этим же
+     тестом (см. отчёт сессии) — отдельная карточка заведена в «Задачи»,
+     здесь только просим конструктор открыться заново, как при первом входе. */
+  await page.evaluate(() => { if (typeof PW === 'object') PW.rows = []; });
+  await reveal('#fh-auto-inp-ppft');
+  await page.click('#fh-auto-inp-ppft');
+  await page.waitForTimeout(150);
+  const pwBtnSel = await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll('.mkbd.open .mkbd-foot button'))
+      .find(b => b.textContent.trim() === 'Кусочная функция');
+    if (!btn) return null;
+    if (!btn.id) btn.id = '__pw_open_btn_calc2math';
+    return '#' + btn.id;
+  });
+  if (!pwBtnSel) return { ok: false, detail: 'кнопка «Кусочная функция» не найдена в клавиатуре поля' };
+  await page.click(pwBtnSel);
+  await page.waitForTimeout(150);
+  await page.click('#pw-apply');
+  await page.waitForTimeout(250);
+  const r = await page.evaluate(() => ({
+    fieldValue: document.getElementById('inp-ppft').value,
+    stateFormula: STATE.ppftFormula,
+    parseError: (typeof parsePpfEquation === 'function') ? (parsePpfEquation(STATE.ppftFormula).error || null) : 'нет функции',
+    canvasPaths: document.querySelectorAll('svg#chart path').length,
+  }));
+  const noPrefix = !/^\s*y\s*=/i.test(r.fieldValue);
+  const ok = noPrefix && r.stateFormula === r.fieldValue && !r.parseError && r.canvasPaths > 0;
+  return { ok, detail: `поле="${r.fieldValue}" ошибка=${r.parseError} путей=${r.canvasPaths}` };
+});
+
+// (д) Излом среди ключевых точек — минимум в двух разных сценах (было
+// «отмечен сценой в 18 из 58 пар», см. карточку 3c3b11c9-2bc1-81cc).
+await gesture('(д) излом присутствует среди ключевых точек — минимум в двух сценах', async () => {
+  const scenes = [
+    { key: 'sd', setup: () => { const D = STATE.curves.find(c => c.role === 'demand'); D.expr = 'Q < 40 ? 100 - Q : 80 - 0.5*Q'; D.compiled = compileFormula(D.expr).compiled; D.linear = null; } },
+    { key: 'labor', setup: () => { const D = STATE.curves.find(c => c.role === 'demand'); D.expr = 'L < 40 ? 100 - L : 80 - 0.5*L'; D.compiled = compileFormula(D.expr).compiled; D.linear = null; } },
+  ];
+  let found = 0;
+  const detail = [];
+  for (const s of scenes) {
+    const r = await page.evaluate(({ key, setupSrc }) => {
+      resetSceneMemory(); pickScene(key);
+      (new Function(setupSrc))();
+      invalidateKeyTargets(); redrawAll();
+      const kink = keyTargets().find(p => p.kind === 'kink');
+      return !!kink;
+    }, { key: s.key, setupSrc: '(' + s.setup.toString() + ')()' });
+    if (r) found++;
+    detail.push(`${s.key}: ${r ? 'есть' : 'НЕТ'}`);
+  }
+  return { ok: found >= 2, detail: detail.join(', ') + ` — сцен с изломом: ${found}/${scenes.length}` };
+});
+
+// (е) Конструктор на пустом поле не падает и не подставляет пустоту —
+// возвращается к букве по виду поля (карточка «полупустое поле», хвост
+// сессии 21.08).
+await gesture('(е) конструктор на пустом поле не падает', async () => {
+  const r = await page.evaluate(() => {
+    resetSceneMemory(); pickScene('costs');
+    const inp = document.getElementById('inp-tc');
+    inp.value = '';
+    let crashed = null, v = null;
+    try {
+      const fallback = (typeof FORMULA_VAR !== 'undefined' && FORMULA_VAR.TC) || 'x';
+      v = pwVarForField(inp, fallback);
+      openPiecewise(inp, v);
+      closePiecewise();
+    } catch (e) { crashed = String(e.message || e); }
+    return { v, crashed };
+  });
+  return { ok: !r.crashed && !!r.v, detail: `буква=${r.v} crash=${r.crashed}` };
+});
+
 await browser.close();
 console.log(`\n=== calc2 регрессия: ${pass} прошло, ${fail} провалено (всего ${CASES.length}) ===`);
 process.exit(fail === 0 ? 0 : 1);

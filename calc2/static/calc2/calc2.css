@@ -1439,9 +1439,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .cv-mode__stop:hover { background: var(--btn-bg-hover); }
 
 
-/* Поля координат своей точки. */
-.mark-xy { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+/* Поля координат своей точки. Приставка «x = »/«y = » — статичный узел рядом
+   с редактируемым значением (не .edval): в правку не входит и пунктира под
+   ней нет, чтобы глаз не путал подпись с тем, что можно щёлкнуть. */
+.mark-xy { display: flex; align-items: baseline; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
 .mark-xy label { font-size: 11px; color: var(--text3); }
+.mark-num-prefix { color: var(--text); font-variant-numeric: tabular-nums; margin-right: -4px; }
+.mark-xy .edval { margin-left: 2px; }
 .mark-xy input[type="number"] {
   width: 100%; min-width: 0; padding: 4px 6px; font-size: 12px;
   border: 1px solid var(--border); border-radius: var(--r);

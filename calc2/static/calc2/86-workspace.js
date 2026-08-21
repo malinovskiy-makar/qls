@@ -863,6 +863,34 @@ function wireHintButtons() {
       const open = pop.classList.toggle('open');
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
+    /* «Точки на графике» и «Площади» открываются ПО НАВЕДЕНИЮ (решение
+       владельца 21.08): подсказка нужна прямо в момент работы с холстом, и
+       щелчок ради нового чтения каждый раз — лишний шаг. Метка на самой
+       кнопке (data-pop-trigger), а не список секций: как и с манипуляторами
+       сцены, список забудут дополнить у новой секции. Клик остаётся —
+       для клавиатуры и сенсорного экрана наведения не бывает вовсе.
+       Уход в саму плашку не должен её гасить, поэтому таймер общий у кнопки
+       и плашки (тот же приём, что у значка закрепки ключевой точки). */
+    if (btn.getAttribute('data-pop-trigger') === 'hover') {
+      let leaveTimer = null;
+      const openNow = () => {
+        if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+        pop.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+      };
+      const closeSoon = () => {
+        if (leaveTimer) clearTimeout(leaveTimer);
+        leaveTimer = setTimeout(() => {
+          leaveTimer = null;
+          pop.classList.remove('open');
+          btn.setAttribute('aria-expanded', 'false');
+        }, 160);
+      };
+      btn.addEventListener('pointerenter', openNow);
+      btn.addEventListener('pointerleave', closeSoon);
+      pop.addEventListener('pointerenter', openNow);
+      pop.addEventListener('pointerleave', closeSoon);
+    }
   });
 }
 

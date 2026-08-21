@@ -747,7 +747,7 @@ function compileAB(expr) {
 function parseConstraint(src) {
   const t = String(src || '').trim();
   if (!t) return null;
-  const eq = t.indexOf('=');
+  const eq = topLevelEqIndex(t);
   const expr = (eq >= 0) ? ('(' + t.slice(0, eq) + ') - (' + t.slice(eq + 1) + ')') : t;
   const r = compileAB(expr);
   if (!r.compiled) return null;
