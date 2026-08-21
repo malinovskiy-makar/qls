@@ -47,6 +47,23 @@ _index_version = None    # маркер, с которым построен _ind
 _NO_CACHE = object()
 
 
+class SemanticSearchDisabled(RuntimeError):
+    """Смысловой поиск выключен настройкой. Это НЕ поломка.
+
+    Отдельный класс, а не общий `RuntimeError`: вызывающая сторона обязана
+    уметь отличить «выключено намеренно» от «сломалось» — в первом случае
+    надо тихо перейти на поиск по словам и сказать об этом человеку,
+    во втором — записать в журнал как ошибку.
+    """
+
+
+def is_enabled():
+    """Включён ли смысловой поиск. Единственная точка правды на весь проект."""
+    from django.conf import settings
+
+    return getattr(settings, 'SEMANTIC_SEARCH_ENABLED', True)
+
+
 def get_model():
     """Ленивая загрузка sentence-transformers модели.
 
@@ -57,6 +74,15 @@ def get_model():
     CPU достаточно для кодирования одиночных поисковых запросов.
     """
     global _model
+    # ⚠️ ПРОВЕРКА СТОИТ ДО import, И ЭТО ВЕСЬ ЕЁ СМЫСЛ. После импорта она
+    # была бы бесполезна: 2,12 ГБ модели уже лежали бы в памяти процесса,
+    # а на четырёх воркерах это 8,5 ГБ при 8 ГБ сервера. Стережёт тест,
+    # который смотрит, не появился ли sentence_transformers в sys.modules.
+    if not is_enabled():
+        raise SemanticSearchDisabled(
+            'Смысловой поиск выключен настройкой SEMANTIC_SEARCH_ENABLED. '
+            'Модель не загружается: она весит 2,12 ГБ на каждый воркер.'
+        )
     if _model is None:
         try:
             from sentence_transformers import SentenceTransformer

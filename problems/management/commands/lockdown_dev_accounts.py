@@ -20,6 +20,9 @@
 владелец руками.
 """
 
+from importlib import import_module
+
+from django.conf import settings
 from django.contrib.sessions.models import Session
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -65,6 +68,16 @@ def kill_sessions(user_ids):
 
     Сессия хранит id пользователя внутри зашифрованных данных, поэтому
     отобрать нужные запросом нельзя — приходится расшифровывать каждую.
+
+    ⚠️ УДАЛЯТЬ СТРОКИ ИЗ БАЗЫ НЕДОСТАТОЧНО, И ЭТО ГЛАВНОЕ В ЭТОЙ ФУНКЦИИ.
+    С 2026-08-21 движок сессий — `cached_db`: у каждой сессии ДВЕ копии,
+    строка в `django_session` и ключ в Redis. Удалённая из базы сессия
+    остаётся в кэше, и `cached_db` читает её оттуда, вообще не заглядывая
+    в базу. То есть команда, которой пользуются ПЕРЕД ПОКАЗОМ ПРОЕКТА
+    кому-либо, гасила бы аккаунт с публично известным паролем не до конца:
+    старая кука работала бы ещё до двух недель.
+    Поэтому сносим обе копии — через `SessionStore.delete()`, который знает
+    про оба хранилища, а не через `Session.objects.delete()`.
     """
     wanted = {str(uid) for uid in user_ids}
     doomed = []
@@ -77,7 +90,16 @@ def kill_sessions(user_ids):
             continue
         if str(data.get('_auth_user_id', '')) in wanted:
             doomed.append(session.pk)
+
     if doomed:
+        store = import_module(settings.SESSION_ENGINE).SessionStore
+        for key in doomed:
+            # Движок берётся из настроек, а не жёстким импортом: при смене
+            # SESSION_ENGINE эта уборка обязана поехать следом сама.
+            store(session_key=key).delete()
+        # Подчищаем остаток: у движка `cache` записи в базе нет вовсе, а у
+        # битых сессий delete() мог не сработать. Строка-сирота в базе —
+        # это уже не дыра доступа, но и мусора не оставляем.
         Session.objects.filter(pk__in=doomed).delete()
     return len(doomed)
 

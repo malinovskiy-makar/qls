@@ -119,9 +119,20 @@ def lexical_search(query, limit, content_kind='problems'):
 
 def dense_search(query, limit=60, content_kind='problems'):
     """Поиск по смыслу. Модели нет (прод) — честно возвращаем пусто."""
-    try:
-        from catalog import semantic
+    from catalog import semantic
 
+    # ⚠️ ВЫКЛЮЧЕНО НАСТРОЙКОЙ — ЭТО НЕ ОШИБКА, И В ЖУРНАЛ ЭТО НЕ ПИШЕТСЯ.
+    # Проверка стоит здесь, до вызова semantic.search, по двум причинам.
+    # Первая: `semantic.search` начинается с кодирования запроса, то есть
+    # с загрузки модели — 2,12 ГБ на каждый воркер (мина №1).
+    # Вторая: раньше выключенный поиск попадал в `except Exception` ниже и
+    # писал traceback на КАЖДЫЙ поисковый запрос. Журнал, в котором штатное
+    # поведение выглядит как авария, перестают читать — и настоящая авария
+    # теряется среди шума.
+    if not semantic.is_enabled():
+        return [], {}
+
+    try:
         hits = semantic.search(query, limit=limit, content_kind=content_kind)
         return ([hit['problem'].pk for hit in hits],
                 {hit['problem'].pk: hit['score'] for hit in hits})

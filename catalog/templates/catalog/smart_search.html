@@ -224,6 +224,22 @@
 .ss-empty h3 { font-size: 1rem; color: var(--text); margin-bottom: 6px; }
 .ss-empty p { font-size: .875rem; }
 
+/* ── Плашка деградации ──────────────────────────────────
+   Спокойная, а не тревожная: человек ничего не сделал не так, и слова
+   «ошибка» здесь нет. Отдельный класс от .ss-error намеренно — красная
+   рамка на штатном режиме приучает не читать предупреждения вовсе. */
+.ss-degraded {
+  background: var(--surface-2, #f5f5f5);
+  border: 1px solid var(--border, #e0e0e0);
+  border-left: 3px solid var(--accent, #b26b00);
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-size: .875rem;
+  color: var(--text2);
+  margin-bottom: 20px;
+}
+.ss-degraded b { color: var(--text); font-weight: 600; }
+
 /* ── Ошибка ─────────────────────────────────────────── */
 .ss-error {
   background: #fff5f5;
@@ -293,6 +309,15 @@
   </form>
 </div>
 
+<!-- ── Смысловой поиск временно выключен ───────────────── -->
+{% if degraded %}
+  <div class="ss-degraded">
+    <b>Умный поиск временно недоступен</b> — показан обычный поиск по словам.
+    Он ищет совпадения слов запроса в условии, решении и заголовке, поэтому
+    описание «своими словами» сработает хуже, чем точный термин.
+  </div>
+{% endif %}
+
 <!-- ── Ошибка ──────────────────────────────────────────── -->
 {% if error %}
   <div class="ss-error">⚠ {{ error }}</div>
@@ -315,7 +340,17 @@
         <div class="ss-result-item">
 
           <!-- Бейдж схожести -->
-          {% if pct >= 0.70 %}
+          {% comment %}
+            ⚠️ pct может быть None: так помечены результаты поиска по словам,
+            когда смысловой выключен. Числа близости у него нет, и рисовать
+            «0 %» нельзя — это выглядело бы как «совсем не подходит», хотя
+            задача найдена. Показываем нейтральную пометку.
+          {% endcomment %}
+          {% if pct is None %}
+            <div class="ss-score-badge score-low" title="Найдено по словам запроса">
+              <span>по&nbsp;словам</span>
+            </div>
+          {% elif pct >= 0.70 %}
             <div class="ss-score-badge score-high">
               {% widthratio pct 1 100 %}<span>%</span>
             </div>

@@ -547,6 +547,55 @@ def catalog_api_problem(request, pk):
 
 # ── Семантический поиск (Стадия 1, прототип) ─────────────────────────────────
 
+def _lexical_fallback(query, topic_id, difficulty, has_solution, kind):
+    """Поиск по СЛОВАМ, когда смысловой выключен.
+
+    ⚠️ ЭТО ДЕГРАДАЦИЯ, А НЕ ОТКАЗ (правило 6.13 docs/EMBEDDINGS.md).
+    Страница обязана ответить 200 и что-то найти: пятисотка и вечный
+    спиннер — худшее, что можно сделать с человеком, который просто искал
+    задачу. Отдаём тот же формат результатов, что и смысловой поиск,
+    чтобы шаблон не пришлось раздваивать.
+    """
+    from problems.models import Problem
+
+    from . import hybrid
+
+    ids, _hits, _picked = hybrid.lexical_search(query, 20, kind)
+    if not ids:
+        return []
+
+    qs = (Problem.objects.filter(pk__in=ids)
+          .prefetch_related('topics', 'parts'))
+    if topic_id.isdigit():
+        qs = qs.filter(topics__id=int(topic_id))
+    if difficulty.isdigit():
+        qs = qs.filter(difficulty=int(difficulty))
+    if has_solution:
+        qs = qs.exclude(solution='').filter(solution__isnull=False)
+
+    by_id = {p.pk: p for p in qs}
+    результаты = []
+    for pid in ids:                       # порядок задаёт лексический поиск
+        problem = by_id.get(pid)
+        if problem is None:
+            continue
+        preview = _strip_latex(problem.statement)[:200].strip()
+        if not preview:
+            first_part = problem.parts.first()
+            if first_part:
+                preview = _strip_latex(first_part.statement)[:200].strip()
+        результаты.append({
+            'problem': problem,
+            # Балла осмысленной близости у поиска по словам нет, и врать
+            # числом нельзя: шаблон показывает score только когда он есть.
+            'score': None,
+            'preview': preview,
+            'topics_display': [t.name for t in problem.topics.all()
+                               if t.name in CANONICAL][:2],
+        })
+    return результаты
+
+
 @login_required
 def smart_search(request):
     """Поиск задач по текстовому описанию через эмбеддинги.
@@ -555,6 +604,7 @@ def smart_search(request):
     Загрузка модели и индекса происходит лениво при первом запросе (~7 с),
     последующие запросы мгновенны (всё в памяти).
     """
+    from . import semantic
     from .semantic import search as semantic_search
 
     # 21 каноническая тема для фильтра (тот же порядок, что в каталоге).
@@ -572,8 +622,15 @@ def smart_search(request):
     results = []
     error = None
     searched = False
+    # Смысловой поиск выключен настройкой — работаем по словам и говорим
+    # об этом. Не «ошибка»: человек ничего не сделал не так.
+    degraded = not semantic.is_enabled()
 
-    if query:
+    if query and degraded:
+        searched = True
+        results = _lexical_fallback(query, topic_id, difficulty,
+                                    has_solution, kind)
+    elif query:
         searched = True
         try:
             raw = semantic_search(
@@ -615,6 +672,7 @@ def smart_search(request):
         'kind': kind,
         'results': results,
         'error': error,
+        'degraded': degraded,
         'searched': searched,
         'canonical_topics': canonical_topics,
         'difficulty_choices': range(1, 6),
