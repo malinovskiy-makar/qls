@@ -92,10 +92,16 @@ def health(request):
     (см. `healthz` выше), а версия и миграции — готовая карта уязвимостей для
     того, кто эту страницу отсканирует.
     """
-    # ВРЕМЕННАЯ ЗАГЛУШКА фазы зубастости — TODO(toothy-phase): вернуть проверки.
     db_ok = True
-    redis_default_ok = True
-    redis_sessions_ok = True
+    try:
+        with connection.cursor() as курсор:
+            курсор.execute('SELECT 1')
+    except Exception:
+        db_ok = False
+        logger.exception('health: PostgreSQL недоступен')
+
+    redis_default_ok = _redis_alive('default')
+    redis_sessions_ok = _redis_alive('sessions')
 
     healthy = db_ok and redis_default_ok and redis_sessions_ok
     return JsonResponse({
