@@ -69,7 +69,7 @@ venv313/Scripts/python.exe manage.py runserver   # Windows
 ```bash
 manage.py check                              # 0 ошибок
 manage.py makemigrations --check --dry-run   # ничего не предлагает создать
-manage.py test                               # 2 627 тестов на SQLite
+manage.py test                               # 2 628 тестов на SQLite
 
 docker compose -f docker-compose.dev.yml up -d        # PostgreSQL 17 + Redis 7
 manage.py test --settings=config.settings_test_pg     # то же на PostgreSQL, ~23 мин
