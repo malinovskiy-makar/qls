@@ -187,6 +187,12 @@ function editEqValue(lab, name, current, apply) {
   inp.type = 'number'; inp.step = 'any'; inp.value = current;
   inp.className = 'param-eq-input';
   lab.append(head, inp);
+  /* Ширина поля идёт за содержимым: подчёркивание должно стоять ровно под
+     числом, а не тянуться до края строки. У input[type=number] нет усадки
+     по содержимому, поэтому считаем сами. */
+  const fitWidth = () => { inp.style.width = Math.max(2, String(inp.value || '').length + 1) + 'ch'; };
+  fitWidth();
+  inp.addEventListener('input', fitWidth);
   /* ⚠️ СОДЕРЖИМОЕ ВЫДЕЛЯЕТСЯ ЦЕЛИКОМ: первый набранный символ заменяет старое
      значение. Это отмена прежнего решения «курсор в конец» (Н75): при a = 1
      набор «50» давал 150, а вместе с ним и границы 146…154 — то есть один
