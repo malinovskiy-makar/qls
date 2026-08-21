@@ -1,5 +1,4 @@
-# Боевой сервер weconomics.site — фундамент.
-# Django здесь пока НЕТ: он появится в следующей сессии.
+# Боевой сервер weconomics.site.
 #
 # ⚠️ ГЛАВНОЕ ПРАВИЛО ЭТОГО ФАЙЛА: у postgres и redis НЕТ секции ports.
 # Публикация портов в Docker обходит ufw — правило в ufw есть, а порт
@@ -55,6 +54,50 @@ services:
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
 
+  # ⚠️ КОНТЕЙНЕР web РОВНО ОДИН, И ВТОРОЙ ПОДНИМАТЬ НЕЛЬЗЯ.
+  # entrypoint накатывает миграции при старте без всякой блокировки — это
+  # безопасно ровно до тех пор, пока процесс один. Два контейнера пойдут
+  # мигрировать одновременно, и схема развалится. Масштабирование — только
+  # числом воркеров gunicorn внутри одного контейнера (GUNICORN_WORKERS).
+  # Причина и порядок — docs/SERVER.md.
+  web:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: weconomics-web:latest
+    container_name: weco-web
+    restart: unless-stopped
+    # ports: НЕ ДОБАВЛЯТЬ. Наружу ходит только nginx, к web он обращается
+    # по имени сервиса во внутренней сети backend.
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings_production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    volumes:
+      # Тома монтируются И СЮДА, И В nginx: web их наполняет, nginx отдаёт.
+      - static:/app/staticfiles
+      - media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      # ⚠️ ЗАГОЛОВОК Host ОБЯЗАТЕЛЕН. Без него запрос попадает в
+      # default_server nginx и получает 444 — но здесь мы стучимся прямо
+      # в gunicorn, а у Django пустой Host не пройдёт ALLOWED_HOSTS и
+      # вернётся 400. Проверка живости краснела бы на живом приложении.
+      test: ["CMD-SHELL", "curl -fsS -H 'Host: weconomics.site' http://127.0.0.1:8000/healthz/ | grep -q '\"ok\": true'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # Первый старт долгий: миграции с нуля плюс сборка статики.
+      start_period: 120s
+
   nginx:
     image: nginx:1.27-alpine
     container_name: weco-nginx
@@ -64,9 +107,14 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    depends_on:
+      - web
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/html:/usr/share/nginx/html:ro
+      # Только чтение: отдавать nginx умеет, писать сюда ему незачем.
+      - static:/var/www/static:ro
+      - media:/var/www/media:ro
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
     networks:
@@ -92,6 +140,11 @@ volumes:
   # Именованные тома: переживают docker compose down и пересоздание контейнеров.
   pgdata:
   redisdata:
+  # ⚠️ Статику наполняет collectstatic в entrypoint контейнера web, а НЕ
+  # сборка образа: том монтируется при запуске и перекрыл бы собранное
+  # на этапе сборки. Подробности — Dockerfile и docs/SERVER.md.
+  static:
+  media:
 
 networks:
   backend:

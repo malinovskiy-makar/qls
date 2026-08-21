@@ -11,6 +11,7 @@ from django.urls import include, path
 from catalog import views as catalog_views
 from problems import views_parent, views_platform, views_stats
 from config.csp_report import csp_report
+from config.health import healthz
 from problems.views_auth import RoleBasedLoginView
 
 urlpatterns = [
@@ -21,6 +22,10 @@ urlpatterns = [
     # режиме отчёта: она ничего не блокирует, но рассказывает, что заблокировал
     # бы боевой режим. См. config/security_headers.py.
     path('csp-report/', csp_report, name='csp_report'),
+
+    # ⚠️ Наружу через nginx НЕ выставляется: сюда ходит только
+    # healthcheck контейнера по внутренней сети Docker.
+    path('healthz/', healthz, name='healthz'),
     # Логин / логаут.
     path('login/', RoleBasedLoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(next_page='/login/'), name='logout'),

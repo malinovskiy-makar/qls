@@ -1,0 +1,49 @@
+# Что НЕ попадает в образ.
+#
+# ⚠️ ЭТОТ ФАЙЛ — ЧАСТЬ ИНВАРИАНТА «ОБРАЗ МЕНЬШЕ 1,5 ГБ». Без него
+# `COPY . /app` затащил бы venv313 с torch (около 2 ГБ), node_modules
+# с браузером playwright, корпус задач и историю git. Образ раздулся бы
+# в разы, а модель эмбеддингов приехала бы на сервер вопреки ADR 0002 —
+# и не как зависимость, а как случайно скопированный каталог.
+
+# Окружения Python — в них лежит ML-стек, которому на проде делать нечего.
+venv/
+venv312/
+venv313/
+.venv/
+*.egg-info/
+__pycache__/
+*.py[cod]
+
+# Node: нужен только браузерным проверкам, на сервере не запускается.
+node_modules/
+package-lock.json
+
+# История и служебное
+.git/
+.github/
+.gitignore
+.claude/
+
+# Данные: корпус на сервер едет отдельно и осознанно, а не внутри образа.
+db.sqlite3
+db_check.sqlite3
+db_*.sqlite3
+*.sqlite3
+materials/
+reports/
+backups/
+media/
+staticfiles/
+
+# Секреты — на всякий случай, даже если их тут нет.
+.env
+.env.*
+deploy/certbot/
+
+# Прочее
+*.log
+.DS_Store
+.pytest_cache/
+.ruff_cache/
+htmlcov/
