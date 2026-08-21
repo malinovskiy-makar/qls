@@ -11,7 +11,7 @@ from django.urls import include, path
 from catalog import views as catalog_views
 from problems import views_parent, views_platform, views_stats
 from config.csp_report import csp_report
-from config.health import healthz
+from config.health import health, healthz
 from problems.views_auth import RoleBasedLoginView
 
 urlpatterns = [
@@ -26,6 +26,9 @@ urlpatterns = [
     # ⚠️ Наружу через nginx НЕ выставляется: сюда ходит только
     # healthcheck контейнера по внутренней сети Docker.
     path('healthz/', healthz, name='healthz'),
+    # Публичная проверка живости для внешнего мониторинга — без авторизации,
+    # без подробностей об ошибке. См. config/health.py.
+    path('health/', health, name='health'),
     # Логин / логаут.
     path('login/', RoleBasedLoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(next_page='/login/'), name='logout'),

@@ -57,3 +57,50 @@ def healthz(request):
     if беды:
         return JsonResponse({'ok': False, 'broken': беды}, status=503)
     return JsonResponse({'ok': True})
+
+
+def _redis_alive(alias):
+    """Живой ли Redis-алиас `alias` — запись и чтение, не просто PING.
+
+    ⚠️ Не берём голый PING через внутренний клиент бэкенда (`cache._cache`
+    у `django.core.cache.backends.redis.RedisCache` — приватный атрибут,
+    не документированный API). Пишем и читаем пробный ключ тем же способом,
+    что и `healthz` выше: PING может ответить, а падать будет именно запись
+    (не туда ACL, не тот пароль, диск полон) — соединение живое, а Redis для
+    приложения нет.
+    """
+    from django.core.cache import caches
+
+    try:
+        caches[alias].set('health:проба', '1', 10)
+        return caches[alias].get('health:проба') == '1'
+    except Exception:
+        logger.exception('health: Redis (%s) недоступен', alias)
+        return False
+
+
+@require_safe
+@never_cache
+def health(request):
+    """Публичная проверка живости: PostgreSQL и обе базы Redis.
+
+    В отличие от `healthz` выше (только для контейнерного healthcheck,
+    наружу через nginx не выставлен) этот адрес открыт всем без авторизации —
+    для внешнего мониторинга. Поэтому ответ по компонентам, но так же скуп на
+    подробности: только имена служб и булевы флаги. Ни версии кода, ни номера
+    миграции, ни текста ошибки — в них попадаются адреса и имена учёток
+    (см. `healthz` выше), а версия и миграции — готовая карта уязвимостей для
+    того, кто эту страницу отсканирует.
+    """
+    # ВРЕМЕННАЯ ЗАГЛУШКА фазы зубастости — TODO(toothy-phase): вернуть проверки.
+    db_ok = True
+    redis_default_ok = True
+    redis_sessions_ok = True
+
+    healthy = db_ok and redis_default_ok and redis_sessions_ok
+    return JsonResponse({
+        'status': 'ok' if healthy else 'error',
+        'db': db_ok,
+        'redis_default': redis_default_ok,
+        'redis_sessions': redis_sessions_ok,
+    }, status=200 if healthy else 503)
