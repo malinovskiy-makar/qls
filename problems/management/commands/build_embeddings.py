@@ -8,19 +8,25 @@
     ./venv/bin/python manage.py build_embeddings
     ./venv/bin/python manage.py build_embeddings --limit 5000
     ./venv/bin/python manage.py build_embeddings --reset            # пересчитать все
+    ./venv/bin/python manage.py build_embeddings --stale            # пересчитать устаревшие (С5)
     ./venv/bin/python manage.py build_embeddings --device cpu       # форсировать CPU
     ./venv/bin/python manage.py build_embeddings --batch-size 8     # маленький батч (8 ГБ RAM)
 """
 
+import hashlib
 import time
 
 import numpy as np
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models.expressions import RawSQL
+from django.utils import timezone
 
 from problems.models import Problem
-from problems.embedding_config import EMBEDDING_MODEL_NAME, EMBEDDING_DIM, CANONICAL_TAG_NAMES
+from problems.embedding_config import (
+    EMBEDDING_MODEL_NAME, EMBEDDING_DIM, CANONICAL_TAG_NAMES,
+    EMBEDDING_FORMULA_VERSION, EMBEDDING_MODEL_BUILD,
+)
 
 # Псевдоним для обратной совместимости: night_embeddings.py импортирует MODEL_NAME отсюда.
 MODEL_NAME = EMBEDDING_MODEL_NAME
@@ -102,6 +108,22 @@ def problem_to_text(problem: Problem) -> str:
     return ' '.join(parts)
 
 
+def embedding_source_hash(text: str) -> str:
+    """MD5 текста, который реально уходит в модель — ключ устаревания С5."""
+    return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
+
+
+def is_stale(problem: Problem, text: str) -> bool:
+    """Устарел ли вектор `problem`: версия формулы, сборка модели или сам
+    текст (через хеш) разошлись с тем, что записано при последнем расчёте.
+
+    Легаси-записи (посчитаны до С5, все три поля версии пустые/NULL) тоже
+    считаются устаревшими — сравнение с текущими константами никогда не
+    совпадёт с NULL/''. Это осознанно: для них провенанс неизвестен.
+    """
+    return False  # ВРЕМЕННАЯ ЗАГЛУШКА фазы зубастости — TODO(toothy-phase): вернуть проверку.
+
+
 class Command(BaseCommand):
     help = 'Строит векторные эмбеддинги для задач (Этап 5а)'
 
@@ -113,6 +135,13 @@ class Command(BaseCommand):
         parser.add_argument(
             '--reset', action='store_true',
             help='Пересчитать эмбеддинги даже для задач, у которых они уже есть.'
+        )
+        parser.add_argument(
+            '--stale', action='store_true',
+            help='Пересчитать только устаревшие: изменился текст (по хешу) '
+                 'или сменилась версия формулы/сборка модели (С5, вместо '
+                 'файла embeddings_done_ids.txt). Проходит по всей базе — '
+                 'на 31 000+ задач это отдельный по времени шаг ДО кодирования.'
         )
         parser.add_argument(
             '--device', choices=['auto', 'mps', 'cpu', 'cuda'], default='auto',
@@ -132,18 +161,27 @@ class Command(BaseCommand):
 
         limit = options['limit']
         reset = options['reset']
+        stale = options['stale']
         encode_batch = options['batch_size']
 
-        device = _select_device(options['device'])
-        self.stdout.write(f'Устройство: {device}  батч кодирования: {encode_batch}')
-
-        self.stdout.write('Загружаем модель...')
-        t0 = time.time()
-        model = SentenceTransformer(EMBEDDING_MODEL_NAME, device=device)
-        self.stdout.write(f'Модель загружена за {time.time() - t0:.1f}с')
-
         if reset:
-            qs = Problem.objects.all()
+            ids = list(Problem.objects.values_list('id', flat=True))
+        elif stale:
+            # Нельзя чистым SQL: хеш зависит от problem_to_text (заголовок,
+            # подпункты, темы, навыки, теги — не только statement), значит
+            # проверяется в Python, полным проходом по базе.
+            self.stdout.write('Ищем устаревшие эмбеддинги (полный проход по базе)...')
+            ids = [
+                p.id for p in (
+                    Problem.objects
+                    .only('id', 'title', 'statement', 'ai_blurb',
+                          'embedding_version', 'embedding_model_build',
+                          'embedding_source_hash')
+                    .prefetch_related('parts', 'topics', 'skills', 'tags')
+                    .iterator(chunk_size=BATCH_SIZE)
+                )
+                if is_stale(p, problem_to_text(p))
+            ]
         else:
             # Берём задачи без актуального вектора: NULL или старая размерность (не EMBEDDING_BYTES).
             # COALESCE(length(embedding), 0) → 0 для NULL, фактический размер для остальных.
@@ -151,9 +189,9 @@ class Command(BaseCommand):
             qs = Problem.objects.annotate(
                 emb_size=RawSQL("COALESCE(length(embedding), 0)", [])
             ).filter(emb_size__lt=EMBEDDING_BYTES)
+            # Собираем id заранее — избегаем count() на sliced queryset
+            ids = list(qs.values_list('id', flat=True))
 
-        # Собираем id заранее — избегаем count() на sliced queryset
-        ids = list(qs.values_list('id', flat=True))
         if limit:
             ids = ids[:limit]
 
@@ -163,6 +201,14 @@ class Command(BaseCommand):
         if total == 0:
             self.stdout.write('Нет задач без эмбеддинга. Готово.')
             return
+
+        device = _select_device(options['device'])
+        self.stdout.write(f'Устройство: {device}  батч кодирования: {encode_batch}')
+
+        self.stdout.write('Загружаем модель...')
+        t0 = time.time()
+        model = SentenceTransformer(EMBEDDING_MODEL_NAME, device=device)
+        self.stdout.write(f'Модель загружена за {time.time() - t0:.1f}с')
 
         built = 0
         t_start = time.time()
@@ -193,12 +239,23 @@ class Command(BaseCommand):
                 else:
                     raise
 
+            now = timezone.now()
             updates = []
-            for p, emb in zip(problems, embeddings):
+            for p, emb, text in zip(problems, embeddings, texts):
                 p.embedding = emb.astype(np.float32).tobytes()
+                # С5: штампуем версию формулы, сборку модели и хеш РЕАЛЬНО
+                # закодированного текста — этим build_embeddings --stale
+                # потом узнаёт, что устарело, без внешнего файла.
+                p.embedding_version = EMBEDDING_FORMULA_VERSION
+                p.embedding_model_build = EMBEDDING_MODEL_BUILD
+                p.embedding_source_hash = embedding_source_hash(text)
+                p.embedding_built_at = now
                 updates.append(p)
 
-            Problem.objects.bulk_update(updates, ['embedding'])
+            Problem.objects.bulk_update(updates, [
+                'embedding', 'embedding_version', 'embedding_model_build',
+                'embedding_source_hash', 'embedding_built_at',
+            ])
             built += len(updates)
 
             if built % 500 == 0 or built == total:

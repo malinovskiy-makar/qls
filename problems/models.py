@@ -344,6 +344,32 @@ class Problem(models.Model):
     # Хранится как bytes (numpy float32 array). Заполняется командой build_embeddings.
     embedding = models.BinaryField(blank=True, null=True)
 
+    # С5 (22.08) — версионирование эмбеддинга. ДО этих полей «что устарело»
+    # было памятью человека в файле embeddings_done_ids.txt: правишь текст
+    # задачи, а её id уже в файле — пересчёт молча пропускал и писал
+    # «осталось 0». Теперь build_embeddings --stale сравнивает эти четыре
+    # поля с текущими константами/текстом сам, без внешнего файла.
+    embedding_version = models.IntegerField(
+        'Версия формулы эмбеддинга', null=True, blank=True,
+        help_text='EMBEDDING_FORMULA_VERSION (problems/embedding_config.py) '
+                   'на момент расчёта. NULL — вектор посчитан до версионирования.',
+    )
+    embedding_model_build = models.CharField(
+        'Сборка модели эмбеддинга', max_length=64, blank=True, default='',
+        help_text='EMBEDDING_MODEL_BUILD (problems/embedding_config.py) '
+                   'на момент расчёта. Пусто — вектор посчитан до версионирования.',
+    )
+    embedding_source_hash = models.CharField(
+        'Хеш текста эмбеддинга', max_length=32, blank=True, default='',
+        help_text='MD5 текста, который реально закодирован (problem_to_text) '
+                   'на момент расчёта. Пусто — вектор посчитан до версионирования.',
+    )
+    embedding_built_at = models.DateTimeField(
+        'Когда посчитан эмбеддинг', null=True, blank=True,
+        help_text='NULL у записей, чей вектор посчитан ДО этой сессии — '
+                   'легаси, это ожидаемо, не баг.',
+    )
+
     # Этап Б3 — кеш похожих задач (топ-5 по косинусному сходству).
     # Заполняется командой cache_similar.
     similar_problems = models.ManyToManyField(
