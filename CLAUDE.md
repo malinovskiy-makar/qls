@@ -123,7 +123,10 @@ Redis остаётся на шаге B.
 
 ```bash
 build_embeddings --limit N        # эмбеддинги для задач без вектора
+build_embeddings --stale          # только устаревшие (С5: по хешу текста и
+                                  # версиям констант, БЕЗ done-файла)
 night_embeddings --ids-file F     # пересчёт по списку id (⚠️ ловушка done-файла)
+build_econ_terms                  # словарь терминов .md → data/econ_terms.json
 cache_similar                     # залить «похожие» в M2M — этим живёт прод
 quality_gate --apply / --revert   # шлюз качества, обратимый
 find_duplicates --threshold 0.95  # заполнить DuplicateCandidate
