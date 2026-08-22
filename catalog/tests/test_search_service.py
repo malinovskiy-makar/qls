@@ -22,7 +22,7 @@ from unittest import mock
 import numpy as np
 from django.contrib.auth import get_user_model
 from django.core.cache import caches
-from django.test import TestCase, SimpleTestCase, override_settings
+from django.test import TestCase, SimpleTestCase, override_settings, tag
 from django.urls import reverse
 
 from catalog import search_client
@@ -295,6 +295,22 @@ class ComposeIsolationTests(SimpleTestCase):
                         'молотилку кому угодно.' % относительный)
 
 
+# ⚠️ SERIAL, И ВОТ ЗАПИСАННАЯ ПРИЧИНА (правило CLAUDE.md: метку ставим
+# только когда тест делит неразделяемый внешний ресурс).
+#
+# Ресурс здесь — САМА МОДЕЛЬ, 2,27 ГБ в памяти. Замерено 22.08.2026 на
+# машине владельца (8 ядер, `--parallel auto` = 8 воркеров): воркер, в
+# который попал этот класс, умирал под весом модели, а дальше начиналось
+# худшее. Django клонирует тестовую базу РОВНО по числу воркеров
+# (default_1…default_8.sqlite3), а multiprocessing взамен умершего
+# поднимает воркера со СЛЕДУЮЩИМ номером — 9, 10, … 25. Своего клона у
+# них нет, каждый падает с «unable to open database file» и тут же
+# заменяется новым. Прогон превращается в лавину из десятков одинаковых
+# ошибок, и настоящий результат в ней не разглядеть.
+#
+# Метка НЕ прячет тест от проверки: он идёт вторым шагом
+# (`scripts/run_tests.py`), где процесс один и памяти хватает.
+@tag('serial')
 @unittest.skipUnless(модель_скачана(),
                      'BGE-M3 не скачана — тест побитового совпадения '
                      'пропущен (модель весит 2,12 ГБ)')
