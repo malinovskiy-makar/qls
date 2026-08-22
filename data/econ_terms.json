@@ -13,12 +13,16 @@
    "terms": 1772,
    "ru_aliases": 651,
    "english": 1291,
-   "notations": 915,
+   "notations": 916,
    "sections": 32,
-   "index_symbols": 502,
+   "index_symbols": 503,
    "ambiguous_symbols": 56
   },
-  "known_fixes_applied": {}
+  "known_fixes_applied": {
+   "модель AD–AS": [
+    "AD–AS"
+   ]
+  }
  },
  "terms": [
   {
@@ -23974,7 +23978,8 @@
     "AD–AS"
    ],
    "notations": [
-    "AD-AS"
+    "AD-AS",
+    "AD–AS"
    ],
    "word_forms": {
     "род": "модели AD–AS",
@@ -45496,6 +45501,12 @@
    "auto_normalize": false
   },
   "AD-AS": {
+   "terms": [
+    "модель AD–AS"
+   ],
+   "auto_normalize": true
+  },
+  "AD–AS": {
    "terms": [
     "модель AD–AS"
    ],
