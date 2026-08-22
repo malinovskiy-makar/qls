@@ -37,12 +37,23 @@ EMBEDDING_BYTES = EMBEDDING_DIM * 4  # 4096 для BGE-M3 (1024 × 4)
 
 
 def _select_device(preferred: str) -> str:
-    """Выбирает устройство для вычислений: mps → cuda → cpu."""
+    """Выбирает устройство для вычислений: mps → cuda → cpu.
+
+    ⚠️ ЯВНОЕ «cpu» ОТВЕЧАЕТ ДО ИМПОРТА torch, И ЭТО НЕ МИКРООПТИМИЗАЦИЯ.
+    Раньше `import torch` стоял первым, и пока torch не был установлен,
+    это сходило с рук: импорт падал в ImportError, и функция возвращала
+    'cpu'. Как только torch появился (22.08, сессия С4), тот же импорт
+    начал по-настоящему тянуть тяжёлый C-модуль — в том числе внутри
+    тестового воркера, где он падает с «module functions cannot set
+    METH_CLASS or METH_STATIC» и роняет тест, не имеющий к устройству
+    никакого отношения. Спросили 'cpu' — отвечаем 'cpu', ничего не
+    импортируя.
+    """
+    if preferred == 'cpu':
+        return 'cpu'
     try:
         import torch
     except ImportError:
-        return 'cpu'
-    if preferred == 'cpu':
         return 'cpu'
     if preferred == 'mps':
         return 'mps' if torch.backends.mps.is_available() else 'cpu'

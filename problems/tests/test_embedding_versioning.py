@@ -69,7 +69,7 @@ class StaleSelectionTests(_FakeModelMixin, TestCase):
         # «Эмбеддинг уже посчитан» — реальный прогон --reset, не фикстура:
         # так поля версии/хеша/времени проставляются тем же кодом, что и
         # на проде, а не руками мимо команды.
-        call_command('build_embeddings', reset=True, verbosity=0)
+        call_command('build_embeddings', reset=True, verbosity=0, device='cpu')
 
         снимок_до = {
             p.id: p.embedding_built_at for p in Problem.objects.all()
@@ -80,7 +80,7 @@ class StaleSelectionTests(_FakeModelMixin, TestCase):
         изменяемая.statement = 'Условие Б, версия ВТОРАЯ — текст изменён.'
         изменяемая.save(update_fields=['statement'])
 
-        call_command('build_embeddings', stale=True, verbosity=0)
+        call_command('build_embeddings', stale=True, verbosity=0, device='cpu')
 
         снимок_после = {
             p.id: p.embedding_built_at for p in Problem.objects.all()
@@ -103,10 +103,10 @@ class StaleSelectionTests(_FakeModelMixin, TestCase):
 
     def test_неизменная_задача_не_трогается(self):
         неизменная = make_problem(statement='Условие А. Оно не меняется.')
-        call_command('build_embeddings', reset=True, verbosity=0)
+        call_command('build_embeddings', reset=True, verbosity=0, device='cpu')
         время_до = Problem.objects.get(id=неизменная.id).embedding_built_at
 
-        call_command('build_embeddings', stale=True, verbosity=0)
+        call_command('build_embeddings', stale=True, verbosity=0, device='cpu')
 
         время_после = Problem.objects.get(id=неизменная.id).embedding_built_at
         self.assertEqual(время_до, время_после)

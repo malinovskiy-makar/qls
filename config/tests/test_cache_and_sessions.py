@@ -51,34 +51,52 @@ def _session_store():
 # ─────────────────────────────────────────────────────────────────────────
 class CachesLayoutTests(SimpleTestCase):
 
-    def test_ровно_два_алиаса(self):
-        self.assertEqual(
-            set(settings.CACHES), {'default', 'sessions'},
-            'Ожидались ровно два алиаса кэша: default (кэш приложения) и '
-            'sessions (сессии). Один алиас означает, что сессии и кэш живут '
-            'в одном хранилище, а cache.clear() у Redis — это FLUSHDB.',
+    # ⚠️ СМЫСЛ ЭТИХ ПРОВЕРОК — «АЛИАСЫ НЕ СХЛОПНУЛИСЬ», А НЕ ИХ ЧИСЛО.
+    # Раньше тут стояло `== {'default', 'sessions'}`, и 22.08 он честно
+    # покраснел на добавлении третьего алиаса `search` (векторы поисковых
+    # запросов, С4). Красным он был по форме, а не по существу: беда,
+    # которую он сторожит, — это когда двум РАЗНЫМ вещам достаётся ОДНО
+    # хранилище, потому что `cache.clear()` у Redis это FLUSHDB. Появление
+    # нового отдельного хранилища такой бедой не является.
+    ОБЯЗАТЕЛЬНЫЕ_АЛИАСЫ = {'default', 'sessions', 'search'}
+
+    def test_обязательные_алиасы_на_месте(self):
+        self.assertLessEqual(
+            self.ОБЯЗАТЕЛЬНЫЕ_АЛИАСЫ, set(settings.CACHES),
+            'Пропал алиас кэша. default — кэш приложения, sessions — сессии, '
+            'search — векторы поисковых запросов (С4). Схлопывание любых двух '
+            'в один означает общее хранилище, а cache.clear() у Redis — это '
+            'FLUSHDB на всю базу.',
         )
 
-    def test_алиасы_указывают_на_разные_хранилища(self):
-        default_loc = settings.CACHES['default'].get('LOCATION')
-        sessions_loc = settings.CACHES['sessions'].get('LOCATION')
-        self.assertTrue(default_loc, 'у default не задан LOCATION')
-        self.assertTrue(sessions_loc, 'у sessions не задан LOCATION')
-        self.assertNotEqual(
-            default_loc, sessions_loc,
-            'default и sessions указывают на одно хранилище. Для Redis это '
-            'означает одну базу, и FLUSHDB при cache.clear() разлогинит всех. '
-            'Для LocMemCache одинаковый LOCATION — это один склад под двумя '
-            'вывесками, то есть та же беда, только в разработке.',
-        )
+    def test_все_алиасы_указывают_на_разные_хранилища(self):
+        места = {}
+        for алиас in sorted(settings.CACHES):
+            место = settings.CACHES[алиас].get('LOCATION')
+            self.assertTrue(место, 'у %s не задан LOCATION' % алиас)
+            self.assertNotIn(
+                место, места,
+                'Алиасы %s и %s указывают на одно хранилище (%s). Для Redis '
+                'это одна база, и FLUSHDB при cache.clear() унесёт чужое: '
+                'сессии — разлогинит людей, векторы запросов — заставит '
+                'заново будить модель. Для LocMemCache одинаковый LOCATION — '
+                'один склад под двумя вывесками, та же беда в разработке.'
+                % (места.get(место), алиас, место),
+            )
+            места[место] = алиас
 
     def test_экземпляры_кэша_не_видят_ключей_друг_друга(self):
         """Проверка не по настройкам, а по поведению: положили в один —
-        во втором пусто. Настройки можно написать правильно и всё равно
+        в остальных пусто. Настройки можно написать правильно и всё равно
         получить один объект (так было бы у LocMemCache без LOCATION)."""
         caches['default'].set('проба-разделения', 'из-кэша', 60)
         self.addCleanup(caches['default'].delete, 'проба-разделения')
-        self.assertIsNone(caches['sessions'].get('проба-разделения'))
+        for алиас in settings.CACHES:
+            if алиас == 'default':
+                continue
+            self.assertIsNone(
+                caches[алиас].get('проба-разделения'),
+                'Алиас %s видит ключ, положенный в default' % алиас)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -146,7 +164,11 @@ class ProductionRequiresRedisTests(SimpleTestCase):
         """Обратная сторона: предохранитель не должен срабатывать зря."""
         env = dict(self.BASE_ENV, REDIS_URL='redis://127.0.0.1:6379')
         module = self._load_production(env)
-        self.assertEqual(set(module.CACHES), {'default', 'sessions'})
+        # Подмножеством, а не равенством: смысл проверки — что боевые
+        # настройки поднялись и алиасы на месте, а не что их ровно столько.
+        # См. комментарий у ОБЯЗАТЕЛЬНЫЕ_АЛИАСЫ выше.
+        self.assertLessEqual({'default', 'sessions', 'search'},
+                             set(module.CACHES))
         self.assertEqual(module.SESSION_ENGINE,
                          'django.contrib.sessions.backends.cached_db')
 
