@@ -661,7 +661,20 @@ def smart_search(request):
                     t.name for t in p.topics.all() if t.name in CANONICAL
                 ][:2]
             results = raw
-        # ВРЕМЕННО СНЯТО — TODO(toothy-phase): вернуть деградацию.
+        except SearchServiceUnavailable as exc:
+            # ⚠️ СЕРВИС ЛЁГ — ЭТО ДЕГРАДАЦИЯ, А НЕ ОШИБКА ЧЕЛОВЕКА.
+            # Раньше этот случай попадал в `except Exception` ниже и человек
+            # видел «Ошибка поиска: нет связи с сервисом…» — то есть нашу
+            # внутреннюю кухню вместо результатов, хотя поиск по словам
+            # прекрасно работает и без сервиса. Ведём себя ровно так же, как
+            # при выключенном флаге выше: ищем словами и честно говорим об
+            # этом плашкой. Ни пятисотки, ни пустого экрана, ни адреса
+            # внутреннего сервиса наружу.
+            logger.warning('search service unavailable: %s — идём по словам',
+                           exc)
+            degraded = True
+            results = _lexical_fallback(query, topic_id, difficulty,
+                                        has_solution, kind)
         except ImportError:
             error = (
                 'Модель эмбеддингов не установлена. '

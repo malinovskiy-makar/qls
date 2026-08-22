@@ -138,8 +138,15 @@ def dense_search(query, limit=60, content_kind='problems'):
         hits = semantic.search(query, limit=limit, content_kind=content_kind)
         return ([hit['problem'].pk for hit in hits],
                 {hit['problem'].pk: hit['score'] for hit in hits})
-    except SearchServiceUnavailable:
-        raise  # ВРЕМЕННО СНЯТО — TODO(toothy-phase): вернуть деградацию.
+    except SearchServiceUnavailable as exc:
+        # ⚠️ ТИПИЗИРОВАННОЕ СОБЫТИЕ, БЕЗ TRACEBACK, И ЭТО ПРИНЦИПИАЛЬНО.
+        # Лежащий сервис — состояние, а не происшествие: пока он лежит,
+        # сюда приходит КАЖДЫЙ поисковый запрос. Полная трассировка на
+        # каждый из них за минуту заливает журнал одинаковыми простынями,
+        # и настоящая авария в них тонет. Одна строка с причиной говорит
+        # ровно столько же, сколько нужно, чтобы понять и починить.
+        logger.warning('search service unavailable: %s — идём по словам', exc)
+        return [], {}
     except Exception:
         # А вот это уже неожиданное: чинить надо код, и трассировка нужна.
         logger.exception('Смысловой поиск сломался — идём только по словам')
