@@ -37,6 +37,8 @@ cryptography==50.0.0
     # via pdfminer-six
 cyclonedx-python-lib==11.12.0
     # via pip-audit
+dawg2-python==0.9.0
+    # via pymorphy3
 defusedxml==0.7.1
     # via py-serializable
 dj-database-url==3.1.2
@@ -96,6 +98,12 @@ pycparser==3.0
     # via cffi
 pygments==2.21.0
     # via rich
+pymorphy3==2.0.6
+    # via -r requirements/dev.in
+pymorphy3-dicts-ru==2.4.417150.4580142
+    # via
+    #   -r requirements/dev.in
+    #   pymorphy3
 pymupdf==1.26.7
     # via -r requirements/base.in
 pypandoc==1.17
