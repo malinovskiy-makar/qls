@@ -132,13 +132,17 @@ def dense_search(query, limit=60, content_kind='problems'):
     if not semantic.is_enabled():
         return [], {}
 
+    from catalog.search_client import SearchServiceUnavailable
+
     try:
         hits = semantic.search(query, limit=limit, content_kind=content_kind)
         return ([hit['problem'].pk for hit in hits],
                 {hit['problem'].pk: hit['score'] for hit in hits})
+    except SearchServiceUnavailable:
+        raise  # ВРЕМЕННО СНЯТО — TODO(toothy-phase): вернуть деградацию.
     except Exception:
-        logger.info('Смысловой поиск недоступен — идём только по словам',
-                    exc_info=True)
+        # А вот это уже неожиданное: чинить надо код, и трассировка нужна.
+        logger.exception('Смысловой поиск сломался — идём только по словам')
         return [], {}
 
 

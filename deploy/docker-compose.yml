@@ -119,6 +119,43 @@ services:
       # Первый старт долгий: миграции с нуля плюс сборка статики.
       start_period: 120s
 
+  # ⚠️ СЕРВИС КОДИРОВАНИЯ ЗАПРОСОВ (С4). ПОРТ НАРУЖУ НЕ ПУБЛИКУЕТСЯ.
+  # Секции `ports` здесь нет и быть не должно: эндпоинт /encode работает
+  # без авторизации, и опубликованный порт раздавал бы кому угодно нашу
+  # CPU-молотилку. Django ходит сюда по внутренней сети backend, по имени
+  # `search`. Проверка изоляции — curl с хоста должен получить отказ,
+  # curl из контейнера web — успех (порядок в docs/SERVER.md).
+  #
+  # ⚠️ ВТОРОЙ ЭКЗЕМПЛЯР ПОДНИМАТЬ НЕЛЬЗЯ, по той же причине, что и у web,
+  # только наоборот: там дело в миграциях, здесь — в памяти. Каждая копия
+  # держит свои 2,12 ГБ модели.
+  search:
+    build:
+      context: ..
+      dockerfile: search_service/Dockerfile
+    image: weconomics-search:latest
+    container_name: weco-search
+    restart: unless-stopped
+    # ports: НЕ ДОБАВЛЯТЬ. См. комментарий выше.
+    environment:
+      EMBEDDING_MODEL_NAME: BAAI/bge-m3
+      EMBEDDING_DIM: "1024"
+      EMBEDDING_MODEL_BUILD: bge-m3/st-fp32
+    volumes:
+      # Модель качается один раз и переживает пересборку образа.
+      - hfcache:/models
+    networks:
+      - backend
+    healthcheck:
+      # /healthz намеренно НЕ трогает модель: пока она грузится (минуты),
+      # контейнер обязан считаться живым, иначе compose будет убивать его
+      # по кругу и модель не догрузится никогда.
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8001/healthz | grep -q '\"ok\":true'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
   nginx:
     image: nginx:1.27-alpine
     container_name: weco-nginx
@@ -160,6 +197,9 @@ services:
 volumes:
   # Именованные тома: переживают docker compose down и пересоздание контейнеров.
   pgdata:
+  # Кэш моделей сервиса поиска: 2,12 ГБ качаются один раз, а не при каждой
+  # пересборке образа.
+  hfcache:
   redisdata:
   # ⚠️ Статику наполняет collectstatic в entrypoint контейнера web, а НЕ
   # сборка образа: том монтируется при запуске и перекрыл бы собранное

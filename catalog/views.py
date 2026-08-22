@@ -604,8 +604,13 @@ def smart_search(request):
     Загрузка модели и индекса происходит лениво при первом запросе (~7 с),
     последующие запросы мгновенны (всё в памяти).
     """
+    import logging
+
     from . import semantic
+    from .search_client import SearchServiceUnavailable
     from .semantic import search as semantic_search
+
+    logger = logging.getLogger(__name__)
 
     # 21 каноническая тема для фильтра (тот же порядок, что в каталоге).
     canonical_topics = sorted(
@@ -656,6 +661,7 @@ def smart_search(request):
                     t.name for t in p.topics.all() if t.name in CANONICAL
                 ][:2]
             results = raw
+        # ВРЕМЕННО СНЯТО — TODO(toothy-phase): вернуть деградацию.
         except ImportError:
             error = (
                 'Модель эмбеддингов не установлена. '

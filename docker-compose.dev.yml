@@ -57,6 +57,41 @@ services:
       timeout: 3s
       retries: 20
 
+  # ⚠️ СЕРВИС ПОИСКА — БЕЗ СЕКЦИИ `ports`, И ЭТО ПРОВЕРЯЕМОЕ СВОЙСТВО.
+  # У postgres и redis выше порты наружу есть (они нужны Django, который
+  # на этой машине живёт вне Docker). У search их нет намеренно: так
+  # локальная раскладка повторяет боевую, где сервис доступен только по
+  # внутренней сети. Проверка ровно в этом и состоит:
+  #
+  #   docker compose -f docker-compose.dev.yml up -d search
+  #   curl http://localhost:8001/healthz          # ОТКАЗ — порт не опубликован
+  #   docker compose -f docker-compose.dev.yml exec search \
+  #       curl -fsS http://127.0.0.1:8001/healthz # успех — изнутри виден
+  #
+  # Из другого контейнера той же сети сервис виден по имени `search` —
+  # именно так к нему ходит Django на боевом сервере.
+  search:
+    build:
+      context: .
+      dockerfile: search_service/Dockerfile
+    image: weconomics-search:latest
+    container_name: qls_search_dev
+    # ports: НЕ ДОБАВЛЯТЬ — на этом стоит проверка изоляции.
+    environment:
+      EMBEDDING_MODEL_NAME: BAAI/bge-m3
+      EMBEDDING_DIM: '1024'
+      EMBEDDING_MODEL_BUILD: bge-m3/st-fp32
+    volumes:
+      - qls_hfcache:/models
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:8001/healthz | grep -q ok']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
 volumes:
   qls_pgdata:
   qls_redisdata:
+  # Кэш модели: 2,12 ГБ качаются один раз и переживают пересборку образа.
+  qls_hfcache:
