@@ -195,10 +195,20 @@ class OneMarkupTests(TestCase):
             self.assertIn('teacher/_tutor_note.html', page)
 
     def test_no_second_note_form_in_templates(self):
-        """Поле заметки объявлено ровно в одном файле проекта."""
+        """Поле заметки объявлено ровно в одном файле проекта.
+
+        ⚠️ `materials/` исключена той же логикой, что и `venv`/`node_modules`:
+        это исходники для импорта и посторонние рабочие копии (например,
+        клон репозитория для сравнения веток), не код проекта — их
+        HTML-файлы не обязаны подчиняться правилу «одна разметка».
+        22.08 упало здесь именно из-за такой копии: materials/
+        gitignore-ится, но не удаляется при переключении веток, и
+        `os.walk` без исключения находил в ней второй `_tutor_note.html`.
+        """
         found = []
         for folder, _dirs, files in os.walk(ROOT):
-            if any(part in folder for part in ('venv', 'node_modules', '.git')):
+            if any(part in folder for part in
+                   ('venv', 'node_modules', '.git', 'materials')):
                 continue
             for name in files:
                 if not name.endswith('.html'):
