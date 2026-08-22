@@ -20,6 +20,7 @@ import hashlib
 import json
 import logging
 import urllib.error
+import urllib.parse
 import urllib.request
 
 import numpy as np
@@ -33,6 +34,9 @@ logger = logging.getLogger(__name__)
 CACHE_ALIAS = 'search'
 CACHE_TTL = 60 * 60 * 24 * 7      # неделя: вектор запроса не портится
 _CACHE_PREFIX = 'qvec'
+
+# Схемы, с которыми имеет смысл обращаться к своему HTTP-сервису.
+_ALLOWED_SCHEMES = ('http', 'https')
 
 
 class SearchServiceUnavailable(RuntimeError):
@@ -68,6 +72,28 @@ def _cache():
         return caches['default']
 
 
+def _checked_url(url):
+    """Проверяет схему URL ДО того, как он уйдёт в `urlopen`.
+
+    ⚠️ ЭТО НЕ КОСМЕТИКА ДЛЯ BANDIT (B310, CWE-22), А НАСТОЯЩАЯ ЗАЩИТА.
+    `urlopen` умеет открывать не только http(s), но и `file://` — bandit не
+    может статически доказать, что адрес всегда таков, и правильно
+    сомневается. `SEARCH_SERVICE_URL` берётся из настроек (адрес соседнего
+    контейнера, не пользовательский ввод), но если однажды его соберут
+    неправильно — опечатка, битый `.env`, случайно оставшийся `file:///` —
+    приложение обязано понятно упасть, а не молча прочитать локальный файл
+    и отдать его содержимое как «вектор». Проверка стоит здесь, единственном
+    месте файла, откуда вызывается `urlopen`, а не в комментарии рядом.
+    """
+    scheme = urllib.parse.urlsplit(url).scheme
+    if scheme not in _ALLOWED_SCHEMES:
+        raise SearchServiceUnavailable(
+            'SEARCH_SERVICE_URL указывает на недопустимую схему %r '
+            '(разрешены только http и https) — проверьте настройки, '
+            'адрес: %s' % (scheme, url))
+    return url
+
+
 def _cache_key(text):
     digest = hashlib.sha256(text.encode('utf-8')).hexdigest()[:32]
     return '%s:%s:%s' % (_CACHE_PREFIX, EMBEDDING_MODEL_BUILD, digest)
@@ -87,13 +113,13 @@ def _post_encode(texts):
     """Один POST /encode. Любая сетевая беда -> SearchServiceUnavailable."""
     body = json.dumps({'texts': list(texts)}).encode('utf-8')
     request = urllib.request.Request(
-        service_url().rstrip('/') + '/encode',
+        _checked_url(service_url().rstrip('/') + '/encode'),
         data=body,
         headers={'Content-Type': 'application/json'},
         method='POST',
     )
     try:
-        with urllib.request.urlopen(request, timeout=_timeout()) as response:
+        with urllib.request.urlopen(request, timeout=_timeout()) as response:  # nosec B310 — схема проверена _checked_url выше
             payload = json.loads(response.read().decode('utf-8'))
     except urllib.error.HTTPError as exc:
         raise SearchServiceUnavailable(
@@ -141,9 +167,8 @@ def encode_one(text):
 def healthy():
     """Отвечает ли сервис. Модель не трогает (см. /healthz в сервисе)."""
     try:
-        with urllib.request.urlopen(
-                service_url().rstrip('/') + '/healthz',
-                timeout=_timeout()) as response:
+        url = _checked_url(service_url().rstrip('/') + '/healthz')
+        with urllib.request.urlopen(url, timeout=_timeout()) as response:  # nosec B310 — схема проверена _checked_url выше
             return json.loads(response.read().decode('utf-8')).get('ok') is True
     except Exception:
         return False

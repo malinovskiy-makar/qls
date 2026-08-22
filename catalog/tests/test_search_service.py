@@ -16,6 +16,7 @@
 import os
 import sys
 import unittest
+import urllib.request
 from pathlib import Path
 from unittest import mock
 
@@ -117,6 +118,34 @@ class ServiceUnavailableTests(SimpleTestCase):
 
     def test_healthy_отвечает_false_а_не_падает(self):
         self.assertFalse(search_client.healthy())
+
+
+@override_settings(SEARCH_SERVICE_URL='file:///etc/passwd',
+                   SEARCH_SERVICE_TIMEOUT=0.5)
+class InvalidSchemeTests(SimpleTestCase):
+    """⚠️ B310 (CWE-22): недопустимая схема ловится ДО обращения к сети.
+
+    Найдено bandit-ом после слияния С4 в main: `urlopen` умеет открывать не
+    только http(s), но и `file://`, и статически доказать обратное bandit
+    не может. Здесь — поведенческое доказательство: если в настройках
+    вместо адреса сервиса окажется `file:///etc/passwd` (опечатка, битый
+    `.env`), клиент обязан упасть с понятной ошибкой РАНЬШЕ, чем попробует
+    открыть это как URL, а не тихо прочитать локальный файл.
+    """
+
+    def setUp(self):
+        caches['search'].clear()
+
+    def test_недопустимая_схема_даёт_ошибку_до_сети(self):
+        with mock.patch.object(urllib.request, 'urlopen') as поддельный:
+            with self.assertRaises(search_client.SearchServiceUnavailable):
+                search_client.encode_one('эластичность спроса')
+        поддельный.assert_not_called()
+
+    def test_healthy_отвечает_false_на_недопустимую_схему_без_сети(self):
+        with mock.patch.object(urllib.request, 'urlopen') as поддельный:
+            self.assertFalse(search_client.healthy())
+        поддельный.assert_not_called()
 
 
 class _БазаДеградации(TestCase):
