@@ -15,6 +15,7 @@
 """
 import importlib
 import os
+import pathlib
 import sys
 import unittest
 from contextlib import contextmanager
@@ -255,3 +256,53 @@ class DeployCheckTests(unittest.TestCase):
             'check --deploy вернул %s:\n%s\n%s'
             % (result.returncode, result.stdout, result.stderr))
         self.assertIn('System check identified no issues', output)
+
+
+class NginxDoesNotDuplicateDjangoHeadersTests(unittest.TestCase):
+    """X-Frame-Options/X-Content-Type-Options/Referrer-Policy — владелец
+    Django (см. классы выше), nginx их ставить не должен вовсе.
+
+    22.08.2026: все три дублировались (ADR 0013, ADR 0014) — у
+    Referrer-Policy расхождение было хуже, чем просто шум: при повторении
+    заголовка побеждает ПОСЛЕДНЕЕ значение, а nginx дописывал своё ПОСЛЕ
+    Django, то есть реально действовала более слабая nginx-политика, пока
+    Django-настройка молча простаивала. Тест читает конфиг текстом —
+    `manage.py test` nginx не поднимает.
+    """
+
+    _ROOT = pathlib.Path(__file__).resolve().parents[2]
+    CONF_PATHS = (
+        _ROOT / 'deploy' / 'nginx' / 'available' / 'django.conf',
+        _ROOT / 'deploy' / 'nginx' / 'conf.d' / 'weconomics.conf',
+    )
+    OWNED_BY_DJANGO = ('X-Frame-Options', 'X-Content-Type-Options',
+                       'Referrer-Policy')
+
+    def test_conf_files_exist(self):
+        for path in self.CONF_PATHS:
+            self.assertTrue(path.exists(), 'Не нашёл %s' % path)
+
+    def test_no_add_header_for_django_owned_headers(self):
+        """Ищет только РЕАЛЬНЫЕ директивы, не упоминания в комментариях.
+
+        Комментарии рядом сознательно цитируют убранные строки (объясняют,
+        что и почему сняли) — наивный поиск подстроки по всему файлу ловил
+        бы своё же объяснение. Поэтому смотрим только на строки, не
+        начинающиеся с `#` после отступа.
+        """
+        for path in self.CONF_PATHS:
+            code_lines = [
+                line for line in path.read_text(encoding='utf-8').splitlines()
+                if not line.strip().startswith('#')
+            ]
+            code_text = '\n'.join(code_lines).lower()
+            for header in self.OWNED_BY_DJANGO:
+                needle = ('add_header %s' % header).lower()
+                self.assertNotIn(
+                    needle, code_text,
+                    '%s: снова появилась ДЕЙСТВУЮЩАЯ директива '
+                    '`add_header %s` (не в комментарии) — значит, '
+                    'заголовок опять будет приходить дважды (или, для '
+                    'Referrer-Policy, побеждать будет более слабое '
+                    'nginx-значение). Владелец — Django, см. ADR 0013/0014.'
+                    % (path.name, header))

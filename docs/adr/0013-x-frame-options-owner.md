@@ -126,14 +126,12 @@ curl -sI https://weconomics.site/ | grep -ci '^X-Frame-Options:'   # 1
 curl -sI https://weconomics.site/ | grep -i  '^X-Frame-Options:'   # DENY
 ```
 
-## Рядом, но не тронуто
+## Рядом, но не тронуто здесь
 
-- **`Referrer-Policy` расходится точно так же:** Django отдаёт `same-origin`,
-  nginx — `strict-origin-when-cross-origin`, и в ответе они оба. Тот же
-  корень, то же лечение, но это отдельное решение о значении политики —
-  заведена карточка, здесь не правим.
+- **`Referrer-Policy` и `X-Content-Type-Options` расходились точно так же** —
+  найдено попутно при разборе этого ADR, но решение о значении
+  `Referrer-Policy` требовало отдельного захода. Починено в тот же день —
+  см. [ADR 0014](0014-referrer-policy-and-nosniff-owner.md).
 - **`stub.conf` сохраняет свой `add_header X-Frame-Options SAMEORIGIN`,** и
   это не оплошность: заглушка отдаётся из `root`, Django за ней нет вовсе,
   так что nginx там единственный источник и дубля не возникает.
-- **`X-Content-Type-Options: nosniff` тоже приходит дважды,** но значение у
-  обоих источников одно, поэтому вреда нет — только шум в ответе.
