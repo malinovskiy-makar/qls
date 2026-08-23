@@ -2251,7 +2251,10 @@
             и продавца можно тянуть мышью.</div>
           <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
             дефицит (продаётся меньше), пол выше равновесия даёт избыток. Линию цены можно тянуть мышью.</div>
-          <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-ghost" checked>
+          <!-- «Было → стало» выключено по умолчанию: сцена сама гасит showGhost
+               при входе (SCENE_DEFAULTS), и отметка в разметке эту правду
+               перечёркивала — тумблер стоял отмеченным, а слоя на графике не было. -->
+          <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-ghost">
             <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
           <div id="info-tax" style="margin-top:8px;"></div>
         </div>

@@ -48,6 +48,15 @@ function syncViewFields() {
      иначе показывало бы прежнее положение. */
   const ac = document.getElementById('chk-areas');
   if (ac) ac.checked = !!(STATE.showCS || STATE.showPS);
+  /* «Было → стало» — та же болезнь, что была у излишков: SCENE_DEFAULTS гасит
+     showGhost при входе в модель, а галочка в разметке стоит отмеченной. Тумблер
+     врал: отмечен, а бледного исходного равновесия на графике нет, и первое
+     нажатие человека ничего не убирало (оно и так было выключено). Ставим обе
+     галочки в согласие с состоянием там же, где и излишки. */
+  ['chk-ghost', 'chk-lab-ghost'].forEach(id => {
+    const e = document.getElementById(id);
+    if (e) e.checked = !!STATE.showGhost;
+  });
   updateResetViewBtn();
 }
 
