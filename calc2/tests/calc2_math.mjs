@@ -2825,7 +2825,7 @@ const CASES = [
           return { moved: moved, noScale: noScale.length, scenes: scenes.length };`,
     checks: [['сдвинутых чисел на осях', 'moved', 0, 0],
              ['сцен без разметки шкалы', 'noScale', 0, 0],
-             ['сцен всего', 'scenes', 43, 0]],   // +2: 'taxes' (объединённый сюжет налогов) и 'quota'
+             ['сцен всего', 'scenes', 44, 0]],   // +3: 'taxes' (объединённый сюжет налогов), 'quota' и 'sdsum' (сложение)
   },
 
   {

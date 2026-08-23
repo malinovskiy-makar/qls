@@ -133,6 +133,8 @@ function redrawScene() {
   }
   updateInfoPanel();
   updateAreasPanel();
+  // Табло «По группам» сюжета сложения: в остальных сценах оно молчит само.
+  if (typeof updateSumPanel === 'function') updateSumPanel();
   if (STATE.market === 'monopoly') {
     if (STATE.monoMode === 'discr1') updateDiscr1Panel(); else updateMonoPanel();
     if (STATE.monoMode === 'natural') updateNaturalPanel();   // три ориентира регулирования (Фаза 3в)
@@ -1186,13 +1188,21 @@ function keyTargets() {
       const kind = (s > 0) ? 'минимум ' : (s < 0 ? 'максимум ' : 'плато ');
       push(x, y, kind + t.name, 'extremum', [t.name]);
     });
-    // Излом, совпавший с уже найденным пересечением, не добавляем: у Z = min(f, g)
-    // ветвь переключается ровно там, где кривые пересекаются, а пересечение и
-    // посчитано точнее (бисекцией), и названо понятнее.
-    const near = (w.x1 - w.x0) * 0.02;
+    /* Излом, совпавший с уже найденным пересечением, не добавляем: у Z = min(f, g)
+       ветвь переключается ровно там, где кривые пересекаются, а пересечение и
+       посчитано точнее (бисекцией), и названо понятнее.
+
+       ⚠️ СОВПАДЕНИЕ ПРОВЕРЯЕТСЯ ПО ОБЕИМ КООРДИНАТАМ. Раньше сверялся только X,
+       и излом гасила ЛЮБАЯ точка с тем же количеством — даже лежащая на другой
+       высоте, то есть совсем другая точка. Замер 24.08 в сюжете сложения: излом
+       рыночного предложения (20; 20) пропадал из списка, потому что рядом стояло
+       пересечение двух групп в (20; 40). Один и тот же Q, разные точки. */
+    const nearX = (w.x1 - w.x0) * 0.02, nearY = (w.y1 - w.y0) * 0.02;
     kinksOf(t.f, lo, hi).forEach(x => {
-      if (out.some(o => Math.abs(o.x - x) < near)) return;
-      push(x, t.f(x), 'излом ' + t.name, 'kink', [t.name]);
+      const y = t.f(x);
+      if (!isFinite(y)) return;
+      if (out.some(o => Math.abs(o.x - x) < nearX && Math.abs(o.y - y) < nearY)) return;
+      push(x, y, 'излом ' + t.name, 'kink', [t.name]);
     });
   });
   _keyPtsCache = out;

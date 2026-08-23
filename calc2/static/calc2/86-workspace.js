@@ -6,7 +6,8 @@
    блоки результатов → в плавающее табло справа.
    --------------------------------------------------------------------- */
 const SCENE_NAMES = {
-  sd: 'Спрос и предложение', tax: 'Потоварные налоги и субсидии', ceil: 'Пол и потолок цены',
+  sd: 'Спрос и предложение', sdsum: 'Сложение спросов и предложений',
+  tax: 'Потоварные налоги и субсидии', ceil: 'Пол и потолок цены',
   mono: 'Стандартная монополия', elast: 'Эластичность', ext: 'Внешние эффекты',
   costs: 'Издержки фирмы', ppf: 'Построение КПВ',
   // п. 67. Ровно то же, что написано на карточке блока «Рынок труда».
@@ -43,7 +44,7 @@ const SCENE_NAMES = {
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
 // info-areacalc сюда НЕ входит: посчитанная площадь остаётся в своей секции
 // «Площади», рядом с кнопкой, которая её посчитала.
-const RESULT_IDS = ['info-graph', 'info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
+const RESULT_IDS = ['info-graph', 'info-areas', 'info-sum', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
   'info-prod', 'info-iso', 'info-plants', 'info-labor',
   'info-inequality', 'info-consumer', 'info-macro', 'info-math', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
@@ -425,6 +426,18 @@ function wireScene() {
     if (!isFinite(n) || n < 1 || n > 12) return;
     PW.n = n;
     renderPw();
+  });
+  /* Сколько групп спроса и сколько предложения (сюжет сложения). Меняем
+     число — добавляются или убираются ТОЛЬКО хвостовые группы, уже набранные
+     формулы остаются на месте. */
+  [['sum-nd', 'D'], ['sum-ns', 'S']].forEach(([id, side]) => {
+    const e = document.getElementById(id);
+    if (!e) return;
+    e.addEventListener('input', () => {
+      const n = parseInt(e.value, 10);
+      if (!isFinite(n) || n < 1 || n > 8) return;
+      if (typeof sumSetCount === 'function') sumSetCount(side, n);
+    });
   });
   const pwApply = document.getElementById('pw-apply');
   if (pwApply) pwApply.addEventListener('click', () => {

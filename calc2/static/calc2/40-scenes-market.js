@@ -9,6 +9,10 @@ function curveByRole(role) { return STATE.curves.find(c => c.role === role) || n
 // Пересчёт сценария БЕЗ рисования: складываем результаты в STATE,
 // чтобы функции отрисовки и табло читали готовые числа.
 function recompute() {
+  /* Суммарные кривые пересобираются ДО чтения ролей: они и есть D и S этой
+     сцены, и обязаны отвечать текущим формулам групп. Отдельного «нажмите
+     построить» здесь нет — правка группы сразу меняет сумму. */
+  sumRebuild();
   STATE.D = curveByRole('demand');
   STATE.S = curveByRole('supply');
   STATE.eq = (STATE.D && STATE.S) ? findEquilibrium(STATE.D, STATE.S) : null;
@@ -17,8 +21,10 @@ function recompute() {
   STATE.cs = STATE.ps = STATE.sw = null;
   if (STATE.eq) {
     const { Q, P } = STATE.eq;
-    STATE.cs = integrate(q => evalCurve(STATE.D, q) - P, 0, Q);   // ∫ (D - P*) dQ
-    STATE.ps = integrate(q => P - evalCurve(STATE.S, q), 0, Q);   // ∫ (P* - S) dQ
+    /* По участкам, если кривая знает свои изломы (суммарная знает): метод
+       трапеций точен на прямой только когда излом лежит в узле сетки. */
+    STATE.cs = integrateBroken(q => evalCurve(STATE.D, q) - P, 0, Q, curveBreaks(STATE.D));   // ∫ (D - P*) dQ
+    STATE.ps = integrateBroken(q => P - evalCurve(STATE.S, q), 0, Q, curveBreaks(STATE.S));   // ∫ (P* - S) dQ
     STATE.sw = STATE.cs + STATE.ps;
   }
 
@@ -955,6 +961,393 @@ function updateInfoPanel() {
   const n = crossingCount(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), 0, CONFIG.Qmax);
   if (n > 1) html += `<div class="hint">Кривые пересекаются ${n} раза, то есть равновесий несколько. ` +
     `Взято ближайшее к началу координат: ${'$Q^* = ' + fmt(STATE.eq.Q) + '$'}. Излишки и потери посчитаны вокруг него.</div>`;
+  box.innerHTML = html;
+}
+
+
+/* =====================================================================
+   БЛОК 5б. СЛОЖЕНИЕ СПРОСОВ И ПРЕДЛОЖЕНИЙ — горизонтальная сумма.
+
+   Договорённость созвона: сначала спрашиваем, СКОЛЬКО спросов и сколько
+   предложений; затем выписываем каждый; складываются они ГОРИЗОНТАЛЬНО —
+   по количествам при одной цене, а не по ценам.
+
+   ⚠️ ГРУППА С ОТРИЦАТЕЛЬНЫМ КОЛИЧЕСТВОМ В СУММУ НЕ ВХОДИТ. При цене выше
+   своей запретительной покупатель просто не покупает, а продавец с высокими
+   издержками при низкой цене не продаёт — «минус пять штук» на рынке не
+   бывает. Именно это выключение и создаёт изломы суммарной кривой: в точке,
+   где очередная группа входит в торговлю, наклон меняется скачком.
+
+   ⚠️ ОСОБОГО ПУТИ ДЛЯ ЭТИХ ИЗЛОМОВ НЕТ. Суммарная кривая — обычная кривая
+   списка (роль «спрос» / «предложение»), поэтому её изломы, пересечения и
+   выходы на оси находит общий детектор ключевых точек. В проекте уже убирали
+   особый путь для излома кусочной ([ADR: решение 22.08]) — повторять не надо.
+   ===================================================================== */
+
+// Идёт ли сейчас сюжет сложения.
+function sumSceneOn() { return !!STATE.sumOn; }
+
+// Группы одной стороны рынка, у которых набрана формула ('D' — спрос, 'S' — предложение).
+function sumGroupsOf(side) {
+  return STATE.curves.filter(c => c.sumGroup === side && c.kind !== 'sum' && c.expr);
+}
+
+/* Количество одной группы при цене P. Ноль означает «эта группа при такой цене
+   не торгует» — и в сумму она не входит. Прямые считаем по свободному члену и
+   наклону (это точно и дёшево), остальное — общей обратной функцией. */
+function sumGroupQty(c, P) {
+  if (c.linear && isFinite(c.linear.a) && c.linear.a !== 0) {
+    const q = (P - c.linear.b) / c.linear.a;
+    return (isFinite(q) && q > 0) ? q : 0;
+  }
+  const q = invCurve(c, P);
+  return (q != null && isFinite(q) && q > 0) ? q : 0;
+}
+
+/* Запретительная цена группы — та, при которой её количество обращается в ноль.
+   Для спроса это верхняя граница («дороже не куплю»), для предложения нижняя
+   («дешевле не выйду на рынок»). Ровно в этих ценах суммарная кривая ломается,
+   поэтому они попадают в расчёт ТОЧНО, а не в ближайший узел сетки. */
+function sumChokePrice(c) {
+  const p = evalCurve(c, 0);
+  return isFinite(p) ? p : NaN;
+}
+
+/* ── Аналитическая запись суммарной кривой ────────────────────────────
+   Пока все группы заданы прямыми, сумма считается точно и в закрытом виде:
+   на каждом участке цен активен свой набор групп, и суммарное количество
+   линейно по цене. Обращаем — получаем P = f(Q) по участкам, то есть ровно
+   ту кусочную запись, которую движок и поле уже умеют (Фаза 3).
+
+   Возвращает строку Math.js или null, если хоть одна группа не прямая. */
+function sumLinearRecord(groups) {
+  if (!groups.length) return null;
+  const ls = [];
+  for (const c of groups) {
+    const l = c.linear;
+    if (!l || !isFinite(l.a) || !isFinite(l.b) || l.a === 0) return null;
+    ls.push(l);
+  }
+  const Pmax = CONFIG.Pmax;
+  const round = (v) => Math.round(v * 1e9) / 1e9;
+  // Границы участков по цене: края окна плюс все запретительные цены внутри него.
+  const marks = [0, Pmax];
+  ls.forEach(l => { if (l.b > 0 && l.b < Pmax) marks.push(l.b); });
+  const ps = Array.from(new Set(marks.map(round))).sort((a, b) => a - b);
+  const segs = [];
+  for (let i = 0; i < ps.length - 1; i++) {
+    const p0 = ps[i], p1 = ps[i + 1], mid = (p0 + p1) / 2;
+    // Кто торгует на этом участке цен. Смотрим в середине: набор внутри постоянен.
+    let A = 0, C = 0, n = 0;
+    ls.forEach(l => {
+      if ((mid - l.b) / l.a > 0) { A += 1 / l.a; C += -l.b / l.a; n++; }   // Q = A·P + C
+    });
+    if (!n || Math.abs(A) < 1e-12) continue;
+    const q0 = A * p0 + C, q1 = A * p1 + C;
+    const lo = Math.min(q0, q1), hi = Math.max(q0, q1);
+    if (!(hi - lo > 1e-9)) continue;
+    // Обращаем: P = (Q − C) / A. Числа A и C держим как есть — печатать их
+    // будет sumSegExpr, и он сам решит, раскрывать дробь или нет.
+    segs.push({ lo: round(lo), hi: round(hi), A: A, C: C });
+  }
+  if (!segs.length) return null;
+  segs.sort((x, y) => x.lo - y.lo);
+  // Точки излома по количеству — границы участков, кроме самого начала.
+  const breaks = segs.map(x => x.lo).filter(x => x > 1e-9);
+  /* Собираем цепочку условий тем же способом, что и конструктор кусочной:
+     показывать её плоским списком умеет condChainToCases (82-input.js).
+     Хвост NaN означает «вне участков функции нет» — там она не рисуется. */
+  let out = null;
+  for (let i = segs.length - 1; i >= 0; i--) {
+    const s = segs[i];
+    const last = (i === segs.length - 1);
+    const cond = '(Q >= ' + s.lo + ' and Q ' + (last ? '<= ' : '< ') + s.hi + ')';
+    const body = sumSegExpr(s.A, s.C);
+    if (out === null) { out = cond + ' ? ' + body + ' : NaN'; continue; }
+    out = cond + ' ? ' + body + ' : (' + out + ')';
+  }
+  return { expr: out, breaks: breaks };
+}
+
+/* ⚠️ ИНТЕГРАЛ ПОД ЛОМАНОЙ СЧИТАЕТСЯ ПО УЧАСТКАМ, А НЕ ОДНОЙ СЕТКОЙ.
+   Метод трапеций точен на прямой, но только если излом попал в УЗЕЛ сетки.
+   Замер 24.08: излишек покупателей под суммарным спросом выходил 1625,0003
+   вместо 1625 — излом при Q = 40 лёг внутрь трапеции (шаг 70/1000 = 0,07,
+   узла в 40 нет). Три десятитысячных — это не округление, а промах метода, и
+   на сверке двух путей с допуском 1e-6 он виден сразу. Разбиваем отрезок
+   точками излома: на каждом куске функция снова прямая и трапеции точны. */
+function integrateBroken(f, a, b, breaks) {
+  if (!(b > a)) return 0;
+  const inner = (breaks || []).filter(x => x > a + 1e-12 && x < b - 1e-12);
+  if (!inner.length) return integrate(f, a, b);
+  const pts = [a].concat(inner.slice().sort((x, y) => x - y), [b]);
+  let acc = 0;
+  for (let i = 0; i < pts.length - 1; i++) acc += integrate(f, pts[i], pts[i + 1], 400);
+  return acc;
+}
+
+// Точки излома кривой, если она их знает (суммарная — знает). Иначе пусто.
+function curveBreaks(c) { return (c && c.sumBreaks) ? c.sumBreaks : []; }
+
+/* ⚠️ УЧАСТОК СУММАРНОЙ КРИВОЙ ПИШЕТСЯ ДРОБЬЮ, ЕСЛИ НАКЛОН НЕ ДЕЛИТСЯ НАЦЕЛО.
+   Суммарное количество на участке линейно по цене: Q = A·P + C. Обратно
+   P = (Q − C) / A. У двух одинаковых групп A = −2, и раскрытая запись
+   «80 − 0.5·Q» точна. У ТРЁХ одинаковых A = −3, и раскрытая дала бы
+   «73.333 − 0.333·Q» — неправду в третьем знаке. А по этой записи кривая и
+   считается (одно значение — один источник), поэтому враньё ушло бы прямо в
+   излишки: сверка «сумма по группам против площади под суммарной кривой»
+   расходилась бы на тысячные и обвиняла бы сложение вместо округления.
+   Поэтому дробь раскрываем только когда это точно, иначе оставляем делением. */
+function sumSegExpr(A, C) {
+  const r9 = (v) => Math.round(v * 1e9) / 1e9;
+  const slope = 1 / A, free = -C / A;
+  const rs = Math.round(slope * 1e6) / 1e6, rf = Math.round(free * 1e6) / 1e6;
+  if (Math.abs(rs - slope) < 1e-12 && Math.abs(rf - free) < 1e-12) return fmtLinear(rs, rf, 'Q', 6);
+  const a = r9(A), c = r9(C);
+  const inner = (sign) => {
+    // sign = +1 → «Q − C», sign = −1 → «C − Q»
+    if (c === 0) return sign > 0 ? 'Q' : '-Q';
+    if (sign > 0) return c < 0 ? ('Q + ' + (-c)) : ('Q - ' + c);
+    return c < 0 ? ('-Q - ' + (-c)) : (c + ' - Q');
+  };
+  return (a > 0) ? ('(' + inner(1) + ')/' + a) : ('(' + inner(-1) + ')/' + (-a));
+}
+
+/* Суммарная кривая по точкам — запасной путь для нелинейных групп.
+   Идём по ценам, при каждой складываем количества торгующих групп и получаем
+   ломаную в осях (Q, P); значение между узлами берём линейно. */
+function sumPolyline(groups) {
+  const Pmax = CONFIG.Pmax, N = 400;
+  const prices = [];
+  for (let i = 0; i <= N; i++) prices.push(Pmax * i / N);
+  groups.forEach(c => { const p = sumChokePrice(c); if (p > 0 && p < Pmax) prices.push(p); });
+  prices.sort((a, b) => a - b);
+  const pts = [];
+  prices.forEach(P => {
+    let q = 0, n = 0;
+    groups.forEach(c => { const g = sumGroupQty(c, P); if (g > 0) { q += g; n++; } });
+    if (n) pts.push([q, P]);
+  });
+  pts.sort((a, b) => a[0] - b[0]);
+  return pts;
+}
+
+// Пересобрать одну суммарную кривую под текущие формулы групп.
+function sumRebuildSide(side) {
+  const cur = STATE.curves.find(c => c.kind === 'sum' && c.sumGroup === side);
+  if (!cur) return;
+  const groups = sumGroupsOf(side);
+  cur.linear = null; cur.compiled = null; cur.fn = null; cur.sumBreaks = [];
+  if (!groups.length) { cur.expr = ''; cur.sumNumeric = false; return; }
+  const rec = sumLinearRecord(groups);
+  if (rec) {
+    /* ⚠️ ОДНО ЗНАЧЕНИЕ — ОДИН ИСТОЧНИК. Аналитическая запись не рисуется
+       рядом с кривой «для красоты»: по ней кривая и считается. Второй
+       математики (отдельно запись, отдельно ломаная) здесь нет. */
+    const { compiled } = compileFormula(rec.expr);
+    cur.expr = rec.expr; cur.compiled = compiled; cur.sumNumeric = false;
+    cur.sumBreaks = rec.breaks;
+  } else {
+    const pts = sumPolyline(groups);
+    cur.expr = 'сумма посчитана по точкам';
+    cur.fn = (q) => interpY(pts, q);
+    cur.sumNumeric = true;
+    // Излом суммарной кривой — там, где очередная группа входит в торговлю.
+    cur.sumBreaks = groups.map(c => {
+      const p = sumChokePrice(c);
+      if (!isFinite(p) || p <= 0 || p >= CONFIG.Pmax) return null;
+      let q = 0;
+      groups.forEach(g => { q += sumGroupQty(g, p); });
+      return q > 1e-9 ? q : null;
+    }).filter(v => v != null);
+  }
+}
+
+// Пересчёт обеих сумм. Зовётся из recompute — то есть на каждой перерисовке.
+function sumRebuild() {
+  if (!sumSceneOn()) return;
+  sumRebuildSide('D');
+  sumRebuildSide('S');
+}
+
+
+/* ── Сборка сцены: сколько групп, такие и поля ────────────────────────
+   Порядок работы для человека взят с созвона: сначала СКОЛЬКО групп спроса и
+   предложения, потом по полю на каждую. Поля — обычные строки списка кривых,
+   поэтому имя правится там же, где и формула, и ничего нового учить не надо. */
+const SUM_ORDINAL = ['первой', 'второй', 'третьей', 'четвёртой', 'пятой', 'шестой', 'седьмой', 'восьмой'];
+// Учебный набор по умолчанию: у каждой следующей группы своя запретительная цена,
+// поэтому суммарная кривая ломается ровно там, где очередная группа входит в торговлю.
+const SUM_START_D = [100, 60, 40, 30, 25, 20, 15, 10];   // P = b − Q
+const SUM_START_S = [0, 20, 40, 55, 65, 72, 78, 84];     // P = Q + b
+const SUM_MAX_GROUPS = 8;
+
+function sumGroupName(side, i) {
+  const ord = SUM_ORDINAL[i] || ((i + 1) + '-й');
+  return (side === 'D' ? 'спрос ' : 'предложение ') + ord + ' группы';
+}
+function sumStartExpr(side, i) {
+  if (side === 'D') return fmtLinear(-1, SUM_START_D[i] === undefined ? 20 : SUM_START_D[i], 'Q', 3);
+  return fmtLinear(1, SUM_START_S[i] === undefined ? 20 * i : SUM_START_S[i], 'Q', 3);
+}
+
+/* Порядок строк в списке: сначала группы спроса и их сумма, затем группы
+   предложения и их сумма. Сумма стоит ПОД своими слагаемыми — так же, как в
+   столбик на бумаге. */
+function sumReorder() {
+  const rank = (c) => (c.sumGroup === 'S' ? 1000 : 0) + (c.kind === 'sum' ? 999 : (c.sumIdx || 0));
+  STATE.curves.sort((a, b) => rank(a) - rank(b));
+}
+
+function sumAddGroup(side, i) {
+  addCurve(sumStartExpr(side, i));
+  const c = STATE.curves[STATE.curves.length - 1];
+  c.sumGroup = side; c.sumIdx = i;
+  c.label = sumGroupName(side, i);
+  return c;
+}
+
+// Собрать сцену с нуля под текущие STATE.sumN.
+function sumBuildScene() {
+  STATE.curves = []; curveCounter = 0;
+  ['D', 'S'].forEach(side => {
+    const n = Math.max(1, Math.min(SUM_MAX_GROUPS, (STATE.sumN && STATE.sumN[side]) || 2));
+    for (let i = 0; i < n; i++) sumAddGroup(side, i);
+    /* Суммарная кривая — обычная кривая списка с ролью «спрос»/«предложение».
+       Именно поэтому равновесие, излишки, ключевые точки и изломы считает
+       общий движок, а не свой особый код. */
+    curveCounter++;
+    const sum = {
+      id: curveCounter, expr: '', compiled: null, fn: null, linear: null,
+      color: (side === 'D') ? COL.D : COL.S, role: null, visible: true,
+      kind: 'sum', sumGroup: side,
+      label: (side === 'D') ? 'рыночный спрос' : 'рыночное предложение',
+    };
+    STATE.curves.push(sum);
+    setRole(sum, (side === 'D') ? 'demand' : 'supply');
+  });
+  sumReorder();
+  sumRebuild();
+  renderCurveList();
+}
+
+// Сменить число групп одной стороны, НЕ теряя уже набранные формулы.
+function sumSetCount(side, n) {
+  if (!sumSceneOn()) return;
+  n = Math.max(1, Math.min(SUM_MAX_GROUPS, Math.round(n)));
+  if (!isFinite(n)) return;
+  STATE.sumN[side] = n;
+  const list = STATE.curves.filter(c => c.sumGroup === side && c.kind !== 'sum');
+  if (list.length > n) {
+    const drop = new Set(list.slice(n));
+    STATE.curves = STATE.curves.filter(c => !drop.has(c));
+  } else {
+    for (let i = list.length; i < n; i++) sumAddGroup(side, i);
+  }
+  sumReorder();
+  sumRebuild();
+  renderCurveList();
+  redrawAll();
+}
+
+// Показать поля «сколько групп» только в своём сюжете и держать их числа честными.
+function syncSumUi() {
+  const box = document.getElementById('sum-counts');
+  if (box) box.style.display = sumSceneOn() ? '' : 'none';
+  if (!sumSceneOn()) return;
+  [['sum-nd', 'D'], ['sum-ns', 'S']].forEach(([id, side]) => {
+    const e = document.getElementById(id);
+    if (e && document.activeElement !== e) e.value = STATE.sumN[side];
+  });
+}
+
+/* ── Аналитика по группам (Фаза 9) ────────────────────────────────────
+   При равновесной цене у каждой группы своё количество и свой излишек.
+   Сумма излишков групп ОБЯЗАНА совпасть с площадью под суммарной кривой:
+   это и есть проверка того, что сложение сделано верно, а не «примерно». */
+function sumGroupStats() {
+  if (!sumSceneOn() || !STATE.eq) return null;
+  const P = STATE.eq.P;
+  const side = (which) => sumGroupsOf(which).map(c => {
+    const q = sumGroupQty(c, P);
+    // Излишек группы — площадь между её кривой и равновесной ценой до q.
+    const surplus = (q > 0)
+      ? (which === 'D' ? integrate(t => evalCurve(c, t) - P, 0, q)
+                       : integrate(t => P - evalCurve(c, t), 0, q))
+      : 0;
+    return { name: curveShortName(c), color: c.color, expr: c.expr, q, surplus };
+  });
+  const D = side('D'), S = side('S');
+  const sum = (arr, k) => arr.reduce((acc, r) => acc + r[k], 0);
+  /* Второй путь к тому же числу: интеграл под СУММАРНОЙ кривой. Расхождение
+     означает ошибку в сложении, а не в округлении, поэтому оно и печатается. */
+  const csWhole = (STATE.D && STATE.eq.Q > 0)
+    ? integrateBroken(q => evalCurve(STATE.D, q) - P, 0, STATE.eq.Q, curveBreaks(STATE.D)) : NaN;
+  const psWhole = (STATE.S && STATE.eq.Q > 0)
+    ? integrateBroken(q => P - evalCurve(STATE.S, q), 0, STATE.eq.Q, curveBreaks(STATE.S)) : NaN;
+  return {
+    P, Q: STATE.eq.Q, D, S,
+    qD: sum(D, 'q'), qS: sum(S, 'q'),
+    csGroups: sum(D, 'surplus'), psGroups: sum(S, 'surplus'),
+    csWhole, psWhole,
+    csGap: Math.abs(sum(D, 'surplus') - csWhole),
+    psGap: Math.abs(sum(S, 'surplus') - psWhole),
+  };
+}
+
+
+/* Запись обеих суммарных кривых, набранная математикой. */
+function sumRecordHtml() {
+  const one = (side, title) => {
+    const c = STATE.curves.find(x => x.kind === 'sum' && x.sumGroup === side);
+    if (!c || !c.expr) return '';
+    if (c.sumNumeric) return `<div class="sb-note"><b>${title}</b><br>Среди групп есть непрямая, ` +
+      `поэтому сумма посчитана по точкам — записи по участкам у неё нет.</div>`;
+    const tex = (typeof mathToLatexField === 'function') ? mathToLatexField(c.expr) : c.expr;
+    return `<div class="sb-note"><b>${title}</b><br>$P = ${tex}$</div>`;
+  };
+  return one('D', 'Рыночный спрос') + one('S', 'Рыночное предложение');
+}
+// Табло «По группам»: количество и излишек каждой группы плюс сумма.
+function updateSumPanel() {
+  syncSumUi();
+  const box = document.getElementById('info-sum');
+  if (!box) return;
+  if (!sumSceneOn()) { box.innerHTML = ''; return; }
+  const st = sumGroupStats();
+  if (!st) {
+    box.innerHTML = '<div class="muted">Суммарные кривые не пересекаются: равновесия нет.</div>';
+    return;
+  }
+  const rows = (list, title, qSum, sSum, tag) => {
+    let h = `<div class="sb-sub">${title}</div>`;
+    list.forEach(r => {
+      h += `<div class="stat"><span>${r.name}</span><b>${fmt(r.q)}</b></div>`;
+    });
+    h += `<div class="stat"><span>вместе $Q$</span><b>${fmt(qSum)}</b></div>`;
+    list.forEach(r => {
+      h += `<div class="stat"><span>${tag} — ${r.name}</span><b>${fmt(r.surplus)}</b></div>`;
+    });
+    h += `<div class="stat"><span>вместе $${tag}$</span><b>${fmt(sSum)}</b></div>`;
+    return h;
+  };
+  /* АНАЛИТИЧЕСКАЯ ЗАПИСЬ суммарных кривых — не картинка, а формула по
+     участкам. Показываем ту же строку, по которой кривая и считается
+     (одно значение — один источник); плоским списком её печатает
+     condChainToCases из 82-input.js. */
+  let html = sumRecordHtml();
+  html += `<div class="stat"><span>Равновесная цена $P^*$</span><b>${fmt(st.P)}</b></div>`;
+  html += rows(st.D, 'Покупатели по группам', st.qD, st.csGroups, 'CS');
+  html += rows(st.S, 'Продавцы по группам', st.qS, st.psGroups, 'PS');
+  /* Сходимость двух путей печатается, а не проверяется молча: расхождение
+     это ошибка сложения, и человек имеет право её увидеть. */
+  const eps = 1e-6;
+  const ok = (st.csGap <= eps && st.psGap <= eps);
+  html += ok
+    ? `<div class="hint">Сумма излишков по группам сошлась с площадью под суммарной кривой: ` +
+      `$CS = ${fmt(st.csGroups)}$, $PS = ${fmt(st.psGroups)}$.</div>`
+    : `<div class="warn">Сумма по группам разошлась с площадью под суммарной кривой ` +
+      `(CS на ${st.csGap.toExponential(2)}, PS на ${st.psGap.toExponential(2)}). Это ошибка сложения, а не округления.</div>`;
   box.innerHTML = html;
 }
 

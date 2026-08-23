@@ -198,13 +198,13 @@
           <span class="scard-name">Спрос и предложение</span>
           <span class="scard-desc">Равновесие, излишки CS и PS, общественное благосостояние.</span>
         </button>
-        <button class="scard soon" data-scene="sdsum" disabled>
+        <button class="scard" data-scene="sdsum">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M22 20 L74 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
             <path d="M22 34 L96 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
             <path d="M22 20 L48 47 L144 74" stroke="var(--curve-d)" stroke-width="2.6" stroke-linejoin="round"/></g></svg></span>
-          <span class="scard-head"><span class="scard-name">Сложение спросов и предложений</span><span class="scard-soon">Скоро</span></span>
+          <span class="scard-name">Сложение спросов и предложений</span>
           <span class="scard-desc">Горизонтальное сложение по количеству: рыночная кривая с изломами.</span>
         </button>
         <!-- ОДНА карточка вместо двух (потоварной и процентной): вид налога
@@ -803,6 +803,20 @@
            и список «Что добавляем» (#new-role), и переключатель формы записи
            P(Q)/Q(P) (#cf-pq/#cf-qp) — форму разбор определяет сам по буквам
            в формуле (см. curveSrcForm в 80-ui.js). -->
+      <!-- СЮЖЕТ «СЛОЖЕНИЕ СПРОСОВ И ПРЕДЛОЖЕНИЙ»: сначала СКОЛЬКО групп.
+           Порядок с созвона: число групп → поле на каждую группу → имя.
+           Поля групп это обычные строки списка кривых ниже, поэтому имя
+           правится там же, где формула, и ничего нового учить не надо. -->
+      <div id="sum-counts" style="display:none;">
+        <div class="field">
+          <label for="sum-nd">Сколько групп спроса</label>
+          <input type="number" id="sum-nd" min="1" max="8" step="1" value="2">
+        </div>
+        <div class="field">
+          <label for="sum-ns">Сколько групп предложения</label>
+          <input type="number" id="sum-ns" min="1" max="8" step="1" value="2">
+        </div>
+      </div>
       <div class="error" id="curve-error"></div>
       <div id="curve-list"></div>
       <!-- ОБЩЕСТВЕННЫЕ КРИВЫЕ сюжета «Внешние эффекты» (ночная сессия
@@ -871,6 +885,9 @@
            заливок переехал одним тумблером в «Настройки графика» у гаечного
            ключа. Табло остаётся — RESULT_IDS переносит его в правую панель. -->
       <div id="info-areas" style="margin-top:8px;"></div>
+        <!-- Аналитика по группам сюжета сложения: количество и излишек каждой
+             группы плюс сумма. В остальных сценах блок пуст и CSS его прячет. -->
+        <div id="info-sum"></div>
 
       <!-- Обёртка «Что изучаем» убрана (решение владельца 21.08 и 22.08).
            Её содержимое — панели сюжетов, монопольные поля и блок

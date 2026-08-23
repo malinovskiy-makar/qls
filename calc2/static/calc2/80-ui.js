@@ -241,7 +241,11 @@ function renderCurveList() {
     // записью, её не нужно удалять и заводить заново ради одной опечатки.
     // Битую формулу не применяем: подсвечиваем поле и оставляем прежнюю кривую.
     let fInp = null;
-    if (curve.kind !== 'vertical') {
+    /* ⚠️ У СУММАРНОЙ КРИВОЙ ПОЛЯ ФОРМУЛЫ НЕТ, И ЭТО НЕ ЗАБЫВЧИВОСТЬ.
+       Её запись считается из формул групп на каждой перерисовке (sumRebuild),
+       и правка руками жила бы ровно до следующей. Саму запись человек видит
+       рядом с именем — в подсказке строки и в аналитике. */
+    if (curve.kind !== 'vertical' && curve.kind !== 'sum') {
       fInp = document.createElement('input');
       fInp.type = 'text'; fInp.className = 'curve-expr-inp';
       fInp.value = curve.srcForm === 'QP' ? (curve.srcExpr || curve.expr) : curve.expr;
