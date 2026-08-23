@@ -3413,6 +3413,215 @@ const CASES = [
           return { pairs: pairs, bad: bad };`,
     checks: [['переходов проверено', 'pairs', 12, 0], ['переходов со следами', 'bad', 0, 0]],
   },
+  /* ═══════════════════════════════════════════════════════════════════
+     ЧЕТЫРЕ ДЕФЕКТА С ПРИЁМКИ ВЛАДЕЛЬЦА 24.08 — постоянные проверки.
+     Каждая проверена на зубастость: дефект временно возвращали и убеждались,
+     что проверка краснеет (тексты провалов — в отчёте сессии).
+     ═══════════════════════════════════════════════════════════════════ */
+  {
+    /* (а) Число перед буквой — это умножение. «100-2P» и «100-2*P» обязаны
+       давать ПОБУКВЕННО одну и ту же кривую: ту же форму записи, тот же
+       наклон, те же значения и то же равновесие. До правки первая запись
+       уходила в форму P = f(Q) и рисовала горизонталь на 98 — молча. */
+    name: 'Четыре дефекта (а) «100-2P» строит ту же кривую, что «100-2*P»',
+    run: `var take = function (text) {
+            resetSceneMemory(); pickScene('sd');
+            var inp = document.getElementById('curve-expr-1');
+            inp.value = text; inp.dispatchEvent(new Event('input', { bubbles: true }));
+            redrawAll();
+            var c = STATE.curves.filter(function (x) { return x.id === 1; })[0];
+            return { form: c.srcForm, a: c.linear ? c.linear.a : NaN, b: c.linear ? c.linear.b : NaN,
+                     v10: evalCurve(c, 10), v20: evalCurve(c, 20), v30: evalCurve(c, 30),
+                     eqQ: STATE.eq ? STATE.eq.Q : NaN, eqP: STATE.eq ? STATE.eq.P : NaN };
+          };
+          var A = take('100-2P'), B = take('100-2*P');
+          var diff = 0;
+          Object.keys(B).forEach(function (k) { if (String(A[k]) !== String(B[k])) diff++; });
+          return { diff: diff, formQP: (A.form === 'QP') ? 1 : 0,
+                   a: A.a, b: A.b, v10: A.v10, v20: A.v20, v30: A.v30 };`,
+    checks: [['расхождений между записями', 'diff', 0, 0],
+             ['форма прочитана как Q(P)', 'formQP', 1, 0],
+             ['наклон', 'a', -0.5, 0.001], ['свободный член', 'b', 50, 0.001],
+             ['значение при Q=10', 'v10', 45, 0.001],
+             ['значение при Q=20', 'v20', 40, 0.001],
+             ['значение при Q=30', 'v30', 35, 0.001]],
+  },
+  {
+    /* (б) Раскрытие неявного умножения не имеет права портить: имена с цифрой
+       ПОСЛЕ буквы, экономические обозначения, научную запись и вызовы функций.
+       Научная запись — главная ловушка: «e» это и число Эйлера, и часть
+       записи числа, и первая версия правки давала «1e5» → «1*e5». */
+    name: 'Четыре дефекта (б) раскрытие не портит Q_1, MC, 1e5, sqrt(4)',
+    run: `var same = { 'Q_1': 'Q_1', 'x1': 'x1', 'P2': 'P2', 'MC': 'MC', 'ATC': 'ATC',
+                       'DWL': 'DWL', '1e5': '1e5', '2e-3': '2e-3', '1.5e+10': '1.5e+10',
+                       'sqrt(4)': 'sqrt(4)', 'log(10)': 'log(10)', 'x^2': 'x^2' };
+          var broken = 0;
+          Object.keys(same).forEach(function (k) { if (expandImplicitMul(k) !== same[k]) broken++; });
+          // И значения: испорченная запись считается по-другому, а не «почти так же».
+          var ev = function (e, sc) { try { return math.evaluate(prepExpr(e), sc || {}); } catch (x) { return NaN; } };
+          return { broken: broken, n: Object.keys(same).length,
+                   sci1: ev('1e5'), sci2: ev('2e-3'), root: ev('sqrt(4)'),
+                   name1: ev('Q_1', { Q_1: 7 }), name2: ev('x1', { x1: 5 }),
+                   // а вот эти обязаны РАСКРЫТЬСЯ
+                   mul1: (expandImplicitMul('2P') === '2*P') ? 1 : 0,
+                   mul2: (expandImplicitMul('0.5Q') === '0.5*Q') ? 1 : 0,
+                   mul3: (expandImplicitMul('2(100-Q)') === '2*(100-Q)') ? 1 : 0,
+                   mul4: (expandImplicitMul('bx') === 'b*x') ? 1 : 0 };`,
+    checks: [['испорчено записей', 'broken', 0, 0], ['записей проверено', 'n', 12, 0],
+             ['1e5', 'sci1', 100000, 0], ['2e-3', 'sci2', 0.002, 1e-12],
+             ['sqrt(4)', 'root', 2, 0], ['Q_1 при Q_1=7', 'name1', 7, 0],
+             ['x1 при x1=5', 'name2', 5, 0],
+             ['2P раскрыто', 'mul1', 1, 0], ['0.5Q раскрыто', 'mul2', 1, 0],
+             ['2(100-Q) раскрыто', 'mul3', 1, 0], ['bx раскрыто', 'mul4', 1, 0]],
+  },
+  {
+    /* (в) Сдвиг — это смещение ОТ набранной формулы. Переписали формулу —
+       точка отсчёта новая, значит сдвиг ноль, а ручка ровно посередине
+       дорожки. До правки после набора «100-2*P» стояло «Сдвиг D = −50»
+       и ручка упиралась в левый край. */
+    name: 'Четыре дефекта (в) правка формулы обнуляет сдвиг и центрирует ручку',
+    run: `var chip = function () {
+            var ch = document.querySelector('#params-curves .pchip[data-cid="1"]');
+            if (!ch) return { shift: NaN, pos: NaN };
+            var sl = ch.querySelector('input[type=range]');
+            var mn = parseFloat(sl.min), mx = parseFloat(sl.max), v = parseFloat(sl.value);
+            var c = STATE.curves.filter(function (x) { return x.id === 1; })[0];
+            return { shift: c.linear.b - (c.shiftBase == null ? c.linear.b : c.shiftBase),
+                     pos: (mx > mn) ? (v - mn) / (mx - mn) * 100 : NaN, slider: v };
+          };
+          var edit = function (text) {
+            var inp = document.getElementById('curve-expr-1');
+            inp.value = text; inp.dispatchEvent(new Event('input', { bubbles: true }));
+            redrawAll(); updatePult();
+          };
+          resetSceneMemory(); pickScene('sd'); redrawAll();
+          var start = chip();
+          // Сдвигаем на +20 ползунком — тем же путём, что и человек.
+          var sl = document.querySelector('#params-curves .pchip[data-cid="1"] input[type=range]');
+          sl.value = '20'; sl.dispatchEvent(new Event('input', { bubbles: true }));
+          var shifted = chip();
+          // Переписываем формулу: свободный член меняется со 120 на 50.
+          edit('100-2*P');
+          var after = chip();
+          var c = STATE.curves.filter(function (x) { return x.id === 1; })[0];
+          return { startShift: start.shift, startPos: start.pos,
+                   shiftedShift: shifted.shift, shiftedPos: shifted.pos,
+                   afterShift: after.shift, afterPos: after.pos, afterSlider: after.slider,
+                   afterB: c.linear.b };`,
+    checks: [['сдвиг на старте', 'startShift', 0, 0], ['ручка на старте, %', 'startPos', 50, 0.01],
+             ['сдвиг после протяжки', 'shiftedShift', 20, 0.01],
+             ['ручка после протяжки, %', 'shiftedPos', 70, 0.01],
+             ['сдвиг после правки формулы', 'afterShift', 0, 0],
+             ['ручка после правки, %', 'afterPos', 50, 0.01],
+             ['значение ползунка после правки', 'afterSlider', 0, 0],
+             ['свободный член новой формулы', 'afterB', 50, 0.01]],
+  },
+  {
+    /* (г) Кусочная запись — СПИСОК условий, а не матрёшка. Одна фигурная
+       скобка на всю функцию, по строке на кусок, и ни одной бесконечности.
+       Проверяем ту запись, которую поле показывает ПОСЛЕ пересборки строки
+       кривой: именно там жил дефект (сразу после «Поставить в поле» запись
+       была правильной и до первой пересборки). */
+    name: 'Четыре дефекта (г) кусочная — список условий, без вложенности и ∞',
+    run: `var build = function (rows, n) {
+            resetSceneMemory(); pickScene('sd'); redrawAll();
+            var inp = document.getElementById('curve-expr-1');
+            PW.rows = rows.slice(); PW.n = n;
+            openPiecewise(inp, 'Q');
+            document.getElementById('pw-apply').click();
+            // То, что поле возьмёт при пересборке строки кривой.
+            return mathToLatexField(document.getElementById('curve-expr-1').value);
+          };
+          var count = function (t, sub) { return t.split(sub).length - 1; };
+          var two = build([{ f: '100 - Q', a: '0', b: '40' }, { f: '80 - 0.5*Q', a: '40', b: '' }], 2);
+          var three = build([{ f: '100 - Q', a: '0', b: '20' }, { f: '90 - 0.5*Q', a: '20', b: '50' },
+                             { f: '65', a: '50', b: '' }], 3);
+          var one = build([{ f: '100 - Q', a: '0', b: '40' }], 1);
+          return { cases2: count(two, '\\\\begin{cases}'), rows2: count(two, '\\\\\\\\') + 1, inf2: count(two, '\\\\infty'),
+                   cases3: count(three, '\\\\begin{cases}'), rows3: count(three, '\\\\\\\\') + 1, inf3: count(three, '\\\\infty'),
+                   cases1: count(one, '\\\\begin{cases}'), rows1: count(one, '\\\\\\\\') + 1, inf1: count(one, '\\\\infty'),
+                   otherwise: count(two, 'otherwise') + count(three, 'otherwise') + count(one, 'otherwise') };`,
+    checks: [['фигурных скобок при двух кусках', 'cases2', 1, 0],
+             ['строк списка при двух кусках', 'rows2', 2, 0],
+             ['бесконечностей при двух кусках', 'inf2', 0, 0],
+             ['фигурных скобок при трёх кусках', 'cases3', 1, 0],
+             ['строк списка при трёх кусках', 'rows3', 3, 0],
+             ['бесконечностей при трёх кусках', 'inf3', 0, 0],
+             ['фигурных скобок при одном куске', 'cases1', 1, 0],
+             ['строк списка при одном куске', 'rows1', 1, 0],
+             ['бесконечностей при одном куске', 'inf1', 0, 0],
+             ['английских «otherwise» во всех трёх', 'otherwise', 0, 0]],
+  },
+  {
+    /* (д) Вне условий функция НЕ ОПРЕДЕЛЕНА, а не равна бесконечности:
+       движок обязан возвращать NaN, и такая точка на графике не рисуется.
+       Проверяем ограниченный последний кусок — иначе он тянется до края. */
+    name: 'Четыре дефекта (д) вне условий кусочной кривой нет',
+    run: `resetSceneMemory(); pickScene('sd'); redrawAll();
+          var inp = document.getElementById('curve-expr-1');
+          PW.rows = [{ f: '100 - Q', a: '0', b: '40' }, { f: '80 - 0.5*Q', a: '40', b: '80' }];
+          PW.n = 2; openPiecewise(inp, 'Q');
+          document.getElementById('pw-apply').click(); redrawAll();
+          var c = STATE.curves.filter(function (x) { return x.id === 1; })[0];
+          var def = function (q) { var v = evalCurve(c, q); return (v == null || isNaN(v)) ? 0 : 1; };
+          return { inside0: def(0), inside20: def(20), inside50: def(50), inside79: def(79),
+                   out80: def(80), out90: def(90), out200: def(200), outNeg: def(-10),
+                   v20: evalCurve(c, 20), v50: evalCurve(c, 50) };`,
+    checks: [['определена при Q=0', 'inside0', 1, 0], ['определена при Q=20', 'inside20', 1, 0],
+             ['определена при Q=50', 'inside50', 1, 0], ['определена при Q=79', 'inside79', 1, 0],
+             ['определена при Q=80 (вне)', 'out80', 0, 0],
+             ['определена при Q=90 (вне)', 'out90', 0, 0],
+             ['определена при Q=200 (вне)', 'out200', 0, 0],
+             ['определена при Q=−10 (вне)', 'outNeg', 0, 0],
+             ['значение при Q=20', 'v20', 80, 0.001], ['значение при Q=50', 'v50', 55, 0.001]],
+  },
+  {
+    /* (е) При СВЯЗЫВАЮЩЕМ потолке равновесия нет. Табло обязано показывать
+       цену потолка, величину спроса, величину предложения и дефицит — а не
+       пересечение D и S, которого на этом рынке уже не происходит. */
+    name: 'Четыре дефекта (е) потолок 30: в табло цена 30, Qd 70, Qs 30, дефицит 40',
+    run: `resetSceneMemory(); pickScene('ceil'); setType('ceiling'); setPReg(30); redrawAll();
+          /* ⚠️ ЧИТАЕМ ВИДИМУЮ ЧАСТЬ, А НЕ textContent. Число в табло набрано
+             формулой, и у готового KaTeX textContent это тройка «MathML +
+             исходная запись + видимый текст»: «30» читалось как «303030». */
+          var nums = [].map.call(document.querySelectorAll('#info-eq .stat b'), function (e) {
+            var t = e.querySelector('.katex') ? katexVisibleText(e) : (e.textContent || '');
+            return parseFloat(String(t).replace(/\u00a0|\u2009|\s/g, '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+          });
+          var title = (document.querySelector('#sec-eq .section-title') || {}).textContent || '';
+          return { n: nums.length, price: nums[0], qd: nums[1], qs: nums[2], gap: nums[3], dwl: nums[4],
+                   promisesEq: /D\s*=\s*S/.test(title) ? 1 : 0,
+                   namesMarket: /Рынок при потолке/.test(title) ? 1 : 0,
+                   // старое мёртвое «50 и 50» не должно стоять в первых двух строках
+                   dead: (Math.abs(nums[0] - 50) < 0.01 && Math.abs(nums[1] - 50) < 0.01) ? 1 : 0 };`,
+    checks: [['строк в табло', 'n', 5, 0], ['цена', 'price', 30, 0.01],
+             ['Qd', 'qd', 70, 0.01], ['Qs', 'qs', 30, 0.01],
+             ['дефицит', 'gap', 40, 0.01], ['DWL', 'dwl', 400, 0.5],
+             ['заголовок всё ещё обещает D = S', 'promisesEq', 0, 0],
+             ['заголовок называет рынок', 'namesMarket', 1, 0],
+             ['мёртвое «50 и 50»', 'dead', 0, 0]],
+  },
+  {
+    /* (ж) НЕсвязывающий потолок равновесия не отменяет: он выше равновесной
+       цены, рынок расчищается сам, и табло обязано остаться прежним. Эта
+       проверка страхует (е) от правки «показывать регулирование всегда». */
+    name: 'Четыре дефекта (ж) потолок 70: обычное равновесие 50 и 50',
+    run: `resetSceneMemory(); pickScene('ceil'); setType('ceiling'); setPReg(70); redrawAll();
+          /* ⚠️ ЧИТАЕМ ВИДИМУЮ ЧАСТЬ, А НЕ textContent. Число в табло набрано
+             формулой, и у готового KaTeX textContent это тройка «MathML +
+             исходная запись + видимый текст»: «30» читалось как «303030». */
+          var nums = [].map.call(document.querySelectorAll('#info-eq .stat b'), function (e) {
+            var t = e.querySelector('.katex') ? katexVisibleText(e) : (e.textContent || '');
+            return parseFloat(String(t).replace(/\u00a0|\u2009|\s/g, '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+          });
+          var title = (document.querySelector('#sec-eq .section-title') || {}).textContent || '';
+          return { n: nums.length, Q: nums[0], P: nums[1],
+                   promisesEq: /D\s*=\s*S/.test(title) ? 1 : 0,
+                   binding: (STATE.pc && STATE.pc.binding) ? 1 : 0 };`,
+    checks: [['строк в табло', 'n', 2, 0], ['Q*', 'Q', 50, 0.01], ['P*', 'P', 50, 0.01],
+             ['заголовок обещает D = S', 'promisesEq', 1, 0],
+             ['потолок связывает', 'binding', 0, 0]],
+  },
   {
     /* (л) Исходное состояние сюжета внешних эффектов: MSB и MSC выключены и
        равны частным кривым, поэтому оптимум совпадает с рыночным равновесием,
