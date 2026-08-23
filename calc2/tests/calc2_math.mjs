@@ -3729,12 +3729,22 @@ const CASES = [
           f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
           await w(400); redrawAll();
           var after = shot();
+          /* Мало проверить, что картинка сменилась: сцена могла отказать и
+             перерисоваться прежней кривой. Спрашиваем саму модель — приняла ли
+             она запись и не показывает ли отказ. */
+          var err = [].slice.call(document.querySelectorAll('.error'))
+            .filter(function (e) { return e.getClientRects().length; })
+            .map(function (e) { return (e.textContent || '').trim(); })
+            .filter(Boolean).join(' / ');
+          var res = STATE.macroRes || {};
           return { accepted: (f.value || '').indexOf('?') >= 0 ? 1 : 0,
                    changed: (before.n !== after.n || before.len !== after.len
                              || Math.abs(before.s - after.s) > 1e-6) ? 1 : 0,
+                   modelOk: (res.kind === 'money' && !err) ? 1 : 0,
                    paths: after.n };
           })();`,
-    checks: [['запись принята', 'accepted', 1, 0], ['картинка изменилась', 'changed', 1, 0],
+    checks: [['запись принята полем', 'accepted', 1, 0], ['картинка изменилась', 'changed', 1, 0],
+             ['модель приняла запись, отказа нет', 'modelOk', 1, 0],
              ['путей на холсте', 'paths', 3, 2]],
   },
   {
@@ -3789,17 +3799,45 @@ const CASES = [
             }).filter(function (v) { return v != null; }).sort(function (a, b) { return a - b; });
             return ys.filter(function (v, i, arr) { return i === 0 || Math.abs(v - arr[i - 1]) > 8; });
           };
+          /* ⚠️ СРАВНИВАЕМ САМУ КРИВУЮ ПОЛЯ, А НЕ ВСЁ, ЧТО В НЁМ НАРИСОВАНО.
+             В нижнем поле кроме производной живут сетка, оси и бегающая точка,
+             а точка следует за верхним полем всегда. Проверка на сумме всего
+             оставалась зелёной, даже когда нижнюю кривую нарочно замораживали
+             (замер зубастости 24.08). Берём в каждом поле САМЫЙ ДЛИННЫЙ путь —
+             это и есть кривая — и сверяем именно его. */
           var sig = function (split) {
-            var acc = { top: 0, bot: 0 };
+            var best = { top: null, bot: null };
             document.querySelectorAll('#chart path').forEach(function (p) {
               var d = p.getAttribute('d') || ''; if (!d) return;
               var nums = (d.match(/-?\\d+(?:\\.\\d+)?/g) || []).map(Number);
-              for (var i = 0; i + 1 < nums.length; i += 2) {
-                if (nums[i + 1] < split) acc.top += nums[i] + nums[i + 1];
-                else acc.bot += nums[i] + nums[i + 1];
-              }
+              if (nums.length < 8) return;
+              var below = 0;
+              for (var i = 1; i < nums.length; i += 2) if (nums[i] >= split) below++;
+              var side = (below * 2 > nums.length / 2) ? 'bot' : 'top';
+              if (!best[side] || d.length > best[side].length) best[side] = d;
             });
-            return acc;
+            return best;
+          };
+          /* ⚠️ ФОРМА КРИВОЙ, А НЕ ЕЁ ПИКСЕЛИ. Нижнее поле подбирает масштаб
+             само, поэтому «связано» и «просто сменился масштаб» в пикселях
+             неотличимы: замер зубастости 24.08 показал, что нарочно
+             ЗАМОРОЖЕННАЯ нижняя кривая всё равно меняла путь — вместе с осями.
+             Считаем перемены направления: у прямой их ноль, у параболы одна,
+             и никакой масштаб этого не спрячет. */
+          var turns = function (d) {
+            if (!d) return -1;
+            var nums = (d.match(/-?\\d+(?:\\.\\d+)?/g) || []).map(Number);
+            var ys = [];
+            for (var i = 1; i < nums.length; i += 2) ys.push(nums[i]);
+            var t = 0, dir = 0;
+            for (var j = 1; j < ys.length; j++) {
+              var dy = ys[j] - ys[j - 1];
+              if (Math.abs(dy) < 1e-9) continue;
+              var nd = dy > 0 ? 1 : -1;
+              if (dir && nd !== dir) t++;
+              dir = nd;
+            }
+            return t;
           };
           var test = async function (key, fieldId, newValue) {
             resetSceneMemory(); pickScene(key); setToolsOpen(true); await w(450); redrawAll();
@@ -3817,10 +3855,17 @@ const CASES = [
             await w(450); redrawAll();
             var after = sig(split);
             return { panes: ys.length,
-                     top: Math.abs(after.top - before.top) > 1e-6 ? 1 : 0,
-                     bot: Math.abs(after.bot - before.bot) > 1e-6 ? 1 : 0 };
+                     top: (before.top !== after.top) ? 1 : 0,
+                     bot: (before.bot !== after.bot) ? 1 : 0,
+                     botTurnsBefore: turns(before.bot), botTurnsAfter: turns(after.bot) };
           };
-          var t1 = await test('m-tangent', 'inp-mathf', '0.5*x^2 - 2');
+          /* ⚠️ НОВАЯ ФОРМУЛА ОБЯЗАНА МЕНЯТЬ ФОРМУ ПРОИЗВОДНОЙ, А НЕ ТОЛЬКО ЕЁ
+             МАСШТАБ. Нижнее поле подбирает масштаб само, поэтому производная
+             2x и производная x рисуются ПОБУКВЕННО одинаковым путём: замер
+             24.08 показывал «низ не пошёл» там, где всё работает. Берём
+             x^3 − 3x: производная становится параболой вместо прямой, и
+             никакой масштаб этого не спрячет. */
+          var t1 = await test('m-tangent', 'inp-mathf', 'x^3 - 3*x');
           var t2 = await test('prod', 'inp-prod', '25*L^2 - 0.9*L^3');
           // Сцен с двумя полями всего две — считаем по всему списку.
           var two = 0;
@@ -3830,11 +3875,14 @@ const CASES = [
             if (panes().length >= 2) two++;
           }
           return { tangentPanes: t1.panes, tangentTop: t1.top, tangentBot: t1.bot,
+                   tangentShape0: t1.botTurnsBefore, tangentShape1: t1.botTurnsAfter,
                    prodPanes: t2.panes, prodTop: t2.top, prodBot: t2.bot, scenesWithTwo: two };
           })();`,
     checks: [['полей в «Производной»', 'tangentPanes', 2, 0],
              ['«Производная»: верх пошёл', 'tangentTop', 1, 0],
              ['«Производная»: низ пошёл', 'tangentBot', 1, 0],
+             ['«Производная»: у x^2 производная прямая (перемен 0)', 'tangentShape0', 0, 0],
+             ['«Производная»: у x^3−3x производная парабола (перемен 1)', 'tangentShape1', 1, 0],
              ['полей в «Производственной функции»', 'prodPanes', 2, 0],
              ['«Производственная»: верх пошёл', 'prodTop', 1, 0],
              ['«Производственная»: низ пошёл', 'prodBot', 1, 0],
