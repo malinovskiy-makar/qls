@@ -608,11 +608,95 @@ function latexToMath(tex) {
   return out.replace(/\s+/g, ' ').trim();
 }
 
+/* ── Цепочка условий → ОДНА фигурная скобка со списком ────────────────
+   ⚠️ ЭТО КОРЕНЬ ДЕФЕКТА «КУСОЧНАЯ ВКЛАДЫВАЕТСЯ САМА В СЕБЯ» (замер 24.08).
+   Конструктор собирает правильный плоский список и ставит его в поле сам,
+   но живёт этот список ровно до первой пересборки строки кривой
+   (`renderCurveList`, её зовёт галочка видимости, смена цвета, ползунок
+   сдвига). При пересборке поле берёт запись из скрытого input — а там лежит
+   цепочка «условие ? то : иначе» — и переводит её в LaTeX силами самого
+   Math.js. Он честно вкладывает каждое следующее условие в ветку «иначе»
+   предыдущего, а NaN печатает как \infty (замер: math.parse('NaN').toTex()
+   даёт \infty). Владелец видел в поле ровно это:
+     {100-Q, if Q≥0∧Q<40; {80-0.5⋅Q, if Q≥40; ∞, otherwise}, otherwise}
+
+   Поэтому цепочку разворачиваем СВОИМИ руками, в тот же вид, что печатает
+   конструктор (`pwLatex`): список на одном уровне, условие по-русски.
+   Тогда после пересборки в поле стоит та же запись, что и сразу после
+   «Поставить в поле», а не другая.
+
+   ⚠️ ХВОСТ «NaN» СТРОКОЙ НЕ ПЕЧАТАЕТСЯ. Это не значение функции, а признак
+   «здесь функция не определена»: движок возвращает NaN и такую точку не
+   рисует. Печатать её «иначе ∞» — врать дважды: бесконечности там нет, и
+   значения там нет вообще. Обратный разбор (`casesToMath`) дописывает этот
+   хвост сам, поэтому запись без него разбирается в то же самое выражение. */
+function isUndefinedTailNode(n) {
+  return !!n && n.type === 'ConstantNode' && typeof n.value === 'number' && isNaN(n.value);
+}
+
+// Снять скобки, в которые Math.js оборачивает вложенное условие.
+function unwrapParens(n) {
+  let x = n;
+  while (x && x.type === 'ParenthesisNode') x = x.content;
+  return x;
+}
+
+/* Условие куска в том же виде, что печатает конструктор: «a ≤ Q < b» одной
+   строкой, а не «Q ≥ a ∧ Q < b». Двойное неравенство читается школьником
+   сразу, и ровно его понимает обратный разбор (`condToMath`). */
+const PW_REL_TEX = { largerEq: ' \\ge ', larger: ' > ', smallerEq: ' \\le ', smaller: ' < ',
+                     equal: ' = ', unequal: ' \\ne ' };
+function pwCondTex(node) {
+  const c = unwrapParens(node);
+  if (c && c.type === 'OperatorNode' && c.fn === 'and' && c.args && c.args.length === 2) {
+    const L = unwrapParens(c.args[0]), R = unwrapParens(c.args[1]);
+    const lo = L && L.type === 'OperatorNode' ? L.fn : '';
+    const hi = R && R.type === 'OperatorNode' ? R.fn : '';
+    if ((lo === 'largerEq' || lo === 'larger') && (hi === 'smaller' || hi === 'smallerEq')
+        && String(L.args[0]) === String(R.args[0])) {
+      return mathToTex(String(L.args[1])) + (lo === 'largerEq' ? ' \\le ' : ' < ')
+           + mathToTex(String(L.args[0]))
+           + (hi === 'smaller' ? ' < ' : ' \\le ') + mathToTex(String(R.args[1]));
+    }
+  }
+  if (c && c.type === 'OperatorNode' && PW_REL_TEX[c.fn] && c.args && c.args.length === 2)
+    return mathToTex(String(c.args[0])) + PW_REL_TEX[c.fn] + mathToTex(String(c.args[1]));
+  return mathToTex(String(c));
+}
+
+// Вернуть плоскую фигурную скобку или null, если это не цепочка условий.
+function condChainToCases(expr) {
+  let node;
+  try { node = math.parse(String(expr || '')); } catch (e) { return null; }
+  const rows = [];
+  let cur = unwrapParens(node);
+  let guard = 0;
+  while (cur && cur.type === 'ConditionalNode' && guard++ < 64) {
+    rows.push({ cond: cur.condition, val: cur.trueExpr });
+    cur = unwrapParens(cur.falseExpr);
+  }
+  if (!rows.length) return null;
+  const lines = rows.map(r => mathToTex(String(r.val)) + ', & \\text{если } ' + pwCondTex(r.cond));
+  if (!isUndefinedTailNode(cur)) lines.push(mathToTex(String(cur)) + ', & \\text{иначе}');
+  /* Двойные пробелы (их оставляет toTex) сжимаем: запись обязана получиться
+     ПОБУКВЕННО той же, что печатает конструктор, иначе «после пересборки та же
+     запись» проверить нечем. */
+  return ('\\begin{cases}' + lines.join('\\\\') + '\\end{cases}').replace(/ {2,}/g, ' ');
+}
+
 /* Обратный перевод: выражение Math.js → LaTeX для показа в поле.
-   Основную работу делает сам Math.js (toTex), запасной путь — грубая замена. */
+   Основную работу делает сам Math.js (toTex), запасной путь — грубая замена.
+   Кусочная запись идёт мимо Math.js — см. condChainToCases выше. */
 function mathToLatexField(expr) {
   const e = String(expr == null ? '' : expr).trim();
   if (!e) return '';
+  if (e.indexOf('?') >= 0) {
+    // Приставка «y = », «P = » к цепочке условий не относится: разворачиваем
+    // тело, а приставку возвращаем на место как есть (так же делает pw-apply).
+    const pfx = pwPrefixOf(e);
+    const cs = condChainToCases(pfx ? e.slice(pfx.length) : e);
+    if (cs) return pfx + cs;
+  }
   return mathToTex(e);
 }
 

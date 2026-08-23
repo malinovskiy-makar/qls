@@ -419,7 +419,10 @@ function wireScene() {
   const pwCount = document.getElementById('pw-count');
   if (pwCount) pwCount.addEventListener('input', () => {
     const n = parseInt(pwCount.value, 10);
-    if (!isFinite(n) || n < 2 || n > 12) return;
+    /* Один кусок — законная запись, а не вырожденный случай: так задают
+       функцию, определённую ТОЛЬКО на отрезке (вне его кривой нет). Нижняя
+       граница была 2 и отрезала этот случай без причины. */
+    if (!isFinite(n) || n < 1 || n > 12) return;
     PW.n = n;
     renderPw();
   });
