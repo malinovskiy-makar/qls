@@ -197,7 +197,7 @@ function renderCurveList() {
     const staff = !!curve.role;
     const del = document.createElement('button');
     del.className = 'btn-icon'; del.textContent = '✕';
-    del.title = staff ? 'Убрать кривую с графика (вернуть — галочкой слева)' : 'Удалить кривую';
+    del.title = staff ? 'Убрать кривую с графика (вернуть галочкой слева)' : 'Удалить кривую';
     del.setAttribute('aria-label', del.title);
     del.addEventListener('click', () => {
       pushUndo();
