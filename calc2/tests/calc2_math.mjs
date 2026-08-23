@@ -118,11 +118,18 @@ const CASES = [
     checks: [['|Ed|', 'absEd', 1, 0.03]],
   },
   {
-    name: 'Экстерналии (Пигу) · D=100−Q, MPC=Q, ext=20',
-    run: `loadScene('sd'); setScenario('externality'); redrawAll();
+    /* Внешний эффект ОТРИЦАТЕЛЬНЫЙ. Устройство сюжета переделано ночной
+       сессией «вмешательство»: величину эффекта отдельным полем больше не
+       вводят, общественная кривая MSC задаётся формулой во «Вводе функций».
+       Рынок D = S ⇒ Q=50. Оптимум MSB = MSC ⇒ 100−Q = Q+20 ⇒ Q=40.
+       DWL = ∫₄₀^50 (2q−80) dq = 100. Налог Пигу = D(40) − S(40) = 20. */
+    name: 'Внешний эффект ОТРИЦАТЕЛЬНЫЙ · MSC = Q+20 ⇒ Qрын=50, Qопт=40, DWL=100',
+    run: `loadScene('ext'); STATE.mscOn = true; STATE.mscExpr = 'Q + 20';
+          recompileSocial(); redrawAll();
           var e = STATE.ext || {};
-          return { Qmkt: e.Qmkt, Qopt: e.Qopt, dwl: e.dwl };`,
-    checks: [['Qрын', 'Qmkt', 50, 0.3], ['Qопт', 'Qopt', 40, 0.4], ['DWL', 'dwl', 100, 2]],
+          return { Qmkt: e.Qmkt, Qopt: e.Qopt, dwl: e.dwl, tax: e.corrective, Popt: e.Popt };`,
+    checks: [['Qрын', 'Qmkt', 50, 0.3], ['Qопт', 'Qopt', 40, 0.4], ['DWL', 'dwl', 100, 2],
+             ['налог Пигу', 'tax', 20, 0.2], ['Pопт', 'Popt', 60, 0.4]],
   },
   {
     name: 'Труд · монопсония D=100−L, S=L',
@@ -268,18 +275,18 @@ const CASES = [
     checks: [['|Es| при Q=20', 'a', 1, 0.02], ['|Es| при Q=70', 'b', 1, 0.02]],
   },
   {
-    name: 'Внешний эффект ПОЛОЖИТЕЛЬНЫЙ · MPB=100−Q, ext=20, S=Q ⇒ Qрын=50, Qопт=60, DWL=100',
-    // Зеркало отрицательного случая: недопроизводство, лечится СУБСИДИЕЙ.
-    // В конце возвращаем знак на 'neg', чтобы не влиять на порядок прогона.
-    run: `loadScene('ext'); setExtSign('pos');
-          STATE.extExpr = '20'; recompileExt(); redrawAll();
+    name: 'Внешний эффект ПОЛОЖИТЕЛЬНЫЙ · MSB = 120−Q ⇒ Qрын=50, Qопт=60, DWL=100',
+    /* Зеркало отрицательного случая: недопроизводство, лечится СУБСИДИЕЙ.
+       Оптимум MSB = MSC ⇒ 120−Q = Q ⇒ Q=60, P = 60.
+       DWL = ∫₅₀^60 (120−2q) dq = 100. Субсидия = |D(60) − S(60)| = 20
+       (в расчёте она приходит со знаком «минус» — это и значит субсидию). */
+    run: `loadScene('ext'); STATE.msbOn = true; STATE.msbExpr = '120 - Q';
+          recompileSocial(); redrawAll();
           var e = STATE.ext || {};
-          var res = { Qmkt: e.Qmkt, Qopt: e.Qopt, dwl: e.dwl, sub: e.corrective,
-                      Popt: e.Popt, pos: e.pos ? 1 : 0 };
-          setExtSign('neg');
-          return res;`,
+          return { Qmkt: e.Qmkt, Qopt: e.Qopt, dwl: e.dwl, sub: -e.corrective,
+                   Popt: e.Popt, pos: e.pos ? 1 : 0 };`,
     checks: [['Qрын', 'Qmkt', 50, 0.3], ['Qопт', 'Qopt', 60, 0.4], ['DWL', 'dwl', 100, 2],
-             ['субсидия', 'sub', 20, 0.2], ['Pопт = S(Qопт)', 'Popt', 60, 0.4], ['знак +', 'pos', 1, 0.1]],
+             ['субсидия', 'sub', 20, 0.2], ['Pопт = MSC(Qопт)', 'Popt', 60, 0.4], ['знак +', 'pos', 1, 0.1]],
   },
   {
     name: 'Адвалорный налог · D=100−Q, S=2Q, τ=50% ⇒ Q1=25, Pb=75, Ps=50, сбор=625',

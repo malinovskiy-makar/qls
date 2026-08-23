@@ -675,7 +675,7 @@ await t('label чистится от посторонних символов', (
 
 await t('пунктирная кривая S+t попала в .tex при налоге', async () => {
   await page.evaluate(() => { resetSceneMemory(); openPicker(); });
-  await clickUI('.scard[data-scene="tax"]');
+  await clickUI('.scard[data-scene="taxes"]');
   await page.waitForTimeout(300);
   return await page.evaluate(() => {
     const tex = buildTex('', '');
@@ -1035,7 +1035,7 @@ await page.evaluate(() => document.querySelectorAll('.modal.open').forEach(m => 
 
 await t('легенда называет области в сцене налога', async () => {
   await page.evaluate(() => { resetSceneMemory(); openPicker(); });
-  await clickUI('.scard[data-scene="tax"]');
+  await clickUI('.scard[data-scene="taxes"]');
   await page.waitForTimeout(350);
   const names = await page.evaluate(() => [...document.querySelectorAll('#chart .legend text')].map(t =>
       [...t.childNodes].filter(n => n.nodeType === 3).map(n => n.nodeValue).join('')));
@@ -1056,12 +1056,24 @@ await t('субсидия подписана расходом, а не сбор�
   return ok || names.join(' | ');
 });
 
+/* Легенда перечисляет ЗАКРАШЕННЫЕ области, поэтому её появление зависит от
+   того, есть ли на графике хоть одна заливка. В сюжете «Внешние эффекты»
+   сцена теперь открывается БЕЗ расхождения (MSB и MSC выключены и равны
+   частным кривым), значит заливки потерь нет и легенде взяться неоткуда —
+   это верное поведение, а не пропажа. Поэтому расхождение сначала создаём. */
 await t('легенда собирается и в других режимах', async () => {
   const thin = [];
   for (const s of ['mono', 'labor', 'ppf', 'laffer', 'ext']) {
     await page.evaluate(() => { resetSceneMemory(); openPicker(); });
     await clickUI(`.scard[data-scene="${s}"]`);
     await page.waitForTimeout(300);
+    if (s === 'ext') {
+      await page.evaluate(() => {
+        STATE.mscOn = true; STATE.mscExpr = 'Q + 20';
+        recompileSocial(); syncSocialFields(); redrawAll();
+      });
+      await page.waitForTimeout(200);
+    }
     const n = await page.evaluate(() => document.querySelectorAll('#chart .legend text').length);
     if (n < 1) thin.push(s);
   }
@@ -1070,7 +1082,7 @@ await t('легенда собирается и в других режимах',
 
 await t('легенда попадает в экспорт вместе с графиком', async () => {
   await page.evaluate(() => { resetSceneMemory(); openPicker(); });
-  await clickUI('.scard[data-scene="tax"]');
+  await clickUI('.scard[data-scene="taxes"]');
   await page.waitForTimeout(330);
   return await page.evaluate(() => {
     const tex = buildTex('', '');

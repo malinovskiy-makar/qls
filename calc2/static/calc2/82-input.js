@@ -1142,7 +1142,7 @@ function liveFormulaTexts() {
    FORMULA_EXAMPLES; поле, которого здесь нет, общей оснастки не получает
    (имена, заголовки и списки чисел формулами не являются). */
 const FORMULA_FIELD_KINDS = {
-  'ext-input': 'PQ',
+  'inp-msb': 'DEMAND', 'inp-msc': 'SUPPLY',   // общественные кривые внешних эффектов
   'inp-d3-1': 'DEMAND', 'inp-d3-2': 'DEMAND', 'inp-d3-mc': 'MC',
   'inp-ki-1': 'DEMAND', 'inp-ki-2': 'DEMAND', 'inp-ki-3': 'DEMAND',
   'inp-kp-1': 'DEMAND', 'inp-kp-2': 'DEMAND', 'inp-kink-mc': 'MC',

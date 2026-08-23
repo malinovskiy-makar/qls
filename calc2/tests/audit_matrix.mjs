@@ -43,7 +43,7 @@ for (const [key, name] of scenes) {
     const allText = [...document.querySelectorAll('#tools-panel input[type=text]')];
     const formulaInputs = allText.filter(i => {
       if (i.classList.contains('pw-bound')) return false;   // границы куска, не формула
-      if (!/^(inp-|ext-input|ma-|cons-custom|ineq-formula|mm-|gr-)/.test(i.id)) return false;
+      if (!/^(inp-|ma-|cons-custom|ineq-formula|mm-|gr-)/.test(i.id)) return false;
       if (/name|title|label/.test(i.id)) return false;
       return typeof fieldActive === 'function' ? fieldActive(i) : vis(i);
     });

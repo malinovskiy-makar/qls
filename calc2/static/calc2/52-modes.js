@@ -802,7 +802,11 @@ function applyScenarioVisibility() {
 // монополист, возвращаем конкуренцию (как монополия выключает интервенции).
 function setScenario(s) {
   STATE.scenario = s;
-  if (s === 'externality') recompileExt();   // подготовить внешние пред. издержки
+  // Общественные кривые сюжета внешних эффектов живут во «Вводе функций»:
+  // блок показывается только в своём сюжете, формулы готовятся заранее.
+  const soc = document.getElementById('social-curves');
+  if (soc) soc.style.display = (s === 'externality') ? '' : 'none';
+  if (s === 'externality') { recompileSocial(); syncSocialFields(); }
   if (s !== 'none' && STATE.market === 'monopoly') {
     STATE.market = 'comp';
     const c = document.getElementById('seg-comp'), mo = document.getElementById('seg-mono');

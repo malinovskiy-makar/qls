@@ -805,6 +805,26 @@
            в формуле (см. curveSrcForm в 80-ui.js). -->
       <div class="error" id="curve-error"></div>
       <div id="curve-list"></div>
+      <!-- ОБЩЕСТВЕННЫЕ КРИВЫЕ сюжета «Внешние эффекты» (ночная сессия
+           «вмешательство»). Задаются ЗАРАНЕЕ, здесь же, где и остальные
+           функции модели, и по умолчанию равны своим частным парам:
+           MSB = спрос, MSC = предложение. Чекбокс СЛЕВА выключен — пока его
+           не включат, кривой на графике нет и потерь нет. Включил — можно
+           править формулу и увидеть расхождение.
+           Кривые D и S при этом НЕ переименовываются (решение владельца). -->
+      <div id="social-curves" style="display:none;margin-top:8px;">
+        <div style="display:flex;gap:6px;align-items:center;">
+          <label class="chk" style="margin:0;white-space:nowrap;"><input type="checkbox" id="chk-msb">
+            <span class="swatch" style="background:var(--curve-mr)"></span> MSB</label>
+          <input type="text" id="inp-msb" autocomplete="off" style="flex:1;min-width:0;" disabled>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+          <label class="chk" style="margin:0;white-space:nowrap;"><input type="checkbox" id="chk-msc">
+            <span class="swatch" style="background:var(--curve-reg)"></span> MSC</label>
+          <input type="text" id="inp-msc" autocomplete="off" style="flex:1;min-width:0;" disabled>
+        </div>
+        <div class="error" id="social-error" style="display:none;"></div>
+      </div>
       <button class="btn" id="btn-add-curve">Добавить кривую</button>
     </div>
 
@@ -888,27 +908,17 @@
       <!-- Внешний эффект и корректирующий налог/субсидия Пигу (Задача 4 + Фаза 2б).
            Два зеркальных случая: отрицательный (перепроизводство → налог) и
            положительный (недопроизводство → субсидия). -->
+      <!-- ПОЛЕЙ ИЗДЕРЖЕК ЗДЕСЬ БОЛЬШЕ НЕТ (Андрей: им тут не место), и знак
+           эффекта кнопкой не выбирается — он вытекает из того, куда сместился
+           оптимум. Сами общественные кривые MSB и MSC задаются во «Вводе
+           функций», рядом с остальными функциями модели. -->
       <div id="scn-pane-ext" style="display:none;margin-top:8px;">
-        <div class="seg">
-          <button class="seg-btn active" id="ext-neg">Отрицательный</button>
-          <button class="seg-btn" id="ext-pos">Положительный</button>
-        </div>
-        <div class="field" style="margin-top:8px;">
-          <label id="ext-label">Внешние предельные издержки (число или f(Q))</label>
-          <input type="text" id="ext-input" value="20" autocomplete="off">
-        </div>
         <label class="chk"><input type="checkbox" id="ext-pigou">
           <span class="swatch" style="background:var(--curve-tax)"></span>
-          <span id="ext-pigou-label">Применить налог Пигу</span></label>
-        <div class="hint" id="ext-hint-neg">Спрос&nbsp;=&nbsp;предельная выгода, предложение (роль S)&nbsp;=&nbsp;частные
-          издержки MPC. MSC&nbsp;=&nbsp;MPC&nbsp;+&nbsp;внешние. Рынок выпускает Qрын (D&nbsp;=&nbsp;MPC),
-          оптимум Qопт (D&nbsp;=&nbsp;MSC) <b>меньше</b> рыночного: перепроизводство.
-          Налог Пигу поднимает MPC до MSC, и рынок приходит в Qопт.</div>
-        <div class="hint" id="ext-hint-pos" style="display:none;">Спрос (роль D)&nbsp;=&nbsp;частная выгода MPB,
-          предложение&nbsp;=&nbsp;издержки. MSB&nbsp;=&nbsp;MPB&nbsp;+&nbsp;внешние. Рынок выпускает Qрын
-          (MPB&nbsp;=&nbsp;S), оптимум Qопт (MSB&nbsp;=&nbsp;S) <b>больше</b> рыночного: недопроизводство.
-          Корректирующая субсидия опускает издержки, и рынок приходит в Qопт.</div>
-        <div class="error" id="ext-error" style="display:none;"></div>
+          <span id="ext-pigou-label">Применить корректирующий налог или субсидию</span></label>
+        <div class="hint" id="ext-hint">Спрос это предельная выгода частного лица, предложение это его
+          предельные издержки. Пока MSB и MSC выключены, общественные кривые совпадают с частными:
+          оптимум там же, где рынок.</div>
         <div id="info-ext" style="margin-top:6px;"></div>
       </div>
       <!-- Малая открытая экономика (Фаза 4в). Обычные D(Q) и S(Q) ПО ЦЕНЕ (это
@@ -2262,7 +2272,7 @@
                (0 — нижняя граница P_s(квота), 100 — верхняя P_d(квота)), потому
                что сами границы двигаются вместе с объёмом квоты. -->
           <div class="field" id="quota-price-field" style="margin-top:8px;display:none;">
-            <label>Цена внутри коридора = <b id="quota-price-val">—</b></label>
+            <label>Цена внутри коридора = <b id="quota-price-val">…</b></label>
             <input type="range" id="quota-price-slider" min="0" max="100" step="1" value="50"
                    style="width:100%;margin-top:4px;">
             <div class="hint" id="quota-price-range" style="margin-top:2px;">коридора нет</div>
@@ -2270,7 +2280,7 @@
           <div class="hint" id="quota-hint" style="display:none;">Квота ограничивает объём напрямую.
             Если она НИЖЕ равновесного количества, рыночная цена не определена однозначно: подойдёт
             любая цена от той, по которой продавцы готовы отдать этот объём, до той, по которой
-            покупатели готовы его выбрать. Двигайте цену внутри коридора — излишки перетекают
+            покупатели готовы его выбрать. Двигайте цену внутри коридора: излишки перетекают
             между сторонами, а их сумма и потери общества не меняются.</div>
           <div class="hint" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
             на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя

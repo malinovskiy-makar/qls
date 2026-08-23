@@ -1105,19 +1105,29 @@ function wireControls() {
     if (inp) inp.addEventListener('change', () => setShift(which, parseFloat(inp.value)));
   });
 
-  // Внешний эффект (Задача 4): формула внешних издержек + галочка налога Пигу.
-  const extInp = document.getElementById('ext-input');
-  if (extInp) {
-    const applyExt = () => { STATE.extExpr = (extInp.value || '').trim(); recompileExt(); redrawAll(); };
-    extInp.addEventListener('change', applyExt);
-    extInp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') applyExt(); });
-  }
+  /* Внешние эффекты. Формулы MSB и MSC живут во «Вводе функций»: чекбокс
+     слева включает кривую, поле рядом правит её формулу. Пока чекбокс снят,
+     поле заперто — общественная кривая просто равна своей частной паре. */
+  [['msb', 'chk-msb', 'inp-msb'], ['msc', 'chk-msc', 'inp-msc']].forEach(([key, cid, iid]) => {
+    const box = document.getElementById(cid), inp = document.getElementById(iid);
+    if (box) box.addEventListener('change', () => {
+      STATE[key + 'On'] = box.checked;
+      // Включили впервые — подставляем формулу частной пары, чтобы человек
+      // правил готовое выражение, а не пустое поле.
+      if (box.checked && !STATE[key + 'Expr']) STATE[key + 'Expr'] = socialDefaultExpr(key);
+      syncSocialFields(); recompileSocial(); redrawAll();
+    });
+    if (inp) {
+      const apply = () => {
+        STATE[key + 'Expr'] = (inp.value || '').trim();
+        recompileSocial(); redrawAll();
+      };
+      inp.addEventListener('change', apply);
+      inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); });
+    }
+  });
   const extPigou = document.getElementById('ext-pigou');
   if (extPigou) extPigou.addEventListener('change', () => { STATE.applyPigou = extPigou.checked; redrawAll(); });
-  // Фаза 2б: знак внешнего эффекта (отрицательный ↔ положительный).
-  const extNeg = document.getElementById('ext-neg'), extPos = document.getElementById('ext-pos');
-  if (extNeg) extNeg.addEventListener('click', () => setExtSign('neg'));
-  if (extPos) extPos.addEventListener('click', () => setExtSign('pos'));
 
   // Фаза 2а: галочка «точка на предложении» (вторая точка эластичности).
   const elS = document.getElementById('chk-elast-s');

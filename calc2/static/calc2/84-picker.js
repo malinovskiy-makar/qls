@@ -54,10 +54,14 @@ function loadScene(name) {
       STATE.elastQ = null; STATE.elastQS = null;   // точки встанут в «умные» стартовые позиции
       setScenario('elasticity');
     } else {
-      STATE.extSign = 'neg'; STATE.extExpr = '20'; STATE.applyPigou = false;
-      const ei = document.getElementById('ext-input'); if (ei) ei.value = '20';
+      /* Сцена открывается ЧИСТОЙ: MSB и MSC равны частным кривым и ВЫКЛЮЧЕНЫ,
+         поэтому оптимум совпадает с рыночным равновесием, а DWL равен нулю.
+         Расхождение появляется только после того, как человек включит чекбокс
+         и поправит формулу. */
+      STATE.msbOn = false; STATE.mscOn = false;
+      STATE.msbExpr = ''; STATE.mscExpr = '';     // подставятся формулы D и S
+      STATE.applyPigou = false;
       const ep = document.getElementById('ext-pigou'); if (ep) ep.checked = false;
-      setExtSign('neg');
       setScenario('externality');
     }
   } else if (name === 'smallopen') {

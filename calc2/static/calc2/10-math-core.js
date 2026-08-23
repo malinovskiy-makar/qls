@@ -412,10 +412,14 @@ function compileExt(expr) {
   try { const c = math.parse(prepExpr(expr)).compile(); c.evaluate(scopeFor(expr, axisScope(1))); return { compiled: c, error: null }; }
   catch (e) { return { compiled: null, error: e.message }; }
 }
-function evalExt(q) {
-  if (!STATE.extCompiled) return NaN;
+
+/* Общественная кривая (MSB или MSC) — та же компиляция, что у внешнего
+   эффекта, но результат хранится не в единственном месте, а рядом со своей
+   кривой: их две, и каждая живёт своей формулой. */
+function evalSocial(compiled, expr, q) {
+  if (!compiled) return NaN;
   try {
-    const v = STATE.extCompiled.evaluate(scopeFor(STATE.extExpr, axisScope(q)));
+    const v = compiled.evaluate(scopeFor(expr, axisScope(q)));
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) { return NaN; }
 }

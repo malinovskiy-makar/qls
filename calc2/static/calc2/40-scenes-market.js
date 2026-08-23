@@ -272,28 +272,38 @@ function recompute() {
   // Рыночное равновесие в обоих случаях одно и то же (пересечение частных кривых).
   STATE.ext = null;
   if (compMarket && STATE.scenario === 'externality' && STATE.D && STATE.S && STATE.eq) {
-    const pos = (STATE.extSign === 'pos');
-    // Общественная кривая = частная той стороны, где сидит эффект, плюс внешний эффект.
-    const social = pos
-      ? (q => { const d = evalCurve(STATE.D, q), x = evalExt(q); return (isNaN(d) || isNaN(x)) ? NaN : d + x; })
-      : (q => { const s = evalCurve(STATE.S, q), x = evalExt(q); return (isNaN(s) || isNaN(x)) ? NaN : s + x; });
-    // «Противоположная» частная кривая — с ней общественная и пересекается в оптимуме.
-    const other = pos ? (q => evalCurve(STATE.S, q)) : (q => evalCurve(STATE.D, q));
+    /* Спрос ЕСТЬ предельная частная выгода MPB, предложение ЕСТЬ предельные
+       частные издержки MPC — отдельных кривых для них не заводим и D с S не
+       переименовываем. Общественные MSB и MSC по умолчанию совпадают с
+       частными: пока чекбокс выключен, кривая просто не отличается от своей
+       частной пары, оптимум совпадает с рынком, а DWL равен нулю. */
+    const msb = q => (STATE.msbOn && STATE.msbCompiled)
+      ? evalSocial(STATE.msbCompiled, STATE.msbExpr, q) : evalCurve(STATE.D, q);
+    const msc = q => (STATE.mscOn && STATE.mscCompiled)
+      ? evalSocial(STATE.mscCompiled, STATE.mscExpr, q) : evalCurve(STATE.S, q);
     const Qmkt = STATE.eq.Q, Pmkt = STATE.eq.P;
-    const Qopt = findRoot(q => social(q) - other(q));
-    let Popt = null, dwl = null, corrective = null, pigouEq = null;
+    // Общественный оптимум — там, где MSB = MSC (а не где D = S).
+    const Qopt = findRoot(q => msb(q) - msc(q));
+    let Popt = null, dwl = null, corrective = null, pigouEq = null, pos = false;
     if (Qopt != null) {
-      Popt = other(Qopt);                                  // высота точки пересечения
+      Popt = msc(Qopt);                                    // высота пересечения MSB и MSC
       const lo = Math.min(Qopt, Qmkt), hi = Math.max(Qopt, Qmkt);
-      // Клин потерь — площадь между общественной и противоположной частной кривой.
-      dwl = areaBetween(q => social(q) - other(q), lo, hi);
-      corrective = evalExt(Qopt);                          // величина эффекта в оптимуме
-      // Корректирующий инструмент приводит рынок ровно в Qопт, двигая предложение:
-      // отрицательный эффект → налог (S + t); положительный → субсидия (S − s).
-      const Sp = { fn: q => evalCurve(STATE.S, q) + (pos ? -corrective : corrective) };
+      /* Потери — площадь между общественными кривыми на промежутке от рыночного
+         выпуска до оптимального. Правее оптимума каждая следующая единица стоит
+         обществу дороже, чем даёт выгоды; левее — наоборот, недополученная выгода. */
+      dwl = areaBetween(q => msb(q) - msc(q), lo, hi);
+      pos = (Qopt - Qmkt) > 1e-9;                          // недопроизводство = эффект положительный
+      /* Корректирующий инструмент двигает предложение так, чтобы ЧАСТНЫЙ рынок
+         пришёл ровно в Qопт: D(Qопт) = S(Qопт) + сдвиг. Плюс — налог Пигу,
+         минус — корректирующая субсидия. Формула общая на оба случая. */
+      corrective = evalCurve(STATE.D, Qopt) - evalCurve(STATE.S, Qopt);
+      const Sp = { fn: q => evalCurve(STATE.S, q) + corrective };
       pigouEq = findEquilibrium(STATE.D, Sp);
     }
-    STATE.ext = { pos, social, other, msc: social, Qmkt, Pmkt, Qopt, Popt, dwl,
+    STATE.extSign = pos ? 'pos' : 'neg';   // знак — ВЫВОД расчёта, а не выбор кнопкой
+    STATE.ext = { pos, msb, msc, social: pos ? msb : msc, other: pos ? msc : msb,
+                  msbOn: !!STATE.msbOn, mscOn: !!STATE.mscOn,
+                  Qmkt, Pmkt, Qopt, Popt, dwl,
                   corrective, pigou: corrective, pigouEq, applyPigou: STATE.applyPigou };
   }
 
@@ -1218,7 +1228,7 @@ function applyTaxRateBounds() {
         'Поэтому предложение не сдвигается, а <b>поворачивается</b>: S<sub>после</sub>(Q)&nbsp;=&nbsp;(1+τ)·S(Q). ' +
         'Клин между ценами растёт вместе с Q, а не остаётся постоянным.';
   } else if (STATE.intervType === 'tax' && STATE.taxForm === 'excise') {
-    h.innerHTML = 'Акциз — потоварный налог на конкретный товар: ставка в рублях за единицу, ' +
+    h.innerHTML = 'Акциз это потоварный налог на конкретный товар: ставка в рублях за единицу, ' +
       'кривая S <b>сдвигается</b> вверх на величину ставки. Числа совпадают с потоварным налогом ' +
       'той же ставки; плательщик закреплён за производителем, поэтому сторона не выбирается.';
   } else {
@@ -1547,9 +1557,9 @@ function drawExtAreas(e) {
   if (!e || e.Qopt == null) return;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const lo = Math.min(e.Qopt, e.Qmkt), hi = Math.max(e.Qopt, e.Qmkt);
-  if (hi <= lo) return;
+  if (hi <= lo) return;   // оптимум совпал с рынком — терять нечего
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
-  const aD = d3.area().x(d => sx(d)).y0(d => sy(e.other(d))).y1(d => sy(e.social(d)));
+  const aD = d3.area().x(d => sx(d)).y0(d => sy(e.msc(d))).y1(d => sy(e.msb(d)));
   g.append('path').datum(samp).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери от внешнего эффекта (DWL)');
 }
 
@@ -1560,13 +1570,20 @@ function drawExtCurves(e) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const pts = (f) => { const o = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = f(q); o.push(isNaN(v) ? null : [q, v]); } return o; };
-  g.append('path').datum(pts(e.social)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr('d', line);
-  // Ярлык общественной кривой (Фаза 3): у правого края или у ближайшего
-  // видимого места — раньше при большом внешнем эффекте он пропадал.
-  labelCurve(g, e.social, e.pos ? 'MSB' : 'MSC', COL.reg, { from: 0.9 });
+  /* Рисуем ТОЛЬКО включённые общественные кривые. Выключенная совпадает со
+     своей частной парой, и вторая линия поверх D или S ничего не сообщала бы,
+     а только путала: на графике оказались бы две кривые в одном месте. */
+  if (e.mscOn) {
+    g.append('path').datum(pts(e.msc)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr('d', line);
+    labelCurve(g, e.msc, 'MSC', COL.reg, { from: 0.9 });
+  }
+  if (e.msbOn) {
+    g.append('path').datum(pts(e.msb)).attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2.5).attr('d', line);
+    labelCurve(g, e.msb, 'MSB', COL.MR, { from: 0.9 });
+  }
   // Корректирующий инструмент: налог поднимает предложение, субсидия — опускает (зелёный пунктир).
-  if (e.applyPigou && e.corrective != null) {
-    g.append('path').datum(pts(q => evalCurve(STATE.S, q) + (e.pos ? -e.corrective : e.corrective)))
+  if (e.applyPigou && e.corrective != null && Math.abs(e.corrective) > 1e-9) {
+    g.append('path').datum(pts(q => evalCurve(STATE.S, q) + e.corrective))
       .attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
   }
 }
@@ -1617,58 +1634,97 @@ function drawExtScenario() {
 // Табло внешнего эффекта: Qрын/Qопт, DWL, налог Пигу, новое равновесие.
 function updateExtPanel() {
   const box = document.getElementById('info-ext'); if (!box) return;
-  if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Отметьте D (выгода MSB) и S (частные издержки MPC).</div>'; return; }
+  if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Отметьте кривые D и S.</div>'; return; }
   if (!STATE.eq) { box.innerHTML = '<div class="warn">Рыночное равновесие не найдено.</div>'; return; }
   const e = STATE.ext;
-  if (!e) { box.innerHTML = '<div class="warn">Введите величину внешнего эффекта.</div>'; return; }
-  const mktEq = e.pos ? 'MPB = S' : 'D = MPC', optEq = e.pos ? 'MSB = S' : 'D = MSC';
-  const tool = e.pos ? 'Корректирующая субсидия' : 'Корректирующий налог (Пигу)';
+  if (!e) { box.innerHTML = '<div class="muted">Расчёт не готов.</div>'; return; }
+  const none = !e.msbOn && !e.mscOn;
   let html = '';
-  html += `<div class="stat"><span>Qрын (${mktEq})</span><b>Q = ${fmt(e.Qmkt)}, P = ${fmt(e.Pmkt)}</b></div>`;
+  html += `<div class="stat"><span>Рынок (D = S)</span><b>Q = ${fmt(e.Qmkt)}, P = ${fmt(e.Pmkt)}</b></div>`;
   if (e.Qopt != null) {
-    html += `<div class="stat"><span>Qопт (${optEq})</span><b>Q = ${fmt(e.Qopt)}, P = ${fmt(e.Popt)}</b></div>`;
+    html += `<div class="stat"><span>Оптимум (MSB = MSC)</span><b>Q = ${fmt(e.Qopt)}, P = ${fmt(e.Popt)}</b></div>`;
     html += `<div class="stat"><span>$DWL$ (потери)</span><b>${fmt(e.dwl)}</b></div>`;
-    html += `<div class="stat"><span>${tool}</span><b>${fmt(e.corrective)}</b></div>`;
+    if (!none && Math.abs(e.corrective) > 1e-9) {
+      const tool = (e.corrective > 0) ? 'Корректирующий налог (Пигу)' : 'Корректирующая субсидия';
+      html += `<div class="stat"><span>${tool}</span><b>${fmt(Math.abs(e.corrective))}</b></div>`;
+    }
     const gap = e.Qopt - e.Qmkt;
-    html += `<div class="hint" style="margin-top:4px;">${gap < -1e-6
-      ? 'Рынок выпускает <b>больше</b> общественного оптимума на ' + fmt(-gap) + ': <b>перепроизводство</b>, частные издержки ниже общественных.'
-      : (gap > 1e-6
-        ? 'Рынок выпускает <b>меньше</b> общественного оптимума на ' + fmt(gap) + ': <b>недопроизводство</b>, частная выгода ниже общественной.'
-        : 'Рынок уже в общественном оптимуме: внешний эффект нулевой.')}</div>`;
-    if (e.applyPigou && e.pigouEq) {
+    html += `<div class="hint" style="margin-top:4px;">${none
+      ? 'MSB и MSC пока совпадают с частными кривыми: внешнего эффекта нет, рынок и так в оптимуме. ' +
+        'Включите MSB или MSC во «Вводе функций» и измените формулу, тогда появится расхождение.'
+      : (gap < -1e-6
+        ? 'Рынок выпускает <b>больше</b> общественного оптимума на ' + fmt(-gap) + ': <b>перепроизводство</b>, ' +
+          'общественные издержки выше частных.'
+        : (gap > 1e-6
+          ? 'Рынок выпускает <b>меньше</b> общественного оптимума на ' + fmt(gap) + ': <b>недопроизводство</b>, ' +
+            'общественная выгода выше частной.'
+          : 'Рынок уже в общественном оптимуме: расхождения нет.'))}</div>`;
+    if (e.applyPigou && e.pigouEq && Math.abs(e.corrective) > 1e-9) {
       html += `<div class="stat" style="margin-top:4px;"><span>Новое равновесие</span><b>Q = ${fmt(e.pigouEq.Q)}, P = ${fmt(e.pigouEq.P)}</b></div>`;
-      html += `<div class="hint">${e.pos ? 'Субсидия опустила издержки' : 'Налог Пигу поднял издержки'}, рынок пришёл в Qопт, DWL устранён.</div>`;
+      html += `<div class="hint">${(e.corrective > 0) ? 'Налог Пигу поднял издержки' : 'Субсидия опустила издержки'}, рынок пришёл в оптимум, DWL устранён.</div>`;
     }
   } else {
-    html += `<div class="warn">Оптимум ${optEq} не найден в первой четверти.</div>`;
+    html += '<div class="warn">Оптимум MSB = MSC не найден в первой четверти.</div>';
   }
   box.innerHTML = html;
 }
 
-// Переключатель знака внешнего эффекта (Фаза 2б): меняет подписи полей и модель.
+/* Знак эффекта кнопкой больше не выбирают — он вытекает из расчёта. Функция
+   осталась ПРОГРАММНЫМ входом: она включает ту общественную кривую, которая
+   этому знаку отвечает, оставляя формулу прежней (её правит человек).
+   Отрицательный эффект живёт на издержках (MSC), положительный — на выгоде (MSB). */
 function setExtSign(sign) {
-  STATE.extSign = (sign === 'pos') ? 'pos' : 'neg';
-  const pos = (STATE.extSign === 'pos');
-  const n = document.getElementById('ext-neg'), p = document.getElementById('ext-pos');
-  if (n) n.classList.toggle('active', !pos);
-  if (p) p.classList.toggle('active', pos);
-  const lbl = document.getElementById('ext-label');
-  if (lbl) lbl.textContent = pos ? 'Внешняя предельная выгода (число или f(Q))'
-                                 : 'Внешние предельные издержки (число или f(Q))';
-  const pl = document.getElementById('ext-pigou-label');
-  if (pl) pl.textContent = pos ? 'Применить корректирующую субсидию' : 'Применить налог Пигу';
-  const hn = document.getElementById('ext-hint-neg'), hp = document.getElementById('ext-hint-pos');
-  if (hn) hn.style.display = pos ? 'none' : '';
-  if (hp) hp.style.display = pos ? '' : 'none';
+  const pos = (sign === 'pos');
+  STATE.msbOn = pos; STATE.mscOn = !pos;
+  syncSocialFields();
+  recompileSocial();
   redrawAll();
 }
 
-// Перекомпиляция внешних предельных издержек (вызывается при смене формулы / сценария).
-function recompileExt() {
-  const r = compileExt(STATE.extExpr);
-  STATE.extCompiled = r.compiled;
-  const errBox = document.getElementById('ext-error');
-  if (errBox) { errBox.style.display = r.error ? 'block' : 'none'; errBox.textContent = r.error ? 'Не понял формулу: ' + r.error : ''; }
+// Тексты и значения полей MSB/MSC приводятся в согласие с состоянием.
+function syncSocialFields() {
+  const put = (id, on) => { const e = document.getElementById(id); if (e) e.checked = !!on; };
+  put('chk-msb', STATE.msbOn); put('chk-msc', STATE.mscOn);
+  const set = (id, val) => {
+    const e = document.getElementById(id);
+    if (e && document.activeElement !== e) e.value = val;
+  };
+  set('inp-msb', STATE.msbExpr); set('inp-msc', STATE.mscExpr);
+  // Формулу правят только у включённой кривой: выключенная равна своей частной паре.
+  ['msb', 'msc'].forEach(k => {
+    const e = document.getElementById('inp-' + k);
+    if (e) e.disabled = !STATE[k + 'On'];
+  });
+  const hint = document.getElementById('ext-hint');
+  if (hint) {
+    hint.innerHTML = (!STATE.msbOn && !STATE.mscOn)
+      ? 'Спрос это предельная выгода частного лица, предложение это его предельные издержки. ' +
+        'Пока MSB и MSC выключены, общественные кривые совпадают с частными: оптимум там же, где рынок.'
+      : 'Общественный оптимум там, где MSB&nbsp;=&nbsp;MSC, а рынок приходит туда, где D&nbsp;=&nbsp;S. ' +
+        'Расстояние между ними и есть потери от внешнего эффекта.';
+  }
+}
+
+// Умолчание общественной кривой — формула её частной пары (MSB = D, MSC = S).
+function socialDefaultExpr(which) {
+  const c = (which === 'msb') ? STATE.D : STATE.S;
+  return (c && c.expr) ? String(c.expr) : '';
+}
+
+// Перекомпиляция обеих общественных кривых. Ошибку показываем одной строкой.
+function recompileSocial() {
+  const errs = [];
+  ['msb', 'msc'].forEach(k => {
+    if (!STATE[k + 'Expr']) STATE[k + 'Expr'] = socialDefaultExpr(k);
+    const r = compileExt(STATE[k + 'Expr']);
+    STATE[k + 'Compiled'] = r.compiled;
+    if (r.error && STATE[k + 'On']) errs.push(k.toUpperCase() + ': ' + r.error);
+  });
+  const errBox = document.getElementById('social-error');
+  if (errBox) {
+    errBox.style.display = errs.length ? 'block' : 'none';
+    errBox.textContent = errs.length ? 'Не понял формулу: ' + errs.join('; ') : '';
+  }
 }
 
 /* ---------------------------------------------------------------------
@@ -1854,7 +1910,7 @@ function updateQuotaPriceLabel() {
   const lbl = document.getElementById('quota-price-val');
   if (!lbl) return;
   const q = STATE.qt;
-  lbl.textContent = (q && q.P != null) ? fmt(q.P) : '—';
+  lbl.textContent = (q && q.P != null) ? fmt(q.P) : '…';
   const rng = document.getElementById('quota-price-range');
   if (rng) rng.textContent = (q && q.P != null)
     ? 'коридор от ' + fmt(q.Plo) + ' до ' + fmt(q.Phi)
@@ -1960,7 +2016,7 @@ function updateQuotaPanel() {
   if (!STATE.eq) { box.innerHTML = '<div class="warn">Равновесие не найдено.</div>'; return; }
   const q = STATE.qt;
   if (!q || !(STATE.quota > 0)) {
-    box.innerHTML = '<div class="muted">Задайте разрешённый объём — квоту.</div>';
+    box.innerHTML = '<div class="muted">Задайте разрешённый объём, который допускает квота.</div>';
     return;
   }
   if (!q.binding) {
