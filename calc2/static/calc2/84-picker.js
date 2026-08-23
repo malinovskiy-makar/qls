@@ -17,12 +17,17 @@ function loadScene(name) {
   // Каскад вмешательства возвращается к началу: потоварный вид, продавец.
   // Иначе НДС, акциз или «платит покупатель» протекают из прошлой сцены.
   STATE.taxForm = 'unit'; STATE.subKind = 'unit'; STATE.taxSide = 'seller';
+  STATE.quota = 0; STATE.quotaPos = 0.5; STATE.qt = null;
+  ['quota-slider', 'quota-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = 0; });
+  const qv = document.getElementById('quota-val'); if (qv) qv.textContent = '0';
+  const qp = document.getElementById('quota-price-slider'); if (qp) qp.value = 50;
   setTaxKind('unit');
   ['tax-slider', 'tax-input', 'pc-slider', 'pc-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = 0; });
   const tv = document.getElementById('tax-val'); if (tv) tv.textContent = '0';
   const pv = document.getElementById('pc-val'); if (pv) pv.textContent = '0';
 
-  if (name === 'sd' || name === 'tax' || name === 'taxes' || name === 'ceil' || name === 'mono') {
+  if (name === 'sd' || name === 'tax' || name === 'taxes' || name === 'ceil'
+      || name === 'quota' || name === 'mono') {
     setMode('market');                 // setMode сам ставит setRanges(100, 100)
     addCurve('100 - Q'); setRole(STATE.curves[0], 'demand');   // спрос — всегда первая кривая
     if (name === 'mono') {
@@ -35,6 +40,8 @@ function loadScene(name) {
       setMarket('comp');
       if (name === 'tax' || name === 'taxes') { setType('tax'); setTax(20); }
       else if (name === 'ceil') { setType('ceiling'); setPReg(30); }
+      // Квота 40 при D = 100 − Q, S = Q: коридор от 40 до 60, цена по центру.
+      else if (name === 'quota') { setType('quota'); setQuota(40); setQuotaPos(0.5); }
       else { setType('tax'); }                                  // 'sd' — чистое равновесие
     }
   } else if (name === 'elast' || name === 'ext') {
@@ -232,14 +239,18 @@ const SCENE_ROUTE = {
      'tax-adv' остались СИНОНИМАМИ: та же базовая сцена, те же запреты,
      различается только предустановка. Ссылки в коде и тестах живы. */
   taxes: { base: 'tax', run: () => loadScene('taxes'),
-           lock: [L_MARKET, 'seg-ceil', 'seg-floor'] },
+           lock: [L_MARKET, 'seg-ceil', 'seg-floor', 'seg-quota'] },
   tax:   { base: 'tax', run: () => loadScene('tax'),
-           lock: [L_MARKET, 'seg-ceil', 'seg-floor'] },
+           lock: [L_MARKET, 'seg-ceil', 'seg-floor', 'seg-quota'] },
   'tax-adv': { base: 'tax',
                run: () => { loadScene('tax'); setTaxForm('vat'); setTax(20); },
-               lock: [L_MARKET, 'seg-ceil', 'seg-floor'] },
+               lock: [L_MARKET, 'seg-ceil', 'seg-floor', 'seg-quota'] },
   ceil:  { run: () => loadScene('ceil'),
-           lock: [L_MARKET, L_TAXKIND, L_TAXSIDE, 'seg-tax', 'seg-sub'] },
+           lock: [L_MARKET, L_TAXKIND, L_TAXSIDE, 'seg-tax', 'seg-sub', 'seg-quota'] },
+  // Квота — прямое ограничение объёма. Внутри сюжета только сама квота:
+  // налог, субсидия и фиксированная цена — соседние сюжеты, они заперты.
+  quota: { run: () => loadScene('quota'),
+           lock: [L_MARKET, L_TAXKIND, L_TAXSIDE, 'seg-tax', 'seg-sub', 'seg-ceil', 'seg-floor'] },
   elast: { run: () => loadScene('elast'), lock: [L_MARKET, L_INTERV] },
   ext:   { run: () => loadScene('ext'),   lock: [L_MARKET, L_INTERV] },
 

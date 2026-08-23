@@ -94,8 +94,9 @@ await t('свободного холста больше нет', () => page.eval
 
 // Было 19; «Построение графиков» стало рабочей сценой, «Оси наоборот» удалены,
 // «Потребление в комплектах» вырезано по П3 — функционал переехал в кривую комплектов.
-await t('карточек «скоро» ровно 17', async () =>
-  (await page.locator('.scard.soon').count()) === 17 || 'их ' + (await page.locator('.scard.soon').count()));
+// Стало 16: «Квоты» доведены до рабочего сюжета (ночная сессия «вмешательство»).
+await t('карточек «скоро» ровно 16', async () =>
+  (await page.locator('.scard.soon').count()) === 16 || 'их ' + (await page.locator('.scard.soon').count()));
 
 await t('в потребителе есть заглушка про риск', async () =>
   (await page.locator('.scard.soon[data-scene="cons-risk"]').count()) === 1 || 'карточки риска нет');
@@ -123,6 +124,7 @@ const CARDS = [
   ['tradeprice',  s => s.mode === 'ppf'   && s.ppfSub === 'trade',               ['ppf-seg']],
   ['sd',          s => s.mode === 'market' && s.market === 'comp',               ['market-struct-row', 'sec-tax']],
   ['taxes',       s => s.taxKind === 'unit' && s.intervType === 'tax',           ['market-struct-row', 'seg-ceil', 'seg-floor']],
+  ['quota',       s => s.intervType === 'quota' && s.quota === 40,               ['market-struct-row', 'seg-tax', 'seg-sub']],
   ['ceil',        s => s.intervType === 'ceiling',                                     ['market-struct-row', 'taxside-row']],
   ['elast',       s => s.scenario === 'elasticity',                              ['market-struct-row', 'sec-tax']],
   ['ext',         s => s.scenario === 'externality',                             ['market-struct-row', 'sec-tax']],
@@ -165,7 +167,7 @@ for (const [key, want, lock] of CARDS) {
       mode: STATE.mode, market: STATE.market, scenario: STATE.scenario, intervType: STATE.intervType,
       monoMode: STATE.monoMode, costsSub: STATE.costsSub, ppfSub: STATE.ppfSub,
       laborStruct: STATE.laborStruct, mathSub: STATE.mathSub, macroModel: STATE.macroModel,
-      taxKind: STATE.taxKind, consSlutskyOn: STATE.consSlutskyOn,
+      taxKind: STATE.taxKind, consSlutskyOn: STATE.consSlutskyOn, quota: STATE.quota,
       sceneKey: STATE.sceneKey, curves: STATE.curves.map(c => c.role || '?'),
     }));
     if (st.sceneKey !== key) return `sceneKey = ${st.sceneKey}`;
@@ -285,15 +287,15 @@ const panelSweep = await page.evaluate(async (FORB) => {
 }, FORBIDDEN_HEADS);
 
 // (г) Ровно три карточки в заданном порядке, первая раскрыта, две свёрнуты.
-await t('(г) в каждой из 42 сцен три карточки панели в одном порядке', async () => {
+await t('(г) в каждой из 43 сцен три карточки панели в одном порядке', async () => {
   const bad = panelSweep.filter(r =>
     r.cards.map(c => c.id).join() !== WANT_CARDS.join()
     || !(r.cards[0].open === true && r.cards[1].open === false && r.cards[2].open === false)
     || r.cards[0].name !== 'Ввод функций'
     || r.cards[0].controls === 0);
-  // 42 маршрута: 41 сцена плюс ключ 'taxes' — объединённый сюжет налогов,
-  // рядом с которым 'tax' и 'tax-adv' оставлены рабочими синонимами.
-  if (panelSweep.length !== 42) return `сцен ${panelSweep.length}, а не 42`;
+  // 43 маршрута: 41 прежняя сцена, ключ 'taxes' (объединённый сюжет налогов,
+  // рядом с которым 'tax' и 'tax-adv' оставлены синонимами) и новый 'quota'.
+  if (panelSweep.length !== 43) return `сцен ${panelSweep.length}, а не 43`;
   return bad.length === 0
     || bad.map(r => r.key + ' [' + r.cards.map(c => c.id + (c.open ? '+' : '-')).join(' ') + ']').join('; ');
 });

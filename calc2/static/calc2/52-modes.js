@@ -29,7 +29,7 @@ function setRanges(qmax, pmax, opts) {
     const e = document.getElementById(id); if (e) e.max = pmax;
   });
   // Квота меряется в ЕДИНИЦАХ товара — её предел задаёт масштаб количества (Фаза 4в).
-  ['open-quota-slider', 'open-quota-input'].forEach(id => { const e = document.getElementById(id); if (e) e.max = qmax; });
+  ['open-quota-slider', 'open-quota-input', 'quota-slider', 'quota-input'].forEach(id => { const e = document.getElementById(id); if (e) e.max = qmax; });
 }
 
 /* Поля границ в меню плоскости показывают то, что на экране прямо сейчас:

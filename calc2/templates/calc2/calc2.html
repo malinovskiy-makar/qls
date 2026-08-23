@@ -230,14 +230,15 @@
           <span class="scard-name">Пол и потолок цены</span>
           <span class="scard-desc">Фиксированная цена, дефицит или избыток, объём торговли по короткой стороне.</span>
         </button>
-        <button class="scard soon" data-scene="quota" disabled>
+        <button class="scard" data-scene="quota">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <rect x="18" y="30" width="46" height="26" fill="var(--curve-reg)" opacity=".16"/>
             <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
             <path d="M64 78 V12" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
-          <span class="scard-head"><span class="scard-name">Квоты</span><span class="scard-soon">Скоро</span></span>
-          <span class="scard-desc">Прямое ограничение объёма: цена по спросу, рента квоты у продавца.</span>
+          <span class="scard-name">Квоты</span>
+          <span class="scard-desc">Прямое ограничение объёма: цена не определена однозначно, а лежит в коридоре.</span>
         </button>
         <button class="scard" data-scene="elast">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
@@ -2196,6 +2197,7 @@
             <button class="seg-btn" id="seg-sub">Субсидия</button>
             <button class="seg-btn" id="seg-ceil">Потолок</button>
             <button class="seg-btn" id="seg-floor">Пол</button>
+            <button class="seg-btn" id="seg-quota">Квота</button>
           </div>
           <!-- УРОВЕНЬ 2 каскада: вид налога (или вид субсидии). Ряд один на оба
                случая — меняются подписи кнопок, а третья кнопка «Акциз» видна
@@ -2246,6 +2248,30 @@
                      style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
             </div>
           </div>
+          <!-- Поле объёма квоты (уровень 5 каскада для вида «Квота») -->
+          <div class="field" id="quota-field" style="margin-top:8px;display:none;">
+            <label>Квота Q<sub>к</sub> = <b id="quota-val">0</b></label>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+              <input type="range" id="quota-slider" min="0" max="100" step="1" value="0"
+                     style="flex:1;margin-top:0;">
+              <input type="number" id="quota-input" min="0" max="100" step="0.1" value="0"
+                     style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+            </div>
+          </div>
+          <!-- Выбор цены ВНУТРИ коридора. Ползунок размечен в долях коридора
+               (0 — нижняя граница P_s(квота), 100 — верхняя P_d(квота)), потому
+               что сами границы двигаются вместе с объёмом квоты. -->
+          <div class="field" id="quota-price-field" style="margin-top:8px;display:none;">
+            <label>Цена внутри коридора = <b id="quota-price-val">—</b></label>
+            <input type="range" id="quota-price-slider" min="0" max="100" step="1" value="50"
+                   style="width:100%;margin-top:4px;">
+            <div class="hint" id="quota-price-range" style="margin-top:2px;">коридора нет</div>
+          </div>
+          <div class="hint" id="quota-hint" style="display:none;">Квота ограничивает объём напрямую.
+            Если она НИЖЕ равновесного количества, рыночная цена не определена однозначно: подойдёт
+            любая цена от той, по которой продавцы готовы отдать этот объём, до той, по которой
+            покупатели готовы его выбрать. Двигайте цену внутри коридора — излишки перетекают
+            между сторонами, а их сумма и потери общества не меняются.</div>
           <div class="hint" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
             на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя
             и продавца можно тянуть мышью.</div>

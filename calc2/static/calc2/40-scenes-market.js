@@ -117,6 +117,40 @@ function recompute() {
     }
   }
 
+  /* КВОТА — прямое ограничение объёма (ночная сессия «вмешательство»).
+     Экономика сюжета:
+       • квота Qк ВЫШЕ равновесного объёма не связывает — рынок работает как обычно;
+       • квота НИЖЕ равновесного объёма задаёт КОРИДОР цен [S(Qк); D(Qк)]:
+         цена внутри него не определена однозначно, её выбирает пользователь;
+       • CS = ∫₀^Qк (D − P), PS = ∫₀^Qк (P − S) — при движении цены по коридору
+         они перетекают друг в друга;
+       • CS + PS = ∫₀^Qк (D − S) от цены НЕ зависит, и потери
+         DWL = ∫_Qк^Q* (D − S) тоже: обе величины считаются без участия P. */
+  STATE.quotaMode = compMarket && scenarioNone && (STATE.intervType === 'quota');
+  STATE.quotaActive = false;
+  STATE.qt = null;
+  if (STATE.quotaMode && STATE.D && STATE.S && STATE.eq && STATE.quota > 0) {
+    const Qq = STATE.quota;
+    const binding = Qq < STATE.eq.Q;
+    const Plo = evalCurve(STATE.S, Qq);   // нижняя граница коридора: цена предложения
+    const Phi = evalCurve(STATE.D, Qq);   // верхняя граница коридора: цена спроса
+    STATE.qt = { Qq, binding, Plo, Phi };
+    if (binding && isFinite(Plo) && isFinite(Phi) && Phi > Plo) {
+      const pos = Math.max(0, Math.min(1, STATE.quotaPos));
+      const P = Plo + (Phi - Plo) * pos;
+      STATE.qt.P = P;
+      STATE.qt.pos = pos;
+      STATE.qt.width = Phi - Plo;
+      STATE.qt.cs = integrate(q => evalCurve(STATE.D, q) - P, 0, Qq);
+      STATE.qt.ps = integrate(q => P - evalCurve(STATE.S, q), 0, Qq);
+      STATE.qt.sw = STATE.qt.cs + STATE.qt.ps;
+      // Потери — площадь между D и S от квоты до равновесного объёма.
+      // Цена в это выражение не входит: трапеция от положения ползунка не зависит.
+      STATE.qt.dwl = areaBetween(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), Qq, STATE.eq.Q);
+      STATE.quotaActive = true;
+    }
+  }
+
   // Монополия: оптимум MR = MC, цена берётся с кривой спроса (Задача 3).
   STATE.mono = null;
   if (STATE.market === 'monopoly' && STATE.D && (mcSourceCurve() || curveByRole('tc'))) {
@@ -1071,10 +1105,18 @@ function applyIntervCascade() {
   const type = STATE.intervType;
   const comp = (STATE.market !== 'monopoly');
   const isRate = (type === 'tax' || type === 'subsidy');
+  const isQuota = (type === 'quota');
+  const isPrice = (type === 'ceiling' || type === 'floor');
   const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
-  // Уровень 5 — значение: ставка у налога/субсидии, цена у потолка/пола.
-  show('tax-field', isRate);   show('tax-hint', isRate);
-  show('pc-field', !isRate);   show('pc-hint', !isRate);
+  // Уровень 5 — значение: ставка у налога/субсидии, цена у потолка/пола,
+  // объём у квоты (и вслед за ним — выбор цены внутри коридора).
+  show('tax-field', isRate);    show('tax-hint', isRate);
+  show('pc-field', isPrice);    show('pc-hint', isPrice);
+  show('quota-field', isQuota); show('quota-hint', isQuota);
+  // Ползунок цены появляется ТОЛЬКО когда коридор существует: квота задана и
+  // связывает. Пока квоты нет или она не связывает, выбирать нечего.
+  show('quota-price-field', isQuota && !!STATE.quotaActive);
+  if (isQuota) updateQuotaPriceLabel();
 
   // Уровень 2 — вид налога / вид субсидии. Только в конкуренции: в монополии
   // налог входит в MC (monopolyTax), процентная форма туда не переносится.
@@ -1132,6 +1174,15 @@ function setType(type) {
 
   if (isTax) {
     applyTaxRateBounds();   // подпись ставки (t / s / τ,%) и пределы ползунка
+  } else if (type === 'quota') {
+    /* Единый механизм: выбрал вид — его настройка появилась уже рабочей.
+       Пустая квота показывала бы обычное равновесие и «задайте объём», то есть
+       выбор вида ничего не менял бы на графике. Стартуем связывающей квотой
+       в четырёх пятых равновесного объёма — коридор виден сразу. */
+    if (!(STATE.quota > 0) && STATE.eq && STATE.eq.Q > 0) {
+      STATE.quotaPos = 0.5;
+      setQuotaFields(Math.round(STATE.eq.Q * 0.8 * 10) / 10);
+    }
   } else {
     const pl = document.getElementById('pc-letter');
     if (pl) pl.textContent = (type === 'ceiling') ? 'Pc' : 'Pf';
@@ -1761,6 +1812,182 @@ function updatePcPanel() {
   box.innerHTML = html;
 }
 
+/* =====================================================================
+   БЛОК 8е. КВОТА — прямое ограничение объёма.
+   Смысл сюжета: при связывающей квоте рыночная цена НЕ ОПРЕДЕЛЕНА
+   однозначно, а лежит в коридоре [S(Qк); D(Qк)]. Пользователь выбирает
+   цену внутри коридора ползунком; излишки перетекают, их сумма и
+   трапеция потерь стоят на месте.
+   ===================================================================== */
+
+// Заполнить поля квоты, НЕ перерисовывая: нужно там, где перерисовка идёт
+// следом сама (setType) — иначе redrawAll вызывается дважды подряд.
+function setQuotaFields(q) {
+  const slider = document.getElementById('quota-slider');
+  const maxQ = slider ? (parseFloat(slider.max) || CONFIG.Qmax) : CONFIG.Qmax;
+  q = Math.max(0, Math.min(q, maxQ));
+  STATE.quota = q;
+  if (slider) slider.value = q;
+  const lbl = document.getElementById('quota-val'); if (lbl) lbl.textContent = fmt(q);
+  const inp = document.getElementById('quota-input'); if (inp) inp.value = fmtInput(q);
+}
+
+// Объём квоты: единый путь для ползунка и числового поля.
+function setQuota(q) {
+  setQuotaFields(q);
+  redrawAll();
+}
+
+// Положение цены внутри коридора: 0 — нижняя граница, 1 — верхняя.
+// Ползунок размечен в процентах: доля коридора читается без пересчёта окна.
+function setQuotaPos(pos) {
+  pos = Math.max(0, Math.min(1, pos));
+  STATE.quotaPos = pos;
+  const slider = document.getElementById('quota-price-slider');
+  if (slider) slider.value = Math.round(pos * 100);
+  updateQuotaPriceLabel();
+  redrawAll();
+}
+
+// Подпись под ползунком цены: сама цена и границы коридора.
+function updateQuotaPriceLabel() {
+  const lbl = document.getElementById('quota-price-val');
+  if (!lbl) return;
+  const q = STATE.qt;
+  lbl.textContent = (q && q.P != null) ? fmt(q.P) : '—';
+  const rng = document.getElementById('quota-price-range');
+  if (rng) rng.textContent = (q && q.P != null)
+    ? 'коридор от ' + fmt(q.Plo) + ' до ' + fmt(q.Phi)
+    : 'коридора нет';
+}
+
+// Заливки при связывающей квоте: CS, PS и трапеция потерь.
+function drawQuotaAreas() {
+  if (!STATE.quotaActive) return;
+  const { Qq, P } = STATE.qt;
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
+  const s1 = samp(0, Qq);
+  if (STATE.showCS) {   // CS — между выбранной ценой (низ) и спросом (верх)
+    const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(STATE.D, d)));
+    g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16)
+      .attr('data-legend', 'Излишек покупателя (CS)');
+  }
+  if (STATE.showPS) {   // PS — между предложением (низ) и выбранной ценой (верх)
+    const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(P));
+    g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16)
+      .attr('data-legend', 'Излишек продавца (PS)');
+  }
+  // Потери — площадь между D и S от квоты до равновесного объёма.
+  const lo = Math.min(Qq, STATE.eq.Q), hi = Math.max(Qq, STATE.eq.Q);
+  if (hi > lo) {
+    const s2 = samp(lo, hi);
+    const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(d => sy(evalCurve(STATE.D, d)));
+    g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28)
+      .attr('data-legend', 'Потери общества (DWL)');
+  }
+}
+
+// Линия квоты, закрашенный коридор возможных цен и выбранная цена внутри него.
+function drawQuotaLines() {
+  if (!STATE.quotaMode) return;
+  const q = STATE.qt;
+  if (!q) { drawEquilibrium(); return; }
+  const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax);
+  const g = svg.append('g');
+  const xQ = sx(q.Qq);
+
+  // Вертикаль разрешённого объёма — это и есть сама квота.
+  g.append('line').attr('x1', xQ).attr('y1', oy).attr('x2', xQ).attr('y2', sy(CONFIG.Pmax))
+    .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
+  axisValueX(g, xQ, oy, fmt(q.Qq), 'к');
+
+  if (!STATE.quotaActive) {
+    // Квота выше равновесного объёма не связывает: коридора нет, рынок обычный.
+    drawEquilibrium();
+  } else {
+    const yLo = sy(q.Plo), yHi = sy(q.Phi), yP = sy(q.P);
+    // КОРИДОР возможных цен — закрашенная полоса от P_s(квота) до P_d(квота)
+    // на участке, где сделки и происходят (от нуля до квоты).
+    g.append('rect').attr('x', ox).attr('y', Math.min(yLo, yHi))
+      .attr('width', Math.max(0, xQ - ox)).attr('height', Math.abs(yLo - yHi))
+      .attr('fill', COL.reg).attr('opacity', 0.12)
+      .attr('data-legend', 'Коридор возможных цен');
+    // Границы коридора — тонкий пунктир с числами на оси цены.
+    [[q.Plo, 's'], [q.Phi, 'd']].forEach(([val, idx]) => {
+      const y = sy(val);
+      g.append('line').attr('x1', ox).attr('y1', y).attr('x2', xQ).attr('y2', y)
+        .attr('stroke', COL.reg).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+      axisValueY(g, ox, y, val, idx);
+    });
+    // Выбранная цена — сплошная линия внутри коридора и точка сделки на квоте.
+    g.append('line').attr('x1', ox).attr('y1', yP).attr('x2', xMax).attr('y2', yP)
+      .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
+    g.append('circle').attr('cx', xQ).attr('cy', yP).attr('r', 4)
+      .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    // Тянуть цену можно прямо на графике — тем же жестом, что и линию потолка.
+    const hit = g.append('rect')
+      .attr('x', ox).attr('y', yP - 12).attr('width', Math.max(0, xMax - ox)).attr('height', 24)
+      .attr('fill', 'transparent').style('cursor', 'grab');
+    attachQuotaDrag(hit);
+  }
+}
+
+// Перетаскивание цены внутри коридора: за его края цена не выходит.
+function attachQuotaDrag(sel) {
+  sel.call(d3.drag()
+    .container(() => svg.node())
+    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('drag', (event) => {
+      const q = STATE.qt;
+      if (!q || q.width == null || !(q.width > 0)) return;
+      setQuotaPos((sy.invert(event.y) - q.Plo) / q.width);
+    })
+    .on('end', () => { document.body.style.cursor = ''; }));
+}
+
+// Табло квоты: коридор, выбранная цена, перетекание излишков и потери.
+function updateQuotaPanel() {
+  // Ползунок цены живёт ровно столько, сколько существует коридор: сам
+  // коридор появляется только у связывающей квоты, и знать об этом можно
+  // лишь ПОСЛЕ расчёта — поэтому видимость обновляется здесь, а не в каскаде.
+  const pf = document.getElementById('quota-price-field');
+  if (pf) pf.style.display = STATE.quotaActive ? '' : 'none';
+  updateQuotaPriceLabel();
+  const box = document.getElementById('info-tax');
+  if (!box) return;
+  if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Сначала отметьте кривые D и S.</div>'; return; }
+  if (!STATE.eq) { box.innerHTML = '<div class="warn">Равновесие не найдено.</div>'; return; }
+  const q = STATE.qt;
+  if (!q || !(STATE.quota > 0)) {
+    box.innerHTML = '<div class="muted">Задайте разрешённый объём — квоту.</div>';
+    return;
+  }
+  if (!q.binding) {
+    box.innerHTML = `<div class="warn">Квота ${fmt(q.Qq)} больше равновесного объёма (Q*=${fmt(STATE.eq.Q)}), ` +
+      'поэтому не связывает. Рынок работает как обычно, коридора цен нет.</div>';
+    return;
+  }
+  let html = `<div class="stat"><span>Коридор цен</span><b>${fmt(q.Plo)} … ${fmt(q.Phi)}</b></div>`;
+  html += `<div class="stat"><span>Выбранная цена</span><b>${fmt(q.P)}</b></div>`;
+  const rows = [
+    ['Q', STATE.eq.Q, q.Qq],
+    ['CS', STATE.cs, q.cs],
+    ['PS', STATE.ps, q.ps],
+    ['CS + PS', STATE.sw, q.sw],
+    ['DWL', 0, q.dwl],
+  ];
+  html += '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
+  rows.forEach(([k, a, b]) => {
+    html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${fmtDiff(b, a)}</td></tr>`;
+  });
+  html += '</table>';
+  html += '<div class="hint" style="margin-top:6px;">Двигая цену внутри коридора, вы перекладываете выигрыш ' +
+    'между покупателем и продавцом. Сумма CS + PS и треугольник потерь при этом не меняются: ' +
+    'цена в их расчёт не входит.</div>';
+  box.innerHTML = html;
+}
+
 /* ---------------------------------------------------------------------
    БЛОК 8в. «БЫЛО → СТАЛО» — бледный слой исходного состояния (Задача 2).
    При любом активном вмешательстве (налог / субсидия / потолок / пол)
@@ -1771,7 +1998,7 @@ function updatePcPanel() {
    --------------------------------------------------------------------- */
 function drawGhost() {
   if (!STATE.showGhost) return;
-  if (!(STATE.taxActive || STATE.pcActive || STATE.shiftActive) || !STATE.eq) return;
+  if (!(STATE.taxActive || STATE.pcActive || STATE.quotaActive || STATE.shiftActive) || !STATE.eq) return;
   const { Q, P } = STATE.eq;               // исходное равновесие E₀ (до вмешательства)
   const [px, py] = toPx(Q, P);
   const ox = sx(0), oy = sy(0);

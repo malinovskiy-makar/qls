@@ -120,13 +120,15 @@ function redrawScene() {
     // Конкуренция, обычный сценарий: заливки + кривые + равновесие/вмешательство.
     if (STATE.taxActive) drawTaxAreas();
     else if (STATE.pcActive) drawPcAreas();
+    else if (STATE.quotaActive) drawQuotaAreas();
     else drawAreas();
     drawGhost();                 // бледный слой «было» под кривыми/точками
     drawCurves();
     drawShiftedSupply();         // пунктирная S + t (если налог активен)
-    // Точки/линии: налог E₀/E₁, регулирование цены или обычное равновесие E*.
+    // Точки/линии: налог E₀/E₁, регулирование цены, квота или равновесие E*.
     if (STATE.taxActive) drawTaxPoints();
     else if (STATE.pcMode) drawPriceControl();
+    else if (STATE.quotaMode) drawQuotaLines();
     else drawEquilibrium();
   }
   updateInfoPanel();
@@ -149,7 +151,9 @@ function redrawScene() {
     updateOpenPanel();
     const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
   } else {
-    if (STATE.pcMode) updatePcPanel(); else updateTaxPanel();
+    if (STATE.pcMode) updatePcPanel();
+    else if (STATE.quotaMode) updateQuotaPanel();
+    else updateTaxPanel();
     // Панель монополии очищаем, чтобы не висело старое из прошлого режима.
     const imono = document.getElementById('info-mono');
     if (imono) imono.innerHTML = '';

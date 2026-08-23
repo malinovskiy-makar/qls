@@ -20,7 +20,7 @@
 // постановки задачи, а не живой регулятор — иначе лента вырастает в три ряда и
 // закрывает график. Живой регулятор здесь один — сама ставка.
 const PULT_MOVABLE = ['mono-submode',                                          // монополия: под-режим
-  'taxside-row', 'tax-field', 'pc-field',                                      // рынок: вмешательство
+  'taxside-row', 'tax-field', 'pc-field', 'quota-field', 'quota-price-field',  // рынок: вмешательство
   'open-pw-field', 'open-tariff-field', 'open-quota-field',                    // открытая экономика
   'union-wage-field', 'labmin-field',                                  // труд: зарплата / МРОТ
   'ppft-price-field', 'tb-price-field',                                // КТВ: мировая цена (A / Б)
@@ -65,6 +65,11 @@ function pultRegulatorIds() {
       if (sideOn) ids.push('taxside-row');
       ids.push('tax-field');
       return ids;
+    }
+    if (t === 'quota') {
+      // Объём квоты — живой регулятор; выбор цены внутри коридора появляется
+      // рядом с ним ровно тогда, когда коридор есть.
+      return STATE.quotaActive ? ['quota-field', 'quota-price-field'] : ['quota-field'];
     }
     return ['pc-field'];   // потолок / пол
   }
@@ -927,6 +932,14 @@ function wireControls() {
   document.getElementById('seg-sub').addEventListener('click', () => setType('subsidy'));
   document.getElementById('seg-ceil').addEventListener('click', () => setType('ceiling'));
   document.getElementById('seg-floor').addEventListener('click', () => setType('floor'));
+  const segQuota = document.getElementById('seg-quota');
+  if (segQuota) segQuota.addEventListener('click', () => setType('quota'));
+  // Квота: объём и выбор цены внутри коридора.
+  const qSl = document.getElementById('quota-slider'), qIn = document.getElementById('quota-input');
+  if (qSl) qSl.addEventListener('input', () => setQuota(parseFloat(qSl.value)));
+  if (qIn) qIn.addEventListener('change', () => { const v = parseFloat(qIn.value); if (!isNaN(v)) setQuota(v); });
+  const qP = document.getElementById('quota-price-slider');
+  if (qP) qP.addEventListener('input', () => setQuotaPos(parseFloat(qP.value) / 100));
 
   // Сторона налога (Задача 1): продавец / покупатель.
   const tsbSel = document.getElementById('tsb-seller'), tsbBuy = document.getElementById('tsb-buyer');
