@@ -834,6 +834,13 @@ function isMonopolyScene() {
 function eqSectionTitle() {
   if (isMonopolyScene()) return 'Оптимум монополии: $MR = MC$';
   if (STATE.scenario === 'openecon') return 'Равновесие без торговли (автаркия)';
+  /* ⚠️ ПРИ СВЯЗЫВАЮЩЕМ ЦЕНОВОМ РЕГУЛИРОВАНИИ РАВНОВЕСИЯ НЕТ ВОВСЕ.
+     Цену назначает государство, величина спроса и величина предложения при
+     ней расходятся, и рынок не расчищается. Заголовок «Равновесие D = S» над
+     этими числами был бы неправдой, поэтому он меняется вместе с числами. */
+  if (STATE.pcActive && STATE.pc) return STATE.pc.isCeiling ? 'Рынок при потолке цены' : 'Рынок при поле цены';
+  if (STATE.quotaActive) return 'Рынок при квоте';
+  if (STATE.taxActive) return (STATE.intervType === 'subsidy') ? 'Рынок после субсидии' : 'Рынок после налога';
   return 'Равновесие $D = S$';
 }
 
@@ -849,6 +856,53 @@ function updateEqSectionTitle() {
   t.dataset.raw = raw;
   t.textContent = raw;
   if (typeof renderMathIn === 'function') renderMathIn(t);
+}
+
+/* Ключевые значения РЫНКА С ВМЕШАТЕЛЬСТВОМ. Возвращает готовую разметку или
+   null, если вмешательства нет (или оно не связывает) — тогда табло печатает
+   обычное равновесие.
+
+   Числа берутся из того же расчёта, по которому рисуется график
+   (STATE.pc / STATE.taxEq / STATE.qt), — никакой параллельной математики. */
+function interventionKeyValues() {
+  const was = 'Равновесие без вмешательства: $Q^* = ' + fmt(STATE.eq.Q)
+            + '$, $P^* = ' + fmt(STATE.eq.P) + '$.';
+
+  // (1) Потолок и пол цены. Связывают — равновесия нет, есть Qd, Qs и разрыв.
+  if (STATE.pcActive && STATE.pc) {
+    const pc = STATE.pc;
+    const isC = pc.isCeiling;
+    return `<div class="stat"><span>${isC ? '$P_c$ (потолок цены)' : '$P_f$ (пол цены)'}</span><b>${fmt(pc.Preg)}</b></div>` +
+      `<div class="stat"><span>$Q_d$ (величина спроса)</span><b>${fmt(pc.Qd)}</b></div>` +
+      `<div class="stat"><span>$Q_s$ (величина предложения)</span><b>${fmt(pc.Qs)}</b></div>` +
+      `<div class="stat"><span>${isC ? 'Дефицит' : 'Избыток'}</span><b>${fmt(pc.gap)}</b></div>` +
+      `<div class="stat"><span>$DWL$ (потери общества)</span><b>${fmt(pc.dwl)}</b></div>` +
+      `<div class="hint">Цену назначило государство, поэтому равновесия нет: ` +
+      `по цене ${fmt(pc.Preg)} рынок не расчищается. Торгуется короткая сторона — ${fmt(pc.Qtrade)}. ` +
+      was + `</div>`;
+  }
+
+  // (2) Налог и субсидия. Рынок расчищается, но цен становится ДВЕ.
+  if (STATE.taxActive && STATE.taxEq) {
+    const t = STATE.taxEq;
+    const sub = (STATE.intervType === 'subsidy');
+    return `<div class="stat"><span>$Q$ (объём торговли)</span><b>${fmt(t.Q)}</b></div>` +
+      `<div class="stat"><span>$P_b$ (платит покупатель)</span><b>${fmt(t.Pb)}</b></div>` +
+      `<div class="stat"><span>$P_s$ (получает продавец)</span><b>${fmt(t.Ps)}</b></div>` +
+      `<div class="hint">Цена покупателя и цена продавца разошлись на ` +
+      `${sub ? 'субсидию' : 'налог'} — одной цены на этом рынке больше нет. ` + was + `</div>`;
+  }
+
+  // (3) Квота. Объём задан прямо, а цена не определена — она лежит в коридоре.
+  if (STATE.quotaActive && STATE.qt) {
+    const q = STATE.qt;
+    return `<div class="stat"><span>$Q$ (объём торговли)</span><b>${fmt(q.Qq)}</b></div>` +
+      `<div class="stat"><span>$P$ (выбранная цена)</span><b>${fmt(q.P)}</b></div>` +
+      `<div class="stat"><span>Коридор возможных цен</span><b>${fmt(q.Plo)} … ${fmt(q.Phi)}</b></div>` +
+      `<div class="hint">Квота ниже равновесного объёма, поэтому одной цены рынок не задаёт: ` +
+      `подойдёт любая внутри коридора. ` + was + `</div>`;
+  }
+  return null;
 }
 
 // Табло слева: показываем Q* и P* (или подсказку / «не найдено»).
@@ -874,6 +928,23 @@ function updateInfoPanel() {
       'либо отодвиньте границы плоскости.</div>';
     return;
   }
+  /* ⚠️ ТАБЛО ПОКАЗЫВАЕТ ТО, ЧТО НА РЫНКЕ НА САМОМ ДЕЛЕ (приёмка владельца 24.08).
+     До правки здесь всегда печаталось STATE.eq — голое пересечение D и S, то
+     есть равновесие БЕЗ вмешательства. График при этом рисовался по ветке
+     регулирования, и на одном экране стояли числа из двух разных миров:
+     замер — потолок 30 при D = 100 − Q и S = Q давал в табло «Q* 50, P* 50»,
+     хотя по цене 30 величина спроса 70, величина предложения 30 и дефицит 40.
+     Оговорка «до вмешательства государства» этого не спасала: она объясняла
+     ЧУЖОЕ число вместо того, чтобы показать своё.
+
+     Роли блоков при этом не смешиваются: «Ключевые значения» отвечают на
+     вопрос «что сейчас», а «Вмешательство» — на вопрос «как изменилось»
+     (таблица До/После остаётся там и здесь не повторяется).
+     Несвязывающее регулирование (потолок выше равновесной цены, пол ниже)
+     равновесия не отменяет — там всё по-прежнему. */
+  const pcOut = interventionKeyValues();
+  if (pcOut) { box.innerHTML = pcOut; return; }
+
   let html =
     `<div class="stat"><span>$Q^*$ (количество)</span><b>${fmt(STATE.eq.Q)}</b></div>` +
     `<div class="stat"><span>$P^*$ (цена)</span><b>${fmt(STATE.eq.P)}</b></div>` +
@@ -920,7 +991,10 @@ function drawAreas() {
    ПОД числами, а не в сноске, и называет область действия. */
 function beforeInterventionNote() {
   const pcOn = !!(STATE.pc && STATE.pc.binding && STATE.pReg > 0);
-  if (!STATE.taxActive && !pcOn) return '';
+  /* Квота — тоже вмешательство. Замер 24.08: при связывающей квоте оговорки
+     не было вовсе, и «CS 1 250» в «Излишках» читалось как нынешнее число,
+     хотя на деле относилось к рынку без квоты. */
+  if (!STATE.taxActive && !pcOn && !STATE.quotaActive) return '';
   return '<div class="scope-note">до вмешательства государства</div>';
 }
 

@@ -2059,9 +2059,15 @@ const CASES = [
        КЛЮЧУ КАРТОЧКИ: STATE.market для этого не годится — после монополии
        флаг остаётся поднятым в сценах рынка труда. */
     name: 'Монополия · раздел равновесия не обещает D = S',
-    run: `var out = { badTitle: 0, stuck: 0, monoOk: 0, compOk: 0, autarky: 0 };
+    run: `var out = { badTitle: 0, stuck: 0, monoOk: 0, compOk: 0, autarky: 0, intervBad: 0, intervOk: 0 };
           var mono = ['mono', 'mono-nat', 'mono-d1', 'mono-d3', 'mono-kink', 'monoexport'];
-          var comp = ['sd', 'tax', 'ceil', 'elast', 'ext'];
+          /* Конкурентные сцены БЕЗ вмешательства: заголовок «D = S» верен.
+             «tax» и «ceil» открываются с уже включённым вмешательством
+             (замер 24.08: taxActive и pcActive подняты сразу при входе),
+             и «Равновесие D = S» там было бы неправдой — заголовок обязан
+             называть то, что на рынке на самом деле. */
+          var comp = ['sd', 'elast', 'ext'];
+          var interv = ['tax', 'ceil'];
           var title = function () {
             var s = document.getElementById('sec-eq');
             var t = s && s.querySelector('.section-title');
@@ -2081,6 +2087,11 @@ const CASES = [
             pickScene(k); redrawAll();
             if (/D\\s*=\\s*S/.test(title())) out.compOk++;
           });
+          interv.forEach(function (k) {
+            resetSceneMemory(); pickScene(k); redrawAll();
+            if (/D\\s*=\\s*S/.test(title())) out.intervBad++;
+            if (/Рынок (после|при)/.test(title())) out.intervOk++;
+          });
           pickScene('smallopen'); redrawAll();
           if (/автарки/i.test(title())) out.autarky = 1;
           pickScene('sd');
@@ -2088,7 +2099,9 @@ const CASES = [
     checks: [['монопольных с «D = S»', 'badTitle', 0, 0],
              ['монопольных с застрявшей подсказкой', 'stuck', 0, 0],
              ['монопольных с «MR = MC»', 'monoOk', 6, 0],
-             ['конкурентных с «D = S»', 'compOk', 5, 0],
+             ['конкурентных без вмешательства с «D = S»', 'compOk', 3, 0],
+             ['сцен с вмешательством, где всё ещё обещают «D = S»', 'intervBad', 0, 0],
+             ['сцен с вмешательством, где заголовок называет рынок', 'intervOk', 2, 0],
              ['малая открытая: автаркия', 'autarky', 1, 0]],
   },
   {
