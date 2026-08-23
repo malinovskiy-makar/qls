@@ -1313,6 +1313,43 @@ function cornerByValue(Xmax, Ymax, ratio) {
 }
 
 // Расчёт КТВ: точка производства и линия торговых возможностей.
+/* ТОЧКА ПРОИЗВОДСТВА ПО НАИБОЛЬШЕЙ ЦЕННОСТИ ВЫПУСКА.
+   Страна производит там, где выпуск в мировых ценах стоит дороже всего, то
+   есть где максимальна величина Y + (Px/Py)·X. Это ОДНО правило на все формы
+   КПВ: у прямой и у выпуклой максимум всегда в углу (прежнее поведение
+   сохраняется), у вогнутой — во внутренней точке, а у ВОГНУТОЙ КУСОЧНОЙ он
+   садится ровно в излом. Особого пути для излома здесь нет и заводить его не
+   надо — в проекте уже убирали такой особый путь у ключевых точек.
+
+   ⚠️ Замер 24.08 до правки. Кусочная КПВ Y = 100 − 0,5·X при X < 40 и
+   Y = 160 − 2·X при X ≥ 40 (стык в (40; 80), ось при X = 80) при мировой цене
+   Px/Py = 1 давала «специализация на Y», производство (0; 100). Ценность там
+   100, а в изломе 40·1 + 80 = 120 — движок выбирал заведомо худшую точку,
+   потому что кусочная не опознавалась ни как прямая, ни как дуга и уходила в
+   ветку «только углы».
+
+   Сетка с уточнением, а не аналитика: КПВ приходит формулой любого вида, и
+   производной у неё в изломе просто нет. Четыре прохода по 400 узлов сужают
+   отрезок в 400 раз каждый — стык находится точно. */
+function bestByValue(f, Xmax, Ymax, ratio) {
+  const val = (x) => { const y = f(x); return isFinite(y) ? (y + ratio * x) : -Infinity; };
+  let lo = 0, hi = Xmax, bx = 0, bv = val(0);
+  for (let pass = 0; pass < 4; pass++) {
+    const N = 400, step = (hi - lo) / N;
+    if (!(step > 0)) break;
+    for (let i = 0; i <= N; i++) {
+      const x = lo + step * i, v = val(x);
+      if (v > bv + 1e-12) { bv = v; bx = x; }
+    }
+    lo = Math.max(0, bx - step); hi = Math.min(Xmax, bx + step);
+  }
+  const eps = Math.max(Xmax * 1e-6, 1e-9);
+  if (bx <= eps) return { xp: 0, yp: Ymax, regime: 'специализация на Y' };
+  if (bx >= Xmax - eps) return { xp: Xmax, yp: 0, regime: 'специализация на X' };
+  const y = f(bx);
+  return { xp: bx, yp: isFinite(y) ? y : 0, regime: 'касание (внутр. точка)' };
+}
+
 function recomputePpfTrade() {
   STATE.ppfTradeData = null;
   const r = parsePpfEquation(STATE.ppftFormula);
@@ -1341,8 +1378,8 @@ function recomputePpfTrade() {
     else if (ratio > b) { xp = Xmax; yp = 0; regime = 'специализация на X'; }
     else { xp = 0; yp = Ymax; regime = 'специализация на Y'; }
   } else {
-    // Выпуклая / неизвестная: угол по ценности (для выпуклой оптимум всегда в углу).
-    ({ xp, yp, regime } = cornerByValue(Xmax, Ymax, ratio));
+    // Выпуклая, кусочная или незнакомая форма — общее правило по ценности.
+    ({ xp, yp, regime } = bestByValue(f, Xmax, Ymax, ratio));
   }
   let line = null, xint = null, yint = null;
   if (regime !== 'нет торговли' && xp != null) {
