@@ -17,6 +17,12 @@ function redrawAll() {
   keepAxisNamesInside(); // и название оси зажимается по ФАКТИЧЕСКОМУ кеглю
   spreadLabels();        // и разведение наложившихся — тем же приёмом (А60)
   applyLabelInk();       // и читаемые чернила подписей — тем же приёмом (П75)
+  /* ⚠️ ОБОЗНАЧЕНИЯ НАБИРАЮТСЯ МАТЕМАТИКОЙ В САМОМ КОНЦЕ, ПОСЛЕ ВСЕХ СЛОЁВ.
+     Первый заход стоял внутри drawOverlays, и подписи, которые сцена рисует
+     позже (S в «Налогах», ATC и MC в естественной монополии, TC в «Сложении
+     заводов»), правило уже не заставало: замер 24.08 находил их обычным
+     шрифтом. Здесь холст собран целиком, кто бы что ни дорисовал. */
+  typesetChartLabels();
   refreshRegulators();   // строки «имя = значение» идут за значениями ползунков
   // Заголовок раздела равновесия — свойство сцены (А52). Синхронизируем здесь,
   // а не только в рыночном пересчёте: иначе в сцене, куда пришли из монополии,
@@ -429,6 +435,7 @@ function drawOverlays() {
    а на отпускании скачком превращались в формулы. */
 function refreshAnalyticsPanel() {
   syncAnalyticsPanel();                                // разбор уезжает в свой блок
+  typesetChartLabels();                                // обозначения на графике — математикой
   renderMathIn(document.getElementById('sb-body'));    // формулы в аналитике
   typesetStats(document.getElementById('sb-body'));    // Н6: числа тоже формулой
 }
@@ -2385,6 +2392,70 @@ function expandImplicitMul(expr) {
     if (after) return name;
     if (!/^[A-Za-z]+$/.test(name)) return name;
     return name.split('').join('*');
+  });
+}
+
+
+/* ── Подписи графика набираются МАТЕМАТИКОЙ ───────────────────────────
+   Правило владельца: любые СЛОВА — шрифтом сайта, любая МАТЕМАТИКА —
+   набрана формулой. В разметке за это отвечает KaTeX, но подписи графика
+   живут в SVG, куда KaTeX не встаёт: там надо взять его же шрифты руками.
+   Так это и делает сам KaTeX — переменная идёт наклонным математическим
+   начертанием (KaTeX_Math), многобуквенное обозначение прямым (KaTeX_Main),
+   как \mathrm{MC}.
+
+   ⚠️ ТРОГАЕМ ТОЛЬКО ПОДПИСЬ, КОТОРАЯ ЦЕЛИКОМ ОБОЗНАЧЕНИЕ. Смешанную фразу
+   («Излишек покупателя (CS)») пришлось бы резать на куски и собирать из
+   tspan, а это переносы и съехавшая привязка. Такие подписи остаются в
+   описи долга (night2_font_audit.mjs) и чинятся отдельной задачей. */
+const CHART_MATH_WORDS = new Set(['MC','MR','TC','ATC','AVC','AFC','FC','VC','TR','TP','MP','AP',
+  'MPL','MRP','Qd','Qs','Pd','Ps','Pb','Pw','Pc','Pf','CS','PS','DWL','AD','AS','SRAS','LRAS',
+  'IS','LM','GDP','MSB','MSC','SW','Qm','Pm','Qc','Px','Py']);
+// Одна буква, при желании со звёздочкой, штрихом, цифрой или индексом.
+const CHART_MATH_LETTER = /^[A-Za-z](?:[*′']|[0-9]|[₀-₉]|_[A-Za-z0-9]+)?$/;
+
+
+// Видимый текст подписи SVG: всё, кроме всплывающей подсказки <title>.
+function visibleSvgText(t) {
+  let out = '';
+  const walk = (n) => {
+    for (const c of n.childNodes) {
+      if (c.nodeType === 3) { out += c.nodeValue; continue; }
+      if (c.nodeType !== 1) continue;
+      if (String(c.nodeName).toLowerCase() === 'title') continue;
+      walk(c);
+    }
+  };
+  walk(t);
+  return out.replace(/\s+/g, ' ').trim();
+}
+function typesetChartLabels() {
+  const root = document.getElementById('chart');
+  if (!root) return;
+  /* ⚠️ ИДЁМ ПО ВСЕМ ПОДПИСЯМ ХОЛСТА, А НЕ ТОЛЬКО ПО ДВУМ КЛАССАМ.
+     Замер 24.08: правило по .axis-name и .curve-name починило три строки из
+     сорока четырёх — остальные подписи 19 сцен рисуются мимо общего помощника
+     и этих классов не несут (известный долг, своя карточка). Правило про
+     шрифт от классов не зависит: подпись, которая ЦЕЛИКОМ обозначение,
+     набирается математикой, кто бы её ни нарисовал. Числа на осях под правило
+     не попадают — оно требует букву первой. */
+  root.querySelectorAll('text').forEach(t => {
+    /* ⚠️ ВИДИМАЯ ЧАСТЬ, А НЕ textContent. Внутри подписи лежит <title> —
+       всплывающая подсказка, и textContent склеивает её с самой подписью:
+       у легенды выходило «CSИзлишек покупателя (CS)», и правило не срабатывало
+       ни на что. Подсказку в расчёт не берём: её и набрать формулой нельзя. */
+    const s = visibleSvgText(t);
+    if (!s) return;
+    if (CHART_MATH_WORDS.has(s)) {
+      // Многобуквенное обозначение — прямое начертание, как \mathrm.
+      t.style.fontFamily = "'KaTeX_Main', 'Times New Roman', serif";
+      t.style.fontStyle = 'normal';
+      t.dataset.mathset = 'upright';
+    } else if (CHART_MATH_LETTER.test(s)) {
+      t.style.fontFamily = "'KaTeX_Math', 'Times New Roman', serif";
+      t.style.fontStyle = 'italic';
+      t.dataset.mathset = 'italic';
+    }
   });
 }
 
