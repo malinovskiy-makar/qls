@@ -372,6 +372,25 @@ function makePchip(labelText, valueText, color) {
   return { chip, lab, val };
 }
 
+/* ТОЧКА ОТСЧЁТА СДВИГА. Сдвиг — это смещение ОТ набранной формулы, поэтому
+   считается он от того свободного члена, с которым кривая пришла в панель.
+   Хранится на самой КРИВОЙ, а не на чипе: чип пересобирается при любой смене
+   набора кривых, и точка отсчёта уезжала бы вместе с ним.
+
+   ⚠️ Снимается точка отсчёта РОВНО в одном месте — `updateCurveExpr`
+   (80-ui.js), то есть при правке формулы через левую панель. Новая формула —
+   новая точка отсчёта, сдвиг ноль, ручка посередине.
+   Замер 24.08 до правки: в сцене «Спрос и предложение» набор «100-2*P» вместо
+   «100 - Q» давал «Сдвиг D = −50» и ручку в упоре у левого края — свободный
+   член сменился со 100 на 50, а точка отсчёта осталась прежней. Кривую при
+   этом никто не двигал: её только что набрали руками.
+   `setCurveFreeTerm` точку отсчёта НЕ трогает — он и есть сам сдвиг. */
+function curveShiftBase(c) {
+  if (!c || !c.linear) return 0;
+  if (c.shiftBase == null) c.shiftBase = c.linear.b;
+  return c.shiftBase;
+}
+
 // Построить (пересобрать) слайдеры кривых в контейнере #params-curves.
 function buildPultCurveChips(list) {
   const body = document.getElementById('params-body');
@@ -398,8 +417,8 @@ function buildPultCurveChips(list) {
        Свободный член кривой остаётся ЕДИНСТВЕННЫМ источником правды: сдвиг
        считается от значения, с которого модель открылась (base), и обратно в
        кривую кладётся тем же setCurveFreeTerm. */
-    const base = c.linear.b;
-    const { chip, lab, val } = makePchip(shiftChipLabel(c), fmt(0), c.color);
+    const base = curveShiftBase(c);
+    const { chip, lab, val } = makePchip(shiftChipLabel(c), fmt(c.linear.b - base), c.color);
     chip.dataset.cid = c.id;
     // Подсказку вешаем на сам чип: подпись .pchip-label заменяет
     // upgradeRegulator строкой «имя = значение», и title на ней пропал бы.
@@ -422,7 +441,10 @@ function buildPultCurveChips(list) {
        нуля оси цен. */
     const half = Math.max(1, CONFIG.Pmax / 2);
     sl.type = 'range'; sl.min = -half; sl.max = half; sl.step = 'any';
-    sl.value = 0;
+    // Ручка встаёт на ФАКТИЧЕСКИЙ сдвиг: у нетронутой кривой это ноль, то есть
+    // середина дорожки, а у сдвинутой — её настоящее положение. Жёсткий ноль
+    // здесь врал бы после пересборки панели.
+    sl.value = c.linear.b - base;
     sl.style.accentColor = c.color;   // акцент ползунка в цвет кривой
     // п. 78. Подсказка идёт через общую плашку, а не через нативный title:
     // тот не появляется ни с клавиатуры, ни на сенсорном экране.
@@ -431,9 +453,8 @@ function buildPultCurveChips(list) {
     // Слайдер → задаём b ТЕМ ЖЕ путём, что перетаскивание (по id, кривая могла пересоздаться).
     sl.addEventListener('input', () => {
       const cur = STATE.curves.find(x => x.id === c.id);
-      if (cur && cur.linear) setCurveFreeTerm(cur, base + parseFloat(sl.value));
+      if (cur && cur.linear) setCurveFreeTerm(cur, curveShiftBase(cur) + parseFloat(sl.value));
     });
-    chip._shiftBase = base;   // от какого свободного члена считается сдвиг
 
     // Дорожка с кликабельными границами — как у букв-параметров: один и тот же
     // ползунок во всех сценах, а не два похожих вида.
@@ -462,8 +483,7 @@ function syncPultCurveValues(list) {
     /* Ползунок несёт СДВИГ, поэтому синхронизируем разницу с базой, а не сам
        свободный член: иначе протяжка кривой мышью ставила бы в ползунок 85,22
        при размахе −50…50 и ручка улетала бы за край. */
-    const base = (chip._shiftBase == null) ? c.linear.b : chip._shiftBase;
-    const shift = c.linear.b - base;
+    const shift = c.linear.b - curveShiftBase(c);
     if (sl && document.activeElement !== sl) sl.value = shift;   // точное, см. п. 3
     if (val) val.textContent = fmt(shift);
     /* Видимая строка «Сдвиг D = …» это .reg-eq, её пишет upgradeRegulator;
