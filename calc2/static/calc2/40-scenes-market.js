@@ -103,7 +103,11 @@ function recompute() {
     const Qd = invCurve(STATE.D, Preg);   // объём спроса при цене Preg (D⁻¹)
     const Qs = invCurve(STATE.S, Preg);   // объём предложения при цене Preg (S⁻¹)
     const Qtrade = (Qd != null && Qs != null) ? Math.min(Qd, Qs) : null;  // короткая сторона
-    const gap = (Qd != null && Qs != null) ? Math.abs(Qd - Qs) : null;    // дефицит/избыток
+    /* Дефицит и избыток существуют, только когда регулирование СВЯЗЫВАЕТ.
+       Раньше разность считалась всегда, и у несвязывающего потолка в состоянии
+       лежало «40» — число, которого на этом рынке нет: по равновесной цене
+       рынок расчищается. Панель его не показывала, но состояние врало. */
+    const gap = (binding && Qd != null && Qs != null) ? Math.abs(Qd - Qs) : null;
     STATE.pc = { Preg, isCeiling, binding, Qd, Qs, Qtrade, gap };
     if (binding && Qtrade != null) {
       // CS / PS считаем интегрированием по фактическому объёму торговли.

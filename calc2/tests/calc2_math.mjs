@@ -123,7 +123,7 @@ const CASES = [
        вводят, общественная кривая MSC задаётся формулой во «Вводе функций».
        Рынок D = S ⇒ Q=50. Оптимум MSB = MSC ⇒ 100−Q = Q+20 ⇒ Q=40.
        DWL = ∫₄₀^50 (2q−80) dq = 100. Налог Пигу = D(40) − S(40) = 20. */
-    name: 'Внешний эффект ОТРИЦАТЕЛЬНЫЙ · MSC = Q+20 ⇒ Qрын=50, Qопт=40, DWL=100',
+    name: '(и) Внешний эффект ОТРИЦАТЕЛЬНЫЙ · MSC = Q+20 ⇒ Qрын=50, Qопт=40, DWL=100',
     run: `loadScene('ext'); STATE.mscOn = true; STATE.mscExpr = 'Q + 20';
           recompileSocial(); redrawAll();
           var e = STATE.ext || {};
@@ -275,7 +275,7 @@ const CASES = [
     checks: [['|Es| при Q=20', 'a', 1, 0.02], ['|Es| при Q=70', 'b', 1, 0.02]],
   },
   {
-    name: 'Внешний эффект ПОЛОЖИТЕЛЬНЫЙ · MSB = 120−Q ⇒ Qрын=50, Qопт=60, DWL=100',
+    name: '(к) Внешний эффект ПОЛОЖИТЕЛЬНЫЙ · MSB = 120−Q ⇒ Qрын=50, Qопт=60, DWL=100',
     /* Зеркало отрицательного случая: недопроизводство, лечится СУБСИДИЕЙ.
        Оптимум MSB = MSC ⇒ 120−Q = Q ⇒ Q=60, P = 60.
        DWL = ∫₅₀^60 (120−2q) dq = 100. Субсидия = |D(60) − S(60)| = 20
@@ -3235,6 +3235,193 @@ const CASES = [
           return { gap: gap, gapFlag: gapFlag };`,
     checks: [['зазор > 2px (флаг)', 'gapFlag', 1, 0.1], ['зазор, px (сырое)', 'gap', 4, 4]],
   },
+
+  /* =====================================================================
+     ВМЕШАТЕЛЬСТВО ГОСУДАРСТВА И ВНЕШНИЕ ЭФФЕКТЫ (ночная сессия 24.08).
+     Одиннадцать проверок (а)–(л) из задания. Ручные расчёты выписаны рядом
+     с каждой: тест сверяет движок с арифметикой, а не сам с собой.
+     Общая модель везде одна: D = 100 − Q, S = Q, значит Q* = 50, P* = 50.
+     ===================================================================== */
+  {
+    /* (а) Потоварный налог t = 20. S_после = Q + 20; 100 − Q = Q + 20 ⇒ Q₁ = 40.
+       Pb = D(40) = 60, Ps = S(40) = 40, сбор = 20·40 = 800,
+       DWL = ½·(50 − 40)·(60 − 40) = 100. */
+    name: '(а) Потоварный налог t=20 ⇒ Q1=40, Pb=60, Ps=40, сбор=800, DWL=100',
+    run: `pickScene('taxes'); setTaxForm('unit'); setTaxSide('seller'); setTax(20); redrawAll();
+          var te = STATE.taxEq || {};
+          return { Q1: te.Q, Pb: te.Pb, Ps: te.Ps, tx: STATE.tx, dwl: STATE.dwl };`,
+    checks: [['Q1', 'Q1', 40, 0.3], ['Pb', 'Pb', 60, 0.3], ['Ps', 'Ps', 40, 0.3],
+             ['сбор', 'tx', 800, 6], ['DWL', 'dwl', 100, 2]],
+  },
+  {
+    /* (б) НДС τ = 20 %: ставка берётся сверх цены продавца, значит предложение
+       ПОВОРАЧИВАЕТСЯ: S_после = 1,2·Q. 100 − Q = 1,2·Q ⇒ Q₁ = 100/2,2 = 45,4545.
+       Pb = 54,5455, Ps = 45,4545 (их отношение равно 1 + τ),
+       сбор = (54,5455 − 45,4545)·45,4545 = 413,2231,
+       DWL = ½·(50 − 45,4545)·9,0909 = 20,6612.
+       АКЦИЗ по механике потоварный: те же числа, что в случае (а). */
+    name: '(б) НДС τ=20% ⇒ Q1=45,4545, сбор=413,2231, DWL=20,6612; акциз = потоварный',
+    run: `pickScene('taxes'); setTaxForm('vat'); setTax(20); redrawAll();
+          var v = STATE.taxEq || {};
+          var res = { vQ: v.Q, vPb: v.Pb, vPs: v.Ps, vRatio: v.Pb / v.Ps, vTx: STATE.tx, vDwl: STATE.dwl };
+          pickScene('taxes'); setTaxForm('excise'); setTax(20); redrawAll();
+          var e = STATE.taxEq || {};
+          res.eQ = e.Q; res.ePb = e.Pb; res.ePs = e.Ps; res.eTx = STATE.tx; res.eDwl = STATE.dwl;
+          return res;`,
+    checks: [['НДС Q1', 'vQ', 45.4545, 0.02], ['НДС Pb', 'vPb', 54.5455, 0.02],
+             ['НДС Ps', 'vPs', 45.4545, 0.02], ['НДС Pb/Ps = 1+τ', 'vRatio', 1.2, 0.002],
+             ['НДС сбор', 'vTx', 413.2231, 0.6], ['НДС DWL', 'vDwl', 20.6612, 0.3],
+             ['акциз Q1', 'eQ', 40, 0.3], ['акциз Pb', 'ePb', 60, 0.3],
+             ['акциз Ps', 'ePs', 40, 0.3], ['акциз сбор', 'eTx', 800, 6], ['акциз DWL', 'eDwl', 100, 2]],
+  },
+  {
+    /* (в) Кто ФОРМАЛЬНО платит налог, экономику не меняет. Возвращаем сами
+       разности: они обязаны быть нулями до последнего разряда, а не «примерно». */
+    name: '(в) Плательщик налога не меняет ни Q1, ни цены, ни бремя, ни сбор',
+    run: `pickScene('taxes'); setTaxForm('unit'); setTax(20);
+          setTaxSide('seller'); redrawAll();
+          var a = STATE.taxEq || {}, aB = STATE.incBuyer, aS = STATE.incSeller, aT = STATE.tx, aD = STATE.dwl;
+          setTaxSide('buyer'); redrawAll();
+          var b = STATE.taxEq || {};
+          return { Q: a.Q, dQ: Math.abs(a.Q - b.Q), dPb: Math.abs(a.Pb - b.Pb), dPs: Math.abs(a.Ps - b.Ps),
+                   dBuyer: Math.abs(aB - STATE.incBuyer), dSeller: Math.abs(aS - STATE.incSeller),
+                   dTx: Math.abs(aT - STATE.tx), dDwl: Math.abs(aD - STATE.dwl) };`,
+    checks: [['Q1 при продавце', 'Q', 40, 0.3], ['разница Q1', 'dQ', 0, 1e-9],
+             ['разница Pb', 'dPb', 0, 1e-9], ['разница Ps', 'dPs', 0, 1e-9],
+             ['разница бремени покупателя', 'dBuyer', 0, 1e-9],
+             ['разница бремени продавца', 'dSeller', 0, 1e-9],
+             ['разница сбора', 'dTx', 0, 1e-9], ['разница DWL', 'dDwl', 0, 1e-9]],
+  },
+  {
+    /* (г) Потолок 30: Qd = 70, Qs = 30, дефицит 40, торгуется короткая сторона 30,
+       DWL = ∫₃₀^50 (100 − 2q) dq = 2500 − 2100 = 400.
+       Пол 70: Qs = 70, Qd = 30, избыток 40, та же торговля и тот же DWL.
+       НЕсвязывающие случаи (потолок 70 и пол 30) рынку не мешают вовсе. */
+    name: '(г) Потолок 30 и пол 70 ⇒ дефицит и избыток 40; несвязывающие не действуют',
+    run: `var take = function (type, p) {
+            resetSceneMemory(); pickScene('ceil'); setType(type); setPReg(p); redrawAll();
+            var pc = STATE.pc || {};
+            return { Qd: pc.Qd, Qs: pc.Qs, gap: pc.gap, dwl: pc.dwl, bind: pc.binding ? 1 : 0 };
+          };
+          var c = take('ceiling', 30), f = take('floor', 70);
+          var cw = take('ceiling', 70), fl = take('floor', 30);
+          return { cQd: c.Qd, cQs: c.Qs, cGap: c.gap, cDwl: c.dwl, cBind: c.bind,
+                   fQs: f.Qs, fQd: f.Qd, fGap: f.gap, fDwl: f.dwl, fBind: f.bind,
+                   wBind: cw.bind, lBind: fl.bind,
+                   wGap: (cw.gap == null ? 0 : 1), lGap: (fl.gap == null ? 0 : 1) };`,
+    checks: [['потолок Qd', 'cQd', 70, 0.3], ['потолок Qs', 'cQs', 30, 0.3],
+             ['дефицит', 'cGap', 40, 0.5], ['потолок DWL', 'cDwl', 400, 4], ['потолок связывает', 'cBind', 1, 0],
+             ['пол Qs', 'fQs', 70, 0.3], ['пол Qd', 'fQd', 30, 0.3],
+             ['избыток', 'fGap', 40, 0.5], ['пол DWL', 'fDwl', 400, 4], ['пол связывает', 'fBind', 1, 0],
+             ['потолок 70 не связывает', 'wBind', 0, 0], ['пол 30 не связывает', 'lBind', 0, 0],
+             ['и дефицита не считает', 'wGap', 0, 0], ['и избытка не считает', 'lGap', 0, 0]],
+  },
+  {
+    /* (д) Квота 40. Ниже цены S(40) = 40 продавцы этот объём не отдадут, выше
+       цены D(40) = 60 покупатели его не выберут: коридор ровно [40; 60]. */
+    name: '(д) Квота 40 ⇒ коридор возможных цен [40; 60]',
+    run: `pickScene('quota'); redrawAll();
+          var q = STATE.qt || {};
+          return { Qq: q.Qq, lo: q.Plo, hi: q.Phi, bind: q.binding ? 1 : 0, active: STATE.quotaActive ? 1 : 0 };`,
+    checks: [['объём квоты', 'Qq', 40, 1e-9], ['нижняя граница', 'lo', 40, 1e-6],
+             ['верхняя граница', 'hi', 60, 1e-6], ['связывает', 'bind', 1, 0], ['коридор есть', 'active', 1, 0]],
+  },
+  {
+    /* (е) ГЛАВНАЯ МЫСЛЬ СЮЖЕТА. Излишки перетекают, их сумма и потери стоят.
+       CS + PS = ∫₀^40 (100 − 2q) dq = 2400 при любой цене внутри коридора,
+       DWL = ∫₄₀^50 (100 − 2q) dq = 100. Цена в оба выражения не входит. */
+    name: '(е) Квота 40, десять положений ползунка ⇒ CS+PS и DWL постоянны',
+    run: `pickScene('quota');
+          var sw = [], dwl = [], cs = [], ps = [], pr = [];
+          for (var i = 0; i <= 9; i++) {
+            setQuotaPos(i / 9);
+            var q = STATE.qt || {};
+            sw.push(q.sw); dwl.push(q.dwl); cs.push(q.cs); ps.push(q.ps); pr.push(q.P);
+          }
+          var spread = function (a) { var m = a[0], d = 0; a.forEach(function (v) { d = Math.max(d, Math.abs(v - m)); }); return d; };
+          return { n: sw.length, swSpread: spread(sw), dwlSpread: spread(dwl),
+                   sw0: sw[0], dwl0: dwl[0], pLo: pr[0], pHi: pr[9],
+                   csDrop: cs[0] - cs[9], psRise: ps[9] - ps[0] };`,
+    checks: [['положений ползунка', 'n', 10, 0],
+             ['разброс CS+PS', 'swSpread', 0, 1e-9], ['разброс DWL', 'dwlSpread', 0, 1e-9],
+             ['CS+PS', 'sw0', 2400, 1e-6], ['DWL', 'dwl0', 100, 1e-6],
+             ['цена снизу', 'pLo', 40, 1e-6], ['цена сверху', 'pHi', 60, 1e-6],
+             ['CS перетёк', 'csDrop', 800, 1e-6], ['PS принял', 'psRise', 800, 1e-6]],
+  },
+  {
+    /* (ж) Квота 70 больше равновесного объёма 50 и потому не связывает:
+       коридора нет, ограничение рынку не мешает. */
+    name: '(ж) Квота 70 (выше равновесия) ⇒ коридора нет',
+    run: `pickScene('quota'); setQuota(70); redrawAll();
+          var q = STATE.qt || {};
+          return { bind: q.binding ? 1 : 0, active: STATE.quotaActive ? 1 : 0,
+                   hasP: (q.P == null ? 0 : 1), hasDwl: (q.dwl == null ? 0 : 1), eqQ: (STATE.eq || {}).Q };`,
+    checks: [['не связывает', 'bind', 0, 0], ['коридора нет', 'active', 0, 0],
+             ['цены внутри коридора нет', 'hasP', 0, 0], ['потерь не считается', 'hasDwl', 0, 0],
+             ['рынок в равновесии', 'eqQ', 50, 0.3]],
+  },
+  {
+    /* (з) Переключение между видами вмешательства не оставляет следов
+       предыдущего. Снимок вида, полученного ПЕРЕХОДОМ, обязан совпасть со
+       снимком того же вида, открытого с чистой сцены: закраски, подписи на
+       графике, счёт фигур и видимые поля панели. Двенадцать переходов между
+       четырьмя видами (налог, субсидия, фиксированная цена, квота). */
+    name: '(з) Двенадцать переходов между видами вмешательства не оставляют следов',
+    run: `var APPLY = {
+            tax:     function(){ setType('tax'); setTaxForm('unit'); setTaxSide('seller'); setTax(20); },
+            subsidy: function(){ setType('subsidy'); setTaxKind('unit'); setTax(20); },
+            ceiling: function(){ setType('ceiling'); setPReg(30); },
+            quota:   function(){ setType('quota'); setQuota(40); setQuotaPos(0.5); }
+          };
+          var snap = function () {
+            var ch = document.getElementById('chart');
+            var leg = [].map.call(ch.querySelectorAll('[data-legend]'), function (e) { return e.getAttribute('data-legend'); }).sort().join('|');
+            var txt = [].map.call(ch.querySelectorAll('text'), function (e) { return (e.textContent || '').replace(/\\s+/g, ' ').trim(); })
+                        .filter(Boolean).sort().join('|');
+            var shp = ['line', 'circle', 'rect', 'path'].map(function (t) { return ch.querySelectorAll(t).length; }).join(',');
+            var vis = ['tax-field', 'pc-field', 'quota-field', 'quota-price-field', 'taxkind-row', 'taxside-row']
+                        .filter(function (id) { var e = document.getElementById(id); return e && e.offsetParent !== null; }).join(',');
+            return leg + '#' + txt + '#' + shp + '#' + vis;
+          };
+          var kinds = ['tax', 'subsidy', 'ceiling', 'quota'], fresh = {};
+          kinds.forEach(function (k) {
+            resetSceneMemory(); pickScene('taxes'); APPLY[k](); redrawAll();
+            fresh[k] = snap();
+          });
+          var pairs = 0, bad = 0;
+          kinds.forEach(function (a) {
+            kinds.forEach(function (b) {
+              if (a === b) return;
+              pairs++;
+              resetSceneMemory(); pickScene('taxes'); APPLY[a](); redrawAll(); APPLY[b](); redrawAll();
+              if (snap() !== fresh[b]) bad++;
+            });
+          });
+          return { pairs: pairs, bad: bad };`,
+    checks: [['переходов проверено', 'pairs', 12, 0], ['переходов со следами', 'bad', 0, 0]],
+  },
+  {
+    /* (л) Исходное состояние сюжета внешних эффектов: MSB и MSC выключены и
+       равны частным кривым, поэтому оптимум совпадает с рыночным равновесием,
+       DWL равен нулю, а на графике нет ни одной общественной кривой. */
+    name: '(л) Внешние эффекты: MSB и MSC выключены по умолчанию, DWL=0',
+    run: `pickScene('ext'); redrawAll();
+          var e = STATE.ext || {};
+          var labels = [].map.call(document.querySelectorAll('#chart text'), function (t) { return t.textContent.trim(); });
+          var names = [].map.call(document.querySelectorAll('#chart text.curve-name'), function (t) { return t.textContent.trim(); });
+          return { msbOn: STATE.msbOn ? 1 : 0, mscOn: STATE.mscOn ? 1 : 0,
+                   boxB: document.getElementById('chk-msb').checked ? 1 : 0,
+                   boxC: document.getElementById('chk-msc').checked ? 1 : 0,
+                   onChart: (labels.indexOf('MSB') >= 0 ? 1 : 0) + (labels.indexOf('MSC') >= 0 ? 1 : 0),
+                   Qmkt: e.Qmkt, Qopt: e.Qopt, dwl: e.dwl,
+                   keepD: names.indexOf('D') >= 0 ? 1 : 0, keepS: names.indexOf('S') >= 0 ? 1 : 0 };`,
+    checks: [['MSB выключен', 'msbOn', 0, 0], ['MSC выключен', 'mscOn', 0, 0],
+             ['галочка MSB снята', 'boxB', 0, 0], ['галочка MSC снята', 'boxC', 0, 0],
+             ['общественных кривых на графике нет', 'onChart', 0, 0],
+             ['рынок', 'Qmkt', 50, 0.3], ['оптимум совпал с рынком', 'Qopt', 50, 0.3],
+             ['DWL', 'dwl', 0, 1e-6],
+             ['кривая D не переименована', 'keepD', 1, 0], ['кривая S не переименована', 'keepS', 1, 0]],
+  },
 ];
 
 function approx(got, want, tol) {
@@ -3270,7 +3457,13 @@ if (!ready) {
 
 let pass = 0, fail = 0;
 const failures = [];
+/* Отбор случаев по куску имени: `CALC2_ONLY='(е)' node calc2/tests/calc2_math.mjs`.
+   Нужен для проверки зубастости — временно вернул дефект и хочешь увидеть
+   ИМЕННО тот случай, который его ловит, не дожидаясь полутора сотен других.
+   В обычном прогоне (и в manage.py test) переменной нет, идут все случаи. */
+const ONLY = process.env.CALC2_ONLY || '';
 for (const c of CASES) {
+  if (ONLY && c.name.indexOf(ONLY) < 0) continue;
   let res;
   try {
     /* П51 завёл память состояния на каждую модель: вернулся в сцену — вернулись
@@ -3318,6 +3511,7 @@ for (const c of CASES) {
    не дал бы вовсе — тремя предыдущими замерами так и не воспроизвели дефект
    протяжки (см. карточку 3c3b11c9-2bc1-81b5). */
 async function gesture(name, fn) {
+  if (ONLY && name.indexOf(ONLY) < 0) return;   // тот же отбор, что и у CASES
   try {
     const r = await fn();
     if (r.ok) { pass++; console.log(`✓ ${name}`); }
