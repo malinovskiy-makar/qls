@@ -72,7 +72,6 @@ function init() {
     [null,             'seg-comp',    'seg-mono',       'Конкуренция',      'Монополия'],
     [null,             'ki-indiv',    'ki-piece',       'Инд. спросы',      'Кусочный'],
     [null,             'tsb-seller',  'tsb-buyer',      'Продавец',         'Покупатель'],
-    [null,             'tk-unit',     'tk-adv',         'Специфический',    'Адвалорный'],
     [null,             'plv-tc',      'plv-mc',         'Суммарные TC',     'Предельные MC'],
     [null,             'un-monopoly', 'un-wagefloor',   'Монопсония',       'Пол зарплаты'],
     [null,             'ineq-rd-tax', 'ineq-rd-transfer', 'Проп. налог',    'Трансферт'],

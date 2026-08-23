@@ -14,12 +14,15 @@ function loadScene(name) {
   // Вид ставки тоже сбрасываем: иначе адвалорная «протекает» из прошлой сцены
   // (та же болезнь, что была у типа вмешательства). Карточка «Процентные
   // налоги» включает адвалорную сама, уже после loadScene.
+  // Каскад вмешательства возвращается к началу: потоварный вид, продавец.
+  // Иначе НДС, акциз или «платит покупатель» протекают из прошлой сцены.
+  STATE.taxForm = 'unit'; STATE.subKind = 'unit'; STATE.taxSide = 'seller';
   setTaxKind('unit');
   ['tax-slider', 'tax-input', 'pc-slider', 'pc-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = 0; });
   const tv = document.getElementById('tax-val'); if (tv) tv.textContent = '0';
   const pv = document.getElementById('pc-val'); if (pv) pv.textContent = '0';
 
-  if (name === 'sd' || name === 'tax' || name === 'ceil' || name === 'mono') {
+  if (name === 'sd' || name === 'tax' || name === 'taxes' || name === 'ceil' || name === 'mono') {
     setMode('market');                 // setMode сам ставит setRanges(100, 100)
     addCurve('100 - Q'); setRole(STATE.curves[0], 'demand');   // спрос — всегда первая кривая
     if (name === 'mono') {
@@ -30,7 +33,7 @@ function loadScene(name) {
     } else {
       addCurve('Q'); setRole(STATE.curves[1], 'supply');
       setMarket('comp');
-      if (name === 'tax')  { setType('tax');     setTax(20); }
+      if (name === 'tax' || name === 'taxes') { setType('tax'); setTax(20); }
       else if (name === 'ceil') { setType('ceiling'); setPReg(30); }
       else { setType('tax'); }                                  // 'sd' — чистое равновесие
     }
@@ -223,12 +226,18 @@ const SCENE_ROUTE = {
 
   /* --- Блок 3 · Совершенная конкуренция ------------------------------ */
   sd:    { run: () => loadScene('sd'),    lock: [L_MARKET, L_INTERV] },
-  tax:   { run: () => loadScene('tax'),
-           lock: [L_MARKET, L_TAXKIND, 'seg-ceil', 'seg-floor'] },
-  // Адвалорная ставка — тот же сюжет налога, но ставка в процентах: не сдвиг, а поворот S.
+  /* «Налоги и субсидии» — ОДИН сюжет вместо двух карточек (потоварной и
+     процентной). Вид налога выбирается внутри, в правой панели, каскадом:
+     налог/субсидия → вид → сторона → значение. Старые ключи 'tax' и
+     'tax-adv' остались СИНОНИМАМИ: та же базовая сцена, те же запреты,
+     различается только предустановка. Ссылки в коде и тестах живы. */
+  taxes: { base: 'tax', run: () => loadScene('taxes'),
+           lock: [L_MARKET, 'seg-ceil', 'seg-floor'] },
+  tax:   { base: 'tax', run: () => loadScene('tax'),
+           lock: [L_MARKET, 'seg-ceil', 'seg-floor'] },
   'tax-adv': { base: 'tax',
-               run: () => { loadScene('tax'); setTaxKind('advalorem'); setTax(20); },
-               lock: [L_MARKET, L_TAXKIND, 'seg-ceil', 'seg-floor'] },
+               run: () => { loadScene('tax'); setTaxForm('vat'); setTax(20); },
+               lock: [L_MARKET, 'seg-ceil', 'seg-floor'] },
   ceil:  { run: () => loadScene('ceil'),
            lock: [L_MARKET, L_TAXKIND, L_TAXSIDE, 'seg-tax', 'seg-sub'] },
   elast: { run: () => loadScene('elast'), lock: [L_MARKET, L_INTERV] },

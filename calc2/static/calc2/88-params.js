@@ -58,7 +58,11 @@ function pultRegulatorIds() {
     const t = STATE.intervType;
     if (t === 'tax' || t === 'subsidy') {
       const ids = [];
-      if (t === 'tax' && STATE.market !== 'monopoly') ids.push('taxside-row');  // как в setType
+      // Ряд стороны живёт в ленте ровно тогда, когда каскад его показывает:
+      // потоварный налог и любая субсидия. У НДС и акциза стороны нет.
+      const sideOn = (STATE.market !== 'monopoly')
+                  && ((t === 'tax' && STATE.taxForm === 'unit') || t === 'subsidy');
+      if (sideOn) ids.push('taxside-row');
       ids.push('tax-field');
       return ids;
     }
@@ -1106,10 +1110,12 @@ function wireControls() {
   const elS = document.getElementById('chk-elast-s');
   if (elS) elS.addEventListener('change', () => { STATE.showElastS = elS.checked; redrawAll(); });
 
-  // Фаза 2в: вид потоварной ставки (специфический ↔ адвалорный).
-  const tkU = document.getElementById('tk-unit'), tkA = document.getElementById('tk-adv');
-  if (tkU) tkU.addEventListener('click', () => setTaxKind('unit'));
-  if (tkA) tkA.addEventListener('click', () => setTaxKind('advalorem'));
+  // Уровень 2 каскада вмешательства: вид налога (потоварный / НДС / акциз)
+  // или вид субсидии (потоварная / процентная — третья кнопка тогда скрыта).
+  [['tk-unit', 'unit'], ['tk-vat', 'vat'], ['tk-exc', 'excise']].forEach(([id, form]) => {
+    const b = document.getElementById(id);
+    if (b) b.addEventListener('click', () => setTaxForm(form));
+  });
 
   /* Режим издержек (Задача 2). Постоянные затраты отдельным полем больше не
      вводятся (Б24): в режиме «задаю TC» они равны TC(0). Поэтому здесь только

@@ -1043,26 +1043,92 @@ function setTax(t) {
   redrawAll();
 }
 
-// Переключение типа вмешательства: налог <-> субсидия.
+/* ---------------------------------------------------------------------
+   КАСКАД ВЫБОРА ВМЕШАТЕЛЬСТВА (ночная сессия «вмешательство государства»).
+   Уровни идут строго сверху вниз, и следующий появляется ТОЛЬКО после
+   предыдущего — все сразу на экране не показываются никогда:
+     1) вид вмешательства: налог / субсидия / потолок / пол;
+     2) вид налога (потоварный / НДС / акциз) либо вид субсидии
+        (потоварная / процентная);
+     3) кто формально платит потоварный налог (у НДС и акциза плательщик
+        закреплён законом, поэтому уровня нет);
+     4) кому достаётся субсидия;
+     5) само значение — ставка или регулируемая цена.
+   Ветка налога и ветка субсидии никогда не видны одновременно.
+   --------------------------------------------------------------------- */
+
+// STATE.taxKind — производная величина: математике важно только «сдвиг или
+// поворот». Каскад же хранит выбор человека (taxForm / subKind), и эта
+// функция сводит одно к другому в единственном месте.
+function syncTaxKind() {
+  STATE.taxKind = (STATE.intervType === 'subsidy')
+    ? ((STATE.subKind === 'percent') ? 'advalorem' : 'unit')
+    : ((STATE.taxForm === 'vat') ? 'advalorem' : 'unit');
+}
+
+// Показать ровно те уровни каскада, которые заслужены сделанным выбором.
+function applyIntervCascade() {
+  const type = STATE.intervType;
+  const comp = (STATE.market !== 'monopoly');
+  const isRate = (type === 'tax' || type === 'subsidy');
+  const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
+  // Уровень 5 — значение: ставка у налога/субсидии, цена у потолка/пола.
+  show('tax-field', isRate);   show('tax-hint', isRate);
+  show('pc-field', !isRate);   show('pc-hint', !isRate);
+
+  // Уровень 2 — вид налога / вид субсидии. Только в конкуренции: в монополии
+  // налог входит в MC (monopolyTax), процентная форма туда не переносится.
+  const isSub = (type === 'subsidy');
+  show('taxkind-row', isRate && comp);
+  const kl = document.getElementById('taxkind-label');
+  if (kl) kl.textContent = isSub ? 'Вид субсидии:' : 'Вид налога:';
+  const bU = document.getElementById('tk-unit');
+  const bV = document.getElementById('tk-vat');
+  const bE = document.getElementById('tk-exc');
+  if (bU) bU.textContent = isSub ? 'Потоварная' : 'Потоварный';
+  if (bV) bV.textContent = isSub ? 'Процентная' : 'НДС';
+  if (bE) bE.style.display = isSub ? 'none' : '';   // акциза у субсидии не бывает
+  const form = isSub ? ((STATE.subKind === 'percent') ? 'vat' : 'unit') : STATE.taxForm;
+  [['tk-unit', 'unit'], ['tk-vat', 'vat'], ['tk-exc', 'excise']].forEach(([id, k]) => {
+    const b = document.getElementById(id); if (b) b.classList.toggle('active', form === k);
+  });
+
+  // Уровень 3 (потоварный налог) и уровень 4б (субсидия): сторона.
+  const sideOn = comp && ((type === 'tax' && STATE.taxForm === 'unit') || isSub);
+  show('taxside-row', sideOn);
+  const sl = document.getElementById('taxside-label');
+  if (sl) sl.textContent = isSub ? 'Субсидию получает:' : 'Налог платит:';
+}
+
+// Уровень 2 каскада: вид налога ('unit' | 'vat' | 'excise') или вид субсидии.
+function setTaxForm(form) {
+  if (STATE.intervType === 'subsidy') {
+    STATE.subKind = (form === 'vat' || form === 'percent' || form === 'advalorem') ? 'percent' : 'unit';
+  } else {
+    STATE.taxForm = (form === 'vat' || form === 'excise') ? form : 'unit';
+    // У НДС и акциза плательщик закреплён законом — сторона возвращается к продавцу.
+    if (STATE.taxForm !== 'unit') STATE.taxSide = 'seller';
+  }
+  syncTaxKind();
+  applyIntervCascade();
+  setTaxSideButtons();
+  applyTaxRateBounds();
+  setTax(STATE.tax);   // пере-зажать значение под новые пределы + перерисовать
+}
+
+// Переключение типа вмешательства: налог <-> субсидия <-> потолок <-> пол.
 function setType(type) {
   STATE.intervType = type;
-  const map = { tax: 'seg-tax', subsidy: 'seg-sub', ceiling: 'seg-ceil', floor: 'seg-floor' };
+  const map = { tax: 'seg-tax', subsidy: 'seg-sub', ceiling: 'seg-ceil', floor: 'seg-floor', quota: 'seg-quota' };
   Object.values(map).forEach(id => {
     const b = document.getElementById(id); if (b) b.classList.remove('active');
   });
   const ab = document.getElementById(map[type]); if (ab) ab.classList.add('active');
 
   const isTax = (type === 'tax' || type === 'subsidy');
-  // Показ нужного поля ввода и подсказки.
-  const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
-  show('tax-field', isTax);   show('tax-hint', isTax);
-  show('pc-field', !isTax);   show('pc-hint', !isTax);
-  // Выбор плательщика — только для налога и только в конкуренции (в монополии налог
-  // на производство; эквивалентность «кто платит» там не задаётся стороной).
-  show('taxside-row', type === 'tax' && STATE.market !== 'monopoly');
-  // Вид ставки (Фаза 2в) — только для потоварного вмешательства и только в конкуренции:
-  // в монополии налог входит в MC (monopolyTax), адвалорная форма туда не переносится.
-  show('taxkind-row', isTax && STATE.market !== 'monopoly');
+  syncTaxKind();          // taxKind зависит от того, налог сейчас или субсидия
+  applyIntervCascade();   // уровни каскада: что показать, что спрятать
+  setTaxSideButtons();
 
   if (isTax) {
     applyTaxRateBounds();   // подпись ставки (t / s / τ,%) и пределы ползунка
@@ -1091,21 +1157,36 @@ function applyTaxRateBounds() {
   const rl = document.getElementById('rate-letter');
   if (rl) rl.textContent = adv ? 'τ, %' : ((STATE.intervType === 'subsidy') ? 's' : 't');
   const h = document.getElementById('tax-hint');
-  if (h) h.innerHTML = adv
-    ? 'Адвалорная ставка берётся долей от цены, поэтому предложение не сдвигается, а <b>поворачивается</b>: ' +
-      'S<sub>после</sub>(Q)&nbsp;=&nbsp;(1+τ)·S(Q) при налоге. Вертикальный разрыв между S и S<sub>после</sub> ' +
-      'растёт вместе с Q (в отличие от постоянного клина при специфической ставке).'
-    : 'Потоварное вмешательство на стороне производителя: кривая S <b>сдвигается</b> ' +
+  if (!h) return;
+  if (adv) {
+    h.innerHTML = (STATE.intervType === 'subsidy')
+      ? 'Процентная субсидия берётся долей от цены, поэтому предложение не сдвигается, а ' +
+        '<b>поворачивается</b> вниз: S<sub>после</sub>(Q)&nbsp;=&nbsp;S(Q)/(1+τ). Вертикальный разрыв ' +
+        'между S и S<sub>после</sub> растёт вместе с Q.'
+      : 'НДС берётся долей от цены продавца и начисляется сверх неё: P<sub>b</sub>&nbsp;=&nbsp;P<sub>s</sub>·(1+τ). ' +
+        'Поэтому предложение не сдвигается, а <b>поворачивается</b>: S<sub>после</sub>(Q)&nbsp;=&nbsp;(1+τ)·S(Q). ' +
+        'Клин между ценами растёт вместе с Q, а не остаётся постоянным.';
+  } else if (STATE.intervType === 'tax' && STATE.taxForm === 'excise') {
+    h.innerHTML = 'Акциз — потоварный налог на конкретный товар: ставка в рублях за единицу, ' +
+      'кривая S <b>сдвигается</b> вверх на величину ставки. Числа совпадают с потоварным налогом ' +
+      'той же ставки; плательщик закреплён за производителем, поэтому сторона не выбирается.';
+  } else {
+    h.innerHTML = 'Потоварное вмешательство на стороне производителя: кривая S <b>сдвигается</b> ' +
       'на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя ' +
       'и продавца можно тянуть мышью.';
+  }
 }
 
-// Переключатель вида ставки. Значение переносится и зажимается новыми пределами.
+/* Старый вход «вид ставки» ('unit' | 'advalorem'). Оставлен рабочим: на него
+   завязаны готовые сцены и контрольные числа. Переводит математический вид в
+   выбор каскада — процентный вид у налога это НДС, у субсидии это процентная. */
 function setTaxKind(kind) {
-  STATE.taxKind = (kind === 'advalorem') ? 'advalorem' : 'unit';
-  const u = document.getElementById('tk-unit'), a = document.getElementById('tk-adv');
-  if (u) u.classList.toggle('active', STATE.taxKind === 'unit');
-  if (a) a.classList.toggle('active', STATE.taxKind === 'advalorem');
+  const adv = (kind === 'advalorem');
+  if (STATE.intervType === 'subsidy') STATE.subKind = adv ? 'percent' : 'unit';
+  else STATE.taxForm = adv ? 'vat' : 'unit';
+  syncTaxKind();
+  applyIntervCascade();
+  setTaxSideButtons();
   applyTaxRateBounds();
   setTax(STATE.tax);   // пере-зажать значение под новые пределы + перерисовать
 }
@@ -1173,10 +1254,16 @@ function updateTaxPanel() {
 // меняется только визуально сдвигаемая кривая (Задача 1).
 function setTaxSide(side) {
   STATE.taxSide = side;
-  const sel = document.getElementById('tsb-seller'), buy = document.getElementById('tsb-buyer');
-  if (sel) sel.classList.toggle('active', side === 'seller');
-  if (buy) buy.classList.toggle('active', side === 'buyer');
+  setTaxSideButtons();
   redrawAll();
+}
+
+// Подсветка выбранной стороны. Вынесена отдельно: каскад тоже её обновляет,
+// когда НДС или акциз возвращают сторону к продавцу.
+function setTaxSideButtons() {
+  const sel = document.getElementById('tsb-seller'), buy = document.getElementById('tsb-buyer');
+  if (sel) sel.classList.toggle('active', STATE.taxSide === 'seller');
+  if (buy) buy.classList.toggle('active', STATE.taxSide === 'buyer');
 }
 
 /* ---------------------------------------------------------------------

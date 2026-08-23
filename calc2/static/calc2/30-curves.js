@@ -912,7 +912,7 @@ function syncCurveListVisibility() {
    Прежний соседний список «сцена запретила мышь» (NO_MOUSE_DRAG) удалён
    вместе с самим перетаскиванием: запрещать нечего, мышью не двигается ни
    одна кривая ни в одной сцене. */
-const NO_CURVE_DRAG = ['elast', 'tax', 'tax-adv'];
+const NO_CURVE_DRAG = ['elast', 'tax', 'taxes', 'tax-adv'];
 function curveDragAllowed() {
   return NO_CURVE_DRAG.indexOf(STATE.sceneKey) < 0;
 }

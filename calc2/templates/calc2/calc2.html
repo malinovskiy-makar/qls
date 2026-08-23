@@ -207,25 +207,19 @@
           <span class="scard-head"><span class="scard-name">Сложение спросов и предложений</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Горизонтальное сложение по количеству: рыночная кривая с изломами.</span>
         </button>
-        <button class="scard" data-scene="tax">
+        <!-- ОДНА карточка вместо двух (потоварной и процентной): вид налога
+             выбирается внутри сюжета, в правой панели. Ключи 'tax' и
+             'tax-adv' остались рабочими синонимами этой же сцены. -->
+        <button class="scard" data-scene="taxes">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <rect x="22" y="36" width="52" height="22" fill="var(--curve-tax)" opacity=".16"/>
             <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 58 L120 12" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
-          <span class="scard-name">Потоварные налоги и субсидии</span>
-          <span class="scard-desc">Клин в рублях за единицу: параллельный сдвиг S, сбор бюджета, потери DWL.</span>
-        </button>
-        <button class="scard" data-scene="tax-adv">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="22" y="34" width="50" height="24" fill="var(--curve-tax)" opacity=".16"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 72 L112 12" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
-          <span class="scard-name">Процентные налоги и субсидии</span>
-          <span class="scard-desc">Адвалорная ставка: не сдвиг, а поворот кривой предложения от начала координат.</span>
+            <path d="M22 58 L120 12" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
+            <path d="M22 72 L112 12" stroke="var(--curve-s)" stroke-width="1.5" stroke-dasharray="3 4" opacity=".5"/></g></svg></span>
+          <span class="scard-name">Налоги и субсидии</span>
+          <span class="scard-desc">Потоварный налог, НДС, акциз и субсидии: клин между ценами, сбор бюджета, потери DWL.</span>
         </button>
         <button class="scard" data-scene="ceil">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
@@ -2203,21 +2197,33 @@
             <button class="seg-btn" id="seg-ceil">Потолок</button>
             <button class="seg-btn" id="seg-floor">Пол</button>
           </div>
-          <!-- Кто формально платит налог (Задача 1). Виден только для типа «Налог». -->
+          <!-- УРОВЕНЬ 2 каскада: вид налога (или вид субсидии). Ряд один на оба
+               случая — меняются подписи кнопок, а третья кнопка «Акциз» видна
+               только у налога. Идентификаторы сохранены (taxkind-row, tk-unit,
+               tk-vat): на них завязаны запреты карточек и лента регуляторов.
+                 потоварный — параллельный сдвиг S на ставку в рублях;
+                 НДС        — ПОВОРОТ S_после(Q) = (1+τ)·S(Q), ставка в процентах;
+                 акциз      — потоварный по механике, отдельный по названию.
+               Только в конкуренции: в монополии налог входит в MC. -->
+          <div id="taxkind-row" style="margin-top:8px;">
+            <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;"
+                   id="taxkind-label">Вид налога:</label>
+            <div class="seg">
+              <button class="seg-btn active" id="tk-unit">Потоварный</button>
+              <button class="seg-btn" id="tk-vat">НДС</button>
+              <button class="seg-btn" id="tk-exc">Акциз</button>
+            </div>
+          </div>
+          <!-- УРОВЕНЬ 3 (потоварный налог) и УРОВЕНЬ 4б (субсидия): кто формально
+               платит налог / кому достаётся субсидия. На числа не влияет —
+               в этом и смысл проверки (Задача 1). У НДС и акциза плательщик
+               закреплён законом, поэтому ряд для них не показывается. -->
           <div id="taxside-row" style="margin-top:8px;">
-            <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Налог платит:</label>
+            <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;"
+                   id="taxside-label">Налог платит:</label>
             <div class="seg">
               <button class="seg-btn active" id="tsb-seller">Продавец</button>
               <button class="seg-btn" id="tsb-buyer">Покупатель</button>
-            </div>
-          </div>
-          <!-- Вид ставки (Фаза 2в): потоварная (руб./ед.) — параллельный сдвиг S;
-               адвалорная (%) — ПОВОРОТ: S_после(Q) = (1+τ)·S(Q). Только в конкуренции. -->
-          <div id="taxkind-row" style="margin-top:8px;">
-            <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Вид ставки:</label>
-            <div class="seg">
-              <button class="seg-btn active" id="tk-unit">Специфический</button>
-              <button class="seg-btn" id="tk-adv">Адвалорный</button>
             </div>
           </div>
           <!-- Поле ставки (налог / субсидия) -->

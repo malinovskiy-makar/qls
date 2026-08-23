@@ -122,8 +122,7 @@ const CARDS = [
   ['trade',       s => s.mode === 'ppf'   && s.ppfSub === 'trade',               ['ppf-seg']],
   ['tradeprice',  s => s.mode === 'ppf'   && s.ppfSub === 'trade',               ['ppf-seg']],
   ['sd',          s => s.mode === 'market' && s.market === 'comp',               ['market-struct-row', 'sec-tax']],
-  ['tax',         s => s.taxKind === 'unit' && s.intervType === 'tax',                 ['market-struct-row', 'taxkind-row']],
-  ['tax-adv',     s => s.taxKind === 'advalorem',                                ['market-struct-row', 'taxkind-row']],
+  ['taxes',       s => s.taxKind === 'unit' && s.intervType === 'tax',           ['market-struct-row', 'seg-ceil', 'seg-floor']],
   ['ceil',        s => s.intervType === 'ceiling',                                     ['market-struct-row', 'taxside-row']],
   ['elast',       s => s.scenario === 'elasticity',                              ['market-struct-row', 'sec-tax']],
   ['ext',         s => s.scenario === 'externality',                             ['market-struct-row', 'sec-tax']],
@@ -226,13 +225,26 @@ await t('заголовок сцены берётся из карточки', as
   return txt === 'Естественная монополия' || txt;
 });
 
+/* --- 2в. Старые ключи налоговых сцен остались синонимами --------------
+   Карточек «Потоварные налоги» и «Процентные налоги» на главном экране
+   больше нет — их заменила одна «Налоги и субсидии». Но ключи 'tax' и
+   'tax-adv' обязаны и дальше открывать ту же сцену: на них ссылаются код
+   и прежние проверки. Поэтому здесь не клик по карточке, а pickScene. */
+await t('ключи tax и tax-adv открывают ту же сцену', () => page.evaluate(() => {
+  resetSceneMemory(); pickScene('tax');
+  if (STATE.intervType !== 'tax' || STATE.taxKind !== 'unit' || STATE.tax !== 20) return 'tax: ' + JSON.stringify({ t: STATE.intervType, k: STATE.taxKind, v: STATE.tax });
+  resetSceneMemory(); pickScene('tax-adv');
+  if (STATE.taxKind !== 'advalorem' || STATE.taxForm !== 'vat') return 'tax-adv: ' + JSON.stringify({ k: STATE.taxKind, f: STATE.taxForm });
+  return true;
+}));
+
 /* --- 5. Пульт узнаёт базовую сцену ------------------------------------ */
 await t('baseScene сводит подрежим к базе', () => page.evaluate(() =>
   (baseScene('mono-nat') === 'mono' && baseScene('labor-bilat') === 'labor'
    && baseScene('tax-adv') === 'tax' && baseScene('sd') === 'sd') || 'baseScene врёт'));
 
 /* --- 6. Ночная сессия «левая панель» (22.08) --------------------------
-   Макет панели утверждён владельцем: во ВСЕХ 41 сцене ровно три карточки в
+   Макет панели утверждён владельцем: во ВСЕХ сценах ровно три карточки в
    одном порядке, убранные блоки не всплывают нигде, дорожки ползунков стоят
    вровень. Всё три — сквозные правила, поэтому проверяются перебором сцен, а
    не на одной удобной. */
@@ -273,13 +285,15 @@ const panelSweep = await page.evaluate(async (FORB) => {
 }, FORBIDDEN_HEADS);
 
 // (г) Ровно три карточки в заданном порядке, первая раскрыта, две свёрнуты.
-await t('(г) в каждой из 41 сцены три карточки панели в одном порядке', async () => {
+await t('(г) в каждой из 42 сцен три карточки панели в одном порядке', async () => {
   const bad = panelSweep.filter(r =>
     r.cards.map(c => c.id).join() !== WANT_CARDS.join()
     || !(r.cards[0].open === true && r.cards[1].open === false && r.cards[2].open === false)
     || r.cards[0].name !== 'Ввод функций'
     || r.cards[0].controls === 0);
-  if (panelSweep.length !== 41) return `сцен ${panelSweep.length}, а не 41`;
+  // 42 маршрута: 41 сцена плюс ключ 'taxes' — объединённый сюжет налогов,
+  // рядом с которым 'tax' и 'tax-adv' оставлены рабочими синонимами.
+  if (panelSweep.length !== 42) return `сцен ${panelSweep.length}, а не 42`;
   return bad.length === 0
     || bad.map(r => r.key + ' [' + r.cards.map(c => c.id + (c.open ? '+' : '-')).join(' ') + ']').join('; ');
 });
