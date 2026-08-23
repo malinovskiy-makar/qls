@@ -3586,11 +3586,11 @@ const CASES = [
              исходная запись + видимый текст»: «30» читалось как «303030». */
           var nums = [].map.call(document.querySelectorAll('#info-eq .stat b'), function (e) {
             var t = e.querySelector('.katex') ? katexVisibleText(e) : (e.textContent || '');
-            return parseFloat(String(t).replace(/\u00a0|\u2009|\s/g, '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+            return parseFloat(String(t).replace(/\\u00a0|\\u2009|\\s/g, '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
           });
           var title = (document.querySelector('#sec-eq .section-title') || {}).textContent || '';
           return { n: nums.length, price: nums[0], qd: nums[1], qs: nums[2], gap: nums[3], dwl: nums[4],
-                   promisesEq: /D\s*=\s*S/.test(title) ? 1 : 0,
+                   promisesEq: /D\\s*=\\s*S/.test(title) ? 1 : 0,
                    namesMarket: /Рынок при потолке/.test(title) ? 1 : 0,
                    // старое мёртвое «50 и 50» не должно стоять в первых двух строках
                    dead: (Math.abs(nums[0] - 50) < 0.01 && Math.abs(nums[1] - 50) < 0.01) ? 1 : 0 };`,
@@ -3612,15 +3612,272 @@ const CASES = [
              исходная запись + видимый текст»: «30» читалось как «303030». */
           var nums = [].map.call(document.querySelectorAll('#info-eq .stat b'), function (e) {
             var t = e.querySelector('.katex') ? katexVisibleText(e) : (e.textContent || '');
-            return parseFloat(String(t).replace(/\u00a0|\u2009|\s/g, '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+            return parseFloat(String(t).replace(/\\u00a0|\\u2009|\\s/g, '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
           });
           var title = (document.querySelector('#sec-eq .section-title') || {}).textContent || '';
           return { n: nums.length, Q: nums[0], P: nums[1],
-                   promisesEq: /D\s*=\s*S/.test(title) ? 1 : 0,
+                   promisesEq: /D\\s*=\\s*S/.test(title) ? 1 : 0,
                    binding: (STATE.pc && STATE.pc.binding) ? 1 : 0 };`,
     checks: [['строк в табло', 'n', 2, 0], ['Q*', 'Q', 50, 0.01], ['P*', 'P', 50, 0.01],
              ['заголовок обещает D = S', 'promisesEq', 1, 0],
              ['потолок связывает', 'binding', 0, 0]],
+  },
+  /* ═══════════════════════════════════════════════════════════════════
+     ДЛИННАЯ НОЧНАЯ СЕССИЯ 24.08, БЛОКИ II-IV — постоянные проверки.
+     Каждая проверена на зубастость: дефект временно возвращали и убеждались,
+     что проверка краснеет (тексты провалов — в отчёте сессии).
+     ═══════════════════════════════════════════════════════════════════ */
+  {
+    /* (а) и (б). Горизонтальное сложение: суммарные кривые ломаются там, где
+       очередная группа входит в торговлю или выходит из неё. Учебный набор
+       D₁ 100−Q, D₂ 60−Q, S₁ Q, S₂ Q+20 даёт излом спроса в (40; 60),
+       излом предложения в (20; 20) и равновесие (70; 45). */
+    name: 'Сложение (а)(б) изломы суммарных кривых и равновесие',
+    run: `resetSceneMemory(); pickScene('sdsum'); redrawAll();
+          var D = STATE.D, S = STATE.S;
+          var pts = keyTargets();
+          var near = function (x, y) {
+            return pts.filter(function (p) { return Math.abs(p.x - x) < 0.6 && Math.abs(p.y - y) < 0.6; }).length;
+          };
+          return { Dat20: evalCurve(D, 20), Dat40: evalCurve(D, 40), Dat70: evalCurve(D, 70),
+                   Dat160: evalCurve(D, 160),
+                   Sat10: evalCurve(S, 10), Sat20: evalCurve(S, 20), Sat70: evalCurve(S, 70),
+                   eqQ: STATE.eq.Q, eqP: STATE.eq.P,
+                   kinkD: near(40, 60), kinkS: near(20, 20), eqPt: near(70, 45),
+                   groups: STATE.curves.filter(function (c) { return c.sumGroup && c.kind !== 'sum'; }).length,
+                   sums: STATE.curves.filter(function (c) { return c.kind === 'sum'; }).length };`,
+    checks: [['спрос при Q=20', 'Dat20', 80, 1e-6], ['спрос в изломе Q=40', 'Dat40', 60, 1e-6],
+             ['спрос при Q=70', 'Dat70', 45, 1e-6], ['спрос при Q=160', 'Dat160', 0, 1e-6],
+             ['предложение при Q=10', 'Sat10', 10, 1e-6],
+             ['предложение в изломе Q=20', 'Sat20', 20, 1e-6],
+             ['предложение при Q=70', 'Sat70', 45, 1e-6],
+             ['равновесие Q*', 'eqQ', 70, 1e-4], ['равновесие P*', 'eqP', 45, 1e-4],
+             ['точка (40; 60) в ключевых', 'kinkD', 1, 0],
+             ['точка (20; 20) в ключевых', 'kinkS', 1, 0],
+             ['точка (70; 45) в ключевых', 'eqPt', 1, 0],
+             ['групп в списке', 'groups', 4, 0], ['суммарных кривых', 'sums', 2, 0]],
+  },
+  {
+    /* (в) и (г). Излишек каждой группы считается по ЕЁ кривой, а сумма обязана
+       совпасть с площадью под СУММАРНОЙ кривой. Расхождение здесь означает
+       ошибку сложения, а не округления, поэтому допуск жёсткий. */
+    name: 'Сложение (в)(г) излишки по группам и сходимость двух путей',
+    run: `resetSceneMemory(); pickScene('sdsum'); redrawAll();
+          var st = sumGroupStats();
+          return { d1q: st.D[0].q, d2q: st.D[1].q, qD: st.qD,
+                   s1q: st.S[0].q, s2q: st.S[1].q, qS: st.qS,
+                   cs1: st.D[0].surplus, cs2: st.D[1].surplus, csGroups: st.csGroups,
+                   ps1: st.S[0].surplus, ps2: st.S[1].surplus, psGroups: st.psGroups,
+                   csWhole: st.csWhole, psWhole: st.psWhole,
+                   csGap: st.csGap, psGap: st.psGap };`,
+    checks: [['D₁ берёт', 'd1q', 55, 1e-6], ['D₂ берёт', 'd2q', 15, 1e-6], ['вместе D', 'qD', 70, 1e-6],
+             ['S₁ даёт', 's1q', 45, 1e-6], ['S₂ даёт', 's2q', 25, 1e-6], ['вместе S', 'qS', 70, 1e-6],
+             ['излишек D₁', 'cs1', 1512.5, 1e-6], ['излишек D₂', 'cs2', 112.5, 1e-6],
+             ['излишки вместе', 'csGroups', 1625, 1e-6],
+             ['излишек S₁', 'ps1', 1012.5, 1e-6], ['излишек S₂', 'ps2', 312.5, 1e-6],
+             ['излишки продавцов вместе', 'psGroups', 1325, 1e-6],
+             ['площадь под суммарным спросом', 'csWhole', 1625, 1e-6],
+             ['площадь под суммарным предложением', 'psWhole', 1325, 1e-6],
+             ['расхождение двух путей CS', 'csGap', 0, 1e-6],
+             ['расхождение двух путей PS', 'psGap', 0, 1e-6]],
+  },
+  {
+    /* (д) Группа с ОТРИЦАТЕЛЬНЫМ количеством в сумму не входит: при цене выше
+       своей запретительной покупатель просто не покупает. Именно это и создаёт
+       излом. Проверяем прямо: при цене 70 вторая группа спроса (60 − Q) не
+       торгует, и суммарный спрос равен ПЕРВОЙ группе, а не их сумме. */
+    name: 'Сложение (д) группа с отрицательным количеством в сумму не входит',
+    run: `resetSceneMemory(); pickScene('sdsum'); redrawAll();
+          var gD = STATE.curves.filter(function (c) { return c.sumGroup === 'D' && c.kind !== 'sum'; });
+          var gS = STATE.curves.filter(function (c) { return c.sumGroup === 'S' && c.kind !== 'sum'; });
+          var q = function (c, P) { return sumGroupQty(c, P); };
+          return {
+            // Цена 70: вторая группа спроса вне рынка, первая берёт 30.
+            d1at70: q(gD[0], 70), d2at70: q(gD[1], 70), sumD70: q(gD[0], 70) + q(gD[1], 70),
+            curveAt30: invCurve(STATE.D, 70),
+            // Цена 10: вторая группа предложения вне рынка, первая даёт 10.
+            s1at10: q(gS[0], 10), s2at10: q(gS[1], 10),
+            curveSat10: invCurve(STATE.S, 10),
+            // Цена 45: торгуют все четверо.
+            d1at45: q(gD[0], 45), d2at45: q(gD[1], 45), s1at45: q(gS[0], 45), s2at45: q(gS[1], 45) };`,
+    checks: [['D₁ при цене 70', 'd1at70', 30, 1e-6],
+             ['D₂ при цене 70 (вне рынка)', 'd2at70', 0, 0],
+             ['суммарный спрос при цене 70', 'curveAt30', 30, 1e-3],
+             ['S₁ при цене 10', 's1at10', 10, 1e-6],
+             ['S₂ при цене 10 (вне рынка)', 's2at10', 0, 0],
+             ['суммарное предложение при цене 10', 'curveSat10', 10, 1e-3],
+             ['D₁ при цене 45', 'd1at45', 55, 1e-6], ['D₂ при цене 45', 'd2at45', 15, 1e-6],
+             ['S₁ при цене 45', 's1at45', 45, 1e-6], ['S₂ при цене 45', 's2at45', 25, 1e-6]],
+  },
+  {
+    /* (е) Кусочная в поле, которое общий обзор считал сломанным. Обзор мерил
+       стыком за пределами самой кривой; со стыком внутри запись принимается и
+       рисуется. Здесь — «Денежный рынок», формула написана по ставке i. */
+    name: 'Сложение (е) кусочная в поле «Денежного рынка» принимается и рисуется',
+    run: `return (async function () {
+          var w = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+          resetSceneMemory(); pickScene('money'); await w(400); redrawAll();
+          var shot = function () { var n = 0, len = 0, s = 0;
+            document.querySelectorAll('#chart path').forEach(function (p) {
+              var d = p.getAttribute('d') || ''; if (!d) return; n++; len += d.length;
+              (d.match(/-?\\d+(?:\\.\\d+)?/g) || []).forEach(function (x) { s += +x; }); });
+            return { n: n, len: len, s: Math.round(s * 100) / 100 }; };
+          var before = shot();
+          var f = document.getElementById('ma-md');
+          f.value = '(i < 20) ? (200 - 4*i) : ((200 - 4*20) - 0.7*(i - 20))';
+          ['input', 'change'].forEach(function (t) { f.dispatchEvent(new Event(t, { bubbles: true })); });
+          f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+          await w(400); redrawAll();
+          var after = shot();
+          return { accepted: (f.value || '').indexOf('?') >= 0 ? 1 : 0,
+                   changed: (before.n !== after.n || before.len !== after.len
+                             || Math.abs(before.s - after.s) > 1e-6) ? 1 : 0,
+                   paths: after.n };
+          })();`,
+    checks: [['запись принята', 'accepted', 1, 0], ['картинка изменилась', 'changed', 1, 0],
+             ['путей на холсте', 'paths', 3, 2]],
+  },
+  {
+    /* (ж) КТВ по кусочной КПВ. У ВОГНУТОЙ кусочной альтернативная стоимость
+       растёт, и при мировой цене между наклонами кусков оптимум ровно в изломе.
+       Куски: Y = 100 − 0,5X при X < 40 и Y = 160 − 2X при X ≥ 40, стык (40; 80).
+       Ценность выпуска при цене 1: весь X — 80, весь Y — 100, излом — 120.
+       Вторая половина проверки страхует от правки «всегда брать середину»:
+       у ВЫПУКЛОЙ кусочной верный ответ — угол. */
+    name: 'КТВ (ж) по кусочной КПВ: касание липнет к излому, у выпуклой — угол',
+    run: `var build = function (formula, price) {
+            resetSceneMemory(); pickScene('trade');
+            var f = document.getElementById('inp-ppft');
+            f.value = formula;
+            ['input', 'change'].forEach(function (t) { f.dispatchEvent(new Event(t, { bubbles: true })); });
+            var p = document.getElementById('inp-ppft-price');
+            p.value = String(price); p.dispatchEvent(new Event('change', { bubbles: true }));
+            document.getElementById('btn-ppft-apply').click();
+            redrawAll();
+            var d = STATE.ppfTradeData || {};
+            return { xp: d.xp, yp: d.yp, xint: d.xint, yint: d.yint, regime: d.regime };
+          };
+          var a = build('(X >= 0 and X < 40) ? 100 - 0.5*X : (X >= 40 ? 160 - 2*X : NaN)', 1);
+          var b = build('(X >= 0 and X < 40) ? 100 - X : (X >= 40 ? 80 - 0.5*X : NaN)', 0.75);
+          var c = build('100 - X', 2);
+          return { aXp: a.xp, aYp: a.yp, aXint: a.xint, aYint: a.yint,
+                   aInner: /касание/.test(a.regime || '') ? 1 : 0,
+                   bXp: b.xp, bYp: b.yp, bCorner: /специализация на X/.test(b.regime || '') ? 1 : 0,
+                   cXp: c.xp, cCorner: /специализация на X/.test(c.regime || '') ? 1 : 0 };`,
+    checks: [['вогнутая: производство X', 'aXp', 40, 1e-3],
+             ['вогнутая: производство Y', 'aYp', 80, 1e-3],
+             ['вогнутая: предел X', 'aXint', 120, 1e-3],
+             ['вогнутая: предел Y', 'aYint', 120, 1e-3],
+             ['вогнутая: режим «касание»', 'aInner', 1, 0],
+             ['выпуклая: производство X (угол)', 'bXp', 160, 1e-3],
+             ['выпуклая: производство Y', 'bYp', 0, 1e-3],
+             ['выпуклая: режим «специализация»', 'bCorner', 1, 0],
+             ['прямая КПВ: угол не сломан', 'cXp', 100, 1e-3],
+             ['прямая КПВ: режим «специализация»', 'cCorner', 1, 0]],
+  },
+  {
+    /* (з) Сцены с ДВУМЯ графиками: правка входа обязана менять ОБА поля.
+       Полей два ровно в двух сценах — «Функция и её производная наглядно» и
+       «Производственная функция». Число сцен тоже проверяем: появится третья —
+       проверка про неё напомнит. */
+    name: 'Два графика (з) связаны обе сцены из двух',
+    run: `return (async function () {
+          var w = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+          var panes = function () {
+            var ys = [].map.call(document.querySelectorAll('#chart line[marker-end]'), function (l) {
+              return (Math.abs(+l.getAttribute('y1') - +l.getAttribute('y2')) < 1.5) ? +l.getAttribute('y1') : null;
+            }).filter(function (v) { return v != null; }).sort(function (a, b) { return a - b; });
+            return ys.filter(function (v, i, arr) { return i === 0 || Math.abs(v - arr[i - 1]) > 8; });
+          };
+          var sig = function (split) {
+            var acc = { top: 0, bot: 0 };
+            document.querySelectorAll('#chart path').forEach(function (p) {
+              var d = p.getAttribute('d') || ''; if (!d) return;
+              var nums = (d.match(/-?\\d+(?:\\.\\d+)?/g) || []).map(Number);
+              for (var i = 0; i + 1 < nums.length; i += 2) {
+                if (nums[i + 1] < split) acc.top += nums[i] + nums[i + 1];
+                else acc.bot += nums[i] + nums[i + 1];
+              }
+            });
+            return acc;
+          };
+          var test = async function (key, fieldId, newValue) {
+            resetSceneMemory(); pickScene(key); setToolsOpen(true); await w(450); redrawAll();
+            var ys = panes();
+            if (ys.length < 2) return { panes: ys.length, top: 0, bot: 0 };
+            var split = (ys[0] + ys[1]) / 2;
+            var before = sig(split);
+            var f = document.getElementById(fieldId);
+            f.value = newValue;
+            ['input', 'change'].forEach(function (t) { f.dispatchEvent(new Event(t, { bubbles: true })); });
+            f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+            var b = [].slice.call(document.querySelectorAll('#tools-panel button'))
+              .filter(function (x) { return /Постро/i.test(x.textContent || '') && x.getClientRects().length; })[0];
+            if (b) b.click();
+            await w(450); redrawAll();
+            var after = sig(split);
+            return { panes: ys.length,
+                     top: Math.abs(after.top - before.top) > 1e-6 ? 1 : 0,
+                     bot: Math.abs(after.bot - before.bot) > 1e-6 ? 1 : 0 };
+          };
+          var t1 = await test('m-tangent', 'inp-mathf', '0.5*x^2 - 2');
+          var t2 = await test('prod', 'inp-prod', '25*L^2 - 0.9*L^3');
+          // Сцен с двумя полями всего две — считаем по всему списку.
+          var two = 0;
+          var keys = Object.keys(SCENE_ROUTE);
+          for (var i = 0; i < keys.length; i++) {
+            resetSceneMemory(); pickScene(keys[i]); await w(320); redrawAll();
+            if (panes().length >= 2) two++;
+          }
+          return { tangentPanes: t1.panes, tangentTop: t1.top, tangentBot: t1.bot,
+                   prodPanes: t2.panes, prodTop: t2.top, prodBot: t2.bot, scenesWithTwo: two };
+          })();`,
+    checks: [['полей в «Производной»', 'tangentPanes', 2, 0],
+             ['«Производная»: верх пошёл', 'tangentTop', 1, 0],
+             ['«Производная»: низ пошёл', 'tangentBot', 1, 0],
+             ['полей в «Производственной функции»', 'prodPanes', 2, 0],
+             ['«Производственная»: верх пошёл', 'prodTop', 1, 0],
+             ['«Производственная»: низ пошёл', 'prodBot', 1, 0],
+             ['сцен с двумя полями', 'scenesWithTwo', 2, 0]],
+  },
+  {
+    /* (и) ХРАПОВИК ШРИФТОВ. Подпись графика, которая ЦЕЛИКОМ математическое
+       обозначение, обязана быть набрана математикой (пометка data-mathset).
+       Считаем ненабранные в шести сценах: число не должно расти. Потолок 3 —
+       это «S» в «Налогах» и «ATC», «MC» в естественной монополии: они
+       рисуются ПОСЛЕ конца перерисовки, корень не найден, карточка заведена.
+       Опустить потолок можно, поднять — нельзя. */
+    name: 'Шрифты (и) обозначений обычным текстом на графике не прибавилось',
+    run: `var WORDS = ['MC','MR','TC','ATC','AVC','AFC','FC','VC','TR','TP','MP','AP','CS','PS','DWL',
+                      'MSB','MSC','Pw','Px','Py','Qd','Qs','SW'];
+          var LET = /^[A-Za-z](?:[*′']|[0-9]|[₀-₉]|_[A-Za-z0-9]+)?$/;
+          var vis = function (t) {
+            var out = '';
+            (function walk(n) {
+              for (var i = 0; i < n.childNodes.length; i++) {
+                var c = n.childNodes[i];
+                if (c.nodeType === 3) { out += c.nodeValue; continue; }
+                if (c.nodeType !== 1) continue;
+                if (String(c.nodeName).toLowerCase() === 'title') continue;
+                walk(c);
+              }
+            })(t);
+            return out.replace(/\\s+/g, ' ').trim();
+          };
+          var bad = 0, total = 0;
+          ['sd', 'costs', 'mono', 'mono-nat', 'ppf', 'taxes'].forEach(function (k) {
+            resetSceneMemory(); pickScene(k); redrawAll();
+            document.querySelectorAll('#chart text').forEach(function (t) {
+              var s = vis(t);
+              if (!s) return;
+              if (!(WORDS.indexOf(s) >= 0 || LET.test(s))) return;
+              total++;
+              if (!t.dataset.mathset) bad++;
+            });
+          });
+          return { bad: bad, total: total };`,
+    checks: [['обозначений обычным текстом (потолок)', 'bad', 0, 3],
+             ['обозначений всего проверено', 'total', 24, 12]],
   },
   {
     /* (л) Исходное состояние сюжета внешних эффектов: MSB и MSC выключены и
