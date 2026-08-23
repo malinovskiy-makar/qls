@@ -813,15 +813,25 @@
            править формулу и увидеть расхождение.
            Кривые D и S при этом НЕ переименовываются (решение владельца). -->
       <div id="social-curves" style="display:none;margin-top:8px;">
+        <!-- ⚠️ ПОЛЕ ФОРМУЛЫ ЗАВЁРНУТО В СВОЙ DIV. Оснастка формул помечает
+             РОДИТЕЛЯ поля классом .f-wrap, а стиль #tools-panel .f-wrap input
+             возвращает всем полям внутри него браузерные рамки. Лежи флажок в
+             том же родителе, он получил бы `border: revert` и пропал бы с
+             глаз: нарисованная каноном рамка снимается, а системная в этой
+             теме невидима. Проверено — флажок был не виден совсем. -->
         <div style="display:flex;gap:6px;align-items:center;">
           <label class="chk" style="margin:0;white-space:nowrap;"><input type="checkbox" id="chk-msb">
             <span class="swatch" style="background:var(--curve-mr)"></span> MSB</label>
-          <input type="text" id="inp-msb" autocomplete="off" style="flex:1;min-width:0;" disabled>
+          <div style="flex:1;min-width:0;">
+            <input type="text" id="inp-msb" autocomplete="off" style="width:100%;" disabled>
+          </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
           <label class="chk" style="margin:0;white-space:nowrap;"><input type="checkbox" id="chk-msc">
             <span class="swatch" style="background:var(--curve-reg)"></span> MSC</label>
-          <input type="text" id="inp-msc" autocomplete="off" style="flex:1;min-width:0;" disabled>
+          <div style="flex:1;min-width:0;">
+            <input type="text" id="inp-msc" autocomplete="off" style="width:100%;" disabled>
+          </div>
         </div>
         <div class="error" id="social-error" style="display:none;"></div>
       </div>

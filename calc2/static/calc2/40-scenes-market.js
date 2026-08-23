@@ -1689,9 +1689,17 @@ function setExtSign(sign) {
 function syncSocialFields() {
   const put = (id, on) => { const e = document.getElementById(id); if (e) e.checked = !!on; };
   put('chk-msb', STATE.msbOn); put('chk-msc', STATE.mscOn);
+  /* ⚠️ ПОЛЕ ФОРМУЛЫ ЗЕРКАЛИТСЯ MathLive. Само поле ввода спрятано, человек
+     видит математический близнец рядом. Тот перечитывает значение по событию
+     `input` — значит присвоить `.value` мало: на экране осталась бы прежняя
+     формула, хотя считает движок уже по новой. Отправляем событие, и мост
+     buildMathfield → fromInput доводит значение до видимого поля. */
   const set = (id, val) => {
     const e = document.getElementById(id);
-    if (e && document.activeElement !== e) e.value = val;
+    if (!e || document.activeElement === e) return;
+    if (e.value === val) return;
+    e.value = val;
+    e.dispatchEvent(new Event('input', { bubbles: true }));
   };
   set('inp-msb', STATE.msbExpr); set('inp-msc', STATE.mscExpr);
   // Формулу правят только у включённой кривой: выключенная равна своей частной паре.
