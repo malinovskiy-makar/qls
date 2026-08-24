@@ -3988,6 +3988,273 @@ const CASES = [
              ['текст записи спроса тот, что ждём', 'textD', 1, 0],
              ['текст записи предложения тот, что ждём', 'textS', 1, 0]],
   },
+  /* =====================================================================
+     ПРОЦЕНТНЫЕ НАЛОГИ И СУБСИДИИ (сессия 24.08, ветка feat/calc2-pct-tax).
+     Четыре процентные формы описаны одной таблицей PCT_FORMS. Числа взяты
+     из учебника Бахарева (глава «Налоги и субсидии») и посчитаны руками
+     в комментарии к каждому случаю: тест сверяет движок с арифметикой.
+     ===================================================================== */
+  {
+    /* (проц-а) ТЕОРЕМА ЭКВИВАЛЕНТНОСТИ. D = 120 − Q, S = Q, Q* = 60, P* = 60.
+       Три разные формы, подобранные так, чтобы дать ОДНУ И ТУ ЖЕ точку:
+         потоварный t = 40   ⇒ S+40 = Q+40;  120−Q = Q+40  ⇒ Q = 40;
+         акциз     τ = 50 %  ⇒ S/(1−0,5) = 2Q; 120−Q = 2Q  ⇒ Q = 40;
+         НДС       τ = 100 % ⇒ S·(1+1)   = 2Q; 120−Q = 2Q  ⇒ Q = 40.
+       Всюду Pd = 80, Ps = 40, сбор 1600, DWL = ∫₄₀^₆₀(120−2q)dq = 400.
+
+       ⚠️ ЭТОТ СЛУЧАЙ И ЛОВИТ СТАРЫЙ ДЕФЕКТ. До 24.08 акциз проваливался
+       в потоварную ветку и при «50» сдвигал кривую на 50 рублей: точка
+       уезжала в (35; 85/35), и три точки переставали совпадать. Сравниваем
+       не только с арифметикой, но и попарно между формами — так дефект
+       виден даже если ошибутся все три одинаково. */
+    name: '(проц-а) Эквивалентность: потоварный 40, акциз 50 %, НДС 100 % — одна точка',
+    run: `var snap = function (form, rate) {
+            resetSceneMemory(); pickScene('taxes');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '120-Q');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+            setType('tax'); setTaxForm(form); setTax(rate); redrawAll();
+            var te = STATE.taxEq || {};
+            return { Q: te.Q, Pd: te.Pb, Ps: te.Ps, tx: STATE.tx, dwl: STATE.dwl };
+          };
+          var u = snap('unit', 40), e = snap('excise', 50), v = snap('vat', 100);
+          var d = function (a, b) { return Math.max(Math.abs(a.Q - b.Q), Math.abs(a.Pd - b.Pd),
+                                                    Math.abs(a.Ps - b.Ps), Math.abs(a.tx - b.tx)); };
+          return { uQ: u.Q, uPd: u.Pd, uPs: u.Ps, uTx: u.tx, uDwl: u.dwl,
+                   eQ: e.Q, ePd: e.Pd, ePs: e.Ps, eTx: e.tx, eDwl: e.dwl,
+                   vQ: v.Q, vPd: v.Pd, vPs: v.Ps, vTx: v.tx, vDwl: v.dwl,
+                   dUE: d(u, e), dUV: d(u, v),
+                   // Тождество столбца «Деньги» таблицы PCT_FORMS.
+                   identE: Math.abs(0.5 * e.Pd * e.Q - e.tx),
+                   identV: Math.abs(1.0 * v.Ps * v.Q - v.tx) };`,
+    checks: [['потоварный Q1', 'uQ', 40, 1e-6], ['потоварный Pd', 'uPd', 80, 1e-6],
+             ['потоварный Ps', 'uPs', 40, 1e-6], ['потоварный сбор', 'uTx', 1600, 1e-4],
+             ['потоварный DWL', 'uDwl', 400, 0.5],
+             ['акциз Q1', 'eQ', 40, 1e-6], ['акциз Pd', 'ePd', 80, 1e-6],
+             ['акциз Ps', 'ePs', 40, 1e-6], ['акциз сбор', 'eTx', 1600, 1e-4],
+             ['акциз DWL', 'eDwl', 400, 0.5],
+             ['НДС Q1', 'vQ', 40, 1e-6], ['НДС Pd', 'vPd', 80, 1e-6],
+             ['НДС Ps', 'vPs', 40, 1e-6], ['НДС сбор', 'vTx', 1600, 1e-4],
+             ['НДС DWL', 'vDwl', 400, 0.5],
+             ['потоварный и акциз — одна точка', 'dUE', 0, 1e-6],
+             ['потоварный и НДС — одна точка', 'dUV', 0, 1e-6],
+             ['акциз: сбор = τ·Pd·Q', 'identE', 0, 1e-6],
+             ['НДС: сбор = τ·Ps·Q', 'identV', 0, 1e-6]],
+  },
+  {
+    /* (проц-б) ДВЕ ПРОЦЕНТНЫЕ СУБСИДИИ. D = 120 − Q, S = Q, ставка 50 %.
+       От цены ПОКУПАТЕЛЯ: S/(1+0,5) = (2/3)Q; 120−Q = (2/3)Q ⇒ Q = 72,
+         Pd = 48, Ps = 72, расход = 0,5·48·72 = 1728,
+         DWL = ∫₆₀^₇₂(2q−120)dq = 144.
+       От цены ПРОДАВЦА: S·(1−0,5) = 0,5Q; 120−Q = 0,5Q ⇒ Q = 80,
+         Pd = 40, Ps = 80, расход = 0,5·80·80 = 3200,
+         DWL = ∫₆₀^₈₀(2q−120)dq = 400.
+       Расход выводится со знаком минус, как у потоварной.
+
+       ⚠️ ДВЕ ФОРМЫ ОБЯЗАНЫ РАЗОЙТИСЬ. До 24.08 процентная субсидия была одна
+       (и равнялась нынешней «от цены покупателя»), а вторая кнопка попадала
+       в потоварную ветку. Проверяем не только числа, но и то, что точки
+       РАЗНЫЕ: иначе правка «обе кнопки ведут в одну форму» осталась бы
+       зелёной по каждому числу в отдельности. */
+    name: '(проц-б) Субсидии 50 %: от цены покупателя Q=72, от цены продавца Q=80',
+    run: `var snap = function (form) {
+            resetSceneMemory(); pickScene('taxes');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '120-Q');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+            setType('subsidy'); setTaxForm(form); setTax(50); redrawAll();
+            var te = STATE.taxEq || {};
+            return { Q: te.Q, Pd: te.Pb, Ps: te.Ps, tx: STATE.tx,
+                     budget: STATE.budget, dwl: STATE.dwl, kind: STATE.taxKind };
+          };
+          var b = snap('subbuyer'), l = snap('subseller');
+          return { bQ: b.Q, bPd: b.Pd, bPs: b.Ps, bMoney: b.tx, bBudget: b.budget, bDwl: b.dwl,
+                   lQ: l.Q, lPd: l.Pd, lPs: l.Ps, lMoney: l.tx, lBudget: l.budget, lDwl: l.dwl,
+                   bAdv: (b.kind === 'advalorem') ? 1 : 0, lAdv: (l.kind === 'advalorem') ? 1 : 0,
+                   apart: Math.abs(b.Q - l.Q),
+                   identB: Math.abs(0.5 * b.Pd * b.Q - b.tx),
+                   identL: Math.abs(0.5 * l.Ps * l.Q - l.tx) };`,
+    checks: [['от Pd: поворот, а не сдвиг', 'bAdv', 1, 0],
+             ['от Pd: Q1', 'bQ', 72, 1e-6], ['от Pd: Pd', 'bPd', 48, 1e-6],
+             ['от Pd: Ps', 'bPs', 72, 1e-6], ['от Pd: расход', 'bMoney', 1728, 1e-4],
+             ['от Pd: бюджет со знаком', 'bBudget', -1728, 1e-4], ['от Pd: DWL', 'bDwl', 144, 0.5],
+             ['от Pd: расход = τ·Pd·Q', 'identB', 0, 1e-6],
+             ['от Ps: поворот, а не сдвиг', 'lAdv', 1, 0],
+             ['от Ps: Q1', 'lQ', 80, 1e-6], ['от Ps: Pd', 'lPd', 40, 1e-6],
+             ['от Ps: Ps', 'lPs', 80, 1e-6], ['от Ps: расход', 'lMoney', 3200, 1e-4],
+             ['от Ps: бюджет со знаком', 'lBudget', -3200, 1e-4], ['от Ps: DWL', 'lDwl', 400, 0.5],
+             ['от Ps: расход = τ·Ps·Q', 'identL', 0, 1e-6],
+             ['две формы дают РАЗНЫЕ точки', 'apart', 8, 1e-6]],
+  },
+  {
+    /* (проц-в) СТАВКА ОБНУЛЯЕТСЯ ПРИ СМЕНЕ ВИДА (решение владельца), и рублёвой
+       записи у процентных форм не остаётся нигде. Проходим цепочку
+       потоварный 40 → акциз → НДС → потоварный и смотрим ставку после каждого
+       шага, а заодно букву, единицу и предел ползунка.
+
+       Пределы: у форм с делителем (1 − τ) верхняя граница строго меньше ста
+       (99), у остальных процентных — 200, у потоварной — масштаб цены. */
+    name: '(проц-в) Смена вида обнуляет ставку; у процентных форм буква τ и знак процента',
+    run: `resetSceneMemory(); pickScene('taxes');
+          setType('tax'); setTaxForm('unit'); setTax(40); redrawAll();
+          var read = function () {
+            var rl = document.getElementById('rate-letter');
+            var ru = document.getElementById('rate-unit');
+            var sl = document.getElementById('tax-slider');
+            var inp = document.getElementById('tax-input');
+            var eq = document.querySelector('#tax-field .reg-eq');
+            var pult = '';
+            if (eq) { var c = eq.cloneNode(true);
+                      c.querySelectorAll('.katex-mathml, annotation').forEach(function (n) { n.remove(); });
+                      pult = c.textContent; }
+            return { rate: STATE.tax, letter: rl ? rl.textContent.trim() : '',
+                     unit: ru ? ru.textContent.trim() : '', max: parseFloat(sl ? sl.max : '0'),
+                     field: parseFloat(inp ? inp.value : '-1'), pult: pult };
+          };
+          var a = read();
+          setTaxForm('excise'); var b = read();
+          setTaxForm('vat');    var c = read();
+          setTaxForm('unit');   var d = read();
+          return { r0: a.rate, r1: b.rate, r2: c.rate, r3: d.rate,
+                   f1: b.field, f2: c.field, f3: d.field,
+                   tauB: (b.letter === 'τ' && b.unit === '%') ? 1 : 0,
+                   tauC: (c.letter === 'τ' && c.unit === '%') ? 1 : 0,
+                   tUnit: (d.letter === 't' && d.unit === '') ? 1 : 0,
+                   maxE: b.max, maxV: c.max,
+                   pultPctB: /%/.test(b.pult) ? 1 : 0,
+                   pultRubD: (d.pult && !/%/.test(d.pult)) ? 1 : 0 };`,
+    checks: [['ставка до смены', 'r0', 40, 1e-9],
+             ['после перехода на акциз', 'r1', 0, 1e-9],
+             ['после перехода на НДС', 'r2', 0, 1e-9],
+             ['после возврата к потоварному', 'r3', 0, 1e-9],
+             ['поле ввода на акцизе', 'f1', 0, 1e-9],
+             ['поле ввода на НДС', 'f2', 0, 1e-9],
+             ['поле ввода на потоварном', 'f3', 0, 1e-9],
+             ['акциз: буква τ и знак процента', 'tauB', 1, 0],
+             ['НДС: буква τ и знак процента', 'tauC', 1, 0],
+             ['потоварный: буква t без единицы', 'tUnit', 1, 0],
+             ['предел акциза строго меньше ста', 'maxE', 99, 1e-9],
+             ['предел НДС без верхней границы формы', 'maxV', 200, 1e-9],
+             ['в ленте регуляторов у акциза есть процент', 'pultPctB', 1, 0],
+             ['в ленте регуляторов у потоварного процента нет', 'pultRubD', 1, 0]],
+  },
+  {
+    /* (проц-г) ЦЕНТР ПОВОРОТА. D = 120 − Q, S = 0,5Q + 30, акциз 25 %:
+       S/(1−0,25) = (2/3)Q + 40; 120−Q = (2/3)Q+40 ⇒ Q = 48, Pd = 72,
+       Ps = S(48) = 54 = 0,75·72, сбор = 0,25·72·48 = 864,
+       Q₀ = 60, DWL = ∫₄₈^₆₀(90 − 1,5q)dq = 108.
+       Обе кривые предложения обращаются в ноль при Q = −60 — это и есть центр.
+
+       Контрпример в том же случае: у S = Q центр лежит в начале координат,
+       и продолжения быть не должно. Без него правка «рисовать всегда»
+       осталась бы зелёной. */
+    name: '(проц-г) Центр поворота: два пунктира приходят в Q=−60; у S=Q продолжений нет',
+    run: `var setup = function (sExpr, rate) {
+            resetSceneMemory(); pickScene('taxes');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '120-Q');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), sExpr);
+            setType('tax'); setTaxForm('excise'); setTax(rate); redrawAll();
+          };
+          var starts = function () {
+            var out = [];
+            document.querySelectorAll('#chart [data-pivot="1"], #chart [data-pivot="2"]').forEach(function (el) {
+              var m = String(el.getAttribute('d') || '').match(/^M\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+              if (m) out.push([sx.invert(+m[1]), sy.invert(+m[2])]);
+            });
+            return out;
+          };
+          setup('0.5*Q+30', 25);
+          /* ⚠️ Числа снимаем СРАЗУ: второй setup ниже перезапишет STATE.tx
+             и STATE.dwl, и в отчёт уехали бы числа контрпримера. */
+          var te = STATE.taxEq || {}, tx1 = STATE.tx, dwl1 = STATE.dwl;
+          var piv = taxPivotPoint(), a = starts();
+          setup('Q', 50);
+          var noPiv = taxPivotPoint(), b = starts();
+          return { Q: te.Q, Pd: te.Pb, Ps: te.Ps, tx: tx1, dwl: dwl1,
+                   pivQ: piv ? piv.Q : NaN, pivP: piv ? piv.P : NaN,
+                   n: a.length,
+                   worstQ: a.length ? Math.max.apply(null, a.map(function (p) { return Math.abs(p[0] + 60); })) : 99,
+                   worstP: a.length ? Math.max.apply(null, a.map(function (p) { return Math.abs(p[1]); })) : 99,
+                   noPiv: (noPiv === null) ? 1 : 0, nNo: b.length };`,
+    checks: [['Q1', 'Q', 48, 1e-6], ['Pd', 'Pd', 72, 1e-6], ['Ps', 'Ps', 54, 1e-6],
+             ['сбор', 'tx', 864, 1e-4], ['DWL', 'dwl', 108, 0.5],
+             ['центр поворота по Q', 'pivQ', -60, 1e-6],
+             ['центр поворота по P', 'pivP', 0, 1e-9],
+             ['продолжений на холсте', 'n', 2, 0],
+             ['оба приходят в Q = −60', 'worstQ', 0, 0.2],
+             ['оба приходят в P = 0', 'worstP', 0, 0.2],
+             ['у S = Q центра не показываем', 'noPiv', 1, 0],
+             ['и продолжений тоже нет', 'nNo', 0, 0]],
+  },
+  {
+    /* (проц-д) ПРАВИЛО ПЕРВОЙ ЧЕТВЕРТИ ПРИ СНЯТОЙ ГАЛОЧКЕ (решение владельца).
+       Экономическая сцена: сняли галочку — оси раздвинулись в минус, сетка на
+       месте, но кривая ниже оси Q не появилась. «Математика» — не экономика:
+       там парабола по-прежнему строится в отрицательных значениях.
+
+       ⚠️ ДВЕ ПОЛОВИНЫ ОДНОГО СЛУЧАЯ, И ВТОРАЯ ВАЖНЕЕ. Правку «резать всегда и
+       везде» первая половина пропустила бы: она сделала бы ровно то, чего
+       здесь ждут. Ловит её вторая — число точек параболы ниже оси x. */
+    name: '(проц-д) Снятая галочка: у экономики нет P < 0, у «Математики» отрицательные остаются',
+    run: `resetSceneMemory(); pickScene('sd');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-Q');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+          document.getElementById('inp-qmax').value = '200';
+          document.getElementById('inp-pmax').value = '200';
+          applyViewBounds(); redrawAll();
+          var below = function () {
+            var n = 0;
+            document.querySelectorAll('#chart path[data-curve]').forEach(function (el) {
+              String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
+                var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+                if (m && sy.invert(+m[2]) < -1e-6) n++;
+              });
+            });
+            return n;
+          };
+          var onQuad = below();
+          setFirstQuad(false); redrawAll();
+          var offQuad = below(), qmin = CONFIG.Qmin, pmin = CONFIG.Pmin;
+          var grid = document.querySelectorAll('#chart .grid line, #chart [data-grid] line').length;
+          var eq = STATE.eq || {}, cs = STATE.cs, ps = STATE.ps;
+          /* Вторая половина: «Математика» правилу не подчиняется.
+             ⚠️ Сюжет задаём ЯВНО. Соседние случаи оставляют STATE.mathSub своим
+             («ограничение», «min/max»), и там общее поле f(x) не показывается
+             вовсе — параболы на холсте не оказывается, а случай краснеет не по
+             делу. Берём сюжет с касательной: у него f(x) есть и рисуется. */
+          setMode('math'); setMathSub('tangent');
+          STATE.mathFormula = 'x^2-4';
+          var inp = document.getElementById('inp-mathf');
+          if (inp) { inp.value = 'x^2-4'; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+          setMathWindow(-6, 6, -6, 6); redrawAll();
+          var ms = mainScales(), best = null;
+          /* ⚠️ Без префикса «#chart»: кривую «Математики» рисует mathLine
+             безымянным path, и ищется она не селектором, а по невязке
+             с самой формулой — так случай не зависит от разметки. */
+          Array.prototype.forEach.call(document.querySelectorAll('path'), function (el) {
+            var pts = [];
+            String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
+              var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+              if (m) pts.push([ms.mx.invert(+m[1]), ms.my.invert(+m[2])]);
+            });
+            if (pts.length < 50) return;
+            var err = 0;
+            pts.forEach(function (p) { err += Math.abs(p[1] - (p[0] * p[0] - 4)); });
+            err /= pts.length;
+            if (!best || err < best.err) best = { err: err, pts: pts };
+          });
+          var mathBelow = best ? best.pts.filter(function (p) { return p[1] < -1e-6; }).length : -1;
+          return { onQuad: onQuad, offQuad: offQuad, qmin: qmin, pmin: pmin,
+                   grid: (grid > 0) ? 1 : 0, Q: eq.Q, P: eq.P, cs: cs, ps: ps,
+                   mathBelow: mathBelow, mathErr: best ? best.err : 99 };`,
+    checks: [['с галочкой точек с P < 0', 'onQuad', 0, 0],
+             ['БЕЗ галочки точек с P < 0', 'offQuad', 0, 0],
+             ['оси раздвинулись по Q', 'qmin', -50, 1e-6],
+             ['оси раздвинулись по P', 'pmin', -50, 1e-6],
+             ['сетка нарисована', 'grid', 1, 0],
+             ['Q* не изменилось', 'Q', 50, 1e-6], ['P* не изменилось', 'P', 50, 1e-6],
+             ['CS не изменился', 'cs', 1250, 1e-4], ['PS не изменился', 'ps', 1250, 1e-4],
+             ['парабола найдена (невязка с x²−4)', 'mathErr', 0, 1e-3],
+             ['в «Математике» точек с y < 0', 'mathBelow', 79, 0]],
+  },
   {
     /* (ж) КТВ по кусочной КПВ. У ВОГНУТОЙ кусочной альтернативная стоимость
        растёт, и при мировой цене между наклонами кусков оптимум ровно в изломе.
