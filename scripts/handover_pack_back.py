@@ -28,7 +28,7 @@ FOLDERS = [
 
 
 def md5_of(path):
-    h = hashlib.md5()
+    h = hashlib.md5(usedforsecurity=False)
     with open(path, 'rb') as fh:
         for chunk in iter(lambda: fh.read(1 << 20), b''):
             h.update(chunk)

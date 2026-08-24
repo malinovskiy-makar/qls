@@ -70,6 +70,32 @@ venv313/Scripts/python.exe manage.py runserver   # Windows
 
 ### Проверки перед сдачей работы
 
+⚠️ **Перед сдачей сессии прогоняются ВСЕ ПЯТЬ джобов из `.github/workflows/ci.yml`,
+поимённо, а не только `scripts/run_tests.py`.** 24.08 red-джоб «Безопасность»
+прожил незамеченным четыре ночные сессии подряд: каждая докладывала «полный
+прогон зелёный», проверив только джоб `tests` (пятую часть). «Полный прогон»
+означает эти пять команд, и отчёт о сдаче обязан назвать статус каждой:
+
+```bash
+# 1. lint — стиль (ruff)
+ruff check .
+
+# 2. security — статический разбор и уязвимости зависимостей
+bandit -r problems catalog teacher student game calc2 config -ll
+pip-audit -r requirements/base.txt
+
+# 3. migrations — схема с нуля (нужен пустой PostgreSQL 17, см. docker-compose.dev.yml)
+python manage.py migrate --noinput --settings=config.settings_test_pg
+python manage.py makemigrations --check --dry-run --settings=config.settings_test_pg
+
+# 4. tests — полный набор на PostgreSQL (см. ниже про два шага)
+python scripts/run_tests.py problems catalog teacher student calc2 game calendar_stub config \
+  --settings=config.settings_test_pg --verbosity 2
+
+# 5. deploy-check — боевые настройки глазами Django (переменные окружения — см. ci.yml, джоб deploy-check)
+python manage.py check --deploy --fail-level WARNING
+```
+
 ```bash
 manage.py check                              # 0 ошибок
 manage.py makemigrations --check --dry-run   # ничего не предлагает создать

@@ -71,7 +71,7 @@ def calc2_static_version():
     key = _stat_key(files)
     if _cache['key'] == key and _cache['version']:
         return _cache['version']
-    digest = hashlib.sha1()
+    digest = hashlib.sha1(usedforsecurity=False)
     for p in files:
         # Имя тоже в хеш: переименование файла — это тоже изменение страницы.
         digest.update(p.name.encode('utf-8'))
