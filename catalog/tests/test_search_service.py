@@ -13,6 +13,7 @@
 3. Лежащий сервис — это ДЕГРАДАЦИЯ, а не пятисотка. И, что не менее важно,
    Django при этом НЕ должен полезть за моделью сам.
 """
+import importlib.util
 import os
 import sys
 import unittest
@@ -40,11 +41,21 @@ from problems.models import Problem
 
 
 def модель_скачана():
-    """Лежит ли BGE-M3 в кэше HuggingFace.
+    """Можно ли вообще запустить тест побитового совпадения.
 
     Проверяем наличие файлов, а не пробуем загрузить: загрузка занимает
     минуты и 2,27 ГБ памяти, и делать это ради `skipUnless` нельзя.
+
+    ⚠️ БИБЛИОТЕКА ПРОВЕРЯЕТСЯ ВМЕСТЕ С МОДЕЛЬЮ, И ЭТО НЕ ПЕДАНТИЗМ.
+    Сторож смотрел только на кэш HuggingFace. На машине, где модель скачана,
+    а `sentence-transformers` не поставлен (он живёт в requirements/local.txt,
+    а не в dev.txt), `skipUnless` пропускал тест внутрь, и `setUpClass` падал
+    с `ModuleNotFoundError` — то есть шаг B прогона краснел не из-за кода, а
+    из-за окружения. Замер 24.08: именно так и вышло. Смысл сторожа — «тест
+    может выполниться», а без библиотеки он выполниться не может.
     """
+    if importlib.util.find_spec('sentence_transformers') is None:
+        return False
     корень = Path(os.environ.get('HF_HOME')
                   or Path.home() / '.cache' / 'huggingface')
     имя = 'models--' + EMBEDDING_MODEL_NAME.replace('/', '--')

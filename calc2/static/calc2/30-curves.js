@@ -100,10 +100,16 @@ function drawMarginalCurve(g, fn, parent, color, opts) {
   const N = o.n || 400;
   const width = (o.width != null) ? o.width : 2;
   const dash = o.dash || '6 4';
-  // Докуда тянуть продолжение: до нуля породившей кривой, но не ближе края
-  // основного отрезка — иначе продолжения не было бы вовсе.
-  const stop = (parent && STATE.firstQuad)
-    ? curveZeroQ(parent, Math.max(to, CONFIG.Qmax, 1) * 4) : 0;
+  /* Докуда тянуть продолжение: до нуля породившей кривой.
+
+     ⚠️ ГАЛОЧКА «ТОЛЬКО ПЕРВАЯ ЧЕТВЕРТЬ» ЗДЕСЬ НИ ПРИ ЧЁМ, И ЭТО ВАЖНО.
+     Сначала было написано «продолжение только при включённой галочке» — по
+     аналогии с обрезкой обычных кривых. Вышло бессмысленно: при ВКЛЮЧЁННОЙ
+     галочке продолжение рисуется, но прямоугольный clip-path режет холст по
+     оси и его не видно, а при выключенной оно видно, но не рисуется вовсе.
+     То есть отличить продолжение по виду было нельзя никогда.
+     Делим по цене всегда: выше нуля — основная линия, ниже — продолжение. */
+  const stop = parent ? curveZeroQ(parent, Math.max(to, CONFIG.Qmax, 1) * 4) : 0;
   const end = Math.max(to, stop);
   const main = [], tail = [];
   for (let i = 0; i <= N; i++) {
@@ -112,9 +118,9 @@ function drawMarginalCurve(g, fn, parent, color, opts) {
     // Ограничение сверху нужно кривым, которые у нуля уходят в небо (ATC
     // естественной монополии): без него путь тянется на километры вверх.
     const bad = isNaN(v) || (o.cap != null && v > o.cap);
-    const inMain = !bad && q <= to + 1e-9 && (!STATE.firstQuad || v >= -1e-9);
+    const inMain = !bad && q <= to + 1e-9 && v >= -1e-9;
     // Продолжение берёт ноль в себя, иначе между линиями остаётся зазор.
-    const inTail = !bad && STATE.firstQuad && v <= 1e-9 && q <= stop + 1e-9;
+    const inTail = !bad && v <= 1e-9 && q <= stop + 1e-9;
     main.push(inMain ? [q, v] : null);
     tail.push(inTail ? [q, v] : null);
   }
