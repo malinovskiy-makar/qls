@@ -133,6 +133,28 @@ class MathProtectionTests(SimpleTestCase):
         self.assertIn(esc('$$x^2$$'), out)
         self.assertNotIn('<em>', out)
 
+    def test_math_with_html_special_chars_is_escaped(self):
+        """`<`/`>` внутри формулы обязаны прийти в HTML экранированными.
+
+        Без escape() при восстановлении математики `$x < 10$` вставляет в
+        HTML настоящий `<`. Первая находка фазы зубастости: с пробелом
+        после `<` (`$x < 10$`) тест всё равно не краснел — nh3 сам
+        переэкранирует одинокий `<`, за которым не следует буква, при
+        сериализации разобранного дерева обратно в строку. Дыру показал
+        только `<`, за которым СРАЗУ буква (`$a<b$`) — html5-парсер nh3
+        читает `<b` как начало тега `<b>`, и всё до ближайшего `>` (в том
+        числе значимый текст) съедается как атрибуты чужого тега. Не
+        просто «сломалось экранирование» — потерялись данные условия.
+        """
+        out = render_markdown('дано $x < 10$ и $y > 5$')
+        self.assertIn(esc('$x < 10$'), out)
+        self.assertIn(esc('$y > 5$'), out)
+
+        out2 = render_markdown('два: $a<b$ рядом $c>d$')
+        self.assertIn(esc('$a<b$'), out2)
+        self.assertIn(esc('$c>d$'), out2)
+        self.assertIn('рядом', out2)
+
 
 class CurrencyEscapeTests(SimpleTestCase):
     """`\\$100` — экранированная валюта, не математика (см. _katex_dollars.html)."""
