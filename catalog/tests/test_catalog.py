@@ -125,6 +125,26 @@ class ProblemDetailTests(TestCase):
         self.assertIn(self.p_visible_similar.pk, similar_ids)
         self.assertNotIn(self.p_hidden_similar.pk, similar_ids)
 
+    def test_solution_linebreaks_rendered_and_escaped(self):
+        """Абзацы решения превращаются в <br>, а не остаются одной строкой.
+
+        Раздел 2а CORPUS-FORMAT.md: `\\n\\n` внутри `solution`/`statement`/
+        `answer`/`ProblemPart.statement` сегодня никак не обрабатывается —
+        абзацы схлопываются в сплошной текст. `linebreaksbr` чинит это,
+        но сначала экранирует — тест проверяет обе стороны одним прогоном,
+        чтобы починка переносов не открыла дыру, которую закрывала сессия 3Б.
+        """
+        p = make_problem(
+            'Условие с решением в несколько абзацев.',
+            solution=('Первый абзац решения.\n\n'
+                      'Второй абзац <script>alert(1)</script> с нагрузкой.'))
+        resp = self.client.get(
+            reverse('catalog:problem_detail', args=[p.pk]))
+        html = resp.content.decode()
+        self.assertIn('Первый абзац решения.<br><br>Второй абзац', html)
+        self.assertNotIn('<script>alert(1)</script>', html)
+        self.assertIn('&lt;script&gt;alert(1)&lt;/script&gt;', html)
+
 
 class CatalogApiTests(TestCase):
     @classmethod

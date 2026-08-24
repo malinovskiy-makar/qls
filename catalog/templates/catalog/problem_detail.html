@@ -230,7 +230,7 @@
 
 <!-- Условие задачи -->
 <div class="problem-statement">
-  <div class="math-content">{{ problem.statement }}</div>
+  <div class="math-content">{{ problem.statement|linebreaksbr }}</div>
 </div>
 
 <!-- Подпункты -->
@@ -246,7 +246,7 @@
     <div class="part-header">
       <span class="part-label">{{ part.label|partlabel }}</span>
       {% if part.statement %}
-      <div class="part-statement math-content">{{ part.statement }}</div>
+      <div class="part-statement math-content">{{ part.statement|linebreaksbr }}</div>
       {% endif %}
     </div>
     {% if part.answer %}
@@ -260,7 +260,7 @@
       </button>
       <div id="part-answer-{{ part.pk }}" class="reveal-content">
         <div class="reveal-label">Ответ</div>
-        <div class="math-content">{{ part.answer }}</div>
+        <div class="math-content">{{ part.answer|linebreaksbr }}</div>
       </div>
     </div>
     {% endif %}
@@ -281,7 +281,7 @@
   </button>
   <div id="answer-block" class="reveal-content">
     <div class="reveal-label">Ответ</div>
-    <div class="math-content">{{ problem.answer }}</div>
+    <div class="math-content">{{ problem.answer|linebreaksbr }}</div>
   </div>
 </div>
 {% endif %}
@@ -297,7 +297,7 @@
   </button>
   <div id="solution-block" class="reveal-content">
     <div class="reveal-label">Решение</div>
-    <div class="math-content">{{ problem.solution }}</div>
+    <div class="math-content">{{ problem.solution|linebreaksbr }}</div>
   </div>
 </div>
 {% endif %}
