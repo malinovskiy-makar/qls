@@ -3748,6 +3748,210 @@ const CASES = [
              ['путей на холсте', 'paths', 3, 2]],
   },
   {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (а). РАВНОВЕСИЕ НЕ ЗАВИСИТ ОТ ГРАНИЦ КАДРА.
+       Дефект 24.08: findEquilibrium без явной границы сканировал отрезок до
+       CONFIG.Qmax — правого края ВИДИМОГО окна. Один и тот же рынок на
+       стартовом масштабе писал «кривые не пересекаются», а после отдаления
+       показывал Q* = 128. Здесь один набор формул меряется на ТРЁХ масштабах:
+       стартовом, отдалённом и приближённом. Числа обязаны совпасть. */
+    name: 'Первая четверть (а) равновесие одно и то же на трёх масштабах',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 3); sumSetCount('S', 2);
+          var gd = STATE.curves.filter(function (c) { return c.sumGroup === 'D' && c.kind !== 'sum'; });
+          var gs = STATE.curves.filter(function (c) { return c.sumGroup === 'S' && c.kind !== 'sum'; });
+          ['100-Q', '60-Q', '40-Q'].forEach(function (e, i) { updateCurveExpr(gd[i], e); });
+          ['Q-100', 'Q+20'].forEach(function (e, i) { updateCurveExpr(gs[i], e); });
+          redrawAll();
+          var startQ = STATE.eq ? STATE.eq.Q : NaN, startP = STATE.eq ? STATE.eq.P : NaN;
+          var startMax = CONFIG.Qmax;
+          zoomStep(1.6); zoomStep(1.6); zoomStep(1.6); redrawAll();
+          var farQ = STATE.eq ? STATE.eq.Q : NaN, farP = STATE.eq ? STATE.eq.P : NaN;
+          var farMax = CONFIG.Qmax;
+          zoomStep(1 / 1.6); zoomStep(1 / 1.6); zoomStep(1 / 1.6); zoomStep(1 / 1.6); redrawAll();
+          var nearQ = STATE.eq ? STATE.eq.Q : NaN, nearP = STATE.eq ? STATE.eq.P : NaN;
+          var nearMax = CONFIG.Qmax;
+          return { startQ: startQ, startP: startP, farQ: farQ, farP: farP,
+                   nearQ: nearQ, nearP: nearP,
+                   grew: (farMax > startMax * 1.5) ? 1 : 0,
+                   shrank: (nearMax < startMax) ? 1 : 0 };`,
+    checks: [['Q* на стартовом масштабе', 'startQ', 128, 1e-3],
+             ['P* на стартовом масштабе', 'startP', 24, 1e-3],
+             ['Q* после отдаления', 'farQ', 128, 1e-3],
+             ['P* после отдаления', 'farP', 24, 1e-3],
+             ['Q* после приближения', 'nearQ', 128, 1e-3],
+             ['P* после приближения', 'nearP', 24, 1e-3],
+             ['окно и вправду отдалилось', 'grew', 1, 0],
+             ['окно и вправду приблизилось', 'shrank', 1, 0]],
+  },
+  {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (б). ИЗЛИШКИ НЕ УХОДЯТ НИЖЕ ОСИ Q.
+       Дефект 24.08: у предложения Q − 100 обратная функция при Q < 100
+       отрицательна, и интеграл излишка продавца уходил в отрицательные цены —
+       PS первой группы выходил 7 688 вместо 2 688, ровно на треугольник под
+       осью. Запись суммарной кривой при этом начиналась с Q = 100, на отрезке
+       0…100 функции не было вовсе, и PS по суммарной давал NaN.
+       Допуск жёсткий: расхождение здесь — ошибка правила, а не округления. */
+    name: 'Первая четверть (б) излишки считаются только над осью Q',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 3); sumSetCount('S', 2);
+          var gd = STATE.curves.filter(function (c) { return c.sumGroup === 'D' && c.kind !== 'sum'; });
+          var gs = STATE.curves.filter(function (c) { return c.sumGroup === 'S' && c.kind !== 'sum'; });
+          ['100-Q', '60-Q', '40-Q'].forEach(function (e, i) { updateCurveExpr(gd[i], e); });
+          ['Q-100', 'Q+20'].forEach(function (e, i) { updateCurveExpr(gs[i], e); });
+          redrawAll();
+          var st = sumGroupStats();
+          var box = document.getElementById('info-sum');
+          return { ps1: st.S[0].surplus, ps2: st.S[1].surplus, psGroups: st.psGroups,
+                   psWhole: st.psWhole, psGap: st.psGap,
+                   cs1: st.D[0].surplus, cs2: st.D[1].surplus, cs3: st.D[2].surplus,
+                   csGroups: st.csGroups, csWhole: st.csWhole, csGap: st.csGap,
+                   sw: st.csGroups + st.psGroups,
+                   warn: (box && box.querySelector('.warn')) ? 1 : 0,
+                   zeroAt50: evalCurve(STATE.S, 50) };`,
+    checks: [['излишек S₁', 'ps1', 2688, 1e-6], ['излишек S₂', 'ps2', 8, 1e-6],
+             ['излишки продавцов вместе', 'psGroups', 2696, 1e-6],
+             ['площадь под суммарным предложением', 'psWhole', 2696, 1e-6],
+             ['расхождение двух путей PS', 'psGap', 0, 1e-6],
+             ['излишек D₁', 'cs1', 2888, 1e-6], ['излишек D₂', 'cs2', 648, 1e-6],
+             ['излишек D₃', 'cs3', 128, 1e-6],
+             ['излишки покупателей вместе', 'csGroups', 3664, 1e-6],
+             ['площадь под суммарным спросом', 'csWhole', 3664, 1e-6],
+             ['расхождение двух путей CS', 'csGap', 0, 1e-6],
+             ['общественное благосостояние', 'sw', 6360, 1e-6],
+             ['предупреждения о расхождении нет', 'warn', 0, 0],
+             ['суммарное предложение при Q=50 равно нулю', 'zeroAt50', 0, 1e-9]],
+  },
+  {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (в). КРИВАЯ НЕ РИСУЕТСЯ НИЖЕ ОСИ Q.
+       Дефект 24.08: curvePoints обрезал область по количеству, но по цене не
+       обрезал вовсе, и в пути спроса 100 − Q при окне до Q = 200 лежало 200
+       точек из 401 с отрицательной ценой, до P = −100. Прямоугольный clip-path
+       прятал их, пока окно начиналось в нуле, но в самом пути они оставались и
+       уходили в полосу попадания мыши, в ключевые точки и в выгрузку.
+       Читаем НАРИСОВАННЫЙ путь и переводим пиксели обратно шкалами. */
+    name: 'Первая четверть (в) в пути кривой нет точек с P < 0',
+    run: `resetSceneMemory(); pickScene('sd');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-Q');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+          document.getElementById('inp-qmax').value = '200';
+          document.getElementById('inp-pmax').value = '200';
+          applyViewBounds(); redrawAll();
+          var below = 0, maxQ = -1e9, n = 0;
+          document.querySelectorAll('#chart path[data-curve]').forEach(function (el) {
+            var id = +el.getAttribute('data-curve');
+            var cur = STATE.curves.find(function (c) { return c.id === id; });
+            if (!cur || cur.role !== 'demand') return;
+            String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
+              var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+              if (!m) return;
+              n++;
+              var q = sx.invert(+m[1]), p = sy.invert(+m[2]);
+              if (p < -1e-6) below++;
+              if (q > maxQ) maxQ = q;
+            });
+          });
+          return { below: below, maxQ: maxQ, n: n };`,
+    checks: [['точек с P < 0 в пути спроса', 'below', 0, 0],
+             ['путь обрывается у Q = 100', 'maxQ', 100, 0.51],
+             ['путь вообще нарисован', 'n', 201, 3]],
+  },
+  {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (г). ПЕРЕСЕЧЕНИЕ ВНЕ ЧЕТВЕРТИ НАЗВАНО, НО НЕ РАВНОВЕСИЕ.
+       Олимпиадная ловушка: у Qd = 100 − P и Qs = −200 + 0,5·P пересечение
+       лежит в (−100; 200). Ученик видит правдоподобную цену и заканчивает
+       решать. Калькулятор обязан назвать числа в разборе — и НЕ считать вокруг
+       них ничего: ни излишков, ни равновесия. */
+    name: 'Первая четверть (г) пересечение вне четверти названо, но не равновесие',
+    run: `resetSceneMemory(); pickScene('sd');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-P');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), '-200+0.5*P');
+          redrawAll();
+          var ex = document.getElementById('ex-body');
+          var txt = '';
+          if (ex) { var cl = ex.cloneNode(true);
+            cl.querySelectorAll('.katex-mathml, annotation').forEach(function (x) { x.remove(); });
+            txt = cl.textContent; }
+          var areas = document.getElementById('info-areas');
+          return { eqNull: STATE.eq === null ? 1 : 0,
+                   offQ: STATE.offEq ? STATE.offEq.Q : NaN,
+                   offP: STATE.offEq ? STATE.offEq.P : NaN,
+                   has200: /200/.test(txt) ? 1 : 0,
+                   has100: /100/.test(txt) ? 1 : 0,
+                   noStar: /Q\\s*\\*|P\\s*\\*/.test(txt) ? 0 : 1,
+                   areasEmpty: (areas && areas.textContent.trim() === '') ? 1 : 0,
+                   csNull: (STATE.cs == null) ? 1 : 0,
+                   dashed: document.querySelectorAll('[data-offquad]').length };`,
+    checks: [['равновесия нет', 'eqNull', 1, 0],
+             ['пересечение Q', 'offQ', -100, 1e-3],
+             ['пересечение P', 'offP', 200, 1e-3],
+             ['в разборе есть число 200', 'has200', 1, 0],
+             ['в разборе есть число 100', 'has100', 1, 0],
+             ['обозначений Q* и P* в разборе нет', 'noStar', 1, 0],
+             ['блок «Излишки» пуст', 'areasEmpty', 1, 0],
+             ['излишки не посчитаны', 'csNull', 1, 0],
+             ['пунктир к точке нарисован', 'dashed', 2, 0]],
+  },
+  {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (д). ПРЕДЕЛЬНАЯ КРИВАЯ — ИСКЛЮЧЕНИЕ.
+       MR продолжается вниз до Q-перехвата породившей её кривой: при спросе
+       P = 100 − Q это Q = 100, где MR = −100. Продолжение обязано отличаться
+       от основной линии видом — толщиной и прозрачностью, а не штрихом: MR
+       и так штриховая. */
+    name: 'Первая четверть (д) предельная кривая продолжается ниже оси',
+    run: `resetSceneMemory(); pickScene('mono');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-Q');
+          var mc = STATE.curves.find(function (c) { return c.role === 'mc' || c.role === 'supply'; });
+          if (mc) updateCurveExpr(mc, '20');
+          redrawAll();
+          var tails = document.querySelectorAll('#chart [data-marginal-tail]');
+          var maxQ = -1e9, minP = 1e9, w = 0, op = 1;
+          tails.forEach(function (el) {
+            w = parseFloat(el.getAttribute('stroke-width'));
+            op = parseFloat(el.getAttribute('opacity'));
+            String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
+              var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+              if (!m) return;
+              var q = sx.invert(+m[1]), p = sy.invert(+m[2]);
+              if (q > maxQ) maxQ = q;
+              if (p < minP) minP = p;
+            });
+          });
+          var m = STATE.mono || {};
+          return { n: tails.length, maxQ: maxQ, minP: minP, w: w, op: op,
+                   Qm: m.Qm, Pm: m.Pm, Qc: m.Qc };`,
+    checks: [['продолжений MR на холсте', 'n', 1, 0],
+             ['край продолжения по Q', 'maxQ', 100, 0.6],
+             ['самая нижняя точка по P', 'minP', -100, 1.5],
+             ['продолжение тоньше основной линии', 'w', 1.1, 0.001],
+             ['продолжение полупрозрачное', 'op', 0.45, 0.001],
+             ['монопольный выпуск не сдвинулся', 'Qm', 40, 1e-3],
+             ['монопольная цена не сдвинулась', 'Pm', 60, 1e-3],
+             ['конкурентный выпуск не сдвинулся', 'Qc', 80, 1e-3]],
+  },
+  {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (е). ЗАПИСЬ СУММАРНОЙ КРИВОЙ НЕ ЕДЕТ С МАСШТАБОМ.
+       sumLinearRecord строил участки по ценам до CONFIG.Pmax, и границы
+       участков в «Объяснении модели» менялись вместе с кадром: «Q <= 180» на
+       стартовом окне и «Q <= 300» после отдаления. А по этой записи кривая и
+       считается, поэтому вместе с ней ехала вся арифметика излишков.
+       Сравниваем строки буквально, а не числа. */
+    name: 'Первая четверть (е) запись суммарной кривой одна на всех масштабах',
+    run: `resetSceneMemory(); pickScene('sdsum'); redrawAll();
+          var rec = function () {
+            var d = STATE.curves.find(function (c) { return c.kind === 'sum' && c.sumGroup === 'D'; });
+            var s = STATE.curves.find(function (c) { return c.kind === 'sum' && c.sumGroup === 'S'; });
+            return String(d ? d.expr : '') + ' ## ' + String(s ? s.expr : '');
+          };
+          var a = rec();
+          zoomStep(1.6); redrawAll(); var b = rec();
+          zoomStep(1 / 1.6); zoomStep(1 / 1.6); redrawAll(); var c = rec();
+          return { sameAB: (a === b) ? 1 : 0, sameBC: (b === c) ? 1 : 0,
+                   notEmpty: (a.length > 20) ? 1 : 0 };`,
+    checks: [['запись после отдаления та же', 'sameAB', 1, 0],
+             ['запись после приближения та же', 'sameBC', 1, 0],
+             ['запись вообще собралась', 'notEmpty', 1, 0]],
+  },
+  {
     /* (ж) КТВ по кусочной КПВ. У ВОГНУТОЙ кусочной альтернативная стоимость
        растёт, и при мировой цене между наклонами кусков оптимум ровно в изломе.
        Куски: Y = 100 − 0,5X при X < 40 и Y = 160 − 2X при X ≥ 40, стык (40; 80).
@@ -4037,7 +4241,14 @@ for (const c of CASES) {
    MouseEvent(...)) из page.evaluate этот путь миновал бы и pointer-событий
    не дал бы вовсе — тремя предыдущими замерами так и не воспроизвели дефект
    протяжки (см. карточку 3c3b11c9-2bc1-81b5). */
+/* ⚠️ ИТОГОВАЯ СТРОКА ОБЯЗАНА СЧИТАТЬ ВСЕ СЛУЧАИ, А НЕ ТОЛЬКО СПИСОК CASES.
+   Она печатала «(всего CASES.length)», а случаи-жесты (gesture) в этот список
+   не входят: они регистрируются вызовами ниже. Получалось «197 прошло (всего
+   185)» — прошло БОЛЬШЕ, чем всего, и это первое, обо что спотыкается глаз
+   при чтении отчёта. Считаем и жесты тоже. */
+let gestureCount = 0;
 async function gesture(name, fn) {
+  gestureCount++;                               // считаем ЗАРЕГИСТРИРОВАННЫЕ, а не прошедшие
   if (ONLY && name.indexOf(ONLY) < 0) return;   // тот же отбор, что и у CASES
   try {
     const r = await fn();
@@ -4310,5 +4521,7 @@ await gesture('(е) добавленная кривая не меняет рав
 });
 
 await browser.close();
-console.log(`\n=== calc2 регрессия: ${pass} прошло, ${fail} провалено (всего ${CASES.length}) ===`);
+console.log(`\n=== calc2 регрессия: ${pass} прошло, ${fail} провалено `
+  + `(всего ${CASES.length + gestureCount}: ${CASES.length} случаев + ${gestureCount} жестов)`
+  + (ONLY ? ` [отбор «${ONLY}»]` : '') + ' ===');
 process.exit(fail === 0 ? 0 : 1);
