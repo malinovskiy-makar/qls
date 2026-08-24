@@ -945,13 +945,20 @@ function hintAnchor(hint) {
     if (n.classList && n.classList.contains('section')) break;
     n = n.parentElement;
   }
-  // 2. Заголовок секции (обычный или складной).
-  const sec = hint.closest('.section');
-  if (sec) {
+  /* 2. Заголовок секции (обычный или складной).
+     ⚠️ ИДЁМ ВВЕРХ, ПОКА ЗАГОЛОВОК НЕ НАЙДЁТСЯ, А НЕ ОСТАНАВЛИВАЕМСЯ НА ПЕРВОЙ
+     СЕКЦИИ. Секции вложены друг в друга, и у внутренних заголовка часто нет
+     НАМЕРЕННО (#sec-curves, #sec-mono). Прежний closest('.section') брал
+     ближайшую, не находил у неё заголовка и сдавался — а подсказка при этом
+     прекрасно относилась к заголовку карточки этажом выше. Так у монополии
+     обе подсказки оставались без якоря и получали по пустой строке с «?». */
+  let sec = hint.closest('.section');
+  while (sec) {
     const fold = sec.querySelector(':scope > .fold-btn > span');
     if (fold) return fold;
     const title = sec.querySelector(':scope > .section-title');
     if (title) return title;
+    sec = sec.parentElement ? sec.parentElement.closest('.section') : null;
   }
   // 3. Подпись поля, внутри которого лежит объяснение.
   const field = hint.closest('.field, .f-wrap');
@@ -963,11 +970,84 @@ function hintAnchor(hint) {
     if (prev.tagName === 'LABEL') return prev;
     prev = prev.previousElementSibling;
   }
-  // 5. Своя строка. Сюда попадают подсказки, у которых заголовка нет вовсе.
-  const own = document.createElement('div');
-  own.className = 'help-anchor';
-  hint.parentNode.insertBefore(own, hint);
-  return own;
+  /* ⚠️ ПЯТОГО ШАГА БОЛЬШЕ НЕТ, И ЭТО НЕ УПУЩЕНИЕ.
+     Здесь заводилась подсказке СВОЯ пустая строка `.help-anchor`, и ровно
+     оттуда брались одинокие «?» посреди панели: вопросик появлялся там, где
+     пояснять нечего — рядом с ним не было ни подписи, ни заголовка. Чаще
+     всего это подсказки вложенной секции `#sec-curves`, у которой своего
+     заголовка нет НАМЕРЕННО, поэтому шаг 2 (closest('.section')) до якоря не
+     доходил. Замер 25.08: в «Спросе и предложении» два таких вопросика из
+     трёх видимых, и живых подсказок у сцены при этом ноль.
+
+     Вопросик появляется только рядом с тем, что он поясняет. Не нашлось
+     подходящего якоря — подсказка остаётся обычным абзацем (hintsToDots на
+     null просто ничего не делает), и это честнее пустой строки со знаком. */
+  return null;
+}
+
+/* ⚠️ ВОПРОСИК ЖИВЁТ РОВНО СТОЛЬКО, СКОЛЬКО ЖИВА ЕГО ПОДСКАЗКА.
+   Вопросик вешается на заголовок ОДИН РАЗ и остаётся на нём навсегда, а
+   подсказки под ним у каждой модели свои. У общего заголовка (например, у
+   карточки «Ввод функций») собираются подсказки нескольких моделей сразу, и
+   после перехода в другую модель на видимом заголовке висел знак от чужих,
+   уже спрятанных подсказок. Прячем знак, у которого не осталось ни одной
+   живой подсказки; проход идёт после applyCardScope, иначе он не увидел бы
+   `scoped-off` у переключателей соседних моделей. */
+/* ⚠️ АНАЛИТИЧЕСКАЯ ЗАПИСЬ ОБЯЗАНА ПОМЕЩАТЬСЯ В ПАНЕЛЬ ПО ШИРИНЕ.
+   Врезка `.sb-note` не умела ничего с широкой формулой: `\begin{cases}` KaTeX
+   рисует одним неразрывным элементом, переносить его негде, и запись просто
+   вылезала за правый край. Замер 25.08, «Сложение спросов» с четырьмя
+   группами: содержимое 239 px во врезке шириной 215, панель 268.
+
+   Прокрутку не заводим — горизонтальная полоса в тексте разбора читается как
+   поломка, да и заметить её там некому. Подбираем кегль вниз, как это делает
+   поле формулы, и с тем же уговором: нижний предел есть, и он 10 px. Ниже
+   формулу в панели уже не прочесть, и честнее показать, что она не влезла,
+   чем нарисовать нечитаемое. От основных 14,5 px это запас в треть — хватает
+   на четыре участка с большим запасом.
+
+   Меряем ВРЕЗКУ, а не формулу: у врезки есть своя ширина и своя прокрутка, а
+   у формулы вокруг ещё и текст, который переносится сам. */
+const PANEL_MATH_MIN_PX = 10;
+function fitPanelMath(root) {
+  root = root || document.getElementById('params-panel');
+  if (!root) return;
+  root.querySelectorAll('.sb-note').forEach(note => {
+    const maths = [].slice.call(note.querySelectorAll('.katex'));
+    if (!maths.length) return;
+    maths.forEach(k => { k.style.fontSize = ''; });
+    const have = note.clientWidth;
+    if (!have || note.scrollWidth <= have + 1) return;
+    const bases = maths.map(k => parseFloat(getComputedStyle(k).fontSize) || 14.5);
+    /* ⚠️ ЦЕЛИМСЯ НА ПАРУ ПИКСЕЛЕЙ УЖЕ, ЧЕМ ВЛЕЗАЕТ. `scrollWidth` — целое, и
+       округление скрывало недобор: замер показывал «215 в 215», а правый край
+       формулы торчал за врезку на 1,8 px. Запас в два пикселя эту щель
+       закрывает и на ответ не влияет. */
+    let scale = 1;
+    for (let step = 0; step < 8; step++) {
+      const need = note.scrollWidth;
+      if (need <= have - 1) break;
+      scale = scale * (have - 2) / need;
+      let atFloor = true;
+      maths.forEach((k, i) => {
+        const px = Math.max(PANEL_MATH_MIN_PX, bases[i] * scale);
+        if (px > PANEL_MATH_MIN_PX) atFloor = false;
+        k.style.fontSize = px + 'px';
+      });
+      if (atFloor) break;
+    }
+  });
+}
+
+function syncHintDots(root) {
+  root = root || document.getElementById('tools-panel');
+  if (!root) return;
+  root.querySelectorAll('.help-dot').forEach(dot => {
+    const hints = dot._hints || [];
+    const live = hints.filter(h => h.isConnected && h.style.display !== 'none'
+                                  && fieldActive(h.parentElement || h));
+    dot.style.display = live.length ? '' : 'none';
+  });
 }
 
 function hintsToDots(root) {

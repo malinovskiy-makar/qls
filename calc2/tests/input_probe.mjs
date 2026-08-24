@@ -161,6 +161,8 @@ function ipDots() {
       return (p ? (p.className || p.tagName) : '?');
     }),
     hintsLive: hints.length,
+    // Подсказка, оставшаяся обычным абзацем: якоря ей не нашлось, и это законно.
+    hintsShown: hints.filter(function (h) { return !h.classList.contains('hint-hidden'); }).length,
   };
 }
 `;
@@ -629,17 +631,22 @@ if (need('Ш') || need('SH')) {
 /* ── НАБОР В. Одинокие вопросики ────────────────────────────────────── */
 if (need('В') || need('V')) {
   console.log('\n=== НАБОР В: вопросики в левой панели ===');
-  for (const sc of ['sd', 'mono', 'ext', 'sdsum']) {
+  for (const sc of ['sd', 'mono', 'ext', 'sdsum', 'elast', 'taxes', 'ceil', 'ppf']) {
     await run(`resetSceneMemory(); pickScene(${JSON.stringify(sc)});`);
     await page.waitForTimeout(600);
     const v = await run(`return ipDots();`);
     console.log(`     ${sc}: .help-anchor всего ${v.anchors} (видимых ${v.anchorsVisible}), видимых «?» ${v.dots}, ` +
-      `из них без текста слева ${v.lonely}, живых подсказок ${v.hintsLive}`);
+      `из них без текста слева ${v.lonely}, живых подсказок ${v.hintsLive} (абзацем ${v.hintsShown})`);
     if (v.lonely) console.log(`       где: ${JSON.stringify(v.lonelyWhere)}`);
-    if (sc === 'sd') {
-      flag('sd: одиноких «?» нет', v.lonely === 0, String(v.lonely));
-      flag('sd: видимых «?» не больше живых подсказок', v.dots <= v.hintsLive, `${v.dots} > ${v.hintsLive}`);
-    }
+    flag(sc + ': одиноких «?» нет', v.lonely === 0, String(v.lonely));
+    /* ⚠️ ВОПРОСИКОВ НЕ БОЛЬШЕ, ЧЕМ ЖИВЫХ ПОДСКАЗОК, А НЕ «РОВНО СТОЛЬКО».
+       У одного заголовка намеренно собираются несколько подсказок под ОДИН
+       знак (у внешнего эффекта свой текст на каждый знак) — это старое и
+       осознанное поведение, ему тут не место ломаться. Дефект был обратный:
+       вопросиков БОЛЬШЕ, чем подсказок, вплоть до трёх при нуле живых. */
+    flag(sc + ': видимых «?» не больше живых подсказок', v.dots <= v.hintsLive, `${v.dots} > ${v.hintsLive}`);
+    flag(sc + ': каждая живая подсказка либо под знаком, либо видна абзацем',
+      v.hintsLive === 0 || v.dots > 0 || v.hintsShown > 0, `подсказок ${v.hintsLive}, знаков ${v.dots}, абзацем ${v.hintsShown}`);
   }
 }
 
@@ -665,16 +672,37 @@ if (need('Ф') || need('F')) {
   console.log(`     карточка 2 («${c1.name}») при наведении: border ${c1.border}, кольцо «${c1.outline}»`);
   flag('border первой карточки при наведении совпадает со второй', c0.border === c1.border,
     `${c0.border} != ${c1.border}`);
-  // После Tab кольцо обязано появиться.
+  // ⚠️ ПОСЛЕ НАВЕДЕНИЯ КОЛЬЦА БЫТЬ НЕ ДОЛЖНО: мышь не клавиатура.
+  flag('после наведения мышью кольца на первой карточке нет', c0.outline.indexOf('none') === 0, c0.outline);
+  // А после Tab — обязано появиться.
   await fresh.keyboard.press('Tab');
-  await fresh.waitForTimeout(200);
+  await fresh.waitForTimeout(250);
   const afterTab = await fresh.evaluate(() => {
     const a = document.activeElement;
     const cs = a ? getComputedStyle(a) : null;
-    return { tag: a ? (a.className || a.tagName) : '?', outline: cs ? cs.outlineStyle + ' ' + cs.outlineWidth : '?' };
+    return { tag: a ? (a.className || a.tagName) : '?', outline: cs ? cs.outlineStyle + ' ' + cs.outlineWidth : '?',
+             ring: !!(a && a.classList && a.classList.contains('no-init-ring')) };
   });
-  console.log(`     после Tab фокус на «${afterTab.tag}», кольцо «${afterTab.outline}»`);
+  console.log(`     после Tab фокус на «${afterTab.tag}», кольцо «${afterTab.outline}», no-init-ring=${afterTab.ring}`);
+  flag('после Tab кольцо есть', afterTab.outline.indexOf('solid') === 0, afterTab.outline);
   await fresh.close();
+
+  /* ⚠️ ОБА КРАЯ ПРАВИЛА. Кольцо гасится ТОЛЬКО служебным фокусом, поэтому
+     проверяем и второй край: посторонняя клавиша (Escape) кольцо не будит,
+     а Tab будит. Иначе достаточно было бы снять класс где угодно. */
+  const esc = await ctx.newPage();
+  await esc.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle' });
+  await esc.waitForTimeout(1200);
+  await esc.keyboard.press('Escape');
+  await esc.waitForTimeout(250);
+  const afterEsc = await esc.evaluate(() => {
+    const c = document.querySelectorAll('#picker-blocks .bcard')[0];
+    const cs = getComputedStyle(c);
+    return { outline: cs.outlineStyle + ' ' + cs.outlineWidth, ring: c.classList.contains('no-init-ring') };
+  });
+  console.log(`     после Escape: кольцо «${afterEsc.outline}», no-init-ring=${afterEsc.ring}`);
+  flag('посторонняя клавиша кольца не будит', afterEsc.outline.indexOf('none') === 0, afterEsc.outline);
+  await esc.close();
 }
 
 /* ── НАБОР З. Ширина записи в правой панели ─────────────────────────── */
@@ -715,6 +743,101 @@ if (need('З') || need('Z')) {
   const over = z.notes.filter(n => n.contentR > n.boxR + 1);
   flag('ни одна врезка не вылезает за свой блок', over.length === 0,
     over.map(n => `${n.title.trim()}: ${num(n.contentR)} > ${num(n.boxR)}`).join('; '));
+  const small = z.notes.filter(n => parseFloat(n.fontSize) < 9.99);
+  flag('кегль не ниже выбранного предела 10 px', small.length === 0,
+    small.map(n => `${n.title.trim()}: ${n.fontSize}`).join('; '));
+
+  // Шесть групп: запись шире, предел кегля ближе — проверяем и этот край.
+  console.log('   шесть групп спроса:');
+  await run(`
+    resetSceneMemory(); pickScene('sdsum');
+    sumSetCount('D', 6); sumSetCount('S', 2);
+    var gd = STATE.curves.filter(function (c) { return c.sumGroup === 'D' && c.kind !== 'sum'; });
+    ['100 - Q', '90 - Q', '80 - Q', '70 - Q', '60 - Q', '50 - Q']
+      .forEach(function (e, i) { if (gd[i]) updateCurveExpr(gd[i], e); });
+    redrawAll();
+    var b = document.getElementById('ex-btn');
+    if (b && b.getAttribute('aria-expanded') !== 'true') b.click();
+  `);
+  await page.waitForTimeout(900);
+  const z6 = await run(`
+    var body = document.getElementById('ex-body');
+    return [].slice.call(body.querySelectorAll('.sb-note')).map(function (n) {
+      var kx = n.querySelector('.katex-html') || n.querySelector('.katex');
+      var r = (kx || n).getBoundingClientRect(), nr = n.getBoundingClientRect();
+      return { title: ((n.querySelector('b') || {}).textContent || '').trim(),
+               contentR: r.right, boxR: nr.right, w: r.width,
+               fontSize: kx ? getComputedStyle(kx).fontSize : getComputedStyle(n).fontSize };
+    });
+  `);
+  z6.forEach(n => console.log(`     врезка «${n.title}»: содержимое ${num(n.w)} px, правый край ${num(n.contentR)} ` +
+    `против края врезки ${num(n.boxR)}; кегль ${n.fontSize}`));
+  flag('шесть групп: запись не вылезает за врезку', z6.every(n => n.contentR <= n.boxR + 1),
+    z6.map(n => `${n.title}: ${num(n.contentR)} vs ${num(n.boxR)}`).join('; '));
+  flag('шесть групп: кегль не ниже 10 px', z6.every(n => parseFloat(n.fontSize) >= 9.99),
+    z6.map(n => n.fontSize).join('; '));
+}
+
+/* ── НАБОР Я. Якорь подписи: место годно только там, где кривая есть ──
+   Сессия «процентные налоги» починила подпись КРИВОЙ: со снятой галочкой «D»
+   висела в пустоте при Q ≈ 145, P ≈ −30. Здесь ищем тот же класс у подписей
+   ТОЧЕК, у названий осей и у легенды: в экономической сцене всё, что
+   привязано к модели, обязано лежать в первой четверти, куда бы ни заходило
+   окно. Названия осей, деления и легенда за четверть выходят законно — они
+   привязаны к КАДРУ, а не к кривой, поэтому считаются отдельно. */
+if (need('Я') || need('YA')) {
+  console.log('\n=== НАБОР Я: подписи не висят в пустоте ===');
+  const SCENES = [
+    ['sd', `ipSet('demand', '100 - Q'); ipSet('supply', 'Q');`],
+    ['mono', `ipSet('demand', '100 - Q'); var mc = ipCurve('mc'); if (mc) updateCurveExpr(mc, '20');`],
+    ['taxes', `ipSet('demand', '120 - Q'); ipSet('supply', 'Q'); setType('tax'); setTaxForm('unit'); setTax(40);`],
+    ['elast', `ipSet('demand', '100 - Q');`],
+    ['ext', `ipSet('demand', '100 - Q'); ipSet('supply', 'Q');
+             STATE.mscOn = true; STATE.mscExpr = 'Q + 20'; recompileSocial();`],
+  ];
+  for (const [key, prep] of SCENES) {
+    const r = await run(`
+      resetSceneMemory(); pickScene(${JSON.stringify(key)});
+      ${prep}
+      setFirstQuad(false);            // окно уходит в минус, кривая — нет
+      redrawAll();
+      var svgEl = document.querySelector('#graph-wrap svg');
+      if (!svgEl) return { err: 'нет холста' };
+      var out = [];
+      svgEl.querySelectorAll('text').forEach(function (t) {
+        var cls = t.getAttribute('class') || '';
+        var pr = t.parentElement ? (t.parentElement.getAttribute('class') || '') : '';
+        var r = t.getBoundingClientRect();
+        var host = svgEl.getBoundingClientRect();
+        var q = sx.invert(r.left + r.width / 2 - host.left);
+        var v = sy.invert(r.top + r.height / 2 - host.top);
+        var clone = t.cloneNode(true);
+        clone.querySelectorAll('.katex-mathml, annotation').forEach(function (n) { n.remove(); });
+        out.push({ cls: cls, parent: pr, txt: clone.textContent.trim().slice(0, 18),
+                   q: Math.round(q * 100) / 100, v: Math.round(v * 100) / 100 });
+      });
+      return { win: { qmin: CONFIG.Qmin, qmax: CONFIG.Qmax, pmin: CONFIG.Pmin, pmax: CONFIG.Pmax }, labels: out };
+    `);
+    if (r.err) { bad++; console.log('FAIL ' + key + ': ' + r.err); continue; }
+    /* Привязано к кадру, а не к модели: деления осей, названия осей, легенда и
+       заголовок графика. Им за четвертью быть можно.
+       ⚠️ И ОТДЕЛЬНО — ПОЛОСА ВДОЛЬ ОСЕЙ. Число ключевой точки (`coord-num`)
+       печатается СНАРУЖИ своей оси: «50» под осью Q лежит при P ≈ −1,9, и это
+       правильное место, а не пустота. «Висит в пустоте» — это далеко от осей:
+       у подписи «D», ради которой правило и заводили, было Q ≈ 145, P ≈ −30
+       при размахе окна 125. Полосу берём в 6 % размаха. */
+    const bandQ = (r.win.qmax - r.win.qmin) * 0.06;
+    const bandP = (r.win.pmax - r.win.pmin) * 0.06;
+    const frameBound = (l) => /axis-num|axis-name|legend|chart-title|graph-title/.test(l.cls + ' ' + l.parent);
+    const hang = r.labels.filter(l => !frameBound(l) && (l.q < -bandQ || l.v < -bandP
+                                                        || l.q > r.win.qmax || l.v > r.win.pmax));
+    console.log(`     ${key}: окно Q ${num(r.win.qmin)}…${num(r.win.qmax)}, P ${num(r.win.pmin)}…${num(r.win.pmax)}; ` +
+      `подписей ${r.labels.length}, привязанных к модели ${r.labels.filter(l => !frameBound(l)).length}`);
+    if (hang.length) {
+      hang.slice(0, 8).forEach(l => console.log(`       ВНЕ ЧЕТВЕРТИ: «${l.txt}» (${l.cls || l.parent}) при Q=${l.q}, P=${l.v}`));
+    }
+    flag(`${key}: подписей модели вне первой четверти нет`, hang.length === 0, String(hang.length));
+  }
 }
 
 /* ── СКОРОСТЬ. 60 шагов панорамы ────────────────────────────────────
