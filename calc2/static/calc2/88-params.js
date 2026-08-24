@@ -969,12 +969,6 @@ function wireControls() {
   if (tsbSel) tsbSel.addEventListener('click', () => setTaxSide('seller'));
   if (tsbBuy) tsbBuy.addEventListener('click', () => setTaxSide('buyer'));
 
-  // Переключатель рынка «Конкуренция / Монополия».
-  const segComp = document.getElementById('seg-comp');
-  const segMono = document.getElementById('seg-mono');
-  if (segComp) segComp.addEventListener('click', () => setMarket('comp'));
-  if (segMono) segMono.addEventListener('click', () => setMarket('monopoly'));
-
   // Под-режимы монополии: обычная / дискр. 1° / дискр. 3° / составной спрос / естественная.
   [['mm-simple', 'simple'], ['mm-d1', 'discr1'], ['mm-d3', 'discr3'],
    ['mm-kink', 'kinked'], ['mm-nat', 'natural']]
@@ -1093,7 +1087,7 @@ function wireControls() {
   if (labGhost) labGhost.addEventListener('change', () => { STATE.showGhost = labGhost.checked; redrawAll(); });
 
   // Сценарии анализа рынка: обычный / эластичность / сдвиги / внешний эффект / открытая экономика.
-  [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'],
+  [['scn-none', 'none'], ['scn-elast', 'elasticity'],
    ['scn-ext', 'externality'], ['scn-open', 'openecon']]
     .forEach(([id, s]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setScenario(s)); });
 
@@ -1119,13 +1113,6 @@ function wireControls() {
   [['chk-open-money', 'showOpenMoney'], ['chk-open-dwl', 'showOpenDwl']].forEach(([id, key]) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); });
-  });
-
-  // Сдвиги спроса и предложения (Задача 3): ползунки + числовые поля.
-  [['shiftD-slider', 'shiftD-input', 'D'], ['shiftS-slider', 'shiftS-input', 'S']].forEach(([sid, iid, which]) => {
-    const sl = document.getElementById(sid), inp = document.getElementById(iid);
-    if (sl) sl.addEventListener('input', () => setShift(which, parseFloat(sl.value)));
-    if (inp) inp.addEventListener('change', () => setShift(which, parseFloat(inp.value)));
   });
 
   /* Внешние эффекты. Формулы MSB и MSC живут во «Вводе функций»: чекбокс

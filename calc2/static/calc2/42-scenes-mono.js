@@ -158,12 +158,11 @@ function updateMonoPanel() {
   box.innerHTML = html;
 }
 
-// Переключатель структуры рынка: конкуренция ↔ монополия.
+/* Структура рынка: конкуренция ↔ монополия. Кнопок у неё больше нет
+   (удалены 24.08), структуру задаёт карточка главного экрана — функция
+   осталась единственной дверью смены STATE.market. */
 function setMarket(mode) {
   STATE.market = mode;
-  const c = document.getElementById('seg-comp'), mo = document.getElementById('seg-mono');
-  if (c) c.classList.toggle('active', mode === 'comp');
-  if (mo) mo.classList.toggle('active', mode === 'monopoly');
   const mh = document.getElementById('mono-hint');
   if (mh) mh.style.display = (mode === 'monopoly') ? '' : 'none';
   // Вход в монополию — подставить стандартные кривые/поля, если их нет (Задача 1).

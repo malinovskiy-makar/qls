@@ -68,7 +68,6 @@ function init() {
   [
     ['ac-mode',        'ac-curve',    'ac-poly',        'Под кривой',       'Между точками'],
     ['mm-mode',        'mm-min',      'mm-max',         'Наименьшую',       'Наибольшую'],
-    [null,             'seg-comp',    'seg-mono',       'Конкуренция',      'Монополия'],
     [null,             'ki-indiv',    'ki-piece',       'Инд. спросы',      'Кусочный'],
     [null,             'tsb-seller',  'tsb-buyer',      'Продавец',         'Покупатель'],
     [null,             'plv-tc',      'plv-mc',         'Суммарные TC',     'Предельные MC'],

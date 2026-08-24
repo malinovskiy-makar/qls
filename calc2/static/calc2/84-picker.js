@@ -223,7 +223,6 @@ function openPicker() {
             темами. Всё, чего нет в списке, остаётся доступным.
    Полный набор переключателей живёт в «Свободном холсте»: у него lock пуст.
    --------------------------------------------------------------------- */
-const L_MARKET  = 'market-struct-row';   // Конкуренция / Монополия
 const L_MONOSUB = 'mono-submode';        // Обычная / Дискр. 1° / 3° / Составной / Естественная
 const L_INTERV  = 'sec-tax';             // весь блок «Вмешательство государства»
 const L_TAXKIND = 'taxkind-row';         // Специфический / Адвалорный
@@ -252,31 +251,31 @@ const SCENE_ROUTE = {
   tradeprice: { run: () => { setMode('ppf'); setPpfSub('trade'); setTradeScenario('B'); }, lock: ['ppf-seg'] },
 
   /* --- Блок 3 · Совершенная конкуренция ------------------------------ */
-  sd:    { run: () => loadScene('sd'),    lock: [L_MARKET, L_INTERV] },
+  sd:    { run: () => loadScene('sd'),    lock: [L_INTERV] },
   /* Сложение спросов и предложений. Вмешательство здесь заперто: сюжет про
      то, откуда берётся рыночная кривая, а не про то, что с ней делает
      государство. Суммарные кривые и есть D и S этой сцены. */
-  sdsum: { run: () => loadScene('sdsum'), lock: [L_MARKET, L_INTERV] },
+  sdsum: { run: () => loadScene('sdsum'), lock: [L_INTERV] },
   /* «Налоги и субсидии» — ОДИН сюжет вместо двух карточек (потоварной и
      процентной). Вид налога выбирается внутри, в правой панели, каскадом:
      налог/субсидия → вид → сторона → значение. Старые ключи 'tax' и
      'tax-adv' остались СИНОНИМАМИ: та же базовая сцена, те же запреты,
      различается только предустановка. Ссылки в коде и тестах живы. */
   taxes: { base: 'tax', run: () => loadScene('taxes'),
-           lock: [L_MARKET, 'seg-ceil', 'seg-floor', 'seg-quota'] },
+           lock: ['seg-ceil', 'seg-floor', 'seg-quota'] },
   tax:   { base: 'tax', run: () => loadScene('tax'),
-           lock: [L_MARKET, 'seg-ceil', 'seg-floor', 'seg-quota'] },
+           lock: ['seg-ceil', 'seg-floor', 'seg-quota'] },
   'tax-adv': { base: 'tax',
                run: () => { loadScene('tax'); setTaxForm('vat'); setTax(20); },
-               lock: [L_MARKET, 'seg-ceil', 'seg-floor', 'seg-quota'] },
+               lock: ['seg-ceil', 'seg-floor', 'seg-quota'] },
   ceil:  { run: () => loadScene('ceil'),
-           lock: [L_MARKET, L_TAXKIND, L_TAXSIDE, 'seg-tax', 'seg-sub', 'seg-quota'] },
+           lock: [L_TAXKIND, L_TAXSIDE, 'seg-tax', 'seg-sub', 'seg-quota'] },
   // Квота — прямое ограничение объёма. Внутри сюжета только сама квота:
   // налог, субсидия и фиксированная цена — соседние сюжеты, они заперты.
   quota: { run: () => loadScene('quota'),
-           lock: [L_MARKET, L_TAXKIND, L_TAXSIDE, 'seg-tax', 'seg-sub', 'seg-ceil', 'seg-floor'] },
-  elast: { run: () => loadScene('elast'), lock: [L_MARKET, L_INTERV] },
-  ext:   { run: () => loadScene('ext'),   lock: [L_MARKET, L_INTERV] },
+           lock: [L_TAXKIND, L_TAXSIDE, 'seg-tax', 'seg-sub', 'seg-ceil', 'seg-floor'] },
+  elast: { run: () => loadScene('elast'), lock: [L_INTERV] },
+  ext:   { run: () => loadScene('ext'),   lock: [L_INTERV] },
 
   /* --- Блок 4 · Теория фирмы ---------------------------------------- */
   costs:    { run: () => { loadScene('costs'); setCostsSub('costs'); },      lock: ['costs-seg'] },
@@ -285,11 +284,11 @@ const SCENE_ROUTE = {
   isoquant: { base: 'costs', run: () => { loadScene('costs'); setCostsSub('isoquant'); },   lock: ['costs-seg'] },
 
   /* --- Блок 5 · Несовершенная конкуренция ---------------------------- */
-  mono:       { run: () => { loadScene('mono'); setMonoMode('simple'); },  lock: [L_MARKET, L_MONOSUB] },
-  'mono-nat': { base: 'mono', run: () => { loadScene('mono'); setMonoMode('natural'); }, lock: [L_MARKET, L_MONOSUB, L_INTERV] },
-  'mono-d1':  { base: 'mono', run: () => { loadScene('mono'); setMonoMode('discr1'); },  lock: [L_MARKET, L_MONOSUB, L_INTERV] },
-  'mono-d3':  { base: 'mono', run: () => { loadScene('mono'); setMonoMode('discr3'); },  lock: [L_MARKET, L_MONOSUB, L_INTERV] },
-  'mono-kink':{ base: 'mono', run: () => { loadScene('mono'); setMonoMode('kinked'); },  lock: [L_MARKET, L_MONOSUB, L_INTERV] },
+  mono:       { run: () => { loadScene('mono'); setMonoMode('simple'); },  lock: [L_MONOSUB] },
+  'mono-nat': { base: 'mono', run: () => { loadScene('mono'); setMonoMode('natural'); }, lock: [L_MONOSUB, L_INTERV] },
+  'mono-d1':  { base: 'mono', run: () => { loadScene('mono'); setMonoMode('discr1'); },  lock: [L_MONOSUB, L_INTERV] },
+  'mono-d3':  { base: 'mono', run: () => { loadScene('mono'); setMonoMode('discr3'); },  lock: [L_MONOSUB, L_INTERV] },
+  'mono-kink':{ base: 'mono', run: () => { loadScene('mono'); setMonoMode('kinked'); },  lock: [L_MONOSUB, L_INTERV] },
 
   /* --- Блок 6 · Рынок труда ------------------------------------------ */
   labor:         { run: () => { setMode('labor'); setLaborStruct('competition'); }, lock: ['labor-seg'] },
@@ -298,8 +297,8 @@ const SCENE_ROUTE = {
   'labor-bilat': { base: 'labor', run: () => { setMode('labor'); setLaborStruct('bilateral'); }, lock: ['labor-seg'] },
 
   /* --- Блок 7 · Международная торговля -------------------------------- */
-  smallopen:  { run: () => loadScene('smallopen'),  lock: [L_MARKET, L_INTERV] },
-  monoexport: { run: () => loadScene('monoexport'), lock: [L_MARKET, L_MONOSUB, L_INTERV] },
+  smallopen:  { run: () => loadScene('smallopen'),  lock: [L_INTERV] },
+  monoexport: { run: () => loadScene('monoexport'), lock: [L_MONOSUB, L_INTERV] },
 
   /* --- Блок 8 · Выбор потребителя ------------------------------------- */
   consumer: { run: () => { setMode('consumer'); setConsSlutsky(false); }, lock: ['cons-slutsky-row'] },

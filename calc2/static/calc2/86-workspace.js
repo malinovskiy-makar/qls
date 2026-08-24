@@ -46,7 +46,7 @@ const SCENE_NAMES = {
 // «Площади», рядом с кнопкой, которая её посчитала.
 const RESULT_IDS = ['info-graph', 'info-areas', 'info-sum', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
   'info-prod', 'info-iso', 'info-plants', 'info-labor',
-  'info-inequality', 'info-consumer', 'info-macro', 'info-math', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
+  'info-inequality', 'info-consumer', 'info-macro', 'info-math', 'info-elast', 'info-ext', 'info-open', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
 
 /* Записать значение в поле формулы и разбудить его слушателей. Отдельная

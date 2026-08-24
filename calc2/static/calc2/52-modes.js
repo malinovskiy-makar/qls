@@ -786,7 +786,6 @@ function applyScenarioVisibility() {
   const s = STATE.scenario, inMarket = (STATE.mode === 'market');
   const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
   show('scn-pane-elast', inMarket && s === 'elasticity');
-  show('scn-pane-shift', inMarket && s === 'shift');
   show('scn-pane-ext',   inMarket && s === 'externality');
   show('scn-pane-open',  inMarket && s === 'openecon');
   show('sec-tax',  inMarket && s === 'none');
@@ -800,7 +799,7 @@ function applyScenarioVisibility() {
      состояние приводится к экрану в ОДНОМ месте, иначе всякий новый путь
      входа в сцену обязан помнить про каждый блок по отдельности. */
   show('social-curves', inMarket && s === 'externality');
-  [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'],
+  [['scn-none', 'none'], ['scn-elast', 'elasticity'],
    ['scn-ext', 'externality'], ['scn-open', 'openecon']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', s === v); });
   // Карточка общего списка кривых живёт только там, где сцена его рисует.
@@ -816,8 +815,6 @@ function setScenario(s) {
   if (s === 'externality') { recompileSocial(); syncSocialFields(); }
   if (s !== 'none' && STATE.market === 'monopoly') {
     STATE.market = 'comp';
-    const c = document.getElementById('seg-comp'), mo = document.getElementById('seg-mono');
-    if (c) c.classList.add('active'); if (mo) mo.classList.remove('active');
     const mh = document.getElementById('mono-hint'); if (mh) mh.style.display = 'none';
     applyMonoVisibility();   // спрятать под-режим монополии и его панели (market теперь comp)
   }

@@ -107,9 +107,6 @@ function redrawScene() {
   } else if (STATE.scenario === 'externality') {
     // Внешний эффект (Задача 4): DWL + D/MPC + MSC + точки Qрын/Qопт (+ Пигу).
     drawExtScenario();
-  } else if (STATE.scenario === 'shift') {
-    // Разложение сдвигов (Задача 3): исходные + сдвинутые кривые + E_d/E_s/E₁.
-    drawShiftScenario();
   } else if (STATE.scenario === 'openecon') {
     // Малая открытая экономика (Фаза 4в): излишки/деньги/потери, кривые, линии цен.
     drawOpenAreas();
@@ -148,9 +145,6 @@ function redrawScene() {
     updateMonoInterventionPanel();
   } else if (STATE.scenario === 'externality') {
     updateExtPanel();
-    const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
-  } else if (STATE.scenario === 'shift') {
-    updateShiftPanel();
     const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
   } else if (STATE.scenario === 'elasticity') {
     updateElasticityPanel();

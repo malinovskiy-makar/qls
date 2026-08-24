@@ -252,27 +252,6 @@ function recompute() {
     STATE.elastS = { q, p, slope, Es, absEs: Math.abs(Es) };
   }
 
-  // Разложение двойных сдвигов спроса и предложения (Задача 3): четыре равновесия.
-  STATE.shiftActive = false;
-  STATE.shiftRes = null;
-  if (compMarket && STATE.scenario === 'shift' && STATE.D && STATE.S && STATE.eq) {
-    const dD = STATE.shiftD || 0, dS = STATE.shiftS || 0;
-    const Dsh = { fn: q => evalCurve(STATE.D, q) + dD };   // спрос со сдвигом по вертикали
-    const Ssh = { fn: q => evalCurve(STATE.S, q) + dS };   // предложение со сдвигом по вертикали
-    const E0 = STATE.eq;
-    const Ed = findEquilibrium(Dsh, STATE.S);   // сдвинут только спрос
-    const Es = findEquilibrium(STATE.D, Ssh);   // сдвинуто только предложение
-    const E1 = findEquilibrium(Dsh, Ssh);       // оба сдвига вместе
-    if (Ed && Es && E1) {
-      STATE.shiftRes = {
-        dD, dS, E0, Ed, Es, E1,
-        dQ: { demand: Ed.Q - E0.Q, supply: Es.Q - E0.Q, total: E1.Q - E0.Q },
-        dP: { demand: Ed.P - E0.P, supply: Es.P - E0.P, total: E1.P - E0.P },
-      };
-      STATE.shiftActive = true;
-    }
-  }
-
   // Внешний эффект и корректирующий инструмент Пигу (Задача 4 + Фаза 2б).
   // Два ЗЕРКАЛЬНЫХ случая, общий код:
   //   'neg' — эффект на ИЗДЕРЖКАХ: MSC = MPC + ext (MPC = кривая S). Рынок (D = MPC)
@@ -1943,79 +1922,6 @@ function updateElasticityPanel() {
 }
 
 /* ---------------------------------------------------------------------
-   БЛОК 8а-3. РАЗЛОЖЕНИЕ ДВОЙНЫХ СДВИГОВ (Задача 3).
-   Сдвигаем спрос на ΔD и предложение на ΔS, считаем четыре равновесия
-   (E0, только спрос, только предложение, оба) и раскладываем ΔQ и ΔP на
-   вклад спроса, предложения и итог.
-   --------------------------------------------------------------------- */
-
-// Одна помеченная точка равновесия с проекциями к осям.
-function shiftMark(g, pt, label, color) {
-  const ox = sx(0), oy = sy(0), [px, py] = toPx(pt.Q, pt.P);
-  g.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy)
-    .attr('stroke', color).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', 0.55);
-  g.append('line').attr('x1', px).attr('y1', py).attr('x2', ox).attr('y2', py)
-    .attr('stroke', color).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('opacity', 0.55);
-  g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  g.append('text').attr('x', px + 8).attr('y', py - 8).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
-}
-
-// Отрисовка сценария сдвигов: исходные кривые + пунктирные сдвинутые + точки E_d/E_s/E1.
-function drawShiftScenario() {
-  drawGhost();        // E₀ как бледный призрак (активируется shiftActive)
-  drawCurves();       // исходные D и S
-  const r = STATE.shiftRes;
-  if (!r) return;
-  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
-  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
-  const shifted = (base, sh, color) => {
-    if (sh === 0) return;
-    const pts = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = evalCurve(base, q); pts.push(isNaN(v) ? null : [q, v + sh]); }
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
-  };
-  shifted(STATE.D, r.dD, STATE.D.color);
-  shifted(STATE.S, r.dS, STATE.S.color);
-  // Промежуточные равновесия и итог. E_d/E_s — разными цветами, E₁ — тёмный (итог).
-  const gp = svg.append('g');
-  if (r.dD !== 0) shiftMark(gp, r.Ed, 'E_d', COL.D);
-  if (r.dS !== 0) shiftMark(gp, r.Es, 'E_s', COL.tax);
-  shiftMark(gp, r.E1, 'E₁', COL.ink);
-}
-
-// Табло сдвигов: четыре равновесия и таблица разложения ΔQ*/ΔP*.
-function updateShiftPanel() {
-  const box = document.getElementById('info-shift'); if (!box) return;
-  if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Отметьте кривые D и S.</div>'; return; }
-  if (!STATE.eq) { box.innerHTML = '<div class="warn">Исходное равновесие не найдено.</div>'; return; }
-  const r = STATE.shiftRes;
-  if (!r) { box.innerHTML = '<div class="warn">Равновесие после сдвигов не найдено в первой четверти.</div>'; return; }
-  const sg = (v) => (v > 0 ? '+' : '') + fmt(v);
-  let html = '';
-  html += `<div class="stat"><span>$E_0$ (исходное)</span><b>${fmt(r.E0.Q)}, ${fmt(r.E0.P)}</b></div>`;
-  html += `<div class="stat"><span>$E_d$ (только спрос)</span><b>${fmt(r.Ed.Q)}, ${fmt(r.Ed.P)}</b></div>`;
-  html += `<div class="stat"><span>$E_s$ (только предложение)</span><b>${fmt(r.Es.Q)}, ${fmt(r.Es.P)}</b></div>`;
-  html += `<div class="stat"><span>$E_1$ (оба сдвига)</span><b>${fmt(r.E1.Q)}, ${fmt(r.E1.P)}</b></div>`;
-  html += '<table class="tx-table" style="margin-top:6px;"><tr><th></th><th>спрос</th><th>предл.</th><th>итог</th></tr>';
-  html += `<tr><td>ΔQ*</td><td>${sg(r.dQ.demand)}</td><td>${sg(r.dQ.supply)}</td><td>${sg(r.dQ.total)}</td></tr>`;
-  html += `<tr><td>ΔP*</td><td>${sg(r.dP.demand)}</td><td>${sg(r.dP.supply)}</td><td>${sg(r.dP.total)}</td></tr>`;
-  html += '</table>';
-  box.innerHTML = html;
-}
-
-// Единый путь смены сдвига (ползунок / число): which = 'D' | 'S'.
-function setShift(which, v) {
-  v = isNaN(v) ? 0 : v;
-  const ids = which === 'D'
-    ? ['shiftD-slider', 'shiftD-input', 'shiftD-val'] : ['shiftS-slider', 'shiftS-input', 'shiftS-val'];
-  if (which === 'D') STATE.shiftD = v; else STATE.shiftS = v;
-  const sl = document.getElementById(ids[0]); if (sl) sl.value = v;
-  const inp = document.getElementById(ids[1]); if (inp) inp.value = v;
-  const lbl = document.getElementById(ids[2]); if (lbl) lbl.textContent = fmt(v);
-  redrawAll();
-}
-
-/* ---------------------------------------------------------------------
    БЛОК 8а-4. ВНЕШНИЙ ЭФФЕКТ и НАЛОГ ПИГУ (Задача 4).
    Отрицательный внешний эффект производства: MSC = MPC + внешние пред. издержки.
    Рынок выпускает Qрын (D = MPC), оптимум — Qопт (D = MSC). Налог Пигу поднимает
@@ -2533,7 +2439,7 @@ function updateQuotaPanel() {
    --------------------------------------------------------------------- */
 function drawGhost() {
   if (!STATE.showGhost) return;
-  if (!(STATE.taxActive || STATE.pcActive || STATE.quotaActive || STATE.shiftActive) || !STATE.eq) return;
+  if (!(STATE.taxActive || STATE.pcActive || STATE.quotaActive) || !STATE.eq) return;
   const { Q, P } = STATE.eq;               // исходное равновесие E₀ (до вмешательства)
   const [px, py] = toPx(Q, P);
   const ox = sx(0), oy = sy(0);

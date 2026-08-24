@@ -124,27 +124,27 @@ const CARDS = [
   ['ppfsum',      s => s.mode === 'ppf'   && s.ppfSub === 'sum',                 ['ppf-seg']],
   ['trade',       s => s.mode === 'ppf'   && s.ppfSub === 'trade',               ['ppf-seg']],
   ['tradeprice',  s => s.mode === 'ppf'   && s.ppfSub === 'trade',               ['ppf-seg']],
-  ['sd',          s => s.mode === 'market' && s.market === 'comp',               ['market-struct-row', 'sec-tax']],
-  ['taxes',       s => s.taxKind === 'unit' && s.intervType === 'tax',           ['market-struct-row', 'seg-ceil', 'seg-floor']],
-  ['quota',       s => s.intervType === 'quota' && s.quota === 40,               ['market-struct-row', 'seg-tax', 'seg-sub']],
-  ['ceil',        s => s.intervType === 'ceiling',                                     ['market-struct-row', 'taxside-row']],
-  ['elast',       s => s.scenario === 'elasticity',                              ['market-struct-row', 'sec-tax']],
-  ['ext',         s => s.scenario === 'externality',                             ['market-struct-row', 'sec-tax']],
+  ['sd',          s => s.mode === 'market' && s.market === 'comp',               ['sec-tax']],
+  ['taxes',       s => s.taxKind === 'unit' && s.intervType === 'tax',           ['seg-ceil', 'seg-floor']],
+  ['quota',       s => s.intervType === 'quota' && s.quota === 40,               ['seg-tax', 'seg-sub']],
+  ['ceil',        s => s.intervType === 'ceiling',                                     ['taxside-row']],
+  ['elast',       s => s.scenario === 'elasticity',                              ['sec-tax']],
+  ['ext',         s => s.scenario === 'externality',                             ['sec-tax']],
   ['costs',       s => s.mode === 'costs' && s.costsSub === 'costs',             ['costs-seg']],
   ['prod',        s => s.mode === 'costs' && s.costsSub === 'production',        ['costs-seg']],
   ['plants',      s => s.mode === 'costs' && s.costsSub === 'plants',            ['costs-seg']],
   ['isoquant',    s => s.mode === 'costs' && s.costsSub === 'isoquant',          ['costs-seg']],
-  ['mono',        s => s.market === 'monopoly' && s.monoMode === 'simple',       ['market-struct-row', 'mono-submode']],
-  ['mono-nat',    s => s.market === 'monopoly' && s.monoMode === 'natural',      ['market-struct-row', 'mono-submode']],
-  ['mono-d1',     s => s.market === 'monopoly' && s.monoMode === 'discr1',       ['market-struct-row', 'mono-submode']],
-  ['mono-d3',     s => s.market === 'monopoly' && s.monoMode === 'discr3',       ['market-struct-row', 'mono-submode']],
-  ['mono-kink',   s => s.market === 'monopoly' && s.monoMode === 'kinked',       ['market-struct-row', 'mono-submode']],
+  ['mono',        s => s.market === 'monopoly' && s.monoMode === 'simple',       ['mono-submode']],
+  ['mono-nat',    s => s.market === 'monopoly' && s.monoMode === 'natural',      ['mono-submode']],
+  ['mono-d1',     s => s.market === 'monopoly' && s.monoMode === 'discr1',       ['mono-submode']],
+  ['mono-d3',     s => s.market === 'monopoly' && s.monoMode === 'discr3',       ['mono-submode']],
+  ['mono-kink',   s => s.market === 'monopoly' && s.monoMode === 'kinked',       ['mono-submode']],
   ['labor',       s => s.mode === 'labor' && s.laborStruct === 'competition',    ['labor-seg']],
   ['labor-mono',  s => s.mode === 'labor' && s.laborStruct === 'monopsony',      ['labor-seg']],
   ['labor-union', s => s.mode === 'labor' && s.laborStruct === 'union',          ['labor-seg']],
   ['labor-bilat', s => s.mode === 'labor' && s.laborStruct === 'bilateral',      ['labor-seg']],
-  ['smallopen',   s => s.scenario === 'openecon',                                ['market-struct-row']],
-  ['monoexport',  s => s.market === 'monopoly' && s.monoMode === 'discr3',       ['market-struct-row', 'mono-submode']],
+  ['smallopen',   s => s.scenario === 'openecon',                                []],
+  ['monoexport',  s => s.market === 'monopoly' && s.monoMode === 'discr3',       ['mono-submode']],
   ['consumer',    s => s.mode === 'consumer' && s.consSlutskyOn === false,       ['cons-slutsky-row']],
   ['cons-slutsky',s => s.mode === 'consumer' && s.consSlutskyOn === true,        ['cons-slutsky-row']],
   ['adas',        s => s.mode === 'macro' && s.macroModel === 'adas',            ['macro-seg']],
@@ -306,7 +306,13 @@ await t('(г) в каждой из 44 сцен три карточки пане�
 // (д) Убранные блоки не показываются НИ В ОДНОЙ сцене.
 await t('(д) «Что изучаем», «Структура рынка» и «Излишки» в панели не встречаются', async () => {
   const bad = panelSweep.filter(r => r.seen.length);
-  const gone = await page.evaluate(() => ['sec-analysis', 'sec-areas', 'scn-none', 'scn-shift']
+  /* Удалённое обязано ОТСУТСТВОВАТЬ в разметке, а не быть спрятанным: спрятанное
+     возвращается одной строчкой стиля, удалённого возвращать нечем.
+     Сюда же переехали переключатель структуры рынка и панель сюжета «Сдвиги» —
+     оба удалены 24.08 после замера по всем 44 сценам. */
+  const gone = await page.evaluate(() => ['sec-analysis', 'sec-areas', 'scn-none', 'scn-shift',
+    'market-struct-row', 'seg-comp', 'seg-mono', 'scn-pane-shift', 'info-shift',
+    'shiftD-slider', 'shiftS-slider']
     .filter(id => document.getElementById(id)));
   if (gone.length) return 'в разметке остались: ' + gone.join(', ');
   return bad.length === 0 || bad.map(r => r.key + ' ' + JSON.stringify(r.seen)).join('; ');
