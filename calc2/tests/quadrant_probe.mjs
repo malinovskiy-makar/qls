@@ -299,6 +299,50 @@ if (need('Г') || need('G')) {
   flag('пунктир к точке пересечения нарисован', g.dashed > 0, String(g.dashed));
 }
 
+/* ── НАБОР Д. Предельная кривая продолжается ниже оси ───────────────── */
+if (need('Д') || need('D')) {
+  console.log('\n=== НАБОР Д: монополия D = 100-Q, MC = 20 ===');
+  const d = await run(`
+    resetSceneMemory(); pickScene('mono');
+    var dd = STATE.curves.find(function (c) { return c.role === 'demand'; });
+    if (dd) updateCurveExpr(dd, '100-Q');
+    var mc = STATE.curves.find(function (c) { return c.role === 'mc' || c.role === 'supply'; });
+    if (mc) updateCurveExpr(mc, '20');
+    redrawAll();
+    var read = function (sel) {
+      var out = [];
+      document.querySelectorAll(sel).forEach(function (el) {
+        var pts = [];
+        String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
+          var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+          if (m) pts.push([sx.invert(+m[1]), sy.invert(+m[2])]);
+        });
+        out.push({ n: pts.length, w: el.getAttribute('stroke-width'), op: el.getAttribute('opacity'),
+                   dash: el.getAttribute('stroke-dasharray'),
+                   maxQ: pts.length ? Math.max.apply(null, pts.map(function (p) { return p[0]; })) : null,
+                   minP: pts.length ? Math.min.apply(null, pts.map(function (p) { return p[1]; })) : null });
+      });
+      return out;
+    };
+    var m = STATE.mono || {};
+    return { Qm: m.Qm, Pm: m.Pm, Qc: m.Qc, tails: read('[data-marginal-tail]'),
+             all: read('path[stroke="' + COL.MR + '"]') };
+  `);
+  show('Qm', d.Qm, 40, 0.3);
+  show('Pm', d.Pm, 60, 0.3);
+  show('Qc', d.Qc, 80, 0.3);
+  d.tails.forEach((t, i) => console.log(`     продолжение MR #${i + 1}: точек ${t.n}, толщина ${t.w}, ` +
+    `прозрачность ${t.op}, штрих «${t.dash}», край Q = ${num(t.maxQ)}, самая нижняя P = ${num(t.minP)}`));
+  const tail = d.tails[0];
+  flag('продолжение MR нарисовано', !!tail, String(d.tails.length));
+  if (tail) {
+    show('край продолжения MR по Q', tail.maxQ, 100, 0.6);
+    show('самая нижняя точка MR по P', tail.minP, -100, 1.5);
+    flag('продолжение тоньше основной линии', parseFloat(tail.w) < 2, tail.w);
+    flag('продолжение полупрозрачное', parseFloat(tail.op) < 1, tail.op);
+  }
+}
+
 /* ── СКОРОСТЬ. 60 шагов панорамы ────────────────────────────────────
    ⚠️ МЕРИМ ТРИ СЛУЧАЯ, А НЕ ОДИН.
    Сравнивать «до» и «после» на наборе Б в стартовом окне НЕЧЕСТНО: до починки

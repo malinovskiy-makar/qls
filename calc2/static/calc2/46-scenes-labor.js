@@ -435,9 +435,8 @@ function setLaborMin(p) {
 function drawLaborUnionMRL() {
   const D = STATE.laborD; if (!D) return;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
-  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
-  const pts = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; const v = marginalRevenue(D, l); pts.push(isNaN(v) ? null : [l, v]); }
-  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  // Продолжение ниже оси — общим помощником, до нуля породившего спроса на труд.
+  drawMarginalCurve(g, l => marginalRevenue(D, l), D, COL.MR, { width: 2 });
   const ql = CONFIG.Qmax * 0.28, vl = marginalRevenue(D, ql);
   if (!isNaN(vl) && vl >= 0 && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.MR)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MRL');
