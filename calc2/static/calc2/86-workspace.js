@@ -796,6 +796,63 @@ function tipExpr(expr) {
    читают. */
 function tipPlain(text) { return String(text || '').replace(/\$/g, ''); }
 
+/* Подпись в РАЗМЕТКЕ (не на холсте), в которой сидит обозначение: «D», «CS»,
+   «MC, предельные затраты». Обозначения уезжают в формулу, слова остаются
+   словами. Разбор — тот же tipName, что у подсказок: одно место правды на
+   весь калькулятор.
+
+   Строку без обозначений печатаем текстом и KaTeX не зовём вовсе: разбор
+   формул дорогой, а список кривых перерисовывается на каждое изменение. */
+/* ── ОБОЗНАЧЕНИЯ В ГОТОВОЙ РАЗМЕТКЕ ПАНЕЛЕЙ ──────────────────────────────
+
+   Подписи галочек и полей написаны в шаблоне и в сценах человеческим текстом:
+   «MC, предельные затраты», «Показывать PS (TR − VC)», «Цена Px». Править их
+   по одной значило бы полторы сотни правок в шаблоне и в девяти файлах сцен,
+   и следующая новая подпись всё равно приехала бы обычным шрифтом.
+
+   Поэтому разметка ставится ОДНИМ проходом по дереву панели: обозначения
+   оборачиваются долларами тем же tipName, а дальше их набирает renderMathIn.
+   Прогон идёт после каждой перерисовки; повторно ничего не портится, потому
+   что набранное уже лежит внутри .katex и обходом не берётся.
+
+   ⚠️ ЧЕГО НЕ КАСАЕМСЯ: поля ввода и предпросмотр формулы (там доллар — знак,
+   а не разметка), готовые формулы KaTeX и MathLive, блоки кода с записью
+   Math.js. В этих местах доллар обязан остаться буквальным. */
+function markNotationsIn(root) {
+  if (!root || typeof tipName !== 'function') return;
+  const SKIP = '.katex, math-field, input, textarea, code, script, style, .f-typeset, .mf-hidden';
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => {
+      const v = n.nodeValue;
+      if (!v || v.indexOf('$') >= 0) return NodeFilter.FILTER_REJECT;
+      if (!/[A-Z]/.test(v)) return NodeFilter.FILTER_REJECT;   // латиницы нет — обозначений нет
+      const el = n.parentElement;
+      if (!el || el.closest(SKIP)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  const jobs = [];
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) jobs.push(n);
+  let touched = 0;
+  jobs.forEach(n => {
+    const marked = tipName(n.nodeValue);
+    if (marked === n.nodeValue) return;
+    n.nodeValue = marked;
+    touched += 1;
+  });
+  if (touched && typeof renderMathIn === 'function') renderMathIn(root);
+}
+
+function paintNotation(el, text) {
+  if (!el) return;
+  const src = String(text == null ? '' : text);
+  const marked = (typeof tipName === 'function') ? tipName(src) : src;
+  if (marked === src) { el.textContent = src; return; }
+  el.textContent = marked;
+  if (typeof renderMathIn === 'function') renderMathIn(el);
+  else el.textContent = src;
+}
+
 function showTipFor(el) {
   const t = tipText(el);
   if (!t) return;

@@ -253,6 +253,43 @@ def reduced_motion_covered():
 class CanonSourceChecks(SimpleTestCase):
     """Две проверки, на которые вычисленный стиль не отвечает."""
 
+    def test_runner_expands_cards_before_counting(self):
+        """Проверка (а) сессии 24.08: ЗАМЕР НЕ ЗАВИСИТ ОТ СОСТОЯНИЯ ЭКРАНА.
+
+        Все двадцать правил считают только ВИДИМЫЕ элементы, а сцена
+        открывается со всеми свёрнутыми карточками. Пока раннер не раскрывал их
+        сам, потолки храповика были свойством не кода, а кода плюс того, что
+        человек успел раскрыть: правка внутри свёрнутой карточки счётчик не
+        двигала (проверено — 134 → 78 после снятия одного `title`).
+
+        Почему проверка смотрит в исходник раннера, а не гоняет браузер дважды:
+        честный ответ стоил бы двух полных обходов по 30 с каждый, и в полном
+        прогоне это минута на одно правило. Здесь сторожится ровно то, что
+        может отвалиться, — сам ВЫЗОВ раскрытия. Пропадёт он — прибор снова
+        ослепнет молча, а этого допускать нельзя.
+        """
+        src = open(RUNNER, encoding="utf-8").read()
+        if "async function expandAll(" not in src:
+            self.fail("в calc2/tests/canon_checks.mjs нет функции expandAll — "
+                      "замер снова считает только раскрытое человеком")
+        # Вызов обязан стоять внутри openScene: только через неё проходит
+        # каждая замеряемая сцена.
+        start = src.find("async function openScene(")
+        if start < 0:
+            self.fail("в раннере канона нет openScene — проверка потеряла точку опоры")
+        body = src[start:start + 1200]
+        if "await expandAll(page)" not in body:
+            self.fail("openScene в calc2/tests/canon_checks.mjs больше НЕ зовёт "
+                      "expandAll: потолки храповика опять зависят от того, какие "
+                      "карточки были раскрыты в момент прогона")
+        # И сама expandAll обязана раскрывать складные блоки, а не быть заглушкой.
+        i = src.find("async function expandAll(")
+        eb = src[i:i + 1600]
+        for need in ("fold-btn[aria-controls]", "setToolsOpen", "setParamsOpen"):
+            if need not in eb:
+                self.fail("expandAll больше не раскрывает «%s» — раскрытие "
+                          "выхолощено, замер снова частичный" % need)
+
     def test_hex_outside_tokens(self):
         bad = hex_outside_tokens()
         note, fail = _ceiling_report("hex_outside_tokens", len(bad), bad)

@@ -190,7 +190,8 @@ function renderCurveList() {
     });
 
     const nm = document.createElement('span');
-    nm.className = 'curve-name'; nm.textContent = curveShortName(curve);
+    nm.className = 'curve-name';
+    paintNotation(nm, curveShortName(curve));   // «D», «MC» — формулой, своё имя — текстом
     nm.setAttribute('data-tip', tipExpr(curve.expr));   // под именем — сама формула
     if (!curve.visible) nm.style.opacity = '.4';
 

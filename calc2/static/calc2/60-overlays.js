@@ -23,6 +23,13 @@ function redrawAll() {
      заводов»), правило уже не заставало: замер 24.08 находил их обычным
      шрифтом. Здесь холст собран целиком, кто бы что ни дорисовал. */
   typesetChartLabels();
+  /* ⚠️ ОБОЗНАЧЕНИЯ В ПАНЕЛЯХ РАЗМЕЧАЮТСЯ ТУТ ЖЕ, В САМОМ КОНЦЕ, И ПО ТОЙ ЖЕ
+     ПРИЧИНЕ. Первый заход стоял внутри refreshAnalyticsPanel, и прозу, которую
+     сцена дописывает позже («продав единицу X, получаешь 2 ед…»), проход уже не
+     заставал: замер 24.08 находил 26 таких мест в семи сценах. Здесь панель
+     собрана целиком, кто бы что ни дописал. */
+  markNotationsIn(document.getElementById('tools-panel'));
+  markNotationsIn(document.getElementById('params-panel'));
   refreshRegulators();   // строки «имя = значение» идут за значениями ползунков
   // Заголовок раздела равновесия — свойство сцены (А52). Синхронизируем здесь,
   // а не только в рыночном пересчёте: иначе в сцене, куда пришли из монополии,
@@ -420,6 +427,8 @@ function drawOverlays() {
   refreshAnalyticsPanel();
   renderMathIn(document.getElementById('ex-body'));    // и в объяснении модели
   renderMathIn(document.getElementById('tools-panel'));// и в подсказках панели
+  /* Обозначения в подписях панели размечает redrawAll в самом конце: сцена
+     дописывает часть текста позже, и проход отсюда её не застаёт. */
 }
 
 /* Довести правую панель до готового вида: разбор в свой блок, формулы, числа
@@ -431,6 +440,10 @@ function refreshAnalyticsPanel() {
   syncAnalyticsPanel();                                // разбор уезжает в свой блок
   typesetChartLabels();                                // обозначения на графике — математикой
   renderMathIn(document.getElementById('sb-body'));    // формулы в аналитике
+  /* Здесь проход нужен ОТДЕЛЬНО от общего: перетаскивание линии цены обновляет
+     ТОЛЬКО панель, redrawAll при этом не зовётся, и подписи в пути остались бы
+     обычным шрифтом, а на отпускании скачком стали бы формулами. */
+  markNotationsIn(document.getElementById('params-panel'));
   typesetStats(document.getElementById('sb-body'));    // Н6: числа тоже формулой
 }
 
@@ -2141,7 +2154,7 @@ function updateAreaCalcPanel() {
     pick.setAttribute('data-area', e.key);
     const lab = document.createElement('span');
     lab.className = 'area-name-fixed';
-    lab.textContent = areaShort(e.key);
+    paintNotation(lab, areaShort(e.key));   // «CS», «PS», «DWL» — формулой
     lab.setAttribute('data-tip', tipName(e.key));
     c1.append(pick, lab);
     const c2 = document.createElement('b');
