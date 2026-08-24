@@ -791,6 +791,15 @@ function applyScenarioVisibility() {
   show('scn-pane-open',  inMarket && s === 'openecon');
   show('sec-tax',  inMarket && s === 'none');
   show('sec-mono', inMarket && s === 'none');
+  /* ⚠️ ОБЩЕСТВЕННЫЕ КРИВЫЕ ПРЯЧУТСЯ ЗДЕСЬ, А НЕ В ОБРАБОТЧИКЕ ЩЕЛЧКА.
+     Блок MSB / MSC живёт во «Вводе функций», и раньше его видимость ставил
+     только `setScenario`. Смена модели меняет STATE.scenario напрямую и зовёт
+     не его, а эту функцию — блок оставался на экране: замер 24.08 показывал
+     два чужих поля в монополии и на рынке труда после захода во «Внешние
+     эффекты». То же семейство, что и прежняя утечка параметров между сценами:
+     состояние приводится к экрану в ОДНОМ месте, иначе всякий новый путь
+     входа в сцену обязан помнить про каждый блок по отдельности. */
+  show('social-curves', inMarket && s === 'externality');
   [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'],
    ['scn-ext', 'externality'], ['scn-open', 'openecon']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', s === v); });
@@ -803,9 +812,7 @@ function applyScenarioVisibility() {
 function setScenario(s) {
   STATE.scenario = s;
   // Общественные кривые сюжета внешних эффектов живут во «Вводе функций»:
-  // блок показывается только в своём сюжете, формулы готовятся заранее.
-  const soc = document.getElementById('social-curves');
-  if (soc) soc.style.display = (s === 'externality') ? '' : 'none';
+  // формулы готовятся заранее, а показывает блок applyScenarioVisibility ниже.
   if (s === 'externality') { recompileSocial(); syncSocialFields(); }
   if (s !== 'none' && STATE.market === 'monopoly') {
     STATE.market = 'comp';
