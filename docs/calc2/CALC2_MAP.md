@@ -182,6 +182,82 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 написан на раннем этапе, до `check_tex_escapes.mjs` и большинства проб).
 Быстрый круг — CLAUDE.md, раздел «Как проверять» под calc2.
 
+## Точки сборки: четыре двери, через которые проходит всё
+
+Карта отвечает по файлам, но чаще нужен другой разрез: «где ОДНО место, через
+которое собирается вот эта часть экрана». Их четыре, и знать их полезнее, чем
+помнить двадцать два файла.
+
+**Холст графика — `redrawAll()` в `60-overlays.js:10`.** Единственная дверь
+перерисовки: `syncParams` (формулы могли завести или потерять буквы) →
+`redrawScene()` (сцена рисует себя) → `drawOverlays()` (слой поверх сцены) →
+проходы по подписям (размер, обрезка, разведение, чернила) →
+`typesetChartLabels()` (шрифты обозначений — намеренно В САМОМ КОНЦЕ, когда
+холст собран целиком) → `refreshRegulators()`. Любое изменение состояния зовёт
+её и перерисовывает ВСЁ заново; частичной перерисовки в движке нет.
+Смотреть сюда, если «изменил значение — на графике не отразилось» или
+«отразилось, но с опозданием на один шаг».
+
+**Сцена внутри холста — `redrawScene()` в `60-overlays.js:45`.** Развилка по
+`STATE.mode` и `STATE.scenario`: она выбирает, какая из сорока с лишним
+рисовалок сцены сработает. Смотреть, если рисуется чужая модель или не
+рисуется ничего.
+
+**Левая панель — `cardifySections()` + `collapseCards()` + `syncFirstCard()`
+в `86-workspace.js:241-379`.** Разметка всех карточек лежит в шаблоне СРАЗУ
+ВСЯ; сцена не строит панель, а показывает и скрывает готовые блоки
+(`style.display`). Кто именно скрывает — `applyScenarioVisibility()` в
+`52-modes.js`, `applyMonoVisibility()` в `42-scenes-mono.js` и `lock` у
+маршрута сцены. ⚠️ Правило, купленное дефектом: **видимость блока ставится в
+«приведи экран к состоянию», а не в обработчике щелчка** — иначе смена модели
+её не застанет и блок протечёт в чужую сцену (так было с MSB/MSC, 24.08).
+
+**Правая аналитика — `refreshAnalyticsPanel()` в `60-overlays.js:430`.**
+`syncAnalyticsPanel()` (разбор уезжает в свой блок) → `typesetChartLabels()` →
+`renderMathIn(#sb-body)` (формулы) → `typesetStats(#sb-body)` (числа тоже
+формулой). Зовётся не только из общей перерисовки: перетаскивание линии цены
+обновляет ТОЛЬКО панель, и без отдельного прохода числа в пути показывались
+сырым текстом.
+
+**Подсказки — `#hint-tip` и `wireTips()` в `86-workspace.js`.** Плашка ОДНА на
+весь калькулятор, текст берётся из атрибута `data-tip`, математика внутри
+размечается долларами (`tipName`, `tipExpr`, `tipPlain`). Нативного `title` в
+калькуляторе нет ни одного и быть не должно — за этим следит правило канона
+`title_on_interactive`.
+
+## Как добавить новую сцену
+
+Порядок шагов, а не список файлов. Всё, кроме шага 4, — по одной записи.
+
+1. **Карточка в меню** — `calc2/templates/calc2/calc2.html`, окно выбора
+   (`#scene-picker`): `<button class="scard" data-scene="ключ">` с названием и
+   строкой `.scard-desc`. Ключ карточки — он же ключ маршрута.
+2. **Имя сцены** — `SCENE_NAMES` в `84-picker.js` (пишется в заголовок над
+   графиком).
+3. **Маршрут** — `SCENE_ROUTE` в `84-picker.js`: `{ run: () => …, lock: […] }`.
+   `run` — только КОМПОЗИЦИЯ уже имеющихся действий движка (`setMode`,
+   `setMonoMode`, `loadScene` и т.п.); своей математики у карточки быть не
+   должно. `lock` — id переключателей соседних моделей, которые эта сцена
+   прячет. `base` — если сцена это подрежим другой.
+4. **Своя рисовалка** (только если сцена рисует что-то новое) — в файле по
+   теме: рынок → `40-scenes-market.js`, монополия → `42`, фирма → `44`,
+   труд → `46`, потребитель → `48`, макро → `50`, КПВ → `54`,
+   неравенство → `56`, математика → `70`. Плюс ветка в `redrawScene()`.
+5. **Свои поля ввода** — блок в шаблоне со своим `id` и `style="display:none"`,
+   показ через ту функцию видимости, что отвечает за её семейство (см. «Левая
+   панель» выше). Проводка полей — в `88-params.js`.
+6. **Пояснение модели** — `90-explain.js` (текст под гаечным ключом).
+7. **Проверки.** Реестр `CARDS` в `calc2/tests/calc2_blocks.mjs` (карточка
+   открывается, состояние то, что обещано, чужие переключатели спрятаны) и —
+   если у сцены есть контрольные числа — `calc2/tests/calc2_math.mjs`.
+   Число сцен зашито в двух проверках сразу: `calc2_blocks` требует ровно 44,
+   аудит шрифтов печатает своё число — обе придётся поправить.
+
+⚠️ **Подписи холста рисуются ТОЛЬКО через `renderLabelText`.** Голый
+`.text(строка)` у нового `<text>` — это дефект: подпись не получит ни
+математического начертания обозначений, ни `data-raw` для выгрузки в `.tex`.
+Четыре таких места нашлись 24.08 и были переведены.
+
 ## Симптом → куда смотреть
 
 Таблица построена на реально закрытых багах из Notion (направление
@@ -197,7 +273,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | Подпись деления или координаты оторвалась от оси / пунктир к оси идёт без числа | `20-plane.js` (`axisValueX:477`, `axisValueY:504`, `coordAlreadyAt:466`, класс `axis-num` против `coord-num`); у сцен со своими мини-панелями (дискриминация в `42-scenes-mono.js`, панели производства в `44-scenes-firm.js`) проверить, что они тоже проставляют класс `coord-num` — своя копия отрисовки легко его теряет |
 | Ползунок буквы появляется позже, чем принята формула, или сбрасывает набранное число | `60-overlays.js` (`syncParams:2524` читает `input`, а не сырой LaTeX — см. находку Н7); `82-input.js` (`grabKeys`, очередь `_mfWaiting` — поле MathLive не собирается, пока сцена под `inert`) |
 | Подпись кривой дёргается, пропадает у края графика или показывает не то имя | `30-curves.js` (`requestLabelFrame:725`, `curveShortName:2985` в `60-overlays.js` — переехало отдельной функцией; правило «подпись переносится, а не скрывается») |
-| Кривую нельзя щёлкнуть, потянуть мышью или взвести её ключевые точки | `30-curves.js` (`sceneDrawsCurveList:890`, `NO_CURVE_DRAG:913`) — ⚠️ перетаскивание кривой мышью УДАЛЕНО целиком решением владельца от 20.08 (`CURVE_MOUSE_DRAG`, `attachDrag` и т.п. больше не существуют) — если жалоба именно «кривая не тянется», сначала проверить, не про это ли речь, а не искать несуществующий код |
+| Кривую нельзя щёлкнуть, потянуть мышью или взвести её ключевые точки | `30-curves.js` (`sceneDrawsCurveList:890`, `NO_CURVE_DRAG`) — ⚠️ перетаскивание кривой мышью УДАЛЕНО целиком решением владельца от 20.08 (`CURVE_MOUSE_DRAG`, `attachDrag` и т.п. больше не существуют) — если жалоба именно «кривая не тянется», сначала проверить, не про это ли речь, а не искать несуществующий код |
 | Ключевые точки / пересечения кривых не находятся, залипают или дублируют друг друга | `60-overlays.js` (`keyTargets:1114`, `kinksOf:1066`, `drawCrossPoints:1246`, `rollerTargetAt:1497`, `coordAlreadyAt` в `20-plane.js` — «одно место — одно число» для совпавших координат) |
 | Ползунок/протяжка ручки двигает окно графика целиком, а не саму кривую | `52-modes.js` (`redrawKeepingWindow:251`, `padMax:167`, `boundsOfDrawn:211`, `STATE.zoomLock`) |
 | Легенда или заливка площади не того цвета, дублирует подпись или путается с исходной формулой | `60-overlays.js` (`applyAreaColors:694`, `drawLegend:791`, `typesetStats:445` — при чтении текста легенды в тестах обязателен клон без `.katex-mathml`/`annotation`, иначе число из KaTeX читается трижды) |
@@ -206,6 +282,9 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | Правка имени точки или границы ползунка не применяется / стирает уже введённое значение | `82-input.js` (`makeEditableValue:1384` — пустое «прежнее» значение обязано означать «прежнего не было», а не `set('')`) |
 | Экспорт `.tex`/PDF: кривая или площадь на бумаге не совпадает с экраном, PDF не собирается | `calc2/views.py` (`compile_pdf_pdflatex`, `_TEX_FORBIDDEN`, `pdflatex_available`); `70-scenes-math.js` (`buildTex`, `mathToPgf` — сборка идёт из состояния и SVG вперемешку, не только из `STATE`, см. «Фаза L откачена» в CLAUDE.md) |
 | Элемент вообще не виден на экране, хотя код его явно создаёт / кнопка не реагирует ни на что | Сначала `calc2/templates/calc2/calc2.html` — проверить, что `id` есть в разметке (класс дефектов «оборванный обработчик»: контрол переделали, обработчик остался висеть на несуществующем элементе — 6 таких случаев нашла проверка связей сессии 10.08); потом сам JS-файл по имени обработчика |
+| Блок или поле чужой модели видно после захода в другую сцену | Видимость поставлена в обработчике щелчка вместо «приведи экран к состоянию»: `52-modes.js` (`applyScenarioVisibility`, `setScenario`), `42-scenes-mono.js` (`applyMonoVisibility`), `lock` у маршрута в `84-picker.js`. Класс дефекта закрывался дважды — параметры между сценами и блок MSB/MSC (24.08) |
+| Обозначение на графике или в подсказке набрано обычным шрифтом, а не формулой | Холст: `60-overlays.js` (`typesetChartLabels`, `chartLabelSource`, `chartLabelBase`, `chartLabelKind` — решение принимается по `data-raw`, а НЕ по склейке tspan'ов) и `40-scenes-market.js` (`renderLabelText`, `mixedMathTspans`, `markNotationTspan`). Подсказки: `86-workspace.js` (`tipName`, `tipExpr`). Прибор — `calc2/tests/night2_font_audit.mjs`, должен давать 0 |
+| Проверка канона зелёная, а нарушение на экране видно | Прибор считает только ВИДИМОЕ: `calc2/tests/canon_checks.mjs` (`expandAll` — раскрывает все складные блоки и обе панели перед подсчётом). Если проверка что-то «не видит», сначала спросите, не свёрнуто ли оно. Тот же класс — `clip-path` и `opacity` в измерителе |
 | После сброса/входа в сцену границы окна или сетка не такие, как ожидалось | `20-plane.js` (`fitMargins:77`, `mainScales`); `86-workspace.js` (`openSection:310`) для авто-раскрытия связанной панели |
 
 ## Чего в карте нет
@@ -240,6 +319,14 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
   уже закрытых багах и известных ловушках CLAUDE.md на момент написания
   (2026-08-21, HEAD `f8e3506`); новый класс дефекта в неё сам не попадёт —
   дописывайте строку, когда разберёте баг, которого здесь нет.
+- **Удалённого в карте нет, и это правильно.** Сюжет «Сдвиги»
+  (`scenario 'shift'`) и переключатель структуры рынка
+  (`#market-struct-row` / `#seg-comp` / `#seg-mono`) удалены 24.08 после
+  замера: значение `'shift'` было недостижимо, переключатель не был виден ни
+  в одной из 44 сцен. Если в старом отчёте или чужой ветке встретите
+  `drawShiftScenario`, `updateShiftPanel`, `setShift`, `L_MARKET` — этого
+  кода больше нет. Список удалённых `id` держится проверкой
+  `calc2_blocks.mjs` («в разметке отсутствует»).
 - **`models.py`, `admin.py`, `apps.py`** в приложении calc2 — стандартные
   пустые заготовки Django (моделей у calc2 нет, см. CLAUDE.md), они не
   участвуют в маршруте `/calc2/` и в карту не включены вовсе.
@@ -248,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-08-24. HEAD: `89fbd89`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-08-24. HEAD: `7f586dc`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -262,16 +349,16 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/10-math-core.js` | 734 | 45.4 | JS |
 | `calc2/static/calc2/20-plane.js` | 637 | 43.3 | JS |
 | `calc2/static/calc2/30-curves.js` | 1000 | 71.2 | JS |
-| `calc2/static/calc2/40-scenes-market.js` | 2459 | 163.6 | JS |
+| `calc2/static/calc2/40-scenes-market.js` | 2548 | 169.4 | JS |
 | `calc2/static/calc2/42-scenes-mono.js` | 1198 | 84.3 | JS |
-| `calc2/static/calc2/44-scenes-firm.js` | 1195 | 79.1 | JS |
+| `calc2/static/calc2/44-scenes-firm.js` | 1201 | 79.4 | JS |
 | `calc2/static/calc2/46-scenes-labor.js` | 737 | 53.3 | JS |
 | `calc2/static/calc2/48-scenes-consumer.js` | 261 | 15.7 | JS |
-| `calc2/static/calc2/50-scenes-macro.js` | 414 | 28.3 | JS |
+| `calc2/static/calc2/50-scenes-macro.js` | 416 | 28.4 | JS |
 | `calc2/static/calc2/52-modes.js` | 824 | 55.4 | JS |
 | `calc2/static/calc2/54-scenes-ppf.js` | 1901 | 126.2 | JS |
 | `calc2/static/calc2/56-scenes-inequality.js` | 532 | 34.0 | JS |
-| `calc2/static/calc2/60-overlays.js` | 4053 | 246.8 | JS |
+| `calc2/static/calc2/60-overlays.js` | 4055 | 247.1 | JS |
 | `calc2/static/calc2/70-scenes-math.js` | 2019 | 131.5 | JS |
 | `calc2/static/calc2/80-ui.js` | 485 | 30.5 | JS |
 | `calc2/static/calc2/82-input.js` | 1794 | 102.2 | JS |
@@ -281,7 +368,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/90-explain.js` | 381 | 63.1 | JS |
 | `calc2/static/calc2/99-boot.js` | 92 | 7.5 | JS |
 
-**Итого: 26 файлов, 29299 строк, 1991.8 КБ.**
+**Итого: 26 файлов, 29398 строк, 1998.1 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -419,87 +506,90 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 535 — `drawEquilibrium`
 - строка 577 — `mathTspans`
 - строка 617 — `hasMathMarkup`
-- строка 631 — `qtyTspans`
-- строка 661 — `qtyGreekChar`
-- строка 699 — `texToCanvasText`
-- строка 708 — `renderLabelText`
-- строка 727 — `haloText`
-- строка 760 — `pointName`
-- строка 783 — `yWageLabel`
-- строка 788 — `yWageValue`
-- строка 811 — `isMonopolyScene`
-- строка 819 — `eqSectionTitle`
-- строка 835 — `updateEqSectionTitle`
-- строка 852 — `interventionKeyValues`
-- строка 894 — `updateInfoPanel`
-- строка 967 — `sumSceneOn`
-- строка 970 — `sumGroupsOf`
-- строка 977 — `sumGroupQty`
-- строка 990 — `sumChokePrice`
-- строка 1002 — `sumLinearRecord`
-- строка 1058 — `integrateBroken`
-- строка 1069 — `curveBreaks`
-- строка 1080 — `sumSegExpr`
-- строка 1098 — `sumPolyline`
-- строка 1115 — `sumRebuildSide`
-- строка 1146 — `sumRebuild`
-- строка 1164 — `sumGroupName`
-- строка 1168 — `sumStartExpr`
-- строка 1176 — `sumReorder`
-- строка 1181 — `sumAddGroup`
-- строка 1190 — `sumBuildScene`
-- строка 1214 — `sumSetCount`
-- строка 1233 — `syncSumUi`
-- строка 1247 — `sumGroupStats`
-- строка 1279 — `sumRecordHtml`
-- строка 1291 — `updateSumPanel`
-- строка 1336 — `drawAreas`
-- строка 1364 — `beforeInterventionNote`
-- строка 1373 — `updateAreasPanel`
-- строка 1396 — `drawShiftedSupply`
-- строка 1425 — `drawTaxAreas`
-- строка 1457 — `drawTaxPoints`
-- строка 1506 — `attachTaxDrag`
-- строка 1527 — `setTax`
-- строка 1557 — `syncTaxKind`
-- строка 1564 — `applyIntervCascade`
-- строка 1606 — `setTaxForm`
-- строка 1622 — `setType`
-- строка 1664 — `applyTaxRateBounds`
-- строка 1694 — `setTaxKind`
-- строка 1706 — `updateTaxPanel`
-- строка 1766 — `setTaxSide`
-- строка 1774 — `setTaxSideButtons`
-- строка 1787 — `drawElasticityZones`
-- строка 1805 — `drawElasticityPoint`
-- строка 1833 — `attachElastDrag`
-- строка 1841 — `drawElasticityPointS`
-- строка 1861 — `attachElastDragS`
-- строка 1869 — `updateElasticityPanel`
-- строка 1933 — `drawExtAreas`
-- строка 1945 — `drawExtCurves`
-- строка 1969 — `drawExtPoints`
-- строка 2003 — `drawExtScenario`
-- строка 2012 — `updateExtPanel`
-- строка 2053 — `setExtSign`
-- строка 2062 — `syncSocialFields`
-- строка 2094 — `socialDefaultExpr`
-- строка 2100 — `recompileSocial`
-- строка 2122 — `setPRegFields`
-- строка 2130 — `setPReg`
-- строка 2139 — `drawPcAreas`
-- строка 2163 — `drawPriceControl`
-- строка 2212 — `attachPcDrag`
-- строка 2221 — `updatePcPanel`
-- строка 2266 — `setQuotaFields`
-- строка 2277 — `setQuota`
-- строка 2284 — `setQuotaPos`
-- строка 2294 — `updateQuotaPriceLabel`
-- строка 2306 — `drawQuotaAreas`
-- строка 2333 — `drawQuotaLines`
-- строка 2378 — `attachQuotaDrag`
-- строка 2391 — `updateQuotaPanel`
-- строка 2440 — `drawGhost`
+- строка 641 — `markNotationTspan`
+- строка 658 — `mixedNotationRe`
+- строка 666 — `mixedMathTspans`
+- строка 710 — `qtyTspans`
+- строка 747 — `qtyGreekChar`
+- строка 785 — `texToCanvasText`
+- строка 794 — `renderLabelText`
+- строка 815 — `haloText`
+- строка 848 — `pointName`
+- строка 871 — `yWageLabel`
+- строка 876 — `yWageValue`
+- строка 899 — `isMonopolyScene`
+- строка 907 — `eqSectionTitle`
+- строка 923 — `updateEqSectionTitle`
+- строка 940 — `interventionKeyValues`
+- строка 982 — `updateInfoPanel`
+- строка 1055 — `sumSceneOn`
+- строка 1058 — `sumGroupsOf`
+- строка 1065 — `sumGroupQty`
+- строка 1078 — `sumChokePrice`
+- строка 1090 — `sumLinearRecord`
+- строка 1146 — `integrateBroken`
+- строка 1157 — `curveBreaks`
+- строка 1168 — `sumSegExpr`
+- строка 1186 — `sumPolyline`
+- строка 1203 — `sumRebuildSide`
+- строка 1234 — `sumRebuild`
+- строка 1252 — `sumGroupName`
+- строка 1256 — `sumStartExpr`
+- строка 1264 — `sumReorder`
+- строка 1269 — `sumAddGroup`
+- строка 1278 — `sumBuildScene`
+- строка 1302 — `sumSetCount`
+- строка 1321 — `syncSumUi`
+- строка 1335 — `sumGroupStats`
+- строка 1367 — `sumRecordHtml`
+- строка 1379 — `updateSumPanel`
+- строка 1424 — `drawAreas`
+- строка 1452 — `beforeInterventionNote`
+- строка 1461 — `updateAreasPanel`
+- строка 1484 — `drawShiftedSupply`
+- строка 1513 — `drawTaxAreas`
+- строка 1545 — `drawTaxPoints`
+- строка 1594 — `attachTaxDrag`
+- строка 1615 — `setTax`
+- строка 1645 — `syncTaxKind`
+- строка 1652 — `applyIntervCascade`
+- строка 1694 — `setTaxForm`
+- строка 1710 — `setType`
+- строка 1752 — `applyTaxRateBounds`
+- строка 1782 — `setTaxKind`
+- строка 1794 — `updateTaxPanel`
+- строка 1854 — `setTaxSide`
+- строка 1862 — `setTaxSideButtons`
+- строка 1875 — `drawElasticityZones`
+- строка 1893 — `drawElasticityPoint`
+- строка 1922 — `attachElastDrag`
+- строка 1930 — `drawElasticityPointS`
+- строка 1950 — `attachElastDragS`
+- строка 1958 — `updateElasticityPanel`
+- строка 2022 — `drawExtAreas`
+- строка 2034 — `drawExtCurves`
+- строка 2058 — `drawExtPoints`
+- строка 2092 — `drawExtScenario`
+- строка 2101 — `updateExtPanel`
+- строка 2142 — `setExtSign`
+- строка 2151 — `syncSocialFields`
+- строка 2183 — `socialDefaultExpr`
+- строка 2189 — `recompileSocial`
+- строка 2211 — `setPRegFields`
+- строка 2219 — `setPReg`
+- строка 2228 — `drawPcAreas`
+- строка 2252 — `drawPriceControl`
+- строка 2301 — `attachPcDrag`
+- строка 2310 — `updatePcPanel`
+- строка 2355 — `setQuotaFields`
+- строка 2366 — `setQuota`
+- строка 2373 — `setQuotaPos`
+- строка 2383 — `updateQuotaPriceLabel`
+- строка 2395 — `drawQuotaAreas`
+- строка 2422 — `drawQuotaLines`
+- строка 2467 — `attachQuotaDrag`
+- строка 2480 — `updateQuotaPanel`
+- строка 2529 — `drawGhost`
 
 #### `calc2/static/calc2/42-scenes-mono.js`
 
@@ -602,23 +692,23 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 723 — `realMax`
 - строка 725 — `recomputeProduction`
 - строка 744 — `redrawProduction`
-- строка 848 — `noMaxNote`
-- строка 857 — `updateProdPanel`
-- строка 881 — `recomputeIsoquant`
-- строка 892 — `redrawIsoquant`
-- строка 906 — `updateIsoPanel`
-- строка 944 — `plantMC`
-- строка 950 — `plantTC`
-- строка 956 — `plantQatMC`
-- строка 972 — `recomputePlants`
-- строка 1006 — `plantsAt`
-- строка 1023 — `redrawPlants`
-- строка 1104 — `updatePlantsPanel`
-- строка 1135 — `setPlantsView`
-- строка 1142 — `setPlantsQ`
-- строка 1153 — `setCostsInputMode`
-- строка 1161 — `syncCostsInputMode`
-- строка 1175 — `setCostsSub`
+- строка 854 — `noMaxNote`
+- строка 863 — `updateProdPanel`
+- строка 887 — `recomputeIsoquant`
+- строка 898 — `redrawIsoquant`
+- строка 912 — `updateIsoPanel`
+- строка 950 — `plantMC`
+- строка 956 — `plantTC`
+- строка 962 — `plantQatMC`
+- строка 978 — `recomputePlants`
+- строка 1012 — `plantsAt`
+- строка 1029 — `redrawPlants`
+- строка 1110 — `updatePlantsPanel`
+- строка 1141 — `setPlantsView`
+- строка 1148 — `setPlantsQ`
+- строка 1159 — `setCostsInputMode`
+- строка 1167 — `syncCostsInputMode`
+- строка 1181 — `setCostsSub`
 
 #### `calc2/static/calc2/46-scenes-labor.js`
 
@@ -679,10 +769,10 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 89 — `macroP`
 - строка 95 — `recomputeMacro`
 - строка 209 — `drawMacroCurve`
-- строка 236 — `redrawMacro`
-- строка 307 — `drawEquilibriumAt`
-- строка 318 — `updateMacroPanel`
-- строка 402 — `setMacroModel`
+- строка 238 — `redrawMacro`
+- строка 309 — `drawEquilibriumAt`
+- строка 320 — `updateMacroPanel`
+- строка 404 — `setMacroModel`
 
 #### `calc2/static/calc2/52-modes.js`
 
@@ -921,69 +1011,69 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 2439 — `chartLabelSource`
 - строка 2449 — `chartLabelBase`
 - строка 2466 — `chartLabelKind`
-- строка 2478 — `typesetChartLabels`
-- строка 2506 — `prepExpr`
-- строка 2524 — `texToPlain`
-- строка 2550 — `sceneReservedKey`
-- строка 2554 — `freeSymbols`
-- строка 2572 — `freeSymbolsUncached`
-- строка 2600 — `sceneReserved`
-- строка 2623 — `sceneExtraParams`
-- строка 2629 — `paramValue`
-- строка 2635 — `paramScope`
-- строка 2645 — `scopeFor`
-- строка 2652 — `evalWithParams`
-- строка 2663 — `syncParams`
-- строка 2719 — `buildParamChip`
-- строка 2842 — `initSceneColorPickers`
-- строка 2854 — `syncSceneColorPickers`
-- строка 2862 — `syncAxisPlaceholders`
-- строка 2877 — `titleAnchorPx`
-- строка 2887 — `drawGraphTitle`
-- строка 2926 — `editGraphTitleOnCanvas`
-- строка 2971 — `normHex`
-- строка 2993 — `paletteSix`
-- строка 3001 — `closeColorMenu`
-- строка 3015 — `onDocClosePick`
-- строка 3019 — `onEscClosePick`
-- строка 3026 — `makeColorPicker`
-- строка 3113 — `autoCurveName`
-- строка 3122 — `curveShortName`
-- строка 3132 — `markCaption`
-- строка 3141 — `drawMarks`
-- строка 3228 — `snapTargets`
-- строка 3314 — `macroSnapTargets`
-- строка 3333 — `consumerSnapTargets`
-- строка 3362 — `ineqSnapTargets`
-- строка 3376 — `mathSnapTargets`
-- строка 3428 — `tradeSnapTargets`
-- строка 3448 — `axisSnapAt`
-- строка 3467 — `snapDistPx`
-- строка 3486 — `snapPointAt`
-- строка 3527 — `showSnapHint`
-- строка 3546 — `armMark`
-- строка 3559 — `cancelMarkDraft`
-- строка 3599 — `resetDecor`
-- строка 3690 — `_undoCopyChild`
-- строка 3704 — `_undoCopy`
-- строка 3718 — `pushUndo`
-- строка 3728 — `undoLast`
-- строка 3744 — `clearUndo`
-- строка 3751 — `forgetSceneSnapshot`
-- строка 3753 — `resetSceneMemory`
-- строка 3755 — `saveSceneSnapshot`
-- строка 3764 — `restoreSceneSnapshot`
-- строка 3783 — `addMarkAt`
-- строка 3818 — `colorDist`
-- строка 3827 — `drawnStrokeColors`
-- строка 3843 — `nextMarkColor`
-- строка 3859 — `newMark`
-- строка 3871 — `pendingMark`
-- строка 3874 — `startMarkDraft`
-- строка 3883 — `markSnapFn`
-- строка 3893 — `renderMarkList`
-- строка 3906 — `ensureAddMarkButton`
-- строка 3916 — `buildMarkRow`
+- строка 2480 — `typesetChartLabels`
+- строка 2508 — `prepExpr`
+- строка 2526 — `texToPlain`
+- строка 2552 — `sceneReservedKey`
+- строка 2556 — `freeSymbols`
+- строка 2574 — `freeSymbolsUncached`
+- строка 2602 — `sceneReserved`
+- строка 2625 — `sceneExtraParams`
+- строка 2631 — `paramValue`
+- строка 2637 — `paramScope`
+- строка 2647 — `scopeFor`
+- строка 2654 — `evalWithParams`
+- строка 2665 — `syncParams`
+- строка 2721 — `buildParamChip`
+- строка 2844 — `initSceneColorPickers`
+- строка 2856 — `syncSceneColorPickers`
+- строка 2864 — `syncAxisPlaceholders`
+- строка 2879 — `titleAnchorPx`
+- строка 2889 — `drawGraphTitle`
+- строка 2928 — `editGraphTitleOnCanvas`
+- строка 2973 — `normHex`
+- строка 2995 — `paletteSix`
+- строка 3003 — `closeColorMenu`
+- строка 3017 — `onDocClosePick`
+- строка 3021 — `onEscClosePick`
+- строка 3028 — `makeColorPicker`
+- строка 3115 — `autoCurveName`
+- строка 3124 — `curveShortName`
+- строка 3134 — `markCaption`
+- строка 3143 — `drawMarks`
+- строка 3230 — `snapTargets`
+- строка 3316 — `macroSnapTargets`
+- строка 3335 — `consumerSnapTargets`
+- строка 3364 — `ineqSnapTargets`
+- строка 3378 — `mathSnapTargets`
+- строка 3430 — `tradeSnapTargets`
+- строка 3450 — `axisSnapAt`
+- строка 3469 — `snapDistPx`
+- строка 3488 — `snapPointAt`
+- строка 3529 — `showSnapHint`
+- строка 3548 — `armMark`
+- строка 3561 — `cancelMarkDraft`
+- строка 3601 — `resetDecor`
+- строка 3692 — `_undoCopyChild`
+- строка 3706 — `_undoCopy`
+- строка 3720 — `pushUndo`
+- строка 3730 — `undoLast`
+- строка 3746 — `clearUndo`
+- строка 3753 — `forgetSceneSnapshot`
+- строка 3755 — `resetSceneMemory`
+- строка 3757 — `saveSceneSnapshot`
+- строка 3766 — `restoreSceneSnapshot`
+- строка 3785 — `addMarkAt`
+- строка 3820 — `colorDist`
+- строка 3829 — `drawnStrokeColors`
+- строка 3845 — `nextMarkColor`
+- строка 3861 — `newMark`
+- строка 3873 — `pendingMark`
+- строка 3876 — `startMarkDraft`
+- строка 3885 — `markSnapFn`
+- строка 3895 — `renderMarkList`
+- строка 3908 — `ensureAddMarkButton`
+- строка 3918 — `buildMarkRow`
 
 #### `calc2/static/calc2/70-scenes-math.js`
 
@@ -1244,6 +1334,6 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 13 — `lockNumberFields`
 - строка 42 — `init`
 
-**Итого функций в индексе: 893.**
+**Итого функций в индексе: 896.**
 
 <!-- AUTO:END -->
