@@ -820,7 +820,12 @@ function tipPlain(text) { return String(text || '').replace(/\$/g, ''); }
    Math.js. В этих местах доллар обязан остаться буквальным. */
 function markNotationsIn(root) {
   if (!root || typeof tipName !== 'function') return;
-  const SKIP = '.katex, math-field, input, textarea, code, script, style, .f-typeset, .mf-hidden';
+  /* ⚠️ СТРОКУ «ИМЯ = ЗНАЧЕНИЕ» РАЗМЕТЧИК НЕ ТРОГАЕТ.
+     Её и так набирает формулой paintEqLabel, а имя для неё читается обратно из
+     той же подписи. Разметив её здесь, мы кормили бы чтение собственным
+     выводом: «Цена P» → «Цена $P$» → на экране «Цена PPP» (замер 24.08). */
+  const SKIP = '.katex, math-field, input, textarea, code, script, style, '
+             + '.f-typeset, .mf-hidden, .param-eq, .pchip-label, .reg-eq';
   const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (n) => {
       const v = n.nodeValue;

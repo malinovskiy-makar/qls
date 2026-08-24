@@ -579,8 +579,21 @@ function upgradeRegulator(field) {
      несёт короткое обозначение. Полное название остаётся подсказкой. */
   const labEl = field.querySelector('label');
   const chipLab = field.querySelector('.pchip-label');
+  /* ⚠️ ТЕКСТ БЕРЁМ БЕЗ НЕВИДИМОЙ ПОЛОВИНЫ KaTeX.
+     Рядом с нарисованной формулой KaTeX держит её же копию для чтецов экрана
+     (.katex-mathml с annotation). `textContent` склеивает обе, и одна буква
+     читается трижды: «Цена P» превращалась в «Цена PPP», а дальше это имя
+     уходило в набор и печаталось на экране. Ровно это и случилось 24.08, когда
+     подписи панели начали набираться формулой. */
+  const plainLabel = (el) => {
+    if (!el) return '';
+    if (!el.querySelector('.katex')) return el.textContent;
+    const c = el.cloneNode(true);
+    c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
+    return c.textContent;
+  };
   // У регуляторов сцен подпись это <label>, у чипов кривых — .pchip-label.
-  const rawName = ((labEl ? labEl.textContent : (chipLab ? chipLab.textContent : ''))
+  const rawName = (plainLabel(labEl || chipLab)
                     .split('=')[0]).replace(/[:\s]+$/, '').trim();
   const name = shortRegulatorName(field.id, rawName);
 
