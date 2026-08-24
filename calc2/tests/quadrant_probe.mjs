@@ -259,30 +259,43 @@ if (need('Г') || need('G')) {
     var e1 = d ? updateCurveExpr(d, '100-P') : 'нет кривой спроса';
     var e2 = s ? updateCurveExpr(s, '-200+0.5*P') : 'нет кривой предложения';
     redrawAll();
-    var keys = document.getElementById('info-key');
+    var keys = document.getElementById('info-eq');
     var areas = document.getElementById('info-areas');
-    var ex = document.getElementById('explain-body') || document.getElementById('info-explain');
-    var txt = ex ? ex.textContent : '';
+    var ex = document.getElementById('ex-body');
+    /* Формулу рядом с текстом печатает KaTeX и держит её невидимую копию для
+       чтецов экрана — textContent склеил бы обе. Снимаем копию с клона. */
+    var txt = '';
+    if (ex) {
+      var clone = ex.cloneNode(true);
+      clone.querySelectorAll('.katex-mathml, annotation').forEach(function (n) { n.remove(); });
+      txt = clone.textContent.replace(/\\s+/g, ' ').trim();
+    }
     return {
       err: [e1, e2].filter(Boolean),
       eq: STATE.eq, cs: STATE.cs, ps: STATE.ps,
-      offEq: (typeof STATE.offQuadEq !== 'undefined') ? STATE.offQuadEq : null,
+      offEq: STATE.offEq || null,
       keysText: keys ? keys.textContent.trim() : '(нет блока)',
       areasText: areas ? areas.textContent.trim() : '(нет блока)',
-      explainHas200: /200/.test(txt) && /100/.test(txt),
+      explainHas200: /200/.test(txt) && /−?-?100/.test(txt),
+      noStarNotation: !/Q\\s*\\*|P\\s*\\*/.test(txt),
       explainLen: txt.length,
-      explainTail: txt.slice(-400),
+      explainTail: txt.slice(-460),
       dashed: document.querySelectorAll('[data-offquad]').length,
     };
   `);
   if (g.err.length) console.log('     ОШИБКИ ВВОДА: ' + g.err.join(' | '));
-  console.log('     STATE.eq = ' + JSON.stringify(g.eq));
-  console.log('     «Ключевые значения»: ' + JSON.stringify(g.keysText.slice(0, 160)));
+  console.log('     STATE.eq = ' + JSON.stringify(g.eq) + ', STATE.offEq = ' + JSON.stringify(g.offEq));
+  console.log('     «Ключевые значения»: ' + JSON.stringify(g.keysText.slice(0, 220)));
   console.log('     «Излишки»: ' + JSON.stringify(g.areasText.slice(0, 160)));
   console.log('     пунктирных элементов пересечения: ' + g.dashed);
-  console.log('     хвост «Объяснения модели»: ' + JSON.stringify(g.explainTail.slice(-260)));
+  console.log('     хвост «Объяснения модели»: ' + JSON.stringify(g.explainTail.slice(-320)));
   flag('равновесия нет (STATE.eq === null)', g.eq === null, JSON.stringify(g.eq));
+  show('найденное пересечение · Q', g.offEq && g.offEq.Q, -100, 0.2);
+  show('найденное пересечение · P', g.offEq && g.offEq.P, 200, 0.2);
   flag('в «Объяснении модели» есть числа 200 и 100', g.explainHas200);
+  flag('обозначений Q* и P* рядом с этими числами НЕТ', g.noStarNotation);
+  flag('блок «Излишки» пуст', g.areasText === '', JSON.stringify(g.areasText.slice(0, 80)));
+  flag('в «Ключевых значениях» нет чисел равновесия', !/\d/.test(g.keysText), g.keysText.slice(0, 80));
   flag('пунктир к точке пересечения нарисован', g.dashed > 0, String(g.dashed));
 }
 

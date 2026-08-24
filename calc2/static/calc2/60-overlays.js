@@ -140,6 +140,8 @@ function redrawScene() {
     else if (STATE.pcMode) drawPriceControl();
     else if (STATE.quotaMode) drawQuotaLines();
     else drawEquilibrium();
+    // Равновесия нет, а пересечение есть — показываем, куда оно уехало.
+    if (typeof drawOffQuadIntersection === 'function') drawOffQuadIntersection();
   }
   updateInfoPanel();
   updateAreasPanel();

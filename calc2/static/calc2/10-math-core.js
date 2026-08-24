@@ -382,6 +382,46 @@ function findEquilibrium(D, S, qMaxOpt) {
   }
 }
 
+/* ⚠️ ПЕРЕСЕЧЕНИЕ ВНЕ ПЕРВОЙ ЧЕТВЕРТИ — ЭТО НЕ РАВНОВЕСИЕ, НО МОЛЧАТЬ О НЁМ НЕЛЬЗЯ.
+
+   Частая олимпиадная ловушка: у Qd = 100 − P и Qs = −200 + 0,5·P пересечение
+   приходится на P = 200 и Q = −100. Ученик видит правдоподобную цену и
+   заканчивает решать, не проверив количество. До сих пор калькулятор в такой
+   ситуации просто гас: равновесия нет, аналитика молчит целиком, и ровно та
+   ошибка, ради которой задача и составлена, оставалась незамеченной.
+
+   Ищем ту же смену знака разности, что и findEquilibrium, но по ОБЕ стороны
+   от нуля, и берём только точку, лежащую ВНЕ первой четверти (отрицательное
+   количество или отрицательная цена). Из нескольких таких берём ближайшую к
+   началу координат — тем же правилом, что и для настоящих равновесий.
+
+   Решение владельца: точку находим и показываем пунктиром и отдельным
+   абзацем разбора, но НИЧЕГО не считаем вокруг неё. Излишки и потери для
+   несуществующего рынка были бы враньём. */
+function findOffQuadIntersection(D, S) {
+  if (!D || !S || isVertical(D) || isVertical(S)) return null;
+  const g = (q) => {
+    const d = evalCurve(D, q), s = evalCurve(S, q);
+    return (isNaN(d) || isNaN(s)) ? NaN : d - s;
+  };
+  const priceAt = (q) => (evalCurve(D, q) + evalCurve(S, q)) / 2;
+  const span = eqSearchSpan(D, S);
+  const N = 2000;                       // та же плотность, что у поиска равновесия: отрезок вдвое длиннее
+  let best = null, prevQ = -span, prevG = g(-span);
+  for (let i = 1; i <= N; i++) {
+    const q = -span + 2 * span * i / N, cur = g(q);
+    if (!isNaN(prevG) && !isNaN(cur) && prevG * cur <= 0 && prevG !== cur) {
+      const qs = (prevG === 0) ? prevQ : (cur === 0 ? q : bisect(g, prevQ, q));
+      const p = priceAt(qs);
+      if (isFinite(p) && (qs < -1e-9 || p < -1e-9)) {
+        if (!best || Math.abs(qs) < Math.abs(best.Q)) best = { Q: qs, P: p };
+      }
+    }
+    prevQ = q; prevG = cur;
+  }
+  return best;
+}
+
 // Бисекция: уточняет корень f на отрезке [lo, hi], где знак f меняется.
 function bisect(f, lo, hi) {
   let flo = f(lo);

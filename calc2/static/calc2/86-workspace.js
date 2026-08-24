@@ -145,6 +145,14 @@ function moveExplanations() {
     const html = sceneExplainHtml();
     if (html) to.innerHTML = html;
   }
+  /* Пересечение вне первой четверти — отдельный абзац В КОНЦЕ разбора, а не
+     вместо него. Общий рассказ сцены при этом остаётся на месте: он про то,
+     как модель устроена, а этот абзац — про конкретную ловушку в введённых
+     сейчас формулах. */
+  if (typeof offQuadExplainHtml === 'function') {
+    const extra = offQuadExplainHtml();
+    if (extra) to.insertAdjacentHTML('beforeend', extra);
+  }
 }
 
 /* Правая панель показывает ровно то, что есть: ползунки, расчёты, разбор.
