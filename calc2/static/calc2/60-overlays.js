@@ -2411,8 +2411,8 @@ function expandImplicitMul(expr) {
 const CHART_MATH_WORDS = new Set(['MC','MR','TC','ATC','AVC','AFC','FC','VC','TR','TP','MP','AP',
   'MPL','MRP','Qd','Qs','Pd','Ps','Pb','Pw','Pc','Pf','CS','PS','DWL','AD','AS','SRAS','LRAS',
   'IS','LM','GDP','MSB','MSC','SW','Qm','Pm','Qc','Px','Py']);
-// Одна буква, при желании со звёздочкой, штрихом, цифрой или индексом.
-const CHART_MATH_LETTER = /^[A-Za-z](?:[*′']|[0-9]|[₀-₉]|_[A-Za-z0-9]+)?$/;
+/* Образец «одна буква с хвостом» больше не нужен: индекс и звёздочку теперь
+   отрезает chartLabelBase, и решение принимается по ОСНОВАНИЮ подписи. */
 
 
 // Видимый текст подписи SVG: всё, кроме всплывающей подсказки <title>.
@@ -2429,6 +2429,58 @@ function visibleSvgText(t) {
   walk(t);
   return out.replace(/\s+/g, ' ').trim();
 }
+/* ⚠️ ПРАВИЛО СПРАШИВАЕТ ИСХОДНУЮ ЗАПИСЬ ПОДПИСИ, А НЕ НАРИСОВАННОЕ.
+
+   Пять подписей (S в «Налогах», ATC / MC / E в естественной монополии, TC в
+   «Сложении заводов») правило не брало, и в карточке это было записано как
+   «рисуются ПОСЛЕ конца перерисовки». ЗАМЕР 24.08 ЭТОТ ДИАГНОЗ ОТВЁРГ: повтор
+   `typesetChartLabels()` прямо в браузере, уже после всей перерисовки, не
+   менял НИ ОДНОЙ подписи в трёх сценах. Значит рисуются они вовремя.
+
+   Настоящая причина: подпись с индексом разложена на tspan'ы (`mathTspans`,
+   `qtyTspans`), и её `textContent` — склейка «EATC», «TC1», «Q∗». Такой
+   склейке не отвечает ни список обозначений, ни образец одиночной буквы.
+   Исходная запись при этом лежит рядом с узлом в `data-raw` — её и спрашиваем.
+   Особого пути отрисовки не заводим: путь остаётся один, умнее стало правило. */
+function chartLabelSource(t) {
+  const raw = t.dataset ? t.dataset.raw : null;
+  return (raw != null && raw !== '') ? raw : visibleSvgText(t);
+}
+
+/* Основание подписи: индекс, степень и звёздочка отброшены.
+   «E_{ATC}» → «E», «TC_1» → «TC», «Q*» → «Q», «TC₁» → «TC».
+   Юникодные индексы отрезаются наравне с записью через подчёркивание: часть
+   сцен пишет «TC₁» готовым символом, и без этой строки подпись «Сложения
+   заводов» оставалась бы системным шрифтом. */
+function chartLabelBase(src) {
+  return String(src == null ? '' : src)
+    .replace(/[_^](\{[^}]*\}|.)/g, '')
+    .replace(/[\u2080-\u2089\u2070\u00b9\u00b2\u00b3\u2074-\u2079]/g, '')
+    .replace(/[*\u2217\u2032']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/* Каким начертанием набрать подпись: прямым (обозначение вроде MC),
+   наклонным (величина вроде Q) или никаким (это проза).
+
+   Короткая запись из одних обозначений и знаков («S + t») — тоже математика:
+   иначе имя сдвинутой кривой предложения оставалось бы системным шрифтом
+   рядом с той же буквой S, набранной курсивом. Кириллица в запись не
+   допускается вовсе: смешанная фраза («TC совокупная») режется на куски,
+   а это отдельная работа и своя карточка. */
+function chartLabelKind(src) {
+  const base = chartLabelBase(src);
+  if (!base) return null;
+  if (CHART_MATH_WORDS.has(base)) return 'upright';
+  if (/^[A-Za-z]$/.test(base)) return 'italic';
+  if (!/^[A-Za-z0-9 +\-−·()]{1,12}$/.test(base)) return null;
+  const runs = base.match(/[A-Za-z]+/g) || [];
+  if (!runs.length) return null;
+  if (!runs.every(r => CHART_MATH_WORDS.has(r) || r.length === 1)) return null;
+  return 'italic';
+}
+
 function typesetChartLabels() {
   const root = document.getElementById('chart');
   if (!root) return;
@@ -2440,18 +2492,13 @@ function typesetChartLabels() {
      набирается математикой, кто бы её ни нарисовал. Числа на осях под правило
      не попадают — оно требует букву первой. */
   root.querySelectorAll('text').forEach(t => {
-    /* ⚠️ ВИДИМАЯ ЧАСТЬ, А НЕ textContent. Внутри подписи лежит <title> —
-       всплывающая подсказка, и textContent склеивает её с самой подписью:
-       у легенды выходило «CSИзлишек покупателя (CS)», и правило не срабатывало
-       ни на что. Подсказку в расчёт не берём: её и набрать формулой нельзя. */
-    const s = visibleSvgText(t);
-    if (!s) return;
-    if (CHART_MATH_WORDS.has(s)) {
+    const kind = chartLabelKind(chartLabelSource(t));
+    if (kind === 'upright') {
       // Многобуквенное обозначение — прямое начертание, как \mathrm.
       t.style.fontFamily = "'KaTeX_Main', 'Times New Roman', serif";
       t.style.fontStyle = 'normal';
       t.dataset.mathset = 'upright';
-    } else if (CHART_MATH_LETTER.test(s)) {
+    } else if (kind === 'italic') {
       t.style.fontFamily = "'KaTeX_Math', 'Times New Roman', serif";
       t.style.fontStyle = 'italic';
       t.dataset.mathset = 'italic';
