@@ -379,3 +379,88 @@ class ControlTests(XssTestCase):
         body = response.content.decode('utf-8', 'replace')
         self.assertIn('Постройте КПВ по данным', body)
         self.assertIn('Q_1 = 10', body)
+
+
+class MarkdownRendererXssTests(XssTestCase):
+    """Те же 6 нагрузок, но через content_format='markdown'.
+
+    Источник риска здесь другой: не сырой текст под autoescape (как в
+    XssTestCase выше), а problems/rendering.render_markdown + явный `|safe`
+    на его выходе в problem_detail.html. Рендерер подключён СЕЙЧАС только
+    в этот шаблон (Фаза 2), поэтому все 4 роли проверяются на одной и той
+    же публичной странице `catalog:problem_detail` — она одинаково доступна
+    гостю и трём залогиненным ролям, других экранов, где markdown-режим
+    показывался бы, в этой сессии не появилось.
+
+    Переиспользует `assert_inert`/`login` из XssTestCase: проверка «нагрузка
+    не доехала живой, но поле на странице есть» не зависит от того, как
+    именно текст попал на страницу.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        raws = dict((p.key, p.raw) for p in PAYLOADS)
+
+        cls.tutor = User.objects.create_user('xss_md_tutor', password=PASSWORD,
+                                             role='teacher')
+        cls.student = User.objects.create_user('xss_md_pupil', password=PASSWORD,
+                                               role='student')
+        cls.staff = User.objects.create_user('xss_md_staff', password=PASSWORD,
+                                             role='teacher', is_staff=True,
+                                             is_superuser=True)
+
+        cls.problem = Problem.objects.create(
+            title='MD ' + raws['script'],
+            statement='Условие ' + raws['img_onerror'] + ' $P = 10 - Q$',
+            solution='Решение ' + raws['svg_onload'],
+            answer='Ответ ' + raws['iframe'],
+            status=Problem.Status.PUBLISHED,
+            content_format=Problem.ContentFormat.MARKDOWN,
+        )
+        ProblemPart.objects.create(
+            problem=cls.problem, label='а', order=0, answer='42',
+            statement='Подпункт ' + raws['latex_href'])
+
+    def test_guest(self):
+        response = Client().get(
+            reverse('catalog:problem_detail', args=[self.problem.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assert_inert(response, 'markdown-режим, гость')
+
+    def test_student(self):
+        client = self.login('xss_md_pupil')
+        response = client.get(
+            reverse('catalog:problem_detail', args=[self.problem.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assert_inert(response, 'markdown-режим, ученик')
+
+    def test_tutor(self):
+        client = self.login('xss_md_tutor')
+        response = client.get(
+            reverse('catalog:problem_detail', args=[self.problem.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assert_inert(response, 'markdown-режим, репетитор')
+
+    def test_staff(self):
+        client = self.login('xss_md_staff')
+        response = client.get(
+            reverse('catalog:problem_detail', args=[self.problem.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assert_inert(response, 'markdown-режим, staff')
+
+    def test_markdown_still_renders_normally_alongside_payloads(self):
+        """Контроль: рендерер не «чинит» защиту запретом всего вывода —
+        обычная разметка (жирный) рядом с нагрузкой по-прежнему работает."""
+        problem = Problem.objects.create(
+            title='MD обычная',
+            statement='**КПВ** по данным $Q_1 = 10$ <script>alert(1)</script>',
+            status=Problem.Status.PUBLISHED,
+            content_format=Problem.ContentFormat.MARKDOWN,
+        )
+        response = Client().get(
+            reverse('catalog:problem_detail', args=[problem.pk]))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode('utf-8', 'replace')
+        self.assertIn('<strong>КПВ</strong>', body)
+        self.assertIn('Q_1 = 10', body)
+        self.assertNotIn('<script>alert', body)
