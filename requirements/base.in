@@ -25,3 +25,11 @@ pdfminer.six
 pypandoc
 redis
 django-redis
+markdown-it-py            # рендерер условий задач (CORPUS-FORMAT.md §2б).
+                          # Уже была транзитивной зависимостью (через rich в
+                          # dev.txt) — здесь фиксируется прямой, потому что
+                          # боевой код теперь импортирует её напрямую.
+nh3<0.5                   # Rust-биндинг Ammonia — санитайзер allow-list для
+                          # рендерера. НЕ bleach: unmaintained с 2023.
+                          # Верхняя граница — правило docs/SECURITY.md для
+                          # новых зависимостей, которые чистят HTML.

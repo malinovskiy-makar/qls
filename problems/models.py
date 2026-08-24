@@ -251,6 +251,28 @@ class Problem(models.Model):
     status = models.CharField('Статус', max_length=20,
                               choices=Status.choices, default=Status.DRAFT)
 
+    class ContentFormat(models.TextChoices):
+        """Как читать statement/answer/solution/ProblemPart.statement.
+
+        PLAIN — как сейчас: автоэскейп Django + `linebreaksbr`, без единого
+        байта разметки. Все 31 694 легаси-задачи стоят на PLAIN и здесь и
+        останутся — рендерер их не касается.
+        MARKDOWN — узкое подмножество markdown (жирный, курсив, списки,
+        простые таблицы, переносы строк) через `problems/rendering.py`
+        (math-aware препроцессор + `nh3`). Ставится только конвертерами
+        новых источников (CORPUS-FORMAT.md §2б), вручную не проставляется.
+        """
+
+        PLAIN = 'plain', 'Обычный текст'
+        MARKDOWN = 'markdown', 'Markdown'
+
+    content_format = models.CharField(
+        'Формат текста', max_length=20,
+        choices=ContentFormat.choices, default=ContentFormat.PLAIN,
+        help_text='PLAIN — текущее поведение (не трогать). MARKDOWN — '
+                  'через math-aware рендерер, для новых источников.',
+    )
+
     owner = models.ForeignKey(settings.AUTH_USER_MODEL,
                               on_delete=models.SET_NULL, null=True, blank=True,
                               related_name='owned_problems',
