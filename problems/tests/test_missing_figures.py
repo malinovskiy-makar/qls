@@ -6,6 +6,8 @@
 молча.
 """
 
+import os
+
 from django.test import TestCase
 
 from problems.missing_figures import (
@@ -206,7 +208,14 @@ class HideCommandTests(TestCase):
     """Команда ``hide_missing_figures``: обратимость и неприкосновенность текста."""
 
     def setUp(self):
+        import tempfile
         self.source = Source.objects.create(name='Тестовый источник')
+        # ⚠️ Журнал ОБЯЗАН быть временным. Прогон с боевым путём оставлял в
+        # reports/ журнал с id тестовой базы, и следующий --revert применил
+        # бы их к настоящим задачам.
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.journal = os.path.join(self.tmp.name, 'hide_journal.json')
 
     def _make(self, statement, status=Problem.Status.PUBLISHED):
         problem = Problem.objects.create(
@@ -220,7 +229,8 @@ class HideCommandTests(TestCase):
 
         from django.core.management import call_command
         out = StringIO()
-        call_command('hide_missing_figures', *args, stdout=out)
+        call_command('hide_missing_figures', *args,
+                     journal=self.journal, stdout=out)
         return out.getvalue()
 
     def test_dry_run_changes_nothing(self):
@@ -291,3 +301,21 @@ class HideCommandTests(TestCase):
                 tags__slug=MISSING_FIGURE_TAG_SLUG
             ).values_list('id', flat=True)),
             [p.pk])
+
+    def test_journal_never_written_to_the_real_reports_dir(self):
+        """Тест не имеет права оставлять журнал с id тестовой базы.
+
+        Именно так и случилось при первом применении команды: в
+        reports/missing_figures/ появился журнал с id=1 из тестовой базы,
+        и --revert применил бы его к боевой задаче номер 1.
+        """
+        real = os.path.join('reports', 'missing_figures', 'hide_journal.json')
+        existed = os.path.exists(real)
+        before = os.path.getmtime(real) if existed else None
+        self._make('На рисунке изображена кривая спроса.')
+        self._run('--apply')
+        self.assertTrue(os.path.exists(self.journal))
+        if existed:
+            self.assertEqual(os.path.getmtime(real), before)
+        else:
+            self.assertFalse(os.path.exists(real))

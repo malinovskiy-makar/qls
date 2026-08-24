@@ -52,6 +52,11 @@ from problems.missing_figures import (
 OUT_DIR = os.path.join('reports', 'missing_figures')
 JOURNAL = os.path.join(OUT_DIR, 'hide_journal.json')
 
+# ⚠️ Путь к журналу — параметр, а не константа. Тесты обязаны писать во
+# временный файл: прогон с настоящим путём оставил бы в reports/ журнал с
+# идентификаторами ТЕСТОВОЙ базы, и следующий --revert применил бы их к
+# боевой. Поймано при первом же применении команды.
+
 
 class Command(BaseCommand):
     help = ('Прячет задачи, которые без пропавшей картинки не решаются. '
@@ -62,13 +67,16 @@ class Command(BaseCommand):
                             help='записать в базу')
         parser.add_argument('--revert', action='store_true',
                             help='вернуть статусы по журналу и снять тег')
+        parser.add_argument('--journal', default=JOURNAL,
+                            help='путь к журналу отката')
 
     def handle(self, *args, **opts):
         say = self.stdout.write
-        os.makedirs(OUT_DIR, exist_ok=True)
+        journal_path = opts['journal']
+        os.makedirs(os.path.dirname(journal_path) or '.', exist_ok=True)
 
         if opts['revert']:
-            return self._revert(say, opts['apply'])
+            return self._revert(say, opts['apply'], journal_path)
 
         found = scan_problems()
         targets = unsolvable_ids(found)
@@ -105,7 +113,7 @@ class Command(BaseCommand):
                 ignore_conflicts=True)
             Problem.objects.filter(id__in=to_hide).update(
                 status=Problem.Status.HIDDEN)
-            with open(JOURNAL, 'w', encoding='utf-8') as fh:
+            with open(journal_path, 'w', encoding='utf-8') as fh:
                 json.dump(journal, fh, ensure_ascii=False, indent=1)
 
         hidden_after = Problem.objects.filter(
@@ -117,15 +125,16 @@ class Command(BaseCommand):
             raise CommandError(
                 f'ИНВАРИАНТ НАРУШЕН: прирост скрытых '
                 f'{hidden_after - hidden_before} != {len(to_hide)}')
-        say(f'Журнал отката: {JOURNAL}')
+        say(f'Журнал отката: {journal_path}')
         say(f'Найти помеченные: '
             f'Problem.objects.filter(tags__slug="{MISSING_FIGURE_TAG_SLUG}")')
 
     # ------------------------------------------------------------------
-    def _revert(self, say, apply):
-        if not os.path.exists(JOURNAL):
-            raise CommandError(f'Журнала нет: {JOURNAL} — откатывать нечего.')
-        with open(JOURNAL, encoding='utf-8') as fh:
+    def _revert(self, say, apply, journal_path):
+        if not os.path.exists(journal_path):
+            raise CommandError(
+                f'Журнала нет: {journal_path} — откатывать нечего.')
+        with open(journal_path, encoding='utf-8') as fh:
             journal = json.load(fh)
         changed = journal['status_changed']
         say(f'ОТКАТ по журналу от {journal["stamp"]}: '
