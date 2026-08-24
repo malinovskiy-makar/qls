@@ -15,17 +15,45 @@ function recompute() {
   sumRebuild();
   STATE.D = curveByRole('demand');
   STATE.S = curveByRole('supply');
-  STATE.eq = (STATE.D && STATE.S) ? findEquilibrium(STATE.D, STATE.S) : null;
 
-  // Площади излишков (шаг 6) — численным интегрированием от 0 до Q*.
-  STATE.cs = STATE.ps = STATE.sw = null;
-  if (STATE.eq) {
-    const { Q, P } = STATE.eq;
-    /* По участкам, если кривая знает свои изломы (суммарная знает): метод
-       трапеций точен на прямой только когда излом лежит в узле сетки. */
-    STATE.cs = integrateBroken(q => evalCurve(STATE.D, q) - P, 0, Q, curveBreaks(STATE.D));   // ∫ (D - P*) dQ
-    STATE.ps = integrateBroken(q => P - evalCurve(STATE.S, q), 0, Q, curveBreaks(STATE.S));   // ∫ (P* - S) dQ
-    STATE.sw = STATE.cs + STATE.ps;
+  /* ⚠️ В СЦЕНЕ СЛОЖЕНИЯ РАВНОВЕСИЕ И ИЗЛИШКИ СЧИТАЮТСЯ РАЗ НА НАБОР ФОРМУЛ.
+
+     Суммарная кривая живёт кусочной записью, и каждое её значение проходит
+     через Math.js: замер 24.08 — 3,6 мкс на вызов, а вызовов на кадр около
+     девяти тысяч. Отсюда и жалоба «график лагает при панорамировании»: тянешь
+     мышь, и на каждое движение движок заново ищет равновесие по тысяче узлов
+     и заново берёт четыре интеграла.
+
+     Кэшировать это раньше было НЕЛЬЗЯ честно: и запись, и отрезок поиска
+     зависели от границ кадра, так что после панорамы числа действительно
+     могли поменяться. Теперь не зависят ни то, ни другое, и панорама изменить
+     их не может в принципе — значит, и считать их заново не за чем. Ключ —
+     подпись формул и отрезок поиска: сменилось что-то из этого, считаем. */
+  const memoKey = sumSceneOn() ? sumAnalyticsKey() : null;
+  const memo = (memoKey && memoKey === STATE._sumAnaKey) ? STATE._sumAnaVal : null;
+  if (memo) {
+    // Копию, а не ту же ссылку: STATE.eq дальше по коду читают и сравнивают,
+    // и отдавать наружу внутренность кэша нельзя.
+    STATE.eq = memo.eq ? { Q: memo.eq.Q, P: memo.eq.P } : null;
+    STATE.cs = memo.cs; STATE.ps = memo.ps; STATE.sw = memo.sw;
+  } else {
+    STATE.eq = (STATE.D && STATE.S) ? findEquilibrium(STATE.D, STATE.S) : null;
+
+    // Площади излишков (шаг 6) — численным интегрированием от 0 до Q*.
+    STATE.cs = STATE.ps = STATE.sw = null;
+    if (STATE.eq) {
+      const { Q, P } = STATE.eq;
+      /* По участкам, если кривая знает свои изломы (суммарная знает): метод
+         трапеций точен на прямой только когда излом лежит в узле сетки. */
+      STATE.cs = integrateBroken(q => evalCurve(STATE.D, q) - P, 0, Q, curveBreaks(STATE.D));   // ∫ (D - P*) dQ
+      STATE.ps = integrateBroken(q => P - evalCurve(STATE.S, q), 0, Q, curveBreaks(STATE.S));   // ∫ (P* - S) dQ
+      STATE.sw = STATE.cs + STATE.ps;
+    }
+    if (memoKey) {
+      STATE._sumAnaKey = memoKey;
+      STATE._sumAnaVal = { eq: STATE.eq ? { Q: STATE.eq.Q, P: STATE.eq.P } : null,
+                           cs: STATE.cs, ps: STATE.ps, sw: STATE.sw };
+    }
   }
 
   // Вмешательство государства (шаг 7 — налог, шаг 8 — субсидия).
@@ -979,6 +1007,19 @@ function interventionKeyValues() {
 }
 
 // Табло слева: показываем Q* и P* (или подсказку / «не найдено»).
+/* Сколько раз кривые пересекаются в области модели.
+   В сцене сложения ответ дорогой (кусочная запись через Math.js) и при этом
+   от кадра не зависит — держим его в кэше рядом с остальной аналитикой.
+   В обычных сценах кривые прямые, и считать заново нечего. */
+function countCrossings(D, S) {
+  const span = eqSearchSpan(D, S);
+  const key = sumSceneOn() ? (STATE._sumSig + '|' + span) : null;
+  if (key && key === STATE._sumCrossKey) return STATE._sumCrossVal;
+  const n = crossingCount(q => evalCurve(D, q) - evalCurve(S, q), 0, span);
+  if (key) { STATE._sumCrossKey = key; STATE._sumCrossVal = n; }
+  return n;
+}
+
 function updateInfoPanel() {
   updateEqSectionTitle();
   const box = document.getElementById('info-eq');
@@ -1025,7 +1066,13 @@ function updateInfoPanel() {
   /* Б31. Кривые могут пересечься не один раз, и тогда равновесие не одно.
      Молчать об этом нельзя: все дальнейшие числа считаются вокруг ОДНОГО
      из них, и человек вправе знать, вокруг какого. */
-  const n = crossingCount(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), 0, CONFIG.Qmax);
+  /* ⚠️ СКОЛЬКО РАЗ КРИВЫЕ ПЕРЕСЕКАЮТСЯ — ТОЖЕ СВОЙСТВО МОДЕЛИ, А НЕ КАДРА.
+     Здесь стоял `CONFIG.Qmax`, и подсказка «равновесий несколько» появлялась
+     и исчезала от колеса мыши: отдалились — второе пересечение вошло в кадр,
+     приблизились — пропало. Считаем по той же области, по которой ищем само
+     равновесие. Заодно это снимает восемьсот вычислений кусочной записи с
+     каждого кадра панорамирования. */
+  const n = countCrossings(STATE.D, STATE.S);
   if (n > 1) html += `<div class="hint">Кривые пересекаются ${n} раза, то есть равновесий несколько. ` +
     `Взято ближайшее к началу координат: ${'$Q^* = ' + fmt(STATE.eq.Q) + '$'}. Излишки и потери посчитаны вокруг него.</div>`;
   box.innerHTML = html;
@@ -1087,6 +1134,26 @@ function sumChokePrice(c) {
    ту кусочную запись, которую движок и поле уже умеют (Фаза 3).
 
    Возвращает строку Math.js или null, если хоть одна группа не прямая. */
+/* ⚠️ ВЕРХНЯЯ ГРАНИЦА ЗАПИСИ — СВОЙСТВО ГРУПП, А НЕ КАДРА.
+
+   Здесь стоял `CONFIG.Pmax`, то есть верх ВИДИМОГО окна. Из-за этого границы
+   участков в «Объяснении модели» ехали вместе с масштабом: один и тот же
+   набор групп давал «Q <= 180» на стартовом окне и «Q <= 300» после
+   отдаления — три разные записи одной и той же кривой. А поскольку по этой
+   записи кривая и считается (одно значение — один источник), вместе с ней
+   ехала и вся арифметика излишков.
+
+   Берём самую высокую запретительную цену групп с двойным запасом: выше неё
+   торгует всё тот же набор групп, участок там один и тянется сколь угодно
+   далеко, поэтому конкретное значение верха на числа уже не влияет — важно
+   лишь, чтобы оно было ОДНО И ТО ЖЕ при любом масштабе. Сотня — пол для
+   вырожденного случая, когда все запретительные цены нулевые. */
+function sumPriceTop(ls) {
+  let top = 0;
+  ls.forEach(l => { if (isFinite(l.b) && l.b > top) top = l.b; });
+  return Math.max(100, top * 2);
+}
+
 function sumLinearRecord(groups) {
   if (!groups.length) return null;
   const ls = [];
@@ -1095,9 +1162,10 @@ function sumLinearRecord(groups) {
     if (!l || !isFinite(l.a) || !isFinite(l.b) || l.a === 0) return null;
     ls.push(l);
   }
-  const Pmax = CONFIG.Pmax;
+  const Pmax = sumPriceTop(ls);
   const round = (v) => Math.round(v * 1e9) / 1e9;
-  // Границы участков по цене: края окна плюс все запретительные цены внутри него.
+  // Границы участков по цене: концы собственного диапазона модели плюс все
+  // запретительные цены внутри него.
   const marks = [0, Pmax];
   ls.forEach(l => { if (l.b > 0 && l.b < Pmax) marks.push(l.b); });
   const ps = Array.from(new Set(marks.map(round))).sort((a, b) => a - b);
@@ -1119,6 +1187,27 @@ function sumLinearRecord(groups) {
   }
   if (!segs.length) return null;
   segs.sort((x, y) => x.lo - y.lo);
+
+  /* ⚠️ ЗАПИСЬ ОБЯЗАНА БЫТЬ СПЛОШНОЙ ОТ Q = 0.
+
+   Запись начиналась там, где первая группа выходит на рынок. У предложения
+   Q − 100 это Q = 100: сама группа при нулевой цене уже готова отдать сто
+   штук, но участка «от нуля до ста» в записи не было вовсе, и на нём функция
+   давала NaN. Дальше этот NaN уходил в интеграл излишка продавца — и вместо
+   числа на табло стояло «PS = NaN», а рядом краснело предупреждение о
+   расхождении.
+
+   Считаем количество при НУЛЕВОЙ цене: если оно положительно, значит на
+   отрезке от нуля до него товар предлагают уже даром, и обратная функция там
+   равна нулю (цена не бывает отрицательной — решение «правило первой
+   четверти»). Этот кусок и дописываем в начало. */
+  let qAtZero = 0;
+  ls.forEach(l => { const q = -l.b / l.a; if (q > 0) qAtZero += q; });
+  qAtZero = round(qAtZero);
+  if (qAtZero > 1e-9 && Math.abs(segs[0].lo - qAtZero) < 1e-6) {
+    segs.unshift({ lo: 0, hi: qAtZero, A: 0, C: 0, body: '0' });
+  }
+
   // Точки излома по количеству — границы участков, кроме самого начала.
   const breaks = segs.map(x => x.lo).filter(x => x > 1e-9);
   /* Собираем цепочку условий тем же способом, что и конструктор кусочной:
@@ -1129,7 +1218,7 @@ function sumLinearRecord(groups) {
     const s = segs[i];
     const last = (i === segs.length - 1);
     const cond = '(Q >= ' + s.lo + ' and Q ' + (last ? '<= ' : '< ') + s.hi + ')';
-    const body = sumSegExpr(s.A, s.C);
+    const body = (s.body != null) ? s.body : sumSegExpr(s.A, s.C);
     if (out === null) { out = cond + ' ? ' + body + ' : NaN'; continue; }
     out = cond + ' ? ' + body + ' : (' + out + ')';
   }
@@ -1184,7 +1273,11 @@ function sumSegExpr(A, C) {
    Идём по ценам, при каждой складываем количества торгующих групп и получаем
    ломаную в осях (Q, P); значение между узлами берём линейно. */
 function sumPolyline(groups) {
-  const Pmax = CONFIG.Pmax, N = 400;
+  // Верх диапазона — как и у аналитической записи, свойство групп, а не кадра
+  // (см. sumPriceTop): иначе ломаная перестраивалась бы при каждом зуме.
+  let top = 0;
+  groups.forEach(c => { const p = sumChokePrice(c); if (isFinite(p) && p > top) top = p; });
+  const Pmax = Math.max(100, top * 2), N = 400;
   const prices = [];
   for (let i = 0; i <= N; i++) prices.push(Pmax * i / N);
   groups.forEach(c => { const p = sumChokePrice(c); if (p > 0 && p < Pmax) prices.push(p); });
@@ -1196,6 +1289,10 @@ function sumPolyline(groups) {
     if (n) pts.push([q, P]);
   });
   pts.sort((a, b) => a[0] - b[0]);
+  /* Та же дырка у нуля, что и в аналитической записи: при нулевой цене товар
+     уже предлагают, и слева от этого количества ломаной не было вовсе.
+     Дотягиваем её до Q = 0 по нулевой цене. */
+  if (pts.length && pts[0][0] > 1e-9 && Math.abs(pts[0][1]) < 1e-9) pts.unshift([0, 0]);
   return pts;
 }
 
@@ -1220,9 +1317,12 @@ function sumRebuildSide(side) {
     cur.fn = (q) => interpY(pts, q);
     cur.sumNumeric = true;
     // Излом суммарной кривой — там, где очередная группа входит в торговлю.
+    let chokeTop = 0;
+    groups.forEach(c => { const p = sumChokePrice(c); if (isFinite(p) && p > chokeTop) chokeTop = p; });
+    const pTop = Math.max(100, chokeTop * 2);   // тот же собственный диапазон, что у ломаной
     cur.sumBreaks = groups.map(c => {
       const p = sumChokePrice(c);
-      if (!isFinite(p) || p <= 0 || p >= CONFIG.Pmax) return null;
+      if (!isFinite(p) || p <= 0 || p >= pTop) return null;
       let q = 0;
       groups.forEach(g => { q += sumGroupQty(g, p); });
       return q > 1e-9 ? q : null;
@@ -1230,11 +1330,46 @@ function sumRebuildSide(side) {
   }
 }
 
-// Пересчёт обеих сумм. Зовётся из recompute — то есть на каждой перерисовке.
+/* Подпись входа пересборки: всё, от чего запись суммарных кривых зависит, и
+   больше ничего. Формулы групп, сколько их, и значения ползунков-параметров
+   (буква в формуле группы меняет её наклон, а значит и сумму). */
+function sumSignature() {
+  const parts = [];
+  ['D', 'S'].forEach(side => {
+    const g = sumGroupsOf(side);
+    parts.push(side + ':' + g.length + ':' + g.map(c => String(c.expr || '')).join('~'));
+  });
+  parts.push(paramSignature(Object.keys(STATE.params || {}).sort()));
+  return parts.join('|');
+}
+
+/* Пересчёт обеих сумм. Зовётся из recompute — то есть на каждой перерисовке.
+
+   ⚠️ ПЕРЕСОБИРАЕМ ТОЛЬКО КОГДА ЕСТЬ ЧТО ПЕРЕСОБИРАТЬ.
+
+   Панорама зовёт redrawAll на каждый кадр мыши, оттуда recompute, оттуда
+   сюда — и sumRebuildSide заново собирал строку записи и заново компилировал
+   её через Math.js, дважды на кадр. Кэшировать это раньше было нельзя честно:
+   запись зависела от CONFIG.Pmax, то есть от границ кадра, и после панорамы
+   действительно менялась. Теперь запись — свойство групп (см. sumPriceTop),
+   и от движения окна не зависит вовсе, поэтому подписи достаточно. */
 function sumRebuild() {
-  if (!sumSceneOn()) return;
+  if (!sumSceneOn()) { STATE._sumSig = null; return; }
+  const sig = sumSignature();
+  if (sig === STATE._sumSig) return;
+  STATE._sumSig = sig;
   sumRebuildSide('D');
   sumRebuildSide('S');
+}
+
+/* Ключ кэша аналитики: подпись формул плюс отрезок поиска равновесия.
+   Отрезок входит в ключ, потому что от него зависит ответ: сузили область —
+   могло пропасть дальнее пересечение. При панорамировании он постоянен
+   (см. eqSearchSpan), поэтому кэш там и живёт. */
+function sumAnalyticsKey() {
+  const D = curveByRole('demand'), S = curveByRole('supply');
+  if (!D || !S || !STATE._sumSig) return null;
+  return STATE._sumSig + '|' + eqSearchSpan(D, S);
 }
 
 
@@ -1294,6 +1429,10 @@ function sumBuildScene() {
     setRole(sum, (side === 'D') ? 'demand' : 'supply');
   });
   sumReorder();
+  /* Сцену собрали заново — суммарные кривые сейчас ПУСТЫЕ, и подпись от
+     прошлой сборки совпала бы с новой (набор групп по умолчанию тот же).
+     Сбрасываем её явно, иначе кэш вернул бы «пересобирать нечего». */
+  STATE._sumSig = null;
   sumRebuild();
   renderCurveList();
 }
@@ -1334,6 +1473,12 @@ function syncSumUi() {
    это и есть проверка того, что сложение сделано верно, а не «примерно». */
 function sumGroupStats() {
   if (!sumSceneOn() || !STATE.eq) return null;
+  /* Табло по группам — та же арифметика по тем же формулам при той же
+     равновесной цене, и от кадра оно не зависит. Раз в кадр это пять
+     интегралов по тысяче узлов плюс две сверки по кусочной записи (замер
+     24.08: 8,6 мс). Считаем на смену формул и цены, а не на движение мыши. */
+  const key = STATE._sumSig + '|' + STATE.eq.Q + '|' + STATE.eq.P;
+  if (key === STATE._sumStatsKey) return STATE._sumStatsVal;
   const P = STATE.eq.P;
   const side = (which) => sumGroupsOf(which).map(c => {
     const q = sumGroupQty(c, P);
@@ -1352,7 +1497,7 @@ function sumGroupStats() {
     ? integrateBroken(q => evalCurve(STATE.D, q) - P, 0, STATE.eq.Q, curveBreaks(STATE.D)) : NaN;
   const psWhole = (STATE.S && STATE.eq.Q > 0)
     ? integrateBroken(q => P - evalCurve(STATE.S, q), 0, STATE.eq.Q, curveBreaks(STATE.S)) : NaN;
-  return {
+  const out = {
     P, Q: STATE.eq.Q, D, S,
     qD: sum(D, 'q'), qS: sum(S, 'q'),
     csGroups: sum(D, 'surplus'), psGroups: sum(S, 'surplus'),
@@ -1360,6 +1505,8 @@ function sumGroupStats() {
     csGap: Math.abs(sum(D, 'surplus') - csWhole),
     psGap: Math.abs(sum(S, 'surplus') - psWhole),
   };
+  STATE._sumStatsKey = key; STATE._sumStatsVal = out;
+  return out;
 }
 
 

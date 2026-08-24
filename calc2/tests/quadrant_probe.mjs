@@ -286,20 +286,37 @@ if (need('Г') || need('G')) {
   flag('пунктир к точке пересечения нарисован', g.dashed > 0, String(g.dashed));
 }
 
-/* ── СКОРОСТЬ. 60 шагов панорамы в наборе Б ─────────────────────────── */
+/* ── СКОРОСТЬ. 60 шагов панорамы ────────────────────────────────────
+   ⚠️ МЕРИМ ТРИ СЛУЧАЯ, А НЕ ОДИН.
+   Сравнивать «до» и «после» на наборе Б в стартовом окне НЕЧЕСТНО: до починки
+   равновесие там не находилось вовсе, а без равновесия движок пропускал и
+   интегралы излишков, и табло по группам. Дешёвый кадр получался оттого, что
+   калькулятор не считал ничего. Поэтому рядом стоят два случая, где обе
+   версии делают ОДНУ И ТУ ЖЕ работу: набор Б после отдаления и набор А. */
 if (need('СКОРОСТЬ') || need('S')) {
-  console.log('\n=== СКОРОСТЬ: 60 шагов панорамы в наборе Б ===');
-  const sp = await run(`
-    quadSetupSum(['100-Q', '60-Q', '40-Q'], ['Q-100', 'Q+20']);
-    // Прогрев: первая перерисовка всегда дороже (компиляция, кэш шрифтов).
-    for (var w = 0; w < 5; w++) panByPixels(-3, 0);
-    var t0 = performance.now();
-    for (var i = 0; i < 60; i++) panByPixels((i % 2 ? -6 : 6), 0);
-    var t1 = performance.now();
-    return { total: t1 - t0, per: (t1 - t0) / 60 };
-  `);
-  show('среднее время кадра, мс', sp.per, null);
-  console.log('     всего на 60 кадров: ' + num(sp.total) + ' мс');
+  console.log('\n=== СКОРОСТЬ: 60 шагов панорамы ===');
+  const speed = async (label, setup) => {
+    const sp = await run(`
+      ${setup}
+      // Прогрев: первая перерисовка всегда дороже (компиляция, кэш шрифтов).
+      for (var w = 0; w < 5; w++) panByPixels(-3, 0);
+      var reb = 0;
+      var _rb = window.sumRebuildSide;
+      window.sumRebuildSide = function (s) { reb++; return _rb(s); };
+      var t0 = performance.now();
+      for (var i = 0; i < 60; i++) panByPixels((i % 2 ? -6 : 6), 0);
+      var t1 = performance.now();
+      window.sumRebuildSide = _rb;
+      return { per: (t1 - t0) / 60, total: t1 - t0, reb: reb, eq: !!STATE.eq };
+    `);
+    console.log(`     ${label}: ${num(sp.per)} мс/кадр (всего ${num(sp.total)} мс), ` +
+      `пересборок суммы за 60 кадров ${sp.reb}, равновесие ${sp.eq ? 'найдено' : 'НЕ найдено'}`);
+    return sp;
+  };
+  await speed('Б, стартовое окно', `quadSetupSum(['100-Q','60-Q','40-Q'], ['Q-100','Q+20']);`);
+  await speed('Б, после отдаления', `quadSetupSum(['100-Q','60-Q','40-Q'], ['Q-100','Q+20']);
+                                     zoomStep(1.6); zoomStep(1.6); zoomStep(1.6);`);
+  await speed('А, стартовое окно  ', `quadSetupSum(['100-Q','60-Q'], ['Q','Q+20']);`);
 }
 
 if (errs.length) { console.log('\nОШИБКИ СТРАНИЦЫ: ' + errs.slice(0, 6).join(' | ')); bad++; }
