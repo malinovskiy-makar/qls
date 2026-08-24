@@ -45,8 +45,8 @@ function recompute() {
       const { Q, P } = STATE.eq;
       /* По участкам, если кривая знает свои изломы (суммарная знает): метод
          трапеций точен на прямой только когда излом лежит в узле сетки. */
-      STATE.cs = integrateBroken(q => evalCurve(STATE.D, q) - P, 0, Q, curveBreaks(STATE.D));   // ∫ (D - P*) dQ
-      STATE.ps = integrateBroken(q => P - evalCurve(STATE.S, q), 0, Q, curveBreaks(STATE.S));   // ∫ (P* - S) dQ
+      STATE.cs = integrateBroken(q => quadPrice(STATE.D, q) - P, 0, Q, quadBreaks(STATE.D, Q));   // ∫ (D - P*) dQ
+      STATE.ps = integrateBroken(q => P - quadPrice(STATE.S, q), 0, Q, quadBreaks(STATE.S, Q));   // ∫ (P* - S) dQ
       STATE.sw = STATE.cs + STATE.ps;
     }
     if (memoKey) {
@@ -109,8 +109,8 @@ function recompute() {
       // Для потоварного это в точности ставка·Q1, для адвалорного — τ·Ps·Q1 (налог).
       STATE.tx = Math.abs(Pb - Ps) * Q1;
       STATE.budget = (STATE.intervType === 'subsidy' ? -1 : 1) * STATE.tx;  // +сбор / -расход
-      STATE.csTax = integrate(q => evalCurve(STATE.D, q) - Pb, 0, Q1);
-      STATE.psTax = integrate(q => Ps - evalCurve(STATE.S, q), 0, Q1);
+      STATE.csTax = integrate(q => quadPrice(STATE.D, q) - Pb, 0, Q1);
+      STATE.psTax = integrate(q => Ps - quadPrice(STATE.S, q), 0, Q1);
       // DWL — площадь между D и S на интервале между старым и новым Q (всегда > 0).
       STATE.dwl = areaBetween(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi);
       if (STATE.intervType === 'subsidy') {
@@ -145,8 +145,8 @@ function recompute() {
     STATE.pc = { Preg, isCeiling, binding, Qd, Qs, Qtrade, gap };
     if (binding && Qtrade != null) {
       // CS / PS считаем интегрированием по фактическому объёму торговли.
-      STATE.pc.cs = integrate(q => evalCurve(STATE.D, q) - Preg, 0, Qtrade);
-      STATE.pc.ps = integrate(q => Preg - evalCurve(STATE.S, q), 0, Qtrade);
+      STATE.pc.cs = integrate(q => quadPrice(STATE.D, q) - Preg, 0, Qtrade);
+      STATE.pc.ps = integrate(q => Preg - quadPrice(STATE.S, q), 0, Qtrade);
       STATE.pc.sw = STATE.pc.cs + STATE.pc.ps;
       // DWL — площадь между D и S от Q_trade до Q* (недо-/перепроизводство).
       const lo = Math.min(Qtrade, STATE.eq.Q), hi = Math.max(Qtrade, STATE.eq.Q);
@@ -179,8 +179,8 @@ function recompute() {
       STATE.qt.P = P;
       STATE.qt.pos = pos;
       STATE.qt.width = Phi - Plo;
-      STATE.qt.cs = integrate(q => evalCurve(STATE.D, q) - P, 0, Qq);
-      STATE.qt.ps = integrate(q => P - evalCurve(STATE.S, q), 0, Qq);
+      STATE.qt.cs = integrate(q => quadPrice(STATE.D, q) - P, 0, Qq);
+      STATE.qt.ps = integrate(q => P - quadPrice(STATE.S, q), 0, Qq);
       STATE.qt.sw = STATE.qt.cs + STATE.qt.ps;
       // Потери — площадь между D и S от квоты до равновесного объёма.
       // Цена в это выражение не входит: трапеция от положения ползунка не зависит.
@@ -1245,6 +1245,22 @@ function integrateBroken(f, a, b, breaks) {
 // Точки излома кривой, если она их знает (суммарная — знает). Иначе пусто.
 function curveBreaks(c) { return (c && c.sumBreaks) ? c.sumBreaks : []; }
 
+/* ⚠️ ОБРЕЗКА НУЛЁМ САМА СОЗДАЁТ ИЗЛОМ, И ИНТЕГРАТОР ОБЯЗАН О НЁМ ЗНАТЬ.
+
+   quadPrice читает отрицательную цену как ноль, поэтому у предложения Q − 100
+   при Q = 100 появляется угол: слева площадь считается от нуля, справа — от
+   прямой. Метод трапеций точен на прямой только тогда, когда излом попал в
+   УЗЕЛ сетки. Замер 24.08: излишек первой группы выходил 2 687,9981 вместо
+   2 688 — шаг 124/1000 = 0,124, узла ровно в сотне нет. Две тысячных это не
+   округление, а промах метода, и сторож сходимости с допуском 1e-6 ловит его
+   сразу. Добавляем ноль кривой к её собственным изломам. */
+function quadBreaks(c, hi) {
+  const out = curveBreaks(c).slice();
+  const zero = curveZeroQ(c, Math.max(hi, 1));
+  if (zero > 1e-9 && zero < hi - 1e-9) out.push(zero);
+  return out;
+}
+
 /* ⚠️ УЧАСТОК СУММАРНОЙ КРИВОЙ ПИШЕТСЯ ДРОБЬЮ, ЕСЛИ НАКЛОН НЕ ДЕЛИТСЯ НАЦЕЛО.
    Суммарное количество на участке линейно по цене: Q = A·P + C. Обратно
    P = (Q − C) / A. У двух одинаковых групп A = −2, и раскрытая запись
@@ -1484,8 +1500,8 @@ function sumGroupStats() {
     const q = sumGroupQty(c, P);
     // Излишек группы — площадь между её кривой и равновесной ценой до q.
     const surplus = (q > 0)
-      ? (which === 'D' ? integrate(t => evalCurve(c, t) - P, 0, q)
-                       : integrate(t => P - evalCurve(c, t), 0, q))
+      ? (which === 'D' ? integrateBroken(t => quadPrice(c, t) - P, 0, q, quadBreaks(c, q))
+                       : integrateBroken(t => P - quadPrice(c, t), 0, q, quadBreaks(c, q)))
       : 0;
     return { name: curveShortName(c), color: c.color, expr: c.expr, q, surplus };
   });
@@ -1494,9 +1510,9 @@ function sumGroupStats() {
   /* Второй путь к тому же числу: интеграл под СУММАРНОЙ кривой. Расхождение
      означает ошибку в сложении, а не в округлении, поэтому оно и печатается. */
   const csWhole = (STATE.D && STATE.eq.Q > 0)
-    ? integrateBroken(q => evalCurve(STATE.D, q) - P, 0, STATE.eq.Q, curveBreaks(STATE.D)) : NaN;
+    ? integrateBroken(q => quadPrice(STATE.D, q) - P, 0, STATE.eq.Q, quadBreaks(STATE.D, STATE.eq.Q)) : NaN;
   const psWhole = (STATE.S && STATE.eq.Q > 0)
-    ? integrateBroken(q => P - evalCurve(STATE.S, q), 0, STATE.eq.Q, curveBreaks(STATE.S)) : NaN;
+    ? integrateBroken(q => P - quadPrice(STATE.S, q), 0, STATE.eq.Q, quadBreaks(STATE.S, STATE.eq.Q)) : NaN;
   const out = {
     P, Q: STATE.eq.Q, D, S,
     qD: sum(D, 'q'), qS: sum(S, 'q'),
@@ -1580,12 +1596,12 @@ function drawAreas() {
 
   // CS — между ценой P* (низ) и кривой спроса (верх).
   if (STATE.showCS && STATE.D) {
-    const csArea = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(STATE.D, d)));
+    const csArea = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(quadPrice(STATE.D, d)));
     g.append('path').datum(samples).attr('d', csArea).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
   }
   // PS — между кривой предложения (низ) и ценой P* (верх).
   if (STATE.showPS && STATE.S) {
-    const psArea = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(P));
+    const psArea = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(P));
     g.append('path').datum(samples).attr('d', psArea).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
   }
 }
@@ -1666,11 +1682,11 @@ function drawTaxAreas() {
   const s1 = samp(0, Q);
 
   if (STATE.showCS) {   // CS: между ценой покупателя Pb и спросом
-    const a = d3.area().x(d => sx(d)).y0(sy(Pb)).y1(d => sy(evalCurve(STATE.D, d)));
+    const a = d3.area().x(d => sx(d)).y0(sy(Pb)).y1(d => sy(quadPrice(STATE.D, d)));
     g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
   }
   if (STATE.showPS) {   // PS: между предложением и ценой продавца Ps
-    const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(Ps));
+    const a = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(Ps));
     g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
   }
   // Деньги бюджета (сбор налога / расход на субсидию) — прямоугольник между Pb и Ps
@@ -2379,11 +2395,11 @@ function drawPcAreas() {
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
   const s1 = samp(0, Qtrade);
   if (STATE.showCS) {   // CS — между ценой Preg (низ) и спросом (верх)
-    const a = d3.area().x(d => sx(d)).y0(sy(Preg)).y1(d => sy(evalCurve(STATE.D, d)));
+    const a = d3.area().x(d => sx(d)).y0(sy(Preg)).y1(d => sy(quadPrice(STATE.D, d)));
     g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
   }
   if (STATE.showPS) {   // PS — между предложением (низ) и ценой Preg (верх)
-    const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(Preg));
+    const a = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(Preg));
     g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
   }
   // DWL — площадь между D и S от Q_trade до Q* (потери от нерасчищенного рынка).
