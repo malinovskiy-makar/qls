@@ -520,19 +520,26 @@ if (need('Ш') || need('SH')) {
         rowH: row ? row.getBoundingClientRect().height : null,
         innerTag: inner ? inner.className : '(не нашли)',
         contentBoxR: content ? content.getBoundingClientRect().right : null,
+        narrow: (typeof isNarrowCases === 'function') ? isNarrowCases(host.value || '') : null,
         mf: !!i._mf, value: i.value,
       };
     `);
     console.log(`   ${n} куска:`);
     console.log(`     поле ${num(m.fieldW)}×${num(m.fieldH)} px, было по высоте ${num(w.base.h)} px`);
     console.log(`     содержимое ${num(m.contentW)} px, правый край содержимого ${num(m.contentR)} против края видимой области ${num(m.contentBoxR)}`);
-    console.log(`     scrollWidth ${num(m.scrollW)} / clientWidth ${num(m.clientW)}  (MathLive: ${m.mf}, кегль ${m.fontSize})`);
+    console.log(`     scrollWidth ${num(m.scrollW)} / clientWidth ${num(m.clientW)}  (MathLive: ${m.mf}, кегль ${m.fontSize}, узкий вид ${m.narrow})`);
     console.log(`     слот ${num(m.slotW)} px, overflow-x «${m.slotOverflow}», высота строки ${num(m.rowH)} px`);
     flag(`${n} куска: горизонтальной прокрутки нет`, m.scrollW <= m.clientW + 1, `${m.scrollW} > ${m.clientW}`);
     flag(`${n} куска: содержимое не вылезает вправо`,
       m.contentR == null || m.contentBoxR == null || m.contentR <= m.contentBoxR + 1,
       num(m.contentR) + ' > ' + num(m.contentBoxR));
     flag(`${n} куска: поле выросло в высоту`, m.fieldH > w.base.h + 4, `${num(m.fieldH)} vs ${num(w.base.h)}`);
+    /* ⚠️ НА ОБЫЧНОЙ ШИРИНЕ ЗАПИСЬ ОСТАЁТСЯ ЧИТАЕМОЙ — ПО СТРОКЕ НА КУСОК.
+       Узкий вид (условие отдельной строкой) заведён для панели в двести
+       пикселей, и на полной ширине он был бы шагом назад. Без этой проверки
+       случай не краснеет, когда отнимают ширину строки или подбор кегля:
+       узкий вид спасает запись от обрезки и прячет обе поломки. */
+    flag(`${n} куска: запись в обычном виде, не в узком`, m.narrow === false, String(m.narrow));
     // Каретка стрелками от начала записи до конца и обратно.
     const walk = await run(`
       var i = document.getElementById('curve-expr-1');
@@ -620,6 +627,7 @@ if (need('Ш') || need('SH')) {
                at20: evalCurve(c, 20), at60: evalCurve(c, 60) };
     `);
     console.log(`     узкий вид: ${rt.narrow}; разбор обратно: ${rt.back}`);
+    flag('380 px: запись перешла в узкий вид', rt.narrow === true, String(rt.narrow));
     flag('380 px: узкая запись разбирается в ту же цепочку', rt.same, rt.back + '  vs  ' + rt.field);
     show('380 px: D(20) после узкой записи', rt.at20, 80, 0.001);
     show('380 px: D(60) после узкой записи', rt.at60, 50, 0.001);

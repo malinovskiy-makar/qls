@@ -4462,6 +4462,262 @@ const CASES = [
              ['DWL', 'dwl', 0, 1e-6],
              ['кривая D не переименована', 'keepD', 1, 0], ['кривая S не переименована', 'keepS', 1, 0]],
   },
+
+  /* =====================================================================
+     СЕССИЯ «ЯДРО И КОНСТРУКТОР» (25.08). Кадр больше не участвует в
+     математике, строки конструктора кусочной принадлежат полю, а запись
+     помещается по ширине. Числа сняты прибором `calc2/tests/input_probe.mjs`
+     (наборы К, П, Ш, В, Ф, З) и проверены на зубастость: каждый дефект
+     временно возвращали, и случай краснел.
+     ⚠️ Все случаи ниже меряют одно и то же ТРИЖДЫ — на стартовом окне, на
+     суженном до 30 и на расширенном до 400. Одного замера мало: ровно в этом
+     и был дефект — числа сходились на привычном масштабе и разъезжались на
+     любом другом.
+     ===================================================================== */
+  {
+    /* (кадр-а) Выпуск и цена монополии не зависят от того, куда смотрит
+       человек. На окне до Q = 30 findRoot искал MR = MC только до края кадра,
+       корень 40 лежал за ним, и всё табло монополии гасло целиком. */
+    name: '(кадр-а) Монополия D 100−Q, MC 20: Qm 40, Pm 60, Qc 80 на трёх масштабах',
+    run: `resetSceneMemory(); pickScene('mono');
+          var prep = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            var mc = STATE.curves.filter(function (c) { return c.role === 'mc'; })[0];
+            if (d) updateCurveExpr(d, '100 - Q');
+            if (mc) updateCurveExpr(mc, '20');
+          };
+          var snap = function () { var m = STATE.mono || {}; return [m.Qm, m.Pm, m.Qc]; };
+          prep(); redrawAll(); var a = snap();
+          setRanges(30, 30); prep(); redrawAll(); var b = snap();
+          setRanges(400, 400); prep(); redrawAll(); var c = snap();
+          var same = function (i) {
+            return (a[i] != null && b[i] != null && c[i] != null
+                    && Math.abs(a[i] - b[i]) < 1e-9 && Math.abs(b[i] - c[i]) < 1e-9) ? 1 : 0;
+          };
+          return { Qm: b[0], Pm: b[1], Qc: b[2], sQ: same(0), sP: same(1), sC: same(2) };`,
+    checks: [['Qm на суженном окне', 'Qm', 40, 0.01], ['Pm на суженном окне', 'Pm', 60, 0.01],
+             ['Qc на суженном окне', 'Qc', 80, 0.01],
+             ['Qm одинаков на трёх масштабах (флаг)', 'sQ', 1, 0],
+             ['Pm одинакова на трёх масштабах (флаг)', 'sP', 1, 0],
+             ['Qc одинаков на трёх масштабах (флаг)', 'sC', 1, 0]],
+  },
+  {
+    /* (кадр-б) Излом предложения лежит за краем суженного окна. Пробная сетка
+       определителя линейности его не видела, кривая запоминалась прямой P = Q,
+       и evalCurve шёл быстрым путём по неверным коэффициентам НА ВСЁМ
+       отрезке: равновесие выходило 50 вместо 46,67, а S(60) — 60 вместо 80. */
+    name: '(кадр-б) Излом S за краем окна: Q* 46,67 и S(60) 80 на трёх масштабах',
+    run: `resetSceneMemory(); pickScene('sd');
+          var prep = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            var s = STATE.curves.filter(function (c) { return c.role === 'supply'; })[0];
+            if (d) updateCurveExpr(d, '100 - Q');
+            if (s) updateCurveExpr(s, '(Q < 40) ? Q : 2*Q - 40');
+          };
+          var snap = function () {
+            var s = STATE.curves.filter(function (c) { return c.role === 'supply'; })[0];
+            return [STATE.eq ? STATE.eq.Q : null, evalCurve(s, 60), s.linear ? 1 : 0];
+          };
+          prep(); redrawAll(); var a = snap();
+          setRanges(30, 30); prep(); redrawAll(); var b = snap();
+          setRanges(400, 400); prep(); redrawAll(); var c = snap();
+          return { Q: b[0], s60: b[1], fast: a[2] + b[2] + c[2],
+                   same: (Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(b[0] - c[0]) < 1e-9) ? 1 : 0 };`,
+    checks: [['Q* на суженном окне', 'Q', 46.666667, 1e-4],
+             ['S(60) на суженном окне', 's60', 80, 1e-6],
+             ['ни на одном масштабе S не запомнена прямой', 'fast', 0, 0],
+             ['Q* одинаков на трёх масштабах (флаг)', 'same', 1, 0]],
+  },
+  {
+    /* (кадр-в) Спрос задан как Q(P) с изломом на цене 60. Определитель
+       линейности по цене брал ТРИ пробы — 0,2 / 0,5 / 0,8 от края кадра, — и
+       на расширенном окне все три ложились выше излома: кривая запоминалась
+       прямой Q = 80 − 1,5·P, и равновесие уезжало с 50 на 32. */
+    name: '(кадр-в) Q(P) с изломом: Q* 50 на трёх масштабах, прямой нигде не запомнена',
+    run: `resetSceneMemory(); pickScene('sd');
+          var prep = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            var s = STATE.curves.filter(function (c) { return c.role === 'supply'; })[0];
+            if (d) updateCurveExpr(d, '(P < 60) ? 100 - P : 80 - 1.5*P');
+            if (s) updateCurveExpr(s, 'Q');
+          };
+          var snap = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            return [STATE.eq ? STATE.eq.Q : null, d.srcLinear ? 1 : 0];
+          };
+          prep(); redrawAll(); var a = snap();
+          setRanges(30, 30); prep(); redrawAll(); var b = snap();
+          setRanges(400, 400); prep(); redrawAll(); var c = snap();
+          return { Q: c[0], fast: a[1] + b[1] + c[1],
+                   same: (Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(b[0] - c[0]) < 1e-9) ? 1 : 0 };`,
+    checks: [['Q* на расширенном окне', 'Q', 50, 1e-4],
+             ['ни на одном масштабе D не запомнена прямой', 'fast', 0, 0],
+             ['Q* одинаков на трёх масштабах (флаг)', 'same', 1, 0]],
+  },
+  {
+    /* (кадр-г) Нелинейное предложение Q = 0,01·P² при спросе 300 − Q.
+       Равновесная цена 130,28; обращение Q(P) сканировало цены только до
+       Pmax·3, и на окне до тридцати верх сетки был 90 — равновесия у сцены
+       не было вовсе. */
+    name: '(кадр-г) Нелинейное Q(P): Q* 169,72 и P* 130,28 на трёх масштабах',
+    run: `resetSceneMemory(); pickScene('sd');
+          var prep = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            var s = STATE.curves.filter(function (c) { return c.role === 'supply'; })[0];
+            if (d) updateCurveExpr(d, '300 - Q');
+            if (s) updateCurveExpr(s, '0.01*P^2');
+          };
+          var snap = function () { return [STATE.eq ? STATE.eq.Q : null, STATE.eq ? STATE.eq.P : null]; };
+          prep(); redrawAll(); var a = snap();
+          setRanges(30, 30); prep(); redrawAll(); var b = snap();
+          setRanges(400, 400); prep(); redrawAll(); var c = snap();
+          return { Q: b[0], P: b[1],
+                   same: (a[0] != null && b[0] != null && c[0] != null
+                          && Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(b[0] - c[0]) < 1e-9) ? 1 : 0 };`,
+    checks: [['Q* на суженном окне', 'Q', 169.722436, 1e-4],
+             ['P* на суженном окне', 'P', 130.277564, 1e-4],
+             ['Q* одинаков на трёх масштабах (флаг)', 'same', 1, 0]],
+  },
+  {
+    /* (кадр-д) Шаг центральной разности брался от края кадра, и на кривой с
+       заметной кривизной одна и та же точка давала на разных масштабах разный
+       наклон — а значит и разную эластичность. Меряем ядро напрямую. */
+    name: '(кадр-д) Численная производная в точке не зависит от масштаба',
+    run: `var mk = function (e) { var c = compileFormula(e); return { expr: e, compiled: c.compiled, linear: null, fn: null }; };
+          var was = CONFIG.Qmax;
+          var d = [100, 30, 400].map(function (qm) {
+            CONFIG.Qmax = qm;
+            return curveDeriv(mk('100 - 40*sin(Q)'), 3);
+          });
+          CONFIG.Qmax = was;
+          return { d0: d[0],
+                   same: (Math.abs(d[0] - d[1]) < 1e-9 && Math.abs(d[1] - d[2]) < 1e-9) ? 1 : 0 };`,
+    checks: [['производная в Q=3 (эталон −40·cos 3)', 'd0', 39.5996998, 1e-5],
+             ['одинакова на трёх масштабах (флаг)', 'same', 1, 0]],
+  },
+  {
+    /* (кадр-е) Общественный оптимум и потери от внешнего эффекта на суженном
+       окне. Оптимум ищет тот же findRoot: на окне до 30 гасло всё табло. */
+    name: '(кадр-е) Внешние эффекты MSC = Q+20: оптимум 40 и DWL 100 на трёх масштабах',
+    run: `resetSceneMemory(); pickScene('ext');
+          var prep = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            var s = STATE.curves.filter(function (c) { return c.role === 'supply'; })[0];
+            if (d) updateCurveExpr(d, '100 - Q');
+            if (s) updateCurveExpr(s, 'Q');
+            STATE.mscOn = true; STATE.mscExpr = 'Q + 20'; STATE.msbOn = false;
+            recompileSocial();
+          };
+          var snap = function () { var e = STATE.ext || {}; return [e.Qopt, e.dwl]; };
+          prep(); redrawAll(); var a = snap();
+          setRanges(30, 30); prep(); redrawAll(); var b = snap();
+          setRanges(400, 400); prep(); redrawAll(); var c = snap();
+          return { Qopt: b[0], dwl: b[1],
+                   same: (a[0] != null && b[0] != null && c[0] != null
+                          && Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(b[0] - c[0]) < 1e-9) ? 1 : 0 };`,
+    checks: [['оптимум на суженном окне', 'Qopt', 40, 0.01],
+             ['DWL на суженном окне', 'dwl', 100, 0.01],
+             ['оптимум одинаков на трёх масштабах (флаг)', 'same', 1, 0]],
+  },
+  {
+    /* (конс-а) Строки конструктора кусочной принадлежат ПОЛЮ, а не странице.
+       Открыли конструктор в «Математике» (буква x), ушли в «Спрос и
+       предложение» — и в полях спроса лежали те же куски с иксом, а условия
+       под ними уже писались по Q. */
+    name: '(конс-а) Конструктор не течёт между полями и моделями',
+    run: `var open = function (id) {
+            var inp = document.getElementById(id);
+            var row = inp.closest('.f-row');
+            row.querySelector('.f-help').click();
+            document.querySelector('.mkbd.open .mkbd-foot button').click();
+            var out = { v: PW.v, all: PW.rows.map(function (r) { return r.f + ' ' + r.a + ' ' + r.b; }).join(' ') };
+            closePiecewise();
+            return out;
+          };
+          resetSceneMemory(); pickScene('m-graph');
+          if (typeof addCurve === 'function' && !STATE.curves.length) addCurve();
+          var rows = [].slice.call(document.querySelectorAll('#tools-panel .f-row'))
+            .filter(function (r) { return r.offsetParent; });
+          var mathInp = rows[0].querySelector('input');
+          if (!mathInp.id) mathInp.id = 'ip-math-field';
+          var m = open(mathInp.id);
+          resetSceneMemory(); pickScene('sd'); redrawAll();
+          var d = open('curve-expr-1');
+          // Метка в спросе не должна доехать до предложения.
+          var inp = document.getElementById('curve-expr-1');
+          inp.closest('.f-row').querySelector('.f-help').click();
+          document.querySelector('.mkbd.open .mkbd-foot button').click();
+          PW.rows[0].f = 'МЕТКА'; closePiecewise();
+          var s = open('curve-expr-2');
+          return { mathX: /(^|[^A-Za-z0-9_])x([^A-Za-z0-9_]|$)/.test(m.all) ? 1 : 0,
+                   demandQ: /(^|[^A-Za-z0-9_])Q([^A-Za-z0-9_]|$)/.test(d.all) ? 1 : 0,
+                   demandX: /(^|[^A-Za-z0-9_])[xX]([^A-Za-z0-9_]|$)/.test(d.all) ? 1 : 0,
+                   supplyMark: /МЕТКА/.test(s.all) ? 1 : 0 };`,
+    checks: [['в «Математике» куски по x (флаг)', 'mathX', 1, 0],
+             ['в «Спросе» куски по Q (флаг)', 'demandQ', 1, 0],
+             ['в «Спросе» иксов нет (флаг)', 'demandX', 0, 0],
+             ['метка спроса не доехала до предложения (флаг)', 'supplyMark', 0, 0]],
+  },
+  {
+    /* (конс-б) Уже стоящая в поле кусочная разбирается обратно в те же куски.
+       Между записью и проверкой ОБЯЗАТЕЛЬНО заходим в чужое поле: иначе
+       случай проходил бы и на утечке — строки просто оставались бы в PW. */
+    name: '(конс-б) Стоящая в поле кусочная разбирается обратно в свои куски',
+    run: `var open = function (id) {
+            var inp = document.getElementById(id);
+            inp.closest('.f-row').querySelector('.f-help').click();
+            document.querySelector('.mkbd.open .mkbd-foot button').click();
+          };
+          resetSceneMemory(); pickScene('sd'); redrawAll();
+          open('curve-expr-1');
+          PW.n = 2;
+          PW.rows = [{ f: '90 - Q', a: '0', b: '30' }, { f: '60 - 0.5*Q', a: '30', b: '' }];
+          renderPw();
+          document.getElementById('pw-apply').click();
+          open('curve-expr-2');
+          var mid = PW.rows[0].f;
+          closePiecewise();
+          open('curve-expr-1');
+          var back = PW.rows.map(function (r) { return r.f + '|' + r.a + '|' + r.b; }).join(' ; ');
+          closePiecewise();
+          return { midDefault: (mid === '100 - Q') ? 1 : 0,
+                   back: back,
+                   ok: (back === '90 - Q|0|30 ; 60 - 0.5*Q|30|') ? 1 : 0 };`,
+    checks: [['чужое поле показало значения по умолчанию (флаг)', 'midDefault', 1, 0],
+             ['разбор вернул те же два куска (флаг)', 'ok', 1, 0]],
+  },
+  {
+    /* (панель-а) Вопросик появляется только рядом с тем, что он поясняет.
+       Раньше подсказка без якоря получала СВОЮ пустую строку, и в «Спросе и
+       предложении» висели два одиноких знака при НУЛЕ живых подсказок. */
+    name: '(панель-а) Одиноких «?» в левой панели нет ни в одной проверенной сцене',
+    run: `var scan = function (key) {
+            resetSceneMemory(); pickScene(key); redrawAll();
+            var panel = document.getElementById('tools-panel');
+            var vis = function (el) { return !!(el.offsetParent || el.getClientRects().length); };
+            var dots = [].slice.call(panel.querySelectorAll('.help-dot')).filter(vis);
+            var lonely = dots.filter(function (d) {
+              var host = d.parentElement;
+              return !host || host.textContent.replace(/[?\s]/g, '').length === 0;
+            });
+            var hints = [].slice.call(panel.querySelectorAll('.hint')).filter(function (h) {
+              return h.style.display !== 'none' && fieldActive(h.parentElement || h);
+            });
+            return { lonely: lonely.length, dots: dots.length, hints: hints.length,
+                     anchors: panel.querySelectorAll('.help-anchor').length };
+          };
+          var keys = ['sd', 'mono', 'ext', 'sdsum', 'elast', 'taxes', 'ppf'];
+          var lonely = 0, over = 0, anchors = 0;
+          keys.forEach(function (k) {
+            var r = scan(k);
+            lonely += r.lonely; anchors += r.anchors;
+            if (r.dots > r.hints) over++;
+          });
+          return { lonely: lonely, over: over, anchors: anchors };`,
+    checks: [['одиноких «?» по семи сценам', 'lonely', 0, 0],
+             ['сцен, где знаков больше живых подсказок', 'over', 0, 0],
+             ['пустых строк .help-anchor в разметке', 'anchors', 0, 0]],
+  },
 ];
 
 function approx(got, want, tol) {
