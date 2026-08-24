@@ -1,5 +1,7 @@
 from django import template
 
+from problems.rendering import render_markdown as _render_markdown
+
 register = template.Library()
 
 
@@ -74,3 +76,20 @@ def partlabel(value):
         return ''
     s = str(value).rstrip(').．。 ')
     return s + ')' if s else str(value)
+
+
+@register.filter(name='render_markdown')
+def render_markdown_filter(value):
+    """Обёртка над problems.rendering.render_markdown для content_format='markdown'.
+
+    ⚠️ Результат НЕ помечается mark_safe здесь — `|safe` ставится явно в
+    шаблоне (problem_detail.html), чтобы каждое использование оставалось
+    видно текстом при поиске по `|safe` (docs/SECURITY.md держит список
+    `|safe` в проекте коротким и проверяемым grep'ом; спрятанный внутри
+    фильтра mark_safe в этот список не попал бы).
+
+    Санитайзер (nh3) уже отработал внутри render_markdown — сюда
+    ЛЮБОЙ текст можно передавать как есть, включая произвольный
+    пользовательский ввод; безопасность гарантирует сама функция.
+    """
+    return _render_markdown(value)
