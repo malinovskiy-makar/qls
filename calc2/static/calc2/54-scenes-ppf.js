@@ -1028,7 +1028,7 @@ function renderPpfSumRows() {
     nameInp.type = 'text'; nameInp.className = 'ppfsum-name';
     nameInp.value = STATE.ppfSumNames[i] || '';
     nameInp.placeholder = 'КПВ ' + (i + 1);
-    nameInp.title = 'Имя кривой на графике';
+    nameInp.setAttribute('data-tip', 'Имя кривой на графике');
     nameInp.addEventListener('input', () => { STATE.ppfSumNames[i] = nameInp.value; redrawAll(); });
     const pick = makeColorPicker(ppfSumColor(i), (hex) => { STATE.ppfSumColors[i] = hex; redrawAll(); },
                                  'Цвет кривой ' + (i + 1));

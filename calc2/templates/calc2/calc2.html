@@ -1017,13 +1017,13 @@
              при выборе сцены «Монополия» переносится в пульт-ленту (Фаза 3а). -->
         <div id="mono-submode" style="display:none;margin-top:8px;">
           <div class="seg">
-            <button class="seg-btn active" id="mm-simple" title="Обычная монополия: MR = MC, одна цена">Обычная</button>
-            <button class="seg-btn" id="mm-d1" title="Ценовая дискриминация 1-й степени (совершенная)">Дискр.&nbsp;1°</button>
-            <button class="seg-btn" id="mm-d3" title="Ценовая дискриминация 3-й степени: два сегмента рынка">Дискр.&nbsp;3°</button>
+            <button class="seg-btn active" id="mm-simple" data-tip="Обычная монополия: $MR = MC$, одна цена">Обычная</button>
+            <button class="seg-btn" id="mm-d1" data-tip="Ценовая дискриминация 1-й степени (совершенная)">Дискр.&nbsp;1°</button>
+            <button class="seg-btn" id="mm-d3" data-tip="Ценовая дискриминация 3-й степени: два сегмента рынка">Дискр.&nbsp;3°</button>
           </div>
           <div class="seg" style="margin-top:6px;">
-            <button class="seg-btn" id="mm-kink" title="Составной спрос: рыночный спрос склеен из сегментов покупателей">Составной&nbsp;спрос</button>
-            <button class="seg-btn" id="mm-nat" title="Естественная монополия: большие постоянные издержки, убывающая ATC">Естественная</button>
+            <button class="seg-btn" id="mm-kink" data-tip="Составной спрос: рыночный спрос склеен из сегментов покупателей">Составной&nbsp;спрос</button>
+            <button class="seg-btn" id="mm-nat" data-tip="Естественная монополия: большие постоянные издержки, убывающая $ATC$">Естественная</button>
           </div>
         </div>
         <!-- Панель дискриминации 1-й степени (Задача 4): использует D и MC из списка кривых. -->
@@ -1153,7 +1153,7 @@
           <div class="f-row">
             <input type="text" id="inp-tc" value="Q^3 - 6*Q^2 + 15*Q + 18" autocomplete="off">
             <button class="f-help" id="fh-tc" type="button" aria-expanded="false"
-                    aria-controls="fp-tc" title="Как писать формулы">?</button>
+                    aria-controls="fp-tc" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-tc" role="region" aria-label="Примеры формул TC"></div>
         </div>
@@ -1184,20 +1184,20 @@
       <div class="curve-group" style="margin-top:10px;">
         <div class="curve-group-title">Средние и предельные затраты</div>
         <label class="chk"><input type="checkbox" id="chk-mc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costMC" title="Цвет MC"> MC, предельные затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costMC" data-tip="Цвет $MC$"> MC, предельные затраты</label>
         <label class="chk"><input type="checkbox" id="chk-atc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costATC" title="Цвет ATC"> ATC, средние общие затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costATC" data-tip="Цвет $ATC$"> ATC, средние общие затраты</label>
         <label class="chk"><input type="checkbox" id="chk-avc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costAVC" title="Цвет AVC"> AVC, средние переменные затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costAVC" data-tip="Цвет $AVC$"> AVC, средние переменные затраты</label>
         <label class="chk"><input type="checkbox" id="chk-afc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costAFC" title="Цвет AFC"> AFC, средние постоянные затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costAFC" data-tip="Цвет $AFC$"> AFC, средние постоянные затраты</label>
         <div class="curve-group-title" style="margin-top:8px;">Полные затраты</div>
         <label class="chk"><input type="checkbox" id="chk-tc">
-          <input type="color" class="swatch swatch-pick" data-col="costTC" title="Цвет TC"> TC, общие затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costTC" data-tip="Цвет $TC$"> TC, общие затраты</label>
         <label class="chk"><input type="checkbox" id="chk-vc">
-          <input type="color" class="swatch swatch-pick" data-col="costVC" title="Цвет VC"> VC, переменные затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costVC" data-tip="Цвет $VC$"> VC, переменные затраты</label>
         <label class="chk"><input type="checkbox" id="chk-fc">
-          <input type="color" class="swatch swatch-pick" data-col="costFC" title="Цвет FC"> FC, постоянные затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costFC" data-tip="Цвет $FC$"> FC, постоянные затраты</label>
       </div>
       <!-- 9в: долгосрочное равновесие конкурентной фирмы. -->
       <div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border);">
@@ -1226,18 +1226,18 @@
           <label>Выпуск Q&nbsp;=&nbsp;f(L)</label>
           <div class="f-row">
             <input type="text" id="inp-prod" value="30*L^2 - L^3" autocomplete="off">
-            <button class="f-help" id="fh-prod" type="button" aria-expanded="false" aria-controls="fp-prod" title="Как писать формулы">?</button>
+            <button class="f-help" id="fh-prod" type="button" aria-expanded="false" aria-controls="fp-prod" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-prod" role="region" aria-label="Примеры производственных функций"></div>
         </div>
         <button class="btn" id="btn-prod-apply">Построить</button>
         <div style="margin-top:10px;">
           <label class="chk"><input type="checkbox" id="chk-tp" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodTP" title="Цвет TP"> TP (общий продукт)</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodTP" data-tip="Цвет $TP$"> TP (общий продукт)</label>
           <label class="chk"><input type="checkbox" id="chk-mp" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodMP" title="Цвет MP"> MP (предельный продукт)</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodMP" data-tip="Цвет $MP$"> MP (предельный продукт)</label>
           <label class="chk"><input type="checkbox" id="chk-ap" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodAP" title="Цвет AP"> AP (средний продукт)</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodAP" data-tip="Цвет $AP$"> AP (средний продукт)</label>
         </div>
         <div class="hint">На верхней панели общий продукт TP, на нижней предельный MP&nbsp;=&nbsp;dQ/dL и
           средний AP&nbsp;=&nbsp;Q/L (у них свой масштаб, иначе на фоне TP их не видно).
@@ -1253,7 +1253,7 @@
           <label>Производственная функция Q(L,&nbsp;K)</label>
           <div class="f-row">
             <input type="text" id="inp-iso" value="L^0.5 * K^0.5" autocomplete="off">
-            <button class="f-help" id="fh-iso" type="button" aria-expanded="false" aria-controls="fp-iso" title="Как писать формулы">?</button>
+            <button class="f-help" id="fh-iso" type="button" aria-expanded="false" aria-controls="fp-iso" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-iso" role="region" aria-label="Примеры производственных функций"></div>
         </div>
@@ -1263,7 +1263,7 @@
         </div>
         <div class="field"><label>Бюджет C</label><input type="number" id="iso-c" min="1" step="1" value="100"></div>
         <label class="chk"><input type="checkbox" id="chk-iso-fan" checked>
-          <input type="color" class="swatch swatch-pick" data-col="isoq" title="Цвет изоквант"> Веер изоквант</label>
+          <input type="color" class="swatch swatch-pick" data-col="isoq" data-tip="Цвет изоквант"> Веер изоквант</label>
         <div class="hint">Изокоста w·L&nbsp;+&nbsp;r·K&nbsp;=&nbsp;C; оптимум это касание изокванты и изокосты,
           там MRTS&nbsp;=&nbsp;w/r. Считает ТОТ ЖЕ движок, что кривые безразличия потребителя:
           при Q&nbsp;=&nbsp;L^0.5·K^0.5, w=1, r=2, C=100 получаются те же 50 и 25.</div>
@@ -1479,12 +1479,12 @@
         <label>U(x, y)</label>
         <div class="f-row">
           <input type="text" id="cons-custom" value="x^0.5 * y^0.5" autocomplete="off">
-          <button class="f-help" id="fh-cons" type="button" aria-expanded="false" aria-controls="fp-cons" title="Как писать формулы">?</button>
+          <button class="f-help" id="fh-cons" type="button" aria-expanded="false" aria-controls="fp-cons" data-tip="Как писать формулы">?</button>
         </div>
         <div class="f-pop" id="fp-cons" role="region" aria-label="Примеры функций полезности"></div>
       </div>
       <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-cons-fan" checked>
-        <input type="color" class="swatch swatch-pick" data-col="indiff" title="Цвет кривых безразличия"> Веер кривых безразличия</label>
+        <input type="color" class="swatch swatch-pick" data-col="indiff" data-tip="Цвет кривых безразличия"> Веер кривых безразличия</label>
       <!-- 8в: разложение Слуцкого (эффект замещения и эффект дохода). -->
       <label class="chk" id="cons-slutsky-row"><input type="checkbox" id="chk-cons-slutsky">
         <span class="swatch" style="background:var(--curve-mr)"></span> Разложить изменение цены (Слуцкий)</label>
@@ -1520,7 +1520,7 @@
           <div class="f-row">
             <input type="text" id="inp-ppf" value="y = 100 - x" autocomplete="off">
             <button class="f-help" id="fh-ppf" type="button" aria-expanded="false"
-                    aria-controls="fp-ppf" title="Как писать формулы">?</button>
+                    aria-controls="fp-ppf" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-ppf" role="region" aria-label="Примеры формул КПВ"></div>
         </div>
@@ -1563,9 +1563,9 @@
         <!-- Области (Фаза 11.5) -->
         <div class="vsub">Области</div>
         <label class="chk"><input type="checkbox" id="chk-ppf-in" checked>
-          <input type="color" class="swatch swatch-pick" data-col="ppfIn" title="Цвет достижимых наборов"> Достижимые наборы</label>
+          <input type="color" class="swatch swatch-pick" data-col="ppfIn" data-tip="Цвет достижимых наборов"> Достижимые наборы</label>
         <label class="chk"><input type="checkbox" id="chk-ppf-out">
-          <input type="color" class="swatch swatch-pick" data-col="ppfOut" title="Цвет недостижимых наборов"> Недостижимые наборы</label>
+          <input type="color" class="swatch swatch-pick" data-col="ppfOut" data-tip="Цвет недостижимых наборов"> Недостижимые наборы</label>
 
         <div id="info-ppf" style="margin-top:8px;"></div>
       </div>
@@ -1772,7 +1772,7 @@
         <div class="f-row">
           <input type="text" id="inp-mathf" value="x^2" autocomplete="off">
           <button class="f-help" id="fh-mathf" type="button" aria-expanded="false"
-                  aria-controls="fp-mathf" title="Как писать формулы">?</button>
+                  aria-controls="fp-mathf" data-tip="Как писать формулы">?</button>
         </div>
         <div class="f-pop" id="fp-mathf" role="region" aria-label="Примеры функций"></div>
       </div>
@@ -1795,9 +1795,9 @@
         </div>
         <div class="field">
           <label>Цвета кривых</label>
-          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanF" title="Цвет функции">
+          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanF" data-tip="Цвет функции">
             f(x), сама функция</label>
-          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanD" title="Цвет производной">
+          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanD" data-tip="Цвет производной">
             f′(x), производная</label>
         </div>
         <div class="hint-row">
@@ -1872,7 +1872,7 @@
         </div>
         <div id="mm-rows"></div>
         <div class="field">
-          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="mmZ" title="Цвет итоговой кривой">
+          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="mmZ" data-tip="Цвет итоговой кривой">
             Цвет итоговой кривой</label>
         </div>
         <div class="hint-row">
@@ -1902,7 +1902,7 @@
           <div class="f-row">
             <input type="text" id="inp-mathfc" value="x^0.5 * y^0.5" autocomplete="off">
             <button class="f-help" id="fh-mathfc" type="button" aria-expanded="false"
-                    aria-controls="fp-mathfc" title="Как писать формулы">?</button>
+                    aria-controls="fp-mathfc" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-mathfc" role="region" aria-label="Примеры функций"></div>
         </div>
@@ -1911,7 +1911,7 @@
           <div class="f-row">
             <input type="text" id="inp-mathgc" value="x + y = 10" autocomplete="off">
             <button class="f-help" id="fh-mathgc" type="button" aria-expanded="false"
-                    aria-controls="fp-mathgc" title="Как писать формулы">?</button>
+                    aria-controls="fp-mathgc" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-mathgc" role="region" aria-label="Примеры ограничений"></div>
         </div>

@@ -739,6 +739,63 @@ function hideHintTip() {
 let _tipByKeyboard = false;   // последнее действие человека было с клавиатуры
 function tipText(el) { return (el.getAttribute('data-tip') || '').trim(); }
 
+/* ═══ МАТЕМАТИКА ВНУТРИ ПОДСКАЗКИ ══════════════════════════════════════
+
+   Решение владельца 24.08: подсказки переводятся с браузерного `title` и
+   простого текста на этот компонент, потому что 64 математических обозначения
+   сидели именно в подсказках, а простой текст формулу нести не умеет.
+
+   Плашка набирает формулой всё, что стоит между знаками доллара — это делает
+   `renderMathIn` в `showHintTip`. Значит здесь одна забота: расставить знаки
+   доллара вокруг обозначений, а слова оставить словами.
+
+   ⚠️ СПИСОК ОБОЗНАЧЕНИЙ — ТОТ ЖЕ, ПО КОТОРОМУ СЧИТАЕТ АУДИТ ШРИФТОВ
+   (`calc2/tests/night2_font_audit.mjs`). Разойдутся списки — разойдутся и
+   числа: прибор будет считать одно, разметка чинить другое, и «починено N»
+   перестанет что-либо значить.                                              */
+const TIP_WORDS = ['SRAS', 'LRAS', 'Wmin', 'MPL', 'MRP', 'ATC', 'AVC', 'AFC', 'DWL',
+  'MSB', 'MSC', 'GDP', 'MC', 'MR', 'TC', 'FC', 'VC', 'TR', 'TP', 'MP', 'AP',
+  'Qd', 'Qs', 'Pd', 'Ps', 'Pb', 'Pw', 'Pc', 'Pf', 'Qm', 'Pm', 'Qc', 'Px', 'Py',
+  'CS', 'PS', 'AD', 'AS', 'IS', 'LM', 'SW'];
+const TIP_LETTERS = ['P', 'Q', 'D', 'S', 'L', 'K', 'X', 'Y', 'W', 'U', 'M', 'E'];
+const TIP_SUBS = { '\u2080': '0', '\u2081': '1', '\u2082': '2', '\u2083': '3', '\u2084': '4' };
+const TIP_RE = new RegExp(
+  '(^|[^A-Za-zА-Яа-я0-9_$\\\\])(' + TIP_WORDS.join('|') + '|' + TIP_LETTERS.join('|') + ')'
+  + '([\u2080-\u2084]?)(?![A-Za-zА-Яа-я0-9_$])', 'g');
+
+/* Как набирается одно обозначение. Сплошные прописные («MC», «DWL») уходят
+   прямым шрифтом — это делает `texAbbrev` сам. Прописная с хвостом («Pw»,
+   «Qd») — это буква с индексом, а не произведение двух букв. */
+function tipTex(word, sub) {
+  const idx = TIP_SUBS[sub] || '';
+  if (/^[A-Z]{2,}$/.test(word)) return word + (idx ? '_{' + idx + '}' : '');
+  const m = /^([A-Z])([A-Za-z0-9]+)$/.exec(word);
+  if (m) return m[1] + '_{\\text{' + m[2] + '}' + idx + '}';
+  return word + (idx ? '_{' + idx + '}' : '');
+}
+
+/* Разметить обозначения в готовом человеческом тексте: «Мировая цена Pw» →
+   «Мировая цена $P_{\\text{w}}$». Слова не трогаем вообще. */
+function tipName(text) {
+  return String(text == null ? '' : text).replace(
+    TIP_RE, (all, pre, word, sub) => pre + '$' + tipTex(word, sub) + '$');
+}
+
+/* Формула целиком (запись кривой) — набирается формулой целиком. Перевод в
+   LaTeX делает тот же `mathToTex`, что и предпросмотр под полем ввода: иначе
+   одна и та же запись выглядела бы в двух местах по-разному. */
+function tipExpr(expr) {
+  const s = String(expr == null ? '' : expr).trim();
+  if (!s) return '';
+  if (typeof mathToTex !== 'function') return s;
+  const tex = mathToTex(s);
+  return tex ? '$' + tex + '$' : s;
+}
+
+/* Текст подсказки для чтеца экрана: доллары — разметка набора, вслух их не
+   читают. */
+function tipPlain(text) { return String(text || '').replace(/\$/g, ''); }
+
 function showTipFor(el) {
   const t = tipText(el);
   if (!t) return;
@@ -789,7 +846,7 @@ function syncTipLabels() {
     const t = tipText(el);
     if (!t) return;
     const own = (el.textContent || '').trim();
-    if (!own) el.setAttribute('aria-label', t);   // у кнопки-иконки своего текста нет
+    if (!own) el.setAttribute('aria-label', tipPlain(t));   // у кнопки-иконки своего текста нет
   });
 }
 

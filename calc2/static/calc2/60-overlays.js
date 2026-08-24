@@ -282,7 +282,7 @@ function buildGraphRow(curve) {
 
   const del = document.createElement('button');
   del.type = 'button'; del.className = 'btn-icon'; del.textContent = '✕';
-  del.title = 'Убрать функцию';
+  del.setAttribute('data-tip', 'Убрать функцию');
   del.style.visibility = curve ? '' : 'hidden';
   del.addEventListener('click', () => {
     if (!row._curve) return;
@@ -1739,7 +1739,7 @@ function renderVertList() {
 
     const t = document.createElement('span');
     t.className = 'vert-co';
-    t.title = 'Двойной щелчок — поправить координаты';
+    t.setAttribute('data-tip', 'Двойной щелчок — поправить координаты');
     const paint = () => {
       t.textContent = (p.name ? p.name + ' ' : '') + '(' + fmt(p.x) + '; ' + fmt(p.y) + ')';
     };
@@ -1773,7 +1773,7 @@ function renderVertList() {
 
     const del = document.createElement('button');
     del.type = 'button'; del.className = 'btn-icon'; del.textContent = '✕';
-    del.title = 'Убрать эту вершину';
+    del.setAttribute('data-tip', 'Убрать эту вершину');
     del.addEventListener('click', () => {
       STATE.areaVerts = (STATE.areaVerts || []).filter(v => v !== p);
       renderVertList(); syncAreaCalcButton(); redrawAll();
@@ -1795,9 +1795,9 @@ function syncAreaCalcButton() {
     ? ((STATE.areaVerts || []).length >= 3)
     : !!areaPickedCurve();
   btn.disabled = !ready;
-  btn.title = ready ? '' : (STATE.areaCalcMode === 'poly'
+  btn.setAttribute('data-tip', ready ? '' : (STATE.areaCalcMode === 'poly'
     ? 'Отметьте на графике хотя бы три точки'
-    : 'Сначала выберите кривую');
+    : 'Сначала выберите кривую'));
 }
 
 function areaPickedCurve() {
@@ -2143,12 +2143,12 @@ function updateAreaCalcPanel() {
     const c1 = document.createElement('span');
     c1.className = 'area-what';
     const pick = makeColorPicker(e.color, (hex) => { STATE.areaColor[e.key] = hex; redrawAll(); },
-                                 'Цвет области: ' + e.key);
+                                 tipName('Цвет области: ' + e.key));
     pick.setAttribute('data-area', e.key);
     const lab = document.createElement('span');
     lab.className = 'area-name-fixed';
     lab.textContent = areaShort(e.key);
-    lab.title = e.key;
+    lab.setAttribute('data-tip', tipName(e.key));
     c1.append(pick, lab);
     const c2 = document.createElement('b');
     c2.textContent = (e.value == null) ? '' : fmt(e.value);
@@ -2167,7 +2167,7 @@ function updateAreaCalcPanel() {
     const pick = makeColorPicker(r.color, (hex) => { r.color = hex; redrawAll(); }, 'Цвет площади');
     const nameInp = document.createElement('input');
     nameInp.type = 'text'; nameInp.className = 'area-name'; nameInp.value = r.label;
-    nameInp.title = 'Название площади';
+    nameInp.setAttribute('data-tip', 'Название площади');
     nameInp.addEventListener('input', () => { r.label = nameInp.value; });
     nameInp.addEventListener('change', () => redrawAll());
     c1.append(pick, nameInp);
@@ -2178,7 +2178,7 @@ function updateAreaCalcPanel() {
 
     const del = document.createElement('button');
     del.type = 'button'; del.className = 'btn-icon'; del.textContent = '×';
-    del.title = 'Убрать эту площадь';
+    del.setAttribute('data-tip', 'Убрать эту площадь');
     del.addEventListener('click', () => {
       STATE.areaCalcList = STATE.areaCalcList.filter(x => x !== r);
       redrawAll();
@@ -2689,7 +2689,7 @@ function buildParamChip(box, name) {
      Число справа при этом лишнее — вся строка «a = 1» и есть значение. */
   val.style.display = 'none';
   lab.classList.add('pchip-editable');
-  lab.title = 'Щёлкните, чтобы ввести точное значение';
+  lab.setAttribute('data-tip', 'Щёлкните, чтобы ввести точное значение');
 
   /* Крестик справа вверху — как у Desmos. У нас параметр не объявляют строкой,
      а выводят из формулы, поэтому «удалить» его насовсем нельзя: syncParams
@@ -2700,8 +2700,7 @@ function buildParamChip(box, name) {
   const kill = document.createElement('button');
   kill.type = 'button'; kill.className = 'param-kill';
   kill.textContent = '✕';
-  kill.title = 'Свернуть ползунок (буква останется с этим значением)';
-  kill.setAttribute('aria-label', kill.title);
+  kill.setAttribute('data-tip', 'Свернуть ползунок (буква останется с этим значением)');
   chip.querySelector('.pchip-top').appendChild(kill);
 
   const track = document.createElement('div');
@@ -2741,8 +2740,8 @@ function buildParamChip(box, name) {
   const applyFold = () => {
     chip.classList.toggle('folded', !!p.folded);
     kill.textContent = p.folded ? '＋' : '✕';
-    kill.title = p.folded ? 'Показать ползунок' : 'Свернуть ползунок (буква останется с этим значением)';
-    kill.setAttribute('aria-label', kill.title);
+    kill.setAttribute('data-tip', p.folded ? 'Показать ползунок'
+                                          : 'Свернуть ползунок (буква останется с этим значением)');
   };
   applyFold();
   kill.addEventListener('click', (e) => { e.stopPropagation(); p.folded = !p.folded; applyFold(); });
@@ -2990,8 +2989,7 @@ function makeColorPicker(value, onChange, title) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'swatch cpick-btn';
-  btn.title = title || 'Цвет кривой';
-  btn.setAttribute('aria-label', btn.title);
+  btn.setAttribute('data-tip', title || 'Цвет кривой');
 
   // Скрытый нативный input — только под кнопку «Свой цвет». Держим его тут,
   // чтобы пикер цвета не пропадал вместе с меню при переоткрытии.
@@ -3024,7 +3022,7 @@ function makeColorPicker(value, onChange, title) {
       sw.style.background = hex;
       sw.setAttribute('role', 'radio');
       sw.setAttribute('aria-checked', hex.toLowerCase() === cur.toLowerCase() ? 'true' : 'false');
-      sw.title = hex;
+      sw.setAttribute('data-tip', hex);
       sw.addEventListener('click', (ev) => { ev.stopPropagation(); apply(hex); closeColorMenu(); });
       grid.appendChild(sw);
     });
@@ -3947,7 +3945,7 @@ function buildMarkRow(mk) {
     const ok = document.createElement('button');
     ok.type = 'button'; ok.className = 'btn-icon mark-ok';
     ok.textContent = '✓';
-    ok.title = 'Поставить точку';
+    ok.setAttribute('data-tip', 'Поставить точку');
     ok.addEventListener('click', () => {
       if (!isFinite(mk.x) || !isFinite(mk.y)) return;
       mk.pending = false;
@@ -3976,7 +3974,7 @@ function buildMarkRow(mk) {
   });
   nameEl.classList.add('mark-name');
   const del = document.createElement('button');
-  del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.title = 'Убрать точку';
+  del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.setAttribute('data-tip', 'Убрать точку');
   del.addEventListener('click', () => {
     STATE.marks = STATE.marks.filter(m => m.id !== mk.id);
     renderMarkList(); redrawAll();

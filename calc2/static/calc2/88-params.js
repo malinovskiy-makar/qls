@@ -422,7 +422,8 @@ function buildPultCurveChips(list) {
     chip.dataset.cid = c.id;
     // Подсказку вешаем на сам чип: подпись .pchip-label заменяет
     // upgradeRegulator строкой «имя = значение», и title на ней пропал бы.
-    chip.title = 'Сдвиг кривой ' + curveShortName(c) + ': ' + (c.expr || '');
+    chip.setAttribute('data-tip',
+      'Сдвиг кривой ' + tipName(curveShortName(c)) + ': ' + tipExpr(c.expr));
 
     const sl = document.createElement('input');
     /* ⚠️ ОДНО ЗНАЧЕНИЕ — ОДИН ИСТОЧНИК (п. 3, канон 2.1).
@@ -590,7 +591,9 @@ function upgradeRegulator(field) {
   if (!eq) {
     eq = document.createElement('span');
     eq.className = 'pchip-label reg-eq pchip-editable';
-    eq.title = rawName ? (rawName + '. Щёлкните, чтобы ввести точное значение') : 'Щёлкните, чтобы ввести точное значение';
+    eq.setAttribute('data-tip', rawName
+      ? (tipName(rawName) + '. Щёлкните, чтобы ввести точное значение')
+      : 'Щёлкните, чтобы ввести точное значение');
     /* Куда встать: у чипа есть верхняя строка, у поля сцены её нет. Дорожка
        ползунка может лежать глубже, поэтому вставляем в САМОЕ НАЧАЛО поля, а не
        перед дорожкой: она не всегда прямой потомок, и insertBefore на чужом

@@ -171,7 +171,8 @@ function renderCurveList() {
     top.className = 'crow-top';
 
     const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.checked = curve.visible; cb.title = 'Показать/скрыть';
+    cb.type = 'checkbox'; cb.checked = curve.visible;
+    cb.setAttribute('data-tip', 'Показать/скрыть');
     cb.addEventListener('change', () => { curve.visible = cb.checked; renderCurveList(); redrawAll(); });
 
     // Цвет кривой (Фаза 2): пикер меняет цвет ТОЛЬКО у этого экземпляра.
@@ -190,7 +191,7 @@ function renderCurveList() {
 
     const nm = document.createElement('span');
     nm.className = 'curve-name'; nm.textContent = curveShortName(curve);
-    nm.title = curve.expr || '';        // под именем — сама формула
+    nm.setAttribute('data-tip', tipExpr(curve.expr));   // под именем — сама формула
     if (!curve.visible) nm.style.opacity = '.4';
 
     // Бейдж формы записи (Фаза 1б): видно, что кривая введена как «объём от цены».
@@ -198,9 +199,12 @@ function renderCurveList() {
     if (curve.srcForm === 'QP') {
       badge = document.createElement('span');
       badge.className = 'form-badge'; badge.textContent = 'Q(P)';
-      const can = curve.linear ? ('P = ' + fmtLinear(curve.linear.a, curve.linear.b))
-                              : 'P = f(Q) считается численно';
-      badge.title = 'Введено как Q(P), в расчётах ' + can;
+      /* Слова остаются словами, математика — формулой: «считается численно»
+         это пояснение, а «P = f(Q)» — запись, и набраны они по-разному. */
+      const can = curve.linear
+        ? ('$P = ' + fmtLinear(curve.linear.a, curve.linear.b) + '$')
+        : '$P = f(Q)$ считается численно';
+      badge.setAttribute('data-tip', 'Введено как $Q(P)$, в расчётах ' + can);
     }
 
     /* ⚠️ КРЕСТИК ДЕЛАЕТ РАЗНОЕ У РАЗНЫХ КРИВЫХ (решение владельца 22.08).
@@ -214,8 +218,8 @@ function renderCurveList() {
     const staff = !!curve.role;
     const del = document.createElement('button');
     del.className = 'btn-icon'; del.textContent = '✕';
-    del.title = staff ? 'Убрать кривую с графика (вернуть галочкой слева)' : 'Удалить кривую';
-    del.setAttribute('aria-label', del.title);
+    del.setAttribute('data-tip',
+      staff ? 'Убрать кривую с графика (вернуть галочкой слева)' : 'Удалить кривую');
     del.addEventListener('click', () => {
       pushUndo();
       if (staff) { curve.visible = false; }
@@ -251,12 +255,13 @@ function renderCurveList() {
       fInp.value = curve.srcForm === 'QP' ? (curve.srcExpr || curve.expr) : curve.expr;
       fInp.placeholder = curve.expr ? (curve.srcForm === 'QP' ? 'Q = f(P)' : 'P = f(Q)')
                                     : 'Например: 100 - Q';
-      fInp.title = 'Формула кривой: правится на месте';
+      fInp.setAttribute('data-tip', 'Формула кривой: правится на месте');
       fInp.addEventListener('input', () => {
         pushUndo();
         const err = updateCurveExpr(curve, fInp.value);
         fInp.classList.toggle('bad', !!err);
-        fInp.title = err ? ('Пока не применено: ' + err) : 'Формула кривой: правится на месте';
+        fInp.setAttribute('data-tip',
+          err ? ('Пока не применено: ' + err) : 'Формула кривой: правится на месте');
         if (!err) {
           nm.textContent = curveShortName(curve);
           redrawAll();
@@ -288,7 +293,7 @@ function renderCurveList() {
 
     const gear = document.createElement('button');
     gear.type = 'button'; gear.className = 'btn-icon crow-gear';
-    gear.title = 'Имя на графике и роль кривой';
+    gear.setAttribute('data-tip', 'Имя на графике и роль кривой');
     gear.setAttribute('aria-expanded', 'false');
     gear.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
       + ' stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';

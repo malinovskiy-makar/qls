@@ -70,7 +70,12 @@ const SWEEP = `(function () {
   ['[data-tip]', '[title]'].forEach(function (sel) {
     [].slice.call(document.querySelectorAll('#tools-panel ' + sel + ', #params-panel ' + sel)).forEach(function (e) {
       var t = (e.getAttribute('data-tip') || e.getAttribute('title') || '').replace(/\\s+/g, ' ').trim();
-      if (!t) return;
+      /* ⚠️ ЧТО СТОИТ МЕЖДУ ДОЛЛАРАМИ — УЖЕ НАБРАНО ФОРМУЛОЙ, А НЕ ТЕКСТОМ.
+         Плашка подсказки прогоняет свой текст через renderMathIn, и «$MC$»
+         попадает на экран математическим начертанием. Считать его нарушением
+         значит считать нарушением саму починку. */
+      t = t.replace(/\\$[^$]*\\$/g, ' ');
+      if (!t.trim()) return;
       re.lastIndex = 0; var m, hits = [];
       while ((m = re.exec(t))) hits.push(m[1]);
       if (hits.length) out.push({ место: 'подсказки', текст: t.slice(0, 70), обозначения: hits, узел: e.className || e.tagName });
@@ -81,8 +86,21 @@ const SWEEP = `(function () {
 
 const all = [];
 for (const key of scenes) {
-  await page.evaluate(k => { resetSceneMemory(); pickScene(k); setToolsOpen(true); setParamsOpen(true); }, key);
-  await page.waitForTimeout(520);
+  /* Карточки раскрываем принудительно: сцена открывается со всеми свёрнутыми,
+     а свёрнутое не видит ни человек, ни прибор — и число «найдено» оказалось бы
+     свойством состояния экрана, а не кода (та же болезнь, что у проверки канона). */
+  await page.evaluate(k => {
+    resetSceneMemory(); pickScene(k); setToolsOpen(true); setParamsOpen(true);
+    document.querySelectorAll('.fold-btn[aria-controls]').forEach(function (b) {
+      var body = document.getElementById(b.getAttribute('aria-controls'));
+      if (!body) return;
+      body.classList.add('open');
+      b.setAttribute('aria-expanded', 'true');
+      var card = b.closest('.section, .side-part');
+      if (card) card.classList.add('open-card');
+    });
+  }, key);
+  await page.waitForTimeout(650);
   const found = await page.evaluate(SWEEP);
   found.forEach(f => all.push({ сцена: key, ...f }));
 }

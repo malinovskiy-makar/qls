@@ -256,7 +256,7 @@ function pwAttachKeyboard(row, inp) {
   if (!btn) {
     btn = document.createElement('button');
     btn.type = 'button'; btn.id = 'pw-kbd-btn'; btn.className = 'f-help f-kbd';
-    btn.title = 'Клавиатура';
+    btn.setAttribute('data-tip', 'Клавиатура');
     btn.setAttribute('aria-label', 'Открыть математическую клавиатуру');
     btn.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
       + ' stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/>'
@@ -1264,7 +1264,7 @@ function equipFormulaField(inputId, kind) {
     btn = document.createElement('button');
     btn.type = 'button'; btn.className = 'f-help'; btn.id = 'fh-auto-' + inputId;
     btn.setAttribute('aria-expanded', 'false');
-    btn.title = 'Как писать формулы';
+    btn.setAttribute('data-tip', 'Как писать формулы');
     btn.textContent = '?';
     row.appendChild(btn);
   }
@@ -1314,7 +1314,7 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
     // та же формула, напечатанная как в учебнике (прежнее поведение).
     const typeset = document.createElement('div');
     typeset.className = 'f-typeset';
-    typeset.title = 'Щёлкните, чтобы поправить формулу';
+    typeset.setAttribute('data-tip', 'Щёлкните, чтобы поправить формулу');
     slot.appendChild(typeset);
 
     const focused = () => document.activeElement === inp;
@@ -1343,7 +1343,7 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
 
   // Кнопка «?» стала кнопкой клавиатуры: примеры формул теперь лежат внутри неё.
   btn.classList.add('f-kbd');
-  btn.title = 'Клавиатура и примеры формул';
+  btn.setAttribute('data-tip', 'Клавиатура и примеры формул');
   btn.setAttribute('aria-label', 'Открыть математическую клавиатуру');
   btn.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
     ' stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/>' +
@@ -1362,7 +1362,8 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
     grid.className = 'f-grid';
     set.items.forEach(([ex, note]) => {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'f-ex'; b.title = 'Поставить эту формулу в поле';
+      b.type = 'button'; b.className = 'f-ex';
+      b.setAttribute('data-tip', 'Поставить эту формулу в поле');
       const m = document.createElement('span'); m.className = 'f-ex-math';
       renderTex(m, ex);
       const s = document.createElement('span'); s.className = 'f-ex-note'; s.textContent = note;
@@ -1399,7 +1400,8 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
       ops.forEach(([shown, note, insRaw, back]) => {
         const ins = insRaw != null ? insRaw : shown;
         const b = document.createElement('button');
-        b.type = 'button'; b.className = 'f-pal'; b.textContent = shown; b.title = note;
+        b.type = 'button'; b.className = 'f-pal'; b.textContent = shown;
+        b.setAttribute('data-tip', note);
         b.addEventListener('click', () => { insertIntoFormula(inp, ins, back || 0); });
         row.appendChild(b);
       });
@@ -1412,7 +1414,7 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
     const pwBtn = document.createElement('button');
     pwBtn.type = 'button'; pwBtn.className = 'f-pal wide';
     pwBtn.textContent = 'Собрать кусочную функцию';
-    pwBtn.title = 'Спросим число кусков и соберём запись из отдельных полей';
+    pwBtn.setAttribute('data-tip', 'Спросим число кусков и соберём запись из отдельных полей');
     pwBtn.addEventListener('click', () => {
       pop.classList.remove('open');
       btn.setAttribute('aria-expanded', 'false');
@@ -1479,7 +1481,7 @@ function makeEditableValue(opts) {
   el.className = 'edval';
   el.tabIndex = 0;
   el.setAttribute('role', 'textbox');
-  if (opts.title) el.title = opts.title;
+  if (opts.title) el.setAttribute('data-tip', opts.title);
   const isNum = (opts.kind || 'number') === 'number';
 
   const shown = () => {
@@ -1667,7 +1669,7 @@ function upgradeSelect(id, title) {
   btn.className = 'sel-btn';
   btn.setAttribute('aria-haspopup', 'listbox');
   btn.setAttribute('aria-expanded', 'false');
-  if (title) btn.title = title;
+  if (title) btn.setAttribute('data-tip', title);
 
   const text = document.createElement('span');
   text.className = 'sel-text';
