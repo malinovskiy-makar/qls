@@ -432,16 +432,43 @@ if (need('П') || need('P')) {
     renderPw();
     ipApplyPw();
     var after = document.getElementById('curve-expr-1').value;
+    /* ⚠️ МЕЖДУ ЗАПИСЬЮ И ПРОВЕРКОЙ ОБЯЗАТЕЛЬНО ЗАХОДИМ В ЧУЖОЕ ПОЛЕ.
+       Без этого набор проходил бы и на утечке: строки просто оставались бы
+       в PW с прошлого открытия, и «разбор обратно» ничего бы не доказывал. */
+    var e0 = ipOpenPw('curve-expr-2'); if (e0) return { err: e0, field: after };
+    var mid = ipPwSnap(); ipClosePw();
     var e2 = ipOpenPw('curve-expr-1'); if (e2) return { err: e2, field: after };
     var s = ipPwSnap(); ipClosePw();
-    return { field: after, snap: s };
+    return { field: after, snap: s, mid: mid };
   `);
   if (pd2.err) { bad++; console.log('FAIL ' + pd2.err + ' (поле: ' + pd2.field + ')'); }
   else {
     console.log('     в поле после «Поставить в поле»: ' + pd2.field);
+    console.log(`     по дороге зашли в предложение: кусок 1 «${pd2.mid.rows[0].f}» (обязано быть по умолчанию)`);
+    flag('чужое поле показало значения по умолчанию, а не чужие куски',
+      pd2.mid.rows[0].f === '100 - Q', pd2.mid.rows[0].f);
     pd2.snap.rows.forEach((r, i) => console.log(`       кусок ${i + 1}: f = «${r.f}»  от «${r.a}»  до «${r.b}»`));
     flag('первый кусок разобран обратно', /90/.test(pd2.snap.rows[0].f || ''), pd2.snap.rows[0].f);
     flag('второй кусок разобран обратно', /60/.test((pd2.snap.rows[1] || {}).f || ''), (pd2.snap.rows[1] || {}).f);
+  }
+
+  console.log('\n=== НАБОР П(е): в поле обычная формула — значения по умолчанию ===');
+  const pe = await run(`
+    resetSceneMemory(); pickScene('sd');
+    return null;
+  `);
+  await page.waitForTimeout(500);
+  const pe2 = await run(`
+    var d = ipCurve('demand'); if (d) updateCurveExpr(d, '100 - 2*Q');
+    document.getElementById('curve-expr-1').value = '100 - 2*Q';
+    var e = ipOpenPw('curve-expr-1'); if (e) return { err: e };
+    var s = ipPwSnap(); ipClosePw(); return s;
+  `);
+  if (pe2.err) { bad++; console.log('FAIL ' + pe2.err); }
+  else {
+    pe2.rows.forEach((r, i) => console.log(`       кусок ${i + 1}: f = «${r.f}»  от «${r.a}»  до «${r.b}»`));
+    flag('обычная формула не разбирается в куски — стоят значения по умолчанию',
+      pe2.rows.length === 2 && pe2.rows[0].f === '100 - Q', JSON.stringify(pe2.rows));
   }
 }
 

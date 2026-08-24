@@ -3541,11 +3541,15 @@ const CASES = [
        кривой: именно там жил дефект (сразу после «Поставить в поле» запись
        была правильной и до первой пересборки). */
     name: 'Четыре дефекта (г) кусочная — список условий, без вложенности и ∞',
+    /* ⚠️ СТРОКИ СТАВИМ ПОСЛЕ ОТКРЫТИЯ ОКНА, А НЕ ДО. Конструктор больше ничего
+       не помнит со страницы: при открытии он собирает строки заново из того,
+       что стоит В ПОЛЕ (иначе куски текли между полями и моделями). Значит и
+       здесь порядок как у человека — сперва открыть, потом набрать. */
     run: `var build = function (rows, n) {
             resetSceneMemory(); pickScene('sd'); redrawAll();
             var inp = document.getElementById('curve-expr-1');
-            PW.rows = rows.slice(); PW.n = n;
             openPiecewise(inp, 'Q');
+            PW.rows = rows.slice(); PW.n = n; renderPw();
             document.getElementById('pw-apply').click();
             // То, что поле возьмёт при пересборке строки кривой.
             return mathToLatexField(document.getElementById('curve-expr-1').value);
@@ -3577,8 +3581,9 @@ const CASES = [
     name: 'Четыре дефекта (д) вне условий кусочной кривой нет',
     run: `resetSceneMemory(); pickScene('sd'); redrawAll();
           var inp = document.getElementById('curve-expr-1');
+          openPiecewise(inp, 'Q');
           PW.rows = [{ f: '100 - Q', a: '0', b: '40' }, { f: '80 - 0.5*Q', a: '40', b: '80' }];
-          PW.n = 2; openPiecewise(inp, 'Q');
+          PW.n = 2; renderPw();
           document.getElementById('pw-apply').click(); redrawAll();
           var c = STATE.curves.filter(function (x) { return x.id === 1; })[0];
           var def = function (q) { var v = evalCurve(c, q); return (v == null || isNaN(v)) ? 0 : 1; };
@@ -4646,15 +4651,13 @@ await gesture('(г) КТВ строится конструктором без р
     }, sel);
     await page.waitForTimeout(120);
   };
-  /* ⚠️ PW.rows переживает закрытие окна и чужие поля: openPiecewise досеивает
-     умолчание, только если PW.rows пуст (82-input.js). Прогон этого файла
-     идёт одним долгим сеансом браузера, и более ранний случай уже мог
-     открыть конструктор для ДРУГОГО поля — тогда здесь всплыли бы чужие
-     строки в чужой букве («p» вместо «X») и разбор упал бы на пустом месте,
-     хотя к приставке «y = » это отношения не имеет. Обнаружено этим же
-     тестом (см. отчёт сессии) — отдельная карточка заведена в «Задачи»,
-     здесь только просим конструктор открыться заново, как при первом входе. */
-  await page.evaluate(() => { if (typeof PW === 'object') PW.rows = []; });
+  /* ⚠️ ЗДЕСЬ СТОЯЛА ПОДПОРКА `PW.rows = []`, И ЕЁ УБРАЛИ НАРОЧНО.
+     Раньше строки конструктора переживали закрытие окна и чужие поля, прогон
+     идёт одним долгим сеансом браузера, и более ранний случай оставлял здесь
+     чужие куски в чужой букве («p» вместо «X»). Утечка починена: конструктор
+     собирает строки заново при каждом открытии — из того, что стоит в ПОЛЕ.
+     Без подпорки этот случай и стережёт починку: вернётся утечка — сюда
+     приедет «p», и разбор КТВ покраснеет. */
   await reveal('#fh-auto-inp-ppft');
   await page.click('#fh-auto-inp-ppft');
   await page.waitForTimeout(150);

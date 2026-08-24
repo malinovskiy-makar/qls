@@ -69,6 +69,14 @@ const FORMULA_VAR = { PQ: 'Q', QP: 'P', TC: 'Q', PROD: 'L', PPF: 'X', MATHF: 'x'
    куска означает «от нуля», пустая правая у последнего — «и дальше».
    Для движка собирается цепочка условий, для показа — одна фигурная скобка
    на всю функцию (LaTeX cases), которую MathLive умеет и рисовать, и править. */
+/* ⚠️ СТРОКИ ЗДЕСЬ — ЧЕРНОВИК ОТКРЫТОГО ОКНА, А НЕ ПАМЯТЬ СТРАНИЦЫ.
+   PW живёт один на всю страницу, и раньше `rows` заполнялись значениями по
+   умолчанию ТОЛЬКО когда массив пуст. Из-за этого куски переживали и смену
+   поля, и смену модели: конструктор, открытый в «Математике» (переменная x),
+   показывал те же куски с иксом у поля спроса в «Спросе и предложении», а
+   условия под ними уже писались по Q. Теперь строки собираются заново при
+   каждом открытии — из того, что стоит В ЭТОМ поле, а если там не кусочная,
+   то из значений по умолчанию с буквой ЭТОГО поля (см. openPiecewise). */
 const PW = { inp: null, v: 'Q', n: 2, rows: [] };
 
 // Условие одного куска для Math.js: «от a до b» с учётом пустых границ.
@@ -323,11 +331,108 @@ function pwVarForField(inp, fallback) {
   return fallback;
 }
 
+// Значения по умолчанию — ВСЕГДА с буквой того поля, куда открыт конструктор.
+function pwDefaultRows(v) {
+  return [{ f: '100 - ' + v, a: '0', b: '40' }, { f: '80 - 0.5*' + v, a: '40', b: '' }];
+}
+
+/* Скобки сбалансированы? Нужно, чтобы снимать лишнюю пару вокруг условия и не
+   съесть при этом «(Q >= 0) and (Q < 40)», где внешних скобок нет вовсе. */
+function pwBalanced(t) {
+  let d = 0;
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === '(') d++;
+    else if (t[i] === ')') { d--; if (d < 0) return false; }
+  }
+  return d === 0;
+}
+
+/* Разрезать «условие ? то : иначе» по знакам ВЕРХНЕГО уровня.
+   Наивный indexOf('?') ошибается на вложенной записи, а indexOf(':') — ещё и
+   на скобках: у нас хвост цепочки как раз заключён в скобки. Поэтому считаем
+   глубину скобок, а между «?» и «:» ещё и вложенные вопросительные знаки. */
+function pwSplitTernary(t) {
+  let depth = 0, q = -1;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    else if (ch === '?' && depth === 0) { q = i; break; }
+  }
+  if (q < 0) return null;
+  let d2 = 0, nest = 0, c = -1;
+  for (let i = q + 1; i < t.length; i++) {
+    const ch = t[i];
+    if (ch === '(') d2++;
+    else if (ch === ')') d2--;
+    else if (d2 === 0 && ch === '?') nest++;
+    else if (d2 === 0 && ch === ':') { if (!nest) { c = i; break; } nest--; }
+  }
+  if (c < 0) return null;
+  return { cond: t.slice(0, q).trim(), then: t.slice(q + 1, c).trim(), rest: t.slice(c + 1).trim() };
+}
+
+/* Границы участка из условия куска: «(V >= a and V < b)», «V >= a», «V < b».
+   Возвращает ещё и саму букву — по ней конструктор узнаёт переменную поля,
+   даже если поле пустое, а кусочная в нём уже стоит. */
+function pwCondBounds(cond) {
+  let s = String(cond || '').trim();
+  while (s.startsWith('(') && s.endsWith(')') && pwBalanced(s.slice(1, -1))) s = s.slice(1, -1).trim();
+  if (!s) return null;
+  const parts = s.split(/\s+and\s+/i);
+  let a = '', b = '', v = '';
+  for (const raw of parts) {
+    const p = raw.trim();
+    let m = /^([A-Za-z][A-Za-z0-9_]*)\s*>=\s*(.+)$/.exec(p);
+    if (m) { v = v || m[1]; if (m[1] !== v) return null; a = m[2].trim(); continue; }
+    m = /^([A-Za-z][A-Za-z0-9_]*)\s*<\s*(.+)$/.exec(p);
+    if (m) { v = v || m[1]; if (m[1] !== v) return null; b = m[2].trim(); continue; }
+    return null;                        // условие не про участок — это не наша кусочная
+  }
+  return v ? { a, b, v } : null;
+}
+
+/* Разбор того, что УЖЕ стоит в поле, обратно в строки конструктора.
+   Возвращает { v, rows } или null, если запись не кусочная (тогда покажем
+   значения по умолчанию). Понимаем ровно то, что собирает pwFormula, плюс
+   последний кусок без условия вместо «иначе NaN». */
+function pwParse(text, fallbackVar) {
+  let t = String(text || '').trim();
+  if (!t) return null;
+  const pfx = pwPrefixOf(t);
+  if (pfx) t = t.slice(pfx.length).trim();
+  const rows = [];
+  let v = '';
+  for (let guard = 0; guard < 12; guard++) {
+    let body = t.trim();
+    while (body.startsWith('(') && body.endsWith(')') && pwBalanced(body.slice(1, -1))) body = body.slice(1, -1).trim();
+    const cut = pwSplitTernary(body);
+    if (!cut) {
+      // Хвост цепочки. «NaN» — это «дальше ничего», отдельным куском не идёт.
+      if (body && !/^nan$/i.test(body)) rows.push({ f: body, a: '', b: '' });
+      break;
+    }
+    const bd = pwCondBounds(cut.cond);
+    if (!bd) return null;               // ветвление не по участкам — не наш случай
+    if (!v) v = bd.v;
+    if (bd.v !== v) return null;        // куски по разным буквам конструктор не собирал
+    rows.push({ f: cut.then, a: bd.a, b: bd.b });
+    t = cut.rest;
+  }
+  if (!rows.length || !v) return null;
+  return { v: v || fallbackVar, rows };
+}
+
+/* ⚠️ ПРИ КАЖДОМ ОТКРЫТИИ СТРОКИ СОБИРАЮТСЯ ЗАНОВО. Ровно этим конструктор и
+   перестаёт течь между полями: он ничего не помнит со страницы, а спрашивает
+   само поле. Либо разбор того, что в нём стоит, либо значения по умолчанию с
+   буквой этого поля — третьего не дано. */
 function openPiecewise(inp, v) {
   PW.inp = inp; PW.v = v || 'Q';
-  if (!PW.rows.length) {
-    PW.rows = [{ f: '100 - ' + PW.v, a: '0', b: '40' }, { f: '80 - 0.5*' + PW.v, a: '40', b: '' }];
-  }
+  const parsed = pwParse(inp ? inp.value : '', PW.v);
+  if (parsed) { PW.v = parsed.v || PW.v; PW.rows = parsed.rows; }
+  else { PW.rows = pwDefaultRows(PW.v); }
+  PW.n = PW.rows.length;
   const m = document.getElementById('pw-modal');
   if (!m) return;
   // Окно открываем ДО сборки полей: MathLive, собранный внутри inert-подложки,
