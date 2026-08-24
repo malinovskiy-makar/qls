@@ -36,6 +36,42 @@ async function login(page) {
   }
 }
 
+/* ⚠️ ЗАМЕР НЕ СМЕЕТ ЗАВИСЕТЬ ОТ ТОГО, ЧТО БЫЛО РАСКРЫТО.
+
+   Все проверки считают только ВИДИМЫЕ элементы (`vis`), а сцена открывается со
+   всеми закрытыми карточками. Значит без этого шага потолки храповика были бы
+   свойством не кода, а кода плюс состояния экрана: починили нарушение внутри
+   свёрнутой карточки — счётчик не шелохнулся, и наоборот.
+
+   Раскрываем ПРИНУДИТЕЛЬНО, а не переводим проверки на разбор исходников:
+   восемнадцать правил из двадцати спрашивают ВЫЧИСЛЕННЫЙ стиль (контраст, кегль,
+   радиус, тень, размер области касания), а его из текста CSS не вывести: одно и то же
+   правило даёт разный цвет в двух темах и разный кегль на четырёх ширинах.
+
+   Скрытое СЦЕНОЙ (`style.display = none` у чужих блоков) остаётся скрытым: это
+   не состояние экрана, а состав сцены, и человек его в этой модели не увидит никогда. */
+async function expandAll(page) {
+  const opened = await page.evaluate(() => {
+    if (typeof setToolsOpen === 'function') setToolsOpen(true);
+    if (typeof setParamsOpen === 'function') setParamsOpen(true);
+    let n = 0;
+    document.querySelectorAll('.fold-btn[aria-controls]').forEach(btn => {
+      const body = document.getElementById(btn.getAttribute('aria-controls'));
+      if (!body) return;
+      if (!body.classList.contains('open')) n += 1;
+      body.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      const card = btn.closest('.section, .side-part');
+      if (card) card.classList.add('open-card');
+    });
+    /* Поля формул собираются лениво (А56): пока карточка была свёрнута, поле
+       стояло в очереди и было бы замерено как голое текстовое окошко. */
+    if (typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
+    return n;
+  });
+  await page.waitForTimeout(opened ? 550 : 120);
+}
+
 async function openScene(page, key, theme) {
   await page.evaluate((t) => localStorage.setItem('theme', t), theme);
   await page.goto(BASE + '/calc2/', { waitUntil: 'load' });
@@ -44,6 +80,7 @@ async function openScene(page, key, theme) {
     null, { timeout: 25000 });
   await page.evaluate((k) => { pickScene(k); }, key);
   await page.waitForTimeout(650);
+  await expandAll(page);
 }
 
 /* Копилка находок. У каждой проверки свой ключ; питон читает ровно эти ключи. */
