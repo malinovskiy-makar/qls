@@ -47,8 +47,9 @@ function curvePoints(curve) {
   const out = [];
   // Считаем от видимого края, но не левее нуля: P = f(Q) для Q < 0 в экономике
   // смысла не имеет, а после панорамирования вправо незачем считать то,
-  // что всё равно останется за кадром.
-  const lo = quadLo(sx.domain()[0]), hi = sx.domain()[1];
+  // что всё равно останется за кадром. Обрезает econLo, а не quadLo: правило
+  // про экономику, а не про галочку «только первая четверть».
+  const lo = econLo(sx.domain()[0]), hi = sx.domain()[1];
   if (!(hi > lo)) return out;
   const [yLo, yHi] = sy.domain();
   const span = Math.abs(yHi - yLo) || 1;
@@ -59,7 +60,9 @@ function curvePoints(curve) {
     const p = evalCurve(curve, q);
     // Допуск 1e-9: ноль на оси — это ещё первая четверть, и точку выхода
     // кривой на ось терять нельзя, иначе линия обрывается на шаг раньше.
-    const off = isNaN(p) || (STATE.firstQuad && p < -1e-9);
+    // Условие — isEconScene(), а не галочка: снятая галочка раздвигает оси,
+    // но отрицательная цена от этого осмысленной не становится.
+    const off = isNaN(p) || (isEconScene() && p < -1e-9);
     const val = off ? null : [q, p];
     if (val && prev && ((prev[1] - yLo) * (val[1] - yLo) < 0 || (prev[1] < yLo && val[1] > yHi) || (prev[1] > yHi && val[1] < yLo))
         && Math.abs(val[1] - prev[1]) > OUT) {

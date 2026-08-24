@@ -967,14 +967,15 @@ function legendCorner(boxW, boxH) {
    в «Математике» и в сценах с двумя панелями окно своё, и всё, что считалось
    от CONFIG, искалось не там, где нарисованы кривые (отсюда терялись корни
    в отрицательной части плана). Нижние границы режем по правилу первой
-   четверти — тем же quadLo, что и остальной движок. */
+   четверти — тем же econLo, что и обрезка кривых: в экономической сцене
+   пересечений и корней ниже нуля не бывает независимо от галочки. */
 function viewWindow() {
   const { mx, my } = mainScales();
   const [dx0, dx1] = mx.domain(), [dy0, dy1] = my.domain();
   const [px0, px1] = mx.range();
   return {
-    x0: quadLo(dx0), x1: dx1,
-    y0: quadLo(dy0), y1: dy1,
+    x0: econLo(dx0), x1: dx1,
+    y0: econLo(dy0), y1: dy1,
     px: Math.abs(px1 - px0),
   };
 }
@@ -1531,13 +1532,14 @@ const ROLL_PX = 12;    // на каком расстоянии нажатие с
 
 /* Осмысленная область кривой. На КПВ за точкой пересечения с осью кривой нет,
    и катать по ней точку в отрицательных значениях бессмысленно. Возвращаем
-   ближайший к запрошенному x, где функция считается и (в сценах первой
-   четверти) не уходит ниже оси; годной точки нет — null. */
+   ближайший к запрошенному x, где функция считается и (в ЭКОНОМИЧЕСКИХ сценах)
+   не уходит ниже оси; годной точки нет — null. Условие — isEconScene(), а не
+   галочка: точка катается по кривой, а кривой ниже оси Q нет. */
 function rollerClampX(f, x) {
   const { mx } = mainScales();
   let [lo, hi] = mx.domain();
-  if (STATE.firstQuad) lo = Math.max(lo, 0);
-  const ok = (t) => { const v = f(t); return isFinite(v) && (!STATE.firstQuad || v >= -1e-9); };
+  if (isEconScene()) lo = Math.max(lo, 0);
+  const ok = (t) => { const v = f(t); return isFinite(v) && (!isEconScene() || v >= -1e-9); };
   x = Math.max(lo, Math.min(hi, x));
   if (ok(x)) return x;
   const N = 240, step = (hi - lo) / N;
