@@ -636,8 +636,14 @@ function labelCurveMath(g, f, mx, my, txt, color, key) {
     if (!isNaN(v) && v >= ylo && v <= yhi) {
       const sm = smoothLabel('math:' + (key || txt), mx(x), my(v), true);
       // А28: имя кривой набирается с индексом (f с единицей), а не слипшимся текстом.
+      /* Класс тот же, что у общего помощника labelCurve: по нему подпись кривой
+         находят и реестр обозначений, и проверка канона, и ночная проба
+         «сколько кривых подписано». Без него подписи «Математики» — эталона
+         поведения по решению владельца 22.08 — были для всех этих проверок
+         невидимы, хотя на экране стояли. */
       renderLabelText(
-        g.append('text').attr('x', sm.px - 4).attr('y', sm.py - 7).attr('text-anchor', 'end')
+        g.append('text').attr('class', 'curve-name')
+          .attr('x', sm.px - 4).attr('y', sm.py - 7).attr('text-anchor', 'end')
           .attr('font-size', curveLabelSize()).attr('font-weight', 600).attr('fill', color)
           .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6),
         txt);
@@ -733,7 +739,7 @@ function drawMathMinMax(f) {
 // из прошлых версий должны продолжать считаться.
 function compileAB(expr) {
   try {
-    const compiled = math.parse(expr).compile();
+    const compiled = math.parse(prepExpr(expr)).compile();
     compiled.evaluate(scopeFor(expr, { a: 1, b: 1, x: 1, y: 1, L: 1, K: 1 }));
     return { compiled, error: null };
   } catch (e) { return { compiled: null, error: 'Не понял формулу f(x, y): ' + e.message }; }
@@ -747,7 +753,7 @@ function compileAB(expr) {
 function parseConstraint(src) {
   const t = String(src || '').trim();
   if (!t) return null;
-  const eq = t.indexOf('=');
+  const eq = topLevelEqIndex(t);
   const expr = (eq >= 0) ? ('(' + t.slice(0, eq) + ') - (' + t.slice(eq + 1) + ')') : t;
   const r = compileAB(expr);
   if (!r.compiled) return null;
@@ -1407,7 +1413,7 @@ function mathToPgf(expr, varName) {
   const src = String(expr || '').trim();
   if (!src) return null;
   let node;
-  try { node = math.parse(src); } catch (e) { return null; }
+  try { node = math.parse(prepExpr(src)); } catch (e) { return null; }
   const vars = new Set([varName, 'x', 'Q', 'L', 'X']);
   let bad = false;
 

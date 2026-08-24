@@ -158,31 +158,26 @@ function updateMonoPanel() {
   box.innerHTML = html;
 }
 
-// Переключатель структуры рынка: конкуренция ↔ монополия.
+/* Структура рынка: конкуренция ↔ монополия. Кнопок у неё больше нет
+   (удалены 24.08), структуру задаёт карточка главного экрана — функция
+   осталась единственной дверью смены STATE.market. */
 function setMarket(mode) {
   STATE.market = mode;
-  const c = document.getElementById('seg-comp'), mo = document.getElementById('seg-mono');
-  if (c) c.classList.toggle('active', mode === 'comp');
-  if (mo) mo.classList.toggle('active', mode === 'monopoly');
   const mh = document.getElementById('mono-hint');
   if (mh) mh.style.display = (mode === 'monopoly') ? '' : 'none';
   // Вход в монополию — подставить стандартные кривые/поля, если их нет (Задача 1).
   if (mode === 'monopoly') ensureMonopolyPreset();
-  // Сторона налога («кто платит») видна только в конкуренции при типе «Налог».
-  const tsr = document.getElementById('taxside-row');
-  if (tsr) tsr.style.display = (mode !== 'monopoly' && STATE.intervType === 'tax') ? '' : 'none';
-  // Вид ставки — только в конкуренции: в монополии налог входит в предельные издержки
-  // (monopolyTax сдвигает MC), адвалорная форма туда не переносится. При входе в
-  // монополию честно возвращаем специфический вид, чтобы не считать по «не той» модели.
-  const tkr = document.getElementById('taxkind-row');
-  if (tkr) tkr.style.display = (mode !== 'monopoly' && (STATE.intervType === 'tax' || STATE.intervType === 'subsidy')) ? '' : 'none';
+  // Уровни каскада вмешательства (вид налога, сторона) видны только в
+  // конкуренции: в монополии налог входит в предельные издержки (monopolyTax
+  // сдвигает MC), процентная форма туда не переносится. При входе в монополию
+  // честно возвращаем потоварный вид, чтобы не считать по «не той» модели.
   if (mode === 'monopoly' && STATE.taxKind === 'advalorem') {
-    STATE.taxKind = 'unit';
-    const u = document.getElementById('tk-unit'), a = document.getElementById('tk-adv');
-    if (u) u.classList.add('active'); if (a) a.classList.remove('active');
+    STATE.taxForm = 'unit'; STATE.subKind = 'unit';
+    syncTaxKind();
     applyTaxRateBounds();
     STATE.tax = Math.min(STATE.tax, CONFIG.Pmax);
   }
+  applyIntervCascade();
   // Видимость под-режима монополии и его панелей (галочки областей / дискриминация / ломаный).
   applyMonoVisibility();
   if (typeof updatePult === 'function') updatePult();   // монополия: пульт = слайдеры D/MC + поле вмешательства

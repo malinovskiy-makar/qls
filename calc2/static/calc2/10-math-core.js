@@ -5,6 +5,26 @@
    ниже одинаково работает и для прямых, и для кривых (парабол, корней…).
    --------------------------------------------------------------------- */
 
+/* Индекс НАСТОЯЩЕГО знака равенства — не части «>=», «<=», «==» или «!=».
+   Разборщики уравнений («y = …», «x = …», «F(x,y) = G(x,y)») искали его
+   наивным indexOf('=') и натыкались на первый попавшийся символ — а он
+   почти всегда лежит внутри условия куска кусочной функции («X >= 0»),
+   которое встаёт РАНЬШЕ настоящего знака в строке вроде «y = (X>=0 and
+   X<40) ? 100-X : 60». Оттого голая кусочная запись без приставки «y = »
+   принималась за неявное уравнение и не считалась вовсе (замер 21.08,
+   «КТВ. Одна страна»). Признак — сосед символа, а не перечень мест, где
+   парсер уравнения встречается: список забудут дополнить у новой сцены. */
+function topLevelEqIndex(t) {
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] !== '=') continue;
+    const prev = t[i - 1], next = t[i + 1];
+    if (prev === '<' || prev === '>' || prev === '=' || prev === '!') continue;
+    if (next === '=') continue;
+    return i;
+  }
+  return -1;
+}
+
 // Компиляция формулы P = f(Q). Возвращает { compiled, error }.
 // Пользователь пишет от Q; внутри даём Math.js обе переменные (Q и x),
 // чтобы принимались оба варианта записи.
@@ -175,7 +195,7 @@ function fmtLinear(a, b, varName, dec) {
 // Компиляция формулы Q = f(P). Переменные: P (основная), p и x — синонимы.
 function compileFormulaP(expr) {
   try {
-    const compiled = math.parse(expr).compile();
+    const compiled = math.parse(prepExpr(expr)).compile();
     compiled.evaluate(scopeFor(expr, { P: 1, p: 1, x: 1 }));   // пробный расчёт ловит опечатки
     return { compiled, error: null };
   } catch (e) {
@@ -389,13 +409,17 @@ function curveDeriv(curve, q) {
 
 // Внешние предельные издержки (Задача 4): константа или функция от Q (как спрос — переменная Q).
 function compileExt(expr) {
-  try { const c = math.parse(expr).compile(); c.evaluate(scopeFor(expr, axisScope(1))); return { compiled: c, error: null }; }
+  try { const c = math.parse(prepExpr(expr)).compile(); c.evaluate(scopeFor(expr, axisScope(1))); return { compiled: c, error: null }; }
   catch (e) { return { compiled: null, error: e.message }; }
 }
-function evalExt(q) {
-  if (!STATE.extCompiled) return NaN;
+
+/* Общественная кривая (MSB или MSC) — та же компиляция, что у внешнего
+   эффекта, но результат хранится не в единственном месте, а рядом со своей
+   кривой: их две, и каждая живёт своей формулой. */
+function evalSocial(compiled, expr, q) {
+  if (!compiled) return NaN;
   try {
-    const v = STATE.extCompiled.evaluate(scopeFor(STATE.extExpr, axisScope(q)));
+    const v = compiled.evaluate(scopeFor(expr, axisScope(q)));
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) { return NaN; }
 }
@@ -432,7 +456,7 @@ function compileTwoVar(expr) {
 
 function compileTwoVarUncached(expr) {
   try {
-    const compiled = math.parse(expr).compile();
+    const compiled = math.parse(prepExpr(expr)).compile();
     compiled.evaluate(scopeFor(expr, { x: 1, y: 1, L: 1, K: 1 }));   // пробный расчёт ловит опечатки
     // Исходный текст носим на самом скомпилированном узле: evalTwoVar получает
     // только его, а буквы-параметры надо подставлять по тексту формулы.

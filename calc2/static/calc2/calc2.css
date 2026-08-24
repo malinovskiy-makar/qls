@@ -174,12 +174,26 @@ input, select { font: inherit; }
   display: flex; align-items: center;
   font-size: 13px; font-weight: 600; letter-spacing: -.005em;
   color: var(--text); margin-bottom: 8px;
+  /* Заголовок бывает смесью слова и набранной формулы («Равновесие D = S»,
+     «Оптимум монополии: MR = MC»). Раскладка в ряд съедает пробел на стыке
+     текста и span.tex, поэтому зазор задаём явно. */
+  column-gap: .28em;
 }
-/* Вложенная секция (Фаза 8): «Структура рынка» и «Вмешательство» живут внутри
-   «Что изучаем», поэтому у них нет собственных отступов верхнего уровня —
-   их роль обозначает подзаголовок .vsub. */
+/* Вложенная секция: блоки моделей живут внутри одной карточки «Ввод функций»,
+   поэтому собственных отступов верхнего уровня у них нет — роль обозначает
+   подзаголовок .vsub. */
 .section .section { margin-bottom: 0; }
 .section .section:last-child { margin-bottom: 0; }
+
+/* ⚠️ ВНУТРИ «ВВОДА ФУНКЦИЙ» ОТСТУП МЕЖДУ БЛОКАМИ ВОЗВРАЩАЕТСЯ.
+   Правило выше обнуляет отступ у любой вложенной секции, и это верно, пока
+   вложенных блоков один-два. В карточке ввода их до четырёх сразу (кривые,
+   монополия, вмешательство, панель сюжета) — без зазора они слипались бы в
+   одну простыню. Последний блок отступа не получает: под ним и так край
+   карточки. Видимость блоков задаёт setMode инлайновым display, поэтому
+   :last-child здесь мало — нужен запас на скрытых соседей снизу. */
+#sec-input .section { margin-bottom: 14px; }
+#sec-input .section:last-child { margin-bottom: 0; }
 
 /* Элементы управления в панели */
 .field { margin-bottom: 8px; }
@@ -955,6 +969,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .bcard:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: var(--shadow-pop); }
 .bcard:focus-visible { border-color: var(--accent); outline: 2px solid var(--focus); outline-offset: 2px; }
 .bcard:active { transform: translateY(-1px) scale(.995); }
+/* Первую карточку окно фокусирует программно при открытии (доступность —
+   Tab/Enter срабатывают сразу), но браузер не отличает такой фокус от
+   настоящего Tab и рисует кольцо на пустом месте, ещё до первого касания
+   мышью или клавиатурой. Кольцо гасим только на время этого «служебного»
+   фокуса — см. openPicker() в 84-picker.js, класс снимается на первое же
+   действие человека, и дальше :focus-visible снова решает сам браузер. */
+.bcard.no-init-ring:focus-visible { border-color: var(--border); outline: none; }
 
 /* Возврат ко всем блокам. Показывается только внутри открытого блока. */
 .picker-back {
@@ -1428,9 +1449,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .cv-mode__stop:hover { background: var(--btn-bg-hover); }
 
 
-/* Поля координат своей точки. */
-.mark-xy { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+/* Поля координат своей точки. Приставка «x = »/«y = » — статичный узел рядом
+   с редактируемым значением (не .edval): в правку не входит и пунктира под
+   ней нет, чтобы глаз не путал подпись с тем, что можно щёлкнуть. */
+.mark-xy { display: flex; align-items: baseline; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
 .mark-xy label { font-size: 11px; color: var(--text3); }
+.mark-num-prefix { color: var(--text); font-variant-numeric: tabular-nums; margin-right: -4px; }
+.mark-xy .edval { margin-left: 2px; }
 .mark-xy input[type="number"] {
   width: 100%; min-width: 0; padding: 4px 6px; font-size: 12px;
   border: 1px solid var(--border); border-radius: var(--r);
@@ -1452,8 +1477,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    человек просто не замечал, что по ним можно щёлкнуть. Оформляем их так же,
    как и любое редактируемое значение (.edval): читаемый цвет, заметный
    пунктир снизу, текстовый курсор. */
+/* ⚠️ ШИРИНА ГРАНИЦЫ НЕ ЗАВИСИТ ОТ РАЗРЯДНОСТИ ЧИСЛА (решение владельца 22.08).
+   Было `flex: 0 0 auto` без минимума, то есть ширина ровно по содержимому:
+   трёхзначная граница «100» шире однозначной «0» на семь пикселей, и дорожки
+   соседних ползунков начинались в разных местах — панель из четырёх ползунков
+   выглядела как лесенка. Минимальная ширина в 3,4em (≈37px при кегле 11)
+   вмещает и «−100», и «1 250», а числа стоят по центру своего места. */
 .param-bound {
-  flex: 0 0 auto; padding: 1px 3px; border: none; background: transparent;
+  flex: 0 0 auto; min-width: 3.4em; text-align: center;
+  padding: 1px 3px; border: none; background: transparent;
   font-size: 11px; color: var(--text2); font-variant-numeric: tabular-nums;
   border-bottom: 1px dashed var(--text3); border-radius: 0; cursor: text;
   transition: color .12s var(--ease), border-bottom-color .12s var(--ease);
@@ -1508,6 +1540,26 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    подпись поля больше не нужна: имя стояло бы дважды (Н8). */
 .reg-label-hidden { display: none !important; }
 .reg-eq { display: inline-flex; align-items: baseline; gap: 3px; font-size: 15px; color: var(--text); }
+
+/* Строка «имя = значение» у регулятора сцены стоит по содержимому. Колонка
+   параметров — flex-столбец, и без этого она растягивала строку на всю
+   ширину панели, а вместе со строкой — и пунктир под ней (жалоба владельца
+   21.08: полоса во всю ширину видна даже без правки). */
+.field > .reg-eq { align-self: flex-start; max-width: 100%; }
+
+/* Поле правки значения НЕ подчиняется общему виду числовых полей панели:
+   ни рамки, ни фона — только подчёркивание под самим числом, как у .edval.
+   Селектор намеренно специфичнее, чем «#params-body .field
+   input[type="number"]:focus», иначе тот перебивает задуманный вид. */
+#params-body .field input.param-eq-input[type="number"],
+#params-body .field input.param-eq-input[type="number"]:hover,
+#params-body .field input.param-eq-input[type="number"]:focus {
+  flex: 0 0 auto; width: auto; min-width: 1.6em; padding: 0 2px;
+  text-align: left; background: transparent; outline: none;
+  border: none; border-bottom: 1px solid var(--accent); border-radius: 0;
+  font-size: 15px; font-family: 'KaTeX_Main', var(--font, inherit);
+  color: var(--text); font-variant-numeric: tabular-nums;
+}
 .pchip-param .pchip-top { gap: 6px; }
 .param-kill {
   margin-left: auto; flex: 0 0 auto; width: 18px; height: 18px; padding: 0;

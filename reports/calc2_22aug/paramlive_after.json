@@ -1,0 +1,2523 @@
+{
+ "scenes": {
+  "m-graph": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "fields": [
+    {
+     "id": "graph-f-1",
+     "was": "",
+     "want": "10 - a*x",
+     "typedInto": "10-a*x",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "10-a*x",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0.color",
+      "curves.0.srcForm",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "crosses.0.b",
+      "crosses.1.b",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": false,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "m-tangent": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "fields": [
+    {
+     "id": "inp-mathf",
+     "was": "x^2",
+     "want": "a*x^2",
+     "typedInto": "a*x^(2)",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*x^(2)",
+     "changedKeys": [
+      "mathFormula",
+      "_paramsSig"
+     ],
+     "exact": [],
+     "anyLetter": [
+      "mathFormula",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "m-optimum": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "fields": [
+    {
+     "id": "inp-mathf",
+     "was": "x^3 - 3*x",
+     "want": "x^3 - a*x",
+     "typedInto": "x^(3)-a*x",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "x^(3)-a*x",
+     "changedKeys": [
+      "mathFormula",
+      "_paramsSig"
+     ],
+     "exact": [],
+     "anyLetter": [
+      "mathFormula",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "3→5.952",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "m-transform": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "fields": [
+    {
+     "id": "inp-mathf",
+     "was": "x^2",
+     "want": "a*x^2",
+     "typedInto": "a*x^(2)",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*x^(2)",
+     "changedKeys": [
+      "mathFormula"
+     ],
+     "exact": [],
+     "anyLetter": [
+      "mathFormula"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": false,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "m-minmax": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "mm-f0",
+     "was": "x^2",
+     "want": "a*x^2",
+     "typedInto": "a*x^(2)",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*x^(2)",
+     "changedKeys": [
+      "mathFormula",
+      "_paramsSig"
+     ],
+     "exact": [],
+     "anyLetter": [
+      "mathFormula",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": false,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "mm-f1",
+     "was": "4 - x",
+     "want": "4 - a*x",
+     "typedInto": "4-a*x",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "4-a*x",
+     "changedKeys": [
+      "mathG2",
+      "_paramsSig"
+     ],
+     "exact": [
+      "mathG2"
+     ],
+     "anyLetter": [
+      "mathG2",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": false,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "m-constraint": {
+   "letter": "k",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "inp-mathfc",
+     "was": "x^0.5 * y^0.5",
+     "want": "x^k* y^0.5",
+     "typedInto": "x^(k*)y^(0).5",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "x^(k)* y^(0.5)",
+     "changedKeys": [
+      "mathFC",
+      "_paramsSig"
+     ],
+     "exact": [],
+     "anyLetter": [
+      "mathFC",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "0.5→0.992",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "inp-mathgc",
+     "was": "x + y = 10",
+     "want": "x + y = k*10",
+     "typedInto": "x+y=k*10",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "x+y=k*10",
+     "changedKeys": [
+      "mathGC",
+      "_paramsSig"
+     ],
+     "exact": [
+      "mathGC"
+     ],
+     "anyLetter": [
+      "mathGC",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "ppf": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "fields": [
+    {
+     "id": "inp-ppf",
+     "was": "y = 100 - x",
+     "want": "y = 100 - a*x",
+     "typedInto": "y=100-a*x",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "y=100-a*x",
+     "changedKeys": [
+      "ppfFormula",
+      "_paramsSig"
+     ],
+     "exact": [
+      "ppfFormula"
+     ],
+     "anyLetter": [
+      "ppfFormula",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": false,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "ppfsum": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "inp-ppfsum-0",
+     "was": "100 - X",
+     "want": "100 - a*X",
+     "typedInto": "100-a*X",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "100-a*X",
+     "changedKeys": [
+      "ppf1",
+      "ppfSumData.sig",
+      "_paramsSig"
+     ],
+     "exact": [
+      "ppf1"
+     ],
+     "anyLetter": [
+      "ppf1",
+      "ppfSumData.sig",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "inp-ppfsum-1",
+     "was": "60 - 3*X",
+     "want": "60 - a*X",
+     "typedInto": "60-a*X",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "60-a*X",
+     "changedKeys": [
+      "ppf2",
+      "ppfSumData.formulaText",
+      "ppfSumData.type",
+      "ppfSumData.sig",
+      "_paramsSig"
+     ],
+     "exact": [
+      "ppf2"
+     ],
+     "anyLetter": [
+      "ppf2",
+      "ppfSumData.sig",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "3→5.952",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "trade": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "fields": [
+    {
+     "id": "inp-ppft",
+     "was": "100 - X",
+     "want": "100 - a*X",
+     "typedInto": "100-a*X",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "100-a*X",
+     "changedKeys": [
+      "ppftFormula",
+      "_paramsSig"
+     ],
+     "exact": [
+      "ppftFormula"
+     ],
+     "anyLetter": [
+      "ppftFormula",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "tradeprice": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "inp-tb1",
+     "was": "100 - X",
+     "want": "100 - a*X",
+     "typedInto": "100-a*X",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "100-a*X",
+     "changedKeys": [
+      "tbF1",
+      "_paramsSig"
+     ],
+     "exact": [
+      "tbF1"
+     ],
+     "anyLetter": [
+      "tbF1",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "inp-tb2",
+     "was": "100 - 2*X",
+     "want": "100 - a*X",
+     "typedInto": "100-a*X",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "100-a*X",
+     "changedKeys": [
+      "tbF2",
+      "tradeBData.error",
+      "_paramsSig"
+     ],
+     "exact": [
+      "tbF2"
+     ],
+     "anyLetter": [
+      "tbF2",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [
+      "Не понял формулу: Альтернативные издержки стран совпали, тор"
+     ],
+     "value": "2→3.968",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "sd": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "tax": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "taxAfterD.texExpr",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "taxAfterD.texExpr",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "taxAfterS.texExpr",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "taxAfterS.texExpr",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "tax-adv": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "taxAfterD.texExpr",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "taxAfterD.texExpr",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "taxAfterS.texExpr",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "taxAfterS.texExpr",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "ceil": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "elast": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "ext": {
+   "letter": "a",
+   "fieldsTotal": 3,
+   "fields": [
+    {
+     "id": "ext-input",
+     "was": "20",
+     "want": "a*20",
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*20",
+     "changedKeys": [
+      "extExpr",
+      "_paramsSig"
+     ],
+     "exact": [
+      "extExpr"
+     ],
+     "anyLetter": [
+      "extExpr",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "costs": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "fields": [
+    {
+     "id": "inp-tc",
+     "was": "Q^3 - 6*Q^2 + 15*Q + 18",
+     "want": "Q^3 - a*Q^2 + 15*Q + 18",
+     "typedInto": "Q^(3)-a*Q^(2)+15*Q+18",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "Q^(3)-a*Q^(2)+15*Q+18",
+     "changedKeys": [
+      "crosses.2.b",
+      "crosses.3.a",
+      "crosses.3.b",
+      "crosses.4.a",
+      "crosses.4.b",
+      "costsTC",
+      "_paramsSig",
+      "costsSig"
+     ],
+     "exact": [],
+     "anyLetter": [
+      "costsTC",
+      "_paramsSig",
+      "costsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "6→12.012",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "prod": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "fields": [
+    {
+     "id": "inp-prod",
+     "was": "30*L^2 - L^3",
+     "want": "a*L^2 - L^3",
+     "typedInto": "a*L^(2)-L^(3)",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "a*L^(2)-L^(3)",
+     "changedKeys": [
+      "crosses.0.b",
+      "crosses.1.a",
+      "crosses.1.b",
+      "prodExpr",
+      "_paramsSig"
+     ],
+     "exact": [],
+     "anyLetter": [
+      "prodExpr",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "30→59.52",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "plants": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "inp-pl1",
+     "was": "Q^2",
+     "want": "a*Q^2",
+     "typedInto": "a*Q^(2)",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "a*Q^(2)",
+     "changedKeys": [
+      "pl1",
+      "_paramsSig"
+     ],
+     "exact": [],
+     "anyLetter": [
+      "pl1",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "inp-pl2",
+     "was": "2*Q^2",
+     "want": "a*Q^2",
+     "typedInto": "a*Q^(2)",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "a*Q^(2)",
+     "changedKeys": [
+      "pl2",
+      "_paramsSig"
+     ],
+     "exact": [],
+     "anyLetter": [
+      "pl2",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "2→3.968",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "isoquant": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "fields": [
+    {
+     "id": "inp-iso",
+     "was": "L^0.5 * K^0.5",
+     "want": "L^a* K^0.5",
+     "typedInto": "L^(a*)K^(0).5",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "L^(a)*K^(0.5)",
+     "changedKeys": [
+      "isoExpr",
+      "_paramsSig"
+     ],
+     "exact": [
+      "isoExpr"
+     ],
+     "anyLetter": [
+      "isoExpr",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "0.5→0.992",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "mono": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "20",
+     "want": "a*20",
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*20",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "mono-nat": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "curves.1._pNamesFor",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "20",
+     "want": "a*20",
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*20",
+     "changedKeys": [
+      "curves.0._pNamesFor",
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "mono-d1": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "curves.1._pNamesFor",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "20",
+     "want": "a*20",
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*20",
+     "changedKeys": [
+      "curves.0._pNamesFor",
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "mono-d3": {
+   "letter": "a",
+   "fieldsTotal": 3,
+   "fields": [
+    {
+     "id": "inp-d3-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0._pNamesFor",
+      "curves.1._pNamesFor",
+      "d3D1",
+      "_paramsSig"
+     ],
+     "exact": [
+      "d3D1"
+     ],
+     "anyLetter": [
+      "d3D1",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "inp-d3-2",
+     "was": "80 - 2*Q",
+     "want": "80 - a*Q",
+     "typedInto": "80-a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "80-a*Q",
+     "changedKeys": [
+      "curves.0._pNamesFor",
+      "curves.1._pNamesFor",
+      "d3D2",
+      "_paramsSig"
+     ],
+     "exact": [
+      "d3D2"
+     ],
+     "anyLetter": [
+      "d3D2",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "2→3.968",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "inp-d3-mc",
+     "was": "20",
+     "want": "a*20",
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "a*20",
+     "changedKeys": [
+      "curves.0._pNamesFor",
+      "curves.1._pNamesFor",
+      "d3MC",
+      "_paramsSig"
+     ],
+     "exact": [
+      "d3MC"
+     ],
+     "anyLetter": [
+      "d3MC",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "mono-kink": {
+   "letter": "a",
+   "fieldsTotal": 3,
+   "fields": [
+    {
+     "id": "inp-ki-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0._pNamesFor",
+      "curves.1._pNamesFor",
+      "kiD1",
+      "_paramsSig"
+     ],
+     "exact": [
+      "kiD1"
+     ],
+     "anyLetter": [
+      "kiD1",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "inp-ki-2",
+     "was": "60 - Q",
+     "want": "60 - a*Q",
+     "typedInto": "60-a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "60-a*Q",
+     "changedKeys": [
+      "curves.0._pNamesFor",
+      "curves.1._pNamesFor",
+      "kiD2",
+      "_paramsSig"
+     ],
+     "exact": [
+      "kiD2"
+     ],
+     "anyLetter": [
+      "kiD2",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "inp-kink-mc",
+     "was": "20",
+     "want": "a*20",
+     "typedInto": "a*20",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "a*20",
+     "changedKeys": [
+      "curves.0._pNamesFor",
+      "curves.1._pNamesFor",
+      "kinkMC",
+      "_paramsSig"
+     ],
+     "exact": [
+      "kinkMC"
+     ],
+     "anyLetter": [
+      "kinkMC",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "labor": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - L",
+     "want": "100 - a*L",
+     "typedInto": "100-a*L",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*L",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "L",
+     "want": "a*L",
+     "typedInto": "a\\cdot L",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*L",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "labor-mono": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - L",
+     "want": "100 - a*L",
+     "typedInto": "100-a*L",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*L",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "L",
+     "want": "a*L",
+     "typedInto": "a\\cdot L",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*L",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "labor-union": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - L",
+     "want": "100 - a*L",
+     "typedInto": "100-a*L",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*L",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "L",
+     "want": "a*L",
+     "typedInto": "a\\cdot L",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*L",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "labor-bilat": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - L",
+     "want": "100 - a*L",
+     "typedInto": "100-a*L",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*L",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "L",
+     "want": "a*L",
+     "typedInto": "a\\cdot L",
+     "typeOk": false,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*L",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "smallopen": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "curve-expr-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "exact": [
+      "curves.0.expr",
+      "curves[0].expr"
+     ],
+     "anyLetter": [
+      "curves.0.expr",
+      "curves.0._pNamesFor",
+      "curves.0._pSig",
+      "_paramsSig",
+      "curves[0].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "curve-expr-2",
+     "was": "Q",
+     "want": "a*Q",
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "changedKeys": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "exact": [
+      "curves.1.expr",
+      "curves[1].expr"
+     ],
+     "anyLetter": [
+      "curves.1.expr",
+      "curves.1._pNamesFor",
+      "curves.1._pSig",
+      "_paramsSig",
+      "curves[1].expr"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "monoexport": {
+   "letter": "a",
+   "fieldsTotal": 3,
+   "fields": [
+    {
+     "id": "inp-d3-1",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "d3D1",
+      "_paramsSig"
+     ],
+     "exact": [
+      "d3D1"
+     ],
+     "anyLetter": [
+      "d3D1",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "inp-d3-2",
+     "was": "50",
+     "want": "a*50",
+     "typedInto": "a*50",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "a*50",
+     "changedKeys": [
+      "d3D2",
+      "_paramsSig"
+     ],
+     "exact": [
+      "d3D2"
+     ],
+     "anyLetter": [
+      "d3D2",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "inp-d3-mc",
+     "was": "Q",
+     "want": "a*Q",
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "кнопка",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "changedKeys": [
+      "d3MC",
+      "_paramsSig"
+     ],
+     "exact": [
+      "d3MC"
+     ],
+     "anyLetter": [
+      "d3MC",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "consumer": {
+   "letter": "a",
+   "fieldsTotal": 0,
+   "fields": []
+  },
+  "cons-slutsky": {
+   "letter": "a",
+   "fieldsTotal": 0,
+   "fields": []
+  },
+  "adas": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "ma-sras",
+     "was": "10 + 0.5*Y",
+     "want": "10 + a*Y",
+     "typedInto": "10+a*Y",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "10+a*Y",
+     "changedKeys": [
+      "macro.adas.sras",
+      "_paramsSig"
+     ],
+     "exact": [
+      "macro.adas.sras"
+     ],
+     "anyLetter": [
+      "macro.adas.sras",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "0.5→0.992",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "ma-ad",
+     "was": "120 - 0.6*Y",
+     "want": "120 - a*Y",
+     "typedInto": "120-a*Y",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "120-a*Y",
+     "changedKeys": [
+      "crosses.1.b",
+      "macro.adas.ad",
+      "_paramsSig"
+     ],
+     "exact": [
+      "macro.adas.ad"
+     ],
+     "anyLetter": [
+      "macro.adas.ad",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "0.6→1.2012",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "islm": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "ma-is",
+     "was": "20 - 0.1*Y",
+     "want": "20 - a*Y",
+     "typedInto": "20-a*Y",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "20-a*Y",
+     "changedKeys": [
+      "macro.islm.is",
+      "macroErr",
+      "_paramsSig"
+     ],
+     "exact": [
+      "macro.islm.is"
+     ],
+     "anyLetter": [
+      "macro.islm.is",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [
+      "Пересечение IS и LM не найдено в первой четверти."
+     ],
+     "value": "0.1→0.2002",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "ma-lm",
+     "was": "0.05*Y - 5",
+     "want": "a*Y - 5",
+     "typedInto": "a*Y-5",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Y-5",
+     "changedKeys": [
+      "crosses.1.b",
+      "macro.islm.lm",
+      "_paramsSig"
+     ],
+     "exact": [
+      "macro.islm.lm"
+     ],
+     "anyLetter": [
+      "macro.islm.lm",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "0.05→0.1001",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "phillips": {
+   "letter": "a",
+   "fieldsTotal": 0,
+   "fields": []
+  },
+  "money": {
+   "letter": "a",
+   "fieldsTotal": 1,
+   "fields": [
+    {
+     "id": "ma-md",
+     "was": "200 - 4*i",
+     "want": "200 - a*i",
+     "typedInto": "200-a*i",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "200-a*i",
+     "changedKeys": [
+      "macro.money.md",
+      "_paramsSig"
+     ],
+     "exact": [
+      "macro.money.md"
+     ],
+     "anyLetter": [
+      "macro.money.md",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "4→7.936",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "loanable": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "ma-ls",
+     "was": "50 + 2*r",
+     "want": "50 + a*r",
+     "typedInto": "50+a*r",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "50+a*r",
+     "changedKeys": [
+      "macro.loanable.s",
+      "_paramsSig"
+     ],
+     "exact": [
+      "macro.loanable.s"
+     ],
+     "anyLetter": [
+      "macro.loanable.s",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "2→3.968",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "ma-ld",
+     "was": "150 - 3*r",
+     "want": "150 - a*r",
+     "typedInto": "150-a*r",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "150-a*r",
+     "changedKeys": [
+      "macro.loanable.d",
+      "_paramsSig"
+     ],
+     "exact": [
+      "macro.loanable.d"
+     ],
+     "anyLetter": [
+      "macro.loanable.d",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "3→5.952",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "fx": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "ma-fxd",
+     "was": "100 - 2*e",
+     "want": "100 - a*e",
+     "typedInto": "100-a*e",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*e",
+     "changedKeys": [
+      "macro.fx.d",
+      "_paramsSig"
+     ],
+     "exact": [
+      "macro.fx.d"
+     ],
+     "anyLetter": [
+      "macro.fx.d",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "2→3.968",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "ma-fxs",
+     "was": "20 + 3*e",
+     "want": "20 + a*e",
+     "typedInto": "20+a*e",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "20+a*e",
+     "changedKeys": [
+      "crosses.1.b",
+      "macro.fx.s",
+      "_paramsSig"
+     ],
+     "exact": [
+      "macro.fx.s"
+     ],
+     "anyLetter": [
+      "macro.fx.s",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "3→5.952",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  },
+  "ineq": {
+   "letter": "a",
+   "fieldsTotal": 0,
+   "fields": []
+  },
+  "laffer": {
+   "letter": "a",
+   "fieldsTotal": 2,
+   "fields": [
+    {
+     "id": "ma-lafd",
+     "was": "100 - Q",
+     "want": "100 - a*Q",
+     "typedInto": "100-a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "100-a*Q",
+     "changedKeys": [
+      "macro.laffer.d",
+      "_paramsSig"
+     ],
+     "exact": [
+      "macro.laffer.d"
+     ],
+     "anyLetter": [
+      "macro.laffer.d",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    },
+    {
+     "id": "ma-lafs",
+     "was": "Q",
+     "want": "a*Q",
+     "typedInto": "a*Q",
+     "typeOk": true,
+     "applyBy": "Enter",
+     "slider": true,
+     "fieldNow": "a*Q",
+     "changedKeys": [
+      "macro.laffer.s",
+      "_paramsSig"
+     ],
+     "exact": [
+      "macro.laffer.s"
+     ],
+     "anyLetter": [
+      "macro.laffer.s",
+      "_paramsSig"
+     ],
+     "substituted": [],
+     "err": [],
+     "value": "1→1.984",
+     "dragMovedHandle": true,
+     "curves": true,
+     "labels": true,
+     "window": false,
+     "numbers": true,
+     "verdict": "живой"
+    }
+   ]
+  }
+ },
+ "pageErrors": []
+}

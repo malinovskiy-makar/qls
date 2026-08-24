@@ -58,7 +58,7 @@ def main():
     print('Размер   : %s байт' % human(os.path.getsize(DB)))
     print('Считаю отпечаток (MD5), это занимает секунд десять...')
 
-    digest = hashlib.md5()
+    digest = hashlib.md5(usedforsecurity=False)
     with open(DB, 'rb') as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b''):
             digest.update(chunk)

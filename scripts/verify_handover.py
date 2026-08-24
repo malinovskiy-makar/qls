@@ -38,11 +38,11 @@ def say(ok, text):
 
 
 def md5_bytes(b):
-    return hashlib.md5(b).hexdigest()
+    return hashlib.md5(b, usedforsecurity=False).hexdigest()
 
 
 def md5_file(path):
-    h = hashlib.md5()
+    h = hashlib.md5(usedforsecurity=False)
     with open(path, 'rb') as fh:
         for chunk in iter(lambda: fh.read(1 << 22), b''):
             h.update(chunk)

@@ -1,4 +1,4 @@
-{% load static %}<!DOCTYPE html>
+{% load static calc2_static %}<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
@@ -55,7 +55,7 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="{% static 'calc2/calc2.css' %}">
+  <link rel="stylesheet" href="{% calc2_static 'calc2/calc2.css' %}">
 </head>
 <body>
 {% include '_nav.html' %}
@@ -198,34 +198,28 @@
           <span class="scard-name">Спрос и предложение</span>
           <span class="scard-desc">Равновесие, излишки CS и PS, общественное благосостояние.</span>
         </button>
-        <button class="scard soon" data-scene="sdsum" disabled>
+        <button class="scard" data-scene="sdsum">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <path d="M22 20 L74 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
             <path d="M22 34 L96 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
             <path d="M22 20 L48 47 L144 74" stroke="var(--curve-d)" stroke-width="2.6" stroke-linejoin="round"/></g></svg></span>
-          <span class="scard-head"><span class="scard-name">Сложение спросов и предложений</span><span class="scard-soon">Скоро</span></span>
+          <span class="scard-name">Сложение спросов и предложений</span>
           <span class="scard-desc">Горизонтальное сложение по количеству: рыночная кривая с изломами.</span>
         </button>
-        <button class="scard" data-scene="tax">
+        <!-- ОДНА карточка вместо двух (потоварной и процентной): вид налога
+             выбирается внутри сюжета, в правой панели. Ключи 'tax' и
+             'tax-adv' остались рабочими синонимами этой же сцены. -->
+        <button class="scard" data-scene="taxes">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
             <rect x="22" y="36" width="52" height="22" fill="var(--curve-tax)" opacity=".16"/>
             <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 58 L120 12" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
-          <span class="scard-name">Потоварные налоги и субсидии</span>
-          <span class="scard-desc">Клин в рублях за единицу: параллельный сдвиг S, сбор бюджета, потери DWL.</span>
-        </button>
-        <button class="scard" data-scene="tax-adv">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="22" y="34" width="50" height="24" fill="var(--curve-tax)" opacity=".16"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 72 L112 12" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
-          <span class="scard-name">Процентные налоги и субсидии</span>
-          <span class="scard-desc">Адвалорная ставка: не сдвиг, а поворот кривой предложения от начала координат.</span>
+            <path d="M22 58 L120 12" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
+            <path d="M22 72 L112 12" stroke="var(--curve-s)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".5"/></g></svg></span>
+          <span class="scard-name">Налоги и субсидии</span>
+          <span class="scard-desc">Потоварный налог, НДС, акциз и субсидии: клин между ценами, сбор бюджета, потери DWL.</span>
         </button>
         <button class="scard" data-scene="ceil">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
@@ -236,14 +230,15 @@
           <span class="scard-name">Пол и потолок цены</span>
           <span class="scard-desc">Фиксированная цена, дефицит или избыток, объём торговли по короткой стороне.</span>
         </button>
-        <button class="scard soon" data-scene="quota" disabled>
+        <button class="scard" data-scene="quota">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
+            <rect x="18" y="30" width="46" height="26" fill="var(--curve-reg)" opacity=".16"/>
             <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
             <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
             <path d="M64 78 V12" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
-          <span class="scard-head"><span class="scard-name">Квоты</span><span class="scard-soon">Скоро</span></span>
-          <span class="scard-desc">Прямое ограничение объёма: цена по спросу, рента квоты у продавца.</span>
+          <span class="scard-name">Квоты</span>
+          <span class="scard-desc">Прямое ограничение объёма: цена не определена однозначно, а лежит в коридоре.</span>
         </button>
         <button class="scard" data-scene="elast">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
@@ -785,49 +780,83 @@
          действие сбивали с толку. Кнопка «Сценарии» в шапке возвращает к выбору. -->
 
     <!-- Кривые (шаг 3) -->
+    <!-- ЕДИНЫЙ БЛОК ВВОДА (решение владельца 22.08). Левая панель во ВСЕХ
+         41 сцене состоит ровно из трёх карточек: «Ввод функций», «Точки на
+         графике», «Площади». Поля разных моделей лежат ВНУТРИ этой карточки
+         вложенными блоками, и setMode по-прежнему показывает нужный по id —
+         поэтому у каждой модели свой набор полей, а заголовок один на всех.
+         Раньше карточек было от трёх до пяти, и имя «Ввод функций» доставалось
+         первой видимой из реестра INPUT_CARDS. -->
+    <div class="section" id="sec-input">
+      <div class="section-title">Ввод функций</div>
     <div class="section" id="sec-curves">
-      <div class="section-title">Кривые</div>
-      <!-- Сначала спрашиваем, ЧТО за кривая: от этого зависят и примеры под
-           знаком «?», и подсказка формы записи, и цвет. Раньше роль ставили
-           уже после добавления, и справка всем подряд объясняла запись
-           спроса, хотя добавляли, например, предельные издержки. -->
-      <div class="field">
-        <label for="new-role">Что добавляем</label>
-        <select id="new-role">
-          <option value="">Обычная кривая</option>
-          <option value="demand">D, спрос</option>
-          <option value="supply">S, предложение</option>
-          <option value="mc">MC, предельные издержки</option>
-          <option value="tc">TC, суммарные затраты</option>
-          <option value="atc">ATC, средние затраты</option>
-        </select>
-      </div>
-      <!-- Фаза 1б: форма записи. P(Q) — цена от количества (канон движка);
-           Q(P) — количество от цены (привычная запись спроса). Q(P) приводится
-           к P=f(Q) аналитически (линейная) или численно (обращение бисекцией). -->
-      <div class="seg" id="curve-form-seg" style="margin-bottom:8px;">
-        <button class="seg-btn active" id="cf-pq">Вводить P(Q)</button>
-        <button class="seg-btn" id="cf-qp">Вводить Q(P)</button>
-      </div>
-      <div class="field f-wrap">
-        <div class="f-row">
-          <input type="text" id="inp-formula" placeholder="Например: 100 - Q" autocomplete="off">
-          <button class="f-help" id="fh-formula" type="button" aria-expanded="false"
-                  aria-controls="fp-formula" title="Как писать формулы">?</button>
+      <!-- Своего заголовка у блока нет: его называет карточка «Ввод функций».
+
+           ЗДЕСЬ БОЛЬШЕ НЕТ ПОЛЯ ДЛЯ НОВОЙ КРИВОЙ СВЕРХУ (решение владельца
+           22.08). Модель открывается своими готовыми полями — «Спрос» и
+           «Предложение», — а пустое поле появляется ТОЛЬКО по кнопке под
+           списком: лишняя пустая строка в экономической модели читается как
+           требование её заполнить.
+
+           Роль при добавлении не спрашивается: добавленная кривая всегда
+           обычная, имя любое, в расчёты модели она не входит. Поэтому ушли
+           и список «Что добавляем» (#new-role), и переключатель формы записи
+           P(Q)/Q(P) (#cf-pq/#cf-qp) — форму разбор определяет сам по буквам
+           в формуле (см. curveSrcForm в 80-ui.js). -->
+      <!-- СЮЖЕТ «СЛОЖЕНИЕ СПРОСОВ И ПРЕДЛОЖЕНИЙ»: сначала СКОЛЬКО групп.
+           Порядок с созвона: число групп → поле на каждую группу → имя.
+           Поля групп это обычные строки списка кривых ниже, поэтому имя
+           правится там же, где формула, и ничего нового учить не надо. -->
+      <div id="sum-counts" style="display:none;">
+        <div class="field">
+          <label for="sum-nd">Сколько групп спроса</label>
+          <input type="number" id="sum-nd" min="1" max="8" step="1" value="2">
         </div>
-        <div class="f-pop" id="fp-formula" role="region" aria-label="Примеры формул"></div>
+        <div class="field">
+          <label for="sum-ns">Сколько групп предложения</label>
+          <input type="number" id="sum-ns" min="1" max="8" step="1" value="2">
+        </div>
+      </div>
+      <div class="error" id="curve-error"></div>
+      <div id="curve-list"></div>
+      <!-- ОБЩЕСТВЕННЫЕ КРИВЫЕ сюжета «Внешние эффекты» (ночная сессия
+           «вмешательство»). Задаются ЗАРАНЕЕ, здесь же, где и остальные
+           функции модели, и по умолчанию равны своим частным парам:
+           MSB = спрос, MSC = предложение. Чекбокс СЛЕВА выключен — пока его
+           не включат, кривой на графике нет и потерь нет. Включил — можно
+           править формулу и увидеть расхождение.
+           Кривые D и S при этом НЕ переименовываются (решение владельца). -->
+      <div id="social-curves" style="display:none;margin-top:8px;">
+        <!-- ⚠️ ПОЛЕ ФОРМУЛЫ ЗАВЁРНУТО В СВОЙ DIV. Оснастка формул помечает
+             РОДИТЕЛЯ поля классом .f-wrap, а стиль #tools-panel .f-wrap input
+             возвращает всем полям внутри него браузерные рамки. Лежи флажок в
+             том же родителе, он получил бы `border: revert` и пропал бы с
+             глаз: нарисованная каноном рамка снимается, а системная в этой
+             теме невидима. Проверено — флажок был не виден совсем. -->
+        <div style="display:flex;gap:6px;align-items:center;">
+          <label class="chk" style="margin:0;white-space:nowrap;"><input type="checkbox" id="chk-msb">
+            <span class="swatch" style="background:var(--curve-mr)"></span> MSB</label>
+          <div style="flex:1;min-width:0;">
+            <input type="text" id="inp-msb" autocomplete="off" style="width:100%;" disabled>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+          <label class="chk" style="margin:0;white-space:nowrap;"><input type="checkbox" id="chk-msc">
+            <span class="swatch" style="background:var(--curve-reg)"></span> MSC</label>
+          <div style="flex:1;min-width:0;">
+            <input type="text" id="inp-msc" autocomplete="off" style="width:100%;" disabled>
+          </div>
+        </div>
+        <div class="error" id="social-error" style="display:none;"></div>
       </div>
       <button class="btn" id="btn-add-curve">Добавить кривую</button>
-      <div class="hint" id="curve-form-hint">Цена как функция количества: P&nbsp;=&nbsp;f(Q).</div>
-      <div class="error" id="curve-error"></div>
-      <div id="curve-list" style="margin-top:10px;"></div>
     </div>
 
     <!-- Построение графиков: чистый список функций, экономики здесь нет.
          Строки заводятся сами: начал печатать в пустой — снизу появилась
          следующая, а эта стала полноценной строкой списка. -->
     <div class="section" id="sec-graph" style="display:none;">
-      <div class="section-title">Функции</div>
+      <!-- Своего заголовка у блока нет: его называет карточка «Ввод функций». -->
       <div class="hint-row">
         <span class="hint-lead">Как строить график</span>
         <button class="hint-btn" type="button" data-pop="hp-graph" aria-label="Как этим пользоваться">?</button>
@@ -852,46 +881,26 @@
       <div class="section-title">Равновесие $D = S$</div>
       <div id="info-eq"></div>
     </div>
-
-    <!-- Излишки CS / PS (шаг 6) -->
-    <div class="section" id="sec-areas">
-      <div class="section-title">Излишки</div>
-        <div class="hint-row">
-          <span class="hint-lead">Что такое излишки</span>
-          <button class="hint-btn" type="button" data-pop="hp-areas" aria-label="Как этим пользоваться">?</button>
-        </div>
-        <div class="hint-pop" id="hp-areas">
-          <p>Излишек покупателя это разница между тем, сколько человек готов был заплатить, и тем, сколько он заплатил на самом деле. На графике это область между кривой спроса и линией цены.</p>
-          <p>Излишек продавца считается зеркально: между ценой и кривой предложения, то есть между выручкой и издержками. Сумма двух излишков это общий выигрыш рынка, и именно её уменьшает любое вмешательство.</p>
-        </div>
-
-      <label class="chk"><input type="checkbox" id="chk-cs" checked>
-        <span class="swatch" style="background:var(--curve-d)"></span> Показывать CS</label>
-      <label class="chk"><input type="checkbox" id="chk-ps" checked>
-        <span class="swatch" style="background:var(--curve-s)"></span> Показывать PS</label>
+      <!-- Карточка «Излишки» убрана из панели (решение владельца 22.08): показ
+           заливок переехал одним тумблером в «Настройки графика» у гаечного
+           ключа. Табло остаётся — RESULT_IDS переносит его в правую панель. -->
       <div id="info-areas" style="margin-top:8px;"></div>
-    </div>
+        <!-- Аналитика по группам сюжета сложения: количество и излишек каждой
+             группы плюс сумма. В остальных сценах блок пуст и CSS его прячет. -->
+        <div id="info-sum"></div>
 
-    <!-- Анализ рынка (Задачи 2–4): взаимоисключающие сценарии поверх «Рынка».
-         «Обычный» — равновесие + интервенции + монополия (как раньше). Остальные
-         сценарии прячут панели интервенций и структуры рынка. -->
-    <div class="section" id="sec-analysis">
-      <div class="section-title">Что изучаем</div>
-      {% comment %}
-        П54 · П55. Пять взаимоисключающих вариантов — ОДИН переключатель, а не
-        два подряд. Разбитые на две обёртки, они читались как две независимые
-        системы режимов и вставали рядами разной высоты (28 и 42 px), хотя
-        выбран из всех пяти всегда ровно один. Идентификаторы кнопок не
-        тронуты: обвязка сцен ходит к ним по id, и переносить их между
-        обёртками для неё ничего не значит.
-      {% endcomment %}
-      <div class="seg">
-        <button class="seg-btn active" id="scn-none">Равновесие</button>
-        <button class="seg-btn" id="scn-elast">Эластичность</button>
-        <button class="seg-btn" id="scn-shift">Сдвиги</button>
-        <button class="seg-btn" id="scn-ext">Внеш. эффект</button>
-        <button class="seg-btn" id="scn-open">Открытая экономика</button>
-      </div>
+      <!-- Обёртка «Что изучаем» убрана (решение владельца 21.08 и 22.08).
+           Её содержимое — панели сюжетов, монопольные поля и блок
+           вмешательства — осталось ровно тем же и лежит теперь прямо
+           в «Вводе функций». -->
+      <!-- Кнопки сюжетов (#scn-none/#scn-elast/#scn-ext/#scn-open) убраны:
+           в эластичность, внешние эффекты и открытую экономику попадают
+           карточками главного экрана. Обвязка в 52-modes.js и 88-params.js
+           проверяет наличие кнопки перед обращением.
+           Сюжет «Сдвиги» (scenario 'shift') УДАЛЁН целиком 24.08: карточки у
+           него не было, значение STATE.scenario никогда не могло стать
+           'shift', и постоянная проверка calc2_blocks уже требовала, чтобы
+           кнопки #scn-shift в разметке не было. -->
       <!-- Эластичность спроса и предложения вдоль кривых (Задача 2 + Фаза 2а) -->
       <div id="scn-pane-elast" style="display:none;margin-top:8px;">
         <label class="chk"><input type="checkbox" id="chk-elast-s" checked>
@@ -902,52 +911,20 @@
           правее неэластичный.</div>
         <div id="info-elast" style="margin-top:6px;"></div>
       </div>
-      <!-- Разложение двойных сдвигов спроса и предложения (Задача 3) -->
-      <div id="scn-pane-shift" style="display:none;margin-top:8px;">
-        <div class="field">
-          <label>Сдвиг спроса ΔD = <b id="shiftD-val">0</b></label>
-          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
-            <input type="range" id="shiftD-slider" min="-50" max="50" step="1" value="0" style="flex:1;margin-top:0;">
-            <input type="number" id="shiftD-input" step="1" value="0"
-                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
-          </div>
-        </div>
-        <div class="field">
-          <label>Сдвиг предложения ΔS = <b id="shiftS-val">0</b></label>
-          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
-            <input type="range" id="shiftS-slider" min="-50" max="50" step="1" value="0" style="flex:1;margin-top:0;">
-            <input type="number" id="shiftS-input" step="1" value="0"
-                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
-          </div>
-        </div>
-        <div class="hint">Сдвиг по вертикали (свободный член кривой): + вверх, − вниз.
-          Разложение показывает вклад спроса (E₀→E_d), предложения (E₀→E_s) и итог (E₀→E₁).</div>
-        <div id="info-shift" style="margin-top:6px;"></div>
-      </div>
       <!-- Внешний эффект и корректирующий налог/субсидия Пигу (Задача 4 + Фаза 2б).
            Два зеркальных случая: отрицательный (перепроизводство → налог) и
            положительный (недопроизводство → субсидия). -->
+      <!-- ПОЛЕЙ ИЗДЕРЖЕК ЗДЕСЬ БОЛЬШЕ НЕТ (Андрей: им тут не место), и знак
+           эффекта кнопкой не выбирается — он вытекает из того, куда сместился
+           оптимум. Сами общественные кривые MSB и MSC задаются во «Вводе
+           функций», рядом с остальными функциями модели. -->
       <div id="scn-pane-ext" style="display:none;margin-top:8px;">
-        <div class="seg">
-          <button class="seg-btn active" id="ext-neg">Отрицательный</button>
-          <button class="seg-btn" id="ext-pos">Положительный</button>
-        </div>
-        <div class="field" style="margin-top:8px;">
-          <label id="ext-label">Внешние предельные издержки (число или f(Q))</label>
-          <input type="text" id="ext-input" value="20" autocomplete="off">
-        </div>
         <label class="chk"><input type="checkbox" id="ext-pigou">
           <span class="swatch" style="background:var(--curve-tax)"></span>
-          <span id="ext-pigou-label">Применить налог Пигу</span></label>
-        <div class="hint" id="ext-hint-neg">Спрос&nbsp;=&nbsp;предельная выгода, предложение (роль S)&nbsp;=&nbsp;частные
-          издержки MPC. MSC&nbsp;=&nbsp;MPC&nbsp;+&nbsp;внешние. Рынок выпускает Qрын (D&nbsp;=&nbsp;MPC),
-          оптимум Qопт (D&nbsp;=&nbsp;MSC) <b>меньше</b> рыночного: перепроизводство.
-          Налог Пигу поднимает MPC до MSC, и рынок приходит в Qопт.</div>
-        <div class="hint" id="ext-hint-pos" style="display:none;">Спрос (роль D)&nbsp;=&nbsp;частная выгода MPB,
-          предложение&nbsp;=&nbsp;издержки. MSB&nbsp;=&nbsp;MPB&nbsp;+&nbsp;внешние. Рынок выпускает Qрын
-          (MPB&nbsp;=&nbsp;S), оптимум Qопт (MSB&nbsp;=&nbsp;S) <b>больше</b> рыночного: недопроизводство.
-          Корректирующая субсидия опускает издержки, и рынок приходит в Qопт.</div>
-        <div class="error" id="ext-error" style="display:none;"></div>
+          <span id="ext-pigou-label">Применить корректирующий налог или субсидию</span></label>
+        <div class="hint" id="ext-hint">Спрос это предельная выгода частного лица, предложение это его
+          предельные издержки. Пока MSB и MSC выключены, общественные кривые совпадают с частными:
+          оптимум там же, где рынок.</div>
         <div id="info-ext" style="margin-top:6px;"></div>
       </div>
       <!-- Малая открытая экономика (Фаза 4в). Обычные D(Q) и S(Q) ПО ЦЕНЕ (это
@@ -1002,15 +979,12 @@
            в разметке, логика не тронута. -->
       <!-- Структура рынка: конкуренция / монополия (Задача 3) -->
       <div class="section" id="sec-mono">
-        <!-- Выбор структуры рынка прячется, когда сюжет её уже задал (блоки 3 и 5):
-             карточка «Спрос и предложение» не должна предлагать монополию. -->
-        <div id="market-struct-row">
-          <div class="vsub">Структура рынка</div>
-          <div class="seg">
-            <button class="seg-btn active" id="seg-comp">Конкуренция</button>
-            <button class="seg-btn" id="seg-mono">Монополия</button>
-          </div>
-        </div>
+        <!-- ПЕРЕКЛЮЧАТЕЛЬ «Конкуренция / Монополия» УДАЛЁН 24.08. Структуру
+             рынка задаёт карточка главного экрана, и замер по всем 44 сценам
+             показал: #market-struct-row не был виден НИ В ОДНОЙ. Поля ввода
+             четырёх монопольных сюжетов (дискриминация 3°, составной спрос,
+             естественная монополия, внешний рынок) жили внутри этого же
+             блока и остались на месте — убран только сам переключатель. -->
         <div class="hint" id="mono-hint" style="display:none;">Монополист выпускает там, где <b>MR&nbsp;=&nbsp;MC</b>,
           и берёт цену с кривой спроса (выше предельных издержек). Нужны: спрос (роль D) и предельные издержки
           (роль MC, либо TC, либо S как MC). Серым закрашены потери общества (DWL) против конкуренции.</div>
@@ -1019,13 +993,13 @@
              при выборе сцены «Монополия» переносится в пульт-ленту (Фаза 3а). -->
         <div id="mono-submode" style="display:none;margin-top:8px;">
           <div class="seg">
-            <button class="seg-btn active" id="mm-simple" title="Обычная монополия: MR = MC, одна цена">Обычная</button>
-            <button class="seg-btn" id="mm-d1" title="Ценовая дискриминация 1-й степени (совершенная)">Дискр.&nbsp;1°</button>
-            <button class="seg-btn" id="mm-d3" title="Ценовая дискриминация 3-й степени: два сегмента рынка">Дискр.&nbsp;3°</button>
+            <button class="seg-btn active" id="mm-simple" data-tip="Обычная монополия: $MR = MC$, одна цена">Обычная</button>
+            <button class="seg-btn" id="mm-d1" data-tip="Ценовая дискриминация 1-й степени (совершенная)">Дискр.&nbsp;1°</button>
+            <button class="seg-btn" id="mm-d3" data-tip="Ценовая дискриминация 3-й степени: два сегмента рынка">Дискр.&nbsp;3°</button>
           </div>
           <div class="seg" style="margin-top:6px;">
-            <button class="seg-btn" id="mm-kink" title="Составной спрос: рыночный спрос склеен из сегментов покупателей">Составной&nbsp;спрос</button>
-            <button class="seg-btn" id="mm-nat" title="Естественная монополия: большие постоянные издержки, убывающая ATC">Естественная</button>
+            <button class="seg-btn" id="mm-kink" data-tip="Составной спрос: рыночный спрос склеен из сегментов покупателей">Составной&nbsp;спрос</button>
+            <button class="seg-btn" id="mm-nat" data-tip="Естественная монополия: большие постоянные издержки, убывающая $ATC$">Естественная</button>
           </div>
         </div>
         <!-- Панель дискриминации 1-й степени (Задача 4): использует D и MC из списка кривых. -->
@@ -1127,63 +1101,7 @@
         <div id="info-mono" style="margin-top:8px;"></div>
       </div>
 
-      <!-- Вмешательство государства: налог / субсидия (шаги 7–8) -->
-      <div class="section" id="sec-tax">
-        <div class="vsub">Вмешательство государства</div>
-        <div class="seg">
-          <button class="seg-btn active" id="seg-tax">Налог</button>
-          <button class="seg-btn" id="seg-sub">Субсидия</button>
-          <button class="seg-btn" id="seg-ceil">Потолок</button>
-          <button class="seg-btn" id="seg-floor">Пол</button>
-        </div>
-        <!-- Кто формально платит налог (Задача 1). Виден только для типа «Налог». -->
-        <div id="taxside-row" style="margin-top:8px;">
-          <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Налог платит:</label>
-          <div class="seg">
-            <button class="seg-btn active" id="tsb-seller">Продавец</button>
-            <button class="seg-btn" id="tsb-buyer">Покупатель</button>
-          </div>
-        </div>
-        <!-- Вид ставки (Фаза 2в): потоварная (руб./ед.) — параллельный сдвиг S;
-             адвалорная (%) — ПОВОРОТ: S_после(Q) = (1+τ)·S(Q). Только в конкуренции. -->
-        <div id="taxkind-row" style="margin-top:8px;">
-          <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;">Вид ставки:</label>
-          <div class="seg">
-            <button class="seg-btn active" id="tk-unit">Специфический</button>
-            <button class="seg-btn" id="tk-adv">Адвалорный</button>
-          </div>
-        </div>
-        <!-- Поле ставки (налог / субсидия) -->
-        <div class="field" id="tax-field" style="margin-top:8px;">
-          <label>Ставка <span id="rate-letter">t</span> = <b id="tax-val">0</b></label>
-          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
-            <input type="range" id="tax-slider" min="0" max="100" step="1" value="0"
-                   style="flex:1;margin-top:0;">
-            <input type="number" id="tax-input" min="0" max="100" step="0.1" value="0"
-                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
-          </div>
-        </div>
-        <!-- Поле регулируемой цены (потолок / пол) -->
-        <div class="field" id="pc-field" style="margin-top:8px;display:none;">
-          <label>Цена <span id="pc-letter">Pc</span> = <b id="pc-val">0</b></label>
-          <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
-            <input type="range" id="pc-slider" min="0" max="100" step="1" value="0"
-                   style="flex:1;margin-top:0;">
-            <input type="number" id="pc-input" min="0" max="100" step="0.1" value="0"
-                   style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
-          </div>
-        </div>
-        <div class="hint" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
-          на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя
-          и продавца можно тянуть мышью.</div>
-        <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
-          дефицит (продаётся меньше), пол выше равновесия даёт избыток. Линию цены можно тянуть мышью.</div>
-        <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-ghost" checked>
-          <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
-        <div id="info-tax" style="margin-top:8px;"></div>
-      </div>
 
-    </div>
 
     <!-- Издержки фирмы (Задача 2) — отдельный режим -->
     <div class="section" id="sec-costs" style="display:none;">
@@ -1211,7 +1129,7 @@
           <div class="f-row">
             <input type="text" id="inp-tc" value="Q^3 - 6*Q^2 + 15*Q + 18" autocomplete="off">
             <button class="f-help" id="fh-tc" type="button" aria-expanded="false"
-                    aria-controls="fp-tc" title="Как писать формулы">?</button>
+                    aria-controls="fp-tc" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-tc" role="region" aria-label="Примеры формул TC"></div>
         </div>
@@ -1242,20 +1160,20 @@
       <div class="curve-group" style="margin-top:10px;">
         <div class="curve-group-title">Средние и предельные затраты</div>
         <label class="chk"><input type="checkbox" id="chk-mc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costMC" title="Цвет MC"> MC, предельные затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costMC" data-tip="Цвет $MC$"> MC, предельные затраты</label>
         <label class="chk"><input type="checkbox" id="chk-atc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costATC" title="Цвет ATC"> ATC, средние общие затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costATC" data-tip="Цвет $ATC$"> ATC, средние общие затраты</label>
         <label class="chk"><input type="checkbox" id="chk-avc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costAVC" title="Цвет AVC"> AVC, средние переменные затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costAVC" data-tip="Цвет $AVC$"> AVC, средние переменные затраты</label>
         <label class="chk"><input type="checkbox" id="chk-afc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costAFC" title="Цвет AFC"> AFC, средние постоянные затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costAFC" data-tip="Цвет $AFC$"> AFC, средние постоянные затраты</label>
         <div class="curve-group-title" style="margin-top:8px;">Полные затраты</div>
         <label class="chk"><input type="checkbox" id="chk-tc">
-          <input type="color" class="swatch swatch-pick" data-col="costTC" title="Цвет TC"> TC, общие затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costTC" data-tip="Цвет $TC$"> TC, общие затраты</label>
         <label class="chk"><input type="checkbox" id="chk-vc">
-          <input type="color" class="swatch swatch-pick" data-col="costVC" title="Цвет VC"> VC, переменные затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costVC" data-tip="Цвет $VC$"> VC, переменные затраты</label>
         <label class="chk"><input type="checkbox" id="chk-fc">
-          <input type="color" class="swatch swatch-pick" data-col="costFC" title="Цвет FC"> FC, постоянные затраты</label>
+          <input type="color" class="swatch swatch-pick" data-col="costFC" data-tip="Цвет $FC$"> FC, постоянные затраты</label>
       </div>
       <!-- 9в: долгосрочное равновесие конкурентной фирмы. -->
       <div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border);">
@@ -1284,18 +1202,18 @@
           <label>Выпуск Q&nbsp;=&nbsp;f(L)</label>
           <div class="f-row">
             <input type="text" id="inp-prod" value="30*L^2 - L^3" autocomplete="off">
-            <button class="f-help" id="fh-prod" type="button" aria-expanded="false" aria-controls="fp-prod" title="Как писать формулы">?</button>
+            <button class="f-help" id="fh-prod" type="button" aria-expanded="false" aria-controls="fp-prod" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-prod" role="region" aria-label="Примеры производственных функций"></div>
         </div>
         <button class="btn" id="btn-prod-apply">Построить</button>
         <div style="margin-top:10px;">
           <label class="chk"><input type="checkbox" id="chk-tp" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodTP" title="Цвет TP"> TP (общий продукт)</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodTP" data-tip="Цвет $TP$"> TP (общий продукт)</label>
           <label class="chk"><input type="checkbox" id="chk-mp" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodMP" title="Цвет MP"> MP (предельный продукт)</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodMP" data-tip="Цвет $MP$"> MP (предельный продукт)</label>
           <label class="chk"><input type="checkbox" id="chk-ap" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodAP" title="Цвет AP"> AP (средний продукт)</label>
+            <input type="color" class="swatch swatch-pick" data-col="prodAP" data-tip="Цвет $AP$"> AP (средний продукт)</label>
         </div>
         <div class="hint">На верхней панели общий продукт TP, на нижней предельный MP&nbsp;=&nbsp;dQ/dL и
           средний AP&nbsp;=&nbsp;Q/L (у них свой масштаб, иначе на фоне TP их не видно).
@@ -1311,7 +1229,7 @@
           <label>Производственная функция Q(L,&nbsp;K)</label>
           <div class="f-row">
             <input type="text" id="inp-iso" value="L^0.5 * K^0.5" autocomplete="off">
-            <button class="f-help" id="fh-iso" type="button" aria-expanded="false" aria-controls="fp-iso" title="Как писать формулы">?</button>
+            <button class="f-help" id="fh-iso" type="button" aria-expanded="false" aria-controls="fp-iso" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-iso" role="region" aria-label="Примеры производственных функций"></div>
         </div>
@@ -1321,7 +1239,7 @@
         </div>
         <div class="field"><label>Бюджет C</label><input type="number" id="iso-c" min="1" step="1" value="100"></div>
         <label class="chk"><input type="checkbox" id="chk-iso-fan" checked>
-          <input type="color" class="swatch swatch-pick" data-col="isoq" title="Цвет изоквант"> Веер изоквант</label>
+          <input type="color" class="swatch swatch-pick" data-col="isoq" data-tip="Цвет изоквант"> Веер изоквант</label>
         <div class="hint">Изокоста w·L&nbsp;+&nbsp;r·K&nbsp;=&nbsp;C; оптимум это касание изокванты и изокосты,
           там MRTS&nbsp;=&nbsp;w/r. Считает ТОТ ЖЕ движок, что кривые безразличия потребителя:
           при Q&nbsp;=&nbsp;L^0.5·K^0.5, w=1, r=2, C=100 получаются те же 50 и 25.</div>
@@ -1537,12 +1455,12 @@
         <label>U(x, y)</label>
         <div class="f-row">
           <input type="text" id="cons-custom" value="x^0.5 * y^0.5" autocomplete="off">
-          <button class="f-help" id="fh-cons" type="button" aria-expanded="false" aria-controls="fp-cons" title="Как писать формулы">?</button>
+          <button class="f-help" id="fh-cons" type="button" aria-expanded="false" aria-controls="fp-cons" data-tip="Как писать формулы">?</button>
         </div>
         <div class="f-pop" id="fp-cons" role="region" aria-label="Примеры функций полезности"></div>
       </div>
       <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-cons-fan" checked>
-        <input type="color" class="swatch swatch-pick" data-col="indiff" title="Цвет кривых безразличия"> Веер кривых безразличия</label>
+        <input type="color" class="swatch swatch-pick" data-col="indiff" data-tip="Цвет кривых безразличия"> Веер кривых безразличия</label>
       <!-- 8в: разложение Слуцкого (эффект замещения и эффект дохода). -->
       <label class="chk" id="cons-slutsky-row"><input type="checkbox" id="chk-cons-slutsky">
         <span class="swatch" style="background:var(--curve-mr)"></span> Разложить изменение цены (Слуцкий)</label>
@@ -1578,7 +1496,7 @@
           <div class="f-row">
             <input type="text" id="inp-ppf" value="y = 100 - x" autocomplete="off">
             <button class="f-help" id="fh-ppf" type="button" aria-expanded="false"
-                    aria-controls="fp-ppf" title="Как писать формулы">?</button>
+                    aria-controls="fp-ppf" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-ppf" role="region" aria-label="Примеры формул КПВ"></div>
         </div>
@@ -1621,9 +1539,9 @@
         <!-- Области (Фаза 11.5) -->
         <div class="vsub">Области</div>
         <label class="chk"><input type="checkbox" id="chk-ppf-in" checked>
-          <input type="color" class="swatch swatch-pick" data-col="ppfIn" title="Цвет достижимых наборов"> Достижимые наборы</label>
+          <input type="color" class="swatch swatch-pick" data-col="ppfIn" data-tip="Цвет достижимых наборов"> Достижимые наборы</label>
         <label class="chk"><input type="checkbox" id="chk-ppf-out">
-          <input type="color" class="swatch swatch-pick" data-col="ppfOut" title="Цвет недостижимых наборов"> Недостижимые наборы</label>
+          <input type="color" class="swatch swatch-pick" data-col="ppfOut" data-tip="Цвет недостижимых наборов"> Недостижимые наборы</label>
 
         <div id="info-ppf" style="margin-top:8px;"></div>
       </div>
@@ -1830,7 +1748,7 @@
         <div class="f-row">
           <input type="text" id="inp-mathf" value="x^2" autocomplete="off">
           <button class="f-help" id="fh-mathf" type="button" aria-expanded="false"
-                  aria-controls="fp-mathf" title="Как писать формулы">?</button>
+                  aria-controls="fp-mathf" data-tip="Как писать формулы">?</button>
         </div>
         <div class="f-pop" id="fp-mathf" role="region" aria-label="Примеры функций"></div>
       </div>
@@ -1853,9 +1771,9 @@
         </div>
         <div class="field">
           <label>Цвета кривых</label>
-          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanF" title="Цвет функции">
+          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanF" data-tip="Цвет функции">
             f(x), сама функция</label>
-          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanD" title="Цвет производной">
+          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanD" data-tip="Цвет производной">
             f′(x), производная</label>
         </div>
         <div class="hint-row">
@@ -1930,7 +1848,7 @@
         </div>
         <div id="mm-rows"></div>
         <div class="field">
-          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="mmZ" title="Цвет итоговой кривой">
+          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="mmZ" data-tip="Цвет итоговой кривой">
             Цвет итоговой кривой</label>
         </div>
         <div class="hint-row">
@@ -1960,7 +1878,7 @@
           <div class="f-row">
             <input type="text" id="inp-mathfc" value="x^0.5 * y^0.5" autocomplete="off">
             <button class="f-help" id="fh-mathfc" type="button" aria-expanded="false"
-                    aria-controls="fp-mathfc" title="Как писать формулы">?</button>
+                    aria-controls="fp-mathfc" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-mathfc" role="region" aria-label="Примеры функций"></div>
         </div>
@@ -1969,7 +1887,7 @@
           <div class="f-row">
             <input type="text" id="inp-mathgc" value="x + y = 10" autocomplete="off">
             <button class="f-help" id="fh-mathgc" type="button" aria-expanded="false"
-                    aria-controls="fp-mathgc" title="Как писать формулы">?</button>
+                    aria-controls="fp-mathgc" data-tip="Как писать формулы">?</button>
           </div>
           <div class="f-pop" id="fp-mathgc" role="region" aria-label="Примеры ограничений"></div>
         </div>
@@ -1992,6 +1910,7 @@
       <!-- Границы окна живут только в меню гаечного ключа над графиком:
            два места для одного и того же сбивали с толку. -->
     </div>
+    </div><!-- /#sec-input -->
 
     <!-- Свои точки и площади. Оформление плоскости (название, оси, сетка,
          границы, легенда) переехало в меню гаечного ключа над графиком. -->
@@ -2005,20 +1924,17 @@
       <div class="fold-body open" id="marks-body">
         <div class="hint-row">
           <span class="hint-lead">Зачем ставить точки</span>
-          <button class="hint-btn" type="button" data-pop="hp-marks" aria-label="Как этим пользоваться">?</button>
+          <button class="hint-btn" type="button" data-pop="hp-marks" data-pop-trigger="hover" aria-label="Как этим пользоваться">?</button>
         </div>
         <div class="hint-pop" id="hp-marks">
-          <p>Точка отмечает на графике конкретный набор чисел: равновесие, оптимум, заданный объём.
-            Её можно ввести координатами или указать щелчком по плоскости, а рядом с кривой она к этой
-            кривой прилипает и дальше скользит по ней.</p>
-          <p>Галочки у точки решают, что показывать: сами координаты, пунктир до осей и подпись.
-            Цвет у каждой новой точки свой, чтобы на одном графике их можно было различить.</p>
+          <p>Точка задаёт набор чисел: равновесие, оптимум, заданный объём. Ставится координатами
+            или щелчком по плоскости; рядом с кривой прилипает к ней.</p>
+          <p>Галочки решают, что видно: координаты, пунктир к осям, подпись. У каждой точки свой цвет.</p>
           <!-- п. 33. Возможности холста названы здесь, а не в подсказке браузера:
                на сенсорном экране её нет вовсе, а плашка поверх самой фигуры
                перехватывает указатель и мешает по ней попасть. -->
-          <p>Машина сама отмечает на графике пересечения, изломы и вершины. У выбранной
-            такой точки рядом с координатами появляется значок: он кладёт её в этот список.
-            Любая подпись на графике переименовывается двойным щелчком по ней самой.</p>
+          <p>Пересечения, изломы и вершины машина находит сама: по наведению у них появляется
+            значок, кладущий точку в список. Подписи переименовываются двойным щелчком.</p>
         </div>
         <div id="mark-list"></div>
       </div>
@@ -2036,12 +1952,12 @@
       <div class="fold-body" id="areascalc-body">
         <div class="hint-row">
           <span class="hint-lead">Что здесь считается</span>
-          <button class="hint-btn" type="button" data-pop="hp-areascalc" aria-label="Как этим пользоваться">?</button>
+          <button class="hint-btn" type="button" data-pop="hp-areascalc" data-pop-trigger="hover" aria-label="Как этим пользоваться">?</button>
         </div>
         <div class="hint-pop" id="hp-areascalc">
-          <p>Площадь под кривой на отрезке это интеграл, и в экономике она почти всегда что-то значит: площадь под спросом до равновесия даёт общую готовность платить, а под предельными издержками переменные издержки.</p>
-          <p>Второй способ считает площадь многоугольника по отмеченным вершинам. Так берут излишки, сбор бюджета и потери общества, когда фигура составлена из отрезков, а не ограничена одной кривой.</p>
-          <p>Счёт численный: под кривой методом трапеций, по вершинам по формуле площади многоугольника. Поэтому подходит любая кривая, а не только та, у которой есть простая первообразная.</p>
+          <p>Площадь под кривой на отрезке считается интегралом: например, площадь под спросом до равновесия равна общей готовности платить.</p>
+          <p>Второй способ считает площадь многоугольника по отмеченным вершинам: так берут излишки, сбор бюджета и потери общества, когда фигуру ограничивают не одна кривая, а отрезки.</p>
+          <p>Счёт численный (трапеции и формула площади многоугольника), поэтому годится любая кривая.</p>
         </div>
 
         <div class="seg" id="ac-mode">
@@ -2198,6 +2114,19 @@
           Только первая четверть</label>
       </div>
 
+      <!-- ИЗЛИШКИ (решение владельца 22.08). Карточка «Излишки» ушла из левой
+           панели, а показ заливок остался нужен — он живёт здесь, рядом с
+           сеткой и первой четвертью: это настройка ВИДА графика, а не ввод
+           модели. Цвета и названия областей не дублируем — они в «Площадях».
+           Прежние две галочки (CS и PS по отдельности) схлопнуты в одну:
+           порознь их никто не включал, а области монополии считаются своими
+           галочками #chk-mono-cs/#chk-mono-ps/#chk-mono-vc и не тронуты. -->
+      <div class="wrench-group">
+        <div class="wrench-title">Излишки</div>
+        <label class="chk"><input type="checkbox" id="chk-areas" checked>
+          Показать излишки</label>
+      </div>
+
       <div class="wrench-group">
         <div class="wrench-title">Сетка</div>
         <div class="seg" id="grid-seg">
@@ -2265,6 +2194,108 @@
           <div id="params-empty" class="k-empty"><b>Ползунков в этой модели нет</b>
             <p>Впишите в формулу букву вместо числа, скажем «100 − a·Q»,
             и она станет ползунком здесь.</p></div>
+        </div>
+
+        <!-- ВМЕШАТЕЛЬСТВО ГОСУДАРСТВА переехало сюда из левой панели
+             (решение владельца 22.08). Разметка, идентификаторы и логика
+             applyScenarioVisibility не тронуты: блок просто живёт в панели
+             аналитики, рядом с ползунками, которыми им и управляют. Правая
+             панель будет перестраиваться отдельной сессией — блок стоит
+             ПЕРЕД «Ключевыми значениями», чтобы та его не потеряла. -->
+        <!-- Вмешательство государства: налог / субсидия (шаги 7–8) -->
+        <div class="section" id="sec-tax">
+          <div class="vsub">Вмешательство государства</div>
+          <div class="seg">
+            <button class="seg-btn active" id="seg-tax">Налог</button>
+            <button class="seg-btn" id="seg-sub">Субсидия</button>
+            <button class="seg-btn" id="seg-ceil">Потолок</button>
+            <button class="seg-btn" id="seg-floor">Пол</button>
+            <button class="seg-btn" id="seg-quota">Квота</button>
+          </div>
+          <!-- УРОВЕНЬ 2 каскада: вид налога (или вид субсидии). Ряд один на оба
+               случая — меняются подписи кнопок, а третья кнопка «Акциз» видна
+               только у налога. Идентификаторы сохранены (taxkind-row, tk-unit,
+               tk-vat): на них завязаны запреты карточек и лента регуляторов.
+                 потоварный — параллельный сдвиг S на ставку в рублях;
+                 НДС        — ПОВОРОТ S_после(Q) = (1+τ)·S(Q), ставка в процентах;
+                 акциз      — потоварный по механике, отдельный по названию.
+               Только в конкуренции: в монополии налог входит в MC. -->
+          <div id="taxkind-row" style="margin-top:8px;">
+            <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;"
+                   id="taxkind-label">Вид налога:</label>
+            <div class="seg">
+              <button class="seg-btn active" id="tk-unit">Потоварный</button>
+              <button class="seg-btn" id="tk-vat">НДС</button>
+              <button class="seg-btn" id="tk-exc">Акциз</button>
+            </div>
+          </div>
+          <!-- УРОВЕНЬ 3 (потоварный налог) и УРОВЕНЬ 4б (субсидия): кто формально
+               платит налог / кому достаётся субсидия. На числа не влияет —
+               в этом и смысл проверки (Задача 1). У НДС и акциза плательщик
+               закреплён законом, поэтому ряд для них не показывается. -->
+          <div id="taxside-row" style="margin-top:8px;">
+            <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:3px;"
+                   id="taxside-label">Налог платит:</label>
+            <div class="seg">
+              <button class="seg-btn active" id="tsb-seller">Продавец</button>
+              <button class="seg-btn" id="tsb-buyer">Покупатель</button>
+            </div>
+          </div>
+          <!-- Поле ставки (налог / субсидия) -->
+          <div class="field" id="tax-field" style="margin-top:8px;">
+            <label>Ставка <span id="rate-letter">t</span> = <b id="tax-val">0</b></label>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+              <input type="range" id="tax-slider" min="0" max="100" step="1" value="0"
+                     style="flex:1;margin-top:0;">
+              <input type="number" id="tax-input" min="0" max="100" step="0.1" value="0"
+                     style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+            </div>
+          </div>
+          <!-- Поле регулируемой цены (потолок / пол) -->
+          <div class="field" id="pc-field" style="margin-top:8px;display:none;">
+            <label>Цена <span id="pc-letter">Pc</span> = <b id="pc-val">0</b></label>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+              <input type="range" id="pc-slider" min="0" max="100" step="1" value="0"
+                     style="flex:1;margin-top:0;">
+              <input type="number" id="pc-input" min="0" max="100" step="0.1" value="0"
+                     style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+            </div>
+          </div>
+          <!-- Поле объёма квоты (уровень 5 каскада для вида «Квота») -->
+          <div class="field" id="quota-field" style="margin-top:8px;display:none;">
+            <label>Квота Q<sub>к</sub> = <b id="quota-val">0</b></label>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+              <input type="range" id="quota-slider" min="0" max="100" step="1" value="0"
+                     style="flex:1;margin-top:0;">
+              <input type="number" id="quota-input" min="0" max="100" step="0.1" value="0"
+                     style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
+            </div>
+          </div>
+          <!-- Выбор цены ВНУТРИ коридора. Ползунок размечен в долях коридора
+               (0 — нижняя граница P_s(квота), 100 — верхняя P_d(квота)), потому
+               что сами границы двигаются вместе с объёмом квоты. -->
+          <div class="field" id="quota-price-field" style="margin-top:8px;display:none;">
+            <label>Цена внутри коридора = <b id="quota-price-val">…</b></label>
+            <input type="range" id="quota-price-slider" min="0" max="100" step="1" value="50"
+                   style="width:100%;margin-top:4px;">
+            <div class="hint" id="quota-price-range" style="margin-top:2px;">коридора нет</div>
+          </div>
+          <div class="hint" id="quota-hint" style="display:none;">Квота ограничивает объём напрямую.
+            Если она НИЖЕ равновесного количества, рыночная цена не определена однозначно: подойдёт
+            любая цена от той, по которой продавцы готовы отдать этот объём, до той, по которой
+            покупатели готовы его выбрать. Двигайте цену внутри коридора: излишки перетекают
+            между сторонами, а их сумма и потери общества не меняются.</div>
+          <div class="hint" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
+            на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя
+            и продавца можно тянуть мышью.</div>
+          <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
+            дефицит (продаётся меньше), пол выше равновесия даёт избыток. Линию цены можно тянуть мышью.</div>
+          <!-- «Было → стало» выключено по умолчанию: сцена сама гасит showGhost
+               при входе (SCENE_DEFAULTS), и отметка в разметке эту правду
+               перечёркивала — тумблер стоял отмеченным, а слоя на графике не было. -->
+          <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-ghost">
+            <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
+          <div id="info-tax" style="margin-top:8px;"></div>
         </div>
 
         <!-- Расчёты сцены: сюда JS переносит блок равновесия и все #info-*. -->
@@ -2355,7 +2386,7 @@
 
       <div class="field pw-count-field">
         <label for="pw-count">Сколько кусков</label>
-        <input type="number" id="pw-count" min="2" max="12" step="1" value="2">
+        <input type="number" id="pw-count" min="1" max="12" step="1" value="2">
       </div>
 
       <div class="pw-brace">
@@ -2395,27 +2426,27 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 </script>
 <!-- Код калькулятора: те же классические скрипты, только вынесенные из шаблона.
      Порядок подключения важен — он повторяет прежний порядок объявлений. -->
-<script src="{% static 'calc2/00-config.js' %}"></script>
-<script src="{% static 'calc2/10-math-core.js' %}"></script>
-<script src="{% static 'calc2/20-plane.js' %}"></script>
-<script src="{% static 'calc2/30-curves.js' %}"></script>
-<script src="{% static 'calc2/40-scenes-market.js' %}"></script>
-<script src="{% static 'calc2/42-scenes-mono.js' %}"></script>
-<script src="{% static 'calc2/44-scenes-firm.js' %}"></script>
-<script src="{% static 'calc2/46-scenes-labor.js' %}"></script>
-<script src="{% static 'calc2/48-scenes-consumer.js' %}"></script>
-<script src="{% static 'calc2/50-scenes-macro.js' %}"></script>
-<script src="{% static 'calc2/52-modes.js' %}"></script>
-<script src="{% static 'calc2/54-scenes-ppf.js' %}"></script>
-<script src="{% static 'calc2/56-scenes-inequality.js' %}"></script>
-<script src="{% static 'calc2/60-overlays.js' %}"></script>
-<script src="{% static 'calc2/70-scenes-math.js' %}"></script>
-<script src="{% static 'calc2/80-ui.js' %}"></script>
-<script src="{% static 'calc2/82-input.js' %}"></script>
-<script src="{% static 'calc2/84-picker.js' %}"></script>
-<script src="{% static 'calc2/86-workspace.js' %}"></script>
-<script src="{% static 'calc2/88-params.js' %}"></script>
-<script src="{% static 'calc2/90-explain.js' %}"></script>
-<script src="{% static 'calc2/99-boot.js' %}"></script>
+<script src="{% calc2_static 'calc2/00-config.js' %}"></script>
+<script src="{% calc2_static 'calc2/10-math-core.js' %}"></script>
+<script src="{% calc2_static 'calc2/20-plane.js' %}"></script>
+<script src="{% calc2_static 'calc2/30-curves.js' %}"></script>
+<script src="{% calc2_static 'calc2/40-scenes-market.js' %}"></script>
+<script src="{% calc2_static 'calc2/42-scenes-mono.js' %}"></script>
+<script src="{% calc2_static 'calc2/44-scenes-firm.js' %}"></script>
+<script src="{% calc2_static 'calc2/46-scenes-labor.js' %}"></script>
+<script src="{% calc2_static 'calc2/48-scenes-consumer.js' %}"></script>
+<script src="{% calc2_static 'calc2/50-scenes-macro.js' %}"></script>
+<script src="{% calc2_static 'calc2/52-modes.js' %}"></script>
+<script src="{% calc2_static 'calc2/54-scenes-ppf.js' %}"></script>
+<script src="{% calc2_static 'calc2/56-scenes-inequality.js' %}"></script>
+<script src="{% calc2_static 'calc2/60-overlays.js' %}"></script>
+<script src="{% calc2_static 'calc2/70-scenes-math.js' %}"></script>
+<script src="{% calc2_static 'calc2/80-ui.js' %}"></script>
+<script src="{% calc2_static 'calc2/82-input.js' %}"></script>
+<script src="{% calc2_static 'calc2/84-picker.js' %}"></script>
+<script src="{% calc2_static 'calc2/86-workspace.js' %}"></script>
+<script src="{% calc2_static 'calc2/88-params.js' %}"></script>
+<script src="{% calc2_static 'calc2/90-explain.js' %}"></script>
+<script src="{% calc2_static 'calc2/99-boot.js' %}"></script>
 </body>
 </html>

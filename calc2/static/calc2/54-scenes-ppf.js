@@ -20,7 +20,7 @@
 function parsePpfEquation(src) {
   const t = String(src || '').trim();
   if (!t) return { error: 'Пустая строка.' };
-  const eq = t.indexOf('=');
+  const eq = topLevelEqIndex(t);
 
   // Явная запись: слева одинокая буква вертикальной оси.
   if (eq >= 0) {
@@ -114,8 +114,12 @@ function compilePpf(expr) {
   if (hit) return hit;
   let res;
   try {
-    const compiled = math.parse(expr).compile();
+    const compiled = math.parse(prepExpr(expr)).compile();
     compiled.evaluate(scopeFor(expr, { x: 1, X: 1 }));   // пробный расчёт ловит опечатки
+    /* Исходный текст носим на самом узле — как это давно делает compileTwoVar.
+       Он нужен расчёту: по нему ppfEvalWith узнаёт, какие буквы в формуле есть,
+       и подставляет единицу той, у которой ползунка ещё нет. */
+    compiled._src = String(expr || '');
     res = { compiled, error: null };
   } catch (e) { res = { compiled: null, error: e.message }; }
   if (_ppfCompileCache.size > 200) _ppfCompileCache.clear();
@@ -525,24 +529,65 @@ function redrawPpf() {
    --------------------------------------------------------------------- */
 
 /* Значение скомпилированной КПВ Y=f(X) (переменные X и x — синонимы).
-   П21: значения ползунков подмешиваем обязательно. Раньше здесь стоял голый
-   { x, X }: разбор формулы «100 - a*X» проходил (compilePpf зовёт scopeFor),
-   а КАЖДЫЙ расчёт падал на неизвестной букве и молча отдавал NaN. Дальше
-   ppfXmaxOf получал null, и сцена показывала «Не удалось определить границы
-   КПВ» на пустом холсте. Через эту функцию идут одиночная КПВ, сумма КПВ и
-   обе сцены торговли — чинится всё разом. */
+   П21: значения ползунков подмешиваем обязательно, иначе расчёт падает на
+   букве и молча отдаёт NaN, ppfXmaxOf получает null, и сцена показывает
+   «Не удалось определить границы КПВ» на пустом холсте. Через эту функцию
+   идут одиночная КПВ, сумма КПВ и обе сцены торговли — чинится всё разом.
+
+   ⚠️ ЗДЕСЬ СТОЯЛО, ЧТО «РАЗБОР ФОРМУЛЫ 100 − a*X ПРОХОДИЛ». Это перестало
+   быть правдой и сбило с пути целую сессию: compilePpf звал math.parse БЕЗ
+   общей подготовки, поэтому падал как раз разбор — «100-ax» отвечало
+   «Undefined symbol ax», хотя буква «a» ползунок исправно заводила. Замер
+   22.08 и правка — в разделе CLAUDE.md за 22.08. Комментарий не доказывает,
+   что код делает написанное: сверяться надо с прогоном, а не с текстом. */
+/* ⚠️ БУКВА БЕЗ ПОЛЗУНКА СЧИТАЕТСЯ ЕДИНИЦЕЙ, А НЕ ОБРУШИВАЕТ РАСЧЁТ.
+
+   Здесь стоял голый paramScope, и это был ТРЕТИЙ, отдельный отказ — не тот же
+   самый, что мёртвый разбор. Проверка владельца 22.08 показала его в чистом
+   виде: `parsePpfEquation('y=100-a*x')` отдаёт `kind: explicit`, то есть
+   формула РАЗОБРАЛАСЬ, а `f(5)` возвращает NaN (в JSON — `null`).
+
+   Асимметрия была ровно между двумя соседними строками: пробный расчёт при
+   разборе идёт через `scopeFor`, который подставляет единицу букве без
+   ползунка, а сам расчёт шёл через `paramScope`, который знает только
+   заведённые ползунки. Разбор проходил, счёт падал.
+
+   Окно, в котором это видно, не выдуманное: ползунок заводится ПОСЛЕ того, как
+   формула принята (об этом прямо сказано в комментарии к `scopeFor`), и между
+   двумя этими моментами кривая считалась в NaN, `ppfXmaxOf` получал null, и
+   сцена показывала «Не удалось определить границы КПВ» на пустом холсте.
+
+   Тот же приём, что у `evalWithParams` и `compileTwoVar`: исходный текст
+   формулы носит сам скомпилированный узел. */
 function ppfEvalWith(compiled, x) {
   try {
-    const v = compiled.evaluate(paramScope({ x: x, X: x }));
+    const ctx = (compiled && compiled._src)
+      ? scopeFor(compiled._src, { x: x, X: x })
+      : paramScope({ x: x, X: x });
+    const v = compiled.evaluate(ctx);
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) { return NaN; }
 }
 
-// Наклон произвольной функции f в точке x (центральная разность).
+/* Наклон произвольной функции f в точке x — центральная разность, а на краю
+   домена односторонняя. Угловое решение КТВ (cornerByValue) стоит РОВНО на
+   границе — xp = 0 или xp = Xmax, — и раньше здесь всегда была NaN: f
+   работает через interpY по точкам [0, Xmax], а та честно не экстраполирует
+   за массив (см. её же комментарий), и f(Xmax + h) уходила в NaN. Центральной
+   разности с одной стороны буквально не из чего считать, но с ДРУГОЙ сторона
+   есть — и наклон там определён не хуже, чем в любой другой точке того же
+   отрезка (это не излом, это край графика). Настоящая неопределённость
+   остаётся только там, где недоступна и точка x, и обе соседние — это и
+   означает «здесь функция не задана», а не пограничный артефакт. */
 function ppfSlopeOf(f, x) {
   const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
   const a = f(x + h), b = f(x - h);
-  return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / (2 * h);
+  if (!isNaN(a) && !isNaN(b)) return (a - b) / (2 * h);
+  const c = f(x);
+  if (isNaN(c)) return NaN;
+  if (!isNaN(a)) return (a - c) / h;   // правая сторона доступна — вперёд
+  if (!isNaN(b)) return (c - b) / h;   // левая сторона доступна — назад
+  return NaN;
 }
 
 // Точка пересечения убывающей КПВ с осью X (где Y=0). NaN-зона трактуется как «ниже нуля».
@@ -820,6 +865,26 @@ function detectKinks(points) {
   return ks;
 }
 
+/* ⚠️ ОТКАЗ НАЗЫВАЕТСЯ ТАМ, ГДЕ ЧЕЛОВЕК НАБИРАЛ, А НЕ ТОЛЬКО В АНАЛИТИКЕ.
+
+   Замер 22.08: непонятую формулу все четыре модели блока честно ловили и
+   складывали текст отказа в свой разбор (`info-ppfsum`, `info-ppft`,
+   `info-tb`) — то есть в правую панель, в блок «Ключевые значения», который
+   по умолчанию свёрнут. Рядом с самим полем в разметке лежали три готовых
+   места под сообщение (`ppfsum-error`, `ppft-error`, `tb-error`), и в них не
+   писал никто и никогда. Человек смотрит на поле, в которое печатал: для него
+   формула не принималась молча, а ползунок буквы при этом заводился и
+   выглядел рабочим.
+
+   Пишем в обе стороны и из пути ОТРИСОВКИ, а не из обработчика кнопки: до
+   расчёта можно добраться и правкой поля, и Enter, и сменой числа кривых. */
+function showPaneError(boxId, msg) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  if (msg) { box.textContent = 'Не понял формулу: ' + msg; box.style.display = 'block'; }
+  else { box.textContent = ''; box.style.display = 'none'; }
+}
+
 // Тяжёлый расчёт суммарной КПВ (кэшируется в STATE.ppfSumData; запускается по «Построить»).
 /* Сколько кривых складываем (Фаза 13.1) и их формулы. Первые две живут в
    прежних STATE.ppf1 / STATE.ppf2, чтобы ничего из проверенной пары не
@@ -963,7 +1028,7 @@ function renderPpfSumRows() {
     nameInp.type = 'text'; nameInp.className = 'ppfsum-name';
     nameInp.value = STATE.ppfSumNames[i] || '';
     nameInp.placeholder = 'КПВ ' + (i + 1);
-    nameInp.title = 'Имя кривой на графике';
+    nameInp.setAttribute('data-tip', 'Имя кривой на графике');
     nameInp.addEventListener('input', () => { STATE.ppfSumNames[i] = nameInp.value; redrawAll(); });
     const pick = makeColorPicker(ppfSumColor(i), (hex) => { STATE.ppfSumColors[i] = hex; redrawAll(); },
                                  'Цвет кривой ' + (i + 1));
@@ -1059,6 +1124,7 @@ function drawPpfSumMarks(d) {
 function updatePpfSumPanel() {
   const box = document.getElementById('info-ppfsum'); if (!box) return;
   const d = STATE.ppfSumData;
+  showPaneError('ppfsum-error', (d && !d.ok) ? (d.error || 'Не удалось построить.') : '');
   if (!d) { box.innerHTML = '<div class="muted">Введите кривые и нажмите «Построить сумму».</div>'; return; }
   if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось построить.') + '</div>'; return; }
   const ord = d.order || [];
@@ -1247,6 +1313,43 @@ function cornerByValue(Xmax, Ymax, ratio) {
 }
 
 // Расчёт КТВ: точка производства и линия торговых возможностей.
+/* ТОЧКА ПРОИЗВОДСТВА ПО НАИБОЛЬШЕЙ ЦЕННОСТИ ВЫПУСКА.
+   Страна производит там, где выпуск в мировых ценах стоит дороже всего, то
+   есть где максимальна величина Y + (Px/Py)·X. Это ОДНО правило на все формы
+   КПВ: у прямой и у выпуклой максимум всегда в углу (прежнее поведение
+   сохраняется), у вогнутой — во внутренней точке, а у ВОГНУТОЙ КУСОЧНОЙ он
+   садится ровно в излом. Особого пути для излома здесь нет и заводить его не
+   надо — в проекте уже убирали такой особый путь у ключевых точек.
+
+   ⚠️ Замер 24.08 до правки. Кусочная КПВ Y = 100 − 0,5·X при X < 40 и
+   Y = 160 − 2·X при X ≥ 40 (стык в (40; 80), ось при X = 80) при мировой цене
+   Px/Py = 1 давала «специализация на Y», производство (0; 100). Ценность там
+   100, а в изломе 40·1 + 80 = 120 — движок выбирал заведомо худшую точку,
+   потому что кусочная не опознавалась ни как прямая, ни как дуга и уходила в
+   ветку «только углы».
+
+   Сетка с уточнением, а не аналитика: КПВ приходит формулой любого вида, и
+   производной у неё в изломе просто нет. Четыре прохода по 400 узлов сужают
+   отрезок в 400 раз каждый — стык находится точно. */
+function bestByValue(f, Xmax, Ymax, ratio) {
+  const val = (x) => { const y = f(x); return isFinite(y) ? (y + ratio * x) : -Infinity; };
+  let lo = 0, hi = Xmax, bx = 0, bv = val(0);
+  for (let pass = 0; pass < 4; pass++) {
+    const N = 400, step = (hi - lo) / N;
+    if (!(step > 0)) break;
+    for (let i = 0; i <= N; i++) {
+      const x = lo + step * i, v = val(x);
+      if (v > bv + 1e-12) { bv = v; bx = x; }
+    }
+    lo = Math.max(0, bx - step); hi = Math.min(Xmax, bx + step);
+  }
+  const eps = Math.max(Xmax * 1e-6, 1e-9);
+  if (bx <= eps) return { xp: 0, yp: Ymax, regime: 'специализация на Y' };
+  if (bx >= Xmax - eps) return { xp: Xmax, yp: 0, regime: 'специализация на X' };
+  const y = f(bx);
+  return { xp: bx, yp: isFinite(y) ? y : 0, regime: 'касание (внутр. точка)' };
+}
+
 function recomputePpfTrade() {
   STATE.ppfTradeData = null;
   const r = parsePpfEquation(STATE.ppftFormula);
@@ -1275,8 +1378,8 @@ function recomputePpfTrade() {
     else if (ratio > b) { xp = Xmax; yp = 0; regime = 'специализация на X'; }
     else { xp = 0; yp = Ymax; regime = 'специализация на Y'; }
   } else {
-    // Выпуклая / неизвестная: угол по ценности (для выпуклой оптимум всегда в углу).
-    ({ xp, yp, regime } = cornerByValue(Xmax, Ymax, ratio));
+    // Выпуклая, кусочная или незнакомая форма — общее правило по ценности.
+    ({ xp, yp, regime } = bestByValue(f, Xmax, Ymax, ratio));
   }
   let line = null, xint = null, yint = null;
   if (regime !== 'нет торговли' && xp != null) {
@@ -1345,6 +1448,7 @@ function drawPpfTradeMarks(d) {
 function updatePpfTradePanel() {
   const box = document.getElementById('info-ppft'); if (!box) return;
   const d = STATE.ppfTradeData;
+  showPaneError('ppft-error', (d && !d.ok) ? (d.error || 'Не удалось.') : '');
   if (!d) { box.innerHTML = '<div class="muted">Введите КПВ и мировую цену, нажмите «Построить КТВ».</div>'; return; }
   if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось.') + '</div>'; return; }
   // Внутренняя (автарктическая) цена X: наклон КПВ. У прямой он один, у дуги
@@ -1353,10 +1457,18 @@ function updatePpfTradePanel() {
     ? d.c.b
     : ((d.xp != null && d.xp > 0) ? Math.abs(ppfSlopeOf((x) => interpY(d.ppfPts, x), d.xp))
                                   : (d.Ymax / d.Xmax));
+  /* ⚠️ НЕ fmt(inner) НАПРЯМУЮ, ЕСЛИ inner НЕ ЧИСЛО. fmt(NaN) печатает буквально
+     «NaN» (isFinite-проверка внутри fmt отдаёт String(v) как есть), а
+     fmt(null) — куда коварнее: roundShown(null) считает null нулём, и «нет
+     значения» на экране неотличимо от настоящего нуля. Оба варианта врут.
+     Есть значение — печатаем; нет — говорим об этом словами. */
+  const innerHtml = (typeof inner === 'number' && isFinite(inner))
+    ? fmt(inner)
+    : '<span class="muted">не определена</span>';
   let html = '';
   html += `<div class="stat"><span>Режим</span><b>${d.regime}</b></div>`;
   html += `<div class="stat"><span>Мировая цена $P_x/P_y$</span><b>${fmt(d.ratio)}</b></div>`;
-  html += `<div class="stat"><span>Внутренняя цена X (наклон КПВ)</span><b>${fmt(inner)}</b></div>`;
+  html += `<div class="stat"><span>Внутренняя цена X (наклон КПВ)</span><b>${innerHtml}</b></div>`;
   if (d.xp != null) {
     html += `<div class="stat"><span>Производство $(X_п; Y_п)$</span><b>(${fmt(d.xp)}; ${fmt(d.yp)})</b></div>`;
   }
@@ -1665,6 +1777,7 @@ function tbName(idx) {
 function updateTradeBPanel() {
   const box = document.getElementById('info-tb'); if (!box) return;
   const d = STATE.tradeBData;
+  showPaneError('tb-error', (d && !d.ok) ? (d.error || 'Не удалось.') : '');
   if (!d) { box.innerHTML = '<div class="muted">Введите две КПВ и нажмите «Построить торговлю».</div>'; return; }
   if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось.') + '</div>'; return; }
   let html = '';

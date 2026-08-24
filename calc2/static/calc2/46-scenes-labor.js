@@ -65,8 +65,18 @@ function laborMinCompetition(Wmin) {
   const D = STATE.laborD, S = STATE.laborS, eq = STATE.laborEq;
   if (!D || !S || !eq) return null;
   const binding = (Wmin > eq.P + 1e-9);
-  const Qd = invCurve(D, Wmin);                   // спрос на труд при W_min
-  const Qs = invCurve(S, Wmin);                   // предложение труда при W_min
+  const dAt0 = evalCurve(D, 0);
+  let Qd = invCurve(D, Wmin);                     // спрос на труд при W_min
+  /* ⚠️ «КОРНЯ НЕТ» И «ЗАНЯТОСТЬ НОЛЬ» — РАЗНЫЕ ОТВЕТЫ, А ФОРМА У НИХ БЫЛА ОДНА.
+     При МРОТ выше начала кривой спроса нанимать не станут никого: занятость
+     ровно 0, а безработными оказываются все, кто готов работать за эту
+     зарплату. Прежде здесь оставался null, он показывался как «0» и означал
+     ровно противоположное — что безработицы нет. */
+  if (Qd == null && isFinite(dAt0) && Wmin > dAt0) Qd = 0;
+  const sAt0 = evalCurve(S, 0);
+  let Qs = invCurve(S, Wmin);                     // предложение труда при W_min
+  // Зеркальный случай: предложение труда не опускается до такой зарплаты.
+  if (Qs == null && isFinite(sAt0) && Wmin < sAt0) Qs = 0;
   const employment = (Qd != null) ? Qd : null;
   const unemployment = (Qd != null && Qs != null) ? Math.max(0, Qs - Qd) : null;
   return { binding, Wmin, Qd, Qs, employment, unemployment };
@@ -372,11 +382,11 @@ function drawLaborCompPoints() {
     // Безработица — полоса между Qd и Qs на оси L.
     const xLo = Math.min(xQd, xQs), xHi = Math.max(xQd, xQs);
     g.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
-    haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(min.unemployment), 'middle', 'hanging');
+    if (Number.isFinite(min.unemployment)) haloText(g, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(min.unemployment), 'middle', 'hanging');
     // Точка занятости (короткая сторона) на линии W_min.
     g.append('circle').attr('cx', xQd).attr('cy', yW).attr('r', 4).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
   } else {
-    laborPoint(g, eq.Q, eq.P, COL.ink, 'E*', { lIdx: 'k', wIdx: 'k' });
+    laborPoint(g, eq.Q, eq.P, COL.ink, 'E', { lIdx: 'k', wIdx: 'k' });   // без звёздочки, как на рынке
   }
 }
 

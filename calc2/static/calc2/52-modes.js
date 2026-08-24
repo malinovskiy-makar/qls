@@ -29,7 +29,7 @@ function setRanges(qmax, pmax, opts) {
     const e = document.getElementById(id); if (e) e.max = pmax;
   });
   // Квота меряется в ЕДИНИЦАХ товара — её предел задаёт масштаб количества (Фаза 4в).
-  ['open-quota-slider', 'open-quota-input'].forEach(id => { const e = document.getElementById(id); if (e) e.max = qmax; });
+  ['open-quota-slider', 'open-quota-input', 'quota-slider', 'quota-input'].forEach(id => { const e = document.getElementById(id); if (e) e.max = qmax; });
 }
 
 /* Поля границ в меню плоскости показывают то, что на экране прямо сейчас:
@@ -42,6 +42,20 @@ function syncViewFields() {
   [['inp-qmin', v[0]], ['inp-qmax', v[1]], ['inp-pmin', v[2]], ['inp-pmax', v[3]]].forEach(([id, val]) => {
     const e = document.getElementById(id);
     if (e && document.activeElement !== e) e.value = Math.round(val * 1000) / 1000;
+  });
+  /* Тумблер излишков ставим в согласие с состоянием: новая модель обнуляет
+     showCS/showPS через SCENE_DEFAULTS, и меню, открытое после смены сцены,
+     иначе показывало бы прежнее положение. */
+  const ac = document.getElementById('chk-areas');
+  if (ac) ac.checked = !!(STATE.showCS || STATE.showPS);
+  /* «Было → стало» — та же болезнь, что была у излишков: SCENE_DEFAULTS гасит
+     showGhost при входе в модель, а галочка в разметке стоит отмеченной. Тумблер
+     врал: отмечен, а бледного исходного равновесия на графике нет, и первое
+     нажатие человека ничего не убирало (оно и так было выключено). Ставим обе
+     галочки в согласие с состоянием там же, где и излишки. */
+  ['chk-ghost', 'chk-lab-ghost'].forEach(id => {
+    const e = document.getElementById(id);
+    if (e) e.checked = !!STATE.showGhost;
   });
   updateResetViewBtn();
 }
@@ -554,6 +568,16 @@ function initZoom() {
     const t = e.target;
     if (t && t.closest && t.closest('.graph-tools, .wrench')) return;
     const tag = (t && t.tagName || '').toLowerCase();
+    /* ⚠️ ОДНО НАЖАТИЕ — ОДИН СМЫСЛ, манипуляторы сцены (замер владельца 21.08,
+       ручка налога в «Потоварных налогах»). Клин налога t, потолок/пол цены,
+       Wmin, Pw, цена в длительном периоде и им подобные рисуются прозрачным
+       rect с курсором grab и уже держат свой d3-drag (см. «МАНИПУЛЯТОРЫ СЦЕНЫ»
+       в 30-curves.js — там же и сказано «курсор у них grab»). Тот же rect
+       ниже проходит как фон, и pointerdown раньше запускал сразу два жеста:
+       ручка меняла значение, а этот обработчик тащил поле следом за пальцем.
+       Признак — курсор grab на самом элементе, а не перечень сцен: список
+       забудут дополнить при новом сюжете. */
+    if (tag === 'rect' && t.style && t.style.cursor === 'grab') return;
     if (tag !== 'svg' && tag !== 'rect' && !(t && t.classList && t.classList.contains('grid'))) {
       // Внутри SVG отзывчивы только сами фигуры; фон — это svg и прозрачные rect.
       if (tag !== 'g' && tag !== 'div') return;
@@ -692,9 +716,13 @@ function setMode(mode) {
   STATE.firstQuad = (mode !== 'math' && mode !== 'graph');
   const quadChk = document.getElementById('chk-quad');
   if (quadChk) quadChk.checked = STATE.firstQuad;
-  // Какие секции панели показывать в каждом режиме (отсутствующие id просто игнорируются).
+  /* Какие блоки ВНУТРИ карточки «Ввод функций» показывать в каждом режиме
+     (отсутствующие id просто игнорируются). Сама карточка #sec-input видна
+     всегда: панель во всех 41 сцене состоит из одних и тех же трёх карточек,
+     и меняется только начинка первой. Из списка ушли 'sec-areas' и
+     'sec-analysis' — этих блоков в разметке больше нет. */
   const groups = {
-    market: ['sec-curves', 'sec-eq', 'sec-areas', 'sec-analysis', 'sec-tax', 'sec-mono'],
+    market: ['sec-curves', 'sec-eq', 'sec-tax', 'sec-mono'],
     costs:  ['sec-costs'],
     ppf:    ['sec-ppf'],
     labor:  ['sec-curves', 'sec-labor'],
@@ -758,12 +786,20 @@ function applyScenarioVisibility() {
   const s = STATE.scenario, inMarket = (STATE.mode === 'market');
   const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
   show('scn-pane-elast', inMarket && s === 'elasticity');
-  show('scn-pane-shift', inMarket && s === 'shift');
   show('scn-pane-ext',   inMarket && s === 'externality');
   show('scn-pane-open',  inMarket && s === 'openecon');
   show('sec-tax',  inMarket && s === 'none');
   show('sec-mono', inMarket && s === 'none');
-  [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'],
+  /* ⚠️ ОБЩЕСТВЕННЫЕ КРИВЫЕ ПРЯЧУТСЯ ЗДЕСЬ, А НЕ В ОБРАБОТЧИКЕ ЩЕЛЧКА.
+     Блок MSB / MSC живёт во «Вводе функций», и раньше его видимость ставил
+     только `setScenario`. Смена модели меняет STATE.scenario напрямую и зовёт
+     не его, а эту функцию — блок оставался на экране: замер 24.08 показывал
+     два чужих поля в монополии и на рынке труда после захода во «Внешние
+     эффекты». То же семейство, что и прежняя утечка параметров между сценами:
+     состояние приводится к экрану в ОДНОМ месте, иначе всякий новый путь
+     входа в сцену обязан помнить про каждый блок по отдельности. */
+  show('social-curves', inMarket && s === 'externality');
+  [['scn-none', 'none'], ['scn-elast', 'elasticity'],
    ['scn-ext', 'externality'], ['scn-open', 'openecon']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', s === v); });
   // Карточка общего списка кривых живёт только там, где сцена его рисует.
@@ -774,11 +810,11 @@ function applyScenarioVisibility() {
 // монополист, возвращаем конкуренцию (как монополия выключает интервенции).
 function setScenario(s) {
   STATE.scenario = s;
-  if (s === 'externality') recompileExt();   // подготовить внешние пред. издержки
+  // Общественные кривые сюжета внешних эффектов живут во «Вводе функций»:
+  // формулы готовятся заранее, а показывает блок applyScenarioVisibility ниже.
+  if (s === 'externality') { recompileSocial(); syncSocialFields(); }
   if (s !== 'none' && STATE.market === 'monopoly') {
     STATE.market = 'comp';
-    const c = document.getElementById('seg-comp'), mo = document.getElementById('seg-mono');
-    if (c) c.classList.add('active'); if (mo) mo.classList.remove('active');
     const mh = document.getElementById('mono-hint'); if (mh) mh.style.display = 'none';
     applyMonoVisibility();   // спрятать под-режим монополии и его панели (market теперь comp)
   }

@@ -17,6 +17,19 @@ function redrawAll() {
   keepAxisNamesInside(); // и название оси зажимается по ФАКТИЧЕСКОМУ кеглю
   spreadLabels();        // и разведение наложившихся — тем же приёмом (А60)
   applyLabelInk();       // и читаемые чернила подписей — тем же приёмом (П75)
+  /* ⚠️ ОБОЗНАЧЕНИЯ НАБИРАЮТСЯ МАТЕМАТИКОЙ В САМОМ КОНЦЕ, ПОСЛЕ ВСЕХ СЛОЁВ.
+     Первый заход стоял внутри drawOverlays, и подписи, которые сцена рисует
+     позже (S в «Налогах», ATC и MC в естественной монополии, TC в «Сложении
+     заводов»), правило уже не заставало: замер 24.08 находил их обычным
+     шрифтом. Здесь холст собран целиком, кто бы что ни дорисовал. */
+  typesetChartLabels();
+  /* ⚠️ ОБОЗНАЧЕНИЯ В ПАНЕЛЯХ РАЗМЕЧАЮТСЯ ТУТ ЖЕ, В САМОМ КОНЦЕ, И ПО ТОЙ ЖЕ
+     ПРИЧИНЕ. Первый заход стоял внутри refreshAnalyticsPanel, и прозу, которую
+     сцена дописывает позже («продав единицу X, получаешь 2 ед…»), проход уже не
+     заставал: замер 24.08 находил 26 таких мест в семи сценах. Здесь панель
+     собрана целиком, кто бы что ни дописал. */
+  markNotationsIn(document.getElementById('tools-panel'));
+  markNotationsIn(document.getElementById('params-panel'));
   refreshRegulators();   // строки «имя = значение» идут за значениями ползунков
   // Заголовок раздела равновесия — свойство сцены (А52). Синхронизируем здесь,
   // а не только в рыночном пересчёте: иначе в сцене, куда пришли из монополии,
@@ -101,9 +114,6 @@ function redrawScene() {
   } else if (STATE.scenario === 'externality') {
     // Внешний эффект (Задача 4): DWL + D/MPC + MSC + точки Qрын/Qопт (+ Пигу).
     drawExtScenario();
-  } else if (STATE.scenario === 'shift') {
-    // Разложение сдвигов (Задача 3): исходные + сдвинутые кривые + E_d/E_s/E₁.
-    drawShiftScenario();
   } else if (STATE.scenario === 'openecon') {
     // Малая открытая экономика (Фаза 4в): излишки/деньги/потери, кривые, линии цен.
     drawOpenAreas();
@@ -120,17 +130,21 @@ function redrawScene() {
     // Конкуренция, обычный сценарий: заливки + кривые + равновесие/вмешательство.
     if (STATE.taxActive) drawTaxAreas();
     else if (STATE.pcActive) drawPcAreas();
+    else if (STATE.quotaActive) drawQuotaAreas();
     else drawAreas();
     drawGhost();                 // бледный слой «было» под кривыми/точками
     drawCurves();
     drawShiftedSupply();         // пунктирная S + t (если налог активен)
-    // Точки/линии: налог E₀/E₁, регулирование цены или обычное равновесие E*.
+    // Точки/линии: налог E₀/E₁, регулирование цены, квота или равновесие E*.
     if (STATE.taxActive) drawTaxPoints();
     else if (STATE.pcMode) drawPriceControl();
+    else if (STATE.quotaMode) drawQuotaLines();
     else drawEquilibrium();
   }
   updateInfoPanel();
   updateAreasPanel();
+  // Табло «По группам» сюжета сложения: в остальных сценах оно молчит само.
+  if (typeof updateSumPanel === 'function') updateSumPanel();
   if (STATE.market === 'monopoly') {
     if (STATE.monoMode === 'discr1') updateDiscr1Panel(); else updateMonoPanel();
     if (STATE.monoMode === 'natural') updateNaturalPanel();   // три ориентира регулирования (Фаза 3в)
@@ -139,9 +153,6 @@ function redrawScene() {
   } else if (STATE.scenario === 'externality') {
     updateExtPanel();
     const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
-  } else if (STATE.scenario === 'shift') {
-    updateShiftPanel();
-    const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
   } else if (STATE.scenario === 'elasticity') {
     updateElasticityPanel();
     const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
@@ -149,7 +160,9 @@ function redrawScene() {
     updateOpenPanel();
     const imono = document.getElementById('info-mono'); if (imono) imono.innerHTML = '';
   } else {
-    if (STATE.pcMode) updatePcPanel(); else updateTaxPanel();
+    if (STATE.pcMode) updatePcPanel();
+    else if (STATE.quotaMode) updateQuotaPanel();
+    else updateTaxPanel();
     // Панель монополии очищаем, чтобы не висело старое из прошлого режима.
     const imono = document.getElementById('info-mono');
     if (imono) imono.innerHTML = '';
@@ -270,7 +283,7 @@ function buildGraphRow(curve) {
 
   const del = document.createElement('button');
   del.type = 'button'; del.className = 'btn-icon'; del.textContent = '✕';
-  del.title = 'Убрать функцию';
+  del.setAttribute('data-tip', 'Убрать функцию');
   del.style.visibility = curve ? '' : 'hidden';
   del.addEventListener('click', () => {
     if (!row._curve) return;
@@ -414,6 +427,8 @@ function drawOverlays() {
   refreshAnalyticsPanel();
   renderMathIn(document.getElementById('ex-body'));    // и в объяснении модели
   renderMathIn(document.getElementById('tools-panel'));// и в подсказках панели
+  /* Обозначения в подписях панели размечает redrawAll в самом конце: сцена
+     дописывает часть текста позже, и проход отсюда её не застаёт. */
 }
 
 /* Довести правую панель до готового вида: разбор в свой блок, формулы, числа
@@ -423,7 +438,12 @@ function drawOverlays() {
    а на отпускании скачком превращались в формулы. */
 function refreshAnalyticsPanel() {
   syncAnalyticsPanel();                                // разбор уезжает в свой блок
+  typesetChartLabels();                                // обозначения на графике — математикой
   renderMathIn(document.getElementById('sb-body'));    // формулы в аналитике
+  /* Здесь проход нужен ОТДЕЛЬНО от общего: перетаскивание линии цены обновляет
+     ТОЛЬКО панель, redrawAll при этом не зовётся, и подписи в пути остались бы
+     обычным шрифтом, а на отпускании скачком стали бы формулами. */
+  markNotationsIn(document.getElementById('params-panel'));
   typesetStats(document.getElementById('sb-body'));    // Н6: числа тоже формулой
 }
 
@@ -746,6 +766,8 @@ function areaOfPathEl(el) {
    школьник читает быстрее любой фразы. Полное название остаётся в подсказке. */
 const AREA_SHORT = {
   'Излишек покупателя (CS)': 'CS',
+  // Коридор возможных цен при квоте: полное имя вдвое шире всей легенды.
+  'Коридор возможных цен': 'Коридор',
   'Излишек продавца (PS)': 'PS',
   'Излишек производителя (TR - VC)': 'PS',
   /* ⚠️ п. 41. НА РЫНКЕ ТРУДА ПРОДАЮТ РАБОТНИКИ, А ПОКУПАЮТ ФИРМЫ.
@@ -1180,13 +1202,21 @@ function keyTargets() {
       const kind = (s > 0) ? 'минимум ' : (s < 0 ? 'максимум ' : 'плато ');
       push(x, y, kind + t.name, 'extremum', [t.name]);
     });
-    // Излом, совпавший с уже найденным пересечением, не добавляем: у Z = min(f, g)
-    // ветвь переключается ровно там, где кривые пересекаются, а пересечение и
-    // посчитано точнее (бисекцией), и названо понятнее.
-    const near = (w.x1 - w.x0) * 0.02;
+    /* Излом, совпавший с уже найденным пересечением, не добавляем: у Z = min(f, g)
+       ветвь переключается ровно там, где кривые пересекаются, а пересечение и
+       посчитано точнее (бисекцией), и названо понятнее.
+
+       ⚠️ СОВПАДЕНИЕ ПРОВЕРЯЕТСЯ ПО ОБЕИМ КООРДИНАТАМ. Раньше сверялся только X,
+       и излом гасила ЛЮБАЯ точка с тем же количеством — даже лежащая на другой
+       высоте, то есть совсем другая точка. Замер 24.08 в сюжете сложения: излом
+       рыночного предложения (20; 20) пропадал из списка, потому что рядом стояло
+       пересечение двух групп в (20; 40). Один и тот же Q, разные точки. */
+    const nearX = (w.x1 - w.x0) * 0.02, nearY = (w.y1 - w.y0) * 0.02;
     kinksOf(t.f, lo, hi).forEach(x => {
-      if (out.some(o => Math.abs(o.x - x) < near)) return;
-      push(x, t.f(x), 'излом ' + t.name, 'kink', [t.name]);
+      const y = t.f(x);
+      if (!isFinite(y)) return;
+      if (out.some(o => Math.abs(o.x - x) < nearX && Math.abs(o.y - y) < nearY)) return;
+      push(x, y, 'излом ' + t.name, 'kink', [t.name]);
     });
   });
   _keyPtsCache = out;
@@ -1227,6 +1257,17 @@ function snapVertexAt(px, py) {
     const d = Math.hypot(mx(p.x) - px, my(p.y) - py);
     if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: p.x, y: p.y, name: p.name, key: true, d };
   });
+  /* ⚠️ СВОИ ТОЧКИ — ТОЖЕ КАНДИДАТ НА ЗАХВАТ, НАРАВНЕ С КЛЮЧЕВЫМИ (замер
+     владельца 21.08: промах 5 px давал вершину в 7+ px от своей точки — щелчок
+     соскальзывал на ближайшую кривую вместо неё). Раньше их не было вовсе ни
+     здесь, ни в snapPointAt: своя точка часто стоит НЕ на кривой и НЕ в
+     пересечении, и тогда ловить её было нечем — засечь получалось только
+     координатами до пикселя. Тот же радиус KEY_SNAP_PX, что и у ключевых
+     точек: своя точка для вершины площади не менее важна. */
+  (STATE.marks || []).forEach(mk => {
+    const d = Math.hypot(mx(mk.x) - px, my(mk.y) - py);
+    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: mk.x, y: mk.y, name: mk.name || 'своя точка', key: true, d };
+  });
   if (best) return best;
   const hit = snapPointAt(px, py);
   return hit ? { x: hit.x, y: hit.y, name: hit.name, key: false, cross: hit.cross } : null;
@@ -1261,44 +1302,15 @@ function drawCrossPoints() {
   // ставилась вовсе. Прилипание к этим же точкам работает и без их кликабельности.
   if (STATE.vertArm || STATE.markArm) g.style('pointer-events', 'none');
 
-  const [x0] = mx.domain(), [y0] = my.domain();
-  const zx = mx(Math.max(0, x0)), zy = my(Math.max(0, y0));   // где стоят оси
-
   pts.forEach((p, i) => {
     const px = mx(p.x), py = my(p.y);
 
-    if (p.kind === 'kink') {
-      /* Излом рисуется подробнее прочих: пунктир к обеим осям и числа прямо на
-         осях. Правило «показывать сразу, без щелчка» отменено общим решением
-         владельца — на холсте по умолчанию нет ни одной автоматической точки.
-         Подробная разметка осталась, но включается вместе со своей кривой. */
-      g.append('line').attr('x1', zx).attr('y1', py).attr('x2', px).attr('y2', py)
-        .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
-        .attr('stroke-dasharray', '3 3').attr('opacity', .6);
-      g.append('line').attr('x1', px).attr('y1', zy).attr('x2', px).attr('y2', py)
-        .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
-        .attr('stroke-dasharray', '3 3').attr('opacity', .6);
-      /* Числа на осях. Если ровно там уже стоит деление, второй раз его не
-         печатаем: вышло бы одно число поверх другого. Делаем как extraTickX —
-         засечка и подпись, только по шкалам сцены, а не по глобальным. */
-      const axg = g.append('g').attr('class', 'kink-axis');
-      const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
-      const spanX = Math.abs(xHi - xLo), spanY = Math.abs(yHi - yLo);
-      if (!xTicks().some(t => Math.abs(t - p.x) < spanX * 0.025)) {
-        axg.append('line').attr('x1', px).attr('y1', zy - 4).attr('x2', px).attr('y2', zy + 4)
-          .attr('stroke', COL.ink).attr('stroke-width', 1.4);
-        haloText(axg, px, zy + 8, fmt(p.x), 'middle', 'hanging');
-      }
-      if (!yTicks().some(t => Math.abs(t - p.y) < spanY * 0.025)) {
-        axg.append('line').attr('x1', zx - 4).attr('y1', py).attr('x2', zx + 4).attr('y2', py)
-          .attr('stroke', COL.ink).attr('stroke-width', 1.4);
-        haloText(axg, zx - 8, py, fmt(p.y), 'end', 'middle');
-      }
-      g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
-        .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.6);
-      return;
-    }
-
+    /* Излом раньше рисовался ОСОБО: пунктир к обеим осям и числа прямо на
+       осях, показанные СРАЗУ, без наведения, и вообще без значка закрепки —
+       свой код, в обход всего, что ниже. Приёмка владельца 21.08: излом обязан
+       быть ключевой точкой НАРАВНЕ с пересечением кривой с осью — наведение
+       показывает подпись с координатами, щелчок по значку закрепляет. Особого
+       пути для 'kink' больше нет: точка идёт тем же кодом, что и все прочие. */
     const item = g.append('g').attr('class', 'cross-item');
     /* ⚠️ ЗАПАС ПОПАДАНИЯ ПО ТОЧКЕ. Замер до правки: сама точка ловила щелчок
        кругом радиусом 4 px, а с пяти пикселей в любую сторону под курсором
@@ -1734,7 +1746,7 @@ function renderVertList() {
 
     const t = document.createElement('span');
     t.className = 'vert-co';
-    t.title = 'Двойной щелчок — поправить координаты';
+    t.setAttribute('data-tip', 'Двойной щелчок — поправить координаты');
     const paint = () => {
       t.textContent = (p.name ? p.name + ' ' : '') + '(' + fmt(p.x) + '; ' + fmt(p.y) + ')';
     };
@@ -1768,7 +1780,7 @@ function renderVertList() {
 
     const del = document.createElement('button');
     del.type = 'button'; del.className = 'btn-icon'; del.textContent = '✕';
-    del.title = 'Убрать эту вершину';
+    del.setAttribute('data-tip', 'Убрать эту вершину');
     del.addEventListener('click', () => {
       STATE.areaVerts = (STATE.areaVerts || []).filter(v => v !== p);
       renderVertList(); syncAreaCalcButton(); redrawAll();
@@ -1790,9 +1802,9 @@ function syncAreaCalcButton() {
     ? ((STATE.areaVerts || []).length >= 3)
     : !!areaPickedCurve();
   btn.disabled = !ready;
-  btn.title = ready ? '' : (STATE.areaCalcMode === 'poly'
+  btn.setAttribute('data-tip', ready ? '' : (STATE.areaCalcMode === 'poly'
     ? 'Отметьте на графике хотя бы три точки'
-    : 'Сначала выберите кривую');
+    : 'Сначала выберите кривую'));
 }
 
 function areaPickedCurve() {
@@ -2138,12 +2150,12 @@ function updateAreaCalcPanel() {
     const c1 = document.createElement('span');
     c1.className = 'area-what';
     const pick = makeColorPicker(e.color, (hex) => { STATE.areaColor[e.key] = hex; redrawAll(); },
-                                 'Цвет области: ' + e.key);
+                                 tipName('Цвет области: ' + e.key));
     pick.setAttribute('data-area', e.key);
     const lab = document.createElement('span');
     lab.className = 'area-name-fixed';
-    lab.textContent = areaShort(e.key);
-    lab.title = e.key;
+    paintNotation(lab, areaShort(e.key));   // «CS», «PS», «DWL» — формулой
+    lab.setAttribute('data-tip', tipName(e.key));
     c1.append(pick, lab);
     const c2 = document.createElement('b');
     c2.textContent = (e.value == null) ? '' : fmt(e.value);
@@ -2162,7 +2174,7 @@ function updateAreaCalcPanel() {
     const pick = makeColorPicker(r.color, (hex) => { r.color = hex; redrawAll(); }, 'Цвет площади');
     const nameInp = document.createElement('input');
     nameInp.type = 'text'; nameInp.className = 'area-name'; nameInp.value = r.label;
-    nameInp.title = 'Название площади';
+    nameInp.setAttribute('data-tip', 'Название площади');
     nameInp.addEventListener('input', () => { r.label = nameInp.value; });
     nameInp.addEventListener('change', () => redrawAll());
     c1.append(pick, nameInp);
@@ -2173,7 +2185,7 @@ function updateAreaCalcPanel() {
 
     const del = document.createElement('button');
     del.type = 'button'; del.className = 'btn-icon'; del.textContent = '×';
-    del.title = 'Убрать эту площадь';
+    del.setAttribute('data-tip', 'Убрать эту площадь');
     del.addEventListener('click', () => {
       STATE.areaCalcList = STATE.areaCalcList.filter(x => x !== r);
       redrawAll();
@@ -2338,11 +2350,48 @@ function isReservedName(n) {
    Здесь склейка букв раскрывается в произведение: bx → b*x, abc → a*b*c.
    Имена с цифрами и подчёркиванием (Q_1, x1), функции Math.js и экономические
    обозначения из ECON_WORDS не трогаем. */
+/* ⚠️ ЧИСЛО ПЕРЕД БУКВОЙ ИЛИ ПЕРЕД СКОБКОЙ — ТОЖЕ УМНОЖЕНИЕ.
+   Замер 24.08: сам Math.js «100-2P» читает верно (100 - 2 P, при P = 10 даёт
+   80), поэтому расчёт от этой записи не падал. Падало другое: определитель
+   формы записи (`curveSrcForm`, 80-ui.js) искал букву P по соседям и цифру
+   слева соседом не считал — «100-2P» уезжало в форму P = f(Q), и вместо
+   наклонной выходила горизонталь на 98 без единого слова об ошибке.
+   Раскрываем звёздочку ЗДЕСЬ, в единственной двери разбора, чтобы у правила
+   «цифра слева — это множитель» было одно место, а не два.
+
+   Что здесь НЕЛЬЗЯ сломать (проверяется в calc2_math.mjs, набор «раскрытие»):
+     · научная запись: «1e5», «2e-3» — целое число, а не «2*e-3». Одного
+       «показатель входит в совпадение» МАЛО: движок регулярных выражений
+       откатывает необязательную часть назад, и «1e5» всё равно распадалось на
+       «1*e5» (замер 24.08, первая попытка правки). Поэтому стоит вторая,
+       запрещающая проверка `(?![eE][+-]?\d)`: если сразу за числом начинается
+       годный показатель степени, звёздочка не ставится ВООБЩЕ. При этом
+       «1e5Q» остаётся умножением: там показатель уже съеден числом, а дальше
+       идёт буква;
+     · имя с цифрой ПОСЛЕ буквы: «Q_1», «x1», «P2» — одно имя. Цифра внутри
+       имени в совпадение не попадает: слева от числа обязан стоять символ,
+       которым имя продолжаться не может (не буква, не цифра, не «_», не «.»);
+     · вызов функции: «sqrt(4)», «log(10)» — цифра в скобках, а за ней «)»,
+       а не буква, поэтому правило молчит;
+     · команды LaTeX: «2\cdot P» — за цифрой обратный слэш, он в список
+       «буква или открывающая скобка» не входит, и команда доходит целой. */
+const NUM_BEFORE_NAME = /(^|[^A-Za-z0-9_.])((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(?![eE][+-]?\d)(?=[A-Za-z_(])/g;
+
 function expandImplicitMul(expr) {
-  const s = String(expr || '');
-  if (!s) return s;
+  const s0 = String(expr || '');
+  if (!s0) return s0;
+  // Сначала цифра-множитель, потом склейка букв: «2ab» → «2*ab» → «2*a*b».
+  const s = s0.replace(NUM_BEFORE_NAME, '$1$2*');
   return s.replace(/[A-Za-z_][A-Za-z_]*/g, (name, at) => {
     if (name.length < 2) return name;
+    /* ⚠️ ИМЯ ПОСЛЕ ОБРАТНОГО СЛЭША — ЭТО КОМАНДА, А НЕ ПРОИЗВЕДЕНИЕ БУКВ.
+       Замер 22.08 до правки: «100-a\cdot x» превращалось здесь в
+       «100-a\c*d*o*t x». То есть разбор не просто не понимал запись из
+       MathLive — он её ДОЛОМЫВАЛ, и сообщение об ошибке показывало уже свою
+       собственную порчу, а не то, что набрал человек. Перевод LaTeX стоит выше
+       (prepExpr), но и здесь имя за слэшем неприкосновенно: непереведённая
+       команда обязана дойти до Math.js целой и получить честный отказ. */
+    if (at > 0 && s[at - 1] === '\\') return name;
     if (ECON_WORDS.has(name) || MATH_CONSTS.has(name)) return name;
     try { if (typeof math[name] !== 'undefined') return name; } catch (e) {}
     // Имя перед скобкой — вызов функции, разбирать его на буквы нельзя.
@@ -2353,11 +2402,148 @@ function expandImplicitMul(expr) {
   });
 }
 
+
+/* ── Подписи графика набираются МАТЕМАТИКОЙ ───────────────────────────
+   Правило владельца: любые СЛОВА — шрифтом сайта, любая МАТЕМАТИКА —
+   набрана формулой. В разметке за это отвечает KaTeX, но подписи графика
+   живут в SVG, куда KaTeX не встаёт: там надо взять его же шрифты руками.
+   Так это и делает сам KaTeX — переменная идёт наклонным математическим
+   начертанием (KaTeX_Math), многобуквенное обозначение прямым (KaTeX_Main),
+   как \mathrm{MC}.
+
+   ⚠️ ТРОГАЕМ ТОЛЬКО ПОДПИСЬ, КОТОРАЯ ЦЕЛИКОМ ОБОЗНАЧЕНИЕ. Смешанную фразу
+   («Излишек покупателя (CS)») пришлось бы резать на куски и собирать из
+   tspan, а это переносы и съехавшая привязка. Такие подписи остаются в
+   описи долга (night2_font_audit.mjs) и чинятся отдельной задачей. */
+const CHART_MATH_WORDS = new Set(['MC','MR','TC','ATC','AVC','AFC','FC','VC','TR','TP','MP','AP',
+  'MPL','MRP','Qd','Qs','Pd','Ps','Pb','Pw','Pc','Pf','CS','PS','DWL','AD','AS','SRAS','LRAS',
+  'IS','LM','GDP','MSB','MSC','SW','Qm','Pm','Qc','Px','Py']);
+/* Образец «одна буква с хвостом» больше не нужен: индекс и звёздочку теперь
+   отрезает chartLabelBase, и решение принимается по ОСНОВАНИЮ подписи. */
+
+
+// Видимый текст подписи SVG: всё, кроме всплывающей подсказки <title>.
+function visibleSvgText(t) {
+  let out = '';
+  const walk = (n) => {
+    for (const c of n.childNodes) {
+      if (c.nodeType === 3) { out += c.nodeValue; continue; }
+      if (c.nodeType !== 1) continue;
+      if (String(c.nodeName).toLowerCase() === 'title') continue;
+      walk(c);
+    }
+  };
+  walk(t);
+  return out.replace(/\s+/g, ' ').trim();
+}
+/* ⚠️ ПРАВИЛО СПРАШИВАЕТ ИСХОДНУЮ ЗАПИСЬ ПОДПИСИ, А НЕ НАРИСОВАННОЕ.
+
+   Пять подписей (S в «Налогах», ATC / MC / E в естественной монополии, TC в
+   «Сложении заводов») правило не брало, и в карточке это было записано как
+   «рисуются ПОСЛЕ конца перерисовки». ЗАМЕР 24.08 ЭТОТ ДИАГНОЗ ОТВЁРГ: повтор
+   `typesetChartLabels()` прямо в браузере, уже после всей перерисовки, не
+   менял НИ ОДНОЙ подписи в трёх сценах. Значит рисуются они вовремя.
+
+   Настоящая причина: подпись с индексом разложена на tspan'ы (`mathTspans`,
+   `qtyTspans`), и её `textContent` — склейка «EATC», «TC1», «Q∗». Такой
+   склейке не отвечает ни список обозначений, ни образец одиночной буквы.
+   Исходная запись при этом лежит рядом с узлом в `data-raw` — её и спрашиваем.
+   Особого пути отрисовки не заводим: путь остаётся один, умнее стало правило. */
+function chartLabelSource(t) {
+  const raw = t.dataset ? t.dataset.raw : null;
+  return (raw != null && raw !== '') ? raw : visibleSvgText(t);
+}
+
+/* Основание подписи: индекс, степень и звёздочка отброшены.
+   «E_{ATC}» → «E», «TC_1» → «TC», «Q*» → «Q», «TC₁» → «TC».
+   Юникодные индексы отрезаются наравне с записью через подчёркивание: часть
+   сцен пишет «TC₁» готовым символом, и без этой строки подпись «Сложения
+   заводов» оставалась бы системным шрифтом. */
+function chartLabelBase(src) {
+  return String(src == null ? '' : src)
+    .replace(/[_^](\{[^}]*\}|.)/g, '')
+    .replace(/[\u2080-\u2089\u2070\u00b9\u00b2\u00b3\u2074-\u2079]/g, '')
+    .replace(/[*\u2217\u2032']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/* Каким начертанием набрать подпись: прямым (обозначение вроде MC),
+   наклонным (величина вроде Q) или никаким (это проза).
+
+   Короткая запись из одних обозначений и знаков («S + t») — тоже математика:
+   иначе имя сдвинутой кривой предложения оставалось бы системным шрифтом
+   рядом с той же буквой S, набранной курсивом. Кириллица в запись не
+   допускается вовсе: смешанная фраза («TC совокупная») режется на куски,
+   а это отдельная работа и своя карточка. */
+function chartLabelKind(src) {
+  const base = chartLabelBase(src);
+  if (!base) return null;
+  if (CHART_MATH_WORDS.has(base)) return 'upright';
+  if (/^[A-Za-z]$/.test(base)) return 'italic';
+  /* Греческая буква в записи — это тоже математика: «S·(1+τ)» (адвалорный
+     налог) без неё оставалась бы системным шрифтом рядом с курсивной S. */
+  if (!/^[A-Za-z0-9 +\-−·()\u0391-\u03c9]{1,14}$/.test(base)) return null;
+  const runs = base.match(/[A-Za-z]+/g) || [];
+  if (!runs.length) return null;
+  if (!runs.every(r => CHART_MATH_WORDS.has(r) || r.length === 1)) return null;
+  return 'italic';
+}
+
+function typesetChartLabels() {
+  const root = document.getElementById('chart');
+  if (!root) return;
+  /* ⚠️ ИДЁМ ПО ВСЕМ ПОДПИСЯМ ХОЛСТА, А НЕ ТОЛЬКО ПО ДВУМ КЛАССАМ.
+     Замер 24.08: правило по .axis-name и .curve-name починило три строки из
+     сорока четырёх — остальные подписи 19 сцен рисуются мимо общего помощника
+     и этих классов не несут (известный долг, своя карточка). Правило про
+     шрифт от классов не зависит: подпись, которая ЦЕЛИКОМ обозначение,
+     набирается математикой, кто бы её ни нарисовал. Числа на осях под правило
+     не попадают — оно требует букву первой. */
+  root.querySelectorAll('text').forEach(t => {
+    const kind = chartLabelKind(chartLabelSource(t));
+    if (kind === 'upright') {
+      // Многобуквенное обозначение — прямое начертание, как \mathrm.
+      t.style.fontFamily = "'KaTeX_Main', 'Times New Roman', serif";
+      t.style.fontStyle = 'normal';
+      t.dataset.mathset = 'upright';
+    } else if (kind === 'italic') {
+      t.style.fontFamily = "'KaTeX_Math', 'Times New Roman', serif";
+      t.style.fontStyle = 'italic';
+      t.dataset.mathset = 'italic';
+    }
+  });
+}
+
 /* Формула в том виде, в каком её считает движок. Раскрытие неявного умножения
    включается только там, где буквы и так становятся ползунками: в готовых
    экономических сценах у обозначений свой смысл, и трогать их нельзя. */
 function prepExpr(expr) {
-  return paramsAllowed() ? expandImplicitMul(expr) : String(expr || '');
+  const plain = texToPlain(expr);
+  return paramsAllowed() ? expandImplicitMul(plain) : plain;
+}
+
+/* ⚠️ ФОРМУЛА ПРИХОДИТ ИЗ ПОЛЯ НА ЯЗЫКЕ LaTeX, А СЧИТАЕТ ЕЁ Math.js.
+   Обычно перевод делает сам ввод (`latexToMath` в связке с MathLive), но
+   надеяться на это нельзя: поле бывает и обычным, запись попадает вставкой из
+   буфера, а математическое поле собирается лениво и до входа в сцену его может
+   не быть вовсе. Поэтому перевод стоит ещё и ЗДЕСЬ, в единственной двери
+   разбора, и раньше раскрытия неявного умножения.
+
+   Дешёвая проверка на слэш — не преждевременная оптимизация: prepExpr зовётся
+   из разбора свободных букв, то есть на каждой новой строке в поле, а подряд
+   идущие символы дают подряд идущие вызовы.
+
+   Перевод, оставивший слэш, означает незнакомую команду. Такую строку отдаём
+   Math.js как есть: пусть откажет он и назовёт место, а не мы молча. */
+function texToPlain(expr) {
+  const s = String(expr == null ? '' : expr);
+  if (s.indexOf('\\') < 0) return s;
+  if (typeof latexToMath !== 'function') return s;
+  try {
+    const t = latexToMath(s);
+    return (typeof t === 'string' && t.trim()) ? t : s;
+  } catch (e) { return s; }
 }
 
 /* Свободные буквы формулы: то, что придётся чем-то заменить при расчёте.
@@ -2392,8 +2578,15 @@ function freeSymbols(expr) {
   return res;
 }
 
+/* ⚠️ ПУСТОЙ СПИСОК БУКВ ЗНАЧИТ «БУКВ НЕТ», А НЕ «НЕ СМОГ РАЗОБРАТЬ».
+   Разные ответы, а форма у них была одна: упавший разбор молча отдавал [], и
+   для всякого, кто спрашивал буквы, непонятая формула была неотличима от
+   «100 - x». Признак разбора носим отдельным полем на самом списке: он не
+   мешает читать список как список (а его читают из десятка мест), но даёт
+   спросить «а разобралось ли вообще». */
 function freeSymbolsUncached(expr) {
   const out = [];
+  let failed = false;
   const scan = (src) => {
     try {
       const node = math.parse(prepExpr(src));
@@ -2405,12 +2598,14 @@ function freeSymbolsUncached(expr) {
         if (sceneReserved().has(n.name)) return;
         if (out.indexOf(n.name) < 0) out.push(n.name);
       });
-    } catch (e) {}
+    } catch (e) { failed = true; }
   };
   const s = String(expr || '');
   // Только одиночное «=»; «==», «<=», «>=», «!=» это сравнения, их не делим.
   const parts = s.split(/(?<![<>=!])=(?!=)/);
   if (parts.length === 2) { scan(parts[0]); scan(parts[1]); } else scan(s);
+  // Пустая строка — это не отказ разбора, а отсутствие формулы.
+  if (s.trim() && failed) Object.defineProperty(out, 'parseFailed', { value: true, enumerable: false });
   return out;
 }
 
@@ -2486,7 +2681,22 @@ function syncParams() {
     return;
   }
   const names = [];
-  const take = (expr) => { if (expr) freeSymbols(expr).forEach(n => { if (names.indexOf(n) < 0) names.push(n); }); };
+  /* ⚠️ БУКВА НЕ ПРОПАДАЕТ ИЗ-ЗА ПОЛУНАБРАННОЙ ФОРМУЛЫ.
+     Замер 22.08: ползунок «a» уводили на 3,5 и продолжали править формулу.
+     Стирание звёздочки даёт промежуточную запись «y = 100 - a*», разбор её не
+     берёт, freeSymbols отдаёт пустой список — и проход удаления сносил живой
+     ползунок. Следующая нажатая клавиша возвращала его со значением 1: набранное
+     человеком число исчезало под рукой, а виноватой выглядела кривая.
+     Пока хоть одна формула на экране не разобралась, только ДОБАВЛЯЕМ буквы;
+     уборка лишних ждёт, пока запись снова станет целой. Ждать недолго — это
+     ровно то время, пока человек дописывает формулу. */
+  let pending = false;
+  const take = (expr) => {
+    if (!expr) return;
+    const got = freeSymbols(expr);
+    if (got.parseFailed) pending = true;
+    got.forEach(n => { if (names.indexOf(n) < 0) names.push(n); });
+  };
   /* ⚠️ Вторая половина договора о параметрах. Карточку списка сцена уже не
      показывает (syncCurveListVisibility), но сами кривые в STATE.curves у неё
      остаются — их кладёт пресет монополии. Пока буквы из них заводили ползунки,
@@ -2506,7 +2716,7 @@ function syncParams() {
   names.forEach(n => {
     if (!STATE.params[n]) { STATE.params[n] = { value: 1, min: -10, max: 10, step: 0.1 }; changed = true; }
   });
-  Object.keys(STATE.params).forEach(n => {
+  if (!pending) Object.keys(STATE.params).forEach(n => {
     if (names.indexOf(n) < 0) { delete STATE.params[n]; changed = true; }
   });
   if (changed) {
@@ -2535,7 +2745,7 @@ function buildParamChip(box, name) {
      Число справа при этом лишнее — вся строка «a = 1» и есть значение. */
   val.style.display = 'none';
   lab.classList.add('pchip-editable');
-  lab.title = 'Щёлкните, чтобы ввести точное значение';
+  lab.setAttribute('data-tip', 'Щёлкните, чтобы ввести точное значение');
 
   /* Крестик справа вверху — как у Desmos. У нас параметр не объявляют строкой,
      а выводят из формулы, поэтому «удалить» его насовсем нельзя: syncParams
@@ -2546,8 +2756,7 @@ function buildParamChip(box, name) {
   const kill = document.createElement('button');
   kill.type = 'button'; kill.className = 'param-kill';
   kill.textContent = '✕';
-  kill.title = 'Свернуть ползунок (буква останется с этим значением)';
-  kill.setAttribute('aria-label', kill.title);
+  kill.setAttribute('data-tip', 'Свернуть ползунок (буква останется с этим значением)');
   chip.querySelector('.pchip-top').appendChild(kill);
 
   const track = document.createElement('div');
@@ -2587,8 +2796,8 @@ function buildParamChip(box, name) {
   const applyFold = () => {
     chip.classList.toggle('folded', !!p.folded);
     kill.textContent = p.folded ? '＋' : '✕';
-    kill.title = p.folded ? 'Показать ползунок' : 'Свернуть ползунок (буква останется с этим значением)';
-    kill.setAttribute('aria-label', kill.title);
+    kill.setAttribute('data-tip', p.folded ? 'Показать ползунок'
+                                          : 'Свернуть ползунок (буква останется с этим значением)');
   };
   applyFold();
   kill.addEventListener('click', (e) => { e.stopPropagation(); p.folded = !p.folded; applyFold(); });
@@ -2836,8 +3045,7 @@ function makeColorPicker(value, onChange, title) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'swatch cpick-btn';
-  btn.title = title || 'Цвет кривой';
-  btn.setAttribute('aria-label', btn.title);
+  btn.setAttribute('data-tip', title || 'Цвет кривой');
 
   // Скрытый нативный input — только под кнопку «Свой цвет». Держим его тут,
   // чтобы пикер цвета не пропадал вместе с меню при переоткрытии.
@@ -2870,7 +3078,7 @@ function makeColorPicker(value, onChange, title) {
       sw.style.background = hex;
       sw.setAttribute('role', 'radio');
       sw.setAttribute('aria-checked', hex.toLowerCase() === cur.toLowerCase() ? 'true' : 'false');
-      sw.title = hex;
+      sw.setAttribute('data-tip', hex);
       sw.addEventListener('click', (ev) => { ev.stopPropagation(); apply(hex); closeColorMenu(); });
       grid.appendChild(sw);
     });
@@ -3793,7 +4001,7 @@ function buildMarkRow(mk) {
     const ok = document.createElement('button');
     ok.type = 'button'; ok.className = 'btn-icon mark-ok';
     ok.textContent = '✓';
-    ok.title = 'Поставить точку';
+    ok.setAttribute('data-tip', 'Поставить точку');
     ok.addEventListener('click', () => {
       if (!isFinite(mk.x) || !isFinite(mk.y)) return;
       mk.pending = false;
@@ -3822,7 +4030,7 @@ function buildMarkRow(mk) {
   });
   nameEl.classList.add('mark-name');
   const del = document.createElement('button');
-  del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.title = 'Убрать точку';
+  del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.setAttribute('data-tip', 'Убрать точку');
   del.addEventListener('click', () => {
     STATE.marks = STATE.marks.filter(m => m.id !== mk.id);
     renderMarkList(); redrawAll();

@@ -14,13 +14,44 @@ function hideError() {
 
 let curveCounter = 0;   // сквозной счётчик id кривых
 
-// Добавить кривую по формуле. form: 'PQ' — P = f(Q) (по умолчанию, канон движка),
-// 'QP' — Q = f(P) (Фаза 1б; приводится к канону в buildCurveFromQP).
-// ВАЖНО: значение по умолчанию — 'PQ', поэтому все внутренние вызовы (пресеты сцен,
-// ensureMonopolyCurves и т.п.) работают ровно как раньше; форму передаёт только UI.
+/* ФОРМУ ЗАПИСИ ОПРЕДЕЛЯЕТ САМ РАЗБОР (решение владельца 22.08).
+   Переключателя «Вводить P(Q) / Вводить Q(P)» больше нет. Правило простое и
+   однозначное: формула, в которой стоит цена P и НЕТ количества Q, — это
+   «объём от цены», Q = f(P); всё остальное — канон движка P = f(Q).
+
+   Почему именно так, а не «угадываем по смыслу»: спрос пишут и «100 - Q»,
+   и «100 - 2*P», и различить их можно ровно по одной вещи — какой буквой
+   названа переменная. Спорный случай, где есть ОБЕ буквы («P - Q»), уходит
+   в P = f(Q): это канон движка, и ошибка в понятную сторону. Формула без
+   букв вовсе («20», предельные издержки) — тоже канон.
+
+   Внутренние вызовы движка (пресеты сцен, ensureMonopolyCurves) формулу с
+   одинокой P не пишут, поэтому для них ничего не меняется. */
+function curveSrcForm(expr) {
+  /* ⚠️ ФОРМУ ЧИТАЕМ ПО ПОДГОТОВЛЕННОЙ ЗАПИСИ, А НЕ ПО СЫРОЙ СТРОКЕ.
+     Соседи буквы решают всё: правила ниже требуют, чтобы слева от P или Q
+     стоял символ, которым имя продолжаться не может. В записи «100-2P» слева
+     от P стоит цифра, и до правки 24.08 буква P не находилась вовсе — формула
+     уезжала в P = f(Q), где P посторонняя, и на графике выходила горизонталь
+     на 98 (замер Фазы 0), причём молча.
+     prepExpr раскрывает и LaTeX (поле хранит набранную запись), и неявное
+     умножение — «100-2P» приходит сюда уже как «100-2*P». Одно правило про
+     «цифра слева — это множитель» живёт в одном месте (60-overlays.js). */
+  let t = String(expr || '');
+  try { if (typeof prepExpr === 'function') t = prepExpr(t); } catch (e) { /* разбор не удался — судим по сырой строке */ }
+  const has = (re) => re.test(t);
+  const hasQ = has(/(^|[^A-Za-z0-9_])[Qq]([^A-Za-z0-9_]|$)/);
+  const hasP = has(/(^|[^A-Za-z0-9_])[Pp]([^A-Za-z0-9_]|$)/);
+  return (hasP && !hasQ) ? 'QP' : 'PQ';
+}
+
+// Добавить кривую по формуле. form: 'PQ' — P = f(Q) (канон движка),
+// 'QP' — Q = f(P) (приводится к канону в buildCurveFromQP).
+// Форму не передали — определяем сами по формуле (curveSrcForm).
 function addCurve(expr, form) {
   expr = (expr || '').trim();
   if (!expr) { showError('Введите формулу, например 100 - Q'); return; }
+  if (!form) form = curveSrcForm(expr);
   if (form === 'QP') {
     const built = buildCurveFromQP(expr);
     if (built.error) { showError('Не понял формулу Q(P): ' + built.error); return; }
@@ -50,6 +81,28 @@ function addCurve(expr, form) {
   redrawAll();
 }
 
+/* ПУСТАЯ СТРОКА ПО КНОПКЕ (решение владельца 22.08). Кнопка «Добавить кривую»
+   заводит не кривую, а ПОЛЕ: строка появляется пустой, и человек печатает
+   формулу прямо в ней — тем же полем с набором формул, что и у готовых кривых.
+   Роль не спрашивается: добавленная кривая всегда обычная и в расчёты модели
+   не входит (у неё нет роли, а равновесие и излишки считаются по ролям).
+   Пока формула не набрана, кривой на холсте нет — drawCurves пропускает
+   строки с пустой записью. */
+function addEmptyCurve() {
+  hideError();
+  curveCounter++;
+  STATE.curves.push({
+    id: curveCounter, expr: '', compiled: null,
+    color: nextColor(), role: null, visible: true,
+    linear: null, srcForm: 'PQ',
+  });
+  renderCurveList();
+  redrawAll();
+  // Курсор сразу в новое поле: кнопку нажали, чтобы печатать.
+  const inp = document.getElementById('curve-expr-' + curveCounter);
+  if (inp) { const mf = inp._mf; if (mf && mf.focusField) mf.focusField(); else inp.focus(); }
+}
+
 /* Правка формулы уже добавленной кривой. Пересобираем её внутренности на
    месте, сохраняя id, цвет, роль, своё имя и видимость: раньше, чтобы
    поправить опечатку, кривую приходилось удалять и заводить заново, теряя
@@ -58,6 +111,9 @@ function updateCurveExpr(curve, expr) {
   expr = (expr || '').trim();
   if (!expr) return 'пустая формула';
   if (curve.kind === 'vertical') return 'у вертикальной линии формулы нет';
+  // Форму записи пересматриваем на КАЖДОЙ правке: переключателя нет, и
+  // «100 - Q», переписанное в «100 - 2*P», обязано стать «объёмом от цены».
+  curve.srcForm = curveSrcForm(expr);
   if (curve.srcForm === 'QP') {
     const built = buildCurveFromQP(expr);
     if (built.error) return built.error;
@@ -71,6 +127,13 @@ function updateCurveExpr(curve, expr) {
     curve.linear = detectLinear(compiled);
     curve.fn = null;   // синтетическая функция (S + t и т.п.) больше не действует
   }
+  /* ⚠️ НОВАЯ ФОРМУЛА — НОВАЯ ТОЧКА ОТСЧЁТА СДВИГА (решение владельца 24.08).
+     Сдвиг это смещение ОТ введённой формулы, поэтому переписали формулу —
+     сдвиг ноль, ручка посередине дорожки. Точку отсчёта заводит заново
+     `curveShiftBase` (88-params.js) при первой же сборке чипа.
+     Без этого замер 24.08 давал «Сдвиг D = −50» сразу после набора «100-2*P»:
+     свободный член сменился, а отсчёт остался от прежней формулы. */
+  delete curve.shiftBase;
   return null;
 }
 
@@ -108,7 +171,8 @@ function renderCurveList() {
     top.className = 'crow-top';
 
     const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.checked = curve.visible; cb.title = 'Показать/скрыть';
+    cb.type = 'checkbox'; cb.checked = curve.visible;
+    cb.setAttribute('data-tip', 'Показать/скрыть');
     cb.addEventListener('change', () => { curve.visible = cb.checked; renderCurveList(); redrawAll(); });
 
     // Цвет кривой (Фаза 2): пикер меняет цвет ТОЛЬКО у этого экземпляра.
@@ -126,8 +190,9 @@ function renderCurveList() {
     });
 
     const nm = document.createElement('span');
-    nm.className = 'curve-name'; nm.textContent = curveShortName(curve);
-    nm.title = curve.expr || '';        // под именем — сама формула
+    nm.className = 'curve-name';
+    paintNotation(nm, curveShortName(curve));   // «D», «MC» — формулой, своё имя — текстом
+    nm.setAttribute('data-tip', tipExpr(curve.expr));   // под именем — сама формула
     if (!curve.visible) nm.style.opacity = '.4';
 
     // Бейдж формы записи (Фаза 1б): видно, что кривая введена как «объём от цены».
@@ -135,16 +200,31 @@ function renderCurveList() {
     if (curve.srcForm === 'QP') {
       badge = document.createElement('span');
       badge.className = 'form-badge'; badge.textContent = 'Q(P)';
-      const can = curve.linear ? ('P = ' + fmtLinear(curve.linear.a, curve.linear.b))
-                              : 'P = f(Q) считается численно';
-      badge.title = 'Введено как Q(P), в расчётах ' + can;
+      /* Слова остаются словами, математика — формулой: «считается численно»
+         это пояснение, а «P = f(Q)» — запись, и набраны они по-разному. */
+      const can = curve.linear
+        ? ('$P = ' + fmtLinear(curve.linear.a, curve.linear.b) + '$')
+        : '$P = f(Q)$ считается численно';
+      badge.setAttribute('data-tip', 'Введено как $Q(P)$, в расчётах ' + can);
     }
 
+    /* ⚠️ КРЕСТИК ДЕЛАЕТ РАЗНОЕ У РАЗНЫХ КРИВЫХ (решение владельца 22.08).
+       У ДОБАВЛЕННОЙ кривой (роли нет) он удаляет — её завёл человек, ему и
+       убирать. У ШТАТНОЙ кривой модели (спрос, предложение, MC и прочие с
+       ролью) он ГАСИТ: удалённый спрос в «Спросе и предложении» оставляет
+       ученика с пустой моделью и без пути назад, кроме «Вернуть исходный
+       вид», который заодно снесёт все его правки.
+       Гашение — это уже написанный признак visible и та же галочка слева:
+       второго механизма видимости рядом с первым не заводим. */
+    const staff = !!curve.role;
     const del = document.createElement('button');
-    del.className = 'btn-icon'; del.textContent = '✕'; del.title = 'Удалить кривую';
+    del.className = 'btn-icon'; del.textContent = '✕';
+    del.setAttribute('data-tip',
+      staff ? 'Убрать кривую с графика (вернуть галочкой слева)' : 'Удалить кривую');
     del.addEventListener('click', () => {
       pushUndo();
-      STATE.curves = STATE.curves.filter(c => c.id !== curve.id);
+      if (staff) { curve.visible = false; }
+      else { STATE.curves = STATE.curves.filter(c => c.id !== curve.id); }
       renderCurveList();
       redrawAll();
     });
@@ -166,17 +246,23 @@ function renderCurveList() {
     // записью, её не нужно удалять и заводить заново ради одной опечатки.
     // Битую формулу не применяем: подсвечиваем поле и оставляем прежнюю кривую.
     let fInp = null;
-    if (curve.kind !== 'vertical') {
+    /* ⚠️ У СУММАРНОЙ КРИВОЙ ПОЛЯ ФОРМУЛЫ НЕТ, И ЭТО НЕ ЗАБЫВЧИВОСТЬ.
+       Её запись считается из формул групп на каждой перерисовке (sumRebuild),
+       и правка руками жила бы ровно до следующей. Саму запись человек видит
+       рядом с именем — в подсказке строки и в аналитике. */
+    if (curve.kind !== 'vertical' && curve.kind !== 'sum') {
       fInp = document.createElement('input');
       fInp.type = 'text'; fInp.className = 'curve-expr-inp';
       fInp.value = curve.srcForm === 'QP' ? (curve.srcExpr || curve.expr) : curve.expr;
-      fInp.placeholder = curve.srcForm === 'QP' ? 'Q = f(P)' : 'P = f(Q)';
-      fInp.title = 'Формула кривой: правится на месте';
+      fInp.placeholder = curve.expr ? (curve.srcForm === 'QP' ? 'Q = f(P)' : 'P = f(Q)')
+                                    : 'Например: 100 - Q';
+      fInp.setAttribute('data-tip', 'Формула кривой: правится на месте');
       fInp.addEventListener('input', () => {
         pushUndo();
         const err = updateCurveExpr(curve, fInp.value);
         fInp.classList.toggle('bad', !!err);
-        fInp.title = err ? ('Пока не применено: ' + err) : 'Формула кривой: правится на месте';
+        fInp.setAttribute('data-tip',
+          err ? ('Пока не применено: ' + err) : 'Формула кривой: правится на месте');
         if (!err) {
           nm.textContent = curveShortName(curve);
           redrawAll();
@@ -208,7 +294,7 @@ function renderCurveList() {
 
     const gear = document.createElement('button');
     gear.type = 'button'; gear.className = 'btn-icon crow-gear';
-    gear.title = 'Имя на графике и роль кривой';
+    gear.setAttribute('data-tip', 'Имя на графике и роль кривой');
     gear.setAttribute('aria-expanded', 'false');
     gear.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
       + ' stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';

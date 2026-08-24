@@ -20,7 +20,7 @@
 // постановки задачи, а не живой регулятор — иначе лента вырастает в три ряда и
 // закрывает график. Живой регулятор здесь один — сама ставка.
 const PULT_MOVABLE = ['mono-submode',                                          // монополия: под-режим
-  'taxside-row', 'tax-field', 'pc-field',                                      // рынок: вмешательство
+  'taxside-row', 'tax-field', 'pc-field', 'quota-field', 'quota-price-field',  // рынок: вмешательство
   'open-pw-field', 'open-tariff-field', 'open-quota-field',                    // открытая экономика
   'union-wage-field', 'labmin-field',                                  // труд: зарплата / МРОТ
   'ppft-price-field', 'tb-price-field',                                // КТВ: мировая цена (A / Б)
@@ -58,9 +58,18 @@ function pultRegulatorIds() {
     const t = STATE.intervType;
     if (t === 'tax' || t === 'subsidy') {
       const ids = [];
-      if (t === 'tax' && STATE.market !== 'monopoly') ids.push('taxside-row');  // как в setType
+      // Ряд стороны живёт в ленте ровно тогда, когда каскад его показывает:
+      // потоварный налог и любая субсидия. У НДС и акциза стороны нет.
+      const sideOn = (STATE.market !== 'monopoly')
+                  && ((t === 'tax' && STATE.taxForm === 'unit') || t === 'subsidy');
+      if (sideOn) ids.push('taxside-row');
       ids.push('tax-field');
       return ids;
+    }
+    if (t === 'quota') {
+      // Объём квоты — живой регулятор; выбор цены внутри коридора появляется
+      // рядом с ним ровно тогда, когда коридор есть.
+      return STATE.quotaActive ? ['quota-field', 'quota-price-field'] : ['quota-field'];
     }
     return ['pc-field'];   // потолок / пол
   }
@@ -135,6 +144,14 @@ function pultShouldShow() {
 }
 
 
+/* Имя регулятора сдвига: «Сдвиг D». Буква кривой уезжает в набор формулой
+   (texifyName делает из одинокой латинской буквы курсивную переменную), а
+   слово «Сдвиг» остаётся прямым текстом. Длинное своё имя кривой сокращаем
+   так же, как раньше: колонка панели узкая. */
+function shiftChipLabel(c) {
+  return 'Сдвиг ' + curveChipLabel(c);
+}
+
 // Короткая метка кривой для чипа: по роли, иначе усечённая формула.
 function curveChipLabel(c) {
   const f = curveShortName(c);   // своё имя → роль → формула (Фаза 1)
@@ -167,6 +184,11 @@ function paintEqLabel(lab, name, value) {
 function texifyName(name) {
   const s = String(name || '').trim();
   if (/^[A-Za-z]$/.test(s)) return s;
+  /* «Сдвиг D» — слово прямым текстом, обозначение кривой набором. Без этой
+     ветки вся строка уходила бы в \text{} целиком, и буква D стояла бы
+     обычным шрифтом рядом с формулой на графике, где она курсивная. */
+  const sh = s.match(/^(Сдвиг)\s+(.+)$/);
+  if (sh) return '\\text{' + sh[1] + '\\,}' + texifyName(sh[2]);
   const m = s.match(/^([A-Za-z])([A-Za-z0-9]{1,4})$/);
   if (m && !/[А-Яа-я]/.test(s)) return m[1] + '_{\\text{' + m[2] + '}}';
   return '\\text{' + s.replace(/([{}\\$&#^_~%])/g, '\\$1') + '}';
@@ -187,6 +209,12 @@ function editEqValue(lab, name, current, apply) {
   inp.type = 'number'; inp.step = 'any'; inp.value = current;
   inp.className = 'param-eq-input';
   lab.append(head, inp);
+  /* Ширина поля идёт за содержимым: подчёркивание должно стоять ровно под
+     числом, а не тянуться до края строки. У input[type=number] нет усадки
+     по содержимому, поэтому считаем сами. */
+  const fitWidth = () => { inp.style.width = Math.max(2, String(inp.value || '').length + 1) + 'ch'; };
+  fitWidth();
+  inp.addEventListener('input', fitWidth);
   /* ⚠️ СОДЕРЖИМОЕ ВЫДЕЛЯЕТСЯ ЦЕЛИКОМ: первый набранный символ заменяет старое
      значение. Это отмена прежнего решения «курсор в конец» (Н75): при a = 1
      набор «50» давал 150, а вместе с ним и границы 146…154 — то есть один
@@ -344,6 +372,25 @@ function makePchip(labelText, valueText, color) {
   return { chip, lab, val };
 }
 
+/* ТОЧКА ОТСЧЁТА СДВИГА. Сдвиг — это смещение ОТ набранной формулы, поэтому
+   считается он от того свободного члена, с которым кривая пришла в панель.
+   Хранится на самой КРИВОЙ, а не на чипе: чип пересобирается при любой смене
+   набора кривых, и точка отсчёта уезжала бы вместе с ним.
+
+   ⚠️ Снимается точка отсчёта РОВНО в одном месте — `updateCurveExpr`
+   (80-ui.js), то есть при правке формулы через левую панель. Новая формула —
+   новая точка отсчёта, сдвиг ноль, ручка посередине.
+   Замер 24.08 до правки: в сцене «Спрос и предложение» набор «100-2*P» вместо
+   «100 - Q» давал «Сдвиг D = −50» и ручку в упоре у левого края — свободный
+   член сменился со 100 на 50, а точка отсчёта осталась прежней. Кривую при
+   этом никто не двигал: её только что набрали руками.
+   `setCurveFreeTerm` точку отсчёта НЕ трогает — он и есть сам сдвиг. */
+function curveShiftBase(c) {
+  if (!c || !c.linear) return 0;
+  if (c.shiftBase == null) c.shiftBase = c.linear.b;
+  return c.shiftBase;
+}
+
 // Построить (пересобрать) слайдеры кривых в контейнере #params-curves.
 function buildPultCurveChips(list) {
   const body = document.getElementById('params-body');
@@ -361,11 +408,22 @@ function buildPultCurveChips(list) {
     box.appendChild(t);
   }
   list.forEach(c => {
-    const { chip, lab, val } = makePchip(curveChipLabel(c), fmt(c.linear.b), c.color);
+    /* ⚠️ ПОЛЗУНОК ПОКАЗЫВАЕТ СДВИГ, А НЕ ЗНАЧЕНИЕ КРИВОЙ (решение владельца 22.08).
+       Раньше в строке стояло «D = 100»: имя кривой и её свободный член. Подпись
+       врала дважды — D это функция, а не число, и ползунок двигает не значение
+       спроса, а параллельный сдвиг всей кривой. Теперь имя регулятора прямо
+       называет действие («Сдвиг D», буква набрана формулой), а число рядом —
+       это сам сдвиг: 0 на старте, 12 после протяжки вверх, −12 вниз.
+       Свободный член кривой остаётся ЕДИНСТВЕННЫМ источником правды: сдвиг
+       считается от значения, с которого модель открылась (base), и обратно в
+       кривую кладётся тем же setCurveFreeTerm. */
+    const base = curveShiftBase(c);
+    const { chip, lab, val } = makePchip(shiftChipLabel(c), fmt(c.linear.b - base), c.color);
     chip.dataset.cid = c.id;
     // Подсказку вешаем на сам чип: подпись .pchip-label заменяет
     // upgradeRegulator строкой «имя = значение», и title на ней пропал бы.
-    chip.title = 'Сдвиг кривой ' + curveShortName(c) + ': ' + (c.expr || '');
+    chip.setAttribute('data-tip',
+      'Сдвиг кривой ' + tipName(curveShortName(c)) + ': ' + tipExpr(c.expr));
 
     const sl = document.createElement('input');
     /* ⚠️ ОДНО ЗНАЧЕНИЕ — ОДИН ИСТОЧНИК (п. 3, канон 2.1).
@@ -377,17 +435,26 @@ function buildPultCurveChips(list) {
        `step = 'any'` разрешает ползунку нести точное значение; клавиши-стрелки
        при этом по-прежнему ходят целыми (браузер берёт сотую долю размаха,
        а размах здесь 0…100). */
-    sl.type = 'range'; sl.min = 0; sl.max = CONFIG.Pmax; sl.step = 'any';
-    sl.value = c.linear.b;
+    /* Старт по центру диапазона — общее правило для всех ползунков аналитики.
+       Диапазон симметричен вокруг нуля, поэтому ручка стоит ровно посередине
+       и сразу видно, что двигать можно в обе стороны. Размах прежний (Pmax),
+       просто он теперь отсчитывается от текущего положения кривой, а не от
+       нуля оси цен. */
+    const half = Math.max(1, CONFIG.Pmax / 2);
+    sl.type = 'range'; sl.min = -half; sl.max = half; sl.step = 'any';
+    // Ручка встаёт на ФАКТИЧЕСКИЙ сдвиг: у нетронутой кривой это ноль, то есть
+    // середина дорожки, а у сдвинутой — её настоящее положение. Жёсткий ноль
+    // здесь врал бы после пересборки панели.
+    sl.value = c.linear.b - base;
     sl.style.accentColor = c.color;   // акцент ползунка в цвет кривой
     // п. 78. Подсказка идёт через общую плашку, а не через нативный title:
     // тот не появляется ни с клавиатуры, ни на сенсорном экране.
-    sl.setAttribute('data-tip', 'Сдвиг кривой по вертикали (свободный член b)');
+    sl.setAttribute('data-tip', 'Параллельный сдвиг кривой по вертикали');
 
     // Слайдер → задаём b ТЕМ ЖЕ путём, что перетаскивание (по id, кривая могла пересоздаться).
     sl.addEventListener('input', () => {
       const cur = STATE.curves.find(x => x.id === c.id);
-      if (cur && cur.linear) setCurveFreeTerm(cur, parseFloat(sl.value));
+      if (cur && cur.linear) setCurveFreeTerm(cur, curveShiftBase(cur) + parseFloat(sl.value));
     });
 
     // Дорожка с кликабельными границами — как у букв-параметров: один и тот же
@@ -414,8 +481,16 @@ function syncPultCurveValues(list) {
     if (!chip) return;
     const sl = chip.querySelector('input[type="range"]');
     const val = chip.querySelector('.pchip-val');
-    if (sl && document.activeElement !== sl) sl.value = c.linear.b;   // точное, см. п. 3
-    if (val) val.textContent = fmt(c.linear.b);
+    /* Ползунок несёт СДВИГ, поэтому синхронизируем разницу с базой, а не сам
+       свободный член: иначе протяжка кривой мышью ставила бы в ползунок 85,22
+       при размахе −50…50 и ручка улетала бы за край. */
+    const shift = c.linear.b - curveShiftBase(c);
+    if (sl && document.activeElement !== sl) sl.value = shift;   // точное, см. п. 3
+    if (val) val.textContent = fmt(shift);
+    /* Видимая строка «Сдвиг D = …» это .reg-eq, её пишет upgradeRegulator;
+       .pchip-val он же прячет. Значит после синхронизации значения надо
+       позвать его же обновление, иначе число в строке останется прежним. */
+    if (chip._regSync) chip._regSync();
   });
 }
 
@@ -504,8 +579,21 @@ function upgradeRegulator(field) {
      несёт короткое обозначение. Полное название остаётся подсказкой. */
   const labEl = field.querySelector('label');
   const chipLab = field.querySelector('.pchip-label');
+  /* ⚠️ ТЕКСТ БЕРЁМ БЕЗ НЕВИДИМОЙ ПОЛОВИНЫ KaTeX.
+     Рядом с нарисованной формулой KaTeX держит её же копию для чтецов экрана
+     (.katex-mathml с annotation). `textContent` склеивает обе, и одна буква
+     читается трижды: «Цена P» превращалась в «Цена PPP», а дальше это имя
+     уходило в набор и печаталось на экране. Ровно это и случилось 24.08, когда
+     подписи панели начали набираться формулой. */
+  const plainLabel = (el) => {
+    if (!el) return '';
+    if (!el.querySelector('.katex')) return el.textContent;
+    const c = el.cloneNode(true);
+    c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
+    return c.textContent;
+  };
   // У регуляторов сцен подпись это <label>, у чипов кривых — .pchip-label.
-  const rawName = ((labEl ? labEl.textContent : (chipLab ? chipLab.textContent : ''))
+  const rawName = (plainLabel(labEl || chipLab)
                     .split('=')[0]).replace(/[:\s]+$/, '').trim();
   const name = shortRegulatorName(field.id, rawName);
 
@@ -516,7 +604,9 @@ function upgradeRegulator(field) {
   if (!eq) {
     eq = document.createElement('span');
     eq.className = 'pchip-label reg-eq pchip-editable';
-    eq.title = rawName ? (rawName + '. Щёлкните, чтобы ввести точное значение') : 'Щёлкните, чтобы ввести точное значение';
+    eq.setAttribute('data-tip', rawName
+      ? (tipName(rawName) + '. Щёлкните, чтобы ввести точное значение')
+      : 'Щёлкните, чтобы ввести точное значение');
     /* Куда встать: у чипа есть верхняя строка, у поля сцены её нет. Дорожка
        ползунка может лежать глубже, поэтому вставляем в САМОЕ НАЧАЛО поля, а не
        перед дорожкой: она не всегда прямой потомок, и insertBefore на чужом
@@ -810,7 +900,6 @@ function wireControls() {
     }
   });
 
-  const formula = document.getElementById('inp-formula');
   const addBtn = document.getElementById('btn-add-curve');
 
   // Границы осей, сетка, легенда и названия осей живут в меню гаечного ключа
@@ -827,13 +916,8 @@ function wireControls() {
     if (typeof updatePult === 'function') updatePult();   // слайдеры кривых: новый предел = Pmax
   });
 
-  // Фаза 1б: форма записи кривой P(Q) / Q(P).
-  const cfPQ = document.getElementById('cf-pq'), cfQP = document.getElementById('cf-qp');
-  if (cfPQ) cfPQ.addEventListener('click', () => setCurveForm('PQ'));
-  if (cfQP) cfQP.addEventListener('click', () => setCurveForm('QP'));
-
-  // Фаза 1а: подсказки формата формулы у полей ввода.
-  attachFormulaHelp('fh-formula', 'fp-formula', 'inp-formula', () => curveHelpKind());
+  // Фаза 1а: подсказки формата формулы у полей ввода. Поля новой кривой здесь
+  // больше нет — справка живёт у полей самих кривых (equipFormulaField).
   attachFormulaHelp('fh-tc', 'fp-tc', 'inp-tc', 'TC');
   attachFormulaHelp('fh-ppf', 'fp-ppf', 'inp-ppf', 'PPF');
   // Остальные формульные поля сцен: обвязку им достраиваем на месте, дальше
@@ -843,11 +927,17 @@ function wireControls() {
   attachFormulaHelp('fh-mathfc', 'fp-mathfc', 'inp-mathfc', 'MATHAB');
   attachFormulaHelp('fh-mathgc', 'fp-mathgc', 'inp-mathgc', 'MATHAB');
 
-  // Галочки показа областей CS и PS.
-  const cs = document.getElementById('chk-cs');
-  const ps = document.getElementById('chk-ps');
-  cs.addEventListener('change', () => { STATE.showCS = cs.checked; redrawAll(); });
-  ps.addEventListener('change', () => { STATE.showPS = ps.checked; redrawAll(); });
+  /* Показ излишков — один тумблер в меню гаечного ключа (решение владельца
+     22.08). Раньше это были две галочки (CS и PS) в карточке «Излишки» левой
+     панели; сама карточка убрана. Оба признака состояния (showCS и showPS)
+     остались — их читают заливки в четырёх местах 40-scenes-market.js, — но
+     переключаются вместе: порознь их не включал никто, а излишки монополии
+     живут на своих галочках #chk-mono-* и сюда не относятся. */
+  const areasChk = document.getElementById('chk-areas');
+  if (areasChk) areasChk.addEventListener('change', () => {
+    STATE.showCS = areasChk.checked; STATE.showPS = areasChk.checked;
+    redrawAll();
+  });
 
   // Галочки областей монополии (Задача 1): CS / VC / PS.
   [['chk-mono-cs', 'showMonoCS'], ['chk-mono-vc', 'showMonoVC'], ['chk-mono-ps', 'showMonoPS']]
@@ -878,17 +968,19 @@ function wireControls() {
   document.getElementById('seg-sub').addEventListener('click', () => setType('subsidy'));
   document.getElementById('seg-ceil').addEventListener('click', () => setType('ceiling'));
   document.getElementById('seg-floor').addEventListener('click', () => setType('floor'));
+  const segQuota = document.getElementById('seg-quota');
+  if (segQuota) segQuota.addEventListener('click', () => setType('quota'));
+  // Квота: объём и выбор цены внутри коридора.
+  const qSl = document.getElementById('quota-slider'), qIn = document.getElementById('quota-input');
+  if (qSl) qSl.addEventListener('input', () => setQuota(parseFloat(qSl.value)));
+  if (qIn) qIn.addEventListener('change', () => { const v = parseFloat(qIn.value); if (!isNaN(v)) setQuota(v); });
+  const qP = document.getElementById('quota-price-slider');
+  if (qP) qP.addEventListener('input', () => setQuotaPos(parseFloat(qP.value) / 100));
 
   // Сторона налога (Задача 1): продавец / покупатель.
   const tsbSel = document.getElementById('tsb-seller'), tsbBuy = document.getElementById('tsb-buyer');
   if (tsbSel) tsbSel.addEventListener('click', () => setTaxSide('seller'));
   if (tsbBuy) tsbBuy.addEventListener('click', () => setTaxSide('buyer'));
-
-  // Переключатель рынка «Конкуренция / Монополия».
-  const segComp = document.getElementById('seg-comp');
-  const segMono = document.getElementById('seg-mono');
-  if (segComp) segComp.addEventListener('click', () => setMarket('comp'));
-  if (segMono) segMono.addEventListener('click', () => setMarket('monopoly'));
 
   // Под-режимы монополии: обычная / дискр. 1° / дискр. 3° / составной спрос / естественная.
   [['mm-simple', 'simple'], ['mm-d1', 'discr1'], ['mm-d3', 'discr3'],
@@ -1008,7 +1100,7 @@ function wireControls() {
   if (labGhost) labGhost.addEventListener('change', () => { STATE.showGhost = labGhost.checked; redrawAll(); });
 
   // Сценарии анализа рынка: обычный / эластичность / сдвиги / внешний эффект / открытая экономика.
-  [['scn-none', 'none'], ['scn-elast', 'elasticity'], ['scn-shift', 'shift'],
+  [['scn-none', 'none'], ['scn-elast', 'elasticity'],
    ['scn-ext', 'externality'], ['scn-open', 'openecon']]
     .forEach(([id, s]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setScenario(s)); });
 
@@ -1036,35 +1128,40 @@ function wireControls() {
     if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); });
   });
 
-  // Сдвиги спроса и предложения (Задача 3): ползунки + числовые поля.
-  [['shiftD-slider', 'shiftD-input', 'D'], ['shiftS-slider', 'shiftS-input', 'S']].forEach(([sid, iid, which]) => {
-    const sl = document.getElementById(sid), inp = document.getElementById(iid);
-    if (sl) sl.addEventListener('input', () => setShift(which, parseFloat(sl.value)));
-    if (inp) inp.addEventListener('change', () => setShift(which, parseFloat(inp.value)));
+  /* Внешние эффекты. Формулы MSB и MSC живут во «Вводе функций»: чекбокс
+     слева включает кривую, поле рядом правит её формулу. Пока чекбокс снят,
+     поле заперто — общественная кривая просто равна своей частной паре. */
+  [['msb', 'chk-msb', 'inp-msb'], ['msc', 'chk-msc', 'inp-msc']].forEach(([key, cid, iid]) => {
+    const box = document.getElementById(cid), inp = document.getElementById(iid);
+    if (box) box.addEventListener('change', () => {
+      STATE[key + 'On'] = box.checked;
+      // Включили впервые — подставляем формулу частной пары, чтобы человек
+      // правил готовое выражение, а не пустое поле.
+      if (box.checked && !STATE[key + 'Expr']) STATE[key + 'Expr'] = socialDefaultExpr(key);
+      syncSocialFields(); recompileSocial(); redrawAll();
+    });
+    if (inp) {
+      const apply = () => {
+        STATE[key + 'Expr'] = (inp.value || '').trim();
+        recompileSocial(); redrawAll();
+      };
+      inp.addEventListener('change', apply);
+      inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); });
+    }
   });
-
-  // Внешний эффект (Задача 4): формула внешних издержек + галочка налога Пигу.
-  const extInp = document.getElementById('ext-input');
-  if (extInp) {
-    const applyExt = () => { STATE.extExpr = (extInp.value || '').trim(); recompileExt(); redrawAll(); };
-    extInp.addEventListener('change', applyExt);
-    extInp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') applyExt(); });
-  }
   const extPigou = document.getElementById('ext-pigou');
   if (extPigou) extPigou.addEventListener('change', () => { STATE.applyPigou = extPigou.checked; redrawAll(); });
-  // Фаза 2б: знак внешнего эффекта (отрицательный ↔ положительный).
-  const extNeg = document.getElementById('ext-neg'), extPos = document.getElementById('ext-pos');
-  if (extNeg) extNeg.addEventListener('click', () => setExtSign('neg'));
-  if (extPos) extPos.addEventListener('click', () => setExtSign('pos'));
 
   // Фаза 2а: галочка «точка на предложении» (вторая точка эластичности).
   const elS = document.getElementById('chk-elast-s');
   if (elS) elS.addEventListener('change', () => { STATE.showElastS = elS.checked; redrawAll(); });
 
-  // Фаза 2в: вид потоварной ставки (специфический ↔ адвалорный).
-  const tkU = document.getElementById('tk-unit'), tkA = document.getElementById('tk-adv');
-  if (tkU) tkU.addEventListener('click', () => setTaxKind('unit'));
-  if (tkA) tkA.addEventListener('click', () => setTaxKind('advalorem'));
+  // Уровень 2 каскада вмешательства: вид налога (потоварный / НДС / акциз)
+  // или вид субсидии (потоварная / процентная — третья кнопка тогда скрыта).
+  [['tk-unit', 'unit'], ['tk-vat', 'vat'], ['tk-exc', 'excise']].forEach(([id, form]) => {
+    const b = document.getElementById(id);
+    if (b) b.addEventListener('click', () => setTaxForm(form));
+  });
 
   /* Режим издержек (Задача 2). Постоянные затраты отдельным полем больше не
      вводятся (Б24): в режиме «задаю TC» они равны TC(0). Поэтому здесь только
@@ -1612,27 +1709,10 @@ function wireControls() {
     redrawAll();
   });
 
-  // Добавление кривой: по кнопке и по Enter в поле формулы.
-  // Форма записи (P(Q) / Q(P)) берётся из переключателя — Фаза 1б.
-  // Роль спрашивается ДО формулы, поэтому назначается сразу после добавления:
-  // кривая появляется уже спросом или предельными издержками, а не «обычной».
-  const submit = () => {
-    const before = STATE.curves.length;
-    addCurve(formula.value, STATE.curveForm);
-    if (STATE.curves.length > before) {
-      const sel = document.getElementById('new-role');
-      const role = sel ? sel.value : '';
-      if (role) setRole(STATE.curves[STATE.curves.length - 1], role);
-      formula.value = '';
-    }
-    formula.focus();
-  };
-  addBtn.addEventListener('click', submit);
-  formula.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
-
-  // Смена роли до ввода перенастраивает справку, подсказку и форму записи.
-  const newRole = document.getElementById('new-role');
-  if (newRole) newRole.addEventListener('change', () => applyNewRoleUI());
-  applyNewRoleUI();
+  /* Кнопка «Добавить кривую» заводит ПУСТУЮ строку под списком (решение
+     владельца 22.08). Ни формулы, ни роли она не спрашивает: формулу человек
+     печатает прямо в новой строке, роль у добавленной кривой всегда пустая,
+     и в расчёты модели такая кривая не входит. */
+  if (addBtn) addBtn.addEventListener('click', () => addEmptyCurve());
 }
 

@@ -1,0 +1,132 @@
+    7.2s    21  ok   problems.tests.test_activity_block
+    4.8s    11  ok   problems.tests.test_activity_shared
+    9.5s    20  ok   problems.tests.test_answer_approval
+    4.4s    16  ok   problems.tests.test_answer_check
+    7.1s    13  ok   problems.tests.test_assignment_export
+    6.4s    20  ok   problems.tests.test_assignment_rows
+    7.9s    11  ok   problems.tests.test_auto_zero
+    0.3s    29  ok   problems.tests.test_batch2_ns
+    3.7s    56  ok   problems.tests.test_batch2_unblock
+    8.5s    17  ok   problems.tests.test_blank_zero
+    7.5s    29  ok   problems.tests.test_blocks_logic
+   28.5s    22  ok   problems.tests.test_build_flow
+    5.5s    12  ok   problems.tests.test_check_block
+   12.2s    18  ok   problems.tests.test_comment_visibility
+    0.8s     3  ok   problems.tests.test_css_comments
+    8.4s    14  ok   problems.tests.test_custom_parts
+   25.2s     3  ok   problems.tests.test_design_canon
+    3.7s     4  ok   problems.tests.test_exam_autosave_js
+    3.9s     5  ok   problems.tests.test_exam_timer_js
+   30.8s    63  ok   problems.tests.test_exams
+    7.9s    15  ok   problems.tests.test_eyes_grading
+    0.4s    10  ok   problems.tests.test_fix_latex_junk
+    3.9s    18  ok   problems.tests.test_found_step
+    8.2s    36  ok   problems.tests.test_gamification
+    3.6s    49  ok   problems.tests.test_glue_pdf_lines
+    8.4s     9  ok   problems.tests.test_group_history
+    0.3s     9  ok   problems.tests.test_hints
+   27.2s    19  ok   problems.tests.test_hw_generator
+    0.6s    11  ok   problems.tests.test_import_matek_clean
+    4.3s     7  ok   problems.tests.test_import_vsosh
+   12.5s    21  ok   problems.tests.test_individual
+    1.2s     7  ok   problems.tests.test_katex_damage
+    4.0s     9  ok   problems.tests.test_katex_dollars
+    4.8s    16  ok   problems.tests.test_look_cards
+    5.2s    27  ok   problems.tests.test_look_check
+    3.7s    36  ok   problems.tests.test_look_kit
+    6.7s    12  ok   problems.tests.test_look_numbers
+    5.1s    31  ok   problems.tests.test_look_pick
+    4.3s    20  ok   problems.tests.test_look_sheet
+    4.1s    22  ok   problems.tests.test_look_stats
+    8.1s    23  ok   problems.tests.test_lost_bits
+    5.8s    11  ok   problems.tests.test_minutes_on_site
+   34.7s    73  ok   problems.tests.test_night_bugs
+    7.8s    11  ok   problems.tests.test_obzor_assignments
+   12.6s    25  ok   problems.tests.test_obzor_build
+    9.8s    16  ok   problems.tests.test_obzor_done
+    9.6s    15  ok   problems.tests.test_obzor_minutes
+    5.9s    12  ok   problems.tests.test_obzor_my_problems
+   10.9s    20  ok   problems.tests.test_obzor_nav
+   11.9s    20  ok   problems.tests.test_obzor_overview
+    7.2s    18  ok   problems.tests.test_obzor_own_problem
+   13.2s    30  ok   problems.tests.test_obzor_review
+    8.8s    12  ok   problems.tests.test_obzor_solo
+    9.7s    15  ok   problems.tests.test_obzor_student_card
+   13.4s    11  ok   problems.tests.test_obzor_students
+    5.7s    22  ok   problems.tests.test_old_screens_gone
+    4.3s    10  ok   problems.tests.test_one_cart
+   13.2s    29  ok   problems.tests.test_option_grading
+    4.8s    10  ok   problems.tests.test_overview_look
+   11.8s    19  ok   problems.tests.test_own_parts_reach
+    0.5s    33  ok   problems.tests.test_parse_vsosh
+    0.5s    31  ok   problems.tests.test_parse_vsosh_municip
+    9.7s    14  ok   problems.tests.test_part_answers
+   17.4s    41  ok   problems.tests.test_platform_models
+    7.9s    10  ok   problems.tests.test_points_lock
+    6.3s    21  ok   problems.tests.test_points_rule
+    8.6s    24  ok   problems.tests.test_print_sheet
+    5.2s    13  ok   problems.tests.test_r15_align
+    6.0s    23  ok   problems.tests.test_r15_builder
+    5.5s    17  ok   problems.tests.test_r15_card
+    4.8s    20  ok   problems.tests.test_r15_collect
+   10.1s    18  ok   problems.tests.test_r15_crumbs
+    4.4s    26  ok   problems.tests.test_r15_date
+   38.0s     9  ok   problems.tests.test_r15_describe
+    6.9s    20  ok   problems.tests.test_r15_format
+    5.0s    10  ok   problems.tests.test_r15_minutes
+    5.2s    13  ok   problems.tests.test_r15_pair
+    4.3s    13  ok   problems.tests.test_r15_print
+   10.2s    26  ok   problems.tests.test_r15_regrade
+    5.2s    20  ok   problems.tests.test_r15_scroll
+    4.7s    20  ok   problems.tests.test_r15_sections
+    4.3s    14  ok   problems.tests.test_readable
+    3.9s    41  ok   problems.tests.test_repair_wave1
+   26.4s    80  ok   problems.tests.test_review55
+    4.2s    25  ok   problems.tests.test_review_bundle
+    1.2s    16  ok   problems.tests.test_ru_forms
+    7.6s    18  ok   problems.tests.test_score_comma
+    5.9s    12  ok   problems.tests.test_score_integrity
+   26.7s    15  ok   problems.tests.test_search_first
+    7.8s    11  ok   problems.tests.test_section_order
+    4.3s    12  ok   problems.tests.test_small_16
+    6.2s    14  ok   problems.tests.test_small_fixes
+   14.3s    17  ok   problems.tests.test_solo_merge
+    7.0s    24  ok   problems.tests.test_stats
+    6.3s    21  ok   problems.tests.test_stats_cards
+    7.8s    20  ok   problems.tests.test_student_card
+   16.2s    15  ok   problems.tests.test_students_screen
+    4.4s    13  ok   problems.tests.test_tables
+    6.6s    20  ok   problems.tests.test_tails
+    5.4s    11  ok   problems.tests.test_talk_block
+    4.2s     2  ok   problems.tests.test_template_hygiene
+    3.7s    24  ok   problems.tests.test_text_clean
+    6.6s    19  ok   problems.tests.test_topic_merge
+    5.3s    19  ok   problems.tests.test_true_numbers
+   10.3s    11  ok   problems.tests.test_waiting_count
+    4.2s    11  ok   problems.tests.test_whole_caption
+   10.5s    47  ok   problems.tests.test_work_flow
+    3.9s     6  ok   problems.tests.test_work_form_js
+   10.1s    15  ok   problems.tests.test_work_review
+    6.4s    23  ok   problems.tests.test_work_settings
+    3.7s    18  ok   catalog.tests.test_catalog
+    3.7s     9  ok   catalog.tests.test_collections
+    4.8s     9  ok   student.tests.test_student_cycle
+    4.7s     9  ok   teacher.tests.test_teacher_panel
+    4.4s   136  ok   game.tests.test_game
+    5.7s    56  ok   game.tests.test_generators
+    3.7s    12  ok   game.tests.test_page_js
+   33.4s     1  ok   calc2.tests.test_calc2_math
+    4.7s    10  ok   calc2.tests.test_export_pdf
+
+ИТОГО 979 с, тестов 2431, модулей 119
+Десятка самых долгих:
+     38.0s     9  problems.tests.test_r15_describe
+     34.7s    73  problems.tests.test_night_bugs
+     33.4s     1  calc2.tests.test_calc2_math
+     30.8s    63  problems.tests.test_exams
+     28.5s    22  problems.tests.test_build_flow
+     27.2s    19  problems.tests.test_hw_generator
+     26.7s    15  problems.tests.test_search_first
+     26.4s    80  problems.tests.test_review55
+     25.2s     3  problems.tests.test_design_canon
+     17.4s    41  problems.tests.test_platform_models

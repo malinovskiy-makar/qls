@@ -4,8 +4,14 @@
     {
       "name": "errorcheck",
       "runtimeExecutable": "venv313/Scripts/python.exe",
-      "runtimeArgs": ["manage.py", "runserver", "8123", "--insecure",
-                      "--noreload", "--settings=config.settings_errorcheck"],
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8123",
+        "--insecure",
+        "--noreload",
+        "--settings=config.settings_errorcheck"
+      ],
       "port": 8123
     },
     {
@@ -62,6 +68,17 @@
         "."
       ],
       "port": 8402
+    },
+    {
+      "name": "calc2-night",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv313/bin/python",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8099",
+        "--noreload"
+      ],
+      "port": 8099
     }
   ]
 }

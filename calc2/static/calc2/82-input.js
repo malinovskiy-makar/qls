@@ -19,7 +19,16 @@ function mathToTex(expr) {
   const s = String(expr || '').trim();
   if (!s) return '';
   try { return math.parse(s).toTex({ parenthesis: 'auto' }); }
-  catch (e) { return texFallback(s); }
+  catch (e) {
+    /* Предпросмотр показывает то, что считает движок. Запись, которую Math.js
+       не берёт как есть («100-ax», вставленный из буфера LaTeX), он берёт
+       после общей подготовки — той же, что стоит перед разбором. Сначала
+       пробуем исходный текст: подготовка раскрывает неявное умножение, и
+       показывать «a*x» там, где человек набрал «ax», незачем. */
+    try { const t = prepExpr(s); if (t !== s) return math.parse(t).toTex({ parenthesis: 'auto' }); }
+    catch (e2) {}
+    return texFallback(s);
+  }
 }
 // Отрисовать формулу в элемент. Без KaTeX (CDN недоступен) показываем исходный
 // текст — предпросмотр деградирует, но ничего не ломается.
@@ -79,6 +88,23 @@ function pwRows() {
     out.push({ f: String(r.f || '').trim(), a: String(r.a || '').trim(), b: String(r.b || '').trim() });
   }
   return out;
+}
+
+/* Приставка вида «y = », «P = »: конструктор её не придумывает, а читает из
+   ТЕКУЩЕГО значения поля, куда открыт. Раньше «Поставить в поле» стирало всё
+   значение целиком вместе с приставкой (setFieldValue переписывал inp.value
+   голой цепочкой условий), и это ломало и запись, и разбор:
+     · для полей, которые ждут именно «буква = …» (КПВ, «Неравенство доходов»)
+       собранная запись без приставки либо не считается вовсе, либо разбор
+       путает «>=»/«<=» ИЗ УСЛОВИЯ КУСКА с настоящим знаком равенства — свой
+       «=» перед ним отводит эту путаницу, поэтому «y = (x>=0 ...)» разбирается,
+       а голое «(x>=0 ...)» — нет (см. `parsePpfEquation`, ищет первый «=»);
+     · для полей без приставки (голое выражение) регулярка просто не
+       совпадает, и правка ничего не меняет — это тоже правильно.
+   Поэтому конструктор ЧИТАЕТ форму, а не решает её сам. */
+function pwPrefixOf(text) {
+  const m = /^\s*[A-Za-zА-Яа-я][A-Za-zА-Яа-я0-9_]*\s*=(?!=)\s*/.exec(String(text || ''));
+  return m ? m[0] : '';
 }
 
 function pwFormula() {
@@ -230,7 +256,7 @@ function pwAttachKeyboard(row, inp) {
   if (!btn) {
     btn = document.createElement('button');
     btn.type = 'button'; btn.id = 'pw-kbd-btn'; btn.className = 'f-help f-kbd';
-    btn.title = 'Клавиатура';
+    btn.setAttribute('data-tip', 'Клавиатура');
     btn.setAttribute('aria-label', 'Открыть математическую клавиатуру');
     btn.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
       + ' stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/>'
@@ -250,6 +276,51 @@ function pwAttachKeyboard(row, inp) {
 function pwPreview() {
   const prev = document.getElementById('pw-preview');
   if (prev) renderTexRaw(prev, pwLatex());
+}
+
+/* Какой буквой сцена ДЕЙСТВИТЕЛЬНО пишет это поле — читаем из его текущей
+   формулы, а не из статичной угадайки FORMULA_VAR («вид поля» → буква).
+   FORMULA_VAR не различает рынок труда (DEMAND/SUPPLY у него всегда «Q», хотя
+   в «Конкурентном рынке труда» и соседних сценах формулы пишут через L) и три
+   разных macro-сюжета под одним ярлыком «MACRO» (денежный рынок — i, рынок
+   заёмных средств — r, кривая Лаффера — Q; угадайка везде отвечает «Y»).
+   Свободная буква самой формулы (freeSymbols, `60-overlays.js`) — то немногое,
+   что действительно знает про КОНКРЕТНОЕ поле; угадайка остаётся только
+   запасным вариантом для пустого поля, где брать букву неоткуда. */
+/* ⚠️ НЕ freeSymbols. У неё обратная задача: найти буквы, которым нужен
+   ползунок, поэтому она НАРОЧНО выбрасывает буквы осей (AXIS_VARS — x, y, Q,
+   L, P… ровно то, что здесь и нужно) и математические константы (MATH_CONSTS,
+   и «i» — мнимая единица — там же, хотя в «Денежном рынке» i это ставка
+   процента, а не корень из −1). Здесь другой вопрос — «по какой букве вообще
+   построена ЭТА формула», — и ответ первая попавшаяся переменная слева
+   направо, будь то ось или что угодно ещё; манипуляторы сцены (ставка t,
+   субсидия s, зарплата w — у них своя роль, не ось) пропускаем, как и имя
+   функции в вызове (sqrt, log…). */
+function pwVarForField(inp, fallback) {
+  if (inp && inp.value) {
+    try {
+      /* Приставка «y = », «P = » — это ИМЯ ФУНКЦИИ (зависимая величина), не
+         буква, по которой сцена строит график. У «y = 100 - x» Math.js читает
+         «y = …» как присваивание, и первым символом при обходе идёт именно
+         «y» — ровно НЕ та буква, что нужна условию куска (условие пишут по x,
+         как и сама функция). Приставку срезаем тем же pwPrefixOf, что уже
+         бережёт её при записи (см. выше) — здесь она, наоборот, мешает. */
+      const pfx = pwPrefixOf(inp.value);
+      const body = pfx ? inp.value.slice(pfx.length) : inp.value;
+      const node = math.parse(prepExpr(body));
+      const reserved = (typeof sceneReserved === 'function') ? sceneReserved() : new Set();
+      let found = null;
+      node.traverse((n, path, parent) => {
+        if (found || n.type !== 'SymbolNode') return;
+        if (parent && parent.type === 'FunctionNode' && parent.fn === n) return;
+        if (reserved.has(n.name)) return;
+        if (n.name.length > 1) { try { if (typeof math[n.name] !== 'undefined') return; } catch (e) {} }
+        found = n.name;
+      });
+      if (found) return found;
+    } catch (e) {}
+  }
+  return fallback;
 }
 
 function openPiecewise(inp, v) {
@@ -537,11 +608,95 @@ function latexToMath(tex) {
   return out.replace(/\s+/g, ' ').trim();
 }
 
+/* ── Цепочка условий → ОДНА фигурная скобка со списком ────────────────
+   ⚠️ ЭТО КОРЕНЬ ДЕФЕКТА «КУСОЧНАЯ ВКЛАДЫВАЕТСЯ САМА В СЕБЯ» (замер 24.08).
+   Конструктор собирает правильный плоский список и ставит его в поле сам,
+   но живёт этот список ровно до первой пересборки строки кривой
+   (`renderCurveList`, её зовёт галочка видимости, смена цвета, ползунок
+   сдвига). При пересборке поле берёт запись из скрытого input — а там лежит
+   цепочка «условие ? то : иначе» — и переводит её в LaTeX силами самого
+   Math.js. Он честно вкладывает каждое следующее условие в ветку «иначе»
+   предыдущего, а NaN печатает как \infty (замер: math.parse('NaN').toTex()
+   даёт \infty). Владелец видел в поле ровно это:
+     {100-Q, if Q≥0∧Q<40; {80-0.5⋅Q, if Q≥40; ∞, otherwise}, otherwise}
+
+   Поэтому цепочку разворачиваем СВОИМИ руками, в тот же вид, что печатает
+   конструктор (`pwLatex`): список на одном уровне, условие по-русски.
+   Тогда после пересборки в поле стоит та же запись, что и сразу после
+   «Поставить в поле», а не другая.
+
+   ⚠️ ХВОСТ «NaN» СТРОКОЙ НЕ ПЕЧАТАЕТСЯ. Это не значение функции, а признак
+   «здесь функция не определена»: движок возвращает NaN и такую точку не
+   рисует. Печатать её «иначе ∞» — врать дважды: бесконечности там нет, и
+   значения там нет вообще. Обратный разбор (`casesToMath`) дописывает этот
+   хвост сам, поэтому запись без него разбирается в то же самое выражение. */
+function isUndefinedTailNode(n) {
+  return !!n && n.type === 'ConstantNode' && typeof n.value === 'number' && isNaN(n.value);
+}
+
+// Снять скобки, в которые Math.js оборачивает вложенное условие.
+function unwrapParens(n) {
+  let x = n;
+  while (x && x.type === 'ParenthesisNode') x = x.content;
+  return x;
+}
+
+/* Условие куска в том же виде, что печатает конструктор: «a ≤ Q < b» одной
+   строкой, а не «Q ≥ a ∧ Q < b». Двойное неравенство читается школьником
+   сразу, и ровно его понимает обратный разбор (`condToMath`). */
+const PW_REL_TEX = { largerEq: ' \\ge ', larger: ' > ', smallerEq: ' \\le ', smaller: ' < ',
+                     equal: ' = ', unequal: ' \\ne ' };
+function pwCondTex(node) {
+  const c = unwrapParens(node);
+  if (c && c.type === 'OperatorNode' && c.fn === 'and' && c.args && c.args.length === 2) {
+    const L = unwrapParens(c.args[0]), R = unwrapParens(c.args[1]);
+    const lo = L && L.type === 'OperatorNode' ? L.fn : '';
+    const hi = R && R.type === 'OperatorNode' ? R.fn : '';
+    if ((lo === 'largerEq' || lo === 'larger') && (hi === 'smaller' || hi === 'smallerEq')
+        && String(L.args[0]) === String(R.args[0])) {
+      return mathToTex(String(L.args[1])) + (lo === 'largerEq' ? ' \\le ' : ' < ')
+           + mathToTex(String(L.args[0]))
+           + (hi === 'smaller' ? ' < ' : ' \\le ') + mathToTex(String(R.args[1]));
+    }
+  }
+  if (c && c.type === 'OperatorNode' && PW_REL_TEX[c.fn] && c.args && c.args.length === 2)
+    return mathToTex(String(c.args[0])) + PW_REL_TEX[c.fn] + mathToTex(String(c.args[1]));
+  return mathToTex(String(c));
+}
+
+// Вернуть плоскую фигурную скобку или null, если это не цепочка условий.
+function condChainToCases(expr) {
+  let node;
+  try { node = math.parse(String(expr || '')); } catch (e) { return null; }
+  const rows = [];
+  let cur = unwrapParens(node);
+  let guard = 0;
+  while (cur && cur.type === 'ConditionalNode' && guard++ < 64) {
+    rows.push({ cond: cur.condition, val: cur.trueExpr });
+    cur = unwrapParens(cur.falseExpr);
+  }
+  if (!rows.length) return null;
+  const lines = rows.map(r => mathToTex(String(r.val)) + ', & \\text{если } ' + pwCondTex(r.cond));
+  if (!isUndefinedTailNode(cur)) lines.push(mathToTex(String(cur)) + ', & \\text{иначе}');
+  /* Двойные пробелы (их оставляет toTex) сжимаем: запись обязана получиться
+     ПОБУКВЕННО той же, что печатает конструктор, иначе «после пересборки та же
+     запись» проверить нечем. */
+  return ('\\begin{cases}' + lines.join('\\\\') + '\\end{cases}').replace(/ {2,}/g, ' ');
+}
+
 /* Обратный перевод: выражение Math.js → LaTeX для показа в поле.
-   Основную работу делает сам Math.js (toTex), запасной путь — грубая замена. */
+   Основную работу делает сам Math.js (toTex), запасной путь — грубая замена.
+   Кусочная запись идёт мимо Math.js — см. condChainToCases выше. */
 function mathToLatexField(expr) {
   const e = String(expr == null ? '' : expr).trim();
   if (!e) return '';
+  if (e.indexOf('?') >= 0) {
+    // Приставка «y = », «P = » к цепочке условий не относится: разворачиваем
+    // тело, а приставку возвращаем на место как есть (так же делает pw-apply).
+    const pfx = pwPrefixOf(e);
+    const cs = condChainToCases(pfx ? e.slice(pfx.length) : e);
+    if (cs) return pfx + cs;
+  }
   return mathToTex(e);
 }
 
@@ -1003,7 +1158,7 @@ function buildKeyboard(box, inp) {
   const pw = document.createElement('button'); pw.type = 'button'; pw.textContent = 'Кусочная функция';
   pw.addEventListener('click', () => {
     box.classList.remove('open');
-    openPiecewise(inp, box._var || 'x');
+    openPiecewise(inp, pwVarForField(inp, box._var || 'x'));
   });
   foot.appendChild(pw);
   box.appendChild(foot);
@@ -1071,7 +1226,7 @@ function liveFormulaTexts() {
    FORMULA_EXAMPLES; поле, которого здесь нет, общей оснастки не получает
    (имена, заголовки и списки чисел формулами не являются). */
 const FORMULA_FIELD_KINDS = {
-  'ext-input': 'PQ',
+  'inp-msb': 'DEMAND', 'inp-msc': 'SUPPLY',   // общественные кривые внешних эффектов
   'inp-d3-1': 'DEMAND', 'inp-d3-2': 'DEMAND', 'inp-d3-mc': 'MC',
   'inp-ki-1': 'DEMAND', 'inp-ki-2': 'DEMAND', 'inp-ki-3': 'DEMAND',
   'inp-kp-1': 'DEMAND', 'inp-kp-2': 'DEMAND', 'inp-kink-mc': 'MC',
@@ -1109,7 +1264,7 @@ function equipFormulaField(inputId, kind) {
     btn = document.createElement('button');
     btn.type = 'button'; btn.className = 'f-help'; btn.id = 'fh-auto-' + inputId;
     btn.setAttribute('aria-expanded', 'false');
-    btn.title = 'Как писать формулы';
+    btn.setAttribute('data-tip', 'Как писать формулы');
     btn.textContent = '?';
     row.appendChild(btn);
   }
@@ -1159,7 +1314,7 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
     // та же формула, напечатанная как в учебнике (прежнее поведение).
     const typeset = document.createElement('div');
     typeset.className = 'f-typeset';
-    typeset.title = 'Щёлкните, чтобы поправить формулу';
+    typeset.setAttribute('data-tip', 'Щёлкните, чтобы поправить формулу');
     slot.appendChild(typeset);
 
     const focused = () => document.activeElement === inp;
@@ -1188,7 +1343,7 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
 
   // Кнопка «?» стала кнопкой клавиатуры: примеры формул теперь лежат внутри неё.
   btn.classList.add('f-kbd');
-  btn.title = 'Клавиатура и примеры формул';
+  btn.setAttribute('data-tip', 'Клавиатура и примеры формул');
   btn.setAttribute('aria-label', 'Открыть математическую клавиатуру');
   btn.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
     ' stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/>' +
@@ -1207,7 +1362,8 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
     grid.className = 'f-grid';
     set.items.forEach(([ex, note]) => {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'f-ex'; b.title = 'Поставить эту формулу в поле';
+      b.type = 'button'; b.className = 'f-ex';
+      b.setAttribute('data-tip', 'Поставить эту формулу в поле');
       const m = document.createElement('span'); m.className = 'f-ex-math';
       renderTex(m, ex);
       const s = document.createElement('span'); s.className = 'f-ex-note'; s.textContent = note;
@@ -1244,7 +1400,8 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
       ops.forEach(([shown, note, insRaw, back]) => {
         const ins = insRaw != null ? insRaw : shown;
         const b = document.createElement('button');
-        b.type = 'button'; b.className = 'f-pal'; b.textContent = shown; b.title = note;
+        b.type = 'button'; b.className = 'f-pal'; b.textContent = shown;
+        b.setAttribute('data-tip', note);
         b.addEventListener('click', () => { insertIntoFormula(inp, ins, back || 0); });
         row.appendChild(b);
       });
@@ -1257,11 +1414,11 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
     const pwBtn = document.createElement('button');
     pwBtn.type = 'button'; pwBtn.className = 'f-pal wide';
     pwBtn.textContent = 'Собрать кусочную функцию';
-    pwBtn.title = 'Спросим число кусков и соберём запись из отдельных полей';
+    pwBtn.setAttribute('data-tip', 'Спросим число кусков и соберём запись из отдельных полей');
     pwBtn.addEventListener('click', () => {
       pop.classList.remove('open');
       btn.setAttribute('aria-expanded', 'false');
-      openPiecewise(inp, FORMULA_VAR[k] || 'x');
+      openPiecewise(inp, pwVarForField(inp, FORMULA_VAR[k] || 'x'));
     });
     pwRow.appendChild(pwBtn);
     pop.appendChild(pwRow);
@@ -1291,65 +1448,12 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
   });
 }
 
-/* ---------------------------------------------------------------------
-   ФАЗА 1б. Переключатель формы записи кривой: P(Q) ↔ Q(P).
-   Меняет только то, КАК пользователь пишет формулу; в математику всегда
-   уходит канон P = f(Q) (см. buildCurveFromQP). Форма запоминается у каждой
-   кривой отдельно — можно смешивать в одной сцене.
-   --------------------------------------------------------------------- */
-function setCurveForm(form) {
-  STATE.curveForm = (form === 'QP') ? 'QP' : 'PQ';
-  const a = document.getElementById('cf-pq'), b = document.getElementById('cf-qp');
-  if (a) a.classList.toggle('active', STATE.curveForm === 'PQ');
-  if (b) b.classList.toggle('active', STATE.curveForm === 'QP');
-  applyNewRoleUI();
-}
-
-/* Какой набор примеров показать в справке поля кривой. Зависит от того, ЧТО
-   пользователь собрался добавить: рядом с предельными издержками объяснять
-   запись спроса бессмысленно. */
-function newCurveRole() {
-  const sel = document.getElementById('new-role');
-  return sel ? sel.value : '';
-}
-function curveHelpKind() {
-  if (STATE.curveForm === 'QP') return 'QP';          // «объём от цены» — свой набор
-  return { demand: 'DEMAND', supply: 'SUPPLY', mc: 'MC', tc: 'TC', atc: 'ATC' }[newCurveRole()] || 'PQ';
-}
-
-/* Подсказка, плейсхолдер и доступность формы записи под выбранную роль.
-   Запись «объём от цены» осмысленна для спроса и предложения; предельные и
-   средние затраты по определению функции количества, поэтому для них
-   переключатель формы прячется. */
-function applyNewRoleUI() {
-  const role = newCurveRole();
-  const qpOk = (role === '' || role === 'demand' || role === 'supply');
-  const seg = document.getElementById('curve-form-seg');
-  if (seg) seg.style.display = qpOk ? '' : 'none';
-  if (!qpOk && STATE.curveForm === 'QP') { STATE.curveForm = 'PQ'; setCurveForm('PQ'); return; }
-
-  const inp = document.getElementById('inp-formula');
-  const ph = { demand: 'Например: 100 - Q', supply: 'Например: Q',
-               mc: 'Например: 20', tc: 'Например: Q^2 + 10*Q + 50',
-               atc: 'Например: Q - 10 + 100/Q' };
-  if (inp) inp.placeholder = (STATE.curveForm === 'QP') ? 'Например: 100 - 2*P' : (ph[role] || 'Например: 100 - Q');
-
-  const h = document.getElementById('curve-form-hint');
-  const note = {
-    demand: 'Спрос: цена как функция количества, P&nbsp;=&nbsp;f(Q).',
-    supply: 'Предложение: цена как функция количества, P&nbsp;=&nbsp;f(Q).',
-    mc: 'Предельные издержки как функция выпуска, MC(Q). Форма записи тут одна.',
-    tc: 'Суммарные затраты как функция выпуска, TC(Q). Средние и предельные посчитаем сами.',
-    atc: 'Средние затраты как функция выпуска, ATC(Q).',
-  };
-  if (h) h.innerHTML = (STATE.curveForm === 'QP')
-    ? 'Количество как функция цены: Q&nbsp;=&nbsp;f(P). Приведём к P&nbsp;=&nbsp;f(Q) сами: линейную явно, любую другую численно.'
-    : (note[role] || 'Цена как функция количества: P&nbsp;=&nbsp;f(Q).');
-
-  const pop = document.getElementById('fp-formula');
-  if (pop && pop.classList.contains('open') && typeof pop._render === 'function') pop._render();
-}
-
+/* Переключателя формы записи P(Q)/Q(P), списка ролей «Что добавляем» и
+   подсказки под ними больше нет (решение владельца 22.08): форму определяет
+   сам разбор (curveSrcForm в 80-ui.js), а роль у добавленной кривой всегда
+   пустая. Вместе с ними ушли setCurveForm, newCurveRole, curveHelpKind и
+   applyNewRoleUI — им нечем было управлять. Справка с примерами формул
+   осталась у полей самих кривых: их оснащает equipFormulaField. */
 
 /* ── Н75, Н60, Н72. Редактируемое значение ────────────────────────────────
    Один компонент на все места, где человек правит число или короткий текст.
@@ -1377,7 +1481,7 @@ function makeEditableValue(opts) {
   el.className = 'edval';
   el.tabIndex = 0;
   el.setAttribute('role', 'textbox');
-  if (opts.title) el.title = opts.title;
+  if (opts.title) el.setAttribute('data-tip', opts.title);
   const isNum = (opts.kind || 'number') === 'number';
 
   const shown = () => {
@@ -1565,7 +1669,7 @@ function upgradeSelect(id, title) {
   btn.className = 'sel-btn';
   btn.setAttribute('aria-haspopup', 'listbox');
   btn.setAttribute('aria-expanded', 'false');
-  if (title) btn.title = title;
+  if (title) btn.setAttribute('data-tip', title);
 
   const text = document.createElement('span');
   text.className = 'sel-text';

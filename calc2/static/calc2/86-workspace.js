@@ -6,7 +6,8 @@
    блоки результатов → в плавающее табло справа.
    --------------------------------------------------------------------- */
 const SCENE_NAMES = {
-  sd: 'Спрос и предложение', tax: 'Потоварные налоги и субсидии', ceil: 'Пол и потолок цены',
+  sd: 'Спрос и предложение', sdsum: 'Сложение спросов и предложений',
+  tax: 'Потоварные налоги и субсидии', ceil: 'Пол и потолок цены',
   mono: 'Стандартная монополия', elast: 'Эластичность', ext: 'Внешние эффекты',
   costs: 'Издержки фирмы', ppf: 'Построение КПВ',
   // п. 67. Ровно то же, что написано на карточке блока «Рынок труда».
@@ -28,6 +29,8 @@ const SCENE_NAMES = {
   'm-transform': 'Деформации графика',
   'm-minmax': 'Функции min и max', 'm-constraint': 'Оптимум при ограничении',
   // Карточки, разложенные из подрежимов при переходе на 10 блоков.
+  taxes: 'Налоги и субсидии',
+  quota: 'Квоты',
   'tax-adv': 'Процентные налоги и субсидии',
   prod: 'Производственная функция', plants: 'Сложение заводов',
   isoquant: 'Изокванта и изокоста',
@@ -41,9 +44,9 @@ const SCENE_NAMES = {
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
 // info-areacalc сюда НЕ входит: посчитанная площадь остаётся в своей секции
 // «Площади», рядом с кнопкой, которая её посчитала.
-const RESULT_IDS = ['info-graph', 'info-areas', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
+const RESULT_IDS = ['info-graph', 'info-areas', 'info-sum', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
   'info-prod', 'info-iso', 'info-plants', 'info-labor',
-  'info-inequality', 'info-consumer', 'info-macro', 'info-math', 'info-elast', 'info-shift', 'info-ext', 'info-open', 'info-d3', 'info-kink',
+  'info-inequality', 'info-consumer', 'info-macro', 'info-math', 'info-elast', 'info-ext', 'info-open', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
 
 /* Записать значение в поле формулы и разбудить его слушателей. Отдельная
@@ -201,9 +204,8 @@ const SECTION_ICONS = {
   // Равновесие: пересечение и точка.
   'sec-eq': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 6l13 12M5 18L18 6" stroke-width="2.2"/><circle cx="11.5" cy="12" r="3.6" stroke-width="2.6"/>',
   // Излишки: закрашенная область.
-  'sec-areas': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 6l12 12H5z" fill="currentColor" fill-opacity=".16" stroke-width="2.6"/>',
-  // Что изучаем: кривая и штриховая «до».
-  'sec-analysis': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 17c5 0 9-4 13-11" stroke-width="2.6"/><path d="M5 12c5 0 9-3 13-7" stroke-width="2.2" stroke-dasharray="5 4" opacity=".4"/>',
+  // Ввод функций: кривая на осях — единственная карточка ввода во всех сценах.
+  'sec-input': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 17c5 0 9-4 13-11" stroke-width="2.6"/>',
   // Монополия: спрос и вдвое круче MR.
   'sec-mono': '<path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M5 6l13 12" stroke-width="2.6"/><path d="M5 6l7 12" stroke-width="2.2" stroke-dasharray="5 4"/>',
   // Вмешательство: клин между кривыми.
@@ -332,8 +334,11 @@ function openSection(secId) {
    Имя достаётся первой ВИДИМОЙ карточке из реестра; не видно ни одной — не
    переименовываем никого, каждая карточка остаётся под своим именем. Врать
    заголовком хуже, чем потерять единообразие в трёх сюжетах из сорока одного. */
-const INPUT_CARDS = ['sec-curves', 'sec-graph', 'sec-costs', 'sec-labor',
-                     'sec-inequality', 'sec-consumer', 'sec-ppf', 'sec-macro', 'sec-math'];
+/* Карточка ввода теперь ровно одна на все модели: поля разных сцен лежат
+   внутри неё вложенными блоками (#sec-curves, #sec-costs и прочие), а имя
+   «Ввод функций» стоит в разметке и никуда не переезжает. Реестр оставлен —
+   на нём держится выделение первой карточки в syncFirstCard. */
+const INPUT_CARDS = ['sec-input'];
 
 /* Карточка, внутри которой лежит живое поле формулы. У трёх монопольных
    сюжетов свои поля стоят во вложенном блоке «Структура рынка», то есть внутри
@@ -415,18 +420,45 @@ function wireScene() {
   const pwCount = document.getElementById('pw-count');
   if (pwCount) pwCount.addEventListener('input', () => {
     const n = parseInt(pwCount.value, 10);
-    if (!isFinite(n) || n < 2 || n > 12) return;
+    /* Один кусок — законная запись, а не вырожденный случай: так задают
+       функцию, определённую ТОЛЬКО на отрезке (вне его кривой нет). Нижняя
+       граница была 2 и отрезала этот случай без причины. */
+    if (!isFinite(n) || n < 1 || n > 12) return;
     PW.n = n;
     renderPw();
+  });
+  /* Сколько групп спроса и сколько предложения (сюжет сложения). Меняем
+     число — добавляются или убираются ТОЛЬКО хвостовые группы, уже набранные
+     формулы остаются на месте. */
+  [['sum-nd', 'D'], ['sum-ns', 'S']].forEach(([id, side]) => {
+    const e = document.getElementById(id);
+    if (!e) return;
+    e.addEventListener('input', () => {
+      const n = parseInt(e.value, 10);
+      if (!isFinite(n) || n < 1 || n > 8) return;
+      if (typeof sumSetCount === 'function') sumSetCount(side, n);
+    });
   });
   const pwApply = document.getElementById('pw-apply');
   if (pwApply) pwApply.addEventListener('click', () => {
     if (PW.inp) {
       // Движку — цепочку условий, полю — одну фигурную скобку. Правится она
       // прямо в строке: разбор скобки обратно в выражение умеет latexToMath.
-      setFieldValue(PW.inp, pwFormula());
-      if (PW.inp._mf) { PW.inp._mf.value = pwLatex(); PW.inp._mf.focusField(); }
+      // Приставка («y = », «P = ») читается из ТЕКУЩЕГО значения поля и
+      // сохраняется — см. pwPrefixOf: без неё КПВ и «Неравенство доходов»
+      // либо путают «>=» условия со знаком равенства, либо просто не
+      // разбирают голую запись.
+      const prefix = pwPrefixOf(PW.inp.value);
+      setFieldValue(PW.inp, prefix + pwFormula());
+      if (PW.inp._mf) { PW.inp._mf.value = prefix + pwLatex(); PW.inp._mf.focusField(); }
       else PW.inp.focus();
+      /* Поле применяется по Enter или по своей кнопке «Построить», не по
+         одному вводу текста (см. applyPpf/applyIneqFm) — setFieldValue выше
+         только пишет текст и будит предпросмотр, но НЕ применяет его. Тот же
+         Enter, каким уже пользуется MathLive-поле при пересылке в inp
+         (см. `mf.addEventListener('keydown', ...)` выше), доводит дело до
+         конца и здесь. */
+      PW.inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     }
     closePiecewise();
   });
@@ -707,6 +739,125 @@ function hideHintTip() {
 let _tipByKeyboard = false;   // последнее действие человека было с клавиатуры
 function tipText(el) { return (el.getAttribute('data-tip') || '').trim(); }
 
+/* ═══ МАТЕМАТИКА ВНУТРИ ПОДСКАЗКИ ══════════════════════════════════════
+
+   Решение владельца 24.08: подсказки переводятся с браузерного `title` и
+   простого текста на этот компонент, потому что 64 математических обозначения
+   сидели именно в подсказках, а простой текст формулу нести не умеет.
+
+   Плашка набирает формулой всё, что стоит между знаками доллара — это делает
+   `renderMathIn` в `showHintTip`. Значит здесь одна забота: расставить знаки
+   доллара вокруг обозначений, а слова оставить словами.
+
+   ⚠️ СПИСОК ОБОЗНАЧЕНИЙ — ТОТ ЖЕ, ПО КОТОРОМУ СЧИТАЕТ АУДИТ ШРИФТОВ
+   (`calc2/tests/night2_font_audit.mjs`). Разойдутся списки — разойдутся и
+   числа: прибор будет считать одно, разметка чинить другое, и «починено N»
+   перестанет что-либо значить.                                              */
+const TIP_WORDS = ['SRAS', 'LRAS', 'Wmin', 'MPL', 'MRP', 'ATC', 'AVC', 'AFC', 'DWL',
+  'MSB', 'MSC', 'GDP', 'MC', 'MR', 'TC', 'FC', 'VC', 'TR', 'TP', 'MP', 'AP',
+  'Qd', 'Qs', 'Pd', 'Ps', 'Pb', 'Pw', 'Pc', 'Pf', 'Qm', 'Pm', 'Qc', 'Px', 'Py',
+  'CS', 'PS', 'AD', 'AS', 'IS', 'LM', 'SW'];
+const TIP_LETTERS = ['P', 'Q', 'D', 'S', 'L', 'K', 'X', 'Y', 'W', 'U', 'M', 'E'];
+const TIP_SUBS = { '\u2080': '0', '\u2081': '1', '\u2082': '2', '\u2083': '3', '\u2084': '4' };
+const TIP_RE = new RegExp(
+  '(^|[^A-Za-zА-Яа-я0-9_$\\\\])(' + TIP_WORDS.join('|') + '|' + TIP_LETTERS.join('|') + ')'
+  + '([\u2080-\u2084]?)(?![A-Za-zА-Яа-я0-9_$])', 'g');
+
+/* Как набирается одно обозначение. Сплошные прописные («MC», «DWL») уходят
+   прямым шрифтом — это делает `texAbbrev` сам. Прописная с хвостом («Pw»,
+   «Qd») — это буква с индексом, а не произведение двух букв. */
+function tipTex(word, sub) {
+  const idx = TIP_SUBS[sub] || '';
+  if (/^[A-Z]{2,}$/.test(word)) return word + (idx ? '_{' + idx + '}' : '');
+  const m = /^([A-Z])([A-Za-z0-9]+)$/.exec(word);
+  if (m) return m[1] + '_{\\text{' + m[2] + '}' + idx + '}';
+  return word + (idx ? '_{' + idx + '}' : '');
+}
+
+/* Разметить обозначения в готовом человеческом тексте: «Мировая цена Pw» →
+   «Мировая цена $P_{\\text{w}}$». Слова не трогаем вообще. */
+function tipName(text) {
+  return String(text == null ? '' : text).replace(
+    TIP_RE, (all, pre, word, sub) => pre + '$' + tipTex(word, sub) + '$');
+}
+
+/* Формула целиком (запись кривой) — набирается формулой целиком. Перевод в
+   LaTeX делает тот же `mathToTex`, что и предпросмотр под полем ввода: иначе
+   одна и та же запись выглядела бы в двух местах по-разному. */
+function tipExpr(expr) {
+  const s = String(expr == null ? '' : expr).trim();
+  if (!s) return '';
+  if (typeof mathToTex !== 'function') return s;
+  const tex = mathToTex(s);
+  return tex ? '$' + tex + '$' : s;
+}
+
+/* Текст подсказки для чтеца экрана: доллары — разметка набора, вслух их не
+   читают. */
+function tipPlain(text) { return String(text || '').replace(/\$/g, ''); }
+
+/* Подпись в РАЗМЕТКЕ (не на холсте), в которой сидит обозначение: «D», «CS»,
+   «MC, предельные затраты». Обозначения уезжают в формулу, слова остаются
+   словами. Разбор — тот же tipName, что у подсказок: одно место правды на
+   весь калькулятор.
+
+   Строку без обозначений печатаем текстом и KaTeX не зовём вовсе: разбор
+   формул дорогой, а список кривых перерисовывается на каждое изменение. */
+/* ── ОБОЗНАЧЕНИЯ В ГОТОВОЙ РАЗМЕТКЕ ПАНЕЛЕЙ ──────────────────────────────
+
+   Подписи галочек и полей написаны в шаблоне и в сценах человеческим текстом:
+   «MC, предельные затраты», «Показывать PS (TR − VC)», «Цена Px». Править их
+   по одной значило бы полторы сотни правок в шаблоне и в девяти файлах сцен,
+   и следующая новая подпись всё равно приехала бы обычным шрифтом.
+
+   Поэтому разметка ставится ОДНИМ проходом по дереву панели: обозначения
+   оборачиваются долларами тем же tipName, а дальше их набирает renderMathIn.
+   Прогон идёт после каждой перерисовки; повторно ничего не портится, потому
+   что набранное уже лежит внутри .katex и обходом не берётся.
+
+   ⚠️ ЧЕГО НЕ КАСАЕМСЯ: поля ввода и предпросмотр формулы (там доллар — знак,
+   а не разметка), готовые формулы KaTeX и MathLive, блоки кода с записью
+   Math.js. В этих местах доллар обязан остаться буквальным. */
+function markNotationsIn(root) {
+  if (!root || typeof tipName !== 'function') return;
+  /* ⚠️ СТРОКУ «ИМЯ = ЗНАЧЕНИЕ» РАЗМЕТЧИК НЕ ТРОГАЕТ.
+     Её и так набирает формулой paintEqLabel, а имя для неё читается обратно из
+     той же подписи. Разметив её здесь, мы кормили бы чтение собственным
+     выводом: «Цена P» → «Цена $P$» → на экране «Цена PPP» (замер 24.08). */
+  const SKIP = '.katex, math-field, input, textarea, code, script, style, '
+             + '.f-typeset, .mf-hidden, .param-eq, .pchip-label, .reg-eq';
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => {
+      const v = n.nodeValue;
+      if (!v || v.indexOf('$') >= 0) return NodeFilter.FILTER_REJECT;
+      if (!/[A-Z]/.test(v)) return NodeFilter.FILTER_REJECT;   // латиницы нет — обозначений нет
+      const el = n.parentElement;
+      if (!el || el.closest(SKIP)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  const jobs = [];
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) jobs.push(n);
+  let touched = 0;
+  jobs.forEach(n => {
+    const marked = tipName(n.nodeValue);
+    if (marked === n.nodeValue) return;
+    n.nodeValue = marked;
+    touched += 1;
+  });
+  if (touched && typeof renderMathIn === 'function') renderMathIn(root);
+}
+
+function paintNotation(el, text) {
+  if (!el) return;
+  const src = String(text == null ? '' : text);
+  const marked = (typeof tipName === 'function') ? tipName(src) : src;
+  if (marked === src) { el.textContent = src; return; }
+  el.textContent = marked;
+  if (typeof renderMathIn === 'function') renderMathIn(el);
+  else el.textContent = src;
+}
+
 function showTipFor(el) {
   const t = tipText(el);
   if (!t) return;
@@ -757,7 +908,7 @@ function syncTipLabels() {
     const t = tipText(el);
     if (!t) return;
     const own = (el.textContent || '').trim();
-    if (!own) el.setAttribute('aria-label', t);   // у кнопки-иконки своего текста нет
+    if (!own) el.setAttribute('aria-label', tipPlain(t));   // у кнопки-иконки своего текста нет
   });
 }
 
@@ -851,6 +1002,34 @@ function wireHintButtons() {
       const open = pop.classList.toggle('open');
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
+    /* «Точки на графике» и «Площади» открываются ПО НАВЕДЕНИЮ (решение
+       владельца 21.08): подсказка нужна прямо в момент работы с холстом, и
+       щелчок ради нового чтения каждый раз — лишний шаг. Метка на самой
+       кнопке (data-pop-trigger), а не список секций: как и с манипуляторами
+       сцены, список забудут дополнить у новой секции. Клик остаётся —
+       для клавиатуры и сенсорного экрана наведения не бывает вовсе.
+       Уход в саму плашку не должен её гасить, поэтому таймер общий у кнопки
+       и плашки (тот же приём, что у значка закрепки ключевой точки). */
+    if (btn.getAttribute('data-pop-trigger') === 'hover') {
+      let leaveTimer = null;
+      const openNow = () => {
+        if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+        pop.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+      };
+      const closeSoon = () => {
+        if (leaveTimer) clearTimeout(leaveTimer);
+        leaveTimer = setTimeout(() => {
+          leaveTimer = null;
+          pop.classList.remove('open');
+          btn.setAttribute('aria-expanded', 'false');
+        }, 160);
+      };
+      btn.addEventListener('pointerenter', openNow);
+      btn.addEventListener('pointerleave', closeSoon);
+      pop.addEventListener('pointerenter', openNow);
+      pop.addEventListener('pointerleave', closeSoon);
+    }
   });
 }
 

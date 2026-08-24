@@ -385,7 +385,7 @@ class Command(BaseCommand):
              '|---|---:|---:|---|---|']
         for c in cases[:30]:
             gone = ', '.join(c['gone'][:10])
-            rem = ' … '.join(c['removed'])[:120].replace('|', '\|')
+            rem = ' … '.join(c['removed'])[:120].replace('|', '\\|')
             L.append(f'| #{c["id"]} | {c["count"]} | {c["count_anywhere"]} | '
                      f'{gone} | {rem} |')
         L.append('')
