@@ -74,14 +74,14 @@ class Command(BaseCommand):
         # Классифицируем поля: concrete/FK (на объект) vs M2M (в through)
         m2m_names = {f.name for f in meta.many_to_many}
         fk_attnames = {}   # имя_поля_в_фикстуре -> attname (например source -> source_id)
-        concrete_names = set()
+        concrete_fields = {}  # имя_поля -> Field, для to_python (см. ниже)
         for f in meta.get_fields():
             if f.many_to_many or f.auto_created and not f.concrete:
                 continue
             if getattr(f, 'many_to_one', False) or getattr(f, 'one_to_one', False):
                 fk_attnames[f.name] = f.attname
             elif f.concrete and not f.auto_created:
-                concrete_names.add(f.name)
+                concrete_fields[f.name] = f
 
         instances = []
         m2m_rows = {n: [] for n in m2m_names}  # field_name -> list of (obj_pk, related_pk)
@@ -96,6 +96,14 @@ class Command(BaseCommand):
                         m2m_rows[key].append((pk, rel_pk))
                 elif key in fk_attnames:
                     kwargs[fk_attnames[key]] = val
+                elif key in concrete_fields:
+                    # field.to_python — тот же путь, которым идёт loaddata.
+                    # Без него BinaryField (embedding) остаётся строкой
+                    # base64 из JSON, а не bytes: psycopg падает на INSERT
+                    # с «bytes or buffer expected, got str» — проверено на
+                    # approved-дампе с эмбеддингами (dump_approved_for_deploy),
+                    # где раньше embedding не грузился вовсе.
+                    kwargs[key] = concrete_fields[key].to_python(val)
                 else:
                     kwargs[key] = val
             instances.append(model(**kwargs))
