@@ -225,7 +225,22 @@ if (need('П') || need('P')) {
   show('сбор', s.money, 864, 0.5);
   show('DWL', s.dwl, 108, 0.5);
   console.log('     центр поворота: ' + JSON.stringify(s.pivot));
-  console.log('     пунктирных продолжений к центру поворота: ' + s.dashed);
+  show('центр поворота по Q', s.pivot && s.pivot.Q, -60, 0.05);
+  show('центр поворота по P', s.pivot && s.pivot.P, 0, 1e-9);
+  flag('продолжения нарисованы у ОБЕИХ кривых предложения', s.dashed === 2, String(s.dashed));
+  // Куда приходит каждое продолжение: обе линии обязаны попасть в одну точку.
+  const ends = await run(`
+    var out = [];
+    document.querySelectorAll('[data-pivot="1"], [data-pivot="2"]').forEach(function (el) {
+      var m = String(el.getAttribute('d') || '').match(/^M\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+      if (m) out.push({ tag: el.getAttribute('data-pivot'), Q: sx.invert(+m[1]), P: sy.invert(+m[2]) });
+    });
+    return out;
+  `);
+  ends.forEach(e => console.log(`     продолжение ${e.tag} начинается в Q = ${num(e.Q)}, P = ${num(e.P)}`));
+  flag('оба продолжения приходят в Q = −60 при P = 0',
+    ends.length === 2 && ends.every(e => Math.abs(e.Q + 60) < 0.2 && Math.abs(e.P) < 0.2),
+    JSON.stringify(ends.map(e => [num(e.Q), num(e.P)])));
 
   const c = await run(`
     pctSetup('120-Q', 'Q', 'tax', 'excise', 50);
@@ -234,6 +249,8 @@ if (need('П') || need('P')) {
   `);
   console.log('     контрпример D 120-Q, S Q, акциз 50 %: центр ' + JSON.stringify(c.pivot) +
               ', продолжений ' + c.dashed);
+  flag('контрпример: центра в первой четверти не показываем', c.pivot === null && c.dashed === 0,
+    JSON.stringify(c));
 }
 
 /* ── НАБОР Г. Галочка против правила первой четверти ────────────────── */

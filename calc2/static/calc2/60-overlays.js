@@ -135,6 +135,9 @@ function redrawScene() {
     drawGhost();                 // бледный слой «было» под кривыми/точками
     drawCurves();
     drawShiftedSupply();         // пунктирная S + t (если налог активен)
+    // Центр поворота при процентной форме: обе кривые предложения продолжены
+    // пунктиром к общей точке на оси Q (рис. 81 учебника).
+    if (typeof drawTaxPivot === 'function') drawTaxPivot();
     // Точки/линии: налог E₀/E₁, регулирование цены, квота или равновесие E*.
     if (STATE.taxActive) drawTaxPoints();
     else if (STATE.pcMode) drawPriceControl();

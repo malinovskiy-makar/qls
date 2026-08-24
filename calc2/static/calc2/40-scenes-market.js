@@ -1789,6 +1789,96 @@ function drawShiftedSupply() {
   labelCurve(g, q => evalCurve(after, q), nm, base.color, { from: 0.82 });
 }
 
+/* ⚠️ ЦЕНТР ПОВОРОТА ПРИ ПРОЦЕНТНОМ ВМЕШАТЕЛЬСТВЕ (рис. 81 учебника Бахарева).
+
+   S_после = factor·S, поэтому обе кривые обращаются в ноль ровно при одном и
+   том же Q: там, где ноль исходное предложение. Эта общая точка на оси Q и
+   есть центр, вокруг которого поворот происходит, и она объясняет, ПОЧЕМУ
+   поворот именно такой, а не какой-нибудь другой.
+
+   ⚠️ ПРОДОЛЖЕНИЕ РИСУЕТСЯ НЕ ВСЕГДА. Если центр лежит ВНУТРИ первой четверти
+   (S пересекает ось Q при Q ≥ 0, как у S = Q или S = Q − 100), показывать
+   нечего: обе кривые и так приходят в эту точку на глазах. Продолжение имеет
+   смысл только когда центр ушёл влево за ось цен.
+
+   ⚠️ ГАЛОЧКА «ТОЛЬКО ПЕРВАЯ ЧЕТВЕРТЬ» ЗДЕСЬ НИ ПРИ ЧЁМ — ровно как у
+   продолжения предельной кривой (30-curves.js). Рисуем всегда; при включённой
+   галочке прямоугольный clip-path режет холст по оси цен, и продолжение просто
+   не попадает на экран. Условие «рисовать только при снятой галочке» дало бы то
+   же самое на экране, но добавило бы вторую точку правды. */
+function taxPivotQ() {
+  const S = STATE.S;
+  if (!S || (typeof isVertical === 'function' && isVertical(S))) return null;
+  // Прямая: перехват считается формулой, без всякой сетки.
+  const l = S.linear;
+  if (l && isFinite(l.a) && isFinite(l.b) && Math.abs(l.a) > 1e-12) {
+    const z = -l.b / l.a;
+    return isFinite(z) ? z : null;
+  }
+  // Кривая: ищем смену знака слева от нуля и уточняем половинным делением.
+  const span = Math.max(CONFIG.Qmax, 1) * 4;
+  const N = 400;
+  let prev = evalCurve(S, -span), best = null;
+  for (let i = 1; i <= N; i++) {
+    const q = -span + span * i / N;
+    const cur = evalCurve(S, q);
+    if (!isNaN(prev) && !isNaN(cur) && prev * cur <= 0 && prev !== cur) {
+      let a = -span + span * (i - 1) / N, b = q;
+      for (let k = 0; k < 50; k++) {
+        const m = (a + b) / 2, v = evalCurve(S, m);
+        if (isNaN(v)) break;
+        if (evalCurve(S, a) * v <= 0) b = m; else a = m;
+      }
+      best = (a + b) / 2;
+    }
+    prev = cur;
+  }
+  return best;
+}
+
+// Центр поворота, если его есть смысл показывать; иначе null.
+function taxPivotPoint() {
+  if (!STATE.taxActive || !pctForm() || !STATE.S || !STATE.taxAfterS) return null;
+  const q = taxPivotQ();
+  if (q == null || !(q < -1e-9)) return null;   // ноль или правее — показывать нечего
+  return { Q: q, P: 0 };
+}
+
+// Пунктирные продолжения обеих кривых предложения вниз-влево к центру поворота.
+function drawTaxPivot() {
+  const p = taxPivotPoint();
+  if (!p) return;
+  const g = svg.append('g').attr('class', 'pivot').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  const color = (STATE.S && STATE.S.color) || COL.S;
+  const N = 160;
+  [STATE.S, STATE.taxAfterS].forEach((c, idx) => {
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const q = p.Q + (0 - p.Q) * i / N;
+      const v = evalCurve(c, q);
+      pts.push(isFinite(v) ? [q, v] : null);
+    }
+    /* Продолжение отличается от самой кривой толщиной и прозрачностью, а не
+       штрихом: S_после и так уже пунктирная, и одним штрихом их не развести —
+       тот же урок, что у продолжения предельной кривой. */
+    g.append('path').datum(pts)
+      .attr('fill', 'none').attr('stroke', color)
+      .attr('stroke-width', 1.1).attr('stroke-dasharray', '5 4').attr('opacity', 0.5)
+      .attr('data-pivot', String(idx + 1))
+      .attr('d', line);
+  });
+  // Сама точка центра — маленький кружок, без имени и без чисел у осей: это
+  // построение, а не значение модели.
+  const [qa, qb] = sx.domain(), [pa, pb] = sy.domain();
+  if (p.Q >= qa && p.Q <= qb && p.P >= pa && p.P <= pb) {
+    const [px, py] = toPx(p.Q, p.P);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 3.2)
+      .attr('fill', 'none').attr('stroke', color).attr('stroke-width', 1.4)
+      .attr('opacity', 0.75).attr('data-pivot', 'dot');
+  }
+}
+
 // Заливки сценария вмешательства: CS, PS, деньги бюджета (прямоугольник), DWL (потери).
 function drawTaxAreas() {
   if (!STATE.taxActive) return;
