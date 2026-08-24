@@ -212,9 +212,10 @@ function drawMacroCurve(c, color, dash, label) {
   if (isVertical(c)) {
     g.append('line').attr('x1', sx(c.atQ)).attr('y1', sy(0)).attr('x2', sx(c.atQ)).attr('y2', sy(CONFIG.Pmax))
       .attr('stroke', color).attr('stroke-width', 2.8);
-    if (label) g.append('text').attr('x', sx(c.atQ) + 6).attr('y', sy(CONFIG.Pmax * 0.94))
-      .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
+    if (label) renderLabelText(
+      g.append('text').attr('x', sx(c.atQ) + 6).attr('y', sy(CONFIG.Pmax * 0.94))
+        .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
+        .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5), label);
     return;
   }
   const pts = [];
@@ -225,8 +226,9 @@ function drawMacroCurve(c, color, dash, label) {
     for (const t of [0.86, 0.7, 0.5, 0.3, 0.14]) {
       const q = CONFIG.Qmax * t, v = evalCurve(c, q);
       if (!isNaN(v) && v > CONFIG.Pmax * 0.04 && v < CONFIG.Pmax * 0.95) {
-        g.append('text').attr('x', sx(q)).attr('y', sy(v) - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
-          .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
+        renderLabelText(
+          g.append('text').attr('x', sx(q)).attr('y', sy(v) - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
+            .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5), label);
         break;
       }
     }

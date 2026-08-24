@@ -772,8 +772,14 @@ function redrawProduction() {
       .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
     g.append('line').attr('x1', left).attr('y1', y0).attr('x2', left).attr('y2', scale.range()[1])
       .attr('stroke', COL.ink).attr('stroke-width', 1.5).attr('marker-end', 'url(#arrow)');
-    g.append('text').attr('x', left + 4).attr('y', scale.range()[1] - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink).text(title);
-    g.append('text').attr('x', right + 6).attr('y', y0 + 4).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink).text('L');
+    // Заголовок панели идёт общим помощником: в нём слова вперемешку с
+    // обозначениями («TP, общий продукт»), и набирать их одним шрифтом нельзя.
+    renderLabelText(
+      g.append('text').attr('x', left + 4).attr('y', scale.range()[1] - 6)
+        .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink), title);
+    renderLabelText(
+      g.append('text').attr('x', right + 6).attr('y', y0 + 4)
+        .attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.ink), 'L');
     /* Класс `axis-num` — признак «это деление шкалы», а не украшение: по нему
        снимается деление под подписью координаты, по нему же `applyLabelSize`
        НЕ увеличивает шкалу вместе с прочими подписями. У панельных сюжетов свои

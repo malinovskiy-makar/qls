@@ -2468,7 +2468,9 @@ function chartLabelKind(src) {
   if (!base) return null;
   if (CHART_MATH_WORDS.has(base)) return 'upright';
   if (/^[A-Za-z]$/.test(base)) return 'italic';
-  if (!/^[A-Za-z0-9 +\-−·()]{1,12}$/.test(base)) return null;
+  /* Греческая буква в записи — это тоже математика: «S·(1+τ)» (адвалорный
+     налог) без неё оставалась бы системным шрифтом рядом с курсивной S. */
+  if (!/^[A-Za-z0-9 +\-−·()\u0391-\u03c9]{1,14}$/.test(base)) return null;
   const runs = base.match(/[A-Za-z]+/g) || [];
   if (!runs.length) return null;
   if (!runs.every(r => CHART_MATH_WORDS.has(r) || r.length === 1)) return null;

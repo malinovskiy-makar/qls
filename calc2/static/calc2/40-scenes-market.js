@@ -604,8 +604,8 @@ function mathTspans(sel, txt) {
       if (shift) { ts.attr('dy', (-shift).toFixed(2) + 'em'); shift = 0; }
     } else {
       const d = (p.t === 'sup') ? -0.42 : 0.26;
-      sel.append('tspan').attr('dy', (d - shift).toFixed(2) + 'em')
-        .attr('font-size', '76%').text(p.v);
+      markNotationTspan(sel.append('tspan').attr('dy', (d - shift).toFixed(2) + 'em')
+        .attr('font-size', '76%').text(p.v), p.v);
       shift = d;
     }
   });
@@ -615,6 +615,85 @@ function mathTspans(sel, txt) {
 
 // Есть ли в подписи что-то математическое: иначе не стоит и разбирать.
 function hasMathMarkup(txt) { return /[*^_]/.test(String(txt == null ? '' : txt)); }
+
+/* ── СМЕШАННАЯ ПОДПИСЬ: СЛОВА ПЛЮС ОБОЗНАЧЕНИЯ ───────────────────────────
+
+   «TP, общий продукт», «max AP = MP при L = 15», «D частн.», «TC совокупная».
+   Правило владельца требует набрать математикой ТОЛЬКО обозначение, а слова
+   оставить шрифтом сайта. Поставить одно начертание на всю подпись нельзя:
+   вместе с TP в математический шрифт уехало бы и слово «продукт».
+
+   Раньше такие подписи объявлялись «долгом на отдельную задачу»: их пришлось
+   бы резать на tspan'ы, а это переносы и съехавшая привязка. Переносов у
+   подписи холста нет вовсе (она однострочная), а привязка держится на самом
+   <text> — режется безопасно. Смещения базовой линии здесь тоже нет: все
+   куски стоят на одной строке, меняется только шрифт.
+
+   Берём ТОЛЬКО фразы, где есть кириллица: подпись, состоящая из одних
+   обозначений, — это уже забота typesetChartLabels, и два хозяина у одного
+   правила заводить незачем. */
+/* Индекс-обозначение набирается математикой отдельно от своего основания.
+
+   «68,28_{ATC}», «80_{MC}», «M_1» — основание это ЧИСЛО (ему положены
+   табличные цифры, а не математический курсив), а индекс — обозначение
+   кривой. Одним начертанием на всю подпись такое не выразить, поэтому шрифт
+   ставится прямо на tspan индекса. */
+function markNotationTspan(ts, v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return ts;
+  /* Пометка `data-mathset` стоит на самом tspan, а не на подписи целиком:
+     основание осталось обычным шрифтом намеренно, и помечать его как
+     «набрано математикой» значило бы соврать прибору. */
+  if (CHART_MATH_WORDS.has(s)) {
+    ts.attr('style', "font-family:'KaTeX_Main','Times New Roman',serif;font-style:normal")
+      .attr('data-mathset', 'upright');
+  } else if (/^[A-Za-z]$/.test(s)) {
+    ts.attr('style', "font-family:'KaTeX_Math','Times New Roman',serif;font-style:italic")
+      .attr('data-mathset', 'italic');
+  }
+  return ts;
+}
+
+let _mixedRe = null;
+function mixedNotationRe() {
+  if (_mixedRe) { _mixedRe.lastIndex = 0; return _mixedRe; }
+  const words = Array.from(CHART_MATH_WORDS).sort((a, b) => b.length - a.length);
+  _mixedRe = new RegExp('(^|[^A-Za-zА-Яа-яЁё0-9_])('
+    + words.join('|') + '|[A-Z])(?![A-Za-zА-Яа-яЁё0-9_])', 'g');
+  return _mixedRe;
+}
+
+function mixedMathTspans(sel, txt) {
+  const s = String(txt);
+  const re = mixedNotationRe();
+  const parts = [];
+  let last = 0, m;
+  while ((m = re.exec(s))) {
+    const at = m.index + m[1].length;
+    if (at > last) parts.push({ math: false, v: s.slice(last, at) });
+    parts.push({ math: true, v: m[2] });
+    last = at + m[2].length;
+    re.lastIndex = last;
+  }
+  if (!parts.some(p => p.math)) return null;      // обозначений нет — не наше дело
+  if (last < s.length) parts.push({ math: false, v: s.slice(last) });
+  parts.forEach(p => {
+    if (!p.v) return;
+    const ts = sel.append('tspan').text(p.v);
+    if (!p.math) return;
+    /* Многобуквенное обозначение — прямым начертанием (как \mathrm{MC}),
+       одиночная величина — наклонным. Тот же выбор, что и у целых подписей. */
+    if (/^[A-Z]{2,}$/.test(p.v)) {
+      ts.attr('style', "font-family:'KaTeX_Main','Times New Roman',serif;font-style:normal");
+    } else {
+      ts.attr('style', "font-family:'KaTeX_Math','Times New Roman',serif;font-style:italic");
+    }
+    ts.attr('data-mathset', /^[A-Z]{2,}$/.test(p.v) ? 'upright' : 'italic');
+  });
+  // Подпись разобрана здесь целиком: общему правилу тут делать нечего.
+  sel.attr('data-mathset', 'mixed');
+  return sel;
+}
 
 /* Подпись-величина на холсте (А28 · А29).
 
@@ -631,21 +710,28 @@ function hasMathMarkup(txt) { return /[*^_]/.test(String(txt == null ? '' : txt)
 function qtyTspans(sel, raw) {
   const parts = qtyParts(raw);
   let shift = 0;
-  const put = (v, kind) => {
+  /* Третий аргумент — «это часть ВЕЛИЧИНЫ, а не проза». Основание величины
+     («M» в «Md», «Q» в «Q*») набирается математикой так же, как её индекс:
+     без этого у денежного рынка буква M стояла системным шрифтом, а её
+     индекс — математическим, то есть в одной подписи два шрифта подряд.
+     Числовое основание («68,28» в «68,28_ATC») markNotationTspan не трогает:
+     числу положены табличные цифры, а не математический курсив. */
+  const put = (v, kind, isSym) => {
     if (!v) return;
     if (kind === 'txt') {
       const ts = sel.append('tspan').text(v);
+      if (isSym) markNotationTspan(ts, v);
       if (shift) { ts.attr('dy', (-shift).toFixed(2) + 'em'); shift = 0; }
       return;
     }
     const d = (kind === 'sup') ? -0.42 : 0.26;
-    sel.append('tspan').attr('dy', (d - shift).toFixed(2) + 'em')
-      .attr('font-size', '76%').text(v);
+    markNotationTspan(sel.append('tspan').attr('dy', (d - shift).toFixed(2) + 'em')
+      .attr('font-size', '76%').text(v), v);
     shift = d;
   };
   parts.forEach(p => {
     if (p.kind === 'sym') {
-      put(p.greek ? qtyGreekChar(p.greek) : p.s, 'txt');
+      put(p.greek ? qtyGreekChar(p.greek) : p.s, 'txt', true);
       if (p.sub) put(p.sub, 'sub');
       if (p.sup) put(p.sup, 'sup');
     } else put(p.s, 'txt');
@@ -717,6 +803,8 @@ function renderLabelText(sel, txt) {
   if (sel && sel.attr) sel.attr('data-raw', s);
   if (hasMathMarkup(s)) return mathTspans(sel, s);
   if (typeof qtyIsQuantity === 'function' && qtyIsQuantity(s)) return qtyTspans(sel, s);
+  // Слова вперемешку с обозначениями: обозначения набираются, слова остаются.
+  if (/[А-Яа-яЁё]/.test(s)) { const mixed = mixedMathTspans(sel, s); if (mixed) return mixed; }
   return sel.text(s);
 }
 
@@ -1812,7 +1900,8 @@ function drawElasticityPoint() {
       .attr('stroke', COL.MR).attr('stroke-width', 1).attr('stroke-dasharray', '3 3');
     g.append('circle').attr('cx', ux).attr('cy', uy).attr('r', 4).attr('fill', COL.MR).attr('stroke', COL.halo).attr('stroke-width', 1.5);
     g.append('text').attr('x', ux + 7).attr('y', uy - 7).attr('font-size', FS.small).attr('font-weight', 600).attr('fill', COL.MR)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Ed|=1 · MR=0 · TR макс');
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5)
+      .call(sel => renderLabelText(sel, '|Ed|=1 · MR=0 · TR макс'));
   }
   // Перетаскиваемая точка вдоль спроса.
   const [px, py] = toPx(e.q, e.p);
