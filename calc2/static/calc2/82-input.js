@@ -169,7 +169,52 @@ function pwVar() {
 /* Разбор одной фигурной скобки обратно в выражение Math.js. Нужен и для
    того, что собрал конструктор, и для того, что Math.js сам печатает через
    toTex, — поэтому понимаем оба вида условия: «a ≤ Q < b» и «если …». */
-function casesToMath(body) {
+/* ── Узкая запись кусочной: условие отдельной строкой ────────────────────
+   На панели шириной в двести пикселей (окно 380 px) обычная запись «формула,
+   если условие» не помещается ни при каком разумном кегле: замер 25.08 —
+   178 px содержимого в окне 126 px, и чтобы влезло, кегль пришлось бы уронить
+   до восьми. Решение владельца звучит «поле растёт в ВЫСОТУ», поэтому вместо
+   нечитаемого кегля переносим условие под свою формулу: у каждого куска
+   становится две строки, и самая длинная из них вдвое короче прежней.
+
+   Переключает вид подбор кегля (fitFormulaField), когда упёрся в свой предел.
+   Разбор обратно один на оба вида: узкую запись приводим к обычной ПЕРЕД
+   разбором — так у casesToMath не появляется второй ветки, которую забудут
+   поправить. */
+function casesToNarrow(tex) {
+  return String(tex || '').replace(/\\begin\{cases\}([\s\S]*?)\\end\{cases\}/g, (m, body) => {
+    const rows = body.split(/\\\\/).map(r => r.trim()).filter(Boolean);
+    const out = [];
+    rows.forEach(row => {
+      const amp = row.indexOf('&');
+      if (amp < 0) { out.push(row); return; }
+      out.push(row.slice(0, amp).trim());
+      out.push('\\quad ' + row.slice(amp + 1).trim());
+    });
+    return '\\begin{cases}' + out.join('\\\\') + '\\end{cases}';
+  });
+}
+function isNarrowCases(tex) { return /\\begin\{cases\}[\s\S]*?\\quad\s*\\text\{\s*(?:если|иначе)/.test(String(tex || '')); }
+
+/* Узкую запись обратно в обычную: строка без «&», начинающаяся с «если» или
+   «иначе», — это условие предыдущего куска, а не отдельный кусок. */
+function casesUnwrapNarrow(body) {
+  const rows = String(body || '').split(/\\\\/);
+  const out = [];
+  rows.forEach(row => {
+    const t = row.trim();
+    if (!t) return;
+    if (out.length && t.indexOf('&') < 0 && /^\\(?:quad|;|,|\s)*\s*\\text\{\s*(?:если|иначе|otherwise)/.test(t)) {
+      out[out.length - 1] += ' & ' + t.replace(/^(?:\\(?:quad|;|,)\s*)+/, '');
+      return;
+    }
+    out.push(t);
+  });
+  return out.join('\\\\');
+}
+
+function casesToMath(rawBody) {
+  const body = casesUnwrapNarrow(rawBody);
   const rows = body.split(/\\\\/);
   const parts = [];
   rows.forEach(row => {
@@ -835,6 +880,92 @@ function upgradeFormulaField(inp) {
   inp.addEventListener('pointerdown', wake);
   inp.addEventListener('focus', wake);
   flushMathfields();
+}
+
+/* ── Кусочная запись помещается в поле целиком (решение владельца 24.08) ──
+   «Кусочная функция показывается в поле в две строки — поле растёт в высоту».
+   Высота у MathLive росла и раньше: фигурная скобка это две-три строки. А вот
+   в ШИРИНУ запись не помещалась и уезжала за край: обрезка живёт внутри
+   MathLive, на `.ML__content` с `overflow-x: hidden`, поэтому снаружи поле
+   выглядело исправным, а «если 0 ≤ Q < 40» обрывалось на «если (». Ровно эта
+   скрытая прокрутка давала и «стрелка вправо перекидывает в начало», и
+   «формула введена дважды».
+
+   Лечим двумя ходами, и оба — про ширину, а не про прокрутку:
+     1. Строка с кусочной записью отдаёт полю ВСЮ свою ширину: кнопка
+        клавиатуры переезжает под поле (класс `f-tall`, стили в calc2.css).
+        Это 215 px вместо 177 — содержимого 151 → 197 px.
+     2. Кегль подбирается вниз до тех пор, пока запись не поместится, но НЕ
+        НИЖЕ 11 px: ниже читать уже нечем, и лучше честно показать, что
+        запись не влезла, чем нарисовать нечитаемое. Замер: два куска 236 px
+        при кегле 15 → помещаются при 12,5; три куска 252 px → при 11,7.
+
+   ⚠️ ЛИНЕЙКА ЛЕЖИТ В ТЕНЕВОМ ДЕРЕВЕ MathLive. Снаружи ширина всегда «в
+   порядке» (см. выше), поэтому мерить приходится `.ML__content`. Разметка
+   чужой библиотеки — вещь непрочная: не нашли узел, значит просто не
+   подбираем кегль, а ширину строке всё равно отдаём. */
+const FIELD_MIN_PX = 11;
+
+function fitFormulaField(inp) {
+  const mf = inp && inp._mf;
+  if (!mf || !mf.isConnected) return;
+  const tall = /\\begin\{cases\}/.test(String(mf.value || ''));
+  const row = inp.closest('.f-row');
+  if (row) row.classList.toggle('f-tall', tall);
+  const box = mf.shadowRoot ? mf.shadowRoot.querySelector('.ML__content') : null;
+  if (!box) return;
+  /* Ключ — сама запись и ширина строки. Пока они те же, подбирать нечего:
+     проход идёт после КАЖДОЙ перерисовки, а перерисовок при панорамировании
+     по одной на движение мыши. Ширину меряем у самого поля, а не у content:
+     у content она зависит от уже применённого кегля.
+
+     ⚠️ К КЛЮЧУ ПРИШИТА ЗАМЕРЕННАЯ ШИРИНА СОДЕРЖИМОГО, И ЭТО НЕ ЛИШНЕЕ.
+     MathLive перерисовывает формулу НЕ В ТОТ ЖЕ МИГ, когда ей поставили
+     значение. Первый проход после «Поставить в поле» видит ещё прежнюю
+     раскладку («помещается»), запоминает ключ — и запись навсегда остаётся
+     при исходном кегле. Замер 25.08: кегль оставался 15 px при содержимом
+     240 px в окне 189 px. Разошлась ширина с запомненной — подбираем заново. */
+  const key = String(mf.value || '') + '¦' + Math.round(mf.getBoundingClientRect().width);
+  if (inp._fitFor === key && box.scrollWidth === inp._fitSaw) return;
+  inp._fitFor = key;
+  mf.style.fontSize = '';
+  if (tall) {
+    const shrink = () => {
+      let size = parseFloat(getComputedStyle(mf).fontSize) || 15;
+      for (let step = 0; step < 6; step++) {
+        const need = box.scrollWidth, have = box.clientWidth;
+        if (!need || !have || need <= have + 1 || size <= FIELD_MIN_PX) break;
+        size = Math.max(FIELD_MIN_PX, size * have / need - 0.2);
+        mf.style.fontSize = size + 'px';
+      }
+    };
+    shrink();
+    /* Упёрлись в предел, а запись всё равно не влезла — переносим условие под
+       свою формулу и подбираем кегль заново. Поле растёт в высоту, а не режет
+       запись по правому краю (решение владельца 24.08). */
+    if (box.scrollWidth > box.clientWidth + 1 && !isNarrowCases(mf.value)) {
+      mf.value = casesToNarrow(mf.value);
+      mf.style.fontSize = '';
+      shrink();
+    }
+  }
+  inp._fitSaw = box.scrollWidth;
+}
+
+/* Проход по видимым полям. Зовётся из redrawAll — тем же приёмом, каким
+   разбирается очередь MathLive и размечаются обозначения панели. Два
+   отложенных повтора (следующий кадр и пятая доля секунды) нужны затем же,
+   зачем и ширина в ключе: библиотека рисует формулу не сразу. */
+let _fitSoonT = null;
+function fitFormulaFields() {
+  FORMULA_FIELDS.forEach(inp => { if (inp._mf && fieldActive(inp)) fitFormulaField(inp); });
+}
+function fitFormulaFieldsSoon() {
+  fitFormulaFields();
+  requestAnimationFrame(fitFormulaFields);
+  if (_fitSoonT == null) {
+    _fitSoonT = setTimeout(() => { _fitSoonT = null; fitFormulaFields(); }, 200);
+  }
 }
 
 /* Собираем только те поля, которые ПРЯМО СЕЙЧАС на экране (А56).

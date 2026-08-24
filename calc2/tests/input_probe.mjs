@@ -553,6 +553,77 @@ if (need('Ш') || need('SH')) {
       flag(`${n} куска: каретка не перепрыгивает в начало`, jumps === 0, `прыжков назад: ${jumps}`);
     }
   }
+
+  // Соседние строки кривых на месте, карточка «Ввод функций» не разъехалась.
+  const neigh = await run(`
+    var s = document.getElementById('curve-expr-2');
+    var srow = s ? s.closest('.f-row') : null;
+    var card = document.getElementById('sec-curves') || (srow && srow.closest('.section'));
+    var cr = card ? card.getBoundingClientRect() : null;
+    var panel = document.getElementById('tools-panel').getBoundingClientRect();
+    return {
+      supplyVisible: !!(srow && srow.offsetParent),
+      supplyH: srow ? srow.getBoundingClientRect().height : null,
+      supplyValue: s ? s.value : null,
+      cardR: cr ? cr.right : null, panelR: panel.right, panelW: panel.width,
+    };
+  `);
+  console.log(`     соседняя строка предложения: видна ${neigh.supplyVisible}, высота ${num(neigh.supplyH)} px, «${neigh.supplyValue}»`);
+  console.log(`     карточка «Ввод функций» правым краем ${num(neigh.cardR)} против края панели ${num(neigh.panelR)}`);
+  flag('строка предложения на месте и однострочная', neigh.supplyVisible && neigh.supplyH < 60, String(neigh.supplyH));
+  flag('карточка не вылезла за панель', neigh.cardR <= neigh.panelR + 1, `${num(neigh.cardR)} > ${num(neigh.panelR)}`);
+
+  // Узкое окно 380 px: то же самое, панель не ломается.
+  console.log('   ширина окна 380 px:');
+  await page.setViewportSize({ width: 380, height: 950 });
+  await run(`resetSceneMemory(); pickScene('sd');`);
+  await page.waitForTimeout(700);
+  const narrow = await run(`
+    var e = ipOpenPw('curve-expr-1'); if (e) return { err: e };
+    PW.n = 2; PW.rows = [{ f: '100 - Q', a: '0', b: '40' }, { f: '80 - 0.5*Q', a: '40', b: '' }];
+    renderPw(); ipApplyPw();
+    return {};
+  `);
+  await page.waitForTimeout(900);
+  if (narrow.err) { bad++; console.log('FAIL ' + narrow.err); }
+  else {
+    const m380 = await run(`
+      var i = document.getElementById('curve-expr-1');
+      var host = i._mf || i;
+      var sr = host.shadowRoot || host;
+      var content = sr.querySelector ? sr.querySelector('.ML__content') : null;
+      var panel = document.getElementById('tools-panel').getBoundingClientRect();
+      var row = i.closest('.f-row').getBoundingClientRect();
+      return {
+        h: host.getBoundingClientRect().height,
+        scrollW: content ? content.scrollWidth : null, clientW: content ? content.clientWidth : null,
+        fontSize: content ? getComputedStyle(content).fontSize : null,
+        rowR: row.right, panelR: panel.right, panelW: panel.width,
+      };
+    `);
+    console.log(`     панель ${num(m380.panelW)} px; поле высотой ${num(m380.h)}, кегль ${m380.fontSize}, ` +
+      `scroll ${num(m380.scrollW)}/${num(m380.clientW)}; строка правым краем ${num(m380.rowR)} против панели ${num(m380.panelR)}`);
+    flag('380 px: горизонтальной прокрутки нет', m380.scrollW <= m380.clientW + 1, `${m380.scrollW} > ${m380.clientW}`);
+    flag('380 px: строка не вылезла за панель', m380.rowR <= m380.panelR + 1, `${num(m380.rowR)} > ${num(m380.panelR)}`);
+    flag('380 px: кегль не ниже предела 11 px', parseFloat(m380.fontSize) >= 10.99, m380.fontSize);
+    /* Узкая запись обязана разбираться обратно в ту же цепочку условий:
+       иначе правка формулы прямо в поле молча испортила бы кривую. */
+    const rt = await run(`
+      var i = document.getElementById('curve-expr-1');
+      var mf = i._mf;
+      var back = latexToMath(mf.value);
+      var c = STATE.curves.find(function (x) { return x.role === 'demand'; });
+      return { narrow: isNarrowCases(mf.value), tex: mf.value, field: i.value, back: back,
+               same: back.replace(/\\s/g, '') === String(i.value || '').replace(/\\s/g, ''),
+               at20: evalCurve(c, 20), at60: evalCurve(c, 60) };
+    `);
+    console.log(`     узкий вид: ${rt.narrow}; разбор обратно: ${rt.back}`);
+    flag('380 px: узкая запись разбирается в ту же цепочку', rt.same, rt.back + '  vs  ' + rt.field);
+    show('380 px: D(20) после узкой записи', rt.at20, 80, 0.001);
+    show('380 px: D(60) после узкой записи', rt.at60, 50, 0.001);
+  }
+  await page.setViewportSize({ width: 1440, height: 950 });
+  await page.waitForTimeout(300);
 }
 
 /* ── НАБОР В. Одинокие вопросики ────────────────────────────────────── */
