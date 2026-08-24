@@ -308,7 +308,7 @@ if (need('К') || need('K')) {
     [100, 30, 400].forEach(function (qm) {
       var was = CONFIG.Qmax; CONFIG.Qmax = qm;
       var c = mk('100 - 40*sin(Q)');
-      out.push({ qmax: CONFIG.Qmax, h: Math.max(1e-4, CONFIG.Qmax * 1e-5), d: curveDeriv(c, 3) });
+      out.push({ qmax: CONFIG.Qmax, h: Math.max(1e-5, Math.abs(3) * 2e-5), d: curveDeriv(c, 3) });
       CONFIG.Qmax = was;
     });
     return out;
