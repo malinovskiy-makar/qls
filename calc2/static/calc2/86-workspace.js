@@ -153,6 +153,13 @@ function moveExplanations() {
     const extra = offQuadExplainHtml();
     if (extra) to.insertAdjacentHTML('beforeend', extra);
   }
+  /* Тем же приёмом — разбор выбранной процентной формы налога или субсидии:
+     соотношение цен и формула сбора. Абзац про конкретную форму, а не про
+     устройство модели, поэтому он идёт в конец, а не вместо общего рассказа. */
+  if (typeof pctFormExplainHtml === 'function') {
+    const pct = pctFormExplainHtml();
+    if (pct) to.insertAdjacentHTML('beforeend', pct);
+  }
 }
 
 /* Правая панель показывает ровно то, что есть: ползунки, расчёты, разбор.

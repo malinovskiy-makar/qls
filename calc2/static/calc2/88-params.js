@@ -59,9 +59,9 @@ function pultRegulatorIds() {
     if (t === 'tax' || t === 'subsidy') {
       const ids = [];
       // Ряд стороны живёт в ленте ровно тогда, когда каскад его показывает:
-      // потоварный налог и любая субсидия. У НДС и акциза стороны нет.
-      const sideOn = (STATE.market !== 'monopoly')
-                  && ((t === 'tax' && STATE.taxForm === 'unit') || t === 'subsidy');
+      // только у потоварной формы. У процентных сторона закреплена самой
+      // формой — доля берётся от цены покупателя либо от цены продавца.
+      const sideOn = (STATE.market !== 'monopoly') && !pctForm();
       if (sideOn) ids.push('taxside-row');
       ids.push('tax-field');
       return ids;
@@ -167,13 +167,17 @@ function pultCurveSig(list) {
 /* Строка «имя = значение», набранная формулой (Н8, Н11, Н12). Одна на все виды
    регуляторов: и на буквы из формул, и на встроенные ставки, зарплаты и мировые
    цены — раньше они выглядели по-разному, хотя делают одно и то же. */
-function paintEqLabel(lab, name, value) {
+/* unit — единица измерения справа от числа («%»). Нужна ровно там, где число
+   без неё читается неправильно: ставка процентного налога «τ = 50» рядом с
+   рублёвой осью выглядит как 50 рублей. Пусто у всех остальных регуляторов. */
+function paintEqLabel(lab, name, value, unit) {
   lab.classList.add('param-eq');
   lab.dataset.eqName = name;
-  const plain = name + ' = ' + fmt(value);
+  const u = String(unit || '');
+  const plain = name + ' = ' + fmt(value) + (u ? ' ' + u : '');
   if (typeof katex === 'undefined') { lab.textContent = plain; return; }
   try {
-    katexInto(lab, texifyName(name) + ' = ' + fmt(value));
+    katexInto(lab, texifyName(name) + ' = ' + fmt(value) + (u === '%' ? '\\,\\%' : ''));
   } catch (e) { lab.textContent = plain; }
 }
 
@@ -595,7 +599,13 @@ function upgradeRegulator(field) {
   // У регуляторов сцен подпись это <label>, у чипов кривых — .pchip-label.
   const rawName = (plainLabel(labEl || chipLab)
                     .split('=')[0]).replace(/[:\s]+$/, '').trim();
-  const name = shortRegulatorName(field.id, rawName);
+  /* ⚠️ ИМЯ СЧИТАЕТСЯ КАЖДЫЙ РАЗ, А НЕ ОДИН РАЗ ПРИ СБОРКЕ ЧИПА. У ставки
+     обозначение зависит от выбранной формы (t / s / τ, %), а чип собирается
+     единожды и живёт до конца сцены: захваченное в замыкание имя оставляло
+     в ленте «t = 50» и у акциза, и у субсидии. */
+  const nameOf = () => shortRegulatorName(field.id, rawName);
+  const unitOf = () => (field.id === 'tax-field' ? rateUnit() : '');
+  const name = nameOf();
 
   /* Значение показываем строкой «имя = значение», как у буквы-параметра, а не
      подписью слева и числом справа. Собственную подпись поля прячем, иначе имя
@@ -630,7 +640,7 @@ function upgradeRegulator(field) {
     if (num) num.classList.add('reg-num-hidden');
   }
 
-  const paint = () => paintEqLabel(eq, name, +sl.value);
+  const paint = () => paintEqLabel(eq, nameOf(), +sl.value, unitOf());
   const sync = () => { lo.textContent = fmt(+sl.min); hi.textContent = fmt(+sl.max); paint(); };
   sync();
   /* Границы сцена двигает атрибутами, и наблюдатель их ловит. А вот САМО
@@ -651,7 +661,7 @@ function upgradeRegulator(field) {
 
   eq.addEventListener('click', () => {
     if (editor._close) editor._close();          // Н10: точное значение закрывает интервал
-    editEqValue(eq, name, +sl.value, (v) => {
+    editEqValue(eq, nameOf(), +sl.value, (v) => {
       // Случай первый: значение за полосой — полоса переезжает, значение в центре.
       if (v < +sl.min || v > +sl.max) {
         const b = centerBandOn({ min: +sl.min, max: +sl.max }, v);
@@ -681,10 +691,16 @@ function upgradeRegulator(field) {
    подсказке; в колонке 268px помещается только обозначение. */
 const REGULATOR_SHORT = {
   'ppft-price-field': 'Pw', 'tb-price-field': 'Pw', 'open-pw-field': 'Pw',
-  'tax-field': 't', 'pc-field': 'Preg', 'union-wage-field': 'Wu',
+  'pc-field': 'Preg', 'union-wage-field': 'Wu',
   'labmin-field': 'Wmin', 'ineq-alpha-field': 'alpha',
 };
 function shortRegulatorName(id, raw) {
+  /* ⚠️ У СТАВКИ ОБОЗНАЧЕНИЕ ЗАВИСИТ ОТ ФОРМЫ, поэтому в готовом списке его
+     нет. У процентных форм это «τ, %», у потоварных — t или s. Стояло здесь
+     жёстко «t», и в ленте регуляторов ставка акциза 50 % читалась как 50
+     рублей — ровно та запись в деньгах, которой у процентной формы быть не
+     должно. Берём ту же букву, что и панель: одна точка правды. */
+  if (id === 'tax-field') return rateLetter();
   if (REGULATOR_SHORT[id]) return REGULATOR_SHORT[id];
   const s = String(raw || '').trim();
   if (!s) return 'Значение';
@@ -1156,12 +1172,16 @@ function wireControls() {
   const elS = document.getElementById('chk-elast-s');
   if (elS) elS.addEventListener('change', () => { STATE.showElastS = elS.checked; redrawAll(); });
 
-  // Уровень 2 каскада вмешательства: вид налога (потоварный / НДС / акциз)
-  // или вид субсидии (потоварная / процентная — третья кнопка тогда скрыта).
-  [['tk-unit', 'unit'], ['tk-vat', 'vat'], ['tk-exc', 'excise']].forEach(([id, form]) => {
-    const b = document.getElementById(id);
-    if (b) b.addEventListener('click', () => setTaxForm(form));
-  });
+  /* Уровень 2 каскада вмешательства: вид налога (потоварный / НДС / акциз)
+     или вид субсидии (потоварная / % от цены продавца / % от цены покупателя).
+     Кнопки разложены ПО БАЗЕ ставки, а какая именно форма за кнопкой стоит,
+     решает тип вмешательства — иначе щелчок по «Акцизу» в ветке субсидии
+     поставил бы налоговую форму. */
+  [['tk-unit', 'unit', 'unit'], ['tk-vat', 'vat', 'subseller'], ['tk-exc', 'excise', 'subbuyer']]
+    .forEach(([id, taxForm, subForm]) => {
+      const b = document.getElementById(id);
+      if (b) b.addEventListener('click', () => setTaxForm(STATE.intervType === 'subsidy' ? subForm : taxForm));
+    });
 
   /* Режим издержек (Задача 2). Постоянные затраты отдельным полем больше не
      вводятся (Б24): в режиме «задаю TC» они равны TC(0). Поэтому здесь только

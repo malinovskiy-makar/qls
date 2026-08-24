@@ -76,6 +76,7 @@ function pctSetup(dExpr, sExpr, type, form, rate) {
 function pctSnap() {
   var te = STATE.taxEq;
   var rl = document.getElementById('rate-letter');
+  var ru = document.getElementById('rate-unit');
   var sl = document.getElementById('tax-slider');
   var inp = document.getElementById('tax-input');
   var val = document.getElementById('tax-val');
@@ -90,6 +91,14 @@ function pctSnap() {
     money: STATE.tx, budget: STATE.budget, dwl: STATE.dwl,
     cs: STATE.csTax, ps: STATE.psTax,
     letter: rl ? rl.textContent.trim() : '',
+    unit: ru ? ru.textContent.trim() : '',
+    pult: (function () {
+      var eq = document.querySelector('#tax-field .reg-eq');
+      if (!eq) return '(нет чипа)';
+      var c = eq.cloneNode(true);
+      c.querySelectorAll('.katex-mathml, annotation').forEach(function (n) { n.remove(); });
+      return c.textContent.replace(/\\s+/g, ' ').trim();
+    })(),
     sliderMax: sl ? sl.max : '', inputMax: inp ? inp.max : '',
     valText: val ? val.textContent.trim() : '',
     inputValue: inp ? inp.value : '',
@@ -315,9 +324,56 @@ if (need('О') || need('O')) {
     return out;
   `);
   seq.forEach(s => console.log(`     ${s.step}: taxKind=${s.kind}, ставка=${num(s.rate)}, ` +
-    `буква «${s.letter}», поле «${s.inputValue}», подпись «${s.valText}», предел ${s.sliderMax}`));
+    `буква «${s.letter}${s.unit}», поле «${s.inputValue}», подпись «${s.valText}», ` +
+    `лента «${s.pult}», предел ${s.sliderMax}`));
   flag('ставка обнуляется при КАЖДОЙ смене вида',
     seq.slice(1).every(s => s.rate === 0), seq.map(s => num(s.rate)).join(' -> '));
+
+  /* Рублёвая запись ставки у процентной формы. Смотрим ЧЕТЫРЕ места сразу:
+     поле ввода, подпись ползунка, всё, что нарисовано на холсте (туда же
+     уходит подпись клина), и «Ключевые значения» с табло налога. Признак
+     рублей — число ставки без знака процента рядом с буквой t или s. */
+  for (const [name, type, form, rate] of [
+    ['акциз', 'tax', 'excise', 50], ['НДС', 'tax', 'vat', 100],
+    ['субсидия от Pb', 'subsidy', 'subbuyer', 50], ['субсидия от Ps', 'subsidy', 'subseller', 50],
+  ]) {
+    const m = await run(`
+      pctSetup('120-Q', 'Q', '${type}', '${form}', ${rate});
+      var svgText = Array.from(document.querySelectorAll('#chart text'))
+        .map(function (t) { return t.textContent.trim(); }).filter(Boolean);
+      var tex = '';
+      try { tex = buildTex('', ''); } catch (e) { tex = 'ОШИБКА: ' + e.message; }
+      var s = pctSnap();
+      return { letter: s.letter, unit: s.unit, pult: s.pult,
+               valText: s.valText, inputValue: s.inputValue,
+               keysText: s.keysText, taxText: s.taxText,
+               wedge: svgText.filter(function (t) { return /^[tsτ]\s*=/.test(t); }),
+               texLen: tex.length, texPct: /\\\\tau\\s*=\\s*[\\d.,]+\\s*(\\\\,)?\\\\%/.test(tex),
+               /* Ставка попадает в .tex ТОЛЬКО подписью-узлом \node{$...$}.
+                  Опции pgfplots (height=8cm, samples=120) не в счёт: там «t=»
+                  это хвост слова, а не буква ставки. */
+               texNodes: (tex.match(/\\\\node[^\\n]*\\{\\$([^$]*)\\$\\}/g) || [])
+                 .map(function (l) { return (l.match(/\\{\\$([^$]*)\\$\\}/) || [])[1] || ''; }) };
+    `);
+    const rub = /(^|[^%\d])[ts]\s*=\s*\d/;   // «t=50» без процента — рублёвая запись
+    console.log(`  ${name}: буква «${m.letter}», поле «${m.inputValue}», клин ${JSON.stringify(m.wedge)}, ` +
+      `.tex ${m.texLen} знаков, ставка в процентах в нём ${m.texPct ? 'есть' : 'НЕТ'}, ` +
+      `подписи в .tex ${JSON.stringify(m.texNodes)}`);
+    flag(`    ${name}: .tex собрался и несёт ставку в процентах`, m.texLen > 200 && m.texPct,
+      `${m.texLen} знаков, процент ${m.texPct}`);
+    flag(`    ${name}: буква ставки процентная`, m.letter === 'τ' && m.unit === '%',
+      `«${m.letter}» + «${m.unit}»`);
+    flag(`    ${name}: в ленте регуляторов ставка со знаком процента`,
+      /%/.test(m.pult), m.pult);
+    flag(`    ${name}: подпись клина со знаком процента`,
+      m.wedge.length > 0 && m.wedge.every(w => /%/.test(w)), JSON.stringify(m.wedge));
+    flag(`    ${name}: в .tex нет рублёвой записи ставки`,
+      !m.texNodes.some(t => rub.test(t.replace(/\\\\tau/g, 'τ'))), JSON.stringify(m.texNodes));
+    flag(`    ${name}: в «Ключевых значениях» нет рублёвой записи ставки`,
+      !rub.test(m.keysText), m.keysText.slice(0, 120));
+    flag(`    ${name}: в табло налога нет рублёвой записи ставки`,
+      !rub.test(m.taxText), m.taxText.slice(0, 160));
+  }
 }
 
 console.log('');
