@@ -189,6 +189,24 @@ function renderCurveList() {
       redrawAll();
     });
 
+    /* ОБОЗНАЧЕНИЕ ПЕРЕД ИМЕНЕМ (Фаза 3). На холсте у кривой сложения стоит
+       короткое обозначение (D₁, S₂, D, S) — иначе шесть подписей по 137–181 px
+       читаются вдоль края одной строкой. Чтобы связь холста со списком
+       осталась однозначной, ТО ЖЕ обозначение стоит здесь, перед полным
+       именем, и в подписи ползунка справа. */
+    let tagEl = null;
+    const rowTag = (typeof sumTagOf === 'function' && typeof sumSceneOn === 'function' && sumSceneOn())
+      ? sumTagOf(curve) : null;
+    if (rowTag) {
+      tagEl = document.createElement('span');
+      tagEl.className = 'crow-tag';
+      tagEl.style.color = curve.color;          // обозначение цветом своей линии
+      const tex = rowTag.replace(/_(\d)/, '_{$1}');
+      if (typeof katexInto === 'function') katexInto(tagEl, tex);
+      else tagEl.textContent = rowTag.replace('_', '');
+      tagEl.setAttribute('data-tip', 'Так эта кривая подписана на графике');
+    }
+
     const nm = document.createElement('span');
     nm.className = 'curve-name';
     paintNotation(nm, curveShortName(curve));   // «D», «MC» — формулой, своё имя — текстом
@@ -228,7 +246,9 @@ function renderCurveList() {
       renderCurveList();
       redrawAll();
     });
-    if (badge) top.append(cb, sw, nm, badge, del); else top.append(cb, sw, nm, del);
+    if (tagEl) top.append(cb, sw, tagEl, nm); else top.append(cb, sw, nm);
+    if (badge) top.append(badge);
+    top.append(del);
 
     // Нижняя строка: роль кривой (обычная / спрос / предложение).
     const sel = document.createElement('select');
@@ -303,6 +323,23 @@ function renderCurveList() {
       gear.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
 
+    /* ── СТРОКА СУММАРНОЙ КРИВОЙ НЕ ДОЛЖНА ВЫГЛЯДЕТЬ ОБЛОМКОМ (Фаза 3) ──
+       Поля формулы у неё нет и быть не может: запись считается из формул
+       групп на каждой перерисовке, и правка руками жила бы до следующей.
+       Но пустое место на её месте читалось как недоделка (замер 25.08:
+       строка группы 115 px, строка суммы 66 — на экране просто короче и всё).
+       Ставим на место поля строку, которая прямо это и говорит, а в подсказке
+       показываем ту самую запись, по которой кривая считается. */
+    let autoLine = null;
+    if (curve.kind === 'sum') {
+      autoLine = document.createElement('div');
+      autoLine.className = 'crow-auto';
+      autoLine.textContent = 'считается по группам — правке не подлежит';
+      autoLine.setAttribute('data-tip', curve.expr
+        ? ('Сейчас это ' + tipExpr(curve.expr))
+        : 'Ни одна группа ещё не задана');
+    }
+
     if (fInp) {
       /* Формула занимает ОТДЕЛЬНУЮ строку во всю ширину (А66). Раньше она
          стояла в одном ряду с галочкой, цветом, шестерёнкой и крестиком, и на
@@ -320,6 +357,9 @@ function renderCurveList() {
          шириной 84px, у новой кривой поле с набором формул. Поле собирается
          лениво (А56): пока строка не на экране, тяжёлый компонент не создаётся. */
       fInp.id = fInp.id || ('curve-expr-' + curve.id);
+    } else if (autoLine) {
+      top.insertBefore(gear, del);
+      row.append(top, autoLine, more);
     } else {
       top.insertBefore(gear, del);
       row.append(top, more);

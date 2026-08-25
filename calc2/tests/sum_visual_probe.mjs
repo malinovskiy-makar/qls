@@ -226,7 +226,13 @@ function svLabels() {
      «спрос третьей группы спрос второй группы». Порог берём у самого шрифта:
      разные подписи обязаны стоять дальше, чем слова внутри одной, — иначе
      глазу нечем разделить их на две. */
-  var spaceW = svSpaceWidth(chart);
+  /* ⚠️ ПОРОГ НЕ ИМЕЕТ ПРАВА ОСЛАБНУТЬ ОТ СМЕНЫ ШРИФТА. Пробел меряется в том
+     же шрифте, каким набраны подписи, а он у математического набора уже: после
+     перехода на обозначения замер дал 3,3 px вместо 7,22, то есть проверка
+     стала бы вдвое мягче сама собой. Держим нижний предел в половину кегля. */
+  var sample0 = chart.querySelector('text.curve-name');
+  var fs0 = sample0 ? parseFloat(getComputedStyle(sample0).fontSize) : 14;
+  var spaceW = Math.max(svSpaceWidth(chart), (isFinite(fs0) ? fs0 : 14) / 4);
   var pairs = [], glued = [];
   for (var i = 0; i < items.length; i++) {
     for (var j = i + 1; j < items.length; j++) {
@@ -316,11 +322,19 @@ function svSliders() {
     }
     var track = chip.querySelector('.param-track');
     var sl = chip.querySelector('input[type=range]');
+    /* ⚠️ СВЕТЛОТА АКЦЕНТА РЕШАЕТ, КАКОЙ БУДЕТ НЕЗАЛИТАЯ ДОРОЖКА.
+       Chromium сам переключает её на тёмную, когда accent-color слишком
+       светлый. Порог измерен перебором 25.08: 0,2487 — ещё светлая,
+       0,2545 — уже тёмная. Прибор держит запас и требует не выше 0,245:
+       иначе на панели оказываются рядом дорожки двух разных видов. */
+    var acc = sl ? svRGB(getComputedStyle(sl).accentColor) : null;
     return {
       cid: cid, full: full, seen: seen,
       ellipsisCss: lab ? (lab.scrollWidth > lab.clientWidth + 1) : false,
       ellipsisChar: /…/.test(seen),
       scrollW: lab ? lab.scrollWidth : 0, clientW: lab ? lab.clientWidth : 0,
+      accent: svHex(acc),
+      accentLum: acc ? Math.round(svLum(acc) * 10000) / 10000 : null,
       trackLeft: track ? Math.round(track.getBoundingClientRect().left * 10) / 10 : null,
       slLeft: sl ? Math.round(sl.getBoundingClientRect().left * 10) / 10 : null,
       slValue: sl ? Number(sl.value) : null,
@@ -621,9 +635,12 @@ if (need('Р')) {
     const sl = await run(`return svSliders();`);
     sl.forEach(s => note(`полный «${s.full}»  видно «${s.seen}»  ` +
       `CSS-обрезка ${s.ellipsisCss ? 'ДА' : 'нет'} (${s.scrollW}/${s.clientW})  многоточие в тексте ${s.ellipsisChar ? 'ДА' : 'нет'}` +
-      `  дорожка слева ${s.trackLeft}`));
+      `  акцент ${s.accent} L=${s.accentLum}  дорожка слева ${s.trackLeft}`));
     const cut = sl.filter(s => s.ellipsisCss || s.ellipsisChar);
     flag('ни одна подпись ползунка не обрезана', cut.length === 0, 'обрезано ' + cut.length + ' из ' + sl.length);
+    const bright = sl.filter(s => s.accentLum != null && s.accentLum > 0.245);
+    flag('незалитая дорожка у всех ползунков одного вида (светлота акцента ≤ 0,245)',
+      bright.length === 0, bright.map(s => s.accent + ' L=' + s.accentLum).join('; ') || 'светлее порога нет');
     const lefts = [...new Set(sl.map(s => s.slLeft))];
     flag('дорожки соседних строк выровнены по левому краю', lefts.length <= 1, 'левых краёв: ' + lefts.join(', '));
     await shot(`r-${key}-panel`);
