@@ -74,7 +74,12 @@ function relocateForScene() {
    Помечаем «погасить, если никто не напишет»; гасит помеченные
    flushPendingPanelClears в конце перерисовки. Смысл тот же, а перенабора нет. */
 function clearResultPanels() {
-  ['info-eq'].concat(RESULT_IDS).forEach(id => {
+  /* ⚠️ info-final ГАСИТСЯ ЗДЕСЬ, ХОТЯ В RESULT_IDS ЕГО НЕТ, И ОДНО ИЗ ДРУГОГО
+     НЕ СЛЕДУЕТ. В том списке он не значится нарочно (иначе relocateForScene
+     унёс бы его в конец табло), но гасить его надо ровно так же: иначе
+     итоговая функция прошлой сцены пережила бы переключение и стояла бы
+     первой строкой в чужой модели. */
+  ['info-eq', 'info-final'].concat(RESULT_IDS).forEach(id => {
     const e = document.getElementById(id);
     if (!e) return;
     if (e._panelGuarded) { e._pendingClear = true; return; }
@@ -926,6 +931,190 @@ function tipExpr(expr) {
 /* Текст подсказки для чтеца экрана: доллары — разметка набора, вслух их не
    читают. */
 function tipPlain(text) { return String(text || '').replace(/\$/g, ''); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ИТОГОВАЯ ФУНКЦИЯ — ОДНО МЕСТО НА ВЕСЬ КАЛЬКУЛЯТОР
+   (решение владельца 26.08, ADR 0028)
+
+   Аналитическая запись посчитанной кривой — это ВЕЛИЧИНА, а не разбор. До
+   26.08 каждая сцена печатала её по-своему и клала внутрь врезки `.sb-note`,
+   а общий проход `moveExplanations` уносил все такие врезки в «Объяснение
+   модели» и гасил оригинал стилем. Попасть в «Ключевые значения» она физически
+   не могла: замер 26.08 — запись суммарной КПВ стояла седьмым абзацем из семи
+   в свёрнутом по умолчанию блоке.
+
+   Здесь она верстается ЕДИНСТВЕННЫЙ раз; сцены только отдают данные.
+
+   ⚠️ КЛАССА `sb-note` ВНУТРИ БЛОКА БЫТЬ НЕ ДОЛЖНО НИ НА ОДНОМ УЗЛЕ — иначе
+   `moveExplanations` унесёт его туда же, откуда мы вышли. На это стоит
+   постоянная проверка.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const FF_MAX_PX = 15;   // канонический кегль записи: крупнее чисел табло (13)
+const FF_MIN_PX = 13;   // ниже НЕ опускаемся — подгонку до 10 владелец забраковал
+
+function ffEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* ⚠️ ПЕРЕВОД В LaTeX ДЕЛАЕТ ТОЛЬКО `mathToLatexField` (82-input.js).
+   Он умеет кусочную цепочку через `condChainToCases`: печатает «если»
+   по-русски, сворачивает `Q ≥ a ∧ Q < b` в `a ≤ Q < b` и проглатывает
+   служебный хвост NaN. Звать `mathToTex` напрямую здесь ЗАПРЕЩЕНО — это
+   ровно источник дефекта «подсказка печатает ∞ и английское if». */
+function ffLatexOf(o) {
+  if (o && o.latex) return String(o.latex);
+  const e = String((o && o.expr) == null ? '' : o.expr).trim();
+  if (!e) return '';
+  return (typeof mathToLatexField === 'function') ? mathToLatexField(e) : e;
+}
+
+/**
+ * Разметка одного блока «Итоговая функция».
+ * @param {string}  o.name   человеческое имя: «Рыночный спрос $D$», «Суммарная КПВ»
+ * @param {string}  o.color  цвет кривой — ТОТ ЖЕ, которым нарисована линия
+ * @param {string}  o.expr   запись в синтаксисе Math.js: для копирования и для .tex
+ * @param {string} [o.latex] готовый LaTeX; не передан — считается из expr
+ * @param {string} [o.note]  короткая приписка («построена численно»)
+ */
+function finalFunctionHtml(o) {
+  if (!o) return '';
+  const tex = ffLatexOf(o);
+  const note = o.note ? String(o.note) : '';
+  if (!tex && !note) return '';
+  const color = o.color || 'var(--text)';
+  let h = '<div class="ff" style="--ff-c: ' + ffEsc(color) + '">';
+  h += '<div class="ff-top"><span class="ff-eyebrow">Итоговая функция</span>';
+  if (o.expr) h += '<button class="ff-copy" type="button" data-tip="Скопировать запись"'
+                 + ' data-ff-expr="' + ffEsc(o.expr) + '">копировать</button>';
+  h += '</div>';
+  h += '<div class="ff-name">' + (o.name || '') + '</div>';
+  /* Сам LaTeX едет и в атрибуте: вторую форму записи (условие под формулой)
+     собирать надо из исходника, а из набранного KaTeX его уже не достать. */
+  if (tex) h += '<div class="ff-math" data-ff-tex="' + ffEsc(tex) + '">$' + tex + '$</div>';
+  if (note) h += '<div class="ff-note">' + note + '</div>';
+  h += '</div>';
+  return h;
+}
+
+/* ВТОРАЯ ФОРМА ЗАПИСИ: условие куска уходит на свою строку ПОД формулу,
+   фигурная скобка остаётся, кегль не трогается (решение владельца 26.08).
+   Возвращает null, если это не фигурная скобка или в ней меньше двух кусков. */
+function ffCasesStacked(tex) {
+  const s = String(tex || '');
+  const B = '\\begin{cases}', E = '\\end{cases}';
+  const i = s.indexOf(B), j = s.lastIndexOf(E);
+  if (i < 0 || j <= i) return null;
+  const head = s.slice(0, i), tail = s.slice(j + E.length);
+  const rows = s.slice(i + B.length, j).split('\\\\').map(r => r.trim()).filter(r => r.length);
+  if (rows.length < 2) return null;
+  const out = rows.map(r => {
+    const k = r.indexOf('&');
+    if (k < 0) return r;
+    const body = r.slice(0, k).trim().replace(/,\s*$/, '');
+    const cond = r.slice(k + 1).trim();
+    if (!body || !cond) return r;
+    /* `gathered` KaTeX 0.16 понимает; кегль условия снижается ГРУППОЙ, вместе
+       со словом «если», если оно в условии уже стоит. */
+    return '\\begin{gathered}' + body + '\\\\[-2pt]{\\footnotesize ' + cond + '}\\end{gathered}';
+  });
+  return head + B + out.join('\\\\[4pt]') + E + tail;
+}
+
+/* Набрать запись в узел заново (обе формы идут одним путём). */
+function ffTypeset(host, tex) {
+  host.textContent = '$' + tex + '$';
+  if (typeof renderMathIn === 'function') renderMathIn(host);
+  return host.querySelector('.katex');
+}
+
+/* ПРАВИЛО ШИРИНЫ (решение владельца 26.08, исполнять буквально).
+     ШАГ 1. Обычная форма, кегль 15 px.
+     ШАГ 2. Мерить ВНУТРЕННИЙ узел `.katex`, а не внешний: у обрезанной
+            записи внешний узел показывает «влезло».
+     ШАГ 3. Шире контейнера — вторая форма (условие под формулой).
+     ШАГ 4. И она шире — кегль ступенями до 13 px, НИЖЕ 13 НЕ ОПУСКАТЬ.
+            Дальше горизонтальная прокрутка с затуханием у правого края.
+   Подгонка вниз до 10 px, как делает fitPanelMath, здесь ЗАПРЕЩЕНА: ровно её
+   владелец и забраковал. */
+function fitFinalMath(root) {
+  const box = root || document.getElementById('info-final');
+  if (!box) return;
+  box.querySelectorAll('.ff-math').forEach(host => {
+    host.classList.remove('ff-scroll');
+    host.style.fontSize = '';
+    const tex = host.getAttribute('data-ff-tex') || '';
+    let k = host.querySelector('.katex');
+    if (!k || !tex) return;
+    const have = host.clientWidth;
+    if (!(have > 0)) return;
+    const over = () => k.getBoundingClientRect().width > have - 1;
+    if (!over()) return;
+    const alt = ffCasesStacked(tex);
+    if (alt && alt !== tex) {
+      k = ffTypeset(host, alt) || k;
+      if (!over()) return;
+    }
+    for (let px = FF_MAX_PX - 1; px >= FF_MIN_PX; px--) {
+      host.style.fontSize = px + 'px';
+      if (!over()) return;
+    }
+    host.classList.add('ff-scroll');
+  });
+}
+
+/* Скопировать запись в синтаксисе Math.js: её можно вставить обратно в поле
+   формулы. Clipboard недоступен (не защищённый контекст) — идём запасным
+   путём, а не молчим. */
+function ffCopyText(text) {
+  const ok = () => toast('Запись скопирована');
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(ok, () => ffCopyFallback(text));
+    return;
+  }
+  ffCopyFallback(text);
+}
+function ffCopyFallback(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  let done = false;
+  try { done = document.execCommand('copy'); } catch (e) { done = false; }
+  ta.remove();
+  toast(done ? 'Запись скопирована' : 'Скопировать не удалось — выделите запись и нажмите Ctrl+C');
+}
+function wireFinalCopy() {
+  if (wireFinalCopy._done) return;
+  wireFinalCopy._done = true;
+  document.addEventListener('click', (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('.ff-copy') : null;
+    if (!b) return;
+    e.preventDefault();
+    ffCopyText(b.getAttribute('data-ff-expr') || '');
+  });
+}
+
+/**
+ * Показать итоговые функции сцены. [] | [rec] | [rec, rec] → в #info-final.
+ * ⚠️ Контейнер защищён guardPanelBoxes: тот же текст — табло не переписывается.
+ * Ломать это нельзя, кадр 47 → 13 мс достигнут именно отказом от перенабора.
+ */
+function setFinalFunctions(list) {
+  const box = document.getElementById('info-final');
+  if (!box) return;
+  wireFinalCopy();
+  const html = (list || []).filter(Boolean).map(finalFunctionHtml).join('');
+  box.innerHTML = html;                  // guardPanelBoxes сам решит, писать ли
+  if (box._ffFitFor === html) return;    // ничего не изменилось — и мерить нечего
+  box._ffFitFor = html;
+  if (!html) return;
+  if (typeof renderMathIn === 'function') renderMathIn(box);
+  fitFinalMath(box);
+}
 
 /* Подпись в РАЗМЕТКЕ (не на холсте), в которой сидит обозначение: «D», «CS»,
    «MC, предельные затраты». Обозначения уезжают в формулу, слова остаются
