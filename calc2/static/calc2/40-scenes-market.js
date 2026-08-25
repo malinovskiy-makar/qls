@@ -15,40 +15,122 @@ function recompute() {
   sumRebuild();
   STATE.D = curveByRole('demand');
   STATE.S = curveByRole('supply');
-  STATE.eq = (STATE.D && STATE.S) ? findEquilibrium(STATE.D, STATE.S) : null;
 
-  // Площади излишков (шаг 6) — численным интегрированием от 0 до Q*.
-  STATE.cs = STATE.ps = STATE.sw = null;
-  if (STATE.eq) {
-    const { Q, P } = STATE.eq;
-    /* По участкам, если кривая знает свои изломы (суммарная знает): метод
-       трапеций точен на прямой только когда излом лежит в узле сетки. */
-    STATE.cs = integrateBroken(q => evalCurve(STATE.D, q) - P, 0, Q, curveBreaks(STATE.D));   // ∫ (D - P*) dQ
-    STATE.ps = integrateBroken(q => P - evalCurve(STATE.S, q), 0, Q, curveBreaks(STATE.S));   // ∫ (P* - S) dQ
-    STATE.sw = STATE.cs + STATE.ps;
+  /* ⚠️ В СЦЕНЕ СЛОЖЕНИЯ РАВНОВЕСИЕ И ИЗЛИШКИ СЧИТАЮТСЯ РАЗ НА НАБОР ФОРМУЛ.
+
+     Суммарная кривая живёт кусочной записью, и каждое её значение проходит
+     через Math.js: замер 24.08 — 3,6 мкс на вызов, а вызовов на кадр около
+     девяти тысяч. Отсюда и жалоба «график лагает при панорамировании»: тянешь
+     мышь, и на каждое движение движок заново ищет равновесие по тысяче узлов
+     и заново берёт четыре интеграла.
+
+     Кэшировать это раньше было НЕЛЬЗЯ честно: и запись, и отрезок поиска
+     зависели от границ кадра, так что после панорамы числа действительно
+     могли поменяться. Теперь не зависят ни то, ни другое, и панорама изменить
+     их не может в принципе — значит, и считать их заново не за чем. Ключ —
+     подпись формул и отрезок поиска: сменилось что-то из этого, считаем. */
+  const memoKey = sumSceneOn() ? sumAnalyticsKey() : null;
+  const memo = (memoKey && memoKey === STATE._sumAnaKey) ? STATE._sumAnaVal : null;
+  if (memo) {
+    // Копию, а не ту же ссылку: STATE.eq дальше по коду читают и сравнивают,
+    // и отдавать наружу внутренность кэша нельзя.
+    STATE.eq = memo.eq ? { Q: memo.eq.Q, P: memo.eq.P } : null;
+    STATE.cs = memo.cs; STATE.ps = memo.ps; STATE.sw = memo.sw;
+    STATE.offEq = memo.offEq ? { Q: memo.offEq.Q, P: memo.offEq.P } : null;
+  } else {
+    STATE.eq = (STATE.D && STATE.S) ? findEquilibrium(STATE.D, STATE.S) : null;
+
+    // Площади излишков (шаг 6) — численным интегрированием от 0 до Q*.
+    STATE.cs = STATE.ps = STATE.sw = null;
+    if (STATE.eq) {
+      const { Q, P } = STATE.eq;
+      /* По участкам, если кривая знает свои изломы (суммарная знает): метод
+         трапеций точен на прямой только когда излом лежит в узле сетки. */
+      STATE.cs = integrateBroken(q => quadPrice(STATE.D, q) - P, 0, Q, quadBreaks(STATE.D, Q));   // ∫ (D - P*) dQ
+      STATE.ps = integrateBroken(q => P - quadPrice(STATE.S, q), 0, Q, quadBreaks(STATE.S, Q));   // ∫ (P* - S) dQ
+      STATE.sw = STATE.cs + STATE.ps;
+    }
+
+    /* Равновесия в первой четверти нет — но кривые могли пересечься за её
+       пределами, и об этом надо сказать (решение владельца «пересечение вне
+       первой четверти»). Ищем только тогда: там, где рынок есть, эта точка
+       не нужна и лишних четырёх тысяч вычислений за неё платить не за что. */
+    STATE.offEq = (!STATE.eq && STATE.D && STATE.S)
+      ? findOffQuadIntersection(STATE.D, STATE.S) : null;
+
+    if (memoKey) {
+      STATE._sumAnaKey = memoKey;
+      STATE._sumAnaVal = { eq: STATE.eq ? { Q: STATE.eq.Q, P: STATE.eq.P } : null,
+                           cs: STATE.cs, ps: STATE.ps, sw: STATE.sw,
+                           offEq: STATE.offEq ? { Q: STATE.offEq.Q, P: STATE.offEq.P } : null };
+    }
   }
 
   // Вмешательство государства (шаг 7 — налог, шаг 8 — субсидия).
   // Налог сдвигает S вверх на t, субсидия — вниз на s. Дальше математика общая.
   STATE.taxActive = false;
   STATE.taxEq = null;
+  /* ⚠️ ХВОСТЫ ПРОШЛОГО ВМЕШАТЕЛЬСТВА ГАСНУТ ЗДЕСЬ, А НЕ «КОГДА-НИБУДЬ».
+     Гасились только два поля из десяти, и остальные восемь доживали до
+     следующей сцены. Замер 25.08 на D = 100−P, S = 0,5·p−200 без равновесия:
+     в состоянии лежали сбор 800 и DWL 100 — числа с ПРОШЛОГО набора кривых,
+     а `taxAfterS` оставалась функцией, замкнутой на прежнюю ставку, и на
+     вопрос «где обращается в ноль» отвечала 420 вместо 500. Панель их не
+     показывала, поэтому и не замечали; но по ним считает выгрузка и по ним
+     же меряет прибор. */
+  STATE.taxAfterS = null;
+  STATE.taxAfterD = null;
+  STATE.taxCurveOn = false;
+  STATE.taxNoBase = false;
+  STATE.shift = 0;
+  STATE.advTau = 0;
+  STATE.tx = null;
+  STATE.budget = null;
+  STATE.dwl = null;
+  STATE.csTax = null;
+  STATE.psTax = null;
+  STATE.incBuyer = null;
+  STATE.incSeller = null;
   // В режиме монополии конкурентные сценарии вмешательства отключены.
   // Интервенции активны только в обычном сценарии (не при эластичности/сдвигах/внешнем эффекте).
   const compMarket = (STATE.market !== 'monopoly');
   const scenarioNone = (STATE.scenario === 'none');
   const isTaxType = compMarket && scenarioNone && (STATE.intervType === 'tax' || STATE.intervType === 'subsidy');
-  if (isTaxType && STATE.tax > 0 && STATE.D && STATE.S && STATE.eq) {
+  /* ⚠️ РАВНОВЕСИЕ ЗДЕСЬ НЕ УСЛОВИЕ, А ОДНО ИЗ СЛАГАЕМЫХ ОТВЕТА.
+     Раньше в этом условии стояло ещё и `STATE.eq`, и одно это слагаемое
+     выключало вмешательство ЦЕЛИКОМ: у рынка без равновесия в первой
+     четверти (D = 100−P, S = 0,5·p−200 — обычная олимпиадная ловушка) налог
+     не двигал кривую вовсе, и человек видел неподвижный график.
+
+     А сдвиг и поворот кривой предложения — операции над ФУНКЦИЕЙ. Ставка
+     есть, кривая есть, значит есть и кривая после вмешательства; пересекается
+     она со спросом или нет, к самой операции отношения не имеет.
+
+     Разделяем три вещи, и каждая живёт по своему условию:
+       • КРИВАЯ ПОСЛЕ — есть S и ставка (это условие, `STATE.taxCurveOn`);
+       • ЧИСЛА ПО НОВОМУ РАВНОВЕСИЮ (Q₁, Pd, Ps, сбор, излишки после) —
+         нашлось новое равновесие в первой четверти (`STATE.taxActive`);
+       • ЧИСЛА ПО ДВУМ РАВНОВЕСИЯМ (DWL и все «было → стало») — вдобавок
+         было и исходное. Не было — не считаем и говорим об этом словами
+         (`STATE.taxNoBase`), а не подставляем ноль вместо «до».
+
+     Отсюда же берётся и краевой случай, который прежде терялся совсем: без
+     вмешательства кривые пересекаются вне четверти, а с ним — внутри
+     (субсидия 450 на тех же кривых даёт Q = 50). Числа обязаны появиться. */
+  if (isTaxType && STATE.tax > 0 && STATE.D && STATE.S) {
     const isSub = (STATE.intervType === 'subsidy');
-    const adv = (STATE.taxKind === 'advalorem');
-    const tau = adv ? STATE.tax / 100 : 0;        // адвалорная ставка в долях (STATE.tax — проценты)
+    const pf = pctForm();                         // строка таблицы PCT_FORMS либо null
+    const adv = !!pf;
+    const tau = adv ? STATE.tax / 100 : 0;        // процентная ставка в долях (STATE.tax — проценты)
     const shift = isSub ? -STATE.tax : STATE.tax; // потоварная ставка со знаком
-    // Кривая предложения ПОСЛЕ вмешательства — единый источник и для чисел, и для отрисовки.
-    //  • специфическое: параллельный СДВИГ  S ± ставка (разрыв постоянен);
-    //  • адвалорное: ПОВОРОТ. Налог: покупатель платит в (1+τ) раз больше, чем получает
-    //    продавец при том же объёме ⇒ S_после = (1+τ)·S. Субсидия — зеркально: продавец
-    //    получает в (1+τ) раз больше, чем платит покупатель ⇒ S_после = S/(1+τ).
-    //    Вертикальный разрыв между S и S_после = τ·S(Q) — растёт вместе с Q.
-    const factor = isSub ? 1 / (1 + tau) : (1 + tau);
+    /* Кривая предложения ПОСЛЕ вмешательства — единый источник и для чисел, и для
+       отрисовки.
+         • потоварное: параллельный СДВИГ S ± ставка (разрыв постоянен);
+         • процентное: ПОВОРОТ S_после = factor·S, где factor берётся ОДНОЙ строкой
+           таблицы PCT_FORMS. Вертикальный разрыв между S и S_после растёт вместе с Q.
+       Цена продавца при повороте всегда Ps = Pd/factor, поэтому четыре соотношения
+       цен из таблицы получаются сами, без четырёх веток здесь. */
+    const factor = adv ? pf.factor(tau) : 1;
     // texExpr — запись той же кривой формулой, для выгрузки в LaTeX (А49).
     // Отдельное поле, а не expr: движок кривых поле expr понимает по-своему,
     // и подкладывать ему выражение в объект, у которого есть только fn, нельзя.
@@ -58,41 +140,61 @@ function recompute() {
           texExpr: sSrc ? '(' + sSrc + ') * ' + factor : '' }
       : { fn: q => evalCurve(STATE.S, q) + shift,
           texExpr: sSrc ? '(' + sSrc + ') + (' + shift + ')' : '' };
+    /* Кривая после вмешательства готова — её и рисуем, независимо от того,
+       найдётся ли дальше новое равновесие. */
+    STATE.shift = shift;
+    STATE.advTau = adv ? tau : 0;
+    STATE.taxAfterS = sAfter;                     // ту же функцию рисует drawShiftedSupply
+    /* Эквивалентная запись «налог платит покупатель» (для рисования): при потоварном —
+       D − t, при адвалорном — D/(1+τ). Объём и цены получаются те же самые.
+       Строится ЗДЕСЬ, рядом с sAfter: при налоге на покупателя рисуется именно
+       она, и её отсутствие означало бы неподвижный график ровно так же. */
+    const dSrc = (STATE.D && STATE.D.expr) ? String(STATE.D.expr) : '';
+    STATE.taxAfterD = adv
+      ? { fn: q => { const d = evalCurve(STATE.D, q); return isNaN(d) ? NaN : d / factor; },
+          texExpr: dSrc ? '(' + dSrc + ') / ' + factor : '' }
+      : { fn: q => evalCurve(STATE.D, q) - STATE.tax,
+          texExpr: dSrc ? '(' + dSrc + ') - (' + STATE.tax + ')' : '' };
+    STATE.taxCurveOn = true;
+
     const te = findEquilibrium(STATE.D, sAfter);
     if (te) {
-      const Q1 = te.Q, Q0 = STATE.eq.Q;
+      const Q1 = te.Q;
       const Pb = evalCurve(STATE.D, Q1);          // цена покупателя
       // Цена продавца: в обоих случаях это S(Q1) (для потоварного — ровно Pb − ставка).
       const Ps = adv ? evalCurve(STATE.S, Q1) : (Pb - shift);
-      const lo = Math.min(Q1, Q0), hi = Math.max(Q1, Q0);
-      STATE.shift = shift;
-      STATE.advTau = adv ? tau : 0;
-      STATE.taxAfterS = sAfter;                   // ту же функцию рисует drawShiftedSupply
-      // Эквивалентная запись «налог платит покупатель» (для рисования): при потоварном —
-      // D − t, при адвалорном — D/(1+τ). Объём и цены получаются те же самые.
-      const dSrc = (STATE.D && STATE.D.expr) ? String(STATE.D.expr) : '';
-      STATE.taxAfterD = adv
-        ? { fn: q => { const d = evalCurve(STATE.D, q); return isNaN(d) ? NaN : d / factor; },
-            texExpr: dSrc ? '(' + dSrc + ') / ' + factor : '' }
-        : { fn: q => evalCurve(STATE.D, q) - STATE.tax,
-            texExpr: dSrc ? '(' + dSrc + ') - (' + STATE.tax + ')' : '' };
       STATE.taxEq = { Q: Q1, Pb, Ps };
       // Объём денег = площадь прямоугольника между ценами покупателя и продавца.
       // Для потоварного это в точности ставка·Q1, для адвалорного — τ·Ps·Q1 (налог).
       STATE.tx = Math.abs(Pb - Ps) * Q1;
       STATE.budget = (STATE.intervType === 'subsidy' ? -1 : 1) * STATE.tx;  // +сбор / -расход
-      STATE.csTax = integrate(q => evalCurve(STATE.D, q) - Pb, 0, Q1);
-      STATE.psTax = integrate(q => Ps - evalCurve(STATE.S, q), 0, Q1);
-      // DWL — площадь между D и S на интервале между старым и новым Q (всегда > 0).
-      STATE.dwl = areaBetween(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi);
-      if (STATE.intervType === 'subsidy') {
-        STATE.incBuyer = STATE.eq.P - Pb;         // выигрыш покупателя (цена упала)
-        STATE.incSeller = Ps - STATE.eq.P;        // выигрыш продавца (цена выросла)
-      } else {
-        STATE.incBuyer = Pb - STATE.eq.P;         // бремя покупателя
-        STATE.incSeller = STATE.eq.P - Ps;        // бремя продавца
-      }
+      STATE.csTax = integrate(q => quadPrice(STATE.D, q) - Pb, 0, Q1);
+      STATE.psTax = integrate(q => Ps - quadPrice(STATE.S, q), 0, Q1);
       STATE.taxActive = true;
+
+      /* ⚠️ ДВА КРАЯ У ЭТОГО ПРАВИЛА, И ОБА ЗДЕСЬ.
+         DWL и все «было → стало» требуют ОБОИХ равновесий: площадь считается
+         МЕЖДУ старым и новым объёмом, а бремя — как разность с исходной ценой.
+         Исходного равновесия не было — считать не из чего, и подставить нуль
+         вместо «до» нельзя: нуль это число, и на табло он читался бы как
+         «до вмешательства торговли не было», а правда другая — рынка не было
+         вовсе. Поэтому величины остаются пустыми, а панель говорит словами
+         (STATE.taxNoBase). */
+      if (STATE.eq) {
+        const Q0 = STATE.eq.Q;
+        const lo = Math.min(Q1, Q0), hi = Math.max(Q1, Q0);
+        // DWL — площадь между D и S на интервале между старым и новым Q (всегда > 0).
+        STATE.dwl = areaBetween(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi);
+        if (STATE.intervType === 'subsidy') {
+          STATE.incBuyer = STATE.eq.P - Pb;       // выигрыш покупателя (цена упала)
+          STATE.incSeller = Ps - STATE.eq.P;      // выигрыш продавца (цена выросла)
+        } else {
+          STATE.incBuyer = Pb - STATE.eq.P;       // бремя покупателя
+          STATE.incSeller = STATE.eq.P - Ps;      // бремя продавца
+        }
+      } else {
+        STATE.taxNoBase = true;
+      }
     }
   }
 
@@ -101,11 +203,24 @@ function recompute() {
   STATE.pcMode = compMarket && scenarioNone && (STATE.intervType === 'ceiling' || STATE.intervType === 'floor');
   STATE.pcActive = false;
   STATE.pc = null;
-  if (STATE.pcMode && STATE.D && STATE.S && STATE.eq && STATE.pReg > 0) {
+  /* Равновесие здесь тоже не пропуск: фиксированная цена и короткая сторона
+     рынка считаются по самим кривым. Ниже равновесие входит только туда, где
+     оно действительно нужно, — в проверку «связывает ли» и в потери. */
+  if (STATE.pcMode && STATE.D && STATE.S && STATE.pReg > 0) {
     const Preg = STATE.pReg;
     const isCeiling = (STATE.intervType === 'ceiling');
     // Связывает ли регулирование: потолок ниже равновесия / пол выше равновесия.
-    const binding = isCeiling ? (Preg < STATE.eq.P) : (Preg > STATE.eq.P);
+    /* Без исходного равновесия сравнивать не с чем, и вместо сравнения
+       действует его определение: регулирование связывает, когда при этой цене
+       спрос и предложение не сходятся. Там, где равновесие есть, оба способа
+       дают одно и то же, поэтому проверенные числа не двигаются — сравнение
+       остаётся первым. */
+    const binding = STATE.eq
+      ? (isCeiling ? (Preg < STATE.eq.P) : (Preg > STATE.eq.P))
+      : (() => {
+          const a = invCurve(STATE.D, Preg), b = invCurve(STATE.S, Preg);
+          return (a != null && b != null) ? Math.abs(a - b) > 1e-9 : false;
+        })();
     const Qd = invCurve(STATE.D, Preg);   // объём спроса при цене Preg (D⁻¹)
     const Qs = invCurve(STATE.S, Preg);   // объём предложения при цене Preg (S⁻¹)
     const Qtrade = (Qd != null && Qs != null) ? Math.min(Qd, Qs) : null;  // короткая сторона
@@ -117,13 +232,27 @@ function recompute() {
     STATE.pc = { Preg, isCeiling, binding, Qd, Qs, Qtrade, gap };
     if (binding && Qtrade != null) {
       // CS / PS считаем интегрированием по фактическому объёму торговли.
-      STATE.pc.cs = integrate(q => evalCurve(STATE.D, q) - Preg, 0, Qtrade);
-      STATE.pc.ps = integrate(q => Preg - evalCurve(STATE.S, q), 0, Qtrade);
+      STATE.pc.cs = integrate(q => quadPrice(STATE.D, q) - Preg, 0, Qtrade);
+      STATE.pc.ps = integrate(q => Preg - quadPrice(STATE.S, q), 0, Qtrade);
       STATE.pc.sw = STATE.pc.cs + STATE.pc.ps;
       // DWL — площадь между D и S от Q_trade до Q* (недо-/перепроизводство).
-      const lo = Math.min(Qtrade, STATE.eq.Q), hi = Math.max(Qtrade, STATE.eq.Q);
-      STATE.pc.dwl = areaBetween(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi);
-      STATE.pcActive = true;
+      // Требует ОБОИХ объёмов: без исходного равновесия второго края у площади нет.
+      if (STATE.eq) {
+        const lo = Math.min(Qtrade, STATE.eq.Q), hi = Math.max(Qtrade, STATE.eq.Q);
+        STATE.pc.dwl = areaBetween(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), lo, hi);
+        STATE.pcActive = true;
+      } else {
+        /* ⚠️ ГРАНИЦА У ПОТОЛКА И ПОЛА ПРОВЕДЕНА ИНАЧЕ, ЧЕМ У НАЛОГА, И НАРОЧНО.
+           Линия цены, проекции Qd и Qs и зона дефицита рисуются по STATE.pc —
+           а она теперь считается и без равновесия, поэтому графика работает.
+           А вот `pcActive` оставляем при равновесии: за ним идут таблица
+           «до → после», ключевые значения и заливка потерь, и все три
+           построены вокруг исходного состояния. Регулировать цену на рынке,
+           которого нет, — случай без экономического смысла: в отличие от
+           налога, здесь не бывает так, чтобы вмешательство рынок СОЗДАЛО. */
+        STATE.pc.dwl = null;
+        STATE.pc.noBase = true;
+      }
     }
   }
 
@@ -151,8 +280,8 @@ function recompute() {
       STATE.qt.P = P;
       STATE.qt.pos = pos;
       STATE.qt.width = Phi - Plo;
-      STATE.qt.cs = integrate(q => evalCurve(STATE.D, q) - P, 0, Qq);
-      STATE.qt.ps = integrate(q => P - evalCurve(STATE.S, q), 0, Qq);
+      STATE.qt.cs = integrate(q => quadPrice(STATE.D, q) - P, 0, Qq);
+      STATE.qt.ps = integrate(q => P - quadPrice(STATE.S, q), 0, Qq);
       STATE.qt.sw = STATE.qt.cs + STATE.qt.ps;
       // Потери — площадь между D и S от квоты до равновесного объёма.
       // Цена в это выражение не входит: трапеция от положения ползунка не зависит.
@@ -559,6 +688,101 @@ function drawEquilibrium() {
   pointName(g, px, py, 'E', COL.ink);
 }
 
+/* Пунктир в сторону пересечения, лежащего вне первой четверти.
+
+   ⚠️ ЭТО НЕ РАВНОВЕСИЕ, И ВЫГЛЯДИТ ОНО ИНАЧЕ. Ни буквы E, ни чисел у осей:
+   всё это язык настоящего равновесия, и повторять его здесь нельзя — числа
+   на осях читались бы как обычные равновесные. Разговор об этой точке идёт
+   в «Объяснении модели» целым абзацем, который нельзя прочитать вполглаза.
+
+   Точка часто лежит за краем холста (у Qd = 100 − P и Qs = −200 + 0,5·P она
+   в (−100, 200)). Специально расширять окно под неё не надо: пунктир доходит
+   до края, и этого достаточно, чтобы стало видно, КУДА уехало пересечение. */
+function drawOffQuadIntersection() {
+  const off = STATE.offEq;
+  if (!off || STATE.eq || !STATE.D || !STATE.S) return;
+  const g = svg.append('g').attr('class', 'offquad').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  const lo = Math.min(0, off.Q), hi = Math.max(0, off.Q);
+  const N = 160;
+  [STATE.D, STATE.S].forEach(c => {
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const q = lo + (hi - lo) * i / N;
+      const p = evalCurve(c, q);
+      pts.push(isFinite(p) ? [q, p] : null);
+    }
+    g.append('path').datum(pts)
+      .attr('fill', 'none').attr('stroke', c.color).attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '5 4').attr('opacity', 0.65)
+      .attr('data-offquad', '1')
+      .attr('data-skip-export', '1')   // продолжение за область смысла в .tex не уходит
+      .attr('d', line);
+  });
+  // Сама точка — только если попала в кадр. Крестик без имени и без чисел у осей.
+  const [qa, qb] = sx.domain(), [pa, pb] = sy.domain();
+  if (off.Q >= qa && off.Q <= qb && off.P >= pa && off.P <= pb) {
+    const [px, py] = toPx(off.Q, off.P);
+    [[-5, -5, 5, 5], [-5, 5, 5, -5]].forEach(([a, b, cc, d]) => {
+      g.append('line').attr('x1', px + a).attr('y1', py + b).attr('x2', px + cc).attr('y2', py + d)
+        .attr('stroke', COL.inkSoft).attr('stroke-width', 1.5).attr('data-offquad', '1');
+    });
+  }
+}
+
+/* Абзац разбора про то же пересечение. Живёт в «Объяснении модели», а не в
+   «Ключевых значениях»: строка с числами в табло соседствовала бы с
+   настоящими равновесными значениями других сцен и слишком легко читалась бы
+   как ещё одно нормальное число. Обозначений $Q^*$ и $P^*$ здесь нет
+   намеренно — звёздочка это и есть знак равновесия. */
+function offQuadExplainHtml() {
+  const off = STATE.offEq;
+  if (!off || STATE.eq) return '';
+  const negQ = off.Q < -1e-9, negP = off.P < -1e-9;
+  const why = (negQ && negP)
+    ? 'Ни отрицательного количества, ни отрицательной цены на рынке не бывает'
+    : (negQ ? 'Отрицательного количества на рынке не бывает'
+            : 'Отрицательной цены на рынке не бывает');
+  return '<div class="sb-note">' +
+    '<p><b>Кривые пересекаются — но не там, где рынок возможен.</b> ' +
+    'Пересечение приходится на $P = ' + fmt(off.P) + '$ и $Q = ' + fmt(off.Q) + '$. ' +
+    why + ', поэтому равновесия нет: точка лежит за пределами первой четверти, ' +
+    'и торговать в ней некому и нечем. Излишки, налоги и потери общества для неё ' +
+    'не считаются — числа для несуществующего рынка были бы враньём.</p>' +
+    '<p><b>Вывод:</b> найдя цену, обязательно проверяйте количество. ' +
+    'Правдоподобная цена сама по себе ещё не означает, что решение найдено.</p>' +
+    '</div>';
+}
+
+/* Абзац разбора про ПРОЦЕНТНУЮ форму. Соотношение цен набирается математикой
+   ($...$, KaTeX), а не обычным текстом: «Ps = (1-t)*Pd», написанное буквами,
+   у ученика читается как строка кода, а не как формула из учебника.
+
+   Живёт рядом с offQuadExplainHtml и подключается тем же проходом
+   moveExplanations (86-workspace.js): общий рассказ сцены остаётся на месте,
+   а этот абзац приписывается в конец — он про конкретную выбранную форму. */
+function pctFormExplainHtml() {
+  const pf = pctForm();
+  if (!pf || !STATE.taxActive || !STATE.taxEq) return '';
+  const isSub = (pf.type === 'subsidy');
+  const baseName = (pf.base === 'buyer') ? 'цены покупателя' : 'цены продавца';
+  const mirror = (pf.base === 'buyer')
+    ? 'Это зеркало акциза: та же база, обратный знак.'
+    : 'Это зеркало НДС: та же база, обратный знак.';
+  return '<div class="sb-note">' +
+    '<p><b>' + pf.label + ': ставка это доля, а не сумма.</b> ' +
+    (isSub ? 'Субсидия' : 'Налог') + ' берётся долей $\\tau$ от ' + baseName +
+    ', поэтому предложение не сдвигается, а <b>поворачивается</b>: ' +
+    '$S_{после}(Q) = ' + pf.curveTex + '$. ' +
+    'Цены связаны так: $' + pf.priceTex + '$, а ' + (isSub ? 'расход бюджета' : 'сбор') +
+    ' равен $' + pf.moneyTex + '$.</p>' +
+    (isSub ? '<p>' + mirror + '</p>' : '') +
+    '<p><b>Чем это отличается от потоварной формы?</b> У потоварной клин между ценами ' +
+    'постоянен и равен ставке в рублях. У процентной он растёт вместе с ценой, поэтому ' +
+    'при больших $Q$ разрыв между $S$ и $S_{после}$ шире, чем при малых.</p>' +
+    '</div>';
+}
+
 // Текст с белой обводкой (halo) — чтобы подписи равновесия читались над сеткой.
 // Подпись держится внутри холста: поля стали узкими (Фаза 1), и длинная строка
 // вроде «P*=50» у оси Y иначе обрезалась бы левым краем. Не влезла слева —
@@ -938,8 +1162,13 @@ function updateEqSectionTitle() {
    Числа берутся из того же расчёта, по которому рисуется график
    (STATE.pc / STATE.taxEq / STATE.qt), — никакой параллельной математики. */
 function interventionKeyValues() {
-  const was = 'Равновесие без вмешательства: $Q^* = ' + fmt(STATE.eq.Q)
-            + '$, $P^* = ' + fmt(STATE.eq.P) + '$.';
+  /* Строка «было» существует только тогда, когда было. Без исходного
+     равновесия она пустая, а объяснение «рынок появился из-за вмешательства»
+     печатает вызывающий блок. */
+  const was = STATE.eq
+    ? ('Равновесие без вмешательства: $Q^* = ' + fmt(STATE.eq.Q)
+       + '$, $P^* = ' + fmt(STATE.eq.P) + '$.')
+    : '';
 
   // (1) Потолок и пол цены. Связывают — равновесия нет, есть Qd, Qs и разрыв.
   if (STATE.pcActive && STATE.pc) {
@@ -979,6 +1208,19 @@ function interventionKeyValues() {
 }
 
 // Табло слева: показываем Q* и P* (или подсказку / «не найдено»).
+/* Сколько раз кривые пересекаются в области модели.
+   В сцене сложения ответ дорогой (кусочная запись через Math.js) и при этом
+   от кадра не зависит — держим его в кэше рядом с остальной аналитикой.
+   В обычных сценах кривые прямые, и считать заново нечего. */
+function countCrossings(D, S) {
+  const span = eqSearchSpan(D, S);
+  const key = sumSceneOn() ? (STATE._sumSig + '|' + span) : null;
+  if (key && key === STATE._sumCrossKey) return STATE._sumCrossVal;
+  const n = crossingCount(q => evalCurve(D, q) - evalCurve(S, q), 0, span);
+  if (key) { STATE._sumCrossKey = key; STATE._sumCrossVal = n; }
+  return n;
+}
+
 function updateInfoPanel() {
   updateEqSectionTitle();
   const box = document.getElementById('info-eq');
@@ -996,9 +1238,31 @@ function updateInfoPanel() {
        «Излишки» («появятся после нахождения равновесия») и «Вмешательство»
        («двигайте ползунок»). Два последних теперь молчат — говорит один, и
        он называет не только факт, но и что сделать (канон 2.3). */
+    /* ⚠️ СОВЕТ «ОТОДВИНЬТЕ ГРАНИЦЫ ПЛОСКОСТИ» УБРАН — ОН БОЛЬШЕ НЕ ПРАВДА.
+       Он был верен ровно потому, что равновесие искалось до края видимого
+       окна: отодвинул границы — нашлось. Ровно эту зависимость и убрала
+       фаза 1, теперь область поиска у модели своя, и двигать окно бесполезно.
+       Оставить совет значило бы посылать человека делать то, что не работает. */
+    const off = STATE.offEq
+      ? ' Кривые всё-таки пересекаются, но за пределами первой четверти — ' +
+        'разбор этой точки в «Объяснении модели».'
+      : '';
+    /* ⚠️ ВМЕШАТЕЛЬСТВО МОЖЕТ РЫНОК СОЗДАТЬ, И ТОГДА «РАВНОВЕСИЯ НЕТ» — ВРАНЬЁ.
+       Замер 25.08: D = 100 − P, S = 0,5·p − 200, потоварная субсидия 450 даёт
+       настоящую торговлю Q = 50 по цене покупателя 50, а табло печатало
+       «Кривые не пересекаются в первой четверти, поэтому равновесия нет».
+       Числа с вмешательством считаются по НОВОМУ равновесию и от исходного не
+       зависят, поэтому показываем их — и отдельной строкой объясняем, что до
+       вмешательства рынка тут не было. */
+    const made = interventionKeyValues();
+    if (made) {
+      box.innerHTML = made +
+        '<div class="hint">Без вмешательства кривые в первой четверти не пересекаются: рынка ' +
+        'не было вовсе, и он появился ровно из-за вмешательства.' + off + '</div>';
+      return;
+    }
     box.innerHTML = '<div class="warn">Кривые не пересекаются в первой четверти, ' +
-      'поэтому равновесия нет. Измените формулу спроса или предложения ' +
-      'либо отодвиньте границы плоскости.</div>';
+      'поэтому равновесия нет. Измените формулу спроса или предложения.' + off + '</div>';
     return;
   }
   /* ⚠️ ТАБЛО ПОКАЗЫВАЕТ ТО, ЧТО НА РЫНКЕ НА САМОМ ДЕЛЕ (приёмка владельца 24.08).
@@ -1025,7 +1289,13 @@ function updateInfoPanel() {
   /* Б31. Кривые могут пересечься не один раз, и тогда равновесие не одно.
      Молчать об этом нельзя: все дальнейшие числа считаются вокруг ОДНОГО
      из них, и человек вправе знать, вокруг какого. */
-  const n = crossingCount(q => evalCurve(STATE.D, q) - evalCurve(STATE.S, q), 0, CONFIG.Qmax);
+  /* ⚠️ СКОЛЬКО РАЗ КРИВЫЕ ПЕРЕСЕКАЮТСЯ — ТОЖЕ СВОЙСТВО МОДЕЛИ, А НЕ КАДРА.
+     Здесь стоял `CONFIG.Qmax`, и подсказка «равновесий несколько» появлялась
+     и исчезала от колеса мыши: отдалились — второе пересечение вошло в кадр,
+     приблизились — пропало. Считаем по той же области, по которой ищем само
+     равновесие. Заодно это снимает восемьсот вычислений кусочной записи с
+     каждого кадра панорамирования. */
+  const n = countCrossings(STATE.D, STATE.S);
   if (n > 1) html += `<div class="hint">Кривые пересекаются ${n} раза, то есть равновесий несколько. ` +
     `Взято ближайшее к началу координат: ${'$Q^* = ' + fmt(STATE.eq.Q) + '$'}. Излишки и потери посчитаны вокруг него.</div>`;
   box.innerHTML = html;
@@ -1087,6 +1357,26 @@ function sumChokePrice(c) {
    ту кусочную запись, которую движок и поле уже умеют (Фаза 3).
 
    Возвращает строку Math.js или null, если хоть одна группа не прямая. */
+/* ⚠️ ВЕРХНЯЯ ГРАНИЦА ЗАПИСИ — СВОЙСТВО ГРУПП, А НЕ КАДРА.
+
+   Здесь стоял `CONFIG.Pmax`, то есть верх ВИДИМОГО окна. Из-за этого границы
+   участков в «Объяснении модели» ехали вместе с масштабом: один и тот же
+   набор групп давал «Q <= 180» на стартовом окне и «Q <= 300» после
+   отдаления — три разные записи одной и той же кривой. А поскольку по этой
+   записи кривая и считается (одно значение — один источник), вместе с ней
+   ехала и вся арифметика излишков.
+
+   Берём самую высокую запретительную цену групп с двойным запасом: выше неё
+   торгует всё тот же набор групп, участок там один и тянется сколь угодно
+   далеко, поэтому конкретное значение верха на числа уже не влияет — важно
+   лишь, чтобы оно было ОДНО И ТО ЖЕ при любом масштабе. Сотня — пол для
+   вырожденного случая, когда все запретительные цены нулевые. */
+function sumPriceTop(ls) {
+  let top = 0;
+  ls.forEach(l => { if (isFinite(l.b) && l.b > top) top = l.b; });
+  return Math.max(100, top * 2);
+}
+
 function sumLinearRecord(groups) {
   if (!groups.length) return null;
   const ls = [];
@@ -1095,9 +1385,10 @@ function sumLinearRecord(groups) {
     if (!l || !isFinite(l.a) || !isFinite(l.b) || l.a === 0) return null;
     ls.push(l);
   }
-  const Pmax = CONFIG.Pmax;
+  const Pmax = sumPriceTop(ls);
   const round = (v) => Math.round(v * 1e9) / 1e9;
-  // Границы участков по цене: края окна плюс все запретительные цены внутри него.
+  // Границы участков по цене: концы собственного диапазона модели плюс все
+  // запретительные цены внутри него.
   const marks = [0, Pmax];
   ls.forEach(l => { if (l.b > 0 && l.b < Pmax) marks.push(l.b); });
   const ps = Array.from(new Set(marks.map(round))).sort((a, b) => a - b);
@@ -1119,6 +1410,35 @@ function sumLinearRecord(groups) {
   }
   if (!segs.length) return null;
   segs.sort((x, y) => x.lo - y.lo);
+
+  /* ⚠️ ЗАПИСЬ ОБЯЗАНА БЫТЬ СПЛОШНОЙ ОТ Q = 0.
+
+   Запись начиналась там, где первая группа выходит на рынок. У предложения
+   Q − 100 это Q = 100: сама группа при нулевой цене уже готова отдать сто
+   штук, но участка «от нуля до ста» в записи не было вовсе, и на нём функция
+   давала NaN. Дальше этот NaN уходил в интеграл излишка продавца — и вместо
+   числа на табло стояло «PS = NaN», а рядом краснело предупреждение о
+   расхождении.
+
+   Считаем количество при НУЛЕВОЙ цене: если оно положительно, значит на
+   отрезке от нуля до него товар предлагают уже даром, и обратная функция там
+   равна нулю (цена не бывает отрицательной — решение «правило первой
+   четверти»). Этот кусок и дописываем в начало. */
+  let qAtZero = 0;
+  ls.forEach(l => { const q = -l.b / l.a; if (q > 0) qAtZero += q; });
+  qAtZero = round(qAtZero);
+  /* ⚠️ ЭТОТ КУСОК — ЕДИНСТВЕННОЕ МЕСТО, ГДЕ РЫНКА НЕТ, А ЗАПИСЬ ЕСТЬ.
+     Мы дописали его сами, чтобы функция не давала NaN, — значит мы же и
+     обязаны сказать об этом отрисовке. Отсюда ghostTo: до этого количества
+     кривая рисуется пунктиром (решение владельца 25.08). Угадывать «здесь
+     цена ноль» по готовой записи нельзя: у предложения P = Q цена тоже ноль,
+     но ровно в одной точке, и рынок там существует. */
+  let ghostTo = 0;
+  if (qAtZero > 1e-9 && Math.abs(segs[0].lo - qAtZero) < 1e-6) {
+    segs.unshift({ lo: 0, hi: qAtZero, A: 0, C: 0, body: '0' });
+    ghostTo = qAtZero;
+  }
+
   // Точки излома по количеству — границы участков, кроме самого начала.
   const breaks = segs.map(x => x.lo).filter(x => x > 1e-9);
   /* Собираем цепочку условий тем же способом, что и конструктор кусочной:
@@ -1129,11 +1449,11 @@ function sumLinearRecord(groups) {
     const s = segs[i];
     const last = (i === segs.length - 1);
     const cond = '(Q >= ' + s.lo + ' and Q ' + (last ? '<= ' : '< ') + s.hi + ')';
-    const body = sumSegExpr(s.A, s.C);
+    const body = (s.body != null) ? s.body : sumSegExpr(s.A, s.C);
     if (out === null) { out = cond + ' ? ' + body + ' : NaN'; continue; }
     out = cond + ' ? ' + body + ' : (' + out + ')';
   }
-  return { expr: out, breaks: breaks };
+  return { expr: out, breaks: breaks, ghostTo: ghostTo };
 }
 
 /* ⚠️ ИНТЕГРАЛ ПОД ЛОМАНОЙ СЧИТАЕТСЯ ПО УЧАСТКАМ, А НЕ ОДНОЙ СЕТКОЙ.
@@ -1155,6 +1475,22 @@ function integrateBroken(f, a, b, breaks) {
 
 // Точки излома кривой, если она их знает (суммарная — знает). Иначе пусто.
 function curveBreaks(c) { return (c && c.sumBreaks) ? c.sumBreaks : []; }
+
+/* ⚠️ ОБРЕЗКА НУЛЁМ САМА СОЗДАЁТ ИЗЛОМ, И ИНТЕГРАТОР ОБЯЗАН О НЁМ ЗНАТЬ.
+
+   quadPrice читает отрицательную цену как ноль, поэтому у предложения Q − 100
+   при Q = 100 появляется угол: слева площадь считается от нуля, справа — от
+   прямой. Метод трапеций точен на прямой только тогда, когда излом попал в
+   УЗЕЛ сетки. Замер 24.08: излишек первой группы выходил 2 687,9981 вместо
+   2 688 — шаг 124/1000 = 0,124, узла ровно в сотне нет. Две тысячных это не
+   округление, а промах метода, и сторож сходимости с допуском 1e-6 ловит его
+   сразу. Добавляем ноль кривой к её собственным изломам. */
+function quadBreaks(c, hi) {
+  const out = curveBreaks(c).slice();
+  const zero = curveZeroQ(c, Math.max(hi, 1));
+  if (zero > 1e-9 && zero < hi - 1e-9) out.push(zero);
+  return out;
+}
 
 /* ⚠️ УЧАСТОК СУММАРНОЙ КРИВОЙ ПИШЕТСЯ ДРОБЬЮ, ЕСЛИ НАКЛОН НЕ ДЕЛИТСЯ НАЦЕЛО.
    Суммарное количество на участке линейно по цене: Q = A·P + C. Обратно
@@ -1184,7 +1520,11 @@ function sumSegExpr(A, C) {
    Идём по ценам, при каждой складываем количества торгующих групп и получаем
    ломаную в осях (Q, P); значение между узлами берём линейно. */
 function sumPolyline(groups) {
-  const Pmax = CONFIG.Pmax, N = 400;
+  // Верх диапазона — как и у аналитической записи, свойство групп, а не кадра
+  // (см. sumPriceTop): иначе ломаная перестраивалась бы при каждом зуме.
+  let top = 0;
+  groups.forEach(c => { const p = sumChokePrice(c); if (isFinite(p) && p > top) top = p; });
+  const Pmax = Math.max(100, top * 2), N = 400;
   const prices = [];
   for (let i = 0; i <= N; i++) prices.push(Pmax * i / N);
   groups.forEach(c => { const p = sumChokePrice(c); if (p > 0 && p < Pmax) prices.push(p); });
@@ -1196,6 +1536,13 @@ function sumPolyline(groups) {
     if (n) pts.push([q, P]);
   });
   pts.sort((a, b) => a[0] - b[0]);
+  /* Та же дырка у нуля, что и в аналитической записи: при нулевой цене товар
+     уже предлагают, и слева от этого количества ломаной не было вовсе.
+     Дотягиваем её до Q = 0 по нулевой цене. */
+  if (pts.length && pts[0][0] > 1e-9 && Math.abs(pts[0][1]) < 1e-9) {
+    pts._ghostTo = pts[0][0];   // докуда рынка нет — см. sumLinearRecord
+    pts.unshift([0, 0]);
+  }
   return pts;
 }
 
@@ -1205,6 +1552,7 @@ function sumRebuildSide(side) {
   if (!cur) return;
   const groups = sumGroupsOf(side);
   cur.linear = null; cur.compiled = null; cur.fn = null; cur.sumBreaks = [];
+  cur.sumGhostTo = 0;
   if (!groups.length) { cur.expr = ''; cur.sumNumeric = false; return; }
   const rec = sumLinearRecord(groups);
   if (rec) {
@@ -1214,15 +1562,22 @@ function sumRebuildSide(side) {
     const { compiled } = compileFormula(rec.expr);
     cur.expr = rec.expr; cur.compiled = compiled; cur.sumNumeric = false;
     cur.sumBreaks = rec.breaks;
+    cur.sumGhostTo = rec.ghostTo || 0;
   } else {
     const pts = sumPolyline(groups);
+    /* Ломаная затыкает ту же дырку у нуля (см. sumPolyline), и помечать её
+       надо тем же признаком: иначе у нелинейных групп пунктира не было бы. */
+    cur.sumGhostTo = (pts._ghostTo || 0);
     cur.expr = 'сумма посчитана по точкам';
     cur.fn = (q) => interpY(pts, q);
     cur.sumNumeric = true;
     // Излом суммарной кривой — там, где очередная группа входит в торговлю.
+    let chokeTop = 0;
+    groups.forEach(c => { const p = sumChokePrice(c); if (isFinite(p) && p > chokeTop) chokeTop = p; });
+    const pTop = Math.max(100, chokeTop * 2);   // тот же собственный диапазон, что у ломаной
     cur.sumBreaks = groups.map(c => {
       const p = sumChokePrice(c);
-      if (!isFinite(p) || p <= 0 || p >= CONFIG.Pmax) return null;
+      if (!isFinite(p) || p <= 0 || p >= pTop) return null;
       let q = 0;
       groups.forEach(g => { q += sumGroupQty(g, p); });
       return q > 1e-9 ? q : null;
@@ -1230,11 +1585,46 @@ function sumRebuildSide(side) {
   }
 }
 
-// Пересчёт обеих сумм. Зовётся из recompute — то есть на каждой перерисовке.
+/* Подпись входа пересборки: всё, от чего запись суммарных кривых зависит, и
+   больше ничего. Формулы групп, сколько их, и значения ползунков-параметров
+   (буква в формуле группы меняет её наклон, а значит и сумму). */
+function sumSignature() {
+  const parts = [];
+  ['D', 'S'].forEach(side => {
+    const g = sumGroupsOf(side);
+    parts.push(side + ':' + g.length + ':' + g.map(c => String(c.expr || '')).join('~'));
+  });
+  parts.push(paramSignature(Object.keys(STATE.params || {}).sort()));
+  return parts.join('|');
+}
+
+/* Пересчёт обеих сумм. Зовётся из recompute — то есть на каждой перерисовке.
+
+   ⚠️ ПЕРЕСОБИРАЕМ ТОЛЬКО КОГДА ЕСТЬ ЧТО ПЕРЕСОБИРАТЬ.
+
+   Панорама зовёт redrawAll на каждый кадр мыши, оттуда recompute, оттуда
+   сюда — и sumRebuildSide заново собирал строку записи и заново компилировал
+   её через Math.js, дважды на кадр. Кэшировать это раньше было нельзя честно:
+   запись зависела от CONFIG.Pmax, то есть от границ кадра, и после панорамы
+   действительно менялась. Теперь запись — свойство групп (см. sumPriceTop),
+   и от движения окна не зависит вовсе, поэтому подписи достаточно. */
 function sumRebuild() {
-  if (!sumSceneOn()) return;
+  if (!sumSceneOn()) { STATE._sumSig = null; return; }
+  const sig = sumSignature();
+  if (sig === STATE._sumSig) return;
+  STATE._sumSig = sig;
   sumRebuildSide('D');
   sumRebuildSide('S');
+}
+
+/* Ключ кэша аналитики: подпись формул плюс отрезок поиска равновесия.
+   Отрезок входит в ключ, потому что от него зависит ответ: сузили область —
+   могло пропасть дальнее пересечение. При панорамировании он постоянен
+   (см. eqSearchSpan), поэтому кэш там и живёт. */
+function sumAnalyticsKey() {
+  const D = curveByRole('demand'), S = curveByRole('supply');
+  if (!D || !S || !STATE._sumSig) return null;
+  return STATE._sumSig + '|' + eqSearchSpan(D, S);
 }
 
 
@@ -1252,6 +1642,66 @@ const SUM_MAX_GROUPS = 8;
 function sumGroupName(side, i) {
   const ord = SUM_ORDINAL[i] || ((i + 1) + '-й');
   return (side === 'D' ? 'спрос ' : 'предложение ') + ord + ' группы';
+}
+
+/* ── ОБОЗНАЧЕНИЕ КРИВОЙ НА ХОЛСТЕ (Фаза 3) ────────────────────────────
+   На холсте у кривой стоит ОБОЗНАЧЕНИЕ, а полное имя живёт в левой панели.
+   Это то же правило, что уже записано для точек: холст и так самый плотный
+   объект на экране.
+
+   Замер 25.08: «спрос первой группы» занимает 137 px, «предложение второй
+   группы» — 181 px. Три такие подписи выстраивались вдоль нижнего края с
+   зазором 7,5 и 9,8 px при внутреннем пробеле шрифта 7,22 — то есть читались
+   одной строкой «спрос третьей группы спрос второй группы спрос первой
+   группы». На 380 px все шесть вылезали за холст.
+
+   Связь с левой панелью держится тем, что ТО ЖЕ обозначение стоит в строке
+   списка перед именем и в подписи ползунка справа. Полное имя никуда не
+   девается: оно в панели, в подсказке и в табло по группам.
+
+   Своё имя человека сильнее: переименовал кривую — на холсте его имя, а не
+   наше обозначение. Отличаем по совпадению с именем по умолчанию — отдельного
+   признака «переименовано» для этого заводить не надо. */
+function sumTagOf(c) {
+  if (!c || !c.sumGroup) return null;
+  if (c.kind === 'sum') return (c.sumGroup === 'D') ? 'D' : 'S';
+  const i = c.sumIdx || 0;
+  return (c.sumGroup === 'D' ? 'D_' : 'S_') + (i + 1);
+}
+/* Имя кривой сложения на холсте и в узких местах панелей. */
+function sumShortTag(c) {
+  if (!sumSceneOn() || !c || !c.sumGroup) return null;
+  const def = (c.kind === 'sum')
+    ? ((c.sumGroup === 'D') ? 'рыночный спрос' : 'рыночное предложение')
+    : sumGroupName(c.sumGroup, c.sumIdx || 0);
+  // Человек дал своё имя — оно и идёт, обозначение не спорит с ним.
+  if (c.label && c.label !== def) return null;
+  return sumTagOf(c);
+}
+
+/* ── ЦВЕТ ГРУППЫ (решение владельца 25.08: «свой цвет, но тише») ───────
+   Группа берёт цвет из СВОЕЙ палитры, а не из общей палитры выбора.
+   Общая начинается с канонических D и S, поэтому «спрос первой группы»
+   выходил того же цвета, что «рыночный спрос», а «спрос второй группы» —
+   того же, что «рыночное предложение» (замер 25.08: 2 совпадения в наборе
+   А, 3 в наборе Б, а при трёх группах ещё и две группы делили один цвет).
+
+   ⚠️ ОБЩУЮ ПАЛИТРУ ВЫБОРА НЕ ТРОГАЕМ. Кривые, которые человек добавляет
+   кнопкой, по-прежнему получают цвета из nextColor(): та палитра живёт во
+   всех сорока одной сцене, и разделить их — как раз и значит починить
+   сложение, ничего больше не сломав.
+
+   Слоты чередуются между семьями: спрос берёт чётные (1, 3, 5, 7),
+   предложение — нечётные (2, 4, 6, 8). Так число групп одной стороны можно
+   менять, не перекрашивая другую, и при четырёх группах в каждом семействе
+   все восемь цветов различны. С пятой группы в семье палитра идёт по
+   второму кругу — владелец это принял: «если при пяти-шести станет тесно,
+   вернуться к «Сумме против фона». */
+const SUM_PALETTE_KEYS = ['sumG1', 'sumG2', 'sumG3', 'sumG4', 'sumG5', 'sumG6', 'sumG7', 'sumG8'];
+function sumGroupColor(side, i) {
+  const slot = ((side === 'D' ? 2 * i : 2 * i + 1) % SUM_PALETTE_KEYS.length + SUM_PALETTE_KEYS.length)
+    % SUM_PALETTE_KEYS.length;
+  return COL[SUM_PALETTE_KEYS[slot]] || COL.MR;
 }
 function sumStartExpr(side, i) {
   if (side === 'D') return fmtLinear(-1, SUM_START_D[i] === undefined ? 20 : SUM_START_D[i], 'Q', 3);
@@ -1271,6 +1721,10 @@ function sumAddGroup(side, i) {
   const c = STATE.curves[STATE.curves.length - 1];
   c.sumGroup = side; c.sumIdx = i;
   c.label = sumGroupName(side, i);
+  /* Цвет ставим ПОСЛЕ addCurve: та выдала цвет из общей палитры выбора, и
+     именно он и был причиной каши. Свой цвет человека (пикер ставит
+     colorCustom) здесь ещё неоткуда взяться — кривая только что заведена. */
+  c.color = sumGroupColor(side, i);
   return c;
 }
 
@@ -1294,6 +1748,10 @@ function sumBuildScene() {
     setRole(sum, (side === 'D') ? 'demand' : 'supply');
   });
   sumReorder();
+  /* Сцену собрали заново — суммарные кривые сейчас ПУСТЫЕ, и подпись от
+     прошлой сборки совпала бы с новой (набор групп по умолчанию тот же).
+     Сбрасываем её явно, иначе кэш вернул бы «пересобирать нечего». */
+  STATE._sumSig = null;
   sumRebuild();
   renderCurveList();
 }
@@ -1334,13 +1792,19 @@ function syncSumUi() {
    это и есть проверка того, что сложение сделано верно, а не «примерно». */
 function sumGroupStats() {
   if (!sumSceneOn() || !STATE.eq) return null;
+  /* Табло по группам — та же арифметика по тем же формулам при той же
+     равновесной цене, и от кадра оно не зависит. Раз в кадр это пять
+     интегралов по тысяче узлов плюс две сверки по кусочной записи (замер
+     24.08: 8,6 мс). Считаем на смену формул и цены, а не на движение мыши. */
+  const key = STATE._sumSig + '|' + STATE.eq.Q + '|' + STATE.eq.P;
+  if (key === STATE._sumStatsKey) return STATE._sumStatsVal;
   const P = STATE.eq.P;
   const side = (which) => sumGroupsOf(which).map(c => {
     const q = sumGroupQty(c, P);
     // Излишек группы — площадь между её кривой и равновесной ценой до q.
     const surplus = (q > 0)
-      ? (which === 'D' ? integrate(t => evalCurve(c, t) - P, 0, q)
-                       : integrate(t => P - evalCurve(c, t), 0, q))
+      ? (which === 'D' ? integrateBroken(t => quadPrice(c, t) - P, 0, q, quadBreaks(c, q))
+                       : integrateBroken(t => P - quadPrice(c, t), 0, q, quadBreaks(c, q)))
       : 0;
     return { name: curveShortName(c), color: c.color, expr: c.expr, q, surplus };
   });
@@ -1349,10 +1813,10 @@ function sumGroupStats() {
   /* Второй путь к тому же числу: интеграл под СУММАРНОЙ кривой. Расхождение
      означает ошибку в сложении, а не в округлении, поэтому оно и печатается. */
   const csWhole = (STATE.D && STATE.eq.Q > 0)
-    ? integrateBroken(q => evalCurve(STATE.D, q) - P, 0, STATE.eq.Q, curveBreaks(STATE.D)) : NaN;
+    ? integrateBroken(q => quadPrice(STATE.D, q) - P, 0, STATE.eq.Q, quadBreaks(STATE.D, STATE.eq.Q)) : NaN;
   const psWhole = (STATE.S && STATE.eq.Q > 0)
-    ? integrateBroken(q => P - evalCurve(STATE.S, q), 0, STATE.eq.Q, curveBreaks(STATE.S)) : NaN;
-  return {
+    ? integrateBroken(q => P - quadPrice(STATE.S, q), 0, STATE.eq.Q, quadBreaks(STATE.S, STATE.eq.Q)) : NaN;
+  const out = {
     P, Q: STATE.eq.Q, D, S,
     qD: sum(D, 'q'), qS: sum(S, 'q'),
     csGroups: sum(D, 'surplus'), psGroups: sum(S, 'surplus'),
@@ -1360,6 +1824,8 @@ function sumGroupStats() {
     csGap: Math.abs(sum(D, 'surplus') - csWhole),
     psGap: Math.abs(sum(S, 'surplus') - psWhole),
   };
+  STATE._sumStatsKey = key; STATE._sumStatsVal = out;
+  return out;
 }
 
 
@@ -1433,12 +1899,12 @@ function drawAreas() {
 
   // CS — между ценой P* (низ) и кривой спроса (верх).
   if (STATE.showCS && STATE.D) {
-    const csArea = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(STATE.D, d)));
+    const csArea = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(quadPrice(STATE.D, d)));
     g.append('path').datum(samples).attr('d', csArea).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
   }
   // PS — между кривой предложения (низ) и ценой P* (верх).
   if (STATE.showPS && STATE.S) {
-    const psArea = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(P));
+    const psArea = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(P));
     g.append('path').datum(samples).attr('d', psArea).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
   }
 }
@@ -1482,7 +1948,10 @@ function updateAreasPanel() {
 // спрос вниз (D − t): эффективный спрос. Итоговые числа в обоих случаях идентичны —
 // меняется только то, какую кривую рисуем; считаем в recompute одинаково.
 function drawShiftedSupply() {
-  if (!STATE.taxActive) return;
+  /* По признаку «кривая после вмешательства построена», а не «числа сошлись».
+     Прежде здесь стоял STATE.taxActive, и на рынке без равновесия кривая не
+     рисовалась вовсе — хотя сдвиг и поворот равновесия не спрашивают. */
+  if (!STATE.taxCurveOn) return;
   const buyerTax = (STATE.intervType === 'tax' && STATE.taxSide === 'buyer');
   const base = buyerTax ? STATE.D : STATE.S;              // чью кривую рисуем сдвинутой
   // Берём ГОТОВУЮ функцию «после вмешательства» из recompute — она уже знает,
@@ -1502,28 +1971,125 @@ function drawShiftedSupply() {
     .attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line), after);
   // Ярлык сдвинутой кривой. Ищем видимый якорь (Фаза 3): при адвалорной ставке
   // кривая круто уходит вверх и на фиксированной точке ярлык раньше пропадал.
-  const adv = (STATE.taxKind === 'advalorem');
+  const pf = pctForm();
   const isSub = (STATE.intervType === 'subsidy');
-  const nm = buyerTax ? (adv ? 'D/(1+τ)' : 'D − t')
-                      : (adv ? (isSub ? 'S/(1+τ)' : 'S·(1+τ)') : (isSub ? 'S − s' : 'S + t'));
+  // Имя сдвинутой кривой берём из той же строки таблицы, что и её множитель:
+  // иначе на графике оказалась бы подпись от другой формы.
+  const nm = buyerTax ? (pf ? pf.curveD : 'D − t')
+                      : (pf ? pf.curve : (isSub ? 'S − s' : 'S + t'));
   labelCurve(g, q => evalCurve(after, q), nm, base.color, { from: 0.82 });
+}
+
+/* ⚠️ ЦЕНТР ПОВОРОТА ПРИ ПРОЦЕНТНОМ ВМЕШАТЕЛЬСТВЕ (рис. 81 учебника Бахарева).
+
+   S_после = factor·S, поэтому обе кривые обращаются в ноль ровно при одном и
+   том же Q: там, где ноль исходное предложение. Эта общая точка на оси Q и
+   есть центр, вокруг которого поворот происходит, и она объясняет, ПОЧЕМУ
+   поворот именно такой, а не какой-нибудь другой.
+
+   ⚠️ ПРОДОЛЖЕНИЕ РИСУЕТСЯ НЕ ВСЕГДА. Если центр лежит ВНУТРИ первой четверти
+   (S пересекает ось Q при Q ≥ 0, как у S = Q или S = Q − 100), показывать
+   нечего: обе кривые и так приходят в эту точку на глазах. Продолжение имеет
+   смысл только когда центр ушёл влево за ось цен.
+
+   ⚠️ ГАЛОЧКА «ТОЛЬКО ПЕРВАЯ ЧЕТВЕРТЬ» ЗДЕСЬ НИ ПРИ ЧЁМ — ровно как у
+   продолжения предельной кривой (30-curves.js). Рисуем всегда; при включённой
+   галочке прямоугольный clip-path режет холст по оси цен, и продолжение просто
+   не попадает на экран. Условие «рисовать только при снятой галочке» дало бы то
+   же самое на экране, но добавило бы вторую точку правды. */
+function taxPivotQ() {
+  const S = STATE.S;
+  if (!S || (typeof isVertical === 'function' && isVertical(S))) return null;
+  // Прямая: перехват считается формулой, без всякой сетки.
+  const l = S.linear;
+  if (l && isFinite(l.a) && isFinite(l.b) && Math.abs(l.a) > 1e-12) {
+    const z = -l.b / l.a;
+    return isFinite(z) ? z : null;
+  }
+  // Кривая: ищем смену знака слева от нуля и уточняем половинным делением.
+  const span = Math.max(CONFIG.Qmax, 1) * 4;
+  const N = 400;
+  let prev = evalCurve(S, -span), best = null;
+  for (let i = 1; i <= N; i++) {
+    const q = -span + span * i / N;
+    const cur = evalCurve(S, q);
+    if (!isNaN(prev) && !isNaN(cur) && prev * cur <= 0 && prev !== cur) {
+      let a = -span + span * (i - 1) / N, b = q;
+      for (let k = 0; k < 50; k++) {
+        const m = (a + b) / 2, v = evalCurve(S, m);
+        if (isNaN(v)) break;
+        if (evalCurve(S, a) * v <= 0) b = m; else a = m;
+      }
+      best = (a + b) / 2;
+    }
+    prev = cur;
+  }
+  return best;
+}
+
+// Центр поворота, если его есть смысл показывать; иначе null.
+function taxPivotPoint() {
+  // Центр поворота — свойство пары кривых, а не найденного равновесия.
+  if (!STATE.taxCurveOn || !pctForm() || !STATE.S || !STATE.taxAfterS) return null;
+  const q = taxPivotQ();
+  if (q == null || !(q < -1e-9)) return null;   // ноль или правее — показывать нечего
+  return { Q: q, P: 0 };
+}
+
+// Пунктирные продолжения обеих кривых предложения вниз-влево к центру поворота.
+function drawTaxPivot() {
+  const p = taxPivotPoint();
+  if (!p) return;
+  const g = svg.append('g').attr('class', 'pivot').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  const color = (STATE.S && STATE.S.color) || COL.S;
+  const N = 160;
+  [STATE.S, STATE.taxAfterS].forEach((c, idx) => {
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const q = p.Q + (0 - p.Q) * i / N;
+      const v = evalCurve(c, q);
+      pts.push(isFinite(v) ? [q, v] : null);
+    }
+    /* Продолжение отличается от самой кривой толщиной и прозрачностью, а не
+       штрихом: S_после и так уже пунктирная, и одним штрихом их не развести —
+       тот же урок, что у продолжения предельной кривой. */
+    g.append('path').datum(pts)
+      .attr('fill', 'none').attr('stroke', color)
+      .attr('stroke-width', 1.1).attr('stroke-dasharray', '5 4').attr('opacity', 0.5)
+      .attr('data-pivot', String(idx + 1))
+      .attr('d', line);
+  });
+  // Сама точка центра — маленький кружок, без имени и без чисел у осей: это
+  // построение, а не значение модели.
+  const [qa, qb] = sx.domain(), [pa, pb] = sy.domain();
+  if (p.Q >= qa && p.Q <= qb && p.P >= pa && p.P <= pb) {
+    const [px, py] = toPx(p.Q, p.P);
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 3.2)
+      .attr('fill', 'none').attr('stroke', color).attr('stroke-width', 1.4)
+      .attr('opacity', 0.75).attr('data-pivot', 'dot');
+  }
 }
 
 // Заливки сценария вмешательства: CS, PS, деньги бюджета (прямоугольник), DWL (потери).
 function drawTaxAreas() {
   if (!STATE.taxActive) return;
   const { Q, Pb, Ps } = STATE.taxEq;
-  const Q0 = STATE.eq.Q;
+  /* Исходного равновесия может не быть вовсе (без вмешательства кривые
+     пересекаются вне первой четверти). Тогда заливки излишков и денег
+     бюджета рисуются как обычно — они считаются по НОВОМУ равновесию, — а
+     области потерь нет: у неё второго края нет. */
+  const Q0 = STATE.eq ? STATE.eq.Q : null;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
   const s1 = samp(0, Q);
 
   if (STATE.showCS) {   // CS: между ценой покупателя Pb и спросом
-    const a = d3.area().x(d => sx(d)).y0(sy(Pb)).y1(d => sy(evalCurve(STATE.D, d)));
+    const a = d3.area().x(d => sx(d)).y0(sy(Pb)).y1(d => sy(quadPrice(STATE.D, d)));
     g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
   }
   if (STATE.showPS) {   // PS: между предложением и ценой продавца Ps
-    const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(Ps));
+    const a = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(Ps));
     g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
   }
   // Деньги бюджета (сбор налога / расход на субсидию) — прямоугольник между Pb и Ps
@@ -1533,7 +2099,7 @@ function drawTaxAreas() {
   g.append('path').datum(s1).attr('d', aTx)
     .attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.intervType === 'subsidy' ? 'Расход бюджета' : 'Сбор бюджета');
   // DWL — между D и S на интервале между старым и новым Q (налог: [Q1,Q0]; субсидия: [Q0,Q1]).
-  const lo = Math.min(Q, Q0), hi = Math.max(Q, Q0);
+  const lo = (Q0 == null) ? 0 : Math.min(Q, Q0), hi = (Q0 == null) ? 0 : Math.max(Q, Q0);
   if (hi > lo) {
     const s2 = samp(lo, hi);
     const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(d => sy(evalCurve(STATE.D, d)));
@@ -1573,9 +2139,13 @@ function drawTaxPoints() {
   // Клин налога: вертикальный отрезок между Ps и Pb.
   g.append('line').attr('x1', xQ1).attr('y1', yPs).attr('x2', xQ1).attr('y2', yPb)
     .attr('stroke', COL.ink).attr('stroke-width', 2.5).style('pointer-events', 'none');
-  const letter = (STATE.intervType === 'subsidy') ? 's=' : 't=';
+  /* Подпись клина. У процентных форм ставка — доля, и писать её без знака
+     процента нельзя: «t=50» рядом с рублёвой осью читается как 50 рублей,
+     а это не так (решение владельца «ставка только в процентах»). */
   const yMid = (yPb + yPs) / 2;
-  haloText(g, xQ1 + 16, yMid, letter + fmt(STATE.tax), 'start', 'middle');
+  const unit = rateUnit();
+  haloText(g, xQ1 + 16, yMid, rateLetter() + '=' + fmt(STATE.tax) + (unit ? ' ' + unit : ''),
+           'start', 'middle');
   // Широкая прозрачная зона захвата поверх клина — удобно хватать мышью.
   const hitRect = g.append('rect')
     .attr('x', xQ1 - 13).attr('y', Math.min(yPb, yPs))
@@ -1614,7 +2184,15 @@ function attachTaxDrag(sel) {
 // Установить ставку налога (единый путь для ползунка, числового поля и клина).
 function setTax(t) {
   const slider = document.getElementById('tax-slider');
-  const maxT = slider ? (parseFloat(slider.max) || CONFIG.Pmax) : CONFIG.Pmax;
+  /* Предел спрашиваем у МОДЕЛИ, а не у атрибута ползунка: формулу правят
+     после того, как каскад расставил границы, и атрибут остаётся от прежних
+     кривых. Ползунку и полю тут же выправляем max — иначе набранное число
+     проходит, а ручка стоит в упоре. */
+  const pf = pctForm();
+  const maxT = pf ? (parseFloat(slider && slider.max) || PCT_MAX_FREE) : unitRateMax();
+  if (!pf) ['tax-slider', 'tax-input'].forEach(id => {
+    const e = document.getElementById(id); if (e) e.max = maxT;
+  });
   t = Math.max(0, Math.min(t, maxT));
   STATE.tax = t;
   if (slider) slider.value = t;                        // ползунок (step=1, целые)
@@ -1639,13 +2217,107 @@ function setTax(t) {
    Ветка налога и ветка субсидии никогда не видны одновременно.
    --------------------------------------------------------------------- */
 
+/* ⚠️ ЧЕТЫРЕ ПРОЦЕНТНЫЕ ФОРМЫ ЖИВУТ ОДНОЙ ТАБЛИЦЕЙ, А НЕ ЧЕТЫРЬМЯ ВЕТКАМИ.
+
+   Раньше процентных форм было две (НДС и «процентная субсидия»), и обе были
+   вписаны прямо в расчёт условными выражениями. Акциз при этом проваливался
+   в потоварную ветку: замер набора Э давал у него точку (35; 85/35) вместо
+   (40; 80/40) — то есть он сдвигал кривую на 50 рублей вместо поворота.
+   Стоило добавить второй вид субсидии, и таких веток стало бы четыре, каждая
+   со своим множителем, своим пределом ставки и своей подписью.
+
+   Поэтому форма описывается ОДНОЙ строкой таблицы, а расчёт, отрисовка,
+   пределы ползунка, подсказка и разбор читают её поля. Основание — учебник
+   Бахарева, глава «Налоги и субсидии», раздел «Акцизный налог и НДС»
+   (рис. 81, 83, 84) и решение владельца «два вида процентной субсидии».
+
+     Форма                       Кривая после   Соотношение цен   Деньги    Предел
+     Акциз (от цены покупателя)  S/(1−t)        Ps = (1−t)·Pd     t·Pd·Q    t < 100 %
+     НДС (от цены продавца)      S·(1+t)        Ps = Pd/(1+t)     t·Ps·Q    без верха
+     Субсидия от цены покупателя S/(1+t)        Ps = (1+t)·Pd     t·Pd·Q    без верха
+     Субсидия от цены продавца   S·(1−t)        Ps = Pd/(1−t)     t·Ps·Q    t < 100 %
+
+   Симметрия ровная: налог поднимает кривую предложения, субсидия опускает;
+   предел «меньше ста процентов» стоит там, где иначе цена одной из сторон
+   обратилась бы в ноль (делитель 1 − t).
+
+   ⚠️ ДЕНЬГИ СЧИТАЮТСЯ ОДНОЙ ФОРМУЛОЙ НА ВСЕ ЧЕТЫРЕ: (Pd − Ps)·Q. Столбец
+   «Деньги» — не второй способ счёта, а тождество, и прибор его проверяет
+   до последнего знака. Ps всегда равно Pd/factor, поэтому
+   (Pd − Pd/factor)·Q сводится ровно к строке таблицы. Разошлись — это ошибка
+   формулы, а не округление.
+
+   Поля строки:
+     type    — при каком вмешательстве форма доступна;
+     label   — подпись кнопки каскада (уровень 2);
+     factor  — множитель кривой предложения: S_после(Q) = factor·S(Q);
+     capped  — ставка обязана быть строго меньше 100 %;
+     curve   — как назвать сдвинутую кривую на графике;
+     curveTex/priceTex/moneyTex — кривая, соотношение цен и деньги формулой
+               для «Объяснения модели» (набираются KaTeX, а не обычным текстом);
+     hint    — подсказка под ползунком ставки. */
+const PCT_FORMS = {
+  excise:    { type: 'tax',     label: 'Акциз',              base: 'buyer',
+               factor: t => 1 / (1 - t), capped: true,  curve: 'S/(1−τ)', curveD: 'D·(1−τ)',
+               curveTex: '\\dfrac{S(Q)}{1-\\tau}',
+               priceTex: 'P_s = (1-\\tau)\\cdot P_d', moneyTex: 'T = \\tau\\cdot P_d\\cdot Q',
+               hint: 'Акциз берётся долей от цены ПОКУПАТЕЛЯ: продавцу остаётся ' +
+                 'P<sub>s</sub>&nbsp;=&nbsp;(1−τ)·P<sub>b</sub>. Предложение не сдвигается, а ' +
+                 '<b>поворачивается</b>: S<sub>после</sub>(Q)&nbsp;=&nbsp;S(Q)/(1−τ). Сбор равен ' +
+                 'τ·P<sub>b</sub>·Q. Ставка строго меньше 100 %: при ста продавцу не осталось бы ничего.' },
+  vat:       { type: 'tax',     label: 'НДС',                base: 'seller',
+               factor: t => 1 + t,       capped: false, curve: 'S·(1+τ)', curveD: 'D/(1+τ)',
+               curveTex: '(1+\\tau)\\cdot S(Q)',
+               priceTex: 'P_s = \\dfrac{P_d}{1+\\tau}', moneyTex: 'T = \\tau\\cdot P_s\\cdot Q',
+               hint: 'НДС берётся долей от цены ПРОДАВЦА и начисляется сверх неё: ' +
+                 'P<sub>b</sub>&nbsp;=&nbsp;P<sub>s</sub>·(1+τ). Предложение не сдвигается, а ' +
+                 '<b>поворачивается</b>: S<sub>после</sub>(Q)&nbsp;=&nbsp;(1+τ)·S(Q). Сбор равен ' +
+                 'τ·P<sub>s</sub>·Q. Верхнего предела у ставки нет.' },
+  subbuyer:  { type: 'subsidy', label: '% от цены покупателя', base: 'buyer',
+               factor: t => 1 / (1 + t), capped: false, curve: 'S/(1+τ)', curveD: 'D·(1+τ)',
+               curveTex: '\\dfrac{S(Q)}{1+\\tau}',
+               priceTex: 'P_s = (1+\\tau)\\cdot P_d', moneyTex: 'G = \\tau\\cdot P_d\\cdot Q',
+               hint: 'Зеркало акциза: субсидия считается долей от цены ПОКУПАТЕЛЯ, продавец ' +
+                 'получает P<sub>s</sub>&nbsp;=&nbsp;(1+τ)·P<sub>b</sub>. Предложение ' +
+                 '<b>поворачивается</b> вниз: S<sub>после</sub>(Q)&nbsp;=&nbsp;S(Q)/(1+τ). Расход ' +
+                 'бюджета равен τ·P<sub>b</sub>·Q. Верхнего предела у ставки нет.' },
+  subseller: { type: 'subsidy', label: '% от цены продавца',  base: 'seller',
+               factor: t => 1 - t,       capped: true,  curve: 'S·(1−τ)', curveD: 'D/(1−τ)',
+               curveTex: '(1-\\tau)\\cdot S(Q)',
+               priceTex: 'P_s = \\dfrac{P_d}{1-\\tau}', moneyTex: 'G = \\tau\\cdot P_s\\cdot Q',
+               hint: 'Зеркало НДС: субсидия считается долей от цены ПРОДАВЦА, покупатель платит ' +
+                 'P<sub>b</sub>&nbsp;=&nbsp;P<sub>s</sub>·(1−τ). Предложение <b>поворачивается</b> ' +
+                 'вниз: S<sub>после</sub>(Q)&nbsp;=&nbsp;(1−τ)·S(Q). Расход бюджета равен ' +
+                 'τ·P<sub>s</sub>·Q. Ставка строго меньше 100 %: при ста покупатель платил бы ноль.' },
+};
+
+/* Верхняя граница процентной ставки у форм с делителем (1 − τ). Строго меньше
+   ста: ровно при ста цена одной из сторон обращается в ноль, а кривая после
+   вмешательства — в вертикаль. Число целое, чтобы ползунок с шагом 1 доезжал
+   до него ровно, а не останавливался за полшага. */
+const PCT_CAP = 99;
+const PCT_MAX_FREE = 200;   // предел у форм без верхней границы (как было у НДС)
+
+/* Какая форма выбрана СЕЙЧАС. Каскад хранит выбор человека двумя полями —
+   taxForm у налога и subKind у субсидии, — и одно из них действует. */
+function taxFormKey() {
+  return (STATE.intervType === 'subsidy') ? STATE.subKind : STATE.taxForm;
+}
+
+/* Строка таблицы для текущей формы либо null, если форма потоварная.
+   ⚠️ Строка обязана СОВПАСТЬ по типу вмешательства: при переключении
+   налог ↔ субсидия второе поле остаётся прежним, и без этой проверки
+   «акциз» дожил бы до субсидии, а множитель 1/(1−τ) оказался бы налоговым. */
+function pctForm() {
+  const f = PCT_FORMS[taxFormKey()];
+  return (f && f.type === STATE.intervType) ? f : null;
+}
+
 // STATE.taxKind — производная величина: математике важно только «сдвиг или
 // поворот». Каскад же хранит выбор человека (taxForm / subKind), и эта
 // функция сводит одно к другому в единственном месте.
 function syncTaxKind() {
-  STATE.taxKind = (STATE.intervType === 'subsidy')
-    ? ((STATE.subKind === 'percent') ? 'advalorem' : 'unit')
-    : ((STATE.taxForm === 'vat') ? 'advalorem' : 'unit');
+  STATE.taxKind = pctForm() ? 'advalorem' : 'unit';
 }
 
 // Показать ровно те уровни каскада, которые заслужены сделанным выбором.
@@ -1668,42 +2340,66 @@ function applyIntervCascade() {
 
   // Уровень 2 — вид налога / вид субсидии. Только в конкуренции: в монополии
   // налог входит в MC (monopolyTax), процентная форма туда не переносится.
+  /* Уровень 2 — вид налога / вид субсидии. Ряд ОДИН на оба случая, и кнопок
+     в нём теперь три и там, и там: у процентных форм две базы — цена
+     покупателя и цена продавца, — и по решению владельца обе есть и у налога
+     (акциз и НДС), и у субсидии. Кнопки разложены ПО БАЗЕ, а не по названию:
+     tk-vat — форма от цены продавца, tk-exc — от цены покупателя. Так пара
+     «акциз ↔ субсидия от цены покупателя» стоит на одном месте каскада. */
   const isSub = (type === 'subsidy');
   show('taxkind-row', isRate && comp);
   const kl = document.getElementById('taxkind-label');
   if (kl) kl.textContent = isSub ? 'Вид субсидии:' : 'Вид налога:';
   const bU = document.getElementById('tk-unit');
-  const bV = document.getElementById('tk-vat');
-  const bE = document.getElementById('tk-exc');
   if (bU) bU.textContent = isSub ? 'Потоварная' : 'Потоварный';
-  if (bV) bV.textContent = isSub ? 'Процентная' : 'НДС';
-  if (bE) bE.style.display = isSub ? 'none' : '';   // акциза у субсидии не бывает
-  const form = isSub ? ((STATE.subKind === 'percent') ? 'vat' : 'unit') : STATE.taxForm;
-  [['tk-unit', 'unit'], ['tk-vat', 'vat'], ['tk-exc', 'excise']].forEach(([id, k]) => {
-    const b = document.getElementById(id); if (b) b.classList.toggle('active', form === k);
+  const seller = isSub ? 'subseller' : 'vat';      // форма от цены ПРОДАВЦА
+  const buyer  = isSub ? 'subbuyer'  : 'excise';   // форма от цены ПОКУПАТЕЛЯ
+  const form = taxFormKey();
+  [['tk-unit', 'unit'], ['tk-vat', seller], ['tk-exc', buyer]].forEach(([id, k]) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.style.display = '';
+    if (k !== 'unit') b.textContent = PCT_FORMS[k].label;
+    b.classList.toggle('active', form === k);
   });
 
-  // Уровень 3 (потоварный налог) и уровень 4б (субсидия): сторона.
-  const sideOn = comp && ((type === 'tax' && STATE.taxForm === 'unit') || isSub);
+  /* Уровень 3 (потоварный налог) и уровень 4б (субсидия): сторона.
+     У процентных форм плательщик и получатель закреплены самой формой
+     (доля от чьей цены берётся), поэтому ряда стороны у них нет — ни у
+     налога, ни теперь у субсидии. */
+  const sideOn = comp && !pctForm() && (type === 'tax' || isSub);
   show('taxside-row', sideOn);
   const sl = document.getElementById('taxside-label');
   if (sl) sl.textContent = isSub ? 'Субсидию получает:' : 'Налог платит:';
 }
 
-// Уровень 2 каскада: вид налога ('unit' | 'vat' | 'excise') или вид субсидии.
+/* Уровень 2 каскада: вид налога ('unit' | 'vat' | 'excise') или вид субсидии
+   ('unit' | 'subseller' | 'subbuyer').
+
+   ⚠️ СТАРЫЕ ИМЕНА ОСТАЮТСЯ РАБОЧИМИ. У субсидии процентный вид назывался
+   'percent' и означал ровно нынешний 'subbuyer' (кривая S/(1+τ), замер 24.08:
+   Q 72, Pd 48, Ps 72, расход 1728). Готовые сцены и тесты зовут его прежним
+   словом, поэтому 'percent' и 'advalorem' переводятся сюда, а не отвергаются.
+
+   ⚠️ СТАВКА ПРИ СМЕНЕ ВИДА ОБНУЛЯЕТСЯ (решение владельца). Пересчитывать её
+   в «эквивалентную» нельзя: эквивалент зависит от самих кривых и прыгал бы
+   при каждой правке формулы. Обнуление — только когда вид ДЕЙСТВИТЕЛЬНО
+   сменился: повторный щелчок по уже выбранной кнопке ставку не сбрасывает. */
 function setTaxForm(form) {
+  const was = taxFormKey();
   if (STATE.intervType === 'subsidy') {
-    STATE.subKind = (form === 'vat' || form === 'percent' || form === 'advalorem') ? 'percent' : 'unit';
+    const alias = (form === 'vat' || form === 'percent' || form === 'advalorem') ? 'subbuyer' : form;
+    STATE.subKind = (alias === 'subbuyer' || alias === 'subseller') ? alias : 'unit';
   } else {
     STATE.taxForm = (form === 'vat' || form === 'excise') ? form : 'unit';
-    // У НДС и акциза плательщик закреплён законом — сторона возвращается к продавцу.
-    if (STATE.taxForm !== 'unit') STATE.taxSide = 'seller';
   }
+  // У процентных форм плательщик закреплён самой формой — сторона к продавцу.
+  if (pctForm()) STATE.taxSide = 'seller';
   syncTaxKind();
   applyIntervCascade();
   setTaxSideButtons();
   applyTaxRateBounds();
-  setTax(STATE.tax);   // пере-зажать значение под новые пределы + перерисовать
+  setTax(taxFormKey() === was ? STATE.tax : 0);
 }
 
 // Переключение типа вмешательства: налог <-> субсидия <-> потолок <-> пол.
@@ -1745,49 +2441,74 @@ function setType(type) {
   redrawAll();
 }
 
-/* --- Фаза 2в. Вид потоварной ставки: специфический ↔ адвалорный --------- */
+/* --- Пределы и подпись ставки: рубли у потоварной формы, проценты у четырёх
+       процентных ------------------------------------------------------------
 
-// Пределы ползунка ставки и подпись её буквы. Специфический — рубли за единицу
-// (потолок = масштаб цены Pmax); адвалорный — проценты (потолок 200 %).
+   ⚠️ У ПРОЦЕНТНЫХ ФОРМ СТАВКА ЗАДАЁТСЯ И ПОКАЗЫВАЕТСЯ ТОЛЬКО В ПРОЦЕНТАХ
+   (решение владельца). Записи величины в деньгах у них не остаётся нигде:
+   ни в поле ввода, ни в подписи ползунка, ни в «Ключевых значениях», ни
+   в выгрузке. Отсюда и буква «τ, %», и предел не от масштаба цены. */
+/* Буква ставки и её единица — ОДНА точка правды на панель, ленту регуляторов
+   и подпись клина. Раньше буква жила в разметке, а лента подставляла свою «t»,
+   и ставка акциза 50 % читалась в ленте как 50 рублей. */
+function rateLetter() {
+  if (pctForm()) return 'τ';
+  return (STATE.intervType === 'subsidy') ? 's' : 't';
+}
+function rateUnit() { return pctForm() ? '%' : ''; }
+
+/* Верхняя граница ПОТОВАРНОЙ ставки — свойство МОДЕЛИ, а не кадра.
+
+   Стояло `CONFIG.Pmax`, то есть край видимого окна. У рынка D = 100 − P,
+   S = 0,5·p − 200 окно подбирается по спросу и уходит до ста, а осмысленная
+   субсидия там начинается с трёхсот (ниже неё рынок так и не появляется).
+   Ползунок останавливался на сотне, и нужное число нельзя было даже набрать —
+   ровно та же болезнь «ядро смотрит на кадр», что уже вылечена у поиска
+   равновесия и у findRoot.
+
+   Берём масштаб цен самой модели: цену каждой кривой при нулевом количестве
+   (для параллельного сдвига важна именно она), полтора запаса сверху и
+   округление до круглого числа. Кадр остаётся нижней границей — сузить
+   прежний предел эта правка не может ни в одном случае. */
+function unitRateMax() {
+  let far = 0;
+  [STATE.D, STATE.S].forEach(c => {
+    if (!c) return;
+    const v = evalCurve(c, 0);
+    if (isFinite(v) && Math.abs(v) > far) far = Math.abs(v);
+  });
+  if (!(far > 0)) return CONFIG.Pmax;
+  return Math.max(CONFIG.Pmax, niceMax(far * 1.5));
+}
+
 function applyTaxRateBounds() {
-  const adv = (STATE.taxKind === 'advalorem');
-  const max = adv ? 200 : CONFIG.Pmax;
+  const pf = pctForm();
+  // Верхняя граница: у форм с делителем (1 − τ) — строго меньше ста, у
+  // остальных процентных — как было у НДС, у потоварной — масштаб цен модели.
+  const max = pf ? (pf.capped ? PCT_CAP : PCT_MAX_FREE) : unitRateMax();
   ['tax-slider', 'tax-input'].forEach(id => { const e = document.getElementById(id); if (e) e.max = max; });
   const rl = document.getElementById('rate-letter');
-  if (rl) rl.textContent = adv ? 'τ, %' : ((STATE.intervType === 'subsidy') ? 's' : 't');
+  if (rl) rl.textContent = rateLetter();
+  // Единица стоит справа от ЧИСЛА, а не рядом с буквой: «Ставка τ = 50 %»
+  // читается как процент, «Ставка τ, % = 50» — как непонятно что.
+  const ru = document.getElementById('rate-unit');
+  if (ru) ru.textContent = rateUnit() ? ' %' : '';
   const h = document.getElementById('tax-hint');
   if (!h) return;
-  if (adv) {
-    h.innerHTML = (STATE.intervType === 'subsidy')
-      ? 'Процентная субсидия берётся долей от цены, поэтому предложение не сдвигается, а ' +
-        '<b>поворачивается</b> вниз: S<sub>после</sub>(Q)&nbsp;=&nbsp;S(Q)/(1+τ). Вертикальный разрыв ' +
-        'между S и S<sub>после</sub> растёт вместе с Q.'
-      : 'НДС берётся долей от цены продавца и начисляется сверх неё: P<sub>b</sub>&nbsp;=&nbsp;P<sub>s</sub>·(1+τ). ' +
-        'Поэтому предложение не сдвигается, а <b>поворачивается</b>: S<sub>после</sub>(Q)&nbsp;=&nbsp;(1+τ)·S(Q). ' +
-        'Клин между ценами растёт вместе с Q, а не остаётся постоянным.';
-  } else if (STATE.intervType === 'tax' && STATE.taxForm === 'excise') {
-    h.innerHTML = 'Акциз это потоварный налог на конкретный товар: ставка в рублях за единицу, ' +
-      'кривая S <b>сдвигается</b> вверх на величину ставки. Числа совпадают с потоварным налогом ' +
-      'той же ставки; плательщик закреплён за производителем, поэтому сторона не выбирается.';
-  } else {
-    h.innerHTML = 'Потоварное вмешательство на стороне производителя: кривая S <b>сдвигается</b> ' +
+  h.innerHTML = pf ? pf.hint
+    : 'Потоварное вмешательство на стороне производителя: кривая S <b>сдвигается</b> ' +
       'на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя ' +
       'и продавца можно тянуть мышью.';
-  }
 }
 
 /* Старый вход «вид ставки» ('unit' | 'advalorem'). Оставлен рабочим: на него
-   завязаны готовые сцены и контрольные числа. Переводит математический вид в
-   выбор каскада — процентный вид у налога это НДС, у субсидии это процентная. */
+   завязаны готовые сцены и контрольные числа. Переводит математический вид
+   в выбор каскада: у налога это НДС, у субсидии — «% от цены покупателя»
+   ('subbuyer'), потому что прежний единственный процентный вид субсидии был
+   именно им, и менять его смысл задним числом нельзя. */
 function setTaxKind(kind) {
   const adv = (kind === 'advalorem');
-  if (STATE.intervType === 'subsidy') STATE.subKind = adv ? 'percent' : 'unit';
-  else STATE.taxForm = adv ? 'vat' : 'unit';
-  syncTaxKind();
-  applyIntervCascade();
-  setTaxSideButtons();
-  applyTaxRateBounds();
-  setTax(STATE.tax);   // пере-зажать значение под новые пределы + перерисовать
+  setTaxForm(adv ? (STATE.intervType === 'subsidy' ? 'subbuyer' : 'vat') : 'unit');
 }
 
 // Табло налога: таблица «До / После / Δ» и распределение бремени.
@@ -1806,14 +2527,39 @@ function updateTaxPanel() {
   if (!STATE.D || !STATE.S) {
     box.innerHTML = '<div class="muted">Сначала отметьте кривые D и S.</div>'; return;
   }
-  if (!STATE.eq) { box.innerHTML = ''; return; }   // об отсутствии равновесия говорит один блок, см. П7
   const isSub = (STATE.intervType === 'subsidy');
   if (!STATE.taxActive) {
+    /* Ставка задана, кривая после вмешательства построена, а рынка всё равно
+       нет: спрос и новое предложение не пересеклись в первой четверти.
+       Говорим об этом здесь, потому что блок равновесия рассказывает про
+       ИСХОДНЫЕ кривые и про вмешательство ничего не знает. */
+    if (!STATE.eq) {
+      box.innerHTML = STATE.taxCurveOn
+        ? `<div class="muted">Кривая после вмешательства построена и на графике видна, но со спросом она
+           по-прежнему не пересекается в первой четверти: рынка нет, и считать пока нечего.</div>`
+        : '';
+      return;
+    }
     box.innerHTML = `<div class="muted">Двигайте ползунок или тяните клин на графике, чтобы ввести ${isSub ? 'субсидию' : 'налог'}.</div>`;
     return;
   }
   const e0 = STATE.eq, te = STATE.taxEq;
-  const rows = [
+  /* ⚠️ СТОЛБЦА «ДО» НЕТ, КОГДА ДО НИЧЕГО НЕ БЫЛО.
+     Исходного равновесия в первой четверти не существовало (обычный случай:
+     без вмешательства кривые пересекаются вне четверти, а с ним — внутри).
+     Ставить в столбец «До» нуль нельзя: нуль это число, и читался бы он как
+     «раньше торговали ноль», хотя правда другая — рынка не было вовсе. По той
+     же причине из таблицы уходят DWL и обе строки бремени: и площадь потерь,
+     и бремя считаются РАЗНОСТЬЮ с исходным состоянием. */
+  const noBase = !e0;
+  const rows = noBase ? [
+    ['Q', te.Q],
+    ['P покупателя', te.Pb],
+    ['P продавца', te.Ps],
+    ['CS', STATE.csTax],
+    ['PS', STATE.psTax],
+    [isSub ? 'Бюджет (расход)' : 'Бюджет (сбор)', STATE.budget],
+  ] : [
     ['Q', e0.Q, te.Q],
     ['P покупателя', e0.P, te.Pb],
     ['P продавца', e0.P, te.Ps],
@@ -1822,27 +2568,46 @@ function updateTaxPanel() {
     [isSub ? 'Бюджет (расход)' : 'Бюджет (сбор)', 0, STATE.budget],
     ['DWL', 0, STATE.dwl],
   ];
-  const adv = (STATE.taxKind === 'advalorem');
-  let html = `<div class="stat"><span>${adv ? 'Ставка τ (адвалорная)' : (isSub ? 'Субсидия s' : 'Налог t')}</span>` +
+  const pf = pctForm();
+  const adv = !!pf;
+  // Название формы стоит рядом с числом: «τ = 50 %» без слова «акциз» не
+  // отличить от «τ = 50 %» у НДС, а точки у них разные.
+  let html = `<div class="stat"><span>${adv ? ('Ставка τ · ' + pf.label) : (isSub ? 'Субсидия s' : 'Налог t')}</span>` +
              `<b>${fmt(STATE.tax)}${adv ? ' %' : ''}</b></div>`;
-  html += '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
-  rows.forEach(([k, a, b]) => {
-    // Δ считается из ОКРУГЛЁННЫХ соседей: иначе столбец не сходится с теми
-    // двумя числами, которые человек видит слева от него (п. 1).
-    const ds = fmtDiff(b, a);
-    html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
-  });
-  html += '</table>';
-  const lbl = isSub ? 'Выигрыш' : 'Бремя';
-  html += `<div class="stat" style="margin-top:6px;"><span>${lbl} покупателя</span><b>${fmt(STATE.incBuyer)}</b></div>`;
-  html += `<div class="stat"><span>${lbl} продавца</span><b>${fmt(STATE.incSeller)}</b></div>`;
+  if (noBase) {
+    html += '<table class="tx-table"><tr><th></th><th>После вмешательства</th></tr>';
+    rows.forEach(([k, b]) => { html += `<tr><td>${k}</td><td>${fmt(b)}</td></tr>`; });
+    html += '</table>';
+    html += `<div class="hint" style="margin-top:6px;">Столбца «до» здесь нет, и это не пропуск:
+      без ${isSub ? 'субсидии' : 'налога'} спрос и предложение пересекаются за пределами первой четверти,
+      то есть рынка не было вовсе. Сравнивать не с чем, поэтому потери общества (DWL) и
+      ${isSub ? 'выигрыш' : 'бремя'} сторон не считаются: обе величины — разность с исходным состоянием.</div>`;
+  } else {
+    html += '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
+    rows.forEach(([k, a, b]) => {
+      // Δ считается из ОКРУГЛЁННЫХ соседей: иначе столбец не сходится с теми
+      // двумя числами, которые человек видит слева от него (п. 1).
+      const ds = fmtDiff(b, a);
+      html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
+    });
+    html += '</table>';
+    const lbl = isSub ? 'Выигрыш' : 'Бремя';
+    html += `<div class="stat" style="margin-top:6px;"><span>${lbl} покупателя</span><b>${fmt(STATE.incBuyer)}</b></div>`;
+    html += `<div class="stat"><span>${lbl} продавца</span><b>${fmt(STATE.incSeller)}</b></div>`;
+  }
   // Вывод об эквивалентности (только для налога): кто платит — не влияет на итог.
   if (adv) {
-    const k = 1 + STATE.tax / 100;
-    html += `<div class="hint" style="margin-top:6px;">Адвалорная ставка: ` +
-      (isSub ? `продавец получает в (1+τ)=${fmt(k)} раза больше покупателя: Ps = Pb·(1+τ) = ${fmt(te.Ps)}.`
-             : `покупатель платит в (1+τ)=${fmt(k)} раза больше продавца: Ps = Pb/(1+τ) = ${fmt(te.Ps)}.`) +
-      ` Деньги = (Pb − Ps)·Q = ${fmt(STATE.tx)}.</div>`;
+    /* Отношение цен и деньги — по строке таблицы PCT_FORMS, а не по формуле,
+       переписанной здесь второй раз. База (цена покупателя или продавца)
+       у четырёх форм разная, и именно ею они и различаются. */
+    const k = pf.factor(STATE.tax / 100);
+    const baseName = (pf.base === 'buyer') ? 'цены покупателя' : 'цены продавца';
+    const money = (pf.base === 'buyer') ? (STATE.tax / 100) * te.Pb * te.Q
+                                        : (STATE.tax / 100) * te.Ps * te.Q;
+    html += `<div class="hint" style="margin-top:6px;">${pf.label}: ставка берётся долей от ` +
+      `${baseName}. Кривая после — ${pf.curve}, то есть S<sub>после</sub> = ${fmt(k)}·S. ` +
+      `Цена продавца Ps = ${fmt(te.Ps)}, цена покупателя Pb = ${fmt(te.Pb)}. ` +
+      `${isSub ? 'Расход' : 'Сбор'} по ставке = ${fmt(money)}, и он же равен (Pb − Ps)·Q = ${fmt(STATE.tx)}.</div>`;
   }
   if (!isSub) html += `<div class="hint" style="margin-top:6px;">Результат не зависит от того, кто формально платит налог: ` +
     `объём Q, цены покупателя/продавца и распределение бремени одинаковы при налоге на продавца и на покупателя.</div>`;
@@ -2232,11 +2997,11 @@ function drawPcAreas() {
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
   const s1 = samp(0, Qtrade);
   if (STATE.showCS) {   // CS — между ценой Preg (низ) и спросом (верх)
-    const a = d3.area().x(d => sx(d)).y0(sy(Preg)).y1(d => sy(evalCurve(STATE.D, d)));
+    const a = d3.area().x(d => sx(d)).y0(sy(Preg)).y1(d => sy(quadPrice(STATE.D, d)));
     g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
   }
   if (STATE.showPS) {   // PS — между предложением (низ) и ценой Preg (верх)
-    const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(Preg));
+    const a = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(Preg));
     g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
   }
   // DWL — площадь между D и S от Q_trade до Q* (потери от нерасчищенного рынка).

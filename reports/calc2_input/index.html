@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<title>Ядро и конструктор — контактный лист</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 16px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif;
+         margin: 0 auto; max-width: 1180px; padding: 32px 20px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .lead { color: #666; margin: 0 0 28px; }
+  section { margin: 0 0 40px; padding: 0 0 32px; border-bottom: 1px solid #ddd; }
+  h2 { font-size: 19px; margin: 0 0 6px; }
+  .note { color: #555; margin: 0 0 14px; max-width: 82ch; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  figure { margin: 0; }
+  figcaption { font-size: 13px; color: #777; margin: 0 0 6px; }
+  img { width: 100%; border: 1px solid #ccc; border-radius: 8px; display: block; }
+  @media (max-width: 900px) { .pair { grid-template-columns: 1fr; } }
+  @media (prefers-color-scheme: dark) {
+    body { background: #16181c; color: #e6e6e6; }
+    .lead, .note, figcaption { color: #a2a6ad; }
+    section { border-color: #303338; } img { border-color: #3a3d43; }
+  }
+</style></head><body>
+<h1>Ядро и конструктор — контактный лист приёмки</h1>
+<p class="lead">Ветка <code>feat/calc2-input</code>. Слева светлая тема, справа тёмная.
+Числа проверены прибором <code>calc2/tests/input_probe.mjs</code> (наборы К, П, Ш, В, Ф, З, Я)
+и случаями (кадр-а)…(кадр-е), (конс-а), (конс-б), (панель-а) в
+<code>calc2/tests/calc2_math.mjs</code>; эти снимки — для глаз.</p>
+<section>
+  <h2>Монополия на СУЖЕННОМ окне: Qm 40, Pm 60, Qc 80</h2>
+  <p class="note">D 100−Q, MC 20, окно сужено до Q = 30 — то есть оптимум монополии лежит ЗА краем кадра. Раньше findRoot искал MR = MC только до края окна, корень 40 туда не попадал, и всё табло монополии гасло: ни выпуска, ни цены, ни конкурентного объёма. Теперь область поиска берётся у самих кривых: числа те же, что на любом другом масштабе, и в «Ключевых значениях» они есть.</p>
+  <div class="pair">
+    <figure><figcaption>светлая</figcaption><img src="a-mono-narrow-light.png" alt="Монополия на СУЖЕННОМ окне: Qm 40, Pm 60, Qc 80, светлая тема"></figure>
+    <figure><figcaption>тёмная</figcaption><img src="a-mono-narrow-dark.png" alt="Монополия на СУЖЕННОМ окне: Qm 40, Pm 60, Qc 80, тёмная тема"></figure>
+  </div>
+</section>
+<section>
+  <h2>Кусочная в поле: два куска, поле выросло в высоту</h2>
+  <p class="note">Собрана конструктором и поставлена в поле. Запись видна ЦЕЛИКОМ: и формулы, и оба условия. Раньше содержимое было 236 px в окне 151 и обрывалось на слове «если» — обрезка живёт внутри MathLive, снаружи поле выглядело исправным. Строка отдала полю всю ширину (кнопка клавиатуры переехала под него), кегль подобран до 12,0 px.</p>
+  <div class="pair">
+    <figure><figcaption>светлая</figcaption><img src="b-pw-two-light.png" alt="Кусочная в поле: два куска, поле выросло в высоту, светлая тема"></figure>
+    <figure><figcaption>тёмная</figcaption><img src="b-pw-two-dark.png" alt="Кусочная в поле: два куска, поле выросло в высоту, тёмная тема"></figure>
+  </div>
+</section>
+<section>
+  <h2>Кусочная в поле: три куска, три строки</h2>
+  <p class="note">То же самое на трёх участках. Кегль 11,2 px — выше нижнего предела 11 px, ниже которого запись не сжимается. Соседняя строка предложения осталась однострочной, карточка «Ввод функций» не разъехалась.</p>
+  <div class="pair">
+    <figure><figcaption>светлая</figcaption><img src="v-pw-three-light.png" alt="Кусочная в поле: три куска, три строки, светлая тема"></figure>
+    <figure><figcaption>тёмная</figcaption><img src="v-pw-three-dark.png" alt="Кусочная в поле: три куска, три строки, тёмная тема"></figure>
+  </div>
+</section>
+<section>
+  <h2>Левая панель «Спроса и предложения»: одиноких «?» нет</h2>
+  <p class="note">Смотреть на вопросики. Было: два знака висели в пустых строках посреди панели при НУЛЕ живых подсказок у сцены — подсказка без якоря получала собственную пустую строку `.help-anchor`. Стало: таких строк в разметке ноль, знак появляется только рядом с тем, что он поясняет, и только если у него есть живая подсказка.</p>
+  <div class="pair">
+    <figure><figcaption>светлая</figcaption><img src="g-panel-hints-light.png" alt="Левая панель «Спроса и предложения»: одиноких «?» нет, светлая тема"></figure>
+    <figure><figcaption>тёмная</figcaption><img src="g-panel-hints-dark.png" alt="Левая панель «Спроса и предложения»: одиноких «?» нет, тёмная тема"></figure>
+  </div>
+</section>
+<section>
+  <h2>Первый экран: карточка подсвечивается при наведении</h2>
+  <p class="note">Курсор наведён на первую карточку («Математика»). Рамка малиновая — та же, что у любой другой карточки. Раньше правило гашения кольца весом било `:hover`, и первая карточка под курсором оставалась серой, пока не нажмёшь клавишу. Светлого кольца клавиатурного фокуса при этом нет: мышь его не будит.</p>
+  <div class="pair">
+    <figure><figcaption>светлая</figcaption><img src="d-picker-light.png" alt="Первый экран: карточка подсвечивается при наведении, светлая тема"></figure>
+    <figure><figcaption>тёмная</figcaption><img src="d-picker-dark.png" alt="Первый экран: карточка подсвечивается при наведении, тёмная тема"></figure>
+  </div>
+</section>
+<section>
+  <h2>«Сложение спросов»: аналитическая запись помещается в панель</h2>
+  <p class="note">Четыре группы спроса — в записи рыночного спроса четыре участка. Правая панель прокручена к «Объяснению модели». Было: содержимое 239 px во врезке шириной 215, запись уезжала за правый край. Стало: кегль подобран вниз (12,0 и 13,2 px при нижнем пределе 10 px), обе записи целиком внутри панели.</p>
+  <div class="pair">
+    <figure><figcaption>светлая</figcaption><img src="e-sum-record-light.png" alt="«Сложение спросов»: аналитическая запись помещается в панель, светлая тема"></figure>
+    <figure><figcaption>тёмная</figcaption><img src="e-sum-record-dark.png" alt="«Сложение спросов»: аналитическая запись помещается в панель, тёмная тема"></figure>
+  </div>
+</section>
+<section>
+  <h2>Ширина окна 380 px: узкий вид записи</h2>
+  <p class="note">Панель на таком экране всего 200 px, и обычная запись «формула, если условие» не помещается ни при каком читаемом кегле. Условие переезжает под свою формулу — поле растёт в высоту, как и решил владелец. Горизонтальной обрезки нет, кегль на нижнем пределе 11 px, запись разбирается обратно в ту же цепочку условий.</p>
+  <div class="pair">
+    <figure><figcaption>светлая</figcaption><img src="zh-narrow-light.png" alt="Ширина окна 380 px: узкий вид записи, светлая тема"></figure>
+    <figure><figcaption>тёмная</figcaption><img src="zh-narrow-dark.png" alt="Ширина окна 380 px: узкий вид записи, тёмная тема"></figure>
+  </div>
+</section>
+</body></html>

@@ -81,10 +81,9 @@ function drawMonopoly() {
     for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = f(q); pts.push(isNaN(v) ? null : [q, v]); }
     return pts;
   };
-  // MR — фиолетовый пунктир.
-  g.append('path').datum(sample(q => marginalRevenue(STATE.D, q)))
-    .attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2)
-    .attr('stroke-dasharray', '6 4').attr('d', line);
+  // MR — фиолетовый пунктир. Продолжение ниже оси Q рисует общий помощник
+  // (см. drawMarginalCurve в 30-curves.js): до нуля породившего спроса.
+  drawMarginalCurve(g, q => marginalRevenue(STATE.D, q), STATE.D, COL.MR, { width: 2 });
   // Если MC выведена из TC (нет явной кривой mc/S) — нарисуем её красным.
   if (!mcSourceCurve() && curveByRole('tc')) {
     g.append('path').datum(sample(mcAt))
@@ -461,8 +460,7 @@ function drawNaturalCurves() {
     for (let i = 0; i <= 400; i++) { const q = a + (CONFIG.Qmax - a) * i / 400; const v = f(q); pts.push((isNaN(v) || v > CONFIG.Pmax * 4) ? null : [q, v]); }
     return pts;
   };
-  g.append('path').datum(sample(q => marginalRevenue(D, q)))
-    .attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  drawMarginalCurve(g, q => marginalRevenue(D, q), D, COL.MR, { width: 2, cap: CONFIG.Pmax * 4 });
   g.append('path').datum(sample(naturalATC, CONFIG.Qmax * 0.005))
     .attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr('d', line);
   // ATC естественной монополии круто уходит вверх у нуля — ярлык ищем по
@@ -1072,9 +1070,13 @@ function drawKinkedFull() {
   const dPts = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = k.Dfn(q); dPts.push((isNaN(v) || v < 0) ? null : [q, v]); }
   g.append('path').datum(dPts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line);
   // MR по каждому куску (отдельные отрезки) + вертикальные разрывы в изломах.
-  k.segs.forEach(s => {
-    const pts = []; for (let i = 0; i <= 200; i++) { const q = s.q0 + (s.q1 - s.q0) * i / 200; const v = marginalRevenue(s.D, q); pts.push(isNaN(v) ? null : [q, v]); }
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  /* Продолжение вниз имеет смысл только у ПОСЛЕДНЕГО куска: у него
+     Q-перехват тот же, что у всего ломаного спроса. Промежуточные куски
+     обрываются не на оси, а в изломе, и тянуть их некуда. */
+  k.segs.forEach((s, i) => {
+    const last = (i === k.segs.length - 1);
+    drawMarginalCurve(g, q => marginalRevenue(s.D, q), last ? s.D : null, COL.MR,
+                      { width: 2, from: s.q0, to: s.q1, n: 200 });
   });
   k.kinks.forEach(qk => {
     const segL = k.segs.find(s => Math.abs(s.q1 - qk) < 1e-6), segR = k.segs.find(s => Math.abs(s.q0 - qk) < 1e-6);

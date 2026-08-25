@@ -207,7 +207,17 @@ function openPicker() {
     const clearInitRing = () => first.classList.remove('no-init-ring');
     first.addEventListener('blur', clearInitRing, { once: true });
     document.addEventListener('pointerdown', clearInitRing, { once: true });
-    document.addEventListener('keydown', clearInitRing, { once: true });
+    /* ⚠️ КОЛЬЦО ВОЗВРАЩАЕТ ТОЛЬКО КЛАВИАТУРНАЯ НАВИГАЦИЯ — Tab и стрелки.
+       Прежде его возвращала ЛЮБАЯ клавиша: нажал Escape или начал печатать в
+       поле — и на карточке, которую никто не выбирал, снова горело кольцо.
+       Тот же признак «фокус дала клавиатура человека», что у подсказок
+       (см. `_tipByKeyboard` в 86-workspace.js). */
+    const keyRing = (e) => {
+      if (e.key !== 'Tab' && e.key.indexOf('Arrow') !== 0) return;
+      document.removeEventListener('keydown', keyRing, true);
+      clearInitRing();
+    };
+    document.addEventListener('keydown', keyRing, true);
   }
 }
 /* ---------------------------------------------------------------------

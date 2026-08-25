@@ -68,8 +68,18 @@ function relocateForScene() {
 
 // Очистка всех блоков табло перед перерисовкой: активный режим заполнит свои,
 // чужие останутся пустыми (CSS прячет пустые) — без устаревших чисел из прошлого режима.
+/* ⚠️ ГАШЕНИЕ ОТЛОЖЕННОЕ, А НЕ НЕМЕДЛЕННОЕ. Немедленное давало по две записи
+   в каждое табло за кадр («пусто», потом содержимое) и сводило на нет проверку
+   «текст не изменился — набирать нечего» (см. guardPanelBoxes в 60-overlays.js).
+   Помечаем «погасить, если никто не напишет»; гасит помеченные
+   flushPendingPanelClears в конце перерисовки. Смысл тот же, а перенабора нет. */
 function clearResultPanels() {
-  ['info-eq'].concat(RESULT_IDS).forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+  ['info-eq'].concat(RESULT_IDS).forEach(id => {
+    const e = document.getElementById(id);
+    if (!e) return;
+    if (e._panelGuarded) { e._pendingClear = true; return; }
+    e.innerHTML = '';
+  });
   // Площадь живёт в своей секции и переживает перерисовку: её очищает
   // только «Убрать» рядом с кнопкой расчёта.
 }
@@ -132,11 +142,42 @@ function moveExplanations() {
   const from = document.getElementById('sb-body');
   const to = document.getElementById('ex-body');
   if (!from || !to) return;
+  /* ⚠️ ПЕРЕЕЗД — ОДНОРАЗОВАЯ ОПЕРАЦИЯ, А НЕ ЕЖЕКАДРОВАЯ.
+     Врезка ЗАБИРАЕТСЯ из табло, поэтому после переезда в табло её больше нет.
+     Пока табло переписывалось на каждом кадре, врезка появлялась заново и
+     переезжала заново — и это выглядело как работающий цикл. Теперь табло с
+     тем же текстом не переписывается (см. guardPanelBoxes), и такой проход
+     просто вычистил бы «Объяснение модели» досуха: замер 25.08 — разбор в
+     «Построении графиков» становился пустым на втором кадре.
+     Ничего в табло не изменилось и сцена та же — значит разбор уже на месте. */
+  const scene = String(STATE.mode) + '|' + (typeof baseScene === 'function' ? baseScene() : '');
+  const changed = (typeof panelsChangedSinceLastPass === 'function') ? panelsChangedSinceLastPass() : true;
+  if (!changed && to._explainFor === scene && to.children.length) return;
+  to._explainFor = scene;
   to.innerHTML = '';
-  from.querySelectorAll('.sb-note').forEach(note => {
-    const h = note.querySelector('b');
+  /* ⚠️ ВРЕЗКА КОПИРУЕТСЯ, А НЕ ЗАБИРАЕТСЯ, И ЭТО ГЛАВНОЕ ЗДЕСЬ.
+     Раньше узел ПЕРЕНОСИЛСЯ: после переноса в табло его не оставалось, и
+     повторный проход собирать было нечего. Работало это только потому, что
+     табло переписывалось заново на каждом кадре и врезка появлялась снова.
+     Как только табло перестало переписываться без надобности, перенос стал
+     одноразовым: первый проход уносил врезку, второй чистил «Объяснение
+     модели» досуха — и разбор пропадал навсегда (замер 25.08: в «Построении
+     графиков» ноль символов вместо тысячи с лишним).
+
+     Копируем. Оригинал остаётся в табло, но переименовывается в
+     `.sb-note-src` и скрывается стилем. Два следствия, и оба нужны:
+       • проход стал повторяемым — собирать всегда есть что;
+       • проверка «врезка не осталась в расчётах» по-прежнему верна: класса
+         `.sb-note` в табло нет ни одного. */
+  from.querySelectorAll('.sb-note, .sb-note-src').forEach(src => {
+    const copy = src.cloneNode(true);
+    copy.classList.remove('sb-note-src');
+    copy.classList.add('sb-note');
+    const h = copy.querySelector('b');
     if (h && h.textContent.trim() === 'Как это получилось') h.remove();
-    to.appendChild(note);
+    src.classList.remove('sb-note');
+    src.classList.add('sb-note-src');
+    to.appendChild(copy);
   });
   /* Н29. Сцена, которая разбор не пишет, берёт его из общего реестра
      (90-explain.js). Свой разбор сцены главнее: если она что-то положила в
@@ -144,6 +185,21 @@ function moveExplanations() {
   if (!to.children.length && typeof sceneExplainHtml === 'function') {
     const html = sceneExplainHtml();
     if (html) to.innerHTML = html;
+  }
+  /* Пересечение вне первой четверти — отдельный абзац В КОНЦЕ разбора, а не
+     вместо него. Общий рассказ сцены при этом остаётся на месте: он про то,
+     как модель устроена, а этот абзац — про конкретную ловушку в введённых
+     сейчас формулах. */
+  if (typeof offQuadExplainHtml === 'function') {
+    const extra = offQuadExplainHtml();
+    if (extra) to.insertAdjacentHTML('beforeend', extra);
+  }
+  /* Тем же приёмом — разбор выбранной процентной формы налога или субсидии:
+     соотношение цен и формула сбора. Абзац про конкретную форму, а не про
+     устройство модели, поэтому он идёт в конец, а не вместо общего рассказа. */
+  if (typeof pctFormExplainHtml === 'function') {
+    const pct = pctFormExplainHtml();
+    if (pct) to.insertAdjacentHTML('beforeend', pct);
   }
 }
 
@@ -594,6 +650,70 @@ function quadSameWindow(a, b) {
       && Math.abs(a.pa - b.pa) < e && Math.abs(a.pb - b.pb) < e;
 }
 
+/* ── ТОЧКИ, КОТОРЫЕ СЦЕНА ПОКАЗЫВАЕТ ВНЕ ПЕРВОЙ ЧЕТВЕРТИ ──────────────
+   Их ровно три вида, и все три названы решением владельца о правиле первой
+   четверти: центр поворота при процентном налоге, пересечение кривых вне
+   четверти и конец продолжения предельной кривой.
+
+   ⚠️ СПИСОК БЕРЁТСЯ У НАРИСОВАННОГО, А НЕ У ВТОРОЙ КОПИИ ПРАВИЛА.
+   Продолжение предельной кривой рисуют четыре сцены, и докуда оно тянется,
+   знает только сам рисователь (`drawMarginalCurve`: до нуля породившей
+   кривой). Переписывать это условие здесь значило бы завести вторую точку
+   правды, которая разойдётся с первой. Поэтому хвосты читаются с холста по
+   их собственной пометке `data-marginal-tail`, а пиксели переводятся обратно
+   теми же шкалами. Две точки, которые сцена знает точно, берутся из модели. */
+function offQuadShownPoints() {
+  const pts = [];
+  if (STATE.offEq && isFinite(STATE.offEq.Q) && isFinite(STATE.offEq.P)) {
+    pts.push([STATE.offEq.Q, STATE.offEq.P]);
+  }
+  if (typeof taxPivotPoint === 'function') {
+    const p = taxPivotPoint();
+    if (p && isFinite(p.Q) && isFinite(p.P)) pts.push([p.Q, p.P]);
+  }
+  if (typeof sx === 'function' && typeof sy === 'function') {
+    document.querySelectorAll('path[data-marginal-tail]').forEach(el => {
+      String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(tok => {
+        const m = tok.match(/[ML]\s*(-?[\d.eE+]+)[,\s]+(-?[\d.eE+]+)/);
+        if (!m) return;
+        const q = sx.invert(+m[1]), p = sy.invert(+m[2]);
+        if (isFinite(q) && isFinite(p)) pts.push([q, p]);
+      });
+    });
+  }
+  // Интересны только те, что ДЕЙСТВИТЕЛЬНО лежат вне первой четверти.
+  return pts.filter(([q, p]) => q < -1e-9 || p < -1e-9);
+}
+
+/* Раздвинуть окно так, чтобы такие точки попали в кадр с запасом по краю.
+   Возвращает true, если окно действительно изменилось.
+
+   Решение владельца 25.08: «снятая галочка „только первая четверть“ сама
+   раздвигает окно до точек вне четверти». Запас — восьмая часть нынешнего
+   окна: точка, легшая ровно на границу, читается как обрыв кривой, а не как
+   то, что нам хотели показать. */
+function fitWindowToOffQuad() {
+  const pts = offQuadShownPoints();
+  if (!pts.length) return false;                 // показывать нечего — окно не трогаем
+  let qa = CONFIG.Qmin, qb = CONFIG.Qmax, pa = CONFIG.Pmin, pb = CONFIG.Pmax;
+  const padQ = Math.max(1e-9, (qb - qa) * 0.08);
+  const padP = Math.max(1e-9, (pb - pa) * 0.08);
+  pts.forEach(([q, p]) => {
+    if (q - padQ < qa) qa = q - padQ;
+    if (q + padQ > qb) qb = q + padQ;
+    if (p - padP < pa) pa = p - padP;
+    if (p + padP > pb) pb = p + padP;
+  });
+  const same = (a, b) => Math.abs(a - b) < 1e-9;
+  if (same(qa, CONFIG.Qmin) && same(qb, CONFIG.Qmax)
+      && same(pa, CONFIG.Pmin) && same(pb, CONFIG.Pmax)) return false;
+  CONFIG.Qmin = qa; CONFIG.Qmax = qb; CONFIG.Pmin = pa; CONFIG.Pmax = pb;
+  /* Окно перестало быть масштабом сцены, значит и авто-подгонка молчит, и
+     кнопка «Вернуть исходный вид» на месте — ровно как после колеса мыши. */
+  STATE.viewDirty = true;
+  return true;
+}
+
 function setFirstQuad(on) {
   const before = quadWindow(null);       // окно ДО переключения — для обратного хода
   STATE.firstQuad = !!on;
@@ -631,6 +751,17 @@ function setFirstQuad(on) {
   }
   syncViewFields();
   redrawAll();
+  /* ⚠️ РАЗДВИГАЕМ ПОСЛЕ ОТРИСОВКИ, И ТОЛЬКО ПРИ СНЯТИИ ГАЛОЧКИ.
+     До отрисовки продолжений предельных кривых на холсте ещё нет, и спросить
+     у них, докуда они тянутся, невозможно. Второй перерисовки не боимся: это
+     один щелчок человека, а не кадр панорамирования.
+
+     Разовость важна: дальше окном распоряжается человек. Колесо и панорама
+     сюда не заходят, потому что setFirstQuad зовёт только сама галочка. */
+  if (!STATE.firstQuad && STATE.mode !== 'math' && fitWindowToOffQuad()) {
+    syncViewFields();
+    redrawAll();
+  }
 }
 
 function setGridMode(mode) {
@@ -930,13 +1061,20 @@ function hintAnchor(hint) {
     if (n.classList && n.classList.contains('section')) break;
     n = n.parentElement;
   }
-  // 2. Заголовок секции (обычный или складной).
-  const sec = hint.closest('.section');
-  if (sec) {
+  /* 2. Заголовок секции (обычный или складной).
+     ⚠️ ИДЁМ ВВЕРХ, ПОКА ЗАГОЛОВОК НЕ НАЙДЁТСЯ, А НЕ ОСТАНАВЛИВАЕМСЯ НА ПЕРВОЙ
+     СЕКЦИИ. Секции вложены друг в друга, и у внутренних заголовка часто нет
+     НАМЕРЕННО (#sec-curves, #sec-mono). Прежний closest('.section') брал
+     ближайшую, не находил у неё заголовка и сдавался — а подсказка при этом
+     прекрасно относилась к заголовку карточки этажом выше. Так у монополии
+     обе подсказки оставались без якоря и получали по пустой строке с «?». */
+  let sec = hint.closest('.section');
+  while (sec) {
     const fold = sec.querySelector(':scope > .fold-btn > span');
     if (fold) return fold;
     const title = sec.querySelector(':scope > .section-title');
     if (title) return title;
+    sec = sec.parentElement ? sec.parentElement.closest('.section') : null;
   }
   // 3. Подпись поля, внутри которого лежит объяснение.
   const field = hint.closest('.field, .f-wrap');
@@ -948,11 +1086,84 @@ function hintAnchor(hint) {
     if (prev.tagName === 'LABEL') return prev;
     prev = prev.previousElementSibling;
   }
-  // 5. Своя строка. Сюда попадают подсказки, у которых заголовка нет вовсе.
-  const own = document.createElement('div');
-  own.className = 'help-anchor';
-  hint.parentNode.insertBefore(own, hint);
-  return own;
+  /* ⚠️ ПЯТОГО ШАГА БОЛЬШЕ НЕТ, И ЭТО НЕ УПУЩЕНИЕ.
+     Здесь заводилась подсказке СВОЯ пустая строка `.help-anchor`, и ровно
+     оттуда брались одинокие «?» посреди панели: вопросик появлялся там, где
+     пояснять нечего — рядом с ним не было ни подписи, ни заголовка. Чаще
+     всего это подсказки вложенной секции `#sec-curves`, у которой своего
+     заголовка нет НАМЕРЕННО, поэтому шаг 2 (closest('.section')) до якоря не
+     доходил. Замер 25.08: в «Спросе и предложении» два таких вопросика из
+     трёх видимых, и живых подсказок у сцены при этом ноль.
+
+     Вопросик появляется только рядом с тем, что он поясняет. Не нашлось
+     подходящего якоря — подсказка остаётся обычным абзацем (hintsToDots на
+     null просто ничего не делает), и это честнее пустой строки со знаком. */
+  return null;
+}
+
+/* ⚠️ ВОПРОСИК ЖИВЁТ РОВНО СТОЛЬКО, СКОЛЬКО ЖИВА ЕГО ПОДСКАЗКА.
+   Вопросик вешается на заголовок ОДИН РАЗ и остаётся на нём навсегда, а
+   подсказки под ним у каждой модели свои. У общего заголовка (например, у
+   карточки «Ввод функций») собираются подсказки нескольких моделей сразу, и
+   после перехода в другую модель на видимом заголовке висел знак от чужих,
+   уже спрятанных подсказок. Прячем знак, у которого не осталось ни одной
+   живой подсказки; проход идёт после applyCardScope, иначе он не увидел бы
+   `scoped-off` у переключателей соседних моделей. */
+/* ⚠️ АНАЛИТИЧЕСКАЯ ЗАПИСЬ ОБЯЗАНА ПОМЕЩАТЬСЯ В ПАНЕЛЬ ПО ШИРИНЕ.
+   Врезка `.sb-note` не умела ничего с широкой формулой: `\begin{cases}` KaTeX
+   рисует одним неразрывным элементом, переносить его негде, и запись просто
+   вылезала за правый край. Замер 25.08, «Сложение спросов» с четырьмя
+   группами: содержимое 239 px во врезке шириной 215, панель 268.
+
+   Прокрутку не заводим — горизонтальная полоса в тексте разбора читается как
+   поломка, да и заметить её там некому. Подбираем кегль вниз, как это делает
+   поле формулы, и с тем же уговором: нижний предел есть, и он 10 px. Ниже
+   формулу в панели уже не прочесть, и честнее показать, что она не влезла,
+   чем нарисовать нечитаемое. От основных 14,5 px это запас в треть — хватает
+   на четыре участка с большим запасом.
+
+   Меряем ВРЕЗКУ, а не формулу: у врезки есть своя ширина и своя прокрутка, а
+   у формулы вокруг ещё и текст, который переносится сам. */
+const PANEL_MATH_MIN_PX = 10;
+function fitPanelMath(root) {
+  root = root || document.getElementById('params-panel');
+  if (!root) return;
+  root.querySelectorAll('.sb-note').forEach(note => {
+    const maths = [].slice.call(note.querySelectorAll('.katex'));
+    if (!maths.length) return;
+    maths.forEach(k => { k.style.fontSize = ''; });
+    const have = note.clientWidth;
+    if (!have || note.scrollWidth <= have + 1) return;
+    const bases = maths.map(k => parseFloat(getComputedStyle(k).fontSize) || 14.5);
+    /* ⚠️ ЦЕЛИМСЯ НА ПАРУ ПИКСЕЛЕЙ УЖЕ, ЧЕМ ВЛЕЗАЕТ. `scrollWidth` — целое, и
+       округление скрывало недобор: замер показывал «215 в 215», а правый край
+       формулы торчал за врезку на 1,8 px. Запас в два пикселя эту щель
+       закрывает и на ответ не влияет. */
+    let scale = 1;
+    for (let step = 0; step < 8; step++) {
+      const need = note.scrollWidth;
+      if (need <= have - 1) break;
+      scale = scale * (have - 2) / need;
+      let atFloor = true;
+      maths.forEach((k, i) => {
+        const px = Math.max(PANEL_MATH_MIN_PX, bases[i] * scale);
+        if (px > PANEL_MATH_MIN_PX) atFloor = false;
+        k.style.fontSize = px + 'px';
+      });
+      if (atFloor) break;
+    }
+  });
+}
+
+function syncHintDots(root) {
+  root = root || document.getElementById('tools-panel');
+  if (!root) return;
+  root.querySelectorAll('.help-dot').forEach(dot => {
+    const hints = dot._hints || [];
+    const live = hints.filter(h => h.isConnected && h.style.display !== 'none'
+                                  && fieldActive(h.parentElement || h));
+    dot.style.display = live.length ? '' : 'none';
+  });
 }
 
 function hintsToDots(root) {

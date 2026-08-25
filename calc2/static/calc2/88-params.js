@@ -30,6 +30,35 @@ const PULT_MOVABLE = ['mono-submode',                                          /
   'ma-dg-field', 'ma-fx-fixed-field'];                                 // макро: дефицит ΔG / фикс. курс
 const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
 
+/* ⚠️ ОРГАНЫ УПРАВЛЕНИЯ ВМЕШАТЕЛЬСТВОМ ОСТАЮТСЯ В СВОЕЙ КАРТОЧКЕ.
+
+   Решение владельца 25.08: «Ставка налога это не параметр формулы, а орган
+   управления сценой, и в ленте ей не место».
+
+   Что было. Лента собирается в `#params-body`, а карточка «Вмешательство
+   государства» стоит НИЖЕ неё, поэтому перенос ставки наверх ломал порядок
+   каскада: замер 25.08 — при потоварном налоге ряд «Налог платит» стоял на
+   y = 136, ставка на y = 199, а сам выбор вида вмешательства только на
+   y = 307. Человек видел ставку раньше, чем то, ставка чего это. У процентных
+   форм ряда стороны нет вовсе, и ставка оказывалась вообще первой на панели.
+
+   Что стало. Эти пять узлов из ленты не забираются НИКОГДА и живут по своему
+   месту в разметке `#sec-tax` — там порядок и без нас правильный:
+     вид вмешательства → вид налога/субсидии → кто платит → ставка →
+     подсказка → «было → стало».
+   Доводку (границы на дорожке, строка «имя = значение», редактор шага) они
+   при этом получают ту же самую: `syncPultRegulators` зовёт для них
+   `upgradeRegulator` на месте, не двигая узел.
+
+   ⚠️ ЛЕНТА НЕ ЛОМАЕТСЯ. Сдвиги кривых, буквы-параметры формул, под-режим
+   монополии, мировая цена, зарплата, α и прочие живые регуляторы сцен
+   по-прежнему переезжают в неё. Уходят ровно ставка вмешательства, цена
+   регулирования, объём квоты, цена внутри коридора и ряд стороны — то есть
+   содержимое одной карточки. */
+const PULT_STAY_HOME = new Set([
+  'taxside-row', 'tax-field', 'pc-field', 'quota-field', 'quota-price-field',
+]);
+
 // Какие экранные регуляторы должны жить в пульте ПРЯМО СЕЙЧАС (по состоянию).
 function pultRegulatorIds() {
   if (STATE.mode === 'market') {
@@ -59,9 +88,9 @@ function pultRegulatorIds() {
     if (t === 'tax' || t === 'subsidy') {
       const ids = [];
       // Ряд стороны живёт в ленте ровно тогда, когда каскад его показывает:
-      // потоварный налог и любая субсидия. У НДС и акциза стороны нет.
-      const sideOn = (STATE.market !== 'monopoly')
-                  && ((t === 'tax' && STATE.taxForm === 'unit') || t === 'subsidy');
+      // только у потоварной формы. У процентных сторона закреплена самой
+      // формой — доля берётся от цены покупателя либо от цены продавца.
+      const sideOn = (STATE.market !== 'monopoly') && !pctForm();
       if (sideOn) ids.push('taxside-row');
       ids.push('tax-field');
       return ids;
@@ -152,8 +181,19 @@ function shiftChipLabel(c) {
   return 'Сдвиг ' + curveChipLabel(c);
 }
 
-// Короткая метка кривой для чипа: по роли, иначе усечённая формула.
+/* Короткая метка кривой для чипа: по роли, иначе усечённая формула.
+
+   ⚠️ В СЦЕНЕ СЛОЖЕНИЯ БЕРЁМ ОБОЗНАЧЕНИЕ, А НЕ ОБРЕЗАННОЕ ИМЯ.
+   Имена там длинные и различаются последним словом: «спрос первой группы»,
+   «спрос второй группы», «спрос третьей группы». Обрезка по шестнадцати
+   символам оставляла от всех трёх одно и то же «спрос первой гр…», а сверху
+   ещё и CSS дорезал строку многоточием — на экране стояло три одинаковых
+   «Сдвиг спрос … = 0» (замер 25.08: обрезаны 5 подписей из 5). Обозначение
+   D₁ / S₂ короткое, различается всегда и совпадает с подписью на графике и
+   с обозначением в строке списка слева. Полное имя остаётся в подсказке. */
 function curveChipLabel(c) {
+  const tag = (typeof sumShortTag === 'function') ? sumShortTag(c) : null;
+  if (tag) return tag;
   const f = curveShortName(c);   // своё имя → роль → формула (Фаза 1)
   return f.length > 16 ? f.slice(0, 15) + '…' : f;
 }
@@ -167,13 +207,17 @@ function pultCurveSig(list) {
 /* Строка «имя = значение», набранная формулой (Н8, Н11, Н12). Одна на все виды
    регуляторов: и на буквы из формул, и на встроенные ставки, зарплаты и мировые
    цены — раньше они выглядели по-разному, хотя делают одно и то же. */
-function paintEqLabel(lab, name, value) {
+/* unit — единица измерения справа от числа («%»). Нужна ровно там, где число
+   без неё читается неправильно: ставка процентного налога «τ = 50» рядом с
+   рублёвой осью выглядит как 50 рублей. Пусто у всех остальных регуляторов. */
+function paintEqLabel(lab, name, value, unit) {
   lab.classList.add('param-eq');
   lab.dataset.eqName = name;
-  const plain = name + ' = ' + fmt(value);
+  const u = String(unit || '');
+  const plain = name + ' = ' + fmt(value) + (u ? ' ' + u : '');
   if (typeof katex === 'undefined') { lab.textContent = plain; return; }
   try {
-    katexInto(lab, texifyName(name) + ' = ' + fmt(value));
+    katexInto(lab, texifyName(name) + ' = ' + fmt(value) + (u === '%' ? '\\,\\%' : ''));
   } catch (e) { lab.textContent = plain; }
 }
 
@@ -189,6 +233,12 @@ function texifyName(name) {
      обычным шрифтом рядом с формулой на графике, где она курсивная. */
   const sh = s.match(/^(Сдвиг)\s+(.+)$/);
   if (sh) return '\\text{' + sh[1] + '\\,}' + texifyName(sh[2]);
+  /* Обозначение с ЯВНЫМ индексом через подчёркивание: «D_1», «S_2». Так
+     подписаны кривые в сцене сложения, и без этой ветки строка уходила бы в
+     \\text{} целиком — на экране стояло бы «D_1» с настоящим подчёркиванием
+     вместо индекса (замер 25.08). */
+  const idx = s.match(/^([A-Za-z])_([A-Za-z0-9]{1,3})$/);
+  if (idx) return idx[1] + '_{' + (/^\d+$/.test(idx[2]) ? idx[2] : '\\text{' + idx[2] + '}') + '}';
   const m = s.match(/^([A-Za-z])([A-Za-z0-9]{1,4})$/);
   if (m && !/[А-Яа-я]/.test(s)) return m[1] + '_{\\text{' + m[2] + '}}';
   return '\\text{' + s.replace(/([{}\\$&#^_~%])/g, '\\$1') + '}';
@@ -424,6 +474,8 @@ function buildPultCurveChips(list) {
     // upgradeRegulator строкой «имя = значение», и title на ней пропал бы.
     chip.setAttribute('data-tip',
       'Сдвиг кривой ' + tipName(curveShortName(c)) + ': ' + tipExpr(c.expr));
+    // Имя для подсказки строки «имя = значение»: человеческое, а не обозначение.
+    chip.dataset.regTip = 'Сдвиг кривой ' + curveShortName(c);
 
     const sl = document.createElement('input');
     /* ⚠️ ОДНО ЗНАЧЕНИЕ — ОДИН ИСТОЧНИК (п. 3, канон 2.1).
@@ -527,7 +579,13 @@ function syncPultRegulators(activeIds) {
   const body = document.getElementById('params-body');
   activeIds.forEach(id => {
     const n = document.getElementById(id);
-    if (!n || !body) return;
+    if (!n) return;
+    /* Домоседы (см. PULT_STAY_HOME) остаются на своём месте в карточке, но
+       доводку получают ту же. Видимостью у них распоряжается каскад
+       (applyIntervCascade), поэтому display здесь не трогаем: иначе лента
+       показала бы поле, которое каскад только что спрятал. */
+    if (PULT_STAY_HOME.has(id)) { upgradeRegulator(n); return; }
+    if (!body) return;
     if (n.parentElement !== body) body.appendChild(n);
     n.style.display = '';
     upgradeRegulator(n);
@@ -595,7 +653,13 @@ function upgradeRegulator(field) {
   // У регуляторов сцен подпись это <label>, у чипов кривых — .pchip-label.
   const rawName = (plainLabel(labEl || chipLab)
                     .split('=')[0]).replace(/[:\s]+$/, '').trim();
-  const name = shortRegulatorName(field.id, rawName);
+  /* ⚠️ ИМЯ СЧИТАЕТСЯ КАЖДЫЙ РАЗ, А НЕ ОДИН РАЗ ПРИ СБОРКЕ ЧИПА. У ставки
+     обозначение зависит от выбранной формы (t / s / τ, %), а чип собирается
+     единожды и живёт до конца сцены: захваченное в замыкание имя оставляло
+     в ленте «t = 50» и у акциза, и у субсидии. */
+  const nameOf = () => shortRegulatorName(field.id, rawName);
+  const unitOf = () => (field.id === 'tax-field' ? rateUnit() : '');
+  const name = nameOf();
 
   /* Значение показываем строкой «имя = значение», как у буквы-параметра, а не
      подписью слева и числом справа. Собственную подпись поля прячем, иначе имя
@@ -604,8 +668,16 @@ function upgradeRegulator(field) {
   if (!eq) {
     eq = document.createElement('span');
     eq.className = 'pchip-label reg-eq pchip-editable';
-    eq.setAttribute('data-tip', rawName
-      ? (tipName(rawName) + '. Щёлкните, чтобы ввести точное значение')
+    /* ⚠️ В ПОДСКАЗКЕ СТОИТ ПОЛНОЕ ИМЯ, А НЕ ОБОЗНАЧЕНИЕ ИЗ ПОДПИСИ.
+       Подпись ползунка в сцене сложения короткая — «Сдвиг D_1», и она набрана
+       формулой. Подсказка же обычный текст: `tipName` знает обозначения с
+       юникодным индексом, но не запись «D_1», и на экране всплывала строка с
+       настоящим подчёркиванием (проверка блоков «обозначений обычным шрифтом
+       нет» выросла с 1 до 5). Поле может назвать себе имя для подсказки
+       отдельно — там оно человеческое и подчёркиваний не содержит. */
+    const tipSrc = field.dataset.regTip || rawName;
+    eq.setAttribute('data-tip', tipSrc
+      ? (tipName(tipSrc) + '. Щёлкните, чтобы ввести точное значение')
       : 'Щёлкните, чтобы ввести точное значение');
     /* Куда встать: у чипа есть верхняя строка, у поля сцены её нет. Дорожка
        ползунка может лежать глубже, поэтому вставляем в САМОЕ НАЧАЛО поля, а не
@@ -630,7 +702,7 @@ function upgradeRegulator(field) {
     if (num) num.classList.add('reg-num-hidden');
   }
 
-  const paint = () => paintEqLabel(eq, name, +sl.value);
+  const paint = () => paintEqLabel(eq, nameOf(), +sl.value, unitOf());
   const sync = () => { lo.textContent = fmt(+sl.min); hi.textContent = fmt(+sl.max); paint(); };
   sync();
   /* Границы сцена двигает атрибутами, и наблюдатель их ловит. А вот САМО
@@ -651,7 +723,7 @@ function upgradeRegulator(field) {
 
   eq.addEventListener('click', () => {
     if (editor._close) editor._close();          // Н10: точное значение закрывает интервал
-    editEqValue(eq, name, +sl.value, (v) => {
+    editEqValue(eq, nameOf(), +sl.value, (v) => {
       // Случай первый: значение за полосой — полоса переезжает, значение в центре.
       if (v < +sl.min || v > +sl.max) {
         const b = centerBandOn({ min: +sl.min, max: +sl.max }, v);
@@ -681,10 +753,16 @@ function upgradeRegulator(field) {
    подсказке; в колонке 268px помещается только обозначение. */
 const REGULATOR_SHORT = {
   'ppft-price-field': 'Pw', 'tb-price-field': 'Pw', 'open-pw-field': 'Pw',
-  'tax-field': 't', 'pc-field': 'Preg', 'union-wage-field': 'Wu',
+  'pc-field': 'Preg', 'union-wage-field': 'Wu',
   'labmin-field': 'Wmin', 'ineq-alpha-field': 'alpha',
 };
 function shortRegulatorName(id, raw) {
+  /* ⚠️ У СТАВКИ ОБОЗНАЧЕНИЕ ЗАВИСИТ ОТ ФОРМЫ, поэтому в готовом списке его
+     нет. У процентных форм это «τ, %», у потоварных — t или s. Стояло здесь
+     жёстко «t», и в ленте регуляторов ставка акциза 50 % читалась как 50
+     рублей — ровно та запись в деньгах, которой у процентной формы быть не
+     должно. Берём ту же букву, что и панель: одна точка правды. */
+  if (id === 'tax-field') return rateLetter();
   if (REGULATOR_SHORT[id]) return REGULATOR_SHORT[id];
   const s = String(raw || '').trim();
   if (!s) return 'Значение';
@@ -1156,12 +1234,16 @@ function wireControls() {
   const elS = document.getElementById('chk-elast-s');
   if (elS) elS.addEventListener('change', () => { STATE.showElastS = elS.checked; redrawAll(); });
 
-  // Уровень 2 каскада вмешательства: вид налога (потоварный / НДС / акциз)
-  // или вид субсидии (потоварная / процентная — третья кнопка тогда скрыта).
-  [['tk-unit', 'unit'], ['tk-vat', 'vat'], ['tk-exc', 'excise']].forEach(([id, form]) => {
-    const b = document.getElementById(id);
-    if (b) b.addEventListener('click', () => setTaxForm(form));
-  });
+  /* Уровень 2 каскада вмешательства: вид налога (потоварный / НДС / акциз)
+     или вид субсидии (потоварная / % от цены продавца / % от цены покупателя).
+     Кнопки разложены ПО БАЗЕ ставки, а какая именно форма за кнопкой стоит,
+     решает тип вмешательства — иначе щелчок по «Акцизу» в ветке субсидии
+     поставил бы налоговую форму. */
+  [['tk-unit', 'unit', 'unit'], ['tk-vat', 'vat', 'subseller'], ['tk-exc', 'excise', 'subbuyer']]
+    .forEach(([id, taxForm, subForm]) => {
+      const b = document.getElementById(id);
+      if (b) b.addEventListener('click', () => setTaxForm(STATE.intervType === 'subsidy' ? subForm : taxForm));
+    });
 
   /* Режим издержек (Задача 2). Постоянные затраты отдельным полем больше не
      вводятся (Б24): в режиме «задаю TC» они равны TC(0). Поэтому здесь только

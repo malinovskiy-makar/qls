@@ -1909,8 +1909,16 @@ const CASES = [
        осталось тем же по сути — индекс обязан доехать до бумаги, — но искать
        его надо в новой записи. Заодно эта строка держит находку фазы: индекс
        при ЧИСЛЕ разбор для бумаги раньше не понимал вовсе и терял молча. */
+    /* ⚠️ ЧИСЛО ПЕРЕСЧИТАНО 25.08, И ВОТ ПОЧЕМУ. Сцена сложения стала
+       подписывать свои кривые обозначениями — D₁, D₂, D₃, S₁, S₂ и D, S
+       вместо «спрос первой группы» и родни (шесть подписей по 137–181 px
+       читались вдоль края одной строкой). Каждое обозначение с индексом
+       добавляет по подписи с tspan[dy], и потолок 58 оказался мал: замер даёт
+       61. Смысл проверки не изменился — индексы обязаны быть НАБРАНЫ, а не
+       слиты в текст, за это отвечает `glued`. Середина сдвинута на измеренное
+       значение, допуск прежний, нижний край от этого стал строже. */
     checks: [['слипшихся величин', 'glued', 0, 0],
-             ['подписей с индексом', 'withSub', 30, 28],
+             ['подписей с индексом', 'withSub', 61, 28],
              ['в файле цена покупателя с индексом', 'texPb', 1, 0],
              ['подписи из файла не пропали', 'texNodes', 11, 4]],
   },
@@ -3267,25 +3275,43 @@ const CASES = [
              ['сбор', 'tx', 800, 6], ['DWL', 'dwl', 100, 2]],
   },
   {
-    /* (б) НДС τ = 20 %: ставка берётся сверх цены продавца, значит предложение
-       ПОВОРАЧИВАЕТСЯ: S_после = 1,2·Q. 100 − Q = 1,2·Q ⇒ Q₁ = 100/2,2 = 45,4545.
-       Pb = 54,5455, Ps = 45,4545 (их отношение равно 1 + τ),
+    /* (б) Две ПРОЦЕНТНЫЕ формы налога, обе дают ПОВОРОТ предложения, но базы
+       у них разные — отсюда и разные точки.
+
+       НДС τ = 20 % — доля от цены ПРОДАВЦА, начисляется сверх неё:
+       S_после = 1,2·Q. 100 − Q = 1,2·Q ⇒ Q₁ = 100/2,2 = 45,4545.
+       Pb = 54,5455, Ps = 45,4545, их отношение равно 1 + τ,
        сбор = (54,5455 − 45,4545)·45,4545 = 413,2231,
        DWL = ½·(50 − 45,4545)·9,0909 = 20,6612.
-       АКЦИЗ по механике потоварный: те же числа, что в случае (а). */
-    name: '(б) НДС τ=20% ⇒ Q1=45,4545, сбор=413,2231, DWL=20,6612; акциз = потоварный',
+
+       АКЦИЗ τ = 20 % — доля от цены ПОКУПАТЕЛЯ: S_после = Q/0,8 = 1,25·Q.
+       100 − Q = 1,25·Q ⇒ Q₁ = 100/2,25 = 44,4444. Pb = 55,5556, Ps = 44,4444,
+       их отношение Ps/Pb равно 1 − τ = 0,8,
+       сбор = τ·Pb·Q = 0,2·55,5556·44,4444 = 493,8272,
+       DWL = ½·(50 − 44,4444)·11,1111 = 30,8642.
+
+       ⚠️ Акциз ЗДЕСЬ И БЫЛ СЛОМАН: до 24.08 он проваливался в потоварную ветку
+       и давал числа случая (а) — Q₁ = 40 при ставке «20 рублей». Этот случай
+       ровно то и проверяет: у акциза своя точка, не совпадающая ни с (а),
+       ни с НДС. */
+    name: '(б) НДС τ=20% ⇒ Q1=45,4545; акциз τ=20% ⇒ Q1=44,4444 (свои точки, не потоварные)',
     run: `pickScene('taxes'); setTaxForm('vat'); setTax(20); redrawAll();
           var v = STATE.taxEq || {};
           var res = { vQ: v.Q, vPb: v.Pb, vPs: v.Ps, vRatio: v.Pb / v.Ps, vTx: STATE.tx, vDwl: STATE.dwl };
           pickScene('taxes'); setTaxForm('excise'); setTax(20); redrawAll();
           var e = STATE.taxEq || {};
-          res.eQ = e.Q; res.ePb = e.Pb; res.ePs = e.Ps; res.eTx = STATE.tx; res.eDwl = STATE.dwl;
+          res.eQ = e.Q; res.ePb = e.Pb; res.ePs = e.Ps; res.eRatio = e.Ps / e.Pb;
+          res.eTx = STATE.tx; res.eDwl = STATE.dwl;
+          // Тождество: сбор по формуле таблицы обязан совпасть с (Pb − Ps)·Q.
+          res.eIdent = Math.abs(0.2 * e.Pb * e.Q - STATE.tx);
           return res;`,
     checks: [['НДС Q1', 'vQ', 45.4545, 0.02], ['НДС Pb', 'vPb', 54.5455, 0.02],
              ['НДС Ps', 'vPs', 45.4545, 0.02], ['НДС Pb/Ps = 1+τ', 'vRatio', 1.2, 0.002],
              ['НДС сбор', 'vTx', 413.2231, 0.6], ['НДС DWL', 'vDwl', 20.6612, 0.3],
-             ['акциз Q1', 'eQ', 40, 0.3], ['акциз Pb', 'ePb', 60, 0.3],
-             ['акциз Ps', 'ePs', 40, 0.3], ['акциз сбор', 'eTx', 800, 6], ['акциз DWL', 'eDwl', 100, 2]],
+             ['акциз Q1', 'eQ', 44.4444, 0.02], ['акциз Pb', 'ePb', 55.5556, 0.02],
+             ['акциз Ps', 'ePs', 44.4444, 0.02], ['акциз Ps/Pb = 1−τ', 'eRatio', 0.8, 0.002],
+             ['акциз сбор', 'eTx', 493.8272, 0.6], ['акциз DWL', 'eDwl', 30.8642, 0.3],
+             ['акциз: сбор = (Pb−Ps)·Q', 'eIdent', 0, 1e-6]],
   },
   {
     /* (в) Кто ФОРМАЛЬНО платит налог, экономику не меняет. Возвращаем сами
@@ -3523,11 +3549,15 @@ const CASES = [
        кривой: именно там жил дефект (сразу после «Поставить в поле» запись
        была правильной и до первой пересборки). */
     name: 'Четыре дефекта (г) кусочная — список условий, без вложенности и ∞',
+    /* ⚠️ СТРОКИ СТАВИМ ПОСЛЕ ОТКРЫТИЯ ОКНА, А НЕ ДО. Конструктор больше ничего
+       не помнит со страницы: при открытии он собирает строки заново из того,
+       что стоит В ПОЛЕ (иначе куски текли между полями и моделями). Значит и
+       здесь порядок как у человека — сперва открыть, потом набрать. */
     run: `var build = function (rows, n) {
             resetSceneMemory(); pickScene('sd'); redrawAll();
             var inp = document.getElementById('curve-expr-1');
-            PW.rows = rows.slice(); PW.n = n;
             openPiecewise(inp, 'Q');
+            PW.rows = rows.slice(); PW.n = n; renderPw();
             document.getElementById('pw-apply').click();
             // То, что поле возьмёт при пересборке строки кривой.
             return mathToLatexField(document.getElementById('curve-expr-1').value);
@@ -3559,8 +3589,9 @@ const CASES = [
     name: 'Четыре дефекта (д) вне условий кусочной кривой нет',
     run: `resetSceneMemory(); pickScene('sd'); redrawAll();
           var inp = document.getElementById('curve-expr-1');
+          openPiecewise(inp, 'Q');
           PW.rows = [{ f: '100 - Q', a: '0', b: '40' }, { f: '80 - 0.5*Q', a: '40', b: '80' }];
-          PW.n = 2; openPiecewise(inp, 'Q');
+          PW.n = 2; renderPw();
           document.getElementById('pw-apply').click(); redrawAll();
           var c = STATE.curves.filter(function (x) { return x.id === 1; })[0];
           var def = function (q) { var v = evalCurve(c, q); return (v == null || isNaN(v)) ? 0 : 1; };
@@ -3746,6 +3777,508 @@ const CASES = [
     checks: [['запись принята полем', 'accepted', 1, 0], ['картинка изменилась', 'changed', 1, 0],
              ['модель приняла запись, отказа нет', 'modelOk', 1, 0],
              ['путей на холсте', 'paths', 3, 2]],
+  },
+  {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (а). РАВНОВЕСИЕ НЕ ЗАВИСИТ ОТ ГРАНИЦ КАДРА.
+       Дефект 24.08: findEquilibrium без явной границы сканировал отрезок до
+       CONFIG.Qmax — правого края ВИДИМОГО окна. Один и тот же рынок на
+       стартовом масштабе писал «кривые не пересекаются», а после отдаления
+       показывал Q* = 128. Здесь один набор формул меряется на ТРЁХ масштабах:
+       стартовом, отдалённом и приближённом. Числа обязаны совпасть. */
+    name: 'Первая четверть (а) равновесие одно и то же на трёх масштабах',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 3); sumSetCount('S', 2);
+          var gd = STATE.curves.filter(function (c) { return c.sumGroup === 'D' && c.kind !== 'sum'; });
+          var gs = STATE.curves.filter(function (c) { return c.sumGroup === 'S' && c.kind !== 'sum'; });
+          ['100-Q', '60-Q', '40-Q'].forEach(function (e, i) { updateCurveExpr(gd[i], e); });
+          ['Q-100', 'Q+20'].forEach(function (e, i) { updateCurveExpr(gs[i], e); });
+          redrawAll();
+          var startQ = STATE.eq ? STATE.eq.Q : NaN, startP = STATE.eq ? STATE.eq.P : NaN;
+          var startMax = CONFIG.Qmax;
+          zoomStep(1.6); zoomStep(1.6); zoomStep(1.6); redrawAll();
+          var farQ = STATE.eq ? STATE.eq.Q : NaN, farP = STATE.eq ? STATE.eq.P : NaN;
+          var farMax = CONFIG.Qmax;
+          zoomStep(1 / 1.6); zoomStep(1 / 1.6); zoomStep(1 / 1.6); zoomStep(1 / 1.6); redrawAll();
+          var nearQ = STATE.eq ? STATE.eq.Q : NaN, nearP = STATE.eq ? STATE.eq.P : NaN;
+          var nearMax = CONFIG.Qmax;
+          return { startQ: startQ, startP: startP, farQ: farQ, farP: farP,
+                   nearQ: nearQ, nearP: nearP,
+                   grew: (farMax > startMax * 1.5) ? 1 : 0,
+                   shrank: (nearMax < startMax) ? 1 : 0 };`,
+    checks: [['Q* на стартовом масштабе', 'startQ', 128, 1e-3],
+             ['P* на стартовом масштабе', 'startP', 24, 1e-3],
+             ['Q* после отдаления', 'farQ', 128, 1e-3],
+             ['P* после отдаления', 'farP', 24, 1e-3],
+             ['Q* после приближения', 'nearQ', 128, 1e-3],
+             ['P* после приближения', 'nearP', 24, 1e-3],
+             ['окно и вправду отдалилось', 'grew', 1, 0],
+             ['окно и вправду приблизилось', 'shrank', 1, 0]],
+  },
+  {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (б). ИЗЛИШКИ НЕ УХОДЯТ НИЖЕ ОСИ Q.
+       Дефект 24.08: у предложения Q − 100 обратная функция при Q < 100
+       отрицательна, и интеграл излишка продавца уходил в отрицательные цены —
+       PS первой группы выходил 7 688 вместо 2 688, ровно на треугольник под
+       осью. Запись суммарной кривой при этом начиналась с Q = 100, на отрезке
+       0…100 функции не было вовсе, и PS по суммарной давал NaN.
+       Допуск жёсткий: расхождение здесь — ошибка правила, а не округления. */
+    name: 'Первая четверть (б) излишки считаются только над осью Q',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 3); sumSetCount('S', 2);
+          var gd = STATE.curves.filter(function (c) { return c.sumGroup === 'D' && c.kind !== 'sum'; });
+          var gs = STATE.curves.filter(function (c) { return c.sumGroup === 'S' && c.kind !== 'sum'; });
+          ['100-Q', '60-Q', '40-Q'].forEach(function (e, i) { updateCurveExpr(gd[i], e); });
+          ['Q-100', 'Q+20'].forEach(function (e, i) { updateCurveExpr(gs[i], e); });
+          redrawAll();
+          var st = sumGroupStats();
+          var box = document.getElementById('info-sum');
+          return { ps1: st.S[0].surplus, ps2: st.S[1].surplus, psGroups: st.psGroups,
+                   psWhole: st.psWhole, psGap: st.psGap,
+                   cs1: st.D[0].surplus, cs2: st.D[1].surplus, cs3: st.D[2].surplus,
+                   csGroups: st.csGroups, csWhole: st.csWhole, csGap: st.csGap,
+                   sw: st.csGroups + st.psGroups,
+                   warn: (box && box.querySelector('.warn')) ? 1 : 0,
+                   zeroAt50: evalCurve(STATE.S, 50) };`,
+    checks: [['излишек S₁', 'ps1', 2688, 1e-6], ['излишек S₂', 'ps2', 8, 1e-6],
+             ['излишки продавцов вместе', 'psGroups', 2696, 1e-6],
+             ['площадь под суммарным предложением', 'psWhole', 2696, 1e-6],
+             ['расхождение двух путей PS', 'psGap', 0, 1e-6],
+             ['излишек D₁', 'cs1', 2888, 1e-6], ['излишек D₂', 'cs2', 648, 1e-6],
+             ['излишек D₃', 'cs3', 128, 1e-6],
+             ['излишки покупателей вместе', 'csGroups', 3664, 1e-6],
+             ['площадь под суммарным спросом', 'csWhole', 3664, 1e-6],
+             ['расхождение двух путей CS', 'csGap', 0, 1e-6],
+             ['общественное благосостояние', 'sw', 6360, 1e-6],
+             ['предупреждения о расхождении нет', 'warn', 0, 0],
+             ['суммарное предложение при Q=50 равно нулю', 'zeroAt50', 0, 1e-9]],
+  },
+  {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (в). КРИВАЯ НЕ РИСУЕТСЯ НИЖЕ ОСИ Q.
+       Дефект 24.08: curvePoints обрезал область по количеству, но по цене не
+       обрезал вовсе, и в пути спроса 100 − Q при окне до Q = 200 лежало 200
+       точек из 401 с отрицательной ценой, до P = −100. Прямоугольный clip-path
+       прятал их, пока окно начиналось в нуле, но в самом пути они оставались и
+       уходили в полосу попадания мыши, в ключевые точки и в выгрузку.
+       Читаем НАРИСОВАННЫЙ путь и переводим пиксели обратно шкалами. */
+    name: 'Первая четверть (в) в пути кривой нет точек с P < 0',
+    run: `resetSceneMemory(); pickScene('sd');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-Q');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+          document.getElementById('inp-qmax').value = '200';
+          document.getElementById('inp-pmax').value = '200';
+          applyViewBounds(); redrawAll();
+           var below = 0, maxQ = -1e9, minQ = 1e9, pAtMin = NaN, n = 0;
+           document.querySelectorAll('#chart path[data-curve]').forEach(function (el) {
+             var id = +el.getAttribute('data-curve');
+             var cur = STATE.curves.find(function (c) { return c.id === id; });
+             if (!cur || cur.role !== 'demand') return;
+             String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
+               var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+               if (!m) return;
+               n++;
+               var q = sx.invert(+m[1]), p = sy.invert(+m[2]);
+               if (p < -1e-6) below++;
+               if (q > maxQ) maxQ = q;
+               if (q < minQ) { minQ = q; pAtMin = p; }
+             });
+           });
+           return { below: below, maxQ: maxQ, minQ: minQ, pAtMin: pAtMin, drawn: (n >= 2 ? 1 : 0) };`,
+    /* ⚠️ ПРОВЕРЯЕМ ПОЛНОТУ ЛИНИИ, А НЕ ГУСТОТУ СЕТКИ.
+       Здесь стояло «точек в пути 201 ± 3». Это была не проверка правила, а
+       отпечаток тогдашней реализации: путь строился по сетке из 400 отрезков,
+       и половина узлов приходилась на первую четверть. Прямая, проведённая
+       по своим двум концам, это ТА ЖЕ линия (25.08, построение по узлам
+       излома), но узлов в ней два, и проверка краснела на верной кривой.
+       Правило же в том, что линия покрывает участок ЦЕЛИКОМ и не заходит под
+       ось: поэтому теперь названы оба конца — начало (0; 100) и обрыв у
+       Q = 100, — а от числа точек требуется только «их не меньше двух». */
+    checks: [['точек с P < 0 в пути спроса', 'below', 0, 0],
+             ['путь начинается у Q = 0', 'minQ', 0, 0.51],
+             ['в начале пути цена 100', 'pAtMin', 100, 0.51],
+             ['путь обрывается у Q = 100', 'maxQ', 100, 0.51],
+             ['путь вообще нарисован', 'drawn', 1, 0]],
+  },
+  {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (г). ПЕРЕСЕЧЕНИЕ ВНЕ ЧЕТВЕРТИ НАЗВАНО, НО НЕ РАВНОВЕСИЕ.
+       Олимпиадная ловушка: у Qd = 100 − P и Qs = −200 + 0,5·P пересечение
+       лежит в (−100; 200). Ученик видит правдоподобную цену и заканчивает
+       решать. Калькулятор обязан назвать числа в разборе — и НЕ считать вокруг
+       них ничего: ни излишков, ни равновесия. */
+    name: 'Первая четверть (г) пересечение вне четверти названо, но не равновесие',
+    run: `resetSceneMemory(); pickScene('sd');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-P');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), '-200+0.5*P');
+          redrawAll();
+          var ex = document.getElementById('ex-body');
+          var txt = '';
+          if (ex) { var cl = ex.cloneNode(true);
+            cl.querySelectorAll('.katex-mathml, annotation').forEach(function (x) { x.remove(); });
+            txt = cl.textContent; }
+          var areas = document.getElementById('info-areas');
+          return { eqNull: STATE.eq === null ? 1 : 0,
+                   offQ: STATE.offEq ? STATE.offEq.Q : NaN,
+                   offP: STATE.offEq ? STATE.offEq.P : NaN,
+                   has200: /200/.test(txt) ? 1 : 0,
+                   has100: /100/.test(txt) ? 1 : 0,
+                   noStar: /Q\\s*\\*|P\\s*\\*/.test(txt) ? 0 : 1,
+                   areasEmpty: (areas && areas.textContent.trim() === '') ? 1 : 0,
+                   csNull: (STATE.cs == null) ? 1 : 0,
+                   dashed: document.querySelectorAll('[data-offquad]').length };`,
+    checks: [['равновесия нет', 'eqNull', 1, 0],
+             ['пересечение Q', 'offQ', -100, 1e-3],
+             ['пересечение P', 'offP', 200, 1e-3],
+             ['в разборе есть число 200', 'has200', 1, 0],
+             ['в разборе есть число 100', 'has100', 1, 0],
+             ['обозначений Q* и P* в разборе нет', 'noStar', 1, 0],
+             ['блок «Излишки» пуст', 'areasEmpty', 1, 0],
+             ['излишки не посчитаны', 'csNull', 1, 0],
+             ['пунктир к точке нарисован', 'dashed', 2, 0]],
+  },
+  {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (д). ПРЕДЕЛЬНАЯ КРИВАЯ — ИСКЛЮЧЕНИЕ.
+       MR продолжается вниз до Q-перехвата породившей её кривой: при спросе
+       P = 100 − Q это Q = 100, где MR = −100. Продолжение обязано отличаться
+       от основной линии видом — толщиной и прозрачностью, а не штрихом: MR
+       и так штриховая. */
+    name: 'Первая четверть (д) предельная кривая продолжается ниже оси',
+    run: `resetSceneMemory(); pickScene('mono');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-Q');
+          var mc = STATE.curves.find(function (c) { return c.role === 'mc' || c.role === 'supply'; });
+          if (mc) updateCurveExpr(mc, '20');
+          redrawAll();
+          var tails = document.querySelectorAll('#chart [data-marginal-tail]');
+          var maxQ = -1e9, minP = 1e9, w = 0, op = 1;
+          tails.forEach(function (el) {
+            w = parseFloat(el.getAttribute('stroke-width'));
+            op = parseFloat(el.getAttribute('opacity'));
+            String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
+              var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+              if (!m) return;
+              var q = sx.invert(+m[1]), p = sy.invert(+m[2]);
+              if (q > maxQ) maxQ = q;
+              if (p < minP) minP = p;
+            });
+          });
+          var m = STATE.mono || {};
+          return { n: tails.length, maxQ: maxQ, minP: minP, w: w, op: op,
+                   Qm: m.Qm, Pm: m.Pm, Qc: m.Qc };`,
+    checks: [['продолжений MR на холсте', 'n', 1, 0],
+             ['край продолжения по Q', 'maxQ', 100, 0.6],
+             ['самая нижняя точка по P', 'minP', -100, 1.5],
+             ['продолжение тоньше основной линии', 'w', 1.1, 0.001],
+             ['продолжение полупрозрачное', 'op', 0.45, 0.001],
+             ['монопольный выпуск не сдвинулся', 'Qm', 40, 1e-3],
+             ['монопольная цена не сдвинулась', 'Pm', 60, 1e-3],
+             ['конкурентный выпуск не сдвинулся', 'Qc', 80, 1e-3]],
+  },
+  {
+    /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (е). ЗАПИСЬ СУММАРНОЙ КРИВОЙ НЕ ЕДЕТ С МАСШТАБОМ.
+       sumLinearRecord строил участки по ценам до CONFIG.Pmax, и границы
+       участков в «Объяснении модели» менялись вместе с кадром: «Q <= 180» на
+       стартовом окне и «Q <= 300» после отдаления. А по этой записи кривая и
+       считается, поэтому вместе с ней ехала вся арифметика излишков.
+       Сравниваем строки буквально, а не числа. */
+    name: 'Первая четверть (е) запись суммарной кривой одна на всех масштабах',
+    run: `resetSceneMemory(); pickScene('sdsum'); redrawAll();
+          /* ⚠️ ЗАПИСЬ ПЕРЕСОБИРАЕМ ЗАНОВО НА КАЖДОМ МАСШТАБЕ.
+             Кэш пересборки держит первую собранную запись и отдаёт её дальше
+             не глядя — и это правильно ровно потому, что от кадра она не
+             зависит. Но проверять надо само СВОЙСТВО, а не кэш: иначе верни
+             зависимость от CONFIG.Pmax, и случай останется зелёным, потому
+             что кэш подсунет прежнюю строку. Сбрасываем подпись руками. */
+          var rec = function () {
+            STATE._sumSig = null; sumRebuild();
+            var d = STATE.curves.find(function (c) { return c.kind === 'sum' && c.sumGroup === 'D'; });
+            var s = STATE.curves.find(function (c) { return c.kind === 'sum' && c.sumGroup === 'S'; });
+            return String(d ? d.expr : '') + ' ## ' + String(s ? s.expr : '');
+          };
+          var a = rec();
+          zoomStep(1.6); redrawAll(); var b = rec();
+          zoomStep(1 / 1.6); zoomStep(1 / 1.6); redrawAll(); var c = rec();
+          /* ⚠️ ОДНОГО СРАВНЕНИЯ ТРЁХ МАСШТАБОВ МАЛО. Кэш пересборки заведён
+             ровно под то, что запись от кадра не зависит: верни зависимость,
+             и кэш просто отдаст СТАРУЮ запись — три строки совпадут, а сама
+             запись будет неверной. Поэтому рядом стоит точный текст: числа
+             160 и 180 на концах берутся у групп (удвоенная запретительная
+             цена), а не у границ окна. */
+          var wantD = '(Q >= 0 and Q < 40) ? 100 - Q : ((Q >= 40 and Q <= 160) ? 80 - 0.5*Q : NaN)';
+          var wantS = '(Q >= 0 and Q < 20) ? Q : ((Q >= 20 and Q <= 180) ? 0.5*Q + 10 : NaN)';
+          return { sameAB: (a === b) ? 1 : 0, sameBC: (b === c) ? 1 : 0,
+                   notEmpty: (a.length > 20) ? 1 : 0,
+                   textD: (a.split(' ## ')[0] === wantD) ? 1 : 0,
+                   textS: (a.split(' ## ')[1] === wantS) ? 1 : 0 };`,
+    checks: [['запись после отдаления та же', 'sameAB', 1, 0],
+             ['запись после приближения та же', 'sameBC', 1, 0],
+             ['запись вообще собралась', 'notEmpty', 1, 0],
+             ['текст записи спроса тот, что ждём', 'textD', 1, 0],
+             ['текст записи предложения тот, что ждём', 'textS', 1, 0]],
+  },
+  /* =====================================================================
+     ПРОЦЕНТНЫЕ НАЛОГИ И СУБСИДИИ (сессия 24.08, ветка feat/calc2-pct-tax).
+     Четыре процентные формы описаны одной таблицей PCT_FORMS. Числа взяты
+     из учебника Бахарева (глава «Налоги и субсидии») и посчитаны руками
+     в комментарии к каждому случаю: тест сверяет движок с арифметикой.
+     ===================================================================== */
+  {
+    /* (проц-а) ТЕОРЕМА ЭКВИВАЛЕНТНОСТИ. D = 120 − Q, S = Q, Q* = 60, P* = 60.
+       Три разные формы, подобранные так, чтобы дать ОДНУ И ТУ ЖЕ точку:
+         потоварный t = 40   ⇒ S+40 = Q+40;  120−Q = Q+40  ⇒ Q = 40;
+         акциз     τ = 50 %  ⇒ S/(1−0,5) = 2Q; 120−Q = 2Q  ⇒ Q = 40;
+         НДС       τ = 100 % ⇒ S·(1+1)   = 2Q; 120−Q = 2Q  ⇒ Q = 40.
+       Всюду Pd = 80, Ps = 40, сбор 1600, DWL = ∫₄₀^₆₀(120−2q)dq = 400.
+
+       ⚠️ ЭТОТ СЛУЧАЙ И ЛОВИТ СТАРЫЙ ДЕФЕКТ. До 24.08 акциз проваливался
+       в потоварную ветку и при «50» сдвигал кривую на 50 рублей: точка
+       уезжала в (35; 85/35), и три точки переставали совпадать. Сравниваем
+       не только с арифметикой, но и попарно между формами — так дефект
+       виден даже если ошибутся все три одинаково. */
+    name: '(проц-а) Эквивалентность: потоварный 40, акциз 50 %, НДС 100 % — одна точка',
+    run: `var snap = function (form, rate) {
+            resetSceneMemory(); pickScene('taxes');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '120-Q');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+            setType('tax'); setTaxForm(form); setTax(rate); redrawAll();
+            var te = STATE.taxEq || {};
+            return { Q: te.Q, Pd: te.Pb, Ps: te.Ps, tx: STATE.tx, dwl: STATE.dwl };
+          };
+          var u = snap('unit', 40), e = snap('excise', 50), v = snap('vat', 100);
+          var d = function (a, b) { return Math.max(Math.abs(a.Q - b.Q), Math.abs(a.Pd - b.Pd),
+                                                    Math.abs(a.Ps - b.Ps), Math.abs(a.tx - b.tx)); };
+          return { uQ: u.Q, uPd: u.Pd, uPs: u.Ps, uTx: u.tx, uDwl: u.dwl,
+                   eQ: e.Q, ePd: e.Pd, ePs: e.Ps, eTx: e.tx, eDwl: e.dwl,
+                   vQ: v.Q, vPd: v.Pd, vPs: v.Ps, vTx: v.tx, vDwl: v.dwl,
+                   dUE: d(u, e), dUV: d(u, v),
+                   // Тождество столбца «Деньги» таблицы PCT_FORMS.
+                   identE: Math.abs(0.5 * e.Pd * e.Q - e.tx),
+                   identV: Math.abs(1.0 * v.Ps * v.Q - v.tx) };`,
+    checks: [['потоварный Q1', 'uQ', 40, 1e-6], ['потоварный Pd', 'uPd', 80, 1e-6],
+             ['потоварный Ps', 'uPs', 40, 1e-6], ['потоварный сбор', 'uTx', 1600, 1e-4],
+             ['потоварный DWL', 'uDwl', 400, 0.5],
+             ['акциз Q1', 'eQ', 40, 1e-6], ['акциз Pd', 'ePd', 80, 1e-6],
+             ['акциз Ps', 'ePs', 40, 1e-6], ['акциз сбор', 'eTx', 1600, 1e-4],
+             ['акциз DWL', 'eDwl', 400, 0.5],
+             ['НДС Q1', 'vQ', 40, 1e-6], ['НДС Pd', 'vPd', 80, 1e-6],
+             ['НДС Ps', 'vPs', 40, 1e-6], ['НДС сбор', 'vTx', 1600, 1e-4],
+             ['НДС DWL', 'vDwl', 400, 0.5],
+             ['потоварный и акциз — одна точка', 'dUE', 0, 1e-6],
+             ['потоварный и НДС — одна точка', 'dUV', 0, 1e-6],
+             ['акциз: сбор = τ·Pd·Q', 'identE', 0, 1e-6],
+             ['НДС: сбор = τ·Ps·Q', 'identV', 0, 1e-6]],
+  },
+  {
+    /* (проц-б) ДВЕ ПРОЦЕНТНЫЕ СУБСИДИИ. D = 120 − Q, S = Q, ставка 50 %.
+       От цены ПОКУПАТЕЛЯ: S/(1+0,5) = (2/3)Q; 120−Q = (2/3)Q ⇒ Q = 72,
+         Pd = 48, Ps = 72, расход = 0,5·48·72 = 1728,
+         DWL = ∫₆₀^₇₂(2q−120)dq = 144.
+       От цены ПРОДАВЦА: S·(1−0,5) = 0,5Q; 120−Q = 0,5Q ⇒ Q = 80,
+         Pd = 40, Ps = 80, расход = 0,5·80·80 = 3200,
+         DWL = ∫₆₀^₈₀(2q−120)dq = 400.
+       Расход выводится со знаком минус, как у потоварной.
+
+       ⚠️ ДВЕ ФОРМЫ ОБЯЗАНЫ РАЗОЙТИСЬ. До 24.08 процентная субсидия была одна
+       (и равнялась нынешней «от цены покупателя»), а вторая кнопка попадала
+       в потоварную ветку. Проверяем не только числа, но и то, что точки
+       РАЗНЫЕ: иначе правка «обе кнопки ведут в одну форму» осталась бы
+       зелёной по каждому числу в отдельности. */
+    name: '(проц-б) Субсидии 50 %: от цены покупателя Q=72, от цены продавца Q=80',
+    run: `var snap = function (form) {
+            resetSceneMemory(); pickScene('taxes');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '120-Q');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+            setType('subsidy'); setTaxForm(form); setTax(50); redrawAll();
+            var te = STATE.taxEq || {};
+            return { Q: te.Q, Pd: te.Pb, Ps: te.Ps, tx: STATE.tx,
+                     budget: STATE.budget, dwl: STATE.dwl, kind: STATE.taxKind };
+          };
+          var b = snap('subbuyer'), l = snap('subseller');
+          return { bQ: b.Q, bPd: b.Pd, bPs: b.Ps, bMoney: b.tx, bBudget: b.budget, bDwl: b.dwl,
+                   lQ: l.Q, lPd: l.Pd, lPs: l.Ps, lMoney: l.tx, lBudget: l.budget, lDwl: l.dwl,
+                   bAdv: (b.kind === 'advalorem') ? 1 : 0, lAdv: (l.kind === 'advalorem') ? 1 : 0,
+                   apart: Math.abs(b.Q - l.Q),
+                   identB: Math.abs(0.5 * b.Pd * b.Q - b.tx),
+                   identL: Math.abs(0.5 * l.Ps * l.Q - l.tx) };`,
+    checks: [['от Pd: поворот, а не сдвиг', 'bAdv', 1, 0],
+             ['от Pd: Q1', 'bQ', 72, 1e-6], ['от Pd: Pd', 'bPd', 48, 1e-6],
+             ['от Pd: Ps', 'bPs', 72, 1e-6], ['от Pd: расход', 'bMoney', 1728, 1e-4],
+             ['от Pd: бюджет со знаком', 'bBudget', -1728, 1e-4], ['от Pd: DWL', 'bDwl', 144, 0.5],
+             ['от Pd: расход = τ·Pd·Q', 'identB', 0, 1e-6],
+             ['от Ps: поворот, а не сдвиг', 'lAdv', 1, 0],
+             ['от Ps: Q1', 'lQ', 80, 1e-6], ['от Ps: Pd', 'lPd', 40, 1e-6],
+             ['от Ps: Ps', 'lPs', 80, 1e-6], ['от Ps: расход', 'lMoney', 3200, 1e-4],
+             ['от Ps: бюджет со знаком', 'lBudget', -3200, 1e-4], ['от Ps: DWL', 'lDwl', 400, 0.5],
+             ['от Ps: расход = τ·Ps·Q', 'identL', 0, 1e-6],
+             ['две формы дают РАЗНЫЕ точки', 'apart', 8, 1e-6]],
+  },
+  {
+    /* (проц-в) СТАВКА ОБНУЛЯЕТСЯ ПРИ СМЕНЕ ВИДА (решение владельца), и рублёвой
+       записи у процентных форм не остаётся нигде. Проходим цепочку
+       потоварный 40 → акциз → НДС → потоварный и смотрим ставку после каждого
+       шага, а заодно букву, единицу и предел ползунка.
+
+       Пределы: у форм с делителем (1 − τ) верхняя граница строго меньше ста
+       (99), у остальных процентных — 200, у потоварной — масштаб цены. */
+    name: '(проц-в) Смена вида обнуляет ставку; у процентных форм буква τ и знак процента',
+    run: `resetSceneMemory(); pickScene('taxes');
+          setType('tax'); setTaxForm('unit'); setTax(40); redrawAll();
+          var read = function () {
+            var rl = document.getElementById('rate-letter');
+            var ru = document.getElementById('rate-unit');
+            var sl = document.getElementById('tax-slider');
+            var inp = document.getElementById('tax-input');
+            var eq = document.querySelector('#tax-field .reg-eq');
+            var pult = '';
+            if (eq) { var c = eq.cloneNode(true);
+                      c.querySelectorAll('.katex-mathml, annotation').forEach(function (n) { n.remove(); });
+                      pult = c.textContent; }
+            return { rate: STATE.tax, letter: rl ? rl.textContent.trim() : '',
+                     unit: ru ? ru.textContent.trim() : '', max: parseFloat(sl ? sl.max : '0'),
+                     field: parseFloat(inp ? inp.value : '-1'), pult: pult };
+          };
+          var a = read();
+          setTaxForm('excise'); var b = read();
+          setTaxForm('vat');    var c = read();
+          setTaxForm('unit');   var d = read();
+          return { r0: a.rate, r1: b.rate, r2: c.rate, r3: d.rate,
+                   f1: b.field, f2: c.field, f3: d.field,
+                   tauB: (b.letter === 'τ' && b.unit === '%') ? 1 : 0,
+                   tauC: (c.letter === 'τ' && c.unit === '%') ? 1 : 0,
+                   tUnit: (d.letter === 't' && d.unit === '') ? 1 : 0,
+                   maxE: b.max, maxV: c.max,
+                   pultPctB: /%/.test(b.pult) ? 1 : 0,
+                   pultRubD: (d.pult && !/%/.test(d.pult)) ? 1 : 0 };`,
+    checks: [['ставка до смены', 'r0', 40, 1e-9],
+             ['после перехода на акциз', 'r1', 0, 1e-9],
+             ['после перехода на НДС', 'r2', 0, 1e-9],
+             ['после возврата к потоварному', 'r3', 0, 1e-9],
+             ['поле ввода на акцизе', 'f1', 0, 1e-9],
+             ['поле ввода на НДС', 'f2', 0, 1e-9],
+             ['поле ввода на потоварном', 'f3', 0, 1e-9],
+             ['акциз: буква τ и знак процента', 'tauB', 1, 0],
+             ['НДС: буква τ и знак процента', 'tauC', 1, 0],
+             ['потоварный: буква t без единицы', 'tUnit', 1, 0],
+             ['предел акциза строго меньше ста', 'maxE', 99, 1e-9],
+             ['предел НДС без верхней границы формы', 'maxV', 200, 1e-9],
+             ['в ленте регуляторов у акциза есть процент', 'pultPctB', 1, 0],
+             ['в ленте регуляторов у потоварного процента нет', 'pultRubD', 1, 0]],
+  },
+  {
+    /* (проц-г) ЦЕНТР ПОВОРОТА. D = 120 − Q, S = 0,5Q + 30, акциз 25 %:
+       S/(1−0,25) = (2/3)Q + 40; 120−Q = (2/3)Q+40 ⇒ Q = 48, Pd = 72,
+       Ps = S(48) = 54 = 0,75·72, сбор = 0,25·72·48 = 864,
+       Q₀ = 60, DWL = ∫₄₈^₆₀(90 − 1,5q)dq = 108.
+       Обе кривые предложения обращаются в ноль при Q = −60 — это и есть центр.
+
+       Контрпример в том же случае: у S = Q центр лежит в начале координат,
+       и продолжения быть не должно. Без него правка «рисовать всегда»
+       осталась бы зелёной. */
+    name: '(проц-г) Центр поворота: два пунктира приходят в Q=−60; у S=Q продолжений нет',
+    run: `var setup = function (sExpr, rate) {
+            resetSceneMemory(); pickScene('taxes');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '120-Q');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), sExpr);
+            setType('tax'); setTaxForm('excise'); setTax(rate); redrawAll();
+          };
+          var starts = function () {
+            var out = [];
+            document.querySelectorAll('#chart [data-pivot="1"], #chart [data-pivot="2"]').forEach(function (el) {
+              var m = String(el.getAttribute('d') || '').match(/^M\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+              if (m) out.push([sx.invert(+m[1]), sy.invert(+m[2])]);
+            });
+            return out;
+          };
+          setup('0.5*Q+30', 25);
+          /* ⚠️ Числа снимаем СРАЗУ: второй setup ниже перезапишет STATE.tx
+             и STATE.dwl, и в отчёт уехали бы числа контрпримера. */
+          var te = STATE.taxEq || {}, tx1 = STATE.tx, dwl1 = STATE.dwl;
+          var piv = taxPivotPoint(), a = starts();
+          setup('Q', 50);
+          var noPiv = taxPivotPoint(), b = starts();
+          return { Q: te.Q, Pd: te.Pb, Ps: te.Ps, tx: tx1, dwl: dwl1,
+                   pivQ: piv ? piv.Q : NaN, pivP: piv ? piv.P : NaN,
+                   n: a.length,
+                   worstQ: a.length ? Math.max.apply(null, a.map(function (p) { return Math.abs(p[0] + 60); })) : 99,
+                   worstP: a.length ? Math.max.apply(null, a.map(function (p) { return Math.abs(p[1]); })) : 99,
+                   noPiv: (noPiv === null) ? 1 : 0, nNo: b.length };`,
+    checks: [['Q1', 'Q', 48, 1e-6], ['Pd', 'Pd', 72, 1e-6], ['Ps', 'Ps', 54, 1e-6],
+             ['сбор', 'tx', 864, 1e-4], ['DWL', 'dwl', 108, 0.5],
+             ['центр поворота по Q', 'pivQ', -60, 1e-6],
+             ['центр поворота по P', 'pivP', 0, 1e-9],
+             ['продолжений на холсте', 'n', 2, 0],
+             ['оба приходят в Q = −60', 'worstQ', 0, 0.2],
+             ['оба приходят в P = 0', 'worstP', 0, 0.2],
+             ['у S = Q центра не показываем', 'noPiv', 1, 0],
+             ['и продолжений тоже нет', 'nNo', 0, 0]],
+  },
+  {
+    /* (проц-д) ПРАВИЛО ПЕРВОЙ ЧЕТВЕРТИ ПРИ СНЯТОЙ ГАЛОЧКЕ (решение владельца).
+       Экономическая сцена: сняли галочку — оси раздвинулись в минус, сетка на
+       месте, но кривая ниже оси Q не появилась. «Математика» — не экономика:
+       там парабола по-прежнему строится в отрицательных значениях.
+
+       ⚠️ ДВЕ ПОЛОВИНЫ ОДНОГО СЛУЧАЯ, И ВТОРАЯ ВАЖНЕЕ. Правку «резать всегда и
+       везде» первая половина пропустила бы: она сделала бы ровно то, чего
+       здесь ждут. Ловит её вторая — число точек параболы ниже оси x. */
+    name: '(проц-д) Снятая галочка: у экономики нет P < 0, у «Математики» отрицательные остаются',
+    run: `resetSceneMemory(); pickScene('sd');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-Q');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+          document.getElementById('inp-qmax').value = '200';
+          document.getElementById('inp-pmax').value = '200';
+          applyViewBounds(); redrawAll();
+          var below = function () {
+            var n = 0;
+            document.querySelectorAll('#chart path[data-curve]').forEach(function (el) {
+              String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
+                var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+                if (m && sy.invert(+m[2]) < -1e-6) n++;
+              });
+            });
+            return n;
+          };
+          var onQuad = below();
+          setFirstQuad(false); redrawAll();
+          var offQuad = below(), qmin = CONFIG.Qmin, pmin = CONFIG.Pmin;
+          var grid = document.querySelectorAll('#chart .grid line, #chart [data-grid] line').length;
+          var eq = STATE.eq || {}, cs = STATE.cs, ps = STATE.ps;
+          /* Вторая половина: «Математика» правилу не подчиняется.
+             ⚠️ Сюжет задаём ЯВНО. Соседние случаи оставляют STATE.mathSub своим
+             («ограничение», «min/max»), и там общее поле f(x) не показывается
+             вовсе — параболы на холсте не оказывается, а случай краснеет не по
+             делу. Берём сюжет с касательной: у него f(x) есть и рисуется. */
+          setMode('math'); setMathSub('tangent');
+          STATE.mathFormula = 'x^2-4';
+          var inp = document.getElementById('inp-mathf');
+          if (inp) { inp.value = 'x^2-4'; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+          setMathWindow(-6, 6, -6, 6); redrawAll();
+          var ms = mainScales(), best = null;
+          /* ⚠️ Без префикса «#chart»: кривую «Математики» рисует mathLine
+             безымянным path, и ищется она не селектором, а по невязке
+             с самой формулой — так случай не зависит от разметки. */
+          Array.prototype.forEach.call(document.querySelectorAll('path'), function (el) {
+            var pts = [];
+            String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
+              var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+              if (m) pts.push([ms.mx.invert(+m[1]), ms.my.invert(+m[2])]);
+            });
+            if (pts.length < 50) return;
+            var err = 0;
+            pts.forEach(function (p) { err += Math.abs(p[1] - (p[0] * p[0] - 4)); });
+            err /= pts.length;
+            if (!best || err < best.err) best = { err: err, pts: pts };
+          });
+          var mathBelow = best ? best.pts.filter(function (p) { return p[1] < -1e-6; }).length : -1;
+          return { onQuad: onQuad, offQuad: offQuad, qmin: qmin, pmin: pmin,
+                   grid: (grid > 0) ? 1 : 0, Q: eq.Q, P: eq.P, cs: cs, ps: ps,
+                   mathBelow: mathBelow, mathErr: best ? best.err : 99 };`,
+    checks: [['с галочкой точек с P < 0', 'onQuad', 0, 0],
+             ['БЕЗ галочки точек с P < 0', 'offQuad', 0, 0],
+             ['оси раздвинулись по Q', 'qmin', -50, 1e-6],
+             ['оси раздвинулись по P', 'pmin', -50, 1e-6],
+             ['сетка нарисована', 'grid', 1, 0],
+             ['Q* не изменилось', 'Q', 50, 1e-6], ['P* не изменилось', 'P', 50, 1e-6],
+             ['CS не изменился', 'cs', 1250, 1e-4], ['PS не изменился', 'ps', 1250, 1e-4],
+             ['парабола найдена (невязка с x²−4)', 'mathErr', 0, 1e-3],
+             ['в «Математике» точек с y < 0', 'mathBelow', 79, 0]],
   },
   {
     /* (ж) КТВ по кусочной КПВ. У ВОГНУТОЙ кусочной альтернативная стоимость
@@ -3949,6 +4482,791 @@ const CASES = [
              ['DWL', 'dwl', 0, 1e-6],
              ['кривая D не переименована', 'keepD', 1, 0], ['кривая S не переименована', 'keepS', 1, 0]],
   },
+
+  /* =====================================================================
+     СЕССИЯ «ЯДРО И КОНСТРУКТОР» (25.08). Кадр больше не участвует в
+     математике, строки конструктора кусочной принадлежат полю, а запись
+     помещается по ширине. Числа сняты прибором `calc2/tests/input_probe.mjs`
+     (наборы К, П, Ш, В, Ф, З) и проверены на зубастость: каждый дефект
+     временно возвращали, и случай краснел.
+     ⚠️ Все случаи ниже меряют одно и то же ТРИЖДЫ — на стартовом окне, на
+     суженном до 30 и на расширенном до 400. Одного замера мало: ровно в этом
+     и был дефект — числа сходились на привычном масштабе и разъезжались на
+     любом другом.
+     ===================================================================== */
+  {
+    /* (кадр-а) Выпуск и цена монополии не зависят от того, куда смотрит
+       человек. На окне до Q = 30 findRoot искал MR = MC только до края кадра,
+       корень 40 лежал за ним, и всё табло монополии гасло целиком. */
+    name: '(кадр-а) Монополия D 100−Q, MC 20: Qm 40, Pm 60, Qc 80 на трёх масштабах',
+    run: `resetSceneMemory(); pickScene('mono');
+          var prep = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            var mc = STATE.curves.filter(function (c) { return c.role === 'mc'; })[0];
+            if (d) updateCurveExpr(d, '100 - Q');
+            if (mc) updateCurveExpr(mc, '20');
+          };
+          var snap = function () { var m = STATE.mono || {}; return [m.Qm, m.Pm, m.Qc]; };
+          prep(); redrawAll(); var a = snap();
+          setRanges(30, 30); prep(); redrawAll(); var b = snap();
+          setRanges(400, 400); prep(); redrawAll(); var c = snap();
+          var same = function (i) {
+            return (a[i] != null && b[i] != null && c[i] != null
+                    && Math.abs(a[i] - b[i]) < 1e-9 && Math.abs(b[i] - c[i]) < 1e-9) ? 1 : 0;
+          };
+          return { Qm: b[0], Pm: b[1], Qc: b[2], sQ: same(0), sP: same(1), sC: same(2) };`,
+    checks: [['Qm на суженном окне', 'Qm', 40, 0.01], ['Pm на суженном окне', 'Pm', 60, 0.01],
+             ['Qc на суженном окне', 'Qc', 80, 0.01],
+             ['Qm одинаков на трёх масштабах (флаг)', 'sQ', 1, 0],
+             ['Pm одинакова на трёх масштабах (флаг)', 'sP', 1, 0],
+             ['Qc одинаков на трёх масштабах (флаг)', 'sC', 1, 0]],
+  },
+  {
+    /* (кадр-б) Излом предложения лежит за краем суженного окна. Пробная сетка
+       определителя линейности его не видела, кривая запоминалась прямой P = Q,
+       и evalCurve шёл быстрым путём по неверным коэффициентам НА ВСЁМ
+       отрезке: равновесие выходило 50 вместо 46,67, а S(60) — 60 вместо 80. */
+    name: '(кадр-б) Излом S за краем окна: Q* 46,67 и S(60) 80 на трёх масштабах',
+    run: `resetSceneMemory(); pickScene('sd');
+          var prep = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            var s = STATE.curves.filter(function (c) { return c.role === 'supply'; })[0];
+            if (d) updateCurveExpr(d, '100 - Q');
+            if (s) updateCurveExpr(s, '(Q < 40) ? Q : 2*Q - 40');
+          };
+          var snap = function () {
+            var s = STATE.curves.filter(function (c) { return c.role === 'supply'; })[0];
+            return [STATE.eq ? STATE.eq.Q : null, evalCurve(s, 60), s.linear ? 1 : 0];
+          };
+          prep(); redrawAll(); var a = snap();
+          setRanges(30, 30); prep(); redrawAll(); var b = snap();
+          setRanges(400, 400); prep(); redrawAll(); var c = snap();
+          return { Q: b[0], s60: b[1], fast: a[2] + b[2] + c[2],
+                   same: (Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(b[0] - c[0]) < 1e-9) ? 1 : 0 };`,
+    checks: [['Q* на суженном окне', 'Q', 46.666667, 1e-4],
+             ['S(60) на суженном окне', 's60', 80, 1e-6],
+             ['ни на одном масштабе S не запомнена прямой', 'fast', 0, 0],
+             ['Q* одинаков на трёх масштабах (флаг)', 'same', 1, 0]],
+  },
+  {
+    /* (кадр-в) Спрос задан как Q(P) с изломом на цене 60. Определитель
+       линейности по цене брал ТРИ пробы — 0,2 / 0,5 / 0,8 от края кадра, — и
+       на расширенном окне все три ложились выше излома: кривая запоминалась
+       прямой Q = 80 − 1,5·P, и равновесие уезжало с 50 на 32. */
+    name: '(кадр-в) Q(P) с изломом: Q* 50 на трёх масштабах, прямой нигде не запомнена',
+    run: `resetSceneMemory(); pickScene('sd');
+          var prep = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            var s = STATE.curves.filter(function (c) { return c.role === 'supply'; })[0];
+            if (d) updateCurveExpr(d, '(P < 60) ? 100 - P : 80 - 1.5*P');
+            if (s) updateCurveExpr(s, 'Q');
+          };
+          var snap = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            return [STATE.eq ? STATE.eq.Q : null, d.srcLinear ? 1 : 0];
+          };
+          prep(); redrawAll(); var a = snap();
+          setRanges(30, 30); prep(); redrawAll(); var b = snap();
+          setRanges(400, 400); prep(); redrawAll(); var c = snap();
+          return { Q: c[0], fast: a[1] + b[1] + c[1],
+                   same: (Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(b[0] - c[0]) < 1e-9) ? 1 : 0 };`,
+    checks: [['Q* на расширенном окне', 'Q', 50, 1e-4],
+             ['ни на одном масштабе D не запомнена прямой', 'fast', 0, 0],
+             ['Q* одинаков на трёх масштабах (флаг)', 'same', 1, 0]],
+  },
+  {
+    /* (кадр-г) Нелинейное предложение Q = 0,01·P² при спросе 300 − Q.
+       Равновесная цена 130,28; обращение Q(P) сканировало цены только до
+       Pmax·3, и на окне до тридцати верх сетки был 90 — равновесия у сцены
+       не было вовсе. */
+    name: '(кадр-г) Нелинейное Q(P): Q* 169,72 и P* 130,28 на трёх масштабах',
+    run: `resetSceneMemory(); pickScene('sd');
+          var prep = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            var s = STATE.curves.filter(function (c) { return c.role === 'supply'; })[0];
+            if (d) updateCurveExpr(d, '300 - Q');
+            if (s) updateCurveExpr(s, '0.01*P^2');
+          };
+          var snap = function () { return [STATE.eq ? STATE.eq.Q : null, STATE.eq ? STATE.eq.P : null]; };
+          prep(); redrawAll(); var a = snap();
+          setRanges(30, 30); prep(); redrawAll(); var b = snap();
+          setRanges(400, 400); prep(); redrawAll(); var c = snap();
+          return { Q: b[0], P: b[1],
+                   same: (a[0] != null && b[0] != null && c[0] != null
+                          && Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(b[0] - c[0]) < 1e-9) ? 1 : 0 };`,
+    checks: [['Q* на суженном окне', 'Q', 169.722436, 1e-4],
+             ['P* на суженном окне', 'P', 130.277564, 1e-4],
+             ['Q* одинаков на трёх масштабах (флаг)', 'same', 1, 0]],
+  },
+  {
+    /* (кадр-д) Шаг центральной разности брался от края кадра, и на кривой с
+       заметной кривизной одна и та же точка давала на разных масштабах разный
+       наклон — а значит и разную эластичность. Меряем ядро напрямую. */
+    name: '(кадр-д) Численная производная в точке не зависит от масштаба',
+    run: `var mk = function (e) { var c = compileFormula(e); return { expr: e, compiled: c.compiled, linear: null, fn: null }; };
+          var was = CONFIG.Qmax;
+          var d = [100, 30, 400].map(function (qm) {
+            CONFIG.Qmax = qm;
+            return curveDeriv(mk('100 - 40*sin(Q)'), 3);
+          });
+          CONFIG.Qmax = was;
+          return { d0: d[0],
+                   same: (Math.abs(d[0] - d[1]) < 1e-9 && Math.abs(d[1] - d[2]) < 1e-9) ? 1 : 0 };`,
+    checks: [['производная в Q=3 (эталон −40·cos 3)', 'd0', 39.5996998, 1e-5],
+             ['одинакова на трёх масштабах (флаг)', 'same', 1, 0]],
+  },
+  {
+    /* (кадр-е) Общественный оптимум и потери от внешнего эффекта на суженном
+       окне. Оптимум ищет тот же findRoot: на окне до 30 гасло всё табло. */
+    name: '(кадр-е) Внешние эффекты MSC = Q+20: оптимум 40 и DWL 100 на трёх масштабах',
+    run: `resetSceneMemory(); pickScene('ext');
+          var prep = function () {
+            var d = STATE.curves.filter(function (c) { return c.role === 'demand'; })[0];
+            var s = STATE.curves.filter(function (c) { return c.role === 'supply'; })[0];
+            if (d) updateCurveExpr(d, '100 - Q');
+            if (s) updateCurveExpr(s, 'Q');
+            STATE.mscOn = true; STATE.mscExpr = 'Q + 20'; STATE.msbOn = false;
+            recompileSocial();
+          };
+          var snap = function () { var e = STATE.ext || {}; return [e.Qopt, e.dwl]; };
+          prep(); redrawAll(); var a = snap();
+          setRanges(30, 30); prep(); redrawAll(); var b = snap();
+          setRanges(400, 400); prep(); redrawAll(); var c = snap();
+          return { Qopt: b[0], dwl: b[1],
+                   same: (a[0] != null && b[0] != null && c[0] != null
+                          && Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(b[0] - c[0]) < 1e-9) ? 1 : 0 };`,
+    checks: [['оптимум на суженном окне', 'Qopt', 40, 0.01],
+             ['DWL на суженном окне', 'dwl', 100, 0.01],
+             ['оптимум одинаков на трёх масштабах (флаг)', 'same', 1, 0]],
+  },
+  {
+    /* (конс-а) Строки конструктора кусочной принадлежат ПОЛЮ, а не странице.
+       Открыли конструктор в «Математике» (буква x), ушли в «Спрос и
+       предложение» — и в полях спроса лежали те же куски с иксом, а условия
+       под ними уже писались по Q. */
+    name: '(конс-а) Конструктор не течёт между полями и моделями',
+    run: `var open = function (id) {
+            var inp = document.getElementById(id);
+            var row = inp.closest('.f-row');
+            row.querySelector('.f-help').click();
+            document.querySelector('.mkbd.open .mkbd-foot button').click();
+            var out = { v: PW.v, all: PW.rows.map(function (r) { return r.f + ' ' + r.a + ' ' + r.b; }).join(' ') };
+            closePiecewise();
+            return out;
+          };
+          resetSceneMemory(); pickScene('m-graph');
+          if (typeof addCurve === 'function' && !STATE.curves.length) addCurve();
+          var rows = [].slice.call(document.querySelectorAll('#tools-panel .f-row'))
+            .filter(function (r) { return r.offsetParent; });
+          var mathInp = rows[0].querySelector('input');
+          if (!mathInp.id) mathInp.id = 'ip-math-field';
+          var m = open(mathInp.id);
+          resetSceneMemory(); pickScene('sd'); redrawAll();
+          var d = open('curve-expr-1');
+          // Метка в спросе не должна доехать до предложения.
+          var inp = document.getElementById('curve-expr-1');
+          inp.closest('.f-row').querySelector('.f-help').click();
+          document.querySelector('.mkbd.open .mkbd-foot button').click();
+          PW.rows[0].f = 'МЕТКА'; closePiecewise();
+          var s = open('curve-expr-2');
+          return { mathX: /(^|[^A-Za-z0-9_])x([^A-Za-z0-9_]|$)/.test(m.all) ? 1 : 0,
+                   demandQ: /(^|[^A-Za-z0-9_])Q([^A-Za-z0-9_]|$)/.test(d.all) ? 1 : 0,
+                   demandX: /(^|[^A-Za-z0-9_])[xX]([^A-Za-z0-9_]|$)/.test(d.all) ? 1 : 0,
+                   supplyMark: /МЕТКА/.test(s.all) ? 1 : 0 };`,
+    checks: [['в «Математике» куски по x (флаг)', 'mathX', 1, 0],
+             ['в «Спросе» куски по Q (флаг)', 'demandQ', 1, 0],
+             ['в «Спросе» иксов нет (флаг)', 'demandX', 0, 0],
+             ['метка спроса не доехала до предложения (флаг)', 'supplyMark', 0, 0]],
+  },
+  {
+    /* (конс-б) Уже стоящая в поле кусочная разбирается обратно в те же куски.
+       Между записью и проверкой ОБЯЗАТЕЛЬНО заходим в чужое поле: иначе
+       случай проходил бы и на утечке — строки просто оставались бы в PW. */
+    name: '(конс-б) Стоящая в поле кусочная разбирается обратно в свои куски',
+    run: `var open = function (id) {
+            var inp = document.getElementById(id);
+            inp.closest('.f-row').querySelector('.f-help').click();
+            document.querySelector('.mkbd.open .mkbd-foot button').click();
+          };
+          resetSceneMemory(); pickScene('sd'); redrawAll();
+          open('curve-expr-1');
+          PW.n = 2;
+          PW.rows = [{ f: '90 - Q', a: '0', b: '30' }, { f: '60 - 0.5*Q', a: '30', b: '' }];
+          renderPw();
+          document.getElementById('pw-apply').click();
+          open('curve-expr-2');
+          var mid = PW.rows[0].f;
+          closePiecewise();
+          open('curve-expr-1');
+          var back = PW.rows.map(function (r) { return r.f + '|' + r.a + '|' + r.b; }).join(' ; ');
+          closePiecewise();
+          return { midDefault: (mid === '100 - Q') ? 1 : 0,
+                   back: back,
+                   ok: (back === '90 - Q|0|30 ; 60 - 0.5*Q|30|') ? 1 : 0 };`,
+    checks: [['чужое поле показало значения по умолчанию (флаг)', 'midDefault', 1, 0],
+             ['разбор вернул те же два куска (флаг)', 'ok', 1, 0]],
+  },
+  {
+    /* (панель-а) Вопросик появляется только рядом с тем, что он поясняет.
+       Раньше подсказка без якоря получала СВОЮ пустую строку, и в «Спросе и
+       предложении» висели два одиноких знака при НУЛЕ живых подсказок. */
+    name: '(панель-а) Одиноких «?» в левой панели нет ни в одной проверенной сцене',
+    run: `var scan = function (key) {
+            resetSceneMemory(); pickScene(key); redrawAll();
+            var panel = document.getElementById('tools-panel');
+            var vis = function (el) { return !!(el.offsetParent || el.getClientRects().length); };
+            var dots = [].slice.call(panel.querySelectorAll('.help-dot')).filter(vis);
+            var lonely = dots.filter(function (d) {
+              var host = d.parentElement;
+              return !host || host.textContent.replace(/[?\s]/g, '').length === 0;
+            });
+            var hints = [].slice.call(panel.querySelectorAll('.hint')).filter(function (h) {
+              return h.style.display !== 'none' && fieldActive(h.parentElement || h);
+            });
+            return { lonely: lonely.length, dots: dots.length, hints: hints.length,
+                     anchors: panel.querySelectorAll('.help-anchor').length };
+          };
+          var keys = ['sd', 'mono', 'ext', 'sdsum', 'elast', 'taxes', 'ppf'];
+          var lonely = 0, over = 0, anchors = 0;
+          keys.forEach(function (k) {
+            var r = scan(k);
+            lonely += r.lonely; anchors += r.anchors;
+            if (r.dots > r.hints) over++;
+          });
+          return { lonely: lonely, over: over, anchors: anchors };`,
+    checks: [['одиноких «?» по семи сценам', 'lonely', 0, 0],
+             ['сцен, где знаков больше живых подсказок', 'over', 0, 0],
+             ['пустых строк .help-anchor в разметке', 'anchors', 0, 0]],
+  },
+  /* =====================================================================
+     ВНЕШНИЙ ВИД СЛОЖЕНИЯ (сессия 25.08, ветка feat/calc2-sum-visual).
+     Пять свойств, каждое из которых уже один раз было сломано и каждое
+     проверено «зубастостью»: возвращаешь дефект — случай краснеет.
+     Подробные замеры (контраст, расстояния между цветами, прямоугольники
+     подписей) снимает calc2/tests/sum_visual_probe.mjs; здесь стоят те
+     проверки, которые обязаны идти в CI на каждом прогоне.
+     ===================================================================== */
+  {
+    /* ⚠️ ЦВЕТ ГРУППЫ НЕ ИМЕЕТ ПРАВА СОВПАСТЬ С ЦВЕТОМ СУММЫ.
+       Группы брали цвета из общей палитры выбора, а её первые два цвета —
+       те же канонические --curve-d и --curve-s, которыми красятся суммарные
+       кривые. На экране «спрос первой группы» был одного цвета с «рыночным
+       спросом», а «спрос второй группы» — с «рыночным предложением».
+       Проверяем на четырёх группах в каждом семействе: там задействована
+       вся палитра целиком. */
+    name: 'Сложение (ж) цвет группы отличается от цвета суммы и от других групп',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 4); sumSetCount('S', 4); redrawAll();
+          var norm = function (v) { return String(v || '').trim().toLowerCase(); };
+          var groups = STATE.curves.filter(function (c) { return c.sumGroup && c.kind !== 'sum'; });
+          var sums = STATE.curves.filter(function (c) { return c.kind === 'sum'; });
+          var clash = 0, dup = 0;
+          groups.forEach(function (g) {
+            sums.forEach(function (s) { if (norm(g.color) === norm(s.color)) clash++; });
+          });
+          for (var i = 0; i < groups.length; i++) {
+            for (var j = i + 1; j < groups.length; j++) {
+              if (norm(groups[i].color) === norm(groups[j].color)) dup++;
+            }
+          }
+          /* Канонические цвета обязаны остаться у сумм: на них держатся все
+             сорок одна сцена, и «развести» их подменой было бы негодным. */
+          var d = sums.find(function (c) { return c.sumGroup === 'D'; });
+          var s = sums.find(function (c) { return c.sumGroup === 'S'; });
+          var canonD = norm(d && d.color) === norm(cssVar('--curve-d')) ? 1 : 0;
+          var canonS = norm(s && s.color) === norm(cssVar('--curve-s')) ? 1 : 0;
+          return { clash: clash, dup: dup, canonD: canonD, canonS: canonS, n: groups.length };`,
+    checks: [['групп в сцене', 'n', 8, 0],
+             ['совпадений «цвет группы = цвет суммы»', 'clash', 0, 0],
+             ['пар групп, делящих один цвет', 'dup', 0, 0],
+             ['у суммарного спроса канонический цвет', 'canonD', 1, 0],
+             ['у суммарного предложения канонический цвет', 'canonS', 1, 0]],
+  },
+  {
+    /* ⚠️ КОНТРАСТ ЛИНИИ К ХОЛСТУ — НЕ МЕНЬШЕ 3:1 В ОБЕИХ ТЕМАХ.
+       Приглушение групп прозрачностью снижает итоговый контраст, поэтому
+       меряем ЦВЕТ ПОВЕРХ ХОЛСТА, а не исходный тон. Порог 3:1 — норма для
+       графических объектов; ниже линию просто не видно на проекторе. */
+    name: 'Сложение (з) контраст каждой линии к холсту не ниже 3:1 в обеих темах',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 4); sumSetCount('S', 4); redrawAll();
+          var rgb = function (v) {
+            v = String(v || '').trim();
+            if (v.charAt(0) === '#') { var h = v.slice(1);
+              if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+              return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+            var m = v.match(/rgba?\(([^)]+)\)/);
+            return m ? m[1].split(/[,\s\/]+/).filter(Boolean).map(Number).slice(0,3) : null;
+          };
+          var lum = function (c) { var f = c.map(function (x) { x /= 255;
+            return x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4); });
+            return 0.2126*f[0] + 0.7152*f[1] + 0.0722*f[2]; };
+          var ratio = function (a, b) { var l1 = lum(a), l2 = lum(b);
+            if (l1 < l2) { var t = l1; l1 = l2; l2 = t; } return (l1+0.05)/(l2+0.05); };
+          var worst = 99;
+          ['light', 'dark'].forEach(function (th) {
+            document.documentElement.setAttribute('data-theme', th);
+            refreshColors(); redrawAll();
+            var bg = rgb(cssVar('--canvas'));
+            [].slice.call(document.querySelectorAll('#chart path[data-curve]')).forEach(function (p) {
+              if (p.getAttribute('data-skip-export') === '1') return;
+              var cs = getComputedStyle(p);
+              var op = parseFloat(p.getAttribute('opacity') != null ? p.getAttribute('opacity') : (cs.opacity || '1'));
+              var al = (isFinite(op) ? op : 1) * (parseFloat(cs.strokeOpacity || '1') || 1);
+              var col = rgb(p.getAttribute('stroke') || cs.stroke);
+              if (!col || !bg) return;
+              var eff = [0,1,2].map(function (i) { return col[i]*al + bg[i]*(1-al); });
+              var r = ratio(eff, bg);
+              if (r < worst) worst = r;
+            });
+          });
+          document.documentElement.setAttribute('data-theme', 'light');
+          refreshColors(); redrawAll();
+          return { worst: Math.round(worst * 100) / 100, ok: (worst >= 3) ? 1 : 0 };`,
+    checks: [['худший контраст линии к холсту не ниже 3:1', 'ok', 1, 0],
+             ['сам худший контраст (справочно, не ниже 3)', 'worst', 3.25, 0.9]],
+  },
+  {
+    /* ⚠️ УЧАСТОК, ГДЕ РЫНКА НЕТ, РИСУЕТСЯ ПУНКТИРОМ ТОГО ЖЕ ВЕСА.
+       При предложении Q − 100 первый продавец выходит на рынок только со ста
+       единиц, и на отрезке Q от 0 до 100 рыночного предложения не существует.
+       Прошлая сессия закрыла там дырку нулём — и на холсте получилась ровная
+       линия по оси, неотличимая от самой оси. Решение владельца: тот же цвет,
+       та же толщина, отличие только в штрихе. */
+    name: 'Сложение (и) несуществующий участок суммарной кривой — пунктир того же веса',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 2); sumSetCount('S', 2);
+          var gs = STATE.curves.filter(function (c) { return c.sumGroup === 'S' && c.kind !== 'sum'; });
+          updateCurveExpr(gs[0], 'Q-100'); updateCurveExpr(gs[1], 'Q+20');
+          redrawAll();
+          var sum = STATE.curves.find(function (c) { return c.kind === 'sum' && c.sumGroup === 'S'; });
+          var ps = [].slice.call(document.querySelectorAll('#chart path[data-curve="' + sum.id + '"]'));
+          var gh = ps.filter(function (p) { return p.getAttribute('data-sum-part') === 'ghost'; });
+          var re = ps.filter(function (p) { return p.getAttribute('data-sum-part') === 'real'; });
+          var num = function (p, a) { return parseFloat(p.getAttribute(a) || getComputedStyle(p)[a] || '0'); };
+          var sameColor = (gh.length && re.length &&
+            String(gh[0].getAttribute('stroke')) === String(re[0].getAttribute('stroke'))) ? 1 : 0;
+          var sameWidth = (gh.length && re.length &&
+            Math.abs(num(gh[0], 'stroke-width') - num(re[0], 'stroke-width')) < 0.01) ? 1 : 0;
+          var alpha = gh.length ? parseFloat(gh[0].getAttribute('opacity') || '1') : 0;
+          /* Стык считаем в пикселях: щель шириной в шаг сетки на экране
+             читается как разрыв, а число «путей два» о ней молчит. */
+          var gap = 0;
+          if (gh.length && re.length) {
+            var a = gh[0].getPointAtLength(gh[0].getTotalLength());
+            var b = re[0].getPointAtLength(0);
+            gap = Math.hypot(a.x - b.x, a.y - b.y);
+          }
+          return { ghost: gh.length, real: re.length, sameColor: sameColor,
+                   sameWidth: sameWidth, alpha: alpha,
+                   ghostTo: Math.round((sum.sumGhostTo || 0) * 100) / 100,
+                   gap: Math.round(gap * 100) / 100 };`,
+    checks: [['пунктирный участок нарисован', 'ghost', 1, 0],
+             ['сплошной участок ровно один', 'real', 1, 0],
+             ['докуда рынка нет, по количеству', 'ghostTo', 100, 0.01],
+             ['цвет пунктира тот же, что у сплошной', 'sameColor', 1, 0],
+             ['толщина пунктира та же, что у сплошной', 'sameWidth', 1, 0],
+             ['пунктир не бледнее сплошной', 'alpha', 1, 0],
+             ['щель на стыке, px', 'gap', 0, 0.35]],
+  },
+  {
+    /* ⚠️ НА ХОЛСТЕ — ОБОЗНАЧЕНИЕ, В ПАНЕЛИ — ПОЛНОЕ ИМЯ.
+       «спрос первой группы» занимает 137 px, «предложение второй группы» —
+       181. Шесть таких подписей выстраивались вдоль края с зазором меньше
+       внутреннего пробела шрифта и читались одной строкой. Связь холста с
+       панелью держится тем, что то же обозначение стоит в строке списка. */
+    name: 'Сложение (к) на холсте обозначение, в панели полное имя',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 3); sumSetCount('S', 2); redrawAll();
+          var raw = [].slice.call(document.querySelectorAll('#chart text.curve-name'))
+            .map(function (t) { return String(t.getAttribute('data-raw') || '').trim(); });
+          var longOnes = raw.filter(function (s) { return s.length > 4; }).length;
+          var wantD1 = raw.indexOf('D_1') >= 0 ? 1 : 0;
+          var wantSum = raw.indexOf('D') >= 0 ? 1 : 0;
+          /* Полное имя обязано остаться в панели: обозначение его не заменяет,
+             а сопровождает. Иначе связь холста со списком теряется. */
+          var names = [].slice.call(document.querySelectorAll('#curve-list .curve-row span.curve-name'))
+            .map(function (e) { return e.textContent.replace(/\s+/g, ' ').trim(); });
+          var full = names.filter(function (s) { return /групп/.test(s) || /рыночн/.test(s); }).length;
+          var tags = document.querySelectorAll('#curve-list .crow-tag').length;
+          /* Строка суммарной кривой не должна выглядеть обломком: поля формулы
+             у неё нет и быть не может, но пустое место надо объяснить. */
+          var autos = document.querySelectorAll('#curve-list .crow-auto').length;
+          return { longOnes: longOnes, wantD1: wantD1, wantSum: wantSum,
+                   full: full, tags: tags, autos: autos };`,
+    checks: [['подписей длиннее четырёх знаков на холсте', 'longOnes', 0, 0],
+             ['подпись первой группы спроса — D с индексом', 'wantD1', 1, 0],
+             ['подпись суммарного спроса — D', 'wantSum', 1, 0],
+             ['строк списка с полным именем', 'full', 7, 0],
+             ['обозначений в строках списка', 'tags', 7, 0],
+             ['пояснений у строк суммарных кривых', 'autos', 2, 0]],
+  },
+  {
+    /* ⚠️ ПОДПИСЬ ПОЛЗУНКА НЕ ИМЕЕТ ПРАВА БЫТЬ ОБРЕЗАННОЙ.
+       Резало дважды: код обрезал имя по шестнадцати символам, а CSS дорезал
+       строку многоточием. При пяти группах на панели стояло пять одинаковых
+       «Сдвиг спрос … = 0». */
+    name: 'Сложение (л) подписи ползунков различимы и не обрезаны',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 3); sumSetCount('S', 2); redrawAll();
+          if (typeof updatePult === 'function') updatePult();
+          var chips = [].slice.call(document.querySelectorAll('#params-curves .pchip'));
+          var cut = 0, seen = {}, dupText = 0, bright = 0;
+          var lum = function (c) { var f = c.map(function (x) { x /= 255;
+            return x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4); });
+            return 0.2126*f[0] + 0.7152*f[1] + 0.0722*f[2]; };
+          chips.forEach(function (ch) {
+            var lab = ch.querySelector('.pchip-label');
+            if (!lab) return;
+            if (lab.scrollWidth > lab.clientWidth + 1) cut++;
+            var cl = lab.cloneNode(true);
+            cl.querySelectorAll('.katex-mathml, annotation').forEach(function (x) { x.remove(); });
+            var t = cl.textContent.replace(/\s+/g, ' ').trim();
+            if (/…/.test(t)) cut++;
+            if (seen[t]) dupText++; else seen[t] = 1;
+            /* Светлый акцент заставляет Chromium рисовать незалитую дорожку
+               тёмной, и на панели оказываются рядом ползунки двух видов.
+               Порог измерен перебором: 0,2487 — ещё светлая, 0,2545 — уже
+               тёмная. Держим запас. */
+            var sl = ch.querySelector('input[type=range]');
+            var m = sl && String(getComputedStyle(sl).accentColor || '').match(/rgba?\(([^)]+)\)/);
+            if (m) {
+              var c = m[1].split(/[,\s\/]+/).filter(Boolean).map(Number).slice(0, 3);
+              if (lum(c) > 0.245) bright++;
+            }
+          });
+          return { chips: chips.length, cut: cut, dupText: dupText, bright: bright };`,
+    checks: [['ползунков сдвига в сцене', 'chips', 5, 0],
+             ['обрезанных подписей', 'cut', 0, 0],
+             ['подписей-двойников', 'dupText', 0, 0],
+             ['ползунков со светлым акцентом (тёмная дорожка)', 'bright', 0, 0]],
+  },
+
+  /* ═══════════════════════════════════════════════════════════════════
+     ПРИЁМКА 25.08. Семь дефектов владельца плюс одна возможность.
+     Полный разбор — прибор calc2/tests/priyomka_probe.mjs; здесь стоят
+     ЧИСЛА, которые обязаны держаться в CI.
+     ═══════════════════════════════════════════════════════════════════ */
+  {
+    /* ⚠️ ВМЕШАТЕЛЬСТВО РАБОТАЕТ БЕЗ РАВНОВЕСИЯ.
+       Дефект: в recompute всё вмешательство было обёрнуто условием, куда
+       вместе с кривыми и ставкой входило `STATE.eq`, и одно это слагаемое
+       выключало сдвиг кривой целиком. На рынке D = 100 − P, S = 0,5·p − 200
+       (пересечение в (−100; 200), то есть вне первой четверти) налог не
+       двигал предложение вовсе — график стоял на месте.
+
+       Три края правила, и все три здесь:
+         • кривая после вмешательства строится ВСЕГДА: налог 100 поднимает
+           предложение, и оно обращается в ноль при цене 500 вместо 400;
+         • равновесия при этом по-прежнему нет — числа не выдумываются;
+         • субсидия 450 равновесие СОЗДАЁТ: Q = 50, цена покупателя 50, цена
+           продавца 500, расход бюджета 22 500. DWL при этом НЕ считается:
+           сравнивать не с чем, и об этом сказано словами. */
+    name: 'Приёмка · вмешательство работает без равновесия',
+    run: `var setup = function (type, form, rate) {
+            resetSceneMemory(); pickScene('taxes');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-P');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), '0.5*p-200');
+            setType(type); setTaxForm(form); setTax(rate); redrawAll();
+          };
+          var textOf = function (id) {
+            var e = document.getElementById(id); if (!e) return '';
+            var c = e.cloneNode(true);
+            c.querySelectorAll('.katex-mathml, annotation').forEach(function (n) { n.remove(); });
+            return c.textContent.replace(/\s+/g, ' ');
+          };
+          setup('tax', 'unit', 0);
+          var zeroNoTax = evalCurve(STATE.S, 0);
+          var eq0 = STATE.eq ? 1 : 0;
+          setup('tax', 'unit', 100);
+          var zeroTax = STATE.taxAfterS ? STATE.taxAfterS.fn(0) : NaN;
+          var drawn = document.querySelectorAll('path[stroke-dasharray="6 4"]').length;
+          var eqTax = STATE.eq ? 1 : 0, dwlTax = (STATE.dwl > 0) ? 1 : 0;
+          setup('subsidy', 'unit', 450);
+          var te = STATE.taxEq || {};
+          var said = /сравнивать не с чем|рынка не было вовсе/i.test(textOf('info-tax') + ' ' + textOf('info-eq'));
+          return { zeroNoTax: zeroNoTax, eq0: eq0, zeroTax: zeroTax, drawn: drawn,
+                   eqTax: eqTax, dwlTax: dwlTax,
+                   q: te.Q, pd: te.Pb, ps: te.Ps, spend: Math.abs(STATE.budget),
+                   dwlSub: (STATE.dwl > 0) ? 1 : 0, said: said ? 1 : 0 };`,
+    checks: [['без налога предложение в ноль при цене', 'zeroNoTax', 400, 1e-6],
+             ['без налога равновесия нет', 'eq0', 0, 0],
+             ['с налогом 100 предложение в ноль при цене', 'zeroTax', 500, 1e-6],
+             ['кривая после вмешательства нарисована', 'drawn', 1, 0],
+             ['с налогом равновесия по-прежнему нет', 'eqTax', 0, 0],
+             ['DWL без исходного равновесия не показан', 'dwlTax', 0, 0],
+             ['субсидия 450 создаёт рынок: Q', 'q', 50, 1e-6],
+             ['цена покупателя', 'pd', 50, 1e-6],
+             ['цена продавца', 'ps', 500, 1e-6],
+             ['расход бюджета', 'spend', 22500, 1e-6],
+             ['DWL по-прежнему не показан', 'dwlSub', 0, 0],
+             ['сказано словами, что сравнивать не с чем', 'said', 1, 0]],
+  },
+  {
+    /* ⚠️ ПОРЯДОК КАРТОЧКИ «ВМЕШАТЕЛЬСТВО ГОСУДАРСТВА».
+       Решение владельца 25.08: ставка это не параметр формулы, а орган
+       управления сценой, и в ленте регуляторов ей не место. Лента живёт
+       ВЫШЕ карточки, поэтому перенос ломал порядок каскада: замер 25.08 —
+       ряд «Налог платит» на y = 136, ставка на y = 199, а сам выбор вида
+       вмешательства только на y = 307.
+
+       Порядок обязан быть один и тот же у налога и у субсидии: ряд «кто
+       платит / кто получает» третьим, ВСЕГДА выше ставки. */
+    name: 'Приёмка · ставка вмешательства живёт в своей карточке, а не в ленте',
+    run: `var y = function (sel) {
+            var e = document.querySelector(sel);
+            if (!e || !(e.offsetParent || e.getClientRects().length)) return null;
+            return Math.round(e.getBoundingClientRect().top);
+          };
+          var inRibbon = function (id) {
+            var e = document.getElementById(id);
+            return (e && e.closest('#params-body')) ? 1 : 0;
+          };
+          var look = function (type, form) {
+            resetSceneMemory(); pickScene('taxes');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '120-Q');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+            setType(type); if (form) setTaxForm(form); setTax(20); redrawAll();
+            return { seg: y('#sec-tax > .seg'), kind: y('#taxkind-row'),
+                     side: y('#taxside-row'), rate: y('#tax-field'),
+                     ribbon: inRibbon('tax-field') + inRibbon('taxside-row')
+                             + inRibbon('pc-field') + inRibbon('quota-field') };
+          };
+          var t = look('tax', 'unit'), s = look('subsidy', 'unit');
+          var e = look('tax', 'excise');
+          var ordered = function (o) {
+            return (o.seg < o.kind && o.kind < o.side && o.side < o.rate) ? 1 : 0;
+          };
+          return { tax: ordered(t), sub: ordered(s),
+                   pctOrdered: (e.seg < e.kind && e.kind < e.rate) ? 1 : 0,
+                   ribbon: t.ribbon + s.ribbon + e.ribbon };`,
+    checks: [['налог: вид → вид налога → кто платит → ставка', 'tax', 1, 0],
+             ['субсидия: тот же порядок, ряд стороны третьим', 'sub', 1, 0],
+             ['процентная форма: вид → вид налога → ставка', 'pctOrdered', 1, 0],
+             ['органов управления вмешательством в ленте регуляторов', 'ribbon', 0, 0]],
+  },
+  {
+    /* ⚠️ КОНСТРУКТОР КУСОЧНОЙ: КОЛОНКИ УЧАСТКА СВОЕЙ ШИРИНЫ.
+       Указание владельца 25.08. Колонки «От» и «До» были жёсткие по 52 px и
+       стояли последними, а поле формулы забирало остаток строки. Вдобавок
+       единственная кнопка клавиатуры переезжает в ту строку, где стоит
+       каретка, и отнимала свои 32 px у поля формулы: замер 25.08 — в строке
+       с курсором поле 118 px, в остальных 156 px.
+
+       Стало: сетка с постоянными колонками и зарезервированным местом под
+       клавиатуру. Ширина поля формулы одна для ВСЕХ строк. */
+    name: 'Приёмка · конструктор кусочной: колонки участка не ужимаются',
+    run: `resetSceneMemory(); pickScene('sd'); redrawAll();
+          openPiecewise(document.querySelector('.f-slot > input'), 'Q');
+          PW.n = 5; renderPw();
+          var card = document.querySelector('#pw-modal .modal-card');
+          var slots = [], bounds = [], overflow = 0;
+          document.querySelectorAll('#pw-rows .pw-row').forEach(function (row) {
+            var sl = row.querySelector('.f-slot');
+            if (sl) slots.push(Math.round(sl.getBoundingClientRect().width));
+            row.querySelectorAll('input.pw-bound').forEach(function (b) {
+              bounds.push(Math.round(b.getBoundingClientRect().width));
+            });
+            var last = row.querySelectorAll('input.pw-bound');
+            if (last.length && card &&
+                last[last.length - 1].getBoundingClientRect().right > card.getBoundingClientRect().right + 1) overflow++;
+          });
+          /* Ширина окна задана правилом min(720px, 92vw), поэтому в узком
+             браузере она МЕНЬШЕ 720 по построению. Сравниваем с самим
+             правилом, а не с числом: иначе проверка ловила бы ширину окна
+             прогонщика, а не вёрстку. */
+          /* Ширина окна задана правилом min(720px, 92vw), и в узком браузере
+             она МЕНЬШЕ 720 по построению — плюс поля самого модального слоя.
+             Поэтому сравниваем не с числом, а с двумя краями правила: окно
+             заметно шире прежних 380 px и не шире 92 % браузера. */
+          var cw = card ? Math.round(card.getBoundingClientRect().width) : 0;
+          var res = { cardW: cw, winW: window.innerWidth,
+                      widerThanOld: cw >= 600 ? 1 : 0,
+                      rows: slots.length,
+                      slotWidths: new Set(slots).size,
+                      boundOk: (bounds.length && Math.min.apply(null, bounds) >= 90) ? 1 : 0,
+                      overflow: overflow,
+                      hScroll: card ? (card.scrollWidth > card.clientWidth + 1 ? 1 : 0) : 1,
+                      wide: card ? (card.getBoundingClientRect().width <= window.innerWidth * 0.92 ? 1 : 0) : 0 };
+          var close = document.getElementById('pw-close'); if (close) close.click();
+          return res;`,
+    checks: [['строк участка при пяти кусках', 'rows', 5, 0],
+             ['окно конструктора шире прежних 380 px', 'widerThanOld', 1, 0],
+             ['окно не шире 92 % браузера', 'wide', 1, 0],
+             ['разных ширин поля формулы (курсор колонки не двигает)', 'slotWidths', 1, 0],
+             ['самая узкая колонка участка не уже 90 px', 'boundOk', 1, 0],
+             ['колонок за правым краем окна', 'overflow', 0, 0],
+             ['горизонтальная прокрутка окна', 'hScroll', 0, 0]],
+  },
+  {
+    /* ⚠️ СЛАГАЕМОЕ СЛОЖЕНИЯ ОФОРМЛЕНО ПО ОБРАЗЦУ СЛОЖЕНИЯ КПВ.
+       Владелец 25.08: «сделай оформление так же, как при сложении нескольких
+       КПВ». Оттуда толщина 1,6 и штрих «5 4»; прозрачность НЕ 0,6 из
+       образца, а найденная перебором — наибольшая приглушающая, при которой
+       контраст итогового цвета к холсту держит 3:1 в обеих темах. Перебор с
+       шагом 0,05 от 0,5 вверх по восьми цветам палитры в двух темах дал 0,95
+       (его требуют фиолетовый и маджента в тёмной теме).
+
+       И два пунктира в одной сцене обязаны быть различимы: участок «рынка
+       здесь нет» — штрих 12/6 при толщине 3,2 и полной непрозрачности,
+       слагаемое — 5/4 при 1,6. Вдвое по толщине и вдвое с лишним по штриху. */
+    name: 'Приёмка · слагаемые сложения: штрих 5 4, толщина 1,6, приглушение 0,95',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 3); sumSetCount('S', 2);
+          var gd = STATE.curves.filter(function (c) { return c.sumGroup === 'D' && c.kind !== 'sum'; });
+          var gs = STATE.curves.filter(function (c) { return c.sumGroup === 'S' && c.kind !== 'sum'; });
+          ['100-Q', '60-Q', '40-Q'].forEach(function (e, i) { if (gd[i]) updateCurveExpr(gd[i], e); });
+          ['Q-100', 'Q+20'].forEach(function (e, i) { if (gs[i]) updateCurveExpr(gs[i], e); });
+          renderCurveList(); redrawAll();
+          var groups = 0, badDash = 0, badWidth = 0, badOp = 0;
+          var sums = 0, sumDashed = 0, ghost = 0, ghostOk = 0, dense = 0;
+          document.querySelectorAll('path[data-curve]').forEach(function (el) {
+            var id = +el.getAttribute('data-curve');
+            var cur = STATE.curves.find(function (c) { return c.id === id; });
+            if (!cur || !cur.sumGroup) return;
+            var cs = getComputedStyle(el);
+            var w = parseFloat(cs.strokeWidth), op = parseFloat(cs.opacity || '1');
+            var dash = (cs.strokeDasharray === 'none' ? '' : cs.strokeDasharray);
+            var pts = (String(el.getAttribute('d') || '').match(/[ML]/g) || []).length;
+            if (pts > 12) dense++;
+            if (cur.kind === 'sum') {
+              if (el.getAttribute('data-sum-part') === 'ghost') {
+                ghost++;
+                if (/^12(px)?[, ]/.test(dash) && Math.abs(w - 3.2) < 1e-6 && op === 1) ghostOk++;
+              } else {
+                sums++;
+                if (dash) sumDashed++;
+                if (Math.abs(w - 3.2) > 1e-6) badWidth++;
+              }
+              return;
+            }
+            groups++;
+            if (!/^5(px)?[, ]/.test(dash)) badDash++;
+            if (Math.abs(w - 1.6) > 1e-6) badWidth++;
+            if (!(op > 0.9 && op < 1)) badOp++;
+          });
+          return { groups: groups, badDash: badDash, badWidth: badWidth, badOp: badOp,
+                   sums: sums, sumDashed: sumDashed, ghost: ghost, ghostOk: ghostOk, dense: dense };`,
+    checks: [['слагаемых в сцене', 'groups', 5, 0],
+             ['слагаемых без штриха 5 4', 'badDash', 0, 0],
+             ['линий не своей толщины', 'badWidth', 0, 0],
+             ['слагаемых без приглушения', 'badOp', 0, 0],
+             ['суммарных кривых', 'sums', 2, 0],
+             ['суммарных кривых со штрихом', 'sumDashed', 0, 0],
+             ['участков «рынка здесь нет»', 'ghost', 1, 0],
+             ['из них со штрихом 12 6 при полной толщине', 'ghostOk', 1, 0],
+             ['кривых, построенных по густой сетке', 'dense', 0, 0]],
+  },
+  {
+    /* ⚠️ СНЯТАЯ ГАЛОЧКА САМА РАЗДВИГАЕТ ОКНО.
+       Решение владельца 25.08: галочка «только первая четверть» управляет
+       границами плоскости, значит раздвинуть границы — ровно её работа.
+       Дважды подряд сделанное вне четверти оказывалось невидимым: центр
+       поворота при процентном налоге и конец продолжения предельной кривой.
+
+       Оба края правила: есть что показать — окно раздвигается с запасом;
+       нечего — не трогается вовсе. */
+    name: 'Приёмка · снятая галочка раздвигает окно до точек вне четверти',
+    run: `var inView = function (Q, P) {
+            var dq = CONFIG.Qmax - CONFIG.Qmin, dp = CONFIG.Pmax - CONFIG.Pmin;
+            var mq = Math.min(Q - CONFIG.Qmin, CONFIG.Qmax - Q) / dq;
+            var mp = Math.min(P - CONFIG.Pmin, CONFIG.Pmax - P) / dp;
+            return (mq > 0.02 && mp > 0.02) ? 1 : 0;
+          };
+          // (1) пересечение вне четверти (−100; 200)
+          resetSceneMemory(); pickScene('taxes');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-P');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), '0.5*p-200');
+          setType('tax'); setTaxForm('unit'); setTax(0); redrawAll();
+          setFirstQuad(false);
+          var cross = inView(-100, 200);
+          setFirstQuad(true);
+          var backQ = (CONFIG.Qmin >= -1e-9 && CONFIG.Pmin >= -1e-9) ? 1 : 0;
+          // (2) центр поворота при акцизе (−60; 0)
+          resetSceneMemory(); pickScene('taxes');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '120-Q');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), '0.5*Q+30');
+          setType('tax'); setTaxForm('excise'); setTax(25); redrawAll();
+          setFirstQuad(false);
+          var pivot = inView(-60, 0);
+          setFirstQuad(true);
+          // (3) конец продолжения MR (100; −100)
+          resetSceneMemory(); pickScene('mono');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-Q');
+          var mc = STATE.curves.find(function (c) { return c.role === 'mc'; });
+          if (mc) updateCurveExpr(mc, '20');
+          redrawAll(); setFirstQuad(false);
+          var mr = inView(100, -100);
+          setFirstQuad(true);
+          // (4) показывать нечего — лишнего расширения нет
+          resetSceneMemory(); pickScene('sd');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-Q');
+          updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+          redrawAll();
+          var wide = CONFIG.Qmax - CONFIG.Qmin;
+          setFirstQuad(false);
+          var quiet = (Math.abs(CONFIG.Qmin + wide * 0.25) < 1e-6
+                       && Math.abs(CONFIG.Pmin + wide * 0.25) < 1e-6) ? 1 : 0;
+          setFirstQuad(true);
+          return { cross: cross, pivot: pivot, mr: mr, backQ: backQ, quiet: quiet };`,
+    checks: [['пересечение (−100; 200) в кадре с запасом', 'cross', 1, 0],
+             ['центр поворота (−60; 0) в кадре с запасом', 'pivot', 1, 0],
+             ['конец продолжения MR (100; −100) в кадре с запасом', 'mr', 1, 0],
+             ['обратное включение вернуло в первую четверть', 'backQ', 1, 0],
+             ['показывать нечего — окно не раздвинуто', 'quiet', 1, 0]],
+  },
+  {
+    /* ⚠️ СУММАРНАЯ КПВ — ЗАКРЫТАЯ ФОРМА ДЛЯ ЛЮБОГО ЧИСЛА ЛИНЕЙНЫХ КРИВЫХ.
+       Было: закрытая форма только для ДВУХ кривых и обычным текстом; для
+       трёх и больше панель писала «построена численно», хотя в сложении
+       прямых ничего численного нет. Заодно численный детектор изломов давал
+       (99,999; 60,001) там, где ответ ровно (100; 60).
+
+       Числа образца владельца. Две КПВ y = 100 − x и y = 60 − 2x:
+         Y = 160 − X при 0 ≤ X ≤ 100;  Y = 260 − 2X при 100 < X ≤ 130.
+       Три (плюс y = 40 − 4x):
+         200 − X, затем 300 − 2X, затем 560 − 4X до X = 140.
+       Нелинейная кривая в наборе — по-прежнему «построена численно». */
+    name: 'Приёмка · суммарная КПВ: закрытая форма по участкам',
+    run: `var take = function (exprs) {
+            resetSceneMemory(); pickScene('ppfsum');
+            STATE.ppfSumCount = exprs.length;
+            exprs.forEach(function (e, i) { ppfSumSet(i, e); });
+            STATE.ppfSumData = null;
+            redrawAll(); ensurePpfSum(); redrawAll();
+            var d = STATE.ppfSumData || {};
+            return { tex: d.formulaTex || '', text: d.formulaText,
+                     kinks: (d.kinks || []).map(function (k) { return k.join(';'); }).join(' '),
+                     Xtot: d.Xtot, Ytot: d.Ytot };
+          };
+          var two = take(['100-x', '60-2x']);
+          var three = take(['100-x', '60-2x', '40-4x']);
+          var arc = take(['sqrt(10000-x^2)', '60-2x']);
+          var has = function (tex, re) { return re.test(tex) ? 1 : 0; };
+          return {
+            two1: has(two.tex, /160 - X, & 0 \\\\le X \\\\le 100/),
+            two2: has(two.tex, /260 - 2X, & 100 < X \\\\le 130/),
+            twoKinks: two.kinks === '100;60' ? 1 : 0,
+            twoX: two.Xtot, twoY: two.Ytot,
+            three1: has(three.tex, /200 - X, & 0 \\\\le X \\\\le 100/),
+            three2: has(three.tex, /300 - 2X, & 100 < X \\\\le 130/),
+            three3: has(three.tex, /560 - 4X, & 130 < X \\\\le 140/),
+            threeKinks: three.kinks === '100;100 130;40' ? 1 : 0,
+            threeX: three.Xtot, threeY: three.Ytot,
+            arcTex: arc.tex ? 1 : 0 };`,
+    checks: [['две КПВ: участок Y = 160 − X при 0 ≤ X ≤ 100', 'two1', 1, 0],
+             ['две КПВ: участок Y = 260 − 2X при 100 < X ≤ 130', 'two2', 1, 0],
+             ['две КПВ: излом ровно в (100; 60)', 'twoKinks', 1, 0],
+             ['две КПВ: конец кривой X', 'twoX', 130, 1e-6],
+             ['две КПВ: Y при нулевом X', 'twoY', 160, 1e-6],
+             ['три КПВ: участок Y = 200 − X', 'three1', 1, 0],
+             ['три КПВ: участок Y = 300 − 2X', 'three2', 1, 0],
+             ['три КПВ: участок Y = 560 − 4X', 'three3', 1, 0],
+             ['три КПВ: изломы (100; 100) и (130; 40)', 'threeKinks', 1, 0],
+             ['три КПВ: конец кривой X', 'threeX', 140, 1e-6],
+             ['три КПВ: Y при нулевом X', 'threeY', 200, 1e-6],
+             ['дуга в наборе: ломаная НЕ выдумана', 'arcTex', 0, 0]],
+  },
 ];
 
 function approx(got, want, tol) {
@@ -4037,7 +5355,14 @@ for (const c of CASES) {
    MouseEvent(...)) из page.evaluate этот путь миновал бы и pointer-событий
    не дал бы вовсе — тремя предыдущими замерами так и не воспроизвели дефект
    протяжки (см. карточку 3c3b11c9-2bc1-81b5). */
+/* ⚠️ ИТОГОВАЯ СТРОКА ОБЯЗАНА СЧИТАТЬ ВСЕ СЛУЧАИ, А НЕ ТОЛЬКО СПИСОК CASES.
+   Она печатала «(всего CASES.length)», а случаи-жесты (gesture) в этот список
+   не входят: они регистрируются вызовами ниже. Получалось «197 прошло (всего
+   185)» — прошло БОЛЬШЕ, чем всего, и это первое, обо что спотыкается глаз
+   при чтении отчёта. Считаем и жесты тоже. */
+let gestureCount = 0;
 async function gesture(name, fn) {
+  gestureCount++;                               // считаем ЗАРЕГИСТРИРОВАННЫЕ, а не прошедшие
   if (ONLY && name.indexOf(ONLY) < 0) return;   // тот же отбор, что и у CASES
   try {
     const r = await fn();
@@ -4131,15 +5456,13 @@ await gesture('(г) КТВ строится конструктором без р
     }, sel);
     await page.waitForTimeout(120);
   };
-  /* ⚠️ PW.rows переживает закрытие окна и чужие поля: openPiecewise досеивает
-     умолчание, только если PW.rows пуст (82-input.js). Прогон этого файла
-     идёт одним долгим сеансом браузера, и более ранний случай уже мог
-     открыть конструктор для ДРУГОГО поля — тогда здесь всплыли бы чужие
-     строки в чужой букве («p» вместо «X») и разбор упал бы на пустом месте,
-     хотя к приставке «y = » это отношения не имеет. Обнаружено этим же
-     тестом (см. отчёт сессии) — отдельная карточка заведена в «Задачи»,
-     здесь только просим конструктор открыться заново, как при первом входе. */
-  await page.evaluate(() => { if (typeof PW === 'object') PW.rows = []; });
+  /* ⚠️ ЗДЕСЬ СТОЯЛА ПОДПОРКА `PW.rows = []`, И ЕЁ УБРАЛИ НАРОЧНО.
+     Раньше строки конструктора переживали закрытие окна и чужие поля, прогон
+     идёт одним долгим сеансом браузера, и более ранний случай оставлял здесь
+     чужие куски в чужой букве («p» вместо «X»). Утечка починена: конструктор
+     собирает строки заново при каждом открытии — из того, что стоит в ПОЛЕ.
+     Без подпорки этот случай и стережёт починку: вернётся утечка — сюда
+     приедет «p», и разбор КТВ покраснеет. */
   await reveal('#fh-auto-inp-ppft');
   await page.click('#fh-auto-inp-ppft');
   await page.waitForTimeout(150);
@@ -4310,5 +5633,7 @@ await gesture('(е) добавленная кривая не меняет рав
 });
 
 await browser.close();
-console.log(`\n=== calc2 регрессия: ${pass} прошло, ${fail} провалено (всего ${CASES.length}) ===`);
+console.log(`\n=== calc2 регрессия: ${pass} прошло, ${fail} провалено `
+  + `(всего ${CASES.length + gestureCount}: ${CASES.length} случаев + ${gestureCount} жестов)`
+  + (ONLY ? ` [отбор «${ONLY}»]` : '') + ' ===');
 process.exit(fail === 0 ? 0 : 1);

@@ -787,9 +787,33 @@ await t('панели не перекрывают график', () => page.eval
   return !bad.length || bad.join(', ');
 }));
 
+/* ⚠️ ПРАВИЛО ИЗМЕНИЛОСЬ, И ПРОВЕРКА ИЗМЕНИЛАСЬ ВМЕСТЕ С НИМ, А НЕ ОТКЛЮЧЕНА.
+   Смысл проверки был и остаётся один: органами управления сцены распоряжаются
+   В ПРАВОЙ ПАНЕЛИ, а не в свёрнутых «Инструментах» слева. Но раньше «правая
+   панель» означала ровно ленту регуляторов `#params-body`, потому что ставка
+   вмешательства физически переезжала туда.
+
+   По решению владельца 25.08 ставка, регулируемая цена, объём квоты, цена в
+   коридоре и ряд «кто платит» в ленту больше не переезжают: они живут в своей
+   карточке «Вмешательство государства», и порядок каскада там правильный —
+   вид вмешательства, вид налога, кто платит, ставка. Карточка стоит в той же
+   правой панели, поэтому правило соблюдено, а старая формулировка искала
+   узел не там.
+
+   Спрашиваем то, что правило и обещает: орган управления найден внутри
+   `#params-panel` и НЕ остался в левой панели инструментов. */
 await t('регуляторы сцены живут в правой панели', () => page.evaluate(() => {
-  const n = document.querySelectorAll('#params-body .pchip, #params-body .field').length;
-  return n > 0 || 'в панели параметров пусто';
+  const panel = document.getElementById('params-panel');
+  if (!panel) return 'правой панели нет вовсе';
+  const n = panel.querySelectorAll('.pchip, .field, #tax-field, #pc-field, #quota-field').length;
+  if (!n) return 'в правой панели ни одного органа управления';
+  const tools = document.getElementById('tools-panel');
+  const strayIds = ['tax-field', 'pc-field', 'quota-field', 'quota-price-field', 'taxside-row'];
+  const stray = strayIds.filter(id => {
+    const e = document.getElementById(id);
+    return e && tools && tools.contains(e);
+  });
+  return !stray.length || 'в «Инструментах» остались: ' + stray.join(', ');
 }));
 
 /* ⚠️ ПРОВЕРКА ПЕРЕСЧИТАНА ПОД КАНОН, А НЕ ОТКЛЮЧЕНА (фаза 6, п. 50).
