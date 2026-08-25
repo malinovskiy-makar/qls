@@ -5295,6 +5295,344 @@ const CASES = [
              ['дуга: Y на конце кривой', 'arcYend', 0, 1e-4],
              ['дуга: конец кривой X', 'arcX', 130, 1e-4]],
   },
+  {
+    /* ⚠️ ДВА КРАЯ У ЭТОГО ПРАВИЛА, И ОБА ЗДЕСЬ.
+       Правило: путь суммарной кривой покрывает ВСЮ её область определения —
+       и не обрывается на последнем изломе, и не тянется дальше записи.
+       Дефект 26.08: узлами кусочной кривой были [lo, hi] плюс внутренние
+       изломы, а правый конец области определения (у спроса Q = 160) в список
+       не входил. Пока окно уже области, узел hi считался и линия рисовалась
+       целиком; как только окно шире — hi давал NaN, точка становилась null, и
+       путь кончался на изломе (40; 60) вместо (160; 0).
+       Числа 160 и 180 — тот же ответ, названный для этого набора. */
+    name: 'Сложение · путь суммарной кривой доходит до конца области определения',
+    run: `resetSceneMemory(); pickScene('sdsum'); redrawAll();
+          CONFIG.Qmin = 0; CONFIG.Qmax = 220; redrawAll();
+          var last = function (side) {
+            var c = STATE.curves.find(function (x) { return x.kind === 'sum' && x.sumGroup === side; });
+            if (!c) return null;
+            var el = document.querySelector('path[data-curve="' + c.id + '"][data-sum-part="real"]')
+                  || document.querySelector('path[data-curve="' + c.id + '"]:not([data-sum-part])');
+            if (!el) return null;
+            var pts = [];
+            String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
+              var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+              if (m) pts.push([sx.invert(+m[1]), sy.invert(+m[2])]);
+            });
+            var p = pts[pts.length - 1] || null;
+            return { q: p ? p[0] : NaN, v: p ? p[1] : NaN, n: pts.length,
+                     domainTo: c.sumDomainTo || 0, breaks: (c.sumBreaks || []).slice() };
+          };
+          var D = last('D'), S = last('S');
+          var offBreak = function (r) {
+            if (!r) return 0;
+            return r.breaks.every(function (b) { return Math.abs(r.q - b) > 1; }) ? 1 : 0;
+          };
+          return { dq: D ? D.q : NaN, dv: D ? D.v : NaN, dn: D ? D.n : NaN,
+                   dDom: D ? D.domainTo : NaN, dOff: offBreak(D),
+                   sq: S ? S.q : NaN, sv: S ? S.v : NaN, sDom: S ? S.domainTo : NaN,
+                   sOff: offBreak(S),
+                   eqQ: STATE.eq ? STATE.eq.Q : NaN, cs: STATE.cs, ps: STATE.ps };`,
+    /* Допуск пиксельный: точки читаются с атрибута d и переводятся обратно в
+       координаты модели, то есть через округление до пикселя. */
+    checks: [['спрос: правый конец области определения', 'dDom', 160, 1e-6],
+             ['спрос: путь доходит до Q = 160', 'dq', 160, 0.35],
+             ['спрос: и приходит на ось цен', 'dv', 0, 0.35],
+             ['спрос: путь НЕ обрывается на изломе', 'dOff', 1, 0],
+             ['спрос: точек в пути единицы, а не сотни', 'dn', 3, 2],
+             ['предложение: правый конец области', 'sDom', 180, 1e-6],
+             ['предложение: путь доходит до Q = 180', 'sq', 180, 0.35],
+             ['предложение: путь НЕ обрывается на изломе', 'sOff', 1, 0],
+             ['равновесие не сдвинулось', 'eqQ', 70, 1e-4],
+             ['CS не сдвинулся', 'cs', 1625, 1e-3],
+             ['PS не сдвинулся', 'ps', 1325, 1e-3]],
+  },
+  {
+    /* Правило: одна и та же запись выглядит ОДИНАКОВО в поле, в подсказке и в
+       блоке «Итоговая функция» — потому что переводчик у них один
+       (mathToLatexField). Дефект 26.08: tipExpr звал mathToTex напрямую, и
+       подсказка печатала вывод Math.js — `if`/`otherwise` по-английски, связку
+       `∧` вместо двойного неравенства и служебный хвост NaN как `∞`.
+       ⚠️ Проверяем ОБА края: и что дурного нет, и что нужное есть. Проверка
+       «нет английского if» одна покраснеть не может: пустая строка её тоже
+       проходит. */
+    name: 'Подсказка кривой · кусочная запись набрана общим переводчиком',
+    run: `resetSceneMemory(); pickScene('sdsum'); redrawAll();
+          var c = STATE.curves.find(function (x) { return x.kind === 'sum' && x.sumGroup === 'D'; });
+          var t = tipExpr(c.expr);
+          var f = mathToLatexField(c.expr);
+          var box = document.createElement('div');
+          box.style.cssText = 'position:absolute;left:-9999px;top:0';
+          box.textContent = t; document.body.appendChild(box);
+          renderMathIn(box);
+          var cl = box.cloneNode(true);
+          cl.querySelectorAll('.katex-mathml, annotation').forEach(function (n) { n.remove(); });
+          var shown = cl.textContent.replace(/\\s+/g, ' ');
+          box.remove();
+          return { hasIf: /\\bif\\b/.test(t) ? 1 : 0,
+                   hasOther: /otherwise/.test(t) ? 1 : 0,
+                   hasWedge: /wedge|∧/.test(t) ? 1 : 0,
+                   hasInf: /infty|∞/.test(t) ? 1 : 0,
+                   hasRu: /\\\\text\\{если \\}/.test(t) ? 1 : 0,
+                   sameAsField: (t === '$' + f + '$') ? 1 : 0,
+                   cases: /begin\\{cases\\}/.test(t) ? 1 : 0,
+                   shownLo: /если 0\\s*≤\\s*Q\\s*<\\s*40/.test(shown) ? 1 : 0,
+                   shownHi: /если 40\\s*≤\\s*Q\\s*≤\\s*160/.test(shown) ? 1 : 0 };`,
+    checks: [['английского «if» в подсказке нет', 'hasIf', 0, 0],
+             ['английского «otherwise» нет', 'hasOther', 0, 0],
+             ['связки ∧ нет', 'hasWedge', 0, 0],
+             ['служебного ∞ нет', 'hasInf', 0, 0],
+             ['«если» по-русски есть', 'hasRu', 1, 0],
+             ['запись набрана фигурной скобкой', 'cases', 1, 0],
+             ['на экране видно «если 0 ≤ Q < 40»', 'shownLo', 1, 0],
+             ['на экране видно «если 40 ≤ Q ≤ 160»', 'shownHi', 1, 0],
+             ['подсказка совпала с записью поля', 'sameAsField', 1, 0]],
+  },
+  {
+    /* Правило: сторона вмешательства меняет ТОЛЬКО нарисованную кривую, а
+       числа обязаны совпасть до разряда. Дефект 26.08: у субсидии сторона не
+       читалась вовсе (условие было ограничено налогом), и «Субсидию получает:
+       Покупатель» не меняло на графике ничего.
+       Второй край того же правила — ЗНАК: у субсидии покупателю эффективный
+       спрос ПОДНИМАЕТСЯ (D + s из точки (0; 120)), а не опускается. */
+    name: 'Вмешательство · субсидия покупателю двигает кривую спроса',
+    run: `var snap = function (side) {
+            resetSceneMemory(); pickScene('taxes');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-Q');
+            updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+            setType('subsidy'); setTaxForm('unit'); setTaxSide(side); setTax(20);
+            redrawAll();
+            var el = document.querySelector('path[stroke-dasharray="6 4"]');
+            var at0 = NaN;
+            if (el) {
+              var m = String(el.getAttribute('d') || '').match(/M\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+              if (m) at0 = sy.invert(+m[2]);
+            }
+            var names = [];
+            document.querySelectorAll('text.curve-name').forEach(function (t) {
+              var c = t.cloneNode(true);
+              c.querySelectorAll('.katex-mathml, annotation').forEach(function (n) { n.remove(); });
+              names.push(c.textContent.replace(/\\s+/g, ' ').trim());
+            });
+            var hint = document.getElementById('tax-hint');
+            var ht = hint ? hint.textContent.replace(/\\s+/g, ' ') : '';
+            var te = STATE.taxEq;
+            return { stroke: el ? el.getAttribute('stroke') : '', at0: at0, names: names,
+                     dcol: STATE.D.color, scol: STATE.S.color,
+                     Q: te ? te.Q : NaN, Pb: te ? te.Pb : NaN, Ps: te ? te.Ps : NaN,
+                     budget: STATE.budget, dwl: STATE.dwl,
+                     saysD: /кривая спроса/.test(ht) ? 1 : 0,
+                     saysS: /кривая предложения/.test(ht) ? 1 : 0 };
+          };
+          var sel = snap('seller'), buy = snap('buyer');
+          return { selIsS: (sel.stroke === sel.scol) ? 1 : 0,
+                   buyIsD: (buy.stroke === buy.dcol) ? 1 : 0,
+                   selAt0: sel.at0, buyAt0: buy.at0,
+                   selName: sel.names.indexOf('S − s') >= 0 ? 1 : 0,
+                   buyName: buy.names.indexOf('D + s') >= 0 ? 1 : 0,
+                   selQ: sel.Q, buyQ: buy.Q, selPb: sel.Pb, buyPb: buy.Pb,
+                   selPs: sel.Ps, buyPs: buy.Ps,
+                   selBud: sel.budget, buyBud: buy.budget,
+                   selDwl: sel.dwl, buyDwl: buy.dwl,
+                   hintSel: (sel.saysS && !sel.saysD) ? 1 : 0,
+                   hintBuy: (buy.saysD && !buy.saysS) ? 1 : 0 };`,
+    checks: [['у продавца сдвинута кривая предложения', 'selIsS', 1, 0],
+             ['у покупателя сдвинута кривая СПРОСА', 'buyIsD', 1, 0],
+             ['S − s выходит из (0; −20)', 'selAt0', -20, 1e-6],
+             ['D + s выходит из (0; 120)', 'buyAt0', 120, 1e-6],
+             ['имя сдвинутой кривой у продавца', 'selName', 1, 0],
+             ['имя сдвинутой кривой у покупателя', 'buyName', 1, 0],
+             ['объём у продавца', 'selQ', 60, 1e-4],
+             ['объём у покупателя тот же', 'buyQ', 60, 1e-4],
+             ['цена покупателя у продавца', 'selPb', 40, 1e-4],
+             ['цена покупателя у покупателя та же', 'buyPb', 40, 1e-4],
+             ['цена продавца у продавца', 'selPs', 60, 1e-4],
+             ['цена продавца у покупателя та же', 'buyPs', 60, 1e-4],
+             ['расход у продавца', 'selBud', -1200, 1e-3],
+             ['расход у покупателя тот же', 'buyBud', -1200, 1e-3],
+             ['DWL у продавца', 'selDwl', 100, 1e-3],
+             ['DWL у покупателя тот же', 'buyDwl', 100, 1e-3],
+             ['подсказка у продавца называет S', 'hintSel', 1, 0],
+             ['подсказка у покупателя называет D', 'hintBuy', 1, 0]],
+  },
+  {
+    /* Правило: аналитическая запись кривой — ВЕЛИЧИНА, и живёт она первой
+       карточкой «Ключевых значений», а не во врезке разбора. Держится это тем,
+       что внутри блока нет ни одного узла с классом `sb-note`: общий проход
+       moveExplanations уносит такие врезки в «Объяснение модели».
+       ⚠️ Проверяем и второй край: запись действительно набрана (в блоке есть
+       .katex), иначе пустой блок прошёл бы проверку «в разборе его нет». */
+    name: 'Итоговая функция · первым блоком в «Ключевых значениях», не в разборе',
+    run: `var look = function (k, setup) {
+            resetSceneMemory(); pickScene(k);
+            if (setup) (new Function(setup))();
+            redrawAll();
+            document.querySelectorAll('.fold-btn').forEach(function (b) {
+              if (b.getAttribute('aria-expanded') !== 'true') b.click();
+            });
+            var sb = document.getElementById('sb-body');
+            var ff = document.getElementById('info-final');
+            var ex = document.getElementById('ex-body');
+            var first = null;
+            if (sb) {
+              for (var i = 0; i < sb.children.length; i++) {
+                var e = sb.children[i];
+                if (e.textContent.replace(/\\s+/g, '').length) { first = e.id || e.className; break; }
+              }
+            }
+            var txt = ff ? ff.textContent : '';
+            return { has: ff && ff.querySelectorAll('.ff').length ? 1 : 0,
+                     math: ff && ff.querySelectorAll('.ff-math .katex').length ? 1 : 0,
+                     notes: ff ? ff.querySelectorAll('.sb-note, .sb-note-src').length : -1,
+                     first: (first === 'info-final') ? 1 : 0,
+                     /* ⚠️ ИЩЕМ САМ БЛОК, А НЕ СЛОВА. Первая версия проверки
+                        искала в разборе строку «Итоговая функция» — и краснела
+                        на честном тексте разбора, где сказано, где эту запись
+                        искать. Правило про УЗЕЛ: блока с классом ff в
+                        «Объяснении модели» быть не должно ни одного. */
+                     inExplain: (ex ? ex.querySelectorAll('.ff').length : 0),
+                     copy: ff && ff.querySelectorAll('.ff-copy[data-ff-expr]').length ? 1 : 0 };
+          };
+          var a = look('sdsum', '');
+          var b = look('ppfsum', "STATE.ppfSumCount=2; ppfSumSet(0,'y = 100 - x'); ppfSumSet(1,'y = 60 - 3*x');"
+                       + " if (typeof renderPpfSumRows === 'function') renderPpfSumRows(); recomputePpfSum();");
+          var c = look('taxes', "setType('tax'); setTaxForm('unit'); setTax(20);");
+          return { aHas: a.has, aMath: a.math, aNotes: a.notes, aFirst: a.first, aEx: a.inExplain, aCopy: a.copy,
+                   bHas: b.has, bMath: b.math, bNotes: b.notes, bFirst: b.first, bEx: b.inExplain,
+                   cHas: c.has, cMath: c.math, cNotes: c.notes, cFirst: c.first, cEx: c.inExplain };`,
+    checks: [['сложение: блок есть', 'aHas', 1, 0],
+             ['сложение: запись набрана математикой', 'aMath', 1, 0],
+             ['сложение: внутри блока нет .sb-note', 'aNotes', 0, 0],
+             ['сложение: блок стоит ПЕРВЫМ в табло', 'aFirst', 1, 0],
+             ['сложение: блок НЕ уехал в разбор', 'aEx', 0, 0],
+             ['сложение: кнопка «копировать» несёт запись', 'aCopy', 1, 0],
+             ['КПВ: блок есть', 'bHas', 1, 0],
+             ['КПВ: запись набрана математикой', 'bMath', 1, 0],
+             ['КПВ: внутри блока нет .sb-note', 'bNotes', 0, 0],
+             ['КПВ: блок стоит ПЕРВЫМ в табло', 'bFirst', 1, 0],
+             ['КПВ: блок НЕ уехал в разбор', 'bEx', 0, 0],
+             ['налог: блок есть', 'cHas', 1, 0],
+             ['налог: запись набрана математикой', 'cMath', 1, 0],
+             ['налог: внутри блока нет .sb-note', 'cNotes', 0, 0],
+             ['налог: блок стоит ПЕРВЫМ в табло', 'cFirst', 1, 0],
+             ['налог: блок НЕ уехал в разбор', 'cEx', 0, 0]],
+  },
+  {
+    /* Сложение КПВ по равным альтернативным издержкам (учебник Бахарева,
+       с. 181–191). Контрольные числа владельца: (а) с. 185–187, (б) две
+       параболы, (в) линейные — НЕ СДВИГАТЬ, (г) с. 182–184.
+       ⚠️ Проверяем ЗНАЧЕНИЯ функции, а не строку записи: одна и та же функция
+       записывается по-разному (16 − (X − 5)² и −9 + 10X − X² — это одно и то
+       же), и требовать буквального совпадения строки значило бы стеречь
+       отпечаток реализации вместо правила. */
+    name: 'Сложение КПВ · закрытая форма по равным альт. издержкам, наборы (а)–(г)',
+    run: `var take = function (exprs) {
+            var cs = exprs.map(function (e) { return classifyPpf(parsePpfEquation(e).f); });
+            var g = ppfSumAnalytic(cs);
+            return g ? function (x) { var v = g.evalY(x); return isNaN(v) ? null : Math.round(v * 1e6) / 1e6; } : null;
+          };
+          var A = take(['y = 20 - 4*x', 'y = 16 - x^2']);
+          var B = take(['y = 16 - x^2', 'y = 36 - 4*x^2']);
+          var V = take(['y = 100 - x', 'y = 60 - 2*x']);
+          var V3 = take(['y = 100 - x', 'y = 60 - 2*x', 'y = 40 - 4*x']);
+          var G = take(['y = 5 - 0.625*x', 'y = 8 - 2*x']);
+          var D = take(['y = sqrt(100 - x^2)', 'y = sqrt(64 - x^2)']);
+          var Z = take(['y = 16 - x^2', 'y = sqrt(64 - x^2)']);
+          return { aOk: A ? 1 : 0, a0: A ? A(0) : NaN, a2: A ? A(2) : NaN, a5: A ? A(5) : NaN,
+                   a7: A ? A(7) : NaN, a8: A ? A(8) : NaN, a9: A ? A(9) : NaN,
+                   aOut: (A && A(9.5) === null) ? 1 : 0,
+                   bOk: B ? 1 : 0, b0: B ? B(0) : NaN, b5: B ? B(5) : NaN, b6: B ? B(6) : NaN, b7: B ? B(7) : NaN,
+                   vOk: V ? 1 : 0, v0: V ? V(0) : NaN, v100: V ? V(100) : NaN, v130: V ? V(130) : NaN,
+                   v3_0: V3 ? V3(0) : NaN, v3_100: V3 ? V3(100) : NaN, v3_130: V3 ? V3(130) : NaN, v3_140: V3 ? V3(140) : NaN,
+                   gOk: G ? 1 : 0, g0: G ? G(0) : NaN, g8: G ? G(8) : NaN, g12: G ? G(12) : NaN,
+                   dOk: D ? 1 : 0, d0: D ? D(0) : NaN, d18: D ? D(18) : NaN, d10: D ? D(10) : NaN,
+                   zNull: Z ? 0 : 1 };`,
+    checks: [['(а) закрытая форма нашлась', 'aOk', 1, 0],
+             ['(а) Y(0) = 36', 'a0', 36, 1e-6],
+             ['(а) излом Y(2) = 32', 'a2', 32, 1e-6],
+             ['(а) середина прямого участка Y(5) = 20', 'a5', 20, 1e-6],
+             ['(а) второй излом Y(7) = 12', 'a7', 12, 1e-6],
+             ['(а) Y(8) = 7', 'a8', 7, 1e-6],
+             ['(а) конец кривой Y(9) = 0', 'a9', 0, 1e-6],
+             ['(а) за концом записи нет', 'aOut', 1, 0],
+             ['(б) закрытая форма нашлась', 'bOk', 1, 0],
+             ['(б) Y(0) = 52', 'b0', 52, 1e-6],
+             ['(б) излом Y(5) = 32', 'b5', 32, 1e-6],
+             ['(б) Y(6) = 20', 'b6', 20, 1e-6],
+             ['(б) конец Y(7) = 0', 'b7', 0, 1e-6],
+             ['(в) линейные: Y(0) = 160', 'v0', 160, 1e-6],
+             ['(в) линейные: излом Y(100) = 60', 'v100', 60, 1e-6],
+             ['(в) линейные: конец Y(130) = 0', 'v130', 0, 1e-6],
+             ['(в) три линейных: Y(0) = 200', 'v3_0', 200, 1e-6],
+             ['(в) три линейных: Y(100) = 100', 'v3_100', 100, 1e-6],
+             ['(в) три линейных: Y(130) = 40', 'v3_130', 40, 1e-6],
+             ['(в) три линейных: Y(140) = 0', 'v3_140', 0, 1e-6],
+             ['(г) Y(0) = 13', 'g0', 13, 1e-6],
+             ['(г) излом Y(8) = 8', 'g8', 8, 1e-6],
+             ['(г) конец Y(12) = 0', 'g12', 0, 1e-6],
+             ['(д) две дуги: Y(0) = 18', 'd0', 18, 1e-6],
+             ['(д) две дуги: Y(10) = √224', 'd10', 14.966630, 1e-4],
+             ['(д) две дуги: конец Y(18) = 0', 'd18', 0, 1e-6],
+             ['парабола + дуга: закрытой формы честно НЕТ', 'zNull', 1, 0]],
+  },
+  {
+    /* СЛУЧАЙ Б — убывающие альтернативные издержки (учебник, с. 188–191).
+       Метод другой: внутреннего оптимума нет, выгодна полная специализация, и
+       суммарная кривая — верхняя огибающая сдвинутых копий исходных.
+       Контрольное число владельца: y = 60 − 20√x (Xᵐᵃˣ 9) и y = 40 − 10x
+       (Xᵐᵃˣ 4) → 100 − 10X, 100 − 20√X, 130 − 10X, узлы (4; 60) и (9; 40).
+       ⚠️ Проверяем и НЕПРЕРЫВНОСТЬ в узлах: огибающая, собранная неверно,
+       чаще всего даёт разрыв именно там. */
+    name: 'Сложение КПВ · убывающие альт. издержки, верхняя огибающая',
+    run: `var cs = ['y = 60 - 20*sqrt(x)', 'y = 40 - 10*x']
+                    .map(function (e) { return classifyPpf(parsePpfEquation(e).f); });
+          var g = ppfSumAnalytic(cs);
+          var at = function (x) { if (!g) return NaN; var v = g.evalY(x); return isNaN(v) ? null : Math.round(v * 1e6) / 1e6; };
+          var kinds = ppfCostKinds(cs).map(function (o) { return o.kind; }).join(',');
+          var mix = ppfSumAnalytic(['y = 60 - 20*sqrt(x)', 'y = 16 - x^2']
+                    .map(function (e) { return classifyPpf(parsePpfEquation(e).f); }));
+          var why = ppfWhyNumeric(['y = 60 - 20*sqrt(x)', 'y = 16 - x^2']
+                    .map(function (e) { return classifyPpf(parsePpfEquation(e).f); }));
+          return { ok: g ? 1 : 0, y0: at(0), y2: at(2), y4: at(4), y625: at(6.25),
+                   y9: at(9), y11: at(11), y13: at(13), out: (at(13.5) === null) ? 1 : 0,
+                   /* ⚠️ НЕПРЕРЫВНОСТЬ — ЭТО НЕ «СЛЕВА И СПРАВА ОДНО ЧИСЛО».
+                      В узле у кривой ИЗЛОМ: наклоны слева и справа разные, и
+                      при шаге ε значения законно расходятся на |Δнаклона|·2ε.
+                      Первая версия проверки требовала совпадения при ε = 1e-3
+                      и краснела на верной кривой. Правило другое: разрыв обязан
+                      СТРЕМИТЬСЯ К НУЛЮ вместе с ε. Считаем скачок при двух
+                      шагах: у непрерывной кривой он падает во столько же раз,
+                      во сколько уменьшен шаг, у разорванной остаётся прежним. */
+                   jump4: (function () {
+                     if (at(4) == null) return NaN;
+                     var big = Math.abs(at(4 - 1e-2) - at(4 + 1e-2));
+                     var sml = Math.abs(at(4 - 1e-4) - at(4 + 1e-4));
+                     return (big < 1e-9) ? 0 : sml / big;
+                   })(),
+                   jump9: (function () {
+                     if (at(9) == null) return NaN;
+                     var big = Math.abs(at(9 - 1e-2) - at(9 + 1e-2));
+                     var sml = Math.abs(at(9 - 1e-4) - at(9 + 1e-4));
+                     return (big < 1e-9) ? 0 : sml / big;
+                   })(),
+                   kinds: (kinds === 'down,const') ? 1 : 0,
+                   mixNull: mix ? 0 : 1,
+                   whyNamed: (/растущими издержками/.test(why) && /убывающими/.test(why)) ? 1 : 0 };`,
+    checks: [['закрытая форма нашлась', 'ok', 1, 0],
+             ['Y(0) = 100', 'y0', 100, 1e-6],
+             ['Y(2) = 80 (прямой участок)', 'y2', 80, 1e-6],
+             ['узел Y(4) = 60', 'y4', 60, 1e-6],
+             ['Y(6,25) = 50 (корневой участок)', 'y625', 50, 1e-6],
+             ['узел Y(9) = 40', 'y9', 40, 1e-6],
+             ['Y(11) = 20', 'y11', 20, 1e-6],
+             ['конец Y(13) = 0', 'y13', 0, 1e-6],
+             ['за концом записи нет', 'out', 1, 0],
+             ['в узле X = 4 кривая непрерывна (скачок падает вместе с шагом)', 'jump4', 0, 0.02],
+             ['в узле X = 9 кривая непрерывна (скачок падает вместе с шагом)', 'jump9', 0, 0.02],
+             ['тип издержек взят из формы кривой', 'kinds', 1, 0],
+             ['смешанный набор закрытой формы НЕ получает', 'mixNull', 1, 0],
+             ['и причина названа словами', 'whyNamed', 1, 0]],
+  },
 ];
 
 function approx(got, want, tol) {
