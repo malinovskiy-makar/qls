@@ -134,14 +134,21 @@ function ffSumPath(side) {
            expr: c.expr, breaks: (c.sumBreaks || []).slice(), domainTo: c.sumDomainTo || null };
 }
 /* Место подписи кривой на холсте (текст .curve-name с нужной надписью). */
-function ffLabelAt(txt) {
+function ffLabelAt(txt, curve) {
   var out = null;
   document.querySelectorAll('text.curve-name').forEach(function (t) {
     if (ffText(t) === txt && !out) {
-      var r = t.getBoundingClientRect();
-      out = { x: Math.round(r.left), y: Math.round(r.top),
-              q: sx.invert(r.left + r.width / 2 - document.querySelector('#chart').getBoundingClientRect().left),
-              raw: t.getAttribute('x') + ';' + t.getAttribute('y') };
+      /* Место подписи берём из САМИХ атрибутов x/y — они уже в системе
+         координат холста, и путать их с экранным прямоугольником не надо. */
+      var q = sx.invert(+t.getAttribute('x'));
+      var p = sy.invert(+t.getAttribute('y'));
+      var v = curve ? evalCurve(curve, q) : NaN;
+      /* Подпись ставится с отступом от линии (±7 и ±14 px по вертикали),
+         поэтому «на линии» меряем в ПИКСЕЛЯХ и с запасом на этот отступ. */
+      var gapPx = isFinite(v) ? Math.abs(sy(v) - (+t.getAttribute('y'))) : Infinity;
+      out = { q: q, p: p, v: v, gap: isFinite(v) ? Math.abs(v - p) : Infinity,
+              gapPx: Math.round(gapPx * 10) / 10,
+              onCurve: isFinite(v) && gapPx <= 22 };
     }
   });
   return out;
@@ -233,15 +240,37 @@ if (need('Д1')) {
       D: ffSumPath('D'), S: ffSumPath('S'),
       eq: STATE.eq ? { Q: STATE.eq.Q, P: STATE.eq.P } : null,
       cs: STATE.cs, ps: STATE.ps,
-      labD: ffLabelAt('D'), labS: ffLabelAt('S'),
+      labD: ffLabelAt('D', STATE.D), labS: ffLabelAt('S', STATE.S),
     };
   });
   note('окно по Q: ' + r.win.join(' … '));
   note('запись D: ' + (r.D ? r.D.expr : '—'));
   note('изломы D: [' + (r.D ? r.D.breaks.join(', ') : '') + ']  правый конец области: ' + (r.D ? r.D.domainTo : '—'));
-  show('последняя точка D по Q', r.D && r.D.last ? r.D.last[0] : NaN, 160, 1e-6);
-  show('последняя точка D по P', r.D && r.D.last ? r.D.last[1] : NaN, 0, 1e-6);
-  show('последняя точка S по Q', r.S && r.S.last ? r.S.last[0] : NaN, 220, 1e-6);
+  note('изломы S: [' + (r.S ? r.S.breaks.join(', ') : '') + ']  правый конец области: ' + (r.S ? r.S.domainTo : '—'));
+  /* ⚠️ ДОПУСК ПИКСЕЛЬНЫЙ, А НЕ МАТЕМАТИЧЕСКИЙ. Точки читаются с атрибута `d`
+     и переводятся обратно в координаты модели, то есть через округление до
+     пикселя: при окне 0…220 на ~770 px пиксель это 0,29 единицы Q. Требовать
+     здесь 1e-6 значило бы мерить не кривую, а разрешение экрана. */
+  const PX = 0.35;
+  /* ПРАВИЛО, А НЕ ОТПЕЧАТОК: путь кривой доходит до правого конца ЕЁ ОБЛАСТИ
+     ОПРЕДЕЛЕНИЯ, а не до последнего излома. Числа 160 и 180 — тот же ответ,
+     названный конкретно для этого набора. */
+  show('последняя точка D по Q', r.D && r.D.last ? r.D.last[0] : NaN, 160, PX);
+  show('последняя точка D по P', r.D && r.D.last ? r.D.last[1] : NaN, 0, PX);
+  flag('путь D доходит до конца своей области определения',
+       !!(r.D && r.D.last && r.D.domainTo && Math.abs(r.D.last[0] - r.D.domainTo) <= PX),
+       (r.D && r.D.last ? num(r.D.last[0]) : '—') + ' против ' + (r.D ? r.D.domainTo : '—'));
+  flag('путь D НЕ обрывается на изломе',
+       !!(r.D && r.D.last && r.D.breaks.every(b => Math.abs(r.D.last[0] - b) > 1)),
+       'изломы [' + (r.D ? r.D.breaks.join(', ') : '') + ']');
+  show('последняя точка S по Q', r.S && r.S.last ? r.S.last[0] : NaN, 180, PX);
+  show('последняя точка S по P', r.S && r.S.last ? r.S.last[1] : NaN, 100, PX);
+  flag('путь S доходит до конца своей области определения',
+       !!(r.S && r.S.last && r.S.domainTo && Math.abs(r.S.last[0] - r.S.domainTo) <= PX),
+       (r.S && r.S.last ? num(r.S.last[0]) : '—') + ' против ' + (r.S ? r.S.domainTo : '—'));
+  flag('путь S НЕ обрывается на изломе',
+       !!(r.S && r.S.last && r.S.breaks.every(b => Math.abs(r.S.last[0] - b) > 1)),
+       'изломы [' + (r.S ? r.S.breaks.join(', ') : '') + ']');
   show('точек в пути D', r.D ? r.D.n : NaN, null);
   show('точек в пути S', r.S ? r.S.n : NaN, null);
   flag('точек в пути D — единицы, а не сотни', !!r.D && r.D.n <= 12, r.D ? r.D.n : '—');
@@ -249,8 +278,16 @@ if (need('Д1')) {
   show('равновесие P*', r.eq ? r.eq.P : NaN, 45, 1e-4);
   show('CS', r.cs, 1625, 1e-3);
   show('PS', r.ps, 1325, 1e-3);
-  note('подпись D на холсте при Q ≈ ' + (r.labD ? num(r.labD.q) : '—'));
-  note('подпись S на холсте при Q ≈ ' + (r.labS ? num(r.labS.q) : '—'));
+  /* Подпись обязана сидеть НА ЛИНИИ, а не за её концом: это второй дефект,
+     а не тот же самый. Считаем расстояние от места подписи до самой кривой. */
+  note('подпись D на холсте при Q ≈ ' + (r.labD ? num(r.labD.q) : '—')
+       + ', расхождение с кривой по P: ' + (r.labD ? num(r.labD.gap) : '—'));
+  note('подпись S на холсте при Q ≈ ' + (r.labS ? num(r.labS.q) : '—')
+       + ', расхождение с кривой по P: ' + (r.labS ? num(r.labS.gap) : '—'));
+  flag('подпись D стоит на своей линии', !!(r.labD && r.labD.onCurve),
+       r.labD ? ('Q ' + num(r.labD.q) + ', расхождение ' + num(r.labD.gap)) : 'подписи нет');
+  flag('подпись S стоит на своей линии', !!(r.labS && r.labS.onCurve),
+       r.labS ? ('Q ' + num(r.labS.q) + ', расхождение ' + num(r.labS.gap)) : 'подписи нет');
   await shot('d1-sum-zoom-220');
 }
 

@@ -78,6 +78,15 @@ function piecewiseNodesQ(curve, lo, hi) {
   else if (curve.kind === 'sum' && curve.sumNumeric === false && Array.isArray(curve.sumBreaks)) {
     breaks = curve.sumBreaks.slice();
     if (curve.sumGhostTo > 0) breaks.push(curve.sumGhostTo);
+    /* ⚠️ ПРАВЫЙ КОНЕЦ ОБЛАСТИ ОПРЕДЕЛЕНИЯ — ТОЖЕ УЗЕЛ, И БЕЗ НЕГО ЛИНИЯ РВЁТСЯ.
+       Узлы это [lo, hi] плюс внутренние изломы. Когда окно шире области
+       определения записи, узел `hi` даёт NaN, точка становится null — и путь
+       кончается на последнем живом узле, то есть на изломе. Замер 26.08:
+       суммарный спрос обрывался в (40; 60) вместо (160; 0), а подписи D и S
+       стояли справа, у пустого места.
+       В `sumBreaks` это значение не кладём: конец кривой не излом, и в
+       ключевых точках он породил бы лишнюю отметку. */
+    if (curve.sumDomainTo > 0) breaks.push(curve.sumDomainTo);
   }
   if (!breaks) return null;
   const nodes = [lo, hi];

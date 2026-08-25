@@ -1441,6 +1441,18 @@ function sumLinearRecord(groups) {
 
   // Точки излома по количеству — границы участков, кроме самого начала.
   const breaks = segs.map(x => x.lo).filter(x => x > 1e-9);
+  /* ⚠️ ПРАВЫЙ КОНЕЦ ОБЛАСТИ ОПРЕДЕЛЕНИЯ — ЭТО НЕ ИЗЛОМ, НО ЭТО УЗЕЛ.
+     В `breaks` лежат только ЛЕВЫЕ края участков, и правого конца записи
+     (у спроса 100−Q и 60−Q это Q = 160) среди них нет. Пока правый край окна
+     был левее 160, узел `hi` считался и линия рисовалась целиком; как только
+     окно стало шире области определения, узел `hi` дал NaN, точка стала
+     null — и путь оборвался на последнем живом узле, то есть на изломе
+     (замер 26.08: последняя точка пути (40; 60) вместо (160; 0)).
+
+     Отдаём правый конец отдельным полем. В `breaks` его дописывать НЕЛЬЗЯ:
+     оттуда читают ключевые точки (лишняя отметка на графике) и
+     integrateBroken — а конец кривой изломом не является. */
+  const domainTo = segs[segs.length - 1].hi;
   /* Собираем цепочку условий тем же способом, что и конструктор кусочной:
      показывать её плоским списком умеет condChainToCases (82-input.js).
      Хвост NaN означает «вне участков функции нет» — там она не рисуется. */
@@ -1453,7 +1465,7 @@ function sumLinearRecord(groups) {
     if (out === null) { out = cond + ' ? ' + body + ' : NaN'; continue; }
     out = cond + ' ? ' + body + ' : (' + out + ')';
   }
-  return { expr: out, breaks: breaks, ghostTo: ghostTo };
+  return { expr: out, breaks: breaks, ghostTo: ghostTo, domainTo: domainTo };
 }
 
 /* ⚠️ ИНТЕГРАЛ ПОД ЛОМАНОЙ СЧИТАЕТСЯ ПО УЧАСТКАМ, А НЕ ОДНОЙ СЕТКОЙ.
@@ -1553,6 +1565,7 @@ function sumRebuildSide(side) {
   const groups = sumGroupsOf(side);
   cur.linear = null; cur.compiled = null; cur.fn = null; cur.sumBreaks = [];
   cur.sumGhostTo = 0;
+  cur.sumDomainTo = 0;
   if (!groups.length) { cur.expr = ''; cur.sumNumeric = false; return; }
   const rec = sumLinearRecord(groups);
   if (rec) {
@@ -1563,11 +1576,20 @@ function sumRebuildSide(side) {
     cur.expr = rec.expr; cur.compiled = compiled; cur.sumNumeric = false;
     cur.sumBreaks = rec.breaks;
     cur.sumGhostTo = rec.ghostTo || 0;
+    /* Правый конец собственной области определения записи — тоже узел кривой
+       (см. sumLinearRecord). Без него линия обрывается на последнем изломе,
+       как только окно шире области. */
+    cur.sumDomainTo = rec.domainTo || 0;
   } else {
     const pts = sumPolyline(groups);
     /* Ломаная затыкает ту же дырку у нуля (см. sumPolyline), и помечать её
        надо тем же признаком: иначе у нелинейных групп пунктира не было бы. */
     cur.sumGhostTo = (pts._ghostTo || 0);
+    /* У численной суммы область определения кончается там, где кончается сама
+       ломаная. Узлами эта ветка не пользуется (изломы найдены приблизительно,
+       и доверять им нельзя), но правый конец знать полезно: по нему меряется
+       та же проверка, что и у аналитической ветки. */
+    cur.sumDomainTo = pts.length ? pts[pts.length - 1][0] : 0;
     cur.expr = 'сумма посчитана по точкам';
     cur.fn = (q) => interpY(pts, q);
     cur.sumNumeric = true;
