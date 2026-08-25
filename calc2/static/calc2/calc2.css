@@ -405,6 +405,12 @@ input:focus-visible, select:focus-visible {
   box-shadow: var(--shadow-pop); pointer-events: none;
   font-size: 12px; line-height: 1.45; color: var(--text2);
 }
+/* Плашка, внутри которой стоит набранная запись (фигурная скобка кусочной
+   функции). KaTeX не переносит строку, и в 260 px запись просто вылезала на
+   холст — замер 26.08 дал перебор 165 px. Здесь плашка растёт по содержимому,
+   но не шире окна; если и этого мало, запись пересобирается второй формой
+   (fitTipMath в 86-workspace.js). */
+#hint-tip.tip-math { max-width: min(560px, calc(100vw - 24px)); }
 #hint-tip hr { border: none; border-top: var(--line) solid var(--border); margin: 7px 0; }
 .hint code { background: var(--surface-2); border: 1px solid var(--border-soft);
   padding: 1px 4px; border-radius: var(--r-sm); font-size: 11px; }

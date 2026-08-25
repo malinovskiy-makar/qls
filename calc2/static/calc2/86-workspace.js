@@ -798,11 +798,40 @@ function hintTip() {
   return t;
 }
 
+/* ⚠️ ПЛАШКА ПОДСКАЗКИ НЕ РАССЧИТАНА НА ФИГУРНУЮ СКОБКУ.
+   Ширина у неё 260 px, а набранная KaTeX запись НЕ ПЕРЕНОСИТСЯ: замер 26.08 —
+   запись суммарного спроса торчала за правый край плашки на 165 px, прямо на
+   холст. Ужимать её нечем (кегль подсказки и так 12), поэтому правило то же,
+   что у блока «Итоговая функция»: сперва даём плашке ширину по содержимому,
+   а если и этого мало — пересобираем ВТОРОЙ формой, где условие уходит на
+   свою строку под формулу.
+
+   Исходный LaTeX берём из самой набранной записи: KaTeX кладёт его рядом, в
+   `<annotation encoding="application/x-tex">`. Второго места хранения (а
+   значит и второй правды) заводить не нужно. */
+function fitTipMath(t) {
+  const k = t.querySelector('.katex');
+  if (!k) return;
+  const fits = () => k.getBoundingClientRect().width <= t.clientWidth + 1;
+  if (fits()) return;
+  t.classList.add('tip-math');                 // плашка шире, но не шире окна
+  if (fits()) return;
+  const ann = k.querySelector('annotation[encoding="application/x-tex"]');
+  const src = ann ? ann.textContent : '';
+  const alt = src ? ffCasesStacked(src) : null;
+  if (!alt || alt === src) return;
+  const host = k.parentNode;
+  if (!host) return;
+  katexInto(host, alt);
+}
+
 function showHintTip(dot, html) {
   const t = hintTip();
   t.innerHTML = html;
+  t.classList.remove('tip-math');
   renderMathIn(t);
   t.style.display = 'block';
+  fitTipMath(t);
   const b = dot.getBoundingClientRect();
   const w = t.offsetWidth, h = t.offsetHeight;
 
@@ -917,14 +946,23 @@ function tipName(text) {
     TIP_RE, (all, pre, word, sub) => pre + '$' + tipTex(word, sub) + '$');
 }
 
-/* Формула целиком (запись кривой) — набирается формулой целиком. Перевод в
-   LaTeX делает тот же `mathToTex`, что и предпросмотр под полем ввода: иначе
-   одна и та же запись выглядела бы в двух местах по-разному. */
+/* Формула целиком (запись кривой) — набирается формулой целиком.
+
+   ⚠️ ПЕРЕВОДЧИК ТОТ ЖЕ, ЧТО У ПОЛЯ ВВОДА, И ЭТО НЕ ПРИДИРКА.
+   Здесь стоял голый `mathToTex`, и для цепочки условий он отдавал вывод
+   Math.js как есть: `if` и `otherwise` по-английски, связка `∧` вместо
+   двойного неравенства, а служебный хвост «здесь функции нет» печатался как
+   `∞` (замер 26.08 на суммарном спросе — все четыре признака сразу).
+   `mathToLatexField` (82-input.js) — тот самый переводчик, которым набрана
+   запись в поле и в блоке «Итоговая функция»: он зовёт `condChainToCases`,
+   печатает «если» по-русски, сворачивает `Q ≥ a ∧ Q < b` в `a ≤ Q < b` и
+   проглатывает хвост NaN. Одна и та же запись обязана выглядеть одинаково в
+   поле, в подсказке и в табло. */
 function tipExpr(expr) {
   const s = String(expr == null ? '' : expr).trim();
   if (!s) return '';
-  if (typeof mathToTex !== 'function') return s;
-  const tex = mathToTex(s);
+  const tex = (typeof mathToLatexField === 'function') ? mathToLatexField(s)
+            : ((typeof mathToTex === 'function') ? mathToTex(s) : '');
   return tex ? '$' + tex + '$' : s;
 }
 

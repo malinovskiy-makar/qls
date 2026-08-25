@@ -339,9 +339,96 @@ if (need('Д2')) {
       flag('плашка целиком в окне браузера', t.inWindow, JSON.stringify(t.rect));
       flag('плашка не залезает на холст', !t.overChart);
       show('запись выходит за правый край плашки, px', t.katexOver, null);
+      flag('запись НЕ выходит за правый край плашки', t.katexOver != null && t.katexOver <= 1,
+           t.katexOver + ' px');
       await shot('d2-tip-sum');
     }
   }
+  /* ⚠️ ДВА КРАЯ У ПРАВИЛА, И ВТОРОЙ — ДЛИННАЯ ЗАПИСЬ. Два куска влезают в
+     плашку и без всякой подгонки; проверять надо и тот случай, ради которого
+     подгонка написана. Набор Б даёт спросу ТРИ участка. */
+  head('Д2 (второй край) · длинная запись из трёх участков');
+  await page.evaluate(() => {
+    resetSceneMemory(); pickScene('sdsum');
+    sumSetCount('D', 3); sumSetCount('S', 2);
+    const gd = STATE.curves.filter(c => c.sumGroup === 'D' && c.kind !== 'sum');
+    const gs = STATE.curves.filter(c => c.sumGroup === 'S' && c.kind !== 'sum');
+    ['100-Q', '60-Q', '40-Q'].forEach((e, i) => updateCurveExpr(gd[i], e));
+    ['Q-100', 'Q+20'].forEach((e, i) => updateCurveExpr(gs[i], e));
+    redrawAll(); ffExpandAll();
+  });
+  await page.waitForTimeout(400);
+  const t2 = await page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll('.crow-auto'));
+    if (!rows.length) return null;
+    const r = rows[0].getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+  });
+  if (t2) {
+    await page.mouse.move(t2.x, t2.y);
+    await page.waitForTimeout(400);
+    const w = await page.evaluate(() => {
+      const el = document.getElementById('hint-tip');
+      if (!el || el.style.display === 'none') return null;
+      const r = el.getBoundingClientRect();
+      const ch = document.querySelector('#chart');
+      const cr = ch ? ch.getBoundingClientRect() : null;
+      const k = el.querySelector('.katex');
+      const kr = k ? k.getBoundingClientRect() : null;
+      const ann = k ? k.querySelector('annotation[encoding="application/x-tex"]') : null;
+      return {
+        text: ffText(el), wide: el.classList.contains('tip-math'),
+        stacked: /gathered/.test(ann ? ann.textContent : ''),
+        w: Math.round(r.width), over: kr ? Math.round(kr.right - r.right) : null,
+        inWindow: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
+        onChart: !!cr && !(r.right <= cr.left || r.left >= cr.right || r.bottom <= cr.top || r.top >= cr.bottom),
+      };
+    });
+    if (!w) flag('плашка всплыла', false);
+    else {
+      note('текст: ' + w.text.slice(0, 220));
+      note('плашка ' + w.w + ' px, расширена: ' + w.wide + ', вторая форма: ' + w.stacked);
+      flag('нет английского if', w.text.indexOf('if') < 0);
+      flag('нет служебного ∞', w.text.indexOf('∞') < 0);
+      show('запись выходит за правый край плашки, px', w.over, null);
+      flag('запись НЕ выходит за правый край плашки', w.over != null && w.over <= 1, w.over + ' px');
+      flag('плашка целиком в окне браузера', w.inWindow);
+      await shot('d2-tip-sum-3');
+    }
+  }
+  /* ⚠️ ТРЕТИЙ СЛУЧАЙ — ЗАВЕДОМО ШИРОКАЯ ЗАПИСЬ. Настоящие наборы дают запись,
+     которая влезает и без подгонки, и на них правило ширины никогда бы не
+     сработало: проверка, которая не может покраснеть, ничего не стережёт.
+     Берём длинные коэффициенты и смотрим, что плашка расширилась либо запись
+     пересобрана второй формой — и в обоих случаях осталась внутри плашки. */
+  head('Д2 (третий край) · заведомо широкая запись');
+  const w3 = await page.evaluate(() => {
+    const LONG = '(Q >= 0 and Q < 40) ? 123.456789 - 0.987654*Q : '
+               + '((Q >= 40 and Q < 80) ? 987.654321 - 0.123456*Q : '
+               + '((Q >= 80 and Q <= 200) ? 1234.56789 - 0.456789*Q : NaN))';
+    const dot = document.querySelector('.crow-auto') || document.body;
+    showHintTip(dot, 'Сейчас это ' + tipExpr(LONG));
+    const el = document.getElementById('hint-tip');
+    const r = el.getBoundingClientRect();
+    const k = el.querySelector('.katex');
+    const kr = k ? k.getBoundingClientRect() : null;
+    const ann = k ? k.querySelector('annotation[encoding="application/x-tex"]') : null;
+    return {
+      text: ffText(el), wide: el.classList.contains('tip-math'),
+      stacked: /gathered/.test(ann ? ann.textContent : ''),
+      w: Math.round(r.width), over: kr ? Math.round(kr.right - r.right) : null,
+      inWindow: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
+    };
+  });
+  note('плашка ' + w3.w + ' px, расширена: ' + w3.wide + ', вторая форма: ' + w3.stacked);
+  note('текст: ' + w3.text.slice(0, 200));
+  flag('широкая запись включила правило ширины', w3.wide || w3.stacked,
+       'расширение ' + w3.wide + ', вторая форма ' + w3.stacked);
+  show('запись выходит за правый край плашки, px', w3.over, null);
+  flag('широкая запись НЕ выходит за правый край плашки', w3.over != null && w3.over <= 1,
+       w3.over + ' px');
+  flag('плашка целиком в окне браузера', w3.inWindow);
+  await shot('d2-tip-wide');
 }
 
 /* ═══════════ Д3. Субсидия покупателю ═══════════════════════════════ */
