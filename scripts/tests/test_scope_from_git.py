@@ -124,9 +124,18 @@ class ResolveLabelsTests(unittest.TestCase):
         result = resolve_labels(['CLAUDE.md'])
         self.assertTrue(result.full_run)
 
-    def test_docs_change_triggers_full_run(self):
+    def test_testing_doc_change_triggers_full_run(self):
+        # docs/TESTING.md описывает саму методику прогона — правка в нём
+        # может означать, что порядок/область тестов сама поменялась.
         result = resolve_labels(['docs/TESTING.md'])
         self.assertTrue(result.full_run)
+
+    def test_unrelated_doc_has_no_test_consequence(self):
+        # А вот docs/DATA.md к тестам отношения не имеет — это была бы
+        # ложная тревога, а не «сигнал широкого эффекта».
+        result = resolve_labels(['docs/DATA.md'])
+        self.assertFalse(result.full_run)
+        self.assertEqual(result.labels, frozenset())
 
     def test_root_template_change_triggers_full_run(self):
         result = resolve_labels(['templates/_nav.html'])

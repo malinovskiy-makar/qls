@@ -95,8 +95,15 @@ NARROW_PROBLEMS_PREFIXES = ('problems/management/commands/', 'problems/tests/')
 BLANKET_PROBLEMS_DEPENDENTS = frozenset({'catalog', 'student', 'teacher', 'game', 'calendar_stub'})
 
 # Широкий эффект — полный набор без попытки сузить.
-_FULL_RUN_EXACT = frozenset({'manage.py', 'CLAUDE.md'})
-_FULL_RUN_PREFIXES = ('config/', 'requirements/', 'docker-compose', 'docs/', 'templates/')
+#
+# docs/TESTING.md — САМ ОПИСЫВАЕТ методику прогона, поэтому в списке. Но
+# `docs/` вообще НЕ здесь: 2026-08-25 код-чек (Фаза 4, зубастость) поймал
+# ложную тревогу — правка docs/DATA.md (документация по данным, к тестам
+# отношения не имеющая) блэнкетом уходила в полный набор наравне с правкой
+# CLAUDE.md. Расширять список докс-триггеров вручную по мере находок, а не
+# сваливать всю docs/ в одну кучу.
+_FULL_RUN_EXACT = frozenset({'manage.py', 'CLAUDE.md', 'docs/TESTING.md'})
+_FULL_RUN_PREFIXES = ('config/', 'requirements/', 'docker-compose', 'templates/')
 
 _IMPORT_RE = re.compile(r'^\s*(?:from|import)\s+([\w.]+)', re.MULTILINE)
 
