@@ -349,6 +349,42 @@ function svConvexity(side) {
   }
   return { span: Math.round(Qmax * 100) / 100, slopes: out };
 }
+/* Стык пунктирного и сплошного кусков суммарной кривой в ПИКСЕЛЯХ.
+   Щель шириной в шаг сетки на экране видна как разрыв, а число «путей 2»
+   само по себе о ней ничего не говорит. */
+function svJoinGap(side) {
+  var c = STATE.curves.find(function (x) { return x.kind === 'sum' && x.sumGroup === side; });
+  if (!c) return null;
+  var ps = svPathsOf(c.id);
+  var gh = ps.find(function (p) { return p.getAttribute('data-sum-part') === 'ghost'; });
+  var re = ps.find(function (p) { return p.getAttribute('data-sum-part') === 'real'; });
+  if (!gh || !re) return null;
+  var a = gh.getPointAtLength(gh.getTotalLength());
+  var b = re.getPointAtLength(0);
+  return Math.round(Math.hypot(a.x - b.x, a.y - b.y) * 1000) / 1000;
+}
+/* Все пунктиры сцены с их числами: чем один вид пунктира отличается от
+   другого, видно только рядом. */
+function svDashes() {
+  var chart = document.getElementById('chart');
+  if (!chart) return [];
+  var bg = svCanvasBg();
+  return [].slice.call(chart.querySelectorAll('path[stroke-dasharray], line[stroke-dasharray]'))
+    .filter(function (p) { return p.getAttribute('stroke-dasharray') !== 'none'; })
+    .map(function (p) {
+      var cs = getComputedStyle(p);
+      var op = parseFloat(p.getAttribute('opacity') != null ? p.getAttribute('opacity') : (cs.opacity || '1'));
+      return {
+        what: p.getAttribute('data-sum-part') || p.getAttribute('data-offquad') && 'вне первой четверти'
+              || p.getAttribute('data-marginal-tail') && 'предельная кривая'
+              || (p.getAttribute('class') || p.parentElement && p.parentElement.getAttribute('class') || 'прочее'),
+        dash: p.getAttribute('stroke-dasharray'),
+        width: Math.round(parseFloat(p.getAttribute('stroke-width') || cs.strokeWidth || '0') * 100) / 100,
+        alpha: Math.round((isFinite(op) ? op : 1) * 100) / 100,
+        stroke: svHex(svRGB(p.getAttribute('stroke') || cs.stroke)),
+      };
+    });
+}
 /* Есть ли на суммарной кривой участок «рынка здесь нет» — тот, где кривая
    лежит на оси Q (цена ноль при положительном количестве). */
 function svGhostRange(side) {
@@ -457,6 +493,21 @@ if (need('Н')) {
       note(`${c.label}: элементов пути ${c.segs.length}, отрезков «M» внутри ${moves}` +
         (c.segs.length > 1 ? ('  части: ' + c.segs.map(s => (s.part || '—') + '/' + s.dash).join(', ')) : ''));
     });
+    for (const side of ['D', 'S']) {
+      const gap = await run(`return svJoinGap(${JSON.stringify(side)});`);
+      if (gap == null) continue;
+      show(`стык пунктира и сплошной (${side}), px`, gap, 0, 0.35);
+    }
+    // Один путь на участок, где рынок есть; пунктирных кусков не больше одного.
+    const sums = snap.curves.filter(c => c.kind === 'sum');
+    const realOk = sums.every(c => c.segs.filter(s => !s.dash || s.dash === 'none').length === 1);
+    const ghostOk = sums.every(c => c.segs.filter(s => s.dash && s.dash !== 'none').length <= 1);
+    flag('у каждой суммарной кривой ровно один сплошной путь', realOk,
+      sums.map(c => c.label + ': ' + c.segs.filter(s => !s.dash || s.dash === 'none').length).join('; '));
+    flag('внутри сплошного пути нет разрывов',
+      sums.every(c => c.segs.filter(s => !s.dash || s.dash === 'none').every(s => s.moves === 1)),
+      sums.map(c => c.label + ': M=' + c.segs.filter(s => !s.dash || s.dash === 'none').map(s => s.moves).join('/')).join('; '));
+    flag('пунктирных кусков не больше одного', ghostOk, '');
   }
 }
 
@@ -475,6 +526,9 @@ if (need('Ш')) {
   dashed.forEach(s => note(`  пунктир: цвет ${s.stroke}, толщина ${s.width}, прозр ${s.alpha}, штрих «${s.dash}»`));
   solid.forEach(s => note(`  сплошной: цвет ${s.stroke}, толщина ${s.width}, прозр ${s.alpha}`));
   flag('несуществующий участок показан пунктиром', dashed.length > 0, 'пунктирных кусков ' + dashed.length);
+  const all = await run(`return svDashes();`);
+  note('все пунктиры сцены:');
+  all.forEach(d => note(`  ${String(d.what).padEnd(24)} штрих «${d.dash}»  толщина ${d.width}  прозр ${d.alpha}  цвет ${d.stroke}`));
   if (dashed.length && solid.length) {
     flag('пунктир того же цвета, что и сплошной', dashed[0].stroke === solid[0].stroke,
       dashed[0].stroke + ' против ' + solid[0].stroke);
@@ -484,6 +538,42 @@ if (need('Ш')) {
       dashed[0].alpha + ' против ' + solid[0].alpha);
   }
   await shot('sh-B-ghost');
+
+  /* ── Могут ли два вида пунктира встретиться в одной сцене ──────────
+     Пунктир первой четверти в сцене сложения даёт только «пересечение вне
+     первой четверти», а оно требует, чтобы равновесия в четверти НЕ было.
+     Но участок «рынка здесь нет» — это ровная нулевая цена от Q = 0: любой
+     падающий спрос доходит до нуля и обязан пересечь её. Проверяем это не
+     рассуждением, а перебором. */
+  console.log('\n=== Ш · встречаются ли два вида пунктира в одной сцене ===');
+  const TRY = [
+    { d: ['10-Q'], s: ['Q-100', 'Q+20'] },
+    { d: ['40-Q', '30-Q'], s: ['Q-100', 'Q-50'] },
+    { d: ['100-Q', '60-Q'], s: ['Q-100', 'Q+200'] },
+    { d: ['5-Q'], s: ['Q-300'] },
+    { d: ['100-2*Q'], s: ['Q-100', 'Q+20'] },
+  ];
+  let both = 0;
+  for (const t of TRY) {
+    await run(`svSetup(${JSON.stringify(t.d)}, ${JSON.stringify(t.s)}); svExpandAll();`);
+    await page.waitForTimeout(180);
+    const st = await run(`return { eq: !!STATE.eq, off: !!STATE.offEq,
+      ghost: [].slice.call(document.querySelectorAll('#chart path[data-sum-part="ghost"]')).length,
+      offq: [].slice.call(document.querySelectorAll('#chart path[data-offquad]')).length };`);
+    if (st.ghost > 0 && st.offq > 0) both++;
+    note(`D ${t.d.join(', ')} | S ${t.s.join(', ')} -> равновесие ${st.eq ? 'есть' : 'нет'}, ` +
+      `пунктир «рынка нет» ${st.ghost}, пунктир вне четверти ${st.offq}`);
+  }
+  note(both ? `оба вида пунктира встретились в ${both} случаях` :
+    'ни в одном случае два вида пунктира в одной сцене не встретились — ' +
+    'участок нулевой цены от Q = 0 любой падающий спрос обязан пересечь, ' +
+    'и равновесие в первой четверти находится всегда');
+  // Числами их всё равно разводим: вес, прозрачность и ритм штриха.
+  await setup('Б');
+  const gh = (await run(`return svDashes();`)).find(d => d.what === 'ghost');
+  note(`«рынка здесь нет»: штрих ${gh ? gh.dash : '—'}, толщина ${gh ? gh.width : '—'}, прозрачность ${gh ? gh.alpha : '—'}`);
+  note('«вне первой четверти» (тот же движок, сцена «Спрос и предложение»): штрих 5 4, толщина 1.5, прозрачность 0.65');
+  note('«предельная кривая» (монополия): штрих 6 4, толщина 0.55·основной, прозрачность 0.45');
 }
 
 /* ═══ П. ПОДПИСИ НА ГРАФИКЕ ════════════════════════════════════════ */

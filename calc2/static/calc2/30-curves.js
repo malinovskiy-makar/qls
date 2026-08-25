@@ -890,6 +890,11 @@ function labelCurve(g, f, txt, color, opts) {
    В сцене сложения сумма — это ответ задачи, а группы — слагаемые к нему,
    поэтому сумма вдвое толще. Во всех остальных сценах толщина прежняя, и
    ни одна из сорока сцен от этой правки не меняется. */
+/* Штрих участка «рынка здесь нет». Вдвое длиннее, чем у пунктира первой
+   четверти («5 4» и «6 4»): в одной сцене оба должны быть различимы глазом,
+   а не только по толщине. */
+const GHOST_DASH = '12 6';
+
 function curveWidth(curve) {
   if (typeof sumSceneOn === 'function' && sumSceneOn() && curve && curve.sumGroup) {
     return (curve.kind === 'sum') ? LW.bold : LW.thin;
@@ -899,6 +904,13 @@ function curveWidth(curve) {
 
 // Рисуем все видимые кривые внутри «окна» первой четверти.
 function drawCurves() {
+  /* ⚠️ СЛОЙ ПОД КРИВЫЕ, ИДУЩИЕ ПО САМОЙ ОСИ, — ОТДЕЛЬНЫЙ, А НЕ ВЛОЖЕННЫЙ.
+     Вложенная обрезка ПЕРЕСЕКАЕТСЯ с родительской, а не заменяет её: группа
+     внутри `curves` со своим окном получала бы всё то же тесное окно и
+     теряла бы половину толщины по-прежнему (замер 25.08: 1,5 пикселя вместо
+     3,2). Поэтому слой лежит рядом, а не внутри. Стоит он ПЕРЕД кривыми:
+     подписи и обычные линии должны оставаться сверху. */
+  const gLip = svg.append('g').attr('class', 'curves-lip').attr('clip-path', 'url(#plot-clip-lip)');
   const g = svg.append('g').attr('class', 'curves').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line()
     .defined(d => d !== null)               // разрыв там, где формула не считается
@@ -908,10 +920,55 @@ function drawCurves() {
        не набрали, рисовать нечего (решение владельца 22.08). */
     if (!curve.visible || !curve.expr) return;
     const pts = curvePoints(curve);
-    g.append('path').datum(pts)
-      .attr('fill', 'none').attr('stroke', curve.color).attr('stroke-width', curveWidth(curve))
-      .attr('data-curve', curve.id)     // экспорт узнаёт кривую и пишет её формулой
-      .attr('d', line);
+    const w = curveWidth(curve);
+    /* ── УЧАСТОК, КОТОРОГО НЕТ (решение владельца 25.08) ──────────────
+       У суммарной кривой бывает кусок, который мы дописали сами, чтобы
+       функция не давала NaN: при предложении Q − 100 первый продавец выходит
+       на рынок только со ста единиц, и от нуля до ста рыночного предложения
+       не существует. Запись там равна нулю, и на холсте это была ровная
+       линия по оси Q, неотличимая от самой оси, — читалось как «кривая
+       начинается из начала координат».
+
+       Пунктир ТОГО ЖЕ ЦВЕТА И ТОЙ ЖЕ ТОЛЩИНЫ, что сплошной: математически
+       кривая здесь есть, а рынка здесь нет, и это столь же важная часть
+       картины. Бледнее или тоньше — значило бы «менее важно», а смысл другой.
+
+       ⚠️ НЕ ПУТАТЬ С ПУНКТИРОМ ПЕРВОЙ ЧЕТВЕРТИ. Тот означает продолжение за
+       пределы четверти и рисуется тонким и полупрозрачным (1,5 и 0,65 у
+       пересечения вне четверти, 0,55·ширины и 0,45 у предельных кривых).
+       Этот — полновесный и с ВДВОЕ более длинным штрихом: «12 6» против
+       «5 4» и «6 4». Различаются весом, прозрачностью и ритмом штриха. */
+    const ghostTo = (typeof sumSceneOn === 'function' && sumSceneOn()) ? (curve.sumGhostTo || 0) : 0;
+    if (ghostTo > 1e-9) {
+      /* Точку стыка считаем ТОЧНО и кладём в оба куска: узла ровно в ней на
+         сетке из 400 отрезков может не оказаться, и между пунктиром и
+         сплошной осталась бы щель шириной в шаг сетки. */
+      const pJoin = evalCurve(curve, ghostTo);
+      const join = isFinite(pJoin) ? [ghostTo, pJoin] : null;
+      const ghost = pts.filter(p => p && p[0] < ghostTo - 1e-9);
+      const real = pts.filter(p => p && p[0] > ghostTo + 1e-9);
+      if (join) { ghost.push(join); real.unshift(join); }
+      if (ghost.length > 1) {
+        /* Своё окно обрезки: участок «рынка здесь нет» идёт ровно по оси Q,
+           и общее окно съедало бы половину его толщины (см. plot-clip-lip). */
+        gLip.append('path').datum(ghost)
+          .attr('fill', 'none').attr('stroke', curve.color).attr('stroke-width', w)
+          .attr('stroke-dasharray', GHOST_DASH)
+          .attr('data-curve', curve.id)
+          .attr('data-sum-part', 'ghost')
+          .attr('d', line);
+      }
+      g.append('path').datum(real)
+        .attr('fill', 'none').attr('stroke', curve.color).attr('stroke-width', w)
+        .attr('data-curve', curve.id)
+        .attr('data-sum-part', 'real')
+        .attr('d', line);
+    } else {
+      g.append('path').datum(pts)
+        .attr('fill', 'none').attr('stroke', curve.color).attr('stroke-width', w)
+        .attr('data-curve', curve.id)     // экспорт узнаёт кривую и пишет её формулой
+        .attr('d', line);
+    }
     /* ⚠️ У ПОЛОСЫ ПОВЕРХ КРИВОЙ ДВА РАЗНЫХ СМЫСЛА, И ОНИ РАЗВЕДЕНЫ.
 
        Полоса делала сразу две вещи: давала допуск попадания по кривой И

@@ -1319,8 +1319,16 @@ function sumLinearRecord(groups) {
   let qAtZero = 0;
   ls.forEach(l => { const q = -l.b / l.a; if (q > 0) qAtZero += q; });
   qAtZero = round(qAtZero);
+  /* ⚠️ ЭТОТ КУСОК — ЕДИНСТВЕННОЕ МЕСТО, ГДЕ РЫНКА НЕТ, А ЗАПИСЬ ЕСТЬ.
+     Мы дописали его сами, чтобы функция не давала NaN, — значит мы же и
+     обязаны сказать об этом отрисовке. Отсюда ghostTo: до этого количества
+     кривая рисуется пунктиром (решение владельца 25.08). Угадывать «здесь
+     цена ноль» по готовой записи нельзя: у предложения P = Q цена тоже ноль,
+     но ровно в одной точке, и рынок там существует. */
+  let ghostTo = 0;
   if (qAtZero > 1e-9 && Math.abs(segs[0].lo - qAtZero) < 1e-6) {
     segs.unshift({ lo: 0, hi: qAtZero, A: 0, C: 0, body: '0' });
+    ghostTo = qAtZero;
   }
 
   // Точки излома по количеству — границы участков, кроме самого начала.
@@ -1337,7 +1345,7 @@ function sumLinearRecord(groups) {
     if (out === null) { out = cond + ' ? ' + body + ' : NaN'; continue; }
     out = cond + ' ? ' + body + ' : (' + out + ')';
   }
-  return { expr: out, breaks: breaks };
+  return { expr: out, breaks: breaks, ghostTo: ghostTo };
 }
 
 /* ⚠️ ИНТЕГРАЛ ПОД ЛОМАНОЙ СЧИТАЕТСЯ ПО УЧАСТКАМ, А НЕ ОДНОЙ СЕТКОЙ.
@@ -1423,7 +1431,10 @@ function sumPolyline(groups) {
   /* Та же дырка у нуля, что и в аналитической записи: при нулевой цене товар
      уже предлагают, и слева от этого количества ломаной не было вовсе.
      Дотягиваем её до Q = 0 по нулевой цене. */
-  if (pts.length && pts[0][0] > 1e-9 && Math.abs(pts[0][1]) < 1e-9) pts.unshift([0, 0]);
+  if (pts.length && pts[0][0] > 1e-9 && Math.abs(pts[0][1]) < 1e-9) {
+    pts._ghostTo = pts[0][0];   // докуда рынка нет — см. sumLinearRecord
+    pts.unshift([0, 0]);
+  }
   return pts;
 }
 
@@ -1433,6 +1444,7 @@ function sumRebuildSide(side) {
   if (!cur) return;
   const groups = sumGroupsOf(side);
   cur.linear = null; cur.compiled = null; cur.fn = null; cur.sumBreaks = [];
+  cur.sumGhostTo = 0;
   if (!groups.length) { cur.expr = ''; cur.sumNumeric = false; return; }
   const rec = sumLinearRecord(groups);
   if (rec) {
@@ -1442,8 +1454,12 @@ function sumRebuildSide(side) {
     const { compiled } = compileFormula(rec.expr);
     cur.expr = rec.expr; cur.compiled = compiled; cur.sumNumeric = false;
     cur.sumBreaks = rec.breaks;
+    cur.sumGhostTo = rec.ghostTo || 0;
   } else {
     const pts = sumPolyline(groups);
+    /* Ломаная затыкает ту же дырку у нуля (см. sumPolyline), и помечать её
+       надо тем же признаком: иначе у нелинейных групп пунктира не было бы. */
+    cur.sumGhostTo = (pts._ghostTo || 0);
     cur.expr = 'сумма посчитана по точкам';
     cur.fn = (q) => interpY(pts, q);
     cur.sumNumeric = true;
