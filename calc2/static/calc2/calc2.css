@@ -627,6 +627,10 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
   margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border-soft);
   font-size: 12px; line-height: 1.55; color: var(--text2);
 }
+/* Оригинал врезки остаётся в табло — но невидимым: показывается его копия
+   в «Объяснении модели» (см. moveExplanations). Держать оригинал нужно, чтобы
+   проход был повторяемым, а не одноразовым. */
+.sb-note-src { display: none; }
 .sb-note b { display: block; margin-bottom: 5px; color: var(--text); font-size: 11px;
   letter-spacing: .04em; text-transform: uppercase; }
 .sb-note p { margin: 0 0 6px; }

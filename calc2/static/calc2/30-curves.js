@@ -42,6 +42,70 @@ function nextColor() {
    но настоящая кривая под это правило не попадает — она окно не покидает
    или покидает с одной стороны. Разрыв отмечается `null`, и `d3.line`
    с `.defined` разрывает путь сам. */
+/* ── КУСОЧНО-ЛИНЕЙНАЯ КРИВАЯ СТРОИТСЯ ПО УЗЛАМ, А НЕ ПО СЕТКЕ ──────────
+   Владелец 25.08: «всё ещё сильные лаги; нельзя отрисовывать здесь график
+   аналогично отрисовке сложения КПВ?» Оттуда и приём: в `54-scenes-ppf.js`
+   суммарная кривая строится по узлам излома, а не по густой сетке.
+
+   Ломаная, проведённая через 400 точек, и ломаная, проведённая через свои
+   три-четыре узла, — ОДНА И ТА ЖЕ ЛИНИЯ: лишние точки лежат ровно на
+   отрезках между узлами. Разница только в цене: каждая точка сетки это вызов
+   формулы через Math.js, а суммарная кривая живёт кусочной записью, то есть
+   вызов дорогой. Замер 25.08 на наборе Б (три группы спроса, две
+   предложения): 7 322 вызова формулы на кадр панорамирования, из них около
+   2 800 — ровно это сэмплирование.
+
+   Узлы известны заранее и БЕЗ поиска:
+     • у прямой (`curve.linear`) их нет вовсе — хватает двух концов;
+     • у суммарной кривой это `sumBreaks` (цены, при которых очередная группа
+       входит в торговлю) плюс `sumGhostTo` — стык участка «рынка здесь нет»
+       со настоящим;
+     • точка выхода на ось цен считается ТОЧНО, линейно между узлами, а не
+       берётся из ближайшего узла сетки: иначе линия обрывалась бы на целый
+       участок раньше или позже.
+
+   ⚠️ ПРИЁМ ГОДИТСЯ ТОЛЬКО ТОМУ, ЧЬИ УЗЛЫ ИЗВЕСТНЫ. Нелинейная группа, полюс
+   у 1/(Q−30), неявная кривая — всё это по-прежнему идёт по сетке, вместе с
+   разрывом на полюсе. Признак строгий: либо кривая объявила себя прямой,
+   либо это суммарная кривая с аналитической записью и списком изломов.
+   Численная сумма (`sumNumeric`) под правило НЕ попадает: её изломы найдены
+   приблизительно, и доверять им как узлам нельзя. */
+function piecewiseNodesQ(curve, lo, hi) {
+  if (!curve) return null;
+  if (typeof isVertical === 'function' && isVertical(curve)) return null;
+  let breaks = null;
+  if (curve.linear && isFinite(curve.linear.a) && isFinite(curve.linear.b)) breaks = [];
+  else if (curve.kind === 'sum' && curve.sumNumeric === false && Array.isArray(curve.sumBreaks)) {
+    breaks = curve.sumBreaks.slice();
+    if (curve.sumGhostTo > 0) breaks.push(curve.sumGhostTo);
+  }
+  if (!breaks) return null;
+  const nodes = [lo, hi];
+  breaks.forEach(q => { if (isFinite(q) && q > lo + 1e-9 && q < hi - 1e-9) nodes.push(q); });
+  nodes.sort((a, b) => a - b);
+  const out = [];
+  nodes.forEach(q => { if (!out.length || q - out[out.length - 1] > 1e-9) out.push(q); });
+  return out;
+}
+
+// Путь по узлам: значение в каждом узле плюс точная точка выхода на ось цен.
+function pointsFromNodes(curve, nodes) {
+  const out = [];
+  const econ = isEconScene();
+  let pq = null, pv = NaN;
+  for (let i = 0; i < nodes.length; i++) {
+    const q = nodes[i];
+    const v = evalCurve(curve, q);
+    if (econ && pq != null && isFinite(pv) && isFinite(v) && ((pv < -1e-9) !== (v < -1e-9))) {
+      const t = pv / (pv - v);                 // доля отрезка до нуля
+      out.push([pq + (q - pq) * t, 0]);
+    }
+    out.push((isNaN(v) || (econ && v < -1e-9)) ? null : [q, v]);
+    pq = q; pv = v;
+  }
+  return out;
+}
+
 function curvePoints(curve) {
   const N = 400;
   const out = [];
@@ -51,6 +115,9 @@ function curvePoints(curve) {
   // про экономику, а не про галочку «только первая четверть».
   const lo = econLo(sx.domain()[0]), hi = sx.domain()[1];
   if (!(hi > lo)) return out;
+  // Узлы известны — строим по ним; линия получается та же, вызовов формулы в сто раз меньше.
+  const nodes = piecewiseNodesQ(curve, lo, hi);
+  if (nodes) return pointsFromNodes(curve, nodes);
   const [yLo, yHi] = sy.domain();
   const span = Math.abs(yHi - yLo) || 1;
   const OUT = span * 4;                     // «далеко за окном»

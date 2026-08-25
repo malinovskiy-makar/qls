@@ -3867,24 +3867,36 @@ const CASES = [
           document.getElementById('inp-qmax').value = '200';
           document.getElementById('inp-pmax').value = '200';
           applyViewBounds(); redrawAll();
-          var below = 0, maxQ = -1e9, n = 0;
-          document.querySelectorAll('#chart path[data-curve]').forEach(function (el) {
-            var id = +el.getAttribute('data-curve');
-            var cur = STATE.curves.find(function (c) { return c.id === id; });
-            if (!cur || cur.role !== 'demand') return;
-            String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
-              var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
-              if (!m) return;
-              n++;
-              var q = sx.invert(+m[1]), p = sy.invert(+m[2]);
-              if (p < -1e-6) below++;
-              if (q > maxQ) maxQ = q;
-            });
-          });
-          return { below: below, maxQ: maxQ, n: n };`,
+           var below = 0, maxQ = -1e9, minQ = 1e9, pAtMin = NaN, n = 0;
+           document.querySelectorAll('#chart path[data-curve]').forEach(function (el) {
+             var id = +el.getAttribute('data-curve');
+             var cur = STATE.curves.find(function (c) { return c.id === id; });
+             if (!cur || cur.role !== 'demand') return;
+             String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(function (tok) {
+               var m = tok.match(/[ML]\\s*(-?[\\d.eE+]+)[,\\s]+(-?[\\d.eE+]+)/);
+               if (!m) return;
+               n++;
+               var q = sx.invert(+m[1]), p = sy.invert(+m[2]);
+               if (p < -1e-6) below++;
+               if (q > maxQ) maxQ = q;
+               if (q < minQ) { minQ = q; pAtMin = p; }
+             });
+           });
+           return { below: below, maxQ: maxQ, minQ: minQ, pAtMin: pAtMin, drawn: (n >= 2 ? 1 : 0) };`,
+    /* ⚠️ ПРОВЕРЯЕМ ПОЛНОТУ ЛИНИИ, А НЕ ГУСТОТУ СЕТКИ.
+       Здесь стояло «точек в пути 201 ± 3». Это была не проверка правила, а
+       отпечаток тогдашней реализации: путь строился по сетке из 400 отрезков,
+       и половина узлов приходилась на первую четверть. Прямая, проведённая
+       по своим двум концам, это ТА ЖЕ линия (25.08, построение по узлам
+       излома), но узлов в ней два, и проверка краснела на верной кривой.
+       Правило же в том, что линия покрывает участок ЦЕЛИКОМ и не заходит под
+       ось: поэтому теперь названы оба конца — начало (0; 100) и обрыв у
+       Q = 100, — а от числа точек требуется только «их не меньше двух». */
     checks: [['точек с P < 0 в пути спроса', 'below', 0, 0],
+             ['путь начинается у Q = 0', 'minQ', 0, 0.51],
+             ['в начале пути цена 100', 'pAtMin', 100, 0.51],
              ['путь обрывается у Q = 100', 'maxQ', 100, 0.51],
-             ['путь вообще нарисован', 'n', 201, 3]],
+             ['путь вообще нарисован', 'drawn', 1, 0]],
   },
   {
     /* ⚠️ ПЕРВАЯ ЧЕТВЕРТЬ (г). ПЕРЕСЕЧЕНИЕ ВНЕ ЧЕТВЕРТИ НАЗВАНО, НО НЕ РАВНОВЕСИЕ.

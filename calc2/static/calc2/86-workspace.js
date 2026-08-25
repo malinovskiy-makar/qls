@@ -68,8 +68,18 @@ function relocateForScene() {
 
 // Очистка всех блоков табло перед перерисовкой: активный режим заполнит свои,
 // чужие останутся пустыми (CSS прячет пустые) — без устаревших чисел из прошлого режима.
+/* ⚠️ ГАШЕНИЕ ОТЛОЖЕННОЕ, А НЕ НЕМЕДЛЕННОЕ. Немедленное давало по две записи
+   в каждое табло за кадр («пусто», потом содержимое) и сводило на нет проверку
+   «текст не изменился — набирать нечего» (см. guardPanelBoxes в 60-overlays.js).
+   Помечаем «погасить, если никто не напишет»; гасит помеченные
+   flushPendingPanelClears в конце перерисовки. Смысл тот же, а перенабора нет. */
 function clearResultPanels() {
-  ['info-eq'].concat(RESULT_IDS).forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+  ['info-eq'].concat(RESULT_IDS).forEach(id => {
+    const e = document.getElementById(id);
+    if (!e) return;
+    if (e._panelGuarded) { e._pendingClear = true; return; }
+    e.innerHTML = '';
+  });
   // Площадь живёт в своей секции и переживает перерисовку: её очищает
   // только «Убрать» рядом с кнопкой расчёта.
 }
@@ -132,11 +142,42 @@ function moveExplanations() {
   const from = document.getElementById('sb-body');
   const to = document.getElementById('ex-body');
   if (!from || !to) return;
+  /* ⚠️ ПЕРЕЕЗД — ОДНОРАЗОВАЯ ОПЕРАЦИЯ, А НЕ ЕЖЕКАДРОВАЯ.
+     Врезка ЗАБИРАЕТСЯ из табло, поэтому после переезда в табло её больше нет.
+     Пока табло переписывалось на каждом кадре, врезка появлялась заново и
+     переезжала заново — и это выглядело как работающий цикл. Теперь табло с
+     тем же текстом не переписывается (см. guardPanelBoxes), и такой проход
+     просто вычистил бы «Объяснение модели» досуха: замер 25.08 — разбор в
+     «Построении графиков» становился пустым на втором кадре.
+     Ничего в табло не изменилось и сцена та же — значит разбор уже на месте. */
+  const scene = String(STATE.mode) + '|' + (typeof baseScene === 'function' ? baseScene() : '');
+  const changed = (typeof panelsChangedSinceLastPass === 'function') ? panelsChangedSinceLastPass() : true;
+  if (!changed && to._explainFor === scene && to.children.length) return;
+  to._explainFor = scene;
   to.innerHTML = '';
-  from.querySelectorAll('.sb-note').forEach(note => {
-    const h = note.querySelector('b');
+  /* ⚠️ ВРЕЗКА КОПИРУЕТСЯ, А НЕ ЗАБИРАЕТСЯ, И ЭТО ГЛАВНОЕ ЗДЕСЬ.
+     Раньше узел ПЕРЕНОСИЛСЯ: после переноса в табло его не оставалось, и
+     повторный проход собирать было нечего. Работало это только потому, что
+     табло переписывалось заново на каждом кадре и врезка появлялась снова.
+     Как только табло перестало переписываться без надобности, перенос стал
+     одноразовым: первый проход уносил врезку, второй чистил «Объяснение
+     модели» досуха — и разбор пропадал навсегда (замер 25.08: в «Построении
+     графиков» ноль символов вместо тысячи с лишним).
+
+     Копируем. Оригинал остаётся в табло, но переименовывается в
+     `.sb-note-src` и скрывается стилем. Два следствия, и оба нужны:
+       • проход стал повторяемым — собирать всегда есть что;
+       • проверка «врезка не осталась в расчётах» по-прежнему верна: класса
+         `.sb-note` в табло нет ни одного. */
+  from.querySelectorAll('.sb-note, .sb-note-src').forEach(src => {
+    const copy = src.cloneNode(true);
+    copy.classList.remove('sb-note-src');
+    copy.classList.add('sb-note');
+    const h = copy.querySelector('b');
     if (h && h.textContent.trim() === 'Как это получилось') h.remove();
-    to.appendChild(note);
+    src.classList.remove('sb-note');
+    src.classList.add('sb-note-src');
+    to.appendChild(copy);
   });
   /* Н29. Сцена, которая разбор не пишет, берёт его из общего реестра
      (90-explain.js). Свой разбор сцены главнее: если она что-то положила в

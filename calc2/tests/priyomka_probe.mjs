@@ -359,6 +359,58 @@ function pfPanTiming(steps) {
   runs.sort(function (a, b) { return a - b; });
   return { median: runs[1], all: runs };
 }
+
+/* ⚠️ ЧЕСТНОЕ «ДО И ПОСЛЕ» МЕРИТСЯ ЧЕРЕДОВАНИЕМ В ОДНОМ СЕАНСЕ.
+   Замер подряд врёт: третий прогон медленнее первого на четверть даже при
+   одинаковом коде (сборка мусора, разогрев, тепловой режим машины). Замер
+   25.08: «без drawCurves» получилось 48 мс против 39 мс «как есть» — то есть
+   выключение работы «замедлило» кадр. Поэтому оба состояния мерятся
+   ПООЧЕРЁДНО, по многу раз, и берётся медиана каждого: общий дрейф ложится
+   на оба одинаково и из разницы уходит.
+
+   «Прежнее поведение» воспроизводится буквально:
+     • кривые снова строятся по сетке (piecewiseNodesQ отключён);
+     • табло снова переписывается на каждом кадре (снимаем память о тексте). */
+function pfPanTimingAB(steps, rounds) {
+  var origNodes = window.piecewiseNodesQ;
+  var boxes = ['info-eq', 'info-areas', 'info-sum', 'info-tax'].map(function (id) {
+    return document.getElementById(id);
+  }).filter(Boolean);
+  var before = [], after = [];
+  var pan = function (old) {
+    var dq = (CONFIG.Qmax - CONFIG.Qmin) * 0.004;
+    var t0 = performance.now();
+    for (var i = 0; i < steps; i++) {
+      if (old) boxes.forEach(function (b) { b._srcHtml = null; });
+      CONFIG.Qmin += dq; CONFIG.Qmax += dq;
+      redrawAll();
+    }
+    var t1 = performance.now();
+    CONFIG.Qmin -= dq * steps; CONFIG.Qmax -= dq * steps;
+    redrawAll();
+    return (t1 - t0) / steps;
+  };
+  for (var r = 0; r < (rounds || 5); r++) {
+    window.piecewiseNodesQ = function () { return null; };
+    before.push(pan(true));
+    window.piecewiseNodesQ = origNodes;
+    after.push(pan(false));
+  }
+  window.piecewiseNodesQ = origNodes;
+  var med = function (a) { var b = a.slice().sort(function (x, y) { return x - y; });
+    return b[Math.floor(b.length / 2)]; };
+  return { before: med(before), after: med(after), beforeAll: before, afterAll: after };
+}
+
+/* Вызовов формулы за кадр при прежнем и нынешнем поведении — тем же чередованием. */
+function pfCallsAB() {
+  var origNodes = window.piecewiseNodesQ;
+  window.piecewiseNodesQ = function () { return null; };
+  var before = pfCallsPerFrame();
+  window.piecewiseNodesQ = origNodes;
+  var after = pfCallsPerFrame();
+  return { before: before, after: after };
+}
 /* Сколько раз формула зовётся за ОДИН кадр панорамирования. */
 function pfCallsPerFrame() {
   var dq = (CONFIG.Qmax - CONFIG.Qmin) * 0.004;
@@ -673,8 +725,16 @@ if (need('С')) {
   const timing = await ev(() => pfPanTiming(60));
   note('время кадра панорамирования: медиана ' + num(timing.median) + ' мс  (три прогона: '
     + timing.all.map(num).join(' / ') + ')');
-  const calls = await ev(() => pfCallsPerFrame());
-  note('вызовов формулы кривой за кадр: ' + calls);
+  const ab = await ev(() => pfPanTimingAB(40, 5));
+  note('честное чередование ДО/ПОСЛЕ в одном сеансе (пять пар по 40 шагов):');
+  note('   по прежнему поведению: медиана ' + num(ab.before) + ' мс   (' + ab.beforeAll.map(num).join(' / ') + ')');
+  note('   по нынешнему:          медиана ' + num(ab.after) + ' мс   (' + ab.afterAll.map(num).join(' / ') + ')');
+  note('   выигрыш: ' + num(ab.before - ab.after) + ' мс, то есть в '
+    + num(ab.before / ab.after) + ' раза');
+  const cab = await ev(() => pfCallsAB());
+  note('вызовов формулы кривой за кадр: было ' + cab.before + ', стало ' + cab.after
+    + ' (в ' + num(cab.before / Math.max(1, cab.after)) + ' раза меньше)');
+  const calls = cab.after;
   const look = await ev(() => pfCurveLook());
   look.forEach(l => note(`  ${l.name}${l.part ? ' [' + l.part + ']' : ''}: цвет ${l.stroke}, толщина ${l.width}, `
     + `штрих «${l.dash || 'сплошная'}», прозрачность ${l.opacity}, точек пути ${l.pts}`));
