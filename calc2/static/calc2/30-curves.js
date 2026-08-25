@@ -884,6 +884,19 @@ function labelCurve(g, f, txt, color, opts) {
   return a;
 }
 
+/* Толщина линии кривой (решение владельца 25.08). Одно место на весь
+   калькулятор: и отрисовка, и полоса попадания, и выгрузка спрашивают здесь.
+
+   В сцене сложения сумма — это ответ задачи, а группы — слагаемые к нему,
+   поэтому сумма вдвое толще. Во всех остальных сценах толщина прежняя, и
+   ни одна из сорока сцен от этой правки не меняется. */
+function curveWidth(curve) {
+  if (typeof sumSceneOn === 'function' && sumSceneOn() && curve && curve.sumGroup) {
+    return (curve.kind === 'sum') ? LW.bold : LW.thin;
+  }
+  return LW.base;
+}
+
 // Рисуем все видимые кривые внутри «окна» первой четверти.
 function drawCurves() {
   const g = svg.append('g').attr('class', 'curves').attr('clip-path', 'url(#plot-clip)');
@@ -896,7 +909,7 @@ function drawCurves() {
     if (!curve.visible || !curve.expr) return;
     const pts = curvePoints(curve);
     g.append('path').datum(pts)
-      .attr('fill', 'none').attr('stroke', curve.color).attr('stroke-width', 2.5)
+      .attr('fill', 'none').attr('stroke', curve.color).attr('stroke-width', curveWidth(curve))
       .attr('data-curve', curve.id)     // экспорт узнаёт кривую и пишет её формулой
       .attr('d', line);
     /* ⚠️ У ПОЛОСЫ ПОВЕРХ КРИВОЙ ДВА РАЗНЫХ СМЫСЛА, И ОНИ РАЗВЕДЕНЫ.
