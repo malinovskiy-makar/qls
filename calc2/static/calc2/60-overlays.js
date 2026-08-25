@@ -2413,6 +2413,10 @@ function wireFolds() {
          оставалось в очереди. Раскрыли — собираем то, что стало видно.
          Перерисовку тут не зовём: раскрытие карточки график не меняет. */
       if (open && typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
+      /* Итоговая функция подгоняется по ширине контейнера, а у свёрнутой
+         панели ширина нулевая: подгонку в этот момент сделать нечем.
+         Раскрыли — делаем. */
+      if (open && typeof refitFinalMathSoon === 'function') refitFinalMathSoon();
     });
   });
 }

@@ -449,11 +449,18 @@ if (need('Ф')) {
         notes: blocks.map(b => {
           const m = b.querySelector('.ff-math');
           const kk = m ? m.querySelector('.katex') : null;
-          const cs = kk ? getComputedStyle(kk) : null;
+          const cs = m ? getComputedStyle(m) : null;
           return {
             name: ffText(b.querySelector('.ff-name')),
             eyebrow: ffText(b.querySelector('.ff-eyebrow')),
             border: getComputedStyle(b).borderLeftColor,
+            note: ffText(b.querySelector('.ff-note')),
+            copy: !!b.querySelector('.ff-copy'),
+            scroll: m ? m.classList.contains('ff-scroll') : false,
+            stacked: m ? m.getAttribute('data-ff-form') === 'stacked' : false,
+            /* Кегль меряем у .ff-math — правило владельца про НЕГО. У самого
+               .katex он множится на 1,21 своим стилем, и «18,2» ничего не
+               доказывает. */
             fontPx: cs ? Math.round(parseFloat(cs.fontSize) * 10) / 10 : null,
             katexW: kk ? Math.round(kk.getBoundingClientRect().width * 10) / 10 : null,
             hostW: m ? Math.round(m.getBoundingClientRect().width * 10) / 10 : null,
@@ -468,10 +475,14 @@ if (need('Ф')) {
     flag('    внутри блока нет .sb-note', r.sbNoteInside === 0, 'найдено ' + r.sbNoteInside);
     r.notes.forEach(n => {
       note('    «' + n.name + '» · кромка ' + n.border + ' · кегль ' + n.fontPx
-           + ' px · запись ' + n.katexW + ' px при контейнере ' + n.hostW + ' px');
+           + ' px · запись ' + n.katexW + ' px при контейнере ' + n.hostW + ' px'
+           + (n.stacked ? ' · вторая форма' : '') + (n.scroll ? ' · с прокруткой' : '')
+           + (n.note ? ' · приписка: ' + n.note : ''));
+      if (n.katexW == null) { flag('    запись набрана', !!n.note, 'ни записи, ни приписки'); return; }
       flag('    кегль не ниже 13 px', n.fontPx >= 13, String(n.fontPx));
-      flag('    запись помещается по ширине', n.katexW <= n.hostW + 1,
-           n.katexW + ' > ' + n.hostW);
+      flag('    запись помещается по ширине (или прокручивается)',
+           n.katexW <= n.hostW + 1 || n.scroll, n.katexW + ' > ' + n.hostW);
+      flag('    кнопка «копировать» на месте', n.copy);
     });
     await shot('ff-' + key);
   }

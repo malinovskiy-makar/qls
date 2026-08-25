@@ -964,10 +964,13 @@ function ffEsc(s) {
    служебный хвост NaN. Звать `mathToTex` напрямую здесь ЗАПРЕЩЕНО — это
    ровно источник дефекта «подсказка печатает ∞ и английское if». */
 function ffLatexOf(o) {
-  if (o && o.latex) return String(o.latex);
-  const e = String((o && o.expr) == null ? '' : o.expr).trim();
-  if (!e) return '';
-  return (typeof mathToLatexField === 'function') ? mathToLatexField(e) : e;
+  let tex = (o && o.latex) ? String(o.latex) : '';
+  if (!tex) {
+    const e = String((o && o.expr) == null ? '' : o.expr).trim();
+    if (!e) return '';
+    tex = (typeof mathToLatexField === 'function') ? mathToLatexField(e) : e;
+  }
+  return (o && o.lhs) ? (o.lhs + ' = ' + tex) : tex;
 }
 
 /**
@@ -976,6 +979,8 @@ function ffLatexOf(o) {
  * @param {string}  o.color  цвет кривой — ТОТ ЖЕ, которым нарисована линия
  * @param {string}  o.expr   запись в синтаксисе Math.js: для копирования и для .tex
  * @param {string} [o.latex] готовый LaTeX; не передан — считается из expr
+ * @param {string} [o.lhs]   левая часть равенства («P», «Y»); в expr её нет,
+ *                           потому что expr обязан вставляться обратно в поле
  * @param {string} [o.note]  короткая приписка («построена численно»)
  */
 function finalFunctionHtml(o) {
@@ -1038,22 +1043,34 @@ function ffTypeset(host, tex) {
             Дальше горизонтальная прокрутка с затуханием у правого края.
    Подгонка вниз до 10 px, как делает fitPanelMath, здесь ЗАПРЕЩЕНА: ровно её
    владелец и забраковал. */
+/* Возвращает false, если померить было НЕЧЕМ: панель свёрнута, ширина нулевая.
+   ⚠️ Это не мелочь. Панель «Ключевые значения» на входе в сцену бывает
+   свёрнута, и подгонка, сделанная в этот момент, молча ничего не делала:
+   запись оставалась в первой форме и торчала за край, как только человек
+   панель раскрывал. Не смогли померить — значит подгонка не сделана, и
+   повторить её надо при следующей возможности. */
 function fitFinalMath(root) {
   const box = root || document.getElementById('info-final');
-  if (!box) return;
+  if (!box) return true;
+  let measured = true;
   box.querySelectorAll('.ff-math').forEach(host => {
     host.classList.remove('ff-scroll');
+    host.removeAttribute('data-ff-form');
     host.style.fontSize = '';
     const tex = host.getAttribute('data-ff-tex') || '';
     let k = host.querySelector('.katex');
     if (!k || !tex) return;
     const have = host.clientWidth;
-    if (!(have > 0)) return;
+    if (!(have > 0)) { measured = false; return; }
     const over = () => k.getBoundingClientRect().width > have - 1;
     if (!over()) return;
     const alt = ffCasesStacked(tex);
     if (alt && alt !== tex) {
       k = ffTypeset(host, alt) || k;
+      /* Пометка «набрано второй формой» — для проверок и для выгрузки: сам
+         `data-ff-tex` остаётся ИСХОДНЫМ, иначе повторная подгонка складывала
+         бы вторую форму из второй формы. */
+      host.setAttribute('data-ff-form', 'stacked');
       if (!over()) return;
     }
     for (let px = FF_MAX_PX - 1; px >= FF_MIN_PX; px--) {
@@ -1062,6 +1079,7 @@ function fitFinalMath(root) {
     }
     host.classList.add('ff-scroll');
   });
+  return measured;
 }
 
 /* Скопировать запись в синтаксисе Math.js: её можно вставить обратно в поле
@@ -1108,12 +1126,23 @@ function setFinalFunctions(list) {
   if (!box) return;
   wireFinalCopy();
   const html = (list || []).filter(Boolean).map(finalFunctionHtml).join('');
+  const same = (box._ffHtml === html);
   box.innerHTML = html;                  // guardPanelBoxes сам решит, писать ли
-  if (box._ffFitFor === html) return;    // ничего не изменилось — и мерить нечего
-  box._ffFitFor = html;
-  if (!html) return;
-  if (typeof renderMathIn === 'function') renderMathIn(box);
-  fitFinalMath(box);
+  box._ffHtml = html;
+  /* Подгонку повторяем, пока она хоть раз не удалась по-настоящему: та же
+     запись при свёрнутой панели меряется нулевой шириной. */
+  if (same && box._ffFitDone) return;
+  if (!html) { box._ffFitDone = true; return; }
+  if (!same && typeof renderMathIn === 'function') renderMathIn(box);
+  box._ffFitDone = fitFinalMath(box);
+}
+
+/* Панель раскрыли — подогнать ширину заново. Пока панель была свёрнута,
+   мерить было нечем, и подгонка не делалась (см. fitFinalMath). */
+function refitFinalMathSoon() {
+  const box = document.getElementById('info-final');
+  if (!box || box._ffFitDone) return;
+  box._ffFitDone = fitFinalMath(box);
 }
 
 /* Подпись в РАЗМЕТКЕ (не на холсте), в которой сидит обозначение: «D», «CS»,
