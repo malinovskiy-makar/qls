@@ -113,6 +113,13 @@ venv313/Scripts/python.exe scripts/run_tests.py       # ПОЛНЫЙ ПРОГО�
 локально скачанную модель BGE-M3 и штатно пропускаются без неё
 (`skipped=3` в шаге B, `skipped=6` в шаге A).
 
+**Быстрый круг во время сессии — `scripts/run_tests.py --scope-from-git`**
+(без аргумента — с последнего коммита): узит прогон до тестовых лейблов,
+задетых изменениями, и печатает сводку вместо полного `verbosity=2`.
+Механизм и границы — [docs/TESTING.md](docs/TESTING.md), раздел «Быстрый
+круг сессии». Каденция (быстрый круг во время работы, ПОЛНЫЙ прогон один
+раз перед сдачей) — решение от 21.08 в Notion, не меняется.
+
 ```bash
 docker compose -f docker-compose.dev.yml up -d     # PostgreSQL 17 + Redis 7
 scripts/run_tests.py --settings=config.settings_test_pg   # то же на PostgreSQL

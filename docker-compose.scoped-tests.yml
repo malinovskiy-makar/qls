@@ -1,0 +1,64 @@
+# Изолированный стенд для рабочего дерева qls-scoped-tests (feat/scoped-test-runner).
+#
+# Зачем отдельный файл, а не общий docker-compose.dev.yml. `git worktree`
+# делит один и тот же .git, но НЕ делит Docker: если эта папка и основная
+# C:\Users\shipu\qls (сессия рендерера Markdown) гоняют тесты одновременно
+# против ОДНОГО contейнера Postgres на 55432, оба прогона калечат друг
+# другу тестовую базу (создание/клонирование/снос test_qls наперегонки) —
+# ровно то, от чего предостерегает «Правило 3» в решении Notion от 21.08
+# («параллельных прогонов не запускать»), только теперь оно бьёт через
+# границу рабочих деревьев, а не только процессов. Обнаружено 2026-08-25:
+# фоновый прогон здесь получил вперемешку чужой вывод и пачку ложных
+# «0 tests FAIL» — след столкновения на общей базе.
+#
+# Порты и имена контейнеров/томов — свои, чтобы НИЧЕГО не пересекалось с
+# docker-compose.dev.yml (55432/56379, qls_postgres_dev/qls_redis_dev,
+# qls_pgdata/qls_redisdata).
+#
+# Поднять:      docker compose -f docker-compose.scoped-tests.yml up -d
+# Погасить:     docker compose -f docker-compose.scoped-tests.yml down
+# Снести с данными: docker compose -f docker-compose.scoped-tests.yml down -v
+#
+# Использование (переопределяем то, что settings_test_pg.py иначе взял бы
+# по умолчанию с общего контейнера):
+#
+#   DATABASE_URL=postgres://qls:qls_dev_password@127.0.0.1:55433/qls_dev \
+#   REDIS_URL=redis://127.0.0.1:56380 \
+#   venv313/Scripts/python.exe scripts/run_tests.py --settings=config.settings_test_pg
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: qls_postgres_scoped
+    environment:
+      POSTGRES_USER: qls
+      POSTGRES_PASSWORD: qls_dev_password
+      POSTGRES_DB: qls_dev
+      LANG: C.UTF-8
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C.UTF-8'
+    ports:
+      - '55433:5432'
+    volumes:
+      - qls_scoped_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U qls -d qls_dev']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: qls_redis_scoped
+    ports:
+      - '56380:6379'
+    volumes:
+      - qls_scoped_redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  qls_scoped_pgdata:
+  qls_scoped_redisdata:
