@@ -1050,6 +1050,12 @@ function ppfPieceTex(p) {
     const co = (Math.abs(p.c.b - 1) < 1e-12) ? '' : (fmt(p.c.b) + (shifted ? '\\cdot ' : ''));
     return fmt(K) + ' - ' + co + arg + '^2';
   }
+  if (p.kind === 'convex') {
+    // Выпуклая кривая: Y = yConst + a − b·√(X − sh)
+    const K = p.yConst + p.c.a;
+    const co = (Math.abs(p.c.b - 1) < 1e-12) ? '' : fmt(p.c.b);
+    return fmt(K) + ' - ' + co + '\\sqrt{' + (shifted ? ('X - ' + fmt(sh)) : 'X') + '}';
+  }
   // дуга: Y = yConst + √(a − b·(X − sh)²)
   const co = (Math.abs(p.c.b - 1) < 1e-12) ? '' : (fmt(p.c.b) + '\\cdot ');
   const root = '\\sqrt{' + fmt(p.c.a) + ' - ' + co + arg + '^2}';
@@ -1068,15 +1074,23 @@ function ppfPieceBody(p) {
     const K = p.yConst + p.c.a;
     return ppfNum(K) + ' - ' + co + arg + '^2';
   }
+  if (p.kind === 'convex') {
+    // Скобки корня свои: `sqrt((X - 9))` разбирается, но читается как описка.
+    const K = p.yConst + p.c.a;
+    const inner = (Math.abs(sh) > 1e-9) ? ('X - ' + ppfNum(sh)) : 'X';
+    return ppfNum(K) + ' - ' + co + 'sqrt(' + inner + ')';
+  }
   const root = 'sqrt(' + ppfNum(p.c.a) + ' - ' + co + arg + '^2)';
   return (Math.abs(p.yConst) > 1e-9) ? (ppfNum(p.yConst) + ' + ' + root) : root;
 }
+/* Значение участка. Все нелинейные виды устроены одинаково —
+   Y = yConst + f(X − xConst), — поэтому считает их одна строка через таблицу
+   семейств: второго описания парабол, дуг и выпуклых здесь нет. */
 function ppfPieceAt(p, X) {
   if (p.kind === 'linear') return p.y0 - p.b * (X - p.x0);
-  const t = X - p.xConst;
-  if (p.kind === 'parabola') return p.yConst + p.c.a - p.c.b * t * t;
-  const v = p.c.a - p.c.b * t * t;
-  return p.yConst + (v > 0 ? Math.sqrt(v) : 0);
+  const F = ppfFam(p.c);
+  if (!F) return NaN;
+  return p.yConst + F.f(p.c, ppfClamp(X - p.xConst, 0, F.Xmax(p.c)));
 }
 
 /* Собрать запись из готовых участков. Форма та же, что у линейной записи
@@ -1198,6 +1212,147 @@ function ppfSumByEqualCost(cs) {
   return rec;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   СЛУЧАЙ Б — ВСЕ КРИВЫЕ С НЕВОЗРАСТАЮЩИМИ АЛЬТЕРНАТИВНЫМИ ИЗДЕРЖКАМИ
+   (выпуклые и линейные). Учебник Бахарева, с. 188–191.
+
+   ⚠️ МЕТОД ЗДЕСЬ ДРУГОЙ, И ЭТО НЕ ПРИДИРКА. Учебник прямо говорит (с. 188):
+   при возрастающей отдаче от масштаба сложение через альтернативные издержки
+   НЕ РАБОТАЕТ — участки нельзя расставить по возрастанию издержек, потому что
+   на возрастающей отдаче они убывают. Внутреннего оптимума нет: выгодна полная
+   специализация, и максимум всегда достигается в углу. Значит каждое поле
+   участвует «всё или ничего», а наращивает в данный момент РОВНО ОДНО.
+
+   Отсюда закрытая форма — ВЕРХНЯЯ ОГИБАЮЩАЯ сдвинутых копий исходных кривых:
+       для поля j и подмножества Full остальных полей
+           S = Σ_{i∈Full} Xᵢᵐᵃˣ
+           Y(X) = f_j(X − S) + Σ_{i∉Full, i≠j} Yᵢᵐᵃˣ,   X ∈ [S; S + X_jᵐᵃˣ]
+       итог = верхняя огибающая всех таких кусков.
+   Кусков не больше n·2ⁿ⁻¹; при n ≤ 5 это максимум 80 — считается мгновенно.
+
+   ⚠️ ГРАНИЦЫ УЧАСТКОВ НАХОДЯТСЯ ЧИСЛЕННО, А САМА ЗАПИСЬ ОСТАЁТСЯ ЗАКРЫТОЙ.
+   Каждый кусок — ИСХОДНАЯ функция, сдвинутая вправо и вверх; численно ищется
+   только точка, где один кусок обгоняет другой. Выдавать это за полностью
+   символьное решение нельзя, и в отчёте так и написано.
+
+   ⚠️ Экономический смысл, который виден глазами: при убывающих АИ кривая может
+   «перескакивать» — выгоднее бросить одно поле и уйти целиком в другое. Это не
+   баг. */
+function ppfSumByEnvelope(cs) {
+  if (!cs || cs.length < 2 || cs.length > 5) return null;
+  for (const c of cs) {
+    const F = ppfFam(c);
+    if (!F || (F.cost !== 'down' && F.cost !== 'const')) return null;
+    if (!isFinite(c.a) || !isFinite(c.b) || !(c.a > 0) || !(c.b > 0)) return null;
+  }
+  const n = cs.length;
+  const Xof = (c) => ppfFam(c).Xmax(c);
+  const Yof = (c) => ppfFam(c).Ymax(c);
+  const Xtot = cs.reduce((s, c) => s + Xof(c), 0);
+  const Ytot = cs.reduce((s, c) => s + Yof(c), 0);
+  if (!(Xtot > 0)) return null;
+
+  // Все куски: кто наращивает (j) и кто уже отдал всё под X (Full).
+  const cands = [];
+  for (let j = 0; j < n; j++) {
+    const others = [];
+    for (let i = 0; i < n; i++) if (i !== j) others.push(i);
+    const m = others.length;
+    for (let mask = 0; mask < (1 << m); mask++) {
+      let S = 0, C = 0;
+      for (let t = 0; t < m; t++) {
+        const i = others[t];
+        if (mask & (1 << t)) S += Xof(cs[i]); else C += Yof(cs[i]);
+      }
+      cands.push({ c: cs[j], S, C, x0: S, x1: S + Xof(cs[j]) });
+    }
+  }
+  const at = (p, X) => {
+    if (X < p.x0 - 1e-9 || X > p.x1 + 1e-9) return -Infinity;
+    const F = ppfFam(p.c);
+    return p.C + F.f(p.c, ppfClamp(X - p.S, 0, F.Xmax(p.c)));
+  };
+
+  // Кто выигрывает на сетке. Победитель меняется редко, поэтому сетки хватает
+  // грубой: точную границу дальше уточняем поиском корня разности.
+  const N = 2000;
+  const win = [];
+  for (let k = 0; k <= N; k++) {
+    const X = Xtot * k / N;
+    let bi = -1, bv = -Infinity;
+    for (let i = 0; i < cands.length; i++) {
+      const v = at(cands[i], X);
+      if (v > bv + 1e-12) { bv = v; bi = i; }
+    }
+    if (bi < 0) return null;                   // ни один кусок не покрывает X
+    win.push(bi);
+  }
+
+  const pieces = [];
+  let start = 0;                                // X, с которого идёт текущий кусок
+  for (let k = 1; k <= N; k++) {
+    if (win[k] === win[k - 1] && k < N) continue;
+    const idx = win[k - 1];
+    let end;
+    if (k === N && win[k] === win[k - 1]) {
+      end = Xtot;
+    } else {
+      const a = cands[win[k - 1]], b = cands[win[k]];
+      const lo = Xtot * (k - 1) / N, hi = Xtot * k / N;
+      const g = (X) => {
+        const va = at(a, X), vb = at(b, X);
+        if (!isFinite(va)) return -1;           // кусок a здесь кончился
+        if (!isFinite(vb)) return 1;            // кусок b здесь ещё не начался
+        return va - vb;
+      };
+      const r = findRootIn(g, lo, hi);
+      end = (r == null) ? hi : r;
+    }
+    if (end - start > 1e-7) pieces.push(ppfEnvPiece(cands[idx], start, end));
+    start = end;
+    if (k === N && win[k] !== win[k - 1] && Xtot - start > 1e-7) {
+      pieces.push(ppfEnvPiece(cands[win[k]], start, Xtot));
+      start = Xtot;
+    }
+  }
+  if (Xtot - start > 1e-7) pieces.push(ppfEnvPiece(cands[win[N]], start, Xtot));
+
+  const rec = ppfPiecesRecord(ppfMergeSameLine(pieces), 'полная специализация');
+  if (!rec) return null;
+  if (Math.abs(rec.Xtot - Xtot) > 1e-6 * Math.max(1, Xtot)) return null;
+  if (Math.abs(rec.evalY(0) - Ytot) > 1e-6 * Math.max(1, Ytot)) return null;
+  return rec;
+}
+
+/* Кусок огибающей в том же виде, что и участки случая A: Y = yConst + f(X − xConst).
+   Линейное поле кладём в прямой участок — у него уже есть свой вид. */
+function ppfEnvPiece(p, x0, x1) {
+  if (p.c.type === 'linear') {
+    return { kind: 'linear', x0, x1, b: p.c.b, y0: p.C + p.c.a - p.c.b * (x0 - p.S) };
+  }
+  return { kind: p.c.type, c: p.c, xConst: p.S, yConst: p.C, x0, x1 };
+}
+
+/* Соседние прямые участки с одним наклоном — это ОДИН участок записи.
+   Огибающая режет по смене куска, а два куска могут лежать на одной прямой
+   (разные поля с равными издержками), и в записи это выглядело бы как излом,
+   которого нет. */
+function ppfMergeSameLine(pieces) {
+  const out = [];
+  pieces.forEach(p => {
+    const last = out[out.length - 1];
+    if (last && last.kind === 'linear' && p.kind === 'linear'
+        && Math.abs(last.b - p.b) < 1e-9
+        && Math.abs(last.x1 - p.x0) < 1e-6 * Math.max(1, last.x1)
+        && Math.abs((last.y0 - last.b * (p.x0 - last.x0)) - p.y0) < 1e-6 * Math.max(1, Math.abs(p.y0))) {
+      last.x1 = p.x1;
+      return;
+    }
+    out.push(p);
+  });
+  return out;
+}
+
 /* Единая точка входа в аналитику суммарной КПВ. Метод выбирается по ТИПУ
    альтернативных издержек набора, и это не мелочь: при растущих АИ оптимум
    внутренний (равенство издержек), при убывающих его нет вовсе (полная
@@ -1208,7 +1363,12 @@ function ppfSumAnalytic(cs) {
   if (!cs.every(c => ppfFam(c))) return null;            // есть нераспознанная кривая
   const kinds = new Set(cs.map(c => ppfFam(c).cost));
   if (!kinds.has('down')) return ppfSumByEqualCost(cs);  // случай A: растут или постоянны
-  return null;                                           // случай Б — фаза 9, В — численно
+  if (!kinds.has('up')) return ppfSumByEnvelope(cs);     // случай Б: убывают или постоянны
+  /* Случай В — в наборе есть и растущие издержки, и убывающие. Закрытой формы
+     общим механизмом здесь нет: у одних полей оптимум внутри, у других в углу.
+     Молча возвращать null мало — причину называет ppfCostKinds, и панель её
+     печатает словами (фаза 10). */
+  return null;
 }
 
 // Распознавание аналитической формулы суммарной КПВ (best-effort).
