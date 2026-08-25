@@ -108,6 +108,10 @@ function pfTaxSnap() {
     money: STATE.tx, budget: STATE.budget, dwl: STATE.dwl,
     cs: STATE.csTax, ps: STATE.psTax,
     hasAfterS: !!STATE.taxAfterS,
+    curveOn: !!STATE.taxCurveOn,
+    /* Сколько путей на холсте объявлено кривой после вмешательства. Числу в
+       состоянии верить нельзя: врёт ровно разрыв между расчётом и отрисовкой. */
+    afterPaths: document.querySelectorAll('path[stroke-dasharray="6 4"]').length,
     keys: pfText(document.getElementById('info-eq')),
     taxbox: pfText(document.getElementById('info-tax')),
     explain: pfText(document.getElementById('ex-body'))
@@ -495,8 +499,11 @@ if (need('В')) {
   // (а) Потоварный налог 100.
   await ev(() => pfTaxSetup('100-P', '0.5*p-200', 'tax', 'unit', 100));
   let ta = await ev(() => pfTaxSnap());
-  flag('а) taxActive', ta.active, 'active=' + ta.active);
+  /* Равновесия здесь по-прежнему нет — и это правильный ответ, а не провал:
+     S + 100 уходит ещё дальше от спроса. Проверяем именно это. */
+  flag('а) равновесия по-прежнему нет', !ta.eq && !ta.active, 'eq=' + JSON.stringify(ta.eq) + ' active=' + ta.active);
   flag('а) кривая после налога построена (STATE.taxAfterS)', ta.hasAfterS, 'hasAfterS=' + ta.hasAfterS);
+  flag('а) кривая после налога РИСУЕТСЯ на холсте', ta.afterPaths > 0, 'путей после вмешательства: ' + ta.afterPaths);
   const zeroA = await ev(() => (STATE.taxAfterS ? STATE.taxAfterS.fn(0) : null));
   show('а) S после налога: цена при Q=0', zeroA, 500, 0.5);
   flag('а) DWL не показан', !(ta.dwl > 0), 'dwl=' + ta.dwl);
