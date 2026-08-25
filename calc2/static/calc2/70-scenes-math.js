@@ -1778,7 +1778,7 @@ function buildTexFromState(title, label) {
       const yMid = (typeof interpY === 'function' && d.points) ? interpY(d.points, d.Xtot * 0.55) : NaN;
       putLabel(d.Xtot * 0.55, yMid, 'Сумма', sumCol, 'south west');
     } else if (!d.formulaExpr) {
-      notes.push('% суммарная КПВ построена численно — закрытой формы у этого набора нет');
+      notes.push('% суммарная КПВ построена численно: закрытой формы у этого набора нет');
     }
     (d.kinks || []).forEach(k => dot(k[0], k[1], sumCol, '(' + fmt(k[0]) + '; ' + fmt(k[1]) + ')'));
   }

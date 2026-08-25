@@ -1143,7 +1143,7 @@ function ffCopyFallback(text) {
   let done = false;
   try { done = document.execCommand('copy'); } catch (e) { done = false; }
   ta.remove();
-  toast(done ? 'Запись скопирована' : 'Скопировать не удалось — выделите запись и нажмите Ctrl+C');
+  toast(done ? 'Запись скопирована' : 'Скопировать не удалось: выделите запись и нажмите Ctrl+C');
 }
 function wireFinalCopy() {
   if (wireFinalCopy._done) return;

@@ -1369,7 +1369,7 @@ const PPF_COST_WORD = { up: 'растут', const: 'постоянны', down: '
 function ppfCostValue(o) {
   const num = (v) => (isFinite(v) ? fmt(v) : '∞');
   if (o.kind === 'const') return num(o.from) + ' Y за ед. X';
-  if (o.kind === 'unknown') return '—';
+  if (o.kind === 'unknown') return 'не определены';
   return num(o.from) + ' → ' + num(o.to) + ' Y за ед. X';
 }
 
@@ -1394,7 +1394,7 @@ function ppfWhyNumeric(cs) {
     return 'Построена численно: верхняя огибающая этого набора не сошлась с численной кривой.';
   }
   return 'Построена численно: исключить общий уровень альтернативных издержек в явном виде '
-    + 'у этого набора не удаётся — закрытой формы по участкам у него нет.';
+    + 'у этого набора не удаётся: закрытой формы по участкам у него нет.';
 }
 
 /* Единая точка входа в аналитику суммарной КПВ. Метод выбирается по ТИПУ
@@ -1804,7 +1804,7 @@ function updatePpfSumPanel() {
   if ((d.costs || []).length) {
     html += '<div class="sb-sub">Альтернативные издержки $X$</div>';
     d.costs.forEach(o => {
-      html += `<div class="stat"><span>${o.name} — ${PPF_COST_WORD[o.kind]}</span>`
+      html += `<div class="stat"><span>${o.name}: ${PPF_COST_WORD[o.kind]}</span>`
             + `<b>${ppfCostValue(o)}</b></div>`;
     });
   }

@@ -659,12 +659,23 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 .ff-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .ff-eyebrow {
   font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
-  color: var(--ff-c, var(--text3));
+  /* ⚠️ ЦВЕТ КРИВОЙ ПОДМЕШАН, А НЕ ВЗЯТ ЧИСТЫМ, И ЭТО НЕ ПРИДИРКА К ОТТЕНКУ.
+     Цвета кривых подобраны под контраст 3:1 к ХОЛСТУ — этого хватает линии, но
+     не мелкому тексту: замер 26.08 дал 3,46 у синего спроса на светлой теме
+     при требуемых каноном 4,6. Подмешиваем цвет текста: оттенок кривой виден
+     (надзаголовок по-прежнему «того же цвета»), а читаемость доходит до
+     канона. Чистый цвет остаётся там, где ему и место, — на левой кромке:
+     это графический элемент, и ему довольно 3:1. */
+  color: color-mix(in srgb, var(--ff-c, var(--text3)) 55%, var(--text));
 }
 .ff-copy {
   border: none; background: none; padding: 0; cursor: pointer;
-  font: inherit; font-size: 10px; color: var(--text3);
-  border-bottom: 1px dotted var(--text3); line-height: 1.2;
+  /* Кегль и вес — из шкалы канона 1.2: 11/400. Десятка допущена каноном
+     только для глифа «?» в кружке, а это обычная подпись кнопки. */
+  /* --text3 на --surface-2 даёт 4,51 при требуемых 4,6 — это старый долг
+     платформы (те же 4,51 у .hint-lead). Новый долг не заводим: берём --text2. */
+  font: inherit; font-size: 11px; font-weight: 400; color: var(--text2);
+  border-bottom: 1px dotted var(--text2); line-height: 1.2;
 }
 .ff-copy:hover { color: var(--text); border-bottom-color: var(--text); }
 .ff-name { margin-top: 3px; font-size: 11.5px; color: var(--text2); }
@@ -674,10 +685,14 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
    у правого края говорит, что запись продолжается. */
 .ff-math.ff-scroll {
   overflow-x: auto; overflow-y: hidden;
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent 100%);
-  mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent 100%);
+  /* ⚠️ Это МАСКА, а не цвет: чёрное здесь означает «показать целиком»,
+     прозрачное — «спрятать». Цветовым токеном его подменять нечем, но и
+     шестнадцатеричной записи мимо токенов тут быть не должно (канон 1.1),
+     поэтому пишем ключевым словом. */
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 18px), transparent 100%);
 }
-.ff-note { margin-top: 5px; font-size: 11px; color: var(--text3); line-height: 1.45; }
+.ff-note { margin-top: 5px; font-size: 11px; color: var(--text2); line-height: 1.45; }
 
 /* Строка списка функций в режиме построения графиков: цвет, формула, крестик
    и своё имя под ними. Пустая строка внизу выглядит так же, только без имени
