@@ -90,6 +90,17 @@
         "--noreload"
       ],
       "port": 8000
+    },
+    {
+      "name": "dev-windows-alt",
+      "runtimeExecutable": "venv313/Scripts/python.exe",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8010",
+        "--noreload"
+      ],
+      "port": 8010
     }
   ]
 }

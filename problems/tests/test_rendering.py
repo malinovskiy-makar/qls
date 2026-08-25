@@ -20,10 +20,19 @@
 через СЕГОДНЯШНИЙ `plain`-режим (autoescape), и рендерер обязан выдать
 то же самое.
 """
+import re
+from pathlib import Path
+
+from django.conf import settings
 from django.test import SimpleTestCase
 from django.utils.html import escape
 
 from problems.rendering import render_markdown, _sanitize_html
+
+PROBLEM_DETAIL_TEMPLATE = (
+    Path(settings.BASE_DIR) / 'catalog' / 'templates' / 'catalog'
+    / 'problem_detail.html'
+)
 
 
 def esc(s):
@@ -274,3 +283,65 @@ class EndToEndRendererSanitizationTests(SimpleTestCase):
         out = render_markdown('[клик](javascript:alert(1))')
         self.assertNotIn('<a ', out)
         self.assertNotIn('href=', out)
+
+
+# ---------------------------------------------------------------------------
+# CSS для таблиц — найдено владельцем на фикстурах 53711/53713: валидный
+# <table> без единого правила выглядит слипшимся текстом, «это ещё хуже,
+# чем плоский текст». Тесты структурные (читают исходник шаблона, как
+# test_xss_payloads.py:test_modal_builds_nodes_not_html), не про пиксели —
+# пиксели проверяет владелец глазами. Не завязаны на конкретные имена
+# классов дизайн-системы (их у сайта для этого случая нет — см. .stats-table/
+# .wk-table в platform/_stats_style.html, тот же язык: вес+цвет у шапки,
+# горизонтальные разделители, без сплошной заливки и без width:100%).
+# ---------------------------------------------------------------------------
+
+class TableCssTests(SimpleTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.source = PROBLEM_DETAIL_TEMPLATE.read_text(encoding='utf-8')
+
+    def test_table_has_dedicated_css_rule(self):
+        self.assertIn('.math-content table', self.source,
+                      'нет ни одного правила для <table> внутри .math-content — '
+                      'таблица рендерится без единого стиля')
+
+    def test_cells_have_visible_row_separation_and_padding(self):
+        """Хотя бы горизонтальный разделитель строк + вертикальный паддинг —
+        buквально то, что просил владелец («или хотя бы»)."""
+        cell_rules = re.findall(
+            r'\.math-content (?:th|td)[^{,]*\{([^}]*)\}', self.source)
+        self.assertTrue(cell_rules, 'нет правил для th/td внутри .math-content')
+        combined = ' '.join(cell_rules)
+        self.assertRegex(combined, r'border(?:-bottom)?\s*:',
+                         'ни в одном правиле нет разделителя строк')
+        self.assertRegex(combined, r'padding\s*:',
+                         'ни в одном правиле нет вертикального паддинга')
+
+    def test_header_is_visually_distinct_from_data_cell(self):
+        """`th` обязан отличаться от `td` весом или фоном — иначе шапка не
+        читается как шапка (первая жалоба владельца: «слипшиеся строки»)."""
+        m = re.search(r'\.math-content th\s*\{([^}]*)\}', self.source)
+        self.assertIsNotNone(m, 'нет отдельного правила .math-content th')
+        rule = m.group(1)
+        self.assertTrue(
+            re.search(r'font-weight\s*:\s*(?:[6-9]00|bold)', rule)
+            or re.search(r'background', rule),
+            'заголовок таблицы ничем не отличим от обычной ячейки: %r' % rule)
+
+    def test_table_does_not_force_full_width(self):
+        """Требование владельца: не растягивать таблицу без нужды."""
+        m = re.search(r'\.math-content table\s*\{([^}]*)\}', self.source)
+        self.assertIsNotNone(m, 'нет правила .math-content table')
+        self.assertNotRegex(m.group(1), r'width\s*:\s*100%')
+
+    def test_table_colors_use_design_tokens_not_hardcoded_hex(self):
+        """catalog/CLAUDE.md: хардкод hex ломает тёмную тему — цвета только
+        через var(--…). Проверка = обе темы поддержаны без дублирования
+        правил под [data-theme="dark"]."""
+        rules = re.findall(
+            r'\.math-content (?:table|th|td)[^{,]*\{([^}]*)\}', self.source)
+        for rule in rules:
+            self.assertNotRegex(rule, r'#[0-9a-fA-F]{3,8}\b',
+                                'хардкод hex-цвета вместо var(--…): %r' % rule)

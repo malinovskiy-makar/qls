@@ -48,6 +48,28 @@
 .math-content p { margin-bottom: .75em; }
 .math-content .katex-display { margin: 1em 0; }
 
+/* Таблицы из markdown-рендерера (content_format='markdown', см.
+   problems/rendering.py). Стиль — тот же язык, что у .stats-table и
+   .wk-table (platform/_stats_style.html): заголовок отличается весом
+   и цветом, а не заливкой; разделители только горизонтальные. Без
+   `width: 100%` — таблица условия задачи обычно на 2–3 колонки и не
+   должна растягиваться на всю ширину блока без нужды. */
+.math-content table {
+  border-collapse: collapse;
+  margin: .75em 0;
+}
+.math-content th, .math-content td {
+  padding: 8px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-soft);
+}
+.math-content th {
+  font-weight: 600;
+  color: var(--text2);
+  border-bottom: 1px solid var(--border);
+}
+.math-content tbody tr:last-child td { border-bottom: none; }
+
 .problem-statement {
   background: var(--surface);
   border: .5px solid var(--border);
