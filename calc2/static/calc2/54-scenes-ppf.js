@@ -1601,8 +1601,34 @@ function updatePpfTradePanel() {
   const box = document.getElementById('info-ppft'); if (!box) return;
   const d = STATE.ppfTradeData;
   showPaneError('ppft-error', (d && !d.ok) ? (d.error || 'Не удалось.') : '');
-  if (!d) { box.innerHTML = '<div class="muted">Введите КПВ и мировую цену, нажмите «Построить КТВ».</div>'; return; }
-  if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось.') + '</div>'; return; }
+  if (!d) {
+    if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
+    box.innerHTML = '<div class="muted">Введите КПВ и мировую цену, нажмите «Построить КТВ».</div>'; return;
+  }
+  if (!d.ok) {
+    if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
+    box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось.') + '</div>'; return;
+  }
+  /* ИТОГОВАЯ ФУНКЦИЯ линии торговых возможностей. Всё уже посчитано:
+     d.line = { intercept, slope } и d.xint — где линия выходит на ось X.
+     ⚠️ Цвет тот же, которым КТВ нарисована на холсте (COL.S в drawPpfTrade);
+     второго места, где решается цвет этой линии, заводить нельзя.
+     ⚠️ Режим «нет торговли» блока не получает: КТВ там совпадает с КПВ, и
+     отдельной итоговой функции у неё нет. */
+  if (typeof setFinalFunctions === 'function') {
+    if (d.line && d.regime !== 'нет торговли' && isFinite(d.xint) && d.xint > 0) {
+      const c0 = d.line.intercept, k = d.line.slope;
+      const body = ppfNum(c0) + ' - ' + (Math.abs(k - 1) < 1e-12 ? 'X' : ppfNum(k) + '*X');
+      setFinalFunctions([{
+        name: 'КТВ страны', color: COL.S, lhs: 'Y',
+        // Набор тот же, что у линейной записи суммарной КПВ в один кусок.
+        latex: fmt(c0) + ' - ' + ppfCoefTex(k) + ',\\ 0 \\le X \\le ' + fmt(d.xint),
+        expr: ppfPiecesToExpr([{ x0: 0, x1: d.xint, body }]),
+      }]);
+    } else {
+      setFinalFunctions([]);
+    }
+  }
   // Внутренняя (автарктическая) цена X: наклон КПВ. У прямой он один, у дуги
   // берём его в точке производства — там и происходит сравнение с мировой.
   const inner = (d.c.type === 'linear' && d.c.b > 0)

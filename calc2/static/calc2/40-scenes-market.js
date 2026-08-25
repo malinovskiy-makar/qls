@@ -1971,6 +1971,14 @@ function updateAreasPanel() {
    БЛОК 8. СЦЕНАРИЙ «НАЛОГ» — сдвиг предложения, новые области, клин.
    --------------------------------------------------------------------- */
 
+/* НА ЧЬЕЙ СТОРОНЕ ВМЕШАТЕЛЬСТВО — ОДИН ВОПРОС И ОДИН ОТВЕТ НА ВЕСЬ ФАЙЛ.
+   Спрашивают его трое: отрисовка сдвинутой кривой, её имя и блок «Итоговая
+   функция». Пока ответ считался на месте у каждого, они могли разъехаться —
+   и разъехались. */
+function intervOnBuyer() {
+  return (STATE.intervType === 'tax' && STATE.taxSide === 'buyer');
+}
+
 // Сдвинутая пунктиром кривая. При налоге на ПРОДАВЦА (по умолчанию) и при субсидии
 // двигается предложение (S ± ставка). При налоге на ПОКУПАТЕЛЯ (Задача 1) двигается
 // спрос вниз (D − t): эффективный спрос. Итоговые числа в обоих случаях идентичны —
@@ -1980,7 +1988,7 @@ function drawShiftedSupply() {
      Прежде здесь стоял STATE.taxActive, и на рынке без равновесия кривая не
      рисовалась вовсе — хотя сдвиг и поворот равновесия не спрашивают. */
   if (!STATE.taxCurveOn) return;
-  const buyerTax = (STATE.intervType === 'tax' && STATE.taxSide === 'buyer');
+  const buyerTax = intervOnBuyer();
   const base = buyerTax ? STATE.D : STATE.S;              // чью кривую рисуем сдвинутой
   // Берём ГОТОВУЮ функцию «после вмешательства» из recompute — она уже знает,
   // сдвиг это (потоварное) или поворот (адвалорное). Никакой параллельной математики.
@@ -2556,6 +2564,25 @@ function updateTaxPanel() {
     box.innerHTML = '<div class="muted">Сначала отметьте кривые D и S.</div>'; return;
   }
   const isSub = (STATE.intervType === 'subsidy');
+  /* ИТОГОВАЯ ФУНКЦИЯ — кривая ПОСЛЕ вмешательства. Условие то же, что у её
+     отрисовки (`taxCurveOn`), а не «нашлось ли новое равновесие»: сдвиг и
+     поворот кривой равновесия не спрашивают. Источник записи один и тот же —
+     `texExpr`, посчитанный в recompute рядом с самой функцией. */
+  if (typeof setFinalFunctions === 'function') {
+    const onBuyer = intervOnBuyer();
+    const after = onBuyer ? STATE.taxAfterD : STATE.taxAfterS;
+    const base = onBuyer ? STATE.D : STATE.S;
+    if (STATE.taxCurveOn && after && after.texExpr && base) {
+      const what = onBuyer ? 'Спрос' : 'Предложение';
+      const tag = onBuyer ? "$D'$" : "$S'$";
+      setFinalFunctions([{
+        name: what + ' после ' + (isSub ? 'субсидии' : 'налога') + ' ' + tag,
+        color: base.color, lhs: 'P', expr: after.texExpr,
+      }]);
+    } else {
+      setFinalFunctions([]);
+    }
+  }
   if (!STATE.taxActive) {
     /* Ставка задана, кривая после вмешательства построена, а рынка всё равно
        нет: спрос и новое предложение не пересеклись в первой четверти.
