@@ -1909,8 +1909,16 @@ const CASES = [
        осталось тем же по сути — индекс обязан доехать до бумаги, — но искать
        его надо в новой записи. Заодно эта строка держит находку фазы: индекс
        при ЧИСЛЕ разбор для бумаги раньше не понимал вовсе и терял молча. */
+    /* ⚠️ ЧИСЛО ПЕРЕСЧИТАНО 25.08, И ВОТ ПОЧЕМУ. Сцена сложения стала
+       подписывать свои кривые обозначениями — D₁, D₂, D₃, S₁, S₂ и D, S
+       вместо «спрос первой группы» и родни (шесть подписей по 137–181 px
+       читались вдоль края одной строкой). Каждое обозначение с индексом
+       добавляет по подписи с tspan[dy], и потолок 58 оказался мал: замер даёт
+       61. Смысл проверки не изменился — индексы обязаны быть НАБРАНЫ, а не
+       слиты в текст, за это отвечает `glued`. Середина сдвинута на измеренное
+       значение, допуск прежний, нижний край от этого стал строже. */
     checks: [['слипшихся величин', 'glued', 0, 0],
-             ['подписей с индексом', 'withSub', 30, 28],
+             ['подписей с индексом', 'withSub', 61, 28],
              ['в файле цена покупателя с индексом', 'texPb', 1, 0],
              ['подписи из файла не пропали', 'texNodes', 11, 4]],
   },
@@ -4717,6 +4725,209 @@ const CASES = [
     checks: [['одиноких «?» по семи сценам', 'lonely', 0, 0],
              ['сцен, где знаков больше живых подсказок', 'over', 0, 0],
              ['пустых строк .help-anchor в разметке', 'anchors', 0, 0]],
+  },
+  /* =====================================================================
+     ВНЕШНИЙ ВИД СЛОЖЕНИЯ (сессия 25.08, ветка feat/calc2-sum-visual).
+     Пять свойств, каждое из которых уже один раз было сломано и каждое
+     проверено «зубастостью»: возвращаешь дефект — случай краснеет.
+     Подробные замеры (контраст, расстояния между цветами, прямоугольники
+     подписей) снимает calc2/tests/sum_visual_probe.mjs; здесь стоят те
+     проверки, которые обязаны идти в CI на каждом прогоне.
+     ===================================================================== */
+  {
+    /* ⚠️ ЦВЕТ ГРУППЫ НЕ ИМЕЕТ ПРАВА СОВПАСТЬ С ЦВЕТОМ СУММЫ.
+       Группы брали цвета из общей палитры выбора, а её первые два цвета —
+       те же канонические --curve-d и --curve-s, которыми красятся суммарные
+       кривые. На экране «спрос первой группы» был одного цвета с «рыночным
+       спросом», а «спрос второй группы» — с «рыночным предложением».
+       Проверяем на четырёх группах в каждом семействе: там задействована
+       вся палитра целиком. */
+    name: 'Сложение (ж) цвет группы отличается от цвета суммы и от других групп',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 4); sumSetCount('S', 4); redrawAll();
+          var norm = function (v) { return String(v || '').trim().toLowerCase(); };
+          var groups = STATE.curves.filter(function (c) { return c.sumGroup && c.kind !== 'sum'; });
+          var sums = STATE.curves.filter(function (c) { return c.kind === 'sum'; });
+          var clash = 0, dup = 0;
+          groups.forEach(function (g) {
+            sums.forEach(function (s) { if (norm(g.color) === norm(s.color)) clash++; });
+          });
+          for (var i = 0; i < groups.length; i++) {
+            for (var j = i + 1; j < groups.length; j++) {
+              if (norm(groups[i].color) === norm(groups[j].color)) dup++;
+            }
+          }
+          /* Канонические цвета обязаны остаться у сумм: на них держатся все
+             сорок одна сцена, и «развести» их подменой было бы негодным. */
+          var d = sums.find(function (c) { return c.sumGroup === 'D'; });
+          var s = sums.find(function (c) { return c.sumGroup === 'S'; });
+          var canonD = norm(d && d.color) === norm(cssVar('--curve-d')) ? 1 : 0;
+          var canonS = norm(s && s.color) === norm(cssVar('--curve-s')) ? 1 : 0;
+          return { clash: clash, dup: dup, canonD: canonD, canonS: canonS, n: groups.length };`,
+    checks: [['групп в сцене', 'n', 8, 0],
+             ['совпадений «цвет группы = цвет суммы»', 'clash', 0, 0],
+             ['пар групп, делящих один цвет', 'dup', 0, 0],
+             ['у суммарного спроса канонический цвет', 'canonD', 1, 0],
+             ['у суммарного предложения канонический цвет', 'canonS', 1, 0]],
+  },
+  {
+    /* ⚠️ КОНТРАСТ ЛИНИИ К ХОЛСТУ — НЕ МЕНЬШЕ 3:1 В ОБЕИХ ТЕМАХ.
+       Приглушение групп прозрачностью снижает итоговый контраст, поэтому
+       меряем ЦВЕТ ПОВЕРХ ХОЛСТА, а не исходный тон. Порог 3:1 — норма для
+       графических объектов; ниже линию просто не видно на проекторе. */
+    name: 'Сложение (з) контраст каждой линии к холсту не ниже 3:1 в обеих темах',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 4); sumSetCount('S', 4); redrawAll();
+          var rgb = function (v) {
+            v = String(v || '').trim();
+            if (v.charAt(0) === '#') { var h = v.slice(1);
+              if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+              return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+            var m = v.match(/rgba?\(([^)]+)\)/);
+            return m ? m[1].split(/[,\s\/]+/).filter(Boolean).map(Number).slice(0,3) : null;
+          };
+          var lum = function (c) { var f = c.map(function (x) { x /= 255;
+            return x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4); });
+            return 0.2126*f[0] + 0.7152*f[1] + 0.0722*f[2]; };
+          var ratio = function (a, b) { var l1 = lum(a), l2 = lum(b);
+            if (l1 < l2) { var t = l1; l1 = l2; l2 = t; } return (l1+0.05)/(l2+0.05); };
+          var worst = 99;
+          ['light', 'dark'].forEach(function (th) {
+            document.documentElement.setAttribute('data-theme', th);
+            refreshColors(); redrawAll();
+            var bg = rgb(cssVar('--canvas'));
+            [].slice.call(document.querySelectorAll('#chart path[data-curve]')).forEach(function (p) {
+              if (p.getAttribute('data-skip-export') === '1') return;
+              var cs = getComputedStyle(p);
+              var op = parseFloat(p.getAttribute('opacity') != null ? p.getAttribute('opacity') : (cs.opacity || '1'));
+              var al = (isFinite(op) ? op : 1) * (parseFloat(cs.strokeOpacity || '1') || 1);
+              var col = rgb(p.getAttribute('stroke') || cs.stroke);
+              if (!col || !bg) return;
+              var eff = [0,1,2].map(function (i) { return col[i]*al + bg[i]*(1-al); });
+              var r = ratio(eff, bg);
+              if (r < worst) worst = r;
+            });
+          });
+          document.documentElement.setAttribute('data-theme', 'light');
+          refreshColors(); redrawAll();
+          return { worst: Math.round(worst * 100) / 100, ok: (worst >= 3) ? 1 : 0 };`,
+    checks: [['худший контраст линии к холсту не ниже 3:1', 'ok', 1, 0],
+             ['сам худший контраст (справочно, не ниже 3)', 'worst', 3.25, 0.9]],
+  },
+  {
+    /* ⚠️ УЧАСТОК, ГДЕ РЫНКА НЕТ, РИСУЕТСЯ ПУНКТИРОМ ТОГО ЖЕ ВЕСА.
+       При предложении Q − 100 первый продавец выходит на рынок только со ста
+       единиц, и на отрезке Q от 0 до 100 рыночного предложения не существует.
+       Прошлая сессия закрыла там дырку нулём — и на холсте получилась ровная
+       линия по оси, неотличимая от самой оси. Решение владельца: тот же цвет,
+       та же толщина, отличие только в штрихе. */
+    name: 'Сложение (и) несуществующий участок суммарной кривой — пунктир того же веса',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 2); sumSetCount('S', 2);
+          var gs = STATE.curves.filter(function (c) { return c.sumGroup === 'S' && c.kind !== 'sum'; });
+          updateCurveExpr(gs[0], 'Q-100'); updateCurveExpr(gs[1], 'Q+20');
+          redrawAll();
+          var sum = STATE.curves.find(function (c) { return c.kind === 'sum' && c.sumGroup === 'S'; });
+          var ps = [].slice.call(document.querySelectorAll('#chart path[data-curve="' + sum.id + '"]'));
+          var gh = ps.filter(function (p) { return p.getAttribute('data-sum-part') === 'ghost'; });
+          var re = ps.filter(function (p) { return p.getAttribute('data-sum-part') === 'real'; });
+          var num = function (p, a) { return parseFloat(p.getAttribute(a) || getComputedStyle(p)[a] || '0'); };
+          var sameColor = (gh.length && re.length &&
+            String(gh[0].getAttribute('stroke')) === String(re[0].getAttribute('stroke'))) ? 1 : 0;
+          var sameWidth = (gh.length && re.length &&
+            Math.abs(num(gh[0], 'stroke-width') - num(re[0], 'stroke-width')) < 0.01) ? 1 : 0;
+          var alpha = gh.length ? parseFloat(gh[0].getAttribute('opacity') || '1') : 0;
+          /* Стык считаем в пикселях: щель шириной в шаг сетки на экране
+             читается как разрыв, а число «путей два» о ней молчит. */
+          var gap = 0;
+          if (gh.length && re.length) {
+            var a = gh[0].getPointAtLength(gh[0].getTotalLength());
+            var b = re[0].getPointAtLength(0);
+            gap = Math.hypot(a.x - b.x, a.y - b.y);
+          }
+          return { ghost: gh.length, real: re.length, sameColor: sameColor,
+                   sameWidth: sameWidth, alpha: alpha,
+                   ghostTo: Math.round((sum.sumGhostTo || 0) * 100) / 100,
+                   gap: Math.round(gap * 100) / 100 };`,
+    checks: [['пунктирный участок нарисован', 'ghost', 1, 0],
+             ['сплошной участок ровно один', 'real', 1, 0],
+             ['докуда рынка нет, по количеству', 'ghostTo', 100, 0.01],
+             ['цвет пунктира тот же, что у сплошной', 'sameColor', 1, 0],
+             ['толщина пунктира та же, что у сплошной', 'sameWidth', 1, 0],
+             ['пунктир не бледнее сплошной', 'alpha', 1, 0],
+             ['щель на стыке, px', 'gap', 0, 0.35]],
+  },
+  {
+    /* ⚠️ НА ХОЛСТЕ — ОБОЗНАЧЕНИЕ, В ПАНЕЛИ — ПОЛНОЕ ИМЯ.
+       «спрос первой группы» занимает 137 px, «предложение второй группы» —
+       181. Шесть таких подписей выстраивались вдоль края с зазором меньше
+       внутреннего пробела шрифта и читались одной строкой. Связь холста с
+       панелью держится тем, что то же обозначение стоит в строке списка. */
+    name: 'Сложение (к) на холсте обозначение, в панели полное имя',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 3); sumSetCount('S', 2); redrawAll();
+          var raw = [].slice.call(document.querySelectorAll('#chart text.curve-name'))
+            .map(function (t) { return String(t.getAttribute('data-raw') || '').trim(); });
+          var longOnes = raw.filter(function (s) { return s.length > 4; }).length;
+          var wantD1 = raw.indexOf('D_1') >= 0 ? 1 : 0;
+          var wantSum = raw.indexOf('D') >= 0 ? 1 : 0;
+          /* Полное имя обязано остаться в панели: обозначение его не заменяет,
+             а сопровождает. Иначе связь холста со списком теряется. */
+          var names = [].slice.call(document.querySelectorAll('#curve-list .curve-row span.curve-name'))
+            .map(function (e) { return e.textContent.replace(/\s+/g, ' ').trim(); });
+          var full = names.filter(function (s) { return /групп/.test(s) || /рыночн/.test(s); }).length;
+          var tags = document.querySelectorAll('#curve-list .crow-tag').length;
+          /* Строка суммарной кривой не должна выглядеть обломком: поля формулы
+             у неё нет и быть не может, но пустое место надо объяснить. */
+          var autos = document.querySelectorAll('#curve-list .crow-auto').length;
+          return { longOnes: longOnes, wantD1: wantD1, wantSum: wantSum,
+                   full: full, tags: tags, autos: autos };`,
+    checks: [['подписей длиннее четырёх знаков на холсте', 'longOnes', 0, 0],
+             ['подпись первой группы спроса — D с индексом', 'wantD1', 1, 0],
+             ['подпись суммарного спроса — D', 'wantSum', 1, 0],
+             ['строк списка с полным именем', 'full', 7, 0],
+             ['обозначений в строках списка', 'tags', 7, 0],
+             ['пояснений у строк суммарных кривых', 'autos', 2, 0]],
+  },
+  {
+    /* ⚠️ ПОДПИСЬ ПОЛЗУНКА НЕ ИМЕЕТ ПРАВА БЫТЬ ОБРЕЗАННОЙ.
+       Резало дважды: код обрезал имя по шестнадцати символам, а CSS дорезал
+       строку многоточием. При пяти группах на панели стояло пять одинаковых
+       «Сдвиг спрос … = 0». */
+    name: 'Сложение (л) подписи ползунков различимы и не обрезаны',
+    run: `resetSceneMemory(); pickScene('sdsum');
+          sumSetCount('D', 3); sumSetCount('S', 2); redrawAll();
+          if (typeof updatePult === 'function') updatePult();
+          var chips = [].slice.call(document.querySelectorAll('#params-curves .pchip'));
+          var cut = 0, seen = {}, dupText = 0, bright = 0;
+          var lum = function (c) { var f = c.map(function (x) { x /= 255;
+            return x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4); });
+            return 0.2126*f[0] + 0.7152*f[1] + 0.0722*f[2]; };
+          chips.forEach(function (ch) {
+            var lab = ch.querySelector('.pchip-label');
+            if (!lab) return;
+            if (lab.scrollWidth > lab.clientWidth + 1) cut++;
+            var cl = lab.cloneNode(true);
+            cl.querySelectorAll('.katex-mathml, annotation').forEach(function (x) { x.remove(); });
+            var t = cl.textContent.replace(/\s+/g, ' ').trim();
+            if (/…/.test(t)) cut++;
+            if (seen[t]) dupText++; else seen[t] = 1;
+            /* Светлый акцент заставляет Chromium рисовать незалитую дорожку
+               тёмной, и на панели оказываются рядом ползунки двух видов.
+               Порог измерен перебором: 0,2487 — ещё светлая, 0,2545 — уже
+               тёмная. Держим запас. */
+            var sl = ch.querySelector('input[type=range]');
+            var m = sl && String(getComputedStyle(sl).accentColor || '').match(/rgba?\(([^)]+)\)/);
+            if (m) {
+              var c = m[1].split(/[,\s\/]+/).filter(Boolean).map(Number).slice(0, 3);
+              if (lum(c) > 0.245) bright++;
+            }
+          });
+          return { chips: chips.length, cut: cut, dupText: dupText, bright: bright };`,
+    checks: [['ползунков сдвига в сцене', 'chips', 5, 0],
+             ['обрезанных подписей', 'cut', 0, 0],
+             ['подписей-двойников', 'dupText', 0, 0],
+             ['ползунков со светлым акцентом (тёмная дорожка)', 'bright', 0, 0]],
   },
 ];
 

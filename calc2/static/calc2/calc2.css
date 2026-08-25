@@ -743,9 +743,14 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 .crow-auto {
   margin-top: 5px; padding: 6px 8px;
   border: 1px dashed var(--border); border-radius: var(--r);
-  background: transparent; color: var(--text3);
+  background: transparent; color: var(--text2);
   font-size: 11px; line-height: 1.35;
 }
+/* ⚠️ ЧЕРНИЛА ЗДЕСЬ --text2, А НЕ --text3, И ЭТО ЗАМЕР.
+   Третья ступень текста даёт на поверхности панели 4,51:1 при норме канона
+   4,6 — проверка контраста краснела бы на двух новых строках (замер 25.08,
+   canon_checks по сцене sdsum: 3 нарушения до правки, 5 после). Строка и так
+   читается как неактивная: пунктирная рамка, мелкий кегль и прямая надпись. */
 .role-sel {
   width: 100%; padding: 4px 6px; border: 1px solid var(--border);
   border-radius: var(--r); background: var(--input-bg); font-size: 12px; color: var(--text2);
