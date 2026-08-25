@@ -411,6 +411,23 @@ function pfCallsAB() {
   var after = pfCallsPerFrame();
   return { before: before, after: after };
 }
+/* Сколько строк табло набирается заново за N кадров панорамирования.
+   Ноль означает, что панорама панель не перенабирает. */
+function pfPanelRetypeset(frames) {
+  var fresh = 0;
+  var orig = window.typesetStats;
+  window.typesetStats = function (root) {
+    if (root) root.querySelectorAll('.stat').forEach(function (r) { if (!r._typeset) fresh++; });
+    return orig.apply(this, arguments);
+  };
+  var dq = (CONFIG.Qmax - CONFIG.Qmin) * 0.004;
+  for (var i = 0; i < (frames || 5); i++) { CONFIG.Qmin += dq; CONFIG.Qmax += dq; redrawAll(); }
+  CONFIG.Qmin -= dq * (frames || 5); CONFIG.Qmax -= dq * (frames || 5);
+  redrawAll();
+  window.typesetStats = orig;
+  return fresh;
+}
+
 /* Сколько раз формула зовётся за ОДИН кадр панорамирования. */
 function pfCallsPerFrame() {
   var dq = (CONFIG.Qmax - CONFIG.Qmin) * 0.004;
@@ -645,6 +662,22 @@ if (need('К')) {
         `scrollW=${g.scrollW} clientW=${g.clientW}`);
       flag(`${W}px, ${n} кусков: «Что получится» не обрезан`, g.previewClipped === false || g.previewClipped === null,
         'previewClipped=' + g.previewClipped + ' right=' + g.previewRight);
+      /* ⚠️ ПРОВЕРЯЕМ САМ МЕХАНИЗМ, А НЕ ТОЛЬКО «ВЛЕЗЛО ЛИ».
+         Проверка «всё помещается» тупая: она зелена и на прежней вёрстке —
+         при окне 380 px и колонках по 52 px тоже ничего не вылезало. Дефект
+         был не в переполнении, а в том, что колонки участка ужимались до
+         невозможного, а поле формулы ЕЗДИЛО от того, где стоит каретка:
+         в строке с курсором 118 px, в остальных 156 px. Поэтому спрашиваем
+         три вещи, которые прежняя вёрстка не держала: окно шире прежнего,
+         колонка границы не уже 90 px, и ширина поля формулы ОДНА для всех
+         строк — место под клавиатуру зарезервировано в каждой. */
+      flag(`${W}px, ${n} кусков: окно шире прежних 380 px`, g.cardW >= 600, g.cardW + ' px');
+      const narrow = g.rows.filter(r => r.boundW != null && r.boundW < 90);
+      flag(`${W}px, ${n} кусков: колонка границы не уже 90 px`, narrow.length === 0,
+        'узких строк ' + narrow.length + ': ' + JSON.stringify(narrow.map(r => r.boundW)));
+      const widths = Array.from(new Set(g.rows.map(r => r.slotW)));
+      flag(`${W}px, ${n} кусков: поле формулы одной ширины во всех строках`, widths.length === 1,
+        'ширин ' + widths.length + ': ' + JSON.stringify(widths));
       if (n === 5) await shot(`K-${W}-5`);
       await ev(() => pfPwClose());
       await page.waitForTimeout(150);
@@ -793,6 +826,40 @@ if (need('С')) {
   const look = await ev(() => pfCurveLook());
   look.forEach(l => note(`  ${l.name}${l.part ? ' [' + l.part + ']' : ''}: цвет ${l.stroke}, толщина ${l.width}, `
     + `штрих «${l.dash || 'сплошная'}», прозрачность ${l.opacity}, точек пути ${l.pts}`));
+  /* Оформление по образцу КПВ: слагаемое тонкое, штрих 5 4, приглушено;
+     сумма толстая и сплошная. Печати чисел мало — утверждаем каждое. */
+  const groups = look.filter(l => l.kind !== 'sum' && l.kind !== 'fill' && l.side);
+  const sums = look.filter(l => l.kind === 'sum' && l.part !== 'ghost');
+  flag('группы найдены', groups.length >= 4, 'групп ' + groups.length);
+  const notDashed = groups.filter(l => !/^5(px)?[, ]\s*4/.test(String(l.dash).replace(/px/g, 'px')));
+  flag('у каждой группы штрих 5 4', notDashed.length === 0,
+    'без штриха: ' + JSON.stringify(notDashed.map(l => l.name + ' «' + l.dash + '»')));
+  const notThin = groups.filter(l => Math.abs(l.width - 1.6) > 1e-6);
+  flag('у каждой группы толщина 1,6', notThin.length === 0,
+    JSON.stringify(notThin.map(l => l.name + ' ' + l.width)));
+  const notMuted = groups.filter(l => !(l.opacity < 1));
+  flag('каждая группа приглушена (прозрачность меньше единицы)', notMuted.length === 0,
+    JSON.stringify(notMuted.map(l => l.name + ' ' + l.opacity)));
+  const sumDashed = sums.filter(l => l.dash);
+  flag('суммарные кривые сплошные', sumDashed.length === 0,
+    JSON.stringify(sumDashed.map(l => l.name + ' «' + l.dash + '»')));
+  const sumThin = sums.filter(l => Math.abs(l.width - 3.2) > 1e-6);
+  flag('суммарные кривые толщиной 3,2', sumThin.length === 0,
+    JSON.stringify(sumThin.map(l => l.name + ' ' + l.width)));
+  const ghost = look.filter(l => l.part === 'ghost');
+  flag('участок «рынка здесь нет» — штрих 12 6 при полной толщине и непрозрачности',
+    ghost.length > 0 && ghost.every(l => /^12(px)?[, ]/.test(String(l.dash))
+      && Math.abs(l.width - 3.2) < 1e-6 && l.opacity === 1),
+    JSON.stringify(ghost.map(l => [l.dash, l.width, l.opacity])));
+  /* Кусочно-линейная кривая строится по узлам излома. Точек в пути должно
+     быть единицы, а не сотни: 401 значит, что вернулась густая сетка. */
+  const dense = look.filter(l => l.kind !== 'fill' && l.pts > 12);
+  flag('кривые построены по узлам, а не по густой сетке', dense.length === 0,
+    'густых путей ' + dense.length + ': ' + JSON.stringify(dense.map(l => l.name + ' ' + l.pts)));
+  // Табло не перенабирается, пока числа не изменились.
+  const retype = await ev(() => pfPanelRetypeset(5));
+  note('строк табло, набираемых заново, за 5 кадров: ' + retype);
+  flag('табло не перенабирается без надобности', retype === 0, 'строк ' + retype);
   for (const th of ['light', 'dark']) {
     await setTheme(th);
     await reinject();
