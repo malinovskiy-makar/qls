@@ -698,6 +698,56 @@ if (need('О')) {
   back = await ev(() => { setFirstQuad(true); return { qa: CONFIG.Qmin, pa: CONFIG.Pmin }; });
   flag('3) обратное включение вернуло в первую четверть', back.qa >= -1e-9 && back.pa >= -1e-9, JSON.stringify(back));
 
+  /* Разовость: после снятия галочки человек распоряжается окном сам —
+     колесо и панорама не имеют права вернуть окно обратно. */
+  const once = await ev(() => {
+    resetSceneMemory(); pickScene('taxes');
+    const d = STATE.curves.find(c => c.role === 'demand');
+    const s2 = STATE.curves.find(c => c.role === 'supply');
+    if (d) updateCurveExpr(d, '100-P');
+    if (s2) updateCurveExpr(s2, '0.5*p-200');
+    setType('tax'); setTaxForm('unit'); setTax(0); redrawAll();
+    setFirstQuad(false);
+    const afterUncheck = { qa: CONFIG.Qmin, qb: CONFIG.Qmax, pa: CONFIG.Pmin, pb: CONFIG.Pmax };
+    // Панорама на 10 % вправо — как мышью.
+    const dq = (CONFIG.Qmax - CONFIG.Qmin) * 0.1;
+    CONFIG.Qmin += dq; CONFIG.Qmax += dq; redrawAll();
+    const afterPan = { qa: CONFIG.Qmin, qb: CONFIG.Qmax, pa: CONFIG.Pmin, pb: CONFIG.Pmax };
+    // Зум: сузили окно вдвое.
+    const mid = (CONFIG.Qmin + CONFIG.Qmax) / 2, half = (CONFIG.Qmax - CONFIG.Qmin) / 4;
+    CONFIG.Qmin = mid - half; CONFIG.Qmax = mid + half; redrawAll();
+    const afterZoom = { qa: CONFIG.Qmin, qb: CONFIG.Qmax, pa: CONFIG.Pmin, pb: CONFIG.Pmax };
+    return { afterUncheck, afterPan, afterZoom, dq,
+      resetExists: !!document.getElementById('btn-view-reset'),
+      dirty: !!STATE.viewDirty };
+  });
+  note('после снятия: ' + JSON.stringify(once.afterUncheck));
+  note('после панорамы: ' + JSON.stringify(once.afterPan));
+  note('после зума:     ' + JSON.stringify(once.afterZoom));
+  flag('окно не прыгает обратно после панорамы',
+    Math.abs(once.afterPan.qa - (once.afterUncheck.qa + once.dq)) < 1e-6, JSON.stringify(once.afterPan));
+  flag('окно не прыгает обратно после зума',
+    once.afterZoom.qb - once.afterZoom.qa < (once.afterPan.qb - once.afterPan.qa) * 0.6,
+    'ширина ' + num(once.afterZoom.qb - once.afterZoom.qa) + ' против ' + num(once.afterPan.qb - once.afterPan.qa));
+  flag('кнопка «Вернуть исходный вид» на месте', once.dirty, 'viewDirty=' + once.dirty);
+
+  // При ВКЛЮЧЁННОЙ галочке не меняется ничего.
+  const onCheck = await ev(() => {
+    resetSceneMemory(); pickScene('taxes');
+    const d = STATE.curves.find(c => c.role === 'demand');
+    const s2 = STATE.curves.find(c => c.role === 'supply');
+    if (d) updateCurveExpr(d, '100-P');
+    if (s2) updateCurveExpr(s2, '0.5*p-200');
+    redrawAll();
+    const a = { qa: CONFIG.Qmin, qb: CONFIG.Qmax, pa: CONFIG.Pmin, pb: CONFIG.Pmax };
+    setFirstQuad(true);
+    const b = { qa: CONFIG.Qmin, qb: CONFIG.Qmax, pa: CONFIG.Pmin, pb: CONFIG.Pmax };
+    return { a, b };
+  });
+  flag('при включённой галочке окно не тронуто',
+    JSON.stringify(onCheck.a) === JSON.stringify(onCheck.b),
+    JSON.stringify(onCheck.a) + ' -> ' + JSON.stringify(onCheck.b));
+
   // Показывать нечего -> окно не трогается.
   const same = await ev(() => {
     resetSceneMemory(); pickScene('sd');
@@ -713,6 +763,10 @@ if (need('О')) {
     return { before, after };
   });
   note('нечего показывать: до ' + JSON.stringify(same.before) + ' -> после ' + JSON.stringify(same.after));
+  flag('нечего показывать — лишнего расширения нет',
+    Math.abs(same.after.qa - (-(same.before.qb - same.before.qa) * 0.25)) < 1e-6
+    && Math.abs(same.after.qb - same.before.qb) < 1e-6,
+    JSON.stringify(same.after));
 }
 
 /* ────────────────────────────────────────────────────────────────────

@@ -650,6 +650,70 @@ function quadSameWindow(a, b) {
       && Math.abs(a.pa - b.pa) < e && Math.abs(a.pb - b.pb) < e;
 }
 
+/* ── ТОЧКИ, КОТОРЫЕ СЦЕНА ПОКАЗЫВАЕТ ВНЕ ПЕРВОЙ ЧЕТВЕРТИ ──────────────
+   Их ровно три вида, и все три названы решением владельца о правиле первой
+   четверти: центр поворота при процентном налоге, пересечение кривых вне
+   четверти и конец продолжения предельной кривой.
+
+   ⚠️ СПИСОК БЕРЁТСЯ У НАРИСОВАННОГО, А НЕ У ВТОРОЙ КОПИИ ПРАВИЛА.
+   Продолжение предельной кривой рисуют четыре сцены, и докуда оно тянется,
+   знает только сам рисователь (`drawMarginalCurve`: до нуля породившей
+   кривой). Переписывать это условие здесь значило бы завести вторую точку
+   правды, которая разойдётся с первой. Поэтому хвосты читаются с холста по
+   их собственной пометке `data-marginal-tail`, а пиксели переводятся обратно
+   теми же шкалами. Две точки, которые сцена знает точно, берутся из модели. */
+function offQuadShownPoints() {
+  const pts = [];
+  if (STATE.offEq && isFinite(STATE.offEq.Q) && isFinite(STATE.offEq.P)) {
+    pts.push([STATE.offEq.Q, STATE.offEq.P]);
+  }
+  if (typeof taxPivotPoint === 'function') {
+    const p = taxPivotPoint();
+    if (p && isFinite(p.Q) && isFinite(p.P)) pts.push([p.Q, p.P]);
+  }
+  if (typeof sx === 'function' && typeof sy === 'function') {
+    document.querySelectorAll('path[data-marginal-tail]').forEach(el => {
+      String(el.getAttribute('d') || '').split(/(?=[ML])/).forEach(tok => {
+        const m = tok.match(/[ML]\s*(-?[\d.eE+]+)[,\s]+(-?[\d.eE+]+)/);
+        if (!m) return;
+        const q = sx.invert(+m[1]), p = sy.invert(+m[2]);
+        if (isFinite(q) && isFinite(p)) pts.push([q, p]);
+      });
+    });
+  }
+  // Интересны только те, что ДЕЙСТВИТЕЛЬНО лежат вне первой четверти.
+  return pts.filter(([q, p]) => q < -1e-9 || p < -1e-9);
+}
+
+/* Раздвинуть окно так, чтобы такие точки попали в кадр с запасом по краю.
+   Возвращает true, если окно действительно изменилось.
+
+   Решение владельца 25.08: «снятая галочка „только первая четверть“ сама
+   раздвигает окно до точек вне четверти». Запас — восьмая часть нынешнего
+   окна: точка, легшая ровно на границу, читается как обрыв кривой, а не как
+   то, что нам хотели показать. */
+function fitWindowToOffQuad() {
+  const pts = offQuadShownPoints();
+  if (!pts.length) return false;                 // показывать нечего — окно не трогаем
+  let qa = CONFIG.Qmin, qb = CONFIG.Qmax, pa = CONFIG.Pmin, pb = CONFIG.Pmax;
+  const padQ = Math.max(1e-9, (qb - qa) * 0.08);
+  const padP = Math.max(1e-9, (pb - pa) * 0.08);
+  pts.forEach(([q, p]) => {
+    if (q - padQ < qa) qa = q - padQ;
+    if (q + padQ > qb) qb = q + padQ;
+    if (p - padP < pa) pa = p - padP;
+    if (p + padP > pb) pb = p + padP;
+  });
+  const same = (a, b) => Math.abs(a - b) < 1e-9;
+  if (same(qa, CONFIG.Qmin) && same(qb, CONFIG.Qmax)
+      && same(pa, CONFIG.Pmin) && same(pb, CONFIG.Pmax)) return false;
+  CONFIG.Qmin = qa; CONFIG.Qmax = qb; CONFIG.Pmin = pa; CONFIG.Pmax = pb;
+  /* Окно перестало быть масштабом сцены, значит и авто-подгонка молчит, и
+     кнопка «Вернуть исходный вид» на месте — ровно как после колеса мыши. */
+  STATE.viewDirty = true;
+  return true;
+}
+
 function setFirstQuad(on) {
   const before = quadWindow(null);       // окно ДО переключения — для обратного хода
   STATE.firstQuad = !!on;
@@ -687,6 +751,17 @@ function setFirstQuad(on) {
   }
   syncViewFields();
   redrawAll();
+  /* ⚠️ РАЗДВИГАЕМ ПОСЛЕ ОТРИСОВКИ, И ТОЛЬКО ПРИ СНЯТИИ ГАЛОЧКИ.
+     До отрисовки продолжений предельных кривых на холсте ещё нет, и спросить
+     у них, докуда они тянутся, невозможно. Второй перерисовки не боимся: это
+     один щелчок человека, а не кадр панорамирования.
+
+     Разовость важна: дальше окном распоряжается человек. Колесо и панорама
+     сюда не заходят, потому что setFirstQuad зовёт только сама галочка. */
+  if (!STATE.firstQuad && STATE.mode !== 'math' && fitWindowToOffQuad()) {
+    syncViewFields();
+    redrawAll();
+  }
 }
 
 function setGridMode(mode) {
