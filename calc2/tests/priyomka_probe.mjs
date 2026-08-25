@@ -456,9 +456,10 @@ function pfPpfForm() {
   return {
     ok: !!(d && d.ok), n: d ? d.n : null,
     formulaText: d ? d.formulaText : null,
+    formulaTex: d ? d.formulaTex : null,
     type: d ? d.type : null,
     kinks: d ? (d.kinks || []) : [],
-    pieces: d ? (d.formulaPieces || null) : null,
+    Xtot: d ? d.Xtot : null, Ytot: d ? d.Ytot : null,
     panelText: text, katexInForm: mathN,
     /* Не вылезает ли запись за ширину панели. */
     overflow: (function () {
@@ -832,6 +833,19 @@ if (need('Р')) {
   note('  панель: ' + f.panelText);
   note('  изломы: ' + JSON.stringify(f.kinks));
   note('  KaTeX в «Форме кривой»: ' + f.katexInForm + ', переполнение панели: ' + JSON.stringify(f.overflow));
+  note('  LaTeX: ' + f.formulaTex);
+  flag('две КПВ: запись набрана математикой, а не текстом', f.katexInForm > 0 && !f.formulaText,
+    'katex=' + f.katexInForm + ', текстовая запись: ' + f.formulaText);
+  flag('две КПВ: первый участок Y = 160 − X при 0 ≤ X ≤ 100',
+    /160\s*-\s*X,\s*&\s*0\s*\\le\s*X\s*\\le\s*100/.test(String(f.formulaTex)), String(f.formulaTex));
+  flag('две КПВ: второй участок Y = 260 − 2X при 100 < X ≤ 130',
+    /260\s*-\s*2X,\s*&\s*100\s*<\s*X\s*\\le\s*130/.test(String(f.formulaTex)), String(f.formulaTex));
+  flag('две КПВ: излом ровно в (100; 60)',
+    f.kinks.length === 1 && Math.abs(f.kinks[0][0] - 100) < 1e-6 && Math.abs(f.kinks[0][1] - 60) < 1e-6,
+    JSON.stringify(f.kinks));
+  show('две КПВ: конец кривой X', f.Xtot, 130, 1e-6);
+  show('две КПВ: конец кривой Y (Ymax)', f.Ytot, 160, 1e-6);
+  flag('две КПВ: запись помещается в панель', f.overflow && f.overflow.over <= 0, JSON.stringify(f.overflow));
   await shot('R-2ppf');
 
   await ev(() => pfPpfSetup(['100-x', '60-2x', '40-4x']));
@@ -842,7 +856,31 @@ if (need('Р')) {
   note('  панель: ' + f.panelText);
   note('  изломы: ' + JSON.stringify(f.kinks));
   note('  KaTeX в «Форме кривой»: ' + f.katexInForm + ', переполнение панели: ' + JSON.stringify(f.overflow));
+  note('  LaTeX: ' + f.formulaTex);
+  flag('три КПВ: запись набрана математикой, а не «построена численно»',
+    f.katexInForm > 0 && !f.formulaText, 'katex=' + f.katexInForm + ', текстовая запись: ' + f.formulaText);
+  flag('три КПВ: участок Y = 200 − X при 0 ≤ X ≤ 100',
+    /200\s*-\s*X,\s*&\s*0\s*\\le\s*X\s*\\le\s*100/.test(String(f.formulaTex)), String(f.formulaTex));
+  flag('три КПВ: участок Y = 300 − 2X при 100 < X ≤ 130',
+    /300\s*-\s*2X,\s*&\s*100\s*<\s*X\s*\\le\s*130/.test(String(f.formulaTex)), String(f.formulaTex));
+  flag('три КПВ: участок Y = 560 − 4X при 130 < X ≤ 140',
+    /560\s*-\s*4X,\s*&\s*130\s*<\s*X\s*\\le\s*140/.test(String(f.formulaTex)), String(f.formulaTex));
+  flag('три КПВ: изломы ровно в (100; 100) и (130; 40)',
+    f.kinks.length === 2 && Math.abs(f.kinks[0][0] - 100) < 1e-6 && Math.abs(f.kinks[0][1] - 100) < 1e-6
+    && Math.abs(f.kinks[1][0] - 130) < 1e-6 && Math.abs(f.kinks[1][1] - 40) < 1e-6,
+    JSON.stringify(f.kinks));
+  show('три КПВ: конец кривой X', f.Xtot, 140, 1e-6);
+  show('три КПВ: конец кривой Y (Ymax)', f.Ytot, 200, 1e-6);
+  flag('три КПВ: запись помещается в панель', f.overflow && f.overflow.over <= 0, JSON.stringify(f.overflow));
   await shot('R-3ppf');
+
+  // Нелинейная КПВ — честно «построена численно», без выдуманной ломаной.
+  await ev(() => pfPpfSetup(['sqrt(10000-x^2)', '60-2x']));
+  await ev(() => pfExpandAll());
+  f = await ev(() => pfPpfForm());
+  note('дуга + прямая: type=' + f.type + '  formulaText: ' + f.formulaText + '  LaTeX: ' + f.formulaTex);
+  flag('нелинейная пара: ломаная НЕ выдумана', !f.formulaTex,
+    'formulaTex=' + f.formulaTex);
 }
 
 console.log('\n--- ошибки страницы: ' + errs.length + (errs.length ? ('\n' + errs.slice(0, 10).join('\n')) : ''));

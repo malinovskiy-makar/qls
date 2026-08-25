@@ -803,6 +803,85 @@ function detectCombinedKinks(f1, f2, xmax1, xmax2) {
   return result;
 }
 
+/* ── ЗАКРЫТАЯ ФОРМА СУММАРНОЙ КПВ ДЛЯ ЛЮБОГО ЧИСЛА ЛИНЕЙНЫХ КРИВЫХ ────
+   Было: закрытая форма выводилась только для ДВУХ кривых, и то обычным
+   текстом; для трёх и больше панель писала «построена численно», хотя ничего
+   численного в сложении прямых нет.
+
+   Задача та же, что у суммарного спроса в сцене сложения, и решается так же:
+   отсортировать по альтернативным издержкам и склеить участки.
+
+     • Кто дешевле производит X, тот наращивает его первым — значит участки
+       идут по возрастанию наклона b.
+     • На k-м участке производит k-й по дешевизне, поэтому наклон там ровно
+       его: Y = c − b_k·X, а постоянная c берётся из непрерывности в начале
+       участка. Никакого перебора и никакой сетки.
+     • Границы участков — накопленные X_max: первый кончается там, где первый
+       участник отдал под X весь свой ресурс.
+     • Равные альтернативные издержки склеиваются в один кусок: излома между
+       ними нет, и рисовать его было бы враньём.
+
+   Числа проверены на образце владельца. Две КПВ y = 100 − x и y = 60 − 2x:
+   Y = 160 − X при 0 ≤ X ≤ 100, затем Y = 260 − 2X при 100 < X ≤ 130.
+   Три (плюс y = 40 − 4x): 200 − X, затем 300 − 2X, затем 560 − 4X до X = 140.
+
+   ⚠️ ХОТЬ ОДНА КРИВАЯ НЕЛИНЕЙНА — ВОЗВРАЩАЕМ null, и панель честно пишет
+   «построена численно». Дуга и парабола складываются не так, и подсунуть им
+   ломаную значило бы нарисовать не ту кривую. */
+function ppfCoefTex(b) {
+  if (Math.abs(b - 1) < 1e-12) return 'X';
+  return fmt(b) + 'X';
+}
+function combinedPpfLinearRecord(cs) {
+  if (!cs || cs.length < 2) return null;
+  for (const c of cs) {
+    if (!c || c.type !== 'linear' || !(c.Xmax > 0) || !isFinite(c.b) || !isFinite(c.a)) return null;
+  }
+  const ord = cs.map(c => ({ b: c.b, Xmax: c.Xmax })).sort((x, y) => x.b - y.b);
+  const Ytot = cs.reduce((s, c) => s + c.a, 0);
+  const segs = [];
+  let x0 = 0, y0 = Ytot;
+  ord.forEach(o => {
+    const x1 = x0 + o.Xmax, y1 = y0 - o.b * o.Xmax;
+    const last = segs.length ? segs[segs.length - 1] : null;
+    if (last && Math.abs(last.b - o.b) < 1e-9) { last.x1 = x1; last.y1 = y1; }
+    else segs.push({ x0, x1, y0, y1, b: o.b, c: y0 + o.b * x0 });
+    x0 = x1; y0 = y1;
+  });
+  if (!segs.length) return null;
+  const Xtot = segs[segs.length - 1].x1;
+  // Набор математикой: тот же \begin{cases}, что у кусочной записи спроса.
+  const rows = segs.map((s, i) => {
+    const cond = (i === 0)
+      ? ('0 \\le X \\le ' + fmt(s.x1))
+      : (fmt(s.x0) + ' < X \\le ' + fmt(s.x1));
+    return fmt(s.c) + ' - ' + ppfCoefTex(s.b) + ', & ' + cond;
+  });
+  const latex = (segs.length === 1)
+    ? ('Y = ' + fmt(segs[0].c) + ' - ' + ppfCoefTex(segs[0].b) + ',\\ 0 \\le X \\le ' + fmt(Xtot))
+    : ('Y = \\begin{cases} ' + rows.join(' \\\\ ') + ' \\end{cases}');
+  const evalY = (x) => {
+    if (x < -1e-9 || x > Xtot + 1e-9) return NaN;
+    for (const s of segs) if (x <= s.x1 + 1e-9) return s.c - s.b * x;
+    return NaN;
+  };
+  /* ⚠️ ГРАНИЦЫ УЧАСТКОВ И ИЗЛОМЫ — НЕ ОДНО И ТО ЖЕ, И ПУТАТЬ ИХ НЕЛЬЗЯ.
+     Границ у записи столько же, сколько участков: у двух КПВ это 100 и 130.
+     А ИЗЛОМОВ на один меньше: последняя граница — это выход кривой на ось X,
+     там кривая кончается, а не ломается.
+
+     Разница не косметическая. `kinks` идёт в отрисовку (от каждого излома
+     пунктир к обеим осям и кружок) и в «Схему», которая рисуется только до
+     трёх участков. Считать конец кривой изломом значило бы дважды нарисовать
+     метку в одной точке — концы табло и так называет отдельно — и отобрать
+     схему у сложения трёх кривых.
+     Обе границы человек видит: они стоят в самой записи, участками. */
+  const bounds = segs.map(s => ({ x: s.x1, y: s.y1 }));
+  const kinks = bounds.slice(0, -1);
+  return { segs, latex, evalY, kinks, bounds, Xtot, Ytot,
+           type: 'линейная (' + segs.length + (segs.length === 1 ? ' кусок)' : (segs.length < 5 ? ' куска)' : ' кусков)')) };
+}
+
 // Распознавание аналитической формулы суммарной КПВ (best-effort).
 // Возвращает { type, text, evalY|null, kinks }. evalY(x) — аналитическое значение
 // (NaN вне распознанной области); проверяется численно перед показом.
@@ -972,10 +1051,21 @@ function recomputePpfSumRaw() {
   const Xtot = xmax.reduce((s, v) => s + v, 0);
   const Ytot = fs.reduce((s, f) => s + f(0), 0);
 
-  // Аналитическая форма и изломы — только для пары: для трёх и больше кривых
-  // закрытой формы не выводим, кривая честно строится численно.
-  let formulaText, kinksXY;
-  if (n === 2) {
+  /* Аналитическая форма и изломы.
+
+     ПЕРВЫМ идёт линейный случай — он работает для ЛЮБОГО числа кривых, даёт
+     закрытую форму по участкам и ТОЧНЫЕ изломы (замер 25.08: численный
+     детектор давал (99,999; 60,001) там, где ответ ровно (100; 60)).
+     Не все кривые линейны — прежние пути на месте: пара разбирается
+     распознавателем, три и больше честно строятся численно. */
+  let formulaText, formulaTex = null, formulaType = null, kinksXY;
+  const lin = combinedPpfLinearRecord(cs);
+  if (lin && verifyFormula(lin.evalY, points)) {
+    formulaTex = lin.latex;
+    formulaText = null;
+    formulaType = lin.type;
+    kinksXY = lin.kinks;
+  } else if (n === 2) {
     const fr = combinedPpfFormula(cs[0], cs[1]);
     formulaText = fr.text;
     if (fr.evalY) {
@@ -1001,7 +1091,8 @@ function recomputePpfSumRaw() {
     ok: true, points, n, parts: pts,
     c1pts: pts[0], c2pts: pts[1],                   // прежние имена для старой отрисовки
     Xtot, Ytot, x1max: xmax[0], x2max: xmax[1], xmax,
-    formulaText, kinks, type: (n === 2 ? combinedPpfFormula(cs[0], cs[1]).type : 'numeric'),
+    formulaText, formulaTex,
+    kinks, type: formulaType || (n === 2 ? combinedPpfFormula(cs[0], cs[1]).type : 'numeric'),
     order,
   };
   applyAutoRanges(padMax(Xtot), padMax(Ytot));
@@ -1178,7 +1269,15 @@ function updatePpfSumPanel() {
 
   html += `<p>Концы суммарной кривой это просто суммы концов: $X_{max} = ${fmt(d.Xtot)}$ `
         + `и $Y_{max} = ${fmt(d.Ytot)}$. Если все отдадут ресурс одному товару, выпуски складываются.</p>`;
-  html += `<p><b>Форма кривой:</b> ${d.formulaText || 'не подобралась'}</p>`;
+  /* Форма кривой набирается МАТЕМАТИКОЙ, когда закрытая форма есть: запись
+     функции здесь и есть предмет обучения, а обычным текстом «X ∈ [0; 100]»
+     читается как строка из журнала. Ширину подгоняет общий проход
+     fitPanelMath — врезка у него та же. */
+  if (d.formulaTex) {
+    html += `<p><b>Форма кривой:</b> $${d.formulaTex}$</p>`;
+  } else {
+    html += `<p><b>Форма кривой:</b> ${d.formulaText || 'не подобралась'}</p>`;
+  }
   html += '</div>';
   box.innerHTML = html;
 }
