@@ -832,6 +832,43 @@ function ppfCoefTex(b) {
   if (Math.abs(b - 1) < 1e-12) return 'X';
   return fmt(b) + 'X';
 }
+
+/* ⚠️ ЧИСЛО ДЛЯ MATH.JS ПЕЧАТАЕТСЯ ЧИСЛОМ, А НЕ ЧЕРЕЗ fmt.
+   `fmt` округляет для ПОКАЗА (и ставит русскую запятую), а эту строку потом
+   разбирает Math.js и вставляет обратно в поле формулы. Округляем до девятого
+   знака — ровно как в записи суммарного спроса. */
+function ppfNum(v) {
+  const r = Math.round(v * 1e9) / 1e9;
+  return (r < 0) ? '(' + r + ')' : String(r);
+}
+
+/* Запись кусочной кривой в синтаксисе Math.js: для кнопки «копировать» и для
+   выгрузки в .tex. Тот же вид цепочки условий, что у суммарного спроса, —
+   значит и обратный разбор у неё общий. */
+function ppfPiecesToExpr(pieces) {
+  const ps = (pieces || []).filter(p => p && p.body);
+  if (!ps.length) return '';
+  let out = null;
+  for (let i = ps.length - 1; i >= 0; i--) {
+    const p = ps[i];
+    const left = (i === 0) ? ('X >= ' + ppfNum(p.x0)) : ('X > ' + ppfNum(p.x0));
+    const cond = '(' + left + ' and X <= ' + ppfNum(p.x1) + ')';
+    out = (out === null) ? (cond + ' ? ' + p.body + ' : NaN')
+                         : (cond + ' ? ' + p.body + ' : (' + out + ')');
+  }
+  return out;
+}
+
+/* Участки линейной записи → куски для ppfPiecesToExpr. Читаем `segs`, которые
+   отдаёт combinedPpfLinearRecord; саму функцию не трогаем — её контрольные
+   числа приняты владельцем. */
+function ppfLinearExpr(segs) {
+  return ppfPiecesToExpr((segs || []).map(s => ({
+    x0: s.x0, x1: s.x1,
+    // Множитель «1·X» не печатаем: строку человек видит и вставляет в поле.
+    body: ppfNum(s.c) + ' - ' + (Math.abs(s.b - 1) < 1e-12 ? 'X' : ppfNum(s.b) + '*X'),
+  })));
+}
 function combinedPpfLinearRecord(cs) {
   if (!cs || cs.length < 2) return null;
   for (const c of cs) {
@@ -1059,9 +1096,11 @@ function recomputePpfSumRaw() {
      Не все кривые линейны — прежние пути на месте: пара разбирается
      распознавателем, три и больше честно строятся численно. */
   let formulaText, formulaTex = null, formulaType = null, kinksXY;
+  let formulaExpr = null;                     // та же запись в синтаксисе Math.js
   const lin = combinedPpfLinearRecord(cs);
   if (lin && verifyFormula(lin.evalY, points)) {
     formulaTex = lin.latex;
+    formulaExpr = ppfLinearExpr(lin.segs);
     formulaText = null;
     formulaType = lin.type;
     kinksXY = lin.kinks;
@@ -1091,7 +1130,7 @@ function recomputePpfSumRaw() {
     ok: true, points, n, parts: pts,
     c1pts: pts[0], c2pts: pts[1],                   // прежние имена для старой отрисовки
     Xtot, Ytot, x1max: xmax[0], x2max: xmax[1], xmax,
-    formulaText, formulaTex,
+    formulaText, formulaTex, formulaExpr,
     kinks, type: formulaType || (n === 2 ? combinedPpfFormula(cs[0], cs[1]).type : 'numeric'),
     order,
   };
@@ -1216,8 +1255,24 @@ function updatePpfSumPanel() {
   const box = document.getElementById('info-ppfsum'); if (!box) return;
   const d = STATE.ppfSumData;
   showPaneError('ppfsum-error', (d && !d.ok) ? (d.error || 'Не удалось построить.') : '');
-  if (!d) { box.innerHTML = '<div class="muted">Введите кривые и нажмите «Построить сумму».</div>'; return; }
-  if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось построить.') + '</div>'; return; }
+  if (!d) {
+    if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
+    box.innerHTML = '<div class="muted">Введите кривые и нажмите «Построить сумму».</div>'; return;
+  }
+  if (!d.ok) {
+    if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
+    box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось построить.') + '</div>'; return;
+  }
+  /* ИТОГОВАЯ ФУНКЦИЯ — первой карточкой «Ключевых значений», общим помощником
+     (86-workspace.js). До 26.08 она печаталась абзацем «Форма кривой» в самом
+     низу «Объяснения модели»: седьмым из семи, в свёрнутом по умолчанию блоке
+     и с кеглем, ужатым подгонкой. */
+  if (typeof setFinalFunctions === 'function') {
+    const color = STATE.ppfSumColor || COL.D;
+    setFinalFunctions([d.formulaTex
+      ? { name: 'Суммарная КПВ', color, latex: d.formulaTex, expr: d.formulaExpr || '' }
+      : { name: 'Суммарная КПВ', color, note: d.formulaText || 'Форма кривой не подобралась.' }]);
+  }
   const ord = d.order || [];
   let html = '';
   html += `<div class="stat"><span>Складываем кривых</span><b>${d.n}</b></div>`;
@@ -1269,15 +1324,13 @@ function updatePpfSumPanel() {
 
   html += `<p>Концы суммарной кривой это просто суммы концов: $X_{max} = ${fmt(d.Xtot)}$ `
         + `и $Y_{max} = ${fmt(d.Ytot)}$. Если все отдадут ресурс одному товару, выпуски складываются.</p>`;
-  /* Форма кривой набирается МАТЕМАТИКОЙ, когда закрытая форма есть: запись
-     функции здесь и есть предмет обучения, а обычным текстом «X ∈ [0; 100]»
-     читается как строка из журнала. Ширину подгоняет общий проход
-     fitPanelMath — врезка у него та же. */
-  if (d.formulaTex) {
-    html += `<p><b>Форма кривой:</b> $${d.formulaTex}$</p>`;
-  } else {
-    html += `<p><b>Форма кривой:</b> ${d.formulaText || 'не подобралась'}</p>`;
-  }
+  /* ⚠️ АБЗАЦА «ФОРМА КРИВОЙ» ЗДЕСЬ БОЛЬШЕ НЕТ, И ВОЗВРАЩАТЬ ЕГО НЕЛЬЗЯ.
+     Запись — величина, а не разбор: она стоит блоком «Итоговая функция»
+     первой карточкой «Ключевых значений» (см. setFinalFunctions выше).
+     Внутри этой врезки она снова уехала бы в «Объяснение модели» вместе со
+     всеми `.sb-note` (moveExplanations в 86-workspace.js). */
+  html += '<p>Саму запись суммарной кривой ищите в «Ключевых значениях», '
+        + 'первым блоком «Итоговая функция»: по ней кривая и построена.</p>';
   html += '</div>';
   box.innerHTML = html;
 }
