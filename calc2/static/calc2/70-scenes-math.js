@@ -1468,10 +1468,403 @@ function pgfStroke(el, cs, colorName) {
   return o;
 }
 
-/* Главный сборщик .tex. Рисуется ровно то, что на экране: границы осей,
-   заливки, кривые, точки, подписи и легенда берутся из текущего состояния
-   и текущего холста. */
-function buildTex(title, label) {
+/* ═══════════════════════════════════════════════════════════════════════
+   ГЕНЕРАТОР .tex ОТ СОСТОЯНИЯ (решение владельца 26.08, ADR 0030)
+
+   Старый сборщик (`buildTexLegacy` ниже) обходит НАРИСОВАННЫЙ SVG и переводит
+   найденное в TeX. Кривая с формулой уходит формулой, а всё остальное —
+   заливки, пунктиры, точки, подписи — списками координат, снятых с ПИКСЕЛЕЙ
+   экрана. Отсюда три известных долга:
+     • выгрузка теряет толщину и пунктир (толщина читалась из `strokeWidth`
+       готового узла и переводилась в одну и ту же «very thick»);
+     • в файл попадает спрятанное до щелчка и не попадает то, что за краем;
+     • файл зависит от того, как было развёрнуто окно браузера.
+
+   Здесь файл строится из НАСТРОЕК, которые задал человек. Все функции —
+   формулами, ни одной таблицы точек.
+
+   ⚠️ ЗДЕСЬ НЕТ И НЕ ДОЛЖНО БЫТЬ: ни одного `getComputedStyle`, ни одного
+   обхода `#chart`, ни одного `getBoundingClientRect`. Чего-то не хватает в
+   состоянии — значит это надо в состояние ДОБАВИТЬ, а не подглядеть в DOM.
+   На это стоит постоянная проверка в `calc2/tests/export_audit.mjs`.
+   ⚠️ Обратный слэш в строке JS обязан быть удвоен (`check_tex_escapes.mjs`).
+   ⚠️ Список настроек осей идёт ОДНОЙ строкой: пустая строка внутри
+   `\begin{axis}[...]` роняет pgfplots.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const TEX_STATE_SAMPLES = 120;
+
+/* Штрих SVG («5 4») → штрих pgf («on 5pt off 4pt»). Одна и та же шкала на
+   экране и на бумаге: числа берутся у curveDash, а не у готового узла. */
+function texDashPattern(dash) {
+  const parts = String(dash || '').trim().split(/[\s,]+/).filter(Boolean);
+  if (!parts.length) return null;
+  const out = [];
+  parts.forEach((v, i) => { out.push((i % 2 ? 'off ' : 'on ') + (parseFloat(v) * 0.5).toFixed(1) + 'pt'); });
+  return 'dash pattern=' + out.join(' ');
+}
+
+/* Разобрать цепочку условий на участки: [{lo, hi, body}].
+   Кусочную кривую pgfplots одной строкой не нарисует, а рисовать её сеткой
+   точек значило бы вернуть ровно тот долг, ради которого всё и затевалось.
+   Разбираем ту же запись, по которой кривая считается на экране. */
+function texCondBounds(node) {
+  const unwrap = (n) => { let x = n; while (x && x.type === 'ParenthesisNode') x = x.content; return x; };
+  const c = unwrap(node);
+  if (!c || c.type !== 'OperatorNode' || c.fn !== 'and' || !c.args || c.args.length !== 2) return null;
+  const L = unwrap(c.args[0]), R = unwrap(c.args[1]);
+  if (!L || !R || L.type !== 'OperatorNode' || R.type !== 'OperatorNode') return null;
+  const lo = parseFloat(L.args[1] && L.args[1].toString());
+  const hi = parseFloat(R.args[1] && R.args[1].toString());
+  if (!isFinite(lo) || !isFinite(hi)) return null;
+  return { lo, hi };
+}
+function texCondPieces(expr) {
+  if (typeof math === 'undefined') return null;
+  const s = String(expr || '');
+  if (s.indexOf('?') < 0) return null;
+  let node;
+  try { node = math.parse(s); } catch (e) { return null; }
+  const unwrap = (n) => { let x = n; while (x && x.type === 'ParenthesisNode') x = x.content; return x; };
+  const out = [];
+  let cur = unwrap(node), guard = 0;
+  while (cur && cur.type === 'ConditionalNode' && guard++ < 64) {
+    const b = texCondBounds(cur.condition);
+    if (!b) return null;
+    out.push({ lo: b.lo, hi: b.hi, body: cur.trueExpr.toString() });
+    cur = unwrap(cur.falseExpr);
+  }
+  if (!out.length) return null;
+  // Хвост NaN означает «вне участков функции нет» — там она и не рисуется.
+  const tail = cur && cur.type === 'ConstantNode' && typeof cur.value === 'number' && isNaN(cur.value);
+  if (!tail) return null;
+  return out;
+}
+
+function buildTexFromState(title, label) {
+  const { mx, my } = mainScales();
+  const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
+  const econ = (typeof isEconScene === 'function') ? isEconScene() : true;
+  const yFloor = econ ? Math.max(0, yLo) : yLo;
+  const xFloor = econ ? Math.max(0, xLo) : xLo;
+
+  const defs = [];
+  const colorName = (css) => {
+    const h = texHex(css), key = 'c' + h;
+    const line = '\\definecolor{' + key + '}{HTML}{' + h + '}';
+    if (defs.indexOf(line) < 0) defs.push(line);
+    return key;
+  };
+  const num = (v) => (Math.round(v * 100) / 100);
+  const body = [];
+  const notes = [];
+  let needFill = false;                     // в файле есть \addplot fill between
+  const tally = { curves: 0, areas: 0, dots: 0, lines: 0, labels: 0 };
+  buildTexFromState._tally = tally;
+  const inView = (x, y) => x >= xLo - 1e-9 && x <= xHi + 1e-9 && y >= yLo - 1e-9 && y <= yHi + 1e-9;
+
+  /* ── КРИВЫЕ ────────────────────────────────────────────────────────
+     Толщина и штрих берутся из ТЕХ ЖЕ правил, что на экране: шкала LW через
+     curveWidth и curveDash (30-curves.js). Это и есть починка долга
+     «выгрузка теряет толщину и пунктир». */
+  const plot = (opts, pgfBody, lo, hi) => {
+    body.push('\\addplot[' + opts.filter(Boolean).join(', ') + ', domain=' + num(lo) + ':' + num(hi)
+      + ', samples=' + TEX_STATE_SAMPLES
+      + ', restrict y to domain=' + num(yFloor) + ':' + num(yHi)
+      + ', forget plot] {' + pgfBody + '};');
+  };
+  const curveOpts = (color, width, dash, opacity) => [
+    colorName(color),
+    'line width=' + (width * 0.35).toFixed(2) + 'pt',
+    texDashPattern(dash),
+    (opacity < 0.99 ? ('opacity=' + opacity.toFixed(2)) : null),
+  ];
+
+  /* Одна кривая: цельная — одной строкой, кусочная — по строке на участок,
+     и границы берутся у самой ЗАПИСИ, а не у окна. */
+  const drawCurveTex = (expr, opts, varName, domFrom, domTo) => {
+    const pieces = texCondPieces(expr);
+    let drawn = false;
+    if (pieces) {
+      pieces.forEach(p => {
+        const pgf = mathToPgf(p.body, varName || 'Q');
+        if (!pgf) return;
+        const lo = Math.max(p.lo, xFloor, domFrom == null ? -Infinity : domFrom);
+        const hi = Math.min(p.hi, xHi, domTo == null ? Infinity : domTo);
+        if (!(hi > lo)) return;
+        plot(opts, pgf, lo, hi);
+        drawn = true;
+      });
+      return drawn;
+    }
+    const pgf = mathToPgf(expr, varName || 'Q');
+    if (!pgf) return false;
+    const lo = Math.max(xFloor, domFrom == null ? -Infinity : domFrom);
+    const hi = Math.min(xHi, domTo == null ? Infinity : domTo);
+    if (!(hi > lo)) return false;
+    plot(opts, pgf, lo, hi);
+    return true;
+  };
+
+  const labelNodes = [];
+  const putLabel = (x, y, txt, color, anchor) => {
+    if (!txt || !isFinite(x) || !isFinite(y)) return;
+    const fs = FS_PT[fsStep(FS.base, 1)];
+    labelNodes.push('\\node[anchor=' + (anchor || 'south west') + ', text=' + colorName(color)
+      + ', font=\\fontsize{' + fs + '}{' + (fs * 1.15).toFixed(1) + '}\\selectfont, inner sep=1.5pt] at (axis cs:'
+      + num(x) + ',' + num(y) + ') {' + quantityTex(txt) + '};');
+    tally.labels++;
+  };
+
+  STATE.curves.forEach(c => {
+    if (!c.visible || !c.expr) return;
+    if (c.kind === 'vertical') return;
+    if (c.sumNumeric) {
+      notes.push('% ' + (curveShortName(c) || 'кривая') + ': сумма посчитана по точкам, формулы у неё нет');
+      return;
+    }
+    const w = (typeof curveWidth === 'function') ? curveWidth(c) : LW.base;
+    const dash = (typeof curveDash === 'function') ? curveDash(c) : null;
+    const op = (typeof curveOpacity === 'function') ? curveOpacity(c) : 1;
+    /* Участок «рынка здесь нет» — свой штрих и своя граница: это часть записи,
+       а не украшение (см. GHOST_DASH в 30-curves.js). */
+    const ghost = (typeof sumSceneOn === 'function' && sumSceneOn()) ? (c.sumGhostTo || 0) : 0;
+    let ok = false;
+    if (ghost > 1e-9) {
+      ok = drawCurveTex(c.expr, curveOpts(c.color, w, GHOST_DASH, op), 'Q', xFloor, ghost) || ok;
+      ok = drawCurveTex(c.expr, curveOpts(c.color, w, dash, op), 'Q', ghost, Infinity) || ok;
+    } else {
+      ok = drawCurveTex(c.expr, curveOpts(c.color, w, dash, op), 'Q', null, null);
+    }
+    if (!ok) { notes.push('% ' + (curveShortName(c) || 'кривая') + ': формулу pgfplots не понимает'); return; }
+    tally.curves++;
+    const a = (typeof curveLabelAnchor === 'function') ? curveLabelAnchor(c) : null;
+    if (a) putLabel(a.q, a.v, a.txt, c.color, 'south west');
+  });
+
+  /* ⚠️ ВМЕШАТЕЛЬСТВО И ЗАЛИВКИ — ТОЛЬКО В РЫНОЧНОЙ СЦЕНЕ.
+     Поля `taxCurveOn`, `showCS`, `eq` живут в состоянии и переживают
+     переключение сцены. Замер 26.08: выгрузка «Сложения КПВ» унесла в файл
+     кривую S + t и заливки CS/PS с прошлой, налоговой сцены. Спрашиваем
+     режим — тот же признак, по которому сцена и рисуется. */
+  const marketScene = (STATE.mode === 'market');
+
+  /* ── КРИВАЯ ПОСЛЕ ВМЕШАТЕЛЬСТВА ───────────────────────────────────
+     Тот же единственный источник, что и у экрана: texExpr, посчитанный в
+     recompute рядом с самой функцией. */
+  if (marketScene && STATE.taxCurveOn) {
+    const onBuyer = (typeof intervOnBuyer === 'function') ? intervOnBuyer() : false;
+    const after = onBuyer ? STATE.taxAfterD : STATE.taxAfterS;
+    const base = onBuyer ? STATE.D : STATE.S;
+    if (after && after.texExpr && base) {
+      if (drawCurveTex(after.texExpr, curveOpts(base.color, LW.base, '6 4', 1), 'Q', null, null)) {
+        tally.curves++;
+        const isSub = (STATE.intervType === 'subsidy');
+        const pf = (typeof pctForm === 'function') ? pctForm() : null;
+        const nm = onBuyer ? (pf ? pf.curveD : (isSub ? 'D + s' : 'D − t'))
+                           : (pf ? pf.curve : (isSub ? 'S − s' : 'S + t'));
+        const f = (q) => evalCurve(after, q);
+        const a = (typeof curveAnchor === 'function') ? curveAnchor(f, 0.82, 0.04, 'tex-after') : null;
+        if (a) putLabel(a.q, a.v, nm, base.color, 'south west');
+      }
+    }
+  }
+
+  /* ── ЗАЛИВКИ ──────────────────────────────────────────────────────
+     Границы аналитические: сама кривая и прямая цены. Никаких координат,
+     снятых с пикселей. */
+  let pathN = 0;
+  const namedPlot = (pgfBody, lo, hi) => {
+    const nm = 'texp' + (++pathN);
+    body.push('\\addplot[draw=none, name path=' + nm + ', domain=' + num(lo) + ':' + num(hi)
+      + ', samples=' + TEX_STATE_SAMPLES + ', forget plot] {' + pgfBody + '};');
+    return nm;
+  };
+  const fillBetween = (aName, bName, color, opacity, legend) => {
+    needFill = true;
+    body.push('\\addplot[' + colorName(color) + ', opacity=' + opacity.toFixed(2)
+      + ', forget plot] fill between[of=' + aName + ' and ' + bName + '];');
+    tally.areas++;
+    if (legend) notes.push('% заливка: ' + legend);
+  };
+  const areaUnderCurve = (curve, qFrom, qTo, price, color, opacity, legend) => {
+    if (!curve || !curve.expr || !(qTo > qFrom)) return;
+    /* ⚠️ КУСОЧНАЯ КРИВАЯ ЗАЛИВАЕТСЯ ПО УЧАСТКАМ, А НЕ ЦЕЛИКОМ.
+       У суммарного спроса запись кусочная, одной формулой её не залить, и
+       пропускать заливку нельзя: в сцене сложения CS и PS показаны по
+       умолчанию. Границы участков берутся у самой ЗАПИСИ. */
+    const pieces = texCondPieces(curve.expr);
+    if (pieces) {
+      let any = false;
+      pieces.forEach(pc => {
+        const lo = Math.max(pc.lo, qFrom), hi = Math.min(pc.hi, qTo);
+        if (!(hi > lo + 1e-9)) return;
+        const pg = mathToPgf(pc.body, 'Q');
+        if (!pg) return;
+        const a1 = namedPlot(pg, lo, hi);
+        const b1 = namedPlot(String(num(price)), lo, hi);
+        needFill = true;
+        body.push('\\addplot[' + colorName(color) + ', opacity=' + opacity.toFixed(2)
+          + ', forget plot] fill between[of=' + a1 + ' and ' + b1 + '];');
+        any = true;
+      });
+      if (any) {
+        tally.areas++; tally.legend = true;
+        const qMid = qFrom + (qTo - qFrom) * 0.45;
+        const vMid = evalCurve(curve, qMid);
+        if (legend && isFinite(vMid)) putLabel(qMid, (vMid + price) / 2, legend, color, 'center');
+      }
+      return;
+    }
+    const pgf = mathToPgf(curve.expr, 'Q');
+    if (!pgf) return;
+    const a = namedPlot(pgf, qFrom, qTo);
+    const b = namedPlot(String(num(price)), qFrom, qTo);
+    fillBetween(a, b, color, opacity, legend);
+    /* ⚠️ ИМЯ ПЯТНА ПИШЕТСЯ НА САМОМ ПЯТНЕ, А НЕ В УГЛОВОЙ ЛЕГЕНДЕ.
+       Угловая легенда — прямоугольник, посчитанный по пикселям экрана, и в
+       генератор от состояния ей дороги нет. На бумаге подпись внутри области
+       читается даже лучше: не надо сверяться с образцом цвета. */
+    const qMid = qFrom + (qTo - qFrom) * 0.45;
+    const vMid = evalCurve(curve, qMid);
+    if (legend && isFinite(vMid)) putLabel(qMid, (vMid + price) / 2, legend, color, 'center');
+    tally.legend = true;
+  };
+  const eqP = STATE.taxEq ? null : (STATE.eq ? STATE.eq.P : null);
+  const eqQ = marketScene ? (STATE.taxEq ? STATE.taxEq.Q : (STATE.eq ? STATE.eq.Q : null)) : null;
+  if (eqQ != null && eqQ > 0) {
+    const pB = STATE.taxEq ? STATE.taxEq.Pb : eqP;
+    const pS = STATE.taxEq ? STATE.taxEq.Ps : eqP;
+    if (STATE.showCS && STATE.D && pB != null) areaUnderCurve(STATE.D, 0, eqQ, pB, COL.D, 0.18, 'CS');
+    if (STATE.showPS && STATE.S && pS != null) areaUnderCurve(STATE.S, 0, eqQ, pS, COL.S, 0.18, 'PS');
+  }
+
+  const dot = (x, y, color, txt) => {
+    if (!inView(x, y)) return;
+    body.push('\\addplot[' + colorName(color) + ', only marks, mark size=2.0pt, forget plot] coordinates {('
+      + num(x) + ',' + num(y) + ')};');
+    tally.dots++;
+    if (txt) putLabel(x, y, txt, color, 'south west');
+  };
+
+  /* ── СЦЕНЫ, КОТОРЫЕ РИСУЮТ СВОИ КРИВЫЕ САМИ ───────────────────────
+     У «Сложения КПВ» кривых в STATE.curves нет вовсе: сцена держит свои
+     формулы в ppfSum* и свой результат в STATE.ppfSumData. Берём их ОТТУДА —
+     это по-прежнему состояние, а не холст. Суммарная кривая уходит своей
+     закрытой формой, слагаемые — теми формулами, которые набрал человек. */
+  if (STATE.mode === 'ppf' && STATE.ppfSub === 'sum' && STATE.ppfSumData && STATE.ppfSumData.ok) {
+    const d = STATE.ppfSumData;
+    for (let i = 0; i < (d.n || 0); i++) {
+      const src = (typeof ppfSumGet === 'function') ? ppfSumGet(i) : '';
+      const r = (typeof parsePpfEquation === 'function') ? parsePpfEquation(src) : null;
+      /* Правая часть «y = …» и есть та формула, которую человек набрал;
+         неявную и обратную запись pgfplots одной строкой не нарисует, и
+         подсовывать вместо них таблицу точек мы не будем. */
+      const rhs = (r && !r.error && r.kind === 'explicit') ? r.src : null;
+      const fx = (r && !r.error) ? r.f : null;
+      const col = (typeof ppfSumColor === 'function') ? ppfSumColor(i) : COL.D;
+      const xm = (d.xmax || [])[i];
+      // Слагаемая КПВ кончается на СВОЁМ Xmax, а не на краю окна.
+      if (rhs && drawCurveTex(rhs, curveOpts(col, LW.thin, SUM_GROUP_DASH, SUM_GROUP_OPACITY), 'X', 0,
+                              isFinite(xm) ? xm : null)) {
+        tally.curves++;
+        const nm = (typeof ppfSumName === 'function') ? ppfSumName(i) : ('КПВ ' + (i + 1));
+        if (isFinite(xm) && fx) putLabel(xm * 0.55, fx(xm * 0.55), nm, col, 'south west');
+      }
+    }
+    const sumCol = STATE.ppfSumColor || COL.D;
+    if (d.formulaExpr && drawCurveTex(d.formulaExpr, curveOpts(sumCol, LW.bold, null, 1), 'X', 0, null)) {
+      tally.curves++;
+      const yMid = (typeof interpY === 'function' && d.points) ? interpY(d.points, d.Xtot * 0.55) : NaN;
+      putLabel(d.Xtot * 0.55, yMid, 'Сумма', sumCol, 'south west');
+    } else if (!d.formulaExpr) {
+      notes.push('% суммарная КПВ построена численно — закрытой формы у этого набора нет');
+    }
+    (d.kinks || []).forEach(k => dot(k[0], k[1], sumCol, '(' + fmt(k[0]) + '; ' + fmt(k[1]) + ')'));
+  }
+
+  /* ── ТОЧКИ ────────────────────────────────────────────────────────
+     Свои точки человека и взведённые ключевые точки сцены. Координаты — если
+     у точки включена галочка «Координаты». */
+  (STATE.marks || []).forEach(mk => {
+    if (mk.pending) return;
+    const parts = [];
+    if (mk.text) parts.push(mk.text);
+    if (mk.showCoords) parts.push('(' + fmt(mk.x) + '; ' + fmt(mk.y) + ')');
+    dot(mk.x, mk.y, mk.color || COL.ink, parts.join(' '));
+  });
+  if (typeof keyTargets === 'function' && typeof keyPointLit === 'function') {
+    keyTargets().filter(keyPointLit).forEach(p => {
+      dot(p.x, p.y, COL.ink, '(' + fmt(p.x) + '; ' + fmt(p.y) + ')');
+    });
+  }
+
+  /* ── ИТОГОВАЯ ФУНКЦИЯ ─────────────────────────────────────────────
+     Отдельной строкой ПОД картинкой, и латех берётся из того же места, что и
+     блок в «Ключевых значениях»: один и тот же LaTeX на экране и в файле. */
+  const finals = [];
+  const ff = document.getElementById('info-final');
+  if (ff) {
+    ff.querySelectorAll('.ff-math').forEach(m => {
+      const t = (m.getAttribute('data-ff-tex') || '').replace(/\s+/g, ' ').trim();
+      if (t) finals.push(t);
+    });
+  }
+
+  const cap = texText(title || STATE.graphTitle || '');
+  const lab = String(label || '').trim().replace(/[^A-Za-z0-9:_-]/g, '');
+  const xName = texText(STATE.axisXName || STATE.axisXDefault || 'Q');
+  const yName = texText(STATE.axisYName || STATE.axisYDefault || 'P');
+  const uniq = [];
+  notes.forEach(n => { if (uniq.indexOf(n) < 0) uniq.push(n); });
+
+  return [
+    '% Собран калькулятором «Экономика 2.0» из настроек графика. Компилируется обычным pdflatex.',
+    '\\documentclass[12pt,a4paper]{article}',
+    '\\usepackage[T2A]{fontenc}',
+    '\\usepackage[utf8]{inputenc}',
+    '\\usepackage[english,russian]{babel}',
+    '\\usepackage{pgfplots}',
+    '\\pgfplotsset{compat=1.18}',
+    '\\usetikzlibrary{arrows.meta}',
+    needFill ? '\\usepgfplotslibrary{fillbetween}' : '',
+    '\\usepackage{geometry}',
+    '\\geometry{margin=2cm}',
+    ...defs,
+    '',
+    '\\begin{document}',
+    '',
+    '\\begin{figure}[h]',
+    '\\centering',
+    '\\begin{tikzpicture}',
+    '\\begin{axis}[' + [
+      'width=' + texPlotSize().w + 'cm, height=' + texPlotSize().h + 'cm',
+      'scale only axis',
+      'xmin=' + num(xLo) + ', xmax=' + num(xHi) + ', ymin=' + num(yLo) + ', ymax=' + num(yHi),
+      'xlabel={' + xName + '}, ylabel={' + yName + '}',
+      'axis lines=left, axis line style={-{Stealth[length=6pt]}}',
+      'xlabel style={at={(axis description cs:1,0)}, anchor=west}',
+      'ylabel style={at={(axis description cs:0,1)}, anchor=south, rotate=-90}',
+      STATE.showGrid ? 'grid=major, grid style={very thin, gray!25}' : '',
+    ].filter(Boolean).join(', ') + ']',
+    ...uniq,
+    ...body,
+    ...labelNodes,
+    '\\end{axis}',
+    '\\end{tikzpicture}',
+    cap ? '\\caption{' + cap + '}' : '',
+    lab ? '\\label{' + lab + '}' : '',
+    '\\end{figure}',
+    ...finals.map(t => '\\[ ' + t + ' \\]'),
+    '',
+    '\\end{document}',
+  ].filter(s => s !== '').join('\n');
+}
+
+/* СТАРЫЙ сборщик: обход нарисованного SVG. Оставлен до приёмки владельца и
+   доступен параметром адреса `?texLegacy=1`. Удалять его нельзя, пока новый
+   генератор не принят глазами. */
+function buildTexLegacy(title, label) {
   const svgEl = document.getElementById('chart');
   if (!svgEl) return '';
   const { mx, my } = mainScales();
@@ -1521,7 +1914,7 @@ function buildTex(title, label) {
     if (areaSeen.has(k)) return;
     areaSeen.add(k); tally.areas++;
   };
-  buildTex._tally = tally;
+  buildTexLegacy._tally = tally;
   const inView = (x, y) => x >= xLo - 1e-9 && x <= xHi + 1e-9 && y >= yLo - 1e-9 && y <= yHi + 1e-9;
   /* Цвет холста. Заливка им означает «здесь ничего нет»: так рисуются
      подложки и пустые метки. На бумаге фон белый, поэтому переносить такую
@@ -1814,6 +2207,22 @@ function buildTex(title, label) {
     '\\end{document}',
   ].filter(s => s !== '').join('\n');
 }
+/* КАКОЙ СБОРЩИК РАБОТАЕТ.
+   Фаза 11: по умолчанию по-прежнему СТАРЫЙ, новый включается параметром
+   адреса `?texState=1`. Переключение по умолчанию — отдельный стоп-гейт
+   (фаза 12), и делается оно только после зелёного аудита и просмотра
+   собранного PDF глазами. */
+function texWantState() {
+  try { return new URLSearchParams(location.search).get('texState') === '1'; }
+  catch (e) { return false; }
+}
+function buildTex(title, label) {
+  const fromState = texWantState();
+  const out = fromState ? buildTexFromState(title, label) : buildTexLegacy(title, label);
+  buildTex._tally = (fromState ? buildTexFromState._tally : buildTexLegacy._tally) || {};
+  return out;
+}
+
 function exportTex() {
   const title = (document.getElementById('exp-title') || {}).value || '';
   const label = (document.getElementById('exp-label') || {}).value || '';

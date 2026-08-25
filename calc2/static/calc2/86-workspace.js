@@ -1008,7 +1008,9 @@ function ffLatexOf(o) {
     if (!e) return '';
     tex = (typeof mathToLatexField === 'function') ? mathToLatexField(e) : e;
   }
-  return (o && o.lhs) ? (o.lhs + ' = ' + tex) : tex;
+  // Двойной пробел после «=» приезжает из toTex; в LaTeX он безвреден, а в
+  // выгруженном файле читается как описка.
+  return (o && o.lhs) ? (o.lhs + ' = ' + String(tex).replace(/^\s+/, '')) : tex;
 }
 
 /**
