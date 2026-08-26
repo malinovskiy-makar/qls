@@ -125,6 +125,16 @@ def strip_multicols_wrapper(text):
     return _MULTICOLS_RE.sub('', text)
 
 
+#: \begin{center}/\end{center} — центрирование, визуальная обёртка без
+#: текстового смысла (ЛЭШ Гамма: живой пример — картинка внутри center).
+_CENTER_RE = re.compile(r'\\begin\{center\}|\\end\{center\}')
+
+
+def strip_center_wrapper(text):
+    """Убрать обёртку \\begin{center}/\\end{center}, содержимое остаётся."""
+    return _CENTER_RE.sub('', text)
+
+
 #: \hypertarget{id}{текст} (Archive 3, атлас: 85 вхождений) — обёртка-якорь
 #: для навигации по PDF, сам текст внутри второго аргумента виден и нужен.
 _HYPERTARGET_RE = re.compile(r'\\hypertarget\{[^}]*\}\{([^}]*)\}')
@@ -175,7 +185,7 @@ def restore_math(text, protected):
 #: не текста) — CORPUS-FORMAT.md §3, строка «\\medskip, \\bigskip, ...».
 _JUNK_COMMANDS = (
     r'\\medskip', r'\\bigskip', r'\\quad', r'\\qquad',
-    r'\\noindent', r'\\centering',
+    r'\\noindent', r'\\centering', r'\\par\b',
 )
 _JUNK_COMMANDS_RE = re.compile('|'.join(_JUNK_COMMANDS))
 #: \\vspace{...}/\\hspace{...} — команды отступа с обязательным аргументом
@@ -479,6 +489,7 @@ def convert_text_field(text):
     protected_text, notes = extract_footnotes(protected_text)
     protected_text = strip_junk_commands(protected_text)
     protected_text = strip_multicols_wrapper(protected_text)
+    protected_text = strip_center_wrapper(protected_text)
     images = find_images(protected_text)
     protected_text = convert_emphasis(protected_text)
     protected_text = convert_lists(protected_text)

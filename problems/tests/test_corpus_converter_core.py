@@ -5,7 +5,7 @@ from problems.corpus_converter.core import (
     normalize_dashes, normalize_quotes, find_images, convert_text_field,
     convert_problem, strip_control_and_bom_chars, unwrap_math_wrapped_tables,
     reconstruct_orphaned_tabular, strip_multicols_wrapper, strip_hypertarget,
-    strip_junk_commands, convert_tables,
+    strip_junk_commands, convert_tables, strip_center_wrapper,
 )
 
 
@@ -527,6 +527,22 @@ class StripMulticolsWrapperTests(SimpleTestCase):
         self.assertNotIn('multicols', result)
         self.assertIn('а) Вариант 1', result)
         self.assertIn('б) Вариант 2', result)
+
+
+class StripCenterAndParTests(SimpleTestCase):
+    """Scale-up: ЛЭШ Гамма — живой пример: \\par и \\begin{center}...
+    \\end{center} вокруг \\includegraphics оставались сырым текстом."""
+
+    def test_par_removed(self):
+        text = strip_junk_commands('Первая часть.\\par\nВторая часть.')
+        self.assertNotIn('\\par', text)
+
+    def test_center_wrapper_removed_keeps_content(self):
+        from problems.corpus_converter.core import strip_center_wrapper
+        text = '\\begin{center}\n\\includegraphics{img.png}\n\\end{center}'
+        result = strip_center_wrapper(text)
+        self.assertNotIn('center', result)
+        self.assertIn('\\includegraphics{img.png}', result)
 
 
 class StripHypertargetTests(SimpleTestCase):

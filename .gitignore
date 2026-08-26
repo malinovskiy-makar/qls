@@ -65,6 +65,14 @@ reports/*
 reports/corpus_converter_pilot/*
 !reports/corpus_converter_pilot/report.md
 
+# ИСКЛЮЧЕНИЕ: та же логика для ночного масштабирования пилота (2026-08-26)
+# на остальные источники — итоговый report.md читаемый, *_report.md на
+# каждый источник (archive3/matek/lsh2025/reshalki/solvehub/lesh) — большие
+# машинные артефакты, пересобираются соответствующей командой за секунды.
+!reports/corpus_converter_scaleup/
+reports/corpus_converter_scaleup/*
+!reports/corpus_converter_scaleup/report.md
+
 # ИСКЛЮЧЕНИЕ: файлы вердиктов ручного ревью. Это НЕ отчёт, который можно
 # пересобрать командой, а единственная копия многодневной ручной работы
 # ревьюера (три пакета, 6 626 задач). Один раз их уже почти потеряли: разбор
