@@ -438,15 +438,17 @@ def convert_problem(statement, answer='', solution='', existing_parts=None):
             'answer': '',
         })
 
-    if answer:
-        _merge(convert_text_field(answer))
-    if solution:
-        _merge(convert_text_field(solution))
+    answer_result = convert_text_field(answer)
+    answer_md = _merge(answer_result)
+    solution_result = convert_text_field(solution)
+    solution_md = _merge(solution_result)
 
     return {
         'statement_md': statement_md,
         'parts': parts,
         'rubric': None,
+        'answer_md': answer_md,
+        'solution_md': solution_md,
         'images': images,
         'complex_table': complex_table,
         'warnings': warnings,

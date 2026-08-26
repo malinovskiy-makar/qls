@@ -368,3 +368,17 @@ class ConvertProblemTests(SimpleTestCase):
         )
         self.assertEqual(result['images'], [{'original_ref': 'gr.png', 'kind': 'includegraphics'}])
         self.assertTrue(result['complex_table'])
+
+    def test_answer_and_solution_md_are_returned(self):
+        result = convert_problem(
+            statement='Условие.',
+            answer='\\textbf{Ответ}: 42.',
+            solution='Решение с $x^2$.',
+        )
+        self.assertIn('**Ответ**', result['answer_md'])
+        self.assertIn('$x^2$', result['solution_md'])
+
+    def test_answer_and_solution_md_empty_when_not_given(self):
+        result = convert_problem(statement='Условие.')
+        self.assertEqual(result['answer_md'], '')
+        self.assertEqual(result['solution_md'], '')
