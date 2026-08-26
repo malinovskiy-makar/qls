@@ -446,6 +446,17 @@ def append_footnote_notes(text, notes):
     return text + '\n\n' + '\n'.join(lines)
 
 
+#: Строка-разделитель markdown-таблицы ("| --- | --- |") — синтаксис,
+#: обязательный для markdown-it (`_tabular_to_markdown` его и порождает).
+#: Найдено ревью 2026-08-26 при подготовке HTML-страницы для визуального
+#: просмотра: normalize_dashes уже трогала эту строку, "---" превращался
+#: в "—", markdown-it переставал узнавать таблицу вовсе (весь текст
+#: рендерился одним <p> с сырыми "|" вместо <table>) — конвертер
+#: производил разметку, которую собственный проверенный движок
+#: `problems/rendering.py` показывал бы студенту сломанной.
+_TABLE_DELIMITER_ROW_RE = re.compile(r'^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$')
+
+
 def normalize_dashes(text):
     """--- -> —, -- -> –, ' - ' (тире между словами) -> ' — '.
 
@@ -453,11 +464,20 @@ def normalize_dashes(text):
     всегда часть слова (составное существительное) или знак минуса перед
     числом, а не тире (CORPUS-FORMAT.md §3 обсуждает только сам факт
     нормализации, различение "тире vs дефис" — эвристика этой сессии,
-    задокументированная явно, а не молчаливое допущение)."""
-    text = text.replace('---', '—')
-    text = text.replace('--', '–')
-    text = re.sub(r'(?<=\S) - (?=\S)', ' — ', text)
-    return text
+    задокументированная явно, а не молчаливое допущение).
+
+    Строки-разделители markdown-таблиц не трогаются вовсе — построчно,
+    не одной заменой по всему тексту (см. _TABLE_DELIMITER_ROW_RE)."""
+    out_lines = []
+    for line in text.split('\n'):
+        if _TABLE_DELIMITER_ROW_RE.match(line.strip()):
+            out_lines.append(line)
+            continue
+        line = line.replace('---', '—')
+        line = line.replace('--', '–')
+        line = re.sub(r'(?<=\S) - (?=\S)', ' — ', line)
+        out_lines.append(line)
+    return '\n'.join(out_lines)
 
 
 #: Прямые кавычки режутся ПАРАМИ по очереди: первая пара -> «», вторая

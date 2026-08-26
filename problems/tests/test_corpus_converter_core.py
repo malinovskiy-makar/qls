@@ -244,6 +244,30 @@ class NormalizeDashesTests(SimpleTestCase):
         # Составное слово — не тире, трогать нельзя.
         self.assertEqual(normalize_dashes('объект-договор'), 'объект-договор')
 
+    def test_table_delimiter_row_untouched(self):
+        # Дефект, найден ревью 2026-08-26 при подготовке страницы визуального
+        # просмотра: "---" в разделителе markdown-таблицы превращался в "—",
+        # markdown-it переставал узнавать таблицу вовсе (весь текст рендерился
+        # одним <p> с сырыми "|" вместо <table> — то, что видел бы студент).
+        line = '| --- | --- | --- |'
+        self.assertEqual(normalize_dashes(line), line)
+
+    def test_table_delimiter_row_untouched_inside_full_table(self):
+        text = (
+            '| Показатель | Значение |\n'
+            '| --- | --- |\n'
+            '| Q | 10 |'
+        )
+        self.assertEqual(normalize_dashes(text), text)
+
+    def test_prose_dashes_still_normalized_around_table(self):
+        # Разделитель не трогается, а обычное тире рядом — как обычно.
+        text = 'До таблицы---тире.\n| --- | --- |\nПосле---тире.'
+        result = normalize_dashes(text)
+        self.assertIn('До таблицы—тире.', result)
+        self.assertIn('| --- | --- |', result)
+        self.assertIn('После—тире.', result)
+
     def test_hyphen_in_negative_number_untouched(self):
         self.assertEqual(normalize_dashes('температура -5 градусов'), 'температура -5 градусов')
 
@@ -335,6 +359,26 @@ class RendererRoundTripTests(SimpleTestCase):
         self.assertIn('<strong>Фирма</strong>', html)
         self.assertIn('<li>Спрос</li>', html)
         self.assertIn('$\\pi = P \\cdot Q - C(Q)$', html)
+
+    def test_reconstructed_table_actually_renders_as_html_table(self):
+        # Дефект, найден ревью 2026-08-26 (задача #33817, "Найдите все
+        # равновесия Нэша..."): normalize_dashes портила служебный "---"
+        # разделитель markdown-таблицы, markdown-it переставал видеть
+        # таблицу вовсе — прод-рендерер показал бы сплошной <p> с "|" вместо
+        # <table>. Проверяем ИМЕННО прод-функцией render_markdown, не только
+        # промежуточный text_md, — это и есть то, что увидит студент.
+        from problems.rendering import render_markdown
+        text = (
+            'Найдите все равновесия Нэша в следующей игре:\n\n\n\n'
+            ' & $ s_1 $ & $ s_2 $\n\n'
+            ' $t_1$ & (100, 10) & (10, 11)\n\n'
+            ' $t_2$ & (110, 5) & (15, 5)'
+        )
+        result = convert_text_field(text)
+        html = render_markdown(result['text_md'])
+        self.assertIn('<table>', html)
+        self.assertIn('<td>$t_1$</td>', html)
+        self.assertIn('<td>(100, 10)</td>', html)
 
 
 class ConvertProblemTests(SimpleTestCase):
