@@ -167,6 +167,54 @@ def has_unreconstructed_bare_ampersand_rows(text):
     return bool(_BARE_AMPERSAND_ROW_RE.search(text))
 
 
+#: Ревью 2026-08-26 (владелец лично просмотрел review_samples.html):
+#: `\begin{cases}...\end{cases}` — тот же баг импорта, что и у таблиц выше
+#: (построчный `\\` потерян, строки разошлись по пустым строкам), но это
+#: НЕ table-специфичный дефект: сигнал — пустая строка между сегментами,
+#: не `&` (живой пример #28255, МатЭк: `100-0.25x,0\leq x\leq 80` — строки
+#: без единого `&`, разделены запятой и пустой строкой). Прежняя страховка
+#: (`_BARE_AMPERSAND_ROW_RE`) требует `&` в каждой строке и потому не ловила
+#: этот вариант вовсе — сломанный cases проходил без единого warning.
+#: Замерено заново по всем 4 легаси-источникам (честный пересчёт, старая
+#: цифра 164 сильно занижена — см. report.md).
+_CASES_BLOCK_RE = re.compile(r'\\begin\{cases\}(.*?)\\end\{cases\}', re.DOTALL)
+
+
+def reconstruct_cases_row_separators(text):
+    """Восстановить `\\\\` между строками `\\begin{cases}`, если они
+    разошлись по пустым строкам — единственный надёжный сигнал границы
+    строки здесь пустая строка, `&` не обязателен (в отличие от таблиц,
+    cases не превращается в другую структуру — обёртка `\\begin{cases}`
+    уже на месте, чинится только разделитель внутри неё).
+
+    Срабатывает, только если сегментов минимум два (однозначно) — при
+    одном сегменте (нет пустой строки вовсе) гадать не из чего, оставляем
+    как есть, дальше это поймает has_unreconstructed_cases_rows."""
+    def repl(match):
+        body = match.group(1)
+        if '\\\\' in body:
+            return match.group(0)
+        segments = [seg.strip() for seg in re.split(r'\n[ \t]*\n', body) if seg.strip()]
+        if len(segments) < 2:
+            return match.group(0)
+        segments = [' '.join(seg.split()) for seg in segments]
+        return '\\begin{cases}' + ' \\\\ '.join(segments) + '\\end{cases}'
+
+    return _CASES_BLOCK_RE.sub(repl, text)
+
+
+def has_unreconstructed_cases_rows(text):
+    """После reconstruct_cases_row_separators — остались ли `\\begin{cases}`
+    без `\\\\` (реконструировать не удалось: меньше двух сегментов по
+    пустым строкам, гадать нельзя). Ловит ОБА паттерна дефекта — со
+    строками через `&` и без него — независимо от _BARE_AMPERSAND_ROW_RE,
+    которая видит только табличный вариант."""
+    for match in _CASES_BLOCK_RE.finditer(text):
+        if '\\\\' not in match.group(1):
+            return True
+    return False
+
+
 #: Archive 3 (атлас, "Ловушка №2"): в 147 из 164 задач с `tabular` нет ни
 #: одного `\\\\` — построчные разделители срезаны при импорте, строки
 #: разошлись по пустым строкам (проверено по живым задачам #43945/#43880).
@@ -566,12 +614,23 @@ def convert_text_field(text):
     text = strip_hypertarget(text)
     text = unwrap_math_wrapped_tables(text)
     text = reconstruct_orphaned_tabular(text)
+    # cases — ДО bare_ampersand_table: уже починенный cases-блок (внутри
+    # него теперь есть \\) не должен больше выглядеть как кандидат в
+    # таблицу для следующего шага.
+    text = reconstruct_cases_row_separators(text)
     text = reconstruct_bare_ampersand_table(text)
     bare_amp_unresolved = has_unreconstructed_bare_ampersand_rows(text)
     if bare_amp_unresolved:
         warnings.append(
             'голые "&"-строки без \\begin{tabular} не удалось разобрать как таблицу '
             '(похоже на кусочную функцию без обёртки \\begin{cases}, либо меньше двух строк) '
+            '— в очередь на ручной разбор'
+        )
+    cases_unresolved = has_unreconstructed_cases_rows(text)
+    if cases_unresolved:
+        warnings.append(
+            'сломанный \\begin{cases}: построчный разделитель \\\\ потерян, восстановить '
+            'однозначно не удалось (меньше двух сегментов по пустым строкам) '
             '— в очередь на ручной разбор'
         )
     text = wrap_bare_environments(text)
@@ -586,7 +645,7 @@ def convert_text_field(text):
     protected_text, complex_table = convert_tables(protected_text)
     if complex_table:
         warnings.append('сложная таблица (multicolumn/multirow) — в очередь на ручной разбор')
-    complex_table = complex_table or bare_amp_unresolved
+    complex_table = complex_table or bare_amp_unresolved or cases_unresolved
     # Тире/кавычки — на ЕЩЁ защищённом тексте (плейсхолдеры математики
     # состоят только из цифр между служебными символами PUA, дефисов и
     # кавычек в них нет), а не после restore_math: иначе буквальный ' - '

@@ -7,6 +7,7 @@ from problems.corpus_converter.core import (
     reconstruct_orphaned_tabular, strip_multicols_wrapper, strip_hypertarget,
     strip_junk_commands, convert_tables, strip_center_wrapper,
     reconstruct_bare_ampersand_table, has_unreconstructed_bare_ampersand_rows,
+    reconstruct_cases_row_separators, has_unreconstructed_cases_rows,
 )
 
 
@@ -611,11 +612,157 @@ class HasUnreconstructedBareAmpersandRowsTests(SimpleTestCase):
     def test_does_not_flag_plain_text_without_ampersand(self):
         self.assertFalse(has_unreconstructed_bare_ampersand_rows('Обычный текст без таблиц.'))
 
-    def test_full_pipeline_warns_and_flags_complex_table_on_broken_cases_block(self):
+    def test_full_pipeline_now_reconstructs_cases_with_blank_line_rows(self):
+        # Раньше (до reconstruct_cases_row_separators) этот cases не
+        # чинился, только флагировался — теперь пустая строка между
+        # строками cases однозначно реконструируется (см. новый класс
+        # ReconstructCasesRowSeparatorsTests ниже), поэтому и полный
+        # конвейер больше не должен на нём предупреждать.
         text = '\\begin{cases}0,5x & x<1\n\n1,5x-0,5 & x\\ge 1\\end{cases}'
         result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertNotIn('\\begin{cases}0,5x & x<1\n', result['text_md'])
+        self.assertIn('0,5x & x<1 \\\\ 1,5x-0,5 & x\\ge 1', result['text_md'])
+
+    def test_full_pipeline_warns_on_genuinely_ambiguous_cases_block(self):
+        # Ни одной пустой строки — строки cases слиплись в одну без
+        # единого разделителя, реконструировать однозначно нельзя.
+        text = '\\begin{cases}0,5x & x<1 1,5x-0,5 & x\\ge 1\\end{cases}'
+        result = convert_text_field(text)
         self.assertTrue(result['complex_table'])
-        self.assertTrue(any('ручной разбор' in w for w in result['warnings']))
+        self.assertTrue(any('сломанный \\begin{cases}' in w for w in result['warnings']))
+
+
+class ReconstructCasesRowSeparatorsTests(SimpleTestCase):
+    """Ревью 2026-08-26 (владелец лично просмотрел review_samples.html):
+    \\begin{cases} с потерянным построчным \\\\ — тот же баг импорта, что
+    у таблиц, но сигнал — пустая строка, не '&' (живой пример #28255:
+    строки вовсе без '&'). Честный пересчёт по всем 4 легаси-источникам
+    показал вместо старых 164 гораздо больший масштаб — см. report.md."""
+
+    def test_reconstructs_rows_with_ampersand_condition(self):
+        text = '\\begin{cases}a & x<1\n\nb & x\\ge 1\\end{cases}'
+        result = reconstruct_cases_row_separators(text)
+        self.assertEqual(result, '\\begin{cases}a & x<1 \\\\ b & x\\ge 1\\end{cases}')
+
+    def test_reconstructs_rows_without_ampersand(self):
+        # Живой паттерн #28255: строки без единого '&', разделены запятой
+        # внутри строки и пустой строкой между строками.
+        text = '\\begin{cases}100-0.25x,0\\leq x\\leq 80\n\n160-x, 80\\leq x\\leq 160\\end{cases}'
+        result = reconstruct_cases_row_separators(text)
+        self.assertNotIn('\n\n', result)
+        self.assertIn('100-0.25x,0\\leq x\\leq 80 \\\\ 160-x, 80\\leq x\\leq 160', result)
+
+    def test_does_not_touch_already_correct_cases(self):
+        text = '\\begin{cases}a & x<1\\\\b & x\\ge 1\\end{cases}'
+        self.assertEqual(reconstruct_cases_row_separators(text), text)
+
+    def test_single_segment_left_alone(self):
+        # Нет пустой строки вовсе — реконструировать не из чего.
+        text = '\\begin{cases}a & x<1\\end{cases}'
+        self.assertEqual(reconstruct_cases_row_separators(text), text)
+
+    def test_three_or_more_segments_reconstructed(self):
+        text = '\\begin{cases}a\n\nb\n\nc\\end{cases}'
+        result = reconstruct_cases_row_separators(text)
+        self.assertEqual(result, '\\begin{cases}a \\\\ b \\\\ c\\end{cases}')
+
+    def test_multiple_cases_blocks_in_one_text_each_handled(self):
+        text = (
+            'Первая: \\begin{cases}a\n\nb\\end{cases}. '
+            'Вторая: \\begin{cases}c\n\nd\\end{cases}.'
+        )
+        result = reconstruct_cases_row_separators(text)
+        self.assertIn('\\begin{cases}a \\\\ b\\end{cases}', result)
+        self.assertIn('\\begin{cases}c \\\\ d\\end{cases}', result)
+
+
+class HasUnreconstructedCasesRowsTests(SimpleTestCase):
+    def test_flags_when_reconstruction_impossible(self):
+        text = '\\begin{cases}a & x<1 b & x\\ge 1\\end{cases}'
+        self.assertTrue(has_unreconstructed_cases_rows(text))
+
+    def test_does_not_flag_after_successful_reconstruction(self):
+        text = reconstruct_cases_row_separators('\\begin{cases}a\n\nb\\end{cases}')
+        self.assertFalse(has_unreconstructed_cases_rows(text))
+
+    def test_does_not_flag_well_formed_cases(self):
+        text = '\\begin{cases}a & x<1\\\\b & x\\ge 1\\end{cases}'
+        self.assertFalse(has_unreconstructed_cases_rows(text))
+
+    def test_does_not_flag_text_without_cases(self):
+        self.assertFalse(has_unreconstructed_cases_rows('Обычный текст.'))
+
+
+class RealDataCasesRegressionTests(SimpleTestCase):
+    """Пять живых примеров ревью 2026-08-26 — по каждому подтверждена
+    методология «откат фикса → тест краснеет → фикс восстановлен → тест
+    зелёный»."""
+
+    def test_archive3_41612_cases_with_blank_line_and_ampersand(self):
+        text = (
+            '\\[ U^\\theta(q,p) = \n'
+            '\\begin{cases}\n'
+            '\\theta\\sqrt{q} - p, & если покупатель приобретает товар \n\n'
+            '0, & если отказывается от покупки\n'
+            '\\end{cases} \\]'
+        )
+        result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertEqual(result['warnings'], [])
+        self.assertIn('\\theta\\sqrt{q} - p, & если покупатель приобретает товар \\\\', result['text_md'])
+        self.assertIn('0, & если отказывается от покупки', result['text_md'])
+
+    def test_matek_26337_cases_with_semicolon_and_ampersand(self):
+        text = (
+            '\\[\nQ(L,K) = min(L^2,K) =\n'
+            '\\begin{cases}\n'
+            'L^2 ; & L^2 \\leq K \n\n'
+            'K; & L^2 > K\n'
+            '\\end{cases}\n\\]'
+        )
+        result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertEqual(result['warnings'], [])
+        self.assertIn('L^2 ; & L^2 \\leq K \\\\ K; & L^2 > K', result['text_md'])
+
+    def test_reshalki_47113_multiple_cases_blocks_in_one_field(self):
+        # Решалки Олмат — источник, где баг раньше вообще не измерялся.
+        text = (
+            '$$\nTC(Q) = \n\\begin{cases}\n'
+            ' 16Q + C, & если Q > 0 \n\n'
+            ' 0, & если Q = 0\n'
+            '\\end{cases}\n$$'
+        )
+        result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertEqual(result['warnings'], [])
+        self.assertIn('16Q + C, & если Q > 0 \\\\ 0, & если Q = 0', result['text_md'])
+
+    def test_reshalki_47137_cases_inside_multicols(self):
+        text = (
+            '\\begin{multicols}{2}\n'
+            '$$U_{м}=\\begin{cases}\n x_{м}, & x_{м}+x_{ж}\\leq1;\n\n'
+            ' 0, & иначе\n\\end{cases}$$\n'
+            '\\end{multicols}'
+        )
+        result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertEqual(result['warnings'], [])
+        self.assertIn('x_{м}, & x_{м}+x_{ж}\\leq1; \\\\ 0, & иначе', result['text_md'])
+        self.assertNotIn('multicols', result['text_md'])
+
+    def test_matek_28255_cases_without_any_ampersand(self):
+        # Дефект, который старая страховка вообще не ловила: строки без
+        # единого '&', разделены запятой и пустой строкой.
+        text = (
+            'Уравнение: $y=\\begin{cases}100-0.25x,0\\leq x\\leq 80\n\n'
+            '160-x, 80\\leq x\\leq 160\\end{cases}$'
+        )
+        result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertEqual(result['warnings'], [])
+        self.assertIn('100-0.25x,0\\leq x\\leq 80 \\\\ 160-x, 80\\leq x\\leq 160', result['text_md'])
 
 
 class StripMulticolsWrapperTests(SimpleTestCase):
