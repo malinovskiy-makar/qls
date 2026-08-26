@@ -23,6 +23,16 @@ class WrapBareEnvironmentsTests(SimpleTestCase):
         result = wrap_bare_environments(text)
         self.assertEqual(text, result)
 
+    def test_wraps_bare_align_star(self):
+        text = 'Вычислим.\n\\begin{align*}\nx = 1\n\\end{align*}\nГотово.'
+        result = wrap_bare_environments(text)
+        self.assertIn('$$\n\\begin{align*}\nx = 1\n\\end{align*}\n$$', result)
+
+    def test_wraps_bare_equation_star(self):
+        text = '\\begin{equation*}\ny = 2x\n\\end{equation*}'
+        result = wrap_bare_environments(text)
+        self.assertIn('$$\n\\begin{equation*}\ny = 2x\n\\end{equation*}\n$$', result)
+
 
 class ProtectMathTests(SimpleTestCase):
     def test_protects_and_restores_dollar_math(self):

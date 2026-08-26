@@ -16,7 +16,7 @@ from problems.rendering import _protect_math_and_currency, _restore_math_and_cur
 #: Приложение, п.1) и никогда не оборачивается само по себе.
 _BARE_ENV_NAMES = ('equation', 'align', 'gather')
 _BARE_ENV_RE = re.compile(
-    r'\\begin\{(' + '|'.join(_BARE_ENV_NAMES) + r'\*?)\}.*?\\end\{\1\}',
+    r'\\begin\{(' + '|'.join(f'{name}\\*?' for name in _BARE_ENV_NAMES) + r')\}.*?\\end\{\1\}',
     re.DOTALL,
 )
 
