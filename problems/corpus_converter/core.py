@@ -313,3 +313,64 @@ def find_images(text):
         images.append({'original_ref': match.group(0), 'kind': 'url'})
 
     return images
+
+
+def convert_text_field(text):
+    """Один текстовый кусок (statement/answer/solution/criteria/часть
+    подпункта) через весь конвейер, в порядке, обязательном по §2б/§3:
+
+    1. TeX-комментарии — до всего остального (иначе '%' может съесть
+       часть уже преобразованной разметки на следующих шагах);
+    2. \\color/\\textcolor — до bold/italic (снимает обёртку, которая
+       иначе помешала бы regex увидеть \\textbf изнутри);
+    3. обернуть голые equation/align/gather — ДО защиты математики, чтобы
+       новая обёртка $$ была защищена вместе со всем остальным;
+    4. защитить математику плейсхолдерами — всё, что дальше, физически
+       не видит формулу (значит не может её сломать);
+    5. вынести сноски (текст сноски может содержать плейсхолдеры формул —
+       восстановятся на шаге 8 вместе с остальным текстом);
+    6. убрать junk-команды, картинки — зафиксировать, не трогая текст;
+    7. bold/italic, списки, таблицы;
+    8. тире/кавычки — НА ЗАЩИЩЁННОМ тексте, ДО восстановления математики
+       (плейсхолдер — это чистые цифры между служебными символами PUA,
+       дефисов и кавычек в нём нет, значит замена его не заденет; а вот
+       обратный порядок задевает — round-trip тест поймал живой пример:
+       буквальный ' - ' внутри формулы вроде '$\\pi=P\\cdot Q-C(Q)$'
+       после restore снова видим как текст и превращается в '—');
+    9. вернуть математику на место;
+    10. дописать сноски в конец.
+    """
+    if not text:
+        return {'text_md': '', 'images': [], 'complex_table': False, 'warnings': []}
+
+    warnings = []
+    text = strip_tex_comments(text)
+    text = strip_color(text)
+    text = wrap_bare_environments(text)
+    protected_text, protected = protect_math(text)
+    protected_text, notes = extract_footnotes(protected_text)
+    protected_text = strip_junk_commands(protected_text)
+    images = find_images(protected_text)
+    protected_text = convert_emphasis(protected_text)
+    protected_text = convert_lists(protected_text)
+    protected_text, complex_table = convert_tables(protected_text)
+    if complex_table:
+        warnings.append('сложная таблица (multicolumn/multirow) — в очередь на ручной разбор')
+    # Тире/кавычки — на ЕЩЁ защищённом тексте (плейсхолдеры математики
+    # состоят только из цифр между служебными символами PUA, дефисов и
+    # кавычек в них нет), а не после restore_math: иначе буквальный ' - '
+    # или '"' внутри самой формулы (например '$\\pi = P \\cdot Q - C(Q)$')
+    # снова становится видимым текстом и ловится этими же regex —
+    # round-trip тест через problems.rendering.render_markdown поймал
+    # именно эту порчу при обратном порядке.
+    protected_text = normalize_dashes(protected_text)
+    protected_text = normalize_quotes(protected_text)
+    restored = restore_math(protected_text, protected)
+    restored = append_footnote_notes(restored, [restore_math(note, protected) for note in notes])
+
+    return {
+        'text_md': restored,
+        'images': images,
+        'complex_table': complex_table,
+        'warnings': warnings,
+    }

@@ -2,7 +2,7 @@ from django.test import SimpleTestCase
 
 from problems.corpus_converter.core import (
     wrap_bare_environments, protect_math, restore_math,
-    normalize_dashes, normalize_quotes, find_images,
+    normalize_dashes, normalize_quotes, find_images, convert_text_field,
 )
 
 
@@ -272,3 +272,52 @@ class FindImagesTests(SimpleTestCase):
 
     def test_no_images_returns_empty_list(self):
         self.assertEqual(find_images('Обычный текст без картинок.'), [])
+
+
+class ConvertTextFieldTests(SimpleTestCase):
+    def test_empty_text_returns_empty_result(self):
+        result = convert_text_field('')
+        self.assertEqual(result, {
+            'text_md': '', 'images': [], 'complex_table': False, 'warnings': [],
+        })
+
+    def test_full_pipeline_on_mixed_latex_text(self):
+        text = (
+            'Фирма \\textbf{"Ромашка"} максимизирует прибыль\\footnote{см. отчёт}.'
+            '\\medskip\n'
+            'Цена $P^*=10$ упала на 20\\%---сильно.\n'
+            '\\begin{itemize}\\item Спрос\\item Предложение\\end{itemize}'
+        )
+        result = convert_text_field(text)
+        self.assertIn('**«Ромашка»**', result['text_md'])
+        self.assertIn('$P^*=10$', result['text_md'])
+        self.assertIn('20\\%', result['text_md'])
+        self.assertIn('—сильно', result['text_md'])
+        self.assertIn('- Спрос', result['text_md'])
+        self.assertIn('- Предложение', result['text_md'])
+        self.assertIn('Примечание: см. отчёт', result['text_md'])
+        self.assertNotIn('\\medskip', result['text_md'])
+        self.assertNotIn('\\textbf', result['text_md'])
+        self.assertFalse(result['complex_table'])
+
+    def test_math_survives_full_pipeline_untouched(self):
+        text = 'Оптимум $Q^*=20$ и $P^*=5$, индекс $x_1$ и $x_2$.'
+        result = convert_text_field(text)
+        self.assertIn('$Q^*=20$', result['text_md'])
+        self.assertIn('$P^*=5$', result['text_md'])
+        self.assertIn('$x_1$', result['text_md'])
+        self.assertIn('$x_2$', result['text_md'])
+
+
+class RendererRoundTripTests(SimpleTestCase):
+    def test_converted_output_renders_without_crashing(self):
+        from problems.rendering import render_markdown
+        text = (
+            '\\textbf{Фирма} максимизирует $\\pi = P \\cdot Q - C(Q)$.\n'
+            '\\begin{itemize}\\item Спрос\\item Предложение\\end{itemize}'
+        )
+        result = convert_text_field(text)
+        html = render_markdown(result['text_md'])
+        self.assertIn('<strong>Фирма</strong>', html)
+        self.assertIn('<li>Спрос</li>', html)
+        self.assertIn('$\\pi = P \\cdot Q - C(Q)$', html)
