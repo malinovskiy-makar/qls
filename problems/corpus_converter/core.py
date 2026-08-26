@@ -110,6 +110,63 @@ def reconstruct_orphaned_tabular(text):
     return _ORPHAN_TABLE_BLOCK_RE.sub(repl, text)
 
 
+#: Archive 3 (ревью 2026-08-26, задача #33817): другой сорт осиротевшей
+#: таблицы, чем у МатЭк выше — строки держатся ГОЛЫМИ `&`, без единого
+#: `\hline` вообще, разделены пустыми строками. Замерено по всей базе
+#: Archive 3 (13699 задач, только чтение): 19 задач после исключения
+#: ложных срабатываний внутри `\begin{cases}` (кусочная функция — тоже
+#: использует `&`, но это не таблица).
+_BARE_AMPERSAND_ROW_RE = re.compile(
+    r'(?:[^\n]*&[^\n]*\n[ \t]*\n){1,}[^\n]*&[^\n]*'
+)
+
+
+def _is_inside_cases_block(text, start, end):
+    """span [start, end) целиком внутри \\begin{cases}...\\end{cases}?
+    Кусочная функция тоже пишется через '&', но это не табличные данные —
+    оборачивать её в tabular значило бы исказить смысл, не просто формат."""
+    for match in re.finditer(r'\\begin\{cases\}.*?\\end\{cases\}', text, re.DOTALL):
+        if match.start() <= start and end <= match.end():
+            return True
+    return False
+
+
+def reconstruct_bare_ampersand_table(text):
+    """Обернуть блок голых `&`-строк (без `\\hline`, без `\\begin{tabular}`)
+    в синтетический tabular. Не трогает блоки внутри `\\begin{cases}` —
+    видит их, чтобы дальнейшая проверка (has_unreconstructed_table_markup)
+    не молчала о них, но не оборачивает как таблицу."""
+    if '\\begin{tabular}' in text:
+        return text
+
+    def repl(match):
+        if _is_inside_cases_block(text, match.start(), match.end()):
+            return match.group(0)
+        rows = [row.strip() for row in match.group(0).split('\n') if row.strip() and '&' in row]
+        if len(rows) < 2:
+            return match.group(0)
+        width = max(row.count('&') + 1 for row in rows)
+        cols = 'l' * width
+        body = ' \\\\ '.join(rows)
+        return f'\\begin{{tabular}}{{{cols}}}{body}\\end{{tabular}}'
+
+    return _BARE_AMPERSAND_ROW_RE.sub(repl, text)
+
+
+def has_unreconstructed_bare_ampersand_rows(text):
+    """После обеих попыток реконструкции (\\hline-стиль МатЭк и голый
+    стиль Archive 3 выше) голые `&`-строки могут остаться БЕЗ
+    `\\begin{tabular}` — блок внутри `\\begin{cases}` (не таблица, трогать
+    нельзя) или строк меньше двух (реконструировать не из чего). Раньше
+    такой текст молча терял структуру: ни warning, ни complex_table.
+    Вызывается ПОСЛЕ reconstruct_orphaned_tabular/reconstruct_bare_
+    ampersand_table в конвейере, поэтому оставшееся совпадение — уже
+    не то, что эти функции способны обработать сами."""
+    if '\\begin{tabular}' in text:
+        return False
+    return bool(_BARE_AMPERSAND_ROW_RE.search(text))
+
+
 #: Archive 3 (атлас, "Ловушка №2"): в 147 из 164 задач с `tabular` нет ни
 #: одного `\\\\` — построчные разделители срезаны при импорте, строки
 #: разошлись по пустым строкам (проверено по живым задачам #43945/#43880).
@@ -484,6 +541,14 @@ def convert_text_field(text):
     text = strip_hypertarget(text)
     text = unwrap_math_wrapped_tables(text)
     text = reconstruct_orphaned_tabular(text)
+    text = reconstruct_bare_ampersand_table(text)
+    bare_amp_unresolved = has_unreconstructed_bare_ampersand_rows(text)
+    if bare_amp_unresolved:
+        warnings.append(
+            'голые "&"-строки без \\begin{tabular} не удалось разобрать как таблицу '
+            '(похоже на кусочную функцию без обёртки \\begin{cases}, либо меньше двух строк) '
+            '— в очередь на ручной разбор'
+        )
     text = wrap_bare_environments(text)
     protected_text, protected = protect_math(text)
     protected_text, notes = extract_footnotes(protected_text)
@@ -496,6 +561,7 @@ def convert_text_field(text):
     protected_text, complex_table = convert_tables(protected_text)
     if complex_table:
         warnings.append('сложная таблица (multicolumn/multirow) — в очередь на ручной разбор')
+    complex_table = complex_table or bare_amp_unresolved
     # Тире/кавычки — на ЕЩЁ защищённом тексте (плейсхолдеры математики
     # состоят только из цифр между служебными символами PUA, дефисов и
     # кавычек в них нет), а не после restore_math: иначе буквальный ' - '

@@ -6,6 +6,7 @@ from problems.corpus_converter.core import (
     convert_problem, strip_control_and_bom_chars, unwrap_math_wrapped_tables,
     reconstruct_orphaned_tabular, strip_multicols_wrapper, strip_hypertarget,
     strip_junk_commands, convert_tables, strip_center_wrapper,
+    reconstruct_bare_ampersand_table, has_unreconstructed_bare_ampersand_rows,
 )
 
 
@@ -517,6 +518,62 @@ class TabularMissingRowSeparatorsTests(SimpleTestCase):
         self.assertIn('Одна строка без пары', result)
 
 
+class ReconstructBareAmpersandTableTests(SimpleTestCase):
+    """Scale-up ревью 2026-08-26: Archive 3, задача #33817 — голые
+    '&'-строки без \\hline и без \\begin{tabular}, замерено 19 задач по
+    всей базе Archive 3 после исключения ложных срабатываний внутри
+    \\begin{cases}."""
+
+    def test_wraps_bare_rows_without_hline(self):
+        text = ' & A & B\n\nстрока1 & 1 & 2\n\nстрока2 & 3 & 4'
+        result = reconstruct_bare_ampersand_table(text)
+        self.assertIn('\\begin{tabular}', result)
+        self.assertIn('\\end{tabular}', result)
+
+    def test_does_not_touch_text_inside_cases_block(self):
+        # Кусочная функция через '&' — это математика, не таблица;
+        # оборачивать её в tabular исказило бы смысл.
+        text = '$$\\begin{cases}0,5x & x<1\\\\1,5x-0,5 & x\\ge 1\\end{cases}$$'
+        self.assertEqual(reconstruct_bare_ampersand_table(text), text)
+
+    def test_single_row_left_alone(self):
+        text = 'Одна строка & без пары'
+        self.assertEqual(reconstruct_bare_ampersand_table(text), text)
+
+    def test_does_not_touch_already_wrapped_tabular(self):
+        text = '\\begin{tabular}{|l|}\\hline X\\hline\\end{tabular}'
+        self.assertEqual(reconstruct_bare_ampersand_table(text), text)
+
+
+class HasUnreconstructedBareAmpersandRowsTests(SimpleTestCase):
+    """Страховка: то, что reconstruct_bare_ampersand_table не смог
+    обработать сам (кусочная функция без обёртки \\begin{cases}, либо
+    меньше двух строк), обязано быть замечено, а не пройти молча."""
+
+    def test_flags_bare_rows_inside_cases_block_left_untouched(self):
+        # Кусочная функция с ТЕМ ЖЕ дефектом, что и таблицы Archive 3:
+        # построчные разделители внутри \begin{cases} срезаны, строки
+        # разошлись пустыми строками вместо '\\'. reconstruct_bare_
+        # ampersand_table намеренно её не трогает (это не таблица) — но
+        # молчать об оставшемся мусоре нельзя.
+        text = '\\begin{cases}0,5x & x<1\n\n1,5x-0,5 & x\\ge 1\\end{cases}'
+        self.assertTrue(has_unreconstructed_bare_ampersand_rows(text))
+
+    def test_does_not_flag_after_successful_reconstruction(self):
+        text = ' & A & B\n\nстрока1 & 1 & 2\n\nстрока2 & 3 & 4'
+        reconstructed = reconstruct_bare_ampersand_table(text)
+        self.assertFalse(has_unreconstructed_bare_ampersand_rows(reconstructed))
+
+    def test_does_not_flag_plain_text_without_ampersand(self):
+        self.assertFalse(has_unreconstructed_bare_ampersand_rows('Обычный текст без таблиц.'))
+
+    def test_full_pipeline_warns_and_flags_complex_table_on_broken_cases_block(self):
+        text = '\\begin{cases}0,5x & x<1\n\n1,5x-0,5 & x\\ge 1\\end{cases}'
+        result = convert_text_field(text)
+        self.assertTrue(result['complex_table'])
+        self.assertTrue(any('ручной разбор' in w for w in result['warnings']))
+
+
 class StripMulticolsWrapperTests(SimpleTestCase):
     """Scale-up: Overleaf Archive 3, атлас — 243 задачи, multicols — вёрстка
     вариантов ответа в колонки, не таблица."""
@@ -585,6 +642,26 @@ class RealDataRegressionTests(SimpleTestCase):
         self.assertFalse(result['complex_table'])
         self.assertIn('|  | A | B | C |', result['text_md'])
         self.assertIn('| c | 0; 0 | 0; 0 | 2; 2 |', result['text_md'])
+
+    def test_archive3_problem_33817_bare_ampersand_matrix_game_table(self):
+        # Дефект 1, найден ревью 2026-08-26: голые '&'-строки без \hline и
+        # без \begin{tabular} — задача #33817 «Найдите все равновесия
+        # Нэша...» — раньше проходила молча: не собиралась в таблицу, но
+        # и не помечалась complex_table/warnings.
+        text = (
+            'Найдите все равновесия Нэша в следующей игре:\n\n\n\n'
+            ' & $ s_1 $ & $ s_2 $ & $ s_3 $ & $ s_4 $ & $ s_5 $\n\n'
+            ' $t_1$ & (100, 10) & (10, 11) & (7, 8) & (3, 10) & (20, 100)\n\n'
+            ' $t_2$ & (110, 5) & (15, 5) & (8, 7) & (4, 4) & (30, 4)\n\n'
+            ' $t_3$ & (10, 2) & (0, 4) & (3, 3) & (6, 2) & (20, 0)\n\n'
+            ' $t_4$ & (200, 0) & (12, 12) & (5, 9) & (2, 10) & (40, 8)'
+        )
+        result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertEqual(result['warnings'], [])
+        self.assertIn('| $t_1$ | (100, 10) | (10, 11) | (7, 8) | (3, 10) | (20, 100) |', result['text_md'])
+        self.assertIn('| $t_4$ | (200, 0) | (12, 12) | (5, 9) | (2, 10) | (40, 8) |', result['text_md'])
+        self.assertNotIn('\\begin{tabular}', result['text_md'])
 
     def test_archive3_problem_43945_preserves_math_and_converts_table(self):
         text = (
