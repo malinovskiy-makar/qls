@@ -36,6 +36,105 @@ def _is_already_wrapped(text, start, end):
     return False
 
 
+#: Мусорные символы источников, найденные атласом у SolveHub: control-char
+#: U+0002 и BOM U+FEFF внутри слов (следы мягкого переноса из PDF), U+2028
+#: (line separator) вместо обычного \n, nbsp (U+00A0) вместо пробела,
+#: псевдо-HTML `<\li>` (опечатка экспорта, 11 задач). Снимаем ПЕРВЫМ шагом
+#: конвейера — иначе мусор может помешать распознаванию TeX-комментариев/
+#: разметки на следующих шагах.
+_CONTROL_CHARS_RE = re.compile('[\u0002\ufeff]')
+
+
+def strip_control_and_bom_chars(text):
+    """Убрать control-char/BOM-мусор, нормализовать U+2028/nbsp, убрать
+    псевдо-HTML `<\\li>` (CORPUS_FORMAT_ATLAS: сюрпризы SolveHub)."""
+    text = _CONTROL_CHARS_RE.sub('', text)
+    text = text.replace('\u2028', '\n')
+    text = text.replace('\u00a0', ' ')
+    text = text.replace('<\\li>', '')
+    return text
+
+
+#: Archive 3 (атлас, "Ловушка №1"): 61 из 164 задач с `tabular` держат ВСЮ
+#: таблицу внутри `$`/`$$` — таблица не формула, KaTeX её не осилит. Снимаем
+#: обёртку ДО protect_math, чтобы дальше таблица шла обычным путём
+#: convert_tables, а не пряталась как непрозрачный математический плейсхолдер.
+_MATH_WRAPPED_TABLE_RE = re.compile(
+    r'\$\$?\s*(\\begin\{tabular\}.*?\\end\{tabular\})\s*\$\$?',
+    re.DOTALL,
+)
+#: \text{X} внутри такой таблицы имел смысл ТОЛЬКО пока таблица была внутри
+#: математики — после снятия $$ это осиротевшая команда, а не текст.
+#: Найдено на живой задаче #41535 при проверке этой функции на реальных
+#: данных: ячейки вида \text{День недели} иначе остались бы сырым LaTeX.
+_ORPHANED_TEXT_CMD_RE = re.compile(r'\\text\{([^}]*)\}')
+
+
+def unwrap_math_wrapped_tables(text):
+    """Снять $/$$ обёртку вокруг целой \\begin{tabular}...\\end{tabular},
+    заодно снять осиротевшие \\text{} внутри неё (см. _ORPHANED_TEXT_CMD_RE)."""
+    def repl(match):
+        return _ORPHANED_TEXT_CMD_RE.sub(r'\1', match.group(1))
+    return _MATH_WRAPPED_TABLE_RE.sub(repl, text)
+
+
+#: МатЭк (атлас, "Главный сюрприз"): 46 задач держат ТЕЛО таблицы без
+#: обёртки \\begin{tabular}{...} — она потерялась при импорте, остались
+#: только \\hline и строки с '&', разделённые пустыми строками (проверено
+#: по живым задачам #30025/#30026: "\\hline\n& L & R & C\n \\hline\nA & ...").
+#: Реконструируем обёртку, чтобы дальше сработал обычный convert_tables.
+#: Срабатывает ТОЛЬКО когда в тексте вообще нет \\begin{tabular} — так
+#: исключается риск задеть уже нормально обёрнутую таблицу в том же тексте.
+_ORPHAN_TABLE_BLOCK_RE = re.compile(
+    r'(?P<block>(?:[ \t]*\\hline[ \t]*\n)'
+    r'(?:[^\n]*&[^\n]*\n[ \t]*\\hline[ \t]*\n)+'
+    r'[^\n]*&[^\n]*)'
+)
+
+
+def reconstruct_orphaned_tabular(text):
+    """Обернуть осиротевшее тело таблицы МатЭк в синтетический
+    \\begin{tabular}{...}...\\end{tabular}."""
+    if '\\begin{tabular}' in text:
+        return text
+
+    def repl(match):
+        rows = [row.strip() for row in re.split(r'\\hline', match.group('block')) if row.strip()]
+        if not rows:
+            return match.group('block')
+        width = max(row.count('&') + 1 for row in rows)
+        cols = 'l' * width
+        body = ' \\\\ '.join(rows)
+        return f'\\begin{{tabular}}{{{cols}}}{body}\\end{{tabular}}'
+
+    return _ORPHAN_TABLE_BLOCK_RE.sub(repl, text)
+
+
+#: Archive 3 (атлас, "Ловушка №2"): в 147 из 164 задач с `tabular` нет ни
+#: одного `\\\\` — построчные разделители срезаны при импорте, строки
+#: разошлись по пустым строкам (проверено по живым задачам #43945/#43880).
+#: Реконструкция — часть _tabular_to_markdown (не отдельный шаг конвейера):
+#: срабатывает только когда после снятия \\hline в теле НЕТ ни одного `\\\\`.
+_MULTICOLS_RE = re.compile(r'\\begin\{multicols\}\{[^}]*\}|\\end\{multicols\}')
+
+
+def strip_multicols_wrapper(text):
+    """Убрать обёртку \\begin{multicols}{N}/\\end{multicols} (Archive 3,
+    атлас: 243 задачи — вёрстка вариантов ответа в колонки, не таблица;
+    содержимое остаётся текстом и идёт по обычному конвейеру списков)."""
+    return _MULTICOLS_RE.sub('', text)
+
+
+#: \hypertarget{id}{текст} (Archive 3, атлас: 85 вхождений) — обёртка-якорь
+#: для навигации по PDF, сам текст внутри второго аргумента виден и нужен.
+_HYPERTARGET_RE = re.compile(r'\\hypertarget\{[^}]*\}\{([^}]*)\}')
+
+
+def strip_hypertarget(text):
+    """\\hypertarget{id}{текст} -> текст (якорь убран, содержимое остаётся)."""
+    return _HYPERTARGET_RE.sub(r'\1', text)
+
+
 def wrap_bare_environments(text):
     """Обернуть голые ``\\begin{equation|align|gather}...\\end{...}`` в ``$$``.
 
@@ -79,12 +178,20 @@ _JUNK_COMMANDS = (
     r'\\noindent', r'\\centering',
 )
 _JUNK_COMMANDS_RE = re.compile('|'.join(_JUNK_COMMANDS))
+#: \\vspace{...}/\\hspace{...} — команды отступа с обязательным аргументом
+#: (ЛЭШ Гамма: живой пример \\vspace{0.5em} между подпунктами условия).
+#: В отличие от _JUNK_COMMANDS_RE эти требуют своего regex — у них есть
+#: аргумент в {}, который тоже убирается целиком (это длина отступа, а не
+#: видимый текст).
+_JUNK_COMMANDS_WITH_ARG_RE = re.compile(r'\\(?:vspace|hspace)\{[^}]*\}')
 
 
 def strip_junk_commands(text):
-    """Убрать \\medskip/\\bigskip/\\quad/\\qquad/\\noindent/\\centering
-    целиком, без замены."""
-    return _JUNK_COMMANDS_RE.sub('', text)
+    """Убрать \\medskip/\\bigskip/\\quad/\\qquad/\\noindent/\\centering/
+    \\vspace{}/\\hspace{} целиком, без замены."""
+    text = _JUNK_COMMANDS_WITH_ARG_RE.sub('', text)
+    text = _JUNK_COMMANDS_RE.sub('', text)
+    return text
 
 
 #: \textcolor{цвет}{содержимое} — двухаргументная форма, содержимое остаётся.
@@ -185,8 +292,18 @@ def _tabular_to_markdown(body):
     """Тело tabular (между {cols} и \\end) -> markdown-таблица.
 
     Строки режутся по '\\\\', ячейки — по '&'. \\hline игнорируется
-    (роль отступа/рамки, в markdown-таблице у неё нет аналога)."""
+    (роль отступа/рамки, в markdown-таблице у неё нет аналога).
+
+    Archive 3 (атлас, "Ловушка №2", 147 из 164 задач): построчные '\\\\'
+    иногда срезаны импортом целиком, строки таблицы расходятся пустыми
+    строками вместо них. Если после снятия \\hline в теле нет ни одного
+    '\\\\' вовсе — реконструируем разделители по пустым строкам."""
     body = _HLINE_RE.sub('', body)
+    if '\\\\' not in body:
+        chunks = [' '.join(chunk.split()) for chunk in re.split(r'\n\s*\n', body)]
+        chunks = [chunk for chunk in chunks if chunk]
+        if len(chunks) >= 2:
+            body = ' \\\\ '.join(chunks)
     rows = [row.strip() for row in body.split('\\\\') if row.strip()]
     grid = [[cell.strip() for cell in row.split('&')] for row in rows]
     if not grid:
@@ -319,17 +436,24 @@ def convert_text_field(text):
     """Один текстовый кусок (statement/answer/solution/criteria/часть
     подпункта) через весь конвейер, в порядке, обязательном по §2б/§3:
 
+    0. control-char/BOM/nbsp-мусор — до всего остального (может помешать
+       распознаванию любой разметки на следующих шагах);
     1. TeX-комментарии — до всего остального (иначе '%' может съесть
        часть уже преобразованной разметки на следующих шагах);
-    2. \\color/\\textcolor — до bold/italic (снимает обёртку, которая
-       иначе помешала бы regex увидеть \\textbf изнутри);
+    2. \\color/\\textcolor, \\hypertarget — до bold/italic (снимают
+       обёртку, которая иначе помешала бы regex увидеть \\textbf изнутри);
+    2а. снять $/$$ вокруг целой tabular (Archive 3) и восстановить
+        осиротевшую обёртку tabular (МатЭк) — ДО защиты математики: первое
+        превращает лже-формулу в обычную таблицу, второе даёт таблице
+        границы, которые дальше найдёт convert_tables;
     3. обернуть голые equation/align/gather — ДО защиты математики, чтобы
        новая обёртка $$ была защищена вместе со всем остальным;
     4. защитить математику плейсхолдерами — всё, что дальше, физически
        не видит формулу (значит не может её сломать);
     5. вынести сноски (текст сноски может содержать плейсхолдеры формул —
        восстановятся на шаге 10 при добавлении сносок в конец);
-    6. убрать junk-команды, картинки — зафиксировать, не трогая текст;
+    6. убрать junk-команды (включая multicols-обёртку), картинки —
+       зафиксировать, не трогая текст;
     7. bold/italic, списки, таблицы;
     8. тире/кавычки — НА ЗАЩИЩЁННОМ тексте, ДО восстановления математики
        (плейсхолдер — это чистые цифры между служебными символами PUA,
@@ -344,12 +468,17 @@ def convert_text_field(text):
         return {'text_md': '', 'images': [], 'complex_table': False, 'warnings': []}
 
     warnings = []
+    text = strip_control_and_bom_chars(text)
     text = strip_tex_comments(text)
     text = strip_color(text)
+    text = strip_hypertarget(text)
+    text = unwrap_math_wrapped_tables(text)
+    text = reconstruct_orphaned_tabular(text)
     text = wrap_bare_environments(text)
     protected_text, protected = protect_math(text)
     protected_text, notes = extract_footnotes(protected_text)
     protected_text = strip_junk_commands(protected_text)
+    protected_text = strip_multicols_wrapper(protected_text)
     images = find_images(protected_text)
     protected_text = convert_emphasis(protected_text)
     protected_text = convert_lists(protected_text)

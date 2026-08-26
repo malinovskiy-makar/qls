@@ -3,7 +3,9 @@ from django.test import SimpleTestCase
 from problems.corpus_converter.core import (
     wrap_bare_environments, protect_math, restore_math,
     normalize_dashes, normalize_quotes, find_images, convert_text_field,
-    convert_problem,
+    convert_problem, strip_control_and_bom_chars, unwrap_math_wrapped_tables,
+    reconstruct_orphaned_tabular, strip_multicols_wrapper, strip_hypertarget,
+    strip_junk_commands, convert_tables,
 )
 
 
@@ -392,3 +394,195 @@ class ConvertProblemTests(SimpleTestCase):
         result = convert_problem(statement='Условие.')
         self.assertEqual(result['answer_md'], '')
         self.assertEqual(result['solution_md'], '')
+
+
+class StripControlAndBomCharsTests(SimpleTestCase):
+    """Scale-up: SolveHub, атлас — U+0002/BOM/U+2028/nbsp/псевдо-HTML."""
+
+    def test_removes_control_char_and_bom(self):
+        text = 'пере\u0002меннойХ и \ufeffэтот текст'
+        result = strip_control_and_bom_chars(text)
+        self.assertNotIn('\u0002', result)
+        self.assertNotIn('\ufeff', result)
+        self.assertEqual(result, 'переменнойХ и этот текст')
+
+    def test_line_separator_becomes_newline(self):
+        text = 'Первая строка\u2028Вторая строка'
+        self.assertEqual(strip_control_and_bom_chars(text), 'Первая строка\nВторая строка')
+
+    def test_nbsp_becomes_regular_space(self):
+        self.assertEqual(strip_control_and_bom_chars('100\u00a0рублей'), '100 рублей')
+
+    def test_pseudo_html_li_removed(self):
+        self.assertEqual(strip_control_and_bom_chars('Пункт<\\li> первый'), 'Пункт первый')
+
+
+class UnwrapMathWrappedTablesTests(SimpleTestCase):
+    """Scale-up: Overleaf Archive 3, атлас "Ловушка №1" — 61 из 164 таблиц
+    целиком внутри $/$$, KaTeX их не осилит."""
+
+    def test_unwraps_double_dollar_table(self):
+        text = '$$\\begin{tabular}{c|c}A & B\\\\\\end{tabular}$$'
+        result = unwrap_math_wrapped_tables(text)
+        self.assertEqual(result, '\\begin{tabular}{c|c}A & B\\\\\\end{tabular}')
+
+    def test_unwraps_single_dollar_table(self):
+        text = '$\\begin{tabular}{c}A\\end{tabular}$'
+        result = unwrap_math_wrapped_tables(text)
+        self.assertEqual(result, '\\begin{tabular}{c}A\\end{tabular}')
+
+    def test_strips_orphaned_text_command_inside_unwrapped_table(self):
+        # Живой дефект, найденный на реальной задаче #41535: \text{} внутри
+        # таблицы имел смысл только пока таблица была математикой.
+        text = '$$\\begin{tabular}{l|c}\\text{День} & \\text{Число}\\\\\\end{tabular}$$'
+        result = unwrap_math_wrapped_tables(text)
+        self.assertNotIn('\\text{', result)
+        self.assertIn('День & Число', result)
+
+    def test_leaves_real_math_untouched(self):
+        text = 'Цена $P^*=10$ и объём $Q^*=5$.'
+        self.assertEqual(unwrap_math_wrapped_tables(text), text)
+
+    def test_real_archive3_problem_41535_table_renders_clean(self):
+        text = (
+            'Минимальное число медсестёр на смене:\n\n'
+            '$$\\begin{tabular}{l | c}\n'
+            '\\text{День недели} & \\text{Минимальное число медсестёр на смене} \\\\\n'
+            '\\hline\n'
+            '\\text{понедельник} & 10 \\\\\n'
+            '\\text{вторник} & 12 \\\\\n'
+            '\\end{tabular}$$'
+        )
+        result = convert_text_field(text)
+        self.assertNotIn('\\text{', result['text_md'])
+        self.assertIn('| День недели | Минимальное число медсестёр на смене |', result['text_md'])
+        self.assertIn('| понедельник | 10 |', result['text_md'])
+        self.assertFalse(result['complex_table'])
+
+
+class ReconstructOrphanedTabularTests(SimpleTestCase):
+    """Scale-up: МатЭк, атлас "Главный сюрприз" — 46 задач без обёртки
+    \\begin{tabular}{...}, остались висячие \\hline и &."""
+
+    def test_wraps_orphaned_matrix_game_table(self):
+        # Живой пример — задача #30026 МатЭк.
+        text = (
+            'Найдите все равновесия в чистых и смешанных стратегиях в этой игре:\n\n'
+            ' \\hline\n& L & R & C\n \\hline\nA & 6; 6 & 0; 0 & 7; 2\n \\hline\nB & 0; 0 & 4; 4 & 5; 1'
+        )
+        result = reconstruct_orphaned_tabular(text)
+        self.assertIn('\\begin{tabular}', result)
+        self.assertIn('\\end{tabular}', result)
+        converted, complex_found = convert_tables(result)
+        self.assertFalse(complex_found)
+        self.assertIn('|  | L | R | C |', converted)
+        self.assertIn('| A | 6; 6 | 0; 0 | 7; 2 |', converted)
+
+    def test_does_not_touch_text_with_properly_wrapped_table(self):
+        text = '\\begin{tabular}{|l|}\\hline X\\hline\\end{tabular}'
+        self.assertEqual(reconstruct_orphaned_tabular(text), text)
+
+    def test_leaves_plain_text_with_ampersand_untouched(self):
+        # Одна строка с '&', без второй строки — недостаточно сигнала,
+        # чтобы уверенно реконструировать таблицу.
+        text = 'Условие: A & B — это два актива, не таблица.'
+        self.assertEqual(reconstruct_orphaned_tabular(text), text)
+
+
+class TabularMissingRowSeparatorsTests(SimpleTestCase):
+    """Scale-up: Overleaf Archive 3, атлас "Ловушка №2" — 147 из 164 задач,
+    построчные \\\\ срезаны, строки таблицы разделены пустыми строками."""
+
+    def test_reconstructs_rows_from_blank_lines(self):
+        # Живой пример — задача #43945 МатЭк/Archive 3.
+        text = (
+            '\\begin{tabular}{c|ccc}\n'
+            'Доходность & Сценарий 1 & Сценарий 2 & Сценарий 3 \n\n'
+            '\\hline\n'
+            'Актив A & +60\\% & -30\\% & -10\\% \n\n'
+            'Актив B & -20\\% & +40\\% & +10\\% \n\n'
+            '\\end{tabular}'
+        )
+        result, complex_found = convert_tables(text)
+        self.assertFalse(complex_found)
+        self.assertIn('| Доходность | Сценарий 1 | Сценарий 2 | Сценарий 3 |', result)
+        self.assertIn('| Актив A | +60\\% | -30\\% | -10\\% |', result)
+        self.assertIn('| Актив B | -20\\% | +40\\% | +10\\% |', result)
+
+    def test_single_row_body_left_alone(self):
+        # Одна строка (после снятия \\hline) — нечего реконструировать,
+        # таблица так и останется без разделителей, но и не пострадает.
+        text = '\\begin{tabular}{c}\nОдна строка без пары\n\\end{tabular}'
+        result, complex_found = convert_tables(text)
+        self.assertIn('Одна строка без пары', result)
+
+
+class StripMulticolsWrapperTests(SimpleTestCase):
+    """Scale-up: Overleaf Archive 3, атлас — 243 задачи, multicols — вёрстка
+    вариантов ответа в колонки, не таблица."""
+
+    def test_removes_wrapper_keeps_content(self):
+        text = '\\begin{multicols}{2}а) Вариант 1\nб) Вариант 2\\end{multicols}'
+        result = strip_multicols_wrapper(text)
+        self.assertNotIn('multicols', result)
+        self.assertIn('а) Вариант 1', result)
+        self.assertIn('б) Вариант 2', result)
+
+
+class StripHypertargetTests(SimpleTestCase):
+    """Scale-up: Overleaf Archive 3, атлас — 85 вхождений \\hypertarget."""
+
+    def test_keeps_visible_text_drops_anchor_id(self):
+        text = '\\hypertarget{sec1}{Раздел про монополию}'
+        self.assertEqual(strip_hypertarget(text), 'Раздел про монополию')
+
+
+class StripJunkCommandsWithArgTests(SimpleTestCase):
+    """Scale-up: ЛЭШ Гамма — живой пример \\vspace{0.5em} между подпунктами."""
+
+    def test_removes_vspace_with_length_argument(self):
+        text = 'Первая часть.\\vspace{0.5em}\n\nВторая часть.'
+        result = strip_junk_commands(text)
+        self.assertNotIn('\\vspace', result)
+        self.assertIn('Первая часть.', result)
+        self.assertIn('Вторая часть.', result)
+
+    def test_removes_hspace_with_length_argument(self):
+        text = 'Слева\\hspace{1cm}справа'
+        result = strip_junk_commands(text)
+        self.assertNotIn('\\hspace', result)
+
+
+class RealDataRegressionTests(SimpleTestCase):
+    """Живые задачи из базы (id по МатЭк/Archive 3), зафиксированные во
+    время расширения конвертера 2026-08-26 — защита от регрессии на
+    реальных, а не упрощённых текстах."""
+
+    def test_matek_orphan_table_25_full_field(self):
+        # Задача #30025 МатЭк — реконструкция без готового \\hline в начале.
+        text = (
+            'Вопрос: с какой вероятностью может играться A в равновесии в данной игре:\n\n\n'
+            '\\hline\n & A & B & C\n \\hline\na & 6; 6 & 0; 0 & 0; 0\n \\hline\n'
+            'b & 0; 0 & 4; 4 & 0; 0\n \\hline\nc & 0; 0 & 0; 0 & 2; 2'
+        )
+        result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertIn('|  | A | B | C |', result['text_md'])
+        self.assertIn('| c | 0; 0 | 0; 0 | 2; 2 |', result['text_md'])
+
+    def test_archive3_problem_43945_preserves_math_and_converts_table(self):
+        text = (
+            'Доходности активов заданы таблицей:\n\n'
+            '\\begin{tabular}{c|ccc}\n'
+            'Доходность & Сценарий 1 & Сценарий 2 & Сценарий 3 \n\n'
+            '\\hline\n'
+            'Актив $A$ & $+60\\%$ & $-30\\%$ & $-10\\%$ \n\n'
+            'Актив $B$ & $-20\\%$ & $+40\\%$ & $+10\\%$ \n\n'
+            '\\end{tabular}\n\n'
+            'коэффициентом оптимизма $\\alpha \\in [0,1]$:\n\\[\nH=\\alpha \\cdot \\max\\{R_1,R_2,R_3\\}\n\\]'
+        )
+        result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertIn('| Доходность | Сценарий 1 | Сценарий 2 | Сценарий 3 |', result['text_md'])
+        self.assertIn('$\\alpha \\in [0,1]$', result['text_md'])
+        self.assertIn('\\[\nH=\\alpha \\cdot \\max\\{R_1,R_2,R_3\\}\n\\]', result['text_md'])

@@ -1,6 +1,6 @@
 from django.test import SimpleTestCase
 
-from problems.corpus_converter.criteria import parse_shkolkovo_criteria
+from problems.corpus_converter.criteria import parse_shkolkovo_criteria, parse_solvehub_criteria
 
 
 class ParseShkolkovoCriteriaTests(SimpleTestCase):
@@ -62,3 +62,68 @@ class ParseShkolkovoCriteriaTests(SimpleTestCase):
         result = parse_shkolkovo_criteria(text)
         self.assertEqual(len(result['criteria']), 1)
         self.assertFalse(any('не распознано ни одного критерия' in w for w in result['warnings']))
+
+
+class ParseSolvehubCriteriaTests(SimpleTestCase):
+    """Real-data фикстуры — задачи SolveHub с диска (2026-08-26), см. отчёт
+    reports/corpus_converter_scaleup/report.md."""
+
+    def test_empty_answer_returns_empty(self):
+        result = parse_solvehub_criteria('')
+        self.assertEqual(result['criteria'], [])
+        self.assertEqual(result['warnings'], [])
+
+    def test_no_criteria_header_returns_empty_no_warning(self):
+        result = parse_solvehub_criteria('Ответ: 42. Решение простое.')
+        self.assertEqual(result['criteria'], [])
+        self.assertEqual(result['warnings'], [])
+
+    def test_real_task_6371_numbered_items_with_signed_points(self):
+        text = (
+            'Ответ готов.\n\n$\\quad$ \n\n***Критерии****:*\n\n'
+            '*1)  Дан ответ для долгосрочного увеличения* $Y \\ (33,1\\%)$ *(*$+5$ *баллов)*\n\n'
+            '*2) Найдено увеличение денежной массы* $(33,1\\%)$  *(*$+5$ *баллов)*\n\n'
+            '*3) Выписан SRAS* $(kP^2)$  *(*$+5$ *баллов)*\n\n'
+            '*4) Найден уровень цен в* $SR$  $(1,1P)$  *(* $+8$  *баллов)*\n\n'
+            '*5) Получен ответ* *(* $+5$  *баллов)*'
+        )
+        result = parse_solvehub_criteria(text)
+        self.assertEqual(len(result['criteria']), 5)
+        self.assertEqual([c['max_points'] for c in result['criteria']], [5.0, 5.0, 5.0, 8.0, 5.0])
+        self.assertEqual([c['order'] for c in result['criteria']], [0, 1, 2, 3, 4])
+
+    def test_real_task_6347_dash_items_with_negative_points(self):
+        text = (
+            'Ответ 200.\n\n'
+            '***Критерии****: За пункт  дается 20 баллов.*\n\n'
+            '*-Если нет* $mpc$ *в потреблении* $-15$ *баллов*\n\n'
+            '*-Если не учли в потреблении* $-10$ *баллов*\n\n'
+            '*-Ставка учтена не в процентных пунктах* $-5$ *баллов*'
+        )
+        result = parse_solvehub_criteria(text)
+        self.assertEqual(len(result['criteria']), 3)
+        self.assertEqual([c['max_points'] for c in result['criteria']], [-15.0, -10.0, -5.0])
+
+    def test_unstructured_prose_warns_when_header_found_but_no_items(self):
+        # Живой пример #2787: заголовок "Критерии проверки:" есть, но нет
+        # ни одного пункта вида "N)"/"-" с баллами в $...$ — сплошная проза.
+        text = 'Критерии проверки:\n\nПолностью решённой считалась задача, если...'
+        result = parse_solvehub_criteria(text)
+        self.assertEqual(result['criteria'], [])
+        self.assertTrue(any('не распознано ни одного пункта' in w for w in result['warnings']))
+
+    def test_criteria_word_as_ordinary_term_gives_no_false_items(self):
+        # Живой пример #5578: "Критерии оптимума для функций полезности" —
+        # обычный экономический термин, не заголовок баллов. Парсер не
+        # обязан отличить это семантически, но не должен извлечь мусор.
+        text = 'Критерии оптимума для функций полезности Кобба-Дугласа: $P_XX_1=P_YY_1$.'
+        result = parse_solvehub_criteria(text)
+        self.assertEqual(result['criteria'], [])
+
+    def test_declined_word_form_does_not_match_as_header(self):
+        # Живой пример #3609: "критериям" (дательный падеж) — обычная
+        # лексика про ранжирование, не заголовок критериев оценивания.
+        text = 'По каждому из критериев institut X превосходит institut Y.'
+        result = parse_solvehub_criteria(text)
+        self.assertEqual(result['criteria'], [])
+        self.assertEqual(result['warnings'], [])
