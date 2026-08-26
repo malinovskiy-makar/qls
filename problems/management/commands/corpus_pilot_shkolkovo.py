@@ -64,7 +64,7 @@ class Command(BaseCommand):
             )
             criteria_result = parse_shkolkovo_criteria(raw.get('criteria_tex') or '')
 
-            content_hash = hashlib.md5(statement_tex.encode('utf-8')).hexdigest()
+            content_hash = hashlib.md5(statement_tex.encode('utf-8'), usedforsecurity=False).hexdigest()
             is_dup = content_hash in existing_hashes
             if is_dup:
                 dup_ids.append(raw['Id'])
