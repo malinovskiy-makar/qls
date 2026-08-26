@@ -174,3 +174,49 @@ def convert_lists(text):
     text = _ITEMIZE_RE.sub(repl_itemize, text)
     text = _ENUMERATE_RE.sub(repl_enumerate, text)
     return text
+
+
+_TABULAR_RE = re.compile(r'\\begin\{tabular\}\{[^}]*\}(.*?)\\end\{tabular\}', re.DOTALL)
+_MULTICOL_ROW_RE = re.compile(r'\\multicolumn|\\multirow')
+_HLINE_RE = re.compile(r'\\hline')
+
+
+def _tabular_to_markdown(body):
+    """Тело tabular (между {cols} и \\end) -> markdown-таблица.
+
+    Строки режутся по '\\\\', ячейки — по '&'. \\hline игнорируется
+    (роль отступа/рамки, в markdown-таблице у неё нет аналога)."""
+    body = _HLINE_RE.sub('', body)
+    rows = [row.strip() for row in body.split('\\\\') if row.strip()]
+    grid = [[cell.strip() for cell in row.split('&')] for row in rows]
+    if not grid:
+        return None
+    width = len(grid[0])
+    lines = ['| ' + ' | '.join(grid[0]) + ' |']
+    lines.append('| ' + ' | '.join(['---'] * width) + ' |')
+    for row in grid[1:]:
+        lines.append('| ' + ' | '.join(row) + ' |')
+    return '\n'.join(lines)
+
+
+def convert_tables(text):
+    """Простые \\begin{tabular} (без multicolumn/multirow) -> markdown-таблицы.
+    Сложные — не трогаем, сигнализируем True вторым элементом кортежа, ради
+    ручной очереди (CORPUS-FORMAT.md §3: "слияние ячеек markdown-таблицей
+    не выражается")."""
+    complex_found = False
+    out = []
+    pos = 0
+    for match in _TABULAR_RE.finditer(text):
+        start, end = match.span()
+        body = match.group(1)
+        out.append(text[pos:start])
+        if _MULTICOL_ROW_RE.search(body):
+            complex_found = True
+            out.append(match.group(0))
+        else:
+            markdown_table = _tabular_to_markdown(body)
+            out.append(markdown_table if markdown_table is not None else match.group(0))
+        pos = end
+    out.append(text[pos:])
+    return ''.join(out), complex_found

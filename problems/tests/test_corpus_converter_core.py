@@ -124,3 +124,44 @@ class ConvertListsTests(SimpleTestCase):
         # Ловушка: '2018)' — год исходного вопроса, не номер пункта списка.
         text = '2018) Активами Центрального банка (ЦБ) являются:'
         self.assertEqual(convert_lists(text), text)
+
+
+class ConvertTablesTests(SimpleTestCase):
+    def test_simple_tabular_to_markdown_table(self):
+        from problems.corpus_converter.core import convert_tables
+        text = (
+            '\\begin{tabular}{|l|c|}\\hline\n'
+            'Показатель & Значение \\\\\\hline\n'
+            'Q & 10 \\\\\\hline\n'
+            '\\end{tabular}'
+        )
+        result, complex_found = convert_tables(text)
+        self.assertFalse(complex_found)
+        self.assertIn('| Показатель | Значение |', result)
+        self.assertIn('| --- | --- |', result)
+        self.assertIn('| Q | 10 |', result)
+        self.assertNotIn('\\begin{tabular}', result)
+
+    def test_complex_table_left_untouched_and_flagged(self):
+        from problems.corpus_converter.core import convert_tables
+        text = (
+            '\\begin{tabular}{|l|c|c|}\\hline\n'
+            '\\multicolumn{2}{|c|}{Итого} & 100 \\\\\\hline\n'
+            '\\end{tabular}'
+        )
+        result, complex_found = convert_tables(text)
+        self.assertTrue(complex_found)
+        self.assertEqual(result, text)
+
+    def test_multirow_also_flags_complex(self):
+        from problems.corpus_converter.core import convert_tables
+        text = '\\begin{tabular}{|l|}\\multirow{2}{*}{X}\\end{tabular}'
+        _, complex_found = convert_tables(text)
+        self.assertTrue(complex_found)
+
+    def test_existing_markdown_table_untouched(self):
+        from problems.corpus_converter.core import convert_tables
+        text = '| A | B |\n| --- | --- |\n| 1 | 2 |'
+        result, complex_found = convert_tables(text)
+        self.assertEqual(result, text)
+        self.assertFalse(complex_found)
