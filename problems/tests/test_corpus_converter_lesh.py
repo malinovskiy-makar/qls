@@ -100,6 +100,56 @@ class ParseZBlocksTests(SimpleTestCase):
         self.assertIn('Определите ВВП острова Мадагаскар', parsed['subpoints'][0])
 
 
+class RealDataRegressionTests(SimpleTestCase):
+    """Дефект 2, найден ревью 2026-08-26: некоторые авторы ЛЭШ (10
+    составителей, атлас) размечают пункты настоящим LaTeX \\item, а не
+    документированным макросом \\n — subpoints_raw приходил ОДНИМ блоком с
+    сырыми \\item внутри, statement_md показал бы студенту LaTeX-команды."""
+
+    def test_kurno_i_shtakelberg_item_marked_subpoints_split(self):
+        # Файл Подборки/Микроэкономика/Курно и Штакельберг.tex, задача
+        # «Вмешательство в модель Курно» — 3 пункта размечены \item.
+        args = [
+            ('[', 'Вмешательство в модель Курно'),
+            ('{', 'На рынке некоторого товара функция спроса имеет вид '
+                  '$Q^d=120-P$. Товар могут производить две фирмы с '
+                  'функциями издержек $TC=20q$, которые выбирают объёмы '
+                  'выпуска одновременно и независимо. '),
+            ('{', '\n    \\item Найдите рыночное равновесие.\n    \\item '
+                  'Государство вводит на рынке потолок цен на уровне '
+                  '$\\overline{P}\\in[0,120]$. Найдите рыночное равновесие '
+                  'в зависимости от $\\overline{P}$.\n    \\item '
+                  'Государство вводит на рынке квоту на уровне '
+                  '$\\overline{q}\\in[0,120]$. Найдите рыночное равновесие '
+                  'в зависимости от $\\overline{q}$.\n'),
+        ]
+        parsed = interpret_z_args(args)
+        self.assertEqual(len(parsed['subpoints']), 3)
+        for subpoint in parsed['subpoints']:
+            self.assertNotIn('\\item', subpoint)
+        self.assertTrue(parsed['subpoints'][0].startswith('Найдите рыночное равновесие'))
+        self.assertIn('потолок цен', parsed['subpoints'][1])
+        self.assertIn('квоту', parsed['subpoints'][2])
+
+    def test_hotelling_item_marked_subpoints_split(self):
+        # Файл Подборки/Микроэкономика/Хотеллинг.tex, задача
+        # «Это сложнее, чем вы думаете» — 2 пункта размечены \item.
+        args = [
+            ('[', 'Это сложнее, чем вы думаете'),
+            ('{', 'Город состоит из одной улицы длиной 1 км...'),
+            ('{', '\n  \\item Никаких дополнительных условий не '
+                  'накладывается\n\n\\item Та половина улицы, которая '
+                  'ближе к фирме Б, оказалась затоплена: издержки '
+                  'перемещения по ней оказываются в 2 раза выше.\n'),
+        ]
+        parsed = interpret_z_args(args)
+        self.assertEqual(len(parsed['subpoints']), 2)
+        for subpoint in parsed['subpoints']:
+            self.assertNotIn('\\item', subpoint)
+        self.assertIn('Никаких дополнительных условий', parsed['subpoints'][0])
+        self.assertIn('затоплена', parsed['subpoints'][1])
+
+
 class InterpretZArgsTests(SimpleTestCase):
     def test_all_five_positions_full_form(self):
         # \\z[Название][20 баллов]{Текст}{\\n Пункт;}[Источник]

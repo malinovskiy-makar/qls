@@ -15,7 +15,15 @@ from __future__ import annotations
 
 import re
 
+from problems.corpus_converter.core import split_item_body
+
 _Z_RE = re.compile(r'\\z\b')
+#: Ревью 2026-08-26: часть авторов ЛЭШ (10 составителей, атлас) размечает
+#: пункты НАСТОЯЩИМ LaTeX \item вместо документированного макроса \n —
+#: живые примеры «Курно и Штакельберг.tex» / «Хотеллинг.tex». Без этой
+#: детекции \n.split('\\n') не находил ни одного разделителя, и весь блок
+#: с сырыми \item утекал в statement_md одним куском.
+_ITEM_MARKER_RE = re.compile(r'\\item\b')
 
 
 def _read_arg(text, pos):
@@ -106,11 +114,17 @@ def interpret_z_args(args):
 
     statement = braces[0].strip() if braces else ''
     subpoints_raw = braces[1] if len(braces) > 1 else ''
-    subpoints = [
-        item.strip().rstrip(';').strip()
-        for item in subpoints_raw.split('\\n')
-        if item.strip().rstrip(';').strip()
-    ]
+    if _ITEM_MARKER_RE.search(subpoints_raw):
+        # Автор разметил пункты настоящим \item, а не документированным \n
+        # — переиспользуем готовый разбор \item-списков из core.py, а не
+        # изобретаем второе правило для того же смысла.
+        subpoints = split_item_body(subpoints_raw)
+    else:
+        subpoints = [
+            item.strip().rstrip(';').strip()
+            for item in subpoints_raw.split('\\n')
+            if item.strip().rstrip(';').strip()
+        ]
     source = trailing_brackets[0] if trailing_brackets else None
 
     return {

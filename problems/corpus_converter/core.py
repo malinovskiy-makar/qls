@@ -314,7 +314,12 @@ _ENUMERATE_RE = re.compile(r'\\begin\{enumerate\}(.*?)\\end\{enumerate\}', re.DO
 _ITEM_RE = re.compile(r'\\item(?:\[([^\]]*)\])?\s*')
 
 
-def _split_items(body):
+def split_item_body(body):
+    """Тело списка (между тегами itemize/enumerate ИЛИ вообще без обёртки —
+    вызывающая сторона решает) -> список пунктов по \\item. Публичная,
+    переиспользуется в lesh.py: у ЛЭШ Гамма встречаются \\item внутри
+    аргумента макроса \\z без itemize вовсе (см. вызов ниже и
+    interpret_z_args в lesh.py)."""
     items = []
     # \item[label]?content — re.split с группой возвращает
     # [pre, label_or_None, content, label_or_None, content, ...]
@@ -338,11 +343,11 @@ def convert_lists(text):
     """\\begin{itemize}/\\begin{enumerate} -> markdown-списки с реальными
     переносами строк. Не трогает ничего вне этих двух явных окружений."""
     def repl_itemize(match):
-        items = _split_items(match.group(1))
+        items = split_item_body(match.group(1))
         return '\n'.join(f'- {item}' for item in items)
 
     def repl_enumerate(match):
-        items = _split_items(match.group(1))
+        items = split_item_body(match.group(1))
         return '\n'.join(f'{i}. {item}' for i, item in enumerate(items, start=1))
 
     text = _ITEMIZE_RE.sub(repl_itemize, text)
