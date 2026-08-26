@@ -97,3 +97,30 @@ class ConvertEmphasisTests(SimpleTestCase):
         text, protected = protect_math('Оптимум $Q^*=20$, цена $P^*=5$.')
         result = restore_math(convert_emphasis(text), protected)
         self.assertEqual(result, 'Оптимум $Q^*=20$, цена $P^*=5$.')
+
+
+class ConvertListsTests(SimpleTestCase):
+    def test_itemize_to_markdown_bullets(self):
+        from problems.corpus_converter.core import convert_lists
+        text = '\\begin{itemize}\\item Первое\\item Второе\\end{itemize}'
+        result = convert_lists(text)
+        self.assertEqual(result, '- Первое\n- Второе')
+
+    def test_enumerate_to_markdown_numbers(self):
+        from problems.corpus_converter.core import convert_lists
+        text = '\\begin{enumerate}\\item Первое\\item Второе\\end{enumerate}'
+        result = convert_lists(text)
+        self.assertEqual(result, '1. Первое\n2. Второе')
+
+    def test_bare_dash_at_line_start_not_touched(self):
+        from problems.corpus_converter.core import convert_lists
+        # Ловушка sweep-диагностики: '-' в начале строки — часто обрыв
+        # формулы на переносе, не буллит. Конвертер его не трогает.
+        text = 'Баланс:\n-\nэ (перенос строки внутри формулы PDF-нарезки)'
+        self.assertEqual(convert_lists(text), text)
+
+    def test_bare_digit_paren_at_line_start_not_touched(self):
+        from problems.corpus_converter.core import convert_lists
+        # Ловушка: '2018)' — год исходного вопроса, не номер пункта списка.
+        text = '2018) Активами Центрального банка (ЦБ) являются:'
+        self.assertEqual(convert_lists(text), text)

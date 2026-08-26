@@ -127,3 +127,50 @@ def convert_emphasis(text):
     text = _TEXTBF_RE.sub(r'**\1**', text)
     text = _TEXTIT_EMPH_RE.sub(r'*\1*', text)
     return text
+
+
+#: Только явные LaTeX-окружения — доверенный сигнал по sweep-диагностике
+#: (corpus_format_sweep_20260824.md: "italic/список — шумные признаки").
+#: Голая '-'/'N.'/'N)' в начале строки НЕ распознаётся как список нигде
+#: в этом модуле — намеренно, это и есть защита от ловушек метода.
+_ITEMIZE_RE = re.compile(r'\\begin\{itemize\}(.*?)\\end\{itemize\}', re.DOTALL)
+_ENUMERATE_RE = re.compile(r'\\begin\{enumerate\}(.*?)\\end\{enumerate\}', re.DOTALL)
+#: \item[X] — ручная метка (Школково: (а), А), 1) ...) — сохраняется как
+#: текст пункта, не переинтерпретируется; \item без метки просто режет на пункты.
+_ITEM_RE = re.compile(r'\\item(?:\[([^\]]*)\])?\s*')
+
+
+def _split_items(body):
+    items = []
+    # \item[label]?content — re.split с группой возвращает
+    # [pre, label_or_None, content, label_or_None, content, ...]
+    parts = _ITEM_RE.split(body)
+    pre = parts[0]
+    if pre.strip():
+        # Текст до первого \item внутри itemize/enumerate не встречался
+        # в проверенных источниках — не теряем его молча.
+        items.append(pre.strip())
+    for i in range(1, len(parts), 2):
+        label = parts[i]
+        content = parts[i + 1].strip() if i + 1 < len(parts) else ''
+        if label:
+            items.append(f'{label} {content}'.strip())
+        else:
+            items.append(content)
+    return [item for item in items if item]
+
+
+def convert_lists(text):
+    """\\begin{itemize}/\\begin{enumerate} -> markdown-списки с реальными
+    переносами строк. Не трогает ничего вне этих двух явных окружений."""
+    def repl_itemize(match):
+        items = _split_items(match.group(1))
+        return '\n'.join(f'- {item}' for item in items)
+
+    def repl_enumerate(match):
+        items = _split_items(match.group(1))
+        return '\n'.join(f'{i}. {item}' for i, item in enumerate(items, start=1))
+
+    text = _ITEMIZE_RE.sub(repl_itemize, text)
+    text = _ENUMERATE_RE.sub(repl_enumerate, text)
+    return text
