@@ -1,6 +1,9 @@
 from django.test import SimpleTestCase
 
-from problems.corpus_converter.core import wrap_bare_environments, protect_math, restore_math
+from problems.corpus_converter.core import (
+    wrap_bare_environments, protect_math, restore_math,
+    normalize_dashes, normalize_quotes,
+)
 
 
 class WrapBareEnvironmentsTests(SimpleTestCase):
@@ -208,3 +211,35 @@ class FootnoteTests(SimpleTestCase):
     def test_append_no_notes_is_noop(self):
         from problems.corpus_converter.core import append_footnote_notes
         self.assertEqual(append_footnote_notes('Решение готово.', []), 'Решение готово.')
+
+
+class NormalizeDashesTests(SimpleTestCase):
+    def test_triple_hyphen_to_em_dash(self):
+        self.assertEqual(normalize_dashes('рост---за год'), 'рост—за год')
+
+    def test_double_hyphen_to_en_dash(self):
+        self.assertEqual(normalize_dashes('2020--2021'), '2020–2021')
+
+    def test_spaced_single_hyphen_to_em_dash(self):
+        self.assertEqual(
+            normalize_dashes('Спрос растёт - предложение падает'),
+            'Спрос растёт — предложение падает',
+        )
+
+    def test_hyphen_inside_word_untouched(self):
+        # Составное слово — не тире, трогать нельзя.
+        self.assertEqual(normalize_dashes('объект-договор'), 'объект-договор')
+
+    def test_hyphen_in_negative_number_untouched(self):
+        self.assertEqual(normalize_dashes('температура -5 градусов'), 'температура -5 градусов')
+
+
+class NormalizeQuotesTests(SimpleTestCase):
+    def test_angle_quotes_to_guillemets(self):
+        self.assertEqual(normalize_quotes('<<Ромашка>>'), '«Ромашка»')
+
+    def test_straight_double_quotes_alternate_to_guillemets(self):
+        self.assertEqual(
+            normalize_quotes('фирма "Ромашка" продала "Одуванчик"'),
+            'фирма «Ромашка» продала «Одуванчик»',
+        )

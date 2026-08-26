@@ -255,3 +255,31 @@ def append_footnote_notes(text, notes):
     else:
         lines = [f'Примечание {i}: {note}' for i, note in enumerate(notes, start=1)]
     return text + '\n\n' + '\n'.join(lines)
+
+
+def normalize_dashes(text):
+    """--- -> —, -- -> –, ' - ' (тире между словами) -> ' — '.
+
+    Одиночный '-' без пробелов с обеих сторон НЕ трогается — он почти
+    всегда часть слова (составное существительное) или знак минуса перед
+    числом, а не тире (CORPUS-FORMAT.md §3 обсуждает только сам факт
+    нормализации, различение "тире vs дефис" — эвристика этой сессии,
+    задокументированная явно, а не молчаливое допущение)."""
+    text = text.replace('---', '—')
+    text = text.replace('--', '–')
+    text = re.sub(r'(?<=\S) - (?=\S)', ' — ', text)
+    return text
+
+
+#: Прямые кавычки режутся ПАРАМИ по очереди: первая пара -> «», вторая
+#: -> «», и так далее — нечётная кавычка (без пары) не трогается вовсе.
+_STRAIGHT_QUOTE_RE = re.compile(r'"([^"]*)"')
+_ANGLE_QUOTE_RE = re.compile(r'<<([^>]*)>>')
+
+
+def normalize_quotes(text):
+    """<<...>>, "..." -> «...» — подтверждённый домашний стандарт
+    (test_fix_latex_junk.py:66: <<Ромашка>> -> «Ромашка» — починка, не порча)."""
+    text = _ANGLE_QUOTE_RE.sub(r'«\1»', text)
+    text = _STRAIGHT_QUOTE_RE.sub(r'«\1»', text)
+    return text
