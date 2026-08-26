@@ -70,3 +70,42 @@ def restore_math(text, protected):
         return protected[int(match.group(1))]
     from problems.rendering import _PLACEHOLDER_RE
     return _PLACEHOLDER_RE.sub(repl, text)
+
+
+#: Команды-«воздух»: чисто оформительские, переносить некуда (задача CSS,
+#: не текста) — CORPUS-FORMAT.md §3, строка «\\medskip, \\bigskip, ...».
+_JUNK_COMMANDS = (
+    r'\\medskip', r'\\bigskip', r'\\quad', r'\\qquad',
+    r'\\noindent', r'\\centering',
+)
+_JUNK_COMMANDS_RE = re.compile('|'.join(_JUNK_COMMANDS))
+
+
+def strip_junk_commands(text):
+    """Убрать \\medskip/\\bigskip/\\quad/\\qquad/\\noindent/\\centering
+    целиком, без замены."""
+    return _JUNK_COMMANDS_RE.sub('', text)
+
+
+#: \textcolor{цвет}{содержимое} — двухаргументная форма, содержимое остаётся.
+_TEXTCOLOR_RE = re.compile(r'\\textcolor\{[^}]*\}\{([^}]*)\}')
+#: \color{цвет} — переключатель без своих аргументов-содержимого, убирается целиком.
+_COLOR_SWITCH_RE = re.compile(r'\\color\{[^}]*\}')
+
+
+def strip_color(text):
+    """Убрать \\color/\\textcolor, оставить содержимое без цвета."""
+    text = _TEXTCOLOR_RE.sub(r'\1', text)
+    text = _COLOR_SWITCH_RE.sub('', text)
+    return text
+
+
+#: Комментарий — '%' в начале строки (после необязательных пробелов),
+#: НЕ экранированный '\%'. Ловушка задокументирована в атласе: снимать
+#: комментарии нужно ДО остального разбора, но '\%' — легитимный процент.
+_TEX_COMMENT_RE = re.compile(r'(^|\n)[ \t]*%[^\n]*', re.MULTILINE)
+
+
+def strip_tex_comments(text):
+    """Убрать TeX-комментарии (только в начале строк, не в середине текста)."""
+    return _TEX_COMMENT_RE.sub(r'\1', text)

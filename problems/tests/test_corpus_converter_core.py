@@ -32,3 +32,47 @@ class ProtectMathTests(SimpleTestCase):
         protected_text, spans = protect_math(text)
         self.assertNotIn('array', protected_text)
         self.assertEqual(restore_math(protected_text, spans), text)
+
+
+class StripJunkCommandsTests(SimpleTestCase):
+    def test_removes_medskip_and_friends_without_trace(self):
+        from problems.corpus_converter.core import strip_junk_commands
+        text = 'Первая часть.\\medskip\n\\noindent Вторая часть.\\quad\\qquad'
+        result = strip_junk_commands(text)
+        self.assertNotIn('\\medskip', result)
+        self.assertNotIn('\\noindent', result)
+        self.assertNotIn('\\quad', result)
+        self.assertIn('Первая часть.', result)
+        self.assertIn('Вторая часть.', result)
+
+
+class StripColorTests(SimpleTestCase):
+    def test_textcolor_keeps_content_drops_color(self):
+        from problems.corpus_converter.core import strip_color
+        text = 'Ответ: \\textcolor{red}{неверно}.'
+        self.assertEqual(strip_color(text), 'Ответ: неверно.')
+
+    def test_bare_color_switch_removed(self):
+        from problems.corpus_converter.core import strip_color
+        text = '\\color{blue}Текст синим.'
+        self.assertEqual(strip_color(text), 'Текст синим.')
+
+
+class StripTexCommentsTests(SimpleTestCase):
+    def test_removes_comment_line_start(self):
+        from problems.corpus_converter.core import strip_tex_comments
+        text = 'Условие.\n% Q = 2KL (KL=16)\nОтвет: 5.'
+        result = strip_tex_comments(text)
+        self.assertNotIn('Q = 2KL', result)
+        self.assertIn('Условие.', result)
+        self.assertIn('Ответ: 5.', result)
+
+    def test_keeps_escaped_percent(self):
+        from problems.corpus_converter.core import strip_tex_comments
+        text = 'Ставка 20\\% годовых.'
+        self.assertEqual(strip_tex_comments(text), text)
+
+    def test_keeps_percent_in_prose(self):
+        from problems.corpus_converter.core import strip_tex_comments
+        text = 'Курс вырос на 20% за год.'
+        self.assertEqual(strip_tex_comments(text), text)
