@@ -127,3 +127,50 @@ class ParseSolvehubCriteriaTests(SimpleTestCase):
         result = parse_solvehub_criteria(text)
         self.assertEqual(result['criteria'], [])
         self.assertEqual(result['warnings'], [])
+
+
+class ParseSolvehubCriteriaMultiHeaderDefectTests(SimpleTestCase):
+    """Дефект 3, найден ревью 2026-08-26: задача #3498 — three-part answer
+    "1) ... 2) ... 3) ..." с ТРЕМЯ отдельными разделами «Критерии» (по
+    одному на часть). Раньше искали только первый заголовок и сканировали
+    до конца answer_md — regex «N)» цеплял границы частей 2 и 3 как будто
+    это пункты критериев, а настоящие (текстом, без "N)"/"-") критерии
+    части 1 терялись без единого warning. Выжимка ниже сохраняет реальную
+    структуру #3498 (номерованные части + три заголовка «Критерии»), но
+    короче полного answer_md (8605 симв. в оригинале)."""
+
+    REAL_STRUCTURE_EXCERPT = (
+        '1) Первое решение $\\pi = 100$.\n\n'
+        'Ответ: $15$  недель - $1$  балл\n\n'
+        'Критерии при отличающемся решении:\n\n'
+        '$1$  балл за весь пункт – если потеряно условие А.\n\n'
+        '$1$  балл за весь пункт – если потеряно условие Б.\n\n'
+        '2) Второе решение начинается здесь, с формулами '
+        '$\\pi = 44400$ −$1$ балл и другими деталями.\n\n'
+        'Критерии в случае неправильных решений:\n\n'
+        'Ответ «неверно» оценивался в $0$ баллов.\n\n'
+        '3) Третье решение теперь начинается тут.\n\n'
+        '***Критерии оценивания:***\n\n'
+        'За полностью правильное решение ставилось $3$ балла.'
+    )
+
+    def test_no_false_criteria_stolen_from_next_part_boundaries(self):
+        # Раньше здесь фабриковались 2 "критерия" из текста частей 2/3.
+        result = parse_solvehub_criteria(self.REAL_STRUCTURE_EXCERPT)
+        self.assertEqual(result['criteria'], [])
+
+    def test_warns_about_each_disqualified_part_boundary_section(self):
+        result = parse_solvehub_criteria(self.REAL_STRUCTURE_EXCERPT)
+        boundary_warnings = [w for w in result['warnings'] if 'границы частей' in w]
+        self.assertEqual(len(boundary_warnings), 2)
+        self.assertTrue(any('"2)"' in w for w in boundary_warnings))
+        self.assertTrue(any('"3)"' in w for w in boundary_warnings))
+
+    def test_warns_about_unclaimed_points_in_part_one_real_criteria(self):
+        # Часть 1 несёт настоящие критерии текстом без "N)"/"-" — не
+        # извлекаются структурно, но обязаны быть видны как warning, а не
+        # молчание (это и есть эвристика-страховка из брифа).
+        result = parse_solvehub_criteria(self.REAL_STRUCTURE_EXCERPT)
+        unclaimed = [w for w in result['warnings'] if 'вне извлечённых критериев' in w]
+        self.assertTrue(any('условие А' in w for w in unclaimed))
+        self.assertTrue(any('условие Б' in w for w in unclaimed))
