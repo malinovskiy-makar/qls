@@ -374,3 +374,80 @@ def convert_text_field(text):
         'complex_table': complex_table,
         'warnings': warnings,
     }
+
+
+#: а)/б)/в)... в начале строки — ЕДИНСТВЕННЫЙ доверенный маркер подпункта
+#: в этом модуле (кириллический буквенный список с закрывающей скобкой).
+#: Латинские a)/A) и другие конвенции атласа — вне пилота (только ILE и
+#: Школково; у обоих в проверенных сэмплах кириллическая метка).
+_SUBPOINT_RE = re.compile(r'(?m)^\s*([а-я])\)\s+')
+
+
+def _detect_subpoints(text):
+    """Разбить текст на (интро, [(метка, текст_пункта), ...]) по а)/б)/в).
+    Без совпадений — (весь_текст, [])."""
+    matches = list(_SUBPOINT_RE.finditer(text))
+    if not matches:
+        return text, []
+    intro = text[:matches[0].start()].strip()
+    parts = []
+    for i, match in enumerate(matches):
+        label = match.group(1)
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        parts.append((label, text[start:end].strip()))
+    return intro, parts
+
+
+def convert_problem(statement, answer='', solution='', existing_parts=None):
+    """Вся задача (одно текстовое поле условия + опционально ответ/решение)
+    через конвейер. Возвращает структуру Фазы 0 из брифа сессии.
+
+    existing_parts=[(label, statement), ...] — режим UPDATE (ILE): части
+    уже есть в базе как ProblemPart, из текста заново их не вычленяем,
+    только прогоняем через convert_text_field как есть.
+
+    existing_parts=None — режим INSERT (Школково): пытаемся найти
+    а)/б)/в) внутри statement сами."""
+    images = []
+    warnings = []
+    complex_table = False
+
+    def _merge(field_result):
+        nonlocal complex_table
+        images.extend(field_result['images'])
+        warnings.extend(field_result['warnings'])
+        if field_result['complex_table']:
+            complex_table = True
+        return field_result['text_md']
+
+    if existing_parts is not None:
+        intro_text = statement
+        raw_parts = existing_parts
+    else:
+        intro_text, raw_parts = _detect_subpoints(statement)
+
+    statement_md = _merge(convert_text_field(intro_text))
+
+    parts = []
+    for label, part_statement in raw_parts:
+        part_result = convert_text_field(part_statement)
+        parts.append({
+            'label': label,
+            'statement_md': _merge(part_result),
+            'answer': '',
+        })
+
+    if answer:
+        _merge(convert_text_field(answer))
+    if solution:
+        _merge(convert_text_field(solution))
+
+    return {
+        'statement_md': statement_md,
+        'parts': parts,
+        'rubric': None,
+        'images': images,
+        'complex_table': complex_table,
+        'warnings': warnings,
+    }

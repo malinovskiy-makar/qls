@@ -3,6 +3,7 @@ from django.test import SimpleTestCase
 from problems.corpus_converter.core import (
     wrap_bare_environments, protect_math, restore_math,
     normalize_dashes, normalize_quotes, find_images, convert_text_field,
+    convert_problem,
 )
 
 
@@ -321,3 +322,49 @@ class RendererRoundTripTests(SimpleTestCase):
         self.assertIn('<strong>Фирма</strong>', html)
         self.assertIn('<li>Спрос</li>', html)
         self.assertIn('$\\pi = P \\cdot Q - C(Q)$', html)
+
+
+class ConvertProblemTests(SimpleTestCase):
+    def test_update_mode_uses_existing_parts_as_is(self):
+        # ILE-подобный случай: подпункты уже в базе как ProblemPart, из
+        # текста заново их вычленять не нужно и не следует.
+        result = convert_problem(
+            statement='Общее условие с \\textbf{данными}.',
+            existing_parts=[('а', 'Найдите $Q$.'), ('б', 'Найдите $P$.')],
+        )
+        self.assertEqual(len(result['parts']), 2)
+        self.assertEqual(result['parts'][0]['label'], 'а')
+        self.assertIn('$Q$', result['parts'][0]['statement_md'])
+        self.assertIn('**данными**', result['statement_md'])
+
+    def test_insert_mode_detects_subpoints_from_raw_text(self):
+        # Школково-подобный случай: подпункты живут внутри statement_tex
+        # текстом, existing_parts не передан вовсе.
+        text = 'Дано уравнение спроса.\nа) Найдите $Q$.\nб) Найдите $P$.'
+        result = convert_problem(statement=text, existing_parts=None)
+        self.assertEqual(len(result['parts']), 2)
+        self.assertEqual(result['parts'][0]['label'], 'а')
+        self.assertIn('Найдите $Q$', result['parts'][0]['statement_md'])
+        self.assertIn('Дано уравнение спроса.', result['statement_md'])
+
+    def test_insert_mode_no_subpoints_found_gives_empty_parts(self):
+        result = convert_problem(statement='Обычная задача без пунктов.', existing_parts=None)
+        self.assertEqual(result['parts'], [])
+
+    def test_candidate_parts_always_have_answer_key(self):
+        # ProblemPart.answer не blank=True — кандидат обязан нести ключ,
+        # даже пустой, иначе будущий реальный импорт споткнётся.
+        result = convert_problem(
+            statement='Условие.\nа) Пункт без ответа в тексте.',
+            existing_parts=None,
+        )
+        self.assertIn('answer', result['parts'][0])
+
+    def test_images_and_complex_table_bubble_up_from_all_fields(self):
+        result = convert_problem(
+            statement='\\includegraphics{gr.png}',
+            answer='',
+            solution='\\begin{tabular}{|l|l|}\\multicolumn{2}{|c|}{X}\\end{tabular}',
+        )
+        self.assertEqual(result['images'], [{'original_ref': 'gr.png', 'kind': 'includegraphics'}])
+        self.assertTrue(result['complex_table'])
