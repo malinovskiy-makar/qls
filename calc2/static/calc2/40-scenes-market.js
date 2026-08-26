@@ -153,8 +153,15 @@ function recompute() {
     STATE.taxAfterD = adv
       ? { fn: q => { const d = evalCurve(STATE.D, q); return isNaN(d) ? NaN : d / factor; },
           texExpr: dSrc ? '(' + dSrc + ') / ' + factor : '' }
-      : { fn: q => evalCurve(STATE.D, q) - STATE.tax,
-          texExpr: dSrc ? '(' + dSrc + ') - (' + STATE.tax + ')' : '' };
+      /* ⚠️ ЗНАК БЕРЁТСЯ У `shift`, А НЕ У СТАВКИ.
+         Здесь стояло `- STATE.tax`, то есть знак был жёстко налоговым: при
+         субсидии покупателю эффективный спрос ПОДНИМАЕТСЯ на ставку, а
+         рисовался бы опущенным. `shift` уже несёт знак (`isSub ? -tax : tax`),
+         поэтому вычитание его даёт оба случая разом: налог D − t, субсидия
+         D + s. Процентную ветку (`d / factor`) это не касается — она верна
+         для всех четырёх форм таблицы PCT_FORMS. */
+      : { fn: q => evalCurve(STATE.D, q) - shift,
+          texExpr: dSrc ? '(' + dSrc + ') - (' + shift + ')' : '' };
     STATE.taxCurveOn = true;
 
     const te = findEquilibrium(STATE.D, sAfter);
@@ -1441,6 +1448,18 @@ function sumLinearRecord(groups) {
 
   // Точки излома по количеству — границы участков, кроме самого начала.
   const breaks = segs.map(x => x.lo).filter(x => x > 1e-9);
+  /* ⚠️ ПРАВЫЙ КОНЕЦ ОБЛАСТИ ОПРЕДЕЛЕНИЯ — ЭТО НЕ ИЗЛОМ, НО ЭТО УЗЕЛ.
+     В `breaks` лежат только ЛЕВЫЕ края участков, и правого конца записи
+     (у спроса 100−Q и 60−Q это Q = 160) среди них нет. Пока правый край окна
+     был левее 160, узел `hi` считался и линия рисовалась целиком; как только
+     окно стало шире области определения, узел `hi` дал NaN, точка стала
+     null — и путь оборвался на последнем живом узле, то есть на изломе
+     (замер 26.08: последняя точка пути (40; 60) вместо (160; 0)).
+
+     Отдаём правый конец отдельным полем. В `breaks` его дописывать НЕЛЬЗЯ:
+     оттуда читают ключевые точки (лишняя отметка на графике) и
+     integrateBroken — а конец кривой изломом не является. */
+  const domainTo = segs[segs.length - 1].hi;
   /* Собираем цепочку условий тем же способом, что и конструктор кусочной:
      показывать её плоским списком умеет condChainToCases (82-input.js).
      Хвост NaN означает «вне участков функции нет» — там она не рисуется. */
@@ -1453,7 +1472,7 @@ function sumLinearRecord(groups) {
     if (out === null) { out = cond + ' ? ' + body + ' : NaN'; continue; }
     out = cond + ' ? ' + body + ' : (' + out + ')';
   }
-  return { expr: out, breaks: breaks, ghostTo: ghostTo };
+  return { expr: out, breaks: breaks, ghostTo: ghostTo, domainTo: domainTo };
 }
 
 /* ⚠️ ИНТЕГРАЛ ПОД ЛОМАНОЙ СЧИТАЕТСЯ ПО УЧАСТКАМ, А НЕ ОДНОЙ СЕТКОЙ.
@@ -1553,6 +1572,7 @@ function sumRebuildSide(side) {
   const groups = sumGroupsOf(side);
   cur.linear = null; cur.compiled = null; cur.fn = null; cur.sumBreaks = [];
   cur.sumGhostTo = 0;
+  cur.sumDomainTo = 0;
   if (!groups.length) { cur.expr = ''; cur.sumNumeric = false; return; }
   const rec = sumLinearRecord(groups);
   if (rec) {
@@ -1563,11 +1583,20 @@ function sumRebuildSide(side) {
     cur.expr = rec.expr; cur.compiled = compiled; cur.sumNumeric = false;
     cur.sumBreaks = rec.breaks;
     cur.sumGhostTo = rec.ghostTo || 0;
+    /* Правый конец собственной области определения записи — тоже узел кривой
+       (см. sumLinearRecord). Без него линия обрывается на последнем изломе,
+       как только окно шире области. */
+    cur.sumDomainTo = rec.domainTo || 0;
   } else {
     const pts = sumPolyline(groups);
     /* Ломаная затыкает ту же дырку у нуля (см. sumPolyline), и помечать её
        надо тем же признаком: иначе у нелинейных групп пунктира не было бы. */
     cur.sumGhostTo = (pts._ghostTo || 0);
+    /* У численной суммы область определения кончается там, где кончается сама
+       ломаная. Узлами эта ветка не пользуется (изломы найдены приблизительно,
+       и доверять им нельзя), но правый конец знать полезно: по нему меряется
+       та же проверка, что и у аналитической ветки. */
+    cur.sumDomainTo = pts.length ? pts[pts.length - 1][0] : 0;
     cur.expr = 'сумма посчитана по точкам';
     cur.fn = (q) => interpY(pts, q);
     cur.sumNumeric = true;
@@ -1829,17 +1858,29 @@ function sumGroupStats() {
 }
 
 
-/* Запись обеих суммарных кривых, набранная математикой. */
-function sumRecordHtml() {
-  const one = (side, title) => {
+/* Записи обеих суммарных кривых — данными, а не разметкой.
+
+   ⚠️ РАЗМЕТКУ ЗДЕСЬ БОЛЬШЕ НЕ ВЕРСТАЕМ. До 26.08 запись печаталась в
+   `#info-sum` внутри `<div class="sb-note">` — и общий проход
+   `moveExplanations` уносил её в «Объяснение модели», где по умолчанию
+   свёрнуто. Теперь верстает один помощник `setFinalFunctions` (86-workspace.js),
+   а сцена только отдаёт ему имя, цвет и саму запись. */
+function sumFinalRecords() {
+  const one = (side, name) => {
     const c = STATE.curves.find(x => x.kind === 'sum' && x.sumGroup === side);
-    if (!c || !c.expr) return '';
-    if (c.sumNumeric) return `<div class="sb-note"><b>${title}</b><br>Среди групп есть непрямая, ` +
-      `поэтому сумма посчитана по точкам — записи по участкам у неё нет.</div>`;
-    const tex = (typeof mathToLatexField === 'function') ? mathToLatexField(c.expr) : c.expr;
-    return `<div class="sb-note"><b>${title}</b><br>$P = ${tex}$</div>`;
+    if (!c || !c.expr) return null;                 // групп нет — и записи нет
+    if (c.sumNumeric) {
+      return { name, color: c.color,
+               note: 'Среди групп есть непрямая, поэтому сумма посчитана по точкам: '
+                   + 'записи по участкам у неё нет.' };
+    }
+    /* Запись обратная: цена как функция количества, ровно та, по которой
+       кривая и считается (одно значение — один источник). Левая часть «P»
+       живёт отдельным полем: в expr её нет, потому что expr обязан
+       вставляться обратно в поле формулы как есть. */
+    return { name, color: c.color, expr: c.expr, lhs: 'P' };
   };
-  return one('D', 'Рыночный спрос') + one('S', 'Рыночное предложение');
+  return [one('D', 'Рыночный спрос $D$'), one('S', 'Рыночное предложение $S$')].filter(Boolean);
 }
 // Табло «По группам»: количество и излишек каждой группы плюс сумма.
 function updateSumPanel() {
@@ -1847,6 +1888,11 @@ function updateSumPanel() {
   const box = document.getElementById('info-sum');
   if (!box) return;
   if (!sumSceneOn()) { box.innerHTML = ''; return; }
+  /* ⚠️ ЗАПИСЬ КРИВОЙ НЕ ЗАВИСИТ ОТ ТОГО, ЕСТЬ ЛИ РАВНОВЕСИЕ. Это свойство
+     набора групп, а не точки пересечения: то же правило, по которому кривая
+     после вмешательства рисуется на рынке без равновесия. Поэтому итоговые
+     функции ставятся ДО проверки на равновесие. */
+  if (typeof setFinalFunctions === 'function') setFinalFunctions(sumFinalRecords());
   const st = sumGroupStats();
   if (!st) {
     box.innerHTML = '<div class="muted">Суммарные кривые не пересекаются: равновесия нет.</div>';
@@ -1864,12 +1910,23 @@ function updateSumPanel() {
     h += `<div class="stat"><span>вместе $${tag}$</span><b>${fmt(sSum)}</b></div>`;
     return h;
   };
-  /* АНАЛИТИЧЕСКАЯ ЗАПИСЬ суммарных кривых — не картинка, а формула по
-     участкам. Показываем ту же строку, по которой кривая и считается
-     (одно значение — один источник); плоским списком её печатает
-     condChainToCases из 82-input.js. */
-  let html = sumRecordHtml();
+  let html = '';
   html += `<div class="stat"><span>Равновесная цена $P^*$</span><b>${fmt(st.P)}</b></div>`;
+  /* ⚠️ РАЗБОР ОСТАЛСЯ, ХОТЯ ЗАПИСЬ ИЗ НЕГО УЕХАЛА, И ЭТО НЕ МЕЛОЧЬ.
+     Единственной врезкой этой сцены была сама запись; унеся её в «Ключевые
+     значения», мы оставили бы «Объяснение модели» пустым — а пустой раскрытый
+     блок читается как недоделка (та же беда, что описана в hasAnalytics).
+     Величина уехала в табло, объяснение осталось объяснением: здесь сказано,
+     ОТКУДА у записи участки, а не какая она. */
+  html += '<div class="sb-note"><b>Как это получилось</b>'
+        + '<p><b>Почему у рыночной кривой участки?</b> Складываем по горизонтали: '
+        + 'при каждой цене берём количество КАЖДОЙ группы и складываем эти количества. '
+        + 'Пока цена выше запретительной цены группы, эта группа не торгует вовсе и в '
+        + 'сумму не входит; как только цена доходит до неё, группа включается, и наклон '
+        + 'рыночной кривой в этот момент меняется. Отсюда и излом, и участки в записи.</p>'
+        + '<p>Сама запись стоит первой в «Ключевых значениях», блоком «Итоговая функция»: '
+        + 'это посчитанная величина, а не разбор. По ней кривая и рисуется: второй '
+        + 'математики здесь нет.</p></div>';
   html += rows(st.D, 'Покупатели по группам', st.qD, st.csGroups, 'CS');
   html += rows(st.S, 'Продавцы по группам', st.qS, st.psGroups, 'PS');
   /* Сходимость двух путей печатается, а не проверяется молча: расхождение
@@ -1943,6 +2000,21 @@ function updateAreasPanel() {
    БЛОК 8. СЦЕНАРИЙ «НАЛОГ» — сдвиг предложения, новые области, клин.
    --------------------------------------------------------------------- */
 
+/* НА ЧЬЕЙ СТОРОНЕ ВМЕШАТЕЛЬСТВО — ОДИН ВОПРОС И ОДИН ОТВЕТ НА ВЕСЬ ФАЙЛ.
+   Спрашивают его трое: отрисовка сдвинутой кривой, её имя и блок «Итоговая
+   функция». Пока ответ считался на месте у каждого, они могли разъехаться —
+   и разъехались. */
+/* ⚠️ СТОРОНА ЧИТАЕТСЯ У ОБОИХ ВИДОВ ВМЕШАТЕЛЬСТВА, А НЕ ТОЛЬКО У НАЛОГА.
+   Здесь стояло `STATE.intervType === 'tax' && …`, и у субсидии сторона не
+   читалась вовсе: переключатель «Субсидию получает: Покупатель» на графике
+   не менял ничего (замер 26.08 — сдвинутой по-прежнему рисовалась S − s).
+   У процентных форм сторона закреплена самой формой (`setTaxForm` ставит
+   `taxSide = 'seller'` при `pctForm()`), поэтому лишнего здесь не сработает. */
+function intervOnBuyer() {
+  const rate = (STATE.intervType === 'tax' || STATE.intervType === 'subsidy');
+  return rate && STATE.taxSide === 'buyer';
+}
+
 // Сдвинутая пунктиром кривая. При налоге на ПРОДАВЦА (по умолчанию) и при субсидии
 // двигается предложение (S ± ставка). При налоге на ПОКУПАТЕЛЯ (Задача 1) двигается
 // спрос вниз (D − t): эффективный спрос. Итоговые числа в обоих случаях идентичны —
@@ -1952,7 +2024,7 @@ function drawShiftedSupply() {
      Прежде здесь стоял STATE.taxActive, и на рынке без равновесия кривая не
      рисовалась вовсе — хотя сдвиг и поворот равновесия не спрашивают. */
   if (!STATE.taxCurveOn) return;
-  const buyerTax = (STATE.intervType === 'tax' && STATE.taxSide === 'buyer');
+  const buyerTax = intervOnBuyer();
   const base = buyerTax ? STATE.D : STATE.S;              // чью кривую рисуем сдвинутой
   // Берём ГОТОВУЮ функцию «после вмешательства» из recompute — она уже знает,
   // сдвиг это (потоварное) или поворот (адвалорное). Никакой параллельной математики.
@@ -1975,7 +2047,9 @@ function drawShiftedSupply() {
   const isSub = (STATE.intervType === 'subsidy');
   // Имя сдвинутой кривой берём из той же строки таблицы, что и её множитель:
   // иначе на графике оказалась бы подпись от другой формы.
-  const nm = buyerTax ? (pf ? pf.curveD : 'D − t')
+  /* Имя сдвинутой кривой: у субсидии покупателю это D + s, а не D − t.
+     Знак у обеих сторон один и тот же — налог опускает, субсидия поднимает. */
+  const nm = buyerTax ? (pf ? pf.curveD : (isSub ? 'D + s' : 'D − t'))
                       : (pf ? pf.curve : (isSub ? 'S − s' : 'S + t'));
   labelCurve(g, q => evalCurve(after, q), nm, base.color, { from: 0.82 });
 }
@@ -2371,6 +2445,8 @@ function applyIntervCascade() {
   show('taxside-row', sideOn);
   const sl = document.getElementById('taxside-label');
   if (sl) sl.textContent = isSub ? 'Субсидию получает:' : 'Налог платит:';
+  // Подсказка — такой же уровень каскада, как всё остальное здесь.
+  syncTaxHint();
 }
 
 /* Уровень 2 каскада: вид налога ('unit' | 'vat' | 'excise') или вид субсидии
@@ -2493,12 +2569,34 @@ function applyTaxRateBounds() {
   // читается как процент, «Ставка τ, % = 50» — как непонятно что.
   const ru = document.getElementById('rate-unit');
   if (ru) ru.textContent = rateUnit() ? ' %' : '';
+}
+
+/* ⚠️ ПОДСКАЗКА ГОВОРИТ ПРО ТУ КРИВУЮ, КОТОРАЯ СЕЙЧАС ДВИГАЕТСЯ.
+   Текст был постоянным — «на стороне производителя: кривая S сдвигается», — и
+   при выборе «Субсидию получает: Покупатель» он врал вместе с графиком
+   (замер 26.08). Собирается здесь, вместе с остальным каскадом, поэтому
+   меняется вслед за стороной, а не живёт своей жизнью. */
+function syncTaxHint() {
   const h = document.getElementById('tax-hint');
   if (!h) return;
-  h.innerHTML = pf ? pf.hint
-    : 'Потоварное вмешательство на стороне производителя: кривая S <b>сдвигается</b> ' +
-      'на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя ' +
-      'и продавца можно тянуть мышью.';
+  const pf = pctForm();
+  if (pf) { h.innerHTML = pf.hint; return; }
+  const isSub = (STATE.intervType === 'subsidy');
+  const onBuyer = intervOnBuyer();
+  // Вверх: налог продавцу и субсидия покупателю. Вниз: налог покупателю и
+  // субсидия продавцу. Одним признаком — совпали ли «субсидия» и «покупатель».
+  const up = (isSub === onBuyer);
+  const what = isSub ? 'субсидия' : 'налог';
+  const who = onBuyer ? 'покупателя' : 'производителя';
+  const curve = onBuyer ? 'кривая спроса D' : 'кривая предложения S';
+  const sign = onBuyer ? (isSub ? 'D + s' : 'D − t') : (isSub ? 'S − s' : 'S + t');
+  h.innerHTML = 'Потоварн' + (isSub ? 'ая ' : 'ый ') + what + ' на стороне ' + who
+    + ': ' + curve + ' <b>сдвигается</b> ' + (up ? 'вверх' : 'вниз')
+    /* ⚠️ БЕЗ ДЛИННОГО ТИРЕ: в калькуляторе оно запрещено (проверка
+       «в интерфейсе нет длинных тире» в calc2_ui.mjs). */
+    + ' на величину ставки (' + sign + '). Объём и цены от выбора стороны не меняются: '
+    + 'меняется только то, какую кривую мы рисуем сдвинутой. '
+    + 'Клин между ценами покупателя и продавца можно тянуть мышью.';
 }
 
 /* Старый вход «вид ставки» ('unit' | 'advalorem'). Оставлен рабочим: на него
@@ -2528,6 +2626,25 @@ function updateTaxPanel() {
     box.innerHTML = '<div class="muted">Сначала отметьте кривые D и S.</div>'; return;
   }
   const isSub = (STATE.intervType === 'subsidy');
+  /* ИТОГОВАЯ ФУНКЦИЯ — кривая ПОСЛЕ вмешательства. Условие то же, что у её
+     отрисовки (`taxCurveOn`), а не «нашлось ли новое равновесие»: сдвиг и
+     поворот кривой равновесия не спрашивают. Источник записи один и тот же —
+     `texExpr`, посчитанный в recompute рядом с самой функцией. */
+  if (typeof setFinalFunctions === 'function') {
+    const onBuyer = intervOnBuyer();
+    const after = onBuyer ? STATE.taxAfterD : STATE.taxAfterS;
+    const base = onBuyer ? STATE.D : STATE.S;
+    if (STATE.taxCurveOn && after && after.texExpr && base) {
+      const what = onBuyer ? 'Спрос' : 'Предложение';
+      const tag = onBuyer ? "$D'$" : "$S'$";
+      setFinalFunctions([{
+        name: what + ' после ' + (isSub ? 'субсидии' : 'налога') + ' ' + tag,
+        color: base.color, lhs: 'P', expr: after.texExpr,
+      }]);
+    } else {
+      setFinalFunctions([]);
+    }
+  }
   if (!STATE.taxActive) {
     /* Ставка задана, кривая после вмешательства построена, а рынка всё равно
        нет: спрос и новое предложение не пересеклись в первой четверти.
@@ -2619,6 +2736,9 @@ function updateTaxPanel() {
 function setTaxSide(side) {
   STATE.taxSide = side;
   setTaxSideButtons();
+  /* Каскад пересобирается целиком: от стороны зависит не только подсветка
+     кнопки, но и подсказка под ставкой (см. syncTaxHint). */
+  applyIntervCascade();
   redrawAll();
 }
 
