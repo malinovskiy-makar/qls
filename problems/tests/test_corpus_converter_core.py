@@ -76,3 +76,24 @@ class StripTexCommentsTests(SimpleTestCase):
         from problems.corpus_converter.core import strip_tex_comments
         text = 'Курс вырос на 20% за год.'
         self.assertEqual(strip_tex_comments(text), text)
+
+
+class ConvertEmphasisTests(SimpleTestCase):
+    def test_textbf_to_markdown_bold(self):
+        from problems.corpus_converter.core import convert_emphasis
+        self.assertEqual(convert_emphasis('\\textbf{Важно}'), '**Важно**')
+
+    def test_textit_and_emph_to_markdown_italic(self):
+        from problems.corpus_converter.core import convert_emphasis
+        self.assertEqual(convert_emphasis('\\textit{тонко}'), '*тонко*')
+        self.assertEqual(convert_emphasis('\\emph{тонко}'), '*тонко*')
+
+    def test_existing_markdown_bold_untouched(self):
+        from problems.corpus_converter.core import convert_emphasis
+        self.assertEqual(convert_emphasis('**уже жирный**'), '**уже жирный**')
+
+    def test_does_not_touch_star_inside_math(self):
+        from problems.corpus_converter.core import convert_emphasis
+        text, protected = protect_math('Оптимум $Q^*=20$, цена $P^*=5$.')
+        result = restore_math(convert_emphasis(text), protected)
+        self.assertEqual(result, 'Оптимум $Q^*=20$, цена $P^*=5$.')

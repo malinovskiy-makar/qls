@@ -109,3 +109,21 @@ _TEX_COMMENT_RE = re.compile(r'(^|\n)[ \t]*%[^\n]*', re.MULTILINE)
 def strip_tex_comments(text):
     """Убрать TeX-комментарии (только в начале строк, не в середине текста)."""
     return _TEX_COMMENT_RE.sub(r'\1', text)
+
+
+#: \textbf{X} -> **X**; \textit{X}/\emph{X} -> *X*. Нежадный [^}]* — без
+#: вложенных фигурных скобок внутри аргумента (в банке их не встречалось,
+#: см. атлас: собственных макросов в телах практически нет).
+_TEXTBF_RE = re.compile(r'\\textbf\{([^}]*)\}')
+_TEXTIT_EMPH_RE = re.compile(r'\\(?:textit|emph)\{([^}]*)\}')
+
+
+def convert_emphasis(text):
+    """LaTeX \\textbf/\\textit/\\emph -> markdown **/*. Уже-markdown
+    **жирный**/*курсив* проходит без изменений (regex их не матчит).
+    Вызывать ТОЛЬКО на math-protected тексте — иначе `$Q^*$` пострадает
+    от парсера markdown позже, но сам этот шаг звёздочки не трогает вовсе,
+    только \\textbf/\\textit/\\emph."""
+    text = _TEXTBF_RE.sub(r'**\1**', text)
+    text = _TEXTIT_EMPH_RE.sub(r'*\1*', text)
+    return text
