@@ -16,6 +16,20 @@ class RenderEntryTests(SimpleTestCase):
         self.assertIn('\\textbf{Старое}', entry)
         self.assertIn('**Старое**', entry)
 
+    def test_list_value_renders_one_item_per_line(self):
+        entry = render_entry(
+            problem_id=1,
+            source_label='Школково',
+            before={'criteria_tex': 'raw'},
+            after={'rubric_criteria': [
+                {'name': '(a) crit one', 'max_points': 3.0},
+                {'name': '(б) crit two', 'max_points': 2.0},
+            ]},
+        )
+        self.assertIn('rubric_criteria:', entry)
+        self.assertIn("- {'name': '(a) crit one', 'max_points': 3.0}", entry)
+        self.assertIn("- {'name': '(б) crit two', 'max_points': 2.0}", entry)
+
 
 class RenderReportTests(SimpleTestCase):
     def test_report_includes_title_and_all_entries(self):

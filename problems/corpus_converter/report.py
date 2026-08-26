@@ -5,6 +5,21 @@ corpus_pilot_shkolkovo — чтобы формат записи не разъе�
 from __future__ import annotations
 
 
+def _render_fields(fields):
+    """Один ряд полей dict-а: каждое поле — одна строка `key: value`,
+    кроме списков: непустой список рисуется заголовком и построчно, каждый
+    элемент — своей строкой с отступом (не сырой repr)."""
+    out = []
+    for key, value in fields.items():
+        if isinstance(value, list) and value:
+            out.append(f'{key}:')
+            for item in value:
+                out.append(f'  - {item}')
+        else:
+            out.append(f'{key}: {value}')
+    return out
+
+
 def render_entry(problem_id, source_label, before, after, extra_note=''):
     """Один блок отчёта: заголовок с id/источником, «было» (сырые поля из
     before), «стало» (converted-поля из after)."""
@@ -14,14 +29,12 @@ def render_entry(problem_id, source_label, before, after, extra_note=''):
         lines.append('')
     lines.append('**Было:**')
     lines.append('```')
-    for key, value in before.items():
-        lines.append(f'{key}: {value}')
+    lines.extend(_render_fields(before))
     lines.append('```')
     lines.append('')
     lines.append('**Стало:**')
     lines.append('```')
-    for key, value in after.items():
-        lines.append(f'{key}: {value}')
+    lines.extend(_render_fields(after))
     lines.append('```')
     lines.append('')
     return '\n'.join(lines)
