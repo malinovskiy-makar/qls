@@ -44,7 +44,10 @@ class Command(BaseCommand):
         }
 
         existing_hashes = set(
-            Problem.objects.exclude(content_hash='').values_list('content_hash', flat=True)
+            Problem.objects
+            .exclude(content_hash='')
+            .exclude(source_references__source__name='Служебное: фикстуры рендерера (не публиковать)')
+            .values_list('content_hash', flat=True)
         )
 
         candidates = []

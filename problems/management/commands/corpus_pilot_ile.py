@@ -36,14 +36,27 @@ class Command(BaseCommand):
         processed = []
         warnings_total = []
         complex_table_ids = []
+        # По id, а не одной переменной из последней итерации цикла — она
+        # нужна повторно в отдельном цикле построения entries ниже (по
+        # семплу, не по порядку обработки), и просто "existing_parts" там
+        # держала бы значение последней задачи из ЭТОГО цикла для всех.
+        existing_parts_by_id = {}
 
         for problem in qs.iterator(chunk_size=300):
             existing_parts = [(part.label, part.statement) for part in problem.parts.all()]
+            existing_parts_by_id[problem.id] = existing_parts
             result = convert_problem(
                 statement=problem.statement,
                 answer=problem.answer,
                 solution=problem.solution,
-                existing_parts=existing_parts or None,
+                # ⚠️ НЕ "existing_parts or None": пустой список [] — это
+                # легитимный сигнал «частей нет», а не «не проверяли». `or
+                # None` схлопывал его в None и включал автодетект по а)/б)/в)
+                # (режим INSERT, для Школково) — у 78% задач ILE (3117 из
+                # 3978) это давало ложные срабатывания вплоть до переноса
+                # всего statement в один part. UPDATE-режим сам корректно
+                # обрабатывает пустой список (даёт пустой parts).
+                existing_parts=existing_parts,
             )
             processed.append((problem, result))
             warnings_total.extend(f'#{problem.id}: {w}' for w in result['warnings'])
@@ -80,6 +93,10 @@ class Command(BaseCommand):
                 source_label=f'ILE (human_review={problem.human_review or "не смотрели"})',
                 before={
                     'statement': problem.statement,
+                    'parts': [
+                        {'label': label, 'statement': part_statement}
+                        for label, part_statement in existing_parts_by_id[problem.id]
+                    ],
                     'answer': problem.answer,
                     'solution': problem.solution,
                 },

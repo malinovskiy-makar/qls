@@ -54,4 +54,10 @@ def parse_shkolkovo_criteria(criteria_tex):
             })
             order += 1
 
+    if not criteria:
+        warnings.append(
+            f'criteria_tex непустой ({len(criteria_tex)} симв.), но не распознано ни одного '
+            f'критерия — формат не соответствует ожидаемому \\textbf{{(метка)}}\\begin{{itemize}}'
+        )
+
     return {'rubric_name': 'Критерии оценивания', 'criteria': criteria, 'warnings': warnings}

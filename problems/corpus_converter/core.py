@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 
-from problems.rendering import _protect_math_and_currency, _restore_math_and_currency
+from problems.rendering import _protect_math_and_currency
 
 #: Голые окружения — те же, что CORPUS-FORMAT.md §3 и атлас источников:
 #: equation/align/gather (со звёздочкой или без). cases НЕ входит — оно

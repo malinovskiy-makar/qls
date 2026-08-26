@@ -47,3 +47,18 @@ class ParseShkolkovoCriteriaTests(SimpleTestCase):
         result = parse_shkolkovo_criteria(text)
         self.assertEqual(result['criteria'][0]['max_points'], 1.0)
         self.assertEqual(result['criteria'][1]['max_points'], 5.0)
+
+    def test_unrecognized_shape_warns_when_zero_criteria_found(self):
+        # Реальная доминирующая форма Школково — \subsection*{(метка)}, а
+        # не \textbf{(метка)} — парсер её не разбирает вовсе (вне рамок
+        # этой fix-волны), но обязан честно предупредить, а не молчать.
+        text = '\\subsection*{(a)}\\begin{itemize}\\item 3 балла за верный ответ.\\end{itemize}'
+        result = parse_shkolkovo_criteria(text)
+        self.assertEqual(result['criteria'], [])
+        self.assertTrue(any('не распознано ни одного критерия' in w for w in result['warnings']))
+
+    def test_recognized_shape_does_not_warn(self):
+        text = '\\textbf{(a)}\\begin{itemize}\\item 3 балла за верный ответ.\\end{itemize}'
+        result = parse_shkolkovo_criteria(text)
+        self.assertEqual(len(result['criteria']), 1)
+        self.assertFalse(any('не распознано ни одного критерия' in w for w in result['warnings']))
