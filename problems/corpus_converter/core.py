@@ -216,7 +216,13 @@ def convert_tables(text):
             out.append(match.group(0))
         else:
             markdown_table = _tabular_to_markdown(body)
-            out.append(markdown_table if markdown_table is not None else match.group(0))
+            if markdown_table is not None:
+                out.append(markdown_table)
+            else:
+                # Таблица не конвертирована (пусто, вырождена или др.) —
+                # оставляем как есть, но флагируем для ручной очереди.
+                complex_found = True
+                out.append(match.group(0))
         pos = end
     out.append(text[pos:])
     return ''.join(out), complex_found

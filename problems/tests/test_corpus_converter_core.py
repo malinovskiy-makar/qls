@@ -165,3 +165,10 @@ class ConvertTablesTests(SimpleTestCase):
         result, complex_found = convert_tables(text)
         self.assertEqual(result, text)
         self.assertFalse(complex_found)
+
+    def test_empty_table_after_hline_strip_flags_complex(self):
+        from problems.corpus_converter.core import convert_tables
+        text = '\\begin{tabular}{|l|}\\hline\\end{tabular}'
+        result, complex_found = convert_tables(text)
+        self.assertEqual(result, text)
+        self.assertTrue(complex_found)
