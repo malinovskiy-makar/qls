@@ -78,6 +78,15 @@ function piecewiseNodesQ(curve, lo, hi) {
   else if (curve.kind === 'sum' && curve.sumNumeric === false && Array.isArray(curve.sumBreaks)) {
     breaks = curve.sumBreaks.slice();
     if (curve.sumGhostTo > 0) breaks.push(curve.sumGhostTo);
+    /* ⚠️ ПРАВЫЙ КОНЕЦ ОБЛАСТИ ОПРЕДЕЛЕНИЯ — ТОЖЕ УЗЕЛ, И БЕЗ НЕГО ЛИНИЯ РВЁТСЯ.
+       Узлы это [lo, hi] плюс внутренние изломы. Когда окно шире области
+       определения записи, узел `hi` даёт NaN, точка становится null — и путь
+       кончается на последнем живом узле, то есть на изломе. Замер 26.08:
+       суммарный спрос обрывался в (40; 60) вместо (160; 0), а подписи D и S
+       стояли справа, у пустого места.
+       В `sumBreaks` это значение не кладём: конец кривой не излом, и в
+       ключевых точках он породил бы лишнюю отметку. */
+    if (curve.sumDomainTo > 0) breaks.push(curve.sumDomainTo);
   }
   if (!breaks) return null;
   const nodes = [lo, hi];
@@ -891,6 +900,22 @@ function requestLabelFrame() {
 // Сцена сменилась — прошлые места подписей к ней отношения не имеют.
 function resetLabelPositions() { _labelPos.clear(); _anchorQ.clear(); }
 
+/* ТОЧКА ПОСТАНОВКИ ПОДПИСИ И САМА ПОДПИСЬ — ОДНО ПРАВИЛО, ДВА ПОТРЕБИТЕЛЯ.
+   Зовут её отрисовка (drawCurves) и выгрузка в .tex (buildTexFromState).
+   Пока каждый считал место сам, выгрузка ставила подпись не туда, куда экран,
+   а сверить это было нечем: экран брал якорь у curveAnchor, а файл — у
+   пикселей нарисованного узла.
+   Возвращает { q, v, txt } в координатах МОДЕЛИ либо null, если годного места
+   на кривой нет (кривая ушла за окно — подписывать нечего). */
+function curveLabelAnchor(curve) {
+  if (!curve || !curve.visible || !curve.expr) return null;
+  const tag = (typeof sumShortTag === 'function') ? sumShortTag(curve) : null;
+  const txt = tag || ((typeof curveShortName === 'function') ? curveShortName(curve) : '');
+  if (!txt) return null;
+  const a = curveAnchor((q) => evalCurve(curve, q), undefined, undefined, curve.id);
+  return a ? { q: a.q, v: a.v, txt } : null;
+}
+
 function labelCurve(g, f, txt, color, opts) {
   const o = opts || {};
   const anchorKey = o.key || (o.curve && o.curve.id) || txt;
@@ -1136,10 +1161,12 @@ function drawCurves() {
     /* В сцене сложения на холсте стоит ОБОЗНАЧЕНИЕ (D₁, S₂, D, S), а полное
        имя — в левой панели и в подсказке. Иначе шесть подписей по 137–181 px
        выстраиваются вдоль края и читаются одной строкой (Фаза 3). */
-    const tag = (typeof sumShortTag === 'function') ? sumShortTag(curve) : null;
-    const nm = tag || curveShortName(curve);
+    /* Имя берём у общего помощника curveLabelAnchor: тем же помощником
+       пользуется выгрузка в .tex, и разъехаться им негде. */
+    const la = curveLabelAnchor(curve);
+    if (!la) return;
     // Соседние кривые в одной точке — разводим по вертикали, иначе подписи слипнутся.
-    labelCurve(g, q => evalCurve(curve, q), nm, curve.color, { below: i % 2 === 1, curve });
+    labelCurve(g, q => evalCurve(curve, q), la.txt, curve.color, { below: i % 2 === 1, curve });
   });
 }
 

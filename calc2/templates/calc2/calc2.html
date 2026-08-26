@@ -2310,7 +2310,15 @@
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="fold-body" id="sb-fold">
-            <div class="sb-body" id="sb-body"><!-- JS переносит сюда #info-* и блок равновесия --></div>
+            <div class="sb-body" id="sb-body"><!-- JS переносит сюда #info-* и блок равновесия -->
+              <!-- ⚠️ ИТОГОВАЯ ФУНКЦИЯ СТОИТ ПЕРВОЙ, И ДЕРЖИТСЯ ЭТО ТЕМ, ЧТО ЕЁ
+                   НЕТ В RESULT_IDS. relocateForScene делает appendChild для
+                   всех id из того списка, то есть уносит их в конец табло;
+                   этот контейнер в списке не значится и потому остаётся там,
+                   где написан, — первым ребёнком. Гасит его clearResultPanels
+                   отдельной строкой. -->
+              <div id="info-final"></div>
+            </div>
           </div>
         </section>
 

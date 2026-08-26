@@ -503,9 +503,15 @@ function drawOverlays() {
    не напишет», а гасится в конце перерисовки — и только то, в которое так
    никто и не написал. Смысл прежний: чужие блоки остаются пустыми, чисел из
    прошлого режима на экране нет. */
+/* ⚠️ info-final ЗАЩИЩАЕТСЯ, НО В RESULT_IDS НЕ ВХОДИТ, И ЭТО РАЗНЫЕ СПИСКИ.
+   RESULT_IDS отвечает за ПЕРЕЕЗД блока в конец табло (relocateForScene), а
+   здесь речь только о защите от перенабора тем же текстом. Итоговая функция
+   обязана остаться первой, поэтому переезжать ей нельзя, а не переписываться
+   лишний раз — нужно ровно так же, как всем: она набирается KaTeX, и перенабор
+   на каждом кадре панорамы стоит дороже всего остального в панели. */
 function guardedPanelIds() {
   const extra = (typeof RESULT_IDS !== 'undefined' && Array.isArray(RESULT_IDS)) ? RESULT_IDS : [];
-  return ['info-eq'].concat(extra);
+  return ['info-eq', 'info-final'].concat(extra);
 }
 function guardPanelBoxes() {
   if (guardPanelBoxes._done) return;
@@ -2407,6 +2413,10 @@ function wireFolds() {
          оставалось в очереди. Раскрыли — собираем то, что стало видно.
          Перерисовку тут не зовём: раскрытие карточки график не меняет. */
       if (open && typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
+      /* Итоговая функция подгоняется по ширине контейнера, а у свёрнутой
+         панели ширина нулевая: подгонку в этот момент сделать нечем.
+         Раскрыли — делаем. */
+      if (open && typeof refitFinalMathSoon === 'function') refitFinalMathSoon();
     });
   });
 }
