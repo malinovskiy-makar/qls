@@ -172,3 +172,39 @@ class ConvertTablesTests(SimpleTestCase):
         result, complex_found = convert_tables(text)
         self.assertEqual(result, text)
         self.assertTrue(complex_found)
+
+
+class FootnoteTests(SimpleTestCase):
+    def test_extracts_single_footnote(self):
+        from problems.corpus_converter.core import extract_footnotes
+        text = 'Цена росла\\footnote{данные ЦБ за 2020 год} весь квартал.'
+        result, notes = extract_footnotes(text)
+        self.assertEqual(result, 'Цена росла весь квартал.')
+        self.assertEqual(notes, ['данные ЦБ за 2020 год'])
+
+    def test_extracts_multiple_footnotes_in_order(self):
+        from problems.corpus_converter.core import extract_footnotes
+        text = 'Первая\\footnote{сноска раз} и вторая\\footnote{сноска два}.'
+        result, notes = extract_footnotes(text)
+        self.assertEqual(result, 'Первая и вторая.')
+        self.assertEqual(notes, ['сноска раз', 'сноска два'])
+
+    def test_append_single_note(self):
+        from problems.corpus_converter.core import append_footnote_notes
+        result = append_footnote_notes('Решение готово.', ['данные ЦБ за 2020 год'])
+        self.assertEqual(
+            result,
+            'Решение готово.\n\nПримечание: данные ЦБ за 2020 год',
+        )
+
+    def test_append_multiple_notes_numbered(self):
+        from problems.corpus_converter.core import append_footnote_notes
+        result = append_footnote_notes('Решение готово.', ['раз', 'два'])
+        self.assertEqual(
+            result,
+            'Решение готово.\n\nПримечание 1: раз\nПримечание 2: два',
+        )
+
+    def test_append_no_notes_is_noop(self):
+        from problems.corpus_converter.core import append_footnote_notes
+        self.assertEqual(append_footnote_notes('Решение готово.', []), 'Решение готово.')

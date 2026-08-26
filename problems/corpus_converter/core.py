@@ -226,3 +226,32 @@ def convert_tables(text):
         pos = end
     out.append(text[pos:])
     return ''.join(out), complex_found
+
+
+_FOOTNOTE_RE = re.compile(r'\s*\\footnote\{([^}]*)\}')
+
+
+def extract_footnotes(text):
+    """Вырезать \\footnote{...} из текста, собрать содержимое по порядку.
+    Пробел ПЕРЕД сноской в исходнике съедается вместе с ней, чтобы не
+    оставить двойной пробел на месте вырезанной сноски."""
+    notes = []
+
+    def repl(match):
+        notes.append(match.group(1))
+        return ''
+
+    result = _FOOTNOTE_RE.sub(repl, text)
+    return result, notes
+
+
+def append_footnote_notes(text, notes):
+    """Дописать сноски в конец отдельным абзацем «Примечание: …» —
+    CORPUS-FORMAT.md §3: "ссылку-маркер в тексте не пытаться имитировать"."""
+    if not notes:
+        return text
+    if len(notes) == 1:
+        lines = [f'Примечание: {notes[0]}']
+    else:
+        lines = [f'Примечание {i}: {note}' for i, note in enumerate(notes, start=1)]
+    return text + '\n\n' + '\n'.join(lines)
