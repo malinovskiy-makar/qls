@@ -2,7 +2,7 @@ from django.test import SimpleTestCase
 
 from problems.corpus_converter.core import (
     wrap_bare_environments, protect_math, restore_math,
-    normalize_dashes, normalize_quotes,
+    normalize_dashes, normalize_quotes, find_images,
 )
 
 
@@ -243,3 +243,32 @@ class NormalizeQuotesTests(SimpleTestCase):
             normalize_quotes('фирма "Ромашка" продала "Одуванчик"'),
             'фирма «Ромашка» продала «Одуванчик»',
         )
+
+
+class FindImagesTests(SimpleTestCase):
+    def test_finds_markdown_image(self):
+        text = 'График: ![](https://s3.example/graph.png) выше.'
+        images = find_images(text)
+        self.assertEqual(images, [
+            {'original_ref': 'https://s3.example/graph.png', 'kind': 'markdown'},
+        ])
+
+    def test_finds_includegraphics(self):
+        text = '\\includegraphics{eq.png} показывает рост.'
+        images = find_images(text)
+        self.assertEqual(images, [{'original_ref': 'eq.png', 'kind': 'includegraphics'}])
+
+    def test_finds_bare_url_not_already_matched(self):
+        text = 'Смотри https://example.com/chart.jpg для деталей.'
+        images = find_images(text)
+        self.assertEqual(
+            images, [{'original_ref': 'https://example.com/chart.jpg', 'kind': 'url'}],
+        )
+
+    def test_bare_url_inside_markdown_image_not_double_counted(self):
+        text = '![](https://s3.example/graph.png)'
+        images = find_images(text)
+        self.assertEqual(len(images), 1)
+
+    def test_no_images_returns_empty_list(self):
+        self.assertEqual(find_images('Обычный текст без картинок.'), [])

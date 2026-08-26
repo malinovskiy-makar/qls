@@ -283,3 +283,33 @@ def normalize_quotes(text):
     text = _ANGLE_QUOTE_RE.sub(r'«\1»', text)
     text = _STRAIGHT_QUOTE_RE.sub(r'«\1»', text)
     return text
+
+
+_MARKDOWN_IMAGE_RE = re.compile(r'!\[[^\]]*\]\(([^)]*)\)')
+_INCLUDEGRAPHICS_RE = re.compile(r'\\includegraphics(?:\[[^\]]*\])?\{([^}]*)\}')
+_BARE_URL_RE = re.compile(r'https?://\S+?(?=[)\s]|$)')
+
+
+def find_images(text):
+    """Найти markdown-картинки, \\includegraphics и голые URL картинок.
+    НЕ резолвит и НЕ трогает текст — только фиксирует ссылку и вид
+    (CORPUS-FORMAT.md §3: "не резолвить..., не терять и не удалять
+    молча")."""
+    images = []
+    covered_spans = []
+
+    for match in _MARKDOWN_IMAGE_RE.finditer(text):
+        images.append({'original_ref': match.group(1), 'kind': 'markdown'})
+        covered_spans.append(match.span())
+
+    for match in _INCLUDEGRAPHICS_RE.finditer(text):
+        images.append({'original_ref': match.group(1), 'kind': 'includegraphics'})
+        covered_spans.append(match.span())
+
+    for match in _BARE_URL_RE.finditer(text):
+        start, end = match.span()
+        if any(cs <= start and end <= ce for cs, ce in covered_spans):
+            continue
+        images.append({'original_ref': match.group(0), 'kind': 'url'})
+
+    return images
