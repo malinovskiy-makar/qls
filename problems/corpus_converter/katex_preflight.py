@@ -56,6 +56,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
 from django.conf import settings
 
@@ -75,6 +76,11 @@ RAW_TEX_MARKERS = (
     '\\section', '\\caption', '\\label', '\\item', '\\diagbox',
     '$$', '\\[', '\\]', '\\(', '\\)',
 )
+
+#: Любая последовательность `\команда` в видимом тексте. Экранированные
+#: `\$`, `\%`, `\&`, `\_`, `\#` сюда не попадают: у них нет букв после
+#: слеша, а боевой `fixCurrencyDollars` превращает их в обычные символы.
+_LEFTOVER_TEX_CMD_RE = re.compile(r'\\[A-Za-z]{2,}')
 
 #: Строго документированный allowlist для `unicodeTextInMathMode`.
 #: ПУСТ намеренно. Аудит (раздел 3) показал: русский текст в math mode —
@@ -303,6 +309,21 @@ def summarize(report):
         details.append('strict-предупреждения KaTeX: ' + ', '.join(other_strict))
 
     visible = report['visibleText']
+
+    # Любая уцелевшая TeX-команда в ВИДИМОМ тексте — сырой LaTeX на
+    # экране, даже если её нет в списке маркеров. Найдено проверкой
+    # готовой страницы v2: у #4073/#35255 непарный `$$` съедался
+    # сканером как пустая пара (`$`+`$`), поэтому в visibleText не
+    # попадал, а соседний `\sqrt{2}` в список маркеров не входил — и
+    # шлюз пропускал карточку, на которой ученик видит сырой TeX.
+    # Критерий аудита сформулирован именно широко: «нет текста,
+    # совпадающего с … document-LaTeX командами».
+    leftover_commands = sorted(set(_LEFTOVER_TEX_CMD_RE.findall(visible)))
+    if leftover_commands:
+        codes.append('R-CMD')
+        details.append('уцелевшие TeX-команды в видимом тексте: '
+                       + ', '.join(leftover_commands[:8]))
+
     raw_found = sorted({m for m in RAW_TEX_MARKERS if m in visible})
     if raw_found:
         code = 'PLOT' if any(

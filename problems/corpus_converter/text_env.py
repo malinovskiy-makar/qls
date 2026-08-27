@@ -39,10 +39,19 @@ UNWRAP_ENVIRONMENTS = frozenset({
 })
 
 #: Команды с одним аргументом, у которых виден и нужен сам аргумент.
+#:
+#: ⚠️ `textbf`/`textit`/`emph` здесь ХОТЯ их и переводит стадия 1
+#: (`convert_emphasis` → `**жирный**`). Стадия 1 требует `\textbf{` без
+#: пробела, а в корпусе встречается `\textbf {Кривая Бевериджа}` — с
+#: пробелом. Такая форма проваливалась мимо обеих стадий и доезжала до
+#: экрана сырой командой (найдено выборочной проверкой FAIL-карточек
+#: после прогона корпуса, живой #32536). Здесь они работают страховкой:
+#: если стадия 1 уже сработала, этих команд в тексте просто нет.
 _KEEP_ARG_COMMANDS = (
     'caption', 'section', 'subsection', 'subsubsection', 'paragraph',
     'title', 'textsc', 'centerline', 'sout', 'underline', 'uline',
     'mbox', 'texttt', 'textsf', 'textrm', 'textnormal',
+    'textbf', 'textit', 'emph', 'fbox', 'framebox', 'MakeUppercase',
 )
 _KEEP_ARG_RE = re.compile(
     r'\\(?:' + '|'.join(_KEEP_ARG_COMMANDS) + r')\*?\s*\{([^{}]*)\}'
@@ -53,20 +62,37 @@ _KEEP_ARG_RE = re.compile(
 _HREF_RE = re.compile(r'\\href\s*\{[^{}]*\}\s*\{([^{}]*)\}')
 _URL_RE = re.compile(r'\\url\s*\{([^{}]*)\}')
 
+#: `\hyperlink{id}{текст}` — как `\href`, виден только второй аргумент.
+_HYPERLINK_RE = re.compile(r'\\hyperlink\s*\{[^{}]*\}\s*\{([^{}]*)\}')
+#: `\addcontentsline{toc}{section}{Название}` — служебная, три аргумента.
+_ADDCONTENTS_RE = re.compile(
+    r'\\addcontentsline\s*\{[^{}]*\}\s*\{[^{}]*\}\s*\{[^{}]*\}')
+
 #: Команды-разметки, которые видны сырыми и смысла на экране не несут.
+#: Размеры/начертания (`\large`, `\bf`, …) — переключатели без аргумента,
+#: их роль берёт на себя CSS; `\cline{1-2}`, `\alph{…}` — служебные с
+#: одним аргументом, он тоже снимается.
 _DROP_COMMANDS_RE = re.compile(
     r'\\(?:label|ref|eqref|cite|index|nonumber|newpage|clearpage|'
-    r'toprule|midrule|bottomrule|hline|maketitle|tableofcontents|'
-    r'raggedright|raggedleft|normalsize|itshape|bfseries|scshape)\b'
+    r'toprule|midrule|bottomrule|hline|cline|maketitle|tableofcontents|'
+    r'raggedright|raggedleft|normalsize|itshape|bfseries|scshape|'
+    r'large|Large|LARGE|huge|Huge|scriptsize|tiny|bf|it|rm|sf|tt|em|'
+    r'center|centering|hrule|hrulefill|dotfill|alph|arabic|roman|'
+    r'Alph|Roman|columnbreak|newline|linebreak|pagebreak|noalign|'
+    r'rowcolor|arraybackslash|setlength|renewcommand|newcommand)\b'
     r'(?:\s*\{[^{}]*\})?'
 )
 
 
 def _clean_commands(chunk):
+    chunk = _ADDCONTENTS_RE.sub('', chunk)
     chunk = _HREF_RE.sub(r'\1', chunk)
+    chunk = _HYPERLINK_RE.sub(r'\1', chunk)
     chunk = _URL_RE.sub(r'\1', chunk)
+    # дважды: `\textbf{\large Заголовок}` разбирается послойно, снаружи внутрь
     chunk = _KEEP_ARG_RE.sub(r'\1', chunk)
     chunk = _DROP_COMMANDS_RE.sub('', chunk)
+    chunk = _KEEP_ARG_RE.sub(r'\1', chunk)
     return chunk
 
 

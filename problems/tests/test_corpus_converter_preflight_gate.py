@@ -103,6 +103,23 @@ class RawTexGateTests(SimpleTestCase):
         self.assertFalse(verdict.ok)
         self.assertIn('R-ENV', verdict.codes)
 
+    def test_leftover_tex_command_blocks(self):
+        # Живые #4073/#35255: непарный `$$` съедался сканером как пустая
+        # пара, поэтому в видимый текст не попадал, а соседний \sqrt{2}
+        # в список маркеров не входил — карточка проходила, хотя ученик
+        # видел сырой TeX. Найдено проверкой готовой страницы v2.
+        blocks = [('Решение', 'src', r'упражнение: x = 5 - 5 / \sqrt{2}$$ Однако')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertFalse(verdict.ok)
+        self.assertIn('R-CMD', verdict.codes)
+
+    def test_escaped_symbols_are_not_leftover_commands(self):
+        # `\$`, `\%`, `\&` — экранированные символы, а не команды:
+        # боевой fixCurrencyDollars показывает их обычными знаками.
+        blocks = [('Условие', 'src', r'цена \$100 и \% ставка и \& знак')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertTrue(verdict.ok, verdict.details)
+
 
 class PipelineTests(SimpleTestCase):
     """Конвейер v2 не ломает контракт стадии 1 и идемпотентен."""
