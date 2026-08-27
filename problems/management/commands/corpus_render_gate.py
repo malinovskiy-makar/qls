@@ -45,6 +45,19 @@ SOURCES = {
     'lsh2025': (3, 'ЛШ Олмат 2025 (Overleaf)'),
     'reshalki': (16, 'Решалки Олмат (olmat41)'),
 }
+
+#: Фаза 9: источники, УЖЕ лежащие в базе, но не входившие в боевой рендер
+#: четырёх легаси. id и названия взяты запросом к `Source`, не угаданы:
+#:   id=2  n=3978  'ILE / iloveeconomics.ru'
+#:   id=6  n=2024  'Сборник тестов АА'
+#: Акимова (id=24, 289 задач) сюда НЕ входит по решению владельца от
+#: 27.08: там отдельный трек OCR-пересъёмки, гонять текстовый рендер-шлюз
+#: по ней бессмысленно, пока материал не пересняли.
+EXTRA_SOURCES = {
+    'ile': (2, 'ILE / iloveeconomics.ru'),
+    'aa': (6, 'Сборник тестов АА'),
+}
+ALL_SOURCES = {**SOURCES, **EXTRA_SOURCES}
 EXCLUDED_SOURCE_NAME = 'Служебное: фикстуры рендерера (не публиковать)'
 OUT_DIR = os.path.join(settings.BASE_DIR, 'reports', 'corpus_converter_scaleup')
 
@@ -112,8 +125,10 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--fixtures', action='store_true',
                             help='прогон по именованным карточкам аудита')
-        parser.add_argument('--source', choices=list(SOURCES),
+        parser.add_argument('--source', choices=list(ALL_SOURCES),
                             help='ограничить одним источником')
+        parser.add_argument('--extra', action='store_true',
+                            help='Фаза 9: источники ILE и Сборник АА')
         parser.add_argument('--limit', type=int,
                             help='взять не больше N задач источника (отладка)')
 
@@ -169,12 +184,17 @@ class Command(BaseCommand):
 
     # ------------------------------------------------------------------
     def _run_corpus(self, checker, options):
-        slugs = [options['source']] if options['source'] else list(SOURCES)
+        if options['source']:
+            slugs = [options['source']]
+        elif options.get('extra'):
+            slugs = list(EXTRA_SOURCES)
+        else:
+            slugs = list(SOURCES)
         summary = {}
         code_totals = {}
         fail_ids = {}
         for slug in slugs:
-            source_id, name = SOURCES[slug]
+            source_id, name = ALL_SOURCES[slug]
             qs = _candidate_qs(slug, source_id).prefetch_related('parts')
             if options['limit']:
                 qs = qs[:options['limit']]
@@ -208,7 +228,10 @@ class Command(BaseCommand):
                 f'(из них были PASS по старому шлюзу: {old_pass_now_fail})')
 
         os.makedirs(OUT_DIR, exist_ok=True)
-        out_path = os.path.join(OUT_DIR, 'gate_v2_corpus.json')
+        out_name = ('gate_v2_extra.json' if options.get('extra')
+                    else f'gate_v2_{options["source"]}.json' if options['source']
+                    else 'gate_v2_corpus.json')
+        out_path = os.path.join(OUT_DIR, out_name)
         with open(out_path, 'w', encoding='utf-8') as f:
             json.dump({'summary': summary, 'codes': code_totals,
                        'fail_ids': fail_ids}, f, ensure_ascii=False, indent=1)
