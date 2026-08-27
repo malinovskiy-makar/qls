@@ -59,6 +59,8 @@ import os
 
 from django.conf import settings
 
+from problems.corpus_converter.macros import find_unresolved_macros
+
 KATEX_DIR = os.path.join(
     settings.BASE_DIR, 'problems', 'review_bundle_assets', 'vendor', 'katex',
 )
@@ -263,11 +265,23 @@ def summarize(report):
     details = []
 
     if report['errors']:
-        codes.append('K-ERR')
-        details.append(
-            f'KaTeX parse error в {len(report["errors"])} формул(ах): '
-            + '; '.join(e['message'] for e in report['errors'][:3])
-        )
+        messages = [e['message'] for e in report['errors']]
+        # Неизвестный макрос отделяется от прочих ошибок разбора: его
+        # причина другая (нет преамбулы исходного проекта) и маршрут
+        # другой — ручной разбор человеком, а не правка конвертера.
+        # Решает сам KaTeX, а не список в macros.py: список собран по
+        # 846 карточкам из 16 804 и неполон по построению.
+        unresolved = find_unresolved_macros(messages)
+        if unresolved:
+            codes.append('MACRO')
+            details.append('неизвестные макросы: ' + ', '.join(unresolved[:8]))
+        other = [m for m in messages if 'Undefined control sequence' not in m]
+        if other:
+            codes.append('K-ERR')
+            details.append(
+                f'KaTeX parse error в {len(other)} формул(ах): '
+                + '; '.join(other[:3])
+            )
 
     unicode_hits = [
         h for h in report['strictHits']
