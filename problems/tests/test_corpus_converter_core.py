@@ -703,6 +703,57 @@ class ReconstructCasesRowSeparatorsTests(SimpleTestCase):
         self.assertIn('\\begin{cases}c \\\\ d\\end{cases}', result)
 
 
+class ReconstructCasesRowsBySingleNewlineTests(SimpleTestCase):
+    """Сессия 2026-08-27: второй сигнал границы строки, кроме пустой строки —
+    одиночный `\\n`, подтверждённый количеством `&` в блоке. Строки cases
+    в LaTeX идут через `&`: если сегментов после разбиения по `\\n` РОВНО
+    столько же, сколько `&` в теле, это не догадка — количество `&`
+    независимо подтверждает число строк (ровно тот же принцип, каким
+    has_broken_cases_rows уже считает строки для проверки).
+
+    Первая версия этого расширения (2026-08-27, до реализации) называла
+    32 таких блока (19 Archive 3 + 13 МатЭк). Число не воспроизвелось:
+    это была ошибка отчёта прошлой сессии — в карточку попала цифра от
+    другого, более мягкого пробного скрипта (эвристика по словам-маркерам
+    «если»/«иначе», без требования `&`), а не от строгого правила `&`,
+    которое здесь реализовано. Проверка по точному правилу на актуальных
+    данных даёт 7 блоков, все в Archive 3 — см. RealDataCasesRowsBySingle
+    NewlineRegressionTests ниже."""
+
+    def test_two_rows_confirmed_by_matching_ampersand_count(self):
+        text = '\\begin{cases}a & x<1\n b & x\\ge 1\\end{cases}'
+        result = reconstruct_cases_row_separators(text)
+        self.assertEqual(result, '\\begin{cases}a & x<1 \\\\ b & x\\ge 1\\end{cases}')
+
+    def test_three_rows_confirmed_by_matching_ampersand_count(self):
+        text = '\\begin{cases}a & x<1\n b & x<2\n c & x\\ge 2\\end{cases}'
+        result = reconstruct_cases_row_separators(text)
+        self.assertEqual(
+            result, '\\begin{cases}a & x<1 \\\\ b & x<2 \\\\ c & x\\ge 2\\end{cases}'
+        )
+
+    def test_does_not_apply_when_ampersand_count_does_not_match_segments(self):
+        # 2 сегмента по '\n', но 3 '&' в теле — не совпадает, значит один
+        # из переносов НЕ граница строки (например перенос длинной
+        # формулы), а гадать, какой именно, нельзя.
+        text = '\\begin{cases}a & x<1 & y<1\n b & x\\ge 1\\end{cases}'
+        self.assertEqual(reconstruct_cases_row_separators(text), text)
+
+    def test_does_not_apply_without_ampersand_at_all(self):
+        # Правило работает только через '&' — без него подтвердить число
+        # строк независимо нечем, это другой (уже реализованный) случай
+        # пустой строки, не одиночного переноса.
+        text = '\\begin{cases}a\n b\\end{cases}'
+        self.assertEqual(reconstruct_cases_row_separators(text), text)
+
+    def test_blank_line_case_still_takes_priority(self):
+        # Если пустая строка есть — реконструкция идёт по ней (прежнее
+        # правило), новая ветка по '&' не должна вмешиваться.
+        text = '\\begin{cases}a & x<1\n\nb & x\\ge 1\\end{cases}'
+        result = reconstruct_cases_row_separators(text)
+        self.assertEqual(result, '\\begin{cases}a & x<1 \\\\ b & x\\ge 1\\end{cases}')
+
+
 class HasBrokenCasesRowsTests(SimpleTestCase):
     """Проверка ПО ПРАВИЛУ, а не по списку известных паттернов поломки:
     разделителей `\\\\` внутри cases обязано быть на единицу меньше, чем
@@ -856,6 +907,57 @@ class RealDataCasesRegressionTests(SimpleTestCase):
         self.assertEqual(result['warnings'], [])
         self.assertIn(
             '16Q-0.25Q^2 & Q \\leq 32 \\\\ 256+32(Q-32) -(Q-32)^2& Q \\in [32; 50]',
+            result['text_md'],
+        )
+
+
+class RealDataCasesRowsBySingleNewlineRegressionTests(SimpleTestCase):
+    """Сессия 2026-08-27, живые тексты из базы (только чтение, до правки
+    кода) для трёх из семи подтверждённых блоков: разделены одиночным
+    `\\n` без пустой строки, число сегментов подтверждено количеством `&`.
+    Все три из Archive 3 — по факту, ни одного подтверждённого блока в
+    МатЭк не оказалось (фикс-пак человека уже закрыл бо́льшую часть)."""
+
+    def test_archive3_41824_two_row_cases_part_b(self):
+        # Живой текст ProblemPart.statement, подпункт «б».
+        text = '$\\begin{cases} TC=Q^2+100, & Q>0 \n TC=0, & Q=0 \\end{cases}$'
+        result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertEqual(result['warnings'], [])
+        self.assertIn('TC=Q^2+100, & Q>0 \\\\ TC=0, & Q=0', result['text_md'])
+
+    def test_archive3_41550_two_row_cases_with_text_command(self):
+        # Живой фрагмент statement — v(x) кусочно-линейная функция полезности.
+        text = (
+            '$$\n'
+            'v(x)= \\begin{cases}x, & \\text { если } x \\geq 0 \n'
+            ' 2 x, & \\text { если } x<0\\end{cases}\n'
+            '$$'
+        )
+        result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertEqual(result['warnings'], [])
+        self.assertIn(
+            'x, & \\text { если } x \\geq 0 \\\\ 2 x, & \\text { если } x<0',
+            result['text_md'],
+        )
+
+    def test_archive3_41236_three_row_cases_gini_coefficient(self):
+        # Живой фрагмент statement — кусочно-линейная R(x), три строки.
+        text = (
+            '$$\n'
+            'R(x)= \\begin{cases}\\frac{5}{7} \\cdot x & x \\in[0 ; 0.35 \\cdot \\sqrt{2}] \n'
+            ' 0.32 \\cdot \\sqrt{2}-0.2 \\cdot x & x \\in[0.35 \\cdot \\sqrt{2} ; 0.6 \\cdot \\sqrt{2}] \n'
+            ' 0.5 \\cdot \\sqrt{2}-0.5 \\cdot x & x \\in[0.6 \\cdot \\sqrt{2} ; \\sqrt{2}]\\end{cases}\n'
+            '$$'
+        )
+        result = convert_text_field(text)
+        self.assertFalse(result['complex_table'])
+        self.assertEqual(result['warnings'], [])
+        self.assertIn(
+            '\\frac{5}{7} \\cdot x & x \\in[0 ; 0.35 \\cdot \\sqrt{2}] \\\\ '
+            '0.32 \\cdot \\sqrt{2}-0.2 \\cdot x & x \\in[0.35 \\cdot \\sqrt{2} ; 0.6 \\cdot \\sqrt{2}] \\\\ '
+            '0.5 \\cdot \\sqrt{2}-0.5 \\cdot x & x \\in[0.6 \\cdot \\sqrt{2} ; \\sqrt{2}]',
             result['text_md'],
         )
 

@@ -189,16 +189,33 @@ def reconstruct_cases_row_separators(text):
 
     Срабатывает, только если сегментов минимум два (однозначно) — при
     одном сегменте (нет пустой строки вовсе) гадать не из чего, оставляем
-    как есть, дальше это поймает has_broken_cases_rows."""
+    как есть, дальше это поймает has_broken_cases_rows.
+
+    Второй сигнал (сессия 2026-08-27): одиночный `\\n` без пустой строки,
+    подтверждённый количеством `&` в теле. Строки `cases` в LaTeX идут
+    через `&`, поэтому если сегментов после разбиения по `\\n` РОВНО
+    столько же, сколько `&`, это не догадка — `&` независимо подтверждает
+    число строк (ровно тот же принцип, каким has_broken_cases_rows уже
+    считает строки для своей проверки). Несовпадение (например перенос
+    длинной формулы, а не граница строки) оставляет блок как есть —
+    дальше его поймает has_broken_cases_rows. Проверено на живых данных
+    (Archive 3 #41824, #41550, #41293×3, #41236, #39939) — единственные
+    7 блоков по всем 4 источникам, где признак сходится."""
     def repl(match):
         body = match.group(1)
         if '\\\\' in body:
             return match.group(0)
         segments = [seg.strip() for seg in re.split(r'\n[ \t]*\n', body) if seg.strip()]
-        if len(segments) < 2:
-            return match.group(0)
-        segments = [' '.join(seg.split()) for seg in segments]
-        return '\\begin{cases}' + ' \\\\ '.join(segments) + '\\end{cases}'
+        if len(segments) >= 2:
+            segments = [' '.join(seg.split()) for seg in segments]
+            return '\\begin{cases}' + ' \\\\ '.join(segments) + '\\end{cases}'
+        ampersands = body.count('&')
+        if ampersands:
+            line_segments = [seg.strip() for seg in body.split('\n') if seg.strip()]
+            if len(line_segments) >= 2 and len(line_segments) == ampersands:
+                line_segments = [' '.join(seg.split()) for seg in line_segments]
+                return '\\begin{cases}' + ' \\\\ '.join(line_segments) + '\\end{cases}'
+        return match.group(0)
 
     return _CASES_BLOCK_RE.sub(repl, text)
 
