@@ -82,6 +82,11 @@ reports/corpus_converter_scaleup/*
 !reports/corpus_converter_scaleup/matek_fixed_backup.json
 !reports/corpus_converter_scaleup/matek_fixed_divergences.md
 
+# ИСКЛЮЧЕНИЕ (2026-08-27): диагностика разрыва $$ между полями (Решалки
+# Олмат) — читаемый вывод для владельца с рекомендацией, не машинный
+# промежуточный артефакт; на него ссылается карточка Notion.
+!reports/corpus_converter_scaleup/reshalki_dollar_diagnosis.md
+
 # ИСКЛЮЧЕНИЕ: страница визуального ревью для владельца (2026-08-26) — сам
 # HTML собирается командой corpus_review_html за ~1 мин, но это конечный
 # артефакт для показа человеку (открывается двойным щелчком), а не
