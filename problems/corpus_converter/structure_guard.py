@@ -69,24 +69,37 @@ def classify_block(source_text, converted_md):
     return None
 
 
-def check_problem(blocks):
+def check_problem(blocks, part_names=()):
     """`blocks` — список `(имя, исходный_текст, конвертированный_md)`.
+    `part_names` — имена блоков, которые являются ПОДПУНКТАМИ задачи.
 
     Возвращает `(lost, needs_content)`:
     * `lost` — имена блоков, где содержимое ПОТЕРЯНО (всегда блокирует);
-    * `needs_content` — у задачи вообще нет содержимого ни в одном блоке
-      (живой `#3989`): публиковать её как решаемую нельзя.
+    * `needs_content` — задачу нельзя публиковать как решаемую.
+
+    `needs_content` истинно в двух случаях:
+    1. содержимого нет вообще ни в одном блоке;
+    2. у задачи ЕСТЬ подпункты, и пусты в исходнике ВСЕ ОНИ (живой
+       `#3989`: условие есть, но пункты а/б/в/г пустые — задача ставит
+       вопросы, которых нет, и решаемой не является).
 
     Пустое условие при непустых подпунктах задачей быть не перестаёт
-    (живой `#4053`), поэтому `needs_content` считается по задаче целиком,
-    а не по каждому блоку — иначе шлюз блокировал бы годный материал.
+    (живой `#4053`), поэтому одного пустого блока для `needs_content`
+    недостаточно — иначе шлюз блокировал бы годный материал.
     """
     lost = []
     any_content = False
+    part_names = set(part_names)
+    parts_seen = parts_with_content = 0
     for name, source_text, converted_md in blocks:
         verdict = classify_block(source_text, converted_md)
         if verdict == CODE_LOST:
             lost.append(name)
         if verdict is None:
             any_content = True
-    return lost, (not any_content)
+        if name in part_names:
+            parts_seen += 1
+            if verdict != CODE_NO_SOURCE:
+                parts_with_content += 1
+    needs_content = (not any_content) or (parts_seen > 0 and parts_with_content == 0)
+    return lost, needs_content

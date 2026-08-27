@@ -58,9 +58,31 @@ class EmptySourceTests(SimpleTestCase):
         blocks = [('Условие', '', ''),
                   ('Часть а', '', ''), ('Часть б', '', ''),
                   ('Часть в', '', ''), ('Часть г', '', '')]
-        lost, needs_content = check_problem(blocks)
+        lost, needs_content = check_problem(blocks, part_names=[
+            'Часть а', 'Часть б', 'Часть в', 'Часть г'])
         self.assertEqual(lost, [])
         self.assertTrue(needs_content)
+
+    def test_3989_shape_with_nonempty_statement_still_needs_content(self):
+        # Живой #3989: условие ЕСТЬ, а все четыре пункта пусты. Задача
+        # ставит вопросы, которых нет, — публиковать как решаемую нельзя.
+        blocks = [('Условие', 'Фирма выпускает товар. Ответьте на вопросы:',
+                   'Фирма выпускает товар. Ответьте на вопросы:'),
+                  ('Часть а', '', ''), ('Часть б', '', ''),
+                  ('Часть в', '', ''), ('Часть г', '', '')]
+        lost, needs_content = check_problem(blocks, part_names=[
+            'Часть а', 'Часть б', 'Часть в', 'Часть г'])
+        self.assertEqual(lost, [])
+        self.assertTrue(needs_content)
+
+    def test_partially_filled_parts_are_fine(self):
+        # Хотя бы один непустой подпункт — задача решаема.
+        blocks = [('Условие', 'условие', 'условие'),
+                  ('Часть а', 'первый вопрос', 'первый вопрос'),
+                  ('Часть б', '', '')]
+        lost, needs_content = check_problem(
+            blocks, part_names=['Часть а', 'Часть б'])
+        self.assertFalse(needs_content)
 
     def test_4053_empty_statement_with_full_parts_is_still_a_task(self):
         # Живой #4053: условие пустое, подпункты полные — блокировать
