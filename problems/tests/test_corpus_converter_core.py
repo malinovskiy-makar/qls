@@ -7,7 +7,7 @@ from problems.corpus_converter.core import (
     reconstruct_orphaned_tabular, strip_multicols_wrapper, strip_hypertarget,
     strip_junk_commands, convert_tables, strip_center_wrapper,
     reconstruct_bare_ampersand_table, has_unreconstructed_bare_ampersand_rows,
-    reconstruct_cases_row_separators, has_unreconstructed_cases_rows,
+    reconstruct_cases_row_separators, has_broken_cases_rows,
 )
 
 
@@ -677,21 +677,66 @@ class ReconstructCasesRowSeparatorsTests(SimpleTestCase):
         self.assertIn('\\begin{cases}c \\\\ d\\end{cases}', result)
 
 
-class HasUnreconstructedCasesRowsTests(SimpleTestCase):
+class HasBrokenCasesRowsTests(SimpleTestCase):
+    """Проверка ПО ПРАВИЛУ, а не по списку известных паттернов поломки:
+    разделителей `\\\\` внутри cases обязано быть на единицу меньше, чем
+    строк условий. Чем строки разделены на самом деле — неважно."""
+
     def test_flags_when_reconstruction_impossible(self):
         text = '\\begin{cases}a & x<1 b & x\\ge 1\\end{cases}'
-        self.assertTrue(has_unreconstructed_cases_rows(text))
+        self.assertTrue(has_broken_cases_rows(text))
 
     def test_does_not_flag_after_successful_reconstruction(self):
         text = reconstruct_cases_row_separators('\\begin{cases}a\n\nb\\end{cases}')
-        self.assertFalse(has_unreconstructed_cases_rows(text))
+        self.assertFalse(has_broken_cases_rows(text))
 
     def test_does_not_flag_well_formed_cases(self):
         text = '\\begin{cases}a & x<1\\\\b & x\\ge 1\\end{cases}'
-        self.assertFalse(has_unreconstructed_cases_rows(text))
+        self.assertFalse(has_broken_cases_rows(text))
 
     def test_does_not_flag_text_without_cases(self):
-        self.assertFalse(has_unreconstructed_cases_rows('Обычный текст.'))
+        self.assertFalse(has_broken_cases_rows('Обычный текст.'))
+
+    def test_flags_partially_lost_separators(self):
+        # ГЛАВНОЕ, ради чего правило заменило прежнюю проверку: три строки
+        # (три '&'), а разделитель всего один — второй потерян. Прежняя
+        # проверка «есть ли хоть один \\» такое увидеть не могла в
+        # принципе и пропускала молча.
+        text = '\\begin{cases}a & x<1 \\\\ b & x<2 c & x<3\\end{cases}'
+        self.assertTrue(has_broken_cases_rows(text))
+
+    def test_flags_rows_glued_by_single_newline(self):
+        # Строки разделены одиночным '\n' — реконструкция по пустой строке
+        # такое не чинит, но правило видит поломку независимо от того,
+        # ЧЕМ строки разделены (живой паттерн #29485 МатЭк).
+        text = '\\begin{cases}30-4k,& k<3,\n 18,& k\\ge 3.\\end{cases}'
+        self.assertTrue(has_broken_cases_rows(text))
+
+    def test_flags_orphaned_line_skip_marker(self):
+        # `\\[8pt]` потерял именно `\\`, остался голый `[8pt]` (живой
+        # паттерн #43909 Archive 3) — разделителя нет, строк две.
+        text = '\\begin{cases}12, & m<\\frac23,\n[8pt]\n6, & m\\ge\\frac23\\end{cases}'
+        self.assertTrue(has_broken_cases_rows(text))
+
+    def test_does_not_flag_single_row_cases(self):
+        # Живой #28419 МатЭк: честная однострочная `\begin{cases} p \end{cases}`.
+        # Прежняя проверка флагировала её ложно (нет `\\` — значит сломано).
+        text = '\\begin{cases}\n p\n \\end{cases}'
+        self.assertFalse(has_broken_cases_rows(text))
+
+    def test_does_not_flag_row_wrapped_across_physical_lines(self):
+        # Живой #41599 Archive 3: строк честные три, разделителя два,
+        # просто третья строка перенесена на две физические. Считать
+        # строки по '\n' здесь нельзя — правило и не считает, потому что
+        # разделители в блоке есть.
+        text = (
+            '\\begin{cases}\n'
+            '\\frac{I}{p_x}, p_x < \\frac{2}{5} \\\\\n'
+            '[0;\\frac{I}{p_X}], p_x = \\frac{2}{5} \\\\\n'
+            '0, p_x > \n \\frac{2}{5}\n'
+            '\\end{cases}'
+        )
+        self.assertFalse(has_broken_cases_rows(text))
 
 
 class RealDataCasesRegressionTests(SimpleTestCase):
@@ -763,6 +808,30 @@ class RealDataCasesRegressionTests(SimpleTestCase):
         self.assertFalse(result['complex_table'])
         self.assertEqual(result['warnings'], [])
         self.assertIn('100-0.25x,0\\leq x\\leq 80 \\\\ 160-x, 80\\leq x\\leq 160', result['text_md'])
+
+    def test_reshalki_47127_cases_is_reconstructed_and_not_flagged(self):
+        # Владелец назвал #47127 как ещё один необнаруженный вариант
+        # поломки cases. Проверка на живом тексте показала другое: cases
+        # здесь чинится штатно (две строки, две '&', разделены пустой
+        # строкой), предупреждения быть не должно. Настоящий дефект
+        # #47127 — в другом месте, см. test_reshalki_47127_unbalanced_
+        # display_math ниже. Тест закрепляет обе половины разбора, чтобы
+        # правило инварианта не начало флагировать этот блок ложно.
+        solution = (
+            '$$\n\n \n\nОбе функции $MC$ убывают, значит, производим только на '
+            'одном заводе. Сначала на втором, потом оставшееся -- на первом\n'
+            '$$TC = \\begin{cases}\n'
+            ' 16Q-0.25Q^2 & Q \\leq 32\n\n'
+            ' 256+32(Q-32) -(Q-32)^2& Q \\in [32; 50]\n\n'
+            ' \\end{cases}$$\n\n'
+        )
+        result = convert_text_field(solution)
+        self.assertFalse(result['complex_table'])
+        self.assertEqual(result['warnings'], [])
+        self.assertIn(
+            '16Q-0.25Q^2 & Q \\leq 32 \\\\ 256+32(Q-32) -(Q-32)^2& Q \\in [32; 50]',
+            result['text_md'],
+        )
 
 
 class StripMulticolsWrapperTests(SimpleTestCase):
