@@ -8,7 +8,33 @@ from problems.corpus_converter.core import (
     strip_junk_commands, convert_tables, strip_center_wrapper,
     reconstruct_bare_ampersand_table, has_unreconstructed_bare_ampersand_rows,
     reconstruct_cases_row_separators, has_broken_cases_rows,
+    may_render_as_markdown,
 )
+
+
+class MayRenderAsMarkdownTests(SimpleTestCase):
+    """Фаза 2 сессии 2026-08-27: фильтр «сложную таблицу не рендерим»
+    обязан быть частью логики, а не пунктом, который надо не забыть
+    проверить руками в боевой команде рендера."""
+
+    def test_forbids_markdown_for_complex_table(self):
+        # \multicolumn — конвертер такое не разбирает, задача в очереди
+        # на ручной разбор (manual_review_queue.md).
+        result = convert_problem(
+            '\\begin{tabular}{ll}\\multicolumn{2}{c}{Шапка} \\\\ a & b\\end{tabular}'
+        )
+        self.assertTrue(result['complex_table'])
+        self.assertFalse(may_render_as_markdown(result))
+
+    def test_forbids_markdown_for_broken_cases(self):
+        result = convert_problem('$$\\begin{cases}a & x<1 b & x\\ge 1\\end{cases}$$')
+        self.assertTrue(result['complex_table'])
+        self.assertFalse(may_render_as_markdown(result))
+
+    def test_allows_markdown_for_clean_problem(self):
+        result = convert_problem('Найдите $Q$, если $P = 10$.')
+        self.assertFalse(result['complex_table'])
+        self.assertTrue(may_render_as_markdown(result))
 
 
 class WrapBareEnvironmentsTests(SimpleTestCase):

@@ -661,8 +661,8 @@ def convert_text_field(text):
     cases_unresolved = has_broken_cases_rows(text)
     if cases_unresolved:
         warnings.append(
-            'сломанный \\begin{cases}: построчный разделитель \\\\ потерян, восстановить '
-            'однозначно не удалось (меньше двух сегментов по пустым строкам) '
+            'сломанный \\begin{cases}: разделителей \\\\ меньше, чем строк условий '
+            '(строки слиплись), восстановить однозначно не удалось '
             '— в очередь на ручной разбор'
         )
     text = wrap_bare_environments(text)
@@ -775,3 +775,22 @@ def convert_problem(statement, answer='', solution='', existing_parts=None):
         'complex_table': complex_table,
         'warnings': warnings,
     }
+
+
+def may_render_as_markdown(result):
+    """Можно ли задаче с таким результатом конвертации ставить
+    `content_format='markdown'`.
+
+    ЕДИНСТВЕННАЯ точка этого решения. Боевая команда рендера обязана
+    спрашивать здесь, а не сравнивать флаги у себя: `complex_table=True`
+    означает «структуру разобрать не удалось, задача в очереди на ручной
+    разбор» (multicolumn/multirow, сломанный `\\begin{cases}`, голые
+    `&`-строки без обёртки). Показать такую задачу через markdown-рендерер
+    значит показать её сломанной — она обязана остаться на PLAIN, пока
+    человек её не починит. Очередь — reports/corpus_converter_scaleup/
+    manual_review_queue.md, команда `corpus_manual_review_queue`.
+
+    Отдельная функция, а не `if not result['complex_table']` в команде
+    рендера, ровно затем, чтобы фильтр нельзя было забыть проверить
+    руками: он часть логики и покрыт тестом."""
+    return not result['complex_table']
