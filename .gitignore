@@ -73,6 +73,15 @@ reports/corpus_converter_pilot/*
 reports/corpus_converter_scaleup/*
 !reports/corpus_converter_scaleup/report.md
 
+# ИСКЛЮЧЕНИЕ (2026-08-27): очередь ручного разбора и артефакты фикс-пака
+# МатЭк. manual_review_queue.md — конечный список «чинит человек», на него
+# ссылается карточка Notion. matek_fixed_backup.json — снимок 745 задач ДО
+# первой настоящей записи в базу: это путь отката, он обязан пережить
+# чистый клон, а не лежать только на одной машине.
+!reports/corpus_converter_scaleup/manual_review_queue.md
+!reports/corpus_converter_scaleup/matek_fixed_backup.json
+!reports/corpus_converter_scaleup/matek_fixed_divergences.md
+
 # ИСКЛЮЧЕНИЕ: страница визуального ревью для владельца (2026-08-26) — сам
 # HTML собирается командой corpus_review_html за ~1 мин, но это конечный
 # артефакт для показа человеку (открывается двойным щелчком), а не
