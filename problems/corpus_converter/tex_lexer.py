@@ -226,6 +226,17 @@ def tokenize(text):
             i = end
             continue
 
+        # 4б. одиночный `$` без пары формулой быть не может в принципе.
+        # Помечаем валютой, а не текстом: в выводе он будет экранирован и
+        # не спарится с `$` из соседнего текстового узла (боевой
+        # auto-render ищет пары ПОУЗЛОВО, и хвостовой `$150.` из #35228
+        # иначе поймал бы доллар из следующего абзаца).
+        if text[i] == '$':
+            flush()
+            tokens.append(Token(TokenKind.CURRENCY, '$', body='$'))
+            i += 1
+            continue
+
         # 5. окружение вне математики
         env = _match_environment(text, i)
         if env is not None:
@@ -255,6 +266,13 @@ def _math_span(text, i):
             continue
         return end + len(close), text[i + len(open_):end], display, open_
     return None
+
+
+def math_span(text, i):
+    """Публичная обёртка над `_math_span` — нужна `math_canon`, чтобы
+    снимать вложенные разделители тем же кодом, каким лексер их находит
+    (иначе две реализации границы формулы неизбежно разъехались бы)."""
+    return _math_span(text, i)
 
 
 def environment_balance(text):
