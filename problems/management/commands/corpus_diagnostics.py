@@ -97,6 +97,9 @@ class Command(BaseCommand):
 
     # ------------------------------------------------------------------ #
 
+    #: Кэш условий неимпортированных источников (читаются с диска один раз).
+    _ext_cache = None
+
     def handle(self, *args, **options):
         report = {}
         report['корпус'] = self._totals()
@@ -113,6 +116,7 @@ class Command(BaseCommand):
         report['по_источникам'] = self._per_source()
         if not options['skip_external']:
             report['неимпортированные_источники'] = self._external()
+            report['полный_корпус'] = self._full_corpus()
 
         os.makedirs(OUT_DIR, exist_ok=True)
         path = os.path.join(OUT_DIR, 'corpus_diagnostics_c13.json')
@@ -383,32 +387,50 @@ class Command(BaseCommand):
 
     # --- 11. Покрытие словаря терминов ----------------------------------- #
 
-    def _corpus_ngrams(self):
-        """Униграммы (с частотой) и множества би-/три-/четырёхграмм банка."""
-        uni = Counter()
-        docs = Counter()
-        bi, tri, quad = set(), set(), set()
+    @staticmethod
+    def _bank_texts():
+        """Тексты банка по отдельности: заголовок, условие, каждый подпункт.
+
+        ⚠️ Именно ПО ОТДЕЛЬНОСТИ. Склейка `_tokens(title) + _tokens(statement)`
+        в одну цепочку рождает n-граммы через границу — «монополия спрос» из
+        заголовка «Монополия» и условия «Спрос линеен», которых никто не писал.
+        Термин, совпавший с такой склейкой, засчитывался бы найденным, и
+        покрытие словаря завышалось бы молча.
+        """
         rows = Problem.objects.values_list('title', 'statement').iterator(chunk_size=2000)
         for title, statement in rows:
-            toks = _tokens(title) + _tokens(statement)
+            yield title or ''
+            yield statement or ''
+        parts = Problem.objects.filter(parts__isnull=False).values_list(
+            'parts__statement', flat=True).iterator(chunk_size=5000)
+        for statement in parts:
+            yield statement or ''
+
+    @staticmethod
+    def _feed_ngrams(texts, uni, docs, grams):
+        """Разложить тексты в униграммы (с частотой) и множества 2–4-грамм.
+
+        ⚠️ Порядки собираются единообразно для ВСЕХ текстов. Раньше подпункты
+        не давали четырёхграмм вовсе, и четырёхсловный термин, живущий только
+        в подпункте, терялся — покрытие занижалось, причём незаметно.
+        """
+        for text in texts:
+            toks = _tokens(text)
             uni.update(toks)
             docs.update(set(toks))
-            for i in range(len(toks) - 1):
-                bi.add(' '.join(toks[i:i + 2]))
-            for i in range(len(toks) - 2):
-                tri.add(' '.join(toks[i:i + 3]))
-            for i in range(len(toks) - 3):
-                quad.add(' '.join(toks[i:i + 4]))
-        for st in Problem.objects.filter(parts__isnull=False).values_list(
-                'parts__statement', flat=True).iterator(chunk_size=5000):
-            toks = _tokens(st)
-            uni.update(toks)
-            docs.update(set(toks))
-            for i in range(len(toks) - 1):
-                bi.add(' '.join(toks[i:i + 2]))
-            for i in range(len(toks) - 2):
-                tri.add(' '.join(toks[i:i + 3]))
-        return uni, docs, {1: None, 2: bi, 3: tri, 4: quad}
+            for n in (2, 3, 4):
+                for i in range(len(toks) - n + 1):
+                    grams[n].add(' '.join(toks[i:i + n]))
+
+    def _corpus_ngrams(self, extra_texts=()):
+        """Индекс n-грамм банка; `extra_texts` добавляет неимпортированные источники."""
+        uni, docs = Counter(), Counter()
+        grams = {1: set(), 2: set(), 3: set(), 4: set()}
+        self._feed_ngrams(self._bank_texts(), uni, docs, grams)
+        if extra_texts:
+            self._feed_ngrams(extra_texts, uni, docs, grams)
+        grams[1] = set(uni)
+        return uni, docs, grams
 
     @staticmethod
     def _term_forms(entry):
@@ -423,28 +445,14 @@ class Command(BaseCommand):
         uni, docs, grams = self._corpus_ngrams()
         entries = econ_terms.terms()
 
-        found, missing_terms = 0, []
-        too_long = 0
+        found = self._coverage(grams, entries)
+        missing_terms, too_long = [], 0
         for entry in entries:
-            hit = False
-            for form in self._term_forms(entry):
-                toks = _tokens(form)
-                if not toks:
-                    continue
-                n = len(toks)
-                if n == 1:
-                    if toks[0] in uni:
-                        hit = True
-                elif n <= 4:
-                    if ' '.join(toks) in grams[n]:
-                        hit = True
-                else:
-                    too_long += 1
-                if hit:
-                    break
-            if hit:
-                found += 1
-            else:
+            forms = [_tokens(f) for f in self._term_forms(entry)]
+            too_long += sum(1 for t in forms if len(t) > 4)
+            if not any(t and len(t) <= 4 and (t[0] in grams[1] if len(t) == 1
+                                              else ' '.join(t) in grams[len(t)])
+                       for t in forms):
                 missing_terms.append(entry.get('canonical'))
 
         # Обратное направление: частые слова корпуса, которых в словаре нет.
@@ -506,6 +514,99 @@ class Command(BaseCommand):
 
     # --- Фаза 3: источники, которых нет в базе ---------------------------- #
 
+    def _external_texts(self):
+        """Условия неимпортированных источников. Читается один раз на прогон."""
+        if getattr(self, '_ext_cache', None) is None:
+            self._ext_cache = {
+                'SolveHub': self._read_solvehub(),
+                'Школково': self._read_shkolkovo(),
+                'ЛЭШ Гамма': self._read_lesh()[0],
+            }
+        return self._ext_cache
+
+    def _full_corpus(self):
+        """Полный корпус = банк + три неимпортированных источника.
+
+        ⚠️ Единица счёта разная по природе: у банка это `Problem`, у SolveHub и
+        Школково — файл-задача, у ЛЭШ — блок `\\z` с условием (решения из
+        «Решалок» сюда не входят, это не задачи). Складывать их в одно число
+        осмысленно только для текстовых показателей — длина, цифры, словарь.
+
+        Показатели, требующие полей `Problem` (ai_blurb, навык, тема, вектор,
+        дубликаты), для 9 612 внешних единиц не существуют вовсе. Пересчитывать
+        их «по полному корпусу» значило бы поделить на больший знаменатель,
+        молча записав отсутствующее поле в нули. Такие числа остаются
+        банковскими, и знаменатель у них назван явно.
+        """
+        ext = self._external_texts()
+        bank = [s or '' for s in
+                Problem.objects.values_list('statement', flat=True).iterator(chunk_size=5000)]
+        parts = {'банк': bank}
+        parts.update(ext)
+
+        combined = bank + [t for texts in ext.values() for t in texts]
+        lengths = [len(t) for t in combined]
+        over = [n for n in lengths if n > STATEMENT_BUDGET]
+        lost = [_lost_fraction(n, STATEMENT_BUDGET) for n in over]
+        digits = sum(1 for t in combined if RE_DIGIT.search(t[:STATEMENT_BUDGET]))
+
+        # Покрытие словаря по объединённому тексту — и прирост от источников.
+        entries = econ_terms.terms()
+        bank_only = self._coverage(self._corpus_ngrams()[2], entries)
+        extra = [t for texts in ext.values() for t in texts]
+        with_ext = self._coverage(self._corpus_ngrams(extra)[2], entries)
+
+        return {
+            'единиц_всего': len(combined),
+            'состав': {k: len(v) for k, v in parts.items()},
+            'комментарий_единицы': (
+                'Банк — Problem; SolveHub и Школково — файл-задача; '
+                'ЛЭШ — блок \\z с условием (48 блоков решений не в счёте).'
+            ),
+            'длина_условия': {
+                'медиана': int(statistics.median(lengths)) if lengths else 0,
+                'среднее': round(statistics.fmean(lengths), 1) if lengths else 0,
+                'максимум': max(lengths) if lengths else 0,
+                'длиннее_500': len(over),
+                'доля_длиннее_500_%': _share(len(over), len(lengths)),
+                'медианная_доля_потерянного_%': (
+                    round(100 * statistics.median(lost), 2) if lost else 0.0),
+            },
+            'цифры_в_первых_500': {
+                'задач': digits, 'доля_%': _share(digits, len(combined))},
+            'покрытие_словаря': {
+                'терминов': len(entries),
+                'только_банк': bank_only,
+                'только_банк_%': _share(bank_only, len(entries)),
+                'банк_и_источники': with_ext,
+                'банк_и_источники_%': _share(with_ext, len(entries)),
+                'прирост_терминов': with_ext - bank_only,
+            },
+            'не_пересчитывается_по_полному_корпусу': [
+                'ai_blurb, навык, каноническая тема, вектор, устаревание, '
+                'набор A, набор D — этих полей у неимпортированных источников '
+                'НЕТ. Числа остаются банковскими (знаменатель 31 699).',
+                'Длина подпунктов — у SolveHub, Школково и ЛЭШ структуры '
+                'подпунктов не существует, дробить нечего.',
+            ],
+        }
+
+    @staticmethod
+    def _coverage(grams, entries):
+        """Сколько терминов словаря встретилось хотя бы одной своей формой."""
+        found = 0
+        for entry in entries:
+            for form in Command._term_forms(entry):
+                toks = _tokens(form)
+                if not toks or len(toks) > 4:
+                    continue
+                hit = (toks[0] in grams[1] if len(toks) == 1
+                       else ' '.join(toks) in grams[len(toks)])
+                if hit:
+                    found += 1
+                    break
+        return found
+
     def _external(self):
         return {
             'SolveHub': self._external_solvehub(),
@@ -548,16 +649,18 @@ class Command(BaseCommand):
             'эмбеддинг': 'N/A — не импортирован',
         }
 
-    def _external_solvehub(self):
+    @staticmethod
+    def _read_solvehub():
         root = os.path.join(os.path.dirname(settings.BASE_DIR),
                             'weconomics-data', 'solvehub', 'problems')
         texts = []
         for path in sorted(glob.glob(os.path.join(root, '*.json'))):
             with open(path, encoding='utf-8') as f:
                 texts.append((json.load(f).get('md') or ''))
-        return self._external_stats(texts, 'SolveHub')
+        return texts
 
-    def _external_shkolkovo(self):
+    @staticmethod
+    def _read_shkolkovo():
         root = os.path.join(os.path.dirname(settings.BASE_DIR),
                             'weconomics-data', 'shkolkovo', 'problems')
         texts = []
@@ -566,15 +669,21 @@ class Command(BaseCommand):
                 raw = json.load(f)
             texts.append(raw.get('statement_tex') or raw.get('statement')
                          or raw.get('question') or '')
-        return self._external_stats(texts, 'Школково')
+        return texts
 
-    def _external_lesh(self):
+    def _external_solvehub(self):
+        return self._external_stats(self._external_texts()['SolveHub'], 'SolveHub')
+
+    def _external_shkolkovo(self):
+        return self._external_stats(self._external_texts()['Школково'], 'Школково')
+
+    @staticmethod
+    def _read_lesh():
         """Блоки \\z разбираются ШТАТНЫМ парсером источника, не своей регуляркой.
 
         Свой разбор дал бы своё число, и расхождение с отчётом
         `corpus_scaleup_lesh` пришлось бы объяснять. Условия лежат в
-        «Подборках», решения — в «Решалках»; для диагностики длины нужны
-        только условия.
+        «Подборках», решения — в «Решалках»; задачами считаются только условия.
         """
         from problems.corpus_converter.lesh import interpret_z_args, parse_z_blocks
         from problems.management.commands.corpus_scaleup_lesh import (
@@ -591,6 +700,10 @@ class Command(BaseCommand):
                     solutions += 1
                 else:
                     conditions.append(parsed.get('statement') or '')
+        return conditions, solutions, files_read
+
+    def _external_lesh(self):
+        conditions, solutions, files_read = self._read_lesh()
         stats = self._external_stats(conditions, 'ЛЭШ Гамма')
         stats['файлов_tex_прочитано'] = files_read
         stats['блоков_решений_в_Решалках'] = solutions

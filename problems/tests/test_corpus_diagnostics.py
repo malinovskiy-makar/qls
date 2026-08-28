@@ -86,3 +86,36 @@ class TokenizerTests(TestCase):
         from problems.management.commands.corpus_diagnostics import _tokens
 
         self.assertIn('спрос', _tokens(r'\text{спрос} = 5'))
+
+
+class CorpusNgramTests(TestCase):
+    """Индекс n-грамм, по которому меряется покрытие словаря терминов."""
+
+    def _grams(self):
+        from problems.management.commands.corpus_diagnostics import Command
+
+        return Command()._corpus_ngrams()[2]
+
+    def test_нграммы_не_склеивают_заголовок_и_условие(self):
+        """Заголовок и условие — разные тексты, между ними границы нет.
+
+        Склейка в одну цепочку токенов рождает биграммы, которых в банке
+        никто не писал («монополия спрос» из заголовка «Монополия» и
+        условия «Спрос линеен»). Термин, случайно совпавший с такой
+        склейкой, засчитывается найденным — покрытие завышается молча.
+        """
+        Problem.objects.create(title='Монополия', statement='Спрос линеен.')
+        self.assertNotIn('монополия спрос', self._grams()[2])
+
+    def test_четырёхграммы_берутся_и_из_подпунктов(self):
+        """Иначе четырёхсловный термин, живущий только в подпункте, теряется.
+
+        У условий четырёхграммы собирались, у подпунктов — нет. Асимметрия
+        занижала покрытие словаря, и незаметно: разница видна только если
+        пересчитать индекс другим кодом.
+        """
+        problem = Problem.objects.create(statement='Условие.')
+        ProblemPart.objects.create(
+            problem=problem, label='а)', order=1,
+            statement='предельная норма технологического замещения')
+        self.assertIn('предельная норма технологического замещения', self._grams()[4])
