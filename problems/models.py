@@ -457,6 +457,67 @@ class ProblemPart(models.Model):
         return f'{self.problem} — пункт ({self.label})'
 
 
+class ProblemFigure(models.Model):
+    """Картинка, СГЕНЕРИРОВАННАЯ этой системой из TikZ/PGFPlots-блока.
+
+    Зачем отдельная таблица, а не тег прямо в тексте задачи.
+    Общий санитайзер показа (`problems/rendering.py`, `nh3` с allow-list)
+    намеренно не пропускает ни `img`, ни `svg`, ни один атрибут — и
+    остаётся таким ([ADR 0031](../docs/adr/0031-tikz-svg-blocked-by-sanitizer.md)).
+    Расширить его значило бы дать ЛЮБОМУ тексту задачи право подставить
+    произвольный `src`: внешние запросы из браузера ученика,
+    трекинг-пиксели. Периметр XSS не расширяется ни на пиксель.
+
+    Поэтому картинка живёт здесь, а в тексте задачи остаётся только
+    маркер `[[FIGURE:<hash>]]` — чистый текст без единого атрибута,
+    который санитайзер спокойно пропускает как обычные символы. На
+    показе маркер заменяется на `<img>` ПОСЛЕ санитайзера, и `src`
+    строится по первичному ключу СТРОКИ ЭТОЙ ТАБЛИЦЫ, никогда — по
+    тому, что написано в тексте задачи.
+
+    Ключевое свойство безопасности: подставить свой `src` через текст
+    задачи невозможно в принципе, потому что из текста берётся только
+    hex-хеш, а адрес картинки собирается из объекта БД.
+    """
+
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE,
+                                related_name='figures', verbose_name='Задача')
+    #: Подпункт, если блок пришёл из него. Нужен для отладки и пересборки,
+    #: на безопасность не влияет: поиск всё равно идёт по задаче.
+    part = models.ForeignKey(ProblemPart, on_delete=models.CASCADE,
+                             null=True, blank=True, related_name='figures',
+                             verbose_name='Подпункт')
+    #: Поле-источник: statement / answer / solution / part.
+    source_field = models.CharField('Поле-источник', max_length=20, blank=True)
+
+    #: SHA-256 исходного TikZ-блока. Он же — тело маркера в тексте.
+    #: Хеш, а не автоинкремент: один и тот же блок не компилируется дважды,
+    #: а изменение исходника даёт другой хеш и, значит, новую картинку.
+    tikz_hash = models.CharField('Хеш TikZ-блока', max_length=64, db_index=True)
+    #: Исходный TikZ — хранится, чтобы картинку можно было пересобрать и
+    #: чтобы человек мог понять, из чего она получилась.
+    tikz_source = models.TextField('Исходный TikZ-блок')
+    #: Уже САНИТИЗИРОВАННЫЙ SVG (script/foreignObject/on*/внешние ссылки
+    #: сняты до записи — см. problems/corpus_converter/tikz_render.py).
+    svg = models.TextField('SVG (санитизированный)')
+
+    created_at = models.DateTimeField('Сгенерирована', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Сгенерированная картинка'
+        verbose_name_plural = 'Сгенерированные картинки'
+        # Один блок на задачу — один раз. Повторная генерация обновляет
+        # существующую строку, а не плодит копии.
+        constraints = [
+            models.UniqueConstraint(fields=['problem', 'tikz_hash'],
+                                    name='uniq_problem_figure_hash'),
+        ]
+
+    def __str__(self):
+        return f'Картинка #{self.pk} задачи #{self.problem_id}'
+
+
+
 class ProblemVersion(models.Model):
     """Снимок истории задачи: сохраняем содержимое целиком, чтобы можно было
     посмотреть, как задача выглядела раньше, и при необходимости откатиться."""
